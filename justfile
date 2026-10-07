@@ -570,3 +570,12 @@ prodqual-b-steering-incumbent:
 prodqual-b-composer-build:
     TMPDIR=$HOME/tmp/prodqual-b CARGO_TARGET_DIR=$HOME/tmp/prodqual-b/target CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 ~/work/zen/scripts/run-heavy --mem 16G --jobs 8 -- cargo test -p zensim --example quality_swap_composites
     TMPDIR=$HOME/tmp/prodqual-b CARGO_TARGET_DIR=$HOME/tmp/prodqual-b/target CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 ~/work/zen/scripts/run-heavy --mem 16G --jobs 8 -- cargo build -p zensim --example quality_swap_composites
+
+prodqual-b-steercodec:
+    ~/work/zen/scripts/run-heavy --mem 16G --jobs 8 -- python3 scripts/prodqual_b_steercodec.py
+
+prodqual-b-incumbent-pixels:
+    ~/work/zen/scripts/run-heavy --mem 16G --jobs 8 -- python3 scripts/prodqual_b_incumbent.py
+
+prodqual-b-report:
+    python3 scripts/prodqual_b_report.py

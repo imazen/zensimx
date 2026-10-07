@@ -1,0 +1,829 @@
+{
+  "schema": "prodqual-b-verdict-v1",
+  "base": "ddf375af",
+  "model_sha256": "f803b74c4252952f337abdc0234c2930839d45dddc32ae9b8b5296d6c840f400",
+  "qualification": "FAIL",
+  "frozen_bytes_and_thresholds_unchanged": true,
+  "protected_payloads_read": false,
+  "human_labels_read": false,
+  "gates": {
+    "G-RANK": {
+      "state": "blocked",
+      "human_panels_evaluated": 0,
+      "reason": "no explicitly admitted independent human Rev5 roots; registered T0 and AIC panels excluded",
+      "additional_rule": "supported aggregate/content and band rule pending"
+    },
+    "G-DIAL": {
+      "state": "PASS",
+      "bars": {
+        "p5_max": 25,
+        "p95_min": 85,
+        "mono_min": 0.93
+      },
+      "standard": {
+        "dynamic_range": 83.30018653183494,
+        "max": 96.62824543453146,
+        "min": -16.90630340576172,
+        "mono": 0.9946734599351552,
+        "n": 4424,
+        "p5": 11.782573936941015,
+        "p95": 95.08276046877596,
+        "reach": 113.53454884029318,
+        "tied": 0.0761926817971283
+      },
+      "ladder": {
+        "dynamic_range": 107.00255854068993,
+        "max": 96.52587800854398,
+        "min": -16.90630340576172,
+        "mono": 0.9896929125491446,
+        "n": 9593,
+        "p5": -13.188074730566301,
+        "p95": 93.81448381012363,
+        "reach": 113.4321814143057,
+        "tied": 0.03644671129529274
+      }
+    },
+    "G-ADDR": {
+      "state": "FAIL",
+      "standard_contract": "FAIL",
+      "standard_checks": [
+        {
+          "bar": null,
+          "id": "A1",
+          "measured": 96.62824543453146,
+          "state": "not_measured",
+          "tier": "report-only"
+        },
+        {
+          "bar": null,
+          "id": "A2",
+          "measured": -16.90630340576172,
+          "state": "not_measured",
+          "tier": "report-only"
+        },
+        {
+          "bar": null,
+          "id": "A3",
+          "measured": 95.08276046877596,
+          "state": "not_measured",
+          "tier": "report-only"
+        },
+        {
+          "bar": null,
+          "id": "A4",
+          "measured": 11.782573936941015,
+          "state": "not_measured",
+          "tier": "report-only"
+        },
+        {
+          "bar": null,
+          "id": "A5",
+          "measured": 113.53454884029318,
+          "state": "not_measured",
+          "tier": "report-only"
+        },
+        {
+          "bar": null,
+          "id": "A6",
+          "measured": 83.30018653183494,
+          "state": "not_measured",
+          "tier": "report-only"
+        },
+        {
+          "bar": null,
+          "id": "A7r",
+          "measured": null,
+          "state": "not_measured",
+          "tier": "regression"
+        },
+        {
+          "bar": null,
+          "id": "A8r",
+          "measured": -16.90630340576172,
+          "state": "not_measured",
+          "tier": "report-only"
+        },
+        {
+          "bar": 0.93,
+          "id": "C1",
+          "measured": 0.9946734599351552,
+          "state": "pass",
+          "tier": "contract"
+        },
+        {
+          "bar": 0.05,
+          "id": "C2",
+          "measured": 0.0761926817971283,
+          "state": "fail",
+          "tier": "contract"
+        },
+        {
+          "bar": 0.0,
+          "id": "C3",
+          "measured": 0.605,
+          "state": "pass",
+          "tier": "contract"
+        },
+        {
+          "bar": 0.0,
+          "id": "C4",
+          "measured": -16.90630340576172,
+          "state": "pass",
+          "tier": "contract"
+        },
+        {
+          "bar": 0.0,
+          "id": "C5",
+          "measured": 38.0,
+          "state": "fail",
+          "tier": "contract"
+        },
+        {
+          "bar": 0.0,
+          "id": "C6",
+          "measured": 0.0,
+          "state": "pass",
+          "tier": "contract"
+        }
+      ],
+      "ladder_contract": "FAIL",
+      "ladder_checks": [
+        {
+          "bar": null,
+          "id": "A1",
+          "measured": 96.52587800854398,
+          "state": "not_measured",
+          "tier": "report-only"
+        },
+        {
+          "bar": null,
+          "id": "A2",
+          "measured": -16.90630340576172,
+          "state": "not_measured",
+          "tier": "report-only"
+        },
+        {
+          "bar": null,
+          "id": "A3",
+          "measured": 93.81448381012363,
+          "state": "not_measured",
+          "tier": "report-only"
+        },
+        {
+          "bar": null,
+          "id": "A4",
+          "measured": -13.188074730566301,
+          "state": "not_measured",
+          "tier": "report-only"
+        },
+        {
+          "bar": null,
+          "id": "A5",
+          "measured": 113.4321814143057,
+          "state": "not_measured",
+          "tier": "report-only"
+        },
+        {
+          "bar": null,
+          "id": "A6",
+          "measured": 107.00255854068993,
+          "state": "not_measured",
+          "tier": "report-only"
+        },
+        {
+          "bar": null,
+          "id": "A7r",
+          "measured": null,
+          "state": "not_measured",
+          "tier": "regression"
+        },
+        {
+          "bar": null,
+          "id": "A8r",
+          "measured": -16.90630340576172,
+          "state": "not_measured",
+          "tier": "report-only"
+        },
+        {
+          "bar": 0.93,
+          "id": "C1",
+          "measured": 0.9896929125491446,
+          "state": "pass",
+          "tier": "contract"
+        },
+        {
+          "bar": 0.05,
+          "id": "C2",
+          "measured": 0.03644671129529274,
+          "state": "pass",
+          "tier": "contract"
+        },
+        {
+          "bar": 0.0,
+          "id": "C3",
+          "measured": 0.605,
+          "state": "pass",
+          "tier": "contract"
+        },
+        {
+          "bar": 0.0,
+          "id": "C4",
+          "measured": -16.90630340576172,
+          "state": "pass",
+          "tier": "contract"
+        },
+        {
+          "bar": 0.0,
+          "id": "C5",
+          "measured": 38.0,
+          "state": "fail",
+          "tier": "contract"
+        },
+        {
+          "bar": 0.0,
+          "id": "C6",
+          "measured": 0.0,
+          "state": "pass",
+          "tier": "contract"
+        }
+      ],
+      "codec_floors": {
+        "state": "blocked",
+        "qualified": 0,
+        "required": 5,
+        "names": [
+          "avif-rav1e",
+          "avif-svt",
+          "jpeg",
+          "jxl",
+          "webp"
+        ],
+        "reason": "new-grid registry/incumbent receipts and per-cell mentor truth missing; resolvable unchanged"
+      }
+    },
+    "negative_tail": {
+      "state": "PASS",
+      "frac_below_zero": 0.605,
+      "min": -16.90630340576172,
+      "n": 2000,
+      "p1": -16.90630340576172,
+      "p5": -16.90630340576172,
+      "truth_min": null,
+      "truth_p1": null
+    },
+    "native_pixel_identity": {
+      "state": "PASS",
+      "seed0": {
+        "n": 38,
+        "min": 100.0,
+        "max": 100.0,
+        "exact100": 38
+      },
+      "B": {
+        "n": 38,
+        "min": 100.0,
+        "max": 100.0,
+        "exact100": 38
+      }
+    },
+    "G-STEER": {
+      "state": "FAIL",
+      "groups": {
+        "broad": {
+          "n": 96,
+          "pass": 94,
+          "min_m2": 0.9440559440559375,
+          "min_m3f": 0.7972027972027916
+        },
+        "owner": {
+          "n": 4,
+          "pass": 4,
+          "min_m2": 0.9996409847107858,
+          "min_m3f": 0.9575874511653174
+        },
+        "jpeg8": {
+          "n": 8,
+          "pass": 4,
+          "min_m2": 0.0,
+          "min_m3f": 0.0
+        },
+        "m3": {
+          "n": 27,
+          "pass": 26,
+          "min_m2": 0.9872252747252745,
+          "min_m3f": 0.8862637362637361
+        }
+      },
+      "failures": [
+        {
+          "instrument": "broad",
+          "row": 70,
+          "case": "broad-206-b32",
+          "rc": 0,
+          "status": "FAIL",
+          "m2": 0.969793621013133,
+          "m3f": 0.972045028142589,
+          "report": "/mnt/v/output/zensim/prodqual-b-2026-10-07/steering/broad-70.json",
+          "sha256": "240b884530f0ceb8c184d01224f4743a5c012f16e36415f538c7af5c4a7dd852"
+        },
+        {
+          "instrument": "broad",
+          "row": 71,
+          "case": "broad-206-b64",
+          "rc": 0,
+          "status": "FAIL",
+          "m2": 0.9440559440559375,
+          "m3f": 0.7972027972027916,
+          "report": "/mnt/v/output/zensim/prodqual-b-2026-10-07/steering/broad-71.json",
+          "sha256": "dc5bd3e5e298dbd4e7e875d93b9c7464e50c2369be6e34be9256a537f6b67c1e"
+        },
+        {
+          "instrument": "jpeg8",
+          "row": 1,
+          "case": "I01_10_05",
+          "rc": 0,
+          "status": "FAIL",
+          "m2": 0.0,
+          "m3f": 0.0,
+          "report": "/mnt/v/output/zensim/prodqual-b-2026-10-07/steering/jpeg8-1.json",
+          "sha256": "cb6bce668d4adafa3ec7c43381f81ade8f50d5c06fbd0f76b795b13574b92724"
+        },
+        {
+          "instrument": "jpeg8",
+          "row": 3,
+          "case": "I21_10_05",
+          "rc": 0,
+          "status": "FAIL",
+          "m2": 0.0,
+          "m3f": 0.0,
+          "report": "/mnt/v/output/zensim/prodqual-b-2026-10-07/steering/jpeg8-3.json",
+          "sha256": "ed09647d6dd64f0a510f789f03815f51dc0b4bd69fe51fb917a40487e999aee1"
+        },
+        {
+          "instrument": "jpeg8",
+          "row": 5,
+          "case": "I41_10_05",
+          "rc": 0,
+          "status": "FAIL",
+          "m2": 0.0,
+          "m3f": 0.0,
+          "report": "/mnt/v/output/zensim/prodqual-b-2026-10-07/steering/jpeg8-5.json",
+          "sha256": "f876dbb363423b51b68efad7173a1d6af8928fe7108d5cf7459c1c3bde34b858"
+        },
+        {
+          "instrument": "jpeg8",
+          "row": 7,
+          "case": "I61_10_05",
+          "rc": 0,
+          "status": "FAIL",
+          "m2": 0.0,
+          "m3f": 0.0,
+          "report": "/mnt/v/output/zensim/prodqual-b-2026-10-07/steering/jpeg8-7.json",
+          "sha256": "2e2b49250786dc922b746c2a0fd2f31a379cc039034f197c262e8386ca2136d4"
+        },
+        {
+          "instrument": "m3",
+          "row": 15,
+          "case": "dog-256-20",
+          "rc": 0,
+          "status": "FAIL",
+          "m2": 0.9872252747252745,
+          "m3f": 0.9679945054945054,
+          "report": "/mnt/v/output/zensim/prodqual-b-2026-10-07/steering/m3-15.json",
+          "sha256": "ee9d64caf83b3488fc725a43b565ee0b235076094d7867cf73636579572cf5b3"
+        }
+      ],
+      "B_comparison": {
+        "state": "blocked",
+        "prepare_refusals": 135,
+        "reason": "masked/IW IDs f228-f371 unsupported by spatial refinement"
+      }
+    },
+    "STEERCODEC": {
+      "state": "rule pending",
+      "swaps": 48,
+      "composites": 192,
+      "pairs": 264,
+      "min_m2": 0.9981220267192064,
+      "min_m3f": 0.4845911970258819,
+      "summary": [
+        {
+          "codec": "zenjpeg",
+          "swap": "q30to60",
+          "bake": "seed0",
+          "neighbour_exact": 0,
+          "n": 8,
+          "m3f_median": 0.7725576960431393,
+          "m3f_min": 0.655731239408658,
+          "m2_min": 0.9990276777309336,
+          "zensim_map_share": 0.571787865809992,
+          "zensim_oracle_share": 0.5851787524199843,
+          "zensim_random_share": 0.2272209706297353,
+          "zensim_anti_share": 0.025858824299326216,
+          "ssim2_map_share": 0.44484387710770334,
+          "ssim2_oracle_share": 0.41839791919657954,
+          "ssim2_random_share": 0.19113860930705256,
+          "ssim2_anti_share": 0.09336022209862056,
+          "butteraugli_map_share": 0.3436877126596991,
+          "butteraugli_oracle_share": 0.3781356723065342,
+          "butteraugli_random_share": 0.19372643101651227,
+          "butteraugli_anti_share": 0.08859864764773431
+        },
+        {
+          "codec": "zenjpeg",
+          "swap": "q60to85",
+          "bake": "seed0",
+          "neighbour_exact": 0,
+          "n": 8,
+          "m3f_median": 0.7383543557525478,
+          "m3f_min": 0.6316759590653515,
+          "m2_min": 0.9986343580880038,
+          "zensim_map_share": 0.5724619455734503,
+          "zensim_oracle_share": 0.5530262250638499,
+          "zensim_random_share": 0.20436167966123425,
+          "zensim_anti_share": 0.020091707792674728,
+          "ssim2_map_share": 0.3827243284137317,
+          "ssim2_oracle_share": 0.33336885390673565,
+          "ssim2_random_share": 0.1540704113999249,
+          "ssim2_anti_share": 0.06735531492353608,
+          "butteraugli_map_share": 0.31838918692319396,
+          "butteraugli_oracle_share": 0.27453327552699297,
+          "butteraugli_random_share": 0.15740157230130025,
+          "butteraugli_anti_share": 0.07550741240303026
+        },
+        {
+          "codec": "zenjxl",
+          "swap": "q30to60",
+          "bake": "seed0",
+          "neighbour_exact": 0,
+          "n": 8,
+          "m3f_median": 0.7433381627691338,
+          "m3f_min": 0.4845911970258819,
+          "m2_min": 0.9992445104031259,
+          "zensim_map_share": 0.7405709260666571,
+          "zensim_oracle_share": 0.7300178152335735,
+          "zensim_random_share": 0.2174331102882333,
+          "zensim_anti_share": -0.03861765359799308,
+          "ssim2_map_share": 0.6471523201063283,
+          "ssim2_oracle_share": 0.5816879348974999,
+          "ssim2_random_share": 0.2082942458100775,
+          "ssim2_anti_share": 0.035879127159059526,
+          "butteraugli_map_share": 0.714613473221707,
+          "butteraugli_oracle_share": 0.6698433418497237,
+          "butteraugli_random_share": 0.19137096098602963,
+          "butteraugli_anti_share": 0.025877295136576446
+        },
+        {
+          "codec": "zenjxl",
+          "swap": "q60to85",
+          "bake": "seed0",
+          "neighbour_exact": 0,
+          "n": 8,
+          "m3f_median": 0.8311571951444026,
+          "m3f_min": 0.6159315325955598,
+          "m2_min": 0.9996091729427121,
+          "zensim_map_share": 0.6212100066208406,
+          "zensim_oracle_share": 0.6450793412945406,
+          "zensim_random_share": 0.19734901107760106,
+          "zensim_anti_share": -0.010723880688516756,
+          "ssim2_map_share": 0.5714562060715019,
+          "ssim2_oracle_share": 0.5557863964402814,
+          "ssim2_random_share": 0.178481798751501,
+          "ssim2_anti_share": 0.034030740209479195,
+          "butteraugli_map_share": 0.47361534658850096,
+          "butteraugli_oracle_share": 0.44946069681235,
+          "butteraugli_random_share": 0.15618037464597267,
+          "butteraugli_anti_share": 0.03222254751419978
+        },
+        {
+          "codec": "zqi",
+          "swap": "q30to60",
+          "bake": "seed0",
+          "neighbour_exact": 0,
+          "n": 8,
+          "m3f_median": 0.8276729228636176,
+          "m3f_min": 0.7464535945676716,
+          "m2_min": 0.9994834901863667,
+          "zensim_map_share": 0.5169746513519344,
+          "zensim_oracle_share": 0.5267104351734208,
+          "zensim_random_share": 0.19950925444733733,
+          "zensim_anti_share": 0.024528018275778996,
+          "ssim2_map_share": 0.3927080641310925,
+          "ssim2_oracle_share": 0.3815879225166664,
+          "ssim2_random_share": 0.1777313134416496,
+          "ssim2_anti_share": 0.07406316049760983,
+          "butteraugli_map_share": 0.3276988226401375,
+          "butteraugli_oracle_share": 0.30093855071984277,
+          "butteraugli_random_share": 0.17164424344018747,
+          "butteraugli_anti_share": 0.0734350520156021
+        },
+        {
+          "codec": "zqi",
+          "swap": "q60to85",
+          "bake": "seed0",
+          "neighbour_exact": 0,
+          "n": 8,
+          "m3f_median": 0.8798636131672777,
+          "m3f_min": 0.7943768577844977,
+          "m2_min": 0.9981220267192064,
+          "zensim_map_share": 0.45525604199957215,
+          "zensim_oracle_share": 0.468045147053198,
+          "zensim_random_share": 0.18858519451490405,
+          "zensim_anti_share": 0.007976731123053365,
+          "ssim2_map_share": 0.3443829804052023,
+          "ssim2_oracle_share": 0.35110653593336993,
+          "ssim2_random_share": 0.15784701296849435,
+          "ssim2_anti_share": 0.07148466844788498,
+          "butteraugli_map_share": 0.2739758634028015,
+          "butteraugli_oracle_share": 0.2777600193377999,
+          "butteraugli_random_share": 0.149153387967341,
+          "butteraugli_anti_share": 0.05746738971656461
+        }
+      ],
+      "B_judges_seed0_composites": [
+        {
+          "codec": "zenjpeg",
+          "swap": "q30to60",
+          "bake": "seed0",
+          "neighbour_exact": 0,
+          "n": 8,
+          "m3f_median": 0.7725576960431393,
+          "m3f_min": 0.655731239408658,
+          "m2_min": 0.9990276777309336,
+          "zensim_map_share": 0.45451048494456475,
+          "zensim_oracle_share": 0.4209398531445203,
+          "zensim_random_share": 0.16338605123182293,
+          "zensim_anti_share": 0.09028433861385944
+        },
+        {
+          "codec": "zenjpeg",
+          "swap": "q60to85",
+          "bake": "seed0",
+          "neighbour_exact": 0,
+          "n": 8,
+          "m3f_median": 0.7383543557525478,
+          "m3f_min": 0.6316759590653515,
+          "m2_min": 0.9986343580880038,
+          "zensim_map_share": 0.42045122242298405,
+          "zensim_oracle_share": 0.3590664226567519,
+          "zensim_random_share": 0.1492622688245427,
+          "zensim_anti_share": 0.041134195562283246
+        },
+        {
+          "codec": "zenjxl",
+          "swap": "q30to60",
+          "bake": "seed0",
+          "neighbour_exact": 0,
+          "n": 8,
+          "m3f_median": 0.7433381627691338,
+          "m3f_min": 0.4845911970258819,
+          "m2_min": 0.9992445104031259,
+          "zensim_map_share": 0.7227281967610685,
+          "zensim_oracle_share": 0.7108565824559613,
+          "zensim_random_share": 0.2320317664047043,
+          "zensim_anti_share": 0.05731457858024414
+        },
+        {
+          "codec": "zenjxl",
+          "swap": "q60to85",
+          "bake": "seed0",
+          "neighbour_exact": 0,
+          "n": 8,
+          "m3f_median": 0.8311571951444026,
+          "m3f_min": 0.6159315325955598,
+          "m2_min": 0.9996091729427121,
+          "zensim_map_share": 0.6571588347861348,
+          "zensim_oracle_share": 0.6166510070864379,
+          "zensim_random_share": 0.19976092893809427,
+          "zensim_anti_share": 0.03551954829832124
+        },
+        {
+          "codec": "zqi",
+          "swap": "q30to60",
+          "bake": "seed0",
+          "neighbour_exact": 0,
+          "n": 8,
+          "m3f_median": 0.8276729228636176,
+          "m3f_min": 0.7464535945676716,
+          "m2_min": 0.9994834901863667,
+          "zensim_map_share": 0.4218726977165925,
+          "zensim_oracle_share": 0.38452352634762654,
+          "zensim_random_share": 0.17702117264515804,
+          "zensim_anti_share": 0.0641136475820274
+        },
+        {
+          "codec": "zqi",
+          "swap": "q60to85",
+          "bake": "seed0",
+          "neighbour_exact": 0,
+          "n": 8,
+          "m3f_median": 0.8798636131672777,
+          "m3f_min": 0.7943768577844977,
+          "m2_min": 0.9981220267192064,
+          "zensim_map_share": 0.3274998144797717,
+          "zensim_oracle_share": 0.32604737602541944,
+          "zensim_random_share": 0.11616676365749111,
+          "zensim_anti_share": 0.04191751975355566
+        }
+      ],
+      "B_meaning": "scores same seed0-selected pixels; not a B-map baseline"
+    },
+    "CHROMAQ": {
+      "state": "rule pending",
+      "cells": 1760,
+      "images": 32,
+      "per_image_chroma_srocc": {
+        "seed0~cvvdp": [
+          0.9321123371653626,
+          0.8771793124834448
+        ],
+        "seed0~butter_p3": [
+          0.9300976611125317,
+          0.866301481030635
+        ],
+        "seed0~butter_max": [
+          0.912997347137788,
+          0.8334349980837462
+        ],
+        "seed0~vmaf": [
+          0.7006203512004456,
+          -0.05384693981812609
+        ],
+        "seed0~ssim2": [
+          0.9378796362196157,
+          0.7174135461428279
+        ],
+        "zensim_B~cvvdp": [
+          0.8035001320134303,
+          0.4133469179826795
+        ],
+        "zensim_B~butter_p3": [
+          0.800770659896585,
+          0.37809475292919
+        ],
+        "zensim_B~butter_max": [
+          0.7935328586229069,
+          0.4616403464085582
+        ],
+        "zensim_B~vmaf": [
+          0.7498175091893678,
+          0.23006695069993915
+        ],
+        "zensim_B~ssim2": [
+          0.872134167235994,
+          0.5345899133978603
+        ],
+        "cvvdp~butter_p3": [
+          0.971369554002051,
+          0.930427665234295
+        ],
+        "cvvdp~butter_max": [
+          0.9560244593388386,
+          0.9032031448974631
+        ],
+        "cvvdp~vmaf": [
+          0.6439899026002124,
+          -0.2083375906815163
+        ],
+        "cvvdp~ssim2": [
+          0.9236975344067643,
+          0.7751176590955596
+        ],
+        "butter_p3~butter_max": [
+          0.9764379838940421,
+          0.9395325639902737
+        ],
+        "butter_p3~vmaf": [
+          0.6371106961688089,
+          -0.20057218759579035
+        ],
+        "butter_p3~ssim2": [
+          0.9018979294263542,
+          0.6570493145078781
+        ],
+        "butter_max~vmaf": [
+          0.6194871697158446,
+          -0.20547665270256463
+        ],
+        "butter_max~ssim2": [
+          0.8793932228576428,
+          0.6480953829169889
+        ],
+        "vmaf~ssim2": [
+          0.724505801858512,
+          0.21119852866046795
+        ],
+        "seed0~consensus3": [
+          0.9338033007227763,
+          0.8134531461301437
+        ],
+        "seed0~consensus_colour": [
+          0.9352313983708812,
+          0.89271913924381
+        ],
+        "zensim_B~consensus3": [
+          0.8394440352619988,
+          0.48787446758264175
+        ],
+        "zensim_B~consensus_colour": [
+          0.8059938417850033,
+          0.3867153867764267
+        ],
+        "ssim2~consensus3": [
+          0.9330851322383639,
+          0.741290224533777
+        ],
+        "ssim2~consensus_colour": [
+          0.9175539341677328,
+          0.7438614497192999
+        ],
+        "psnr_y~consensus3": [
+          0.9022649878937157,
+          0.5128101225308485
+        ],
+        "psnr_y~consensus_colour": [
+          0.9039915567466585,
+          0.4636696140076728
+        ]
+      },
+      "seed0_monotonicity": {
+        "cb_only": {
+          "mean_tau": -0.6602268797920973,
+          "ladders": 32,
+          "upticks": 22
+        },
+        "chroma": {
+          "mean_tau": -0.7043343723690151,
+          "ladders": 32,
+          "upticks": 46
+        },
+        "chroma_hf": {
+          "mean_tau": -0.5309033338044323,
+          "ladders": 32,
+          "upticks": 23
+        },
+        "chroma_lf": {
+          "mean_tau": -0.7246719249550007,
+          "ladders": 32,
+          "upticks": 44
+        },
+        "cr_only": {
+          "mean_tau": -0.760676543047467,
+          "ladders": 32,
+          "upticks": 20
+        },
+        "luma": {
+          "mean_tau": -0.9917156500760583,
+          "ladders": 32,
+          "upticks": 0
+        },
+        "mix_y1": {
+          "mean_tau": -0.8020833333333334,
+          "ladders": 32,
+          "upticks": 15
+        },
+        "s420": {
+          "mean_tau": -0.9171463530640784,
+          "ladders": 32,
+          "upticks": 13
+        }
+      }
+    },
+    "G-RD": {
+      "state": "blocked",
+      "native_codecs_qualified": 0,
+      "required": 4,
+      "reason": "registered frozen-model native intervention packet missing; guard adapter/tests ready"
+    },
+    "G-TARGET": {
+      "state": "blocked",
+      "requests_qualified": 0,
+      "reason": "matching production composition/configuration/TRAIN calibration/bounds and witnesses missing"
+    },
+    "ZCTH_v4_compatibility": {
+      "state": "PASS",
+      "head_sha256": "568380f1bd2fe6202ebcc5a194078d7885035f466abe93ada3a4b3ea8f4a26f2",
+      "meaning": "attachment accepted only; companion not attached to primary evaluation"
+    },
+    "integrity": {
+      "state": "blocked",
+      "additional_rule": "reviewed class/source strata pending",
+      "numerical_corruption_populations": 0
+    },
+    "HDR": {
+      "state": "blocked",
+      "meaning": "no independent human HDR accuracy qualification"
+    },
+    "speed": {
+      "state": "blocked",
+      "research_parity_checks": 384,
+      "paired_segments": 0,
+      "required_segments": 192,
+      "RSS_cells": 0,
+      "required_RSS_cells": 112,
+      "reason": "available SPEEDQ weights differ from frozen seed0"
+    }
+  },
+  "evidence_root": "/mnt/v/output/zensim/prodqual-b-2026-10-07",
+  "tower_root": "/mnt/tower/output/zensim/prodqual-b-2026-10-07"
+}
