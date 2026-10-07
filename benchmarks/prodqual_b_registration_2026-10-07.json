@@ -1,0 +1,167 @@
+{
+  "schema": "prodqual-b-preread-v1",
+  "utc": "2026-10-07T23:39:38.128507+00:00",
+  "base": "ddf375af",
+  "composition": {
+    "schema": "production-composition-freeze-v1",
+    "frozen_utc": "2026-10-07T21:50Z",
+    "owner_decision": "\"seed 0.\" (owner, 2026-10-07, in reply to the composition question; recorded verbatim in docs/DATA_SPLITS.md)",
+    "composition": "single model: D1 production seed 0 (no ensemble)",
+    "jobset": "fitv2d1-20261007",
+    "cell": "full_s0",
+    "spec": "sel:59f0bbc2f290@h32:H128:cv16:cf98",
+    "head": "N",
+    "formula_revision": 5,
+    "packed_model": "refit/production-f16.bin",
+    "packed_model_sha256": "f803b74c4252952f337abdc0234c2930839d45dddc32ae9b8b5296d6c840f400",
+    "dense_model_sha256": "e6995b1073de6022c31e012a104a50a1710488d4e520ee7fd016c649d924c4c4",
+    "selected_bake_sha256": "0f62469cefb743f5fe58586e3f853f4e74543dba7d2e85699ac496ad3b82d52b",
+    "train_calibration_table_sha256": "5726053da43c9bc0bf33a26ad99c3b9fdde64de42425e685cc84527c606d5999",
+    "result_json_sha256": "156c816cc514dd60876824c7098ba641fc6d4e3e6c4548e3041237e180ce6422",
+    "tower_copy": "/mnt/tower/output/zensim-production-d1-2026-10-07/cells/sel:59f0bbc2f290@h32:H128:cv16:cf98__N/full_s0/",
+    "serving_note": "Rev5 bakes are served with ZENSIM_FORMULA_REV=5 (rev5 spec: no cross-revision mixing in one process).",
+    "frozen_before": "any release gate that reads evaluation data; label-free gates (PRODQUAL-A) had run on all three seeds",
+    "seeds_not_shipped": {
+      "s1": "1bf8f3af\u2026 (label-free identity band fail)",
+      "s2": "54118c54\u2026 (label-free identity band fail)"
+    }
+  },
+  "inputs": [
+    {
+      "name": "standard",
+      "path": "/var/tmp/shippath7/verified/instruments/standard.parquet",
+      "sha256": "f5f9191bac723d5bb1e3dd7b4ee08dc7fd88ce867acdb6984a6341954d544d4a",
+      "rows": 4424,
+      "declaration": "/var/tmp/shippath7/verified/instruments/standard.parquet.manifest.json",
+      "declaration_sha256": "01f62a26b089f877c2e3ee967fcff01ab58995ba14e10deb75c601bd9df4634e",
+      "keys_sha256": "863fcc48111295ebef4f1ee8734cd565a01838e0b45da1b549ebe6a6792c3131",
+      "role": "registered label-free engineering instrument, already exposed",
+      "features": "basic+v2@w720/rev5_localwin#62adfc93"
+    },
+    {
+      "name": "ladder",
+      "path": "/var/tmp/shippath7/verified/instruments/ladder.parquet",
+      "sha256": "f67e478ca7f54b7f096ed4ecc27b76c3d6f4555a529897864b920634b2fab8ce",
+      "rows": 9593,
+      "declaration": "/var/tmp/shippath7/verified/instruments/ladder.parquet.manifest.json",
+      "declaration_sha256": "d1d1750f4d439790e195fe9881f943224dbbb6a0316f0405d04740a42bb13217",
+      "keys_sha256": "378c3cb29dcb8105a40c04aaac2d38a1a101b152bd1a31cc73ddd69a72e9b387",
+      "role": "registered label-free engineering instrument, already exposed",
+      "features": "basic+v2@w720/rev5_localwin#62adfc93"
+    },
+    {
+      "name": "negtail",
+      "path": "/var/tmp/shippath7/verified/instruments/negtail.parquet",
+      "sha256": "3a94421f335fddb0ffa9f0b7eb9c361ac03764acef679f380de8c994a2a59f9f",
+      "rows": 2000,
+      "declaration": "/var/tmp/shippath7/verified/instruments/negtail.parquet.manifest.json",
+      "declaration_sha256": "fa1ce646b6f6f943fe73c0ec591a8fe86d1638718c04b6eb8528324f0e32c09f",
+      "keys_sha256": "df00e3cb8798028b206c66b5a9f20456c69f2ef9190b4dada8ac369071847ee9",
+      "role": "registered label-free engineering instrument, already exposed",
+      "features": "basic+v2@w720/rev5_localwin#62adfc93"
+    },
+    {
+      "name": "identity",
+      "path": "/var/tmp/shippath7/verified/instruments/identity.parquet",
+      "sha256": "1713941688ba6260a48e5a3d0f0a17422be1a1d9ae5766cfb0be2c2b9f8de629",
+      "rows": 38,
+      "declaration": "/var/tmp/shippath7/verified/instruments/identity.parquet.manifest.json",
+      "declaration_sha256": "75e78ddfa4c87e383a7024b3c35b943e70b683b4b9aaa961ca51a96c85aea46a",
+      "keys_sha256": "4c71ab9c7e4279f837017381dfe14160140163e4b6a31fd73009af4e564de836",
+      "role": "registered label-free engineering instrument, already exposed",
+      "features": "basic+v2@w720/rev5_localwin#62adfc93"
+    },
+    {
+      "name": "broad",
+      "path": "/var/tmp/shippath7/verified/instruments/broad.parquet",
+      "sha256": "edc40da4cc4cfcf07704e5dd92ff0d92f43c49ff1d33d97f84f0ced793770562",
+      "rows": 96,
+      "declaration": "/var/tmp/shippath7/verified/instruments/broad.parquet.manifest.json",
+      "declaration_sha256": "dc51f48fd13865e4d02ce8f18699769fb06c7d6ef69680dce5d914602dd87308",
+      "keys_sha256": "b6e568ba487a8667fb3eda60b5712fa6c3e0778dfd48bb53f481e6f6b71dc7d4",
+      "role": "registered label-free engineering instrument, already exposed",
+      "features": "basic+v2@w720/rev5_localwin#62adfc93"
+    },
+    {
+      "name": "owner",
+      "path": "/var/tmp/shippath7/verified/instruments/owner.parquet",
+      "sha256": "954ee6e719be918765830f266ed66126151ee08e3f5e8fc0f11ee5473ef82afc",
+      "rows": 4,
+      "declaration": "/var/tmp/shippath7/verified/instruments/owner.parquet.manifest.json",
+      "declaration_sha256": "19eedac19f2dc61c63d7e6f739a01540f78e7e35361ce8bab85d1a21488f2386",
+      "keys_sha256": "7204cc0ccec03b2a221e05fd9c3b023e3ed796182a2811a3232440951ef9d525",
+      "role": "registered label-free engineering instrument, already exposed",
+      "features": "basic+v2@w720/rev5_localwin#62adfc93"
+    },
+    {
+      "name": "jpeg8",
+      "path": "/var/tmp/shippath7/verified/instruments/jpeg8.parquet",
+      "sha256": "1b3c5f021cde04d517912346ed84310730675b91a57d933a8e4c319e7894be4f",
+      "rows": 8,
+      "declaration": "/var/tmp/shippath7/verified/instruments/jpeg8.parquet.manifest.json",
+      "declaration_sha256": "d09842273ca35eb0887a548dec86859d1dd9b8e63898a0af760b8d941fbf1008",
+      "keys_sha256": "66900bb3e5a9f95f6768630fc884761c8f241e89e974a625008e15ad65f084b5",
+      "role": "registered label-free engineering instrument, already exposed",
+      "features": "basic+v2@w720/rev5_localwin#62adfc93"
+    },
+    {
+      "name": "m3",
+      "path": "/var/tmp/shippath7/verified/instruments/m3.parquet",
+      "sha256": "40b2803577a7a29bcc741767049a0f6c6b9a1efcc98f8d5515045fc1e4782b1e",
+      "rows": 27,
+      "declaration": "/var/tmp/shippath7/verified/instruments/m3.parquet.manifest.json",
+      "declaration_sha256": "2851cac4ea27bc1567a47edf28e35a5a2ef8826ec692236fa868e497980bfc99",
+      "keys_sha256": "60a326893428bcb4266293c6f73b9e80ad20c06b2d8bd6b3f513ab5cf25b71d1",
+      "role": "registered label-free engineering instrument, already exposed",
+      "features": "basic+v2@w720/rev5_localwin#62adfc93"
+    }
+  ],
+  "protected_reads": "forbidden; no discovery, hashing or payload reads of T0, terminal, sealed or AIC-family",
+  "human_rank": "blocked: registered CID22-49/NITS/LIVE/MCIQA/CSIQ/AIC pools are T0; D1 human design rows are not independent qualification. No human labels opened.",
+  "thresholds": {
+    "G-DIAL": {
+      "p5_max": 25,
+      "p95_min": 85,
+      "mono_min": 0.93
+    },
+    "G-ADDR": {
+      "contract": "canonical owner C1-C6 unchanged",
+      "codec_floors": [
+        "avif-rav1e",
+        "avif-svt",
+        "jpeg",
+        "jxl",
+        "webp"
+      ],
+      "floor_rule": "canonical registry; no new grid receipt guessed"
+    },
+    "identity": {
+      "feature_min": 97.5,
+      "feature_max": 100,
+      "pixel_exact": 100,
+      "n": 38
+    },
+    "G-STEER": {
+      "m2_min": 0.99,
+      "m3f_min": 0.7,
+      "broad_cases": 96,
+      "owner_seed0_cases": 4,
+      "jpeg8_cases": 8,
+      "m3_cases": 27
+    }
+  },
+  "rules_pending": [
+    "G-RANK supported content/aggregate and band rule",
+    "CHROMAQ/STEERCODEC additional bars",
+    "integrity reviewed class/source strata"
+  ],
+  "blocked_until_bound": [
+    "new Rev5 floor registry and mentor truth",
+    "G-TARGET production composition and TRAIN calibration/bounds binding",
+    "complete native codec interventions packet",
+    "independent human HDR study"
+  ],
+  "model_changes": "forbidden",
+  "evaluation_owner": "bake_verdict, diffmap_block_coherence; programs pinned before invocation",
+  "no_companion": "owner froze seed0 alone; separately inspect v4 head compatibility, never silently attach it"
+}
