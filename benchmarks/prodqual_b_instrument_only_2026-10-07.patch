@@ -1,0 +1,13 @@
+--- a/zensim-validate/src/bin/bake_verdict.rs
++++ b/zensim-validate/src/bin/bake_verdict.rs
+@@ -684,6 +684,10 @@
+ ];
+ 
+ fn parse_corpora_arg(arg: &str) -> Result<Vec<&'static Corpus>, String> {
++    // Explicit instrument-only qualification: no human corpus is opened.
++    if arg == "none" {
++        return Ok(Vec::new());
++    }
+     let mut out: Vec<&'static Corpus> = Vec::new();
+     for name in arg.split(',') {
+         let key = name.trim().to_lowercase();

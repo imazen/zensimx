@@ -547,3 +547,7 @@ speedq-rss *options:
 # Freeze the executable named by the successful Cargo JSON build receipt.
 speedq-freeze build_log dest:
     python3 scripts/demos/speedq_run.py freeze --build-log "{{build_log}}" --dest "{{dest}}"
+
+# PRODQUAL-B canonical gate owners; explicit instrument-only overlay is archived.
+prodqual-b-build:
+    ~/work/zen/scripts/run-heavy --mem 16G --jobs 8 -- python3 scripts/prodqual_b_build.py
