@@ -551,3 +551,22 @@ speedq-freeze build_log dest:
 # PRODQUAL-B canonical gate owners; explicit instrument-only overlay is archived.
 prodqual-b-build:
     ~/work/zen/scripts/run-heavy --mem 16G --jobs 8 -- python3 scripts/prodqual_b_build.py
+
+prodqual-b-dial:
+    ~/work/zen/scripts/run-heavy --mem 16G --jobs 8 -- python3 scripts/prodqual_b_run.py dial
+
+prodqual-b-steering:
+    ~/work/zen/scripts/run-heavy --mem 16G --jobs 8 -- python3 scripts/prodqual_b_run.py steering
+
+prodqual-b-identity:
+    ~/work/zen/scripts/run-heavy --mem 16G --jobs 8 -- python3 scripts/prodqual_b_pixels.py identity
+
+prodqual-b-chromaq:
+    ~/work/zen/scripts/run-heavy --mem 16G --jobs 8 -- python3 scripts/prodqual_b_pixels.py chromaq
+
+prodqual-b-steering-incumbent:
+    ~/work/zen/scripts/run-heavy --mem 16G --jobs 8 -- python3 scripts/prodqual_b_run.py steering-B
+
+prodqual-b-composer-build:
+    TMPDIR=$HOME/tmp/prodqual-b CARGO_TARGET_DIR=$HOME/tmp/prodqual-b/target CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 ~/work/zen/scripts/run-heavy --mem 16G --jobs 8 -- cargo test -p zensim --example quality_swap_composites
+    TMPDIR=$HOME/tmp/prodqual-b CARGO_TARGET_DIR=$HOME/tmp/prodqual-b/target CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 ~/work/zen/scripts/run-heavy --mem 16G --jobs 8 -- cargo build -p zensim --example quality_swap_composites

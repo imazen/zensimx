@@ -1,0 +1,20 @@
+{
+  "schema": "prodqual-b-chromaq-preread-v1",
+  "model_sha256": "f803b74c4252952f337abdc0234c2930839d45dddc32ae9b8b5296d6c840f400",
+  "source_manifest": "benchmarks/chromaq_2026-10-04/src_manifest.json",
+  "source_manifest_sha256": "094bc37b0a70f424fe4fef7b89776248414645512b2cee2f76af1f4f22c585ab",
+  "sweeps": [
+    "/home/lilith/tmp/chromaq/out/sweep444.tsv",
+    "/home/lilith/tmp/chromaq/out/sweep420.tsv"
+  ],
+  "pairs": [
+    "/home/lilith/tmp/chromaq/out/pairs444.tsv",
+    "/home/lilith/tmp/chromaq/out/pairs420.tsv"
+  ],
+  "sources": 32,
+  "cells": 1760,
+  "role": "CLIC2025 tuning sources; no human labels; previously registered unlabelled engineering diagnostic",
+  "rules": "report-only / rule pending; unchanged canonical CHROMAQ analyzer",
+  "scoring": "frozen seed0 native BakeScorer Rev5; stored serving B and independent objective judges on identical decoded images",
+  "forbidden": "no extra sources, AIC, T0, sealed or terminal"
+}

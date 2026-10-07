@@ -1,0 +1,205 @@
+{
+  "schema": "prodqual-b-steercodec-preread-v1",
+  "model": "f803b74c4252952f337abdc0234c2930839d45dddc32ae9b8b5296d6c840f400",
+  "sources": [
+    {
+      "name": "c00",
+      "src": "/home/lilith/work/codec-corpus/clic2025/training/097cb426910ba8ce2525dd8bb7fb1777.png",
+      "sha256": "7995fc6c3653a0cfa9cfa6ee207983532f2c52d430262243cc917fd214ae186c",
+      "crop": [
+        497,
+        768,
+        512,
+        512
+      ]
+    },
+    {
+      "name": "c01",
+      "src": "/home/lilith/work/codec-corpus/clic2025/training/11f2b039b293758398b1a7a8afa64bb2.png",
+      "sha256": "814f8f52ae8a0d1a4e704dc8d0c4c30604beae2ceb478a7516e8dd0ac4a222c9",
+      "crop": [
+        563,
+        768,
+        512,
+        512
+      ]
+    },
+    {
+      "name": "c02",
+      "src": "/home/lilith/work/codec-corpus/clic2025/training/28d24b9c83de066597ff96a68769884f.png",
+      "sha256": "2c3bee67c5454f971564178f15bf81150306bfc6c664c41e94b41702e0cd816e",
+      "crop": [
+        768,
+        410,
+        512,
+        512
+      ]
+    },
+    {
+      "name": "c03",
+      "src": "/home/lilith/work/codec-corpus/clic2025/training/4a18abf66d65ad1a95ce455c8b6cd8de.png",
+      "sha256": "fc04a8a45908c4a013b3e1a25c08efcb315d79538b8fde913d66d05787de11ae",
+      "crop": [
+        475,
+        768,
+        512,
+        512
+      ]
+    },
+    {
+      "name": "c04",
+      "src": "/home/lilith/work/codec-corpus/clic2025/training/60430844748882ff66b9a5598ef06dd6.png",
+      "sha256": "3f14ec46d7e5b41f1792aac72f7eae58863e3d13330baf220bd0925f057fe772",
+      "crop": [
+        467,
+        768,
+        512,
+        512
+      ]
+    },
+    {
+      "name": "c05",
+      "src": "/home/lilith/work/codec-corpus/clic2025/training/9466a908d088d32ee73f04116c40e48c.png",
+      "sha256": "d1efd29b73510f56f89e3a4ff0c4cea4a41963cd26679ee56d68b047525b5887",
+      "crop": [
+        429,
+        768,
+        512,
+        512
+      ]
+    },
+    {
+      "name": "c06",
+      "src": "/home/lilith/work/codec-corpus/clic2025/training/afe3676bbfcf7183d697ff7b5d5bd45b.png",
+      "sha256": "71207b7aacd1c73d26ed151475b9272fd03b224e23615a1d1700eb0291c838f9",
+      "crop": [
+        768,
+        426,
+        512,
+        512
+      ]
+    },
+    {
+      "name": "c07",
+      "src": "/home/lilith/work/codec-corpus/clic2025/training/d1a9be98d1936065967adac50a6fb750.png",
+      "sha256": "680003ddef09a61e8604c6f681e27482892f6f1edf3f86c62a03c22e200c534a",
+      "crop": [
+        768,
+        379,
+        512,
+        512
+      ]
+    }
+  ],
+  "paths": [
+    "/var/tmp/steercodec/src/c00.png",
+    "/var/tmp/steercodec/dec/zenjpeg/c00_q30.png",
+    "/var/tmp/steercodec/dec/zenjpeg/c00_q60.png",
+    "/var/tmp/steercodec/dec/zenjpeg/c00_q85.png",
+    "/var/tmp/steercodec/dec/zenjxl/c00_q30.png",
+    "/var/tmp/steercodec/dec/zenjxl/c00_q60.png",
+    "/var/tmp/steercodec/dec/zenjxl/c00_q85.png",
+    "/var/tmp/steercodec/dec/zqi/c00_q30.png",
+    "/var/tmp/steercodec/dec/zqi/c00_q60.png",
+    "/var/tmp/steercodec/dec/zqi/c00_q85.png",
+    "/var/tmp/steercodec/src/c01.png",
+    "/var/tmp/steercodec/dec/zenjpeg/c01_q30.png",
+    "/var/tmp/steercodec/dec/zenjpeg/c01_q60.png",
+    "/var/tmp/steercodec/dec/zenjpeg/c01_q85.png",
+    "/var/tmp/steercodec/dec/zenjxl/c01_q30.png",
+    "/var/tmp/steercodec/dec/zenjxl/c01_q60.png",
+    "/var/tmp/steercodec/dec/zenjxl/c01_q85.png",
+    "/var/tmp/steercodec/dec/zqi/c01_q30.png",
+    "/var/tmp/steercodec/dec/zqi/c01_q60.png",
+    "/var/tmp/steercodec/dec/zqi/c01_q85.png",
+    "/var/tmp/steercodec/src/c02.png",
+    "/var/tmp/steercodec/dec/zenjpeg/c02_q30.png",
+    "/var/tmp/steercodec/dec/zenjpeg/c02_q60.png",
+    "/var/tmp/steercodec/dec/zenjpeg/c02_q85.png",
+    "/var/tmp/steercodec/dec/zenjxl/c02_q30.png",
+    "/var/tmp/steercodec/dec/zenjxl/c02_q60.png",
+    "/var/tmp/steercodec/dec/zenjxl/c02_q85.png",
+    "/var/tmp/steercodec/dec/zqi/c02_q30.png",
+    "/var/tmp/steercodec/dec/zqi/c02_q60.png",
+    "/var/tmp/steercodec/dec/zqi/c02_q85.png",
+    "/var/tmp/steercodec/src/c03.png",
+    "/var/tmp/steercodec/dec/zenjpeg/c03_q30.png",
+    "/var/tmp/steercodec/dec/zenjpeg/c03_q60.png",
+    "/var/tmp/steercodec/dec/zenjpeg/c03_q85.png",
+    "/var/tmp/steercodec/dec/zenjxl/c03_q30.png",
+    "/var/tmp/steercodec/dec/zenjxl/c03_q60.png",
+    "/var/tmp/steercodec/dec/zenjxl/c03_q85.png",
+    "/var/tmp/steercodec/dec/zqi/c03_q30.png",
+    "/var/tmp/steercodec/dec/zqi/c03_q60.png",
+    "/var/tmp/steercodec/dec/zqi/c03_q85.png",
+    "/var/tmp/steercodec/src/c04.png",
+    "/var/tmp/steercodec/dec/zenjpeg/c04_q30.png",
+    "/var/tmp/steercodec/dec/zenjpeg/c04_q60.png",
+    "/var/tmp/steercodec/dec/zenjpeg/c04_q85.png",
+    "/var/tmp/steercodec/dec/zenjxl/c04_q30.png",
+    "/var/tmp/steercodec/dec/zenjxl/c04_q60.png",
+    "/var/tmp/steercodec/dec/zenjxl/c04_q85.png",
+    "/var/tmp/steercodec/dec/zqi/c04_q30.png",
+    "/var/tmp/steercodec/dec/zqi/c04_q60.png",
+    "/var/tmp/steercodec/dec/zqi/c04_q85.png",
+    "/var/tmp/steercodec/src/c05.png",
+    "/var/tmp/steercodec/dec/zenjpeg/c05_q30.png",
+    "/var/tmp/steercodec/dec/zenjpeg/c05_q60.png",
+    "/var/tmp/steercodec/dec/zenjpeg/c05_q85.png",
+    "/var/tmp/steercodec/dec/zenjxl/c05_q30.png",
+    "/var/tmp/steercodec/dec/zenjxl/c05_q60.png",
+    "/var/tmp/steercodec/dec/zenjxl/c05_q85.png",
+    "/var/tmp/steercodec/dec/zqi/c05_q30.png",
+    "/var/tmp/steercodec/dec/zqi/c05_q60.png",
+    "/var/tmp/steercodec/dec/zqi/c05_q85.png",
+    "/var/tmp/steercodec/src/c06.png",
+    "/var/tmp/steercodec/dec/zenjpeg/c06_q30.png",
+    "/var/tmp/steercodec/dec/zenjpeg/c06_q60.png",
+    "/var/tmp/steercodec/dec/zenjpeg/c06_q85.png",
+    "/var/tmp/steercodec/dec/zenjxl/c06_q30.png",
+    "/var/tmp/steercodec/dec/zenjxl/c06_q60.png",
+    "/var/tmp/steercodec/dec/zenjxl/c06_q85.png",
+    "/var/tmp/steercodec/dec/zqi/c06_q30.png",
+    "/var/tmp/steercodec/dec/zqi/c06_q60.png",
+    "/var/tmp/steercodec/dec/zqi/c06_q85.png",
+    "/var/tmp/steercodec/src/c07.png",
+    "/var/tmp/steercodec/dec/zenjpeg/c07_q30.png",
+    "/var/tmp/steercodec/dec/zenjpeg/c07_q60.png",
+    "/var/tmp/steercodec/dec/zenjpeg/c07_q85.png",
+    "/var/tmp/steercodec/dec/zenjxl/c07_q30.png",
+    "/var/tmp/steercodec/dec/zenjxl/c07_q60.png",
+    "/var/tmp/steercodec/dec/zenjxl/c07_q85.png",
+    "/var/tmp/steercodec/dec/zqi/c07_q30.png",
+    "/var/tmp/steercodec/dec/zqi/c07_q60.png",
+    "/var/tmp/steercodec/dec/zqi/c07_q85.png"
+  ],
+  "role": "eight registered CLIC2025 tuning crops; no human labels or holdout data",
+  "codecs": [
+    "zenjpeg",
+    "zenjxl",
+    "zqi"
+  ],
+  "swaps": [
+    [
+      30,
+      60
+    ],
+    [
+      60,
+      85
+    ]
+  ],
+  "block": 8,
+  "fraction": 0.25,
+  "rankings": [
+    "map",
+    "oracle",
+    "random",
+    "anti"
+  ],
+  "random_seed": 20261004,
+  "neighbour_exact": false,
+  "cases": 48,
+  "additional_rules": "rule pending; diagnostic only",
+  "native_composition_writer": "zensim shared zen_io with zenpng; no foreign image writer"
+}
