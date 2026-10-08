@@ -15,6 +15,11 @@ Its initial modification time is 2026-10-07 11:20:59.106636025 -0600.
 Record the replacement marker's bytes, hash and status before proceeding.
 This preread uses source and program/provenance metadata only.
 
+Coordinator amendment, 2026-10-07: the quiet window is blocked by another
+session. Proceed without waiting for SPEEDQ_DONE, with all builds and replays
+under run-heavy. The pending marker question is resolved by this instruction.
+No speed qualification is attempted or inferred from these contended runs.
+
 ## Fixed packets, controls and bars
 
 Reuse the already admitted PRODQUAL-B engineering population, at

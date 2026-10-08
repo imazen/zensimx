@@ -1,0 +1,29 @@
+--- a/zensim-validate/src/bin/bake_verdict.rs
++++ b/zensim-validate/src/bin/bake_verdict.rs
+@@ -683,7 +683,13 @@
+     },
+ ];
+ 
++#[path = "bake_verdict/missing_features.rs"]
++mod missing_features;
++
+ fn parse_corpora_arg(arg: &str) -> Result<Vec<&'static Corpus>, String> {
++    if arg.trim().eq_ignore_ascii_case("none") {
++        return Ok(Vec::new());
++    }
+     let mut out: Vec<&'static Corpus> = Vec::new();
+     for name in arg.split(',') {
+         let key = name.trim().to_lowercase();
+@@ -2768,11 +2774,7 @@
+         const FEAT_EPS: f64 = 1e-5;
+         let ra = &grid.feature_rows[a];
+         let rb = &grid.feature_rows[b];
+-        ra.len() == rb.len()
+-            && ra
+-                .iter()
+-                .zip(rb.iter())
+-                .all(|(x, y)| (x - y).abs() <= FEAT_EPS)
++        missing_features::near_equal_rows(ra, rb, FEAT_EPS)
+     };
+ 
+     // Per-codec native-param extremes + dial score at the representable

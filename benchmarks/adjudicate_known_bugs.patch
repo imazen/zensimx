@@ -1,0 +1,19 @@
+--- a/CLAUDE.md
++++ b/CLAUDE.md
+@@ -157,6 +157,16 @@
+ because cleanup tests or a historical training reproduction pass.
+ 
+ ## Known Bugs
++
++* **2026-10-07 — C2 cached-feature saturation comparator rejects matching uncomputed NaN slots. Verified owner-overlay fix, unlanded.**
++  The label-free Rev5 standard grid charges 301 feature-equivalent adjacent
++  pairs as flat because subtracting two NaN placeholders fails the finite
++  epsilon comparison. With the same frozen production model and unchanged
++  epsilon/bars, the owner overlay reduces C2 from 329/4318 to 28/4318.
++  Ladder C2 is unchanged. Review patch and evidence:
++  `benchmarks/adjudicate_bake_verdict.patch` and
++  `benchmarks/adjudicate_registration_2026-10-07.md`. This does not resolve
++  the separate raw-feature identity or steering failures.
+ 
+ * **2026-10-07 — Three zensim integration tests failed on main. FIXED (stale test contracts; reviewed patch, no weakening).** Found by the PRODQUAL-A label-free gate
+   run: `featcanon_rev4_contract::served_paths_serve_rev4` (1867 vs 1825 features) and

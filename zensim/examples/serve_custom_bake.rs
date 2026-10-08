@@ -66,6 +66,10 @@ use zensim::{BakeScorer, RgbSlice};
 #[path = "serve_custom_bake/prodqual.rs"]
 mod prodqual;
 
+#[cfg(feature = "feature-regime-v2")]
+#[path = "serve_custom_bake/adjudicate.rs"]
+mod adjudicate;
+
 fn load_rgb(path: &str) -> (Vec<[u8; 3]>, u32, u32) {
     let img = image::open(path)
         .unwrap_or_else(|e| panic!("open {path}: {e}"))
@@ -342,6 +346,11 @@ fn head_probe(args: &[String]) {
 fn main() {
     #[allow(unused_mut)]
     let mut args: Vec<String> = std::env::args().skip(1).collect();
+    #[cfg(feature = "feature-regime-v2")]
+    if args.first().map(String::as_str) == Some("--adjudicate") {
+        adjudicate::run(&args[1..]);
+        return;
+    }
     #[cfg(feature = "feature-regime-v2")]
     if args.first().map(String::as_str) == Some("--prodqual") {
         prodqual::run(&args[1..]);
