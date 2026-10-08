@@ -127,7 +127,10 @@ The original steering registration defines owner12 as four moderate JPEG
 pairs times three individual research seeds, each at block32. PRODQUAL-B's
 frozen composition is a single seed, hence four owner cases. Those are four
 of four input geometries for seed0, not a claimed 12-case three-seed result.
-The planned D1 three-seed control rerun keeps this distinction explicit.
+The D1 control rerun passes 12/12 owner cases across seeds0,1,2, with seed0
+exactly reproducing its original four cases. Minimum M2 is
+0.9993285950682256 and minimum M3f is 0.9501095907947129. These are individual
+seed controls, not an ensemble or an expansion of the shipping composition.
 
 The Rev5 JPEG owner enumerates I01/I21/I41/I61 at levels03/05 and block8:
 eight pairs with 8x8 blocks. The gate map's command also says `--block 8`.
@@ -147,13 +150,31 @@ owner. Its SHA is exactly the declared
 opinion target was opened. The existing corpus-disabled verdict command uses
 the registered empty-root manifest and feature-set admission, not defaults.
 
-Evidence: `/mnt/v/output/zensim/adjudicate-2026-10-07/`. Final archive checks,
-coverage control and cleanup are still pending the renewed SPEEDQ hold; this
-draft is not the completion marker. The earlier coordinator amendment allowed
-run-heavy work, then e28-sol requested another hold. No adjudication training
-process exists. The supplied blocking PIDs belong to the separate V40R2 lane.
+Evidence: `/mnt/v/output/zensim/adjudicate-2026-10-07/`; mirror:
+`/mnt/tower/output/zensim/adjudicate-2026-10-07/`. Exact verification and archive
+receipts are `FINAL_VERIFICATION.json`, `_MANIFEST.json`,
+`MIRROR_VERIFICATION.json` and `CARGO_CLEANUP.json`. They are required before
+the final completion marker. Input path mappings retain original paths and
+bind archived engineering packets/pixels by SHA256. Original reports and
+intermediate failure logs remain preserved. No R2 copy is claimed.
+
+The earlier coordinator amendment allowed run-heavy work, then e28-sol
+requested another hold. The lane stopped and ended its waiting turn without
+polling. The 2026-10-08 10:20Z coordinator release explicitly ends the hold;
+every subsequent heavy command uses its shared flock wrapper. No adjudication
+training process exists. The supplied blocking PIDs belonged to the separate
+V40R2 lane and were not signaled. SPEEDQ's completed timing report separately
+fails its release criterion; no speed pass is inferred here.
+
+Validation: native owner comparator regression tests pass; scoped Rust fmt
+and the audit example's warnings-denied clippy pass. Full library tests and
+remote CI are not claimed. The twelve-case owner rerun's run-heavy receipt is
+`rc=0 22s | peak-RSS 0.06GiB | min-avail 37779MiB | peak-load 0.76`.
+This process receipt is not a per-size scorer RSS or speed qualification.
 
 The proposed Known Bugs update is a small review patch because the existing
 CLAUDE.md exceeds 30KB; committing that full file requires user approval under
-the shared AGENTS rule. The native harness correction is likewise supplied
-as a small overlay patch, with the large canonical owner restored byte-for-byte.
+the shared AGENTS rule. The native harness correction is supplied as a reviewable
+overlay patch, with the canonical owner restored byte-for-byte. Rust source
+below 600KB is size-exempt under the revised shared instructions; integration
+is left to the coordinator because this brief requests analysis and no pushes.

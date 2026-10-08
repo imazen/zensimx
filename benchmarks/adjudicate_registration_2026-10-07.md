@@ -20,6 +20,13 @@ session. Proceed without waiting for SPEEDQ_DONE, with all builds and replays
 under run-heavy. The pending marker question is resolved by this instruction.
 No speed qualification is attempted or inferred from these contended runs.
 
+Renewed hold, 2026-10-08: all local numerical work stopped; the lane ended its
+waiting turn without marker or process polling. Coordinator release
+`RELEASE_after_speedq.md` at 10:20Z explicitly ends that hold. Every subsequent
+heavy command serializes through the shared `heavy.lock` flock wrapper and
+run-heavy with 16G/8-job caps. The replacement SPEEDQ report is complete and
+reports a failed speed release criterion; this adjudication cannot qualify it.
+
 ## Fixed packets, controls and bars
 
 Reuse the already admitted PRODQUAL-B engineering population, at

@@ -25,3 +25,6 @@ native packet revision label *models:
 
 clippy-serve:
     {{heavy}} --mem 16G --jobs 8 -- env TMPDIR={{scratch}} CARGO_TARGET_DIR={{scratch}}/target CARGO_INCREMENTAL=0 CARGO_PROFILE_RELEASE_DEBUG=0 cargo clippy -p zensim --release --features custom-profiles,candidate-profiles --example serve_custom_bake -- -D warnings > {{evidence}}/clippy-serve.log 2>&1
+
+evidence mode commit='':
+    {{heavy}} --mem 16G --jobs 8 -- env TMPDIR={{scratch}} python3 scripts/adjudicate_evidence.py {{mode}} --commit '{{commit}}' > {{scratch}}/{{mode}}.log 2>&1
