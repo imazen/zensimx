@@ -45,6 +45,9 @@ features from the same pixels; never treat Rev5 cached rows as Rev1 inputs.
    inputs. Record nonzero/reference-only inputs, raw feature inference,
    identity-aware feature inference and pixel identity separately. Native
    identity shortcuts cannot waive the raw C5 contract.
+   The cache manifest records an f32 digest: compare full native f64 bits
+   and the canonical f32 storage round trip separately. Expected storage
+   rounding is not proof of stale data; any residual disagreement is reported.
 2. Dump exact standard and ladder cell scores through bake_verdict's existing
    `ZENSIM_DIAL_PRED_OUT` owner. Identify every tied adjacent rung by key and
    compare consumed features, uncomputed slots, and existing image hashes.
