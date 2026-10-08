@@ -579,3 +579,6 @@ prodqual-b-incumbent-pixels:
 
 prodqual-b-report:
     python3 scripts/prodqual_b_report.py
+
+prodqual-b-mirror:
+    ~/work/zen/scripts/run-heavy --mem 4G --jobs 1 -- rsync -aL --no-owner --no-group --omit-dir-times /mnt/v/output/zensim/prodqual-b-2026-10-07/ /mnt/tower/output/zensim/prodqual-b-2026-10-07/
