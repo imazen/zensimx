@@ -2271,6 +2271,42 @@ mixture inversions.
 came from the separate `byc_globaff` example with its own per-scale planes; re-deriving those under the toggle is a
 second producer change, so Tga waits for an M64 result worth following.
 
+**Implementation** (`ec21497b`). `ZENSIM_PYRAMID=linear` (unset or `xyb` keeps the default; other values panic):
+alongside each scale-0 row's XYB conversion, the walk keeps the row in linear RGB (the sRGB8 table), averages 2×2 blocks
+of linear RGB with the same `downscale_2x_into` and row targets, and converts each coarse level to positive XYB at the
+walk's revision. Both pyramid producers carry it: the streaming producer and the block walk's chunk tasks. It refuses
+scale-0 chroma omission, cached references, sampling and HDR, and the materialized pyramid builders refuse it, so no
+other path can mix pyramids silently. Research manifests record `"pyramid"`.
+
+- Unset: 110 of 110 score-and-feature dumps identical at revisions 5/6 and at revision 7 (`perf_bits.sh`).
+- `linear_pyramid_producers_match_the_whole_image_form`: every strip window of both producers, both sides, every
+  channel and scale, bit for bit against the whole-image form (one conversion call per level), revisions 5 and 7, six
+  sizes down to odd and short ones; the coarse levels differ from the XYB-averaged ones (negative control).
+- Set, on 14 KADID pairs: the 141 measured columns that read only scale 0 keep their bits; the other 435 move: every
+  column of scales 1–3, plus scale 0's edge-width change, a two-scale ratio (scale 0 against scale 1). Served features
+  (`score_pair_with_bake`, an M64 bake) equal the extracted ones on all 410 inputs of that bake, both arms.
+- The sibling codecs now use zencodec's incremental-decode API, so `zensim-bench` pins zencodec `d327434b` (their
+  rev) instead of `4fda4391`. With it, the 14 pairs reproduce the stored Rev5 bank bit for bit; `ring_root.py build`
+  checks the same identity on every row of every table.
+- `ring_root.py` and `ring_bank.sh` take the arm (`--arm linpyr`): era `rev5_localwin_linpyr`, feature-set id
+  `basic+peaks+v2@w1825/rev5_localwin_linpyr#36c3f3af` (registered, admitted like the `hpm` root).
+
+**AVIF decode drift, and a second amendment before any result.** The derived-root build refused safesyn: 33,384 of its
+34,001 AVIF rows (`zenavif-s5-e6`) differ from the stored root in columns the toggle cannot touch, while every JPEG,
+JXL and WebP row and every row of the seven other sets is bit-identical. With the toggle off, the extractor built
+today (`678e280c`, zencodec `d327434b`) decodes different pixels from the 2026-10-23 extractor (`1152f194`, which
+reproduced the stored root): 10 of 10 sampled AVIF files differ, their references and 3 of 3 JXL files do not. Neither
+decode equals libavif's (Pillow 12.3; ours differs from it by at most 2 levels, on 2–55% of values per image), so this
+check cannot say which is right. The sibling codecs have not moved since 2026-10-19 and zensim-bench pinned zencodec
+`4fda4391` throughout; what made the 2026-10-23 build compile and decode differently is not yet known.
+
+The pyramid comparison must hold pixels fixed, so: the safesyn and coverage-pool sets are extracted again with the
+toggle off and the same binary, into a control root (era `rev5_localwin_avifdec`) that differs from the stored root
+only in AVIF rows; the linear-pyramid root takes its AVIF rows from the same decode. The baseline becomes **M64ctl**
+(the M64 recipe on the control root); the stored M64 stays as a reference, and one M64 cell (KADID, seed 0) retrained
+on the stored root with today's trainer checks that the trainer reproduces it. The adoption rule is unchanged and
+applies to M64lin against M64ctl.
+
 ### DVIFM 0.3 on the E21 sets and the mixture test (2026-10-23)
 
 Owner request: "eval dvifm 0.3 on kadid and other distortion//corrputions". Scorer: the frozen runtime of the
