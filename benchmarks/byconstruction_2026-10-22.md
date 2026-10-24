@@ -2571,6 +2571,42 @@ coupled for most others, where the loop assumes −1. The fix is in the map's co
 per pixel is a local error amplitude), or, short of that, a loop whose bump uses the map's own response. Whether the
 14–19% fewer bytes on photos are the same quality is the steering study's question (below).
 
+**The integral change, tried: an amplitude split** (`SplitMode::Amplitude`, `ZENSIM_MAP_SPLIT=amplitude`, workbench
+map `diffmap_amp`; `bb484919`). Every nonlinear pool (the basic L4/L2 pools and the peak cells' L8 slots, the v2 soft
+peaks and the SSIM, GMS, artifact and detail deviation pools) is distributed as a mean pool of its per-pixel quantity,
+`−s·v_i/N`, folded into the existing linear coefficients; linear, weighted, ratio and global terms keep their exact
+shares, and the repair and exact maps keep their bits (592 library tests). A pixel's value then moves with its own
+error as the pool moves with a uniform change.
+
+- *Calibration* (tail max, the same pairs): Tga 4.7213e-2 / 0.9, fit r 0.831, held out 0.483 (exact split: 0.900 /
+  0.758); M64a 4.6644e-2 / 1.0, **0.951 / 0.873** (0.877 / 0.786); B 4.5157e-2 / 0.9, 0.811 / 0.690 (0.807 / 0.778). The
+  bulk fits rise from exponent 0.15–0.2 and r 0.48–0.52 to 0.35–0.45 and 0.62–0.67: block by block the amplitude map is
+  closer to butteraugli's. Tga's held-out (screen) tail falls; its sign-free descriptor terms fold their sign into the
+  map, which M64a (every weight non-negative) cannot do.
+- *The response is fixed.* Median response of bumped blocks at d ≤ 1: Tga −1.07, −1.22, −1.06, −1.26; M64a −0.68,
+  −1.21, −1.06, −1.07 (exact split at the tail placement: −2.6); unadjusted blocks no longer move (median |Δ log tile|
+  0.000–0.016). B's response falls toward 0 from d 2.5 up (−0.15 to −0.02), unexplained.
+- *Reach is worse.* Static reach of the Tga amplitude map (no loop, held-out images): photos 76 / 91 / 94 / 97% at
+  0.3 / 0.45 / 0.6 / 1 (exact tail 94 / 97 / 100 / 100%), illustrations 85 / 90 / 100 / 100%, screens 56 / 78 / 78 / 83%,
+  floors median 0.223 (photos) and 0.524 (screens; the dithered palette `windows95` crops 3.3–3.4 at d 0.05). A share
+  suppresses small per-pixel values (v^p / Σv^p); the amplitude counts them linearly, so low-level per-pixel terms set
+  a floor. The four-iteration loop now ends near the target (largest tile 0.94–1.27 of it at d ≤ 1.6) instead of below
+  it, converging on photos 41 / 50 / 50 / 77% (Tga) at d ≤ 1 against 71 / 82 / 82 / 85% for the exact tail fit, and on
+  screens 6–11%.
+
+- *Bytes at equal quality* (the steering study's judges, the same 78 images; against butteraugli's loop,
+  SSIMULACRA2 / CVVDP): Tga amplitude −3.98 [−5.83, −2.39] / −4.47 [−6.63, −2.57] over all images (Tga at the tail
+  placement −1.54 / −2.01), photos −0.79 / −1.45 (+0.74 / −0.38), screens −12.67 / −13.96 (−6.77 / −6.58); M64a amplitude
+  −2.48 / −2.74 (tail −1.04 / −2.09), photos +0.43 [−0.54, +1.13] / +0.55 [−0.35, +1.20], screens −9.65 / −11.41; B
+  amplitude −9.08 / −8.44, screens −25.4 / −25.8.
+
+**Reading.** Fixing the per-block response does not make the map a better steering signal: with every pool counted
+linearly the loop no longer overshoots, but it spends bytes where small per-pixel terms sit, raises the reachable
+floor and loses bytes against butteraugli everywhere. So neither the fit nor this change to the map's construction
+makes our maps steer JPEG XL better than butteraugli; the fit is the one to keep, because it is what makes the
+requested distance reachable. Screens are the open problem for every zensim map (5–26% more bytes at equal quality).
+The split stays a research mode; the defaults are unchanged.
+
 ### JPEG XL steering: our maps against butteraugli and DVIFM 0.3 (2026-10-24)
 
 Owner, 2026-10-24: "also remember to eval our maps against butter and dvifm 03 as jxl spatial steering candidates".
