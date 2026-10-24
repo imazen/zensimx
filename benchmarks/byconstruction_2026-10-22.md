@@ -2120,6 +2120,12 @@ v4x −1.05% at 1507×2048 but +0.60% at 1024², v3 +0.08% / −0.32% / +0.58%, 
 (`rev7_lean8_vs_vblurprefetch_t1`, `_t8`); eight rows ahead was no better, sixteen into L2 worse. The phase-B kernels
 hold 14% of the load stalls (dense 9.5%, gradient 2.4%, v1 fold 2.1%), so fusing them into one pass per row band
 would not remove much waiting: the dense kernel is bound by its twenty-six pools' per-step updates.
+After 24, the AVX-512 vertical blur as a column walk (each 16-column vector down the whole height, its four pair and
+eight quadruple tree nodes in registers through an eight-row unroll, one load per row, no node stores; bit-identical,
+the fused-pass tier tests pass against it): 28.2–28.4 → 27.8–28.2 ms at 1507×2048 but 9.7 → 13.3 ms at 1024², one
+thread, unpaired. With a power-of-two row stride every input load shares its low twelve address bits with the output
+stores still in flight from the rows above (4K aliasing); the panel order loads a row segment before it stores into
+the same columns.
 
 **Tried and not kept** (after 21): the horizontal moment blur rewritten to share each output's pair and quad tree
 nodes between adjacent outputs (the same trees, half the adds), once through row buffers and once through `valignd`
