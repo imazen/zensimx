@@ -173,6 +173,7 @@ def cmd_score(a):
             scores = dict(pool.map(one, images))
         dest.write_text(json.dumps({"bake": path, "post": a.post,
                                     "ring_form": os.environ.get("ZENSIM_RING_FORM", "raw"),
+                                    "pyramid": os.environ.get("ZENSIM_PYRAMID", "xyb"),
                                     "bake_sha256": hashlib.sha256(Path(path).read_bytes()).hexdigest(),
                                     "scores": scores}, indent=1) + "\n")
         print(f"{name}: {len(scores)} images scored")
