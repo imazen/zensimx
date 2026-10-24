@@ -212,6 +212,18 @@ def cmd_score(args) -> int:
                     "per_dataset_delta": {f: float(np.mean(v)) for f, v in per_ds.items()},
                     "per_dataset_srocc": {f: float(np.mean(v)) for f, v in absolute.items()},
                     "e33_point_form": bool(mean >= -0.002 and all(np.mean(v) >= -0.005 for v in per_ds.values()))}
+    if args.paired_with:
+        # Each arm against another cell arm, seed by seed: the per-seed E21 deltas share the control, so their
+        # difference is the arms' own paired difference; its seed-unit SE is the comparison's.
+        ref = out[args.paired_with]
+        for arm, res in out.items():
+            if arm == args.paired_with:
+                continue
+            diff = [a - b for a, b in zip(res["per_seed_delta"], ref["per_seed_delta"])]
+            res["paired_with"] = {
+                "arm": args.paired_with, "per_seed_difference": diff, "difference": float(np.mean(diff)),
+                "seed_unit_se": float(np.std(diff, ddof=1) / np.sqrt(len(diff))) if len(diff) > 1 else float("nan"),
+                "per_dataset_difference": {f: res["per_dataset_delta"][f] - ref["per_dataset_delta"][f] for f in FOLDS}}
     print(json.dumps(out, indent=1))
     return 0
 
@@ -455,6 +467,7 @@ def main() -> int:
     s.add_argument("--seeds", default="0,1,2")
     s.add_argument("--rule", choices=("last", "best"), default="last",
                    help="last = registered final epoch; best = refit/best.bin (predict-best first)")
+    s.add_argument("--paired-with", help="also report every other arm minus this arm (one of --arms), seed by seed")
     c = sub.add_parser("curves")
     c.add_argument("--arm", required=True, help="arm directory name, e.g. mono-thr")
     c.add_argument("--seeds", default="0,1,2")
