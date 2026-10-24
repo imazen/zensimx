@@ -12,6 +12,10 @@
 //! ZENSIM_WORKBENCH_BAKES=... cargo run --release --example loop_calibrate -- PAIRS_DIR OUT.tsv
 //! ```
 //!
+//! `LOOP_CAL_TAIL` adds a fit to each pair's worst tiles (largest and 99th
+//! percentile; `OUT.tail.tsv`), the blocks that decide whether the loop
+//! reaches its target.
+//!
 //! Fit: the CID22-512 *training* images. Held out: the gb82-sc screenshots.
 //! The pair set's CID22-512 validation images are left out entirely (they are
 //! a protected population in zensim's data splits).
@@ -106,6 +110,9 @@ fn main() {
     };
     let mut tsv = String::from(
         "metric\tmap\tscale\texponent\tfit_log_rmse\tfit_log_r\tfit_blocks\thold_log_rmse\thold_log_r\thold_blocks\n",
+    );
+    let mut tail_tsv = String::from(
+        "metric\tmap\ttail\tscale\texponent\tfit_log_rmse\tfit_log_r\tfit_pairs\thold_log_rmse\thold_log_r\thold_pairs\n",
     );
     let metrics: Vec<String> =
         serde_json::from_str(&zensim_workbench::available_metrics()).expect("metrics");
@@ -268,6 +275,90 @@ fn main() {
                     eprintln!("{line}");
                 }
             }
+            // LOOP_CAL_TAIL: the same search, fitted to each pair's worst
+            // tiles instead of every tile (the largest, and the 99th
+            // percentile): the blocks that decide whether the loop reaches
+            // its target and what its score reads. Bias by distance as
+            // above, for this tail fit and for the bulk fit.
+            if std::env::var_os("LOOP_CAL_TAIL").is_some() {
+                let quantile = |v: &[f64], q: f64| -> f64 {
+                    let mut s: Vec<f64> = v.to_vec();
+                    s.sort_by(f64::total_cmp);
+                    s[((s.len() - 1) as f64 * q).round() as usize]
+                };
+                for (stat, q) in [("max", 1.0), ("p99", 0.99)] {
+                    let butter: Vec<f64> = pairs
+                        .iter()
+                        .map(|p| quantile(&p.2.iter().map(|&b| f64::from(b)).collect::<Vec<_>>(), q))
+                        .collect();
+                    // (set, distance, log butteraugli, log placed at scale 1) per pair.
+                    let logs = |ex: f64| -> Vec<(&str, f64, f64, f64)> {
+                        pairs
+                            .iter()
+                            .zip(&butter)
+                            .filter_map(|(p, &b)| {
+                                let m = quantile(&tile_norms(&p.1, p.3, p.4, ex), q);
+                                (m > 0.0 && b >= FLOOR).then(|| (p.0, p.5, b.ln(), m.ln()))
+                            })
+                            .collect()
+                    };
+                    let stats = |l: &[(&str, f64, f64, f64)], which: &str, ls: f64| -> (f64, f64, usize) {
+                        let r: Vec<(f64, f64)> =
+                            l.iter().filter(|x| x.0 == which).map(|x| (x.3 + ls, x.2)).collect();
+                        let n = r.len() as f64;
+                        let rmse = (r.iter().map(|(m, b)| (m - b).powi(2)).sum::<f64>() / n).sqrt();
+                        let (mx, my) = (r.iter().map(|x| x.0).sum::<f64>() / n, r.iter().map(|x| x.1).sum::<f64>() / n);
+                        let cov: f64 = r.iter().map(|(x, y)| (x - mx) * (y - my)).sum();
+                        let vx: f64 = r.iter().map(|(x, _)| (x - mx).powi(2)).sum();
+                        let vy: f64 = r.iter().map(|(_, y)| (y - my).powi(2)).sum();
+                        (rmse, cov / (vx * vy).sqrt(), r.len())
+                    };
+                    let mut best: Option<(f64, f64, f64)> = None;
+                    for &ex in &EXPONENTS {
+                        let l = logs(ex);
+                        let fit: Vec<f64> = l.iter().filter(|x| x.0 == "fit").map(|x| x.2 - x.3).collect();
+                        if fit.is_empty() {
+                            continue;
+                        }
+                        let ls = fit.iter().sum::<f64>() / fit.len() as f64;
+                        let (rmse, _, _) = stats(&l, "fit", ls);
+                        if best.is_none_or(|b| rmse < b.0) {
+                            best = Some((rmse, ls, ex));
+                        }
+                    }
+                    let Some((_, ls, ex)) = best else { continue };
+                    let l = logs(ex);
+                    let (fr, fp, fnn) = stats(&l, "fit", ls);
+                    let (hr, hp, hn) = stats(&l, "hold", ls);
+                    eprintln!(
+                        "{metric}/{map} tail {stat}: scale {:.4e} exponent {ex} · fit rmse {fr:.3} r {fp:.3} (n{fnn}) · held-out rmse {hr:.3} r {hp:.3} (n{hn})",
+                        ls.exp()
+                    );
+                    tail_tsv.push_str(&format!(
+                        "{metric}\t{map}\t{stat}\t{:.6e}\t{ex}\t{fr:.4}\t{fp:.4}\t{fnn}\t{hr:.4}\t{hp:.4}\t{hn}\n",
+                        ls.exp()
+                    ));
+                    let lb = logs(e);
+                    let mut ds: Vec<f64> = pairs.iter().map(|p| p.5).collect();
+                    ds.sort_by(f64::total_cmp);
+                    ds.dedup();
+                    for which in ["fit", "hold"] {
+                        let mut line = format!("  {which} {stat} bias by distance (tail fit | bulk fit):");
+                        for &d in &ds {
+                            let bias = |l: &[(&str, f64, f64, f64)], lsc: f64| -> f64 {
+                                let v: Vec<f64> = l
+                                    .iter()
+                                    .filter(|x| x.0 == which && x.1 == d)
+                                    .map(|x| x.3 + lsc - x.2)
+                                    .collect();
+                                v.iter().sum::<f64>() / v.len() as f64
+                            };
+                            line += &format!(" d{d} {:+.2}|{:+.2}", bias(&l, ls), bias(&lb, scale.ln()));
+                        }
+                        eprintln!("{line}");
+                    }
+                }
+            }
             tsv.push_str(&format!(
                 "{metric}\t{map}\t{scale:.6e}\t{e}\t{fr:.4}\t{fp:.4}\t{fnn}\t{hr:.4}\t{hp:.4}\t{hn}\n"
             ));
@@ -279,4 +370,7 @@ fn main() {
     std::fs::File::create(&out)
         .and_then(|mut f| f.write_all(tsv.as_bytes()))
         .expect("write tsv");
+    if std::env::var_os("LOOP_CAL_TAIL").is_some() {
+        std::fs::write(out.with_extension("tail.tsv"), tail_tsv).expect("write tail tsv");
+    }
 }

@@ -2445,6 +2445,54 @@ labels equal row for row). 13,814 pairs took 4.5 s on 16 threads and the 1,344 m
 - **Smoothness:** the largest Z-RMSE of any model on every E21 set; on AIC2026 public_train, which it was fitted on, the
   smoothest fixed model (Z-RMSE 0.364).
 
+### JPEG XL reachability with Tga: placement fits or a different map? (2026-10-24)
+
+Owner, 2026-10-24: "lead with figuring out even reachability for jxl target distance with tga, and if we just need
+better fits or integral changes". The workbench loop places a map on butteraugli's scale (`scale · v^exponent`, `v` the
+map's density times the pixel count), compares each 8×8 tile's 16-norm × 1.2 with the requested distance, multiplies
+an above-target block's quant field by tile / target (from iteration 2 on, only those blocks), and reports the placed
+map's largest value as its score.
+
+**One image first** (`loop-converge` as built at 08:23, single thread; CID22 training photo `1129482`, 512²,
+effort 7):
+
+- *The loop misses at every distance, not only near lossless.* Final score ÷ requested, 4 iterations, d 0.3 / 0.45 /
+  0.6 / 1 / 2 / 4: butteraugli 1.07 / 1.07 / 1.11 / 1.06 / 1.04 / 0.99; Tga `diffmap` at its shipped placement
+  (0.1330 / 0.6) 6.13 / 5.29 / 4.99 / 4.98 / 3.58 / 2.44, at more bytes than butteraugli (d 0.45: 29,712 against
+  24,400). B's `diffmap` 7.15 / 4.90 / 4.56 / 5.61 / 4.88 / 2.36; Tga `blocks8` and `diffmap_px` alike. At d 0.45 Tga's
+  loop stops at a fixed point after two adjustments (iterations 3 and 4 identical, 816 blocks above target).
+- *Static reach.* Without the loop (frame 0, the encode before any adjustment) over encoder distances 0.05–10, Tga's
+  largest placed tile never falls below 1.47 (d 0.05, where butteraugli's is 0.080): at the shipped placement no target
+  below about 1.5 is reachable on this image at any uniform quality. The map itself does fall with quality: at
+  exponent 1 its largest tile spans 50.6 → 3,810 over d 0.05 → 10 (butteraugli 0.080 → 7.25), a log–log slope of 0.96
+  against butteraugli's; exponent 0.6 flattens that slope to about 0.5, which is the floor.
+- *A placement that tracks the level converges.* At exponent 1 and scale 1.2e-3 (chosen on this image's static curve,
+  so not a fit) the Tga-steered loop ends with no block above target at every distance, final 0.77 / 0.64 / 0.54 /
+  0.88 / 0.89 / 0.51 of the request, at fewer bytes than butteraugli at the same request (d 0.45: 20,368 against
+  24,400; d 1: 13,586 against 15,767); 16 iterations change nothing (a fixed point by iteration 3). Its first
+  adjustment still makes the map 3–40× worse (d 0.3: 0.232 → 9.38) before iterations 2–3 repair it: the reclaim step
+  coarsens blocks by (tile / target)^0.2, and an attribution map reads most blocks as nearly free (an L8 pool's pixel
+  share goes as x⁸, a fourth-moment pool's as e⁴, so the map concentrates on the worst pixels).
+
+**Fitting the placement to the tail** (`loop_calibrate` `LOOP_CAL_TAIL`, new; the calibration pairs of "The JPEG XL
+loop at low distances": 17 CID22-512 training images fitted, 10 gb82 screenshots held out, 12 distances 0.1–6). The
+shipped method fits every block with butteraugli ≥ 0.05 equally; over 0.1–6 it picks exponent 0.15 (Tga `diffmap`:
+fit r 0.488, held out 0.447), which compresses the map until the loop cannot move it. Fitting each pair's largest tile
+instead gives scale 2.2571e-2, exponent 0.7, fit r 0.900, held out 0.758 (99th percentile: 2.5142e-2 / 0.8, r 0.919 /
+0.829). On the fitted photos the tail fit's bias (log placed − log butteraugli, largest tile) stays within ±0.13 from
+d 0.2 to 4 (+0.41 at d 0.1, −0.25 at d 6). On the held-out screenshots Tga reads +0.97 to +1.61 above butteraugli for
+d ≤ 1, a content-dependent level no single placement can serve.
+
+**Corpus test (recorded before its results).** `jxl_reach.sh` on the 78 TRAIN images of the steering study:
+`static` (no loop, 20 encoder distances 0.05–10), `butteraugli`, `Tga` (shipped placement), `Tgatail` (tail-max fit)
+and `Tgatail8` (8 iterations), distances 0.3–10, effort 7, every output probed by Tga's map at both placements, frames
+dumped for the per-block response (`jxl_reach.py elastic`: ln(tile_next / tile) / ln(q_next / q) for adjusted blocks;
+the bump rule assumes −1). Reading (my bars): placement fits suffice if, at the tail placement, every target from 0.3
+is statically reachable on at least 95% of images and the 4-iteration loop ends with no block above target on at least
+90% of photos, its largest tile within 0.8–1.25 of the request; otherwise, or if bumped blocks respond with a median
+above −0.3, the map needs a different construction (for example a split that gives each pixel its local error
+amplitude instead of its share). Screens are reported separately.
+
 ### JPEG XL steering: our maps against butteraugli and DVIFM 0.3 (2026-10-24)
 
 Owner, 2026-10-24: "also remember to eval our maps against butter and dvifm 03 as jxl spatial steering candidates".
