@@ -9,6 +9,9 @@ this harness reproduced bit for bit (kadid seed 0, 7,869 rows).
   run    --arm TOKENS --folds kadid,tid2013,konfig,cid22_a25 --seeds 0,1,2 --jobs N [--aic-weight W --label L]
   score  --arms NAME[,NAME...] [--seeds 0,1,2]
   aicscore --arms NAME[,NAME...]   (AIC2026 TRAIN out-of-fold panel of --aic-weight arms)
+  aiczero --arm NAME=TABLE [--arm ...] [--out JSON]
+                                   (AIC2026 public_train zero-shot of every cell of arms trained without AIC: TABLE holds
+                                    label-free features of pairs_train.tsv in row order, from the arm's own extraction)
 
 Point estimates only: the E21 statistic (mean over the four D1 sources of signed SROCC, arm minus paired control,
 averaged over seeds) with its seed-unit SE. Registered intervals and tests belong to the `panel e34` owner.
@@ -374,6 +377,40 @@ def cmd_aicscore(args) -> int:
     return 0
 
 
+def cmd_aiczero(args) -> int:
+    """AIC2026 public_train zero-shot (no AIC fit) of each cell of each arm: the cell's `refit/last.bin` predicts the arm's
+    feature table, scored by `aic_train.panel` per cell; also the panel of the cells' mean prediction."""
+    import tempfile
+    import numpy as np
+    import pandas as pd
+    sys.path.insert(0, str(HERE.parent / "byconstruction"))
+    from aic_train import panel
+    pairs = pd.read_csv(AIC / "pairs_train.tsv", sep="\t")
+    out = {}
+    for spec in args.arm:
+        arm, table = spec.split("=", 1)
+        preds = {}
+        for cell in sorted((CELLS / arm).glob("without_*_s*")):
+            with tempfile.TemporaryDirectory(dir=Path.home() / "tmp") as td:
+                preds[cell.name] = predict(cell / "refit" / "last.bin", Path(table), Path(td) / "p.tsv")
+            if len(preds[cell.name]) != len(pairs):
+                raise ValueError(f"{arm}/{cell.name}: {len(preds[cell.name])} predictions for {len(pairs)} pairs")
+        if len(preds) != len(FOLDS) * 3:
+            raise ValueError(f"{arm}: {len(preds)} cells")
+        per = {c: panel(p, pairs) for c, p in preds.items()}
+        out[arm] = {"table": table, "table_sha256": sha(Path(table)),
+                    "mean_cell_global": float(np.mean([r["global"] for r in per.values()])),
+                    "per_cell_global": {c: r["global"] for c, r in per.items()},
+                    "mean_cell_within_ref": float(np.mean([r["within_ref_mean"] for r in per.values()])),
+                    "ensemble": panel(np.mean(list(preds.values()), axis=0), pairs)}
+        print(f"{arm:12s} AIC public_train zero-shot: mean cell global {out[arm]['mean_cell_global']:.4f}, "
+              f"within-source {out[arm]['mean_cell_within_ref']:.4f}; mean prediction {out[arm]['ensemble']['global']:.4f}",
+              flush=True)
+    if args.out:
+        Path(args.out).write_text(json.dumps(out, indent=1) + "\n")
+    return 0
+
+
 def cmd_predict_best(args) -> int:
     """Held-out predictions from each cell's `refit/best.bin` (the trainer's best dev-geomean3 epoch: the harness's
     `best_dev` rule) for an arm, or for E34's stored control cells with `--arm base-c`."""
@@ -406,6 +443,9 @@ def main() -> int:
     r.add_argument("--cols", help="comma-separated columns file for --base-spec")
     r.add_argument("--label", help="arm directory name for --base-spec runs")
     r.add_argument("--aic-weight", type=float, help="add the AIC2026 TRAIN leg (rotating held-out fold) at this weight")
+    z = sub.add_parser("aiczero")
+    z.add_argument("--arm", action="append", required=True, help="NAME=TABLE")
+    z.add_argument("--out")
     q = sub.add_parser("aicscore")
     q.add_argument("--arms", required=True)
     q.add_argument("--out")
@@ -430,7 +470,8 @@ def main() -> int:
     pb.add_argument("--seeds", default="0,1,2")
     args = ap.parse_args()
     return {"run": cmd_run, "score": cmd_score, "curves": cmd_curves, "pairclass": cmd_pairclass,
-            "bytype": cmd_bytype, "predict-best": cmd_predict_best, "aicscore": cmd_aicscore}[args.cmd](args)
+            "bytype": cmd_bytype, "predict-best": cmd_predict_best, "aicscore": cmd_aicscore,
+            "aiczero": cmd_aiczero}[args.cmd](args)
 
 
 if __name__ == "__main__":
