@@ -2101,6 +2101,16 @@ The changes, in order:
     slower on v4x (28.7 → 33–35 ms at 1507×2048, unpaired): with the twenty-nine term vectors live as well, the
     register allocator spilled more than the explicit updates move.
 
+**Tried and not kept** (after 23, all bit-identical): the gradient kernel's six 16-lane row-lane arrays held in
+registers across its steps: no change (28.42–28.55 against 28.43–28.53 ms, unpaired; LLVM already kept them there).
+`|src − mu1|` formed a row at a time inside the activity's horizontal blur instead of as a plane (the difference pass
+is 1.8% of one thread): no change at one thread (28.5–28.6 → 28.6–28.8 ms, unpaired). A software prefetch four rows
+ahead in the vertical blurs, where 36% of the load-stall cycles fall (13.5% of all cycles wait on a load): paired,
+v4x −1.05% at 1507×2048 but +0.60% at 1024², v3 +0.08% / −0.32% / +0.58%, eight threads +0.67% / +0.38%
+(`rev7_lean8_vs_vblurprefetch_t1`, `_t8`); eight rows ahead was no better, sixteen into L2 worse. The phase-B kernels
+hold 14% of the load stalls (dense 9.5%, gradient 2.4%, v1 fold 2.1%), so fusing them into one pass per row band
+would not remove much waiting: the dense kernel is bound by its twenty-six pools' per-step updates.
+
 **Tried and not kept** (after 21): the horizontal moment blur rewritten to share each output's pair and quad tree
 nodes between adjacent outputs (the same trees, half the adds), once through row buffers and once through `valignd`
 on adjacent vectors, both bit-identical: 29.7 → 32.1 ms and 29.6 → 31.1 ms at 1507×2048, one thread, v4x (unpaired).
@@ -2143,13 +2153,16 @@ correctly rounded) made the opsin step slower, because it is bound by FP op coun
 15.1% of samples); spreading revision 7's vertical blockiness lattice over eight lanes removed the lane-0 add chain but
 not the time (1.09 against 1.11 ms; the scalar divisions bound it); a 16-wide loop at revision 5 (above).
 
-**Where the time goes now** (B, revision 7, the 1507×2048 photo, one thread, after 13; harness PNG decoding
-excluded): v4x — the dense kernel 20%, sRGB → XYB 16% (opsin math and the cube root), the vertical blur 13%, the
-horizontal fused blur 12%, the fused SSIM pools 10%, the gradient kernel 7%, blockiness 5%, the activity plane's
-horizontal box blur 5%, downscaling 2.5%, strip copies 2%; v3 — dense 22%, XYB 19% (scalar table loads: no safe AVX2
-gather exists), horizontal fused blur 14%, vertical blur 10%, fused SSIM 10%, gradient 8%. Retirement waits on a load
-for 15.1% of the whole run's cycles (`perf stat`, 30 iterations; 15.8% before 11–13), most of it in the plane passes
-(each 148-row strip's eleven planes hold about 10 MB, more than L2).
+**Where the time goes now** (B, revision 7, the 1507×2048 photo, one thread, after 23; harness PNG decoding
+excluded): v4x — the dense kernel 20.5%, sRGB → XYB 18.0% (opsin math and the cube root), the vertical blurs 14.5%, the
+horizontal moment blur 13.3%, the gradient kernel 7.3%, the v1 fold 6.1% (10.4% before 22), the activity plane's
+horizontal blur 4.9%, downscaling 2.6%, blockiness 2.3%, copies 1.9%, the activity difference 1.9%; v3 — dense 22.1%,
+XYB 20.1%, horizontal moment blur 14.6%, vertical blurs 10.8%, gradient 9.1%, v1 fold 8.7%. Retirement waits on a
+load for 13.5% of cycles (v4x, `perf stat`, 30 iterations), 36% of those in the vertical blurs and 14% in the phase-B
+kernels. The dense kernel's samples are mostly its twenty-six pools' per-step load/add/store (stack moves 40%,
+memory-operand adds 16%); the conversion is bound by its three cube roots' operations. One thread is now 28.4 ms (v4x)
+and 41.7 ms (v3) at 1507×2048, against 43.2 / 59.7 ms at revision 7's implementation commit (separate runs); eight
+threads 4.84 ms (v4x).
 
 Open: NEON still runs the scalar canonical bodies (magetypes' NEON `max`/`min` propagate NaN where the canon's
 `f32::max` does not; `FMAXNM`/`FMINNM` would match it); multithreaded scaling is bound by the strips' memory traffic
