@@ -2342,6 +2342,26 @@ predicts all 7,869 KADID rows bit-identically to the stored M64 cell (prediction
 same validation curve; the bake files' bytes differ, their outputs do not. So stored M64 is the right baseline for
 M64lin.
 
+**Result: not adopted.** M64lin (12 cells, trainer `ede5b94c`, 3,224–3,663 s each) against stored M64, out of sample:
+
+| | M64 | M64lin | M64lin − M64 |
+|---|---|---|---|
+| E21 Δ against `base-c` (seed-unit SE) | −0.0131 (0.0023) | −0.0134 (0.0034) | **−0.0003** (paired SE 0.0012) |
+| KADID / TID2013 / KonFiG / CID22-A Δ | −0.0166 / −0.0215 / −0.0150 / +0.0005 | −0.0042 / −0.0282 / −0.0250 / +0.0036 | **+0.0124** / −0.0067 / −0.0101 / +0.0031 |
+| Z-RMSE KADID / TID2013 / KonFiG / CID22-A (mean) | 0.487 / 0.441 / 0.591 / 0.489 (0.502) | 0.463 / 0.447 / 0.606 / 0.482 (0.499) | |
+| Standard mixture: inversions per cell, total, max rise | 1–6, 38, +7.56 | 2–5, 36, +3.91 | 10 steps newly invert, 12 stop |
+| Global-edit mixture | 0, max −0.05 | 0, max −0.25 | |
+| AIC2026 public_train zero-shot, mean over cells (mean prediction) | 0.9080 (0.9093) | 0.9048 (0.9059) | −0.0032; 2 of 12 cells better |
+
+Per seed the paired difference is −0.0002, −0.0025, +0.0018. E21 does not improve, so the registered rule keeps linear
+light out of revision 7. What it does: coarse damage measured in linear light helps KADID a lot (+0.012, Z-RMSE 0.487 →
+0.463) and CID22-A a little, and costs TID2013 and KonFiG about as much. Per type (`type_bias.py`), the over-penalties M64
+puts on global edits shrink slightly (KADID contrast −0.121 → −0.108, non-eccentricity patch −0.105 → −0.099, TID2013
+pattern noise −0.198 → −0.186) while TID2013 masked noise (+0.026 → +0.006) and sparse sampling (−0.018 → −0.033)
+move the wrong way. The halved worst mixture rise and the fewer falling inputs on added-damage steps are real but do not
+buy E21. The toggle stays as a research arm; the AIC zero-shot rows (an unregistered view: the cells never fit AIC) use
+`linpyr/aic_public_train/` and `byc_cells.py aiczero`.
+
 ### Orientation-selective bands: a label-free probe (2026-10-24)
 
 The second missing idea from the HaarPSI / HaarXYB comparison: every zensim edge and texture feature is isotropic.
