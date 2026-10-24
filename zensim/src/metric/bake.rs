@@ -104,7 +104,7 @@ impl<'a> BakeScorer<'a> {
     ) -> Result<Self, ZensimError> {
         self.map_paint = Some(crate::map_paint::MapPaint::parse(window, paint, split).ok_or(
             ZensimError::ModelLoadFailed {
-                reason: "map paint modes are box|center|guided, nearest|guided and repair|exact",
+                reason: "map paint modes are box|center|guided, nearest|guided and repair|exact|amplitude",
             },
         )?);
         Ok(self)

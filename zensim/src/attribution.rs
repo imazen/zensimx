@@ -2120,6 +2120,67 @@ impl crate::metric::Zensim {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// `SplitMode::Amplitude` carries every p-pool of the basic slots (the L4 and L2 pools of SSIM, artifact and
+    /// detail loss) and the three L8 slots of a peak cell as mean pools of their members: no power term is left,
+    /// and each member's linear coefficient is the sum of its pools' `−s/N`. The exact split keeps its power terms.
+    #[test]
+    fn amplitude_split_folds_p_pools_into_the_linear_terms() {
+        use crate::map_paint::SplitMode;
+        let n = 256.0;
+        let stats = crate::metric::ScaleStats {
+            ssim: [0.02, 0.3, 0.0, 0.0, 0.0, 0.0],
+            ssim_2nd: [0.2, 0.0, 0.0],
+            edge: [0.0, 0.25, 0.0, 0.15, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+            edge_2nd: [0.1, 0.05, 0.0, 0.0, 0.0, 0.0],
+            ssim_p95: [0.4, 0.0, 0.0],
+            art_p95: [0.35, 0.0, 0.0],
+            det_p95: [0.3, 0.0, 0.0],
+            ..Default::default()
+        };
+        let g: [f64; 13] = [
+            1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 0.0, 0.0, 0.0, 0.0,
+        ];
+        let form = crate::hf_gain_form::HfGainForm::RatioExcess;
+        let co = |split| SlotCoeffs::from_scale_stats(&g, 0, &stats, 0, n, 0.0, 0.0, form, split);
+        let (exact, amp) = (co(SplitMode::Exact), co(SplitMode::Amplitude));
+        for v in [
+            exact.c_sd4,
+            exact.c_sd2,
+            exact.c_art4,
+            exact.c_art2,
+            exact.c_det4,
+            exact.c_det2,
+        ] {
+            assert!(v != 0.0, "the exact split keeps its power terms");
+        }
+        assert_eq!(
+            [
+                amp.c_sd4, amp.c_sd2, amp.c_art4, amp.c_art2, amp.c_det4, amp.c_det2
+            ],
+            [0.0; 6]
+        );
+        let close = |a: f64, b: f64| (a - b).abs() <= 1e-15 * b.abs();
+        assert!(close(amp.c_sd, -(1.0 + 2.0 + 3.0) / n), "{}", amp.c_sd);
+        assert!(close(amp.c_art, -(4.0 + 5.0 + 6.0) / n), "{}", amp.c_art);
+        assert!(close(amp.c_det, -(7.0 + 8.0 + 9.0) / n), "{}", amp.c_det);
+        assert_eq!(amp.c_mse, exact.c_mse);
+        let mut peaks = [0.0; 6];
+        peaks[3..].copy_from_slice(&[2.0, 3.0, 5.0]);
+        assert!(
+            l8_coefficients(&peaks, 0, 0, &stats, n, SplitMode::Exact)
+                .iter()
+                .all(|v| *v != 0.0)
+        );
+        assert_eq!(
+            l8_coefficients(&peaks, 0, 0, &stats, n, SplitMode::Amplitude),
+            [0.0; 3]
+        );
+        assert_eq!(
+            l8_amplitude_fold(&peaks, 0, 0, n),
+            [-2.0 / n, -3.0 / n, -5.0 / n]
+        );
+    }
     use crate::profile::ProfileParams;
     use crate::{RgbSlice, Zensim, ZensimProfile};
     use std::sync::OnceLock;
@@ -4899,11 +4960,13 @@ fn l8_coefficients(
     n: f64,
     split: crate::map_paint::SplitMode,
 ) -> [f64; 3] {
-    // Removal `−s·x⁸/(8·N·L8⁷)`; the exact share is eight times it.
-    let share = if split == crate::map_paint::SplitMode::Exact {
-        1.0
-    } else {
-        1.0 / 8.0
+    // Removal `−s·x⁸/(8·N·L8⁷)`; the exact share is eight times it. The
+    // amplitude split carries these slots in the linear terms instead
+    // ([`l8_amplitude_fold`]).
+    let share = match split {
+        crate::map_paint::SplitMode::Exact => 1.0,
+        crate::map_paint::SplitMode::Repair => 1.0 / 8.0,
+        crate::map_paint::SplitMode::Amplitude => return [0.0; 3],
     };
     let roots = [
         stats.ssim_p95[channel],
@@ -4920,6 +4983,18 @@ fn l8_coefficients(
         } else {
             -sensitivity * share / (n * roots[slot].powi(7))
         }
+    })
+}
+
+/// `SplitMode::Amplitude`: the three L8 slots of a peak cell as mean pools of
+/// their members (`sd`, `art`, `det`), `−s/N` each, to add to the linear
+/// coefficients of the basic combine (`[sd, art, det]`).
+fn l8_amplitude_fold(s: &[f64], scale: usize, channel: usize, n: f64) -> [f64; 3] {
+    core::array::from_fn(|slot| {
+        -s.get((scale * 3 + channel) * 6 + 3 + slot)
+            .copied()
+            .unwrap_or(0.0)
+            / n
     })
 }
 
@@ -5542,10 +5617,15 @@ impl SlotCoeffs {
         split: crate::map_paint::SplitMode,
     ) -> Self {
         let exact = split == crate::map_paint::SplitMode::Exact;
+        // `SplitMode::Amplitude`: every p-pool distributed as a mean pool of
+        // its member (folded into the linear coefficients below).
+        let amplitude = split == crate::map_paint::SplitMode::Amplitude;
         let g = |slot: usize| s.get(base_k + slot).copied().unwrap_or(0.0);
         let inv_n = 1.0 / n_f;
         let p_coeff = |sk: f64, m: f64, p: f64| -> f64 {
-            if m > 0.0 {
+            if amplitude {
+                0.0
+            } else if m > 0.0 {
                 let share = if exact { 1.0 } else { 1.0 / p };
                 -sk * inv_n * share * m.powf((1.0 - p) / p)
             } else {
@@ -5566,7 +5646,7 @@ impl SlotCoeffs {
                     // Preserve the established revision-1 spelling bit for bit
                     // (this gain is linear in Σdst², so both splits agree).
                     g(12) / hf_sq_src_sum
-                } else if exact {
+                } else if exact || amplitude {
                     g(12) * stats.hf_energy_gain[c] / (stats.hf_sq_dst_sum[c] - hf_sq_src_sum)
                 } else {
                     g(12)
@@ -5588,14 +5668,15 @@ impl SlotCoeffs {
         } else {
             0.0
         };
+        let fold = |a: usize, b: usize| if amplitude { g(a) + g(b) } else { 0.0 };
         Self {
-            c_sd: -g(0) * inv_n,
+            c_sd: -(g(0) + fold(1, 2)) * inv_n,
             c_sd4: p_coeff(g(1), m4_ssim, 4.0),
             c_sd2: p_coeff(g(2), m2_ssim, 2.0),
-            c_art: -g(3) * inv_n,
+            c_art: -(g(3) + fold(4, 5)) * inv_n,
             c_art4: p_coeff(g(4), m4_art, 4.0),
             c_art2: p_coeff(g(5), m2_art, 2.0),
-            c_det: -g(6) * inv_n,
+            c_det: -(g(6) + fold(7, 8)) * inv_n,
             c_det4: p_coeff(g(7), m4_det, 4.0),
             c_det2: p_coeff(g(8), m2_det, 2.0),
             c_mse: -g(9) * inv_n,
@@ -6591,7 +6672,7 @@ impl crate::metric::Zensim {
             });
             let co32: [[f32; 12]; 3] = core::array::from_fn(|c| {
                 let base_k = scale * FPC * 3 + c * FPC;
-                coeffs_to_f32(&SlotCoeffs::from_scale_stats(
+                let mut co = SlotCoeffs::from_scale_stats(
                     s,
                     base_k,
                     stats,
@@ -6601,7 +6682,14 @@ impl crate::metric::Zensim {
                     hf[c].1,
                     crate::hf_gain_form::HfGainForm::at_revision(config.formula_revision),
                     paint.split,
-                ))
+                );
+                if paint.split == crate::map_paint::SplitMode::Amplitude {
+                    let [sd, art, det] = l8_amplitude_fold(s_peaks, scale, c, n_f);
+                    co.c_sd += sd;
+                    co.c_art += art;
+                    co.c_det += det;
+                }
+                coeffs_to_f32(&co)
             });
             let l8_co: [[f64; 3]; 3] = core::array::from_fn(|c| {
                 l8_coefficients(s_peaks, scale, c, stats, n_f, paint.split)

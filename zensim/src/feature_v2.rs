@@ -10989,6 +10989,21 @@ fn derive_v2app_coeffs(
         c.sp_art.1 = 0.0;
         c.sp_det.1 = 0.0;
     }
+    if split == SplitMode::Amplitude {
+        // Each soft peak as a mean pool of its member: `−s·v_i/N`.
+        if dense.ws_peak_ssim.den > 0.0 {
+            c.c_ssim -= gv2(idx::SSIM_SOFT_PEAK) * inv_n;
+        }
+        if dense.ws_peak_art.den > 0.0 {
+            c.c_art -= gv2(idx::ART_SOFT_PEAK) * inv_n;
+        }
+        if dense.ws_peak_det.den > 0.0 {
+            c.c_det -= gv2(idx::DET_SOFT_PEAK) * inv_n;
+        }
+        c.sp_ssim = (0.0, 0.0);
+        c.sp_art = (0.0, 0.0);
+        c.sp_det = (0.0, 0.0);
+    }
     // SSIM deviation pools (central moments of the d map).
     let mu = dense.sum_d * inv_n;
     let raw2 = dense.sum_d2 * inv_n;
@@ -11038,6 +11053,8 @@ fn derive_v2app_coeffs(
                 q[1] += k * mu;
                 q[2] += k;
             }
+            // As a mean pool of `d`.
+            SplitMode::Amplitude => c.c_ssim -= c.s_dev2 * inv_n,
         }
     }
     if c.s_dev4 != 0.0 && c.dev_f4 > 1e-12 {
@@ -11058,6 +11075,8 @@ fn derive_v2app_coeffs(
                 q[3] += k * mu;
                 q[4] += k;
             }
+            // As a mean pool of `d`.
+            SplitMode::Amplitude => c.c_ssim -= c.s_dev4 * inv_n,
         }
     }
     c.dev_q = q;
@@ -11108,11 +11127,27 @@ fn derive_v2app_coeffs(
                     let k = -sk * inv_n / f;
                     [0.0, k * m, k, m]
                 }
+                // Folded into the member's mean pool below.
+                SplitMode::Amplitude => [0.0; 4],
             }
         };
         c.gq_gms = gq(c.gd_gms);
         c.gq_art = gq(c.gd_art);
         c.gq_det = gq(c.gd_det);
+        if split == SplitMode::Amplitude {
+            // Each deviation pool as a mean pool of its member: `−s·v_i/N`.
+            let fold = |g: (f64, f64, f64)| -> f64 {
+                let (sk, _, f) = g;
+                if sk == 0.0 || f <= 1e-12 {
+                    0.0
+                } else {
+                    -sk * inv_n
+                }
+            };
+            c.c_gms += fold(c.gd_gms);
+            c.c_art += fold(c.gd_art);
+            c.c_det += fold(c.gd_det);
+        }
         // Globals. GLOBAL_DMEAN: f = sat(|Δ|, C), Δ = (Σs−Σd)/N. Repair:
         // (δf)_i = −sat'(|Δ|)·sign(Δ)·(s_i−d_i)/N. Exact: the secant share
         // (f/Δ)·(s_i−d_i)/N, with f/Δ = sign(Δ)/(|Δ| + C) bounded at Δ → 0.
@@ -11122,11 +11157,11 @@ fn derive_v2app_coeffs(
                 let sat_p = C_GDMEAN / ((delta.abs() + C_GDMEAN) * (delta.abs() + C_GDMEAN));
                 gap(idx_append::GLOBAL_DMEAN) * (-sat_p * delta.signum() * inv_n)
             }
-            SplitMode::Exact if delta != 0.0 => {
+            SplitMode::Exact | SplitMode::Amplitude if delta != 0.0 => {
                 gap(idx_append::GLOBAL_DMEAN)
                     * (-(delta.signum() / (delta.abs() + C_GDMEAN)) * inv_n)
             }
-            SplitMode::Exact => 0.0,
+            SplitMode::Exact | SplitMode::Amplitude => 0.0,
         };
         // GLOBAL_CGAIN/CLOSS: chain rule on gvar2 (gvar1 is reference-side).
         let gmean_s = app.sum_s * inv_n;
@@ -11148,7 +11183,7 @@ fn derive_v2app_coeffs(
                 c.g_shift = 0.0;
                 c.g_sum = 2.0 * gmean_d;
             }
-            SplitMode::Exact => {
+            SplitMode::Exact | SplitMode::Amplitude => {
                 // GLOBAL_CGAIN = (gvar2 − gvar1)/denom, GLOBAL_CLOSS its
                 // negation: the pixel's share of `gvar2 − gvar1` is
                 // ((d−μd)² − (s−μs)²)/N, factored as

@@ -4,6 +4,54 @@ pub(crate) mod tests {
     use crate::PixelFormat;
     use crate::source::{RgbSlice, StridedBytes};
 
+    /// `SplitMode::Amplitude` carries the SSIM member's soft peak and both deviation pools as mean pools of `d`,
+    /// with no peak or deviation polynomial left; the exact split keeps both.
+    #[cfg(feature = "custom-profiles")]
+    #[test]
+    fn amplitude_split_folds_the_ssim_pools_into_its_mean_pool() {
+        use crate::map_paint::SplitMode;
+        let n = 64usize;
+        let mut cell = AttrCellSums {
+            n,
+            ..Default::default()
+        };
+        for i in 0..n {
+            let v = 0.01 + 0.002 * i as f64;
+            cell.dense.sum_d += v;
+            cell.dense.sum_d2 += v * v;
+            cell.dense.sum_d3 += v * v * v;
+            cell.dense.sum_d4 += v * v * v * v;
+        }
+        cell.dense.ws_peak_ssim = WeightedSum { num: 0.5, den: 2.0 };
+        let mut s = vec![0.0; FEATURES_PER_CHANNEL_V2_TOTAL];
+        s[idx::SSIM_MEAN] = 1.0;
+        s[idx::SSIM_SOFT_PEAK] = 2.0;
+        s[idx::SSIM_DEV2] = 3.0;
+        s[idx::SSIM_DEV4] = 4.0;
+        let derive = |split| {
+            derive_v2app_coeffs(
+                &s,
+                None,
+                None,
+                0,
+                0,
+                &cell,
+                false,
+                false,
+                0.0,
+                FormulaRevision::Rev5,
+                split,
+            )
+        };
+        let (exact, amp) = (derive(SplitMode::Exact), derive(SplitMode::Amplitude));
+        let inv_n = 1.0 / n as f64;
+        assert!(exact.sp_ssim.0 != 0.0 && exact.dev_q.iter().any(|q| *q != 0.0));
+        assert_eq!(exact.c_ssim, -inv_n);
+        assert_eq!(amp.sp_ssim, (0.0, 0.0));
+        assert_eq!(amp.dev_q, [0.0; 5]);
+        assert!((amp.c_ssim + 10.0 * inv_n).abs() <= 1e-15, "{}", amp.c_ssim);
+    }
+
     /// Revision 7's blockiness takes lane partials per `STRIP_ROWS` kernel strip, merged in strip order: the
     /// whole-range form (`blockiness_sparse_rows`, the materialized walks) and the strip walk
     /// (`blockiness_sparse_strip_wide` over reflected halo windows, as the streaming walk and its parallel jobs

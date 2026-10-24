@@ -191,7 +191,7 @@ pub(crate) fn map_planes(
     split: crate::map_paint::SplitMode,
 ) -> Vec<(usize, Vec<f32>, usize, usize)> {
     let k = match split {
-        crate::map_paint::SplitMode::Exact => 1.0,
+        crate::map_paint::SplitMode::Exact | crate::map_paint::SplitMode::Amplitude => 1.0,
         crate::map_paint::SplitMode::Repair => 2.0,
     };
     let sens = |scale: usize, ch: usize, slot: usize| {

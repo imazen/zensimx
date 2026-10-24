@@ -87,6 +87,14 @@ pub(crate) enum SplitMode {
     Repair,
     /// Each pixel's share of the feature; the shares sum to it.
     Exact,
+    /// For steering (research): each nonlinear pool (Lp and L8 norms, soft
+    /// peaks, deviation pools) distributed as a mean pool of its per-pixel
+    /// quantity, `−s·v_i/N` (`−s·|v_i − μ|/N` for a deviation pool). A pixel's
+    /// value then responds to its own error as the pool does to a uniform
+    /// change, where a share of an Lp pool goes as `v^p` locally and as `v`
+    /// globally; for uniform damage the total equals the exact split's.
+    /// Linear, weighted, ratio and global terms keep their exact shares.
+    Amplitude,
 }
 
 /// The painting choices of one map.
@@ -120,7 +128,7 @@ impl Default for MapPaint {
 }
 
 impl MapPaint {
-    /// Parse `box|center|guided`, `nearest|guided` and `repair|exact`.
+    /// Parse `box|center|guided`, `nearest|guided` and `repair|exact|amplitude`.
     pub(crate) fn parse(window: &str, paint: &str, split: &str) -> Option<Self> {
         let window = match window {
             "box" => WindowMode::Box,
@@ -136,6 +144,7 @@ impl MapPaint {
         let split = match split {
             "repair" => SplitMode::Repair,
             "exact" => SplitMode::Exact,
+            "amplitude" => SplitMode::Amplitude,
             _ => return None,
         };
         Some(Self {
@@ -173,7 +182,7 @@ impl MapPaint {
             Self::parse(&window, &paint, &split).map(|p| Self { smooth_milli, guide, ..p }).unwrap_or_else(|| {
                 panic!(
                     "ZENSIM_MAP_WINDOW={window:?} / ZENSIM_MAP_PAINT={paint:?} / ZENSIM_MAP_SPLIT={split:?}: \
-                     expected box|center|guided, nearest|guided and repair|exact"
+                     expected box|center|guided, nearest|guided and repair|exact|amplitude"
                 )
             })
         })
