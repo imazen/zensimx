@@ -2337,6 +2337,30 @@ of steps on which an input falls 0.184 → 0.171, inputs falling on more than 25
 tables and SHA256SUMS in `linpyr/mixture_features/`). The monotone recipe treats every input as damage, so a falling
 input on an added-damage step is one way a monotone model can invert.
 
+### Orientation-selective bands: a label-free probe (2026-10-24)
+
+The second missing idea from the HaarPSI / HaarXYB comparison: every zensim edge and texture feature is isotropic.
+`scripts/byconstruction/haar_orient_probe.py` takes the three Haar detail bands (horizontal, vertical, diagonal) of
+each scale's 2×2 blocks of zensim's own pyramid (Y, scales 0–3) for the same 8,165 TRAIN pairs as the linear-light probe
+(keys only, no labels), and reports per distortion type the diagonal share of the band-difference energy and the
+horizontal/vertical asymmetry `|E_H − E_V| / (E_H + E_V)`. Outputs and SHA256SUMS:
+`/mnt/v/output/zensim/byconstruction-2026-10-22/haar_orient/`.
+
+- Natural content puts 0.09–0.12 of its band energy in the diagonal band (per scale and set).
+- Additive noise puts a third there with no asymmetry (KADID 11–14, TID2013 1/2/6/19, KonFiG multiplicative noise:
+  0.31–0.33, asymmetry ≤ 0.06); spectrally shaped noise more at fine scales (TID2013 masked noise 0.48, high-frequency
+  noise 0.45, scale 0).
+- Directional damage is strongly asymmetric: KADID motion blur 0.37 → 0.61 (scale 0 → 2), TID2013 chromatic aberration
+  0.45–0.57, TID2013 JPEG2000 transmission errors 0.26–0.40; colour block (KADID 23) and colour saturation (KADID 7)
+  have the lowest diagonal shares (0.05–0.11).
+- KADID's Gaussian and lens blur move damage toward the diagonal band with scale (0.14–0.15 at scale 0, 0.31–0.32 at
+  scale 3); TID2013's Gaussian blur stays at 0.14–0.22.
+
+So orientation separates noise-like from structural damage, and directional from isotropic, where our features
+cannot. The visual system is less sensitive to oblique orientations at high frequencies, so a damage feature split by
+orientation could let a monotone model weight noise below structure. This says orientation is missing information, not
+that it helps a model; a trained test waits on the linear-light result.
+
 ### DVIFM 0.3 on the E21 sets and the mixture test (2026-10-23)
 
 Owner request: "eval dvifm 0.3 on kadid and other distortion//corrputions". Scorer: the frozen runtime of the
