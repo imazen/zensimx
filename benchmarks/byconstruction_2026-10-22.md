@@ -2483,6 +2483,21 @@ instead gives scale 2.2571e-2, exponent 0.7, fit r 0.900, held out 0.758 (99th p
 d 0.2 to 4 (+0.41 at d 0.1, −0.25 at d 6). On the held-out screenshots Tga reads +0.97 to +1.61 above butteraugli for
 d ≤ 1, a content-dependent level no single placement can serve.
 
+**The tail placement on two images** (one CID22 training photo, one held-out gb82 screenshot; scale 2.2571e-2, exponent
+0.7, 4 iterations). Final ÷ requested at d 0.3 / 0.45 / 0.6 / 1 / 2 / 4: photo 1.39 / 1.02 / 1.28 / 1.13 / 1.08 / 0.82
+at 1–7% more bytes than butteraugli's loop (shipped placement: 6.13 / 5.29 / 4.99 / 4.98 / 3.58 / 2.44); screenshot 1.56
+/ 0.94 / 0.92 / 1.40 / 0.93 / 0.96 (butteraugli 0.76–0.91). Blocks still above target after the last iteration were
+still falling over the last steps (photo d 0.3: 147 → 74 → 42 after the first step sent the score to 13.5, 45× the
+target), so the loop is converging, slowly. Static frame-0 tiles on the screenshot read about 3× butteraugli's at d
+0.3–1, and the curve is not monotone at the finest encoder distances (0.46 at d 0.05, 0.29 at d 0.1).
+
+**What the map tells the loop about the rest of the image** (the photo at d 0.45, frame dumps; tile / target per
+8×8 block): butteraugli's median block sits at 0.20 of the target, 1% of blocks below 0.1, and the first step coarsens
+the below-target blocks by a median factor of 0.73 ((tile / target)^0.2). Tga at the tail placement puts its median
+block at 0.003 of the target, 78% of blocks below 0.1 and 62% below 0.01, and coarsens them by a median factor of 0.30.
+The tail fit makes the worst blocks reachable; it does not change the map's spread across blocks, which an attribution
+map gets from splitting pooled norms (shares ∝ e⁴, x⁸) and which no power-law placement can remove.
+
 **Corpus test (recorded before its results).** `jxl_reach.sh` on the 78 TRAIN images of the steering study:
 `static` (no loop, 20 encoder distances 0.05–10), `butteraugli`, `Tga` (shipped placement), `Tgatail` (tail-max fit)
 and `Tgatail8` (8 iterations), distances 0.3–10, effort 7, every output probed by Tga's map at both placements, frames
