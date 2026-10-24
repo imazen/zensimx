@@ -2601,6 +2601,43 @@ signal, by rate–distortion against judges.
   under both independent judges; an interval that straddles zero under either is a tie. Home-turf cells are reported
   and not counted. Encode time per arm is reported.
 
+**Amendment (before the encodes).** The reachability result added tail-fit placements (`loop_calibrate`
+`LOOP_CAL_TAIL`, largest tile): Tga 2.2571e-2 / 0.7, M64a 2.4053e-2 / 0.7, B 1.8152e-2 / 0.7, and DVIFM 0.3
+2.960654e-1 / 0.35 (the private aic4-wasm `loop_calibrate`, same method: fit r 0.328, held out 0.462; its bulk fit is
+exponent 0.3, r 0.164). Each map runs at both placements. The no-loop baseline is `jxl_reach.sh`'s 20-distance sweep
+(the same bitstreams as a 9-distance run, more points for the equal-quality interpolation).
+
+**Results** (`jxl_steer_rd.sh`, steer_rd `3ba4f4ba1cb8`, DVIFM server `aic4-eb492421acd3`, judge build
+`zenmetrics-judge-7a0f8394`, DVIFM runtime `4827663c…`; 8,580 judged images, run-heavy 901 s, peak RSS 1.88 GiB;
+tables and SHA256SUMS in `/mnt/v/output/zensim/byconstruction-2026-10-22/jxl-steer/`). Bytes saved against the
+butteraugli loop at equal judged score (%, mean over images of each image's median, 95% bootstrap interval; positive
+is fewer bytes):
+
+| Arm | Photos SSIMULACRA2 | Photos CVVDP | Illustrations SSIMULACRA2 / CVVDP | Screens SSIMULACRA2 / CVVDP | All SSIMULACRA2 | All CVVDP |
+|---|---|---|---|---|---|---|
+| Tga | **+2.61** [+1.72, +3.48] | +0.69 [−0.57, +1.84] | −1.37 / −2.45 | −7.05 / −12.68 | −0.74 [−2.05, +0.50] | −3.28 [−5.61, −1.23] |
+| Tga, tail | +0.74 [+0.18, +1.23] | −0.38 [−0.89, +0.16] | −1.21 / −1.11 | −6.77 / −6.58 | −1.54 [−2.77, −0.54] | −2.01 [−3.14, −1.00] |
+| M64a | **+2.56** [+1.48, +3.55] | +0.70 [−0.62, +1.95] | −0.26 / −1.55 | −7.07 / −11.76 | −0.46 [−2.08, +0.93] | −2.81 [−5.36, −0.72] |
+| M64a, tail | +0.81 [+0.21, +1.33] | −0.26 [−0.89, +0.32] | −1.04 / −0.71 | −4.96 / −7.63 | −1.04 [−2.19, −0.08] | −2.09 [−3.57, −0.88] |
+| B | +1.95 [+0.82, +3.02] | −0.82 [−2.54, +0.76] | −1.15 / −5.24 | −9.52 / −14.38 | −1.57 [−3.32, −0.04] | −5.19 [−8.04, −2.53] |
+| B, tail | −0.15 [−1.08, +0.63] | −1.54 [−2.40, −0.70] | −0.96 / −1.53 | −10.92 / −11.33 | −2.86 [−4.78, −1.28] | −3.80 [−5.72, −2.14] |
+| DVIFM 0.3 | −0.32 [−0.75, +0.07] | −1.35 [−1.77, −0.88] | +0.17 / −1.27 | −1.72 / −2.34 | −0.51 [−1.13, −0.00] | −1.56 [−2.33, −0.81] |
+| DVIFM 0.3, tail | −1.40 [−1.90, −0.91] | −1.37 [−1.97, −0.84] | −0.68 / −1.46 | −1.06 / −0.89 | −1.12 [−1.61, −0.65] | −1.28 [−1.85, −0.77] |
+
+Against no loop the butteraugli loop saves +1.20% [+0.78, +1.60] (SSIMULACRA2) and +1.12% [+0.54, +1.72] (CVVDP)
+over all 78 images; Tga −0.87 / −4.04, Tga tail −0.84 / −2.64, DVIFM 0.3 −2.79 / −5.24, DVIFM tail −0.47 / −1.70.
+Eight-iteration Tga tail equals the four-iteration one within 0.1 point everywhere. Home-turf cells (butteraugli on
+its own loop, DVIFM on its own map, zensim on ours) are in the full tables and not read.
+
+**Reading** (my bar: positive with the interval above zero under both SSIMULACRA2 and CVVDP): no map steers JPEG XL
+better than butteraugli on this corpus. Our maps are ahead on photos by SSIMULACRA2 only (+2.6% at the shipped
+placement; CVVDP +0.7% with an interval across zero) and behind on screens by 5–14% under both judges; DVIFM 0.3 stays
+within about 2% of butteraugli everywhere and is not ahead anywhere. The tail placement, which makes the target
+reachable, costs our maps about 1.9 points of SSIMULACRA2 savings on photos against the shipped placement (+0.74
+against +2.61 for Tga) and gains on screens (CVVDP −6.6 against −12.7): once the loop believes it has met its target
+it coarsens the blocks the map reads as free (the reclaim step, "What the map tells the loop" above), and the
+independent judges charge for it. That is the same construction problem the reachability test found, seen in bytes.
+
 ## Summary (all arms, E21 screen, seeds 0–2, Δ vs `base-c`)
 
 | Arm | Guarantee | E21 Δ (SE) | Mixture inversions / cell (max rise) |
