@@ -245,17 +245,20 @@ fn main() {
         ["none"] => Steer::None,
         ["butteraugli"] => Steer::Butteraugli,
         ["workbench", metric, map] => {
-            let p = fitted(metric, map);
+            // An explicit placement needs no fitted one.
             let (scale, exponent) = match &placement_override {
                 Some(se) => {
                     let (sc, ex) = se.split_once(',').expect("--placement SCALE,EXPONENT");
                     (sc.parse().expect("scale"), ex.parse().expect("exponent"))
                 }
-                None => (p.scale, p.exponent),
+                None => {
+                    let p = fitted(metric, map);
+                    (p.scale, p.exponent)
+                }
             };
             Steer::Workbench {
-                metric: p.metric,
-                map: p.map,
+                metric: metric.to_string(),
+                map: map.to_string(),
                 scale,
                 exponent,
             }
