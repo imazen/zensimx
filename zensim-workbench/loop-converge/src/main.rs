@@ -18,109 +18,8 @@
 //! loop (`MAP` is then ignored); `DISTANCES` is comma-separated. The
 //! workbench's loop player defaults to effort 7 and 4 iterations.
 
-use jxl_encoder::{ExternalLoopMetric, ExternalMetric, LoopTrace, LossyConfig, PixelLayout};
-
-/// sRGB8 of a linear value in `[0, 1]`, as the wasm codec hands
-/// reconstructions to the scorer.
-fn srgb8(v: f32) -> u8 {
-    let v = v.clamp(0.0, 1.0);
-    let e = if v <= 0.003_130_8 {
-        12.92 * v
-    } else {
-        1.055 * v.powf(1.0 / 2.4) - 0.055
-    };
-    (e * 255.0 + 0.5) as u8
-}
-
-struct MapScorer {
-    metric: String,
-    map: String,
-    scale: f64,
-    exponent: f64,
-    reference: Vec<u8>,
-}
-
-impl ExternalLoopMetric for MapScorer {
-    fn set_reference(
-        &mut self,
-        _r: &[f32],
-        _g: &[f32],
-        _b: &[f32],
-        _width: usize,
-        _height: usize,
-    ) -> Result<(), String> {
-        // As in the workbench, the scorer already holds the source the encode
-        // was given.
-        Ok(())
-    }
-
-    fn compare(
-        &mut self,
-        r: &[f32],
-        g: &[f32],
-        b: &[f32],
-        stride: usize,
-        width: usize,
-        height: usize,
-        diffmap: &mut Vec<f32>,
-    ) -> Result<f64, String> {
-        let mut rgba = Vec::with_capacity(width * height * 4);
-        for y in 0..height {
-            for x in y * stride..y * stride + width {
-                rgba.extend([srgb8(r[x]), srgb8(g[x]), srgb8(b[x]), 255]);
-            }
-        }
-        let (values, score) = zensim_workbench::loop_map_values(
-            &self.metric,
-            &self.map,
-            &self.reference,
-            &rgba,
-            width as u32,
-            height as u32,
-            width * 4,
-            self.scale,
-            self.exponent,
-        )?;
-        diffmap.clear();
-        diffmap.extend_from_slice(&values);
-        Ok(score)
-    }
-}
-
-fn read_png(path: &str) -> (Vec<u8>, u32, u32) {
-    let mut decoder = png::Decoder::new(std::io::BufReader::new(
-        std::fs::File::open(path).expect("open image"),
-    ));
-    // Palette and sub-byte images expand to 8-bit RGB(A); 16-bit strips.
-    decoder.set_transformations(png::Transformations::EXPAND | png::Transformations::STRIP_16);
-    let mut reader = decoder.read_info().expect("png header");
-    let mut buf = vec![0; reader.output_buffer_size().expect("png size")];
-    let info = reader.next_frame(&mut buf).expect("png frame");
-    assert_eq!(info.bit_depth, png::BitDepth::Eight, "8-bit PNG expected");
-    let rgb: Vec<u8> = match info.color_type {
-        png::ColorType::Rgb => buf[..info.buffer_size()].to_vec(),
-        png::ColorType::Rgba => buf[..info.buffer_size()]
-            .as_chunks::<4>()
-            .0
-            .iter()
-            .flat_map(|p| [p[0], p[1], p[2]])
-            .collect(),
-        png::ColorType::Grayscale => buf[..info.buffer_size()]
-            .iter()
-            .flat_map(|&v| [v, v, v])
-            .collect(),
-        other => panic!("unsupported PNG color type {other:?}"),
-    };
-    (rgb, info.width, info.height)
-}
-
-fn rgba_ref(rgb: &[u8]) -> Vec<u8> {
-    rgb.as_chunks::<3>()
-        .0
-        .iter()
-        .flat_map(|p| [p[0], p[1], p[2], 255])
-        .collect()
-}
+use jxl_encoder::{ExternalMetric, LoopTrace, LossyConfig, PixelLayout};
+use zensim_workbench_loop_converge::{ErrorSlot, MapScorer, read_png, rgba as rgba_ref, srgb8};
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
@@ -169,12 +68,7 @@ fn main() {
             d["exponent"].as_f64().expect("exponent"),
         )
     });
-    let rgba: Vec<u8> = rgb
-        .as_chunks::<3>()
-        .0
-        .iter()
-        .flat_map(|p| [p[0], p[1], p[2], 255])
-        .collect();
+    let rgba = rgba_ref(&rgb);
     println!(
         "image {} {width}x{height}; metric {metric} {}; iters {iters}; effort {effort}",
         args[1],
@@ -197,6 +91,7 @@ fn main() {
                 .or_else(|| overrides.iter().find(|o| o.0.is_none()))
                 .map_or(p, |o| (o.1, o.2))
         });
+        let error = ErrorSlot::default();
         let external = placed.map(|(scale, exponent)| {
             ExternalMetric::new(MapScorer {
                 metric: metric.clone(),
@@ -204,6 +99,7 @@ fn main() {
                 scale,
                 exponent,
                 reference: rgba.clone(),
+                error: error.clone(),
             })
         });
         let request = match &external {
@@ -211,6 +107,9 @@ fn main() {
             None => request,
         };
         let file = request.encode(&rgb).expect("encode");
+        if let Some(e) = error.lock().expect("error slot").take() {
+            panic!("d {distance}: the steering map failed: {e}");
+        }
         let frames = trace.take();
         // LOOP_CONVERGE_DUMP=DIR: every frame's reconstruction (sRGB8 RGB, raw)
         // and map (f32 LE) as d<distance>_s<seed>_i<iter>.{rgb,map}.

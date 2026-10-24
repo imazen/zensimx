@@ -11,6 +11,9 @@
 #   ZM_BIN=~/work/zen/zenmetrics/target/release/zenmetrics \
 #   bash scripts/v_next/rd_probe_2026-07-18.sh [jxl|zenjpeg|judge|all]
 #
+# JUDGES (default "ssim2 butteraugli zensim") names the zenmetrics metrics the
+# judge phase runs, e.g. with `cvvdp` added.
+#
 # Everything streams to $RD/logs/*.log (tail-able) + accumulating TSVs.
 set -euo pipefail
 
@@ -101,7 +104,7 @@ with open(f"{rd}/judge_pairs.tsv", "w", newline="") as f:
     w.writerows(rows)
 print(f"{len(rows)} judge pairs")
 EOF
-  for metric in ssim2 butteraugli zensim; do
+  for metric in ${JUDGES:-ssim2 butteraugli zensim}; do
     echo "-- judging with $metric ($(date -u +%H:%M:%SZ))" | tee -a "$log"
     nice -n19 "$ZM_BIN" batch --metric "$metric" \
       --pairs "$RD/judge_pairs.tsv" --output "$RD/judge_$metric.tsv" >>"$log" 2>&1

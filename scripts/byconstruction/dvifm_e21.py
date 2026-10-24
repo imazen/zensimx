@@ -8,6 +8,8 @@ sets (KADID TRAIN+SELECT, TID2013, KonFiG TRAIN+VAL, CID22-A 25 references) and 
   pairs     OUT/pairs.tsv (unique ref/dist pairs, no labels) and OUT/rows.parquet (E21 row order with type and level)
   score     OUT/dvifm.tsv through the frozen binary (run under run-heavy)
   mixture   --mixture DIR: scores the mixture images and writes DIR/scores_DVIFM03.json as quality = -JND
+  judge     --rd DIR: scores an RD judge panel's pairs (DIR/judge_pairs.tsv, scripts/v_next/rd_probe_2026-07-18.sh) into
+            DIR/judge_dvifm.tsv (`jnd`, a distance), the panel's DVIFM 0.3 judge
 
 E21 row order is the fold tables' (`wide/main/real/<ds>.keys.parquet`), which is E34 panel-input order. Paths,
 distortion type and level come from the promoted feature bank's keys of each member set; no label is read here.
@@ -103,6 +105,17 @@ def cmd_mixture(a) -> int:
     return 0
 
 
+def cmd_judge(a) -> int:
+    rd = Path(a.rd)
+    dest = rd / "judge_dvifm.tsv"
+    if dest.exists():
+        raise SystemExit(f"exists: {dest}")
+    pairs = pd.read_csv(rd / "judge_pairs.tsv", sep="\t")[["ref_path", "dist_path"]].drop_duplicates()
+    got = batch(pairs.reset_index(drop=True), dest, a.threads)
+    print(json.dumps({"pairs": len(got), "judge_dvifm_sha256": sha(dest), "binary": sha(frozen_binary())}))
+    return 0
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -112,8 +125,11 @@ def main() -> int:
     m = sub.add_parser("mixture")
     m.add_argument("--mixture", required=True)
     m.add_argument("--threads", type=int, default=16)
+    j = sub.add_parser("judge")
+    j.add_argument("--rd", required=True)
+    j.add_argument("--threads", type=int, default=16)
     a = ap.parse_args()
-    return {"pairs": cmd_pairs, "score": cmd_score, "mixture": cmd_mixture}[a.cmd](a)
+    return {"pairs": cmd_pairs, "score": cmd_score, "mixture": cmd_mixture, "judge": cmd_judge}[a.cmd](a)
 
 
 if __name__ == "__main__":
