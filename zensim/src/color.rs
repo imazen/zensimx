@@ -653,9 +653,10 @@ impl<T: F32x16Convert> CanonChunk<T> {
         let [m0, m1, m2] = self.mixed(r, g, b);
         let (t0, t1, t2) = if self.cbrt7 {
             (
-                crate::det_math::cbrt_newton_x16(self.token, m0),
-                crate::det_math::cbrt_newton_x16(self.token, m1),
-                crate::det_math::cbrt_newton_x16(self.token, m2),
+                // `mixed` ends in `max(0)`: the inputs are `+0` or positive.
+                crate::det_math::cbrt_newton_nonneg_x16(self.token, m0),
+                crate::det_math::cbrt_newton_nonneg_x16(self.token, m1),
+                crate::det_math::cbrt_newton_nonneg_x16(self.token, m2),
             )
         } else {
             (m0.cbrt_midp(), m1.cbrt_midp(), m2.cbrt_midp())

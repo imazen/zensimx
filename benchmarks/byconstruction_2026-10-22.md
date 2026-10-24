@@ -2101,10 +2101,20 @@ The changes, in order:
     slower on v4x (28.7 → 33–35 ms at 1507×2048, unpaired): with the twenty-nine term vectors live as well, the
     register allocator spilled more than the explicit updates move.
 
+24. **The opsin cube root without sign handling** (revision 7, v4x/v4/v3): the opsin mix ends in `max(0)`, so its
+    three cube roots never see a negative input or `−0`, and `cbrt_newton_x16`'s absolute value and sign restore are
+    no-ops there. `cbrt_newton_nonneg_x16` drops them (it keeps the `+0` case); every lane has the full form's bits.
+    Bits: 110 of 110 dumps at revisions 5/6 and 7, 72 revision-7 thread and tier dumps unchanged;
+    `cbrt_newton_nonneg_matches_scalar` compares it with the scalar root on every compiled tier over `+0`,
+    subnormals, all of `[1, 8)` and every 97th positive bit pattern to `+inf`, and fails without the `+0` case.
+    Paired, 8 rounds, one thread (`rev7_lean8_vs_nonnegcbrt_t1`): v4x −0.74% (1507×2048), −0.76% (256²), −1.51%
+    (1024²); v3 −2.31% / −2.64% / −2.46%.
+
 **Tried and not kept** (after 23, all bit-identical): the gradient kernel's six 16-lane row-lane arrays held in
 registers across its steps: no change (28.42–28.55 against 28.43–28.53 ms, unpaired; LLVM already kept them there).
 `|src − mu1|` formed a row at a time inside the activity's horizontal blur instead of as a plane (the difference pass
-is 1.8% of one thread): no change at one thread (28.5–28.6 → 28.6–28.8 ms, unpaired). A software prefetch four rows
+is 1.8% of one thread): no change at one thread (28.5–28.6 → 28.6–28.8 ms, unpaired), as the per-row form tried after
+13 found. A software prefetch four rows
 ahead in the vertical blurs, where 36% of the load-stall cycles fall (13.5% of all cycles wait on a load): paired,
 v4x −1.05% at 1507×2048 but +0.60% at 1024², v3 +0.08% / −0.32% / +0.58%, eight threads +0.67% / +0.38%
 (`rev7_lean8_vs_vblurprefetch_t1`, `_t8`); eight rows ahead was no better, sixteen into L2 worse. The phase-B kernels

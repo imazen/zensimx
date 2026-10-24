@@ -564,6 +564,10 @@ pub(crate) fn cbrt_newton_f32(x: f32) -> f32 {
 
 /// [`cbrt_newton_f32`] in sixteen lanes, on a tier whose `mul_add` is fused
 /// (x86-64 v3, v4, v4x): per lane the same IEEE operations in the same order.
+/// The opsin conversion, whose inputs are never negative, runs
+/// [`cbrt_newton_nonneg_x16`]; this full form is the reference the tier tests
+/// hold it to.
+#[cfg(test)]
 #[inline(always)]
 pub(crate) fn cbrt_newton_x16<T: magetypes::simd::backends::F32x16Convert>(
     token: T,
@@ -585,6 +589,31 @@ pub(crate) fn cbrt_newton_x16<T: magetypes::simd::backends::F32x16Convert>(
     let sign = x & f32x16::splat_t(token, -0.0);
     let zero = x.simd_eq(f32x16::zero_t(token));
     f32x16::blend(zero, x, y | sign)
+}
+
+/// [`cbrt_newton_x16`] for inputs that are `+0` or positive (the opsin mix
+/// after its `max(0)`): `|x|` is `x` and the sign bit is clear, so the absolute
+/// value and the sign restore are dropped and every lane has
+/// [`cbrt_newton_x16`]'s bits; `+0` still returns itself.
+#[inline(always)]
+pub(crate) fn cbrt_newton_nonneg_x16<T: magetypes::simd::backends::F32x16Convert>(
+    token: T,
+    a: magetypes::simd::generic::f32x16<T>,
+) -> magetypes::simd::generic::f32x16<T> {
+    use magetypes::simd::generic::{f32x16, i32x16};
+    let third = f32x16::splat_t(token, 1.0 / 3.0);
+    let one = f32x16::splat_t(token, 1.0);
+    let q = (f32x16::from_i32_t(token, a.bitcast_to_i32()) * third).to_i32();
+    let r = f32x16::from_i32_bitcast_t(token, i32x16::splat_t(token, CBRT_NEWTON_MAGIC) - q);
+    let t = a * r;
+    let e = (-t).mul_add(r * r, one);
+    let r = (r * e).mul_add(third, r);
+    let y = (a * r) * r;
+    let y2 = y * y;
+    let res = (-y2).mul_add(y, a);
+    let y = y.mul_add(res / (y2 + y2).mul_add(y, a), y);
+    let zero = a.simd_eq(f32x16::zero_t(token));
+    f32x16::blend(zero, a, y)
 }
 
 #[cfg(test)]
@@ -1153,6 +1182,63 @@ mod rev4vec_midp_gate {
             5 => pow_midp_f32(x, 1.0 / 78.843_75),
             6 => pow_midp_f32(x, 1.0 / 0.159_301_75),
             _ => cbrt_newton_f32(x),
+        }
+    }
+
+    /// [`cbrt_newton_nonneg_x16`] in one tier, for the test below.
+    #[magetypes(define(f32x16), v4x, v4, v3, -scalar)]
+    fn cbrt_nonneg_vec(token: Token, arr: [f32; 16]) -> [f32; 16] {
+        cbrt_newton_nonneg_x16(token, f32x16::from_array_t(token, arr)).to_array()
+    }
+
+    /// The opsin cube root ([`cbrt_newton_nonneg_x16`]) has [`cbrt_newton_f32`]'s
+    /// bits on every compiled tier for `+0`, subnormals, `[1, 8)` in full and
+    /// every 97th positive bit pattern up to `+inf`.
+    #[test]
+    fn cbrt_newton_nonneg_matches_scalar() {
+        type RootFn = Box<dyn Fn([f32; 16]) -> [f32; 16]>;
+        let mut tiers: Vec<(&str, RootFn)> = Vec::new();
+        #[cfg(target_arch = "x86_64")]
+        {
+            if let Some(t) = archmage::X64V3Token::summon() {
+                tiers.push(("v3", Box::new(move |a| cbrt_nonneg_vec_v3(t, a))));
+            }
+            #[cfg(feature = "avx512")]
+            {
+                if let Some(t) = archmage::X64V4Token::summon() {
+                    tiers.push(("v4", Box::new(move |a| cbrt_nonneg_vec_v4(t, a))));
+                }
+                if let Some(t) = archmage::X64V4xToken::summon() {
+                    tiers.push(("v4x", Box::new(move |a| cbrt_nonneg_vec_v4x(t, a))));
+                }
+            }
+        }
+        if tiers.is_empty() {
+            return;
+        }
+        let lo = 1.0f32.to_bits();
+        let hi = 8.0f32.to_bits();
+        let bits: Vec<u32> = [0u32, 1, 2, 0x007f_ffff]
+            .into_iter()
+            .chain(lo..hi)
+            .chain((0..0x7f80_0000u32).step_by(97))
+            .chain([0x7f80_0000])
+            .collect();
+        for (name, f) in &tiers {
+            for chunk in bits.chunks(16) {
+                let mut arr = [1.0f32; 16];
+                for (a, b) in arr.iter_mut().zip(chunk) {
+                    *a = f32::from_bits(*b);
+                }
+                let got = f(arr);
+                for (x, g) in arr.iter().zip(got) {
+                    let want = cbrt_newton_f32(*x);
+                    assert!(
+                        want.to_bits() == g.to_bits() || (want.is_nan() && g.is_nan()),
+                        "{name}: cbrt({x:e}) = {g:e}, scalar {want:e}"
+                    );
+                }
+            }
         }
     }
 
