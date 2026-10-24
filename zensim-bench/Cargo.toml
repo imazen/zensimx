@@ -305,6 +305,11 @@ required-features = ["zen-decode"]
 name = "byc_avif_route"
 required-features = ["zen-decode"]
 
+# By-construction exploration: orientation-split (Haar H/V/D) damage sidecar (research only).
+[[example]]
+name = "byc_orient"
+required-features = ["zen-decode"]
+
 # By-construction exploration: candidate/legacy/judge spatial maps for the map-quality study.
 [[example]]
 name = "map_dump"
