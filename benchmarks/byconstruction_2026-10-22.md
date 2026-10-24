@@ -2626,13 +2626,13 @@ is fewer bytes):
 
 Against no loop the butteraugli loop saves +1.20% [+0.78, +1.60] (SSIMULACRA2) and +1.12% [+0.54, +1.72] (CVVDP)
 over all 78 images; Tga −0.87 / −4.04, Tga tail −0.84 / −2.64, DVIFM 0.3 −2.79 / −5.24, DVIFM tail −0.47 / −1.70.
-Eight-iteration Tga tail equals the four-iteration one within 0.1 point everywhere. Home-turf cells (butteraugli on
+Eight-iteration Tga tail is within 0.2 point of the four-iteration one on SSIMULACRA2 and CVVDP in every class. Home-turf cells (butteraugli on
 its own loop, DVIFM on its own map, zensim on ours) are in the full tables and not read.
 
 **Reading** (my bar: positive with the interval above zero under both SSIMULACRA2 and CVVDP): no map steers JPEG XL
 better than butteraugli on this corpus. Our maps are ahead on photos by SSIMULACRA2 only (+2.6% at the shipped
 placement; CVVDP +0.7% with an interval across zero) and behind on screens by 5–14% under both judges; DVIFM 0.3 stays
-within about 2% of butteraugli everywhere and is not ahead anywhere. The tail placement, which makes the target
+within 2.4% of butteraugli everywhere and is not ahead with an interval above zero anywhere. The tail placement, which makes the target
 reachable, costs our maps about 1.9 points of SSIMULACRA2 savings on photos against the shipped placement (+0.74
 against +2.61 for Tga) and gains on screens (CVVDP −6.6 against −12.7): once the loop believes it has met its target
 it coarsens the blocks the map reads as free (the reclaim step, "What the map tells the loop" above), and the
