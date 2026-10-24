@@ -15,7 +15,6 @@ const BASE: &str = "basic+peaks+v2@w1825/rev5_localwin#36c3f3af";
 const BYC_DERIVED: &[&str] = &[
     "basic+peaks+v2@w1825/rev5_localwin_ringhpm#36c3f3af",
     "basic+peaks+v2@w1825/rev5_localwin_linpyr#36c3f3af",
-    "basic+peaks+v2@w1825/rev5_localwin_avifdec#36c3f3af",
     "basic+peaks+v2@w1891/rev5_localwin_ringhpm_globaff#d56ad477",
     "basic+peaks+v2@w2301/rev5_localwin_ringhpm_globaffgate#45e0e84c",
 ];

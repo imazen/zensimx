@@ -1,7 +1,6 @@
 #!/bin/bash
 # Re-extract every training/assessment set of the v2e29 root under a measurement arm (ring_root.py ARMS: hpm =
-# ZENSIM_RING_FORM=hpm, linpyr = ZENSIM_PYRAMID=linear, ctl = its default-pyramid control), report each against the
-# stored Rev5 bank (slots the arm does
+# ZENSIM_RING_FORM=hpm, linpyr = ZENSIM_PYRAMID=linear), report each against the stored Rev5 bank (slots the arm does
 # not replace must be bit-identical; ring_root.py build enforces it), then the E15 coverage pool, then the derived root.
 # Exploration record: benchmarks/byconstruction_2026-10-22.md.
 # Usage: ring_bank.sh EXTRACTOR BUILD_COMMIT OUT_DIR THREADS [ARM]
@@ -12,7 +11,6 @@ FEATPOT=$HERE/../rev4_featpot
 case $ARM in
   hpm) ENV=ZENSIM_RING_FORM=hpm; ERA=rev5_localwin_ringhpm ;;
   linpyr) ENV=ZENSIM_PYRAMID=linear; ERA=rev5_localwin_linpyr ;;
-  ctl) ENV=ZENSIM_PYRAMID=xyb; ERA=rev5_localwin_avifdec ;;
   *) echo "unknown arm $ARM" >&2; exit 2 ;;
 esac
 mkdir -p "$OUT"

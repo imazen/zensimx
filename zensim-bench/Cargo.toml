@@ -300,6 +300,11 @@ required-features = ["training", "zen-decode"]
 name = "byc_globaff"
 required-features = ["zen-decode"]
 
+# By-construction exploration: the decode owner's AVIF projection routes and their pixel hashes (research only).
+[[example]]
+name = "byc_avif_route"
+required-features = ["zen-decode"]
+
 # By-construction exploration: candidate/legacy/judge spatial maps for the map-quality study.
 [[example]]
 name = "map_dump"
@@ -411,6 +416,10 @@ zenjxl = { path = "../../zenjxl" }
 # amendment; the "patch it in and KEEP WORKING" rule).
 zenjxl-decoder = { path = "../../zenjxl-decoder/zenjxl-decoder" }
 zenpixels = { path = "../../zenpixels/zenpixels" }
+# The unpublished local 0.2.17 narrows u16 to u8 correctly rounded (`round(v / 257)`); registry 0.2.16 does not, and
+# moved 4.5% of the safesyn AVIF samples by one level against the stored training root (2026-10-24; see the
+# "AVIF decode drift" record in benchmarks/byconstruction_2026-10-22.md). Drop when 0.2.17 is published.
+zenpixels-convert = { path = "../../zenpixels/zenpixels-convert" }
 # zenjpeg@0.9.0 requires unpublished zenanalyze 0.2.x — dev-only local patch (2026-08-30).
 zenanalyze = { path = "../../zenanalyze" }
 

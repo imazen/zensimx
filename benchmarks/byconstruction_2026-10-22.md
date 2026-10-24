@@ -2312,6 +2312,18 @@ only in AVIF rows; the linear-pyramid root takes its AVIF rows from the same dec
 on the stored root with today's trainer checks that the trainer reproduces it. The adoption rule is unchanged and
 applies to M64lin against M64ctl.
 
+*Cause found, and the control withdrawn (still before any result).* `byc_avif_route` (new, `zensim-bench/examples/`)
+decodes through the owner and projects zenavif's native buffer (Rgb16, sRGB-tagged, BT.709, full range) three ways. On
+10 of 10 files the owner's projection, with or without the transfer tag, gives today's pixels, and rounding the same
+16-bit samples by hand (`round(v · 255 / 65535)`) gives the 2026-10-23 pixels: zenavif's samples did not change, the
+16→8-bit narrowing did. The lockfile resolves zenpixels-convert from the registry (0.2.16, the newest published), whose
+narrowing is not correctly rounded; the local, unpublished 0.2.17 narrows as `round(v / 257)` (zenpixels `d019ae9`,
+2026-09-23). With 0.2.17 patched in (`zensim-bench/Cargo.toml`, dropped once it is published), the extractor reproduces
+the 2026-10-23 extractor bit for bit on 13 of 13 pairs (10 AVIF, 3 JXL: pixel hashes and all 7,488 feature cells). The
+stored root's AVIF pixels are the correctly rounded ones. The linear-pyramid bank is extracted again with that build,
+the comparison returns to the registered baseline (the stored M64), and the control arm is dropped; its partial bank is
+kept as `linpyr_ctl.superseded`. The reproduction cell stays.
+
 ### DVIFM 0.3 on the E21 sets and the mixture test (2026-10-23)
 
 Owner request: "eval dvifm 0.3 on kadid and other distortion//corrputions". Scorer: the frozen runtime of the
