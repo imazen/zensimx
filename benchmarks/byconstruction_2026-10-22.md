@@ -2519,6 +2519,56 @@ is statically reachable on at least 95% of images and the 4-iteration loop ends 
 above −0.3, the map needs a different construction (for example a split that gives each pixel its local error
 amplitude instead of its share). Screens are reported separately.
 
+**Corpus results** (`jxl_reach.sh`, steer_rd `3ba4f4ba1cb8`, 153 s on dev, run-heavy peak RSS 2.31 GiB; tables and
+SHA256SUMS in `/mnt/v/output/zensim/byconstruction-2026-10-22/jxl-reach/`, decoded images, bitstreams and frames in
+`/var/tmp/byconstruction-jxl-steer/` on dev). Six CID22 images the tail fit used are left out: 72 images (34 photos, 20
+illustrations, 18 screen crops of the held-out screenshots).
+
+*Static reach* (no loop, 20 encoder distances 0.05–10; share of images whose Tga tile, on the decoded output, falls to
+the target at some uniform quality):
+
+| Placement | 0.3 | 0.45 | 0.6 | 1.0 | 1.6 | 2.5 | Floor median / p90 |
+|---|---|---|---|---|---|---|---|
+| Shipped (0.1330 / 0.6), all 78 | 1% | 14% | 47% | 86% | 95% | 100% | 0.668 / 1.376 |
+| Tail (2.2571e-2 / 0.7), all 78 | 88% | 96% | 97% | 100% | 100% | 100% | 0.145 / 0.337 |
+| Tail, photos | 94% | 97% | 100% | 100% | 100% | 100% | 0.133 / 0.202 |
+| Tail, illustrations | 95% | 100% | 100% | 100% | 100% | 100% | 0.150 / 0.301 |
+| Tail, screens | 72% | 89% | 89% | 100% | 100% | 100% | 0.243 / 0.502 |
+
+Every image's curve rises at least once as the encoder distance falls (the largest value follows the worst pixel).
+
+*The loop* (4 iterations unless noted; distances 0.3 / 0.45 / 0.6 / 1 / 1.6 / 2.5 / 4 / 6.4 / 10; "converged" = no
+block above target at the end):
+
+| Arm | Largest tile ÷ target, median | Converged | Bytes against butteraugli's loop |
+|---|---|---|---|
+| butteraugli | 1.00 / 1.00 / 1.00 / 0.99 / 0.98 / 0.95 / 0.89 / 0.83 / 0.77 | 54 / 63 / 50 / 72 / 85 / 100 / 100 / 100 / 100% | — |
+| Tga, shipped placement | 2.91 / 2.21 / 3.23 / 2.22 / 1.55 / 1.28 / 1.12 / 1.01 / 0.95 | 0 / 0 / 0 / 0 / 1 / 11 / 18 / 49 / 79% | +72% at d 0.3, +34% at d 0.45 |
+| Tga, tail placement | 1.04 / 0.98 / 0.99 / 0.96 / 0.89 / 0.81 / 0.71 / 0.56 / 0.44 | 47 / 58 / 57 / 68 / 83 / 93 / 96 / 99 / 99% | +2% at d 0.3, −11% to −16% above |
+| Tga, tail, 8 iterations | 0.98 / 0.96 / 0.98 / 0.95 / 0.88 / 0.81 / 0.71 / 0.56 / 0.44 | 65 / 82 / 76 / 90 / 94 / 97 / 99 / 99 / 100% | the same bytes |
+
+By class at the tail placement (converged at d ≤ 1, 4 / 8 iterations; butteraugli at 4): photos 71–85% / 91–100%
+(butteraugli 18–65%), 14–18% fewer bytes than butteraugli at every distance; illustrations 45–80% / 70–95%
+(45–75%); screens 6–22% / 11–67% (78–100%), 5–10% more bytes at d ≤ 1.
+
+*The blocks' response* (`jxl_reach.py elastic`, median of ln(tile_next / tile) / ln(q_next / q) over bumped
+above-target blocks; the bump rule assumes −1): butteraugli −0.97 to −1.11 at d ≤ 1.6. Tga at the shipped placement
+−0.39 (d 0.3), −0.60, −0.79, −1.21 (d 1), with a quarter of its bumped blocks getting worse at d 0.3 and unadjusted
+blocks changing by a median 16% there (their tiles depend on neighbours and on the pools' global normalisation). Tga at
+the tail placement −2.6 to −4.1 at every distance: the blocks the loop bumps behave like shares of fourth-power pools
+(∝ e⁴, so e^(4 × 0.7) ≈ e^2.8 of the error amplitude), so each bump overshoots, which is why it lands at 0.44–0.72 of
+the target from d 2.5 up.
+
+**Reading** (the rule recorded above, my bars): not met. The tail fit is what makes the target reachable at all,
+which settles the d 0.45 report for photos (0.95 of the request, 82% converged at 4 iterations, 97% at 8), but static
+reach of d 0.3 is 88% (bar 95%), photo convergence at 4 iterations is 71–85% at d ≤ 1 (bar 90%; butteraugli itself
+reaches 18–65%), the landing ratio leaves 0.8–1.25 from d 2.5 up, and screens do not converge at low distances. So
+better fits are necessary, and they are not enough: the remaining failures come from what the map is, a per-pixel
+split of pooled power norms whose response to a block's quantization is −2.6 to −4 for the worst blocks, near zero and
+coupled for most others, where the loop assumes −1. The fix is in the map's construction (a steering map whose value
+per pixel is a local error amplitude), or, short of that, a loop whose bump uses the map's own response. Whether the
+14–18% fewer bytes on photos are the same quality is the steering study's question (below).
+
 ### JPEG XL steering: our maps against butteraugli and DVIFM 0.3 (2026-10-24)
 
 Owner, 2026-10-24: "also remember to eval our maps against butter and dvifm 03 as jxl spatial steering candidates".
