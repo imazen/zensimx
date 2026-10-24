@@ -2548,8 +2548,8 @@ block above target at the end):
 | Tga, tail, 8 iterations | 0.98 / 0.96 / 0.98 / 0.95 / 0.88 / 0.81 / 0.71 / 0.56 / 0.44 | 65 / 82 / 76 / 90 / 94 / 97 / 99 / 99 / 100% | the same bytes |
 
 By class at the tail placement (converged at d ≤ 1, 4 / 8 iterations; butteraugli at 4): photos 71–85% / 91–100%
-(butteraugli 18–65%), 14–18% fewer bytes than butteraugli at every distance; illustrations 45–80% / 70–95%
-(45–75%); screens 6–22% / 11–67% (78–100%), 5–10% more bytes at d ≤ 1.
+(butteraugli 18–65%), 14–19% fewer bytes than butteraugli at every distance; illustrations 45–80% / 70–95%
+(45–75%); screens 6–22% / 11–67% (78–100%), 3–11% more bytes at d ≤ 1.
 
 *The blocks' response* (`jxl_reach.py elastic`, median of ln(tile_next / tile) / ln(q_next / q) over bumped
 above-target blocks; the bump rule assumes −1): butteraugli −0.97 to −1.11 at d ≤ 1.6. Tga at the shipped placement
@@ -2567,7 +2567,7 @@ better fits are necessary, and they are not enough: the remaining failures come 
 split of pooled power norms whose response to a block's quantization is −2.6 to −4 for the worst blocks, near zero and
 coupled for most others, where the loop assumes −1. The fix is in the map's construction (a steering map whose value
 per pixel is a local error amplitude), or, short of that, a loop whose bump uses the map's own response. Whether the
-14–18% fewer bytes on photos are the same quality is the steering study's question (below).
+14–19% fewer bytes on photos are the same quality is the steering study's question (below).
 
 ### JPEG XL steering: our maps against butteraugli and DVIFM 0.3 (2026-10-24)
 
