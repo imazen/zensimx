@@ -2423,7 +2423,9 @@ set 2–18 inversions per cell, 57 in all (M64 1–6, 38), largest rise +7.56 (M
 cell. **Not adopted:** E21 is worse by 13 seed-unit SE and the standard mixture gains inversions. The bands do carry
 type information (the probe above), but the monotone recipe spends it on KADID and CID22-A and loses TID2013. A
 reproduction cell (M64's KADID-held-out seed-0 cell, retrained in the same run) gives predictions bit-identical to the
-stored M64 cell (`3026b06d…`). Smoothness and per-type bias: pending (panel).
+stored M64 cell (`3026b06d…`). Smoothness (`aic_panel.py --no-public-test`, out of sample): mean Z-RMSE over the
+four E21 sets 0.505 against M64's 0.502 (TID2013 0.457 against 0.441; KADID 0.483 against 0.487, CID22-A 0.486
+against 0.489, KonFiG 0.594 against 0.591).
 
 ### DVIFM 0.3 on the E21 sets and the mixture test (2026-10-23)
 
