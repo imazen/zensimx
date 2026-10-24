@@ -2437,6 +2437,38 @@ labels equal row for row). 13,814 pairs took 4.5 s on 16 threads and the 1,344 m
 - **Smoothness:** the largest Z-RMSE of any model on every E21 set; on AIC2026 public_train, which it was fitted on, the
   smoothest fixed model (Z-RMSE 0.364).
 
+### JPEG XL steering: our maps against butteraugli and DVIFM 0.3 (2026-10-24)
+
+Owner, 2026-10-24: "also remember to eval our maps against butter and dvifm 03 as jxl spatial steering candidates".
+jxl-encoder's perceptual loop bumps the quantization of every 8×8 block whose tile distance (1.2 × the block's
+16-norm of the steering map) exceeds the target; the map decides where bytes go. This compares maps as that steering
+signal, by rate–distortion against judges.
+
+**Design (recorded before any result).**
+
+- *Runner.* `zensim-workbench/loop-converge` `steer_rd`: every arm in one binary, so one jxl-encoder build; effort 7
+  and 4 iterations (the workbench loop player's defaults), default strategy (Zenjxl), distances 0.3, 0.45, 0.6, 1, 1.6,
+  2.5, 4, 6.4 and 10; each bitstream decoded by zenjxl-decoder to dithered sRGB8 as the earlier harness decodes, kept
+  by SHA-256. A failed map comparison stops the run (the loop itself would keep the previous iteration silently).
+- *Arms.* `none` (no loop), `butteraugli` (the built-in loop), the workbench `diffmap` (σ 3) of B (`89cb4861`), Tga
+  (`5ece9e45`) and M64a (`b8555871`) at their fitted placements (table above, "Workbench (second build)"), and
+  `dvifm03`: DVIFM 0.3's `diffmap` (`aic4-dvifm-lap-v0.3`, author constants) at its fitted placement (scale 0.8846,
+  exponent 0.2, held-out r 0.139), served by the private aic4 module through `loop_map_server` (zenmetrics-private,
+  `aic4-wasm` example; the protocol is `MapServer`'s). Tga and M64a were trained with AIC2026 public_train labels and
+  DVIFM's constants were fitted on AIC2026 by its author; none of the judges below was.
+- *Corpus.* The 78 TRAIN images of the map-todo study (`jxl-maprd-large/corpus`: 38 CID22 training photos, 22 graphics
+  and illustrations, 18 gb82-sc screen crops). Overlap: the loop placements were fitted on CID22-512 training images.
+- *Judges.* SSIMULACRA2, butteraugli 3-norm, zensim and ColorVideoVDP (CPU, `cvvdp_cpu_imazen_v0_1_0`) from the
+  pinned judge build (`zenmetrics-judge-7a0f8394`; its zensim is an August 2026 build), and DVIFM 0.3 from its frozen
+  runtime (`dvifm_e21.py judge`). SSIMULACRA2 and CVVDP are independent of every arm. Home turf: butteraugli for the
+  butteraugli arm, DVIFM for `dvifm03`, zensim (partly: a different model on shared features) for B, Tga and M64a.
+- *Statistic.* `rd_probe_analyze_2026-07-18.py --paired-vs`: bytes saved at equal judged score against a base arm,
+  per image the median over its matched points, then the mean over images with a 95% bootstrap interval over images;
+  against `none` and against `butteraugli`, overall and per content class.
+- *Reading (my bar).* An arm steers better than another when its saving is positive with the interval above zero
+  under both independent judges; an interval that straddles zero under either is a tie. Home-turf cells are reported
+  and not counted. Encode time per arm is reported.
+
 ## Summary (all arms, E21 screen, seeds 0–2, Δ vs `base-c`)
 
 | Arm | Guarantee | E21 Δ (SE) | Mixture inversions / cell (max rise) |
