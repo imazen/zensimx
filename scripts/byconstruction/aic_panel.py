@@ -45,7 +45,8 @@ E34_CELLS = Path("/var/tmp/rev4-featpot/e34-controlc-results/cells/sel:3b7bd5ebe
 ROOTS = {"raw": Path("/mnt/v/output/zensim/v40r4-2026-10-08/v2e29"),
          "hpm": Path("/mnt/v/output/zensim/byconstruction-2026-10-22/ringhpm/root"),
          "g": Path("/mnt/v/output/zensim/byconstruction-2026-10-22/ringhpm/root_globaff"),
-         "gg": Path("/mnt/v/output/zensim/byconstruction-2026-10-22/ringhpm/root_globaff_gated")}
+         "gg": Path("/mnt/v/output/zensim/byconstruction-2026-10-22/ringhpm/root_globaff_gated"),
+         "linpyr": Path("/mnt/v/output/zensim/byconstruction-2026-10-22/linpyr/root")}
 
 
 def arm_root(arm: str, spec: str) -> str:

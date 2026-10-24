@@ -6,6 +6,10 @@ Exploration record: benchmarks/byconstruction_2026-10-22.md. No human label is r
                                       write ref / D1 / D2∘D1 PNGs and manifest.json
   score    --out DIR --bake NAME=PATH [--bake ...] [--jobs 6] [--post raw]
   report   --out DIR
+  pairs    --out DIR --tsv PAIRS.tsv  every (reference, image) pair, for extract_features_372col --corpus pairs-tsv
+  feature-steps --out DIR --tsv PAIRS.tsv --csv NAME=FEATURES.csv [--csv ...] --ids IDS.txt
+                                      per feature, the share of D1 -> D2∘D1 steps on which it falls (features
+                                      extracted from PAIRS.tsv; damage-oriented inputs should not fall)
 
 References: TRAIN-eligible E34 inventory origins (256 px, `p4-inventory-r2/references`), excluding E34's 128
 augmentation and 8 development origins, chosen by sha256(origin) order within each category prefix.
@@ -198,6 +202,46 @@ def cmd_report(a):
     return 0
 
 
+def cmd_pairs(a):
+    out = Path(a.out)
+    man = json.loads((out / "manifest.json").read_text())
+    images = sorted({(r["ref"], r["base"]) for r in man["rows"]} | {(r["ref"], r["more"]) for r in man["rows"]})
+    with open(a.tsv, "w") as f:
+        f.write("ref_path\tdist_path\thuman_score\trow_id\n")
+        for i, (ref, img) in enumerate(images):
+            f.write(f"{out / 'img' / ref}\t{out / 'img' / img}\t0\t{i}\n")
+    print(f"{len(images)} pairs -> {a.tsv}")
+    return 0
+
+
+def cmd_feature_steps(a):
+    import pyarrow.csv as pacsv
+    out = Path(a.out)
+    man = json.loads((out / "manifest.json").read_text())
+    row_of = {line.split("\t")[1].rsplit("/", 1)[-1]: int(line.split("\t")[3])
+              for line in Path(a.tsv).read_text().splitlines()[1:]}
+    ids = [int(x) for x in Path(a.ids).read_text().replace(",", " ").split()]
+    base = np.array([row_of[r["base"]] for r in man["rows"]])
+    more = np.array([row_of[r["more"]] for r in man["rows"]])
+    res = {}
+    for spec in a.csv:
+        name, path = spec.split("=", 1)
+        t = pacsv.read_csv(path)
+        rid = t.column("row_id").to_numpy()
+        order = np.empty_like(rid)
+        order[rid] = np.arange(len(rid))
+        x = np.stack([t.column(f"f{i}").to_numpy()[order] for i in ids], axis=1)
+        falls = (x[more] - x[base]) < 0
+        share = falls.mean(axis=0)
+        res[name] = {"steps": int(len(base)), "features": len(ids), "mean_share_falling": float(share.mean()),
+                     "features_falling_over_10pct": int((share > 0.10).sum()),
+                     "features_falling_over_25pct": int((share > 0.25).sum()),
+                     "per_step_share_falling_p50": float(np.median(falls.mean(axis=1))),
+                     "per_step_share_falling_p90": float(np.percentile(falls.mean(axis=1), 90))}
+    print(json.dumps(res, indent=1))
+    return 0
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -213,8 +257,17 @@ def main():
     s.add_argument("--jobs", type=int, default=6)
     r = sub.add_parser("report")
     r.add_argument("--out", required=True)
+    p = sub.add_parser("pairs")
+    p.add_argument("--out", required=True)
+    p.add_argument("--tsv", required=True)
+    f = sub.add_parser("feature-steps")
+    f.add_argument("--out", required=True)
+    f.add_argument("--tsv", required=True)
+    f.add_argument("--csv", action="append", required=True, help="NAME=FEATURES.csv")
+    f.add_argument("--ids", required=True, help="feature ids to check (whitespace or comma separated)")
     a = ap.parse_args()
-    return {"generate": cmd_generate, "score": cmd_score, "report": cmd_report}[a.cmd](a)
+    return {"generate": cmd_generate, "score": cmd_score, "report": cmd_report, "pairs": cmd_pairs,
+            "feature-steps": cmd_feature_steps}[a.cmd](a)
 
 
 if __name__ == "__main__":
