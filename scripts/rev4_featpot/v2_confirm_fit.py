@@ -149,7 +149,7 @@ def main() -> None:
         if args.strict_admission:
             strict_training_groups(groups, args.data_role_decision)
         read = keep
-        if recipe.get("derived_inputs") in ("fx1", "fx2", "fx1nr", "fx1g", "fx1gs1", "fx1gg"):
+        if recipe.get("derived_inputs") in ("fx1", "fx2", "fx1nr", "fx1g", "fx1gs1", "fx1gg", "fx1o"):
             from v2_common import derived_declaration
             read = sorted(set(keep) | {b for _, b in derived_declaration(recipe["derived_inputs"])[2]["products"]})
         refuse_nonfinite_kept([g[1] for g in groups], read)  # Rev5 tables mark absent slots NaN

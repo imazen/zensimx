@@ -10,8 +10,10 @@ ARMS=("$@")
 [ ${#ARMS[@]} -eq 0 ] && ARMS=("Bhpm=" "Mhpm=mono:thr:mp32" "FRhpm=mono:thr:freering")
 H=$(cd "$(dirname "$0")" && pwd)/../rev4_featpot
 export BYC_ROOT=$ROOT REV4_V2_BIN_DIR=$BIN RAYON_NUM_THREADS=1
-BASE=sel:3b7bd5ebe929@h32:H128:cv16:cf98:fx1
-COLS=$HOME/tmp/byc/cols_c.txt
+# BASE / COLS select another input declaration, e.g. the orientation arm's
+# BASE=sel:46516c473ae7@h32:H128:cv16:cf98:fx1o COLS=$HOME/tmp/byc/cols_fx1o.txt
+BASE=${BASE:-sel:3b7bd5ebe929@h32:H128:cv16:cf98:fx1}
+COLS=${COLS:-$HOME/tmp/byc/cols_c.txt}
 FOLDS=kadid,tid2013,konfig,cid22_a25
 for arm in "${ARMS[@]}"; do
   label=${arm%%=*}; tokens=${arm#*=}

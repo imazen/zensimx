@@ -2364,7 +2364,18 @@ horizontal/vertical asymmetry `|E_H − E_V| / (E_H + E_V)`. Outputs and SHA256S
 So orientation separates noise-like from structural damage, and directional from isotropic, where our features
 cannot. The visual system is less sensitive to oblique orientations at high frequencies, so a damage feature split by
 orientation could let a monotone model weight noise below structure. This says orientation is missing information, not
-that it helps a model; a trained test waits on the linear-light result.
+that it helps a model.
+
+**Experiment (recorded before any result).** `byc_orient` (`zensim-bench/examples/`) writes, per pair, the RMS of the
+horizontal, vertical and diagonal Haar bands of the error `dst − src` at every scale (0–3) and XYB channel: 36
+non-negative damage values from zensim's own conversion and 2× downscale through the shared decode owner, as the
+globaff sidecar was built. `ring_root.py orient` widens the stored root with them at research ids f2301–f2336
+(`basic+peaks+v2@w2337/rev5_localwin_orient#24a93918`, admitted like the other derived roots); declaration `fx1o` is
+fx1 plus the 36 as unpaired direct inputs. The strictly monotone recipe trains on it (`mono:thr:mp64` on
+`sel:46516c473ae7@h32:H128:cv16:cf98:fx1o`, **M64o**, 12 E21 cells, seeds 0–2) and is compared with M64: E21 Δ and per
+dataset, per-type bias, smoothness and both mixture tests (mixture images through the same sidecar and `byc_predict`).
+It is a candidate for a served family only if E21 improves by more than the seed-unit SE with no new mixture
+inversions; its compute cost is measured only then.
 
 ### DVIFM 0.3 on the E21 sets and the mixture test (2026-10-23)
 

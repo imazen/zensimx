@@ -46,7 +46,8 @@ ROOTS = {"raw": Path("/mnt/v/output/zensim/v40r4-2026-10-08/v2e29"),
          "hpm": Path("/mnt/v/output/zensim/byconstruction-2026-10-22/ringhpm/root"),
          "g": Path("/mnt/v/output/zensim/byconstruction-2026-10-22/ringhpm/root_globaff"),
          "gg": Path("/mnt/v/output/zensim/byconstruction-2026-10-22/ringhpm/root_globaff_gated"),
-         "linpyr": Path("/mnt/v/output/zensim/byconstruction-2026-10-22/linpyr/root")}
+         "linpyr": Path("/mnt/v/output/zensim/byconstruction-2026-10-22/linpyr/root"),
+         "o": Path("/mnt/v/output/zensim/byconstruction-2026-10-22/orient/root")}
 
 
 def arm_root(arm: str, spec: str) -> str:
@@ -55,7 +56,9 @@ def arm_root(arm: str, spec: str) -> str:
     if arm == "base-c":
         return "raw"
     decl = research_decl(spec)
-    return "hpm" if decl is None else "gg" if decl.name == "byc_fx1gg_declaration.json" else "g"
+    if decl is None:
+        return "hpm"
+    return {"byc_fx1gg_declaration.json": "gg", "byc_fx1o_declaration.json": "o"}.get(decl.name, "g")
 def cell_root(cell: Path, arm: str, spec: str) -> Path:
     """The root a cell actually trained on, read from its trainer command line (train.log's first line); falls back
     to `arm_root` for B's control, whose E34 cells keep no such log here."""
@@ -127,7 +130,7 @@ def geometry(x, y, arrays: bool = False):
 
 
 def research_decl(spec: str):
-    for tok in ("fx1gs1", "fx1gg", "fx1g"):
+    for tok in ("fx1gs1", "fx1gg", "fx1g", "fx1o"):
         if f":{tok}:" in f"{spec}:":
             return HERE.parent / "rev4_featpot" / f"byc_{tok}_declaration.json"
     return None

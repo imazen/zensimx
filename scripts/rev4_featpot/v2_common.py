@@ -95,6 +95,10 @@ FX1GS1_SHA256 = "a8d224e465ed9014793496926630399bf189ec1e6e28b966feb9538493269b5
 # monotone, the descriptor itself not read (byconstruction global-edit inversion fix)
 FX1GG_DECLARATION = Path(__file__).resolve().parent / "byc_fx1gg_declaration.json"
 FX1GG_SHA256 = "c009fbedd3fbd2678720ff2a2b2bf89845a4f571e0909b36ac68caeb766a273a"
+# fx1 plus the byc_orient damage (research ids f2301-f2336: Haar H/V/D band-difference RMS per scale x channel), direct
+# only (byconstruction orientation-band arm)
+FX1O_DECLARATION = Path(__file__).resolve().parent / "byc_fx1o_declaration.json"
+FX1O_SHA256 = "155be1f8019396e7fc350d61754947d0002884c314d30e1461e5d97eb0b31b3d"
 
 
 def fx1_declaration() -> dict:
@@ -120,6 +124,10 @@ def derived_declaration(token):
         data=FX1GS1_DECLARATION.read_bytes()
         if hashlib.sha256(data).hexdigest()!=FX1GS1_SHA256:raise ValueError('fx1gs1 declaration changed')
         return FX1GS1_DECLARATION, FX1GS1_SHA256, json.loads(data)
+    if token == 'fx1o':
+        data=FX1O_DECLARATION.read_bytes()
+        if hashlib.sha256(data).hexdigest()!=FX1O_SHA256:raise ValueError('fx1o declaration changed')
+        return FX1O_DECLARATION, FX1O_SHA256, json.loads(data)
     if token == 'fx1g':
         data=FX1G_DECLARATION.read_bytes()
         if hashlib.sha256(data).hexdigest()!=FX1G_SHA256:raise ValueError('fx1g declaration changed')
@@ -298,7 +306,7 @@ def recipe_of(spec: str) -> dict:
             out.update(hdr_weight=4.0, hdr_mode={"hp": "rank", "ha": "withinref,both", "hb": "rank", "hc": "rank"}[tok[:2]], **({"hdr_consensus": tok} if tok[:2] in ("hb", "hc") else {}))
         elif tok == "sh1" and "smooth_hinge" not in out:
             out["smooth_hinge"] = True
-        elif tok in ("fx1", "fx2", "fx1nr", "fx1g", "fx1gs1", "fx1gg") and "derived_inputs" not in out:
+        elif tok in ("fx1", "fx2", "fx1nr", "fx1g", "fx1gs1", "fx1gg", "fx1o") and "derived_inputs" not in out:
             out["derived_inputs"] = tok
         elif tok == "mono" and "mono_all" not in out:  # by-construction exploration: W1 >= 0 on every input
             out["mono_all"] = True
