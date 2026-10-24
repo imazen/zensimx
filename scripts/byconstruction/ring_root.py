@@ -380,6 +380,10 @@ def widen_root(a, name: str) -> int:
     cache = {}
     record = {"source_root": str(root), "source_frozen_sha256": sha(root / "wide/frozen.json"), "ids": ids,
               "sidecars": {}, "tables": {}}
+    # A stored root still carries the HDR legs; like `build`, the widened root leaves them out (no sidecar covers them).
+    for p in sorted(real.iterdir()):
+        if p.name.split(".")[0] in HDR:
+            p.unlink()
     for t in sorted(real.glob("*.parquet")):
         if t.name.endswith(".keys.parquet"):
             continue
@@ -432,6 +436,7 @@ def widen_root(a, name: str) -> int:
         m["immutable_input_roots"] = [*m.get("immutable_input_roots", []), str(root.resolve()), str(side.resolve())]
         mp.write_text(json.dumps(m, indent=1) + "\n")
     receipt = json.loads((real / "receipt.json").read_text())
+    receipt["legs"].pop("hdr_consensus", None)
     for leg in receipt["legs"].values():
         for part in leg.values():
             if isinstance(part, dict) and "rel" in part:
@@ -448,7 +453,7 @@ def widen_root(a, name: str) -> int:
     frozen = json.loads((out / "wide/frozen.json").read_text())
     frozen["admission_view"] = view
     frozen["wide_receipts"] = {"main/real": sha(real / "receipt.json")}
-    frozen["auxiliary_files"] = {rel: sha(out / rel) for rel in frozen["auxiliary_files"]}
+    frozen["auxiliary_files"] = {rel: sha(out / rel) for rel in frozen["auxiliary_files"] if not any(h in rel for h in HDR)}
     frozen[f"byc_{name}"] = record
     (out / "wide/frozen.json").write_text(json.dumps(frozen, indent=1) + "\n")
     log(f"{name} root written: {out}")
