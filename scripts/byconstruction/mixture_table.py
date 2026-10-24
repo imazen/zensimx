@@ -1,14 +1,15 @@
 """Table route for the label-free damage-mixture test: score bakes that read research columns the pixel scorer does not
-compute (the byc_globaff descriptor at f1867-f1890).
+compute (the byc_globaff descriptor at f1867-f1890, the byc_orient orientation damage at f2301-f2336).
 
 Exploration record: benchmarks/byconstruction_2026-10-22.md. For every image of the mixture manifest, the computed Rev5
 vector comes from `score_pair_with_bake --dump-features-to` (B's served bake reads every id the fx1 family reads; the
 ring form is whatever ZENSIM_RING_FORM selects) and the descriptor from `byc_globaff`. One wide table holds them in
 manifest image order; `bake_dial_refit predict --score-units` scores it. The route is checked against the pixel route on
-a bake that reads no research column (`check`), which must agree before any table score is reported.
+a bake that reads no research column (`check`), which must agree before any table score is reported. With `--orient`
+the table also carries the orientation damage (width 2337; `--globaff` is then optional).
 
-  build   --mixture DIR --bin-dir BIN --bake B.bin --globaff BIN --out DIR [--jobs 16]
-  build-pairs --pairs PAIRS.tsv --bin-dir BIN --bake B.bin --globaff BIN --out DIR [--jobs 16]
+  build   --mixture DIR --bin-dir BIN --bake B.bin [--globaff BIN] [--orient BIN] --out DIR [--jobs 16]
+  build-pairs --pairs PAIRS.tsv --bin-dir BIN --bake B.bin [--globaff BIN] [--orient BIN] --out DIR [--jobs 16]
           (any labelled pairs list: columns key, group, label, ref_path, dist_path; the table keeps them in file order
           as `key`, `ref_basename` = group and `human_score` = label)
   score   --mixture DIR --table DIR --bin-dir BIN --bake NAME=PATH [--bake ...] [--decl DECL.json]
@@ -30,8 +31,8 @@ import pyarrow as pa
 import pyarrow.csv as pacsv
 import pyarrow.parquet as pq
 
-WIDTH = 1891
 GLOBAFF = list(range(1867, 1891))
+ORIENT = list(range(2301, 2337))
 
 
 def images(mix: Path) -> list[tuple[str, str]]:
@@ -62,23 +63,33 @@ def build_table(pairs: list[tuple[str, str]], out: Path, a, groups: list[str], l
     tsv = out / "pairs.tsv"
     tsv.write_text("ref_path\tdist_path\thuman_score\trow_id\n" +
                    "".join(f"{r}\t{d}\t0\t{i}\n" for i, (r, d) in enumerate(pairs)))
-    gcsv = out / "globaff.csv"
-    subprocess.run([a.globaff, "--pairs", str(tsv), "--out", str(gcsv)], check=True,
-                   env=dict(os.environ, RAYON_NUM_THREADS=str(a.jobs)))
-    g = pacsv.read_csv(gcsv)
-    order = np.argsort(g.column("row_id").to_numpy())
-    G = np.stack([g.column(f"g{i}").to_numpy()[order] for i in range(len(GLOBAFF))], axis=1).astype(np.float32)
-    X = np.full((len(pairs), WIDTH), np.nan, np.float32)
+    if not (a.globaff or a.orient):
+        raise SystemExit("give --globaff, --orient or both")
+    sidecars = []  # (binary, csv name, column prefix, ids)
+    if a.globaff:
+        sidecars.append((a.globaff, "globaff.csv", "g", GLOBAFF))
+    if a.orient:
+        sidecars.append((a.orient, "orient.csv", "o", ORIENT))
+    width = ORIENT[-1] + 1 if a.orient else GLOBAFF[-1] + 1
+    X = np.full((len(pairs), width), np.nan, np.float32)
     k = next(iter(n))
     X[:, :min(k, 720)] = np.stack(vecs)[:, :min(k, 720)]
-    X[:, GLOBAFF] = G
+    for binary, name, prefix, ids in sidecars:
+        dest = out / name
+        subprocess.run([binary, "--pairs", str(tsv), "--out", str(dest)], check=True,
+                       env=dict(os.environ, RAYON_NUM_THREADS=str(a.jobs)))
+        g = pacsv.read_csv(dest)
+        order = np.argsort(g.column("row_id").to_numpy())
+        X[:, ids] = np.stack([g.column(f"{prefix}{i}").to_numpy()[order] for i in range(len(ids))],
+                             axis=1).astype(np.float32)
     cols = {"key": pa.array(keys), "ref_basename": pa.array(groups),
             "human_score": pa.array(np.asarray(labels, dtype=np.float64))}
-    cols.update({f"f{i}": pa.array(X[:, i]) for i in range(WIDTH)})
+    cols.update({f"f{i}": pa.array(X[:, i]) for i in range(width)})
     pq.write_table(pa.table(cols), out / "table.parquet", compression="zstd")
     meta = {"images": keys, "ring_form": os.environ.get("ZENSIM_RING_FORM", "raw"), "dump_bake": a.bake,
-            "dump_bake_sha256": hashlib.sha256(Path(a.bake).read_bytes()).hexdigest(), "dump_width": k,
-            "globaff_sha256": hashlib.sha256(Path(a.globaff).read_bytes()).hexdigest()}
+            "dump_bake_sha256": hashlib.sha256(Path(a.bake).read_bytes()).hexdigest(), "dump_width": k}
+    for binary, name, _, _ in sidecars:
+        meta[f"{name.removesuffix('.csv')}_sha256"] = hashlib.sha256(Path(binary).read_bytes()).hexdigest()
     (out / "table.json").write_text(json.dumps(meta, indent=1) + "\n")
     print(f"{len(pairs)} images, dump width {k}")
 
@@ -143,7 +154,8 @@ def main() -> int:
     b.add_argument("--mixture", required=True)
     b.add_argument("--bin-dir", required=True)
     b.add_argument("--bake", required=True)
-    b.add_argument("--globaff", required=True)
+    b.add_argument("--globaff")
+    b.add_argument("--orient")
     b.add_argument("--out", required=True)
     b.add_argument("--jobs", type=int, default=16)
     b.set_defaults(fn=cmd_build)
@@ -151,7 +163,8 @@ def main() -> int:
     bp.add_argument("--pairs", required=True)
     bp.add_argument("--bin-dir", required=True)
     bp.add_argument("--bake", required=True)
-    bp.add_argument("--globaff", required=True)
+    bp.add_argument("--globaff")
+    bp.add_argument("--orient")
     bp.add_argument("--out", required=True)
     bp.add_argument("--jobs", type=int, default=16)
     bp.set_defaults(fn=cmd_build_pairs)
