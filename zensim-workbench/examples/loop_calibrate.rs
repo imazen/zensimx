@@ -14,7 +14,7 @@
 //!
 //! `LOOP_CAL_TAIL` adds a fit to each pair's worst tiles (largest and 99th
 //! percentile; `OUT.tail.tsv`), the blocks that decide whether the loop
-//! reaches its target.
+//! reaches its target. `LOOP_CAL_MAPS=a,b` fits only those maps.
 //!
 //! Fit: the CID22-512 *training* images. Held out: the gb82-sc screenshots.
 //! The pair set's CID22-512 validation images are left out entirely (they are
@@ -116,8 +116,15 @@ fn main() {
     );
     let metrics: Vec<String> =
         serde_json::from_str(&zensim_workbench::available_metrics()).expect("metrics");
+    // LOOP_CAL_MAPS=a,b: only those maps.
+    let only_maps: Option<Vec<String>> = std::env::var("LOOP_CAL_MAPS")
+        .ok()
+        .map(|v| v.split(',').map(str::to_string).collect());
     for metric in &metrics {
         for map in zensim_workbench::map_names() {
+            if only_maps.as_ref().is_some_and(|m| !m.contains(&map)) {
+                continue;
+            }
             // Per pair: the map's local error (scale 1, exponent 1) and butteraugli's block distances.
             let pairs: Vec<Pair> = rows
                 .iter()
@@ -289,7 +296,9 @@ fn main() {
                 for (stat, q) in [("max", 1.0), ("p99", 0.99)] {
                     let butter: Vec<f64> = pairs
                         .iter()
-                        .map(|p| quantile(&p.2.iter().map(|&b| f64::from(b)).collect::<Vec<_>>(), q))
+                        .map(|p| {
+                            quantile(&p.2.iter().map(|&b| f64::from(b)).collect::<Vec<_>>(), q)
+                        })
                         .collect();
                     // (set, distance, log butteraugli, log placed at scale 1) per pair.
                     let logs = |ex: f64| -> Vec<(&str, f64, f64, f64)> {
@@ -302,21 +311,33 @@ fn main() {
                             })
                             .collect()
                     };
-                    let stats = |l: &[(&str, f64, f64, f64)], which: &str, ls: f64| -> (f64, f64, usize) {
-                        let r: Vec<(f64, f64)> =
-                            l.iter().filter(|x| x.0 == which).map(|x| (x.3 + ls, x.2)).collect();
-                        let n = r.len() as f64;
-                        let rmse = (r.iter().map(|(m, b)| (m - b).powi(2)).sum::<f64>() / n).sqrt();
-                        let (mx, my) = (r.iter().map(|x| x.0).sum::<f64>() / n, r.iter().map(|x| x.1).sum::<f64>() / n);
-                        let cov: f64 = r.iter().map(|(x, y)| (x - mx) * (y - my)).sum();
-                        let vx: f64 = r.iter().map(|(x, _)| (x - mx).powi(2)).sum();
-                        let vy: f64 = r.iter().map(|(_, y)| (y - my).powi(2)).sum();
-                        (rmse, cov / (vx * vy).sqrt(), r.len())
-                    };
+                    let stats =
+                        |l: &[(&str, f64, f64, f64)], which: &str, ls: f64| -> (f64, f64, usize) {
+                            let r: Vec<(f64, f64)> = l
+                                .iter()
+                                .filter(|x| x.0 == which)
+                                .map(|x| (x.3 + ls, x.2))
+                                .collect();
+                            let n = r.len() as f64;
+                            let rmse =
+                                (r.iter().map(|(m, b)| (m - b).powi(2)).sum::<f64>() / n).sqrt();
+                            let (mx, my) = (
+                                r.iter().map(|x| x.0).sum::<f64>() / n,
+                                r.iter().map(|x| x.1).sum::<f64>() / n,
+                            );
+                            let cov: f64 = r.iter().map(|(x, y)| (x - mx) * (y - my)).sum();
+                            let vx: f64 = r.iter().map(|(x, _)| (x - mx).powi(2)).sum();
+                            let vy: f64 = r.iter().map(|(_, y)| (y - my).powi(2)).sum();
+                            (rmse, cov / (vx * vy).sqrt(), r.len())
+                        };
                     let mut best: Option<(f64, f64, f64)> = None;
                     for &ex in &EXPONENTS {
                         let l = logs(ex);
-                        let fit: Vec<f64> = l.iter().filter(|x| x.0 == "fit").map(|x| x.2 - x.3).collect();
+                        let fit: Vec<f64> = l
+                            .iter()
+                            .filter(|x| x.0 == "fit")
+                            .map(|x| x.2 - x.3)
+                            .collect();
                         if fit.is_empty() {
                             continue;
                         }
@@ -343,7 +364,8 @@ fn main() {
                     ds.sort_by(f64::total_cmp);
                     ds.dedup();
                     for which in ["fit", "hold"] {
-                        let mut line = format!("  {which} {stat} bias by distance (tail fit | bulk fit):");
+                        let mut line =
+                            format!("  {which} {stat} bias by distance (tail fit | bulk fit):");
                         for &d in &ds {
                             let bias = |l: &[(&str, f64, f64, f64)], lsc: f64| -> f64 {
                                 let v: Vec<f64> = l
@@ -353,7 +375,11 @@ fn main() {
                                     .collect();
                                 v.iter().sum::<f64>() / v.len() as f64
                             };
-                            line += &format!(" d{d} {:+.2}|{:+.2}", bias(&l, ls), bias(&lb, scale.ln()));
+                            line += &format!(
+                                " d{d} {:+.2}|{:+.2}",
+                                bias(&l, ls),
+                                bias(&lb, scale.ln())
+                            );
                         }
                         eprintln!("{line}");
                     }

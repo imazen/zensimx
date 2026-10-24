@@ -55,7 +55,9 @@ use std::time::Instant;
 
 use jxl_encoder::{ExternalMetric, LoopTrace, LossyConfig, PixelLayout};
 use sha2::{Digest, Sha256};
-use zensim_workbench_loop_converge::{ErrorSlot, MapScorer, MapServer, ServerScorer, read_png, rgba};
+use zensim_workbench_loop_converge::{
+    ErrorSlot, MapScorer, MapServer, ServerScorer, read_png, rgba,
+};
 
 const DISTANCES: &str = "0.3,0.45,0.6,1.0,1.6,2.5,4.0,6.4,10.0";
 
@@ -160,10 +162,12 @@ fn write_frames(path: &Path, frames: &[jxl_encoder::LoopFrame]) {
 }
 
 fn hex(bytes: &[u8]) -> String {
-    Sha256::digest(bytes).iter().fold(String::new(), |mut s, b| {
-        let _ = write!(s, "{b:02x}");
-        s
-    })
+    Sha256::digest(bytes)
+        .iter()
+        .fold(String::new(), |mut s, b| {
+            let _ = write!(s, "{b:02x}");
+            s
+        })
 }
 
 fn write_png(path: &Path, rgb: &[u8], width: u32, height: u32) {
@@ -204,7 +208,8 @@ fn decode(bitstream: &[u8], width: u32, height: u32) -> Vec<u8> {
 fn main() {
     let mut args = std::env::args().skip(1);
     let (mut corpus, mut out, mut label, mut steer) = (None, None, None, None);
-    let (mut distances, mut iters, mut effort, mut threads) = (DISTANCES.to_string(), 4u32, 7u8, 8usize);
+    let (mut distances, mut iters, mut effort, mut threads) =
+        (DISTANCES.to_string(), 4u32, 7u8, 8usize);
     let mut server = Vec::new();
     let (mut placement_override, mut probe_specs, mut frames_dir) = (None, Vec::new(), None);
     while let Some(a) = args.next() {
@@ -232,7 +237,10 @@ fn main() {
     let out = out.expect("--out DIR");
     let label = label.expect("--label LABEL");
     let steer_spec = steer.expect("--steer none|butteraugli|workbench:METRIC:MAP|server");
-    let distances: Vec<f32> = distances.split(',').map(|d| d.parse().expect("distance")).collect();
+    let distances: Vec<f32> = distances
+        .split(',')
+        .map(|d| d.parse().expect("distance"))
+        .collect();
     let steer = match steer_spec.split(':').collect::<Vec<_>>().as_slice() {
         ["none"] => Steer::None,
         ["butteraugli"] => Steer::Butteraugli,
@@ -253,7 +261,10 @@ fn main() {
             }
         }
         ["server"] => {
-            assert!(!server.is_empty(), "--steer server needs --server CMD ARG...");
+            assert!(
+                !server.is_empty(),
+                "--steer server needs --server CMD ARG..."
+            );
             Steer::Server(server.clone())
         }
         _ => panic!("unknown --steer {steer_spec}"),
@@ -262,25 +273,31 @@ fn main() {
         placement_override.is_none() || matches!(steer, Steer::Workbench { .. }),
         "--placement applies to a workbench arm"
     );
-    let iters = if matches!(steer, Steer::None) { 0 } else { iters };
+    let iters = if matches!(steer, Steer::None) {
+        0
+    } else {
+        iters
+    };
     let probes: Vec<Placed> = probe_specs
         .iter()
-        .map(|spec| match spec.split(':').collect::<Vec<_>>().as_slice() {
-            ["workbench", metric, map] => match map.split_once('@') {
-                // `MAP@SCALE,EXPONENT`: the map at that placement instead of its fitted one.
-                Some((map, se)) => {
-                    let (sc, ex) = se.split_once(',').expect("MAP@SCALE,EXPONENT");
-                    Placed {
-                        metric: metric.to_string(),
-                        map: map.to_string(),
-                        scale: sc.parse().expect("scale"),
-                        exponent: ex.parse().expect("exponent"),
+        .map(
+            |spec| match spec.split(':').collect::<Vec<_>>().as_slice() {
+                ["workbench", metric, map] => match map.split_once('@') {
+                    // `MAP@SCALE,EXPONENT`: the map at that placement instead of its fitted one.
+                    Some((map, se)) => {
+                        let (sc, ex) = se.split_once(',').expect("MAP@SCALE,EXPONENT");
+                        Placed {
+                            metric: metric.to_string(),
+                            map: map.to_string(),
+                            scale: sc.parse().expect("scale"),
+                            exponent: ex.parse().expect("exponent"),
+                        }
                     }
-                }
-                None => fitted(metric, map),
+                    None => fitted(metric, map),
+                },
+                _ => panic!("unknown --probe {spec}"),
             },
-            _ => panic!("unknown --probe {spec}"),
-        })
+        )
         .collect();
     if let Some(dir) = &frames_dir {
         std::fs::create_dir_all(dir).expect("frames dir");
@@ -388,7 +405,11 @@ fn main() {
                     seeds.dedup();
                     let last = frames.last().map(|f| {
                         let tile_max = f.tile_dist.iter().copied().fold(0f32, f32::max);
-                        let above = f.tile_dist.iter().filter(|&&t| f64::from(t) > f.target).count();
+                        let above = f
+                            .tile_dist
+                            .iter()
+                            .filter(|&&t| f64::from(t) > f.target)
+                            .count();
                         (f.score, f.target, tile_max, above)
                     });
                     let sha256 = hex(&bitstream);
@@ -455,13 +476,17 @@ fn main() {
     assert_eq!(results.len(), jobs.len(), "every encode finished");
     results.sort_by_key(|r| (r.image, r.distance));
 
-    let mut manifest = String::from("ref_path\tdist_path\tlabel\timage\tcorpus\tdistance\tbytes\tencode_ms\n");
+    let mut manifest =
+        String::from("ref_path\tdist_path\tlabel\timage\tcorpus\tdistance\tbytes\tencode_ms\n");
     let mut lp = String::from(
         "image\tclass\tdistance\tbytes\tbitstream_sha256\tencode_ms\tframes\tseeds\tlast_score\tlast_target\tlast_tile_max\tlast_blocks_above",
     );
     for p in &probes {
         let tag = format!("{}:{}@{:e},{}", p.metric, p.map, p.scale, p.exponent);
-        let _ = write!(lp, "\tprobe_max[{tag}]\tprobe_tile_max[{tag}]\tprobe_above[{tag}]");
+        let _ = write!(
+            lp,
+            "\tprobe_max[{tag}]\tprobe_tile_max[{tag}]\tprobe_above[{tag}]"
+        );
     }
     lp.push('\n');
     for r in &results {
@@ -480,7 +505,14 @@ fn main() {
         );
         let (score, target, tile, above) = r.last.map_or(
             ("".into(), "".into(), "".into(), "".into()),
-            |(s, t, m, a)| (format!("{s:.6}"), format!("{t:.6}"), format!("{m:.6}"), a.to_string()),
+            |(s, t, m, a)| {
+                (
+                    format!("{s:.6}"),
+                    format!("{t:.6}"),
+                    format!("{m:.6}"),
+                    a.to_string(),
+                )
+            },
         );
         let _ = write!(
             lp,
@@ -500,10 +532,14 @@ fn main() {
             map,
             scale,
             exponent,
-        } => serde_json::json!({"metric": metric, "map": map, "scale": scale, "exponent": exponent}),
+        } => {
+            serde_json::json!({"metric": metric, "map": map, "scale": scale, "exponent": exponent})
+        }
         _ => serde_json::Value::Null,
     };
-    let exe = std::fs::read("/proc/self/exe").map(|b| hex(&b)).unwrap_or_default();
+    let exe = std::fs::read("/proc/self/exe")
+        .map(|b| hex(&b))
+        .unwrap_or_default();
     let run = serde_json::json!({
         "label": label,
         "steer": steer_spec,

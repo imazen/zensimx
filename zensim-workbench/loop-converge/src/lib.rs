@@ -24,7 +24,14 @@ pub fn srgb8(v: f32) -> u8 {
 
 /// A reconstruction (planar linear RGB, rows `stride` values apart) as sRGB8
 /// RGBA.
-pub fn recon_rgba(r: &[f32], g: &[f32], b: &[f32], stride: usize, width: usize, height: usize) -> Vec<u8> {
+pub fn recon_rgba(
+    r: &[f32],
+    g: &[f32],
+    b: &[f32],
+    stride: usize,
+    width: usize,
+    height: usize,
+) -> Vec<u8> {
     let mut rgba = Vec::with_capacity(width * height * 4);
     for y in 0..height {
         for x in y * stride..y * stride + width {
@@ -98,7 +105,14 @@ pub struct MapScorer {
 }
 
 impl ExternalLoopMetric for MapScorer {
-    fn set_reference(&mut self, _r: &[f32], _g: &[f32], _b: &[f32], _width: usize, _height: usize) -> Result<(), String> {
+    fn set_reference(
+        &mut self,
+        _r: &[f32],
+        _g: &[f32],
+        _b: &[f32],
+        _width: usize,
+        _height: usize,
+    ) -> Result<(), String> {
         // As in the workbench, the scorer already holds the source the encode
         // was given.
         Ok(())
@@ -165,7 +179,11 @@ impl MapServer {
         let mut stdout = BufReader::new(child.stdout.take().expect("server stdout"));
         let mut header = String::new();
         stdout.read_line(&mut header).expect("server header");
-        assert!(header.ends_with('\n'), "map server {:?} exited before its header", command[0]);
+        assert!(
+            header.ends_with('\n'),
+            "map server {:?} exited before its header",
+            command[0]
+        );
         header.pop();
         Self {
             child,
@@ -186,19 +204,35 @@ impl MapServer {
     }
 
     /// Sets the reference.
-    pub fn set_reference(&mut self, rgba: &[u8], width: usize, height: usize) -> std::io::Result<()> {
+    pub fn set_reference(
+        &mut self,
+        rgba: &[u8],
+        width: usize,
+        height: usize,
+    ) -> std::io::Result<()> {
         self.send(b'R', rgba, width, height)
     }
 
     /// Scores `rgba` against the reference: fills `values` and returns the score.
-    pub fn compare(&mut self, rgba: &[u8], width: usize, height: usize, values: &mut Vec<f32>) -> std::io::Result<f64> {
+    pub fn compare(
+        &mut self,
+        rgba: &[u8],
+        width: usize,
+        height: usize,
+        values: &mut Vec<f32>,
+    ) -> std::io::Result<f64> {
         self.send(b'D', rgba, width, height)?;
         let mut score = [0u8; 8];
         self.stdout.read_exact(&mut score)?;
         let mut raw = vec![0u8; width * height * 4];
         self.stdout.read_exact(&mut raw)?;
         values.clear();
-        values.extend(raw.as_chunks::<4>().0.iter().map(|b| f32::from_le_bytes(*b)));
+        values.extend(
+            raw.as_chunks::<4>()
+                .0
+                .iter()
+                .map(|b| f32::from_le_bytes(*b)),
+        );
         Ok(f64::from_le_bytes(score))
     }
 }
@@ -221,7 +255,14 @@ pub struct ServerScorer {
 }
 
 impl ExternalLoopMetric for ServerScorer {
-    fn set_reference(&mut self, _r: &[f32], _g: &[f32], _b: &[f32], width: usize, height: usize) -> Result<(), String> {
+    fn set_reference(
+        &mut self,
+        _r: &[f32],
+        _g: &[f32],
+        _b: &[f32],
+        width: usize,
+        height: usize,
+    ) -> Result<(), String> {
         let mut server = self.server.lock().unwrap_or_else(|p| p.into_inner());
         server
             .set_reference(&self.reference, width, height)

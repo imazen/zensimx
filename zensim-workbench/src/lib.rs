@@ -38,6 +38,10 @@ pub const MAPS: &[(&str, &str, &str, &str, f32, usize)] = &[
     ("removal", "box", "nearest", "repair", 0.0, 1),
     // 8×8 blocks for the JPEG XL loop.
     ("blocks8", "center", "nearest", "exact", 0.0, 8),
+    // For steering: `diffmap` with the amplitude split (every nonlinear pool
+    // as a mean pool of its member), so a block's value moves with its own
+    // error as it does with the image's ("JPEG XL reachability with Tga").
+    ("diffmap_amp", "center", "guided", "amplitude", 3.0, 1),
 ];
 
 /// The module's menu group: the zensim version and source this module was
