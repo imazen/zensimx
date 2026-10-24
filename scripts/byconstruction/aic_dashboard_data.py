@@ -54,7 +54,10 @@ ARMS = {
 # Same model classes without the AIC leg, for the arms table.
 CONTROLS = {"Thpm": "Thpm (monotone, no descriptor, no AIC leg)", "Tghpm": "Tghpm (no AIC leg)",
             "Bghpm": "Bghpm (B + descriptor, no AIC leg)", "Tgg": "Tgg (gated damage, every weight >= 0, no AIC leg)",
-            "M64": "M64 (certified max pairs, no AIC leg)", "Mgg64": "Mgg64 (max pairs on gated damage, no AIC leg)"}
+            "M64": "M64 (certified max pairs, no AIC leg)", "Mgg64": "Mgg64 (max pairs on gated damage, no AIC leg)",
+            "M64lin": "M64lin (M64 recipe, coarse scales from linear RGB, no AIC leg)"}
+# Arms made from other arms' predictions after the fact (no training of their own): the mean of two cells' outputs.
+POSTHOC = {"M64ens": "M64ens (mean of M64 and M64lin, post hoc, no AIC leg)"}
 COMMIT_SUMMARY = {
     "d24c2ec6": "AIC2026 feature tables, source-held-out fits, band-feature prototypes",
     "31e3ba97": "AIC2026 as a research training leg through the Rust trainer (strict refusal kept)",
@@ -235,6 +238,7 @@ def main() -> int:
 
     # E21 + mixture for every arm with cells
     have = [x for x in list(CONTROLS) + arms if len(list((CELLS / x).glob("without_*_s*/byc_record.json"))) == 12]
+    have += [x for x in POSTHOC if len(list((CELLS / x).glob("without_*_s*/pred_*.tsv"))) == 12]
     sc = run_json([sys.executable, str(REPO / "scripts/rev4_featpot/byc_cells.py"), "score", "--arms", ",".join(have)], env)
     mix = run_json([sys.executable, str(HERE / "mixture_test.py"), "report", "--out", MIX], env)
     mixg = run_json([sys.executable, str(HERE / "mixture_test.py"), "report", "--out", MIXG], env)
@@ -242,15 +246,17 @@ def main() -> int:
         s = sc[arm]
         cells = [v for k, v in mix.items() if k.startswith(arm + "_")]
         gcells = [v for k, v in mixg.items() if k.startswith(arm + "_")]
-        lab = CONTROLS.get(arm) or ARMS[arm][0]
-        add("arms", id=slug(arm), arm=lab, aic_weight=None if arm in CONTROLS else ARMS[arm][2], e21_delta=s["delta"],
+        lab = CONTROLS.get(arm) or POSTHOC.get(arm) or ARMS[arm][0]
+        noaic = arm in CONTROLS or arm in POSTHOC
+        add("arms", id=slug(arm), arm=lab, aic_weight=None if noaic else ARMS[arm][2], e21_delta=s["delta"],
             e21_se=s["seed_unit_se"], **{d: s["per_dataset_delta"][d] for d in ("kadid", "tid2013", "konfig", "cid22_a25")},
-            aic_oof=None if arm in CONTROLS else aicscore[arm]["global"],
+            aic_oof=None if noaic else aicscore[arm]["global"],
             mix_min=min(v["inversions"] for v in cells) if cells else None,
             mix_max=max(v["inversions"] for v in cells) if cells else None,
             mix_max_rise=max(v["max_rise"] for v in cells) if cells else None,
             gmix_max=max(v["inversions"] for v in gcells) if gcells else None,
-            gmix_max_rise=max(v["max_rise"] for v in gcells) if gcells else None, status="done")
+            gmix_max_rise=max(v["max_rise"] for v in gcells) if gcells else None,
+            status="post hoc" if arm in POSTHOC else "done")
 
     pc_b = zs["B"]["per_codec"]
     pc_t = json.loads((O / "rust/folds_train/T/oof_panel.json").read_text())["per_codec"]
@@ -340,7 +346,7 @@ def main() -> int:
     frozen = json.loads((O / "panel_public_test_frozen.json").read_text())["rows"]
     names = {"kadid": "KADID", "tid2013": "TID2013", "konfig": "KonFiG", "cid22_a25": "CID22-A",
              "aic2026_public_train": "AIC2026 public_train", "aic2026_public_test": "AIC2026 public_test"}
-    models = {"base-c": "B recipe (base-c)", "Thpm": "Thpm (convex monotone)", "Mhpm": "Mhpm (max pairs)", **CONTROLS,
+    models = {"base-c": "B recipe (base-c)", "Thpm": "Thpm (convex monotone)", "Mhpm": "Mhpm (max pairs)", **CONTROLS, **POSTHOC,
               **{k: v[0] for k, v in ARMS.items()}}
     geo_f = ("fit_p99", "fit_max", "out4", "p99d", "maxd")
     for x in pj["rows"] + frozen:
@@ -356,7 +362,7 @@ def main() -> int:
         return (float(np.mean([x["z_rmse"] for x in xs])), float(np.mean([x["fit_p99"] for x in xs]))) if xs else (None, None)
     for r in rows:
         if r["table"] == "arms":
-            arm = next(k for k, v in {**CONTROLS, **{k: v[0] for k, v in ARMS.items()}}.items() if v == r["arm"])
+            arm = next(k for k, v in {**CONTROLS, **POSTHOC, **{k: v[0] for k, v in ARMS.items()}}.items() if v == r["arm"])
             r["z_e21"], r["p99_e21"] = z_of(arm)
             r["z_aic"] = z_of(f"{arm} (E21 + AIC)", "aic2026_public_train")[0]
     add("headline", id="basec_z", label="B's recipe (base-c), E21 Z-RMSE out of sample", value=z_of("base-c")[0])
@@ -406,7 +412,9 @@ def main() -> int:
         frame = {"ds": ds, "label": np.round(y, 4), "type": [TYPE_NAMES.get(t, t) for t in sel.type]}
         models = [("basec", "B’s recipe (base-c), seed 0", np.asarray(panel_in[ds]["predictions"]["base-c"][0], np.float64))]
         for arm, sid, lab in (("Tga", "tga", "Tga, seed 0"), ("mono-thr-mp64", "m64", "M64 (certified max pairs), seed 0"),
-                              ("Mgg64", "mgg64", "Mgg64 (max pairs, gated damage), seed 0"), ("Tgg", "tgg", "Tgg, seed 0")):
+                              ("Mgg64", "mgg64", "Mgg64 (max pairs, gated damage), seed 0"), ("Tgg", "tgg", "Tgg, seed 0"),
+                              ("M64lin", "m64lin", "M64lin (linear-light coarse scales), seed 0"),
+                              ("M64ens", "m64ens", "M64ens (mean of M64 and M64lin, post hoc), seed 0")):
             f = CELLS / arm / f"without_{ds}_s0" / f"pred_{ds}.tsv"
             if f.is_file():
                 models.append((sid, lab, pd.read_csv(f, sep="\t").pred.to_numpy(np.float64)))
