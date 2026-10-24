@@ -2092,6 +2092,15 @@ The changes, in order:
     thread 8 rounds, eight threads 10; `rev7_fusedact_vs_leanv1_t1`, `_t8`): v4x −3.86% (1507×2048), −2.42% (256²),
     −4.72% (1024²); eight threads −4.11% / −4.66%; v3, which keeps the eight-column loop, −0.31% / −0.91% / −0.10%.
 
+23. **The same configuration in the v1 fold's eight-column loop** (revision 7; v3, and the odd last chunk on AVX-512):
+    AVX2 has sixteen vector registers, too few for the fourteen pools' two half-row accumulators, so this loop keeps
+    the pool updates in memory and drops only the per-chunk flag tests. Bits: 110 of 110 dumps at revisions 5/6 and 7;
+    the lean-loop tier test now also fails on v3 when the high-pass term takes its revision-6 form. Paired, 8 rounds,
+    one thread (`rev7_leanv1_vs_lean8_t1`): v3 −1.20% (1507×2048), −0.55% (256²), −1.61% (1024²); v4x −0.09% /
+    +0.10% / +0.11%, inside noise. Holding the dense kernel's twenty-six row pools in registers the same way was
+    slower on v4x (28.7 → 33–35 ms at 1507×2048, unpaired): with the twenty-nine term vectors live as well, the
+    register allocator spilled more than the explicit updates move.
+
 **Tried and not kept** (after 21): the horizontal moment blur rewritten to share each output's pair and quad tree
 nodes between adjacent outputs (the same trees, half the adds), once through row buffers and once through `valignd`
 on adjacent vectors, both bit-identical: 29.7 → 32.1 ms and 29.6 → 31.1 ms at 1507×2048, one thread, v4x (unpaired).

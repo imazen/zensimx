@@ -6181,6 +6181,21 @@ fn fused_vblur_ssim_canon64_vec<P: crate::featcanon::Pool64>(
                     }
                 }};
             }
+            // The configuration B and Tga run (radius 0, direct SSIM, edges and
+            // HF on, no peaks, extensions, free extras or stores) has its own
+            // loops at revision 7.
+            let lean = rev7
+                && radius == 0
+                && direct
+                && !free.local_only
+                && free.omit_peaks
+                && !free.omit_edges
+                && !free.raw_moments
+                && !free.bounded_err
+                && !ext.on
+                && !store_sd
+                && !store_mu
+                && !store_sigma;
             let mut c = 0usize;
             // Revision 7: sixteen columns per step on AVX-512 tiers.
             if rev7 && crate::feature_v2::steps_sixteen::<Token>() {
@@ -6215,22 +6230,10 @@ fn fused_vblur_ssim_canon64_vec<P: crate::featcanon::Pool64>(
                         }
                     }};
                 }
-                // The configuration B and Tga run (radius 0, direct SSIM, edges
-                // and HF on, no peaks, extensions, free extras or stores): its
-                // fourteen row pools stay in registers between folds, and no
-                // per-chunk flag is tested. Each lane adds the same values in
-                // the same column order as `chunk!`, so every sum keeps its bits.
-                let lean = radius == 0
-                    && direct
-                    && !free.local_only
-                    && free.omit_peaks
-                    && !free.omit_edges
-                    && !free.raw_moments
-                    && !free.bounded_err
-                    && !ext.on
-                    && !store_sd
-                    && !store_mu
-                    && !store_sigma;
+                // The lean configuration's fourteen row pools stay in registers
+                // between folds, and no per-chunk flag is tested. Each lane adds
+                // the same values in the same column order as `chunk!`, so every
+                // sum keeps its bits.
                 if lean {
                     macro_rules! get {
                         ($f:ident) => {
@@ -6342,17 +6345,74 @@ fn fused_vblur_ssim_canon64_vec<P: crate::featcanon::Pool64>(
                 }
             }
             let consts8 = (one, zero, c_mse, c_lumt, km, kiw);
-            for c in c..full {
-                chunk!(
-                    f32x8,
-                    8,
-                    splats,
-                    consts8,
-                    pool_add,
-                    pool_add64,
-                    window8,
-                    c * 8
-                );
+            if lean {
+                // The lean configuration eight columns at a time (v3, and the
+                // odd last chunk on AVX-512): `chunk!`'s pool adds without its
+                // per-chunk flag tests.
+                let (m1p, m2p, sqp, s12p) = (planes.m1, planes.m2, planes.sq, planes.s12);
+                for c in c..full {
+                    let x0 = c * 8;
+                    let at = base + x0;
+                    let m1v = f32x8::load_t(token, m1p[at..at + 8].try_into().unwrap());
+                    let m2v = f32x8::load_t(token, m2p[at..at + 8].try_into().unwrap());
+                    let ssqv = f32x8::load_t(token, sqp[at..at + 8].try_into().unwrap());
+                    let s12v = f32x8::load_t(token, s12p[at..at + 8].try_into().unwrap());
+                    let sv = f32x8::load_t(token, srow[x0..x0 + 8].try_into().unwrap());
+                    let dv = f32x8::load_t(token, drow[x0..x0 + 8].try_into().unwrap());
+                    macro_rules! add8 {
+                        ($f:ident, $v:expr) => {{
+                            let lanes = row32.$f.chunk8(x0 & 15);
+                            (f32x8::load_t(token, lanes) + $v).store(lanes);
+                        }};
+                    }
+                    let sd = splats.direct(m1v, m2v, ssqv, s12v).max(zero);
+                    let sd2 = sd * sd;
+                    let sd4 = sd2 * sd2;
+                    add8!(ssim_d, sd);
+                    add8!(ssim_d4, sd4);
+                    add8!(ssim_d2, sd2);
+                    let diff1 = (sv - m1v).abs();
+                    let diff2 = (dv - m2v).abs();
+                    let ed = if stable7 {
+                        (diff2 - diff1) / (one + diff1)
+                    } else {
+                        (one + diff2) / (one + diff1) - one
+                    };
+                    let artifact = ed.max(zero);
+                    let detail_lost = (-ed).max(zero);
+                    let a2 = artifact * artifact;
+                    let dl2 = detail_lost * detail_lost;
+                    add8!(edge_art, artifact);
+                    add8!(edge_art4, a2 * a2);
+                    add8!(edge_art2, a2);
+                    add8!(edge_det, detail_lost);
+                    add8!(edge_det4, dl2 * dl2);
+                    add8!(edge_det2, dl2);
+                    let vs = sv - m1v;
+                    let vd = dv - m2v;
+                    add8!(hf_sq_src, vs * vs);
+                    add8!(hf_sq_dst, (vd - vs) * (vd + vs));
+                    add8!(hf_abs_src, diff1);
+                    add8!(hf_abs_dst, diff2 - diff1);
+                    let pd = sv - dv;
+                    add8!(mse, pd * pd);
+                    if (x0 + 8).is_multiple_of(crate::featcanon::ROW_LANES_FOLD) {
+                        row32.fold_into(&mut *row, free, ext);
+                    }
+                }
+            } else {
+                for c in c..full {
+                    chunk!(
+                        f32x8,
+                        8,
+                        splats,
+                        consts8,
+                        pool_add,
+                        pool_add64,
+                        window8,
+                        c * 8
+                    );
+                }
             }
             // The end of the chunks, unless the last chunk already folded.
             if rev7 && full > 0 && !(full * 8).is_multiple_of(crate::featcanon::ROW_LANES_FOLD) {
