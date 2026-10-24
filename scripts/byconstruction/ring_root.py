@@ -1,13 +1,16 @@
-"""Derive a training root whose ringing columns use `ZENSIM_RING_FORM=hpm` (by-construction exploration).
+"""Derive a training root whose columns come from a measurement arm (by-construction exploration).
 
-Exploration record: benchmarks/byconstruction_2026-10-22.md ("Ringing corrected: high-pass form, trained and tested").
-The source root (the v40r4 `v2e29` root every E21 arm trained on) stays untouched. The new root holds the same tables,
-rows, keys, labels and split decisions; only the 12 ringing columns (v2 `idx::RINGING` over the 12 scale x channel cells)
-are replaced with values from a bank extracted under `ZENSIM_RING_FORM=hpm`. Every other measured column of the new bank
-must equal the stored table bit for bit (float64 bank values cast to float32, as `v2c_wide` writes them); that check is
-what proves each row joined to the right pixels and that the form moved nothing else.
+Exploration record: benchmarks/byconstruction_2026-10-22.md ("Ringing corrected: high-pass form, trained and tested";
+"Coarse scales in linear light"). The source root (the v40r4 `v2e29` root every E21 arm trained on) stays untouched.
+The new root holds the same tables, rows, keys, labels and split decisions; only the arm's columns are replaced with
+values from a bank extracted under it. Every other measured column of the new bank must equal the stored table bit for
+bit (float64 bank values cast to float32, as `v2c_wide` writes them); that check is what proves each row joined to the
+right pixels and that the arm moved nothing else. Arms (`--arm`, default hpm):
 
-  pool   --bin EXTRACTOR --out DIR             extract the E15 coverage-pool selection (44,000 pairs) under hpm
+  hpm     `ZENSIM_RING_FORM=hpm`: the 12 ringing columns (v2 `idx::RINGING` over the 12 scale x channel cells)
+  linpyr  `ZENSIM_PYRAMID=linear`: every column of scales 1-3, and scale 0's edge-width change (a scale 0/1 ratio)
+
+  pool   --bin EXTRACTOR --out DIR             extract the E15 coverage-pool selection (44,000 pairs) under the arm
   build  --bank DIR --pool DIR --out ROOT      write the derived root and re-pin its receipt and freeze
   globaff-pairs --bank DIR --pool DIR --out DIR   one pairs TSV per bank set (row_id = bank row) and the pool's
   globaff --root ROOT --bank DIR --sidecars DIR --out ROOT2
@@ -41,9 +44,28 @@ SOURCE = Path("/mnt/v/output/zensim/v40r4-2026-10-08/v2e29")
 POOL_SOURCE = Path("/var/tmp/rev5-featpot/v2c/e15")
 RING_IDS = [372 + 29 * cell + 26 for cell in range(12)]  # v2 block f372.., 29 per (scale, channel) cell, RINGING = 26
 MEASURED = [i for lo, hi in ((0, 228), (372, 720)) for i in range(lo, hi)]
-OTHER = [i for i in MEASURED if i not in RING_IDS]
 ERA = "rev5_localwin_ringhpm"
 HDR = ("hdr_hb4", "hdr_hc4")
+
+
+def scale_of(i: int) -> int:
+    """Pyramid scale of measured feature `i`: (scale, channel) cells of 13 basic, 6 peak and 29 v2 features."""
+    if i < 156:
+        return i // 39
+    if i < 228:
+        return (i - 156) // 18
+    return (i - 372) // 87
+
+
+EDGE_WIDTH_S0 = [372 + 29 * ch + 28 for ch in range(3)]  # v2 EDGE_WIDTH_CHANGE = 28: scale 0's two-scale ratio
+ARMS = {
+    "hpm": {"env": {"ZENSIM_RING_FORM": "hpm"}, "manifest": ("ring_form", "hpm"), "era": ERA, "replaced": RING_IDS,
+            "record": "byc_ring_root",
+            "note": f"; ringing f{RING_IDS[0]}..f{RING_IDS[-1]} (12 ids) re-extracted under ZENSIM_RING_FORM=hpm (byconstruction)"},
+    "linpyr": {"env": {"ZENSIM_PYRAMID": "linear"}, "manifest": ("pyramid", "linear"), "era": "rev5_localwin_linpyr",
+               "replaced": sorted([i for i in MEASURED if scale_of(i) > 0] + EDGE_WIDTH_S0), "record": "byc_linpyr_root",
+               "note": "; scales 1-3 and scale-0 edge-width change re-extracted under ZENSIM_PYRAMID=linear (byconstruction)"},
+}
 
 
 def sha(p) -> str:
@@ -58,13 +80,18 @@ def log(msg: str) -> None:
     print(f"{time.strftime('%F %T')} {msg}", flush=True)
 
 
-def require_hpm(manifests: list[Path]) -> None:
-    """Every research manifest of the extraction must say the hpm arm ran."""
+def require_arm(manifests: list[Path], arm: dict) -> None:
+    """Every research manifest of the extraction must say the arm ran (and its scale map must be `scale_of`)."""
     if not manifests:
         raise ValueError("no research manifests found")
+    key, value = arm["manifest"]
     for m in manifests:
-        if json.loads(m.read_text()).get("ring_form") != "hpm":
-            raise ValueError(f"{m}: not extracted under ZENSIM_RING_FORM=hpm")
+        man = json.loads(m.read_text())
+        if man.get(key) != value:
+            raise ValueError(f"{m}: not extracted under {key}={value}")
+        scales = {f["id"]: f["scale"] for f in man["features"]}
+        if any(scales[i] != scale_of(i) for i in MEASURED):
+            raise ValueError(f"{m}: feature scales disagree with scale_of")
 
 
 def cmd_pool(a) -> int:
@@ -73,14 +100,15 @@ def cmd_pool(a) -> int:
     tsv = out / "pairs.tsv"
     shutil.copyfile(POOL_SOURCE / "extract/pairs.tsv", tsv)
     csvp = out / "features.csv"
-    env = dict(os.environ, ZENSIM_FORMULA_REV="5", ZENSIM_ROOT_FORM="sqrt", ZENSIM_RING_FORM="hpm",
+    arm = ARMS[a.arm]
+    env = dict(os.environ, ZENSIM_FORMULA_REV="5", ZENSIM_ROOT_FORM="sqrt", **arm["env"],
                RAYON_NUM_THREADS=str(a.threads))
     cmd = [a.bin, "--corpus", "pairs-tsv", "--path", str(tsv), "--out", str(csvp), "--restore-cuts", "basic,peaks,v2",
-           "--input-contract", "legacy-rgb8", "--era-label", ERA, "--force-tier", "native"]
+           "--input-contract", "legacy-rgb8", "--era-label", arm["era"], "--force-tier", "native"]
     t0 = time.time()
     with (out / "extract.log").open("w") as lg:
         subprocess.run(cmd, env=env, stdout=lg, stderr=subprocess.STDOUT, check=True)
-    require_hpm([Path(f"{csvp}.research_manifest.json")])
+    require_arm([Path(f"{csvp}.research_manifest.json")], arm)
     names = ["row_id"] + [f"f{i}" for i in MEASURED]
     tab = pacsv.read_csv(csvp, convert_options=pacsv.ConvertOptions(
         column_types={"row_id": pa.int64(), **{f"f{i}": pa.float64() for i in MEASURED}}, include_columns=names))
@@ -89,7 +117,7 @@ def cmd_pool(a) -> int:
     if tab.column("row_id").to_pylist() != list(range(tab.num_rows)):
         raise ValueError("pool row_id join failed")
     pq.write_table(tab, out / "features.parquet", compression="zstd")
-    meta = {"pairs_sha256": sha(tsv), "binary_sha256": sha(a.bin), "rows": tab.num_rows, "era": ERA,
+    meta = {"pairs_sha256": sha(tsv), "binary_sha256": sha(a.bin), "rows": tab.num_rows, "era": arm["era"],
             "extract_wall_s": round(time.time() - t0, 1), "features_sha256": sha(out / "features.parquet"),
             "research_manifest_sha256": sha(f"{csvp}.research_manifest.json")}
     csvp.unlink()
@@ -98,8 +126,8 @@ def cmd_pool(a) -> int:
     return 0
 
 
-def load_bank(bank: Path, name: str) -> tuple[dict, np.ndarray]:
-    require_hpm(sorted((bank / "_work" / name).glob("chunk_*.csv.research_manifest.json")))
+def load_bank(bank: Path, name: str, arm: dict) -> tuple[dict, np.ndarray]:
+    require_arm(sorted((bank / "_work" / name).glob("chunk_*.csv.research_manifest.json")), arm)
     cols = ["pair_key"] + [f"f{i}" for i in MEASURED]
     tab = pq.read_table(bank / name / "features.parquet", columns=cols)
     index = {k: i for i, k in enumerate(tab.column("pair_key").to_pylist())}
@@ -109,21 +137,23 @@ def load_bank(bank: Path, name: str) -> tuple[dict, np.ndarray]:
     return index, X
 
 
-def patch(table: pa.Table, new: np.ndarray, what: str) -> pa.Table:
-    """Check every non-ringing measured column bit for bit, then swap in the 12 ringing columns."""
+def patch(table: pa.Table, new: np.ndarray, what: str, replaced: list[int]) -> pa.Table:
+    """Check every measured column outside `replaced` bit for bit, then swap in the `replaced` columns."""
     pos = {i: j for j, i in enumerate(MEASURED)}
-    for i in OTHER:
+    other = [i for i in MEASURED if i not in replaced]
+    for i in other:
         old = table.column(f"f{i}").to_numpy()
         if not np.array_equal(old.view(np.uint32), new[:, pos[i]].view(np.uint32)):
             bad = int((old.view(np.uint32) != new[:, pos[i]].view(np.uint32)).sum())
             raise ValueError(f"{what}: f{i} differs on {bad} rows; the join or the extractor is wrong")
     moved = 0
-    for i in RING_IDS:
+    for i in replaced:
         j = table.column_names.index(f"f{i}")
         col = np.ascontiguousarray(new[:, pos[i]])
         moved += int((table.column(j).to_numpy().view(np.uint32) != col.view(np.uint32)).sum())
         table = table.set_column(j, f"f{i}", pa.array(col))
-    log(f"{what}: {table.num_rows} rows, {len(OTHER)} columns identical, {moved} ringing cells changed")
+    log(f"{what}: {table.num_rows} rows, {len(other)} columns identical, {moved} of {table.num_rows * len(replaced)} "
+        f"replaced cells changed")
     return table
 
 
@@ -134,6 +164,8 @@ def write(table: pa.Table, path: Path) -> None:
 
 
 def cmd_build(a) -> int:
+    arm = ARMS[a.arm]
+    era, replaced = arm["era"], arm["replaced"]
     bank, pool, out = Path(a.bank), Path(a.pool), Path(a.out)
     if out.exists():
         raise ValueError(f"{out} exists")
@@ -142,8 +174,9 @@ def cmd_build(a) -> int:
     src_real = SOURCE / "wide/main/real"
     banks, bank_manifests = {}, {}
     fsids = set()
-    record = {"source_root": str(SOURCE), "source_frozen_sha256": sha(SOURCE / "wide/frozen.json"), "ring_form": "hpm",
-              "replaced_ids": RING_IDS, "bank": str(bank), "pool": str(pool), "tables": {}}
+    key, value = arm["manifest"]
+    record = {"source_root": str(SOURCE), "source_frozen_sha256": sha(SOURCE / "wide/frozen.json"), key: value,
+              "replaced_ids": replaced, "bank": str(bank), "pool": str(pool), "tables": {}}
     for t in sorted(src_real.glob("*.parquet")):
         if t.name.endswith(".keys.parquet") or t.stem in HDR:
             continue
@@ -154,7 +187,7 @@ def cmd_build(a) -> int:
         pks = keys.column("pair_key").to_pylist()
         for m in sorted(set(members)):
             if m not in banks:
-                banks[m] = load_bank(bank, m)
+                banks[m] = load_bank(bank, m, arm)
                 man = json.loads((bank / m / "_MANIFEST.json").read_text())
                 fsids.add(man["feature_set_id"])
                 bank_manifests[m] = {"manifest_sha256": sha(bank / m / "_MANIFEST.json"),
@@ -164,21 +197,21 @@ def cmd_build(a) -> int:
             index, X = banks[m]
             sel = [r for r, mm in enumerate(members) if mm == m]
             new[sel] = X[[index[pks[r]] for r in sel]]
-        table = patch(pq.read_table(t), new, t.stem)
+        table = patch(pq.read_table(t), new, t.stem, replaced)
         write(table, real / t.name)
         shutil.copyfile(src_real / f"{t.stem}.keys.parquet", real / f"{t.stem}.keys.parquet")
         record["tables"][t.name] = {"source_sha256": sha(t), "sha256": sha(real / t.name)}
     if len(fsids) != 1:
         raise ValueError(f"bank feature_set_id differs between sets: {fsids}")
     fsid = fsids.pop()
-    if f"/{ERA}#" not in fsid:
-        raise ValueError(f"bank was not extracted with era {ERA}: {fsid}")
+    if f"/{era}#" not in fsid:
+        raise ValueError(f"bank was not extracted with era {era}: {fsid}")
 
     # Coverage pool: the stored pool is the selection minus identical and single-rung rows, in order. Match it as a
     # subsequence on its ladder fields, then let the bit-for-bit check confirm the alignment.
     import pandas as pd
-    require_hpm([pool / "features.csv.research_manifest.json"] if (pool / "features.csv.research_manifest.json").exists()
-                else [])
+    require_arm([pool / "features.csv.research_manifest.json"] if (pool / "features.csv.research_manifest.json").exists()
+                else [], arm)
     sel = pd.read_parquet(POOL_SOURCE / "selection.parquet")
     pkeys = pd.read_parquet(SOURCE / "e15/coverage_pool.keys.parquet")
     fields = ["source_filename", "type", "severity_level", "severity", "sign"]
@@ -193,7 +226,7 @@ def cmd_build(a) -> int:
         raise ValueError(f"coverage pool: matched {j} of {len(want)} rows")
     ptab = pq.read_table(pool / "features.parquet")
     X = np.stack([ptab.column(f"f{i}").to_numpy() for i in MEASURED], axis=1)[take].astype(np.float32)
-    table = patch(pq.read_table(SOURCE / "e15/coverage_pool.parquet"), X, "coverage_pool")
+    table = patch(pq.read_table(SOURCE / "e15/coverage_pool.parquet"), X, "coverage_pool", replaced)
     (out / "e15").mkdir()
     write(table, out / "e15/coverage_pool.parquet")
     shutil.copyfile(SOURCE / "e15/coverage_pool.keys.parquet", out / "e15/coverage_pool.keys.parquet")
@@ -202,7 +235,7 @@ def cmd_build(a) -> int:
     record["pool_manifest_sha256"] = sha(pool / "_MANIFEST.json")
 
     # Declarations: same rows, roles and decisions; new table hashes, feature identity and the derivation.
-    note = f"; ringing f{RING_IDS[0]}..f{RING_IDS[-1]} (12 ids) re-extracted under ZENSIM_RING_FORM=hpm (byconstruction)"
+    note = arm["note"]
     bank_root = str(bank.resolve())
     new_roots = [str(SOURCE.resolve()), bank_root, str(pool.resolve()), str(POOL_SOURCE.resolve())]
 
@@ -215,7 +248,7 @@ def cmd_build(a) -> int:
         m["feature_set_id"] = fsid
         m["source_bank_feature_set_id"] = fsid
         m["feature_values_changed"] = True
-        m["ring_form"] = "hpm"
+        m[key] = value
         m["composite"] = m.get("composite", "") + note
         m["immutable_input_roots"] = [*m.get("immutable_input_roots", []), *new_roots]
         Path(f"{table}.manifest.json").write_text(json.dumps(m, indent=1) + "\n")
@@ -242,8 +275,8 @@ def cmd_build(a) -> int:
     receipt["byc_source_bank"] = receipt["bank"]
     receipt["bank"] = bank_manifests
     receipt["feature_set_id"] = fsid
-    receipt["era"] = ERA
-    receipt["ring_form"] = "hpm"
+    receipt["era"] = era
+    receipt[key] = value
     view = dict(receipt["admission_view"])
     view["bank_root"] = bank_root
     view["immutable_input_roots"] = [*view["immutable_input_roots"], *new_roots]
@@ -260,7 +293,7 @@ def cmd_build(a) -> int:
         aux[rel] = sha(out / rel)
     frozen["auxiliary_files"] = aux
     frozen["keep_lists_sha256"] = sha(out / "wide/keep_lists.json")
-    frozen["byc_ring_root"] = record
+    frozen[arm["record"]] = record
     (out / "wide/frozen.json").write_text(json.dumps(frozen, indent=1) + "\n")
     log(f"root written: {out} (fsid {fsid})")
     return 0
@@ -500,11 +533,13 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
     p = sub.add_parser("pool")
+    p.add_argument("--arm", choices=sorted(ARMS), default="hpm")
     p.add_argument("--bin", required=True)
     p.add_argument("--out", required=True)
     p.add_argument("--threads", type=int, default=24)
     p.set_defaults(fn=cmd_pool)
     b = sub.add_parser("build")
+    b.add_argument("--arm", choices=sorted(ARMS), default="hpm")
     b.add_argument("--bank", required=True)
     b.add_argument("--pool", required=True)
     b.add_argument("--out", required=True)

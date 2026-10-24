@@ -646,6 +646,16 @@ impl Extraction {
                 crate::feature_v2::RingForm::Raw.as_str()
             }
         ));
+        // The pyramid arm (`ZENSIM_PYRAMID`): coarse levels averaged in XYB
+        // (the shipped form) or in linear RGB.
+        s.push_str(&format!(
+            "  \"pyramid\": \"{}\",\n",
+            if crate::feature_v2_stream::linear_pyramid() {
+                "linear"
+            } else {
+                "xyb"
+            }
+        ));
         s.push_str("  \"features\": [\n");
         for (i, p) in self.provenance.iter().enumerate() {
             s.push_str(&format!(

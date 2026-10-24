@@ -4554,6 +4554,10 @@ fn build_v2_ref_scales(
     img: &impl ImageSource,
     parallel: bool,
 ) -> Vec<([Vec<f32>; 3], usize, usize)> {
+    assert!(
+        !crate::feature_v2_stream::linear_pyramid(),
+        "ZENSIM_PYRAMID=linear covers only the streaming and block producers"
+    );
     let mut width = img.width();
     let mut height = img.height();
     let mut scales: Vec<([Vec<f32>; 3], usize, usize)> = Vec::with_capacity(crate::NUM_SCALES);
@@ -8925,7 +8929,10 @@ fn foldapp_streaming_walk_impl<S: ImageSource, D: ImageSource, const ALL_CHANNEL
     // windows (`rev5_block_walk`); the streaming producer above is unused.
     #[cfg(feature = "threads")]
     let block_walk = {
-        let omit_xb = !compute.full_res_xb && !complete_distorted0 && !globaff_on;
+        let omit_xb = !compute.full_res_xb
+            && !complete_distorted0
+            && !globaff_on
+            && !crate::feature_v2_stream::linear_pyramid();
         batch_limit > 0
             && retention.is_none()
             && ref_planes.is_none()
@@ -8953,7 +8960,10 @@ fn foldapp_streaming_walk_impl<S: ImageSource, D: ImageSource, const ALL_CHANNEL
             toggles,
             fold_v1,
             batch_limit,
-            !compute.full_res_xb && !complete_distorted0 && !globaff_on,
+            !compute.full_res_xb
+                && !complete_distorted0
+                && !globaff_on
+                && !crate::feature_v2_stream::linear_pyramid(),
             rev5_jobs,
             block_pool,
             &mut accums,

@@ -43,6 +43,73 @@ use crate::feature_v2::gather_strip_halo;
 use crate::feature_v2::{HALO_P, HdrEncoding, STRIP_ROWS, reflect_101};
 use crate::source::{ImageSource, PixelFormat, SubsetView};
 
+/// Research toggle (`ZENSIM_PYRAMID=linear`): scales 1–3 from 2×2 averages of
+/// linear RGB, each level converted to positive XYB (HaarXYB's pyramid),
+/// instead of 2×2 averages of XYB. Scale 0 and every default path are
+/// unchanged; only the streaming and block producers take it, and the
+/// materialized pyramid builders refuse it. Unset or `xyb` keeps the default;
+/// any other value panics. Exploration record:
+/// `benchmarks/byconstruction_2026-10-22.md`, "Coarse scales in linear light".
+pub(crate) fn linear_pyramid() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| match std::env::var("ZENSIM_PYRAMID").as_deref() {
+        Err(_) | Ok("xyb") => false,
+        Ok("linear") => true,
+        Ok(other) => panic!("ZENSIM_PYRAMID={other:?}: expected \"xyb\" or \"linear\""),
+    })
+}
+
+/// Rows `y0 .. y0 + n` of an sRGB8 source as planar linear RGB (`out`: three
+/// planes of `n · width`), through the sRGB8 table the conversion uses.
+pub(crate) fn srgb8_rows_to_linear(
+    src: &impl ImageSource,
+    y0: usize,
+    n: usize,
+    width: usize,
+    out: [&mut [f32]; 3],
+) {
+    assert!(
+        src.pixel_format() == PixelFormat::Srgb8Rgb
+            && src.color_primaries() == crate::source::ColorPrimaries::Srgb,
+        "ZENSIM_PYRAMID=linear takes sRGB8 RGB sources"
+    );
+    let [r, g, b] = out;
+    for k in 0..n {
+        let row: &[[u8; 3]] = bytemuck::cast_slice(&src.row_bytes(y0 + k)[..width * 3]);
+        for (x, p) in row.iter().enumerate() {
+            let o = k * width + x;
+            r[o] = crate::color::srgb_u8_to_linear(p[0]);
+            g[o] = crate::color::srgb_u8_to_linear(p[1]);
+            b[o] = crate::color::srgb_u8_to_linear(p[2]);
+        }
+    }
+}
+
+/// Positive XYB of `n` planar linear RGB rows (`lin`) into three XYB slices.
+pub(crate) fn linear_rows_to_xyb(
+    lin: [&[f32]; 3],
+    n: usize,
+    width: usize,
+    out: [&mut [f32]; 3],
+    revision: crate::feature_defs::FormulaRevision,
+    buf: &mut Vec<[f32; 3]>,
+) {
+    let [r, g, b] = lin;
+    let [x, y, bb] = out;
+    for k in 0..n {
+        let row = k * width..(k + 1) * width;
+        buf.clear();
+        buf.extend(row.clone().map(|i| [r[i], g[i], b[i]]));
+        crate::color::linear_to_positive_xyb_planar_into(
+            buf,
+            &mut x[row.clone()],
+            &mut y[row.clone()],
+            &mut bb[row],
+            revision,
+        );
+    }
+}
+
 /// Which front-end fills the scale-0 rolling planes.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) enum FrontEnd {
@@ -341,6 +408,10 @@ pub(crate) struct StripPlaneProducer<'a, S: ImageSource, D: ImageSource> {
     /// The walk's formula revision — what the scale-0 opsin conversion runs
     /// (canonical at Rev4, featcanon D1).
     revision: crate::feature_defs::FormulaRevision,
+    /// [`linear_pyramid`]: `[side][R, G, B][scale]` linear rolling planes,
+    /// the parents of every coarse level, and a row of interleaved pixels.
+    lin: Option<Box<[[Vec<RollingPlane>; 3]; 2]>>,
+    lin_buf: Vec<[f32; 3]>,
 }
 
 /// Convert `n_new` scale-0 rows of one side into that side's three rolling
@@ -618,6 +689,10 @@ impl<'a, S: ImageSource, D: ImageSource> StripPlaneProducer<'a, S, D> {
     ) -> Self {
         if let Some(sampling) = sampling {
             assert!(matches!(front_end, FrontEnd::Sdr));
+            assert!(
+                !linear_pyramid(),
+                "ZENSIM_PYRAMID=linear does not cover sampled walks"
+            );
             let make_pair = || {
                 [
                     sampling.pyramid(source, parallel, revision),
@@ -661,6 +736,8 @@ impl<'a, S: ImageSource, D: ImageSource> StripPlaneProducer<'a, S, D> {
                 ref_planes: None,
                 advance_rows: 0,
                 revision,
+                lin: None,
+                lin_buf: Vec::new(),
             };
         }
         Self::new_inner(
@@ -712,7 +789,14 @@ impl<'a, S: ImageSource, D: ImageSource> StripPlaneProducer<'a, S, D> {
         revision: crate::feature_defs::FormulaRevision,
         omit_scale0_xb: bool,
     ) -> Self {
+        let linear = linear_pyramid();
+        assert!(
+            !linear || (matches!(front_end, FrontEnd::Sdr) && ref_planes.is_none()),
+            "ZENSIM_PYRAMID=linear supports the SDR walk without a cached reference"
+        );
+        // The linear pyramid converts every level itself: scale-0 chroma is kept.
         let omit_scale0_xb = omit_scale0_xb
+            && !linear
             && revision >= crate::feature_defs::FormulaRevision::Rev5
             && matches!(front_end, FrontEnd::Sdr);
         let (w0, h0) = (source.width(), source.height());
@@ -758,6 +842,24 @@ impl<'a, S: ImageSource, D: ImageSource> StripPlaneProducer<'a, S, D> {
             })
         });
 
+        let lin = linear.then(|| {
+            Box::new(std::array::from_fn(|_| {
+                std::array::from_fn(|_| {
+                    scales
+                        .iter()
+                        .enumerate()
+                        .map(|(s, st)| {
+                            RollingPlane::from_pooled(
+                                pool.pop().unwrap_or_default(),
+                                st.plane_w,
+                                scale_capacity_rows(s, st.plane_h, advance_rows),
+                            )
+                        })
+                        .collect::<Vec<_>>()
+                })
+            }))
+        });
+
         Self {
             source,
             distorted,
@@ -775,6 +877,8 @@ impl<'a, S: ImageSource, D: ImageSource> StripPlaneProducer<'a, S, D> {
             ref_planes,
             advance_rows,
             revision,
+            lin,
+            lin_buf: Vec::new(),
         }
     }
 
@@ -1050,6 +1154,25 @@ impl<'a, S: ImageSource, D: ImageSource> StripPlaneProducer<'a, S, D> {
         }
         crate::fold_timing::stop(__t_conv, crate::fold_timing::Phase::ProdConvert, 0);
 
+        // `ZENSIM_PYRAMID=linear`: the same rows in linear RGB, the parents of
+        // every coarse level.
+        if let Some(lin) = self.lin.as_deref_mut() {
+            let width = self.scales[0].plane_w;
+            for (si, side) in lin.iter_mut().enumerate() {
+                let [r, g, b] = side;
+                let out = [
+                    r[0].append_rows(n_new),
+                    g[0].append_rows(n_new),
+                    b[0].append_rows(n_new),
+                ];
+                if si == 0 {
+                    srgb8_rows_to_linear(self.source, hi0, n_new, width, out);
+                } else {
+                    srgb8_rows_to_linear(self.distorted, hi0, n_new, width, out);
+                }
+            }
+        }
+
         // --- Cascade downscales: fill each deeper scale from complete
         //     even row pairs of its parent. ---
         //
@@ -1061,6 +1184,53 @@ impl<'a, S: ImageSource, D: ImageSource> StripPlaneProducer<'a, S, D> {
         // is 6-way per scale, which is a pure schedule change: no value is
         // summed across the boundary, no byte moves.
         let __t_ds = crate::fold_timing::start();
+        if let Some(lin) = self.lin.as_deref_mut() {
+            // Each coarse level: 2×2 averages of the parent's linear rows (the
+            // XYB cascade's `downscale_2x_into` and row targets), then positive
+            // XYB of the new rows.
+            for scale in 1..crate::NUM_SCALES {
+                let (plane_w, plane_h) = (self.scales[scale].plane_w, self.scales[scale].plane_h);
+                let parent_w = self.scales[scale - 1].plane_w;
+                for (side, planes) in lin.iter_mut().zip(self.planes.iter_mut()) {
+                    let child_hi = side[0][scale].hi;
+                    let target = (side[0][scale - 1].hi / 2).min(plane_h);
+                    if target <= child_hi {
+                        continue;
+                    }
+                    let n_out = target - child_hi;
+                    for ch in side.iter_mut() {
+                        let (head, tail) = ch.split_at_mut(scale);
+                        let src_rows = head[scale - 1].rows(child_hi * 2, target * 2);
+                        let dst = tail[0].append_rows(n_out);
+                        crate::blur::downscale_2x_into(src_rows, parent_w, dst, plane_w, n_out);
+                    }
+                    let [r, g, b] = &*side;
+                    let [x, y, bb] = planes;
+                    linear_rows_to_xyb(
+                        [
+                            r[scale].rows(child_hi, target),
+                            g[scale].rows(child_hi, target),
+                            b[scale].rows(child_hi, target),
+                        ],
+                        n_out,
+                        plane_w,
+                        [
+                            x[scale].append_rows(n_out),
+                            y[scale].append_rows(n_out),
+                            bb[scale].append_rows(n_out),
+                        ],
+                        self.revision,
+                        &mut self.lin_buf,
+                    );
+                }
+            }
+            crate::fold_timing::stop(__t_ds, crate::fold_timing::Phase::ProdDownscale, 0);
+            for (scale, held) in self.max_held_rows.iter_mut().enumerate() {
+                let p = &self.planes[0][0][scale];
+                *held = (*held).max(p.hi - p.lo);
+            }
+            return true;
+        }
         let ref_planes = self.ref_planes;
         #[cfg(feature = "threads")]
         let cascade_parallel = self.parallel;
@@ -1160,6 +1330,25 @@ impl<'a, S: ImageSource, D: ImageSource> StripPlaneProducer<'a, S, D> {
                     self.planes[si][ch][scale].retire_below(floor);
                 }
             }
+            // Linear rows are read only by the next level's downscale; the
+            // last level's are converted as they are made.
+            if let Some(lin) = self.lin.as_deref_mut() {
+                for side in lin.iter_mut() {
+                    let floor = if scale + 1 < crate::NUM_SCALES {
+                        let child_hi = side[0][scale + 1].hi;
+                        if child_hi >= self.scales[scale + 1].plane_h {
+                            st.plane_h
+                        } else {
+                            child_hi * 2
+                        }
+                    } else {
+                        side[0][scale].hi
+                    };
+                    for ch in side.iter_mut() {
+                        ch[scale].retire_below(floor);
+                    }
+                }
+            }
         }
     }
 
@@ -1233,6 +1422,11 @@ impl<'a, S: ImageSource, D: ImageSource> StripPlaneProducer<'a, S, D> {
 
     /// Return every rolling-plane buffer to `pool` for the next pair.
     pub(crate) fn recycle(self, pool: &mut Vec<Vec<f32>>) {
+        for side in self.lin.into_iter().flat_map(|lin| *lin) {
+            for ch in side {
+                pool.extend(ch.into_iter().map(|plane| plane.buf));
+            }
+        }
         for side in self.planes.into_iter().rev() {
             for ch in side.into_iter().rev() {
                 for plane in ch.into_iter().rev() {
@@ -1636,6 +1830,185 @@ mod tests {
     /// materialized planes; interior strips' zero-copy windows equal the
     /// filled ones; every kernel strip of every scale is emitted exactly
     /// once, ascending per scale; capacity budget holds.
+    /// `ZENSIM_PYRAMID=linear` (a child process, the toggle being read once
+    /// per process): every strip window of both producers, both sides, every
+    /// channel and scale, bit for bit against the whole-image form (scale 0
+    /// as the default conversion; each coarse level the 2×2 average of the
+    /// parent level's linear RGB, converted to positive XYB in one call), at
+    /// revisions 5 and 7, with the walk's scale-0 chroma omission requested
+    /// and refused. Negative control: the coarse levels differ from the
+    /// XYB-averaged pyramid.
+    #[cfg(feature = "threads")]
+    #[test]
+    fn linear_pyramid_producers_match_the_whole_image_form() {
+        if std::env::var("ZENSIM_PYRAMID").as_deref() != Ok("linear") {
+            let output = std::process::Command::new(std::env::current_exe().unwrap())
+                .args([
+                    "feature_v2_stream::tests::linear_pyramid_producers_match_the_whole_image_form",
+                    "--exact",
+                ])
+                .env("ZENSIM_PYRAMID", "linear")
+                .output()
+                .unwrap();
+            assert!(
+                output.status.success(),
+                "{}\n{}",
+                String::from_utf8_lossy(&output.stdout),
+                String::from_utf8_lossy(&output.stderr)
+            );
+            assert!(String::from_utf8_lossy(&output.stdout).contains("1 passed"));
+            return;
+        }
+        use crate::feature_defs::FormulaRevision;
+        use crate::feature_v2_blocks::{BlockPool, CHUNK_ROWS, gather_window, produce_chunk};
+        use std::sync::Arc;
+        assert!(linear_pyramid());
+        let whole = |img: &RgbSlice<'_>, revision| {
+            let (mut w, mut h) = (img.width(), img.height());
+            let mut out = vec![(
+                crate::streaming::convert_source_to_xyb(img, w, false, revision),
+                w,
+                h,
+            )];
+            let mut lin: [Vec<f32>; 3] = std::array::from_fn(|_| vec![0.0; w * h]);
+            for y in 0..h {
+                let row: &[[u8; 3]] = bytemuck::cast_slice(&img.row_bytes(y)[..w * 3]);
+                for (x, p) in row.iter().enumerate() {
+                    for ch in 0..3 {
+                        lin[ch][y * w + x] = crate::color::srgb_u8_to_linear(p[ch]);
+                    }
+                }
+            }
+            for _ in 1..crate::NUM_SCALES {
+                let (nw, nh) = (w / 2, h / 2);
+                let next: [Vec<f32>; 3] = std::array::from_fn(|ch| {
+                    let mut v = vec![0.0; nw * nh];
+                    crate::blur::downscale_2x_into(&lin[ch], w, &mut v, nw, nh);
+                    v
+                });
+                let pixels: Vec<[f32; 3]> = (0..nw * nh)
+                    .map(|i| [next[0][i], next[1][i], next[2][i]])
+                    .collect();
+                let mut xyb: [Vec<f32>; 3] = std::array::from_fn(|_| vec![0.0; nw * nh]);
+                {
+                    let [x, y, b] = &mut xyb;
+                    crate::color::linear_to_positive_xyb_planar_into(&pixels, x, y, b, revision);
+                }
+                out.push((xyb, nw, nh));
+                (lin, w, h) = (next, nw, nh);
+            }
+            out
+        };
+        let cases = [
+            (96usize, 64usize),
+            (127, 93),
+            (208, 144),
+            (96, 1030),
+            (320, 517),
+            (77, 300),
+        ];
+        for revision in [FormulaRevision::Rev5, FormulaRevision::Rev7] {
+            for (w, h) in cases {
+                let src = textured_image(w, h, 11);
+                let dst = distort(&src);
+                let s_img = RgbSlice::new(&src, w, h);
+                let d_img = RgbSlice::new(&dst, w, h);
+                let expected = [whole(&s_img, revision), whole(&d_img, revision)];
+                // Negative control: averaging XYB instead gives other levels.
+                let mut avg = expected[1][0].0.clone();
+                for (scale, (planes, cw, chh)) in expected[1].iter().enumerate().skip(1) {
+                    let pw = w >> (scale - 1);
+                    avg = std::array::from_fn(|ch| {
+                        let mut v = vec![0.0; cw * chh];
+                        crate::blur::downscale_2x_into(&avg[ch], pw, &mut v, *cw, *chh);
+                        v
+                    });
+                    assert_ne!(*planes, avg, "{w}x{h} scale {scale}");
+                }
+                let dims: Vec<(usize, usize)> =
+                    (0..crate::NUM_SCALES).map(|s| (w >> s, h >> s)).collect();
+                let pool = Arc::new(BlockPool::default());
+                let chunks: Vec<[crate::feature_v2_blocks::ChunkPlanes; 2]> = (0..h
+                    .div_ceil(CHUNK_ROWS))
+                    .map(|k| {
+                        [
+                            produce_chunk(&s_img, k, &dims, false, revision, &pool),
+                            produce_chunk(&d_img, k, &dims, false, revision, &pool),
+                        ]
+                    })
+                    .collect();
+                for omit in [false, true] {
+                    let mut spool = Vec::new();
+                    let mut prod = StripPlaneProducer::new_with_ref_feed(
+                        &s_img,
+                        &d_img,
+                        false,
+                        &mut spool,
+                        FrontEnd::Sdr,
+                        None,
+                        None,
+                        revision,
+                        omit,
+                    );
+                    let (mut wide, mut wide_ref, mut wide_blk) =
+                        (Vec::new(), Vec::new(), Vec::new());
+                    let mut strips = 0;
+                    while let Some(info) = prod.next_strip() {
+                        strips += 1;
+                        let n_wide = info.plane_w * info.wide_h();
+                        wide.resize(n_wide, 0.0);
+                        wide_ref.resize(n_wide, 0.0);
+                        wide_blk.resize(n_wide, 0.0);
+                        for (side, si) in [(Side::Source, 0), (Side::Distorted, 1)] {
+                            let (planes, pw, ph) = &expected[si][info.scale];
+                            assert_eq!((*pw, *ph), (info.plane_w, info.plane_h));
+                            for ch in 0..3 {
+                                gather_strip_halo(
+                                    &planes[ch],
+                                    *pw,
+                                    *ph,
+                                    info.y0,
+                                    info.wide_h(),
+                                    HALO_P,
+                                    &mut wide_ref,
+                                );
+                                prod.fill_wide(side, ch, &info, &mut wide);
+                                let blocks: Vec<_> = chunks
+                                    .iter()
+                                    .filter_map(|c| c[si][ch][info.scale].clone())
+                                    .collect();
+                                gather_window(&blocks, &info, &mut wide_blk);
+                                for i in 0..n_wide {
+                                    let at = || {
+                                        format!(
+                                            "{revision:?} omit={omit} {w}x{h} scale {} y0={} \
+                                             side {side:?} ch {ch} idx {i}",
+                                            info.scale, info.y0
+                                        )
+                                    };
+                                    assert_eq!(
+                                        wide[i].to_bits(),
+                                        wide_ref[i].to_bits(),
+                                        "{}",
+                                        at()
+                                    );
+                                    assert_eq!(
+                                        wide_blk[i].to_bits(),
+                                        wide_ref[i].to_bits(),
+                                        "{}",
+                                        at()
+                                    );
+                                }
+                            }
+                        }
+                    }
+                    assert!(strips > 0);
+                    prod.recycle(&mut spool);
+                }
+            }
+        }
+    }
+
     /// The block producer (`crate::feature_v2_blocks`, the parallel walk's
     /// rows) against this producer: every strip window of every scale, both
     /// sides and every stored channel, bit for bit, at revisions 5 and 7 with

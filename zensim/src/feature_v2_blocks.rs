@@ -174,6 +174,56 @@ pub(crate) fn produce_chunk<S: ImageSource>(
         planes[2][0] = Some(b);
     }
     planes[1][0] = Some(y);
+    // `ZENSIM_PYRAMID=linear`: every coarse level from 2×2 averages of the
+    // parent's linear rows, then positive XYB (the streaming producer's form).
+    if crate::feature_v2_stream::linear_pyramid() {
+        debug_assert!(!omit_scale0_xb);
+        let mut lin: [Vec<f32>; 3] = std::array::from_fn(|_| vec![0.0; n0 * w0]);
+        {
+            let [r, g, b] = &mut lin;
+            crate::feature_v2_stream::srgb8_rows_to_linear(
+                source,
+                r0,
+                n0,
+                w0,
+                [&mut r[..], &mut g[..], &mut b[..]],
+            );
+        }
+        let (mut lr0, mut lrows) = (r0, n0);
+        let mut buf = Vec::new();
+        for s in 1..dims.len() {
+            let (ws, hs) = dims[s];
+            let pw = dims[s - 1].0;
+            let (c0, c1) = (lr0 / 2, ((lr0 + lrows) / 2).min(hs));
+            if c1 <= c0 {
+                break;
+            }
+            debug_assert_eq!(c0 * 2, lr0);
+            let n = c1 - c0;
+            let next: [Vec<f32>; 3] = std::array::from_fn(|ch| {
+                let mut v = vec![0.0; n * ws];
+                crate::blur::downscale_2x_into(&lin[ch][..2 * n * pw], pw, &mut v, ws, n);
+                v
+            });
+            let mut blocks: [RowBlock; 3] =
+                std::array::from_fn(|_| RowBlock::new(pool, s, c0, n, ws));
+            {
+                let [bx, by, bb] = &mut blocks;
+                crate::feature_v2_stream::linear_rows_to_xyb(
+                    [&next[0][..], &next[1][..], &next[2][..]],
+                    n,
+                    ws,
+                    [bx.rows_mut(), by.rows_mut(), bb.rows_mut()],
+                    revision,
+                    &mut buf,
+                );
+            }
+            for (ch, block) in blocks.into_iter().enumerate() {
+                planes[ch][s] = Some(block);
+            }
+            (lin, lr0, lrows) = (next, c0, n);
+        }
+    }
     // The cascade: child row `j` reads parent rows `2j` and `2j + 1`, and the
     // streaming producer's target `min(parent rows / 2, plane height)`.
     for s in 1..dims.len() {

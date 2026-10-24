@@ -378,7 +378,7 @@ check-cfg = ['cfg(feature, values("training"))', 'cfg(has_cpp_ssimulacra2)', 'cf
 [patch.crates-io]
 # The current optional WebP source requires the unpublished 0.1.27 codec
 # contract. Pin the same source as the JPEG sibling for native audit builds.
-zencodec = { git = "https://github.com/imazen/zencodec", rev = "4fda439133d465246174b55f62426dc54ef204dd" }
+zencodec = { git = "https://github.com/imazen/zencodec", rev = "d327434b0826a3e39633665c76f5081c0ceb34cc" }
 # NOTE 2026-09-05: this plain path patch was briefly WRONG and is right again.
 # `~/work/zen/jxl-encoder` bumped 0.3.2 -> 0.4.0 on 2026-08-29 (`4363a3d5`) while
 # the `~/work/zen/zenjxl` checkout still required `^0.3.2` — which was never

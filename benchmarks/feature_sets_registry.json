@@ -1085,6 +1085,18 @@
    "legacy_name": "Rev5 basic+peaks+v2 measured subset, ringing hpm (by-construction exploration)",
    "evidence": "scripts/byconstruction/ring_root.py; benchmarks/byconstruction_2026-10-22.md"
   },
+  "basic+peaks+v2@w1825/rev5_localwin_linpyr": {
+   "compute": "basic+peaks+v2",
+   "layout": 1825,
+   "era": "rev5_localwin_linpyr",
+   "slots": "0-227,372-719",
+   "slots_hash8": "36c3f3af",
+   "n_slots": 576,
+   "role": "producer",
+   "kind": "set",
+   "legacy_name": "Rev5 basic+peaks+v2 measured subset, coarse scales from linear RGB (by-construction exploration)",
+   "evidence": "scripts/byconstruction/ring_root.py; benchmarks/byconstruction_2026-10-22.md"
+  },
   "basic+peaks+v2@w1891/rev5_localwin_ringhpm_globaff": {
    "compute": "basic+peaks+v2",
    "layout": 1891,

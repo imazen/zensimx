@@ -3488,6 +3488,10 @@ impl PrecomputedReference {
         revision: crate::feature_defs::FormulaRevision,
         fill_scale0: impl FnOnce(&mut [Vec<f32>; 3]),
     ) -> Self {
+        assert!(
+            !crate::feature_v2_stream::linear_pyramid(),
+            "ZENSIM_PYRAMID=linear covers only the streaming and block producers"
+        );
         // Compute scale dimensions up front (powers-of-2 down)
         let mut dims = Vec::with_capacity(num_scales);
         let mut w = padded_width;
