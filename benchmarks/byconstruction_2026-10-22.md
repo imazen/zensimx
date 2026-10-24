@@ -2414,6 +2414,17 @@ dataset, per-type bias, smoothness and both mixture tests (mixture images throug
 It is a candidate for a served family only if E21 improves by more than the seed-unit SE with no new mixture
 inversions; its compute cost is measured only then.
 
+**Result (M64o, 12 cells, seeds 0–2; pinned binaries `bdc6b7662175`).** E21 Δ **−0.0168** (seed-unit SE 0.0020;
+per seed −0.0152, −0.0208, −0.0145), against M64's −0.0131. Paired with M64: **−0.0037 (SE 0.0003)**, worse in every
+seed (−0.0041, −0.0031, −0.0038). Per dataset against M64: KADID +0.0020, TID2013 −0.0147, KonFiG −0.0035, CID22-A
++0.0015. Mixture tests through the table route (`mixture_table.py build --orient`: B's computed vector plus the
+`byc_orient` sidecar; on an M64 cell it reproduces the stored pixel-route scores on every image of both sets): standard
+set 2–18 inversions per cell, 57 in all (M64 1–6, 38), largest rise +7.56 (M64 +7.56); global-edit set none in any
+cell. **Not adopted:** E21 is worse by 13 seed-unit SE and the standard mixture gains inversions. The bands do carry
+type information (the probe above), but the monotone recipe spends it on KADID and CID22-A and loses TID2013. A
+reproduction cell (M64's KADID-held-out seed-0 cell, retrained in the same run) gives predictions bit-identical to the
+stored M64 cell (`3026b06d…`). Smoothness and per-type bias: pending (panel).
+
 ### DVIFM 0.3 on the E21 sets and the mixture test (2026-10-23)
 
 Owner request: "eval dvifm 0.3 on kadid and other distortion//corrputions". Scorer: the frozen runtime of the
@@ -2552,6 +2563,8 @@ signal, by rate–distortion against judges.
 | FRhpm: `hpm` ringing sign-free | monotone in 800 of 820 | −0.0042 (0.0029) | 6–70 (+35.8) |
 | **Tghpm: descriptor sign-free** | **monotone in all 820 damage inputs** | **−0.0101 (0.0024)** | **2–7 (+7.1)** |
 | **M64: max pairs** | **certified monotone** | **−0.0131 (0.0023)** | 1–6 (+7.6) |
+| M64lin: M64, coarse scales from linear RGB | certified monotone | −0.0134 (0.0034) | 2–5 (+3.9) |
+| M64o: M64 + orientation bands | certified monotone | −0.0168 (0.0020) | 2–18 (+7.6) |
 | **M: max pairs + hinges** | **certified monotone** | **−0.0144 (0.0016)** | 1–32 (+6.5) |
 | Mhpm: M, ringing `hpm` | certified monotone | −0.0158 (0.0017) | 2–35 (+8.0) |
 | E20: budget 20 | ≤ +20 certified | −0.0154 (0.0026) | 4–37 (+7.3) |
