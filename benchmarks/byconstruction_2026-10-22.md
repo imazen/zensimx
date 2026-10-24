@@ -2326,8 +2326,8 @@ kept as `linpyr_ctl.superseded`. The reproduction cell stays.
 
 **Derived root** (`/mnt/v/output/zensim/byconstruction-2026-10-22/linpyr/root`, extractor `67c82b65` at `d13211dd`,
 1,177 s on 20 threads, peak RSS 7.06 GiB): in every table of the stored root, including all 196,086 safesyn rows and
-the 42,021-row coverage pool, the 141 columns that read only scale 0 are bit-identical, and 96.2–97.2% of the 435
-replaced cells change. The drifted first extraction is kept under `linpyr/superseded-narrowing-0.2.16/`. M64lin (the
+the 42,021-row coverage pool, the 141 columns that read only scale 0 are bit-identical, and 93.4–97.9% of the 435
+replaced cells change (per table; the lowest are safesyn's). The drifted first extraction is kept under `linpyr/superseded-narrowing-0.2.16/`. M64lin (the
 M64 recipe, 12 cells) trains on it with trainer `ede5b94c`, the build the reproduction cell uses.
 
 *Exploratory, label-free, not a selection criterion:* on the mixture steps (D1 → D2∘D1, each adding error energy),
