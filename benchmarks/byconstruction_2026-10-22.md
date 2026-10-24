@@ -2362,6 +2362,15 @@ move the wrong way. The halved worst mixture rise and the fewer falling inputs o
 buy E21. The toggle stays as a research arm; the AIC zero-shot rows (an unregistered view: the cells never fit AIC) use
 `linpyr/aic_public_train/` and `byc_cells.py aiczero`.
 
+*Post hoc, chosen after seeing the result above:* the two arms err on different datasets, so their plain mean,
+cell by cell (**M64ens**: the average of the M64 and M64lin outputs; no weights fitted; monotone in every input because
+both are), scores E21 −0.0121 (SE 0.0029): +0.0010 over M64 with paired SE 0.0006 (per dataset −0.0088 / −0.0234 /
+−0.0191 / +0.0028; mean Z-RMSE 0.499). Its standard-mixture scores, the per-image mean of the two arms' stored scores,
+give 2–5 inversions per cell (38 in all, max rise +4.74) and the global-edit set none. It is the best strictly monotone
+E21 so far, but it was picked after the fact and needs both pyramids, so it is a lead, not a selection. Tga (descriptor
+sign-free, AIC leg) still has the best E21 of all arms: −0.0089 (SE 0.0038). The dashboard's scatters and arms table
+include M64lin and M64ens (`aic_dashboard_data.py`, `POSTHOC`).
+
 ### Orientation-selective bands: a label-free probe (2026-10-24)
 
 The second missing idea from the HaarPSI / HaarXYB comparison: every zensim edge and texture feature is isotropic.
