@@ -1,0 +1,5 @@
+# A=/home/lilith/tmp/byc/perf/fact2/byc_score_timing sha256=9e0974fc10ed8d56
+# B=/home/lilith/tmp/byc/perf/lean/byc_score_timing sha256=0b011910f435c950
+# A bakes: /home/lilith/tmp/byc/perf/b_rev7.bin /home/lilith/tmp/byc/parity/tga_full_rev6.bin; B bakes: /home/lilith/tmp/byc/perf/b_rev7.bin /home/lilith/tmp/byc/parity/tga_full_rev6.bin
+# host=dev date=2026-10-24T17:30:32Z rounds=8 load=1.61 1.42 2.07
+# cases: /mnt/v/output/zensim/byconstruction-2026-10-22/perf/cases/cases_focus.tsv

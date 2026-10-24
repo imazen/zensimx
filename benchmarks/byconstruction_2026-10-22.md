@@ -2079,6 +2079,25 @@ The changes, in order:
     +1.43% (−1.42..+2.30) / +1.02% (+0.32..+1.96) and v3 at eight +0.59% / +1.28%, so only pools of sixteen or more
     threads take it.
 
+22. **A lean sixteen-column loop for the v1 fold** (revision 7, AVX-512 tiers): the v1 SSIM/edge/HF fold kernel
+    (`fused_vblur_ssim_canon64_vec`, 10.4% of one thread) tested about a dozen work flags per 16-column step, re-read
+    from the stack (compare and branch instructions held 21.7% of its samples), and loaded, added and stored each pool's
+    row lanes per step (stack moves 20.8%, memory-operand adds 12.3%). B and Tga run one configuration on every
+    channel and scale (radius 0, direct SSIM, edges and HF on, no peaks, extensions, free extras or stores), so that
+    configuration now has its own loop: its fourteen row pools stay in registers between folds and no flag is tested
+    per step; each lane adds the same values in the same column order. Bits: 110 of 110 dumps at revisions 5/6 and at
+    revision 7, 72 revision-7 thread and tier dumps unchanged; `vblur_ssim_rev7_lean_loop_matches_every_tier` compares
+    the kernel at that configuration on every compiled tier with the scalar body (widths 16 to 4133, so the
+    4,096-column fold falls inside the loop) and fails with the high-pass term in its revision-6 form. Paired (one
+    thread 8 rounds, eight threads 10; `rev7_fusedact_vs_leanv1_t1`, `_t8`): v4x −3.86% (1507×2048), −2.42% (256²),
+    −4.72% (1024²); eight threads −4.11% / −4.66%; v3, which keeps the eight-column loop, −0.31% / −0.91% / −0.10%.
+
+**Tried and not kept** (after 21): the horizontal moment blur rewritten to share each output's pair and quad tree
+nodes between adjacent outputs (the same trees, half the adds), once through row buffers and once through `valignd`
+on adjacent vectors, both bit-identical: 29.7 → 32.1 ms and 29.6 → 31.1 ms at 1507×2048, one thread, v4x (unpaired).
+The buffered form reloads windows straddling just-stored vectors, which store forwarding cannot serve; the shifted form
+costs more in shuffles than the eleven L1 tap loads it replaces.
+
 **Tried and not kept** (after 13): the three opsin cube roots interleaved step by step (bit-identical): −0.06% /
 −0.90% on v4x (`rev7_band_vs_cbrt3`, the 1507×2048 and 1024² cases), noise on v3; the conversion's inner loop runs at
 about two instructions per cycle, but interleaving did not raise it. The activity chain's `|src − mu1|` computed per

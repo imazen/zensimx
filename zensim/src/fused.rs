@@ -6215,6 +6215,118 @@ fn fused_vblur_ssim_canon64_vec<P: crate::featcanon::Pool64>(
                         }
                     }};
                 }
+                // The configuration B and Tga run (radius 0, direct SSIM, edges
+                // and HF on, no peaks, extensions, free extras or stores): its
+                // fourteen row pools stay in registers between folds, and no
+                // per-chunk flag is tested. Each lane adds the same values in
+                // the same column order as `chunk!`, so every sum keeps its bits.
+                let lean = radius == 0
+                    && direct
+                    && !free.local_only
+                    && free.omit_peaks
+                    && !free.omit_edges
+                    && !free.raw_moments
+                    && !free.bounded_err
+                    && !ext.on
+                    && !store_sd
+                    && !store_mu
+                    && !store_sigma;
+                if lean {
+                    macro_rules! get {
+                        ($f:ident) => {
+                            f32x16::load_t(token, &row32.$f.0)
+                        };
+                    }
+                    macro_rules! put {
+                        ($f:ident, $v:expr) => {
+                            ($v).store(&mut row32.$f.0)
+                        };
+                    }
+                    let mut p = [
+                        get!(ssim_d),
+                        get!(ssim_d4),
+                        get!(ssim_d2),
+                        get!(edge_art),
+                        get!(edge_art4),
+                        get!(edge_art2),
+                        get!(edge_det),
+                        get!(edge_det4),
+                        get!(edge_det2),
+                        get!(hf_sq_src),
+                        get!(hf_sq_dst),
+                        get!(hf_abs_src),
+                        get!(hf_abs_dst),
+                        get!(mse),
+                    ];
+                    macro_rules! flush {
+                        () => {
+                            put!(ssim_d, p[0]);
+                            put!(ssim_d4, p[1]);
+                            put!(ssim_d2, p[2]);
+                            put!(edge_art, p[3]);
+                            put!(edge_art4, p[4]);
+                            put!(edge_art2, p[5]);
+                            put!(edge_det, p[6]);
+                            put!(edge_det4, p[7]);
+                            put!(edge_det2, p[8]);
+                            put!(hf_sq_src, p[9]);
+                            put!(hf_sq_dst, p[10]);
+                            put!(hf_abs_src, p[11]);
+                            put!(hf_abs_dst, p[12]);
+                            put!(mse, p[13]);
+                        };
+                    }
+                    let (one, zero) = (consts16.0, consts16.1);
+                    let (m1p, m2p, sqp, s12p) = (planes.m1, planes.m2, planes.sq, planes.s12);
+                    while c + 2 <= full {
+                        let x0 = c * 8;
+                        let at = base + x0;
+                        let m1v = f32x16::load_t(token, m1p[at..at + 16].try_into().unwrap());
+                        let m2v = f32x16::load_t(token, m2p[at..at + 16].try_into().unwrap());
+                        let ssqv = f32x16::load_t(token, sqp[at..at + 16].try_into().unwrap());
+                        let s12v = f32x16::load_t(token, s12p[at..at + 16].try_into().unwrap());
+                        let sv = f32x16::load_t(token, srow[x0..x0 + 16].try_into().unwrap());
+                        let dv = f32x16::load_t(token, drow[x0..x0 + 16].try_into().unwrap());
+                        let sd = splats16.direct(m1v, m2v, ssqv, s12v).max(zero);
+                        let sd2 = sd * sd;
+                        let sd4 = sd2 * sd2;
+                        p[0] = p[0] + sd;
+                        p[1] = p[1] + sd4;
+                        p[2] = p[2] + sd2;
+                        let diff1 = (sv - m1v).abs();
+                        let diff2 = (dv - m2v).abs();
+                        let ed = if stable7 {
+                            (diff2 - diff1) / (one + diff1)
+                        } else {
+                            (one + diff2) / (one + diff1) - one
+                        };
+                        let artifact = ed.max(zero);
+                        let detail_lost = (-ed).max(zero);
+                        let a2 = artifact * artifact;
+                        let dl2 = detail_lost * detail_lost;
+                        p[3] = p[3] + artifact;
+                        p[4] = p[4] + a2 * a2;
+                        p[5] = p[5] + a2;
+                        p[6] = p[6] + detail_lost;
+                        p[7] = p[7] + dl2 * dl2;
+                        p[8] = p[8] + dl2;
+                        let vs = sv - m1v;
+                        let vd = dv - m2v;
+                        p[9] = p[9] + vs * vs;
+                        p[10] = p[10] + (vd - vs) * (vd + vs);
+                        p[11] = p[11] + diff1;
+                        p[12] = p[12] + (diff2 - diff1);
+                        let pd = sv - dv;
+                        p[13] = p[13] + pd * pd;
+                        if (x0 + 16).is_multiple_of(crate::featcanon::ROW_LANES_FOLD) {
+                            flush!();
+                            row32.fold_into(&mut *row, free, ext);
+                            p = [zero; 14];
+                        }
+                        c += 2;
+                    }
+                    flush!();
+                }
                 while c + 2 <= full {
                     chunk!(
                         f32x16,
@@ -7975,6 +8087,105 @@ mod tests {
                 check_variant!("v4x", f);
             }
             assert!(compiled >= 1);
+        }
+
+        /// Revision 7's lean sixteen-column loop (the configuration B and Tga
+        /// run: radius 0, direct SSIM, edges and HF on, no peaks, extensions,
+        /// free extras or stores) against the generic chunk body: every
+        /// compiled tier and the scalar body accumulate the same bits, over
+        /// remainder columns, a single row and a width past the 4,096-column
+        /// fold.
+        #[test]
+        fn vblur_ssim_rev7_lean_loop_matches_every_tier() {
+            let mut rng = Rng(0x7E57_1EA2_5EED_0007);
+            let free = FreeExtrasWork {
+                revision: Some(crate::feature_defs::FormulaRevision::Rev7),
+                local_only: false,
+                omit_peaks: true,
+                omit_edges: false,
+                raw_moments: false,
+                bounded_err: false,
+                lum_bins: false,
+            };
+            let ext = ExtPoolsWork::default();
+            type P = crate::featcanon::Lanes16F64;
+            for (w, h, i0, ih) in [
+                (16usize, 1usize, 0usize, 1usize),
+                (37, 5, 1, 3),
+                (64, 9, 0, 9),
+                (255, 4, 1, 2),
+                (4133, 3, 0, 3),
+            ] {
+                let n = w * h;
+                let planes: [Vec<f32>; 6] = std::array::from_fn(|_| {
+                    (0..n)
+                        .map(|_| (rng.next() % 4096) as f32 / 4096.0)
+                        .collect()
+                });
+                let [m1, m2, sq, s12, src, dst] = &planes;
+                macro_rules! run {
+                    ($f:path, $t:expr) => {{
+                        let (mut a, mut b, mut c, mut d, mut e) =
+                            (Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new());
+                        acc_bits(&$f(
+                            $t,
+                            m1,
+                            m2,
+                            sq,
+                            s12,
+                            src,
+                            dst,
+                            w,
+                            h,
+                            i0,
+                            ih,
+                            0,
+                            &mut a,
+                            &mut b,
+                            false,
+                            &mut c,
+                            false,
+                            &mut d,
+                            &mut e,
+                            false,
+                            free,
+                            true,
+                            ext,
+                            &[],
+                            crate::featcanon::Mode::Canon64,
+                        ))
+                    }};
+                }
+                let want = run!(
+                    fused_vblur_ssim_canon64_vec_scalar::<P>,
+                    archmage::ScalarToken::summon().expect("infallible")
+                );
+                assert!(want.iter().any(|&b| b != 0), "vacuous accumulators");
+                #[cfg(target_arch = "x86_64")]
+                if let Some(t) = archmage::X64V3Token::summon() {
+                    assert_eq!(
+                        run!(fused_vblur_ssim_canon64_vec_v3::<P>, t),
+                        want,
+                        "v3 {w}x{h}"
+                    );
+                }
+                #[cfg(all(target_arch = "x86_64", feature = "avx512"))]
+                if let Some(t) = archmage::X64V4Token::summon() {
+                    assert_eq!(
+                        run!(fused_vblur_ssim_canon64_vec_v4::<P>, t),
+                        want,
+                        "v4 {w}x{h}"
+                    );
+                }
+                #[cfg(all(target_arch = "x86_64", feature = "avx512"))]
+                if let Some(t) = archmage::X64V4xToken::summon() {
+                    assert_eq!(
+                        run!(fused_vblur_ssim_canon64_vec_v4x::<P>, t),
+                        want,
+                        "v4x {w}x{h}"
+                    );
+                }
+            }
         }
 
         struct EdgeCase {
