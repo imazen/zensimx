@@ -2267,6 +2267,10 @@ the twelve E21 cells each. Reported against the same recipes on the XYB-averaged
 bias, smoothness, both mixture tests. It joins revision 7 only if E21 improves by more than the seed-unit SE with no new
 mixture inversions.
 
+*Amendment, also before any result:* M64 only. Tga's inputs include the `byc_globaff` descriptor, whose bank columns
+came from the separate `byc_globaff` example with its own per-scale planes; re-deriving those under the toggle is a
+second producer change, so Tga waits for an M64 result worth following.
+
 ### DVIFM 0.3 on the E21 sets and the mixture test (2026-10-23)
 
 Owner request: "eval dvifm 0.3 on kadid and other distortion//corrputions". Scorer: the frozen runtime of the
