@@ -279,7 +279,7 @@ gaps:
 | KADID | color shift | −0.006 | +0.098 |
 | KADID | color quantization | −0.059 | +0.003 |
 | KADID | non-eccentricity patch | −0.086 | −0.036 |
-| TID2013 | high-frequency pattern noise | −0.217 | −0.095 |
+| TID2013 | non-eccentricity pattern noise | −0.217 | −0.095 |
 | TID2013 | local block-wise | +0.040 | +0.150 |
 | TID2013 | denoising | −0.087 | −0.003 |
 
@@ -2229,6 +2229,43 @@ Final score ÷ requested distance:
 
 Outputs: calibration pairs `/mnt/v/zenmetrics-private/aic4/loop-pairs/2026-10-24-hq/` (dev; 324 pairs), fits
 `/mnt/v/zenmetrics-private/zensimx-workbench/loop_calibration_2026-10-24hq.tsv`.
+
+### Coarse scales in linear light: a label-free probe (2026-10-24)
+
+The first revision-7 candidate from the HaarPSI / HaarXYB comparison: zensim converts each image to positive XYB at full
+resolution and builds scales 1–3 from 2×2 averages of XYB values; HaarXYB averages linear RGB and converts each level.
+`scripts/byconstruction/linpyr_probe.py` builds both pyramids for every TRAIN pair (KADID train split, TID2013, KonFiG
+train split; keys only, no labels; the 8,165 pairs whose pixels differ) and reports, per distortion type, scale and channel, the median log ratio
+of two damage measures, linear-light over XYB-averaged: the mean squared XYB difference, and the mean squared difference
+of 7×7 box detail (pixel minus local mean). Outputs and SHA256SUMS: `/mnt/v/output/zensim/byconstruction-2026-10-22/linpyr/`.
+
+The ratio is not uniform across types. Detail damage, scale 1 / 3, X, Y, B channels:
+
+| Type | Scale 1 | Scale 3 |
+|---|---|---|
+| KADID impulse noise / TID2013 impulse noise | ×2.1–2.5 / ×1.9–2.1 | ×3.9–5.3 / ×2.7–3.8 |
+| KADID Gaussian, lens, motion blur | ×1.0 | ×1.5–2.0 |
+| TID2013 Gaussian blur | ×1.0 | ×1.4–1.8 |
+| KADID sharpen / KonFiG high sharpen | ×1.0–1.1 | ×1.2–1.6 / ×1.1–2.3 |
+| TID2013 JPEG transmission errors | ×1.0 | Y ×7.2 |
+| TID2013 masked noise | ×1.2 | ×1.2–1.6 |
+| global edits (KADID 16–18, 25; TID2013 16–18) | ×0.95–1.05 | ×0.94–1.31 (TID mean shift Y) |
+| non-eccentricity patch / pattern noise | ×1.0 | ×1.0–1.06 |
+| denoising (KADID 15 / TID2013 9) | ×1.0 | ×1.0–1.06 |
+
+Linear-light averaging keeps the energy of outliers and sharp edges that the cube root compresses before XYB averaging, so
+outlier- and edge-heavy damage weighs more at coarse scales, while global edits, displacement and denoising keep their
+coarse damage. The types the monotone arms over-penalise (contrast change, non-eccentricity, saturation, denoising) are
+not among those that move; a gain for monotone models would come indirectly, if lower coarse-feature weights then fit
+the outlier-heavy types. The probe shows the change is type-dependent, not that it helps.
+
+**Experiment (recorded before any result).** A research toggle builds scales 1–3 from 2×2 averages of linear RGB,
+converted to positive XYB per level, in both pyramid producers; scale 0 and every default path keep their bits. The eight
+training and assessment sets are re-extracted with it into a derived root (same feature IDs, its own era label) and the
+strictly monotone frontier recipe (`mono:thr:mp64`, M64) and the best-balance recipe (Tga) are trained on it: seeds 0–2,
+the twelve E21 cells each. Reported against the same recipes on the XYB-averaged root: E21 Δ and per dataset, per-type
+bias, smoothness, both mixture tests. It joins revision 7 only if E21 improves by more than the seed-unit SE with no new
+mixture inversions.
 
 ### DVIFM 0.3 on the E21 sets and the mixture test (2026-10-23)
 
