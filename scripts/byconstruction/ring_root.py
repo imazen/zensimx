@@ -9,6 +9,12 @@ right pixels and that the arm moved nothing else. Arms (`--arm`, default hpm):
 
   hpm     `ZENSIM_RING_FORM=hpm`: the 12 ringing columns (v2 `idx::RINGING` over the 12 scale x channel cells)
   linpyr  `ZENSIM_PYRAMID=linear`: every column of scales 1-3, and scale 0's edge-width change (a scale 0/1 ratio)
+  ctl     no column: the linpyr study's control, the same extractor with the default pyramid
+
+linpyr and ctl also replace every column of rows with an AVIF input: the current extractor decodes AVIF differently
+from the build behind the stored root (benchmarks/byconstruction_2026-10-22.md, "AVIF decode drift"). With
+`--reference-bank`/`--reference-pool` (the ctl bank and pool), build checks those rows' unreplaced columns against the
+reference instead, so both roots carry the same AVIF pixels.
 
   pool   --bin EXTRACTOR --out DIR             extract the E15 coverage-pool selection (44,000 pairs) under the arm
   build  --bank DIR --pool DIR --out ROOT      write the derived root and re-pin its receipt and freeze
@@ -64,8 +70,23 @@ ARMS = {
             "note": f"; ringing f{RING_IDS[0]}..f{RING_IDS[-1]} (12 ids) re-extracted under ZENSIM_RING_FORM=hpm (byconstruction)"},
     "linpyr": {"env": {"ZENSIM_PYRAMID": "linear"}, "manifest": ("pyramid", "linear"), "era": "rev5_localwin_linpyr",
                "replaced": sorted([i for i in MEASURED if scale_of(i) > 0] + EDGE_WIDTH_S0), "record": "byc_linpyr_root",
-               "note": "; scales 1-3 and scale-0 edge-width change re-extracted under ZENSIM_PYRAMID=linear (byconstruction)"},
+               "avif_rows": True,
+               "note": "; scales 1-3 and scale-0 edge-width change re-extracted under ZENSIM_PYRAMID=linear, AVIF rows "
+                       "re-decoded (byconstruction)"},
+    "ctl": {"env": {"ZENSIM_PYRAMID": "xyb"}, "manifest": ("pyramid", "xyb"), "era": "rev5_localwin_avifdec",
+            "replaced": [], "record": "byc_ctl_root", "avif_rows": True,
+            "note": "; AVIF rows re-decoded by the linear-pyramid study's extractor (byconstruction control)"},
 }
+
+
+def is_avif(*paths) -> bool:
+    return any(str(p).lower().endswith(".avif") for p in paths)
+
+
+def bank_avif(bank: Path, name: str) -> set:
+    """Pair keys of a bank set whose reference or distorted input is an AVIF file."""
+    k = pq.read_table(bank / name / "keys.parquet", columns=["pair_key", "ref_path", "dist_path"]).to_pydict()
+    return {pk for pk, r, d in zip(k["pair_key"], k["ref_path"], k["dist_path"]) if is_avif(r, d)}
 
 
 def sha(p) -> str:
@@ -137,23 +158,35 @@ def load_bank(bank: Path, name: str, arm: dict) -> tuple[dict, np.ndarray]:
     return index, X
 
 
-def patch(table: pa.Table, new: np.ndarray, what: str, replaced: list[int]) -> pa.Table:
-    """Check every measured column outside `replaced` bit for bit, then swap in the `replaced` columns."""
+def patch(table: pa.Table, new: np.ndarray, what: str, replaced: list[int], free: np.ndarray | None = None,
+          ref: np.ndarray | None = None) -> pa.Table:
+    """Check every measured column outside `replaced` bit for bit, then swap in the `replaced` columns.
+
+    Rows in `free` (AVIF inputs) are replaced whole; their other columns must equal `ref` (the control's values for
+    the same rows) when it is given."""
     pos = {i: j for j, i in enumerate(MEASURED)}
     other = [i for i in MEASURED if i not in replaced]
+    free = np.zeros(table.num_rows, bool) if free is None else free
     for i in other:
-        old = table.column(f"f{i}").to_numpy()
-        if not np.array_equal(old.view(np.uint32), new[:, pos[i]].view(np.uint32)):
-            bad = int((old.view(np.uint32) != new[:, pos[i]].view(np.uint32)).sum())
+        old = table.column(f"f{i}").to_numpy().view(np.uint32)
+        cur = new[:, pos[i]].view(np.uint32)
+        bad = int(((old != cur) & ~free).sum())
+        if bad:
             raise ValueError(f"{what}: f{i} differs on {bad} rows; the join or the extractor is wrong")
+        if ref is not None and not np.array_equal(cur[free], ref[free, pos[i]].view(np.uint32)):
+            raise ValueError(f"{what}: f{i} differs from the reference bank on AVIF rows")
     moved = 0
-    for i in replaced:
+    for i in MEASURED:
+        if i not in replaced and not free.any():
+            continue
         j = table.column_names.index(f"f{i}")
-        col = np.ascontiguousarray(new[:, pos[i]])
-        moved += int((table.column(j).to_numpy().view(np.uint32) != col.view(np.uint32)).sum())
+        old = table.column(j).to_numpy()
+        col = np.ascontiguousarray(new[:, pos[i]] if i in replaced else np.where(free, new[:, pos[i]], old))
+        moved += int((old.view(np.uint32) != col.view(np.uint32)).sum())
         table = table.set_column(j, f"f{i}", pa.array(col))
-    log(f"{what}: {table.num_rows} rows, {len(other)} columns identical, {moved} of {table.num_rows * len(replaced)} "
-        f"replaced cells changed")
+    log(f"{what}: {table.num_rows} rows ({int(free.sum())} AVIF, replaced whole), {len(other)} columns identical "
+        f"elsewhere{', AVIF rows equal to the reference' if ref is not None and free.any() else ''}, {moved} cells "
+        f"changed")
     return table
 
 
@@ -167,6 +200,10 @@ def cmd_build(a) -> int:
     arm = ARMS[a.arm]
     era, replaced = arm["era"], arm["replaced"]
     bank, pool, out = Path(a.bank), Path(a.pool), Path(a.out)
+    ref_bank = Path(a.reference_bank) if a.reference_bank else None
+    if ref_bank and not arm.get("avif_rows"):
+        raise ValueError("--reference-bank checks AVIF rows; this arm has none")
+    ref_banks = {}
     if out.exists():
         raise ValueError(f"{out} exists")
     real = out / "wide/main/real"
@@ -181,8 +218,9 @@ def cmd_build(a) -> int:
         if t.name.endswith(".keys.parquet") or t.stem in HDR:
             continue
         keys = pq.read_table(src_real / f"{t.stem}.keys.parquet", columns=["pair_key", "member_set"])
-        rows = []
         new = np.empty((keys.num_rows, len(MEASURED)), np.float32)
+        ref = np.empty_like(new) if ref_bank else None
+        free = np.zeros(keys.num_rows, bool)
         members = keys.column("member_set").to_pylist()
         pks = keys.column("pair_key").to_pylist()
         for m in sorted(set(members)):
@@ -197,7 +235,15 @@ def cmd_build(a) -> int:
             index, X = banks[m]
             sel = [r for r, mm in enumerate(members) if mm == m]
             new[sel] = X[[index[pks[r]] for r in sel]]
-        table = patch(pq.read_table(t), new, t.stem, replaced)
+            if arm.get("avif_rows"):
+                avif = bank_avif(bank, m)
+                free[sel] = [pks[r] in avif for r in sel]
+            if ref_bank:
+                if m not in ref_banks:
+                    ref_banks[m] = load_bank(ref_bank, m, ARMS["ctl"])
+                rindex, RX = ref_banks[m]
+                ref[sel] = RX[[rindex[pks[r]] for r in sel]]
+        table = patch(pq.read_table(t), new, t.stem, replaced, free, ref)
         write(table, real / t.name)
         shutil.copyfile(src_real / f"{t.stem}.keys.parquet", real / f"{t.stem}.keys.parquet")
         record["tables"][t.name] = {"source_sha256": sha(t), "sha256": sha(real / t.name)}
@@ -226,7 +272,17 @@ def cmd_build(a) -> int:
         raise ValueError(f"coverage pool: matched {j} of {len(want)} rows")
     ptab = pq.read_table(pool / "features.parquet")
     X = np.stack([ptab.column(f"f{i}").to_numpy() for i in MEASURED], axis=1)[take].astype(np.float32)
-    table = patch(pq.read_table(SOURCE / "e15/coverage_pool.parquet"), X, "coverage_pool", replaced)
+    pairs = [line.split("\t") for line in (pool / "pairs.tsv").read_text().splitlines()[1:]]
+    pfree = np.array([is_avif(pairs[i][0], pairs[i][1]) for i in take]) if arm.get("avif_rows") else None
+    pref = None
+    if ref_bank:
+        rpool = Path(a.reference_pool)
+        require_arm([rpool / "features.csv.research_manifest.json"], ARMS["ctl"])
+        if sha(rpool / "pairs.tsv") != sha(pool / "pairs.tsv"):
+            raise ValueError("reference pool extracted other pairs")
+        rtab = pq.read_table(rpool / "features.parquet")
+        pref = np.stack([rtab.column(f"f{i}").to_numpy() for i in MEASURED], axis=1)[take].astype(np.float32)
+    table = patch(pq.read_table(SOURCE / "e15/coverage_pool.parquet"), X, "coverage_pool", replaced, pfree, pref)
     (out / "e15").mkdir()
     write(table, out / "e15/coverage_pool.parquet")
     shutil.copyfile(SOURCE / "e15/coverage_pool.keys.parquet", out / "e15/coverage_pool.keys.parquet")
@@ -543,6 +599,8 @@ def main() -> int:
     b.add_argument("--bank", required=True)
     b.add_argument("--pool", required=True)
     b.add_argument("--out", required=True)
+    b.add_argument("--reference-bank", help="ctl bank: AVIF rows' unreplaced columns must equal it")
+    b.add_argument("--reference-pool", help="ctl pool (with --reference-bank)")
     b.set_defaults(fn=cmd_build)
     g = sub.add_parser("globaff-pairs")
     g.add_argument("--bank", required=True)
