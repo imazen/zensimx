@@ -2337,6 +2337,11 @@ of steps on which an input falls 0.184 → 0.171, inputs falling on more than 25
 tables and SHA256SUMS in `linpyr/mixture_features/`). The monotone recipe treats every input as damage, so a falling
 input on an added-damage step is one way a monotone model can invert.
 
+*Trainer check:* the M64 KADID seed-0 cell retrained on the stored root with trainer `ede5b94c` (`M64repro`, 3,557 s)
+predicts all 7,869 KADID rows bit-identically to the stored M64 cell (prediction SHA-256 `3026b06d…` both), with the
+same validation curve; the bake files' bytes differ, their outputs do not. So stored M64 is the right baseline for
+M64lin.
+
 ### Orientation-selective bands: a label-free probe (2026-10-24)
 
 The second missing idea from the HaarPSI / HaarXYB comparison: every zensim edge and texture feature is isotropic.
