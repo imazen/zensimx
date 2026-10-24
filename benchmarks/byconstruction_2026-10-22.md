@@ -1070,6 +1070,14 @@ mean), in sample = a seed-0 cell trained with it. In-sample minus out-of-sample 
 0.892 vs 0.890. The monotone models gain less from seeing a dataset than B's recipe does. AIC2026 public_train, T: in
 sample 0.974 / out of fold 0.953 (PLCC 0.964 / 0.933, Z-RMSE 0.265 / 0.359).
 
+The same panel for every set, in-sample minus out-of-sample SROCC (KADID / TID2013 / KonFiG / CID22-A): `base-c`
++0.050 / +0.039 / +0.058 / +0.001; M64 +0.038 / +0.019 / +0.027 / −0.002; M64lin +0.024 / +0.032 / +0.037 / −0.004;
+Thpm +0.023 / +0.028 / +0.010 / −0.002; Tga +0.022 / +0.011 / +0.012 / +0.002. Out of sample, `base-c` still leads M64
+on the synthetic sets (0.891 / 0.901 / 0.817 against 0.874 / 0.880 / 0.802) and ties it on CID22-A (0.880 both). Over
+the three synthetic sets the constraint cuts what a model gains from seeing a dataset by about 40% (mean +0.049 for
+`base-c`, +0.028 for M64), while `base-c`'s mean out-of-sample lead of 0.018 shows that part of what its signs buy
+does transfer (cross-type calibration).
+
 **AIC2026 test data used (counted from the commands run, 2026-10-23).** Before the split was found, the 14 public_test
 sources were inside the 42-source pool with the overlay labels: 1 frozen-model read, 10 descriptive label reads, 32 Python
 source-fold runs and 4 Rust trainer runs that fitted and scored them. After the split was found, the official public_test
