@@ -43,5 +43,38 @@ class PatchTest(unittest.TestCase):
         self.assertEqual(sorted(set(self.replaced) - {i for i in r.MEASURED if r.scale_of(i) > 0}), r.EDGE_WIDTH_S0)
 
 
+class WidenTest(unittest.TestCase):
+    def stored(self, rows=3):
+        return pa.table({f"f{i}": pa.array(np.full(rows, i, np.float32)) for i in range(1853)})
+
+    def check(self, name, first, last):
+        spec = r.WIDEN[name]
+        vals = np.arange(3 * len(spec["ids"]), dtype=np.float32).reshape(3, -1)
+        t = r.widen(self.stored(), vals, "t", spec)
+        names = [c for c in t.column_names if c.startswith("f")]
+        self.assertEqual(names, [f"f{i}" for i in range(last + 1)])
+        for i in range(1853, first):
+            self.assertTrue(np.isnan(t.column(f"f{i}").to_numpy()).all())
+        for j, i in enumerate(range(first, last + 1)):
+            np.testing.assert_array_equal(t.column(f"f{i}").to_numpy(), vals[:, j])
+        np.testing.assert_array_equal(t.column("f1852").to_numpy(), np.full(3, 1852, np.float32))
+
+    def test_globaff_columns_unchanged(self):
+        self.check("globaff", 1867, 1890)
+        self.assertIs(r.widen.__defaults__[0], None)  # no spec: globaff, as before
+
+    def test_orient_columns(self):
+        self.check("orient", 2301, 2336)
+
+    def test_refuses_other_widths_and_nonfinite(self):
+        spec = r.WIDEN["orient"]
+        vals = np.zeros((3, 36), np.float32)
+        with self.assertRaisesRegex(ValueError, "width 1852"):
+            r.widen(self.stored().drop(["f1852"]), vals, "t", spec)
+        vals[1, 7] = np.nan
+        with self.assertRaisesRegex(ValueError, "nonfinite"):
+            r.widen(self.stored(), vals, "t", spec)
+
+
 if __name__ == "__main__":
     unittest.main()
