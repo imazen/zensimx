@@ -2296,9 +2296,14 @@ other path can mix pyramids silently. Research manifests record `"pyramid"`.
 JXL and WebP row and every row of the seven other sets is bit-identical. With the toggle off, the extractor built
 today (`678e280c`, zencodec `d327434b`) decodes different pixels from the 2026-10-23 extractor (`1152f194`, which
 reproduced the stored root): 10 of 10 sampled AVIF files differ, their references and 3 of 3 JXL files do not. Neither
-decode equals libavif's (Pillow 12.3; ours differs from it by at most 2 levels, on 2–55% of values per image), so this
-check cannot say which is right. The sibling codecs have not moved since 2026-10-19 and zensim-bench pinned zencodec
-`4fda4391` throughout; what made the 2026-10-23 build compile and decode differently is not yet known.
+decode equals libavif's (Pillow 12.3; ours differs from it by at most 2 levels, on 2–55% of values per image). Against
+an exact float64 conversion of the same 10-bit YUV (ffmpeg decodes the YUV; the files are CICP 1/13/6, full range,
+4:4:4), today's decode is off by one on 4.54% of values (705,672 of 15,544,662 over the 10 files, always ±1, at values
+a few hundredths of a level from a rounding boundary), and the 2026-10-23 decode equals the exact conversion bit for bit
+on 2 of the 10 (where today's is off on 0.015% and 0.057%); libavif is further off (45–76% exact, up to 3 levels). The
+AVIF route is zenavif Rgb16 → `zenpixels_convert::RowConverter` → RGB8_SRGB. The sibling codecs have not moved since
+2026-10-19 and zensim-bench pinned zencodec `4fda4391` throughout; what made the 2026-10-23 build compile and decode
+differently is not yet known.
 
 The pyramid comparison must hold pixels fixed, so: the safesyn and coverage-pool sets are extracted again with the
 toggle off and the same binary, into a control root (era `rev5_localwin_avifdec`) that differs from the stored root
