@@ -160,6 +160,8 @@ because cleanup tests or a historical training reproduction pass.
 
 ## Known Bugs
 
+* **2026-10-25 — dataset EVAL tied ranks.** The coordinator's new dataset evaluator used nested argsort, assigning different ranks to tied scores. The MOS report now uses the canonical Rust midrank and reference-bootstrap owners for every model and peer; synthetic tied-score and row-order controls pass. The Mdata assessment recomputes its M7/B7/peer controls with this method. The original coordinator outputs remain preserved.
+
 * **2026-10-25 — Mdata trainer transport compatibility.** Admission initially refused the derived-input read set and width; after those bindings passed, fx1 refused new rows with1825 logical columns against the inherited1853-column trainer transport. New dataset tables now retain28 NaN tail columns, matching the existing root. The420 consumed measurements and original source root are unchanged; failed outputs remain preserved.
 
 * **2026-10-25 — fresh dataset-root receipt serialization.** The first Mdata root assembly wrote all eleven TRAIN legs but refused its final receipt because inherited immutable roots were `Path` objects. The builder now serializes those paths as strings. The incomplete root and label-read ledger remain preserved; no frozen input was modified.

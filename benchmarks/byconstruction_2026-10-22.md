@@ -3575,3 +3575,50 @@ comparison includes both new datasets and that required family mask. Frozen
 revision-7 source tables stay intact. The new root, label-read ledger and
 results live under `rev7data/`; measurements and final artifact bindings will
 be recorded here after the registered run. No production profile changes.
+
+The full-data candidate is now frozen at
+`/var/tmp/datalegs-20261025/rev7data/full/refit/production-f16.bin`, SHA-256
+`9fe1aa47a82730550ed1b9dd73addeacf31304485a12213c4e3e9f151bff5117`.
+The selected dense final-epoch bake is `62c844a22b49585320ef8b8b74c2956816738511f4b9f6d6ff7781230d288b69`;
+the packed output uses the inherited TRAIN calibration and identity-knot tail.
+`certify-monotone` reports `certified=true`, `monotone=true`, zero free ramps
+and zero free amplitude. The full fit ran with one trainer thread:
+`run-heavy: done rc=0 1735s | peak-RSS 2.06GiB | min-avail 43154MiB | peak-load 5.77`.
+`CANDIDATE_FREEZE.json` binds this candidate, M5, M7 and the new root's
+`wide/frozen.json` (`e127eef91efce57c6bb980c3c6e047e0a49079d57f337fc122be74e70cbef1ad`)
+before this lane's held-out scoring. The prior coordinator EVAL results and
+published documentation examples were already exposed; no result selected
+the new weights or epoch. The documentation-example disclosure in
+[`DATA_SPLITS.md`](../docs/DATA_SPLITS.md) still applies.
+
+Label reads are retained at
+`/var/tmp/datalegs-20261025/rev7data/LABEL_READS.json`: original TRAIN row
+indices, selected fields, every tokenized field, and repeated reads from
+preserved failed assembly attempts. It also records derived TRAIN pair-count
+reads. EVAL reads use separate ledgers in `eval/` (a checksum-verified copy
+of the coordinator's input) and `eval-bapps/`. The source root remains
+`/mnt/v/output/zensim/byconstruction-2026-10-22/rev7raw/root`; the new dev-local
+path `/mnt/v/output/zensim/byconstruction-2026-10-22/rev7data` resolves to
+`/var/tmp/datalegs-20261025/rev7data`. Exact native pixels and confirmed D4
+aliases define the family audit's bounded coverage; it does not prove perfect
+crop recall. The inherited development mask removes another120 rows.
+
+The existing dataset evaluator now delegates MOS SROCC, midranks and
+reference-bootstrap intervals to the canonical Rust statistics owner.
+Its earlier `argsort(argsort(...))` tie handling assigned distinct ranks to
+ties, so this run recomputes M7, B7 and all peers with the same corrected
+method. MOS intervals use2,000 reference resamples, seed1, type7 quantiles;
+pairwise evaluation retains the original soft-probability agreement and
+reference bootstrap, including `.5` comparisons. BAPPS's36,344 frozen EVAL
+comparisons extend the coordinator's11-collection assessment. Only retained
+original archives supply their PNG bytes, with archive and content-index
+hash verification; no training images are decoded for this assessment.
+
+The12 E21 cells use four one-thread fits inside each bounded seed job, with
+the shared heavy lock released between seeds. The rebuilt trainer must first
+reproduce the unchanged-root Mr7 KADID seed0 predictions byte for byte.
+The deciding loop uses `diffmap` on float reconstruction and its own
+TRAIN-fitted maximum-tail placement. M5/M7/B placements,702 bitstreams per
+control arm, and retained judge rows must reproduce through the original
+loop owners before the new comparisons qualify. Every reported loop
+comparison uses `--bdrate-vs`.
