@@ -3648,3 +3648,15 @@ Reference-bootstrap95% intervals and within-reference MOS statistics are in
 The changes are mixed: MDID, NITS, VCL-FER and PieAPP improve in point
 estimate over M7, while CID:OA falls. These individual intervals do not
 provide a paired significance test of the difference.
+
+BAPPS model-only EVAL completes all36,344 comparisons from the existing
+feature bank, without image extraction or peer rescoring:
+
+| Model | Soft2AFC agreement | Reference-bootstrap95% interval |
+|---|---:|---:|
+| Mdata | 0.673924 | [0.671068, 0.677020] |
+| M7 | 0.661796 | [0.658769, 0.664932] |
+| B7 | 0.639217 | [0.636058, 0.642483] |
+
+The BAPPS peer columns are unmeasured in this run and wait for the owner’s
+IMI archive route. This result does not change the registered training mix.
