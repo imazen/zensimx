@@ -22,6 +22,10 @@ dataset-features-mirror root host destination cache array:
 dataset-features-verify root:
     OPENBLAS_NUM_THREADS=1 PYTHONDONTWRITEBYTECODE=1 python3 -B scripts/byconstruction/dataset_verify.py --root {{quote(root)}} --write
 
+# Caller holds shared heavy.lock and run-heavy; only phase-owned PNG scratch is removed.
+dataset-bapps-cleanup root:
+    OPENBLAS_NUM_THREADS=1 PYTHONDONTWRITEBYTECODE=1 python3 -B scripts/byconstruction/dataset_bapps_cleanup.py --root {{quote(root)}}
+
 addrfix-test target:
     TMPDIR="$HOME/tmp" cargo test --locked -p zensim-validate --bin panel panel_e34:: --target-dir {{quote(target)}}
 
