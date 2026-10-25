@@ -2890,7 +2890,7 @@ so the saturation change is explained in every channel and the all-channel gate 
   luminance-gated mixture tables), and E21's pooled Δ as a diagnostic. No AIC2026 label is read.
 - *Reading (my bars).* The luminance gate does what it is built for when, in each class, TID2013 saturation's bias is
   no larger than the ungated arm's (Thpm +0.352, M64 +0.212) while KADID contrast change keeps at least half of the
-  all-channel gate's improvement (T: at most −0.112; M: at most −0.099). It becomes a candidate under the proposed
+  all-channel gate's improvement (its bias at least −0.112 in the T class, −0.099 in the M class). It becomes a candidate under the proposed
   gates if, in addition, no global-edit step inverts, standard-mixture inversions stay within the ungated arm's range,
   within-reference ordering is no worse than `base-c` on every set, and CID22-A's codec spread is no worse than the
   ungated arm's (T 0.0380, M 0.0382).
