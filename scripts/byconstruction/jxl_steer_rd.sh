@@ -7,10 +7,14 @@
 # loop_map_server at both kinds of placement. Then the shared judge panel (SSIMULACRA2, butteraugli, zensim and CVVDP
 # from ZM_BIN), DVIFM 0.3 (its frozen runtime, dvifm_e21.py judge) and the analysis against no loop and against the
 # butteraugli loop. Arms jxl_reach.sh already ran in the same RD_DIR (butteraugli, Tga, Tgatail) are reused.
+# Opt-in arms ("JPEG XL steering with the full-data monotone models"): Mfull, Tfull (the full-data certified-monotone
+# fits, workbench metrics $MFULL and $TFULL) at their bulk placements (*_BULK, loop_calibrate's shipped method) and as
+# Mfulltail, Tfulltail at their tail placements; Bcheck, B's arm again, which a new steer_rd build must reproduce byte
+# for byte. Judge tables already in RD_DIR move to judged-<UTC time>/ before the panel runs again.
 #
 #   STEER_RD=<steer_rd> DVIFM_SERVER=<loop_map_server> ZM_BIN=<zenmetrics CLI> [*_TAIL=SCALE,EXPONENT] \
-#     [ARMS="none butteraugli B Tga M64a dvifm03 Btail Tgatail M64atail dvifm03tail"] [THREADS=12] \
-#     jxl_steer_rd.sh RD_DIR
+#     [*_BULK=SCALE,EXPONENT] [ARMS="none butteraugli B Tga M64a dvifm03 Btail Tgatail M64atail dvifm03tail"] \
+#     [THREADS=12] jxl_steer_rd.sh RD_DIR
 set -euo pipefail
 RD=$1
 : "${STEER_RD:?set STEER_RD}" "${ZM_BIN:?set ZM_BIN}"
@@ -22,6 +26,8 @@ THREADS=${THREADS:-12}
 ARMS=${ARMS:-none butteraugli B Tga M64a dvifm03 Btail Tgatail M64atail dvifm03tail}
 TGA_TAIL=${TGA_TAIL:-2.2571e-2,0.7}
 M64A_TAIL=${M64A_TAIL:-2.4053e-2,0.7}
+MFULL=${MFULL:-zensim-Mfull@rev5}
+TFULL=${TFULL:-zensim-Tfull@rev5}
 : "${B_TAIL:?set B_TAIL (loop_calibrate LOOP_CAL_TAIL, zensim-B@rev5 diffmap, tail max)}"
 : "${DVIFM_TAIL:?set DVIFM_TAIL (aic4-wasm loop_calibrate LOOP_CAL_TAIL, aic4-dvifm-lap-v0.3 diffmap, tail max)}"
 mkdir -p "$RD"/jxl "$RD"/logs
@@ -49,11 +55,39 @@ run Btail workbench:zensim-B@rev5:diffmap --placement "$B_TAIL"
 run Tgatail workbench:zensim-Tga@rev6:diffmap --placement "$TGA_TAIL"
 run M64atail workbench:zensim-M64a-noKADID@rev6:diffmap --placement "$M64A_TAIL"
 run dvifm03tail server --server "${DVIFM_SERVER:-}" aic4-dvifm-lap-v0.3 diffmap "${DVIFM_TAIL%,*}" "${DVIFM_TAIL#*,}"
+run Bcheck workbench:zensim-B@rev5:diffmap
+for arm in Mfull Tfull Mfulltail Tfulltail; do
+  case " $ARMS " in *" $arm "*) ;; *) continue ;; esac
+  case $arm in Mfull*) metric=$MFULL var=MFULL ;; *) metric=$TFULL var=TFULL ;; esac
+  case $arm in *tail) var=${var}_TAIL ;; *) var=${var}_BULK ;; esac
+  : "${!var:?set $var (loop_calibrate fit of $metric diffmap)}"
+  run "$arm" "workbench:$metric:diffmap" --placement "${!var}"
+done
+case " $ARMS " in *" Bcheck "*)
+  python3 - "$RD/jxl" <<'PY' | tee -a "$log"
+import csv, sys
+d = sys.argv[1]
+def rows(label):
+    return {(r['image'], r['distance']): r['bitstream_sha256']
+            for r in csv.DictReader(open(f"{d}/loop_{label}.tsv"), delimiter='\t')}
+a, b = rows('B'), rows('Bcheck')
+bad = sorted(k for k in a.keys() | b.keys() if a.get(k) != b.get(k))
+if bad:
+    sys.exit(f"Bcheck: {len(bad)} of {len(a)} bitstreams differ from B's (first {bad[:3]}); the build changed the encode")
+print(f"Bcheck: all {len(a)} bitstreams equal B's")
+PY
+  ;;
+esac
+if ls "$RD"/judge_*.tsv >/dev/null 2>&1; then
+  keep="$RD/judged-$(date -u +%Y%m%dT%H%M%SZ)"
+  mkdir "$keep"
+  mv "$RD"/judge_*.tsv "$keep"/
+  echo "previous judge tables: $keep" | tee -a "$log"
+fi
 RD="$RD" ZM_BIN="$ZM_BIN" JUDGES="ssim2 butteraugli zensim cvvdp" bash "$H/../v_next/rd_probe_2026-07-18.sh" judge
-rm -f "$RD/judge_dvifm.tsv"
 python3 "$H/dvifm_e21.py" judge --rd "$RD" --threads "$THREADS" | tee -a "$log"
 python3 "$H/../v_next/rd_probe_analyze_2026-07-18.py" "$RD" | tee "$RD/analysis_stdout.md"
-for base in none butteraugli; do
+for base in none butteraugli B; do
   python3 "$H/../v_next/rd_probe_analyze_2026-07-18.py" "$RD" --paired-vs "$base" >"$RD/paired_vs_$base.md"
 done
 echo ALL-DONE

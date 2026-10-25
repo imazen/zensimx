@@ -2734,6 +2734,29 @@ dial: within-reference ordering on every set no worse than `base-c`, the full-da
 (5) steering: G-STEER, map agreement with independent judges, JPEG XL steering against butteraugli. E21's pooled
 statistic stays as a reported diagnostic of cross-type calibration.
 
+### JPEG XL steering with the full-data monotone models (2026-10-25)
+
+The steering study's zensim maps were B and two models trained with AIC2026 labels (Tga, M64a). The models the
+proposed gates favour, the full-data certified-monotone fits M (`mono-thr-mp32_s0`, packed `6291eeb5…`) and T
+(`mono-thr_s0`, packed `8c40f24c…`), have never steered the loop. This measures them; it reads no human label.
+
+**Design (recorded before any result).**
+- *Build.* One new steer_rd and loop_calibrate (`just byc-loop-bins`) embedding `zensim-Mfull@rev5`,
+  `zensim-Tfull@rev5` and `zensim-B@rev5` (`89cb4861…`). Controls: the new build's B arm (`Bcheck`) must reproduce
+  every one of the study's 702 B bitstreams byte for byte, and loop_calibrate's B fits must reproduce B's placements
+  (bulk 1.302887e-1 / 0.6 on the 2026-10-21 pairs, tail 1.8152e-2 / 0.7 on the 2026-10-24-hq pairs). A failed control
+  stops the run before any M or T result is read.
+- *Placements.* Each map's `diffmap` (σ 3) at a bulk placement (loop_calibrate's shipped method on the 2026-10-21
+  calibration pairs, as B's, Tga's and M64a's shipped placements were fitted) and at a tail placement
+  (`LOOP_CAL_TAIL`, each pair's largest tile, on the 2026-10-24-hq pairs, as the tail arms). Arms `Mfull`, `Tfull`,
+  `Mfulltail`, `Tfulltail`.
+- *Everything else as the steering study:* the 78 TRAIN images, effort 7, 4 iterations, distances 0.3–10, the same
+  judge build and DVIFM runtime, `--paired-vs` against `none`, `butteraugli` and, new, `B`. The earlier judge tables
+  move to `judged-<time>/` and the panel re-judges every arm, so every earlier arm's numbers must come out again.
+- *Reading (my bar, unchanged):* an arm steers better than another when its saving is positive with the interval
+  above zero under both SSIMULACRA2 and CVVDP; an interval across zero under either is a tie. Against B this answers
+  whether a monotone model's map is a better steering signal than B's at the same kind of placement.
+
 ## Summary (all arms, E21 screen, seeds 0–2, Δ vs `base-c`)
 
 | Arm | Guarantee | E21 Δ (SE) | Mixture inversions / cell (max rise) |

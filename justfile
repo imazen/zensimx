@@ -2699,3 +2699,29 @@ byc-workbench-module out="target/zensim-workbench-web" wasm_bindgen="wasm-bindge
     RUSTFLAGS="-C target-feature=+simd128" cargo build --release --manifest-path zensim-workbench/Cargo.toml --target wasm32-unknown-unknown --lib
     {{wasm_bindgen}} --target web --out-dir {{out}}/pkg-zensimx zensim-workbench/target/wasm32-unknown-unknown/release/zensim_workbench.wasm
     cargo run -q --release --manifest-path zensim-workbench/Cargo.toml --example workbench_manifest > {{out}}/extra-modules.json
+
+# The native loop tools (loop-converge's binaries and the workbench's loop_calibrate) with the bakes in
+# ZENSIM_WORKBENCH_BAKES, copied to /var/tmp/byconstruction-bin/<commit>-loop-TAG with PROVENANCE and SHA256SUMS. NOTE
+# goes into PROVENANCE (say "private weights: LAN only" when a bake is private). The working copy must equal its commit.
+byc-loop-bins tag note="":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    : "${ZENSIM_WORKBENCH_BAKES:?set ZENSIM_WORKBENCH_BAKES (name=path;...)}"
+    [ -z "$(jj diff --summary -r @)" ] || { echo 'commit first: the binaries name their commit' >&2; exit 2; }
+    commit=$(jj log -r 'latest(::@ & ~empty())' --no-graph -T 'commit_id.short(12)')
+    dest=/var/tmp/byconstruction-bin/$commit-loop-{{tag}}
+    [ ! -e "$dest" ] || { echo "$dest exists" >&2; exit 2; }
+    cargo build --release --manifest-path zensim-workbench/loop-converge/Cargo.toml --bins
+    cargo build --release --manifest-path zensim-workbench/Cargo.toml --example loop_calibrate
+    mkdir -p "$dest"
+    cp zensim-workbench/loop-converge/target/release/{steer_rd,loop_pairs,map_probe,zensim-workbench-loop-converge} \
+      zensim-workbench/target/release/examples/loop_calibrate "$dest"/
+    bakes=$(echo "$ZENSIM_WORKBENCH_BAKES" | tr ';' '\n' | while IFS='=' read -r name path; do
+      [ -n "$name" ] && echo "$name=$(sha256sum "$path" | cut -c1-8)"; done | paste -sd, - | sed 's/,/, /g')
+    {
+      echo "built from $commit (explore/byconstruction) on $(hostname), $(date -u +%F)"
+      echo "ZENSIM_WORKBENCH_BAKES: $bakes{{ if note != "" { " (" + note + ")" } else { "" } }}"
+      echo "loop_calibrate built from the same commit's zensim-workbench"
+    } > "$dest/PROVENANCE"
+    (cd "$dest" && sha256sum steer_rd loop_pairs map_probe zensim-workbench-loop-converge loop_calibrate > SHA256SUMS)
+    echo "$dest"
