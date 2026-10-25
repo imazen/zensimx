@@ -384,6 +384,9 @@ dataset-unpack-bapps keys library scratch receipts:
 dataset-features root binary:
     OPENBLAS_NUM_THREADS=1 PYTHONDONTWRITEBYTECODE=1 python3 -B scripts/byconstruction/dataset_features.py --root {{quote(root)}} --bin {{quote(binary)}}
 
+dataset-subset-keys collection admission out content:
+    OPENBLAS_NUM_THREADS=1 python3 -B scripts/byconstruction/dataset_keys.py {{quote(collection)}} --admission {{quote(admission)}} --out {{quote(out)}} --extractor /var/tmp/byconstruction-bin/b77883be18db-rev7/extract_features_372col --build-commit b77883be18db5933a9db4b9e2670a2ba88a9729b --content-root {{quote(content)}}
+
 # Lightweight queue; each collection takes/releases the caller's shared lock.
 dataset-features-queue root binary lock wrapper:
     OPENBLAS_NUM_THREADS=1 PYTHONDONTWRITEBYTECODE=1 python3 -B scripts/byconstruction/dataset_features.py --root {{quote(root)}} --bin {{quote(binary)}} --queue --heavy-lock {{quote(lock)}} --heavy-wrapper {{quote(wrapper)}}

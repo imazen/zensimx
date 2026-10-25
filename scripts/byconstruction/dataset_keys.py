@@ -164,6 +164,9 @@ def prepare(args):
     out = args.out / "inputs" / dataset
     out.mkdir(parents=True, exist_ok=False)
     content = args.library / dataset / "content"
+    if args.content_root is not None:
+        assert args.content_root.is_absolute() and args.content_root.is_relative_to(args.library)
+        content = args.content_root
     if dataset == "bapps":
         assert args.bapps_root.is_absolute()
         content = args.bapps_root
@@ -333,6 +336,7 @@ def main():
     ap.add_argument(
         "--library", type=Path, default=Path("/mnt/tower/input/iqa/datasets")
     )
+    ap.add_argument("--content-root", type=Path, help="explicit admitted parent content root")
     ap.add_argument(
         "--bapps-root",
         type=Path,
