@@ -1,4 +1,19 @@
 # Identifier-only preparation; no pixel or subjective table is opened.
+dataset-leg-tests:
+    python3 -B -m unittest discover -s scripts/tests -p 'test_dataset_legs.py' -v
+    python3 -B -m unittest discover -s scripts/tests -p 'test_subjective_training_leg.py' -v
+
+# Caller holds shared heavy.lock and run-heavy. TMPDIR must be disk-backed.
+dataset-leg-native-tests target:
+    cargo test --locked -p zensim-validate --bin zensim_mlp_train --target-dir {{quote(target)}} subjective_training_leg:: -- --nocapture
+    cargo test --locked -p zensim-validate --test subjective_rank --target-dir {{quote(target)}}
+
+dataset-trainer-build target:
+    cargo build --locked --release -p zensim-validate --bin zensim_mlp_train --target-dir {{quote(target)}}
+
+dataset-root source out admission features library columns:
+    python3 -B scripts/byconstruction/ring_root.py datasets --root {{quote(source)}} --out {{quote(out)}} --admission {{quote(admission)}} --features {{quote(features)}} --library {{quote(library)}} --columns {{quote(columns)}}
+
 rev7-inventory out:
     python3 -B scripts/rev7/inventory.py --out {{quote(out)}}
 

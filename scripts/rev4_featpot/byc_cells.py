@@ -104,7 +104,7 @@ def run_cell(tokens: str, fold: str, seed: int) -> dict:
         return json.loads(record.read_text())
     if dest.exists():
         raise ValueError(f"{dest}: incomplete earlier attempt; inspect and move it aside")
-    scratch = Path.home() / "tmp/byc/scratch" / arm_name(tokens) / f"{fold}_s{seed}"
+    scratch = Path(os.environ.get("BYC_SCRATCH", str(Path.home() / "tmp/byc/scratch"))) / arm_name(tokens) / f"{fold}_s{seed}"
     scratch.mkdir(parents=True, exist_ok=True)
     env = dict(os.environ, TMPDIR=str(scratch), ZENSIM_MAX_TIER="v3")
     cmd = [sys.executable, str(HERE / "v2_lodo_mlp.py"), "--root", str(ROOT), "--spec", spec_of(tokens),
@@ -139,6 +139,7 @@ def run_cell(tokens: str, fold: str, seed: int) -> dict:
 
 def cmd_run(args) -> int:
     global BASE_SPEC, COLS, LABEL, AIC_WEIGHT
+    LABEL = args.label
     if args.aic_weight is not None:
         AIC_WEIGHT = args.aic_weight
         if not args.label:

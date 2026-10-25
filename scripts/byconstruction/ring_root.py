@@ -36,6 +36,8 @@ The HDR legs (`hdr_hb4`, `hdr_hc4`, leg `hdr_consensus`) are not re-extracted an
 """
 
 import argparse
+import collections
+import csv
 import hashlib
 import json
 import os
@@ -87,6 +89,294 @@ def sha(p) -> str:
         for b in iter(lambda: f.read(1 << 22), b""):
             h.update(b)
     return h.hexdigest()
+
+
+DATASET_MOS = ("pipal", "mdid", "live-md", "cid-iq", "cid-oa", "vcl-fer", "irccyn-ivc",
+               "colourlab-rating-variability-2022")
+DATASET_PAIR = ("bapps", "pieapp", "fg-iqa")
+
+
+def dataset_family_guard(admission, source, out):
+    """Label-free closure of new reservations through native hashes and D4 aliases.
+
+    Include excluded reservations too: exclusion from an assessment does not
+    grant fit permission. This audit refuses inherited collisions rather than
+    silently rewriting the frozen revision-7 recipe's populations.
+    """
+    memberships, protected, protected_hashes = {}, set(), set()
+    validation_path = admission/"validation-receipt.json"
+    if sha(validation_path) != "a4013c0bb1a72b5b4990cc78eb7003acb0e87e2374a01c7d5c8a47bf1d82f9d8":
+        raise ValueError("accepted membership receipt changed")
+    accepted = json.loads(validation_path.read_text())["collections"]
+    for p in sorted(admission.glob("*/membership.parquet")):
+        if p.parent.name == "ls2n-ipi-sr":
+            continue
+        if sha(p) != accepted[p.parent.name]["membership_sha256"]:
+            raise ValueError("frozen membership changed")
+        rows = pq.read_table(p).to_pylist()
+        memberships[p.parent.name] = rows
+        for r in rows:
+            if r["role"] in ("EVAL", "TEST", "CALIBRATION", "SOURCE_EXPOSED_TEST_DIAGNOSTIC"):
+                protected.add(str(r["family_id"]))
+                protected_hashes.update(h for h in r["source_audit_rgb8_sha256"] if h)
+    d4 = Path("/mnt/v/zensim/d4-roles-private")
+    freeze = json.loads((admission / "family-registry-freeze.json").read_text())
+    for file, key in (("images.json", "source_authority_inventory_sha256"),
+                      ("source-family-authority.json", "source_authority_sha256")):
+        if sha(d4 / file) != freeze[key]:
+            raise ValueError("D4 family authority changed since admission")
+    images = json.loads((d4 / "images.json").read_text())
+    authority = json.loads((d4 / "source-family-authority.json").read_text())["uid_to_family"]
+    aliases = {images[int(uid)]["rgb_sha256"]: family for uid, family in authority.items()}
+    del images
+    reserved_aliases = {aliases[h] for h in protected_hashes if h in aliases}
+    def reserved(h):
+        return h in protected_hashes or aliases.get(h) in reserved_aliases
+    bank = Path(json.loads((source / "wide/main/real/receipt.json").read_text())["admission_view"]["bank_root"])
+    collisions = {}
+    for p in sorted(bank.glob("*/keys.parquet")):
+        keys = pq.read_table(p).to_pylist()
+        collisions[p.parent.name] = {r["ref_group"] for r in keys if reserved(r["ref_pixels_sha256"])}
+    inherited = {}
+    for p in sorted((source / "wide/main/real").glob("*.keys.parquet")):
+        if not p.name.endswith(("_fit.keys.parquet", "_dev.keys.parquet")):
+            continue
+        keys = pq.read_table(p).to_pylist()
+        bad = [r for r in keys if r["ref_basename"] in collisions.get(r["member_set"], set())]
+        inherited[p.name] = {"rows": len(keys), "reserved_rows": len(bad),
+                             "references": sorted({r["ref_basename"] for r in bad})}
+    # E15 uses source filenames, unlike the bank-keyed human/teacher legs.
+    coverage = pq.read_table(source / "e15/coverage_pool.keys.parquet").to_pylist()
+    source_images = json.loads((admission / "screen-v1/source-images.json").read_text())
+    bad_names = {Path(p).name for r in source_images if reserved(r["rgb_sha256"]) for p in r["paths"]}
+    del source_images
+    coverage_bad = [r for r in coverage if r["source_filename"] in bad_names]
+    guard = dict(schema="dataset-family-guard-v1", protected_families=sorted(protected),
+                 protected_roles=["EVAL", "TEST", "CALIBRATION", "SOURCE_EXPOSED_TEST_DIAGNOSTIC"],
+                 includes_excluded_memberships=True, inherited=inherited,
+                 coverage_reserved_rows=len(coverage_bad), coverage_reserved_sources=sorted(
+                     {r["source_filename"] for r in coverage_bad}),
+                 inherited_leaks=sum(r["reserved_rows"] for r in inherited.values())+len(coverage_bad),
+                 membership_sha256={c: sha(admission/c/"membership.parquet") for c in memberships},
+                 source_frozen_sha256=sha(source/"wide/frozen.json"),
+                 family_registry_sha256=sha(admission/"source-family-registry.tsv"),
+                 scope="accepted exact native pixels and confirmed D4 aliases; bounded source screen, not perfect crop recall")
+    out.write_text(json.dumps(guard, indent=1)+"\n")
+    return guard, memberships
+
+
+def cmd_dataset_guard(a):
+    guard, _ = dataset_family_guard(Path(a.admission), Path(a.root), Path(a.out))
+    log(f"inherited reserved rows: {guard['inherited_leaks']}")
+    return 0
+
+
+def dataset_targets(path, wanted, columns, ledger, collection):
+    """Parse selected TRAIN lines only. Persist the preread ledger first."""
+    reads = json.loads(ledger.read_text()) if ledger.exists() else {"role": "TRAIN", "reads": []}
+    reads["reads"].append(dict(collection=collection, table=str(path), rows=sorted(wanted),
+                               columns=columns, row_count=len(wanted), state="requested"))
+    ledger.write_text(json.dumps(reads, indent=1)+"\n")
+    result = {}
+    with path.open() as stream:
+        header = next(csv.reader([next(stream)], delimiter="\t"))
+        positions = [header.index(c) for c in columns]
+        for i, line in enumerate(stream):
+            if i in wanted:
+                row = next(csv.reader([line], delimiter="\t"))
+                if len(row) != len(header):
+                    raise ValueError("normalized label table requires one complete TSV record per line")
+                result[i] = dict(zip(columns, (row[j] for j in positions)))
+    if set(result) != wanted:
+        raise ValueError("TRAIN label row selection incomplete")
+    reads["reads"][-1]["state"] = "read"
+    ledger.write_text(json.dumps(reads, indent=1)+"\n")
+    return result
+
+
+def dataset_observations(collection, members, mapping, labels):
+    """Quality-oriented scalar rows and strictly pair-local hard preferences."""
+    by_row = collections.defaultdict(dict)
+    for r in mapping:
+        if r["role"] == "TRAIN" and r["skip_reason"] is None:
+            key = (r["input_table"], r["membership_row_index"])
+            if r["side"] in by_row[key]:
+                raise ValueError("duplicate membership-side join")
+            by_row[key][r["side"]] = r["pair_key"]
+    observations, dropped = [], collections.Counter()
+    for r in members:
+        key = (r["input_table"], r["row_index"])
+        sides, lab = by_row[key], labels[key]
+        if lab["ref"] != r["reference_path"]:
+            raise ValueError("label reference does not match frozen membership")
+        identity = f"{collection}:{r['input_table']}:{r['row_index']}"
+        if collection in DATASET_PAIR:
+            if set(sides) != {"a", "b"} or (lab["a"], lab["b"]) != (r["a_path"], r["b_path"]):
+                raise ValueError("preference side binding differs")
+            p = float(lab["p_a"])
+            if not np.isfinite(p) or not 0 <= p <= 1:
+                raise ValueError("invalid native preference probability")
+            if p == 0.5:
+                dropped["exact_probability_tie"] += 1
+                continue
+            for side in ("a", "b"):
+                observations.append(dict(pair_key=sides[side], ref_basename=identity,
+                    human_score=float((p > 0.5) == (side == "a")), observation=identity+":"+side,
+                    family=str(r["family_id"])))
+        else:
+            if set(sides) != {"item"} or lab["item"] != r["item_path"]:
+                raise ValueError("MOS item binding differs")
+            direction = lab["higher_is_better"].lower()
+            if direction not in ("true", "false", "1", "0", "yes", "no"):
+                raise ValueError("unknown native MOS direction")
+            score = float(lab["score"])
+            if not np.isfinite(score):
+                raise ValueError("nonfinite native MOS")
+            ref = f"{collection}:{r['reference_path']}"
+            observations.append(dict(pair_key=sides["item"], ref_basename=ref,
+                human_score=score if direction in ("true", "1", "yes") else -score,
+                observation=identity, family=str(r["family_id"])))
+    counts = collections.Counter(r["ref_basename"] for r in observations)
+    usable = [r for r in observations if counts[r["ref_basename"]] >= 2]
+    dropped["singleton_rows"] = len(observations)-len(usable)
+    return usable, dict(dropped)
+
+
+def cmd_datasets(a):
+    """Extend the existing derived root builder; never mutate frozen inputs."""
+    source, out, admission, features = map(Path, (a.root, a.out, a.admission, a.features))
+    if out.exists():
+        raise ValueError("dataset root destination must be fresh")
+    out.parent.mkdir(parents=True, exist_ok=True)
+    # Metadata/identity audit comes before the first new label value.
+    guard_path = out.parent / "FAMILY_GUARD.json"
+    guard, memberships = dataset_family_guard(admission, source, guard_path)
+    shutil.copytree(source, out)
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]/"rev4_featpot"))
+    from v2_teacher import row_keys_sha, selection_sha
+    from v2_common import admission_input_roots
+    real = out / "wide/main/real"
+    masked = {}
+    # Excluded TEST memberships still reserve their known families. Preserve
+    # every original row and receipt in the immutable source root.
+    for key_name, rec in guard["inherited"].items():
+        if not rec["reserved_rows"]:
+            continue
+        path = real / key_name.replace(".keys.parquet", ".parquet")
+        kp = path.with_suffix(".keys.parquet")
+        keys = pq.read_table(kp)
+        keep = [i for i,r in enumerate(keys["ref_basename"].to_pylist()) if r not in rec["references"]]
+        table = pq.read_table(path).take(pa.array(keep))
+        keys = keys.take(pa.array(keep))
+        write(table, path)
+        pq.write_table(keys, kp, compression="zstd")
+        dp = Path(str(path)+".manifest.json")
+        decl = json.loads(dp.read_text())
+        decl.update(table_sha256=sha(path), keys_sha256=sha(kp), row_keys_sha256=row_keys_sha(keys),
+                    rows_kept=len(keep), row_selection_sha256=selection_sha(keep),
+                    dataset_family_mask=dict(parent_table_sha256=decl["table_sha256"],
+                                             removed_rows=rec["reserved_rows"], references=rec["references"]))
+        dp.write_text(json.dumps(decl, indent=1)+"\n")
+        masked[path.name] = dict(removed_rows=rec["reserved_rows"], kept_rows=len(keep))
+    if guard["coverage_reserved_rows"]:
+        raise ValueError("coverage source reservation needs a bound ordinal mask")
+    remaining = sum(sum(ref in rec["references"] for ref in
+        pq.read_table(real/name, columns=["ref_basename"])["ref_basename"].to_pylist())
+        for name,rec in guard["inherited"].items())
+    if remaining:
+        raise ValueError("inherited family mask incomplete")
+    guard["masked_inherited_tables"] = masked
+    guard["inherited_leaks"] = remaining
+    guard_path.write_text(json.dumps(guard, indent=1)+"\n")
+    legdir = out / "datasets"
+    legdir.mkdir()
+    shutil.copyfile(guard_path, legdir/"FAMILY_GUARD.json")
+    guard_path = legdir/"FAMILY_GUARD.json"
+    ledger = out.parent/"LABEL_READS.json"
+    selected = [int(x) for x in Path(a.columns).read_text().strip().split(",")]
+    protected = set(guard["protected_families"])
+    legs = []
+    for c in (*DATASET_MOS, *DATASET_PAIR):
+        members = [r for r in memberships[c] if r["membership_state"] == "FROZEN" and r["role"] == "TRAIN"]
+        if any(str(r["family_id"]) in protected for r in members):
+            raise ValueError(f"{c}: TRAIN family reserved by another role")
+        mapping = pq.read_table(features/"inputs"/c/"membership-to-pairs.parquet").to_pylist()
+        preparation = json.loads((features/"inputs"/c/"PREPARATION.json").read_text())
+        if (preparation["membership_sha256"] != guard["membership_sha256"][c]
+                or preparation["mapping_sha256"] != sha(features/"inputs"/c/"membership-to-pairs.parquet")):
+            raise ValueError("feature-to-membership mapping changed")
+        labels = {}
+        columns = ["ref", "a", "b", "p_a"] if c in DATASET_PAIR else ["ref", "item", "score", "higher_is_better"]
+        for table in sorted({r["input_table"] for r in members}):
+            wanted = {r["row_index"] for r in members if r["input_table"] == table}
+            labels.update({(table,i):v for i,v in dataset_targets(Path(a.library)/c/table, wanted, columns, ledger, c).items()})
+        obs, dropped = dataset_observations(c, members, mapping, labels)
+        bank = features/"bank"/c.replace("-", "_")
+        manifest = json.loads((bank/"_MANIFEST.json").read_text())
+        if (manifest["feature_set_id"] != "basic+peaks+v2@w1825/rev7_rowlanes#36c3f3af"
+                or manifest["build_commit"] != "b77883be18db5933a9db4b9e2670a2ba88a9729b"
+                or sha(bank/"features.parquet") != manifest["features_parquet_sha256"]):
+            raise ValueError("dataset feature producer/hash differs")
+        tab = pq.read_table(bank/"features.parquet")
+        index = {k:i for i,k in enumerate(tab["pair_key"].to_pylist())}
+        if len(index) != tab.num_rows:
+            raise ValueError("duplicate dataset bank key")
+        tab = tab.take(pa.array([index[r["pair_key"]] for r in obs]))
+        # Keep the canonical gapped width; absent slots stay NaN, never zero-filled.
+        tab = tab.select([f"f{i}" for i in range(1825)]).cast(pa.schema(
+            [(f"f{i}", pa.float32()) for i in range(1825)]))
+        tab = tab.append_column("ref_basename",pa.array([r["ref_basename"] for r in obs]))
+        tab = tab.append_column("human_score",pa.array([r["human_score"] for r in obs]))
+        path = legdir/f"{c}.parquet"
+        write(tab, path)
+        counts = dict(sorted(collections.Counter(r["ref_basename"] for r in obs).items()))
+        keys = [dict(row=i, observation=r["observation"],source=r["ref_basename"],reference=r["ref_basename"],
+                     family=r["family"],role="fit",tier="T2") for i,r in enumerate(obs)]
+        kp = legdir/f"{c}.keys.json"
+        kp.write_text(json.dumps(keys,separators=(",",":"))+"\n")
+        decl = dict(schema="subjective-training-leg-v2",loss="hard-pair-preference" if c in DATASET_PAIR else "within-source-rank",
+            nominal_weight=0.5,target_orientation="quality",target_transform="orient-native-quality",target_column="human_score",
+            selection="fixed-final-epoch",formula_revision=7,tier="v3",feature_ids=selected,
+            producer_commit=manifest["build_commit"],feature_set_id=manifest["feature_set_id"],
+            native_role="TRAIN",rows=len(obs),table_sha256=sha(path),admission_root=str(out),
+            membership_sha256=guard["membership_sha256"][c],feature_manifest_sha256=sha(bank/"_MANIFEST.json"))
+        dp = Path(str(path)+".manifest.json")
+        dp.write_text(json.dumps(decl,indent=1)+"\n")
+        weight = 0.5/(sum(1-1/n for n in counts.values())/len(counts))
+        legs.append(dict(name="subjective_rank_"+c.replace("-","_"),path=str(path),train_weight=weight,val_weight=0.,
+            mode="withinref,rank",subjective=True,table_sha256=sha(path),manifest_sha256=sha(dp),
+            keys_path=str(kp),keys_sha256=sha(kp),rows=len(obs),source_counts=counts,
+            collection=c,membership_rows=len(members),dropped=dropped,groups=len(counts),
+            pairs=sum(n*(n-1)//2 for n in counts.values())))
+        log(f"{c}: {len(members)} memberships, {len(obs)} rows, {len(counts)} groups; dropped {dropped}")
+    receipt_path = real/"receipt.json"
+    receipt = json.loads(receipt_path.read_text())
+    for leg in receipt["legs"].values():
+        for rec in leg.values():
+            if isinstance(rec,dict) and "rel" in rec:
+                p = out/rec["rel"]
+                rec.update(sha256=sha(p),manifest_sha256=sha(str(p)+".manifest.json"),
+                           keys_sha256=sha(p.with_suffix(".keys.parquet")))
+                if p.name in masked:
+                    rec["rows"] = masked[p.name]["kept_rows"]
+    view = dict(receipt["admission_view"])
+    view["immutable_input_roots"] = [*admission_input_roots(source),str(source),str(admission),str(features),str(out)]
+    receipt["admission_view"] = view
+    receipt_path.write_text(json.dumps(receipt,indent=1)+"\n")
+    packet = dict(schema="rev7-dataset-legs-v1",groups=legs,feature_ids=selected,
+                  producer_commit="b77883be18db5933a9db4b9e2670a2ba88a9729b",
+                  family_guard_path=str(guard_path),family_guard_sha256=sha(guard_path),label_reads_path=str(ledger))
+    pp = legdir/"receipt.json"
+    pp.write_text(json.dumps(packet,indent=1)+"\n")
+    frozen = json.loads((out/"wide/frozen.json").read_text())
+    frozen["admission_view"] = view
+    frozen["wide_receipts"] = {"main/real":sha(receipt_path)}
+    frozen["dataset_legs_sha256"] = sha(pp)
+    frozen["auxiliary_files"] = {rel:sha(out/rel) for rel in frozen["auxiliary_files"]}
+    frozen["auxiliary_files"].update({str(p.relative_to(out)):sha(p) for p in legdir.iterdir()})
+    (out/"wide/frozen.json").write_text(json.dumps(frozen,indent=1)+"\n")
+    log(f"dataset root frozen: {out}")
+    return 0
 
 
 def log(msg: str) -> None:
@@ -663,6 +953,15 @@ def cmd_gated(a) -> int:
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
+    dg = sub.add_parser("dataset-guard")
+    dg.add_argument("--admission", required=True)
+    dg.add_argument("--root", required=True)
+    dg.add_argument("--out", required=True)
+    dg.set_defaults(fn=cmd_dataset_guard)
+    ds = sub.add_parser("datasets")
+    for flag in ("root", "out", "admission", "features", "library", "columns"):
+        ds.add_argument("--"+flag, required=True)
+    ds.set_defaults(fn=cmd_datasets)
     p = sub.add_parser("pool")
     p.add_argument("--arm", choices=sorted(ARMS), default="hpm")
     p.add_argument("--bin", required=True)

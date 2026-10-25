@@ -3552,3 +3552,26 @@ keeps inversions bounded. It is a research sidecar today; serving it needs the d
 additive sums per channel, see "Can the fixes stream?"). Timing the correction found a 9% speedup for the shipped
 scorer (64-byte-aligned lane accumulators), so the corrected scorer is 7–8.5% faster than the shipped one; the ring
 form itself costs about 0.5%.
+
+### Revision-7 M with provided-library TRAIN datasets (2026-10-25)
+
+Registered before reading the new TRAIN labels: `Mdata` keeps M's
+`sel:3b7bd5ebe929@h32:H128:cv16:cf98:fx1:mono:thr:mp32`, columns C, seeds,
+120 × 50,000 budget and fixed final epoch 119. Eight MOS collections enter as
+within-reference ranks with native `higher_is_better` orientation; BAPPS,
+PieAPP and FG-IQA enter as pair-local hard preferences: `p_a > .5` prefers A,
+`p_a < .5` prefers B, and exact `.5` comparisons drop. Probability magnitudes
+and vote counts do not enter the loss. Each added collection has nominal
+weight 0.5, corrected for uniform within-reference self draws by the existing
+sampling owner. This is a fixed recipe, with no held-out weight selection.
+
+The fresh revision-7 authority extends the existing subjective/group admission
+owners. Metadata, ordered keys and source-family reservations pass before
+payload reads. Every EVAL/TEST/CALIBRATION family, including excluded
+memberships and source-exposed TEST diagnostics, stays outside fits. The
+label-free audit found seven inherited TID families (840 full-human fit rows)
+in excluded TEST memberships; the derived root masks these too. Thus the
+comparison includes both new datasets and that required family mask. Frozen
+revision-7 source tables stay intact. The new root, label-read ledger and
+results live under `rev7data/`; measurements and final artifact bindings will
+be recorded here after the registered run. No production profile changes.
