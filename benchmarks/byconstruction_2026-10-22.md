@@ -3573,8 +3573,8 @@ label-free audit found seven inherited TID families (840 full-human fit rows)
 in excluded TEST memberships; the derived root masks these too. Thus the
 comparison includes both new datasets and that required family mask. Frozen
 revision-7 source tables stay intact. The new root, label-read ledger and
-results live under `rev7data/`; measurements and final artifact bindings will
-be recorded here after the registered run. No production profile changes.
+results live under `rev7data/`; the completed measurements are recorded below.
+No production profile changes.
 
 The full-data candidate is now frozen at
 `/var/tmp/datalegs-20261025/rev7data/full/refit/production-f16.bin`, SHA-256
@@ -3610,15 +3610,41 @@ ties, so this run recomputes M7, B7 and all peers with the same corrected
 method. MOS intervals use 2,000 reference resamples, seed 1, type 7 quantiles;
 pairwise evaluation retains the original soft-probability agreement and
 reference bootstrap, including `.5` comparisons. BAPPS's 36,344 frozen EVAL
-comparisons extend the coordinator's 11-collection assessment. Only retained
-original archives supply their PNG bytes, with archive and content-index
-hash verification; no training images are decoded for this assessment.
+comparisons extend the coordinator's 11-collection assessment using its
+existing feature bank for models only. The owner explicitly prohibited
+unpacking BAPPS again; its peer scoring waits for the IMI archive route.
 
 The 12 E21 cells use four one-thread fits inside each bounded seed job, with
 the shared heavy lock released between seeds. The rebuilt trainer must first
 reproduce the unchanged-root Mr7 KADID seed 0 predictions byte for byte.
-The deciding loop uses `diffmap` on float reconstruction and its own
-TRAIN-fitted maximum-tail placement. M5/M7/B placements, 702 bitstreams per
-control arm, and retained judge rows must reproduce through the original
-loop owners before the new comparisons qualify. Every reported loop
-comparison uses `--bdrate-vs`.
+The owner superseded the JPEG XL part of this run before calibration:
+`lslocks` showed the queued calibration as `WRITE*` (not acquired), and its
+PID was terminated. No calibration, encode, judge or analysis step ran.
+The preparation build and candidate freeze remain preserved. The already
+running control fit was stopped at epoch85 to put EVAL first; its partial
+outputs and scratch were renamed with `.interrupted-for-eval.bak` suffixes.
+It restarts at the full registered budget after feature-only BAPPS scoring.
+
+The copied eleven-collection assessment added only Mdata model predictions;
+M7, B7 and all three peer TSVs retain their copied hashes. MOS uses signed
+SROCC; FG-IQA and PieAPP use expected2AFC agreement under native `p_a`.
+Reference-bootstrap95% intervals and within-reference MOS statistics are in
+`/var/tmp/datalegs-20261025/eval/report.{json,md}`. The point estimates are:
+
+| EVAL collection | Mdata | M7 | B7 | SSIMULACRA2 | Butteraugli | CVVDP |
+|---|---:|---:|---:|---:|---:|---:|
+| cid-iq | 0.870 | 0.861 | 0.871 | 0.757 | 0.592 | 0.749 |
+| cid-oa | 0.893 | 0.914 | 0.882 | 0.847 | 0.577 | 0.912 |
+| colourlab-rating-variability-2022 | 0.722 | 0.723 | 0.701 | 0.604 | 0.373 | 0.612 |
+| fg-iqa | 0.758 | 0.757 | 0.758 | 0.758 | 0.749 | 0.755 |
+| iqa-odi | 0.841 | 0.843 | 0.849 | 0.854 | 0.806 | 0.833 |
+| irccyn-ivc | 0.934 | 0.935 | 0.960 | 0.949 | 0.912 | 0.928 |
+| live-md | 0.892 | 0.891 | 0.879 | 0.916 | 0.837 | 0.899 |
+| mdid | 0.902 | 0.894 | 0.892 | 0.787 | 0.572 | 0.829 |
+| nits-iqa | 0.727 | 0.717 | 0.704 | 0.777 | 0.706 | 0.721 |
+| pieapp | 0.586 | 0.582 | 0.579 | 0.560 | 0.535 | 0.570 |
+| vcl-fer | 0.945 | 0.938 | 0.884 | 0.945 | 0.877 | 0.933 |
+
+The changes are mixed: MDID, NITS, VCL-FER and PieAPP improve in point
+estimate over M7, while CID:OA falls. These individual intervals do not
+provide a paired significance test of the difference.
