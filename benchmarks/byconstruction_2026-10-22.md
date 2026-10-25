@@ -3318,6 +3318,29 @@ error and refused safesyn_dev. A wrong join moves most of a row: with safesyn's 
 546 of its 576 columns, against at most 49 for the true join, so the check now refuses more than 0.1% of rows with
 over a quarter of their columns moved.
 
+**Cells** (`Tr7` = T's recipe `mono:thr`, `Mr7` = M's `mono:thr:mp32`, B's fx1 spec and columns C, the 12 E21 cells,
+seeds 0–2, the revision-7 root; trainer binaries `be72a3dfb039`; scorecard `~/tmp/byc/score_r7.sh`, outputs under
+`~/tmp/byc/r7_scorecard/` on dev):
+
+| | T (rev 5) | Tr7 | M (rev 5) | Mr7 |
+|---|---|---|---|---|
+| E21 Δ (diagnostic), seed-unit SE | −0.0205 ± 0.0029 | −0.0203 ± 0.0029 | −0.0144 ± 0.0016 | −0.0127 ± 0.0016 |
+| Paired Δ against the revision-5 cell, per seed | | +0.0001 / +0.0002 / +0.0005 | | +0.0038 / −0.0021 / +0.0034 |
+| SROCC KADID / TID2013 / KonFiG / CID22-A | .8714 / .8590 / .7904 / .8860 | .8720 / .8593 / .7905 / .8860 | .8759 / .8761 / .7988 / .8808 | .8793 / .8736 / .8007 / .8846 |
+| Codec/type bias spread KADID / TID / KonFiG / CID22-A | .0840 / .0985 / .0899 / .0376 | .0832 / .0983 / .0899 / .0376 | .0817 / .0824 / .0852 / .0345 | .0796 / .0854 / .0903 / .0356 |
+| Knob-concurring inversions KADID / TID2013 | .0130 / .0106 | .0131 / .0106 | .0139 / .0097 | .0136 / .0091 |
+| Standard mixture: inversions per cell (all cells), largest rise | 0–4 (28), +4.03 | 0–4 (28), +4.04 | 1–32 (82), +6.54 | 1–14 (57), +6.28 |
+| Global mixture: inversions | — | 0 | 0 | 0 |
+
+Reading against the bar set above: **T at revision 7 reproduces T** (every statistic within its seed spread, most to
+the last printed digit). **M at revision 7 stays within seed spread on E21** (per-seed differences of mixed sign);
+M's training amplifies small input changes more than T's, so its per-dataset statistics move by a few thousandths in
+both directions (bias spreads: KADID better, TID2013/KonFiG/CID22-A worse, no seed interval computed for the pooled
+spreads). One finding: Mr7's standard-mixture inversions fall from 82 to 57 (the worst cell 32 → 14). The bias spreads
+are pooled over seeds, so they carry no seed interval here; their moves are the size of the M/Mhpm differences above.
+Next: the full-data Mr7 fit and its gates at revision 7 (rebuilt tools, after the revision-5 controls reproduce M's
+stored gates).
+
 ## Summary (all arms, E21 screen, seeds 0–2, Δ vs `base-c`)
 
 | Arm | Guarantee | E21 Δ (SE) | Mixture inversions / cell (max rise) |
