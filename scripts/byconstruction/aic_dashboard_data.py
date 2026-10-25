@@ -61,7 +61,8 @@ CONTROLS = {"Thpm": "Thpm (monotone, no descriptor, no AIC leg)", "Tghpm": "Tghp
 POSTHOC = {"M64ens": "M64ens (mean of M64 and M64lin, post hoc, no AIC leg)"}
 # Revision-7 arms (no AIC leg). Their cells sit in the data-legs lane's directory, where Mr7 links to
 # ~/tmp/byc/cells/Mr7; they are scored against the revision-7 data root with binaries that read revision-7 bakes.
-REV7 = {"Mr7": "Mr7 (revision-7 M, no AIC leg)", "Mdata": "Mdata (Mr7 + 11 new datasets' TRAIN legs, no AIC leg)"}
+REV7 = {"Mr7": "Mr7 (revision-7 M, no AIC leg)", "Mdata": "Mdata (Mr7 + 11 new datasets' TRAIN legs, no AIC leg)",
+        "Mdata64": "Mdata64 (Mdata's data, M64's shape, no AIC leg)", "MdataT": "MdataT (Mdata's data, T's shape, no AIC leg)"}
 REV7_CELLS = Path(os.environ.get("BYC_REV7_CELLS", "/var/tmp/datalegs-20261025/cells"))
 REV7_ROOT = "/mnt/v/output/zensim/byconstruction-2026-10-22/rev7data/root"
 REV7_BIN = os.environ.get("REV7_BIN", "/var/tmp/datalegs-20261025/bin")
@@ -147,17 +148,20 @@ def run_json(cmd: list[str], env: dict) -> dict:
     return json.loads(out[out.index("{"):])
 
 
-def e21_scatter(add) -> pd.DataFrame:
+def e21_scatter(add) -> tuple[pd.DataFrame, pd.DataFrame]:
     """The scatter views for the E21 sets: each dataset's out-of-sample seed-0 predictions on its own label scale
-    (quality orientation, as E34's panel input stores the targets), one `scatter` row per dataset and model."""
+    (quality orientation, as E34's panel input stores the targets), one `scatter` row per dataset and model. The
+    revision-7 arms go to a second frame (the dashboard's file size limit), the others to the first as before."""
     panel_in = {d["name"]: d for d in json.loads(A_E34.read_text())["datasets"]}
     dvr = pd.read_parquet(DVIFM_DIR / "rows.parquet")
     dvj = pd.read_csv(DVIFM_DIR / "dvifm.tsv", sep="\t").set_index(["ref_path", "dist_path"]).jnd
-    e21rows = []
+    e21rows, e21rows7 = [], []
+    rev7_keys = {"mr7", "mdata", "mdata64", "mdatat"}
     for ds in ("kadid", "tid2013", "konfig", "cid22_a25"):
         y = np.asarray(panel_in[ds]["target"], np.float64)
         sel = dvr[dvr.dataset == ds]
         frame = {"ds": ds, "label": np.round(y, 4), "type": [TYPE_NAMES.get(t, t) for t in sel.type]}
+        frame7 = dict(frame)
         models = [("basec", "B’s recipe (base-c), seed 0", np.asarray(panel_in[ds]["predictions"]["base-c"][0], np.float64))]
         for arm, sid, lab, cells in (("Tga", "tga", "Tga, seed 0", CELLS),
                                      ("mono-thr-mp64", "m64", "M64 (certified max pairs), seed 0", CELLS),
@@ -166,7 +170,9 @@ def e21_scatter(add) -> pd.DataFrame:
                                      ("M64lin", "m64lin", "M64lin (linear-light coarse scales), seed 0", CELLS),
                                      ("M64ens", "m64ens", "M64ens (mean of M64 and M64lin, post hoc), seed 0", CELLS),
                                      ("Mr7", "mr7", "Mr7 (revision-7 M), seed 0", REV7_CELLS),
-                                     ("Mdata", "mdata", "Mdata (Mr7 + new datasets), seed 0", REV7_CELLS)):
+                                     ("Mdata", "mdata", "Mdata (Mr7 + new datasets), seed 0", REV7_CELLS),
+                                     ("Mdata64", "mdata64", "Mdata64 (Mdata's data, M64's shape), seed 0", REV7_CELLS),
+                                     ("MdataT", "mdatat", "MdataT (Mdata's data, T's shape), seed 0", REV7_CELLS)):
             f = cells / arm / f"without_{ds}_s0" / f"pred_{ds}.tsv"
             if f.is_file():
                 x = pd.read_csv(f, sep="\t").pred.to_numpy(np.float64)
@@ -177,12 +183,14 @@ def e21_scatter(add) -> pd.DataFrame:
         for sid, lab, x in models:
             st, arr = geometry(x, y, arrays=True)
             pn = panel_batch([(sid, x, y)], stats="full")[0]
-            frame[f"f_{sid}"], frame[f"r_{sid}"] = np.round(arr["fit"], 4), np.round(arr["rank"], 4)
-            frame[f"a_{sid}"] = np.round(y.mean() + (x - x.mean()) * (y.std() / x.std()), 4)
+            fr = frame7 if sid in rev7_keys else frame
+            fr[f"f_{sid}"], fr[f"r_{sid}"] = np.round(arr["fit"], 4), np.round(arr["rank"], 4)
+            fr[f"a_{sid}"] = np.round(y.mean() + (x - x.mean()) * (y.std() / x.std()), 4)
             add("scatter", id=f"{ds}_{sid}", dataset=NAMES[ds], key=sid, model=lab, n=int(pn["n"]),
                 srocc=pn["srocc_signed"], plcc=pn["plcc"], z_rmse=pn["z_rmse"], **{"or": pn["or"]}, **st)
         e21rows.append(pd.DataFrame(frame))
-    return pd.concat(e21rows, ignore_index=True)
+        e21rows7.append(pd.DataFrame(frame7))
+    return pd.concat(e21rows, ignore_index=True), pd.concat(e21rows7, ignore_index=True)
 
 
 def rev7_rows(add, out: Path) -> None:
@@ -260,7 +268,7 @@ def extend(prev: Path, out: Path, eval_dir: Path | None = None) -> int:
 
     def add(table, **kw):
         rows.append({"table": table, **kw})
-    e21 = e21_scatter(add)
+    e21, e21_7 = e21_scatter(add)
     rev7_rows(add, out)
     if eval_dir:
         eval_scatter_rows(add, eval_dir)
@@ -269,6 +277,7 @@ def extend(prev: Path, out: Path, eval_dir: Path | None = None) -> int:
         raise ValueError("duplicate row ids")
     (out / "results.json").write_text(json.dumps(rows, indent=0))
     e21.sample(frac=1, random_state=0).reset_index(drop=True).to_json(out / "e21predictions.json", orient="records")
+    e21_7.sample(frac=1, random_state=0).reset_index(drop=True).to_json(out / "e21predictions7.json", orient="records")
     print(f"{len(rows)} result rows; {len(e21)} E21 prediction rows (extended {prev})")
     return 0
 
@@ -541,7 +550,7 @@ def main() -> int:
         views[f"a_{sid}"] = jnd_tr.mean() + (worse - worse.mean()) * (jnd_tr.std() / worse.std())
         add("scatter", id=sid, dataset="AIC2026 public_train", key=sid, model=lab, n=int(pn["n"]),
             srocc=pn["srocc_signed"], plcc=pn["plcc"], z_rmse=pn["z_rmse"], **{"or": pn["or"]}, **st)
-    e21 = e21_scatter(add)
+    e21, e21_7 = e21_scatter(add)
     rev7_rows(add, out)
     for i, (ph, labels, what, runs, use) in enumerate(EXPOSURE):
         add("exposure", id=f"e{i}", phase=ph, labels=labels, what=what, runs=runs, use=use)
@@ -559,6 +568,7 @@ def main() -> int:
                        "dvifm": dv.loc[keys].jnd.round(5).to_numpy(), **{k: np.round(v, 3) for k, v in views.items()}})
     pr.sample(frac=1, random_state=0).reset_index(drop=True).to_json(out / "predictions.json", orient="records")
     e21.sample(frac=1, random_state=0).reset_index(drop=True).to_json(out / "e21predictions.json", orient="records")
+    e21_7.sample(frac=1, random_state=0).reset_index(drop=True).to_json(out / "e21predictions7.json", orient="records")
     print(f"{len(rows)} result rows; {len(pr)} prediction rows; arms {have}")
     return 0
 
