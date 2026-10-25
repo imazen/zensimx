@@ -1,5 +1,13 @@
 # Zensim Dataset & Experiment History — accurate record
 
+All 1,103 additive FROZEN rows now have every required native image side in the
+pinned Rev7 banks: 753 distinct pairs, zero decode failures or unresolved feature
+rows. The [subset pointer](../benchmarks/dataset_subsets_rev7_2026-10-25.pointer.md)
+records per-role coverage, producer pins and the NFS mirror checksums. The
+[confidence pointer](../benchmarks/dataset_confidence_2026-10-25.pointer.md) covers
+all 27 historical/additive collection identities; unavailable fields remain null.
+No targets were read or model fitted by this delivery.
+
 **October 25, additive provided-library subsets:** Six native collections freeze
 577 TRAIN, 390 EVAL and 136 TEST rows; 112 Toyama TRAIN rows stay excluded because
 retained source matches are unresolved. The independent validator checks 40,919
