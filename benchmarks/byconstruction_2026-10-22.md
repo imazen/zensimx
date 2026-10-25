@@ -3806,3 +3806,44 @@ receipt `d91ab3c54aae6b06f011e43b0b9210d86d0971f51d66dde5a93b948349273117`.
 The [artifact pointer](mdata_2026-10-25.pointer.md) binds the inventory hash
 and local/NAS paths. No R2 mirror was created. The preservation wrapper
 reported `run-heavy: done rc=0 229s | peak-RSS 0.02GiB | min-avail 43986MiB | peak-load 2.11`.
+
+
+## New dataset training mixes — preregistered 2026-10-25
+
+This follow-up compares M-shape Mw025 (all eleven legs, nominal 0.25),
+Mdata (all eleven, 0.5), Mw100 (all eleven, 1.0), Mmos (eight MOS legs,
+0.5), and Mpair (three pairwise legs, 0.5), seeds 0–2. Existing Mdata E21
+cells are reused. Full-data seeds and shape experiments owned elsewhere
+are not duplicated. All roots retain the same frozen inputs, source-family
+reservations and fixed final epoch 119, with separate label-read ledgers.
+
+The following selection rule is written before any new mix results are read.
+For each seed, the old-data score is the equal mean of the four E21 SROCCs,
+rescaled to [0,1] as (rho+1)/2. The new-data score is the equal mean over
+eleven collections: within-reference SROCC, rescaled the same way, for each
+of the eight MOS sets; hard-pair agreement with half credit for predicted
+ties for each of BAPPS, PieAPP and FG-IQA. Holdouts omit PIPAL, all three
+pairwise legs, or the other seven MOS legs. A subset arm already excludes
+some of these groups: its full-data fit is an out-of-group model for those
+groups, reused rather than fitting identical no-op holdouts. All scoring
+labels are TRAIN. Collection means give each set equal mass regardless of
+its number of rows or references. References with fewer than two rows or
+constant targets/predictions are reported and excluded from the SROCC mean;
+a collection with no defined correlations blocks selection.
+
+The balanced score is the equal mean of the old-data and new-data scores.
+Select at most two distinct finalists: the largest three-seed mean balanced
+score, and the largest three-seed mean old-data score. Ties break by larger
+new-data score, then lexicographic arm name. Report paired seed-unit SEs,
+the complete old/new tradeoff, type-bias SD, knob-concurring inversions,
+Z-RMSE, error p99, rank geometry and both mixture tests for every arm.
+These diagnostics remain visible; they do not introduce post-hoc selection
+thresholds. This exploration cannot establish product qualification.
+
+After freezing finalist names, inputs and model hashes, evaluate seed 0 of
+each finalist once against the coordinator's frozen EVAL copy. If Mdata is
+a finalist, reuse its already-frozen seed-0 predictions, with no fresh
+assessment or candidate tuning. EVAL cannot change the finalists, weights,
+shape, seed or checkpoint. No TEST/calibration labels are read. New-data
+group holdouts assess omitted dataset labels; they are not claimed to prove
+source independence between different TRAIN collections.
