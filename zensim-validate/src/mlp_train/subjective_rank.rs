@@ -3,7 +3,7 @@
 use super::{GroupLossMode, TrainingGroup};
 
 pub(super) fn tied(group: &TrainingGroup<'_>, a: f64, b: f64, legacy_target: f64) -> bool {
-    if group.name == "subjective_rank" {
+    if group.name == "subjective_rank" || group.name.starts_with("subjective_rank_") {
         assert_eq!(group.loss_mode, GroupLossMode::Rank);
         assert!(
             group.ref_ids.is_some(),

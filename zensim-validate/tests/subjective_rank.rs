@@ -116,3 +116,22 @@ fn subjective_pairing_never_uses_between_source_magnitude() {
     let (shifted, _) = fit("subjective_rank", &b, 1., 3, &refs);
     assert_eq!(predictions(&first, 4), predictions(&shifted, 4));
 }
+
+#[test]
+fn dataset_pair_preferences_use_only_pair_order_and_skip_exact_ties() {
+    let refs = [0, 0, 1, 1];
+    let targets = [1., 0., 0., 1.];
+    let shifted = [1001., 1000., 500., 501.];
+    // This helper returns the best validation epoch. One epoch isolates loss
+    // equivalence from the native target magnitudes' effect on that monitor;
+    // production dataset cells select their fixed final epoch instead.
+    let (hard, _) = fit("subjective_rank_fixture", &targets, 1., 1, &refs);
+    let (offset, _) = fit("subjective_rank_fixture", &shifted, 1., 1, &refs);
+    let (legacy, _) = fit("subjective_rank", &targets, 1., 1, &refs);
+    assert_eq!(predictions(&hard, 4), predictions(&offset, 4));
+    assert_eq!(predictions(&hard, 4), predictions(&legacy, 4));
+    let ties = [0., 0., -10., -10.];
+    let (initial, _) = fit("subjective_rank_fixture", &ties, 1., 0, &refs);
+    let (trained, _) = fit("subjective_rank_fixture", &ties, 1., 1, &refs);
+    assert_eq!(predictions(&initial, 4), predictions(&trained, 4));
+}

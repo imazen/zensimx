@@ -131,6 +131,9 @@ pub(super) fn admit(
     run: Option<&super::Args>,
 ) -> Result<BTreeMap<String, Value>, String> {
     let a = json(authority_path, authority_pin)?;
+    if a["schema"] == "subjective-training-authority-v2" {
+        return admit_datasets(&a, cell, groups, selected, run);
+    }
     if a["schema"] != "subjective-training-authority-v1"
         || a["state"] != "approved"
         || a["artifact_visibility"] != "private"
@@ -304,6 +307,177 @@ pub(super) fn admit(
     Ok(admitted)
 }
 
+// Fresh revision-7 authority. The historical v1 experiment above retains its
+// exact revision, single group and nominal-eight contract.
+fn admit_datasets(
+    a: &Value,
+    cell: &str,
+    groups: &[Group],
+    selected: &[usize],
+    run: Option<&super::Args>,
+) -> Result<BTreeMap<String, Value>, String> {
+    if a["state"] != "approved"
+        || a["artifact_visibility"] != "private"
+        || a["selection"] != "fixed-final-epoch"
+    {
+        return Err("dataset authority not admitted".into());
+    }
+    let c = &a["cells"][cell];
+    if let Some(args) = run {
+        run_binding(c, args)?;
+    }
+    let ids: Vec<usize> =
+        serde_json::from_value(c["feature_ids"].clone()).map_err(|e| e.to_string())?;
+    if ids != selected || c["formula_revision"] != 7 || c["tier"] != "v3" {
+        return Err("dataset feature/producer contract differs".into());
+    }
+    let guard = json(
+        Path::new(string(c, "family_guard_path")?),
+        string(c, "family_guard_sha256")?,
+    )?;
+    if guard["schema"] != "dataset-family-guard-v1" || guard["inherited_leaks"] != 0 {
+        return Err("dataset family guard differs".into());
+    }
+    let excluded: BTreeSet<String> =
+        serde_json::from_value(guard["protected_families"].clone()).map_err(|e| e.to_string())?;
+    let records = c["groups"]
+        .as_array()
+        .ok_or("dataset group inventory required")?;
+    let names: BTreeSet<_> = groups.iter().map(|g| g.0.as_str()).collect();
+    let expected: BTreeSet<_> = records
+        .iter()
+        .map(|r| string(r, "name"))
+        .collect::<Result<_, _>>()?;
+    if names != expected || names.len() != groups.len() || expected.len() != records.len() {
+        return Err("complete unique dataset cell inventory required".into());
+    }
+    let mut pending = Vec::new();
+    for g in groups {
+        let r = records.iter().find(|r| r["name"] == g.0).unwrap();
+        let path = PathBuf::from(string(r, "path")?);
+        safe(&path)?;
+        safe(&g.1)?;
+        if path.canonicalize().map_err(|e| e.to_string())?
+            != g.1.canonicalize().map_err(|e| e.to_string())?
+            || !g.2.is_finite()
+            || !g.3.is_finite()
+            || r["train_weight"].as_f64() != Some(g.2)
+            || r["val_weight"].as_f64() != Some(g.3)
+            || r["mode"] != "withinref,rank" && r["subjective"] == true
+        {
+            return Err("dataset cell group path/mode/weight mismatch".into());
+        }
+        let mode = if g.4 { "withinref," } else { "" }.to_string()
+            + match g.5 {
+                GroupLossMode::Rank => "rank",
+                GroupLossMode::Both => "both",
+                GroupLossMode::Mse => "mse",
+            };
+        if r["mode"] != mode {
+            return Err("dataset cell loss mode mismatch".into());
+        }
+        let manifest = PathBuf::from(format!("{}.manifest.json", g.1.display()));
+        safe(&manifest)?;
+        safe(Path::new(string(r, "keys_path")?))?;
+        pending.push((r, manifest));
+    }
+    let declarations: Vec<_> = pending
+        .iter()
+        .map(|(r, p)| Ok((*r, json(p, string(r, "manifest_sha256")?)?)))
+        .collect::<Result<_, String>>()?;
+    let mut admitted = BTreeMap::new();
+    for (r, d) in declarations {
+        if r["subjective"] != true {
+            continue;
+        }
+        if d["schema"] != "subjective-training-leg-v2"
+            || !matches!(
+                d["loss"].as_str(),
+                Some("within-source-rank" | "hard-pair-preference")
+            )
+            || d["nominal_weight"].as_f64() != Some(0.5)
+            || d["target_orientation"] != "quality"
+            || d["target_transform"] != "orient-native-quality"
+            || d["target_column"] != "human_score"
+            || d["formula_revision"] != 7
+            || d["tier"] != "v3"
+            || d["feature_ids"] != c["feature_ids"]
+            || d["selection"] != "fixed-final-epoch"
+            || d["native_role"] != "TRAIN"
+            || d["producer_commit"] != c["producer_commit"]
+            || !string(r, "name")?.starts_with("subjective_rank_")
+            || r["val_weight"].as_f64() != Some(0.)
+            || r["train_weight"].as_f64().is_none_or(|v| v <= 0.)
+            || d["table_sha256"] != r["table_sha256"]
+        {
+            return Err("dataset role/loss/producer/target binding differs".into());
+        }
+        let keys = json(
+            Path::new(string(r, "keys_path")?),
+            string(r, "keys_sha256")?,
+        )?;
+        let keys = keys.as_array().ok_or("dataset ordered keys required")?;
+        if keys.is_empty()
+            || r["rows"].as_u64() != Some(keys.len() as u64)
+            || d["rows"] != r["rows"]
+        {
+            return Err("dataset ordered key count differs".into());
+        }
+        let allowed: BTreeSet<_> = [
+            "observation",
+            "source",
+            "family",
+            "reference",
+            "role",
+            "tier",
+            "row",
+        ]
+        .into_iter()
+        .collect();
+        let mut observations = BTreeSet::new();
+        let mut counts = BTreeMap::<&str, usize>::new();
+        for (i, k) in keys.iter().enumerate() {
+            let fields: BTreeSet<_> = k
+                .as_object()
+                .ok_or("dataset key object required")?
+                .keys()
+                .map(String::as_str)
+                .collect();
+            if fields != allowed
+                || k["row"].as_u64() != Some(i as u64)
+                || k["role"] != "fit"
+                || k["tier"] != "T2"
+                || excluded.contains(string(k, "family")?)
+                || !observations.insert(string(k, "observation")?)
+                || k["source"] != k["reference"]
+                || ["observation", "source", "family", "reference"]
+                    .iter()
+                    .any(|f| !string(k, f).is_ok_and(|s| !s.is_empty()))
+            {
+                return Err("dataset key role/order/family mismatch".into());
+            }
+            *counts.entry(string(k, "source")?).or_default() += 1;
+        }
+        if serde_json::to_value(&counts).map_err(|e| e.to_string())? != r["source_counts"]
+            || counts
+                .values()
+                .any(|&n| n < 2 || d["loss"] == "hard-pair-preference" && n != 2)
+        {
+            return Err("dataset source population mismatch".into());
+        }
+        let corrected =
+            0.5 / (counts.values().map(|&n| 1. - 1. / n as f64).sum::<f64>() / counts.len() as f64);
+        if r["train_weight"].as_f64() != Some(corrected) {
+            return Err("dataset nominal-half acceptance correction differs".into());
+        }
+        admitted.insert(string(r, "name")?.to_owned(), d);
+    }
+    if admitted.is_empty() {
+        return Err("dataset authority has no subjective groups".into());
+    }
+    Ok(admitted)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -357,6 +531,13 @@ mod tests {
             }
         }
         fn call(&mut self) -> Result<BTreeMap<String, Value>, String> {
+            self.call_named("subjective_rank", 16.)
+        }
+        fn call_named(
+            &mut self,
+            name: &str,
+            weight: f64,
+        ) -> Result<BTreeMap<String, Value>, String> {
             let keys = self.root.join("keys.json");
             let declaration = PathBuf::from(format!("{}.manifest.json", self.table.display()));
             std::fs::write(&keys, serde_json::to_vec(&self.keys).unwrap()).unwrap();
@@ -372,9 +553,9 @@ mod tests {
                 &hash(&authority).unwrap(),
                 "cell",
                 &[(
-                    "subjective_rank".into(),
+                    name.into(),
                     self.table.clone(),
-                    16.,
+                    weight,
                     0.,
                     true,
                     GroupLossMode::Rank,
@@ -383,6 +564,45 @@ mod tests {
                 None,
             )
         }
+    }
+    #[test]
+    fn dataset_v2_keeps_legacy_authority_and_enforces_family_and_pair_keys() {
+        let mut f = Fixture::new();
+        let guard = f.root.join("guard.json");
+        std::fs::write(&guard, br#"{"schema":"dataset-family-guard-v1","protected_families":["reserved"],"inherited_leaks":0}"#).unwrap();
+        f.authority["schema"] = json!("subjective-training-authority-v2");
+        let c = &mut f.authority["cells"]["cell"];
+        c["formula_revision"] = json!(7);
+        c["family_guard_path"] = json!(guard);
+        c["family_guard_sha256"] = json!(hash(&guard).unwrap());
+        c["groups"][0]["name"] = json!("subjective_rank_fixture");
+        c["groups"][0]["train_weight"] = json!(1.);
+        f.declaration["schema"] = json!("subjective-training-leg-v2");
+        f.declaration["formula_revision"] = json!(7);
+        f.declaration["nominal_weight"] = json!(0.5);
+        f.declaration["target_transform"] = json!("orient-native-quality");
+        f.declaration["native_role"] = json!("TRAIN");
+        f.declaration["loss"] = json!("hard-pair-preference");
+        for k in f.keys.as_array_mut().unwrap() {
+            k["reference"] = k["source"].clone();
+        }
+        assert_eq!(
+            f.call_named("subjective_rank_fixture", 1.).unwrap().len(),
+            1
+        );
+        f.keys[0]["family"] = json!("reserved");
+        assert!(
+            f.call_named("subjective_rank_fixture", 1.)
+                .unwrap_err()
+                .contains("family")
+        );
+        f.keys[0]["family"] = json!("f");
+        f.declaration["native_role"] = json!("EVAL");
+        assert!(
+            f.call_named("subjective_rank_fixture", 1.)
+                .unwrap_err()
+                .contains("role")
+        );
     }
     #[test]
     fn subjective_native_metadata_never_hashes_or_parses_targets() {

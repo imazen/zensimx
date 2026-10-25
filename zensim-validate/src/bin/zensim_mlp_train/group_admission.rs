@@ -456,7 +456,10 @@ pub(super) fn preflight(
                 return Err("declared ordered row selection pin changed".into());
             }
         }
-        if d["schema"] == "subjective-training-leg-v1" {
+        if matches!(
+            d["schema"].as_str(),
+            Some("subjective-training-leg-v1" | "subjective-training-leg-v2")
+        ) {
             if subjective.get(&g.0) != Some(d) {
                 return Err("unnamed leg has no independently pinned authority".into());
             }

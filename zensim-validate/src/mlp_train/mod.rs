@@ -3871,7 +3871,8 @@ pub fn train_mlp_strategy_pairs(
             // run stays bit-identical to the legacy trainer.
             let mode = g.loss_mode;
             let rank_tied = subjective_rank::tied(g, mos_a, mos_b, target);
-            if g.name == "subjective_rank" && rank_tied {
+            if (g.name == "subjective_rank" || g.name.starts_with("subjective_rank_")) && rank_tied
+            {
                 subjective_ties += 1;
             }
             let rank_sub_threshold = hyperparams.pwrc_pair_weight
@@ -4383,7 +4384,10 @@ pub fn train_mlp_strategy_pairs(
             );
         }
 
-        if groups.iter().any(|g| g.name == "subjective_rank") {
+        if groups
+            .iter()
+            .any(|g| g.name == "subjective_rank" || g.name.starts_with("subjective_rank_"))
+        {
             log_line(
                 &format!("subjective-rank epoch={epoch} exact_target_ties={subjective_ties}"),
                 log,

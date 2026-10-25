@@ -264,7 +264,7 @@ def strict_training_groups(groups: list, data_role_decision: Path | None = None,
         path = safe_path(path)
         sp = Path(f"{path}.manifest.json")
         d = json.loads(sp.read_text())
-        if d.get("schema") == "subjective-training-leg-v1":
+        if d.get("schema") in ("subjective-training-leg-v1", "subjective-training-leg-v2"):
             if subjective.get(name) != d:
                 raise ValueError("unnamed leg requires independently pinned authority")
             records.append(dict(name=name, manifest=d, manifest_sha256=sha(sp)))
@@ -629,10 +629,17 @@ def main() -> None:
                                              NOMINAL_WEIGHT["human"] if human_w is None else human_w)
         weights = {name: tw for name, _, tw, _, _ in groups if tw > 0}
     init_seed, sample_seed = seeds(args.heldout, args.seed_index)
+    dataset_authority = None
+    if args.strict_admission:
+        from subjective_training_leg import dataset_groups
+        groups, dataset_authority = dataset_groups(V2, groups, keep, args.heldout, args.seed_index,
+                                                   init_seed, sample_seed, dest)
+        if dataset_authority:
+            weights.update({name:tw for name,_,tw,_,_ in groups if tw > 0})
     try:
         from v2_common import refuse_nonfinite_kept
         if args.strict_admission:
-            strict_training_groups(groups, args.data_role_decision, args.upiq_label_disposition)
+            strict_training_groups(groups, args.data_role_decision, args.upiq_label_disposition, dataset_authority)
         read = keep
         if recipe.get("derived_inputs") in ("fx1", "fx2", "fx1nr", "fx1g", "fx1gs1", "fx1gg", "fx1gy", "fx1o", "fx1ns0"):
             from v2_common import derived_declaration
@@ -646,6 +653,7 @@ def main() -> None:
                                                   strict_admission=args.strict_admission,
                                                   data_role_decision=args.data_role_decision,
                                                   upiq_label_disposition=args.upiq_label_disposition,
+                                                  subjective_authority=dataset_authority,
                                                   research_extra=(args.research_extra_group, args.research_replay)
                                                   if args.research_extra_group else None)
     finally:

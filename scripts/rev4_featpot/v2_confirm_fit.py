@@ -144,10 +144,17 @@ def main() -> None:
     groups += [("human", hfit, weights["human"], 0, "withinref,rank"),
                ("human_development", hdev, 0, HUMAN_VAL_WEIGHT, "withinref,rank")]
     init_seed, sample_seed = confirm_seeds(args.seed_index)
+    dataset_authority = None
+    if args.strict_admission:
+        from subjective_training_leg import dataset_groups
+        groups, dataset_authority = dataset_groups(V2, groups, keep, "full", args.seed_index,
+                                                   init_seed, sample_seed, dest)
+        if dataset_authority:
+            weights.update({name:tw for name,_,tw,_,_ in groups if tw > 0})
     try:
         from v2_common import refuse_nonfinite_kept
         if args.strict_admission:
-            strict_training_groups(groups, args.data_role_decision)
+            strict_training_groups(groups, args.data_role_decision, subjective_authority=dataset_authority)
         read = keep
         if recipe.get("derived_inputs") in ("fx1", "fx2", "fx1nr", "fx1g", "fx1gs1", "fx1gg", "fx1gy", "fx1o", "fx1ns0"):
             from v2_common import derived_declaration
@@ -161,6 +168,7 @@ def main() -> None:
         bake, curve, selection = train_and_select(groups, init_seed, sample_seed, width, keep_file, args.head, dest, recipe,
                                                   strict_admission=args.strict_admission,
                                                   data_role_decision=args.data_role_decision,
+                                                  subjective_authority=dataset_authority,
                                                   research_extra=(args.research_extra_group, args.research_replay)
                                                   if args.research_extra_group else None)
     finally:
