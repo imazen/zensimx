@@ -256,6 +256,7 @@ def cmd_datasets(a):
     from v2_teacher import row_keys_sha, selection_sha
     from v2_common import admission_input_roots
     real = out / "wide/main/real"
+    training_width = json.loads((real/"receipt.json").read_text())["width"]
     masked = {}
     # Excluded TEST memberships still reserve their known families. Preserve
     # every original row and receipt in the immutable source root.
@@ -325,6 +326,11 @@ def cmd_datasets(a):
         # Keep the canonical gapped width; absent slots stay NaN, never zero-filled.
         tab = tab.select([f"f{i}" for i in range(1825)]).cast(pa.schema(
             [(f"f{i}", pa.float32()) for i in range(1825)]))
+        # The inherited v2 trainer transport is width1853 even though the
+        # registered measurement surface ends at1824. Match that transport;
+        # these unmeasured tail columns remain NaN and are never selected.
+        for i in range(1825, training_width):
+            tab = tab.append_column(f"f{i}",pa.array(np.full(len(obs),np.nan,dtype=np.float32)))
         tab = tab.append_column("ref_basename",pa.array([r["ref_basename"] for r in obs]))
         tab = tab.append_column("human_score",pa.array([r["human_score"] for r in obs]))
         path = legdir/f"{c}.parquet"
@@ -339,6 +345,7 @@ def cmd_datasets(a):
             selection="fixed-final-epoch",formula_revision=7,tier="v3",feature_ids=selected,
             producer_commit=manifest["build_commit"],feature_set_id=manifest["feature_set_id"],
             native_role="TRAIN",rows=len(obs),table_sha256=sha(path),admission_root=str(out),
+            training_width=training_width,
             membership_sha256=guard["membership_sha256"][c],feature_manifest_sha256=sha(bank/"_MANIFEST.json"))
         dp = Path(str(path)+".manifest.json")
         dp.write_text(json.dumps(decl,indent=1)+"\n")
