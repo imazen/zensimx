@@ -471,8 +471,18 @@ fn admit_datasets(
         }
         let corrected =
             0.5 / (counts.values().map(|&n| 1. - 1. / n as f64).sum::<f64>() / counts.len() as f64);
-        if r["train_weight"].as_f64() != Some(corrected) {
-            return Err("dataset nominal-half acceptance correction differs".into());
+        // Python 3.12+ sums with compensation; Iterator::sum uses ordinary
+        // ordered addition. Bind the CLI weight exactly above, allowing only
+        // final arithmetic roundoff when independently checking its formula.
+        if r["train_weight"]
+            .as_f64()
+            .is_none_or(|w| (w - corrected).abs() > 32. * f64::EPSILON * corrected.abs())
+        {
+            return Err(format!(
+                "dataset nominal-half acceptance correction differs: {} stored={} computed={corrected:.17}",
+                string(r, "name")?,
+                r["train_weight"]
+            ));
         }
         admitted.insert(string(r, "name")?.to_owned(), d);
     }
