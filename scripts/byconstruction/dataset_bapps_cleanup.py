@@ -25,6 +25,8 @@ def sha(path):
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--root", type=Path, required=True)
+    ap.add_argument("--remove-scratch", action="store_true")
+    ap.add_argument("--removal-receipt", type=Path)
     args = ap.parse_args()
     unpack_path = args.root / "bapps-unpack/UNPACK_VERIFIED.json"
     unpack = json.loads(unpack_path.read_text())
@@ -91,9 +93,25 @@ def main():
     if failed.exists():
         assert sorted(p.name for p in failed.iterdir()) == [marker.name]
         assert (failed / marker.name).read_text().strip() == str(keys_path)
-    with (args.root / "BAPPS_SOURCE_BINDING.json").open("x") as stream:
-        json.dump(result, stream, indent=2)
-        stream.write("\n")
+    binding_path = args.root / "BAPPS_SOURCE_BINDING.json"
+    if not args.remove_scratch:
+        with binding_path.open("x") as stream:
+            json.dump(result, stream, indent=2)
+            stream.write("\n")
+        print(json.dumps(result), flush=True)
+        return
+    assert json.loads(binding_path.read_text()) == result
+    mirror = json.loads((args.root / "MIRROR_VERIFIED.json").read_text())
+    assert mirror["all_artifact_sha256_verified"], (
+        "mirror canonical features before cleanup"
+    )
+    assert (
+        f"{sha(binding_path)}  BAPPS_SOURCE_BINDING.json"
+        in (args.root / "SHA256SUMS").read_text().splitlines()
+    )
+    assert args.removal_receipt and args.removal_receipt.is_absolute()
+    assert not args.removal_receipt.resolve().is_relative_to(args.root.resolve())
+    assert not args.removal_receipt.exists(), "preserve prior removal receipts"
     print(
         f"Verified {bindings} native file hashes; removing owned PNG scratch",
         flush=True,
@@ -109,7 +127,9 @@ def main():
         "failed_empty_scratch_removed": str(failed),
         "original_library_untouched": True,
     }
-    with (args.root / "BAPPS_SCRATCH_REMOVED.json").open("x") as stream:
+    # Store outside the mirrored root so its complete checksum snapshot stays
+    # immutable. The caller supplies a separate receipt path on tower.
+    with args.removal_receipt.open("x") as stream:
         json.dump(removal, stream, indent=2)
         stream.write("\n")
     print(json.dumps(result), flush=True)
