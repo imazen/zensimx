@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Checksum and mirror a completed label-free feature root without deletion.
+"""Checksum and mirror completed feature or training artifacts without deletion.
 
 Run under the shared heavy lock and resource wrapper. The caller supplies the
 physical array destination and capacity-check mount paths. Existing files are
@@ -27,6 +27,7 @@ def main():
     ap.add_argument("--host", required=True)
     ap.add_argument("--destination", required=True)
     ap.add_argument("--capacity-path", nargs="+", required=True)
+    ap.add_argument("--artifact-kind", choices=("features", "training"), default="features")
     args = ap.parse_args()
     assert args.root.is_dir() and args.destination.startswith("/")
     receipt_path = args.root / "MIRROR_VERIFIED.json"
@@ -71,7 +72,7 @@ def main():
         assert result.split()[0] == digests[name], name
         readbacks.append({"relative_path": name, "sha256": digests[name]})
     receipt = {
-        "schema": "dataset-features-mirror-v1",
+        "schema": "dataset-features-mirror-v1" if args.artifact_kind == "features" else "dataset-training-mirror-v1",
         "verified_at": datetime.now(timezone.utc).isoformat(),
         "destination": args.host + ":" + destination,
         "artifact_files_verified_before_receipt": len(files),
@@ -79,8 +80,11 @@ def main():
         "all_artifact_sha256_verified": True,
         "random_readbacks": readbacks,
         "response_tables_opened": False,
-        "readme_example_exposure_receipt": "README_EXPOSURE.json",
     }
+    if args.artifact_kind == "features":
+        receipt["readme_example_exposure_receipt"] = "README_EXPOSURE.json"
+    else:
+        receipt["label_values_interpreted_by_mirror"] = False
     receipt_path.write_text(json.dumps(receipt, indent=2) + "\n")
     # Final inventory includes the receipt; no inventory hash in the receipt
     # means there is no circular digest dependency.

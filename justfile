@@ -117,6 +117,9 @@ dataset-features-queue root binary lock wrapper:
 dataset-features-mirror root host destination cache array:
     python3 -B scripts/byconstruction/dataset_mirror.py --root {{quote(root)}} --host {{quote(host)}} --destination {{quote(destination)}} --capacity-path {{quote(cache)}} {{quote(array)}}
 
+dataset-artifacts-mirror root host destination cache array:
+    python3 -B scripts/byconstruction/dataset_mirror.py --root {{quote(root)}} --host {{quote(host)}} --destination {{quote(destination)}} --capacity-path {{quote(cache)}} {{quote(array)}} --artifact-kind training
+
 # Caller holds shared heavy.lock and run-heavy; a final receipt requires no gaps.
 dataset-features-verify root:
     OPENBLAS_NUM_THREADS=1 PYTHONDONTWRITEBYTECODE=1 python3 -B scripts/byconstruction/dataset_verify.py --root {{quote(root)}} --write
