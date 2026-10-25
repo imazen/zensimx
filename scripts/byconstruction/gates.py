@@ -33,9 +33,10 @@ def sha(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
-def steer(name, model, out):
-    if sha(STEER_BIN) != STEER_BIN_SHA:
+def steer(name, model, out, steer_bin=None, formula_rev="5"):
+    if steer_bin is None and sha(STEER_BIN) != STEER_BIN_SHA:
         raise ValueError("steer instrument changed")
+    steer_bin = steer_bin or STEER_BIN
     dest = out / "steer135" / name
     dest.mkdir(parents=True, exist_ok=False)
     job = json.loads(STEER_JOB.read_text())
@@ -45,10 +46,10 @@ def steer(name, model, out):
     job["linear_probe"] = False
     job["output"] = str(dest / "result.json")
     (dest / "job.json").write_text(json.dumps(job, indent=2) + "\n")
-    env = dict(os.environ, ZENSIM_FORMULA_REV="5", ZENSIM_NEIGHBOUR_EXACT="1", ZENSIM_MAX_TIER="v3",
+    env = dict(os.environ, ZENSIM_FORMULA_REV=formula_rev, ZENSIM_NEIGHBOUR_EXACT="1", ZENSIM_MAX_TIER="v3",
                RAYON_NUM_THREADS="1", STEERFIX_PACKET=str(dest / "job.json"))
     with (dest / "run.log").open("x") as log:
-        subprocess.run([str(STEER_BIN), "metric::bake::steerfix_packet::engineering_packet", "--exact", "--nocapture"],
+        subprocess.run([str(steer_bin), "metric::bake::steerfix_packet::engineering_packet", "--exact", "--nocapture"],
                        check=True, stdout=log, stderr=subprocess.STDOUT, env=env)
     rows = json.loads((dest / "result.json").read_text())["rows"]
     if len(rows) != 135 or not all(r["model"] == digest and r["sensitivity_method"] == "exact-gradient-d12" for r in rows):
@@ -61,7 +62,10 @@ def run(a):
     out = Path(a.out)
     out.mkdir(parents=True, exist_ok=True)
     owner.GATES = out
-    owner.BIN = E34 / "evaluation/bin"
+    owner.BIN = Path(a.bin_dir) if a.bin_dir else E34 / "evaluation/bin"
+    owner.FORMULA_REV = a.formula_rev
+    if a.instruments:
+        owner.INSTRUMENTS = Path(a.instruments)
     model = Path(a.model).resolve()
     owner.MODELS_OVERRIDE = {a.name: (model, sha(model), None)}
     steps = a.steps.split(",")
@@ -71,7 +75,7 @@ def run(a):
         for grid in ("standard", "ladder"):
             owner.verdict(a.name, 0, grid)
     if "steer" in steps:
-        steer(a.name, model, out)
+        steer(a.name, model, out, Path(a.bin_dir) / "steer_instrument" if a.bin_dir else None, a.formula_rev)
     if "identity" in steps:
         owner.identity(0)
     return 0
@@ -112,6 +116,11 @@ def main():
     ap.add_argument("--model")
     ap.add_argument("--out", required=True)
     ap.add_argument("--steps", default="nearid,verdict,steer,identity")
+    # Rebuilt gate tools (bake_verdict, serve_custom_bake, steer_instrument) instead of E34's pinned binaries, the
+    # instrument tables of another extraction, and the process formula revision (the revision-7 models: 7).
+    ap.add_argument("--bin-dir")
+    ap.add_argument("--instruments")
+    ap.add_argument("--formula-rev", default="5")
     ap.add_argument("--summary", action="store_true")
     a = ap.parse_args()
     return summary(a) if a.summary else run(a)

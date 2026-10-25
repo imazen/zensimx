@@ -1101,6 +1101,19 @@
    "evidence": "benchmarks/shippath7_REGISTRATION.md",
    "note": "Features-only projection of the pinned Rev5 bank onto the existing by_v2fy consumed IDs; all other slots NaN. Rust owner checks the hash."
   },
+  "basic+v2@w720/rev7_rowlanes#62adfc93": {
+   "compute": "basic+v2",
+   "layout": 720,
+   "era": "rev7_rowlanes",
+   "slots": "13-25,39-155,401-429,459-719",
+   "slots_hash8": "62adfc93",
+   "n_slots": 420,
+   "role": "producer",
+   "kind": "set",
+   "slot_selection": "by_v2fy_420",
+   "evidence": "benchmarks/byconstruction_2026-10-22.md (\"Revision 7 with raw ringing\")",
+   "note": "By-construction exploration: the shippath7 dial and identity instruments re-extracted at formula revision 7 (raw ringing) and projected onto the by_v2fy consumed IDs, as the rev5_localwin instruments; all other slots NaN."
+  },
   "basic+peaks+v2@w1825/rev5_localwin_ringhpm": {
    "compute": "basic+peaks+v2",
    "layout": 1825,
