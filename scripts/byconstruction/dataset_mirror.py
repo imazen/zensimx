@@ -71,6 +71,7 @@ def main():
         "docker",
         "run",
         "--rm",
+        "--pull=never",
         "--network=none",
         "--read-only",
         "--cpuset-cpus=0-23",
