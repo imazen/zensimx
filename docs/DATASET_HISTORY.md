@@ -1,5 +1,13 @@
 # Zensim Dataset & Experiment History — accurate record
 
+**October 25, confidence side tables:** Every key, role, membership state, family ID
+and row order is equal to the original 21-collection admission, across 498,216 rows.
+Published confidence metadata matches 2,444 rows; missing data stay explicit. The
+source flags do not amend membership or authorize a fit. No source quality target or
+MCL-JCI rating payload was read. The [confidence pointer](../benchmarks/dataset_confidence_2026-10-25.pointer.md)
+binds every output and the independent identity/role verification. New subset source
+admission is a separate operation; IMI remains deferred.
+
 **October 25, complete provided-library registration receipts and Rev7 features:**
 The following table repeats the canonical [membership registration](DATA_SPLITS.md#october-25--provided-library-membership-registration-labels-unopened) so this history directly binds every collection's roles, counts and receipts. Membership SHA-256 binds `<id>/membership.parquet`; receipt SHA-256 binds `<id>/SHA256SUMS`, under `/mnt/v/zensim/dataset-admission-20261025/` on dev. These are frozen identifier/role memberships, without subjective targets.
 

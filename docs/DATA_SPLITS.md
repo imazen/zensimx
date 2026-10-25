@@ -1,5 +1,20 @@
 # DATA_SPLITS.md — canonical train/val/test conventions (locked 2026-07-02)
 
+## October 25 — confidence metadata preserves frozen memberships
+
+Label-free confidence side tables preserve all 498,216 historical membership rows,
+their native table/row keys, roles, states, families and order. They match published
+item/pair metadata for 2,444 rows; unavailable fields remain null. Keep flags and
+weights are copied with the producer's rounding, and pairs carry total votes without
+preference probabilities. Source SE may be absent even where the producer defaults
+weight to 1; this does not establish measured precision.
+
+No admission changes and no training result follows from these flags. Existing
+validate-only policies remain effective; all non-TRAIN roles stay non-TRAIN. LS2N's
+historical rows are metadata-only and explicitly out of the supplied-library scope.
+MCL-JCI rating payloads were not opened, and D3/KonFiG roles are unchanged.
+Paths, complete coverage and checksums: [confidence metadata pointer](../benchmarks/dataset_confidence_2026-10-25.pointer.md).
+
 ## October 25 — TRAIN-only dataset mix selection
 
 The later owner licence addendum adds Mlic at nominal 0.5, excluding
