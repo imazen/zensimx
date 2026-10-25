@@ -3639,15 +3639,26 @@ Reference-bootstrap95% intervals and within-reference MOS statistics are in
 | fg-iqa | 0.758 | 0.757 | 0.758 | 0.758 | 0.749 | 0.755 |
 | iqa-odi | 0.841 | 0.843 | 0.849 | 0.854 | 0.806 | 0.833 |
 | irccyn-ivc | 0.934 | 0.935 | 0.960 | 0.949 | 0.912 | 0.928 |
-| live-md | 0.892 | 0.891 | 0.879 | 0.916 | 0.837 | 0.899 |
+| live-md | 0.892 | 0.891 | 0.879 | 0.913 | 0.827 | 0.896 |
 | mdid | 0.902 | 0.894 | 0.892 | 0.787 | 0.572 | 0.829 |
 | nits-iqa | 0.727 | 0.717 | 0.704 | 0.777 | 0.706 | 0.721 |
 | pieapp | 0.586 | 0.582 | 0.579 | 0.560 | 0.535 | 0.570 |
 | vcl-fer | 0.945 | 0.938 | 0.884 | 0.945 | 0.877 | 0.933 |
 
+LIVE-MD peers cover all180 rows after the coordinator’s `7bd403d2`
+`pair_key` correction; distorted paths alone had retained only162 rows.
+All nine input hashes match the corrected coordinator report; the prior
+report is preserved in `eval/prior-report-before-pair-key-fix/`. Model
+values are unchanged. Corrected within-reference SROCC for SSIMULACRA2,
+Butteraugli and CVVDP is0.961,0.954 and0.960.
+
 The changes are mixed: MDID, NITS, VCL-FER and PieAPP improve in point
-estimate over M7, while CID:OA falls. These individual intervals do not
-provide a paired significance test of the difference.
+estimate over M7, while CID:OA falls. The coordinator’s paired MOS report
+(`fb25f4a2`, copied to `eval/paired-Mdata/`) resamples whole references for
+both arms. Except IQA-ODI (42), these cohorts have3–12 references, so the
+intervals are descriptive. MDID’s paired difference is+0.0082
+[+0.0011,+0.0179], NITS+0.0106 [+0.0049,+0.0192], and CID:OA−0.0209
+[−0.0351,+0.0000]. No comparison selects model weights or epoch.
 
 BAPPS model-only EVAL completes all36,344 comparisons from the existing
 feature bank, without image extraction or peer rescoring:
