@@ -116,8 +116,36 @@ if ls "$RD"/judge_*.tsv >/dev/null 2>&1; then
 fi
 RD="$RD" ZM_BIN="$ZM_BIN" JUDGES="ssim2 butteraugli zensim cvvdp" bash "$H/../v_next/rd_probe_2026-07-18.sh" judge
 python3 "$H/dvifm_e21.py" judge --rd "$RD" --threads "$THREADS" | tee -a "$log"
+if [ -n "${JUDGE_REPRO_RECEIPT:-}" ]; then
+  python3 - "$keep" "$RD" "$JUDGE_REPRO_RECEIPT" <<'PY'
+import csv, hashlib, json, sys
+from pathlib import Path
+old, new, receipt = map(Path, sys.argv[1:])
+results = {}
+for metric in ('ssim2','butteraugli','zensim','cvvdp','dvifm'):
+    name = f'judge_{metric}.tsv'
+    def load(root):
+        rows = list(csv.DictReader(open(root/name),delimiter='\t'))
+        keyed = {(r['ref_path'],r['dist_path']):{k:v for k,v in r.items() if k!='row'} for r in rows}
+        assert len(keyed)==len(rows), (name,'duplicate pair identity')
+        return keyed
+    a,b = load(old),load(new)
+    bad = [dict(pair=list(k),old=v,new=b.get(k)) for k,v in a.items() if b.get(k)!=v]
+    results[metric] = dict(previous_rows=len(a),current_rows=len(b),differences=bad,
+                          previous_sha256=hashlib.file_digest(open(old/name,'rb'),'sha256').hexdigest(),
+                          current_sha256=hashlib.file_digest(open(new/name,'rb'),'sha256').hexdigest())
+receipt.write_text(json.dumps(results,indent=1)+'\n')
+assert all(not v['differences'] for v in results.values()), 're-judging differs; complete findings in '+str(receipt)
+print('Every earlier judge row reproduces under all five judges')
+PY
+fi
 python3 "$H/../v_next/rd_probe_analyze_2026-07-18.py" "$RD" | tee "$RD/analysis_stdout.md"
+case "${RD_COMPARE_MODE:-paired}" in
+  bdrate) compare=--bdrate-vs ;;
+  paired) compare=--paired-vs ;;
+  *) echo 'RD_COMPARE_MODE must be bdrate or paired' >&2; exit 2 ;;
+esac
 for base in none butteraugli B; do
-  python3 "$H/../v_next/rd_probe_analyze_2026-07-18.py" "$RD" --paired-vs "$base" >"$RD/paired_vs_$base.md"
+  python3 "$H/../v_next/rd_probe_analyze_2026-07-18.py" "$RD" "$compare" "$base" >"$RD/${RD_COMPARE_MODE:-paired}_vs_$base.md"
 done
 echo ALL-DONE
