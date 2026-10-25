@@ -26,12 +26,13 @@
 //!   fine structure: a row-dithered gradient's error, whose row means vary
 //!   by 40%, paints coarse mass onto alternate rows at twice that.
 //! - **split** — how a pooled feature's value is divided among its pixels.
-//!   `repair` (the default, today's map) gives each pixel its first-order
-//!   removal effect, what the feature loses when that one pixel is made
+//!   `repair` (the removal split; the default of the fused and folded
+//!   attribution entries, and of `BakeScorer`'s served map until 2026-10-25)
+//!   gives each pixel its first-order removal effect, what the feature loses when that one pixel is made
 //!   perfect: exact for mean pools, `1/p` of the feature in total for an Lp
 //!   pool, and for the SSIM deviation pools a near-uniform field (making a
 //!   pixel perfect moves it away from the mean) whose total is not the
-//!   feature. `exact` gives each pixel its share of the feature, as DVIFM
+//!   feature. `exact` (`BakeScorer`'s served default) gives each pixel its share of the feature, as DVIFM
 //!   splits its block terms: `xᵖ/Σxᵖ` of an Lp pool (Euler's theorem), `d·∂f/∂d`
 //!   of a deviation pool, `w·v/W` of a soft peak and the secant share of the
 //!   global and HF-gain ratios, so every such pool's map sums to its feature.
@@ -97,6 +98,17 @@ pub(crate) enum SplitMode {
     Amplitude,
 }
 
+impl SplitMode {
+    /// The mode's name in `ZENSIM_MAP_SPLIT` and `with_map_paint`.
+    pub(crate) fn name(self) -> &'static str {
+        match self {
+            Self::Repair => "repair",
+            Self::Exact => "exact",
+            Self::Amplitude => "amplitude",
+        }
+    }
+}
+
 /// The painting choices of one map.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct MapPaint {
@@ -115,7 +127,10 @@ pub(crate) struct MapPaint {
 
 impl Default for MapPaint {
     /// The uniform window spread, nearest-neighbour fold and removal split:
-    /// today's map.
+    /// the map of the fused and folded attribution entries, which their
+    /// standalone reference densities and the stale single-pass route (always
+    /// the removal split) reproduce. `BakeScorer`'s served map uses
+    /// [`Self::served`] instead.
     fn default() -> Self {
         Self {
             window: WindowMode::Box,
@@ -128,6 +143,20 @@ impl Default for MapPaint {
 }
 
 impl MapPaint {
+    /// The map `BakeScorer` serves when no mode is chosen: the uniform window
+    /// spread and nearest-neighbour fold with the exact (Euler) split, the
+    /// served default since 2026-10-25 (owner decision). On 16-px blocks it
+    /// agrees better with butteraugli, SSIMULACRA2 and DVIFM 0.3 than the
+    /// removal split and leaks no more out of a repaired square
+    /// (`benchmarks/byconstruction_2026-10-22.md`, "Map study after the
+    /// fixes"); `repair` keeps the old map.
+    pub(crate) fn served() -> Self {
+        Self {
+            split: SplitMode::Exact,
+            ..Self::default()
+        }
+    }
+
     /// Parse `box|center|guided`, `nearest|guided` and `repair|exact|amplitude`.
     pub(crate) fn parse(window: &str, paint: &str, split: &str) -> Option<Self> {
         let window = match window {
@@ -163,15 +192,16 @@ impl MapPaint {
 
     /// The process's research selection (`ZENSIM_MAP_WINDOW`,
     /// `ZENSIM_MAP_PAINT`, `ZENSIM_MAP_SPLIT`, `ZENSIM_MAP_GUIDE`,
-    /// `ZENSIM_MAP_SMOOTH`), read once; unset means [`Self::default`] and an
-    /// unknown value panics.
+    /// `ZENSIM_MAP_SMOOTH`) over the served map, read once; unset means
+    /// [`Self::served`] and an unknown value panics.
     pub(crate) fn from_env() -> Self {
         use std::sync::OnceLock;
         static MODES: OnceLock<MapPaint> = OnceLock::new();
         *MODES.get_or_init(|| {
             let window = std::env::var("ZENSIM_MAP_WINDOW").unwrap_or_else(|_| "box".into());
             let paint = std::env::var("ZENSIM_MAP_PAINT").unwrap_or_else(|_| "nearest".into());
-            let split = std::env::var("ZENSIM_MAP_SPLIT").unwrap_or_else(|_| "repair".into());
+            let split = std::env::var("ZENSIM_MAP_SPLIT")
+                .unwrap_or_else(|_| Self::served().split.name().into());
             let smooth = std::env::var("ZENSIM_MAP_SMOOTH").unwrap_or_else(|_| "0".into());
             let guide = std::env::var("ZENSIM_MAP_GUIDE").unwrap_or_else(|_| "sq".into());
             let guide = GuideNorm::parse(&guide)
@@ -392,6 +422,34 @@ pub(crate) fn paint_guided(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The served map (`BakeScorer` with no map mode chosen) divides pooled
+    /// features with the exact split (owner decision 2026-10-25); the fused and
+    /// folded attribution entries keep the removal split, which their
+    /// standalone reference densities and the stale single-pass route
+    /// reproduce. No test in this crate sets the `ZENSIM_MAP_*` variables, so
+    /// the process selection is the served map.
+    #[test]
+    fn served_map_uses_the_exact_split_and_fused_entries_the_removal_split() {
+        assert_eq!(MapPaint::served().split, SplitMode::Exact);
+        assert_eq!(MapPaint::default().split, SplitMode::Repair);
+        assert_eq!(
+            MapPaint {
+                split: SplitMode::Repair,
+                ..MapPaint::served()
+            },
+            MapPaint::default()
+        );
+        assert_eq!(MapPaint::from_env(), MapPaint::served());
+        for mode in [SplitMode::Repair, SplitMode::Exact, SplitMode::Amplitude] {
+            assert_eq!(
+                MapPaint::parse("box", "nearest", mode.name())
+                    .unwrap()
+                    .split,
+                mode
+            );
+        }
+    }
 
     fn planes(w: usize, h: usize) -> ([Vec<f32>; 3], [Vec<f32>; 3]) {
         let s: [Vec<f32>; 3] = core::array::from_fn(|c| {

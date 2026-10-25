@@ -108,7 +108,11 @@ fn attribution_identities_hold_on_every_tier() {
                                 scored.refinement_gain(0, 0, w, h),
                                 scored.attribution().query_rect(0, 0, w, h)
                             );
-                            (scored.attribution().query_rect(0, 0, w, h), 8.0)
+                            // The served map's exact split gives each pixel its share
+                            // of the L8 pool, so the shares sum to the feature
+                            // (default since 2026-10-25); the removal split's
+                            // first-order effects sum to f/8, checked below.
+                            (scored.attribution().query_rect(0, 0, w, h), 1.0)
                         };
                         let expected =
                             -scored.sensitivities()[id] * scalar.features()[id] / divisor;
@@ -116,6 +120,30 @@ fn attribution_identities_hold_on_every_tier() {
                             failures.push(format!(
                                 "{label} candidate peak f{id}: {actual} != {expected}"
                             ));
+                        }
+                        if slot >= 3 {
+                            let mut removal_scorer = zensim::BakeScorer::new(&model)
+                                .unwrap()
+                                .with_map_paint("box", "nearest", "repair")
+                                .unwrap();
+                            let removal_pre = removal_scorer.precompute_reference(&rs).unwrap();
+                            let removal = removal_scorer
+                                .compute_with_ref_and_attribution(
+                                    &rs,
+                                    &removal_pre,
+                                    &ds,
+                                    None,
+                                    &mut session,
+                                    8,
+                                )
+                                .unwrap();
+                            let got = removal.attribution().query_rect(0, 0, w, h);
+                            let want = -removal.sensitivities()[id] * scalar.features()[id] / 8.0;
+                            if (got - want).abs() > 2e-5 * want.abs().max(1e-12) {
+                                failures.push(format!(
+                                    "{label} removal-split candidate peak f{id}: {got} != {want}"
+                                ));
+                            }
                         }
                         if slot >= 3 {
                             let finite = scorer

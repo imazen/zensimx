@@ -85,7 +85,7 @@ impl<'a> BakeScorer<'a> {
     /// Research: how the attribution map paints windowed signals and coarse
     /// scales and divides pooled features among pixels — `window` is `box`
     /// (default), `center` or `guided`; `paint` is `nearest` (default) or
-    /// `guided`; `split` is `repair` (default) or `exact`. Scores are
+    /// `guided`; `split` is `exact` (default), `repair` or `amplitude`. Scores are
     /// unchanged. Such a map is for viewing, so it keeps every feature's
     /// density: the scorer takes no neighbour-exact steering snapshot, which
     /// would zero the v2 features of scales 1–3 (f459..f719) in the map and
@@ -124,7 +124,9 @@ impl<'a> BakeScorer<'a> {
             crate::map_paint::GuideNorm::parse(norm).ok_or(ZensimError::ModelLoadFailed {
                 reason: "map guide norms are sq|abs",
             })?;
-        let paint = self.map_paint.unwrap_or_default();
+        let paint = self
+            .map_paint
+            .unwrap_or_else(crate::map_paint::MapPaint::from_env);
         self.map_paint = Some(crate::map_paint::MapPaint { guide, ..paint });
         Ok(self)
     }
@@ -144,7 +146,9 @@ impl<'a> BakeScorer<'a> {
                 reason: "map smoothing sigma must be in 0..=16 source pixels",
             },
         )?;
-        let paint = self.map_paint.unwrap_or_default();
+        let paint = self
+            .map_paint
+            .unwrap_or_else(crate::map_paint::MapPaint::from_env);
         self.map_paint = Some(crate::map_paint::MapPaint {
             smooth_milli,
             ..paint
