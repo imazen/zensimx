@@ -46,6 +46,10 @@ dataset-eval out model binary:
     python3 -B scripts/byconstruction/dataset_eval.py score --out {{quote(out)}} --predict {{quote(binary)}}/bake_dial_refit --model Mdata={{quote(model)}}
     ZEN_PANEL_BIN={{quote(binary)}}/panel python3 -B scripts/byconstruction/dataset_eval.py report --out {{quote(out)}}
 
+# Paired A − B on each MOS collection through `panel evaluate`; the evaluator is multithreaded, so cap it.
+dataset-eval-paired out dest a vs binary threads='2':
+    RAYON_NUM_THREADS={{quote(threads)}} ZEN_PANEL_BIN={{quote(binary)}}/panel nice -n19 python3 -B scripts/byconstruction/dataset_eval.py paired --out {{quote(out)}} --dest {{quote(dest)}} --a {{quote(a)}} --vs {{quote(vs)}}
+
 dataset-eval-prepare out collection:
     python3 -B scripts/byconstruction/dataset_eval.py prepare --out {{quote(out)}} --collections {{quote(collection)}}
 

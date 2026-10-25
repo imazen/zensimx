@@ -5,6 +5,7 @@
   dataset_eval.py prepare --out DIR      EVAL rows, their labels (logged), feature table and judge pairs
   dataset_eval.py score --out DIR --model NAME=BAKE ... --zm ZENMETRICS
   dataset_eval.py report --out DIR
+  dataset_eval.py paired --out DIR --dest NEW --a A --vs B[,C]   paired A − B through `panel evaluate`
 
 Inputs: the frozen memberships and revision-7 feature banks of the 2026-10-25 admission
 (/mnt/v/zensim/dataset-features-rev7-20261025/{inputs,bank}/<collection>/) and each collection's label table in the
@@ -322,6 +323,69 @@ def cmd_report(a):
     print("\n".join(lines))
 
 
+def cmd_paired(a):
+    """Paired A-minus-B differences on each MOS collection, through the canonical `panel evaluate` owner.
+
+    Writes one table per collection (id, oriented target, reference_id, one column per stored score) and a suite
+    with a comparison of A against each B; the owner resamples whole references for both arms on the same draw.
+    Pairwise collections stay with `report`: their soft-probability agreement has no panel comparison.
+    """
+    import hashlib
+    from lib.zen_stats import _find_panel_bin
+    out, dest = Path(a.out), Path(a.dest)
+    rows = json.loads((out / "eval_rows.json").read_text())
+    scores = load_scores(out)
+    names = sorted(scores)
+    for n in [a.a, *a.vs]:
+        if n not in scores:
+            raise ValueError(f"no stored scores named {n}; have {names}")
+    dest.mkdir(parents=True)
+    suite = {"schema": "metric-evaluation-v1", "datasets": [], "comparisons": [],
+             "metrics": [{"id": n, "direction": "higher", "implementation": f"stored scores {n} from {out}",
+                          "input_contract": "dataset_eval.py score: models in score units, peers oriented higher "
+                                            "is better (butteraugli negated)",
+                          "source": {"kind": "column", "column": n}} for n in names]}
+    for c in sorted({r["collection"] for r in rows if r["kind"] == "mos"}):
+        rr = [r for r in rows if r["collection"] == c]
+        missing = {n: sum(r["a"] not in scores[n] for r in rr) for n in names}
+        if any(missing.values()):
+            raise ValueError(f"{c}: rows without a stored score {missing}")
+        path = dest / f"{c}.tsv"
+        with open(path, "w", newline="") as f:
+            w = csv.writer(f, delimiter="\t", lineterminator="\n")
+            w.writerow(["id", "target", "reference_id", *names])
+            for r in rr:
+                w.writerow([f"{c}:{r['row']}", repr(r["target"]), r["group"], *(repr(scores[n][r["a"]]) for n in names)])
+        suite["datasets"].append({"id": c, "path": path.name, "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+                                  "role": "eval", "target_kind": "human",
+                                  "columns": {"id": "id", "target": "target", "reference_id": "reference_id",
+                                              **{n: n for n in names}}})
+        suite["comparisons"] += [{"dataset": c, "a": a.a, "b": b, "bootstrap_resamples": a.resamples, "seed": 1}
+                                 for b in a.vs]
+    (dest / "suite.json").write_text(json.dumps(suite, indent=1) + "\n")
+    subprocess.run([_find_panel_bin(), "evaluate", "--manifest", str(dest / "suite.json"),
+                    "--output", str(dest / "report")], check=True)
+    render_paired(dest)
+
+
+def render_paired(dest):
+    report = json.loads((Path(dest) / "report" / "report.json").read_text())
+    lines = ["| Collection | A − B | ΔSROCC [95%] | two-sided p (Δ = 0) | references |", "|---|---|---|---|---|"]
+    for cmp in report["comparisons"]:
+        spec, rep = cmp["spec"], cmp["report"]
+        if rep.get("state") != "measured":
+            lines.append(f"| {spec['dataset']} | {spec['a']} − {spec['b']} | {rep.get('state')}: {rep.get('reason')} | | |")
+            continue
+        m = rep["measurements"]
+        d = m["delta"][m["delta_order"].index("srocc")]
+        lines.append(f"| {spec['dataset']} | {spec['a']} − {spec['b']} | {d['estimate']:+.4f} [{d['lo']:+.4f}, "
+                     f"{d['hi']:+.4f}] | {d['p_zero']:.3f} | {m['bootstrap']['references']} |")
+    lines += ["", "Whole references resampled for both arms on each draw (zenstats cluster bootstrap). With fewer than "
+                  "about 30 references the percentile interval under-covers: read these as descriptive."]
+    (Path(dest) / "paired.md").write_text("\n".join(lines) + "\n")
+    print("\n".join(lines))
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -336,14 +400,20 @@ def main():
     s.add_argument("--judge", action="append", default=[])
     r = sub.add_parser("report")
     r.add_argument("--out", required=True)
+    q = sub.add_parser("paired")
+    q.add_argument("--out", required=True)
+    q.add_argument("--dest", required=True, help="new directory for the tables, suite and evaluator report")
+    q.add_argument("--a", required=True)
+    q.add_argument("--vs", required=True, type=lambda s: s.split(","), help="comma-separated B arms")
+    q.add_argument("--resamples", type=int, default=2000)
     j = sub.add_parser("judge-png")
     j.add_argument("--out", required=True)
     b = sub.add_parser("bapps-keys")
     b.add_argument("--out", required=True)
     b.add_argument("--scratch", required=True)
     a = ap.parse_args()
-    return {"prepare": cmd_prepare, "score": cmd_score, "report": cmd_report, "judge-png": cmd_judge_png,
-            "bapps-keys":cmd_bapps_keys}[a.cmd](a)
+    return {"prepare": cmd_prepare, "score": cmd_score, "report": cmd_report, "paired": cmd_paired,
+            "judge-png": cmd_judge_png, "bapps-keys":cmd_bapps_keys}[a.cmd](a)
 
 
 if __name__ == "__main__":

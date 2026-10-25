@@ -51,6 +51,27 @@ class DatasetEval(unittest.TestCase):
             with self.assertRaisesRegex(ValueError,"does not match"):
                 evaluation.load_scores(p)
 
+    def test_paired_comparison_runs_the_panel_owner_over_references(self):
+        import json
+        rows, keys, a, b = [], [], [], []
+        for ref in range(8):
+            for level in range(4):
+                k = f"k{ref}_{level}"
+                rows.append(dict(collection="c", row=len(rows), kind="mos", group=f"ref{ref}", a=k, b=None,
+                                 target=float(level)))
+                keys.append(k); a.append(float(level)); b.append(float(level if level % 2 == 0 or ref % 3 else 3 - level))
+        with tempfile.TemporaryDirectory() as d:
+            p = self._eval_dir(d, keys, {"A":a, "B":b})
+            (p/"eval_rows.json").write_text(json.dumps(rows))
+            evaluation.cmd_paired(SimpleNamespace(out=str(p), dest=str(p/"paired"), a="A", vs=["B"], resamples=64))
+            report = json.loads((p/"paired/report/report.json").read_text())
+            (cmp,) = report["comparisons"]
+            self.assertEqual(cmp["report"]["state"], "measured")
+            m = cmp["report"]["measurements"]
+            self.assertEqual(m["bootstrap"]["references"], 8)
+            self.assertGreater(m["delta"][m["delta_order"].index("srocc")]["estimate"], 0.0)
+            self.assertIn("| c | A − B |", (p/"paired/paired.md").read_text())
+
     def test_mos_midrank_is_tie_aware_and_order_independent(self):
         x, y = [1.,1.,2.,3.], [1.,2.,2.,4.]
         self.assertAlmostEqual(evaluation.spearman(x,y), 5/6, places=14)
