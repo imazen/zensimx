@@ -3347,6 +3347,51 @@ are pooled over seeds, so they carry no seed interval here; their moves are the 
 Next: the full-data Mr7 fit and its gates at revision 7 (rebuilt tools, after the revision-5 controls reproduce M's
 stored gates).
 
+### Which split steers the JPEG XL loop (2026-10-25)
+
+The served map moved to the exact split (`3f779c8c`) on judge block agreement alone; on G-STEER (E34's 135
+block-repair cases, at revision 5 with the rebuilt instrument) the exact split lowers M3f on 130 of 135 cases (mean
+−0.045, worst 0.930 → 0.800; all still pass), because G-STEER's truth is block removal, which the removal split
+predicts by construction. Owner: "the jxl loop is the only thing that matters, you should have run that first".
+
+**Design.** The loop of the float-reconstruction study ("JPEG XL steering on the loop's float reconstruction": the
+same 78 TRAIN images, distances 0.3–10, effort 7, 4 iterations, judges and statistic), build `ba73151f5e1e-loop-split`,
+full-data M (`6291eeb5`) and B (`89cb4861`), float input, each map at its own tail placement refitted on the same float
+replay. Maps (workbench `MAPS`): `diffmap` (exact split, centred window, guided paint, σ 3: the recorded `Mlintail` and
+`Blintail` arms), `diffmap_rem` (the same with the removal split, new), `removal` (the old served map: removal split,
+box window, nearest paint, no smoothing) and `diffmap_amp` (amplitude split, σ 3). Placements (scale, exponent): M
+2.590255e-2/0.7, 4.547074e-2/0.7, 2.193165e-2/0.6, 4.220431e-2/1; B 1.779112e-2/0.7, 4.183675e-2/0.7, 3.565719e-2/0.5,
+4.641337e-2/0.9 (`loop_calibration_2026-10-25split.tail.tsv`).
+
+**Controls** (all passed): the new build's `diffmap` float tail refit reproduces the four recorded M and B rows; `Bcheck3`
+reproduces all 702 of B's bitstreams and `Mlinchk` all 702 of `Mlintail`'s; re-judging reproduces every earlier value
+of the 19,110 earlier rows under SSIMULACRA2, butteraugli, zensim and CVVDP, and DVIFM's values (its table renumbers
+rows). Run-heavy 3,014 s, peak RSS 1.05 GiB.
+
+**Results.** Bytes saved at equal judged score (%, mean over images of each image's median, 95% bootstrap interval;
+SSIMULACRA2 / CVVDP), each arm against its model's exact-split `diffmap` arm:
+
+| Arm | All | Photos | Illustrations | Screens |
+|---|---|---|---|---|
+| M, removal split (`diffmap_rem`) | **−1.19 / −1.03** | −0.62 / −0.09 | **−2.57 / −2.91** | −0.72 / −0.73 |
+| M, old served map (`removal`) | −0.30 / +0.14 | **−0.76 / −0.34** | −0.79 / −0.36 | **+1.27** / +1.77 [−0.09, +3.68] |
+| M, amplitude split | −0.48 / +1.01 | **+0.99 / +3.37** | −0.14 / +0.75 | **−4.00** / −3.64 [−9.21, +0.31] |
+| B, removal split | −0.80 / −0.21 | +0.34 / +1.12 | −0.99 / −0.23 | **−3.00 / −2.98** |
+| B, old served map | +0.13 / **+0.56** | **−0.46 / +0.49** | +0.08 / +0.25 | +1.44 [−0.18, +3.40] / +1.10 |
+| B, amplitude split | **−3.19** / −0.87 | +0.35 / **+3.57** | **−3.28** / −2.10 | **−10.57 / −8.74** |
+
+Bold: the interval excludes zero (negative: worse than the exact split). Against the butteraugli loop, M's exact-split
+arm stays the best of M's maps overall (−0.71 / −1.31; photos +1.06 / +0.27; screens −4.80 / −5.49); the old map is
+−1.72 / −2.50 overall and −4.11 / −4.42 on screens.
+
+**Reading.** In the loop, **the exact split is the better split**: changing only the split to removal costs M 1.2% /
+1.0% of bytes (illustrations 2.6% / 2.9%) and costs B 3.0% on screens, with no class where removal wins. G-STEER's
+preference for the removal split does not carry to the encoder. The old served map's screen advantage for M (+1.27 /
++1.77) therefore comes from its box window, nearest paint or missing smoothing, not from its split; it pays for it on
+photos. The amplitude split helps photos (+1.0% / +3.4% for M, +3.6% CVVDP for B) and fails on screens. Next
+(running): the exact split with the old map's box window and nearest paint, unsmoothed and at σ 3, and `diffmap`
+unsmoothed, to place the screen gain; and full-data M retrained at revision 7 in the same loop.
+
 ## Summary (all arms, E21 screen, seeds 0–2, Δ vs `base-c`)
 
 | Arm | Guarantee | E21 Δ (SE) | Mixture inversions / cell (max rise) |
