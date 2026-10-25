@@ -26,6 +26,44 @@ class RetainedPipe(io.BytesIO):
 
 
 class MirrorKinds(unittest.TestCase):
+    def test_mounted_transport_and_corruption_refusal(self):
+        for corrupt in (False, True):
+            with self.subTest(corrupt=corrupt), tempfile.TemporaryDirectory() as directory:
+                parent = Path(directory)
+                root, destination = parent / "source", parent / "mirror"
+                root.mkdir()
+                for i in range(3):
+                    (root / f"artifact-{i}.txt").write_text(f"retained {i}")
+                argv = ["dataset_mirror.py", "--root", str(root), "--nfs",
+                        "--destination", str(destination)]
+                original_copy = mirror.shutil.copyfile
+
+                def copy(source, target):
+                    original_copy(source, target)
+                    if corrupt:
+                        Path(target).write_bytes(b"corrupt")
+
+                with patch.object(sys, "argv", argv), \
+                        patch.object(mirror.subprocess, "run", side_effect=AssertionError("remote command")), \
+                        patch.object(mirror.subprocess, "Popen", side_effect=AssertionError("remote process")), \
+                        patch.object(mirror.subprocess, "check_output", side_effect=AssertionError("remote query")), \
+                        patch.object(mirror.shutil, "copyfile", copy), contextlib.redirect_stdout(io.StringIO()):
+                    if corrupt:
+                        with self.assertRaises(AssertionError):
+                            mirror.main()
+                        self.assertFalse((root / "MIRROR_VERIFIED.json").exists())
+                        continue
+                    mirror.main()
+                receipt = json.loads((root / "MIRROR_VERIFIED.json").read_text())
+                self.assertEqual(receipt["transport"], "mounted-filesystem")
+                self.assertFalse(receipt["remote_processes_started"])
+                self.assertNotIn("checksum_container_image_id", receipt)
+                self.assertEqual(len(receipt["random_readbacks"]), 3)
+                for line in (destination / "SHA256SUMS").read_text().splitlines():
+                    digest, name = line.split("  ", 1)
+                    self.assertEqual(mirror.sha(destination / name), digest)
+                    self.assertEqual((root / name).read_bytes(), (destination / name).read_bytes())
+
     def check_kind(self, kind):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

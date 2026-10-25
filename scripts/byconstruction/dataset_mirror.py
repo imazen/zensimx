@@ -13,6 +13,8 @@ import json
 from pathlib import Path
 import random
 import shlex
+import shutil
+import socket
 import subprocess
 import tarfile
 
@@ -25,9 +27,10 @@ def sha(path):
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--root", type=Path, required=True)
-    ap.add_argument("--host", required=True)
+    ap.add_argument("--host")
+    ap.add_argument("--nfs", action="store_true", help="copy and checksum on this host through a mounted filesystem; no remote processes")
     ap.add_argument("--destination", required=True)
-    ap.add_argument("--capacity-path", nargs="+", required=True)
+    ap.add_argument("--capacity-path", nargs="+")
     ap.add_argument("--artifact-kind", choices=("features", "training"), default="features")
     ap.add_argument(
         "--image",
@@ -35,12 +38,71 @@ def main():
         help="resident checksum image; never pulled",
     )
     args = ap.parse_args()
+    if args.nfs:
+        assert args.host is None, "mounted-filesystem transport never starts remote processes"
+    else:
+        assert args.host and args.capacity_path
     assert args.root.is_dir() and args.destination.startswith("/")
     receipt_path = args.root / "MIRROR_VERIFIED.json"
     sums = args.root / "SHA256SUMS"
     assert not receipt_path.exists() and not sums.exists(), (
         "preserve verified snapshots"
     )
+    if not args.nfs:
+        return remote_main(args, receipt_path, sums)
+    destination = Path(args.destination)
+    assert not destination.exists(), "preserve existing mirrors"
+    assert not destination.is_relative_to(args.root.resolve())
+    files = sorted(p for p in args.root.rglob("*") if p.is_file())
+    assert not any(p.is_symlink() for p in args.root.rglob("*"))
+    assert not any(p.suffix.lower() in {".png", ".jpg", ".bmp", ".tif", ".imijset"} for p in files)
+    total = sum(p.stat().st_size for p in files)
+    assert shutil.disk_usage(destination.parent).free > total
+    digests = {p.relative_to(args.root).as_posix(): sha(p) for p in files}
+    destination.mkdir()
+
+    def copy(path):
+        target = destination / path.relative_to(args.root)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(path, target)
+
+    for path in files:
+        copy(path)
+    for name, digest in digests.items():
+        assert sha(destination / name) == digest, name
+    readbacks = []
+    for name in random.SystemRandom().sample(list(digests), 3):
+        assert sha(destination / name) == digests[name], name
+        readbacks.append({"relative_path": name, "sha256": digests[name]})
+    receipt = {
+        "schema": f"dataset-{args.artifact_kind}-mirror-v1",
+        "verified_at": datetime.now(timezone.utc).isoformat(),
+        "destination": str(destination),
+        "transport": "mounted-filesystem",
+        "checksum_compute_host": socket.gethostname(),
+        "remote_processes_started": False,
+        "artifact_files_verified_before_receipt": len(files),
+        "artifact_bytes": total,
+        "all_artifact_sha256_verified": True,
+        "random_readbacks": readbacks,
+    }
+    if args.artifact_kind == "features":
+        receipt["response_tables_opened"] = False
+        receipt["readme_example_exposure_receipt"] = "README_EXPOSURE.json"
+    else:
+        receipt["label_values_interpreted_by_mirror"] = False
+    receipt_path.write_text(json.dumps(receipt, indent=2) + "\n")
+    digests[receipt_path.name] = sha(receipt_path)
+    sums.write_text("".join(f"{digest}  {name}\n" for name, digest in sorted(digests.items())))
+    copy(receipt_path)
+    copy(sums)
+    assert sha(destination / sums.name) == sha(sums)
+    assert sha(destination / receipt_path.name) == sha(receipt_path)
+    print(json.dumps({"receipt_sha256": sha(receipt_path), "sha256sums_sha256": sha(sums),
+                      "files_in_final_inventory": len(digests), **receipt}), flush=True)
+
+
+def remote_main(args, receipt_path, sums):
     subprocess.run(
         ["ssh", args.host, "df -h " + " ".join(map(shlex.quote, args.capacity_path))],
         check=True,

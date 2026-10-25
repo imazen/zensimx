@@ -504,6 +504,10 @@ dataset-features-mirror root host destination cache array:
 dataset-artifacts-mirror root host destination cache array:
     python3 -B scripts/byconstruction/dataset_mirror.py --root {{quote(root)}} --host {{quote(host)}} --destination {{quote(destination)}} --capacity-path {{quote(cache)}} {{quote(array)}} --artifact-kind training
 
+# Caller holds shared heavy.lock and run-heavy. No remote compute is started.
+dataset-artifacts-mirror-nfs root destination:
+    python3 -B scripts/byconstruction/dataset_mirror.py --root {{quote(root)}} --nfs --destination {{quote(destination)}}
+
 # Caller holds shared heavy.lock and run-heavy. Preserve a fresh, closed snapshot.
 dataset-snapshot study columns mode='mdata':
     #!/usr/bin/env bash
