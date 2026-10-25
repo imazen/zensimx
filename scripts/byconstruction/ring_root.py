@@ -360,7 +360,8 @@ def cmd_datasets(a):
                 if p.name in masked:
                     rec["rows"] = masked[p.name]["kept_rows"]
     view = dict(receipt["admission_view"])
-    view["immutable_input_roots"] = [*admission_input_roots(source),str(source),str(admission),str(features),str(out)]
+    view["immutable_input_roots"] = [str(p) for p in
+        (*admission_input_roots(source),source,admission,features,out)]
     receipt["admission_view"] = view
     receipt_path.write_text(json.dumps(receipt,indent=1)+"\n")
     packet = dict(schema="rev7-dataset-legs-v1",groups=legs,feature_ids=selected,
