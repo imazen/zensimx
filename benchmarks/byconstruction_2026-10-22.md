@@ -3115,6 +3115,13 @@ inside ladders compared on every set (reported with Z-RMSE and its p99), with th
 
 ### Which cells can revision 7 skip? Scale 0 (2026-10-25)
 
+**Withdrawn (my error).** The owner ruled on 2026-10-23 that "scale 0 is mandatory: no candidate drops the finest
+scale" ("AIC2026 TRAIN" above, owner decisions; its 41–46% instruction saving was measured then). I missed that
+decision and pre-registered this experiment anyway. The T class had already run when I found it; its result below
+agrees with the ruling (without scale 0, JPEG is rated too well). The M class was stopped at 05:20 UTC with no cell
+finished; its partial cells are kept aside (`~/tmp/byc/cells/Mns0.stopped-scale0-mandatory-0525`). `cell_share.py`
+and `byc_stub_bake` stay as tools; no read set without scale 0 is a candidate.
+
 The owner's goals include less compute, and revision 7 may be restructured freely for speed. Dropping single
 features saves nothing when their kernel still runs for other features (ringing, "Cost of the ringing fix" above); time
 goes only when a whole kernel, scale or channel goes. The walk already skips scale 0's chroma for fx1 models: B, M, T
@@ -3175,7 +3182,7 @@ knob-agreed pairs than `base-c` (0.0116 against 0.0113). The codec spread says w
 rates mozjpeg better than people do by +0.069 (T +0.049) and JPEG 2000 by +0.056 (T +0.045), while AVIF (aom −0.031,
 vis_avif −0.048) and WebP (−0.048) move the other way: JPEG's fine-scale artifacts live at full resolution, and the coarser
 scales do not see them. Ordering within references barely moves (KADID −0.0015, TID2013 +0.0029 against T). The mixture
-tests and the M class are running.
+tests were not run, and the M class was stopped (see the note at the top of this section).
 
 ## Summary (all arms, E21 screen, seeds 0–2, Δ vs `base-c`)
 
