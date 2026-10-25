@@ -1,7 +1,8 @@
 # Revision selector site index (2026-10-25)
 
 Companion to [the dependency map](REV7_DEPENDENCY_MAP_2026-10-25.md).
-Source: `bcf26e70`; product source is unchanged by phase 1. Generated locations
+Source locations: `bcf26e70`; phase 1 changes no product arithmetic. Main's
+later cfg-only integration is described in the dependency map. Generated locations
 from `scripts/rev7/inventory.py`, with source-reviewed caller envelopes below.
 Each `line: selector` is one executable occurrence or definition (including
 registry matches); comments and string literals are excluded. Entries sharing

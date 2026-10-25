@@ -5,6 +5,15 @@ Phase 1 changes only tooling and shared test fixtures; `zensim/src`, model
 bytes, formulas, supported API and existing test expectations are unchanged.
 The controlling decisions are [D1–D3 in the plan](REV7_UNIFICATION_PLAN_2026-10-25.md#owner-decisions-my-recommendation-first).
 
+After capturing that baseline, the coordinator requested integration with main.
+The lane rebased onto `ead38550` (main's revision-7 integration includes
+`e223fad3`). Product-source differences from the audit baseline are cfg/allow
+attributes on five map/globaff items, not arithmetic. The validate integration
+test now recognizes the revision-7 partial producer; the fetched main also
+contains dataset-tooling/docs work, retained unchanged. Site-index locations
+remain explicitly pinned to `bcf26e70`; the rebase did not change their selector
+inventory or the function-body counts in this map.
+
 ## Limits before deletion
 
 - This is a source call-graph audit plus runnable bit oracles, not exhaustive
@@ -140,10 +149,10 @@ conceptual groups; do not add the rows to estimate a total deletion.
 | Shared canonical dense bodies | 812 / 5 | R7, B5, Rev4 | Keep; specialize away old pool instantiations only after D1 and old research/HDR replay decisions. |
 | Shared canonical gradient bodies | 874 / 5 | R7, B5, Rev4 | Keep; Rev6 HPM/gmsbank/old pool instantiations are narrower branches, not this whole group. |
 | Exact leaf bodies listed above (excluding edge-only exact) | 842 / 7 | oracle research | Keep one ruler per needed leaf; move obsolete-family rulers with research. No product score dependency. |
-| Standalone CVVDP/LMS/palette function bodies | 666 / 19 | research-only | Independent of named-profile decisions: product-feature exclusion is possible after moving their callers; deleting public `training` extractors is a separate API action. |
+| Standalone CVVDP/LMS/palette function bodies | 666 / 19 | research-only, already `training`-gated | Independent of named-profile decisions: move these with their research callers; deleting public `training` extractors is a separate API action. They are already excluded from default builds. |
 | Preview/C/CHdr/D params + C/CHdr/D loaders | 109 declaration/body lines (100 params + 9 loaders) | CD | D3 permits removing those named bindings, not `LegacyLinearV0_2` or Custom. C/CHdr removal frees named append-family demand; raw public research still retains it. Variant arms, docs and tests are additional uncounted edit sites. |
-| V0_1 coefficient declaration | 232 declaration lines | PreviewV0_1; public training alias | D3's weights removal can remove it with its aliases through the API review. V0_2's separate232-line table stays: A, B, BHdr and Custom defaults still use it. |
-| BHdr params + loader | 22 declaration/body lines | BHdr **and generic BakeScorer front-end defaults** | D2=drop requires replacing internal BHdr-name references with private front-end defaults before removing the named binding; this22-line group is not presently BHdr-only. |
+| V0_1 coefficient declaration | 232 declaration lines | PreviewV0_1; public training alias | D3's weights removal can remove it with its aliases through the API review. V0_2's separate 232-line table stays: A, B, BHdr and Custom defaults still use it. |
+| BHdr params + loader | 22 declaration/body lines | BHdr **and generic BakeScorer front-end defaults** | D2=drop requires replacing internal BHdr-name references with private front-end defaults before removing the named binding; this 22-line group is not presently BHdr-only. |
 | B5-only false row-lane/old-form instantiations | shared bodies above; no separable body count | B5, possibly research | D1 permits retiring the default B5 identity only after all B5 controls migrate. It does not authorize changing arbitrary baked revision5 models. |
 | BHdr PU buffered frontend | shared streaming/color/transfer bodies; no separable body count | BHdr (also A/D explicit PU) | D2=keep retains it; D2=drop alone cannot delete shared H helpers or A's explicit PU entry. |
 
@@ -172,15 +181,15 @@ BHdr use the unset process default Rev1.
 | `ZENSIM_FEATCANON_BLUR` | oracle only `rec,rec64,local,fresh`; default exact→Fresh, >=5→Local, c64 Rev4→Rec64 | none; diagnostic axis |
 | `ZENSIM_FEATCANON_MOMENT_CHECK` | oracle only, `1` enables independent moment assertion, otherwise off | none |
 | `ZENSIM_ERA2_DENSE` | era2 enabled unless `0`; only noncanonical dense dispatch consumes it | CD/research may reach default; A/R7/B5/BHdr do not need selector |
-| `ZENSIM_H_TILE` | `blur::h_blur_tile_width`, parsed usize or1024 | legacy default bits depend on the tiling; remove override only with default fixed at same value |
+| `ZENSIM_H_TILE` | `blur::h_blur_tile_width`, parsed usize or 1024 | legacy default bits depend on the tiling; remove override only with default fixed at same value |
 | `ZENSIM_REV4_DIAG` | presence enables extra Rev4 tail-histogram bins, default off | none |
-| `ZENSIM_FOLD_TIMING` | positive parsed interval enables fold telemetry, default0 | none |
+| `ZENSIM_FOLD_TIMING` | positive parsed interval enables fold telemetry, default 0 | none |
 | `ZENSIM_FOLD_CENSUS_ASSERT` | presence asserts work census when telemetry dumps, default absent | none |
 | `ZENSIM_ATTR_PERF` | `1` enables map pass timing output, default off; multiple map owners | none |
 | `ZENSIM_MAP_WINDOW` | `MapPaint::from_env`: `box` default, `center`, `guided` | default map geometry must persist; selector unnecessary |
 | `ZENSIM_MAP_PAINT` | `nearest` default / `guided` | same |
 | `ZENSIM_MAP_SPLIT` | defaults to `MapPaint::served().split` = **exact**; accepts repair/exact/amplitude | keep exact default for bake maps; older fused APIs deliberately use removal default separately |
-| `ZENSIM_MAP_SMOOTH` | sigma parsed0..16, default0, invalid panic | none; `with_map_smooth` supplies explicit API |
+| `ZENSIM_MAP_SMOOTH` | sigma parsed 0..16, default 0, invalid panic | none; `with_map_smooth` supplies explicit API |
 | `ZENSIM_MAP_GUIDE` | `sq` default / `abs` | none; `with_map_guide` supplies explicit API |
 | `ZENSIM_NEIGHBOUR_EXACT` | unset→on for revision>=5; `1`→on, any other explicit value→off | preserve default-on R7/B5 local refinement when removing switch |
 | `ZENSIM_STEER_EXACT` | absent/`off` false, `all-blocks-v1` true; other values refuse; Rev5 isolated RGB8/bin1 only | none for R7; research diagnostic |
@@ -199,9 +208,9 @@ Other validate variables in the appendix control file destinations, data
 admission, training or diagnostics; they do not add a product arithmetic gate.
 
 Every occurrence is listed in the [revision selector site index](REV7_SITE_INDEX_2026-10-25.md)
-(578 occurrences,246 function/context groups), and every environment read in
+(578 occurrences, 246 function/context groups), and every environment read in
 the [environment index](REV7_ENV_INDEX_2026-10-25.md) (100 direct/constant-name
-reads across67 variable names, plus the validate manifest's dynamic capture).
+reads across 67 variable names, plus the validate manifest's dynamic capture).
 
 ## Existing regression owners
 
@@ -245,11 +254,11 @@ Build with `just rev7-oracle-build`, then run
 Named-profile mode uses `Zensim`, not a parallel scoring implementation.
 HDR fixtures are shared with their original integration tests. The dump is
 score first, then all `ZensimResult::features()` f64 bits, including structural
-zero slots; `full_rev7.ids` names the600 declared R7 feature IDs.
+zero slots; `full_rev7.ids` names the 600 declared R7 feature IDs.
 
 Start-point verification on r7900x: `cargo test --release -p zensim
 --all-features` (with `--locked`, offline dependency resolution) **942 passed,
-0 failed, 29 ignored** across44 result summaries. CI-exact workspace/all-targets/
+0 failed, 29 ignored** across 44 result summaries. CI-exact workspace/all-targets/
 all-features clippy excluding `zensim-wasm-tests` exited0. Cargo additionally
 reports a pre-existing future-incompatibility notice for `proc-macro-error2`;
 there are no Clippy diagnostic failures. Baseline wrapper evidence:
@@ -269,37 +278,62 @@ initial baseline. The coordinator subsequently requested a fetch/rebase.
 ### Frozen numerical baseline
 
 The final tier-availability-checking harness captured `baseline/capture3` and
-`baseline/capture4`. All305 dumps and the complete309-file SHA256SUMS manifests
+`baseline/capture4`. All 305 dumps and the complete 309-file SHA256SUMS manifests
 are identical; manifest SHA256 is
 `0a5ebc6da2f806f2d74087189136f714e85b13d87389f8c8b87ed4db370513fc`.
-Earlier captures1/2 are retained and their305 numerical dumps also equal these.
+Earlier captures1/2 are retained and their 305 numerical dumps also equal these.
 
 | Configuration | Inputs | Tiers / threads | Dumps | Emitted features per dump |
 |---|---|---|---:|---:|
-| B weights stamped Rev7 | 6 synthetic +5 photos | v4x/v4/v3/scalar at1; v4x at8 | 55 | 720 |
-| Full Rev7 stub (600 declared IDs) | same11 | same5 policies | 55 | 1,891 |
-| Named A | same11 | same5 policies | 55 | 372 |
-| B5 control | same11 | same5 policies | 55 | 720 |
-| Named BHdr through PU | same11 converted to nits +6 shared HDR fixtures | same5 policies | 85 | 372 |
+| B weights stamped Rev7 | 6 synthetic + 5 photos | v4x/v4/v3/scalar at 1; v4x at 8 | 55 | 720 |
+| Full Rev7 stub (600 declared IDs) | same 11 | same 5 policies | 55 | 1,891 |
+| Named A | same 11 | same 5 policies | 55 | 372 |
+| B5 control | same 11 | same 5 policies | 55 | 720 |
+| Named BHdr through PU | same 11 converted to nits + 6 shared HDR fixtures | same 5 policies | 85 | 372 |
 
-All235,590 dumped words (scores included) are finite. R7 B, full R7 and B5
-each have0 tier mismatches across55 dumps. A and BHdr intentionally retain
-their own tier baselines: comparing every other policy to scalar gives44/44
-and68/68 differing dumps respectively. This is not a failure of repeated
+All 235,590 dumped words (scores included) are finite. R7 B, full R7 and B5
+each have 0 tier mismatches across 55 dumps. A and BHdr intentionally retain
+their own tier baselines: comparing every other policy to scalar gives 44/44
+and 68/68 differing dumps respectively. This is not a failure of repeated
 capture determinism and must not be “fixed” by changing legacy expectations.
 
 The B revision-7 stamp SHA256 is
 `5fe0a96230badfa4228e314f12b962b3c18408612d8da9a6390d6259c5a9bcd4`;
 full R7 stub is
 `cdd9612010b0d1e45f0fde1d02c9547991984dd157d167d904941413a94fdfd4`.
-The two final captures each took22s under the resource wrapper; capture4:
+The two final captures each took 22s under the resource wrapper; capture4:
 
 ```text
 run-heavy: done rc=0 22s | peak-RSS 0.15GiB | min-avail 18805MiB | peak-load 0.56
 ```
 
 Shared HDR generators are token-identical to their original test bodies;
-all9 tests in `chdr_pu` and `native_hdr_color` pass after relocation. The
-strict comparison/scanner tools pass5 negative-control tests; script lint
+all 9 tests in `chdr_pu` and `native_hdr_color` pass after relocation. The
+strict comparison/scanner tools pass 6 negative-control tests; script lint
 and the modified Rust workspace clippy pass. No public API change or relaxed
-test expectation is part of phase1.
+test expectation is part of phase 1.
+
+### Verification after integration with main
+
+The full release suite was repeated on the rebased stack: **942 passed,
+0 failed, 29 ignored**. CI-exact `just clippy` also passed. The focused
+`--no-default-features --features custom-profiles` Clippy check passed, covering
+the feature combination fixed by `e223fad3`.
+
+Rebuilt tools wrote `~/tmp/rev7unify/post-main/capture1`. Its **305/305 dumps
+are byte-identical to baseline/capture4**; input hashes and matrix coverage
+also match. The only changed product-source fingerprints are `attribution.rs`,
+`globaff.rs` and `map_paint.rs`, exactly the incoming cfg/allow edits. The
+original baseline/tools and all original captures remain preserved.
+
+```text
+main tests: run-heavy: done rc=0 441s | peak-RSS 2.50GiB | min-avail 10298MiB | peak-load 16.06
+main clippy: run-heavy: done rc=0 5s | peak-RSS 0.75GiB | min-avail 17915MiB | peak-load 1.64
+post-main capture: run-heavy: done rc=0 22s | peak-RSS 0.15GiB | min-avail 18644MiB | peak-load 0.90
+```
+
+Repeat comparisons with `just rev7-bits-compare <base-dumps> <new-dumps>`;
+`just rev7-bits-tiers <dumps> <model>` requires all five policies for every
+input. These strict comparers refuse empty captures, missing policies,
+missing/extra dumps and changed bits. Run the legacy-tier comparison only as
+a diagnostic: its differences against scalar are expected and retained.
