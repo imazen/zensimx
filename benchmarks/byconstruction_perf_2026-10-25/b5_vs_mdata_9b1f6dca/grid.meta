@@ -1,0 +1,6 @@
+# A=/var/tmp/byconstruction-bin/688746b78bee-gates/byc_score_timing sha256=73a26f4d2004ef53
+# B=/var/tmp/byconstruction-bin/688746b78bee-gates/byc_score_timing sha256=73a26f4d2004ef53
+# A bakes: /home/lilith/work/zen/zensim--rev7main/zensim/weights/b_sdr_diff_frag_820_rev5_2026-10-19.bin /home/lilith/tmp/byc/parity/tga_full_rev6.bin; B bakes: /var/tmp/datalegs-20261025/rev7data/full/refit/production-f16.bin /home/lilith/tmp/byc/parity/tga_full_rev6.bin
+# host=dev date=2026-10-25T15:54:43Z rounds=8 load=1.00 2.18 3.61
+# cases: /mnt/v/output/zensim/byconstruction-2026-10-22/perf/cases/cases_focus.tsv
+# raw rounds: /mnt/v/output/zensim/byconstruction-2026-10-22/perf/2026-10-25/b5_vs_mdata_9b1f6dca/*.jsonl on dev (SHA256SUMS beside them); one binary (9b1f6dca byc_score_timing), A = B's revision-5 bake (89cb4861, today's default), B = Mdata (9fe1aa47, revision 7; the same 420 declared feature ids); run-heavy rc=0 177s peak-RSS 0.05GiB peak-load 3.11; quiet gate load1 < 2.5 on three checks before start
