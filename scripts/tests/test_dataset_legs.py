@@ -158,8 +158,11 @@ class DatasetHoldouts(unittest.TestCase):
             e21 = {arm:dict(seeds=[0,1,2], per_dataset_per_seed_srocc={f:[rho]*3 for f in byc_cells.FOLDS})
                    for arm,(rho,_) in settings.items()}
             (study/"scorecard/e21.json").write_text(json.dumps(e21))
+            policy_manifest = study/"policy-fixture.tsv"
+            policy_manifest.write_text("dataset\tpolicy\n")
             (study/"LICENCE_POLICY.json").write_text(json.dumps(dict(
-                excluded_from_Mlic=list(byc_cells.VALIDATE_ONLY_NEW_LEGS), eligible_new_leg_arms=["Mlic"])))
+                excluded_from_Mlic=list(byc_cells.VALIDATE_ONLY_NEW_LEGS), eligible_new_leg_arms=["Mlic"],
+                copied_manifest=str(policy_manifest), source_sha256=root.sha(policy_manifest))))
             for arm,(_,value) in settings.items():
                 for seed in range(3):
                     dest=study/"cells"/arm/f"without_full_s{seed}"

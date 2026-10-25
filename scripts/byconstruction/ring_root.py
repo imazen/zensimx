@@ -412,6 +412,8 @@ def cmd_mix_licence(a):
         raise ValueError("training-confidence dataset manifest checksum differs")
     for path in (source, checksums):
         shutil.copyfile(path, metadata/path.name)
+    if sha(metadata/source.name) != expected[0]:
+        raise ValueError("training-confidence manifest changed while being copied")
     with (metadata/source.name).open() as stream:
         rows = {r["dataset"]: r for r in csv.DictReader(stream, delimiter="\t")}
     excluded = ("vcl-fer", "pieapp", "fg-iqa")
@@ -424,7 +426,7 @@ def cmd_mix_licence(a):
     if (rows["bapps"]["tier"], rows["bapps"]["per_item"]) != ("C", "2"):
         raise ValueError("BAPPS tier/judgment policy differs")
     policy = dict(schema="dataset-mix-owner-licence-policy-v1", date="2026-10-25",
-                  source=str(source), source_sha256=sha(source),
+                  source=str(source), source_sha256=expected[0],
                   copied_manifest=str(metadata/source.name), excluded_from_Mlic=list(excluded),
                   retained_in_Mlic=list(included), eligible_new_leg_arms=["Mlic"],
                   research_only_arms=["Mdata", "Mw025", "Mw100", "Mmos", "Mpair"],

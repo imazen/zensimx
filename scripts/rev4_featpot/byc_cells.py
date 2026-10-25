@@ -469,6 +469,8 @@ def cmd_mix_select(args):
     if (set(policy["excluded_from_Mlic"]) != set(VALIDATE_ONLY_NEW_LEGS)
             or policy["eligible_new_leg_arms"] != ["Mlic"]):
         raise ValueError("the owner's new-leg licence policy differs")
+    if sha(Path(policy["copied_manifest"])) != policy["source_sha256"]:
+        raise ValueError("the frozen licence-policy dataset manifest changed")
     expected = {c for cs in DATASET_FOLDS.values() for c in cs}
     arms = {}
     records = {str(e21_path): sha(e21_path), str(policy_path): sha(policy_path)}
