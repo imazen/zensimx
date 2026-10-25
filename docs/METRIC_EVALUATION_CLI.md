@@ -84,6 +84,9 @@ panels remain explicitly unmeasured. Increase it deliberately with an adequate
 memory budget; this option never samples or truncates rows. Within-reference,
 scatter, score retention and other applicable diagnostics still operate on all
 rows. Run substantial evaluations through the normal resource-limited runner.
+The evaluator parallelizes across every core (Rayon) unless `RAYON_NUM_THREADS`
+caps it: paired comparisons repeat the full panel per bootstrap draw, and an
+uncapped run of nine collections took 32 threads on dev (2026-10-25).
 
 ## Scoring adapters
 
