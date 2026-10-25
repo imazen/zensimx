@@ -18,6 +18,10 @@ dataset-features-queue root binary lock wrapper:
 dataset-features-mirror root host destination cache array:
     python3 -B scripts/byconstruction/dataset_mirror.py --root {{quote(root)}} --host {{quote(host)}} --destination {{quote(destination)}} --capacity-path {{quote(cache)}} {{quote(array)}}
 
+# Caller holds shared heavy.lock and run-heavy; a final receipt requires no gaps.
+dataset-features-verify root:
+    OPENBLAS_NUM_THREADS=1 PYTHONDONTWRITEBYTECODE=1 python3 -B scripts/byconstruction/dataset_verify.py --root {{quote(root)}} --write
+
 addrfix-test target:
     TMPDIR="$HOME/tmp" cargo test --locked -p zensim-validate --bin panel panel_e34:: --target-dir {{quote(target)}}
 
