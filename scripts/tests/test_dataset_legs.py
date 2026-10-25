@@ -53,6 +53,81 @@ class DatasetAuthority(unittest.TestCase):
             f.admit()
 
 
+class DatasetHoldouts(unittest.TestCase):
+    def test_all_excluded_never_opens_added_targets(self):
+        from subjective_training_leg import dataset_groups
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d)
+            (p/"wide").mkdir()
+            (p/"datasets").mkdir()
+            dest = p/"cell"
+            dest.mkdir()
+            packet = p/"datasets/receipt.json"
+            packet.write_text(json.dumps(dict(schema="rev7-dataset-legs-v1", feature_ids=[0],
+                groups=[dict(collection="bapps", path=str(p/"missing-target.parquet"))])))
+            (p/"wide/frozen.json").write_text(json.dumps(dict(dataset_legs_sha256=root.sha(packet))))
+            groups, binding = dataset_groups(p, [], [0], "full", 0, 1, 2, dest, exclude=("bapps",))
+            self.assertEqual(groups, [])
+            self.assertIsNone(binding)
+            selection = json.loads((dest/"DATASET_GROUP_SELECTION.json").read_text())
+            self.assertEqual(selection["omitted_collections"], ["bapps"])
+            self.assertEqual(selection["retained_collections"], [])
+
+    def test_dataset_fold_inventory_and_subset_noop_refusal(self):
+        from byc_cells import dataset_holdout_collections
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d)
+            (p/"datasets").mkdir()
+            (p/"datasets/receipt.json").write_text(json.dumps(dict(groups=[dict(collection="pipal")])))
+            self.assertEqual(dataset_holdout_collections(p, "pipal"), (("pipal",), ("pipal",)))
+            with self.assertRaisesRegex(ValueError, "no-op"):
+                dataset_holdout_collections(p, "pairs")
+            scored, excluded = dataset_holdout_collections(p, "full")
+            self.assertEqual(len(scored), 10)
+            self.assertEqual(excluded, ())
+
+    def test_hard_pair_tie_credit(self):
+        from byc_cells import dataset_train_statistic
+        got = dataset_train_statistic(["a","a","b","b","c","c"], [1.,0.]*3,
+                                      [4.,3.,2.,2.,0.,1.], True)
+        self.assertEqual(got["value"], 0.5)
+        self.assertEqual(got["predicted_ties"], 1)
+        with self.assertRaisesRegex(ValueError, "exactly"):
+            dataset_train_statistic(["a","a"], [0.3,0.7], [1.,2.], True)
+
+    def test_mix_rule_freezes_balanced_and_old_winners(self):
+        import byc_cells
+        from subjective_training_leg import DATASET_FOLDS
+        from unittest.mock import patch
+        from contextlib import redirect_stdout
+        import io
+        with tempfile.TemporaryDirectory() as d:
+            study = Path(d)
+            (study/"scorecard").mkdir()
+            e21 = {arm:dict(per_dataset_per_seed_srocc={f:[rho]*3 for f in byc_cells.FOLDS})
+                   for arm,rho in (("A",0.9),("B",0.8))}
+            (study/"scorecard/e21.json").write_text(json.dumps(e21))
+            for arm,value in (("A",0.),("B",1.)):
+                for seed in range(3):
+                    dest=study/"cells"/arm/f"without_full_s{seed}"
+                    dest.mkdir(parents=True)
+                    (dest/"byc_record.json").write_text(json.dumps(dict(dataset_train_statistics={
+                        c:dict(value=value) for cs in DATASET_FOLDS.values() for c in cs})))
+            args=SimpleNamespace(study=str(study), arms="A,B")
+            with patch.object(byc_cells,"CELLS",study/"cells"), redirect_stdout(io.StringIO()):
+                byc_cells.cmd_mix_select(args)
+                with self.assertRaisesRegex(ValueError,"preserve"):
+                    byc_cells.cmd_mix_select(args)
+            frozen=json.loads((study/"TRAIN_SELECTION.json").read_text())
+            self.assertEqual(frozen["finalists"],["B","A"])
+            self.assertFalse(frozen["eval_labels_used"])
+
+    def test_invalid_builder_parameters_refuse_before_inputs(self):
+        for weight, subset in [(0., None), (float("nan"), None), (0.5,"pipal,pipal"), (0.5,"unknown")]:
+            with self.assertRaisesRegex(ValueError, "positive finite"):
+                root.cmd_datasets(SimpleNamespace(nominal_weight=weight, collections=subset))
+
+
 class DatasetTargets(unittest.TestCase):
     def test_report_counts_informative_pairs_and_ledgers_derived_targets(self):
         with tempfile.TemporaryDirectory() as d:

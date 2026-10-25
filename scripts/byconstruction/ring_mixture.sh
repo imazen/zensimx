@@ -17,6 +17,8 @@ esac
 for arm in "$@"; do
   for d in "$CELLS"/"$arm"/without_*_s*; do
     cell=$(basename "$d"); cell=${cell#without_}
+    # New-data holdouts are separate diagnostics; mixtures cover E21 cells.
+    case $cell in kadid_s*|tid2013_s*|konfig_s*|cid22_a25_s*) ;; *) continue ;; esac
     bakes=("$d"/dense/*.bin)
     [ "${#bakes[@]}" = 1 ] && [ -f "${bakes[0]}" ] || { echo "expected one dense bake: $d" >&2; exit 2; }
     bake=${bakes[0]}

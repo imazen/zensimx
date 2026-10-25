@@ -25,6 +25,7 @@ import os
 import subprocess
 import sys
 import time
+import threading
 from pathlib import Path
 
 # BYC_ROOT selects a derived root (e.g. the hpm ringing root from scripts/byconstruction/ring_root.py).
@@ -40,6 +41,7 @@ os.environ.setdefault("REV4_V2_ROOT", str(ROOT))
 os.environ.setdefault("REV4_V2_BIN_DIR", "/var/tmp/byconstruction-target/release")
 sys.path.insert(0, str(HERE))
 from v2_common import sha  # noqa: E402
+from subjective_training_leg import read_train_panel  # noqa: E402
 from v2_lodo_mlp import EPOCH_RE, predict, read_curve  # noqa: E402
 
 
@@ -54,6 +56,7 @@ def spec_of(tokens: str) -> str:
     return base + "".join(f":{t}" for t in rest)
 
 
+DATASET_SCORE_LOCK = threading.Lock()
 LABEL = None
 # AIC2026 TRAIN (benchmarks/byconstruction_2026-10-22.md, section "AIC2026 TRAIN"): with --aic-weight W each E21 cell also
 # fits the AIC2026 public_train references outside one fold (pooled rank, research replay) and predicts that fold. Fold
@@ -98,6 +101,84 @@ def aic_predict(dest: Path, fold: str, seed: int, spec: str) -> dict:
             "aic_pred_sha256": sha(dest / f"pred_aic_k{k}.tsv")}
 
 
+def dataset_holdout_collections(root, fold):
+    from subjective_training_leg import DATASET_FOLDS
+    packet = json.loads((root / "datasets/receipt.json").read_text())
+    trained = {r["collection"] for r in packet["groups"]}
+    if fold == "full":
+        # A subset arm's full fit already excludes these labels.
+        return tuple(c for cs in DATASET_FOLDS.values() for c in cs if c not in trained), ()
+    omitted = DATASET_FOLDS[fold]
+    if not trained.intersection(omitted):
+        raise ValueError("do not fit a no-op dataset holdout; reuse the arm's full fit")
+    return omitted, omitted
+
+
+def dataset_train_statistic(refs, targets, predictions, pairwise):
+    """Use canonical signed midranks for MOS; exact hard-pair ordering for pairs."""
+    import numpy as np
+    from collections import defaultdict
+    by = defaultdict(list)
+    for ref, target, pred in zip(refs, targets, predictions, strict=True):
+        if not (np.isfinite(target) and np.isfinite(pred)):
+            raise ValueError("nonfinite TRAIN target or prediction")
+        by[ref].append((float(target), float(pred)))
+    if pairwise:
+        agreements = []
+        for points in by.values():
+            if len(points) != 2 or {p[0] for p in points} != {0., 1.}:
+                raise ValueError("hard pair requires exactly one winner and one loser")
+            a, b = sorted(points)
+            agreements.append(float(b[1] > a[1]) + 0.5 * float(b[1] == a[1]))
+        if not agreements:
+            raise ValueError("empty pairwise population")
+        return dict(statistic="hard-pair-agreement", value=float(np.mean(agreements)),
+                    groups=len(by), defined_groups=len(by), rows=len(predictions),
+                    predicted_ties=sum(v == 0.5 for v in agreements))
+    sys.path.insert(0, str(HERE.parent))
+    from lib.zen_stats import panel_batch
+    jobs = [(str(i), [p[1] for p in points], [p[0] for p in points])
+            for i, points in enumerate(by.values()) if len(points) >= 2
+            and len({p[0] for p in points}) > 1 and len({p[1] for p in points}) > 1]
+    vals = [v["srocc_signed"] for v in panel_batch(jobs, stats="srocc")] if jobs else []
+    if not vals or not np.isfinite(vals).all():
+        raise ValueError("collection has no complete defined within-reference SROCC")
+    return dict(statistic="within-reference-srocc", value=float(np.mean(vals)),
+                groups=len(by), defined_groups=len(vals), excluded_groups=len(by)-len(vals), rows=len(predictions))
+
+
+def score_dataset_holdout(dest, collections, spec):
+    import pyarrow.parquet as pq
+    from subjective_training_leg import DATASET_FOLDS, log_dataset_read
+    score_root = Path(os.environ.get("BYC_DATASET_SCORE_ROOT",
+        "/var/tmp/datalegs-20261025/rev7data/root"))
+    packet_path = score_root / "datasets/receipt.json"
+    packet = json.loads(packet_path.read_text())
+    frozen = json.loads((score_root / "wide/frozen.json").read_text())
+    if sha(packet_path) != frozen["dataset_legs_sha256"]:
+        raise ValueError("TRAIN score root is not frozen")
+    groups = {r["collection"]: r for r in packet["groups"]}
+    fit = json.loads((dest / "DATASET_GROUP_SELECTION.json").read_text())
+    if set(collections).intersection(fit["retained_collections"]):
+        raise ValueError("new-data scoring group was retained in fitting")
+    stats = {}
+    for collection in collections:
+        group = groups[collection]
+        table = Path(group["path"])
+        if sha(table) != group["table_sha256"]:
+            raise ValueError("TRAIN score table pin changed")
+        log_dataset_read(dest, table, group["rows"], ["ref_basename", "human_score"],
+                         "heldout-new-dataset-TRAIN-score", collection=collection,
+                         table_sha256=group["table_sha256"])
+        pred_path = dest / f"pred_dataset_{collection}.tsv"
+        pred = predict_cell(dest / "refit/last.bin", table, pred_path, spec)
+        labels = pq.read_table(table, columns=["ref_basename", "human_score"])
+        stats[collection] = dict(dataset_train_statistic(labels["ref_basename"].to_pylist(),
+            labels["human_score"].to_pylist(), pred, collection in DATASET_FOLDS["pairs"]),
+            prediction_sha256=sha(pred_path), table_sha256=group["table_sha256"])
+    return stats
+
+
 def run_cell(tokens: str, fold: str, seed: int) -> dict:
     dest = CELLS / arm_name(tokens) / f"without_{fold}_s{seed}"
     record = dest / "byc_record.json"
@@ -108,10 +189,23 @@ def run_cell(tokens: str, fold: str, seed: int) -> dict:
     scratch = Path(os.environ.get("BYC_SCRATCH", str(Path.home() / "tmp/byc/scratch"))) / arm_name(tokens) / f"{fold}_s{seed}"
     scratch.mkdir(parents=True, exist_ok=True)
     env = dict(os.environ, TMPDIR=str(scratch), ZENSIM_MAX_TIER="v3")
+    from subjective_training_leg import DATASET_FOLDS
+    new_fold = fold in (*DATASET_FOLDS, "full")
+    if fold not in (*FOLDS, *DATASET_FOLDS, "full"):
+        raise ValueError(f"unknown fold: {fold}")
     cmd = [sys.executable, str(HERE / "v2_lodo_mlp.py"), "--root", str(ROOT), "--spec", spec_of(tokens),
            "--columns", COLS.read_text().strip(), "--head", "N", "--heldout", fold, "--seed-index", str(seed),
            "--strict-admission", "--data-role-decision", str(ROOT / "human_role_decision.json"),
            "--dest", str(dest), "--train-only"]
+    if new_fold:
+        if AIC_WEIGHT is not None:
+            raise ValueError("new dataset folds do not add AIC labels")
+        collections, excluded = dataset_holdout_collections(ROOT, fold)
+        cmd[1] = str(HERE / "v2_confirm_fit.py")
+        heldout_index = cmd.index("--heldout")
+        del cmd[heldout_index:heldout_index+2]
+        if excluded:
+            cmd += ["--exclude-datasets", ",".join(excluded)]
     if AIC_WEIGHT is not None:
         k = aic_fold(fold, seed)
         cmd += ["--research-extra-group", f"aic:{AIC}/aic_k{k}_fit.parquet:{AIC_WEIGHT!r}:0:rank",
@@ -119,15 +213,23 @@ def run_cell(tokens: str, fold: str, seed: int) -> dict:
     t0 = time.time()
     proc = subprocess.run(cmd, env=env, capture_output=True, text=True)
     train_s = time.time() - t0
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    (dest.parent / f"{dest.name}.wrapper.log").write_text(proc.stdout + proc.stderr)
     if proc.returncode:
         raise RuntimeError(f"{dest}: rc={proc.returncode}\n{proc.stderr[-2000:]}")
-    pred = predict_cell(dest / "refit/last.bin", ROOT / "wide/main/real" / f"{fold}.parquet", dest / f"pred_{fold}.tsv",
-                        spec_of(tokens))
+    dataset_stats = None
+    if new_fold:
+        # Large feature-table prediction stays serial while other fits continue.
+        with DATASET_SCORE_LOCK:
+            dataset_stats = score_dataset_holdout(dest, collections, spec_of(tokens))
+    pred = None if new_fold else predict_cell(dest / "refit/last.bin", ROOT / "wide/main/real" / f"{fold}.parquet",
+                                             dest / f"pred_{fold}.tsv", spec_of(tokens))
     rec = {"tokens": tokens, "spec": spec_of(tokens), "fold": fold, "seed": seed, "train_seconds": round(train_s, 1),
            **({} if AIC_WEIGHT is None else aic_predict(dest, fold, seed, spec_of(tokens))),
-           "last_bin_sha256": sha(dest / "refit/last.bin"), "pred_sha256": sha(dest / f"pred_{fold}.tsv"),
-           "rows": int(len(pred)), "curve": read_curve(dest / "train.log"),
-           "bin_dir": os.environ["REV4_V2_BIN_DIR"],
+           "last_bin_sha256": sha(dest / "refit/last.bin"),
+           **({"dataset_train_statistics": dataset_stats} if new_fold else
+              {"pred_sha256": sha(dest / f"pred_{fold}.tsv"), "rows": int(len(pred))}),
+           "curve": read_curve(dest / "train.log"), "bin_dir": os.environ["REV4_V2_BIN_DIR"],
            "trainer_sha256": sha(Path(os.environ["REV4_V2_BIN_DIR"]) / "zensim_mlp_train")}
     for line in (dest / "train.log").read_text().splitlines():
         if line.startswith("  epoch 119 "):
@@ -198,7 +300,7 @@ def cmd_progress(args) -> int:
 def cmd_score(args) -> int:
     import numpy as np
     import pandas as pd
-    panel = json.loads(E34_PANEL.read_text())
+    panel = read_train_panel(E34_PANEL)
     data = {d["name"]: d for d in panel["datasets"]}
     seeds = [int(s) for s in args.seeds.split(",")]
     out = {}
@@ -235,6 +337,7 @@ def cmd_score(args) -> int:
                     "per_seed_delta": per_seed,
                     "per_dataset_delta": {f: float(np.mean(v)) for f, v in per_ds.items()},
                     "per_dataset_srocc": {f: float(np.mean(v)) for f, v in absolute.items()},
+                    "per_dataset_per_seed_srocc": absolute,
                     "e33_point_form": bool(mean >= -0.002 and all(np.mean(v) >= -0.005 for v in per_ds.values()))}
     if args.paired_with:
         # Each arm against another cell arm, seed by seed: the per-seed E21 deltas share the control, so their
@@ -248,7 +351,67 @@ def cmd_score(args) -> int:
                 "arm": args.paired_with, "per_seed_difference": diff, "difference": float(np.mean(diff)),
                 "seed_unit_se": float(np.std(diff, ddof=1) / np.sqrt(len(diff))) if len(diff) > 1 else float("nan"),
                 "per_dataset_difference": {f: res["per_dataset_delta"][f] - ref["per_dataset_delta"][f] for f in FOLDS}}
+            ds_stats = {}
+            for f in FOLDS:
+                values = [a-b for a,b in zip(res["per_dataset_per_seed_srocc"][f], ref["per_dataset_per_seed_srocc"][f], strict=True)]
+                ds_stats[f] = dict(per_seed_difference=values, seed_unit_se=float(np.std(values, ddof=1)/np.sqrt(len(values))) if len(values)>1 else float("nan"))
+            res["paired_with"]["per_dataset_seed_statistics"] = ds_stats
     print(json.dumps(out, indent=1))
+    return 0
+
+
+def cmd_mix_select(args):
+    """Freeze the preregistered decision from completed TRAIN-only cell records."""
+    import numpy as np
+    from subjective_training_leg import DATASET_FOLDS
+    study = Path(args.study)
+    output = study / "TRAIN_SELECTION.json"
+    if output.exists():
+        raise ValueError("preserve the frozen TRAIN decision")
+    e21_path = study / "scorecard/e21.json"
+    e21 = json.loads(e21_path.read_text())
+    expected = {c for cs in DATASET_FOLDS.values() for c in cs}
+    arms = {}
+    records = {str(e21_path): sha(e21_path)}
+    for arm in args.arms.split(","):
+        new, old = [], []
+        per_collection = {c: [] for c in expected}
+        for seed in range(3):
+            values = {}
+            for fold in (*DATASET_FOLDS, "full"):
+                recpath = CELLS / arm / f"without_{fold}_s{seed}/byc_record.json"
+                if not recpath.exists():
+                    continue
+                record = json.loads(recpath.read_text())
+                records[str(recpath)] = sha(recpath)
+                stats = record["dataset_train_statistics"]
+                if set(values).intersection(stats):
+                    raise ValueError("overlapping new-dataset score records")
+                values.update(stats)
+            if set(values) != expected:
+                raise ValueError(f"{arm}/s{seed}: incomplete new-dataset assessment")
+            mapped = []
+            for c, value in sorted(values.items()):
+                v = value["value"]
+                if not np.isfinite(v):
+                    raise ValueError("undefined collection statistic blocks selection")
+                per_collection[c].append(v)
+                mapped.append(v if c in DATASET_FOLDS["pairs"] else (v+1)/2)
+            new.append(float(np.mean(mapped)))
+            old.append(float(np.mean([(e21[arm]["per_dataset_per_seed_srocc"][f][seed]+1)/2 for f in FOLDS])))
+        balanced = [(o+n)/2 for o,n in zip(old,new,strict=True)]
+        def describe(v):
+            return dict(per_seed=v, mean=float(np.mean(v)), seed_unit_se=float(np.std(v,ddof=1)/np.sqrt(3)))
+        arms[arm] = dict(old=describe(old), new=describe(new), balanced=describe(balanced),
+                         per_collection={c:describe(v) for c,v in sorted(per_collection.items())})
+    balanced_winner = min(arms, key=lambda a:(-arms[a]["balanced"]["mean"],-arms[a]["new"]["mean"],a))
+    old_winner = min(arms, key=lambda a:(-arms[a]["old"]["mean"],-arms[a]["new"]["mean"],a))
+    result = dict(schema="dataset-mix-TRAIN-selection-v1", role="TRAIN", rule_commit="7155abdcf3fc",
+                  finalists=list(dict.fromkeys((balanced_winner,old_winner))), assessment_seed=0,
+                  balanced_winner=balanced_winner, old_winner=old_winner, arms=arms,
+                  input_sha256=records, eval_labels_used=False)
+    output.write_text(json.dumps(result,indent=1)+"\n")
+    print(json.dumps(result,indent=1))
     return 0
 
 
@@ -262,7 +425,7 @@ def cmd_seedens(args) -> int:
     mean."""
     import numpy as np
     import pandas as pd
-    panel = json.loads(E34_PANEL.read_text())
+    panel = read_train_panel(E34_PANEL)
     data = {d["name"]: d for d in panel["datasets"]}
     seeds = [int(x) for x in args.seeds.split(",")]
 
@@ -346,7 +509,7 @@ def cmd_pairclass(args) -> int:
     target ties excluded. Datasets above 4,000 rows use every within-reference pair plus a fixed-seed 2M cross-source
     sample."""
     import numpy as np
-    panel = json.loads(E34_PANEL.read_text())
+    panel = read_train_panel(E34_PANEL)
     arms = args.arms.split(",")
     seeds = [int(s) for s in args.seeds.split(",")]
     rng = np.random.default_rng(20261022)
@@ -388,7 +551,7 @@ def cmd_pairclass(args) -> int:
 def cmd_bytype(args) -> int:
     """Per distortion type: mean within-reference SROCC (ladder ordering) and pooled SROCC, arm vs control."""
     import numpy as np
-    panel = json.loads(E34_PANEL.read_text())
+    panel = read_train_panel(E34_PANEL)
     seeds = [int(s) for s in args.seeds.split(",")]
     out = {}
     for d in panel["datasets"]:
@@ -458,7 +621,7 @@ def cmd_knobinv(args) -> int:
     sys.path.insert(0, str(HERE.parent))
     os.environ.setdefault("ZEN_PANEL_BIN", str(Path(os.environ["REV4_V2_BIN_DIR"]) / "panel"))
     from lib.zen_stats import logistic_fit
-    panel = json.loads(E34_PANEL.read_text())
+    panel = read_train_panel(E34_PANEL)
     seeds = [int(s) for s in args.seeds.split(",")]
     arms = ["base-c", *[a for a in args.arms.split(",") if a and a != "base-c"]]
     out = {}
@@ -641,6 +804,9 @@ def main() -> int:
     r.add_argument("--cols", help="comma-separated columns file for --base-spec")
     r.add_argument("--label", help="arm directory name for --base-spec runs")
     r.add_argument("--aic-weight", type=float, help="add the AIC2026 TRAIN leg (rotating held-out fold) at this weight")
+    ms = sub.add_parser("mix-select")
+    ms.add_argument("--study", required=True)
+    ms.add_argument("--arms", default="Mw025,Mdata,Mw100,Mmos,Mpair")
     z = sub.add_parser("aiczero")
     z.add_argument("--arm", action="append", required=True, help="NAME=TABLE")
     z.add_argument("--out")
@@ -678,7 +844,7 @@ def main() -> int:
     args = ap.parse_args()
     return {"run": cmd_run, "score": cmd_score, "seedens": cmd_seedens, "curves": cmd_curves, "pairclass": cmd_pairclass,
             "bytype": cmd_bytype, "knobinv": cmd_knobinv, "predict-best": cmd_predict_best, "aicscore": cmd_aicscore,
-            "aiczero": cmd_aiczero, "progress": cmd_progress}[args.cmd](args)
+            "aiczero": cmd_aiczero, "progress": cmd_progress, "mix-select": cmd_mix_select}[args.cmd](args)
 
 
 if __name__ == "__main__":

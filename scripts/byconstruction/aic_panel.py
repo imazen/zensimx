@@ -21,6 +21,7 @@ import argparse
 import glob
 import json
 import os
+import shlex
 import subprocess
 import sys
 import tempfile
@@ -33,6 +34,7 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent))
 sys.path.insert(0, str(HERE))
 from lib.zen_stats import logistic_fit, panel_batch, scatter  # noqa: E402
+from rev4_featpot.subjective_training_leg import read_train_panel  # noqa: E402
 
 BIN = Path(os.environ.get("AIC_BIN", "/var/tmp/byconstruction-bin/58a4d100ad36"))
 os.environ.setdefault("REV4_V2_BIN_DIR", str(BIN))
@@ -70,9 +72,19 @@ def cell_root(cell: Path, arm: str, spec: str) -> Path:
     if arm != "base-c" and log.is_file():
         first = log.read_text().split("\n", 1)[0]
         hits = [r for r in ROOTS.values() if f"{r}/wide/" in first]
-        if len(hits) != 1:
-            raise ValueError(f"{cell}: cannot tell its training root")
-        return hits[0]
+        if len(hits) == 1:
+            return hits[0]
+        # New mix roots are recorded by each strict cell's bound inventory.
+        selection = cell / "DATASET_GROUP_SELECTION.json"
+        if not hits and selection.is_file():
+            bound = json.loads(selection.read_text())
+            root = Path(bound["root"])
+            import hashlib
+            pin = hashlib.sha256((root / "wide/frozen.json").read_bytes()).hexdigest()
+            if pin != bound["root_sha256"] or not any(str(root)+"/wide/" in token for token in shlex.split(first)):
+                raise ValueError(f"{cell}: training root pin/command mismatch")
+            return root
+        raise ValueError(f"{cell}: cannot tell its training root")
     return ROOTS[arm_root(arm, spec)]
 
 
@@ -153,7 +165,7 @@ def predict(bake: Path, table: Path, spec: str) -> np.ndarray:
 
 
 def e21_jobs(arms: list[str], dvifm=None):
-    panel_in = {d["name"]: d for d in json.loads(E34.read_text())["datasets"]}
+    panel_in = {d["name"]: d for d in read_train_panel(E34)["datasets"]}
     jobs, meta = [], []
     for fold in FOLDS:
         y = np.asarray(panel_in[fold]["target"], np.float64)

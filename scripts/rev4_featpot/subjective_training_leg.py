@@ -7,6 +7,8 @@ import hashlib
 import json
 from pathlib import Path
 import math
+import os
+import sys
 
 
 def safe(path):
@@ -216,7 +218,35 @@ def payloads(admitted, groups):
             raise ValueError("subjective payload pin changed")
 
 
-def dataset_groups(root, groups, selected, route, seed_index, init_seed, sample_seed, dest):
+DATASET_FOLDS = {
+    "pipal": ("pipal",),
+    "pairs": ("bapps", "pieapp", "fg-iqa"),
+    "mos7": ("mdid", "live-md", "cid-iq", "cid-oa", "vcl-fer", "irccyn-ivc",
+             "colourlab-rating-variability-2022"),
+}
+
+
+def log_dataset_read(dest, path, rows, columns, kind, **bindings):
+    """Persist a per-cell authorization before interpreting TRAIN target values."""
+    ledger = dest / "LABEL_READS.json"
+    value = document(ledger) if ledger.exists() else dict(schema="dataset-cell-label-reads-v1", role="TRAIN", reads=[])
+    value["reads"].append(dict(table=str(path), rows=dict(start=0, stop=rows), columns=columns,
+                               kind=kind, state="authorized-before-read", **bindings))
+    ledger.write_text(json.dumps(value, indent=1) + "\n")
+
+
+def read_train_panel(path):
+    """Optional pre-read ledger shared by the existing TRAIN diagnostic owners."""
+    directory = os.environ.get("BYC_LABEL_LEDGER_DIR")
+    if directory:
+        dest = Path(directory) / (Path(sys.argv[0]).stem + "-" + str(os.getpid()))
+        dest.mkdir(parents=True, exist_ok=True)
+        log_dataset_read(dest, path, "all", ["datasets[*].target", "datasets[*].orientation"],
+                         "E21-TRAIN-diagnostic", table_sha256=sha(path), argv=sys.argv)
+    return document(path)
+
+
+def dataset_groups(root, groups, selected, route, seed_index, init_seed, sample_seed, dest, exclude=()):
     """Attach the frozen derived root's dataset legs to the canonical fitter."""
     frozen = document(root/"wide/frozen.json")
     pin = frozen.get("dataset_legs_sha256")
@@ -225,12 +255,33 @@ def dataset_groups(root, groups, selected, route, seed_index, init_seed, sample_
     p = document(root/"datasets/receipt.json", pin)
     if p.get("schema") != "rev7-dataset-legs-v1" or p["feature_ids"] != selected:
         raise ValueError("frozen dataset leg recipe differs")
+    exclude = tuple(exclude)
+    supported = {c for group in DATASET_FOLDS.values() for c in group}
+    if len(exclude) != len(set(exclude)) or not set(exclude) <= supported:
+        raise ValueError("unique supported dataset exclusions required")
+    retained = [r for r in p["groups"] if r["collection"] not in exclude]
+    selection = dict(schema="dataset-group-selection-v1", root=str(root), root_sha256=sha(root/"wide/frozen.json"),
+                     receipt_sha256=pin, requested_exclusions=list(exclude),
+                     omitted_collections=[r["collection"] for r in p["groups"] if r["collection"] in exclude],
+                     retained_collections=[r["collection"] for r in retained])
+    (dest/"DATASET_GROUP_SELECTION.json").write_text(json.dumps(selection, indent=1)+"\n")
+    import pyarrow.parquet as pq
+    for name, path, tw, vw, mode in groups:
+        metadata = pq.read_metadata(path)
+        log_dataset_read(dest, path, metadata.num_rows, metadata.schema.names, "inherited-native-fit", name=name,
+                         train_weight=tw, val_weight=vw, manifest_sha256=sha(str(path)+".manifest.json"))
+    for r in retained:
+        log_dataset_read(dest, Path(r["path"]), r["rows"], ["ref_basename", "human_score"], "derived-native-fit",
+                         collection=r["collection"], table_sha256=r["table_sha256"],
+                         manifest_sha256=r["manifest_sha256"])
+    if not retained:
+        return groups, None
     records = []
     for name, path, tw, vw, mode in groups:
         records.append(dict(name=name, path=str(path), train_weight=tw, val_weight=vw, mode=mode,
                             manifest_sha256=sha(str(path)+".manifest.json"),
                             keys_path=str(path.with_suffix(".keys.parquet")), subjective=False))
-    records += p["groups"]
+    records += retained
     expanded = [(r["name"],Path(r["path"]),r["train_weight"],r["val_weight"],r["mode"]) for r in records]
     cell_id = f"{route}-s{seed_index}"
     cell = dict(route="full" if route == "full" else "d1",seed_index=seed_index,epochs=120,pairs_per_epoch=50000,

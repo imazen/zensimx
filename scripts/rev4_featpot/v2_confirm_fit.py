@@ -48,6 +48,7 @@ def cell_dir(spec: str, head: str, seed_index: int) -> Path:
 def main() -> None:
     os.environ.setdefault("ZEN_PANEL_BIN", str(PANEL))
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--exclude-datasets", default="", help="TRAIN-only dataset-group holdout, comma-separated collections")
     ap.add_argument("--spec", required=True)
     ap.add_argument("--head", choices=HEADS, required=True)
     ap.add_argument("--seed-index", type=int, choices=range(10), required=True)
@@ -83,6 +84,8 @@ def main() -> None:
         ap.error("production packing requires strict admission and training-only")
     if args.strict_admission and (args.dest is None or not args.train_only):
         ap.error("strict route requires --dest and --train-only; assessment is a separately registered read")
+    if args.exclude_datasets and not (args.strict_admission and args.train_only):
+        ap.error("dataset-group holdout requires strict training-only route")
     if args.strict_admission:
         strict_output_preflight(V2, args.dest)
         from v2_human_role import preflight_recipe
@@ -148,7 +151,8 @@ def main() -> None:
     if args.strict_admission:
         from subjective_training_leg import dataset_groups
         groups, dataset_authority = dataset_groups(V2, groups, keep, "full", args.seed_index,
-                                                   init_seed, sample_seed, dest)
+                                                   init_seed, sample_seed, dest,
+                                                   exclude=tuple(filter(None, args.exclude_datasets.split(","))))
         if dataset_authority:
             weights.update({name:tw for name,_,tw,_,_ in groups if tw > 0})
     try:

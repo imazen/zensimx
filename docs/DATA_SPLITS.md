@@ -1,5 +1,22 @@
 # DATA_SPLITS.md — canonical train/val/test conventions (locked 2026-07-02)
 
+## October 25 — TRAIN-only dataset mix selection
+
+The follow-up dataset-mixes brief authorizes nominal weights 0.25, 0.5 and
+1.0, plus MOS-only and pairwise-only subsets. Weights are hyperparameters:
+selection uses only the four existing E21 populations and held-out groups
+of the eleven new collections' TRAIN rows. Dataset-group holdouts preserve
+the same family reservations; they do not establish cross-collection source
+independence. Subset arms' full fits assess groups they already omit.
+
+The finalist rule was committed before new mix results in 7155abdcf3fc,
+[experiment record](../benchmarks/byconstruction_2026-10-22.md#new-dataset-training-mixes--preregistered-2026-10-25).
+Only the frozen seed-0 finalists receive one EVAL assessment each, in a new
+copy of the coordinator's corrected EVAL directory. An Mdata finalist reuses
+its existing frozen predictions. TEST and CALIBRATION targets remain closed.
+Per-root source-label ledgers and per-cell derived-label ledgers precede
+reads; diagnostic owners log their E21 TRAIN-panel reads separately.
+
 ## October 25 — Mdata TRAIN-leg execution
 
 The owner's dataset-leg brief authorizes TRAIN labels for PIPAL, MDID,

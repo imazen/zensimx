@@ -1,3 +1,69 @@
+# Queue individual existing-owner operations; heavy work takes the shared lock.
+dataset-mix-queue study:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    study={{quote(study)}}
+    for arm in Mdata Mw025 Mw100 Mmos Mpair; do
+      flock "$HOME/tmp/heavy.lock" "$HOME/work/claudehints/scripts/run-heavy" --mem 24G --jobs 12 -- env TMPDIR="$study/scratch" OPENBLAS_NUM_THREADS=1 just dataset-mix-cells "$study" "$arm" 2>&1 | tee "$study/cells_$arm.log"
+    done
+    touch "$study/CELLS_COMPLETE"
+
+dataset-mix-cells study arm:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    study={{quote(study)}}
+    arm={{quote(arm)}}
+    test -f "$study/PREPARE_COMPLETE"
+    root="$study/$arm/root"
+    folds=kadid,tid2013,konfig,cid22_a25,pipal,pairs,mos7
+    case "$arm" in
+      Mdata) root=/var/tmp/datalegs-20261025/rev7data/root; folds=pipal,pairs,mos7 ;;
+      Mmos) folds=kadid,tid2013,konfig,cid22_a25,pipal,mos7,full ;;
+      Mpair) folds=kadid,tid2013,konfig,cid22_a25,pairs,full ;;
+      Mw025|Mw100) ;;
+      *) exit 2 ;;
+    esac
+    mkdir -p "$study/cells/Mdata" "$study/scratch/$arm"
+    for fold in kadid tid2013 konfig cid22_a25; do
+      for seed in 0 1 2; do
+        dest="$study/cells/Mdata/without_${fold}_s$seed"
+        if [ ! -e "$dest" ]; then ln -s "/var/tmp/datalegs-20261025/cells/Mdata/without_${fold}_s$seed" "$dest"; fi
+      done
+    done
+    export BYC_ROOT="$root" REV4_V2_BIN_DIR="$study/bin" BYC_CELLS="$study/cells" BYC_SCRATCH="$study/scratch"
+    export ZENSIM_MAX_TIER=v3 RAYON_NUM_THREADS=1 OMP_NUM_THREADS=1 ZEN_PANEL_BIN="$study/bin/panel"
+    # Six single-thread fits under 24 GiB; large new-data predictions serialize.
+    python3 -B scripts/rev4_featpot/byc_cells.py run --arm mono:thr:mp32 --label "$arm" --folds "$folds" --seeds 0,1,2 --jobs 6
+
+# Caller holds shared heavy.lock and run-heavy; no new labels outside TRAIN.
+dataset-mix-scorecard study:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    study={{quote(study)}}
+    test -f "$study/CELLS_COMPLETE"
+    out="$study/scorecard"
+    mkdir "$out"
+    export BYC_CELLS="$study/cells" REV4_V2_BIN_DIR="$study/bin" AIC_BIN="$study/bin" ZEN_PANEL_BIN="$study/bin/panel"
+    export BYC_LABEL_LEDGER_DIR="$out/label_reads" RAYON_NUM_THREADS=1 OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1
+    arms=Mdata,Mw025,Mw100,Mmos,Mpair
+    python3 -B scripts/rev4_featpot/byc_cells.py score --arms "$arms" --paired-with Mdata > "$out/e21.json"
+    for arm in Mdata Mw025 Mw100 Mmos Mpair; do
+      python3 -B scripts/rev4_featpot/byc_cells.py bytype --arm "$arm" > "$out/bytype_$arm.json"
+    done
+    python3 -B scripts/byconstruction/type_bias.py Mdata Mw025 Mw100 Mmos Mpair --out "$out/type_bias.json" > "$out/type_bias.txt"
+    python3 -B scripts/rev4_featpot/byc_cells.py knobinv --arms "$arms" --out "$out/knobinv.json" > "$out/knobinv.txt"
+    python3 -B scripts/byconstruction/aic_panel.py --out "$out/panel.json" --arms "base-c,$arms" --geo --no-aic --no-public-test > "$out/panel.txt" 2>&1
+    for set in mixture mixture_global; do
+      mix="$study/$set"
+      mkdir "$mix"
+      cp "/var/tmp/datalegs-20261025/$set/manifest.json" "$mix/manifest.json"
+      ln -s "/mnt/v/output/zensim/byconstruction-2026-10-22/$set/img" "$mix/img"
+      for file in /var/tmp/datalegs-20261025/$set/scores_Mdata_*.json; do cp "$file" "$mix/"; done
+      MIX="$mix" bash scripts/byconstruction/ring_mixture.sh "$study/bin" raw 12 Mw025 Mw100 Mmos Mpair > "$study/${set}_score.log" 2>&1
+      python3 -B scripts/byconstruction/mixture_test.py summary --out "$mix" Mdata Mw025 Mw100 Mmos Mpair > "$out/$set.txt" 2>&1
+    done
+    python3 -B scripts/rev4_featpot/byc_cells.py mix-select --study "$study" > "$out/selection.txt"
+
 # Caller holds shared heavy.lock and run-heavy; all destinations must be fresh.
 dataset-mix-prepare study:
     #!/usr/bin/env bash

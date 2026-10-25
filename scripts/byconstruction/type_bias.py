@@ -15,7 +15,10 @@ import numpy as np
 import pandas as pd
 from scipy.stats import rankdata
 
-panel = json.load(open('/mnt/v/output/zensim/e34-launch-2026-10-15/evaluation/panel-input.json'))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from rev4_featpot.subjective_training_leg import read_train_panel
+
+panel = read_train_panel(Path('/mnt/v/output/zensim/e34-launch-2026-10-15/evaluation/panel-input.json'))
 cells = Path(os.environ.get('BYC_CELLS', str(Path.home() / 'tmp/byc/cells')))
 KN = {1: 'gblur', 2: 'lensblur', 3: 'motionblur', 4: 'colordiffuse', 5: 'colorshift', 6: 'colorquant', 7: 'sat1',
       8: 'sat2', 9: 'jp2k', 10: 'jpeg', 11: 'whitenoise', 12: 'colornoise', 13: 'impulse', 14: 'multnoise',
