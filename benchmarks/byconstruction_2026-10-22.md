@@ -2737,7 +2737,7 @@ statistic stays as a reported diagnostic of cross-type calibration.
 **M64's full-data run** (2026-10-25, after the gates were adopted; `scripts/byconstruction/full_fit_gates.sh
 mono-thr-mp64_s0 mono:thr:mp64 m64full`, trainer `774955ad` at one thread as M's and T's ran, run-heavy 3,013 s, peak
 RSS 0.96 GiB): certified monotone (one live max pair), packed f16 bake `0ff53fdc…` (22,560 B). Dial C1 0.9984 standard
-and 0.9937 ladder with C2–C6 passing on both grids, NEARID N1–N3 with 142 of 144 monotone ladders, G-STEER 135/135,
+and 0.9937 ladder with C2–C6 passing on both grids, G-DIAL (p5 13.3 / −9.2, p95 97.5 / 95.1), NEARID N1–N3 with 142 of 144 monotone ladders, G-STEER 135/135,
 identity at every SIMD tier (10 permutations, 62 sources each). It is level with M on the product gates; M keeps the
 better CID22-A codec spread (0.0345 against 0.038), M64 the fewer standard-mixture inversions per cell (1–6 against
 1–32).
@@ -3124,8 +3124,9 @@ inside ladders compared on every set (reported with Z-RMSE and its p99), with th
 | DG: global-sensitive dropped | certified monotone | −0.0229 (0.0032) | — |
 | `base-c` (B's recipe) | pin only | 0 | 86–171 (+61.5) |
 
-Full-data certified-monotone models (T, M) pass every label-free product gate; M: C1
-0.9984 / 0.9935, NEARID 143/144, G-STEER 135/135, identity at all tiers.
+Full-data certified-monotone models (T, M, M64) pass every label-free product gate; M: C1
+0.9984 / 0.9935, NEARID 143/144, G-STEER 135/135, identity at all tiers; M64: C1 0.9984 / 0.9937,
+NEARID 142/144, G-STEER 135/135, identity at all tiers.
 
 **Answer to the question.** A metric that is monotone by construction is competitive with B
 on the product contract (dial, identity, steering) and far more robust (inversions bounded to a
