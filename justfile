@@ -134,6 +134,34 @@ dataset-features-mirror root host destination cache array:
 dataset-artifacts-mirror root host destination cache array:
     python3 -B scripts/byconstruction/dataset_mirror.py --root {{quote(root)}} --host {{quote(host)}} --destination {{quote(destination)}} --capacity-path {{quote(cache)}} {{quote(array)}} --artifact-kind training
 
+# Caller holds shared heavy.lock and run-heavy. Preserve a fresh, closed snapshot.
+dataset-snapshot study columns:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    study={{quote(study)}}
+    out="$study/archive-ready"
+    test ! -e "$out"
+    for arm in Mdata Mr7; do
+      for fold in kadid tid2013 konfig cid22_a25; do
+        for seed in 0 1 2; do
+          test -s "$study/cells/$arm/without_${fold}_s$seed/byc_record.json"
+          for mix in mixture mixture_global; do test -s "$study/$mix/scores_${arm}_${fold}_s$seed.json"; done
+        done
+      done
+    done
+    test -s "$study/scorecard/panel.json"
+    test -s "$study/gates-Mdata/COPY_RECEIPT.json"
+    test -s "$study/NATIVE_CELL_CONTROLS.json"
+    test -s "$study/NUMERIC_SUMMARY.json"
+    mkdir "$out"
+    rsync -aL --exclude=/archive-ready/ --exclude=/loop-target/ --exclude=img/ --exclude=/snapshot-mirror.log "$study/" "$out/"
+    mkdir "$out/input_configuration"
+    cp {{quote(columns)}} "$out/input_configuration/cols_c.txt"
+    cp scripts/rev4_featpot/e33_fx1_declaration.json "$out/input_configuration/"
+    jj log -r @- --no-graph -T 'commit_id ++ "\n"' > "$out/SOURCE_COMMIT.txt"
+    test -z "$(find "$out" -type l -print -quit)"
+    sha256sum "$out/rev7data/full/refit/production-f16.bin" "$out/rev7data/root/wide/frozen.json"
+
 # Caller holds shared heavy.lock and run-heavy; a final receipt requires no gaps.
 dataset-features-verify root:
     OPENBLAS_NUM_THREADS=1 PYTHONDONTWRITEBYTECODE=1 python3 -B scripts/byconstruction/dataset_verify.py --root {{quote(root)}} --write

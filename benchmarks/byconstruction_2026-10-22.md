@@ -3555,6 +3555,12 @@ form itself costs about 0.5%.
 
 ### Revision-7 M with provided-library TRAIN datasets (2026-10-25)
 
+The full-data candidate passes the label-free checks, while the three-seed
+E21 mean falls by 0.002701 SROCC against Mr7 (seed-unit SE 0.002163).
+The new EVAL results are mixed; BAPPS soft agreement rises from 0.661796
+to 0.673924. No serving profile changes. All 12 cells and both mixture
+tests are complete.
+
 Registered before reading the new TRAIN labels: `Mdata` keeps M's
 `sel:3b7bd5ebe929@h32:H128:cv16:cf98:fx1:mono:thr:mp32`, columns C, seeds,
 120 × 50,000 budget and fixed final epoch 119. Eight MOS collections enter as
@@ -3572,8 +3578,8 @@ memberships and source-exposed TEST diagnostics, stays outside fits. The
 label-free audit found seven inherited TID families (840 full-human fit rows)
 in excluded TEST memberships; the derived root masks these too. Thus the
 comparison includes both new datasets and that required family mask. Frozen
-revision-7 source tables stay intact. The new root, label-read ledger and
-results live under `rev7data/`; the completed measurements are recorded below.
+revision-7 source tables stay intact. The new root, label-read ledger and full fit live under `rev7data/`;
+assessments and cells live in sibling directories of the study.
 No production profile changes.
 
 The full-data candidate is now frozen at
@@ -3615,15 +3621,15 @@ existing feature bank for models only. The owner explicitly prohibited
 unpacking BAPPS again; its peer scoring waits for the IMI archive route.
 
 The 12 E21 cells use four one-thread fits inside each bounded seed job, with
-the shared heavy lock released between seeds. The rebuilt trainer must first
-reproduce the unchanged-root Mr7 KADID seed 0 predictions byte for byte.
+the shared heavy lock released between seeds. The rebuilt trainer reproduces the unchanged-root Mr7 KADID seed 0
+predictions byte for byte.
 The owner superseded the JPEG XL part of this run before calibration:
 `lslocks` showed the queued calibration as `WRITE*` (not acquired), and its
 PID was terminated. No calibration, encode, judge or analysis step ran.
 The preparation build and candidate freeze remain preserved. The already
-running control fit was stopped at epoch85 to put EVAL first; its partial
+running control fit was stopped at epoch 85 to put EVAL first; its partial
 outputs and scratch were renamed with `.interrupted-for-eval.bak` suffixes.
-It restarts at the full registered budget after feature-only BAPPS scoring.
+Its fresh full-budget restart completed after feature-only BAPPS scoring.
 
 The copied eleven-collection assessment added only Mdata model predictions;
 M7, B7 and all three peer TSVs retain their copied hashes. MOS uses signed
@@ -3645,22 +3651,22 @@ Reference-bootstrap95% intervals and within-reference MOS statistics are in
 | pieapp | 0.586 | 0.582 | 0.579 | 0.560 | 0.535 | 0.570 |
 | vcl-fer | 0.945 | 0.938 | 0.884 | 0.945 | 0.877 | 0.933 |
 
-LIVE-MD peers cover all180 rows after the coordinator’s `7bd403d2`
-`pair_key` correction; distorted paths alone had retained only162 rows.
+LIVE-MD peers cover all 180 rows after the coordinator’s `7bd403d2`
+`pair_key` correction; distorted paths alone had retained only 162 rows.
 All nine input hashes match the corrected coordinator report; the prior
 report is preserved in `eval/prior-report-before-pair-key-fix/`. Model
 values are unchanged. Corrected within-reference SROCC for SSIMULACRA2,
-Butteraugli and CVVDP is0.961,0.954 and0.960.
+Butteraugli and CVVDP is 0.961, 0.954 and 0.960.
 
 The changes are mixed: MDID, NITS, VCL-FER and PieAPP improve in point
 estimate over M7, while CID:OA falls. The coordinator’s paired MOS report
 (`fb25f4a2`, copied to `eval/paired-Mdata/`) resamples whole references for
-both arms. Except IQA-ODI (42), these cohorts have3–12 references, so the
-intervals are descriptive. MDID’s paired difference is+0.0082
-[+0.0011,+0.0179], NITS+0.0106 [+0.0049,+0.0192], and CID:OA−0.0209
+both arms. Except IQA-ODI (42), these cohorts have 3–12 references, so the
+intervals are descriptive. MDID’s paired difference is +0.0082
+[+0.0011,+0.0179], NITS +0.0106 [+0.0049,+0.0192], and CID:OA −0.0209
 [−0.0351,+0.0000]. No comparison selects model weights or epoch.
 
-BAPPS model-only EVAL completes all36,344 comparisons from the existing
+BAPPS model-only EVAL completes all 36,344 comparisons from the existing
 feature bank, without image extraction or peer rescoring:
 
 | Model | Soft2AFC agreement | Reference-bootstrap95% interval |
@@ -3672,15 +3678,20 @@ feature bank, without image extraction or peer rescoring:
 The BAPPS peer columns are unmeasured in this run and wait for the owner’s
 IMI archive route. This result does not change the registered training mix.
 
-The unchanged-root KADID seed0 control reproduces all7,869 Mr7 predictions
+The unchanged-root KADID seed 0 control reproduces all 7,869 Mr7 predictions
 byte for byte (`e03397f6b7e769708d9a299366f90c19f708fedcb37b3ec38c515c4e2244c9f6`).
 The native bake hashes differ because their `zentrain.repro` invocation
 provenance differs. Removing only that entry through `bake_dial_refit strip`
-produces identical22,230-byte files; weights, scaler and all remaining
+produces identical 22,230-byte files; weights, scaler and all remaining
 metadata reproduce. `CONTROL_REPRODUCTION.json` binds both original hashes
-and the stripped comparison. The first four Mdata cells are now running.
+and the stripped comparison. All 12 Mdata cells use the same fixed budget.
+`NATIVE_CELL_CONTROLS.json` verifies all 24 Mdata/Mr7 cell identities,
+epochs, model hashes, prediction hashes and singular dense bakes.
+The label ledger also records the 13 completed native fits against all
+11 derived TRAIN legs, reconstructed after fitting from their bound
+commands and authorities without reinterpreting target values.
 
-All eleven legs deliver350,396 derived TRAIN rows from223,275 native
+All eleven legs deliver 350,396 derived TRAIN rows from 223,275 native
 memberships. Informative pairs below count the possible within-group rank
 comparisons after exact target ties, rather than independent human votes.
 Native reference groups stay separate across LIVE-MD study parts and IVC
@@ -3701,28 +3712,87 @@ For pairwise legs each non-tied comparison is its own two-row group.
 | pieapp | 51,000 | 100,202 | 50,101 | 140 | 50,101 | 899 |
 | fg-iqa | 900 | 1,754 | 877 | 50 | 877 | 23 |
 
-Exact MOS target ties remove1 MDID,1 LIVE-MD,48 CID:IQ,11 CID:OA,5 IVC
-and149 Colourlab candidate pairs; no singleton rows drop. Counts and
+Exact MOS target ties remove 1 MDID, 1 LIVE-MD, 48 CID:IQ, 11 CID:OA, 5 IVC
+and 149 Colourlab candidate pairs; no singleton rows drop. Counts and
 acceptance-corrected weights are in `DATASET_LEG_COUNTS.json`; its derived
 TRAIN target reads are appended to the same label-read ledger.
 
-#### E21 interim: seed0,4 of12 cells complete
+#### E21: all 12 cells, final epoch 119
 
-| Held-out dataset | Mdata SROCC | Mr7 SROCC | Mdata − Mr7 |
+| Held-out dataset | Mdata mean SROCC | Mr7 mean SROCC | Mdata − Mr7 |
 |---|---:|---:|---:|
-| kadid | 0.883292 | 0.874132 | +0.009160 |
-| tid2013 | 0.866123 | 0.865304 | +0.000819 |
-| konfig | 0.791486 | 0.803466 | -0.011979 |
-| cid22_a25 | 0.880014 | 0.884811 | -0.004797 |
+| kadid | 0.875736 | 0.879282 | -0.003547 |
+| tid2013 | 0.872804 | 0.873635 | -0.000832 |
+| konfig | 0.800243 | 0.800749 | -0.000506 |
+| cid22_a25 | 0.878678 | 0.884600 | -0.005922 |
 
-The seed0 four-dataset mean difference is-0.00169954.
-There is no seed-based uncertainty estimate from one seed. All budgets and
-weights stay fixed; seeds1 and2 continue. These figures include both the
-added data and the required inherited source-family mask.
+The equal-cohort paired mean is **−0.002701497**, seed-unit SE
+**0.002163089**, over three seeds. Per-seed differences are −0.001699541,
+−0.006847188 and +0.000442237. Against the inherited `base-c` control,
+Mdata is −0.015375027 (SE 0.003000262), Mr7 −0.012673530
+(SE 0.001565142); both registered E33 point-form flags are false.
+This comparison includes the added data and the required inherited family
+mask. Seed-unit uncertainty does not establish uncertainty over new cohorts.
 
-The frozen mixture manifests also received a label-free metadata audit.
+The per-type owner covers 25 KADID, 24 TID2013, seven KonFiG and eight
+CID22-A codec types. The table averages within-reference per-type SROCC
+changes against Mr7; bias SD is the SD of per-type mean pooled rank bias.
+Knob inversion rates use only pairs where human ordering and the knob
+agree. Ladder RMS is a fraction of the human p1–p99 span. All are
+three-seed summaries.
+
+| Dataset | Per-type within-ref Δ | Bias SD Mdata / Mr7 | Knob inversion % Mdata / Mr7 | Ladder RMS Mdata / Mr7 |
+|---|---:|---:|---:|---:|
+| kadid | -0.000376 | 0.080899 / 0.079641 | 1.4910 / 1.3629 | 0.089059 / 0.088447 |
+| tid2013 | -0.002389 | 0.084836 / 0.085366 | 1.0141 / 0.9115 | 0.059200 / 0.058431 |
+| konfig | -0.000095 | 0.087935 / 0.090295 | 0.0194 / 0.0065 | 0.131721 / 0.131885 |
+| cid22_a25 | -0.000030 | 0.036431 / 0.035638 | 0.0200 / 0.0100 | 0.070738 / 0.070090 |
+
+The full panel, including PLCC, KROCC, outliers, PWRC, Z-RMSE and scatter
+geometry, is preserved in `scorecard/panel.{json,txt}`. No AIC population
+is read by this scorecard (`--no-aic`).
+
+#### Existing label-free mixture tests
+
+| Test | Compositions per cell | Model | Inversions per cell | Total across 12 cells | Largest score rise |
+|---|---:|---|---:|---:|---:|
+| mixture | 1,152 | Mdata | 2–5 | 38 | +7.08 |
+| mixture | 1,152 | Mr7 | 1–14 | 57 | +6.28 |
+| mixture_global | 1,728 | Mdata | 0–0 | 0 | -0.89 |
+| mixture_global | 1,728 | Mr7 | 0–0 | 0 | -1.12 |
+
+The same 48-reference manifests and copied Mr7 score files are used; all
+24 model/seed score files per test bind the correct dense bake hashes, raw
+ring form and XYB pyramid. Standard-mixture inversion counts fall, while
+the largest rise grows. Global mixtures have zero inversions for both arms.
+
 RGB MSE rises in all 1,152 standard compositions and 1,727 of 1,728 global
 compositions. For origin 7076, `contrast1.15` followed by `luma4`, MSE
 changes from 84.20919799804688 to 83.93456013997395. The registered tests
 retain every composition, including this exception; no count or expectation
 is relaxed. `MIXTURE_MANIFEST_CHECK.json` pins both manifests and this row.
+
+#### Full-data label-free gates
+
+The coordinator ran the frozen `9fe1aa47…` candidate through the same
+revision-7 instruments and empty human-corpus root as full-data Mr7, using
+`688746b78bee-gates` (`bake_verdict` at 688746b7; serving/steering/timing
+tools from 9b1f6dca). This lane copied the text outputs with SHA-256 checks,
+verified the model hash and checked all 744 identity rows.
+
+| Check | Mdata | Full-data Mr7 |
+|---|---|---|
+| NEARID N1–N3 | pass; 143 monotone ladders | pass; 143 |
+| Standard dial grid, C1–C6 | PASS; C1 0.9972, C3 0.819 | PASS; C1 0.9984, C3 0.793 |
+| Ladder dial grid, C1–C6 | PASS; C1 0.9914 | PASS; C1 0.9935 |
+| G-STEER, exact-split map | 134/135 | 133/135 |
+| Identity, 12 SIMD permutations | 744/744 equal read-set bits; no bad fragility | 744/744 equal |
+
+These are label-free checks; the human A-series verdicts are not measured
+by this gate run. The E21 point-form result above remains false. The source
+is the canonical `gates-Mdata/` output and `gates-Mdata.summary.json` under
+`/mnt/v/output/zensim/byconstruction-2026-10-22/`; this study preserves the
+text copy, command and source tool hashes in `gates-Mdata/`. JPEG XL loop
+work remains canceled, and BAPPS peer scores wait for the IMI route.
+
+Large private artifacts and hashes: [Mdata artifact pointer](mdata_2026-10-25.pointer.md).
