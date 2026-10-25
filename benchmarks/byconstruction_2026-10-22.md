@@ -3973,3 +3973,31 @@ min-avail 29536MiB | peak-load 11.16` (36 GiB batch scope; RSS is the
 wrapper's process maximum, not a sum across the concurrent fits).
 At this baseline record the four other arms remain queued; no finalist or
 new EVAL assessment exists. The preregistered rule is unchanged.
+
+### Mlic assembly and first mix-arm completion
+
+Mlic's eight-leg root is frozen at
+`a7fd4af0c2bb5a8981be636e5c1cb1a51db57496b7c60d7bf6da01d71dd16952`:
+248,176 derived TRAIN rows, total nominal new mass 4, 40,904 known reserved
+families and zero remaining inherited reservations. Every included dataset
+payload and all 18 inherited tables have Mdata's actual byte digest. Eight
+source-label ledger entries precede the reads. The copied confidence
+manifest has SHA-256
+`48ab25bde4fc5fc573b8de8886b34e4318d86de1695065bef3cac9e468bf4218`.
+BAPPS contributes 111,534 hard TRAIN pairs (223,068 rows) after excluding
+34,469 exact probability ties from 146,003 native memberships; it remains
+tier C, with two judgments per original TRAIN pair. Its nominal collection
+weight stays 0.5, without confidence weighting or binomial vote loss.
+
+The Mlic extension, policy-copy and finalist-input controls are on main in
+c2a1fcdb8f93, f3567339e4a1 and 51ff84985962. The dataset fixture controls,
+legacy authority controls, undefined-name check and script lint pass. The
+native trainer binary is reused unchanged. Existing family guards remain
+bounded to their recorded exact-pixel/D4 coverage.
+
+Mw025 completed all 21 requested cells at epoch 119, without retries.
+Resource record: `run-heavy: done rc=0 4081s | peak-RSS 3.43GiB |
+min-avail 19312MiB | peak-load 14.98` (36 GiB scope, up to twelve one-thread
+fits). Mlic then acquired the shared lock for assembly and its 21 cells.
+At this record, 42 of the expanded 123 cells are complete; no six-arm
+finalist selection or new EVAL assessment has run.
