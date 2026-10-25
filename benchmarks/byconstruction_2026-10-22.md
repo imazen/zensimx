@@ -3069,6 +3069,50 @@ loop's own Butteraugli never sees. This measures what each map does when it sees
   butteraugli loop, per class; loop convergence at d ≤ 2.5 (each map's last largest tile over the request, and the
   share of encodes ending with no block above target) is reported beside it.
 
+**Controls** (both passed before any result was read): `Bcheck2` reproduced all 702 of B's bitstreams, and the new
+build's 8-bit tail refit reproduced the six recorded M, T and B rows. Re-judging reproduced every earlier value of all
+14,898 rows under SSIMULACRA2, butteraugli, zensim, CVVDP and DVIFM (DVIFM's table differs only in its row numbering).
+Linear tail placements: M 2.590255e-2 / 0.7, T 2.479297e-2 / 0.7, B 1.779112e-2 / 0.7, M64 2.589969e-2 / 0.7 (the 8-bit
+fits were 2.629540e-2, 2.510790e-2 and 1.815210e-2, all at 0.7). The first margarinelin attempt failed on the server's
+protocol (a zenmetrics build from an uncommitted state wanted lowercase tags); it ran on the lane's v2 build `baf0500c`
+instead, whose calibration matches. Run-heavy 1,820 s for the resume, peak RSS 0.60 GiB; tables and logs in
+`/var/tmp/byconstruction-jxl-steer/` on dev.
+
+**Results.** Bytes saved at equal judged score (%, mean over images of each image's median, 95% bootstrap interval;
+SSIMULACRA2 / CVVDP). Each map's float arm against its own 8-bit arm:
+
+| Map | All | Photos | Illustrations | Screens |
+|---|---|---|---|---|
+| Margarine | **+1.11 / +1.31** | +0.37 [−0.00, +0.91] / **+0.55** | +0.68 [−0.27, +1.98] / **+1.08** | **+3.18 / +3.16** |
+| M (full data) | **+0.76 / +0.39** | +0.17 [+0.00, +0.40] / **+0.20** | **+0.68** / +0.21 [−0.50, +0.83] | **+2.09** / +1.01 [−0.18, +2.16] |
+| T (full data) | **+0.69 / +0.56** | **+0.29 / +0.20** | **+0.45** / +0.35 [−0.17, +0.88] | **+1.84 / +1.57** |
+| B | **+1.17 / +0.93** | **+0.43 / +0.30** | **+0.85 / +0.91** | **+3.12 / +2.28** |
+
+Against the butteraugli loop (the encoder's own Butteraugli on its floats):
+
+| Arm | All | Photos | Illustrations | Screens |
+|---|---|---|---|---|
+| **Margarine, floats** | +0.00 [−0.13, +0.13] / **+0.16** [+0.04, +0.28] | −0.02 / **+0.15** | −0.16 / +0.11 | **+0.26** [+0.03, +0.48] / +0.24 [−0.19, +0.68] |
+| Margarine, 8-bit | −1.33 / −1.21 | −0.18 / −0.15 | −0.99 / −0.80 | −4.20 / −3.95 |
+| M, floats (tail) | −0.71 [−1.68, +0.11] / −1.31 | **+1.06** / +0.27 [−0.21, +0.76] | −0.42 / −0.61 | −4.80 / −5.49 |
+| M, 8-bit (tail) | −1.41 / −2.05 | **+0.88** / +0.15 | −1.34 / −1.16 | −6.32 / −7.77 |
+| T, floats (tail) | −0.61 / −1.73 | **+1.09** / +0.07 | −0.22 / −0.46 | −4.69 / −7.05 |
+| M64, floats (tail) | −0.71 / −1.47 | **+1.21** / +0.33 | −0.44 / −0.39 | −5.06 / −6.59 |
+| B, floats (tail) | −1.38 / −2.28 | +0.39 / −1.30 | −0.23 / −0.60 | −6.53 / −6.40 |
+
+Bold: positive with the interval above zero. Loop convergence (each map in its own units, median over images of the
+last largest tile ÷ the request, `~/tmp/byc/converge_lin.py`): on screens M's loop ends at 1.13× the request at d 0.3
+(3.03× from 8 bits), T 1.24 (3.74), B 1.41 (4.17), and half of M's d 1.0 encodes end with no block above target (28%);
+illustrations improve alike, photos are unchanged; Margarine's photo loop ends at 1.06 at d 0.3 (1.16).
+
+**Reading** (my bar). Every map steers better from the floats the loop holds than from their 8-bit rounding, under both
+judges. Margarine fed the floats **is the butteraugli loop's equal**: a tie by SSIMULACRA2 in every class, slightly
+better by CVVDP overall and on photos, with the screen gap gone. That was entirely the rounding. Our maps keep a real
+screen deficit even from floats (4.7–6.5% against butteraugli by SSIMULACRA2, 5.5–7.1% by CVVDP), while M, T and M64
+still beat it on photos by SSIMULACRA2 (+1.06 to +1.21%, CVVDP tied). An encoder that steers by an external metric should pass it the
+reconstruction it holds; the zenmetrics web adapter (`web/codecs/jxl`) and the workbench's `loop_map` take 8-bit
+pixels today.
+
 ### Owner decisions (2026-10-25)
 
 Owner, 2026-10-25: "I take your reccomendation for euler split, yes. … For rev 7, we can restructure to our heart's
