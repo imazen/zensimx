@@ -16,7 +16,7 @@ case $FORM in
   *) echo "unknown form $FORM" >&2; exit 2 ;;
 esac
 for arm in "$@"; do
-  for d in "$CELLS"/"$arm"/without_*_s*; do
+  for d in "$CELLS"/"$arm"/without_*_s*/; do
     cell=$(basename "$d"); cell=${cell#without_}
     # Optional experiment-specific subset; the default still scores every cell.
     fold=${cell%_s*}

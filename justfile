@@ -106,6 +106,18 @@ dataset-mix-mixtures study arms='Mdata,Mw025,Mw100,Mmos,Mpair,Mlic':
     done
 
 # Caller holds shared heavy.lock and run-heavy; no new labels outside TRAIN.
+dataset-mix-local-mixtures study:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    study={{quote(study)}}
+    just dataset-mix-mixtures "$study" Mdata,Mw025,Mlic
+    mkdir "$study/local-mixtures"
+    for set in mixture mixture_global; do
+      python3 -B scripts/byconstruction/mixture_test.py summary --out "$study/$set" --json-out "$study/local-mixtures/$set.json" Mdata Mw025 Mlic > "$study/local-mixtures/$set.txt"
+      python3 -B scripts/byconstruction/mixture_test.py report --out "$study/$set" > "$study/local-mixtures/${set}_all-cells.json"
+    done
+
+# Caller holds shared heavy.lock and run-heavy; no new labels outside TRAIN.
 dataset-mix-scorecard study:
     #!/usr/bin/env bash
     set -euo pipefail

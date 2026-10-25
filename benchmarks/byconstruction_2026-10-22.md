@@ -4098,3 +4098,9 @@ manifest and every comparison remain unchanged, including the previously
 recorded global MSE exception. Completed local models can be scored while
 fleet fits run; the complete scorecard reuses only verified cache entries
 and still requires all 123 models in both mixture sets.
+
+The first local mixture pass found wrapper-log files matching the cell
+glob. The owner now selects directories explicitly; all 21 directories in
+each completed local arm remain selected. Its successful cached score is
+preserved, along with the failed-pass log. Reporting moved into a Just
+recipe so the resource wrapper cannot expand a shell report-name variable.
