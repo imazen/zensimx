@@ -2677,6 +2677,63 @@ against +2.61 for Tga) and gains on screens (CVVDP −6.6 against −12.7): once
 it coarsens the blocks the map reads as free (the reclaim step, "What the map tells the loop" above), and the
 independent judges charge for it. That is the same construction problem the reachability test found, seen in bytes.
 
+### Gate review: what E21 parity selected for, against the product's goals (2026-10-25)
+
+Owner, 2026-10-25: "the E2/E33 gates might be damaging our ability to get a good all around model? consider what has
+changed because of older gates, vs our current smooth-dial, codec-uniform robust and spatial steering goals." (A
+session goal still carried the dropped AIC2026 0.99 target; the last steps it drove, ensembles and capacity for E21,
+are recorded above and below.)
+
+**What the screen measures.** E21 is each held-out dataset's SROCC pooled over all its distortion types, against
+`base-c`; E33's point form asks for parity (mean ≥ −0.002, every set ≥ −0.005), and only an arm at parity is extended
+to the product gates (dial C1–C6, NEARID, identity, G-STEER; "Decision rules" above). Three of the four sets are
+synthetic (KADID 25 types, TID2013 24, KonFiG 7), so the statistic is dominated by placing unlike distortions (contrast
+change, saturation, mean shift, colour blocks, noise, codecs) on one human scale.
+
+**Where the monotone models stand once that is separated** (seeds 0–2, out of sample, no label read that was not read
+before; `byc_cells.py bytype`, `type_bias.py` extended to every set, `aiczero` with per-codec bias):
+
+| | `base-c` (B's recipe) | M64 | M (32 pairs) | T (convex) |
+|---|---|---|---|---|
+| E21 pooled Δ (the screen) | 0 | −0.0131 | −0.0144 | −0.0205 |
+| Within-reference ordering per type, Δ: KADID / TID2013 / KonFiG / CID22-A | 0 | **+0.013 / +0.005 / +0.004** / 0.000 | **+0.014 / +0.006 / +0.004** / 0.000 | **+0.015 / +0.008 / +0.004** / 0.000 |
+| Per-type bias spread across types (SD of rank bias): KADID / TID2013 / KonFiG | 0.060 / 0.054 / 0.079 | 0.083 / 0.078 / 0.088 | 0.082 / 0.082 / 0.085 | 0.084 / 0.099 / 0.090 |
+| CID22-A codec bias spread | 0.0340 | 0.038 | **0.0345** | 0.038 |
+| Standard mixture inversions per cell (largest rise) | 86–171 (+61.5) | 1–6 (+7.6) | 1–32 (+6.5) | **0–4 (+4.0)** |
+| Global-edit inversions per cell | (frozen B: 88 in all, +18.3) | 0 | 0 | 0 (Thpm) |
+| Full-data product gates (C1 standard / ladder, NEARID, G-STEER) | 0.9954 / 0.9882, 130/144, 130/135 | not run | **0.9984 / 0.9935, 143/144, 135/135** | 0.9970 / 0.9914, 140/144, 135/135 |
+
+Reported only, not for selection (AIC2026 labels must not tune models): AIC2026 public_train zero-shot global SROCC
+0.9072 / 0.9080 / 0.9091 / 0.9108, within source 0.9530 / 0.9492 / 0.9498 / 0.9496, per-codec bias spread (mean over
+cells) 0.061 / 0.074 / 0.071 / 0.075; every model orders each codec ladder at 0.9996–0.9998; the spread is mostly PNG (palette
+quantization), which every model overrates and the monotone ones more (+0.18 to +0.20 against +0.13).
+
+**Reading.** The monotone models order severity within every distortion type better than B's recipe, match it on
+codec data and are far more robust; their whole E21 deficit is cross-type calibration, mainly global and colour edits
+(rated against people: saturation +0.21 to +0.34 and mean shift +0.12 in TID2013, contrast −0.12 and Gaussian blur
++0.10 in KADID). E21 parity therefore selected for exactly the capacity that makes B invert (sign contrasts between
+correlated damage features), and it stopped every monotone arm before the product gates: M64 has never been measured
+on them; T and M were, and pass every one with better dial and steering numbers than `base-c`. The full-data monotone
+fits keep one or two live units, so capacity, ensembles and new features barely move them, and none of that work
+could reach parity.
+
+What the old gates changed in this record:
+1. *Screen and extension*: no arm extended since T and M; the product gates were never run on M64 or its relatives.
+2. *Feature adoption* ("E21 improves by more than one seed-unit SE"): linear-light coarse scales and orientation bands
+   were judged by E21 alone (linear light was neutral there, better on KADID and CID22-A, half the largest mixture rise).
+3. *Recipe choice*: M64 over M and T by E21 (−0.0131 against −0.0144 / −0.0205), though T has the fewest mixture
+   inversions and M the best dial, NEARID and codec spread.
+4. *The candidate rule and the AIC leg* (mine, 04743622; the dropped 0.99 goal): selection by AIC2026 public_train out
+   of fold, which tuned models on AIC2026 labels, and Tga, a partly monotone model with 4–47 global-edit inversions
+   per cell, as the session's best. Revision 6's `globaff` family exists to serve it.
+
+**Proposed gates for the current goals** (for the owner; nothing changes until approved): (1) certified monotone with
+the identity pin; (2) robustness: no global-edit inversion, at most a few standard-mixture inversions per cell; (3)
+dial: within-reference ordering on every set no worse than `base-c`, the full-data dial gates C1–C6, G-DIAL and NEARID;
+(4) codec uniformity and smoothness on CID22-A (pooled SROCC, per-codec bias spread, Z-RMSE), no AIC2026 label used;
+(5) steering: G-STEER, map agreement with independent judges, JPEG XL steering against butteraugli. E21's pooled
+statistic stays as a reported diagnostic of cross-type calibration.
+
 ## Summary (all arms, E21 screen, seeds 0–2, Δ vs `base-c`)
 
 | Arm | Guarantee | E21 Δ (SE) | Mixture inversions / cell (max rise) |

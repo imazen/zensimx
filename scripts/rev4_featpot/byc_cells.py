@@ -429,9 +429,23 @@ def cmd_aicscore(args) -> int:
     return 0
 
 
+def codec_rank_bias(pred, q, codec) -> dict:
+    """Per codec, the mean of (pooled prediction rank − pooled human rank), ranks as fractions of the set: negative = the
+    model rates that codec's images worse than humans do. `spread` is the SD across codecs (equal weight), the
+    codec-uniformity statistic: 0 when equal scores mean equal quality for every codec."""
+    import numpy as np
+    from scipy.stats import rankdata
+    n = len(q)
+    rp, rq = rankdata(pred) / n, rankdata(q) / n
+    per = {str(c): float(np.mean(rp[codec == c] - rq[codec == c])) for c in sorted(set(codec.tolist()))}
+    v = np.array(list(per.values()))
+    return {"per_codec": per, "spread": float(np.std(v)), "max_abs": float(np.max(np.abs(v)))}
+
+
 def cmd_aiczero(args) -> int:
     """AIC2026 public_train zero-shot (no AIC fit) of each cell of each arm: the cell's `refit/last.bin` predicts the arm's
-    feature table, scored by `aic_train.panel` per cell; also the panel of the cells' mean prediction."""
+    feature table, scored by `aic_train.panel` per cell; also the panel of the cells' mean prediction and its per-codec
+    rank bias (`codec_rank_bias`). Arm `base-c` reads E34's stored control cells."""
     import tempfile
     import numpy as np
     import pandas as pd
@@ -442,7 +456,9 @@ def cmd_aiczero(args) -> int:
     for spec in args.arm:
         arm, table = spec.split("=", 1)
         preds = {}
-        for cell in sorted((CELLS / arm).glob("without_*_s*")):
+        cells_dir = E34_CONTROL_CELLS if arm == "base-c" else CELLS / arm
+        # Seeds 0-2, the screen's (E34's control has ten).
+        for cell in sorted(c for c in cells_dir.glob("without_*_s*") if c.name.endswith(("_s0", "_s1", "_s2"))):
             with tempfile.TemporaryDirectory(dir=Path.home() / "tmp") as td:
                 preds[cell.name] = predict(cell / "refit" / "last.bin", Path(table), Path(td) / "p.tsv")
             if len(preds[cell.name]) != len(pairs):
@@ -454,9 +470,15 @@ def cmd_aiczero(args) -> int:
                     "mean_cell_global": float(np.mean([r["global"] for r in per.values()])),
                     "per_cell_global": {c: r["global"] for c, r in per.items()},
                     "mean_cell_within_ref": float(np.mean([r["within_ref_mean"] for r in per.values()])),
-                    "ensemble": panel(np.mean(list(preds.values()), axis=0), pairs)}
+                    "ensemble": panel(np.mean(list(preds.values()), axis=0), pairs),
+                    "codec_bias": codec_rank_bias(np.mean(list(preds.values()), axis=0), -pairs.jnd.to_numpy(),
+                                                  pairs.codec.to_numpy()),
+                    "codec_bias_per_cell_spread": float(np.mean([
+                        codec_rank_bias(p, -pairs.jnd.to_numpy(), pairs.codec.to_numpy())["spread"]
+                        for p in preds.values()]))}
         print(f"{arm:12s} AIC public_train zero-shot: mean cell global {out[arm]['mean_cell_global']:.4f}, "
-              f"within-source {out[arm]['mean_cell_within_ref']:.4f}; mean prediction {out[arm]['ensemble']['global']:.4f}",
+              f"within-source {out[arm]['mean_cell_within_ref']:.4f}; mean prediction {out[arm]['ensemble']['global']:.4f}; "
+              f"codec bias spread {out[arm]['codec_bias_per_cell_spread']:.4f} per cell",
               flush=True)
     if args.out:
         Path(args.out).write_text(json.dumps(out, indent=1) + "\n")
