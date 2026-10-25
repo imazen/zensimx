@@ -11,7 +11,8 @@
 # fits, workbench metrics $MFULL and $TFULL) at their bulk placements (*_BULK, loop_calibrate's shipped method) and as
 # Mfulltail, Tfulltail at their tail placements; Bcheck, B's arm again, which a new steer_rd build must reproduce byte
 # for byte; margarine, zenmetrics' Butteraugli approximation steering with its own diffmap (MARGARINE: its CLI, served by
-# margarine_map_server.py). Judge tables already in RD_DIR move to judged-<UTC time>/ before the panel runs again.
+# margarine_map_server.py), and further Margarine builds as arms named in MARGARINE_ARMS. Judge tables already in RD_DIR
+# move to judged-<UTC time>/ before the panel runs again.
 #
 #   STEER_RD=<steer_rd> DVIFM_SERVER=<loop_map_server> ZM_BIN=<zenmetrics CLI> [*_TAIL=SCALE,EXPONENT] \
 #     [*_BULK=SCALE,EXPONENT] [ARMS="none butteraugli B Tga M64a dvifm03 Btail Tgatail M64atail dvifm03tail"] \
@@ -59,8 +60,16 @@ run Tgatail workbench:zensim-Tga@rev6:diffmap --placement "$TGA_TAIL"
 run M64atail workbench:zensim-M64a-noKADID@rev6:diffmap --placement "$M64A_TAIL"
 run dvifm03tail server --server "${DVIFM_SERVER:-}" aic4-dvifm-lap-v0.3 diffmap "${DVIFM_TAIL%,*}" "${DVIFM_TAIL#*,}"
 run Bcheck workbench:zensim-B@rev5:diffmap --placement 1.302887e-1,0.6
-case " $ARMS " in *" margarine"*) : "${MARGARINE:?set MARGARINE (zenmetrics: just margarine-build)}" ;; esac
+case " $ARMS " in *" margarine "*) : "${MARGARINE:?set MARGARINE (zenmetrics: just margarine-build)}" ;; esac
 run margarine server --server python3 "$H/margarine_map_server.py" --margarine "${MARGARINE:-}"
+# Further Margarine builds as their own arms: MARGARINE_ARMS="label=/path/to/margarine[@SCALE,EXPONENT] ..." (each label
+# also listed in ARMS); the placement defaults to Margarine's own map.
+for spec in ${MARGARINE_ARMS:-}; do
+  label=${spec%%=*}; bin=${spec#*=}; place=
+  case $bin in *@*) place=${bin#*@}; bin=${bin%@*} ;; esac
+  run "$label" server --server python3 "$H/margarine_map_server.py" --margarine "$bin" \
+    ${place:+--scale "${place%,*}" --exponent "${place#*,}"}
+done
 for arm in Mfull Tfull Mfulltail Tfulltail; do
   case " $ARMS " in *" $arm "*) ;; *) continue ;; esac
   case $arm in Mfull*) metric=$MFULL var=MFULL ;; *) metric=$TFULL var=TFULL ;; esac
