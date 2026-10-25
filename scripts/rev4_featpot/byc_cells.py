@@ -228,6 +228,46 @@ def cmd_score(args) -> int:
     return 0
 
 
+def cmd_seedens(args) -> int:
+    """E21 of ensembles that average held-out predictions, against the control averaged the same way. Each arm is a
+    `+`-joined list of cell arms (`M64` alone, or `M64+M+T`); per fold the members' predictions over the given seeds
+    are averaged into one prediction, and the control's (`--control` from the E34 panel) over the same seeds. The
+    ensemble needs every member's features and one model evaluation each, so on one feature set it costs no extra
+    extraction. Reported: the ensemble's E21 delta (mean over the four datasets of the oriented SROCC difference) and,
+    beside it, the members' ordinary per-seed delta for reference. Seed-unit SEs do not apply to an across-seed
+    mean."""
+    import numpy as np
+    import pandas as pd
+    panel = json.loads(E34_PANEL.read_text())
+    data = {d["name"]: d for d in panel["datasets"]}
+    seeds = [int(x) for x in args.seeds.split(",")]
+
+    def preds(arm, f, s):
+        if arm in data[f]["predictions"]:
+            return np.asarray(data[f]["predictions"][arm][s], dtype=float)
+        t = pd.read_csv(CELLS / arm / f"without_{f}_s{s}" / f"pred_{f}.tsv", sep="\t")
+        return t.pred.to_numpy(dtype=float)
+
+    out = {}
+    for spec in args.arms.split(","):
+        members = spec.split("+")
+        per_ds, per_seed_mean = {}, {}
+        for f in FOLDS:
+            d = data[f]
+            target = np.asarray(d["target"], dtype=float)
+            orient = float(d["orientation"])
+            ens = np.mean([preds(m, f, s) for m in members for s in seeds], axis=0)
+            ctl = np.mean([preds(args.control, f, s) for s in seeds], axis=0)
+            per_ds[f] = orient * srocc(ens, target) - orient * srocc(ctl, target)
+            per_seed_mean[f] = float(np.mean([orient * srocc(np.mean([preds(m, f, s) for m in members], axis=0), target)
+                                              - orient * srocc(preds(args.control, f, s), target) for s in seeds]))
+        out[spec] = {"control": args.control, "seeds": seeds, "members": members,
+                     "ensemble_delta": float(np.mean(list(per_ds.values()))), "ensemble_per_dataset": per_ds,
+                     "per_seed_delta": float(np.mean(list(per_seed_mean.values()))), "per_seed_per_dataset": per_seed_mean}
+    print(json.dumps(out, indent=1))
+    return 0
+
+
 E34_CONTROL_CELLS = Path("/var/tmp/rev4-featpot/e34-controlc-results/cells/sel:3b7bd5ebe929@h32:H128:cv16:cf98:fx1__N")
 DEV_RE = None
 
@@ -468,6 +508,10 @@ def main() -> int:
     s.add_argument("--rule", choices=("last", "best"), default="last",
                    help="last = registered final epoch; best = refit/best.bin (predict-best first)")
     s.add_argument("--paired-with", help="also report every other arm minus this arm (one of --arms), seed by seed")
+    se = sub.add_parser("seedens")
+    se.add_argument("--arms", required=True, help="comma-separated ensembles, each a +-joined list of cell arms")
+    se.add_argument("--control", default="base-c")
+    se.add_argument("--seeds", default="0,1,2")
     c = sub.add_parser("curves")
     c.add_argument("--arm", required=True, help="arm directory name, e.g. mono-thr")
     c.add_argument("--seeds", default="0,1,2")
@@ -482,7 +526,7 @@ def main() -> int:
     pb.add_argument("--arm", required=True, help="arm directory name, or base-c for E34's control cells")
     pb.add_argument("--seeds", default="0,1,2")
     args = ap.parse_args()
-    return {"run": cmd_run, "score": cmd_score, "curves": cmd_curves, "pairclass": cmd_pairclass,
+    return {"run": cmd_run, "score": cmd_score, "seedens": cmd_seedens, "curves": cmd_curves, "pairclass": cmd_pairclass,
             "bytype": cmd_bytype, "predict-best": cmd_predict_best, "aicscore": cmd_aicscore,
             "aiczero": cmd_aiczero}[args.cmd](args)
 
