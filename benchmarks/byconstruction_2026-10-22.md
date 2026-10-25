@@ -3891,11 +3891,40 @@ inventory, default control and ledgers are retained there. At this assembly
 record, mix fits and finalist EVAL assessment are not yet complete.
 
 
-A pre-fit receipt check also confirms that each variant retains all18
+A pre-fit receipt check also confirms that each variant retains all 18
 inherited payload digests unchanged, and that every included dataset table
-has Mdata's payload digest (11,11,8,3 tables for Mw025,Mw100,Mmos,Mpair).
+has Mdata's payload digest (11, 11, 8, 3 tables for Mw025, Mw100, Mmos, Mpair).
 Native admission verifies the actual payload hashes before fitting; the
 end-of-run audit repeats the byte checks. The local control receipt is
 `ROOT_ROW_EQUIVALENCE.json`. Columns C are now copied into the study before
 fitting and bound with `BYC_COLS`; their SHA-256 is
 `e662c7225c7f6aca27bf208161b0d1b99f6d2ba7be427dfa37c4ac4ec1c49c75`.
+
+
+### Mdata held-out-new-TRAIN baseline
+
+All nine cells completed at epoch119; predictions and group statistics are
+saved in each `byc_record.json`. Every MOS reference correlation is defined.
+The three MOS-group fits omit PIPAL, pairs, or the other seven MOS sets,
+respectively, while retaining the older human TRAIN groups. Pair scores
+below use hard preferences; EVAL retains the original probabilities.
+
+| TRAIN collection | Statistic | Seed0 | Seed1 | Seed2 |
+|---|---|---:|---:|---:|
+| bapps | hard-pair-agreement | 0.773495 | 0.752766 | 0.771227 |
+| cid-iq | within-reference-srocc | 0.902953 | 0.902042 | 0.912140 |
+| cid-oa | within-reference-srocc | 0.986498 | 0.986498 | 0.986498 |
+| colourlab-rating-variability-2022 | within-reference-srocc | 0.764149 | 0.802475 | 0.761858 |
+| fg-iqa | hard-pair-agreement | 0.898518 | 0.897377 | 0.899658 |
+| irccyn-ivc | within-reference-srocc | 0.946764 | 0.942434 | 0.948892 |
+| live-md | within-reference-srocc | 0.967918 | 0.955419 | 0.971745 |
+| mdid | within-reference-srocc | 0.950206 | 0.923020 | 0.950881 |
+| pieapp | hard-pair-agreement | 0.675685 | 0.669498 | 0.670456 |
+| pipal | within-reference-srocc | 0.648894 | 0.698702 | 0.645379 |
+| vcl-fer | within-reference-srocc | 0.942767 | 0.922134 | 0.947431 |
+
+Resource record: `run-heavy: done rc=0 2040s | peak-RSS 3.43GiB |
+min-avail 29536MiB | peak-load 11.16` (36 GiB batch scope; RSS is the
+wrapper's process maximum, not a sum across the concurrent fits).
+At this baseline record the four other arms remain queued; no finalist or
+new EVAL assessment exists. The preregistered rule is unchanged.
