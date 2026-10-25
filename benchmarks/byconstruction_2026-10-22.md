@@ -3296,6 +3296,28 @@ bar): revision 7 is a faithful re-extraction when every scorecard statistic stay
 revision-5 cell; any larger move is reported as a finding. (4) Full-data M at revision 7 through the product gates,
 with gate tools rebuilt at the head after they reproduce M's revision-5 gate results exactly.
 
+**Root built** (`/mnt/v/output/zensim/byconstruction-2026-10-22/rev7raw/root`, extractor `ed495741…` at `b77883be`,
+the `zensim-bench` lockfile of the earlier branch builds). Control passed first: at revision 5 the new extractor
+reproduces the stored Rev5 bank on all 576 requested slots of `konfig_train` (327 rows) and `cid22_a25` (2,192 rows).
+At revision 7, values that ring_root.py's check counts as moved (beyond 1e-2 relative + 1e-6), per table:
+
+| Tables | Cells beyond the bound | Most in one row (of 576) | Columns that moved most |
+|---|---|---|---|
+| Human legs (KADID, TID2013, KonFiG, CID22-A and the `human_*` tables) | 0–7 per table | 2 | none systematic |
+| `cid22_fit` / `cid22_dev` (codec encodes of training references) | 2,192 / 1,314 (0.03% / 0.06%) | 24 / 28 | v2 HF magnitude loss |
+| `safesyn_fit` / `safesyn_dev` (synthetic distortions) | 505,949 / 146,733 (0.62% / 0.66%) | 49 / 47 | v2 HF magnitude loss (every cell), v1 texture loss on flat chroma |
+| E15 coverage pool | 11,925 (0.05%) | 46 | v2 HF magnitude loss |
+
+So revision 7 moves natural-image features by rounding (median 4–6e-7 relative), but on near-degenerate content it
+corrects values revision 5 computed from noise. On safesyn, `hf_mag_loss` drops from about 1e-4 toward its exact
+value (revision 5's `max(0, ·)` turned blur rounding into positive mass). The v1 texture loss on flat chroma goes from
+about 0.79, a ratio of two vanishing sums, to 0. Edge-width change and blockiness move at their noise floor. The
+dump-based measurement above ("moves only by rounding") holds for the natural images it measured, not for this
+content. My first closeness bound (refuse more than 0.1% of cells beyond 1e-2) mistook these corrections for a join
+error and refused safesyn_dev. A wrong join moves most of a row: with safesyn's rows shuffled, a row disagrees in a mean of
+546 of its 576 columns, against at most 49 for the true join, so the check now refuses more than 0.1% of rows with
+over a quarter of their columns moved.
+
 ## Summary (all arms, E21 screen, seeds 0–2, Δ vs `base-c`)
 
 | Arm | Guarantee | E21 Δ (SE) | Mixture inversions / cell (max rise) |

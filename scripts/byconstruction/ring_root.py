@@ -75,7 +75,7 @@ ARMS = {
     "linpyr": {"env": {"ZENSIM_PYRAMID": "linear"}, "manifest": ("pyramid", "linear"), "era": "rev5_localwin_linpyr",
                "replaced": sorted([i for i in MEASURED if scale_of(i) > 0] + EDGE_WIDTH_S0), "record": "byc_linpyr_root",
                "note": "; scales 1-3 and scale-0 edge-width change re-extracted under ZENSIM_PYRAMID=linear (byconstruction)"},
-    "rev7": {"env": {"ZENSIM_FORMULA_REV": "7"}, "manifest": ("formula_revision", "7"), "era": "rev7_rowlanes",
+    "rev7": {"env": {"ZENSIM_FORMULA_REV": "7"}, "manifest": ("formula_revision", "Rev7"), "era": "rev7_rowlanes",
              "replaced": MEASURED, "record": "byc_rev7_root", "revision": 7, "close": True,
              "note": "; every measured slot re-extracted at formula revision 7 (rowlanes, raw ringing; byconstruction)"},
 }
@@ -151,22 +151,32 @@ def load_bank(bank: Path, name: str, arm: dict) -> tuple[dict, np.ndarray]:
 
 
 def close_check(table: pa.Table, new: np.ndarray, what: str, replaced: list[int]) -> None:
-    """A re-extraction at another formula revision (rev7) moves every value a little; a join or extractor error moves
-    many a lot. Refuse a nonfinite value where the stored one is finite, or more than 0.1% of cells off by more than
-    1e-2 relative (plus 1e-6 absolute); log the relative-change distribution either way."""
+    """A re-extraction at another formula revision (rev7) moves values: by rounding almost everywhere, and by more where
+    revision 7's cancellation-free forms correct the old forms' noise on near-degenerate content (flat channels: v1
+    texture and variance loss, v2 HF magnitude loss, edge-width change, blockiness at the noise floor). A join or
+    extractor error instead moves most of a row's columns. Refuse a nonfinite value where the stored one is finite,
+    or more than 0.1% of rows with over a quarter of their columns off by more than 1e-2 relative (+1e-6); log the
+    relative-change distribution and the columns that moved most. (A first version refused more than 0.1% of cells;
+    on safesyn_dev 0.66% of cells moved, at most 49 of a row's 576 columns, against a mean of 546 for rows joined to
+    the wrong pair: benchmarks/byconstruction_2026-10-22.md, "Revision 7 with raw ringing".)"""
     pos = {i: j for j, i in enumerate(MEASURED)}
     old = np.stack([table.column(f"f{i}").to_numpy() for i in replaced], axis=1).astype(np.float64)
     cur = new[:, [pos[i] for i in replaced]].astype(np.float64)
     fin = np.isfinite(old)
     if (fin & ~np.isfinite(cur)).any():
         raise ValueError(f"{what}: a re-extracted value is nonfinite where the stored one is finite")
-    d = np.abs(cur - old)[fin]
-    rel = d / np.maximum(np.abs(old[fin]), 1e-12)
-    far = int((d > 1e-2 * np.abs(old[fin]) + 1e-6).sum())
-    log(f"{what}: relative change median {np.median(rel):.2e} p99 {np.quantile(rel, 0.99):.2e} max {rel.max():.2e}; "
-        f"{far} of {d.size} cells beyond 1e-2 relative + 1e-6")
-    if far > 1e-3 * d.size:
-        raise ValueError(f"{what}: {far} of {d.size} cells moved more than a revision change can; the join is wrong")
+    both = fin & np.isfinite(cur)
+    d = np.where(both, np.abs(cur - old), 0.0)
+    far = both & (d > 1e-2 * np.abs(old) + 1e-6)
+    rel = d[both] / np.maximum(np.abs(old[both]), 1e-12)
+    per_row = far.sum(axis=1)
+    bad_rows = int((per_row > len(replaced) / 4).sum())
+    top = sorted(((int(far[:, j].sum()), replaced[j]) for j in range(len(replaced))), reverse=True)[:6]
+    log(f"{what}: relative change median {np.median(rel):.2e} p99 {np.quantile(rel, 0.99):.2e}; "
+        f"{int(far.sum())} of {int(both.sum())} cells beyond 1e-2 relative + 1e-6, at most {int(per_row.max())} of "
+        f"{len(replaced)} in a row; most: " + ", ".join(f"f{i} {c}" for c, i in top if c))
+    if bad_rows > 1e-3 * len(per_row):
+        raise ValueError(f"{what}: {bad_rows} rows moved in over a quarter of their columns; the join is wrong")
 
 
 def patch(table: pa.Table, new: np.ndarray, what: str, replaced: list[int], close: bool = False) -> pa.Table:

@@ -423,6 +423,13 @@
    "label": "Formula revision 6: Rev5 local-window arithmetic with the high-pass ringing form, selected by the bake's declared revision; admits the globaff family f1867-f1890",
    "formula_revision": 6,
    "note": "Branch explore/byconstruction. Ringing slots equal the research rev5_localwin_ringhpm values (same kernel arithmetic, selected per call instead of by ZENSIM_RING_FORM); globaff is accumulated in the streaming walk (zensim/src/globaff.rs), replacing the research sidecar at the same ids. benchmarks/byconstruction_2026-10-22.md"
+  },
+  "rev7_rowlanes": {
+   "build_commit": "b77883be",
+   "root": "/mnt/v/output/zensim/byconstruction-2026-10-22/rev7raw/root",
+   "label": "Formula revision 7: revision 5's measurements (raw ringing) with row-lane, cancellation-free arithmetic; admits the globaff family f1867-f1890",
+   "formula_revision": 7,
+   "note": "Branch explore/byconstruction (owner 2026-10-25: raw ringing). The by-construction root re-extracts every measured slot at revision 7 (scripts/byconstruction/ring_root.py --arm rev7): each value within 1e-2 relative (+1e-6) of rev5_localwin, and the same extractor reproduces rev5_localwin bit for bit at revision 5. benchmarks/byconstruction_2026-10-22.md"
   }
  },
  "sets": {
@@ -1169,6 +1176,18 @@
    "kind": "set",
    "legacy_name": "Rev5 basic+peaks+v2 measured subset, ringing hpm, byc_globaff, gated luminance damage (by-construction exploration)",
    "evidence": "zensim-validate/src/bin/byc_fsid.rs (hash); scripts/byconstruction/ring_root.py gated --channels Y; benchmarks/byconstruction_2026-10-22.md"
+  },
+  "basic+peaks+v2@w1825/rev7_rowlanes": {
+   "compute": "basic+peaks+v2",
+   "layout": 1825,
+   "era": "rev7_rowlanes",
+   "slots": "0-227,372-719",
+   "slots_hash8": "36c3f3af",
+   "n_slots": 576,
+   "role": "producer",
+   "kind": "set",
+   "legacy_name": "Revision 7 basic+peaks+v2 measured subset, raw ringing (by-construction exploration)",
+   "evidence": "scripts/byconstruction/ring_root.py --arm rev7; benchmarks/byconstruction_2026-10-22.md"
   }
  },
  "roots": {

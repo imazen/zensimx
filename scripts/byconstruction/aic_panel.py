@@ -48,7 +48,8 @@ ROOTS = {"raw": Path("/mnt/v/output/zensim/v40r4-2026-10-08/v2e29"),
          "gg": Path("/mnt/v/output/zensim/byconstruction-2026-10-22/ringhpm/root_globaff_gated"),
          "gy": Path("/mnt/v/output/zensim/byconstruction-2026-10-22/ringhpm/root_globaff_gatedy"),
          "linpyr": Path("/mnt/v/output/zensim/byconstruction-2026-10-22/linpyr/root"),
-         "o": Path("/mnt/v/output/zensim/byconstruction-2026-10-22/orient/root")}
+         "o": Path("/mnt/v/output/zensim/byconstruction-2026-10-22/orient/root"),
+         "rev7": Path("/mnt/v/output/zensim/byconstruction-2026-10-22/rev7raw/root")}
 
 
 def arm_root(arm: str, spec: str) -> str:
