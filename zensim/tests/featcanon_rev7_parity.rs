@@ -239,7 +239,16 @@ fn rev7_moves_slots_by_rounding_only() {
             );
         };
         compare(&r5, &mut bpv.iter_slots(), "rev5 (basic + peaks + v2)");
-        compare(&r6, &mut globaff.iter_slots(), "rev6 (globaff)");
+        // The research vector carries the globaff family (f1867..) only with `training`: without it the vector ends at
+        // the palette block (`research::full_width`), so there is no globaff slot to compare.
+        if cfg!(feature = "training") {
+            compare(&r6, &mut globaff.iter_slots(), "rev6 (globaff)");
+        } else {
+            assert!(
+                globaff.iter_slots().all(|id| id >= r7.len()),
+                "globaff slots inside a vector built without `training`"
+            );
+        }
         // Rev7 reads raw ringing, so its ringing slots must leave Rev6's high-pass values behind.
         let ring_moved = ringing
             .iter()
