@@ -2749,6 +2749,23 @@ deltas, so read them as unchanged). Linear light halves the largest mixture rise
 at a cost on TID2013's; orientation bands add mixture inversions. Under the proposed gates neither is a clear
 adoption either; linear light stays the better-behaved of the two.
 
+**Smoothness of the candidates** (the "Smoothness" section's statistics, out of sample, seeds 0–2; `aic_panel.py --geo
+--no-aic`, a new switch that reads no AIC2026 label; `base-c` reproduces that section's row exactly; JSON
+`aic2026train/panel_smooth_monotone_e21only.json`). Z-RMSE / error p99:
+
+| Model | KADID | TID2013 | KonFiG | CID22-A | Mean Z-RMSE | Mean error p99 | Mean rank out4 |
+|---|---|---|---|---|---|---|---|
+| `base-c` | **0.454** / **0.372** | **0.423** / **0.270** | **0.567** / **0.555** | 0.488 / 0.377 | **0.483** | **0.394** | **1.05%** |
+| M64 | 0.487 / 0.392 | 0.441 / 0.272 | 0.591 / 0.593 | 0.489 / 0.376 | 0.502 | 0.408 | 1.12% |
+| M | 0.483 / 0.387 | 0.442 / 0.276 | 0.594 / 0.591 | 0.489 / 0.377 | 0.502 | 0.408 | 1.17% |
+| T | 0.492 / 0.391 | 0.460 / 0.291 | 0.607 / 0.604 | **0.481** / **0.369** | 0.510 | 0.414 | 1.30% |
+
+On codec data (CID22-A) the monotone models are as smooth as B's recipe (T slightly smoother). On the synthetic sets
+they are 0.02–0.04 worse in Z-RMSE, with KonFiG's error tail the largest gap (0.59–0.60 against 0.555): one logistic
+curve fitted across every distortion type absorbs the per-type offsets of the table above, so this is the same
+cross-type calibration seen as error rather than rank. Nothing in training asks for it (the human legs train on
+rank alone, "Smoothness" above).
+
 ### JPEG XL steering with the full-data monotone models (2026-10-25)
 
 The steering study's zensim maps were B and two models trained with AIC2026 labels (Tga, M64a). The models the

@@ -14,7 +14,7 @@ Options: `--dvifm` adds DVIFM 0.3 (dvifm_e21.py outputs; zero-shot on E21, its c
 the absolute-error tails around the panel's own 4-parameter logistic fit; `--per-type` adds every E21 statistic per
 distortion type (KADID 25, TID2013 24, KonFiG 7, CID22-A 8 codecs).
 
-  python3 aic_panel.py --out PANEL.json [--arms base-c,Tghpm,Tga,Thpm,Mhpm] [--dvifm] [--geo] [--per-type]
+  python3 aic_panel.py --out PANEL.json [--arms base-c,Tghpm,Tga,Thpm,Mhpm] [--dvifm] [--geo] [--per-type] [--no-aic]
 """
 
 import argparse
@@ -246,10 +246,11 @@ def main() -> int:
     ap.add_argument("--per-type", action="store_true", help="add E21 statistics per distortion type")
     ap.add_argument("--no-public-test", action="store_true",
                     help="leave out the frozen-B public_test row (reuse panel_public_test_frozen.json instead)")
+    ap.add_argument("--no-aic", action="store_true", help="E21 sets only: read no AIC2026 label")
     a = ap.parse_args()
     dv, types = dvifm_e21() if (a.dvifm or a.per_type) else (None, None)
     j1, m1 = e21_jobs(a.arms.split(","), dv if a.dvifm else None)
-    j2, m2 = aic_jobs(public_test=not a.no_public_test)
+    j2, m2 = ([], []) if a.no_aic else aic_jobs(public_test=not a.no_public_test)
     res = panel_batch(j1 + j2, stats="full")
     rows = []
     for m, r, (label, x, y) in zip(m1 + m2, res, j1 + j2):
