@@ -2670,6 +2670,12 @@ byc-serve-parity-pairs bin_dir pairs pred out bake:
 byc-map-dump pairs out bake tag window="box" paint="nearest" split="repair" *flags="":
     cargo run --release --manifest-path zensim-bench/Cargo.toml --features dvifm-judge --example map_dump -- --pairs {{quote(pairs)}} --out {{quote(out)}} --bake {{quote(bake)}} --tag {{tag}} --window {{window}} --paint {{paint}} --split {{split}} {{flags}}
 
+# By-construction arms on both damage-mixture tests (standard and global-edit): inversions per E21 cell and the largest
+# rise, from the score files aic_mixture.sh wrote.
+byc-mixture-summary +arms:
+    python3 scripts/byconstruction/mixture_test.py summary --out /mnt/v/output/zensim/byconstruction-2026-10-22/mixture {{arms}}
+    python3 scripts/byconstruction/mixture_test.py summary --out /mnt/v/output/zensim/byconstruction-2026-10-22/mixture_global {{arms}}
+
 # The built workbench module (PKG = its pkg-zensimx) against the native crate on one synthetic pair: every metric's
 # score and every map's sum; same ZENSIM_WORKBENCH_BAKES as the build.
 byc-workbench-smoke pkg:

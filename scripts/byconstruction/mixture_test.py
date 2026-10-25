@@ -6,6 +6,7 @@ Exploration record: benchmarks/byconstruction_2026-10-22.md. No human label is r
                                       write ref / D1 / D2∘D1 PNGs and manifest.json
   score    --out DIR --bake NAME=PATH [--bake ...] [--jobs 6] [--post raw]
   report   --out DIR
+  summary  --out DIR ARM [ARM ...]    per arm: inversions per E21 cell (range and total) and the largest rise
   pairs    --out DIR --tsv PAIRS.tsv  every (reference, image) pair, for extract_features_372col --corpus pairs-tsv
   feature-steps --out DIR --tsv PAIRS.tsv --csv NAME=FEATURES.csv [--csv ...] --ids IDS.txt
                                       per feature, the share of D1 -> D2∘D1 steps on which it falls (features
@@ -34,6 +35,7 @@ import numpy as np
 from PIL import Image
 
 INV = Path("/mnt/v/output/zensim/e34-prep-2026-10-15/part5/p4-inventory-r2")
+E21_SETS = ("kadid", "tid2013", "konfig", "cid22_a25")
 SCORER = "score_pair_with_bake"
 
 
@@ -184,8 +186,7 @@ def cmd_score(a):
     return 0
 
 
-def cmd_report(a):
-    out = Path(a.out)
+def report(out: Path) -> dict:
     man = json.loads((out / "manifest.json").read_text())
     res = {}
     for f in sorted(out.glob("scores_*.json")):
@@ -198,7 +199,26 @@ def cmd_report(a):
                            "inversions_over_1pt": int((rise > 1).sum()), "max_rise": float(rise.max()),
                            "worst_cells": sorted(((k, float(np.max(v)), int(np.sum(np.array(v) > 0)))
                                                   for k, v in by.items()), key=lambda t: -t[1])[:5]}
-    print(json.dumps(res, indent=1))
+    return res
+
+
+def cmd_report(a):
+    print(json.dumps(report(Path(a.out)), indent=1))
+    return 0
+
+
+def cmd_summary(a):
+    """Per arm: the range of inversions over its E21 cells (`<arm>_<held-out set>_s<seed>` score files), their total
+    and the largest rise."""
+    res = report(Path(a.out))
+    for arm in a.arms:
+        cells = {k: v for k, v in res.items()
+                 if k.startswith(f"{arm}_") and k[len(arm) + 1:].rsplit("_s", 1)[0] in E21_SETS}
+        if not cells:
+            raise ValueError(f"{arm}: no scored cells in {a.out}")
+        inv = [v["inversions"] for v in cells.values()]
+        print(f"{arm}: {len(cells)} cells, inversions per cell {min(inv)}-{max(inv)} ({sum(inv)} in all), "
+              f"largest rise {max(v['max_rise'] for v in cells.values()):+.2f}")
     return 0
 
 
@@ -257,6 +277,9 @@ def main():
     s.add_argument("--jobs", type=int, default=6)
     r = sub.add_parser("report")
     r.add_argument("--out", required=True)
+    sm = sub.add_parser("summary")
+    sm.add_argument("--out", required=True)
+    sm.add_argument("arms", nargs="+", help="arm labels whose cells were scored (scores_<arm>_<set>_s<seed>.json)")
     p = sub.add_parser("pairs")
     p.add_argument("--out", required=True)
     p.add_argument("--tsv", required=True)
@@ -266,8 +289,8 @@ def main():
     f.add_argument("--csv", action="append", required=True, help="NAME=FEATURES.csv")
     f.add_argument("--ids", required=True, help="feature ids to check (whitespace or comma separated)")
     a = ap.parse_args()
-    return {"generate": cmd_generate, "score": cmd_score, "report": cmd_report, "pairs": cmd_pairs,
-            "feature-steps": cmd_feature_steps}[a.cmd](a)
+    return {"generate": cmd_generate, "score": cmd_score, "report": cmd_report, "summary": cmd_summary,
+            "pairs": cmd_pairs, "feature-steps": cmd_feature_steps}[a.cmd](a)
 
 
 if __name__ == "__main__":
