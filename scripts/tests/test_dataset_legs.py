@@ -5,6 +5,9 @@ from pathlib import Path
 import sys
 import tempfile
 import unittest
+from types import SimpleNamespace
+import pyarrow as pa
+import pyarrow.parquet as pq
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]/"rev4_featpot"))
 import test_subjective_training_leg as legacy
@@ -41,6 +44,26 @@ class DatasetAuthority(unittest.TestCase):
 
 
 class DatasetTargets(unittest.TestCase):
+    def test_report_counts_informative_pairs_and_ledgers_derived_targets(self):
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d)
+            (p/"datasets").mkdir()
+            table = p/"mos.parquet"
+            pq.write_table(pa.table(dict(ref_basename=["r"]*3,human_score=[1.,1.,2.])),table)
+            keys = p/"keys.json"
+            keys.write_text(json.dumps([dict(family="f")]*3))
+            ledger = p/"LABEL_READS.json"
+            ledger.write_text('{"role":"TRAIN","reads":[]}')
+            group = dict(collection="fixture",path=str(table),keys_path=str(keys),rows=3,membership_rows=3,
+                         pairs=3,train_weight=0.75,dropped={})
+            (p/"datasets/receipt.json").write_text(json.dumps(dict(groups=[group],label_reads_path=str(ledger))))
+            output = p/"counts.json"
+            root.cmd_dataset_report(SimpleNamespace(root=str(p),out=str(output)))
+            count = json.loads(output.read_text())["fixture"]
+            self.assertEqual((count["candidate_pairs"],count["informative_pairs"],count["exact_mos_tied_pairs"]),(3,2,1))
+            read = json.loads(ledger.read_text())["reads"][0]
+            self.assertEqual((read["rows"],read["state"]),([0,1,2],"read"))
+
     def test_only_selected_train_lines_are_parsed_and_ledgered(self):
         with tempfile.TemporaryDirectory() as d:
             p = Path(d)/"labels.tsv"

@@ -387,6 +387,36 @@ def cmd_datasets(a):
     return 0
 
 
+def cmd_dataset_report(a):
+    root, output = Path(a.root), Path(a.out)
+    packet = json.loads((root/"datasets/receipt.json").read_text())
+    ledger_path = Path(packet["label_reads_path"])
+    ledger = json.loads(ledger_path.read_text())
+    result = {}
+    for r in packet["groups"]:
+        # Record this read of already-derived TRAIN targets separately from
+        # the original source-table reads. No held-out target is accessed.
+        ledger["reads"].append(dict(collection=r["collection"],table=r["path"],
+            rows=list(range(r["rows"])),columns=["ref_basename","human_score"],
+            row_count=r["rows"],state="requested",kind="derived-TRAIN-pair-count"))
+        ledger_path.write_text(json.dumps(ledger,indent=1)+"\n")
+        t = pq.read_table(r["path"],columns=["ref_basename","human_score"])
+        grouped = collections.defaultdict(collections.Counter)
+        for ref,score in zip(t["ref_basename"].to_pylist(),t["human_score"].to_pylist()):
+            grouped[ref][score] += 1
+        tied = sum(sum(n*(n-1)//2 for n in counts.values()) for counts in grouped.values())
+        keys = json.loads(Path(r["keys_path"]).read_text())
+        result[r["collection"]] = dict(membership_rows=r["membership_rows"],rows=r["rows"],groups=len(grouped),
+            families=len({k["family"] for k in keys}),candidate_pairs=r["pairs"],
+            informative_pairs=r["pairs"]-tied,exact_mos_tied_pairs=tied,dropped=r["dropped"],
+            nominal_weight=0.5,train_weight=r["train_weight"])
+        ledger["reads"][-1]["state"] = "read"
+        ledger_path.write_text(json.dumps(ledger,indent=1)+"\n")
+    output.write_text(json.dumps(result,indent=1)+"\n")
+    print(json.dumps(result,indent=1))
+    return 0
+
+
 def log(msg: str) -> None:
     print(f"{time.strftime('%F %T')} {msg}", flush=True)
 
@@ -970,6 +1000,10 @@ def main() -> int:
     for flag in ("root", "out", "admission", "features", "library", "columns"):
         ds.add_argument("--"+flag, required=True)
     ds.set_defaults(fn=cmd_datasets)
+    dr = sub.add_parser("dataset-report")
+    dr.add_argument("--root", required=True)
+    dr.add_argument("--out", required=True)
+    dr.set_defaults(fn=cmd_dataset_report)
     p = sub.add_parser("pool")
     p.add_argument("--arm", choices=sorted(ARMS), default="hpm")
     p.add_argument("--bin", required=True)
