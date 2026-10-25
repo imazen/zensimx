@@ -2,6 +2,9 @@
 rev7-inventory out:
     python3 -B scripts/rev7/inventory.py --out {{quote(out)}}
 
+rev7-probe-ssim out:
+    python3 -B scripts/rev7/probe_ssim_reference.py {{quote(out)}}
+
 rev7-tool-tests:
     TMPDIR="$HOME/tmp" python3 -B -m unittest discover -s scripts/tests -p 'test_rev7_*.py' -v
 
