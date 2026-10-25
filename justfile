@@ -1,4 +1,17 @@
 # Identifier-only preparation; no pixel or subjective table is opened.
+rev7-tool-tests:
+    TMPDIR="$HOME/tmp" python3 -B -m unittest discover -s scripts/tests -p 'test_rev7_*.py' -v
+
+# Run builds, scoring and verification under the caller's run-heavy scope.
+rev7-baseline-test:
+    cargo test --locked --release -p zensim --all-features
+
+rev7-oracle-build:
+    cargo build --locked --release -p zensim-validate --bin byc_score_timing --bin byc_stub_bake --bin bake_stamp_revision
+
+rev7-oracle-dumps out:
+    bash scripts/rev7/oracle_dumps.sh {{quote(out)}}
+
 dataset-assessment-keys collection admission out extractor commit:
     OPENBLAS_NUM_THREADS=1 PYTHONDONTWRITEBYTECODE=1 nice -n19 ionice -c3 python3 -B scripts/byconstruction/dataset_keys.py {{collection}} --admission {{admission}} --out {{out}} --extractor {{extractor}} --build-commit {{commit}}
 

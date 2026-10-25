@@ -25,14 +25,24 @@ def main():
     ap.add_argument("cand", nargs="?")
     ap.add_argument("--allow-diff", action="store_true")
     ap.add_argument("--tiers", action="store_true", help="compare tiers within BASE instead of two dirs")
+    ap.add_argument("--model", help="restrict --tiers to one model name")
     a = ap.parse_args()
     if a.tiers:
         groups = {}
         for f in sorted(Path(a.base).glob("*.hex")):
             bake, pair = f.stem.split("_")[0], "_".join(f.stem.split("_")[1:-2])
+            if a.model is not None and bake != a.model:
+                continue
             groups.setdefault((bake, pair), []).append(f)
         bad = 0
+        if not groups:
+            sys.exit(f"no dumps in {a.base}")
         for (bake, pair), files in groups.items():
+            actual = {"_".join(f.stem.split("_")[-2:]) for f in files}
+            expected = {"v4x_t1", "v4_t1", "v3_t1", "scalar_t1", "v4x_t8"}
+            if actual != expected:
+                print(f"TIER COVERAGE {bake}/{pair}: missing {sorted(expected - actual)}, extra {sorted(actual - expected)}")
+                bad += 1
             ref = files[0].read_bytes()
             for f in files[1:]:
                 if f.read_bytes() != ref:
@@ -46,12 +56,17 @@ def main():
     names = sorted(p.name for p in base.glob("*.hex"))
     if not names:
         sys.exit(f"no dumps in {base}")
-    bad, worst = 0, 0.0
+    extra = sorted(p.name for p in cand.glob("*.hex") if p.name not in names)
+    for name in extra:
+        print(f"EXTRA {name}")
+    bad, worst = len(extra), 0.0
+    differing = 0
     for n in names:
         c = cand / n
         if not c.exists():
             print(f"MISSING {n}")
             bad += 1
+            differing += 1
             continue
         if c.read_bytes() == (base / n).read_bytes():
             continue
@@ -59,6 +74,7 @@ def main():
         if len(va) != len(vb):
             print(f"LENGTH {n}: {len(va)} vs {len(vb)}")
             bad += 1
+            differing += 1
             continue
         moved = [(i, x, y) for i, (x, y) in enumerate(zip(va, vb)) if struct.pack("<d", x) != struct.pack("<d", y)]
         rel = max(abs(y - x) / max(abs(x), 1e-30) for _, x, y in moved)
@@ -66,7 +82,8 @@ def main():
         score = " (score moved)" if moved[0][0] == 0 else ""
         print(f"DIFF {n}: {len(moved)} of {len(va)} values, max rel {rel:.3e}{score}, first index {moved[0][0]}")
         bad += 1
-    print(f"{len(names) - bad} of {len(names)} dumps identical; worst relative change {worst:.3e}")
+        differing += 1
+    print(f"{len(names) - differing} of {len(names)} dumps identical; {len(extra)} extra dumps; worst relative change {worst:.3e}")
     if bad and not a.allow_diff:
         sys.exit(1)
 

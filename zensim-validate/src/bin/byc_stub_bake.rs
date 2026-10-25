@@ -4,7 +4,8 @@
 //! declares the ids (dense contract: one input per id, ascending) and a formula revision, and weighs every input
 //! −1e-3, so `BakeScorer` plans and computes exactly the features those ids need. Its score means nothing.
 //!
-//! Usage: byc_stub_bake --ids-file PATH (whitespace-separated ids) --revision 5|6|7 --out PATH
+//! Usage: byc_stub_bake [--ids-file PATH (whitespace-separated ids)] --revision 5|6|7 --out PATH
+//! Without --ids-file, revision 7 declares the registry's entire basic + peaks + v2 + globaff scope.
 
 fn main() {
     let mut ids_file = None;
@@ -20,22 +21,38 @@ fn main() {
             other => panic!("unknown argument {other}"),
         }
     }
-    let (ids_file, revision, out) = match (ids_file, revision, out) {
-        (Some(i), Some(r), Some(o)) => (i, r, o),
+    let (revision, out) = match (revision, out) {
+        (Some(r), Some(o)) => (r, o),
         _ => {
-            eprintln!("usage: byc_stub_bake --ids-file PATH --revision 5|6|7 --out PATH");
+            eprintln!("usage: byc_stub_bake [--ids-file PATH] --revision 5|6|7 --out PATH");
             std::process::exit(2);
         }
     };
-    let text =
-        std::fs::read_to_string(&ids_file).unwrap_or_else(|e| panic!("read {ids_file}: {e}"));
-    let mut ids: Vec<usize> = text
-        .split_ascii_whitespace()
-        .map(|t| t.parse().unwrap_or_else(|_| panic!("bad id {t}")))
-        .collect();
+    let mut ids: Vec<usize> = if let Some(path) = ids_file {
+        std::fs::read_to_string(&path)
+            .unwrap_or_else(|e| panic!("read {path}: {e}"))
+            .split_ascii_whitespace()
+            .map(|t| t.parse().unwrap_or_else(|_| panic!("bad id {t}")))
+            .collect()
+    } else {
+        assert_eq!(revision, "7", "--ids-file is required below revision 7");
+        use zensim::feature_set_id::ComputeToken;
+        [
+            ComputeToken::Basic,
+            ComputeToken::Peaks,
+            ComputeToken::V2,
+            ComputeToken::GlobAff,
+        ]
+        .into_iter()
+        .fold(zensim::feature_set_id::SlotSet::default(), |ids, family| {
+            ids.union(&zensim::research::family_slots(family))
+        })
+        .iter_slots()
+        .collect()
+    };
     ids.sort_unstable();
     ids.dedup();
-    assert!(!ids.is_empty(), "no ids in {ids_file}");
+    assert!(!ids.is_empty(), "no feature ids");
     let n = ids.len();
     let id_text = ids
         .iter()

@@ -15,10 +15,61 @@
 //!
 //! Usage: byc_score_timing --bake PATH [--size N | --width W --height H | --image PNG]
 //!        [--iters 30] [--warmup 5] [--dump PATH] [--tier v4x|v4|v3|scalar] [--read-set]
+//! Or --profile A|B|BHdr for the named serving entry; --hdr-nits converts the pair
+//! to sRGB-primary absolute nits (203 cd/m² white), and --hdr-fixture NAME uses
+//! the integration tests' native-color / CHdr PU fixture generators verbatim.
+#![allow(deprecated)]
 use std::time::Instant;
 
-use zensim::{BakeScorer, RgbSlice};
+use zensim::{BakeScorer, RgbSlice, Zensim, ZensimProfile};
 use zensim_validate::bake_runtime::post_mode_params;
+
+#[path = "../../../zensim/tests/fixtures/hdr_pairs.rs"]
+mod hdr_pairs;
+
+type NitsPair = (Vec<f32>, Vec<f32>, usize, usize);
+
+fn hdr_fixture(name: &str) -> NitsPair {
+    match name {
+        "native17" | "native97" => {
+            let (w, h) = if name == "native17" {
+                (17, 9)
+            } else {
+                (97, 65)
+            };
+            let (a, b) = hdr_pairs::native_color(w, h);
+            let rgb = |px: Vec<[f32; 4]>| px.into_iter().flat_map(|p| [p[0], p[1], p[2]]).collect();
+            (rgb(a), rgb(b), w, h)
+        }
+        _ => {
+            let (w, h, seed) = match name {
+                "chdr17" => (17, 19, 0x9e37_79b9_7f4a_7c15),
+                "chdr64" => (64, 64, 0x2545_f491_4f6c_dd1d),
+                "chdr97" => (97, 65, 0x1234_5678_9abc_def1),
+                "chdr256" => (256, 128, 0x0bad_c0de_dead_beef),
+                _ => panic!("unknown HDR fixture {name}"),
+            };
+            let (a, b) = hdr_pairs::chdr_pu(w, h, seed);
+            (a, b, w, h)
+        }
+    }
+}
+
+fn nits(px: &[[u8; 3]]) -> Vec<f32> {
+    px.iter()
+        .flat_map(|p| {
+            p.map(|v| {
+                let v = f64::from(v) / 255.0;
+                let lin = if v <= 0.04045 {
+                    v / 12.92
+                } else {
+                    ((v + 0.055) / 1.055).powf(2.4)
+                };
+                (lin * 203.0) as f32
+            })
+        })
+        .collect()
+}
 
 /// Disable the tokens above `tier` (x86-64 only; `v4x` disables nothing).
 fn force_tier(tier: &str) {
@@ -70,7 +121,14 @@ fn force_tier(tier: &str) {
                 "v2",
             );
         }
-        let _ = X64V3Token::summon();
+        let available = match tier {
+            "v4x" => X64V4xToken::summon().is_some(),
+            "v4" => X64V4Token::summon().is_some(),
+            "v3" => X64V3Token::summon().is_some(),
+            "scalar" => true,
+            _ => unreachable!(),
+        };
+        assert!(available, "requested tier {tier} is unavailable on this host");
     }
     #[cfg(not(target_arch = "x86_64"))]
     assert!(
@@ -133,6 +191,7 @@ fn main() {
     let mut args = std::env::args().skip(1);
     let (mut bake, mut iters, mut warmup) = (None, 30usize, 5usize);
     let mut read_set = false;
+    let (mut profile, mut fixture, mut hdr_nits) = (None, None, false);
     let (mut width, mut height, mut image, mut dump, mut tier) = (
         1024usize,
         None::<usize>,
@@ -147,6 +206,9 @@ fn main() {
     while let Some(a) = args.next() {
         match a.as_str() {
             "--bake" => bake = args.next(),
+            "--profile" => profile = args.next(),
+            "--hdr-fixture" => fixture = args.next(),
+            "--hdr-nits" => hdr_nits = true,
             "--size" | "--width" => width = num(args.next(), &a),
             "--height" => height = Some(num(args.next(), "--height")),
             "--iters" => iters = num(args.next(), "--iters"),
@@ -158,9 +220,22 @@ fn main() {
             other => panic!("unknown argument {other}"),
         }
     }
-    let bake = bake.expect("--bake PATH");
+    assert!(
+        bake.is_some() != profile.is_some(),
+        "choose --bake PATH or --profile A|B|BHdr"
+    );
+    assert!(iters > 0, "--iters must be positive");
+    assert!(
+        !(hdr_nits || fixture.is_some()) || profile.is_some(),
+        "HDR dump mode requires --profile"
+    );
+    assert!(
+        !(fixture.is_some() && image.is_some()),
+        "--hdr-fixture and --image conflict"
+    );
     if read_set {
-        let model = zenpredict::Model::from_bytes(&std::fs::read(&bake).expect("read bake"))
+        let bake = bake.as_ref().expect("--read-set requires --bake PATH");
+        let model = zenpredict::Model::from_bytes(&std::fs::read(bake).expect("read bake"))
             .expect("parse bake");
         let ids = zensim::declared_feature_ids(&model).expect("declared feature ids");
         let ids: Vec<String> = ids.iter().map(|i| i.to_string()).collect();
@@ -170,37 +245,66 @@ fn main() {
     if let Some(t) = &tier {
         force_tier(t);
     }
-    let (src, dst, w, h) = match &image {
-        Some(path) => from_image(path),
-        None => {
+    let fixture_pair = fixture.as_deref().map(hdr_fixture);
+    let (src, dst, w, h) = match (&image, &fixture_pair) {
+        (_, Some((_, _, w, h))) => (Vec::new(), Vec::new(), *w, *h),
+        (Some(path), None) => from_image(path),
+        (None, None) => {
             let h = height.unwrap_or(width);
             let (s, d) = synthetic(width, h);
             (s, d, width, h)
         }
     };
-    let model = zenpredict::Model::from_bytes(&std::fs::read(&bake).expect("read bake"))
-        .expect("parse bake");
+    let hdr = fixture_pair.or_else(|| hdr_nits.then(|| (nits(&src), nits(&dst), w, h)));
+    let model = bake.as_ref().map(|path| {
+        zenpredict::Model::from_bytes(&std::fs::read(path).expect("read bake")).expect("parse bake")
+    });
     let params = post_mode_params("raw").expect("raw post");
-    let mut scorer = BakeScorer::new(&model)
-        .expect("score metadata")
-        .with_score_disposition(&params)
-        .expect("disposition");
-    let (s, d) = (RgbSlice::new(&src, w, h), RgbSlice::new(&dst, w, h));
+    let mut scorer = model.as_ref().map(|model| {
+        BakeScorer::new(model)
+            .expect("score metadata")
+            .with_score_disposition(&params)
+            .expect("disposition")
+    });
+    let named = profile.as_deref().map(|p| {
+        Zensim::new(match p {
+            "A" => ZensimProfile::A,
+            "B" => ZensimProfile::B,
+            "BHdr" => ZensimProfile::BHdr,
+            _ => panic!("unknown profile {p}: expected A|B|BHdr"),
+        })
+    });
+    let mut compute = || {
+        if let (Some(z), Some((s, d, w, h))) = (&named, &hdr) {
+            return z
+                .compute_pu_linear(s, d, *w, *h, w * 3, w * 3)
+                .expect("HDR score");
+        }
+        let (s, d) = (RgbSlice::new(&src, w, h), RgbSlice::new(&dst, w, h));
+        match &mut scorer {
+            Some(scorer) => scorer.compute(&s, &d, None).expect("score"),
+            None => named
+                .as_ref()
+                .expect("named profile")
+                .compute(&s, &d)
+                .expect("named score"),
+        }
+    };
     let mut score = 0.0;
     for _ in 0..warmup {
-        score = scorer.compute(&s, &d, None).expect("score").score();
+        score = compute().score();
     }
     let mut ms = Vec::with_capacity(iters);
     for _ in 0..iters {
         let t = Instant::now();
-        let r = scorer.compute(&s, &d, None).expect("score");
+        let r = compute();
         ms.push(t.elapsed().as_secs_f64() * 1e3);
         score = r.score();
     }
     ms.sort_by(f64::total_cmp);
     let q = |p: f64| ms[((ms.len() - 1) as f64 * p).round() as usize];
     if let Some(path) = &dump {
-        let r = scorer.compute(&s, &d, None).expect("score");
+        let r = compute();
         let mut out = format!("{:016x}\n", r.score().to_bits());
         for f in r.features() {
             out.push_str(&format!("{:016x}\n", f.to_bits()));
