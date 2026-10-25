@@ -18,6 +18,12 @@ rev7-oracle-build:
 rev7-oracle-dumps out:
     bash scripts/rev7/oracle_dumps.sh {{quote(out)}}
 
+rev7-bits-compare base cand:
+    python3 -B scripts/byconstruction/perf_bits_compare.py {{quote(base)}} {{quote(cand)}}
+
+rev7-bits-tiers root model:
+    python3 -B scripts/byconstruction/perf_bits_compare.py --tiers --model {{quote(model)}} {{quote(root)}}
+
 dataset-assessment-keys collection admission out extractor commit:
     OPENBLAS_NUM_THREADS=1 PYTHONDONTWRITEBYTECODE=1 nice -n19 ionice -c3 python3 -B scripts/byconstruction/dataset_keys.py {{collection}} --admission {{admission}} --out {{out}} --extractor {{extractor}} --build-commit {{commit}}
 
