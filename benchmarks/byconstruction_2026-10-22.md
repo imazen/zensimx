@@ -3118,7 +3118,7 @@ inside ladders compared on every set (reported with Z-RMSE and its p99), with th
 **Withdrawn (my error).** The owner ruled on 2026-10-23 that "scale 0 is mandatory: no candidate drops the finest
 scale" ("AIC2026 TRAIN" above, owner decisions; its 41–46% instruction saving was measured then). I missed that
 decision and pre-registered this experiment anyway. The T class had already run when I found it; its result below
-agrees with the ruling (without scale 0, JPEG is rated too well). The M class was stopped at 05:20 UTC with no cell
+agrees with the ruling (without scale 0, JPEG is rated too well). The M class was stopped at 05:08 UTC with no cell
 finished; its partial cells are kept aside (`~/tmp/byc/cells/Mns0.stopped-scale0-mandatory-0525`). `cell_share.py`
 and `byc_stub_bake` stay as tools; no read set without scale 0 is a candidate.
 
