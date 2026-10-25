@@ -23,7 +23,6 @@ import json
 import math
 import hashlib
 import shutil
-import random
 import statistics as st
 import subprocess
 import sys
@@ -255,16 +254,38 @@ def mos_interval(rows, scores, resamples=2000):
     return result, len(points)
 
 
-def statistic(rows, s, kind):
-    if kind == "pair":
-        vals = []
-        for r in rows:
-            if r["a"] in s and r["b"] in s:
-                d = s[r["a"]] - s[r["b"]]
-                vals.append(r["target"] if d > 0 else (1 - r["target"]) if d < 0 else 0.5)
-        return st.mean(vals) if vals else float("nan"), len(vals)
-    pts = [(s[r["a"]], r["target"]) for r in rows if r["a"] in s]
-    return spearman([p[0] for p in pts], [p[1] for p in pts]), len(pts)
+def pair_agreement(rows, s, resamples=2000, seed=1):
+    """Forced-choice agreement from the canonical owner (zenstats::forced_choice through `panel --pairwise`) with a
+    whole-reference bootstrap interval. A pair's soft probability p_a that A is closer to the reference becomes two
+    weighted responses (B more distorted, weight p_a; A more distorted, weight 1 - p_a), so each pair weighs 1 and the
+    owner's weighted agreement is the mean over pairs of p_a·[A ahead] + (1 - p_a)·[B ahead] + ½·[tie]."""
+    from lib.zen_stats import _find_panel_bin
+    pairs = [r for r in rows if r["a"] in s and r["b"] in s]
+    resp = [(r["group"], s[r["a"]], s[r["b"]], c, w) for r in pairs
+            for c, w in (("right", r["target"]), ("left", 1 - r["target"])) if w > 0]
+    if not resp:
+        return math.nan, math.nan, math.nan, 0
+    tsv = "group\ts_left\ts_right\tchoice\tweight\n" + "".join(f"{g}\t{a!r}\t{b!r}\t{c}\t{w!r}\n" for g, a, b, c, w in resp)
+    out = subprocess.run([_find_panel_bin(), "--pairwise", "-"], input=tsv, capture_output=True, text=True,
+                         check=True).stdout.strip().splitlines()
+    head, row = out[0].split("\t"), out[1].split("\t")
+    acc = float(row[head.index("acc_response")])
+    # The interval resamples whole references over per-reference sums of the same agreement, checked against the owner.
+    gi = {g: i for i, g in enumerate(dict.fromkeys(x[0] for x in resp))}
+    g = np.array([gi[x[0]] for x in resp])
+    a, b, w = (np.array([x[k] for x in resp], np.float64) for k in (1, 2, 4))
+    right = np.array([x[3] == "right" for x in resp])
+    agree = np.where(a == b, 0.5, np.where(right, a > b, a < b).astype(np.float64))
+    num, den = np.bincount(g, w * agree, len(gi)), np.bincount(g, w, len(gi))
+    if abs(num.sum() / den.sum() - acc) > 1e-8:
+        raise ValueError(f"pairwise agreement {num.sum() / den.sum()} disagrees with the owner's {acc}")
+    rng = np.random.default_rng(seed)
+    boots = np.empty(resamples)
+    for i in range(resamples):
+        k = np.bincount(rng.integers(0, len(gi), len(gi)), minlength=len(gi))
+        boots[i] = (k @ num) / (k @ den)
+    lo, hi = np.quantile(boots, [0.025, 0.975])  # Hyndman-Fan type 7
+    return acc, float(lo), float(hi), len(pairs)
 
 
 def within(rows, s):
@@ -356,7 +377,6 @@ def cmd_report(a):
     rows = read_eval_rows(out, "dataset-eval-report")
     scores = load_scores(out)
     names = sorted(scores)
-    rng = random.Random(1)
     lines = ["| Collection | Rows | Statistic | " + " | ".join(names) + " |", "|---|---|---|" + "---|" * len(names)]
     result = {}
     for c in sorted({r["collection"] for r in rows}):
@@ -364,7 +384,6 @@ def cmd_report(a):
         if not rr:
             continue
         kind = rr[0]["kind"]
-        groups = sorted({r["group"] for r in rr})
         cells, cells_w = [], []
         for n in names:
             method = None
@@ -373,16 +392,7 @@ def cmd_report(a):
                 v,lo,hi = (interval["signed"][k] for k in ("estimate","lo","hi"))
                 method = interval["srocc_ci_method"]
             else:
-                v, used = statistic(rr, scores[n], kind)
-                # Pairwise agreement retains the original reference bootstrap.
-                by_group = {g:[r for r in rr if r["group"] == g] for g in groups}
-                boots = []
-                for _ in range(2000):
-                    pick = [groups[rng.randrange(len(groups))] for _ in groups]
-                    sample = [r for g in pick for r in by_group[g]]
-                    boots.append(statistic(sample, scores[n], kind)[0])
-                boots = sorted(b for b in boots if not math.isnan(b))
-                lo, hi = (boots[int(0.025 * len(boots))], boots[int(0.975 * len(boots)) - 1]) if boots else (math.nan,) * 2
+                v, lo, hi, used = pair_agreement(rr, scores[n])
             cells.append(f"{v:.3f} [{lo:.3f}, {hi:.3f}]")
             result.setdefault(c, {})[n] = {"value": v, "ci95": [lo, hi], "n": used}
             if method is not None:

@@ -95,6 +95,22 @@ class DatasetEval(unittest.TestCase):
             self.assertGreater(m["delta"][m["delta_order"].index("srocc")]["estimate"], 0.0)
             self.assertIn("| c | A − B |", (p/"paired/paired.md").read_text())
 
+    def test_pair_agreement_is_the_soft_formula_through_the_owner(self):
+        rows, s = [], {}
+        for i, (pa, da, db) in enumerate([(1.0, 3, 1), (0.0, 3, 1), (0.3, 3, 1), (0.5, 2, 5), (0.8, 4, 4),
+                                          (0.9, 1, 2), (0.6, 7, 3), (0.2, 2, 6)]):
+            s[f"a{i}"], s[f"b{i}"] = float(da), float(db)
+            rows.append(dict(group=f"ref{i % 3}", a=f"a{i}", b=f"b{i}", target=pa))
+        def soft(r):
+            d = s[r["a"]] - s[r["b"]]
+            return r["target"] if d > 0 else (1 - r["target"]) if d < 0 else 0.5
+        want = sum(map(soft, rows)) / len(rows)
+        acc, lo, hi, n = evaluation.pair_agreement(rows, s, resamples=256)
+        self.assertEqual(n, 8)
+        self.assertAlmostEqual(acc, want, places=9)
+        self.assertLessEqual(lo, acc)
+        self.assertLessEqual(acc, hi)
+
     def test_mos_midrank_is_tie_aware_and_order_independent(self):
         x, y = [1.,1.,2.,3.], [1.,2.,2.,4.]
         self.assertAlmostEqual(evaluation.spearman(x,y), 5/6, places=14)
