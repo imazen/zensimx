@@ -58,3 +58,5 @@ Mlic root: `a7fd4af0c2bb5a8981be636e5c1cb1a51db57496b7c60d7bf6da01d71dd16952`; 2
 `LICENCE_POLICY.json`: `a87165b72ef0c1991a33d677aa3ad48245aa4102b9c6bb746e4e183d32746f46`.
 
 The initial `SOURCE_EQUIVALENCE.json` describes the 348407450b0d landing. Later Python changes add diagnostics, progress and Mlic policy handling; the native trainer and its recorded binary hash are unchanged.
+
+`FLEET_OWNERSHIP.json`: `f68d7e1a9f960eb69dd6a1add9857e223540a6ddcb6951345538ef475d8f2ef3`. Fleet exclusively owns 60 Mw100/Mmos/Mpair cells; the full submitted Mlic batch stays local. Source scripts are pinned to b7cb1a224dc7.

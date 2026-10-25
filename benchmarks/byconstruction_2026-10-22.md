@@ -4001,3 +4001,25 @@ min-avail 19312MiB | peak-load 14.98` (36 GiB scope, up to twelve one-thread
 fits). Mlic then acquired the shared lock for assembly and its 21 cells.
 At this record, 42 of the expanded 123 cells are complete; no six-arm
 finalist selection or new EVAL assessment has run.
+
+### Fleet ownership for the remaining mix arms
+
+The owner assigned Mw100 (21 cells), Mmos (21) and Mpair (18) exclusively
+to the fleet-cells lane: 60 cells, seeds 0–2, with the registered folds.
+All 21 submitted Mlic cells remain local (twelve fitting and nine queued
+inside the active executor at the ownership agreement). The completed
+Mdata and Mw025 cells stay unchanged. No fleet-owned cell had started
+locally: the waiting Mw100 flock was verified WRITE* and canceled before
+lock acquisition, which exited the local queue before Mmos/Mpair launch.
+
+Fleet scripts are pinned to b7cb1a224dc7a4835e7259fe41c447ffa4c811e4,
+with the six exact study binaries and frozen columns C. All binary hashes
+were rechecked at the agreement. The Mw025/without_kadid_s0 control's
+prediction SHA-256 is
+`9333a13dff53fa4200166e723a9c33f0a48cf32e6beacd40856163571d536eff`.
+Fleet arms remain gated on prediction parity and normalized-model parity;
+the prediction digest above is the local reference, not a claimed fleet
+pass. `FLEET_OWNERSHIP.json` records every assigned cell and the source pin.
+Verified complete cell directories are harvested into the same study tree;
+the consolidated 123-cell audit and TRAIN-only scorecard remain this study's
+acceptance path. Local and fleet jobsets do not overlap.
