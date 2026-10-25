@@ -36,6 +36,10 @@ pub const MAPS: &[(&str, &str, &str, &str, f32, usize)] = &[
     ("diffmap_px", "center", "guided", "exact", 0.0, 1),
     // Today's map: removal split, uniform window spread.
     ("removal", "box", "nearest", "repair", 0.0, 1),
+    // `diffmap` with the removal split instead of the exact one, everything
+    // else equal: the split's own effect in the JPEG XL loop ("Which split
+    // steers the JPEG XL loop").
+    ("diffmap_rem", "center", "guided", "repair", 3.0, 1),
     // 8×8 blocks for the JPEG XL loop.
     ("blocks8", "center", "nearest", "exact", 0.0, 8),
     // For steering: `diffmap` with the amplitude split (every nonlinear pool

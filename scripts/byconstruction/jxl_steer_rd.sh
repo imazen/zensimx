@@ -14,7 +14,8 @@
 # margarine_map_server.py), and further Margarine builds as arms named in MARGARINE_ARMS. Judge tables already in RD_DIR
 # move to judged-<UTC time>/ before the panel runs again.
 # Linear-input arms ("Correction ... the 8-bit rounding"): LINEAR_ARMS="label=METRIC@SCALE,EXPONENT ..." runs that
-# workbench map's diffmap on the loop's unrounded float reconstruction (steer_rd --linear); LINEAR_SERVER_ARMS=
+# workbench map's diffmap on the loop's unrounded float reconstruction (steer_rd --linear; a "#MAP" suffix names another
+# workbench map, e.g. label=METRIC@SCALE,EXPONENT#diffmap_rem); LINEAR_SERVER_ARMS=
 # "label=/path/to/server ..." starts `server --server`, which must advertise "input":"linear-rgb-f32" (zenmetrics'
 # margarine-steer). Each label is also listed in ARMS.
 #
@@ -77,8 +78,9 @@ for spec in ${MARGARINE_ARMS:-}; do
     ${place:+--scale "${place%,*}" --exponent "${place#*,}"}
 done
 for spec in ${LINEAR_ARMS:-}; do
-  label=${spec%%=*}; rest=${spec#*=}
-  run "$label" "workbench:${rest%@*}:diffmap" --placement "${rest##*@}" --linear
+  label=${spec%%=*}; rest=${spec#*=}; map=diffmap
+  case $rest in *#*) map=${rest##*#}; rest=${rest%#*} ;; esac
+  run "$label" "workbench:${rest%@*}:$map" --placement "${rest##*@}" --linear
 done
 for spec in ${LINEAR_SERVER_ARMS:-}; do
   label=${spec%%=*}
