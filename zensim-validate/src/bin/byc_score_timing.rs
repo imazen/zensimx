@@ -128,7 +128,10 @@ fn force_tier(tier: &str) {
             "scalar" => true,
             _ => unreachable!(),
         };
-        assert!(available, "requested tier {tier} is unavailable on this host");
+        assert!(
+            available,
+            "requested tier {tier} is unavailable on this host"
+        );
     }
     #[cfg(not(target_arch = "x86_64"))]
     assert!(
