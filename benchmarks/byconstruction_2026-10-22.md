@@ -3903,13 +3903,14 @@ fitting and bound with `BYC_COLS`; their SHA-256 is
 
 ### Mdata held-out-new-TRAIN baseline
 
-All nine cells completed at epoch119; predictions and group statistics are
+All nine cells completed at epoch 119; predictions and group statistics are
 saved in each `byc_record.json`. Every MOS reference correlation is defined.
-The three MOS-group fits omit PIPAL, pairs, or the other seven MOS sets,
-respectively, while retaining the older human TRAIN groups. Pair scores
+Each seed trains one model without PIPAL, one without the three pairwise
+sets, and one without the other seven MOS sets. All retain the older human
+TRAIN groups. Pair scores
 below use hard preferences; EVAL retains the original probabilities.
 
-| TRAIN collection | Statistic | Seed0 | Seed1 | Seed2 |
+| TRAIN collection | Statistic | Seed 0 | Seed 1 | Seed 2 |
 |---|---|---:|---:|---:|
 | bapps | hard-pair-agreement | 0.773495 | 0.752766 | 0.771227 |
 | cid-iq | within-reference-srocc | 0.902953 | 0.902042 | 0.912140 |
