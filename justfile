@@ -118,6 +118,28 @@ dataset-mix-local-mixtures study:
     done
 
 # Caller holds shared heavy.lock and run-heavy; no new labels outside TRAIN.
+dataset-mix-diagnostics study out arms='Mdata,Mw025,Mw100,Mmos,Mpair,Mlic':
+    #!/usr/bin/env bash
+    set -euo pipefail
+    study={{quote(study)}}
+    out={{quote(out)}}
+    arms={{quote(arms)}}
+    mkdir -p "$out"
+    test ! -e "$out/type_bias.json"
+    test ! -e "$out/knobinv.json"
+    test ! -e "$out/panel.json"
+    export BYC_ROOT=/var/tmp/datalegs-20261025/rev7data/root BYC_CELLS="$study/cells" REV4_V2_BIN_DIR="$study/bin" AIC_BIN="$study/bin" ZEN_PANEL_BIN="$study/bin/panel"
+    export ZENSIM_MAX_TIER=v3 BYC_LABEL_LEDGER_DIR="$out/label_reads" RAYON_NUM_THREADS=1 OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1
+    IFS=, read -r -a requested <<< "$arms"
+    for arm in "${requested[@]}"; do
+      test ! -e "$out/bytype_$arm.json"
+      python3 -B scripts/rev4_featpot/byc_cells.py bytype --arm "$arm" > "$out/bytype_$arm.json"
+    done
+    python3 -B scripts/byconstruction/type_bias.py "${requested[@]}" --out "$out/type_bias.json" > "$out/type_bias.txt"
+    python3 -B scripts/rev4_featpot/byc_cells.py knobinv --arms "$arms" --out "$out/knobinv.json" > "$out/knobinv.txt"
+    python3 -B scripts/byconstruction/aic_panel.py --out "$out/panel.json" --arms "base-c,$arms" --geo --no-aic --no-public-test > "$out/panel.txt" 2>&1
+
+# Caller holds shared heavy.lock and run-heavy; no new labels outside TRAIN.
 dataset-mix-scorecard study:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -132,12 +154,7 @@ dataset-mix-scorecard study:
     just dataset-mix-forced-choice-controls "$study" > "$out/forced-choice-controls.txt"
     arms=Mdata,Mw025,Mw100,Mmos,Mpair,Mlic
     just dataset-mix-e21 "$study" "$out" "$arms"
-    for arm in Mdata Mw025 Mw100 Mmos Mpair Mlic; do
-      python3 -B scripts/rev4_featpot/byc_cells.py bytype --arm "$arm" > "$out/bytype_$arm.json"
-    done
-    python3 -B scripts/byconstruction/type_bias.py Mdata Mw025 Mw100 Mmos Mpair Mlic --out "$out/type_bias.json" > "$out/type_bias.txt"
-    python3 -B scripts/rev4_featpot/byc_cells.py knobinv --arms "$arms" --out "$out/knobinv.json" > "$out/knobinv.txt"
-    python3 -B scripts/byconstruction/aic_panel.py --out "$out/panel.json" --arms "base-c,$arms" --geo --no-aic --no-public-test > "$out/panel.txt" 2>&1
+    just dataset-mix-diagnostics "$study" "$out" "$arms"
     just dataset-mix-mixtures "$study" "$arms" > "$study/mixture-score.log" 2>&1
     for set in mixture mixture_global; do
       mix="$study/$set"
