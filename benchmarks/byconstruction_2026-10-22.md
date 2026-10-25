@@ -3889,3 +3889,13 @@ Artifacts checked on dev:
 `/var/tmp/byc-mixes-20261025`. The source cut, patch, binary hashes, root
 inventory, default control and ledgers are retained there. At this assembly
 record, mix fits and finalist EVAL assessment are not yet complete.
+
+
+A pre-fit receipt check also confirms that each variant retains all18
+inherited payload digests unchanged, and that every included dataset table
+has Mdata's payload digest (11,11,8,3 tables for Mw025,Mw100,Mmos,Mpair).
+Native admission verifies the actual payload hashes before fitting; the
+end-of-run audit repeats the byte checks. The local control receipt is
+`ROOT_ROW_EQUIVALENCE.json`. Columns C are now copied into the study before
+fitting and bound with `BYC_COLS`; their SHA-256 is
+`e662c7225c7f6aca27bf208161b0d1b99f6d2ba7be427dfa37c4ac4ec1c49c75`.

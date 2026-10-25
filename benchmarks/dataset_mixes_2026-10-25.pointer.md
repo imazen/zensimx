@@ -20,6 +20,14 @@ The build's source patch and file pins are retained alongside the binaries.
 | `BIN_SHA256SUMS` | `ef2d70d6e62b4c4bbeb1a553ffabf1e17ceefa1d62d99ac50bcdc21859965202` |
 | `SOURCE_EQUIVALENCE.json` | `f604b6ae0d5cb44ca887c94a060fd2b3609933c2ced0037b844fbfecc64c981b` |
 
+The study freezes columns C and the fx1 declaration in `frozen_configuration/`.
+Their bytes match every root's declared feature IDs; fits bind this local copy
+through `BYC_COLS` (9ffb8c188a73). Hashes:
+
+- `frozen_configuration/cols_c.txt`: `e662c7225c7f6aca27bf208161b0d1b99f6d2ba7be427dfa37c4ac4ec1c49c75`.
+- `frozen_configuration/e33_fx1_declaration.json`: `a97a5fa63937ed8fade3c56fd7470765a031d1d309afc36e631f371a1796e648`.
+- `ROOT_ROW_EQUIVALENCE.json`: `61c8cfa792acbf866b8794155ec6f9305c47ccebe7f7a09e508ebc853e4b0097`.
+
 Both default-rebuild controls have frozen-file SHA-256
 `743d20148bbd265c829490621ed45a74bcde0842fdc47cc2b3f1f67b2e0d0115`;
 all root files compare byte-identically. The original Mdata root remains
