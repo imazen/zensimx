@@ -66,3 +66,7 @@ The initial `SOURCE_EQUIVALENCE.json` describes the 348407450b0d landing. Later 
 requires `BINARY_CELL_CONTROLS.json` covering all 123 records; the partial
 receipt cannot satisfy it. Changed-trainer and missing-cell negative
 controls are recorded in `BINARY_CELL_CONTROLS_NEGATIVE.json`.
+
+Mlic has completed all 21 cells at fixed epoch 119. Together with Mdata and
+Mw025, 63 of 123 cells are complete; the remaining 60 are fleet-owned.
+`MLIC_COMPLETION.json`: `bf7478ccc2d3351312888a21f85e9485c1090abf1b605b78490862fbd4e51c72`.

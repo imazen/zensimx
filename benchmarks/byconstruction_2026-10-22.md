@@ -4032,3 +4032,19 @@ negative controls refuse a changed trainer hash and incomplete coverage;
 neither writes a successful receipt. The complete audit requires all 123
 records and exact agreement with the native cell inventory. Fitting scripts
 remain pinned to b7cb1a224dc7; this check only extends the scorecard recipe.
+
+### Mlic cell completion
+
+Mlic completed all 21 cells at fixed epoch 119 without retries, using the
+same pinned trainer as the new Mdata holdouts and Mw025. Their recorded
+budgets are all 120 epochs and 50,000 pairs per epoch. This brings local
+coverage to 63 of the 123 requested cells; the remaining 60 are exclusively
+fleet-owned. No six-arm selection or new finalist EVAL assessment has run.
+
+Resource record: `run-heavy: done rc=0 4086s | peak-RSS 10.86GiB |
+min-avail 23279MiB | peak-load 15.30` (36 GiB scope). This wrapper covers
+Mlic root assembly and the 21-cell batch; its RSS is the maximum single
+process, not an aggregate or a fit-only bound. The completion receipt is
+`MLIC_COMPLETION.json`. After the wrapper exited, the queued decoder
+acquired the shared heavy lock and fleet image/data preparation remained
+queued behind it. No new local heavy job was submitted at release.
