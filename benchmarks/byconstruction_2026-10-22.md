@@ -3796,3 +3796,13 @@ text copy, command and source tool hashes in `gates-Mdata/`. JPEG XL loop
 work remains canceled, and BAPPS peer scores wait for the IMI route.
 
 Large private artifacts and hashes: [Mdata artifact pointer](mdata_2026-10-25.pointer.md).
+
+The closed artifact snapshot is SHA-256 verified at
+`/mnt/tower/output/zensim-datalegs-archive-2026-10-25/` (checked through
+the mounted NAS view on dev). It preserves roots, models, all cell records
+and predictions, ledgers, copied EVAL/gate outputs, configuration and
+source-cut hashes. All inventory checks and three random readbacks pass;
+receipt `d91ab3c54aae6b06f011e43b0b9210d86d0971f51d66dde5a93b948349273117`.
+The [artifact pointer](mdata_2026-10-25.pointer.md) binds the inventory hash
+and local/NAS paths. No R2 mirror was created. The preservation wrapper
+reported `run-heavy: done rc=0 229s | peak-RSS 0.02GiB | min-avail 43986MiB | peak-load 2.11`.
