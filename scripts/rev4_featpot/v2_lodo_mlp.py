@@ -162,7 +162,7 @@ def train_command(groups: list, init_seed: int, sample_seed: int, width: int, ke
     if "hdr_consensus" in recipe:
         from e29_consensus import trainer_options
         cmd += trainer_options(groups, recipe["hdr_consensus"])
-    if recipe.get("derived_inputs") in ("fx1", "fx2", "fx1nr", "fx1g", "fx1gs1", "fx1gg", "fx1gy", "fx1o"):
+    if recipe.get("derived_inputs") in ("fx1", "fx2", "fx1nr", "fx1g", "fx1gs1", "fx1gg", "fx1gy", "fx1o", "fx1ns0"):
         from v2_common import derived_declaration
         declaration_path, _, decl = derived_declaration(recipe["derived_inputs"])
         if [int(x) for x in keep_file.read_text().split()] != decl["direct"]:
@@ -629,7 +629,7 @@ def main() -> None:
         if args.strict_admission:
             strict_training_groups(groups, args.data_role_decision, args.upiq_label_disposition)
         read = keep
-        if recipe.get("derived_inputs") in ("fx1", "fx2", "fx1nr", "fx1g", "fx1gs1", "fx1gg", "fx1gy", "fx1o"):
+        if recipe.get("derived_inputs") in ("fx1", "fx2", "fx1nr", "fx1g", "fx1gs1", "fx1gg", "fx1gy", "fx1o", "fx1ns0"):
             from v2_common import derived_declaration
             read = sorted(set(keep) | {b for _, b in derived_declaration(recipe["derived_inputs"])[2]["products"]})
         refuse_nonfinite_kept([g[1] for g in groups], read)  # Rev5 tables mark absent slots NaN; a kept one is refused here

@@ -3097,6 +3097,51 @@ knob more often (0.70 and 0.59 against 0.65–0.67 and 0.51–0.56), which says 
 Refined gate 3 (dial): no more concurring inversions than `base-c` on any set, inversions no larger, and the error
 inside ladders compared on every set (reported with Z-RMSE and its p99), with the full-data C1–C6, G-DIAL and NEARID.
 
+### Which cells can revision 7 skip? Scale 0 (2026-10-25)
+
+The owner's goals include less compute, and revision 7 may be restructured freely for speed. Dropping single
+features saves nothing when their kernel still runs for other features (ringing, "Cost of the ringing fix" above); time
+goes only when a whole kernel, scale or channel goes. The walk already skips scale 0's chroma for fx1 models: B, M, T
+and M64 read none of its 82 X and B inputs (`full_res_xb` off, so the producer omits those planes). What remains at
+scale 0 is its luma cell, which runs every kernel at full resolution: about as many pixels as the nine coarser cells
+together.
+
+**How much of the score scale 0 carries** (`scripts/byconstruction/cell_share.py`, label-free: feature columns of the
+training root's `cid22_fit`, `safesyn_fit` and `human_all_fit` tables, no label read). Each row's score drop from the
+identity input is split over inputs by the live units' slopes; a group's ablation sets its damage inputs and their
+fragility products to their identity value. The models are close to linear, so both agree:
+
+| Share of the score drop | M (cid22 / safesyn / human) | T | M64 |
+|---|---|---|---|
+| Scale 0 (luma only) | 0.242 / 0.247 / 0.227 | 0.234 / 0.222 / 0.215 | 0.241 / 0.245 / 0.226 |
+| Scale 1 | 0.343 / 0.328 / 0.319 | 0.403 / 0.363 / 0.346 | 0.344 / 0.328 / 0.320 |
+| Scale 2 | 0.282 / 0.316 / 0.300 | 0.242 / 0.283 / 0.273 | 0.283 / 0.317 / 0.301 |
+| Scale 3 | 0.126 / 0.106 / 0.141 | 0.121 / 0.132 / 0.166 | 0.125 / 0.105 / 0.140 |
+
+By family (M, the same three tables): edge detail loss 4th power 0.19, artifact soft peak 0.15–0.17, HF loss
+0.06–0.08, edge detail loss 2nd power 0.04–0.07, blockiness 0.03–0.07; the 20 smallest of 39 families carry 7% together,
+but they share kernels with the large ones. So scale 0 is the one large unit of work a retrained model could give up.
+
+**Design (recorded before any result).**
+- *Speed:* `byc_stub_bake` (new, `zensim-validate`) writes a linear stub over a list of feature ids, so the scorer
+  plans exactly that read set. Paired timing (`perf_grid.sh`, 8 rounds, one thread on core 2, v4x and v3, the focus
+  cases 256² photo, 1024² plot, 1507×2048 photo) of a stub over M's 420 ids against the same ids without scale 0 (378:
+  the cell's 41 damage ids and its fragility id), both at revision 7.
+- *Arms:* `fx1ns0` (new declaration `byc_fx1ns0_declaration.json`, SHA-256 `e74f8cc1…`): fx1 without its scale-0 cell,
+  369 differences and their 369 fragility products, selection `sel:04207431eeb5`. **Mns0** (`mono:thr:mp32`, M's recipe)
+  and **Tns0** (`mono:thr`), the 12 E21 cells, seeds 0–2, on the raw root (as M and T), trainer `774955ad`. Control:
+  M's KADID seed-0 cell retrained on `774955ad` (**Mrepro**) must give predictions bit-identical to the stored M cell
+  (trainer `d2b7ce30`), or no comparison with M is made.
+- *Statistics:* the goal-aligned scorecard against M and T: within-reference ordering and per-type and codec bias
+  spread (`byc_cells.py bytype`, `type_bias.py`), knob-concurring inversions and ladder error (`knobinv`), smoothness
+  (`aic_panel.py --geo --no-aic`), the standard and global-edit mixture tests (image route, `mixture_test.py`), and E21's
+  pooled Δ as a diagnostic. No AIC2026 label is read.
+- *Reading (my bars).* The scale-0 drop goes to a full-data fit (NEARID, the dial gates, G-STEER, identity, JPEG XL
+  steering) if, in its class: no global-edit step inverts; standard-mixture inversions stay within the full arm's range
+  (M 1–32, T 0–4 per cell); knob-concurring inversions are no more than `base-c`'s on every set; within-reference
+  ordering is no worse than `base-c` on every set; and CID22-A's codec spread is within 0.005 of the full arm's (M 0.0345,
+  T 0.038). Losses smaller than these against M or T are the price of the measured speed, reported, not hidden.
+
 ## Summary (all arms, E21 screen, seeds 0–2, Δ vs `base-c`)
 
 | Arm | Guarantee | E21 Δ (SE) | Mixture inversions / cell (max rise) |

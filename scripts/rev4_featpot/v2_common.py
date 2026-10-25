@@ -99,6 +99,10 @@ FX1GG_SHA256 = "c009fbedd3fbd2678720ff2a2b2bf89845a4f571e0909b36ac68caeb766a273a
 # cell)); X and B damage ungated (byconstruction luminance-gate arm; `ring_root.py gated-decl --channels Y`)
 FX1GY_DECLARATION = Path(__file__).resolve().parent / "byc_fx1gy_declaration.json"
 FX1GY_SHA256 = "d850c8a89ff1553a8db543a9adc4c34fe6a3dc33241272db1a9e8125b666f1c2"
+# By-construction exploration (benchmarks/byconstruction_2026-10-22.md, "Which cells can revision 7 skip"): fx1
+# without its scale-0 cell (luma only), so the walk skips scale 0.
+FX1NS0_DECLARATION = Path(__file__).resolve().parent / "byc_fx1ns0_declaration.json"
+FX1NS0_SHA256 = "e74f8cc1f9c624b8f8aa2fbdd624b30869ec4900a8412ced2d4c68d651c3bd66"
 # fx1 plus the byc_orient damage (research ids f2301-f2336: Haar H/V/D band-difference RMS per scale x channel), direct
 # only (byconstruction orientation-band arm)
 FX1O_DECLARATION = Path(__file__).resolve().parent / "byc_fx1o_declaration.json"
@@ -128,6 +132,10 @@ def derived_declaration(token):
         data=FX1GY_DECLARATION.read_bytes()
         if hashlib.sha256(data).hexdigest()!=FX1GY_SHA256:raise ValueError('fx1gy declaration changed')
         return FX1GY_DECLARATION, FX1GY_SHA256, json.loads(data)
+    if token == 'fx1ns0':
+        data=FX1NS0_DECLARATION.read_bytes()
+        if hashlib.sha256(data).hexdigest()!=FX1NS0_SHA256:raise ValueError('fx1ns0 declaration changed')
+        return FX1NS0_DECLARATION, FX1NS0_SHA256, json.loads(data)
     if token == 'fx1gs1':
         data=FX1GS1_DECLARATION.read_bytes()
         if hashlib.sha256(data).hexdigest()!=FX1GS1_SHA256:raise ValueError('fx1gs1 declaration changed')
@@ -314,7 +322,7 @@ def recipe_of(spec: str) -> dict:
             out.update(hdr_weight=4.0, hdr_mode={"hp": "rank", "ha": "withinref,both", "hb": "rank", "hc": "rank"}[tok[:2]], **({"hdr_consensus": tok} if tok[:2] in ("hb", "hc") else {}))
         elif tok == "sh1" and "smooth_hinge" not in out:
             out["smooth_hinge"] = True
-        elif tok in ("fx1", "fx2", "fx1nr", "fx1g", "fx1gs1", "fx1gg", "fx1gy", "fx1o") and "derived_inputs" not in out:
+        elif tok in ("fx1", "fx2", "fx1nr", "fx1g", "fx1gs1", "fx1gg", "fx1gy", "fx1o", "fx1ns0") and "derived_inputs" not in out:
             out["derived_inputs"] = tok
         elif tok == "mono" and "mono_all" not in out:  # by-construction exploration: W1 >= 0 on every input
             out["mono_all"] = True
