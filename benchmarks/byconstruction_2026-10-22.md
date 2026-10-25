@@ -3184,6 +3184,29 @@ vis_avif −0.048) and WebP (−0.048) move the other way: JPEG's fine-scale art
 scales do not see them. Ordering within references barely moves (KADID −0.0015, TID2013 +0.0029 against T). The mixture
 tests were not run, and the M class was stopped (see the note at the top of this section).
 
+### Before the revision-7 cut: which ringing form (2026-10-25, for the owner)
+
+Every bit-moving speed item listed for revision 7 has landed ("Revision 7 speed after the implementation"); NEON vector
+kernels (a lane is porting them now) and the multithreaded line-buffer walk keep every bit, so neither blocks a cut. One
+definition does: revision 7 is revision 6 plus the row lanes, and revision 6 computes ringing in its high-pass form
+(`revision.ring_high_pass()`, chosen to serve Tga, a candidate the gate review retired). So the leading model's recipe
+retrained at revision 7 would be **Mhpm**, not M. On the goal-aligned scorecard (E21 cells, seeds 0–2; tables above):
+
+| | M (raw ringing, revision 5) | Mhpm (high-pass ringing) |
+|---|---|---|
+| CID22-A codec bias spread | **0.0345** | 0.0383 |
+| Standard mixture inversions per cell (largest rise) | **1–32 (+6.5)** | 2–35 (+8.0) |
+| TID2013 saturation bias | **+0.246** | +0.282 |
+| Knob-concurring inversions, TID2013 | 0.0097 | **0.0084** |
+| Mean Z-RMSE (CID22-A Z-RMSE / error p99) | 0.502 (0.489 / 0.377) | 0.504 (0.488 / 0.375) |
+| E21 Δ, diagnostic | −0.0144 | −0.0158 |
+
+For a monotone model the raw form scores better on codec uniformity and robustness. Its defect (imazen/zensim#72:
+ringing responds to global edits) matters when a signed model subtracts it as a global-change detector. A monotone model
+cannot subtract, and the raw response to saturation pushes saturation's under-penalty the right way. Options for revision 7: (a) keep
+revision 6's high-pass form; (b) restore revision 5's raw ringing in revision 7, keeping the high-pass form as a research
+toggle. My recommendation is (b); the re-extraction and retrain wait for this choice.
+
 ## Summary (all arms, E21 screen, seeds 0–2, Δ vs `base-c`)
 
 | Arm | Guarantee | E21 Δ (SE) | Mixture inversions / cell (max rise) |
