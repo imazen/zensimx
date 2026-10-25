@@ -138,7 +138,7 @@ def admit(authority_path, authority_sha256, cell_id, groups, selected_ids):
 def admit_datasets(a, cell_id, groups, selected_ids):
     """Revision-7 TRAIN datasets; v1's registered experiment stays unchanged.
 
-    Separate datasets have nominal 0.5 mass each. Uniform within-reference
+    Separate datasets have a declared positive nominal mass each. Uniform within-reference
     sampling uses the inherited acceptance correction (including self draws).
     Hard preferences contain exactly two rows per comparison, never a pooled
     list of scores for all distortions of the reference.
@@ -170,7 +170,9 @@ def admit_datasets(a, cell_id, groups, selected_ids):
             continue
         if (d.get("schema") != "subjective-training-leg-v2" or d.get("loss") not in
                 ("within-source-rank", "hard-pair-preference")
-                or d.get("nominal_weight") != 0.5 or d.get("target_orientation") != "quality"
+                or not isinstance(d.get("nominal_weight"), (float, int))
+                or not math.isfinite(d["nominal_weight"]) or d["nominal_weight"] <= 0
+                or d.get("target_orientation") != "quality"
                 or d.get("target_transform") != "orient-native-quality"
                 or d.get("target_column") != "human_score" or d.get("formula_revision") != 7
                 or d.get("tier") != "v3" or d.get("feature_ids") != selected_ids
@@ -198,9 +200,9 @@ def admit_datasets(a, cell_id, groups, selected_ids):
             raise ValueError("dataset source population mismatch")
         if d["loss"] == "hard-pair-preference" and any(n != 2 for n in counts.values()):
             raise ValueError("hard preference requires exactly two sides per comparison")
-        weight = 0.5/(sum(1-1/counts[k] for k in sorted(counts))/len(counts))
+        weight = d["nominal_weight"]/(sum(1-1/counts[k] for k in sorted(counts))/len(counts))
         if r["train_weight"] != weight:
-            raise ValueError("dataset nominal-half acceptance correction differs")
+            raise ValueError("dataset nominal-weight acceptance correction differs")
         admitted[r["name"]] = d
     if not admitted:
         raise ValueError("dataset authority has no subjective groups")

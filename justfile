@@ -1,3 +1,41 @@
+# Caller holds shared heavy.lock and run-heavy; all destinations must be fresh.
+dataset-mix-prepare study:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    study={{quote(study)}}
+    source=/mnt/v/output/zensim/byconstruction-2026-10-22/rev7raw/root
+    admission=/mnt/v/zensim/dataset-admission-20261025
+    features=/mnt/v/zensim/dataset-features-rev7-20261025
+    library=/mnt/tower/input/iqa/datasets
+    columns="$HOME/tmp/byc/cols_c.txt"
+    export OPENBLAS_NUM_THREADS=1 TMPDIR="$study/scratch"
+    just dataset-leg-tests
+    just dataset-leg-native-tests /var/tmp/datalegs-target
+    just dataset-trainer-build /var/tmp/datalegs-target
+    cp /var/tmp/datalegs-target/release/zensim_mlp_train "$study/bin/"
+    for name in bake_dial_refit panel byc_fsid byc_predict score_pair_with_bake; do
+      cp -L /var/tmp/datalegs-20261025/bin/$name "$study/bin/"
+    done
+    mkdir "$study/default-control"
+    args=(datasets --root "$source" --out "$study/default-control/root" --admission "$admission" --features "$features" --library "$library" --columns "$columns")
+    python3 -B "$study/oracle/scripts/byconstruction/ring_root.py" "${args[@]}"
+    mv "$study/default-control" "$study/default-control.bak"
+    python3 -B scripts/byconstruction/ring_root.py "${args[@]}"
+    diff -qr "$study/default-control.bak/root" "$study/default-control/root" > "$study/default-control.diff"
+    sha256sum "$study/default-control.bak/root/wide/frozen.json" "$study/default-control/root/wide/frozen.json" > "$study/DEFAULT_CONTROL_SHA256SUMS"
+    for arm in Mw025 Mw100 Mmos Mpair; do
+      weight=0.5
+      collections=pipal,mdid,live-md,cid-iq,cid-oa,vcl-fer,irccyn-ivc,colourlab-rating-variability-2022,bapps,pieapp,fg-iqa
+      case "$arm" in
+        Mw025) weight=0.25 ;;
+        Mw100) weight=1.0 ;;
+        Mmos) collections=pipal,mdid,live-md,cid-iq,cid-oa,vcl-fer,irccyn-ivc,colourlab-rating-variability-2022 ;;
+        Mpair) collections=bapps,pieapp,fg-iqa ;;
+      esac
+      just dataset-root "$source" "$study/$arm/root" "$admission" "$features" "$library" "$columns" "$weight" "$collections"
+    done
+    touch "$study/PREPARE_COMPLETE"
+
 # Identifier-only preparation; no pixel or subjective table is opened.
 dataset-leg-tests:
     python3 -B -m unittest discover -s scripts/tests -p 'test_dataset_legs.py' -v
@@ -18,8 +56,8 @@ dataset-leg-native-tests target:
 dataset-trainer-build target:
     cargo build --locked --release -p zensim-validate --bin zensim_mlp_train --target-dir {{quote(target)}}
 
-dataset-root source out admission features library columns:
-    python3 -B scripts/byconstruction/ring_root.py datasets --root {{quote(source)}} --out {{quote(out)}} --admission {{quote(admission)}} --features {{quote(features)}} --library {{quote(library)}} --columns {{quote(columns)}}
+dataset-root source out admission features library columns weight='0.5' collections='pipal,mdid,live-md,cid-iq,cid-oa,vcl-fer,irccyn-ivc,colourlab-rating-variability-2022,bapps,pieapp,fg-iqa':
+    python3 -B scripts/byconstruction/ring_root.py datasets --root {{quote(source)}} --out {{quote(out)}} --admission {{quote(admission)}} --features {{quote(features)}} --library {{quote(library)}} --columns {{quote(columns)}} --nominal-weight {{quote(weight)}} --collections {{quote(collections)}}
 
 dataset-full root binary dest columns:
     env REV4_V2_BIN_DIR={{quote(binary)}} ZENSIM_MAX_TIER=v3 RAYON_NUM_THREADS=1 OMP_NUM_THREADS=1 python3 -B scripts/rev4_featpot/v2_confirm_fit.py --root {{quote(root)}} --spec sel:3b7bd5ebe929@h32:H128:cv16:cf98:fx1:mono:thr:mp32 --columns "$(cat {{quote(columns)}})" --head N --seed-index 0 --strict-admission --data-role-decision {{quote(root)}}/human_role_decision.json --dest {{quote(dest)}} --train-only --pack-production --e33-output-stage

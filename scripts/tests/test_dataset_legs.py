@@ -38,6 +38,16 @@ class DatasetAuthority(unittest.TestCase):
         command_binding(f.authority_path, f.save(), "invented-cell", 1101, 101, 1853, "N", {"hidden":128})
         with self.assertRaisesRegex(ValueError,"binding"):
             command_binding(f.authority_path, f.save(), "invented-cell", 1101, 101, 1825, "N", {"hidden":128})
+        for nominal in (0.25, 1.0):
+            f.decl["nominal_weight"] = nominal
+            f.record["train_weight"] = nominal * 2
+            f.groups = [("subjective_rank_fixture", f.path, nominal * 2, 0., "withinref,rank")]
+            self.assertEqual(set(f.admit()), {"subjective_rank_fixture"})
+        f.decl["nominal_weight"] = 0.5
+        with self.assertRaisesRegex(ValueError, "nominal-weight"):
+            f.admit()
+        f.record["train_weight"] = 1.
+        f.groups = [("subjective_rank_fixture", f.path, 1., 0., "withinref,rank")]
         f.rows[1]["family"] = "reserved"
         with self.assertRaisesRegex(ValueError,"family"):
             f.admit()
@@ -52,6 +62,7 @@ class DatasetTargets(unittest.TestCase):
             pq.write_table(pa.table(dict(ref_basename=["r"]*3,human_score=[1.,1.,2.])),table)
             keys = p/"keys.json"
             keys.write_text(json.dumps([dict(family="f")]*3))
+            Path(str(table)+".manifest.json").write_text('{"nominal_weight":0.5}')
             ledger = p/"LABEL_READS.json"
             ledger.write_text('{"role":"TRAIN","reads":[]}')
             group = dict(collection="fixture",path=str(table),keys_path=str(keys),rows=3,membership_rows=3,

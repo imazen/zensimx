@@ -399,7 +399,9 @@ fn admit_datasets(
                 d["loss"].as_str(),
                 Some("within-source-rank" | "hard-pair-preference")
             )
-            || d["nominal_weight"].as_f64() != Some(0.5)
+            || d["nominal_weight"]
+                .as_f64()
+                .is_none_or(|w| !w.is_finite() || w <= 0.)
             || d["target_orientation"] != "quality"
             || d["target_transform"] != "orient-native-quality"
             || d["target_column"] != "human_score"
@@ -469,8 +471,8 @@ fn admit_datasets(
         {
             return Err("dataset source population mismatch".into());
         }
-        let corrected =
-            0.5 / (counts.values().map(|&n| 1. - 1. / n as f64).sum::<f64>() / counts.len() as f64);
+        let corrected = d["nominal_weight"].as_f64().unwrap()
+            / (counts.values().map(|&n| 1. - 1. / n as f64).sum::<f64>() / counts.len() as f64);
         // Python 3.12+ sums with compensation; Iterator::sum uses ordinary
         // ordered addition. Bind the CLI weight exactly above, allowing only
         // final arithmetic roundoff when independently checking its formula.
@@ -479,7 +481,7 @@ fn admit_datasets(
             .is_none_or(|w| (w - corrected).abs() > 32. * f64::EPSILON * corrected.abs())
         {
             return Err(format!(
-                "dataset nominal-half acceptance correction differs: {} stored={} computed={corrected:.17}",
+                "dataset nominal-weight acceptance correction differs: {} stored={} computed={corrected:.17}",
                 string(r, "name")?,
                 r["train_weight"]
             ));
@@ -605,6 +607,18 @@ mod tests {
             f.call_named("subjective_rank_fixture", 1.).unwrap().len(),
             1
         );
+        for nominal in [0.25, 1.] {
+            f.declaration["nominal_weight"] = json!(nominal);
+            f.authority["cells"]["cell"]["groups"][0]["train_weight"] = json!(nominal * 2.);
+            assert_eq!(
+                f.call_named("subjective_rank_fixture", nominal * 2.)
+                    .unwrap()
+                    .len(),
+                1
+            );
+        }
+        f.declaration["nominal_weight"] = json!(0.5);
+        f.authority["cells"]["cell"]["groups"][0]["train_weight"] = json!(1.);
         f.keys[0]["family"] = json!("reserved");
         assert!(
             f.call_named("subjective_rank_fixture", 1.)

@@ -246,6 +246,16 @@ def dataset_observations(collection, members, mapping, labels):
 
 def cmd_datasets(a):
     """Extend the existing derived root builder; never mutate frozen inputs."""
+    weight = getattr(a, "nominal_weight", 0.5)
+    available = (*DATASET_MOS, *DATASET_PAIR)
+    requested = getattr(a, "collections", None)
+    selected_collections = available if requested is None else tuple(requested.split(","))
+    if (not np.isfinite(weight) or weight <= 0 or not selected_collections
+            or len(set(selected_collections)) != len(selected_collections)
+            or not set(selected_collections) <= set(available)):
+        raise ValueError("positive finite nominal weight and unique supported collections required")
+    # Canonical order preserves the original all-collections byte stream.
+    selected_collections = tuple(c for c in available if c in selected_collections)
     source, out, admission, features = map(Path, (a.root, a.out, a.admission, a.features))
     if out.exists():
         raise ValueError("dataset root destination must be fresh")
@@ -299,7 +309,7 @@ def cmd_datasets(a):
     selected = [int(x) for x in Path(a.columns).read_text().strip().split(",")]
     protected = set(guard["protected_families"])
     legs = []
-    for c in (*DATASET_MOS, *DATASET_PAIR):
+    for c in selected_collections:
         members = [r for r in memberships[c] if r["membership_state"] == "FROZEN" and r["role"] == "TRAIN"]
         if any(str(r["family_id"]) in protected for r in members):
             raise ValueError(f"{c}: TRAIN family reserved by another role")
@@ -343,7 +353,7 @@ def cmd_datasets(a):
         kp = legdir/f"{c}.keys.json"
         kp.write_text(json.dumps(keys,separators=(",",":"))+"\n")
         decl = dict(schema="subjective-training-leg-v2",loss="hard-pair-preference" if c in DATASET_PAIR else "within-source-rank",
-            nominal_weight=0.5,target_orientation="quality",target_transform="orient-native-quality",target_column="human_score",
+            nominal_weight=weight,target_orientation="quality",target_transform="orient-native-quality",target_column="human_score",
             selection="fixed-final-epoch",formula_revision=7,tier="v3",feature_ids=selected,
             producer_commit=manifest["build_commit"],feature_set_id=manifest["feature_set_id"],
             native_role="TRAIN",rows=len(obs),table_sha256=sha(path),admission_root=str(out),
@@ -351,8 +361,8 @@ def cmd_datasets(a):
             membership_sha256=guard["membership_sha256"][c],feature_manifest_sha256=sha(bank/"_MANIFEST.json"))
         dp = Path(str(path)+".manifest.json")
         dp.write_text(json.dumps(decl,indent=1)+"\n")
-        weight = 0.5/(sum(1-1/n for n in counts.values())/len(counts))
-        legs.append(dict(name="subjective_rank_"+c.replace("-","_"),path=str(path),train_weight=weight,val_weight=0.,
+        corrected_weight = weight/(sum(1-1/n for n in counts.values())/len(counts))
+        legs.append(dict(name="subjective_rank_"+c.replace("-","_"),path=str(path),train_weight=corrected_weight,val_weight=0.,
             mode="withinref,rank",subjective=True,table_sha256=sha(path),manifest_sha256=sha(dp),
             keys_path=str(kp),keys_sha256=sha(kp),rows=len(obs),source_counts=counts,
             collection=c,membership_rows=len(members),dropped=dropped,groups=len(counts),
@@ -411,7 +421,8 @@ def cmd_dataset_report(a):
         result[r["collection"]] = dict(membership_rows=r["membership_rows"],rows=r["rows"],groups=len(grouped),
             families=len({k["family"] for k in keys}),candidate_pairs=r["pairs"],
             informative_pairs=r["pairs"]-tied,exact_mos_tied_pairs=tied,dropped=r["dropped"],
-            nominal_weight=0.5,train_weight=r["train_weight"])
+            nominal_weight=json.loads(Path(str(r["path"])+".manifest.json").read_text())["nominal_weight"],
+            train_weight=r["train_weight"])
         ledger["reads"][-1]["state"] = "read"
         ledger_path.write_text(json.dumps(ledger,indent=1)+"\n")
     output.write_text(json.dumps(result,indent=1)+"\n")
@@ -1001,6 +1012,8 @@ def main() -> int:
     ds = sub.add_parser("datasets")
     for flag in ("root", "out", "admission", "features", "library", "columns"):
         ds.add_argument("--"+flag, required=True)
+    ds.add_argument("--nominal-weight", type=float, default=0.5)
+    ds.add_argument("--collections", help="comma-separated subset; default all eleven")
     ds.set_defaults(fn=cmd_datasets)
     dr = sub.add_parser("dataset-report")
     dr.add_argument("--root", required=True)
