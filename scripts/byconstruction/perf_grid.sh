@@ -14,7 +14,7 @@ OUT=$3
 ROUNDS=${4:-10}
 RAW=${RAW:-$OUT}
 mkdir -p "$OUT" "$RAW"
-cd "$(dirname "$0")/../.."
+cd "$(dirname "${BASH_SOURCE[0]}")/../.."
 S=scripts/byconstruction
 BB=${A_BB:-$PWD/zensim/weights/b_sdr_diff_frag_820_rev5_2026-10-19.bin}
 TGA=${A_TGA:-$HOME/tmp/byc/parity/tga_full_rev6.bin}
