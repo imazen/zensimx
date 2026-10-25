@@ -212,23 +212,27 @@ def load_scores(out):
             v = [float(r["pred"]) for r in csv.DictReader(f, delimiter="\t")]
         assert len(v) == len(keys), p
         scores[p.stem[5:]] = dict(zip(keys, v))
-    judge_keys = {}
+    # Judge rows carry their pair key. Several rows can share one distorted image (LIVE-MD rates 18 images twice,
+    # once in each part), so a path never identifies a row.
     with open(out / "judge_pairs.tsv") as f:
-        for r in csv.DictReader(f, delimiter="\t"):
-            judge_keys[r["dist_path"]] = r["pair_key"]
+        judge_paths = {r["pair_key"]: (r["ref_path"], r["dist_path"]) for r in csv.DictReader(f, delimiter="\t")}
     for p in sorted(out.glob("judge_*.tsv")):
         if p.name.startswith("judge_pairs"):
             continue
         with open(p) as f:
             rd = csv.DictReader(f, delimiter="\t")
+            if "pair_key" not in rd.fieldnames:
+                raise ValueError(f"{p.name}: judge output without pair_key")
             cols = [c for c in rd.fieldnames if c not in ("ref_path", "dist_path", "pair_key")]
             prefer = ("butteraugli_pnorm3", "ssim2", "cvvdp_cpu_imazen_v", "zensim")
             col = next((c for k in prefer for c in cols if c.startswith(k)), cols[0])
             sign = -1.0 if "butteraugli" in p.stem else 1.0
             s = {}
             for r in rd:
+                if judge_paths.get(r["pair_key"]) != (r["ref_path"], r["dist_path"]):
+                    raise ValueError(f"{p.name}: row {r['pair_key']} does not match judge_pairs.tsv")
                 if r[col] not in ("", "nan"):
-                    s[judge_keys[r["dist_path"]]] = sign * float(r[col])
+                    s[r["pair_key"]] = sign * float(r[col])
         scores[p.stem[6:]] = s
     return scores
 

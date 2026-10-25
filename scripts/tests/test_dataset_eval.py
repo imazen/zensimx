@@ -30,6 +30,27 @@ class DatasetEval(unittest.TestCase):
                     with self.assertRaisesRegex(ValueError,"already exists"):
                         evaluation.cmd_bapps_keys(args)
 
+    def _eval_dir(self, d, keys, preds, judge_rows=()):
+        import pyarrow as pa, pyarrow.parquet as pq
+        p = Path(d)
+        pq.write_table(pa.table({"ref_basename": keys}), p/"features.parquet")
+        for name, v in preds.items():
+            (p/f"pred_{name}.tsv").write_text("ref_basename\tpred\n" + "".join(f"{k}\t{x!r}\n" for k,x in zip(keys,v)))
+        (p/"judge_pairs.tsv").write_text("ref_path\tdist_path\tpair_key\n" + "".join(f"{r}\t{t}\t{k}\n" for r,t,k,_ in judge_rows))
+        if judge_rows:
+            (p/"judge_ssim2.tsv").write_text("ref_path\tdist_path\tpair_key\tssim2\n"
+                                              + "".join(f"{r}\t{t}\t{k}\t{s}\n" for r,t,k,s in judge_rows))
+        return p
+
+    def test_judge_scores_reach_every_row_that_shares_a_distorted_image(self):
+        shared = [("r.png","d.png","k1",70.0), ("r.png","d.png","k2",70.0), ("r.png","e.png","k3",50.0)]
+        with tempfile.TemporaryDirectory() as d:
+            p = self._eval_dir(d, ["k1","k2","k3"], {"M":[1.,2.,3.]}, shared)
+            self.assertEqual(evaluation.load_scores(p)["ssim2"], {"k1":70.0,"k2":70.0,"k3":50.0})
+            (p/"judge_ssim2.tsv").write_text("ref_path\tdist_path\tpair_key\tssim2\nr.png\te.png\tk1\t70\n")
+            with self.assertRaisesRegex(ValueError,"does not match"):
+                evaluation.load_scores(p)
+
     def test_mos_midrank_is_tie_aware_and_order_independent(self):
         x, y = [1.,1.,2.,3.], [1.,2.,2.,4.]
         self.assertAlmostEqual(evaluation.spearman(x,y), 5/6, places=14)
