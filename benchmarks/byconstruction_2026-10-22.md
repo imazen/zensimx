@@ -3719,3 +3719,10 @@ The seed0 four-dataset mean difference is-0.00169954.
 There is no seed-based uncertainty estimate from one seed. All budgets and
 weights stay fixed; seeds1 and2 continue. These figures include both the
 added data and the required inherited source-family mask.
+
+The frozen mixture manifests also received a label-free metadata audit.
+RGB MSE rises in all 1,152 standard compositions and 1,727 of 1,728 global
+compositions. For origin 7076, `contrast1.15` followed by `luma4`, MSE
+changes from 84.20919799804688 to 83.93456013997395. The registered tests
+retain every composition, including this exception; no count or expectation
+is relaxed. `MIXTURE_MANIFEST_CHECK.json` pins both manifests and this row.
