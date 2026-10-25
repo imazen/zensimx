@@ -48,7 +48,10 @@ def cmd_prepare(a):
     out = Path(a.out)
     out.mkdir(parents=True, exist_ok=False)
     reads, rows, pair_keys = {}, [], set()
-    for c in COLLECTIONS:
+    collections = a.collections.split(",") if a.collections else COLLECTIONS
+    if len(set(collections)) != len(collections) or not set(collections) <= set(COLLECTIONS+["bapps"]):
+        raise ValueError("explicit supported EVAL collections required")
+    for c in collections:
         m = pq.read_table(FEAT / "inputs" / c / "membership-to-pairs.parquet").to_pylist()
         ev = [r for r in m if r["role"] == "EVAL" and r["skip_reason"] is None]
         if not ev:
@@ -59,16 +62,22 @@ def cmd_prepare(a):
         want = {r["membership_row_index"] for r in ev}
         labels = {}
         with open(path) as f:
-            for i, r in enumerate(csv.DictReader(f, delimiter="\t")):
+            header = next(csv.reader([next(f)],delimiter="\t"))
+            reads[c] = {"table":str(path),"eval_rows":len(want),"rows":sorted(want),
+                        "columns":header,"state":"requested"}
+            (out/"LABEL_READS.json").write_text(json.dumps({"role":"EVAL","label_values_read_for":reads},indent=1)+"\n")
+            for i, line in enumerate(f):
                 if i in want:
-                    labels[i] = r
+                    values = next(csv.reader([line],delimiter="\t"))
+                    if len(values) != len(header):
+                        raise ValueError("one normalized TSV record per line required")
+                    labels[i] = dict(zip(header,values))
         assert set(labels) == want, (c, len(want - set(labels)))
         # The frozen role governs; the library's own split column is recorded, not trusted.
         native = defaultdict(int)
         for r in labels.values():
             native[r.get("split", "")] += 1
-        reads[c] = {"table": str(path), "eval_rows": len(want), "native_split_values": dict(native),
-                    "columns": sorted(next(iter(labels.values())))}
+        reads[c].update(native_split_values=dict(native),state="read")
         by_row = defaultdict(dict)
         for r in ev:
             by_row[r["membership_row_index"]][r["side"]] = r["pair_key"]
@@ -89,7 +98,7 @@ def cmd_prepare(a):
         json.dump(rows, f)
     # One feature table over the needed pairs (bank order kept per collection), and the judge pairs.
     parts, judge = [], []
-    for c in COLLECTIONS:
+    for c in collections:
         bank = FEAT / "bank" / token(c)
         if not bank.exists():
             continue
@@ -122,7 +131,7 @@ def cmd_judge_png(a):
     pngdir = out / "judge_png"
     pngdir.mkdir(exist_ok=False)
     recorded = {}
-    for c in COLLECTIONS:
+    for c in COLLECTIONS+["bapps"]:
         bank = FEAT / "bank" / token(c)
         if (bank / "keys.parquet").exists():
             for r in pq.read_table(bank / "keys.parquet").to_pylist():
@@ -166,6 +175,33 @@ def cmd_score(a):
     for metric in a.judge:
         subprocess.run(["nice", "-n19", a.zm, "batch", "--metric", metric, "--pairs", str(out / "judge_pairs.tsv"),
                         "--output", str(out / f"judge_{metric}.tsv")], check=True)
+
+
+def cmd_bapps_keys(a):
+    """Rebind EVAL judge paths for the existing original-PNG unpack owner."""
+    out, scratch = Path(a.out), Path(a.scratch)
+    original = out/"judge_pairs.original-paths.bak.tsv"
+    if original.exists() or (out/"bapps-unpack-keys.parquet").exists():
+        raise ValueError("BAPPS judge rebind destination already exists")
+    with open(out/"judge_pairs.tsv") as stream:
+        rows = list(csv.DictReader(stream,delimiter="\t"))
+    rebound = []
+    for r in rows:
+        r = dict(r)
+        for c in ("ref_path","dist_path"):
+            parts = Path(r[c]).parts[-4:]
+            if len(parts)!=4 or parts[0]!="val" or parts[2] not in ("ref","p0","p1") or not parts[-1].endswith(".png"):
+                raise ValueError("BAPPS EVAL requires its original native VAL PNG paths")
+            r[c] = str(scratch.joinpath(*parts))
+        rebound.append(r)
+    keys = pa.table({c:[r[c] for r in rebound] for c in ("ref_path","dist_path")})
+    pq.write_table(keys,out/"bapps-unpack-keys.parquet",compression="zstd")
+    (out/"judge_pairs.tsv").rename(original)
+    with open(out/"judge_pairs.tsv","x",newline="") as f:
+        writer = csv.DictWriter(f,fieldnames=list(rebound[0]),delimiter="\t")
+        writer.writeheader()
+        writer.writerows(rebound)
+    print(f"{len(rebound)} BAPPS EVAL judge pairs rebound to original-PNG scratch; no target opened")
 
 
 def load_scores(out):
@@ -241,7 +277,7 @@ def cmd_report(a):
     rng = random.Random(1)
     lines = ["| Collection | Rows | Statistic | " + " | ".join(names) + " |", "|---|---|---|" + "---|" * len(names)]
     result = {}
-    for c in COLLECTIONS:
+    for c in sorted({r["collection"] for r in rows}):
         rr = [r for r in rows if r["collection"] == c]
         if not rr:
             continue
@@ -287,6 +323,7 @@ def main():
     sub = ap.add_subparsers(dest="cmd", required=True)
     p = sub.add_parser("prepare")
     p.add_argument("--out", required=True)
+    p.add_argument("--collections", help="explicit comma-separated subset; bapps is also supported")
     s = sub.add_parser("score")
     s.add_argument("--out", required=True)
     s.add_argument("--model", action="append", default=[], help="NAME=BAKE")
@@ -297,8 +334,12 @@ def main():
     r.add_argument("--out", required=True)
     j = sub.add_parser("judge-png")
     j.add_argument("--out", required=True)
+    b = sub.add_parser("bapps-keys")
+    b.add_argument("--out", required=True)
+    b.add_argument("--scratch", required=True)
     a = ap.parse_args()
-    return {"prepare": cmd_prepare, "score": cmd_score, "report": cmd_report, "judge-png": cmd_judge_png}[a.cmd](a)
+    return {"prepare": cmd_prepare, "score": cmd_score, "report": cmd_report, "judge-png": cmd_judge_png,
+            "bapps-keys":cmd_bapps_keys}[a.cmd](a)
 
 
 if __name__ == "__main__":
