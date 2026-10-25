@@ -2922,6 +2922,28 @@ the cells run on trainer `774955ad` (`just byc-train-bins`), not `70eba638`; no 
 reproduction cell (Tgg's KADID-held-out seed-0 cell retrained in the same run) must give predictions bit-identical to
 the stored Tgg cell, or the comparison with Tgg and Mgg64 is not made.
 
+**Result, T class** (`run_gy.sh`; 12 cells 01:30–01:46 UTC, trainer `774955ad`). Control passed: the reproduction
+cell's predictions are bit-identical to the stored Tgg cell's (`3e156ccd…` both). Seeds 0–2, out of sample:
+
+| | Thpm (no gate) | Tgg (all channels) | **Tgy (luminance)** |
+|---|---|---|---|
+| KADID contrast change / brighten / darken bias | −0.127 / −0.090 / −0.093 | −0.097 / −0.066 / −0.077 | −0.099 / −0.066 / −0.078 |
+| TID2013 saturation / mean shift / contrast bias | +0.352 / +0.118 / −0.073 | +0.345 / +0.109 / +0.010 | +0.344 / +0.108 / +0.011 |
+| Within-reference ordering Δ vs `base-c` (KADID / TID2013 / KonFiG / CID22-A) | +0.0143 / +0.0089 / +0.0037 / 0.0000 | +0.0130 / +0.0096 / +0.0036 / 0.0000 | +0.0131 / +0.0104 / +0.0036 / 0.0000 |
+| Per-type bias spread (KADID / TID2013 / KonFiG) | 0.083 / 0.101 / 0.093 | 0.079 / 0.099 / 0.097 | 0.080 / 0.099 / 0.096 |
+| CID22-A codec bias spread | 0.0380 | 0.0363 | 0.0365 |
+| Standard mixture inversions per cell (all, largest rise) | 0–4 (29, +4.19) | 1–9 (73, +7.85) | 1–11 (75, +8.00) |
+| Global-edit mixture inversions | 0 | 0 | 0 |
+| Mean Z-RMSE (CID22-A Z-RMSE / error p99) | 0.512 (0.482 / 0.368) | 0.511 (0.486 / 0.366) | 0.510 (0.485 / 0.370) |
+| E21 Δ, diagnostic (KADID / TID2013 / KonFiG / CID22-A) | −0.0221 | −0.0194 | −0.0188 (−0.011 / −0.043 / −0.027 / +0.006) |
+
+Against the bars: TID2013 saturation +0.344 is no larger than Thpm's +0.352 and KADID contrast change −0.099 clears
+−0.112, so the luminance gate does what it is built for. It is not a candidate: standard-mixture inversions rise to
+1–11 per cell, outside Thpm's 0–4 (every other candidate bar passes). In this class the luminance gate and the
+all-channel gate agree to within 0.002 on every statistic; the T-class all-channel gate never worsened saturation
+(+0.345 against +0.352), so the class where the two gates should differ is M (Mgg64 +0.277 against M64's +0.212),
+running now.
+
 ## Summary (all arms, E21 screen, seeds 0–2, Δ vs `base-c`)
 
 | Arm | Guarantee | E21 Δ (SE) | Mixture inversions / cell (max rise) |
