@@ -2766,6 +2766,13 @@ curve fitted across every distortion type absorbs the per-type offsets of the ta
 cross-type calibration seen as error rather than rank. Nothing in training asks for it (the human legs train on
 rank alone, "Smoothness" above).
 
+**Compute of the candidates.** Neither full-data bake has an exactly dead input (`zenpredict-inspect --weights` on
+the dense bakes): M keeps two live units (both output weights −0.5174) and T one, every one of the 820 derived inputs
+has a nonzero weight into a live unit, and all 420 raw feature ids (`basic+peaks+v2@w1825/rev5_localwin#36c3f3af`,
+revision 5) are read. So M and T cost what B costs to extract; nothing can be dropped without a refit. The weight is
+concentrated (with each input's weight divided by its scaler scale, 8 / 114 / 474 of M's inputs carry 50 / 90 / 99% of
+the total, T's 6 / 89 / 420), which is where a reduced input set would start.
+
 ### JPEG XL steering with the full-data monotone models (2026-10-25)
 
 The steering study's zensim maps were B and two models trained with AIC2026 labels (Tga, M64a). The models the
@@ -2788,6 +2795,21 @@ proposed gates favour, the full-data certified-monotone fits M (`mono-thr-mp32_s
 - *Reading (my bar, unchanged):* an arm steers better than another when its saving is positive with the interval
   above zero under both SSIMULACRA2 and CVVDP; an interval across zero under either is a tie. Against B this answers
   whether a monotone model's map is a better steering signal than B's at the same kind of placement.
+
+**Placements** (`5d15916f107f-loop-mt` build, `loop_calibration_2026-10-25mt.tsv` and `…mttail.tail.tsv` in
+`/mnt/v/zenmetrics-private/zensimx-workbench/`; 187 s, run-heavy peak RSS 0.37 GiB). Control passed: B's bulk fit
+(1.302887e-1 / 0.6, fit r 0.7482 over 476,229 blocks), its tail fit (1.815210e-2 / 0.7, r 0.8074 / 0.7779) and the
+tail run's bulk row reproduce the recorded rows digit for digit.
+
+| Map | Bulk scale / exponent | Fit r / held-out r | Tail (largest) scale / exponent | Fit r / held-out r |
+|---|---|---|---|---|
+| M (`6291eeb5`) | 1.319342e-1 / 0.6 | 0.811 / **0.638** | 2.629540e-2 / 0.7 | 0.848 / 0.683 |
+| T (`8c40f24c`) | 1.358903e-1 / 0.6 | 0.814 / 0.622 | 2.510790e-2 / 0.7 | 0.842 / 0.675 |
+| B (`89cb4861`) | 1.302887e-1 / 0.6 | 0.748 / 0.491 | 1.815210e-2 / 0.7 | 0.807 / **0.778** |
+
+Across all blocks the monotone maps agree with butteraugli's block distances better than B's (held-out r 0.638 /
+0.622 against 0.491, as Tga's 0.653 and M64a's 0.681 did); on each pair's largest tile, which decides reach, B's
+agrees better on the held-out screenshots (0.778 against 0.683 / 0.675).
 
 ## Summary (all arms, E21 screen, seeds 0–2, Δ vs `base-c`)
 
