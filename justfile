@@ -39,10 +39,8 @@ dataset-eval out model binary:
 dataset-eval-prepare out collection:
     python3 -B scripts/byconstruction/dataset_eval.py prepare --out {{quote(out)}} --collections {{quote(collection)}}
 
-dataset-eval-bapps out model binary scratch:
-    python3 -B scripts/byconstruction/dataset_eval.py bapps-keys --out {{quote(out)}} --scratch {{quote(scratch)}}
-    just dataset-unpack-bapps {{quote(out)}}/bapps-unpack-keys.parquet /mnt/tower/input/iqa {{quote(scratch)}} {{quote(out)}}/unpack-receipts
-    python3 -B scripts/byconstruction/dataset_eval.py score --out {{quote(out)}} --predict {{quote(binary)}}/bake_dial_refit --model Mdata={{quote(model)}} --model M7="$HOME/tmp/byc/full/mono-thr-mp32-r7_s0/refit/production-f16.bin" --model B7="$HOME/tmp/byc/perf/b_rev7.bin" --zm /var/tmp/byconstruction-bin/zenmetrics-judge-7a0f8394/zenmetrics --judge ssim2 --judge butteraugli --judge cvvdp
+dataset-eval-bapps out model binary:
+    python3 -B scripts/byconstruction/dataset_eval.py score --out {{quote(out)}} --predict {{quote(binary)}}/bake_dial_refit --model Mdata={{quote(model)}} --model M7="$HOME/tmp/byc/full/mono-thr-mp32-r7_s0/refit/production-f16.bin" --model B7="$HOME/tmp/byc/perf/b_rev7.bin"
     ZEN_PANEL_BIN={{quote(binary)}}/panel python3 -B scripts/byconstruction/dataset_eval.py report --out {{quote(out)}}
 
 dataset-loop stage study:
