@@ -76,5 +76,41 @@ class WidenTest(unittest.TestCase):
             r.widen(self.stored(), vals, "t", spec)
 
 
+class GatedTest(unittest.TestCase):
+    """Gated damage: the plan per gated channel set and the declaration a gated root trains with."""
+
+    DECLS = REPO / "scripts/rev4_featpot"
+
+    def decl(self, channels: str) -> bytes:
+        import tempfile
+        from types import SimpleNamespace
+        with tempfile.TemporaryDirectory(dir=Path.home() / "tmp") as td:
+            out = Path(td) / "decl.json"
+            r.cmd_gated_decl(SimpleNamespace(decl=str(self.DECLS / "byc_fx1g_declaration.json"), out=str(out),
+                                             channels=channels))
+            return out.read_bytes()
+
+    def test_all_channels_reproduce_the_registered_declaration(self):
+        self.assertEqual(self.decl("XYB"), (self.DECLS / "byc_fx1gg_declaration.json").read_bytes())
+
+    def test_luminance_gate_reads_only_y_cells(self):
+        diffs, shares = r.gated_plan(self.DECLS / "byc_fx1g_declaration.json", "Y")
+        all_diffs, all_shares = r.gated_plan(self.DECLS / "byc_fx1g_declaration.json", "XYB")
+        self.assertEqual(len(diffs), 164)
+        self.assertTrue(all((s - r.GLOBAFF_IDS[0]) // 2 % 3 == 1 for s in shares))
+        self.assertEqual([(d, s) for d, s in zip(all_diffs, all_shares) if (s - r.GLOBAFF_IDS[0]) // 2 % 3 == 1],
+                         list(zip(diffs, shares)))
+        self.assertEqual(self.decl("Y"), (self.DECLS / "byc_fx1gy_declaration.json").read_bytes())
+
+    def test_gate_scales_each_difference_by_its_cell(self):
+        diffs, shares = [13, 40], [1869, 1875]
+        cols = {f"f{i}": pa.array(np.zeros(2, np.float32)) for i in range(r.GATED_FIRST)}
+        cols["f13"], cols["f1869"] = pa.array(np.float32([2, 4])), pa.array(np.float32([0.25, 1]))
+        cols["f40"], cols["f1875"] = pa.array(np.float32([3, 5])), pa.array(np.float32([0, 0.5]))
+        t = r.gate_table(pa.table(cols), diffs, shares, "t")
+        self.assertEqual(t.column(f"f{r.GATED_FIRST}").to_pylist(), [1.5, 0.0])
+        self.assertEqual(t.column(f"f{r.GATED_FIRST + 1}").to_pylist(), [3.0, 2.5])
+
+
 if __name__ == "__main__":
     unittest.main()

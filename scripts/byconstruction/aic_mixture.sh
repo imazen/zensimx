@@ -16,6 +16,7 @@ for arm in "$@"; do
     decl=$H/../rev4_featpot/byc_fx1g_declaration.json
     case ":$spec:" in *:fx1gs1:*) decl=$H/../rev4_featpot/byc_fx1gs1_declaration.json ;;
       *:fx1gg:*) decl=$H/../rev4_featpot/byc_fx1gg_declaration.json ;;
+      *:fx1gy:*) decl=$H/../rev4_featpot/byc_fx1gy_declaration.json ;;
       *:fx1o:*) decl=$H/../rev4_featpot/byc_fx1o_declaration.json ;; esac
     python3 "$H/mixture_table.py" score --mixture "$MIX" --table "$TABLE" --bin-dir "$BIN" \
       --bake "${arm}_${cell}=$d/refit/last.bin" --decl "$decl"

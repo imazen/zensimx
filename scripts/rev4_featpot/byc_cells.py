@@ -75,7 +75,7 @@ def predict_cell(bake: Path, table: Path, out: Path, spec: str):
     """Held-out predictions. Bakes that read research ids past zensim's registry (fx1g, the byc_globaff descriptor)
     go through `byc_predict` (zenpredict, same row layout; bit-identical to `bake_dial_refit predict --score-units` on
     fx1 bakes); every other bake through the registered owner."""
-    token = next((t for t in spec.split(":") if t in ("fx1g", "fx1gs1", "fx1gg", "fx1o")), None)
+    token = next((t for t in spec.split(":") if t in ("fx1g", "fx1gs1", "fx1gg", "fx1gy", "fx1o")), None)
     if token is None:
         return predict(bake, table, out)
     import numpy as np

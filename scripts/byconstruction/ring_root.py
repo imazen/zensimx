@@ -18,12 +18,17 @@ right pixels and that the arm moved nothing else. Arms (`--arm`, default hpm):
   orient --root ROOT --bank DIR --sidecars DIR --out ROOT2
                                                widen a root with the byc_orient damage (Haar H/V/D band-difference RMS
                                                per scale x channel) at f2301-f2336; sidecars from the globaff-pairs TSVs
-  gate-table --table T.parquet --decl FX1G.json --out T2.parquet
+  gate-table --table T.parquet --decl FX1G.json --out T2.parquet [--channels XYB|Y]
                                                the same gating for one width-1891 table (mixture tables, AIC folds)
-  gated --root ROOT2 --decl FX1G.json --out ROOT3
-                                               widen a descriptor root with gated damage at f1891-f2300: for each of
-                                               fx1's 410 differences d (ascending), d x (1 - share) of its own scale and
-                                               channel cell, as an f32 product of f32 factors
+  gated --root ROOT2 --decl FX1G.json --out ROOT3 [--channels XYB|Y]
+                                               widen a descriptor root with gated damage from f1891: for each of fx1's
+                                               differences d (ascending) in a gated channel, d x (1 - share) of its own
+                                               scale and channel cell, as an f32 product of f32 factors. XYB (default)
+                                               gates all 410 (f1891-f2300); Y only the 164 luminance-cell differences
+                                               (f1891-f2054)
+  gated-decl --decl FX1G.json --out DECL.json [--channels XYB|Y]
+                                               the training declaration of a gated root: fx1's 410 differences and the
+                                               gated ids direct, fx1's 410 fragility products
 
 The HDR legs (`hdr_hb4`, `hdr_hc4`, leg `hdr_consensus`) are not re-extracted and are left out of the derived root.
 """
@@ -461,25 +466,40 @@ def widen_root(a, name: str) -> int:
 
 
 GATED_FIRST = GLOBAFF_WIDTH
-GATED_WIDTH = GATED_FIRST + 410
-# `byc_fsid basic+peaks+v2 2301 rev5_localwin_ringhpm_globaffgate 0-227,372-719,1867-2300` (hash from zensim::feature_set_id).
-GATED_FSID = "basic+peaks+v2@w2301/rev5_localwin_ringhpm_globaffgate#45e0e84c"
+# Gated channels (XYB order, cell k = 3 * scale + channel) -> (gated difference count, feature set id, declaration
+# registration text). `byc_fsid basic+peaks+v2 <first + count> <era> 0-227,372-719,1867-<first + count - 1>` (hash from
+# zensim::feature_set_id).
+GATED = {
+    "XYB": ((0, 1, 2), 410, "basic+peaks+v2@w2301/rev5_localwin_ringhpm_globaffgate#45e0e84c",
+            "exploration only: benchmarks/byconstruction_2026-10-22.md (fx1 plus gated damage at research ids f1891-f2300: "
+            "each difference x (1 - byc_globaff share of its scale and channel cell); the descriptor itself is not read)"),
+    "Y": ((1,), 164, "basic+peaks+v2@w2055/rev5_localwin_ringhpm_globaffgatey#7b645e91",
+          "exploration only: benchmarks/byconstruction_2026-10-22.md (fx1 plus gated luminance damage at research ids "
+          "f1891-f2054: each Y-cell difference x (1 - byc_globaff share of its scale's Y cell); the descriptor itself is "
+          "not read)"),
+}
+GATED_WIDTH = GATED_FIRST + GATED["XYB"][1]
+GATED_FSID = GATED["XYB"][2]
 
 
-def gated_plan(decl: Path) -> tuple[list[int], list[int]]:
-    """fx1's differences in ascending order and the share id of each one's (scale, channel) cell: the declaration
-    pairs each difference with the `pjnd_fragility` slot of its own cell, `372 + 29k + 21` (E33 section 5.1), and
-    the descriptor's share of cell k sits at `1867 + 2k`."""
+def gated_plan(decl: Path, channels: str = "XYB") -> tuple[list[int], list[int]]:
+    """fx1's differences in a gated channel, in ascending order, and the share id of each one's (scale, channel) cell:
+    the declaration pairs each difference with the `pjnd_fragility` slot of its own cell, `372 + 29k + 21` (E33
+    section 5.1, k = 3 * scale + channel), and the descriptor's share of cell k sits at `1867 + 2k`."""
+    gated_channels, count, _, _ = GATED[channels]
     pairs = json.loads(decl.read_text())["products"]
-    diffs = [a for a, _ in pairs]
-    if diffs != sorted(diffs) or len(diffs) != GATED_WIDTH - GATED_FIRST:
+    if [a for a, _ in pairs] != sorted(a for a, _ in pairs) or len(pairs) != 410:
         raise ValueError(f"{decl}: expected 410 differences in ascending order")
-    cells = []
-    for _, f in pairs:
+    diffs, cells = [], []
+    for a, f in pairs:
         k, rem = divmod(f - 372 - 21, 29)
         if rem or not 0 <= k < 12:
             raise ValueError(f"{decl}: {f} is not a pjnd_fragility slot")
-        cells.append(GLOBAFF_IDS[0] + 2 * k)
+        if k % 3 in gated_channels:
+            diffs.append(a)
+            cells.append(GLOBAFF_IDS[0] + 2 * k)
+    if len(diffs) != count:
+        raise ValueError(f"{decl}: {len(diffs)} differences in channels {channels}, expected {count}")
     return diffs, cells
 
 
@@ -498,13 +518,37 @@ def gate_table(table: pa.Table, diffs: list[int], shares: list[int], what: str) 
 
 
 def cmd_gate_table(a) -> int:
+    """One table; a mixture table's `table.json` beside it is carried over with the gating recorded."""
     src, out = Path(a.table), Path(a.out)
     if out.exists():
         raise ValueError(f"{out} exists")
-    diffs, shares = gated_plan(Path(a.decl))
+    diffs, shares = gated_plan(Path(a.decl), a.channels)
     out.parent.mkdir(parents=True, exist_ok=True)
     write(gate_table(pq.read_table(src), diffs, shares, src.name), out)
-    log(f"gated {src} -> {out} ({sha(out)[:12]})")
+    meta = src.parent / "table.json"
+    if src.name == "table.parquet" and out.name == "table.parquet" and meta.is_file():
+        m = json.loads(meta.read_text())
+        m["gated"] = {"from_table_sha256": sha(src), "ids": [GATED_FIRST, GATED_FIRST + len(diffs) - 1],
+                      **({} if a.channels == "XYB" else {"channels": a.channels}), "builder": "ring_root.py gate-table"}
+        (out.parent / "table.json").write_text(json.dumps(m, indent=1) + "\n")
+    log(f"gated ({a.channels}) {src} -> {out} ({sha(out)[:12]})")
+    return 0
+
+
+def cmd_gated_decl(a) -> int:
+    """The declaration a gated root trains with (`zensim-fx1-v1`): fx1's differences and the gated ids direct (the
+    gated ids also unpaired), fx1's fragility products; the descriptor itself is not read."""
+    out = Path(a.out)
+    if out.exists():
+        raise ValueError(f"{out} exists")
+    src = json.loads(Path(a.decl).read_text())
+    diffs, _ = gated_plan(Path(a.decl), a.channels)
+    ids = list(range(GATED_FIRST, GATED_FIRST + len(diffs)))
+    decl = {"schema": "zensim-fx1-v1", "registration": GATED[a.channels][3],
+            "direct": [i for i in src["direct"] if i not in GLOBAFF_IDS] + ids, "products": src["products"],
+            "unpaired": ids}
+    out.write_text(json.dumps(decl, indent=1) + "\n")
+    log(f"declaration ({a.channels}) {out} ({sha(out)})")
     return 0
 
 
@@ -512,19 +556,23 @@ def cmd_gated(a) -> int:
     root, out = Path(a.root), Path(a.out)
     if out.exists():
         raise ValueError(f"{out} exists")
-    diffs, shares = gated_plan(Path(a.decl))
+    diffs, shares = gated_plan(Path(a.decl), a.channels)
+    width, fsid = GATED_FIRST + len(diffs), GATED[a.channels][2]
     shutil.copytree(root, out)
     real = out / "wide/main/real"
     record = {"source_root": str(root), "source_frozen_sha256": sha(root / "wide/frozen.json"),
-              "declaration_sha256": sha(Path(a.decl)), "ids": list(range(GATED_FIRST, GATED_WIDTH)),
+              "declaration_sha256": sha(Path(a.decl)), "ids": list(range(GATED_FIRST, width)),
               "differences": diffs, "share_ids": shares, "tables": {}}
+    if a.channels != "XYB":  # the all-channel root's records stay as they were first written
+        record["channels"] = a.channels
     tables = [t for t in sorted(real.glob("*.parquet")) if not t.name.endswith(".keys.parquet")]
     for t in [*tables, out / "e15/coverage_pool.parquet"]:
         write(gate_table(pq.read_table(t), diffs, shares, t.stem), t)
         record["tables"][t.name if t.parent == real else "e15/coverage_pool.parquet"] = sha(t)
         log(f"gated {t.name}")
-    note = "; gated damage at f1891-f2300 (each fx1 difference x (1 - byc_globaff share of its cell))"
-    ids = list(range(GLOBAFF_IDS[0], GATED_WIDTH))
+    note = (f"; gated damage at f{GATED_FIRST}-f{width - 1} (each fx1 difference"
+            + ("" if a.channels == "XYB" else f" in channels {a.channels}") + " x (1 - byc_globaff share of its cell))")
+    ids = list(range(GLOBAFF_IDS[0], width))
     for name in list(record["tables"]):
         path = out / name if name.startswith("e15/") else real / name
         mp = Path(f"{path}.manifest.json")
@@ -534,8 +582,8 @@ def cmd_gated(a) -> int:
         if "source_table_sha256" in m:
             m["source_table_sha256"] = m["table_sha256"]
         m["byc_globaff_ids"] = ids
-        m["feature_set_id"] = GATED_FSID
-        m["source_bank_feature_set_id"] = GATED_FSID
+        m["feature_set_id"] = fsid
+        m["source_bank_feature_set_id"] = fsid
         m["composite"] = m.get("composite", "") + note
         m["immutable_input_roots"] = [*m.get("immutable_input_roots", []), str(root.resolve())]
         mp.write_text(json.dumps(m, indent=1) + "\n")
@@ -546,8 +594,8 @@ def cmd_gated(a) -> int:
                 q = out / part["rel"]
                 part["sha256"] = sha(q)
                 part["manifest_sha256"] = sha(Path(f"{q}.manifest.json"))
-    receipt["width"] = GATED_WIDTH
-    receipt["feature_set_id"] = GATED_FSID
+    receipt["width"] = width
+    receipt["feature_set_id"] = fsid
     receipt["byc_gated"] = record
     view = dict(receipt["admission_view"])
     view["immutable_input_roots"] = [*view["immutable_input_roots"], str(root.resolve())]
@@ -599,12 +647,19 @@ def main() -> int:
     t.add_argument("--table", required=True)
     t.add_argument("--decl", required=True)
     t.add_argument("--out", required=True)
+    t.add_argument("--channels", choices=sorted(GATED), default="XYB")
     t.set_defaults(fn=cmd_gate_table)
     q = sub.add_parser("gated")
     q.add_argument("--root", required=True)
     q.add_argument("--decl", required=True)
     q.add_argument("--out", required=True)
+    q.add_argument("--channels", choices=sorted(GATED), default="XYB")
     q.set_defaults(fn=cmd_gated)
+    gd = sub.add_parser("gated-decl")
+    gd.add_argument("--decl", required=True)
+    gd.add_argument("--out", required=True)
+    gd.add_argument("--channels", choices=sorted(GATED), default="XYB")
+    gd.set_defaults(fn=cmd_gated_decl)
     a = ap.parse_args()
     return a.fn(a)
 

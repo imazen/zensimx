@@ -2840,6 +2840,61 @@ placement, in every content class and under both independent judges, except T's 
 those models loses nothing here. None of them steers better than butteraugli: M and T save 2.6–2.8% on photos by
 SSIMULACRA2 with CVVDP tied, and screens still cost 6–13%.
 
+### A luminance-only gate (2026-10-25)
+
+Owner, 2026-10-25: "I thought we added some global features, why still 820?" The full-data M and T read B's 820
+inputs because they were fitted before the `byc_globaff` descriptor existed. The descriptor was tried three ways in E21
+cells only: as 24 sign-free inputs (Tghpm, 844 inputs; E21 −0.0101, but 5–72 global-edit inversions per cell), and as
+410 gated copies of the damage inputs with every weight non-negative (Tgg and Mgg64, 1,230 inputs; no global-edit
+inversion; E21 −0.0194 and −0.0161). The only full-data fit with it is Tga, trained on AIC2026 labels.
+
+**The all-channel gate on the goal-aligned scorecard** (`byc_cells.py bytype`, `type_bias.py`; seeds 0–2, out of
+sample). Rank bias per type (prediction rank − human rank; negative: the model rates the edit worse than people do):
+
+| Type | `base-c` | M64 | Mgg64 | Thpm | Tgg | Tghpm |
+|---|---|---|---|---|---|---|
+| KADID contrast change | −0.023 | −0.121 | −0.076 | −0.127 | −0.097 | −0.073 |
+| KADID brighten | −0.075 | −0.091 | −0.055 | −0.090 | −0.066 | −0.039 |
+| KADID darken | −0.075 | −0.092 | −0.063 | −0.093 | −0.077 | −0.063 |
+| TID2013 contrast change | −0.072 | −0.064 | −0.001 | −0.073 | +0.010 | −0.109 |
+| TID2013 mean shift | −0.025 | +0.117 | +0.089 | +0.118 | +0.109 | +0.100 |
+| TID2013 saturation | +0.025 | +0.212 | **+0.277** | +0.352 | +0.345 | +0.222 |
+
+| | M64 | Mgg64 | Thpm | Tgg | Tghpm |
+|---|---|---|---|---|---|
+| Within-reference ordering Δ vs `base-c` (KADID / TID2013 / KonFiG / CID22-A) | +0.0132 / +0.0054 / +0.0037 / 0.0000 | +0.0123 / +0.0103 / +0.0036 / 0.0000 | +0.0143 / +0.0089 / +0.0037 / 0.0000 | +0.0130 / +0.0096 / +0.0036 / 0.0000 | +0.0109 / +0.0084 / +0.0036 / +0.0001 |
+| Per-type bias spread (KADID / TID2013 / KonFiG) | 0.083 / 0.078 / 0.088 | 0.077 / 0.083 / 0.105 | 0.083 / 0.101 / 0.093 | 0.079 / 0.099 / 0.097 | 0.078 / 0.081 / 0.105 |
+| CID22-A codec bias spread | 0.0382 | 0.0404 | 0.0380 | 0.0363 | 0.0409 |
+
+The gate removes much of the luminance edits' over-penalty (KADID contrast −0.121 → −0.076, TID2013 contrast −0.064 →
+−0.001), but it discounts every affine change, and the monotone models already under-penalize saturation (TID2013
++0.21 to +0.35 against `base-c`'s +0.025); the M-class gate pushes it further (+0.277). The descriptor's shares say
+why: on KADID the median share (mean over the four scales) is X / Y / B 1.000 / 0.687 / 1.000 for color saturation 1,
+0.326 / 0.942 / 0.502 for brighten, 0.484 / 0.862 / 0.599 for contrast change and 0.629 / 0.981 / 0.804 for mean shift,
+so the saturation change is explained in every channel and the all-channel gate forgives it most.
+
+**Design (recorded before any result).**
+- *Inputs* `fx1gy` (`ring_root.py gated --channels Y`, declaration `byc_fx1gy_declaration.json`, SHA-256
+  `d850c8a8…`, written by the new `gated-decl`, which reproduces `byc_fx1gg_declaration.json` byte for byte with
+  `--channels XYB`): fx1's 410 differences and 410 fragility products plus 164 gated copies, `d · (1 − share)`, of the
+  differences in the four luminance cells only (f1891–f2054; root `ringhpm/root_globaff_gatedy`, era
+  `rev5_localwin_ringhpm_globaffgatey`, `basic+peaks+v2@w2055/rev5_localwin_ringhpm_globaffgatey#7b645e91`); 984
+  inputs, every weight non-negative, the descriptor itself not read. Chroma damage is never discounted. Rebuilding the
+  all-channel root with the changed builder reproduces all 63 of its files byte for byte; the all-channel mixture table
+  reproduces bit for bit (its hand-written `table.json` differed only by a trailing newline).
+- *Arms* (no AIC leg; the same 12 E21 cells, seeds 0–2; trainer `70eba638`, as Tgg and Mgg64): **Tgy**
+  (`mono:thr`) against Tgg and Thpm, and **Mgy64** (`mono:thr:mp64`) against Mgg64. Mgy64 against M64 mixes the gate
+  with the ringing form (M64 reads raw ringing; no mp64 arm reads `hpm` ringing without the descriptor).
+- *Statistics:* the tables above (per-type rank bias, per-type and codec bias spread, within-reference ordering),
+  smoothness (`aic_panel.py --geo --no-aic`), the standard and global-edit mixture tests (`aic_mixture.sh` on the
+  luminance-gated mixture tables), and E21's pooled Δ as a diagnostic. No AIC2026 label is read.
+- *Reading (my bars).* The luminance gate does what it is built for when, in each class, TID2013 saturation's bias is
+  no larger than the ungated arm's (Thpm +0.352, M64 +0.212) while KADID contrast change keeps at least half of the
+  all-channel gate's improvement (T: at most −0.112; M: at most −0.099). It becomes a candidate under the proposed
+  gates if, in addition, no global-edit step inverts, standard-mixture inversions stay within the ungated arm's range,
+  within-reference ordering is no worse than `base-c` on every set, and CID22-A's codec spread is no worse than the
+  ungated arm's (T 0.0380, M 0.0382).
+
 ## Summary (all arms, E21 screen, seeds 0–2, Δ vs `base-c`)
 
 | Arm | Guarantee | E21 Δ (SE) | Mixture inversions / cell (max rise) |
