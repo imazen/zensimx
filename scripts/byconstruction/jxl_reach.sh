@@ -42,7 +42,7 @@ run() { # label steer-arguments...
 }
 run none --steer none --distances "$STATIC"
 run butteraugli --steer butteraugli --iters 4 --distances "$DISTANCES"
-run Tga --steer "workbench:$TGA:diffmap" --iters 4 --distances "$DISTANCES"
+run Tga --steer "workbench:$TGA:diffmap" --placement 1.329536e-1,0.6 --iters 4 --distances "$DISTANCES"
 run Tgatail --steer "workbench:$TGA:diffmap" --placement "$TAIL" --iters 4 --distances "$DISTANCES"
 run Tgatail8 --steer "workbench:$TGA:diffmap" --placement "$TAIL" --iters 8 --distances "$DISTANCES"
 AMPPROBE="workbench:$TGA:diffmap_amp@$AMP_TGA"

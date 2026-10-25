@@ -47,16 +47,18 @@ run() { # label steer-arguments...
 }
 run none none
 run butteraugli butteraugli
-run B workbench:zensim-B@rev5:diffmap
-run Tga workbench:zensim-Tga@rev6:diffmap
-run M64a workbench:zensim-M64a-noKADID@rev6:diffmap
+# The bulk arms name their placements (loop_calibration_2026-10-24c.tsv): the workbench defaults became the tail fits
+# on 2026-10-25, and a rebuilt steer_rd must not change what these arms mean.
+run B workbench:zensim-B@rev5:diffmap --placement 1.302887e-1,0.6
+run Tga workbench:zensim-Tga@rev6:diffmap --placement 1.329536e-1,0.6
+run M64a workbench:zensim-M64a-noKADID@rev6:diffmap --placement 1.372091e-1,0.6
 case " $ARMS " in *" dvifm03"*) : "${DVIFM_SERVER:?set DVIFM_SERVER}" ;; esac
 run dvifm03 server --server "${DVIFM_SERVER:-}" aic4-dvifm-lap-v0.3 diffmap
 run Btail workbench:zensim-B@rev5:diffmap --placement "$B_TAIL"
 run Tgatail workbench:zensim-Tga@rev6:diffmap --placement "$TGA_TAIL"
 run M64atail workbench:zensim-M64a-noKADID@rev6:diffmap --placement "$M64A_TAIL"
 run dvifm03tail server --server "${DVIFM_SERVER:-}" aic4-dvifm-lap-v0.3 diffmap "${DVIFM_TAIL%,*}" "${DVIFM_TAIL#*,}"
-run Bcheck workbench:zensim-B@rev5:diffmap
+run Bcheck workbench:zensim-B@rev5:diffmap --placement 1.302887e-1,0.6
 case " $ARMS " in *" margarine"*) : "${MARGARINE:?set MARGARINE (zenmetrics: just margarine-build)}" ;; esac
 run margarine server --server python3 "$H/margarine_map_server.py" --margarine "${MARGARINE:-}"
 for arm in Mfull Tfull Mfulltail Tfulltail; do
