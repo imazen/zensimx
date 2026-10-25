@@ -2974,6 +2974,38 @@ correction of luminance edits, and none fixes the saturation under-penalty. That
 monotone combination of these damage features (B's recipe gets saturation right through sign contrasts), not of a
 missing global term. Full-data M, which reads no descriptor, stays the leading candidate.
 
+### Margarine as the steering map (2026-10-25)
+
+Owner, 2026-10-25: "Also add margaraine to the spatial steer and see if it can approach butter better." Margarine is
+zenmetrics' unpublished Butteraugli approximation (`crates/margarine`, candidate `simd-row-malta`; its README notes that
+spatial encoder steering had not been evaluated end to end). It emits a native-size diffmap on Butteraugli's scale, so
+it steers at its own placement (scale 1, exponent 1, nothing fitted): the loop treats its map as it treats Butteraugli's.
+`margarine_map_server.py` serves it to steer_rd (one server per loop worker, one Margarine thread per call); its
+`--check` mode passed before the run: on a 512×512 CID22 training pair the served map is bit-identical to the CLI's and
+the score equal (1.0024 for a no-loop d = 1.0 encode). Binary `22a3ff33…`, built from zenmetrics `86b48522`.
+
+**Results** (same 78 TRAIN images, judges and statistic as the steering study; run-heavy 1,436 s, peak RSS 0.60 GiB;
+re-judging reproduced all 14,196 earlier values in every judge table; tables and SHA256SUMS in
+`/mnt/v/output/zensim/byconstruction-2026-10-22/jxl-steer-margarine/`). Bytes saved against the butteraugli loop at
+equal judged score (%, 95% interval):
+
+| Map | All SSIMULACRA2 | All CVVDP | Photos SSIMULACRA2 / CVVDP | Illustrations SSIMULACRA2 / CVVDP | Screens SSIMULACRA2 / CVVDP |
+|---|---|---|---|---|---|
+| **Margarine** | −1.33 [−2.26, −0.57] | **−1.21** [−2.13, −0.45] | **−0.18 [−0.65, +0.14] / −0.15 [−0.59, +0.11]** | −0.99 / −0.80 | −4.20 / −3.95 |
+| DVIFM 0.3 | **−0.51** [−1.10, −0.00] | −1.56 [−2.37, −0.82] | −0.32 [−0.76, +0.05] / −1.35 [−1.77, −0.90] | +0.17 / −1.27 | **−1.72 / −2.34** |
+| full-data M | −0.54 [−2.01, +0.69] | −3.34 [−5.97, −1.11] | **+2.57** / +0.76 [−0.28, +1.84] | −0.65 / −2.62 | −6.98 / −12.88 |
+| B | −1.57 [−3.32, −0.04] | −5.19 [−8.04, −2.53] | +1.95 / −0.82 | −1.15 / −5.24 | −9.52 / −14.38 |
+
+Against no loop, Margarine's loop saves −0.12% [−1.27, +0.85] (SSIMULACRA2) and −0.36% [−1.38, +0.57] (CVVDP) over all
+images (butteraugli's +1.20 / +1.12), +1.19 / +0.74 on photos and −2.98 / −3.08 on screens. 533 of its 702 encodes end
+with no block above target (butteraugli's loop 566).
+
+**Reading** (my bar). Margarine does approach Butteraugli: it is the only map whose photos are a tie with the
+butteraugli loop under both independent judges, and the closest overall by CVVDP (−1.2%). It is not better than
+Butteraugli anywhere, and it is not ahead of the other maps everywhere: DVIFM 0.3 is closer overall by SSIMULACRA2 and on
+screens, and full-data M saves more on photos by SSIMULACRA2 (+2.6%, CVVDP tied). On screens it loses 4% against our maps'
+7–15%.
+
 ### Owner decisions (2026-10-25)
 
 Owner, 2026-10-25: "I take your reccomendation for euler split, yes. … For rev 7, we can restructure to our heart's
