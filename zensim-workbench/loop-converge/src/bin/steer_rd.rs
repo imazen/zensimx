@@ -9,7 +9,7 @@
 //! ZENSIM_WORKBENCH_BAKES=... cargo run --release --manifest-path zensim-workbench/loop-converge/Cargo.toml \
 //!     --bin steer_rd -- --corpus CORPUS.tsv --out RD/jxl --label LABEL --steer STEER \
 //!     [--distances 0.3,0.45,...] [--iters 4] [--effort 7] [--threads 8] [--placement SCALE,EXPONENT] \
-//!     [--probe workbench:METRIC:MAP ...] [--frames DIR] [--server CMD ARG...]
+//!     [--probe workbench:METRIC:MAP ...] [--frames DIR] [--linear] [--server CMD ARG...]
 //! ```
 //!
 //! `STEER` is `none` (no loop: zero iterations), `butteraugli` (the built-in
@@ -30,6 +30,11 @@
 //! score, target, largest tile distance and blocks above the target) and
 //! `run_LABEL.json` (arguments, placement or server header, the embedded
 //! bakes with their SHA-256, this executable's SHA-256).
+//!
+//! `--linear` scores a workbench arm's reconstructions as the loop holds them
+//! (linear-light floats, not rounded to sRGB8: errors under half an 8-bit step
+//! still count); a server gets floats when its header asks for
+//! `"input":"linear-rgb-f32"`. Both are recorded in `run_LABEL.json`.
 //!
 //! `--placement` replaces a workbench arm's fitted placement. Each `--probe`
 //! (a workbench map at its fitted placement, or `workbench:METRIC:MAP@SCALE,EXPONENT`
@@ -212,6 +217,7 @@ fn main() {
         (DISTANCES.to_string(), 4u32, 7u8, 8usize);
     let mut server = Vec::new();
     let (mut placement_override, mut probe_specs, mut frames_dir) = (None, Vec::new(), None);
+    let mut linear = false;
     while let Some(a) = args.next() {
         let mut value = || args.next().unwrap_or_else(|| panic!("{a} needs a value"));
         match a.as_str() {
@@ -226,6 +232,7 @@ fn main() {
             "--placement" => placement_override = Some(value()),
             "--probe" => probe_specs.push(value()),
             "--frames" => frames_dir = Some(PathBuf::from(value())),
+            "--linear" => linear = true,
             "--server" => {
                 server = args.by_ref().collect();
                 break;
@@ -275,6 +282,10 @@ fn main() {
     assert!(
         placement_override.is_none() || matches!(steer, Steer::Workbench { .. }),
         "--placement applies to a workbench arm"
+    );
+    assert!(
+        !linear || matches!(steer, Steer::Workbench { .. }),
+        "--linear applies to a workbench arm (a server asks for floats in its header)"
     );
     let iters = if matches!(steer, Steer::None) {
         0
@@ -342,9 +353,12 @@ fn main() {
     }
 
     // A server's header is read once here, for the record; every worker starts its own.
-    let header = match &steer {
-        Steer::Server(cmd) => Some(MapServer::spawn(cmd).header.clone()),
-        _ => None,
+    let (header, server_linear) = match &steer {
+        Steer::Server(cmd) => {
+            let probe = MapServer::spawn(cmd);
+            (Some(probe.header.clone()), probe.linear)
+        }
+        _ => (None, false),
     };
     let jobs: Vec<(usize, usize)> = (0..images.len())
         .flat_map(|i| (0..distances.len()).map(move |d| (i, d)))
@@ -385,6 +399,7 @@ fn main() {
                             scale: *scale,
                             exponent: *exponent,
                             reference: rgba(&im.rgb),
+                            linear,
                             error: error.clone(),
                         })),
                         Steer::Server(_) => Some(ExternalMetric::new(ServerScorer {
@@ -549,6 +564,7 @@ fn main() {
         "placement": placement,
         "server": if server.is_empty() { serde_json::Value::Null } else { serde_json::json!(server) },
         "server_header": header,
+        "linear_input": linear || server_linear,
         "probes": probes.iter().map(|p| serde_json::json!({"metric": p.metric, "map": p.map, "scale": p.scale, "exponent": p.exponent})).collect::<Vec<_>>(),
         "frames_dir": frames_dir,
         "iters": iters,

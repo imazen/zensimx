@@ -27,7 +27,8 @@ fn main() {
             std::process::exit(2);
         }
     };
-    let text = std::fs::read_to_string(&ids_file).unwrap_or_else(|e| panic!("read {ids_file}: {e}"));
+    let text =
+        std::fs::read_to_string(&ids_file).unwrap_or_else(|e| panic!("read {ids_file}: {e}"));
     let mut ids: Vec<usize> = text
         .split_ascii_whitespace()
         .map(|t| t.parse().unwrap_or_else(|_| panic!("bad id {t}")))
@@ -36,7 +37,11 @@ fn main() {
     ids.dedup();
     assert!(!ids.is_empty(), "no ids in {ids_file}");
     let n = ids.len();
-    let id_text = ids.iter().map(|i| i.to_string()).collect::<Vec<_>>().join(" ");
+    let id_text = ids
+        .iter()
+        .map(|i| i.to_string())
+        .collect::<Vec<_>>()
+        .join(" ");
     let recipe = serde_json::json!({
         "schema_hash": 1,
         "scaler_mean": vec![0.0f32; n],

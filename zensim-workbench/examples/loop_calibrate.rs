@@ -15,6 +15,11 @@
 //! `LOOP_CAL_TAIL` adds a fit to each pair's worst tiles (largest and 99th
 //! percentile; `OUT.tail.tsv`), the blocks that decide whether the loop
 //! reaches its target. `LOOP_CAL_MAPS=a,b` fits only those maps.
+//! `LOOP_CAL_LINEAR=DIR` scores each pair's distorted image from
+//! `DIR/IDX.dist.linear.f32` (interleaved linear-light RGB `f32`, the encoder's
+//! unrounded reconstruction, as zenmetrics' `margarine-loop-replay` writes it)
+//! through `loop_map_values_linear`, the input `steer_rd --linear` gives the
+//! loop, instead of the saved sRGB8 rounding.
 //!
 //! Fit: the CID22-512 *training* images. Held out: the gb82-sc screenshots.
 //! The pair set's CID22-512 validation images are left out entirely (they are
@@ -120,6 +125,7 @@ fn main() {
     let only_maps: Option<Vec<String>> = std::env::var("LOOP_CAL_MAPS")
         .ok()
         .map(|v| v.split(',').map(str::to_string).collect());
+    let linear_dir = std::env::var_os("LOOP_CAL_LINEAR").map(std::path::PathBuf::from);
     for metric in &metrics {
         for map in zensim_workbench::map_names() {
             if only_maps.as_ref().is_some_and(|m| !m.contains(&map)) {
@@ -130,18 +136,49 @@ fn main() {
                 .iter()
                 .map(|(idx, set, w, h, distance)| {
                     let r = read(dir.join(format!("{idx}.ref.rgba")));
-                    let d = read(dir.join(format!("{idx}.dist.rgba")));
-                    let (values, _) = zensim_workbench::loop_map_values(
-                        metric,
-                        &map,
-                        &r,
-                        &d,
-                        *w as u32,
-                        *h as u32,
-                        w * 4,
-                        1.0,
-                        1.0,
-                    )
+                    let (values, _) = match &linear_dir {
+                        Some(ld) => {
+                            let f: Vec<f32> = read(ld.join(format!("{idx}.dist.linear.f32")))
+                                .as_chunks::<4>()
+                                .0
+                                .iter()
+                                .map(|c| f32::from_le_bytes(*c))
+                                .collect();
+                            assert_eq!(f.len(), w * h * 3, "{idx}: linear reconstruction size");
+                            let plane = |c: usize| {
+                                f.iter().skip(c).step_by(3).copied().collect::<Vec<f32>>()
+                            };
+                            let (pr, pg, pb) = (plane(0), plane(1), plane(2));
+                            zensim_workbench::loop_map_values_linear(
+                                metric,
+                                &map,
+                                &r,
+                                w * 4,
+                                &pr,
+                                &pg,
+                                &pb,
+                                *w,
+                                *w as u32,
+                                *h as u32,
+                                1.0,
+                                1.0,
+                            )
+                        }
+                        None => {
+                            let d = read(dir.join(format!("{idx}.dist.rgba")));
+                            zensim_workbench::loop_map_values(
+                                metric,
+                                &map,
+                                &r,
+                                &d,
+                                *w as u32,
+                                *h as u32,
+                                w * 4,
+                                1.0,
+                                1.0,
+                            )
+                        }
+                    }
                     .expect("loop map");
                     let b: Vec<f32> = read(dir.join(format!("{idx}.butter.f32")))
                         .as_chunks::<4>()

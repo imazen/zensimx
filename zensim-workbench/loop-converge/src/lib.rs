@@ -101,6 +101,10 @@ pub struct MapScorer {
     pub exponent: f64,
     /// The source the encode was given, sRGB8 RGBA.
     pub reference: Vec<u8>,
+    /// Score each reconstruction as the loop holds it (linear-light floats,
+    /// [`zensim_workbench::loop_map_values_linear`]) instead of its sRGB8
+    /// rounding.
+    pub linear: bool,
     pub error: ErrorSlot,
 }
 
@@ -128,18 +132,35 @@ impl ExternalLoopMetric for MapScorer {
         height: usize,
         diffmap: &mut Vec<f32>,
     ) -> Result<f64, String> {
-        let rgba = recon_rgba(r, g, b, stride, width, height);
-        let (values, score) = zensim_workbench::loop_map_values(
-            &self.metric,
-            &self.map,
-            &self.reference,
-            &rgba,
-            width as u32,
-            height as u32,
-            width * 4,
-            self.scale,
-            self.exponent,
-        )
+        let (values, score) = if self.linear {
+            zensim_workbench::loop_map_values_linear(
+                &self.metric,
+                &self.map,
+                &self.reference,
+                width * 4,
+                r,
+                g,
+                b,
+                stride,
+                width as u32,
+                height as u32,
+                self.scale,
+                self.exponent,
+            )
+        } else {
+            let rgba = recon_rgba(r, g, b, stride, width, height);
+            zensim_workbench::loop_map_values(
+                &self.metric,
+                &self.map,
+                &self.reference,
+                &rgba,
+                width as u32,
+                height as u32,
+                width * 4,
+                self.scale,
+                self.exponent,
+            )
+        }
         .inspect_err(|e| record(&self.error, e))?;
         diffmap.clear();
         diffmap.extend_from_slice(&values);
@@ -158,12 +179,18 @@ impl ExternalLoopMetric for MapScorer {
 /// the server replies with the score (`f64`, the loop's) and `width × height`
 /// steering values (`f32`, already placed on butteraugli's scale). The server
 /// exits when its stdin closes.
+///
+/// A server whose header has `"input":"linear-rgb-f32"` is sent, instead of
+/// RGBA8, `width × height × 3` little-endian `f32`: interleaved linear-light
+/// sRGB, as the loop holds the image (unclamped and unrounded), for both tags.
 pub struct MapServer {
     child: Child,
     stdin: Option<ChildStdin>,
     stdout: BufReader<ChildStdout>,
     /// The server's self-description, its first line.
     pub header: String,
+    /// The header asks for linear-light float input.
+    pub linear: bool,
 }
 
 impl MapServer {
@@ -185,12 +212,67 @@ impl MapServer {
             command[0]
         );
         header.pop();
+        let linear = serde_json::from_str::<serde_json::Value>(&header)
+            .ok()
+            .and_then(|h| {
+                h.get("input")
+                    .and_then(|v| v.as_str())
+                    .map(|v| v == "linear-rgb-f32")
+            })
+            .unwrap_or(false);
         Self {
             child,
             stdin,
             stdout,
             header,
+            linear,
         }
+    }
+
+    /// One message of a linear-input server: planar linear RGB (rows `stride`
+    /// values apart) sent interleaved.
+    fn send_linear(
+        &mut self,
+        tag: u8,
+        [r, g, b]: [&[f32]; 3],
+        stride: usize,
+        width: usize,
+        height: usize,
+    ) -> std::io::Result<()> {
+        let mut buf = Vec::with_capacity(9 + width * height * 12);
+        buf.push(tag);
+        buf.extend_from_slice(&(width as u32).to_le_bytes());
+        buf.extend_from_slice(&(height as u32).to_le_bytes());
+        for y in 0..height {
+            for x in y * stride..y * stride + width {
+                for v in [r[x], g[x], b[x]] {
+                    buf.extend_from_slice(&v.to_le_bytes());
+                }
+            }
+        }
+        let w = self.stdin.as_mut().expect("server stdin");
+        w.write_all(&buf)?;
+        w.flush()
+    }
+
+    fn read_reply(
+        &mut self,
+        width: usize,
+        height: usize,
+        values: &mut Vec<f32>,
+    ) -> std::io::Result<f64> {
+        let mut score = [0u8; 8];
+        self.stdout.read_exact(&mut score)?;
+        let mut raw = vec![0u8; width * height * 4];
+        self.stdout.read_exact(&mut raw)?;
+        values.clear();
+        values.extend(
+            raw.as_chunks::<4>()
+                .0
+                .iter()
+                .map(|b| f32::from_le_bytes(*b)),
+        );
+        Ok(f64::from_le_bytes(score))
     }
 
     fn send(&mut self, tag: u8, rgba: &[u8], width: usize, height: usize) -> std::io::Result<()> {
@@ -222,18 +304,7 @@ impl MapServer {
         values: &mut Vec<f32>,
     ) -> std::io::Result<f64> {
         self.send(b'D', rgba, width, height)?;
-        let mut score = [0u8; 8];
-        self.stdout.read_exact(&mut score)?;
-        let mut raw = vec![0u8; width * height * 4];
-        self.stdout.read_exact(&mut raw)?;
-        values.clear();
-        values.extend(
-            raw.as_chunks::<4>()
-                .0
-                .iter()
-                .map(|b| f32::from_le_bytes(*b)),
-        );
-        Ok(f64::from_le_bytes(score))
+        self.read_reply(width, height, values)
     }
 }
 
@@ -257,16 +328,19 @@ pub struct ServerScorer {
 impl ExternalLoopMetric for ServerScorer {
     fn set_reference(
         &mut self,
-        _r: &[f32],
-        _g: &[f32],
-        _b: &[f32],
+        r: &[f32],
+        g: &[f32],
+        b: &[f32],
         width: usize,
         height: usize,
     ) -> Result<(), String> {
         let mut server = self.server.lock().unwrap_or_else(|p| p.into_inner());
-        server
-            .set_reference(&self.reference, width, height)
-            .map_err(|e| format!("map server reference: {e}"))
+        let sent = if server.linear {
+            server.send_linear(b'R', [r, g, b], width, width, height)
+        } else {
+            server.set_reference(&self.reference, width, height)
+        };
+        sent.map_err(|e| format!("map server reference: {e}"))
             .inspect_err(|e| record(&self.error, e))
     }
 
@@ -280,10 +354,16 @@ impl ExternalLoopMetric for ServerScorer {
         height: usize,
         diffmap: &mut Vec<f32>,
     ) -> Result<f64, String> {
-        let rgba = recon_rgba(r, g, b, stride, width, height);
         let mut server = self.server.lock().unwrap_or_else(|p| p.into_inner());
-        let score = server
-            .compare(&rgba, width, height, diffmap)
+        let reply = if server.linear {
+            server
+                .send_linear(b'D', [r, g, b], stride, width, height)
+                .and_then(|()| server.read_reply(width, height, diffmap))
+        } else {
+            let rgba = recon_rgba(r, g, b, stride, width, height);
+            server.compare(&rgba, width, height, diffmap)
+        };
+        let score = reply
             .map_err(|e| format!("map server compare: {e}"))
             .inspect_err(|e| record(&self.error, e))?;
         if !score.is_finite() || diffmap.iter().any(|v| !v.is_finite()) {

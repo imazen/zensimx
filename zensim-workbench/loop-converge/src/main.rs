@@ -99,6 +99,7 @@ fn main() {
                 scale,
                 exponent,
                 reference: rgba.clone(),
+                linear: false,
                 error: error.clone(),
             })
         });

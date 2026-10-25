@@ -273,16 +273,27 @@ pub fn compute_map(
     width: u32,
     height: u32,
 ) -> Result<SpatialMap, String> {
+    let ds = RgbSlice::new(distorted, width as usize, height as usize);
+    compute_map_from(metric, map, reference, &ds, width, height)
+}
+
+/// [`compute_map`] with the distorted image as any zensim source (an sRGB8
+/// slice, or linear-light floats for [`loop_map_values_linear`]).
+fn compute_map_from(
+    metric: &str,
+    map: &str,
+    reference: &[[u8; 3]],
+    ds: &impl zensim::ImageSource,
+    width: u32,
+    height: u32,
+) -> Result<SpatialMap, String> {
     let &(name, window, paint, split, smooth, bin) = MAPS
         .iter()
         .find(|m| m.0 == map)
         .ok_or_else(|| format!("no map named {map} (maps: {})", map_names().join(", ")))?;
     let m = model(metric)?;
     let (w, h) = (width as usize, height as usize);
-    let (rs, ds) = (
-        RgbSlice::new(reference, w, h),
-        RgbSlice::new(distorted, w, h),
-    );
+    let rs = RgbSlice::new(reference, w, h);
     let mut scorer = BakeScorer::new(&m)
         .map_err(|e| e.to_string())?
         .with_parallel(false)
@@ -294,7 +305,7 @@ pub fn compute_map(
         .map_err(|e| e.to_string())?;
     let mut session = Fused944Session::new();
     let att = scorer
-        .compute_with_ref_and_attribution(&rs, &pre, &ds, None, &mut session, bin)
+        .compute_with_ref_and_attribution(&rs, &pre, ds, None, &mut session, bin)
         .map_err(|e| e.to_string())?;
     let a = att.attribution();
     Ok(SpatialMap {
@@ -421,6 +432,12 @@ pub fn loop_map_values(
     );
     let want = if map.is_empty() { "diffmap" } else { map };
     let m = compute_map(metric, want, &r, &d, width, height)?;
+    Ok(placed(&m, width, height, scale, exponent))
+}
+
+/// A map's cells spread over its pixels as local error, placed at
+/// `scale · e^exponent`; the score is the largest placed value.
+fn placed(m: &SpatialMap, width: u32, height: u32, scale: f64, exponent: f64) -> (Vec<f32>, f64) {
     let (w, h) = (width as usize, height as usize);
     let n = (w * h) as f64;
     let mut values = vec![0.0f32; w * h];
@@ -432,7 +449,59 @@ pub fn loop_map_values(
         }
     }
     let score = values.iter().copied().fold(0f32, f32::max).into();
-    Ok((values, score))
+    (values, score)
+}
+
+/// [`loop_map_values`] with the distorted image as jxl-encoder's loop holds
+/// its reconstruction: planar linear-light sRGB floats (`r`, `g`, `b`, rows
+/// `stride` values apart), not rounded to sRGB8, so an error smaller than half
+/// an 8-bit step still reaches the map. The SDR walk clamps values to [0, 1],
+/// as the sRGB8 view does. The reference stays the encode's sRGB8 source
+/// (RGBA8 rows `ref_stride` bytes apart), which the floats of an exact encode
+/// equal. Native only (record: benchmarks/byconstruction_2026-10-22.md).
+#[allow(clippy::too_many_arguments)]
+pub fn loop_map_values_linear(
+    metric: &str,
+    map: &str,
+    reference: &[u8],
+    ref_stride: usize,
+    r: &[f32],
+    g: &[f32],
+    b: &[f32],
+    stride: usize,
+    width: u32,
+    height: u32,
+    scale: f64,
+    exponent: f64,
+) -> Result<(Vec<f32>, f64), String> {
+    if !(scale.is_finite() && scale > 0.0 && exponent.is_finite() && exponent > 0.0) {
+        return Err("scale and exponent must be finite and positive".into());
+    }
+    let (w, h) = (width as usize, height as usize);
+    if w == 0 || h == 0 || stride < w || [r, g, b].iter().any(|p| p.len() < (h - 1) * stride + w) {
+        return Err("invalid dimensions, stride or plane length".into());
+    }
+    let rs = rgb(reference, width, height, ref_stride)?;
+    let mut bytes = Vec::with_capacity(w * h * 16);
+    for y in 0..h {
+        for x in y * stride..y * stride + w {
+            for v in [r[x], g[x], b[x], 1.0] {
+                bytes.extend_from_slice(&v.to_ne_bytes());
+            }
+        }
+    }
+    let ds = zensim::StridedBytes::try_with_alpha_mode(
+        &bytes,
+        w,
+        h,
+        w * 16,
+        zensim::PixelFormat::LinearF32Rgba,
+        zensim::AlphaMode::Opaque,
+    )
+    .map_err(|e| e.to_string())?;
+    let want = if map.is_empty() { "diffmap" } else { map };
+    let m = compute_map_from(metric, want, &rs, &ds, width, height)?;
+    Ok(placed(&m, width, height, scale, exponent))
 }
 
 /// The steering map for one loop iteration (see [`loop_map_values`]).
