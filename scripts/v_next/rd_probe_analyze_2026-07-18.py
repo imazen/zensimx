@@ -1611,7 +1611,74 @@ def paired_vs_main():
     print("\n".join(out))
 
 
+def bdrate_vs_main():
+    """Arms against one baseline arm by BD-rate (`--bdrate-vs LABEL`): per image and judge, both arms' (score, log bytes)
+    points as piecewise-linear curves in score, the mean log-bytes difference over the score range both reach (a
+    256-point grid), and the mean over images of `1 - exp(diff)` with a 95% bootstrap interval over images (2,000
+    resamples, seed 1). Positive means fewer bytes than the baseline at equal judged score. Unlike `--paired-vs`, it is
+    symmetric (an arm against the baseline is minus the baseline against the arm in log bytes) and compares every pair
+    over the same score range; images whose two curves overlap over less than a tenth of the narrower range are left
+    out and counted."""
+    import glob
+    import random
+    base = sys.argv[sys.argv.index("--bdrate-vs") + 1]
+    judges = load_judges()
+    curves = defaultdict(list)  # (judge, label, image) -> [(score, log bytes)]
+    for mf in glob.glob(f"{RD}/jxl/manifest_*.tsv"):
+        with open(mf) as f:
+            for r in csv.DictReader(f, delimiter="\t"):
+                for j, sc in judges.get(r["dist_path"], {}).items():
+                    curves[(j, r["label"], r["image"])].append((sc, math.log(int(r["bytes"]))))
+
+    def at(pts, x):
+        for (s0, y0), (s1, y1) in zip(pts, pts[1:]):
+            if s0 <= x <= s1:
+                return y0 if s1 == s0 else y0 + (x - s0) / (s1 - s0) * (y1 - y0)
+        return pts[-1][1]
+
+    per_img, dropped = defaultdict(dict), defaultdict(int)
+    for (j, lab, img), pts in curves.items():
+        if lab in (base, "none") or (j, base, img) not in curves:
+            continue
+        a, b = sorted(pts), sorted(curves[(j, base, img)])
+        lo, hi = max(a[0][0], b[0][0]), min(a[-1][0], b[-1][0])
+        narrower = min(a[-1][0] - a[0][0], b[-1][0] - b[0][0])
+        if narrower <= 0 or hi - lo < 0.1 * narrower:
+            dropped[(j, lab)] += 1
+            continue
+        grid = [lo + (hi - lo) * k / 255 for k in range(256)]
+        diff = st.mean(at(a, x) - at(b, x) for x in grid)
+        for cls in (CLASS.get(img, "photo"), "all"):
+            per_img[(j, lab, cls)][img] = 1.0 - math.exp(diff)
+    rng = random.Random(1)
+    out = [f"# Arms against `{base}` by BD-rate: mean over images of 1 - exp(mean log-bytes difference over the "
+           "commonly reached score range), 95% bootstrap interval over images\n"]
+    labels = sorted({k[1] for k in per_img})
+    present = [j for j in ("ssim2", "butter", "zensim", "dvifm", "cvvdp") if any(k[0] == j for k in per_img)]
+    for cls in ["all", *sorted({k[2] for k in per_img} - {"all"})]:
+        out.append(f"\n## {cls}\n\n| arm | " + " | ".join(f"{j} %" for j in present) + " | images |\n|---|"
+                   + "---|" * len(present) + "---|")
+        for lab in labels:
+            row, n = [], 0
+            for j in present:
+                d = per_img.get((j, lab, cls))
+                if not d:
+                    row.append("—")
+                    continue
+                vals = [d[i] for i in sorted(d)]
+                boots = sorted(st.mean([vals[rng.randrange(len(vals))] for _ in vals]) for _ in range(2000))
+                row.append(f"{100 * st.mean(vals):+.2f} [{100 * boots[50]:+.2f}, {100 * boots[1949]:+.2f}]")
+                n = max(n, len(vals))
+            out.append(f"| {lab} | " + " | ".join(row) + f" | {n} |")
+    if dropped:
+        out.append("\nImages left out for too little common score range (judge, arm: count): "
+                   + ", ".join(f"{j} {lab}: {c}" for (j, lab), c in sorted(dropped.items())))
+    print("\n".join(out))
+
+
 def main():
+    if "--bdrate-vs" in sys.argv:
+        return bdrate_vs_main()
     if "--paired-vs" in sys.argv:
         return paired_vs_main()
     if "--shipgates-rd" in sys.argv:
