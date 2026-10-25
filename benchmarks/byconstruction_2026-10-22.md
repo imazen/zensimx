@@ -3413,7 +3413,7 @@ float-over-8-bit conclusion stand.
 
 **Revision 7 in the loop** (run `00cc14ed2af0-loop-r7win`; controls: `Bcheck4` and `Mlinchk2` reproduce all 702
 bitstreams of B and `Mlintail`, the `diffmap` float placement refits reproduce, re-judging reproduces all 24,726
-earlier rows under all five judges; run-heavy 3,014 s and 3,800 s). Full-data M retrained at revision 7 (`bc471d21`,
+earlier rows under all five judges; run-heavy 3,014 s for the split run, 3,812 s for this one, peak RSS 1.06 GiB). Full-data M retrained at revision 7 (`bc471d21`,
 certified monotone, float placement 2.586523e-2 / 0.7) against M at revision 5, both `diffmap` on floats: all +0.02 /
 −0.07, photos −0.02 / −0.01, illustrations +0.03 / +0.08, screens +0.10 / −0.37, every interval across zero.
 **Revision 7 steers the JPEG XL loop as revision 5 does.**
