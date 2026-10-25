@@ -2567,9 +2567,10 @@ reach of d 0.3 is 88% (bar 95%), photo convergence at 4 iterations is 71–85% a
 reaches 18–65%), the landing ratio leaves 0.8–1.25 from d 2.5 up, and screens do not converge at low distances. So
 better fits are necessary, and they are not enough: the remaining failures come from what the map is, a per-pixel
 split of pooled power norms whose response to a block's quantization is −2.6 to −4 for the worst blocks, near zero and
-coupled for most others, where the loop assumes −1. The fix is in the map's construction (a steering map whose value
-per pixel is a local error amplitude), or, short of that, a loop whose bump uses the map's own response. Whether the
-14–19% fewer bytes on photos are the same quality is the steering study's question (below).
+coupled for most others, where the loop assumes −1. A map whose value per pixel is a local error amplitude fixes that
+response but not the steering (tested below: it loses bytes at equal quality); a loop whose bump uses the map's own
+response is untested. Whether the 14–19% fewer bytes on photos are the same quality is the steering study's question
+(below: not on CVVDP).
 
 **The integral change, tried: an amplitude split** (`SplitMode::Amplitude`, `ZENSIM_MAP_SPLIT=amplitude`, workbench
 map `diffmap_amp`; `bb484919`). Every nonlinear pool (the basic L4/L2 pools and the peak cells' L8 slots, the v2 soft
