@@ -458,7 +458,7 @@ def cmd_mix_licence(a):
     record = dict(root=str(root), frozen_sha256=sha(root/"wide/frozen.json"),
                   collections=len(included), nominal_per_collection=[0.5], nominal_total=4.,
                   derived_rows=sum(r["rows"] for r in packet["groups"]),
-                  protected_families=guard["protected_families"], inherited_leaks=guard["inherited_leaks"],
+                  protected_families=len(guard["protected_families"]), inherited_leaks=guard["inherited_leaks"],
                   label_read_ledger_entries=len(reads["reads"]),
                   eligible_under_new_leg_licence_policy=True)
     # Preserve earlier five-arm inventories as the record of that phase.
