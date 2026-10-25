@@ -208,8 +208,15 @@ def rev7_rows(add, out: Path) -> None:
     seeds = sorted(set.intersection(*(done[a] for a in arms)))
     sc = run_json([sys.executable, str(REPO / "scripts/rev4_featpot/byc_cells.py"), "score", "--arms", ",".join(arms),
                    "--seeds", ",".join(map(str, seeds))], env)
-    mix = run_json([sys.executable, str(HERE / "mixture_test.py"), "report", "--out", MIX], env)
-    mixg = run_json([sys.executable, str(HERE / "mixture_test.py"), "report", "--out", MIXG], env)
+    # Mixture scores: the shared directories, then the revision-7 lane's own copies of the same tests (refused if a
+    # manifest differs from the shared one, so scores from different test sets never mix).
+    mix, mixg = {}, {}
+    for shared, lane, acc in ((MIX, REV7_CELLS.parent / "mixture", mix), (MIXG, REV7_CELLS.parent / "mixture_global", mixg)):
+        acc.update(run_json([sys.executable, str(HERE / "mixture_test.py"), "report", "--out", shared], env))
+        if (lane / "manifest.json").is_file():
+            if (lane / "manifest.json").read_bytes() != (Path(shared) / "manifest.json").read_bytes():
+                raise ValueError(f"{lane}: mixture manifest differs from {shared}")
+            acc.update(run_json([sys.executable, str(HERE / "mixture_test.py"), "report", "--out", str(lane)], env))
     for arm in arms:
         s = sc[arm]
         outs = [x for x in pj["rows"] if x["model"] == arm and x["sample"].startswith("out")]
