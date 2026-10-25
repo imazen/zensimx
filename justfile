@@ -386,7 +386,7 @@ dataset-snapshot study columns mode='mdata':
     test ! -e "$out"
     case {{quote(mode)}} in
       mdata) arms="Mdata Mr7" ;;
-      mixes) arms="Mdata Mw025 Mw100 Mmos Mpair"; test -s "$study/FINALISTS.json"; test -s "$study/TRAIN_SELECTION.json"; test -s "$study/eval/report.json"; test -s "$study/eval-bapps/report.json" ;;
+      mixes) arms="Mdata Mw025 Mw100 Mmos Mpair"; test -s "$study/FINALISTS.json"; test -s "$study/TRAIN_SELECTION.json"; test -s "$study/eval/report.json"; test -s "$study/eval-bapps/report.json"; test -s "$study/FORCED_CHOICE_CONTROLS.json"; test -s "$study/MIXTURE_CELL_CONTROLS.json" ;;
       *) exit 2 ;;
     esac
     for arm in $arms; do

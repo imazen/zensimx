@@ -600,9 +600,19 @@ def cmd_mix_summary(args):
     result = dict(schema="dataset-mix-numeric-summary-v1", selection=selection, finalists=frozen,
                   native_controls=load("NATIVE_CELL_CONTROLS.json"), e21=load("scorecard/e21.json"),
                   panel=load("scorecard/panel.json"), type_bias=load("scorecard/type_bias.json"),
-                  knob_inversions=load("scorecard/knobinv.json"), mixtures={}, eval={}, eval_paired={})
+                  knob_inversions=load("scorecard/knobinv.json"),
+                  forced_choice_controls=load("FORCED_CHOICE_CONTROLS.json"),
+                  mixture_cell_controls=load("MIXTURE_CELL_CONTROLS.json"),
+                  mixtures={}, all_cell_mixtures={}, eval={}, eval_paired={})
+    if result["forced_choice_controls"]["comparisons"] != 45:
+        raise ValueError("native hard-agreement controls require all forty-five comparisons")
     for name in ("mixture","mixture_global"):
         result["mixtures"][name] = load(f"scorecard/{name}.json")
+        result["all_cell_mixtures"][name] = load(f"scorecard/{name}_all-cells.json")
+        count = result["native_controls"]["verified_cells"]
+        if (len(result["all_cell_mixtures"][name]) != count
+                or result["mixture_cell_controls"][name]["models"] != count):
+            raise ValueError("all-cell mixture coverage differs from native model inventory")
         if any(v["cells"] != 12 for v in result["mixtures"][name].values()):
             raise ValueError("mixtures require all twelve E21 cells per arm")
     for directory in ("eval","eval-bapps"):
