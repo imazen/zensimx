@@ -2701,7 +2701,7 @@ before; `byc_cells.py bytype`, `type_bias.py` extended to every set, `aiczero` w
 | CID22-A codec bias spread | 0.0340 | 0.038 | **0.0345** | 0.038 |
 | Standard mixture inversions per cell (largest rise) | 86–171 (+61.5) | 1–6 (+7.6) | 1–32 (+6.5) | **0–4 (+4.0)** |
 | Global-edit inversions per cell | (frozen B: 88 in all, +18.3) | 0 | 0 | 0 (Thpm) |
-| Full-data product gates (C1 standard / ladder, NEARID, G-STEER) | 0.9954 / 0.9882, 130/144, 130/135 | not run | **0.9984 / 0.9935, 143/144, 135/135** | 0.9970 / 0.9914, 140/144, 135/135 |
+| Full-data product gates (C1 standard / ladder, NEARID, G-STEER) | 0.9954 / 0.9882, 130/144, 130/135 | **0.9984 / 0.9937, 142/144, 135/135** (2026-10-25) | **0.9984 / 0.9935, 143/144, 135/135** | 0.9970 / 0.9914, 140/144, 135/135 |
 
 Reported only, not for selection (AIC2026 labels must not tune models): AIC2026 public_train zero-shot global SROCC
 0.9072 / 0.9080 / 0.9091 / 0.9108, within source 0.9530 / 0.9492 / 0.9498 / 0.9496, per-codec bias spread (mean over
@@ -2733,6 +2733,14 @@ dial: within-reference ordering on every set no worse than `base-c`, the full-da
 (4) codec uniformity and smoothness on CID22-A (pooled SROCC, per-codec bias spread, Z-RMSE), no AIC2026 label used;
 (5) steering: G-STEER, map agreement with independent judges, JPEG XL steering against butteraugli. E21's pooled
 statistic stays as a reported diagnostic of cross-type calibration.
+
+**M64's full-data run** (2026-10-25, after the gates were adopted; `scripts/byconstruction/full_fit_gates.sh
+mono-thr-mp64_s0 mono:thr:mp64 m64full`, trainer `774955ad` at one thread as M's and T's ran, run-heavy 3,013 s, peak
+RSS 0.96 GiB): certified monotone (one live max pair), packed f16 bake `0ff53fdc…` (22,560 B). Dial C1 0.9984 standard
+and 0.9937 ladder with C2–C6 passing on both grids, NEARID N1–N3 with 142 of 144 monotone ladders, G-STEER 135/135,
+identity at every SIMD tier (10 permutations, 62 sources each). It is level with M on the product gates; M keeps the
+better CID22-A codec spread (0.0345 against 0.038), M64 the fewer standard-mixture inversions per cell (1–6 against
+1–32).
 
 **The two features E21 alone judged, on this scorecard** (seeds 0–2, out of sample, the same cells; `byc_cells.py
 bytype`, `type_bias.py`):
