@@ -31,6 +31,9 @@ def main():
     ap.add_argument("--bin", type=Path, required=True)
     ap.add_argument("--bapps-library", type=Path, default=Path("/mnt/tower/input/iqa"))
     ap.add_argument("--only", nargs="+")
+    ap.add_argument("--queue", action="store_true")
+    ap.add_argument("--heavy-lock", type=Path)
+    ap.add_argument("--heavy-wrapper", type=Path)
     args = ap.parse_args()
     assert sha(args.bin) == EXTRACTOR_SHA
     assert (args.bin.parent / "BUILD_COMMIT").read_text().strip() == BUILD_COMMIT
@@ -39,6 +42,44 @@ def main():
     assert not admitted & {"ls2n-ipi-sr", "espl-synthetic"}
     selected = set(args.only) if args.only else admitted
     assert selected <= admitted
+    if args.queue:
+        assert args.heavy_lock and args.heavy_wrapper
+        order = sorted(
+            selected,
+            key=lambda n: (
+                json.loads((args.root / "inputs" / n / "PREPARATION.json").read_text())[
+                    "distinct_pairs"
+                ],
+                n,
+            ),
+        )
+        failed = []
+        for name in order:
+            command = [
+                "flock",
+                str(args.heavy_lock),
+                str(args.heavy_wrapper),
+                "--mem",
+                "16G",
+                "--jobs",
+                "12",
+                "--",
+                sys.executable,
+                str(Path(__file__).resolve()),
+                "--root",
+                str(args.root),
+                "--bin",
+                str(args.bin),
+                "--bapps-library",
+                str(args.bapps_library),
+                "--only",
+                name,
+            ]
+            print(f"QUEUED {name}: separate shared-lock acquisition", flush=True)
+            if subprocess.run(command).returncode:
+                failed.append(name)
+        print(f"QUEUE COMPLETE; failed collections={failed}", flush=True)
+        return int(bool(failed))
     owner = Path(__file__).resolve().parents[1] / "rev4_featpot/rev5_bank.py"
     logs = args.root / "owner-logs"
     logs.mkdir(exist_ok=True)
