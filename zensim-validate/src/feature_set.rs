@@ -1668,7 +1668,8 @@ mod training_admission_tests {
         std::fs::remove_dir_all(dir).unwrap();
     }
 
-    /// **The admitted-revision list is ONE list and covers all five registered revisions.**
+    /// **The admitted-revision list is ONE list and covers every registered revision** (1–7 since the
+    /// by-construction revisions 6 and 7 joined `zensim::feature_defs::FormulaRevision`).
     ///
     /// Before this, the registry parse, the per-table metadata check and the
     /// root-manifest read each spelled `matches!(n, 1 | 2)` separately — which
@@ -1678,14 +1679,14 @@ mod training_admission_tests {
     /// defaulted (a mislabelled table must fail loudly, not become revision 1).
     #[test]
     fn the_admitted_revision_list_covers_every_registered_revision() {
-        assert_eq!(ADMITTED_FORMULA_REVISIONS, &[1, 2, 3, 4, 5]);
+        assert_eq!(ADMITTED_FORMULA_REVISIONS, &[1, 2, 3, 4, 5, 6, 7]);
         for n in ADMITTED_FORMULA_REVISIONS {
             assert!(
                 is_admitted_formula_revision(*n),
                 "revision {n} is registered but not admitted"
             );
         }
-        for n in [0u64, 6, 99] {
+        for n in [0u64, 8, 99] {
             assert!(
                 !is_admitted_formula_revision(n),
                 "revision {n} must not be admitted"
@@ -1701,7 +1702,8 @@ mod training_admission_tests {
             ("2", true),
             ("4", true),
             ("5", true),
-            ("6", false),
+            ("7", true),
+            ("8", false),
         ] {
             std::fs::write(
                 dir.join("_MANIFEST.json"),
