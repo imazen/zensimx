@@ -14,6 +14,7 @@ from pathlib import Path
 import random
 import shlex
 import subprocess
+import tarfile
 
 
 def sha(path):
@@ -66,22 +67,7 @@ def main():
     digests = {p.relative_to(args.root).as_posix(): sha(p) for p in files}
     sums.write_text("".join(f"{digest}  {name}\n" for name, digest in digests.items()))
     destination = args.destination.rstrip("/")
-    remote = args.host + ":" + destination + "/"
-    subprocess.run(
-        [
-            "rsync",
-            "-a",
-            "--no-owner",
-            "--no-group",
-            "--backup",
-            "--suffix=.bak",
-            "--mkpath",
-            str(args.root) + "/",
-            remote,
-        ],
-        check=True,
-    )
-    checksum_command = [
+    container = [
         "docker",
         "run",
         "--rm",
@@ -91,6 +77,40 @@ def main():
         "--cpu-shares=256",
         "--memory=1g",
         "--blkio-weight=100",
+    ]
+
+    def copy(paths):
+        command = [
+            *container,
+            "-i",
+            "-v",
+            destination + ":/artifacts:rw",
+            "--entrypoint=/usr/bin/tar",
+            image_id,
+            "--extract",
+            "--file=-",
+            "--directory=/artifacts",
+            "--no-same-owner",
+            "--backup=numbered",
+        ]
+        with subprocess.Popen(
+            ["ssh", args.host, shlex.join(command)], stdin=subprocess.PIPE
+        ) as proc:
+            assert proc.stdin is not None
+            with tarfile.open(fileobj=proc.stdin, mode="w|") as archive:
+                for path in paths:
+                    archive.add(
+                        path,
+                        arcname=path.relative_to(args.root).as_posix(),
+                        recursive=False,
+                    )
+            proc.stdin.close()
+            if proc.wait():
+                raise RuntimeError("containerized array copy failed")
+
+    copy([*files, sums])
+    checksum_command = [
+        *container,
         "-v",
         destination + ":/artifacts:ro",
         "--workdir=/artifacts",
@@ -129,18 +149,7 @@ def main():
     sums.write_text(
         "".join(f"{digest}  {name}\n" for name, digest in sorted(digests.items()))
     )
-    subprocess.run(
-        [
-            "rsync",
-            "-a",
-            "--no-owner",
-            "--no-group",
-            str(receipt_path),
-            str(sums),
-            remote,
-        ],
-        check=True,
-    )
+    copy([receipt_path, sums])
     subprocess.run(["ssh", args.host, verify], check=True)
     print(
         json.dumps(
