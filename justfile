@@ -66,6 +66,9 @@ dataset-scorecard root binary cells out:
     python3 -B scripts/rev4_featpot/byc_cells.py knobinv --arms Mdata,Mr7 --out {{quote(out)}}/knobinv.json > {{quote(out)}}/knobinv.txt
     python3 -B scripts/byconstruction/aic_panel.py --out {{quote(out)}}/panel.json --arms base-c,Mdata,Mr7 --geo --no-aic > {{quote(out)}}/panel.txt 2>&1
 
+dataset-e21 root binary cells out seeds='0,1,2':
+    env BYC_ROOT={{quote(root)}} REV4_V2_BIN_DIR={{quote(binary)}} BYC_CELLS={{quote(cells)}} python3 -B scripts/rev4_featpot/byc_cells.py score --arms Mdata,Mr7 --paired-with Mr7 --seeds {{quote(seeds)}} > {{quote(out)}}
+
 dataset-mixture binary cells out:
     env BYC_CELLS={{quote(cells)}} MIX={{quote(out)}} bash scripts/byconstruction/ring_mixture.sh {{quote(binary)}} raw 12 Mdata
     python3 -B scripts/byconstruction/mixture_test.py summary --out {{quote(out)}} Mdata Mr7
