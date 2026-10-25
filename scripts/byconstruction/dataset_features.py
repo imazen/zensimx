@@ -29,6 +29,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--root", type=Path, required=True)
     ap.add_argument("--bin", type=Path, required=True)
+    ap.add_argument("--bapps-library", type=Path, default=Path("/mnt/tower/input/iqa"))
     ap.add_argument("--only", nargs="+")
     args = ap.parse_args()
     assert sha(args.bin) == EXTRACTOR_SHA
@@ -54,6 +55,25 @@ def main():
             token = prep["collection_token"]
             result = args.root / "bank" / token
             manifest_path = result / "_MANIFEST.json"
+            if name == "bapps" and not manifest_path.exists():
+                receipt_dir = args.root / "bapps-unpack"
+                if not (receipt_dir / "UNPACK_VERIFIED.json").exists():
+                    spec = json.loads((inputs / "instrument.json").read_text())
+                    scratch = Path(spec["immutable_roots"][0])
+                    command = [
+                        sys.executable,
+                        str(Path(__file__).with_name("dataset_unpack_bapps.py")),
+                        "--keys",
+                        str(inputs / "keys.parquet"),
+                        "--library",
+                        str(args.bapps_library),
+                        "--scratch",
+                        str(scratch),
+                        "--receipt-dir",
+                        str(receipt_dir),
+                    ]
+                    print("START BAPPS original-PNG scratch preparation", flush=True)
+                    subprocess.run(command, check=True)
             if not result.exists():
                 command = [
                     sys.executable,
