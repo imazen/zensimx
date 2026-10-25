@@ -81,7 +81,7 @@ def main():
         "unpack_receipt_sha256": sha(unpack_path),
         "bank_manifest_sha256": sha(bank / "_MANIFEST.json"),
         "cleanup_owner_sha256": sha(Path(__file__)),
-        "scratch_removed": str(scratch),
+        "authorized_scratch": str(scratch),
         "original_library_untouched": True,
         "response_payloads_opened": False,
     }
@@ -92,10 +92,26 @@ def main():
     with (args.root / "BAPPS_SOURCE_BINDING.json").open("x") as stream:
         json.dump(result, stream, indent=2)
         stream.write("\n")
+    print(
+        f"Verified {bindings} native file hashes; removing owned PNG scratch",
+        flush=True,
+    )
     shutil.rmtree(scratch)
     if failed.exists():
         shutil.rmtree(failed)
+    assert not scratch.exists() and not failed.exists()
+    removal = {
+        "schema": "bapps-owned-scratch-removal-v1",
+        "source_binding_sha256": sha(args.root / "BAPPS_SOURCE_BINDING.json"),
+        "scratch_removed": str(scratch),
+        "failed_empty_scratch_removed": str(failed),
+        "original_library_untouched": True,
+    }
+    with (args.root / "BAPPS_SCRATCH_REMOVED.json").open("x") as stream:
+        json.dump(removal, stream, indent=2)
+        stream.write("\n")
     print(json.dumps(result), flush=True)
+    print(json.dumps(removal), flush=True)
 
 
 if __name__ == "__main__":
