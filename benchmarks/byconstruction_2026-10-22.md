@@ -3694,3 +3694,17 @@ Exact MOS target ties remove1 MDID,1 LIVE-MD,48 CID:IQ,11 CID:OA,5 IVC
 and149 Colourlab candidate pairs; no singleton rows drop. Counts and
 acceptance-corrected weights are in `DATASET_LEG_COUNTS.json`; its derived
 TRAIN target reads are appended to the same label-read ledger.
+
+#### E21 interim: seed0,4 of12 cells complete
+
+| Held-out dataset | Mdata SROCC | Mr7 SROCC | Mdata − Mr7 |
+|---|---:|---:|---:|
+| kadid | 0.883292 | 0.874132 | +0.009160 |
+| tid2013 | 0.866123 | 0.865304 | +0.000819 |
+| konfig | 0.791486 | 0.803466 | -0.011979 |
+| cid22_a25 | 0.880014 | 0.884811 | -0.004797 |
+
+The seed0 four-dataset mean difference is-0.00169954.
+There is no seed-based uncertainty estimate from one seed. All budgets and
+weights stay fixed; seeds1 and2 continue. These figures include both the
+added data and the required inherited source-family mask.
