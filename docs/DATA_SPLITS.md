@@ -1,5 +1,48 @@
 # DATA_SPLITS.md — canonical train/val/test conventions (locked 2026-07-02)
 
+## October 25 — additional provided-library subset memberships
+
+This additive, label-blind admission freezes **577 TRAIN, 390 EVAL and 136 TEST
+rows** across six collections. Another 112 prospective Toyama TRAIN rows remain
+excluded by unresolved retained source matches. This is a conservative boundary
+of this source screen, not proof that those sources overlap. No old membership
+or native table key changed. No subjective target or MCL-JCI rating was read,
+no fitting occurred, and IMI remains deferred.
+
+| Collection | TRAIN | EVAL | TEST | Excluded TRAIN | Membership SHA-256 |
+|---|---:|---:|---:|---:|---|
+| colourlab-cognitive-science-2022 | 109 | 66 | 44 | 0 | `8ae14d0ca2127aa81877d4b9d7ea2c6fb2bb7881f13173bfbc5ea19eaddd16c0` |
+| irccyn-ivc-broken-arrows | 60 | 36 | 24 | 0 | `101498199f128f47af961cf0ffd8a4ec8764f14ca232b9d67fe69c4bee5a4348` |
+| irccyn-ivc-dibr-images | 288 | 144 | 0 | 0 | `0497829363d0439afc4982525b08ad71a00898ead4563d102c56f1a61352e9b3` |
+| irccyn-ivc-dwt-dtcwt | 60 | 40 | 20 | 0 | `a654a740bbd332a900a49157b6d4be3d3a2609b5973f9b65a1a685284bec146e` |
+| irccyn-ivc-enrico | 60 | 40 | 0 | 0 | `abd8d497aa235a73f786d74efe7cee6a084e54f145bcb3ece4e6764b078fb4bc` |
+| irccyn-ivc-toyama-scores | 0 | 64 | 48 | 112 | `8616f2f68bb866e9d83626114d096485fee3013d76f0d42398a16f7a3832fb83` |
+
+DIBR's four viewpoints per sequence share a source family; ACR, scaled pairwise
+scores and vote pairs retain separate native table keys. Cognitive Science
+Experiment 2 joins 219 existing Colourlab variability stimuli to their documented
+parent references by exact image identifier; it supplies no new independent source
+content. A future TRAIN reader must bind the same parent join rather than bypass
+the native reference check. Experiment 1 and demosaicing lack pristine references;
+HDR-JPEG and PairComp TMO need a native HDR/viewing recipe; Fourier is tier C.
+These are excluded from this A/B SDR extraction.
+
+The source screen extends the existing estate to 486,061 native image records,
+with 58 distinct new reference pixels and 29 retained possible matches after the
+unchanged calibrated filter. The independent validator checks 40,919 prior
+reserved family IDs, including excluded held-out memberships: both new-fit /
+new-held-out and new-fit / prior-reserved intersections are zero. Recall remains
+bounded. D3 source permission accepts MCL-JCI/KonFiG overlap without changing
+KonFiG's TRAIN role or granting access to MCL-JCI ratings. Actual fitting exposure
+is separately inherited from hash-bound earlier model keys and declarations.
+
+Checked on dev: `/mnt/v/zensim/dataset-subsets-20261025/admission/`.
+Admission producer: zenpapers `71f8920cac4ed6679bc7b92eebe5d42c7319e4eb`.
+Validation SHA-256 `ba44794cdf87818ae112b0198cb34965c6f7a926683dae5580895ba87d2271b9`;
+family registry SHA-256 `16af89ed47b1f66ad32196e3696146a28bdd579045723e0ae84bf7ee69260916`.
+Revision-7 features and confidence metadata retain all roles; this registration
+grants no label-access, fitting or assessment authority.
+
 ## October 25 — confidence metadata preserves frozen memberships
 
 Label-free confidence side tables preserve all 498,216 historical membership rows,

@@ -1,5 +1,15 @@
 # Zensim Dataset & Experiment History — accurate record
 
+**October 25, additive provided-library subsets:** Six native collections freeze
+577 TRAIN, 390 EVAL and 136 TEST rows; 112 Toyama TRAIN rows stay excluded because
+retained source matches are unresolved. The independent validator checks 40,919
+prior reserved families with zero new-fit intersections. Old memberships and all
+sealed ratings remain unchanged. Cognitive Experiment 2 inherits existing Colourlab
+references by exact identifier; DIBR views share sequence families. Exclusions are
+no-reference Cognitive Experiment 1/demosaicing, native-HDR HDR-JPEG/TMO, and tier-C
+Fourier. No model fit or quality-target read occurred. The [registration](DATA_SPLITS.md#october-25--additional-provided-library-subset-memberships)
+binds per-role counts, membership hashes and source-screen limits.
+
 **October 25, confidence side tables:** Every key, role, membership state, family ID
 and row order is equal to the original 21-collection admission, across 498,216 rows.
 Published confidence metadata matches 2,444 rows; missing data stay explicit. The
