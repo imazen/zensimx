@@ -7,7 +7,6 @@ archives, feature outputs and unpack/hash receipts are never removed.
 """
 
 import argparse
-import csv
 import hashlib
 import json
 from pathlib import Path
@@ -38,13 +37,16 @@ def main():
     keys_path = args.root / "inputs/bapps/keys.parquet"
     assert marker.read_text().strip() == str(keys_path)
     assert sha(keys_path) == unpack["keys_sha256"]
-    png_receipt = args.root / "bapps-unpack/png-sha256.tsv"
+    png_receipt = args.root / "bapps-unpack/png-sha256.parquet"
     assert sha(png_receipt) == unpack["png_receipt_sha256"]
-    with png_receipt.open() as stream:
-        original = {
-            row["relative_path"]: row["source_sha256"]
-            for row in csv.DictReader(stream, delimiter="\t")
-        }
+    hashes = pq.read_table(png_receipt, columns=["relative_path", "source_sha256"])
+    original = dict(
+        zip(
+            hashes["relative_path"].to_pylist(),
+            hashes["source_sha256"].to_pylist(),
+            strict=True,
+        )
+    )
     assert len(original) == unpack["png_count"]
     bank = args.root / "bank/bapps"
     manifest = json.loads((bank / "_MANIFEST.json").read_text())

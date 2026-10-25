@@ -13,6 +13,7 @@ import json
 from pathlib import Path
 import tarfile
 
+import pyarrow as pa
 import pyarrow.parquet as pq
 
 ARCHIVES = {
@@ -62,8 +63,16 @@ def main():
     args.receipt_dir.mkdir(parents=True, exist_ok=False)
     archives = []
     found = set()
-    with (args.receipt_dir / "png-sha256.tsv").open("x") as receipt:
-        receipt.write("relative_path\tsource_sha256\tbytes\n")
+    receipt_path = args.receipt_dir / "png-sha256.parquet"
+    receipt_schema = pa.schema(
+        [
+            ("relative_path", pa.string()),
+            ("source_sha256", pa.string()),
+            ("bytes", pa.int64()),
+        ]
+    )
+    batch = []
+    with pq.ParquetWriter(receipt_path, receipt_schema, compression="zstd") as receipt:
         for split, (filename, expected_sha) in ARCHIVES.items():
             archive = (
                 args.library / "raw/huggingface/AaronCIH__IQA_dataset/BAPPS" / filename
@@ -91,7 +100,18 @@ def main():
                     dest.parent.mkdir(parents=True, exist_ok=True)
                     with dest.open("xb") as stream:
                         stream.write(data)
-                    receipt.write(f"{rel}\t{actual}\t{len(data)}\n")
+                    batch.append(
+                        {
+                            "relative_path": rel,
+                            "source_sha256": actual,
+                            "bytes": len(data),
+                        }
+                    )
+                    if len(batch) == 4096:
+                        receipt.write_table(
+                            pa.Table.from_pylist(batch, schema=receipt_schema)
+                        )
+                        batch.clear()
                     found.add(rel)
                     if len(found) % 10000 == 0:
                         print(
@@ -99,6 +119,8 @@ def main():
                             flush=True,
                         )
             print(f"finished retained {split} archive: {len(found)} PNGs", flush=True)
+        if batch:
+            receipt.write_table(pa.Table.from_pylist(batch, schema=receipt_schema))
     assert found == wanted, f"missing {len(wanted - found)} required PNGs"
     result = {
         "schema": "bapps-original-png-scratch-v1",
@@ -106,7 +128,8 @@ def main():
         "library_index_sha256": sha(index),
         "archives": archives,
         "png_count": len(found),
-        "png_receipt_sha256": sha(args.receipt_dir / "png-sha256.tsv"),
+        "png_receipt_sha256": sha(receipt_path),
+        "unpacker_sha256": sha(Path(__file__)),
         "scratch": str(args.scratch),
         "labels_read": False,
         "third_party_pixel_conversion": False,
