@@ -1,5 +1,6 @@
 """Negative controls for the lexical audit: quoted/commented gates are not code."""
 import importlib.util
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -29,6 +30,26 @@ class InventoryTests(unittest.TestCase):
         spans = INVENTORY.spans(code, r"\bfn\s+(\w+)")
         self.assertEqual([s[2] for s in spans], ["kept", "next"])
         self.assertEqual(code[spans[0][1]:].strip(), "fn next() {}")
+
+    def test_constant_environment_names_report_each_read_not_the_declaration(self):
+        with tempfile.TemporaryDirectory(dir=Path.home() / "tmp") as tmp:
+            root = Path(tmp)
+            source = root / "zensim/src"
+            source.mkdir(parents=True)
+            (source / "feature_defs.rs").write_text(
+                "impl FormulaRevision { fn row_lanes(self) -> bool { true } }\n"
+                "/// Every slot id ONE\n"
+            )
+            (source / "helper.rs").write_text(
+                'const CHILD: &str = "ZENSIM_TEST_CHILD";\n'
+                'fn helper() {\n'
+                '    std::env::var(CHILD);\n'
+                '    std::env::var_os(CHILD);\n'
+                '}\n'
+            )
+            reads = INVENTORY.collect(root)["environment_reads"]
+            self.assertEqual([r["line"] for r in reads], [3, 4])
+            self.assertEqual({r["variable"] for r in reads}, {"ZENSIM_TEST_CHILD"})
 
 
 if __name__ == "__main__":

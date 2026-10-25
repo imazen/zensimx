@@ -115,8 +115,8 @@ def collect(root):
                 envs.append({**location(m.start()), "variable": m.group(1)})
             # One test helper reads a constant rather than a string at its call site.
             for m in re.finditer(r'const\s+(\w+)\s*:\s*&str\s*=\s*"(ZENSIM_[A-Z0-9_]+)"', literals):
-                if re.search(r'\b(?:var|var_os)\s*\(\s*' + m.group(1) + r'\s*\)', code):
-                    envs.append({**location(m.start()), "variable": m.group(2)})
+                for use in re.finditer(r'\b(?:var|var_os)\s*\(\s*' + m.group(1) + r'\s*\)', code):
+                    envs.append({**location(use.start()), "variable": m.group(2)})
     return {"predicates": predicates, "revision_sites": revisions, "environment_reads": envs,
             "functions": functions}
 
