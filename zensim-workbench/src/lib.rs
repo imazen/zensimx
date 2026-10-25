@@ -459,29 +459,50 @@ pub fn loop_map(
 }
 
 /// Each map's placement on butteraugli's scale for one bake,
-/// `(bake SHA-256 prefix, map, scale, exponent, r)`: fitted by zenmetrics'
-/// method on its calibration encodes of the CID22-512 training images, with
-/// `r` the log-space correlation of block distances with butteraugli's on the
-/// held-out gb82 screenshots (`examples/loop_calibrate.rs`, 2026-10-24, file
-/// `loop_calibration_2026-10-24c.tsv`; record
-/// `benchmarks/byconstruction_2026-10-22.md`). A bake or map without an entry
-/// gets scale 1, exponent 0.5 and no `r`.
+/// `(bake SHA-256 prefix, map, scale, exponent, r)`, fitted to each pair's
+/// largest tile, the blocks that decide whether jxl-encoder's loop reaches its
+/// target (`examples/loop_calibrate.rs` with `LOOP_CAL_TAIL`, on the
+/// 2026-10-24-hq calibration encodes: 17 CID22-512 training images fitted, 10
+/// gb82 screenshots held out, 12 distances 0.1–6), with `r` the log-space
+/// correlation of largest tiles with butteraugli's on the held-out
+/// screenshots. These replaced the bulk fits (every block weighted equally,
+/// `loop_calibration_2026-10-24c.tsv`) on 2026-10-25 by owner decision: at the
+/// bulk placements the requested distance is out of reach for most images.
+/// Files `loop_calibration_2026-10-24tail.tail.tsv`, `…-24amp.tail.tsv` and
+/// `…-25mtalltail.tail.tsv`; record `benchmarks/byconstruction_2026-10-22.md`
+/// ("JPEG XL reachability with Tga", "Owner decisions (2026-10-25)"). A bake or
+/// map without an entry gets scale 1, exponent 0.5 and no `r`.
 pub const LOOP_DEFAULTS: &[(&str, &str, f64, f64, f64)] = &[
     // The revision-6 Tga candidate (maps with the globaff term).
-    ("5ece9e45", "diffmap", 1.329536e-1, 0.6, 0.6532),
-    ("5ece9e45", "diffmap_px", 1.411546e-1, 0.4, 0.4948),
-    ("5ece9e45", "removal", 1.499584e-1, 0.5, 0.5125),
-    ("5ece9e45", "blocks8", 1.553179e-1, 0.6, 0.6112),
+    ("5ece9e45", "diffmap", 2.257066e-2, 0.7, 0.7578),
+    ("5ece9e45", "diffmap_px", 2.974979e-3, 0.7, 0.6767),
+    ("5ece9e45", "removal", 1.125896e-2, 0.7, 0.6882),
+    ("5ece9e45", "blocks8", 2.001415e-2, 0.7, 0.7551),
+    ("5ece9e45", "diffmap_amp", 4.721284e-2, 0.9, 0.4831),
     // M64a, the strictly monotone max-pair arm (its KADID-held-out fold cell, revision 6).
-    ("b8555871", "diffmap", 1.372091e-1, 0.6, 0.6810),
-    ("b8555871", "diffmap_px", 1.449550e-1, 0.4, 0.4570),
-    ("b8555871", "removal", 1.506346e-1, 0.5, 0.3960),
-    ("b8555871", "blocks8", 1.590695e-1, 0.6, 0.6422),
+    ("b8555871", "diffmap", 2.405271e-2, 0.7, 0.7859),
+    ("b8555871", "diffmap_px", 7.639043e-3, 0.6, 0.6132),
+    ("b8555871", "removal", 2.259940e-2, 0.6, 0.3206),
+    ("b8555871", "blocks8", 2.086467e-2, 0.7, 0.7866),
+    ("b8555871", "diffmap_amp", 4.664400e-2, 1.0, 0.8726),
     // B (diff+frag-820, revision 5).
-    ("89cb4861", "diffmap", 1.302887e-1, 0.6, 0.4909),
-    ("89cb4861", "diffmap_px", 1.748248e-1, 0.35, 0.2805),
-    ("89cb4861", "removal", 1.740943e-1, 0.45, 0.3308),
-    ("89cb4861", "blocks8", 2.027928e-1, 0.5, 0.4378),
+    ("89cb4861", "diffmap", 1.815210e-2, 0.7, 0.7779),
+    ("89cb4861", "diffmap_px", 5.841487e-3, 0.6, 0.6135),
+    ("89cb4861", "removal", 3.530780e-2, 0.5, 0.1524),
+    ("89cb4861", "blocks8", 1.608033e-2, 0.7, 0.7940),
+    ("89cb4861", "diffmap_amp", 4.515668e-2, 0.9, 0.6903),
+    // Full-data M, certified monotone max pairs (revision 5).
+    ("6291eeb5", "diffmap", 2.629540e-2, 0.7, 0.6833),
+    ("6291eeb5", "diffmap_px", 3.484946e-3, 0.7, 0.5819),
+    ("6291eeb5", "removal", 2.187459e-2, 0.6, 0.3672),
+    ("6291eeb5", "blocks8", 2.332104e-2, 0.7, 0.6858),
+    ("6291eeb5", "diffmap_amp", 2.954686e-2, 1.1, 0.8620),
+    // Full-data T, certified convex monotone thresholds (revision 5).
+    ("8c40f24c", "diffmap", 2.510790e-2, 0.7, 0.6749),
+    ("8c40f24c", "diffmap_px", 3.218330e-3, 0.7, 0.5451),
+    ("8c40f24c", "removal", 2.178350e-2, 0.6, 0.2484),
+    ("8c40f24c", "blocks8", 2.228227e-2, 0.7, 0.6762),
+    ("8c40f24c", "diffmap_amp", 4.393584e-2, 1.0, 0.8911),
 ];
 
 /// The loop defaults, as `[{metric, map, scale, exponent, r}]`, one per
