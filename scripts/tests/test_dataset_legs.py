@@ -72,6 +72,7 @@ class DatasetTargets(unittest.TestCase):
             self.assertEqual(root.dataset_targets(p,{0},["score"],ledger,"fixture"), {0:{"score":"3.5"}})
             read = json.loads(ledger.read_text())["reads"][0]
             self.assertEqual((read["rows"],read["columns"],read["state"]),([0],["score"],"read"))
+            self.assertEqual(read["parsed_columns"],["item","score"])
 
     def test_soft_probabilities_become_hard_pair_local_rows_and_ties_drop(self):
         members, mapping, labels = [], [], {}

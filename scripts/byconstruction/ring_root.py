@@ -100,8 +100,8 @@ def dataset_family_guard(admission, source, out):
     """Label-free closure of new reservations through native hashes and D4 aliases.
 
     Include excluded reservations too: exclusion from an assessment does not
-    grant fit permission. This audit refuses inherited collisions rather than
-    silently rewriting the frozen revision-7 recipe's populations.
+    grant fit permission. Return inherited collisions for the derived-root
+    builder to mask, while preserving the frozen revision-7 source root.
     """
     memberships, protected, protected_hashes = {}, set(), set()
     validation_path = admission/"validation-receipt.json"
@@ -174,13 +174,15 @@ def cmd_dataset_guard(a):
 def dataset_targets(path, wanted, columns, ledger, collection):
     """Parse selected TRAIN lines only. Persist the preread ledger first."""
     reads = json.loads(ledger.read_text()) if ledger.exists() else {"role": "TRAIN", "reads": []}
-    reads["reads"].append(dict(collection=collection, table=str(path), rows=sorted(wanted),
-                               columns=columns, row_count=len(wanted), state="requested"))
-    ledger.write_text(json.dumps(reads, indent=1)+"\n")
     result = {}
     with path.open() as stream:
         header = next(csv.reader([next(stream)], delimiter="\t"))
         positions = [header.index(c) for c in columns]
+        # CSV tokenizes the complete selected TRAIN record. Record every
+        # parsed field as well as the columns actually used by the trainer.
+        reads["reads"].append(dict(collection=collection, table=str(path), rows=sorted(wanted),
+            columns=columns, parsed_columns=header, row_count=len(wanted), state="requested"))
+        ledger.write_text(json.dumps(reads, indent=1)+"\n")
         for i, line in enumerate(stream):
             if i in wanted:
                 row = next(csv.reader([line], delimiter="\t"))
