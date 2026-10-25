@@ -29,6 +29,9 @@ import numpy as np
 import pyarrow as pa
 import pyarrow.parquet as pq
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from lib.zen_stats import panel_batch, reference_srocc_interval  # noqa: E402
+
 FEAT = Path("/mnt/v/zensim/dataset-features-rev7-20261025")
 LIB = Path("/mnt/tower/input/iqa/datasets")
 # Collections with FROZEN EVAL rows and features. Left out: LocVisVC (its markings are spatial maps, not a scalar
@@ -195,8 +198,16 @@ def load_scores(out):
 
 
 def spearman(x, y):
-    rx, ry = np.argsort(np.argsort(x)), np.argsort(np.argsort(y))
-    return float(np.corrcoef(rx, ry)[0, 1]) if len(x) > 2 and np.std(rx) > 0 and np.std(ry) > 0 else float("nan")
+    return panel_batch([("rank", x, y)], stats="srocc")[0]["srocc_signed"]
+
+
+def mos_interval(rows, scores, resamples=2000):
+    """Canonical midrank Spearman and whole-reference bootstrap, with no tie breaking by row order."""
+    points = [r for r in rows if r["a"] in scores]
+    groups = {g:i for i,g in enumerate(sorted({r["group"] for r in points}))}
+    result = reference_srocc_interval([scores[r["a"]] for r in points], [r["target"] for r in points],
+                                     [groups[r["group"]] for r in points], resamples=resamples, seed=1)
+    return result, len(points)
 
 
 def statistic(rows, s, kind):
@@ -216,7 +227,8 @@ def within(rows, s):
     for r in rows:
         if r["a"] in s:
             by[r["group"]].append((s[r["a"]], r["target"]))
-    vals = [spearman([p[0] for p in g], [p[1] for p in g]) for g in by.values() if len(g) >= 3]
+    jobs = [(str(i),[p[0] for p in g],[p[1] for p in g]) for i,g in enumerate(by.values()) if len(g) >= 3]
+    vals = [r["srocc_signed"] for r in panel_batch(jobs,stats="srocc")] if jobs else []
     vals = [v for v in vals if not math.isnan(v)]
     return st.mean(vals) if vals else float("nan")
 
@@ -237,16 +249,26 @@ def cmd_report(a):
         groups = sorted({r["group"] for r in rr})
         cells, cells_w = [], []
         for n in names:
-            v, used = statistic(rr, scores[n], kind)
-            boots = []
-            for _ in range(2000):
-                pick = [groups[rng.randrange(len(groups))] for _ in groups]
-                sample = [r for g in pick for r in rr if r["group"] == g]
-                boots.append(statistic(sample, scores[n], kind)[0])
-            boots = sorted(b for b in boots if not math.isnan(b))
-            lo, hi = (boots[int(0.025 * len(boots))], boots[int(0.975 * len(boots)) - 1]) if boots else (math.nan,) * 2
+            method = None
+            if kind == "mos":
+                interval, used = mos_interval(rr,scores[n])
+                v,lo,hi = (interval["signed"][k] for k in ("estimate","lo","hi"))
+                method = interval["srocc_ci_method"]
+            else:
+                v, used = statistic(rr, scores[n], kind)
+                # Pairwise agreement retains the original reference bootstrap.
+                by_group = {g:[r for r in rr if r["group"] == g] for g in groups}
+                boots = []
+                for _ in range(2000):
+                    pick = [groups[rng.randrange(len(groups))] for _ in groups]
+                    sample = [r for g in pick for r in by_group[g]]
+                    boots.append(statistic(sample, scores[n], kind)[0])
+                boots = sorted(b for b in boots if not math.isnan(b))
+                lo, hi = (boots[int(0.025 * len(boots))], boots[int(0.975 * len(boots)) - 1]) if boots else (math.nan,) * 2
             cells.append(f"{v:.3f} [{lo:.3f}, {hi:.3f}]")
             result.setdefault(c, {})[n] = {"value": v, "ci95": [lo, hi], "n": used}
+            if method is not None:
+                result[c][n]["srocc_ci_method"] = method
             if kind == "mos":
                 w = within(rr, scores[n])
                 cells_w.append(f"{w:.3f}")
@@ -254,7 +276,7 @@ def cmd_report(a):
         stat = "2AFC agreement" if kind == "pair" else "SROCC"
         lines.append(f"| {c} | {len(rr)} | {stat} | " + " | ".join(cells) + " |")
         if kind == "mos":
-            lines.append(f"| | | within-reference SROCC | " + " | ".join(cells_w) + " |")
+            lines.append("| | | within-reference SROCC | " + " | ".join(cells_w) + " |")
     (out / "report.json").write_text(json.dumps(result, indent=1) + "\n")
     (out / "report.md").write_text("\n".join(lines) + "\n")
     print("\n".join(lines))
