@@ -32,6 +32,13 @@ dataset-cell-control cells:
     cmp {{quote(cells)}}/Mcontrol/without_kadid_s0/pred_kadid.tsv {{quote(cells)}}/Mr7/without_kadid_s0/pred_kadid.tsv
     sha256sum {{quote(cells)}}/Mcontrol/without_kadid_s0/refit/last.bin {{quote(cells)}}/Mr7/without_kadid_s0/refit/last.bin
 
+# Preserve an independent comparison excluding only invocation provenance.
+dataset-model-control cells binary out:
+    mkdir {{quote(out)}}
+    {{quote(binary)}}/bake_dial_refit strip --in {{quote(cells)}}/Mcontrol/without_kadid_s0/refit/last.bin --out {{quote(out)}}/Mcontrol.bin --key zentrain.repro
+    {{quote(binary)}}/bake_dial_refit strip --in {{quote(cells)}}/Mr7/without_kadid_s0/refit/last.bin --out {{quote(out)}}/Mr7.bin --key zentrain.repro
+    cmp {{quote(out)}}/Mcontrol.bin {{quote(out)}}/Mr7.bin
+
 dataset-eval out model binary:
     python3 -B scripts/byconstruction/dataset_eval.py score --out {{quote(out)}} --predict {{quote(binary)}}/bake_dial_refit --model Mdata={{quote(model)}}
     ZEN_PANEL_BIN={{quote(binary)}}/panel python3 -B scripts/byconstruction/dataset_eval.py report --out {{quote(out)}}

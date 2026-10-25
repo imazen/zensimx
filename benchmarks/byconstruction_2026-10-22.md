@@ -3660,3 +3660,37 @@ feature bank, without image extraction or peer rescoring:
 
 The BAPPS peer columns are unmeasured in this run and wait for the owner’s
 IMI archive route. This result does not change the registered training mix.
+
+The unchanged-root KADID seed0 control reproduces all7,869 Mr7 predictions
+byte for byte (`e03397f6b7e769708d9a299366f90c19f708fedcb37b3ec38c515c4e2244c9f6`).
+The native bake hashes differ because their `zentrain.repro` invocation
+provenance differs. Removing only that entry through `bake_dial_refit strip`
+produces identical22,230-byte files; weights, scaler and all remaining
+metadata reproduce. `CONTROL_REPRODUCTION.json` binds both original hashes
+and the stripped comparison. The first four Mdata cells are now running.
+
+All eleven legs deliver350,396 derived TRAIN rows from223,275 native
+memberships. Informative pairs below count the possible within-group rank
+comparisons after exact target ties, rather than independent human votes.
+Native reference groups stay separate across LIVE-MD study parts and IVC
+reference renditions; source families can therefore be fewer than groups.
+For pairwise legs each non-tied comparison is its own two-row group.
+
+| TRAIN leg | Memberships | Derived rows | Groups | Families | Informative pairs | Dropped p_a=.5 |
+|---|---:|---:|---:|---:|---:|---:|
+| pipal | 23,200 | 23,200 | 200 | 200 | 1,334,000 | 0 |
+| mdid | 800 | 800 | 10 | 10 | 31,599 | 0 |
+| live-md | 210 | 210 | 14 | 7 | 1,469 | 0 |
+| cid-iq | 330 | 330 | 11 | 11 | 4,737 | 0 |
+| cid-oa | 143 | 143 | 11 | 11 | 847 | 0 |
+| vcl-fer | 264 | 264 | 11 | 11 | 3,036 | 0 |
+| irccyn-ivc | 105 | 105 | 7 | 5 | 905 | 0 |
+| colourlab-rating-variability-2022 | 320 | 320 | 5 | 5 | 9,931 | 0 |
+| bapps | 146,003 | 223,068 | 111,534 | 111,363 | 111,534 | 34,469 |
+| pieapp | 51,000 | 100,202 | 50,101 | 140 | 50,101 | 899 |
+| fg-iqa | 900 | 1,754 | 877 | 50 | 877 | 23 |
+
+Exact MOS target ties remove1 MDID,1 LIVE-MD,48 CID:IQ,11 CID:OA,5 IVC
+and149 Colourlab candidate pairs; no singleton rows drop. Counts and
+acceptance-corrected weights are in `DATASET_LEG_COUNTS.json`; its derived
+TRAIN target reads are appended to the same label-read ledger.
