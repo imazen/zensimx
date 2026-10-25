@@ -3450,6 +3450,54 @@ v4x 1507×2048 photo 47.09 → 28.43 ms (−39.60%, −39.99..−39.08), 256² p
 16.35 → 9.79 ms (−40.22%); v3 −36.09%, −31.83%, −35.68%. Revision 7's raw ringing against its high-pass research
 arm: the high-pass form costs +0.3% to +1.4%.
 
+### The new datasets' EVAL splits (2026-10-25)
+
+The provided-library collections admitted on 2026-10-25 (`docs/DATA_SPLITS.md`), scored on their frozen EVAL rows,
+which no model has trained on: 11 collections, 9,658 rows, 4,678 distinct image pairs
+(`scripts/byconstruction/dataset_eval.py`; outputs in `/var/tmp/byc-dataset-eval-2026-10-25/` on dev). Models from the
+revision-7 feature banks through the production predictor in score units: **M7** (full-data M retrained at revision 7,
+`bc471d21`) and **B7** (B's weights stamped revision 7, `5fe0a962`). Peers on the same pixels: SSIMULACRA2, Butteraugli
+(p-norm 3) and CVVDP (`cvvdp_cpu_imazen_v0_1_0`) from the pinned judge build. MOS tables are oriented to higher =
+better and scored by Spearman correlation over all rows (and the mean within references); PieAPP and FG-IQA by the
+two-alternative agreement `p_a·[A ahead] + (1 − p_a)·[B ahead] + ½·[tie]`. Intervals: 95% bootstrap over references
+(2,000 resamples), per model, not paired.
+
+Controls: the judge build cannot read BMP, so the 1,555 distinct BMP images were decoded, their RGB8 SHA-256 checked
+against the pixel hash the feature extractor recorded for each (all equal), and written as PNG for the judges; JPEG
+inputs (888) the judges decode themselves. No EVAL row has a source in our existing training data under the admission
+screen (`existing_training_source_exposure` false for all 9,658). Label reads: EVAL rows only, listed in
+`LABEL_READS.json` beside the outputs. Left out: LocVisVC (spatial markings), Colourlab chroma masking (a
+masking-threshold design), DiffIQA and SPCD (no pristine reference), CID:PPS (TIFF), PIPAL and IE-Bench (no EVAL rows).
+
+| Collection | Rows | Statistic | B7 | M7 | butteraugli | cvvdp | ssim2 |
+|---|---|---|---|---|---|---|---|
+| cid-iq | 210 | SROCC | 0.871 [0.841, 0.899] | 0.861 [0.841, 0.883] | 0.590 [0.519, 0.659] | 0.748 [0.715, 0.795] | 0.756 [0.735, 0.785] |
+| | | within-reference SROCC | 0.882 | 0.865 | 0.594 | 0.745 | 0.763 |
+| cid-oa | 91 | SROCC | 0.880 [0.802, 0.976] | 0.913 [0.859, 0.972] | 0.582 [0.472, 0.908] | 0.912 [0.874, 0.961] | 0.847 [0.772, 0.949] |
+| | | within-reference SROCC | 0.988 | 0.989 | 0.988 | 0.988 | 0.988 |
+| colourlab-rating-variability-2022 | 192 | SROCC | 0.703 [0.696, 0.732] | 0.725 [0.695, 0.764] | 0.375 [0.247, 0.590] | 0.614 [0.543, 0.731] | 0.606 [0.570, 0.696] |
+| | | within-reference SROCC | 0.724 | 0.735 | 0.381 | 0.621 | 0.634 |
+| fg-iqa | 540 | 2AFC agreement | 0.758 [0.731, 0.784] | 0.757 [0.731, 0.782] | 0.749 [0.726, 0.772] | 0.755 [0.728, 0.782] | 0.758 [0.729, 0.784] |
+| iqa-odi | 48 | SROCC | 0.849 [0.716, 0.909] | 0.843 [0.703, 0.904] | 0.806 [0.639, 0.896] | 0.833 [0.701, 0.898] | 0.854 [0.726, 0.906] |
+| | | within-reference SROCC | nan | nan | nan | nan | nan |
+| irccyn-ivc | 60 | SROCC | 0.959 [0.911, 0.977] | 0.933 [0.826, 0.957] | 0.909 [0.898, 0.945] | 0.926 [0.892, 0.937] | 0.949 [0.924, 0.979] |
+| | | within-reference SROCC | 0.982 | 0.964 | 0.948 | 0.926 | 0.970 |
+| live-md | 180 | SROCC | 0.879 [0.843, 0.920] | 0.891 [0.867, 0.934] | 0.837 [0.772, 0.917] | 0.899 [0.861, 0.939] | 0.916 [0.889, 0.947] |
+| | | within-reference SROCC | 0.932 | 0.955 | 0.953 | 0.959 | 0.958 |
+| mdid | 480 | SROCC | 0.892 [0.858, 0.929] | 0.894 [0.860, 0.930] | 0.572 [0.444, 0.718] | 0.829 [0.781, 0.884] | 0.787 [0.713, 0.858] |
+| | | within-reference SROCC | 0.908 | 0.907 | 0.592 | 0.860 | 0.803 |
+| nits-iqa | 405 | SROCC | 0.703 [0.671, 0.745] | 0.716 [0.678, 0.764] | 0.705 [0.681, 0.732] | 0.721 [0.674, 0.774] | 0.776 [0.732, 0.829] |
+| | | within-reference SROCC | 0.711 | 0.728 | 0.712 | 0.741 | 0.795 |
+| pieapp | 7260 | 2AFC agreement | 0.579 [0.572, 0.587] | 0.582 [0.576, 0.588] | 0.535 [0.524, 0.546] | 0.570 [0.562, 0.578] | 0.560 [0.551, 0.568] |
+| vcl-fer | 192 | SROCC | 0.884 [0.846, 0.921] | 0.938 [0.923, 0.959] | 0.877 [0.848, 0.906] | 0.933 [0.912, 0.956] | 0.945 [0.930, 0.965] |
+| | | within-reference SROCC | 0.910 | 0.957 | 0.917 | 0.953 | 0.967 |
+
+Reading. Against SSIMULACRA2, revision-7 M is ahead on CID:IQ (0.861 against 0.756), MDID (0.894 / 0.787), Colourlab
+(0.725 / 0.606), CID:OA (0.913 / 0.847) and PieAPP (0.582 / 0.560, intervals apart); behind on NITS (0.716 / 0.776) and
+LIVE-MD (0.891 / 0.916), with overlapping intervals; tied on IRCCyN/IVC, IQA-ODI, VCL@FER and FG-IQA. Butteraugli is
+last or near last on nine of eleven. B7 and M7 differ little except VCL@FER (M7 0.938, B7 0.884) and IRCCyN/IVC (B7
+0.959, M7 0.933). The per-model intervals are not a paired test of the differences.
+
 ## Summary (all arms, E21 screen, seeds 0–2, Δ vs `base-c`)
 
 | Arm | Guarantee | E21 Δ (SE) | Mixture inversions / cell (max rise) |
