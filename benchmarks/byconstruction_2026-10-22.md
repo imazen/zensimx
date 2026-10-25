@@ -3204,7 +3204,8 @@ tests were not run, and the M class was stopped (see the note at the top of this
 ### Before the revision-7 cut: which ringing form (2026-10-25, for the owner)
 
 Every bit-moving speed item listed for revision 7 has landed ("Revision 7 speed after the implementation"); NEON vector
-kernels (a lane is porting them now) and the multithreaded line-buffer walk keep every bit, so neither blocks a cut. One
+kernels (set aside by the owner on 2026-10-25) and the multithreaded line-buffer walk keep every bit, so neither blocks a
+cut. One
 definition does: revision 7 is revision 6 plus the row lanes, and revision 6 computes ringing in its high-pass form
 (`revision.ring_high_pass()`, chosen to serve Tga, a candidate the gate review retired). So the leading model's recipe
 retrained at revision 7 would be **Mhpm**, not M. On the goal-aligned scorecard (E21 cells, seeds 0–2; tables above):
