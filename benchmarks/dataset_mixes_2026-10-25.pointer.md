@@ -109,3 +109,11 @@ scorecard or select finalists. Receipts checked on dev:
 - `LOCAL_MIXTURE_CELL_CONTROLS.json`: `12e5f3457fd06a2180ade5289808bdfd77e85739fcd5737f1e609cdccbb709ba`.
 - `local-mixtures/mixture.json`: `a70e17686b3f6c8358294fdf9681047d93f4e41aaef5a604fcb869f716c74e6b`.
 - `local-mixtures/mixture_global.json`: `a604f890bc53fef218d24fc598db15299cbb1d679ad224c0a366e7abc37a8b3b`.
+
+The AMD replay passed its exact control; the study independently repeated
+the prediction-byte and native checkpoint-strip comparisons. No scientific
+arm harvest is claimed by these receipts:
+
+- `fleet-coordination/AMD_CONTROL_PARITY.json`: `2b3409d09d768773ef8067da7c9d92cabe06ea39113492272f6177c3f1091c67`.
+- `fleet-coordination/AMD_CONTROL_HARVEST.json`: `0e5cc3d85570ebd8991c2eeefc221970f4806c1b50f02515c859037e68f89f97`.
+- `fleet-coordination/amd-parity-independent/VERIFIED.json`: `28eec6c3893cd252caa490257cf3e408663f32bfdabc520fa10242dd00fa692b`.

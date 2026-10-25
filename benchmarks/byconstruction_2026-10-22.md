@@ -4171,3 +4171,25 @@ and TID2013 rank error p99 increases from 0.296727 to 0.298518. No finalist
 is named from this partial study. Resource record: `run-heavy: done rc=0
 47s | peak-RSS 0.32GiB | min-avail 44849MiB | peak-load 1.91` (16 GiB
 scope, jobs 1). TRAIN label-read ledgers precede the diagnostic reads.
+
+
+### Exact fleet control before scientific cells
+
+The AMD replay of frozen Mw025/without_kadid_s0 completed at epoch 119.
+All 23 registered control checks pass. The prediction file is byte-identical
+to the completed local cell, SHA-256
+`9333a13dff53fa4200166e723a9c33f0a48cf32e6beacd40856163571d536eff`.
+The study independently checked the returned prediction bytes and retained
+refit/dense file digests, then stripped only `zentrain.repro` with its pinned
+native binary. Both fresh stripped checkpoints are byte-identical, SHA-256
+`854f75f3a6ec08581faf6b54e88afdffa8a47ebe4a6574778baa565c49fa3e6b`.
+Original local and returned bakes remain preserved. The extra Intel control
+was still running at this observation; it is not claimed to have passed.
+
+The fleet lane can now execute its exclusively assigned 60 scientific
+cells. The independent verification and copied source receipts are under
+`fleet-coordination/`; no scientific result has yet been harvested into the
+123-cell scorecard at this control record. The registered TRAIN selection
+and EVAL freeze order remain unchanged. Every candidate cell/full-data bake
+will be retained for later AIC2026 evaluation; new full-data candidates will
+be added to `candidate_registry.py` and its verified private mirror.
