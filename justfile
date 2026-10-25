@@ -6,7 +6,7 @@ dataset-mix-summary study:
 dataset-mix-progress study:
     #!/usr/bin/env bash
     set -euo pipefail
-    for arm in Mdata Mw025 Mw100 Mmos Mpair; do
+    for arm in Mdata Mw025 Mw100 Mmos Mpair Mlic; do
       folds=kadid,tid2013,konfig,cid22_a25,pipal,pairs,mos7
       case "$arm" in
         Mmos) folds=kadid,tid2013,konfig,cid22_a25,pipal,mos7,full ;;
@@ -28,7 +28,7 @@ dataset-mix-queue study:
     #!/usr/bin/env bash
     set -euo pipefail
     study={{quote(study)}}
-    for arm in Mdata Mw025 Mw100 Mmos Mpair; do
+    for arm in Mdata Mw025 Mw100 Mmos Mpair Mlic; do
       flock "$HOME/tmp/heavy.lock" "$HOME/work/claudehints/scripts/run-heavy" --mem 36G --jobs 12 -- env TMPDIR="$study/scratch" OPENBLAS_NUM_THREADS=1 just dataset-mix-cells "$study" "$arm" 2>&1 | tee "$study/cells_$arm.log"
     done
     touch "$study/CELLS_COMPLETE"
@@ -45,7 +45,7 @@ dataset-mix-cells study arm:
       Mdata) root=/var/tmp/datalegs-20261025/rev7data/root; folds=pipal,pairs,mos7 ;;
       Mmos) folds=kadid,tid2013,konfig,cid22_a25,pipal,mos7,full ;;
       Mpair) folds=kadid,tid2013,konfig,cid22_a25,pairs,full ;;
-      Mw025|Mw100) ;;
+      Mw025|Mw100|Mlic) ;;
       *) exit 2 ;;
     esac
     mkdir -p "$study/cells/Mdata" "$study/scratch/$arm"
@@ -72,12 +72,12 @@ dataset-mix-scorecard study:
     export ZENSIM_MAX_TIER=v3 BYC_LABEL_LEDGER_DIR="$out/label_reads" RAYON_NUM_THREADS=1 OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1
     python3 -B scripts/rev4_featpot/byc_cells.py mix-audit --study "$study" > "$out/native-audit.txt"
     just dataset-mix-forced-choice-controls "$study" > "$out/forced-choice-controls.txt"
-    arms=Mdata,Mw025,Mw100,Mmos,Mpair
+    arms=Mdata,Mw025,Mw100,Mmos,Mpair,Mlic
     python3 -B scripts/rev4_featpot/byc_cells.py score --arms "$arms" --paired-with Mdata > "$out/e21.json"
-    for arm in Mdata Mw025 Mw100 Mmos Mpair; do
+    for arm in Mdata Mw025 Mw100 Mmos Mpair Mlic; do
       python3 -B scripts/rev4_featpot/byc_cells.py bytype --arm "$arm" > "$out/bytype_$arm.json"
     done
-    python3 -B scripts/byconstruction/type_bias.py Mdata Mw025 Mw100 Mmos Mpair --out "$out/type_bias.json" > "$out/type_bias.txt"
+    python3 -B scripts/byconstruction/type_bias.py Mdata Mw025 Mw100 Mmos Mpair Mlic --out "$out/type_bias.json" > "$out/type_bias.txt"
     python3 -B scripts/rev4_featpot/byc_cells.py knobinv --arms "$arms" --out "$out/knobinv.json" > "$out/knobinv.txt"
     python3 -B scripts/byconstruction/aic_panel.py --out "$out/panel.json" --arms "base-c,$arms" --geo --no-aic --no-public-test > "$out/panel.txt" 2>&1
     for set in mixture mixture_global; do
@@ -86,9 +86,9 @@ dataset-mix-scorecard study:
       cp "/var/tmp/datalegs-20261025/$set/manifest.json" "$mix/manifest.json"
       ln -s "/mnt/v/output/zensim/byconstruction-2026-10-22/$set/img" "$mix/img"
       for file in /var/tmp/datalegs-20261025/$set/scores_Mdata_*.json; do cp "$file" "$mix/"; done
-      BYC_MIX_FOLDS=kadid,tid2013,konfig,cid22_a25 MIX="$mix" bash scripts/byconstruction/ring_mixture.sh "$study/bin" raw 12 Mw025 Mw100 Mmos Mpair > "$study/${set}_score.log" 2>&1
-      BYC_MIX_FOLDS=pipal,pairs,mos7,full MIX="$mix" bash scripts/byconstruction/ring_mixture.sh "$study/bin" raw 12 Mdata Mw025 Mw100 Mmos Mpair >> "$study/${set}_score.log" 2>&1
-      python3 -B scripts/byconstruction/mixture_test.py summary --out "$mix" --json-out "$out/$set.json" Mdata Mw025 Mw100 Mmos Mpair > "$out/$set.txt" 2>&1
+      BYC_MIX_FOLDS=kadid,tid2013,konfig,cid22_a25 MIX="$mix" bash scripts/byconstruction/ring_mixture.sh "$study/bin" raw 12 Mw025 Mw100 Mmos Mpair Mlic > "$study/${set}_score.log" 2>&1
+      BYC_MIX_FOLDS=pipal,pairs,mos7,full MIX="$mix" bash scripts/byconstruction/ring_mixture.sh "$study/bin" raw 12 Mdata Mw025 Mw100 Mmos Mpair Mlic >> "$study/${set}_score.log" 2>&1
+      python3 -B scripts/byconstruction/mixture_test.py summary --out "$mix" --json-out "$out/$set.json" Mdata Mw025 Mw100 Mmos Mpair Mlic > "$out/$set.txt" 2>&1
       python3 -B scripts/byconstruction/mixture_test.py report --out "$mix" > "$out/${set}_all-cells.json"
     done
     just dataset-mix-mixture-controls "$study"
@@ -195,6 +195,23 @@ dataset-mix-mixture-controls study:
     print(json.dumps(inventories))
     PY
 
+# Separate queue entry for an addendum while the original five-arm queue runs.
+dataset-mix-licence-queue study:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    study={{quote(study)}}
+    flock "$HOME/tmp/heavy.lock" "$HOME/work/claudehints/scripts/run-heavy" --mem 36G --jobs 12 -- env TMPDIR="$study/scratch" OPENBLAS_NUM_THREADS=1 just dataset-mix-licence-run "$study" 2>&1 | tee "$study/cells_Mlic.log"
+
+dataset-mix-licence-run study:
+    just dataset-leg-tests
+    just lint-scripts
+    just dataset-mix-licence-prepare {{quote(study)}}
+    just dataset-mix-cells {{quote(study)}} Mlic
+
+# Caller holds shared heavy.lock and run-heavy; copies only policy metadata.
+dataset-mix-licence-prepare study:
+    python3 -B scripts/byconstruction/ring_root.py mix-licence --study {{quote(study)}}
+
 # Caller holds shared heavy.lock and run-heavy; all destinations must be fresh.
 dataset-mix-prepare study:
     #!/usr/bin/env bash
@@ -239,6 +256,7 @@ dataset-mix-prepare study:
       esac
       just dataset-root "$source" "$study/$arm/root" "$admission" "$features" "$library" "$columns" "$weight" "$collections"
     done
+    just dataset-mix-licence-prepare "$study"
     touch "$study/PREPARE_COMPLETE"
 
 # Synthetic fixture tables; no provided-library response table is opened.
@@ -386,7 +404,7 @@ dataset-snapshot study columns mode='mdata':
     test ! -e "$out"
     case {{quote(mode)}} in
       mdata) arms="Mdata Mr7" ;;
-      mixes) arms="Mdata Mw025 Mw100 Mmos Mpair"; test -s "$study/FINALISTS.json"; test -s "$study/TRAIN_SELECTION.json"; test -s "$study/eval/report.json"; test -s "$study/eval-bapps/report.json"; test -s "$study/FORCED_CHOICE_CONTROLS.json"; test -s "$study/MIXTURE_CELL_CONTROLS.json" ;;
+      mixes) arms="Mdata Mw025 Mw100 Mmos Mpair Mlic"; test -s "$study/FINALISTS.json"; test -s "$study/TRAIN_SELECTION.json"; test -s "$study/eval/report.json"; test -s "$study/eval-bapps/report.json"; test -s "$study/FORCED_CHOICE_CONTROLS.json"; test -s "$study/MIXTURE_CELL_CONTROLS.json" ;;
       *) exit 2 ;;
     esac
     for arm in $arms; do

@@ -94,6 +94,25 @@ class DatasetHoldouts(unittest.TestCase):
             with self.assertRaisesRegex(ValueError,"subset arm"):
                 dataset_holdout_collections(p,"full")
 
+    def test_licence_subset_scores_entire_omitted_groups(self):
+        from byc_cells import dataset_holdout_collections, VALIDATE_ONLY_NEW_LEGS
+        from subjective_training_leg import DATASET_FOLDS
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d)
+            (p/"datasets").mkdir()
+            trained = {c for cs in DATASET_FOLDS.values() for c in cs} - set(VALIDATE_ONLY_NEW_LEGS)
+            self.assertEqual(len(trained), 8)
+            (p/"datasets/receipt.json").write_text(json.dumps(dict(groups=[
+                dict(collection=c) for c in sorted(trained)])))
+            scored = set()
+            for fold in ("pipal", "pairs", "mos7"):
+                collections, excluded = dataset_holdout_collections(p, fold)
+                self.assertTrue(trained.intersection(excluded))
+                self.assertEqual(set(collections), set(DATASET_FOLDS[fold]))
+                scored.update(collections)
+            self.assertTrue(set(VALIDATE_ONLY_NEW_LEGS) <= scored)
+            self.assertEqual(len(scored), 11)
+
     def test_hard_pair_tie_credit(self):
         from byc_cells import dataset_train_statistic
         got = dataset_train_statistic(["a","a","b","b","c","c"], [1.,0.]*3,
@@ -134,23 +153,29 @@ class DatasetHoldouts(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             study = Path(d)
             (study/"scorecard").mkdir()
+            settings = {arm:(0.7,0.1) for arm in byc_cells.MIX_ARMS}
+            settings.update(Mdata=(0.9,0.), Mlic=(0.8,1.))
             e21 = {arm:dict(seeds=[0,1,2], per_dataset_per_seed_srocc={f:[rho]*3 for f in byc_cells.FOLDS})
-                   for arm,rho in (("A",0.9),("B",0.8))}
+                   for arm,(rho,_) in settings.items()}
             (study/"scorecard/e21.json").write_text(json.dumps(e21))
-            for arm,value in (("A",0.),("B",1.)):
+            (study/"LICENCE_POLICY.json").write_text(json.dumps(dict(
+                excluded_from_Mlic=list(byc_cells.VALIDATE_ONLY_NEW_LEGS), eligible_new_leg_arms=["Mlic"])))
+            for arm,(_,value) in settings.items():
                 for seed in range(3):
                     dest=study/"cells"/arm/f"without_full_s{seed}"
                     dest.mkdir(parents=True)
                     (dest/"byc_record.json").write_text(json.dumps(dict(dataset_train_statistics={
                         c:dict(value=value) for cs in DATASET_FOLDS.values() for c in cs})))
-            args=SimpleNamespace(study=str(study), arms="A,B")
+            args=SimpleNamespace(study=str(study), arms=",".join(byc_cells.MIX_ARMS))
             with patch.object(byc_cells,"CELLS",study/"cells"), redirect_stdout(io.StringIO()):
                 byc_cells.cmd_mix_select(args)
                 with self.assertRaisesRegex(ValueError,"preserve"):
                     byc_cells.cmd_mix_select(args)
             frozen=json.loads((study/"TRAIN_SELECTION.json").read_text())
-            self.assertEqual(frozen["finalists"],["B","A"])
+            self.assertEqual(frozen["finalists"],["Mlic","Mdata"])
             self.assertFalse(frozen["eval_labels_used"])
+            self.assertTrue(frozen["arms"]["Mlic"]["eligible_under_new_leg_licence_policy"])
+            self.assertFalse(frozen["arms"]["Mdata"]["eligible_under_new_leg_licence_policy"])
 
     def test_invalid_builder_parameters_refuse_before_inputs(self):
         for weight, subset in [(0., None), (float("nan"), None), (0.5,"pipal,pipal"), (0.5,"unknown")]:

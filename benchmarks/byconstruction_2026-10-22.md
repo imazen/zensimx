@@ -3819,6 +3819,41 @@ reported `run-heavy: done rc=0 229s | peak-RSS 0.02GiB | min-avail 43986MiB | pe
 
 ## New dataset training mixes — preregistered 2026-10-25
 
+The original five-arm registration below is extended by the owner addendum.
+
+### Owner licence addendum — 2026-10-25
+
+The owner's later addendum adds **Mlic**: the same M shape, nominal 0.5,
+seeds 0–2, with PIPAL, MDID, LIVE-MD, CID:IQ, CID:OA, IRCCyN/IVC,
+Colourlab rating variability and BAPPS. VCL@FER, PieAPP and FG-IQA are
+validate-only under the owner's October 25 policy. They remain usable as
+out-of-fit validation populations, including their frozen TRAIN memberships.
+
+The original five arms remain registered research comparisons. All five
+include at least one validate-only leg and are ineligible as commercial
+defaults under this new-leg policy; the separately owned Mdata64 also uses
+those legs. Mlic excludes all three and is the eligible new-leg arm.
+BAPPS is retained and reported as tier C with two judgments per TRAIN pair.
+No per-item confidence weights or binomial vote loss are introduced here;
+those follow-ups are owned separately.
+
+The unchanged rule below now ranks six arms for at most two research
+finalists. Eligibility is reported separately and does not replace the
+preregistered scores or tie-breaks. Mlic receives the same twelve E21 cells
+and nine group holdouts; its pairwise holdout scores all three pair datasets,
+and its seven-MOS holdout also scores VCL@FER, which it never fits. This
+raises the requested inventory to 123 cells: 111 new fits and 12 reused
+Mdata E21 cells. Both mixtures cover every cell, and the native hard-pair
+point control covers 54 model/collection comparisons.
+
+This extension is registered before Mlic assembly or measurements. The
+Mdata baseline and twelve Mw025 cells had completed when the addendum was
+implemented; no Mlic result informed it. The frozen confidence manifest is
+copied with its SHA256SUMS entry, with the licence classifications recorded
+in `LICENCE_POLICY.json`. Root source-label and per-cell derived-label
+ledgers continue to precede TRAIN target reads.
+
+
 This follow-up compares M-shape Mw025 (all eleven legs, nominal 0.25),
 Mdata (all eleven, 0.5), Mw100 (all eleven, 1.0), Mmos (eight MOS legs,
 0.5), and Mpair (three pairwise legs, 0.5), seeds 0–2. Existing Mdata E21

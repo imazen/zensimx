@@ -399,6 +399,89 @@ def cmd_datasets(a):
     return 0
 
 
+def cmd_mix_licence(a):
+    """Add the owner's eight-leg Mlic root without changing existing roots."""
+    study, confidence = Path(a.study), Path(a.confidence)
+    metadata = study / "licence-policy"
+    metadata.mkdir()
+    source = confidence / "datasets_full.tsv"
+    checksums = confidence / "SHA256SUMS"
+    expected = [line.split()[0] for line in checksums.read_text().splitlines()
+                if line.split()[-1] == "./datasets_full.tsv"]
+    if expected != [sha(source)]:
+        raise ValueError("training-confidence dataset manifest checksum differs")
+    for path in (source, checksums):
+        shutil.copyfile(path, metadata/path.name)
+    with (metadata/source.name).open() as stream:
+        rows = {r["dataset"]: r for r in csv.DictReader(stream, delimiter="\t")}
+    excluded = ("vcl-fer", "pieapp", "fg-iqa")
+    included = ("pipal", "mdid", "live-md", "cid-iq", "cid-oa", "irccyn-ivc",
+                "colourlab-rating-variability-2022", "bapps")
+    if any(rows[c]["policy"] != "validate-only" for c in excluded):
+        raise ValueError("owner's validate-only dataset classifications differ")
+    if any(rows[c]["policy"] != "train" for c in included):
+        raise ValueError("Mlic includes a dataset outside the owner's train policy")
+    if (rows["bapps"]["tier"], rows["bapps"]["per_item"]) != ("C", "2"):
+        raise ValueError("BAPPS tier/judgment policy differs")
+    policy = dict(schema="dataset-mix-owner-licence-policy-v1", date="2026-10-25",
+                  source=str(source), source_sha256=sha(source),
+                  copied_manifest=str(metadata/source.name), excluded_from_Mlic=list(excluded),
+                  retained_in_Mlic=list(included), eligible_new_leg_arms=["Mlic"],
+                  research_only_arms=["Mdata", "Mw025", "Mw100", "Mmos", "Mpair"],
+                  dataset_classifications={c: rows[c] for c in (*included,*excluded)},
+                  confidence_weights_applied=False, binomial_vote_loss_applied=False)
+    (study/"LICENCE_POLICY.json").write_text(json.dumps(policy, indent=1)+"\n")
+    root = study / "Mlic/root"
+    cmd_datasets(argparse.Namespace(
+        root="/mnt/v/output/zensim/byconstruction-2026-10-22/rev7raw/root", out=str(root),
+        admission="/mnt/v/zensim/dataset-admission-20261025",
+        features="/mnt/v/zensim/dataset-features-rev7-20261025", library="/mnt/tower/input/iqa/datasets",
+        columns=str(study/"frozen_configuration/cols_c.txt"), nominal_weight=0.5,
+        collections=",".join(included)))
+    packet = json.loads((root/"datasets/receipt.json").read_text())
+    baseline_root = Path("/var/tmp/datalegs-20261025/rev7data/root")
+    baseline = json.loads((baseline_root/"datasets/receipt.json").read_text())
+    tables = {r["collection"]:r for r in baseline["groups"]}
+    if {r["collection"] for r in packet["groups"]} != set(included):
+        raise ValueError("Mlic root does not match its authorised collection subset")
+    for group in packet["groups"]:
+        if sha(Path(group["path"])) != tables[group["collection"]]["table_sha256"]:
+            raise ValueError("Mlic dataset payload differs from the frozen baseline")
+    inherited = list((baseline_root/"wide/main/real").glob("*.parquet"))
+    for path in inherited:
+        if sha(root/"wide/main/real"/path.name) != sha(path):
+            raise ValueError("Mlic inherited payload differs from the frozen baseline")
+    guard = json.loads(Path(packet["family_guard_path"]).read_text())
+    reads = json.loads((study/"Mlic/LABEL_READS.json").read_text())
+    record = dict(root=str(root), frozen_sha256=sha(root/"wide/frozen.json"),
+                  collections=len(included), nominal_per_collection=[0.5], nominal_total=4.,
+                  derived_rows=sum(r["rows"] for r in packet["groups"]),
+                  protected_families=guard["protected_families"], inherited_leaks=guard["inherited_leaks"],
+                  label_read_ledger_entries=len(reads["reads"]),
+                  eligible_under_new_leg_licence_policy=True)
+    # Preserve earlier five-arm inventories as the record of that phase.
+    for name, key, value in (
+        ("ROOTS.json", "Mlic", record),
+        ("ROOT_ROW_EQUIVALENCE.json", "Mlic", dict(dataset_tables_checked=len(included),
+         inherited_tables_checked=len(inherited), actual_payload_hashes_match_Mdata=True)),
+    ):
+        path = study/name
+        old = json.loads(path.read_text()) if path.exists() else {}
+        target = old.setdefault("arms", {}) if name.startswith("ROOT_ROW") else old
+        if key in target:
+            raise ValueError("preserve the completed Mlic inventory")
+        target[key] = value
+        if path.exists():
+            backup = path.with_name(path.stem+".before-Mlic.bak.json")
+            if backup.exists():
+                raise ValueError("preserve the earlier inventory backup")
+            path.rename(backup)
+        path.write_text(json.dumps(old, indent=1)+"\n")
+    (study/"MLIC_ROOT.json").write_text(json.dumps(record, indent=1)+"\n")
+    print(json.dumps(record))
+    return 0
+
+
 def cmd_dataset_report(a):
     root, output = Path(a.root), Path(a.out)
     packet = json.loads((root/"datasets/receipt.json").read_text())
@@ -1015,6 +1098,10 @@ def main() -> int:
     ds.add_argument("--nominal-weight", type=float, default=0.5)
     ds.add_argument("--collections", help="comma-separated subset; default all eleven")
     ds.set_defaults(fn=cmd_datasets)
+    ml = sub.add_parser("mix-licence")
+    ml.add_argument("--study", required=True)
+    ml.add_argument("--confidence", default="/mnt/tower/output/zenpapers/training-confidence-2026-10-25")
+    ml.set_defaults(fn=cmd_mix_licence)
     dr = sub.add_parser("dataset-report")
     dr.add_argument("--root", required=True)
     dr.add_argument("--out", required=True)

@@ -2,6 +2,17 @@
 
 ## October 25 — TRAIN-only dataset mix selection
 
+The later owner licence addendum adds Mlic at nominal 0.5, excluding
+VCL@FER, PieAPP and FG-IQA from fitting. These three collections are
+validate-only for commercial models under the October 25 policy. Their
+TRAIN memberships may assess omitted-data folds, and their EVAL rows may
+assess frozen finalists. Mlic is the eligible new-leg arm; the original
+five mix arms and Mdata64 remain research-only under this policy. BAPPS
+stays tier C (two judgments per TRAIN pair). Confidence weighting and
+binomial vote counts are separate work. The unchanged finalist rule ranks
+all six research arms; eligibility remains an explicit separate field.
+
+
 The follow-up dataset-mixes brief authorizes nominal weights 0.25, 0.5 and
 1.0, plus MOS-only and pairwise-only subsets. Weights are hyperparameters:
 selection uses only the four existing E21 populations and held-out groups

@@ -40,5 +40,13 @@ TRAIN-read ledger. Diagnostic owners log E21 TRAIN-panel reads separately.
 No completed archive of this new study exists yet, and there is no R2 mirror.
 The original Mdata artifacts retain their separately verified
 [archive record](mdata_2026-10-25.pointer.md). Study completion requires all
-102 requested cell records (12 reused), diagnostics, both mixture sets,
+123 requested cell records (12 reused), diagnostics, both mixture sets,
 frozen finalists, one assessment per finalist and a verified private archive.
+
+The owner licence addendum adds Mlic (eight new legs at nominal 0.5).
+VCL@FER, PieAPP and FG-IQA are omitted from Mlic fitting and remain
+validation populations. Only Mlic is eligible under this new-leg policy;
+the other five arms are research comparisons. Its queued assembly binds
+`LICENCE_POLICY.json` to the copied training-confidence dataset manifest.
+The five-arm ROOTS and row-equivalence inventories are preserved as
+`.before-Mlic.bak.json` before the sixth root is added.

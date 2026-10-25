@@ -37,6 +37,8 @@ ROOT = Path(os.environ.get("BYC_ROOT", "/mnt/v/output/zensim/v40r4-2026-10-08/v2
 BASE_SPEC = "sel:3b7bd5ebe929@h32:H128:cv16:cf98:fx1"
 E34_PANEL = Path("/mnt/v/output/zensim/e34-launch-2026-10-15/evaluation/panel-input.json")
 FOLDS = ("kadid", "tid2013", "konfig", "cid22_a25")
+MIX_ARMS = ("Mdata", "Mw025", "Mw100", "Mmos", "Mpair", "Mlic")
+VALIDATE_ONLY_NEW_LEGS = ("vcl-fer", "pieapp", "fg-iqa")
 HERE = Path(__file__).resolve().parent
 CELLS = Path(os.environ.get("BYC_CELLS", str(Path.home() / "tmp/byc/cells")))
 COLS = Path(os.environ.get("BYC_COLS", str(Path.home() / "tmp/byc/cols_c.txt")))
@@ -382,6 +384,7 @@ def cmd_mix_audit(args):
         "Mdata": (*FOLDS,*DATASET_FOLDS),
         "Mw025": (*FOLDS,*DATASET_FOLDS),
         "Mw100": (*FOLDS,*DATASET_FOLDS),
+        "Mlic": (*FOLDS,*DATASET_FOLDS),
         "Mmos": (*FOLDS,"pipal","mos7","full"),
         "Mpair": (*FOLDS,"pairs","full"),
     }
@@ -397,6 +400,8 @@ def cmd_mix_audit(args):
             expected_collections -= set(DATASET_FOLDS["pairs"])
         elif arm == "Mpair":
             expected_collections = set(DATASET_FOLDS["pairs"])
+        elif arm == "Mlic":
+            expected_collections -= set(VALIDATE_ONLY_NEW_LEGS)
         if trained != expected_collections:
             raise ValueError("mix root collection subset differs")
         nominal = {"Mw025":0.25,"Mw100":1.}.get(arm,0.5)
@@ -457,9 +462,16 @@ def cmd_mix_select(args):
         raise ValueError("preserve the frozen TRAIN decision")
     e21_path = study / "scorecard/e21.json"
     e21 = json.loads(e21_path.read_text())
+    if len(args.arms.split(",")) != len(MIX_ARMS) or set(args.arms.split(",")) != set(MIX_ARMS):
+        raise ValueError("the licence addendum requires all six registered mix arms")
+    policy_path = study / "LICENCE_POLICY.json"
+    policy = json.loads(policy_path.read_text())
+    if (set(policy["excluded_from_Mlic"]) != set(VALIDATE_ONLY_NEW_LEGS)
+            or policy["eligible_new_leg_arms"] != ["Mlic"]):
+        raise ValueError("the owner's new-leg licence policy differs")
     expected = {c for cs in DATASET_FOLDS.values() for c in cs}
     arms = {}
-    records = {str(e21_path): sha(e21_path)}
+    records = {str(e21_path): sha(e21_path), str(policy_path): sha(policy_path)}
     for arm in args.arms.split(","):
         if e21[arm]["seeds"] != [0,1,2]:
             raise ValueError("mix selection requires registered seed order 0,1,2")
@@ -495,13 +507,16 @@ def cmd_mix_select(args):
         def describe(v):
             return dict(per_seed=v, mean=float(np.mean(v)), seed_unit_se=float(np.std(v,ddof=1)/np.sqrt(3)))
         arms[arm] = dict(old=describe(old), new=describe(new), balanced=describe(balanced),
+                         eligible_under_new_leg_licence_policy=arm == "Mlic",
                          per_collection={c:describe(v) for c,v in sorted(per_collection.items())})
     balanced_winner = min(arms, key=lambda a:(-arms[a]["balanced"]["mean"],-arms[a]["new"]["mean"],a))
     old_winner = min(arms, key=lambda a:(-arms[a]["old"]["mean"],-arms[a]["new"]["mean"],a))
     result = dict(schema="dataset-mix-TRAIN-selection-v1", role="TRAIN", rule_commit="7155abdcf3fc",
                   finalists=list(dict.fromkeys((balanced_winner,old_winner))), assessment_seed=0,
                   balanced_winner=balanced_winner, old_winner=old_winner, arms=arms,
-                  input_sha256=records, eval_labels_used=False)
+                  input_sha256=records, eval_labels_used=False,
+                  licence_addendum="2026-10-25", selection_scope="research-comparison",
+                  eligible_new_leg_arms=["Mlic"])
     output.write_text(json.dumps(result,indent=1)+"\n")
     print(json.dumps(result,indent=1))
     return 0
@@ -555,7 +570,7 @@ def cmd_mix_freeze(args):
                 packed = pack_production(bake, dest, anchor, e33_output_stage=True)
                 packed_receipt.write_text(json.dumps(packed,indent=1)+"\n")
             model = Path(packed["packed_model"])
-        elif arm in ("Mw025", "Mw100"):
+        elif arm in ("Mw025", "Mw100", "Mlic"):
             dest = study / arm / "full_s0"
             if dest.exists() and not (dest/"result.json").is_file():
                 raise ValueError("inspect and preserve the earlier finalist-fit attempt")
@@ -579,7 +594,8 @@ def cmd_mix_freeze(args):
             subprocess.run([str(Path(os.environ["REV4_V2_BIN_DIR"])/"bake_dial_refit"),
                             "certify-monotone","--bake",str(model)],stdout=log,stderr=subprocess.STDOUT,check=True)
         models[arm] = dict(path=str(model),sha256=sha(model),root=str(root),
-                           frozen_root_sha256=sha(root/"wide/frozen.json"),seed_index=0)
+                           frozen_root_sha256=sha(root/"wide/frozen.json"),seed_index=0,
+                           eligible_under_new_leg_licence_policy=arm == "Mlic")
     value = dict(schema="dataset-mix-finalists-v1",TRAIN_selection_sha256=sha(selection_path),models=models,
                  eval_assessments_per_finalist=1,selection_uses_EVAL=False)
     output.write_text(json.dumps(value,indent=1)+"\n")
@@ -609,8 +625,8 @@ def cmd_mix_summary(args):
                   forced_choice_controls=load("FORCED_CHOICE_CONTROLS.json"),
                   mixture_cell_controls=load("MIXTURE_CELL_CONTROLS.json"),
                   mixtures={}, all_cell_mixtures={}, eval={}, eval_paired={})
-    if result["forced_choice_controls"]["comparisons"] != 45:
-        raise ValueError("native hard-agreement controls require all forty-five comparisons")
+    if result["forced_choice_controls"]["comparisons"] != 54:
+        raise ValueError("native hard-agreement controls require all fifty-four comparisons")
     for name in ("mixture","mixture_global"):
         result["mixtures"][name] = load(f"scorecard/{name}.json")
         result["all_cell_mixtures"][name] = load(f"scorecard/{name}_all-cells.json")
@@ -1026,7 +1042,7 @@ def main() -> int:
     ma.add_argument("--study", required=True)
     ms = sub.add_parser("mix-select")
     ms.add_argument("--study", required=True)
-    ms.add_argument("--arms", default="Mw025,Mdata,Mw100,Mmos,Mpair")
+    ms.add_argument("--arms", default=",".join(MIX_ARMS))
     mf = sub.add_parser("mix-freeze")
     mf.add_argument("--study", required=True)
     z = sub.add_parser("aiczero")
