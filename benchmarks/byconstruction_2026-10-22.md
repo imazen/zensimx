@@ -4048,3 +4048,19 @@ process, not an aggregate or a fit-only bound. The completion receipt is
 `MLIC_COMPLETION.json`. After the wrapper exited, the queued decoder
 acquired the shared heavy lock and fleet image/data preparation remained
 queued behind it. No new local heavy job was submitted at release.
+
+The completed local arms provide the following held-out-new-TRAIN means.
+Each seed averages the same eleven collection statistics under the
+registered transformation; differences pair the three seeds against Mdata.
+These are record aggregates, with no new target table read or finalist
+selection. The complete scorecard still awaits the fleet arms.
+
+| Arm | New-data mean | Seed-unit SE | Difference from Mdata | Paired seed-unit SE |
+|---|---:|---:|---:|---:|
+| Mdata | 0.899773554 | 0.000523623 | 0 | 0 |
+| Mw025 | 0.899266963 | 0.000625827 | -0.000506591 | 0.000109575 |
+| Mlic | 0.899509341 | 0.000905100 | -0.000264213 | 0.000484277 |
+
+`LOCAL_TRAIN_GROUP_RESULTS.json` retains all per-seed collection values and
+their source record hashes. The queued decoder subsequently completed
+successfully in one second; fleet image/data preparation acquired the lock.

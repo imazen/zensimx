@@ -70,3 +70,6 @@ controls are recorded in `BINARY_CELL_CONTROLS_NEGATIVE.json`.
 Mlic has completed all 21 cells at fixed epoch 119. Together with Mdata and
 Mw025, 63 of 123 cells are complete; the remaining 60 are fleet-owned.
 `MLIC_COMPLETION.json`: `bf7478ccc2d3351312888a21f85e9485c1090abf1b605b78490862fbd4e51c72`.
+
+`LOCAL_TRAIN_GROUP_RESULTS.json` retains the held-out-new-TRAIN statistics
+for the three completed local arms, before six-arm selection.
