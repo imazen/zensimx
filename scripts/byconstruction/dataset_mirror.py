@@ -79,9 +79,9 @@ def main():
         "artifact_bytes": sum(p.stat().st_size for p in files),
         "all_artifact_sha256_verified": True,
         "random_readbacks": readbacks,
-        "response_tables_opened": False,
     }
     if args.artifact_kind == "features":
+        receipt["response_tables_opened"] = False
         receipt["readme_example_exposure_receipt"] = "README_EXPOSURE.json"
     else:
         receipt["label_values_interpreted_by_mirror"] = False
