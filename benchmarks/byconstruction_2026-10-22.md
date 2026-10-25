@@ -2773,6 +2773,25 @@ revision 5) are read. So M and T cost what B costs to extract; nothing can be dr
 concentrated (with each input's weight divided by its scaler scale, 8 / 114 / 474 of M's inputs carry 50 / 90 / 99% of
 the total, T's 6 / 89 / 420), which is where a reduced input set would start.
 
+**Bake sizes.** Every bake here is ZNPR v3 with its payload LZ4-compressed (flags 0x0003). The production packs used
+`--dtype f16 --zerobias-bulk 0 --protect-last`: zerobias zeroed nothing (L0 0 of 104,960, L1 0 of 128; at the dense
+default τ 0.005 it would have killed 17 of M's and 44 of T's 820 live input lines outright) and prune found no dead
+input column. The 126 / 127 dead hidden units are stored as zeros, so the payloads are as large as B's, and LZ4
+removes them:
+
+| Bake | Payload, uncompressed | On disk | Without the `zentrain.repro` record | Also without `zentrain.sample_coverage` |
+|---|---|---|---|---|
+| B (`89cb4861`, f16) | 254,512 B | 214,904 B | 210,617 B | — |
+| M dense (f32) | 464,174 B | 26,259 B | — | — |
+| M packed (f16, `6291eeb5`) | 254,466 B | **22,797 B** | 18,615 B | 15,620 B |
+| T dense (f32) | 464,140 B | 23,057 B | — | — |
+| T packed (f16, `8c40f24c`) | 254,432 B | **21,215 B** | 17,045 B | 14,050 B |
+
+So M and T ship at a tenth of B's size; about a third of what is left is provenance metadata (36.6 KB of text before
+compression: the repro record 19.9 KB, the derived-input declaration 9.3 KB, the coverage record 5.5 KB), which
+serving needs only for the declaration. The stripped files (`bake_dial_refit strip`) were measured only; the
+production bakes keep every record.
+
 ### JPEG XL steering with the full-data monotone models (2026-10-25)
 
 The steering study's zensim maps were B and two models trained with AIC2026 labels (Tga, M64a). The models the
