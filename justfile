@@ -7,7 +7,12 @@ dataset-mix-progress study:
     #!/usr/bin/env bash
     set -euo pipefail
     for arm in Mdata Mw025 Mw100 Mmos Mpair; do
-      env BYC_CELLS={{quote(study)}}/cells OPENBLAS_NUM_THREADS=1 python3 -B scripts/rev4_featpot/byc_cells.py progress --arm "$arm" --folds kadid,tid2013,konfig,cid22_a25,pipal,pairs,mos7,full
+      folds=kadid,tid2013,konfig,cid22_a25,pipal,pairs,mos7
+      case "$arm" in
+        Mmos) folds=kadid,tid2013,konfig,cid22_a25,pipal,mos7,full ;;
+        Mpair) folds=kadid,tid2013,konfig,cid22_a25,pairs,full ;;
+      esac
+      just dataset-cell-progress {{quote(study)}}/cells "$arm" "$folds"
     done
 
 # Caller holds shared heavy.lock and run-heavy; refuses unfrozen candidates.
@@ -158,8 +163,8 @@ dataset-full root binary dest columns:
 dataset-cell root binary cells scratch label fold seed jobs='1':
     env BYC_ROOT={{quote(root)}} REV4_V2_BIN_DIR={{quote(binary)}} BYC_CELLS={{quote(cells)}} BYC_SCRATCH={{quote(scratch)}} ZENSIM_MAX_TIER=v3 RAYON_NUM_THREADS=1 OMP_NUM_THREADS=1 python3 -B scripts/rev4_featpot/byc_cells.py run --arm mono:thr:mp32 --label {{quote(label)}} --folds {{quote(fold)}} --seeds {{quote(seed)}} --jobs {{quote(jobs)}}
 
-dataset-cell-progress cells arm='Mdata':
-    env BYC_CELLS={{quote(cells)}} OPENBLAS_NUM_THREADS=1 python3 -B scripts/rev4_featpot/byc_cells.py progress --arm {{quote(arm)}}
+dataset-cell-progress cells arm='Mdata' folds='kadid,tid2013,konfig,cid22_a25':
+    env BYC_CELLS={{quote(cells)}} OPENBLAS_NUM_THREADS=1 python3 -B scripts/rev4_featpot/byc_cells.py progress --arm {{quote(arm)}} --folds {{quote(folds)}}
 
 dataset-counts root out:
     OPENBLAS_NUM_THREADS=1 python3 -B scripts/byconstruction/ring_root.py dataset-report --root {{quote(root)}} --out {{quote(out)}}
