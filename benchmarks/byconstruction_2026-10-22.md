@@ -3052,6 +3052,23 @@ screenshot bulk log bias goes from −0.85 to +0.02 and its worst-block held-out
 The earlier statement that "the gap lies between that frozen Butteraugli and the one jxl-encoder's loop uses" is
 wrong. Whether the floats also steer better, for Margarine and for our maps, is measured next (`steer_rd --linear`).
 
+### JPEG XL steering on the loop's float reconstruction (2026-10-25)
+
+**Design (recorded before any result).** The correction above says every external map steered from an 8-bit view the
+loop's own Butteraugli never sees. This measures what each map does when it sees the float reconstruction instead
+(build `59e0c1d40640-loop-lin`, `scripts/byconstruction/jxl_steer_rd.sh` with `LINEAR_ARMS`/`LINEAR_SERVER_ARMS`, the same
+78 TRAIN images, effort 7, 4 iterations, distances 0.3–10, judges and statistic as the steering study).
+- *Placements.* Our maps' tail placements refitted on the replayed float reconstructions of the 2026-10-24-hq pairs
+  (`loop_calibrate` with `LOOP_CAL_TAIL` and `LOOP_CAL_LINEAR`); Margarine's native placement (scale 1, exponent 1), as its 8-bit arm.
+- *Arms:* `Mlintail`, `Tlintail`, `Blintail`, `M64lintail` (full-data M, T, M64 and B, `steer_rd --linear`) and
+  `margarinelin` (zenmetrics' `margarine-steer --server`, binary `953fe4ae…`, one thread per worker).
+- *Controls* (a failure stops the run before any linear result is read): `Bcheck2` must reproduce all 702 of B's
+  bitstreams, and the new build's 8-bit tail refit must reproduce the recorded M, T and B rows (scale, exponent, both r).
+- *Reading (my bar, as before):* an arm steers better than another when its saving is positive with the interval above
+  zero under both SSIMULACRA2 and CVVDP. Each linear arm is compared with its own 8-bit arm (`--paired-vs`) and with the
+  butteraugli loop, per class; loop convergence at d ≤ 2.5 (each map's last largest tile over the request, and the
+  share of encodes ending with no block above target) is reported beside it.
+
 ### Owner decisions (2026-10-25)
 
 Owner, 2026-10-25: "I take your reccomendation for euler split, yes. … For rev 7, we can restructure to our heart's
