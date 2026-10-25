@@ -18,6 +18,7 @@ const BYC_DERIVED: &[&str] = &[
     "basic+peaks+v2@w2337/rev5_localwin_orient#24a93918",
     "basic+peaks+v2@w1891/rev5_localwin_ringhpm_globaff#d56ad477",
     "basic+peaks+v2@w2301/rev5_localwin_ringhpm_globaffgate#45e0e84c",
+    "basic+peaks+v2@w2055/rev5_localwin_ringhpm_globaffgatey#7b645e91",
 ];
 
 pub(super) fn safe(path: &Path) -> Result<(), String> {

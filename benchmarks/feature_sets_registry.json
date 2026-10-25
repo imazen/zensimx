@@ -411,6 +411,13 @@
    "formula_revision": 5,
    "note": "Research only (branch explore/byconstruction). f1891-f2300 hold, for each of fx1's 410 differences d in ascending id order, the f32 product d x (1 - share) with the byc_globaff share of d's own scale and channel cell (scripts/byconstruction/ring_root.py gated); every other column is the globaff root's. zensim cannot compute them at serving time. benchmarks/byconstruction_2026-10-22.md"
   },
+  "rev5_localwin_ringhpm_globaffgatey": {
+   "build_commit": "985ac5c9",
+   "root": "/mnt/v/output/zensim/byconstruction-2026-10-22/ringhpm/root_globaff_gatedy",
+   "label": "By-construction exploration: rev5_localwin_ringhpm_globaff plus gated luminance damage at f1891-f2054",
+   "formula_revision": 5,
+   "note": "Research only (branch explore/byconstruction). f1891-f2054 hold, for each of fx1's 164 differences d in the four luminance (Y) cells, in ascending id order, the f32 product d x (1 - share) with the byc_globaff share of d's own scale and channel cell (scripts/byconstruction/ring_root.py gated --channels Y); every other column is the globaff root's. zensim cannot compute them at serving time. benchmarks/byconstruction_2026-10-22.md"
+  },
   "rev6_ringhpm": {
    "build_commit": "per-run source/binary hashes",
    "label": "Formula revision 6: Rev5 local-window arithmetic with the high-pass ringing form, selected by the bake's declared revision; admits the globaff family f1867-f1890",
@@ -1149,6 +1156,19 @@
    "kind": "set",
    "legacy_name": "Rev5 basic+peaks+v2 measured subset, ringing hpm, byc_globaff, gated damage (by-construction exploration)",
    "evidence": "zensim-validate/src/bin/byc_fsid.rs (hash); scripts/byconstruction/ring_root.py gated; benchmarks/byconstruction_2026-10-22.md"
+  },
+  "basic+peaks+v2@w2055/rev5_localwin_ringhpm_globaffgatey": {
+   "compute": "basic+peaks+v2",
+   "layout": 2055,
+   "era": "rev5_localwin_ringhpm_globaffgatey",
+   "slots": "0-227,372-719,1867-2054",
+   "research_slots": "1867-2054",
+   "slots_hash8": "7b645e91",
+   "n_slots": 764,
+   "role": "producer",
+   "kind": "set",
+   "legacy_name": "Rev5 basic+peaks+v2 measured subset, ringing hpm, byc_globaff, gated luminance damage (by-construction exploration)",
+   "evidence": "zensim-validate/src/bin/byc_fsid.rs (hash); scripts/byconstruction/ring_root.py gated --channels Y; benchmarks/byconstruction_2026-10-22.md"
   }
  },
  "roots": {

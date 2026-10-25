@@ -2700,6 +2700,25 @@ byc-workbench-module out="target/zensim-workbench-web" wasm_bindgen="wasm-bindge
     {{wasm_bindgen}} --target web --out-dir {{out}}/pkg-zensimx zensim-workbench/target/wasm32-unknown-unknown/release/zensim_workbench.wasm
     cargo run -q --release --manifest-path zensim-workbench/Cargo.toml --example workbench_manifest > {{out}}/extra-modules.json
 
+# The trainer-side tools the by-construction cells use (byc_cells.py's REV4_V2_BIN_DIR): zensim_mlp_train,
+# bake_dial_refit, panel, score_pair_with_bake, byc_fsid and byc_predict, copied to /var/tmp/byconstruction-bin/<commit>
+# with BUILD_COMMIT and SHA256SUMS. The working copy must equal its commit.
+byc-train-bins:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    [ -z "$(jj diff --summary -r @)" ] || { echo 'commit first: the binaries name their commit' >&2; exit 2; }
+    commit=$(jj log -r 'latest(::@ & ~empty())' --no-graph -T 'commit_id')
+    dest=/var/tmp/byconstruction-bin/${commit:0:12}
+    [ ! -e "$dest" ] || { echo "$dest exists" >&2; exit 2; }
+    bins="zensim_mlp_train bake_dial_refit panel score_pair_with_bake byc_fsid byc_predict"
+    cargo build --release -p zensim-validate $(printf -- '--bin %s ' $bins)
+    target=$(cargo metadata --format-version 1 --no-deps | python3 -c 'import json,sys; print(json.load(sys.stdin)["target_directory"])')
+    mkdir -p "$dest"
+    for b in $bins; do cp "$target/release/$b" "$dest/"; done
+    printf '%s' "$commit" > "$dest/BUILD_COMMIT"
+    (cd "$dest" && sha256sum $bins > SHA256SUMS)
+    echo "$dest"
+
 # The native loop tools (loop-converge's binaries and the workbench's loop_calibrate) with the bakes in
 # ZENSIM_WORKBENCH_BAKES, copied to /var/tmp/byconstruction-bin/<commit>-loop-TAG with PROVENANCE and SHA256SUMS. NOTE
 # goes into PROVENANCE (say "private weights: LAN only" when a bake is private). The working copy must equal its commit.
