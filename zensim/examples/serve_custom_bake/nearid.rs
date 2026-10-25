@@ -147,10 +147,14 @@ pub(super) fn run(args: &[String]) {
     let root = Path::new(&args[1]);
     fs::create_dir_all(root).unwrap();
     assert!(matches!(name.as_str(), "seed0" | "B" | "A") || candidate.is_some());
-    assert_eq!(
-        std::env::var("ZENSIM_FORMULA_REV").unwrap(),
-        if dynamic { "5" } else { "1" }
-    );
+    // A dynamic model serves at revision 5. A by-construction candidate (benchmarks/byconstruction_2026-10-22.md)
+    // may serve at revision 7, which its bake must declare.
+    let revision = std::env::var("ZENSIM_FORMULA_REV").unwrap();
+    if candidate.is_some() {
+        assert!(matches!(revision.as_str(), "5" | "7"));
+    } else {
+        assert_eq!(revision, if dynamic { "5" } else { "1" });
+    }
     let bytes = fs::read(&args[3]).unwrap();
     let expected = match name.as_str() {
         "seed0" => "f803b74c4252952f337abdc0234c2930839d45dddc32ae9b8b5296d6c840f400",
@@ -160,6 +164,12 @@ pub(super) fn run(args: &[String]) {
     };
     assert_eq!(sha(&bytes), expected, "frozen model bytes");
     let model = zenpredict::Model::from_bytes(&bytes).unwrap();
+    if revision == "7" {
+        assert_eq!(
+            model.metadata().get_utf8("zentrain.formula_revision").ok(),
+            Some("7")
+        );
+    }
     let mut scorer = BakeScorer::new(&model).unwrap().with_parallel(false);
     let request = zensim::research::Request::for_bake_bytes(&bytes).unwrap();
     let metadata = json!({"model":name,"model_sha256":sha(&bytes),
@@ -383,7 +393,7 @@ struct Fx1 {
 /// weights <= 0, output bias = pin) over E33 Arm A (`products` empty) or Arm
 /// C, with deterministic positive first-layer weights. Its raw output is the
 /// pin exactly when every model input is ±0 (registration §7 E7).
-fn e33_nonneg_bake(fx1: &Fx1, products: bool, pin: f64) -> Vec<u8> {
+fn e33_nonneg_bake(fx1: &Fx1, products: bool, pin: f64, revision: &str) -> Vec<u8> {
     let mut read: Vec<usize> = fx1.direct.clone();
     let mut derived = String::from("zensim-derived-inputs v1\n");
     for id in &fx1.direct {
@@ -405,7 +415,7 @@ fn e33_nonneg_bake(fx1: &Fx1, products: bool, pin: f64) -> Vec<u8> {
     let mut metadata = vec![
         json!({"key":"zentrain.feature_ids","type":"utf8",
                "text":read.iter().map(usize::to_string).collect::<Vec<_>>().join(" ")}),
-        json!({"key":"zentrain.formula_revision","type":"utf8","text":"5"}),
+        json!({"key":"zentrain.formula_revision","type":"utf8","text":revision}),
     ];
     if products {
         metadata.push(json!({"key":"zensim.derived_inputs","type":"utf8","text":derived}));
@@ -435,7 +445,10 @@ pub(super) fn e33_identity(args: &[String]) {
         args.len() >= 4,
         "--e33-identity SOURCES.json FX1.json PRODUCTION_MODEL.bin OUTPUT.jsonl [CANDIDATE.bin ...]"
     );
-    assert_eq!(std::env::var("ZENSIM_FORMULA_REV").unwrap(), "5");
+    // Revision 5, or 7 for the by-construction revision-7 candidates: the production bake only names the read
+    // set, the extraction runs at the process revision, and the nonneg bakes declare it.
+    let revision = std::env::var("ZENSIM_FORMULA_REV").unwrap();
+    assert!(matches!(revision.as_str(), "5" | "7"));
     let sources: Vec<E33Source> = serde_json::from_slice(&fs::read(&args[0]).unwrap()).unwrap();
     let fx1_bytes = fs::read(&args[1]).unwrap();
     let fx1: Fx1 = serde_json::from_slice(&fx1_bytes).unwrap();
@@ -461,8 +474,8 @@ pub(super) fn e33_identity(args: &[String]) {
         "fx1 reference factors are the ten fragility slots"
     );
     let pin = 100.0;
-    let bake_a = e33_nonneg_bake(&fx1, false, pin);
-    let bake_c = e33_nonneg_bake(&fx1, true, pin);
+    let bake_a = e33_nonneg_bake(&fx1, false, pin, &revision);
+    let bake_c = e33_nonneg_bake(&fx1, true, pin, &revision);
     let model_a = zenpredict::Model::from_bytes(&bake_a).unwrap();
     let model_c = zenpredict::Model::from_bytes(&bake_c).unwrap();
     // E1: zensim validates every product pair against its own registry.

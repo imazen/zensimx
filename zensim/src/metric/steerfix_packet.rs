@@ -78,6 +78,14 @@ struct Job {
     // part 4. The current score owner and map still execute for every case.
     #[serde(default)]
     repair_feature_cache: Option<String>,
+    // The process formula revision the packet runs at: 5 for every registered packet. The by-construction
+    // revision-7 models (benchmarks/byconstruction_2026-10-22.md) declare 7; a repair cache must carry the same
+    // revision, so they run without one.
+    #[serde(default = "revision_five")]
+    formula_revision: u64,
+}
+fn revision_five() -> u64 {
+    5
 }
 #[derive(Deserialize)]
 struct Case {
@@ -117,12 +125,16 @@ fn owner(model: &crate::mlp::Model, objective: Objective) -> BakeScorer<'_> {
 
 #[test]
 fn engineering_packet() {
-    assert_eq!(std::env::var("ZENSIM_FORMULA_REV").as_deref(), Ok("5"));
     let _token = archmage::testing::lock_token_testing();
     let path =
         std::env::var("STEERFIX_PACKET").expect("recipe selects an explicit engineering packet");
     let bytes = std::fs::read(&path).unwrap();
     let job: Job = serde_json::from_slice(&bytes).unwrap();
+    assert!(matches!(job.formula_revision, 5 | 7));
+    assert_eq!(
+        std::env::var("ZENSIM_FORMULA_REV").as_deref(),
+        Ok(job.formula_revision.to_string().as_str())
+    );
     assert!(
         !std::path::Path::new(&job.output).exists(),
         "fresh output required"
@@ -135,7 +147,7 @@ fn engineering_packet() {
         let value: serde_json::Value =
             serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap();
         assert_eq!(value["schema"], "e34-native-repair-features-v1");
-        assert_eq!(value["formula_revision"], 5);
+        assert_eq!(value["formula_revision"], job.formula_revision);
         let producer = std::fs::read(value["producer_model"].as_str().unwrap()).unwrap();
         assert_eq!(sha(&producer), value["producer_sha256"].as_str().unwrap());
         let model = crate::mlp::Model::from_bytes(&producer).unwrap();
@@ -385,7 +397,8 @@ fn engineering_packet() {
     }
     std::fs::write(
         &job.output,
-        serde_json::to_vec(&json!({"packet_sha256":sha(&bytes),"rows":summary})).unwrap(),
+        serde_json::to_vec(&json!({"packet_sha256":sha(&bytes),"formula_revision":job.formula_revision,"rows":summary}))
+            .unwrap(),
     )
     .unwrap();
 }

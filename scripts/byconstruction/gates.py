@@ -33,7 +33,7 @@ def sha(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
-def steer(name, model, out, steer_bin=None, formula_rev="5"):
+def steer(name, model, out, steer_bin=None, formula_rev="5", live_repairs=False):
     if steer_bin is None and sha(STEER_BIN) != STEER_BIN_SHA:
         raise ValueError("steer instrument changed")
     steer_bin = steer_bin or STEER_BIN
@@ -45,6 +45,11 @@ def steer(name, model, out, steer_bin=None, formula_rev="5"):
         case.update(model=str(model), model_sha256=digest)
     job["linear_probe"] = False
     job["output"] = str(dest / "result.json")
+    if formula_rev != "5":
+        job["formula_revision"] = int(formula_rev)
+    if formula_rev != "5" or live_repairs:
+        # The repair cache holds revision-5 features; without it the harness computes every block repair live.
+        job["repair_feature_cache"] = None
     (dest / "job.json").write_text(json.dumps(job, indent=2) + "\n")
     env = dict(os.environ, ZENSIM_FORMULA_REV=formula_rev, ZENSIM_NEIGHBOUR_EXACT="1", ZENSIM_MAX_TIER="v3",
                RAYON_NUM_THREADS="1", STEERFIX_PACKET=str(dest / "job.json"))
@@ -75,7 +80,8 @@ def run(a):
         for grid in ("standard", "ladder"):
             owner.verdict(a.name, 0, grid)
     if "steer" in steps:
-        steer(a.name, model, out, Path(a.bin_dir) / "steer_instrument" if a.bin_dir else None, a.formula_rev)
+        steer(a.name, model, out, Path(a.bin_dir) / "steer_instrument" if a.bin_dir else None, a.formula_rev,
+              a.live_repairs)
     if "identity" in steps:
         owner.identity(0)
     return 0
@@ -121,6 +127,8 @@ def main():
     ap.add_argument("--bin-dir")
     ap.add_argument("--instruments")
     ap.add_argument("--formula-rev", default="5")
+    # G-STEER without the revision-5 repair cache (implied at any other revision): every block repair is scored live.
+    ap.add_argument("--live-repairs", action="store_true")
     ap.add_argument("--summary", action="store_true")
     a = ap.parse_args()
     return summary(a) if a.summary else run(a)
