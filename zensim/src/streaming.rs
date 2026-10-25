@@ -341,6 +341,201 @@ fn redistribute_pow2x_guided_add(
     }
 }
 
+/// Research (`custom-profiles`): interpolation kernel for the coarse-scale (s1–s3) diffmap
+/// upsample, chosen per call by `ZENSIM_DIFFMAP_UPSAMPLE`. Unset or `nearest` keeps the
+/// default [`upsample_pow2x_add`] path byte-identical.
+///
+/// Interpolating kernels sample the coarse plane at every full-res pixel centre,
+/// `u = (x + 0.5) / f − 0.5` in coarse samples (a coarse cell's centre is the middle of its
+/// aligned `f × f` footprint), with replicated borders and taps normalized to sum to 1, so a
+/// constant plane stays constant. Coverage matches nearest-neighbour: pixels beyond
+/// `src_w·f` / `src_h·f` receive nothing. A `-mass` variant then deposits each coarse cell's
+/// exact nearest-neighbour mass inside its own footprint in proportion to the interpolated
+/// plane (the E-JBU redistribution with the interpolation as guide), so footprint-aligned
+/// block sums are unchanged and only the shape inside each footprint differs.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(not(feature = "custom-profiles"), allow(dead_code))] // selected only through the env knob
+pub(crate) enum CoarseKernel {
+    Nearest,
+    Bilinear,
+    CatmullRom,
+    BSpline,
+    Lanczos3,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct CoarseUpsample {
+    kernel: CoarseKernel,
+    mass: bool,
+}
+
+impl CoarseUpsample {
+    pub(crate) const NEAREST: Self = Self {
+        kernel: CoarseKernel::Nearest,
+        mass: false,
+    };
+
+    /// `nearest`, `bilinear`, `catmull-rom`, `bspline` or `lanczos3`, optionally with `-mass`.
+    #[cfg_attr(not(feature = "custom-profiles"), allow(dead_code))]
+    pub(crate) fn parse(s: &str) -> Option<Self> {
+        let (k, mass) = match s.strip_suffix("-mass") {
+            Some(k) => (k, true),
+            None => (s, false),
+        };
+        let kernel = match k {
+            "nearest" => CoarseKernel::Nearest,
+            "bilinear" => CoarseKernel::Bilinear,
+            "catmull-rom" => CoarseKernel::CatmullRom,
+            "bspline" => CoarseKernel::BSpline,
+            "lanczos3" => CoarseKernel::Lanczos3,
+            _ => return None,
+        };
+        (kernel != CoarseKernel::Nearest || !mass).then_some(Self { kernel, mass })
+    }
+
+    /// Reads `ZENSIM_DIFFMAP_UPSAMPLE`; an unrecognized value panics rather than silently
+    /// running the default.
+    #[cfg(feature = "custom-profiles")]
+    pub(crate) fn from_env() -> Self {
+        match std::env::var("ZENSIM_DIFFMAP_UPSAMPLE") {
+            Ok(s) => Self::parse(&s).unwrap_or_else(|| {
+                panic!(
+                    "ZENSIM_DIFFMAP_UPSAMPLE={s}: expected nearest, bilinear, catmull-rom, \
+                     bspline or lanczos3, optionally suffixed -mass"
+                )
+            }),
+            Err(_) => Self::NEAREST,
+        }
+    }
+}
+
+impl CoarseKernel {
+    fn support(self) -> f64 {
+        match self {
+            CoarseKernel::Nearest => 0.5,
+            CoarseKernel::Bilinear => 1.0,
+            CoarseKernel::CatmullRom | CoarseKernel::BSpline => 2.0,
+            CoarseKernel::Lanczos3 => 3.0,
+        }
+    }
+
+    fn weight(self, t: f64) -> f64 {
+        let a = t.abs();
+        match self {
+            CoarseKernel::Nearest => f64::from(u8::from(a < 0.5)),
+            CoarseKernel::Bilinear => (1.0 - a).max(0.0),
+            CoarseKernel::CatmullRom if a < 1.0 => 1.5 * a * a * a - 2.5 * a * a + 1.0,
+            CoarseKernel::CatmullRom if a < 2.0 => -0.5 * a * a * a + 2.5 * a * a - 4.0 * a + 2.0,
+            CoarseKernel::BSpline if a < 1.0 => (4.0 - 6.0 * a * a + 3.0 * a * a * a) / 6.0,
+            CoarseKernel::BSpline if a < 2.0 => (2.0 - a).powi(3) / 6.0,
+            CoarseKernel::Lanczos3 if a < 1e-12 => 1.0,
+            CoarseKernel::Lanczos3 if a < 3.0 => {
+                let pa = core::f64::consts::PI * a;
+                3.0 * pa.sin() * (pa / 3.0).sin() / (pa * pa)
+            }
+            _ => 0.0,
+        }
+    }
+
+    /// Normalized taps `(index, weight)` for each of `n_out` output samples of a 1-D coarse line
+    /// of `n_in` samples upsampled by `factor`.
+    fn taps(self, n_in: usize, n_out: usize, factor: usize) -> Vec<Vec<(usize, f64)>> {
+        let support = self.support();
+        (0..n_out)
+            .map(|x| {
+                let u = (x as f64 + 0.5) / factor as f64 - 0.5;
+                let lo = (u - support).floor() as i64 + 1;
+                let hi = (u + support).ceil() as i64 - 1;
+                let mut taps: Vec<(usize, f64)> = (lo..=hi)
+                    .map(|i| {
+                        let w = self.weight(u - i as f64);
+                        (i.clamp(0, n_in as i64 - 1) as usize, w)
+                    })
+                    .filter(|&(_, w)| w != 0.0)
+                    .collect();
+                let sum: f64 = taps.iter().map(|&(_, w)| w).sum();
+                for t in &mut taps {
+                    t.1 /= sum;
+                }
+                taps
+            })
+            .collect()
+    }
+}
+
+/// Separable kernel upsample of one coarse plane by `factor`, over nearest-neighbour coverage:
+/// returns a `cover_h × dst_w` plane (columns past `src_w·factor` stay zero).
+fn interpolate_pow2x(
+    src: &[f32],
+    src_w: usize,
+    src_h: usize,
+    dst_w: usize,
+    dst_h: usize,
+    factor: usize,
+    kernel: CoarseKernel,
+) -> (Vec<f64>, usize) {
+    let cover_w = (src_w * factor).min(dst_w);
+    let cover_h = (src_h * factor).min(dst_h);
+    let col_taps = kernel.taps(src_w, cover_w, factor);
+    let row_taps = kernel.taps(src_h, cover_h, factor);
+    let mut horiz = vec![0.0f64; src_h * cover_w];
+    for sy in 0..src_h {
+        let srow = &src[sy * src_w..(sy + 1) * src_w];
+        for (x, taps) in col_taps.iter().enumerate() {
+            horiz[sy * cover_w + x] = taps.iter().map(|&(i, w)| w * srow[i] as f64).sum();
+        }
+    }
+    let mut out = vec![0.0f64; cover_h * dst_w];
+    for (y, taps) in row_taps.iter().enumerate() {
+        let orow = &mut out[y * dst_w..y * dst_w + cover_w];
+        for &(sy, w) in taps {
+            for (o, &h) in orow
+                .iter_mut()
+                .zip(&horiz[sy * cover_w..(sy + 1) * cover_w])
+            {
+                *o += w * h;
+            }
+        }
+    }
+    (out, cover_h)
+}
+
+/// Research counterpart of [`upsample_pow2x_add`] for an interpolating [`CoarseUpsample`]:
+/// adds `weight ×` the upsampled coarse plane into `dst`, or, for a `-mass` mode, each cell's
+/// exact nearest-neighbour mass distributed in proportion to the interpolated plane.
+fn upsample_pow2x_kernel_add(
+    src: &[f32],
+    src_w: usize,
+    src_h: usize,
+    dst: &mut [f32],
+    dst_w: usize,
+    dst_h: usize,
+    factor: usize,
+    weight: f32,
+    mode: CoarseUpsample,
+) {
+    debug_assert!(factor >= 2 && mode != CoarseUpsample::NEAREST);
+    let (interp, cover_h) = interpolate_pow2x(src, src_w, src_h, dst_w, dst_h, factor, mode.kernel);
+    if mode.mass {
+        // |interp| + ε as the guide of the mass-conserving redistribution; ε as in the E-JBU guide.
+        let mean_abs = interp.iter().map(|v| v.abs()).sum::<f64>() / interp.len().max(1) as f64;
+        let eps = (mean_abs * 1e-6) as f32 + 1e-20f32;
+        let mut guide = vec![eps; dst_w * dst_h];
+        for (g, v) in guide.iter_mut().zip(&interp) {
+            *g = v.abs() as f32 + eps;
+        }
+        redistribute_pow2x_guided_add(src, src_w, src_h, dst, dst_w, dst_h, factor, weight, &guide);
+        return;
+    }
+    let w = weight as f64;
+    for y in 0..cover_h {
+        let drow = &mut dst[y * dst_w..(y + 1) * dst_w];
+        for (d, &v) in drow.iter_mut().zip(&interp[y * dst_w..(y + 1) * dst_w]) {
+            *d += (w * v) as f32;
+        }
+    }
+}
+
 /// Track background deallocation thread to prevent accumulation on repeated calls.
 #[cfg(all(feature = "threads", not(target_arch = "wasm32")))]
 static DEALLOC_THREAD: Mutex<Option<std::thread::JoinHandle<()>>> = Mutex::new(None);
@@ -2097,6 +2292,7 @@ fn process_strip_channel(
                     co,
                     id_out,
                     win_out,
+                    config.revision().stable_forms(),
                 );
             }
             #[cfg(not(feature = "custom-profiles"))]
@@ -3292,6 +3488,10 @@ impl PrecomputedReference {
         revision: crate::feature_defs::FormulaRevision,
         fill_scale0: impl FnOnce(&mut [Vec<f32>; 3]),
     ) -> Self {
+        assert!(
+            !crate::feature_v2_stream::linear_pyramid(),
+            "ZENSIM_PYRAMID=linear covers only the streaming and block producers"
+        );
         // Compute scale dimensions up front (powers-of-2 down)
         let mut dims = Vec::with_capacity(num_scales);
         let mut w = padded_width;
@@ -4554,6 +4754,15 @@ fn compute_diffmap_from_xyb(
         }
     }
 
+    // Research kernel for the coarse upsample (`ZENSIM_DIFFMAP_UPSAMPLE`, custom-profiles only).
+    #[cfg(feature = "custom-profiles")]
+    let upsample = CoarseUpsample::from_env();
+    #[cfg(not(feature = "custom-profiles"))]
+    let upsample = CoarseUpsample::NEAREST;
+    assert!(
+        guide.is_none() || upsample == CoarseUpsample::NEAREST,
+        "guided coarse redistribution and ZENSIM_DIFFMAP_UPSAMPLE are alternative upsamples; set one"
+    );
     for (scale, (dm, dm_w, dm_h)) in scale_diffmaps.iter().enumerate() {
         let blend = scale_blend_weights.get(scale).copied().unwrap_or(0.0);
         if blend <= 0.0 {
@@ -4565,6 +4774,9 @@ fn compute_diffmap_from_xyb(
         match &guide {
             Some(g) if factor > 1 => redistribute_pow2x_guided_add(
                 dm, *dm_w, *dm_h, &mut fused, full_w, full_h, factor, blend, g,
+            ),
+            _ if factor > 1 && upsample != CoarseUpsample::NEAREST => upsample_pow2x_kernel_add(
+                dm, *dm_w, *dm_h, &mut fused, full_w, full_h, factor, blend, upsample,
             ),
             _ => upsample_pow2x_add(dm, *dm_w, *dm_h, &mut fused, full_w, full_h, factor, blend),
         }
@@ -8603,6 +8815,8 @@ mod tests {
             crate::feature_defs::FormulaRevision::Rev3 => 3,
             crate::feature_defs::FormulaRevision::Rev4 => 4,
             crate::feature_defs::FormulaRevision::Rev5 => 5,
+            crate::feature_defs::FormulaRevision::Rev6 => 6,
+            crate::feature_defs::FormulaRevision::Rev7 => 7,
         };
         let expected = spec
             .get("formula_revision")
@@ -8985,6 +9199,122 @@ mod tests {
         for (a, b) in nn.iter().zip(jbu.iter()) {
             assert!(b.is_finite());
             assert_eq!(a, b);
+        }
+    }
+
+    // ── Research coarse-upsample kernels (`ZENSIM_DIFFMAP_UPSAMPLE`) ─────────
+
+    #[test]
+    fn coarse_upsample_names_parse() {
+        assert_eq!(
+            CoarseUpsample::parse("nearest"),
+            Some(CoarseUpsample::NEAREST)
+        );
+        assert!(CoarseUpsample::parse("nearest-mass").is_none());
+        assert!(CoarseUpsample::parse("bicubic").is_none());
+        for k in ["bilinear", "catmull-rom", "bspline", "lanczos3"] {
+            assert!(!CoarseUpsample::parse(k).unwrap().mass);
+            assert!(CoarseUpsample::parse(&format!("{k}-mass")).unwrap().mass);
+        }
+    }
+
+    /// Normalized taps: every kernel, plain or mass, keeps a constant coarse plane constant
+    /// (and equal to what nearest-neighbour deposits) over the covered pixels.
+    #[test]
+    fn coarse_kernels_keep_a_constant_plane_constant() {
+        for k in [
+            "bilinear",
+            "catmull-rom",
+            "bspline",
+            "lanczos3",
+            "bilinear-mass",
+            "lanczos3-mass",
+        ] {
+            let mode = CoarseUpsample::parse(k).unwrap();
+            for f in [2usize, 4, 8] {
+                let (sw, sh) = (5usize, 3usize);
+                let (dw, dh) = (sw * f, sh * f);
+                let src = vec![0.75f32; sw * sh];
+                let mut out = vec![0.0f32; dw * dh];
+                upsample_pow2x_kernel_add(&src, sw, sh, &mut out, dw, dh, f, 2.0, mode);
+                for v in &out {
+                    assert!((v - 1.5).abs() < 1e-5, "{k} f={f}: {v}");
+                }
+            }
+        }
+    }
+
+    /// Bilinear samples the coarse plane at each pixel centre, footprint centres at the middle.
+    #[test]
+    fn bilinear_samples_at_pixel_centres() {
+        let src = [0.0f32, 1.0];
+        let mut out = vec![0.0f32; 4];
+        let mode = CoarseUpsample::parse("bilinear").unwrap();
+        upsample_pow2x_kernel_add(&src, 2, 1, &mut out, 4, 1, 2, 1.0, mode);
+        assert_eq!(out, vec![0.0, 0.25, 0.75, 1.0]);
+    }
+
+    /// `-mass` modes keep each footprint's nearest-neighbour mass (also at clipped edges) and
+    /// still move pixels inside the footprint; plain modes move mass across footprints.
+    #[test]
+    fn mass_kernels_conserve_footprint_mass() {
+        let (sw, sh, f) = (6usize, 5usize, 4usize);
+        let (dw, dh) = (sw * f - 2, sh * f - 3);
+        let src = jbu_lcg(sw * sh, 11, 0.0, 2.0);
+        let mut nn = vec![0.0f32; dw * dh];
+        upsample_pow2x_add(&src, sw, sh, &mut nn, dw, dh, f, 0.4);
+        let cell_sums = |plane: &[f32]| -> Vec<f64> {
+            let mut sums = Vec::new();
+            for sy in 0..sh {
+                for sx in 0..sw {
+                    let (y0, y1, x0, x1) = (
+                        sy * f,
+                        ((sy + 1) * f).min(dh),
+                        sx * f,
+                        ((sx + 1) * f).min(dw),
+                    );
+                    let mut t = 0.0f64;
+                    for y in y0..y1 {
+                        for x in x0..x1 {
+                            t += plane[y * dw + x] as f64;
+                        }
+                    }
+                    sums.push(t);
+                }
+            }
+            sums
+        };
+        let nn_sums = cell_sums(&nn);
+        for k in ["bilinear", "catmull-rom", "bspline", "lanczos3"] {
+            for mass in [false, true] {
+                let mode = CoarseUpsample::parse(&if mass {
+                    format!("{k}-mass")
+                } else {
+                    k.to_string()
+                })
+                .unwrap();
+                let mut out = vec![0.0f32; dw * dh];
+                upsample_pow2x_kernel_add(&src, sw, sh, &mut out, dw, dh, f, 0.4, mode);
+                let max_px = nn
+                    .iter()
+                    .zip(&out)
+                    .map(|(a, b)| (a - b).abs())
+                    .fold(0.0f32, f32::max);
+                assert!(max_px > 1e-3, "{k} mass={mass}: no pixel moved");
+                let drift = nn_sums
+                    .iter()
+                    .zip(cell_sums(&out))
+                    .map(|(a, b)| (a - b).abs() / a.abs().max(1e-9))
+                    .fold(0.0f64, f64::max);
+                if mass {
+                    assert!(drift < 1e-5, "{k}-mass: footprint mass drift {drift:.3e}");
+                } else {
+                    assert!(
+                        drift > 1e-3,
+                        "{k}: footprint masses unchanged, interpolation not engaged"
+                    );
+                }
+            }
         }
     }
 }

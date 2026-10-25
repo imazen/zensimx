@@ -875,13 +875,13 @@ impl LocalRefineSnapshot {
                     let ds = bs / (ps + C_GRAD_DECAY);
                     let dd = bd / (pd + C_GRAD_DECAY);
                     outs_base[si][ch][idx::EDGE_WIDTH_CHANGE] =
-                        1.0 - feature_v2::bounded_sim(ds, dd, C_EDGEWIDTH);
+                        feature_v2::bounded_dissim(ds, dd, C_EDGEWIDTH, revision.stable_forms());
                     let (bs, bd) = mg_new[si + 1][ch];
                     let (ps, pd) = mg_new[si][ch];
                     let ds = bs / (ps + C_GRAD_DECAY);
                     let dd = bd / (pd + C_GRAD_DECAY);
                     outs_new[si][ch][idx::EDGE_WIDTH_CHANGE] =
-                        1.0 - feature_v2::bounded_sim(ds, dd, C_EDGEWIDTH);
+                        feature_v2::bounded_dissim(ds, dd, C_EDGEWIDTH, revision.stable_forms());
                 } else {
                     outs_base[si][ch][idx::EDGE_WIDTH_CHANGE] =
                         outs_base[si - 1][ch][idx::EDGE_WIDTH_CHANGE];
@@ -1321,6 +1321,7 @@ impl<'a> Query<'a> {
                 let d_new = self.dst_at(si + 1, ch, y, x);
                 let (to, _, _, _, mwo, iwo, mvo, ivo, kno, kdo) = feature_v2::dense_terms32(
                     src[i], dst[i], p.mu1[i], p.mu2[i], p.ssq[i], p.s12[i], p.act[i], tb, self.err,
+                    false,
                 );
                 let (tn, _, _, _, mwn, iwn, mvn, ivn, knn, kdn) = feature_v2::dense_terms32(
                     src[i],
@@ -1332,6 +1333,9 @@ impl<'a> Query<'a> {
                     p.act[i],
                     tb,
                     self.err,
+                    // Refinement refuses revision 6+ (high-pass ringing), so
+                    // revision 7's forms never reach it.
+                    false,
                 );
                 acc.sum_d += f64::from(tn[0]) - f64::from(to[0]);
                 acc.sum_d2 += f64::from(tn[1]) - f64::from(to[1]);
@@ -1409,30 +1413,45 @@ impl<'a> Query<'a> {
             }
         }
         let act = &self.snap.planes[si][ch].act;
+        // `RingForm::HighPassMu` reads the local-mean planes, which a change
+        // moves over the blur radius, not this ±1 dilation.
+        assert!(
+            feature_v2::active_ring_form() == feature_v2::RingForm::Raw
+                && !self.snap.revision.ring_high_pass(),
+            "local refinement supports the raw ringing form only \
+             (not revision 6 or ZENSIM_RING_FORM=hpm)"
+        );
         for y in gy0..gy1 {
             let ly = y - gy0;
             for x in gx0..gx1 {
-                let o = feature_v2::gradient_terms64::<false, false>(
+                let terms = feature_v2::gradient_terms64::<false, false, false>;
+                let o = terms(
                     &src_g,
                     &dst_old,
                     &act[gy0 * w..],
                     &[],
-                    w,
-                    x,
-                    ly,
-                    0.0,
-                    0.0,
-                );
-                let n = feature_v2::gradient_terms64::<false, false>(
-                    &src_g,
-                    &dst_new,
-                    &act[gy0 * w..],
+                    &[],
                     &[],
                     w,
                     x,
                     ly,
                     0.0,
                     0.0,
+                    false,
+                );
+                let n = terms(
+                    &src_g,
+                    &dst_new,
+                    &act[gy0 * w..],
+                    &[],
+                    &[],
+                    &[],
+                    w,
+                    x,
+                    ly,
+                    0.0,
+                    0.0,
+                    false,
                 );
                 acc.sum_grad_src += n.gsrc - o.gsrc;
                 acc.sum_grad_dst += n.gdst - o.gdst;

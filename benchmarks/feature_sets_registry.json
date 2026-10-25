@@ -375,6 +375,61 @@
    "formula_revision": 3,
    "sampling": "v2:xyb:robidouxsharp:1,2,3,5",
    "note": "Direct original XYB planes; scale_selective_944_2026-09-13.md"
+  },
+  "rev5_localwin_ringhpm": {
+   "build_commit": "980fde3f",
+   "root": "/mnt/v/output/zensim/byconstruction-2026-10-22/ringhpm/root",
+   "label": "By-construction exploration: Rev5 local-window bank with ringing under ZENSIM_RING_FORM=hpm",
+   "formula_revision": 5,
+   "note": "Research only (branch explore/byconstruction). The 12 v2 ringing slots measure the error after removing each image's SSIM local mean (RingForm::HighPassMu); every other measured slot is bit-identical to rev5_localwin (checked per table by scripts/byconstruction/ring_root.py). benchmarks/byconstruction_2026-10-22.md"
+  },
+  "rev5_localwin_ringhpm_globaff": {
+   "build_commit": "b8e0c678",
+   "root": "/mnt/v/output/zensim/byconstruction-2026-10-22/ringhpm/root_globaff",
+   "label": "By-construction exploration: rev5_localwin_ringhpm plus the byc_globaff descriptor at f1867-f1890",
+   "formula_revision": 5,
+   "note": "Research only (branch explore/byconstruction). f1867-f1890 are the byc_globaff sidecar (zensim-bench/examples/byc_globaff.rs: global affine fit share and explained mean squared error per scale x XYB channel), not a registered zensim family; zensim cannot compute them at serving time. benchmarks/byconstruction_2026-10-22.md"
+  },
+  "rev5_localwin_linpyr": {
+   "build_commit": "d13211dd",
+   "root": "/mnt/v/output/zensim/byconstruction-2026-10-22/linpyr/root",
+   "label": "By-construction exploration: Rev5 local-window bank with coarse scales from linear RGB (ZENSIM_PYRAMID=linear)",
+   "formula_revision": 5,
+   "note": "Research only (branch explore/byconstruction). The 435 measured slots of scales 1-3 plus scale 0's edge-width change are extracted with scales 1-3 built from 2x2 averages of linear RGB, converted to positive XYB per level; the other 141 measured slots are bit-identical to rev5_localwin (checked per table by scripts/byconstruction/ring_root.py --arm linpyr). Extractor built with zenpixels-convert 0.2.17 (correctly rounded 16-bit narrowing). benchmarks/byconstruction_2026-10-22.md"
+  },
+  "rev5_localwin_orient": {
+   "build_commit": "b533194c",
+   "root": "/mnt/v/output/zensim/byconstruction-2026-10-22/orient/root",
+   "label": "By-construction exploration: rev5_localwin plus the byc_orient damage at f2301-f2336",
+   "formula_revision": 5,
+   "note": "Research only (branch explore/byconstruction). f2301-f2336 are the byc_orient sidecar (zensim-bench/examples/byc_orient.rs: RMS of the horizontal, vertical and diagonal Haar bands of the error per scale x XYB channel), not a registered zensim family; zensim cannot compute them at serving time. Every other column is the stored rev5_localwin root's. benchmarks/byconstruction_2026-10-22.md"
+  },
+  "rev5_localwin_ringhpm_globaffgate": {
+   "build_commit": "ce289c8d",
+   "root": "/mnt/v/output/zensim/byconstruction-2026-10-22/ringhpm/root_globaff_gated",
+   "label": "By-construction exploration: rev5_localwin_ringhpm_globaff plus gated damage at f1891-f2300",
+   "formula_revision": 5,
+   "note": "Research only (branch explore/byconstruction). f1891-f2300 hold, for each of fx1's 410 differences d in ascending id order, the f32 product d x (1 - share) with the byc_globaff share of d's own scale and channel cell (scripts/byconstruction/ring_root.py gated); every other column is the globaff root's. zensim cannot compute them at serving time. benchmarks/byconstruction_2026-10-22.md"
+  },
+  "rev5_localwin_ringhpm_globaffgatey": {
+   "build_commit": "985ac5c9",
+   "root": "/mnt/v/output/zensim/byconstruction-2026-10-22/ringhpm/root_globaff_gatedy",
+   "label": "By-construction exploration: rev5_localwin_ringhpm_globaff plus gated luminance damage at f1891-f2054",
+   "formula_revision": 5,
+   "note": "Research only (branch explore/byconstruction). f1891-f2054 hold, for each of fx1's 164 differences d in the four luminance (Y) cells, in ascending id order, the f32 product d x (1 - share) with the byc_globaff share of d's own scale and channel cell (scripts/byconstruction/ring_root.py gated --channels Y); every other column is the globaff root's. zensim cannot compute them at serving time. benchmarks/byconstruction_2026-10-22.md"
+  },
+  "rev6_ringhpm": {
+   "build_commit": "per-run source/binary hashes",
+   "label": "Formula revision 6: Rev5 local-window arithmetic with the high-pass ringing form, selected by the bake's declared revision; admits the globaff family f1867-f1890",
+   "formula_revision": 6,
+   "note": "Branch explore/byconstruction. Ringing slots equal the research rev5_localwin_ringhpm values (same kernel arithmetic, selected per call instead of by ZENSIM_RING_FORM); globaff is accumulated in the streaming walk (zensim/src/globaff.rs), replacing the research sidecar at the same ids. benchmarks/byconstruction_2026-10-22.md"
+  },
+  "rev7_rowlanes": {
+   "build_commit": "b77883be",
+   "root": "/mnt/v/output/zensim/byconstruction-2026-10-22/rev7raw/root",
+   "label": "Formula revision 7: revision 5's measurements (raw ringing) with row-lane, cancellation-free arithmetic; admits the globaff family f1867-f1890",
+   "formula_revision": 7,
+   "note": "Branch explore/byconstruction (owner 2026-10-25: raw ringing). The by-construction root re-extracts every measured slot at revision 7 (scripts/byconstruction/ring_root.py --arm rev7): each value within 1e-2 relative (+1e-6) of rev5_localwin, and the same extractor reproduces rev5_localwin bit for bit at revision 5. benchmarks/byconstruction_2026-10-22.md"
   }
  },
  "sets": {
@@ -1045,6 +1100,107 @@
    "slot_selection": "by_v2fy_420",
    "evidence": "benchmarks/shippath7_REGISTRATION.md",
    "note": "Features-only projection of the pinned Rev5 bank onto the existing by_v2fy consumed IDs; all other slots NaN. Rust owner checks the hash."
+  },
+  "basic+v2@w720/rev7_rowlanes#62adfc93": {
+   "compute": "basic+v2",
+   "layout": 720,
+   "era": "rev7_rowlanes",
+   "slots": "13-25,39-155,401-429,459-719",
+   "slots_hash8": "62adfc93",
+   "n_slots": 420,
+   "role": "producer",
+   "kind": "set",
+   "slot_selection": "by_v2fy_420",
+   "evidence": "benchmarks/byconstruction_2026-10-22.md (\"Revision 7 with raw ringing\")",
+   "note": "By-construction exploration: the shippath7 dial and identity instruments re-extracted at formula revision 7 (raw ringing) and projected onto the by_v2fy consumed IDs, as the rev5_localwin instruments; all other slots NaN."
+  },
+  "basic+peaks+v2@w1825/rev5_localwin_ringhpm": {
+   "compute": "basic+peaks+v2",
+   "layout": 1825,
+   "era": "rev5_localwin_ringhpm",
+   "slots": "0-227,372-719",
+   "slots_hash8": "36c3f3af",
+   "n_slots": 576,
+   "role": "producer",
+   "kind": "set",
+   "legacy_name": "Rev5 basic+peaks+v2 measured subset, ringing hpm (by-construction exploration)",
+   "evidence": "scripts/byconstruction/ring_root.py; benchmarks/byconstruction_2026-10-22.md"
+  },
+  "basic+peaks+v2@w2337/rev5_localwin_orient": {
+   "compute": "basic+peaks+v2",
+   "layout": 2337,
+   "era": "rev5_localwin_orient",
+   "slots": "0-227,372-719,2301-2336",
+   "research_slots": "2301-2336",
+   "slots_hash8": "24a93918",
+   "n_slots": 612,
+   "role": "producer",
+   "kind": "set",
+   "legacy_name": "Rev5 basic+peaks+v2 measured subset plus byc_orient (by-construction exploration)",
+   "evidence": "zensim-validate/src/bin/byc_fsid.rs (hash); scripts/byconstruction/ring_root.py orient; benchmarks/byconstruction_2026-10-22.md"
+  },
+  "basic+peaks+v2@w1825/rev5_localwin_linpyr": {
+   "compute": "basic+peaks+v2",
+   "layout": 1825,
+   "era": "rev5_localwin_linpyr",
+   "slots": "0-227,372-719",
+   "slots_hash8": "36c3f3af",
+   "n_slots": 576,
+   "role": "producer",
+   "kind": "set",
+   "legacy_name": "Rev5 basic+peaks+v2 measured subset, coarse scales from linear RGB (by-construction exploration)",
+   "evidence": "scripts/byconstruction/ring_root.py; benchmarks/byconstruction_2026-10-22.md"
+  },
+  "basic+peaks+v2@w1891/rev5_localwin_ringhpm_globaff": {
+   "compute": "basic+peaks+v2",
+   "layout": 1891,
+   "era": "rev5_localwin_ringhpm_globaff",
+   "slots": "0-227,372-719,1867-1890",
+   "research_slots": "1867-1890",
+   "slots_hash8": "d56ad477",
+   "n_slots": 600,
+   "role": "producer",
+   "kind": "set",
+   "legacy_name": "Rev5 basic+peaks+v2 measured subset, ringing hpm, plus byc_globaff (by-construction exploration)",
+   "evidence": "zensim-validate/src/bin/byc_fsid.rs (hash); scripts/byconstruction/ring_root.py globaff; benchmarks/byconstruction_2026-10-22.md"
+  },
+  "basic+peaks+v2@w2301/rev5_localwin_ringhpm_globaffgate": {
+   "compute": "basic+peaks+v2",
+   "layout": 2301,
+   "era": "rev5_localwin_ringhpm_globaffgate",
+   "slots": "0-227,372-719,1867-2300",
+   "research_slots": "1867-2300",
+   "slots_hash8": "45e0e84c",
+   "n_slots": 1010,
+   "role": "producer",
+   "kind": "set",
+   "legacy_name": "Rev5 basic+peaks+v2 measured subset, ringing hpm, byc_globaff, gated damage (by-construction exploration)",
+   "evidence": "zensim-validate/src/bin/byc_fsid.rs (hash); scripts/byconstruction/ring_root.py gated; benchmarks/byconstruction_2026-10-22.md"
+  },
+  "basic+peaks+v2@w2055/rev5_localwin_ringhpm_globaffgatey": {
+   "compute": "basic+peaks+v2",
+   "layout": 2055,
+   "era": "rev5_localwin_ringhpm_globaffgatey",
+   "slots": "0-227,372-719,1867-2054",
+   "research_slots": "1867-2054",
+   "slots_hash8": "7b645e91",
+   "n_slots": 764,
+   "role": "producer",
+   "kind": "set",
+   "legacy_name": "Rev5 basic+peaks+v2 measured subset, ringing hpm, byc_globaff, gated luminance damage (by-construction exploration)",
+   "evidence": "zensim-validate/src/bin/byc_fsid.rs (hash); scripts/byconstruction/ring_root.py gated --channels Y; benchmarks/byconstruction_2026-10-22.md"
+  },
+  "basic+peaks+v2@w1825/rev7_rowlanes": {
+   "compute": "basic+peaks+v2",
+   "layout": 1825,
+   "era": "rev7_rowlanes",
+   "slots": "0-227,372-719",
+   "slots_hash8": "36c3f3af",
+   "n_slots": 576,
+   "role": "producer",
+   "kind": "set",
+   "legacy_name": "Revision 7 basic+peaks+v2 measured subset, raw ringing (by-construction exploration)",
+   "evidence": "scripts/byconstruction/ring_root.py --arm rev7; benchmarks/byconstruction_2026-10-22.md"
   }
  },
  "roots": {

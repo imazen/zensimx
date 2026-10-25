@@ -6,7 +6,7 @@
 # impls omitted; re-export duplicates annotated `[also: path]`.
 # DO NOT EDIT BY HAND — commit regenerated changes with the code.
 #
-# files: zensim.txt 580 lines (supported surface) | zensim.features.txt 184 added (features: avx512,candidate-profiles,classification,corruption-head,cross-revision-diagnostic,custom-profiles,deprecated-profiles,feature-regime-v2,imgref,iw-diagnostics,oracle,streaming_strips_oom,threads,training,zenpixels) | zensim.internal.txt 375 lines (558 hidden + 0 excluded-feature)
+# files: zensim.txt 581 lines (supported surface) | zensim.features.txt 184 added (features: avx512,candidate-profiles,classification,corruption-head,cross-revision-diagnostic,custom-profiles,deprecated-profiles,feature-regime-v2,imgref,iw-diagnostics,oracle,streaming_strips_oom,threads,training,zenpixels) | zensim.internal.txt 381 lines (564 hidden + 0 excluded-feature)
 
 ## summary
 #
@@ -16,7 +16,7 @@
 #   free functions                             20
 #   inherent methods                          233
 #   struct fields                              35
-#   enum variants                              96
+#   enum variants                              97
 #   re-exports                                  3
 #   trait roster entries (type × trait)       145
 #   auto-trait-complete types                  32
@@ -24,13 +24,13 @@
 #
 # per-module pub lines:
 #   (root)                          206
-#   feature_set_id                   59
+#   feature_set_id                   60
 #   feature_v2                      185
 #   mapping                          12
 #   profile                          32
 #   source                           59
 
-## items (542 lines)
+## items (543 lines)
 
 pub mod zensim
 pub use Stop
@@ -45,6 +45,7 @@ pub feature_set_id::ComputeToken::Basic
 pub feature_set_id::ComputeToken::Carriers
 pub feature_set_id::ComputeToken::ClassC
 pub feature_set_id::ComputeToken::Csfw
+pub feature_set_id::ComputeToken::GlobAff
 pub feature_set_id::ComputeToken::Gmsbank
 pub feature_set_id::ComputeToken::Gmsnative
 pub feature_set_id::ComputeToken::Gridblk = 13

@@ -1120,8 +1120,8 @@ pub(crate) fn fused_vblur_features_ssim(
 /// Computes edge, variance, texture, and MSE features inline.
 ///
 /// `revision` is the computation's formula revision; it selects the canonical
-/// body at Rev4 (featcanon D1) and nothing else — the edge features have no
-/// revision-dependent formula.
+/// body at Rev4 (featcanon D1) and nothing else. Revision 7 changes the edge
+/// ratio's form, but no canonical revision takes this route.
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn fused_vblur_features_edge(
     h_mu1: &[f32],
@@ -1138,6 +1138,13 @@ pub(crate) fn fused_vblur_features_edge(
     store_mu: bool,
     revision: crate::feature_defs::FormulaRevision,
 ) -> StripChannelAccum {
+    // Canonical revisions route every channel through the fused SSIM kernels
+    // (`streaming::active_channels`), so revision 7 never reaches this route;
+    // its edge ratio here keeps the subtractive form.
+    assert!(
+        !revision.stable_forms(),
+        "the edge-only route has no revision-7 form; canonical revisions use the SSIM route"
+    );
     let mode = crate::featcanon::mode(crate::ssim_form::effective_revision(revision));
     match mode {
         #[cfg(feature = "oracle")]
@@ -4594,6 +4601,48 @@ impl<P: crate::featcanon::Pool> VblurPools<P> {
             iw_mse: P::zero(),
         }
     }
+    /// Add each pool's finished sum to `acc`, in the fixed order every body
+    /// uses: once per row, or at revision 7 once per call.
+    fn finish_into(&self, acc: &mut StripChannelAccum, free: FreeExtrasWork, ext: ExtPoolsWork) {
+        acc.ssim_d += self.ssim_d.fin();
+        acc.ssim_d4 += self.ssim_d4.fin();
+        acc.ssim_d2 += self.ssim_d2.fin();
+        acc.edge_art += self.edge_art.fin();
+        acc.edge_art4 += self.edge_art4.fin();
+        acc.edge_art2 += self.edge_art2.fin();
+        acc.edge_det += self.edge_det.fin();
+        acc.edge_det4 += self.edge_det4.fin();
+        acc.edge_det2 += self.edge_det2.fin();
+        acc.mse += self.mse.fin();
+        if !free.local_only {
+            acc.ssim_d8 += self.ssim_d8.fin();
+            acc.edge_art8 += self.edge_art8.fin();
+            acc.edge_det8 += self.edge_det8.fin();
+            acc.hf_sq_src += self.hf_sq_src.fin();
+            acc.hf_sq_dst += self.hf_sq_dst.fin();
+            acc.hf_abs_src += self.hf_abs_src.fin();
+            acc.hf_abs_dst += self.hf_abs_dst.fin();
+        }
+        if ext.on {
+            acc.act_sum += self.act_sum.fin();
+            if ext.mask {
+                acc.masked_ssim_d += self.masked_ssim_d.fin();
+                acc.masked_ssim_d4 += self.masked_ssim_d4.fin();
+                acc.masked_ssim_d2 += self.masked_ssim_d2.fin();
+                acc.masked_art4 += self.masked_art4.fin();
+                acc.masked_det4 += self.masked_det4.fin();
+                acc.masked_mse += self.masked_mse.fin();
+            }
+            if ext.iw {
+                acc.iw_ssim_d += self.iw_ssim_d.fin();
+                acc.iw_ssim_d4 += self.iw_ssim_d4.fin();
+                acc.iw_ssim_d2 += self.iw_ssim_d2.fin();
+                acc.iw_art4 += self.iw_art4.fin();
+                acc.iw_det4 += self.iw_det4.fin();
+                acc.iw_mse += self.iw_mse.fin();
+            }
+        }
+    }
 }
 
 /// The band-lifetime accumulators (raw moments + bounded error + luma bins):
@@ -4613,6 +4662,88 @@ struct BandPools<P: Copy> {
     wd_den: P,
     wb_num: P,
     wb_den: P,
+}
+
+impl VblurPools<crate::featcanon::Lanes16F32> {
+    /// Revision 7: fold the f32 row lanes into `row` and clear them
+    /// (`crate::featcanon::Lanes16F32::fold_into`). The `hf_*_dst` lanes hold
+    /// the differences from the source (`(vd − vs)(vd + vs)`, `|vd| − |vs|`),
+    /// so each source lane is added to both its own sum and the distorted
+    /// sum, then the difference lane to the distorted sum: the ratio features
+    /// then see the small difference summed directly, not recovered by
+    /// subtracting two large sums.
+    ///
+    /// Only the pools the element step writes under `free` and `ext` are
+    /// folded (the others' lanes stay zero, and so do their sums).
+    fn fold_into<P: crate::featcanon::Pool>(
+        &mut self,
+        row: &mut VblurPools<P>,
+        free: FreeExtrasWork,
+        ext: ExtPoolsWork,
+    ) {
+        if !free.local_only {
+            for (src, dst, rsrc, rdst) in [
+                (
+                    &mut self.hf_sq_src,
+                    &mut self.hf_sq_dst,
+                    &mut row.hf_sq_src,
+                    &mut row.hf_sq_dst,
+                ),
+                (
+                    &mut self.hf_abs_src,
+                    &mut self.hf_abs_dst,
+                    &mut row.hf_abs_src,
+                    &mut row.hf_abs_dst,
+                ),
+            ] {
+                for l in 0..16 {
+                    rsrc.add(l, src.0[l]);
+                    rdst.add(l, src.0[l]);
+                    rdst.add(l, dst.0[l]);
+                }
+                *src = crate::featcanon::Lanes16F32::default();
+                *dst = crate::featcanon::Lanes16F32::default();
+            }
+        }
+        self.ssim_d.fold_into(&mut row.ssim_d);
+        self.ssim_d4.fold_into(&mut row.ssim_d4);
+        self.ssim_d2.fold_into(&mut row.ssim_d2);
+        if !free.local_only && !free.omit_peaks {
+            self.ssim_d8.fold_into(&mut row.ssim_d8);
+        }
+        if !free.omit_edges {
+            self.edge_art.fold_into(&mut row.edge_art);
+            self.edge_art4.fold_into(&mut row.edge_art4);
+            self.edge_art2.fold_into(&mut row.edge_art2);
+            self.edge_det.fold_into(&mut row.edge_det);
+            self.edge_det4.fold_into(&mut row.edge_det4);
+            self.edge_det2.fold_into(&mut row.edge_det2);
+            if !free.omit_peaks {
+                self.edge_art8.fold_into(&mut row.edge_art8);
+                self.edge_det8.fold_into(&mut row.edge_det8);
+            }
+        }
+        self.mse.fold_into(&mut row.mse);
+        if ext.on {
+            self.act_sum.fold_into(&mut row.act_sum);
+            if ext.mask {
+                self.masked_ssim_d.fold_into(&mut row.masked_ssim_d);
+                self.masked_ssim_d4.fold_into(&mut row.masked_ssim_d4);
+                self.masked_ssim_d2.fold_into(&mut row.masked_ssim_d2);
+                self.masked_art4.fold_into(&mut row.masked_art4);
+                self.masked_det4.fold_into(&mut row.masked_det4);
+                self.masked_mse.fold_into(&mut row.masked_mse);
+            }
+            if ext.iw {
+                self.iw_ssim_d.fold_into(&mut row.iw_ssim_d);
+                self.iw_ssim_d4.fold_into(&mut row.iw_ssim_d4);
+                self.iw_ssim_d2.fold_into(&mut row.iw_ssim_d2);
+                self.iw_art4.fold_into(&mut row.iw_art4);
+                self.iw_det4.fold_into(&mut row.iw_det4);
+                self.iw_mse.fold_into(&mut row.iw_mse);
+            }
+        }
+    }
 }
 
 impl<P: crate::featcanon::Pool> BandPools<P> {
@@ -5104,6 +5235,8 @@ fn vblur_ssim_elem_canon<P: crate::featcanon::Pool>(
     base: usize,
     form: crate::ssim_form::SsimLumaForm,
     direct: bool,
+    // Revision 7: the v1 edge ratio as `(x − y)/(1 + y)`.
+    stable7: bool,
     free: FreeExtrasWork,
     ext: ExtPoolsWork,
     store_mu: bool,
@@ -5115,10 +5248,21 @@ fn vblur_ssim_elem_canon<P: crate::featcanon::Pool>(
     ssq_out: &mut [f32],
     s12_out: &mut [f32],
     row: &mut VblurPools<P>,
+    // Revision 7: where the f32-lane pools add (`None`: `row`, f64).
+    mut row32: Option<&mut VblurPools<crate::featcanon::Lanes16F32>>,
     band: &mut BandPools<P>,
     acc: &mut StripChannelAccum,
 ) {
     let lane = x & (P::LANES - 1);
+    macro_rules! rowadd {
+        ($f:ident, $v:expr) => {{
+            let v = $v;
+            match row32.as_deref_mut() {
+                Some(r) => crate::featcanon::Pool::add(&mut r.$f, lane, v),
+                None => row.$f.add(lane, v),
+            }
+        }};
+    }
     let sd = if direct {
         ssim_direct_raw_scalar(form, mu1, mu2, ssq, s12).max(0.0f32)
     } else {
@@ -5126,11 +5270,11 @@ fn vblur_ssim_elem_canon<P: crate::featcanon::Pool>(
     };
     let sd2 = sd * sd;
     let sd4 = sd2 * sd2;
-    row.ssim_d.add(lane, sd);
-    row.ssim_d4.add(lane, sd4);
-    row.ssim_d2.add(lane, sd2);
+    rowadd!(ssim_d, sd);
+    rowadd!(ssim_d4, sd4);
+    rowadd!(ssim_d2, sd2);
     if !free.local_only && !free.omit_peaks {
-        row.ssim_d8.add(lane, sd4 * sd4);
+        rowadd!(ssim_d8, sd4 * sd4);
         acc.ssim_max = acc.ssim_max.max(sd);
     }
     if store_sd {
@@ -5148,7 +5292,11 @@ fn vblur_ssim_elem_canon<P: crate::featcanon::Pool>(
     // Edge
     let diff1 = (s - mu1).abs();
     let diff2 = (d - mu2).abs();
-    let ed = (1.0f32 + diff2) / (1.0f32 + diff1) - 1.0f32;
+    let ed = if stable7 {
+        (diff2 - diff1) / (1.0f32 + diff1)
+    } else {
+        (1.0f32 + diff2) / (1.0f32 + diff1) - 1.0f32
+    };
     let artifact = ed.max(0.0f32);
     let detail_lost = (-ed).max(0.0f32);
     let a2 = artifact * artifact;
@@ -5156,15 +5304,15 @@ fn vblur_ssim_elem_canon<P: crate::featcanon::Pool>(
     let a4 = a2 * a2;
     let dl4 = dl2 * dl2;
     if !free.omit_edges {
-        row.edge_art.add(lane, artifact);
-        row.edge_art4.add(lane, a4);
-        row.edge_art2.add(lane, a2);
-        row.edge_det.add(lane, detail_lost);
-        row.edge_det4.add(lane, dl4);
-        row.edge_det2.add(lane, dl2);
+        rowadd!(edge_art, artifact);
+        rowadd!(edge_art4, a4);
+        rowadd!(edge_art2, a2);
+        rowadd!(edge_det, detail_lost);
+        rowadd!(edge_det4, dl4);
+        rowadd!(edge_det2, dl2);
         if !free.omit_peaks {
-            row.edge_art8.add(lane, a4 * a4);
-            row.edge_det8.add(lane, dl4 * dl4);
+            rowadd!(edge_art8, a4 * a4);
+            rowadd!(edge_det8, dl4 * dl4);
             acc.edge_art_max = acc.edge_art_max.max(artifact);
             acc.edge_det_max = acc.edge_det_max.max(detail_lost);
         }
@@ -5174,45 +5322,59 @@ fn vblur_ssim_elem_canon<P: crate::featcanon::Pool>(
     let vs = s - mu1;
     let vd = d - mu2;
     if !free.local_only {
-        row.hf_sq_src.add(lane, vs * vs);
-        row.hf_sq_dst.add(lane, vd * vd);
-        row.hf_abs_src.add(lane, diff1);
-        row.hf_abs_dst.add(lane, diff2);
+        match row32.as_deref_mut() {
+            // Revision 7: the source sums and the differences
+            // `(vd − vs)(vd + vs)` and `|vd| − |vs|` (exact subtractions
+            // when the two are within a factor of 2) in the f32 lanes; the
+            // fold adds both to the distorted sums (`VblurPools::fold_into`).
+            Some(r) => {
+                crate::featcanon::Pool::add(&mut r.hf_sq_src, lane, vs * vs);
+                crate::featcanon::Pool::add(&mut r.hf_sq_dst, lane, (vd - vs) * (vd + vs));
+                crate::featcanon::Pool::add(&mut r.hf_abs_src, lane, diff1);
+                crate::featcanon::Pool::add(&mut r.hf_abs_dst, lane, diff2 - diff1);
+            }
+            None => {
+                row.hf_sq_src.add(lane, vs * vs);
+                row.hf_sq_dst.add(lane, vd * vd);
+                row.hf_abs_src.add(lane, diff1);
+                row.hf_abs_dst.add(lane, diff2);
+            }
+        }
     }
 
     // MSE + ext pools
     let pd = s - d;
     let d2 = pd * pd;
-    row.mse.add(lane, d2);
+    rowadd!(mse, d2);
     if ext.on {
-        row.act_sum.add(lane, act);
+        rowadd!(act_sum, act);
         if ext.mask {
             let w = 1.0f32 / ext.k_mask.mul_add(act, 1.0f32);
             let da = (sd * w).max(0.0);
             let d2a = da * da;
-            row.masked_ssim_d.add(lane, da);
-            row.masked_ssim_d2.add(lane, d2a);
-            row.masked_ssim_d4.add(lane, d2a * d2a);
+            rowadd!(masked_ssim_d, da);
+            rowadd!(masked_ssim_d2, d2a);
+            rowadd!(masked_ssim_d4, d2a * d2a);
             let e = ed * w;
             let a2 = e.max(0.0) * e.max(0.0);
             let dl2 = (-e).max(0.0) * (-e).max(0.0);
-            row.masked_art4.add(lane, a2 * a2);
-            row.masked_det4.add(lane, dl2 * dl2);
-            row.masked_mse.add(lane, d2 * w);
+            rowadd!(masked_art4, a2 * a2);
+            rowadd!(masked_det4, dl2 * dl2);
+            rowadd!(masked_mse, d2 * w);
         }
         if ext.iw {
             let w = ext.k_iw.mul_add(act, 1.0f32);
             let db = (sd * w).max(0.0);
             let d2b = db * db;
-            row.iw_ssim_d.add(lane, db);
-            row.iw_ssim_d2.add(lane, d2b);
-            row.iw_ssim_d4.add(lane, d2b * d2b);
+            rowadd!(iw_ssim_d, db);
+            rowadd!(iw_ssim_d2, d2b);
+            rowadd!(iw_ssim_d4, d2b * d2b);
             let e = ed * w;
             let a2 = e.max(0.0) * e.max(0.0);
             let dl2 = (-e).max(0.0) * (-e).max(0.0);
-            row.iw_art4.add(lane, a2 * a2);
-            row.iw_det4.add(lane, dl2 * dl2);
-            row.iw_mse.add(lane, d2 * w);
+            rowadd!(iw_art4, a2 * a2);
+            rowadd!(iw_det4, dl2 * dl2);
+            rowadd!(iw_mse, d2 * w);
         }
     }
 
@@ -5278,6 +5440,8 @@ fn fused_vblur_ssim_canon<P: crate::featcanon::Pool>(
     mode: crate::featcanon::Mode,
 ) -> StripChannelAccum {
     let form = free.luma_form();
+    // Revision 7: the v1 edge ratio without cancellation.
+    let stable7 = free.revision().stable_forms();
     let r = radius;
     let inner_end = inner_start + inner_h;
 
@@ -5322,6 +5486,7 @@ fn fused_vblur_ssim_canon<P: crate::featcanon::Pool>(
                     base,
                     form,
                     direct,
+                    stable7,
                     free,
                     ext,
                     store_mu,
@@ -5333,6 +5498,7 @@ fn fused_vblur_ssim_canon<P: crate::featcanon::Pool>(
                     ssq_out,
                     s12_out,
                     &mut row,
+                    None,
                     &mut band,
                     &mut acc,
                 );
@@ -5449,6 +5615,15 @@ fn fused_vblur_ssim_local<P: crate::featcanon::Pool>(
         crate::fold_timing::work(crate::fold_timing::Work::PeakBand, 1);
     }
     let form = free.luma_form();
+    // Revision 7: the v1 edge ratio without cancellation.
+    let stable7 = free.revision().stable_forms();
+    // Revision 7's row lanes: the columns of complete eight-column chunks add
+    // the f32-lane pools in `crate::featcanon::Lanes16F32`, folded every
+    // `ROW_LANES_FOLD` columns and at the end of the chunks, as the vector
+    // body does; the tail adds in f64.
+    use crate::featcanon::ROW_LANES_FOLD;
+    let rev7 = free.revision().row_lanes() && P::LANES == 16;
+    let chunk_end = (width / 8) * 8;
     let r = radius;
     let inner_end = inner_start + inner_h;
     let planes = VWinPlanes {
@@ -5486,13 +5661,19 @@ fn fused_vblur_ssim_local<P: crate::featcanon::Pool>(
 
     // `localwin` rows: only the inner range produces outputs — nothing below
     // or above feeds a recurrence, so those rows are never visited.
+    // Revision 7: the row pools' f64 lanes live for the whole call (each row's
+    // f32 row lanes fold into them, and every fold clears the row lanes), and
+    // each pool finishes once, after the last row.
+    let mut call_row = VblurPools::<P>::zero();
+    let mut row32 = VblurPools::<crate::featcanon::Lanes16F32>::zero();
     for y in inner_start..inner_end {
         for k in 0..diam {
             rb[k] =
                 crate::featcanon::tap_mirror(y as isize + k as isize - r as isize, height) * width;
         }
         let base = y * width;
-        let mut row = VblurPools::<P>::zero();
+        let mut fresh = VblurPools::<P>::zero();
+        let row = if rev7 { &mut call_row } else { &mut fresh };
         for x in 0..width {
             let mut win_at = |plane: &[f32]| -> f32 {
                 if plane.is_empty() {
@@ -5528,6 +5709,7 @@ fn fused_vblur_ssim_local<P: crate::featcanon::Pool>(
                 base,
                 form,
                 direct,
+                stable7,
                 free,
                 ext,
                 store_mu,
@@ -5538,51 +5720,30 @@ fn fused_vblur_ssim_local<P: crate::featcanon::Pool>(
                 sd_out,
                 ssq_out,
                 s12_out,
-                &mut row,
+                &mut *row,
+                if rev7 && x < chunk_end {
+                    Some(&mut row32)
+                } else {
+                    None
+                },
                 &mut band,
                 &mut acc,
             );
-        }
-        // One fixed-order finish per row per pool.
-        acc.ssim_d += row.ssim_d.fin();
-        acc.ssim_d4 += row.ssim_d4.fin();
-        acc.ssim_d2 += row.ssim_d2.fin();
-        acc.edge_art += row.edge_art.fin();
-        acc.edge_art4 += row.edge_art4.fin();
-        acc.edge_art2 += row.edge_art2.fin();
-        acc.edge_det += row.edge_det.fin();
-        acc.edge_det4 += row.edge_det4.fin();
-        acc.edge_det2 += row.edge_det2.fin();
-        acc.mse += row.mse.fin();
-        if !free.local_only {
-            acc.ssim_d8 += row.ssim_d8.fin();
-            acc.edge_art8 += row.edge_art8.fin();
-            acc.edge_det8 += row.edge_det8.fin();
-            acc.hf_sq_src += row.hf_sq_src.fin();
-            acc.hf_sq_dst += row.hf_sq_dst.fin();
-            acc.hf_abs_src += row.hf_abs_src.fin();
-            acc.hf_abs_dst += row.hf_abs_dst.fin();
-        }
-        if ext.on {
-            acc.act_sum += row.act_sum.fin();
-            if ext.mask {
-                acc.masked_ssim_d += row.masked_ssim_d.fin();
-                acc.masked_ssim_d4 += row.masked_ssim_d4.fin();
-                acc.masked_ssim_d2 += row.masked_ssim_d2.fin();
-                acc.masked_art4 += row.masked_art4.fin();
-                acc.masked_det4 += row.masked_det4.fin();
-                acc.masked_mse += row.masked_mse.fin();
+            if rev7
+                && (x + 1 == chunk_end || (x < chunk_end && (x + 1).is_multiple_of(ROW_LANES_FOLD)))
+            {
+                row32.fold_into(&mut *row, free, ext);
             }
-            if ext.iw {
-                acc.iw_ssim_d += row.iw_ssim_d.fin();
-                acc.iw_ssim_d4 += row.iw_ssim_d4.fin();
-                acc.iw_ssim_d2 += row.iw_ssim_d2.fin();
-                acc.iw_art4 += row.iw_art4.fin();
-                acc.iw_det4 += row.iw_det4.fin();
-                acc.iw_mse += row.iw_mse.fin();
-            }
+        }
+        // One fixed-order finish per pool: per row, or at revision 7 after
+        // the last row.
+        if !rev7 {
+            row.finish_into(&mut acc, free, ext);
         }
         if y + 1 == inner_end {
+            if rev7 {
+                call_row.finish_into(&mut acc, free, ext);
+            }
             if free.raw_moments {
                 acc.sum_s += band.fm_s.fin();
                 acc.sum_d += band.fm_d.fin();
@@ -5630,7 +5791,7 @@ fn fused_vblur_ssim_local<P: crate::featcanon::Pool>(
 /// falls back to the scalar body, which honours the other variants).
 /// `_scalar`/`_wasm128` keep the scalar canonical body: their `mul_add` is
 /// unfused either way, so the scalar body is already their exact form.
-#[magetypes(define(f32x8, f64x8), v4x, v4, v3, -scalar)]
+#[magetypes(define(f32x8, f32x16, f64x8), v4x, v4, v3, -scalar)]
 #[allow(clippy::too_many_arguments)]
 fn fused_vblur_ssim_canon64_vec<P: crate::featcanon::Pool64>(
     token: Token,
@@ -5660,6 +5821,8 @@ fn fused_vblur_ssim_canon64_vec<P: crate::featcanon::Pool64>(
     mode: crate::featcanon::Mode,
 ) -> StripChannelAccum {
     let form = free.luma_form();
+    // Revision 7: the v1 edge ratio without cancellation.
+    let stable7 = free.revision().stable_forms();
     let r = radius;
     let inner_end = inner_start + inner_h;
     let planes = VWinPlanes {
@@ -5714,6 +5877,46 @@ fn fused_vblur_ssim_canon64_vec<P: crate::featcanon::Pool64>(
         f32x8::from_array_t(token, std::array::from_fn(|i| a[i] as f32))
     };
 
+    // Revision 7 (`rowlanes`): each f32-lane pool's chunk adds go to
+    // `crate::featcanon::Lanes16F32` for the row, folded into the f64 lanes
+    // every `ROW_LANES_FOLD` columns and at the end of the chunks
+    // (`VblurPools::fold_into`); the tail adds in f64. Revisions 5 and 6 keep
+    // the f64 per-chunk update.
+    let rev7 = free.revision().row_lanes() && local;
+    macro_rules! pool_add {
+        ($tgt:ident, $tgt32:ident, $field:ident, $x0:expr, $v:expr) => {{
+            let v: f32x8 = $v;
+            if rev7 {
+                let lanes = $tgt32.$field.chunk8($x0 & 15);
+                (f32x8::load_t(token, lanes) + v).store(lanes);
+            } else {
+                let values = v.to_array();
+                let lanes = $tgt.$field.chunk8($x0 & (P::LANES - 1));
+                for l in 0..8 {
+                    lanes[l] += values[l] as f64;
+                }
+            }
+        }};
+    }
+    // Pools whose features difference or ratio large sums keep f64 lanes
+    // (f32 row sums lose up to 2.4e-4 of those features to the
+    // cancellation): the band raw moments, and through revision 6 the v1
+    // variance, texture and contrast sums, which revision 7 accumulates in
+    // the f32 lanes as differences instead (`VblurPools::fold_into`).
+    macro_rules! pool_add64 {
+        ($tgt:ident, $field:ident, $x0:expr, $v:expr) => {{
+            let values = ($v).to_array();
+            let lanes = $tgt.$field.chunk8($x0 & (P::LANES - 1));
+            for l in 0..8 {
+                lanes[l] += values[l] as f64;
+            }
+        }};
+    }
+    // Revision 7: the row pools' f64 lanes live for the whole call (each row's
+    // f32 row lanes fold into them, and every fold clears the row lanes), and
+    // each pool finishes once, after the last row.
+    let mut call_row = VblurPools::<P>::zero();
+    let mut row32 = VblurPools::<crate::featcanon::Lanes16F32>::zero();
     for y in if local {
         inner_start..inner_end
     } else {
@@ -5721,7 +5924,8 @@ fn fused_vblur_ssim_canon64_vec<P: crate::featcanon::Pool64>(
     } {
         if y >= inner_start && y < inner_end {
             let base = y * width;
-            let mut row = VblurPools::<P>::zero();
+            let mut fresh = VblurPools::<P>::zero();
+            let row = if rev7 { &mut call_row } else { &mut fresh };
             let [wm1, wm2, wsq, ws12, wact] = win.f64_states().unwrap_or([&[]; 5]);
             // Provable-length slices: `x0 + 8 <= full * 8` is then literal,
             // so `narrow`'s window reads and the plane loads compile with
@@ -5738,422 +5942,481 @@ fn fused_vblur_ssim_canon64_vec<P: crate::featcanon::Pool64>(
             let srow = &src[base..base + full * 8];
             let drow = &dst[base..base + full * 8];
 
-            let window = |plane: &[f32], state: &[f64], x0: usize| -> f32x8 {
-                if !local {
-                    return narrow(state, x0);
+            // The vertical window's eleven mirrored tap rows, once per row:
+            // each tap plane is cut to the chunks' exact span, so the loads
+            // need no per-chunk offset arithmetic or range checks. Same taps,
+            // same summation tree.
+            let tap_base: [usize; 11] = if local && radius != 0 {
+                std::array::from_fn(|k| {
+                    crate::featcanon::tap_mirror(y as isize + k as isize - 5, height) * width
+                })
+            } else {
+                [0; 11]
+            };
+            macro_rules! taps {
+                ($plane:expr) => {{
+                    let plane: &[f32] = $plane;
+                    let t: [&[f32]; 11] = if !local || radius == 0 || plane.is_empty() {
+                        [&[]; 11]
+                    } else {
+                        std::array::from_fn(|k| &plane[tap_base[k]..tap_base[k] + full * 8])
+                    };
+                    t
+                }};
+            }
+            let (tm1, tm2, tsq, ts12, tact) = (
+                taps!(planes.m1),
+                taps!(planes.m2),
+                taps!(planes.sq),
+                taps!(planes.s12),
+                taps!(planes.act),
+            );
+            // One chunk of `$w` columns (eight or sixteen) at column `x0`,
+            // through vector type `$vt`: every term is element-wise, and the
+            // pools add each lane's values in column order, so a sixteen-wide
+            // step computes the same bits as its two eight-wide chunks.
+            macro_rules! window8 {
+                ($plane:expr, $state:expr, $taps:expr, $x0:expr) => {{
+                    let x0: usize = $x0;
+                    if !local {
+                        narrow($state, x0)
+                    } else if radius == 0 {
+                        f32x8::load_t(token, $plane[base + x0..base + x0 + 8].try_into().unwrap())
+                    } else {
+                        debug_assert_eq!(radius, 5);
+                        let tp: &[&[f32]; 11] = &$taps;
+                        let t: [f32x8; 11] = std::array::from_fn(|k| {
+                            f32x8::load_t(token, tp[k][x0..x0 + 8].try_into().unwrap())
+                        });
+                        ((((t[0] + t[1]) + (t[2] + t[3])) + ((t[4] + t[5]) + (t[6] + t[7])))
+                            + (t[8] + t[9])
+                            + t[10])
+                            * f32x8::splat_t(token, 1.0 / 11.0)
+                    }
+                }};
+            }
+            macro_rules! window16 {
+                ($plane:expr, $state:expr, $taps:expr, $x0:expr) => {{
+                    let x0: usize = $x0;
+                    let _ = $state;
+                    if radius == 0 {
+                        f32x16::load_t(token, $plane[base + x0..base + x0 + 16].try_into().unwrap())
+                    } else {
+                        let tp: &[&[f32]; 11] = &$taps;
+                        let t: [f32x16; 11] = std::array::from_fn(|k| {
+                            f32x16::load_t(token, tp[k][x0..x0 + 16].try_into().unwrap())
+                        });
+                        ((((t[0] + t[1]) + (t[2] + t[3])) + ((t[4] + t[5]) + (t[6] + t[7])))
+                            + (t[8] + t[9])
+                            + t[10])
+                            * f32x16::splat_t(token, 1.0 / 11.0)
+                    }
+                }};
+            }
+            macro_rules! chunk {
+                ($vt:ident, $w:literal, $splats:expr, $consts:expr, $add:ident, $add64:ident, $window:ident, $x0:expr) => {{
+                    let x0: usize = $x0;
+                    let (one, zero, c_mse, c_lumt, km, kiw) = $consts;
+                    let m1v = $window!(planes.m1, wm1, tm1, x0);
+                    let m2v = $window!(planes.m2, wm2, tm2, x0);
+                    let ssqv = $window!(planes.sq, wsq, tsq, x0);
+                    let s12v = $window!(planes.s12, ws12, ts12, x0);
+                    let actv = if planes.act.is_empty() {
+                        zero
+                    } else {
+                        $window!(planes.act, wact, tact, x0)
+                    };
+                    let sv = $vt::load_t(token, srow[x0..x0 + $w].try_into().unwrap());
+                    let dv = $vt::load_t(token, drow[x0..x0 + $w].try_into().unwrap());
+
+                    let sd = if direct {
+                        $splats.direct(m1v, m2v, ssqv, s12v)
+                    } else {
+                        $splats.dissim(m1v, m2v, ssqv, s12v)
+                    }
+                    .max(zero);
+                    let sd2 = sd * sd;
+                    let sd4 = sd2 * sd2;
+                    $add!(row, row32, ssim_d, x0, sd);
+                    $add!(row, row32, ssim_d4, x0, sd4);
+                    $add!(row, row32, ssim_d2, x0, sd2);
+                    if !free.local_only && !free.omit_peaks {
+                        $add!(row, row32, ssim_d8, x0, sd4 * sd4);
+                        for v in sd.to_array() {
+                            acc.ssim_max = acc.ssim_max.max(v);
+                        }
+                    }
+                    if store_sd {
+                        sd_out[base + x0..base + x0 + $w].copy_from_slice(&sd.to_array());
+                    }
+                    if store_mu {
+                        mu1_out[base + x0..base + x0 + $w].copy_from_slice(&m1v.to_array());
+                        mu2_out[base + x0..base + x0 + $w].copy_from_slice(&m2v.to_array());
+                    }
+                    if store_sigma {
+                        ssq_out[base + x0..base + x0 + $w].copy_from_slice(&ssqv.to_array());
+                        s12_out[base + x0..base + x0 + $w].copy_from_slice(&s12v.to_array());
+                    }
+
+                    // Edge
+                    let diff1 = (sv - m1v).abs();
+                    let diff2 = (dv - m2v).abs();
+                    let ed = if stable7 {
+                        (diff2 - diff1) / (one + diff1)
+                    } else {
+                        (one + diff2) / (one + diff1) - one
+                    };
+                    let artifact = ed.max(zero);
+                    let detail_lost = (-ed).max(zero);
+                    let a2 = artifact * artifact;
+                    let dl2 = detail_lost * detail_lost;
+                    let a4 = a2 * a2;
+                    let dl4 = dl2 * dl2;
+                    if !free.omit_edges {
+                        $add!(row, row32, edge_art, x0, artifact);
+                        $add!(row, row32, edge_art4, x0, a4);
+                        $add!(row, row32, edge_art2, x0, a2);
+                        $add!(row, row32, edge_det, x0, detail_lost);
+                        $add!(row, row32, edge_det4, x0, dl4);
+                        $add!(row, row32, edge_det2, x0, dl2);
+                        if !free.omit_peaks {
+                            $add!(row, row32, edge_art8, x0, a4 * a4);
+                            $add!(row, row32, edge_det8, x0, dl4 * dl4);
+                            for v in artifact.to_array() {
+                                acc.edge_art_max = acc.edge_art_max.max(v);
+                            }
+                            for v in detail_lost.to_array() {
+                                acc.edge_det_max = acc.edge_det_max.max(v);
+                            }
+                        }
+                    }
+
+                    // Variance / texture
+                    let vs = sv - m1v;
+                    let vd = dv - m2v;
+                    if !free.local_only {
+                        if rev7 {
+                            // The difference form of the scalar step.
+                            $add!(row, row32, hf_sq_src, x0, vs * vs);
+                            $add!(row, row32, hf_sq_dst, x0, (vd - vs) * (vd + vs));
+                            $add!(row, row32, hf_abs_src, x0, diff1);
+                            $add!(row, row32, hf_abs_dst, x0, diff2 - diff1);
+                        } else {
+                            $add64!(row, hf_sq_src, x0, vs * vs);
+                            $add64!(row, hf_sq_dst, x0, vd * vd);
+                            $add64!(row, hf_abs_src, x0, diff1);
+                            $add64!(row, hf_abs_dst, x0, diff2);
+                        }
+                    }
+
+                    // MSE + ext pools
+                    let pd = sv - dv;
+                    let d2 = pd * pd;
+                    $add!(row, row32, mse, x0, d2);
+                    if ext.on {
+                        $add!(row, row32, act_sum, x0, actv);
+                        if ext.mask {
+                            let w = one / km.mul_add(actv, one);
+                            let da = (sd * w).max(zero);
+                            let d2a = da * da;
+                            $add!(row, row32, masked_ssim_d, x0, da);
+                            $add!(row, row32, masked_ssim_d2, x0, d2a);
+                            $add!(row, row32, masked_ssim_d4, x0, d2a * d2a);
+                            let e = ed * w;
+                            let ep = e.max(zero);
+                            let en = (-e).max(zero);
+                            let a2m = ep * ep;
+                            let dl2m = en * en;
+                            $add!(row, row32, masked_art4, x0, a2m * a2m);
+                            $add!(row, row32, masked_det4, x0, dl2m * dl2m);
+                            $add!(row, row32, masked_mse, x0, d2 * w);
+                        }
+                        if ext.iw {
+                            let w = kiw.mul_add(actv, one);
+                            let db = (sd * w).max(zero);
+                            let d2b = db * db;
+                            $add!(row, row32, iw_ssim_d, x0, db);
+                            $add!(row, row32, iw_ssim_d2, x0, d2b);
+                            $add!(row, row32, iw_ssim_d4, x0, d2b * d2b);
+                            let e = ed * w;
+                            let ep = e.max(zero);
+                            let en = (-e).max(zero);
+                            let a2i = ep * ep;
+                            let dl2i = en * en;
+                            $add!(row, row32, iw_art4, x0, a2i * a2i);
+                            $add!(row, row32, iw_det4, x0, dl2i * dl2i);
+                            $add!(row, row32, iw_mse, x0, d2 * w);
+                        }
+                    }
+
+                    // Free raw moments — band-lifetime canonical lanes.
+                    if free.raw_moments {
+                        $add64!(band, fm_s, x0, sv);
+                        $add64!(band, fm_d, x0, dv);
+                        $add64!(band, fm_s2, x0, sv * sv);
+                        $add64!(band, fm_d2, x0, dv * dv);
+                        let df = dv - sv;
+                        $add64!(band, fm_dd, x0, df * (dv + sv));
+                        $add64!(band, fm_ds, x0, df);
+                    }
+                    // Free bounded error + luminance bins.
+                    if free.bounded_err {
+                        let sqm = (pd * pd).max(zero);
+                        let be_i = sqm / (sqm + c_mse);
+                        $add64!(band, be_m, x0, be_i);
+                        if free.lum_bins {
+                            let ry = sv.max(zero);
+                            let t = ry / (ry + c_lumt);
+                            let omt = one - t;
+                            let wd = omt * omt;
+                            let wb = t * t;
+                            $add64!(band, wd_num, x0, wd * be_i);
+                            $add64!(band, wd_den, x0, wd);
+                            $add64!(band, wb_num, x0, wb * be_i);
+                            $add64!(band, wb_den, x0, wb);
+                        }
+                    }
+                    if rev7 && (x0 + $w).is_multiple_of(crate::featcanon::ROW_LANES_FOLD) {
+                        row32.fold_into(&mut *row, free, ext);
+                    }
+                }};
+            }
+            // The configuration B and Tga run (radius 0, direct SSIM, edges and
+            // HF on, no peaks, extensions, free extras or stores) has its own
+            // loops at revision 7.
+            let lean = rev7
+                && radius == 0
+                && direct
+                && !free.local_only
+                && free.omit_peaks
+                && !free.omit_edges
+                && !free.raw_moments
+                && !free.bounded_err
+                && !ext.on
+                && !store_sd
+                && !store_mu
+                && !store_sigma;
+            let mut c = 0usize;
+            // Revision 7: sixteen columns per step on AVX-512 tiers.
+            if rev7 && crate::feature_v2::steps_sixteen::<Token>() {
+                let splats16 = crate::ssim_form::SsimSplats16::new(token, form);
+                let consts16 = (
+                    f32x16::splat_t(token, 1.0),
+                    f32x16::zero_t(token),
+                    f32x16::splat_t(token, C_MSE_F32),
+                    f32x16::splat_t(token, C_LUM_T_F32),
+                    f32x16::splat_t(token, ext.k_mask),
+                    f32x16::splat_t(token, ext.k_iw),
+                );
+                macro_rules! pool_add16 {
+                    ($tgt:ident, $tgt32:ident, $field:ident, $x0:expr, $v:expr) => {{
+                        let v: f32x16 = $v;
+                        if rev7 {
+                            let lanes = &mut $tgt32.$field.0;
+                            (f32x16::load_t(token, lanes) + v).store(lanes);
+                        } else {
+                            pool_add64_16!($tgt, $field, $x0, v);
+                        }
+                    }};
                 }
-                if radius == 0 {
-                    return f32x8::load_t(
-                        token,
-                        plane[base + x0..base + x0 + 8].try_into().unwrap(),
+                macro_rules! pool_add64_16 {
+                    ($tgt:ident, $field:ident, $x0:expr, $v:expr) => {{
+                        let values = ($v).to_array();
+                        for (off, half) in [(0usize, &values[..8]), (8, &values[8..])] {
+                            let lanes = $tgt.$field.chunk8(off);
+                            for l in 0..8 {
+                                lanes[l] += half[l] as f64;
+                            }
+                        }
+                    }};
+                }
+                // The lean configuration's fourteen row pools stay in registers
+                // between folds, and no per-chunk flag is tested. Each lane adds
+                // the same values in the same column order as `chunk!`, so every
+                // sum keeps its bits.
+                if lean {
+                    macro_rules! get {
+                        ($f:ident) => {
+                            f32x16::load_t(token, &row32.$f.0)
+                        };
+                    }
+                    macro_rules! put {
+                        ($f:ident, $v:expr) => {
+                            ($v).store(&mut row32.$f.0)
+                        };
+                    }
+                    let mut p = [
+                        get!(ssim_d),
+                        get!(ssim_d4),
+                        get!(ssim_d2),
+                        get!(edge_art),
+                        get!(edge_art4),
+                        get!(edge_art2),
+                        get!(edge_det),
+                        get!(edge_det4),
+                        get!(edge_det2),
+                        get!(hf_sq_src),
+                        get!(hf_sq_dst),
+                        get!(hf_abs_src),
+                        get!(hf_abs_dst),
+                        get!(mse),
+                    ];
+                    macro_rules! flush {
+                        () => {
+                            put!(ssim_d, p[0]);
+                            put!(ssim_d4, p[1]);
+                            put!(ssim_d2, p[2]);
+                            put!(edge_art, p[3]);
+                            put!(edge_art4, p[4]);
+                            put!(edge_art2, p[5]);
+                            put!(edge_det, p[6]);
+                            put!(edge_det4, p[7]);
+                            put!(edge_det2, p[8]);
+                            put!(hf_sq_src, p[9]);
+                            put!(hf_sq_dst, p[10]);
+                            put!(hf_abs_src, p[11]);
+                            put!(hf_abs_dst, p[12]);
+                            put!(mse, p[13]);
+                        };
+                    }
+                    let (one, zero) = (consts16.0, consts16.1);
+                    let (m1p, m2p, sqp, s12p) = (planes.m1, planes.m2, planes.sq, planes.s12);
+                    while c + 2 <= full {
+                        let x0 = c * 8;
+                        let at = base + x0;
+                        let m1v = f32x16::load_t(token, m1p[at..at + 16].try_into().unwrap());
+                        let m2v = f32x16::load_t(token, m2p[at..at + 16].try_into().unwrap());
+                        let ssqv = f32x16::load_t(token, sqp[at..at + 16].try_into().unwrap());
+                        let s12v = f32x16::load_t(token, s12p[at..at + 16].try_into().unwrap());
+                        let sv = f32x16::load_t(token, srow[x0..x0 + 16].try_into().unwrap());
+                        let dv = f32x16::load_t(token, drow[x0..x0 + 16].try_into().unwrap());
+                        let sd = splats16.direct(m1v, m2v, ssqv, s12v).max(zero);
+                        let sd2 = sd * sd;
+                        let sd4 = sd2 * sd2;
+                        p[0] = p[0] + sd;
+                        p[1] = p[1] + sd4;
+                        p[2] = p[2] + sd2;
+                        let diff1 = (sv - m1v).abs();
+                        let diff2 = (dv - m2v).abs();
+                        let ed = if stable7 {
+                            (diff2 - diff1) / (one + diff1)
+                        } else {
+                            (one + diff2) / (one + diff1) - one
+                        };
+                        let artifact = ed.max(zero);
+                        let detail_lost = (-ed).max(zero);
+                        let a2 = artifact * artifact;
+                        let dl2 = detail_lost * detail_lost;
+                        p[3] = p[3] + artifact;
+                        p[4] = p[4] + a2 * a2;
+                        p[5] = p[5] + a2;
+                        p[6] = p[6] + detail_lost;
+                        p[7] = p[7] + dl2 * dl2;
+                        p[8] = p[8] + dl2;
+                        let vs = sv - m1v;
+                        let vd = dv - m2v;
+                        p[9] = p[9] + vs * vs;
+                        p[10] = p[10] + (vd - vs) * (vd + vs);
+                        p[11] = p[11] + diff1;
+                        p[12] = p[12] + (diff2 - diff1);
+                        let pd = sv - dv;
+                        p[13] = p[13] + pd * pd;
+                        if (x0 + 16).is_multiple_of(crate::featcanon::ROW_LANES_FOLD) {
+                            flush!();
+                            row32.fold_into(&mut *row, free, ext);
+                            p = [zero; 14];
+                        }
+                        c += 2;
+                    }
+                    flush!();
+                }
+                while c + 2 <= full {
+                    chunk!(
+                        f32x16,
+                        16,
+                        splats16,
+                        consts16,
+                        pool_add16,
+                        pool_add64_16,
+                        window16,
+                        c * 8
+                    );
+                    c += 2;
+                }
+            }
+            let consts8 = (one, zero, c_mse, c_lumt, km, kiw);
+            if lean {
+                // The lean configuration eight columns at a time (v3, and the
+                // odd last chunk on AVX-512): `chunk!`'s pool adds without its
+                // per-chunk flag tests.
+                let (m1p, m2p, sqp, s12p) = (planes.m1, planes.m2, planes.sq, planes.s12);
+                for c in c..full {
+                    let x0 = c * 8;
+                    let at = base + x0;
+                    let m1v = f32x8::load_t(token, m1p[at..at + 8].try_into().unwrap());
+                    let m2v = f32x8::load_t(token, m2p[at..at + 8].try_into().unwrap());
+                    let ssqv = f32x8::load_t(token, sqp[at..at + 8].try_into().unwrap());
+                    let s12v = f32x8::load_t(token, s12p[at..at + 8].try_into().unwrap());
+                    let sv = f32x8::load_t(token, srow[x0..x0 + 8].try_into().unwrap());
+                    let dv = f32x8::load_t(token, drow[x0..x0 + 8].try_into().unwrap());
+                    macro_rules! add8 {
+                        ($f:ident, $v:expr) => {{
+                            let lanes = row32.$f.chunk8(x0 & 15);
+                            (f32x8::load_t(token, lanes) + $v).store(lanes);
+                        }};
+                    }
+                    let sd = splats.direct(m1v, m2v, ssqv, s12v).max(zero);
+                    let sd2 = sd * sd;
+                    let sd4 = sd2 * sd2;
+                    add8!(ssim_d, sd);
+                    add8!(ssim_d4, sd4);
+                    add8!(ssim_d2, sd2);
+                    let diff1 = (sv - m1v).abs();
+                    let diff2 = (dv - m2v).abs();
+                    let ed = if stable7 {
+                        (diff2 - diff1) / (one + diff1)
+                    } else {
+                        (one + diff2) / (one + diff1) - one
+                    };
+                    let artifact = ed.max(zero);
+                    let detail_lost = (-ed).max(zero);
+                    let a2 = artifact * artifact;
+                    let dl2 = detail_lost * detail_lost;
+                    add8!(edge_art, artifact);
+                    add8!(edge_art4, a2 * a2);
+                    add8!(edge_art2, a2);
+                    add8!(edge_det, detail_lost);
+                    add8!(edge_det4, dl2 * dl2);
+                    add8!(edge_det2, dl2);
+                    let vs = sv - m1v;
+                    let vd = dv - m2v;
+                    add8!(hf_sq_src, vs * vs);
+                    add8!(hf_sq_dst, (vd - vs) * (vd + vs));
+                    add8!(hf_abs_src, diff1);
+                    add8!(hf_abs_dst, diff2 - diff1);
+                    let pd = sv - dv;
+                    add8!(mse, pd * pd);
+                    if (x0 + 8).is_multiple_of(crate::featcanon::ROW_LANES_FOLD) {
+                        row32.fold_into(&mut *row, free, ext);
+                    }
+                }
+            } else {
+                for c in c..full {
+                    chunk!(
+                        f32x8,
+                        8,
+                        splats,
+                        consts8,
+                        pool_add,
+                        pool_add64,
+                        window8,
+                        c * 8
                     );
                 }
-                debug_assert_eq!(radius, 5);
-                let t: [f32x8; 11] = std::array::from_fn(|k| {
-                    let rb =
-                        crate::featcanon::tap_mirror(y as isize + k as isize - 5, height) * width;
-                    f32x8::load_t(token, plane[rb + x0..rb + x0 + 8].try_into().unwrap())
-                });
-                ((((t[0] + t[1]) + (t[2] + t[3])) + ((t[4] + t[5]) + (t[6] + t[7])))
-                    + (t[8] + t[9])
-                    + t[10])
-                    * f32x8::splat_t(token, 1.0 / 11.0)
-            };
-            for c in 0..full {
-                let x0 = c * 8;
-                let m1v = window(planes.m1, wm1, x0);
-                let m2v = window(planes.m2, wm2, x0);
-                let ssqv = window(planes.sq, wsq, x0);
-                let s12v = window(planes.s12, ws12, x0);
-                let actv = if planes.act.is_empty() {
-                    zero
-                } else {
-                    window(planes.act, wact, x0)
-                };
-                let sv = f32x8::load_t(token, srow[x0..x0 + 8].try_into().unwrap());
-                let dv = f32x8::load_t(token, drow[x0..x0 + 8].try_into().unwrap());
-
-                let sd = if direct {
-                    splats.direct(m1v, m2v, ssqv, s12v)
-                } else {
-                    splats.dissim(m1v, m2v, ssqv, s12v)
-                }
-                .max(zero);
-                let sd2 = sd * sd;
-                let sd4 = sd2 * sd2;
-                {
-                    let values = sd.to_array();
-                    let lanes = row.ssim_d.chunk8(x0 & (P::LANES - 1));
-                    for l in 0..8 {
-                        lanes[l] += values[l] as f64;
-                    }
-                }
-                {
-                    let values = sd4.to_array();
-                    let lanes = row.ssim_d4.chunk8(x0 & (P::LANES - 1));
-                    for l in 0..8 {
-                        lanes[l] += values[l] as f64;
-                    }
-                }
-                {
-                    let values = sd2.to_array();
-                    let lanes = row.ssim_d2.chunk8(x0 & (P::LANES - 1));
-                    for l in 0..8 {
-                        lanes[l] += values[l] as f64;
-                    }
-                }
-                if !free.local_only && !free.omit_peaks {
-                    {
-                        let values = (sd4 * sd4).to_array();
-                        let lanes = row.ssim_d8.chunk8(x0 & (P::LANES - 1));
-                        for l in 0..8 {
-                            lanes[l] += values[l] as f64;
-                        }
-                    }
-                    for v in sd.to_array() {
-                        acc.ssim_max = acc.ssim_max.max(v);
-                    }
-                }
-                if store_sd {
-                    sd_out[base + x0..base + x0 + 8].copy_from_slice(&sd.to_array());
-                }
-                if store_mu {
-                    mu1_out[base + x0..base + x0 + 8].copy_from_slice(&m1v.to_array());
-                    mu2_out[base + x0..base + x0 + 8].copy_from_slice(&m2v.to_array());
-                }
-                if store_sigma {
-                    ssq_out[base + x0..base + x0 + 8].copy_from_slice(&ssqv.to_array());
-                    s12_out[base + x0..base + x0 + 8].copy_from_slice(&s12v.to_array());
-                }
-
-                // Edge
-                let diff1 = (sv - m1v).abs();
-                let diff2 = (dv - m2v).abs();
-                let ed = (one + diff2) / (one + diff1) - one;
-                let artifact = ed.max(zero);
-                let detail_lost = (-ed).max(zero);
-                let a2 = artifact * artifact;
-                let dl2 = detail_lost * detail_lost;
-                let a4 = a2 * a2;
-                let dl4 = dl2 * dl2;
-                if !free.omit_edges {
-                    {
-                        let values = artifact.to_array();
-                        let lanes = row.edge_art.chunk8(x0 & (P::LANES - 1));
-                        for l in 0..8 {
-                            lanes[l] += values[l] as f64;
-                        }
-                    }
-                    {
-                        let values = a4.to_array();
-                        let lanes = row.edge_art4.chunk8(x0 & (P::LANES - 1));
-                        for l in 0..8 {
-                            lanes[l] += values[l] as f64;
-                        }
-                    }
-                    {
-                        let values = a2.to_array();
-                        let lanes = row.edge_art2.chunk8(x0 & (P::LANES - 1));
-                        for l in 0..8 {
-                            lanes[l] += values[l] as f64;
-                        }
-                    }
-                    {
-                        let values = detail_lost.to_array();
-                        let lanes = row.edge_det.chunk8(x0 & (P::LANES - 1));
-                        for l in 0..8 {
-                            lanes[l] += values[l] as f64;
-                        }
-                    }
-                    {
-                        let values = dl4.to_array();
-                        let lanes = row.edge_det4.chunk8(x0 & (P::LANES - 1));
-                        for l in 0..8 {
-                            lanes[l] += values[l] as f64;
-                        }
-                    }
-                    {
-                        let values = dl2.to_array();
-                        let lanes = row.edge_det2.chunk8(x0 & (P::LANES - 1));
-                        for l in 0..8 {
-                            lanes[l] += values[l] as f64;
-                        }
-                    }
-                    if !free.omit_peaks {
-                        {
-                            let values = (a4 * a4).to_array();
-                            let lanes = row.edge_art8.chunk8(x0 & (P::LANES - 1));
-                            for l in 0..8 {
-                                lanes[l] += values[l] as f64;
-                            }
-                        }
-                        {
-                            let values = (dl4 * dl4).to_array();
-                            let lanes = row.edge_det8.chunk8(x0 & (P::LANES - 1));
-                            for l in 0..8 {
-                                lanes[l] += values[l] as f64;
-                            }
-                        }
-                        for v in artifact.to_array() {
-                            acc.edge_art_max = acc.edge_art_max.max(v);
-                        }
-                        for v in detail_lost.to_array() {
-                            acc.edge_det_max = acc.edge_det_max.max(v);
-                        }
-                    }
-                }
-
-                // Variance / texture
-                let vs = sv - m1v;
-                let vd = dv - m2v;
-                if !free.local_only {
-                    {
-                        let values = (vs * vs).to_array();
-                        let lanes = row.hf_sq_src.chunk8(x0 & (P::LANES - 1));
-                        for l in 0..8 {
-                            lanes[l] += values[l] as f64;
-                        }
-                    }
-                    {
-                        let values = (vd * vd).to_array();
-                        let lanes = row.hf_sq_dst.chunk8(x0 & (P::LANES - 1));
-                        for l in 0..8 {
-                            lanes[l] += values[l] as f64;
-                        }
-                    }
-                    {
-                        let values = diff1.to_array();
-                        let lanes = row.hf_abs_src.chunk8(x0 & (P::LANES - 1));
-                        for l in 0..8 {
-                            lanes[l] += values[l] as f64;
-                        }
-                    }
-                    {
-                        let values = diff2.to_array();
-                        let lanes = row.hf_abs_dst.chunk8(x0 & (P::LANES - 1));
-                        for l in 0..8 {
-                            lanes[l] += values[l] as f64;
-                        }
-                    }
-                }
-
-                // MSE + ext pools
-                let pd = sv - dv;
-                let d2 = pd * pd;
-                {
-                    let values = d2.to_array();
-                    let lanes = row.mse.chunk8(x0 & (P::LANES - 1));
-                    for l in 0..8 {
-                        lanes[l] += values[l] as f64;
-                    }
-                }
-                if ext.on {
-                    {
-                        let values = actv.to_array();
-                        let lanes = row.act_sum.chunk8(x0 & (P::LANES - 1));
-                        for l in 0..8 {
-                            lanes[l] += values[l] as f64;
-                        }
-                    }
-                    if ext.mask {
-                        let w = one / km.mul_add(actv, one);
-                        let da = (sd * w).max(zero);
-                        let d2a = da * da;
-                        {
-                            let values = da.to_array();
-                            let lanes = row.masked_ssim_d.chunk8(x0 & (P::LANES - 1));
-                            for l in 0..8 {
-                                lanes[l] += values[l] as f64;
-                            }
-                        }
-                        {
-                            let values = d2a.to_array();
-                            let lanes = row.masked_ssim_d2.chunk8(x0 & (P::LANES - 1));
-                            for l in 0..8 {
-                                lanes[l] += values[l] as f64;
-                            }
-                        }
-                        {
-                            let values = (d2a * d2a).to_array();
-                            let lanes = row.masked_ssim_d4.chunk8(x0 & (P::LANES - 1));
-                            for l in 0..8 {
-                                lanes[l] += values[l] as f64;
-                            }
-                        }
-                        let e = ed * w;
-                        let ep = e.max(zero);
-                        let en = (-e).max(zero);
-                        let a2m = ep * ep;
-                        let dl2m = en * en;
-                        {
-                            let values = (a2m * a2m).to_array();
-                            let lanes = row.masked_art4.chunk8(x0 & (P::LANES - 1));
-                            for l in 0..8 {
-                                lanes[l] += values[l] as f64;
-                            }
-                        }
-                        {
-                            let values = (dl2m * dl2m).to_array();
-                            let lanes = row.masked_det4.chunk8(x0 & (P::LANES - 1));
-                            for l in 0..8 {
-                                lanes[l] += values[l] as f64;
-                            }
-                        }
-                        {
-                            let values = (d2 * w).to_array();
-                            let lanes = row.masked_mse.chunk8(x0 & (P::LANES - 1));
-                            for l in 0..8 {
-                                lanes[l] += values[l] as f64;
-                            }
-                        }
-                    }
-                    if ext.iw {
-                        let w = kiw.mul_add(actv, one);
-                        let db = (sd * w).max(zero);
-                        let d2b = db * db;
-                        {
-                            let values = db.to_array();
-                            let lanes = row.iw_ssim_d.chunk8(x0 & (P::LANES - 1));
-                            for l in 0..8 {
-                                lanes[l] += values[l] as f64;
-                            }
-                        }
-                        {
-                            let values = d2b.to_array();
-                            let lanes = row.iw_ssim_d2.chunk8(x0 & (P::LANES - 1));
-                            for l in 0..8 {
-                                lanes[l] += values[l] as f64;
-                            }
-                        }
-                        {
-                            let values = (d2b * d2b).to_array();
-                            let lanes = row.iw_ssim_d4.chunk8(x0 & (P::LANES - 1));
-                            for l in 0..8 {
-                                lanes[l] += values[l] as f64;
-                            }
-                        }
-                        let e = ed * w;
-                        let ep = e.max(zero);
-                        let en = (-e).max(zero);
-                        let a2i = ep * ep;
-                        let dl2i = en * en;
-                        {
-                            let values = (a2i * a2i).to_array();
-                            let lanes = row.iw_art4.chunk8(x0 & (P::LANES - 1));
-                            for l in 0..8 {
-                                lanes[l] += values[l] as f64;
-                            }
-                        }
-                        {
-                            let values = (dl2i * dl2i).to_array();
-                            let lanes = row.iw_det4.chunk8(x0 & (P::LANES - 1));
-                            for l in 0..8 {
-                                lanes[l] += values[l] as f64;
-                            }
-                        }
-                        {
-                            let values = (d2 * w).to_array();
-                            let lanes = row.iw_mse.chunk8(x0 & (P::LANES - 1));
-                            for l in 0..8 {
-                                lanes[l] += values[l] as f64;
-                            }
-                        }
-                    }
-                }
-
-                // Free raw moments — band-lifetime canonical lanes.
-                if free.raw_moments {
-                    {
-                        let values = sv.to_array();
-                        let lanes = band.fm_s.chunk8(x0 & (P::LANES - 1));
-                        for l in 0..8 {
-                            lanes[l] += values[l] as f64;
-                        }
-                    }
-                    {
-                        let values = dv.to_array();
-                        let lanes = band.fm_d.chunk8(x0 & (P::LANES - 1));
-                        for l in 0..8 {
-                            lanes[l] += values[l] as f64;
-                        }
-                    }
-                    {
-                        let values = (sv * sv).to_array();
-                        let lanes = band.fm_s2.chunk8(x0 & (P::LANES - 1));
-                        for l in 0..8 {
-                            lanes[l] += values[l] as f64;
-                        }
-                    }
-                    {
-                        let values = (dv * dv).to_array();
-                        let lanes = band.fm_d2.chunk8(x0 & (P::LANES - 1));
-                        for l in 0..8 {
-                            lanes[l] += values[l] as f64;
-                        }
-                    }
-                    let df = dv - sv;
-                    {
-                        let values = (df * (dv + sv)).to_array();
-                        let lanes = band.fm_dd.chunk8(x0 & (P::LANES - 1));
-                        for l in 0..8 {
-                            lanes[l] += values[l] as f64;
-                        }
-                    }
-                    {
-                        let values = df.to_array();
-                        let lanes = band.fm_ds.chunk8(x0 & (P::LANES - 1));
-                        for l in 0..8 {
-                            lanes[l] += values[l] as f64;
-                        }
-                    }
-                }
-                // Free bounded error + luminance bins.
-                if free.bounded_err {
-                    let sqm = (pd * pd).max(zero);
-                    let be_i = sqm / (sqm + c_mse);
-                    {
-                        let values = be_i.to_array();
-                        let lanes = band.be_m.chunk8(x0 & (P::LANES - 1));
-                        for l in 0..8 {
-                            lanes[l] += values[l] as f64;
-                        }
-                    }
-                    if free.lum_bins {
-                        let ry = sv.max(zero);
-                        let t = ry / (ry + c_lumt);
-                        let omt = one - t;
-                        let wd = omt * omt;
-                        let wb = t * t;
-                        {
-                            let values = (wd * be_i).to_array();
-                            let lanes = band.wd_num.chunk8(x0 & (P::LANES - 1));
-                            for l in 0..8 {
-                                lanes[l] += values[l] as f64;
-                            }
-                        }
-                        {
-                            let values = wd.to_array();
-                            let lanes = band.wd_den.chunk8(x0 & (P::LANES - 1));
-                            for l in 0..8 {
-                                lanes[l] += values[l] as f64;
-                            }
-                        }
-                        {
-                            let values = (wb * be_i).to_array();
-                            let lanes = band.wb_num.chunk8(x0 & (P::LANES - 1));
-                            for l in 0..8 {
-                                lanes[l] += values[l] as f64;
-                            }
-                        }
-                        {
-                            let values = wb.to_array();
-                            let lanes = band.wb_den.chunk8(x0 & (P::LANES - 1));
-                            for l in 0..8 {
-                                lanes[l] += values[l] as f64;
-                            }
-                        }
-                    }
-                }
+            }
+            // The end of the chunks, unless the last chunk already folded.
+            if rev7 && full > 0 && !(full * 8).is_multiple_of(crate::featcanon::ROW_LANES_FOLD) {
+                row32.fold_into(&mut *row, free, ext);
             }
             // Scalar tail — the canonical element step verbatim.
             for x in full * 8..width {
@@ -6172,6 +6435,7 @@ fn fused_vblur_ssim_canon64_vec<P: crate::featcanon::Pool64>(
                     base,
                     form,
                     direct,
+                    stable7,
                     free,
                     ext,
                     store_mu,
@@ -6182,52 +6446,21 @@ fn fused_vblur_ssim_canon64_vec<P: crate::featcanon::Pool64>(
                     sd_out,
                     ssq_out,
                     s12_out,
-                    &mut row,
+                    &mut *row,
+                    None,
                     &mut band,
                     &mut acc,
                 );
             }
-            // One fixed-order finish per row per pool — same order as the
-            // scalar body.
-            acc.ssim_d += row.ssim_d.fin();
-            acc.ssim_d4 += row.ssim_d4.fin();
-            acc.ssim_d2 += row.ssim_d2.fin();
-            acc.edge_art += row.edge_art.fin();
-            acc.edge_art4 += row.edge_art4.fin();
-            acc.edge_art2 += row.edge_art2.fin();
-            acc.edge_det += row.edge_det.fin();
-            acc.edge_det4 += row.edge_det4.fin();
-            acc.edge_det2 += row.edge_det2.fin();
-            acc.mse += row.mse.fin();
-            if !free.local_only {
-                acc.ssim_d8 += row.ssim_d8.fin();
-                acc.edge_art8 += row.edge_art8.fin();
-                acc.edge_det8 += row.edge_det8.fin();
-                acc.hf_sq_src += row.hf_sq_src.fin();
-                acc.hf_sq_dst += row.hf_sq_dst.fin();
-                acc.hf_abs_src += row.hf_abs_src.fin();
-                acc.hf_abs_dst += row.hf_abs_dst.fin();
-            }
-            if ext.on {
-                acc.act_sum += row.act_sum.fin();
-                if ext.mask {
-                    acc.masked_ssim_d += row.masked_ssim_d.fin();
-                    acc.masked_ssim_d4 += row.masked_ssim_d4.fin();
-                    acc.masked_ssim_d2 += row.masked_ssim_d2.fin();
-                    acc.masked_art4 += row.masked_art4.fin();
-                    acc.masked_det4 += row.masked_det4.fin();
-                    acc.masked_mse += row.masked_mse.fin();
-                }
-                if ext.iw {
-                    acc.iw_ssim_d += row.iw_ssim_d.fin();
-                    acc.iw_ssim_d4 += row.iw_ssim_d4.fin();
-                    acc.iw_ssim_d2 += row.iw_ssim_d2.fin();
-                    acc.iw_art4 += row.iw_art4.fin();
-                    acc.iw_det4 += row.iw_det4.fin();
-                    acc.iw_mse += row.iw_mse.fin();
-                }
+            // One fixed-order finish per pool: per row, or at revision 7 after
+            // the last row.
+            if !rev7 {
+                row.finish_into(&mut acc, free, ext);
             }
             if y + 1 == inner_end {
+                if rev7 {
+                    call_row.finish_into(&mut acc, free, ext);
+                }
                 if free.raw_moments {
                     acc.sum_s += band.fm_s.fin();
                     acc.sum_d += band.fm_d.fin();
@@ -6549,6 +6782,8 @@ fn fused_vblur_ssim_exact(
 ) -> StripChannelAccum {
     use crate::featcanon::{Neum64, Pool as _};
     let form = free.luma_form();
+    // Revision 7: the v1 edge ratio without cancellation.
+    let stable7 = free.revision().stable_forms();
     let r = radius;
     let inner_end = inner_start + inner_h;
 
@@ -6607,7 +6842,11 @@ fn fused_vblur_ssim_exact(
 
                 let diff1 = (s - mu1).abs();
                 let diff2 = (d - mu2).abs();
-                let ed = (1.0f64 + diff2) / (1.0f64 + diff1) - 1.0f64;
+                let ed = if stable7 {
+                    (diff2 - diff1) / (1.0f64 + diff1)
+                } else {
+                    (1.0f64 + diff2) / (1.0f64 + diff1) - 1.0f64
+                };
                 let artifact = ed.max(0.0f64);
                 let detail_lost = (-ed).max(0.0f64);
                 let a2 = artifact * artifact;
@@ -7908,6 +8147,105 @@ mod tests {
                 check_variant!("v4x", f);
             }
             assert!(compiled >= 1);
+        }
+
+        /// Revision 7's lean sixteen-column loop (the configuration B and Tga
+        /// run: radius 0, direct SSIM, edges and HF on, no peaks, extensions,
+        /// free extras or stores) against the generic chunk body: every
+        /// compiled tier and the scalar body accumulate the same bits, over
+        /// remainder columns, a single row and a width past the 4,096-column
+        /// fold.
+        #[test]
+        fn vblur_ssim_rev7_lean_loop_matches_every_tier() {
+            let mut rng = Rng(0x7E57_1EA2_5EED_0007);
+            let free = FreeExtrasWork {
+                revision: Some(crate::feature_defs::FormulaRevision::Rev7),
+                local_only: false,
+                omit_peaks: true,
+                omit_edges: false,
+                raw_moments: false,
+                bounded_err: false,
+                lum_bins: false,
+            };
+            let ext = ExtPoolsWork::default();
+            type P = crate::featcanon::Lanes16F64;
+            for (w, h, i0, ih) in [
+                (16usize, 1usize, 0usize, 1usize),
+                (37, 5, 1, 3),
+                (64, 9, 0, 9),
+                (255, 4, 1, 2),
+                (4133, 3, 0, 3),
+            ] {
+                let n = w * h;
+                let planes: [Vec<f32>; 6] = std::array::from_fn(|_| {
+                    (0..n)
+                        .map(|_| (rng.next() % 4096) as f32 / 4096.0)
+                        .collect()
+                });
+                let [m1, m2, sq, s12, src, dst] = &planes;
+                macro_rules! run {
+                    ($f:path, $t:expr) => {{
+                        let (mut a, mut b, mut c, mut d, mut e) =
+                            (Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new());
+                        acc_bits(&$f(
+                            $t,
+                            m1,
+                            m2,
+                            sq,
+                            s12,
+                            src,
+                            dst,
+                            w,
+                            h,
+                            i0,
+                            ih,
+                            0,
+                            &mut a,
+                            &mut b,
+                            false,
+                            &mut c,
+                            false,
+                            &mut d,
+                            &mut e,
+                            false,
+                            free,
+                            true,
+                            ext,
+                            &[],
+                            crate::featcanon::Mode::Canon64,
+                        ))
+                    }};
+                }
+                let want = run!(
+                    fused_vblur_ssim_canon64_vec_scalar::<P>,
+                    archmage::ScalarToken::summon().expect("infallible")
+                );
+                assert!(want.iter().any(|&b| b != 0), "vacuous accumulators");
+                #[cfg(target_arch = "x86_64")]
+                if let Some(t) = archmage::X64V3Token::summon() {
+                    assert_eq!(
+                        run!(fused_vblur_ssim_canon64_vec_v3::<P>, t),
+                        want,
+                        "v3 {w}x{h}"
+                    );
+                }
+                #[cfg(all(target_arch = "x86_64", feature = "avx512"))]
+                if let Some(t) = archmage::X64V4Token::summon() {
+                    assert_eq!(
+                        run!(fused_vblur_ssim_canon64_vec_v4::<P>, t),
+                        want,
+                        "v4 {w}x{h}"
+                    );
+                }
+                #[cfg(all(target_arch = "x86_64", feature = "avx512"))]
+                if let Some(t) = archmage::X64V4xToken::summon() {
+                    assert_eq!(
+                        run!(fused_vblur_ssim_canon64_vec_v4x::<P>, t),
+                        want,
+                        "v4x {w}x{h}"
+                    );
+                }
+            }
         }
 
         struct EdgeCase {

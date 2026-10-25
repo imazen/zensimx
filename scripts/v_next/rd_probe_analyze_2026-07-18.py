@@ -9,7 +9,8 @@ HELPFUL  — bytes saved vs the same codec's no-diffmap baseline at EQUAL
            per-judge tables so home-turf cells are visible (#38 convention).
 EFFICIENT — passes / encode_ms / |achieved−T| residuals per driver.
 
-Reads:  $RD/jxl/manifest_*.tsv, $RD/zenjpeg/probe.tsv, $RD/judge_{ssim2,butteraugli,zensim}.tsv
+Reads:  $RD/jxl/manifest_*.tsv, $RD/zenjpeg/probe.tsv, $RD/judge_{ssim2,butteraugli,zensim}.tsv and, when present,
+        $RD/judge_dvifm.tsv (DVIFM 0.3's `jnd`, scripts/byconstruction/dvifm_e21.py judge) and $RD/judge_cvvdp.tsv
 Writes: $RD/analysis_summary.md (+ prints it)
 """
 import csv
@@ -21,21 +22,34 @@ from collections import defaultdict
 
 RD = sys.argv[1] if len(sys.argv) > 1 else "/mnt/v/output/zensim/rd-target-eval-2026-07"
 CLASS = {"codec_wiki": "screen", "gmessages": "screen"}  # rest = photo
+# A corpus file beside the run (`$RD/corpus/corpus.tsv`: path, name, class) names every image's class.
+if os.path.exists(f"{RD}/corpus/corpus.tsv"):
+    with open(f"{RD}/corpus/corpus.tsv") as _f:
+        for _line in _f:
+            _parts = _line.rstrip("\n").split("\t")
+            if len(_parts) >= 3:
+                CLASS[_parts[1]] = _parts[2]
 
 
 def load_judges():
-    """dist_path -> {judge: score}. Butteraugli negated (higher=better uniformly)."""
+    """dist_path -> {judge: score}. Butteraugli and DVIFM (distances) negated (higher=better uniformly)."""
     out = defaultdict(dict)
     specs = [
         ("ssim2", f"{RD}/judge_ssim2.tsv", ("ssim2", "ssim2_gpu"), +1),
         ("butter", f"{RD}/judge_butteraugli.tsv", ("butteraugli_pnorm3", "butteraugli_max"), -1),
         ("zensim", f"{RD}/judge_zensim.tsv", ("zensim",), +1),
+        ("dvifm", f"{RD}/judge_dvifm.tsv", ("jnd",), -1),
+        # ColorVideoVDP (JOD), CPU; the column name carries the implementation's version.
+        ("cvvdp", f"{RD}/judge_cvvdp.tsv", ("cvvdp_cpu_imazen_v*",), +1),
     ]
     for name, path, cols, sign in specs:
         if not os.path.exists(path):
             continue
         with open(path) as f:
-            for r in csv.DictReader(f, delimiter="\t"):
+            rows = csv.DictReader(f, delimiter="\t")
+            cols = [h for k in cols for h in rows.fieldnames or []
+                    if h == k or (k.endswith("*") and h.startswith(k[:-1]))]
+            for r in rows:
                 v = next((r[c] for c in cols if c in r and r[c] not in ("", "nan")), None)
                 if v is not None:
                     out[r["dist_path"]][name] = sign * float(v)
@@ -86,8 +100,9 @@ def fmt_saved(saved, drivers, judges=("ssim2", "butter", "zensim")):
         "| driver | class | " + " | ".join(f"{j} med% (n)" for j in judges) + " |",
         "|---|---|" + "---|" * len(judges),
     ]
+    classes = sorted({cls for (_, _, cls) in saved}) or ["photo", "screen"]
     for d in drivers:
-        for cls in ("photo", "screen"):
+        for cls in classes:
             cells = []
             for j in judges:
                 v = saved.get((j, d, cls), [])
@@ -1545,7 +1560,60 @@ def shipgates_rd_main():
     print(json.dumps({k:v for k,v in result.items() if k not in ["per_source","summary"]},indent=2))
 
 
+def paired_vs_main():
+    """Arms against one baseline arm at equal judged score (`--paired-vs LABEL`): per image the median bytes saved
+    over its matched points, then the mean over images with a 95% bootstrap interval over images (2,000 resamples,
+    seed 1). Positive means fewer bytes than the baseline arm at the same judged quality."""
+    import glob
+    import random
+    base = sys.argv[sys.argv.index("--paired-vs") + 1]
+    judges = load_judges()
+    cells = []
+    for mf in glob.glob(f"{RD}/jxl/manifest_*.tsv"):
+        with open(mf) as f:
+            for r in csv.DictReader(f, delimiter="\t"):
+                cells.append({"image": r["image"], "label": r["label"], "bytes": int(r["bytes"]),
+                              "dist_path": r["dist_path"]})
+    frontiers = defaultdict(list)
+    for c in cells:
+        if c["label"] == base:
+            for j, sc in judges.get(c["dist_path"], {}).items():
+                frontiers[(j, c["image"])].append((sc, c["bytes"]))
+    per_img = defaultdict(lambda: defaultdict(list))
+    for c in cells:
+        if c["label"] in (base, "none"):
+            continue
+        for j, sc in judges.get(c["dist_path"], {}).items():
+            b = interp_bytes(frontiers.get((j, c["image"]), []), sc)
+            if b and b > 0:
+                for cls in (CLASS.get(c["image"], "photo"), "all"):
+                    per_img[(j, c["label"], cls)][c["image"]].append(1.0 - c["bytes"] / b)
+    rng = random.Random(1)
+    out = [f"# Arms against `{base}` at equal judged score: mean over images of each image's median bytes saved, "
+           "95% bootstrap interval over images\n"]
+    labels = sorted({k[1] for k in per_img})
+    present = [j for j in ("ssim2", "butter", "zensim", "dvifm", "cvvdp") if any(k[0] == j for k in per_img)]
+    for cls in ["all", *sorted({k[2] for k in per_img} - {"all"})]:
+        out.append(f"\n## {cls}\n\n| arm | " + " | ".join(f"{j} %" for j in present) + " | images |\n|---|"
+                   + "---|" * len(present) + "---|")
+        for lab in labels:
+            row, n = [], 0
+            for j in present:
+                d = per_img.get((j, lab, cls))
+                if not d:
+                    row.append("—")
+                    continue
+                meds = [st.median(d[i]) for i in sorted(d)]
+                boots = sorted(st.mean([meds[rng.randrange(len(meds))] for _ in meds]) for _ in range(2000))
+                row.append(f"{100 * st.mean(meds):+.2f} [{100 * boots[50]:+.2f}, {100 * boots[1949]:+.2f}]")
+                n = max(n, len(meds))
+            out.append(f"| {lab} | " + " | ".join(row) + f" | {n} |")
+    print("\n".join(out))
+
+
 def main():
+    if "--paired-vs" in sys.argv:
+        return paired_vs_main()
     if "--shipgates-rd" in sys.argv:
         return shipgates_rd_main()
     if "--model-preferences" in sys.argv:
@@ -1571,16 +1639,18 @@ def main():
     if jxl:
         drivers = sorted({c["label"] for c in jxl} - {"none"})
         out.append("## jxl-encoder — bytes saved vs `none` baseline at equal judged score\n")
-        out.append(fmt_saved(helpful(jxl, "none", judges, "jxl"), drivers))
+        present = tuple(j for j in ("ssim2", "butter", "zensim", "dvifm", "cvvdp") if any(j in v for v in judges.values()))
+        out.append(fmt_saved(helpful(jxl, "none", judges, "jxl"), drivers, present))
         out.append("\n### efficiency (median encode_ms per image class)\n")
         eff = defaultdict(list)
         for c in jxl:
             eff[(c["label"], CLASS.get(c["image"], "photo"))].append(c["ms"])
-        out.append("| driver | photo ms | screen ms |")
-        out.append("|---|---|---|")
+        classes = sorted({cls for (_, cls) in eff})
+        out.append("| driver | " + " | ".join(f"{c} ms" for c in classes) + " |")
+        out.append("|---|" + "---|" * len(classes))
         for d in ["none", *drivers]:
-            p = eff.get((d, "photo"), []); s = eff.get((d, "screen"), [])
-            out.append(f"| {d} | {st.median(p):.0f} | {st.median(s):.0f} |" if p and s else f"| {d} | — | — |")
+            out.append(f"| {d} | " + " | ".join(f"{st.median(eff[(d, c)]):.0f}" if eff.get((d, c)) else "—"
+                                              for c in classes) + " |")
 
     # ---- zenjpeg ----
     zp = f"{RD}/zenjpeg/probe.tsv"

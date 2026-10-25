@@ -123,7 +123,8 @@ fn superseded_palette_revision_refuses() {
 #[test]
 fn private_palette_identity_preserves_supported_token_vocabulary() {
     use zensim::feature_set_id::{ComputeParts, ComputeToken, FeatureSetId};
-    assert_eq!(ComputeToken::ALL.len(), 20);
+    // 20 through gmsnative, plus globaff (formula revision 6).
+    assert_eq!(ComputeToken::ALL.len(), 21);
     assert_eq!(ComputeToken::Gridblk as u32, 13);
     assert_eq!(ComputeToken::parse("palette"), None);
     let id = FeatureSetId::parse("palette@w1867/palette_v2#30b09cd1").unwrap();

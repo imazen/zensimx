@@ -1,0 +1,5 @@
+bake	tier	case	class	size	A_ms	B_ms	delta	ci95_lo	ci95_hi
+b	v4x	syn64	synthetic	64x64	0.2525	0.2631	+4.22%	+3.92%	+4.62%
+b	v4x	syn256	synthetic	256x256	1.6139	1.6732	+3.65%	+3.50%	+3.98%
+b	v4x	syn1024	synthetic	1024x1024	20.2733	20.9170	+3.20%	+2.97%	+3.29%
+b	v4x	syn2048	synthetic	2048x2048	78.3560	80.6379	+2.94%	+2.61%	+3.26%

@@ -35,6 +35,9 @@ ARMS = {"a": "sel:3b7bd5ebe929@h32:H128:cv16:cf98", "c": "sel:3b7bd5ebe929@h32:H
 
 
 MODELS_OVERRIDE = None  # {name: (path, sha256, cell or None)} from --models: an explicit qualification model set
+# The process formula revision of the pixel gates (NEARID, identity, steering); the by-construction revision-7 models set
+# "7" (scripts/byconstruction/gates.py --formula-rev). Every registered gate ran at "5".
+FORMULA_REV = "5"
 
 
 def candidates(seed=0):
@@ -86,7 +89,7 @@ def nearid(arm, seed):
         return
     root.mkdir(parents=True, exist_ok=True)
     run([str(BIN / "serve_custom_bake"), "--nearid", str(NEARID_PACKET), str(root), f"candidate-{arm}", str(model),
-         digest], root / f"candidate-{arm}.run.log", {"ZENSIM_FORMULA_REV": "5"})
+         digest], root / f"candidate-{arm}.run.log", {"ZENSIM_FORMULA_REV": FORMULA_REV})
     run([sys.executable, str(REPO / "scripts/prodqual_label_free.py"), "--nearid-candidate", str(root), arm],
         root / f"candidate-{arm}.gates.log")
 
@@ -100,7 +103,7 @@ def verdict(arm, seed, grid):
     run(["just", "--justfile", str(REPO / "benchmarks/adjudicate_land.just"), "--working-directory", str(REPO),
          "bake-verdict-engineering", str(BIN / "bake_verdict"), str(model), str(NO_HUMAN),
          str(INSTRUMENTS / f"{grid}.parquet"), str(INSTRUMENTS / "negtail.parquet"),
-         str(INSTRUMENTS / "identity.parquet"), str(NO_INTEGRITY), str(out)], out.parent / f"{grid}.log")
+         str(INSTRUMENTS / "identity.parquet"), str(NO_INTEGRITY), str(out), FORMULA_REV], out.parent / f"{grid}.log")
 
 
 def identity(seed):
@@ -110,7 +113,7 @@ def identity(seed):
         return
     run([str(BIN / "serve_custom_bake"), "--e33-identity", str(E / "E3_SOURCES.json"),
          str(REPO / "scripts/rev4_featpot/e33_fx1_declaration.json"), str(PRODUCTION), str(out),
-         *(str(found[a][0]) for a in sorted(found))], GATES / f"identity-s{seed}.log", {"ZENSIM_FORMULA_REV": "5"})
+         *(str(found[a][0]) for a in sorted(found))], GATES / f"identity-s{seed}.log", {"ZENSIM_FORMULA_REV": FORMULA_REV})
 
 
 def steer(arm, seed):
@@ -127,7 +130,7 @@ def steer(arm, seed):
         f.write(json.dumps(doc, indent=1) + "\n")
     run([str(BIN / "steer_instrument"), "metric::bake::steerfix_packet::engineering_packet", "--exact",
          "--nocapture"], GATES / f"steer-s{seed}-{arm}.log",
-        {"ZENSIM_FORMULA_REV": "5", "ZENSIM_NEIGHBOUR_EXACT": "1", "STEERFIX_PACKET": str(packet)})
+        {"ZENSIM_FORMULA_REV": FORMULA_REV, "ZENSIM_NEIGHBOUR_EXACT": "1", "STEERFIX_PACKET": str(packet)})
 
 
 def identity_rows(path):
@@ -350,7 +353,7 @@ def steer_diagnose(arm, neighbour):
                            indent=1) + "\n")
     run([str(BIN / "steer_instrument"), "metric::bake::steerfix_packet::engineering_packet", "--exact",
          "--nocapture"], GATES / f"{name}.log",
-        {"ZENSIM_FORMULA_REV": "5", "ZENSIM_NEIGHBOUR_EXACT": "1" if neighbour else "0", "STEERFIX_PACKET": str(packet)})
+        {"ZENSIM_FORMULA_REV": FORMULA_REV, "ZENSIM_NEIGHBOUR_EXACT": "1" if neighbour else "0", "STEERFIX_PACKET": str(packet)})
 
 
 def steer_dense(arm):
@@ -372,7 +375,7 @@ def steer_dense(arm):
         f.write(json.dumps(doc, indent=1) + "\n")
     run([str(BIN / "steer_instrument"), "metric::bake::steerfix_packet::engineering_packet", "--exact",
          "--nocapture"], GATES / f"steer-s0-{arm}-dense.log",
-        {"ZENSIM_FORMULA_REV": "5", "ZENSIM_NEIGHBOUR_EXACT": "1", "STEERFIX_PACKET": str(packet)})
+        {"ZENSIM_FORMULA_REV": FORMULA_REV, "ZENSIM_NEIGHBOUR_EXACT": "1", "STEERFIX_PACKET": str(packet)})
 
 
 def k4_full(*, fitbin=None, bounds=None, calibration_input=None):
@@ -430,7 +433,7 @@ def k4_full(*, fitbin=None, bounds=None, calibration_input=None):
             if not pred.exists():
                 run([str(fitbin), "predict", "--bake", str(stripped), "--corpus",
                      str(root / f"{name}.scored-input.parquet"), "--score-units", "--out", str(pred)],
-                    root / f"{arm}-{name}.raw.log", {"ZENSIM_FORMULA_REV": "5"})
+                    root / f"{arm}-{name}.raw.log", {"ZENSIM_FORMULA_REV": FORMULA_REV})
             with pred.open() as f:
                 raw = [float(r["pred"]) for r in csv.DictReader(f, delimiter="\t")]
             assert len(raw) == inputs[name]["rows"]
@@ -448,7 +451,7 @@ def k4_full(*, fitbin=None, bounds=None, calibration_input=None):
             packet.write_text(json.dumps(doc, indent=1) + "\n")
             run([str(BIN / "steer_instrument"), "metric::bake::steerfix_packet::engineering_packet", "--exact",
                  "--nocapture"], root / f"{arm}-steer-raw.log",
-                {"ZENSIM_FORMULA_REV": "5", "ZENSIM_NEIGHBOUR_EXACT": "1", "STEERFIX_PACKET": str(packet)})
+                {"ZENSIM_FORMULA_REV": FORMULA_REV, "ZENSIM_NEIGHBOUR_EXACT": "1", "STEERFIX_PACKET": str(packet)})
         import struct
         f64 = lambda bits: struct.unpack("<d", struct.pack("<Q", bits))[0]
         forwards = [f64(b) for r in json.loads(steer.read_text())["rows"]
@@ -481,7 +484,7 @@ def head_probe(head):
     found = candidates(0)
     with open(GATES / "head-probe.log", "x") as log, open(out, "x") as f:
         subprocess.run([str(BIN / "serve_custom_bake"), "--head-probe", str(head), *(str(found[a][0]) for a in sorted(found))],
-                       stdout=f, stderr=log, check=True, env={**os.environ, "ZENSIM_FORMULA_REV": "5"})
+                       stdout=f, stderr=log, check=True, env={**os.environ, "ZENSIM_FORMULA_REV": FORMULA_REV})
 
 
 def inspect():
@@ -516,7 +519,7 @@ def served_identity():
     found = candidates(0)
     with open(GATES / "served-identity.log", "x") as log, open(out, "x") as f:
         subprocess.run([str(BIN / "serve_custom_bake"), "--pairs", str(pairs), *(str(found[a][0]) for a in sorted(found))],
-                       stdout=f, stderr=log, check=True, env={**os.environ, "ZENSIM_FORMULA_REV": "5"})
+                       stdout=f, stderr=log, check=True, env={**os.environ, "ZENSIM_FORMULA_REV": FORMULA_REV})
 
 
 def main():

@@ -2520,3 +2520,33 @@ provenance states its author constants were trained on AIC2026; this
 comparison is not an unseen-corpus test for DVIFM. Original target and
 image hashes remain bound.
 [Complete results and runtime bindings](../benchmarks/jnd_reconstruction_b_2026-10-19.pointer.md).
+
+
+## Exposure ledger — 2026-10-23: AIC2026 reconstructed-JND labels fitted under source-held-out folds (explore/byconstruction)
+
+The owner's goal of 2026-10-23 asks for SROCC above 0.99 on **"AIC2026 TRAIN"** without memorization. That is WG1's
+`public_train` split (document m112107, preliminary public-split JND reconstruction, CSV SHA-256 `bd5ea3c5…`):
+3,920 PTC crops of 28 sources, label `JND_score`. On the `explore/byconstruction` branch only, these labels are
+**fitted** by exploration models (Python, and the Rust trainer in `--historical-replay` research mode) under
+source-held-out folds; every reported AIC2026 number is a frozen model's score or an out-of-fold prediction.
+
+- **Before the split was found**, the same day, the owner-supplied `JND_curve` overlay (CSV `5bdbf540…`) of all 42
+  labelled sources was fitted under 6 source folds. That includes the 14 `public_test` sources, so `public_test`
+  informed this study's design choices; it is read only to assess frozen candidates and is not a clean test for them.
+- **Frozen reads:** B, full-data T and full-data M, each once, without fit. On the official public_test labels: frozen B
+  once, and the candidate chosen by the committed rule (Tga, full-data fit, bake `2664b4c7…`) once. Both are
+  development numbers, not clean tests (public_test sources were inside the first phase's fits).
+- **Untouched:** the 28 unlabelled AIC2026 sources, AIC-3, AIC-4, SDR25, CID22 gold, KonJND JPEG, CSIQ and every
+  secret holdout.
+- **Not changed:** the main-line role of AIC2026 (§3d), the strict route's AIC-family refusal
+  (`v2_human_role.py`) and the protected-population guards. Main-line adoption needs the owner's explicit decision.
+- **Later the same day (owner-requested evaluation, no fit):** DVIFM 0.3 (frozen dvifmish `port-lap-v0.3` runtime) was
+  scored once on the four E21 populations (KADID TRAIN+SELECT 7,869, TID2013 3,000, KonFiG TRAIN+VAL 756, CID22-A(25)
+  2,192; one more model label on these already-exposed populations) and on the label-free mixture images. Smoothness
+  statistics (logistic-fit error tails, zenstats geometry) and per-distortion-type panels were computed on the stored
+  E21 and public_train predictions of the existing arms. No AIC2026 public_test label was loaded: its frozen-B panel
+  row is a stored copy (`panel_public_test_frozen.json`), and the dashboard builder loads only the key, source and
+  codec columns of its pairs list.
+
+Record: `benchmarks/byconstruction_2026-10-22.md`, sections "AIC2026 TRAIN", "Smoothness" and "DVIFM 0.3 on the E21
+sets".

@@ -1,0 +1,413 @@
+<title>Global-Edit Picker</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a viewing bench. A slim control rail, a neutral-grey stage holding the images at exact pixel zoom,
+   a decision bar under the stage, then the verdict and the running tally. */
+:root {
+  --bg: #f3f4f2;
+  --panel: #ffffff;
+  --fg: #1d2421;
+  --muted: #5d6762;
+  --line: #d6dbd8;
+  --accent: #1f6f78;       /* teal: focus, primary action */
+  --accent-fg: #ffffff;
+  --warn: #b5541a;         /* a model rated the noisy image higher */
+  --ok: #2d7a46;
+  /* Viewing surround: mid-grey, identical in both themes on purpose, so the page theme never shifts what the
+     images look like (the convention of BT.500-style viewing). */
+  --stage: #7a7a7a;
+  --stage-fg: #f4f4f4;
+  --ui: "Instrument Sans", "Segoe UI", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --r: 8px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #161b19; --panel: #1e2422; --fg: #e4e9e6; --muted: #9aa5a0; --line: #333c38;
+    --accent: #5fb3bc; --accent-fg: #0d1f21; --warn: #e3894d; --ok: #6cc28a; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #161b19; --panel: #1e2422; --fg: #e4e9e6; --muted: #9aa5a0; --line: #333c38;
+  --accent: #5fb3bc; --accent-fg: #0d1f21; --warn: #e3894d; --ok: #6cc28a; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--fg); font-family: var(--ui); font-size: 15px; line-height: 1.5;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 20px 40px;
+}
+.wrap { max-width: 1240px; margin: 0 auto; display: grid; gap: 16px; }
+h1 { font-size: 1.45rem; font-weight: 600; margin: 0; letter-spacing: -0.01em; text-wrap: balance; }
+h2 { font-size: 1.02rem; font-weight: 600; margin: 0; text-wrap: balance; }
+p { margin: 0; }
+.lede { color: var(--muted); max-width: 70ch; }
+.rail { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; }
+.field { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; background: var(--panel); }
+.seg button { font: inherit; font-size: 13px; color: var(--fg); background: none; border: 0; padding: 6px 11px; cursor: pointer; }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-fg); }
+button:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+select { font: inherit; font-size: 13px; color: var(--fg); background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 5px 8px; }
+.progress { margin-left: auto; font-family: var(--mono); font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.stage { background: var(--stage); color: var(--stage-fg); border-radius: var(--r); padding: 18px; min-height: 300px; display: grid; place-items: center; overflow-x: auto; }
+.views { display: flex; flex-wrap: wrap; gap: 16px; justify-content: center; align-items: flex-start; }
+figure { margin: 0; display: grid; gap: 6px; justify-items: center; }
+figcaption { font-family: var(--mono); font-size: 12px; letter-spacing: 0.04em; text-transform: uppercase; }
+figure img { display: block; image-rendering: pixelated; image-rendering: crisp-edges; max-width: none; }
+.stack figure img { max-width: 100%; height: auto; }
+.flash { font-weight: 500; }
+.decide { display: grid; grid-template-columns: 1fr auto 1fr; gap: 10px; }
+.decide button { font: inherit; font-size: 15px; padding: 12px 14px; border-radius: var(--r); border: 1px solid var(--line); background: var(--panel); color: var(--fg); cursor: pointer; }
+.decide button.primary { border-color: var(--accent); }
+.decide button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
+.decide kbd, .keys kbd { font-family: var(--mono); font-size: 11px; border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; margin-left: 6px; color: var(--muted); }
+.decide button[aria-pressed="true"] kbd { color: inherit; border-color: currentColor; }
+.keys { font-size: 12px; color: var(--muted); }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 16px; display: grid; gap: 10px; min-width: 0; }
+.verdict-head { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: baseline; }
+.chip { font-family: var(--mono); font-size: 12px; padding: 1px 8px; border-radius: 999px; border: 1px solid currentColor; }
+.chip.inv { color: var(--warn); }
+.chip.ctl { color: var(--muted); }
+.twrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 13px; font-variant-numeric: tabular-nums; }
+th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+th { color: var(--muted); font-weight: 500; }
+td.num, th.num { text-align: right; font-family: var(--mono); }
+.up { color: var(--warn); }
+.down { color: var(--ok); }
+.nav { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.nav button { font: inherit; font-size: 14px; padding: 8px 14px; border-radius: var(--r); border: 1px solid var(--line); background: var(--panel); color: var(--fg); cursor: pointer; }
+.nav button.go { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
+.nav button:disabled { opacity: 0.45; cursor: default; }
+.note { font-size: 13px; color: var(--muted); }
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr)); gap: 16px; }
+@media (max-width: 560px) { .decide { grid-template-columns: 1fr; } .progress { margin-left: 0; } }
+</style>
+
+<div class="wrap">
+  <header style="display:grid;gap:6px">
+    <h1>Global-Edit Picker</h1>
+    <p class="lede">Each round shows a reference and two versions of it. Both carry the same global edit (brightness, contrast or saturation); one also has noise added on top. Pick the version that looks less bad against the reference. The mixture test counts it as an inversion whenever a model scores the noisy one higher; this page checks whether people agree that the noisy one is worse.</p>
+  </header>
+
+  <div class="rail" role="group" aria-label="Viewing controls">
+    <span class="field">View
+      <span class="seg" id="mode">
+        <button type="button" data-mode="side" aria-pressed="true">Side by side</button>
+        <button type="button" data-mode="flickab" aria-pressed="false">Flicker A ↔ B</button>
+        <button type="button" data-mode="flickref" aria-pressed="false">Flicker with reference</button>
+      </span>
+    </span>
+    <label class="field" for="zoom">Zoom
+      <select id="zoom"><option value="fit">Fit</option><option value="1">1×</option><option value="2">2×</option><option value="3">3×</option><option value="4">4×</option></select>
+    </label>
+    <label class="field" for="rate">Flicker
+      <select id="rate"><option value="2">2 swaps/s</option><option value="4" selected>4 swaps/s</option><option value="6">6 swaps/s</option></select>
+    </label>
+    <span class="progress" id="progress">—</span>
+  </div>
+
+  <div class="stage" id="stage"><p>Loading the rounds…</p></div>
+  <p class="keys" id="keyhint">Keys: <kbd>1</kbd> or <kbd>←</kbd> A is less bad · <kbd>2</kbd> or <kbd>↓</kbd> can’t tell · <kbd>3</kbd> or <kbd>→</kbd> B is less bad · <kbd>Enter</kbd> next · <kbd>Backspace</kbd> previous · <kbd>Space</kbd> pause or swap the flicker · <kbd>F</kbd> next view</p>
+
+  <div class="decide" role="group" aria-label="Your pick">
+    <button type="button" id="pick-a" class="primary">A is less bad<kbd>1</kbd></button>
+    <button type="button" id="pick-tie">Can’t tell<kbd>2</kbd></button>
+    <button type="button" id="pick-b" class="primary">B is less bad<kbd>3</kbd></button>
+  </div>
+
+  <section class="panel" id="verdict" aria-live="polite">
+    <p class="note">Pick a side to see which image had the noise and how each model scored this round.</p>
+  </section>
+
+  <div class="nav">
+    <button type="button" id="prev">Previous</button>
+    <button type="button" id="next" class="go">Next round</button>
+    <button type="button" id="jump">Next unanswered</button>
+    <span class="note" id="savestate"></span>
+  </div>
+
+  <div class="grid2">
+    <section class="panel">
+      <h2>Your picks so far</h2>
+      <div id="tally"><p class="note">No picks yet. Your tally by edit and noise type appears here.</p></div>
+    </section>
+    <section class="panel">
+      <h2>Agreement with each model</h2>
+      <p class="note">Share of your decided rounds (ties left out) where the model’s preference matches yours. A model prefers the noisy version when it scores it higher; for Tga, Tga128, Bga, M64 and Tgg that is the mean over 12 cells.</p>
+      <div id="agree"><p class="note">Appears after your first decided pick.</p></div>
+    </section>
+  </div>
+  <p class="note">Images: 48 imazen-26 TRAIN references at 256 px from the by-construction mixture test (branch explore/byconstruction), with global edits and BT.601 noise applied by <code>mixture_test.py --d1 global</code>. 49 rounds are steps where B or a Tga cell scored the noisy version higher; 11 are controls where no model did. Sides and order are fixed by a seed.</p>
+</div>
+
+<script type="application/json" id="picker-data">__PICKER_DATA__</script>
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const S = { items: [], img: {}, i: 0, picks: {}, mode: 'side', flickOn: true, flickTimer: null, flickPhase: 0 };
+  const U = (path) => S.img[path] || path;
+  const NEXT_MODE = { side: 'flickab', flickab: 'flickref', flickref: 'side' };
+  let store = null;          // {save(picks)} once db or local storage is ready
+  let saving = Promise.resolve();
+  const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (reduceMotion) S.flickOn = false;
+
+  const fmt = (v, u) => (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(v).toFixed(u === 'JND' ? 3 : 2) + (u === 'JND' ? ' JND' : '');
+  const cur = () => S.items[S.i];
+
+  // ---------- persistence: db (per viewer, private) with a browser fallback
+  function local() {
+    const K = 'globaledit-picks-v1';
+    return {
+      kind: 'local',
+      load: async () => { try { return JSON.parse(localStorage.getItem(K) || '{}'); } catch { return {}; } },
+      save: async (p) => { try { localStorage.setItem(K, JSON.stringify(p)); } catch { /* storage unavailable */ } },
+    };
+  }
+  async function connect() {
+    try {
+      const [db, user] = await Promise.all([window.claude?.use?.('db') ?? null, window.claude?.use?.('user') ?? null]);
+      const uid = user ? await user.id() : null;
+      if (db && uid) {
+        const ref = db.doc('data/users/' + uid + '/globaledit');
+        return {
+          kind: 'db',
+          load: async () => { const s = await ref.get(); return (s.exists && s.data().picks) || {}; },
+          save: async (p) => ref.set({ picks: p, updated: new Date().toISOString(), schema: 'globaledit-picker-v1' }),
+        };
+      }
+    } catch { /* fall through */ }
+    return local();
+  }
+  function persist() {
+    if (!store) return;
+    const snapshot = JSON.parse(JSON.stringify(S.picks));
+    $('savestate').textContent = 'Saving…';
+    saving = saving.then(() => store.save(snapshot)).then(
+      () => { $('savestate').textContent = store.kind === 'db' ? 'Saved to this page.' : 'Saved in this browser only; Claude cannot read these picks.'; },
+      (e) => { $('savestate').textContent = 'Could not save this pick (' + (e && e.code ? e.code : 'error') + '); it is kept until you leave the page.'; });
+  }
+
+  // ---------- rendering
+  function zoomFor(w) {
+    const z = $('zoom').value;
+    if (z !== 'fit') return Number(z);
+    const avail = $('stage').clientWidth - 36;
+    const per = S.mode === 'side' ? 3 : S.mode === 'flickref' ? 2 : 1;
+    return Math.max(1, Math.floor((avail - 16 * (per - 1)) / (per * w)));
+  }
+  function img(src, label) {
+    const f = document.createElement('figure');
+    const im = new Image();
+    im.alt = label + ' image';
+    im.decoding = 'async';
+    im.src = U(src);
+    const cap = document.createElement('figcaption');
+    cap.textContent = label;
+    f.append(im, cap);
+    return { f, im, cap };
+  }
+  function sizeAll(ims) {
+    const it = cur();
+    const probe = ims[0].im;
+    const apply = () => {
+      const w = probe.naturalWidth || 256;
+      const z = zoomFor(w);
+      const narrow = $('stage').clientWidth - 36 < w * (S.mode === 'side' ? 3 : 1);
+      $('stage').firstChild.classList.toggle('stack', narrow && $('zoom').value === 'fit');
+      for (const x of ims) { x.im.width = (x.im.naturalWidth || w) * z; x.im.height = (x.im.naturalHeight || w) * z; }
+      void it;
+    };
+    if (probe.complete && probe.naturalWidth) apply(); else probe.addEventListener('load', apply, { once: true });
+  }
+  function stopFlicker() { if (S.flickTimer) { clearInterval(S.flickTimer); S.flickTimer = null; } }
+  function render() {
+    stopFlicker();
+    const it = cur();
+    if (!it) return;
+    const stage = $('stage');
+    stage.innerHTML = '';
+    const views = document.createElement('div');
+    views.className = 'views';
+    stage.appendChild(views);
+    if (S.mode === 'side') {
+      const parts = [img(it.ref, 'Reference'), img(it.a, 'A'), img(it.b, 'B')];
+      parts.forEach((p) => views.appendChild(p.f));
+      sizeAll(parts);
+    } else if (S.mode === 'flickab') {
+      const one = img(it.a, 'A');
+      views.appendChild(one.f);
+      sizeAll([one]);
+      const show = () => { const b = S.flickPhase % 2 === 1; one.im.src = U(b ? it.b : it.a); one.cap.textContent = b ? 'B' : 'A'; };
+      show();
+      if (S.flickOn) S.flickTimer = setInterval(() => { S.flickPhase++; show(); }, 1000 / Number($('rate').value));
+      S.showFlick = show;
+    } else {
+      const left = img(it.ref, 'Reference ↔ A'), right = img(it.ref, 'Reference ↔ B');
+      views.append(left.f, right.f);
+      sizeAll([left, right]);
+      const show = () => {
+        const on = S.flickPhase % 2 === 1;
+        left.im.src = U(on ? it.a : it.ref); right.im.src = U(on ? it.b : it.ref);
+        left.cap.textContent = on ? 'A' : 'Reference'; right.cap.textContent = on ? 'B' : 'Reference';
+      };
+      show();
+      if (S.flickOn) S.flickTimer = setInterval(() => { S.flickPhase++; show(); }, 1000 / Number($('rate').value));
+      S.showFlick = show;
+    }
+    // preload the next round
+    const nx = S.items[S.i + 1];
+    if (nx) [nx.ref, nx.a, nx.b].forEach((s) => { const p = new Image(); p.src = U(s); });
+    const answered = Object.keys(S.picks).length;
+    $('progress').textContent = `Round ${S.i + 1} of ${S.items.length} · ${answered} answered`;
+    $('prev').disabled = S.i === 0;
+    $('next').disabled = S.i === S.items.length - 1;
+    const pick = S.picks[it.id];
+    for (const [id, c] of [['pick-a', 'a'], ['pick-tie', 'tie'], ['pick-b', 'b']]) $(id).setAttribute('aria-pressed', String(!!pick && pick.choice === c));
+    renderVerdict();
+  }
+  function renderVerdict() {
+    const it = cur(), pick = S.picks[it.id], box = $('verdict');
+    box.innerHTML = '';
+    if (!pick) {
+      const p = document.createElement('p'); p.className = 'note';
+      p.textContent = 'Pick a side to see which image had the noise and how each model scored this round.';
+      box.appendChild(p);
+      return;
+    }
+    const noisy = it.noisy.toUpperCase(), clean = it.noisy === 'a' ? 'B' : 'A';
+    const head = document.createElement('div'); head.className = 'verdict-head';
+    const h = document.createElement('h2');
+    h.textContent = pick.choice === 'tie' ? 'You could not tell them apart.'
+      : pick.choice === it.noisy ? `You found the noisy version (${noisy}) less bad.` : `You found the noise-free version (${clean}) less bad.`;
+    const chip = document.createElement('span');
+    chip.className = 'chip ' + (it.kind === 'inversion' ? 'inv' : 'ctl');
+    chip.textContent = it.kind === 'inversion' ? 'a model inverted here' : 'control: no model inverted';
+    head.append(h, chip);
+    const p = document.createElement('p');
+    p.textContent = `${clean}: ${it.edit}. ${noisy}: the same edit, then ${it.noise}.`;
+    const tw = document.createElement('div'); tw.className = 'twrap';
+    const t = document.createElement('table');
+    t.innerHTML = '<thead><tr><th>Model</th><th>Prefers</th><th class="num">Score change from adding noise</th><th class="num">Cells rating noisy higher</th></tr></thead>';
+    const tb = document.createElement('tbody');
+    for (const m of it.models) {
+      const tr = document.createElement('tr');
+      const prefNoisy = m.mean_rise > 0;
+      const cells = [m.label, prefNoisy ? `noisy (${noisy})` : `noise-free (${clean})`, fmt(m.mean_rise, m.units), m.cells > 1 ? `${m.cells_rising} of ${m.cells}` : (m.cells_rising ? 'yes' : 'no')];
+      cells.forEach((v, k) => { const td = document.createElement('td'); td.textContent = v; if (k >= 2) td.className = 'num'; if (k === 2) td.classList.add(m.mean_rise > 0 ? 'up' : 'down'); tr.appendChild(td); });
+      tb.appendChild(tr);
+    }
+    t.appendChild(tb); tw.appendChild(t);
+    const note = document.createElement('p'); note.className = 'note';
+    note.textContent = 'Positive means the model scored the noisy version higher (an inversion under the mixture test). DVIFM is shown in JND, where it scores distance; its sign is flipped so positive still means it prefers the noisy version.';
+    box.append(head, p, tw, note);
+  }
+  function renderTally() {
+    const done = S.items.filter((it) => S.picks[it.id]);
+    const box = $('tally'), ag = $('agree');
+    if (!done.length) return;
+    const rows = new Map();
+    const add = (k, it) => {
+      const r = rows.get(k) || { n: 0, noisy: 0, clean: 0, tie: 0 };
+      const c = S.picks[it.id].choice;
+      r.n++; if (c === 'tie') r.tie++; else if (c === it.noisy) r.noisy++; else r.clean++;
+      rows.set(k, r);
+    };
+    done.forEach((it) => { add('All rounds', it); add(it.kind === 'inversion' ? 'Rounds where a model inverted' : 'Controls', it); add('Edit: ' + it.edit, it); add('Noise: ' + it.noise, it); });
+    const t = document.createElement('table');
+    t.innerHTML = '<thead><tr><th>Group</th><th class="num">Picks</th><th class="num">Noise-free less bad</th><th class="num">Noisy less bad</th><th class="num">Can’t tell</th></tr></thead>';
+    const tb = document.createElement('tbody');
+    for (const [k, r] of rows) {
+      const tr = document.createElement('tr');
+      [k, r.n, r.clean, r.noisy, r.tie].forEach((v, i) => { const td = document.createElement('td'); td.textContent = String(v); if (i) td.className = 'num'; tr.appendChild(td); });
+      tb.appendChild(tr);
+    }
+    t.appendChild(tb);
+    box.innerHTML = ''; const w = document.createElement('div'); w.className = 'twrap'; w.appendChild(t); box.appendChild(w);
+    const decided = done.filter((it) => S.picks[it.id].choice !== 'tie');
+    if (!decided.length) return;
+    const ids = done[0].models.map((m) => m.id);
+    const t2 = document.createElement('table');
+    t2.innerHTML = '<thead><tr><th>Model</th><th class="num">Agrees with you</th><th class="num">Rounds</th></tr></thead>';
+    const tb2 = document.createElement('tbody');
+    for (const id of ids) {
+      let agree = 0, label = '';
+      for (const it of decided) {
+        const m = it.models.find((x) => x.id === id); label = m.label;
+        const userNoisy = S.picks[it.id].choice === it.noisy, modelNoisy = m.mean_rise > 0;
+        if (userNoisy === modelNoisy) agree++;
+      }
+      const tr = document.createElement('tr');
+      [label, Math.round(100 * agree / decided.length) + '%', decided.length].forEach((v, i) => { const td = document.createElement('td'); td.textContent = String(v); if (i) td.className = 'num'; tr.appendChild(td); });
+      tb2.appendChild(tr);
+    }
+    t2.appendChild(tb2);
+    ag.innerHTML = ''; const w2 = document.createElement('div'); w2.className = 'twrap'; w2.appendChild(t2); ag.appendChild(w2);
+  }
+
+  // ---------- actions
+  function choose(c) {
+    const it = cur(); if (!it) return;
+    S.picks[it.id] = { choice: c, noisy: it.noisy, kind: it.kind, d1: it.d1, d2: it.d2, view: S.mode, at: new Date().toISOString() };
+    persist(); render(); renderTally();
+  }
+  function go(d) { const j = S.i + d; if (j >= 0 && j < S.items.length) { S.i = j; S.flickPhase = 0; render(); } }
+  function nextUnanswered() {
+    for (let k = 1; k <= S.items.length; k++) { const j = (S.i + k) % S.items.length; if (!S.picks[S.items[j].id]) { S.i = j; S.flickPhase = 0; render(); return; } }
+  }
+  function setMode(m) {
+    S.mode = m;
+    document.querySelectorAll('#mode button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.mode === m)));
+    render();
+  }
+  document.querySelectorAll('#mode button').forEach((b) => b.addEventListener('click', () => setMode(b.dataset.mode)));
+  $('zoom').addEventListener('change', render);
+  $('rate').addEventListener('change', render);
+  $('pick-a').addEventListener('click', () => choose('a'));
+  $('pick-b').addEventListener('click', () => choose('b'));
+  $('pick-tie').addEventListener('click', () => choose('tie'));
+  $('prev').addEventListener('click', () => go(-1));
+  $('next').addEventListener('click', () => go(1));
+  $('jump').addEventListener('click', nextUnanswered);
+  window.addEventListener('resize', () => { if (S.items.length) render(); });
+  document.addEventListener('keydown', (e) => {
+    if (e.target && (e.target.tagName === 'SELECT' || e.target.tagName === 'INPUT')) return;
+    if (e.target && e.target.tagName === 'BUTTON' && (e.key === 'Enter' || e.key === ' ')) return;
+    const k = e.key;
+    if (k === '1' || k === 'ArrowLeft') { choose('a'); e.preventDefault(); }
+    else if (k === '2' || k === 'ArrowDown') { choose('tie'); e.preventDefault(); }
+    else if (k === '3' || k === 'ArrowRight') { choose('b'); e.preventDefault(); }
+    else if (k === 'Enter') { go(1); e.preventDefault(); }
+    else if (k === 'Backspace') { go(-1); e.preventDefault(); }
+    else if (k === 'f' || k === 'F') { setMode(NEXT_MODE[S.mode]); }
+    else if (k === ' ' && S.mode !== 'side') {
+      e.preventDefault();
+      if (S.flickTimer) { stopFlicker(); S.flickOn = false; } else { S.flickPhase++; S.showFlick && S.showFlick(); }
+    } else if ((k === 'p' || k === 'P') && S.mode !== 'side') { S.flickOn = !S.flickOn; render(); }
+  });
+
+  // ---------- boot
+  (async () => {
+    try {
+      const data = JSON.parse(document.getElementById('picker-data').textContent);
+      S.items = data.items; S.img = data.images;
+    } catch {
+      $('stage').innerHTML = '<p>The rounds did not load. Reload the page to try again.</p>';
+      return;
+    }
+    render();
+    store = await connect();
+    try { S.picks = Object.assign(await store.load(), S.picks); } catch { /* keep in-page picks */ }
+    $('savestate').textContent = store.kind === 'db' ? 'Picks save to this page as you go.' : 'Picks save in this browser only; Claude cannot read them.';
+    const first = S.items.findIndex((it) => !S.picks[it.id]);
+    if (first >= 0 && S.picks[cur().id]) S.i = first;
+    render(); renderTally();
+  })();
+})();
+</script>

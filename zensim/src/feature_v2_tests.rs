@@ -4,6 +4,112 @@ pub(crate) mod tests {
     use crate::PixelFormat;
     use crate::source::{RgbSlice, StridedBytes};
 
+    /// `SplitMode::Amplitude` carries the SSIM member's soft peak and both deviation pools as mean pools of `d`,
+    /// with no peak or deviation polynomial left; the exact split keeps both.
+    #[cfg(feature = "custom-profiles")]
+    #[test]
+    fn amplitude_split_folds_the_ssim_pools_into_its_mean_pool() {
+        use crate::map_paint::SplitMode;
+        let n = 64usize;
+        let mut cell = AttrCellSums {
+            n,
+            ..Default::default()
+        };
+        for i in 0..n {
+            let v = 0.01 + 0.002 * i as f64;
+            cell.dense.sum_d += v;
+            cell.dense.sum_d2 += v * v;
+            cell.dense.sum_d3 += v * v * v;
+            cell.dense.sum_d4 += v * v * v * v;
+        }
+        cell.dense.ws_peak_ssim = WeightedSum { num: 0.5, den: 2.0 };
+        let mut s = vec![0.0; FEATURES_PER_CHANNEL_V2_TOTAL];
+        s[idx::SSIM_MEAN] = 1.0;
+        s[idx::SSIM_SOFT_PEAK] = 2.0;
+        s[idx::SSIM_DEV2] = 3.0;
+        s[idx::SSIM_DEV4] = 4.0;
+        let derive = |split| {
+            derive_v2app_coeffs(
+                &s,
+                None,
+                None,
+                0,
+                0,
+                &cell,
+                false,
+                false,
+                0.0,
+                FormulaRevision::Rev5,
+                split,
+            )
+        };
+        let (exact, amp) = (derive(SplitMode::Exact), derive(SplitMode::Amplitude));
+        let inv_n = 1.0 / n as f64;
+        assert!(exact.sp_ssim.0 != 0.0 && exact.dev_q.iter().any(|q| *q != 0.0));
+        assert_eq!(exact.c_ssim, -inv_n);
+        assert_eq!(amp.sp_ssim, (0.0, 0.0));
+        assert_eq!(amp.dev_q, [0.0; 5]);
+        assert!((amp.c_ssim + 10.0 * inv_n).abs() <= 1e-15, "{}", amp.c_ssim);
+    }
+
+    /// Revision 7's blockiness takes lane partials per `STRIP_ROWS` kernel strip, merged in strip order: the
+    /// whole-range form (`blockiness_sparse_rows`, the materialized walks) and the strip walk
+    /// (`blockiness_sparse_strip_wide` over reflected halo windows, as the streaming walk and its parallel jobs
+    /// call it) must give the same bits, for heights that end on and off a strip boundary and widths with and
+    /// without a lattice remainder.
+    #[test]
+    fn rev7_blockiness_strip_partials_match_the_whole_range_form() {
+        if !crate::ssim_form::run_at_revision(
+            "7",
+            "feature_v2::tests::rev7_blockiness_strip_partials_match_the_whole_range_form",
+            "REV7-BLOCKINESS-STRIPS-RAN",
+        ) {
+            return;
+        }
+        println!("REV7-BLOCKINESS-STRIPS-RAN");
+        use crate::featcanon::SumVar;
+        let mut state = 0x2545_f491_4f6c_dd1du64;
+        let mut next = move || {
+            state ^= state << 13;
+            state ^= state >> 7;
+            state ^= state << 17;
+            (state >> 40) as f32 / (1u64 << 24) as f32
+        };
+        for (w, h) in [(77usize, 300usize), (200, 256), (1031, 133), (64, 129), (9, 40)] {
+            let src: Vec<f32> = (0..w * h).map(|_| next()).collect();
+            let dst: Vec<f32> = src.iter().map(|&v| v + (next() - 0.5) * 0.1).collect();
+            let (whole_v, whole_h) = blockiness_sparse_rows(&src, &dst, w, 0, h);
+            let mode = crate::featcanon::mode(FormulaRevision::Rev7);
+            let (mut sv, mut sh) = (SumVar::f64_elems(mode), SumVar::f64_elems(mode));
+            let mut y0 = 0;
+            while y0 < h {
+                let strip_h = STRIP_ROWS.min(h - y0);
+                let wide_h = strip_h + 2 * HALO_P;
+                let (mut sw, mut dw) = (vec![0f32; w * wide_h], vec![0f32; w * wide_h]);
+                for i in 0..wide_h {
+                    let gy = reflect_101(y0 as isize - HALO_P as isize + i as isize, h);
+                    sw[i * w..(i + 1) * w].copy_from_slice(&src[gy * w..(gy + 1) * w]);
+                    dw[i * w..(i + 1) * w].copy_from_slice(&dst[gy * w..(gy + 1) * w]);
+                }
+                blockiness_sparse_strip_wide(
+                    &sw,
+                    &dw,
+                    w,
+                    y0,
+                    strip_h,
+                    FormulaRevision::Rev7,
+                    &mut sv,
+                    &mut sh,
+                );
+                y0 += strip_h;
+            }
+            assert!(matches!(sv, SumVar::L64(_)), "revision 7 runs on the eight-lane sums");
+            assert_eq!(whole_v.fin().to_bits(), sv.fin().to_bits(), "{w}x{h} vertical");
+            assert_eq!(whole_h.fin().to_bits(), sh.fin().to_bits(), "{w}x{h} horizontal");
+            assert!(whole_v.fin() > 0.0 && (h <= 8 || whole_h.fin() > 0.0), "{w}x{h}: terms ran");
+        }
+    }
+
     // Explicit calibration tool; compiled only by calibration_instrument.sh.
     #[cfg(gmsbank_calibration_instrument)]
     include!("gmsbank_calibration_instrument.rs");
@@ -279,19 +385,23 @@ pub(crate) mod tests {
             let na = (2.0 * m1 * m2 + C1_V2) as f32;
             let nb = (m1 * m1 + m2 * m2 + C1_V2) as f32;
             let nd = (ssq - m1 * m1 - m2 * m2 + C2_V2) as f32;
-            for (direct, s12) in [(true, s12_direct), (false, s12_prod)] {
-                let want = ssim_d_local(m1, m2, s12, ssq, direct);
-                let got = f64::from(ssim_d_px(
-                    na, nb, nd, m1 as f32, m2 as f32, s12 as f32, direct,
-                ));
-                assert!(
-                    (0.0..=2.0 + 1e-3).contains(&got),
-                    "d out of range: {got} (direct {direct})"
-                );
-                assert!(
-                    (got - want).abs() < 2e-3,
-                    "px {got} vs f64 {want} (direct {direct})"
-                );
+            // Both luminance forms: revision 7's `(m1 − m2)²` and the
+            // subtractive one before it.
+            for stable in [false, true] {
+                for (direct, s12) in [(true, s12_direct), (false, s12_prod)] {
+                    let want = ssim_d_local(m1, m2, s12, ssq, direct, stable);
+                    let got = f64::from(ssim_d_px(
+                        na, nb, nd, m1 as f32, m2 as f32, s12 as f32, direct, stable,
+                    ));
+                    assert!(
+                        (0.0..=2.0 + 1e-3).contains(&got),
+                        "d out of range: {got} (direct {direct}, stable {stable})"
+                    );
+                    assert!(
+                        (got - want).abs() < 2e-3,
+                        "px {got} vs f64 {want} (direct {direct}, stable {stable})"
+                    );
+                }
             }
         }
     }
@@ -3292,6 +3402,7 @@ pub(crate) mod tests {
                     mapdev: false,
                     z1max: false,
                     gmsnative: false,
+                    globaff: false,
                 };
                 let cs = ComputeSet::from_toggles(t);
                 // --- the legacy derivation, verbatim ---
@@ -6303,6 +6414,75 @@ pub(crate) mod tests {
                 with_reuse.features()[i].to_bits(),
                 "streamed scratch reuse changed f{i}"
             );
+        }
+    }
+
+    /// A declared-ID plan that reads no slot at scale 0 (no v1-era slot, no v2-era work) skips the scale-0 strips
+    /// whole, and every slot it does read is bit-identical to the full plan's.
+    #[test]
+    fn declared_plan_skips_unread_scales_bit_identically() {
+        use crate::feature_plan::Plan;
+        use crate::feature_set_id::SlotSet;
+        let (w, h) = (160, 128);
+        let mut st = 0x9e37_79b9u32;
+        let mut rnd = move || {
+            st ^= st << 13;
+            st ^= st >> 17;
+            st ^= st << 5;
+            st
+        };
+        let src: Vec<[u8; 3]> = (0..w * h)
+            .map(|i| {
+                let (x, y) = (i % w, i / w);
+                [((x * 7 + y * 3) % 256) as u8, ((x * x + y) % 256) as u8, ((y * 5 + x / 3) % 256) as u8]
+            })
+            .collect();
+        let dst: Vec<[u8; 3]> = src
+            .iter()
+            .map(|p| p.map(|v| v.saturating_add((rnd() % 7) as u8)))
+            .collect();
+        let (sref, dref) = (RgbSlice::new(&src, w, h), RgbSlice::new(&dst, w, h));
+        // basic + peaks + v2: the Rev5 families, so the test holds at every revision.
+        let all: Vec<usize> = (0..228).chain(372..720).collect();
+        let coarse: Vec<usize> = all
+            .iter()
+            .copied()
+            .filter(|&id| crate::feature_defs::def_at(id, 4).is_some_and(|d| d.scale >= 1))
+            .collect();
+        let full = Plan::derive(&SlotSet::from_slots(all), 720).unwrap();
+        let narrow = Plan::derive(&SlotSet::from_slots(coarse.iter().copied()), 720).unwrap();
+        assert_eq!(narrow.compute.v1_scales, 0b1110);
+        assert_eq!(narrow.compute.v2_scales & 1, 0);
+        let stray: Vec<usize> = narrow
+            .compute
+            .populated_slots(4, 720)
+            .iter_slots()
+            .filter(|&id| crate::feature_defs::def_at(id, 4).is_none_or(|d| d.scale == 0))
+            .collect();
+        assert!(stray.is_empty(), "a skipped scale must not be reported as populated: {stray:?}");
+        let run = |plan: &Plan| {
+            SKIPPED_SCALES.with_borrow_mut(|v| *v = 0);
+            let f = foldapp_streaming_walk(
+                &sref,
+                &dref,
+                false,
+                plan.toggles(),
+                crate::feature_v2_stream::FrontEnd::Sdr,
+                &mut V2Scratch::new(),
+                FoldWalkExtras {
+                    compute: Some(plan.compute),
+                    ..FoldWalkExtras::default()
+                },
+            )
+            .into_features();
+            (f, SKIPPED_SCALES.with_borrow(|v| *v))
+        };
+        let (f_full, skipped_full) = run(&full);
+        let (f_narrow, skipped_narrow) = run(&narrow);
+        assert_eq!(skipped_full, 0);
+        assert_eq!(skipped_narrow, 0b0001, "scale 0 must be skipped whole");
+        for &id in &coarse {
+            assert_eq!(f_full[id].to_bits(), f_narrow[id].to_bits(), "f{id} moved when scale 0 was skipped");
         }
     }
 

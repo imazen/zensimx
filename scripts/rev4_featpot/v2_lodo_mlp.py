@@ -73,6 +73,22 @@ def predict(bake: Path, table: Path, out: Path, *, research_palette_cached=False
     return pred
 
 
+def admit_coverage_keep(core_spec: str, keep: list[int], strict_admission: bool) -> None:
+    """The coverage pool carries ids below the ordinal width; a keep list reaching past it needs a pool that declares
+    those ids: the by-construction derived pool (ring_root.py globaff declares its research columns) or the E32
+    palette extension. Shared by the LODO cell and the full-data fit (v2_confirm_fit.py)."""
+    import v2_teacher
+    if max(keep) < v2_teacher.ORDINAL_WIDTH:
+        return
+    if not strict_admission:
+        raise ValueError(f"{core_spec}: the coverage pool has no f{v2_teacher.ORDINAL_WIDTH}+ (NaN); refusing this keep list")
+    pool_decl = json.loads((V2 / "e15" / f"{Path(v2_teacher.POOL_NAME).name}.manifest.json").read_text())
+    extra = {k for k in keep if k >= v2_teacher.ORDINAL_WIDTH}
+    if not ("byc_derived_from" in pool_decl and extra <= set(pool_decl.get("byc_globaff_ids", []))):
+        from e32_palette import coverage_extension
+        coverage_extension(V2 / "e15" / Path(v2_teacher.POOL_NAME).name, keep)
+
+
 def strict_group_input_roots(groups: list) -> tuple[Path, ...]:
     from v2_common import table_input_roots
     roots = []
@@ -146,7 +162,7 @@ def train_command(groups: list, init_seed: int, sample_seed: int, width: int, ke
     if "hdr_consensus" in recipe:
         from e29_consensus import trainer_options
         cmd += trainer_options(groups, recipe["hdr_consensus"])
-    if recipe.get("derived_inputs") in ("fx1", "fx2"):
+    if recipe.get("derived_inputs") in ("fx1", "fx2", "fx1nr", "fx1g", "fx1gs1", "fx1gg", "fx1gy", "fx1o", "fx1ns0"):
         from v2_common import derived_declaration
         declaration_path, _, decl = derived_declaration(recipe["derived_inputs"])
         if [int(x) for x in keep_file.read_text().split()] != decl["direct"]:
@@ -154,6 +170,33 @@ def train_command(groups: list, init_seed: int, sample_seed: int, width: int, ke
         cmd += ["--derived-inputs", str(declaration_path)]
     if head == "N":
         cmd.append("--nonneg-distance")
+    if recipe.get("mono_all") or recipe.get("thresholds") or recipe.get("ramps") or recipe.get("free_ramps"):
+        if head != "N" or recipe.get("monotone_cbc") or recipe.get("smooth_hinge") or recipe.get("steer_pairs"):
+            raise ValueError("by-construction tokens require the plain N head without E34 L/K or sh1")
+        if (recipe.get("ramps") or recipe.get("free_ramps")) and not (recipe.get("mono_all") and recipe.get("thresholds")):
+            raise ValueError("rp<N>/fr<N> require mono and thr")
+        if recipe.get("mono_all"):
+            cmd.append("--monotone-cbc")
+        if recipe.get("thresholds"):
+            cmd.append("--nonneg-thresholds")
+        if recipe.get("ramps"):
+            cmd += ["--monotone-ramps", str(recipe["ramps"])]
+        if recipe.get("free_ramps"):
+            cmd += ["--free-ramps", str(recipe["free_ramps"]), "--free-budget", repr(recipe["free_budget"])]
+    if recipe.get("free_mask"):
+        if not recipe.get("mono_all") or recipe.get("ramps") or recipe.get("free_ramps") or recipe.get("gated_products"):
+            raise ValueError("a free mask applies to the plain mono recipe, with or without max pairs")
+        cmd += ["--monotone-feature-mask", str(REPO / "scripts/byconstruction/masks" / f"{recipe['free_mask']}.tsv")]
+        if recipe.get("drop_masked"):
+            cmd.append("--monotone-strict")
+    if recipe.get("max_pairs"):
+        if not (recipe.get("mono_all") and recipe.get("thresholds")) or recipe.get("gated_products"):
+            raise ValueError("mp<N> requires mono and thr, without gate")
+        cmd += ["--max-pairs", str(recipe["max_pairs"])]
+    if recipe.get("gated_products"):
+        if not (recipe.get("mono_all") and recipe.get("derived_inputs") == "fx1"):
+            raise ValueError("gate requires mono and fx1")
+        cmd.append("--monotone-gated-products")
     if recipe.get("monotone_cbc"):
         if head != "N" or recipe.get("derived_inputs") or recipe.get("hidden") != 1:
             raise ValueError("E34 L requires A's plain N H1 recipe")
@@ -180,6 +223,18 @@ def e34_options(args, recipe):
                       steer_lambda=args.steer_lambda)
     from e36_training import options
     return options(args,recipe)
+
+
+# Formula revision 7 (raw ringing; owner 2026-10-25): every measured slot re-extracted at revision 7
+# (scripts/byconstruction/ring_root.py --arm rev7); its tables declare formula_revision 7.
+REV7_FSID = "basic+peaks+v2@w1825/rev7_rowlanes#36c3f3af"
+BYC_DERIVED_FSIDS = {"basic+peaks+v2@w1825/rev5_localwin_ringhpm#36c3f3af",
+                     "basic+peaks+v2@w1825/rev5_localwin_linpyr#36c3f3af",
+                     "basic+peaks+v2@w2337/rev5_localwin_orient#24a93918",
+                     "basic+peaks+v2@w1891/rev5_localwin_ringhpm_globaff#d56ad477",
+                     "basic+peaks+v2@w2301/rev5_localwin_ringhpm_globaffgate#45e0e84c",
+                     "basic+peaks+v2@w2055/rev5_localwin_ringhpm_globaffgatey#7b645e91",
+                     REV7_FSID}
 
 
 def strict_training_groups(groups: list, data_role_decision: Path | None = None,
@@ -238,8 +293,12 @@ def strict_training_groups(groups: list, data_role_decision: Path | None = None,
             if ((train_w > 0 and projection["role"].endswith("development"))
                     or (train_w == 0 and val_w > 0 and projection["role"].endswith("fit"))):
                 raise ValueError("E32 fit/development role disagrees with group weights")
-        if ((not palette and d.get("feature_set_id") != "basic+peaks+v2@w1825/rev5_localwin#36c3f3af")
-                or d.get("formula_revision") != 5 or not d.get("decoder_era")
+        # By-construction exploration: a derived root (scripts/byconstruction/ring_root.py) re-extracts named columns
+        # under a measurement arm and declares its own era; every other measured column was checked bit for bit.
+        derived = "byc_derived_from" in d and d.get("feature_set_id") in BYC_DERIVED_FSIDS
+        if ((not palette and not derived and d.get("feature_set_id") != "basic+peaks+v2@w1825/rev5_localwin#36c3f3af")
+                or d.get("formula_revision") != (7 if d.get("feature_set_id") == REV7_FSID else 5)
+                or not d.get("decoder_era")
                 or not d.get("table_sha256") or not d.get("row_selection_sha256")):
             raise ValueError(f"{name}: strict admission requires bound Rev5 table provenance")
         if not d.get("data_role_decision_required") and d.get("data_role") not in ("TRAIN oracle teacher", "TRAIN ordinal KADIS source_id%10<8; no human labels"):
@@ -288,7 +347,8 @@ def train_and_select(groups: list, init_seed: int, sample_seed: int, width: int,
                      dest: Path, recipe: dict | None = None, *, strict_admission: bool = False,
                      data_role_decision: Path | None = None,
                   upiq_label_disposition: Path | None = None,
-                     subjective_authority: tuple | None = None) -> tuple[Path, dict[int, float], dict]:
+                     subjective_authority: tuple | None = None,
+                     research_extra: tuple[list[str], str] | None = None) -> tuple[Path, dict[int, float], dict]:
     """Train one cell and return (selected bake, dev curve, selection record) under EPOCH_RULE.
 
     best_dev: the trainer's own best-validation bake (refit/best.bin); the recorded epoch is the argmax of the log's
@@ -316,6 +376,16 @@ def train_and_select(groups: list, init_seed: int, sample_seed: int, width: int,
                         strict_admission=strict_admission, data_role_decision=data_role_decision,
                         upiq_label_disposition=upiq_label_disposition,
                         subjective_authority=subjective_authority)
+    if research_extra is not None:
+        # By-construction research (benchmarks/byconstruction_2026-10-22.md): extra trainer groups the strict route does
+        # not admit (AIC2026 TRAIN). The registered groups above passed their strict checks; the trainer runs in replay
+        # mode, which records that the fit cannot qualify a model.
+        extra, reason = research_extra
+        if not extra or not reason or subjective_authority is not None or upiq_label_disposition is not None:
+            raise ValueError("research extra groups need a replay reason and no E31/subjective leg")
+        at = cmd.index("--target-column")
+        cmd[at:at] = [x for g in extra for x in ("--group", g)]
+        cmd += ["--historical-replay", reason]
     (dest / "refit").mkdir(exist_ok=True)
     ckpt = dest / "ckpt"
     if EPOCH_RULE == "last":
@@ -418,6 +488,9 @@ def main() -> None:
     ap.add_argument("--steer-lambda", type=float, default=0.0, help="E34 K residual weight")
     ap.add_argument("--monotone-cbc", action="store_true", help="E34 L: project plain N H1 inputs nonnegative")
     ap.add_argument("--local-smoke-budget", help="explicit non-installable local smoke epochs:pairs")
+    ap.add_argument("--research-extra-group", action="append", default=[],
+                    help="by-construction research only: extra trainer group NAME:PATH:TW:VW:FLAGS (needs --research-replay)")
+    ap.add_argument("--research-replay", help="replay reason recorded by the trainer for a research-extra fit")
     from e36_training import add_args
     add_args(ap)
     args = ap.parse_args()
@@ -528,11 +601,7 @@ def main() -> None:
     coverage_record = None
     if "coverage_weight" in recipe and recipe.get("ssim2_recipe") != "s2m":  # design log E15: chosen families of the ordinal coverage pool, rank-only within ladders
         import v2_teacher
-        if max(keep) >= v2_teacher.ORDINAL_WIDTH:
-            if not args.strict_admission:
-                raise ValueError(f"{core_spec}: the coverage pool has no f{v2_teacher.ORDINAL_WIDTH}+ (NaN); refusing this keep list")
-            from e32_palette import coverage_extension
-            coverage_extension(V2 / "e15" / Path(v2_teacher.POOL_NAME).name, keep)
+        admit_coverage_keep(core_spec, keep, args.strict_admission)
         cpath, coverage_record = v2_teacher.coverage_leg(recipe["coverage_mask"], Path(os.environ.get("TMPDIR") or dest),
                                                        admitted_root=V2 if args.strict_admission else None)
         curated_extra = cpath
@@ -565,14 +634,20 @@ def main() -> None:
         if args.strict_admission:
             strict_training_groups(groups, args.data_role_decision, args.upiq_label_disposition)
         read = keep
-        if recipe.get("derived_inputs") in ("fx1", "fx2"):
+        if recipe.get("derived_inputs") in ("fx1", "fx2", "fx1nr", "fx1g", "fx1gs1", "fx1gg", "fx1gy", "fx1o", "fx1ns0"):
             from v2_common import derived_declaration
             read = sorted(set(keep) | {b for _, b in derived_declaration(recipe["derived_inputs"])[2]["products"]})
         refuse_nonfinite_kept([g[1] for g in groups], read)  # Rev5 tables mark absent slots NaN; a kept one is refused here
+        if bool(args.research_extra_group) != bool(args.research_replay):
+            raise ValueError("--research-extra-group and --research-replay go together")
+        if args.research_extra_group and not (args.strict_admission and args.train_only):
+            raise ValueError("research extra groups ride on the strict training-only route")
         bake, curve, selection = train_and_select(groups, init_seed, sample_seed, width, keep_file, args.head, dest, recipe,
                                                   strict_admission=args.strict_admission,
                                                   data_role_decision=args.data_role_decision,
-                                                  upiq_label_disposition=args.upiq_label_disposition)
+                                                  upiq_label_disposition=args.upiq_label_disposition,
+                                                  research_extra=(args.research_extra_group, args.research_replay)
+                                                  if args.research_extra_group else None)
     finally:
         for tmp in (curated, curated_extra):
             if tmp is not None:
@@ -585,10 +660,12 @@ def main() -> None:
     if args.train_only:
         schema = ("e31-native-hdr-research-training-cell-v1" if native_recipe else
                   "e29-research-training-cell-v1" if hdr_record and "hdr_consensus" in recipe else
+                  "byc-research-replay-training-cell-v1" if args.research_extra_group else
                   "rev5-qualified-training-cell-v1" if args.strict_admission else "historical-training-only-v1")
         (dest / "result.json").write_text(json.dumps({"schema": schema,
             "hdr_leg": hdr_record,
-            "training_only": True, "execution_contract": "local-smoke" if args.local_smoke_budget else "registered-fit", "selection": selection, "heldout": args.heldout, "epochs": EPOCHS, "pairs_per_epoch": PAIRS_PER_EPOCH,
+            "training_only": True, "execution_contract": "local-smoke" if args.local_smoke_budget else "registered-fit", "selection": selection,
+            "research_extra_groups": args.research_extra_group or None, "research_replay": args.research_replay, "heldout": args.heldout, "epochs": EPOCHS, "pairs_per_epoch": PAIRS_PER_EPOCH,
             "seed_index": args.seed_index, "width": width, "kept_features": len(keep),
             "wide_receipt_sha256": sha(receipt_path), "frozen_sha256": frozen_sha if args.strict_admission else None,
             "human_sources": role_decision["sources"] if args.strict_admission else None,

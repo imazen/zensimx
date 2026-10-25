@@ -657,6 +657,15 @@ pub(crate) fn score_plan(
     // Nothing to plan for: a purely linear profile reads `f0..228` only, and
     // the existing `score_pool_mode` policy already covers it.
     let mut plan = union?;
+    // A profile's linear tail reads the v1 prefix whatever its bakes declare, so
+    // every v1 scale stays computed (the per-scale skip is for plans whose
+    // readers are all declared, e.g. `BakeScorer`).
+    if plan.compute.v1_scales != crate::feature_v2::ComputeSet::ALL_SCALES {
+        plan.compute.v1_scales = crate::feature_v2::ComputeSet::ALL_SCALES;
+        plan.emit = plan
+            .compute
+            .populated_slots(crate::NUM_SCALES, plan.layout_width());
+    }
     if widest <= v1_width && !skip_unread {
         // The narrow, non-skipping case IS today's path. Returning `None`
         // keeps it on the identical code path rather than on an equivalent
@@ -671,6 +680,7 @@ pub(crate) fn score_plan(
         plan.compute.omit_edges = false;
         plan.compute.v1_pools = crate::feature_v2::V1PoolsMode::Full;
         plan.compute.v1_full_scales = crate::feature_v2::ComputeSet::ALL_SCALES;
+        plan.compute.v1_scales = crate::feature_v2::ComputeSet::ALL_SCALES;
         plan.emit = plan
             .compute
             .populated_slots(crate::NUM_SCALES, plan.layout_width());

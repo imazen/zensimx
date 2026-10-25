@@ -1,0 +1,4 @@
+# A=/home/lilith/tmp/byc/perf/base/byc_score_timing sha256=296a67096ffb82bf
+# B=/home/lilith/tmp/byc/perf/step1/byc_score_timing sha256=b1cbaca73d6a9620
+# host=dev date=2026-10-24T08:55:27Z rounds=10 load=2.02 4.22 3.47
+# raw rounds: /mnt/v/output/zensim/byconstruction-2026-10-22/perf/2026-10-24/step1/*.jsonl on dev (SHA256SUMS beside them)

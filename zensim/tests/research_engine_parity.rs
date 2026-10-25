@@ -212,7 +212,14 @@ fn research_output_is_thread_invariant() {
 #[test]
 fn dropping_a_family_perturbs_only_its_own_slots() {
     let full_w = research::full_width();
+    // `globaff` is computed only in a formula-revision-6 process (`Request::everything` leaves it out below).
+    let globaff = research::family_slots(ComputeToken::GlobAff);
     let all = SlotSet::from_ranges([(0, 956), (986, 1820), (1825, full_w)]);
+    let all = if research::Request::everything().want().contains(1867) {
+        all
+    } else {
+        globaff.missing_from(&all)
+    };
     for &(w, h) in CELLS {
         let (s, d) = pair(w, h);
         let (rs, rd) = (RgbSlice::new(&s, w, h), RgbSlice::new(&d, w, h));

@@ -1,3 +1,27 @@
+# Identifier-only preparation; no pixel or subjective table is opened.
+dataset-assessment-keys collection admission out extractor commit:
+    OPENBLAS_NUM_THREADS=1 PYTHONDONTWRITEBYTECODE=1 nice -n19 ionice -c3 python3 -B scripts/byconstruction/dataset_keys.py {{collection}} --admission {{admission}} --out {{out}} --extractor {{extractor}} --build-commit {{commit}}
+
+# Caller holds shared heavy.lock and run-heavy; archive payload stays on tower.
+dataset-unpack-bapps keys library scratch receipts:
+    OPENBLAS_NUM_THREADS=1 PYTHONDONTWRITEBYTECODE=1 python3 -B scripts/byconstruction/dataset_unpack_bapps.py --keys {{quote(keys)}} --library {{quote(library)}} --scratch {{quote(scratch)}} --receipt-dir {{quote(receipts)}}
+
+# Caller holds shared heavy.lock and run-heavy; all assembly stays with rev5_bank.
+dataset-features root binary:
+    OPENBLAS_NUM_THREADS=1 PYTHONDONTWRITEBYTECODE=1 python3 -B scripts/byconstruction/dataset_features.py --root {{quote(root)}} --bin {{quote(binary)}}
+
+# Lightweight queue; each collection takes/releases the caller's shared lock.
+dataset-features-queue root binary lock wrapper:
+    OPENBLAS_NUM_THREADS=1 PYTHONDONTWRITEBYTECODE=1 python3 -B scripts/byconstruction/dataset_features.py --root {{quote(root)}} --bin {{quote(binary)}} --queue --heavy-lock {{quote(lock)}} --heavy-wrapper {{quote(wrapper)}}
+
+# Caller holds shared heavy.lock and run-heavy; destination is the physical array.
+dataset-features-mirror root host destination cache array:
+    python3 -B scripts/byconstruction/dataset_mirror.py --root {{quote(root)}} --host {{quote(host)}} --destination {{quote(destination)}} --capacity-path {{quote(cache)}} {{quote(array)}}
+
+# Caller holds shared heavy.lock and run-heavy; a final receipt requires no gaps.
+dataset-features-verify root:
+    OPENBLAS_NUM_THREADS=1 PYTHONDONTWRITEBYTECODE=1 python3 -B scripts/byconstruction/dataset_verify.py --root {{quote(root)}} --write
+
 addrfix-test target:
     TMPDIR="$HOME/tmp" cargo test --locked -p zensim-validate --bin panel panel_e34:: --target-dir {{quote(target)}}
 
@@ -2652,3 +2676,101 @@ aic2026-jnd-reproduced-suite scored spec peer_images output:
 # Current B intentionally has no JND map; the report owner must agree.
 default-b-verdict-jnd-tests:
     cargo test -p zensim-validate --bin bake_verdict
+
+# By-construction exploration (benchmarks/byconstruction_2026-10-22.md): revision 6 (ringhpm + globaff) and the
+# research map painting modes. Heavy: run through ~/work/zen/scripts/run-heavy.
+byc-rev6-tests:
+    cargo test --release -p zensim --features custom-profiles,feature-regime-v2,training --lib -- globaff map_paint ring_form feature_defs feature_plan research::
+
+# Served (pixel route) against table route for revision-6 research bakes on the mixture images.
+byc-serve-parity bin_dir mixture out +bakes:
+    python3 scripts/byconstruction/serve_parity.py --bin-dir {{quote(bin_dir)}} --mixture {{quote(mixture)}} --out {{quote(out)}} {{ prepend("--bake ", bakes) }}
+
+# The same against a bake's table-route predictions for a pair list (row order), e.g. AIC2026 public_train.
+byc-serve-parity-pairs bin_dir pairs pred out bake:
+    python3 scripts/byconstruction/serve_parity.py --bin-dir {{quote(bin_dir)}} --pairs {{quote(pairs)}} --pred {{quote(pred)}} --out {{quote(out)}} --bake {{quote(bake)}} --jobs 12
+
+# Candidate, legacy and judge maps for the map-quality study (zensim-bench `map_dump`).
+byc-map-dump pairs out bake tag window="box" paint="nearest" split="repair" *flags="":
+    cargo run --release --manifest-path zensim-bench/Cargo.toml --features dvifm-judge --example map_dump -- --pairs {{quote(pairs)}} --out {{quote(out)}} --bake {{quote(bake)}} --tag {{tag}} --window {{window}} --paint {{paint}} --split {{split}} {{flags}}
+
+# By-construction arms on both damage-mixture tests (standard and global-edit): inversions per E21 cell and the largest
+# rise, from the score files aic_mixture.sh wrote.
+byc-mixture-summary +arms:
+    python3 scripts/byconstruction/mixture_test.py summary --out /mnt/v/output/zensim/byconstruction-2026-10-22/mixture {{arms}}
+    python3 scripts/byconstruction/mixture_test.py summary --out /mnt/v/output/zensim/byconstruction-2026-10-22/mixture_global {{arms}}
+
+# The built workbench module (PKG = its pkg-zensimx) against the native crate on one synthetic pair: every metric's
+# score and every map's sum; same ZENSIM_WORKBENCH_BAKES as the build.
+byc-workbench-smoke pkg:
+    cargo run -q --release --manifest-path zensim-workbench/Cargo.toml --example smoke > target/byc-smoke-native.jsonl
+    node zensim-workbench/smoke.mjs {{quote(pkg)}} > target/byc-smoke-wasm.jsonl
+    python3 scripts/byconstruction/workbench_site.py smoke-compare target/byc-smoke-native.jsonl target/byc-smoke-wasm.jsonl
+
+# The assembled workbench SITE in headless Chromium against the native smoke values (needs Playwright; PY is a
+# Python with it). Same ZENSIM_WORKBENCH_BAKES as the build.
+byc-workbench-check site py="python3":
+    cargo run -q --release --manifest-path zensim-workbench/Cargo.toml --example smoke > target/byc-smoke-native.jsonl
+    {{py}} zensim-workbench/workbench_check.py {{quote(site)}} target/byc-smoke-native.jsonl
+
+# The workbench module (wasm32 + SIMD128) with the bakes in ZENSIM_WORKBENCH_BAKES; wasm-bindgen-cli 0.2.129. The
+# module's menu label names zensim's version and the commit it was built from (`wip on` when the working copy
+# differs), unless ZENSIM_WORKBENCH_LABEL is set.
+byc-workbench-module out="target/zensim-workbench-web" wasm_bindgen="wasm-bindgen":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    [ "$({{wasm_bindgen}} --version)" = 'wasm-bindgen 0.2.129' ] || { echo 'wasm-bindgen-cli 0.2.129 required' >&2; exit 2; }
+    version=$(sed -n 's/^version = "\(.*\)"/\1/p' zensim/Cargo.toml | head -1)
+    dirty=$(jj log -r @ --no-graph -T 'if(empty, "", "wip on ")')
+    if [ -z "$dirty" ]; then rev='latest(::@ & ~empty())'; else rev='latest(::@- & ~empty())'; fi
+    commit=$(jj log -r "$rev" --no-graph -T 'commit_id.short(8)')
+    export ZENSIM_WORKBENCH_LABEL="${ZENSIM_WORKBENCH_LABEL:-zensim $version · $dirty$commit (private)}"
+    echo "module label: $ZENSIM_WORKBENCH_LABEL"
+    RUSTFLAGS="-C target-feature=+simd128" cargo build --release --manifest-path zensim-workbench/Cargo.toml --target wasm32-unknown-unknown --lib
+    {{wasm_bindgen}} --target web --out-dir {{out}}/pkg-zensimx zensim-workbench/target/wasm32-unknown-unknown/release/zensim_workbench.wasm
+    cargo run -q --release --manifest-path zensim-workbench/Cargo.toml --example workbench_manifest > {{out}}/extra-modules.json
+
+# The trainer-side tools the by-construction cells use (byc_cells.py's REV4_V2_BIN_DIR): zensim_mlp_train,
+# bake_dial_refit, panel, score_pair_with_bake, byc_fsid and byc_predict, copied to /var/tmp/byconstruction-bin/<commit>
+# with BUILD_COMMIT and SHA256SUMS. The working copy must equal its commit.
+byc-train-bins:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    [ -z "$(jj diff --summary -r @)" ] || { echo 'commit first: the binaries name their commit' >&2; exit 2; }
+    commit=$(jj log -r 'latest(::@ & ~empty())' --no-graph -T 'commit_id')
+    dest=/var/tmp/byconstruction-bin/${commit:0:12}
+    [ ! -e "$dest" ] || { echo "$dest exists" >&2; exit 2; }
+    bins="zensim_mlp_train bake_dial_refit panel score_pair_with_bake byc_fsid byc_predict"
+    cargo build --release -p zensim-validate $(printf -- '--bin %s ' $bins)
+    target=$(cargo metadata --format-version 1 --no-deps | python3 -c 'import json,sys; print(json.load(sys.stdin)["target_directory"])')
+    mkdir -p "$dest"
+    for b in $bins; do cp "$target/release/$b" "$dest/"; done
+    printf '%s' "$commit" > "$dest/BUILD_COMMIT"
+    (cd "$dest" && sha256sum $bins > SHA256SUMS)
+    echo "$dest"
+
+# The native loop tools (loop-converge's binaries and the workbench's loop_calibrate) with the bakes in
+# ZENSIM_WORKBENCH_BAKES, copied to /var/tmp/byconstruction-bin/<commit>-loop-TAG with PROVENANCE and SHA256SUMS. NOTE
+# goes into PROVENANCE (say "private weights: LAN only" when a bake is private). The working copy must equal its commit.
+byc-loop-bins tag note="":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    : "${ZENSIM_WORKBENCH_BAKES:?set ZENSIM_WORKBENCH_BAKES (name=path;...)}"
+    [ -z "$(jj diff --summary -r @)" ] || { echo 'commit first: the binaries name their commit' >&2; exit 2; }
+    commit=$(jj log -r 'latest(::@ & ~empty())' --no-graph -T 'commit_id.short(12)')
+    dest=/var/tmp/byconstruction-bin/$commit-loop-{{tag}}
+    [ ! -e "$dest" ] || { echo "$dest exists" >&2; exit 2; }
+    cargo build --release --manifest-path zensim-workbench/loop-converge/Cargo.toml --bins
+    cargo build --release --manifest-path zensim-workbench/Cargo.toml --example loop_calibrate
+    mkdir -p "$dest"
+    cp zensim-workbench/loop-converge/target/release/{steer_rd,loop_pairs,map_probe,zensim-workbench-loop-converge} \
+      zensim-workbench/target/release/examples/loop_calibrate "$dest"/
+    bakes=$(echo "$ZENSIM_WORKBENCH_BAKES" | tr ';' '\n' | while IFS='=' read -r name path; do
+      [ -n "$name" ] && echo "$name=$(sha256sum "$path" | cut -c1-8)"; done | paste -sd, - | sed 's/,/, /g')
+    {
+      echo "built from $commit (explore/byconstruction) on $(hostname), $(date -u +%F)"
+      echo "ZENSIM_WORKBENCH_BAKES: $bakes{{ if note != "" { " (" + note + ")" } else { "" } }}"
+      echo "loop_calibrate built from the same commit's zensim-workbench"
+    } > "$dest/PROVENANCE"
+    (cd "$dest" && sha256sum steer_rd loop_pairs map_probe zensim-workbench-loop-converge loop_calibrate > SHA256SUMS)
+    echo "$dest"

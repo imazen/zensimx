@@ -1,0 +1,6 @@
+# A=/home/lilith/tmp/byc/perf/final/byc_score_timing sha256=ad4328f044d0d016
+# B=/home/lilith/tmp/byc/perf/gate7/byc_score_timing sha256=e068dd9c7952c304
+# A bakes: /home/lilith/tmp/byc/perf/b_rev7.bin /home/lilith/tmp/byc/perf/tga_rev7.bin; B bakes: /home/lilith/tmp/byc/perf/b_rev7.bin /home/lilith/tmp/byc/perf/tga_rev7.bin
+# host=dev date=2026-10-24T11:33:44Z rounds=6 load=1.29 1.25 1.64
+# cases: /mnt/v/output/zensim/byconstruction-2026-10-22/perf/cases/cases.tsv
+# raw rounds: /mnt/v/output/zensim/byconstruction-2026-10-22/perf/2026-10-24/matrix_rev7_bad544a3_vs_db964918/*.jsonl on dev (SHA256SUMS beside them); A = first binary, B = second, both with revision-7 stamps of the bakes

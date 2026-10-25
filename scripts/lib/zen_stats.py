@@ -341,6 +341,30 @@ def scatter(predicted: Sequence[float], target: Sequence[float]) -> dict:
         return result
 
 
+def logistic_fit(predicted: Sequence[float], target: Sequence[float]) -> list:
+    """Rust's 4-parameter logistic map of `predicted` into `target` units, one value per row in input order.
+
+    The same fit (Mohammadi 2025 IV-A, polarity and saturation absorbed) that PLCC, OR and Z-RMSE are computed on,
+    so its residuals are the error around the best smooth monotone curve.
+    """
+    predicted, target = list(predicted), list(target)
+    if len(predicted) != len(target) or any(not math.isfinite(float(v)) for v in predicted + target):
+        raise ValueError("logistic_fit requires aligned finite pairs")
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".tsv") as f:
+        f.write("predicted\ttarget\n")
+        for x, y in zip(predicted, target):
+            f.write(f"{float(x):.17g}\t{float(y):.17g}\n")
+        f.flush()
+        p = subprocess.run([_find_panel_bin(), "--input", f.name, "--emit-rescaled"],
+                           pass_fds=_panel_pass_fds(), text=True, capture_output=True)
+        if p.returncode != 0:
+            raise RuntimeError(f"Rust logistic fit failed: {p.stderr}")
+        fitted = [float(v) for v in p.stdout.split()]
+        if len(fitted) != len(predicted):
+            raise ValueError("logistic fit returned a different row count")
+        return fitted
+
+
 def recipe_correlations(predicted, target):
     """In-process signed raw Pearson and tau-b for E28 objective evaluations.
 

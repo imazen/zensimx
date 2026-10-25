@@ -327,6 +327,8 @@ pub(crate) enum KernelId {
     RestoreMaps,
     /// Research palette signature and population transport.
     Palette,
+    /// The walk's per-strip global-affine moment sums (`crate::globaff`).
+    GlobAff,
 }
 
 impl KernelId {
@@ -346,6 +348,7 @@ impl KernelId {
             KernelId::Gridblk => "gridblk",
             KernelId::RestoreMaps => "restore_maps",
             KernelId::Palette => "palette",
+            KernelId::GlobAff => "globaff",
         }
     }
 }
@@ -480,6 +483,63 @@ pub enum FormulaRevision {
     /// model is Rev4's: `ZENSIM_FORMULA_REV=5` pins it and
     /// `ssim_form::refuse_rev4_mix` refuses every cross-boundary mix.
     Rev5,
+    /// Revision 5 with the corrected ringing measurement (the `ringhpm` era,
+    /// imazen/zensim#72, `benchmarks/byconstruction_2026-10-22.md`).
+    ///
+    /// The twelve v2 `ringing` slots measure the error after removing each
+    /// image's SSIM local mean, `(src − mu1) − (dst − mu2)`, instead of
+    /// `src − dst` (`feature_v2::RingForm::HighPassMu`), so a global offset,
+    /// contrast or saturation change no longer reads as ringing away from
+    /// edges. Every other slot keeps Rev5's arithmetic bit for bit. It also
+    /// admits the `globaff` family (f1867..1890): per scale and XYB channel,
+    /// the share of the mean squared error a global least-squares fit
+    /// `dst ≈ a·src + b` explains, and that explained error.
+    ///
+    /// Rev5's scope and process model otherwise apply unchanged:
+    /// `ZENSIM_FORMULA_REV=6` pins it for research, and a bake declaring
+    /// revision 6 selects it per call.
+    Rev6,
+    /// Revision 5's measurements, raw ringing included, with revision 6's
+    /// `globaff` family and faster, cancellation-free pooled arithmetic (the
+    /// `rowlanes` era, `benchmarks/byconstruction_2026-10-22.md`, "Speed pass
+    /// before revision 7"). Revision 6's high-pass ringing form is not part
+    /// of it (owner, 2026-10-25: for the monotone models the raw form scores
+    /// better on codec uniformity and robustness; "Before the revision-7
+    /// cut" in the record):
+    ///
+    /// * **f32 row lanes.** The dense, fused-SSIM and gradient pools add
+    ///   the columns of each row's complete 8-column chunks to sixteen f32
+    ///   lanes (`x & 15`) and fold every lane into its f64 lane at the end
+    ///   of the chunks and after every 4,096th column, instead of adding
+    ///   every column in f64; the remaining columns add in f64 as before.
+    ///   The f64 lanes live for a band of 32 rows (dense) or for the call
+    ///   (fused SSIM, gradient: a 128-row strip) and are finished once there
+    ///   instead of once per row. Pools whose features difference or ratio
+    ///   two large sums (v1
+    ///   variance, texture and contrast terms, the edge-width change, the
+    ///   band-lifetime raw moments) keep f64 lanes.
+    /// * **Blockiness lattice lanes.** The vertical lattice step at column
+    ///   `8j` adds to f64 lane `(j − 1) & 7` instead of lane 0, so the eight
+    ///   lanes take eight steps at once; each 128-row kernel strip sums into
+    ///   its own lanes, added to the running lanes in strip order (strips run
+    ///   in parallel, with the same bits at any thread count).
+    /// * **Central moments per row.** The SSIM deviation moments are
+    ///   two-pass per row (a sixteen-lane f64 mean, then the centred sums)
+    ///   with one Chan/Pébay merge per row instead of one per 16 columns.
+    /// * **Cancellation-free forms.** The v2 SSIM luminance term is
+    ///   `(m1 − m2)²`, the bounded dissimilarities `(a − b)²/(a² + b² + c)`
+    ///   and the v1 edge ratio `(x − y)/(1 + y)`: the exact values the old
+    ///   forms computed by subtracting nearly equal numbers.
+    /// * **Opsin cube root with one division**
+    ///   ([`crate::det_math::cbrt_newton_f32`]): within 3 ulp like
+    ///   `cbrt_midp`, correctly rounded more often (72.7% against 56%), with
+    ///   one division instead of two.
+    ///
+    /// Any live slot may move (an arithmetic era); scope and process model
+    /// are Rev6's (`ZENSIM_FORMULA_REV=7`, or a bake declaring revision 7).
+    /// `ZENSIM_RING_FORM=hpm` still selects the high-pass ringing form as a
+    /// per-process research arm.
+    Rev7,
 }
 
 impl FormulaRevision {
@@ -525,7 +585,68 @@ impl FormulaRevision {
                 "c3negfold",
                 "localwin",
             ],
+            Self::Rev6 => &[
+                "v1ssimcap",
+                "freecomp",
+                "v1hfgain",
+                "v1detroot",
+                "scorepow",
+                "v1ssimstable",
+                "v2ssimstable",
+                "v1extfused",
+                "tiercanon",
+                "c3negfold",
+                "localwin",
+                "ringhpm",
+            ],
+            Self::Rev7 => &[
+                "v1ssimcap",
+                "freecomp",
+                "v1hfgain",
+                "v1detroot",
+                "scorepow",
+                "v1ssimstable",
+                "v2ssimstable",
+                "v1extfused",
+                "tiercanon",
+                "c3negfold",
+                "localwin",
+                "rowlanes",
+            ],
         }
+    }
+
+    /// Whether the v2 `ringing` family measures the local-mean-removed error
+    /// ([`Self::Rev6`]'s `ringhpm` era) rather than the raw pixel error.
+    /// Revision 7 returns to the raw error.
+    pub(crate) const fn ring_high_pass(self) -> bool {
+        matches!(self, Self::Rev6)
+    }
+
+    /// Whether the `globaff` family (f1867..1890) is computed at this revision.
+    pub(crate) const fn computes_globaff(self) -> bool {
+        matches!(self, Self::Rev6 | Self::Rev7)
+    }
+
+    /// Whether the pools add columns in f32 row lanes and the central
+    /// moments are two-pass per row ([`Self::Rev7`]'s `rowlanes` era).
+    pub(crate) const fn row_lanes(self) -> bool {
+        matches!(self, Self::Rev7)
+    }
+
+    /// Whether the opsin conversion takes its cube root from
+    /// [`crate::det_math::cbrt_newton_f32`] (a Newton then a Halley step, one
+    /// division) instead of `cbrt_midp` ([`Self::Rev7`]).
+    pub(crate) const fn cbrt_newton(self) -> bool {
+        matches!(self, Self::Rev7)
+    }
+
+    /// Whether the cancellation-free forms replace the subtractive ones:
+    /// `(m1 − m2)²` for the v2 SSIM luminance term, `(a − b)²/(a² + b² + c)`
+    /// for the bounded dissimilarities and `(x − y)/(1 + y)` for the v1 edge
+    /// ratio ([`Self::Rev7`]).
+    pub(crate) const fn stable_forms(self) -> bool {
+        matches!(self, Self::Rev7)
     }
 
     /// Whether `GLOBAL_CGAIN`/`GLOBAL_CLOSS` are formed from the PAIRED
@@ -554,7 +675,10 @@ impl FormulaRevision {
     /// remaining free-vs-append gap into a MEASUREMENT of the append route's
     /// own error (plan R4) rather than an unattributed disagreement.
     pub(crate) const fn paired_global_contrast(self) -> bool {
-        matches!(self, Self::Rev2 | Self::Rev3 | Self::Rev4 | Self::Rev5)
+        matches!(
+            self,
+            Self::Rev2 | Self::Rev3 | Self::Rev4 | Self::Rev5 | Self::Rev6 | Self::Rev7
+        )
     }
 
     /// Every slot id this revision moves, derived from the signal table's own
@@ -764,6 +888,35 @@ const REV_C3NEGFOLD: Revision = Revision {
            phantom C3 top-bin saturation measured in REVIEW_PARTB \
            2026-09-25; record in benchmarks/rev4canon_WORKLOG.md.",
 };
+
+/// The defect behind the `ringhpm` era: the ringing error is the raw pixel
+/// error, so a global edit reads as ringing.
+const DEFECT_RING_GLOBAL: Defect = Defect {
+    id: "RINGGLOBAL",
+    note: "v2 `ringing` saturates the raw error `|src − dst|`, which a global \
+           offset, contrast or saturation change makes uniformly large away \
+           from edges. MEASURED on 24 references (feature_probe.py, \
+           benchmarks/byconstruction_2026-10-22.md): a +8 luma shift was \
+           ringing's largest response, 2.4x a visible blur sigma 1.2 \
+           (median 0.334 vs 0.139). imazen/zensim#72.",
+};
+
+/// The `ringhpm` era: ringing measures the error after removing each image's
+/// SSIM local mean ([`FormulaRevision::Rev6`]).
+const REV_RINGHPM: Revision = Revision {
+    era: "ringhpm",
+    commit: "-",
+    status: RevisionStatus::Proposed,
+    note: "ringing's per-pixel error becomes `(src − mu1) − (dst − mu2)` with \
+           the SSIM local means the dense kernel already holds; the three \
+           saturations are unchanged. Moves only the 12 ringing slots \
+           (+8 shift median 0.334 -> 0.017, blur unchanged 0.139 -> 0.143). \
+           Rev5 keeps the raw form byte for byte, and Rev7 returns to it \
+           (owner, 2026-10-25); `ZENSIM_RING_FORM=hpm` is \
+           the per-process research arm of the same arithmetic. Record: \
+           benchmarks/byconstruction_2026-10-22.md.",
+};
+const RINGING_REVS: &[Revision] = &[REV_RINGHPM];
 
 /// The tailhist `Bin` signals carry `rev4bank` plus the C3 binning fix;
 /// `Max` signals keep `REV4BANK` alone (exact maxima are unaffected).
@@ -1272,9 +1425,56 @@ const REV_LOCALWIN: Revision = Revision {
 /// [`FormulaRevision::moved_slots`]), is registered for
 /// `research::era_is_registered`, and — when the build computes it — is every
 /// slot's provenance era (`research::current_era_of`).
+/// The defect behind the `rowlanes` era: subtractive forms that cancel, and
+/// pooled arithmetic that costs more than its precision needs.
+const DEFECT_FORM_CANCELLATION: Defect = Defect {
+    id: "FORMCANCEL",
+    note: "Three formulas compute a small value by subtracting nearly equal \
+           numbers: the v2 SSIM luminance term `(m1² + m2² + C1) − (2·m1·m2 + \
+           C1)`, the bounded dissimilarity `1 − (2ab + c)/(a² + b² + c)` and \
+           the v1 edge ratio `(1 + x)/(1 + y) − 1`. MEASURED \
+           (byconstruction record, \"Formula revision 7\"): +336% / −87% on \
+           near-identical chroma features of 1e-8 to 1e-9; scores move by at \
+           most 7.9e-5 points. Separately, every pool column was added in f64 \
+           (a conversion and an f64 add per term) and the central moments \
+           merged once per 16 columns, most of the pooled kernels' time.",
+};
+
+/// The `rowlanes` era: Rev5's measurements (raw ringing) and Rev6's `globaff`
+/// family, with f32 row lanes, per-row central moments and the
+/// cancellation-free forms ([`FormulaRevision::Rev7`]).
+const REV_ROWLANES: Revision = Revision {
+    era: "rowlanes",
+    commit: "-",
+    status: RevisionStatus::Proposed,
+    note: "rev7 (raw ringing as rev5; owner 2026-10-25): the dense, fused-SSIM and gradient pools add the columns of \
+           each row's complete 8-column chunks to sixteen f32 lanes (`x & 15`, \
+           ascending x), folded into f64 lanes at the end of the chunks and \
+           after every 4,096th column, except pools whose features difference \
+           or ratio two large sums (f64, as before); the f64 lanes live for a \
+           32-row band (dense) or the call (fused SSIM, gradient) and finish \
+           once there; the v1 HF and edge-width sums add source sums plus \
+           differences; the blockiness lattice's vertical steps use all \
+           eight f64 lanes, summed per 128-row strip; the SSIM deviation moments are two-pass per row with \
+           one Chan/Pébay merge per row; the three subtractive forms become \
+           their exact cancellation-free equivalents; the opsin cube root \
+           takes one division (`cbrt_newton_f32`). MEASURED (byconstruction \
+           record, \"Revision 7 with raw ringing\"): against revision 5 on \
+           B's 11 dump inputs (one binary, stamps 5 and 7), 4,438 of 7,920 \
+           finite feature values move, by a median 1.1e-6 relative (largest \
+           4.0e-3, an absolute 2.3e-8), and the score by at most 5.4e-5 \
+           points; tier-identical at 1 and 8 threads; against the exact f64 \
+           oracle (93 near-identical pairs) the per-feature median error's \
+           p90 falls from 2.80e-6 to 2.39e-6 and its worst feature rises from \
+           5.10e-5 to 5.91e-5 (`peaks_ssim_max_s3_b`, the cube root's error \
+           pattern). Registered as moving every live slot (an arithmetic era); \
+           tier-identical by the same fixed order.",
+};
+
 pub(crate) const ARITHMETIC_REVISIONS: &[(Defect, Revision)] = &[
     (DEFECT_TIER_DIVERGENCE, REV_TIERCANON),
     (DEFECT_WINDOW_DRIFT, REV_LOCALWIN),
+    (DEFECT_FORM_CANCELLATION, REV_ROWLANES),
 ];
 
 /// Whether `era` names a registered ARITHMETIC era.
@@ -1966,7 +2166,7 @@ pub(crate) static V2: [SignalDef; 29] = {
             Tranche::None,
             None,
         ),
-        v2sig(
+        v2sig_rev(
             26,
             "ringing",
             Mean,
@@ -1974,7 +2174,8 @@ pub(crate) static V2: [SignalDef; 29] = {
             HigherIsWorse,
             V2Gradient,
             Tranche::None,
-            None,
+            Some(DEFECT_RING_GLOBAL),
+            RINGING_REVS,
         ),
         v2sig(
             27,
@@ -2792,6 +2993,43 @@ pub(crate) static PALETTE_SIGNALS: [SignalDef; 42] = [
     palette_signal(41, "n8_largest_shift", Direction::HigherIsWorse),
 ];
 
+/// The `globaff` introduction (formula revision 6): an append-only family.
+const GLOBAFF_REVISION: &[Revision] = &[Revision {
+    era: "globaff",
+    commit: "-",
+    status: RevisionStatus::Proposed,
+    note: "append-only introduction of the global affine-change descriptor, \
+           f1867..1890, computed at formula revision 6 only: per scale and XYB \
+           channel the share of the mean squared error a least-squares fit \
+           dst = a*src + b explains, and that explained error, from five f64 \
+           sums per cell accumulated over the walk's strips (`crate::globaff`). \
+           It replaces the research sidecar zensim-bench/examples/byc_globaff.rs \
+           (two-pass moments) at the same ids. No earlier slot moves.",
+}];
+const fn globaff_signal(block_local: u16, name: &'static str, direction: Direction) -> SignalDef {
+    SignalDef {
+        family: Family::Supported(ComputeToken::GlobAff),
+        block_local,
+        name,
+        statistic: Statistic::Global,
+        cost: CostClass::Cheap,
+        tranche: Tranche::None,
+        placement: Placement::AllCells,
+        form: Form::Difference,
+        direction,
+        kernel: KernelId::GlobAff,
+        deprecated: false,
+        defect: None,
+        revisions: GLOBAFF_REVISION,
+    }
+}
+/// `share` (block-local 0) and `explained` (1) per (scale, channel), in the
+/// sidecar's order `2·(3·scale + channel) + signal`.
+pub(crate) static GLOBAFF_SIGNALS: [SignalDef; crate::globaff::GLOBAFF_PER_CELL] = [
+    globaff_signal(0, "share", Direction::Unsigned),
+    globaff_signal(1, "explained", Direction::HigherIsWorse),
+];
+
 // ============================================================================
 // Layout arithmetic — THE owner
 // ============================================================================
@@ -2912,6 +3150,11 @@ pub(crate) static BLOCKS: &[BlockDef] = &[
         signals: &PALETTE_SIGNALS,
         replication: Replication::Flat,
     },
+    BlockDef {
+        family: Family::Supported(ComputeToken::GlobAff),
+        signals: &GLOBAFF_SIGNALS,
+        replication: Replication::PerChannel,
+    },
 ];
 
 impl BlockDef {
@@ -2979,13 +3222,15 @@ pub(crate) fn block_base(
 ///
 /// Sourced from `benchmarks/feature_sets_registry.json`'s `sets[].layout`
 /// (append-only; 2026-09-19: 372, 720, 924, 944, 956, 986; 2026-09-23: the
-/// Rev4 feature bank's full width 1322) plus C8's width 1502 and the restored-cut families' widths 1562 (mapdev),
+/// Rev4 feature bank's full width 1322) plus C8's width 1502, the by-construction research widths 1891 (globaff),
+/// 2055 (the luminance-gated globaff research set), 2301 (the gated globaff research set) and 2337 (the byc_orient
+/// research set) and the restored-cut families' widths 1562 (mapdev),
 /// `zensim-validate`'s
 /// `every_registered_layout_width_is_a_candidate` holds the two in sync, so
 /// registering a set at a new width fails the build rather than silently
 /// becoming unreproducible.
 pub(crate) const REGISTERED_LAYOUT_WIDTHS: &[usize] = &[
-    372, 720, 924, 944, 956, 986, 1322, 1502, 1562, 1790, 1820, 1825, 1867,
+    372, 720, 924, 944, 956, 986, 1322, 1502, 1562, 1790, 1820, 1825, 1867, 1891, 2055, 2301, 2337,
 ];
 
 /// Total layout width at `n_scales` with every registered block present.
@@ -3568,7 +3813,12 @@ mod tests {
             1825,
             "legacy width stays frozen"
         );
-        assert_eq!(w, 1867, "full registered width with palette");
+        assert_eq!(
+            block_base(ComputeToken::GlobAff, NS).unwrap().0,
+            1867,
+            "globaff sits after the palette block"
+        );
+        assert_eq!(w, 1891, "full registered width with palette and globaff");
         for id in 0..w {
             let Some(d) = def_at(id, NS) else {
                 assert!((956..986).contains(&id) || (1820..1825).contains(&id));
@@ -3679,7 +3929,8 @@ mod tests {
             );
             assert!(seen.insert(n.clone()), "duplicate slot name {n:?} at {id}");
         }
-        assert_eq!(seen.len(), 1832);
+        // 1832 through the palette, plus globaff's 24 (2 signals × 4 scales × 3 channels).
+        assert_eq!(seen.len(), 1832 + 24);
     }
 
     /// Signal names are unique WITHIN a family (the family prefix is what
@@ -4109,6 +4360,7 @@ mod owner_gates {
             v1_basic: false,
             v1_pools: V1PoolsMode::Off,
             v1_full_scales: ComputeSet::ALL_SCALES,
+            v1_scales: ComputeSet::ALL_SCALES,
             v2_scales: ComputeSet::ALL_SCALES,
             v2_blocks: false,
             gradient: false,
@@ -4128,10 +4380,11 @@ mod owner_gates {
             mapdev: false,
             z1max: false,
             gmsnative: false,
+            globaff: false,
             free_extras: V1FreeExtras::Off,
         };
         // One `ComputeSet` per token that turns on EXACTLY that family.
-        let cases: [(T, ComputeSet); 17] = [
+        let cases: [(T, ComputeSet); 18] = [
             (
                 T::Basic,
                 ComputeSet {
@@ -4215,6 +4468,13 @@ mod owner_gates {
                 T::Gmsnative,
                 ComputeSet {
                     gmsnative: true,
+                    ..off
+                },
+            ),
+            (
+                T::GlobAff,
+                ComputeSet {
+                    globaff: true,
                     ..off
                 },
             ),
@@ -4423,6 +4683,14 @@ mod owner_gates {
                 derived =
                     crate::feature_plan::apply_registered_slot_selection(&selection, derived, NS);
             }
+            // A set may declare `research_slots`: columns a sidecar outside zensim supplies (the by-construction
+            // byc_globaff descriptor). zensim cannot derive them; everything else must still match exactly.
+            let recorded = match json_str_field(&obj, "research_slots") {
+                Some(r) => SlotSet::parse(&r)
+                    .unwrap_or_else(|| panic!("{key}: unparseable research_slots"))
+                    .missing_from(&recorded),
+                None => recorded,
+            };
 
             if role == "consumer" {
                 // A read set is a subset of what its producer populates.

@@ -149,6 +149,10 @@ enum Cmd {
     /// `FeatureTransform::Drop`. The cruft-purge owner
     /// (`docs/PLAN_CRUFT_PURGE_2026-09-06.md` increment B).
     Densify(DensifyArgs),
+    /// Check the monotone-by-construction certificate on a bake
+    /// (`zensim_validate::mlp_train::certify_monotone_bake`): prints one JSON
+    /// line and exits non-zero when the bake is not certified.
+    CertifyMonotone(CertifyMonotoneArgs),
     /// Drop a metadata entry (default: the output-calibration spline) and
     /// re-emit everything else verbatim (reproduces
     /// `strip_spline_metadata.py`).
@@ -1550,6 +1554,37 @@ fn pack_layers(
 /// Serialize packed layers + metadata through the canonical serializer,
 /// returning the bytes. `schema_hash` is preserved from the input;
 /// `flags: 0` and `compressed: true` match the Python pipeline verbatim.
+#[derive(Args, Debug)]
+struct CertifyMonotoneArgs {
+    /// Bake to check.
+    #[arg(long)]
+    bake: PathBuf,
+    /// Identity pin the output bias must equal bit-exactly.
+    #[arg(long, default_value_t = 100.0)]
+    pin: f32,
+}
+
+/// `Ok(true)` = not certified (the gate convention: exit non-zero).
+fn cmd_certify_monotone(a: &CertifyMonotoneArgs) -> Result<bool, String> {
+    let bytes = std::fs::read(&a.bake).map_err(|e| format!("read {:?}: {e}", a.bake))?;
+    let model = Model::from_bytes(&bytes).map_err(|e| format!("parse bake: {e:?}"))?;
+    let verdict = if model.feature_bounds().is_empty() {
+        zensim_validate::mlp_train::certify_monotone_bake(&model, a.pin)
+    } else {
+        Err("feature bounds present".into())
+    };
+    let line = match &verdict {
+        Ok(c) => {
+            serde_json::json!({"certified": true, "ramps": c.ramps, "free_ramps": c.free_ramps,
+            "free_amplitude": c.free_amplitude, "max_pairs": c.max_pairs,
+            "monotone": c.free_amplitude == 0.0, "bake": a.bake})
+        }
+        Err(e) => serde_json::json!({"certified": false, "reason": e, "bake": a.bake}),
+    };
+    println!("{line}");
+    Ok(verdict.is_err())
+}
+
 #[derive(Args, Debug)]
 struct DensifyArgs {
     /// Explicit registered E32 cached-table diagnostic; serving remains refused.
@@ -5255,6 +5290,7 @@ fn main() -> ExitCode {
         Cmd::Gate(a) => cmd_gate(a),
         Cmd::Pack(a) => cmd_pack(a).map(|_| false),
         Cmd::Densify(a) => cmd_densify(a).map(|_| false),
+        Cmd::CertifyMonotone(a) => cmd_certify_monotone(a),
         Cmd::Strip(a) => cmd_strip(a).map(|_| false),
         Cmd::AppendMeta(a) => cmd_append_meta(a).map(|_| false),
         Cmd::FitLasso(a) => cmd_fit_lasso(a).map(|_| false),

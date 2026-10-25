@@ -117,6 +117,60 @@ pub struct MlpHyperparams {
     /// `nonneg_distance` is set. `100.0` matches the dial contract's identity
     /// band `[97.5, 100]`.
     pub nonneg_pin: f64,
+    /// Under `nonneg_distance`, project the hidden biases to `b1 <= 0` after
+    /// every step instead of freezing them at `0`. `h(0⃗) = ReLU(b1) = 0⃗` still
+    /// holds exactly, so `raw(0⃗) = pin` and `raw <= pin` are unchanged; each
+    /// unit becomes a hinge with a non-negative activation threshold.
+    ///
+    /// Why it exists: with `monotone_cbc` (W1 >= 0) and non-negative inputs,
+    /// zero biases make every unit always active, so the network is exactly
+    /// linear (E34 arm L's class at any width). Thresholds restore capacity
+    /// inside the monotone class: `raw` stays non-increasing in every input,
+    /// pinned at identity, and convex piecewise-linear. Plain one-layer N only.
+    pub nonneg_thresholds: bool,
+    /// Requires `nonneg_thresholds` and `monotone_cbc`. The last
+    /// `2·monotone_ramps` hidden units form tied pairs `(p, p+1)`: one W1 row,
+    /// `b1[p+1] <= b1[p] <= 0`, and `w2[p+1] = -w2[p] >= 0`. Each pair is the
+    /// bounded ramp `w2[p]·(ReLU(z + b1[p]) - ReLU(z + b1[p+1]))`: non-increasing
+    /// in `z = a·x` (a >= 0) and <= 0, so `raw` stays monotone, `<= pin` and
+    /// pinned at identity while gaining saturation (non-convex). The other units
+    /// stay plain hinges. Representable in the existing ReLU wire format; the
+    /// guarantee is the pair structure, which identical values keep through
+    /// packing. `0` = off.
+    pub monotone_ramps: usize,
+    /// Bounded non-monotone budget. The last `2·free_ramps` hidden units form
+    /// tied ramp pairs whose W1 rows are NOT sign-constrained; every other
+    /// unit stays monotone. A free pair contributes `v·ramp(z)` with
+    /// `ramp ∈ [0, b_p - b_q]` and `v <= 0`, so `raw <= pin` and the identity
+    /// pin still hold, and the summed amplitude `Σ |v|·(b_p - b_q)` is
+    /// projected to at most `free_budget`. Then increasing any input raises
+    /// `raw` by at most `free_budget`: an explicit, certified cap on
+    /// non-monotonicity. `0` = off.
+    pub free_ramps: usize,
+    /// Cap on the free ramps' summed amplitude, in raw score units.
+    pub free_budget: f64,
+    /// Requires `nonneg_thresholds` and `monotone_cbc`. The first
+    /// `2·max_pairs` hidden units form pairs `(u, v) = (2i, 2i+1)`: `u` has a
+    /// W1 row `a >= 0` and bias exactly 0, `v` a row `b - a` with `b >= 0`
+    /// (each input's `(a, b - a)` projected onto `{a >= 0, a + (b-a) >= 0}`) and
+    /// bias `-t <= 0`, and both share one output weight `c <= 0`. On
+    /// non-negative inputs `ReLU(a·x) = a·x`, so the pair contributes
+    /// `c·max(a·x, b·x - t)`: monotone, pinned at identity, and able to take a
+    /// maximum over two damage detectors instead of summing them (no double
+    /// counting of one artifact through redundant features). `0` = off.
+    pub max_pairs: usize,
+    /// Content-gated monotonicity over `fx1` products. Each `(direct, product)`
+    /// input-index pair carries `d` and `d·f` with `f ∈ (0, 1]` a reference
+    /// fragility. With `monotone_cbc`, the product's W1 row is not clamped
+    /// `>= 0`; instead each unit's `(a, b)` is projected onto
+    /// `{a >= 0, a/s_d + b/s_p >= 0}` (`s` = scaler scales), so the unit's gain
+    /// on `d`, `a/s_d + b·f/s_p`, is non-negative for every `f ∈ (0, 1]`: the
+    /// model stays non-increasing in every damage feature while its gain may
+    /// rise or fall with content. Empty = off.
+    pub monotone_product_pairs: Vec<(usize, usize)>,
+    /// Filled by the trainer from its scaler (`(s_d, s_p)` per pair); callers
+    /// leave it empty.
+    pub monotone_product_scales: Vec<(f64, f64)>,
     pub n_hidden: usize,
     pub n_epochs: usize,
     pub pairs_per_epoch: usize,
@@ -954,6 +1008,13 @@ impl Default for MlpHyperparams {
             pooled_pearson_weight: 0.0,
             nonneg_distance: false,
             nonneg_pin: 100.0,
+            nonneg_thresholds: false,
+            monotone_ramps: 0,
+            free_ramps: 0,
+            free_budget: 0.0,
+            max_pairs: 0,
+            monotone_product_pairs: Vec::new(),
+            monotone_product_scales: Vec::new(),
             n_hidden: 32,
             n_epochs: 200,
             pairs_per_epoch: 50_000,
@@ -1369,15 +1430,483 @@ fn project_plain(
     pin: Option<f64>,
     hp: &MlpHyperparams,
 ) {
-    nonneg_project(w2, b1, b2, pin);
-    if hp.monotone_cbc {
+    // A ramp's upper unit carries `-w2[p] >= 0`; read the pair's tied output
+    // weight before the `w2 <= 0` clamp erases it.
+    let n_hidden = b1.len();
+    let n_pairs = hp.monotone_ramps + hp.free_ramps;
+    let first_pair = n_hidden - 2 * n_pairs;
+    let first_free = n_hidden - 2 * hp.free_ramps;
+    let ramp_w2: Vec<f64> = (0..n_pairs)
+        .map(|i| {
+            let p = first_pair + 2 * i;
+            ((w2[p] - w2[p + 1]) / 2.0).min(0.0)
+        })
+        .collect();
+    // Max pairs: keep each v row's sign through the per-unit clamp below, and
+    // tie the pair's output weight (mean, then <= 0).
+    let max_v_rows: Vec<Vec<f64>> = (0..hp.max_pairs)
+        .map(|i| {
+            w1.chunks_exact(n_hidden)
+                .map(|row| row[2 * i + 1])
+                .collect()
+        })
+        .collect();
+    let max_w2: Vec<f64> = (0..hp.max_pairs)
+        .map(|i| (0.5 * (w2[2 * i] + w2[2 * i + 1])).min(0.0))
+        .collect();
+    if hp.nonneg_thresholds && pin.is_some() {
+        nonneg_project_thresholds(b1);
+        nonneg_project_w2b2(w2, b2, pin);
+    } else {
+        nonneg_project(w2, b1, b2, pin);
+    }
+    if hp.monotone_cbc && !hp.monotone_product_pairs.is_empty() {
+        let n_in = w1.len() / n_hidden;
+        let mut gated = vec![false; n_in];
+        for &(_, p) in &hp.monotone_product_pairs {
+            gated[p] = true;
+        }
+        for (k, block) in w1.chunks_exact_mut(n_hidden).enumerate() {
+            if !gated[k] {
+                for v in &mut block[..first_free] {
+                    *v = v.max(0.0);
+                }
+            }
+        }
+        for (&(d, p), &(sd, sp)) in hp
+            .monotone_product_pairs
+            .iter()
+            .zip(&hp.monotone_product_scales)
+        {
+            for j in 0..first_free {
+                let (a, b) = project_gate(w1[d * n_hidden + j], w1[p * n_hidden + j], sd, sp);
+                w1[d * n_hidden + j] = a;
+                w1[p * n_hidden + j] = b;
+            }
+        }
+    } else if hp.monotone_cbc && hp.free_ramps > 0 {
+        // Free ramp rows keep their sign; only the monotone units are clamped.
+        for block in w1.chunks_exact_mut(n_hidden) {
+            for v in &mut block[..first_free] {
+                *v = v.max(0.0);
+            }
+        }
+    } else if hp.monotone_cbc {
         project_monotone_w1(
             w1,
-            b1.len(),
+            n_hidden,
             hp.monotone_feature_pin.as_deref(),
             hp.monotone_strict && !hp.monotone_pin_during_training,
         );
     }
+    if n_pairs > 0 {
+        project_ramp_pairs(w1, w2, b1, n_hidden, first_pair, &ramp_w2);
+    }
+    if hp.free_ramps > 0 {
+        project_free_budget(w2, b1, first_free, hp.free_ramps, hp.free_budget);
+    }
+    // A sign-free input under `--monotone-feature-mask` enters only the v row: u keeps `a·x >= 0`, so the pair is
+    // still `c·max(a·x, b·x + f·x_free - t)` (non-increasing in every masked-monotone input, convex in all of them).
+    let free = hp.monotone_feature_pin.as_deref();
+    let strict = hp.monotone_strict && !hp.monotone_pin_during_training;
+    for (i, (v_row, &c)) in max_v_rows.iter().zip(&max_w2).enumerate() {
+        let (u, v) = (2 * i, 2 * i + 1);
+        for (k, (row, &bv)) in w1.chunks_exact_mut(n_hidden).zip(v_row).enumerate() {
+            if free.is_some_and(|pin| !pin[k]) {
+                row[u] = 0.0;
+                row[v] = if strict { 0.0 } else { bv };
+                continue;
+            }
+            let (a, b) = project_gate(row[u], bv, 1.0, 1.0);
+            row[u] = a;
+            row[v] = b;
+        }
+        b1[u] = 0.0;
+        if b1[v] > 0.0 {
+            b1[v] = 0.0;
+        }
+        w2[u] = c;
+        w2[v] = c;
+    }
+}
+
+/// Smallest direct weight that may carry a negative product weight: the f16
+/// normal range, so packing cannot flush `a` to zero while `b < 0` survives.
+const GATE_MIN_DIRECT: f64 = 1.0 / 8192.0;
+/// Relative margin kept inside the gate cone so f16 packing (relative error
+/// <= 2^-11 per weight) cannot move a boundary pair outside it.
+const GATE_MARGIN: f64 = 1.0 / 256.0;
+
+/// Projects one unit's `(a, b)` (direct, product weights) onto the gate cone
+/// `{a >= 0, s_p·a + s_d·b >= GATE_MARGIN·s_p·a}`: the closer of the two edge
+/// rays when outside, then the f16 safety rules above.
+fn project_gate(a: f64, b: f64, sd: f64, sp: f64) -> (f64, f64) {
+    let (mut a, mut b) = if a >= 0.0 && sp * a + sd * b >= 0.0 {
+        (a, b)
+    } else {
+        let n = (sd * sd + sp * sp).sqrt();
+        let (ux, uy) = (sd / n, -sp / n);
+        let t1 = b.max(0.0);
+        let t2 = (a * ux + b * uy).max(0.0);
+        let d1 = a * a + (b - t1) * (b - t1);
+        let d2 = (a - t2 * ux).powi(2) + (b - t2 * uy).powi(2);
+        if d1 <= d2 {
+            (0.0, t1)
+        } else {
+            (t2 * ux, t2 * uy)
+        }
+    };
+    if b < 0.0 {
+        if a < GATE_MIN_DIRECT {
+            b = 0.0;
+        } else {
+            b = b.max(-a * (sp / sd) * (1.0 - GATE_MARGIN));
+        }
+    }
+    a = a.max(0.0);
+    (a, b)
+}
+
+/// Scales the free ramps' output weights so `Σ |v|·(b_p - b_q) <= budget`.
+/// Thresholds are left alone; shrinking `|v|` keeps every tie and sign.
+fn project_free_budget(w2: &mut [f64], b1: &[f64], first_free: usize, n: usize, budget: f64) {
+    let amplitude: f64 = (0..n)
+        .map(|i| {
+            let p = first_free + 2 * i;
+            -w2[p] * (b1[p] - b1[p + 1])
+        })
+        .sum();
+    if amplitude > budget {
+        let s = if amplitude > 0.0 {
+            budget / amplitude
+        } else {
+            0.0
+        };
+        for i in 0..n {
+            let p = first_free + 2 * i;
+            w2[p] *= s;
+            w2[p + 1] = -w2[p];
+        }
+    }
+}
+
+/// Ties each ramp pair `(p, p+1)` after the per-unit projections: averaged W1
+/// rows (already `>= 0`), `w2[p+1] = -w2[p]` with `w2[p] <= 0`, and
+/// `b1[p+1] <= b1[p]`. Averaging is the Euclidean projection onto the tie, so
+/// the pair follows the mean of its two gradients.
+fn project_ramp_pairs(
+    w1: &mut [f64],
+    w2: &mut [f64],
+    b1: &mut [f64],
+    n_hidden: usize,
+    first_pair: usize,
+    ramp_w2: &[f64],
+) {
+    for (i, &v) in ramp_w2.iter().enumerate() {
+        let p = first_pair + 2 * i;
+        w2[p] = v;
+        w2[p + 1] = -v;
+        if b1[p + 1] > b1[p] {
+            b1[p + 1] = b1[p];
+        }
+        for row in w1.chunks_exact_mut(n_hidden) {
+            let a = 0.5 * (row[p] + row[p + 1]);
+            row[p] = a;
+            row[p + 1] = a;
+        }
+    }
+}
+
+/// `--nonneg-thresholds`' replacement for the `b1 := 0` third: `b1 := min(b1, 0)`.
+/// `ReLU(min(b, 0)) = 0`, so `h(0⃗) = 0⃗` and the pin guarantee are unchanged.
+fn nonneg_project_thresholds(b1: &mut [f64]) {
+    for b in b1.iter_mut() {
+        if *b > 0.0 {
+            *b = 0.0;
+        }
+    }
+}
+
+/// What [`certify_monotone_bake`] proved about a bake.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct MonotoneCertificate {
+    /// Live monotone ramp pairs (non-negative W1 column).
+    pub ramps: usize,
+    /// Live free ramp pairs (sign-free W1 column).
+    pub free_ramps: usize,
+    /// Certified bound: for `x' >= x` (every input), `raw(x') <= raw(x) + free_amplitude`.
+    /// `0.0` means exactly non-increasing.
+    pub free_amplitude: f64,
+    /// Live max pairs (`c·max(a·x, b·x - t)`, guarantee on non-negative inputs).
+    pub max_pairs: usize,
+}
+
+/// Checks, from the baked bytes alone, the structure that makes a one-hidden-
+/// layer model monotone by construction (up to an explicit bounded budget):
+///
+/// - ReLU hidden layer, identity scalar output, no feature transforms;
+/// - `scaler_mean = 0`, `scaler_scale > 0` (standardization is increasing and
+///   maps `0⃗` to `0⃗`);
+/// - every `b1 <= 0`, output bias `== pin`;
+/// - every hidden unit with a positive output weight is a ramp's upper unit,
+///   matched one-to-one to a distinct lower unit with a bit-identical W1
+///   column, the exactly negated output weight and `b1_lower >= b1_upper`;
+/// - a negative W1 entry appears only in such a pair (a *free* ramp), or on
+///   an `fx1` fragility product whose unit keeps a non-negative gain on its
+///   damage feature for every fragility in (0, 1] (`zensim.derived_inputs`).
+///   Hidden units may be stored in any order.
+///
+/// Each plain unit contributes `w2·ReLU(z + b) <= 0` with `w2 <= 0`, non-
+/// increasing in `z = a·x` for `a >= 0`. Each pair contributes
+/// `w2·(ReLU(z + b_lo) - ReLU(z + b_up)) ∈ [w2·(b_lo - b_up), 0]`, non-increasing
+/// in `z`; for a free pair `z` may fall as inputs rise, which raises `raw` by
+/// at most that pair's amplitude. So `raw(0⃗) = pin`, `raw <= pin`, and for
+/// `x' >= x`, `raw(x') <= raw(x) + free_amplitude`, on all of input space.
+/// Floating-point evaluation follows this exactly for plain units; a pair's
+/// two terms can cancel to within rounding.
+pub fn certify_monotone_bake(
+    model: &zenpredict::Model,
+    pin: f32,
+) -> Result<MonotoneCertificate, String> {
+    fn values(w: &zenpredict::WeightStorage<'_>, out_dim: usize) -> Vec<f32> {
+        match w {
+            zenpredict::WeightStorage::F32(w) => w.to_vec(),
+            zenpredict::WeightStorage::F16(w) => {
+                w.iter().map(|&b| zenpredict::f16_bits_to_f32(b)).collect()
+            }
+            zenpredict::WeightStorage::I8 { weights, scales } => weights
+                .iter()
+                .enumerate()
+                .map(|(i, &q)| f32::from(q) * scales[i % out_dim])
+                .collect(),
+        }
+    }
+    if model.n_layers() != 2 {
+        return Err(format!("{} layers, expected 2", model.n_layers()));
+    }
+    let (l0, l1) = (model.layer(0), model.layer(1));
+    if l0.activation != Activation::Relu || l1.activation != Activation::Identity || l1.out_dim != 1
+    {
+        return Err("needs ReLU hidden layer and identity scalar output".into());
+    }
+    if model
+        .feature_transforms()
+        .is_some_and(|ts| ts.iter().any(|t| *t != FeatureTransform::Identity))
+    {
+        return Err("feature transforms present".into());
+    }
+    if model.scaler_mean().iter().any(|&m| m != 0.0)
+        || model
+            .scaler_scale()
+            .iter()
+            .any(|&s| !(s > 0.0 && s.is_finite()))
+    {
+        return Err("standardization is not scale-only and positive".into());
+    }
+    let (n_in, n_hidden) = (l0.in_dim, l0.out_dim);
+    let w1 = values(&l0.weights, n_hidden);
+    let w2 = values(&l1.weights, 1);
+    if w1.iter().any(|w| w.is_nan()) || w2.iter().any(|w| w.is_nan()) {
+        return Err("NaN weight".into());
+    }
+    if l0.biases.iter().any(|&b| !(b <= 0.0)) {
+        return Err("a hidden bias is positive or NaN".into());
+    }
+    if l1.biases[0].to_bits() != pin.to_bits() {
+        return Err(format!("output bias {} != pin {pin}", l1.biases[0]));
+    }
+    let column =
+        |j: usize| -> Vec<u32> { (0..n_in).map(|k| w1[k * n_hidden + j].to_bits()).collect() };
+    // `fx1` products: (direct input, product input) pairs whose second factor
+    // is a `pjnd_fragility` slot, bounded in (0, 1] by construction. A unit is
+    // monotone in a damage feature when its gain `a/s_d + b·f/s_p` is >= 0 for
+    // every such f, i.e. `a >= 0` and `a/s_d + min(0, b)/s_p >= 0`.
+    let gates = derived_gates(model)?;
+    let scale = model.scaler_scale();
+    let mut gated = vec![false; n_in];
+    for &(_, p) in &gates {
+        gated[p] = true;
+    }
+    let signed = |j: usize| {
+        (0..n_in).any(|k| !gated[k] && w1[k * n_hidden + j] < 0.0)
+            || gates.iter().any(|&(d, p)| {
+                let a = f64::from(w1[d * n_hidden + j]) / f64::from(scale[d]);
+                let b = f64::from(w1[p * n_hidden + j]) / f64::from(scale[p]);
+                a < 0.0 || a + b.min(0.0) < 0.0
+            })
+    };
+    let mut used = vec![false; n_hidden];
+    let mut cert = MonotoneCertificate {
+        ramps: 0,
+        free_ramps: 0,
+        free_amplitude: 0.0,
+        max_pairs: 0,
+    };
+    for up in 0..n_hidden {
+        if !(w2[up] > 0.0) {
+            continue;
+        }
+        let col = column(up);
+        let b_up = l0.biases[up];
+        let lo = (0..n_hidden).find(|&j| {
+            !used[j]
+                && j != up
+                && w2[j].to_bits() == (-w2[up]).to_bits()
+                && l0.biases[j] >= b_up
+                && column(j) == col
+        });
+        let Some(lo) = lo else {
+            return Err(format!(
+                "unit {up}: positive output weight without a ramp partner"
+            ));
+        };
+        used[lo] = true;
+        used[up] = true;
+        if signed(up) {
+            cert.free_ramps += 1;
+            cert.free_amplitude += f64::from(w2[up]) * (f64::from(l0.biases[lo]) - f64::from(b_up));
+        } else {
+            cert.ramps += 1;
+        }
+    }
+    // Max pairs: a signed unit v with w2 <= 0 is covered by an unused partner u
+    // with bias exactly 0, the bit-identical output weight, a non-negative
+    // column, and column(u) + column(v) >= 0: then c·(ReLU(a·x) + ReLU((b-a)·x - t))
+    // = c·max(a·x, b·x - t) on non-negative inputs.
+    let col_f =
+        |j: usize| -> Vec<f64> { (0..n_in).map(|k| f64::from(w1[k * n_hidden + j])).collect() };
+    for v in 0..n_hidden {
+        if used[v] || !signed(v) || w2[v] == 0.0 {
+            continue;
+        }
+        let cv = col_f(v);
+        let u = (0..n_hidden).find(|&u| {
+            !used[u]
+                && u != v
+                && l0.biases[u] == 0.0
+                && w2[u].to_bits() == w2[v].to_bits()
+                && !signed(u)
+                && col_f(u)
+                    .iter()
+                    .zip(&cv)
+                    .all(|(a, b)| *a >= 0.0 && a + b >= 0.0)
+        });
+        match u {
+            Some(u) => {
+                used[u] = true;
+                used[v] = true;
+                cert.max_pairs += 1;
+            }
+            None => {
+                return Err(format!(
+                    "unit {v}: negative first-layer weight outside a ramp or max pair"
+                ));
+            }
+        }
+    }
+    Ok(cert)
+}
+
+/// `(direct input, product input)` index pairs from a bake's
+/// `zensim.derived_inputs` declaration, each product's second factor checked
+/// to be a `pjnd_fragility` slot (v2 signal 21: `372 + 29·cell + 21`). No
+/// declaration = no pairs. Anything else in the declaration refuses.
+fn derived_gates(model: &zenpredict::Model) -> Result<Vec<(usize, usize)>, String> {
+    let Ok(text) = model.metadata().get_utf8("zensim.derived_inputs") else {
+        return Ok(Vec::new());
+    };
+    let mut lines = text.lines();
+    if lines.next() != Some("zensim-derived-inputs v1") {
+        return Err("unknown derived-inputs header".into());
+    }
+    let mut direct_pos = std::collections::BTreeMap::new();
+    let mut pairs = Vec::new();
+    for (pos, line) in lines.filter(|l| !l.is_empty()).enumerate() {
+        let parts: Vec<&str> = line.split_whitespace().collect();
+        let id = |s: &str| {
+            s.parse::<usize>()
+                .map_err(|_| format!("bad derived-inputs id {s:?}"))
+        };
+        match parts.as_slice() {
+            ["in", a] => {
+                direct_pos.insert(id(a)?, pos);
+            }
+            ["product", a, f] => {
+                let (a, f) = (id(a)?, id(f)?);
+                if !(372..720).contains(&f) || (f - 372) % 29 != 21 {
+                    return Err(format!("product factor {f} is not a pjnd_fragility slot"));
+                }
+                let d = *direct_pos
+                    .get(&a)
+                    .ok_or_else(|| format!("product of {a} precedes or lacks its direct input"))?;
+                pairs.push((d, pos));
+            }
+            _ => return Err(format!("unknown derived-inputs line {line:?}")),
+        }
+    }
+    if direct_pos.len() + pairs.len() != model.n_inputs() {
+        return Err("derived-inputs declaration does not cover the model inputs".into());
+    }
+    Ok(pairs)
+}
+
+/// Upper end of the per-unit quantile range [`init_thresholds`] draws from.
+const THRESHOLD_INIT_MAX_Q: f64 = 0.9;
+/// Training rows [`init_thresholds`] samples to place each unit's threshold.
+const THRESHOLD_INIT_ROWS: usize = 4096;
+
+/// `--nonneg-thresholds` initialization. With `W1 >= 0`, `b1 = 0` and
+/// non-negative inputs every unit is active on every row, so the within-pair
+/// rank loss gives `b1` an exactly zero gradient (a shared shift cancels in the
+/// pair difference) and only the absolute term could ever move it. Each unit
+/// therefore starts as a hinge: `b1[j] = -quantile(z_j, u_j)` with
+/// `u_j ~ U[0, THRESHOLD_INIT_MAX_Q)` over a fixed sample of training rows,
+/// where `z_j` is the unit's pre-activation. Its own stream (derived from the
+/// init seed), so no other recipe's init or sample draws move. Returns the
+/// number of rows sampled.
+fn init_thresholds(
+    w1: &[f64],
+    b1: &mut [f64],
+    std_features: &StdFeatures,
+    groups: &[TrainingGroup<'_>],
+    train_indices: &[usize],
+    n_hidden: usize,
+    seed: u64,
+) -> usize {
+    let mut rng = SplitMix64::new(seed ^ 0x6279_635f_7468_7265);
+    let counts: Vec<usize> = train_indices
+        .iter()
+        .map(|&gi| groups[gi].human_scores.len())
+        .collect();
+    let total: usize = counts.iter().sum();
+    if total == 0 {
+        return 0;
+    }
+    let n = THRESHOLD_INIT_ROWS.min(total);
+    let mut z: Vec<Vec<f64>> = vec![Vec::with_capacity(n); n_hidden];
+    for _ in 0..n {
+        let mut r = (rng.next_u64() % total as u64) as usize;
+        let mut pos = 0;
+        while r >= counts[pos] {
+            r -= counts[pos];
+            pos += 1;
+        }
+        let x = std_features.row_cow(train_indices[pos], r);
+        for (j, zj) in z.iter_mut().enumerate() {
+            let mut acc = 0.0;
+            for (k, &xk) in x.iter().enumerate() {
+                acc += xk * w1[k * n_hidden + j];
+            }
+            zj.push(acc);
+        }
+    }
+    for (j, zj) in z.iter_mut().enumerate() {
+        zj.sort_by(f64::total_cmp);
+        let q = rng.next_f64_unit() * THRESHOLD_INIT_MAX_Q;
+        let at = ((zj.len() - 1) as f64 * q).floor() as usize;
+        b1[j] = -zj[at].max(0.0);
+    }
+    n
 }
 
 /// The `b1 := 0` third of [`nonneg_project`]. Split out for the
@@ -2607,8 +3136,31 @@ pub fn train_mlp_strategy_pairs(
                 log,
             );
         }
+        if hyperparams.nonneg_thresholds {
+            log_line(
+                "MLP train: --nonneg-thresholds — hidden biases projected <= 0 \
+                 (trainable thresholds) instead of frozen at 0",
+                log,
+            );
+        }
     }
     let scaler_mean = scaler_mean;
+    // `--monotone-gated-products`: the gate cone is defined in standardized
+    // units, so its scales come from this run's scaler.
+    let gated_hp;
+    let hyperparams = if hyperparams.monotone_product_pairs.is_empty() {
+        hyperparams
+    } else {
+        gated_hp = MlpHyperparams {
+            monotone_product_scales: hyperparams
+                .monotone_product_pairs
+                .iter()
+                .map(|&(d, p)| (scaler_scale[d].max(1e-12), scaler_scale[p].max(1e-12)))
+                .collect(),
+            ..hyperparams.clone()
+        };
+        &gated_hp
+    };
 
     // 2. Standardize features per group up-front. Standardizing now
     //    avoids redoing it inside the per-step inner loop and lets the
@@ -2722,6 +3274,36 @@ pub fn train_mlp_strategy_pairs(
                 "[keep-features] pinned {masked_rows} of {n_features} layer-1 input rows to 0 \
                  (effective width {})",
                 n_features - masked_rows
+            ),
+            log,
+        );
+    }
+    if hyperparams.nonneg_thresholds {
+        let sampled = init_thresholds(
+            &w1,
+            &mut b1,
+            &std_features,
+            groups,
+            &train_indices,
+            n_hidden,
+            hyperparams.init_seed.unwrap_or(hyperparams.seed),
+        );
+        // A ramp pair's two units share a W1 row, so their quantile thresholds
+        // order cleanly: the lower unit takes the smaller threshold.
+        let n_pairs = hyperparams.monotone_ramps + hyperparams.free_ramps;
+        let first_pair = n_hidden - 2 * n_pairs;
+        for i in 0..n_pairs {
+            let p = first_pair + 2 * i;
+            if b1[p + 1] > b1[p] {
+                b1.swap(p, p + 1);
+            }
+        }
+        project_plain(&mut w1, &mut w2, &mut b1, &mut b2, nonneg, hyperparams);
+        log_line(
+            &format!(
+                "[nonneg-thresholds] b1 initialized at per-unit pre-activation quantiles \
+                 U[0, {THRESHOLD_INIT_MAX_Q}) over {sampled} training rows; min b1 {:.6}",
+                b1.iter().copied().fold(0.0, f64::min)
             ),
             log,
         );
@@ -2953,7 +3535,9 @@ pub fn train_mlp_strategy_pairs(
     //  - coarse decay off (checked per step — `apply_post_adam_penalties`
     //    writes w1 after the walk when on);
     //  - not the epoch's last pair (the next draw belongs to the next
-    //    epoch and may never happen under early stop).
+    //    epoch and may never happen under early stop);
+    //  - no `--nonneg-thresholds`: the armed step projects b1 with the
+    //    `b1 := 0` third, which would erase the thresholds.
     #[cfg(e36_tv)]
     let tv_pool_ready = e36_pool.is_some();
     #[cfg(not(e36_tv))]
@@ -2964,6 +3548,7 @@ pub fn train_mlp_strategy_pairs(
     let pooled_on = !hyperparams.pooled_legs.is_empty();
     let lookahead_ok = fuse_w1
         && !hyperparams.monotone_cbc
+        && !hyperparams.nonneg_thresholds
         && !parallel
         && !nin_on
         && !tv_can_fire

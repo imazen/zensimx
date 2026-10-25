@@ -82,11 +82,12 @@ REV4_PROFILE = BankProfile(4, "rev4-featbank-r4-v1", CANON_ERA, CANON_FEATURE_SE
 PROFILE = REV4_PROFILE
 
 
-def rev5_profile(era: str, fsid: str, binary: str, build: str, pad_to: int | None) -> BankProfile:
+def rev5_profile(era: str, fsid: str, binary: str, build: str, pad_to: int | None, revision: int = 5) -> BankProfile:
+    """A rev5_bank.py bank: revision 5, or revision 7 (by-construction exploration, raw ringing; the same bank layout)."""
     from rev5_bank import SCHEMA as REV5_SCHEMA, SLOT_RANGES
     if not (era and fsid and binary and build):
-        raise ValueError("--revision 5 needs --expect-era, --expect-fsid, --expect-binary and --expect-build")
-    return BankProfile(5, REV5_SCHEMA, era, fsid, binary, build, None, tuple(tuple(r) for r in SLOT_RANGES), pad_to)
+        raise ValueError(f"--revision {revision} needs --expect-era, --expect-fsid, --expect-binary and --expect-build")
+    return BankProfile(revision, REV5_SCHEMA, era, fsid, binary, build, None, tuple(tuple(r) for r in SLOT_RANGES), pad_to)
 
 
 def requested_mask(width: int) -> np.ndarray:
@@ -902,8 +903,8 @@ def build_assessment(bank: Path, out: Path, names: list[str], ids: list[int]) ->
     from v2_common import refuse_immutable_output
     from rev5_bank import ASSESSMENT_KEY_COLUMNS
     registered_ids = json.loads((REPO / "benchmarks/costset2_2026-10-03.candidate_ids.json").read_text())["candidates"]["by_v2fy"]
-    if PROFILE.revision != 5 or ids != registered_ids:
-        raise ValueError("Rev5 by_v2fy420 assessment required")
+    if PROFILE.revision not in (5, 7) or ids != registered_ids:
+        raise ValueError("Rev5 (or by-construction revision 7) by_v2fy420 assessment required")
     bank = assessment_path(bank)
     refuse_immutable_output(out, [bank])
     if assessment_path(out).exists():
@@ -937,7 +938,7 @@ def build_assessment(bank: Path, out: Path, names: list[str], ids: list[int]) ->
     out.mkdir(parents=True)
     record = {"schema":"rev5-assessment-tables-v1", "features_only":True,"labels_read":False,
         "feature_ids":ids,"feature_set_id":"basic+v2@w720/"+PROFILE.era+"#62adfc93",
-        "formula_revision":5,"decoder_era":f"legacy-rgb8/extract_features_372col@sha256:{PROFILE.binary}",
+        "formula_revision":PROFILE.revision,"decoder_era":f"legacy-rgb8/extract_features_372col@sha256:{PROFILE.binary}",
         "table_code":code_identity(),"bank_root":str(bank.resolve()),"tables":[]}
     for name, m, keys, X, paths in prepared:
         kp = out / (name + ".keys.parquet");pq.write_table(keys, kp, compression="zstd")
@@ -1033,7 +1034,8 @@ def main() -> None:
     ap.add_argument("--extra-arm", action="append", default=[], help="NAME=ID,ID,... (keeplists)")
     ap.add_argument("--peer-dir", type=Path, default=CANON_PEERS)
     ap.add_argument("--sample", type=int, default=10_000, help="verify: SafeSyn sample rows")
-    ap.add_argument("--revision", type=int, choices=[4, 5], default=4, help="bank profile (Rev5: rev5_bank.py output)")
+    ap.add_argument("--revision", type=int, choices=[4, 5, 7], default=4,
+                    help="bank profile (Rev5: rev5_bank.py output; 7: its revision-7 output, assessment only)")
     ap.add_argument("--expect-era", default="")
     ap.add_argument("--expect-fsid", default="")
     ap.add_argument("--expect-binary", default="")
@@ -1041,10 +1043,13 @@ def main() -> None:
     ap.add_argument("--pad-to", type=int, default=0, help="Rev5: NaN-pad tables to this width (the Rev4 tables' width)")
     args = ap.parse_args()
     global PROFILE
-    if args.revision == 5:
+    if args.revision in (5, 7):
         if args.bank == CANON_BANK:
-            ap.error("--revision 5 needs an explicit --bank (the Rev5 bank)")
-        PROFILE = rev5_profile(args.expect_era, args.expect_fsid, args.expect_binary, args.expect_build, args.pad_to or None)
+            ap.error(f"--revision {args.revision} needs an explicit --bank (the rev5_bank.py bank)")
+        if args.revision == 7 and args.action != "assessment":
+            ap.error("--revision 7 builds assessment tables only")
+        PROFILE = rev5_profile(args.expect_era, args.expect_fsid, args.expect_binary, args.expect_build, args.pad_to or None,
+                               args.revision)
     import v2_common
     v2_common.V2 = args.out  # receipts hold root-relative table paths (table_path); the root is --out
     extras = parse_extras(args.extra)

@@ -1,0 +1,6 @@
+# A=/home/lilith/tmp/byc/perf/final/byc_score_timing sha256=ad4328f044d0d016
+# B=/home/lilith/tmp/byc/perf/band7/byc_score_timing sha256=b352861dc508f1fa
+# A bakes: /home/lilith/tmp/byc/perf/b_rev7.bin /home/lilith/tmp/byc/parity/tga_full_rev6.bin; B bakes: /home/lilith/tmp/byc/perf/b_rev7.bin /home/lilith/tmp/byc/parity/tga_full_rev6.bin
+# host=dev date=2026-10-24T13:45:37Z rounds=8 load=0.95 4.09 3.73
+# cases: /mnt/v/output/zensim/byconstruction-2026-10-22/perf/cases/cases_focus.tsv
+# raw rounds: /mnt/v/output/zensim/byconstruction-2026-10-22/perf/2026-10-24/rev7_bad544a3_vs_f96d7218/*.jsonl on dev (SHA256SUMS beside them); revision-7 stamp of B; A = the bad544a3 build, B = the f96d7218 build

@@ -1,0 +1,23 @@
+# perf record -g, byc_score_timing --size 2048 --iters 20 --warmup 2, B served bake 89cb4861, RAYON_NUM_THREADS=1, taskset -c 2, dev 2026-10-22
+# baseline binary sha256 bb445dca30db399e2cda17d890c6cb915f0125bb82e99086f9cf550933b84d2a; 8487 samples; sin/cos/main = the benchmark's own image synthesis
+# perf report --no-children --sort symbol -g none (top 20)
+29.80% [.] zensim::feature_v2::__arcane_dense_block_kernel_canon64_vec_v4x::<zensim::featcanon::Lanes16F64>
+13.16% [.] zensim::color::__arcane_srgb_xyb_canon_vec_v4x
+7.98% [.] <zensim::feature_v2::OnlineMoments>::block
+7.82% [.] zensim::fused::__arcane_fused_vblur_ssim_canon64_vec_v4x::<zensim::featcanon::Lanes16F64>
+7.55% [.] zensim::blur::__arcane_fused_blur_h_local11_wide_v4x
+7.51% [.] zensim::feature_v2::__arcane_gradient_block_kernel_canon64_vec_v4x::<zensim::featcanon::Lanes16F64, false, false, false>
+7.30% [.] zensim::blur::__arcane_box_blur_v_local11_wide_v4x
+3.68% [.] __sin_fma
+2.99% [.] zensim::blur::__arcane_box_blur_h_local11_wide_v4x
+2.41% [.] __cos_fma
+2.25% [.] zensim::feature_v2::blockiness_sparse_strip_wide
+1.66% [.] byc_score_timing::main
+1.19% [.] zensim::blur::__arcane_downscale_2x_into_inner_v4x
+0.88% [.] zensim::simd_ops::__arcane_abs_diff_into_inner_v4
+0.77% [.] __memmove_avx512_unaligned_erms
+0.69% [.] zensim::feature_v2::gradient_interior_elem_canon::<zensim::featcanon::Lanes16F64, false, false, false>
+0.36% [.] __memset_avx512_unaligned_erms
+0.20% [.] <std::sys::sync::mutex::futex::Mutex>::lock_contended
+0.11% [k] kernel_init_pages
+0.05% [k] restore_fpregs_from_fpstate

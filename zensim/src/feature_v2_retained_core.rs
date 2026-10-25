@@ -11,7 +11,7 @@ pub(super) struct RetainedCoreWork {
 }
 
 pub(super) fn retained_core_admits(local: &ComputeSet) -> bool {
-    local.formula_revision == FormulaRevision::Rev5
+    local.formula_revision >= FormulaRevision::Rev5
         && matches!(
             crate::featcanon::mode(local.formula_revision),
             crate::featcanon::Mode::Canon64
@@ -175,6 +175,7 @@ pub(super) fn rev5_retained_phase_b(
             &raw[0][g_off..g_off + g_n],
             &raw[1][g_off..g_off + g_n],
             act,
+            Some((m1, m2)),
             width,
             info.strip_h,
             None,
@@ -269,7 +270,16 @@ pub(super) fn rev5_retained_single_channel<S: ImageSource, D: ImageSource>(
     }
     if local.blockiness {
         let (sum_v, sum_h) = &mut acc.block[scale];
-        blockiness_sparse_strip_wide(src, dst, info.plane_w, info.y0, info.strip_h, sum_v, sum_h);
+        blockiness_sparse_strip_wide(
+            src,
+            dst,
+            info.plane_w,
+            info.y0,
+            info.strip_h,
+            local.formula_revision,
+            sum_v,
+            sum_h,
+        );
     }
 }
 

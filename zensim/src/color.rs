@@ -15,6 +15,8 @@
 use archmage::arcane;
 use archmage::incant;
 use archmage::magetypes;
+#[cfg(all(target_arch = "x86_64", feature = "avx512"))]
+use core::arch::x86_64::{__m512, __m512i};
 use magetypes::simd::backends::F32x8Convert;
 use magetypes::simd::backends::F32x16Convert;
 #[cfg(target_arch = "x86_64")]
@@ -188,7 +190,7 @@ pub(crate) fn srgb_to_positive_xyb_planar_into_at_revision(
 ) {
     let mode = crate::featcanon::mode(revision);
     if mode.active() {
-        srgb_xyb_canon(pixels, x_out, y_out, b_out, mode);
+        srgb_xyb_canon(pixels, x_out, y_out, b_out, mode, revision.cbrt_newton());
         return;
     }
     srgb_to_positive_xyb_planar_into(pixels, x_out, y_out, b_out);
@@ -256,9 +258,10 @@ fn absorbance_bias_f32() -> f32 {
 }
 
 /// One pixel of canonical opsin absorbance mix + cube root + positive shift.
+/// `cbrt7` selects revision 7's cube root ([`crate::det_math::cbrt_newton_f32`]).
 #[inline(always)]
 #[allow(clippy::manual_clamp)]
-fn opsin_px_canon(ab: f32, r: f32, g: f32, b: f32) -> (f32, f32, f32) {
+fn opsin_px_canon(ab: f32, r: f32, g: f32, b: f32, cbrt7: bool) -> (f32, f32, f32) {
     let m0 = K_M00
         .mul_add(r, K_M01.mul_add(g, K_M02.mul_add(b, K_B0)))
         .max(0.0);
@@ -268,9 +271,14 @@ fn opsin_px_canon(ab: f32, r: f32, g: f32, b: f32) -> (f32, f32, f32) {
     let m2 = K_M20
         .mul_add(r, K_M21.mul_add(g, K_M22.mul_add(b, K_B0)))
         .max(0.0);
-    let t0 = magetypes::nostd_math::cbrt_midp_f32(m0);
-    let t1 = magetypes::nostd_math::cbrt_midp_f32(m1);
-    let t2 = magetypes::nostd_math::cbrt_midp_f32(m2);
+    let root = |m: f32| {
+        if cbrt7 {
+            crate::det_math::cbrt_newton_f32(m)
+        } else {
+            magetypes::nostd_math::cbrt_midp_f32(m)
+        }
+    };
+    let (t0, t1, t2) = (root(m0), root(m1), root(m2));
     let c0 = t0 + ab;
     let c1 = t1 + ab;
     let x = 0.5 * (c0 - c1);
@@ -334,6 +342,7 @@ pub(crate) fn srgb_xyb_canon(
     y_out: &mut [f32],
     b_out: &mut [f32],
     mode: crate::featcanon::Mode,
+    cbrt7: bool,
 ) {
     #[cfg(feature = "oracle")]
     if mode.exact() {
@@ -353,7 +362,7 @@ pub(crate) fn srgb_xyb_canon(
     #[cfg(not(feature = "oracle"))]
     let _ = mode;
     incant!(
-        srgb_xyb_canon_vec(pixels, x_out, y_out, b_out),
+        srgb_xyb_canon_vec(pixels, x_out, y_out, b_out, cbrt7),
         [v4x, v4, v3, neon, wasm128, scalar]
     );
 }
@@ -367,6 +376,7 @@ fn srgb_xyb_canon_body(
     x_out: &mut [f32],
     y_out: &mut [f32],
     b_out: &mut [f32],
+    cbrt7: bool,
 ) {
     let ab = absorbance_bias_f32();
     for (i, &p) in pixels.iter().enumerate() {
@@ -375,6 +385,7 @@ fn srgb_xyb_canon_body(
             srgb_u8_to_linear(p[0]),
             srgb_u8_to_linear(p[1]),
             srgb_u8_to_linear(p[2]),
+            cbrt7,
         );
         x_out[i] = x;
         y_out[i] = y;
@@ -391,6 +402,7 @@ pub(crate) fn linear_xyb_canon<const CLAMP: bool>(
     y_out: &mut [f32],
     b_out: &mut [f32],
     mode: crate::featcanon::Mode,
+    cbrt7: bool,
 ) {
     #[cfg(feature = "oracle")]
     if mode.exact() {
@@ -417,7 +429,7 @@ pub(crate) fn linear_xyb_canon<const CLAMP: bool>(
     #[cfg(not(feature = "oracle"))]
     let _ = mode;
     incant!(
-        linear_xyb_canon_vec::<CLAMP>(pixels, x_out, y_out, b_out),
+        linear_xyb_canon_vec::<CLAMP>(pixels, x_out, y_out, b_out, cbrt7),
         [v4x, v4, v3, neon, wasm128, scalar]
     );
 }
@@ -427,7 +439,7 @@ pub(crate) fn linear_xyb_canon<const CLAMP: bool>(
 /// the scalar/wasm128 stubs (REV4VEC).
 #[inline(always)]
 #[allow(clippy::manual_clamp)]
-fn linear_px_canon<const CLAMP: bool>(ab: f32, p: [f32; 3]) -> (f32, f32, f32) {
+fn linear_px_canon<const CLAMP: bool>(ab: f32, p: [f32; 3], cbrt7: bool) -> (f32, f32, f32) {
     let (r, g, b) = if CLAMP {
         (
             p[0].max(0.0).min(1.0),
@@ -437,7 +449,7 @@ fn linear_px_canon<const CLAMP: bool>(ab: f32, p: [f32; 3]) -> (f32, f32, f32) {
     } else {
         (p[0], p[1], p[2])
     };
-    opsin_px_canon(ab, r, g, b)
+    opsin_px_canon(ab, r, g, b, cbrt7)
 }
 
 /// The per-element scalar canonical linear→XYB body — as
@@ -447,10 +459,11 @@ fn linear_xyb_canon_body<const CLAMP: bool>(
     x_out: &mut [f32],
     y_out: &mut [f32],
     b_out: &mut [f32],
+    cbrt7: bool,
 ) {
     let ab = absorbance_bias_f32();
     for (i, &p) in pixels.iter().enumerate() {
-        let (x, y, bb) = linear_px_canon::<CLAMP>(ab, p);
+        let (x, y, bb) = linear_px_canon::<CLAMP>(ab, p, cbrt7);
         x_out[i] = x;
         y_out[i] = y;
         b_out[i] = bb;
@@ -487,6 +500,8 @@ fn linear_xyb_canon_body<const CLAMP: bool>(
 #[cfg_attr(not(target_arch = "x86_64"), allow(dead_code))]
 struct CanonChunk<T: F32x16Convert> {
     token: T,
+    /// Revision 7's cube root ([`crate::det_math::cbrt_newton_x16`]).
+    cbrt7: bool,
     m: [[GenericF32x16<T>; 3]; 3],
     bias: GenericF32x16<T>,
     zero: GenericF32x16<T>,
@@ -509,9 +524,16 @@ struct CanonChunk<T: F32x16Convert> {
 impl<T: F32x16Convert> CanonChunk<T> {
     #[inline(always)]
     fn new(token: T) -> Self {
+        Self::new_at(token, false)
+    }
+
+    /// `cbrt7` selects revision 7's cube root in [`Self::opsin_positive`].
+    #[inline(always)]
+    fn new_at(token: T, cbrt7: bool) -> Self {
         let splat = |v: f32| GenericF32x16::splat_t(token, v);
         Self {
             token,
+            cbrt7,
             m: [
                 [splat(K_M00), splat(K_M01), splat(K_M02)],
                 [splat(K_M10), splat(K_M11), splat(K_M12)],
@@ -629,9 +651,16 @@ impl<T: F32x16Convert> CanonChunk<T> {
         b: GenericF32x16<T>,
     ) -> (GenericF32x16<T>, GenericF32x16<T>, GenericF32x16<T>) {
         let [m0, m1, m2] = self.mixed(r, g, b);
-        let t0 = m0.cbrt_midp();
-        let t1 = m1.cbrt_midp();
-        let t2 = m2.cbrt_midp();
+        let (t0, t1, t2) = if self.cbrt7 {
+            (
+                // `mixed` ends in `max(0)`: the inputs are `+0` or positive.
+                crate::det_math::cbrt_newton_nonneg_x16(self.token, m0),
+                crate::det_math::cbrt_newton_nonneg_x16(self.token, m1),
+                crate::det_math::cbrt_newton_nonneg_x16(self.token, m2),
+            )
+        } else {
+            (m0.cbrt_midp(), m1.cbrt_midp(), m2.cbrt_midp())
+        };
         let c0 = t0 + self.ab;
         let c1 = t1 + self.ab;
         let x = self.half * (c0 - c1);
@@ -684,16 +713,19 @@ impl<T: F32x16Convert> CanonChunk<T> {
 /// per-element formula through [`CanonChunk`], full 16-pixel chunks only;
 /// the `n mod 16` remainder runs the scalar body on every tier.
 /// `-scalar`: `#[magetypes]` would otherwise emit a generic `_scalar`
-/// variant whose `mul_add` is unfused — not canonical.
-#[magetypes(define(f32x16), v4x, v4, v3, -scalar)]
+/// variant whose `mul_add` is unfused — not canonical. v4x is
+/// [`srgb_xyb_canon_vec_v4x`]: the same arithmetic with the table held in
+/// registers.
+#[magetypes(define(f32x16), v4, v3, -scalar)]
 fn srgb_xyb_canon_vec(
     token: Token,
     pixels: &[[u8; 3]],
     x_out: &mut [f32],
     y_out: &mut [f32],
     b_out: &mut [f32],
+    cbrt7: bool,
 ) {
-    let k = CanonChunk::new(token);
+    let k = CanonChunk::new_at(token, cbrt7);
     let n = pixels.len();
     let chunks = n / 16;
     for c in 0..chunks {
@@ -716,11 +748,242 @@ fn srgb_xyb_canon_vec(
             srgb_u8_to_linear(p[0]),
             srgb_u8_to_linear(p[1]),
             srgb_u8_to_linear(p[2]),
+            cbrt7,
         );
         x_out[i] = x;
         y_out[i] = y;
         b_out[i] = bb;
     }
+}
+
+/// [`srgb_xyb_canon_vec`] on v4x, with the sRGB8 → linear table held in
+/// sixteen registers ([`srgb_lanes_v4x`]) instead of three 16-lane gathers
+/// per chunk (most of this kernel's time on Zen 5). The table values, the
+/// opsin arithmetic ([`CanonChunk::opsin_positive`]) and the scalar
+/// remainder are the generated variant's, so every output is bit-identical.
+#[cfg(all(target_arch = "x86_64", feature = "avx512"))]
+#[arcane]
+fn srgb_xyb_canon_vec_v4x(
+    token: archmage::X64V4xToken,
+    pixels: &[[u8; 3]],
+    x_out: &mut [f32],
+    y_out: &mut [f32],
+    b_out: &mut [f32],
+    cbrt7: bool,
+) {
+    let k = CanonChunk::new_at(token, cbrt7);
+    let lut = srgb_lut_regs_v4x();
+    let lut_bytes = srgb_lut_byte_planes_v4x();
+    let n = pixels.len();
+    // Sixty-four pixels at a time through the byte-plane table
+    // ([`srgb64_channel_v4x`]), then sixteen through the register table.
+    let groups = n / 64;
+    for g in 0..groups {
+        let base = g * 64;
+        let px: &[[u8; 3]; 64] = pixels[base..base + 64]
+            .try_into()
+            .expect("64 pixels per group");
+        let v = load_rgb64_v4x(px);
+        let r = srgb64_channel_v4x::<0>(&lut_bytes, &v);
+        let gr = srgb64_channel_v4x::<1>(&lut_bytes, &v);
+        let b = srgb64_channel_v4x::<2>(&lut_bytes, &v);
+        for m in 0..4 {
+            let (x, y, bb) = k.opsin_positive(
+                GenericF32x16::<archmage::X64V4xToken>::from_raw_t(token, r[m]),
+                GenericF32x16::<archmage::X64V4xToken>::from_raw_t(token, gr[m]),
+                GenericF32x16::<archmage::X64V4xToken>::from_raw_t(token, b[m]),
+            );
+            let o = base + 16 * m;
+            x_out[o..o + 16].copy_from_slice(&x.to_array());
+            y_out[o..o + 16].copy_from_slice(&y.to_array());
+            b_out[o..o + 16].copy_from_slice(&bb.to_array());
+        }
+    }
+    let chunks = n / 16;
+    for c in groups * 4..chunks {
+        let base = c * 16;
+        let px: &[[u8; 3]; 16] = pixels[base..base + 16]
+            .try_into()
+            .expect("16 pixels per chunk");
+        let (r, g, b) = srgb_lanes_v4x(&lut, px);
+        let (x, y, bb) = k.opsin_positive(
+            GenericF32x16::<archmage::X64V4xToken>::from_raw_t(token, r),
+            GenericF32x16::<archmage::X64V4xToken>::from_raw_t(token, g),
+            GenericF32x16::<archmage::X64V4xToken>::from_raw_t(token, b),
+        );
+        x_out[base..base + 16].copy_from_slice(&x.to_array());
+        y_out[base..base + 16].copy_from_slice(&y.to_array());
+        b_out[base..base + 16].copy_from_slice(&bb.to_array());
+    }
+    let ab = absorbance_bias_f32();
+    for i in (chunks * 16)..n {
+        let p = pixels[i];
+        let (x, y, bb) = opsin_px_canon(
+            ab,
+            srgb_u8_to_linear(p[0]),
+            srgb_u8_to_linear(p[1]),
+            srgb_u8_to_linear(p[2]),
+            cbrt7,
+        );
+        x_out[i] = x;
+        y_out[i] = y;
+        b_out[i] = bb;
+    }
+}
+
+/// Byte positions that deinterleave 16 packed RGB8 pixels: R to bytes
+/// 0..16, G to 16..32, B to 32..48.
+#[cfg(all(target_arch = "x86_64", feature = "avx512"))]
+const DEINTERLEAVE_RGB16: [u8; 64] = {
+    let mut p = [0u8; 64];
+    let mut k = 0;
+    while k < 16 {
+        p[k] = (3 * k) as u8;
+        p[16 + k] = (3 * k + 1) as u8;
+        p[32 + k] = (3 * k + 2) as u8;
+        k += 1;
+    }
+    p
+};
+
+/// Byte-permute tables that deinterleave 64 packed RGB8 pixels (192 bytes in
+/// three registers) for channel `c`: byte `p = 16L + 4m + j` of the result is
+/// the channel byte of pixel `16m + 4L + j`, the order in which the byte-plane
+/// reassembly of [`srgb64_channel_v4x`] yields pixels `16m..16m + 16` in its
+/// register `m`. `.0` permutes registers 0–1, `.1` registers 1–2, and `.2`
+/// marks the bytes taken from `.1`.
+#[cfg(all(target_arch = "x86_64", feature = "avx512"))]
+const fn deinterleave_rgb64(c: usize) -> ([u8; 64], [u8; 64], u64) {
+    let mut lo = [0u8; 64];
+    let mut hi = [0u8; 64];
+    let mut mask = 0u64;
+    let mut p = 0;
+    while p < 64 {
+        let q = 16 * ((p % 16) / 4) + 4 * (p / 16) + p % 4;
+        let s = 3 * q + c;
+        if s < 128 {
+            lo[p] = s as u8;
+        } else {
+            hi[p] = (s - 64) as u8;
+            mask |= 1u64 << p;
+        }
+        p += 1;
+    }
+    (lo, hi, mask)
+}
+
+#[cfg(all(target_arch = "x86_64", feature = "avx512"))]
+const DEINTERLEAVE_RGB64: [([u8; 64], [u8; 64], u64); 3] = [
+    deinterleave_rgb64(0),
+    deinterleave_rgb64(1),
+    deinterleave_rgb64(2),
+];
+
+/// The sRGB8 → linear table ([`srgb_u8_to_linear`]) as four byte planes
+/// (byte `k` of each entry's little-endian bits), each four registers of 64
+/// entries.
+#[cfg(all(target_arch = "x86_64", feature = "avx512"))]
+#[archmage::rite(v4x, import_intrinsics)]
+fn srgb_lut_byte_planes_v4x() -> [[__m512i; 4]; 4] {
+    let lut: [f32; 256] = std::array::from_fn(|i| srgb_u8_to_linear(i as u8));
+    std::array::from_fn(|k| {
+        let plane: [u8; 256] = std::array::from_fn(|i| lut[i].to_bits().to_le_bytes()[k]);
+        std::array::from_fn(|q| {
+            let b: &[u8; 64] = plane[64 * q..64 * q + 64].try_into().unwrap();
+            _mm512_loadu_si512(b)
+        })
+    })
+}
+
+/// 64 packed RGB8 pixels as three registers of 64 bytes.
+#[cfg(all(target_arch = "x86_64", feature = "avx512"))]
+#[archmage::rite(v4x, import_intrinsics)]
+fn load_rgb64_v4x(px: &[[u8; 3]; 64]) -> [__m512i; 3] {
+    let bytes = px.as_flattened();
+    std::array::from_fn(|q| {
+        let b: &[u8; 64] = bytes[64 * q..64 * q + 64].try_into().unwrap();
+        _mm512_loadu_si512(b)
+    })
+}
+
+/// Channel `C` of 64 packed RGB8 pixels (`v`, three registers) to linear,
+/// as four registers of sixteen pixels in order: two byte permutes and a
+/// blend deinterleave the channel ([`DEINTERLEAVE_RGB64`]); each of the four
+/// table byte planes is two 128-entry byte permutes blended on index bit 7;
+/// two unpack levels reassemble each entry's four bytes. The entries are
+/// copied byte for byte, so every value equals the scalar lookup.
+#[cfg(all(target_arch = "x86_64", feature = "avx512"))]
+#[archmage::rite(v4x, import_intrinsics)]
+fn srgb64_channel_v4x<const C: usize>(lut: &[[__m512i; 4]; 4], v: &[__m512i; 3]) -> [__m512; 4] {
+    let (lo, hi, mask) = &DEINTERLEAVE_RGB64[C];
+    let a = _mm512_permutex2var_epi8(v[0], _mm512_loadu_si512(lo), v[1]);
+    let b = _mm512_permutex2var_epi8(v[1], _mm512_loadu_si512(hi), v[2]);
+    let idx = _mm512_mask_blend_epi8(*mask, a, b);
+    let upper = _mm512_movepi8_mask(idx);
+    let planes: [__m512i; 4] = std::array::from_fn(|k| {
+        let low = _mm512_permutex2var_epi8(lut[k][0], idx, lut[k][1]);
+        let high = _mm512_permutex2var_epi8(lut[k][2], idx, lut[k][3]);
+        _mm512_mask_blend_epi8(upper, low, high)
+    });
+    let lo01 = _mm512_unpacklo_epi8(planes[0], planes[1]);
+    let hi01 = _mm512_unpackhi_epi8(planes[0], planes[1]);
+    let lo23 = _mm512_unpacklo_epi8(planes[2], planes[3]);
+    let hi23 = _mm512_unpackhi_epi8(planes[2], planes[3]);
+    [
+        _mm512_castsi512_ps(_mm512_unpacklo_epi16(lo01, lo23)),
+        _mm512_castsi512_ps(_mm512_unpackhi_epi16(lo01, lo23)),
+        _mm512_castsi512_ps(_mm512_unpacklo_epi16(hi01, hi23)),
+        _mm512_castsi512_ps(_mm512_unpackhi_epi16(hi01, hi23)),
+    ]
+}
+
+/// The sRGB8 → linear table ([`srgb_u8_to_linear`]) as sixteen registers of
+/// sixteen entries.
+#[cfg(all(target_arch = "x86_64", feature = "avx512"))]
+#[archmage::rite(v4x, import_intrinsics)]
+fn srgb_lut_regs_v4x() -> [__m512; 16] {
+    let lut: [f32; 256] = std::array::from_fn(|i| srgb_u8_to_linear(i as u8));
+    std::array::from_fn(|k| _mm512_loadu_ps(lut[k * 16..k * 16 + 16].try_into().unwrap()))
+}
+
+/// One channel's sixteen table lookups, `idx` in `0..256` per 32-bit lane:
+/// eight two-register permutes each serve 32 entries (index bits 0–4) and a
+/// blend tree on bits 5–7 picks the group. The entries are copied, not
+/// computed, so the result equals the scalar lookup bit for bit.
+#[cfg(all(target_arch = "x86_64", feature = "avx512"))]
+#[archmage::rite(v4x, import_intrinsics)]
+fn lut256_v4x(lut: &[__m512; 16], idx: __m512i) -> __m512 {
+    let g: [__m512; 8] =
+        std::array::from_fn(|k| _mm512_permutex2var_ps(lut[2 * k], idx, lut[2 * k + 1]));
+    let b5 = _mm512_test_epi32_mask(idx, _mm512_set1_epi32(32));
+    let b6 = _mm512_test_epi32_mask(idx, _mm512_set1_epi32(64));
+    let b7 = _mm512_test_epi32_mask(idx, _mm512_set1_epi32(128));
+    let s01 = _mm512_mask_blend_ps(b5, g[0], g[1]);
+    let s23 = _mm512_mask_blend_ps(b5, g[2], g[3]);
+    let s45 = _mm512_mask_blend_ps(b5, g[4], g[5]);
+    let s67 = _mm512_mask_blend_ps(b5, g[6], g[7]);
+    let s03 = _mm512_mask_blend_ps(b6, s01, s23);
+    let s47 = _mm512_mask_blend_ps(b6, s45, s67);
+    _mm512_mask_blend_ps(b7, s03, s47)
+}
+
+/// Sixteen packed RGB8 pixels to linear channel vectors: one byte permute
+/// deinterleaves the 48 bytes, then [`lut256_v4x`] per channel.
+#[cfg(all(target_arch = "x86_64", feature = "avx512"))]
+#[archmage::rite(v4x, import_intrinsics)]
+fn srgb_lanes_v4x(lut: &[__m512; 16], px: &[[u8; 3]; 16]) -> (__m512, __m512, __m512) {
+    let bytes = px.as_flattened();
+    let lo: &[u8; 32] = bytes[..32].try_into().unwrap();
+    let hi: &[u8; 16] = bytes[32..48].try_into().unwrap();
+    let v = _mm512_inserti32x4::<2>(
+        _mm512_castsi256_si512(_mm256_loadu_si256(lo)),
+        _mm_loadu_si128(hi),
+    );
+    let d = _mm512_permutexvar_epi8(_mm512_loadu_si512(&DEINTERLEAVE_RGB16), v);
+    let r = _mm512_cvtepu8_epi32(_mm512_castsi512_si128(d));
+    let g = _mm512_cvtepu8_epi32(_mm512_extracti32x4_epi32::<1>(d));
+    let b = _mm512_cvtepu8_epi32(_mm512_extracti32x4_epi32::<2>(d));
+    (lut256_v4x(lut, r), lut256_v4x(lut, g), lut256_v4x(lut, b))
 }
 
 /// The scalar tier's canonical sRGB→XYB: the per-element scalar body
@@ -732,8 +995,9 @@ fn srgb_xyb_canon_vec_scalar(
     x_out: &mut [f32],
     y_out: &mut [f32],
     b_out: &mut [f32],
+    cbrt7: bool,
 ) {
-    srgb_xyb_canon_body(pixels, x_out, y_out, b_out);
+    srgb_xyb_canon_body(pixels, x_out, y_out, b_out, cbrt7);
 }
 
 /// wasm128 has no hardware FMA — same scalar canonical body as the scalar
@@ -745,8 +1009,9 @@ fn srgb_xyb_canon_vec_wasm128(
     x_out: &mut [f32],
     y_out: &mut [f32],
     b_out: &mut [f32],
+    cbrt7: bool,
 ) {
-    srgb_xyb_canon_body(pixels, x_out, y_out, b_out);
+    srgb_xyb_canon_body(pixels, x_out, y_out, b_out, cbrt7);
 }
 
 /// NEON runs the scalar canonical body (2026-10-03): its vector `max`/`min` propagate NaN, while the canon clamps with
@@ -758,8 +1023,9 @@ fn srgb_xyb_canon_vec_neon(
     x_out: &mut [f32],
     y_out: &mut [f32],
     b_out: &mut [f32],
+    cbrt7: bool,
 ) {
-    srgb_xyb_canon_body(pixels, x_out, y_out, b_out);
+    srgb_xyb_canon_body(pixels, x_out, y_out, b_out, cbrt7);
 }
 
 /// [`linear_xyb_canon`] lane-parallel — as [`srgb_xyb_canon_vec`], with
@@ -771,8 +1037,9 @@ fn linear_xyb_canon_vec<const CLAMP: bool>(
     x_out: &mut [f32],
     y_out: &mut [f32],
     b_out: &mut [f32],
+    cbrt7: bool,
 ) {
-    let k = CanonChunk::new(token);
+    let k = CanonChunk::new_at(token, cbrt7);
     let n = pixels.len();
     let chunks = n / 16;
     for c in 0..chunks {
@@ -788,7 +1055,7 @@ fn linear_xyb_canon_vec<const CLAMP: bool>(
     }
     let ab = absorbance_bias_f32();
     for i in (chunks * 16)..n {
-        let (x, y, bb) = linear_px_canon::<CLAMP>(ab, pixels[i]);
+        let (x, y, bb) = linear_px_canon::<CLAMP>(ab, pixels[i], cbrt7);
         x_out[i] = x;
         y_out[i] = y;
         b_out[i] = bb;
@@ -801,8 +1068,9 @@ fn linear_xyb_canon_vec_scalar<const CLAMP: bool>(
     x_out: &mut [f32],
     y_out: &mut [f32],
     b_out: &mut [f32],
+    cbrt7: bool,
 ) {
-    linear_xyb_canon_body::<CLAMP>(pixels, x_out, y_out, b_out);
+    linear_xyb_canon_body::<CLAMP>(pixels, x_out, y_out, b_out, cbrt7);
 }
 
 #[cfg(target_arch = "wasm32")]
@@ -812,8 +1080,9 @@ fn linear_xyb_canon_vec_wasm128<const CLAMP: bool>(
     x_out: &mut [f32],
     y_out: &mut [f32],
     b_out: &mut [f32],
+    cbrt7: bool,
 ) {
-    linear_xyb_canon_body::<CLAMP>(pixels, x_out, y_out, b_out);
+    linear_xyb_canon_body::<CLAMP>(pixels, x_out, y_out, b_out, cbrt7);
 }
 
 /// NEON runs the scalar canonical body (2026-10-03): its vector `max`/`min` propagate NaN, while the canon clamps with
@@ -825,8 +1094,9 @@ fn linear_xyb_canon_vec_neon<const CLAMP: bool>(
     x_out: &mut [f32],
     y_out: &mut [f32],
     b_out: &mut [f32],
+    cbrt7: bool,
 ) {
-    linear_xyb_canon_body::<CLAMP>(pixels, x_out, y_out, b_out);
+    linear_xyb_canon_body::<CLAMP>(pixels, x_out, y_out, b_out, cbrt7);
 }
 
 // --- SIMD implementations ---
@@ -1784,7 +2054,7 @@ pub fn linear_to_positive_xyb_planar_into(
 ) {
     let mode = crate::featcanon::mode(revision);
     if mode.active() {
-        linear_xyb_canon::<true>(pixels, x_out, y_out, b_out, mode);
+        linear_xyb_canon::<true>(pixels, x_out, y_out, b_out, mode, revision.cbrt_newton());
         return;
     }
     incant!(
@@ -2446,7 +2716,7 @@ pub(crate) fn linear_to_positive_xyb_planar_into_unclamped(
 ) {
     let mode = crate::featcanon::mode(revision);
     if mode.active() {
-        linear_xyb_canon::<false>(pixels, x_out, y_out, b_out, mode);
+        linear_xyb_canon::<false>(pixels, x_out, y_out, b_out, mode, revision.cbrt_newton());
         return;
     }
     incant!(
@@ -3143,7 +3413,14 @@ mod tests {
         };
         let canon = {
             let (mut x, mut y, mut b) = (vec![0f32; n], vec![0f32; n], vec![0f32; n]);
-            srgb_xyb_canon(&px, &mut x, &mut y, &mut b, crate::featcanon::Mode::Canon64);
+            srgb_xyb_canon(
+                &px,
+                &mut x,
+                &mut y,
+                &mut b,
+                crate::featcanon::Mode::Canon64,
+                false,
+            );
             [x, y, b].map(|p| p.iter().map(|v| v.to_bits()).collect::<Vec<_>>())
         };
         let production = conv(None);
@@ -3703,11 +3980,12 @@ mod rev4vec_tests {
     }
 
     /// sRGB8 → XYB: deterministic pixel sweep (all channel values mixed,
-    /// n=4111 = 256 chunks + 15 remainder).
+    /// n = 4159 = 64 groups of 64 (v4x's byte-plane table) + 3 chunks of 16
+    /// + 15 remainder).
     #[test]
     fn srgb_xyb_canon_vec_matches_scalar_body_on_every_compiled_tier() {
         let mut rng = Rng(0x9E37_79B9_7F4A_7C15);
-        let n = 4111;
+        let n = 4159;
         let px: Vec<[u8; 3]> = (0..n)
             .map(|i| {
                 if i < 256 * 16 {
@@ -3722,49 +4000,70 @@ mod rev4vec_tests {
                 }
             })
             .collect();
-        let (mut xe, mut ye, mut be) = (vec![0f32; n], vec![0f32; n], vec![0f32; n]);
-        srgb_xyb_canon_body(&px, &mut xe, &mut ye, &mut be);
+        // Both cube roots: `cbrt_midp` (revisions 4-6) and revision 7's
+        // `cbrt_newton`.
+        for cbrt7 in [false, true] {
+            let (mut xe, mut ye, mut be) = (vec![0f32; n], vec![0f32; n], vec![0f32; n]);
+            srgb_xyb_canon_body(&px, &mut xe, &mut ye, &mut be, cbrt7);
 
-        let run = |name: &str, f: &mut PlanarFn<'_, [u8; 3]>| {
-            let (mut x, mut y, mut b) = (vec![0f32; n], vec![0f32; n], vec![0f32; n]);
-            f(&px, &mut x, &mut y, &mut b);
-            assert_planes_eq(name, &x, &y, &b, [&xe, &ye, &be]);
-        };
+            let run = |name: &str, f: &mut PlanarFn<'_, [u8; 3]>| {
+                let (mut x, mut y, mut b) = (vec![0f32; n], vec![0f32; n], vec![0f32; n]);
+                f(&px, &mut x, &mut y, &mut b);
+                assert_planes_eq(
+                    &format!("{name} cbrt7={cbrt7}"),
+                    &x,
+                    &y,
+                    &b,
+                    [&xe, &ye, &be],
+                );
+            };
 
-        run("scalar", &mut |p, x, y, b| {
-            srgb_xyb_canon_vec_scalar(archmage::ScalarToken::summon().unwrap(), p, x, y, b)
-        });
-        #[cfg(target_arch = "x86_64")]
-        {
-            if let Some(t) = archmage::X64V3Token::summon() {
-                run("v3", &mut |p, x, y, b| srgb_xyb_canon_vec_v3(t, p, x, y, b));
-            }
-            #[cfg(feature = "avx512")]
+            run("scalar", &mut |p, x, y, b| {
+                srgb_xyb_canon_vec_scalar(
+                    archmage::ScalarToken::summon().unwrap(),
+                    p,
+                    x,
+                    y,
+                    b,
+                    cbrt7,
+                )
+            });
+            #[cfg(target_arch = "x86_64")]
             {
-                if let Some(t) = archmage::X64V4Token::summon() {
-                    run("v4", &mut |p, x, y, b| srgb_xyb_canon_vec_v4(t, p, x, y, b));
+                if let Some(t) = archmage::X64V3Token::summon() {
+                    run("v3", &mut |p, x, y, b| {
+                        srgb_xyb_canon_vec_v3(t, p, x, y, b, cbrt7)
+                    });
                 }
-                if let Some(t) = archmage::X64V4xToken::summon() {
-                    run("v4x", &mut |p, x, y, b| {
-                        srgb_xyb_canon_vec_v4x(t, p, x, y, b)
+                #[cfg(feature = "avx512")]
+                {
+                    if let Some(t) = archmage::X64V4Token::summon() {
+                        run("v4", &mut |p, x, y, b| {
+                            srgb_xyb_canon_vec_v4(t, p, x, y, b, cbrt7)
+                        });
+                    }
+                    if let Some(t) = archmage::X64V4xToken::summon() {
+                        run("v4x", &mut |p, x, y, b| {
+                            srgb_xyb_canon_vec_v4x(t, p, x, y, b, cbrt7)
+                        });
+                    }
+                }
+            }
+            #[cfg(target_arch = "aarch64")]
+            {
+                if let Some(t) = archmage::NeonToken::summon() {
+                    run("neon", &mut |p, x, y, b| {
+                        srgb_xyb_canon_vec_neon(t, p, x, y, b, cbrt7)
                     });
                 }
             }
-        }
-        #[cfg(target_arch = "aarch64")]
-        {
-            if let Some(t) = archmage::NeonToken::summon() {
-                run("neon", &mut |p, x, y, b| {
-                    srgb_xyb_canon_vec_neon(t, p, x, y, b)
-                });
-            }
-        }
-        #[cfg(target_arch = "wasm32")]
-        {
-            if let Some(t) = archmage::Wasm128Token::summon() {
-                run("wasm128", &mut |p, x, y, b| {
-                    srgb_xyb_canon_vec_wasm128(t, p, x, y, b)
-                });
+            #[cfg(target_arch = "wasm32")]
+            {
+                if let Some(t) = archmage::Wasm128Token::summon() {
+                    run("wasm128", &mut |p, x, y, b| {
+                        srgb_xyb_canon_vec_wasm128(t, p, x, y, b, cbrt7)
+                    });
+                }
             }
         }
     }
@@ -3785,12 +4084,12 @@ mod rev4vec_tests {
         }
         let n = px.len();
 
-        for clamp in [true, false] {
+        for (clamp, cbrt7) in [(true, false), (false, false), (true, true), (false, true)] {
             let (mut xe, mut ye, mut be) = (vec![0f32; n], vec![0f32; n], vec![0f32; n]);
             if clamp {
-                linear_xyb_canon_body::<true>(&px, &mut xe, &mut ye, &mut be);
+                linear_xyb_canon_body::<true>(&px, &mut xe, &mut ye, &mut be, cbrt7);
             } else {
-                linear_xyb_canon_body::<false>(&px, &mut xe, &mut ye, &mut be);
+                linear_xyb_canon_body::<false>(&px, &mut xe, &mut ye, &mut be, cbrt7);
             }
             let tag = if clamp { "clamped" } else { "unclamped" };
             let run = |name: &str, f: &mut PlanarFn<'_, [f32; 3]>| {
@@ -3800,7 +4099,7 @@ mod rev4vec_tests {
                     assert_eq!(
                         (x[i].to_bits(), y[i].to_bits(), b[i].to_bits()),
                         (xe[i].to_bits(), ye[i].to_bits(), be[i].to_bits()),
-                        "{tag}/{name}: differs at px {i}"
+                        "{tag}/{name} cbrt7={cbrt7}: differs at px {i}"
                     );
                 }
             };
@@ -3812,6 +4111,7 @@ mod rev4vec_tests {
                         x,
                         y,
                         b,
+                        cbrt7,
                     )
                 } else {
                     linear_xyb_canon_vec_scalar::<false>(
@@ -3820,6 +4120,7 @@ mod rev4vec_tests {
                         x,
                         y,
                         b,
+                        cbrt7,
                     )
                 }
             });
@@ -3828,9 +4129,9 @@ mod rev4vec_tests {
                 if let Some(t) = archmage::X64V3Token::summon() {
                     run("v3", &mut |p, x, y, b| {
                         if clamp {
-                            linear_xyb_canon_vec_v3::<true>(t, p, x, y, b)
+                            linear_xyb_canon_vec_v3::<true>(t, p, x, y, b, cbrt7)
                         } else {
-                            linear_xyb_canon_vec_v3::<false>(t, p, x, y, b)
+                            linear_xyb_canon_vec_v3::<false>(t, p, x, y, b, cbrt7)
                         }
                     });
                 }
@@ -3839,18 +4140,18 @@ mod rev4vec_tests {
                     if let Some(t) = archmage::X64V4Token::summon() {
                         run("v4", &mut |p, x, y, b| {
                             if clamp {
-                                linear_xyb_canon_vec_v4::<true>(t, p, x, y, b)
+                                linear_xyb_canon_vec_v4::<true>(t, p, x, y, b, cbrt7)
                             } else {
-                                linear_xyb_canon_vec_v4::<false>(t, p, x, y, b)
+                                linear_xyb_canon_vec_v4::<false>(t, p, x, y, b, cbrt7)
                             }
                         });
                     }
                     if let Some(t) = archmage::X64V4xToken::summon() {
                         run("v4x", &mut |p, x, y, b| {
                             if clamp {
-                                linear_xyb_canon_vec_v4x::<true>(t, p, x, y, b)
+                                linear_xyb_canon_vec_v4x::<true>(t, p, x, y, b, cbrt7)
                             } else {
-                                linear_xyb_canon_vec_v4x::<false>(t, p, x, y, b)
+                                linear_xyb_canon_vec_v4x::<false>(t, p, x, y, b, cbrt7)
                             }
                         });
                     }
@@ -3861,9 +4162,9 @@ mod rev4vec_tests {
                 if let Some(t) = archmage::NeonToken::summon() {
                     run("neon", &mut |p, x, y, b| {
                         if clamp {
-                            linear_xyb_canon_vec_neon::<true>(t, p, x, y, b)
+                            linear_xyb_canon_vec_neon::<true>(t, p, x, y, b, cbrt7)
                         } else {
-                            linear_xyb_canon_vec_neon::<false>(t, p, x, y, b)
+                            linear_xyb_canon_vec_neon::<false>(t, p, x, y, b, cbrt7)
                         }
                     });
                 }
@@ -3873,9 +4174,9 @@ mod rev4vec_tests {
                 if let Some(t) = archmage::Wasm128Token::summon() {
                     run("wasm128", &mut |p, x, y, b| {
                         if clamp {
-                            linear_xyb_canon_vec_wasm128::<true>(t, p, x, y, b)
+                            linear_xyb_canon_vec_wasm128::<true>(t, p, x, y, b, cbrt7)
                         } else {
-                            linear_xyb_canon_vec_wasm128::<false>(t, p, x, y, b)
+                            linear_xyb_canon_vec_wasm128::<false>(t, p, x, y, b, cbrt7)
                         }
                     });
                 }

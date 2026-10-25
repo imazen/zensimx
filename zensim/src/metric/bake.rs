@@ -37,6 +37,10 @@ pub struct BakeScorer<'a> {
     parallel: bool,
     #[cfg(feature = "feature-regime-v2")]
     finite_moments: bool,
+    /// Research map painting for the attribution map; `None` reads the
+    /// process selection (`crate::map_paint::MapPaint::from_env`).
+    #[cfg(feature = "custom-profiles")]
+    map_paint: Option<crate::map_paint::MapPaint>,
     members: Vec<BakeScorer<'a>>,
     weights: Option<Vec<f64>>,
     #[cfg(feature = "corruption-head")]
@@ -46,6 +50,10 @@ pub struct BakeScorer<'a> {
     /// scorer's model never changes, so the cache needs no invalidation.
     /// Composition (members, weights, companion) stays per call in [`Self::plan`].
     model_plan: std::sync::OnceLock<crate::feature_plan::Plan>,
+    /// [`Self::plan`]'s result, built on first use. Unlike `model_plan` it
+    /// depends on the composition, so every change to `members`, `weights` or
+    /// `corruption` resets it ([`Self::reset_plan`]).
+    served_plan: std::sync::OnceLock<crate::feature_plan::Plan>,
 }
 
 #[cfg(feature = "corruption-head")]
@@ -72,6 +80,80 @@ impl<'a> BakeScorer<'a> {
     pub fn with_parallel(mut self, parallel: bool) -> Self {
         self.parallel = parallel;
         self
+    }
+
+    /// Research: how the attribution map paints windowed signals and coarse
+    /// scales and divides pooled features among pixels — `window` is `box`
+    /// (default), `center` or `guided`; `paint` is `nearest` (default) or
+    /// `guided`; `split` is `exact` (default), `repair` or `amplitude`. Scores are
+    /// unchanged. Such a map is for viewing, so it keeps every feature's
+    /// density: the scorer takes no neighbour-exact steering snapshot, which
+    /// would zero the v2 features of scales 1–3 (f459..f719) in the map and
+    /// serve them only through `refinement_gain`. Exploration record:
+    /// `benchmarks/byconstruction_2026-10-22.md` ("Maps").
+    ///
+    /// # Errors
+    /// An unknown mode name.
+    #[doc(hidden)]
+    #[cfg(feature = "custom-profiles")]
+    pub fn with_map_paint(
+        mut self,
+        window: &str,
+        paint: &str,
+        split: &str,
+    ) -> Result<Self, ZensimError> {
+        self.map_paint = Some(crate::map_paint::MapPaint::parse(window, paint, split).ok_or(
+            ZensimError::ModelLoadFailed {
+                reason: "map paint modes are box|center|guided, nearest|guided and repair|exact|amplitude",
+            },
+        )?);
+        Ok(self)
+    }
+
+    /// Research: weigh pixels in the guided window and paint modes by their
+    /// squared (`"sq"`, the default) or absolute (`"abs"`) difference. Like
+    /// the other map modes, this scorer then serves a map for viewing (no
+    /// steering snapshot).
+    ///
+    /// # Errors
+    /// `norm` other than `sq` or `abs`.
+    #[doc(hidden)]
+    #[cfg(feature = "custom-profiles")]
+    pub fn with_map_guide(mut self, norm: &str) -> Result<Self, ZensimError> {
+        let guide =
+            crate::map_paint::GuideNorm::parse(norm).ok_or(ZensimError::ModelLoadFailed {
+                reason: "map guide norms are sq|abs",
+            })?;
+        let paint = self
+            .map_paint
+            .unwrap_or_else(crate::map_paint::MapPaint::from_env);
+        self.map_paint = Some(crate::map_paint::MapPaint { guide, ..paint });
+        Ok(self)
+    }
+
+    /// Research: integrate the per-pixel attribution map with a sum-preserving
+    /// Gaussian of `sigma` source pixels (0: none, the default) before it is
+    /// returned. Like the other map modes, this scorer then serves a map for
+    /// viewing (no steering snapshot).
+    ///
+    /// # Errors
+    /// `sigma` outside `0..=16`.
+    #[doc(hidden)]
+    #[cfg(feature = "custom-profiles")]
+    pub fn with_map_smooth(mut self, sigma: f32) -> Result<Self, ZensimError> {
+        let smooth_milli = crate::map_paint::MapPaint::smooth_milli_of(sigma).ok_or(
+            ZensimError::ModelLoadFailed {
+                reason: "map smoothing sigma must be in 0..=16 source pixels",
+            },
+        )?;
+        let paint = self
+            .map_paint
+            .unwrap_or_else(crate::map_paint::MapPaint::from_env);
+        self.map_paint = Some(crate::map_paint::MapPaint {
+            smooth_milli,
+            ..paint
+        });
+        Ok(self)
     }
 
     /// Opt into finite L2/L4/L8 moment removal for rectangle refinement.
@@ -181,7 +263,7 @@ impl<'a> BakeScorer<'a> {
             crate::feature_v2::validate_hdr_pair(source, source, encoding, Some(120_000_000))?;
             crate::PrecomputedReference::for_candidate(
                 source,
-                self.parallel,
+                crate::metric::effective_parallel(self.parallel),
                 Some(encoding),
                 self.plan()?.compute.formula_revision,
             )
@@ -246,11 +328,14 @@ impl<'a> BakeScorer<'a> {
             parallel: true,
             #[cfg(feature = "feature-regime-v2")]
             finite_moments: false,
+            #[cfg(feature = "custom-profiles")]
+            map_paint: None,
             members: Vec::new(),
             weights: None,
             #[cfg(feature = "corruption-head")]
             corruption: None,
             model_plan: std::sync::OnceLock::new(),
+            served_plan: std::sync::OnceLock::new(),
         })
     }
 
@@ -362,6 +447,7 @@ impl<'a> BakeScorer<'a> {
         let mut scorer = Self::new(first)?;
         scorer.members = rest.iter().map(Self::new).collect::<Result<_, _>>()?;
         scorer.weights = weights.map(<[f64]>::to_vec);
+        scorer.reset_plan();
         scorer.check_servable()?;
         Ok(scorer)
     }
@@ -385,6 +471,7 @@ impl<'a> BakeScorer<'a> {
         let t = deadband.unwrap_or_else(|| head.deadband_score());
         check_deadband(t)?;
         self.corruption = Some(Companion::Tree(head, t));
+        self.reset_plan();
         self.check_servable()?;
         Ok(self)
     }
@@ -404,6 +491,7 @@ impl<'a> BakeScorer<'a> {
     ) -> Result<Self, ZensimError> {
         check_deadband(deadband)?;
         self.corruption = Some(Companion::Linear(Box::new(Self::new(model)?), deadband));
+        self.reset_plan();
         self.check_servable()?;
         Ok(self)
     }
@@ -640,7 +728,7 @@ impl<'a> BakeScorer<'a> {
         // owner intact, including after an error and on session reuse.
         let mut raw = Self::with_metadata(self.model, Arc::clone(&self.metadata))?
             .without_output_calibration()
-            .with_parallel(self.parallel);
+            .with_parallel(crate::metric::effective_parallel(self.parallel));
         let output = raw.score_features(features, width, height, None)?;
         let linear = spline.ys[0] + spline.derivs[0] * (output - spline.xs[0]);
         if output < spline.xs[0] && linear < spline.ys[0] - span {
@@ -695,7 +783,24 @@ impl<'a> BakeScorer<'a> {
         }
     }
 
+    /// The served extraction plan: the members' and companion's union,
+    /// widened to an identity row. Cached in `served_plan` (built once per
+    /// composition; it was rebuilt several times per score, which re-derived
+    /// the identity layout over every slot).
     fn plan(&self) -> Result<crate::feature_plan::Plan, ZensimError> {
+        if let Some(plan) = self.served_plan.get() {
+            return Ok(plan.clone());
+        }
+        let plan = self.compose_plan()?;
+        Ok(self.served_plan.get_or_init(|| plan).clone())
+    }
+
+    /// Forget the cached [`Self::plan`] after a change to the composition.
+    fn reset_plan(&mut self) {
+        self.served_plan = std::sync::OnceLock::new();
+    }
+
+    fn compose_plan(&self) -> Result<crate::feature_plan::Plan, ZensimError> {
         use crate::feature_plan::Plan;
         let mut combined: Option<Plan> = None;
         for (i, scorer) in std::iter::once(self).chain(self.members.iter()).enumerate() {
@@ -830,7 +935,7 @@ impl<'a> BakeScorer<'a> {
         // Raw/older wide walks retain the process-mix guard. Validated Rev5
         // plans carry their revision through conversion, blur, pooling and
         // finalization, so they can serve alongside older named models.
-        if revision != crate::feature_defs::FormulaRevision::Rev5 {
+        if revision < crate::feature_defs::FormulaRevision::Rev5 {
             crate::ssim_form::refuse_rev4_mix(revision)?;
         }
         // Basic/peak plans carry their arithmetic explicitly through both
@@ -923,7 +1028,7 @@ impl<'a> BakeScorer<'a> {
             distorted,
             encoding,
             Some(120_000_000),
-            self.parallel,
+            crate::metric::effective_parallel(self.parallel),
             plan.toggles(),
             &mut self.pixel_scratch,
             Some(plan.compute),
@@ -976,7 +1081,8 @@ impl<'a> BakeScorer<'a> {
         // candidate's own plan determines which feature families run; BHdr's
         // weights only fill the intermediate result and are never returned.
         let params = ZensimProfile::BHdr.params();
-        let mut config = config_from_params(params, self.parallel);
+        let mut config =
+            config_from_params(params, crate::metric::effective_parallel(self.parallel));
         config.formula_revision = Some(self.plan()?.compute.formula_revision);
         let plan = self.plan()?;
         if plan.compute.formula_revision >= crate::feature_defs::FormulaRevision::Rev5 {
@@ -1025,7 +1131,7 @@ impl<'a> BakeScorer<'a> {
                     source,
                     distorted,
                     Some(120_000_000),
-                    self.parallel,
+                    crate::metric::effective_parallel(self.parallel),
                     &mut self.pixel_scratch,
                     Some(&plan),
                     #[cfg(feature = "custom-profiles")]
@@ -1120,7 +1226,8 @@ impl<'a> BakeScorer<'a> {
         }
         if crate::feature_v2::retained_ref_feed_admits(precomputed, distorted, &plan) {
             let params = ZensimProfile::BHdr.params();
-            let mut config = config_from_params(params, self.parallel);
+            let mut config =
+                config_from_params(params, crate::metric::effective_parallel(self.parallel));
             config.formula_revision = Some(self.plan()?.compute.formula_revision);
             if let Some(mut result) = crate::fold_engine::compute_fold_backed_with_ref_plan(
                 precomputed,
@@ -1170,7 +1277,7 @@ impl<'a> BakeScorer<'a> {
             )?;
             return Ok(sampling.reference(
                 source,
-                self.parallel,
+                crate::metric::effective_parallel(self.parallel),
                 self.plan()?.compute.formula_revision,
             ));
         }
@@ -1192,7 +1299,7 @@ impl<'a> BakeScorer<'a> {
             )?;
             return Ok(crate::PrecomputedReference::for_candidate(
                 source,
-                self.parallel,
+                crate::metric::effective_parallel(self.parallel),
                 None,
                 plan.compute.formula_revision,
             ));
@@ -1202,7 +1309,7 @@ impl<'a> BakeScorer<'a> {
         Ok(crate::PrecomputedReference::new(
             source,
             crate::NUM_SCALES,
-            self.parallel,
+            crate::metric::effective_parallel(self.parallel),
             plan.compute.formula_revision,
         ))
     }
@@ -1292,7 +1399,8 @@ impl<'a> BakeScorer<'a> {
             });
         }
         let params = ZensimProfile::BHdr.params();
-        let mut config = config_from_params(params, self.parallel);
+        let mut config =
+            config_from_params(params, crate::metric::effective_parallel(self.parallel));
         config.formula_revision = Some(self.plan()?.compute.formula_revision);
         #[cfg(feature = "corruption-head")]
         let has_corruption_gate = self.corruption.is_some();
@@ -1328,7 +1436,7 @@ impl<'a> BakeScorer<'a> {
             precomputed,
             distorted,
             &plan,
-            self.parallel,
+            crate::metric::effective_parallel(self.parallel),
             encoding,
         )?;
         #[cfg(steerfix_instrument)]
@@ -1428,7 +1536,11 @@ impl<'a> BakeScorer<'a> {
         // either way, and whether a capture succeeds is decided up front
         // (`capture_admits`), so the frozen v2 density is zeroed for exactly
         // the same calls as before.
+        // A scorer with research map modes (`with_map_paint`) serves a map for
+        // viewing: every feature's density stays in it, so it takes no
+        // snapshot.
         let capture = neighbour_enabled
+            && self.map_paint.is_none()
             && (encoding.is_none()
                 || plan.compute.formula_revision >= crate::feature_defs::FormulaRevision::Rev5)
             && crate::local_refine::LocalRefineSnapshot::capture_admits(
@@ -1444,7 +1556,7 @@ impl<'a> BakeScorer<'a> {
         let mut max_removals = Vec::new();
         let mut moment_removals = Vec::new();
         let (_, attribution) = Zensim::new(ZensimProfile::BHdr)
-            .with_parallel(self.parallel)
+            .with_parallel(crate::metric::effective_parallel(self.parallel))
             .attribution_from_retention_binned(
                 precomputed,
                 distorted,
@@ -1457,6 +1569,8 @@ impl<'a> BakeScorer<'a> {
                 session,
                 bin,
                 Some(plan.compute.formula_revision),
+                self.map_paint
+                    .unwrap_or_else(crate::map_paint::MapPaint::from_env),
             )?;
         #[cfg(steerfix_instrument)]
         mapperf_audit::stage(&mut mapperf_stage, "density");
@@ -1586,6 +1700,8 @@ impl<S: ImageSource> SteeringSession<'_, '_, S> {
         // reconstruction. Local probes must never differentiate its threshold.
         #[cfg(feature = "corruption-head")]
         let companion = self.scorer.corruption.take();
+        #[cfg(feature = "corruption-head")]
+        self.scorer.reset_plan();
         let attempted = self.scorer.compute_attribution_input(
             self.source,
             &self.reference,
@@ -1599,6 +1715,7 @@ impl<S: ImageSource> SteeringSession<'_, '_, S> {
         #[cfg(feature = "corruption-head")]
         {
             self.scorer.corruption = companion;
+            self.scorer.reset_plan();
         }
         let mut result = attempted?;
         #[cfg(feature = "corruption-head")]
@@ -4558,11 +4675,12 @@ mod revision_contract_tests {
 
     /// The attribution map of a declared-revision bake is the same in every
     /// process. Its retained planes come from the bake's revision, so pass B
-    /// must read them in that revision's form: the `s12` plane as the direct
-    /// error moment (Rev3+). Pass B used to take it from the process revision,
-    /// so the shipped B bake (Rev5) in a default process read `s12` as a
-    /// product moment and its SSIM deviation pools amplified the resulting `d`
-    /// to a map summing to about -1.8e19 (found on `explore/byconstruction`).
+    /// must read them in that revision's forms: the `s12` plane as the direct
+    /// error moment (Rev3+) and ringing as the high-pass residual (revision 6).
+    /// Pass B used to take both from the process revision, so the shipped B
+    /// bake (Rev5) in a default process read `s12` as a product moment and its
+    /// SSIM deviation pools amplified the resulting `d` to a map summing to
+    /// about -1.8e19 (benchmarks/byconstruction_2026-10-22.md).
     #[test]
     #[cfg(all(feature = "custom-profiles", feature = "feature-regime-v2"))]
     fn attribution_maps_serve_the_declared_revision_in_every_process() {
@@ -4570,7 +4688,7 @@ mod revision_contract_tests {
         let path = "metric::bake::revision_contract_tests::attribution_maps_serve_the_declared_revision_in_every_process";
         if std::env::var("ZENSIM_ATTRIBUTION_REVISION_CHILD").is_err() {
             let mut expected: Option<Vec<String>> = None;
-            for process in ["1", "5"] {
+            for process in ["1", "5", "6"] {
                 let out = std::process::Command::new(std::env::current_exe().unwrap())
                     .args([path, "--exact", "--nocapture", "--test-threads=1"])
                     .env("ZENSIM_FORMULA_REV", process)
@@ -4588,7 +4706,7 @@ mod revision_contract_tests {
                     .lines()
                     .filter_map(|l| l.find(MARK).map(|i| l[i..].to_owned()))
                     .collect();
-                assert_eq!(lines.len(), 1, "child at revision {process}: {stdout}");
+                assert_eq!(lines.len(), 2, "child at revision {process}: {stdout}");
                 if let Some(expected) = &expected {
                     assert_eq!(
                         &lines, expected,
@@ -4626,28 +4744,58 @@ mod revision_contract_tests {
             "/weights/b_sdr_diff_frag_820_rev5_2026-10-19.bin"
         ))
         .unwrap();
-        let name = "shipped-b-rev5";
-        let model = zenpredict::Model::from_bytes(&shipped).unwrap();
-        let mut scorer = crate::BakeScorer::new(&model).unwrap().with_parallel(false);
-        let pre = scorer.precompute_reference(&rs).unwrap();
-        let mut session = crate::Fused944Session::new();
-        let att = scorer
-            .compute_with_ref_and_attribution(&rs, &pre, &ds, None, &mut session, 1)
-            .unwrap();
-        let density = att.attribution().density();
-        let total: f64 = density.iter().map(|&v| f64::from(v)).sum();
-        assert!(
-            density.iter().all(|v| v.is_finite()) && total.abs() < 1e4,
-            "{name}: map total {total:e} is not a bounded attribution"
-        );
-        let hash = density.iter().fold(0xcbf2_9ce4_8422_2325u64, |h, v| {
-            (h ^ u64::from(v.to_bits())).wrapping_mul(0x0000_0100_0000_01b3)
+        // A revision-6 bake over the SSIM mean and deviation pools and the
+        // ringing slot of every scale's Y channel and scale 1's X channel.
+        let v2 = |scale: usize, ch: usize, slot: usize| 372 + scale * 87 + ch * 29 + slot;
+        let slots = [
+            crate::feature_v2::idx::SSIM_MEAN,
+            crate::feature_v2::idx::SSIM_DEV2,
+            crate::feature_v2::idx::SSIM_DEV4,
+            crate::feature_v2::idx::RINGING,
+        ];
+        let mut ids: Vec<usize> = (0..4)
+            .flat_map(|scale| slots.map(|slot| v2(scale, 1, slot)))
+            .chain(slots.map(|slot| v2(1, 0, slot)))
+            .collect();
+        ids.sort_unstable();
+        let recipe = serde_json::json!({
+            "schema_hash":1,
+            "scaler_mean": vec![0.0; ids.len()],
+            "scaler_scale": vec![1.0; ids.len()],
+            "metadata":[
+                {"key":"zentrain.feature_ids","type":"utf8",
+                 "text": ids.iter().map(usize::to_string).collect::<Vec<_>>().join(" ")},
+                {"key":"zentrain.formula_revision","type":"utf8","text":"6"}],
+            "layers":[{"in_dim":ids.len(),"out_dim":1,"activation":"identity",
+                "dtype":"f32","weights": vec![-40.0; ids.len()],"biases":[100.0]}]
         });
-        println!(
-            "{MARK}{name} {} {hash:016x} {}",
-            att.result().score().to_bits(),
-            total.to_bits()
-        );
+        let rev6 = zenpredict_bake::bake_from_json_str(&recipe.to_string()).unwrap();
+        for (name, bytes) in [
+            ("shipped-b-rev5", shipped.as_slice()),
+            ("rev6-ring-dev", rev6.as_slice()),
+        ] {
+            let model = zenpredict::Model::from_bytes(bytes).unwrap();
+            let mut scorer = crate::BakeScorer::new(&model).unwrap().with_parallel(false);
+            let pre = scorer.precompute_reference(&rs).unwrap();
+            let mut session = crate::Fused944Session::new();
+            let att = scorer
+                .compute_with_ref_and_attribution(&rs, &pre, &ds, None, &mut session, 1)
+                .unwrap();
+            let density = att.attribution().density();
+            let total: f64 = density.iter().map(|&v| f64::from(v)).sum();
+            assert!(
+                density.iter().all(|v| v.is_finite()) && total.abs() < 1e4,
+                "{name}: map total {total:e} is not a bounded attribution"
+            );
+            let hash = density.iter().fold(0xcbf2_9ce4_8422_2325u64, |h, v| {
+                (h ^ u64::from(v.to_bits())).wrapping_mul(0x0000_0100_0000_01b3)
+            });
+            println!(
+                "{MARK}{name} {} {hash:016x} {}",
+                att.result().score().to_bits(),
+                total.to_bits()
+            );
+        }
     }
 
     #[test]
@@ -4688,9 +4836,10 @@ mod revision_contract_tests {
             crate::feature_layout::formula_revision(&model).expect("undeclared resolves"),
             crate::ssim_form::SHIPPED_REVISION
         );
-        // `4` is registered since featcanon (Rev4, the `tiercanon` era) and
-        // `5` since rev5 (the `localwin` era); the first unregistered value
-        // is `6`.
+        // `4` is registered since featcanon (Rev4, the `tiercanon` era), `5`
+        // since rev5 (the `localwin` era), `6` since the by-construction
+        // `ringhpm` era and `7` since the `rowlanes` era; the first
+        // unregistered value is `8`.
         let bytes = bake_declaring(Some("4"), 5);
         let model = zenpredict::Model::from_bytes(&bytes).expect("parse bake");
         assert_eq!(
@@ -4704,6 +4853,18 @@ mod revision_contract_tests {
             crate::feature_defs::FormulaRevision::Rev5
         );
         let bytes = bake_declaring(Some("6"), 5);
+        let model = zenpredict::Model::from_bytes(&bytes).expect("parse bake");
+        assert_eq!(
+            crate::feature_layout::formula_revision(&model).expect("6 resolves"),
+            crate::feature_defs::FormulaRevision::Rev6
+        );
+        let bytes = bake_declaring(Some("7"), 5);
+        let model = zenpredict::Model::from_bytes(&bytes).expect("parse bake");
+        assert_eq!(
+            crate::feature_layout::formula_revision(&model).expect("7 resolves"),
+            crate::feature_defs::FormulaRevision::Rev7
+        );
+        let bytes = bake_declaring(Some("8"), 5);
         let model = zenpredict::Model::from_bytes(&bytes).expect("parse bake");
         assert!(
             crate::feature_layout::formula_revision(&model).is_err(),
@@ -4725,3 +4886,356 @@ mod steerfix_packet;
 #[path = "mapperf_audit.rs"]
 mod mapperf_audit;
 
+/// Per-feature map sums of the candidate attribution map: one unit
+/// sensitivity at a time, each map summed over the image, against the feature
+/// value. Under the exact split (`crate::map_paint::SplitMode::Exact`) every
+/// pool's map sums to minus its feature; the diagnostic below prints the sums
+/// of either split (`ZENSIM_DIAG_SPLIT=exact`).
+#[cfg(all(test, feature = "custom-profiles", feature = "feature-regime-v2"))]
+mod map_split_tests {
+    use crate::RgbSlice;
+    use crate::map_paint::{MapPaint, SplitMode};
+
+    fn shipped_b() -> Vec<u8> {
+        std::fs::read(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/weights/b_sdr_diff_frag_820_rev5_2026-10-19.bin"
+        ))
+        .expect("B bake")
+    }
+
+    /// `(id, map sum, feature, sensitivity)` for every feature the bake's map
+    /// reads, each map over the one walk's retention.
+    fn probe(
+        bytes: &[u8],
+        src: &[[u8; 3]],
+        dst: &[[u8; 3]],
+        w: usize,
+        h: usize,
+        split: SplitMode,
+    ) -> Vec<(usize, f64, f64, f64)> {
+        let model = zenpredict::Model::from_bytes(bytes).expect("parse");
+        let (rs, ds) = (RgbSlice::new(src, w, h), RgbSlice::new(dst, w, h));
+        // Map modes keep the session's retention whole (no steering snapshot),
+        // which every probe below reads.
+        let mut scorer = super::BakeScorer::new(&model)
+            .unwrap()
+            .with_parallel(false)
+            .with_map_paint("box", "nearest", "repair")
+            .unwrap();
+        let pre = scorer.precompute_reference(&rs).unwrap();
+        let mut session = crate::Fused944Session::new();
+        let att = scorer
+            .compute_with_ref_and_attribution(&rs, &pre, &ds, None, &mut session, 1)
+            .unwrap();
+        let feats = att.result().features().to_vec();
+        let plan = scorer.plan().unwrap();
+        let (spatial, _) =
+            crate::attribution::candidate_map_sensitivities(&plan, att.sensitivities());
+        (0..spatial.len())
+            .filter(|&id| spatial[id] != 0.0)
+            .map(|id| {
+                let mut one = vec![0.0f64; spatial.len()];
+                one[id] = 1.0;
+                let (_, a) = crate::Zensim::new(crate::ZensimProfile::BHdr)
+                    .with_parallel(false)
+                    .attribution_from_retention_binned(
+                        &pre,
+                        &ds,
+                        &one,
+                        &[],
+                        None,
+                        None,
+                        &mut session,
+                        1,
+                        Some(plan.compute.formula_revision),
+                        MapPaint {
+                            split,
+                            ..Default::default()
+                        },
+                    )
+                    .unwrap();
+                let sum: f64 = a.density().iter().map(|&v| f64::from(v)).sum();
+                (
+                    id,
+                    sum,
+                    feats.get(id).copied().unwrap_or(f64::NAN),
+                    spatial[id],
+                )
+            })
+            .collect()
+    }
+
+    /// A smooth sinusoid-and-ramp source and its 3×3 box blur.
+    fn blur_pair(w: usize, h: usize) -> (Vec<[u8; 3]>, Vec<[u8; 3]>) {
+        let src: Vec<[u8; 3]> = (0..w * h)
+            .map(|i| {
+                let (x, y) = (i % w, i / w);
+                let v = (((x * 7 + y * 13) % 200) + 20) as u8;
+                [v, v / 2 + 40, 255 - v]
+            })
+            .collect();
+        let mut dst = src.clone();
+        for y in 0..h {
+            for x in 0..w {
+                let mut acc = [0u32; 3];
+                for dy in 0..3 {
+                    for dx in 0..3 {
+                        let yy = (y + dy).saturating_sub(1).min(h - 1);
+                        let xx = (x + dx).saturating_sub(1).min(w - 1);
+                        for (c, a) in acc.iter_mut().enumerate() {
+                            *a += u32::from(src[yy * w + xx][c]);
+                        }
+                    }
+                }
+                dst[y * w + x] = acc.map(|a| (a / 9) as u8);
+            }
+        }
+        (src, dst)
+    }
+
+    /// A bright, nearly flat source and a uniformly brightened copy: every
+    /// per-pixel dissimilarity is close to one value, so each deviation pool
+    /// is tiny against its mean, where an uncentred polynomial cancels.
+    fn offset_pair(w: usize, h: usize) -> (Vec<[u8; 3]>, Vec<[u8; 3]>) {
+        let src: Vec<[u8; 3]> = (0..w * h)
+            .map(|i| {
+                let t = (((i as u64).wrapping_mul(2_654_435_761) >> 13) % 5) as u8;
+                [226 + t, 222 + t, 218 + t]
+            })
+            .collect();
+        let dst = src.iter().map(|p| p.map(|v| v + 4)).collect();
+        (src, dst)
+    }
+
+    /// The cross-scale edge-width slot keeps its linearized term in both
+    /// splits (`crate::map_paint`), so it has no sum identity; globaff's
+    /// `share` slots split to zero (`exact_split_globaff_maps_sum_to_their_features`).
+    fn linearized(id: usize) -> bool {
+        let first = crate::globaff::FIRST_ID;
+        ((372..372 + 4 * 87).contains(&id)
+            && (id - 372) % 29 == crate::feature_v2::idx::EDGE_WIDTH_CHANGE)
+            || ((first..first + crate::globaff::SLOTS).contains(&id)
+                && (id - first).is_multiple_of(2))
+    }
+
+    /// Under the exact split each probed feature's map sums to minus the
+    /// feature, on structure (a blur) and on a near-constant dissimilarity
+    /// (a uniform brightening, where the deviation pools are tiny against
+    /// their means). Tolerance (introduced here): 1e-4 of the feature plus
+    /// 1e-9, for the f32 kernels' rounding over the image.
+    #[test]
+    fn exact_split_maps_sum_to_their_features() {
+        let b = shipped_b();
+        let (w, h) = (192usize, 160usize);
+        for (name, (src, dst)) in [("blur", blur_pair(w, h)), ("offset", offset_pair(w, h))] {
+            let rows = probe(&b, &src, &dst, w, h, SplitMode::Exact);
+            assert!(rows.len() > 100, "{name}: only {} probes", rows.len());
+            let off: Vec<String> = rows
+                .iter()
+                .filter(|r| !linearized(r.0))
+                .filter(|&&(_, sum, f, _)| {
+                    let err = (sum + f).abs();
+                    err.is_nan() || err > 1e-4 * f.abs() + 1e-9
+                })
+                .map(|&(id, sum, f, _)| format!("f{id}: map {sum:e}, -feature {:e}", -f))
+                .collect();
+            assert!(
+                off.is_empty(),
+                "{name}: {} of {} maps miss -feature:\n{}",
+                off.len(),
+                rows.len(),
+                off.join("\n")
+            );
+        }
+    }
+
+    /// A revision-6 bake over the globaff family's slots and a few v2 slots.
+    fn rev6_globaff_bake() -> Vec<u8> {
+        let ids: Vec<usize> = (crate::globaff::FIRST_ID
+            ..crate::globaff::FIRST_ID + crate::globaff::SLOTS)
+            .chain([372 + 29, 372 + 87 + 29])
+            .collect::<std::collections::BTreeSet<_>>()
+            .into_iter()
+            .collect();
+        let recipe = serde_json::json!({
+            "schema_hash":1,
+            "scaler_mean": vec![0.0; ids.len()],
+            "scaler_scale": vec![1.0; ids.len()],
+            "metadata":[
+                {"key":"zentrain.feature_ids","type":"utf8",
+                 "text": ids.iter().map(usize::to_string).collect::<Vec<_>>().join(" ")},
+                {"key":"zentrain.formula_revision","type":"utf8","text":"6"}],
+            "layers":[{"in_dim":ids.len(),"out_dim":1,"activation":"identity",
+                "dtype":"f32","weights": vec![-40.0; ids.len()],"biases":[100.0]}]
+        });
+        zenpredict_bake::bake_from_json_str(&recipe.to_string()).unwrap()
+    }
+
+    /// The globaff family's map term (`crate::globaff::map_planes`) under the
+    /// exact split: each `explained` map sums to minus its feature and each
+    /// `share` map (a degree-0 ratio) to zero, on a global edit and on a blur.
+    #[test]
+    fn exact_split_globaff_maps_sum_to_their_features() {
+        let bake = rev6_globaff_bake();
+        let (w, h) = (192usize, 160usize);
+        let (src, blurred) = blur_pair(w, h);
+        let edited: Vec<[u8; 3]> = src
+            .iter()
+            .map(|p| p.map(|v| ((u16::from(v) * 7) / 8 + 20).min(255) as u8))
+            .collect();
+        for (name, d) in [("global edit", &edited), ("blur", &blurred)] {
+            let rows = probe(&bake, &src, d, w, h, SplitMode::Exact);
+            let first = crate::globaff::FIRST_ID;
+            let globaff: Vec<_> = rows
+                .iter()
+                .filter(|r| (first..first + crate::globaff::SLOTS).contains(&r.0))
+                .collect();
+            assert!(
+                globaff.len() >= 12,
+                "{name}: only {} globaff probes",
+                globaff.len()
+            );
+            for &&(id, sum, f, _) in &globaff {
+                let explained = (id - first) % 2 == 1;
+                let want = if explained { -f } else { 0.0 };
+                let tol = 1e-4 * f.abs() + 1e-9;
+                assert!(
+                    (sum - want).abs() <= tol,
+                    "{name} f{id} ({}): map {sum:e}, want {want:e} (feature {f:e})",
+                    if explained { "explained" } else { "share" }
+                );
+            }
+        }
+    }
+
+    /// Diagnostic (ignored by default): the v2 SSIM dissimilarity's luminance
+    /// term in the direct form is `nb − na`, a difference of two numbers near
+    /// `2μ²` whose true value is `(μ1 − μ2)²`. Per scale and channel, prints
+    /// the walk's own mean `d` against the same mean recomputed from the
+    /// retained f32 moments with the production form, with `(μ1 − μ2)²` in
+    /// f32, and in f64. `cargo test --release --all-features --lib
+    /// v2_ssim_luminance_cancellation -- --ignored --nocapture`.
+    #[test]
+    #[ignore]
+    fn v2_ssim_luminance_cancellation() {
+        let (w, h) = (192usize, 160usize);
+        let (src, blurred) = blur_pair(w, h);
+        let sparse: Vec<[u8; 3]> = src
+            .iter()
+            .enumerate()
+            .map(|(i, p)| {
+                if i % 7 == 0 {
+                    p.map(|v| v.saturating_add(1))
+                } else {
+                    *p
+                }
+            })
+            .collect();
+        let lsb: Vec<[u8; 3]> = src.iter().map(|p| p.map(|v| v.saturating_add(1))).collect();
+        let (osrc, odst) = offset_pair(w, h);
+        let b = shipped_b();
+        let model = zenpredict::Model::from_bytes(&b).unwrap();
+        let (c1, c2) = (
+            crate::feature_v2::C1_V2 as f32,
+            crate::feature_v2::C2_V2 as f32,
+        );
+        for (name, s, d) in [
+            ("blur", &src, &blurred),
+            ("+1 on every 7th pixel", &src, &sparse),
+            ("+1 everywhere", &src, &lsb),
+            ("flat +4", &osrc, &odst),
+        ] {
+            let (rs, ds) = (RgbSlice::new(s, w, h), RgbSlice::new(d, w, h));
+            let mut scorer = super::BakeScorer::new(&model)
+                .unwrap()
+                .with_parallel(false)
+                .with_map_paint("box", "nearest", "repair")
+                .unwrap();
+            let pre = scorer.precompute_reference(&rs).unwrap();
+            let mut session = crate::Fused944Session::new();
+            scorer
+                .compute_with_ref_and_attribution(&rs, &pre, &ds, None, &mut session, 1)
+                .unwrap();
+            let ret = session.retention();
+            println!("{name}:");
+            for (scale, planes) in ret.planes.iter().enumerate() {
+                for (ch, p) in planes.iter().enumerate() {
+                    let n = p.mu1.len();
+                    if n == 0 {
+                        continue;
+                    }
+                    let (mut prod, mut stable, mut exact) = (0.0f64, 0.0f64, 0.0f64);
+                    for i in 0..n {
+                        let (m1, m2, sq, e) = (p.mu1[i], p.mu2[i], p.ssq[i], p.s12[i]);
+                        let na = 2.0 * m1 * m2 + c1;
+                        let nb = m1 * m1 + m2 * m2 + c1;
+                        let nd = sq - m1 * m1 - m2 * m2 + c2;
+                        let md = m1 - m2;
+                        let ev = (e - md * md).max(0.0);
+                        prod += f64::from(((nd * (nb - na) + na * ev) / (nb * nd)).max(0.0));
+                        stable += f64::from(((nd * (md * md) + na * ev) / (nb * nd)).max(0.0));
+                        let (m1, m2, sq, e) =
+                            (f64::from(m1), f64::from(m2), f64::from(sq), f64::from(e));
+                        let (na, nb) = (
+                            2.0 * m1 * m2 + f64::from(c1),
+                            m1 * m1 + m2 * m2 + f64::from(c1),
+                        );
+                        let nd = sq - m1 * m1 - m2 * m2 + f64::from(c2);
+                        let md = m1 - m2;
+                        exact +=
+                            ((nd * (md * md) + na * (e - md * md).max(0.0)) / (nb * nd)).max(0.0);
+                    }
+                    let walk = ret.cells[scale][ch].dense.sum_d / n as f64;
+                    let nf = n as f64;
+                    println!(
+                        "  scale {scale} ch {ch}: walk {walk:.6e} prod {:.6e} stable {:.6e} f64 {:.6e} | walk/f64 {:+.3e} stable/f64 {:+.3e}",
+                        prod / nf,
+                        stable / nf,
+                        exact / nf,
+                        walk / (exact / nf) - 1.0,
+                        stable / exact - 1.0,
+                    );
+                }
+            }
+        }
+    }
+
+    /// Diagnostic (ignored by default): prints the largest per-feature map
+    /// masses and the sum identity. `ZENSIM_DIAG_SPLIT=exact cargo test
+    /// --release --all-features --lib map_split_diagnostic -- --ignored
+    /// --nocapture`.
+    #[test]
+    #[ignore]
+    fn map_split_diagnostic() {
+        let split = if std::env::var("ZENSIM_DIAG_SPLIT").as_deref() == Ok("exact") {
+            SplitMode::Exact
+        } else {
+            SplitMode::Repair
+        };
+        let (w, h) = (192usize, 160usize);
+        let (src, dst) = blur_pair(w, h);
+        let mut rows = probe(&shipped_b(), &src, &dst, w, h, split);
+        rows.sort_by(|a, b| (b.1 * b.3).abs().total_cmp(&(a.1 * a.3).abs()));
+        println!("split {split:?}: {} probes", rows.len());
+        for (id, sum, f, s) in rows.iter().take(25) {
+            println!(
+                "f{id}: map sum {sum:e} feature {f:e} sens {s:e} mass {:e}",
+                sum * s
+            );
+        }
+        let mut off: Vec<_> = rows
+            .iter()
+            .filter(|(_, sum, f, _)| (sum + f).abs() > 1e-4 * f.abs() + 1e-9)
+            .collect();
+        off.sort_by_key(|r| r.0);
+        println!("maps not summing to -feature: {}", off.len());
+        for (id, sum, f, _) in off {
+            println!(
+                "  f{id}: map {sum:e} vs -feature {:e} (ratio {:.4})",
+                -f,
+                sum / -f
+            );
+        }
+    }
+}

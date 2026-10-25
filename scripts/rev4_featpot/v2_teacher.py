@@ -306,7 +306,10 @@ def coverage_leg(mask: int, scratch: Path, *, admitted_root: Path | None = None)
     pool, keys, scratch = safe_path(pool), safe_path(keys), safe_path(scratch)
     man = Path(f"{pool}.manifest.json")
     revision = int(json.loads(man.read_text()).get("formula_revision", 4)) if man.is_file() else 4
-    pool_sha = {4: POOL_SHA, 5: POOL_SHA_REV5}.get(revision)
+    declared = json.loads(man.read_text()) if man.is_file() else {}
+    # A revision-7 pool exists only as a by-construction derivation of the Rev5 pool (ring_root.py --arm rev7).
+    source_revision = 5 if revision == 7 and "byc_derived_from" in declared else revision
+    pool_sha = {4: POOL_SHA, 5: POOL_SHA_REV5}.get(source_revision)
     if pool_sha is None:
         raise ValueError(f"{pool}: no registered E15 coverage pool for formula revision {revision}")
     declaration = json.loads(man.read_text()) if man.is_file() else {}
@@ -316,6 +319,13 @@ def coverage_leg(mask: int, scratch: Path, *, admitted_root: Path | None = None)
         if admitted_root is None or projection["role"] != "TRAIN-ordinal" or projection["inherited_table_sha256"] != pool_sha:
             raise ValueError("E32 coverage must preserve the exact registered inherited pool")
         admit_keys(pool, declaration, pq.read_table(keys))
+        pool_sha = declaration["table_sha256"]
+    elif "byc_derived_from" in declaration:
+        # By-construction exploration (benchmarks/byconstruction_2026-10-22.md): the registered pool with named columns
+        # re-extracted (scripts/byconstruction/ring_root.py, which checked every other measured column bit for bit).
+        # Same rows and keys; the strict root's freeze pins this declaration, which pins the table.
+        if admitted_root is None or declaration["byc_derived_from"]["table_sha256"] != pool_sha:
+            raise ValueError("by-construction coverage must derive from the registered pool under strict admission")
         pool_sha = declaration["table_sha256"]
     for path, want in ((pool, pool_sha), (keys, POOL_KEYS_SHA)):
         got = hashlib.sha256(path.read_bytes()).hexdigest()

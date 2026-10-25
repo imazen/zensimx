@@ -1,0 +1,5 @@
+# A=/home/lilith/tmp/byc/perf/vp1/byc_score_timing sha256=df1a44f845696031
+# B=/home/lilith/tmp/byc/perf/vp1024/byc_score_timing sha256=f6c326d58212889b
+# A bakes: /home/lilith/tmp/byc/perf/b_rev7.bin /home/lilith/tmp/byc/parity/tga_full_rev6.bin; B bakes: /home/lilith/tmp/byc/perf/b_rev7.bin /home/lilith/tmp/byc/parity/tga_full_rev6.bin
+# host=dev date=2026-10-24T13:12:39Z rounds=8 load=1.85 1.68 2.42
+# cases: /home/lilith/tmp/cases_big.tsv

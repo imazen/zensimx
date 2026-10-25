@@ -245,8 +245,13 @@ mod fused;
 /// Unconditional: `contrast_inc` is a v1 basic slot, so it exists on a
 /// `--no-default-features` build too.
 pub(crate) mod hf_gain_form;
+// The `globaff` family's strip moment sums (formula revision 6).
+pub(crate) mod globaff;
+// Research painting modes for the candidate attribution map.
 mod iw_pool;
 mod jnd;
+#[cfg(feature = "custom-profiles")]
+pub(crate) mod map_paint;
 pub mod mapping;
 mod metric;
 // MLP runtime is internal — V0_4+ dispatch is exposed only through
@@ -344,6 +349,9 @@ mod feature_v2;
 // Streaming strip-plane producer for the folded-720+append walk
 // (docs/STREAMING_FOLDAPP_C0_DESIGN_2026-07-26.md).
 pub(crate) mod feature_v2_stream;
+// Pyramid rows produced by parallel chunk tasks for the strip-job pipeline.
+#[cfg(feature = "threads")]
+pub(crate) mod feature_v2_blocks;
 
 // NEIGHSTEER (lane 2026-10-04): exact local refinement of the coarse-scale
 // v2 pooled features for steering — crate-private, default-on for Rev5.
@@ -460,6 +468,7 @@ pub(crate) mod feature_plan;
 // benchmarks/fold_mt_scaling_2026-08-31.md
 pub(crate) mod fold_timing;
 // A clock for the attribution path's timing counters that also runs in wasm.
+#[cfg(feature = "custom-profiles")]
 pub(crate) mod perf_clock;
 
 // The fold-backed scoring engine (benchmarks/fold_engine_2026-08-31.md):

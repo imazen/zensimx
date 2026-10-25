@@ -176,7 +176,8 @@ def cmd_extract(a) -> int:
                 raise ValueError("fresh assessment bank/scratch required")
         if set(pq.ParquetFile(key_path).schema_arrow.names) - ASSESSMENT_KEY_COLUMNS:
             raise ValueError("label-bearing assessment keys forbidden before payload read")
-        if a.revision != 5 or sha256_file(key_path) != spec["keys"]["sha256"] or sha256_file(a.bin) != spec["extractor"]["sha256"]:
+        # Revision 7: the by-construction re-extraction of the same instruments (benchmarks/byconstruction_2026-10-22.md).
+        if a.revision not in (5, 7) or sha256_file(key_path) != spec["keys"]["sha256"] or sha256_file(a.bin) != spec["extractor"]["sha256"]:
             raise ValueError("changed assessment keys/extractor")
     keys = pq.read_table(key_path)
     if spec:
@@ -663,7 +664,7 @@ def main() -> int:
     ap.add_argument("--instrument-manifest", type=Path, help="explicit label-free assessment keys; historical bank default unchanged")
     ap.add_argument("--hdr-teacher", help="immutable HDRTEACH role; native E26 extraction")
     ap.add_argument("--build-commit", default="")
-    ap.add_argument("--revision", type=int, choices=[4, 5], default=5)
+    ap.add_argument("--revision", type=int, choices=[4, 5, 7], default=5)
     ap.add_argument("--era", default="")
     ap.add_argument("--out", default="/var/tmp/rev5-featbank")
     ap.add_argument("--reference", default="/var/tmp/rev4-featbank-r4")

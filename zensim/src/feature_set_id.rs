@@ -123,6 +123,11 @@ pub enum ComputeToken {
     /// Restored cut (COST_CUTS_AUDIT Ambiguous 7): C8's X/B gradient
     /// loss/gain/deviation bank at native scale, `f1790..1819`.
     Gmsnative,
+    /// Global affine-change descriptor, `f1867..1890` (formula revision 6):
+    /// per scale and XYB channel, the share of the mean squared error a
+    /// least-squares fit `dst ≈ a·src + b` over the whole plane explains, and
+    /// that explained error.
+    GlobAff,
 }
 
 impl ComputeToken {
@@ -145,6 +150,7 @@ impl ComputeToken {
         ComputeToken::Mapdev,
         ComputeToken::Z1max,
         ComputeToken::Gmsnative,
+        ComputeToken::GlobAff,
         ComputeToken::Moments,
         ComputeToken::ClassC,
         ComputeToken::Hdr,
@@ -172,6 +178,7 @@ impl ComputeToken {
             ComputeToken::Mapdev => "mapdev",
             ComputeToken::Z1max => "z1max",
             ComputeToken::Gmsnative => "gmsnative",
+            ComputeToken::GlobAff => "globaff",
             ComputeToken::Moments => "moments",
             ComputeToken::ClassC => "classc",
             ComputeToken::Hdr => "hdr",

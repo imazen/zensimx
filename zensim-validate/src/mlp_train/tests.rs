@@ -3843,6 +3843,854 @@ fn e34_plain_monotone_refusals() {
     }
 }
 
+/// `--nonneg-thresholds` with `--monotone-cbc`: trainable `b1 <= 0` keeps the
+/// identity pin bit-exact in f32 and f16, and the baked model is non-increasing
+/// along every non-negative direction (checked exactly, since every forward op
+/// is monotone under round-to-nearest). Without thresholds the same projection
+/// is linear on the non-negative orthant; with them, units switch on at a
+/// threshold, which this target (a hinge in x0) rewards.
+#[test]
+fn byc_monotone_thresholds_identity_and_monotonicity() {
+    let rows: Vec<Vec<f64>> = (0..64)
+        .map(|i| vec![(i % 16) as f64 / 15., (i / 16) as f64 / 3.])
+        .collect();
+    let refs: Vec<&[f64]> = rows.iter().map(Vec::as_slice).collect();
+    let scores: Vec<f64> = rows
+        .iter()
+        .map(|x| 100. - 80. * (x[0] - 0.6).max(0.) - 1. * x[1])
+        .collect();
+    for dtype in [WeightDtype::F32, WeightDtype::F16] {
+        let hp = MlpHyperparams {
+            nonneg_distance: true,
+            monotone_cbc: true,
+            nonneg_thresholds: true,
+            n_hidden: 8,
+            n_epochs: 80,
+            pairs_per_epoch: 1024,
+            seed: 7,
+            out_dtype: dtype,
+            early_stop_patience: 0,
+            ..Default::default()
+        };
+        let mut groups = [TrainingGroup {
+            name: "invented".into(),
+            human_scores: &scores,
+            features: FeatureRows::Borrowed(&refs),
+            metric_sigmas: None,
+            train_weight: 1.,
+            validation_weight: 1.,
+            ref_ids: None,
+            loss_mode: GroupLossMode::Both,
+        }];
+        let mut log = Vec::new();
+        let bytes = train_mlp(&mut groups, 2, &hp, &mut log);
+        let model = zenpredict::Model::from_bytes(&bytes).unwrap();
+        let biases = model.layer(0).biases;
+        assert!(
+            biases.iter().all(|&b| b <= 0.0),
+            "b1 must stay <= 0: {biases:?}"
+        );
+        assert!(
+            biases.iter().any(|&b| b < 0.0),
+            "a hinge target must move at least one threshold: {biases:?}\n{}",
+            log.join("\n")
+        );
+        assert_eq!(
+            certify_monotone_bake(&model, 100.0),
+            Ok(MonotoneCertificate {
+                ramps: 0,
+                free_ramps: 0,
+                free_amplitude: 0.0,
+                max_pairs: 0
+            }),
+            "certificate"
+        );
+        let mut predictor = zenpredict::Predictor::new(&model);
+        assert_eq!(
+            predictor.predict(&[0., 0.]).unwrap()[0].to_bits(),
+            100.0_f32.to_bits()
+        );
+        let mut rng = 0x9e37_79b9_7f4a_7c15u64;
+        let mut next = || {
+            rng ^= rng << 13;
+            rng ^= rng >> 7;
+            rng ^= rng << 17;
+            (rng >> 11) as f32 / (1u64 << 53) as f32
+        };
+        for _ in 0..2000 {
+            let x = [2. * next(), 2. * next()];
+            let y = [x[0] + next(), x[1] + next() * 0.25];
+            let fx = predictor.predict(&x).unwrap()[0];
+            let fy = predictor.predict(&y).unwrap()[0];
+            assert!(
+                fy <= fx && fx <= 100.,
+                "monotone violation {x:?}->{fx} {y:?}->{fy}"
+            );
+        }
+    }
+}
+
+/// `--monotone-ramps`: the baked model passes [`certify_monotone_bake`] (every
+/// positive output weight is a ramp's upper unit, matched to its lower unit by
+/// an identical W1 column; the bake may store hidden units in any order), the
+/// identity pin is bit-exact, and the model is exactly non-increasing along
+/// non-negative steps.
+#[test]
+fn byc_monotone_ramps_structure_identity_and_monotonicity() {
+    let rows: Vec<Vec<f64>> = (0..64)
+        .map(|i| vec![(i % 16) as f64 / 15., (i / 16) as f64 / 3.])
+        .collect();
+    let refs: Vec<&[f64]> = rows.iter().map(Vec::as_slice).collect();
+    let scores: Vec<f64> = rows
+        .iter()
+        .map(|x| 100. - 60. * x[0].min(0.4) - 5. * x[1])
+        .collect();
+    let (hidden, ramps) = (8usize, 3usize);
+    for dtype in [WeightDtype::F32, WeightDtype::F16] {
+        let hp = MlpHyperparams {
+            nonneg_distance: true,
+            monotone_cbc: true,
+            nonneg_thresholds: true,
+            monotone_ramps: ramps,
+            n_hidden: hidden,
+            n_epochs: 40,
+            pairs_per_epoch: 1024,
+            seed: 11,
+            out_dtype: dtype,
+            early_stop_patience: 0,
+            ..Default::default()
+        };
+        let mut groups = [TrainingGroup {
+            name: "invented".into(),
+            human_scores: &scores,
+            features: FeatureRows::Borrowed(&refs),
+            metric_sigmas: None,
+            train_weight: 1.,
+            validation_weight: 1.,
+            ref_ids: None,
+            loss_mode: GroupLossMode::Both,
+        }];
+        let bytes = train_mlp(&mut groups, 2, &hp, &mut Vec::new());
+        let model = zenpredict::Model::from_bytes(&bytes).unwrap();
+        // A pair can train to output weight 0 (two dead units), so live ramps <= ramps.
+        let cert = certify_monotone_bake(&model, 100.0).expect("certificate");
+        assert!(
+            cert.ramps <= ramps && cert.free_ramps == 0 && cert.free_amplitude == 0.0,
+            "{cert:?}"
+        );
+        let mut predictor = zenpredict::Predictor::new(&model);
+        assert_eq!(
+            predictor.predict(&[0., 0.]).unwrap()[0].to_bits(),
+            100.0_f32.to_bits()
+        );
+        let mut rng = 0x2545_f491_4f6c_dd1du64;
+        let mut next = || {
+            rng ^= rng << 13;
+            rng ^= rng >> 7;
+            rng ^= rng << 17;
+            (rng >> 11) as f32 / (1u64 << 53) as f32
+        };
+        for _ in 0..2000 {
+            let x = [2. * next(), 2. * next()];
+            let y = [x[0] + next(), x[1] + next() * 0.25];
+            let fx = predictor.predict(&x).unwrap()[0];
+            let fy = predictor.predict(&y).unwrap()[0];
+            assert!(
+                fy <= fx && fx <= 100.,
+                "monotone violation {x:?}->{fx} {y:?}->{fy}"
+            );
+        }
+    }
+}
+
+/// `--free-ramps` with a budget: the certificate reports the free pairs and an
+/// amplitude within the budget, and no non-negative step raises the score by
+/// more than that amplitude (plus f32 rounding). The target needs a
+/// non-monotone term, so the budget binds.
+#[test]
+fn byc_free_ramps_certified_budget() {
+    let rows: Vec<Vec<f64>> = (0..64)
+        .map(|i| vec![(i % 16) as f64 / 15., (i / 16) as f64 / 3.])
+        .collect();
+    let refs: Vec<&[f64]> = rows.iter().map(Vec::as_slice).collect();
+    let scores: Vec<f64> = rows
+        .iter()
+        .map(|x| 100. - 40. * x[0] + 15. * x[1] * x[0])
+        .collect();
+    let budget = 3.0;
+    for dtype in [WeightDtype::F32, WeightDtype::F16] {
+        let hp = MlpHyperparams {
+            nonneg_distance: true,
+            monotone_cbc: true,
+            nonneg_thresholds: true,
+            monotone_ramps: 1,
+            free_ramps: 2,
+            free_budget: budget,
+            n_hidden: 8,
+            n_epochs: 40,
+            pairs_per_epoch: 1024,
+            seed: 5,
+            out_dtype: dtype,
+            early_stop_patience: 0,
+            ..Default::default()
+        };
+        let mut groups = [TrainingGroup {
+            name: "invented".into(),
+            human_scores: &scores,
+            features: FeatureRows::Borrowed(&refs),
+            metric_sigmas: None,
+            train_weight: 1.,
+            validation_weight: 1.,
+            ref_ids: None,
+            loss_mode: GroupLossMode::Both,
+        }];
+        let bytes = train_mlp(&mut groups, 2, &hp, &mut Vec::new());
+        let model = zenpredict::Model::from_bytes(&bytes).unwrap();
+        let cert = certify_monotone_bake(&model, 100.0).expect("certificate");
+        assert!(cert.free_amplitude <= budget * (1. + 1e-3), "{cert:?}");
+        let mut predictor = zenpredict::Predictor::new(&model);
+        assert_eq!(
+            predictor.predict(&[0., 0.]).unwrap()[0].to_bits(),
+            100.0_f32.to_bits()
+        );
+        let mut rng = 0x1234_5678_9abc_def1u64;
+        let mut next = || {
+            rng ^= rng << 13;
+            rng ^= rng >> 7;
+            rng ^= rng << 17;
+            (rng >> 11) as f32 / (1u64 << 53) as f32
+        };
+        let slack = cert.free_amplitude as f32 + 1e-3;
+        for _ in 0..2000 {
+            let x = [2. * next(), 2. * next()];
+            let y = [x[0] + next(), x[1] + next()];
+            let fx = predictor.predict(&x).unwrap()[0];
+            let fy = predictor.predict(&y).unwrap()[0];
+            assert!(
+                fy <= fx + slack && fx <= 100.,
+                "budget violation {x:?}->{fx} {y:?}->{fy} {cert:?}"
+            );
+        }
+    }
+}
+
+/// Projection with free ramps, on hand-set weights: monotone rows clamp to
+/// `>= 0`, free rows keep their sign (averaged within the pair), every pair is
+/// tied, `b1 <= 0` with `b_q <= b_p`, and the free amplitude meets the budget.
+#[test]
+fn byc_free_ramp_projection_contract() {
+    // 2 inputs, 6 hidden: unit 0 plain, (1,2) monotone ramp, (3,4) free ramp, 5 plain? No:
+    // the layout is [plain | monotone ramps | free ramps], so use 1 plain, 1 monotone pair, 2 free pairs = 7 units.
+    let h = 7;
+    let hp = MlpHyperparams {
+        nonneg_distance: true,
+        monotone_cbc: true,
+        nonneg_thresholds: true,
+        monotone_ramps: 1,
+        free_ramps: 2,
+        free_budget: 2.0,
+        n_hidden: h,
+        ..Default::default()
+    };
+    let mut w1 = vec![
+        -1.0, -2.0, 3.0, -4.0, -5.0, 6.0, -7.0, // feature 0 across units
+        2.0, -1.0, -3.0, 4.0, 2.0, -6.0, 1.0, // feature 1
+    ];
+    let mut w2 = vec![0.5, -3.0, 1.0, -4.0, 2.0, -6.0, 6.0];
+    let mut b1 = vec![0.3, -0.1, -0.5, -1.0, -3.0, 0.2, -2.0];
+    let mut b2 = vec![0.0];
+    project_plain(&mut w1, &mut w2, &mut b1, &mut b2, Some(100.0), &hp);
+    let col = |j: usize| [w1[j], w1[h + j]];
+    assert!(
+        col(0).iter().all(|&v| v >= 0.0) && col(1) == col(2) && col(1).iter().all(|&v| v >= 0.0)
+    );
+    assert_eq!(col(3), col(4));
+    assert_eq!(col(5), col(6));
+    assert!(
+        col(3).iter().chain(col(5).iter()).any(|&v| v < 0.0),
+        "free rows must keep their sign"
+    );
+    assert!(b1.iter().all(|&b| b <= 0.0) && b1[2] <= b1[1] && b1[4] <= b1[3] && b1[6] <= b1[5]);
+    for p in [1, 3, 5] {
+        assert!(w2[p] <= 0.0 && w2[p + 1] == -w2[p]);
+    }
+    assert!(w2[0] <= 0.0 && b2[0] == 100.0);
+    let amplitude = -w2[3] * (b1[3] - b1[4]) - w2[5] * (b1[5] - b1[6]);
+    assert!(
+        amplitude <= 2.0 + 1e-12 && amplitude > 1.9,
+        "amplitude {amplitude}"
+    );
+}
+
+/// A hand-built bake with one free ramp certifies to exactly its amplitude, and
+/// that bound is tight: raising an input raises the score by up to (and not
+/// beyond) the amplitude.
+#[test]
+fn byc_certificate_free_amplitude_is_exact_and_tight() {
+    // 2 inputs, 3 hidden units: one monotone hinge, one free ramp (units 1, 2).
+    // free row = (1, -1): z = x0 - x1 falls as x1 rises.
+    // The hinge reads only x0, so raising x1 moves the score through the free ramp alone.
+    let w1 = [0.5, 1.0, 1.0, 0.0, -1.0, -1.0];
+    let b1 = [-0.1, 0.0, -2.0];
+    let w2 = [-4.0, -1.5, 1.5];
+    let b2 = [100.0];
+    let bytes = bake_two_layer_znpr_v3(
+        &[0.0, 0.0],
+        &[1.0, 1.0],
+        &w1,
+        &b1,
+        &w2,
+        &b2,
+        2,
+        3,
+        1,
+        WeightDtype::F32,
+        None,
+        None,
+        Activation::Relu,
+    );
+    let model = zenpredict::Model::from_bytes(&bytes).unwrap();
+    let cert = certify_monotone_bake(&model, 100.0).expect("certificate");
+    assert_eq!(
+        cert,
+        MonotoneCertificate {
+            ramps: 0,
+            free_ramps: 1,
+            free_amplitude: 3.0,
+            max_pairs: 0
+        }
+    );
+    let mut predictor = zenpredict::Predictor::new(&model);
+    let lo = predictor.predict(&[3.0, 0.0]).unwrap()[0];
+    let hi = predictor.predict(&[3.0, 5.0]).unwrap()[0];
+    assert!(hi > lo, "the free ramp must make this step raise the score");
+    assert!(
+        (hi - lo - 3.0).abs() <= 1e-5,
+        "rise {} should equal the certified amplitude 3",
+        hi - lo
+    );
+    // Breaking the tie (one weight changed) must refuse.
+    let mut w2_bad = w2;
+    w2_bad[2] = 1.4;
+    let bad = bake_two_layer_znpr_v3(
+        &[0.0, 0.0],
+        &[1.0, 1.0],
+        &w1,
+        &b1,
+        &w2_bad,
+        &b2,
+        2,
+        3,
+        1,
+        WeightDtype::F32,
+        None,
+        None,
+        Activation::Relu,
+    );
+    assert!(certify_monotone_bake(&zenpredict::Model::from_bytes(&bad).unwrap(), 100.0).is_err());
+}
+
+/// The gate projection: any input lands in `{a >= 0, s_p·a + s_d·b >= 0}`,
+/// with the f16 margin, and a point well inside the cone is unchanged.
+#[test]
+fn byc_gate_projection_property() {
+    let mut rng = 0x5eed_0f_9a7e_u64;
+    let mut next = || {
+        rng ^= rng << 13;
+        rng ^= rng >> 7;
+        rng ^= rng << 17;
+        (rng >> 11) as f64 / (1u64 << 53) as f64
+    };
+    for _ in 0..20_000 {
+        let (a, b) = (4.0 * next() - 2.0, 4.0 * next() - 2.0);
+        let (sd, sp) = (0.01 + 3.0 * next(), 0.01 + 3.0 * next());
+        let (pa, pb) = project_gate(a, b, sd, sp);
+        assert!(pa >= 0.0, "a {pa}");
+        assert!(
+            sp * pa + sd * pb >= GATE_MARGIN * sp * pa * (1.0 - 1e-9) - 1e-15,
+            "({a},{b}) -> ({pa},{pb})"
+        );
+        if pb < 0.0 {
+            assert!(pa >= GATE_MIN_DIRECT);
+        }
+    }
+    assert_eq!(project_gate(1.0, -0.5, 1.0, 1.0), (1.0, -0.5));
+    assert_eq!(project_gate(1.0, 0.25, 1.0, 1.0), (1.0, 0.25));
+}
+
+/// Content-gated training: inputs `[d0, d1, d0·f0, d1·f1]` with f in (0, 1],
+/// a target whose gain on `d0` falls with `f0`. The trained model keeps every
+/// unit's gain non-negative for every f (checked on the baked f32 weights and
+/// scaler), uses a negative product weight somewhere (the gate is exercised),
+/// and is exactly non-increasing in each damage input for random fragilities.
+#[test]
+fn byc_gated_products_train_monotone_in_damage() {
+    let mut rng = 0x00c0_ffee_u64;
+    let mut next = || {
+        rng ^= rng << 13;
+        rng ^= rng >> 7;
+        rng ^= rng << 17;
+        (rng >> 11) as f64 / (1u64 << 53) as f64
+    };
+    let rows: Vec<Vec<f64>> = (0..256)
+        .map(|_| {
+            let (d0, d1, f0, f1) = (next(), next(), 0.05 + 0.95 * next(), 0.05 + 0.95 * next());
+            vec![d0, d1, d0 * f0, d1 * f1]
+        })
+        .collect();
+    let refs: Vec<&[f64]> = rows.iter().map(Vec::as_slice).collect();
+    let scores: Vec<f64> = rows
+        .iter()
+        .map(|x| 100. - 40. * (x[0] - 0.8 * x[2]) - 10. * x[1])
+        .collect();
+    let hp = MlpHyperparams {
+        nonneg_distance: true,
+        monotone_cbc: true,
+        nonneg_thresholds: true,
+        monotone_product_pairs: vec![(0, 2), (1, 3)],
+        n_hidden: 8,
+        n_epochs: 60,
+        pairs_per_epoch: 2048,
+        seed: 9,
+        early_stop_patience: 0,
+        ..Default::default()
+    };
+    let mut groups = [TrainingGroup {
+        name: "invented".into(),
+        human_scores: &scores,
+        features: FeatureRows::Borrowed(&refs),
+        metric_sigmas: None,
+        train_weight: 1.,
+        validation_weight: 1.,
+        ref_ids: None,
+        loss_mode: GroupLossMode::Both,
+    }];
+    let bytes = train_mlp(&mut groups, 4, &hp, &mut Vec::new());
+    let model = zenpredict::Model::from_bytes(&bytes).unwrap();
+    let (l0, l1) = (model.layer(0), model.layer(1));
+    let zenpredict::WeightStorage::F32(w1) = l0.weights else {
+        panic!("f32 test bake")
+    };
+    let zenpredict::WeightStorage::F32(w2) = l1.weights else {
+        panic!("f32 test bake")
+    };
+    let s = model.scaler_scale();
+    let h = l0.out_dim;
+    let mut used_negative = false;
+    for j in (0..h).filter(|&j| w2[j] != 0.0) {
+        for (d, p) in [(0usize, 2usize), (1, 3)] {
+            let a = f64::from(w1[d * h + j]) / f64::from(s[d]);
+            let b = f64::from(w1[p * h + j]) / f64::from(s[p]);
+            assert!(a >= 0.0 && a + b.min(0.0) >= 0.0, "unit {j}: gain {a} {b}");
+            used_negative |= b < 0.0;
+        }
+    }
+    assert!(
+        used_negative,
+        "the target needs a falling gain; no negative product weight was used"
+    );
+    let mut predictor = zenpredict::Predictor::new(&model);
+    for _ in 0..3000 {
+        let (d0, d1, f0, f1) = (
+            2.0 * next(),
+            2.0 * next(),
+            0.01 + 0.99 * next(),
+            0.01 + 0.99 * next(),
+        );
+        let (e0, e1) = (next(), next());
+        let x = [d0 as f32, d1 as f32, (d0 * f0) as f32, (d1 * f1) as f32];
+        let y = [
+            (d0 + e0) as f32,
+            (d1 + e1) as f32,
+            ((d0 + e0) * f0) as f32,
+            ((d1 + e1) * f1) as f32,
+        ];
+        let (fx, fy) = (
+            predictor.predict(&x).unwrap()[0],
+            predictor.predict(&y).unwrap()[0],
+        );
+        assert!(
+            fy <= fx + 1e-4 && fx <= 100.0,
+            "monotone violation {x:?}->{fx} {y:?}->{fy}"
+        );
+    }
+}
+
+fn byc_derived_bake(w1: &[f32], b1: &[f32], w2: &[f32], products: &str) -> Vec<u8> {
+    let text = format!("zensim-derived-inputs v1\nin 13\nin 14\n{products}");
+    let meta = [BakeMetadataEntry {
+        key: "zensim.derived_inputs",
+        kind: zenpredict::MetadataType::Utf8,
+        value: text.as_bytes(),
+    }];
+    bake(&BakeRequest {
+        schema_hash: 0,
+        flags: 0,
+        scaler_mean: &[0.0; 4],
+        scaler_scale: &[1.0, 2.0, 1.0, 0.5],
+        layers: &[
+            BakeLayer {
+                in_dim: 4,
+                out_dim: 2,
+                activation: Activation::Relu,
+                dtype: WeightDtype::F32,
+                weights: w1,
+                biases: b1,
+            },
+            BakeLayer {
+                in_dim: 2,
+                out_dim: 1,
+                activation: Activation::Identity,
+                dtype: WeightDtype::F32,
+                weights: w2,
+                biases: &[100.0],
+            },
+        ],
+        feature_bounds: &[],
+        metadata: &meta,
+        output_specs: &[],
+        discrete_sets: &[],
+        sparse_overrides: &[],
+        feature_order: None,
+        output_order: None,
+        compressed: false,
+        hu_permutations: None,
+    })
+    .unwrap()
+}
+
+/// Certificate on declared `fx1` products: a negative product weight inside
+/// the gate cone certifies; one outside it, or a factor that is not a
+/// `pjnd_fragility` slot, refuses.
+#[test]
+fn byc_certificate_gated_products() {
+    // inputs: d13, d14, d13·f422, d14·f480; scales 1, 2, 1, 0.5; two units.
+    // unit 0: a=1 on d13, b=-0.9 on its product (gain 1 - 0.9f >= 0.1). unit 1: plain on d14.
+    let ok = [1.0f32, 0.0, 0.0, 0.5, -0.9, 0.0, 0.0, 0.2];
+    let fx1 = "product 13 422\nproduct 14 480\n";
+    let good = byc_derived_bake(&ok, &[0.0, -0.1], &[-1.0, -2.0], fx1);
+    let cert = certify_monotone_bake(&zenpredict::Model::from_bytes(&good).unwrap(), 100.0);
+    assert_eq!(
+        cert,
+        Ok(MonotoneCertificate {
+            ramps: 0,
+            free_ramps: 0,
+            free_amplitude: 0.0,
+            max_pairs: 0
+        })
+    );
+    // b = -1.1 makes the gain negative at f = 1.
+    let mut bad = ok;
+    bad[4] = -1.1;
+    let refused = byc_derived_bake(&bad, &[0.0, -0.1], &[-1.0, -2.0], fx1);
+    assert!(
+        certify_monotone_bake(&zenpredict::Model::from_bytes(&refused).unwrap(), 100.0).is_err()
+    );
+    // 423 is not a fragility slot ((423 - 372) % 29 != 21).
+    let wrong = byc_derived_bake(
+        &ok,
+        &[0.0, -0.1],
+        &[-1.0, -2.0],
+        "product 13 423\nproduct 14 480\n",
+    );
+    assert!(certify_monotone_bake(&zenpredict::Model::from_bytes(&wrong).unwrap(), 100.0).is_err());
+}
+
+/// `--max-pairs`: trained on a target that is the max of two damage directions,
+/// the bake certifies (live max pairs or not), keeps the exact identity pin and
+/// is non-increasing along non-negative steps (up to f32 rounding of a pair's
+/// two terms).
+#[test]
+fn byc_max_pairs_train_certify_and_stay_monotone() {
+    let rows: Vec<Vec<f64>> = (0..256)
+        .map(|i| vec![(i % 16) as f64 / 15., (i / 16) as f64 / 15.])
+        .collect();
+    let refs: Vec<&[f64]> = rows.iter().map(Vec::as_slice).collect();
+    let scores: Vec<f64> = rows.iter().map(|x| 100. - 50. * x[0].max(x[1])).collect();
+    for dtype in [WeightDtype::F32, WeightDtype::F16] {
+        let hp = MlpHyperparams {
+            nonneg_distance: true,
+            monotone_cbc: true,
+            nonneg_thresholds: true,
+            max_pairs: 4,
+            n_hidden: 8,
+            n_epochs: 60,
+            pairs_per_epoch: 2048,
+            seed: 13,
+            out_dtype: dtype,
+            early_stop_patience: 0,
+            ..Default::default()
+        };
+        let mut groups = [TrainingGroup {
+            name: "invented".into(),
+            human_scores: &scores,
+            features: FeatureRows::Borrowed(&refs),
+            metric_sigmas: None,
+            train_weight: 1.,
+            validation_weight: 1.,
+            ref_ids: None,
+            loss_mode: GroupLossMode::Both,
+        }];
+        let bytes = train_mlp(&mut groups, 2, &hp, &mut Vec::new());
+        let model = zenpredict::Model::from_bytes(&bytes).unwrap();
+        // Whether a pair keeps a signed v row (a live max) is a training outcome,
+        // not a guarantee; the hand-built test below proves the max itself.
+        let cert = certify_monotone_bake(&model, 100.0).expect("certificate");
+        assert!(cert.free_amplitude == 0.0, "{cert:?}");
+        let mut predictor = zenpredict::Predictor::new(&model);
+        assert_eq!(
+            predictor.predict(&[0., 0.]).unwrap()[0].to_bits(),
+            100.0_f32.to_bits()
+        );
+        let mut rng = 0x7777_1234_u64;
+        let mut next = || {
+            rng ^= rng << 13;
+            rng ^= rng >> 7;
+            rng ^= rng << 17;
+            (rng >> 11) as f32 / (1u64 << 53) as f32
+        };
+        for _ in 0..3000 {
+            let x = [2. * next(), 2. * next()];
+            let y = [x[0] + next(), x[1] + next()];
+            let (fx, fy) = (
+                predictor.predict(&x).unwrap()[0],
+                predictor.predict(&y).unwrap()[0],
+            );
+            assert!(
+                fy <= fx + 1e-4 && fx <= 100.,
+                "monotone violation {x:?}->{fx} {y:?}->{fy}"
+            );
+        }
+    }
+}
+
+/// `--max-pairs` with `--monotone-feature-mask`: a sign-free third input (a global-change descriptor) enters only the
+/// pairs' v rows, so the bake stays pinned at identity and non-increasing in the two masked-monotone inputs for every
+/// value of the free one, while the free input may raise or lower the score.
+#[test]
+fn byc_max_pairs_with_free_input_stay_monotone_in_damage() {
+    let rows: Vec<Vec<f64>> = (0..512)
+        .map(|i| {
+            vec![
+                (i % 8) as f64 / 7.,
+                (i / 8 % 8) as f64 / 7.,
+                (i / 64) as f64 / 7.,
+            ]
+        })
+        .collect();
+    let refs: Vec<&[f64]> = rows.iter().map(Vec::as_slice).collect();
+    // Damage counts less when the descriptor says the change is global.
+    let scores: Vec<f64> = rows
+        .iter()
+        .map(|x| 100. - 50. * x[0].max(x[1]) * (1. - 0.6 * x[2]))
+        .collect();
+    let hp = MlpHyperparams {
+        nonneg_distance: true,
+        monotone_cbc: true,
+        nonneg_thresholds: true,
+        max_pairs: 4,
+        monotone_feature_pin: Some(vec![true, true, false]),
+        n_hidden: 12,
+        n_epochs: 60,
+        pairs_per_epoch: 2048,
+        seed: 29,
+        out_dtype: WeightDtype::F32,
+        early_stop_patience: 0,
+        ..Default::default()
+    };
+    let mut groups = [TrainingGroup {
+        name: "invented".into(),
+        human_scores: &scores,
+        features: FeatureRows::Borrowed(&refs),
+        metric_sigmas: None,
+        train_weight: 1.,
+        validation_weight: 1.,
+        ref_ids: None,
+        loss_mode: GroupLossMode::Both,
+    }];
+    let bytes = train_mlp(&mut groups, 3, &hp, &mut Vec::new());
+    let model = zenpredict::Model::from_bytes(&bytes).unwrap();
+    let l0 = model.layer(0);
+    let zenpredict::WeightStorage::F32(w1) = &l0.weights else {
+        panic!("f32 bake expected")
+    };
+    let n_hidden = l0.out_dim;
+    for i in 0..hp.max_pairs {
+        assert_eq!(
+            w1[2 * n_hidden + 2 * i],
+            0.0,
+            "pair {i}: the free input must not enter u"
+        );
+    }
+    let mut predictor = zenpredict::Predictor::new(&model);
+    assert_eq!(
+        predictor.predict(&[0., 0., 0.]).unwrap()[0].to_bits(),
+        100.0_f32.to_bits()
+    );
+    let mut rng = 0x1357_9bdf_u64;
+    let mut next = || {
+        rng ^= rng << 13;
+        rng ^= rng >> 7;
+        rng ^= rng << 17;
+        (rng >> 11) as f32 / (1u64 << 53) as f32
+    };
+    for _ in 0..3000 {
+        let d = next();
+        let x = [2. * next(), 2. * next(), d];
+        let y = [x[0] + next(), x[1] + next(), d];
+        let (fx, fy) = (
+            predictor.predict(&x).unwrap()[0],
+            predictor.predict(&y).unwrap()[0],
+        );
+        assert!(
+            fy <= fx + 1e-4,
+            "monotone violation {x:?}->{fx} {y:?}->{fy}"
+        );
+    }
+}
+
+/// A hand-built max pair computes `c·max(a·x, b·x - t)` and certifies; breaking
+/// the partner's bias, the tie or the cone refuses.
+#[test]
+fn byc_certificate_max_pair() {
+    // u = (1, 0) bias 0; v = (b - a) = (-1, 1) bias -0.5 => max(x0, x1 - 0.5); c = -10.
+    let w1 = [1.0f64, -1.0, 0.0, 1.0];
+    let ok = bake_two_layer_znpr_v3(
+        &[0.0, 0.0],
+        &[1.0, 1.0],
+        &w1,
+        &[0.0, -0.5],
+        &[-10.0, -10.0],
+        &[100.0],
+        2,
+        2,
+        1,
+        WeightDtype::F32,
+        None,
+        None,
+        Activation::Relu,
+    );
+    let model = zenpredict::Model::from_bytes(&ok).unwrap();
+    assert_eq!(
+        certify_monotone_bake(&model, 100.0),
+        Ok(MonotoneCertificate {
+            ramps: 0,
+            free_ramps: 0,
+            free_amplitude: 0.0,
+            max_pairs: 1
+        })
+    );
+    let mut p = zenpredict::Predictor::new(&model);
+    for (x, want) in [
+        ([0.3f32, 0.2f32], 100.0 - 3.0),
+        ([0.3, 1.5], 100.0 - 10.0),
+        ([2.0, 2.0], 80.0),
+    ] {
+        assert!((p.predict(&x).unwrap()[0] - want).abs() < 1e-4, "{x:?}");
+    }
+    let refuse = |w1: &[f64], b1: &[f64], w2: &[f64]| {
+        let bytes = bake_two_layer_znpr_v3(
+            &[0.0, 0.0],
+            &[1.0, 1.0],
+            w1,
+            b1,
+            w2,
+            &[100.0],
+            2,
+            2,
+            1,
+            WeightDtype::F32,
+            None,
+            None,
+            Activation::Relu,
+        );
+        certify_monotone_bake(&zenpredict::Model::from_bytes(&bytes).unwrap(), 100.0).is_err()
+    };
+    assert!(
+        refuse(&w1, &[-0.1, -0.5], &[-10.0, -10.0]),
+        "u must have bias 0"
+    );
+    assert!(
+        refuse(&w1, &[0.0, -0.5], &[-10.0, -9.0]),
+        "output weights must be tied"
+    );
+    assert!(
+        refuse(&[1.0, -1.5, 0.0, 1.0], &[0.0, -0.5], &[-10.0, -10.0]),
+        "a + (b - a) >= 0"
+    );
+}
+
+/// Negative control: B's recipe class (`--nonneg-distance`, signed W1) trains
+/// negative first-layer weights, which the certificate must refuse.
+#[test]
+fn byc_certificate_refuses_signed_first_layer() {
+    let rows: Vec<Vec<f64>> = (0..64)
+        .map(|i| vec![(i % 16) as f64 / 15., (i / 16) as f64 / 3.])
+        .collect();
+    let refs: Vec<&[f64]> = rows.iter().map(Vec::as_slice).collect();
+    let scores: Vec<f64> = rows
+        .iter()
+        .map(|x| 100. - 30. * x[0] + 10. * x[1])
+        .collect();
+    let hp = MlpHyperparams {
+        nonneg_distance: true,
+        n_hidden: 8,
+        n_epochs: 20,
+        pairs_per_epoch: 512,
+        seed: 3,
+        early_stop_patience: 0,
+        ..Default::default()
+    };
+    let mut groups = [TrainingGroup {
+        name: "invented".into(),
+        human_scores: &scores,
+        features: FeatureRows::Borrowed(&refs),
+        metric_sigmas: None,
+        train_weight: 1.,
+        validation_weight: 1.,
+        ref_ids: None,
+        loss_mode: GroupLossMode::Both,
+    }];
+    let bytes = train_mlp(&mut groups, 2, &hp, &mut Vec::new());
+    let model = zenpredict::Model::from_bytes(&bytes).unwrap();
+    assert!(certify_monotone_bake(&model, 100.0).is_err());
+}
+
+#[test]
+fn byc_thresholds_refuse_unsupported_modes() {
+    let enabled = MlpHyperparams {
+        nonneg_distance: true,
+        nonneg_thresholds: true,
+        ..Default::default()
+    };
+    validate_training_capabilities(&enabled, true, 0);
+    for hp in [
+        MlpHyperparams {
+            nonneg_distance: false,
+            ..enabled.clone()
+        },
+        MlpHyperparams {
+            smooth_hinge: true,
+            ..enabled.clone()
+        },
+        MlpHyperparams {
+            steer_pairs: Some("not-read.parquet".into()),
+            steer_lambda: 1.,
+            ..enabled.clone()
+        },
+        MlpHyperparams {
+            pool_head: true,
+            ..enabled.clone()
+        },
+        MlpHyperparams {
+            n_hidden_layers: 2,
+            ..enabled.clone()
+        },
+    ] {
+        assert!(std::panic::catch_unwind(|| validate_training_capabilities(&hp, true, 0)).is_err());
+    }
+}
+
 #[test]
 fn e34_k_refuses_incomplete_or_incompatible_options() {
     let enabled = MlpHyperparams {

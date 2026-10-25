@@ -177,10 +177,15 @@ impl Request {
     #[must_use]
     pub fn everything() -> Request {
         let w = full_width();
+        // `globaff` exists only from formula revision 6; below it, everything
+        // is every other registered slot.
+        let globaff = feature_defs::family_slots(ComputeToken::GlobAff, crate::NUM_SCALES);
+        let computes_globaff = crate::ssim_form::active_revision().computes_globaff();
         Request {
-            want: SlotSet::from_slots(
-                (0..w).filter(|&id| feature_defs::def_at(id, crate::NUM_SCALES).is_some()),
-            ),
+            want: SlotSet::from_slots((0..w).filter(|&id| {
+                feature_defs::def_at(id, crate::NUM_SCALES).is_some()
+                    && (computes_globaff || !globaff.contains(id))
+            })),
             layout_width: w,
             revision: RevisionRef::Current,
             era_label: crate::feature_set_id::ERA_UNKNOWN.to_string(),
@@ -359,6 +364,16 @@ impl Request {
     // Research-only extension; the existing fold plan sees exactly its old IDs
     // and layout. This deliberately does not relax Plan::for_bake's scope.
     fn plan(&self) -> Result<Plan, ResearchError> {
+        let globaff = self.want.intersect(&feature_defs::family_slots(
+            ComputeToken::GlobAff,
+            crate::NUM_SCALES,
+        ));
+        if !globaff.is_empty() && !crate::ssim_form::active_revision().computes_globaff() {
+            return Err(ResearchError::Plan(format!(
+                "globaff slot(s) {globaff} are computed only at formula revision 6 \
+                 (ZENSIM_FORMULA_REV=6)"
+            )));
+        }
         let palette = self.want.intersect(&feature_defs::family_slots(
             Family::Palette,
             crate::NUM_SCALES,
@@ -379,11 +394,16 @@ impl Request {
         ));
         #[cfg(feature = "training")]
         {
-            let legacy = SlotSet::from_ranges([(0, crate::palette::BASE)]).intersect(&self.want);
+            // Every walk-computed slot: below the palette, plus `globaff`
+            // after it (whose identity layout then spans the palette's zeros,
+            // filled below).
+            let legacy = palette.missing_from(&self.want);
             let legacy_layout = if self.dense {
                 crate::feature_layout::Layout::dense(&legacy)
-            } else {
+            } else if globaff.is_empty() {
                 crate::feature_layout::Layout::identity(self.layout_width.min(crate::palette::BASE))
+            } else {
+                crate::feature_layout::Layout::identity(self.layout_width)
             };
             let mut plan = Plan::derive_with_layout(&legacy, legacy_layout)?;
             plan.layout = self.layout();
@@ -615,6 +635,26 @@ impl Extraction {
                 .map(|t| format!("\"{t}\""))
                 .collect::<Vec<_>>()
                 .join(", ")
+        ));
+        // The ringing measurement arm (`ZENSIM_RING_FORM`), so a table made
+        // under the high-pass arm can never pass for a shipped-form table.
+        s.push_str(&format!(
+            "  \"ring_form\": \"{}\",\n",
+            if crate::feature_v2::process_ring_high_pass() {
+                crate::feature_v2::RingForm::HighPassMu.as_str()
+            } else {
+                crate::feature_v2::RingForm::Raw.as_str()
+            }
+        ));
+        // The pyramid arm (`ZENSIM_PYRAMID`): coarse levels averaged in XYB
+        // (the shipped form) or in linear RGB.
+        s.push_str(&format!(
+            "  \"pyramid\": \"{}\",\n",
+            if crate::feature_v2_stream::linear_pyramid() {
+                "linear"
+            } else {
+                "xyb"
+            }
         ));
         s.push_str("  \"features\": [\n");
         for (i, p) in self.provenance.iter().enumerate() {
@@ -952,7 +992,9 @@ fn extract_impl(
         compute: Some(plan.compute),
         ..Default::default()
     };
-    let palette_only = !plan.emit.is_empty() && plan.emit.iter_slots().all(|id| id >= 1825);
+    let palette_slots = feature_defs::family_slots(Family::Palette, ns);
+    let palette_only =
+        !plan.emit.is_empty() && plan.emit.iter_slots().all(|id| palette_slots.contains(id));
     #[allow(unused_mut)] // Mutated by the training-only palette block.
     let mut walk = if palette_only {
         Vec::new()
@@ -1005,7 +1047,10 @@ fn extract_impl(
             ));
         }
         let palette = crate::palette::extract(source, distorted)?;
-        walk.resize(crate::palette::BASE + crate::palette::WIDTH, 0.0);
+        walk.resize(
+            walk.len().max(crate::palette::BASE + crate::palette::WIDTH),
+            0.0,
+        );
         for (offset, value) in palette.into_iter().enumerate() {
             if plan.emit.contains(crate::palette::BASE + offset) {
                 walk[crate::palette::BASE + offset] = value;
@@ -1187,7 +1232,14 @@ mod tests {
         assert!((956..986).chain(1820..1825).all(|id| e.values()[id] == 0.0));
         assert_eq!(e.provenance().len(), w);
         // Every registered slot is populated by the everything plan.
+        // `globaff` (f1867..1890) is computed only at formula revision 6.
+        let globaff = family_slots(ComputeToken::GlobAff);
         let all = SlotSet::from_ranges([(0, 956), (986, 1820), (1825, w)]);
+        let all = if crate::ssim_form::active_revision().computes_globaff() {
+            all
+        } else {
+            globaff.missing_from(&all)
+        };
         assert!(
             Request::for_slots(SlotSet::from_ranges([(956, 986), (1820, 1825)]), w)
                 .validate()

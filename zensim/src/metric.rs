@@ -1357,6 +1357,24 @@ impl core::fmt::Debug for StopHandle {
     }
 }
 
+/// Whether a computation that asked for internal parallel work runs it:
+/// `requested`, and the current rayon pool has more than one thread. With a
+/// single thread each parallel section would only hand its work to the
+/// pool's one worker and block until it returns (most of a small image's
+/// time); the sequential path computes the same bits.
+#[inline]
+pub(crate) fn effective_parallel(requested: bool) -> bool {
+    #[cfg(feature = "threads")]
+    {
+        requested && rayon::current_num_threads() > 1
+    }
+    #[cfg(not(feature = "threads"))]
+    {
+        let _ = requested;
+        false
+    }
+}
+
 impl Zensim {
     /// Create a new `Zensim` with the given profile. Parallel by default.
     ///
@@ -1515,7 +1533,7 @@ impl Zensim {
     #[doc(hidden)]
     pub fn score_pool_mode(&self) -> crate::feature_v2::V1PoolsMode {
         let params = self.profile.params();
-        let config = config_from_params(params, self.parallel);
+        let config = config_from_params(params, self.parallel_now());
         self.scoring_plan(params, &config).map_or_else(
             || crate::fold_engine::score_pool_mode(params, &config, self.skip_unread_pools),
             |plan| plan.compute.v1_pools,
@@ -1551,7 +1569,7 @@ impl Zensim {
     #[doc(hidden)]
     pub fn engine(&self) -> crate::fold_engine::ScoringEngine {
         if self.fold_engine
-            || config_from_params(self.profile.params(), self.parallel).revision()
+            || config_from_params(self.profile.params(), self.parallel_now()).revision()
                 >= crate::feature_defs::FormulaRevision::Rev5
         {
             crate::fold_engine::ScoringEngine::Fold
@@ -1675,6 +1693,13 @@ impl Zensim {
         self.parallel
     }
 
+    /// Whether this call runs its internal parallel work: [`Self::parallel`]
+    /// and a rayon pool of more than one thread ([`effective_parallel`]).
+    #[inline]
+    fn parallel_now(&self) -> bool {
+        effective_parallel(self.parallel)
+    }
+
     /// Compare source and distorted images.
     ///
     /// # Errors
@@ -1744,7 +1769,7 @@ impl Zensim {
         validate_pair(source, distorted)?;
         check_within_max_pixels(source.width(), source.height(), self.max_pixels)?;
         self.check_stop()?;
-        let config = config_from_params(params, self.parallel);
+        let config = config_from_params(params, self.parallel_now());
         check_profile_route(params, &config)?;
         let mut result = compute_with_config_inner(
             source,
@@ -1807,7 +1832,7 @@ impl Zensim {
         let params = self.profile.params();
         validate_pair(source, distorted)?;
         check_within_max_pixels(source.width(), source.height(), self.max_pixels)?;
-        let mut config = config_from_params(params, self.parallel);
+        let mut config = config_from_params(params, self.parallel_now());
         check_profile_route(params, &config)?;
         config.extended_features = true;
         if config.revision() >= crate::feature_defs::FormulaRevision::Rev5 {
@@ -1863,7 +1888,7 @@ impl Zensim {
             source,
             distorted,
             self.max_pixels,
-            self.parallel,
+            self.parallel_now(),
         )
     }
 
@@ -1901,7 +1926,7 @@ impl Zensim {
             distorted,
             s_v2,
             self.max_pixels,
-            self.parallel,
+            self.parallel_now(),
         )
     }
 
@@ -1925,7 +1950,7 @@ impl Zensim {
             source,
             distorted,
             self.max_pixels,
-            self.parallel,
+            self.parallel_now(),
             toggles,
         )
     }
@@ -1951,7 +1976,12 @@ impl Zensim {
         &self,
         source: &impl ImageSource,
     ) -> Result<crate::feature_v2::V2PreparedReference, ZensimError> {
-        crate::feature_v2::prepare_v2_reference_impl(source, self.max_pixels, self.parallel, false)
+        crate::feature_v2::prepare_v2_reference_impl(
+            source,
+            self.max_pixels,
+            self.parallel_now(),
+            false,
+        )
     }
 
     /// Like [`Self::prepare_v2_reference`], but ALSO caches the
@@ -1975,7 +2005,12 @@ impl Zensim {
         &self,
         source: &impl ImageSource,
     ) -> Result<crate::feature_v2::V2PreparedReference, ZensimError> {
-        crate::feature_v2::prepare_v2_reference_impl(source, self.max_pixels, self.parallel, true)
+        crate::feature_v2::prepare_v2_reference_impl(
+            source,
+            self.max_pixels,
+            self.parallel_now(),
+            true,
+        )
     }
 
     /// Compute v2 features for one distorted image against a prepared
@@ -2002,7 +2037,7 @@ impl Zensim {
             reference,
             distorted,
             self.max_pixels,
-            self.parallel,
+            self.parallel_now(),
             crate::feature_v2::V2NewFeatureToggles::default(),
             &mut scratch,
         )
@@ -2030,7 +2065,7 @@ impl Zensim {
             reference,
             distorted,
             self.max_pixels,
-            self.parallel,
+            self.parallel_now(),
             toggles,
             scratch,
         )
@@ -2071,7 +2106,7 @@ impl Zensim {
             source,
             distorted,
             self.max_pixels,
-            self.parallel,
+            self.parallel_now(),
             crate::feature_v2::V2NewFeatureToggles::default(),
         )
     }
@@ -2101,7 +2136,7 @@ impl Zensim {
             source,
             distorted,
             self.max_pixels,
-            self.parallel,
+            self.parallel_now(),
             crate::feature_v2::V2NewFeatureToggles::default(),
         )
     }
@@ -2130,7 +2165,7 @@ impl Zensim {
             source,
             distorted,
             self.max_pixels,
-            self.parallel,
+            self.parallel_now(),
             toggles,
             scratch,
             None,
@@ -2161,7 +2196,7 @@ impl Zensim {
             source,
             distorted,
             self.max_pixels,
-            self.parallel,
+            self.parallel_now(),
             toggles,
             scratch,
         )
@@ -2199,7 +2234,7 @@ impl Zensim {
             distorted,
             encoding,
             self.max_pixels,
-            self.parallel,
+            self.parallel_now(),
             toggles,
             scratch,
             None,
@@ -2228,7 +2263,7 @@ impl Zensim {
             distorted,
             encoding,
             self.max_pixels,
-            self.parallel,
+            self.parallel_now(),
             toggles,
             scratch,
         )
@@ -2255,7 +2290,7 @@ impl Zensim {
             source,
             distorted,
             self.max_pixels,
-            self.parallel,
+            self.parallel_now(),
             crate::feature_v2::V2NewFeatureToggles::default(),
         )
     }
@@ -2282,7 +2317,7 @@ impl Zensim {
             distorted,
             encoding,
             self.max_pixels,
-            self.parallel,
+            self.parallel_now(),
             toggles,
             scratch,
         )
@@ -2310,7 +2345,7 @@ impl Zensim {
             source,
             distorted,
             self.max_pixels,
-            self.parallel,
+            self.parallel_now(),
             crate::feature_v2::V2NewFeatureToggles::default(),
         )
     }
@@ -2337,7 +2372,7 @@ impl Zensim {
             distorted,
             encoding,
             self.max_pixels,
-            self.parallel,
+            self.parallel_now(),
             toggles,
             scratch,
         )
@@ -2363,8 +2398,8 @@ impl Zensim {
         Ok(crate::streaming::PrecomputedReference::new(
             source,
             params.num_scales,
-            self.parallel,
-            config_from_params(params, self.parallel).revision(),
+            self.parallel_now(),
+            config_from_params(params, self.parallel_now()).revision(),
         ))
     }
 
@@ -2482,7 +2517,7 @@ impl Zensim {
         // which already rejected HDR — so only check the distorted side
         // here. Symmetry across the call path is preserved.
         reject_hdr_input(distorted)?;
-        let config = config_from_params(params, self.parallel);
+        let config = config_from_params(params, self.parallel_now());
         check_profile_route(params, &config)?;
         validate_cached_revision(precomputed, config.revision())?;
         let (ow, oh) = (distorted.width(), distorted.height());
@@ -2582,7 +2617,7 @@ impl Zensim {
             return self.compute(source, distorted);
         }
         check_within_max_pixels(source.width(), source.height(), self.max_pixels)?;
-        let config = config_from_params(params, self.parallel);
+        let config = config_from_params(params, self.parallel_now());
         check_profile_route(params, &config)?;
         if config.revision() >= crate::feature_defs::FormulaRevision::Rev5 {
             return self.compute(source, distorted);
@@ -2686,7 +2721,7 @@ impl Zensim {
             return self.compute_with_ref(precomputed, distorted);
         }
         check_within_max_pixels(distorted.width(), distorted.height(), self.max_pixels)?;
-        let config = config_from_params(params, self.parallel);
+        let config = config_from_params(params, self.parallel_now());
         check_profile_route(params, &config)?;
         validate_cached_revision(precomputed, config.revision())?;
         if config.revision() >= crate::feature_defs::FormulaRevision::Rev5 {
@@ -2752,7 +2787,7 @@ impl Zensim {
         validate_ref_match(precomputed, distorted)?;
         check_within_max_pixels(distorted.width(), distorted.height(), self.max_pixels)?;
         reject_hdr_input(distorted)?;
-        let config = config_from_params(params, self.parallel);
+        let config = config_from_params(params, self.parallel_now());
         check_profile_route(params, &config)?;
         validate_cached_revision(precomputed, config.revision())?;
         let (ow, oh) = (distorted.width(), distorted.height());
@@ -2862,8 +2897,8 @@ impl Zensim {
             height,
             stride,
             params.num_scales,
-            self.parallel,
-            config_from_params(params, self.parallel).revision(),
+            self.parallel_now(),
+            config_from_params(params, self.parallel_now()).revision(),
         ))
     }
 
@@ -2925,7 +2960,7 @@ impl Zensim {
                 return Err(ZensimError::InvalidDataLength);
             }
         }
-        let config = config_from_params(params, self.parallel);
+        let config = config_from_params(params, self.parallel_now());
         check_profile_route(params, &config)?;
         // Identical inputs must score exactly 100.0 through the same
         // `mark_identical` contract the SDR path uses (compares only the
@@ -3015,7 +3050,7 @@ impl Zensim {
                 return Err(ZensimError::InvalidDataLength);
             }
         }
-        let mut config = config_from_params(params, self.parallel);
+        let mut config = config_from_params(params, self.parallel_now());
         check_profile_route(params, &config)?;
         config.extended_features = true;
         if config.revision() >= crate::feature_defs::FormulaRevision::Rev5 {
@@ -3096,7 +3131,7 @@ impl Zensim {
                 return Err(ZensimError::InvalidDataLength);
             }
         }
-        let config = config_from_params(params, self.parallel);
+        let config = config_from_params(params, self.parallel_now());
         check_profile_route(params, &config)?;
         // Same identity short-circuit as the interleaved entry (valid
         // `width` of each plane row only).
@@ -3229,7 +3264,7 @@ impl Zensim {
             distorted,
             crate::feature_v2::HdrEncoding::Linear,
             self.max_pixels,
-            self.parallel,
+            self.parallel_now(),
             toggles,
             &mut scratch,
             crate::feature_v2::FoldWalkExtras {
@@ -3283,7 +3318,7 @@ impl Zensim {
     ) -> Result<ZensimResult, ZensimError> {
         let params = self.profile.params();
         validate_pair(source, distorted)?;
-        let mut config = config_from_params(params, self.parallel);
+        let mut config = config_from_params(params, self.parallel_now());
         check_profile_route(params, &config)?;
         config.compute_all_features = true;
         let extraction_plan = if config.revision() >= crate::feature_defs::FormulaRevision::Rev5 {
@@ -4130,7 +4165,9 @@ pub(crate) fn check_profile_route(
     config: &ZensimConfig,
 ) -> Result<(), ZensimError> {
     if params.mlp_bytes.is_some()
-        && config.formula_revision == Some(crate::feature_defs::FormulaRevision::Rev5)
+        && config
+            .formula_revision
+            .is_some_and(|r| r >= crate::feature_defs::FormulaRevision::Rev5)
         && crate::fold_engine::is_fold_backable(config)
     {
         return Ok(());
@@ -4144,7 +4181,7 @@ pub(crate) fn config_from_params(params: &ProfileParams, parallel: bool) -> Zens
             .mlp_bytes
             .and_then(|load| cached_profile_model(load()).ok())
             .and_then(|model| crate::feature_layout::formula_revision(&model).ok())
-            .filter(|revision| *revision == crate::feature_defs::FormulaRevision::Rev5),
+            .filter(|revision| *revision >= crate::feature_defs::FormulaRevision::Rev5),
         local_only: false,
         omit_edges: false,
         attribution_channels: None,

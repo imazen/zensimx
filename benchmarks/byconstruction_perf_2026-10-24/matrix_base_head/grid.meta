@@ -1,0 +1,6 @@
+# A=/home/lilith/tmp/byc/perf/base/byc_score_timing sha256=296a67096ffb82bf
+# B=/home/lilith/tmp/byc/perf/head98/byc_score_timing sha256=04857325bc557ea3
+# A bakes: /home/lilith/work/zen/zensim--byconstruction/zensim/weights/b_sdr_diff_frag_820_rev5_2026-10-19.bin /home/lilith/tmp/byc/parity/tga_full_rev6.bin; B bakes: /home/lilith/work/zen/zensim--byconstruction/zensim/weights/b_sdr_diff_frag_820_rev5_2026-10-19.bin /home/lilith/tmp/byc/parity/tga_full_rev6.bin
+# host=dev date=2026-10-24T11:29:16Z rounds=6 load=2.00 1.32 1.79
+# cases: /mnt/v/output/zensim/byconstruction-2026-10-22/perf/cases/cases.tsv
+# ABORTED after 4 of 72 cells: arm B (pre-db964918 build) ran the sixteen-wide steps at revision 5, measured slower than arm A (the session's starting build); db964918 limits those steps to revision 7. Kept as the evidence for that fix, not as a speed result.

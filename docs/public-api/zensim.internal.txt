@@ -13,28 +13,28 @@
 #   pub types (struct/enum/trait/alias)        19
 #   pub consts/statics                          7
 #   free functions                             37
-#   inherent methods                          129
-#   struct fields                             100
-#   enum variants                              28
+#   inherent methods                          132
+#   struct fields                             101
+#   enum variants                              30
 #   trait roster entries (type × trait)       100
 #   auto-trait-complete types                  17
 #
 # per-module pub lines:
-#   (root)                           34
+#   (root)                           37
 #   __bench_stages                   10
 #   bake_metadata                    43
 #   corruption_head                  71
 #   det_math                         13
 #   f64                               3
 #   feature_set_id                    5
-#   feature_v2                       32
+#   feature_v2                       35
 #   fold_engine                       8
 #   profile                           1
 #   research                         77
 #   score_math                       26
 #   source                            4
 
-## items (327 lines)
+## items (333 lines)
 
 #[non_exhaustive] pub enum feature_v2::FormulaRevision
 pub const fn det_math::PowForm::for_revision(feature_v2::FormulaRevision) -> Self
@@ -56,6 +56,9 @@ pub fn BakeScorer<'a>::consumed_feature_ids(&self) -> core::result::Result<alloc
 pub fn BakeScorer<'a>::metadata(&self) -> &bake_metadata::ScoreMetadata
 pub fn BakeScorer<'a>::score_network_output(&self, &[f32], core::option::Option<&str>) -> core::result::Result<f64, ZensimError>
 pub fn BakeScorer<'a>::with_corruption_head(self, &'a corruption_head::CorruptionHead, core::option::Option<f64>) -> core::result::Result<Self, ZensimError>
+pub fn BakeScorer<'a>::with_map_guide(self, &str) -> core::result::Result<Self, ZensimError>
+pub fn BakeScorer<'a>::with_map_paint(self, &str, &str, &str) -> core::result::Result<Self, ZensimError>
+pub fn BakeScorer<'a>::with_map_smooth(self, f32) -> core::result::Result<Self, ZensimError>
 pub fn BakeScorer<'a>::without_output_calibration(self) -> Self
 pub fn BlurKernel::assert_fields_are_eq(&self)
 pub fn ErrorCategory::assert_fields_are_eq(&self)
@@ -308,8 +311,11 @@ pub feature_v2::FormulaRevision::Rev2
 pub feature_v2::FormulaRevision::Rev3
 pub feature_v2::FormulaRevision::Rev4
 pub feature_v2::FormulaRevision::Rev5
+pub feature_v2::FormulaRevision::Rev6
+pub feature_v2::FormulaRevision::Rev7
 pub feature_v2::V2NewFeatureToggles::formula_revision: feature_v2::FormulaRevision
 pub feature_v2::V2NewFeatureToggles::free_extras: feature_v2::V1FreeExtras
+pub feature_v2::V2NewFeatureToggles::globaff: bool
 pub feature_v2::V2NewFeatureToggles::gmsbank: bool
 pub feature_v2::V2NewFeatureToggles::gmsnative: bool
 pub feature_v2::V2NewFeatureToggles::mapdev: bool

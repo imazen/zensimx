@@ -7,7 +7,9 @@
 
 /// A point in time, or nothing where the target has no clock.
 #[derive(Clone, Copy, Debug)]
-pub(crate) struct Instant(#[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))] std::time::Instant);
+pub(crate) struct Instant(
+    #[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))] std::time::Instant,
+);
 
 impl Instant {
     /// Now.

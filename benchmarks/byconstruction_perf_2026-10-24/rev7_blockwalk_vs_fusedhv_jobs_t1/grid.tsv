@@ -1,0 +1,4 @@
+bake	tier	case	class	size	A_ms	B_ms	delta	ci95_lo	ci95_hi
+b	v4x	photo-clic	photo	1507x2048	29.6340	29.7600	+0.33%	+0.23%	+0.70%
+b	v4x	photo-clic256	photo	256x256	0.8502	0.8538	+0.45%	-0.01%	+0.66%
+b	v4x	plot	lineart	1024x1024	10.3046	10.2749	-0.06%	-0.86%	+0.82%

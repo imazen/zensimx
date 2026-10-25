@@ -141,6 +141,24 @@ impl Fx1Declaration {
         base + j
     }
 
+    /// Whether the declaration reads ids past zensim's registry (research columns only a table can supply).
+    pub fn reads_research_ids(&self) -> bool {
+        let width = zensim::research::full_width();
+        self.read_set().iter().any(|&id| id >= width)
+    }
+
+    /// The compact model row for one full-width table row: direct ids in declaration order, then the products,
+    /// factors narrowed to f32 first (the trainer's `extend_compact` layout).
+    pub fn compact_row(&self, row: &[f64], out: &mut Vec<f32>) {
+        out.clear();
+        out.extend(self.direct.iter().map(|&id| row[id] as f32));
+        out.extend(
+            self.products
+                .iter()
+                .map(|&[a, b]| Self::product_f32(row[a] as f32, row[b] as f32)),
+        );
+    }
+
     /// The trainer's kept logical columns after extension: the direct ids,
     /// then one column per product past `base`.
     pub fn kept_columns(&self, base: usize) -> Vec<usize> {
@@ -371,7 +389,18 @@ impl Fx1Declaration {
             hu_permutations: None,
         })
         .map_err(|e| format!("fx1 compact: serialize: {e:?}"))?;
-        self.gate(bytes, &out, base, 64)?;
+        if self.reads_research_ids() {
+            // By-construction exploration: ids past zensim's registry (the byc_globaff descriptor) cannot be
+            // served by `BakeScorer`, so its half of the gate cannot run. `byc_predict` forwards these bakes
+            // through zenpredict with the same row layout.
+            eprintln!(
+                "fx1 compact: declaration reads ids at or past zensim's registry width {}; \
+                 the BakeScorer gate is skipped (research bake, zensim cannot serve it)",
+                zensim::research::full_width()
+            );
+        } else {
+            self.gate(bytes, &out, base, 64)?;
+        }
         Ok(out)
     }
 

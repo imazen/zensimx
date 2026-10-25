@@ -430,7 +430,10 @@ impl LanesF32 {
 /// the same adjacent-pairwise tree shape as [`LanesF32`], but every partial
 /// is f64, so per-term error is only the term's own f32 rounding. FEATACC's
 /// recommendation (`c64`); under `oracle` also a measurement arm.
+///
+/// 64-byte aligned for the same reason as [`Lanes16F64`].
 #[derive(Debug, Clone, Copy, Default)]
+#[repr(align(64))]
 pub(crate) struct LanesF64(pub [f64; CANON_LANES]);
 
 /// dead_code until chunked-pool kernels land; see LanesF32::add_chunk.
@@ -477,7 +480,14 @@ impl LanesF64 {
 }
 
 /// Rev5's sixteen virtual f64 lanes, independent of the hardware width.
+///
+/// 64-byte aligned: the canonical kernels add whole 8-lane chunks (`chunk8`, 64 bytes) every few pixels, and
+/// at the default 8-byte alignment those accesses split cache lines whenever the caller's frame puts the
+/// array off a line. Measured (benchmarks/byconstruction_2026-10-22.md): the Rev5 walk at 2048², one thread,
+/// ran 9.3% faster with this alignment, and without it an unrelated call-site change cost 3.5% in the
+/// unchanged dense kernel. Values are unchanged; this is memory alignment only.
 #[derive(Debug, Clone, Copy, Default)]
+#[repr(align(64))]
 pub(crate) struct Lanes16F64(pub [f64; 16]);
 
 impl Pool for Lanes16F64 {
@@ -507,6 +517,72 @@ impl Pool for Lanes16F64 {
     }
 }
 
+/// Revision 7's sixteen f32 row lanes (the `rowlanes` era,
+/// [`crate::feature_defs::FormulaRevision::Rev7`]).
+///
+/// A pool's terms for the columns of a row's complete eight-column chunks
+/// (`x < 8·⌊width/8⌋`) add here, lane `x & 15`, ascending `x`;
+/// [`Self::fold_into`] then adds each lane to the matching f64 lane of the
+/// pool's [`Lanes16F64`] and clears it, after every column `x` with
+/// `(x + 1) % ROW_LANES_FOLD == 0` and at the end of the chunks. The row's
+/// tail columns add to the f64 lanes directly. One f32 add per term replaces a
+/// conversion and an f64 add, and no f32 lane takes more than 256 terms
+/// between folds. The f64 lanes live for a dense band of 32 rows, or for a
+/// fused-SSIM or gradient call, and are finished once there.
+#[derive(Debug, Clone, Copy, Default)]
+#[repr(align(64))]
+pub(crate) struct Lanes16F32(pub [f32; 16]);
+
+/// Columns between two folds of [`Lanes16F32`] into the f64 lanes.
+pub(crate) const ROW_LANES_FOLD: usize = 4096;
+
+impl Lanes16F32 {
+    /// Lanes `offset..offset + 8` (`offset` is 0 or 8; indexed by its bit 3,
+    /// so the access needs no range check).
+    #[inline(always)]
+    pub(crate) fn chunk8(&mut self, offset: usize) -> &mut [f32; 8] {
+        debug_assert!(offset == 0 || offset == 8);
+        &mut self.0.as_chunks_mut::<8>().0[(offset >> 3) & 1]
+    }
+
+    /// Add every lane to `pool`'s matching lane, keeping the lanes (the
+    /// first half of a difference pair's fold, see the gradient kernel).
+    #[inline(always)]
+    pub(crate) fn add_into<P: Pool>(&self, pool: &mut P) {
+        for l in 0..16 {
+            pool.add(l, self.0[l]);
+        }
+    }
+
+    /// Add every lane to `pool`'s matching lane (for [`Lanes16F64`],
+    /// `lane += v as f64`), then clear.
+    #[inline(always)]
+    pub(crate) fn fold_into<P: Pool>(&mut self, pool: &mut P) {
+        for l in 0..16 {
+            pool.add(l, self.0[l]);
+        }
+        self.0 = [0.0; 16];
+    }
+}
+
+impl Pool for Lanes16F32 {
+    const LANES: usize = 16;
+    #[inline(always)]
+    fn zero() -> Self {
+        Self([0.0; 16])
+    }
+    #[inline(always)]
+    fn add(&mut self, lane: usize, v: f32) {
+        self.0[lane & 15] += v;
+    }
+    /// Row lanes are folded into [`Lanes16F64`], never finished themselves;
+    /// this reduces them by its tree for completeness.
+    #[inline(always)]
+    fn fin(self) -> f64 {
+        Lanes16F64(self.0.map(f64::from)).fin()
+    }
+}
+
 /// Fixed f64 lane storage used by the existing vector kernels.
 pub(crate) trait Pool64: Pool {
     fn chunk8(&mut self, offset: usize) -> &mut [f64; 8];
@@ -518,9 +594,12 @@ impl Pool64 for LanesF64 {
     }
 }
 impl Pool64 for Lanes16F64 {
+    /// Lanes `offset..offset + 8` (`offset` is 0 or 8; indexed by its bit 3,
+    /// so the access needs no range check).
     #[inline(always)]
     fn chunk8(&mut self, offset: usize) -> &mut [f64; 8] {
-        (&mut self.0[offset..offset + 8]).try_into().unwrap()
+        debug_assert!(offset == 0 || offset == 8);
+        &mut self.0.as_chunks_mut::<8>().0[(offset >> 3) & 1]
     }
 }
 

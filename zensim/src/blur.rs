@@ -6866,78 +6866,540 @@ fn fused_blur_h_local11(
     let last = (width / 8).saturating_sub(1) * 8;
     let right: [usize; 18] =
         std::array::from_fn(|i| crate::featcanon::tap_mirror((last + i) as isize - 5, width));
+    // One 8-output block of the four planes from its 18 leaves of each input:
+    // the frozen tree over taps at constant offsets (one range check per block
+    // and input, not one per tap), as `fused_blur_h_local11_wide` does at 16.
+    let block = |a_t: &[f32; 18], b_t: &[f32; 18]| {
+        let tap = |k: usize| {
+            let a = f32x8::load_t(token, a_t[k..k + 8].try_into().unwrap());
+            let b = f32x8::load_t(token, b_t[k..k + 8].try_into().unwrap());
+            let q = a.mul_add(a, b * b);
+            let p = if err {
+                let e = a - b;
+                e * e
+            } else {
+                a * b
+            };
+            (a, b, q, p)
+        };
+        let add = |a: (f32x8, f32x8, f32x8, f32x8), b: (f32x8, f32x8, f32x8, f32x8)| {
+            (a.0 + b.0, a.1 + b.1, a.2 + b.2, a.3 + b.3)
+        };
+        let pair = |k| add(tap(k), tap(k + 1));
+        let s01 = add(pair(0), pair(2));
+        let s45 = add(pair(4), pair(6));
+        add(add(add(s01, s45), pair(8)), tap(10))
+    };
     for y in 0..height {
         let row = y * width;
+        let (sr, dr) = (&src[row..row + width], &dst[row..row + width]);
+        let o1 = &mut out_mu1[row..row + width];
+        let o2 = &mut out_mu2[row..row + width];
+        let oq = &mut out_sigma_sq[row..row + width];
+        let op = &mut out_sigma12[row..row + width];
         let mut x = 0;
-        while x < width {
-            if x + 8 <= width {
-                let interior = x >= 5 && x + 8 + 5 <= width;
-                let edge = (!interior).then(|| {
-                    let indices = if x == 0 { &left } else { &right };
-                    (indices.map(|i| src[row + i]), indices.map(|i| dst[row + i]))
-                });
-                let mut a = [f32x8::zero_t(token); 11];
-                let mut b = a;
-                let mut q = a;
-                let mut p = a;
-                for k in 0..11 {
-                    if x >= 5 && x + 8 + 5 <= width {
-                        let i = row + x + k - 5;
-                        a[k] = f32x8::load_t(token, src[i..i + 8].try_into().unwrap());
-                        b[k] = f32x8::load_t(token, dst[i..i + 8].try_into().unwrap());
-                    } else {
-                        let (a_edge, b_edge) = edge.as_ref().unwrap();
-                        a[k] = f32x8::load_t(token, a_edge[k..k + 8].try_into().unwrap());
-                        b[k] = f32x8::load_t(token, b_edge[k..k + 8].try_into().unwrap());
-                    }
-                    q[k] = a[k].mul_add(a[k], b[k] * b[k]);
-                    p[k] = if err {
-                        let e = a[k] - b[k];
-                        e * e
-                    } else {
-                        a[k] * b[k]
-                    };
-                }
-                let tree = |t: [f32x8; 11]| {
-                    ((((t[0] + t[1]) + (t[2] + t[3])) + ((t[4] + t[5]) + (t[6] + t[7])))
-                        + (t[8] + t[9])
-                        + t[10])
-                        * inv
-                };
-                tree(a).store((&mut out_mu1[row + x..row + x + 8]).try_into().unwrap());
-                tree(b).store((&mut out_mu2[row + x..row + x + 8]).try_into().unwrap());
-                tree(q).store(
-                    (&mut out_sigma_sq[row + x..row + x + 8])
-                        .try_into()
-                        .unwrap(),
-                );
-                tree(p).store((&mut out_sigma12[row + x..row + x + 8]).try_into().unwrap());
-                x += 8;
+        while x + 8 <= width {
+            let sum = if x >= 5 && x + 8 + 5 <= width {
+                block(
+                    sr[x - 5..x + 13].try_into().unwrap(),
+                    dr[x - 5..x + 13].try_into().unwrap(),
+                )
             } else {
-                let mut a = [0.0; 11];
-                let mut b = a;
-                let mut q = a;
-                let mut p = a;
-                for k in 0..11 {
-                    let i = row + crate::featcanon::tap_mirror(x as isize + k as isize - 5, width);
-                    a[k] = src[i];
-                    b[k] = dst[i];
-                    q[k] = a[k].mul_add(a[k], b[k] * b[k]);
-                    p[k] = if err {
-                        let e = a[k] - b[k];
-                        e * e
-                    } else {
-                        a[k] * b[k]
-                    };
+                let indices = if x == 0 { &left } else { &right };
+                block(&indices.map(|i| sr[i]), &indices.map(|i| dr[i]))
+            };
+            (sum.0 * inv).store((&mut o1[x..x + 8]).try_into().unwrap());
+            (sum.1 * inv).store((&mut o2[x..x + 8]).try_into().unwrap());
+            (sum.2 * inv).store((&mut oq[x..x + 8]).try_into().unwrap());
+            (sum.3 * inv).store((&mut op[x..x + 8]).try_into().unwrap());
+            x += 8;
+        }
+        while x < width {
+            let mut a = [0.0; 11];
+            let mut b = a;
+            let mut q = a;
+            let mut p = a;
+            for k in 0..11 {
+                let i = crate::featcanon::tap_mirror(x as isize + k as isize - 5, width);
+                a[k] = sr[i];
+                b[k] = dr[i];
+                q[k] = a[k].mul_add(a[k], b[k] * b[k]);
+                p[k] = if err {
+                    let e = a[k] - b[k];
+                    e * e
+                } else {
+                    a[k] * b[k]
+                };
+            }
+            o1[x] = local_sum_taps(&a) * (1.0 / 11.0);
+            o2[x] = local_sum_taps(&b) * (1.0 / 11.0);
+            oq[x] = local_sum_taps(&q) * (1.0 / 11.0);
+            op[x] = local_sum_taps(&p) * (1.0 / 11.0);
+            x += 1;
+        }
+    }
+}
+
+/// [`fused_blur_h_local11`] and then [`box_blur_v_local11`] on each of its
+/// four planes, a 256-column panel at a time through `hbuf` (four panel-wide
+/// planes, row stride = the panel's span), as [`fused_blur_hv_local11_wide`]
+/// does at sixteen lanes. Every output keeps both kernels' trees, operands and
+/// roundings.
+#[cfg(feature = "threads")]
+#[magetypes(define(f32x8), v4x, v4, v3, -scalar)]
+#[allow(clippy::too_many_arguments)]
+fn fused_blur_hv_local11(
+    token: Token,
+    src: &[f32],
+    dst: &[f32],
+    out_mu1: &mut [f32],
+    out_mu2: &mut [f32],
+    out_sigma_sq: &mut [f32],
+    out_sigma12: &mut [f32],
+    width: usize,
+    height: usize,
+    err: bool,
+    hbuf: [&mut [f32]; 4],
+) {
+    if width == 0 || height == 0 {
+        return;
+    }
+    let inv = f32x8::splat_t(token, 1.0 / 11.0);
+    let left: [usize; 18] =
+        std::array::from_fn(|i| crate::featcanon::tap_mirror(i as isize - 5, width));
+    let last = (width / 8).saturating_sub(1) * 8;
+    let right: [usize; 18] =
+        std::array::from_fn(|i| crate::featcanon::tap_mirror((last + i) as isize - 5, width));
+    // `fused_blur_h_local11`'s 8-output block.
+    let block = |a_t: &[f32; 18], b_t: &[f32; 18]| {
+        let tap = |k: usize| {
+            let a = f32x8::load_t(token, a_t[k..k + 8].try_into().unwrap());
+            let b = f32x8::load_t(token, b_t[k..k + 8].try_into().unwrap());
+            let q = a.mul_add(a, b * b);
+            let p = if err {
+                let e = a - b;
+                e * e
+            } else {
+                a * b
+            };
+            (a, b, q, p)
+        };
+        let add = |a: (f32x8, f32x8, f32x8, f32x8), b: (f32x8, f32x8, f32x8, f32x8)| {
+            (a.0 + b.0, a.1 + b.1, a.2 + b.2, a.3 + b.3)
+        };
+        let pair = |k| add(tap(k), tap(k + 1));
+        let s01 = add(pair(0), pair(2));
+        let s45 = add(pair(4), pair(6));
+        add(add(add(s01, s45), pair(8)), tap(10))
+    };
+    let [h1, h2, hq, hp] = hbuf;
+    let mut outs = [out_mu1, out_mu2, out_sigma_sq, out_sigma12];
+    const PANEL: usize = 32;
+    let blocks = width / 8;
+    let mut pairs = [[f32x8::zero_t(token); PANEL]; 4];
+    let mut quads = [[f32x8::zero_t(token); PANEL]; 8];
+    for tile in (0..blocks).step_by(PANEL) {
+        let count = (blocks - tile).min(PANEL);
+        let (x0, span) = (tile * 8, count * 8);
+        for y in 0..height {
+            let row = y * width;
+            let (sr, dr) = (&src[row..row + width], &dst[row..row + width]);
+            let o = y * span;
+            let r1 = &mut h1[o..o + span].as_chunks_mut::<8>().0[..count];
+            let r2 = &mut h2[o..o + span].as_chunks_mut::<8>().0[..count];
+            let rq = &mut hq[o..o + span].as_chunks_mut::<8>().0[..count];
+            let rp = &mut hp[o..o + span].as_chunks_mut::<8>().0[..count];
+            for c in 0..count {
+                let x = x0 + c * 8;
+                let sum = if x >= 5 && x + 8 + 5 <= width {
+                    block(
+                        sr[x - 5..x + 13].try_into().unwrap(),
+                        dr[x - 5..x + 13].try_into().unwrap(),
+                    )
+                } else {
+                    let indices = if x == 0 { &left } else { &right };
+                    block(&indices.map(|i| sr[i]), &indices.map(|i| dr[i]))
+                };
+                (sum.0 * inv).store(&mut r1[c]);
+                (sum.1 * inv).store(&mut r2[c]);
+                (sum.2 * inv).store(&mut rq[c]);
+                (sum.3 * inv).store(&mut rp[c]);
+            }
+        }
+        for (input, output) in [&*h1, &*h2, &*hq, &*hp].into_iter().zip(outs.iter_mut()) {
+            for k in 0..9 {
+                let a = crate::featcanon::tap_mirror(k as isize - 5, height) * span;
+                let b = crate::featcanon::tap_mirror(k as isize - 4, height) * span;
+                let ra = &input[a..a + span].as_chunks::<8>().0[..count];
+                let rb = &input[b..b + span].as_chunks::<8>().0[..count];
+                for c in 0..count {
+                    pairs[k & 3][c] = f32x8::load_t(token, &ra[c]) + f32x8::load_t(token, &rb[c]);
                 }
-                out_mu1[row + x] = local_sum_taps(&a) * (1.0 / 11.0);
-                out_mu2[row + x] = local_sum_taps(&b) * (1.0 / 11.0);
-                out_sigma_sq[row + x] = local_sum_taps(&q) * (1.0 / 11.0);
-                out_sigma12[row + x] = local_sum_taps(&p) * (1.0 / 11.0);
-                x += 1;
+                if k >= 2 {
+                    for c in 0..count {
+                        quads[k - 2][c] = pairs[(k - 2) & 3][c] + pairs[k & 3][c];
+                    }
+                }
+            }
+            for y in 0..height {
+                let a = crate::featcanon::tap_mirror(y as isize + 4, height) * span;
+                let b = crate::featcanon::tap_mirror(y as isize + 5, height) * span;
+                let ra = &input[a..a + span].as_chunks::<8>().0[..count];
+                let rb = &input[b..b + span].as_chunks::<8>().0[..count];
+                let o = y * width + x0;
+                let ro = &mut output[o..o + span].as_chunks_mut::<8>().0[..count];
+                let (q0, q4, q7) = (y & 7, (y + 4) & 7, (y + 7) & 7);
+                let (p7, p8, p9) = ((y + 7) & 3, (y + 8) & 3, (y + 9) & 3);
+                for c in 0..count {
+                    let last = f32x8::load_t(token, &rb[c]);
+                    pairs[p9][c] = f32x8::load_t(token, &ra[c]) + last;
+                    quads[q7][c] = pairs[p7][c] + pairs[p9][c];
+                    let sum = ((quads[q0][c] + quads[q4][c]) + pairs[p8][c]) + last;
+                    (sum * inv).store(&mut ro[c]);
+                }
             }
         }
     }
+    // The incomplete vector: both kernels' per-output scalar trees, the
+    // horizontal one per row into `hbuf` (row stride = the tail's width).
+    let xt = blocks * 8;
+    let tw = width - xt;
+    if tw == 0 {
+        return;
+    }
+    for y in 0..height {
+        let row = y * width;
+        let (sr, dr) = (&src[row..row + width], &dst[row..row + width]);
+        for x in xt..width {
+            let mut a = [0.0; 11];
+            let mut b = a;
+            let mut q = a;
+            let mut p = a;
+            for k in 0..11 {
+                let i = crate::featcanon::tap_mirror(x as isize + k as isize - 5, width);
+                a[k] = sr[i];
+                b[k] = dr[i];
+                q[k] = a[k].mul_add(a[k], b[k] * b[k]);
+                p[k] = if err {
+                    let e = a[k] - b[k];
+                    e * e
+                } else {
+                    a[k] * b[k]
+                };
+            }
+            let o = y * tw + (x - xt);
+            h1[o] = local_sum_taps(&a) * (1.0 / 11.0);
+            h2[o] = local_sum_taps(&b) * (1.0 / 11.0);
+            hq[o] = local_sum_taps(&q) * (1.0 / 11.0);
+            hp[o] = local_sum_taps(&p) * (1.0 / 11.0);
+        }
+    }
+    for (input, output) in [&*h1, &*h2, &*hq, &*hp].into_iter().zip(outs.iter_mut()) {
+        for y in 0..height {
+            let rows: [usize; 11] = std::array::from_fn(|k| {
+                crate::featcanon::tap_mirror(y as isize + k as isize - 5, height) * tw
+            });
+            for x in 0..tw {
+                let taps: [f32; 11] = std::array::from_fn(|k| input[rows[k] + x]);
+                output[y * width + xt + x] = local_sum_taps(&taps) * (1.0 / 11.0);
+            }
+        }
+    }
+}
+
+/// The scalar tier's form of [`fused_blur_hv_local11`]: the two scalar kernels
+/// in turn, `hbuf` holding the four image-wide horizontal planes.
+#[cfg(feature = "threads")]
+#[allow(clippy::too_many_arguments)]
+fn fused_blur_hv_local11_scalar(
+    token: archmage::ScalarToken,
+    src: &[f32],
+    dst: &[f32],
+    out_mu1: &mut [f32],
+    out_mu2: &mut [f32],
+    out_sigma_sq: &mut [f32],
+    out_sigma12: &mut [f32],
+    width: usize,
+    height: usize,
+    err: bool,
+    hbuf: [&mut [f32]; 4],
+) {
+    let [h1, h2, hq, hp] = hbuf;
+    fused_blur_h_local11_scalar(token, src, dst, h1, h2, hq, hp, width, height, 5, err);
+    for (input, output) in
+        [&*h1, &*h2, &*hq, &*hp]
+            .into_iter()
+            .zip([out_mu1, out_mu2, out_sigma_sq, out_sigma12])
+    {
+        box_blur_v_local11_scalar(token, input, output, width, height, 5);
+    }
+}
+
+/// The Rev5 `localwin` moment planes of one window in one pass: what
+/// [`fused_blur_h_ssim_at_revision`] and then [`box_blur_v_from_copy_at_revision`]
+/// on each of its four planes compute, bit for bit, without writing four
+/// image-wide horizontal planes. `hbuf` (each `width × height`) holds the
+/// panels' horizontal rows. Returns false, computing nothing, where either
+/// kernel would not run its per-output (`Local`) tree.
+#[cfg(feature = "threads")]
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn fused_blur_hv_ssim_at_revision(
+    src: &[f32],
+    dst: &[f32],
+    out_mu1: &mut [f32],
+    out_mu2: &mut [f32],
+    out_sigma_sq: &mut [f32],
+    out_sigma12: &mut [f32],
+    width: usize,
+    height: usize,
+    radius: usize,
+    revision: crate::feature_defs::FormulaRevision,
+    hbuf: [&mut [f32]; 4],
+) -> bool {
+    use crate::featcanon::BlurMode;
+    // The horizontal kernel's selection (`fused_blur_h_ssim_at_revision`).
+    let revision_h = crate::ssim_form::effective_revision(revision);
+    let mode_h = crate::featcanon::mode(revision_h);
+    #[cfg(feature = "oracle")]
+    let canon_h = mode_h.active() || !matches!(crate::featcanon::blur_axis(), BlurMode::Rec);
+    #[cfg(not(feature = "oracle"))]
+    let canon_h = mode_h.active();
+    let local = |mode, revision| {
+        matches!(
+            crate::featcanon::canon_blur_axis_for(mode, revision),
+            BlurMode::Local
+        )
+    };
+    // The vertical kernel's (`box_blur_v_from_copy_at_revision`).
+    let local_v = local(crate::featcanon::mode(revision), revision);
+    if radius != 5 || !canon_h || !local(mode_h, revision_h) || !local_v {
+        return false;
+    }
+    let err = revision_h >= crate::feature_defs::FormulaRevision::Rev3;
+    #[cfg(feature = "feature-regime-v2")]
+    crate::fold_timing::work(crate::fold_timing::Work::VerticalPlane, 4);
+    #[cfg(all(target_arch = "x86_64", feature = "avx512"))]
+    if let Some(token) = <archmage::X64V4xToken as archmage::SimdToken>::summon() {
+        fused_blur_hv_local11_wide_v4x(
+            token,
+            src,
+            dst,
+            out_mu1,
+            out_mu2,
+            out_sigma_sq,
+            out_sigma12,
+            width,
+            height,
+            err,
+            hbuf,
+        );
+        return true;
+    }
+    incant!(
+        fused_blur_hv_local11(
+            src,
+            dst,
+            out_mu1,
+            out_mu2,
+            out_sigma_sq,
+            out_sigma12,
+            width,
+            height,
+            err,
+            hbuf
+        ),
+        [v4x, v4, v3, scalar]
+    );
+    true
+}
+
+/// [`activity_local11_wide`] at eight lanes: `|src − mu|` through
+/// [`box_blur_h_local11`] then [`box_blur_v_local11`], a 256-column panel at a
+/// time through `row` and `hbuf`.
+#[cfg(feature = "threads")]
+#[magetypes(define(f32x8), v4x, v4, v3, -scalar)]
+#[allow(clippy::too_many_arguments)]
+fn activity_local11(
+    token: Token,
+    src: &[f32],
+    mu: &[f32],
+    output: &mut [f32],
+    width: usize,
+    height: usize,
+    hbuf: &mut [f32],
+    row: &mut [f32],
+) {
+    if width == 0 || height == 0 {
+        return;
+    }
+    let inv = f32x8::splat_t(token, 1.0 / 11.0);
+    let left: [usize; 18] =
+        std::array::from_fn(|i| crate::featcanon::tap_mirror(i as isize - 5, width));
+    let last = (width / 8).saturating_sub(1) * 8;
+    let right: [usize; 18] =
+        std::array::from_fn(|i| crate::featcanon::tap_mirror((last + i) as isize - 5, width));
+    // `box_blur_h_local11`'s 8-output block.
+    let block = |t: &[f32; 18]| {
+        let l = |k: usize| f32x8::load_t(token, t[k..k + 8].try_into().unwrap());
+        (((l(0) + l(1)) + (l(2) + l(3))) + ((l(4) + l(5)) + (l(6) + l(7)))) + (l(8) + l(9)) + l(10)
+    };
+    const PANEL: usize = 32;
+    let blocks = width / 8;
+    let mut pairs = [[f32x8::zero_t(token); PANEL]; 4];
+    let mut quads = [[f32x8::zero_t(token); PANEL]; 8];
+    for tile in (0..blocks).step_by(PANEL) {
+        let count = (blocks - tile).min(PANEL);
+        let (x0, span) = (tile * 8, count * 8);
+        let lo = x0.saturating_sub(5);
+        let hi = (x0 + span + 5).min(width);
+        for y in 0..height {
+            let r = y * width;
+            let (s, m) = (&src[r + lo..r + hi], &mu[r + lo..r + hi]);
+            let d = &mut row[..hi - lo];
+            let full = (hi - lo) / 8;
+            for ((dc, sc), mc) in d
+                .as_chunks_mut::<8>()
+                .0
+                .iter_mut()
+                .zip(s.as_chunks::<8>().0)
+                .zip(m.as_chunks::<8>().0)
+            {
+                (f32x8::load_t(token, sc) - f32x8::load_t(token, mc))
+                    .abs()
+                    .store(dc);
+            }
+            for i in full * 8..hi - lo {
+                d[i] = (s[i] - m[i]).abs();
+            }
+            let o = y * span;
+            let rh = &mut hbuf[o..o + span].as_chunks_mut::<8>().0[..count];
+            for c in 0..count {
+                let x = x0 + c * 8;
+                let sum = if x >= 5 && x + 8 + 5 <= width {
+                    block(d[x - 5 - lo..x + 13 - lo].try_into().unwrap())
+                } else {
+                    let indices = if x == 0 { &left } else { &right };
+                    block(&indices.map(|i| d[i - lo]))
+                };
+                (sum * inv).store(&mut rh[c]);
+            }
+        }
+        let input = &*hbuf;
+        for k in 0..9 {
+            let a = crate::featcanon::tap_mirror(k as isize - 5, height) * span;
+            let b = crate::featcanon::tap_mirror(k as isize - 4, height) * span;
+            let ra = &input[a..a + span].as_chunks::<8>().0[..count];
+            let rb = &input[b..b + span].as_chunks::<8>().0[..count];
+            for c in 0..count {
+                pairs[k & 3][c] = f32x8::load_t(token, &ra[c]) + f32x8::load_t(token, &rb[c]);
+            }
+            if k >= 2 {
+                for c in 0..count {
+                    quads[k - 2][c] = pairs[(k - 2) & 3][c] + pairs[k & 3][c];
+                }
+            }
+        }
+        for y in 0..height {
+            let a = crate::featcanon::tap_mirror(y as isize + 4, height) * span;
+            let b = crate::featcanon::tap_mirror(y as isize + 5, height) * span;
+            let ra = &input[a..a + span].as_chunks::<8>().0[..count];
+            let rb = &input[b..b + span].as_chunks::<8>().0[..count];
+            let o = y * width + x0;
+            let ro = &mut output[o..o + span].as_chunks_mut::<8>().0[..count];
+            let (q0, q4, q7) = (y & 7, (y + 4) & 7, (y + 7) & 7);
+            let (p7, p8, p9) = ((y + 7) & 3, (y + 8) & 3, (y + 9) & 3);
+            for c in 0..count {
+                let last = f32x8::load_t(token, &rb[c]);
+                pairs[p9][c] = f32x8::load_t(token, &ra[c]) + last;
+                quads[q7][c] = pairs[p7][c] + pairs[p9][c];
+                let sum = ((quads[q0][c] + quads[q4][c]) + pairs[p8][c]) + last;
+                (sum * inv).store(&mut ro[c]);
+            }
+        }
+    }
+    let xt = blocks * 8;
+    let tw = width - xt;
+    if tw == 0 {
+        return;
+    }
+    for y in 0..height {
+        let r = y * width;
+        for x in xt..width {
+            let t: [f32; 11] = std::array::from_fn(|k| {
+                let i = r + crate::featcanon::tap_mirror(x as isize + k as isize - 5, width);
+                (src[i] - mu[i]).abs()
+            });
+            hbuf[y * tw + (x - xt)] = local_sum_taps(&t) * (1.0 / 11.0);
+        }
+    }
+    for y in 0..height {
+        let rows: [usize; 11] = std::array::from_fn(|k| {
+            crate::featcanon::tap_mirror(y as isize + k as isize - 5, height) * tw
+        });
+        for x in 0..tw {
+            let taps: [f32; 11] = std::array::from_fn(|k| hbuf[rows[k] + x]);
+            output[y * width + xt + x] = local_sum_taps(&taps) * (1.0 / 11.0);
+        }
+    }
+}
+
+/// The scalar tier's form of [`activity_local11`]: the three kernels in turn,
+/// `hbuf` and `row` as image-wide planes.
+#[cfg(feature = "threads")]
+#[allow(clippy::too_many_arguments)]
+fn activity_local11_scalar(
+    token: archmage::ScalarToken,
+    src: &[f32],
+    mu: &[f32],
+    output: &mut [f32],
+    width: usize,
+    height: usize,
+    hbuf: &mut [f32],
+    row: &mut [f32],
+) {
+    let n = width * height;
+    crate::simd_ops::abs_diff_into(&src[..n], &mu[..n], &mut row[..n]);
+    box_blur_h_local11_scalar(token, &row[..n], &mut hbuf[..n], width, height, 5);
+    box_blur_v_local11_scalar(token, &hbuf[..n], &mut output[..n], width, height, 5);
+}
+
+/// The activity plane `box_blur(|src − mu|)` of one window in one pass: what
+/// `abs_diff_into` and then [`box_blur_1pass_at_revision`] compute, bit for
+/// bit, without the two image-wide intermediates (`hbuf` and `row`, each
+/// `width × height`, hold a panel's rows). Returns false, computing nothing,
+/// where the blurs would not run their per-output (`Local`) trees.
+#[cfg(feature = "threads")]
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn activity_at_revision(
+    src: &[f32],
+    mu: &[f32],
+    output: &mut [f32],
+    width: usize,
+    height: usize,
+    radius: usize,
+    revision: crate::feature_defs::FormulaRevision,
+    hbuf: &mut [f32],
+    row: &mut [f32],
+) -> bool {
+    let local = matches!(
+        crate::featcanon::canon_blur_axis_for(crate::featcanon::mode(revision), revision),
+        crate::featcanon::BlurMode::Local
+    );
+    if radius != 5 || !local {
+        return false;
+    }
+    #[cfg(feature = "feature-regime-v2")]
+    crate::fold_timing::work(crate::fold_timing::Work::VerticalPlane, 1);
+    #[cfg(all(target_arch = "x86_64", feature = "avx512"))]
+    if let Some(token) = <archmage::X64V4xToken as archmage::SimdToken>::summon() {
+        activity_local11_wide_v4x(token, src, mu, output, width, height, hbuf, row);
+        return true;
+    }
+    incant!(
+        activity_local11(src, mu, output, width, height, hbuf, row),
+        [v4x, v4, v3, scalar]
+    );
+    true
 }
 
 pub(crate) fn box_blur_h_local(
@@ -7004,36 +7466,32 @@ fn box_blur_h_local11(
     let last = (width / 8).saturating_sub(1) * 8;
     let right: [usize; 18] =
         std::array::from_fn(|i| crate::featcanon::tap_mirror((last + i) as isize - 5, width));
+    // One 8-output block from its 18 leaves: the frozen tree over taps at
+    // constant offsets (one range check per block, not one per tap).
+    let block = |t: &[f32; 18]| {
+        let l = |k: usize| f32x8::load_t(token, t[k..k + 8].try_into().unwrap());
+        (((l(0) + l(1)) + (l(2) + l(3))) + ((l(4) + l(5)) + (l(6) + l(7)))) + (l(8) + l(9)) + l(10)
+    };
     for y in 0..height {
-        let row = y * width;
+        let rin = &input[y * width..(y + 1) * width];
+        let rout = &mut output[y * width..(y + 1) * width];
         let mut x = 0;
-        while x < width {
-            if x + 8 <= width {
-                let interior = x >= 5 && x + 8 + 5 <= width;
-                let edge = (!interior).then(|| {
-                    let indices = if x == 0 { &left } else { &right };
-                    indices.map(|i| input[row + i])
-                });
-                let t: [f32x8; 11] = std::array::from_fn(|k| {
-                    if let Some(edge) = &edge {
-                        f32x8::load_t(token, edge[k..k + 8].try_into().unwrap())
-                    } else {
-                        let i = row + x + k - 5;
-                        f32x8::load_t(token, input[i..i + 8].try_into().unwrap())
-                    }
-                });
-                let sum = (((t[0] + t[1]) + (t[2] + t[3])) + ((t[4] + t[5]) + (t[6] + t[7])))
-                    + (t[8] + t[9])
-                    + t[10];
-                (sum * inv).store((&mut output[row + x..row + x + 8]).try_into().unwrap());
-                x += 8;
+        while x + 8 <= width {
+            let sum = if x >= 5 && x + 8 + 5 <= width {
+                block(rin[x - 5..x + 13].try_into().unwrap())
             } else {
-                let t: [f32; 11] = std::array::from_fn(|k| {
-                    input[row + crate::featcanon::tap_mirror(x as isize + k as isize - 5, width)]
-                });
-                output[row + x] = local_sum_taps(&t) * (1.0 / 11.0);
-                x += 1;
-            }
+                let indices = if x == 0 { &left } else { &right };
+                block(&indices.map(|i| rin[i]))
+            };
+            (sum * inv).store((&mut rout[x..x + 8]).try_into().unwrap());
+            x += 8;
+        }
+        while x < width {
+            let t: [f32; 11] = std::array::from_fn(|k| {
+                rin[crate::featcanon::tap_mirror(x as isize + k as isize - 5, width)]
+            });
+            rout[x] = local_sum_taps(&t) * (1.0 / 11.0);
+            x += 1;
         }
     }
 }
@@ -7098,42 +7556,49 @@ fn box_blur_v_local11(
     let inv = f32x8::splat_t(token, 1.0 / 11.0);
     // Cache the frozen tree's pair and quadruple nodes, never an output
     // recurrence. Each node has the same two operands and rounding as before.
-    // Eight vector columns bound scratch and keep adjacent rows in one tile.
+    // A panel of 2 KiB row segments walks the whole height, so every row's
+    // reads and writes are contiguous runs the stream prefetchers follow (the
+    // former 512-byte tiles moved one row stride per few cache lines). A pair
+    // node lives three rows and a quadruple node eight, so rings of four and
+    // eight segments hold every live node.
+    const PANEL: usize = 64;
     let blocks = width / 8;
-    for tile in (0..blocks).step_by(8) {
-        let count = (blocks - tile).min(8);
-        let mut pairs = [[f32x8::zero_t(token); 8]; 16];
-        let mut quads = pairs;
+    let mut pairs = [[f32x8::zero_t(token); PANEL]; 4];
+    let mut quads = [[f32x8::zero_t(token); PANEL]; 8];
+    for tile in (0..blocks).step_by(PANEL) {
+        let count = (blocks - tile).min(PANEL);
+        // The panel's span of a tap row and of the output row, cut to exact
+        // length once per row, so the column loops have no range checks.
+        let (x0, span) = (tile * 8, count * 8);
         for k in 0..9 {
             let a = crate::featcanon::tap_mirror(k as isize - 5, height) * width;
             let b = crate::featcanon::tap_mirror(k as isize - 4, height) * width;
+            let ra = &input[a + x0..a + x0 + span].as_chunks::<8>().0[..count];
+            let rb = &input[b + x0..b + x0 + span].as_chunks::<8>().0[..count];
             for c in 0..count {
-                let x = (tile + c) * 8;
-                pairs[k][c] = f32x8::load_t(token, input[a + x..a + x + 8].try_into().unwrap())
-                    + f32x8::load_t(token, input[b + x..b + x + 8].try_into().unwrap());
+                pairs[k & 3][c] = f32x8::load_t(token, &ra[c]) + f32x8::load_t(token, &rb[c]);
             }
-        }
-        for k in 0..7 {
-            for c in 0..count {
-                quads[k][c] = pairs[k][c] + pairs[k + 2][c];
+            if k >= 2 {
+                for c in 0..count {
+                    quads[k - 2][c] = pairs[(k - 2) & 3][c] + pairs[k & 3][c];
+                }
             }
         }
         for y in 0..height {
             let a = crate::featcanon::tap_mirror(y as isize + 4, height) * width;
             let b = crate::featcanon::tap_mirror(y as isize + 5, height) * width;
+            let ra = &input[a + x0..a + x0 + span].as_chunks::<8>().0[..count];
+            let rb = &input[b + x0..b + x0 + span].as_chunks::<8>().0[..count];
+            let o = y * width + x0;
+            let ro = &mut output[o..o + span].as_chunks_mut::<8>().0[..count];
+            let (q0, q4, q7) = (y & 7, (y + 4) & 7, (y + 7) & 7);
+            let (p7, p8, p9) = ((y + 7) & 3, (y + 8) & 3, (y + 9) & 3);
             for c in 0..count {
-                let x = (tile + c) * 8;
-                let last = f32x8::load_t(token, input[b + x..b + x + 8].try_into().unwrap());
-                pairs[(y + 9) & 15][c] =
-                    f32x8::load_t(token, input[a + x..a + x + 8].try_into().unwrap()) + last;
-                quads[(y + 7) & 15][c] = pairs[(y + 7) & 15][c] + pairs[(y + 9) & 15][c];
-                let sum =
-                    ((quads[y & 15][c] + quads[(y + 4) & 15][c]) + pairs[(y + 8) & 15][c]) + last;
-                (sum * inv).store(
-                    (&mut output[y * width + x..y * width + x + 8])
-                        .try_into()
-                        .unwrap(),
-                );
+                let last = f32x8::load_t(token, &rb[c]);
+                pairs[p9][c] = f32x8::load_t(token, &ra[c]) + last;
+                quads[q7][c] = pairs[p7][c] + pairs[p9][c];
+                let sum = ((quads[q0][c] + quads[q4][c]) + pairs[p8][c]) + last;
+                (sum * inv).store(&mut ro[c]);
             }
         }
     }
@@ -8121,6 +8586,208 @@ pub fn box_spread_merge_f32(
 
 #[cfg(test)]
 mod tests {
+    /// The fused moment pass ([`fused_blur_hv_ssim_at_revision`]) against the
+    /// horizontal kernel followed by four vertical ones, bit for bit, at every
+    /// SIMD tier permutation: widths with and without remainder columns, on and
+    /// across the 256-column panel edge, and short, odd and strip heights.
+    #[cfg(feature = "threads")]
+    #[test]
+    fn fused_moment_pass_matches_the_two_passes() {
+        if std::env::var("FUSED_HV_CHILD").as_deref() != Ok("1") {
+            let output = std::process::Command::new(std::env::current_exe().unwrap())
+                .args([
+                    "blur::tests::fused_moment_pass_matches_the_two_passes",
+                    "--exact",
+                ])
+                .env("FUSED_HV_CHILD", "1")
+                .output()
+                .unwrap();
+            assert!(
+                output.status.success(),
+                "{}\n{}",
+                String::from_utf8_lossy(&output.stdout),
+                String::from_utf8_lossy(&output.stderr)
+            );
+            assert!(String::from_utf8_lossy(&output.stdout).contains("1 passed"));
+            return;
+        }
+        use super::*;
+        use crate::feature_defs::FormulaRevision;
+        let _guard = archmage::testing::lock_token_testing();
+        let mut runs = 0;
+        let report = archmage::testing::for_each_token_permutation(
+            archmage::testing::CompileTimePolicy::Warn,
+            |_| {
+                for (w, h) in [
+                    (1, 1),
+                    (7, 3),
+                    (8, 12),
+                    (15, 2),
+                    (16, 11),
+                    (17, 9),
+                    (255, 13),
+                    (256, 21),
+                    (257, 21),
+                    (300, 148),
+                    (513, 31),
+                    (1031, 17),
+                ] {
+                    let src: Vec<f32> = (0..w * h)
+                        .map(|i| ((i * 137 + 19) % 1009) as f32 / 1009.0 - 0.2)
+                        .collect();
+                    let dst: Vec<f32> = src
+                        .iter()
+                        .enumerate()
+                        .map(|(i, v)| if i % 23 == 0 { *v } else { 0.9 * v + 0.02 })
+                        .collect();
+                    for revision in [FormulaRevision::Rev5, FormulaRevision::Rev7] {
+                        let n = w * h;
+                        let mut horizontal: [Vec<f32>; 4] = std::array::from_fn(|_| vec![0.0; n]);
+                        let mut expected = horizontal.clone();
+                        {
+                            let [a, b, c, d] = &mut horizontal;
+                            fused_blur_h_ssim_at_revision(
+                                &src, &dst, a, b, c, d, w, h, 5, revision,
+                            );
+                        }
+                        for (hp, out) in horizontal.iter().zip(expected.iter_mut()) {
+                            box_blur_v_from_copy_at_revision(hp, out, w, h, 5, revision);
+                        }
+                        let mut actual: [Vec<f32>; 4] = std::array::from_fn(|_| vec![0.0; n]);
+                        let mut hbuf: [Vec<f32>; 4] = std::array::from_fn(|_| vec![0.0; n]);
+                        let [a, b, c, d] = &mut actual;
+                        let [h1, h2, h3, h4] = &mut hbuf;
+                        assert!(fused_blur_hv_ssim_at_revision(
+                            &src,
+                            &dst,
+                            a,
+                            b,
+                            c,
+                            d,
+                            w,
+                            h,
+                            5,
+                            revision,
+                            [h1, h2, h3, h4],
+                        ));
+                        for plane in 0..4 {
+                            for i in 0..n {
+                                assert_eq!(
+                                    actual[plane][i].to_bits(),
+                                    expected[plane][i].to_bits(),
+                                    "{revision:?} {w}x{h} plane {plane} index {i}"
+                                );
+                            }
+                        }
+                    }
+                }
+                runs += 1;
+            },
+        );
+        assert!(runs >= 1, "{report:?}");
+    }
+
+    /// The fused activity pass ([`activity_at_revision`]) against `|src − mu|`
+    /// followed by [`box_blur_1pass_at_revision`], bit for bit, at every SIMD
+    /// tier permutation and the moment test's geometries.
+    #[cfg(feature = "threads")]
+    #[test]
+    fn fused_activity_pass_matches_the_two_passes() {
+        if std::env::var("FUSED_ACT_CHILD").as_deref() != Ok("1") {
+            let output = std::process::Command::new(std::env::current_exe().unwrap())
+                .args([
+                    "blur::tests::fused_activity_pass_matches_the_two_passes",
+                    "--exact",
+                ])
+                .env("FUSED_ACT_CHILD", "1")
+                .output()
+                .unwrap();
+            assert!(
+                output.status.success(),
+                "{}\n{}",
+                String::from_utf8_lossy(&output.stdout),
+                String::from_utf8_lossy(&output.stderr)
+            );
+            assert!(String::from_utf8_lossy(&output.stdout).contains("1 passed"));
+            return;
+        }
+        use super::*;
+        use crate::feature_defs::FormulaRevision;
+        let _guard = archmage::testing::lock_token_testing();
+        let mut runs = 0;
+        let report = archmage::testing::for_each_token_permutation(
+            archmage::testing::CompileTimePolicy::Warn,
+            |_| {
+                for (w, h) in [
+                    (1, 1),
+                    (7, 3),
+                    (8, 12),
+                    (15, 2),
+                    (16, 11),
+                    (17, 9),
+                    (21, 5),
+                    (255, 13),
+                    (256, 21),
+                    (257, 21),
+                    (300, 148),
+                    (513, 31),
+                    (1031, 17),
+                ] {
+                    let n = w * h;
+                    let src: Vec<f32> = (0..n)
+                        .map(|i| ((i * 137 + 19) % 1009) as f32 / 1009.0 - 0.2)
+                        .collect();
+                    let mu: Vec<f32> = (0..n)
+                        .map(|i| {
+                            if i % 29 == 0 {
+                                src[i]
+                            } else {
+                                ((i * 71 + 5) % 997) as f32 / 997.0
+                            }
+                        })
+                        .collect();
+                    for revision in [FormulaRevision::Rev5, FormulaRevision::Rev7] {
+                        let mut abs = vec![0.0; n];
+                        let mut temp = vec![0.0; n];
+                        let mut expected = vec![0.0; n];
+                        crate::simd_ops::abs_diff_into(&src, &mu, &mut abs);
+                        box_blur_1pass_at_revision(
+                            &abs,
+                            &mut expected,
+                            &mut temp,
+                            w,
+                            h,
+                            5,
+                            revision,
+                        );
+                        let mut actual = vec![0.0; n];
+                        let (mut hbuf, mut row) = (vec![0.0; n], vec![0.0; n]);
+                        assert!(activity_at_revision(
+                            &src,
+                            &mu,
+                            &mut actual,
+                            w,
+                            h,
+                            5,
+                            revision,
+                            &mut hbuf,
+                            &mut row,
+                        ));
+                        for i in 0..n {
+                            assert_eq!(
+                                actual[i].to_bits(),
+                                expected[i].to_bits(),
+                                "{revision:?} {w}x{h} index {i}"
+                            );
+                        }
+                    }
+                }
+                runs += 1;
+            },
+        );
+        assert!(runs >= 1, "{report:?}");
+    }
+
     #[test]
     fn rev5_simd_edges_match_frozen_windows() {
         if std::env::var("REV5PERF_EDGES_CHILD").as_deref() != Ok("1") {
@@ -10792,83 +11459,76 @@ fn fused_blur_h_local11_wide(
     let last = (width / 16).saturating_sub(1) * 16;
     let right: [usize; 26] =
         std::array::from_fn(|i| crate::featcanon::tap_mirror((last + i) as isize - 5, width));
+    // One 16-output block of the four planes from its 26 leaves of each
+    // input: the frozen tree over taps at constant offsets (one range check
+    // per block and input, not one per tap).
+    let block = |a_t: &[f32; 26], b_t: &[f32; 26]| {
+        let tap = |k: usize| {
+            let a = f32x16::load_t(token, a_t[k..k + 16].try_into().unwrap());
+            let b = f32x16::load_t(token, b_t[k..k + 16].try_into().unwrap());
+            let q = a.mul_add(a, b * b);
+            let p = if err {
+                let e = a - b;
+                e * e
+            } else {
+                a * b
+            };
+            (a, b, q, p)
+        };
+        let add = |a: (f32x16, f32x16, f32x16, f32x16), b: (f32x16, f32x16, f32x16, f32x16)| {
+            (a.0 + b.0, a.1 + b.1, a.2 + b.2, a.3 + b.3)
+        };
+        let pair = |k| add(tap(k), tap(k + 1));
+        let s01 = add(pair(0), pair(2));
+        let s45 = add(pair(4), pair(6));
+        add(add(add(s01, s45), pair(8)), tap(10))
+    };
     for y in 0..height {
         let row = y * width;
+        let (sr, dr) = (&src[row..row + width], &dst[row..row + width]);
+        let o1 = &mut out_mu1[row..row + width];
+        let o2 = &mut out_mu2[row..row + width];
+        let oq = &mut out_sigma_sq[row..row + width];
+        let op = &mut out_sigma12[row..row + width];
         let mut x = 0;
-        while x < width {
-            if x + 16 <= width {
-                let interior = x >= 5 && x + 16 + 5 <= width;
-                let edge = (!interior).then(|| {
-                    let indices = if x == 0 { &left } else { &right };
-                    (indices.map(|i| src[row + i]), indices.map(|i| dst[row + i]))
-                });
-                let tap = |k: usize| {
-                    let (a, b) = if x >= 5 && x + 16 + 5 <= width {
-                        let i = row + x + k - 5;
-                        (
-                            f32x16::load_t(token, src[i..i + 16].try_into().unwrap()),
-                            f32x16::load_t(token, dst[i..i + 16].try_into().unwrap()),
-                        )
-                    } else {
-                        let (a_edge, b_edge) = edge.as_ref().unwrap();
-                        (
-                            f32x16::load_t(token, a_edge[k..k + 16].try_into().unwrap()),
-                            f32x16::load_t(token, b_edge[k..k + 16].try_into().unwrap()),
-                        )
-                    };
-                    let q = a.mul_add(a, b * b);
-                    let p = if err {
-                        let e = a - b;
-                        e * e
-                    } else {
-                        a * b
-                    };
-                    (a, b, q, p)
-                };
-                let add = |a: (f32x16, f32x16, f32x16, f32x16),
-                           b: (f32x16, f32x16, f32x16, f32x16)| {
-                    (a.0 + b.0, a.1 + b.1, a.2 + b.2, a.3 + b.3)
-                };
-                let pair = |k| add(tap(k), tap(k + 1));
-                let s01 = add(pair(0), pair(2));
-                let s45 = add(pair(4), pair(6));
-                let sum = add(add(add(s01, s45), pair(8)), tap(10));
-                (sum.0 * inv).store((&mut out_mu1[row + x..row + x + 16]).try_into().unwrap());
-                (sum.1 * inv).store((&mut out_mu2[row + x..row + x + 16]).try_into().unwrap());
-                (sum.2 * inv).store(
-                    (&mut out_sigma_sq[row + x..row + x + 16])
-                        .try_into()
-                        .unwrap(),
-                );
-                (sum.3 * inv).store(
-                    (&mut out_sigma12[row + x..row + x + 16])
-                        .try_into()
-                        .unwrap(),
-                );
-                x += 16;
+        while x + 16 <= width {
+            let sum = if x >= 5 && x + 16 + 5 <= width {
+                block(
+                    sr[x - 5..x + 21].try_into().unwrap(),
+                    dr[x - 5..x + 21].try_into().unwrap(),
+                )
             } else {
-                let mut a = [0.0; 11];
-                let mut b = a;
-                let mut q = a;
-                let mut p = a;
-                for k in 0..11 {
-                    let i = row + crate::featcanon::tap_mirror(x as isize + k as isize - 5, width);
-                    a[k] = src[i];
-                    b[k] = dst[i];
-                    q[k] = a[k].mul_add(a[k], b[k] * b[k]);
-                    p[k] = if err {
-                        let e = a[k] - b[k];
-                        e * e
-                    } else {
-                        a[k] * b[k]
-                    };
-                }
-                out_mu1[row + x] = local_sum_taps(&a) * (1.0 / 11.0);
-                out_mu2[row + x] = local_sum_taps(&b) * (1.0 / 11.0);
-                out_sigma_sq[row + x] = local_sum_taps(&q) * (1.0 / 11.0);
-                out_sigma12[row + x] = local_sum_taps(&p) * (1.0 / 11.0);
-                x += 1;
+                let indices = if x == 0 { &left } else { &right };
+                block(&indices.map(|i| sr[i]), &indices.map(|i| dr[i]))
+            };
+            (sum.0 * inv).store((&mut o1[x..x + 16]).try_into().unwrap());
+            (sum.1 * inv).store((&mut o2[x..x + 16]).try_into().unwrap());
+            (sum.2 * inv).store((&mut oq[x..x + 16]).try_into().unwrap());
+            (sum.3 * inv).store((&mut op[x..x + 16]).try_into().unwrap());
+            x += 16;
+        }
+        while x < width {
+            let mut a = [0.0; 11];
+            let mut b = a;
+            let mut q = a;
+            let mut p = a;
+            for k in 0..11 {
+                let i = crate::featcanon::tap_mirror(x as isize + k as isize - 5, width);
+                a[k] = sr[i];
+                b[k] = dr[i];
+                q[k] = a[k].mul_add(a[k], b[k] * b[k]);
+                p[k] = if err {
+                    let e = a[k] - b[k];
+                    e * e
+                } else {
+                    a[k] * b[k]
+                };
             }
+            o1[x] = local_sum_taps(&a) * (1.0 / 11.0);
+            o2[x] = local_sum_taps(&b) * (1.0 / 11.0);
+            oq[x] = local_sum_taps(&q) * (1.0 / 11.0);
+            op[x] = local_sum_taps(&p) * (1.0 / 11.0);
+            x += 1;
         }
     }
 }
@@ -10890,36 +11550,32 @@ fn box_blur_h_local11_wide(
     let last = (width / 16).saturating_sub(1) * 16;
     let right: [usize; 26] =
         std::array::from_fn(|i| crate::featcanon::tap_mirror((last + i) as isize - 5, width));
+    // One 16-output block from its 26 leaves: the frozen tree over taps at
+    // constant offsets (one range check per block, not one per tap).
+    let block = |t: &[f32; 26]| {
+        let l = |k: usize| f32x16::load_t(token, t[k..k + 16].try_into().unwrap());
+        (((l(0) + l(1)) + (l(2) + l(3))) + ((l(4) + l(5)) + (l(6) + l(7)))) + (l(8) + l(9)) + l(10)
+    };
     for y in 0..height {
-        let row = y * width;
+        let rin = &input[y * width..(y + 1) * width];
+        let rout = &mut output[y * width..(y + 1) * width];
         let mut x = 0;
-        while x < width {
-            if x + 16 <= width {
-                let interior = x >= 5 && x + 16 + 5 <= width;
-                let edge = (!interior).then(|| {
-                    let indices = if x == 0 { &left } else { &right };
-                    indices.map(|i| input[row + i])
-                });
-                let t: [f32x16; 11] = std::array::from_fn(|k| {
-                    if let Some(edge) = &edge {
-                        f32x16::load_t(token, edge[k..k + 16].try_into().unwrap())
-                    } else {
-                        let i = row + x + k - 5;
-                        f32x16::load_t(token, input[i..i + 16].try_into().unwrap())
-                    }
-                });
-                let sum = (((t[0] + t[1]) + (t[2] + t[3])) + ((t[4] + t[5]) + (t[6] + t[7])))
-                    + (t[8] + t[9])
-                    + t[10];
-                (sum * inv).store((&mut output[row + x..row + x + 16]).try_into().unwrap());
-                x += 16;
+        while x + 16 <= width {
+            let sum = if x >= 5 && x + 16 + 5 <= width {
+                block(rin[x - 5..x + 21].try_into().unwrap())
             } else {
-                let t: [f32; 11] = std::array::from_fn(|k| {
-                    input[row + crate::featcanon::tap_mirror(x as isize + k as isize - 5, width)]
-                });
-                output[row + x] = local_sum_taps(&t) * (1.0 / 11.0);
-                x += 1;
-            }
+                let indices = if x == 0 { &left } else { &right };
+                block(&indices.map(|i| rin[i]))
+            };
+            (sum * inv).store((&mut rout[x..x + 16]).try_into().unwrap());
+            x += 16;
+        }
+        while x < width {
+            let t: [f32; 11] = std::array::from_fn(|k| {
+                rin[crate::featcanon::tap_mirror(x as isize + k as isize - 5, width)]
+            });
+            rout[x] = local_sum_taps(&t) * (1.0 / 11.0);
+            x += 1;
         }
     }
 }
@@ -10941,42 +11597,49 @@ fn box_blur_v_local11_wide(
     let inv = f32x16::splat_t(token, 1.0 / 11.0);
     // Cache the frozen tree's pair and quadruple nodes, never an output
     // recurrence. Each node has the same two operands and rounding as before.
-    // Eight vector columns bound scratch and keep adjacent rows in one tile.
+    // A panel of 2 KiB row segments walks the whole height, so every row's
+    // reads and writes are contiguous runs the stream prefetchers follow (the
+    // former 512-byte tiles moved one row stride per few cache lines). A pair
+    // node lives three rows and a quadruple node eight, so rings of four and
+    // eight segments hold every live node.
+    const PANEL: usize = 32;
     let blocks = width / 16;
-    for tile in (0..blocks).step_by(8) {
-        let count = (blocks - tile).min(8);
-        let mut pairs = [[f32x16::zero_t(token); 8]; 16];
-        let mut quads = pairs;
+    let mut pairs = [[f32x16::zero_t(token); PANEL]; 4];
+    let mut quads = [[f32x16::zero_t(token); PANEL]; 8];
+    for tile in (0..blocks).step_by(PANEL) {
+        let count = (blocks - tile).min(PANEL);
+        // The panel's span of a tap row and of the output row, cut to exact
+        // length once per row, so the column loops have no range checks.
+        let (x0, span) = (tile * 16, count * 16);
         for k in 0..9 {
             let a = crate::featcanon::tap_mirror(k as isize - 5, height) * width;
             let b = crate::featcanon::tap_mirror(k as isize - 4, height) * width;
+            let ra = &input[a + x0..a + x0 + span].as_chunks::<16>().0[..count];
+            let rb = &input[b + x0..b + x0 + span].as_chunks::<16>().0[..count];
             for c in 0..count {
-                let x = (tile + c) * 16;
-                pairs[k][c] = f32x16::load_t(token, input[a + x..a + x + 16].try_into().unwrap())
-                    + f32x16::load_t(token, input[b + x..b + x + 16].try_into().unwrap());
+                pairs[k & 3][c] = f32x16::load_t(token, &ra[c]) + f32x16::load_t(token, &rb[c]);
             }
-        }
-        for k in 0..7 {
-            for c in 0..count {
-                quads[k][c] = pairs[k][c] + pairs[k + 2][c];
+            if k >= 2 {
+                for c in 0..count {
+                    quads[k - 2][c] = pairs[(k - 2) & 3][c] + pairs[k & 3][c];
+                }
             }
         }
         for y in 0..height {
             let a = crate::featcanon::tap_mirror(y as isize + 4, height) * width;
             let b = crate::featcanon::tap_mirror(y as isize + 5, height) * width;
+            let ra = &input[a + x0..a + x0 + span].as_chunks::<16>().0[..count];
+            let rb = &input[b + x0..b + x0 + span].as_chunks::<16>().0[..count];
+            let o = y * width + x0;
+            let ro = &mut output[o..o + span].as_chunks_mut::<16>().0[..count];
+            let (q0, q4, q7) = (y & 7, (y + 4) & 7, (y + 7) & 7);
+            let (p7, p8, p9) = ((y + 7) & 3, (y + 8) & 3, (y + 9) & 3);
             for c in 0..count {
-                let x = (tile + c) * 16;
-                let last = f32x16::load_t(token, input[b + x..b + x + 16].try_into().unwrap());
-                pairs[(y + 9) & 15][c] =
-                    f32x16::load_t(token, input[a + x..a + x + 16].try_into().unwrap()) + last;
-                quads[(y + 7) & 15][c] = pairs[(y + 7) & 15][c] + pairs[(y + 9) & 15][c];
-                let sum =
-                    ((quads[y & 15][c] + quads[(y + 4) & 15][c]) + pairs[(y + 8) & 15][c]) + last;
-                (sum * inv).store(
-                    (&mut output[y * width + x..y * width + x + 16])
-                        .try_into()
-                        .unwrap(),
-                );
+                let last = f32x16::load_t(token, &rb[c]);
+                pairs[p9][c] = f32x16::load_t(token, &ra[c]) + last;
+                quads[q7][c] = pairs[p7][c] + pairs[p9][c];
+                let sum = ((quads[q0][c] + quads[q4][c]) + pairs[p8][c]) + last;
+                (sum * inv).store(&mut ro[c]);
             }
         }
     }
@@ -10991,6 +11654,310 @@ fn box_blur_v_local11_wide(
         for x in blocks * 16..width {
             let taps: [f32; 11] = std::array::from_fn(|k| input[rows[k] + x]);
             output[y * width + x] = local_sum_taps(&taps) * (1.0 / 11.0);
+        }
+    }
+}
+
+/// [`fused_blur_h_local11_wide`] and then [`box_blur_v_local11_wide`] on each
+/// of its four planes, a 256-column panel at a time: the panel's horizontal
+/// rows go to `hbuf` (four panel-wide planes, row stride = the panel's span,
+/// small enough for L2) instead of four image-wide planes. Every output has
+/// both kernels' trees, operands and roundings, so the moments are unchanged.
+#[cfg(all(target_arch = "x86_64", feature = "avx512", feature = "threads"))]
+#[magetypes(define(f32x16), v4x, -v4, -v3, -scalar)]
+#[allow(clippy::too_many_arguments)]
+fn fused_blur_hv_local11_wide(
+    token: Token,
+    src: &[f32],
+    dst: &[f32],
+    out_mu1: &mut [f32],
+    out_mu2: &mut [f32],
+    out_sigma_sq: &mut [f32],
+    out_sigma12: &mut [f32],
+    width: usize,
+    height: usize,
+    err: bool,
+    hbuf: [&mut [f32]; 4],
+) {
+    if width == 0 || height == 0 {
+        return;
+    }
+    let inv = f32x16::splat_t(token, 1.0 / 11.0);
+    let left: [usize; 26] =
+        std::array::from_fn(|i| crate::featcanon::tap_mirror(i as isize - 5, width));
+    let last = (width / 16).saturating_sub(1) * 16;
+    let right: [usize; 26] =
+        std::array::from_fn(|i| crate::featcanon::tap_mirror((last + i) as isize - 5, width));
+    // `fused_blur_h_local11_wide`'s 16-output block.
+    let block = |a_t: &[f32; 26], b_t: &[f32; 26]| {
+        let tap = |k: usize| {
+            let a = f32x16::load_t(token, a_t[k..k + 16].try_into().unwrap());
+            let b = f32x16::load_t(token, b_t[k..k + 16].try_into().unwrap());
+            let q = a.mul_add(a, b * b);
+            let p = if err {
+                let e = a - b;
+                e * e
+            } else {
+                a * b
+            };
+            (a, b, q, p)
+        };
+        let add = |a: (f32x16, f32x16, f32x16, f32x16), b: (f32x16, f32x16, f32x16, f32x16)| {
+            (a.0 + b.0, a.1 + b.1, a.2 + b.2, a.3 + b.3)
+        };
+        let pair = |k| add(tap(k), tap(k + 1));
+        let s01 = add(pair(0), pair(2));
+        let s45 = add(pair(4), pair(6));
+        add(add(add(s01, s45), pair(8)), tap(10))
+    };
+    let [h1, h2, hq, hp] = hbuf;
+    let mut outs = [out_mu1, out_mu2, out_sigma_sq, out_sigma12];
+    const PANEL: usize = 16;
+    let blocks = width / 16;
+    let mut pairs = [[f32x16::zero_t(token); PANEL]; 4];
+    let mut quads = [[f32x16::zero_t(token); PANEL]; 8];
+    for tile in (0..blocks).step_by(PANEL) {
+        let count = (blocks - tile).min(PANEL);
+        let (x0, span) = (tile * 16, count * 16);
+        // The panel's horizontal rows.
+        for y in 0..height {
+            let row = y * width;
+            let (sr, dr) = (&src[row..row + width], &dst[row..row + width]);
+            let o = y * span;
+            let r1 = &mut h1[o..o + span].as_chunks_mut::<16>().0[..count];
+            let r2 = &mut h2[o..o + span].as_chunks_mut::<16>().0[..count];
+            let rq = &mut hq[o..o + span].as_chunks_mut::<16>().0[..count];
+            let rp = &mut hp[o..o + span].as_chunks_mut::<16>().0[..count];
+            for c in 0..count {
+                let x = x0 + c * 16;
+                let sum = if x >= 5 && x + 16 + 5 <= width {
+                    block(
+                        sr[x - 5..x + 21].try_into().unwrap(),
+                        dr[x - 5..x + 21].try_into().unwrap(),
+                    )
+                } else {
+                    let indices = if x == 0 { &left } else { &right };
+                    block(&indices.map(|i| sr[i]), &indices.map(|i| dr[i]))
+                };
+                (sum.0 * inv).store(&mut r1[c]);
+                (sum.1 * inv).store(&mut r2[c]);
+                (sum.2 * inv).store(&mut rq[c]);
+                (sum.3 * inv).store(&mut rp[c]);
+            }
+        }
+        // `box_blur_v_local11_wide`'s panel walk over each of them.
+        for (input, output) in [&*h1, &*h2, &*hq, &*hp].into_iter().zip(outs.iter_mut()) {
+            for k in 0..9 {
+                let a = crate::featcanon::tap_mirror(k as isize - 5, height) * span;
+                let b = crate::featcanon::tap_mirror(k as isize - 4, height) * span;
+                let ra = &input[a..a + span].as_chunks::<16>().0[..count];
+                let rb = &input[b..b + span].as_chunks::<16>().0[..count];
+                for c in 0..count {
+                    pairs[k & 3][c] = f32x16::load_t(token, &ra[c]) + f32x16::load_t(token, &rb[c]);
+                }
+                if k >= 2 {
+                    for c in 0..count {
+                        quads[k - 2][c] = pairs[(k - 2) & 3][c] + pairs[k & 3][c];
+                    }
+                }
+            }
+            for y in 0..height {
+                let a = crate::featcanon::tap_mirror(y as isize + 4, height) * span;
+                let b = crate::featcanon::tap_mirror(y as isize + 5, height) * span;
+                let ra = &input[a..a + span].as_chunks::<16>().0[..count];
+                let rb = &input[b..b + span].as_chunks::<16>().0[..count];
+                let o = y * width + x0;
+                let ro = &mut output[o..o + span].as_chunks_mut::<16>().0[..count];
+                let (q0, q4, q7) = (y & 7, (y + 4) & 7, (y + 7) & 7);
+                let (p7, p8, p9) = ((y + 7) & 3, (y + 8) & 3, (y + 9) & 3);
+                for c in 0..count {
+                    let last = f32x16::load_t(token, &rb[c]);
+                    pairs[p9][c] = f32x16::load_t(token, &ra[c]) + last;
+                    quads[q7][c] = pairs[p7][c] + pairs[p9][c];
+                    let sum = ((quads[q0][c] + quads[q4][c]) + pairs[p8][c]) + last;
+                    (sum * inv).store(&mut ro[c]);
+                }
+            }
+        }
+    }
+    // The incomplete vector: both kernels' per-output scalar trees, the
+    // horizontal one per row into `hbuf` (row stride = the tail's width).
+    let xt = blocks * 16;
+    let tw = width - xt;
+    if tw == 0 {
+        return;
+    }
+    for y in 0..height {
+        let row = y * width;
+        let (sr, dr) = (&src[row..row + width], &dst[row..row + width]);
+        for x in xt..width {
+            let mut a = [0.0; 11];
+            let mut b = a;
+            let mut q = a;
+            let mut p = a;
+            for k in 0..11 {
+                let i = crate::featcanon::tap_mirror(x as isize + k as isize - 5, width);
+                a[k] = sr[i];
+                b[k] = dr[i];
+                q[k] = a[k].mul_add(a[k], b[k] * b[k]);
+                p[k] = if err {
+                    let e = a[k] - b[k];
+                    e * e
+                } else {
+                    a[k] * b[k]
+                };
+            }
+            let o = y * tw + (x - xt);
+            h1[o] = local_sum_taps(&a) * (1.0 / 11.0);
+            h2[o] = local_sum_taps(&b) * (1.0 / 11.0);
+            hq[o] = local_sum_taps(&q) * (1.0 / 11.0);
+            hp[o] = local_sum_taps(&p) * (1.0 / 11.0);
+        }
+    }
+    for (input, output) in [&*h1, &*h2, &*hq, &*hp].into_iter().zip(outs.iter_mut()) {
+        for y in 0..height {
+            let rows: [usize; 11] = std::array::from_fn(|k| {
+                crate::featcanon::tap_mirror(y as isize + k as isize - 5, height) * tw
+            });
+            for x in 0..tw {
+                let taps: [f32; 11] = std::array::from_fn(|k| input[rows[k] + x]);
+                output[y * width + xt + x] = local_sum_taps(&taps) * (1.0 / 11.0);
+            }
+        }
+    }
+}
+
+/// The activity plane `box_blur(|src − mu|)` as [`box_blur_h_local11_wide`]
+/// and then [`box_blur_v_local11_wide`] compute it from an `|src − mu|` plane,
+/// a 256-column panel at a time: each row's panel span of `|src − mu|` goes to
+/// `row` and its horizontal sums to `hbuf` (row stride = the span) instead of
+/// two image-wide planes. Every output keeps the three kernels' operations.
+#[cfg(all(target_arch = "x86_64", feature = "avx512", feature = "threads"))]
+#[magetypes(define(f32x16), v4x, -v4, -v3, -scalar)]
+#[allow(clippy::too_many_arguments)]
+fn activity_local11_wide(
+    token: Token,
+    src: &[f32],
+    mu: &[f32],
+    output: &mut [f32],
+    width: usize,
+    height: usize,
+    hbuf: &mut [f32],
+    row: &mut [f32],
+) {
+    if width == 0 || height == 0 {
+        return;
+    }
+    let inv = f32x16::splat_t(token, 1.0 / 11.0);
+    let left: [usize; 26] =
+        std::array::from_fn(|i| crate::featcanon::tap_mirror(i as isize - 5, width));
+    let last = (width / 16).saturating_sub(1) * 16;
+    let right: [usize; 26] =
+        std::array::from_fn(|i| crate::featcanon::tap_mirror((last + i) as isize - 5, width));
+    // `box_blur_h_local11_wide`'s 16-output block.
+    let block = |t: &[f32; 26]| {
+        let l = |k: usize| f32x16::load_t(token, t[k..k + 16].try_into().unwrap());
+        (((l(0) + l(1)) + (l(2) + l(3))) + ((l(4) + l(5)) + (l(6) + l(7)))) + (l(8) + l(9)) + l(10)
+    };
+    const PANEL: usize = 16;
+    let blocks = width / 16;
+    let mut pairs = [[f32x16::zero_t(token); PANEL]; 4];
+    let mut quads = [[f32x16::zero_t(token); PANEL]; 8];
+    for tile in (0..blocks).step_by(PANEL) {
+        let count = (blocks - tile).min(PANEL);
+        let (x0, span) = (tile * 16, count * 16);
+        // Every column this panel's blocks read, mirrored ones included.
+        let lo = x0.saturating_sub(5);
+        let hi = (x0 + span + 5).min(width);
+        for y in 0..height {
+            let r = y * width;
+            let (s, m) = (&src[r + lo..r + hi], &mu[r + lo..r + hi]);
+            let d = &mut row[..hi - lo];
+            let full = (hi - lo) / 16;
+            for ((dc, sc), mc) in d
+                .as_chunks_mut::<16>()
+                .0
+                .iter_mut()
+                .zip(s.as_chunks::<16>().0)
+                .zip(m.as_chunks::<16>().0)
+            {
+                (f32x16::load_t(token, sc) - f32x16::load_t(token, mc))
+                    .abs()
+                    .store(dc);
+            }
+            for i in full * 16..hi - lo {
+                d[i] = (s[i] - m[i]).abs();
+            }
+            let o = y * span;
+            let rh = &mut hbuf[o..o + span].as_chunks_mut::<16>().0[..count];
+            for c in 0..count {
+                let x = x0 + c * 16;
+                let sum = if x >= 5 && x + 16 + 5 <= width {
+                    block(d[x - 5 - lo..x + 21 - lo].try_into().unwrap())
+                } else {
+                    let indices = if x == 0 { &left } else { &right };
+                    block(&indices.map(|i| d[i - lo]))
+                };
+                (sum * inv).store(&mut rh[c]);
+            }
+        }
+        // `box_blur_v_local11_wide`'s panel walk.
+        let input = &*hbuf;
+        for k in 0..9 {
+            let a = crate::featcanon::tap_mirror(k as isize - 5, height) * span;
+            let b = crate::featcanon::tap_mirror(k as isize - 4, height) * span;
+            let ra = &input[a..a + span].as_chunks::<16>().0[..count];
+            let rb = &input[b..b + span].as_chunks::<16>().0[..count];
+            for c in 0..count {
+                pairs[k & 3][c] = f32x16::load_t(token, &ra[c]) + f32x16::load_t(token, &rb[c]);
+            }
+            if k >= 2 {
+                for c in 0..count {
+                    quads[k - 2][c] = pairs[(k - 2) & 3][c] + pairs[k & 3][c];
+                }
+            }
+        }
+        for y in 0..height {
+            let a = crate::featcanon::tap_mirror(y as isize + 4, height) * span;
+            let b = crate::featcanon::tap_mirror(y as isize + 5, height) * span;
+            let ra = &input[a..a + span].as_chunks::<16>().0[..count];
+            let rb = &input[b..b + span].as_chunks::<16>().0[..count];
+            let o = y * width + x0;
+            let ro = &mut output[o..o + span].as_chunks_mut::<16>().0[..count];
+            let (q0, q4, q7) = (y & 7, (y + 4) & 7, (y + 7) & 7);
+            let (p7, p8, p9) = ((y + 7) & 3, (y + 8) & 3, (y + 9) & 3);
+            for c in 0..count {
+                let last = f32x16::load_t(token, &rb[c]);
+                pairs[p9][c] = f32x16::load_t(token, &ra[c]) + last;
+                quads[q7][c] = pairs[p7][c] + pairs[p9][c];
+                let sum = ((quads[q0][c] + quads[q4][c]) + pairs[p8][c]) + last;
+                (sum * inv).store(&mut ro[c]);
+            }
+        }
+    }
+    // The incomplete vector: both kernels' per-output scalar trees.
+    let xt = blocks * 16;
+    let tw = width - xt;
+    if tw == 0 {
+        return;
+    }
+    for y in 0..height {
+        let r = y * width;
+        for x in xt..width {
+            let t: [f32; 11] = std::array::from_fn(|k| {
+                let i = r + crate::featcanon::tap_mirror(x as isize + k as isize - 5, width);
+                (src[i] - mu[i]).abs()
+            });
+            hbuf[y * tw + (x - xt)] = local_sum_taps(&t) * (1.0 / 11.0);
+        }
+    }
+    for y in 0..height {
+        let rows: [usize; 11] = std::array::from_fn(|k| {
+            crate::featcanon::tap_mirror(y as isize + k as isize - 5, height) * tw
+        });
+        for x in 0..tw {
+            let taps: [f32; 11] = std::array::from_fn(|k| hbuf[rows[k] + x]);
+            output[y * width + xt + x] = local_sum_taps(&taps) * (1.0 / 11.0);
         }
     }
 }

@@ -867,6 +867,42 @@ struct Args {
     #[arg(long, default_value_t = false)]
     nonneg_distance: bool,
 
+    /// Under `--nonneg-distance`, project hidden biases to `<= 0` instead of
+    /// freezing them at 0 (`raw(0⃗) = pin` stays exact). With `--monotone-cbc`
+    /// this gives a monotone, identity-pinned, convex piecewise-linear model
+    /// that is not restricted to linear. Plain one-layer N only.
+    #[arg(long, requires = "nonneg_distance", conflicts_with_all = ["steer_pairs", "smooth_hinge", "pool_head", "hybrid_head", "per_sample_alpha_head", "skip_connection"])]
+    nonneg_thresholds: bool,
+
+    /// With `--nonneg-thresholds --monotone-cbc`: tie the last `2*N` hidden
+    /// units into N bounded monotone ramps (shared W1 row, two thresholds,
+    /// opposite output weights). Adds saturation inside the monotone class.
+    #[arg(long, default_value_t = 0, requires = "nonneg_thresholds")]
+    monotone_ramps: usize,
+
+    /// With `--nonneg-thresholds --monotone-cbc`: the last `2*N` hidden units
+    /// form tied ramp pairs with sign-free W1 rows, their summed amplitude
+    /// capped at `--free-budget` raw units. Certified bound: increasing any
+    /// input raises the score by at most the budget.
+    #[arg(long, default_value_t = 0, requires = "nonneg_thresholds")]
+    free_ramps: usize,
+
+    /// Cap on the free ramps' summed amplitude (raw score units).
+    #[arg(long, default_value_t = 0.0)]
+    free_budget: f64,
+
+    /// With `--monotone-cbc` and `--derived-inputs`: content-gated
+    /// monotonicity. Product rows are not clamped `>= 0`; each unit's
+    /// (direct, product) weights keep the gain on every damage feature
+    /// non-negative for any fragility in (0, 1].
+    #[arg(long, requires_all = ["derived_inputs", "monotone_cbc", "nonneg_distance"])]
+    monotone_gated_products: bool,
+
+    /// With `--nonneg-thresholds --monotone-cbc`: the first `2*N` hidden units
+    /// form monotone max pairs `c·max(a·x, b·x - t)` (pooling instead of summing).
+    #[arg(long, default_value_t = 0, requires = "nonneg_thresholds")]
+    max_pairs: usize,
+
     /// STEER S: fixed tau1/8 C1 convex hinge; plain N only.
     #[arg(long, requires = "nonneg_distance", conflicts_with_all = ["steer_pairs", "pool_head", "hybrid_head", "per_sample_alpha_head", "skip_connection"])]
     smooth_hinge: bool,
@@ -3312,6 +3348,13 @@ fn main() {
         pooled_pearson_weight: args.pooled_pearson_weight,
         nonneg_distance: args.nonneg_distance,
         nonneg_pin: args.nonneg_pin,
+        nonneg_thresholds: args.nonneg_thresholds,
+        monotone_ramps: args.monotone_ramps,
+        free_ramps: args.free_ramps,
+        free_budget: args.free_budget,
+        max_pairs: args.max_pairs,
+        monotone_product_pairs: Vec::new(),
+        monotone_product_scales: Vec::new(),
         n_hidden: args.hidden,
         n_epochs: args.epochs,
         pairs_per_epoch: args.pairs_per_epoch,
@@ -4086,6 +4129,17 @@ fn main() {
     hyperparams.feature_transforms = feature_transforms.clone();
     hyperparams.feature_transform_params = feature_transform_params.clone();
     hyperparams.monotone_feature_pin = monotone_feature_pin;
+    if args.monotone_gated_products {
+        let (decl, _) = derived
+            .as_ref()
+            .expect("--monotone-gated-products requires --derived-inputs");
+        hyperparams.monotone_product_pairs = decl
+            .products
+            .iter()
+            .enumerate()
+            .map(|(j, &[direct, _])| (direct, decl.product_column(args.max_features, j)))
+            .collect();
+    }
 
     println!(
         "Training: {} groups, {n_features} features, {hyperparams:?}",

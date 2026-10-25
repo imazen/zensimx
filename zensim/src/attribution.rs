@@ -1098,6 +1098,15 @@ impl BinAccum {
         result
     }
 
+    /// Research perceptual integration of a per-pixel map
+    /// ([`crate::map_paint::smooth_sum_preserving`]); a binned map is left as is.
+    #[cfg(feature = "custom-profiles")]
+    pub(crate) fn smooth_per_pixel(&mut self, sigma: f64) {
+        if self.bin == 1 {
+            crate::map_paint::smooth_sum_preserving(&mut self.bins, self.gw, self.height, sigma);
+        }
+    }
+
     /// The logical image size queries are made against.
     #[cfg_attr(not(feature = "feature-regime-v2"), allow(dead_code))] // BLOCKINESS lattice terms are produced by the v2 walk
     pub(crate) fn logical_dimensions(&self) -> (usize, usize) {
@@ -1255,6 +1264,33 @@ impl BinAccum {
         factor: usize,
     ) {
         self.add_scale_plane(PlaneRef::F32(plane), sw, sh, factor);
+    }
+
+    /// [`Self::add_scale_plane_f32`] under the research paint mode
+    /// ([`crate::map_paint`]): at `bin == 1` with a source-resolution guide,
+    /// `PaintMode::Guided` splits each coarse pixel over its footprint in
+    /// proportion to the guide; otherwise the nearest-neighbour fold.
+    #[cfg(feature = "custom-profiles")]
+    pub(crate) fn add_scale_plane_painted_f32(
+        &mut self,
+        plane: &[f32],
+        sw: usize,
+        sh: usize,
+        scale: usize,
+        paint: crate::map_paint::PaintMode,
+        guide0: Option<&[f64]>,
+    ) {
+        if scale > 0
+            && self.bin == 1
+            && paint == crate::map_paint::PaintMode::Guided
+            && let Some(g) = guide0.filter(|g| g.len() == self.width * self.height)
+        {
+            let full =
+                crate::map_paint::paint_guided(plane, sw, sh, scale, g, self.width, self.height);
+            self.add_scale_plane(PlaneRef::F32(&full), self.width, self.height, 1);
+            return;
+        }
+        self.add_scale_plane(PlaneRef::F32(plane), sw, sh, 1usize << scale);
     }
 
     fn into_result(self) -> AttributionResult {
@@ -1522,6 +1558,8 @@ fn basic_combine_channel(
     co: &SlotCoeffs,
     id_slice: &mut [f64],
     bl_slice: &mut [f64],
+    // Revision 7: the v1 edge ratio as `(x − y)/(1 + y)`.
+    stable7: bool,
 ) {
     for i in 0..n {
         let sd = bufs.sd[i] as f64;
@@ -1531,7 +1569,11 @@ fn basic_combine_channel(
         let m2 = bufs.mu2[i] as f64;
         let d1 = (sv - m1).abs();
         let d2 = (dv - m2).abs();
-        let ed = (1.0 + d2) / (1.0 + d1) - 1.0;
+        let ed = if stable7 {
+            (d2 - d1) / (1.0 + d1)
+        } else {
+            (1.0 + d2) / (1.0 + d1) - 1.0
+        };
         let art = ed.max(0.0);
         let det = (-ed).max(0.0);
         let sd2 = sd * sd;
@@ -1659,7 +1701,16 @@ fn build_attribution_into_sink(
                 let acc = process_channel_banded(src_c, dst_c, sw, sh, radius, buf);
                 let base_k = scale * FPC * 3 + c * FPC;
                 let co = SlotCoeffs::derive(s, base_k, &acc, n as f64);
-                basic_combine_channel(buf, src_c, dst_c, n, &co, &mut idp[..n], &mut winp[..n]);
+                basic_combine_channel(
+                    buf,
+                    src_c,
+                    dst_c,
+                    n,
+                    &co,
+                    &mut idp[..n],
+                    &mut winp[..n],
+                    crate::ssim_form::active_revision().stable_forms(),
+                );
                 acc
             };
             #[cfg(feature = "threads")]
@@ -2069,6 +2120,67 @@ impl crate::metric::Zensim {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// `SplitMode::Amplitude` carries every p-pool of the basic slots (the L4 and L2 pools of SSIM, artifact and
+    /// detail loss) and the three L8 slots of a peak cell as mean pools of their members: no power term is left,
+    /// and each member's linear coefficient is the sum of its pools' `−s/N`. The exact split keeps its power terms.
+    #[test]
+    fn amplitude_split_folds_p_pools_into_the_linear_terms() {
+        use crate::map_paint::SplitMode;
+        let n = 256.0;
+        let stats = crate::metric::ScaleStats {
+            ssim: [0.02, 0.3, 0.0, 0.0, 0.0, 0.0],
+            ssim_2nd: [0.2, 0.0, 0.0],
+            edge: [0.0, 0.25, 0.0, 0.15, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+            edge_2nd: [0.1, 0.05, 0.0, 0.0, 0.0, 0.0],
+            ssim_p95: [0.4, 0.0, 0.0],
+            art_p95: [0.35, 0.0, 0.0],
+            det_p95: [0.3, 0.0, 0.0],
+            ..Default::default()
+        };
+        let g: [f64; 13] = [
+            1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 0.0, 0.0, 0.0, 0.0,
+        ];
+        let form = crate::hf_gain_form::HfGainForm::RatioExcess;
+        let co = |split| SlotCoeffs::from_scale_stats(&g, 0, &stats, 0, n, 0.0, 0.0, form, split);
+        let (exact, amp) = (co(SplitMode::Exact), co(SplitMode::Amplitude));
+        for v in [
+            exact.c_sd4,
+            exact.c_sd2,
+            exact.c_art4,
+            exact.c_art2,
+            exact.c_det4,
+            exact.c_det2,
+        ] {
+            assert!(v != 0.0, "the exact split keeps its power terms");
+        }
+        assert_eq!(
+            [
+                amp.c_sd4, amp.c_sd2, amp.c_art4, amp.c_art2, amp.c_det4, amp.c_det2
+            ],
+            [0.0; 6]
+        );
+        let close = |a: f64, b: f64| (a - b).abs() <= 1e-15 * b.abs();
+        assert!(close(amp.c_sd, -(1.0 + 2.0 + 3.0) / n), "{}", amp.c_sd);
+        assert!(close(amp.c_art, -(4.0 + 5.0 + 6.0) / n), "{}", amp.c_art);
+        assert!(close(amp.c_det, -(7.0 + 8.0 + 9.0) / n), "{}", amp.c_det);
+        assert_eq!(amp.c_mse, exact.c_mse);
+        let mut peaks = [0.0; 6];
+        peaks[3..].copy_from_slice(&[2.0, 3.0, 5.0]);
+        assert!(
+            l8_coefficients(&peaks, 0, 0, &stats, n, SplitMode::Exact)
+                .iter()
+                .all(|v| *v != 0.0)
+        );
+        assert_eq!(
+            l8_coefficients(&peaks, 0, 0, &stats, n, SplitMode::Amplitude),
+            [0.0; 3]
+        );
+        assert_eq!(
+            l8_amplitude_fold(&peaks, 0, 0, n),
+            [-2.0 / n, -3.0 / n, -5.0 / n]
+        );
+    }
     use crate::profile::ProfileParams;
     use crate::{RgbSlice, Zensim, ZensimProfile};
     use std::sync::OnceLock;
@@ -2566,6 +2678,7 @@ mod tests {
                         co,
                         &mut expected_id,
                         &mut expected_win,
+                        false,
                     );
                     fused_combine_l8_f32(
                         sd,
@@ -2577,7 +2690,9 @@ mod tests {
                         &mut expected_id,
                         &mut expected_win,
                     );
-                    combine_basic_and_l8::<true>(sd, src, dst, mu1, mu2, co, l8, &mut id, &mut win);
+                    combine_basic_and_l8::<true>(
+                        sd, src, dst, mu1, mu2, co, l8, &mut id, &mut win, false,
+                    );
                     for (a, b) in id
                         .iter()
                         .chain(&win)
@@ -2671,6 +2786,7 @@ mod tests {
                             8,
                             None,
                             None,
+                            crate::map_paint::MapPaint::default(),
                         )
                         .unwrap();
                         bins.into_result()
@@ -2713,8 +2829,17 @@ mod tests {
                 };
                 let mut sensitivities = [0.0; 156];
                 sensitivities[12] = -2.5;
-                let co =
-                    SlotCoeffs::from_scale_stats(&sensitivities, 0, &stats, 0, n, src, 0.5, form);
+                let co = SlotCoeffs::from_scale_stats(
+                    &sensitivities,
+                    0,
+                    &stats,
+                    0,
+                    n,
+                    src,
+                    0.5,
+                    form,
+                    crate::map_paint::SplitMode::Repair,
+                );
                 let eps = dst * 1e-5;
                 let fd = -2.5
                     * (hf_energy_gain(form, src / n, (dst + eps) / n)
@@ -2754,7 +2879,7 @@ mod tests {
             };
             let mut s = [0.0; 72];
             s[3] = -256.0;
-            let co = l8_coefficients(&s, 0, 0, &stats, 64.0);
+            let co = l8_coefficients(&s, 0, 0, &stats, 64.0, crate::map_paint::SplitMode::Repair);
             let mut id = [0.0; 64];
             let mut win = [0.0; 64];
             fused_combine_l8_f32(
@@ -4432,6 +4557,7 @@ mod tests {
                     co32[c],
                     &mut id_plane[..n],
                     &mut win_plane[..n],
+                    false,
                 );
             }
             crate::blur::box_spread_merge_f32(
@@ -4749,8 +4875,11 @@ pub(crate) fn fused_combine_plane_f32(
     co: [f32; 12],
     id_plane: &mut [f32],
     win_plane: &mut [f32],
+    stable7: bool,
 ) {
-    combine_basic_and_l8::<false>(sd, src, dst, mu1, mu2, co, [0.0; 3], id_plane, win_plane);
+    combine_basic_and_l8::<false>(
+        sd, src, dst, mu1, mu2, co, [0.0; 3], id_plane, win_plane, stable7,
+    );
 }
 
 #[autoversion]
@@ -4765,6 +4894,8 @@ fn combine_basic_and_l8<const L8: bool>(
     l8: [f64; 3],
     id_plane: &mut [f32],
     win_plane: &mut [f32],
+    // Revision 7: the v1 edge ratio as `(x − y)/(1 + y)`.
+    stable7: bool,
 ) {
     let n = id_plane.len();
     let sd = &sd[..n];
@@ -4781,7 +4912,11 @@ fn combine_basic_and_l8<const L8: bool>(
         let m2 = mu2[i];
         let d1 = (sv - m1).abs();
         let d2 = (dv - m2).abs();
-        let ed = (1.0 + d2) / (1.0 + d1) - 1.0;
+        let ed = if stable7 {
+            (d2 - d1) / (1.0 + d1)
+        } else {
+            (1.0 + d2) / (1.0 + d1) - 1.0
+        };
         let art = ed.max(0.0);
         let det = (-ed).max(0.0);
         let sd2 = sdv * sdv;
@@ -4823,7 +4958,16 @@ fn l8_coefficients(
     channel: usize,
     stats: &crate::metric::ScaleStats,
     n: f64,
+    split: crate::map_paint::SplitMode,
 ) -> [f64; 3] {
+    // Removal `−s·x⁸/(8·N·L8⁷)`; the exact share is eight times it. The
+    // amplitude split carries these slots in the linear terms instead
+    // ([`l8_amplitude_fold`]).
+    let share = match split {
+        crate::map_paint::SplitMode::Exact => 1.0,
+        crate::map_paint::SplitMode::Repair => 1.0 / 8.0,
+        crate::map_paint::SplitMode::Amplitude => return [0.0; 3],
+    };
     let roots = [
         stats.ssim_p95[channel],
         stats.art_p95[channel],
@@ -4837,8 +4981,20 @@ fn l8_coefficients(
         if sensitivity == 0.0 || roots[slot] <= 0.0 {
             0.0
         } else {
-            -sensitivity / (8.0 * n * roots[slot].powi(7))
+            -sensitivity * share / (n * roots[slot].powi(7))
         }
+    })
+}
+
+/// `SplitMode::Amplitude`: the three L8 slots of a peak cell as mean pools of
+/// their members (`sd`, `art`, `det`), `−s/N` each, to add to the linear
+/// coefficients of the basic combine (`[sd, art, det]`).
+fn l8_amplitude_fold(s: &[f64], scale: usize, channel: usize, n: f64) -> [f64; 3] {
+    core::array::from_fn(|slot| {
+        -s.get((scale * 3 + channel) * 6 + 3 + slot)
+            .copied()
+            .unwrap_or(0.0)
+            / n
     })
 }
 
@@ -5441,6 +5597,14 @@ impl SlotCoeffs {
     /// the stats do not carry. Matches [`SlotCoeffs::derive`]'s math; the
     /// clamp-side gating for the hf ratio slots reads the stats' CLAMPED
     /// feature values directly (`f10 > 0` ⇔ loss side active, etc.).
+    ///
+    /// `split` ([`crate::map_paint::SplitMode`]): `Repair` keeps the
+    /// removal-consistent `1/p` integrand of the p-pooled slots; `Exact` gives
+    /// each pixel its Euler share `xᵖ·M^((1−p)/p)/N` (p times the removal
+    /// form), so those slots sum to their feature, and splits a nonlinear HF
+    /// gain by the secant, `f·e_i/(Σdst² − Σsrc²)`. Mean and HF-loss slots are
+    /// linear and identical in both.
+    #[allow(clippy::too_many_arguments)]
     fn from_scale_stats(
         s: &[f64],
         base_k: usize,
@@ -5450,12 +5614,20 @@ impl SlotCoeffs {
         hf_sq_src_sum: f64,
         hf_abs_src_sum: f64,
         gain_form: crate::hf_gain_form::HfGainForm,
+        split: crate::map_paint::SplitMode,
     ) -> Self {
+        let exact = split == crate::map_paint::SplitMode::Exact;
+        // `SplitMode::Amplitude`: every p-pool distributed as a mean pool of
+        // its member (folded into the linear coefficients below).
+        let amplitude = split == crate::map_paint::SplitMode::Amplitude;
         let g = |slot: usize| s.get(base_k + slot).copied().unwrap_or(0.0);
         let inv_n = 1.0 / n_f;
         let p_coeff = |sk: f64, m: f64, p: f64| -> f64 {
-            if m > 0.0 {
-                -sk * inv_n * (1.0 / p) * m.powf((1.0 - p) / p)
+            if amplitude {
+                0.0
+            } else if m > 0.0 {
+                let share = if exact { 1.0 } else { 1.0 / p };
+                -sk * inv_n * share * m.powf((1.0 - p) / p)
             } else {
                 0.0
             }
@@ -5471,8 +5643,11 @@ impl SlotCoeffs {
                 -g(10) / hf_sq_src_sum
             } else if stats.hf_energy_gain[c] > 0.0 {
                 if gain_form == crate::hf_gain_form::HfGainForm::RatioExcess {
-                    // Preserve the established revision-1 spelling bit for bit.
+                    // Preserve the established revision-1 spelling bit for bit
+                    // (this gain is linear in Σdst², so both splits agree).
                     g(12) / hf_sq_src_sum
+                } else if exact || amplitude {
+                    g(12) * stats.hf_energy_gain[c] / (stats.hf_sq_dst_sum[c] - hf_sq_src_sum)
                 } else {
                     g(12)
                         * crate::hf_gain_form::hf_energy_gain_d_sum_dst_sq(
@@ -5493,14 +5668,15 @@ impl SlotCoeffs {
         } else {
             0.0
         };
+        let fold = |a: usize, b: usize| if amplitude { g(a) + g(b) } else { 0.0 };
         Self {
-            c_sd: -g(0) * inv_n,
+            c_sd: -(g(0) + fold(1, 2)) * inv_n,
             c_sd4: p_coeff(g(1), m4_ssim, 4.0),
             c_sd2: p_coeff(g(2), m2_ssim, 2.0),
-            c_art: -g(3) * inv_n,
+            c_art: -(g(3) + fold(4, 5)) * inv_n,
             c_art4: p_coeff(g(4), m4_art, 4.0),
             c_art2: p_coeff(g(5), m2_art, 2.0),
-            c_det: -g(6) * inv_n,
+            c_det: -(g(6) + fold(7, 8)) * inv_n,
             c_det4: p_coeff(g(7), m4_det, 4.0),
             c_det2: p_coeff(g(8), m2_det, 2.0),
             c_mse: -g(9) * inv_n,
@@ -6154,10 +6330,15 @@ pub(crate) fn candidate_map_sensitivities(
         }
         let v1_pool_missing = (BLOCK_END_BASIC..BLOCK_END_V1_POOLS).contains(&id)
             && !(id < BLOCK_END_V1_PEAKS && (id - BLOCK_END_BASIC) % 6 >= 3);
-        let missing = v1_pool_missing
-            || id >= BLOCK_END_APPEND2
-            || (toggles.v1_only && id >= BLOCK_END_V1_POOLS)
-            || (toggles.append2_dst_activity && append2_slot.is_some());
+        // The globaff family has its own map term (`crate::globaff::map_planes`).
+        let globaff = toggles.globaff
+            && (crate::globaff::FIRST_ID..crate::globaff::FIRST_ID + crate::globaff::SLOTS)
+                .contains(&id);
+        let missing = !globaff
+            && (v1_pool_missing
+                || id >= BLOCK_END_APPEND2
+                || (toggles.v1_only && id >= BLOCK_END_V1_POOLS)
+                || (toggles.append2_dst_activity && append2_slot.is_some()));
         if missing {
             unsupported.push(id);
             *value = 0.0;
@@ -6354,6 +6535,7 @@ impl crate::metric::Zensim {
             1,
             None,
             None,
+            crate::map_paint::MapPaint::default(),
         )
     }
 
@@ -6371,6 +6553,7 @@ impl crate::metric::Zensim {
         moment_bin: usize,
         retained: Option<BasicMapRetention<'_>>,
         map_scratch: Option<&mut BasicMapScratch>,
+        paint: crate::map_paint::MapPaint,
     ) -> Result<(crate::metric::ZensimResult, f64, f64), ZensimError> {
         const FPC: usize = FEATURES_PER_CHANNEL_BASIC;
         let params = self.profile().params();
@@ -6443,6 +6626,10 @@ impl crate::metric::Zensim {
             win_plane.resize(comp_pw * comp_h, 0.0);
         }
 
+        // Source-resolution difference guide for research guided painting,
+        // filled at scale 0 (`crate::map_paint`).
+        let mut guide0_cell: Option<Vec<f64>> = None;
+        let guide0 = &mut guide0_cell;
         let mut on_scale = |scale: usize,
                             stats: &crate::metric::ScaleStats,
                             src_planes: [&[f32]; 3],
@@ -6485,7 +6672,7 @@ impl crate::metric::Zensim {
             });
             let co32: [[f32; 12]; 3] = core::array::from_fn(|c| {
                 let base_k = scale * FPC * 3 + c * FPC;
-                coeffs_to_f32(&SlotCoeffs::from_scale_stats(
+                let mut co = SlotCoeffs::from_scale_stats(
                     s,
                     base_k,
                     stats,
@@ -6494,10 +6681,19 @@ impl crate::metric::Zensim {
                     hf[c].0,
                     hf[c].1,
                     crate::hf_gain_form::HfGainForm::at_revision(config.formula_revision),
-                ))
+                    paint.split,
+                );
+                if paint.split == crate::map_paint::SplitMode::Amplitude {
+                    let [sd, art, det] = l8_amplitude_fold(s_peaks, scale, c, n_f);
+                    co.c_sd += sd;
+                    co.c_art += art;
+                    co.c_det += det;
+                }
+                coeffs_to_f32(&co)
             });
-            let l8_co: [[f64; 3]; 3] =
-                core::array::from_fn(|c| l8_coefficients(s_peaks, scale, c, stats, n_f));
+            let l8_co: [[f64; 3]; 3] = core::array::from_fn(|c| {
+                l8_coefficients(s_peaks, scale, c, stats, n_f, paint.split)
+            });
             // task #70: prime the stale session — THIS compare's coefficient
             // packs become the NEXT stale call's fold input; the hf sums are
             // reference-side constants cached once here.
@@ -6506,6 +6702,7 @@ impl crate::metric::Zensim {
                 sess.hf_src.push(hf);
             }
             // Row-banded parallel combine (disjoint id/win rows per band).
+            let stable7 = config.revision().stable_forms();
             let run_band = |band: usize, idc: &mut [f32], winc: &mut [f32]| {
                 let off = band * 64 * sw;
                 let len = idc.len();
@@ -6528,6 +6725,7 @@ impl crate::metric::Zensim {
                         l8_co[c],
                         idc,
                         winc,
+                        stable7,
                     );
                 }
             };
@@ -6604,21 +6802,48 @@ impl crate::metric::Zensim {
                     }
                 }
                 AttrSinkF32::Bins(accum) => {
-                    crate::blur::box_spread_merge_f32(
+                    // The research window/paint modes (`crate::map_paint`);
+                    // the defaults are the uniform spread and fold above.
+                    let (window_mode, paint_mode) = (paint.window, paint.paint);
+                    crate::map_paint::merge_window(
+                        window_mode,
                         &mut win_plane[..n],
                         &mut id_plane[..n],
                         sw,
                         sh,
                         config.blur_radius,
+                        || {
+                            crate::map_paint::difference_guide(
+                                src_planes,
+                                dst_planes,
+                                n,
+                                paint.guide,
+                            )
+                        },
                         spread_tmp,
                         spread_out,
                         config.allow_multithreading && n >= crate::blur::SPREAD_PARALLEL_MIN_N,
                     );
+                    if scale == 0 && paint_mode == crate::map_paint::PaintMode::Guided {
+                        *guide0 = Some(crate::map_paint::difference_guide(
+                            src_planes,
+                            dst_planes,
+                            n,
+                            paint.guide,
+                        ));
+                    }
                     if let Some(geometry) = &precomputed.sampling_geometry {
                         let projected = geometry.project(&id_plane[..n], scale);
                         accum.add_scale_plane_f32(&projected, width, height, 1);
                     } else {
-                        accum.add_scale_plane_f32(&id_plane[..n], sw, sh, 1usize << scale);
+                        accum.add_scale_plane_painted_f32(
+                            &id_plane[..n],
+                            sw,
+                            sh,
+                            scale,
+                            paint_mode,
+                            guide0.as_deref(),
+                        );
                     }
                 }
             }
@@ -6974,6 +7199,8 @@ impl crate::metric::Zensim {
                     hf[c].0,
                     hf[c].1,
                     crate::hf_gain_form::HfGainForm::at_revision(config.formula_revision),
+                    // The stale route has no paint modes.
+                    crate::map_paint::SplitMode::Repair,
                 ))
             }));
             tail_ms.set(tail_ms.get() + t_c.elapsed().as_secs_f64() * 1e3);
@@ -7267,6 +7494,7 @@ impl crate::metric::Zensim {
             session,
             bin,
             None,
+            crate::map_paint::MapPaint::default(),
         )?;
         Ok((result, v2res, attribution))
     }
@@ -7285,6 +7513,7 @@ impl crate::metric::Zensim {
         session: &mut Fused944Session,
         bin: usize,
         revision: Option<crate::feature_defs::FormulaRevision>,
+        paint: crate::map_paint::MapPaint,
     ) -> Result<(crate::ZensimResult, AttributionResult), ZensimError> {
         let width = distorted.width();
         let height = distorted.height();
@@ -7318,6 +7547,7 @@ impl crate::metric::Zensim {
                     .map(|_| BasicMapRetention::Basic(&session.basic))
             },
             Some(&mut session.basic_map),
+            paint,
         )?;
         let block = |start: usize, end: usize| -> Option<&[f64]> {
             (s.len() > start).then(|| &s[start..s.len().min(end)])
@@ -7335,7 +7565,48 @@ impl crate::metric::Zensim {
                 &mut session.pass_b,
                 &mut accum,
                 precomputed.sampling_geometry.as_ref(),
+                paint,
             );
+        }
+        // The globaff family (revision 6), over the pyramid planes its walk read.
+        let first = crate::globaff::FIRST_ID;
+        let s_globaff =
+            block(first, first + crate::globaff::SLOTS).filter(|g| g.iter().any(|v| *v != 0.0));
+        if let Some(s_globaff) = s_globaff {
+            let rev = revision.unwrap_or_else(crate::ssim_form::active_revision);
+            let dst = PrecomputedReference::new(
+                distorted,
+                precomputed.scales.len(),
+                self.parallel(),
+                rev,
+            );
+            let planes = crate::globaff::map_planes(precomputed, &dst, s_globaff, paint.split);
+            let geometry = precomputed.sampling_geometry.as_ref();
+            let guide0 = (paint.paint == crate::map_paint::PaintMode::Guided && geometry.is_none())
+                .then(|| {
+                    let (sp, w, h) = precomputed.scale(0);
+                    let (dp, _, _) = dst.scale(0);
+                    crate::map_paint::difference_guide(sp, dp, w * h, paint.guide)
+                });
+            for (scale, plane, w, h) in planes {
+                if let Some(geometry) = geometry {
+                    let projected = geometry.project(&plane, scale);
+                    let (lw, lh) = geometry.logical_dimensions();
+                    accum.add_scale_plane_f32(&projected, lw, lh, 1);
+                } else {
+                    accum.add_scale_plane_painted_f32(
+                        &plane,
+                        w,
+                        h,
+                        scale,
+                        paint.paint,
+                        guide0.as_deref(),
+                    );
+                }
+            }
+        }
+        if paint.smooth_milli > 0 && precomputed.sampling_geometry.is_none() {
+            accum.smooth_per_pixel(f64::from(paint.smooth_milli) / 1000.0);
         }
         Ok((result, accum.into_result_reusing(&mut session.bin_scratch)))
     }

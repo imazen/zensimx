@@ -8,7 +8,11 @@
 //! metadata section in via `zenpredict_bake::append_metadata_utf8`, which
 //! leaves the weight sections byte-identical (no requantization).
 //!
-//! Usage: bake_stamp_revision <in.bin> <1|2|3|4|5> <out.bin>
+//! Usage: bake_stamp_revision <in.bin> <1|2|3|4|5|6|7> <out.bin>
+//!
+//! Revision 6 (`ringhpm` + `globaff`) is the arithmetic a bake trained on the
+//! by-construction `ringhpm` roots was extracted with; stamping declares it so
+//! the bake serves without `ZENSIM_RING_FORM`.
 
 fn main() {
     let mut args = std::env::args();
@@ -16,12 +20,12 @@ fn main() {
     let (src, rev, dst) = match (args.next(), args.next(), args.next(), args.next()) {
         (Some(s), Some(r), Some(d), None) => (s, r, d),
         _ => {
-            eprintln!("usage: {bin} <in.bin> <revision 1|2|3|4|5> <out.bin>");
+            eprintln!("usage: {bin} <in.bin> <revision 1|2|3|4|5|6|7> <out.bin>");
             std::process::exit(2);
         }
     };
-    if !matches!(rev.as_str(), "1" | "2" | "3" | "4" | "5") {
-        eprintln!("revision must be one of 1, 2, 3, 4, 5");
+    if !matches!(rev.as_str(), "1" | "2" | "3" | "4" | "5" | "6" | "7") {
+        eprintln!("revision must be one of 1, 2, 3, 4, 5, 6, 7");
         std::process::exit(2);
     }
     let bytes = std::fs::read(&src).unwrap_or_else(|e| panic!("read {src}: {e}"));

@@ -22,6 +22,61 @@ pub fn validate_training_capabilities(
             "smooth hinge requires plain one-layer N, uniform/minibatch1, no transforms, pooled objectives or K penalty"
         );
     }
+    if hyperparams.nonneg_thresholds {
+        assert!(
+            hyperparams.nonneg_distance
+                && hyperparams.n_hidden_layers == 1
+                && !hyperparams.smooth_hinge
+                && hyperparams.steer_pairs.is_none()
+                && !hyperparams.pool_head
+                && !hyperparams.hybrid_head
+                && !hyperparams.per_sample_alpha_head,
+            "--nonneg-thresholds requires plain one-layer N without smooth hinge, heads or the K penalty"
+        );
+    }
+    if hyperparams.max_pairs > 0 {
+        // A feature mask is allowed: sign-free inputs enter only a pair's v row (see `project_plain`).
+        assert!(
+            hyperparams.nonneg_thresholds
+                && hyperparams.monotone_cbc
+                && hyperparams.monotone_product_pairs.is_empty()
+                && 2 * (hyperparams.max_pairs
+                    + hyperparams.monotone_ramps
+                    + hyperparams.free_ramps)
+                    <= hyperparams.n_hidden,
+            "--max-pairs requires --nonneg-thresholds, --monotone-cbc, no gated products, and room in --hidden"
+        );
+    }
+    if !hyperparams.monotone_product_pairs.is_empty() {
+        assert!(
+            hyperparams.nonneg_distance
+                && hyperparams.monotone_cbc
+                && hyperparams.monotone_feature_pin.is_none(),
+            "--monotone-gated-products requires --nonneg-distance and --monotone-cbc on every input"
+        );
+    }
+    if hyperparams.free_ramps > 0 {
+        assert!(
+            hyperparams.nonneg_thresholds
+                && hyperparams.monotone_cbc
+                && hyperparams.monotone_feature_pin.is_none()
+                && hyperparams.free_budget.is_finite()
+                && hyperparams.free_budget >= 0.0
+                && 2 * (hyperparams.monotone_ramps + hyperparams.free_ramps)
+                    <= hyperparams.n_hidden,
+            "--free-ramps requires --nonneg-thresholds, --monotone-cbc on every input, a finite \
+             --free-budget >= 0 and 2*(ramps + free ramps) <= hidden"
+        );
+    }
+    if hyperparams.monotone_ramps > 0 {
+        assert!(
+            hyperparams.nonneg_thresholds
+                && hyperparams.monotone_cbc
+                && hyperparams.monotone_feature_pin.is_none()
+                && 2 * hyperparams.monotone_ramps <= hyperparams.n_hidden,
+            "--monotone-ramps requires --nonneg-thresholds, --monotone-cbc on every input and 2*ramps <= hidden"
+        );
+    }
     assert!(
         hyperparams.steer_lambda.is_finite() && hyperparams.steer_lambda >= 0.0,
         "--steer-lambda must be finite and nonnegative"

@@ -1,0 +1,6 @@
+# A=/home/lilith/tmp/byc/perf/final/byc_score_timing sha256=ad4328f044d0d016
+# B=/home/lilith/tmp/byc/perf/d7/byc_score_timing sha256=4fd58f398b5104e2
+# A bakes: /home/lilith/tmp/byc/perf/b_rev7.bin /home/lilith/tmp/byc/parity/tga_full_rev6.bin; B bakes: /home/lilith/tmp/byc/perf/b_rev7.bin /home/lilith/tmp/byc/parity/tga_full_rev6.bin
+# host=dev date=2026-10-24T12:44:16Z rounds=8 load=2.36 5.55 4.68
+# cases: /mnt/v/output/zensim/byconstruction-2026-10-22/perf/cases/cases_focus.tsv
+# raw rounds: /mnt/v/output/zensim/byconstruction-2026-10-22/perf/2026-10-24/rev7_bad544a3_vs_b6a7e510/*.jsonl on dev (SHA256SUMS beside them); revision-7 stamp of B; B arm = the b6a7e510 build (5e706fc9 sources; the fix touched tests only)

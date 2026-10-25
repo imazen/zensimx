@@ -55,8 +55,8 @@ mod restore_cuts;
 
 use archmage::incant;
 use archmage::magetypes;
-use magetypes::simd::backends::F32x8Backend;
-use magetypes::simd::generic::f32x8 as GenericF32x8;
+use magetypes::simd::backends::{F32x8Backend, F32x16Backend};
+use magetypes::simd::generic::{f32x8 as GenericF32x8, f32x16 as GenericF32x16};
 
 // ============================================================================
 // Layout constants
@@ -207,6 +207,204 @@ pub const C_RING_EDGE: f64 = 0.02;
 /// the ringing product (keeps ringing bounded regardless of input dynamic
 /// range, same D6-style rationale as `C_ACTIVITY`).
 pub const C_RING_ERR: f64 = 0.05;
+
+/// Which per-pixel error the ringing family measures.
+///
+/// A measurement arm selected per process by `ZENSIM_RING_FORM`, modelled on
+/// `ZENSIM_HF_GAIN` ([`crate::hf_gain_form::active_gain_form`]): no shipping
+/// path sets it, and every stored table and bake is [`Self::Raw`].
+///
+/// imazen/zensim#72 (`benchmarks/byconstruction_2026-10-22.md`): [`Self::Raw`]
+/// saturates `|src − dst|`, which a global offset, contrast or saturation
+/// change makes uniformly large off edges. Measured on 24 references, a
+/// +8 luma shift was ringing's largest response, 2.4× a visible σ1.2 blur.
+/// [`Self::HighPassMu`] measures the error after removing each image's SSIM
+/// local mean (`mu1`, `mu2`, already computed for the dense kernel), so a
+/// constant offset or a linear ramp contributes nothing away from the image
+/// border, while noise and oscillation next to edges still do.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub(crate) enum RingForm {
+    /// `sat(|e|, C_RING_ERR) · sat(act, C_ACTIVITY) · (1 − sat(|∇src|, C_RING_EDGE))`,
+    /// `e = src − dst`. The shipped form.
+    #[default]
+    Raw,
+    /// The same product with `e = (src − mu1) − (dst − mu2)`.
+    HighPassMu,
+}
+
+impl RingForm {
+    /// The `ZENSIM_RING_FORM` spelling. Both values have the same byte length
+    /// on purpose (see [`crate::ssim_form::active_revision`]).
+    pub(crate) const fn as_str(self) -> &'static str {
+        match self {
+            Self::Raw => "raw",
+            Self::HighPassMu => "hpm",
+        }
+    }
+}
+
+/// **The ring form for this process**, read once.
+///
+/// `ZENSIM_RING_FORM=hpm` selects [`RingForm::HighPassMu`]; unset or `raw`
+/// keeps [`RingForm::Raw`]. Any other value panics, so a typo can never
+/// measure the wrong arm silently.
+pub(crate) fn active_ring_form() -> RingForm {
+    use std::sync::OnceLock;
+    static FORM: OnceLock<RingForm> = OnceLock::new();
+    *FORM.get_or_init(|| match std::env::var("ZENSIM_RING_FORM").as_deref() {
+        Err(_) | Ok("raw") => RingForm::Raw,
+        Ok("hpm") => RingForm::HighPassMu,
+        Ok(other) => panic!("ZENSIM_RING_FORM={other:?}: expected \"raw\" or \"hpm\""),
+    })
+}
+
+/// The ringing form of the process-revision legacy paths (the diffmap and the
+/// caller-gradient attribution passes, which read
+/// [`crate::ssim_form::active_revision`] rather than a request's revision):
+/// high-pass under `ZENSIM_RING_FORM=hpm` or in a revision-6 process.
+pub(crate) fn process_ring_high_pass() -> bool {
+    active_ring_form() == RingForm::HighPassMu
+        || crate::ssim_form::active_revision().ring_high_pass()
+}
+
+#[cfg(test)]
+mod ring_form_tests {
+    use super::*;
+
+    /// Deterministic xorshift values in `[lo, hi)`.
+    struct Draw(u64);
+    impl Draw {
+        fn next(&mut self, lo: f64, hi: f64) -> f32 {
+            self.0 ^= self.0 << 13;
+            self.0 ^= self.0 >> 7;
+            self.0 ^= self.0 << 17;
+            (lo + (hi - lo) * ((self.0 >> 11) as f64 / (1u64 << 53) as f64)) as f32
+        }
+    }
+
+    /// 3×3 box mean with clamped borders: a stand-in local mean. The kernel
+    /// takes whatever `mu` planes the walk supplies; these tests only need
+    /// `mu(dst) = mu(src) + k` for `dst = src + k`.
+    fn box3(p: &[f32], w: usize, h: usize) -> Vec<f32> {
+        let mut out = vec![0.0; w * h];
+        for y in 0..h {
+            for x in 0..w {
+                let mut s = 0.0f32;
+                for dy in [-1i64, 0, 1] {
+                    for dx in [-1i64, 0, 1] {
+                        let yy = (y as i64 + dy).clamp(0, h as i64 - 1) as usize;
+                        let xx = (x as i64 + dx).clamp(0, w as i64 - 1) as usize;
+                        s += p[yy * w + xx];
+                    }
+                }
+                out[y * w + x] = s / 9.0;
+            }
+        }
+        out
+    }
+
+    /// `(src_h, dst_h, act, mu1, mu2)`.
+    type Planes = (Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>);
+
+    /// `(src_h, dst_h, act, mu1, mu2)` for a `w×h` interior with one halo row
+    /// above and below, `dst = f(src)`.
+    fn planes(w: usize, h: usize, seed: u64, f: impl Fn(f32, &mut Draw) -> f32) -> Planes {
+        let mut r = Draw(seed);
+        let src_h: Vec<f32> = (0..(h + 2) * w).map(|_| r.next(0.2, 0.8)).collect();
+        let dst_h: Vec<f32> = src_h.iter().map(|&v| f(v, &mut r)).collect();
+        let act: Vec<f32> = (0..w * h).map(|_| r.next(0.0, 0.5)).collect();
+        let mu1 = box3(&src_h[w..w + w * h], w, h);
+        let mu2 = box3(&dst_h[w..w + w * h], w, h);
+        (src_h, dst_h, act, mu1, mu2)
+    }
+
+    fn run(hp: bool, p: &Planes, w: usize, h: usize) -> GradientAccum {
+        let (src_h, dst_h, act, mu1, mu2) = p;
+        let m = crate::featcanon::Mode::Canon64;
+        if hp {
+            gradient_block_kernel_canon::<
+                crate::featcanon::Lanes16F64,
+                false,
+                false,
+                false,
+                true,
+                false,
+            >(src_h, dst_h, act, &[], mu1, mu2, w, h, 0.0, 0.0, None, m)
+        } else {
+            gradient_block_kernel_canon::<
+                crate::featcanon::Lanes16F64,
+                false,
+                false,
+                false,
+                false,
+                false,
+            >(src_h, dst_h, act, &[], mu1, mu2, w, h, 0.0, 0.0, None, m)
+        }
+    }
+
+    #[test]
+    fn a_global_offset_does_not_register_under_hpm_and_only_ringing_moves() {
+        let (w, h) = (37usize, 11usize);
+        let p = planes(w, h, 0x5249_4e47_4850_3403, |v, _| v + 0.03);
+        let (raw, hp) = (run(false, &p, w, h), run(true, &p, w, h));
+        assert!(raw.sum_ringing > 1.0, "{}", raw.sum_ringing);
+        assert!(
+            hp.sum_ringing < 1e-4 * raw.sum_ringing,
+            "{} vs {}",
+            hp.sum_ringing,
+            raw.sum_ringing
+        );
+        for (a, b) in [
+            (raw.sum_gms, hp.sum_gms),
+            (raw.sum_gms2, hp.sum_gms2),
+            (raw.sum_banding, hp.sum_banding),
+            (raw.sum_grad_src, hp.sum_grad_src),
+            (raw.sum_grad_dst, hp.sum_grad_dst),
+        ] {
+            assert_eq!(a.to_bits(), b.to_bits());
+        }
+    }
+
+    #[test]
+    fn noise_still_registers_under_hpm() {
+        let (w, h) = (37usize, 11usize);
+        let p = planes(w, h, 0x5249_4e47_4850_3404, |v, r| v + r.next(-0.05, 0.05));
+        let (raw, hp) = (run(false, &p, w, h), run(true, &p, w, h));
+        assert!(
+            hp.sum_ringing > 0.3 * raw.sum_ringing,
+            "{} vs {}",
+            hp.sum_ringing,
+            raw.sum_ringing
+        );
+    }
+
+    #[test]
+    fn hpm_matches_an_independent_per_pixel_sum() {
+        // Every pixel's term recomputed here in f64 from the definition; the
+        // kernel's f32 terms pooled in f64 must agree to f32 precision.
+        let (w, h) = (29usize, 7usize);
+        let p = planes(w, h, 0x5249_4e47_4850_3405, |v, r| v + r.next(-0.08, 0.08));
+        let (src_h, dst_h, act, mu1, mu2) = &p;
+        let mut want = 0.0f64;
+        for y in 0..h {
+            for x in 0..w {
+                let at = |pl: &[f32], yy: usize, xx: usize| pl[yy * w + xx] as f64;
+                let (xl, xr) = (x.saturating_sub(1), (x + 1).min(w - 1));
+                let gx = at(src_h, y + 1, xr) - at(src_h, y + 1, xl);
+                let gy = at(src_h, y + 2, x) - at(src_h, y, x);
+                let g = (gx * gx + gy * gy).sqrt();
+                let i = y * w + x;
+                let e =
+                    (at(src_h, y + 1, x) - mu1[i] as f64) - (at(dst_h, y + 1, x) - mu2[i] as f64);
+                want += saturate(e.abs(), C_RING_ERR)
+                    * saturate(act[i] as f64, C_ACTIVITY)
+                    * (1.0 - saturate(g, C_RING_EDGE));
+            }
+        }
+        let got = run(true, &p, w, h).sum_ringing;
+        assert!((got - want).abs() <= 1e-5 * want, "{got} vs {want}");
+    }
+}
 /// Saturating half-point for "distorted now has a noticeable edge here"
 /// in the banding approximation.
 pub const C_BAND_DST: f64 = 0.01;
@@ -1711,14 +1909,17 @@ pub(crate) fn gather_strip_halo(
 /// `(d(b-a) + a·err_var) / (b·d)`: still one division, and the same
 /// bounded-error contract as the v1 signal (`ssim_form::SsimSplats16::direct`).
 #[inline]
-fn ssim_d_local(mu1: f64, mu2: f64, s12: f64, ssq: f64, direct: bool) -> f64 {
+fn ssim_d_local(mu1: f64, mu2: f64, s12: f64, ssq: f64, direct: bool, stable: bool) -> f64 {
     let a = 2.0 * mu1 * mu2 + C1_V2;
     let b = mu1 * mu1 + mu2 * mu2 + C1_V2;
     let d = ssq - mu1 * mu1 - mu2 * mu2 + C2_V2;
     if direct {
         let mu_diff = mu1 - mu2;
         let err_var = (s12 - mu_diff * mu_diff).max(0.0);
-        ((d * (b - a) + a * err_var) / (b * d)).max(0.0)
+        // Revision 7: `(m1 − m2)²`, the exact value of `b − a`, which
+        // cancels when the means are close (the old form keeps its bits).
+        let lum = if stable { mu_diff * mu_diff } else { b - a };
+        ((d * lum + a * err_var) / (b * d)).max(0.0)
     } else {
         let cov = s12 - mu1 * mu2;
         let c = 2.0 * cov + C2_V2;
@@ -1732,6 +1933,32 @@ fn ssim_d_local(mu1: f64, mu2: f64, s12: f64, ssq: f64, direct: bool) -> f64 {
 #[inline]
 pub(crate) fn bounded_sim(a: f64, b: f64, c: f64) -> f64 {
     (2.0 * a * b + c) / (a * a + b * b + c)
+}
+
+/// `1 − bounded_sim(a, b, c)`, the bounded dissimilarity `(a−b)²/(a²+b²+c)`.
+/// Formed as `1 − ratio` it cancels when `a ≈ b` (the ratio rounds near 1);
+/// with `stable` (revision 7, [`FormulaRevision::stable_forms`]) it forms the
+/// exact quotient instead.
+#[inline]
+pub(crate) fn bounded_dissim(a: f64, b: f64, c: f64, stable: bool) -> f64 {
+    if stable {
+        let d = a - b;
+        d * d / (a * a + b * b + c)
+    } else {
+        1.0 - bounded_sim(a, b, c)
+    }
+}
+
+/// [`bounded_dissim`] in f32, op for op `1 − (2ab + c)/(a² + b² + c)`, or the
+/// exact quotient with `stable`.
+#[inline(always)]
+pub(crate) fn bounded_dissim32(a: f32, b: f32, c: f32, stable: bool) -> f32 {
+    if stable {
+        let d = a - b;
+        d * d / (a * a + b * b + c)
+    } else {
+        1.0 - (2.0 * a * b + c) / (a * a + b * b + c)
+    }
 }
 
 /// Bounded, SIGNED normalized-difference form: `max(0, a-b) / (a+b+c)`.
@@ -2536,6 +2763,8 @@ enum BandPoolWork {
 thread_local! {
     // Observe actual weighted-pool execution, not planner declarations.
     static POOL_TEST_WIDTHS: std::cell::RefCell<Option<Vec<usize>>> = const { std::cell::RefCell::new(None) };
+    // Scales whose strips the streaming walk skipped (declared plans reading nothing there).
+    static SKIPPED_SCALES: std::cell::RefCell<u8> = const { std::cell::RefCell::new(0) };
 }
 
 /// Band-local planes for the v1 pool replay (`V2NewFeatureToggles::v1_pools`):
@@ -3850,6 +4079,8 @@ pub(crate) fn compute_v2_diffmap_channel_scale(
     // the v2 SSIM signal must read it as such. Hoisted once per call;
     // loop-invariant, so every call site below unswitches on it.
     let direct = crate::ssim_form::active_revision() >= crate::feature_defs::FormulaRevision::Rev3;
+    let stable = crate::ssim_form::active_revision().stable_forms();
+    let ring_hp = process_ring_high_pass();
     let n = width * height;
     assert_eq!(src.len(), n, "src plane length must be width*height");
     assert_eq!(dst.len(), n, "dst plane length must be width*height");
@@ -3970,12 +4201,13 @@ pub(crate) fn compute_v2_diffmap_channel_scale(
                     s12_strip[i_local] as f64,
                     ssq_strip[i_local] as f64,
                     direct,
+                    stable,
                 );
                 acc += weights[idx::SSIM_MEAN] * d;
 
                 let diff_src = (s - m1).abs();
                 let diff_dst = (dd - m2).abs();
-                let edge_dissim = 1.0 - bounded_sim(diff_src, diff_dst, C_EDGE);
+                let edge_dissim = bounded_dissim(diff_src, diff_dst, C_EDGE, stable);
                 if diff_dst > diff_src {
                     acc += weights[idx::ART] * edge_dissim;
                 } else if diff_dst < diff_src {
@@ -4057,9 +4289,15 @@ pub(crate) fn compute_v2_diffmap_channel_scale(
                 let gy_dst = dyd - dyu;
                 let grad_dst_mag = (gx_dst * gx_dst + gy_dst * gy_dst).sqrt();
 
-                acc += weights[idx::GMS] * (1.0 - bounded_sim(grad_src_mag, grad_dst_mag, C_GMS));
+                acc +=
+                    weights[idx::GMS] * (bounded_dissim(grad_src_mag, grad_dst_mag, C_GMS, stable));
 
-                let err_b = saturate(raw_abs_err, C_RING_ERR);
+                let ring_err = if ring_hp {
+                    ((s - m1) - (dd - m2)).abs()
+                } else {
+                    raw_abs_err
+                };
+                let err_b = saturate(ring_err, C_RING_ERR);
                 let act_b = saturate(act, C_ACTIVITY);
                 let edge_r = saturate(grad_src_mag, C_RING_EDGE);
                 acc += weights[idx::RINGING] * (err_b * act_b * (1.0 - edge_r));
@@ -4316,6 +4554,10 @@ fn build_v2_ref_scales(
     img: &impl ImageSource,
     parallel: bool,
 ) -> Vec<([Vec<f32>; 3], usize, usize)> {
+    assert!(
+        !crate::feature_v2_stream::linear_pyramid(),
+        "ZENSIM_PYRAMID=linear covers only the streaming and block producers"
+    );
     let mut width = img.width();
     let mut height = img.height();
     let mut scales: Vec<([Vec<f32>; 3], usize, usize)> = Vec::with_capacity(crate::NUM_SCALES);
@@ -4693,14 +4935,8 @@ impl Rev5StripJob {
         }
     }
 
-    fn gather<S: ImageSource, D: ImageSource>(
-        &mut self,
-        producer: &crate::feature_v2_stream::StripPlaneProducer<'_, S, D>,
-        info: crate::feature_v2_stream::StripInfo,
-        ch: usize,
-        borrow_source: bool,
-    ) {
-        use crate::feature_v2_stream::Side;
+    /// Take the strip and size the scratch for its window.
+    fn prepare(&mut self, info: crate::feature_v2_stream::StripInfo, ch: usize) {
         self.info = info;
         self.ch = ch;
         let n = info.plane_w * info.wide_h();
@@ -4712,6 +4948,18 @@ impl Rev5StripJob {
             self.scratch = rev5_job_scratch(n);
             self.sized_for = n;
         }
+    }
+
+    fn gather<S: ImageSource, D: ImageSource>(
+        &mut self,
+        producer: &crate::feature_v2_stream::StripPlaneProducer<'_, S, D>,
+        info: crate::feature_v2_stream::StripInfo,
+        ch: usize,
+        borrow_source: bool,
+    ) {
+        use crate::feature_v2_stream::Side;
+        self.prepare(info, ch);
+        let n = info.plane_w * info.wide_h();
         for (side, out) in [
             (Side::Source, &mut self.scratch.src_wide),
             (Side::Distorted, &mut self.scratch.dst_wide),
@@ -4789,48 +5037,768 @@ fn rev5_job_blur(
     } = scratch;
     let src = source.unwrap_or(&src_wide[..n]);
     let start = crate::fold_timing::start();
-    fused_blur_h_ssim_banded(
-        src,
-        &dst_wide[..n],
-        &mut mu1_h[..n],
-        &mut mu2_h[..n],
-        &mut ssq_h[..n],
-        &mut s12_h[..n],
-        info.plane_w,
-        info.wide_h(),
-        false,
-        revision,
-    );
+    // The moments in one pass where both blurs run their per-output trees:
+    // the horizontal planes then live a column panel at a time in the first
+    // rows of `mu1_h`..`s12_h` instead of filling them. Only pools of eight or
+    // more threads take it, where the jobs' planes contend for the cache
+    // (paired, B at revision 7, 1507×2048 / 1024²: eight threads −3.6% /
+    // +0.1%, sixteen on eight cores −22.0% / −16.4%, 32 −10.8% / −3.1%); four
+    // threads ran +2.4% / −3.0% and one thread 1–2% slower on the panels'
+    // shorter row runs, so smaller pools and the serial walk keep two passes.
+    let fused = rayon::current_num_threads() >= 8
+        && crate::blur::fused_blur_hv_ssim_at_revision(
+            src,
+            &dst_wide[..n],
+            &mut mu1[..n],
+            &mut mu2[..n],
+            &mut ssq[..n],
+            &mut s12[..n],
+            info.plane_w,
+            info.wide_h(),
+            BLUR_RADIUS,
+            revision,
+            [
+                &mut mu1_h[..n],
+                &mut mu2_h[..n],
+                &mut ssq_h[..n],
+                &mut s12_h[..n],
+            ],
+        );
+    if !fused {
+        fused_blur_h_ssim_banded(
+            src,
+            &dst_wide[..n],
+            &mut mu1_h[..n],
+            &mut mu2_h[..n],
+            &mut ssq_h[..n],
+            &mut s12_h[..n],
+            info.plane_w,
+            info.wide_h(),
+            false,
+            revision,
+        );
+    }
     crate::fold_timing::stop(start, crate::fold_timing::Phase::BlurHWall, info.scale);
     let start = crate::fold_timing::start();
-    for (horizontal, vertical) in [
-        (&mu1_h[..n], &mut mu1[..n]),
-        (&mu2_h[..n], &mut mu2[..n]),
-        (&ssq_h[..n], &mut ssq[..n]),
-        (&s12_h[..n], &mut s12[..n]),
-    ] {
-        crate::blur::box_blur_v_from_copy_at_revision(
-            horizontal,
-            vertical,
+    if !fused {
+        for (horizontal, vertical) in [
+            (&mu1_h[..n], &mut mu1[..n]),
+            (&mu2_h[..n], &mut mu2[..n]),
+            (&ssq_h[..n], &mut ssq[..n]),
+            (&s12_h[..n], &mut s12[..n]),
+        ] {
+            crate::blur::box_blur_v_from_copy_at_revision(
+                horizontal,
+                vertical,
+                info.plane_w,
+                info.wide_h(),
+                BLUR_RADIUS,
+                revision,
+            );
+        }
+    }
+    // The activity plane in one pass where its blurs run their per-output
+    // trees, `mu1_h` and `mu2_h` holding a panel's rows. Pools of sixteen or
+    // more threads only (paired against the fused moments alone, B at
+    // revision 7, 1507×2048 / 1024²: sixteen on eight cores −13.5% / −4.9%,
+    // 32 −8.1% / −7.9%, but eight +1.4% / +1.0%).
+    if !(fused
+        && rayon::current_num_threads() >= 16
+        && crate::blur::activity_at_revision(
+            src,
+            &mu1[..n],
+            &mut activity[..n],
+            info.plane_w,
+            info.wide_h(),
+            BLUR_RADIUS,
+            revision,
+            &mut mu1_h[..n],
+            &mut mu2_h[..n],
+        ))
+    {
+        crate::simd_ops::abs_diff_into(src, &mu1[..n], &mut mu1_h[..n]);
+        crate::blur::box_blur_1pass_at_revision(
+            &mu1_h[..n],
+            &mut activity[..n],
+            &mut mu2_h[..n],
             info.plane_w,
             info.wide_h(),
             BLUR_RADIUS,
             revision,
         );
     }
-    crate::simd_ops::abs_diff_into(src, &mu1[..n], &mut mu1_h[..n]);
-    crate::blur::box_blur_1pass_at_revision(
-        &mu1_h[..n],
-        &mut activity[..n],
-        &mut mu2_h[..n],
-        info.plane_w,
-        info.wide_h(),
-        BLUR_RADIUS,
-        revision,
-    );
     crate::fold_timing::work(crate::fold_timing::Work::ActivityChain, 1);
     crate::fold_timing::work(crate::fold_timing::Work::V2Cell, 1);
     crate::fold_timing::stop(start, crate::fold_timing::Phase::PhaseAV2Planes, info.scale);
+}
+
+/// One queued strip job's work: phase A into its own planes, phase B into its
+/// own partials (and its retained rows when `output` is given). Runs on any
+/// thread; [`rev5_merge_job`] adds the partials to the walk's totals.
+#[cfg(feature = "threads")]
+#[allow(clippy::too_many_arguments)]
+fn rev5_execute_job(
+    job: &mut Rev5StripJob,
+    mut output: Option<RetainedRows<'_>>,
+    compute: &ComputeSet,
+    toggles: V2NewFeatureToggles,
+    fold_v1: bool,
+    retain: bool,
+    reference: Option<&[crate::streaming::XybPyramidLevel]>,
+) {
+    let busy = crate::fold_timing::start();
+    let info = &job.info;
+    let scale = info.scale;
+    let local = compute.at_scale(scale);
+    let toggles = V2NewFeatureToggles {
+        v1_pools: local.v1_pools,
+        v1_only: false,
+        gradient_features: local.gradient,
+        // This running sum must be accumulated in original pixel order.
+        blockiness: false,
+        ..toggles
+    };
+    job.result.dense[scale] = DenseAccum::default();
+    job.result.grad[scale] = GradientAccum::default();
+    if retain && (1..=3).contains(&scale) {
+        let strips = job
+            .result
+            .retained_strips
+            .get_or_insert_with(|| (0..crate::NUM_SCALES).map(|_| Vec::new()).collect());
+        strips[scale].clear();
+        if strips[scale].capacity() == 0 {
+            strips[scale].reserve_exact(1);
+        }
+    } else if !retain {
+        job.result.retained_strips = None;
+    }
+    let cached_source = rev5_cached_window(reference, info, job.ch);
+    // Revision 7: the strip's blockiness lane partials, here in the
+    // parallel job (both branches below); the merge after the batch adds
+    // them in strip order.
+    if local.blockiness && local.formula_revision.row_lanes() {
+        let n = info.plane_w * info.wide_h();
+        let src = cached_source.unwrap_or(&job.scratch.src_wide[..n]);
+        let mode = crate::featcanon::mode(local.formula_revision);
+        let (v, h) = &mut job.result.block[scale];
+        *v = crate::featcanon::SumVar::f64_elems(mode);
+        *h = crate::featcanon::SumVar::f64_elems(mode);
+        blockiness_sparse_strip_wide(
+            src,
+            &job.scratch.dst_wide[..n],
+            info.plane_w,
+            info.y0,
+            info.strip_h,
+            local.formula_revision,
+            v,
+            h,
+        );
+    }
+    if let Some(output) = output.as_mut()
+        && retained_core_admits(&local)
+    {
+        rev5_blur_into_retained(info, &mut job.scratch, [cached_source, None], output);
+        let n = info.plane_w * info.wide_h();
+        let src = cached_source.unwrap_or(&job.scratch.src_wide[..n]);
+        rev5_retained_phase_b(
+            info,
+            [src, &job.scratch.dst_wide[..n]],
+            output.moment_rows(),
+            RetainedCoreWork {
+                toggles,
+                fold_v1,
+                free: local.free_work(job.ch, scale),
+            },
+            &mut job.result,
+            &mut job.bands,
+        );
+        crate::fold_timing::stop(busy, crate::fold_timing::Phase::BBusy, scale);
+        return;
+    }
+    rev5_job_blur(
+        info,
+        &mut job.scratch,
+        compute.formula_revision,
+        cached_source,
+    );
+    let n = info.plane_w * info.wide_h();
+    let src = cached_source.unwrap_or(&job.scratch.src_wide[..n]);
+    if let Some(output) = &mut output {
+        output.copy(info, &job.scratch, src, &job.scratch.dst_wide[..n], false);
+    }
+    stream_phase_b(
+        &job.scratch,
+        src,
+        &job.scratch.dst_wide[..n],
+        info,
+        toggles,
+        false,
+        true,
+        false,
+        false,
+        false,
+        &[],
+        None,
+        None,
+        None,
+        local.free_work(job.ch, scale),
+        local.rev4_work(scale, job.ch, None, None),
+        &mut job.result,
+    );
+    if fold_v1 {
+        let raw = [src, &job.scratch.dst_wide[..n]];
+        let vertical = FoldHSource::Vertical([
+            &job.scratch.mu1[..n],
+            &job.scratch.mu2[..n],
+            &job.scratch.ssq[..n],
+            &job.scratch.s12[..n],
+        ]);
+        let mut b0 = info.y0;
+        for band in &mut job.bands[..info.strip_h.div_ceil(V1_BAND_ROWS)] {
+            *band = V1BasicSums::at_revision(FormulaRevision::Rev5);
+            b0 = fold_v1_one_band(
+                b0,
+                info.plane_w,
+                info.y0 + info.strip_h,
+                info.y0,
+                HALO_P,
+                info.plane_h,
+                vertical,
+                raw,
+                band,
+                None,
+                local.free_work(job.ch, scale),
+            );
+        }
+    }
+    crate::fold_timing::stop(busy, crate::fold_timing::Phase::BBusy, scale);
+}
+
+/// Add one executed strip job's partials to the walk's totals. Jobs merge
+/// once each, in the producer's order; do not reorder or tree-reduce them.
+#[cfg(feature = "threads")]
+fn rev5_merge_job(
+    job: &Rev5StripJob,
+    compute: &ComputeSet,
+    fold_v1: bool,
+    totals: &mut [StreamChannelAccums; 3],
+    reference: Option<&[crate::streaming::XybPyramidLevel]>,
+) {
+    let info = &job.info;
+    let scale = info.scale;
+    let local = compute.at_scale(scale);
+    let total = &mut totals[job.ch];
+    total.dense[scale].accumulate(&job.result.dense[scale]);
+    total.grad[scale].accumulate(&job.result.grad[scale]);
+    if let Some(target) = &mut total.retained_strips
+        && let Some(strips) = &job.result.retained_strips
+    {
+        target[scale].extend_from_slice(&strips[scale]);
+    }
+    if fold_v1 {
+        // Preserve each canonical 32-row band addition, never merge a
+        // pre-reduced strip sum into the running basic accumulator.
+        for band in &job.bands[..info.strip_h.div_ceil(V1_BAND_ROWS)] {
+            total.v1[scale].merge(band);
+        }
+    }
+    if local.blockiness {
+        let (sum_v, sum_h) = &mut total.block[scale];
+        if local.formula_revision.row_lanes() {
+            let (v, h) = &job.result.block[scale];
+            sum_v.merge_from(v);
+            sum_h.merge_from(h);
+        } else {
+            // Revisions 4–6 keep one running sum: the strip's windows, here.
+            let n = info.plane_w * info.wide_h();
+            let src =
+                rev5_cached_window(reference, info, job.ch).unwrap_or(&job.scratch.src_wide[..n]);
+            let dst = &job.scratch.dst_wide[..n];
+            blockiness_sparse_strip_wide(
+                src,
+                dst,
+                info.plane_w,
+                info.y0,
+                info.strip_h,
+                local.formula_revision,
+                sum_v,
+                sum_h,
+            );
+        }
+    }
+}
+
+/// Queued strip jobs without batch barriers, for walks that retain nothing
+/// and read no cached reference: each gathered job is spawned on the rayon
+/// pool at once, finished jobs come back over a channel and merge in the
+/// producer's order ([`rev5_merge_job`], the batch runner's merge), and the
+/// producer waits only when `limit` jobs are in flight. The merge order is the
+/// batch runner's, so every value has the batch runner's bits; the producer
+/// gathers and converts while the pool computes.
+#[cfg(feature = "threads")]
+struct Rev5Pipeline {
+    compute: ComputeSet,
+    fold_v1: bool,
+    limit: usize,
+    free: Vec<Rev5StripJob>,
+    in_flight: usize,
+    next_seq: usize,
+    merge_seq: usize,
+    done: std::collections::BTreeMap<usize, Rev5StripJob>,
+    tx: std::sync::mpsc::Sender<(usize, std::thread::Result<Rev5StripJob>)>,
+    rx: std::sync::mpsc::Receiver<(usize, std::thread::Result<Rev5StripJob>)>,
+}
+
+#[cfg(feature = "threads")]
+impl Rev5Pipeline {
+    fn new(compute: ComputeSet, fold_v1: bool, limit: usize, free: Vec<Rev5StripJob>) -> Self {
+        let (tx, rx) = std::sync::mpsc::channel();
+        Self {
+            compute,
+            fold_v1,
+            limit,
+            free,
+            in_flight: 0,
+            next_seq: 0,
+            merge_seq: 0,
+            done: std::collections::BTreeMap::new(),
+            tx,
+            rx,
+        }
+    }
+
+    /// A job slot for the next strip, merging finished jobs (oldest first)
+    /// until fewer than `limit` are in flight.
+    fn slot(
+        &mut self,
+        info: crate::feature_v2_stream::StripInfo,
+        ch: usize,
+        totals: &mut [StreamChannelAccums; 3],
+    ) -> Rev5StripJob {
+        while self.in_flight >= self.limit {
+            self.wait(totals);
+        }
+        self.free
+            .pop()
+            .unwrap_or_else(|| Rev5StripJob::new(info, ch))
+    }
+
+    /// Spawn a gathered job.
+    fn submit(&mut self, mut job: Rev5StripJob, toggles: V2NewFeatureToggles) {
+        let (seq, tx, compute, fold_v1) =
+            (self.next_seq, self.tx.clone(), self.compute, self.fold_v1);
+        self.next_seq += 1;
+        self.in_flight += 1;
+        rayon::spawn(move || {
+            let run = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                rev5_execute_job(&mut job, None, &compute, toggles, fold_v1, false, None);
+            }));
+            // The walk owns the receiver until every spawned job reports.
+            let _ = tx.send((seq, run.map(|()| job)));
+        });
+    }
+
+    /// Take at least one finished job and merge every job that is next in
+    /// order. A rayon worker waiting here runs pending pool work instead of
+    /// blocking, so a walk called from inside the pool cannot starve its own
+    /// jobs.
+    fn wait(&mut self, totals: &mut [StreamChannelAccums; 3]) {
+        let mut got = None;
+        while got.is_none() {
+            match self.rx.try_recv() {
+                Ok(m) => got = Some(m),
+                Err(std::sync::mpsc::TryRecvError::Empty) => match rayon::yield_now() {
+                    Some(rayon::Yield::Executed) => {}
+                    Some(rayon::Yield::Idle) => std::thread::yield_now(),
+                    None => got = Some(self.rx.recv().expect("strip job channel")),
+                },
+                Err(std::sync::mpsc::TryRecvError::Disconnected) => {
+                    unreachable!("the pipeline holds a sender")
+                }
+            }
+        }
+        let mut next = got;
+        while let Some((seq, run)) = next.take() {
+            let job = run.unwrap_or_else(|payload| std::panic::resume_unwind(payload));
+            self.done.insert(seq, job);
+            next = self.rx.try_recv().ok();
+        }
+        while let Some(job) = self.done.remove(&self.merge_seq) {
+            rev5_merge_job(&job, &self.compute, self.fold_v1, totals, None);
+            self.merge_seq += 1;
+            self.in_flight -= 1;
+            self.free.push(job);
+        }
+    }
+
+    /// Finish and merge every job in flight; returns the job slots.
+    fn drain(&mut self, totals: &mut [StreamChannelAccums; 3]) {
+        while self.in_flight > 0 {
+            self.wait(totals);
+        }
+    }
+}
+
+/// A finished task of [`rev5_block_walk`]: a produced chunk (side, chunk
+/// index) or a strip job (sequence number).
+#[cfg(feature = "threads")]
+enum BlockWalkMsg {
+    Chunk(
+        usize,
+        usize,
+        std::thread::Result<crate::feature_v2_blocks::ChunkPlanes>,
+    ),
+    // Boxed: a job slot is about 21 KB, a chunk message about 120 bytes.
+    Job(usize, std::thread::Result<Box<Rev5StripJob>>),
+}
+
+/// The plain revision-5+ walk with parallel row production
+/// ([`crate::feature_v2_blocks`]): chunk tasks convert rows and downscale them
+/// into immutable blocks, strip jobs copy their own windows out of the blocks,
+/// and this thread only schedules, adds the `globaff` rows and merges finished
+/// jobs. Jobs are submitted, and merged, in the streaming walk's order: strips
+/// in ascending order within each scale and channels in order within a strip,
+/// so every accumulator receives the same partials in the same order and every
+/// value keeps its bits. Production runs at most a few chunks ahead of the
+/// rows the next strip needs.
+#[cfg(feature = "threads")]
+#[allow(clippy::too_many_arguments)]
+fn rev5_block_walk<S: ImageSource, D: ImageSource, const ALL_CHANNELS: bool>(
+    source: &S,
+    distorted: &D,
+    dims: &[(usize, usize)],
+    compute: &ComputeSet,
+    toggles: V2NewFeatureToggles,
+    fold_v1: bool,
+    limit: usize,
+    omit_scale0_xb: bool,
+    slots: &mut Vec<Rev5StripJob>,
+    pool: &std::sync::Arc<crate::feature_v2_blocks::BlockPool>,
+    totals: &mut [StreamChannelAccums; 3],
+    globaff: &mut [[crate::globaff::GlobAffAccum; 3]],
+    stop: Option<&dyn enough::Stop>,
+) {
+    use crate::feature_v2_blocks::{CHUNK_ROWS, RowBlock, gather_window, produce_chunk};
+    use crate::feature_v2_stream::StripInfo;
+    use std::collections::{BTreeMap, VecDeque};
+    use std::sync::Arc;
+
+    let n_scales = dims.len();
+    let h0 = dims[0].1;
+    let n_chunks = h0.div_ceil(CHUNK_ROWS);
+    let threads = rayon::current_num_threads().max(2);
+    // Production may run this many scale-0 rows past the rows the next
+    // strip needs, with at most this many chunk tasks (one per side) queued.
+    // At most twelve strip jobs hold scratch at once: each holds about
+    // 9.8 MB at 1507 columns, and sixteen at once overflowed a 96 MiB L3 at
+    // sixteen threads on eight cores (paired, B at revision 7, 1507×2048:
+    // twelve −13.2% and eight −20.8% against sixteen; at 32 threads on two
+    // CCDs twelve −2.5% and eight +8.8%). Eight chunks of look-ahead instead
+    // of one per thread: −3.6% at sixteen threads, −7.6% at 32 (1024²).
+    let ahead = threads.min(8) * CHUNK_ROWS;
+    let prod_limit = 2 * threads.min(8);
+    let limit = limit.min(12);
+    // The streaming producer's conversion revision.
+    let revision = toggles.formula_revision;
+    let globaff_on = !globaff.is_empty();
+    let compute = *compute;
+
+    rayon::in_place_scope(|scope| {
+        let (tx, rx) = std::sync::mpsc::channel::<BlockWalkMsg>();
+        // Retained blocks per side, channel and scale, in row order; rows
+        // `[.., hi[scale])` are produced on both sides.
+        let mut planes: [[Vec<VecDeque<Arc<RowBlock>>>; 3]; 2] = core::array::from_fn(|_| {
+            core::array::from_fn(|_| (0..n_scales).map(|_| VecDeque::new()).collect())
+        });
+        let mut hi = vec![0usize; n_scales];
+        let mut arrived: BTreeMap<usize, [Option<crate::feature_v2_blocks::ChunkPlanes>; 2]> =
+            BTreeMap::new();
+        let mut appended = 0usize;
+        let mut next_chunk = 0usize;
+        let mut prod_in_flight = 0usize;
+        let mut next_ks = vec![0usize; n_scales];
+        // The next channel to submit within each scale's current strip.
+        let mut next_ch = vec![0usize; n_scales];
+        let mut free = core::mem::take(slots);
+        // Strip scratch released by finished jobs whose merge does not read
+        // it (every job but revision-5/6 blockiness, which the merge sums
+        // from the job's windows): `limit` bounds the scratch in use, so a
+        // finished job never holds its planes while it waits to merge.
+        let mut free_scratch: Vec<(ScratchV2Strip, usize)> = Vec::new();
+        let (mut in_scratch, mut pending) = (0usize, 0usize);
+        let (mut next_seq, mut merge_seq) = (0usize, 0usize);
+        let mut done: BTreeMap<usize, Rev5StripJob> = BTreeMap::new();
+        let mut stopped = false;
+        let keeps_scratch = |scale: usize| {
+            let local = compute.at_scale(scale);
+            local.blockiness && !local.formula_revision.row_lanes()
+        };
+
+        let strip_at = |s: usize, ks: usize| {
+            let (plane_w, plane_h) = dims[s];
+            let y0 = ks * STRIP_ROWS;
+            (y0 < plane_h).then(|| StripInfo {
+                scale: s,
+                y0,
+                strip_h: STRIP_ROWS.min(plane_h - y0),
+                plane_w,
+                plane_h,
+            })
+        };
+        // The scale-0 rows that make a strip's window complete.
+        let need0 = |info: &StripInfo| {
+            ((info.y0 + info.strip_h + HALO_P).min(info.plane_h) << info.scale).min(h0)
+        };
+
+        loop {
+            if !stopped && stop.is_some_and(|token| token.check().is_err()) {
+                stopped = true;
+            }
+
+            // Production, a bounded distance past the next strip's rows.
+            if !stopped {
+                let want0 = (0..n_scales)
+                    .filter_map(|s| strip_at(s, next_ks[s]).map(|info| need0(&info)))
+                    .min()
+                    .unwrap_or(h0);
+                while next_chunk < n_chunks
+                    && prod_in_flight + 2 <= prod_limit
+                    && next_chunk * CHUNK_ROWS < want0 + ahead
+                {
+                    let k = next_chunk;
+                    for side in 0..2 {
+                        let tx = tx.clone();
+                        scope.spawn(move |_| {
+                            let run =
+                                std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                                    if side == 0 {
+                                        produce_chunk(
+                                            source,
+                                            k,
+                                            dims,
+                                            omit_scale0_xb,
+                                            revision,
+                                            pool,
+                                        )
+                                    } else {
+                                        produce_chunk(
+                                            distorted,
+                                            k,
+                                            dims,
+                                            omit_scale0_xb,
+                                            revision,
+                                            pool,
+                                        )
+                                    }
+                                }));
+                            // The walk holds the receiver until every task reports.
+                            let _ = tx.send(BlockWalkMsg::Chunk(side, k, run));
+                        });
+                    }
+                    next_chunk += 1;
+                    prod_in_flight += 2;
+                }
+            }
+
+            // Every ready strip, shallowest scale first, while job slots last.
+            'emit: for s in 0..n_scales {
+                if stopped {
+                    break;
+                }
+                while let Some(info) = strip_at(s, next_ks[s]) {
+                    if hi[s] < (info.y0 + info.strip_h + HALO_P).min(info.plane_h) {
+                        break;
+                    }
+                    if next_ch[s] == 0 {
+                        // `globaff`: every strip of every scale, all three
+                        // channels, in strip order, before the dead-scale skip.
+                        if globaff_on {
+                            let y1 = info.y0 + info.strip_h;
+                            for (ch, acc) in globaff[s].iter_mut().enumerate() {
+                                let [src, dst] = [&planes[0][ch][s], &planes[1][ch][s]];
+                                for (bs, bd) in src.iter().zip(dst) {
+                                    let (a, b) = (bs.r0().max(info.y0), bs.end().min(y1));
+                                    if a < b {
+                                        acc.add_rows(bs.rows(a, b), bd.rows(a, b), info.plane_w);
+                                    }
+                                }
+                            }
+                        }
+                        if compute.scale_dead(s) {
+                            #[cfg(test)]
+                            SKIPPED_SCALES.with_borrow_mut(|v| *v |= 1 << s);
+                            next_ch[s] = 3;
+                        }
+                    }
+                    let local = compute.at_scale(s);
+                    let strip_toggles = V2NewFeatureToggles {
+                        v1_pools: local.v1_pools,
+                        v1_only: !local.v2_blocks,
+                        gradient_features: local.gradient,
+                        blockiness: local.blockiness,
+                        ..toggles
+                    };
+                    while next_ch[s] < 3 {
+                        let ch = next_ch[s];
+                        if !ALL_CHANNELS && !compute.channel_active(s, ch) {
+                            next_ch[s] += 1;
+                            continue;
+                        }
+                        if in_scratch >= limit {
+                            break 'emit;
+                        }
+                        let lo = info.y0.saturating_sub(HALO_P);
+                        let top = (info.y0 + info.strip_h + HALO_P).min(info.plane_h);
+                        let window = |side: usize| -> Vec<Arc<RowBlock>> {
+                            planes[side][ch][s]
+                                .iter()
+                                .filter(|b| b.end() > lo && b.r0() < top)
+                                .cloned()
+                                .collect()
+                        };
+                        let (src_blocks, dst_blocks) = (window(0), window(1));
+                        let mut job = free.pop().unwrap_or_else(|| Rev5StripJob::new(info, ch));
+                        if job.sized_for == 0
+                            && let Some((scratch, sized_for)) = free_scratch.pop()
+                        {
+                            job.scratch = scratch;
+                            job.sized_for = sized_for;
+                        }
+                        job.prepare(info, ch);
+                        let (seq, tx) = (next_seq, tx.clone());
+                        scope.spawn(move |_| {
+                            let run =
+                                std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                                    let n = info.plane_w * info.wide_h();
+                                    gather_window(
+                                        &src_blocks,
+                                        &info,
+                                        &mut job.scratch.src_wide[..n],
+                                    );
+                                    gather_window(
+                                        &dst_blocks,
+                                        &info,
+                                        &mut job.scratch.dst_wide[..n],
+                                    );
+                                    drop((src_blocks, dst_blocks));
+                                    rev5_execute_job(
+                                        &mut job,
+                                        None,
+                                        &compute,
+                                        strip_toggles,
+                                        fold_v1,
+                                        false,
+                                        None,
+                                    );
+                                }));
+                            let _ = tx.send(BlockWalkMsg::Job(seq, run.map(|()| Box::new(job))));
+                        });
+                        next_seq += 1;
+                        in_scratch += 1;
+                        pending += 1;
+                        next_ch[s] += 1;
+                    }
+                    next_ks[s] += 1;
+                    next_ch[s] = 0;
+                    // Retire the blocks no later strip of this scale reads.
+                    let floor = strip_at(s, next_ks[s])
+                        .map_or(usize::MAX, |next| next.y0.saturating_sub(HALO_P));
+                    for side in &mut planes {
+                        for ch in side.iter_mut() {
+                            while ch[s].front().is_some_and(|b| b.end() <= floor) {
+                                ch[s].pop_front();
+                            }
+                        }
+                    }
+                }
+            }
+
+            let emitted = (0..n_scales).all(|s| strip_at(s, next_ks[s]).is_none());
+            if (emitted || stopped) && pending == 0 && prod_in_flight == 0 {
+                break;
+            }
+
+            // Wait for at least one finished task, then take every other
+            // finished one. A rayon worker waiting here runs pending pool work.
+            let mut msg = None;
+            while msg.is_none() {
+                match rx.try_recv() {
+                    Ok(m) => msg = Some(m),
+                    Err(std::sync::mpsc::TryRecvError::Empty) => match rayon::yield_now() {
+                        Some(rayon::Yield::Executed) => {}
+                        Some(rayon::Yield::Idle) => std::thread::yield_now(),
+                        None => msg = Some(rx.recv().expect("block walk channel")),
+                    },
+                    Err(std::sync::mpsc::TryRecvError::Disconnected) => {
+                        unreachable!("the walk holds a sender")
+                    }
+                }
+            }
+            while let Some(m) = msg.take() {
+                match m {
+                    BlockWalkMsg::Chunk(side, k, run) => {
+                        prod_in_flight -= 1;
+                        let chunk =
+                            run.unwrap_or_else(|payload| std::panic::resume_unwind(payload));
+                        arrived.entry(k).or_default()[side] = Some(chunk);
+                        // Append whole chunks (both sides) in order.
+                        while let Some(both) = arrived.get(&appended)
+                            && both.iter().all(Option::is_some)
+                        {
+                            let both = arrived.remove(&appended).expect("present");
+                            for (side, chunk) in both.into_iter().enumerate() {
+                                for (ch, scales) in chunk.expect("present").into_iter().enumerate()
+                                {
+                                    for (s, block) in scales.into_iter().enumerate() {
+                                        if let Some(block) = block {
+                                            if ch == 1 {
+                                                hi[s] = hi[s].max(block.end());
+                                            }
+                                            planes[side][ch][s].push_back(block);
+                                        }
+                                    }
+                                }
+                            }
+                            appended += 1;
+                        }
+                    }
+                    BlockWalkMsg::Job(seq, run) => {
+                        let mut job =
+                            *run.unwrap_or_else(|payload| std::panic::resume_unwind(payload));
+                        if !keeps_scratch(job.info.scale) {
+                            let scratch =
+                                core::mem::replace(&mut job.scratch, ScratchV2Strip::new(0));
+                            free_scratch.push((scratch, core::mem::take(&mut job.sized_for)));
+                            in_scratch -= 1;
+                        }
+                        done.insert(seq, job);
+                        while let Some(job) = done.remove(&merge_seq) {
+                            rev5_merge_job(&job, &compute, fold_v1, totals, None);
+                            if keeps_scratch(job.info.scale) {
+                                in_scratch -= 1;
+                            }
+                            merge_seq += 1;
+                            pending -= 1;
+                            free.push(job);
+                        }
+                    }
+                }
+                msg = rx.try_recv().ok();
+            }
+        }
+        // Reattach the released scratch so the next walk's first `limit`
+        // slots keep their planes.
+        free.sort_by_key(|job| core::cmp::Reverse(job.sized_for));
+        for job in free.iter_mut().filter(|job| job.sized_for == 0) {
+            let Some((scratch, sized_for)) = free_scratch.pop() else {
+                break;
+            };
+            job.scratch = scratch;
+            job.sized_for = sized_for;
+        }
+        free.sort_by_key(|job| core::cmp::Reverse(job.sized_for));
+        *slots = free;
+    });
 }
 
 #[cfg(feature = "threads")]
@@ -4847,112 +5815,8 @@ fn rev5_run_jobs(
     let wall = crate::fold_timing::start();
     let retain = retention.is_some();
     let outputs = retention.map(|r| r.job_sinks(jobs));
-    let execute = |job: &mut Rev5StripJob, mut output: Option<RetainedRows<'_>>| {
-        let busy = crate::fold_timing::start();
-        let info = &job.info;
-        let scale = info.scale;
-        let local = compute.at_scale(scale);
-        let toggles = V2NewFeatureToggles {
-            v1_pools: local.v1_pools,
-            v1_only: false,
-            gradient_features: local.gradient,
-            // This running sum must be accumulated in original pixel order.
-            blockiness: false,
-            ..toggles
-        };
-        job.result.dense[scale] = DenseAccum::default();
-        job.result.grad[scale] = GradientAccum::default();
-        if retain && (1..=3).contains(&scale) {
-            let strips = job
-                .result
-                .retained_strips
-                .get_or_insert_with(|| (0..crate::NUM_SCALES).map(|_| Vec::new()).collect());
-            strips[scale].clear();
-            if strips[scale].capacity() == 0 {
-                strips[scale].reserve_exact(1);
-            }
-        } else if !retain {
-            job.result.retained_strips = None;
-        }
-        let cached_source = rev5_cached_window(reference, info, job.ch);
-        if let Some(output) = output.as_mut()
-            && retained_core_admits(&local)
-        {
-            rev5_blur_into_retained(info, &mut job.scratch, [cached_source, None], output);
-            let n = info.plane_w * info.wide_h();
-            let src = cached_source.unwrap_or(&job.scratch.src_wide[..n]);
-            rev5_retained_phase_b(
-                info,
-                [src, &job.scratch.dst_wide[..n]],
-                output.moment_rows(),
-                RetainedCoreWork {
-                    toggles,
-                    fold_v1,
-                    free: local.free_work(job.ch, scale),
-                },
-                &mut job.result,
-                &mut job.bands,
-            );
-            crate::fold_timing::stop(busy, crate::fold_timing::Phase::BBusy, scale);
-            return;
-        }
-        rev5_job_blur(
-            info,
-            &mut job.scratch,
-            compute.formula_revision,
-            cached_source,
-        );
-        let n = info.plane_w * info.wide_h();
-        let src = cached_source.unwrap_or(&job.scratch.src_wide[..n]);
-        if let Some(output) = &mut output {
-            output.copy(info, &job.scratch, src, &job.scratch.dst_wide[..n], false);
-        }
-        stream_phase_b(
-            &job.scratch,
-            src,
-            &job.scratch.dst_wide[..n],
-            info,
-            toggles,
-            false,
-            true,
-            false,
-            false,
-            false,
-            &[],
-            None,
-            None,
-            None,
-            local.free_work(job.ch, scale),
-            local.rev4_work(scale, job.ch, None, None),
-            &mut job.result,
-        );
-        if fold_v1 {
-            let raw = [src, &job.scratch.dst_wide[..n]];
-            let vertical = FoldHSource::Vertical([
-                &job.scratch.mu1[..n],
-                &job.scratch.mu2[..n],
-                &job.scratch.ssq[..n],
-                &job.scratch.s12[..n],
-            ]);
-            let mut b0 = info.y0;
-            for band in &mut job.bands[..info.strip_h.div_ceil(V1_BAND_ROWS)] {
-                *band = V1BasicSums::at_revision(FormulaRevision::Rev5);
-                b0 = fold_v1_one_band(
-                    b0,
-                    info.plane_w,
-                    info.y0 + info.strip_h,
-                    info.y0,
-                    HALO_P,
-                    info.plane_h,
-                    vertical,
-                    raw,
-                    band,
-                    None,
-                    local.free_work(job.ch, scale),
-                );
-            }
-        }
-        crate::fold_timing::stop(busy, crate::fold_timing::Phase::BBusy, scale);
+    let execute = |job: &mut Rev5StripJob, output: Option<RetainedRows<'_>>| {
+        rev5_execute_job(job, output, compute, toggles, fold_v1, retain, reference)
     };
     if let Some(outputs) = outputs {
         jobs.par_iter_mut()
@@ -4964,40 +5828,8 @@ fn rev5_run_jobs(
     crate::fold_timing::stop(wall, crate::fold_timing::Phase::BWall, 0);
     // Every cell's kernel partial is merged once, in the producer's order.
     // Do not replace this loop with a parallel/tree reduction.
-    for job in jobs {
-        let info = &job.info;
-        let scale = info.scale;
-        let local = compute.at_scale(scale);
-        let total = &mut totals[job.ch];
-        total.dense[scale].accumulate(&job.result.dense[scale]);
-        total.grad[scale].accumulate(&job.result.grad[scale]);
-        if let Some(target) = &mut total.retained_strips
-            && let Some(strips) = &job.result.retained_strips
-        {
-            target[scale].extend_from_slice(&strips[scale]);
-        }
-        let n = info.plane_w * info.wide_h();
-        let src = rev5_cached_window(reference, info, job.ch).unwrap_or(&job.scratch.src_wide[..n]);
-        let dst = &job.scratch.dst_wide[..n];
-        if fold_v1 {
-            // Preserve each canonical 32-row band addition, never merge a
-            // pre-reduced strip sum into the running basic accumulator.
-            for band in &job.bands[..info.strip_h.div_ceil(V1_BAND_ROWS)] {
-                total.v1[scale].merge(band);
-            }
-        }
-        if local.blockiness {
-            let (sum_v, sum_h) = &mut total.block[scale];
-            blockiness_sparse_strip_wide(
-                src,
-                dst,
-                info.plane_w,
-                info.y0,
-                info.strip_h,
-                sum_v,
-                sum_h,
-            );
-        }
+    for job in jobs.iter() {
+        rev5_merge_job(job, compute, fold_v1, totals, reference);
     }
 }
 
@@ -5694,6 +6526,7 @@ fn stream_phase_b(
                 &src_win[g_off..g_off + g_n],
                 &dst_win[g_off..g_off + g_n],
                 act_strip,
+                Some((mu1_strip, mu2_strip)),
                 width,
                 strip_h,
                 bandvis,
@@ -5806,6 +6639,7 @@ fn stream_phase_b(
             width,
             y0,
             strip_h,
+            toggles.formula_revision,
             sum_v,
             sum_h,
         );
@@ -5897,35 +6731,45 @@ fn stream_fold_v1(
 /// (a per-strip partial would reassociate: `(Σ strip0) + (Σ strip1)` ≠
 /// one running sum — measured as a 1-ULP BLOCKINESS divergence when this
 /// function briefly returned partials).
+#[allow(clippy::too_many_arguments)]
 fn blockiness_sparse_strip_wide(
     src_wide: &[f32],
     dst_wide: &[f32],
     width: usize,
     y0: usize,
     strip_h: usize,
+    revision: FormulaRevision,
     sum_v: &mut crate::featcanon::SumVar,
     sum_h: &mut crate::featcanon::SumVar,
 ) {
+    use crate::featcanon::{LanesF64, SumVar};
+    let spread = revision.row_lanes();
+    // Revision 7: the strip's own lane partials, added to the running lanes
+    // once, so a strip's terms can be computed apart from the others (in
+    // parallel) and merged in strip order with the same bits.
+    let partial = spread && matches!((&*sum_v, &*sum_h), (SumVar::L64(_), SumVar::L64(_)));
+    let (mut pv, mut ph) = (SumVar::L64(LanesF64::zero()), SumVar::L64(LanesF64::zero()));
+    let (v, h) = if partial {
+        (&mut pv, &mut ph)
+    } else {
+        (&mut *sum_v, &mut *sum_h)
+    };
     for k in 0..strip_h {
         let y = y0 + k;
-        let row = (HALO_P + k) * width;
-        let mut x = BLOCK_LATTICE;
-        while x < width {
-            let i = row + x;
-            let step_dst = (dst_wide[i] as f64 - dst_wide[i - 1] as f64).abs();
-            let step_src = (src_wide[i] as f64 - src_wide[i - 1] as f64).abs();
-            sum_v.add64(x & 7, bounded_excess(step_dst, step_src, C_BLOCK));
-            x += BLOCK_LATTICE;
-        }
-        if y.is_multiple_of(BLOCK_LATTICE) && y > 0 {
-            for x in 0..width {
-                let i = row + x;
-                let i_up = i - width;
-                let step_dst = (dst_wide[i] as f64 - dst_wide[i_up] as f64).abs();
-                let step_src = (src_wide[i] as f64 - src_wide[i_up] as f64).abs();
-                sum_h.add64(x & 7, bounded_excess(step_dst, step_src, C_BLOCK));
-            }
-        }
+        blockiness_row(
+            src_wide,
+            dst_wide,
+            (HALO_P + k) * width,
+            width,
+            y.is_multiple_of(BLOCK_LATTICE) && y > 0,
+            spread,
+            v,
+            h,
+        );
+    }
+    if partial {
+        sum_v.merge_from(&pv);
+        sum_h.merge_from(&ph);
     }
 }
 
@@ -6519,6 +7363,13 @@ fn validate_wide_revision(toggles: V2NewFeatureToggles) -> Result<(), ZensimErro
 /// Raw toggles request computation, unlike the layout flags of a validated
 /// plan. Refuse unsupported families before `rev5_scope` can narrow work.
 fn validate_raw_rev5_request(t: V2NewFeatureToggles) -> Result<(), ZensimError> {
+    // `globaff` sits past the whole optional-block layout chain, which no raw
+    // Rev5+ request may carry; only a validated revision-6 plan reaches it.
+    if t.globaff {
+        return Err(ZensimError::ModelLoadFailed {
+            reason: "the globaff family is served only through a validated formula revision 6 plan",
+        });
+    }
     if t.formula_revision >= FormulaRevision::Rev5
         && (matches!(t.v1_pools, V1PoolsMode::Full | V1PoolsMode::Carriers)
             || t.append_block
@@ -6584,7 +7435,7 @@ pub(crate) fn compute_folded720_streaming_extras(
 ) -> Result<ZensimV2Result, ZensimError> {
     if !extras
         .compute
-        .is_some_and(|c| c.formula_revision == FormulaRevision::Rev5)
+        .is_some_and(|c| c.formula_revision >= FormulaRevision::Rev5)
     {
         validate_wide_revision(toggles)?;
     }
@@ -7092,7 +7943,7 @@ pub(crate) fn compute_folded720_hdr_streaming_extras(
 ) -> Result<ZensimV2Result, ZensimError> {
     if !extras
         .compute
-        .is_some_and(|c| c.formula_revision == FormulaRevision::Rev5)
+        .is_some_and(|c| c.formula_revision >= FormulaRevision::Rev5)
     {
         validate_wide_revision(toggles)?;
     }
@@ -7329,6 +8180,7 @@ pub(crate) fn compute_v2_append_attribution_from_retention(
         &mut crate::attribution::AttrSinkF32::Canvas(&mut canvas),
         None,
         (orig_w, orig_h),
+        crate::map_paint::MapPaint::default(),
     );
     let lattice = scratch.lattice.finish();
     // Trim the (possibly reflect-padded sub-64) canvas to the original.
@@ -7360,6 +8212,7 @@ pub(crate) fn compute_v2_append_attribution_from_retention_into_bins(
     scratch: &mut PassBScratchF32,
     accum: &mut crate::attribution::BinAccum,
     geometry: Option<&crate::sampling::Geometry>,
+    paint: crate::map_paint::MapPaint,
 ) {
     let logical = accum.logical_dimensions();
     retention_pass_b_all_scales(
@@ -7372,6 +8225,7 @@ pub(crate) fn compute_v2_append_attribution_from_retention_into_bins(
         &mut crate::attribution::AttrSinkF32::Bins(accum),
         geometry,
         logical,
+        paint,
     );
     accum.set_lattice(scratch.lattice.finish());
 }
@@ -7410,6 +8264,7 @@ fn retention_pass_b_all_scales(
     sink: &mut crate::attribution::AttrSinkF32<'_>,
     geometry: Option<&crate::sampling::Geometry>,
     logical: (usize, usize),
+    paint: crate::map_paint::MapPaint,
 ) {
     scratch
         .lattice
@@ -7420,6 +8275,17 @@ fn retention_pass_b_all_scales(
     let n0 = w0 * h0;
     scratch.scale_density.resize(n0, 0.0);
     scratch.win_plane.resize(n0, 0.0);
+    // Research guided painting (`crate::map_paint`): the source-resolution
+    // difference guide, built once per map when that mode is selected.
+    let guide0 =
+        (paint.paint == crate::map_paint::PaintMode::Guided && geometry.is_none()).then(|| {
+            crate::map_paint::difference_guide(
+                [&ret.pyr_src[0][0], &ret.pyr_src[0][1], &ret.pyr_src[0][2]],
+                [&ret.pyr_dst[0][0], &ret.pyr_dst[0][1], &ret.pyr_dst[0][2]],
+                n0,
+                paint.guide,
+            )
+        });
     for scale in 0..n_scales {
         // A selectively omitted cell can have no retained samples. Deriving
         // its coefficients would evaluate 0 * (1 / 0), poisoning an otherwise
@@ -7459,6 +8325,8 @@ fn retention_pass_b_all_scales(
             &mut scratch.spread_out,
             geometry,
             &mut scratch.lattice,
+            guide0.as_deref(),
+            paint,
             ret.revision,
         );
     }
@@ -7790,6 +8658,10 @@ fn foldapp_streaming_walk_impl<S: ImageSource, D: ImageSource, const ALL_CHANNEL
     let layout_mapdev = toggles.mapdev;
     let layout_z1max = toggles.z1max;
     let layout_gmsnative = toggles.gmsnative;
+    // `globaff` (revision 6): the layout flag sets the width; `compute.globaff`
+    // decides whether the strip moment sums run.
+    let layout_globaff = toggles.globaff;
+    let globaff_on = compute.globaff;
     // Only read below under `threads` (the `fuse_channels` derivation a few
     // lines down); the `not(threads)` arm hardcodes `fuse_channels = false`
     // without it, so `--no-default-features --features feature-regime-v2`
@@ -7844,6 +8716,18 @@ fn foldapp_streaming_walk_impl<S: ImageSource, D: ImageSource, const ALL_CHANNEL
         !layout_gmsnative || layout_z1max,
         "gmsnative requires the z1max layout (f1790 sits after f1789)"
     );
+    assert!(
+        !layout_globaff || layout_gmsnative,
+        "globaff requires the gmsnative layout (f1867 sits after f1866)"
+    );
+    assert!(
+        !globaff_on || (layout_globaff && compute.formula_revision.computes_globaff()),
+        "globaff is computed only at formula revision 6, into its own layout"
+    );
+    assert!(
+        !globaff_on || compute.sampling.is_none(),
+        "globaff is defined on the walk's own pyramid, not a sampled one"
+    );
     // Route-local derived φ: the SAME weighting mechanism on both routes,
     // pre-composed with each route's own encoding (design §6 — runtime
     // never inverts an encoding; the route-dependence lives entirely in
@@ -7897,7 +8781,7 @@ fn foldapp_streaming_walk_impl<S: ImageSource, D: ImageSource, const ALL_CHANNEL
         && compute.formula_revision >= FormulaRevision::Rev5
         && compute.v2_blocks
         && !layout_append
-        && rayon::current_num_threads() >= 8
+        && rayon::current_num_threads() >= 2
         && h0 > STRIP_ROWS
     {
         debug_assert!(
@@ -7931,7 +8815,13 @@ fn foldapp_streaming_walk_impl<S: ImageSource, D: ImageSource, const ALL_CHANNEL
         if jobs >= REV5_MIN_JOB_SLOTS && jobs <= capacity {
             jobs
         } else {
-            rev5_job_limit(strip_max_n, rayon::current_num_threads(), job_budget)
+            // One job per thread, at least four (measured on a 1507×2048
+            // photo, B at revision 7: two threads 21.2 → 18.7 ms with batches
+            // of four; at eight threads batches of sixteen were slower, 7.8 →
+            // 10.1 ms, their scratch no longer fitting the cache). The
+            // pipeline uses the same number as its in-flight limit; at eight
+            // threads limits of four and six were slower than eight.
+            rev5_job_limit(strip_max_n, rayon::current_num_threads().max(4), job_budget)
         }
     } else {
         0
@@ -7956,6 +8846,8 @@ fn foldapp_streaming_walk_impl<S: ImageSource, D: ImageSource, const ALL_CHANNEL
         stream_pool,
         #[cfg(feature = "threads")]
         rev5_jobs,
+        #[cfg(feature = "threads")]
+        block_pool,
         ..
     } = scratch;
 
@@ -8020,14 +8912,70 @@ fn foldapp_streaming_walk_impl<S: ImageSource, D: ImageSource, const ALL_CHANNEL
         ref_planes,
         compute.sampling,
         toggles.formula_revision,
-        !compute.full_res_xb && !complete_distorted0,
+        // `globaff` reads every channel's rows at every scale, so the
+        // scale-zero chroma rows stay in the rolling planes.
+        !compute.full_res_xb && !complete_distorted0 && !globaff_on,
     );
+    let mut globaff: Vec<[crate::globaff::GlobAffAccum; 3]> = if globaff_on {
+        vec![Default::default(); n_scales]
+    } else {
+        Vec::new()
+    };
 
     #[cfg(feature = "threads")]
     let mut queued = 0;
+    // Plain SDR walks whose every live scale runs the v2 blocks produce their
+    // rows in parallel chunk tasks, and their strip jobs copy their own
+    // windows (`rev5_block_walk`); the streaming producer above is unused.
+    #[cfg(feature = "threads")]
+    let block_walk = {
+        let omit_xb = !compute.full_res_xb
+            && !complete_distorted0
+            && !globaff_on
+            && !crate::feature_v2_stream::linear_pyramid();
+        batch_limit > 0
+            && retention.is_none()
+            && ref_planes.is_none()
+            && compute.sampling.is_none()
+            && matches!(front_end, crate::feature_v2_stream::FrontEnd::Sdr)
+            && !(ALL_CHANNELS && omit_xb)
+            && (0..n_scales).all(|s| compute.scale_dead(s) || compute.at_scale(s).v2_blocks)
+    };
+    // Other plain walks (nothing retained, no cached reference) run their
+    // strip jobs through the pipeline instead of batches: same merge order,
+    // no barrier between batches, production overlapped with the jobs.
+    #[cfg(feature = "threads")]
+    let mut pipeline =
+        (batch_limit > 0 && retention.is_none() && ref_planes.is_none() && !block_walk)
+            .then(|| Rev5Pipeline::new(compute, fold_v1, batch_limit, core::mem::take(rev5_jobs)));
 
     let __t_walk = crate::fold_timing::start();
+    #[cfg(feature = "threads")]
+    if block_walk {
+        rev5_block_walk::<S, D, ALL_CHANNELS>(
+            source,
+            distorted,
+            &dims,
+            &compute,
+            toggles,
+            fold_v1,
+            batch_limit,
+            !compute.full_res_xb
+                && !complete_distorted0
+                && !globaff_on
+                && !crate::feature_v2_stream::linear_pyramid(),
+            rev5_jobs,
+            block_pool,
+            &mut accums,
+            &mut globaff,
+            stop,
+        );
+    }
     loop {
+        #[cfg(feature = "threads")]
+        if block_walk {
+            break;
+        }
         if stop.is_some_and(|token| token.check().is_err()) {
             break;
         }
@@ -8055,6 +9003,30 @@ fn foldapp_streaming_walk_impl<S: ImageSource, D: ImageSource, const ALL_CHANNEL
                 }
             }
         }
+        // `globaff`: every strip of every scale, all three channels, in
+        // strip order — before the dead-scale skip, which knows nothing of it.
+        if globaff_on {
+            let y1 = info.y0 + info.strip_h;
+            for (ch, acc) in globaff[scale].iter_mut().enumerate() {
+                acc.add_rows(
+                    producer.rows(
+                        crate::feature_v2_stream::Side::Source,
+                        ch,
+                        scale,
+                        info.y0,
+                        y1,
+                    ),
+                    producer.rows(
+                        crate::feature_v2_stream::Side::Distorted,
+                        ch,
+                        scale,
+                        info.y0,
+                        y1,
+                    ),
+                    info.plane_w,
+                );
+            }
+        }
         let local = compute.at_scale(scale);
         let v2_blocks = local.v2_blocks;
         let append_on = local.append;
@@ -8069,9 +9041,39 @@ fn foldapp_streaming_walk_impl<S: ImageSource, D: ImageSource, const ALL_CHANNEL
             ..toggles
         };
         crate::fold_timing::stop(__t_prod, crate::fold_timing::Phase::Producer, scale);
+        // A declared-ID plan that reads no v1-era slot and runs no v2-era work at this scale skips its strips whole
+        // (the producer has already carried the pyramid through them). Only the pre-Rev5 scale-0 side channel keeps
+        // them.
+        if compute.scale_dead(scale)
+            && !(scale == 0
+                && compute.formula_revision < FormulaRevision::Rev5
+                && mean_offset.is_some())
+        {
+            #[cfg(test)]
+            SKIPPED_SCALES.with_borrow_mut(|v| *v |= 1 << scale);
+            continue;
+        }
 
         #[cfg(feature = "threads")]
-        if batch_limit > 0 {
+        if let Some(pipe) = pipeline.as_mut() {
+            // A basic-only cell keeps its existing path; finish every queued
+            // cell first so per-channel/scale ordering is never disturbed.
+            if !v2_blocks {
+                pipe.drain(&mut accums);
+            } else {
+                for ch in 0..3 {
+                    if !ALL_CHANNELS && !compute.channel_active(scale, ch) {
+                        continue;
+                    }
+                    let mut job = pipe.slot(info, ch, &mut accums);
+                    job.gather(&producer, info, ch, false);
+                    pipe.submit(job, toggles);
+                }
+                continue;
+            }
+        }
+        #[cfg(feature = "threads")]
+        if batch_limit > 0 && pipeline.is_none() {
             // A basic-only cell keeps its existing path; finish older queued
             // cells first so per-channel/scale ordering is never disturbed.
             if !v2_blocks && queued > 0 {
@@ -8633,6 +9635,11 @@ fn foldapp_streaming_walk_impl<S: ImageSource, D: ImageSource, const ALL_CHANNEL
             ref_planes.filter(|_| compute.sampling.is_none()),
         );
     }
+    #[cfg(feature = "threads")]
+    if let Some(mut pipe) = pipeline.take() {
+        pipe.drain(&mut accums);
+        *rev5_jobs = core::mem::take(&mut pipe.free);
+    }
 
     if let Some(t) = __t_walk {
         crate::fold_timing::walk_done(t.elapsed().as_nanos() as u64);
@@ -8712,24 +9719,38 @@ fn foldapp_streaming_walk_impl<S: ImageSource, D: ImageSource, const ALL_CHANNEL
         0
     };
     let gmsnative_total = if layout_gmsnative { GMSNATIVE_WIDTH } else { 0 };
-    let reserved_tail_total = 0;
-    let mut features = vec![
-        0.0f64;
-        v12_total
-            + append_total
-            + append2_total
-            + csfw_total
-            + reserved_total
-            + gridblk_total
-            + ringbasis_total
-            + tailhist_total
-            + arttype_total
-            + gmsbank_total
-            + mapdev_total
-            + z1max_total
-            + gmsnative_total
-            + reserved_tail_total
-    ];
+    let before_tail = v12_total
+        + append_total
+        + append2_total
+        + csfw_total
+        + reserved_total
+        + gridblk_total
+        + ringbasis_total
+        + tailhist_total
+        + arttype_total
+        + gmsbank_total
+        + mapdev_total
+        + z1max_total
+        + gmsnative_total;
+    // `globaff` sits at its registered base: the reserved slots and the
+    // research palette block before it (f1820..1866) are structural zeros.
+    let (reserved_tail_total, globaff_total) = if layout_globaff {
+        let base =
+            crate::feature_defs::block_base(crate::feature_set_id::ComputeToken::GlobAff, n_scales)
+                .expect("globaff is a registered block")
+                .0;
+        assert!(
+            base >= before_tail,
+            "globaff base {base} precedes the walk tail {before_tail}"
+        );
+        (
+            base - before_tail,
+            n_scales * 3 * crate::globaff::GLOBAFF_PER_CELL,
+        )
+    } else {
+        (0, 0)
+    };
+    let mut features = vec![0.0f64; before_tail + reserved_tail_total + globaff_total];
     let (features_v12, features_tail) = features.split_at_mut(v12_total);
     let (features_app, features_tail2) = features_tail.split_at_mut(append_total);
     let (features_app2, features_tail3) = features_tail2.split_at_mut(append2_total);
@@ -8742,7 +9763,8 @@ fn foldapp_streaming_walk_impl<S: ImageSource, D: ImageSource, const ALL_CHANNEL
     let (features_gmsbank, features_tail10) = features_tail9.split_at_mut(gmsbank_total);
     let (features_mapdev, features_tail11) = features_tail10.split_at_mut(mapdev_total);
     let (features_z1max, features_tail12) = features_tail11.split_at_mut(z1max_total);
-    let (features_gmsnative, _reserved_tail) = features_tail12.split_at_mut(gmsnative_total);
+    let (features_gmsnative, features_tail13) = features_tail12.split_at_mut(gmsnative_total);
+    let (_reserved_tail, features_globaff) = features_tail13.split_at_mut(reserved_tail_total);
     let mut prev_grad: [Option<(f64, f64)>; 3] = [None; 3];
 
     #[allow(clippy::needless_range_loop)] // scale derives 3+ offsets across distinct arrays
@@ -8968,8 +9990,12 @@ fn foldapp_streaming_walk_impl<S: ImageSource, D: ImageSource, const ALL_CHANNEL
                 let prev_base = v1_total
                     + (scale - 1) * 3 * FEATURES_PER_CHANNEL_V2_TOTAL
                     + ch * FEATURES_PER_CHANNEL_V2_TOTAL;
-                features_v12[prev_base + idx::EDGE_WIDTH_CHANGE] =
-                    1.0 - bounded_sim(decay_src, decay_dst, C_EDGEWIDTH);
+                features_v12[prev_base + idx::EDGE_WIDTH_CHANGE] = bounded_dissim(
+                    decay_src,
+                    decay_dst,
+                    C_EDGEWIDTH,
+                    compute.formula_revision.stable_forms(),
+                );
             }
             prev_grad[ch] = Some((gsrc, gdst));
 
@@ -9150,6 +10176,18 @@ fn foldapp_streaming_walk_impl<S: ImageSource, D: ImageSource, const ALL_CHANNEL
         mapdev: layout_mapdev && compute.mapdev,
         z1max: layout_z1max && compute.z1max,
     };
+    // --- globaff finalize: `(share, explained)` per (scale, channel), in the
+    //     registry's `2·(3·scale + channel) + signal` order. ---
+    if globaff_on {
+        for (scale, cells) in globaff.iter().enumerate() {
+            for (ch, acc) in cells.iter().enumerate() {
+                let (share, explained) = acc.finish();
+                let at = crate::globaff::GLOBAFF_PER_CELL * (3 * scale + ch);
+                features_globaff[at] = share;
+                features_globaff[at + 1] = explained;
+            }
+        }
+    }
     if restore_work.any() {
         assert!(
             restore_side_ok,
@@ -9400,8 +10438,12 @@ fn compute_v2_features_with_ref_impl_inner(
                 let decay_dst = gdst / (prev_gdst + C_GRAD_DECAY);
                 let prev_base = (scale - 1) * 3 * FEATURES_PER_CHANNEL_V2_TOTAL
                     + ch * FEATURES_PER_CHANNEL_V2_TOTAL;
-                features[prev_base + idx::EDGE_WIDTH_CHANGE] =
-                    1.0 - bounded_sim(decay_src, decay_dst, C_EDGEWIDTH);
+                features[prev_base + idx::EDGE_WIDTH_CHANGE] = bounded_dissim(
+                    decay_src,
+                    decay_dst,
+                    C_EDGEWIDTH,
+                    toggles.formula_revision.stable_forms(),
+                );
             }
             prev_grad[ch] = Some((gsrc, gdst));
 
@@ -9767,6 +10809,10 @@ struct V2AppCoeffs {
     dev_f4: f64,
     s_dev2: f64,
     s_dev4: f64,
+    // The two deviation pools' density as one polynomial in `e = d − dev_mu`,
+    // guards and the map split folded in:
+    // `q0 + e·(q1 + e·(q2 + e·(q3 + e·q4)))`.
+    dev_q: [f64; 5],
     // append mean slots.
     c_xmask: f64,
     c_lumt: f64,
@@ -9783,21 +10829,38 @@ struct V2AppCoeffs {
     gd_gms: (f64, f64, f64),
     gd_art: (f64, f64, f64),
     gd_det: (f64, f64, f64),
+    // The same pools' densities as `q[0] + e·(q[1] + e·q[2])` in `e = v − q[3]`.
+    gq_gms: [f64; 4],
+    gq_art: [f64; 4],
+    gq_det: [f64; 4],
     // append globals.
     g_dmean: f64, // coefficient × (s − d)
-    g_var: f64,   // coefficient × ((s²−d²) − 2·gmean_d·(s−d))
-    gmean_d: f64,
+    g_var: f64,   // coefficient × ((s − d) − g_shift)·((s + d) − g_sum)
+    g_shift: f64,
+    g_sum: f64,
     // edge-width: coefficient × (|∇d| − |∇s|).
     c_edgew: f64,
     // append2 BANDVIS pair (f924+, Y-only): coefficient × the per-pixel
     // FR-excess indicator. Mean pools like the v2 hf pair — `−s_k/N`.
     c_bv_gain: f64,
     c_bv_loss: f64,
-    inv_n: f64,
-    // The form of the computation that produced the planes, never the process's: whether `s12` holds the
-    // direct error moment (Rev3+). A bake served at its declared revision in a process of another one
+    // The forms of the computation that produced the planes, never the process's: whether `s12` holds the
+    // direct error moment (Rev3+), and whether ringing reads the high-pass residual (revision 6 or the
+    // research ring-form override). A bake served at its declared revision in a process of another one
     // retains planes of its own revision.
     direct: bool,
+    ring_hp: bool,
+    // Whether the planes' revision uses the cancellation-free forms (revision 7).
+    stable: bool,
+}
+
+/// A deviation pool's centred quadratic density (`V2AppCoeffs::gq_art`):
+/// `q[0] + e·(q[1] + e·q[2])` with `e = v − q[3]`.
+#[cfg(feature = "custom-profiles")]
+#[inline(always)]
+fn gq_density(q: &[f64; 4], v: f64) -> f64 {
+    let e = v - q[3];
+    q[0] + e * (q[1] + e * q[2])
 }
 
 #[cfg(feature = "custom-profiles")]
@@ -9813,7 +10876,9 @@ fn derive_v2app_coeffs(
     cross: bool,
     edgew_coeff: f64,
     revision: FormulaRevision,
+    split: crate::map_paint::SplitMode,
 ) -> V2AppCoeffs {
+    use crate::map_paint::SplitMode;
     let n_f = cell.n as f64;
     let inv_n = 1.0 / n_f;
     let v2b = scale * 3 * FEATURES_PER_CHANNEL_V2_TOTAL + ch * FEATURES_PER_CHANNEL_V2_TOTAL;
@@ -9830,7 +10895,6 @@ fn derive_v2app_coeffs(
     let grad = &cell.grad;
 
     let mut c = V2AppCoeffs {
-        inv_n,
         // Mean pools: density += s_k · (−v_i/N).
         c_ssim: -gv2(idx::SSIM_MEAN) * inv_n,
         c_art: -gv2(idx::ART) * inv_n,
@@ -9848,6 +10912,8 @@ fn derive_v2app_coeffs(
         c_blockiness: -gv2(idx::BLOCKINESS) * inv_n,
         c_edgew: edgew_coeff,
         direct: revision >= FormulaRevision::Rev3,
+        ring_hp: revision.ring_high_pass() || active_ring_form() == RingForm::HighPassMu,
+        stable: revision.stable_forms(),
         ..Default::default()
     };
 
@@ -9917,6 +10983,27 @@ fn derive_v2app_coeffs(
     c.sp_ssim = sp(&dense.ws_peak_ssim, gv2(idx::SSIM_SOFT_PEAK));
     c.sp_art = sp(&dense.ws_peak_art, gv2(idx::ART_SOFT_PEAK));
     c.sp_det = sp(&dense.ws_peak_det, gv2(idx::DET_SOFT_PEAK));
+    if split == SplitMode::Exact {
+        // The pixel's share `w(v)·v/W` of the soft peak `Σw(v)·v / Σw(v)`.
+        c.sp_ssim.1 = 0.0;
+        c.sp_art.1 = 0.0;
+        c.sp_det.1 = 0.0;
+    }
+    if split == SplitMode::Amplitude {
+        // Each soft peak as a mean pool of its member: `−s·v_i/N`.
+        if dense.ws_peak_ssim.den > 0.0 {
+            c.c_ssim -= gv2(idx::SSIM_SOFT_PEAK) * inv_n;
+        }
+        if dense.ws_peak_art.den > 0.0 {
+            c.c_art -= gv2(idx::ART_SOFT_PEAK) * inv_n;
+        }
+        if dense.ws_peak_det.den > 0.0 {
+            c.c_det -= gv2(idx::DET_SOFT_PEAK) * inv_n;
+        }
+        c.sp_ssim = (0.0, 0.0);
+        c.sp_art = (0.0, 0.0);
+        c.sp_det = (0.0, 0.0);
+    }
     // SSIM deviation pools (central moments of the d map).
     let mu = dense.sum_d * inv_n;
     let raw2 = dense.sum_d2 * inv_n;
@@ -9943,6 +11030,56 @@ fn derive_v2app_coeffs(
     c.dev_f4 = m4.quarter_root(crate::det_math::active_root_form());
     c.s_dev2 = gv2(idx::SSIM_DEV2);
     c.s_dev4 = gv2(idx::SSIM_DEV4);
+    // Both deviation pools as one polynomial in `e = d − μ`, which does not
+    // cancel when the deviation is small against the mean (raw powers of `d`
+    // carry coefficients that grow as `1/f³`).
+    //  * repair (pixel `i` made perfect, `d → 0`, first order):
+    //    `k2·(μ² − e²)` and `k4·(μ⁴ − e⁴ + 4d·c3)`, `k2 = s2/(2·f2·N)`,
+    //    `k4 = s4/(4·f4³·N)`;
+    //  * exact (the pixel's share `d·∂f/∂d`, negated; both pools are
+    //    homogeneous of degree 1 in `d`, so the shares sum to the feature):
+    //    `−(s2/(f2·N))·d·e` and `−(s4/(f4³·N))·d·(e³ − c3)`.
+    let mut q = [0.0f64; 5];
+    if c.s_dev2 != 0.0 && c.dev_f2 > 1e-12 {
+        match split {
+            SplitMode::Repair => {
+                let k = c.s_dev2 * inv_n / (2.0 * c.dev_f2);
+                q[0] += k * mu * mu;
+                q[2] -= k;
+            }
+            SplitMode::Exact => {
+                // d·e = e² + μ·e
+                let k = -c.s_dev2 * inv_n / c.dev_f2;
+                q[1] += k * mu;
+                q[2] += k;
+            }
+            // As a mean pool of `d`.
+            SplitMode::Amplitude => c.c_ssim -= c.s_dev2 * inv_n,
+        }
+    }
+    if c.s_dev4 != 0.0 && c.dev_f4 > 1e-12 {
+        let c3 = c.dev_c3;
+        match split {
+            SplitMode::Repair => {
+                // μ⁴ − e⁴ + 4(e + μ)·c3
+                let k = c.s_dev4 * inv_n / (4.0 * c.dev_f4.powi(3));
+                q[0] += k * (mu.powi(4) + 4.0 * mu * c3);
+                q[1] += k * 4.0 * c3;
+                q[4] -= k;
+            }
+            SplitMode::Exact => {
+                // d·(e³ − c3) = e⁴ + μ·e³ − c3·e − μ·c3
+                let k = -c.s_dev4 * inv_n / c.dev_f4.powi(3);
+                q[0] -= k * mu * c3;
+                q[1] -= k * c3;
+                q[3] += k * mu;
+                q[4] += k;
+            }
+            // As a mean pool of `d`.
+            SplitMode::Amplitude => c.c_ssim -= c.s_dev4 * inv_n,
+        }
+    }
+    c.dev_q = q;
 
     if append_active {
         if cross {
@@ -9973,27 +11110,95 @@ fn derive_v2app_coeffs(
         c.gd_gms = gd(gap(idx_append::GMS_DEV2), grad.sum_gms, grad.sum_gms2);
         c.gd_art = gd(gap(idx_append::ART_DEV2), dense.sum_art, app.sum_art2);
         c.gd_det = gd(gap(idx_append::DET_DEV2), dense.sum_det, app.sum_det2);
-        // Globals. GLOBAL_DMEAN: f = sat(|Δ|, C), Δ = (Σs−Σd)/N;
-        // (δf)_i = −sat'(|Δ|)·sign(Δ)·(s_i−d_i)/N.
+        // The same deviation pools as quadratics in `e = v − m`: repair
+        // `s·(2m·v − v²)/(2f·N) = −(s/(2fN))·(e² − m²)`; exact, the share
+        // `v·∂f/∂v` negated, `−(s/(fN))·v·(v − m) = −(s/(fN))·(e² + m·e)`.
+        let gq = |g: (f64, f64, f64)| -> [f64; 4] {
+            let (sk, m, f) = g;
+            if sk == 0.0 || f <= 1e-12 {
+                return [0.0; 4];
+            }
+            match split {
+                SplitMode::Repair => {
+                    let k = -sk * inv_n / (2.0 * f);
+                    [-k * m * m, 0.0, k, m]
+                }
+                SplitMode::Exact => {
+                    let k = -sk * inv_n / f;
+                    [0.0, k * m, k, m]
+                }
+                // Folded into the member's mean pool below.
+                SplitMode::Amplitude => [0.0; 4],
+            }
+        };
+        c.gq_gms = gq(c.gd_gms);
+        c.gq_art = gq(c.gd_art);
+        c.gq_det = gq(c.gd_det);
+        if split == SplitMode::Amplitude {
+            // Each deviation pool as a mean pool of its member: `−s·v_i/N`.
+            let fold = |g: (f64, f64, f64)| -> f64 {
+                let (sk, _, f) = g;
+                if sk == 0.0 || f <= 1e-12 {
+                    0.0
+                } else {
+                    -sk * inv_n
+                }
+            };
+            c.c_gms += fold(c.gd_gms);
+            c.c_art += fold(c.gd_art);
+            c.c_det += fold(c.gd_det);
+        }
+        // Globals. GLOBAL_DMEAN: f = sat(|Δ|, C), Δ = (Σs−Σd)/N. Repair:
+        // (δf)_i = −sat'(|Δ|)·sign(Δ)·(s_i−d_i)/N. Exact: the secant share
+        // (f/Δ)·(s_i−d_i)/N, with f/Δ = sign(Δ)/(|Δ| + C) bounded at Δ → 0.
         let delta = (app.sum_s - app.sum_d) * inv_n;
-        let sat_p = C_GDMEAN / ((delta.abs() + C_GDMEAN) * (delta.abs() + C_GDMEAN));
-        c.g_dmean = gap(idx_append::GLOBAL_DMEAN) * (-sat_p * delta.signum() * inv_n);
+        c.g_dmean = match split {
+            SplitMode::Repair => {
+                let sat_p = C_GDMEAN / ((delta.abs() + C_GDMEAN) * (delta.abs() + C_GDMEAN));
+                gap(idx_append::GLOBAL_DMEAN) * (-sat_p * delta.signum() * inv_n)
+            }
+            SplitMode::Exact | SplitMode::Amplitude if delta != 0.0 => {
+                gap(idx_append::GLOBAL_DMEAN)
+                    * (-(delta.signum() / (delta.abs() + C_GDMEAN)) * inv_n)
+            }
+            SplitMode::Exact | SplitMode::Amplitude => 0.0,
+        };
         // GLOBAL_CGAIN/CLOSS: chain rule on gvar2 (gvar1 is reference-side).
         let gmean_s = app.sum_s * inv_n;
         let gmean_d = app.sum_d * inv_n;
         let gvar1 = (app.sum_s2 * inv_n - gmean_s * gmean_s).max(0.0);
         let gvar2 = (app.sum_d2 * inv_n - gmean_d * gmean_d).max(0.0);
         let denom = gvar1 + gvar2 + C_GCONTRAST;
-        // δgvar2 per refined pixel = ((s²−d²) − 2·gmean_d·(s−d))/N.
-        let df_dg2 = if gvar2 > gvar1 {
-            gap(idx_append::GLOBAL_CGAIN) * ((2.0 * gvar1 + C_GCONTRAST) / (denom * denom))
-        } else if gvar1 > gvar2 {
-            gap(idx_append::GLOBAL_CLOSS) * (-(2.0 * gvar1 + C_GCONTRAST) / (denom * denom))
-        } else {
-            0.0
-        };
-        c.g_var = df_dg2 * inv_n;
-        c.gmean_d = gmean_d;
+        match split {
+            SplitMode::Repair => {
+                // δgvar2 per refined pixel = (s−d)·((s+d) − 2·gmean_d)/N.
+                let df_dg2 = if gvar2 > gvar1 {
+                    gap(idx_append::GLOBAL_CGAIN) * ((2.0 * gvar1 + C_GCONTRAST) / (denom * denom))
+                } else if gvar1 > gvar2 {
+                    gap(idx_append::GLOBAL_CLOSS) * (-(2.0 * gvar1 + C_GCONTRAST) / (denom * denom))
+                } else {
+                    0.0
+                };
+                c.g_var = df_dg2 * inv_n;
+                c.g_shift = 0.0;
+                c.g_sum = 2.0 * gmean_d;
+            }
+            SplitMode::Exact | SplitMode::Amplitude => {
+                // GLOBAL_CGAIN = (gvar2 − gvar1)/denom, GLOBAL_CLOSS its
+                // negation: the pixel's share of `gvar2 − gvar1` is
+                // ((d−μd)² − (s−μs)²)/N, factored as
+                // −((s−d) − (μs−μd))·((s+d) − (μs+μd))/N so it does not cancel.
+                c.g_var = if gvar2 > gvar1 {
+                    gap(idx_append::GLOBAL_CGAIN) * inv_n / denom
+                } else if gvar1 > gvar2 {
+                    -gap(idx_append::GLOBAL_CLOSS) * inv_n / denom
+                } else {
+                    0.0
+                };
+                c.g_shift = gmean_s - gmean_d;
+                c.g_sum = gmean_s + gmean_d;
+            }
+        }
         // GRAD_SRC_MEAN (slot 16): reference-only ⇒ integrand 0 (no term).
     }
     c
@@ -10084,6 +11289,7 @@ fn attr_pass_b_rows(
     // (`V2AppCoeffs::direct`); loop-invariant, so every call site below
     // unswitches on it.
     let direct = co.direct;
+    let ring_hp = co.ring_hp;
     let out_off = y0 * width;
     let cross_on = cross.is_some();
     for y in y0..y1 {
@@ -10106,10 +11312,10 @@ fn attr_pass_b_rows(
             let mut a_res = 0.0f64;
 
             // Dense family (same formulas as `dense_block_kernel`'s tail).
-            let d = ssim_d_local(m1, m2, s12v, sq, direct);
+            let d = ssim_d_local(m1, m2, s12v, sq, direct, co.stable);
             let diff_src = (s - m1).abs();
             let diff_dst = (dd - m2).abs();
-            let edge_dissim = 1.0 - bounded_sim(diff_src, diff_dst, C_EDGE);
+            let edge_dissim = bounded_dissim(diff_src, diff_dst, C_EDGE, co.stable);
             let (art_i, det_i) = if diff_dst > diff_src {
                 (edge_dissim, 0.0)
             } else if diff_dst < diff_src {
@@ -10152,20 +11358,12 @@ fn attr_pass_b_rows(
             a_res += co.sp_art.0 * saturate(art_i, C_PEAK) * (co.sp_art.1 - art_i);
             a_res += co.sp_det.0 * saturate(det_i, C_PEAK) * (co.sp_det.1 - det_i);
 
-            // SSIM deviation pools (v = d), in centered form: the removal
-            // polynomials `2μd − d²` and `−d⁴ + 4d·raw3 + 4μd³ − 12μd·raw2 −
-            // 6μ²d² + 12μ³d` equal `μ² − e²` and `μ⁴ − e⁴ + 4d·c3` with
-            // `e = d − μ`, which do not cancel when the deviation is small
-            // against the mean.
-            if co.s_dev2 != 0.0 && co.dev_f2 > 1e-12 {
+            // SSIM deviation pools (v = d): the centred polynomial
+            // `V2AppCoeffs::dev_q` in `e = d − μ`.
+            {
+                let q = &co.dev_q;
                 let e = d - co.dev_mu;
-                a_win += co.s_dev2 * (co.dev_mu * co.dev_mu - e * e)
-                    / (2.0 * co.dev_f2 * (1.0 / co.inv_n));
-            }
-            if co.s_dev4 != 0.0 && co.dev_f4 > 1e-12 {
-                let e = d - co.dev_mu;
-                let dm4 = co.dev_mu.powi(4) - e.powi(4) + 4.0 * d * co.dev_c3;
-                a_win += co.s_dev4 * co.inv_n * dm4 / (4.0 * co.dev_f4.powi(3));
+                a_win += q[0] + e * (q[1] + e * (q[2] + e * (q[3] + e * q[4])));
             }
 
             // Append block.
@@ -10179,7 +11377,7 @@ fn attr_pass_b_rows(
             a_res += co.c_mscn2 * saturate(dn * dn, C_MSCN_SQ);
             let (cg, cl) = bounded_excess_pair(var2, var1, C_CONTRAST);
             a_win += co.c_cgain * cg + co.c_closs * cl;
-            a_win += co.c_tex * (1.0 - bounded_sim(var1, var2, C_CONTRAST));
+            a_win += co.c_tex * (bounded_dissim(var1, var2, C_CONTRAST, co.stable));
 
             if cross_on {
                 let ry = ref_y[i] as f64;
@@ -10213,19 +11411,10 @@ fn attr_pass_b_rows(
                 a_id += (co.c_dark * wd + co.c_mid * wm + co.c_bright * wb) * mse_i;
             }
             // Append dev pools for art/det (gms handled in the gradient loop).
-            let gdp = |g: (f64, f64, f64), v: f64, inv_n: f64| -> f64 {
-                let (sk, m, f) = g;
-                if sk != 0.0 && f > 1e-12 {
-                    sk * (2.0 * m * v - v * v) * inv_n / (2.0 * f)
-                } else {
-                    0.0
-                }
-            };
-            a_res += gdp(co.gd_art, art_i, co.inv_n);
-            a_res += gdp(co.gd_det, det_i, co.inv_n);
+            a_res += gq_density(&co.gq_art, art_i) + gq_density(&co.gq_det, det_i);
             // Globals (pixel class — raw whole-plane sums).
             a_id += co.g_dmean * (s - dd);
-            a_id += co.g_var * ((s * s - dd * dd) - 2.0 * co.gmean_d * (s - dd));
+            a_id += co.g_var * (((s - dd) - co.g_shift) * ((s + dd) - co.g_sum));
 
             id_plane[i - out_off] += a_id + a_res;
             win_plane[i - out_off] += a_win;
@@ -10264,17 +11453,19 @@ fn attr_pass_b_rows(
                 let gx_d = dxr - dxl;
                 let gy_d = dyd - dyu;
                 let gmag_d = (gx_d * gx_d + gy_d * gy_d).sqrt();
-                let g = 1.0 - bounded_sim(gmag_s, gmag_d, C_GMS);
+                let g = bounded_dissim(gmag_s, gmag_d, C_GMS, co.stable);
                 let mut acc = co.c_gms * g;
-                if co.gd_gms.0 != 0.0 && co.gd_gms.2 > 1e-12 {
-                    acc += co.gd_gms.0 * (2.0 * co.gd_gms.1 * g - g * g) * co.inv_n
-                        / (2.0 * co.gd_gms.2);
-                }
+                acc += gq_density(&co.gq_gms, g);
                 if co.c_ringing != 0.0 {
                     let s = src[i] as f64;
                     let dd = dst[i] as f64;
                     let act = planes.act[i] as f64;
-                    let err_b = saturate((s - dd).abs(), C_RING_ERR);
+                    let ring_err = if ring_hp {
+                        ((s - planes.mu1[i] as f64) - (dd - planes.mu2[i] as f64)).abs()
+                    } else {
+                        (s - dd).abs()
+                    };
+                    let err_b = saturate(ring_err, C_RING_ERR);
                     let act_b = saturate(act, C_ACTIVITY);
                     let edge_r = saturate(gmag_s, C_RING_EDGE);
                     acc += co.c_ringing * (err_b * act_b * (1.0 - edge_r));
@@ -10439,16 +11630,12 @@ struct V2AppCoeffsF32 {
     sp_ssim: (f32, f32),
     sp_art: (f32, f32),
     sp_det: (f32, f32),
-    /// ssim-`d` dev-pool polynomial (dev2 + dev4 folded, guards applied at
-    /// fold time), centered at the pool mean `pdm`:
-    /// `pd0 + pd1·d + pq2·e² + pq4·e⁴` with `e = d − pdm`, added to the
-    /// window class. Expanded in raw powers of `d` these coefficients grow as
-    /// `1/f³` and the f32 sum cancels catastrophically once the deviation is
-    /// small against the mean.
-    pd0: f32,
-    pd1: f32,
-    pq2: f32,
-    pq4: f32,
+    /// ssim-`d` dev-pool polynomial ([`V2AppCoeffs::dev_q`]), centered at the
+    /// pool mean `pdm`: `pq[0] + e·(pq[1] + e·(pq[2] + e·(pq[3] + e·pq[4])))`
+    /// with `e = d − pdm`, added to the window class. Expanded in raw powers
+    /// of `d` these coefficients grow as `1/f³` and the f32 sum cancels
+    /// catastrophically once the deviation is small against the mean.
+    pq: [f32; 5],
     pdm: f32,
     c_xmask: f32,
     c_lumt: f32,
@@ -10460,21 +11647,23 @@ struct V2AppCoeffsF32 {
     c_dark: f32,
     c_mid: f32,
     c_bright: f32,
-    /// gdp pools as lin/quad pairs: `lin·v + quad·v²` (guards folded).
-    ga_lin: f32,
-    ga_quad: f32,
-    gd_lin: f32,
-    gd_quad: f32,
-    gg_lin: f32,
-    gg_quad: f32,
+    /// gdp pools as centred quadratics ([`V2AppCoeffs::gq_art`]):
+    /// `q[0] + e·(q[1] + e·q[2])`, `e = v − q[3]` (guards folded).
+    ga: [f32; 4],
+    gd: [f32; 4],
+    gg: [f32; 4],
     g_dmean: f32,
     g_var: f32,
-    gmean_d: f32,
+    g_shift: f32,
+    g_sum: f32,
     c_edgew: f32,
     c_bv_gain: f32,
     c_bv_loss: f32,
-    /// [`V2AppCoeffs::direct`]: the planes' own form.
+    /// [`V2AppCoeffs::direct`] / [`V2AppCoeffs::ring_hp`] / [`V2AppCoeffs::stable`]: the
+    /// planes' own forms.
     direct: bool,
+    ring_hp: bool,
+    stable: bool,
 }
 
 /// Fold a derived [`V2AppCoeffs`] into the f32 pack. `cross_on` = the f64
@@ -10482,32 +11671,8 @@ struct V2AppCoeffsF32 {
 /// and cross-mask terms are zeroed exactly as the f64 branch skips them.
 #[cfg(feature = "custom-profiles")]
 fn v2app_coeffs_fold_f32(co: &V2AppCoeffs, cross_on: bool) -> V2AppCoeffsF32 {
-    // dev2: s·(μ² − e²) / (2·f2·N); dev4: k4·(μ⁴ − e⁴ + 4d·c3), e = d − μ.
-    let (mut pd0, mut pd1, mut pq2, mut pq4) = (0.0f64, 0.0f64, 0.0f64, 0.0f64);
-    let mu = co.dev_mu;
-    if co.s_dev2 != 0.0 && co.dev_f2 > 1e-12 {
-        let k = co.s_dev2 * co.inv_n / (2.0 * co.dev_f2);
-        pd0 += k * mu * mu;
-        pq2 += -k;
-    }
-    if co.s_dev4 != 0.0 && co.dev_f4 > 1e-12 {
-        let k4 = co.s_dev4 * co.inv_n / (4.0 * co.dev_f4.powi(3));
-        pd0 += k4 * mu.powi(4);
-        pd1 += k4 * 4.0 * co.dev_c3;
-        pq4 += -k4;
-    }
-    let gdp_lq = |g: (f64, f64, f64)| -> (f32, f32) {
-        let (sk, m, f) = g;
-        if sk != 0.0 && f > 1e-12 {
-            let k = sk * co.inv_n / (2.0 * f);
-            ((k * 2.0 * m) as f32, (-k) as f32)
-        } else {
-            (0.0, 0.0)
-        }
-    };
-    let (ga_lin, ga_quad) = gdp_lq(co.gd_art);
-    let (gd_lin, gd_quad) = gdp_lq(co.gd_det);
-    let (gg_lin, gg_quad) = gdp_lq(co.gd_gms);
+    let f32x = |q: &[f64]| -> Vec<f32> { q.iter().map(|&v| v as f32).collect() };
+    let q4 = |q: &[f64; 4]| -> [f32; 4] { f32x(q).try_into().unwrap() };
     V2AppCoeffsF32 {
         c_ssim: co.c_ssim as f32,
         c_art: co.c_art as f32,
@@ -10534,11 +11699,8 @@ fn v2app_coeffs_fold_f32(co: &V2AppCoeffs, cross_on: bool) -> V2AppCoeffsF32 {
         sp_ssim: (co.sp_ssim.0 as f32, co.sp_ssim.1 as f32),
         sp_art: (co.sp_art.0 as f32, co.sp_art.1 as f32),
         sp_det: (co.sp_det.0 as f32, co.sp_det.1 as f32),
-        pd0: pd0 as f32,
-        pd1: pd1 as f32,
-        pq2: pq2 as f32,
-        pq4: pq4 as f32,
-        pdm: mu as f32,
+        pq: f32x(&co.dev_q).try_into().unwrap(),
+        pdm: co.dev_mu as f32,
         c_xmask: if cross_on { co.c_xmask as f32 } else { 0.0 },
         c_lumt: if cross_on { co.c_lumt as f32 } else { 0.0 },
         c_mscn: co.c_mscn as f32,
@@ -10549,19 +11711,19 @@ fn v2app_coeffs_fold_f32(co: &V2AppCoeffs, cross_on: bool) -> V2AppCoeffsF32 {
         c_dark: co.c_dark as f32,
         c_mid: co.c_mid as f32,
         c_bright: co.c_bright as f32,
-        ga_lin,
-        ga_quad,
-        gd_lin,
-        gd_quad,
-        gg_lin,
-        gg_quad,
+        ga: q4(&co.gq_art),
+        gd: q4(&co.gq_det),
+        gg: q4(&co.gq_gms),
         g_dmean: co.g_dmean as f32,
         g_var: co.g_var as f32,
-        gmean_d: co.gmean_d as f32,
+        g_shift: co.g_shift as f32,
+        g_sum: co.g_sum as f32,
         c_edgew: co.c_edgew as f32,
         c_bv_gain: co.c_bv_gain as f32,
         c_bv_loss: co.c_bv_loss as f32,
         direct: co.direct,
+        ring_hp: co.ring_hp,
+        stable: co.stable,
     }
 }
 
@@ -10575,11 +11737,22 @@ fn v2app_coeffs_fold_f32(co: &V2AppCoeffs, cross_on: bool) -> V2AppCoeffsF32 {
 /// columns; `benchmarks/v2spatial_2026-10-02.md`).
 #[cfg(feature = "custom-profiles")]
 #[inline(always)]
-fn ssim_d_px(na: f32, nb: f32, nd: f32, m1: f32, m2: f32, s12v: f32, direct: bool) -> f32 {
+#[allow(clippy::too_many_arguments)]
+fn ssim_d_px(
+    na: f32,
+    nb: f32,
+    nd: f32,
+    m1: f32,
+    m2: f32,
+    s12v: f32,
+    direct: bool,
+    stable: bool,
+) -> f32 {
     if direct {
         let mu_diff = m1 - m2;
         let err_var = (s12v - mu_diff * mu_diff).max(0.0);
-        ((nd * (nb - na) + na * err_var) / (nb * nd)).max(0.0)
+        let lum = if stable { mu_diff * mu_diff } else { nb - na };
+        ((nd * lum + na * err_var) / (nb * nd)).max(0.0)
     } else {
         let nc = 2.0 * (s12v - m1 * m2) + C2_V2 as f32;
         (1.0 - (na * nc) / (nb * nd)).max(0.0)
@@ -10636,11 +11809,10 @@ fn attr_pass_b_main_px(
     let na = 2.0 * m1 * m2 + C1;
     let nb = m1 * m1 + m2 * m2 + C1;
     let nd = sq - m1 * m1 - m2 * m2 + C2;
-    let d = ssim_d_px(na, nb, nd, m1, m2, s12v, direct);
+    let d = ssim_d_px(na, nb, nd, m1, m2, s12v, direct, co.stable);
     let diff_src = (s - m1).abs();
     let diff_dst = (dd - m2).abs();
-    let edge_dissim =
-        1.0 - (2.0 * diff_src * diff_dst + CE) / (diff_src * diff_src + diff_dst * diff_dst + CE);
+    let edge_dissim = bounded_dissim32(diff_src, diff_dst, CE, co.stable);
     let art_i = if diff_dst > diff_src {
         edge_dissim
     } else {
@@ -10686,10 +11858,10 @@ fn attr_pass_b_main_px(
     a_win += co.sp_ssim.0 * sat(d, CPK) * (co.sp_ssim.1 - d);
     a_res += co.sp_art.0 * sat(art_i, CPK) * (co.sp_art.1 - art_i);
     a_res += co.sp_det.0 * sat(det_i, CPK) * (co.sp_det.1 - det_i);
-    // Dev polynomial, centered: pd0 + pd1·d + pq2·e² + pq4·e⁴, e = d − pdm.
+    // Dev polynomial, centered: `V2AppCoeffsF32::pq` in e = d − pdm.
     let e = d - co.pdm;
-    let esq = e * e;
-    a_win += co.pd0 + co.pd1 * d + (co.pq2 + co.pq4 * esq) * esq;
+    let q = &co.pq;
+    a_win += q[0] + e * (q[1] + e * (q[2] + e * (q[3] + e * q[4])));
     // Rev5 retains no appendix plane: its coefficients cannot read this block.
     if append {
         // Append block.
@@ -10705,7 +11877,7 @@ fn attr_pass_b_main_px(
             ((var2 - var1).max(0.0) * r, (var1 - var2).max(0.0) * r)
         };
         a_win += co.c_cgain * cg + co.c_closs * cl;
-        a_win += co.c_tex * (1.0 - (2.0 * var1 * var2 + CC) / (var1 * var1 + var2 * var2 + CC));
+        a_win += co.c_tex * (bounded_dissim32(var1, var2, CC, co.stable));
         // Luminance transducer + cross-mask (coefficients zero off-Y).
         let t = sat(ry, CLT);
         if co.c_lumt != 0.0 {
@@ -10722,11 +11894,14 @@ fn attr_pass_b_main_px(
         let wm = 1.0 - wd - wb;
         a_id += (co.c_dark * wd + co.c_mid * wm + co.c_bright * wb) * mse_i;
         // gdp pools (art/det).
-        a_res += (co.ga_lin + co.ga_quad * art_i) * art_i;
-        a_res += (co.gd_lin + co.gd_quad * det_i) * det_i;
+        let gq = |q: &[f32; 4], v: f32| -> f32 {
+            let e = v - q[3];
+            q[0] + e * (q[1] + e * q[2])
+        };
+        a_res += gq(&co.ga, art_i) + gq(&co.gd, det_i);
         // Globals (factored g_var form).
         a_id += co.g_dmean * raw_diff;
-        a_id += co.g_var * raw_diff * ((s + dd) - 2.0 * co.gmean_d);
+        a_id += co.g_var * ((raw_diff - co.g_shift) * ((s + dd) - co.g_sum));
     }
     (a_id + a_res, a_win)
 }
@@ -10818,10 +11993,10 @@ fn attr_pass_b_main_kernel_generic<T: F32x8Backend + Copy>(
             let mut a_win = zero;
             let mut a_res = zero;
             // Dense family.
-            let d = ssim_d_local_v(token, m1, m2, ld!(s12), sq, c1, c2, direct);
+            let d = ssim_d_local_v(token, m1, m2, ld!(s12), sq, c1, c2, direct, co.stable);
             let diff_src = (s - m1).abs();
             let diff_dst = (dd - m2).abs();
-            let edge_dissim = one - bounded_sim_v(token, diff_src, diff_dst, c_edge);
+            let edge_dissim = bounded_dissim_v(token, diff_src, diff_dst, c_edge, co.stable);
             let art_i = V8::<T>::blend(diff_dst.simd_gt(diff_src), edge_dissim, zero);
             let det_i = V8::<T>::blend(diff_dst.simd_lt(diff_src), edge_dissim, zero);
             let raw_diff = s - dd;
@@ -10853,10 +12028,10 @@ fn attr_pass_b_main_kernel_generic<T: F32x8Backend + Copy>(
             a_win += sp(co.sp_ssim.0) * sat_v(d, c_peak) * (sp(co.sp_ssim.1) - d);
             a_res += sp(co.sp_art.0) * sat_v(art_i, c_peak) * (sp(co.sp_art.1) - art_i);
             a_res += sp(co.sp_det.0) * sat_v(det_i, c_peak) * (sp(co.sp_det.1) - det_i);
-            // Dev polynomial, centered (see `V2AppCoeffsF32::pd0`).
+            // Dev polynomial, centered (see `V2AppCoeffsF32::pq`).
             let e = d - sp(co.pdm);
-            let esq = e * e;
-            a_win += sp(co.pd0) + sp(co.pd1) * d + (sp(co.pq2) + sp(co.pq4) * esq) * esq;
+            let q = &co.pq;
+            a_win += sp(q[0]) + e * (sp(q[1]) + e * (sp(q[2]) + e * (sp(q[3]) + e * sp(q[4]))));
             if append {
                 // Append block.
                 let b2v = ld!(bs2);
@@ -10869,7 +12044,8 @@ fn attr_pass_b_main_kernel_generic<T: F32x8Backend + Copy>(
                 a_res += sp(co.c_mscn2) * sat_v(dn * dn, c_mscn_sq);
                 let (cg, cl) = bounded_excess_pair_v(token, var2, var1, c_contrast);
                 a_win += sp(co.c_cgain) * cg + sp(co.c_closs) * cl;
-                a_win += sp(co.c_tex) * (one - bounded_sim_v(token, var1, var2, c_contrast));
+                a_win +=
+                    sp(co.c_tex) * (bounded_dissim_v(token, var1, var2, c_contrast, co.stable));
                 // Luminance transducer + cross-mask (Y only; uniform branches).
                 let ry = ld!(ref_y);
                 let t = sat_v(ry, c_lum_t);
@@ -10895,11 +12071,13 @@ fn attr_pass_b_main_kernel_generic<T: F32x8Backend + Copy>(
                 let wm = one - wd - wb;
                 a_id += (sp(co.c_dark) * wd + sp(co.c_mid) * wm + sp(co.c_bright) * wb) * mse_i;
                 // gdp pools.
-                a_res += (sp(co.ga_lin) + sp(co.ga_quad) * art_i) * art_i;
-                a_res += (sp(co.gd_lin) + sp(co.gd_quad) * det_i) * det_i;
+                let ea = art_i - sp(co.ga[3]);
+                a_res += sp(co.ga[0]) + ea * (sp(co.ga[1]) + ea * sp(co.ga[2]));
+                let ed = det_i - sp(co.gd[3]);
+                a_res += sp(co.gd[0]) + ed * (sp(co.gd[1]) + ed * sp(co.gd[2]));
                 // Globals (factored g_var form).
                 a_id += sp(co.g_dmean) * raw_diff;
-                a_id += sp(co.g_var) * raw_diff * ((s + dd) - sp(2.0 * co.gmean_d));
+                a_id += sp(co.g_var) * ((raw_diff - sp(co.g_shift)) * ((s + dd) - sp(co.g_sum)));
             }
             let o = orow + x;
             let id_new =
@@ -11004,7 +12182,9 @@ fn attr_pass_b_rows_f32(
         ),
         [v4x, v4, v3, neon, wasm128, scalar]
     );
-    attr_pass_b_grad_rows_f32(src, dst, width, height, act_p, co, y0, y1, id_plane);
+    attr_pass_b_grad_rows_f32(
+        src, dst, width, height, act_p, mu1, mu2, co, y0, y1, id_plane,
+    );
 }
 
 /// Scalar per-pixel gradient-family integrand of the f32 fused pass-B —
@@ -11016,6 +12196,8 @@ fn attr_pass_b_grad_px(
     s_c: f32,
     d_c: f32,
     act_i: f32,
+    m1_c: f32,
+    m2_c: f32,
     sxl: f32,
     sxr: f32,
     syu: f32,
@@ -11044,11 +12226,17 @@ fn attr_pass_b_grad_px(
     let gx_d = dxr - dxl;
     let gy_d = dyd - dyu;
     let gmag_d = (gx_d * gx_d + gy_d * gy_d).sqrt();
-    let g = 1.0 - (2.0 * gmag_s * gmag_d + CG) / (gmag_s * gmag_s + gmag_d * gmag_d + CG);
+    let g = bounded_dissim32(gmag_s, gmag_d, CG, co.stable);
     let mut acc = co.c_gms * g;
-    acc += (co.gg_lin + co.gg_quad * g) * g;
+    let eg = g - co.gg[3];
+    acc += co.gg[0] + eg * (co.gg[1] + eg * co.gg[2]);
     if co.c_ringing != 0.0 {
-        let err_b = sat((s_c - d_c).abs(), CRE);
+        let ring_err = if co.ring_hp {
+            ((s_c - m1_c) - (d_c - m2_c)).abs()
+        } else {
+            (s_c - d_c).abs()
+        };
+        let err_b = sat(ring_err, CRE);
         let act_b = sat(act_i, CA);
         let edge_r = sat(gmag_s, CRG);
         acc += co.c_ringing * (err_b * act_b * (1.0 - edge_r));
@@ -11089,6 +12277,8 @@ fn attr_pass_b_grad_kernel_generic<T: F32x8Backend + Copy>(
     src: &[f32],
     dst: &[f32],
     act_p: &[f32],
+    mu1: &[f32],
+    mu2: &[f32],
     co: &V2AppCoeffsF32,
     width: usize,
     height: usize,
@@ -11098,6 +12288,7 @@ fn attr_pass_b_grad_kernel_generic<T: F32x8Backend + Copy>(
 ) {
     let need_bandvis = co.c_bv_gain != 0.0 || co.c_bv_loss != 0.0;
     let has_ringing = co.c_ringing != 0.0;
+    let ring_hp = co.ring_hp;
     let has_banding = co.c_banding != 0.0;
     let zero = V8::<T>::zero_t(token);
     let one = V8::<T>::splat_t(token, 1.0);
@@ -11127,6 +12318,8 @@ fn attr_pass_b_grad_kernel_generic<T: F32x8Backend + Copy>(
                 src[i],
                 dst[i],
                 act_p[i],
+                mu1[i],
+                mu2[i],
                 src[i],
                 src[i],
                 src[ru],
@@ -11147,6 +12340,8 @@ fn attr_pass_b_grad_kernel_generic<T: F32x8Backend + Copy>(
                 src[i],
                 dst[i],
                 act_p[i],
+                mu1[i],
+                mu2[i],
                 src[i],
                 src[i + 1],
                 src[ru],
@@ -11185,11 +12380,17 @@ fn attr_pass_b_grad_kernel_generic<T: F32x8Backend + Copy>(
             let gx_d = dxr - dxl;
             let gy_d = dyd - dyu;
             let gmag_d = (gx_d * gx_d + gy_d * gy_d).sqrt();
-            let g = one - bounded_sim_v(token, gmag_s, gmag_d, c_gms);
+            let g = bounded_dissim_v(token, gmag_s, gmag_d, c_gms, co.stable);
             let mut acc = sp(co.c_gms) * g;
-            acc += (sp(co.gg_lin) + sp(co.gg_quad) * g) * g;
+            let eg = g - sp(co.gg[3]);
+            acc += sp(co.gg[0]) + eg * (sp(co.gg[1]) + eg * sp(co.gg[2]));
             if has_ringing {
-                let err_b = sat_v((s_c - d_c).abs(), c_ring_err);
+                let ring_err = if ring_hp {
+                    ((s_c - ldo!(mu1, i)) - (d_c - ldo!(mu2, i))).abs()
+                } else {
+                    (s_c - d_c).abs()
+                };
+                let err_b = sat_v(ring_err, c_ring_err);
                 let act_b = sat_v(ldo!(act_p, i), c_activity);
                 let edge_r = sat_v(gmag_s, c_ring_edge);
                 acc += sp(co.c_ringing) * (err_b * act_b * (one - edge_r));
@@ -11224,6 +12425,8 @@ fn attr_pass_b_grad_kernel_generic<T: F32x8Backend + Copy>(
                 src[i],
                 dst[i],
                 act_p[i],
+                mu1[i],
+                mu2[i],
                 src[i - 1],
                 src[i + 1],
                 src[ru + x],
@@ -11245,6 +12448,8 @@ fn attr_pass_b_grad_kernel_generic<T: F32x8Backend + Copy>(
                 src[i],
                 dst[i],
                 act_p[i],
+                mu1[i],
+                mu2[i],
                 src[i - 1],
                 src[i],
                 src[ru + x],
@@ -11269,6 +12474,8 @@ fn attr_pass_b_grad_entry(
     src: &[f32],
     dst: &[f32],
     act_p: &[f32],
+    mu1: &[f32],
+    mu2: &[f32],
     co: &V2AppCoeffsF32,
     width: usize,
     height: usize,
@@ -11276,7 +12483,9 @@ fn attr_pass_b_grad_entry(
     y1: usize,
     id_plane: &mut [f32],
 ) {
-    attr_pass_b_grad_kernel_generic(token, src, dst, act_p, co, width, height, y0, y1, id_plane);
+    attr_pass_b_grad_kernel_generic(
+        token, src, dst, act_p, mu1, mu2, co, width, height, y0, y1, id_plane,
+    );
 }
 
 /// Gradient-family sweep of the f32 fused pass-B (gms / gms-dev / ringing
@@ -11290,6 +12499,8 @@ fn attr_pass_b_grad_rows_f32(
     width: usize,
     height: usize,
     act_p: &[f32],
+    mu1: &[f32],
+    mu2: &[f32],
     co: V2AppCoeffsF32,
     y0: usize,
     y1: usize,
@@ -11299,15 +12510,16 @@ fn attr_pass_b_grad_rows_f32(
     let need_grad = co.c_gms != 0.0
         || co.c_ringing != 0.0
         || co.c_banding != 0.0
-        || co.gg_lin != 0.0
-        || co.gg_quad != 0.0
+        || co.gg[..3].iter().any(|&v| v != 0.0)
         || co.c_edgew != 0.0
         || need_bandvis;
     if !need_grad {
         return;
     }
     incant!(
-        attr_pass_b_grad_entry(src, dst, act_p, &co, width, height, y0, y1, id_plane),
+        attr_pass_b_grad_entry(
+            src, dst, act_p, mu1, mu2, &co, width, height, y0, y1, id_plane
+        ),
         [v4x, v4, v3, neon, wasm128, scalar]
     );
 }
@@ -11579,6 +12791,8 @@ fn attr_pass_b_for_scale(
             attr_ew_coeff(s_v2, mg, dims, n_scales, scale, ch),
             // The standalone walk computes its planes at the process revision (`validate_wide_revision`).
             crate::ssim_form::active_revision(),
+            // The standalone route keeps the removal split (no paint modes).
+            crate::map_paint::SplitMode::Repair,
         );
         attr_pass_b_channel(
             rplanes[ch],
@@ -11670,6 +12884,8 @@ fn attr_pass_b_for_scale_f32(
     spread_out: &mut Vec<f32>,
     geometry: Option<&crate::sampling::Geometry>,
     lattice: &mut crate::attribution::LatticeSet,
+    guide0: Option<&[f64]>,
+    paint: crate::map_paint::MapPaint,
     revision: FormulaRevision,
 ) {
     let tpb = crate::perf_clock::Instant::now();
@@ -11706,6 +12922,7 @@ fn attr_pass_b_for_scale_f32(
             ch == 1,
             attr_ew_coeff(s_v2, mg, dims, n_scales, scale, ch),
             revision,
+            paint.split,
         );
         let co32 = v2app_coeffs_fold_f32(&co, cross.is_some());
         attr_pass_b_channel_f32(
@@ -11727,13 +12944,16 @@ fn attr_pass_b_for_scale_f32(
         lattice.put(l);
     }
     // Window spread fused with the window→identity merge (value-exact vs
-    // spread-then-add; parallel is bitwise-invariant per its gate).
-    crate::blur::box_spread_merge_f32(
+    // spread-then-add; parallel is bitwise-invariant per its gate). The
+    // research window modes (`crate::map_paint`) replace the uniform spread.
+    crate::map_paint::merge_window(
+        paint.window,
         &mut win_plane[..n],
         &mut scale_density[..n],
         ws,
         hs,
         BLUR_RADIUS,
+        || crate::map_paint::difference_guide(rplanes, dplanes, n, paint.guide),
         spread_tmp,
         spread_out,
         parallel && n >= crate::blur::SPREAD_PARALLEL_MIN_N,
@@ -11757,7 +12977,14 @@ fn attr_pass_b_for_scale_f32(
                 let (w, h) = geometry.logical_dimensions();
                 accum.add_scale_plane_f32(&projected, w, h, 1);
             } else {
-                accum.add_scale_plane_f32(&scale_density[..n], ws, hs, 1usize << scale);
+                accum.add_scale_plane_painted_f32(
+                    &scale_density[..n],
+                    ws,
+                    hs,
+                    scale,
+                    paint.paint,
+                    guide0,
+                );
             }
         }
     }
@@ -12123,8 +13350,12 @@ fn compute_v2_append_attribution_impl(
                 let decay_dst = gd / (pgd + C_GRAD_DECAY);
                 let prev_b = (scale - 1) * 3 * FEATURES_PER_CHANNEL_V2_TOTAL
                     + ch * FEATURES_PER_CHANNEL_V2_TOTAL;
-                v2_features[prev_b + idx::EDGE_WIDTH_CHANGE] =
-                    1.0 - bounded_sim(decay_src, decay_dst, C_EDGEWIDTH);
+                v2_features[prev_b + idx::EDGE_WIDTH_CHANGE] = bounded_dissim(
+                    decay_src,
+                    decay_dst,
+                    C_EDGEWIDTH,
+                    toggles.formula_revision.stable_forms(),
+                );
                 if scale == n_scales - 1 && n_scales >= 2 {
                     let this_b = scale * 3 * FEATURES_PER_CHANNEL_V2_TOTAL
                         + ch * FEATURES_PER_CHANNEL_V2_TOTAL;

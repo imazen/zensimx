@@ -1,0 +1,32 @@
+[package]
+name = "zensim-workbench-loop-converge"
+version = "0.0.0"
+edition = "2024"
+license = "MIT OR Apache-2.0"
+publish = false
+description = "Research: the zenmetrics workbench's JPEG XL loop run natively against zensim-workbench's loop maps, to measure where it lands against the requested distance."
+
+# Standalone, so the sibling jxl-encoder path stays out of zensim-workbench's
+# lockfile and wasm build.
+[workspace]
+
+[dependencies]
+zensim-workbench = { path = ".." }
+jxl-encoder = { path = "../../../jxl-encoder/jxl-encoder", default-features = false, features = ["std", "butteraugli-loop", "__external_metric"] }
+png = "0.18.1"
+# map_probe: the attribution map under each mode, from a bake file.
+zensim = { path = "../../zensim", default-features = false, features = ["custom-profiles", "feature-regime-v2"] }
+zenpredict = { version = "0.2.0", git = "https://github.com/imazen/zenanalyze", rev = "f0903489300aea240ffae2e3f1359f8f2b9a0ba4" }
+serde_json = "1.0.145"
+# steer_rd: decodes each bitstream as jxl-encoder's zensim_diffmap_rd harness does, and hashes it.
+zenjxl-decoder = { path = "../../../zenjxl-decoder/zenjxl-decoder" }
+sha2 = "0.11.0"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+
+# jxl-encoder's own workspace patch for the butteraugli it needs (0.9.4 is
+# unreleased); keep in step with ~/work/zen/jxl-encoder/Cargo.toml.
+[patch.crates-io]
+butteraugli = { git = "https://github.com/imazen/butteraugli", rev = "d2466a4eaad67f8008838c0caa452484300214ca" }

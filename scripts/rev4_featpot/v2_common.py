@@ -82,6 +82,31 @@ FX1_DECLARATION = Path(__file__).resolve().parent / "e33_fx1_declaration.json"
 FX1_SHA256 = "a97a5fa63937ed8fade3c56fd7470765a031d1d309afc36e631f371a1796e648"
 FX2_DECLARATION = Path(__file__).resolve().parent / "color_noise_fx2_declaration.json"
 FX2_SHA256 = "a3802ddeeede6ec5c9e3d03efdd6cc5af683ab4ea2b0d1143c8e9183c5bd46e5"
+# By-construction exploration (benchmarks/byconstruction_2026-10-22.md): fx1 without the v2 ringing slots.
+FX1NR_DECLARATION = Path(__file__).resolve().parent / "byc_fx1nr_declaration.json"
+FX1NR_SHA256 = "923da70c2ccdfcdf2d34192a8b7f6679dd27d918b55ff1c7827e5da5234cb740"
+# By-construction exploration: fx1 plus the byc_globaff global affine-change descriptor (research ids f1867-f1890).
+FX1G_DECLARATION = Path(__file__).resolve().parent / "byc_fx1g_declaration.json"
+FX1G_SHA256 = "2fa7a8c8a908406e101b705d061cb41cfb6f36a31afd815f8ef1d3529fd2d2a0"
+# fx1g restricted to pyramid scales 1-3 (no scale-0 slot read; byconstruction AIC2026 TRAIN compute arm)
+FX1GS1_DECLARATION = Path(__file__).resolve().parent / "byc_fx1gs1_declaration.json"
+FX1GS1_SHA256 = "a8d224e465ed9014793496926630399bf189ec1e6e28b966feb9538493269b52"
+# fx1 plus gated damage (research ids f1891-f2300: each difference x (1 - byc_globaff share of its cell)); every input
+# monotone, the descriptor itself not read (byconstruction global-edit inversion fix)
+FX1GG_DECLARATION = Path(__file__).resolve().parent / "byc_fx1gg_declaration.json"
+FX1GG_SHA256 = "c009fbedd3fbd2678720ff2a2b2bf89845a4f571e0909b36ac68caeb766a273a"
+# fx1 plus gated luminance damage (research ids f1891-f2054: each Y-cell difference x (1 - byc_globaff share of its
+# cell)); X and B damage ungated (byconstruction luminance-gate arm; `ring_root.py gated-decl --channels Y`)
+FX1GY_DECLARATION = Path(__file__).resolve().parent / "byc_fx1gy_declaration.json"
+FX1GY_SHA256 = "d850c8a89ff1553a8db543a9adc4c34fe6a3dc33241272db1a9e8125b666f1c2"
+# By-construction exploration (benchmarks/byconstruction_2026-10-22.md, "Which cells can revision 7 skip"): fx1
+# without its scale-0 cell (luma only), so the walk skips scale 0.
+FX1NS0_DECLARATION = Path(__file__).resolve().parent / "byc_fx1ns0_declaration.json"
+FX1NS0_SHA256 = "e74f8cc1f9c624b8f8aa2fbdd624b30869ec4900a8412ced2d4c68d651c3bd66"
+# fx1 plus the byc_orient damage (research ids f2301-f2336: Haar H/V/D band-difference RMS per scale x channel), direct
+# only (byconstruction orientation-band arm)
+FX1O_DECLARATION = Path(__file__).resolve().parent / "byc_fx1o_declaration.json"
+FX1O_SHA256 = "155be1f8019396e7fc350d61754947d0002884c314d30e1461e5d97eb0b31b3d"
 
 
 def fx1_declaration() -> dict:
@@ -95,6 +120,34 @@ def fx1_declaration() -> dict:
 def derived_declaration(token):
     """Pinned experiment declaration; existing fx1 bytes remain unchanged."""
     if token == 'fx1':return FX1_DECLARATION, FX1_SHA256, fx1_declaration()
+    if token == 'fx1nr':
+        data=FX1NR_DECLARATION.read_bytes()
+        if hashlib.sha256(data).hexdigest()!=FX1NR_SHA256:raise ValueError('fx1nr declaration changed')
+        return FX1NR_DECLARATION, FX1NR_SHA256, json.loads(data)
+    if token == 'fx1gg':
+        data=FX1GG_DECLARATION.read_bytes()
+        if hashlib.sha256(data).hexdigest()!=FX1GG_SHA256:raise ValueError('fx1gg declaration changed')
+        return FX1GG_DECLARATION, FX1GG_SHA256, json.loads(data)
+    if token == 'fx1gy':
+        data=FX1GY_DECLARATION.read_bytes()
+        if hashlib.sha256(data).hexdigest()!=FX1GY_SHA256:raise ValueError('fx1gy declaration changed')
+        return FX1GY_DECLARATION, FX1GY_SHA256, json.loads(data)
+    if token == 'fx1ns0':
+        data=FX1NS0_DECLARATION.read_bytes()
+        if hashlib.sha256(data).hexdigest()!=FX1NS0_SHA256:raise ValueError('fx1ns0 declaration changed')
+        return FX1NS0_DECLARATION, FX1NS0_SHA256, json.loads(data)
+    if token == 'fx1gs1':
+        data=FX1GS1_DECLARATION.read_bytes()
+        if hashlib.sha256(data).hexdigest()!=FX1GS1_SHA256:raise ValueError('fx1gs1 declaration changed')
+        return FX1GS1_DECLARATION, FX1GS1_SHA256, json.loads(data)
+    if token == 'fx1o':
+        data=FX1O_DECLARATION.read_bytes()
+        if hashlib.sha256(data).hexdigest()!=FX1O_SHA256:raise ValueError('fx1o declaration changed')
+        return FX1O_DECLARATION, FX1O_SHA256, json.loads(data)
+    if token == 'fx1g':
+        data=FX1G_DECLARATION.read_bytes()
+        if hashlib.sha256(data).hexdigest()!=FX1G_SHA256:raise ValueError('fx1g declaration changed')
+        return FX1G_DECLARATION, FX1G_SHA256, json.loads(data)
     if token != 'fx2':raise ValueError('unknown derived-input recipe: '+str(token))
     data=FX2_DECLARATION.read_bytes()
     if hashlib.sha256(data).hexdigest()!=FX2_SHA256:raise ValueError('fx2 declaration changed after registration')
@@ -269,8 +322,32 @@ def recipe_of(spec: str) -> dict:
             out.update(hdr_weight=4.0, hdr_mode={"hp": "rank", "ha": "withinref,both", "hb": "rank", "hc": "rank"}[tok[:2]], **({"hdr_consensus": tok} if tok[:2] in ("hb", "hc") else {}))
         elif tok == "sh1" and "smooth_hinge" not in out:
             out["smooth_hinge"] = True
-        elif tok in ("fx1", "fx2") and "derived_inputs" not in out:
+        elif tok in ("fx1", "fx2", "fx1nr", "fx1g", "fx1gs1", "fx1gg", "fx1gy", "fx1o", "fx1ns0") and "derived_inputs" not in out:
             out["derived_inputs"] = tok
+        elif tok == "mono" and "mono_all" not in out:  # by-construction exploration: W1 >= 0 on every input
+            out["mono_all"] = True
+        elif tok == "thr" and "thresholds" not in out:  # by-construction exploration: trainable b1 <= 0
+            out["thresholds"] = True
+        elif tok.startswith("rp") and tok[2:].isdigit() and int(tok[2:]) > 0 and "ramps" not in out:
+            out["ramps"] = int(tok[2:])  # by-construction exploration: tied monotone ramp pairs
+        elif tok.startswith("fr") and tok[2:].isdigit() and int(tok[2:]) > 0 and "free_ramps" not in out:
+            out["free_ramps"] = int(tok[2:])  # by-construction exploration: budgeted sign-free ramp pairs
+        elif tok.startswith("fb") and "free_budget" not in out and 0 <= float(tok[2:]) <= 1000:
+            out["free_budget"] = float(tok[2:])
+        elif tok == "gate" and "gated_products" not in out:  # content-gated monotone over fx1 products
+            out["gated_products"] = True
+        elif tok == "freering" and "free_mask" not in out:  # partial monotone: v2 ringing inputs sign-free
+            out["free_mask"] = "free_ringing"
+        elif tok == "freeglob" and "free_mask" not in out:  # partial monotone: byc_globaff descriptor inputs sign-free
+            out["free_mask"] = "free_globaff"
+        elif tok == "freeglobs1" and "free_mask" not in out:  # the same for fx1gs1 (descriptor scales 1-3)
+            out["free_mask"] = "free_globaff_s1"
+        elif tok == "dropring" and "free_mask" not in out:  # exactly monotone, v2 ringing inputs dropped
+            out.update(free_mask="free_ringing", drop_masked=True)
+        elif tok == "dropglobal" and "free_mask" not in out:  # exactly monotone, probe-flagged global-sensitive families dropped
+            out.update(free_mask="global_sensitive", drop_masked=True)
+        elif tok.startswith("mp") and tok[2:].isdigit() and int(tok[2:]) > 0 and "max_pairs" not in out:
+            out["max_pairs"] = int(tok[2:])  # certified monotone pairwise max
         elif tok.startswith("cv") and "coverage_weight" not in out and 0 < float(tok[2:]) <= 64:
             out["coverage_weight"] = float(tok[2:])
         elif (tok.startswith("cf") and "coverage_mask" not in out
@@ -278,6 +355,8 @@ def recipe_of(spec: str) -> dict:
             out["coverage_mask"] = int(tok[2:], 16)
         else:
             raise ValueError(f"bad recipe token {tok!r} in {spec!r}")
+    if ("free_ramps" in out) != ("free_budget" in out):
+        raise ValueError(f"{spec!r}: fr<N> and fb<budget> go together")
     if ("coverage_weight" in out) != ("coverage_mask" in out):
         raise ValueError(f"{spec!r}: cv<w> and cf<mask> go together")
     return out

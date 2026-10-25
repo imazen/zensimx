@@ -137,7 +137,9 @@ impl RootForm {
             FormulaRevision::Rev2
             | FormulaRevision::Rev3
             | FormulaRevision::Rev4
-            | FormulaRevision::Rev5 => Self::NestedSqrt,
+            | FormulaRevision::Rev5
+            | FormulaRevision::Rev6
+            | FormulaRevision::Rev7 => Self::NestedSqrt,
         }
     }
 }
@@ -336,7 +338,9 @@ impl PowForm {
             FormulaRevision::Rev2
             | FormulaRevision::Rev3
             | FormulaRevision::Rev4
-            | FormulaRevision::Rev5 => Self::PureRust,
+            | FormulaRevision::Rev5
+            | FormulaRevision::Rev6
+            | FormulaRevision::Rev7 => Self::PureRust,
         }
     }
 }
@@ -521,9 +525,139 @@ pub(crate) fn pow_midp_f32(x: f32, n: f32) -> f32 {
     exp2_midp_f32(log2_midp_f32(x) * n)
 }
 
+/// The seed of [`cbrt_newton_f32`]: `MAGIC − bits(x)/3` approximates the bits
+/// of `x^(−1/3)` to about five bits (the classic reciprocal-root bit trick).
+pub(crate) const CBRT_NEWTON_MAGIC: i32 = 0x54a2_fa8c;
+
+/// Revision 7's cube root ([`FormulaRevision::cbrt_newton`]): one Newton step
+/// on the reciprocal cube root `r ≈ x^(−1/3)` from a bit-pattern seed, then
+/// `y = x·r²` and one Halley step written as a residual correction,
+/// `y + y·(x − y³)/(2y³ + x)`: one division. For positive normal inputs below
+/// `2^126` it is within 3 ulp, and correctly rounded for 72.7% of `[1, 8)`
+/// (exhaustive; the seed's error pattern repeats every three binades);
+/// [`magetypes::nostd_math::cbrt_midp_f32`], the opsin root through revision 6,
+/// is also within 3 ulp there but correctly rounded for 56%, and divides twice
+/// (`benchmarks/byconstruction_2026-10-22.md`, "Speed pass"). From `2^126` up
+/// it loses accuracy (`cbrt_midp_f32` overflows there). The seed's `bits/3` is
+/// formed in f32 (`(bits as f32 · ⅓) as i32`), as the vector form does it.
+/// `±0` returns itself; the sign carries through. [`cbrt_newton_x16`] is the
+/// same arithmetic lane for lane.
+#[inline(always)]
+pub(crate) fn cbrt_newton_f32(x: f32) -> f32 {
+    let a = x.abs();
+    let third = 1.0f32 / 3.0;
+    let q = ((a.to_bits() as i32) as f32 * third) as i32;
+    let r = f32::from_bits((CBRT_NEWTON_MAGIC - q) as u32);
+    let t = a * r;
+    let e = (-t).mul_add(r * r, 1.0);
+    let r = (r * e).mul_add(third, r);
+    let y = (a * r) * r;
+    let y2 = y * y;
+    let res = (-y2).mul_add(y, a);
+    let y = y.mul_add(res / (y2 + y2).mul_add(y, a), y);
+    if x == 0.0 {
+        x
+    } else {
+        f32::from_bits(y.to_bits() | (x.to_bits() & 0x8000_0000))
+    }
+}
+
+/// [`cbrt_newton_f32`] in sixteen lanes, on a tier whose `mul_add` is fused
+/// (x86-64 v3, v4, v4x): per lane the same IEEE operations in the same order.
+/// The opsin conversion, whose inputs are never negative, runs
+/// [`cbrt_newton_nonneg_x16`]; this full form is the reference the tier tests
+/// hold it to.
+#[cfg(test)]
+#[inline(always)]
+pub(crate) fn cbrt_newton_x16<T: magetypes::simd::backends::F32x16Convert>(
+    token: T,
+    x: magetypes::simd::generic::f32x16<T>,
+) -> magetypes::simd::generic::f32x16<T> {
+    use magetypes::simd::generic::{f32x16, i32x16};
+    let a = x.abs();
+    let third = f32x16::splat_t(token, 1.0 / 3.0);
+    let one = f32x16::splat_t(token, 1.0);
+    let q = (f32x16::from_i32_t(token, a.bitcast_to_i32()) * third).to_i32();
+    let r = f32x16::from_i32_bitcast_t(token, i32x16::splat_t(token, CBRT_NEWTON_MAGIC) - q);
+    let t = a * r;
+    let e = (-t).mul_add(r * r, one);
+    let r = (r * e).mul_add(third, r);
+    let y = (a * r) * r;
+    let y2 = y * y;
+    let res = (-y2).mul_add(y, a);
+    let y = y.mul_add(res / (y2 + y2).mul_add(y, a), y);
+    let sign = x & f32x16::splat_t(token, -0.0);
+    let zero = x.simd_eq(f32x16::zero_t(token));
+    f32x16::blend(zero, x, y | sign)
+}
+
+/// [`cbrt_newton_x16`] for inputs that are `+0` or positive (the opsin mix
+/// after its `max(0)`): `|x|` is `x` and the sign bit is clear, so the absolute
+/// value and the sign restore are dropped and every lane has
+/// [`cbrt_newton_x16`]'s bits; `+0` still returns itself.
+#[inline(always)]
+pub(crate) fn cbrt_newton_nonneg_x16<T: magetypes::simd::backends::F32x16Convert>(
+    token: T,
+    a: magetypes::simd::generic::f32x16<T>,
+) -> magetypes::simd::generic::f32x16<T> {
+    use magetypes::simd::generic::{f32x16, i32x16};
+    let third = f32x16::splat_t(token, 1.0 / 3.0);
+    let one = f32x16::splat_t(token, 1.0);
+    let q = (f32x16::from_i32_t(token, a.bitcast_to_i32()) * third).to_i32();
+    let r = f32x16::from_i32_bitcast_t(token, i32x16::splat_t(token, CBRT_NEWTON_MAGIC) - q);
+    let t = a * r;
+    let e = (-t).mul_add(r * r, one);
+    let r = (r * e).mul_add(third, r);
+    let y = (a * r) * r;
+    let y2 = y * y;
+    let res = (-y2).mul_add(y, a);
+    let y = y.mul_add(res / (y2 + y2).mul_add(y, a), y);
+    let zero = a.simd_eq(f32x16::zero_t(token));
+    f32x16::blend(zero, a, y)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Revision 7's cube root: within 3 ulp of the correctly rounded value on
+    /// every 101st positive normal bit pattern below `2^126` (about 21 million
+    /// inputs), odd in its sign, exact on ±0; and over every input in `[1, 8)`
+    /// correctly rounded at least as often as `cbrt_midp_f32`, the root it
+    /// replaces.
+    #[test]
+    fn cbrt_newton_is_within_three_ulp() {
+        let (lo, hi) = (f32::MIN_POSITIVE.to_bits(), 2.0f32.powi(126).to_bits());
+        let mut b = lo;
+        while b < hi {
+            let x = f32::from_bits(b);
+            let want = (x as f64).cbrt() as f32;
+            let got = cbrt_newton_f32(x);
+            assert!(
+                got.to_bits().abs_diff(want.to_bits()) <= 3,
+                "cbrt_newton({x:e}) = {got:e}, correctly rounded {want:e}"
+            );
+            assert_eq!(
+                cbrt_newton_f32(-x).to_bits(),
+                (-got).to_bits(),
+                "odd at {x:e}"
+            );
+            b += 101;
+        }
+        assert_eq!(cbrt_newton_f32(0.0).to_bits(), 0.0f32.to_bits());
+        assert_eq!(cbrt_newton_f32(-0.0).to_bits(), (-0.0f32).to_bits());
+        let (mut newton, mut midp) = (0u64, 0u64);
+        for b in 1.0f32.to_bits()..8.0f32.to_bits() {
+            let x = f32::from_bits(b);
+            let want = ((x as f64).cbrt() as f32).to_bits();
+            newton += u64::from(cbrt_newton_f32(x).to_bits() == want);
+            midp += u64::from(magetypes::nostd_math::cbrt_midp_f32(x).to_bits() == want);
+        }
+        assert!(
+            newton >= midp,
+            "correctly rounded: newton {newton}, midp {midp}"
+        );
+    }
 
     /// **THE pinning gate.** Bit-exact expected values for
     /// [`RootForm::NestedSqrt`] on a fixed input set, so a toolchain, libc or
@@ -1032,7 +1166,8 @@ mod rev4vec_midp_gate {
             3 => v.log10_midp(),
             4 => v.cbrt_midp(),
             5 => v.pow_midp(1.0 / 78.843_75),
-            _ => v.pow_midp(1.0 / 0.159_301_75),
+            6 => v.pow_midp(1.0 / 0.159_301_75),
+            _ => cbrt_newton_x16(token, v),
         }
         .to_array()
     }
@@ -1045,11 +1180,69 @@ mod rev4vec_midp_gate {
             3 => log10_midp_f32(x),
             4 => magetypes::nostd_math::cbrt_midp_f32(x),
             5 => pow_midp_f32(x, 1.0 / 78.843_75),
-            _ => pow_midp_f32(x, 1.0 / 0.159_301_75),
+            6 => pow_midp_f32(x, 1.0 / 0.159_301_75),
+            _ => cbrt_newton_f32(x),
         }
     }
 
-    const WHICH_NAMES: [&str; 7] = [
+    /// [`cbrt_newton_nonneg_x16`] in one tier, for the test below.
+    #[magetypes(define(f32x16), v4x, v4, v3, -scalar)]
+    fn cbrt_nonneg_vec(token: Token, arr: [f32; 16]) -> [f32; 16] {
+        cbrt_newton_nonneg_x16(token, f32x16::from_array_t(token, arr)).to_array()
+    }
+
+    /// The opsin cube root ([`cbrt_newton_nonneg_x16`]) has [`cbrt_newton_f32`]'s
+    /// bits on every compiled tier for `+0`, subnormals, `[1, 8)` in full and
+    /// every 97th positive bit pattern up to `+inf`.
+    #[test]
+    fn cbrt_newton_nonneg_matches_scalar() {
+        type RootFn = Box<dyn Fn([f32; 16]) -> [f32; 16]>;
+        let mut tiers: Vec<(&str, RootFn)> = Vec::new();
+        #[cfg(target_arch = "x86_64")]
+        {
+            if let Some(t) = archmage::X64V3Token::summon() {
+                tiers.push(("v3", Box::new(move |a| cbrt_nonneg_vec_v3(t, a))));
+            }
+            #[cfg(feature = "avx512")]
+            {
+                if let Some(t) = archmage::X64V4Token::summon() {
+                    tiers.push(("v4", Box::new(move |a| cbrt_nonneg_vec_v4(t, a))));
+                }
+                if let Some(t) = archmage::X64V4xToken::summon() {
+                    tiers.push(("v4x", Box::new(move |a| cbrt_nonneg_vec_v4x(t, a))));
+                }
+            }
+        }
+        if tiers.is_empty() {
+            return;
+        }
+        let lo = 1.0f32.to_bits();
+        let hi = 8.0f32.to_bits();
+        let bits: Vec<u32> = [0u32, 1, 2, 0x007f_ffff]
+            .into_iter()
+            .chain(lo..hi)
+            .chain((0..0x7f80_0000u32).step_by(97))
+            .chain([0x7f80_0000])
+            .collect();
+        for (name, f) in &tiers {
+            for chunk in bits.chunks(16) {
+                let mut arr = [1.0f32; 16];
+                for (a, b) in arr.iter_mut().zip(chunk) {
+                    *a = f32::from_bits(*b);
+                }
+                let got = f(arr);
+                for (x, g) in arr.iter().zip(got) {
+                    let want = cbrt_newton_f32(*x);
+                    assert!(
+                        want.to_bits() == g.to_bits() || (want.is_nan() && g.is_nan()),
+                        "{name}: cbrt({x:e}) = {g:e}, scalar {want:e}"
+                    );
+                }
+            }
+        }
+    }
+
+    const WHICH_NAMES: [&str; 8] = [
         "log2_midp",
         "exp2_midp",
         "exp_midp",
@@ -1057,6 +1250,7 @@ mod rev4vec_midp_gate {
         "cbrt_midp",
         "pow_midp(1/78.84375)",
         "pow_midp(1/0.15930175)",
+        "cbrt_newton",
     ];
 
     /// One compiled tier variant bound to its summoned token.
@@ -1160,7 +1354,7 @@ mod rev4vec_midp_gate {
         // Round to a chunk multiple.
         bits.resize(bits.len() + 16 - bits.len() % 16, 0);
 
-        for which in 0u8..7 {
+        for which in 0u8..8 {
             for chunk in bits.as_chunks::<16>().0 {
                 let arr = chunk.map(f32::from_bits);
                 for (name, f) in &tiers {
@@ -1217,7 +1411,7 @@ mod rev4vec_midp_gate {
         }
         bits.resize(bits.len() + 16 - bits.len() % 16, 0);
 
-        for which in 0u8..7 {
+        for which in 0u8..8 {
             for chunk in bits.as_chunks::<16>().0 {
                 let arr = chunk.map(f32::from_bits);
                 let expected = arr.map(|x| scalar_fn(which, x));
@@ -1271,7 +1465,7 @@ mod rev4vec_midp_gate {
             handles.push(std::thread::spawn(move || {
                 let mut checked = 0u64;
                 let mut mismatches = 0u64;
-                for which in 0u8..7 {
+                for which in 0u8..8 {
                     let mut base = lo as u32;
                     loop {
                         let mut arr = [0f32; 16];
