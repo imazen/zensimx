@@ -4064,3 +4064,27 @@ selection. The complete scorecard still awaits the fleet arms.
 `LOCAL_TRAIN_GROUP_RESULTS.json` retains all per-seed collection values and
 their source record hashes. The queued decoder subsequently completed
 successfully in one second; fleet image/data preparation acquired the lock.
+
+The existing E21 owner also scored these three local arms while the fleet
+control replay ran remotely. The Mdata baseline is unchanged, including its
+per-seed/per-dataset values. All target reads have the existing TRAIN ledger.
+
+| Arm | E21 mean signed SROCC | Paired difference from Mdata | Seed-unit SE of difference |
+|---|---:|---:|---:|
+| Mdata | 0.856865163 | 0 | 0 |
+| Mw025 | 0.861762900 | +0.004897736 | 0.001756875 |
+| Mlic | 0.861284769 | +0.004419605 | 0.000249599 |
+
+| Arm | KADID | TID2013 | Konfig | CID22 A25 |
+|---|---:|---:|---:|---:|
+| Mdata | 0.875735715 | 0.872803620 | 0.800242948 | 0.878678370 |
+| Mw025 | 0.879206151 | 0.875520167 | 0.809619830 | 0.882705450 |
+| Mlic | 0.882458850 | 0.874057075 | 0.807786333 | 0.880836816 |
+
+The local E21 receipt retains each per-set paired seed-unit SE and all
+three seed differences. Resource record: `run-heavy: done rc=0 1s |
+peak-RSS 0.24GiB | min-avail 45817MiB | peak-load 1.68` (4 GiB scope).
+This interim comparison does not select finalists or assess new EVAL rows.
+R2's image/control-input preparation receipt is copied into the study;
+its complete scientific-arm archives and numeric control remain separately
+owned by the fleet lane.

@@ -73,3 +73,12 @@ Mw025, 63 of 123 cells are complete; the remaining 60 are fleet-owned.
 
 `LOCAL_TRAIN_GROUP_RESULTS.json` retains the held-out-new-TRAIN statistics
 for the three completed local arms, before six-arm selection.
+
+`local-e21/e21.json`: `3eaede9e77b4779ee0755bfc06686b0c4d533b0655e669c513a1298a39369f6f`;
+its `label_reads/` records the original TRAIN-panel target read. The frozen
+Mdata E21 values are unchanged. `LOCAL_TRAIN_GROUP_RESULTS.json`:
+`f416ceeb9851933e29f41bb7c883e2ab398b7747c453bf90e509637f03fe13ad`.
+`fleet-coordination/R2_PREPARATION_READY.json`:
+`de9cef2b8db3554bd9d705c30dbeadcfacbddb411eaf26f0553dfec3c979830c`;
+this covers image/control inputs, without claiming completed arm archives
+or numeric control parity.
