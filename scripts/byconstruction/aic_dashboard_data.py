@@ -228,10 +228,26 @@ def rev7_rows(add, out: Path) -> None:
             z_aic=None)
 
 
-def extend(prev: Path, out: Path) -> int:
-    """Refresh the E21 scatter views and the revision-7 rows of an earlier build without rebuilding its AIC tables."""
+EVAL_NAMES = {"cid-iq": "EVAL CID:IQ", "cid-oa": "EVAL CID:OA", "colourlab-rating-variability-2022": "EVAL Colourlab",
+              "iqa-odi": "EVAL IQA-ODI", "irccyn-ivc": "EVAL IRCCyN/IVC", "live-md": "EVAL LIVE-MD", "mdid": "EVAL MDID",
+              "nits-iqa": "EVAL NITS", "vcl-fer": "EVAL VCL@FER"}
+EVAL_MODELS = {"b7": "B, revision-7 stamp", "m7": "M7 (revision-7 M)", "mdata": "Mdata (M7 + new datasets)",
+               "ssim2": "SSIMULACRA2", "cvvdp": "CVVDP", "butter": "Butteraugli 3-norm"}
+
+
+def eval_scatter_rows(add, eval_dir: Path) -> None:
+    """Scatter rows for the provided-library EVAL sets from `dataset_eval.py scatter` (eval_scatter_stats.json)."""
+    for s in json.loads((eval_dir / "eval_scatter_stats.json").read_text()):
+        add("scatter", id=f"eval_{slug(s['collection'])}_{s['key']}", dataset=EVAL_NAMES[s["collection"]], key=s["key"],
+            model=EVAL_MODELS[s["key"]], **{k: v for k, v in s.items() if k not in ("collection", "key", "model")})
+
+
+def extend(prev: Path, out: Path, eval_dir: Path | None = None) -> int:
+    """Refresh the E21 scatter views and the revision-7 rows of an earlier build without rebuilding its AIC tables;
+    with `eval_dir`, also the EVAL sets' scatter rows."""
     rows = [r for r in json.loads((prev / "results.json").read_text())
             if not (r["table"] == "scatter" and r["dataset"] in ("KADID", "TID2013", "KonFiG", "CID22-A"))
+            and not (r["table"] == "scatter" and r["dataset"].startswith("EVAL "))
             and not (r["table"] == "panel" and r["model"] in REV7.values())
             and not (r["table"] == "arms" and r["arm"] in REV7.values())]
 
@@ -239,6 +255,8 @@ def extend(prev: Path, out: Path) -> int:
         rows.append({"table": table, **kw})
     e21 = e21_scatter(add)
     rev7_rows(add, out)
+    if eval_dir:
+        eval_scatter_rows(add, eval_dir)
     ids = [(r["table"], r.get("id")) for r in rows]
     if len(ids) != len(set(ids)):
         raise ValueError("duplicate row ids")
@@ -254,11 +272,12 @@ def main() -> int:
     ap.add_argument("--arms", help="finished combined arms, comma-separated (required unless --extend)")
     ap.add_argument("--commits-since", default="322930e4")
     ap.add_argument("--extend", help="an earlier build's directory: refresh only its E21 scatter and revision-7 rows")
+    ap.add_argument("--eval-scatter", help="with --extend: a dataset_eval.py directory whose scatter stats to add")
     a = ap.parse_args()
     out = Path(a.out)
     out.mkdir(parents=True, exist_ok=True)
     if a.extend:
-        return extend(Path(a.extend), out)
+        return extend(Path(a.extend), out, Path(a.eval_scatter) if a.eval_scatter else None)
     if not a.arms:
         ap.error("--arms is required without --extend")
     arms = a.arms.split(",")
