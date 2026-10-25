@@ -3392,6 +3392,64 @@ photos. The amplitude split helps photos (+1.0% / +3.4% for M, +3.6% CVVDP for B
 (running): the exact split with the old map's box window and nearest paint, unsmoothed and at σ 3, and `diffmap`
 unsmoothed, to place the screen gain; and full-data M retrained at revision 7 in the same loop.
 
+### The loop statistic favours the challenger; the loop results by BD-rate (2026-10-25)
+
+**The finding.** `rd_probe_analyze_2026-07-18.py --paired-vs` puts each of an arm's points on the baseline's per-image
+curve (log bytes, straight lines between the baseline's nine points) and takes each image's median saving. On a
+convex rate curve the straight lines overstate the baseline's bytes, so the arm under test gains: `exact_box` against
+`diffmap` "saves" +0.25% and `diffmap` against `exact_box` "saves" +1.55% (SSIMULACRA2, M, all images), and the
+direct comparison disagreed with the one through the butteraugli loop (`exact_box` −0.69 points behind `diffmap` there).
+The new `--bdrate-vs LABEL` (`4b58f139`) takes, per image and judge, the mean log-bytes difference of both arms'
+piecewise-linear curves over the score range both reach, then the mean over images with a 95% bootstrap interval.
+Checks: identical arms (`Mlinchk`, `Mlinchk2`) give exactly 0.00; swapping the arms flips the sign (−1.21 / +1.16);
+the direct difference agrees with the one through butteraugli (−1.21 against −1.04 SSIMULACRA2, −1.35 against −1.22
+CVVDP). Every loop number in this section is BD-rate: bytes saved at equal judged score (%, SSIMULACRA2 / CVVDP, 95%
+interval, 78 TRAIN images; bold where the interval excludes zero).
+
+**Superseded by it** (sections above, left as written): in "JPEG XL steering on the loop's float reconstruction",
+our maps beating the butteraugli loop on photos (M +1.06, T +1.09, M64 +1.21, SSIMULACRA2) and the size of the float
+gains; in "Which split steers the JPEG XL loop", the old served map's overall tie. The split conclusion and the
+float-over-8-bit conclusion stand.
+
+**Revision 7 in the loop** (run `00cc14ed2af0-loop-r7win`; controls: `Bcheck4` and `Mlinchk2` reproduce all 702
+bitstreams of B and `Mlintail`, the `diffmap` float placement refits reproduce, re-judging reproduces all 24,726
+earlier rows under all five judges; run-heavy 3,014 s and 3,800 s). Full-data M retrained at revision 7 (`bc471d21`,
+certified monotone, float placement 2.586523e-2 / 0.7) against M at revision 5, both `diffmap` on floats: all +0.02 /
+−0.07, photos −0.02 / −0.01, illustrations +0.03 / +0.08, screens +0.10 / −0.37, every interval across zero.
+**Revision 7 steers the JPEG XL loop as revision 5 does.**
+
+**Maps** (each against its model's exact-split `diffmap`, floats, own tail placement):
+
+| M (full data) | All | Photos | Illustrations | Screens |
+|---|---|---|---|---|
+| removal split (`diffmap_rem`) | **−1.46 / −1.07** | −0.79 / −0.13 | **−2.23 / −1.88** | −1.94 / −2.04 |
+| old served map (removal, box, no smoothing) | **−1.22 / −1.03** | **−1.68 / −1.95** | **−1.80 / −1.77** | +0.48 / **+1.83** |
+| exact, box, no smoothing (`exact_box`) | **−1.21 / −1.35** | **−2.05 / −2.57** | **−1.16 / −1.47** | +0.50 / +1.37 |
+| exact, box, σ 3 (`exact_box3`) | +0.01 / +0.08 | **−0.12** / −0.05 | −0.23 / −0.07 | +0.59 / +0.55 |
+| `diffmap` unsmoothed (`diffmap_px`) | **−2.11 / −2.44** | **−2.35 / −2.89** | **−2.23 / −2.53** | **−1.47 / −1.37** |
+| amplitude split (`diffmap_amp`) | −0.24 / **+1.10** | **+0.90 / +2.63** | −0.50 / +0.71 | **−2.33** / −1.66 |
+
+B gives the same picture (removal −0.77 / −0.18; old map −0.08 / +0.18 with photos **−1.04 / −0.79** and screens
+**+2.44 / +2.72**; `exact_box` **−1.84 / −2.40**; `exact_box3` +0.16 / +0.09; `diffmap_px` **−1.99 / −2.58**; amplitude
+**−3.60** / −0.77 with photos +0.38 / **+3.20** and screens **−11.71 / −8.34**).
+
+**Against the butteraugli loop:** M `diffmap` **−2.34 / −4.26** (photos **−0.79 / −3.24**, illustrations
+**−1.74 / −2.79**, screens **−6.34 / −8.21**); revision-7 M **−2.32 / −4.32**; B **−3.37 / −5.63**; Margarine on
+floats −0.03 / −0.04 (a tie in every class). **Floats against 8 bits:** Margarine **+0.93 / +0.97**, B
+**+0.92 / +0.85**, M **+0.48 / +0.38**, T **+0.44** / +0.34.
+
+**Reading.** The exact split stays the right default. Smoothing is the lever among the factorial's parts: removing
+σ 3 costs 1.2–2.4% with either window, while the box window and nearest paint at σ 3 tie `diffmap`. The old map's
+screen gain is a CVVDP effect bought with photos and illustrations. The amplitude split is the one map that gains on
+photos (+0.9% / +2.6% for M), at a cost on screens. Our maps still trail the encoder's own Butteraugli loop
+everywhere, by about 2.3% / 4.3% for M; Margarine on floats is its equal.
+
+**Revision-7 speed** (paired, 8 rounds, one thread pinned, one binary `9b1f6dca`, B's revision-5 bake against its
+byte-identical revision-7 stamp; load 4.5–6.8 during the run; grids in `benchmarks/byconstruction_perf_2026-10-24/`):
+v4x 1507×2048 photo 47.09 → 28.43 ms (−39.60%, −39.99..−39.08), 256² photo 1.219 → 0.824 ms (−32.68%), 1024² plot
+16.35 → 9.79 ms (−40.22%); v3 −36.09%, −31.83%, −35.68%. Revision 7's raw ringing against its high-pass research
+arm: the high-pass form costs +0.3% to +1.4%.
+
 ## Summary (all arms, E21 screen, seeds 0–2, Δ vs `base-c`)
 
 | Arm | Guarantee | E21 Δ (SE) | Mixture inversions / cell (max rise) |

@@ -1,0 +1,6 @@
+# A=/var/tmp/byconstruction-bin/9b1f6dca1aba-gates/byc_score_timing sha256=73a26f4d2004ef53
+# B=/var/tmp/byconstruction-bin/9b1f6dca1aba-gates/byc_score_timing sha256=73a26f4d2004ef53
+# A bakes: /home/lilith/work/zen/zensim--byconstruction/zensim/weights/b_sdr_diff_frag_820_rev5_2026-10-19.bin /home/lilith/tmp/byc/parity/tga_full_rev6.bin; B bakes: /home/lilith/tmp/byc/perf/b_rev7.bin /home/lilith/tmp/byc/parity/tga_full_rev6.bin
+# host=dev date=2026-10-25T11:50:04Z rounds=8 load=4.53 6.80 5.71
+# cases: /mnt/v/output/zensim/byconstruction-2026-10-22/perf/cases/cases_focus.tsv
+# raw rounds: /mnt/v/output/zensim/byconstruction-2026-10-22/perf/2026-10-25/rev5_vs_rev7raw_9b1f6dca/*.jsonl on dev; one binary (9b1f6dca), A = B's revision-5 bake, B = its revision-7 stamp

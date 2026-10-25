@@ -1,0 +1,6 @@
+# A=/var/tmp/byconstruction-bin/9b1f6dca1aba-gates/byc_score_timing sha256=73a26f4d2004ef53
+# B=/var/tmp/byconstruction-bin/9b1f6dca1aba-gates/byc_score_timing sha256=73a26f4d2004ef53
+# A bakes: /home/lilith/tmp/byc/perf/b_rev7.bin /home/lilith/tmp/byc/parity/tga_full_rev6.bin; B bakes: /home/lilith/tmp/byc/perf/b_rev7.bin /home/lilith/tmp/byc/parity/tga_full_rev6.bin
+# host=dev date=2026-10-25T11:51:02Z rounds=8 load=3.94 6.21 5.57
+# cases: /mnt/v/output/zensim/byconstruction-2026-10-22/perf/cases/cases_focus.tsv
+# raw rounds: /mnt/v/output/zensim/byconstruction-2026-10-22/perf/2026-10-25/rev7raw_vs_hpm_9b1f6dca/*.jsonl on dev; one binary (9b1f6dca), B's revision-7 stamp, A raw ringing, B ZENSIM_RING_FORM=hpm
