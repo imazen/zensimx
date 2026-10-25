@@ -11,6 +11,17 @@ spec.loader.exec_module(evaluation)
 
 
 class DatasetEval(unittest.TestCase):
+    def test_mix_eval_refuses_changed_selection_before_eval_access(self):
+        import json
+        with tempfile.TemporaryDirectory() as d:
+            p=Path(d)
+            (p/"TRAIN_SELECTION.json").write_text('{"finalists":[]}')
+            (p/"FINALISTS.json").write_text(json.dumps(dict(schema="dataset-mix-finalists-v1",
+                selection_uses_EVAL=False, TRAIN_selection_sha256="0"*64)))
+            with self.assertRaisesRegex(ValueError,"frozen TRAIN-only"):
+                evaluation.cmd_mix_eval(SimpleNamespace(study=str(p),source=str(p/"missing-eval"),predict="unused"))
+            self.assertFalse((p/"eval").exists())
+
     def test_bapps_rebind_preserves_original_and_refuses_training_paths(self):
         for split in ("val","train"):
             with self.subTest(split=split),tempfile.TemporaryDirectory() as d:

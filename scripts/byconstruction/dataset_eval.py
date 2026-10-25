@@ -20,6 +20,8 @@ import argparse
 import csv
 import json
 import math
+import hashlib
+import shutil
 import random
 import statistics as st
 import subprocess
@@ -275,9 +277,82 @@ def within(rows, s):
     return st.mean(vals) if vals else float("nan")
 
 
+def read_eval_rows(out, purpose):
+    path = out / "eval_rows.json"
+    if (out / "EVAL_ASSESSMENT.json").exists():
+        ledger = out / "EVAL_DERIVED_LABEL_READS.json"
+        value = json.loads(ledger.read_text()) if ledger.exists() else dict(role="EVAL", reads=[])
+        value["reads"].append(dict(table=str(path), sha256=hashlib.sha256(path.read_bytes()).hexdigest(),
+                                   rows="all", columns=["target", "group"], purpose=purpose,
+                                   state="authorized-before-read"))
+        ledger.write_text(json.dumps(value,indent=1)+"\n")
+    return json.loads(path.read_text())
+
+
+def cmd_mix_eval(a):
+    """Assess frozen seed-0 finalists once, reusing frozen Mdata predictions."""
+    study = Path(a.study)
+    frozen_path = study / "FINALISTS.json"
+    frozen = json.loads(frozen_path.read_text())
+    selection_path = study / "TRAIN_SELECTION.json"
+    if (frozen["schema"] != "dataset-mix-finalists-v1" or frozen["selection_uses_EVAL"]
+            or frozen["TRAIN_selection_sha256"] != hashlib.sha256(selection_path.read_bytes()).hexdigest()):
+        raise ValueError("frozen TRAIN-only finalist decision required")
+    for model in frozen["models"].values():
+        if hashlib.sha256(Path(model["path"]).read_bytes()).hexdigest() != model["sha256"]:
+            raise ValueError("frozen finalist model changed")
+    for directory, source, mdata_source in (
+        ("eval", Path(a.source), Path("/var/tmp/datalegs-20261025/eval")),
+        ("eval-bapps", Path("/var/tmp/datalegs-20261025/eval-bapps"), Path("/var/tmp/datalegs-20261025/eval-bapps")),
+    ):
+        out = study / directory
+        out.mkdir()
+        copies = {}
+        # Scoring uses the top-level tables and receipts. No image is unpacked
+        # or rescored by peers; the corrected peer TSVs are copied unchanged.
+        for path in sorted(source.iterdir()):
+            if path.is_file() and path.suffix.lower() not in (".png", ".jpg", ".bmp", ".tif"):
+                shutil.copyfile(path, out/path.name)
+                copies[path.name] = hashlib.sha256(path.read_bytes()).hexdigest()
+        for name in ("features.parquet", "eval_rows.json"):
+            if hashlib.sha256((out/name).read_bytes()).digest() != hashlib.sha256((mdata_source/name).read_bytes()).digest():
+                raise ValueError("Mdata baseline and EVAL copy have different inputs")
+        baseline = out / "pred_Mdata.tsv"
+        expected = hashlib.sha256((mdata_source/baseline.name).read_bytes()).hexdigest()
+        if baseline.exists() and hashlib.sha256(baseline.read_bytes()).hexdigest() != expected:
+            raise ValueError("copied Mdata predictions differ from the frozen assessment")
+        if not baseline.exists():
+            shutil.copyfile(mdata_source/baseline.name, baseline)
+        prior = out / "copied-source-reports"
+        prior.mkdir()
+        for name in ("report.json", "report.md"):
+            if (out/name).exists():
+                (out/name).rename(prior/name)
+        receipt = dict(schema="dataset-mix-EVAL-assessment-v1", source=str(source), copied_file_sha256=copies,
+                       finalists_sha256=hashlib.sha256(frozen_path.read_bytes()).hexdigest(),
+                       models=frozen["models"], Mdata_prediction_sha256=expected,
+                       Mdata_assessment_reused=True, peer_images_unpacked=False)
+        (out/"EVAL_ASSESSMENT.json").write_text(json.dumps(receipt,indent=1)+"\n")
+        new = []
+        for name, model in frozen["models"].items():
+            if name != "Mdata":
+                if (out/f"pred_{name}.tsv").exists():
+                    raise ValueError("a finalist already has stored predictions; preserve this assessment")
+                new.append(f"{name}={model['path']}")
+        if new:
+            cmd_score(argparse.Namespace(out=str(out), model=new, predict=a.predict, judge=[]))
+        cmd_report(argparse.Namespace(out=str(out)))
+        if directory == "eval":
+            names = set(load_scores(out))
+            for name in frozen["models"]:
+                peers = [n for n in ("Mdata", "M7", "B7", "ssim2", "butteraugli", "cvvdp") if n != name and n in names]
+                cmd_paired(argparse.Namespace(out=str(out),dest=str(out/f"paired-{name}"),a=name,vs=peers,resamples=2000))
+    return 0
+
+
 def cmd_report(a):
     out = Path(a.out)
-    rows = json.loads((out / "eval_rows.json").read_text())
+    rows = read_eval_rows(out, "dataset-eval-report")
     scores = load_scores(out)
     names = sorted(scores)
     rng = random.Random(1)
@@ -334,7 +409,7 @@ def cmd_paired(a):
     import hashlib
     from lib.zen_stats import _find_panel_bin
     out, dest = Path(a.out), Path(a.dest)
-    rows = json.loads((out / "eval_rows.json").read_text())
+    rows = read_eval_rows(out, "dataset-eval-paired")
     scores = load_scores(out)
     names = sorted(scores)
     for n in [a.a, *a.vs]:
@@ -380,7 +455,7 @@ def cmd_scatter(a):
     import pandas as pd
     from aic_panel import geometry  # the E21 views' owner
     out = Path(a.out)
-    rows = json.loads((out / "eval_rows.json").read_text())
+    rows = read_eval_rows(out, "dataset-eval-scatter")
     scores = load_scores(out)
     names = [n for n in sorted(scores) if n in SCATTER_KEYS]
     frames, stats = [], []
@@ -430,6 +505,10 @@ def render_paired(dest):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
+    m = sub.add_parser("mix-eval")
+    m.add_argument("--study", required=True)
+    m.add_argument("--source", default="/var/tmp/byc-dataset-eval-2026-10-25-v2")
+    m.add_argument("--predict", required=True)
     p = sub.add_parser("prepare")
     p.add_argument("--out", required=True)
     p.add_argument("--collections", help="explicit comma-separated subset; bapps is also supported")
@@ -456,7 +535,7 @@ def main():
     b.add_argument("--scratch", required=True)
     a = ap.parse_args()
     return {"prepare": cmd_prepare, "score": cmd_score, "report": cmd_report, "paired": cmd_paired, "scatter": cmd_scatter,
-            "judge-png": cmd_judge_png, "bapps-keys":cmd_bapps_keys}[a.cmd](a)
+            "judge-png": cmd_judge_png, "bapps-keys":cmd_bapps_keys, "mix-eval":cmd_mix_eval}[a.cmd](a)
 
 
 if __name__ == "__main__":

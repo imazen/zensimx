@@ -1,3 +1,11 @@
+# Caller holds shared heavy.lock and run-heavy; refuses unfrozen candidates.
+dataset-mix-eval study:
+    env ZEN_PANEL_BIN={{quote(study)}}/bin/panel RAYON_NUM_THREADS=2 OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 python3 -B scripts/byconstruction/dataset_eval.py mix-eval --study {{quote(study)}} --predict {{quote(study)}}/bin/bake_dial_refit
+
+# Caller holds shared heavy.lock and run-heavy; selection precedes these fits.
+dataset-mix-freeze study:
+    env BYC_CELLS={{quote(study)}}/cells REV4_V2_BIN_DIR={{quote(study)}}/bin ZEN_PANEL_BIN={{quote(study)}}/bin/panel RAYON_NUM_THREADS=1 OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 python3 -B scripts/rev4_featpot/byc_cells.py mix-freeze --study {{quote(study)}}
+
 # Queue individual existing-owner operations; heavy work takes the shared lock.
 dataset-mix-queue study:
     #!/usr/bin/env bash
