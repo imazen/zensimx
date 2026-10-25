@@ -32,12 +32,14 @@ def document(path, expected=None):
 
 
 def command_binding(authority_path,pin,cell_id,init_seed,sample_seed,width,head,recipe):
-    c=document(authority_path,pin)["cells"][cell_id]
+    authority = document(authority_path,pin)
+    c = authority["cells"][cell_id]
+    expected_width = c["width"] if authority["schema"] == "subjective-training-authority-v2" else 1825
     if (c.get("route") not in ("d1","full","loso")
             or not 0<=c["seed_index"]<(3 if c["route"]=="loso" else 10)
             or (c["epochs"],c["pairs_per_epoch"],c["selected_epoch"])!=(120,50000,119)
             or (c["init_seed"],c["sample_seed"])!=(init_seed,sample_seed)
-            or width!=1825 or head!="N" or (recipe or {}).get("hidden",32)!=128):
+            or width!=expected_width or head!="N" or (recipe or {}).get("hidden",32)!=128):
         raise ValueError("subjective registered cell/seed/full-budget/head binding differs")
 
 
@@ -232,6 +234,7 @@ def dataset_groups(root, groups, selected, route, seed_index, init_seed, sample_
     cell = dict(route="full" if route == "full" else "d1",seed_index=seed_index,epochs=120,pairs_per_epoch=50000,
                 selected_epoch=119,init_seed=init_seed,sample_seed=sample_seed,feature_ids=selected,
                 formula_revision=7,tier="v3",producer_commit=p["producer_commit"],groups=records,
+                width=document(root/"wide/main/real/receipt.json")["width"],
                 family_guard_path=p["family_guard_path"],family_guard_sha256=p["family_guard_sha256"])
     a = dict(schema="subjective-training-authority-v2",state="approved",artifact_visibility="private",
              selection="fixed-final-epoch",cells={cell_id:cell})

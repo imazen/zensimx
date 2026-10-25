@@ -33,7 +33,7 @@ fn string<'a>(v: &'a Value, key: &str) -> Result<&'a str, String> {
         .ok_or_else(|| format!("subjective {key} required"))
 }
 
-fn run_binding(c: &Value, args: &super::Args) -> Result<(), String> {
+fn run_binding(c: &Value, args: &super::Args, width: usize) -> Result<(), String> {
     let limit = if c["route"] == "loso" { 3 } else { 10 };
     if !matches!(c["route"].as_str(), Some("full" | "d1" | "loso"))
         || c["seed_index"].as_u64().is_none_or(|v| v >= limit)
@@ -43,7 +43,7 @@ fn run_binding(c: &Value, args: &super::Args) -> Result<(), String> {
         || args.pairs_per_epoch != 50000
         || c["selected_epoch"] != 119
         || args.hidden != 128
-        || args.max_features != 1825
+        || args.max_features != width
         || c["init_seed"].as_u64() != args.init_seed
         || c["sample_seed"].as_u64() != args.sample_seed
         || args.init_seed.is_none()
@@ -143,7 +143,7 @@ pub(super) fn admit(
     }
     let c = &a["cells"][cell];
     if let Some(args) = run {
-        run_binding(c, args)?;
+        run_binding(c, args, 1825)?;
     }
     let ids: Vec<usize> =
         serde_json::from_value(c["feature_ids"].clone()).map_err(|e| e.to_string())?;
@@ -324,7 +324,11 @@ fn admit_datasets(
     }
     let c = &a["cells"][cell];
     if let Some(args) = run {
-        run_binding(c, args)?;
+        let width = c["width"]
+            .as_u64()
+            .filter(|&w| matches!(w, 1825 | 1853))
+            .ok_or("dataset declared training width required")? as usize;
+        run_binding(c, args, width)?;
     }
     let ids: Vec<usize> =
         serde_json::from_value(c["feature_ids"].clone()).map_err(|e| e.to_string())?;

@@ -22,6 +22,7 @@ class DatasetAuthority(unittest.TestCase):
         guard = f.path.parent/"guard.json"
         guard.write_text(json.dumps(dict(schema="dataset-family-guard-v1",protected_families=["reserved"],inherited_leaks=0)))
         f.cell.update(formula_revision=7,family_guard_path=str(guard),family_guard_sha256=root.sha(guard))
+        f.cell["width"] = 1853
         f.authority["schema"] = "subjective-training-authority-v2"
         f.record.update(name="subjective_rank_fixture", train_weight=1.)
         f.groups = [("subjective_rank_fixture",f.path,1.,0.,"withinref,rank")]
@@ -30,6 +31,10 @@ class DatasetAuthority(unittest.TestCase):
         for k in f.rows:
             k["reference"] = k["source"]
         self.assertEqual(set(f.admit()), {"subjective_rank_fixture"})
+        from subjective_training_leg import command_binding
+        command_binding(f.authority_path, f.save(), "invented-cell", 1101, 101, 1853, "N", {"hidden":128})
+        with self.assertRaisesRegex(ValueError,"binding"):
+            command_binding(f.authority_path, f.save(), "invented-cell", 1101, 101, 1825, "N", {"hidden":128})
         f.rows[1]["family"] = "reserved"
         with self.assertRaisesRegex(ValueError,"family"):
             f.admit()
