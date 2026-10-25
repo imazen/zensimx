@@ -3036,6 +3036,22 @@ Margarine's map against Butteraugli's block distances on the loop calibration en
   `d2466a4`), with the same default parameters. Which change moved low-error blocks is not resolved here: the local
   Butteraugli checkout does not hold `13c49cbc`'s line.
 
+**Correction (2026-10-25, later): the gap is the 8-bit rounding, not the teacher's revision.** The Margarine lane
+(zenmetrics `77fc41d4`, `a3237b6a`, `31856c6c`; `crates/margarine/STEERING_REFERENCE.md`) pinned the three Butteraugli
+sources (the encoder loop's `d2466a4`, the teacher `13c49cbc`, current `554a42f8`) and found their maps bit-identical
+on identical RGBA8 pixels of all 324 calibration pairs, so the revision explains nothing. The cause is the inputs: the
+loop's block targets (`butter.f32`) come from Butteraugli on the encoder's floating-point reconstruction, while the
+saved distorted image, and every external map in this study (Margarine through its server, our zensim maps through
+the workbench adapter), sees that reconstruction rounded and clamped to sRGB8. Checked here on the saved pairs
+(numpy, the lane's replayed float reconstructions, which reproduce the saved RGBA8 byte for byte): among blocks whose
+target is at least 0.05, **44.8% of the screenshots' (150,189 of 335,301) and 6.7% of the photos' (53,664 of 805,248)
+are pixel-identical to the reference after rounding**, with a median largest float error of 2.1e-4 (screenshots) and
+7.7e-4 (photos) in linear light, under half an 8-bit step. Any 8-bit map reads those blocks as undamaged, so the loop
+coarsens them: the screens' loss. Fed the unrounded floats (`margarine-steer`, the same kernels), Margarine's
+screenshot bulk log bias goes from −0.85 to +0.02 and its worst-block held-out r to 0.9992, with no fitted placement.
+The earlier statement that "the gap lies between that frozen Butteraugli and the one jxl-encoder's loop uses" is
+wrong. Whether the floats also steer better, for Margarine and for our maps, is measured next (`steer_rd --linear`).
+
 ### Owner decisions (2026-10-25)
 
 Owner, 2026-10-25: "I take your reccomendation for euler split, yes. … For rev 7, we can restructure to our heart's
@@ -3141,6 +3157,25 @@ but they share kernels with the large ones. So scale 0 is the one large unit of 
   (M 1–32, T 0–4 per cell); knob-concurring inversions are no more than `base-c`'s on every set; within-reference
   ordering is no worse than `base-c` on every set; and CID22-A's codec spread is within 0.005 of the full arm's (M 0.0345,
   T 0.038). Losses smaller than these against M or T are the price of the measured speed, reported, not hidden.
+
+**Result, T class** (Tns0, 12 cells 04:51–05:03 UTC, trainer `774955ad`; seeds 0–2, out of sample):
+
+| | `base-c` | T | **Tns0 (no scale 0)** |
+|---|---|---|---|
+| Within-reference ordering Δ vs `base-c` (KADID / TID2013 / KonFiG / CID22-A) | 0 | +0.0146 / +0.0080 / +0.0036 / 0.0000 | +0.0131 / +0.0109 / +0.0037 / +0.0001 |
+| Knob-concurring inversions (KADID / TID2013) | 0.0166 / 0.0113 | 0.0130 / 0.0106 | 0.0135 / **0.0116** |
+| Inversion size p90 (KADID / TID2013 / CID22-A) | 0.065 / 0.092 / 0.007 | 0.067 / 0.058 / 0.001 | 0.077 / 0.066 / 0.004 |
+| Ladder error (KADID / TID2013 / KonFiG / CID22-A) | 0.0926 / 0.0643 / 0.1258 / 0.0694 | 0.0909 / 0.0584 / 0.1361 / 0.0703 | 0.0910 / 0.0591 / 0.1363 / 0.0698 |
+| Per-type bias spread (KADID / TID2013 / KonFiG) | 0.060 / 0.054 / 0.079 | 0.084 / 0.099 / 0.090 | 0.083 / 0.102 / 0.089 |
+| CID22-A codec bias spread | 0.0340 | 0.0376 | **0.0450** |
+| E21 Δ, diagnostic (KADID / TID2013 / KonFiG / CID22-A) | 0 | −0.0205 | −0.0227 (−0.018 / −0.047 / −0.029 / +0.003) |
+
+Against the bars it fails twice: CID22-A's codec spread rises by 0.0074 (bar 0.005), and on TID2013 it inverts more
+knob-agreed pairs than `base-c` (0.0116 against 0.0113). The codec spread says where scale 0 matters. Without it the model
+rates mozjpeg better than people do by +0.069 (T +0.049) and JPEG 2000 by +0.056 (T +0.045), while AVIF (aom −0.031,
+vis_avif −0.048) and WebP (−0.048) move the other way: JPEG's fine-scale artifacts live at full resolution, and the coarser
+scales do not see them. Ordering within references barely moves (KADID −0.0015, TID2013 +0.0029 against T). The mixture
+tests and the M class are running.
 
 ## Summary (all arms, E21 screen, seeds 0–2, Δ vs `base-c`)
 
