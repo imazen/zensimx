@@ -4123,3 +4123,51 @@ Docker or SSH invocation. A cold-readback corruption control refuses before
 creating a verification receipt. Evidence is in
 `mounted-mirror-canonical-control*` and `MOUNTED_MIRROR_CANONICAL_CONTROLS.json`.
 The final study archive still awaits the fleet cells and completed scorecard.
+
+
+### Completed local-arm mixtures and diagnostics
+
+Both mixture sets now cover all 63 completed local models, with each
+score cache bound to its actual bake and complete comparison inventory.
+The primary comparison below uses the twelve older-data E21 models per
+arm; each model retains 1,152 standard and 1,728 global comparisons.
+
+| Arm | Standard inversions, total | Range per E21 model | Largest standard rise | Global inversions, total | Largest global rise |
+|---|---:|---:|---:|---:|---:|
+| Mdata | 38 | 2–5 | +7.082146 | 0 | -0.889359 |
+| Mw025 | 43 | 1–6 | +7.173730 | 0 | -1.097992 |
+| Mlic | 41 | 3–5 | +6.172589 | 0 | -0.790390 |
+
+The global MSE exception remains included; no comparisons or thresholds
+changed. Raw results for all 63 models are retained separately from the
+E21 summaries. Resource record: `run-heavy: done rc=0 78s | peak-RSS
+0.04GiB | min-avail 44326MiB | peak-load 10.86` (12 GiB scope, jobs 12;
+RSS is the maximum single process, not an aggregate).
+
+The following diagnostic rows are three-seed means from dataset-held-out
+TRAIN predictions. They exclude the panel's in-sample rows. The complete
+per-type and rank-geometry outputs, including tails, coverage, clumping and
+clamping, remain in `local-diagnostics/`; these diagnostics do not gate the
+registered selection.
+
+| Arm | Dataset | Type-bias SD | Knob inversion rate | Ladder RMS | Z-RMSE | Rank error p99 | Fitted error p99 |
+|---|---|---:|---:|---:|---:|---:|---:|
+| Mdata | kadid | 0.080899 | 0.014910 | 0.089059 | 0.484136 | 0.408663 | 0.379704 |
+| Mw025 | kadid | 0.079287 | 0.013581 | 0.088365 | 0.477914 | 0.407721 | 0.381542 |
+| Mlic | kadid | 0.077532 | 0.013097 | 0.087282 | 0.472303 | 0.401431 | 0.377887 |
+| Mdata | tid2013 | 0.084836 | 0.010141 | 0.059200 | 0.444892 | 0.296727 | 0.277738 |
+| Mw025 | tid2013 | 0.082506 | 0.010081 | 0.059223 | 0.441296 | 0.298891 | 0.276827 |
+| Mlic | tid2013 | 0.084821 | 0.010141 | 0.058626 | 0.442287 | 0.298518 | 0.276314 |
+| Mdata | konfig | 0.087935 | 0.000194 | 0.131721 | 0.591952 | 0.661607 | 0.574378 |
+| Mw025 | konfig | 0.084933 | 0.000194 | 0.128165 | 0.577721 | 0.638393 | 0.569735 |
+| Mlic | konfig | 0.084633 | 0.000129 | 0.128728 | 0.582080 | 0.654167 | 0.565668 |
+| Mdata | cid22_a25 | 0.036431 | 0.000200 | 0.070738 | 0.493620 | 0.402445 | 0.377916 |
+| Mw025 | cid22_a25 | 0.032990 | 0.000100 | 0.069846 | 0.486263 | 0.398364 | 0.372084 |
+| Mlic | cid22_a25 | 0.038681 | 0.000167 | 0.070297 | 0.489250 | 0.395900 | 0.378415 |
+
+Mlic lowers Z-RMSE on all four sets relative to Mdata, with mixed tails
+and type bias: CID22 A25 type-bias SD increases from 0.036431 to 0.038681,
+and TID2013 rank error p99 increases from 0.296727 to 0.298518. No finalist
+is named from this partial study. Resource record: `run-heavy: done rc=0
+47s | peak-RSS 0.32GiB | min-avail 44849MiB | peak-load 1.91` (16 GiB
+scope, jobs 1). TRAIN label-read ledgers precede the diagnostic reads.

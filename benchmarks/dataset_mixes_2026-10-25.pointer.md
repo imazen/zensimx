@@ -99,3 +99,13 @@ optional cold readback. Its actual-NAS control started no remote processes:
 and inventory `04c2624b198bcaa0a656ab4bb3403164a6029732fc410ee8e5009592aedaa42e`.
 NAS location:
 `/mnt/tower/output/zensim-datamixes-mounted-mirror-canonical-control-2026-10-25/`.
+
+Local diagnostics and both mixture sets are complete for the 63 local
+models. The E21 mixture summaries cover twelve models per arm; all-cell
+raw reports preserve every local model. This does not complete the six-arm
+scorecard or select finalists. Receipts checked on dev:
+
+- `LOCAL_DIAGNOSTIC_RESULTS.json`: `917c153bae782f3c2c2493c5253812dbe0bad0212e886d2d24fd5ed1b0790f10`.
+- `LOCAL_MIXTURE_CELL_CONTROLS.json`: `12e5f3457fd06a2180ade5289808bdfd77e85739fcd5737f1e609cdccbb709ba`.
+- `local-mixtures/mixture.json`: `a70e17686b3f6c8358294fdf9681047d93f4e41aaef5a604fcb869f716c74e6b`.
+- `local-mixtures/mixture_global.json`: `a604f890bc53fef218d24fc598db15299cbb1d679ad224c0a366e7abc37a8b3b`.
