@@ -3847,3 +3847,45 @@ assessment or candidate tuning. EVAL cannot change the finalists, weights,
 shape, seed or checkpoint. No TEST/calibration labels are read. New-data
 group holdouts assess omitted dataset labels; they are not claimed to prove
 source independence between different TRAIN collections.
+
+
+### Mix implementation and assembly controls
+
+Implementation 348407450b0d is verified on origin/main. Native admission and
+ranking controls, strict workspace/all-target/all-feature Clippy, script lint
+and the release trainer build pass. Source build cut 0572d08b8d0e precedes a
+rebase containing only the coordinator's dashboard update; all captured
+training-source hashes still match the landed files.
+
+The pinned pre-parameterization builder (337382e4) and the new builder's
+0.5/all-collections defaults rebuilt at the same fresh output path. Every
+root file is byte-identical (`diff -qr` is empty); both frozen-file hashes are
+`743d20148bbd265c829490621ed45a74bcde0842fdc47cc2b3f1f67b2e0d0115`.
+The original Mdata root remains unchanged at `e127eef91efc…`.
+The new source-label ledgers have 11, 11, 8 and 3 entries for Mw025, Mw100,
+Mmos and Mpair respectively; per-cell ledgers separately authorize derived
+TRAIN reads. Mdata reuses its earlier ledger and cells.
+
+| Arm | Collections | Nominal per collection | Total nominal new mass | Derived TRAIN rows | Frozen root SHA-256 |
+|---|---:|---:|---:|---:|---|
+| Mw025 | 11 | 0.25 | 2.75 | 350,396 | `d02b01d290feb8a9b5b107aed0941ffa3eb864d2e3b91ba36333886976db382e` |
+| Mdata | 11 | 0.5 | 5.5 | 350,396 | `e127eef91efce57c6bb980c3c6e047e0a49079d57f337fc122be74e70cbef1ad` |
+| Mw100 | 11 | 1 | 11 | 350,396 | `28ab159f4be7b5ab614055d1f6a2070e310edecc571a63cd800f0b8430b772e8` |
+| Mmos | 8 | 0.5 | 4 | 25,372 | `322ea0f8518ad004d6314557cbc7fcab7339269a08b01821db3cf2aec487abcd` |
+| Mpair | 3 | 0.5 | 1.5 | 325,024 | `c538fd925c2d84808998f737a0e020151c71029455b5b91f44a352634af61f03` |
+
+All five roots reserve the same 40,904 known families and report zero
+remaining inherited reservations within the existing exact-pixel/D4 guard.
+The bounded family screen does not prove perfect crop recall.
+Preparation resource record: `run-heavy: done rc=0 272s | peak-RSS 10.84GiB |
+min-avail 36184MiB | peak-load 11.19` (16 GiB scope).
+The fit queue uses up to twelve one-thread cells under a 36 GiB scope,
+matching the completed shape-control schedule; large new-data predictions
+are serialized. Rescheduling the initial six-cell queue happened while
+`lslocks` still marked it `WRITE*`; no fit was canceled.
+
+Artifacts checked on dev:
+`/mnt/v/output/zensim/byconstruction-2026-10-22/data-mixes` points to
+`/var/tmp/byc-mixes-20261025`. The source cut, patch, binary hashes, root
+inventory, default control and ledgers are retained there. At this assembly
+record, mix fits and finalist EVAL assessment are not yet complete.
