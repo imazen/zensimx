@@ -2734,6 +2734,21 @@ dial: within-reference ordering on every set no worse than `base-c`, the full-da
 (5) steering: G-STEER, map agreement with independent judges, JPEG XL steering against butteraugli. E21's pooled
 statistic stays as a reported diagnostic of cross-type calibration.
 
+**The two features E21 alone judged, on this scorecard** (seeds 0–2, out of sample, the same cells; `byc_cells.py
+bytype`, `type_bias.py`):
+
+| | M64 | M64lin (coarse scales from linear RGB) | M64o (orientation bands) |
+|---|---|---|---|
+| Within-reference ordering Δ vs `base-c` (KADID / TID2013 / KonFiG / CID22-A) | +0.0132 / +0.0054 / +0.0037 / 0.0000 | +0.0134 / +0.0052 / +0.0037 / −0.0002 | +0.0142 / +0.0057 / +0.0037 / 0.0000 |
+| Per-type bias spread (KADID / TID2013 / KonFiG) | 0.083 / 0.078 / 0.088 | **0.069** / 0.085 / 0.092 | 0.082 / 0.093 / 0.093 |
+| CID22-A codec bias spread | 0.0382 | 0.0387 | 0.0370 |
+| Mixture inversions per cell (largest rise) | 1–6 (+7.6) | 2–5 (**+3.9**) | 2–18 (+7.6) |
+
+Neither feature changes within-reference ordering by more than 0.001 (no seed-level uncertainty is computed for these
+deltas, so read them as unchanged). Linear light halves the largest mixture rise and calibrates KADID's types better,
+at a cost on TID2013's; orientation bands add mixture inversions. Under the proposed gates neither is a clear
+adoption either; linear light stays the better-behaved of the two.
+
 ### JPEG XL steering with the full-data monotone models (2026-10-25)
 
 The steering study's zensim maps were B and two models trained with AIC2026 labels (Tga, M64a). The models the
