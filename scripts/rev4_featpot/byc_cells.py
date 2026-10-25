@@ -8,6 +8,7 @@ this harness reproduced bit for bit (kadid seed 0, 7,869 rows).
 
   run    --arm TOKENS --folds kadid,tid2013,konfig,cid22_a25 --seeds 0,1,2 --jobs N [--aic-weight W --label L]
   score  --arms NAME[,NAME...] [--seeds 0,1,2]
+  progress --arm NAME [--seeds 0,1,2]  (record presence and latest logged epoch; no target table opened)
   aicscore --arms NAME[,NAME...]   (AIC2026 TRAIN out-of-fold panel of --aic-weight arms)
   aiczero --arm NAME=TABLE [--arm ...] [--out JSON]
                                    (AIC2026 public_train zero-shot of every cell of arms trained without AIC: TABLE holds
@@ -39,7 +40,7 @@ os.environ.setdefault("REV4_V2_ROOT", str(ROOT))
 os.environ.setdefault("REV4_V2_BIN_DIR", "/var/tmp/byconstruction-target/release")
 sys.path.insert(0, str(HERE))
 from v2_common import sha  # noqa: E402
-from v2_lodo_mlp import predict, read_curve  # noqa: E402
+from v2_lodo_mlp import EPOCH_RE, predict, read_curve  # noqa: E402
 
 
 def spec_of(tokens: str) -> str:
@@ -170,6 +171,28 @@ def cmd_run(args) -> int:
 def srocc(x, y) -> float:
     from scipy.stats import spearmanr
     return float(spearmanr(x, y).statistic)
+
+
+def cmd_progress(args) -> int:
+    cells = []
+    for seed in [int(s) for s in args.seeds.split(",")]:
+        for fold in args.folds.split(","):
+            path = CELLS / args.arm / f"without_{fold}_s{seed}"
+            record, log = path / "byc_record.json", path / "train.log"
+            if record.is_file():
+                r = json.loads(record.read_text())
+                if (r["fold"], r["seed"]) != (fold, seed):
+                    raise ValueError(f"{record}: cell identity differs")
+                state, epoch = "complete", 119
+            elif log.is_file():
+                epochs = [int(e) for e, _ in EPOCH_RE.findall(log.read_text())]
+                state, epoch = "training", max(epochs) if epochs else None
+            else:
+                state, epoch = "preparing" if path.exists() else "not-started", None
+            cells.append(dict(fold=fold, seed=seed, state=state, latest_logged_epoch=epoch))
+    print(json.dumps(dict(arm=args.arm, complete=sum(r["state"] == "complete" for r in cells),
+                          requested=len(cells), cells=cells), indent=1))
+    return 0
 
 
 def cmd_score(args) -> int:
@@ -605,6 +628,10 @@ def cmd_predict_best(args) -> int:
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
+    pr = sub.add_parser("progress")
+    pr.add_argument("--arm", required=True)
+    pr.add_argument("--folds", default=",".join(FOLDS))
+    pr.add_argument("--seeds", default="0,1,2")
     r = sub.add_parser("run")
     r.add_argument("--arm", required=True, help="recipe tokens, e.g. mono:thr or H1:mono")
     r.add_argument("--folds", default=",".join(FOLDS))
@@ -651,7 +678,7 @@ def main() -> int:
     args = ap.parse_args()
     return {"run": cmd_run, "score": cmd_score, "seedens": cmd_seedens, "curves": cmd_curves, "pairclass": cmd_pairclass,
             "bytype": cmd_bytype, "knobinv": cmd_knobinv, "predict-best": cmd_predict_best, "aicscore": cmd_aicscore,
-            "aiczero": cmd_aiczero}[args.cmd](args)
+            "aiczero": cmd_aiczero, "progress": cmd_progress}[args.cmd](args)
 
 
 if __name__ == "__main__":
