@@ -1021,8 +1021,11 @@ These rulings answer the decisions in `docs/REV4_FEATURE_BANK_PLAN_2026-09-23.md
     optional". Cost is measured and reported for every family. It never accepts or rejects one. Every candidate
     stays in the evaluation, its code stays landed (default off), and its results stay recorded.
   - it keeps the dial contract under the non-negative-distance head.
-- **D3 (MCL-JCI's role)** is pending the datasets-lane proposal. The default is confirmation-only, as the natural
-  test set for the JPEG response-shape question.
+- **D3 (MCL-JCI's role).** Owner, 2026-10-25: "mcl jci and konfig iqa can be sources." Their images may serve as
+  training sources: KonFiG-IQA keeps its training role, and the overlap zenpapers found that day (KonFiG-IQA's
+  references are crops of ten MCL-JCI sources; zenpapers `docs/training-confidence.md`) is accepted, so MCL-JCI is no
+  longer a content-clean confirmation set. Training on MCL-JCI's own ratings is not part of this ruling: they stay
+  unread for fitting until a recipe registers them.
 
 ## Exposure ledger — 2026-09-23: MCL-JCI datasets-lane orientation and DSSIM panel
 

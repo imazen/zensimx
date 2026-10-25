@@ -3152,6 +3152,15 @@ loop: bytes saved at equal SSIMULACRA2 and CVVDP, one variable changed per arm, 
 block agreement, G-STEER, leak and mass on unchanged pixels are diagnostics. The exact split became the served default
 (`3f779c8c`) on judge agreement alone; its loop comparison follows ("Which split steers the JPEG XL loop").
 
+**Data, evening of 2026-10-25.** zenpapers' training-confidence manifests (zenpapers `docs/training-confidence.md`,
+made that day at the owner's request) apply the owner's licence policy: research-only or non-commercial data validates
+but never trains a commercial bake. Three of Mdata's legs are `validate-only` (VCL@FER, PieAPP, FG-IQA), so neither
+Mdata nor Mdata64 can ship as trained; the training-mix study adds a licence-clean arm (`Mlic`). Asked about
+KonFiG-IQA, which the manifests put in tier X because its references are crops of MCL-JCI sources, the owner ruled:
+"mcl jci and konfig iqa can be sources. and the 3. see if it goes well." KonFiG-IQA stays a training set and the overlap
+is accepted (`docs/DATA_SPLITS.md`, D3); "the 3" read as the three validate-only datasets: the licence-clean arm goes
+ahead.
+
 ### Ladder inversions that people and the knob agree on (2026-10-25)
 
 `byc_cells.py knobinv` (new): within each ladder (one reference and distortion type with levels for KADID, TID2013
