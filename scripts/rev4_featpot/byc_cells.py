@@ -473,7 +473,8 @@ def cmd_mix_select(args):
         raise ValueError("the frozen licence-policy dataset manifest changed")
     expected = {c for cs in DATASET_FOLDS.values() for c in cs}
     arms = {}
-    records = {str(e21_path): sha(e21_path), str(policy_path): sha(policy_path)}
+    records = {str(e21_path): sha(e21_path), str(policy_path): sha(policy_path),
+               policy["copied_manifest"]: policy["source_sha256"]}
     for arm in args.arms.split(","):
         if e21[arm]["seeds"] != [0,1,2]:
             raise ValueError("mix selection requires registered seed order 0,1,2")

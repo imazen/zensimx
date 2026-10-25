@@ -179,6 +179,10 @@ class DatasetHoldouts(unittest.TestCase):
             self.assertFalse(frozen["eval_labels_used"])
             self.assertTrue(frozen["arms"]["Mlic"]["eligible_under_new_leg_licence_policy"])
             self.assertFalse(frozen["arms"]["Mdata"]["eligible_under_new_leg_licence_policy"])
+            self.assertEqual(frozen["input_sha256"][str(policy_manifest)], root.sha(policy_manifest))
+            policy_manifest.write_text("changed after selection")
+            with self.assertRaisesRegex(ValueError, "TRAIN selection input changed"):
+                byc_cells.cmd_mix_freeze(args)
 
     def test_invalid_builder_parameters_refuse_before_inputs(self):
         for weight, subset in [(0., None), (float("nan"), None), (0.5,"pipal,pipal"), (0.5,"unknown")]:
