@@ -9,6 +9,7 @@ aic_panel.py --dvifm --geo --per-type). Nothing is computed on AIC2026 public_te
 the frozen-B row comes from panel_public_test_frozen.json and the candidate's from full/Tga/panel.json.
 
   python3 aic_dashboard_data.py --out DIR --arms Tga,Ma,Bga,... [--commits-since 322930e4]
+  python3 aic_dashboard_data.py --out NEW --extend OLD    E21 scatter and revision-7 rows only (Mr7, Mdata)
 """
 
 import argparse
@@ -58,6 +59,15 @@ CONTROLS = {"Thpm": "Thpm (monotone, no descriptor, no AIC leg)", "Tghpm": "Tghp
             "M64lin": "M64lin (M64 recipe, coarse scales from linear RGB, no AIC leg)"}
 # Arms made from other arms' predictions after the fact (no training of their own): the mean of two cells' outputs.
 POSTHOC = {"M64ens": "M64ens (mean of M64 and M64lin, post hoc, no AIC leg)"}
+# Revision-7 arms (no AIC leg). Their cells sit in the data-legs lane's directory, where Mr7 links to
+# ~/tmp/byc/cells/Mr7; they are scored against the revision-7 data root with binaries that read revision-7 bakes.
+REV7 = {"Mr7": "Mr7 (revision-7 M, no AIC leg)", "Mdata": "Mdata (Mr7 + 11 new datasets' TRAIN legs, no AIC leg)"}
+REV7_CELLS = Path(os.environ.get("BYC_REV7_CELLS", "/var/tmp/datalegs-20261025/cells"))
+REV7_ROOT = "/mnt/v/output/zensim/byconstruction-2026-10-22/rev7data/root"
+REV7_BIN = os.environ.get("REV7_BIN", "/var/tmp/datalegs-20261025/bin")
+NAMES = {"kadid": "KADID", "tid2013": "TID2013", "konfig": "KonFiG", "cid22_a25": "CID22-A",
+         "aic2026_public_train": "AIC2026 public_train", "aic2026_public_test": "AIC2026 public_test"}
+GEO_F = ("fit_p99", "fit_max", "out4", "p99d", "maxd")
 COMMIT_SUMMARY = {
     "d24c2ec6": "AIC2026 feature tables, source-held-out fits, band-feature prototypes",
     "31e3ba97": "AIC2026 as a research training leg through the Rust trainer (strict refusal kept)",
@@ -137,15 +147,121 @@ def run_json(cmd: list[str], env: dict) -> dict:
     return json.loads(out[out.index("{"):])
 
 
+def e21_scatter(add) -> pd.DataFrame:
+    """The scatter views for the E21 sets: each dataset's out-of-sample seed-0 predictions on its own label scale
+    (quality orientation, as E34's panel input stores the targets), one `scatter` row per dataset and model."""
+    panel_in = {d["name"]: d for d in json.loads(A_E34.read_text())["datasets"]}
+    dvr = pd.read_parquet(DVIFM_DIR / "rows.parquet")
+    dvj = pd.read_csv(DVIFM_DIR / "dvifm.tsv", sep="\t").set_index(["ref_path", "dist_path"]).jnd
+    e21rows = []
+    for ds in ("kadid", "tid2013", "konfig", "cid22_a25"):
+        y = np.asarray(panel_in[ds]["target"], np.float64)
+        sel = dvr[dvr.dataset == ds]
+        frame = {"ds": ds, "label": np.round(y, 4), "type": [TYPE_NAMES.get(t, t) for t in sel.type]}
+        models = [("basec", "B’s recipe (base-c), seed 0", np.asarray(panel_in[ds]["predictions"]["base-c"][0], np.float64))]
+        for arm, sid, lab, cells in (("Tga", "tga", "Tga, seed 0", CELLS),
+                                     ("mono-thr-mp64", "m64", "M64 (certified max pairs), seed 0", CELLS),
+                                     ("Mgg64", "mgg64", "Mgg64 (max pairs, gated damage), seed 0", CELLS),
+                                     ("Tgg", "tgg", "Tgg, seed 0", CELLS),
+                                     ("M64lin", "m64lin", "M64lin (linear-light coarse scales), seed 0", CELLS),
+                                     ("M64ens", "m64ens", "M64ens (mean of M64 and M64lin, post hoc), seed 0", CELLS),
+                                     ("Mr7", "mr7", "Mr7 (revision-7 M), seed 0", REV7_CELLS),
+                                     ("Mdata", "mdata", "Mdata (Mr7 + new datasets), seed 0", REV7_CELLS)):
+            f = cells / arm / f"without_{ds}_s0" / f"pred_{ds}.tsv"
+            if f.is_file():
+                x = pd.read_csv(f, sep="\t").pred.to_numpy(np.float64)
+                if len(x) != len(y):
+                    raise ValueError(f"{f}: {len(x)} predictions for {len(y)} labels")
+                models.append((sid, lab, x))
+        models.append(("dvifm", "DVIFM 0.3 (zero-shot)", -dvj.loc[list(zip(sel.ref_path, sel.dist_path))].to_numpy(np.float64)))
+        for sid, lab, x in models:
+            st, arr = geometry(x, y, arrays=True)
+            pn = panel_batch([(sid, x, y)], stats="full")[0]
+            frame[f"f_{sid}"], frame[f"r_{sid}"] = np.round(arr["fit"], 4), np.round(arr["rank"], 4)
+            frame[f"a_{sid}"] = np.round(y.mean() + (x - x.mean()) * (y.std() / x.std()), 4)
+            add("scatter", id=f"{ds}_{sid}", dataset=NAMES[ds], key=sid, model=lab, n=int(pn["n"]),
+                srocc=pn["srocc_signed"], plcc=pn["plcc"], z_rmse=pn["z_rmse"], **{"or": pn["or"]}, **st)
+        e21rows.append(pd.DataFrame(frame))
+    return pd.concat(e21rows, ignore_index=True)
+
+
+def rev7_rows(add, out: Path) -> None:
+    """Panel rows (E21 in and out of sample, smoothness and geometry, no AIC label) and arms rows for the revision-7
+    arms, with the seeds both arms have finished; the mixture columns stay empty until an arm's mixture cells exist."""
+    # Revision-7 bakes need the newer bake readers; the statistics come from the same panel build as every other row.
+    env = dict(os.environ, AIC_BIN=REV7_BIN, REV4_V2_BIN_DIR=REV7_BIN, ZEN_PANEL_BIN=f"{BIN}/panel",
+               BYC_CELLS=str(REV7_CELLS), BYC_ROOT=REV7_ROOT)
+    done = {a: {s for s in (0, 1, 2) if len(list((REV7_CELLS / a).glob(f"without_*_s{s}/pred_*.tsv"))) == 4} for a in REV7}
+    arms = [a for a in REV7 if done[a]]
+    if not arms:
+        return
+    panel_json = out / "panel_rev7.json"
+    subprocess.run([sys.executable, str(HERE / "aic_panel.py"), "--out", str(panel_json), "--arms", ",".join(arms),
+                    "--geo", "--per-type", "--no-aic", "--no-public-test"], check=True, capture_output=True, env=env)
+    pj = json.loads(panel_json.read_text())
+    for x in pj["rows"]:
+        if x["model"] in REV7:
+            add("panel", id=slug(x["dataset"] + " " + x["model"] + " " + x["sample"]), dataset=NAMES[x["dataset"]],
+                model=REV7[x["model"]], sample=x["sample"], kind="out" if x["sample"].startswith(("out", "zero")) else "in",
+                n=x["n"], seeds=x["seeds"], srocc=x["srocc_signed"], plcc=x["plcc"], krocc=x["krocc"], **{"or": x["or"]},
+                pwrc=x["pwrc"], z_rmse=x["z_rmse"], **{k: x.get(k) for k in GEO_F})
+    seeds = sorted(set.intersection(*(done[a] for a in arms)))
+    sc = run_json([sys.executable, str(REPO / "scripts/rev4_featpot/byc_cells.py"), "score", "--arms", ",".join(arms),
+                   "--seeds", ",".join(map(str, seeds))], env)
+    mix = run_json([sys.executable, str(HERE / "mixture_test.py"), "report", "--out", MIX], env)
+    mixg = run_json([sys.executable, str(HERE / "mixture_test.py"), "report", "--out", MIXG], env)
+    for arm in arms:
+        s = sc[arm]
+        outs = [x for x in pj["rows"] if x["model"] == arm and x["sample"].startswith("out")]
+        cells = [v for k, v in mix.items() if k.startswith(arm + "_")]
+        gcells = [v for k, v in mixg.items() if k.startswith(arm + "_")]
+        add("arms", id=slug(arm), arm=REV7[arm], aic_weight=None, e21_delta=s["delta"], e21_se=s["seed_unit_se"],
+            **{d: s["per_dataset_delta"][d] for d in ("kadid", "tid2013", "konfig", "cid22_a25")}, aic_oof=None,
+            mix_min=min(v["inversions"] for v in cells) if cells else None,
+            mix_max=max(v["inversions"] for v in cells) if cells else None,
+            mix_max_rise=max(v["max_rise"] for v in cells) if cells else None,
+            gmix_max=max(v["inversions"] for v in gcells) if gcells else None,
+            gmix_max_rise=max(v["max_rise"] for v in gcells) if gcells else None,
+            status=f"E21 seeds {','.join(map(str, seeds))}" + ("" if seeds == [0, 1, 2] else
+                                                               " (matched across the revision-7 arms; more pending)"),
+            z_e21=float(np.mean([x["z_rmse"] for x in outs])), p99_e21=float(np.mean([x["fit_p99"] for x in outs])),
+            z_aic=None)
+
+
+def extend(prev: Path, out: Path) -> int:
+    """Refresh the E21 scatter views and the revision-7 rows of an earlier build without rebuilding its AIC tables."""
+    rows = [r for r in json.loads((prev / "results.json").read_text())
+            if not (r["table"] == "scatter" and r["dataset"] in ("KADID", "TID2013", "KonFiG", "CID22-A"))
+            and not (r["table"] == "panel" and r["model"] in REV7.values())
+            and not (r["table"] == "arms" and r["arm"] in REV7.values())]
+
+    def add(table, **kw):
+        rows.append({"table": table, **kw})
+    e21 = e21_scatter(add)
+    rev7_rows(add, out)
+    ids = [(r["table"], r.get("id")) for r in rows]
+    if len(ids) != len(set(ids)):
+        raise ValueError("duplicate row ids")
+    (out / "results.json").write_text(json.dumps(rows, indent=0))
+    e21.sample(frac=1, random_state=0).reset_index(drop=True).to_json(out / "e21predictions.json", orient="records")
+    print(f"{len(rows)} result rows; {len(e21)} E21 prediction rows (extended {prev})")
+    return 0
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--out", required=True)
-    ap.add_argument("--arms", required=True, help="finished combined arms, comma-separated")
+    ap.add_argument("--arms", help="finished combined arms, comma-separated (required unless --extend)")
     ap.add_argument("--commits-since", default="322930e4")
+    ap.add_argument("--extend", help="an earlier build's directory: refresh only its E21 scatter and revision-7 rows")
     a = ap.parse_args()
-    arms = a.arms.split(",")
     out = Path(a.out)
     out.mkdir(parents=True, exist_ok=True)
+    if a.extend:
+        return extend(Path(a.extend), out)
+    if not a.arms:
+        ap.error("--arms is required without --extend")
+    arms = a.arms.split(",")
     env = dict(os.environ, REV4_V2_BIN_DIR=BIN, BYC_ROOT=GROOT)
     rows = []
 
@@ -344,11 +460,10 @@ def main() -> int:
                     "--no-public-test"], check=True, capture_output=True, env=env)
     pj = json.loads(panel_json.read_text())
     frozen = json.loads((O / "panel_public_test_frozen.json").read_text())["rows"]
-    names = {"kadid": "KADID", "tid2013": "TID2013", "konfig": "KonFiG", "cid22_a25": "CID22-A",
-             "aic2026_public_train": "AIC2026 public_train", "aic2026_public_test": "AIC2026 public_test"}
+    names = NAMES
     models = {"base-c": "B recipe (base-c)", "Thpm": "Thpm (convex monotone)", "Mhpm": "Mhpm (max pairs)", **CONTROLS, **POSTHOC,
               **{k: v[0] for k, v in ARMS.items()}}
-    geo_f = ("fit_p99", "fit_max", "out4", "p99d", "maxd")
+    geo_f = GEO_F
     for x in pj["rows"] + frozen:
         add("panel", id=slug(x["dataset"] + " " + x["model"] + " " + x["sample"]), dataset=names[x["dataset"]],
             model=models.get(x["model"], x["model"]), sample=x["sample"],
@@ -400,34 +515,8 @@ def main() -> int:
         views[f"a_{sid}"] = jnd_tr.mean() + (worse - worse.mean()) * (jnd_tr.std() / worse.std())
         add("scatter", id=sid, dataset="AIC2026 public_train", key=sid, model=lab, n=int(pn["n"]),
             srocc=pn["srocc_signed"], plcc=pn["plcc"], z_rmse=pn["z_rmse"], **{"or": pn["or"]}, **st)
-    # The same views for the E21 sets: each dataset's out-of-sample seed-0 predictions on its own label scale
-    # (quality orientation, as E34's panel input stores the targets).
-    panel_in = {d["name"]: d for d in json.loads(A_E34.read_text())["datasets"]}
-    dvr = pd.read_parquet(DVIFM_DIR / "rows.parquet")
-    dvj = pd.read_csv(DVIFM_DIR / "dvifm.tsv", sep="\t").set_index(["ref_path", "dist_path"]).jnd
-    e21rows = []
-    for ds in ("kadid", "tid2013", "konfig", "cid22_a25"):
-        y = np.asarray(panel_in[ds]["target"], np.float64)
-        sel = dvr[dvr.dataset == ds]
-        frame = {"ds": ds, "label": np.round(y, 4), "type": [TYPE_NAMES.get(t, t) for t in sel.type]}
-        models = [("basec", "B’s recipe (base-c), seed 0", np.asarray(panel_in[ds]["predictions"]["base-c"][0], np.float64))]
-        for arm, sid, lab in (("Tga", "tga", "Tga, seed 0"), ("mono-thr-mp64", "m64", "M64 (certified max pairs), seed 0"),
-                              ("Mgg64", "mgg64", "Mgg64 (max pairs, gated damage), seed 0"), ("Tgg", "tgg", "Tgg, seed 0"),
-                              ("M64lin", "m64lin", "M64lin (linear-light coarse scales), seed 0"),
-                              ("M64ens", "m64ens", "M64ens (mean of M64 and M64lin, post hoc), seed 0")):
-            f = CELLS / arm / f"without_{ds}_s0" / f"pred_{ds}.tsv"
-            if f.is_file():
-                models.append((sid, lab, pd.read_csv(f, sep="\t").pred.to_numpy(np.float64)))
-        models.append(("dvifm", "DVIFM 0.3 (zero-shot)", -dvj.loc[list(zip(sel.ref_path, sel.dist_path))].to_numpy(np.float64)))
-        for sid, lab, x in models:
-            st, arr = geometry(x, y, arrays=True)
-            pn = panel_batch([(sid, x, y)], stats="full")[0]
-            frame[f"f_{sid}"], frame[f"r_{sid}"] = np.round(arr["fit"], 4), np.round(arr["rank"], 4)
-            frame[f"a_{sid}"] = np.round(y.mean() + (x - x.mean()) * (y.std() / x.std()), 4)
-            add("scatter", id=f"{ds}_{sid}", dataset=names[ds], key=sid, model=lab, n=int(pn["n"]),
-                srocc=pn["srocc_signed"], plcc=pn["plcc"], z_rmse=pn["z_rmse"], **{"or": pn["or"]}, **st)
-        e21rows.append(pd.DataFrame(frame))
-    e21 = pd.concat(e21rows, ignore_index=True)
+    e21 = e21_scatter(add)
+    rev7_rows(add, out)
     for i, (ph, labels, what, runs, use) in enumerate(EXPOSURE):
         add("exposure", id=f"e{i}", phase=ph, labels=labels, what=what, runs=runs, use=use)
 
