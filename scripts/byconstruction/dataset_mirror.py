@@ -27,6 +27,11 @@ def main():
     ap.add_argument("--host", required=True)
     ap.add_argument("--destination", required=True)
     ap.add_argument("--capacity-path", nargs="+", required=True)
+    ap.add_argument(
+        "--image",
+        default="iqa-organize:5",
+        help="resident checksum image; never pulled",
+    )
     args = ap.parse_args()
     assert args.root.is_dir() and args.destination.startswith("/")
     receipt_path = args.root / "MIRROR_VERIFIED.json"
@@ -38,6 +43,21 @@ def main():
         ["ssh", args.host, "df -h " + " ".join(map(shlex.quote, args.capacity_path))],
         check=True,
     )
+    subprocess.run(["ssh", args.host, "uptime"], check=True)
+    subprocess.run(
+        ["ssh", args.host, "docker ps --format '{{.Names}} {{.Image}}'"], check=True
+    )
+    image_id = subprocess.check_output(
+        [
+            "ssh",
+            args.host,
+            shlex.join(
+                ["docker", "image", "inspect", args.image, "--format", "{{.Id}}"]
+            ),
+        ],
+        text=True,
+    ).strip()
+    assert image_id.startswith("sha256:")
     files = sorted(p for p in args.root.rglob("*") if p.is_file())
     assert not any(
         p.suffix.lower() in {".png", ".jpg", ".bmp", ".tif", ".imijset"} for p in files
@@ -60,12 +80,28 @@ def main():
         ],
         check=True,
     )
-    verify = "cd " + shlex.quote(destination) + " && sha256sum -c SHA256SUMS"
+    checksum_command = [
+        "docker",
+        "run",
+        "--rm",
+        "--network=none",
+        "--read-only",
+        "--cpuset-cpus=0-23",
+        "--cpu-shares=256",
+        "--memory=1g",
+        "--blkio-weight=100",
+        "-v",
+        destination + ":/artifacts:ro",
+        "--workdir=/artifacts",
+        "--entrypoint=/usr/bin/sha256sum",
+        image_id,
+    ]
+    verify = shlex.join([*checksum_command, "-c", "SHA256SUMS"])
     subprocess.run(["ssh", args.host, verify], check=True)
     readbacks = []
     for name in random.SystemRandom().sample(list(digests), 3):
         result = subprocess.check_output(
-            ["ssh", args.host, "sha256sum " + shlex.quote(destination + "/" + name)],
+            ["ssh", args.host, shlex.join([*checksum_command, name])],
             text=True,
         )
         assert result.split()[0] == digests[name], name
@@ -80,6 +116,7 @@ def main():
         "random_readbacks": readbacks,
         "response_tables_opened": False,
         "readme_example_exposure_receipt": "README_EXPOSURE.json",
+        "checksum_container_image_id": image_id,
     }
     receipt_path.write_text(json.dumps(receipt, indent=2) + "\n")
     # Final inventory includes the receipt; no inventory hash in the receipt
