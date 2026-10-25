@@ -389,6 +389,102 @@ def cmd_bytype(args) -> int:
     return 0
 
 
+BANK = Path("/var/tmp/rev5-featbank")
+
+
+def _knobs(name: str) -> list:
+    """Per E21 row of `name`: `(ladder, knob, sign)`, `sign` +1 when a larger knob means better quality. A ladder is one
+    reference and distortion type with levels (KADID, TID2013, KonFiG; a larger level is worse), or one reference,
+    codec and fixed other setting with quality `q` (CID22-A; larger is better, except aom's quantizer). Joined on the
+    table's `pair_key` to the bank keys of its `member_set` (`ref_group`, `codec`, `knob`); no label is read.
+    Directions were checked without labels: KonFiG's level raises pixel MSE in every ladder, CID22-A's `q` raises the
+    encoded size except aom's (benchmarks/byconstruction_2026-10-22.md, "Ladder inversions that people and the knob
+    agree on")."""
+    import re
+    import pyarrow.parquet as pq
+    keys = pq.read_table(ROOT / "wide/main/real" / f"{name}.keys.parquet",
+                         columns=["pair_key", "member_set", "ref_basename"]).to_pylist()
+    bank = {}
+    for ms in sorted({k["member_set"] for k in keys}):
+        for r in pq.read_table(BANK / ms / "keys.parquet", columns=["pair_key", "ref_group", "codec", "knob"]).to_pylist():
+            bank[(ms, r["pair_key"])] = r
+    out = []
+    for k in keys:
+        b = bank[(k["member_set"], k["pair_key"])]
+        if b["ref_group"] != k["ref_basename"]:
+            raise ValueError(f"{name}: key reference {k['ref_basename']} against bank {b['ref_group']}")
+        if name == "cid22_a25":
+            m = re.fullmatch(r"(?:([se]\d+)_)?q([0-9.]+)", b["knob"])
+            out.append(((b["ref_group"], b["codec"], m.group(1) or ""), float(m.group(2)),
+                        -1 if b["codec"] == "aom" else 1))
+        else:
+            out.append(((b["ref_group"], b["codec"]), int(b["knob"]), -1))
+    return out
+
+
+def cmd_knobinv(args) -> int:
+    """Ladder ordering against the encoder knob as well as people. Over pairs of one ladder with different knob values,
+    a pair is `concurring` when the human order agrees with the knob's; the model's inversions are counted on those
+    pairs only, each with its size on the human scale (the panel's logistic map of the model, as a share of the label
+    span p1-p99). Pairs where people disagree with the knob are reported apart: how often the model follows the knob.
+    `ladder_rms` is the error amount inside ladders: the logistic-map residual with each ladder's mean removed, RMS over
+    rows, as a share of the span. Out of sample, seeds averaged."""
+    import itertools
+    import numpy as np
+    sys.path.insert(0, str(HERE.parent))
+    os.environ.setdefault("ZEN_PANEL_BIN", str(Path(os.environ["REV4_V2_BIN_DIR"]) / "panel"))
+    from lib.zen_stats import logistic_fit
+    panel = json.loads(E34_PANEL.read_text())
+    seeds = [int(s) for s in args.seeds.split(",")]
+    arms = ["base-c", *[a for a in args.arms.split(",") if a and a != "base-c"]]
+    out = {}
+    for d in panel["datasets"]:
+        name = d["name"]
+        t = np.asarray(d["target"], dtype=float) * float(d["orientation"])
+        knobs = _knobs(name)
+        if len(knobs) != len(t):
+            raise ValueError(f"{name}: {len(knobs)} knob rows for {len(t)} targets")
+        ladders = {}
+        for i, (key, knob, sign) in enumerate(knobs):
+            ladders.setdefault(key, []).append((i, knob, sign))
+        conc, subj = [], []
+        for rows in ladders.values():
+            for (i, ki, sg), (j, kj, _) in itertools.combinations(rows, 2):
+                if ki == kj or t[i] == t[j]:
+                    continue
+                good, bad = (i, j) if (ki - kj) * sg > 0 else (j, i)  # the knob's better row first
+                (conc if t[good] > t[bad] else subj).append((good, bad))
+        conc, subj = np.asarray(conc), np.asarray(subj)
+        lad = np.zeros(len(t), dtype=int)
+        for n, rows in enumerate(ladders.values()):
+            lad[[r[0] for r in rows]] = n
+        span = float(np.quantile(t, 0.99) - np.quantile(t, 0.01))
+        res = {"ladders": len(ladders), "pairs_concurring": int(len(conc)), "pairs_subjective_only": int(len(subj))}
+        for arm in arms:
+            acc = {k: [] for k in ("inversion_rate", "size_mean", "size_p90", "size_max", "follows_knob", "ladder_rms")}
+            for s in seeds:
+                m = np.asarray(logistic_fit(_preds(d, arm, s), t))
+                inv = m[conc[:, 0]] < m[conc[:, 1]]
+                size = (m[conc[:, 1]] - m[conc[:, 0]])[inv] / span
+                acc["inversion_rate"].append(float(inv.mean()))
+                acc["size_mean"].append(float(size.mean()) if size.size else 0.0)
+                acc["size_p90"].append(float(np.quantile(size, 0.9)) if size.size else 0.0)
+                acc["size_max"].append(float(size.max()) if size.size else 0.0)
+                acc["follows_knob"].append(float((m[subj[:, 0]] > m[subj[:, 1]]).mean()) if len(subj) else float("nan"))
+                r = m - t
+                r = r - (np.bincount(lad, r) / np.bincount(lad))[lad]
+                acc["ladder_rms"].append(float(np.sqrt(np.mean(r * r)) / span))
+            res[arm] = {k: float(np.mean(v)) for k, v in acc.items()}
+        out[name] = res
+        line = "  ".join(f"{a} inv {res[a]['inversion_rate']:.4f} (p90 {res[a]['size_p90']:.3f}) rms {res[a]['ladder_rms']:.4f}"
+                         for a in arms)
+        print(f"== {name}: {len(ladders)} ladders, {len(conc)} concurring / {len(subj)} subjective-only pairs  {line}",
+              flush=True)
+    if args.out:
+        Path(args.out).write_text(json.dumps(out, indent=1) + "\n")
+    return 0
+
+
 BEST = Path(os.environ.get("BYC_BEST", str(Path.home() / "tmp/byc/best")))
 
 
@@ -544,12 +640,16 @@ def main() -> int:
     bt.add_argument("--arm", required=True)
     bt.add_argument("--control", default="base-c")
     bt.add_argument("--seeds", default="0,1,2")
+    kv = sub.add_parser("knobinv")
+    kv.add_argument("--arms", required=True, help="comma list of arm directories; base-c is always included")
+    kv.add_argument("--seeds", default="0,1,2")
+    kv.add_argument("--out")
     pb = sub.add_parser("predict-best")
     pb.add_argument("--arm", required=True, help="arm directory name, or base-c for E34's control cells")
     pb.add_argument("--seeds", default="0,1,2")
     args = ap.parse_args()
     return {"run": cmd_run, "score": cmd_score, "seedens": cmd_seedens, "curves": cmd_curves, "pairclass": cmd_pairclass,
-            "bytype": cmd_bytype, "predict-best": cmd_predict_best, "aicscore": cmd_aicscore,
+            "bytype": cmd_bytype, "knobinv": cmd_knobinv, "predict-best": cmd_predict_best, "aicscore": cmd_aicscore,
             "aiczero": cmd_aiczero}[args.cmd](args)
 
 

@@ -2944,6 +2944,58 @@ all-channel gate agree to within 0.002 on every statistic; the T-class all-chann
 (+0.345 against +0.352), so the class where the two gates should differ is M (Mgg64 +0.277 against M64's +0.212),
 running now.
 
+### Owner decisions (2026-10-25)
+
+Owner, 2026-10-25: "I take your reccomendation for euler split, yes. … For rev 7, we can restructure to our heart's
+content for speed; we will eventually be shifting zensim stuff into zenmetrics and pruning zensim back to JUST rev 7 +
+legacy A support. For datasets, you can add more datasets, just located an honor their train/test splits. I approve
+all of them that have useful stats. And you can switch the workbench placement. Also add margaraine to the spatial
+steer and see if it can approach butter better. For e21-parity screen, yes, I take your reccomendations." And: "but
+also mse might matter more than ladder inversions - or another error amount distributions, if the ladder inversions
+are subjective-only rather than subjective+ecnoder-knob concurring".
+
+- **Selection gates:** the five goal-aligned gates of the gate review replace the E21-parity screen; E21's pooled
+  statistic stays a reported diagnostic. Gate 3 (dial) is refined by the second message: inversions count only where
+  people and the encoder knob agree, and the error amount inside ladders is weighed with them (next section).
+- **Euler (exact) split** becomes the default map, as recommended (its condition: better block agreement with the
+  three judges and no worse leak).
+- **Workbench JPEG XL loop placements** switch to the tail fits.
+- **Margarine** (zenmetrics' Butteraugli approximation) joins the JPEG XL steering comparison.
+- **Datasets:** every collection with useful statistics may be added, honouring its published train/test split.
+- **Revision 7** may be restructured freely for speed; zensim will later shrink to revision 7 plus legacy profile A
+  support, with the rest moving to zenmetrics.
+- The "own versions of the missing ideas" were already built and measured: coarse scales from linear RGB (M64lin)
+  and orientation bands (M64o), neither adopted ("Coarse scales in linear light", "Orientation bands" above, and the
+  goal-aligned scorecard in the gate review).
+
+### Ladder inversions that people and the knob agree on (2026-10-25)
+
+`byc_cells.py knobinv` (new): within each ladder (one reference and distortion type with levels for KADID, TID2013
+and KonFiG; one reference, codec and fixed other setting with quality `q` for CID22-A), every pair with different knob
+values whose human order agrees with the knob's is **concurring**; the model's inversions are counted on those pairs
+only, each with its size on the human scale (the panel's logistic map, as a share of the label span p1–p99). Pairs
+where people disagree with the knob are counted apart. `ladder_rms` is the error amount inside ladders: the logistic-
+map residual with each ladder's mean removed, RMS over rows, as a share of the span. Knobs come from the bank keys
+(`ref_group`, `codec`, `knob`), joined on `pair_key`; directions were checked without labels (KonFiG's level raises
+pixel MSE in all 56 ladders, τ = +1.000; CID22-A's `q` raises encoded size for every codec except aom, whose `q` is
+a quantizer, τ −0.857). Seeds 0–2, out of sample (JSON `~/tmp/byc/knobinv.json` on dev).
+
+| | KADID (13,794 concurring / 1,285 people-only) | TID2013 (5,522 / 468) | KonFiG (5,166 / 0) | CID22-A (9,988 / 0) |
+|---|---|---|---|---|
+| Concurring inversion rate: `base-c` / M64 / M / T | 0.0166 / 0.0141 / 0.0139 / **0.0130** | 0.0113 / **0.0095** / 0.0097 / 0.0106 | 0.0021 / 0.0001 / **0.0000** / 0.0001 | 0.0002 / 0.0002 / 0.0001 / 0.0001 |
+| Inversion size p90 (share of span) | 0.065 / 0.071 / 0.072 / 0.067 | 0.092 / 0.062 / 0.066 / **0.058** | 0.007 / 0 / 0 / 0 | 0.007 / 0.002 / 0.003 / 0.001 |
+| Error inside ladders (`ladder_rms`) | 0.0926 / 0.0894 / 0.0895 / 0.0909 | 0.0643 / 0.0593 / 0.0587 / **0.0584** | **0.1258** / 0.1314 / 0.1324 / 0.1361 | **0.0694** / 0.0701 / 0.0700 / 0.0703 |
+
+The monotone models invert less than B's recipe on every set where people and the knob agree, and their inversions
+are no larger. The error amount inside ladders is smaller for them on KADID and TID2013 and larger on KonFiG (by 4–8%)
+and on CID22-A (by 1%): on codec ladders B's recipe spaces the levels slightly closer to people's spacing. KonFiG and
+CID22-A have no pairs where people disagree with the knob; where KADID and TID2013 have them, B's recipe follows the
+knob more often (0.70 and 0.59 against 0.65–0.67 and 0.51–0.56), which says nothing about who is right. The gated arms
+(Tgg, Tgy, Mgg64) sit within 0.001 of their classes on inversions; Mgg64 has the smallest KADID ladder error (0.0857).
+
+Refined gate 3 (dial): no more concurring inversions than `base-c` on any set, inversions no larger, and the error
+inside ladders compared on every set (reported with Z-RMSE and its p99), with the full-data C1–C6, G-DIAL and NEARID.
+
 ## Summary (all arms, E21 screen, seeds 0–2, Δ vs `base-c`)
 
 | Arm | Guarantee | E21 Δ (SE) | Mixture inversions / cell (max rise) |
