@@ -54,6 +54,16 @@ The frozen source-family registry SHA-256 is
 | spcd | CALIBRATION 9947; SOURCE_EXPOSED_TEST_DIAGNOSTIC 20000 | CALIBRATION 53 | `fb893c96fca33e6dff1ef9c30f30b6d5543d025bf621dfb0ee7d2d13b0c3483b` | `a27316dfd282ea4e29c9494d04482f81861fcc407268325b9a0e389feb4c1a7b` |
 | vcl-fer | EVAL 192; TRAIN 264; TEST 96 | 0 | `1a412c4d0c525a87126ac78fcd543f2c8d4fbeb9c1ee0cd3eec684e7f6c78d2b` | `9a958598a710e5fdf2c639480ac83538f2aef1aee6bca5a0a8862c695f375d37` |
 
+Published documentation examples were also visible in the CID:OA README
+and a PieAPP paper illustration. Identifier-only matching binds CID:OA
+examples to two FROZEN TRAIN, one FROZEN EVAL and two FROZEN TEST rows, and
+IQA-ODI examples to six already-excluded TRAIN and two FROZEN TEST rows.
+`/mnt/v/zensim/dataset-features-rev7-20261025/EXAMPLE_EXPOSURE_IDENTIFIERS.json`
+records these identifiers without values. Native roles remain unchanged;
+future assessments must disclose this documentation exposure. FG-IQA and
+PieAPP illustrations were not resolved through a workbook or label payload.
+No examples entered extraction, fitting or selection.
+
 Native validation/test tags are preserved. The accepted admission's active
 TRAIN/CALIBRATION families and independent EVAL/TEST families have zero shared
 family IDs. This is a bounded source-screen result, with retained possible
