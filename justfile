@@ -2,6 +2,10 @@
 dataset-assessment-keys collection admission out extractor commit:
     OPENBLAS_NUM_THREADS=1 PYTHONDONTWRITEBYTECODE=1 nice -n19 ionice -c3 python3 -B scripts/byconstruction/dataset_keys.py {{collection}} --admission {{admission}} --out {{out}} --extractor {{extractor}} --build-commit {{commit}}
 
+# Caller holds shared heavy.lock and run-heavy; archive payload stays on tower.
+dataset-unpack-bapps keys library scratch receipts:
+    OPENBLAS_NUM_THREADS=1 PYTHONDONTWRITEBYTECODE=1 python3 -B scripts/byconstruction/dataset_unpack_bapps.py --keys {{quote(keys)}} --library {{quote(library)}} --scratch {{quote(scratch)}} --receipt-dir {{quote(receipts)}}
+
 addrfix-test target:
     TMPDIR="$HOME/tmp" cargo test --locked -p zensim-validate --bin panel panel_e34:: --target-dir {{quote(target)}}
 
