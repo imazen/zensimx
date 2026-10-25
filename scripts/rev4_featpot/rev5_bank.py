@@ -663,7 +663,7 @@ def main() -> int:
     ap.add_argument("--instrument-manifest", type=Path, help="explicit label-free assessment keys; historical bank default unchanged")
     ap.add_argument("--hdr-teacher", help="immutable HDRTEACH role; native E26 extraction")
     ap.add_argument("--build-commit", default="")
-    ap.add_argument("--revision", type=int, choices=[4, 5], default=5)
+    ap.add_argument("--revision", type=int, choices=[4, 5, 7], default=5)
     ap.add_argument("--era", default="")
     ap.add_argument("--out", default="/var/tmp/rev5-featbank")
     ap.add_argument("--reference", default="/var/tmp/rev4-featbank-r4")

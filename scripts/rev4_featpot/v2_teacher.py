@@ -306,7 +306,10 @@ def coverage_leg(mask: int, scratch: Path, *, admitted_root: Path | None = None)
     pool, keys, scratch = safe_path(pool), safe_path(keys), safe_path(scratch)
     man = Path(f"{pool}.manifest.json")
     revision = int(json.loads(man.read_text()).get("formula_revision", 4)) if man.is_file() else 4
-    pool_sha = {4: POOL_SHA, 5: POOL_SHA_REV5}.get(revision)
+    declared = json.loads(man.read_text()) if man.is_file() else {}
+    # A revision-7 pool exists only as a by-construction derivation of the Rev5 pool (ring_root.py --arm rev7).
+    source_revision = 5 if revision == 7 and "byc_derived_from" in declared else revision
+    pool_sha = {4: POOL_SHA, 5: POOL_SHA_REV5}.get(source_revision)
     if pool_sha is None:
         raise ValueError(f"{pool}: no registered E15 coverage pool for formula revision {revision}")
     declaration = json.loads(man.read_text()) if man.is_file() else {}

@@ -19,7 +19,11 @@ const BYC_DERIVED: &[&str] = &[
     "basic+peaks+v2@w1891/rev5_localwin_ringhpm_globaff#d56ad477",
     "basic+peaks+v2@w2301/rev5_localwin_ringhpm_globaffgate#45e0e84c",
     "basic+peaks+v2@w2055/rev5_localwin_ringhpm_globaffgatey#7b645e91",
+    REV7_FSID,
 ];
+/// Formula revision 7 with raw ringing (owner 2026-10-25; `scripts/byconstruction/ring_root.py --arm rev7`): its
+/// tables declare `formula_revision` 7, every other admitted table 5.
+const REV7_FSID: &str = "basic+peaks+v2@w1825/rev7_rowlanes#36c3f3af";
 
 pub(super) fn safe(path: &Path) -> Result<(), String> {
     for p in [
@@ -559,8 +563,13 @@ pub(super) fn preflight(
         }
         let derived = d.get("byc_derived_from").is_some()
             && BYC_DERIVED.contains(&identity.id.to_string().as_str());
+        let revision = if identity.id.to_string() == REV7_FSID {
+            7
+        } else {
+            5
+        };
         if (!palette && !derived && identity.id.to_string() != BASE)
-            || d["formula_revision"] != 5
+            || d["formula_revision"] != revision
             || d["decoder_era"].as_str().is_none_or(str::is_empty)
             || [
                 "table_sha256",

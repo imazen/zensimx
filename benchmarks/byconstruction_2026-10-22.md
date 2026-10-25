@@ -3269,6 +3269,33 @@ cannot subtract, and the raw response to saturation pushes saturation's under-pe
 revision 6's high-pass form; (b) restore revision 5's raw ringing in revision 7, keeping the high-pass form as a research
 toggle. My recommendation is (b); the re-extraction and retrain wait for this choice.
 
+### Revision 7 with raw ringing (2026-10-25)
+
+Owner, 2026-10-25: "ok, restore and train/test raw ringing then." Revision 7 now computes revision 5's measurements, raw
+ringing included, with revision 6's `globaff` family and the row-lane arithmetic; `ZENSIM_RING_FORM=hpm` still selects
+the high-pass form as a research arm (`FormulaRevision::ring_high_pass` is revision 6 only; the gradient kernel gains the
+revision-7 raw-ringing instantiation in its canonical and exact-oracle dispatch; local refinement, which refuses the
+high-pass form, works at revision 7 again).
+
+Checks: `cargo test --release -p zensim --all-features` 942 passed, 0 failed, 29 ignored; CI-exact clippy clean.
+`featcanon_rev7_parity` now compares revision 7 with revision 5 on basic + peaks + v2 and with revision 6 on `globaff`
+(both by rounding only, the existing 1e-2 floored-relative guard), and requires the ringing slots to leave revision 6's
+high-pass values. Bit dumps of B stamped at revisions 5 and 7 (one binary, the 11 inputs of `perf_bits.sh`): revision 7
+is identical across v4x, v4, v3 and scalar at one thread and v4x at eight (55 runs, 0 mismatches); against revision 5,
+4,438 of 7,920 finite feature values move, by a median 1.1e-6 relative (p90 1.7e-5, p99 2.3e-4, largest 4.0e-3 on the
+97×63 pair's f664, an absolute 2.3e-8), and B's score by at most 5.4e-5 points (median 6.7e-6).
+
+**Plan (recorded before any result).** (1) Re-extract the eight training and assessment sets of the `v2e29` root and
+its E15 coverage pool at revision 7 (`ring_bank.sh … rev7`, era `rev7_rowlanes`, feature set
+`basic+peaks+v2@w1825/rev7_rowlanes#36c3f3af`); control first: the same extractor at revision 5 must reproduce the stored
+Rev5 bank bit for bit on `konfig_train` and `cid22_a25`, and every revision-7 value must stay within 1e-2 relative
+(+1e-6) of its Rev5 value (`ring_root.py` refuses more than 0.1% of cells beyond that). (2) Admit the root (registry era
+and set, Python and trainer admission accept formula revision 7 for that set only). (3) Train M (`mono:thr:mp32`) and T
+on the 12 E21 cells at revision 7 and compare with their revision-5 cells on the goal-aligned scorecard. Reading (my
+bar): revision 7 is a faithful re-extraction when every scorecard statistic stays within its seed spread of the
+revision-5 cell; any larger move is reported as a finding. (4) Full-data M at revision 7 through the product gates,
+with gate tools rebuilt at the head after they reproduce M's revision-5 gate results exactly.
+
 ## Summary (all arms, E21 screen, seeds 0–2, Δ vs `base-c`)
 
 | Arm | Guarantee | E21 Δ (SE) | Mixture inversions / cell (max rise) |

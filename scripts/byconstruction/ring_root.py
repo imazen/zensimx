@@ -9,6 +9,8 @@ right pixels and that the arm moved nothing else. Arms (`--arm`, default hpm):
 
   hpm     `ZENSIM_RING_FORM=hpm`: the 12 ringing columns (v2 `idx::RINGING` over the 12 scale x channel cells)
   linpyr  `ZENSIM_PYRAMID=linear`: every column of scales 1-3, and scale 0's edge-width change (a scale 0/1 ratio)
+  rev7    `ZENSIM_FORMULA_REV=7` (raw ringing, owner 2026-10-25): every measured column; the tables declare formula
+          revision 7 and the new extractor, and each replaced value must stay close to the stored Rev5 value
 
   pool   --bin EXTRACTOR --out DIR             extract the E15 coverage-pool selection (44,000 pairs) under the arm
   build  --bank DIR --pool DIR --out ROOT      write the derived root and re-pin its receipt and freeze
@@ -73,6 +75,9 @@ ARMS = {
     "linpyr": {"env": {"ZENSIM_PYRAMID": "linear"}, "manifest": ("pyramid", "linear"), "era": "rev5_localwin_linpyr",
                "replaced": sorted([i for i in MEASURED if scale_of(i) > 0] + EDGE_WIDTH_S0), "record": "byc_linpyr_root",
                "note": "; scales 1-3 and scale-0 edge-width change re-extracted under ZENSIM_PYRAMID=linear (byconstruction)"},
+    "rev7": {"env": {"ZENSIM_FORMULA_REV": "7"}, "manifest": ("formula_revision", "7"), "era": "rev7_rowlanes",
+             "replaced": MEASURED, "record": "byc_rev7_root", "revision": 7, "close": True,
+             "note": "; every measured slot re-extracted at formula revision 7 (rowlanes, raw ringing; byconstruction)"},
 }
 
 
@@ -95,7 +100,7 @@ def require_arm(manifests: list[Path], arm: dict) -> None:
     key, value = arm["manifest"]
     for m in manifests:
         man = json.loads(m.read_text())
-        if man.get(key) != value:
+        if str(man.get(key)) != str(value):
             raise ValueError(f"{m}: not extracted under {key}={value}")
         scales = {f["id"]: f["scale"] for f in man["features"]}
         if any(scales[i] != scale_of(i) for i in MEASURED):
@@ -109,8 +114,8 @@ def cmd_pool(a) -> int:
     shutil.copyfile(POOL_SOURCE / "extract/pairs.tsv", tsv)
     csvp = out / "features.csv"
     arm = ARMS[a.arm]
-    env = dict(os.environ, ZENSIM_FORMULA_REV="5", ZENSIM_ROOT_FORM="sqrt", **arm["env"],
-               RAYON_NUM_THREADS=str(a.threads))
+    env = dict(os.environ, ZENSIM_FORMULA_REV="5", ZENSIM_ROOT_FORM="sqrt", RAYON_NUM_THREADS=str(a.threads))
+    env.update(arm["env"])
     cmd = [a.bin, "--corpus", "pairs-tsv", "--path", str(tsv), "--out", str(csvp), "--restore-cuts", "basic,peaks,v2",
            "--input-contract", "legacy-rgb8", "--era-label", arm["era"], "--force-tier", "native"]
     t0 = time.time()
@@ -145,8 +150,30 @@ def load_bank(bank: Path, name: str, arm: dict) -> tuple[dict, np.ndarray]:
     return index, X
 
 
-def patch(table: pa.Table, new: np.ndarray, what: str, replaced: list[int]) -> pa.Table:
-    """Check every measured column outside `replaced` bit for bit, then swap in the `replaced` columns."""
+def close_check(table: pa.Table, new: np.ndarray, what: str, replaced: list[int]) -> None:
+    """A re-extraction at another formula revision (rev7) moves every value a little; a join or extractor error moves
+    many a lot. Refuse a nonfinite value where the stored one is finite, or more than 0.1% of cells off by more than
+    1e-2 relative (plus 1e-6 absolute); log the relative-change distribution either way."""
+    pos = {i: j for j, i in enumerate(MEASURED)}
+    old = np.stack([table.column(f"f{i}").to_numpy() for i in replaced], axis=1).astype(np.float64)
+    cur = new[:, [pos[i] for i in replaced]].astype(np.float64)
+    fin = np.isfinite(old)
+    if (fin & ~np.isfinite(cur)).any():
+        raise ValueError(f"{what}: a re-extracted value is nonfinite where the stored one is finite")
+    d = np.abs(cur - old)[fin]
+    rel = d / np.maximum(np.abs(old[fin]), 1e-12)
+    far = int((d > 1e-2 * np.abs(old[fin]) + 1e-6).sum())
+    log(f"{what}: relative change median {np.median(rel):.2e} p99 {np.quantile(rel, 0.99):.2e} max {rel.max():.2e}; "
+        f"{far} of {d.size} cells beyond 1e-2 relative + 1e-6")
+    if far > 1e-3 * d.size:
+        raise ValueError(f"{what}: {far} of {d.size} cells moved more than a revision change can; the join is wrong")
+
+
+def patch(table: pa.Table, new: np.ndarray, what: str, replaced: list[int], close: bool = False) -> pa.Table:
+    """Check every measured column outside `replaced` bit for bit (and, with `close`, every replaced value against
+    `close_check`), then swap in the `replaced` columns."""
+    if close:
+        close_check(table, new, what, replaced)
     pos = {i: j for j, i in enumerate(MEASURED)}
     other = [i for i in MEASURED if i not in replaced]
     for i in other:
@@ -205,7 +232,7 @@ def cmd_build(a) -> int:
             index, X = banks[m]
             sel = [r for r, mm in enumerate(members) if mm == m]
             new[sel] = X[[index[pks[r]] for r in sel]]
-        table = patch(pq.read_table(t), new, t.stem, replaced)
+        table = patch(pq.read_table(t), new, t.stem, replaced, arm.get("close", False))
         write(table, real / t.name)
         shutil.copyfile(src_real / f"{t.stem}.keys.parquet", real / f"{t.stem}.keys.parquet")
         record["tables"][t.name] = {"source_sha256": sha(t), "sha256": sha(real / t.name)}
@@ -234,7 +261,8 @@ def cmd_build(a) -> int:
         raise ValueError(f"coverage pool: matched {j} of {len(want)} rows")
     ptab = pq.read_table(pool / "features.parquet")
     X = np.stack([ptab.column(f"f{i}").to_numpy() for i in MEASURED], axis=1)[take].astype(np.float32)
-    table = patch(pq.read_table(SOURCE / "e15/coverage_pool.parquet"), X, "coverage_pool", replaced)
+    table = patch(pq.read_table(SOURCE / "e15/coverage_pool.parquet"), X, "coverage_pool", replaced,
+                  arm.get("close", False))
     (out / "e15").mkdir()
     write(table, out / "e15/coverage_pool.parquet")
     shutil.copyfile(SOURCE / "e15/coverage_pool.keys.parquet", out / "e15/coverage_pool.keys.parquet")
@@ -257,6 +285,15 @@ def cmd_build(a) -> int:
         m["source_bank_feature_set_id"] = fsid
         m["feature_values_changed"] = True
         m[key] = value
+        if "revision" in arm:
+            # The tables now hold another revision's values: declare it, and the extractor that produced them.
+            binaries = {b["binary_sha256"] for b in bank_manifests.values()}
+            commits = {b["build_commit"] for b in bank_manifests.values()}
+            if len(binaries) != 1 or len(commits) != 1:
+                raise ValueError(f"bank sets were extracted by different binaries: {binaries} {commits}")
+            m["formula_revision"] = arm["revision"]
+            m["decoder_era"] = f"legacy-rgb8/extract_features_372col@sha256:{next(iter(binaries))}"
+            m["extractor_build_commit"] = next(iter(commits))
         m["composite"] = m.get("composite", "") + note
         m["immutable_input_roots"] = [*m.get("immutable_input_roots", []), *new_roots]
         Path(f"{table}.manifest.json").write_text(json.dumps(m, indent=1) + "\n")
@@ -285,6 +322,8 @@ def cmd_build(a) -> int:
     receipt["feature_set_id"] = fsid
     receipt["era"] = era
     receipt[key] = value
+    if "revision" in arm:
+        receipt["formula_revision"] = arm["revision"]
     view = dict(receipt["admission_view"])
     view["bank_root"] = bank_root
     view["immutable_input_roots"] = [*view["immutable_input_roots"], *new_roots]

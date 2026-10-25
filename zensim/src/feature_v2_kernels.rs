@@ -6344,16 +6344,21 @@ fn gradient_block_kernel_at_revision(
                         ),
                         [v4x, v4, v3, neon, wasm128, scalar]
                     ),
-                    // Revision 7 (`rowlanes`, which also carries Rev6's ringing form).
+                    // Revision 7 (`rowlanes`): raw ringing, as revision 5 (owner, 2026-10-25) ...
+                    (true, false, true) => incant!(
+                        gradient_block_kernel_canon64_vec::<crate::featcanon::Lanes16F64, $b, $v, $k, false, true>(
+                            src, dst, activity, $act_dst, mu1, mu2, width, height, $lo, $hi, r4, m,
+                        ),
+                        [v4x, v4, v3, neon, wasm128, scalar]
+                    ),
+                    // ... or the high-pass form under the `ZENSIM_RING_FORM=hpm` research arm.
                     (true, true, true) => incant!(
                         gradient_block_kernel_canon64_vec::<crate::featcanon::Lanes16F64, $b, $v, $k, true, true>(
                             src, dst, activity, $act_dst, mu1, mu2, width, height, $lo, $hi, r4, m,
                         ),
                         [v4x, v4, v3, neon, wasm128, scalar]
                     ),
-                    (_, false, true) | (false, _, true) => {
-                        unreachable!("revision 7 implies revision 5's lanes and revision 6's ringing")
-                    }
+                    (false, _, true) => unreachable!("revision 7 implies revision 5's lanes"),
                     (false, false, false) => incant!(
                         gradient_block_kernel_canon64_vec::<crate::featcanon::LanesF64, $b, $v, $k, false, false>(
                             src, dst, activity, $act_dst, mu1, mu2, width, height, $lo, $hi, r4, m,
@@ -6414,7 +6419,7 @@ fn gradient_block_kernel_at_revision(
                 (false, false) => go_exact!(false, false),
                 (true, false) => go_exact!(true, false),
                 (true, true) => go_exact!(true, true),
-                (false, true) => unreachable!("revision 7 carries revision 6's ringing form"),
+                (false, true) => go_exact!(false, true),
             },
             Mode::Off => unreachable!("active() excludes Off"),
         };

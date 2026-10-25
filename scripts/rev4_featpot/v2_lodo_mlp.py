@@ -225,12 +225,16 @@ def e34_options(args, recipe):
     return options(args,recipe)
 
 
+# Formula revision 7 (raw ringing; owner 2026-10-25): every measured slot re-extracted at revision 7
+# (scripts/byconstruction/ring_root.py --arm rev7); its tables declare formula_revision 7.
+REV7_FSID = "basic+peaks+v2@w1825/rev7_rowlanes#36c3f3af"
 BYC_DERIVED_FSIDS = {"basic+peaks+v2@w1825/rev5_localwin_ringhpm#36c3f3af",
                      "basic+peaks+v2@w1825/rev5_localwin_linpyr#36c3f3af",
                      "basic+peaks+v2@w2337/rev5_localwin_orient#24a93918",
                      "basic+peaks+v2@w1891/rev5_localwin_ringhpm_globaff#d56ad477",
                      "basic+peaks+v2@w2301/rev5_localwin_ringhpm_globaffgate#45e0e84c",
-                     "basic+peaks+v2@w2055/rev5_localwin_ringhpm_globaffgatey#7b645e91"}
+                     "basic+peaks+v2@w2055/rev5_localwin_ringhpm_globaffgatey#7b645e91",
+                     REV7_FSID}
 
 
 def strict_training_groups(groups: list, data_role_decision: Path | None = None,
@@ -293,7 +297,8 @@ def strict_training_groups(groups: list, data_role_decision: Path | None = None,
         # under a measurement arm and declares its own era; every other measured column was checked bit for bit.
         derived = "byc_derived_from" in d and d.get("feature_set_id") in BYC_DERIVED_FSIDS
         if ((not palette and not derived and d.get("feature_set_id") != "basic+peaks+v2@w1825/rev5_localwin#36c3f3af")
-                or d.get("formula_revision") != 5 or not d.get("decoder_era")
+                or d.get("formula_revision") != (7 if d.get("feature_set_id") == REV7_FSID else 5)
+                or not d.get("decoder_era")
                 or not d.get("table_sha256") or not d.get("row_selection_sha256")):
             raise ValueError(f"{name}: strict admission requires bound Rev5 table provenance")
         if not d.get("data_role_decision_required") and d.get("data_role") not in ("TRAIN oracle teacher", "TRAIN ordinal KADIS source_id%10<8; no human labels"):

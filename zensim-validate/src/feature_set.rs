@@ -727,7 +727,7 @@ pub fn registry() -> &'static Registry {
 /// separately, which is exactly how a new revision comes to be accepted in
 /// one place and silently rejected in another. Mirrors
 /// `zensim::feature_v2::FormulaRevision`; extend both together.
-pub const ADMITTED_FORMULA_REVISIONS: &[u64] = &[1, 2, 3, 4, 5];
+pub const ADMITTED_FORMULA_REVISIONS: &[u64] = &[1, 2, 3, 4, 5, 6, 7];
 
 /// Whether a declared `formula_revision` value names a revision this build
 /// knows how to read.

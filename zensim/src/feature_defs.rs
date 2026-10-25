@@ -499,9 +499,13 @@ pub enum FormulaRevision {
     /// `ZENSIM_FORMULA_REV=6` pins it for research, and a bake declaring
     /// revision 6 selects it per call.
     Rev6,
-    /// Revision 6 with faster and cancellation-free pooled arithmetic (the
+    /// Revision 5's measurements, raw ringing included, with revision 6's
+    /// `globaff` family and faster, cancellation-free pooled arithmetic (the
     /// `rowlanes` era, `benchmarks/byconstruction_2026-10-22.md`, "Speed pass
-    /// before revision 7"):
+    /// before revision 7"). Revision 6's high-pass ringing form is not part
+    /// of it (owner, 2026-10-25: for the monotone models the raw form scores
+    /// better on codec uniformity and robustness; "Before the revision-7
+    /// cut" in the record):
     ///
     /// * **f32 row lanes.** The dense, fused-SSIM and gradient pools add
     ///   the columns of each row's complete 8-column chunks to sixteen f32
@@ -533,6 +537,8 @@ pub enum FormulaRevision {
     ///
     /// Any live slot may move (an arithmetic era); scope and process model
     /// are Rev6's (`ZENSIM_FORMULA_REV=7`, or a bake declaring revision 7).
+    /// `ZENSIM_RING_FORM=hpm` still selects the high-pass ringing form as a
+    /// per-process research arm.
     Rev7,
 }
 
@@ -605,7 +611,6 @@ impl FormulaRevision {
                 "tiercanon",
                 "c3negfold",
                 "localwin",
-                "ringhpm",
                 "rowlanes",
             ],
         }
@@ -613,8 +618,9 @@ impl FormulaRevision {
 
     /// Whether the v2 `ringing` family measures the local-mean-removed error
     /// ([`Self::Rev6`]'s `ringhpm` era) rather than the raw pixel error.
+    /// Revision 7 returns to the raw error.
     pub(crate) const fn ring_high_pass(self) -> bool {
-        matches!(self, Self::Rev6 | Self::Rev7)
+        matches!(self, Self::Rev6)
     }
 
     /// Whether the `globaff` family (f1867..1890) is computed at this revision.
@@ -905,7 +911,8 @@ const REV_RINGHPM: Revision = Revision {
            the SSIM local means the dense kernel already holds; the three \
            saturations are unchanged. Moves only the 12 ringing slots \
            (+8 shift median 0.334 -> 0.017, blur unchanged 0.139 -> 0.143). \
-           Rev5 keeps the raw form byte for byte; `ZENSIM_RING_FORM=hpm` is \
+           Rev5 keeps the raw form byte for byte, and Rev7 returns to it \
+           (owner, 2026-10-25); `ZENSIM_RING_FORM=hpm` is \
            the per-process research arm of the same arithmetic. Record: \
            benchmarks/byconstruction_2026-10-22.md.",
 };
@@ -1433,13 +1440,14 @@ const DEFECT_FORM_CANCELLATION: Defect = Defect {
            merged once per 16 columns, most of the pooled kernels' time.",
 };
 
-/// The `rowlanes` era: Rev6 with f32 row lanes, per-row central moments and
-/// the cancellation-free forms ([`FormulaRevision::Rev7`]).
+/// The `rowlanes` era: Rev5's measurements (raw ringing) and Rev6's `globaff`
+/// family, with f32 row lanes, per-row central moments and the
+/// cancellation-free forms ([`FormulaRevision::Rev7`]).
 const REV_ROWLANES: Revision = Revision {
     era: "rowlanes",
     commit: "-",
     status: RevisionStatus::Proposed,
-    note: "rev7: the dense, fused-SSIM and gradient pools add the columns of \
+    note: "rev7 (raw ringing as rev5; owner 2026-10-25): the dense, fused-SSIM and gradient pools add the columns of \
            each row's complete 8-column chunks to sixteen f32 lanes (`x & 15`, \
            ascending x), folded into f64 lanes at the end of the chunks and \
            after every 4,096th column, except pools whose features difference \
@@ -1451,10 +1459,11 @@ const REV_ROWLANES: Revision = Revision {
            one Chan/Pébay merge per row; the three subtractive forms become \
            their exact cancellation-free equivalents; the opsin cube root \
            takes one division (`cbrt_newton_f32`). MEASURED (byconstruction \
-           record, \"Revision 7 speed after the implementation\"): against \
-           revision 6 on B's 55 dumps, 22,190 of 39,600 feature values move, \
-           by a median 1.1e-6 relative (largest 4.0e-3, an absolute 2.3e-8), \
-           and the score by at most 4.0e-5 points; against the exact f64 \
+           record, \"Revision 7 with raw ringing\"): against revision 5 on \
+           B's 11 dump inputs (one binary, stamps 5 and 7), 4,438 of 7,920 \
+           finite feature values move, by a median 1.1e-6 relative (largest \
+           4.0e-3, an absolute 2.3e-8), and the score by at most 5.4e-5 \
+           points; tier-identical at 1 and 8 threads; against the exact f64 \
            oracle (93 near-identical pairs) the per-feature median error's \
            p90 falls from 2.80e-6 to 2.39e-6 and its worst feature rises from \
            5.10e-5 to 5.91e-5 (`peaks_ssim_max_s3_b`, the cube root's error \
