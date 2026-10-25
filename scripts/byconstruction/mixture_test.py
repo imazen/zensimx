@@ -26,6 +26,7 @@ import argparse
 import concurrent.futures as cf
 import hashlib
 import json
+import math
 import os
 import subprocess
 import sys
@@ -165,6 +166,13 @@ def cmd_score(a):
         name, path = spec.split("=", 1)
         dest = out / f"scores_{name}.json"
         if dest.exists():
+            cached = json.loads(dest.read_text())
+            expected = (hashlib.sha256(Path(path).read_bytes()).hexdigest(), a.post,
+                        os.environ.get("ZENSIM_RING_FORM", "raw"), os.environ.get("ZENSIM_PYRAMID", "xyb"))
+            actual = tuple(cached[k] for k in ("bake_sha256", "post", "ring_form", "pyramid"))
+            if (actual != expected or set(cached["scores"]) != {dist for _, dist in images}
+                    or not all(math.isfinite(v) for v in cached["scores"].values())):
+                raise ValueError(f"{dest}: cached bake, measurement settings or image coverage differs")
             print(f"exists: {dest}")
             continue
 
@@ -173,7 +181,10 @@ def cmd_score(a):
             r = subprocess.run([str(bin_dir / SCORER), "--bake", path, "--bake-post", a.post, "--ref",
                                 str(out / "img" / ref), "--dist", str(out / "img" / dist)],
                                capture_output=True, text=True, check=True)
-            return dist, float(r.stdout.strip().splitlines()[-1])
+            score = float(r.stdout.strip().splitlines()[-1])
+            if not math.isfinite(score):
+                raise ValueError(f"{dist}: nonfinite mixture score")
+            return dist, score
 
         with cf.ThreadPoolExecutor(a.jobs) as pool:
             scores = dict(pool.map(one, images))

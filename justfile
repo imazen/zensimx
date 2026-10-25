@@ -70,6 +70,42 @@ dataset-mix-e21 study out arms='Mdata,Mw025,Mw100,Mmos,Mpair,Mlic':
     env BYC_ROOT=/var/tmp/datalegs-20261025/rev7data/root BYC_CELLS={{quote(study)}}/cells BYC_LABEL_LEDGER_DIR="$out/label_reads" OPENBLAS_NUM_THREADS=1 RAYON_NUM_THREADS=1 OMP_NUM_THREADS=1 python3 -B scripts/rev4_featpot/byc_cells.py score --arms {{quote(arms)}} --paired-with Mdata > "$out/e21.json"
 
 # Caller holds shared heavy.lock and run-heavy; no new labels outside TRAIN.
+dataset-mix-mixtures study arms='Mdata,Mw025,Mw100,Mmos,Mpair,Mlic':
+    #!/usr/bin/env bash
+    set -euo pipefail
+    study={{quote(study)}}
+    arms={{quote(arms)}}
+    python3 - "$study" "$arms" <<'PY'
+    from pathlib import Path
+    import shutil, sys
+    study, arms = Path(sys.argv[1]), sys.argv[2].split(',')
+    assert arms and len(arms) == len(set(arms))
+    assert set(arms) <= {'Mdata','Mw025','Mw100','Mmos','Mpair','Mlic'}
+    for name in ('mixture','mixture_global'):
+        out, source = study/name, Path('/var/tmp/datalegs-20261025')/name
+        images = Path('/mnt/v/output/zensim/byconstruction-2026-10-22')/name/'img'
+        if not out.exists():
+            out.mkdir()
+            shutil.copyfile(source/'manifest.json', out/'manifest.json')
+            (out/'img').symlink_to(images)
+        assert (out/'manifest.json').read_bytes() == (source/'manifest.json').read_bytes()
+        assert (out/'img').is_symlink() and (out/'img').resolve() == images.resolve()
+        for fold in ('kadid','tid2013','konfig','cid22_a25'):
+            for seed in range(3):
+                name = f'scores_Mdata_{fold}_s{seed}.json'
+                dest = out/name
+                if dest.exists():
+                    assert dest.read_bytes() == (source/name).read_bytes(), str(dest)
+                else:
+                    shutil.copyfile(source/name, dest)
+    PY
+    IFS=, read -r -a requested <<< "$arms"
+    export BYC_CELLS="$study/cells" ZENSIM_MAX_TIER=v3 ZENSIM_PYRAMID=xyb RAYON_NUM_THREADS=1 OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1
+    for set in mixture mixture_global; do
+      MIX="$study/$set" BYC_MIX_FOLDS=kadid,tid2013,konfig,cid22_a25,pipal,pairs,mos7,full bash scripts/byconstruction/ring_mixture.sh "$study/bin" raw 12 "${requested[@]}"
+    done
+
+# Caller holds shared heavy.lock and run-heavy; no new labels outside TRAIN.
 dataset-mix-scorecard study:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -90,14 +126,9 @@ dataset-mix-scorecard study:
     python3 -B scripts/byconstruction/type_bias.py Mdata Mw025 Mw100 Mmos Mpair Mlic --out "$out/type_bias.json" > "$out/type_bias.txt"
     python3 -B scripts/rev4_featpot/byc_cells.py knobinv --arms "$arms" --out "$out/knobinv.json" > "$out/knobinv.txt"
     python3 -B scripts/byconstruction/aic_panel.py --out "$out/panel.json" --arms "base-c,$arms" --geo --no-aic --no-public-test > "$out/panel.txt" 2>&1
+    just dataset-mix-mixtures "$study" "$arms" > "$study/mixture-score.log" 2>&1
     for set in mixture mixture_global; do
       mix="$study/$set"
-      mkdir "$mix"
-      cp "/var/tmp/datalegs-20261025/$set/manifest.json" "$mix/manifest.json"
-      ln -s "/mnt/v/output/zensim/byconstruction-2026-10-22/$set/img" "$mix/img"
-      for file in /var/tmp/datalegs-20261025/$set/scores_Mdata_*.json; do cp "$file" "$mix/"; done
-      BYC_MIX_FOLDS=kadid,tid2013,konfig,cid22_a25 MIX="$mix" bash scripts/byconstruction/ring_mixture.sh "$study/bin" raw 12 Mw025 Mw100 Mmos Mpair Mlic > "$study/${set}_score.log" 2>&1
-      BYC_MIX_FOLDS=pipal,pairs,mos7,full MIX="$mix" bash scripts/byconstruction/ring_mixture.sh "$study/bin" raw 12 Mdata Mw025 Mw100 Mmos Mpair Mlic >> "$study/${set}_score.log" 2>&1
       python3 -B scripts/byconstruction/mixture_test.py summary --out "$mix" --json-out "$out/$set.json" Mdata Mw025 Mw100 Mmos Mpair Mlic > "$out/$set.txt" 2>&1
       python3 -B scripts/byconstruction/mixture_test.py report --out "$mix" > "$out/${set}_all-cells.json"
     done

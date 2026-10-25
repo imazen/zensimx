@@ -4088,3 +4088,13 @@ This interim comparison does not select finalists or assess new EVAL rows.
 R2's image/control-input preparation receipt is copied into the study;
 its complete scientific-arm archives and numeric control remain separately
 owned by the fleet lane.
+
+The mixture score owner now verifies a cache hit against the actual bake
+digest, postprocessing/ring/pyramid settings, complete manifest image keys
+and finite scores before reuse. An original Mdata cache passes; changed
+bake, settings, image coverage and nonfinite-score controls all refuse and
+preserve their input. Evidence is in `mixture-cache-controls/`. The mixture
+manifest and every comparison remain unchanged, including the previously
+recorded global MSE exception. Completed local models can be scored while
+fleet fits run; the complete scorecard reuses only verified cache entries
+and still requires all 123 models in both mixture sets.
