@@ -7,7 +7,7 @@ set -euo pipefail
 BIN=$1
 OUT=$2
 mkdir -p "$OUT"
-cd ~/work/zen/zensim--byconstruction
+cd "$(dirname "$0")/../.."
 B=${B_BAKE:-$PWD/zensim/weights/b_sdr_diff_frag_820_rev5_2026-10-19.bin}
 TGA=${TGA_BAKE:-$HOME/tmp/byc/parity/tga_full_rev6.bin}
 G=$HOME/.cache/codec-corpus/v1/gb82

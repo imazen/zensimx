@@ -2,7 +2,7 @@
 # Map-study dumps after the 2026-10-24 map fixes (record: "Attribution-map correctness").
 # TAGS=a,b runs only those tags.
 set -euo pipefail
-cd ~/work/zen/zensim--byconstruction
+cd "$(dirname "$0")/../.."
 BIN=zensim-bench/target/release/examples/map_dump
 S=/mnt/v/output/zensim/byconstruction-2026-10-22/maps/study
 TGA=$HOME/tmp/byc/parity/tga_full_rev6.bin
