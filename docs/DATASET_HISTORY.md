@@ -1,7 +1,7 @@
 # Zensim Dataset & Experiment History — accurate record
 
 **October 25, provided-library frozen memberships; labels unopened:**
-The [registration](DATA_SPLITS.md#october-25--provided-library-membership-registration-labels-unopened) records all 20 in-scope collections, per-role counts, membership and receipt SHA-256s, protected populations and conservative fit exclusions. The accepted historical receipt includes LS2N IPI SR; the owner excludes it and ESPL from phase 2 because they were acquired afterward, leaving their files untouched. SCID, SIQAD, QACS and JPEG-AI EPFL are closed, absent from the library, never retry. No human label value was read and no model trained. DiffIQA and SPCD have no pristine reference and skip full-reference feature extraction. Native splits and all earlier seals remain in force.
+The [registration](DATA_SPLITS.md#october-25--provided-library-membership-registration-labels-unopened) records all 20 in-scope collections, per-role counts, membership and receipt SHA-256s, protected populations and conservative fit exclusions. The accepted historical receipt includes LS2N IPI SR; the owner excludes it and ESPL from phase 2 because they were acquired afterward, leaving their files untouched. SCID, SIQAD, QACS and JPEG-AI EPFL are closed, absent from the library, never retry. No subjective response table or label column was opened and no model trained. A subsequent protocol README read exposed embedded illustrative DMOS/vote examples; those were not used numerically, and the phase-2 report records the exception. DiffIQA and SPCD have no pristine reference and skip full-reference feature extraction. Native splits and all earlier seals remain in force.
 
 
 **October 18, completed TRAIN repair screens:**

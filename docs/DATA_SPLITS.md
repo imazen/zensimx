@@ -9,8 +9,13 @@ their existing files and historical admission receipts remain untouched.
 SCID, SIQAD, QACS and the JPEG-AI EPFL study are closed: not in the library,
 no retry. No new dataset downloads, network probes or web searches are authorized.
 
-**No human label value has been read in this admission/feature phase, and no
-model has trained on these populations.** Revision-7 label-free extraction
+**No subjective response table or label column has been opened, and no model
+has trained on these populations.** A later protocol read of an author README
+unexpectedly displayed its embedded example DMOS table; the FG-IQA ReadMe
+also contains an illustrative vote-count cell. Those incidental documentation
+examples were not used numerically or copied into features. This exception
+to the literal no-label-values-read instruction is disclosed in the phase-2
+report and its `README_EXPOSURE.json` receipt. Revision-7 label-free extraction
 is a separate operation over FROZEN rows, with role-preserving mappings;
 it does not authorize label access, fitting, calibration or assessment.
 DiffIQA's imperfect original input is not a pristine reference; all its FROZEN
