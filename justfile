@@ -61,6 +61,15 @@ dataset-mix-cells study arm:
     python3 -B scripts/rev4_featpot/byc_cells.py run --arm mono:thr:mp32 --label "$arm" --folds "$folds" --seeds 0,1,2 --jobs 12
 
 # Caller holds shared heavy.lock and run-heavy; no new labels outside TRAIN.
+dataset-mix-e21 study out arms='Mdata,Mw025,Mw100,Mmos,Mpair,Mlic':
+    #!/usr/bin/env bash
+    set -euo pipefail
+    out={{quote(out)}}
+    test ! -e "$out/e21.json"
+    mkdir -p "$out/label_reads"
+    env BYC_ROOT=/var/tmp/datalegs-20261025/rev7data/root BYC_CELLS={{quote(study)}}/cells BYC_LABEL_LEDGER_DIR="$out/label_reads" OPENBLAS_NUM_THREADS=1 RAYON_NUM_THREADS=1 OMP_NUM_THREADS=1 python3 -B scripts/rev4_featpot/byc_cells.py score --arms {{quote(arms)}} --paired-with Mdata > "$out/e21.json"
+
+# Caller holds shared heavy.lock and run-heavy; no new labels outside TRAIN.
 dataset-mix-scorecard study:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -74,7 +83,7 @@ dataset-mix-scorecard study:
     just dataset-mix-binary-controls "$study" > "$out/binary-controls.txt"
     just dataset-mix-forced-choice-controls "$study" > "$out/forced-choice-controls.txt"
     arms=Mdata,Mw025,Mw100,Mmos,Mpair,Mlic
-    python3 -B scripts/rev4_featpot/byc_cells.py score --arms "$arms" --paired-with Mdata > "$out/e21.json"
+    just dataset-mix-e21 "$study" "$out" "$arms"
     for arm in Mdata Mw025 Mw100 Mmos Mpair Mlic; do
       python3 -B scripts/rev4_featpot/byc_cells.py bytype --arm "$arm" > "$out/bytype_$arm.json"
     done
