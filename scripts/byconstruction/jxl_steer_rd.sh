@@ -10,7 +10,8 @@
 # Opt-in arms ("JPEG XL steering with the full-data monotone models"): Mfull, Tfull (the full-data certified-monotone
 # fits, workbench metrics $MFULL and $TFULL) at their bulk placements (*_BULK, loop_calibrate's shipped method) and as
 # Mfulltail, Tfulltail at their tail placements; Bcheck, B's arm again, which a new steer_rd build must reproduce byte
-# for byte. Judge tables already in RD_DIR move to judged-<UTC time>/ before the panel runs again.
+# for byte; margarine, zenmetrics' Butteraugli approximation steering with its own diffmap (MARGARINE: its CLI, served by
+# margarine_map_server.py). Judge tables already in RD_DIR move to judged-<UTC time>/ before the panel runs again.
 #
 #   STEER_RD=<steer_rd> DVIFM_SERVER=<loop_map_server> ZM_BIN=<zenmetrics CLI> [*_TAIL=SCALE,EXPONENT] \
 #     [*_BULK=SCALE,EXPONENT] [ARMS="none butteraugli B Tga M64a dvifm03 Btail Tgatail M64atail dvifm03tail"] \
@@ -56,6 +57,8 @@ run Tgatail workbench:zensim-Tga@rev6:diffmap --placement "$TGA_TAIL"
 run M64atail workbench:zensim-M64a-noKADID@rev6:diffmap --placement "$M64A_TAIL"
 run dvifm03tail server --server "${DVIFM_SERVER:-}" aic4-dvifm-lap-v0.3 diffmap "${DVIFM_TAIL%,*}" "${DVIFM_TAIL#*,}"
 run Bcheck workbench:zensim-B@rev5:diffmap
+case " $ARMS " in *" margarine"*) : "${MARGARINE:?set MARGARINE (zenmetrics: just margarine-build)}" ;; esac
+run margarine server --server python3 "$H/margarine_map_server.py" --margarine "${MARGARINE:-}"
 for arm in Mfull Tfull Mfulltail Tfulltail; do
   case " $ARMS " in *" $arm "*) ;; *) continue ;; esac
   case $arm in Mfull*) metric=$MFULL var=MFULL ;; *) metric=$TFULL var=TFULL ;; esac
