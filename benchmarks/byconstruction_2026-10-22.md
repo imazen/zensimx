@@ -3020,8 +3020,17 @@ are subjective-only rather than subjective+ecnoder-knob concurring".
   statistic stays a reported diagnostic. Gate 3 (dial) is refined by the second message: inversions count only where
   people and the encoder knob agree, and the error amount inside ladders is weighed with them (next section).
 - **Euler (exact) split** becomes the default map, as recommended (its condition: better block agreement with the
-  three judges and no worse leak).
-- **Workbench JPEG XL loop placements** switch to the tail fits.
+  three judges and no worse leak). *Done* (`3f779c8c`): `BakeScorer`'s served map defaults to the exact split. The
+  fused and folded attribution entries keep the removal split: their standalone reference densities are removal-split,
+  and the stale single-pass route always derives removal-split coefficients, so a shared exact default made two
+  identical stale calls differ (caught by `stale_binned_reuse_and_no_canvas`). `attribution_cross_tier` now checks the
+  served map's exact identity on every SIMD tier and keeps the removal identity through an explicit `repair` scorer.
+  The full suite (`cargo test -p zensim --all-features`) passed 941 of 942 before that one expectation update, which
+  then passes on all 12 tier permutations; workspace clippy is clean.
+- **Workbench JPEG XL loop placements** switch to the tail fits. *Done* (`3a311ce5`): `LOOP_DEFAULTS` holds the
+  largest-tile fits for Tga, M64a, B and the full-data M and T across all five maps; the served LAN workbench
+  (`site-2026-10-24`, previous module kept beside it) carries the five metrics, and native/wasm smoke values agree for
+  all of them. The steering scripts name the bulk placements their recorded arms used.
 - **Margarine** (zenmetrics' Butteraugli approximation) joins the JPEG XL steering comparison.
 - **Datasets:** every collection with useful statistics may be added, honouring its published train/test split.
 - **Revision 7** may be restructured freely for speed; zensim will later shrink to revision 7 plus legacy profile A
