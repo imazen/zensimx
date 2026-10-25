@@ -71,6 +71,7 @@ dataset-mix-scorecard study:
     export BYC_ROOT=/var/tmp/datalegs-20261025/rev7data/root BYC_CELLS="$study/cells" REV4_V2_BIN_DIR="$study/bin" AIC_BIN="$study/bin" ZEN_PANEL_BIN="$study/bin/panel"
     export ZENSIM_MAX_TIER=v3 BYC_LABEL_LEDGER_DIR="$out/label_reads" RAYON_NUM_THREADS=1 OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1
     python3 -B scripts/rev4_featpot/byc_cells.py mix-audit --study "$study" > "$out/native-audit.txt"
+    just dataset-mix-binary-controls "$study" > "$out/binary-controls.txt"
     just dataset-mix-forced-choice-controls "$study" > "$out/forced-choice-controls.txt"
     arms=Mdata,Mw025,Mw100,Mmos,Mpair,Mlic
     python3 -B scripts/rev4_featpot/byc_cells.py score --arms "$arms" --paired-with Mdata > "$out/e21.json"
@@ -93,6 +94,59 @@ dataset-mix-scorecard study:
     done
     just dataset-mix-mixture-controls "$study"
     python3 -B scripts/rev4_featpot/byc_cells.py mix-select --study "$study" > "$out/selection.txt"
+
+# Bind completed cell trainer receipts to the frozen study binaries, without labels.
+dataset-mix-binary-controls study scope='complete':
+    #!/usr/bin/env bash
+    set -euo pipefail
+    python3 - {{quote(study)}} {{quote(scope)}} <<'PY'
+    import hashlib, json, sys
+    from pathlib import Path
+    study, scope = Path(sys.argv[1]), sys.argv[2]
+    assert scope in ('complete', 'partial')
+    sha = lambda path: hashlib.file_digest(path.open('rb'), 'sha256').hexdigest()
+    pins = study/'BIN_SHA256SUMS'
+    assert sha(pins) == 'ef2d70d6e62b4c4bbeb1a553ffabf1e17ceefa1d62d99ac50bcdc21859965202'
+    binaries = {}
+    for line in pins.read_text().splitlines():
+        digest, name = line.split(maxsplit=1)
+        path = study/'bin'/Path(name.lstrip('*')).name
+        assert sha(path) == digest, str(path)
+        binaries[path.name] = digest
+    assert len(binaries) == 6
+    ownership = json.loads((study/'FLEET_OWNERSHIP.json').read_text())
+    assert ownership['source_commit'] == 'b7cb1a224dc7a4835e7259fe41c447ffa4c811e4'
+    old = ('kadid', 'tid2013', 'konfig', 'cid22_a25')
+    local = {a:[dict(fold=f, seed=s) for f in (*old,'pipal','pairs','mos7') for s in range(3)]
+             for a in ownership['local_arms']}
+    expected = {**local, **ownership['fleet_cells']}
+    assert sum(map(len, expected.values())) == 123
+    checked, missing = [], []
+    for arm, cells in expected.items():
+        for cell in cells:
+            fold, seed = cell['fold'], cell['seed']
+            path = study/'cells'/arm/f'without_{fold}_s{seed}'/'byc_record.json'
+            if not path.is_file():
+                missing.append(str(path))
+                continue
+            record = json.loads(path.read_text())
+            reused = arm == 'Mdata' and fold in old
+            trainer = ('c966d725b43244ff30c560bff1c9b3ed898b3331ae640afd460239b455b738f2'
+                       if reused else binaries['zensim_mlp_train'])
+            assert (record['fold'], record['seed'], record['trainer_sha256']) == (fold, seed, trainer), str(path)
+            checked.append(dict(arm=arm, fold=fold, seed=seed, trainer_sha256=trainer, record_sha256=sha(path)))
+    if scope == 'complete':
+        assert not missing, missing
+        native = json.loads((study/'NATIVE_CELL_CONTROLS.json').read_text())
+        identity = lambda rows: {(r['arm'], r['fold'], r['seed'], r['record_sha256']) for r in rows}
+        assert identity(checked) == identity(native['cells'])
+    result = dict(schema='dataset-mix-binary-controls-v1', scope=scope, binary_sha256=binaries,
+                  verified_cells=len(checked), missing=missing, cells=checked)
+    output = study/('BINARY_CELL_CONTROLS.json' if scope == 'complete' else 'BINARY_CELL_CONTROLS.partial.json')
+    assert not output.exists(), 'preserve the earlier binary audit'
+    output.write_text(json.dumps(result, indent=1)+'\n')
+    print(json.dumps(dict(scope=scope, verified_cells=len(checked), pending_cells=len(missing), binaries=len(binaries))))
+    PY
 
 # Compare every exact TRAIN hard-agreement reference with the native owner.
 dataset-mix-forced-choice-controls study:
@@ -407,7 +461,7 @@ dataset-snapshot study columns mode='mdata':
     test ! -e "$out"
     case {{quote(mode)}} in
       mdata) arms="Mdata Mr7" ;;
-      mixes) arms="Mdata Mw025 Mw100 Mmos Mpair Mlic"; test -s "$study/FINALISTS.json"; test -s "$study/TRAIN_SELECTION.json"; test -s "$study/eval/report.json"; test -s "$study/eval-bapps/report.json"; test -s "$study/FORCED_CHOICE_CONTROLS.json"; test -s "$study/MIXTURE_CELL_CONTROLS.json" ;;
+      mixes) arms="Mdata Mw025 Mw100 Mmos Mpair Mlic"; test -s "$study/FINALISTS.json"; test -s "$study/TRAIN_SELECTION.json"; test -s "$study/eval/report.json"; test -s "$study/eval-bapps/report.json"; test -s "$study/FORCED_CHOICE_CONTROLS.json"; test -s "$study/MIXTURE_CELL_CONTROLS.json"; test -s "$study/BINARY_CELL_CONTROLS.json" ;;
       *) exit 2 ;;
     esac
     for arm in $arms; do

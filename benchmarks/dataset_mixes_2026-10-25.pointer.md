@@ -60,3 +60,9 @@ Mlic root: `a7fd4af0c2bb5a8981be636e5c1cb1a51db57496b7c60d7bf6da01d71dd16952`; 2
 The initial `SOURCE_EQUIVALENCE.json` describes the 348407450b0d landing. Later Python changes add diagnostics, progress and Mlic policy handling; the native trainer and its recorded binary hash are unchanged.
 
 `FLEET_OWNERSHIP.json`: `f68d7e1a9f960eb69dd6a1add9857e223540a6ddcb6951345538ef475d8f2ef3`. Fleet exclusively owns 60 Mw100/Mmos/Mpair cells; the full submitted Mlic batch stays local. Source scripts are pinned to b7cb1a224dc7.
+
+`BINARY_CELL_CONTROLS.partial.json` verifies the recorded trainer hashes for
+54 completed cells against the frozen binaries. The complete scorecard
+requires `BINARY_CELL_CONTROLS.json` covering all 123 records; the partial
+receipt cannot satisfy it. Changed-trainer and missing-cell negative
+controls are recorded in `BINARY_CELL_CONTROLS_NEGATIVE.json`.

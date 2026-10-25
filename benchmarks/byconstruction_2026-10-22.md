@@ -4023,3 +4023,12 @@ pass. `FLEET_OWNERSHIP.json` records every assigned cell and the source pin.
 Verified complete cell directories are harvested into the same study tree;
 the consolidated 123-cell audit and TRAIN-only scorecard remain this study's
 acceptance path. Local and fleet jobsets do not overlap.
+
+The scorecard also binds each cell's recorded trainer hash to the six frozen
+study binaries before reading scoring targets. A partial metadata audit
+verified 54 completed cells: 42 use the current pinned trainer, and the
+twelve reused Mdata E21 cells retain their recorded earlier trainer. Two
+negative controls refuse a changed trainer hash and incomplete coverage;
+neither writes a successful receipt. The complete audit requires all 123
+records and exact agreement with the native cell inventory. Fitting scripts
+remain pinned to b7cb1a224dc7; this check only extends the scorecard recipe.
