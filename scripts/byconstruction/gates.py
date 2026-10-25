@@ -71,6 +71,8 @@ def run(a):
     owner.FORMULA_REV = a.formula_rev
     if a.instruments:
         owner.INSTRUMENTS = Path(a.instruments)
+    if a.corpus_root:
+        owner.NO_HUMAN = Path(a.corpus_root)
     model = Path(a.model).resolve()
     owner.MODELS_OVERRIDE = {a.name: (model, sha(model), None)}
     steps = a.steps.split(",")
@@ -127,6 +129,8 @@ def main():
     ap.add_argument("--bin-dir")
     ap.add_argument("--instruments")
     ap.add_argument("--formula-rev", default="5")
+    # The empty human-corpus root the verdicts read; its manifest's formula revision must be the model's.
+    ap.add_argument("--corpus-root")
     # G-STEER without the revision-5 repair cache (implied at any other revision): every block repair is scored live.
     ap.add_argument("--live-repairs", action="store_true")
     ap.add_argument("--summary", action="store_true")
