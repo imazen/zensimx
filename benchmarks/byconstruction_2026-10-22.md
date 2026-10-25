@@ -3146,6 +3146,12 @@ are subjective-only rather than subjective+ecnoder-knob concurring".
   and orientation bands (M64o), neither adopted ("Coarse scales in linear light", "Orientation bands" above, and the
   goal-aligned scorecard in the gate review).
 
+**Later the same day** (after the steering gate's M3f fell under the exact split): "the jxl loop is the only thing
+that matters, you should have run that first". Map, split, placement and steering defaults are decided by the JPEG XL
+loop: bytes saved at equal SSIMULACRA2 and CVVDP, one variable changed per arm, with reproduction controls. Judge
+block agreement, G-STEER, leak and mass on unchanged pixels are diagnostics. The exact split became the served default
+(`3f779c8c`) on judge agreement alone; its loop comparison follows ("Which split steers the JPEG XL loop").
+
 ### Ladder inversions that people and the knob agree on (2026-10-25)
 
 `byc_cells.py knobinv` (new): within each ladder (one reference and distortion type with levels for KADID, TID2013
