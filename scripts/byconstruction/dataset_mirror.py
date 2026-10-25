@@ -2,14 +2,16 @@
 """Checksum and mirror completed feature or training artifacts without deletion.
 
 Run under the shared heavy lock and resource wrapper. The caller supplies the
-physical array destination and capacity-check mount paths. Existing files are
-backed up, never removed. No dataset source is modified.
+physical array destination and capacity-check mount paths, or a mounted
+destination for copying and verification on the client. Existing mirrors
+are preserved. No dataset source is modified.
 """
 
 import argparse
 from datetime import datetime, timezone
 import hashlib
 import json
+import os
 from pathlib import Path
 import random
 import shlex
@@ -24,11 +26,21 @@ def sha(path):
         return hashlib.file_digest(stream, "sha256").hexdigest()
 
 
+def cold_sha(path):
+    """Request Linux page-cache eviction before and after a client readback."""
+    with path.open("rb") as stream:
+        os.posix_fadvise(stream.fileno(), 0, 0, os.POSIX_FADV_DONTNEED)
+        digest = hashlib.file_digest(stream, "sha256").hexdigest()
+        os.posix_fadvise(stream.fileno(), 0, 0, os.POSIX_FADV_DONTNEED)
+        return digest
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--root", type=Path, required=True)
     ap.add_argument("--host")
     ap.add_argument("--nfs", action="store_true", help="copy and checksum on this host through a mounted filesystem; no remote processes")
+    ap.add_argument("--cold-readback", action="store_true", help="with --nfs on Linux: fsync copies and request page-cache eviction for readback")
     ap.add_argument("--destination", required=True)
     ap.add_argument("--capacity-path", nargs="+")
     ap.add_argument("--artifact-kind", choices=("features", "training"), default="features")
@@ -41,7 +53,7 @@ def main():
     if args.nfs:
         assert args.host is None, "mounted-filesystem transport never starts remote processes"
     else:
-        assert args.host and args.capacity_path
+        assert args.host and args.capacity_path and not args.cold_readback
     assert args.root.is_dir() and args.destination.startswith("/")
     receipt_path = args.root / "MIRROR_VERIFIED.json"
     sums = args.root / "SHA256SUMS"
@@ -52,7 +64,8 @@ def main():
         return remote_main(args, receipt_path, sums)
     destination = Path(args.destination)
     assert not destination.exists(), "preserve existing mirrors"
-    assert not destination.is_relative_to(args.root.resolve())
+    assert not destination.resolve().is_relative_to(args.root.resolve())
+    assert not args.root.resolve().is_relative_to(destination.resolve())
     files = sorted(p for p in args.root.rglob("*") if p.is_file())
     assert not any(p.is_symlink() for p in args.root.rglob("*"))
     assert not any(p.suffix.lower() in {".png", ".jpg", ".bmp", ".tif", ".imijset"} for p in files)
@@ -60,19 +73,23 @@ def main():
     assert shutil.disk_usage(destination.parent).free > total
     digests = {p.relative_to(args.root).as_posix(): sha(p) for p in files}
     destination.mkdir()
+    readback_sha = cold_sha if args.cold_readback else sha
 
     def copy(path):
         target = destination / path.relative_to(args.root)
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(path, target)
+        if args.cold_readback:
+            with target.open("rb") as stream:
+                os.fsync(stream.fileno())
 
     for path in files:
         copy(path)
     for name, digest in digests.items():
-        assert sha(destination / name) == digest, name
+        assert readback_sha(destination / name) == digest, name
     readbacks = []
     for name in random.SystemRandom().sample(list(digests), 3):
-        assert sha(destination / name) == digests[name], name
+        assert readback_sha(destination / name) == digests[name], name
         readbacks.append({"relative_path": name, "sha256": digests[name]})
     receipt = {
         "schema": f"dataset-{args.artifact_kind}-mirror-v1",
@@ -85,6 +102,7 @@ def main():
         "artifact_bytes": total,
         "all_artifact_sha256_verified": True,
         "random_readbacks": readbacks,
+        "readback_method": "fsync, POSIX_FADV_DONTNEED and client SHA-256" if args.cold_readback else "client SHA-256",
     }
     if args.artifact_kind == "features":
         receipt["response_tables_opened"] = False
@@ -96,8 +114,8 @@ def main():
     sums.write_text("".join(f"{digest}  {name}\n" for name, digest in sorted(digests.items())))
     copy(receipt_path)
     copy(sums)
-    assert sha(destination / sums.name) == sha(sums)
-    assert sha(destination / receipt_path.name) == sha(receipt_path)
+    assert readback_sha(destination / sums.name) == sha(sums)
+    assert readback_sha(destination / receipt_path.name) == sha(receipt_path)
     print(json.dumps({"receipt_sha256": sha(receipt_path), "sha256sums_sha256": sha(sums),
                       "files_in_final_inventory": len(digests), **receipt}), flush=True)
 

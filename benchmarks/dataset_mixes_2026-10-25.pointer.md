@@ -82,3 +82,20 @@ Mdata E21 values are unchanged. `LOCAL_TRAIN_GROUP_RESULTS.json`:
 `de9cef2b8db3554bd9d705c30dbeadcfacbddb411eaf26f0553dfec3c979830c`;
 this covers image/control inputs, without claiming completed arm archives
 or numeric control parity.
+
+The initial mounted-NAS mirror control copied and verified three result artifacts,
+with all hashing/readback on dev and no Docker invocation. Local evidence:
+`mounted-mirror-control/`, `mounted-mirror-control.exec.log` and
+`mounted-mirror-control-negative/`. The control's receipt SHA-256 is
+`fe4e1094fb6608cd607992a00c7b3bafd15a0207d47a559aaa7b42ff4342ff6a`;
+inventory SHA-256 `dc52fe5fbea419065923c09adf228ffc3737eef402d7650d0b17441555d85cb7`.
+NAS control location:
+`/mnt/tower/output/zensim-datamixes-mounted-mirror-control-2026-10-25/`.
+Its initial source patch is retained in `MOUNTED_MIRROR_INITIAL_CONTROL_SOURCE.patch`.
+The final archive will use the consolidated shared mounted transport with
+optional cold readback. Its actual-NAS control started no remote processes:
+`mounted-mirror-canonical-control/`, with receipt SHA-256
+`4fdd7ba8eb8ad9dc11212841612b00979f1bbb42961114d261c72ac8d43b126b`
+and inventory `04c2624b198bcaa0a656ab4bb3403164a6029732fc410ee8e5009592aedaa42e`.
+NAS location:
+`/mnt/tower/output/zensim-datamixes-mounted-mirror-canonical-control-2026-10-25/`.

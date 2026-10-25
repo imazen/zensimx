@@ -4104,3 +4104,22 @@ glob. The owner now selects directories explicitly; all 21 directories in
 each completed local arm remain selected. Its successful cached score is
 preserved, along with the failed-pass log. Reporting moved into a Just
 recipe so the resource wrapper cannot expand a shell report-name variable.
+
+### Result archive transport
+
+The shared mounted-filesystem mirror from dc79d8dbacd5 remains the owner.
+This study adds optional cold readback: fsync copied files and request
+Linux page-cache eviction before client SHA-256 verification. The existing
+mounted-transport, corruption and artifact-kind tests pass unchanged.
+The final archive will use this mode, without starting remote processes.
+
+An initial experimental transport control and its source patch are retained
+under `mounted-mirror-control*` and `MOUNTED_MIRROR_INITIAL_CONTROL_SOURCE.patch`.
+The consolidated CLI then mirrored the same three actual result files
+(20,660 bytes), verified all artifact digests plus its receipt and performed
+three additional readbacks. An independent coreutils inventory check passes.
+Its trace contains five fsync calls, sixteen cache-advice calls, and no
+Docker or SSH invocation. A cold-readback corruption control refuses before
+creating a verification receipt. Evidence is in
+`mounted-mirror-canonical-control*` and `MOUNTED_MIRROR_CANONICAL_CONTROLS.json`.
+The final study archive still awaits the fleet cells and completed scorecard.
