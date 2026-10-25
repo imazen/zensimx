@@ -3006,6 +3006,28 @@ Butteraugli anywhere, and it is not ahead of the other maps everywhere: DVIFM 0.
 screens, and full-data M saves more on photos by SSIMULACRA2 (+2.6%, CVVDP tied). On screens it loses 4% against our maps'
 7–15%.
 
+**Where its remaining gap comes from** (owner: "Are there any obvious cheap improvements margarine could make?").
+Margarine's map against Butteraugli's block distances on the loop calibration encodes, by `loop_calibrate`'s method
+(`scripts/byconstruction/margarine_calibrate.py`; 2026-10-24-hq pairs: 17 CID22-512 training photos fitted, 10 gb82 screenshots held out):
+
+| Map (native placement: scale 1, exponent 1) | Worst block, fit / held-out r | Worst-block log bias (held out) | All blocks, fit / held-out r | All-block log bias, photos / screenshots |
+|---|---|---|---|---|
+| Margarine, selected (`simd-row-malta`) | 0.997 / **0.990** | +0.017 | 0.675 / 0.561 | −0.16 / **−0.85** |
+| Margarine, `native-uhf` control | 0.997 / 0.991 | +0.041 | 0.674 / 0.562 | −0.14 / −0.85 |
+| Margarine's teacher (frozen Butteraugli `13c49cbc`, `margarine-score teacher`) | 0.998 / 0.991 | +0.038 | 0.669 / 0.557 | −0.16 / −0.93 |
+
+- No placement is needed: on each pair's worst block, which decides whether the loop reaches its target, the native map
+  agrees with Butteraugli at r 0.99 with almost no bias; a fitted placement (1.1 / 0.97) does no better held out. Our maps
+  reach 0.68–0.79 there.
+- On the bulk of blocks Margarine reads lower than the loop's Butteraugli on screenshots (log −0.85, about 0.43×), so the
+  loop treats those blocks as nearly free and coarsens them: the screens' 4%.
+- Computing the ultra-high-frequency Malta banks natively changes nothing (built from a copy of the crate outside
+  zenmetrics with the CLI's candidate check widened; maps differ in 116k–197k of 262k pixels, means within 0.3%).
+- Margarine's own teacher shows the same bulk bias (−0.93): Margarine is faithful to its teacher, and the gap lies
+  between that frozen Butteraugli (`13c49cbc`) and the one jxl-encoder's loop and the calibration use (0.9.4 at
+  `d2466a4`), with the same default parameters. Which change moved low-error blocks is not resolved here: the local
+  Butteraugli checkout does not hold `13c49cbc`'s line.
+
 ### Owner decisions (2026-10-25)
 
 Owner, 2026-10-25: "I take your reccomendation for euler split, yes. … For rev 7, we can restructure to our heart's
