@@ -27,6 +27,11 @@ dataset-cell root binary cells scratch label fold seed jobs='1':
 dataset-counts root out:
     OPENBLAS_NUM_THREADS=1 python3 -B scripts/byconstruction/ring_root.py dataset-report --root {{quote(root)}} --out {{quote(out)}}
 
+# Fail before candidate cells unless the rebuilt trainer reproduces Mr7.
+dataset-cell-control cells:
+    cmp {{quote(cells)}}/Mcontrol/without_kadid_s0/pred_kadid.tsv {{quote(cells)}}/Mr7/without_kadid_s0/pred_kadid.tsv
+    sha256sum {{quote(cells)}}/Mcontrol/without_kadid_s0/refit/last.bin {{quote(cells)}}/Mr7/without_kadid_s0/refit/last.bin
+
 dataset-eval out model binary:
     python3 -B scripts/byconstruction/dataset_eval.py score --out {{quote(out)}} --predict {{quote(binary)}}/bake_dial_refit --model Mdata={{quote(model)}}
     ZEN_PANEL_BIN={{quote(binary)}}/panel python3 -B scripts/byconstruction/dataset_eval.py report --out {{quote(out)}}
