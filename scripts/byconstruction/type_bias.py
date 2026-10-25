@@ -7,6 +7,7 @@ KonFiG and CID22-A by index.
   type_bias.py [ARM ...] [--out JSON]   (cell directory names under ~/tmp/byc/cells; default mono-thr)
 """
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -15,7 +16,7 @@ import pandas as pd
 from scipy.stats import rankdata
 
 panel = json.load(open('/mnt/v/output/zensim/e34-launch-2026-10-15/evaluation/panel-input.json'))
-cells = Path.home() / 'tmp/byc/cells'
+cells = Path(os.environ.get('BYC_CELLS', str(Path.home() / 'tmp/byc/cells')))
 KN = {1: 'gblur', 2: 'lensblur', 3: 'motionblur', 4: 'colordiffuse', 5: 'colorshift', 6: 'colorquant', 7: 'sat1',
       8: 'sat2', 9: 'jp2k', 10: 'jpeg', 11: 'whitenoise', 12: 'colornoise', 13: 'impulse', 14: 'multnoise',
       15: 'denoise', 16: 'brighten', 17: 'darken', 18: 'meanshift', 19: 'jitter', 20: 'noneccpatch', 21: 'pixelate',

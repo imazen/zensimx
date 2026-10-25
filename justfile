@@ -43,6 +43,26 @@ dataset-eval-bapps out model binary:
     python3 -B scripts/byconstruction/dataset_eval.py score --out {{quote(out)}} --predict {{quote(binary)}}/bake_dial_refit --model Mdata={{quote(model)}} --model M7="$HOME/tmp/byc/full/mono-thr-mp32-r7_s0/refit/production-f16.bin" --model B7="$HOME/tmp/byc/perf/b_rev7.bin"
     ZEN_PANEL_BIN={{quote(binary)}}/panel python3 -B scripts/byconstruction/dataset_eval.py report --out {{quote(out)}}
 
+dataset-scorecard root binary cells out:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    export BYC_ROOT={{quote(root)}} REV4_V2_BIN_DIR={{quote(binary)}} BYC_CELLS={{quote(cells)}} AIC_BIN={{quote(binary)}} ZEN_PANEL_BIN={{quote(binary)}}/panel
+    for arm in Mdata Mr7; do
+      for fold in kadid tid2013 konfig cid22_a25; do
+        for seed in 0 1 2; do test -s "$BYC_CELLS/$arm/without_${fold}_s$seed/byc_record.json"; done
+      done
+    done
+    mkdir {{quote(out)}}
+    python3 -B scripts/rev4_featpot/byc_cells.py score --arms Mdata,Mr7 --paired-with Mr7 > {{quote(out)}}/e21.json
+    for arm in Mdata Mr7; do python3 -B scripts/rev4_featpot/byc_cells.py bytype --arm "$arm" > {{quote(out)}}/bytype_$arm.json; done
+    python3 -B scripts/byconstruction/type_bias.py Mdata Mr7 --out {{quote(out)}}/type_bias.json > {{quote(out)}}/type_bias.txt
+    python3 -B scripts/rev4_featpot/byc_cells.py knobinv --arms Mdata,Mr7 --out {{quote(out)}}/knobinv.json > {{quote(out)}}/knobinv.txt
+    python3 -B scripts/byconstruction/aic_panel.py --out {{quote(out)}}/panel.json --arms base-c,Mdata,Mr7 --geo --no-aic > {{quote(out)}}/panel.txt 2>&1
+
+dataset-mixture binary cells out:
+    env BYC_CELLS={{quote(cells)}} MIX={{quote(out)}} bash scripts/byconstruction/ring_mixture.sh {{quote(binary)}} raw 12 Mdata
+    python3 -B scripts/byconstruction/mixture_test.py summary --out {{quote(out)}} Mdata Mr7
+
 dataset-loop stage study:
     bash scripts/byconstruction/dataset_loop.sh {{quote(stage)}} {{quote(study)}}
 

@@ -39,7 +39,7 @@ os.environ.setdefault("REV4_V2_BIN_DIR", str(BIN))
 os.environ.setdefault("ZEN_PANEL_BIN", str(BIN / "panel"))
 OUT = Path("/mnt/v/output/zensim/byconstruction-2026-10-22/aic2026train")
 F = OUT / "folds_train"
-CELLS = Path.home() / "tmp/byc/cells"
+CELLS = Path(os.environ.get("BYC_CELLS", str(Path.home() / "tmp/byc/cells")))
 E34 = Path("/mnt/v/output/zensim/e34-launch-2026-10-15/evaluation/panel-input.json")
 E34_CELLS = Path("/var/tmp/rev4-featpot/e34-controlc-results/cells/sel:3b7bd5ebe929@h32:H128:cv16:cf98:fx1__N")
 ROOTS = {"raw": Path("/mnt/v/output/zensim/v40r4-2026-10-08/v2e29"),
@@ -49,7 +49,8 @@ ROOTS = {"raw": Path("/mnt/v/output/zensim/v40r4-2026-10-08/v2e29"),
          "gy": Path("/mnt/v/output/zensim/byconstruction-2026-10-22/ringhpm/root_globaff_gatedy"),
          "linpyr": Path("/mnt/v/output/zensim/byconstruction-2026-10-22/linpyr/root"),
          "o": Path("/mnt/v/output/zensim/byconstruction-2026-10-22/orient/root"),
-         "rev7": Path("/mnt/v/output/zensim/byconstruction-2026-10-22/rev7raw/root")}
+         "rev7": Path("/mnt/v/output/zensim/byconstruction-2026-10-22/rev7raw/root"),
+         "rev7data": Path("/mnt/v/output/zensim/byconstruction-2026-10-22/rev7data/root")}
 
 
 def arm_root(arm: str, spec: str) -> str:
