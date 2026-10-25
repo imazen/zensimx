@@ -6,6 +6,10 @@ dataset-assessment-keys collection admission out extractor commit:
 dataset-unpack-bapps keys library scratch receipts:
     OPENBLAS_NUM_THREADS=1 PYTHONDONTWRITEBYTECODE=1 python3 -B scripts/byconstruction/dataset_unpack_bapps.py --keys {{quote(keys)}} --library {{quote(library)}} --scratch {{quote(scratch)}} --receipt-dir {{quote(receipts)}}
 
+# Caller holds shared heavy.lock and run-heavy; all assembly stays with rev5_bank.
+dataset-features root binary:
+    OPENBLAS_NUM_THREADS=1 PYTHONDONTWRITEBYTECODE=1 python3 -B scripts/byconstruction/dataset_features.py --root {{quote(root)}} --bin {{quote(binary)}}
+
 addrfix-test target:
     TMPDIR="$HOME/tmp" cargo test --locked -p zensim-validate --bin panel panel_e34:: --target-dir {{quote(target)}}
 

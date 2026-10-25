@@ -71,7 +71,9 @@ def main():
             actual_sha = sha(archive)
             assert actual_sha == expected_sha, "retained original archive changed"
             archives.append({"path": str(archive), "sha256": actual_sha})
-            with tarfile.open(archive, "r|gz") as source:
+            # The retained files are plain tar despite their .tar.gz names.
+            # Detect the container by bytes rather than trusting the suffix.
+            with tarfile.open(archive, "r|*") as source:
                 for member in source:
                     parts = Path(member.name).parts
                     if not member.isfile() or len(parts) < 4:
