@@ -2604,3 +2604,37 @@ source-held-out folds; every reported AIC2026 number is a frozen model's score o
 
 Record: `benchmarks/byconstruction_2026-10-22.md`, sections "AIC2026 TRAIN", "Smoothness" and "DVIFM 0.3 on the E21
 sets".
+
+## Exposure ledger — 2026-10-24/25: zenpapers JND-unit and observer studies (MCL-JCI, Konstanz PJND, AIC family)
+
+The zenpapers lane read human labels of holdout populations for JND-unit and observer studies. No zensim candidate
+was scored, fitted or selected, and none of these outputs trains or calibrates zensim. No preregistration was
+committed before the reads; that process defect is recorded here, not backdated. The scripts are in zenpapers.
+
+- **MCL-JCI** (Rev4 confirmatory holdout, D3 pending): every subject's JND chain for all 50 sources.
+  - 2026-10-24, `scripts/jnd_ladder_agreement.py` with the jnd-ladder scorer: maps from SSIMULACRA2, butteraugli (max
+    and 3-norm), luma MSE and the AIC-4 HaarXYB-SSIM configurations to the human JND count, fitted
+    leave-one-source-out on counts up to 2; and metric-only JND chains at quantiles of each source's first-JND QFs.
+  - 2026-10-25, `scripts/iqa_library/observer_models.py` and `threshold_variance.py`: per-source median, 75th and
+    90th percentile of the first-JND QF. Reported: median observer q23.0, most sensitive quarter q31.9, SD of the
+    source medians 8.7 QF.
+  - 2026-10-25, `scripts/iqa_library/training_confidence.py`: the `score` column of 243 MCL-JCI rows in the IQA
+    library's `labels.tsv`, read as training rows. No statistic used them.
+- **Konstanz PJND 2020**, whose stimuli are MCL-JCI sources 04, 05, 12, 14, 17, 26, 32, 36, 43 and 48: every
+  participant's thresholds, 2026-10-25, for observer sensitivity (split-half 0.973) and a variance decomposition; and
+  100 label rows and 280 pairs' vote counts in `training_confidence.py`. Whether a set built on holdout content is
+  itself a holdout is the open KonFiG question (finding 2026-10-04); zenpapers now treats both as holdouts.
+- **AIC-3 BTC/PTC raw answers and the AIC-4 sample's published JND**, 2026-10-24, `scripts/aic3_boosted_refit.py`:
+  Thurstone refits of the boosted and plain answers, to choose a JND unit (evaluation and unit choice, the uses the
+  owner allows for this family). If zensim's JND output adopts that unit, its AIC-3 and AIC-4 reads must disclose that
+  the unit was chosen on these answers.
+- **AIC2026 reconstructed curves** (2026-10-21), 2026-10-24, `scripts/jnd_ladder_agreement.py`: the same non-zensim
+  metric maps, fitted on public_train sources and read on public_test.
+- **Parsed, never used:** from zenpapers `e29ba36` until `37b37030` (both 2026-10-25), `training_confidence.py`
+  parsed the `score` column of every row of every library labels table, holdout, test and TERMINAL rows included, and
+  discarded the values of rows outside training before any use. It now reads scores from training rows only.
+
+Since zenpapers `5bf44739` and `37b37030` (2026-10-25), its training-confidence manifest marks MCL-JCI, Konstanz PJND
+and KonFiG-IQA as tier X (it had listed the first two as trainable earlier that day). `observer_models.py` and
+`threshold_variance.py` read MCL-JCI and Konstanz PJND only with `--read-holdouts` and keep the results apart. This
+exposure must accompany any later MCL-JCI confirmation claim.
