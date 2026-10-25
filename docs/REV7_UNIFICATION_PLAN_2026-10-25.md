@@ -24,8 +24,9 @@ zenmetrics and pruning zensim back to JUST rev 7 + legacy A support."
 
 ## Where it stands (measured 2026-10-25)
 
-- Revision 7 is on `explore/byconstruction` and merges into main as `6d146e15` (main's only source change since the
-  branch point, the attribution fix `bab88fde`, was a port of the branch's `ec9289df`).
+- Revision 7 was on `explore/byconstruction`; it is on main since `7a0a8495` (main's only source change since the
+  branch point, the attribution fix `bab88fde`, was a port of the branch's `ec9289df`, whose fuller versions were
+  kept).
 - `zensim/src`: 137,917 lines in 60 files. Uses of `FormulaRevision::RevN`: Rev1 26, Rev2 26, Rev3 64, Rev4 41,
   Rev5 115, Rev6 15, Rev7 18.
 - Profiles: A (deprecated, revision 1, buffered walk), PreviewV0_1 and PreviewV0_2 (linear, revision 1), B (default,
@@ -40,9 +41,11 @@ zenmetrics and pruning zensim back to JUST rev 7 + legacy A support."
 
 ## Phases, each gated
 
-0. **Land revision 7 on main.** The merge, verified locally (workspace clippy, the default and all-features test
-   suites, zensim-validate, the minimal-feature clippy set, script lint, the API snapshot), pushed with
-   `scripts/safe_push.sh`, then the CI workflow dispatched.
+0. **Land revision 7 on main.** *Done* (`e223fad3`, 2026-10-25). Locally: workspace clippy, the default (2,243),
+   all-features (1,483) and zensim-validate (799) test suites, clippy and lib tests for six minimal-feature sets,
+   script lint and the API snapshot. The run found two defects from the branch, fixed in `e223fad3`: five map and
+   globaff items unused in a `custom-profiles`-only build, and `feature_set_match` not listing the revision-7
+   projection among the partial producers. CI dispatched (run 40176894590).
 1. **Oracles before any deletion.** (a) Revision 7: the 55-dump bit harness (`scripts/byconstruction/perf_bits.sh`)
    for B's revision-7 stamp, plus a full-width research extraction (every revision-7 slot) on the same 11 inputs,
    at every x86 tier and eight threads. (b) A: score and all 372 features on the same inputs at every tier.
