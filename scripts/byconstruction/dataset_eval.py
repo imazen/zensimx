@@ -6,6 +6,7 @@
   dataset_eval.py score --out DIR --model NAME=BAKE ... --zm ZENMETRICS
   dataset_eval.py report --out DIR
   dataset_eval.py paired --out DIR --dest NEW --a A --vs B[,C]   paired A − B through `panel evaluate`
+  dataset_eval.py scatter --out DIR      the dashboard's scatter views (logistic fit, rank map, matched) per MOS set
 
 Inputs: the frozen memberships and revision-7 feature banks of the 2026-10-25 admission
 (/mnt/v/zensim/dataset-features-rev7-20261025/{inputs,bank}/<collection>/) and each collection's label table in the
@@ -368,6 +369,46 @@ def cmd_paired(a):
     render_paired(dest)
 
 
+SCATTER_KEYS = {"B7": "b7", "M7": "m7", "Mdata": "mdata", "ssim2": "ssim2", "cvvdp": "cvvdp", "butteraugli": "butter"}
+
+
+def cmd_scatter(a):
+    """Scatter views of every stored score on each MOS collection's own label scale, as the dashboard draws the E21
+    sets: the panel's logistic fit (f_), zenstats' rank map (r_) and mean/SD matching (a_), with zenstats geometry and
+    the logistic-fit error tails per collection and model. Writes eval_scatter.json (rows, no image names) and
+    eval_scatter_stats.json."""
+    import pandas as pd
+    from aic_panel import geometry  # the E21 views' owner
+    out = Path(a.out)
+    rows = json.loads((out / "eval_rows.json").read_text())
+    scores = load_scores(out)
+    names = [n for n in sorted(scores) if n in SCATTER_KEYS]
+    frames, stats = [], []
+    for c in sorted({r["collection"] for r in rows if r["kind"] == "mos"}):
+        rr = [r for r in rows if r["collection"] == c]
+        y = np.array([r["target"] for r in rr], np.float64)
+        frame = {"ds": c, "label": np.round(y, 4)}
+        for n in names:
+            missing = sum(r["a"] not in scores[n] for r in rr)
+            if missing:
+                raise ValueError(f"{c}: {missing} rows without a {n} score")
+            x = np.array([scores[n][r["a"]] for r in rr], np.float64)
+            st, arr = geometry(x, y, arrays=True)
+            pn = panel_batch([(n, x, y)], stats="full")[0]
+            k = SCATTER_KEYS[n]
+            frame[f"f_{k}"] = np.round(arr["fit"], 4)
+            # zenstats leaves the rank geometry unmeasured on small sets: that view stays empty, never invented.
+            frame[f"r_{k}"] = np.round(arr["rank"], 4) if arr["rank"] is not None else [None] * len(y)
+            frame[f"a_{k}"] = np.round(y.mean() + (x - x.mean()) * (y.std() / x.std()), 4)
+            stats.append({"collection": c, "key": k, "model": n, "n": int(pn["n"]), "srocc": pn["srocc_signed"],
+                          "plcc": pn["plcc"], "z_rmse": pn["z_rmse"], "or": pn["or"], **st})
+        frames.append(pd.DataFrame(frame))
+    df = pd.concat(frames, ignore_index=True)
+    df.sample(frac=1, random_state=0).reset_index(drop=True).to_json(out / "eval_scatter.json", orient="records")
+    (out / "eval_scatter_stats.json").write_text(json.dumps(stats, indent=1) + "\n")
+    print(f"{len(df)} rows over {len(frames)} collections; models {names}")
+
+
 def render_paired(dest):
     report = json.loads((Path(dest) / "report" / "report.json").read_text())
     lines = ["| Collection | A − B | ΔSROCC [95%] | two-sided p (Δ = 0) | references |", "|---|---|---|---|---|"]
@@ -400,6 +441,8 @@ def main():
     s.add_argument("--judge", action="append", default=[])
     r = sub.add_parser("report")
     r.add_argument("--out", required=True)
+    v = sub.add_parser("scatter")
+    v.add_argument("--out", required=True)
     q = sub.add_parser("paired")
     q.add_argument("--out", required=True)
     q.add_argument("--dest", required=True, help="new directory for the tables, suite and evaluator report")
@@ -412,7 +455,7 @@ def main():
     b.add_argument("--out", required=True)
     b.add_argument("--scratch", required=True)
     a = ap.parse_args()
-    return {"prepare": cmd_prepare, "score": cmd_score, "report": cmd_report, "paired": cmd_paired,
+    return {"prepare": cmd_prepare, "score": cmd_score, "report": cmd_report, "paired": cmd_paired, "scatter": cmd_scatter,
             "judge-png": cmd_judge_png, "bapps-keys":cmd_bapps_keys}[a.cmd](a)
 
 
