@@ -147,7 +147,7 @@ dataset-mix-forced-choice-controls study:
             assert sha(path) == value['prediction_sha256']
             prediction = pd.read_csv(path, sep='\t')
             assert prediction.row_idx.tolist() == list(range(len(prediction)))
-            scores = dict(enumerate(prediction.pred.to_numpy()))
+            scores = {i: float(v) for i, v in enumerate(prediction.pred.to_numpy())}
             # Only the point is checked; this helper's bootstrap output is unused.
             acc, _, _, count = pair_agreement(cache[collection], scores, resamples=1)
             error = abs(acc - value['value'])
