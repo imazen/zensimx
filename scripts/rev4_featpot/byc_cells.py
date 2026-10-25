@@ -293,7 +293,11 @@ def cmd_progress(args) -> int:
                     raise ValueError(f"{record}: cell identity differs")
                 state, epoch = "complete", 119
             elif log.is_file():
-                epochs = [int(e) for e, _ in EPOCH_RE.findall(log.read_text())]
+                text = log.read_text()
+                epochs = [int(e) for e, _ in EPOCH_RE.findall(text)]
+                # The rank trainer records a progress marker every epoch between
+                # its less frequent metric rows; include those for live status.
+                epochs += [int(e) for e in re.findall(r"subjective-rank epoch=(\d+)", text)]
                 state, epoch = "training", max(epochs) if epochs else None
             else:
                 state, epoch = "preparing" if path.exists() else "not-started", None
