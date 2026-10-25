@@ -21,8 +21,24 @@ dataset-full root binary dest columns:
     env REV4_V2_BIN_DIR={{quote(binary)}} ZENSIM_MAX_TIER=v3 RAYON_NUM_THREADS=1 OMP_NUM_THREADS=1 python3 -B scripts/rev4_featpot/v2_confirm_fit.py --root {{quote(root)}} --spec sel:3b7bd5ebe929@h32:H128:cv16:cf98:fx1:mono:thr:mp32 --columns "$(cat {{quote(columns)}})" --head N --seed-index 0 --strict-admission --data-role-decision {{quote(root)}}/human_role_decision.json --dest {{quote(dest)}} --train-only --pack-production --e33-output-stage
     {{quote(binary)}}/bake_dial_refit certify-monotone --bake {{quote(dest)}}/refit/production-f16.bin
 
-dataset-cell root binary cells scratch label fold seed:
-    env BYC_ROOT={{quote(root)}} REV4_V2_BIN_DIR={{quote(binary)}} BYC_CELLS={{quote(cells)}} BYC_SCRATCH={{quote(scratch)}} ZENSIM_MAX_TIER=v3 RAYON_NUM_THREADS=1 OMP_NUM_THREADS=1 python3 -B scripts/rev4_featpot/byc_cells.py run --arm mono:thr:mp32 --label {{quote(label)}} --folds {{quote(fold)}} --seeds {{quote(seed)}} --jobs 1
+dataset-cell root binary cells scratch label fold seed jobs='1':
+    env BYC_ROOT={{quote(root)}} REV4_V2_BIN_DIR={{quote(binary)}} BYC_CELLS={{quote(cells)}} BYC_SCRATCH={{quote(scratch)}} ZENSIM_MAX_TIER=v3 RAYON_NUM_THREADS=1 OMP_NUM_THREADS=1 python3 -B scripts/rev4_featpot/byc_cells.py run --arm mono:thr:mp32 --label {{quote(label)}} --folds {{quote(fold)}} --seeds {{quote(seed)}} --jobs {{quote(jobs)}}
+
+dataset-counts root out:
+    OPENBLAS_NUM_THREADS=1 python3 -B scripts/byconstruction/ring_root.py dataset-report --root {{quote(root)}} --out {{quote(out)}}
+
+dataset-eval out model binary:
+    python3 -B scripts/byconstruction/dataset_eval.py score --out {{quote(out)}} --predict {{quote(binary)}}/bake_dial_refit --model Mdata={{quote(model)}}
+    ZEN_PANEL_BIN={{quote(binary)}}/panel python3 -B scripts/byconstruction/dataset_eval.py report --out {{quote(out)}}
+
+dataset-eval-prepare out collection:
+    python3 -B scripts/byconstruction/dataset_eval.py prepare --out {{quote(out)}} --collections {{quote(collection)}}
+
+dataset-eval-bapps out model binary scratch:
+    python3 -B scripts/byconstruction/dataset_eval.py bapps-keys --out {{quote(out)}} --scratch {{quote(scratch)}}
+    just dataset-unpack-bapps {{quote(out)}}/bapps-unpack-keys.parquet /mnt/tower/input/iqa {{quote(scratch)}} {{quote(out)}}/unpack-receipts
+    python3 -B scripts/byconstruction/dataset_eval.py score --out {{quote(out)}} --predict {{quote(binary)}}/bake_dial_refit --model Mdata={{quote(model)}} --model M7="$HOME/tmp/byc/full/mono-thr-mp32-r7_s0/refit/production-f16.bin" --model B7="$HOME/tmp/byc/perf/b_rev7.bin" --zm /var/tmp/byconstruction-bin/zenmetrics-judge-7a0f8394/zenmetrics --judge ssim2 --judge butteraugli --judge cvvdp
+    ZEN_PANEL_BIN={{quote(binary)}}/panel python3 -B scripts/byconstruction/dataset_eval.py report --out {{quote(out)}}
 
 dataset-loop stage study:
     bash scripts/byconstruction/dataset_loop.sh {{quote(stage)}} {{quote(study)}}
