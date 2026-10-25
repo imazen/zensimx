@@ -3214,14 +3214,14 @@ pub(crate) fn block_base(
 /// Sourced from `benchmarks/feature_sets_registry.json`'s `sets[].layout`
 /// (append-only; 2026-09-19: 372, 720, 924, 944, 956, 986; 2026-09-23: the
 /// Rev4 feature bank's full width 1322) plus C8's width 1502, the by-construction research widths 1891 (globaff),
-/// 2301 (the gated globaff research set) and 2337 (the byc_orient research set) and the restored-cut families' widths
-/// 1562 (mapdev),
+/// 2055 (the luminance-gated globaff research set), 2301 (the gated globaff research set) and 2337 (the byc_orient
+/// research set) and the restored-cut families' widths 1562 (mapdev),
 /// `zensim-validate`'s
 /// `every_registered_layout_width_is_a_candidate` holds the two in sync, so
 /// registering a set at a new width fails the build rather than silently
 /// becoming unreproducible.
 pub(crate) const REGISTERED_LAYOUT_WIDTHS: &[usize] = &[
-    372, 720, 924, 944, 956, 986, 1322, 1502, 1562, 1790, 1820, 1825, 1867, 1891, 2301, 2337,
+    372, 720, 924, 944, 956, 986, 1322, 1502, 1562, 1790, 1820, 1825, 1867, 1891, 2055, 2301, 2337,
 ];
 
 /// Total layout width at `n_scales` with every registered block present.
