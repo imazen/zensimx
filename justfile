@@ -71,6 +71,7 @@ dataset-mix-scorecard study:
     export BYC_ROOT=/var/tmp/datalegs-20261025/rev7data/root BYC_CELLS="$study/cells" REV4_V2_BIN_DIR="$study/bin" AIC_BIN="$study/bin" ZEN_PANEL_BIN="$study/bin/panel"
     export ZENSIM_MAX_TIER=v3 BYC_LABEL_LEDGER_DIR="$out/label_reads" RAYON_NUM_THREADS=1 OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1
     python3 -B scripts/rev4_featpot/byc_cells.py mix-audit --study "$study" > "$out/native-audit.txt"
+    just dataset-mix-forced-choice-controls "$study" > "$out/forced-choice-controls.txt"
     arms=Mdata,Mw025,Mw100,Mmos,Mpair
     python3 -B scripts/rev4_featpot/byc_cells.py score --arms "$arms" --paired-with Mdata > "$out/e21.json"
     for arm in Mdata Mw025 Mw100 Mmos Mpair; do
@@ -86,9 +87,113 @@ dataset-mix-scorecard study:
       ln -s "/mnt/v/output/zensim/byconstruction-2026-10-22/$set/img" "$mix/img"
       for file in /var/tmp/datalegs-20261025/$set/scores_Mdata_*.json; do cp "$file" "$mix/"; done
       BYC_MIX_FOLDS=kadid,tid2013,konfig,cid22_a25 MIX="$mix" bash scripts/byconstruction/ring_mixture.sh "$study/bin" raw 12 Mw025 Mw100 Mmos Mpair > "$study/${set}_score.log" 2>&1
+      BYC_MIX_FOLDS=pipal,pairs,mos7,full MIX="$mix" bash scripts/byconstruction/ring_mixture.sh "$study/bin" raw 12 Mdata Mw025 Mw100 Mmos Mpair >> "$study/${set}_score.log" 2>&1
       python3 -B scripts/byconstruction/mixture_test.py summary --out "$mix" --json-out "$out/$set.json" Mdata Mw025 Mw100 Mmos Mpair > "$out/$set.txt" 2>&1
+      python3 -B scripts/byconstruction/mixture_test.py report --out "$mix" > "$out/${set}_all-cells.json"
     done
+    just dataset-mix-mixture-controls "$study"
     python3 -B scripts/rev4_featpot/byc_cells.py mix-select --study "$study" > "$out/selection.txt"
+
+# Compare every exact TRAIN hard-agreement reference with the native owner.
+dataset-mix-forced-choice-controls study:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    python3 - {{quote(study)}} <<'PY'
+    import hashlib, json, sys
+    from pathlib import Path
+    from collections import defaultdict
+    import pandas as pd
+    import pyarrow.parquet as pq
+    sys.path.insert(0, str(Path.cwd()/'scripts/byconstruction'))
+    sys.path.insert(0, str(Path.cwd()/'scripts/rev4_featpot'))
+    from dataset_eval import pair_agreement
+    from subjective_training_leg import log_dataset_read
+    study = Path(sys.argv[1])
+    destination = study/'FORCED_CHOICE_CONTROLS.json'
+    assert not destination.exists(), 'preserve the completed point controls'
+    root = Path('/var/tmp/datalegs-20261025/rev7data/root')
+    packet = json.loads((root/'datasets/receipt.json').read_text())
+    frozen = json.loads((root/'wide/frozen.json').read_text())
+    sha = lambda path: hashlib.sha256(path.read_bytes()).hexdigest()
+    assert sha(root/'datasets/receipt.json') == frozen['dataset_legs_sha256']
+    groups = {r['collection']: r for r in packet['groups']}
+    reads = study/'scorecard/forced-choice-label-reads'
+    reads.mkdir()
+    cache, checked = {}, []
+    for record in json.loads((study/'NATIVE_CELL_CONTROLS.json').read_text())['cells']:
+        cell = study/'cells'/record['arm']/f"without_{record['fold']}_s{record['seed']}"
+        result = json.loads((cell/'byc_record.json').read_text())
+        for collection, value in result.get('dataset_train_statistics', {}).items():
+            if collection not in ('bapps', 'pieapp', 'fg-iqa'):
+                continue
+            if collection not in cache:
+                group = groups[collection]
+                table = Path(group['path'])
+                assert sha(table) == group['table_sha256']
+                log_dataset_read(reads, table, group['rows'], ['ref_basename', 'human_score'],
+                                 'TRAIN-native-forced-choice-parity', collection=collection,
+                                 table_sha256=group['table_sha256'])
+                labels = pq.read_table(table, columns=['ref_basename', 'human_score']).to_pylist()
+                pairs = defaultdict(list)
+                for i, row in enumerate(labels):
+                    pairs[row['ref_basename']].append((row['human_score'], i))
+                rows = []
+                for key, points in pairs.items():
+                    assert len(points) == 2 and {v[0] for v in points} == {0., 1.}
+                    lose, win = sorted(points)
+                    rows.append(dict(group=key, a=win[1], b=lose[1], target=1.))
+                cache[collection] = rows
+            path = cell/f'pred_dataset_{collection}.tsv'
+            assert sha(path) == value['prediction_sha256']
+            prediction = pd.read_csv(path, sep='\t')
+            assert prediction.row_idx.tolist() == list(range(len(prediction)))
+            scores = dict(enumerate(prediction.pred.to_numpy()))
+            # Only the point is checked; this helper's bootstrap output is unused.
+            acc, _, _, count = pair_agreement(cache[collection], scores, resamples=1)
+            error = abs(acc - value['value'])
+            assert error <= 1e-8 and count == value['groups'], (cell, collection, error)
+            checked.append(dict(arm=record['arm'], fold=record['fold'], seed=record['seed'],
+                                collection=collection, pairs=count, reference=value['value'],
+                                native=acc, absolute_error=error))
+    assert checked
+    result = dict(schema='dataset-TRAIN-hard-agreement-native-controls-v1', role='TRAIN',
+                  definition_unchanged=True, comparisons=len(checked),
+                  point_tolerance=1e-8, reason='native CSV point precision', checks=checked)
+    destination.write_text(json.dumps(result, indent=1)+'\n')
+    print(json.dumps(dict(comparisons=len(checked), maximum_absolute_error=max(v['absolute_error'] for v in checked))))
+    PY
+
+# Check every completed model against both sets' actual scored bake hashes.
+dataset-mix-mixture-controls study:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    python3 - {{quote(study)}} <<'PY'
+    import hashlib, json, sys
+    from pathlib import Path
+    study = Path(sys.argv[1])
+    cells = json.loads((study/'NATIVE_CELL_CONTROLS.json').read_text())['cells']
+    destination = study/'MIXTURE_CELL_CONTROLS.json'
+    assert not destination.exists(), 'preserve the completed mixture audit'
+    inventories = {}
+    for name in ('mixture', 'mixture_global'):
+        report = json.loads((study/f'scorecard/{name}_all-cells.json').read_text())
+        expected = {f"{r['arm']}_{r['fold']}_s{r['seed']}" for r in cells}
+        assert set(report) == expected, (name, 'mixture model coverage differs')
+        comparisons = len(json.loads((study/name/'manifest.json').read_text())['rows'])
+        for record in cells:
+            key = f"{record['arm']}_{record['fold']}_s{record['seed']}"
+            cell = study/'cells'/record['arm']/f"without_{record['fold']}_s{record['seed']}"
+            dense = list((cell/'dense').glob('*.bin'))
+            assert len(dense) == 1, str(cell)
+            score = json.loads((study/name/f'scores_{key}.json').read_text())
+            assert score['bake_sha256'] == hashlib.sha256(dense[0].read_bytes()).hexdigest(), key
+            assert score['ring_form'] == 'raw' and score['pyramid'] == 'xyb', key
+            assert report[key]['n'] == comparisons, key
+        inventories[name] = dict(models=len(expected), comparisons_per_model=comparisons,
+                                 score_bake_hashes_verified=True, all_native_cell_records_covered=True)
+    destination.write_text(json.dumps(inventories, indent=1)+'\n')
+    print(json.dumps(inventories))
+    PY
 
 # Caller holds shared heavy.lock and run-heavy; all destinations must be fresh.
 dataset-mix-prepare study:
