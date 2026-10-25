@@ -37,11 +37,17 @@ pub(crate) const GLOBAFF_PER_CELL: usize = 2;
 
 /// The family's first feature id; its slots follow in
 /// `2·(3·scale + channel) + {share, explained}` order.
-#[cfg_attr(not(feature = "custom-profiles"), allow(dead_code))]
+#[cfg_attr(
+    not(all(feature = "custom-profiles", feature = "feature-regime-v2")),
+    allow(dead_code)
+)]
 pub(crate) const FIRST_ID: usize = 1867;
 
 /// The family's slot count over the four scales.
-#[cfg_attr(not(feature = "custom-profiles"), allow(dead_code))]
+#[cfg_attr(
+    not(all(feature = "custom-profiles", feature = "feature-regime-v2")),
+    allow(dead_code)
+)]
 pub(crate) const SLOTS: usize = crate::NUM_SCALES * 3 * GLOBAFF_PER_CELL;
 
 /// Below this, a variance or a mean squared error counts as zero (the
@@ -183,7 +189,7 @@ fn finish_moments(ms: f64, md: f64, vss: f64, vdd: f64, vsd: f64) -> (f64, f64) 
 /// moves mass between pixels and sums to zero. The removal split is the first
 /// order effect of `e_i → 0`, `−e_i·∂f/∂e_i`, twice the exact share for both.
 /// Moments are two-pass f64, and the walk's `TINY` thresholds apply.
-#[cfg(feature = "custom-profiles")]
+#[cfg(all(feature = "custom-profiles", feature = "feature-regime-v2"))]
 pub(crate) fn map_planes(
     src: &impl crate::streaming::MultiScaleRef,
     dst: &impl crate::streaming::MultiScaleRef,

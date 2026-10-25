@@ -1100,7 +1100,7 @@ impl BinAccum {
 
     /// Research perceptual integration of a per-pixel map
     /// ([`crate::map_paint::smooth_sum_preserving`]); a binned map is left as is.
-    #[cfg(feature = "custom-profiles")]
+    #[cfg(all(feature = "custom-profiles", feature = "feature-regime-v2"))]
     pub(crate) fn smooth_per_pixel(&mut self, sigma: f64) {
         if self.bin == 1 {
             crate::map_paint::smooth_sum_preserving(&mut self.bins, self.gw, self.height, sigma);

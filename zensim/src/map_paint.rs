@@ -247,6 +247,7 @@ fn box_sum(src: &[f64], w: usize, h: usize, r: usize, out: &mut Vec<f64>) {
 /// each value is scattered to its in-bounds neighbours with the kernel
 /// renormalized over them, so the map's total (and every row's, then every
 /// column's) is kept exactly; radius `⌈3σ⌉`.
+#[cfg_attr(not(feature = "feature-regime-v2"), allow(dead_code))] // its one caller is the v2 map walk
 pub(crate) fn smooth_sum_preserving(map: &mut [f64], w: usize, h: usize, sigma: f64) {
     if sigma <= 0.0 || map.is_empty() {
         return;
