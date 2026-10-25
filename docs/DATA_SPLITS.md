@@ -1,5 +1,42 @@
 # DATA_SPLITS.md — canonical train/val/test conventions (locked 2026-07-02)
 
+## October 25 — Mdata TRAIN-leg execution
+
+The owner's dataset-leg brief authorizes TRAIN labels for PIPAL, MDID,
+LIVE-MD, CID:IQ, CID:OA, VCL@FER, IRCCyN/IVC, Colourlab rating variability,
+BAPPS, PieAPP and FG-IQA. The initial membership-only registration below
+records the preceding phase. The new fit uses only its FROZEN TRAIN rows;
+EVAL labels are read separately after candidate freezing, and TEST and
+CALIBRATION targets do not enter this work.
+
+MOS legs preserve native reference groups and orient scores to quality.
+Pairwise TRAIN legs use hard preferences around `p_a=.5`, dropping exact
+ties; evaluation retains the original probability. Every added collection
+has fixed nominal weight 0.5. Full-data M keeps its registered recipe,
+one trainer thread, 120 epochs and fixed final epoch 119. Its packed model
+SHA-256 is `9fe1aa47a82730550ed1b9dd73addeacf31304485a12213c4e3e9f151bff5117`;
+monotonicity certification passes. No serving profile changes.
+
+The new dev-local root is
+`/mnt/v/output/zensim/byconstruction-2026-10-22/rev7data/root`, backed by
+`/var/tmp/datalegs-20261025/rev7data/root`. Family reservations include
+excluded EVAL/TEST/CALIBRATION and source-exposed diagnostic memberships.
+The derived root masks 840 inherited human-fit rows and 120 development rows;
+the original revision-7 root stays intact. The audit reports zero remaining
+reserved rows within accepted exact-pixel and confirmed D4 alias coverage;
+its bounded source screen does not prove perfect crop recall.
+
+Original TRAIN row indices and fields read are retained in
+`/var/tmp/datalegs-20261025/rev7data/LABEL_READS.json`, including repeated
+failed-attempt reads and derived-target counts. EVAL ledgers are in that
+study's `eval/` and `eval-bapps/` directories. The coordinator's original
+11-collection assessment is copied with checksums; BAPPS adds its 36,344
+EVAL comparisons. Published documentation examples and earlier coordinator
+EVAL results were already exposed; neither selects this fit's weights or
+epoch. Methods, controls and results are recorded in
+[`byconstruction_2026-10-22.md`](../benchmarks/byconstruction_2026-10-22.md),
+"Revision-7 M with provided-library TRAIN datasets".
+
 ## October 25 — provided-library membership registration (labels unopened)
 
 The accepted source-screen admission is registered here as membership only.

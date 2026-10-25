@@ -3601,24 +3601,24 @@ of the coordinator's input) and `eval-bapps/`. The source root remains
 path `/mnt/v/output/zensim/byconstruction-2026-10-22/rev7data` resolves to
 `/var/tmp/datalegs-20261025/rev7data`. Exact native pixels and confirmed D4
 aliases define the family audit's bounded coverage; it does not prove perfect
-crop recall. The inherited development mask removes another120 rows.
+crop recall. The inherited development mask removes another 120 rows.
 
 The existing dataset evaluator now delegates MOS SROCC, midranks and
 reference-bootstrap intervals to the canonical Rust statistics owner.
 Its earlier `argsort(argsort(...))` tie handling assigned distinct ranks to
 ties, so this run recomputes M7, B7 and all peers with the same corrected
-method. MOS intervals use2,000 reference resamples, seed1, type7 quantiles;
+method. MOS intervals use 2,000 reference resamples, seed 1, type 7 quantiles;
 pairwise evaluation retains the original soft-probability agreement and
-reference bootstrap, including `.5` comparisons. BAPPS's36,344 frozen EVAL
-comparisons extend the coordinator's11-collection assessment. Only retained
+reference bootstrap, including `.5` comparisons. BAPPS's 36,344 frozen EVAL
+comparisons extend the coordinator's 11-collection assessment. Only retained
 original archives supply their PNG bytes, with archive and content-index
 hash verification; no training images are decoded for this assessment.
 
-The12 E21 cells use four one-thread fits inside each bounded seed job, with
+The 12 E21 cells use four one-thread fits inside each bounded seed job, with
 the shared heavy lock released between seeds. The rebuilt trainer must first
-reproduce the unchanged-root Mr7 KADID seed0 predictions byte for byte.
+reproduce the unchanged-root Mr7 KADID seed 0 predictions byte for byte.
 The deciding loop uses `diffmap` on float reconstruction and its own
-TRAIN-fitted maximum-tail placement. M5/M7/B placements,702 bitstreams per
+TRAIN-fitted maximum-tail placement. M5/M7/B placements, 702 bitstreams per
 control arm, and retained judge rows must reproduce through the original
 loop owners before the new comparisons qualify. Every reported loop
 comparison uses `--bdrate-vs`.
