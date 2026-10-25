@@ -62,30 +62,10 @@ impl ImageSource for Nits {
     }
 }
 
-/// Deterministic synthetic HDR pair: a 0.1–1,800 cd/m² ramp with texture,
-/// and a distortion that brightens every seventh sample by 8%.
-fn pair(w: usize, h: usize, seed: u64) -> (Vec<f32>, Vec<f32>) {
-    let mut s = seed;
-    let mut rnd = || {
-        s ^= s << 13;
-        s ^= s >> 7;
-        s ^= s << 17;
-        (s >> 40) as f32 / (1u64 << 24) as f32
-    };
-    let r: Vec<f32> = (0..w * h * 3)
-        .map(|i| {
-            let x = (i / 3) % w;
-            let base = 0.1 + 1200.0 * (x as f32 / w as f32).powi(2);
-            base * (0.5 + rnd())
-        })
-        .collect();
-    let d = r
-        .iter()
-        .enumerate()
-        .map(|(i, v)| if i % 7 == 0 { v * 1.08 } else { *v })
-        .collect();
-    (r, d)
-}
+#[path = "fixtures/hdr_pairs.rs"]
+#[allow(dead_code)]
+mod hdr_pairs;
+use hdr_pairs::chdr_pu as pair;
 
 fn planes(rgb: &[f32], w: usize, h: usize, stride: usize) -> [Vec<f32>; 3] {
     core::array::from_fn(|c| {

@@ -5,6 +5,10 @@ use zensim::{
     AlphaMode, ColorPrimaries, ImageSource, PixelFormat, StridedBytes, Zensim, ZensimProfile,
 };
 
+#[path = "fixtures/hdr_pairs.rs"]
+#[allow(dead_code)]
+mod hdr_pairs;
+
 fn matrix(p: ColorPrimaries) -> [[f64; 3]; 3] {
     match p {
         ColorPrimaries::Srgb => [[1., 0., 0.], [0., 1., 0.], [0., 0., 1.]],
@@ -89,22 +93,7 @@ fn features(a: &impl ImageSource, b: &impl ImageSource, encoding: HdrEncoding) -
 #[test]
 fn hdr_public_features_match_independent_common_primaries_without_sdr_clipping() {
     for (w, h) in [(17, 9), (97, 65)] {
-        let a: Vec<[f32; 4]> = (0..w * h)
-            .map(|i| {
-                let t = (i * 37 % 251) as f32;
-                [
-                    50. + t * 2.,
-                    20. + (i * 19 % 191) as f32,
-                    10. + (i * 13 % 173) as f32,
-                    1.,
-                ]
-            })
-            .collect();
-        let b: Vec<_> = a
-            .iter()
-            .enumerate()
-            .map(|(i, p)| [p[0] * 0.91, p[1] + (i % 7) as f32, p[2] * 1.08, 1.])
-            .collect();
+        let (a, b) = hdr_pairs::native_color(w, h);
         for p in [ColorPrimaries::DisplayP3, ColorPrimaries::Bt2020] {
             let ar = transform(&a, p);
             let br = transform(&b, p);
