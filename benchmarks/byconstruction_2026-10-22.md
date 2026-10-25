@@ -2895,6 +2895,14 @@ so the saturation change is explained in every channel and the all-channel gate 
   within-reference ordering is no worse than `base-c` on every set, and CID22-A's codec spread is no worse than the
   ungated arm's (T 0.0380, M 0.0382).
 
+*Amendment (before any result).* The first launch was refused by strict admission before any cell trained: the new
+root's feature set was not in the admitted list. It is now registered in the trainer's compiled list
+(`group_admission.rs`), the Python admission, the feature-set registry and zensim's layout widths (the
+`every_registered_layout_width_is_a_candidate` gate failed until w2055 joined; `feature_set_match` 10/10 after). So
+the cells run on trainer `774955ad` (`just byc-train-bins`), not `70eba638`; no trainer source changed in between. A
+reproduction cell (Tgg's KADID-held-out seed-0 cell retrained in the same run) must give predictions bit-identical to
+the stored Tgg cell, or the comparison with Tgg and Mgg64 is not made.
+
 ## Summary (all arms, E21 screen, seeds 0–2, Δ vs `base-c`)
 
 | Arm | Guarantee | E21 Δ (SE) | Mixture inversions / cell (max rise) |
