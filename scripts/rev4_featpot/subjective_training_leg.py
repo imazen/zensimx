@@ -236,6 +236,11 @@ def dataset_groups(root, groups, selected, route, seed_index, init_seed, sample_
                 formula_revision=7,tier="v3",producer_commit=p["producer_commit"],groups=records,
                 width=document(root/"wide/main/real/receipt.json")["width"],
                 family_guard_path=p["family_guard_path"],family_guard_sha256=p["family_guard_sha256"])
+    from v2_common import derived_declaration
+    direct = derived_declaration("fx1")[2]
+    if selected != direct["direct"]:
+        raise ValueError("dataset M recipe requires its pinned direct columns")
+    cell["read_ids"] = sorted(set(selected) | {b for _,b in direct["products"]})
     a = dict(schema="subjective-training-authority-v2",state="approved",artifact_visibility="private",
              selection="fixed-final-epoch",cells={cell_id:cell})
     ap = dest/"dataset-authority.json"

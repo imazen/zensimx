@@ -331,7 +331,7 @@ fn admit_datasets(
         run_binding(c, args, width)?;
     }
     let ids: Vec<usize> =
-        serde_json::from_value(c["feature_ids"].clone()).map_err(|e| e.to_string())?;
+        serde_json::from_value(c["read_ids"].clone()).map_err(|e| e.to_string())?;
     if ids != selected || c["formula_revision"] != 7 || c["tier"] != "v3" {
         return Err("dataset feature/producer contract differs".into());
     }
@@ -577,6 +577,7 @@ mod tests {
         f.authority["schema"] = json!("subjective-training-authority-v2");
         let c = &mut f.authority["cells"]["cell"];
         c["formula_revision"] = json!(7);
+        c["read_ids"] = c["feature_ids"].clone();
         c["family_guard_path"] = json!(guard);
         c["family_guard_sha256"] = json!(hash(&guard).unwrap());
         c["groups"][0]["name"] = json!("subjective_rank_fixture");
