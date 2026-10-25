@@ -19,7 +19,7 @@ def main():
     original = path.read_bytes()
     source = original.decode()
     changed = source
-    for marker in ["#[derive(Default)]\npub(crate) struct StableSsimScratch", "#[autoversion]\npub(crate) fn stable_ssim_plane"]:
+    for marker in ["#[derive(Default)]\npub(crate) struct StableSsimScratch {", "#[autoversion]\npub(crate) fn stable_ssim_plane("]:
         assert changed.count(marker) == 1, f"source owner changed: {marker}"
         changed = changed.replace(marker, "#[cfg(test)]\n" + marker)
     args.out.mkdir(parents=True, exist_ok=False)
