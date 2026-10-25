@@ -2811,6 +2811,35 @@ Across all blocks the monotone maps agree with butteraugli's block distances bet
 0.622 against 0.491, as Tga's 0.653 and M64a's 0.681 did); on each pair's largest tile, which decides reach, B's
 agrees better on the held-out screenshots (0.778 against 0.683 / 0.675).
 
+**Results** (`jxl_steer_rd.sh` with `ARMS="Bcheck Mfull Tfull Mfulltail Tfulltail"`, run-heavy 1,462 s, peak RSS
+1.02 GiB; tables, placements, logs and SHA256SUMS in `/mnt/v/output/zensim/byconstruction-2026-10-22/jxl-steer-mt/`).
+Both controls passed: `Bcheck` reproduced all 702 of B's bitstreams, and the re-judged panel reproduced every earlier
+value (10,686 rows under each of the six judge tables). Bytes saved at equal judged score (%, mean over images of each
+image's median, 95% bootstrap interval; positive is fewer bytes):
+
+| Arm | vs | All SSIMULACRA2 | All CVVDP | Photos SSIMULACRA2 / CVVDP | Illustrations SSIMULACRA2 / CVVDP | Screens SSIMULACRA2 / CVVDP |
+|---|---|---|---|---|---|---|
+| M | B | **+1.78** [+1.24, +2.36] | **+2.25** [+1.59, +2.89] | **+1.64 / +2.27** | **+1.34 / +1.73** | **+2.61 / +2.83** |
+| T | B | **+1.60** [+0.95, +2.37] | **+1.80** [+1.00, +2.58] | **+1.59 / +2.11** | +0.61 [−0.22, +1.36] / +1.81 | +2.84 / +1.12 [−1.67, +3.61] |
+| M, tail | B, tail | **+1.93** [+1.29, +2.82] | **+2.58** [+2.01, +3.33] | **+1.44 / +2.77** | **+0.70 / +1.49** | **+4.48 / +3.51** |
+| T, tail | B, tail | **+1.77** [+1.16, +2.53] | **+2.27** [+1.70, +2.94] | **+1.36 / +2.43** | **+0.67 / +1.38** | **+3.95 / +3.06** |
+| M | butteraugli | −0.54 [−2.01, +0.69] | −3.34 [−5.97, −1.11] | **+2.57** / +0.76 [−0.27, +1.79] | −0.65 / −2.62 | −6.98 / −12.88 |
+| T | butteraugli | −0.39 [−1.95, +0.91] | −2.91 [−5.16, −0.99] | **+2.76** / +0.51 [−0.68, +1.65] | −0.60 / −2.11 | −6.77 / −11.10 |
+| M, tail | butteraugli | −1.41 [−2.64, −0.37] | −2.05 [−3.44, −0.84] | +0.88 / +0.15 [−0.41, +0.72] | −1.34 / −1.16 | −6.32 / −7.77 |
+| T, tail | butteraugli | −1.51 [−2.79, −0.40] | −2.14 [−3.59, −0.90] | +0.71 / −0.09 [−0.64, +0.49] | −1.26 / −1.20 | −6.49 / −7.63 |
+
+Bold: positive with the interval above zero. Against butteraugli the earlier arms read, over all images, Tga −0.74 /
+−3.28 and M64a −0.46 / −2.81 (SSIMULACRA2 / CVVDP), B −1.57 / −5.19. Within this run the maps cost B's encode time
+(median 403–410 ms against `Bcheck`'s 402; times from different runs are not comparable). Encodes that end with no
+block above target: M 165 and T 152 of 702 at the bulk placement (B 116), 548 / 549 at the tail placement (B 531,
+butteraugli 566).
+
+**Reading** (my bar). The full-data monotone models' maps steer JPEG XL better than B's: at either kind of
+placement, in every content class and under both independent judges, except T's bulk placement on illustrations
+(SSIMULACRA2) and screens (CVVDP), which tie. They steer as well as the AIC2026-trained Tga and M64a, so dropping
+those models loses nothing here. None of them steers better than butteraugli: M and T save 2.6–2.8% on photos by
+SSIMULACRA2 with CVVDP tied, and screens still cost 6–13%.
+
 ## Summary (all arms, E21 screen, seeds 0–2, Δ vs `base-c`)
 
 | Arm | Guarantee | E21 Δ (SE) | Mixture inversions / cell (max rise) |
