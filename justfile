@@ -1,10 +1,22 @@
+# Aggregate only completed owner outputs; no new target table is read.
+dataset-mix-summary study:
+    python3 -B scripts/rev4_featpot/byc_cells.py mix-summary --study {{quote(study)}}
+
+# Metadata-only progress; caller can inspect this while another job holds the lock.
+dataset-mix-progress study:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    for arm in Mdata Mw025 Mw100 Mmos Mpair; do
+      env BYC_CELLS={{quote(study)}}/cells OPENBLAS_NUM_THREADS=1 python3 -B scripts/rev4_featpot/byc_cells.py progress --arm "$arm" --folds kadid,tid2013,konfig,cid22_a25,pipal,pairs,mos7,full
+    done
+
 # Caller holds shared heavy.lock and run-heavy; refuses unfrozen candidates.
 dataset-mix-eval study:
-    env ZEN_PANEL_BIN={{quote(study)}}/bin/panel RAYON_NUM_THREADS=2 OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 python3 -B scripts/byconstruction/dataset_eval.py mix-eval --study {{quote(study)}} --predict {{quote(study)}}/bin/bake_dial_refit
+    env ZENSIM_MAX_TIER=v3 ZEN_PANEL_BIN={{quote(study)}}/bin/panel RAYON_NUM_THREADS=2 OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 python3 -B scripts/byconstruction/dataset_eval.py mix-eval --study {{quote(study)}} --predict {{quote(study)}}/bin/bake_dial_refit
 
 # Caller holds shared heavy.lock and run-heavy; selection precedes these fits.
 dataset-mix-freeze study:
-    env BYC_CELLS={{quote(study)}}/cells REV4_V2_BIN_DIR={{quote(study)}}/bin ZEN_PANEL_BIN={{quote(study)}}/bin/panel RAYON_NUM_THREADS=1 OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 python3 -B scripts/rev4_featpot/byc_cells.py mix-freeze --study {{quote(study)}}
+    env ZENSIM_MAX_TIER=v3 BYC_CELLS={{quote(study)}}/cells REV4_V2_BIN_DIR={{quote(study)}}/bin ZEN_PANEL_BIN={{quote(study)}}/bin/panel RAYON_NUM_THREADS=1 OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 python3 -B scripts/rev4_featpot/byc_cells.py mix-freeze --study {{quote(study)}}
 
 # Queue individual existing-owner operations; heavy work takes the shared lock.
 dataset-mix-queue study:
@@ -12,7 +24,7 @@ dataset-mix-queue study:
     set -euo pipefail
     study={{quote(study)}}
     for arm in Mdata Mw025 Mw100 Mmos Mpair; do
-      flock "$HOME/tmp/heavy.lock" "$HOME/work/claudehints/scripts/run-heavy" --mem 24G --jobs 12 -- env TMPDIR="$study/scratch" OPENBLAS_NUM_THREADS=1 just dataset-mix-cells "$study" "$arm" 2>&1 | tee "$study/cells_$arm.log"
+      flock "$HOME/tmp/heavy.lock" "$HOME/work/claudehints/scripts/run-heavy" --mem 36G --jobs 12 -- env TMPDIR="$study/scratch" OPENBLAS_NUM_THREADS=1 just dataset-mix-cells "$study" "$arm" 2>&1 | tee "$study/cells_$arm.log"
     done
     touch "$study/CELLS_COMPLETE"
 
@@ -40,8 +52,8 @@ dataset-mix-cells study arm:
     done
     export BYC_ROOT="$root" REV4_V2_BIN_DIR="$study/bin" BYC_CELLS="$study/cells" BYC_SCRATCH="$study/scratch"
     export ZENSIM_MAX_TIER=v3 RAYON_NUM_THREADS=1 OMP_NUM_THREADS=1 ZEN_PANEL_BIN="$study/bin/panel"
-    # Six single-thread fits under 24 GiB; large new-data predictions serialize.
-    python3 -B scripts/rev4_featpot/byc_cells.py run --arm mono:thr:mp32 --label "$arm" --folds "$folds" --seeds 0,1,2 --jobs 6
+    # Twelve single-thread fits under 36 GiB; large new-data predictions serialize.
+    python3 -B scripts/rev4_featpot/byc_cells.py run --arm mono:thr:mp32 --label "$arm" --folds "$folds" --seeds 0,1,2 --jobs 12
 
 # Caller holds shared heavy.lock and run-heavy; no new labels outside TRAIN.
 dataset-mix-scorecard study:
@@ -51,8 +63,9 @@ dataset-mix-scorecard study:
     test -f "$study/CELLS_COMPLETE"
     out="$study/scorecard"
     mkdir "$out"
-    export BYC_CELLS="$study/cells" REV4_V2_BIN_DIR="$study/bin" AIC_BIN="$study/bin" ZEN_PANEL_BIN="$study/bin/panel"
-    export BYC_LABEL_LEDGER_DIR="$out/label_reads" RAYON_NUM_THREADS=1 OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1
+    export BYC_ROOT=/var/tmp/datalegs-20261025/rev7data/root BYC_CELLS="$study/cells" REV4_V2_BIN_DIR="$study/bin" AIC_BIN="$study/bin" ZEN_PANEL_BIN="$study/bin/panel"
+    export ZENSIM_MAX_TIER=v3 BYC_LABEL_LEDGER_DIR="$out/label_reads" RAYON_NUM_THREADS=1 OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1
+    python3 -B scripts/rev4_featpot/byc_cells.py mix-audit --study "$study" > "$out/native-audit.txt"
     arms=Mdata,Mw025,Mw100,Mmos,Mpair
     python3 -B scripts/rev4_featpot/byc_cells.py score --arms "$arms" --paired-with Mdata > "$out/e21.json"
     for arm in Mdata Mw025 Mw100 Mmos Mpair; do
@@ -67,8 +80,8 @@ dataset-mix-scorecard study:
       cp "/var/tmp/datalegs-20261025/$set/manifest.json" "$mix/manifest.json"
       ln -s "/mnt/v/output/zensim/byconstruction-2026-10-22/$set/img" "$mix/img"
       for file in /var/tmp/datalegs-20261025/$set/scores_Mdata_*.json; do cp "$file" "$mix/"; done
-      MIX="$mix" bash scripts/byconstruction/ring_mixture.sh "$study/bin" raw 12 Mw025 Mw100 Mmos Mpair > "$study/${set}_score.log" 2>&1
-      python3 -B scripts/byconstruction/mixture_test.py summary --out "$mix" Mdata Mw025 Mw100 Mmos Mpair > "$out/$set.txt" 2>&1
+      BYC_MIX_FOLDS=kadid,tid2013,konfig,cid22_a25 MIX="$mix" bash scripts/byconstruction/ring_mixture.sh "$study/bin" raw 12 Mw025 Mw100 Mmos Mpair > "$study/${set}_score.log" 2>&1
+      python3 -B scripts/byconstruction/mixture_test.py summary --out "$mix" --json-out "$out/$set.json" Mdata Mw025 Mw100 Mmos Mpair > "$out/$set.txt" 2>&1
     done
     python3 -B scripts/rev4_featpot/byc_cells.py mix-select --study "$study" > "$out/selection.txt"
 
@@ -83,13 +96,18 @@ dataset-mix-prepare study:
     library=/mnt/tower/input/iqa/datasets
     columns="$HOME/tmp/byc/cols_c.txt"
     export OPENBLAS_NUM_THREADS=1 TMPDIR="$study/scratch"
+    jj log -r @ --no-graph -T 'commit_id ++ "\n"' > "$study/BUILD_SOURCE_COMMIT.txt"
+    jj diff --from 337382e4 --to @ --git > "$study/BUILD_SOURCE_CHANGES.patch"
+    sha256sum Cargo.lock Cargo.toml zensim-validate/src/subjective_training_leg.rs scripts/rev4_featpot/subjective_training_leg.py scripts/rev4_featpot/byc_cells.py scripts/rev4_featpot/v2_confirm_fit.py scripts/byconstruction/ring_root.py > "$study/BUILD_SOURCE_FILES_SHA256SUMS"
     just dataset-leg-tests
     just dataset-leg-native-tests /var/tmp/datalegs-target
+    CARGO_TARGET_DIR=/var/tmp/datalegs-target just clippy
     just dataset-trainer-build /var/tmp/datalegs-target
     cp /var/tmp/datalegs-target/release/zensim_mlp_train "$study/bin/"
     for name in bake_dial_refit panel byc_fsid byc_predict score_pair_with_bake; do
       cp -L /var/tmp/datalegs-20261025/bin/$name "$study/bin/"
     done
+    sha256sum "$study"/bin/* > "$study/BIN_SHA256SUMS"
     mkdir "$study/default-control"
     args=(datasets --root "$source" --out "$study/default-control/root" --admission "$admission" --features "$features" --library "$library" --columns "$columns")
     python3 -B "$study/oracle/scripts/byconstruction/ring_root.py" "${args[@]}"
@@ -110,7 +128,7 @@ dataset-mix-prepare study:
     done
     touch "$study/PREPARE_COMPLETE"
 
-# Identifier-only preparation; no pixel or subjective table is opened.
+# Synthetic fixture tables; no provided-library response table is opened.
 dataset-leg-tests:
     python3 -B -m unittest discover -s scripts/tests -p 'test_dataset_legs.py' -v
     python3 -B -m unittest discover -s scripts/tests -p 'test_subjective_training_leg.py' -v
@@ -247,13 +265,18 @@ dataset-artifacts-mirror root host destination cache array:
     python3 -B scripts/byconstruction/dataset_mirror.py --root {{quote(root)}} --host {{quote(host)}} --destination {{quote(destination)}} --capacity-path {{quote(cache)}} {{quote(array)}} --artifact-kind training
 
 # Caller holds shared heavy.lock and run-heavy. Preserve a fresh, closed snapshot.
-dataset-snapshot study columns:
+dataset-snapshot study columns mode='mdata':
     #!/usr/bin/env bash
     set -euo pipefail
     study={{quote(study)}}
     out="$study/archive-ready"
     test ! -e "$out"
-    for arm in Mdata Mr7; do
+    case {{quote(mode)}} in
+      mdata) arms="Mdata Mr7" ;;
+      mixes) arms="Mdata Mw025 Mw100 Mmos Mpair"; test -s "$study/FINALISTS.json"; test -s "$study/TRAIN_SELECTION.json"; test -s "$study/eval/report.json"; test -s "$study/eval-bapps/report.json" ;;
+      *) exit 2 ;;
+    esac
+    for arm in $arms; do
       for fold in kadid tid2013 konfig cid22_a25; do
         for seed in 0 1 2; do
           test -s "$study/cells/$arm/without_${fold}_s$seed/byc_record.json"
@@ -262,7 +285,7 @@ dataset-snapshot study columns:
       done
     done
     test -s "$study/scorecard/panel.json"
-    test -s "$study/gates-Mdata/COPY_RECEIPT.json"
+    if [ {{quote(mode)}} = mdata ]; then test -s "$study/gates-Mdata/COPY_RECEIPT.json"; fi
     test -s "$study/NATIVE_CELL_CONTROLS.json"
     test -s "$study/NUMERIC_SUMMARY.json"
     mkdir "$out"
@@ -272,7 +295,7 @@ dataset-snapshot study columns:
     cp scripts/rev4_featpot/e33_fx1_declaration.json "$out/input_configuration/"
     jj log -r @- --no-graph -T 'commit_id ++ "\n"' > "$out/SOURCE_COMMIT.txt"
     test -z "$(find "$out" -type l -print -quit)"
-    sha256sum "$out/rev7data/full/refit/production-f16.bin" "$out/rev7data/root/wide/frozen.json"
+    if [ {{quote(mode)}} = mdata ]; then sha256sum "$out/rev7data/full/refit/production-f16.bin" "$out/rev7data/root/wide/frozen.json"; else sha256sum "$out/FINALISTS.json" "$out/TRAIN_SELECTION.json"; fi
 
 # Caller holds shared heavy.lock and run-heavy; a final receipt requires no gaps.
 dataset-features-verify root:

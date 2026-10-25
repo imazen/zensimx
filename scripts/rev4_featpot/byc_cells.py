@@ -8,6 +8,9 @@ this harness reproduced bit for bit (kadid seed 0, 7,869 rows).
 
   run    --arm TOKENS --folds kadid,tid2013,konfig,cid22_a25 --seeds 0,1,2 --jobs N [--aic-weight W --label L]
   score  --arms NAME[,NAME...] [--seeds 0,1,2]
+  run    --folds pipal,pairs,mos7 ...   (omit new-data groups, score their TRAIN rows)
+  run    --folds full ...              (subset full fit; score groups already omitted)
+  mix-audit / mix-select / mix-freeze --study DIR
   progress --arm NAME [--seeds 0,1,2]  (record presence and latest logged epoch; no target table opened)
   aicscore --arms NAME[,NAME...]   (AIC2026 TRAIN out-of-fold panel of --aic-weight arms)
   aiczero --arm NAME=TABLE [--arm ...] [--out JSON]
@@ -107,7 +110,10 @@ def dataset_holdout_collections(root, fold):
     trained = {r["collection"] for r in packet["groups"]}
     if fold == "full":
         # A subset arm's full fit already excludes these labels.
-        return tuple(c for cs in DATASET_FOLDS.values() for c in cs if c not in trained), ()
+        missing = tuple(c for cs in DATASET_FOLDS.values() for c in cs if c not in trained)
+        if not missing:
+            raise ValueError("full dataset-fold scoring requires a subset arm")
+        return missing, ()
     omitted = DATASET_FOLDS[fold]
     if not trained.intersection(omitted):
         raise ValueError("do not fit a no-op dataset holdout; reuse the arm's full fit")
@@ -360,6 +366,82 @@ def cmd_score(args) -> int:
     return 0
 
 
+def cmd_mix_audit(args):
+    """Verify completed cells and their exclusion inventories without target reads."""
+    from subjective_training_leg import DATASET_FOLDS
+    study = Path(args.study)
+    output = study / "NATIVE_CELL_CONTROLS.json"
+    if output.exists():
+        raise ValueError("preserve the completed cell audit")
+    required = {
+        "Mdata": (*FOLDS,*DATASET_FOLDS),
+        "Mw025": (*FOLDS,*DATASET_FOLDS),
+        "Mw100": (*FOLDS,*DATASET_FOLDS),
+        "Mmos": (*FOLDS,"pipal","mos7","full"),
+        "Mpair": (*FOLDS,"pairs","full"),
+    }
+    inventory = []
+    for arm,folds in required.items():
+        root = study/arm/"root" if arm != "Mdata" else Path("/var/tmp/datalegs-20261025/rev7data/root")
+        packet = json.loads((root/"datasets/receipt.json").read_text())
+        trained = {r["collection"] for r in packet["groups"]}
+        baseline_root = Path("/var/tmp/datalegs-20261025/rev7data/root")
+        baseline = json.loads((baseline_root/"datasets/receipt.json").read_text())
+        expected_collections = {r["collection"] for r in baseline["groups"]}
+        if arm == "Mmos":
+            expected_collections -= set(DATASET_FOLDS["pairs"])
+        elif arm == "Mpair":
+            expected_collections = set(DATASET_FOLDS["pairs"])
+        if trained != expected_collections:
+            raise ValueError("mix root collection subset differs")
+        nominal = {"Mw025":0.25,"Mw100":1.}.get(arm,0.5)
+        baseline_groups = {r["collection"]:r for r in baseline["groups"]}
+        for group in packet["groups"]:
+            declaration = json.loads(Path(str(group["path"])+".manifest.json").read_text())
+            if (declaration["nominal_weight"] != nominal
+                    or group["table_sha256"] != baseline_groups[group["collection"]]["table_sha256"]):
+                raise ValueError("mix root weight or frozen TRAIN rows differ")
+        for table in (baseline_root/"wide/main/real").glob("*.parquet"):
+            if sha(root/"wide/main/real"/table.name) != sha(table):
+                raise ValueError("inherited tables differ across dataset mixes")
+        for fold in folds:
+            for seed in range(3):
+                cell = CELLS/arm/f"without_{fold}_s{seed}"
+                rec = json.loads((cell/"byc_record.json").read_text())
+                result = json.loads((cell/"result.json").read_text())
+                if (rec["seed"] != seed or rec["fold"] != fold or rec["spec"] != spec_of("mono:thr:mp32")
+                        or result["selection"]["selected_epoch"] != 119 or result["epochs"] != 120
+                        or result["pairs_per_epoch"] != 50000 or result["seed_index"] != seed
+                        or result["frozen_sha256"] != sha(root/"wide/frozen.json")
+                        or rec["last_bin_sha256"] != sha(cell/"refit/last.bin")):
+                    raise ValueError(f"{cell}: native cell binding differs")
+                if not (arm == "Mdata" and fold in FOLDS):
+                    bound = json.loads((cell/"DATASET_GROUP_SELECTION.json").read_text())
+                    retained = trained - set(DATASET_FOLDS.get(fold,()))
+                    if set(bound["retained_collections"]) != retained or bound["root_sha256"] != sha(root/"wide/frozen.json"):
+                        raise ValueError(f"{cell}: dataset exclusion inventory differs")
+                    if not (cell/"LABEL_READS.json").is_file():
+                        raise ValueError("new native fit is missing its pre-read ledger")
+                if fold in FOLDS:
+                    if sha(cell/f"pred_{fold}.tsv") != rec["pred_sha256"]:
+                        raise ValueError("E21 predictions changed")
+                else:
+                    scored, _ = dataset_holdout_collections(root,fold)
+                    if set(rec["dataset_train_statistics"]) != set(scored):
+                        raise ValueError("new-data score coverage differs")
+                    for collection,value in rec["dataset_train_statistics"].items():
+                        if sha(cell/f"pred_dataset_{collection}.tsv") != value["prediction_sha256"]:
+                            raise ValueError("new-data predictions changed")
+                read_curve(cell/"train.log")
+                inventory.append(dict(arm=arm,fold=fold,seed=seed,record_sha256=sha(cell/"byc_record.json"),
+                                      model_sha256=rec["last_bin_sha256"]))
+    value=dict(schema="dataset-mix-cell-controls-v1",cells=inventory,verified_cells=len(inventory),
+               new_native_fits=len(inventory)-12,reused_Mdata_E21_cells=12,selected_epoch=119)
+    output.write_text(json.dumps(value,indent=1)+"\n")
+    print(json.dumps({k:v for k,v in value.items() if k != "cells"}))
+    return 0
+
+
 def cmd_mix_select(args):
     """Freeze the preregistered decision from completed TRAIN-only cell records."""
     import numpy as np
@@ -374,6 +456,8 @@ def cmd_mix_select(args):
     arms = {}
     records = {str(e21_path): sha(e21_path)}
     for arm in args.arms.split(","):
+        if e21[arm]["seeds"] != [0,1,2]:
+            raise ValueError("mix selection requires registered seed order 0,1,2")
         new, old = [], []
         per_collection = {c: [] for c in expected}
         for seed in range(3):
@@ -398,7 +482,10 @@ def cmd_mix_select(args):
                 per_collection[c].append(v)
                 mapped.append(v if c in DATASET_FOLDS["pairs"] else (v+1)/2)
             new.append(float(np.mean(mapped)))
-            old.append(float(np.mean([(e21[arm]["per_dataset_per_seed_srocc"][f][seed]+1)/2 for f in FOLDS])))
+            old_values = [(e21[arm]["per_dataset_per_seed_srocc"][f][seed]+1)/2 for f in FOLDS]
+            if not np.isfinite(old_values).all():
+                raise ValueError("undefined E21 collection statistic blocks selection")
+            old.append(float(np.mean(old_values)))
         balanced = [(o+n)/2 for o,n in zip(old,new,strict=True)]
         def describe(v):
             return dict(per_seed=v, mean=float(np.mean(v)), seed_unit_se=float(np.std(v,ddof=1)/np.sqrt(3)))
@@ -441,31 +528,45 @@ def cmd_mix_freeze(args):
             dest = CELLS / arm / "without_full_s0"
             fit = json.loads((dest / "result.json").read_text())
             bake = dest / "refit/last.bin"
-            if fit["selected_bake_sha256"] != sha(bake) or fit["seed_index"] != 0:
-                raise ValueError("subset full-fit seed/model binding differs")
+            if (fit["selected_bake_sha256"] != sha(bake) or fit["seed_index"] != 0
+                    or fit["frozen_sha256"] != sha(root/"wide/frozen.json")
+                    or (fit["epochs"],fit["pairs_per_epoch"],fit["selection"]["selected_epoch"]) != (120,50000,119)):
+                raise ValueError("subset full-fit budget/seed/model binding differs")
             receipt = json.loads((root / "wide/main/real/receipt.json").read_text())
             anchor = root / receipt["legs"]["cid22"]["fit"]["rel"]
             if sha(anchor) != receipt["legs"]["cid22"]["fit"]["sha256"]:
                 raise ValueError("TRAIN packing anchor changed")
             log_dataset_read(dest, anchor, receipt["legs"]["cid22"]["fit"]["rows"],
                              ["human_score"], "TRAIN-production-packing", table_sha256=sha(anchor))
-            from v2_production_pack import pack_production
-            packed = pack_production(bake, dest, anchor, e33_output_stage=True)
-            (dest/"PACKED_FINALIST.json").write_text(json.dumps(packed,indent=1)+"\n")
+            packed_receipt = dest/"PACKED_FINALIST.json"
+            if packed_receipt.exists():
+                packed = json.loads(packed_receipt.read_text())
+                if sha(Path(packed["packed_model"])) != packed["packed_model_sha256"]:
+                    raise ValueError("completed finalist pack changed")
+            else:
+                if (dest/"refit/production-f16.bin").exists():
+                    raise ValueError("preserve and inspect the incomplete finalist pack")
+                from v2_production_pack import pack_production
+                packed = pack_production(bake, dest, anchor, e33_output_stage=True)
+                packed_receipt.write_text(json.dumps(packed,indent=1)+"\n")
             model = Path(packed["packed_model"])
         elif arm in ("Mw025", "Mw100"):
             dest = study / arm / "full_s0"
-            if dest.exists():
+            if dest.exists() and not (dest/"result.json").is_file():
                 raise ValueError("inspect and preserve the earlier finalist-fit attempt")
             command = [sys.executable,str(HERE/"v2_confirm_fit.py"),"--root",str(root),
                 "--spec",spec_of("mono:thr:mp32"),"--columns",COLS.read_text().strip(),"--head","N",
                 "--seed-index","0","--strict-admission","--data-role-decision",str(root/"human_role_decision.json"),
                 "--dest",str(dest),"--train-only","--pack-production","--e33-output-stage"]
-            with (study/f"full_{arm}_s0.log").open("w") as log:
-                subprocess.run(command,stdout=log,stderr=subprocess.STDOUT,check=True)
+            if not (dest/"result.json").is_file():
+                with (study/f"full_{arm}_s0.log").open("w") as log:
+                    subprocess.run(command,stdout=log,stderr=subprocess.STDOUT,check=True)
             fit = json.loads((dest/"result.json").read_text())
             model = Path(fit["packed_model"])
-            if sha(model) != fit["packed_model_sha256"]:
+            if (sha(model) != fit["packed_model_sha256"] or fit["seed_index"] != 0
+                    or fit["spec"] != spec_of("mono:thr:mp32")
+                    or fit["frozen_sha256"] != sha(root/"wide/frozen.json")
+                    or (fit["epochs"],fit["pairs_per_epoch"],fit["selection"]["selected_epoch"]) != (120,50000,119)):
                 raise ValueError("packed model binding differs")
         else:
             raise ValueError("unregistered mix finalist")
@@ -478,6 +579,40 @@ def cmd_mix_freeze(args):
                  eval_assessments_per_finalist=1,selection_uses_EVAL=False)
     output.write_text(json.dumps(value,indent=1)+"\n")
     print(json.dumps(value,indent=1))
+    return 0
+
+
+def cmd_mix_summary(args):
+    """Collect the existing owners' results and input hashes for the durable record."""
+    study = Path(args.study)
+    output = study/"NUMERIC_SUMMARY.json"
+    if output.exists():
+        raise ValueError("preserve the closed numeric summary")
+    inputs = {}
+    def load(relative):
+        path = study/relative
+        inputs[relative] = sha(path)
+        return json.loads(path.read_text())
+    selection = load("TRAIN_SELECTION.json")
+    frozen = load("FINALISTS.json")
+    if frozen["TRAIN_selection_sha256"] != inputs["TRAIN_SELECTION.json"]:
+        raise ValueError("finalist decision changed")
+    result = dict(schema="dataset-mix-numeric-summary-v1", selection=selection, finalists=frozen,
+                  native_controls=load("NATIVE_CELL_CONTROLS.json"), e21=load("scorecard/e21.json"),
+                  panel=load("scorecard/panel.json"), type_bias=load("scorecard/type_bias.json"),
+                  knob_inversions=load("scorecard/knobinv.json"), mixtures={}, eval={}, eval_paired={})
+    for name in ("mixture","mixture_global"):
+        result["mixtures"][name] = load(f"scorecard/{name}.json")
+        if any(v["cells"] != 12 for v in result["mixtures"][name].values()):
+            raise ValueError("mixtures require all twelve E21 cells per arm")
+    for directory in ("eval","eval-bapps"):
+        result["eval"][directory] = load(f"{directory}/report.json")
+    for name in frozen["models"]:
+        result["eval_paired"][name] = load(f"eval/paired-{name}/report/report.json")
+    result["input_sha256"] = inputs
+    output.write_text(json.dumps(result,indent=1)+"\n")
+    print(json.dumps(dict(path=str(output),sha256=sha(output),finalists=list(frozen["models"]),
+                         native_cells=result["native_controls"]["verified_cells"])))
     return 0
 
 
@@ -870,6 +1005,10 @@ def main() -> int:
     r.add_argument("--cols", help="comma-separated columns file for --base-spec")
     r.add_argument("--label", help="arm directory name for --base-spec runs")
     r.add_argument("--aic-weight", type=float, help="add the AIC2026 TRAIN leg (rotating held-out fold) at this weight")
+    mx = sub.add_parser("mix-summary")
+    mx.add_argument("--study", required=True)
+    ma = sub.add_parser("mix-audit")
+    ma.add_argument("--study", required=True)
     ms = sub.add_parser("mix-select")
     ms.add_argument("--study", required=True)
     ms.add_argument("--arms", default="Mw025,Mdata,Mw100,Mmos,Mpair")
@@ -912,7 +1051,7 @@ def main() -> int:
     args = ap.parse_args()
     return {"run": cmd_run, "score": cmd_score, "seedens": cmd_seedens, "curves": cmd_curves, "pairclass": cmd_pairclass,
             "bytype": cmd_bytype, "knobinv": cmd_knobinv, "predict-best": cmd_predict_best, "aicscore": cmd_aicscore,
-            "aiczero": cmd_aiczero, "progress": cmd_progress, "mix-select": cmd_mix_select, "mix-freeze": cmd_mix_freeze}[args.cmd](args)
+            "aiczero": cmd_aiczero, "progress": cmd_progress, "mix-select": cmd_mix_select, "mix-freeze": cmd_mix_freeze, "mix-audit": cmd_mix_audit, "mix-summary": cmd_mix_summary}[args.cmd](args)
 
 
 if __name__ == "__main__":

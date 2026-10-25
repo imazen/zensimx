@@ -2,6 +2,7 @@
 """The provided-library datasets' held-out EVAL splits: today's models and peers (benchmarks/byconstruction_2026-10-22.md,
 "The new datasets' EVAL splits").
 
+  dataset_eval.py mix-eval --study DIR --predict BINARY   frozen TRAIN-selected finalists, copied EVAL + feature-only BAPPS
   dataset_eval.py prepare --out DIR      EVAL rows, their labels (logged), feature table and judge pairs
   dataset_eval.py score --out DIR --model NAME=BAKE ... --zm ZENMETRICS
   dataset_eval.py report --out DIR

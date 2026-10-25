@@ -11,6 +11,18 @@ spec.loader.exec_module(evaluation)
 
 
 class DatasetEval(unittest.TestCase):
+    def test_train_fold_mos_uses_signed_midranks_and_reports_undefined_refs(self):
+        import sys
+        sys.path.insert(0,str(Path(__file__).resolve().parents[1]/"rev4_featpot"))
+        from byc_cells import dataset_train_statistic
+        pair = dataset_train_statistic(["r","r"],[0.,1.],[1.,2.],False)
+        self.assertEqual(pair["value"],1.)
+        tied = dataset_train_statistic(["r","r","r","s","s"],
+            [1.,1.,2.,0.,1.],[3.,3.,1.,1.,1.],False)
+        self.assertEqual(tied["value"],-1.)
+        self.assertEqual(tied["defined_groups"],1)
+        self.assertEqual(tied["excluded_groups"],1)
+
     def test_mix_eval_refuses_changed_selection_before_eval_access(self):
         import json
         with tempfile.TemporaryDirectory() as d:

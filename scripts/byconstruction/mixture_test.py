@@ -211,14 +211,21 @@ def cmd_summary(a):
     """Per arm: the range of inversions over its E21 cells (`<arm>_<held-out set>_s<seed>` score files), their total
     and the largest rise."""
     res = report(Path(a.out))
+    summary = {}
     for arm in a.arms:
         cells = {k: v for k, v in res.items()
                  if k.startswith(f"{arm}_") and k[len(arm) + 1:].rsplit("_s", 1)[0] in E21_SETS}
         if not cells:
             raise ValueError(f"{arm}: no scored cells in {a.out}")
         inv = [v["inversions"] for v in cells.values()]
+        summary[arm] = dict(cells=len(cells), per_cell=cells,
+                            inversions_total=sum(inv), inversions_min=min(inv), inversions_max=max(inv),
+                            max_rise=max(v["max_rise"] for v in cells.values()),
+                            comparisons_per_cell=sorted({v["n"] for v in cells.values()}))
         print(f"{arm}: {len(cells)} cells, inversions per cell {min(inv)}-{max(inv)} ({sum(inv)} in all), "
               f"largest rise {max(v['max_rise'] for v in cells.values()):+.2f}")
+    if getattr(a,"json_out",None):
+        Path(a.json_out).write_text(json.dumps(summary,indent=1)+"\n")
     return 0
 
 
@@ -279,6 +286,7 @@ def main():
     r.add_argument("--out", required=True)
     sm = sub.add_parser("summary")
     sm.add_argument("--out", required=True)
+    sm.add_argument("--json-out", help="save the same summary as structured data")
     sm.add_argument("arms", nargs="+", help="arm labels whose cells were scored (scores_<arm>_<set>_s<seed>.json)")
     p = sub.add_parser("pairs")
     p.add_argument("--out", required=True)

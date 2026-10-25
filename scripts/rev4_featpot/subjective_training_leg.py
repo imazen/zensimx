@@ -255,6 +255,9 @@ def dataset_groups(root, groups, selected, route, seed_index, init_seed, sample_
     p = document(root/"datasets/receipt.json", pin)
     if p.get("schema") != "rev7-dataset-legs-v1" or p["feature_ids"] != selected:
         raise ValueError("frozen dataset leg recipe differs")
+    guard = document(p["family_guard_path"],p["family_guard_sha256"])
+    if guard.get("schema") != "dataset-family-guard-v1" or guard.get("inherited_leaks") != 0:
+        raise ValueError("dataset family guard differs")
     exclude = tuple(exclude)
     supported = {c for group in DATASET_FOLDS.values() for c in group}
     if len(exclude) != len(set(exclude)) or not set(exclude) <= supported:
@@ -265,11 +268,11 @@ def dataset_groups(root, groups, selected, route, seed_index, init_seed, sample_
                      omitted_collections=[r["collection"] for r in p["groups"] if r["collection"] in exclude],
                      retained_collections=[r["collection"] for r in retained])
     (dest/"DATASET_GROUP_SELECTION.json").write_text(json.dumps(selection, indent=1)+"\n")
-    import pyarrow.parquet as pq
     for name, path, tw, vw, mode in groups:
-        metadata = pq.read_metadata(path)
-        log_dataset_read(dest, path, metadata.num_rows, metadata.schema.names, "inherited-native-fit", name=name,
-                         train_weight=tw, val_weight=vw, manifest_sha256=sha(str(path)+".manifest.json"))
+        declaration = document(str(path)+".manifest.json")
+        log_dataset_read(dest, path, declaration.get("rows_kept", "all"), ["ref_basename", "human_score"],
+                         "inherited-native-fit", name=name, train_weight=tw, val_weight=vw,
+                         manifest_sha256=sha(str(path)+".manifest.json"))
     for r in retained:
         log_dataset_read(dest, Path(r["path"]), r["rows"], ["ref_basename", "human_score"], "derived-native-fit",
                          collection=r["collection"], table_sha256=r["table_sha256"],

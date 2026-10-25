@@ -62,8 +62,11 @@ class DatasetHoldouts(unittest.TestCase):
             (p/"datasets").mkdir()
             dest = p/"cell"
             dest.mkdir()
+            guard = p/"datasets/FAMILY_GUARD.json"
+            guard.write_text(json.dumps(dict(schema="dataset-family-guard-v1", inherited_leaks=0)))
             packet = p/"datasets/receipt.json"
             packet.write_text(json.dumps(dict(schema="rev7-dataset-legs-v1", feature_ids=[0],
+                family_guard_path=str(guard), family_guard_sha256=root.sha(guard),
                 groups=[dict(collection="bapps", path=str(p/"missing-target.parquet"))])))
             (p/"wide/frozen.json").write_text(json.dumps(dict(dataset_legs_sha256=root.sha(packet))))
             groups, binding = dataset_groups(p, [], [0], "full", 0, 1, 2, dest, exclude=("bapps",))
@@ -85,6 +88,11 @@ class DatasetHoldouts(unittest.TestCase):
             scored, excluded = dataset_holdout_collections(p, "full")
             self.assertEqual(len(scored), 10)
             self.assertEqual(excluded, ())
+            from subjective_training_leg import DATASET_FOLDS
+            (p/"datasets/receipt.json").write_text(json.dumps(dict(groups=[
+                dict(collection=c) for cs in DATASET_FOLDS.values() for c in cs])))
+            with self.assertRaisesRegex(ValueError,"subset arm"):
+                dataset_holdout_collections(p,"full")
 
     def test_hard_pair_tie_credit(self):
         from byc_cells import dataset_train_statistic
@@ -95,6 +103,28 @@ class DatasetHoldouts(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "exactly"):
             dataset_train_statistic(["a","a"], [0.3,0.7], [1.,2.], True)
 
+    def test_diagnostic_root_binds_frozen_inventory_and_actual_command(self):
+        sys.path.insert(0,str(Path(__file__).resolve().parents[1]/"byconstruction"))
+        from aic_panel import cell_root
+        with tempfile.TemporaryDirectory() as d:
+            p=Path(d)
+            r=p/"fresh-root"
+            (r/"wide").mkdir(parents=True)
+            (r/"wide/frozen.json").write_text('{}')
+            cell=p/"cell"
+            cell.mkdir()
+            (cell/"train.log").write_text(f'--group teacher:{r}/wide/main/real/table.parquet\n')
+            (cell/"DATASET_GROUP_SELECTION.json").write_text(json.dumps(dict(root=str(r),
+                root_sha256=root.sha(r/"wide/frozen.json"))))
+            self.assertEqual(cell_root(cell,"new-mix",""),r)
+            (cell/"train.log").write_text('--group teacher:/another/root/wide/table.parquet\n')
+            with self.assertRaisesRegex(ValueError,"pin/command"):
+                cell_root(cell,"new-mix","")
+            (cell/"train.log").write_text(f'--group teacher:{r}/wide/table.parquet\n')
+            (r/"wide/frozen.json").write_text('{"changed":true}')
+            with self.assertRaisesRegex(ValueError,"pin/command"):
+                cell_root(cell,"new-mix","")
+
     def test_mix_rule_freezes_balanced_and_old_winners(self):
         import byc_cells
         from subjective_training_leg import DATASET_FOLDS
@@ -104,7 +134,7 @@ class DatasetHoldouts(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             study = Path(d)
             (study/"scorecard").mkdir()
-            e21 = {arm:dict(per_dataset_per_seed_srocc={f:[rho]*3 for f in byc_cells.FOLDS})
+            e21 = {arm:dict(seeds=[0,1,2], per_dataset_per_seed_srocc={f:[rho]*3 for f in byc_cells.FOLDS})
                    for arm,rho in (("A",0.9),("B",0.8))}
             (study/"scorecard/e21.json").write_text(json.dumps(e21))
             for arm,value in (("A",0.),("B",1.)):

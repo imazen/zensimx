@@ -71,12 +71,9 @@ def cell_root(cell: Path, arm: str, spec: str) -> Path:
     log = cell / "train.log"
     if arm != "base-c" and log.is_file():
         first = log.read_text().split("\n", 1)[0]
-        hits = [r for r in ROOTS.values() if f"{r}/wide/" in first]
-        if len(hits) == 1:
-            return hits[0]
-        # New mix roots are recorded by each strict cell's bound inventory.
+        # Prefer each strict cell's pinned inventory over historical aliases.
         selection = cell / "DATASET_GROUP_SELECTION.json"
-        if not hits and selection.is_file():
+        if selection.is_file():
             bound = json.loads(selection.read_text())
             root = Path(bound["root"])
             import hashlib
@@ -84,6 +81,9 @@ def cell_root(cell: Path, arm: str, spec: str) -> Path:
             if pin != bound["root_sha256"] or not any(str(root)+"/wide/" in token for token in shlex.split(first)):
                 raise ValueError(f"{cell}: training root pin/command mismatch")
             return root
+        hits = [r for r in ROOTS.values() if f"{r}/wide/" in first]
+        if len(hits) == 1:
+            return hits[0]
         raise ValueError(f"{cell}: cannot tell its training root")
     return ROOTS[arm_root(arm, spec)]
 
