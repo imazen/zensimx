@@ -21,7 +21,7 @@ dataset-mix-eval study:
 
 # Caller holds shared heavy.lock and run-heavy; selection precedes these fits.
 dataset-mix-freeze study:
-    env ZENSIM_MAX_TIER=v3 BYC_CELLS={{quote(study)}}/cells REV4_V2_BIN_DIR={{quote(study)}}/bin ZEN_PANEL_BIN={{quote(study)}}/bin/panel RAYON_NUM_THREADS=1 OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 python3 -B scripts/rev4_featpot/byc_cells.py mix-freeze --study {{quote(study)}}
+    env ZENSIM_MAX_TIER=v3 BYC_COLS={{quote(study)}}/frozen_configuration/cols_c.txt BYC_CELLS={{quote(study)}}/cells REV4_V2_BIN_DIR={{quote(study)}}/bin ZEN_PANEL_BIN={{quote(study)}}/bin/panel RAYON_NUM_THREADS=1 OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 python3 -B scripts/rev4_featpot/byc_cells.py mix-freeze --study {{quote(study)}}
 
 # Queue individual existing-owner operations; heavy work takes the shared lock.
 dataset-mix-queue study:
@@ -55,7 +55,7 @@ dataset-mix-cells study arm:
         if [ ! -e "$dest" ]; then ln -s "/var/tmp/datalegs-20261025/cells/Mdata/without_${fold}_s$seed" "$dest"; fi
       done
     done
-    export BYC_ROOT="$root" REV4_V2_BIN_DIR="$study/bin" BYC_CELLS="$study/cells" BYC_SCRATCH="$study/scratch"
+    export BYC_COLS="$study/frozen_configuration/cols_c.txt" BYC_ROOT="$root" REV4_V2_BIN_DIR="$study/bin" BYC_CELLS="$study/cells" BYC_SCRATCH="$study/scratch"
     export ZENSIM_MAX_TIER=v3 RAYON_NUM_THREADS=1 OMP_NUM_THREADS=1 ZEN_PANEL_BIN="$study/bin/panel"
     # Twelve single-thread fits under 36 GiB; large new-data predictions serialize.
     python3 -B scripts/rev4_featpot/byc_cells.py run --arm mono:thr:mp32 --label "$arm" --folds "$folds" --seeds 0,1,2 --jobs 12
@@ -99,7 +99,10 @@ dataset-mix-prepare study:
     admission=/mnt/v/zensim/dataset-admission-20261025
     features=/mnt/v/zensim/dataset-features-rev7-20261025
     library=/mnt/tower/input/iqa/datasets
-    columns="$HOME/tmp/byc/cols_c.txt"
+    mkdir "$study/frozen_configuration"
+    cp "$HOME/tmp/byc/cols_c.txt" "$study/frozen_configuration/cols_c.txt"
+    cp scripts/rev4_featpot/e33_fx1_declaration.json "$study/frozen_configuration/"
+    columns="$study/frozen_configuration/cols_c.txt"
     export OPENBLAS_NUM_THREADS=1 TMPDIR="$study/scratch"
     jj log -r @ --no-graph -T 'commit_id ++ "\n"' > "$study/BUILD_SOURCE_COMMIT.txt"
     jj diff --from 337382e4 --to @ --git > "$study/BUILD_SOURCE_CHANGES.patch"
