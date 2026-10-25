@@ -2944,6 +2944,36 @@ all-channel gate agree to within 0.002 on every statistic; the T-class all-chann
 (+0.345 against +0.352), so the class where the two gates should differ is M (Mgg64 +0.277 against M64's +0.212),
 running now.
 
+**Result, M class** (Mgy64, 12 cells 01:49–02:57 UTC; run-heavy for both arms 5,220 s, peak RSS 1.32 GiB). Seeds 0–2,
+out of sample. Mhpm (max pairs mp32 on the `hpm` ringing root, no descriptor) is added because the gated roots read the
+`hpm` ringing form and M64 does not:
+
+| | M64 (raw ringing) | Mhpm (mp32, `hpm`, no gate) | Mgg64 (all channels) | **Mgy64 (luminance)** |
+|---|---|---|---|---|
+| KADID contrast change / brighten / darken bias | −0.121 / −0.091 / −0.092 | −0.119 / — / — | −0.076 / −0.055 / −0.063 | −0.084 / −0.053 / −0.062 |
+| TID2013 saturation / mean shift / contrast bias | +0.212 / +0.117 / −0.064 | +0.282 / — / −0.068 | +0.277 / +0.089 / −0.001 | **+0.309** / +0.110 / −0.023 |
+| Within-reference ordering Δ vs `base-c` (KADID / TID2013 / KonFiG / CID22-A) | +0.0132 / +0.0054 / +0.0037 / 0.0000 | — | +0.0123 / +0.0103 / +0.0036 / 0.0000 | +0.0130 / +0.0123 / +0.0036 / +0.0001 |
+| Per-type bias spread (KADID / TID2013 / KonFiG) | 0.083 / 0.078 / 0.088 | 0.084 / 0.086 / 0.087 | 0.077 / 0.083 / 0.105 | 0.080 / 0.089 / 0.101 |
+| CID22-A codec bias spread | 0.0382 | 0.0383 | 0.0404 | 0.0413 |
+| Knob-concurring inversions (KADID / TID2013), ladder error (KADID / CID22-A) | 0.0141 / 0.0095, 0.0894 / 0.0701 | 0.0140 / 0.0084, 0.0896 / 0.0700 | 0.0132 / 0.0089, 0.0857 / 0.0707 | 0.0134 / **0.0080**, 0.0864 / 0.0706 |
+| Standard mixture inversions per cell (all, largest rise) | 1–6 (38, +7.56) | 2–35 (+8.0) | 2–36 (88, +7.55) | 2–33 (79, +7.83) |
+| Global-edit mixture inversions | 0 | 0 | 0 | 0 |
+| Mean Z-RMSE (CID22-A Z-RMSE / error p99) | 0.502 (0.489 / 0.376) | 0.504 (0.488 / 0.375) | 0.507 (0.497 / 0.376) | 0.511 (0.497 / 0.378) |
+| E21 Δ, diagnostic | −0.0131 | −0.0158 | −0.0161 | −0.0181 |
+
+Against the bars: the luminance gate keeps the contrast correction (KADID contrast change −0.084 clears −0.099) but
+TID2013 saturation rises to +0.309, above M64's +0.212, so it fails the bar it was built for. The ringing form
+explains part of the gap to M64 (Mhpm alone +0.282 against M's +0.246 on the raw root, both mp32), and Mgy64 is above
+that too: gating only luminance does not spare saturation. It also fails as a candidate on standard-mixture
+inversions (2–33 per cell against 1–6) and codec spread (0.0413 against 0.0382). It has the fewest knob-concurring
+TID2013 inversions of any arm (0.0080).
+
+**Reading.** The global descriptor, as sign-free inputs or as either gate, does not give a candidate under the adopted
+gates: every form trades robustness (standard-mixture inversions) and, in the M class, codec uniformity for its
+correction of luminance edits, and none fixes the saturation under-penalty. That under-penalty is a property of the
+monotone combination of these damage features (B's recipe gets saturation right through sign contrasts), not of a
+missing global term. Full-data M, which reads no descriptor, stays the leading candidate.
+
 ### Owner decisions (2026-10-25)
 
 Owner, 2026-10-25: "I take your reccomendation for euler split, yes. … For rev 7, we can restructure to our heart's
