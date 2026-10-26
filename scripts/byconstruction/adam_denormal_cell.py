@@ -99,6 +99,7 @@ def compare():
     parser.add_argument("--candidate", type=Path, required=True)
     parser.add_argument("--tools", type=Path, required=True)
     parser.add_argument("--probe", type=Path, help="native section-splice comparison tool")
+    parser.add_argument("--inspect-probe", type=Path, help="native model component-bit inspector")
     parser.add_argument("--root", type=Path, required=True)
     parser.add_argument("--out", type=Path, required=True)
     args = parser.parse_args(sys.argv[2:])
@@ -156,7 +157,7 @@ def compare():
         "TRAIN_packing": {"path": str(anchor), "sha256": digest(anchor), "column": "human_score"},
         "prediction_table": {"path": str(table), "sha256": digest(table), "operation": "native prediction and byte comparison; no target used for selection"},
     }, indent=2) + "\n")
-    predictions, packed, normalized, dense_models = {}, {}, {}, {}
+    predictions, packed, normalized, dense_models, inspections = {}, {}, {}, {}, {}
     for label, cell in [("reference", args.reference), ("candidate", args.candidate)]:
         dest = args.out / label
         (dest / "refit").mkdir(parents=True)
@@ -170,6 +171,10 @@ def compare():
         (dest / "PACKED.json").write_text(json.dumps(record, indent=2) + "\n")
         for name, bake in [("best", cell / "refit/best.bin"), ("last", cell / "refit/last.bin"),
                            ("dense", dense), ("packed", packed[label])]:
+            if args.inspect_probe:
+                target = dest / f"{name}.native-components.txt"
+                run([args.inspect_probe, "--inspect", bake, target], dest / f"{name}.inspect.log")
+                inspections[label, name] = target
             target = dest / f"{name}.without-repro.bin"
             run([tool, "strip", "--in", bake, "--out", target, "--key", "zentrain.repro"], dest / f"{name}.strip.log")
             normalized[label, name] = target
@@ -218,6 +223,23 @@ def compare():
     compare_bytes("refit_best_spec", first_spec, second_spec)
     results["spec_value_differences"] = json_changes(json.loads(first_spec.read_text()), json.loads(second_spec.read_text()))
     for name in ("best", "last", "dense", "packed"):
+        if args.inspect_probe:
+            def components(path):
+                pairs = [line.split("=", 1) for line in path.read_text().splitlines()]
+                values = dict(pairs)
+                if len(values) != len(pairs):
+                    raise ValueError(f"duplicate native component in {path}")
+                return values
+            first = components(inspections["reference", name])
+            second = components(inspections["candidate", name])
+            changes = [{"component": key, "reference": first.get(key), "candidate": second.get(key)}
+                       for key in sorted(first.keys() | second.keys()) if first.get(key) != second.get(key)]
+            results[f"native_{name}"] = {"numeric_views_equal": not any(
+                not change["component"].startswith("metadata:") for change in changes),
+                "different_components": changes,
+                "reference_sha256": digest(inspections["reference", name]),
+                "candidate_sha256": digest(inspections["candidate", name]),
+                "probe_sha256": digest(args.inspect_probe)}
         compare_bytes(f"without_repro_{name}", normalized["reference", name], normalized["candidate", name])
         if args.probe:
             compare_bytes(f"constant_repro_splice_{name}", normalized["reference", f"splice_{name}"], normalized["candidate", f"splice_{name}"])

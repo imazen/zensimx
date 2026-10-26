@@ -727,6 +727,9 @@ adam-denormal-pair-held plan tests before after:
 adam-denormal-repro model output:
     tools/adam-denormal-probe/target/release/adam-denormal-probe --repro {{quote(model)}} {{quote(output)}}
 
+adam-denormal-inspect model output:
+    tools/adam-denormal-probe/target/release/adam-denormal-probe --inspect {{quote(model)}} {{quote(output)}}
+
 # Run after all writers finish; caller supplies run-heavy for large archives.
 adam-denormal-manifest root:
     #!/usr/bin/env bash

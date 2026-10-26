@@ -12,13 +12,13 @@ fn main() {
     let argv: Vec<String> = std::env::args().collect();
     if matches!(
         argv.get(1).map(String::as_str),
-        Some("--repro" | "--normalize-repro")
+        Some("--repro" | "--normalize-repro" | "--inspect")
     ) {
         use std::io::Write;
         assert_eq!(
             argv.len(),
             4,
-            "usage: probe --repro|--normalize-repro MODEL OUTPUT"
+            "usage: probe --repro|--normalize-repro|--inspect MODEL OUTPUT"
         );
         let bytes = std::fs::read(&argv[2]).expect("read model");
         let model =
@@ -27,7 +27,50 @@ fn main() {
         let repro = metadata
             .get_utf8("zentrain.repro")
             .expect("embedded trainer provenance");
-        let output = if argv[1] == "--repro" {
+        let output = if argv[1] == "--inspect" {
+            use std::fmt::Write;
+            let bits = |values: &[f32]| values.iter().map(|v| v.to_bits()).collect::<Vec<_>>();
+            let mut out = format!(
+                "scaler_mean={:?}\nscaler_scale={:?}\nfeature_bounds={:?}\noutput_specs={:?}\nfeature_columns={:?}\nfeature_transforms={:?}\nfeature_transform_params={:?}\n",
+                bits(model.scaler_mean()),
+                bits(model.scaler_scale()),
+                model.feature_bounds(),
+                model.output_specs(),
+                model.feature_columns().collect::<Vec<_>>(),
+                model.feature_transforms(),
+                model.feature_transform_params(),
+            );
+            for (index, layer) in model.layers().enumerate() {
+                use zenpredict::WeightStorage;
+                let weights = match layer.weights {
+                    WeightStorage::F32(values) => format!("F32:{:?}", bits(values)),
+                    WeightStorage::F16(values) => format!("F16:{values:?}"),
+                    WeightStorage::I8 { weights, scales } => {
+                        format!("I8:{weights:?}:{:?}", bits(scales))
+                    }
+                };
+                writeln!(
+                    &mut out,
+                    "layer:{index}={},{},{:?};{weights};biases:{:?}",
+                    layer.in_dim,
+                    layer.out_dim,
+                    layer.activation,
+                    bits(layer.biases)
+                )
+                .unwrap();
+            }
+            for entry in metadata
+                .iter()
+                .filter(|entry| entry.key != "zentrain.repro")
+            {
+                write!(&mut out, "metadata:{}={:?}:", entry.key, entry.kind).unwrap();
+                for byte in entry.value {
+                    write!(&mut out, "{byte:02x}").unwrap();
+                }
+                out.push('\n');
+            }
+            out.into_bytes()
+        } else if argv[1] == "--repro" {
             repro.as_bytes().to_vec()
         } else {
             // The owner's splice preserves every non-metadata section byte,

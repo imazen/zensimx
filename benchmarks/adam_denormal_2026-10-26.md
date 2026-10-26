@@ -459,3 +459,48 @@ also pass with unchanged expectations. Release trainer SHA-256:
 native x86 test executable:
 `604e100d921e735cc16bc62b7d8f39f2707fe8b7f781b1cd5e10bf95cfc56ea5`.
 `run-heavy: done rc=0 51s | peak-RSS 1.30GiB | min-avail 20671MiB | peak-load 6.07`.
+
+## Complete optimized Intel replay and auxiliary metadata finding
+
+The `1106eb3d…cea1` successor completes the same i265 control in
+2820.563446415 s (2817.506403000 user, 1.144824000 system), with
+15,154,811,841,658 cycles, 32,872,884,536,270 instructions and 26,369,672
+FP assists. Maximum trainer RSS is 2,132,044 KiB, with no swaps.
+`run-heavy: done rc=0 2821s | peak-RSS 0.03GiB | min-avail 19968MiB | peak-load 4.32`.
+This full observation is slower than the preceding 2721.960114026 s candidate;
+the normal-L2 microbenchmark improvement does not establish a full-cell gain.
+These i265 observations share the host with another frozen control. The fully
+matched before/after measurement uses i134's owned input snapshot.
+
+All 7,869 prediction rows remain byte-identical. Unlike previous replays,
+replacing only `zentrain.repro` does not make these model files identical:
+
+| Raw artifact | Different common offsets | Unmatched tail bytes |
+|---|---:|---:|
+| best refit | 16,480 | 214 |
+| last refit / dense | 16,145 | 233 |
+| freshly packed | 16,352 | 233 |
+| best specification | 11,390 | 1,144 |
+
+The native model owner confirms identical layer dimensions, activations,
+weight-storage bits (including packed values and scales), bias bits and scaler
+bits. Every other inspected numeric view matches. The sole non-repro metadata
+difference, in best/last/dense/packed, is the absent `zentrain.feature_set_id`,
+whose reference value is `basic+peaks+v2@w1825/rev7_rowlanes#36c3f3af`.
+The recorded input hashes are identical, and every table resolved its feature
+identity at initial admission. At the final metadata pass, the shared coverage
+file and sidecar no longer exist at their original scratch path. The trainer
+therefore reports an unresolved leg and omits that stamp. This is retained as
+an artifact difference; no missing bytes are described as equal. Dev and i134
+use owned coverage copies, including the original manifest.
+
+The diagnostic `--inspect` reads the native model views and emits integer bit
+patterns for all weight formats, biases and scalers, plus each other metadata
+entry's exact bytes. Its SHA-256 is
+`6c912be62a4b6d395e016790eea810157a60355d0c59e69abc667900bf8b7b0e`.
+The comparison helper records component differences independently of the raw
+byte and provenance-splice comparisons. Original failed splice reports remain
+preserved alongside the stronger native component audit.
+Strict inspector Clippy/build and real four-bake audit pass:
+`run-heavy: done rc=0 2s | peak-RSS 0.22GiB | min-avail 24602MiB | peak-load 0.63`,
+`run-heavy: done rc=0 3s | peak-RSS 0.03GiB | min-avail 24038MiB | peak-load 0.82`.
