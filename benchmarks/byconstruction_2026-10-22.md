@@ -4284,3 +4284,5 @@ fold of Mlic+sub also omits every added subset collection that shares a source f
 by the study's source-family registry. The linkage list is computed label-free and recorded before those cells run.
 Folds with no linked subset (the E21 folds, pipal and pairs, unless the registry says otherwise) are unchanged. Every
 other part of the rule stands.
+The same omission applies to the four E21 folds: a subset collection that shares a source family with KADID, TID2013,
+KonFiG-IQA or CID22-A is left out of that fold's Mlic+sub fit (clarified at 03:10Z, still before any Mlic+sub cell).
