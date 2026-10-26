@@ -2727,3 +2727,28 @@ Since zenpapers `5bf44739` and `37b37030` (2026-10-25), its training-confidence 
 and KonFiG-IQA as tier X (it had listed the first two as trainable earlier that day). `observer_models.py` and
 `threshold_variance.py` read MCL-JCI and Konstanz PJND only with `--read-holdouts` and keep the results apart. This
 exposure must accompany any later MCL-JCI confirmation claim.
+
+## Exposure ledger — 2026-10-25/26: zenpapers read KADID TERMINAL and MCIQA-2K labels as training rows
+
+zenpapers' training-confidence and JND-utility scripts read labels of two protected populations. The frozen
+admission doesn't cover KADID-10k, so an empty split counted as training. No zensim candidate was scored, fitted or
+selected on these reads.
+
+- **KADID TERMINAL** (references I07, I09, I17, I19, I27, I29, I37, I39, I47, I49, I57, I59, I67, I69, I77, I79;
+  2,000 pairs; reserved for one confirmatory read, owner decision D2):
+  - `scripts/iqa_library/training_confidence.py`, from zenpapers `e29ba36` (2026-10-25) until `f400d5fa`
+    (2026-10-26): every KADID row's DMOS entered KADID's reliability, 1 − mean(SE²) / var(score) = 0.979.
+    `release_spreads.py` supplied each row's rating variance from `dmos.csv`, and the per-item manifests carried the
+    standard errors.
+  - `scripts/iqa_library/jnd_utility_analyze.py`, 2026-10-25: a monotone fit of KADID DMOS against our CVVDP port's
+    distance over all 10,125 rows, with residual spreads, signal shares and composite weights. Those outputs are kept
+    as superseded (`analysis.with-kadid-terminal/`) and marked never to be used.
+  - Scoring TERMINAL's pixels with CVVDP, butteraugli and SSIMULACRA2 read pixels only.
+- **MCIQA-2K** (T0, eval-only): `training_confidence.py` read its 1,600 rows' scores as training rows for a
+  reliability statistic over the same span.
+
+Since zenpapers `f400d5fa` (2026-10-26), `training_confidence.PROTECTED_SOURCES` lists KADID TERMINAL's references.
+Their rows are read for `source_id` only in every zenpapers training-row reader, and MCIQA-2K is tier X there. KADID
+TERMINAL's labels are no longer unread. Aggregate statistics over them shaped a zenpapers tier and composite weights,
+and these reads must accompany the D2 confirmatory read. Whether TERMINAL still serves as D2's set is the owner's
+decision.
