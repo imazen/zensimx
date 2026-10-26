@@ -107,7 +107,9 @@ def run(args, cells):
                 "--head", "N", "--heldout", "kadid", "--seed-index", "0", "--strict-admission",
                 "--data-role-decision", cells.ROOT / "human_role_decision.json", "--train-only"]
         command("zero-step-cli", [*base, "--dest", zero, "--init-from", original / "refit/last.bin",
-                "--fine-tune-epochs", "0", "--fine-tune-lr", "0.00001"])
+                "--fine-tune-epochs", "0", "--fine-tune-lr", "0.00001",
+                "--aic-public-train", Path(os.environ["AIC_FOLDS"]) / "aic_k0_fit.parquet",
+                "--research-extra-group", f"aic_public_train:{os.environ['AIC_FOLDS']}/aic_k0_fit.parquet:8.0:0:rank"])
         state("zero-step-prediction")
         selected = Path(json.loads((zero / "result.json").read_text())["selected_bake"])
         output = zero / "pred_kadid.tsv"

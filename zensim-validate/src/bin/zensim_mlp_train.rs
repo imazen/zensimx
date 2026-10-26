@@ -3107,7 +3107,7 @@ fn stamp_emitted_checkpoints(
 }
 
 fn checkpoint_feature_identity(
-    model: &zenpredict::Model<'_>,
+    model: &zenpredict::Model,
     admission: &serde_json::Value,
 ) -> Result<(), String> {
     let revision = model
