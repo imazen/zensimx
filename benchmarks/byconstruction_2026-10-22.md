@@ -4395,3 +4395,30 @@ SROCC (0.9091). Scored by `aic_train.panel` (SROCC against −JND); results `/va
 
 Globally every candidate ties B within the seed spread (0.902–0.912); the new datasets do not help here. B leads within
 source (0.956 against about 0.949), the same price of monotonicity seen on the E21 sets.
+
+### Mlic frozen EVAL paired comparisons (2026-10-26)
+
+Whole-reference paired bootstrap,2,000 resamples/seed1, using stored predictions. The table shows signed SROCC differences. Except IQA-ODI42 references, cohorts contain3–12 references; the percentile intervals are descriptive and can under-cover. These do not select or retune models.
+
+| Collection | Mlic minus | Delta SROCC [95%] | References |
+|---|---|---:|---:|
+| cid-iq | Mdata | +0.000189 [-0.003421, +0.004004] | 7 |
+| cid-iq | M7 | +0.009458 [-0.003026, +0.021095] | 7 |
+| cid-oa | Mdata | -0.000175 [-0.006703, +0.008004] | 7 |
+| cid-oa | M7 | -0.021111 [-0.033628, -0.001387] | 7 |
+| colourlab-rating-variability-2022 | Mdata | -0.000220 [-0.003001, +0.002630] | 3 |
+| colourlab-rating-variability-2022 | M7 | -0.001348 [-0.008545, +0.009167] | 3 |
+| iqa-odi | Mdata | +0.001086 [-0.007912, +0.012161] | 42 |
+| iqa-odi | M7 | -0.000977 [-0.021805, +0.012834] | 42 |
+| irccyn-ivc | Mdata | -0.007199 [-0.016933, -0.001400] | 4 |
+| irccyn-ivc | M7 | -0.008756 [-0.016282, +0.000890] | 4 |
+| live-md | Mdata | -0.001761 [-0.007023, +0.003704] | 12 |
+| live-md | M7 | -0.001056 [-0.006278, +0.004983] | 12 |
+| mdid | Mdata | -0.003719 [-0.012213, +0.002518] | 6 |
+| mdid | M7 | +0.004469 [+0.000457, +0.008413] | 6 |
+| nits-iqa | Mdata | -0.003481 [-0.006789, -0.001044] | 9 |
+| nits-iqa | M7 | +0.007162 [+0.002204, +0.013487] | 9 |
+| vcl-fer | Mdata | -0.004430 [-0.007531, -0.000464] | 8 |
+| vcl-fer | M7 | +0.002058 [-0.001847, +0.008863] | 8 |
+
+Relative to M7, Mlic has positive point differences on MDID and NITS and a negative difference on CID:OA with descriptive intervals excluding zero. Relative to Mdata, its IRCCyN/IVC, NITS and VCL differences have negative descriptive intervals. This preserves the mixed EVAL outcome alongside the TRAIN-only licence-eligible choice. The full report also retains B7 and all three peer comparisons and the labelled legacy row-bootstrap auxiliary field.
