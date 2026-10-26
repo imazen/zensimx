@@ -3565,6 +3565,14 @@ aic-finetune-packet prior output:
 aic-finetune-status study:
     python3 -B scripts/rev4_featpot/aic_finetune_status.py {{quote(study)}}
 
+# Caller holds shared heavy.lock and run-heavy for prediction/statistics.
+aic-finetune-analysis study packet folds pairs:
+    AIC_FOLDS={{quote(folds)}} AIC_PAIRS_TRAIN={{quote(pairs)}} python3 -B scripts/rev4_featpot/aic_finetune_analysis.py --study {{quote(study)}} --packet {{quote(packet)}}
+
+# The completed TRAIN selector is rechecked before any full-data continuation.
+aic-finetune-full study selection packet folds:
+    python3 -B scripts/rev4_featpot/aic_finetune_full.py --study {{quote(study)}} --selection {{quote(selection)}} --packet {{quote(packet)}} --folds {{quote(folds)}} --jobs 2
+
 aic-finetune-launch study packet:
     #!/usr/bin/env bash
     set -Eeuo pipefail
