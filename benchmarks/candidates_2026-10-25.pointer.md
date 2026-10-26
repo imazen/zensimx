@@ -6,7 +6,8 @@ entries are verified, never overwritten).
 
 - **dev:** `/mnt/v/output/zensim/candidates-2026-10-25/` (`CANDIDATES.tsv`, `CANDIDATES.json`, `SHA256SUMS`, one
   directory per candidate). Checked on dev 2026-10-25.
-- **tower:** `/mnt/tower/output/zensim/candidates-2026-10-25/` (copied 2026-10-25, `sha256sum -c` passed).
+- **tower:** `/mnt/tower/output/zensim/candidates-2026-10-25/` (copied 2026-10-25, `sha256sum -c` passed; Mlic rows added
+  2026-10-26, 18 bakes, `sha256sum -c` passed).
 
 AIC2026 rules still apply to any evaluation: public_train is the study's training split (Tga trained on it);
 public_test has one sanctioned frozen read, with the exposure recorded (`docs/DATA_SPLITS.md`).
@@ -28,3 +29,6 @@ public_test has one sanctioned frozen read, with the exposure recorded (`docs/DA
 | Mdata64-s0 | 7 | M64 shape on the Mdata data (rev7data root) | `257194e446beefd4…` | trains on VCL@FER, PieAPP, FG-IQA (validate-only licences) |
 | Mdata64-s1 | 7 | M64 shape on the Mdata data (rev7data root) | `3562cc06ec9a995f…` | trains on VCL@FER, PieAPP, FG-IQA (validate-only licences) |
 | Mdata64-s2 | 7 | M64 shape on the Mdata data (rev7data root) | `cb0d32a278e0ddee…` | trains on VCL@FER, PieAPP, FG-IQA (validate-only licences) |
+| Mlic-s0 | 7 | M recipe on the Mlic root (Mdata's legs without VCL@FER, PieAPP, FG-IQA) | `7612c2e46154fe9c…` | licence-clean under the 2026-10-25 policy |
+| Mlic-s1 | 7 | M recipe on the Mlic root (Mdata's legs without VCL@FER, PieAPP, FG-IQA) | `5618cd8b2206428a…` | licence-clean under the 2026-10-25 policy |
+| Mlic-s2 | 7 | M recipe on the Mlic root (Mdata's legs without VCL@FER, PieAPP, FG-IQA) | `4ecd413abdb70004…` | licence-clean under the 2026-10-25 policy |
