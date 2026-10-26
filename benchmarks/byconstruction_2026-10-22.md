@@ -4559,3 +4559,15 @@ snapshot; this lane launched no subset fits. Full artifact hashes and the
 historical execution records are in the
 [mix pointer](dataset_mixes_2026-10-25.pointer.md) and
 [subset pointer](mlic_subsets_2026-10-26.pointer.md).
+
+### Mlic+sub against Mlic: the registered rule keeps Mlic (2026-10-26)
+
+All 21 Mlic+sub cells (linked root `6abfac53…`; 14 on the fleet, 7 on dev) were installed at 06:11Z and scored with
+the study's own formula (`~/tmp/byc/subs_rule.py`, which reproduces Mlic's frozen balanced score 0.915076). Paired by
+seed against Mlic: balanced −0.00072 (seed-unit SE 0.00036), old data −0.00255 (0.00038), new data +0.00112 (0.00081).
+The rule needed the balanced difference within one SE and the old-data difference within two; both fail, so **Mlic
+stays**. The five small subsets cost accuracy on the four older sets and gained little on the new data.
+
+Owner ruling D6 (2026-10-26, `docs/DATA_SPLITS.md`): AIC2026 public_train may be a training leg. Next: a short
+warm-started fine-tune of Mlic with that leg, assessed out of fold on rotating AIC2026 source folds, on E21 and on both
+mixture tests; its rule is registered before any cell runs.

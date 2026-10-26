@@ -1103,6 +1103,15 @@ These rulings answer the decisions in `docs/REV4_FEATURE_BANK_PLAN_2026-09-23.md
   references are crops of ten MCL-JCI sources; zenpapers `docs/training-confidence.md`) is accepted, so MCL-JCI is no
   longer a content-clean confirmation set. Training on MCL-JCI's own ratings is not part of this ruling: they stay
   unread for fitting until a recipe registers them.
+- **D6 (AIC2026 public_train as training data).** Owner, 2026-10-26: "aic 2026 license is aok, I'm part of the aic
+  ahg". WG1's `public_train` split (28 sources, 3,920 PTC crops, `JND_score`; §3d family member until now) may be a
+  training leg of main-line models, in reply to the question of improving Mlic with it. Its labels stay private
+  (members-only): never published or copied into a public artifact. Unchanged: `public_test` (14 sources) is a sealed
+  holdout whose one read for this study is spent (frozen B and Tga, 2026-10-23); the 28 unlabelled sources stay
+  untouched; AIC-3, AIC-4 and SDR25 keep their holdout roles. AIC2026's 70 sources are disjoint from AIC-3's 10, AIC-4's
+  5 and CID22's 49 (dHash audit, minimum distance 15; `benchmarks/aic2026_2026-09-19.pointer.md`), so training on
+  public_train does not contaminate those reads. A model trained on it is assessed on AIC2026 only out of fold
+  (rotating source folds within public_train).
 
 ## Exposure ledger — 2026-09-23: MCL-JCI datasets-lane orientation and DSSIM panel
 
