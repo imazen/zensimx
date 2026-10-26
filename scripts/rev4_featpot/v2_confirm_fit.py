@@ -68,9 +68,26 @@ def main() -> None:
     ap.add_argument("--research-extra-group", action="append", default=[],
                     help="by-construction research only: extra trainer group NAME:PATH:TW:VW:FLAGS (needs --research-replay)")
     ap.add_argument("--research-replay", help="replay reason recorded by the trainer for a research-extra fit")
+    ap.add_argument("--init-from", type=Path)
+    ap.add_argument("--fine-tune-epochs", type=int)
+    ap.add_argument("--fine-tune-lr", type=float, default=0.00001)
+    ap.add_argument("--aic-public-train", type=Path)
+    ap.add_argument("--aic-weight", type=float)
     from e36_training import add_args
     add_args(ap)
     args = ap.parse_args()
+    if args.init_from is not None or args.fine_tune_epochs is not None:
+        if (not args.init_from or not args.strict_admission or not args.train_only
+                or args.exclude_datasets or args.local_smoke_budget or args.research_extra_group
+                or args.research_replay or args.aic_public_train is None or args.fine_tune_lr != 0.00001
+                or (args.fine_tune_epochs, args.aic_weight) not in ((4, 8.0), (8, 16.0))):
+            ap.error("full continuation requires a registered D6 strength, original legs and strict TRAIN-only route")
+        import v2_lodo_mlp
+        globals().update(EPOCHS=args.fine_tune_epochs)
+        v2_lodo_mlp.EPOCHS = args.fine_tune_epochs
+        v2_lodo_mlp.LOG_EVERY = 1
+    elif args.aic_public_train is not None or args.aic_weight is not None:
+        ap.error("D6 full-data leg requires its registered continuation")
     from e36_training import bootstrap
     bootstrap(args)
     if args.local_smoke_budget:
@@ -155,6 +172,14 @@ def main() -> None:
                                                    exclude=tuple(filter(None, args.exclude_datasets.split(","))))
         if dataset_authority:
             weights.update({name:tw for name,_,tw,_,_ in groups if tw > 0})
+    if args.init_from is not None:
+        if dataset_authority is None:
+            raise ValueError("full continuation requires frozen Mlic dataset authority")
+        from subjective_training_leg import continuation_authority
+        dataset_authority = continuation_authority(dataset_authority, args.init_from,
+            args.fine_tune_epochs, args.fine_tune_lr)
+        groups.append(("aic_public_train", args.aic_public_train, args.aic_weight, 0, "rank"))
+        weights["aic_public_train"] = args.aic_weight
     try:
         from v2_common import refuse_nonfinite_kept
         if args.strict_admission:
@@ -213,6 +238,10 @@ def main() -> None:
             "selected_bake": str(bake), "selected_bake_sha256": sha(bake), "dev_curve": curve,
             "spec": args.spec, "head": args.head, "init_seed": init_seed, "sample_seed": sample_seed,
             "train_weights": weights, "coverage_leg": coverage_record, **packed,
+            **({"continuation": dict(initial_checkpoint=str(args.init_from),
+                initial_checkpoint_sha256=sha(args.init_from), epochs=args.fine_tune_epochs,
+                lr=args.fine_tune_lr, lr_schedule="constant", optimizer_state="fresh")}
+                if args.init_from is not None else {}),
             **({"derived_inputs": {"token": recipe["derived_inputs"], "declaration_sha256": __import__("v2_common").derived_declaration(recipe["derived_inputs"])[1]}}
                if recipe.get("derived_inputs") else {})}) + "\n")
         from e36_training import model_binding
