@@ -6,6 +6,14 @@ dataset-mix-summary study:
 dataset-candidate-registry:
     python3 -B scripts/byconstruction/candidate_registry.py
 
+# Copy bytes over the mounted mirror; NAS ownership is managed by the export.
+dataset-candidate-mirror destination:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    rsync -r --checksum /mnt/v/output/zensim/candidates-2026-10-25/ {{quote(destination)}}/
+    cd {{quote(destination)}}
+    sha256sum -c SHA256SUMS
+
 # Metadata-only progress; caller can inspect this while another job holds the lock.
 dataset-mix-progress study:
     #!/usr/bin/env bash
