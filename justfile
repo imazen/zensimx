@@ -679,6 +679,24 @@ adam-denormal-counter-probe binary output events kernel state steps tier pages="
     if [[ -n {{quote(pages)}} ]]; then probe_argv+=({{quote(pages)}}); fi
     perf stat -o {{quote(output)}} -e {{quote(events)}} -- "${probe_argv[@]}"
 
+# Caller pins the core and supplies run-heavy; preserve both executable versions.
+adam-denormal-final-probes before selected prefix:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    before={{quote(before)}}
+    selected={{quote(selected)}}
+    prefix={{quote(prefix)}}
+    for state in normal decay; do
+      for phase in before selected; do
+        binary="$before"
+        if [[ "$phase" == selected ]]; then binary="$selected"; fi
+        just adam-denormal-counter-probe "$binary" "$prefix-$phase-$state.stat" cpu_core/cycles/,cpu_core/instructions/,cpu_core/assists.fp/ fused "$state" 2000 v3
+      done
+    done
+    for state in tiny-l2 tiny-moment subnormal-weight; do
+      just adam-denormal-counter-probe "$selected" "$prefix-selected-$state.stat" cpu_core/cycles/,cpu_core/instructions/,cpu_core/assists.fp/ fused "$state" 2000 v3
+    done
+
 adam-denormal-compare reference candidate tools root output:
     python3 scripts/byconstruction/adam_denormal_cell.py compare --reference {{quote(reference)}} --candidate {{quote(candidate)}} --tools {{quote(tools)}} --root {{quote(root)}} --out {{quote(output)}}
 

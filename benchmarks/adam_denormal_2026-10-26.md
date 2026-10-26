@@ -533,3 +533,36 @@ the checksum-recorded wrapper snapshot for the entire pair. The i134 baseline
 already uses owned input and coverage snapshots; its after phase selects this
 same preserved trainer and native test binary. Those closing full measurements
 are recorded separately, rather than inferred from the microbenchmarks.
+
+## Closing selected-kernel counter pair
+
+Repeat the original and selected preserved probes together on i265 CPU 2,
+2,000 updates × 104,960 parameters, v3, nice 19, idle I/O priority:
+
+| State / executable | Elapsed seconds | Cycles | Instructions | FP assists |
+|---|---:|---:|---:|---:|
+| normal / original | 0.101315239 | 542,662,351 | 1,807,187,156 | 0 |
+| normal / selected | 0.178638189 | 960,183,991 | 3,670,924,837 | 0 |
+| decay / original | 7.327646621 | 39,214,147,756 | 1,867,062,545 | 268,094,080 |
+| decay / selected | 0.124496110 | 669,490,528 | 2,641,892,280 | 367,360 |
+| tiny L2 / selected | 0.084768618 | 454,293,665 | 2,158,961,702 | 0 |
+| tiny moment / selected | 0.080247096 | 432,204,945 | 2,158,927,049 | 0 |
+| subnormal weight / selected | 0.082245461 | 442,683,251 | 2,159,174,360 | 0 |
+
+Both normal-state moment bit patterns match the original. The original decay
+state ends at m=`0000000000000005`, v=`0004538ecb401ffc`; the selected state
+ends with both +0. These are single paired observations. The normal-state
+overhead is retained, rather than presenting the decay speedup as universal.
+Original probe SHA-256:
+`1940bb4efb5376fd031fddcc010df3cfa1f89d5205e81ac6b5b4e4858d4abf6b`;
+selected probe SHA-256:
+`5459d9f22685e9f5ddb9e9fd976dcdabbd635dcaf8f841e83e5fcf746d88bbb6`.
+`run-heavy: done rc=0 8s | peak-RSS 0.02GiB | min-avail 24633MiB | peak-load 0.59`.
+
+Fresh native ARM strict Clippy and boundary/tier checks also pass on the selected
+`4dc9e41f…6b91e` source. The retained native test executable SHA-256 is
+`ace988e065e57084503346ac6265e86de991ccd33af9783da9c82127449ff9ff`.
+Its source, Cargo manifest/lock, executable and complete output are retained;
+the inactive Cargo output directory created on that host is removed after
+preserving them.
+`run-heavy: done rc=0 43s | peak-RSS 0.37GiB | min-avail 26676MiB | peak-load 6.98`.
