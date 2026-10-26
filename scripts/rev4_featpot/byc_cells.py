@@ -474,10 +474,51 @@ def cmd_mix_audit(args):
     return 0
 
 
-def cmd_mix_select(args):
-    """Freeze the preregistered decision from completed TRAIN-only cell records."""
+def mix_arm_statistics(arm, e21, records):
+    """The registered old/new balanced statistic, shared by prospective comparisons."""
     import numpy as np
     from subjective_training_leg import DATASET_FOLDS
+    expected = {c for cs in DATASET_FOLDS.values() for c in cs}
+    if e21[arm]["seeds"] != [0,1,2]:
+        raise ValueError("mix selection requires registered seed order 0,1,2")
+    new, old = [], []
+    per_collection = {c: [] for c in expected}
+    for seed in range(3):
+        values = {}
+        for fold in (*DATASET_FOLDS, "full"):
+            recpath = CELLS / arm / f"without_{fold}_s{seed}/byc_record.json"
+            if not recpath.exists():
+                continue
+            record = json.loads(recpath.read_text())
+            records[str(recpath)] = sha(recpath)
+            stats = record["dataset_train_statistics"]
+            if set(values).intersection(stats):
+                raise ValueError("overlapping new-dataset score records")
+            values.update(stats)
+        if set(values) != expected:
+            raise ValueError(f"{arm}/s{seed}: incomplete new-dataset assessment")
+        mapped = []
+        for c, value in sorted(values.items()):
+            v = value["value"]
+            if not np.isfinite(v):
+                raise ValueError("undefined collection statistic blocks selection")
+            per_collection[c].append(v)
+            mapped.append(v if c in DATASET_FOLDS["pairs"] else (v+1)/2)
+        new.append(float(np.mean(mapped)))
+        old_values = [(e21[arm]["per_dataset_per_seed_srocc"][f][seed]+1)/2 for f in FOLDS]
+        if not np.isfinite(old_values).all():
+            raise ValueError("undefined E21 collection statistic blocks selection")
+        old.append(float(np.mean(old_values)))
+    balanced = [(o+n)/2 for o,n in zip(old,new,strict=True)]
+    def describe(v):
+        return dict(per_seed=v, mean=float(np.mean(v)), seed_unit_se=float(np.std(v,ddof=1)/np.sqrt(3)))
+    return dict(old=describe(old), new=describe(new), balanced=describe(balanced),
+                     eligible_under_new_leg_licence_policy=arm == "Mlic",
+                     per_collection={c:describe(v) for c,v in sorted(per_collection.items())})
+
+
+def cmd_mix_select(args):
+    """Freeze the preregistered decision from completed TRAIN-only cell records."""
     study = Path(args.study)
     output = study / "TRAIN_SELECTION.json"
     if output.exists():
@@ -493,47 +534,11 @@ def cmd_mix_select(args):
         raise ValueError("the owner's new-leg licence policy differs")
     if sha(Path(policy["copied_manifest"])) != policy["source_sha256"]:
         raise ValueError("the frozen licence-policy dataset manifest changed")
-    expected = {c for cs in DATASET_FOLDS.values() for c in cs}
     arms = {}
     records = {str(e21_path): sha(e21_path), str(policy_path): sha(policy_path),
                policy["copied_manifest"]: policy["source_sha256"]}
     for arm in args.arms.split(","):
-        if e21[arm]["seeds"] != [0,1,2]:
-            raise ValueError("mix selection requires registered seed order 0,1,2")
-        new, old = [], []
-        per_collection = {c: [] for c in expected}
-        for seed in range(3):
-            values = {}
-            for fold in (*DATASET_FOLDS, "full"):
-                recpath = CELLS / arm / f"without_{fold}_s{seed}/byc_record.json"
-                if not recpath.exists():
-                    continue
-                record = json.loads(recpath.read_text())
-                records[str(recpath)] = sha(recpath)
-                stats = record["dataset_train_statistics"]
-                if set(values).intersection(stats):
-                    raise ValueError("overlapping new-dataset score records")
-                values.update(stats)
-            if set(values) != expected:
-                raise ValueError(f"{arm}/s{seed}: incomplete new-dataset assessment")
-            mapped = []
-            for c, value in sorted(values.items()):
-                v = value["value"]
-                if not np.isfinite(v):
-                    raise ValueError("undefined collection statistic blocks selection")
-                per_collection[c].append(v)
-                mapped.append(v if c in DATASET_FOLDS["pairs"] else (v+1)/2)
-            new.append(float(np.mean(mapped)))
-            old_values = [(e21[arm]["per_dataset_per_seed_srocc"][f][seed]+1)/2 for f in FOLDS]
-            if not np.isfinite(old_values).all():
-                raise ValueError("undefined E21 collection statistic blocks selection")
-            old.append(float(np.mean(old_values)))
-        balanced = [(o+n)/2 for o,n in zip(old,new,strict=True)]
-        def describe(v):
-            return dict(per_seed=v, mean=float(np.mean(v)), seed_unit_se=float(np.std(v,ddof=1)/np.sqrt(3)))
-        arms[arm] = dict(old=describe(old), new=describe(new), balanced=describe(balanced),
-                         eligible_under_new_leg_licence_policy=arm == "Mlic",
-                         per_collection={c:describe(v) for c,v in sorted(per_collection.items())})
+        arms[arm] = mix_arm_statistics(arm, e21, records)
     balanced_winner = min(arms, key=lambda a:(-arms[a]["balanced"]["mean"],-arms[a]["new"]["mean"],a))
     old_winner = min(arms, key=lambda a:(-arms[a]["old"]["mean"],-arms[a]["new"]["mean"],a))
     result = dict(schema="dataset-mix-TRAIN-selection-v1", role="TRAIN", rule_commit="7155abdcf3fc",
@@ -544,6 +549,99 @@ def cmd_mix_select(args):
                   eligible_new_leg_arms=["Mlic"])
     output.write_text(json.dumps(result,indent=1)+"\n")
     print(json.dumps(result,indent=1))
+    return 0
+
+
+def neff_decision(arms, global_inversions):
+    """Rule 89d3e738: paired TRAIN gain, old-data noninferiority, global monotonicity."""
+    import numpy as np
+    delta = {}
+    for metric in ("old", "new", "balanced"):
+        values = [a-b for a,b in zip(arms["MlicNeff"][metric]["per_seed"],
+                                     arms["Mlic"][metric]["per_seed"], strict=True)]
+        if len(values) != 3 or not np.isfinite(values).all():
+            raise ValueError("three finite paired seed values required")
+        delta[metric] = dict(per_seed=values, mean=float(np.mean(values)),
+                            seed_unit_se=float(np.std(values,ddof=1)/np.sqrt(3)))
+    if len(global_inversions) != 21 or any(type(v) is not int or v < 0 for v in global_inversions):
+        raise ValueError("twenty-one global mixture cell counts required")
+    checks = dict(balanced_gain=delta["balanced"]["mean"] > 0,
+                  old_noninferiority=delta["old"]["mean"] >= -2*delta["old"]["seed_unit_se"],
+                  zero_global_inversions=all(v == 0 for v in global_inversions))
+    return dict(paired_delta=delta, checks=checks,
+                finalist="MlicNeff" if all(checks.values()) else None,
+                retain_control=not all(checks.values()), production_qualified=False)
+
+
+def cmd_neff_select(args):
+    """Bind every cell and mixture model before freezing the prospective decision."""
+    from subjective_training_leg import DATASET_FOLDS
+    sys.path.insert(0, str(HERE.parent/"byconstruction"))
+    from mixture_test import report
+    study = Path(args.study)
+    output = study/"TRAIN_SELECTION.json"
+    if output.exists():
+        raise ValueError("preserve frozen effective-sample decision")
+    baseline_path = study/"BASELINE.json"
+    baseline = json.loads(baseline_path.read_text())
+    for path,pin in baseline["input_sha256"].items():
+        if sha(path) != pin:
+            raise ValueError("frozen baseline input changed")
+    e21_path = study/"scorecard/e21.json"
+    e21 = json.loads(e21_path.read_text())
+    inputs = {str(e21_path):sha(e21_path), str(baseline_path):sha(baseline_path)}
+    inventory = []
+    for arm in ("Mlic", "MlicNeff"):
+        root = study/arm/"root"
+        pin = sha(root/"wide/frozen.json")
+        inputs[str(root/"wide/frozen.json")] = pin
+        packet = json.loads((root/"datasets/receipt.json").read_text())
+        trained = {g["collection"] for g in packet["groups"]}
+        if trained != {"pipal","mdid","live-md","cid-iq","cid-oa","irccyn-ivc",
+                       "colourlab-rating-variability-2022","bapps"}:
+            raise ValueError("Mlic collection inventory differs")
+        for fold in (*FOLDS,*DATASET_FOLDS):
+            for seed in range(3):
+                cell = CELLS/arm/f"without_{fold}_s{seed}"
+                rec = json.loads((cell/"byc_record.json").read_text())
+                result = json.loads((cell/"result.json").read_text())
+                selected = json.loads((cell/"DATASET_GROUP_SELECTION.json").read_text())
+                if (rec["fold"] != fold or rec["seed"] != seed or rec["spec"] != spec_of("mono:thr:mp32")
+                        or result["selection"]["selected_epoch"] != 119 or result["epochs"] != 120
+                        or result["pairs_per_epoch"] != 50000 or result["seed_index"] != seed
+                        or result["frozen_sha256"] != pin or selected["root_sha256"] != pin
+                        or set(selected["retained_collections"]) != trained-set(DATASET_FOLDS.get(fold,()))
+                        or rec["trainer_sha256"] != baseline["trainer_sha256"]
+                        or rec["last_bin_sha256"] != sha(cell/"refit/last.bin")):
+                    raise ValueError(f"native cell binding differs: {cell}")
+                predictions = {f"pred_{fold}.tsv":rec["pred_sha256"]} if fold in FOLDS else {
+                    f"pred_dataset_{c}.tsv":v["prediction_sha256"] for c,v in rec["dataset_train_statistics"].items()}
+                for relative, expected in predictions.items():
+                    if sha(cell/relative) != expected:
+                        raise ValueError("cell prediction changed")
+                inputs[str(cell/"byc_record.json")] = sha(cell/"byc_record.json")
+                inputs[str(cell/"result.json")] = sha(cell/"result.json")
+                inventory.append(dict(arm=arm,fold=fold,seed=seed,model_sha256=rec["last_bin_sha256"]))
+    mixtures = {}
+    for name in ("mixture","mixture_global"):
+        mixtures[name] = report(study/name)
+        inputs[str(study/name/"manifest.json")] = sha(study/name/"manifest.json")
+        for cell in inventory:
+            key = f'{cell["arm"]}_{cell["fold"]}_s{cell["seed"]}'
+            path = study/name/f"scores_{key}.json"
+            model = json.loads(path.read_text())
+            if model["bake_sha256"] != cell["model_sha256"] or key not in mixtures[name]:
+                raise ValueError("mixture model binding differs")
+            inputs[str(path)] = sha(path)
+    arms = {arm:mix_arm_statistics(arm,e21,inputs) for arm in ("Mlic","MlicNeff")}
+    arms["MlicNeff"]["eligible_under_new_leg_licence_policy"] = True
+    inversions = [mixtures["mixture_global"][f'MlicNeff_{c["fold"]}_s{c["seed"]}']["inversions"]
+                  for c in inventory if c["arm"] == "MlicNeff"]
+    value = dict(schema="mlic-effective-sample-TRAIN-selection-v1",rule_commit="89d3e738af4e",
+                 eval_labels_used=False,arms=arms,mixtures=mixtures,cells=inventory,input_sha256=inputs,
+                 **neff_decision(arms,inversions))
+    output.write_text(json.dumps(value,indent=1)+"\n")
+    print(json.dumps({k:v for k,v in value.items() if k not in ("arms","mixtures","cells","input_sha256")},indent=1))
     return 0
 
 
@@ -1068,6 +1166,8 @@ def main() -> int:
     ms = sub.add_parser("mix-select")
     ms.add_argument("--study", required=True)
     ms.add_argument("--arms", default=",".join(MIX_ARMS))
+    ns = sub.add_parser("neff-select")
+    ns.add_argument("--study", required=True)
     mf = sub.add_parser("mix-freeze")
     mf.add_argument("--study", required=True)
     z = sub.add_parser("aiczero")
@@ -1107,7 +1207,8 @@ def main() -> int:
     args = ap.parse_args()
     return {"run": cmd_run, "score": cmd_score, "seedens": cmd_seedens, "curves": cmd_curves, "pairclass": cmd_pairclass,
             "bytype": cmd_bytype, "knobinv": cmd_knobinv, "predict-best": cmd_predict_best, "aicscore": cmd_aicscore,
-            "aiczero": cmd_aiczero, "progress": cmd_progress, "mix-select": cmd_mix_select, "mix-freeze": cmd_mix_freeze, "mix-audit": cmd_mix_audit, "mix-summary": cmd_mix_summary}[args.cmd](args)
+            "aiczero": cmd_aiczero, "progress": cmd_progress, "mix-select": cmd_mix_select, "neff-select": cmd_neff_select,
+            "mix-freeze": cmd_mix_freeze, "mix-audit": cmd_mix_audit, "mix-summary": cmd_mix_summary}[args.cmd](args)
 
 
 if __name__ == "__main__":

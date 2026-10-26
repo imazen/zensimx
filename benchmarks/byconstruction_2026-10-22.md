@@ -4685,3 +4685,9 @@ registered vote-loss or ordering proposal; a negative result is not task
 completion. The seamless HDR frontend remains queued behind adoption of a
 stable, qualified candidate. All artifacts live in the separate
 `/mnt/v/output/zensim/mlic-neff-20261026/` study; original studies stay frozen.
+
+The prospective selector shares the original balanced-statistic owner. Before
+new candidate cells, its extracted helper reproduced every numeric field of
+all six frozen original arm records exactly. Decision controls cover ties,
+old-data regression, a single global inversion, missing cells and nonfinite
+statistics. This changes no old study result or selection threshold.

@@ -54,6 +54,23 @@ class DatasetAuthority(unittest.TestCase):
 
 
 class EffectiveSampleMasses(unittest.TestCase):
+    def test_selection_requires_gain_noninferiority_and_every_global_cell(self):
+        from byc_cells import neff_decision
+        arms = {a:{m:dict(per_seed=[0.8,0.8,0.8]) for m in ("old","new","balanced")}
+                for a in ("Mlic","MlicNeff")}
+        # A tie cannot replace the control.
+        self.assertIsNone(neff_decision(arms,[0]*21)["finalist"])
+        arms["MlicNeff"]["balanced"]["per_seed"] = [0.81]*3
+        self.assertEqual(neff_decision(arms,[0]*21)["finalist"],"MlicNeff")
+        self.assertIsNone(neff_decision(arms,[0]*20+[1])["finalist"])
+        arms["MlicNeff"]["old"]["per_seed"] = [0.79]*3
+        self.assertFalse(neff_decision(arms,[0]*21)["checks"]["old_noninferiority"])
+        with self.assertRaisesRegex(ValueError,"twenty-one"):
+            neff_decision(arms,[0]*20)
+        arms["MlicNeff"]["old"]["per_seed"][0] = float("nan")
+        with self.assertRaisesRegex(ValueError,"finite"):
+            neff_decision(arms,[0]*21)
+
     def populations(self):
         return dict(pipal=(23200,200), mdid=(800,10), **{
             "live-md":(210,7), "cid-iq":(330,11), "cid-oa":(143,11),
