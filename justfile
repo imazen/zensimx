@@ -3565,6 +3565,9 @@ aic-finetune-packet prior output:
 aic-finetune-status study:
     python3 -B scripts/rev4_featpot/aic_finetune_status.py {{quote(study)}}
 
+aic-finetune-selection-tests:
+    TMPDIR="$HOME/tmp/aic-finetune-20261026" python3 -B -m unittest scripts.tests.test_aic_finetune_selection
+
 # Caller holds shared heavy.lock and run-heavy for prediction/statistics.
 aic-finetune-analysis study packet folds pairs:
     AIC_FOLDS={{quote(folds)}} AIC_PAIRS_TRAIN={{quote(pairs)}} python3 -B scripts/rev4_featpot/aic_finetune_analysis.py --study {{quote(study)}} --packet {{quote(packet)}}

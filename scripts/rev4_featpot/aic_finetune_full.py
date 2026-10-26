@@ -29,6 +29,11 @@ def write(path, value):
 
 
 def selected_arm(directory):
+    receipt = json.loads((directory / "TRAIN_SELECTION.json").read_text())
+    pins = receipt["evidence_sha256"]
+    for name in ("E21.json", "AIC_OOF.json", "mixture_global.json"):
+        if sha(directory / name) != pins[name]:
+            raise ValueError("TRAIN selection evidence pin differs")
     e21 = json.loads((directory / "E21.json").read_text())
     aic = json.loads((directory / "AIC_OOF.json").read_text())
     mixtures = json.loads((directory / "mixture_global.json").read_text())
@@ -41,7 +46,6 @@ def selected_arm(directory):
                 and e21[arm]["delta"] >= -2 * e21[arm]["seed_unit_se"]):
             qualified.append((aic[arm]["mean_cell_global_gain"], -epochs, -weight, arm))
     winner = max(qualified)[3] if qualified else None
-    receipt = json.loads((directory / "TRAIN_SELECTION.json").read_text())
     if receipt["winner"] != winner:
         raise ValueError("selection receipt differs from the frozen TRAIN rule")
     return winner

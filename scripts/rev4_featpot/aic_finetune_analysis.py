@@ -247,7 +247,11 @@ def main():
     write(out / "TRAIN_SELECTION.json", dict(winner=winner, arms=decisions,
         rule="zero global-edit inversions in every cell; E21 mean >= -2 paired seed SE; largest mean of 12 same-fold AIC global gains; exact ties fewer epochs then lower weight",
         preflight_sha256=sha(study / "PREFLIGHT_PASSED.json"),
-        training_complete_sha256=sha(study / "TRAIN_COMPLETE.json")))
+        training_complete_sha256=sha(study / "TRAIN_COMPLETE.json"),
+        analysis_driver_sha256=sha(Path(__file__)),
+        evidence_sha256={name: sha(out / name) for name in ("E21.json", "AIC_OOF.json",
+            "mixture_global.json", "mixture.json", "E21_DIAGNOSTICS.json", "AIC_DIAGNOSTICS.json",
+            "TYPE_BIAS.json", "KNOB_INVERSIONS.json")}))
     print(json.dumps(dict(winner=winner, arms=decisions), indent=2), flush=True)
     return 0
 
