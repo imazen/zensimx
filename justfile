@@ -727,6 +727,34 @@ adam-denormal-pair-held plan tests before after:
 adam-denormal-repro model output:
     tools/adam-denormal-probe/target/release/adam-denormal-probe --repro {{quote(model)}} {{quote(output)}}
 
+# Run after all writers finish; caller supplies run-heavy for large archives.
+adam-denormal-manifest root:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    python3 - {{quote(root)}} <<'PY'
+    import hashlib, sys
+    from pathlib import Path
+    root = Path(sys.argv[1]).resolve(strict=True)
+    files = sorted(p for p in root.rglob('*') if p.is_file())
+    if any(p.is_symlink() or '\n' in str(p) or '\\' in str(p) for p in files):
+        raise ValueError('Archive requires plain files and portable checksum paths')
+    with (root / 'SHA256SUMS').open('x') as out:
+        for p in files:
+            with p.open('rb') as stream:
+                digest = hashlib.file_digest(stream, 'sha256').hexdigest()
+            out.write(f'{digest}  {p.relative_to(root).as_posix()}\n')
+    PY
+    cd {{quote(root)}}
+    sha256sum -c SHA256SUMS
+
+adam-denormal-mirror root destination:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    mkdir -p {{quote(destination)}}
+    rsync -r --checksum {{quote(root)}}/ {{quote(destination)}}/
+    cd {{quote(destination)}}
+    sha256sum -c SHA256SUMS
+
 addrfix-cost-report binary:
     python3 scripts/rev4_featpot/addrfix.py cost-report --binary {{quote(binary)}}
 
