@@ -4571,3 +4571,57 @@ stays**. The five small subsets cost accuracy on the four older sets and gained 
 Owner ruling D6 (2026-10-26, `docs/DATA_SPLITS.md`): AIC2026 public_train may be a training leg. Next: a short
 warm-started fine-tune of Mlic with that leg, assessed out of fold on rotating AIC2026 source folds, on E21 and on both
 mixture tests; its rule is registered before any cell runs.
+
+### Mlic AIC2026 warm start: rule registered before results (2026-10-26)
+
+Owner ruling D6 admits exactly WG1 public_train. This follow-up starts from
+Mlic's unpacked final checkpoints; it does not repeat its original training.
+Only public_train labels may be opened. public_test and all EVAL rows remain
+unopened by this lane. These development comparisons cannot establish a clean
+unseen-population claim; prior AIC development exposure remains disclosed above.
+
+Two fixed strengths retain Mlic's inputs, M shape (`mono:thr:mp32`), scaling,
+old training legs and weights, pair budget (50,000 per epoch), and seed streams.
+Adam state starts fresh. Both use constant learning rate 0.00001 and select the
+final epoch, without development-based checkpoint selection:
+
+| Arm | AIC pooled-rank weight | Extra epochs |
+|---|---:|---:|
+| MlicFT8x4 | 8 | 4 |
+| MlicFT16x8 | 16 | 8 |
+
+Each arm continues all twelve E21 cells (four omitted datasets, seeds 0–2).
+The AIC held-out source fold is `(4*seed + E21_fold_index) mod 7`, preserving
+the existing assignment of 28 public_train sources. Revision-7 fold tables
+must be derived from the complete revision-7 public_train table, with row keys
+and source exclusions checked. No revision-5/6 feature table is a training input.
+Each comparison uses the same initial Mlic checkpoint and held-out rows.
+
+For each seed, old-data delta is the equal mean of four signed E21 SROCC
+differences against Mlic. Its standard error is the sample standard deviation
+of those three seed means divided by sqrt(3). An arm qualifies only when every
+cell has **zero global-edit mixture inversions**, and its mean old-data delta
+is at least minus twice that paired seed-unit standard error. The existing
+mixture comparison inventory and tolerances remain unchanged. Among qualifying
+arms, select the largest mean of twelve per-cell AIC held-out global SROCC
+gains against the corresponding Mlic zero-shot prediction. Exact ties prefer
+the smaller epoch count, then the smaller AIC weight. No qualifying arm means
+no finalist; do not loosen this rule after results.
+
+Report both arms' complete E21 deltas and seed-unit errors; AIC global,
+within-source, within-ladder and per-codec results, including source-fold
+coverage and Mlic's same-fold zero-shot reference; both mixture tests;
+knob-concurring inversions, type bias, Z-RMSE and error p99. Also report the
+complete OOF row-level aggregate, averaging only predictions from cells that
+omit that row's source fold. It is descriptive, not a replacement selector.
+
+Before these arms, require byte-identical held-out predictions after loading
+a Mlic final checkpoint and taking zero optimizer steps, refusal controls for
+mismatched initialization contracts, existing trainer tests, and a default-run
+arithmetic control against the frozen trainer. Freeze the new binary and its
+SHA256 separately; never replace finished studies' binaries.
+
+Only a qualifying winner receives three full-data continuations from Mlic's
+three unpacked full-data seeds, with all public_train rows in the AIC leg.
+Pack and certify those final bakes, register their hashes, and mirror them.
+The coordinator owns subsequent product gates and the single EVAL assessment.
