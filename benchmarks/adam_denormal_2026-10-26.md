@@ -423,3 +423,39 @@ Probe build/check resource record:
 `run-heavy: done rc=0 2s | peak-RSS 0.21GiB | min-avail 22259MiB | peak-load 1.05`.
 Counter/profile pair:
 `run-heavy: done rc=0 8s | peak-RSS 0.05GiB | min-avail 21975MiB | peak-load 1.15`.
+
+## Remove redundant normal-path classification
+
+Use integer ordering of positive f64 encodings for the L2 magnitude cutoff,
+avoiding both the preliminary weight flush and an FP comparison on its original
+value. Skip first-moment blends when no lane is tiny. The fused +0-gradient,
+zero-input path reuses the L2 helper's classified result. Arithmetic ordering,
+cutoffs and rounding remain unchanged. The arithmetic tag stays
+`adam-f64-normal-moments-v1`; each measurement preserves a distinct executable.
+
+| i265 CPU 2 probe | Steps | Elapsed seconds | Cycles | Instructions | FP assists |
+|---|---:|---:|---:|---:|---:|
+| normal L2, touched | 20,000 | 2.475792475 | 13,277,077,206 | 48,525,337,601 | 0 |
+| tiny moment, lazy | 20,000 | 0.820526093 | 4,402,860,530 | 21,748,161,218 | 0 |
+| decay, lazy | 2,000 | 0.118682449 | 635,605,127 | 2,644,673,705 | 367,360 |
+
+The normal-L2 final weight and both moment bits exactly match the preceding
+probe. The decay probe's remaining assists are transient boundary crossings;
+final m/v are +0, and repeated tiny-state updates incur zero assists.
+All 22 native Intel probe tests and all 15 applicable native ARM tests pass,
+including unchanged tier parity expectations and boundary-neighbor checks.
+Strict probe Clippy passes on both. Kernel source SHA-256:
+`60600a314bad60a8cee80c95d5c1233492a616a71e576271a7eeb5f944f8505d`.
+Resource records:
+`run-heavy: done rc=0 5s | peak-RSS 0.30GiB | min-avail 22062MiB | peak-load 1.30`
+(Intel probe checks/build),
+`run-heavy: done rc=0 3s | peak-RSS 0.02GiB | min-avail 22235MiB | peak-load 1.29`
+(Intel counters), and
+`run-heavy: done rc=0 10s | peak-RSS 0.32GiB | min-avail 29388MiB | peak-load 1.21`
+(native ARM checks).
+The canonical workspace Clippy recipe and existing trainer Adam/L2/rsqrt tests
+also pass with unchanged expectations. Release trainer SHA-256:
+`1106eb3d3c5b58d1bc8ef067f88d97d2733793c798c241ae3cdd39376413cea1`;
+native x86 test executable:
+`604e100d921e735cc16bc62b7d8f39f2707fe8b7f781b1cd5e10bf95cfc56ea5`.
+`run-heavy: done rc=0 51s | peak-RSS 1.30GiB | min-avail 20671MiB | peak-load 6.07`.

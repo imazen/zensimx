@@ -104,8 +104,9 @@ fn l2_product(w: f64, sm: f64, cutoff: f64) -> f64 {
     if sm.abs() > 1.0 {
         return flush_moment(sm * w);
     }
-    let w = flush_moment(w);
-    let safe_w = if w.abs() < cutoff {
+    // Positive f64 encodings have integer magnitude order. This also classifies
+    // subnormal inputs without an FP comparison or a separate exponent mask.
+    let safe_w = if (w.to_bits() & i64::MAX as u64) < cutoff.to_bits() {
         0.0f64.copysign(w)
     } else {
         w
@@ -115,18 +116,25 @@ fn l2_product(w: f64, sm: f64, cutoff: f64) -> f64 {
 
 #[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
 #[inline(always)]
-fn l2_product4<T: magetypes::simd::backends::F64x4Backend>(
+fn l2_product4<T: magetypes::simd::backends::I64x4Bitcast>(
     token: T,
     w: magetypes::simd::generic::f64x4<T>,
     sm: magetypes::simd::generic::f64x4<T>,
     cutoff: magetypes::simd::generic::f64x4<T>,
 ) -> magetypes::simd::generic::f64x4<T> {
-    use magetypes::simd::generic::f64x4;
+    use magetypes::simd::generic::i64x4;
     if sm.to_array()[0].abs() > 1.0 {
         return flush_moment4(token, sm * w);
     }
-    let w = flush_moment4(token, w);
-    let safe_w = f64x4::blend(w.abs().simd_lt(cutoff), w & f64x4::splat_t(token, -0.0), w);
+    let bits = i64x4::from_array_t(token, w.to_array().map(|x| x.to_bits() as i64));
+    let magnitude = bits & i64x4::splat_t(token, i64::MAX);
+    let cutoff_bits = i64x4::splat_t(token, cutoff.to_array()[0].to_bits() as i64);
+    let safe_w = i64x4::blend(
+        magnitude.simd_lt(cutoff_bits),
+        bits & i64x4::splat_t(token, i64::MIN),
+        bits,
+    )
+    .bitcast_to_f64();
     flush_moment4(token, sm * safe_w)
 }
 
@@ -210,7 +218,11 @@ fn first_moment4<T: magetypes::simd::backends::F64x4Backend>(
         return flush_moment4(token, one_minus.mul_add(g, beta * m));
     }
     let zero = f64x4::zero_t(token);
-    let bypass = m.simd_eq(zero) & g.simd_ne(zero) & g.abs().simd_lt(cutoff);
+    let tiny = g.simd_ne(zero) & g.abs().simd_lt(cutoff);
+    if tiny.to_array().map(f64::to_bits) == [0; 4] {
+        return flush_moment4(token, one_minus.mul_add(g, beta * m));
+    }
+    let bypass = m.simd_eq(zero) & tiny;
     let safe_g = f64x4::blend(bypass, zero, g);
     let value = flush_moment4(token, one_minus.mul_add(safe_g, beta * m));
     f64x4::blend(bypass, g & f64x4::splat_t(token, -0.0), value)
@@ -230,7 +242,11 @@ fn first_moment8(
         return flush_moment8(token, one_minus.mul_add(g, beta * m));
     }
     let zero = f64x8::zero_t(token);
-    let bypass = m.simd_eq(zero) & g.simd_ne(zero) & g.abs().simd_lt(cutoff);
+    let tiny = g.simd_ne(zero) & g.abs().simd_lt(cutoff);
+    if tiny.to_array().map(f64::to_bits) == [0; 8] {
+        return flush_moment8(token, one_minus.mul_add(g, beta * m));
+    }
+    let bypass = m.simd_eq(zero) & tiny;
     let safe_g = f64x8::blend(bypass, zero, g);
     let value = flush_moment8(token, one_minus.mul_add(safe_g, beta * m));
     f64x8::blend(bypass, g & f64x8::splat_t(token, -0.0), value)
@@ -1487,7 +1503,11 @@ fn adam_pair_fused_inner_v3_body(token: archmage::X64V3Token, args: &mut AdamW1F
                     }
                     // Tiny L2 gradients can be subnormal even when w is normal.
                     // Do not feed them to the moment FMAs on every update.
-                    g = flush_moment4(token, g);
+                    // With +0 input and no data contribution, the L2 helper
+                    // already returns a classified result (or g stays +0).
+                    if !gz || do_a || do_b {
+                        g = flush_moment4(token, g);
+                    }
                     let m = flush_moment4(token, m);
                     let v = flush_moment4(token, v);
                     let m_new = first_moment4(token, g, m, beta1_v, one_minus_b1_v, first_cutoff_v);

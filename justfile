@@ -675,9 +675,9 @@ adam-denormal-counter-probe binary output events kernel state steps tier pages="
     #!/usr/bin/env bash
     set -euo pipefail
     test ! -e {{quote(output)}}
-    command=({{quote(binary)}} {{quote(kernel)}} {{quote(state)}} {{quote(steps)}} {{quote(tier)}})
-    if [[ -n {{quote(pages)}} ]]; then command+=({{quote(pages)}}); fi
-    perf stat -o {{quote(output)}} -e {{quote(events)}} -- "${command[@]}"
+    probe_argv=({{quote(binary)}} {{quote(kernel)}} {{quote(state)}} {{quote(steps)}} {{quote(tier)}})
+    if [[ -n {{quote(pages)}} ]]; then probe_argv+=({{quote(pages)}}); fi
+    perf stat -o {{quote(output)}} -e {{quote(events)}} -- "${probe_argv[@]}"
 
 adam-denormal-compare reference candidate tools root output:
     python3 scripts/byconstruction/adam_denormal_cell.py compare --reference {{quote(reference)}} --candidate {{quote(candidate)}} --tools {{quote(tools)}} --root {{quote(root)}} --out {{quote(output)}}
@@ -693,7 +693,21 @@ adam-denormal-docker plan phase output:
 
 # Keep the entire matched pair quiet under one shared heavy-lock/resource scope.
 adam-denormal-quiet-pair plan tests before after:
-    env TMPDIR="$HOME/tmp" flock "$HOME/tmp/heavy.lock" "$HOME/work/zen/scripts/run-heavy" --mem 12G --jobs 1 -- just adam-denormal-pair-held {{quote(plan)}} {{quote(tests)}} {{quote(before)}} {{quote(after)}}
+    env TMPDIR="$HOME/tmp" flock "$HOME/tmp/heavy.lock" "${ADAM_RUN_HEAVY:-$HOME/work/zen/scripts/run-heavy}" --mem 12G --jobs 1 -- just adam-denormal-pair-held {{quote(plan)}} {{quote(tests)}} {{quote(before)}} {{quote(after)}}
+
+# Reuse a completed quiet baseline when testing a new preserved successor.
+adam-denormal-quiet-cell plan phase output:
+    env TMPDIR="$HOME/tmp" flock "$HOME/tmp/heavy.lock" "${ADAM_RUN_HEAVY:-$HOME/work/zen/scripts/run-heavy}" --mem 12G --jobs 1 -- just adam-denormal-cell-held {{quote(plan)}} {{quote(phase)}} {{quote(output)}}
+
+adam-denormal-cell-held plan phase output:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    set -o noclobber
+    base=$(dirname {{quote(plan)}})
+    phase={{quote(phase)}}
+    output={{quote(output)}}
+    { date -u; lscpu; free -h; mpstat -P ALL 1 2; } > "$base/results/$phase-$output-preflight.log"
+    just adam-denormal-docker {{quote(plan)}} {{quote(phase)}} {{quote(output)}}
 
 adam-denormal-pair-held plan tests before after:
     #!/usr/bin/env bash
