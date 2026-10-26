@@ -20,7 +20,8 @@ C = [
   + [(f"Mdata64-s{s}", f"/var/tmp/datalegs-20261025/rev7data/full64_s{s}/refit/production-f16.bin", 7, "M64 shape on the Mdata data (rev7data root)", f"{B}/gates-Mdata64" if s == 0 else "", "trains on VCL@FER, PieAPP, FG-IQA (validate-only licences)") for s in (0, 1, 2)] \
   + [(f"Mlic-s{s}", f"/var/tmp/byc-finalists-20261026/Mlic/full_s{s}/refit/production-f16.bin", 7, "M recipe on the Mlic root (Mdata's legs without VCL@FER, PieAPP, FG-IQA; byc-mixes-20261025)", f"{B}/gates-Mlic" if s == 0 else "", "licence-clean under the 2026-10-25 policy") for s in (0, 1, 2)] \
   + [("Mw025-s0", "/var/tmp/byc-mixes-20261025/Mw025/full_s0/refit/production-f16.bin", 7, "M recipe, all 11 new TRAIN legs at nominal 0.25; TRAIN-only old-data finalist", "", "research-only: trains on VCL@FER, PieAPP, FG-IQA (validate-only licences)")] \
-  + [(f"Mlic64-s{s}", f"/var/tmp/byc-finalists-20261026/Mlic64/full_s{s}/refit/production-f16.bin", 7, "M64 shape on the Mlic root (licence-clean data)", "", "licence-clean; lost the registered shape rule to Mlic on E21 (6690a44b)") for s in (0, 1, 2)]
+  + [(f"Mlic64-s{s}", f"/var/tmp/byc-finalists-20261026/Mlic64/full_s{s}/refit/production-f16.bin", 7, "M64 shape on the Mlic root (licence-clean data)", "", "licence-clean; lost the registered shape rule to Mlic on E21 (6690a44b)") for s in (0, 1, 2)] \
+  + [(f"MlicFT16x8-s{s}", f"/mnt/v/output/zensim/aic-finetune-20261026/run-05/full/MlicFT16x8/full_s{s}/refit/production-f16.bin", 7, "Mlic full-data seed continued for 8 epochs at constant 1e-5, AIC2026 public_train weight 16 under D6; TRAIN-selected arm", "/mnt/v/output/zensim/aic-finetune-20261026/run-05/gates" if s == 0 else "", "certified monotone; candidate registration is not production adoption") for s in (0, 1, 2)]
 sha = lambda p: hashlib.sha256(Path(p).read_bytes()).hexdigest()
 R.mkdir(parents=True, exist_ok=True)
 rows = []

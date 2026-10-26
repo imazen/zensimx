@@ -4689,3 +4689,75 @@ reuses those verified native controls and runs both registered arms, followed
 by the existing TRAIN-only analysis. Run progress records distinguish live
 processes, completed cells and failure receipts. No selection gate or sealed
 data permission changes. Full fits and candidate adoption remain separate.
+
+### AIC continuation TRAIN result and full-data certification (2026-10-26)
+
+Run `run-05` completed all **24/24** registered cells. Both arms meet the frozen selector; **MlicFT16x8 wins**. The selection receipt binds the training inventory and every analysis input. No EVAL or public_test row was used for this selection. Earlier AIC development exposure remains disclosed; these are development comparisons, not clean unseen-population claims.
+
+| Arm | Mean same-fold AIC SROCC | AIC gain | E21 mean delta | Paired seed-unit SE | Global-edit inversions/cell |
+|---|---:|---:|---:|---:|---:|
+| Mlic | 0.912927 | +0.000000 | +0.000000 | 0.000000 | 0 |
+| MlicFT8x4 | 0.914531 | +0.001604 | +0.000692 | 0.000154 | 0 |
+| MlicFT16x8 | 0.916187 | +0.003260 | +0.000915 | 0.000502 | 0 |
+
+The twelve cell folds cover AIC source folds 0–6 with counts 2, 2, 2, 2, 2, 1, 1 per arm. The row-level OOF aggregate averages predictions only from cells excluding that row’s source fold; it is descriptive, not the selector.
+
+| Arm | OOF global | Within-source mean | Within-ladder mean |
+|---|---:|---:|---:|
+| Mlic | 0.899602 | 0.946605 | 0.999785 |
+| MlicFT8x4 | 0.907960 | 0.947571 | 0.999785 |
+| MlicFT16x8 | 0.909699 | 0.948769 | 0.999770 |
+
+OOF per-codec SROCC (descriptive):
+
+| Codec | Mlic | MlicFT8x4 | MlicFT16x8 |
+|---|---:|---:|---:|
+| AVIF | 0.9580 | 0.9604 | 0.9610 |
+| AVIFQ | 0.9536 | 0.9574 | 0.9571 |
+| CCW | 0.9364 | 0.9486 | 0.9485 |
+| HEVC | 0.9552 | 0.9653 | 0.9641 |
+| J2K | 0.8964 | 0.9078 | 0.9082 |
+| JAI | 0.8984 | 0.9070 | 0.9086 |
+| JPG | 0.9335 | 0.9407 | 0.9423 |
+| JPGL | 0.9526 | 0.9688 | 0.9657 |
+| JPGR | 0.9481 | 0.9510 | 0.9529 |
+| JXL | 0.8896 | 0.9064 | 0.9059 |
+| JXLM | 0.7929 | 0.8155 | 0.8143 |
+| PNG | 0.9437 | 0.9305 | 0.9387 |
+| VVC | 0.9676 | 0.9746 | 0.9727 |
+| WEBP | 0.8938 | 0.9098 | 0.9102 |
+
+Standard-mixture inversions range 3–5 per Mlic cell, 3–8 for MlicFT8x4, and 3–7 for MlicFT16x8. Every arm has twelve cells with 1,152 comparison rows per cell (1,344 unique pairs). The separate global-edit test has 1,728 comparison rows (2,016 unique pairs) per cell, and zero inversions in every cell of every arm. Standard mixtures are reported separately from the registered zero-global gate.
+
+Old-data diagnostics below use held-out-dataset rows only; the analysis also retains explicitly labelled in-sample diagnostics. Values are mean-over-seed summaries from the canonical report.
+
+| Dataset | Arm | Z-RMSE | Error p99 (`p99d`) | Knob-concurring inversion rate | Ladder RMS | Type-bias spread |
+|---|---|---:|---:|---:|---:|---:|
+| kadid | Mlic | 0.472303 | 0.401431 | 0.013097 | 0.087282 | 0.077532 |
+| kadid | MlicFT8x4 | 0.471365 | 0.403955 | 0.013097 | 0.087066 | 0.077198 |
+| kadid | MlicFT16x8 | 0.472199 | 0.403955 | 0.013146 | 0.087144 | 0.077574 |
+| tid2013 | Mlic | 0.442287 | 0.298518 | 0.010141 | 0.058626 | 0.084821 |
+| tid2013 | MlicFT8x4 | 0.442808 | 0.295913 | 0.010443 | 0.058242 | 0.086007 |
+| tid2013 | MlicFT16x8 | 0.443073 | 0.296235 | 0.009839 | 0.058317 | 0.085978 |
+| konfig | Mlic | 0.582080 | 0.654167 | 0.000129 | 0.128728 | 0.084633 |
+| konfig | MlicFT8x4 | 0.578587 | 0.648810 | 0.000129 | 0.127388 | 0.081483 |
+| konfig | MlicFT16x8 | 0.578469 | 0.644345 | 0.000129 | 0.127373 | 0.080931 |
+| cid22_a25 | Mlic | 0.489250 | 0.395900 | 0.000167 | 0.070297 | 0.038681 |
+| cid22_a25 | MlicFT8x4 | 0.489342 | 0.394617 | 0.000200 | 0.070106 | 0.039139 |
+| cid22_a25 | MlicFT16x8 | 0.485876 | 0.391541 | 0.000200 | 0.069695 | 0.038913 |
+
+AIC mean-over-twelve-cell Z-RMSE / error p99: Mlic 0.441623 / 0.344883; MlicFT8x4 0.437333 / 0.340774; MlicFT16x8 0.432848 / 0.336083. These are means of cell diagnostics, not a global pooled error estimate. Full per-type, per-codec and per-cell results remain in the bound analysis artifacts. The gain is not universal: the selected arm’s TID2013 E21 delta is −0.000747, AIC PNG SROCC decreases, and some local inversion rates increase. None of these observations changes the registered selector.
+
+The twelve MlicFT8x4 E21 prediction files reproduce the preserved prior run byte for byte (`RETRAIN_PARITY.json`). Training and analysis exited 0: `run-heavy` reported 1.97 GiB peak RSS, 39,524 MiB minimum available, peak load 5.42. This is resource evidence, not a speed comparison.
+
+All three winner full-data continuations completed, preserving each original seed, scaler, calibration table and E33 output stage. Each selected final epoch 7 of 8 at constant 1e-5 and 50,000 pairs/epoch. All three packed bakes certify monotone with zero free ramps. Full-data execution exited 0: `run-heavy` reported 1.94 GiB peak RSS, 41,140 MiB minimum available, peak load 3.33.
+
+| Seed | Packed bake SHA256 |
+|---|---|
+| 0 | `8c8bc7056323ea1723f2745b796f1dea8605b4ba9b53e0635801bc2675336909` |
+| 1 | `678f3b1bbdcaed103ac4247afb63482d91836ccd2b41a1d264c8fb124dcbf12f` |
+| 2 | `b3697c21c06f925cf52b4ca22555dc3d44b14763fed534887fc54207a3f18306` |
+
+Durable evidence: `/mnt/v/output/zensim/aic-finetune-20261026/run-05/`, with `analysis/TRAIN_SELECTION.json`, `FULL_COMPLETE.json`, `PROGRESS.json`, native controls, source/binary pins and full logs. `PROGRESS.json` checks the live process and distinguishes TRAIN completion, full-data certification and subsequent label-free measurements; partial identity output is not a completed gate. Models and private labels stay outside git.
+
+**Qualification remains separate.** Candidate registration does not adopt a default. The coordinator is running the existing revision-7 label-free owners with their frozen instrument tables. Human EVAL assessment and production qualification remain outstanding at this record. HDR changes and new weighting/sampling remain outside this frozen continuation.
