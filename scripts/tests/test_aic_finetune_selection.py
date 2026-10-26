@@ -93,6 +93,17 @@ class FullProgress(unittest.TestCase):
         (self.root / "FULL_LAUNCH_FAILED.json").write_text('{"error":"bad pin"}')
         self.assertEqual(STATUS.status(self.root)["status"], "failed")
 
+    def test_gate_status_does_not_count_partial_identity_output(self):
+        (self.root / "QUALIFY_RUN_STATE.json").write_text(json.dumps(dict(stage="label-free-identity", pid=-1)))
+        gates = self.root / "gates"
+        gates.mkdir()
+        (gates / "identity-s0.jsonl").write_text('{"partial":true}\n')
+        value = STATUS.status(self.root)
+        self.assertEqual(value["status"], "not-running")
+        self.assertNotIn("identity", value["gates"]["complete"])
+        (gates / "FAILED.json").write_text('{"error":"identity worker failed"}')
+        self.assertEqual(STATUS.status(self.root)["status"], "failed")
+
 
 if __name__ == "__main__":
     unittest.main()

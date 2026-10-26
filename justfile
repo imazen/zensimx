@@ -3593,6 +3593,10 @@ aic-finetune-analysis study packet folds pairs:
 aic-finetune-full study selection packet folds:
     python3 -B scripts/rev4_featpot/aic_finetune_full.py --study {{quote(study)}} --selection {{quote(selection)}} --packet {{quote(packet)}} --folds {{quote(folds)}} --jobs 2
 
+# Caller holds heavy.lock/run-heavy; this records measurements, not adoption.
+aic-finetune-gates study binaries instruments corpus:
+    python3 -B scripts/rev4_featpot/aic_finetune_gates.py --study {{quote(study)}} --bin-dir {{quote(binaries)}} --instruments {{quote(instruments)}} --corpus-root {{quote(corpus)}}
+
 aic-finetune-launch study packet:
     #!/usr/bin/env bash
     set -Eeuo pipefail

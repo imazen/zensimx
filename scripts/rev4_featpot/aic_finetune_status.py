@@ -19,6 +19,9 @@ def status(study):
     full_state = study / "FULL_RUN_STATE.json"
     if full_state.is_file():
         state.update(json.loads(full_state.read_text()))
+    qualify_state = study / "QUALIFY_RUN_STATE.json"
+    if qualify_state.is_file():
+        state.update(json.loads(qualify_state.read_text()))
     result = {key: value for key, value in state.items() if key != "command"}
     result["checked_utc"] = datetime.now(timezone.utc).isoformat()
     result["study"] = str(study.resolve())
@@ -70,6 +73,16 @@ def status(study):
             (study / "FULL_COMPLETE.json").is_file() and result["full"]["complete"] == 3 else
             "no-finalist" if (study / "NO_FINALIST.json").is_file() else
             "running" if result["worker_alive"] else "not-running")
+    if qualify_state.is_file():
+        gates = study / "gates"
+        required = {"nearid": "nearid-s0/*.GATES.json", "standard": "verdict-s0-*/standard/gaddr.json",
+            "ladder": "verdict-s0-*/ladder/gaddr.json", "steer": "steer135/*/result.json", "identity": "identity-s0.jsonl"}
+        result["gates"] = dict(complete=[name for name, pattern in required.items() if list(gates.glob(pattern)) and
+            (gates / (("verdict" if name in ("standard", "ladder") else name) + ".complete.json")).is_file()],
+            required=list(required), failure=json.loads((gates / "FAILED.json").read_text()) if (gates / "FAILED.json").is_file() else None)
+        result["status"] = ("failed" if failed or result["gates"]["failure"] else
+            "label-free-gates-complete" if (gates / "COMPLETE.json").is_file() and
+            len(result["gates"]["complete"]) == len(required) else "running" if result["worker_alive"] else "not-running")
     return result
 
 
