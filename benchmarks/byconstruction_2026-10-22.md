@@ -4758,3 +4758,18 @@ Synthetic controls retain a `(1,1)` disagreement as two 0.5 targets and reject
 missing, fractional, inconsistent or three-vote counts. The original hard-pair
 mode and its tie-dropping test remain unchanged. Native loss/admission and
 actual vote-root construction are still required before this arm can fit.
+
+
+The unchanged-Mlic KADID seed-0 control completed: all 7,869 held-out
+predictions are byte-identical, SHA256
+`0cae0f6fcc1ca3f83108df4c3fd400751a6321842a56a0e942ecba09ab4bd8fa`.
+Resource wrapper: `rc=0 1563s | peak-RSS 1.91GiB | min-avail 42743MiB | peak-load 3.99`.
+This is training execution evidence, not a runtime performance comparison.
+The derived MlicNeff root is frozen at SHA256
+`772faa767a4399887ade260607b8c5fa11953eac9464c61a71f15caf2652187f`;
+its tables and keys passed the byte-preservation audit. The trial driver is
+frozen from source `cd2438b9e29e416ee33cec8a42cc7d29461946d0` under the
+study's `source/`. `BASELINE.json` binds original models, predictions, binary
+inventory and mixture manifests before candidate results. Live progress now
+refuses a control-cell population when the recorded active command names a
+candidate population. No candidate outcome is claimed here.

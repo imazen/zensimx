@@ -310,6 +310,7 @@ def cmd_progress(args) -> int:
     from datetime import datetime, timezone
     from run_processes import bound_worker, compute_lock, process_tree
     state = json.loads(Path(args.run_state).read_text()) if getattr(args,"run_state",None) else {}
+    progress_binding(args,state)
     worker = bound_worker(state.get("pid"), state.get("start_ticks"))
     cells = []
     for seed in [int(s) for s in args.seeds.split(",")]:
@@ -354,6 +355,15 @@ def cmd_progress(args) -> int:
         temporary.replace(output)
     print(text,end="")
     return 0
+
+
+def progress_binding(args,state):
+    """A completed control cannot stand in for the subsequent candidate stage."""
+    command = state.get("command",[])
+    if state.get("stage") == "cells" and "--label" in command:
+        for attribute,flag in (("arm","--label"),("folds","--folds"),("seeds","--seeds")):
+            if flag not in command or getattr(args,attribute) != command[command.index(flag)+1]:
+                raise ValueError("progress population differs from the active cell command")
 
 
 def cmd_score(args) -> int:

@@ -5,6 +5,7 @@ import queue
 import subprocess
 import sys
 import threading
+from types import SimpleNamespace
 import unittest
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/"rev4_featpot"))
@@ -12,6 +13,13 @@ from run_processes import bound_worker, process_snapshot, process_tree
 
 
 class RunProcesses(unittest.TestCase):
+    def test_completed_control_cannot_report_candidate_population(self):
+        from byc_cells import progress_binding
+        state = dict(stage="cells",command=["run","--label","MlicNeff","--folds","kadid,pipal","--seeds","0,1,2"])
+        progress_binding(SimpleNamespace(arm="MlicNeff",folds="kadid,pipal",seeds="0,1,2"),state)
+        with self.assertRaisesRegex(ValueError,"population"):
+            progress_binding(SimpleNamespace(arm="MlicControl",folds="kadid",seeds="0"),state)
+
     def test_pid_reuse_and_zombie_are_not_live_evidence(self):
         current = process_snapshot(os.getpid())
         self.assertIsNotNone(bound_worker(os.getpid(),current["start_ticks"]))
