@@ -2,9 +2,11 @@
 
 import importlib.util
 import json
+import os
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 MODULE = Path(__file__).resolve().parents[1] / "rev4_featpot/aic_finetune_full.py"
 SPEC = importlib.util.spec_from_file_location("aic_finetune_full", MODULE)
@@ -75,6 +77,31 @@ class FullProgress(unittest.TestCase):
         self.assertEqual(value["completed_cells"], 24)
         self.assertEqual(value["full"]["complete"], 0)
         self.assertEqual(value["status"], "not-running")
+
+    def test_unrelated_live_pid_is_not_the_study_worker(self):
+        (self.root / "FULL_RUN_STATE.json").write_text(json.dumps(dict(stage="full-data-continuation", pid=os.getpid())))
+        value = STATUS.status(self.root)
+        self.assertFalse(value["worker_alive"])
+        self.assertEqual(value["live_processes"], [])
+
+    def test_zombie_with_matching_argv_is_not_running(self):
+        (self.root / "FULL_RUN_STATE.json").write_text(json.dumps(dict(stage="full-data-continuation", pid=123)))
+        with patch.object(STATUS, "process_snapshot", return_value=dict(state="Z", argv=[str(self.root)])):
+            value = STATUS.status(self.root)
+        self.assertFalse(value["worker_alive"])
+        self.assertEqual(value["status"], "not-running")
+
+    def test_real_flock_holder_is_resolved_by_inode_and_ancestry(self):
+        import fcntl
+        (self.root / "tmp").mkdir()
+        with (self.root / "tmp/heavy.lock").open("w") as stream, patch.object(STATUS.Path, "home", return_value=self.root):
+            fcntl.flock(stream, fcntl.LOCK_EX)
+            value = STATUS.compute_lock(os.getpid())
+            self.assertEqual(value["holder_pids"], [os.getpid()])
+            self.assertTrue(value["held_by_worker_ancestor"])
+            self.assertFalse(STATUS.compute_lock(None)["held_by_worker_ancestor"])
+            fcntl.flock(stream, fcntl.LOCK_UN)
+            self.assertEqual(STATUS.compute_lock(os.getpid())["holder_pids"], [])
 
     def test_all_full_receipts_required_and_failure_takes_precedence(self):
         (self.root / "FULL_COMPLETE.json").write_text("{}")
