@@ -423,6 +423,33 @@ dataset-subsets-root source out columns:
 dataset-subsets-links source out:
     python3 -B scripts/byconstruction/ring_root.py dataset-links --root {{quote(source)}} --out {{quote(out)}}
 
+# Wrapper/receipt admission only: no target payload or optimizer is opened.
+dataset-subsets-admission root out columns:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    python3 - {{quote(root)}} {{quote(out)}} {{quote(columns)}} <<'PY'
+    from pathlib import Path
+    import json, sys
+    sys.path.insert(0, 'scripts/rev4_featpot')
+    from byc_cells import dataset_holdout_collections
+    from subjective_training_leg import dataset_groups, sha
+    root, out, columns = map(Path, sys.argv[1:])
+    selected = [int(v) for v in columns.read_text().strip().split(',')]
+    out.mkdir()
+    rows = {}
+    for fold in ('kadid','tid2013','konfig','cid22_a25','pipal','mos7','pairs'):
+        _, excluded = dataset_holdout_collections(root, fold)
+        dest = out/fold
+        dest.mkdir()
+        groups, authority = dataset_groups(root, [], selected, fold if fold in ('kadid','tid2013','konfig','cid22_a25') else 'full', 0, 1101, 101, dest, exclude=excluded)
+        receipt = json.loads((dest/'DATASET_GROUP_SELECTION.json').read_text())
+        rows[fold] = dict(excluded=list(excluded), retained_collections=receipt['retained_collections'], groups=len(groups), authority_sha256=authority[1])
+    assert not list(out.rglob('*.bin'))
+    result = dict(schema='linked-subset-wrapper-admission-control-v1', root_sha256=sha(root/'wide/frozen.json'), folds=rows, target_payloads_opened=False, optimizer_invoked=False)
+    (out/'VERIFIED.json').write_text(json.dumps(result, indent=1)+'\n')
+    print(json.dumps(result))
+    PY
+
 dataset-full root binary dest columns:
     env REV4_V2_BIN_DIR={{quote(binary)}} ZENSIM_MAX_TIER=v3 RAYON_NUM_THREADS=1 OMP_NUM_THREADS=1 python3 -B scripts/rev4_featpot/v2_confirm_fit.py --root {{quote(root)}} --spec sel:3b7bd5ebe929@h32:H128:cv16:cf98:fx1:mono:thr:mp32 --columns "$(cat {{quote(columns)}})" --head N --seed-index 0 --strict-admission --data-role-decision {{quote(root)}}/human_role_decision.json --dest {{quote(dest)}} --train-only --pack-production --e33-output-stage
     {{quote(binary)}}/bake_dial_refit certify-monotone --bake {{quote(dest)}}/refit/production-f16.bin
