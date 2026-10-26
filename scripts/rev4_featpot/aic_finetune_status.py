@@ -22,6 +22,9 @@ def status(study):
     qualify_state = study / "QUALIFY_RUN_STATE.json"
     if qualify_state.is_file():
         state.update(json.loads(qualify_state.read_text()))
+    eval_state = study / "EVAL_RUN_STATE.json"
+    if eval_state.is_file():
+        state.update(json.loads(eval_state.read_text()))
     result = {key: value for key, value in state.items() if key != "command"}
     result["checked_utc"] = datetime.now(timezone.utc).isoformat()
     result["study"] = str(study.resolve())
@@ -83,6 +86,14 @@ def status(study):
         result["status"] = ("failed" if failed or result["gates"]["failure"] else
             "label-free-gates-complete" if (gates / "COMPLETE.json").is_file() and
             len(result["gates"]["complete"]) == len(required) else "running" if result["worker_alive"] else "not-running")
+    if eval_state.is_file():
+        assessment = study / "assessment"
+        result["assessment"] = dict(complete=[name for name in ("main", "bapps") if
+            (assessment / name / "COMPLETE.json").is_file()], required=["main", "bapps"],
+            failure=json.loads((assessment / "FAILED.json").read_text()) if (assessment / "FAILED.json").is_file() else None)
+        result["status"] = ("failed" if failed or result["assessment"]["failure"] else
+            "coordinator-EVAL-complete" if (assessment / "COMPLETE.json").is_file() and
+            len(result["assessment"]["complete"]) == 2 else "running" if result["worker_alive"] else "not-running")
     return result
 
 

@@ -3597,6 +3597,10 @@ aic-finetune-full study selection packet folds:
 aic-finetune-gates study binaries instruments corpus:
     python3 -B scripts/rev4_featpot/aic_finetune_gates.py --study {{quote(study)}} --bin-dir {{quote(binaries)}} --instruments {{quote(instruments)}} --corpus-root {{quote(corpus)}}
 
+# Fixed coordinator assessment of the selected three seeds; never AIC public_test.
+aic-finetune-eval study:
+    python3 -B scripts/rev4_featpot/aic_finetune_eval.py --study {{quote(study)}}
+
 aic-finetune-launch study packet:
     #!/usr/bin/env bash
     set -Eeuo pipefail
