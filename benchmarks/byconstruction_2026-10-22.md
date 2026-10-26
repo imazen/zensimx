@@ -4796,6 +4796,23 @@ Synthetic observation, admission and builder-refusal controls pass; the
 fresh real-data root has not yet run, so counts remain unverified until its
 admitted preparation succeeds.
 
+The independent vote trial reuses the mass coordinator's fit, diagnostics,
+mixture and paired-selection owners. It admits the fresh root, executes the
+new trainer's unchanged-Mlic control, then requires all 21 candidate cells.
+Before selection, the three pair-omission cells must reproduce all nine
+original Mlic held-out prediction files exactly. Synthetic controls verify
+the same numeric screen for either registered candidate and rejection of
+changed omission predictions. Completed mass artifacts keep their archived
+driver; extending the coordinator does not alter that running study.
+
+Frozen native-vote trainer: source `e3151ba3642312be7599cd4c5584d15449fef491`,
+binary SHA256 `dafda1f44e0dc2b18e0bbe8b878061cd9441e8ad58f656a6c8da6763ab390972`.
+Rust 1.99.0, default portable release flags, thin LTO; build on i265:
+`run-heavy: done rc=0 61s | peak-RSS 1.76GiB | min-avail 20271MiB | peak-load 5.03`.
+The private study's `trainer/BUILD.json` records the compiler, lockfile and
+binary identities. Its bytes were verified after copying; inactive Cargo
+output was removed only after preserving this reference binary and build log.
+
 The existing observation mapper now has an explicit vote-preserving mode.
 Synthetic controls retain a `(1,1)` disagreement as two 0.5 targets and reject
 missing, fractional, inconsistent or three-vote counts. The original hard-pair

@@ -593,12 +593,14 @@ def cmd_mix_select(args):
     return 0
 
 
-def neff_decision(arms, global_inversions):
-    """Rule 89d3e738: paired TRAIN gain, old-data noninferiority, global monotonicity."""
+def neff_decision(arms, global_inversions, candidate="MlicNeff"):
+    """Shared prospectively fixed screen for the independent mass and vote arms."""
     import numpy as np
+    if candidate not in ("MlicNeff", "MlicVote") or set(arms) != {"Mlic", candidate}:
+        raise ValueError("one registered candidate and original Mlic control required")
     delta = {}
     for metric in ("old", "new", "balanced"):
-        values = [a-b for a,b in zip(arms["MlicNeff"][metric]["per_seed"],
+        values = [a-b for a,b in zip(arms[candidate][metric]["per_seed"],
                                      arms["Mlic"][metric]["per_seed"], strict=True)]
         if len(values) != 3 or not np.isfinite(values).all():
             raise ValueError("three finite paired seed values required")
@@ -610,8 +612,19 @@ def neff_decision(arms, global_inversions):
                   old_noninferiority=delta["old"]["mean"] >= -2*delta["old"]["seed_unit_se"],
                   zero_global_inversions=all(v == 0 for v in global_inversions))
     return dict(paired_delta=delta, checks=checks,
-                finalist="MlicNeff" if all(checks.values()) else None,
+                finalist=candidate if all(checks.values()) else None,
                 retain_control=not all(checks.values()), production_qualified=False)
+
+
+def verify_omitted_vote_predictions(control, candidate):
+    """When BAPPS is absent, the new trainer must reproduce original Mlic."""
+    pins = {}
+    for collection in ("bapps", "pieapp", "fg-iqa"):
+        old, new = (root/f"pred_dataset_{collection}.tsv" for root in (control, candidate))
+        if old.read_bytes() != new.read_bytes():
+            raise ValueError("BAPPS-omission predictions differ from original Mlic")
+        pins[str(new)] = sha(new)
+    return pins
 
 
 def cmd_neff_select(args):
@@ -620,6 +633,9 @@ def cmd_neff_select(args):
     sys.path.insert(0, str(HERE.parent/"byconstruction"))
     from mixture_test import report
     study = Path(args.study)
+    candidate = getattr(args, "candidate", "MlicNeff")
+    if candidate not in ("MlicNeff", "MlicVote"):
+        raise ValueError("unregistered paired dataset candidate")
     output = study/"TRAIN_SELECTION.json"
     if output.exists():
         raise ValueError("preserve frozen effective-sample decision")
@@ -632,7 +648,7 @@ def cmd_neff_select(args):
     e21 = json.loads(e21_path.read_text())
     inputs = {str(e21_path):sha(e21_path), str(baseline_path):sha(baseline_path)}
     inventory = []
-    for arm in ("Mlic", "MlicNeff"):
+    for arm in ("Mlic", candidate):
         root = study/arm/"root"
         pin = sha(root/"wide/frozen.json")
         inputs[str(root/"wide/frozen.json")] = pin
@@ -652,7 +668,8 @@ def cmd_neff_select(args):
                         or result["pairs_per_epoch"] != 50000 or result["seed_index"] != seed
                         or result["frozen_sha256"] != pin or selected["root_sha256"] != pin
                         or set(selected["retained_collections"]) != trained-set(DATASET_FOLDS.get(fold,()))
-                        or rec["trainer_sha256"] != baseline["trainer_sha256"]
+                        or rec["trainer_sha256"] != (baseline["candidate_trainer_sha256"]
+                            if arm == "MlicVote" else baseline["trainer_sha256"])
                         or rec["last_bin_sha256"] != sha(cell/"refit/last.bin")):
                     raise ValueError(f"native cell binding differs: {cell}")
                 predictions = {f"pred_{fold}.tsv":rec["pred_sha256"]} if fold in FOLDS else {
@@ -660,6 +677,8 @@ def cmd_neff_select(args):
                 for relative, expected in predictions.items():
                     if sha(cell/relative) != expected:
                         raise ValueError("cell prediction changed")
+                if arm == "MlicVote" and fold == "pairs":
+                    inputs.update(verify_omitted_vote_predictions(CELLS/"Mlic"/cell.name, cell))
                 inputs[str(cell/"byc_record.json")] = sha(cell/"byc_record.json")
                 inputs[str(cell/"result.json")] = sha(cell/"result.json")
                 inventory.append(dict(arm=arm,fold=fold,seed=seed,model_sha256=rec["last_bin_sha256"]))
@@ -674,13 +693,15 @@ def cmd_neff_select(args):
             if model["bake_sha256"] != cell["model_sha256"] or key not in mixtures[name]:
                 raise ValueError("mixture model binding differs")
             inputs[str(path)] = sha(path)
-    arms = {arm:mix_arm_statistics(arm,e21,inputs) for arm in ("Mlic","MlicNeff")}
-    arms["MlicNeff"]["eligible_under_new_leg_licence_policy"] = True
-    inversions = [mixtures["mixture_global"][f'MlicNeff_{c["fold"]}_s{c["seed"]}']["inversions"]
-                  for c in inventory if c["arm"] == "MlicNeff"]
-    value = dict(schema="mlic-effective-sample-TRAIN-selection-v1",rule_commit="89d3e738af4e",
+    arms = {arm:mix_arm_statistics(arm,e21,inputs) for arm in ("Mlic",candidate)}
+    arms[candidate]["eligible_under_new_leg_licence_policy"] = True
+    inversions = [mixtures["mixture_global"][f'{candidate}_{c["fold"]}_s{c["seed"]}']["inversions"]
+                  for c in inventory if c["arm"] == candidate]
+    schema, rule = ("mlic-native-vote-TRAIN-selection-v1", "b2ee920aa351") if candidate == "MlicVote" else (
+        "mlic-effective-sample-TRAIN-selection-v1", "89d3e738af4e")
+    value = dict(schema=schema,rule_commit=rule,
                  eval_labels_used=False,arms=arms,mixtures=mixtures,cells=inventory,input_sha256=inputs,
-                 **neff_decision(arms,inversions))
+                 **neff_decision(arms,inversions,candidate))
     output.write_text(json.dumps(value,indent=1)+"\n")
     print(json.dumps({k:v for k,v in value.items() if k not in ("arms","mixtures","cells","input_sha256")},indent=1))
     return 0
@@ -1212,6 +1233,7 @@ def main() -> int:
     ms.add_argument("--arms", default=",".join(MIX_ARMS))
     ns = sub.add_parser("neff-select")
     ns.add_argument("--study", required=True)
+    ns.add_argument("--candidate", choices=("MlicNeff", "MlicVote"), default="MlicNeff")
     mf = sub.add_parser("mix-freeze")
     mf.add_argument("--study", required=True)
     z = sub.add_parser("aiczero")

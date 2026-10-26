@@ -379,6 +379,10 @@ def cmd_datasets(a):
                 classifications["bapps"]["per_item"]) != ("train", "C", "2"):
             raise ValueError("native BAPPS training/count policy differs")
         parent_packet = json.loads((source/"datasets/receipt.json").read_text())
+        if any(classifications[g["collection"]]["policy"] != "train" for g in parent_packet["groups"]):
+            raise ValueError("native vote root includes a collection outside the corrected training policy")
+        if any(classifications[c]["policy"] != "validate-only" for c in ("vcl-fer", "pieapp", "fg-iqa")):
+            raise ValueError("native vote root validate-only collection policy differs")
         frozen = json.loads((source/"wide/frozen.json").read_text())
         if sha(source/"datasets/receipt.json") != frozen["dataset_legs_sha256"]:
             raise ValueError("original Mlic dataset receipt changed")

@@ -98,6 +98,26 @@ class NativeVotes(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "separate studies"):
                 root.cmd_datasets(args)
 
+    def test_vote_screen_reuses_mass_rule_and_requires_omission_identity(self):
+        from byc_cells import neff_decision, verify_omitted_vote_predictions
+        arms = {a:{m:dict(per_seed=[0.8]*3) for m in ("old", "new", "balanced")}
+                for a in ("Mlic", "MlicNeff")}
+        arms["MlicNeff"]["balanced"]["per_seed"] = [0.81]*3
+        mass = neff_decision(arms, [0]*21)
+        votes = neff_decision({"Mlic":arms["Mlic"], "MlicVote":arms["MlicNeff"]}, [0]*21, "MlicVote")
+        self.assertEqual(votes, {**mass, "finalist":"MlicVote"})
+        self.assertIsNone(neff_decision({"Mlic":arms["Mlic"], "MlicVote":arms["MlicNeff"]},
+                                       [0]*20+[1], "MlicVote")["finalist"])
+        control, candidate = (self.f.path.parent/n for n in ("control", "candidate"))
+        for directory in (control, candidate):
+            directory.mkdir()
+            for collection in ("bapps", "pieapp", "fg-iqa"):
+                (directory/f"pred_dataset_{collection}.tsv").write_text("key\tprediction\ninvented\t1.0\n")
+        self.assertEqual(len(verify_omitted_vote_predictions(control, candidate)), 3)
+        (candidate/"pred_dataset_bapps.tsv").write_text("key\tprediction\ninvented\t1.1\n")
+        with self.assertRaisesRegex(ValueError, "omission predictions differ"):
+            verify_omitted_vote_predictions(control, candidate)
+
 
 if __name__ == "__main__":
     unittest.main()
