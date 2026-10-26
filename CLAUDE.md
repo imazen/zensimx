@@ -160,6 +160,8 @@ because cleanup tests or a historical training reproduction pass.
 
 ## Known Bugs
 
+* **2026-10-26 — AIC coordinator duplicated score-ensemble arithmetic. Fixed.** Python averaging differed from the frozen Rust `bake_dial_refit predict --ensemble --score-units` owner on 575 of 4,678 rows, by at most 2.842170943040401e-14 score points. The interrupted assessment and preliminary reports are preserved and superseded. The coordinator now calls the canonical Rust owner for both populations, with unchanged models, selection and statistical owners. The original single-seed predictions remain reusable; no retraining or reselection is permitted by this repair.
+
 * **2026-10-26 — AIC coordinator EVAL copy omitted judge keys. Fixed (`940e795b`).** The first report refused the missing `judge_pairs.tsv` after producing three seed predictions, before any statistic report completed. The recovery binds the original plan, failure and prediction hashes, adds only the frozen judge-key tables, and uses a fresh assessment directory. The failed attempt and label-read ledger are preserved; completed predictions are reused. Input completeness is now checked before assessment reads. No model, label, selector or statistic changed.
 
 * **2026-10-26 — completed TRAIN status could hide later-stage failure. Fixed (`b3a45faf`, `a8daef38`, `bb942e1c`).** Full-data continuation, label-free gates and coordinator EVAL have separate live process identities and completion/failure receipts. Progress follows the active stage, and partial identity output is not counted as a completed gate. Checks cover dead workers, incomplete receipts and failure precedence.

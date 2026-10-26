@@ -13,9 +13,6 @@ SPEC.loader.exec_module(FULL)
 STATUS_SPEC = importlib.util.spec_from_file_location("aic_finetune_status", MODULE.with_name("aic_finetune_status.py"))
 STATUS = importlib.util.module_from_spec(STATUS_SPEC)
 STATUS_SPEC.loader.exec_module(STATUS)
-EVAL_SPEC = importlib.util.spec_from_file_location("aic_finetune_eval", MODULE.with_name("aic_finetune_eval.py"))
-EVAL = importlib.util.module_from_spec(EVAL_SPEC)
-EVAL_SPEC.loader.exec_module(EVAL)
 
 
 class FrozenSelection(unittest.TestCase):
@@ -113,32 +110,6 @@ class FullProgress(unittest.TestCase):
         self.assertEqual(STATUS.status(self.root)["status"], "not-running")
         (self.root / "assessment/FAILED.json").write_text('{"error":"scoring failed"}')
         self.assertEqual(STATUS.status(self.root)["status"], "failed")
-
-
-class FrozenEnsemble(unittest.TestCase):
-    def setUp(self):
-        temporary = tempfile.TemporaryDirectory()
-        self.addCleanup(temporary.cleanup)
-        self.root = Path(temporary.name)
-        self.paths = [self.root / f"s{i}.tsv" for i in range(3)]
-        for i, path in enumerate(self.paths):
-            path.write_text(f"row_idx\tpred\n0\t{3*i}\n1\t{6*i}\n")
-
-    def test_equal_seed_mean_and_row_order(self):
-        output = self.root / "mean.tsv"
-        EVAL.mean_predictions(self.paths, output)
-        self.assertEqual(output.read_text(), "row_idx\tpred\n0\t3.0\n1\t6.0\n")
-        self.paths[1].write_text("row_idx\tpred\n1\t3\n0\t6\n")
-        with self.assertRaisesRegex(ValueError, "row order"):
-            EVAL.mean_predictions(self.paths, self.root / "bad.tsv")
-
-    def test_incomplete_or_nonfinite_seed_is_refused(self):
-        self.paths[1].write_text("row_idx\tpred\n0\t3\n")
-        with self.assertRaisesRegex(ValueError, "matching seed"):
-            EVAL.mean_predictions(self.paths, self.root / "bad.tsv")
-        self.paths[1].write_text("row_idx\tpred\n0\tnan\n1\t3\n")
-        with self.assertRaisesRegex(ValueError, "nonfinite"):
-            EVAL.mean_predictions(self.paths, self.root / "bad.tsv")
 
 
 if __name__ == "__main__":

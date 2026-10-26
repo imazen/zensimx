@@ -6,11 +6,9 @@ Caller owns heavy.lock/run-heavy.
 """
 
 import argparse
-import csv
 from datetime import datetime, timezone
 import hashlib
 import json
-import math
 import os
 from pathlib import Path
 import shutil
@@ -28,28 +26,6 @@ def write(path, value):
     temporary = path.with_suffix(path.suffix + ".new")
     temporary.write_text(json.dumps(value, indent=2, allow_nan=False) + "\n")
     temporary.replace(path)
-
-
-def mean_predictions(paths, output):
-    tables = []
-    for path in paths:
-        with path.open() as stream:
-            reader = csv.DictReader(stream, delimiter="\t")
-            if reader.fieldnames != ["row_idx", "pred"]:
-                raise ValueError("prediction columns differ")
-            rows = list(reader)
-        if [int(row["row_idx"]) for row in rows] != list(range(len(rows))):
-            raise ValueError("prediction row order differs")
-        values = [float(row["pred"]) for row in rows]
-        if not values or not all(math.isfinite(value) for value in values):
-            raise ValueError("empty or nonfinite prediction")
-        tables.append(values)
-    if len(tables) != 3 or len({len(table) for table in tables}) != 1:
-        raise ValueError("three complete matching seed predictions required")
-    with output.open("x") as stream:
-        writer = csv.writer(stream, delimiter="\t", lineterminator="\n")
-        writer.writerow(["row_idx", "pred"])
-        writer.writerows((i, sum(values) / 3) for i, values in enumerate(zip(*tables)))
 
 
 def main():
@@ -90,6 +66,9 @@ def main():
                     "FileNotFoundError" not in failure_log.read_text() or
                     "judge_pairs.tsv" not in failure_log.read_text() or (prior / "main/report.json").exists()):
                 raise ValueError("only missing judge-key report recovery is admitted")
+            for path, digest in recovery.get("correction_evidence_sha256", {}).items():
+                if sha(Path(path)) != digest:
+                    raise ValueError("ensemble correction evidence changed")
         for population in ("main", "bapps"):
             available = set(plan["populations"][population]["files"])
             if recovery:
@@ -131,7 +110,8 @@ def main():
             receipt = dict(role="EVAL", purpose="single frozen TRAIN-winner assessment",
                 plan_sha256=sha(study / "EVAL_PLAN.json"), models=full["seeds"], source=str(source),
                 files=dict(plan["populations"][population]["files"]), state="authorized-before-copy-and-read",
-                existing_baseline_predictions_reused=True, AIC_public_test="unread")
+                existing_baseline_predictions_reused=True, AIC_public_test="unread",
+                ensemble_owner="frozen bake_dial_refit predict --ensemble --score-units")
             if recovery:
                 receipt["files"].update(recovery["extra_files"][population])
                 receipt["recovery_sha256"] = sha(args.recovery)
@@ -142,12 +122,12 @@ def main():
                 shutil.copyfile(source / name, dest / name)
                 if sha(dest / name) != digest:
                     raise ValueError("EVAL copied bytes differ")
-            names, paths = [], []
+            names, bakes = [], []
             for row in sorted(full["seeds"], key=lambda value: value["seed"]):
                 name = f"{full['arm']}_s{row['seed']}"
                 names.append(name)
                 path = dest / f"pred_{name}.tsv"
-                paths.append(path)
+                bakes.append(row["bake"])
                 reused = recovery and recovery["predictions"].get(population, {}).get(name)
                 if reused:
                     previous = Path(recovery["prior"]) / population / path.name
@@ -161,7 +141,10 @@ def main():
                         [str(study / "bin/bake_dial_refit"), "predict", "--bake", row["bake"],
                          "--corpus", str(dest / "features.parquet"), "--score-units", "--out", str(path)])
             ensemble = full["arm"] + "_ens"
-            mean_predictions(paths, dest / f"pred_{ensemble}.tsv")
+            command("coordinator-EVAL-ensemble-" + population,
+                [str(study / "bin/bake_dial_refit"), "predict", "--ensemble", ",".join(bakes),
+                 "--corpus", str(dest / "features.parquet"), "--score-units",
+                 "--out", str(dest / f"pred_{ensemble}.tsv")])
             command("coordinator-EVAL-report-" + population,
                 [sys.executable, "-B", str(owner), "report", "--out", str(dest)])
             if population == "main":
