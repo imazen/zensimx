@@ -4511,3 +4511,7 @@ BAPPS peer metrics remain deferred to the owner’s IMI archive route. Mlic’s 
 Intervals remain descriptive for the small reference cohorts. Mw025 has negative intervals against Mdata on MDID, NITS and VCL and against M7 on MDID. Its recovered old-data TRAIN mean is not a uniform new-data EVAL gain.
 
 The complete owner command exited0 in40:00.00; `/usr/bin/time -v` maximum RSS1,738,980KiB. It ran inside the existing42GiB/no-swap scope with two native statistics threads. The measured RSS is for the owner process tree, not all separately joined coordinator work. `EVAL_COMPLETE.json` SHA256 `c5db7b5929d172732110176f7f75f66b3a3db9862f9aed5a7faeab237ba1947e`. Coordinator AIC public_train aggregate results were exposed during a post-freeze document merge; `POST_FREEZE_AGGREGATE_EXPOSURE.json` records that no raw AIC target table was opened by this lane and no selection or tuning followed.
+BAPPS (36,344 held-out EVAL pairs, hard-pair agreement; seed 0 reuses the data-legs lane's frozen read, sha256
+`b2264f99…`; seeds 1–2 predicted on the byte-identical copy `/var/tmp/byc-dataset-eval-bapps-seeds`): Mlic seeds
+0.673 / 0.663 / 0.668, three-seed mean prediction 0.669 [0.666, 0.672]; M7 0.663 [0.660, 0.666]; Mdata 0.672;
+Mdata64 0.672; B 0.639 [0.636, 0.643]. BAPPS TRAIN is one of Mlic's legs, so this is in distribution.
