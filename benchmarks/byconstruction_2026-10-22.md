@@ -4672,3 +4672,20 @@ CLI zero-step prediction comparison or the frozen-trainer default reproduction.
 Earlier guarded failures and their binaries are preserved separately.
 Pack and certify those final bakes, register their hashes, and mirror them.
 The coordinator owns subsequent product gates and the single EVAL assessment.
+
+### AIC continuation recovery (2026-10-26)
+
+The fourth launch passed actual-trainer zero-step and default-control parity,
+then completed twelve MlicFT8x4 fits. AIC prediction rejected null unused
+feature slots introduced by pandas-to-Arrow fold serialization; none of those
+twelve cells completed evaluation, and MlicFT16x8 had not started.
+
+Recovery preserves the frozen fit tables, binaries, passing control receipts
+and failed outputs. Inference-only views restore the original extraction
+arrays after checking every observed feature and ordered row identity. The
+actual frozen scorer produced identical prediction values for all 560 rows
+of the first AIC fold compared with the original extraction. A fresh retry
+reuses those verified native controls and runs both registered arms, followed
+by the existing TRAIN-only analysis. Run progress records distinguish live
+processes, completed cells and failure receipts. No selection gate or sealed
+data permission changes. Full fits and candidate adoption remain separate.

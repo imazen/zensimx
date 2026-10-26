@@ -158,6 +158,120 @@ def verify_rev7_folds(output):
                 manifest_sha256=hashlib.sha256((output / "_MANIFEST.json").read_bytes()).hexdigest())
 
 
+
+def prediction_views(source, folds, output):
+    """Restore original extraction NaNs lost to Arrow nulls by the fold writer.
+
+    Training tables remain immutable. Every non-null feature is compared with
+    the source extraction; nulls may represent only original NaNs. No feature,
+    target, key, or source order may change. Targets are copied, not interpreted.
+    """
+    import pyarrow as pa
+    source, folds, output = map(Path, (source, folds, output))
+    verify_rev7_folds(folds)
+    manifest = json.loads((folds / "_MANIFEST.json").read_text())
+    digest = lambda p: hashlib.sha256(Path(p).read_bytes()).hexdigest()
+    if digest(source) != manifest["source_table_sha256"]:
+        raise ValueError("prediction extraction differs from registered source")
+    names = ["key", "ref_basename", *(f"f{i}" for i in range(1853))]
+    original = pq.read_table(source, columns=names)
+    keys = original["key"].to_pylist()
+    if len(set(keys)) != len(keys):
+        raise ValueError("duplicate source extraction keys")
+    position = {key: i for i, key in enumerate(keys)}
+    output.mkdir()
+    records = {}
+    for k in range(7):
+        path = folds / f"aic_k{k}_test.parquet"
+        table = pq.read_table(path)
+        index = [position[key] for key in table["key"].to_pylist()]
+        reference = original.take(pa.array(index))
+        restored, nulls = restore_prediction_features(table, reference)
+        dest = output / path.name
+        pq.write_table(restored, dest, compression="zstd")
+        reread = pq.read_table(dest)
+        # Arrow equality treats NaNs as unequal; compare feature bytes below.
+        check, _ = restore_prediction_features(reread, reference)
+        if check.num_rows != table.num_rows:
+            raise ValueError("prediction view row count changed")
+        records[path.name] = dict(source_sha256=digest(path), view_sha256=digest(dest),
+                                 restored_nulls=nulls, rows=table.num_rows)
+        sidecar = Path(str(dest) + ".manifest.json")
+        sidecar.write_text(json.dumps(dict(formula_revision=7, inference_only=True,
+            **records[path.name]), indent=2) + "\n")
+        records[path.name]["sidecar_sha256"] = digest(sidecar)
+    receipt = dict(source_extraction_sha256=digest(source),
+                   fold_manifest_sha256=digest(folds / "_MANIFEST.json"), tables=records)
+    (output / "PREDICTION_VIEWS.json").write_text(json.dumps(receipt, indent=2) + "\n")
+    return receipt
+
+
+def restore_prediction_features(table, reference):
+    """Copy original feature arrays only after exact non-null value checks."""
+    import pyarrow as pa
+    if table.num_rows != reference.num_rows:
+        raise ValueError("prediction row count differs")
+    for name in ("key", "ref_basename"):
+        if table[name].to_pylist() != reference[name].to_pylist():
+            raise ValueError("prediction key/source order differs")
+    nulls = 0
+    for name in table.column_names:
+        if not (name.startswith("f") and name[1:].isdigit()):
+            continue
+        actual, expected = table[name], reference[name]
+        if actual.type != expected.type or not pa.types.is_floating(expected.type):
+            raise ValueError(f"prediction feature type differs: {name}")
+        if expected.null_count:
+            raise ValueError(f"source extraction contains null: {name}")
+        a, e = actual.to_numpy(), expected.to_numpy()
+        missing = actual.is_null().to_numpy()
+        # NaN payloads are not numeric values; every other bit must agree.
+        same = (a.view(f"u{a.dtype.itemsize}") == e.view(f"u{e.dtype.itemsize}")) | (np.isnan(a) & np.isnan(e))
+        if not same.all() or not np.isnan(e[missing]).all():
+            raise ValueError(f"prediction feature differs from extraction: {name}")
+        nulls += actual.null_count
+        table = table.set_column(table.schema.get_field_index(name), table.schema.field(name), expected)
+    return table, nulls
+
+
+def prediction_view(table, directory):
+    """Resolve a verified inference-only view, never a replacement fit table."""
+    table, directory = Path(table), Path(directory)
+    receipt = json.loads((directory / "PREDICTION_VIEWS.json").read_text())
+    row = receipt["tables"][table.name]
+    view = directory / table.name
+    digest = lambda p: hashlib.sha256(Path(p).read_bytes()).hexdigest()
+    if (digest(table) != row["source_sha256"] or digest(view) != row["view_sha256"]
+            or digest(Path(str(view) + ".manifest.json")) != row["sidecar_sha256"]):
+        raise ValueError("prediction view or frozen source changed")
+    return view
+
+
+def prediction_control(source, view, bake, output):
+    """Compare the real frozen scorer on original and restored feature rows."""
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "rev4_featpot"))
+    from v2_common import dense_bake
+    from v2_lodo_mlp import predict
+    source, view, bake, output = map(Path, (source, view, bake, output))
+    output.mkdir()
+    dense = dense_bake(bake, output)
+    predict(dense, source, output / "original.tsv")
+    predict(dense, view, output / "restored.tsv")
+    keys = pq.read_table(source, columns=["key"])["key"].to_pylist()
+    index = {key: i for i, key in enumerate(keys)}
+    selected = [index[key] for key in pq.read_table(view, columns=["key"])["key"].to_pylist()]
+    original = (output / "original.tsv").read_text().splitlines()[1:]
+    restored = (output / "restored.tsv").read_text().splitlines()[1:]
+    if [original[i].split("\t")[1] for i in selected] != [row.split("\t")[1] for row in restored]:
+        raise ValueError("restored-view predictions differ from original extraction")
+    receipt = dict(byte_identical_prediction_values=True, rows=len(restored),
+        source_sha256=hashlib.sha256(source.read_bytes()).hexdigest(),
+        view_sha256=hashlib.sha256(view.read_bytes()).hexdigest(),
+        bake_sha256=hashlib.sha256(bake.read_bytes()).hexdigest())
+    (output / "CONTROL.json").write_text(json.dumps(receipt, indent=2) + "\n")
+    return receipt
+
+
 def v2_name(i: int) -> str:
     cell, k = divmod(i - V2_START, len(V2))
     return f"{V2[k]}_s{cell // 3}{'XYB'[cell % 3]}"
@@ -412,6 +526,14 @@ def main() -> int:
     v = sub.add_parser("verify-rev7-folds", help="D6 metadata/key and output byte readback; no targets interpreted")
     v.add_argument("output")
     v.set_defaults(fn=lambda a: (print(json.dumps(verify_rev7_folds(a.output))), 0)[1])
+    p = sub.add_parser("prediction-views", help="Restore original extraction NaNs for inference only")
+    for option in ("source", "folds", "output"):
+        p.add_argument("--" + option, required=True)
+    p.set_defaults(fn=lambda a: (print(json.dumps(prediction_views(a.source, a.folds, a.output))), 0)[1])
+    c = sub.add_parser("prediction-control", help="Frozen scorer parity on restored inference rows")
+    for option in ("source", "view", "bake", "output"):
+        c.add_argument("--" + option, required=True)
+    c.set_defaults(fn=lambda a: (print(json.dumps(prediction_control(a.source, a.view, a.bake, a.output))), 0)[1])
     z = sub.add_parser("zeroshot")
     z.add_argument("--table", required=True)
     z.add_argument("--pairs", required=True)

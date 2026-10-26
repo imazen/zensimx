@@ -3568,6 +3568,23 @@ aic-finetune-status study:
 aic-finetune-selection-tests:
     TMPDIR="$HOME/tmp/aic-finetune-20261026" python3 -B -m unittest scripts.tests.test_aic_finetune_selection
 
+aic-finetune-recovery-tests:
+    TMPDIR="$HOME/tmp/aic-finetune-20261026" OPENBLAS_NUM_THREADS=1 python3 -B -m unittest scripts.tests.test_aic_prediction_views scripts.tests.test_aic_finetune_selection
+
+# Caller holds heavy.lock/run-heavy. Frozen fit tables remain unchanged.
+aic-finetune-prediction-views source folds output:
+    OPENBLAS_NUM_THREADS=1 python3 -B scripts/byconstruction/aic_train.py prediction-views --source {{quote(source)}} --folds {{quote(folds)}} --output {{quote(output)}}
+
+aic-finetune-progress study output:
+    python3 -B scripts/rev4_featpot/aic_finetune_status.py {{quote(study)}} --output {{quote(output)}}
+
+aic-finetune-prediction-control source view bake output:
+    OPENBLAS_NUM_THREADS=1 python3 -B scripts/byconstruction/aic_train.py prediction-control --source {{quote(source)}} --view {{quote(view)}} --bake {{quote(bake)}} --output {{quote(output)}}
+
+# Caller supplies the immutable prior controls and fresh retry/output locations.
+aic-finetune-resume prior study packet folds views columns pairs control:
+    python3 -B scripts/rev4_featpot/aic_finetune_chain.py resume --prior {{quote(prior)}} --study {{quote(study)}} --packet {{quote(packet)}} --folds {{quote(folds)}} --views {{quote(views)}} --columns {{quote(columns)}} --pairs {{quote(pairs)}} --control {{quote(control)}} --jobs 2
+
 # Caller holds shared heavy.lock and run-heavy for prediction/statistics.
 aic-finetune-analysis study packet folds pairs:
     AIC_FOLDS={{quote(folds)}} AIC_PAIRS_TRAIN={{quote(pairs)}} python3 -B scripts/rev4_featpot/aic_finetune_analysis.py --study {{quote(study)}} --packet {{quote(packet)}}

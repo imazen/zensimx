@@ -2,6 +2,7 @@
 
 import argparse
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 import re
 
@@ -16,7 +17,18 @@ def epoch(path):
 def status(study):
     state = json.loads((study / "RUN_STATE.json").read_text()) if (study / "RUN_STATE.json").is_file() else {"stage": "queued"}
     result = {key: value for key, value in state.items() if key != "command"}
-    result["queue_pid"] = int((study / "QUEUE_PID").read_text())
+    result["checked_utc"] = datetime.now(timezone.utc).isoformat()
+    result["study"] = str(study.resolve())
+    queue = study / "QUEUE_PID"
+    result["queue_pid"] = int(queue.read_text()) if queue.is_file() else None
+    pid = state.get("pid")
+    result["worker_alive"] = False
+    if isinstance(pid, int) and pid > 0:
+        try:
+            command = Path(f"/proc/{pid}/cmdline").read_bytes().split(b"\0")
+            result["worker_alive"] = str(study.resolve()).encode() in command
+        except OSError:
+            pass
     result["binary_frozen"] = (study / "BIN_FROZEN.json").is_file()
     for name in ("ZERO_STEP", "DEFAULT_PARITY"):
         path = study / f"{name}.json"
@@ -26,7 +38,7 @@ def status(study):
     result["default_control_latest_epoch"] = epoch(study / "cells/MlicDefaultControl/without_kadid_s0/train.log")
     result["arms"] = {}
     for arm, epochs in (("MlicFT8x4", 4), ("MlicFT16x8", 8)):
-        cells = list((study / "cells" / arm).glob("without_*_s*"))
+        cells = [p for p in (study / "cells" / arm).glob("without_*_s*") if p.is_dir()]
         complete = sum((cell / "byc_record.json").is_file() for cell in cells)
         active = {cell.name: epoch(cell / "train.log") for cell in cells if not (cell / "byc_record.json").is_file()}
         result["arms"][arm] = dict(complete=complete, requested=12, epochs=epochs, active=active)
@@ -34,10 +46,26 @@ def status(study):
         path = study / name
         if path.is_file():
             result[name] = json.loads(path.read_text())
+    failed = any(name in result for name in ("FAILED.json", "LAUNCH_FAILED.json"))
+    completed = sum(arm["complete"] for arm in result["arms"].values())
+    result["completed_cells"] = completed
+    result["required_cells"] = 24
+    result["status"] = ("failed" if failed else "train-evaluation-complete" if
+        (study / "EVALUATION_COMPLETE.json").is_file() and completed == 24 else
+        "running" if result["worker_alive"] else "training-complete" if
+        (study / "TRAIN_COMPLETE.json").is_file() and completed == 24 else "not-running")
     return result
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("study", type=Path)
-    print(json.dumps(status(parser.parse_args().study), indent=2))
+    parser.add_argument("--output", type=Path, help="atomically update a durable progress record")
+    args = parser.parse_args()
+    value = status(args.study)
+    text = json.dumps(value, indent=2) + "\n"
+    if args.output:
+        temporary = args.output.with_suffix(args.output.suffix + ".new")
+        temporary.write_text(text)
+        temporary.replace(args.output)
+    print(text, end="")

@@ -89,6 +89,10 @@ def predict_cell(bake: Path, table: Path, out: Path, spec: str):
     fx1 bakes); every other bake through the registered owner."""
     token = next((t for t in spec.split(":") if t in ("fx1g", "fx1gs1", "fx1gg", "fx1gy", "fx1o")), None)
     if token is None:
+        if os.environ.get("AIC_PREDICT_FOLDS") and table.parent.resolve() == AIC.resolve():
+            sys.path.insert(0, str(HERE.parent / "byconstruction"))
+            from aic_train import prediction_view
+            table = prediction_view(table, os.environ["AIC_PREDICT_FOLDS"])
         return predict(bake, table, out)
     import numpy as np
     import pandas as pd
