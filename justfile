@@ -21,6 +21,16 @@ dataset-mix-eval study:
 
 # Caller holds shared heavy.lock and run-heavy; selection precedes these fits.
 dataset-mix-freeze study:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    python3 - {{quote(study)}} "$$" <<'PY'
+    from pathlib import Path
+    import sys
+    runtime = Path(sys.argv[1]) / 'freeze-runtime'
+    runtime.mkdir()
+    (runtime / 'batch.pid').write_text(sys.argv[2] + '\n')
+    (runtime / 'scope.cgroup').write_text(Path('/proc/self/cgroup').read_text())
+    PY
     env ZENSIM_MAX_TIER=v3 BYC_COLS={{quote(study)}}/frozen_configuration/cols_c.txt BYC_CELLS={{quote(study)}}/cells REV4_V2_BIN_DIR={{quote(study)}}/bin ZEN_PANEL_BIN={{quote(study)}}/bin/panel RAYON_NUM_THREADS=1 OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 python3 -B scripts/rev4_featpot/byc_cells.py mix-freeze --study {{quote(study)}}
 
 # Queue individual existing-owner operations; heavy work takes the shared lock.
