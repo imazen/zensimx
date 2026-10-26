@@ -135,3 +135,11 @@ All 123 cells pass native inventory and binary controls. Both mixture sets cover
 Final original fleet coverage is 60 DONE, zero missing/FAILED/STRANDED/outside-grid/duplicate DONE. Historical failures remain: five lost-lease partials, nine intentional rebalance partials and three failed-output/scratch retries. Every candidate bake is retained. Seventeen preserved candidate directories are bound for materialized archival; scratch remains protected under its fleet inventory. No scientific file or source receipt was rewritten.
 
 Immutable inputs remain in LAN-store bucket `zentrain`, keys `jobs/byc-<ARM>-r2-20261025/inputs/<sha>`; `fleet-coordination/STAGED_INPUTS.json` records exact bytes. Archive digests differ from the frozen-root manifest digests. The workspace DATA_PROVENANCE index records all six object pointers.
+
+## Frozen finalists and EVAL point report — 2026-10-26
+
+Mw025 full seed0 has completed the registered120×50000/fixed119 fit. The finalist manifest `FINALISTS.json` SHA256 `8191f8ced4488629c9c8d37b7439df203b0f1a9b58804bd6e9e312c8692c24c8` binds Mlic `7612c2e46154fe9c0c359bfd02e521013f5717e3bf8e11967f5434150e220bcc` and Mw025 `a6d43ef2ec717cb8f9b07ecb85f7f4c76aae7995cbce9b42e4d39ef7123ea4ac`. Both certify monotone. No EVAL result selected either model. The11-collection point report is written from stored features; paired reference-bootstrap computation and BAPPS assessment are still in progress. Mlic seed0 predictions are frozen for coordinator reuse, with no second scoring.
+
+Mw025-s0 is registered in the durable candidate registry, now19 entries. All19 bakes passed SHA256SUMS on the mounted tower mirror with dev doing checksum work. `CANDIDATE_REGISTRY_VERIFIED.json` SHA256 `20255999ae094ae034fbebed23a5ae59c70c23e42b0820a0c2cddc26ca36a42f`; prior local and mirror metadata and the ownership-error/retry logs are retained. Registry source a9a7d34997cc; mounted-copy recipe0153adc179e6. No tower compute or AIC2026 label read.
+
+The later [linked subset root and seven-fold authority](mlic_subsets_2026-10-26.pointer.md#linked-family-fold-authority) are outside the original123 cells. Their build/control evidence is linked into this study for materialized archival. Coordinator-owned Mlic64 jobs remain separate in `SCOPE_ACCOUNTING.json`. No subset fit was launched by this lane.
