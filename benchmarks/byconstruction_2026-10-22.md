@@ -4374,3 +4374,24 @@ The frozen single-seed EVAL point table follows. MOS uses signed midrank SROCC; 
 The balanced TRAIN Mlic-minus-Mw025 difference is 0.0000016562213901, paired seed-unit SE 0.0006342087471001. The registered rule uses the point estimate. EVAL differences are mixed; no EVAL result changes the selected weights or candidates. Mlic’s licence eligibility does not establish product qualification.
 
 Across all123 models, the standard set retains442 inversions (122 models have at least one), largest rise8.103523. The global set retains0 inversions, largest rise−0.730728. These are raw all-cell totals, separate from the primary twelve-E21-model table. Script lint passed on the final recipe/source tree; no Rust arithmetic or native binary changed for the linked-fold transport.
+
+### AIC2026 public_train zero-shot of the revision-7 candidates (2026-10-26)
+
+None of these models trains on any AIC2026 data. public_train is the development split: reported, never used to choose a
+model; public_test was not opened. Revision-7 features of the 3,920 public_train pairs were dumped through B's
+revision-7 stamp (B7, the same 420-id read set) with the mix study's binaries (`mixture_table.py build-pairs`, the route
+that built the revision-5 `table_raw`; table `/var/tmp/byc-finalists-20261026/aic-rev7/table/table.parquet`, sha256 `a2969c70f2e1c96f…`). The table
+route agrees with the pixel route on 8 spread pairs (max |difference| 4.9e-7), and B7 reproduces B's revision-5 global
+SROCC (0.9091). Scored by `aic_train.panel` (SROCC against −JND); results `/var/tmp/byc-finalists-20261026/aic-rev7/zeroshot.json` (sha256 `7da5eded1d3bb03b…`).
+
+| Model | Global, seeds 0 / 1 / 2 | Global, mean prediction of 3 seeds | Within source | Within ladder |
+|---|---|---:|---:|---:|
+| B (B7) | 0.9091 | — | 0.9558 | 0.9995 |
+| M7 | 0.9121 / 0.9082 / 0.9047 | 0.9095 | 0.9498 | 0.9998 |
+| Mlic | 0.9094 / 0.9089 / 0.9023 | 0.9076 | 0.9485 | 0.9998 |
+| Mdata64 | 0.9077 / 0.9048 / 0.9019 | 0.9056 | 0.9497 | 0.9998 |
+| Mdata | 0.9024 / 0.9048 / 0.9037 | 0.9050 | 0.9496 | 0.9998 |
+| Mw025 | 0.9085 (seed 0) | — | 0.9503 | 0.9998 |
+
+Globally every candidate ties B within the seed spread (0.902–0.912); the new datasets do not help here. B leads within
+source (0.956 against about 0.949), the same price of monotonicity seen on the E21 sets.
