@@ -634,6 +634,9 @@ adam-denormal-counters pid output events seconds="10":
 adam-denormal-compare reference candidate tools root output:
     python3 scripts/byconstruction/adam_denormal_cell.py compare --reference {{quote(reference)}} --candidate {{quote(candidate)}} --tools {{quote(tools)}} --root {{quote(root)}} --out {{quote(output)}}
 
+adam-denormal-compare-splice reference candidate tools root output probe:
+    python3 scripts/byconstruction/adam_denormal_cell.py compare --reference {{quote(reference)}} --candidate {{quote(candidate)}} --tools {{quote(tools)}} --root {{quote(root)}} --out {{quote(output)}} --probe {{quote(probe)}}
+
 adam-denormal-status output:
     python3 scripts/byconstruction/adam_denormal_cell.py status --out {{quote(output)}}
 

@@ -10,9 +10,16 @@ use std::hint::black_box;
 
 fn main() {
     let argv: Vec<String> = std::env::args().collect();
-    if argv.get(1).map(String::as_str) == Some("--repro") {
+    if matches!(
+        argv.get(1).map(String::as_str),
+        Some("--repro" | "--normalize-repro")
+    ) {
         use std::io::Write;
-        assert_eq!(argv.len(), 4, "usage: probe --repro MODEL OUTPUT.json");
+        assert_eq!(
+            argv.len(),
+            4,
+            "usage: probe --repro|--normalize-repro MODEL OUTPUT"
+        );
         let bytes = std::fs::read(&argv[2]).expect("read model");
         let model =
             zenpredict::Model::from_bytes(&bytes).expect("parse model with the native owner");
@@ -20,12 +27,20 @@ fn main() {
         let repro = metadata
             .get_utf8("zentrain.repro")
             .expect("embedded trainer provenance");
+        let output = if argv[1] == "--repro" {
+            repro.as_bytes().to_vec()
+        } else {
+            // The owner's splice preserves every non-metadata section byte,
+            // including packed weight bits and permutation sections.
+            zenpredict_bake::append_metadata_utf8(&bytes, "zentrain.repro", "{}")
+                .expect("replace provenance without rebaking model content")
+        };
         std::fs::OpenOptions::new()
             .write(true)
             .create_new(true)
             .open(&argv[3])
             .expect("fresh provenance output")
-            .write_all(repro.as_bytes())
+            .write_all(&output)
             .expect("write provenance");
         return;
     }

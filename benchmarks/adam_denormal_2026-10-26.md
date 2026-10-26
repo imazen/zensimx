@@ -220,3 +220,51 @@ dispatch checks pass, as does strict all-target release probe Clippy including
 the native provenance reader dependency. Full output:
 `arm/neon-final-versioned-probe.log`. Resource record:
 `run-heavy: done rc=0 14s | peak-RSS 0.32GiB | min-avail 27152MiB | peak-load 6.37`.
+
+## Completed final Intel replay and section-preserving byte proof
+
+Final v4 completes all 120 registered epochs on i265 CPU 2 with the preserved
+`cef30445…8159` trainer (full SHA above). Perf elapsed: **2779.769636014 s**;
+user: 2775.920338000 s; system: 1.605729000 s. P-core counters:
+14,849,340,987,154 cycles; 32,993,011,393,865 instructions;
+26,369,672 FP assists. GNU time reports 2,132,120 KiB maximum trainer RSS and
+zero swaps. Docker imposes a separate 12 GiB no-swap cap. The run-heavy record
+covers the Docker client, not container RSS:
+`run-heavy: done rc=0 2780s | peak-RSS 0.03GiB | min-avail 18540MiB | peak-load 3.52`.
+
+The final replay again matches all 7,869 / 184,397 prediction bytes and all
+native provenance-stripped bakes. Raw final comparisons:
+
+| Artifact | Original bytes | Final bytes | Different common offsets | Extra final tail bytes |
+|---|---:|---:|---:|---:|
+| refit best | 37,304 | 37,537 | 16,133 | 233 |
+| refit last | 34,808 | 35,060 | 16,326 | 252 |
+| native dense | 34,808 | 35,060 | 16,326 | 252 |
+| fresh packed f16 | 30,444 | 30,696 | 16,534 | 252 |
+| best spec JSON | 11,992 | 13,136 | 11,390 | 1,144 |
+
+The existing native `strip` command re-emits a model. A stronger independent
+check uses the pinned native `append_metadata_utf8` section-splice owner to
+replace only `zentrain.repro` with `{}`. It preserves packed weight bits,
+permutations and all other sections without rebaking them. All four resulting
+whole files are byte-identical:
+
+| Constant-provenance artifact | Bytes | SHA-256, both arms |
+|---|---:|---|
+| best | 31,514 | `69a935ed93acb673e62f46b9086de22a334c9ed743d69aa3f6984e128ccc88aa` |
+| last / dense | 28,998 | `bc4a61a35af4c040264a96b588828fffe6afd9272294be4a1fff498143333f97` |
+| packed | 24,634 | `aa31427404cc43922185ad212b7c238e72efba39c51c81eec72dd2ef42c4f11b` |
+
+Evidence: `intel/comparison-splice-v4/COMPARISON.json`, with every raw differing
+byte and complete native JSON provenance differences. There are 34 changed
+embedded provenance fields (paths, container hostname, source identity,
+timestamp and the new arithmetic version) and 28 spec fields (paths, cwd,
+timestamp); the numerical settings and input hashes match. This is the frozen
+control only, not a promise that all possible future fits keep their outputs.
+The section-splice tool SHA is
+`6bf5dbb3b24adfcfa9c744f4cf27f115a84d6027176838a0c02e0da6ef7a5bf5`.
+Its strict all-target Clippy/build resource record:
+`run-heavy: done rc=0 8s | peak-RSS 0.25GiB | min-avail 22448MiB | peak-load 1.09`.
+The comparison completes with
+`run-heavy: done rc=0 3s | peak-RSS 0.03GiB | min-avail 22540MiB | peak-load 1.10`.
+The frozen i134 baseline and quiet dev before/after measurements remain pending.

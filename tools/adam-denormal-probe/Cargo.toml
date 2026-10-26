@@ -10,6 +10,7 @@ publish = false
 archmage = { version = "=0.9.30", features = ["macros", "avx512"] }
 magetypes = { version = "=0.9.30", features = ["avx512"] }
 zenpredict = { version = "0.2.0", git = "https://github.com/imazen/zenanalyze", rev = "f0903489300aea240ffae2e3f1359f8f2b9a0ba4" }
+zenpredict-bake = { version = "0.1.0", git = "https://github.com/imazen/zenanalyze", rev = "f0903489300aea240ffae2e3f1359f8f2b9a0ba4" }
 
 [profile.release]
 lto = "thin"

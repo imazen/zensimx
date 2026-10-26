@@ -25,6 +25,27 @@ def digest(path):
         return hashlib.file_digest(stream, "sha256").hexdigest()
 
 
+def json_changes(before, after, path=""):
+    """Record exact semantic provenance changes using JSON Pointer paths."""
+    if isinstance(before, dict) and isinstance(after, dict):
+        changes = []
+        for key in sorted(before.keys() | after.keys()):
+            pointer = path + "/" + key.replace("~", "~0").replace("/", "~1")
+            if key not in before or key not in after:
+                changes.append({"path": pointer, "reference_present": key in before,
+                                "candidate_present": key in after,
+                                "reference": before.get(key), "candidate": after.get(key)})
+            else:
+                changes.extend(json_changes(before[key], after[key], pointer))
+        return changes
+    if isinstance(before, list) and isinstance(after, list) and len(before) == len(after):
+        return [change for i, (x, y) in enumerate(zip(before, after))
+                for change in json_changes(x, y, f"{path}/{i}")]
+    if type(before) is not type(after) or before != after:
+        return [{"path": path, "reference": before, "candidate": after}]
+    return []
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--argv-json", type=Path, required=True)
@@ -77,6 +98,7 @@ def compare():
     parser.add_argument("--reference", type=Path, required=True)
     parser.add_argument("--candidate", type=Path, required=True)
     parser.add_argument("--tools", type=Path, required=True)
+    parser.add_argument("--probe", type=Path, help="native section-splice comparison tool")
     parser.add_argument("--root", type=Path, required=True)
     parser.add_argument("--out", type=Path, required=True)
     args = parser.parse_args(sys.argv[2:])
@@ -90,6 +112,8 @@ def compare():
     tool = args.tools / "bake_dial_refit"
     results = {"schema": "adam-denormal-byte-comparison-v1", "tool_sha256": digest(tool),
                "reference": str(args.reference), "candidate": str(args.candidate), "comparisons": {}}
+    if args.probe:
+        results["splice_probe_sha256"] = digest(args.probe)
 
     def run(command, log):
         with log.open("w") as stream:
@@ -145,6 +169,13 @@ def compare():
             target = dest / f"{name}.without-repro.bin"
             run([tool, "strip", "--in", bake, "--out", target, "--key", "zentrain.repro"], dest / f"{name}.strip.log")
             normalized[label, name] = target
+            if args.probe:
+                spliced = dest / f"{name}.constant-repro.bin"
+                run([args.probe, "--normalize-repro", bake, spliced], dest / f"{name}.splice.log")
+                normalized[label, f"splice_{name}"] = spliced
+                repro = dest / f"{name}.repro.json"
+                run([args.probe, "--repro", bake, repro], dest / f"{name}.repro.log")
+                normalized[label, f"repro_{name}"] = repro
 
     compare_bytes("reference_prediction_replay", args.reference / "pred_kadid.tsv", predictions["reference"])
     compare_bytes("predictions", args.reference / "pred_kadid.tsv", predictions["candidate"])
@@ -182,8 +213,15 @@ def compare():
     second_spec = args.candidate / "refit/best.bin.spec.json"
     if first_spec.is_file() and second_spec.is_file():
         compare_bytes("refit_best_spec", first_spec, second_spec)
+        results["spec_value_differences"] = json_changes(json.loads(first_spec.read_text()), json.loads(second_spec.read_text()))
     for name in ("best", "last", "dense", "packed"):
         compare_bytes(f"without_repro_{name}", normalized["reference", name], normalized["candidate", name])
+        if args.probe:
+            compare_bytes(f"constant_repro_splice_{name}", normalized["reference", f"splice_{name}"], normalized["candidate", f"splice_{name}"])
+            changes = json_changes(json.loads(normalized["reference", f"repro_{name}"].read_text()), json.loads(normalized["candidate", f"repro_{name}"].read_text()))
+            listing = args.out / f"{name}.repro-value-differences.json"
+            listing.write_text(json.dumps(changes, indent=2) + "\n")
+            results[f"{name}_repro_value_differences"] = {"count": len(changes), "all_changes": str(listing), "sha256": digest(listing)}
     (args.out / "COMPARISON.json").write_text(json.dumps(results, indent=2) + "\n")
     print(json.dumps(results, indent=2))
 
