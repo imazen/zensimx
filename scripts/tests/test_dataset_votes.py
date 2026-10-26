@@ -5,6 +5,7 @@ from pathlib import Path
 import sys
 import unittest
 from unittest import mock
+from types import SimpleNamespace
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]/"rev4_featpot"))
 import subjective_training_leg as leg
@@ -82,6 +83,20 @@ class NativeVotes(unittest.TestCase):
         self.f.decl["keys_sha256"] = self.f.record["keys_sha256"]
         with self.assertRaisesRegex(ValueError, "family"):
             self.f.admit()
+
+    def test_vote_builder_refuses_mixed_trials_and_missing_policy_before_labels(self):
+        from test_dataset_legs import root
+        args = SimpleNamespace(root=str(self.f.path.parent/"missing-source"),
+            out=str(self.f.path.parent/"fresh-root"), admission="missing-admission",
+            features="missing-features", library="missing-library", columns="missing-columns",
+            nominal_weight=0.5, collections="bapps", bapps_votes=True, additional_subsets=False,
+            confidence=None)
+        with mock.patch.object(root, "dataset_targets", side_effect=AssertionError("labels read")):
+            with self.assertRaisesRegex(ValueError, "frozen confidence policy"):
+                root.cmd_datasets(args)
+            args.additional_subsets = True
+            with self.assertRaisesRegex(ValueError, "separate studies"):
+                root.cmd_datasets(args)
 
 
 if __name__ == "__main__":

@@ -4784,6 +4784,18 @@ and count/target/role corruption controls. Real BAPPS counts have not yet
 been admitted by this implementation; that remains a separate frozen-root
 preparation and full-budget execution gate.
 
+`just dataset-vote-root` prepares that fresh root from the original Mlic
+root and BAPPS membership/feature pins. It preserves the seven MOS payloads
+and nominal masses, keeps every one of the 146,003 admitted comparisons,
+and writes a count sidecar bound to the ordered probability targets. The
+corrected confidence policy is pinned to
+`40407d74cf998da64400b36a7885b798333c886227c9c6aef5927cb1777e3e02`;
+the older Mlic studies retain their original policy bytes. The new builder
+refuses a combined subset/vote trial or missing policy before label reads.
+Synthetic observation, admission and builder-refusal controls pass; the
+fresh real-data root has not yet run, so counts remain unverified until its
+admitted preparation succeeds.
+
 The existing observation mapper now has an explicit vote-preserving mode.
 Synthetic controls retain a `(1,1)` disagreement as two 0.5 targets and reject
 missing, fractional, inconsistent or three-vote counts. The original hard-pair

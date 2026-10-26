@@ -347,6 +347,9 @@ def cmd_datasets(a):
     """Extend the existing derived root builder; never mutate frozen inputs."""
     weight = getattr(a, "nominal_weight", 0.5)
     subsets = getattr(a, "additional_subsets", False)
+    votes = getattr(a, "bapps_votes", False)
+    if subsets and votes:
+        raise ValueError("vote replacement and subset append are separate studies")
     available = DATASET_SUBSETS if subsets else (*DATASET_MOS, *DATASET_PAIR)
     requested = getattr(a, "collections", None)
     selected_collections = available if requested is None else tuple(requested.split(","))
@@ -361,6 +364,27 @@ def cmd_datasets(a):
         raise ValueError("dataset root destination must be fresh")
     out.parent.mkdir(parents=True, exist_ok=True)
     parent_packet, projection = None, None
+    vote_policy = None
+    if votes:
+        if selected_collections != ("bapps",) or weight != 0.5 or not getattr(a, "confidence", None):
+            raise ValueError("native votes require BAPPS mass 0.5 and its frozen confidence policy")
+        if sha(source/"wide/frozen.json") != "a7fd4af0c2bb5a8981be636e5c1cb1a51db57496b7c60d7bf6da01d71dd16952":
+            raise ValueError("native votes require the original Mlic root and BAPPS mass 0.5")
+        policy_path = Path(a.confidence)
+        if sha(policy_path) != "40407d74cf998da64400b36a7885b798333c886227c9c6aef5927cb1777e3e02":
+            raise ValueError("native votes require the corrected frozen confidence policy")
+        with policy_path.open() as stream:
+            classifications = {r["dataset"]:r for r in csv.DictReader(stream, delimiter="\t")}
+        if (classifications["bapps"]["policy"], classifications["bapps"]["tier"],
+                classifications["bapps"]["per_item"]) != ("train", "C", "2"):
+            raise ValueError("native BAPPS training/count policy differs")
+        parent_packet = json.loads((source/"datasets/receipt.json").read_text())
+        frozen = json.loads((source/"wide/frozen.json").read_text())
+        if sha(source/"datasets/receipt.json") != frozen["dataset_legs_sha256"]:
+            raise ValueError("original Mlic dataset receipt changed")
+        vote_policy = dict(schema="mlic-native-vote-policy-v1", confidence_sha256=sha(policy_path),
+                           source_frozen_sha256=sha(source/"wide/frozen.json"),
+                           native_votes_per_pair=2, nominal_weight=0.5, TRAIN_memberships=146003)
     if subsets:
         if (sha(source/"wide/frozen.json") != "a7fd4af0c2bb5a8981be636e5c1cb1a51db57496b7c60d7bf6da01d71dd16952"
                 or sha(admission/"validation-receipt.json") != SUBSET_ADMISSION_SHA
@@ -371,8 +395,10 @@ def cmd_datasets(a):
     # Metadata/identity audit comes before the first new label value.
     guard_path = out.parent / "FAMILY_GUARD.json"
     guard, memberships = dataset_family_guard(admission, source, guard_path)
-    if subsets and guard["inherited_leaks"]:
-        raise ValueError("subset append would alter inherited Mlic rows")
+    if (subsets or votes) and guard["inherited_leaks"]:
+        raise ValueError("derived trial would alter inherited Mlic rows")
+    if votes and guard["membership_sha256"]["bapps"] != "96e5acc0d01c412d81e9a5259df5a6af903550a2d85138cc3b45fd6f75f9b669":
+        raise ValueError("frozen BAPPS membership changed")
     shutil.copytree(source, out)
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]/"rev4_featpot"))
     from v2_teacher import row_keys_sha, selection_sha
@@ -412,15 +438,37 @@ def cmd_datasets(a):
     guard["inherited_leaks"] = remaining
     guard_path.write_text(json.dumps(guard, indent=1)+"\n")
     legdir = out / "datasets"
-    legdir.mkdir(exist_ok=subsets)
+    legdir.mkdir(exist_ok=subsets or votes)
     shutil.copyfile(guard_path, legdir/"FAMILY_GUARD.json")
     if subsets:
         shutil.copyfile(out.parent/"SUBSET_POLICY.json", legdir/"SUBSET_POLICY.json")
+    if votes:
+        (legdir/"NATIVE_VOTE_POLICY.json").write_text(json.dumps(vote_policy, indent=1)+"\n")
     guard_path = legdir/"FAMILY_GUARD.json"
     ledger = out.parent/"LABEL_READS.json"
     selected = [int(x) for x in Path(a.columns).read_text().strip().split(",")]
     protected = set(guard["protected_families"])
     legs = list(parent_packet["groups"]) if subsets else []
+    if votes:
+        for group in parent_packet["groups"]:
+            if group["collection"] == "bapps":
+                continue
+            group = dict(group)
+            path, keys = (out/Path(group[k]).relative_to(source) for k in ("path", "keys_path"))
+            if sha(path) != group["table_sha256"] or sha(keys) != group["keys_sha256"]:
+                raise ValueError("native vote rebuild changed inherited MOS payload")
+            dp = Path(str(path)+".manifest.json")
+            if sha(dp) != group["manifest_sha256"]:
+                raise ValueError("native vote rebuild changed inherited MOS declaration")
+            declaration = json.loads(dp.read_text())
+            if declaration["nominal_weight"] != 0.5:
+                raise ValueError("native vote rebuild requires original Mlic masses")
+            declaration["admission_root"] = str(out)
+            dp.write_text(json.dumps(declaration, indent=1)+"\n")
+            group.update(path=str(path), keys_path=str(keys), manifest_sha256=sha(dp))
+            legs.append(group)
+        if len(legs) != 7:
+            raise ValueError("native vote rebuild requires seven inherited MOS legs")
     jobs = []
     for c in selected_collections:
         if subsets and c == "irccyn-ivc-toyama-scores":
@@ -441,10 +489,17 @@ def cmd_datasets(a):
         if (preparation["membership_sha256"] != guard["membership_sha256"][c]
                 or preparation["mapping_sha256"] != sha(features/"inputs"/c/"membership-to-pairs.parquet")):
             raise ValueError("feature-to-membership mapping changed")
+        bank = features/"bank"/c.replace("-", "_")
+        manifest = json.loads((bank/"_MANIFEST.json").read_text())
+        if (manifest["feature_set_id"] != "basic+peaks+v2@w1825/rev7_rowlanes#36c3f3af"
+                or manifest["build_commit"] != "b77883be18db5933a9db4b9e2670a2ba88a9729b"):
+            raise ValueError("dataset feature producer/hash differs")
+        if votes and sha(bank/"_MANIFEST.json") != "ecd9f0b96dc175cff5caeb1af06f038f359b7c17e1ed091a4a0dc85058950551":
+            raise ValueError("native vote root requires original BAPPS feature manifest")
         labels = {}
         pair_mode = c in DATASET_PAIR or protocol == "pairs.tsv"
         columns = ["ref", "a", "b", "p_a"] if pair_mode else ["ref", "item", "score", "higher_is_better"]
-        if subsets and protocol == "pairs.tsv":
+        if votes or (subsets and protocol == "pairs.tsv"):
             columns += ["n_a", "n_b", "n_tie", "n"]
         for table in sorted({r["input_table"] for r in members}):
             wanted = {r["row_index"] for r in members if r["input_table"] == table}
@@ -452,12 +507,10 @@ def cmd_datasets(a):
         if subsets and c == "colourlab-cognitive-science-2022":
             parent = pq.read_table("/mnt/v/zensim/dataset-admission-20261025/colourlab-rating-variability-2022/membership.parquet").to_pylist()
             labels = subset_parent_binding(members, labels, projection, parent)
-        obs, dropped = dataset_observations(c, members, mapping, labels)
-        bank = features/"bank"/c.replace("-", "_")
-        manifest = json.loads((bank/"_MANIFEST.json").read_text())
-        if (manifest["feature_set_id"] != "basic+peaks+v2@w1825/rev7_rowlanes#36c3f3af"
-                or manifest["build_commit"] != "b77883be18db5933a9db4b9e2670a2ba88a9729b"
-                or sha(bank/"features.parquet") != manifest["features_parquet_sha256"]):
+        obs, dropped = dataset_observations(c, members, mapping, labels, votes=votes)
+        if votes and (len(members) != 146003 or len(obs) != 2*len(members)):
+            raise ValueError("native vote root must retain every frozen BAPPS TRAIN comparison")
+        if sha(bank/"features.parquet") != manifest["features_parquet_sha256"]:
             raise ValueError("dataset feature producer/hash differs")
         tab = pq.read_table(bank/"features.parquet")
         index = {k:i for i,k in enumerate(tab["pair_key"].to_pylist())}
@@ -489,6 +542,19 @@ def cmd_datasets(a):
             native_role="TRAIN",rows=len(obs),table_sha256=sha(path),admission_root=str(out),
             training_width=training_width,
             membership_sha256=guard["membership_sha256"][c],feature_manifest_sha256=sha(bank/"_MANIFEST.json"))
+        if votes:
+            native_votes = []
+            for member in members:
+                label = labels[(member["input_table"], member["row_index"])]
+                native_votes.append(dict(source=f"{c}:{member['input_table']}:{member['row_index']}",
+                    **{k:int(label[k]) for k in ("n_a", "n_b", "n_tie", "n")}, p_a=float(label["p_a"])))
+            vp = legdir/"bapps.votes.json"
+            vp.write_text(json.dumps(dict(schema="bapps-native-votes-v1", comparisons=native_votes), separators=(",", ":"))+"\n")
+            decl.update(schema="subjective-training-leg-v3", loss="binomial-two-vote",
+                        target_transform="native-vote-probability", collection="bapps", native_votes_per_pair=2,
+                        native_votes_path=str(vp), native_votes_sha256=sha(vp), keys_path=str(kp), keys_sha256=sha(kp))
+            from subjective_training_leg import validate_native_votes
+            validate_native_votes(decl, [r["human_score"] for r in obs])
         dp = Path(str(path)+".manifest.json")
         dp.write_text(json.dumps(decl,indent=1)+"\n")
         corrected_weight = leg_weight/(sum(1-1/n for n in counts.values())/len(counts))
@@ -497,6 +563,8 @@ def cmd_datasets(a):
             keys_path=str(kp),keys_sha256=sha(kp),rows=len(obs),source_counts=counts,
             collection=c,membership_rows=len(members),dropped=dropped,groups=len(counts),
             pairs=sum(n*(n-1)//2 for n in counts.values())))
+        if votes:
+            legs[-1]["name"] = "subjective_vote_bapps"
         log(f"{c}: {len(members)} memberships, {len(obs)} rows, {len(counts)} groups; dropped {dropped}")
         if subsets:
             legs[-1].update(protocol=protocol or members[0]["input_table"], nominal_weight=leg_weight,
@@ -524,6 +592,10 @@ def cmd_datasets(a):
                       inherited_label_reads_path=parent_packet["label_reads_path"],
                       subset_policy_sha256=sha(legdir/"SUBSET_POLICY.json"),
                       source_frozen_sha256=sha(source/"wide/frozen.json"), build_only=True)
+    if votes:
+        packet.update(source_frozen_sha256=sha(source/"wide/frozen.json"),
+                      native_vote_policy_sha256=sha(legdir/"NATIVE_VOTE_POLICY.json"),
+                      inherited_label_reads_path=parent_packet["label_reads_path"])
     pp = legdir/"receipt.json"
     pp.write_text(json.dumps(packet,indent=1)+"\n")
     frozen = json.loads((out/"wide/frozen.json").read_text())
@@ -1464,6 +1536,8 @@ def main() -> int:
     ds.add_argument("--collections", help="comma-separated subset; default all eleven")
     ds.add_argument("--additional-subsets", action="store_true",
                     help="append the registered subset protocols to the frozen eight-leg Mlic root; build only")
+    ds.add_argument("--bapps-votes", action="store_true", help="replace only BAPPS with the registered two-vote likelihood leg")
+    ds.add_argument("--confidence", help="frozen corrected confidence policy TSV, required for native votes")
     ds.set_defaults(fn=cmd_datasets)
     ml = sub.add_parser("mix-licence")
     ml.add_argument("--study", required=True)

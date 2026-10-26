@@ -433,6 +433,11 @@ dataset-trainer-build target:
 dataset-root source out admission features library columns weight='0.5' collections='pipal,mdid,live-md,cid-iq,cid-oa,vcl-fer,irccyn-ivc,colourlab-rating-variability-2022,bapps,pieapp,fg-iqa':
     python3 -B scripts/byconstruction/ring_root.py datasets --root {{quote(source)}} --out {{quote(out)}} --admission {{quote(admission)}} --features {{quote(features)}} --library {{quote(library)}} --columns {{quote(columns)}} --nominal-weight {{quote(weight)}} --collections {{quote(collections)}}
 
+# Fresh root only; fixed original Mlic memberships/masses and corrected policy.
+# Caller holds heavy.lock and run-heavy, serialized with training/evaluation.
+dataset-vote-root source out admission features library columns confidence:
+    python3 -B scripts/byconstruction/ring_root.py datasets --root {{quote(source)}} --out {{quote(out)}} --admission {{quote(admission)}} --features {{quote(features)}} --library {{quote(library)}} --columns {{quote(columns)}} --nominal-weight 0.5 --collections bapps --bapps-votes --confidence {{quote(confidence)}}
+
 # Build only. Caller holds heavy.lock and run-heavy; original mix selection stays first.
 dataset-subsets-root source out columns:
     python3 -B scripts/byconstruction/ring_root.py datasets --additional-subsets --root {{quote(source)}} --out {{quote(out)}} --admission /mnt/v/zensim/dataset-subsets-20261025/admission --features /mnt/v/zensim/dataset-subsets-20261025/features --library /mnt/tower/input/iqa/datasets --columns {{quote(columns)}} --nominal-weight 0.5
