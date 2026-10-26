@@ -46,7 +46,7 @@ fn main() {
     }
     assert!(
         matches!(argv.len(), 5 | 6),
-        "usage: probe fused|unfused normal|decay|tiny-l2|tiny-moment|subnormal-weight STEPS v3|scalar|native [lazy|touched]"
+        "usage: probe fused|unfused normal|normal-l2|decay|tiny-l2|tiny-moment|subnormal-weight STEPS v3|scalar|native [lazy|touched]"
     );
     let steps: usize = argv[3].parse().unwrap();
     let _guard = archmage::testing::lock_token_testing();
@@ -72,7 +72,7 @@ fn main() {
     ];
     let mut g = vec![0.0; n];
     let initial = match argv[2].as_str() {
-        "normal" => 0.01,
+        "normal" | "normal-l2" => 0.01,
         "decay" => f64::MIN_POSITIVE * 2.0,
         "tiny-l2" | "tiny-moment" | "subnormal-weight" => 0.0,
         _ => panic!("unknown state"),
@@ -93,6 +93,7 @@ fn main() {
     }
     let x = vec![0.0; 820];
     let dh = vec![0.0; 128];
+    assert!(argv[2] != "normal-l2" || argv[1] == "fused");
     for _ in 0..steps {
         match argv[1].as_str() {
             "fused" => adam_update_w1_fused(&mut AdamW1FusedArgs {
@@ -107,7 +108,7 @@ fn main() {
                 n_hidden: 128,
                 l2_scale: if matches!(
                     argv[2].as_str(),
-                    "tiny-l2" | "tiny-moment" | "subnormal-weight"
+                    "normal-l2" | "tiny-l2" | "tiny-moment" | "subnormal-weight"
                 ) {
                     1e-5
                 } else {
@@ -142,10 +143,11 @@ fn main() {
         black_box((&w, &m, &v));
     }
     println!(
-        "kernel={} state={} steps={steps} tier={} pages={pages} params={n} m_bits={:016x} v_bits={:016x}",
+        "kernel={} state={} steps={steps} tier={} pages={pages} params={n} w_bits={:016x} m_bits={:016x} v_bits={:016x}",
         argv[1],
         argv[2],
         argv[4],
+        w[0].to_bits(),
         m[0].to_bits(),
         v[0].to_bits()
     );

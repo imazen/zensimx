@@ -384,3 +384,42 @@ The original control folder has best/last refit bakes and a dense bake, with no
 pre-existing packed bake. Packed comparisons therefore freshly pack both the
 frozen reference and candidate through the same canonical owner and TRAIN
 anchor. Comparison subprocesses explicitly use one thread and v3 dispatch.
+
+## Store-preserving full replays and normal-path profiling
+
+The store-preserving successor completes the i265 control in 2721.960114026 s
+(2718.716656000 user, 1.198070000 system), with 14,575,609,544,173 cycles,
+33,168,445,500,348 instructions and 26,369,672 FP assists. Maximum RSS is
+2,132,212 KiB, with no swaps. Resource wrapper:
+`run-heavy: done rc=0 2722s | peak-RSS 0.03GiB | min-avail 19211MiB | peak-load 3.14`.
+The wrapper measures its client; GNU time measures the actual container trainer.
+
+On quiet dev, the same successor takes 2140.277556482 s (2137.630308000 user,
+0.606442000 system), 11,349,578,767,010 cycles, 33,177,262,625,347 instructions
+and 8 AMD FP dispatch faults. Maximum RSS is 2,131,308 KiB; no swaps. This is a
+21.1% elapsed-time regression from the frozen 1766.748224283 s baseline.
+Both trainers exit successfully and write COMPLETE records. The outer resource
+wrapper subsequently exits 2 with an unexpected-EOF error in its footer. Its
+source modification time is 04:53:43 UTC, during the pair, and its current syntax
+check passes. No wrapper peak-RSS footer is available for this pair; the trainer
+GNU time records and Docker's 12 GiB cap remain available. Later long runs use a
+checksum-recorded private snapshot of the wrapper to avoid live script changes.
+
+All three new comparisons (Intel successor, dev frozen baseline, dev successor)
+reproduce all 7,869 prediction rows exactly, including their serialized bytes.
+Best/last refit, dense and freshly packed bakes become byte-identical after
+the native section-splice tool replaces only `zentrain.repro` with `{}`.
+This preserves every other raw section and does not rebake the model. Raw bake
+and specification differences remain recorded, with every offset and JSON path.
+
+The new `normal-l2` probe covers the common nonzero L2/moment path. On i265 CPU 2,
+20,000 updates over 104,960 parameters take 3.731870611 s, 19,811,587,703 cycles,
+55,145,586,719 instructions and zero assists. Final w/m/v bits are
+`3dc1e0912e0ca552` / `3cbabd0460f81372` / `3db676e45977c4b5`. Cycle sampling
+attributes 99.89% to the fused Adam owner. The preserved annotation shows repeated
+classification/blend work around the canonical sqrt/divide chain. This motivates
+removing redundant classification without changing any arithmetic result.
+Probe build/check resource record:
+`run-heavy: done rc=0 2s | peak-RSS 0.21GiB | min-avail 22259MiB | peak-load 1.05`.
+Counter/profile pair:
+`run-heavy: done rc=0 8s | peak-RSS 0.05GiB | min-avail 21975MiB | peak-load 1.15`.
