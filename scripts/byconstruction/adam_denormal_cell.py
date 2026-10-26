@@ -241,10 +241,46 @@ def status():
                       "failed": "Traceback" in errors or "RuntimeError" in errors}))
 
 
+def docker_control():
+    parser = argparse.ArgumentParser(description="Run one frozen-image control with recorded resource limits")
+    parser.add_argument("--plan", type=Path, required=True)
+    parser.add_argument("--phase", choices=("before", "after"), required=True)
+    parser.add_argument("--output", required=True)
+    parser.add_argument("--dry-run", action="store_true")
+    args = parser.parse_args(sys.argv[2:])
+    plan = json.loads(args.plan.read_text())
+    if not re.fullmatch(r"[a-z0-9][a-z0-9-]*", args.output):
+        raise ValueError("output must be one fresh directory name")
+    if not re.fullmatch(r"[^\s]+@sha256:[0-9a-f]{64}", plan["image"]):
+        raise ValueError("control image must be pinned by digest")
+    if int(plan["memory_bytes"]) <= 0 or int(plan["cpu"]) < 0:
+        raise ValueError("invalid resource limits")
+    command = ["docker", "run", "--rm", "--name", "adam-denormal-" + args.output,
+               "--cap-add", "PERFMON", "--security-opt", "seccomp=unconfined",
+               "--cpuset-cpus", str(plan["cpu"]), "--cpu-shares", "256",
+               "--memory", str(plan["memory_bytes"]), "--memory-swap", str(plan["memory_bytes"])]
+    for source, target in plan["mounts"].items():
+        if not Path(source).exists():
+            raise FileNotFoundError(source)
+        command.extend(["-v", source + ":" + target + ("" if target == "/adam" else ":ro")])
+    command.extend(["--entrypoint", "/usr/bin/nice", plan["image"], "-n19", "ionice", "-c3",
+                    "python3", "/adam/input/" + plan.get("launch_script", "launch-dev.py"),
+                    args.phase, args.output])
+    if args.dry_run:
+        print(json.dumps(command, indent=2))
+        return
+    record = args.plan.parent / "results" / f"{args.output}.docker-command.json"
+    with record.open("x") as stream:
+        stream.write(json.dumps(command, indent=2) + "\n")
+    subprocess.run(command, check=True)
+
+
 if __name__ == "__main__":
     if len(sys.argv) > 1 and sys.argv[1] == "compare":
         compare()
     elif len(sys.argv) > 1 and sys.argv[1] == "status":
         status()
+    elif len(sys.argv) > 1 and sys.argv[1] == "docker":
+        docker_control()
     else:
         main()

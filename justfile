@@ -679,6 +679,28 @@ adam-denormal-compare-splice reference candidate tools root output probe:
 adam-denormal-status output:
     python3 scripts/byconstruction/adam_denormal_cell.py status --out {{quote(output)}}
 
+adam-denormal-docker plan phase output:
+    python3 scripts/byconstruction/adam_denormal_cell.py docker --plan {{quote(plan)}} --phase {{quote(phase)}} --output {{quote(output)}}
+
+# Keep the entire matched pair quiet under one shared heavy-lock/resource scope.
+adam-denormal-quiet-pair plan tests before after:
+    env TMPDIR="$HOME/tmp" flock "$HOME/tmp/heavy.lock" "$HOME/work/zen/scripts/run-heavy" --mem 12G --jobs 1 -- just adam-denormal-pair-held {{quote(plan)}} {{quote(tests)}} {{quote(before)}} {{quote(after)}}
+
+adam-denormal-pair-held plan tests before after:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    set -o noclobber
+    before={{quote(before)}}
+    base=$(dirname {{quote(plan)}})
+    if pgrep -x zensim_mlp_trai > "$base/results/$before-busy-trainers.txt"; then
+      echo 'Existing trainers are active; a quiet timing pair cannot start.' >&2
+      exit 1
+    fi
+    { date -u; lscpu; free -h; mpstat -P ALL 1 2; } > "$base/results/$before-preflight.log"
+    env -u ZENSIM_MAX_TIER {{quote(tests)}} --test-threads=1 > "$base/results/$before-native-tests.log" 2>&1
+    just adam-denormal-docker {{quote(plan)}} before {{quote(before)}}
+    just adam-denormal-docker {{quote(plan)}} after {{quote(after)}}
+
 adam-denormal-repro model output:
     tools/adam-denormal-probe/target/release/adam-denormal-probe --repro {{quote(model)}} {{quote(output)}}
 
