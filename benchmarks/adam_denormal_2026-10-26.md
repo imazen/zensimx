@@ -1,5 +1,12 @@
 # Adam subnormal reproduction (2026-10-26)
 
+Current status: the final dev comparison was interrupted by owner priority at
+07:55Z and is scientifically incomplete. Its timing must not be used. All
+evidence is retained; see the interruption record at the end of this report.
+The owner now prohibits benchmarks on dev. All later benchmark reruns must use
+another available host and must not take dev's heavy lock or interrupt the
+priority training/evaluation work. The selected Adam repair remains on main.
+
 Source before the numerical change: `e8704f52`. Tool:
 `tools/adam-denormal-probe`, which includes the actual trainer's `adam_simd.rs`.
 Dependencies match the root lockfile: archmage/magetypes 0.9.30. Rust 1.99.0,
@@ -566,3 +573,42 @@ Its source, Cargo manifest/lock, executable and complete output are retained;
 the inactive Cargo output directory created on that host is removed after
 preserving them.
 `run-heavy: done rc=0 43s | peak-RSS 0.37GiB | min-avail 26676MiB | peak-load 6.98`.
+
+## Final dev comparison interrupted by owner priority
+
+On 2026-10-26 the owner made training/evaluation the immediate priority and
+specified that benchmarks do not belong on dev. The coordinator verified that
+the queued archive/copy waiter, PID 1899204, had no children, then canceled it
+with SIGTERM before releasing the running comparison. The coordinator stopped
+the exact container `be6197ce4765` (`adam-denormal-dev-after-final`) with
+`docker stop --timeout 30`. This lane sent no duplicate stop signals.
+
+The comparison's lock holder 1759032, Docker parent 1884996, container init
+1885044, trainer 1885126, queued waiter 1899204, and the previously recorded
+benchmark children have exited. No owned benchmark container or resource scope
+remained at verification. AIC acquired the shared heavy lock at
+07:55:50.754629Z; subsequent observation found AIC holder 1994057 and its training
+process 1994106. This lane did not stop or modify AIC processes.
+
+The after phase last logged zero-based epoch 108 of 120. It has no
+`COMPLETE.json`; its `perf.stat` and `time.txt` are empty. The outer Docker
+command returned 137 and the pair wrapper returned 1. The entire
+`dev-before-final`/`dev-after-final` comparison is **interrupted and scientifically
+incomplete**. Do not salvage timing, compare the completed before phase with
+the partial after phase, or extrapolate a full result. Earlier completed
+experiments above retain their separately stated evidence and limitations.
+
+All existing logs, partial checkpoints, bakes, input snapshots and binaries are
+retained in place under
+`/mnt/v/output/zensim/adam-denormal-20261026/dev/`. Interruption sidecars are
+`dev-after-final/INTERRUPTED.json`, `FINAL_PAIR_INTERRUPTED.json` and
+`INTERRUPTION_COORDINATOR_CONFIRMATION.json`. The coordinator's independent
+receipts are `DEV_BENCHMARK_PREEMPTION.json` and `DEV_RELEASED_FOR_MLIC.json`
+under `/mnt/v/output/zensim/aic-finetune-20261026/coordinator-context-review/`.
+No evidence was deleted or overwritten, and the canceled archive/copy work was
+not restarted.
+
+No dev benchmark rerun is scheduled. The already-running i134 baseline uses
+owned frozen input and coverage snapshots; any remaining benchmark phase runs
+off dev. The numerical repair and its arithmetic-version separation remain
+selected; frozen studies retain their original binaries.
