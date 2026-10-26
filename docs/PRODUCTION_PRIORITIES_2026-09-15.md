@@ -6,6 +6,23 @@ text in this repository. Preserve higher-level instructions, split protections,
 registered numerical gates and historical evidence. An old experiment remains
 a record of what happened, not authority to restart its abandoned work.
 
+## Owner queue update — October 26, 2026
+
+Zensim training and evaluation take priority. Finish the registered Mlic AIC2026
+public_train comparison and preserve its existing scientific and production
+qualification gates. Model-agent availability is separate from experiment
+progress; verify run artifacts and failures directly.
+
+**Queued: seamless HDR frontend, after adoption of a stable candidate.** Record
+the adopted candidate's exact identity and the evidence supporting the decision
+before starting the frontend work. A provisional training winner alone does not
+release this dependency. The frontend should reuse the adopted scorer and the
+existing color/HDR contracts; its implementation is not started by this queue
+entry. “Optimal” remains relative to the agreed evidence and gates, not a claim
+of a proven global optimum.
+
+## Production deliverable
+
 The deliverable is a production-qualified Rev3 model with one useful target
 score, fast complete Rust inference, useful spatial steering, correct declared
 color/HBD/HDR inputs, and a thresholded integrity companion. Preserve a fast
