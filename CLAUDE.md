@@ -160,6 +160,10 @@ because cleanup tests or a historical training reproduction pass.
 
 ## Known Bugs
 
+* **2026-10-26 — AIC coordinator EVAL copy omitted judge keys. Fixed (`940e795b`).** The first report refused the missing `judge_pairs.tsv` after producing three seed predictions, before any statistic report completed. The recovery binds the original plan, failure and prediction hashes, adds only the frozen judge-key tables, and uses a fresh assessment directory. The failed attempt and label-read ledger are preserved; completed predictions are reused. Input completeness is now checked before assessment reads. No model, label, selector or statistic changed.
+
+* **2026-10-26 — completed TRAIN status could hide later-stage failure. Fixed (`b3a45faf`, `a8daef38`, `bb942e1c`).** Full-data continuation, label-free gates and coordinator EVAL have separate live process identities and completion/failure receipts. Progress follows the active stage, and partial identity output is not counted as a completed gate. Checks cover dead workers, incomplete receipts and failure precedence.
+
 * **2026-10-26 — AIC fold inference rejects null unused slots.** The fold writer's pandas-to-Arrow conversion turns extraction NaNs into nulls. The frozen trainer reads the selected finite features, but the full-width prediction reader rejects the unused null slots. Preserve those fit tables; inference-only views restore the original extraction arrays after exact observed-value and row-key checks. A real frozen-scorer control reproduced all 560 held-out prediction values exactly. The failed run and its completed fits remain evidence, not completed evaluation.
 
 * **2026-10-26 — DIBR subset pair ingestion. Fixed.** The native table leaves `p_a` blank and stores row-preferred vote counts. The root reader derives the hard direction from the checked `n_a`, `n_b`, `n_tie`, `n` total; votes do not weight the loss. The partial root and TRAIN-read ledger remain preserved. Count-direction parity and inconsistent-total refusal are checked.
