@@ -4422,3 +4422,25 @@ Whole-reference paired bootstrap,2,000 resamples/seed1, using stored predictions
 | vcl-fer | M7 | +0.002058 [-0.001847, +0.008863] | 8 |
 
 Relative to M7, Mlic has positive point differences on MDID and NITS and a negative difference on CID:OA with descriptive intervals excluding zero. Relative to Mdata, its IRCCyN/IVC, NITS and VCL differences have negative descriptive intervals. This preserves the mixed EVAL outcome alongside the TRAIN-only licence-eligible choice. The full report also retains B7 and all three peer comparisons and the labelled legacy row-bootstrap auxiliary field.
+
+### Mlic64 against Mlic: the registered shape rule keeps M's shape (2026-10-26)
+
+Mlic64 (the Mlic root with M64's shape, `mono:thr:mp64`) ran its 12 E21 cells and three full-data seeds on dev
+(16 trainers in one 42 GiB scope, 02:58–04:03Z; peak 33.8 GB, no OOM kill). Its full-data seeds are certified monotone
+(zero free ramps, selected epoch 119; packed sha256 seed 0 `7a05deec…`, seed 1 `2f4fbabc…`, seed 2 `85532fb1…`).
+
+| Set (E21, out of sample, three seeds) | Mlic | Mlic64 | Paired difference (seed-unit SE) |
+|---|---:|---:|---:|
+| KADID | 0.8825 | 0.8829 | +0.0005 (0.0011) |
+| TID2013 | 0.8741 | 0.8731 | −0.0010 (0.0010) |
+| KonFiG-IQA | 0.8078 | 0.7993 | −0.0085 (0.0065) |
+| CID22-A | 0.8808 | 0.8786 | −0.0022 (0.0037) |
+| Mean of the four (per-seed differences +0.0000, −0.0043, −0.0042) | | | **−0.0028 (0.0014)** |
+
+Rule 1 required a gain of at least two seed-unit SEs; Mlic64 is about two SEs worse, so **Mlic keeps M's shape**. M64's
+gain on the Mdata data (+0.0046, SE 0.0017) does not carry over to the licence-clean data. Its nine held-out-new-data
+cells could not change this outcome and were withdrawn from the fleet queue. Reported, not deciding: standard-mixture
+inversions over the 12 cells, Mlic 41 (largest rise +6.17) and Mlic64 36 (+5.83); global edits 0 for both. Mlic's
+full-data seed 0 already passes every label-free gate (NEARID 143 monotone ladders; dial C1 0.9977 / 0.9932, C3 0.7885;
+G-STEER 132/135; identity at 12 SIMD permutations), so its one EVAL read follows (seed 0 reuses the data-legs lane's
+frozen read). Mlic64's bakes stay registered for later evaluation.
