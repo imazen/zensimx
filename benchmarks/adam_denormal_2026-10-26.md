@@ -185,3 +185,31 @@ accept the remote layout. Full output is in
 `intel/results/verification-final2.log` under the artifact root. The standalone
 native model reader also verifies the new arithmetic version in the completed
 replay's embedded provenance.
+
+## Final fixed-work probe
+
+Final source `286fd9e4`, preserved trainer SHA-256
+`cef30445eaf804969145f89e59282c1e009668462a1234c8f93c68d4053d8159`.
+The kernel file hash is
+`2430fb5324bc8f06d99e5fb553de30bdd681d003173d533171286bc69790b86a`.
+The final rebuild resource record is
+`run-heavy: done rc=0 33s | peak-RSS 1.30GiB | min-avail 19252MiB | peak-load 4.16`.
+The following single observations use the same i265 CPU 2, 2,000 steps,
+104,960 parameters and v3 tier as the original probe:
+
+| Final state | Elapsed seconds | P-core cycles | P-core instructions | FP assists |
+|---|---:|---:|---:|---:|
+| normal | 0.187329725 | 966,317,142 | 3,682,696,729 | 0 |
+| decay | 0.128464481 | 663,815,065 | 2,545,934,359 | 368,270 |
+| tiny-l2 | 0.807562376 | 4,151,191,942 | 2,009,511,391 | 0 |
+| tiny-moment | 0.807628885 | 4,150,042,174 | 2,009,406,363 | 0 |
+| subnormal-weight | 0.807697956 | 4,150,957,465 | 2,009,883,025 | 0 |
+
+Final normal-state moment bits match the original probe. All other final
+moments are +0. The decay arm still pays for transitions into the flushed
+state; repeated tiny-gradient states have zero assists. The normal control
+has added instruction/time cost, and the tiny-weight fixed-point shortcut is
+slower than the earlier L2-only probe despite fewer instructions. These are
+reported costs, not a claim of improvement on every input. Full-cell timings
+use the final preserved executable. Probe resource record:
+`run-heavy: done rc=0 3s | peak-RSS 0.02GiB | min-avail 20641MiB | peak-load 3.34`.
