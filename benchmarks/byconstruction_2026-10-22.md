@@ -4623,5 +4623,33 @@ SHA256 separately; never replace finished studies' binaries.
 
 Only a qualifying winner receives three full-data continuations from Mlic's
 three unpacked full-data seeds, with all public_train rows in the AIC leg.
+
+#### Guarded continuation launch queued (2026-10-26 07:28 UTC)
+
+The implementation cut is `68d66c4f46ebce936c63768e8fc324509b633ce3`,
+including the separate Adam change `088ef0d3`. Its private launch packet pins
+2,570 source files and the frozen Mlic tools. The approved unpublished trainer
+fields are `MlpHyperparams::init_from: Option<PathBuf>` (default `None`) and
+`constant_lr: bool` (default `false`). The real CLI checks checkpoint formula
+revision and every admitted training leg's feature-set identity, in addition
+to the private reader's head, derived-input, read-set, scaler and monotone
+parameter checks. Native negative controls cover revision and feature-set
+mismatches.
+
+One visible chain is queued under the shared heavy lock. All checks, the actual
+Mlic zero-step prediction comparison, and a full default-training reproduction
+against the frozen trainer must pass before it freezes the new tools and
+starts either registered arm. The frozen trainer reference SHA256 is
+`acfb2a9f24fd7a294f027b552b19eef1b9b4d707cbdf5e0bdf22ef328db3fe28`.
+No finished study binary is replaced. Each failed stage writes a failure
+receipt and exits nonzero; passing preflight proceeds directly to the arms.
+
+At queue admission, the new trainer is unbuilt, the actual-trainer controls
+are unrun, and completed continuation cells are **0/24**. This is launch
+readiness, not a training or quality result. Python D6/D1 admission controls
+passed (22 tests); the independent label-free fold audit agrees with manifest
+`0c9595f65d0ad08587c04821fc734733c0582033cbb96ad902eb4406556b3d18`.
+Private control, progress, prediction and failure receipts are kept under
+the continuation study's `run-01/`; no label or generated model is published.
 Pack and certify those final bakes, register their hashes, and mirror them.
 The coordinator owns subsequent product gates and the single EVAL assessment.
