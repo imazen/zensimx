@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### QUEUED BREAKING CHANGES
+
+- Unpublished `zensim-validate`: explicit `MlpHyperparams` struct literals gain the owner-approved `init_from` and `constant_lr` fields (`None` and `false` preserve default behavior). Supported serving-crate APIs are unchanged.
+
 ### Validation training tools
 
 - Add opt-in checkpoint initialization and constant learning rate for the registered Mlic AIC public_train continuation. The unpublished trainer's approved `MlpHyperparams::init_from` and `constant_lr` fields default to `None` and `false`; the launch requires actual-trainer zero-step and frozen-trainer default parity before fitting either arm.
