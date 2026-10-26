@@ -21,6 +21,32 @@ existing color/HDR contracts; its implementation is not started by this queue
 entry. “Optimal” remains relative to the agreed evidence and gates, not a claim
 of a proven global optimum.
 
+The owner's follow-up asks whether the zenpapers weighting and ordering
+proposals were adopted. The registered AIC continuation still uses inherited
+collection masses with pair-acceptance correction and `--pair-sampling uniform`.
+These prospective recipe comparisons remain outstanding:
+
+- Binomial vote likelihood retaining ties.
+- Collection masses proportional to the square root of effective sample count,
+  preserving the registered total new-data mass in a future comparison.
+- Per-item confidence weights with their linking uncertainty accounted for.
+- Same-source, between-codec sampling strata at matched distortion distance.
+
+The existing stratified sampler is not evidence that this specific sampling
+scheme is active. Each proposed change needs its own preregistered comparison;
+the running AIC arms and their selection rule stay frozen. The source review is
+`zenpapers/docs/mlic-recipe-review-2026-10-26.md`, committed revision `4e81c03a`.
+
+For the queued HDR metric frontend, preserve the SDR fast path and native input
+precision; establish cost with measurement before claiming no performance
+penalty. The current declared-HDR route uses f32 rows, SIMD PU encoding and the
+shared streaming feature walk (`feature_v2_stream.rs`, `color.rs`). It still
+needs qualification of near-identity arithmetic, the PU floor in dark regions,
+display parameters and mixed SDR/HDR behavior. The existing luminance
+cancellation diagnostic is in `metric/bake.rs`; changing feature arithmetic
+requires a new formula revision and qualification. Reuse the existing
+[HDR plan](HDR_PLAN.md) and [PU21 reference](https://www.cl.cam.ac.uk/~rkm38/pdfs/mantiuk2021_PU21.pdf).
+
 ## Production deliverable
 
 The deliverable is a production-qualified Rev3 model with one useful target
