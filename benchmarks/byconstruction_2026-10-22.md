@@ -4444,3 +4444,31 @@ inversions over the 12 cells, Mlic 41 (largest rise +6.17) and Mlic64 36 (+5.83)
 full-data seed 0 already passes every label-free gate (NEARID 143 monotone ladders; dial C1 0.9977 / 0.9932, C3 0.7885;
 G-STEER 132/135; identity at 12 SIMD permutations), so its one EVAL read follows (seed 0 reuses the data-legs lane's
 frozen read). Mlic64's bakes stay registered for later evaluation.
+
+### Mlic's one EVAL read: three full-data seeds (2026-10-26)
+
+After the shape rule chose Mlic, its three full-data seeds were read once on the EVAL copy that already holds M7, Mdata
+and Mdata64 (`/var/tmp/byc-dataset-eval-2026-10-25-seeds`; `eval_rows.json` and `features.parquet` byte-identical to the data-legs lane's copy). Seed 0
+reuses the lane's frozen read (`pred_Mlic.tsv`, sha256 `88953d92…`); only seeds 1 and 2 were predicted here.
+Report sha256 `c2a6ccdceef2adcb…`; paired report `/var/tmp/byc-dataset-eval-2026-10-25-seeds/paired-Mlicens/paired.md` (`391efe9f170a0bdb…`). SROCC of the three-seed
+mean prediction (pairwise agreement for FG-IQA and PieAPP):
+
+| EVAL set | Mlic | M7 | Mdata | Mdata64 | B (B7) | SSIMULACRA2 |
+|---|---:|---:|---:|---:|---:|---:|
+| CID:IQ | 0.870 | 0.856 | 0.869 | 0.868 | 0.871 | 0.757 |
+| CID:OA | 0.890 | 0.904 | 0.901 | 0.901 | 0.882 | 0.847 |
+| Colourlab | 0.726 | 0.728 | 0.720 | 0.721 | 0.701 | 0.604 |
+| IQA-ODI | 0.842 | 0.845 | 0.843 | 0.843 | 0.849 | 0.854 |
+| IRCCyN/IVC | 0.934 | 0.940 | 0.935 | 0.935 | 0.960 | 0.949 |
+| LIVE-MD | 0.890 | 0.893 | 0.890 | 0.892 | 0.879 | 0.913 |
+| MDID | 0.895 | 0.893 | 0.891 | 0.893 | 0.892 | 0.787 |
+| NITS | 0.716 | 0.720 | 0.720 | 0.723 | 0.704 | 0.777 |
+| VCL@FER | 0.937 | 0.939 | 0.941 | 0.942 | 0.884 | 0.945 |
+| FG-IQA (pairs) | 0.758 | 0.757 | 0.758 | 0.758 | 0.758 | 0.758 |
+| PieAPP (pairs) | 0.584 | 0.582 | 0.585 | 0.585 | 0.579 | 0.560 |
+
+Paired (whole references resampled; 3–42 references per set, so descriptive): against M7, CID:IQ +0.014 (p 0.001),
+CID:OA −0.014 (p 0.012), NITS −0.004 (p 0.040), the rest level; against Mdata and Mdata64, CID:OA −0.011, NITS
+−0.004 / −0.007 and VCL@FER −0.004 / −0.005 (the cost of leaving out the validate-only data), Colourlab +0.006 against
+Mdata, the rest level. Seed spread is large on NITS (seed 1 0.692, seed 2 0.732). BAPPS follows (reusing the lane's
+seed 0). EVAL changes neither the shape nor the data choice.
