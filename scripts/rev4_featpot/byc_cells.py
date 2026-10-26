@@ -353,7 +353,14 @@ def cmd_progress(args) -> int:
         temporary = output.with_suffix(output.suffix+".new")
         temporary.write_text(text)
         temporary.replace(output)
-    print(text,end="")
+    if getattr(args,"brief",False):
+        display = dict(result)
+        display["live_processes"] = [{k:v for k,v in p.items() if k != "argv"} |
+                                     dict(program=p["argv"][0] if p["argv"] else None)
+                                     for p in result.get("live_processes",[])]
+        print(json.dumps(display,separators=(",",":")))
+    else:
+        print(text,end="")
     return 0
 
 
@@ -1186,6 +1193,7 @@ def main() -> int:
     pr.add_argument("--seeds", default="0,1,2")
     pr.add_argument("--run-state", help="recorded worker PID/start ticks, stage and frozen identities")
     pr.add_argument("--output", help="atomically update durable progress evidence")
+    pr.add_argument("--brief", action="store_true",help="keep full command lines on disk and print compact process identities")
     r = sub.add_parser("run")
     r.add_argument("--arm", required=True, help="recipe tokens, e.g. mono:thr or H1:mono")
     r.add_argument("--folds", default=",".join(FOLDS))
