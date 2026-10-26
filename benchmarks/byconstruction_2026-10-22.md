@@ -4323,3 +4323,52 @@ New-data fold entries are mean (seed-unit SE): within-reference SROCC normalized
 Frozen finalists: `FINALISTS.json` SHA256 `8191f8ced4488629c9c8d37b7439df203b0f1a9b58804bd6e9e312c8692c24c8`. Mlic reuses the coordinator’s seed-0 packed SHA256 `7612c2e46154fe9c0c359bfd02e521013f5717e3bf8e11967f5434150e220bcc`; Mw025 packed SHA256 `a6d43ef2ec717cb8f9b07ecb85f7f4c76aae7995cbce9b42e4d39ef7123ea4ac`. Both certify monotone with zero ramps. Mw025 used the registered 120 epochs × 50,000 pairs, fixed epoch119, seed0; its `run-heavy` completion was rc0, 2,271s, peak-RSS2.06GiB, min-avail15,297MiB, peak-load20.03. The RSS is the maximum single process; coordinator-owned Mlic64 work shared the explicitly approved42GiB/no-swap scope and remains separate from this study.
 
 Mw025-s0 is retained in the candidate registry (source a9a7d34997cc). All19 registry bakes passed `sha256sum -c` through the mounted tower mirror, with checksum compute on dev and no remote process. Initial rsync ownership requests failed; the content-only retry passed. Prior registry metadata and both logs are preserved. `CANDIDATE_REGISTRY_VERIFIED.json` SHA256 `20255999ae094ae034fbebed23a5ae59c70c23e42b0820a0c2cddc26ca36a42f`. No AIC2026 target was opened.
+
+### Six-arm diagnostic panel and first frozen EVAL report (2026-10-26)
+
+The table retains only dataset-held-out rows, averaged over three seeds. Full per-type results, signed biases, clumping/clamping and raw/fit tails remain in `scorecard/{bytype,type_bias,knobinv,panel}.json`; diagnostics do not choose finalists.
+
+| Arm | Dataset | Type-bias SD | Knob inversion rate | Ladder RMS | Z-RMSE | Rank error p99 | Fitted error p99 |
+|---|---|---:|---:|---:|---:|---:|---:|
+| Mdata | kadid | 0.080899 | 0.014910 | 0.089059 | 0.484136 | 0.408663 | 0.379704 |
+| Mw025 | kadid | 0.079287 | 0.013581 | 0.088365 | 0.477914 | 0.407721 | 0.381542 |
+| Mw100 | kadid | 0.078583 | 0.016891 | 0.088331 | 0.477121 | 0.404256 | 0.375138 |
+| Mmos | kadid | 0.077046 | 0.013532 | 0.087567 | 0.472411 | 0.399247 | 0.376680 |
+| Mpair | kadid | 0.079390 | 0.014209 | 0.088273 | 0.477231 | 0.402072 | 0.379320 |
+| Mlic | kadid | 0.077532 | 0.013097 | 0.087282 | 0.472303 | 0.401431 | 0.377887 |
+| Mdata | tid2013 | 0.084836 | 0.010141 | 0.059200 | 0.444892 | 0.296727 | 0.277738 |
+| Mw025 | tid2013 | 0.082506 | 0.010081 | 0.059223 | 0.441296 | 0.298891 | 0.276827 |
+| Mw100 | tid2013 | 0.083095 | 0.010322 | 0.059587 | 0.444894 | 0.293984 | 0.275805 |
+| Mmos | tid2013 | 0.089178 | 0.010503 | 0.059354 | 0.449385 | 0.304244 | 0.278204 |
+| Mpair | tid2013 | 0.083482 | 0.009658 | 0.059466 | 0.445374 | 0.296650 | 0.273758 |
+| Mlic | tid2013 | 0.084821 | 0.010141 | 0.058626 | 0.442287 | 0.298518 | 0.276314 |
+| Mdata | konfig | 0.087935 | 0.000194 | 0.131721 | 0.591952 | 0.661607 | 0.574378 |
+| Mw025 | konfig | 0.084933 | 0.000194 | 0.128165 | 0.577721 | 0.638393 | 0.569735 |
+| Mw100 | konfig | 0.085640 | 0.000194 | 0.128845 | 0.584439 | 0.638393 | 0.569416 |
+| Mmos | konfig | 0.089329 | 0.000065 | 0.133154 | 0.597035 | 0.691369 | 0.593593 |
+| Mpair | konfig | 0.089025 | 0.000194 | 0.127953 | 0.575647 | 0.630357 | 0.561813 |
+| Mlic | konfig | 0.084633 | 0.000129 | 0.128728 | 0.582080 | 0.654167 | 0.565668 |
+| Mdata | cid22_a25 | 0.036431 | 0.000200 | 0.070738 | 0.493620 | 0.402445 | 0.377916 |
+| Mw025 | cid22_a25 | 0.032990 | 0.000100 | 0.069846 | 0.486263 | 0.398364 | 0.372084 |
+| Mw100 | cid22_a25 | 0.029139 | 0.000234 | 0.070553 | 0.486535 | 0.395027 | 0.374898 |
+| Mmos | cid22_a25 | 0.035268 | 0.000100 | 0.069992 | 0.484925 | 0.397081 | 0.374690 |
+| Mpair | cid22_a25 | 0.033190 | 0.000100 | 0.070161 | 0.488375 | 0.396106 | 0.375014 |
+| Mlic | cid22_a25 | 0.038681 | 0.000167 | 0.070297 | 0.489250 | 0.395900 | 0.378415 |
+
+The frozen single-seed EVAL point table follows. MOS uses signed midrank SROCC; FG-IQA/PieAPP use soft-probability 2AFC agreement. LIVE-MD peers cover all180 rows. Mdata and peers reuse the corrected coordinator copy; only Mlic and Mw025 are newly scored. BAPPS and paired reference-bootstrap reports are still pending at this record.
+
+| Collection | Mlic | Mw025 | Mdata | M7 | B7 | SSIMULACRA2 | Butteraugli | CVVDP |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| cid-iq | 0.870 | 0.865 | 0.870 | 0.861 | 0.871 | 0.757 | 0.592 | 0.749 |
+| cid-oa | 0.893 | 0.911 | 0.893 | 0.914 | 0.882 | 0.847 | 0.577 | 0.912 |
+| colourlab-rating-variability-2022 | 0.722 | 0.723 | 0.722 | 0.723 | 0.701 | 0.604 | 0.373 | 0.612 |
+| fg-iqa | 0.758 | 0.759 | 0.758 | 0.757 | 0.758 | 0.758 | 0.749 | 0.755 |
+| iqa-odi | 0.842 | 0.848 | 0.841 | 0.843 | 0.849 | 0.854 | 0.806 | 0.833 |
+| irccyn-ivc | 0.927 | 0.937 | 0.934 | 0.935 | 0.960 | 0.949 | 0.912 | 0.928 |
+| live-md | 0.890 | 0.888 | 0.892 | 0.891 | 0.879 | 0.913 | 0.827 | 0.896 |
+| mdid | 0.899 | 0.888 | 0.902 | 0.894 | 0.892 | 0.787 | 0.572 | 0.829 |
+| nits-iqa | 0.724 | 0.715 | 0.727 | 0.717 | 0.704 | 0.777 | 0.706 | 0.721 |
+| pieapp | 0.585 | 0.584 | 0.586 | 0.582 | 0.579 | 0.560 | 0.535 | 0.570 |
+| vcl-fer | 0.940 | 0.937 | 0.945 | 0.938 | 0.884 | 0.945 | 0.877 | 0.933 |
+
+The balanced TRAIN Mlic-minus-Mw025 difference is 0.0000016562213901, paired seed-unit SE 0.0006342087471001. The registered rule uses the point estimate. EVAL differences are mixed; no EVAL result changes the selected weights or candidates. Mlic’s licence eligibility does not establish product qualification.
