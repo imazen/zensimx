@@ -4326,7 +4326,7 @@ Mw025-s0 is retained in the candidate registry (source a9a7d34997cc). All19 regi
 
 ### Six-arm diagnostic panel and first frozen EVAL report (2026-10-26)
 
-The table retains only dataset-held-out rows, averaged over three seeds. Full per-type results, signed biases, clumping/clamping and raw/fit tails remain in `scorecard/{bytype,type_bias,knobinv,panel}.json`; diagnostics do not choose finalists.
+The table retains only dataset-held-out rows, averaged over three seeds. Full per-type results remain in `scorecard/bytype_<arm>.json`; signed biases, clumping/clamping and raw/fit tails remain in `scorecard/{type_bias,knobinv,panel}.json`. Diagnostics do not choose finalists.
 
 | Arm | Dataset | Type-bias SD | Knob inversion rate | Ladder RMS | Z-RMSE | Rank error p99 | Fitted error p99 |
 |---|---|---:|---:|---:|---:|---:|---:|
@@ -4372,3 +4372,5 @@ The frozen single-seed EVAL point table follows. MOS uses signed midrank SROCC; 
 | vcl-fer | 0.940 | 0.937 | 0.945 | 0.938 | 0.884 | 0.945 | 0.877 | 0.933 |
 
 The balanced TRAIN Mlic-minus-Mw025 difference is 0.0000016562213901, paired seed-unit SE 0.0006342087471001. The registered rule uses the point estimate. EVAL differences are mixed; no EVAL result changes the selected weights or candidates. Mlic’s licence eligibility does not establish product qualification.
+
+Across all123 models, the standard set retains442 inversions (122 models have at least one), largest rise8.103523. The global set retains0 inversions, largest rise−0.730728. These are raw all-cell totals, separate from the primary twelve-E21-model table. Script lint passed on the final recipe/source tree; no Rust arithmetic or native binary changed for the linked-fold transport.
