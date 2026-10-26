@@ -9,7 +9,7 @@ aic_panel.py --dvifm --geo --per-type). Nothing is computed on AIC2026 public_te
 the frozen-B row comes from panel_public_test_frozen.json and the candidate's from full/Tga/panel.json.
 
   python3 aic_dashboard_data.py --out DIR --arms Tga,Ma,Bga,... [--commits-since 322930e4]
-  python3 aic_dashboard_data.py --out NEW --extend OLD    E21 scatter and revision-7 rows only (Mr7, Mdata)
+  python3 aic_dashboard_data.py --out NEW --extend OLD    E21 scatter and revision-7 rows only (Mr7, Mdata, Mlic, ...)
 """
 
 import argparse
@@ -62,7 +62,9 @@ POSTHOC = {"M64ens": "M64ens (mean of M64 and M64lin, post hoc, no AIC leg)"}
 # Revision-7 arms (no AIC leg). Their cells sit in the data-legs lane's directory, where Mr7 links to
 # ~/tmp/byc/cells/Mr7; they are scored against the revision-7 data root with binaries that read revision-7 bakes.
 REV7 = {"Mr7": "Mr7 (revision-7 M, no AIC leg)", "Mdata": "Mdata (Mr7 + 11 new datasets' TRAIN legs, no AIC leg)",
-        "Mdata64": "Mdata64 (Mdata's data, M64's shape, no AIC leg)", "MdataT": "MdataT (Mdata's data, T's shape, no AIC leg)"}
+        "Mdata64": "Mdata64 (Mdata's data, M64's shape, no AIC leg)", "MdataT": "MdataT (Mdata's data, T's shape, no AIC leg)",
+        "Mlic": "Mlic (Mr7 + 8 licence-clean new datasets, no AIC leg)",
+        "Mlic64": "Mlic64 (Mlic's data, M64's shape, no AIC leg)"}
 REV7_CELLS = Path(os.environ.get("BYC_REV7_CELLS", "/var/tmp/datalegs-20261025/cells"))
 REV7_ROOT = "/mnt/v/output/zensim/byconstruction-2026-10-22/rev7data/root"
 REV7_BIN = os.environ.get("REV7_BIN", "/var/tmp/datalegs-20261025/bin")
@@ -156,7 +158,7 @@ def e21_scatter(add) -> tuple[pd.DataFrame, pd.DataFrame]:
     dvr = pd.read_parquet(DVIFM_DIR / "rows.parquet")
     dvj = pd.read_csv(DVIFM_DIR / "dvifm.tsv", sep="\t").set_index(["ref_path", "dist_path"]).jnd
     e21rows, e21rows7 = [], []
-    rev7_keys = {"mr7", "mdata", "mdata64", "mdatat"}
+    rev7_keys = {"mr7", "mdata", "mdata64", "mdatat", "mlic", "mlic64"}
     for ds in ("kadid", "tid2013", "konfig", "cid22_a25"):
         y = np.asarray(panel_in[ds]["target"], np.float64)
         sel = dvr[dvr.dataset == ds]
@@ -172,7 +174,9 @@ def e21_scatter(add) -> tuple[pd.DataFrame, pd.DataFrame]:
                                      ("Mr7", "mr7", "Mr7 (revision-7 M), seed 0", REV7_CELLS),
                                      ("Mdata", "mdata", "Mdata (Mr7 + new datasets), seed 0", REV7_CELLS),
                                      ("Mdata64", "mdata64", "Mdata64 (Mdata's data, M64's shape), seed 0", REV7_CELLS),
-                                     ("MdataT", "mdatat", "MdataT (Mdata's data, T's shape), seed 0", REV7_CELLS)):
+                                     ("MdataT", "mdatat", "MdataT (Mdata's data, T's shape), seed 0", REV7_CELLS),
+                                     ("Mlic", "mlic", "Mlic (licence-clean new datasets), seed 0", REV7_CELLS),
+                                     ("Mlic64", "mlic64", "Mlic64 (Mlic's data, M64's shape), seed 0", REV7_CELLS)):
             f = cells / arm / f"without_{ds}_s0" / f"pred_{ds}.tsv"
             if f.is_file():
                 x = pd.read_csv(f, sep="\t").pred.to_numpy(np.float64)
@@ -247,6 +251,7 @@ EVAL_NAMES = {"cid-iq": "EVAL CID:IQ", "cid-oa": "EVAL CID:OA", "colourlab-ratin
               "iqa-odi": "EVAL IQA-ODI", "irccyn-ivc": "EVAL IRCCyN/IVC", "live-md": "EVAL LIVE-MD", "mdid": "EVAL MDID",
               "nits-iqa": "EVAL NITS", "vcl-fer": "EVAL VCL@FER"}
 EVAL_MODELS = {"b7": "B, revision-7 stamp", "m7": "M7 (revision-7 M)", "mdata": "Mdata (M7 + new datasets)",
+               "mlic": "Mlic (M7 + licence-clean new datasets)",
                "ssim2": "SSIMULACRA2", "cvvdp": "CVVDP", "butter": "Butteraugli 3-norm"}
 
 

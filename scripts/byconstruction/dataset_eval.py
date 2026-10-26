@@ -455,7 +455,8 @@ def cmd_paired(a):
     render_paired(dest)
 
 
-SCATTER_KEYS = {"B7": "b7", "M7": "m7", "Mdata": "mdata", "ssim2": "ssim2", "cvvdp": "cvvdp", "butteraugli": "butter"}
+SCATTER_KEYS = {"B7": "b7", "M7": "m7", "Mdata": "mdata", "Mlic": "mlic", "ssim2": "ssim2", "cvvdp": "cvvdp",
+                "butteraugli": "butter"}
 
 
 def cmd_scatter(a):
