@@ -1,0 +1,15 @@
+[package]
+name = "adam-denormal-probe"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[dependencies]
+archmage = { version = "=0.9.30", features = ["macros", "avx512"] }
+magetypes = { version = "=0.9.30", features = ["avx512"] }
+
+[profile.release]
+lto = "thin"
+codegen-units = 1

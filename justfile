@@ -589,6 +589,19 @@ addrfix-rank-score:
 
 # zensim dev commands
 
+# Fixed-work counter probe includes the actual Adam owner. Caller supplies resource limits.
+adam-denormal-build:
+    cargo build --release --locked --manifest-path tools/adam-denormal-probe/Cargo.toml
+
+adam-denormal-tests:
+    cargo test --release --locked --manifest-path tools/adam-denormal-probe/Cargo.toml
+
+adam-denormal-clippy:
+    cargo clippy --release --locked --manifest-path tools/adam-denormal-probe/Cargo.toml -- -D warnings
+
+adam-denormal-probe kernel="fused" state="decay" steps="2000" tier="v3":
+    tools/adam-denormal-probe/target/release/adam-denormal-probe {{quote(kernel)}} {{quote(state)}} {{steps}} {{quote(tier)}}
+
 addrfix-cost-report binary:
     python3 scripts/rev4_featpot/addrfix.py cost-report --binary {{quote(binary)}}
 

@@ -160,6 +160,8 @@ because cleanup tests or a historical training reproduction pass.
 
 ## Known Bugs
 
+* **2026-10-26 — Adam retains subnormal moments. OPEN.** A fixed-work probe of the fused v3 owner on Intel Core Ultra 7 265K produces 268,105,485 FP assists in 7.412144902 seconds when moments decay below the smallest normal f64; its normal-state control has zero assists in 0.104186039 seconds. See `benchmarks/adam_denormal_2026-10-26.md`. Any numerical repair is a new trainer version; frozen studies keep their existing binaries.
+
 * **2026-10-25 — rank-cell progress display. Fixed.** The per-epoch rank-marker reader initially omitted its regex import. The corrected display passes against the twelve active mix cells, and undefined-name checks pass across the changed Python owners. Running fits and their statistics were unaffected.
 
 * **2026-10-25 — dataset EVAL tied ranks.** The coordinator's new dataset evaluator used nested argsort, assigning different ranks to tied scores. The MOS report now uses the canonical Rust midrank and reference-bootstrap owners for every model and peer; synthetic tied-score and row-order controls pass. The Mdata assessment recomputes its M7/B7/peer controls with this method. The original coordinator outputs remain preserved.
