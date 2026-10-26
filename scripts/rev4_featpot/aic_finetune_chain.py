@@ -79,7 +79,8 @@ def run(args, cells):
         command("checks", ["just", "aic-finetune-checks"])
         command("python-admission", ["just", "aic-finetune-admission-tests"])
         command("subjective-admission", [sys.executable, "-B", "-m", "unittest",
-                "scripts.tests.test_subjective_training_leg", "scripts.tests.test_dataset_legs"])
+                "scripts.tests.test_subjective_training_leg", "scripts.tests.test_dataset_legs"],
+                env=dict(os.environ, PYTHONPATH=str(repo / "scripts/tests")))
         command("script-lint", ["just", "lint-scripts"])
         command("api-doc-check", ["just", "api-doc-check"])
         command("trainer-lib-tests", ["cargo", "test", "--offline", "--locked", "-p",
