@@ -4777,3 +4777,66 @@ The D6 public_train pair list resolves to 28 reference PNGs and 3,920 distorted 
 The initial assessment refused a missing `judge_pairs.tsv` before producing a statistic report. Its three main-population seed predictions were preserved and hash-reused. The first recovery then exposed a duplicate Python ensemble: 575 of 4,678 predictions differed from the existing Rust score-unit ensemble by at most 2.842170943040401e-14. The paired-statistics process was interrupted, and that assessment's reports are superseded. `EVAL_RECOVERY_CANONICAL.json` binds both failures and the canonical control. Fresh `assessment-retry-02` calls the frozen `bake_dial_refit predict --ensemble --score-units`; its main ensemble matches control SHA256 `1523596901232a06738f5e00cf1ae89cfd0aaac8bb521e9e15d63f6b0df136b8`. Models, selection, statistical owners, frozen baseline predictions and resample counts are unchanged.
 
 The status owner now records the live worker's process tree, start identities and CPU counters, and resolves the compute lock by inode and holder ancestry. An unrelated live PID or a zombie cannot count as the study worker. Real lock acquisition/release and both refusal controls pass. These observations supplement artifact completion/failure receipts; neither a live coordinator nor CPU activity proves a scientific stage complete.
+
+#### Completed fixed-candidate EVAL assessment (2026-10-26)
+
+**Missing for adoption:** matched runtime evidence and full production qualification. This study does not promote a default or release the queued HDR frontend work. The selected MlicFT16x8 family improves the registered AIC TRAIN criterion, but its broader EVAL result is a tradeoff, not a general improvement over Mlic. The three selected seeds remain retained without reselection or refitting.
+
+Both admitted populations completed in `assessment-retry-02`. All 63/63 MOS comparisons against the seven frozen model/peer controls produced measurements, with 2,000 finite SROCC resamples each. The nine collections below are separate targets; no new cross-collection selector or composite is constructed. Paired intervals resample entire references. Eight collections have fewer than 30 references, and these populations have prior exposure, so the intervals are descriptive, not fresh confirmatory evidence.
+
+| Collection | References | Mlic ensemble | MlicFT16x8 ensemble | Paired delta SROCC [95%] | Within-reference Mlic / FT |
+|---|---:|---:|---:|---|---|
+| cid-iq | 7 | 0.870122 | 0.856965 | -0.013156 [-0.019131, -0.008015] | 0.877954 / 0.862723 |
+| cid-oa | 7 | 0.889832 | 0.885401 | -0.004431 [-0.008880, -0.000079] | 0.989986 / 0.989986 |
+| colourlab-rating-variability-2022 | 3 | 0.725951 | 0.729759 | +0.003808 [+0.001696, +0.004902] | 0.740113 / 0.743374 |
+| iqa-odi | 42 | 0.841837 | 0.849218 | +0.007382 [-0.000579, +0.021557] | unavailable / unavailable |
+| irccyn-ivc | 4 | 0.933847 | 0.943103 | +0.009256 [-0.000140, +0.050045] | 0.966553 / 0.966916 |
+| live-md | 12 | 0.890146 | 0.887982 | -0.002164 [-0.007953, +0.003100] | 0.957884 / 0.952823 |
+| mdid | 6 | 0.894753 | 0.886938 | -0.007815 [-0.010377, -0.004518] | 0.906942 / 0.900121 |
+| nits-iqa | 9 | 0.715817 | 0.706400 | -0.009417 [-0.012847, -0.006964] | 0.728357 / 0.716290 |
+| vcl-fer | 8 | 0.936983 | 0.930794 | -0.006188 [-0.010571, -0.002318] | 0.954674 / 0.950326 |
+
+Against Mlic, six of nine MOS point estimates decrease. The reported paired intervals are below zero on CID-IQ, CID-OA, MDID, NITS and VCL; Colourlab increases with a positive interval, based on only three references. IRCCyN and ODI have positive point estimates with intervals crossing zero. The within-reference ODI statistic is unavailable under the existing owner's minimum-three-row rule; it is not a zero or a pass.
+
+Pairwise populations use the existing soft-probability 2AFC agreement owner. The intervals below are marginal reference-bootstrap intervals for the candidate; they are not intervals for candidate-minus-Mlic.
+
+| Collection | Pairs | Mlic ensemble | MlicFT16x8 ensemble [95%] | Point delta |
+|---|---:|---:|---|---:|
+| fg-iqa | 540 | 0.757716 | 0.758457 [0.729753, 0.784199] | +0.000741 |
+| pieapp | 7260 | 0.584016 | 0.583451 [0.577263, 0.589390] | -0.000566 |
+| bapps | 36344 | 0.668531 | 0.666853 [0.663916, 0.669965] | -0.001678 |
+
+All fixed-seed point estimates are retained; none of these observations chooses a seed:
+
+| Collection | FT seed 0 | FT seed 1 | FT seed 2 |
+|---|---:|---:|---:|
+| cid-iq | 0.856158 | 0.860472 | 0.851499 |
+| cid-oa | 0.881879 | 0.886820 | 0.889720 |
+| colourlab-rating-variability-2022 | 0.732849 | 0.714920 | 0.733311 |
+| fg-iqa | 0.757716 | 0.757716 | 0.757716 |
+| iqa-odi | 0.852041 | 0.848784 | 0.847590 |
+| irccyn-ivc | 0.945132 | 0.941602 | 0.938099 |
+| live-md | 0.884440 | 0.887713 | 0.887517 |
+| mdid | 0.884192 | 0.888782 | 0.883940 |
+| nits-iqa | 0.712162 | 0.694823 | 0.711747 |
+| pieapp | 0.583347 | 0.584346 | 0.583558 |
+| vcl-fer | 0.933015 | 0.925789 | 0.932812 |
+| bapps | 0.667304 | 0.663502 | 0.666875 |
+
+For the MOS peer controls, the complete point panel is:
+
+| Collection | M7 ensemble | Mdata ensemble | B7 | SSIMULACRA2 | Butteraugli | CVVDP |
+|---|---:|---:|---:|---:|---:|---:|
+| cid-iq | 0.855992 | 0.868739 | 0.870524 | 0.757442 | 0.591767 | 0.748624 |
+| cid-oa | 0.903802 | 0.900535 | 0.881624 | 0.846845 | 0.576741 | 0.911612 |
+| colourlab-rating-variability-2022 | 0.728408 | 0.719714 | 0.700656 | 0.603975 | 0.372974 | 0.611935 |
+| iqa-odi | 0.845202 | 0.843031 | 0.849218 | 0.853995 | 0.806014 | 0.833044 |
+| irccyn-ivc | 0.940212 | 0.934681 | 0.960447 | 0.948912 | 0.912500 | 0.928371 |
+| live-md | 0.893259 | 0.890272 | 0.879178 | 0.912784 | 0.827027 | 0.896087 |
+| mdid | 0.892577 | 0.890511 | 0.891774 | 0.787166 | 0.571675 | 0.829281 |
+| nits-iqa | 0.719458 | 0.720077 | 0.704313 | 0.776646 | 0.705937 | 0.721194 |
+| vcl-fer | 0.938902 | 0.940650 | 0.883930 | 0.945069 | 0.876534 | 0.933326 |
+
+Complete peer intervals, per-seed intervals and the full six-statistic comparisons remain in the bound owner reports. Main `report.json` SHA256: `59cefc4a03b54519b2811be618a63ea1d5d9f4b751411d666966598cc46c8086`; paired `report/report.json`: `b7870e206bd740540470aff74edf66493fc89031ab165ddc1c46064308936cdc`; BAPPS `report.json`: `7644670f38a4edee35378e6d61573a650ad380ef2601c6332949273839d3a806`. All new label reads have assessment ledgers. AIC public_test was excluded.
+
+Execution completed with `run-heavy: done rc=0 2374s | peak-RSS 1.66GiB | min-avail 43347MiB | peak-load 1.90`. This is assessment resource evidence, not a scoring-latency benchmark. The compute lock was released on completion. No numerical gate, model byte, sampler, dataset mass, checkpoint choice or statistical owner was changed to obtain this result.
