@@ -191,6 +191,40 @@ class DatasetHoldouts(unittest.TestCase):
 
 
 class DatasetTargets(unittest.TestCase):
+    def test_cognitive_parent_join_refuses_native_and_identifier_drift(self):
+        member = dict(input_table="labels_experiment2.tsv", row_index=7,
+                      item_path="images/003_05_01.jpg", reference_path="images/003.jpg")
+        key = (member["input_table"], 7)
+        label = dict(item=member["item_path"], ref="", score="3", higher_is_better="true")
+        projection = [dict(input_table=key[0], row_index=7, item=label["item"], ref=member["reference_path"])]
+        parent = [dict(item_path=label["item"], reference_path=member["reference_path"])]
+        joined = root.subset_parent_binding([member], {key: label}, projection, parent)
+        self.assertEqual(joined[key]["ref"], "images/003.jpg")
+        self.assertEqual(label["ref"], "")
+        for labels, projected, parents in [
+                ({key: dict(label, ref="another.jpg")}, projection, parent),
+                ({key: label}, [dict(projection[0], ref="another.jpg")], parent),
+                ({key: label}, projection, [dict(parent[0], reference_path="another.jpg")]),
+                ({key: dict(label, item="another.jpg")}, projection, parent)]:
+            with self.assertRaisesRegex(ValueError, "reference binding"):
+                root.subset_parent_binding([member], labels, projected, parents)
+
+    def test_dibr_pairs_keep_local_direction_and_native_reference_guard(self):
+        members, mapping, labels = [], [], {}
+        for i, probability in enumerate((0.9, 0.1)):
+            members.append(dict(input_table="pairs.tsv", row_index=i, reference_path="view",
+                                a_path="a", b_path="b", family_id=1))
+            labels[("pairs.tsv", i)] = dict(ref="view", a="a", b="b", p_a=str(probability))
+            for side in ("a", "b"):
+                mapping.append(dict(input_table="pairs.tsv", membership_row_index=i, role="TRAIN",
+                                    skip_reason=None, side=side, pair_key=side))
+        obs, _ = root.dataset_observations("irccyn-ivc-dibr-images", members, mapping, labels)
+        self.assertEqual([r["human_score"] for r in obs], [1., 0., 0., 1.])
+        self.assertNotEqual(obs[0]["ref_basename"], obs[2]["ref_basename"])
+        labels[("pairs.tsv", 1)]["ref"] = "another-view"
+        with self.assertRaisesRegex(ValueError, "reference"):
+            root.dataset_observations("irccyn-ivc-dibr-images", members, mapping, labels)
+
     def test_report_counts_informative_pairs_and_ledgers_derived_targets(self):
         with tempfile.TemporaryDirectory() as d:
             p = Path(d)

@@ -94,6 +94,10 @@ def sha(p) -> str:
 DATASET_MOS = ("pipal", "mdid", "live-md", "cid-iq", "cid-oa", "vcl-fer", "irccyn-ivc",
                "colourlab-rating-variability-2022")
 DATASET_PAIR = ("bapps", "pieapp", "fg-iqa")
+DATASET_SUBSETS = ("colourlab-cognitive-science-2022", "irccyn-ivc-broken-arrows",
+                   "irccyn-ivc-dibr-images", "irccyn-ivc-dwt-dtcwt", "irccyn-ivc-enrico",
+                   "irccyn-ivc-toyama-scores")
+SUBSET_ADMISSION_SHA = "ba44794cdf87818ae112b0198cb34965c6f7a926683dae5580895ba87d2271b9"
 
 
 def dataset_family_guard(admission, source, out):
@@ -105,7 +109,9 @@ def dataset_family_guard(admission, source, out):
     """
     memberships, protected, protected_hashes = {}, set(), set()
     validation_path = admission/"validation-receipt.json"
-    if sha(validation_path) != "a4013c0bb1a72b5b4990cc78eb7003acb0e87e2374a01c7d5c8a47bf1d82f9d8":
+    subset = sha(validation_path) == SUBSET_ADMISSION_SHA
+    if sha(validation_path) not in (SUBSET_ADMISSION_SHA,
+            "a4013c0bb1a72b5b4990cc78eb7003acb0e87e2374a01c7d5c8a47bf1d82f9d8"):
         raise ValueError("accepted membership receipt changed")
     accepted = json.loads(validation_path.read_text())["collections"]
     for p in sorted(admission.glob("*/membership.parquet")):
@@ -121,6 +127,28 @@ def dataset_family_guard(admission, source, out):
                 protected_hashes.update(h for h in r["source_audit_rgb8_sha256"] if h)
     d4 = Path("/mnt/v/zensim/d4-roles-private")
     freeze = json.loads((admission / "family-registry-freeze.json").read_text())
+    if subset:
+        if sha(admission/"source-family-registry.tsv") != freeze["sha256"]:
+            raise ValueError("subset family registry changed")
+        for name, digest in {**freeze["prior_membership_receipts"],
+                             **freeze["prior_fit_identifier_receipts"]}.items():
+            if sha(name) != digest:
+                raise ValueError("subset prior reservation/fit identity changed")
+        for name in freeze["prior_membership_receipts"]:
+            if not name.endswith("/membership.parquet"):
+                continue
+            for r in pq.read_table(name).to_pylist():
+                if r["role"] in ("EVAL", "TEST", "CALIBRATION", "SOURCE_EXPOSED_TEST_DIAGNOSTIC"):
+                    protected.add(str(r["family_id"]))
+                    protected_hashes.update(h for h in r["source_audit_rgb8_sha256"] if h)
+        # Existing derived legs carry family keys too; reject, never silently
+        # mask a newly reserved family out of the eight fixed Mlic legs.
+        inherited_packet = json.loads((source/"datasets/receipt.json").read_text())
+        protected.update(json.loads(Path(inherited_packet["family_guard_path"]).read_text())["protected_families"])
+        for leg in inherited_packet["groups"]:
+            if (sha(leg["keys_path"]) != leg["keys_sha256"]
+                    or any(r["family"] in protected for r in json.loads(Path(leg["keys_path"]).read_text()))):
+                raise ValueError("inherited dataset leg family is now reserved or keys changed")
     for file, key in (("images.json", "source_authority_inventory_sha256"),
                       ("source-family-authority.json", "source_authority_sha256")):
         if sha(d4 / file) != freeze[key]:
@@ -147,7 +175,8 @@ def dataset_family_guard(admission, source, out):
                              "references": sorted({r["ref_basename"] for r in bad})}
     # E15 uses source filenames, unlike the bank-keyed human/teacher legs.
     coverage = pq.read_table(source / "e15/coverage_pool.keys.parquet").to_pylist()
-    source_images = json.loads((admission / "screen-v1/source-images.json").read_text())
+    source_admission = Path("/mnt/v/zensim/dataset-admission-20261025") if subset else admission
+    source_images = json.loads((source_admission / "screen-v1/source-images.json").read_text())
     bad_names = {Path(p).name for r in source_images if reserved(r["rgb_sha256"]) for p in r["paths"]}
     del source_images
     coverage_bad = [r for r in coverage if r["source_filename"] in bad_names]
@@ -163,6 +192,56 @@ def dataset_family_guard(admission, source, out):
                  scope="accepted exact native pixels and confirmed D4 aliases; bounded source screen, not perfect crop recall")
     out.write_text(json.dumps(guard, indent=1)+"\n")
     return guard, memberships
+
+
+def subset_parent_binding(members, labels, projection, parent_members):
+    """Replay Exp2's admitted exact identifier join, before scalar conversion."""
+    projected = {(r["input_table"], r["row_index"]): r for r in projection}
+    parent = {}
+    for r in parent_members:
+        if r["item_path"] in parent and parent[r["item_path"]] != r["reference_path"]:
+            raise ValueError("ambiguous Colourlab parent identifier")
+        parent[r["item_path"]] = r["reference_path"]
+    result = {}
+    for r in members:
+        key = (r["input_table"], r["row_index"])
+        lab, p = dict(labels[key]), projected[key]
+        if (lab["item"] != r["item_path"] or p["item"] != lab["item"]
+                or parent.get(lab["item"]) != r["reference_path"] or p["ref"] != r["reference_path"]
+                or lab["ref"] not in ("", r["reference_path"])):
+            raise ValueError("Cognitive Exp2 native/parent reference binding differs")
+        lab["ref"] = parent[lab["item"]]
+        result[key] = lab
+    return result
+
+
+def subset_policy(admission, out):
+    """Freeze licence and identifier authorities without opening target tables."""
+    source = Path("/mnt/tower/output/zenpapers/training-confidence-2026-10-25/datasets_full.tsv")
+    expected = [line.split()[0] for line in (source.parent/"SHA256SUMS").read_text().splitlines()
+                if line.split()[-1] == "./datasets_full.tsv"]
+    if expected != [sha(source)]:
+        raise ValueError("subset licence policy inventory differs")
+    with source.open() as stream:
+        policy = {r["dataset"]: r for r in csv.DictReader(stream, delimiter="\t")}
+    for c in DATASET_SUBSETS:
+        if policy[c]["policy"] != "train" or policy[c]["tier"] not in ("A", "B") or not policy[c]["licence"]:
+            raise ValueError("subset does not have an A/B train licence policy")
+    p = admission.parent/"inventory/colourlab-cognitive-science-2022/projected-identifiers.jsonl"
+    pointer = json.loads((admission/"colourlab-cognitive-science-2022/pointer.json").read_text())
+    if sha(p) != pointer["projection_sha256"]:
+        raise ValueError("subset parent identifier projection changed")
+    registration = Path(__file__).resolve().parents[2]/"benchmarks/byconstruction_2026-10-22.md"
+    if "Mlic+sub root preparation — preread registration" not in registration.read_text():
+        raise ValueError("subset preread weight registration missing")
+    receipt = dict(schema="dataset-subset-policy-v1", policy_sha256=sha(source),
+                   policies={c: policy[c] for c in DATASET_SUBSETS}, nominal_total=0.5,
+                   nominal_per_nonempty_collection=0.1, dibr_protocols=["labels.tsv", "labels_pc.tsv", "pairs.tsv"],
+                   dibr_nominal_per_protocol=0.1/3, projection_sha256=sha(p),
+                   weight_registration_sha256=sha(registration), training=False,
+                   metadata_exposure="Library MANIFEST checks/notes include published aggregate example statistics; not used in weights or selection")
+    (out.parent/"SUBSET_POLICY.json").write_text(json.dumps(receipt, indent=1)+"\n")
+    return [json.loads(line) for line in p.read_text().splitlines()]
 
 
 def cmd_dataset_guard(a):
@@ -212,7 +291,7 @@ def dataset_observations(collection, members, mapping, labels):
         if lab["ref"] != r["reference_path"]:
             raise ValueError("label reference does not match frozen membership")
         identity = f"{collection}:{r['input_table']}:{r['row_index']}"
-        if collection in DATASET_PAIR:
+        if collection in DATASET_PAIR or r["input_table"] == "pairs.tsv":
             if set(sides) != {"a", "b"} or (lab["a"], lab["b"]) != (r["a_path"], r["b_path"]):
                 raise ValueError("preference side binding differs")
             p = float(lab["p_a"])
@@ -247,7 +326,8 @@ def dataset_observations(collection, members, mapping, labels):
 def cmd_datasets(a):
     """Extend the existing derived root builder; never mutate frozen inputs."""
     weight = getattr(a, "nominal_weight", 0.5)
-    available = (*DATASET_MOS, *DATASET_PAIR)
+    subsets = getattr(a, "additional_subsets", False)
+    available = DATASET_SUBSETS if subsets else (*DATASET_MOS, *DATASET_PAIR)
     requested = getattr(a, "collections", None)
     selected_collections = available if requested is None else tuple(requested.split(","))
     if (not np.isfinite(weight) or weight <= 0 or not selected_collections
@@ -260,9 +340,19 @@ def cmd_datasets(a):
     if out.exists():
         raise ValueError("dataset root destination must be fresh")
     out.parent.mkdir(parents=True, exist_ok=True)
+    parent_packet, projection = None, None
+    if subsets:
+        if (sha(source/"wide/frozen.json") != "a7fd4af0c2bb5a8981be636e5c1cb1a51db57496b7c60d7bf6da01d71dd16952"
+                or sha(admission/"validation-receipt.json") != SUBSET_ADMISSION_SHA
+                or weight != 0.5 or selected_collections != DATASET_SUBSETS):
+            raise ValueError("subset append requires the frozen Mlic root, complete admission and registered weight")
+        projection = subset_policy(admission, out)
+        parent_packet = json.loads((source/"datasets/receipt.json").read_text())
     # Metadata/identity audit comes before the first new label value.
     guard_path = out.parent / "FAMILY_GUARD.json"
     guard, memberships = dataset_family_guard(admission, source, guard_path)
+    if subsets and guard["inherited_leaks"]:
+        raise ValueError("subset append would alter inherited Mlic rows")
     shutil.copytree(source, out)
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]/"rev4_featpot"))
     from v2_teacher import row_keys_sha, selection_sha
@@ -302,15 +392,28 @@ def cmd_datasets(a):
     guard["inherited_leaks"] = remaining
     guard_path.write_text(json.dumps(guard, indent=1)+"\n")
     legdir = out / "datasets"
-    legdir.mkdir()
+    legdir.mkdir(exist_ok=subsets)
     shutil.copyfile(guard_path, legdir/"FAMILY_GUARD.json")
+    if subsets:
+        shutil.copyfile(out.parent/"SUBSET_POLICY.json", legdir/"SUBSET_POLICY.json")
     guard_path = legdir/"FAMILY_GUARD.json"
     ledger = out.parent/"LABEL_READS.json"
     selected = [int(x) for x in Path(a.columns).read_text().strip().split(",")]
     protected = set(guard["protected_families"])
-    legs = []
+    legs = list(parent_packet["groups"]) if subsets else []
+    jobs = []
     for c in selected_collections:
+        if subsets and c == "irccyn-ivc-toyama-scores":
+            if any(r["membership_state"] == "FROZEN" and r["role"] == "TRAIN" for r in memberships[c]):
+                raise ValueError("Toyama TRAIN admission changed")
+            continue
+        protocols = ("labels.tsv", "labels_pc.tsv", "pairs.tsv") if subsets and c == "irccyn-ivc-dibr-images" else (None,)
+        for protocol in protocols:
+            jobs.append((c, protocol, 0.1/len(protocols) if subsets else weight))
+    for c, protocol, leg_weight in jobs:
         members = [r for r in memberships[c] if r["membership_state"] == "FROZEN" and r["role"] == "TRAIN"]
+        if protocol:
+            members = [r for r in members if r["input_table"] == protocol]
         if any(str(r["family_id"]) in protected for r in members):
             raise ValueError(f"{c}: TRAIN family reserved by another role")
         mapping = pq.read_table(features/"inputs"/c/"membership-to-pairs.parquet").to_pylist()
@@ -319,10 +422,14 @@ def cmd_datasets(a):
                 or preparation["mapping_sha256"] != sha(features/"inputs"/c/"membership-to-pairs.parquet")):
             raise ValueError("feature-to-membership mapping changed")
         labels = {}
-        columns = ["ref", "a", "b", "p_a"] if c in DATASET_PAIR else ["ref", "item", "score", "higher_is_better"]
+        pair_mode = c in DATASET_PAIR or protocol == "pairs.tsv"
+        columns = ["ref", "a", "b", "p_a"] if pair_mode else ["ref", "item", "score", "higher_is_better"]
         for table in sorted({r["input_table"] for r in members}):
             wanted = {r["row_index"] for r in members if r["input_table"] == table}
             labels.update({(table,i):v for i,v in dataset_targets(Path(a.library)/c/table, wanted, columns, ledger, c).items()})
+        if subsets and c == "colourlab-cognitive-science-2022":
+            parent = pq.read_table("/mnt/v/zensim/dataset-admission-20261025/colourlab-rating-variability-2022/membership.parquet").to_pylist()
+            labels = subset_parent_binding(members, labels, projection, parent)
         obs, dropped = dataset_observations(c, members, mapping, labels)
         bank = features/"bank"/c.replace("-", "_")
         manifest = json.loads((bank/"_MANIFEST.json").read_text())
@@ -345,15 +452,16 @@ def cmd_datasets(a):
             tab = tab.append_column(f"f{i}",pa.array(np.full(len(obs),np.nan,dtype=np.float32)))
         tab = tab.append_column("ref_basename",pa.array([r["ref_basename"] for r in obs]))
         tab = tab.append_column("human_score",pa.array([r["human_score"] for r in obs]))
-        path = legdir/f"{c}.parquet"
+        leg_token = c if protocol is None else c+"--"+protocol.removesuffix(".tsv")
+        path = legdir/f"{leg_token}.parquet"
         write(tab, path)
         counts = dict(sorted(collections.Counter(r["ref_basename"] for r in obs).items()))
         keys = [dict(row=i, observation=r["observation"],source=r["ref_basename"],reference=r["ref_basename"],
                      family=r["family"],role="fit",tier="T2") for i,r in enumerate(obs)]
-        kp = legdir/f"{c}.keys.json"
+        kp = legdir/f"{leg_token}.keys.json"
         kp.write_text(json.dumps(keys,separators=(",",":"))+"\n")
-        decl = dict(schema="subjective-training-leg-v2",loss="hard-pair-preference" if c in DATASET_PAIR else "within-source-rank",
-            nominal_weight=weight,target_orientation="quality",target_transform="orient-native-quality",target_column="human_score",
+        decl = dict(schema="subjective-training-leg-v2",loss="hard-pair-preference" if pair_mode else "within-source-rank",
+            nominal_weight=leg_weight,target_orientation="quality",target_transform="orient-native-quality",target_column="human_score",
             selection="fixed-final-epoch",formula_revision=7,tier="v3",feature_ids=selected,
             producer_commit=manifest["build_commit"],feature_set_id=manifest["feature_set_id"],
             native_role="TRAIN",rows=len(obs),table_sha256=sha(path),admission_root=str(out),
@@ -361,13 +469,16 @@ def cmd_datasets(a):
             membership_sha256=guard["membership_sha256"][c],feature_manifest_sha256=sha(bank/"_MANIFEST.json"))
         dp = Path(str(path)+".manifest.json")
         dp.write_text(json.dumps(decl,indent=1)+"\n")
-        corrected_weight = weight/(sum(1-1/n for n in counts.values())/len(counts))
-        legs.append(dict(name="subjective_rank_"+c.replace("-","_"),path=str(path),train_weight=corrected_weight,val_weight=0.,
+        corrected_weight = leg_weight/(sum(1-1/n for n in counts.values())/len(counts))
+        legs.append(dict(name="subjective_rank_"+leg_token.replace("-","_"),path=str(path),train_weight=corrected_weight,val_weight=0.,
             mode="withinref,rank",subjective=True,table_sha256=sha(path),manifest_sha256=sha(dp),
             keys_path=str(kp),keys_sha256=sha(kp),rows=len(obs),source_counts=counts,
             collection=c,membership_rows=len(members),dropped=dropped,groups=len(counts),
             pairs=sum(n*(n-1)//2 for n in counts.values())))
         log(f"{c}: {len(members)} memberships, {len(obs)} rows, {len(counts)} groups; dropped {dropped}")
+        if subsets:
+            legs[-1].update(protocol=protocol or members[0]["input_table"], nominal_weight=leg_weight,
+                            families=len({r["family_id"] for r in members}))
     receipt_path = real/"receipt.json"
     receipt = json.loads(receipt_path.read_text())
     for leg in receipt["legs"].values():
@@ -386,6 +497,11 @@ def cmd_datasets(a):
     packet = dict(schema="rev7-dataset-legs-v1",groups=legs,feature_ids=selected,
                   producer_commit="b77883be18db5933a9db4b9e2670a2ba88a9729b",
                   family_guard_path=str(guard_path),family_guard_sha256=sha(guard_path),label_reads_path=str(ledger))
+    if subsets:
+        packet.update(parent_receipt_sha256=sha(source/"datasets/receipt.json"),
+                      inherited_label_reads_path=parent_packet["label_reads_path"],
+                      subset_policy_sha256=sha(legdir/"SUBSET_POLICY.json"),
+                      source_frozen_sha256=sha(source/"wide/frozen.json"), build_only=True)
     pp = legdir/"receipt.json"
     pp.write_text(json.dumps(packet,indent=1)+"\n")
     frozen = json.loads((out/"wide/frozen.json").read_text())
@@ -503,7 +619,8 @@ def cmd_dataset_report(a):
             grouped[ref][score] += 1
         tied = sum(sum(n*(n-1)//2 for n in counts.values()) for counts in grouped.values())
         keys = json.loads(Path(r["keys_path"]).read_text())
-        result[r["collection"]] = dict(membership_rows=r["membership_rows"],rows=r["rows"],groups=len(grouped),
+        result_key = r["collection"]+(":"+r["protocol"] if "protocol" in r else "")
+        result[result_key] = dict(membership_rows=r["membership_rows"],rows=r["rows"],groups=len(grouped),
             families=len({k["family"] for k in keys}),candidate_pairs=r["pairs"],
             informative_pairs=r["pairs"]-tied,exact_mos_tied_pairs=tied,dropped=r["dropped"],
             nominal_weight=json.loads(Path(str(r["path"])+".manifest.json").read_text())["nominal_weight"],
@@ -1099,6 +1216,8 @@ def main() -> int:
         ds.add_argument("--"+flag, required=True)
     ds.add_argument("--nominal-weight", type=float, default=0.5)
     ds.add_argument("--collections", help="comma-separated subset; default all eleven")
+    ds.add_argument("--additional-subsets", action="store_true",
+                    help="append the registered subset protocols to the frozen eight-leg Mlic root; build only")
     ds.set_defaults(fn=cmd_datasets)
     ml = sub.add_parser("mix-licence")
     ml.add_argument("--study", required=True)
