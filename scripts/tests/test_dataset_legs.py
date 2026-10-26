@@ -54,6 +54,23 @@ class DatasetAuthority(unittest.TestCase):
 
 
 class DatasetHoldouts(unittest.TestCase):
+    def test_e21_family_lookup_binds_full_keys_and_native_reference_hashes(self):
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d)
+            real, bank = p/"real", p/"bank"
+            real.mkdir()
+            (bank/"native").mkdir(parents=True)
+            source = bank/"native/keys.parquet"
+            pq.write_table(pa.table(dict(pair_key=["a","b"], ref_pixels_sha256=["reference-a","reference-b"])),source)
+            (bank/"native/_MANIFEST.json").write_text(json.dumps(dict(keys_sha256=root.sha(source))))
+            keys = real/"kadid.keys.parquet"
+            pq.write_table(pa.table(dict(pair_key=["b"], member_set=["native"])), keys)
+            receipt = dict(legs=dict(kadid=dict(full=dict(keys_sha256=root.sha(keys)))))
+            self.assertEqual(root.dataset_e21_reference_hashes(real,receipt,bank,"kadid",lambda p:p), {"reference-b"})
+            receipt["legs"]["kadid"]["full"]["keys_sha256"] = "changed"
+            with self.assertRaisesRegex(ValueError,"reference-key"):
+                root.dataset_e21_reference_hashes(real,receipt,bank,"kadid",lambda p:p)
+
     def linked_fixture(self, directory):
         from subjective_training_leg import DATASET_FOLDS
         p = Path(directory)

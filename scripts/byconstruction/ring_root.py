@@ -643,6 +643,25 @@ def cmd_dataset_report(a):
     return 0
 
 
+def dataset_e21_reference_hashes(real, receipt, bank, fold, bind):
+    """Join frozen assessment keys to native bank references, without targets."""
+    path = bind(real/f"{fold}.keys.parquet")
+    if sha(path) != receipt["legs"][fold]["full"]["keys_sha256"]:
+        raise ValueError("E21 reference-key inventory changed")
+    rows = pq.read_table(path, columns=["pair_key", "member_set"]).to_pylist()
+    hashes = set()
+    for member in sorted({r["member_set"] for r in rows}):
+        keys_path, manifest_path = bind(bank/member/"keys.parquet"), bind(bank/member/"_MANIFEST.json")
+        if sha(keys_path) != json.loads(manifest_path.read_text())["keys_sha256"]:
+            raise ValueError("E21 bank reference-key inventory changed")
+        keys = pq.read_table(keys_path, columns=["pair_key", "ref_pixels_sha256"]).to_pylist()
+        mapping = {r["pair_key"]:r["ref_pixels_sha256"] for r in keys}
+        if len(mapping) != len(keys):
+            raise ValueError("duplicate E21 bank key")
+        hashes.update(mapping[r["pair_key"]] for r in rows if r["member_set"] == member)
+    return hashes
+
+
 def cmd_dataset_links(a):
     """Freeze label-free collection linkage in a derived metadata-only root."""
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]/"rev4_featpot"))
@@ -700,18 +719,7 @@ def cmd_dataset_links(a):
             fs, ts = collection_tokens(heldout)
         else:
             heldout = (fold,)
-            path = bind(real/f"{fold}.keys.parquet")
-            if inputs[str(path)] != real_receipt["legs"][fold]["keys_sha256"]:
-                raise ValueError("E21 reference-key inventory changed")
-            rows = pq.read_table(path, columns=["pair_key", "member_set"]).to_pylist()
-            hashes = set()
-            for member in sorted({r["member_set"] for r in rows}):
-                keys_path, manifest_path = bind(bank/member/"keys.parquet"), bind(bank/member/"_MANIFEST.json")
-                if inputs[str(keys_path)] != json.loads(manifest_path.read_text())["keys_sha256"]:
-                    raise ValueError("E21 bank reference-key inventory changed")
-                keys = pq.read_table(keys_path, columns=["pair_key", "ref_pixels_sha256"]).to_pylist()
-                mapping = {r["pair_key"]:r["ref_pixels_sha256"] for r in keys}
-                hashes.update(mapping[r["pair_key"]] for r in rows if r["member_set"] == member)
+            hashes = dataset_e21_reference_hashes(real, real_receipt, bank, fold, bind)
             ts = tokens(hashes)
             fs = {f for f,t in family_tokens.items() if t.intersection(ts)}
             ts |= {t for f in fs for t in family_tokens[f]}
