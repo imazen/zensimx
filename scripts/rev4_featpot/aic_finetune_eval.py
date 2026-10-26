@@ -55,14 +55,19 @@ def mean_predictions(paths, output):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--study", required=True, type=Path)
+    parser.add_argument("--output", type=Path)
+    parser.add_argument("--recovery", type=Path, help="bound missing-key recovery; preserve the failed assessment")
     args = parser.parse_args()
     study = args.study.resolve()
-    output = study / "assessment"
+    output = args.output.resolve() if args.output else study / "assessment"
+    if output.parent != study:
+        raise ValueError("assessment output must be a fresh child of the study")
     output.mkdir()  # Never overwrite or silently repeat an assessment.
     from aic_finetune_status import status
     def state(stage):
         write(study / "EVAL_RUN_STATE.json", dict(stage=stage, pid=os.getpid(),
-            utc=datetime.now(timezone.utc).isoformat(), runner_sha256=sha(Path(__file__))))
+            utc=datetime.now(timezone.utc).isoformat(), runner_sha256=sha(Path(__file__)),
+            assessment_directory=str(output)))
     stop = threading.Event()
     def progress():
         while not stop.wait(15):
@@ -73,6 +78,26 @@ def main():
         write(study / "PROGRESS.json", status(study))
         monitor.start()
         plan = json.loads((study / "EVAL_PLAN.json").read_text())
+        recovery = json.loads(args.recovery.read_text()) if args.recovery else None
+        if recovery:
+            if sha(study / "EVAL_PLAN.json") != recovery["plan_sha256"]:
+                raise ValueError("recovery changes the frozen assessment plan")
+            prior = Path(recovery["prior"])
+            if sha(prior / "FAILED.json") != recovery["failure_sha256"]:
+                raise ValueError("recovery failure receipt differs")
+            failure_log = prior / "coordinator-EVAL-report-main.log"
+            if (sha(failure_log) != recovery["failure_log_sha256"] or
+                    "FileNotFoundError" not in failure_log.read_text() or
+                    "judge_pairs.tsv" not in failure_log.read_text() or (prior / "main/report.json").exists()):
+                raise ValueError("only missing judge-key report recovery is admitted")
+        for population in ("main", "bapps"):
+            available = set(plan["populations"][population]["files"])
+            if recovery:
+                available.update(recovery["extra_files"][population])
+                if set(recovery["extra_files"][population]) != {"judge_pairs.tsv"}:
+                    raise ValueError("recovery may only add the frozen judge-key table")
+            if not {"features.parquet", "eval_rows.json", "LABEL_READS.json", "judge_pairs.tsv"} <= available:
+                raise ValueError("EVAL owner requires feature, label-ledger and judge-key inputs")
         if not plan["label_free_gate_pass"] or plan["uses_EVAL_for_selection"]:
             raise ValueError("fixed TRAIN selection and passing label-free gates required")
         for relative, digest in plan["evidence_sha256"].items():
@@ -105,8 +130,11 @@ def main():
             dest.mkdir()
             receipt = dict(role="EVAL", purpose="single frozen TRAIN-winner assessment",
                 plan_sha256=sha(study / "EVAL_PLAN.json"), models=full["seeds"], source=str(source),
-                files=plan["populations"][population]["files"], state="authorized-before-copy-and-read",
+                files=dict(plan["populations"][population]["files"]), state="authorized-before-copy-and-read",
                 existing_baseline_predictions_reused=True, AIC_public_test="unread")
+            if recovery:
+                receipt["files"].update(recovery["extra_files"][population])
+                receipt["recovery_sha256"] = sha(args.recovery)
             write(dest / "EVAL_ASSESSMENT.json", receipt)
             for name, digest in receipt["files"].items():
                 if sha(source / name) != digest:
@@ -120,9 +148,18 @@ def main():
                 names.append(name)
                 path = dest / f"pred_{name}.tsv"
                 paths.append(path)
-                command(f"coordinator-EVAL-{population}-s{row['seed']}",
-                    [str(study / "bin/bake_dial_refit"), "predict", "--bake", row["bake"],
-                     "--corpus", str(dest / "features.parquet"), "--score-units", "--out", str(path)])
+                reused = recovery and recovery["predictions"].get(population, {}).get(name)
+                if reused:
+                    previous = Path(recovery["prior"]) / population / path.name
+                    if sha(previous) != reused:
+                        raise ValueError("preserved seed prediction differs")
+                    shutil.copyfile(previous, path)
+                    if sha(path) != reused:
+                        raise ValueError("reused seed prediction differs")
+                else:
+                    command(f"coordinator-EVAL-{population}-s{row['seed']}",
+                        [str(study / "bin/bake_dial_refit"), "predict", "--bake", row["bake"],
+                         "--corpus", str(dest / "features.parquet"), "--score-units", "--out", str(path)])
             ensemble = full["arm"] + "_ens"
             mean_predictions(paths, dest / f"pred_{ensemble}.tsv")
             command("coordinator-EVAL-report-" + population,

@@ -3601,6 +3601,9 @@ aic-finetune-gates study binaries instruments corpus:
 aic-finetune-eval study:
     python3 -B scripts/rev4_featpot/aic_finetune_eval.py --study {{quote(study)}}
 
+aic-finetune-eval-recover study output recovery:
+    python3 -B scripts/rev4_featpot/aic_finetune_eval.py --study {{quote(study)}} --output {{quote(output)}} --recovery {{quote(recovery)}}
+
 aic-finetune-launch study packet:
     #!/usr/bin/env bash
     set -Eeuo pipefail

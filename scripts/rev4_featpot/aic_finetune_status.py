@@ -87,7 +87,7 @@ def status(study):
             "label-free-gates-complete" if (gates / "COMPLETE.json").is_file() and
             len(result["gates"]["complete"]) == len(required) else "running" if result["worker_alive"] else "not-running")
     if eval_state.is_file():
-        assessment = study / "assessment"
+        assessment = Path(state.get("assessment_directory", study / "assessment"))
         result["assessment"] = dict(complete=[name for name in ("main", "bapps") if
             (assessment / name / "COMPLETE.json").is_file()], required=["main", "bapps"],
             failure=json.loads((assessment / "FAILED.json").read_text()) if (assessment / "FAILED.json").is_file() else None)
