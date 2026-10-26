@@ -4691,3 +4691,64 @@ new candidate cells, its extracted helper reproduced every numeric field of
 all six frozen original arm records exactly. Decision controls cover ties,
 old-data regression, a single global inversion, missing cells and nonfinite
 statistics. This changes no old study result or selection threshold.
+
+
+### Native BAPPS vote likelihood: prospective TRAIN registration (2026-10-26)
+
+Registered before constructing a vote-preserving root or fitting its candidate.
+MlicVote tests the zenpapers vote-count proposal independently of MlicNeff:
+its control is the original Mlic recipe and its eight nominal masses remain
+0.5 each. No result of the mass trial changes this arm. The inference model,
+Rev7 feature set, M shape, original seven holdouts, seed indices 0–2, 120 epochs
+of 50,000 pair draws and final epoch 119 remain fixed. No AIC leg is added.
+
+The [BAPPS paper](https://arxiv.org/html/1801.03924v2#S2.SS2) and
+[dataset owner](https://github.com/richzhang/PerceptualSimilarity#c-about-the-dataset)
+state two judgments per training comparison. Use only the 146,003 originally
+frozen TRAIN memberships and their existing revision-7 feature mapping.
+Excluded memberships and EVAL stay excluded. Require native integer counts
+`n_a+n_b=2`, `n_tie=0`, `n=2`, and `p_a=n_a/2`; preserve the source count values
+and pre-read ledger. A disagreement `(1,1)` is not an observer choosing an
+explicit third tie response. It must remain a two-sided comparison with equal
+probability, rather than being discarded or assigned a hard winner. Missing
+or inconsistent counts block admission; do not infer new votes from a model.
+
+Use the binomial negative log likelihood per vote, with the existing RankNet
+logistic link: `p=n_a/2`, `d=distance_b-distance_a`,
+`L=-p*log(sigmoid(d))-(1-p)*log(sigmoid(-d))`. Its derivative with respect to d
+is `sigmoid(d)-p`. The factor of two is normalized out because every admitted
+comparison has exactly two votes; total BAPPS sampling mass stays 0.5, with
+the existing two-row acceptance correction. Keep the legacy arithmetic path
+for old hard-rank groups and verify endpoint agreement, swap symmetry,
+finite large-logit behavior and finite-difference gradients. A split vote's
+minimum is equal predicted distances; it is not a skipped pair.
+
+This isolates retaining vote information with the current logistic rank scale.
+It does not implement zenpapers' broader probit/JND model, dataset unit or
+viewing-condition parameters, or claim that a native logit is a calibrated
+JND. Those require separate anchor admission and prospective comparisons.
+Use the private subjective-ingress/loss owners with explicit new declarations;
+no public trainer signature or inference API change is part of this trial.
+
+Before fitting, require native/Python refusal controls for the vote schema,
+counts, source pairing, non-TRAIN rows and producer/feature mismatches; an
+actual unchanged-Mlic KADID seed-0 fit through the new frozen trainer must
+reproduce the original 7,869 held-out predictions byte for byte. Freeze its
+binary separately. The candidate runs all 21 registered cells. Pair-omission
+cells must also reproduce their corresponding Mlic predictions exactly,
+because their fitting inputs omit BAPPS entirely.
+
+Apply the same prospective screen as the effective-sample trial: strict gain
+in the existing balanced TRAIN score against Mlic, old-data paired delta at
+least minus two seed-unit SEs, and zero global-edit mixture inversions in every
+candidate cell. Exact ties retain Mlic. Preserve all production numerical,
+identity, steering and speed gates. Report per-collection held-out TRAIN
+results, both mixture tests and the existing smoothness/bias diagnostics.
+The fixed held-out BAPPS accuracy population remains the original hard-pair
+TRAIN assessment; tie restoration changes fitting only, not the selector's
+population. No EVAL reselection or post-result weight changes.
+
+A qualifying arm receives three full-data fits and full qualification; a
+failed screen retains Mlic and leads to the separately registered ordering
+comparison. Combining successful recipe factors requires another prospective
+TRAIN comparison. The completed AIC and mass studies remain immutable.
