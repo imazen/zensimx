@@ -28,6 +28,8 @@
 //! model is the one with the highest validation mean.
 
 mod capabilities;
+#[cfg(test)]
+mod warm_start;
 pub use capabilities::validate_training_capabilities;
 
 use rayon::prelude::*;

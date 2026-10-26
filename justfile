@@ -3538,3 +3538,8 @@ aic-finetune-admission-tests:
 # Queue behind existing shared-machine timing work; caller supplies frozen source paths.
 aic-finetune-folds table pairs assignment output commit:
     TMPDIR="$HOME/tmp/aic-finetune-20261026" OPENBLAS_NUM_THREADS=1 flock "$HOME/tmp/heavy.lock" "$HOME/work/claudehints/scripts/run-heavy" --mem 4G --jobs 1 -- python3 -B scripts/byconstruction/aic_train.py rev7-folds --table {{quote(table)}} --pairs {{quote(pairs)}} --assignment {{quote(assignment)}} --output {{quote(output)}} --build-commit {{quote(commit)}}
+
+# Private readers can be verified before any trainer API change or scientific fit.
+aic-finetune-reader-tests:
+    cargo test --offline --locked -p zensim-validate --lib mlp_train::warm_start -- --test-threads=1
+    cargo test --offline --locked -p zensim-validate --bin zensim_mlp_train aic_public_train -- --test-threads=1

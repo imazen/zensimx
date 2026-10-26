@@ -3069,6 +3069,9 @@ fn stamp_emitted_checkpoints(
     Ok(written.len())
 }
 
+#[cfg(test)]
+#[path = "zensim_mlp_train/aic_public_train.rs"]
+mod aic_public_train;
 #[path = "zensim_mlp_train/e29_hdr_admission.rs"]
 mod e29_hdr_admission;
 #[path = "zensim_mlp_train/group_admission.rs"]
