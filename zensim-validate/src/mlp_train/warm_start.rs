@@ -10,6 +10,83 @@ pub(super) struct InitialWeights {
     pub(super) b1: Vec<f64>,
     pub(super) w2: Vec<f64>,
     pub(super) b2: Vec<f64>,
+    pub(super) max_pair_positions: Vec<[usize; 2]>,
+}
+
+// The baker sorts hidden units and emits no inverse permutation. Recover
+// valid pair positions without changing stored tensor or accumulation order.
+fn max_pair_positions(
+    w1: &[f64],
+    b1: &[f32],
+    w2: &[f64],
+    count: usize,
+) -> Result<Vec<[usize; 2]>, String> {
+    let hidden = b1.len();
+    let signed = |j| w1.chunks_exact(hidden).any(|row| row[j] < 0.0);
+    let upper: Vec<_> = (0..hidden)
+        .filter(|&j| b1[j] == 0.0 && !signed(j))
+        .collect();
+    let mut lower: Vec<_> = (0..hidden).filter(|j| !upper.contains(j)).collect();
+    lower.sort_by_key(|&j| (!signed(j), j));
+    let mut compatible = vec![Vec::new(); hidden];
+    for &v in &lower {
+        compatible[v] = upper
+            .iter()
+            .copied()
+            .filter(|&u| {
+                w2[u].to_bits() == w2[v].to_bits()
+                    && b1[v] <= 0.0
+                    && w1.chunks_exact(hidden).all(|row| row[u] + row[v] >= 0.0)
+            })
+            .collect();
+    }
+    fn augment(
+        v: usize,
+        edges: &[Vec<usize>],
+        seen: &mut [bool],
+        matched: &mut [Option<usize>],
+    ) -> bool {
+        for &u in &edges[v] {
+            if seen[u] {
+                continue;
+            }
+            seen[u] = true;
+            if matched[u].is_none_or(|old| augment(old, edges, seen, matched)) {
+                matched[u] = Some(v);
+                return true;
+            }
+        }
+        false
+    }
+    let mut matched = vec![None; hidden];
+    for v in lower {
+        augment(v, &compatible, &mut vec![false; hidden], &mut matched);
+    }
+    let mut pairs: Vec<_> = upper
+        .iter()
+        .filter_map(|&u| matched[u].map(|v| [u, v]))
+        .collect();
+    let mut unused: Vec<_> = upper
+        .into_iter()
+        .filter(|&u| matched[u].is_none())
+        .collect();
+    while let Some(u) = unused.pop() {
+        if let Some(i) = unused
+            .iter()
+            .position(|&v| w2[u].to_bits() == w2[v].to_bits())
+        {
+            pairs.push([u, unused.remove(i)]);
+        }
+    }
+    pairs.sort_by_key(|&[u, v]| (!signed(v), w2[u] == 0.0, u, v));
+    if pairs.len() < count {
+        return Err("initial checkpoint lacks its declared max-pair parameterization".into());
+    }
+    pairs.truncate(count);
+    if (0..hidden).any(|j| signed(j) && !pairs.iter().any(|p| p[1] == j)) {
+        return Err("initial checkpoint has a signed unit outside its declared max pairs".into());
+    }
+    Ok(pairs)
 }
 
 fn flag<'a>(argv: &'a [String], name: &str) -> Result<Option<&'a str>, String> {
@@ -194,21 +271,22 @@ impl InitialWeights {
         }
         let compact_w1 = weights(0)?;
         let w2 = weights(1)?;
+        if hp.nonneg_distance
+            && (w2.iter().any(|&w| w > 0.0)
+                || (!hp.nonneg_thresholds && l0.biases.iter().any(|&b| b != 0.0)))
+        {
+            return Err(
+                "initial checkpoint plain nonnegative-distance parameterization differs".into(),
+            );
+        }
         if hp.max_pairs * 2 > hp.n_hidden {
             return Err("initial checkpoint max-pair count exceeds its hidden width".into());
         }
-        for j in 0..hp.max_pairs {
-            let u = 2 * j;
-            let v = u + 1;
-            if l0.biases[u] != 0.0
-                || w2[u].to_bits() != w2[v].to_bits()
-                || compact_w1
-                    .chunks_exact(hp.n_hidden)
-                    .any(|row| row[u] < 0.0 || row[u] + row[v] < 0.0)
-            {
-                return Err("initial checkpoint max-pair parameterization differs".into());
-            }
-        }
+        let max_pair_positions = if hp.max_pairs > 0 {
+            max_pair_positions(&compact_w1, l0.biases, &w2, hp.max_pairs)?
+        } else {
+            Vec::new()
+        };
         let mut result = Self {
             scaler_mean: vec![0.0; n_features],
             scaler_scale: vec![1.0; n_features],
@@ -216,6 +294,7 @@ impl InitialWeights {
             b1: l0.biases.iter().map(|&x| f64::from(x)).collect(),
             w2,
             b2: l1.biases.iter().map(|&x| f64::from(x)).collect(),
+            max_pair_positions,
         };
         for (i, &column) in columns.iter().enumerate() {
             result.scaler_mean[column] = f64::from(model.scaler_mean()[i]);
@@ -388,6 +467,58 @@ mod tests {
                 assert_eq!(a, b);
             }
         }
+    }
+
+    #[test]
+    fn recovers_max_pairs_after_the_bakers_hidden_unit_reorder() {
+        let hp = MlpHyperparams {
+            n_hidden: 4,
+            max_pairs: 1,
+            nonneg_distance: true,
+            nonneg_thresholds: true,
+            monotone_cbc: true,
+            leaky_alpha: 0.0,
+            ..MlpHyperparams::default()
+        };
+        let bytes = bake_two_layer_znpr_v3(
+            &[0.0, 0.0],
+            &[1.0, 1.0],
+            &[2.0, -1.0, 0.0, 0.25, 1.0, 0.5, 0.0, 0.5],
+            &[0.0, -0.25, -1.0, -0.5],
+            &[-0.5, -0.5, 0.0, -1.0],
+            &[100.0],
+            2,
+            4,
+            1,
+            WeightDtype::F32,
+            None,
+            None,
+            Activation::Relu,
+        );
+        let repro = serde_json::json!({"argv":["trainer", "--hidden", "4", "--max-pairs", "1",
+            "--nonneg-distance", "--nonneg-thresholds", "--monotone-cbc"]})
+        .to_string();
+        let bytes =
+            zenpredict_bake::append_metadata_utf8(&bytes, "zentrain.repro", &repro).unwrap();
+        let mut loaded = InitialWeights::load(&bytes, 2, &hp, None).unwrap();
+        assert_eq!(loaded.max_pair_positions, vec![[3, 2]]);
+        let before = (
+            loaded.w1.clone(),
+            loaded.w2.clone(),
+            loaded.b1.clone(),
+            loaded.b2.clone(),
+        );
+        super::super::project_plain_indexed(
+            &mut loaded.w1,
+            &mut loaded.w2,
+            &mut loaded.b1,
+            &mut loaded.b2,
+            Some(100.0),
+            &hp,
+            Some(&loaded.max_pair_positions),
+        );
+        assert_eq!(before, (loaded.w1, loaded.w2, loaded.b1, loaded.b2));
+        assert!(max_pair_positions(&[0.0, 0.0], &[0.0, 0.0], &[-1.0, -2.0], 1).is_err());
     }
 
     #[test]

@@ -4651,5 +4651,24 @@ passed (22 tests); the independent label-free fold audit agrees with manifest
 `0c9595f65d0ad08587c04821fc734733c0582033cbb96ad902eb4406556b3d18`.
 Private control, progress, prediction and failure receipts are kept under
 the continuation study's `run-01/`; no label or generated model is published.
+
+#### Checkpoint hidden-unit ordering control (2026-10-26)
+
+The checkpoint baker sorts hidden units by input-column norm for compression
+and stores no inverse permutation. An initial adjacency check therefore
+refused the actual Mlic checkpoint before any optimizer step. The reader now
+recovers valid max-pair positions from exact saved weights, biases and tied
+output weights, leaving every tensor and its accumulation order unchanged.
+Projection follows those recovered positions only for initialization; default
+training retains its original positional pairs. The original unit labels and
+optimizer state are absent from this artifact; degenerate pairings use a
+deterministic reconstruction. The declared 32-pair count, signed-unit partner
+coverage and monotone certificate remain mandatory.
+
+The actual Mlic private-reader roundtrip passes on the corrected reader.
+A new fixture exercises the baker's hidden-unit reordering and projection at
+the recovered positions. This reader result does not yet establish the real
+CLI zero-step prediction comparison or the frozen-trainer default reproduction.
+Earlier guarded failures and their binaries are preserved separately.
 Pack and certify those final bakes, register their hashes, and mirror them.
 The coordinator owns subsequent product gates and the single EVAL assessment.

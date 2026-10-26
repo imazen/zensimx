@@ -1371,6 +1371,18 @@ fn project_plain(
     pin: Option<f64>,
     hp: &MlpHyperparams,
 ) {
+    project_plain_indexed(w1, w2, b1, b2, pin, hp, None);
+}
+
+fn project_plain_indexed(
+    w1: &mut [f64],
+    w2: &mut [f64],
+    b1: &mut [f64],
+    b2: &mut [f64],
+    pin: Option<f64>,
+    hp: &MlpHyperparams,
+    max_pair_positions: Option<&[[usize; 2]]>,
+) {
     // A ramp's upper unit carries `-w2[p] >= 0`; read the pair's tied output
     // weight before the `w2 <= 0` clamp erases it.
     let n_hidden = b1.len();
@@ -1385,15 +1397,19 @@ fn project_plain(
         .collect();
     // Max pairs: keep each v row's sign through the per-unit clamp below, and
     // tie the pair's output weight (mean, then <= 0).
+    let pair_at = |i: usize| max_pair_positions.map_or([2 * i, 2 * i + 1], |pairs| pairs[i]);
     let max_v_rows: Vec<Vec<f64>> = (0..hp.max_pairs)
         .map(|i| {
             w1.chunks_exact(n_hidden)
-                .map(|row| row[2 * i + 1])
+                .map(|row| row[pair_at(i)[1]])
                 .collect()
         })
         .collect();
     let max_w2: Vec<f64> = (0..hp.max_pairs)
-        .map(|i| (0.5 * (w2[2 * i] + w2[2 * i + 1])).min(0.0))
+        .map(|i| {
+            let [u, v] = pair_at(i);
+            (0.5 * (w2[u] + w2[v])).min(0.0)
+        })
         .collect();
     if hp.nonneg_thresholds && pin.is_some() {
         nonneg_project_thresholds(b1);
@@ -1451,7 +1467,7 @@ fn project_plain(
     let free = hp.monotone_feature_pin.as_deref();
     let strict = hp.monotone_strict && !hp.monotone_pin_during_training;
     for (i, (v_row, &c)) in max_v_rows.iter().zip(&max_w2).enumerate() {
-        let (u, v) = (2 * i, 2 * i + 1);
+        let [u, v] = pair_at(i);
         for (k, (row, &bv)) in w1.chunks_exact_mut(n_hidden).zip(v_row).enumerate() {
             if free.is_some_and(|pin| !pin[k]) {
                 row[u] = 0.0;
@@ -2906,6 +2922,19 @@ pub fn train_mlp_strategy_pairs(
         .unwrap_or_else(|e| panic!("initial checkpoint: {e}"))
     });
 
+    let max_pair_positions = initial.as_ref().map(|init| init.max_pair_positions.clone());
+    let project_plain = |w1: &mut [f64],
+                         w2: &mut [f64],
+                         b1: &mut [f64],
+                         b2: &mut [f64],
+                         pin: Option<f64>,
+                         hp: &MlpHyperparams| {
+        match max_pair_positions.as_deref() {
+            Some(pairs) => project_plain_indexed(w1, w2, b1, b2, pin, hp, Some(pairs)),
+            None => project_plain(w1, w2, b1, b2, pin, hp),
+        }
+    };
+
     #[cfg(e36_tv)]
     let mut e36_pool = tv.map(|config| e36_tv::Pool::new(config, hyperparams));
     #[cfg(e36_tv)]
@@ -3272,6 +3301,10 @@ pub fn train_mlp_strategy_pairs(
         b2 = init.b2;
         log_line(
             "[init-from] loaded checkpoint parameters and scaler; optimizer state starts fresh",
+            log,
+        );
+        log_line(
+            &format!("[init-from] recovered max-pair positions={max_pair_positions:?}"),
             log,
         );
     }
