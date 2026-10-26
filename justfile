@@ -3543,3 +3543,16 @@ aic-finetune-folds table pairs assignment output commit:
 aic-finetune-reader-tests:
     cargo test --offline --locked -p zensim-validate --lib mlp_train::warm_start -- --test-threads=1
     cargo test --offline --locked -p zensim-validate --bin zensim_mlp_train aic_public_train -- --test-threads=1
+
+# The explicit package list keeps formatting out of local path-dependency repos.
+aic-finetune-checks:
+    cargo fmt -p zensim -p zensim-experimental -p zensim-validate -p zensim-regress -p zensim-wasm-tests -p zensim-train-core -p zensim-train-gpu -- --check
+    cargo clippy --offline --locked --workspace --all-targets --all-features --exclude zensim-wasm-tests -- -D warnings
+
+# No target column is opened by the output readback verifier.
+aic-finetune-fold-verify output:
+    OPENBLAS_NUM_THREADS=1 python3 -B scripts/byconstruction/aic_train.py verify-rev7-folds {{quote(output)}}
+
+# Reader initialization only: the trainer CLI warm-start integration is a separate gate.
+aic-finetune-checkpoint-control source declaration output:
+    ZENSIM_WARM_START_SOURCE={{quote(source)}} ZENSIM_WARM_START_DECL={{quote(declaration)}} ZENSIM_WARM_START_OUT={{quote(output)}} cargo test --offline --locked -p zensim-validate --lib mlp_train::warm_start::tests::actual_mlic_zero_step_control -- --exact --ignored --test-threads=1

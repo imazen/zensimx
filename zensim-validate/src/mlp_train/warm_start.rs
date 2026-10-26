@@ -82,6 +82,8 @@ impl InitialWeights {
             return Err("initial checkpoint feature transforms are unsupported".into());
         }
         let metadata = model.metadata();
+        let declared_ids: Option<Vec<usize>> = zensim::declared_feature_ids(&model)
+            .map(|ids| ids.into_iter().map(usize::from).collect());
         let repro: serde_json::Value = serde_json::from_str(
             metadata
                 .get_utf8("zentrain.repro")
@@ -137,7 +139,7 @@ impl InitialWeights {
             if metadata.get_utf8("zensim.derived_inputs").ok()
                 != Some(decl.metadata_text().as_str())
                 || metadata.get_utf8("zentrain.derived_inputs_sha256").ok() != Some(sha.as_str())
-                || zensim::declared_feature_ids(&model) != Some(decl.read_set())
+                || declared_ids.as_ref() != Some(&decl.read_set())
             {
                 return Err("initial checkpoint derived inputs or read set differs".into());
             }
@@ -150,14 +152,15 @@ impl InitialWeights {
                 return Err("initial checkpoint feature layout differs".into());
             }
             if let Some(mask) = keep_mask {
-                let ids = zensim::declared_feature_ids(&model)
+                let ids = declared_ids
+                    .as_ref()
                     .ok_or("initial checkpoint subset has no declared read set")?;
                 let expected: Vec<_> = mask
                     .iter()
                     .enumerate()
                     .filter_map(|(i, &k)| k.then_some(i))
                     .collect();
-                if ids != expected {
+                if ids != &expected {
                     return Err("initial checkpoint read set differs".into());
                 }
             }
@@ -229,6 +232,98 @@ mod tests {
     use super::super::bake_two_layer_znpr_v3;
     use super::*;
     use zenpredict::WeightDtype;
+
+    /// Called explicitly by `just aic-finetune-checkpoint-control`; CI does not
+    /// have this private checkpoint. Missing requested inputs are hard errors.
+    #[test]
+    #[ignore = "caller must supply private Mlic source, declaration and fresh output"]
+    fn actual_mlic_zero_step_control() {
+        let source = std::path::PathBuf::from(
+            std::env::var_os("ZENSIM_WARM_START_SOURCE").expect("source required"),
+        );
+        let declaration = std::path::PathBuf::from(
+            std::env::var_os("ZENSIM_WARM_START_DECL").expect("declaration required"),
+        );
+        let out = std::path::PathBuf::from(
+            std::env::var_os("ZENSIM_WARM_START_OUT").expect("fresh output required"),
+        );
+        assert!(!out.exists(), "preserve the earlier control output");
+        let bytes = std::fs::read(source).unwrap();
+        let model = Model::from_bytes(&bytes).unwrap();
+        let (decl, _) = crate::derived_inputs::Fx1Declaration::load(&declaration).unwrap();
+        let width = 1853 + decl.products.len();
+        let hp = MlpHyperparams {
+            n_hidden: 128,
+            n_epochs: 0,
+            nonneg_distance: true,
+            nonneg_thresholds: true,
+            monotone_cbc: true,
+            max_pairs: 32,
+            leaky_alpha: 0.0,
+            steer_derived_inputs: Some(declaration),
+            ..MlpHyperparams::default()
+        };
+        let mut keep = vec![false; width];
+        for c in decl.kept_columns(1853) {
+            keep[c] = true;
+        }
+        let init = InitialWeights::load(&bytes, width, &hp, Some(&keep)).unwrap();
+        let mut after = bake_two_layer_znpr_v3(
+            &init.scaler_mean,
+            &init.scaler_scale,
+            &init.w1,
+            &init.b1,
+            &init.w2,
+            &init.b2,
+            width,
+            hp.n_hidden,
+            1,
+            WeightDtype::F32,
+            None,
+            None,
+            Activation::Relu,
+        );
+        for entry in model.metadata().iter() {
+            if entry.key != zensim::ZENTRAIN_FEATURE_IDS_KEY && entry.key != "zensim.derived_inputs"
+            {
+                // The existing serializer owns section splicing and compression.
+                assert_eq!(entry.kind, zenpredict::MetadataType::Utf8);
+                after = zenpredict_bake::append_metadata_utf8(
+                    &after,
+                    entry.key,
+                    std::str::from_utf8(entry.value).unwrap(),
+                )
+                .unwrap();
+            }
+        }
+        let after = decl.compact_bake(&after, 1853).unwrap();
+        let loaded = Model::from_bytes(&after).unwrap();
+        assert_eq!(
+            loaded
+                .scaler_mean()
+                .iter()
+                .map(|v| v.to_bits())
+                .collect::<Vec<_>>(),
+            model
+                .scaler_mean()
+                .iter()
+                .map(|v| v.to_bits())
+                .collect::<Vec<_>>()
+        );
+        assert_eq!(
+            loaded
+                .scaler_scale()
+                .iter()
+                .map(|v| v.to_bits())
+                .collect::<Vec<_>>(),
+            model
+                .scaler_scale()
+                .iter()
+                .map(|v| v.to_bits())
+                .collect::<Vec<_>>()
+        );
+        std::fs::write(out, after).unwrap();
+    }
 
     fn fixture() -> (Vec<u8>, MlpHyperparams) {
         let hp = MlpHyperparams {

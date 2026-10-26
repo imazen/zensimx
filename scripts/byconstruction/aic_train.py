@@ -122,6 +122,42 @@ def prepare_rev7_folds(table, pairs, assignment, output, build_commit):
     return manifest
 
 
+def verify_rev7_folds(output):
+    """Replay all metadata/key checks, then verify every output byte digest.
+
+    No target column is opened or interpreted by this independent readback.
+    """
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "rev4_featpot"))
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+    from v2_human_role import D6_INPUT_PINS, aic_public_train_declaration
+    output = Path(output)
+    manifest = json.loads((output / "_MANIFEST.json").read_text())
+    expected = {f"aic_k{k}_{split}" for k in range(7) for split in ("fit", "test")} | {"aic_full_fit"}
+    if (manifest.get("schema") != "aic2026-public-train-rev7-folds-v1"
+            or set(manifest.get("tables", {})) != expected
+            or any(manifest.get(k) != v for k, v in D6_INPUT_PINS.items())):
+        raise ValueError("D6 complete revision-7 fold inventory differs")
+    payloads = []
+    for name, record in manifest["tables"].items():
+        path = output / (name + ".parquet")
+        sidecar = Path(str(path) + ".manifest.json")
+        if (path.resolve() != Path(record["path"]).resolve()
+                or hashlib.sha256(sidecar.read_bytes()).hexdigest() != record["manifest_sha256"]):
+            raise ValueError("D6 fold output declaration differs")
+        d = json.loads(sidecar.read_text())
+        kp = Path(d["keys_path"])
+        if hashlib.sha256(kp.read_bytes()).hexdigest() != d["keys_sha256"]:
+            raise ValueError("D6 fold output keys differ")
+        keys = json.loads(kp.read_text())
+        aic_public_train_declaration(d, keys, fit=name.endswith("_fit"))
+        payloads.append((path, d["table_sha256"]))
+    for path, expected_sha in payloads:
+        if hashlib.sha256(path.read_bytes()).hexdigest() != expected_sha:
+            raise ValueError("D6 fold output bytes differ")
+    return dict(status="PASS", tables=len(payloads), targets_interpreted=False,
+                manifest_sha256=hashlib.sha256((output / "_MANIFEST.json").read_bytes()).hexdigest())
+
+
 def v2_name(i: int) -> str:
     cell, k = divmod(i - V2_START, len(V2))
     return f"{V2[k]}_s{cell // 3}{'XYB'[cell % 3]}"
@@ -373,6 +409,9 @@ def main() -> int:
     for option in ("table", "pairs", "assignment", "output", "build-commit"):
         f.add_argument("--" + option, required=True)
     f.set_defaults(fn=lambda a: (prepare_rev7_folds(a.table, a.pairs, a.assignment, a.output, a.build_commit), 0)[1])
+    v = sub.add_parser("verify-rev7-folds", help="D6 metadata/key and output byte readback; no targets interpreted")
+    v.add_argument("output")
+    v.set_defaults(fn=lambda a: (print(json.dumps(verify_rev7_folds(a.output))), 0)[1])
     z = sub.add_parser("zeroshot")
     z.add_argument("--table", required=True)
     z.add_argument("--pairs", required=True)
