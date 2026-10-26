@@ -4753,6 +4753,24 @@ failed screen retains Mlic and leads to the separately registered ordering
 comparison. Combining successful recipe factors requires another prospective
 TRAIN comparison. The completed AIC and mass studies remain immutable.
 
+Native vote-loss implementation checks (2026-10-26): the private sequential
+CPU path accepts the reserved `subjective_vote_bapps` protocol and retains
+the original arithmetic for hard-rank groups. The existing polarity owner
+maps raw scores to distance differences. Invented controls verify the
+two-Bernoulli likelihood, finite-difference gradients, side-swap symmetry,
+finite logits at ±1000, actual training toward equal predictions for a 1–1
+disagreement, and both unanimous preference directions. Unsupported parallel
+and pooled routes and non-native probabilities refuse before optimization.
+The four existing subjective hard-rank controls pass unchanged.
+
+On i265, the native loss/control test command completed with
+`run-heavy: done rc=0 166s | peak-RSS 1.96GiB | min-avail 19965MiB | peak-load 8.54`.
+Strict workspace clippy passed afterward. Logs are in
+`~/tmp/zensim-vote-preflight-20261026/{vote-loss-tests,vote-admission-checks}.log`
+on that host. These are implementation controls, not runtime benchmarks or
+evidence of candidate quality; the registered full-budget Mlic prediction
+control and the 21 candidate cells remain required.
+
 The existing observation mapper now has an explicit vote-preserving mode.
 Synthetic controls retain a `(1,1)` disagreement as two 0.5 targets and reject
 missing, fractional, inconsistent or three-vote counts. The original hard-pair

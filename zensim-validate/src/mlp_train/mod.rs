@@ -2880,6 +2880,7 @@ pub fn train_mlp_strategy_pairs(
     triplets: Option<&TripletPool>,
     rank_pairs: &std::collections::BTreeMap<String, Vec<[usize; 2]>>,
 ) -> Vec<u8> {
+    subjective_rank::validate_votes(groups, hyperparams, !rank_pairs.is_empty());
     let effective = validate_training_capabilities(
         hyperparams,
         groups.iter().any(|g| g.loss_mode.has_mse()),
@@ -3831,20 +3832,27 @@ pub fn train_mlp_strategy_pairs(
             // RankNet term. Zeroed for `GroupLossMode::Mse` groups and for
             // tied / sub-threshold pairs of a `Both` group.
             let (dl_dya_rn, dl_dyb_rn) = if want_rank {
-                let pred_diff = yb - ya;
-                let z = -target * pred_diff;
-                let loss_raw = if z > 50.0 {
-                    z
-                } else if z < -50.0 {
-                    0.0
+                if g.name == subjective_rank::VOTE_GROUP {
+                    let (loss, gradient) =
+                        subjective_rank::vote_loss(mos_a, yb - ya, rank_target_sign);
+                    total_loss += loss;
+                    (-gradient, gradient)
                 } else {
-                    (z.exp() + 1.0).ln()
-                };
-                total_loss += loss_raw * pair_weight;
+                    let pred_diff = yb - ya;
+                    let z = -target * pred_diff;
+                    let loss_raw = if z > 50.0 {
+                        z
+                    } else if z < -50.0 {
+                        0.0
+                    } else {
+                        (z.exp() + 1.0).ln()
+                    };
+                    total_loss += loss_raw * pair_weight;
 
-                let sig_z = 1.0 / (1.0 + (-z).exp());
-                let dl_d_pred_diff = -target * sig_z * pair_weight;
-                (-dl_d_pred_diff, dl_d_pred_diff)
+                    let sig_z = 1.0 / (1.0 + (-z).exp());
+                    let dl_d_pred_diff = -target * sig_z * pair_weight;
+                    (-dl_d_pred_diff, dl_d_pred_diff)
+                }
             } else {
                 (0.0, 0.0)
             };
