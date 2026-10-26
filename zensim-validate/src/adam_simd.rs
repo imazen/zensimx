@@ -31,6 +31,8 @@
 //! Selection happens via [`archmage::incant!`] which probes `summon()`
 //! once per call and dispatches to the fastest available tier.
 
+#![forbid(unsafe_code)]
+
 #[cfg(target_arch = "x86_64")]
 use archmage::arcane;
 use archmage::incant;
@@ -179,7 +181,9 @@ fn l2_row_wasm128(_: archmage::Wasm128Token, g: &mut [f64], w: &[f64], sm: f64) 
 // flushed result is known without executing a repeatedly underflowing FMA.
 #[inline]
 fn first_moment_cutoff(one_minus: f64) -> f64 {
-    if one_minus.is_finite() && one_minus > 0.0 {
+    // Below EPSILON, a normal g can multiply down to signed zero before
+    // the scalar tail's separate add. Preserve that rounding/sign behavior.
+    if one_minus.is_finite() && one_minus >= f64::EPSILON {
         l2_cutoff(one_minus)
     } else {
         0.0
@@ -202,6 +206,9 @@ fn first_moment4<T: magetypes::simd::backends::F64x4Backend>(
     cutoff: magetypes::simd::generic::f64x4<T>,
 ) -> magetypes::simd::generic::f64x4<T> {
     use magetypes::simd::generic::f64x4;
+    if g.to_array().map(f64::to_bits) == [0; 4] {
+        return flush_moment4(token, one_minus.mul_add(g, beta * m));
+    }
     let zero = f64x4::zero_t(token);
     let bypass = m.simd_eq(zero) & g.simd_ne(zero) & g.abs().simd_lt(cutoff);
     let safe_g = f64x4::blend(bypass, zero, g);
@@ -219,6 +226,9 @@ fn first_moment8(
     one_minus: f64x8<archmage::X64V4Token>,
     cutoff: f64x8<archmage::X64V4Token>,
 ) -> f64x8<archmage::X64V4Token> {
+    if g.to_array().map(f64::to_bits) == [0; 8] {
+        return flush_moment8(token, one_minus.mul_add(g, beta * m));
+    }
     let zero = f64x8::zero_t(token);
     let bypass = m.simd_eq(zero) & g.simd_ne(zero) & g.abs().simd_lt(cutoff);
     let safe_g = f64x8::blend(bypass, zero, g);
@@ -269,9 +279,8 @@ pub fn adam_update(args: &mut AdamUpdateArgs<'_>) {
     incant!(adam_update_inner(args), [+v4])
 }
 
-/// Scalar reference. Used as the bit-identity oracle in tests and as
-/// the always-available fallback. Mirrors the original closure body in
-/// [`crate::mlp_train::AdamState::step`] verbatim.
+/// Split multiply/add scalar reference and canonical final n%4 tail.
+/// Applies the same local subnormal policy as the fused SIMD domain.
 #[inline(always)]
 pub fn adam_update_scalar_ref(args: &mut AdamUpdateArgs<'_>) {
     let beta1 = args.beta1;
@@ -1376,6 +1385,16 @@ fn adam_pair_fused_inner_v3_body(token: archmage::X64V3Token, args: &mut AdamW1F
     let l2_on = args.l2_scale > 0.0;
     let gz = args.g_zero_in;
     let tau = args.group_l1_tau;
+    // The canonical all-+0 state is a fixed point for ordinary Adam
+    // hyperparameters. Once moments have flushed, dead chunks need no FP
+    // arithmetic or stores. Keep exceptional parameters on the full path.
+    let zero_fixed_point = args.beta1.is_finite()
+        && args.beta2.is_finite()
+        && args.bc1 >= f64::MIN_POSITIVE
+        && args.bc2 >= f64::MIN_POSITIVE
+        && args.lr.is_finite()
+        && args.eps > 0.0;
+    let ordinary_betas = args.beta1 == 0.9 && args.beta2 == 0.999;
     let (dha_chunks, _) = args.dha[..nh].as_chunks::<4>();
     let (dhb_chunks, _) = args.dhb[..nh].as_chunks::<4>();
 
@@ -1405,6 +1424,17 @@ fn adam_pair_fused_inner_v3_body(token: archmage::X64V3Token, args: &mut AdamW1F
                 };
                 let sm_v = f64x4::splat_t(token, sm);
                 let cutoff_v = f64x4::splat_t(token, if l2_on { l2_cutoff(sm) } else { 0.0 });
+                // Positive finite weights are unchanged when g/m/v are +0
+                // and no L2 contribution can start a normal first moment.
+                // For the trainer's beta pair this bound is also far below
+                // the range where g*g could start a normal second moment.
+                let idle_weight_bound = if !l2_on || sm == 0.0 {
+                    f64::INFINITY
+                } else if ordinary_betas && sm > 0.0 && sm <= 1.0 {
+                    (first_cutoff_v.to_array()[0] / sm).next_down().next_down()
+                } else {
+                    0.0
+                };
                 debug_assert!(
                     !gz || args.g[base..base + nh].iter().all(|g| g.to_bits() == 0),
                     "g_zero_in promised an all +0.0 gradient row (row {row})"
@@ -1428,6 +1458,22 @@ fn adam_pair_fused_inner_v3_body(token: archmage::X64V3Token, args: &mut AdamW1F
                         g = sb_v.mul_add(f64x4::load_t(token, &dhb_chunks[c]), g);
                     }
                     let w = f64x4::load_t(token, wc);
+                    let m = f64x4::load_t(token, mc);
+                    let v = f64x4::load_t(token, vc);
+                    if zero_fixed_point && (g | m | v).to_array().map(f64::to_bits) == [0; 4] {
+                        let bits = w.to_array().map(f64::to_bits);
+                        let unchanged_weights = if bits == [0; 4] {
+                            !l2_on || sm.is_finite()
+                        } else {
+                            bits.into_iter().all(|b| b < idle_weight_bound.to_bits())
+                        };
+                        if unchanged_weights {
+                            if !gz {
+                                zero_v.store(gc);
+                            }
+                            continue;
+                        }
+                    }
                     if l2_on {
                         // mul+add — two roundings, matching l2_row_avx exactly.
                         g += l2_product4(token, w, sm_v, cutoff_v);
@@ -1435,8 +1481,8 @@ fn adam_pair_fused_inner_v3_body(token: archmage::X64V3Token, args: &mut AdamW1F
                     // Tiny L2 gradients can be subnormal even when w is normal.
                     // Do not feed them to the moment FMAs on every update.
                     g = flush_moment4(token, g);
-                    let m = flush_moment4(token, f64x4::load_t(token, mc));
-                    let v = flush_moment4(token, f64x4::load_t(token, vc));
+                    let m = flush_moment4(token, m);
+                    let v = flush_moment4(token, v);
                     let m_new = first_moment4(token, g, m, beta1_v, one_minus_b1_v, first_cutoff_v);
                     let gg = g * g;
                     let v_new = flush_moment4(token, one_minus_b2_v.mul_add(gg, beta2_v * v));
@@ -1995,6 +2041,188 @@ mod tests {
             let mut v = m.clone();
             adam_update(&mut make_args(&mut w, &mut g, &mut m, &mut v, 100));
             assert_eq!(bits_of(&m), bits_of(&expected), "{}", perm.label);
+        });
+        assert!(report.permutations_run > 0);
+    }
+
+    #[test]
+    fn vanishing_first_moment_coefficient_keeps_the_canonical_tail_sign() {
+        use archmage::testing::{CompileTimePolicy, for_each_token_permutation};
+        let beta1 = 1.0f64.next_down();
+        let one_minus = 1.0 - beta1;
+        let gradient = -f64::MIN_POSITIVE;
+        let expected: Vec<_> = (0..5)
+            .map(|i| {
+                if i < 4 {
+                    one_minus.mul_add(gradient, 0.0)
+                } else {
+                    0.0 + one_minus * gradient
+                }
+            })
+            .collect();
+        assert_ne!(expected[0].to_bits(), expected[4].to_bits());
+        let report = for_each_token_permutation(CompileTimePolicy::Warn, |perm| {
+            let mut w = [0.5; 5];
+            let mut g = [gradient; 5];
+            let mut m = [0.0; 5];
+            let mut v = [0.0; 5];
+            adam_update(&mut AdamUpdateArgs {
+                w: &mut w,
+                g: &mut g,
+                m: &mut m,
+                v: &mut v,
+                beta1,
+                beta2: 0.999,
+                eps: 1e-8,
+                bc1: 1.0,
+                bc2: 1.0,
+                lr: 0.005,
+            });
+            assert_eq!(bits_of(&m), bits_of(&expected), "{}", perm.label);
+        });
+        assert!(report.permutations_run > 0);
+    }
+
+    #[test]
+    fn zero_state_fixed_point_keeps_signed_zero_and_exception_behavior() {
+        use archmage::testing::{CompileTimePolicy, for_each_token_permutation};
+        let report = for_each_token_permutation(CompileTimePolicy::Warn, |perm| {
+            for (eps, bc1, bc2, lr, beta1, beta2) in [
+                (1e-8, 1.0, 1.0, 0.005, 0.9, 0.999),
+                (0.0, 1.0, 1.0, 0.005, 0.9, 0.999),
+                (1e-8, 0.0, 1.0, 0.005, 0.9, 0.999),
+                (1e-8, 1.0, 0.0, 0.005, 0.9, 0.999),
+                (1e-8, 1.0, 1.0, f64::NAN, 0.9, 0.999),
+                (1e-8, 1.0, 1.0, 0.005, f64::NAN, 0.999),
+                (1e-8, 1.0, 1.0, 0.005, 0.9, f64::NAN),
+            ] {
+                for negative_zero_field in 0..=4 {
+                    let mut actual = (vec![0.0; 16], vec![0.0; 16], vec![0.0; 16], vec![0.0; 16]);
+                    for (i, field) in [&mut actual.0, &mut actual.1, &mut actual.2, &mut actual.3]
+                        .into_iter()
+                        .enumerate()
+                    {
+                        if i == negative_zero_field {
+                            field[0] = -0.0;
+                        }
+                    }
+                    let mut reference = actual.clone();
+                    macro_rules! args {
+                        ($state:ident) => {
+                            AdamW1FusedArgs {
+                                w: &mut $state.0,
+                                g: &mut $state.1,
+                                m: &mut $state.2,
+                                v: &mut $state.3,
+                                xa: &[0.0; 2],
+                                xb: &[0.0; 2],
+                                dha: &[0.0; 8],
+                                dhb: &[0.0; 8],
+                                n_hidden: 8,
+                                l2_scale: 0.0,
+                                l2_mult: None,
+                                beta1,
+                                beta2,
+                                eps,
+                                bc1,
+                                bc2,
+                                lr,
+                                active_rows: None,
+                                group_l1_tau: None,
+                                g_zero_in: false,
+                                fwd: None,
+                            }
+                        };
+                    }
+                    adam_pair_fused_fallback(&mut args!(reference));
+                    adam_update_w1_fused(&mut args!(actual));
+                    for (a, e) in [
+                        (&actual.0, &reference.0),
+                        (&actual.1, &reference.1),
+                        (&actual.2, &reference.2),
+                        (&actual.3, &reference.3),
+                    ] {
+                        for (a, e) in a.iter().zip(e) {
+                            assert!(
+                                a.to_bits() == e.to_bits() || (a.is_nan() && e.is_nan()),
+                                "{} {a:?} != {e:?}",
+                                perm.label
+                            );
+                        }
+                    }
+                }
+            }
+        });
+        assert!(report.permutations_run > 0);
+    }
+
+    #[test]
+    fn inactive_positive_weights_match_full_update_at_every_cutoff_neighbor() {
+        use archmage::testing::{CompileTimePolicy, for_each_token_permutation};
+        let report = for_each_token_permutation(CompileTimePolicy::Warn, |perm| {
+            for sm in [0.0, 1e-308, 1e-5, 0.125, 0.5, 1.0, 2.0, -1.0] {
+                let boundary = if sm > 0.0 {
+                    first_moment_cutoff(1.0 - 0.9) / sm
+                } else {
+                    f64::MAX
+                };
+                let mut values = vec![0.0, -0.0, 1e-310, -1e-310, 1e-302, -1e-302, 0.5];
+                let (mut lo, mut hi) = (boundary, boundary);
+                for _ in 0..64 {
+                    values.extend([lo, hi, -lo, -hi]);
+                    lo = lo.next_down();
+                    hi = hi.next_up();
+                }
+                let weights: Vec<_> = values.iter().flat_map(|&w| [w; 4]).collect();
+                let n = weights.len();
+                let zero_inputs = vec![0.0; n / 4];
+                let mult = vec![sm; n / 4];
+                let mut actual = (weights, vec![0.0; n], vec![0.0; n], vec![0.0; n]);
+                let mut reference = actual.clone();
+                macro_rules! args {
+                    ($state:ident) => {
+                        AdamW1FusedArgs {
+                            w: &mut $state.0,
+                            g: &mut $state.1,
+                            m: &mut $state.2,
+                            v: &mut $state.3,
+                            xa: &zero_inputs,
+                            xb: &zero_inputs,
+                            dha: &[0.0; 4],
+                            dhb: &[0.0; 4],
+                            n_hidden: 4,
+                            l2_scale: 1.0,
+                            l2_mult: Some(&mult),
+                            beta1: 0.9,
+                            beta2: 0.999,
+                            eps: 1e-8,
+                            bc1: 1.0,
+                            bc2: 1.0,
+                            lr: 0.005,
+                            active_rows: None,
+                            group_l1_tau: None,
+                            g_zero_in: false,
+                            fwd: None,
+                        }
+                    };
+                }
+                adam_pair_fused_fallback(&mut args!(reference));
+                adam_update_w1_fused(&mut args!(actual));
+                for (a, e) in [
+                    (&actual.0, &reference.0),
+                    (&actual.1, &reference.1),
+                    (&actual.2, &reference.2),
+                    (&actual.3, &reference.3),
+                ] {
+                    for (i, (a, e)) in a.iter().zip(e).enumerate() {
+                        assert!(
+                            a.to_bits() == e.to_bits() || (a.is_nan() && e.is_nan()),
+                            "{} sm={sm} i={i} {a:?} != {e:?}",
+                            perm.label
+                        );
+                    }
+                }
+            }
         });
         assert!(report.permutations_run > 0);
     }
