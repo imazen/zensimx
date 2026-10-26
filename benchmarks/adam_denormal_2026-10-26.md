@@ -313,3 +313,8 @@ Cache/alias/TLB passes:
 `run-heavy: done rc=0 34s | peak-RSS 0.02GiB | min-avail 22362MiB | peak-load 1.57`.
 Stall passes:
 `run-heavy: done rc=0 11s | peak-RSS 0.02GiB | min-avail 22718MiB | peak-load 1.21`.
+
+The final section-splice/page-control tool also passes native Neoverse-N1
+strict all-target Clippy and its applicable Adam tests with the unchanged
+kernel hash. Evidence: `arm/neon-final-splice-page-tool.log`.
+`run-heavy: done rc=0 28s | peak-RSS 0.31GiB | min-avail 26923MiB | peak-load 6.65`.
