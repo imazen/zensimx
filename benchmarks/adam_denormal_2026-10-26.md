@@ -164,3 +164,24 @@ positive weights whose L2 contribution cannot start a normal moment. The full
 scalar composition remains its oracle. Boundary, signed-zero, exceptional
 hyperparameter and ordinary tier-parity tests pass on native Intel; final
 complete timing and AVX-512 execution remain separate gates.
+
+## Final source verification on Intel
+
+The final source passes CI-exact workspace Clippy with all targets/features
+(excluding the browser-only crate), with warnings denied. The trainer Adam and
+L2 unit tests, both existing Adam integration suites and the standalone
+release probe tests pass unchanged expectations on i265. Strict all-target
+release probe Clippy and formatting pass. Native NEON execution and the clean
+x86 cross-compile check also pass; native AVX-512 execution is scheduled for the
+quiet dev window.
+
+Combined build/check resource record:
+`run-heavy: done rc=1 340s | peak-RSS 1.35GiB | min-avail 18555MiB | peak-load 6.55`.
+Every Rust check passed. That command's final script lint fails because the
+isolated remote source copy lacks the pre-existing `zensim--rev7main` sibling
+referenced by `candidate_registry.py`; the same script lint passes in the local
+workspace (1,287 scripts runnable). No script expectation or path was changed to
+accept the remote layout. Full output is in
+`intel/results/verification-final2.log` under the artifact root. The standalone
+native model reader also verifies the new arithmetic version in the completed
+replay's embedded provenance.
