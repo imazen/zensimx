@@ -36,3 +36,7 @@ Both metadata jobs joined the existing 42 GiB/no-swap scope. Linked-root constru
 ## Worker relocation control — 2026-10-26
 
 The fleet’s network-disabled in-image relocation audit passed210 archive files,82 runtime paths and all7 folds. Receipt `fleet-coordination/MLIC_SUB_RELOCATION_VERIFIED.json` in the mix study, SHA256 `e7c4df4460cd0e6b064fa248822fdd6c2a517b0c51adbd218ff66eeed3903952`, binds unchanged source1076a19e, root6abfac53 and authoritye7772dbc. The R6 transport archive checked and independently SHA256-verified on dev is `/mnt/v/output/zensim/fleet-cells-20261025/r6/data-Mlic-sub.tar.gz`,2,249,990,216 bytes, SHA256 `f70cb25352dc84152c105334bf6143ca8966508511323c1ae4b6979d606d8fde`. This is an archive digest, separate from the frozen-root digest. No uploaded object or new mirror is claimed by this observation. Fresh R6 exact parity remains the fleet gate before subset science.
+
+## Fresh fleet parity gate — 2026-10-26
+
+Fresh R6 control exited0 with23/23 exact checks. The parity comparison report retains SHA256 `2b3409d09d768773ef8067da7c9d92cabe06ea39113492272f6177c3f1091c67`; distinct fresh harvest `fleet-coordination/MLIC_SUB_CONTROL_HARVEST.json` SHA256 `c181678fac6bc18aad1139c7d43b7fb04f615530f24dbe480f8addcbdb6729a0` binds this new run. This preserves the difference between identical comparison bytes and a fresh control execution. The fleet is publishing21 Mlic+sub cells, E21 first, outside the original123-cell inventory. No subset fit is launched by this lane.
