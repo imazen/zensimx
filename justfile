@@ -3562,6 +3562,9 @@ aic-finetune-checkpoint-control source declaration output:
 aic-finetune-packet prior output:
     python3 -B scripts/rev4_featpot/aic_finetune_chain.py {{quote(prior)}} {{quote(output)}}
 
+aic-finetune-status study:
+    python3 -B scripts/rev4_featpot/aic_finetune_status.py {{quote(study)}}
+
 aic-finetune-launch study packet:
     #!/usr/bin/env bash
     set -Eeuo pipefail
