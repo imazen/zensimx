@@ -37,6 +37,9 @@ def main():
     parser.add_argument("--jobs", choices=range(1, 9), type=int, default=8)
     args = parser.parse_args()
     study = args.study.resolve()
+    scratch = Path.home() / "tmp" / "zensim-aic-analysis" / study.name
+    scratch.mkdir(parents=True, exist_ok=True)
+    os.environ["TMPDIR"] = str(scratch)
     out = args.output.resolve() if args.output else study / "analysis"
     packet = json.loads(args.packet.read_text())
     if json.loads((study / "TRAIN_COMPLETE.json").read_text())["registered_cells"] != 24:
