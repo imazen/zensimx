@@ -268,3 +268,48 @@ Its strict all-target Clippy/build resource record:
 The comparison completes with
 `run-heavy: done rc=0 3s | peak-RSS 0.03GiB | min-avail 22540MiB | peak-load 1.10`.
 The frozen i134 baseline and quiet dev before/after measurements remain pending.
+
+## Synthetic zero-moment memory setup
+
+A cycles profile of the final probe's tiny-moment case attributes 99.97% of
+samples to fused Adam and 86.76% to the v/m load and following instruction.
+Retired-load/cache, alias, branch, TLB and machine-clear counters do not identify
+FP assists as its remaining cost. One stall-counter observation reports
+31,646,139,457 load-bound cycles out of 41,873,664,125 cycles; the preceding
+zero-bypass implementation reports 376,145,669 out of 18,295,135,619. These
+counter passes use 20,000 updates, not the 2,000-update tables above. Their
+complete raw files remain in `intel/results/`.
+
+Add an optional `lazy|touched` probe setup. `touched` writes the initial value
+into every m/v element through safe `black_box` references before the update
+loop. Both modes have identical numerical state and use the same kernel. This
+controls lazy zero allocation, rather than changing trainer arithmetic. With
+one preserved executable (`d54009a05a8d8d9bad0d4b2abc052d183c71100fd8504175cea1564b0fd432ba`),
+interleaved on i265 CPU 2, tiny-moment, 104,960 parameters, 20,000 updates:
+
+| Moment setup | Elapsed seconds | P-core cycles | Instructions | Load-bound cycles | FP assists |
+|---|---:|---:|---:|---:|---:|
+| lazy 1 | 7.806803397 | 41,849,258,162 | 20,002,718,251 | 31,407,674,113 | 0 |
+| touched 1 | 0.781310919 | 4,189,468,006 | 19,969,671,555 | 334,002,354 | 0 |
+| lazy 2 | 7.800425164 | 41,844,218,992 | 20,001,028,695 | 31,511,402,513 | 0 |
+| touched 2 | 0.777104722 | 4,165,663,381 | 19,969,653,732 | 313,368,591 | 0 |
+
+All final moment bits are +0 in both modes. Writing the initial moment pages
+removes this probe's load stall. Lazy shared-zero-page mappings are the likely
+cause; the precise hardware mechanism is not established. The normal and decay
+probes already initialize moments to nonzero values; the real fit also updates
+moments before they decay. No trainer change follows from this synthetic setup
+finding, and no original lazy timing is replaced or scaled to another size.
+The new default remains lazy so earlier commands retain their setup.
+
+The updated tool passes its native Intel tests and strict all-target Clippy.
+Build record:
+`run-heavy: done rc=0 5s | peak-RSS 0.30GiB | min-avail 22485MiB | peak-load 1.25`.
+Page-control record:
+`run-heavy: done rc=0 17s | peak-RSS 0.02GiB | min-avail 22437MiB | peak-load 1.48`.
+Cycles profile record:
+`run-heavy: done rc=0 8s | peak-RSS 0.08GiB | min-avail 22650MiB | peak-load 1.19`.
+Cache/alias/TLB passes:
+`run-heavy: done rc=0 34s | peak-RSS 0.02GiB | min-avail 22362MiB | peak-load 1.57`.
+Stall passes:
+`run-heavy: done rc=0 11s | peak-RSS 0.02GiB | min-avail 22718MiB | peak-load 1.21`.

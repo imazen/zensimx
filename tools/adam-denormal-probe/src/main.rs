@@ -44,10 +44,9 @@ fn main() {
             .expect("write provenance");
         return;
     }
-    assert_eq!(
-        argv.len(),
-        5,
-        "usage: probe fused|unfused normal|decay|tiny-l2|tiny-moment|subnormal-weight STEPS v3|scalar|native"
+    assert!(
+        matches!(argv.len(), 5 | 6),
+        "usage: probe fused|unfused normal|decay|tiny-l2|tiny-moment|subnormal-weight STEPS v3|scalar|native [lazy|touched]"
     );
     let steps: usize = argv[3].parse().unwrap();
     let _guard = archmage::testing::lock_token_testing();
@@ -80,6 +79,18 @@ fn main() {
     };
     let mut m = vec![initial; n];
     let mut v = vec![initial; n];
+    let pages = argv.get(5).map(String::as_str).unwrap_or("lazy");
+    match pages {
+        "touched" => {
+            // Force actual writes even when calloc supplied shared zero pages.
+            // Training normally touches moment pages before they decay to zero.
+            for value in m.iter_mut().chain(v.iter_mut()) {
+                *black_box(value) = black_box(initial);
+            }
+        }
+        "lazy" => {}
+        _ => panic!("unknown moment-page setup"),
+    }
     let x = vec![0.0; 820];
     let dh = vec![0.0; 128];
     for _ in 0..steps {
@@ -131,7 +142,7 @@ fn main() {
         black_box((&w, &m, &v));
     }
     println!(
-        "kernel={} state={} steps={steps} tier={} params={n} m_bits={:016x} v_bits={:016x}",
+        "kernel={} state={} steps={steps} tier={} pages={pages} params={n} m_bits={:016x} v_bits={:016x}",
         argv[1],
         argv[2],
         argv[4],
