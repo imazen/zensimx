@@ -459,6 +459,30 @@ class DatasetTargets(unittest.TestCase):
         self.assertNotEqual(obs[0]["ref_basename"],obs[2]["ref_basename"])
         self.assertEqual(dropped["exact_probability_tie"],1)
 
+    def test_native_two_vote_observations_keep_disagreements_and_reject_invented_counts(self):
+        members, mapping, labels = [], [], {}
+        for i,na in enumerate((2,0,1)):
+            members.append(dict(input_table="pairs.tsv",row_index=i,reference_path="ref",a_path="a",b_path="b",family_id=7))
+            labels[("pairs.tsv",i)] = dict(ref="ref",a="a",b="b",p_a=str(na/2),
+                                           n_a=str(na),n_b=str(2-na),n_tie="0",n="2")
+            for side in ("a","b"):
+                mapping.append(dict(input_table="pairs.tsv",membership_row_index=i,role="TRAIN",skip_reason=None,
+                                    side=side,pair_key=f"{i}{side}"))
+        obs,dropped = root.dataset_observations("bapps",members,mapping,labels,votes=True)
+        self.assertEqual([o["human_score"] for o in obs],[1.,0.,0.,1.,0.5,0.5])
+        self.assertNotIn("exact_probability_tie",dropped)
+        self.assertEqual(len({o["ref_basename"] for o in obs}),3)
+        self.assertEqual({o["family"] for o in obs},{"7"})
+        for field,value in (("n_a","0"),("n_tie","1"),("n","3"),("n_a","1.5"),("p_a","0.75")):
+            original = labels[("pairs.tsv",2)][field]
+            labels[("pairs.tsv",2)][field] = value
+            with self.assertRaisesRegex(ValueError,"BAPPS"):
+                root.dataset_observations("bapps",members,mapping,labels,votes=True)
+            labels[("pairs.tsv",2)][field] = original
+        del labels[("pairs.tsv",2)]["n"]
+        with self.assertRaisesRegex(ValueError,"integer vote counts"):
+            root.dataset_observations("bapps",members,mapping,labels,votes=True)
+
     def test_native_dmos_is_negated_and_mos_is_preserved(self):
         members, mapping, labels = [], [], {}
         for i,(value,direction) in enumerate(((2,"false"),(1,"false"),(2,"true"),(1,"true"))):

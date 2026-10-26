@@ -276,8 +276,10 @@ def dataset_targets(path, wanted, columns, ledger, collection):
     return result
 
 
-def dataset_observations(collection, members, mapping, labels):
+def dataset_observations(collection, members, mapping, labels, *, votes=False):
     """Quality-oriented scalar rows and strictly pair-local hard preferences."""
+    if votes and collection != "bapps":
+        raise ValueError("two-vote comparison is registered only for BAPPS")
     by_row = collections.defaultdict(dict)
     for r in mapping:
         if r["role"] == "TRAIN" and r["skip_reason"] is None:
@@ -307,12 +309,20 @@ def dataset_observations(collection, members, mapping, labels):
                 p = float(lab["p_a"])
             if not np.isfinite(p) or not 0 <= p <= 1:
                 raise ValueError("invalid native preference probability")
-            if p == 0.5:
+            if votes:
+                try:
+                    na, nb, nt, total = (int(lab[k]) for k in ("n_a", "n_b", "n_tie", "n"))
+                except (KeyError, ValueError) as error:
+                    raise ValueError("native BAPPS integer vote counts required") from error
+                if min(na, nb) < 0 or na+nb != 2 or nt != 0 or total != 2 or p != na/2:
+                    raise ValueError("native BAPPS two-vote count/probability binding differs")
+            if p == 0.5 and not votes:
                 dropped["exact_probability_tie"] += 1
                 continue
             for side in ("a", "b"):
                 observations.append(dict(pair_key=sides[side], ref_basename=identity,
-                    human_score=float((p > 0.5) == (side == "a")), observation=identity+":"+side,
+                    human_score=(p if side == "a" else 1-p) if votes else float((p > 0.5) == (side == "a")),
+                    observation=identity+":"+side,
                     family=str(r["family_id"])))
         else:
             if set(sides) != {"item"} or lab["item"] != r["item_path"]:

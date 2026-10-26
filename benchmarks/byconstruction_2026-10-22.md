@@ -4752,3 +4752,9 @@ A qualifying arm receives three full-data fits and full qualification; a
 failed screen retains Mlic and leads to the separately registered ordering
 comparison. Combining successful recipe factors requires another prospective
 TRAIN comparison. The completed AIC and mass studies remain immutable.
+
+The existing observation mapper now has an explicit vote-preserving mode.
+Synthetic controls retain a `(1,1)` disagreement as two 0.5 targets and reject
+missing, fractional, inconsistent or three-vote counts. The original hard-pair
+mode and its tie-dropping test remain unchanged. Native loss/admission and
+actual vote-root construction are still required before this arm can fit.
