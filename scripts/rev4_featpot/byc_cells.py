@@ -108,7 +108,7 @@ def aic_predict(dest: Path, fold: str, seed: int, spec: str) -> dict:
 
 
 def dataset_holdout_collections(root, fold):
-    from subjective_training_leg import DATASET_FOLDS
+    from subjective_training_leg import DATASET_FOLDS, linked_subset_exclusions
     packet = json.loads((root / "datasets/receipt.json").read_text())
     trained = {r["collection"] for r in packet["groups"]}
     if fold == "full":
@@ -117,10 +117,13 @@ def dataset_holdout_collections(root, fold):
         if not missing:
             raise ValueError("full dataset-fold scoring requires a subset arm")
         return missing, ()
+    linked = linked_subset_exclusions(root, fold)
+    if fold in FOLDS:
+        return (), linked
     omitted = DATASET_FOLDS[fold]
     if not trained.intersection(omitted):
         raise ValueError("do not fit a no-op dataset holdout; reuse the arm's full fit")
-    return omitted, omitted
+    return omitted, tuple(dict.fromkeys((*omitted, *linked)))
 
 
 def dataset_train_statistic(refs, targets, predictions, pairwise):
@@ -191,8 +194,22 @@ def score_dataset_holdout(dest, collections, spec):
 def run_cell(tokens: str, fold: str, seed: int) -> dict:
     dest = CELLS / arm_name(tokens) / f"without_{fold}_s{seed}"
     record = dest / "byc_record.json"
+    linked_pin = None
+    packet_path = ROOT/"datasets/receipt.json"
+    if packet_path.exists() and fold != "full":
+        packet = json.loads(packet_path.read_text())
+        if packet.get("subset_policy_sha256"):
+            from subjective_training_leg import linked_subset_exclusions
+            linked_subset_exclusions(ROOT, fold)
+            linked_pin = packet["linked_subset_omissions"]["sha256"]
     if record.is_file():
-        return json.loads(record.read_text())
+        value = json.loads(record.read_text())
+        if linked_pin is not None:
+            fit = json.loads((dest/"result.json").read_text())
+            if (value.get("linked_subset_omission_sha256") != linked_pin
+                    or fit["frozen_sha256"] != sha(ROOT/"wide/frozen.json")):
+                raise ValueError("cached linked-subset cell does not bind the registered omission/root")
+        return value
     if dest.exists():
         raise ValueError(f"{dest}: incomplete earlier attempt; inspect and move it aside")
     scratch = Path(os.environ.get("BYC_SCRATCH", str(Path.home() / "tmp/byc/scratch"))) / arm_name(tokens) / f"{fold}_s{seed}"
@@ -213,8 +230,11 @@ def run_cell(tokens: str, fold: str, seed: int) -> dict:
         cmd[1] = str(HERE / "v2_confirm_fit.py")
         heldout_index = cmd.index("--heldout")
         del cmd[heldout_index:heldout_index+2]
-        if excluded:
-            cmd += ["--exclude-datasets", ",".join(excluded)]
+    else:
+        from subjective_training_leg import linked_subset_exclusions
+        excluded = linked_subset_exclusions(ROOT, fold)
+    if excluded:
+        cmd += ["--exclude-datasets", ",".join(excluded)]
     if AIC_WEIGHT is not None:
         k = aic_fold(fold, seed)
         cmd += ["--research-extra-group", f"aic:{AIC}/aic_k{k}_fit.parquet:{AIC_WEIGHT!r}:0:rank",
@@ -243,6 +263,8 @@ def run_cell(tokens: str, fold: str, seed: int) -> dict:
     for line in (dest / "train.log").read_text().splitlines():
         if line.startswith("  epoch 119 "):
             rec["epoch119"] = line.split("| t=")[0].strip()
+    if linked_pin is not None:
+        rec.update(linked_subset_omission_sha256=linked_pin, dataset_exclusions=list(excluded))
     record.write_text(json.dumps(rec, indent=1) + "\n")
     for leftover in scratch.glob("*"):
         leftover.unlink()

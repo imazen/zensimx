@@ -483,6 +483,7 @@ def main() -> None:
     ap.add_argument("--upiq-label-disposition", type=Path, help="owner decision on the legacy label producer gap")
     ap.add_argument("--dest", type=Path, help="strict route output directory outside frozen inputs")
     ap.add_argument("--train-only", action="store_true", help="stop after selected bake, without human assessment")
+    ap.add_argument("--exclude-datasets", default="", help="omit frozen dataset legs, including linked subset protocols")
     ap.add_argument("--columns", help="comma-separated sorted wide columns of a sel:<id> spec (E9′ method 2 refits)")
     ap.add_argument("--steer-pairs", type=Path, help="E34 K label-free repair table")
     ap.add_argument("--steer-lambda", type=float, default=0.0, help="E34 K residual weight")
@@ -503,6 +504,8 @@ def main() -> None:
         apply_smoke_budget(args.local_smoke_budget, globals())
     if args.strict_admission and (args.dest is None or not args.train_only):
         ap.error("strict route requires --dest and --train-only; assessment is a separately registered read")
+    if args.exclude_datasets and not (args.strict_admission and args.train_only):
+        ap.error("dataset exclusions require strict training-only route")
     native_recipe = recipe_of(args.spec).get("upiq380", False)
     if native_recipe != bool(args.upiq380_fit) or native_recipe != bool(args.upiq_label_disposition):
         ap.error("uh4 requires exactly --upiq380-fit and --upiq-label-disposition")
@@ -633,7 +636,8 @@ def main() -> None:
     if args.strict_admission:
         from subjective_training_leg import dataset_groups
         groups, dataset_authority = dataset_groups(V2, groups, keep, args.heldout, args.seed_index,
-                                                   init_seed, sample_seed, dest)
+                                                   init_seed, sample_seed, dest,
+                                                   exclude=tuple(filter(None, args.exclude_datasets.split(","))))
         if dataset_authority:
             weights.update({name:tw for name,_,tw,_,_ in groups if tw > 0})
     try:

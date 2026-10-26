@@ -54,6 +54,92 @@ class DatasetAuthority(unittest.TestCase):
 
 
 class DatasetHoldouts(unittest.TestCase):
+    def linked_fixture(self, directory):
+        from subjective_training_leg import DATASET_FOLDS
+        p = Path(directory)
+        (p/"wide").mkdir()
+        (p/"datasets").mkdir()
+        child = "colourlab-cognitive-science-2022"
+        link = dict(schema="dataset-linked-subset-omissions-v1", labels_read=False,
+                    parent_frozen_sha256="parent", added_collections=[child],
+                    folds={f:dict(excluded_subset_collections=[child] if f in ("kadid", "mos7") else [])
+                           for f in ("kadid", "tid2013", "konfig", "cid22_a25", *DATASET_FOLDS)})
+        lp = p/"datasets/linked-subset-omissions.json"
+        lp.write_text(json.dumps(link))
+        packet = dict(subset_policy_sha256="registered", groups=[dict(collection="pipal"),
+            dict(collection="colourlab-rating-variability-2022"), dict(collection=child, protocol="labels_experiment2.tsv")],
+            linked_subset_omissions=dict(path="datasets/linked-subset-omissions.json", sha256=root.sha(lp),
+                                         parent_frozen_sha256="parent"))
+        pp = p/"datasets/receipt.json"
+        pp.write_text(json.dumps(packet))
+        (p/"wide/frozen.json").write_text(json.dumps(dict(dataset_legs_sha256=root.sha(pp),
+            auxiliary_files={"datasets/linked-subset-omissions.json":root.sha(lp)})))
+        return p, child, packet
+
+    def test_linked_subset_omits_entire_child_in_new_and_e21_folds(self):
+        from byc_cells import dataset_holdout_collections
+        from subjective_training_leg import DATASET_FOLDS
+        with tempfile.TemporaryDirectory() as d:
+            p, child, _ = self.linked_fixture(d)
+            scored, omitted = dataset_holdout_collections(p, "mos7")
+            self.assertEqual(scored, DATASET_FOLDS["mos7"])
+            self.assertEqual(omitted, (*DATASET_FOLDS["mos7"], child))
+            self.assertEqual(dataset_holdout_collections(p, "kadid"), ((), (child,)))
+            self.assertEqual(dataset_holdout_collections(p, "tid2013"), ((), ()))
+            self.assertEqual(dataset_holdout_collections(p, "pipal"), (("pipal",), ("pipal",)))
+
+    def test_linked_subset_refuses_changed_or_absent_authority(self):
+        from subjective_training_leg import linked_subset_exclusions
+        with tempfile.TemporaryDirectory() as d:
+            p, child, packet = self.linked_fixture(d)
+            lp = p/"datasets/linked-subset-omissions.json"
+            lp.write_text(lp.read_text().replace(child, "another-collection"))
+            with self.assertRaisesRegex(ValueError, "pin changed"):
+                linked_subset_exclusions(p, "kadid")
+            del packet["linked_subset_omissions"]
+            (p/"datasets/receipt.json").write_text(json.dumps(packet))
+            with self.assertRaisesRegex(ValueError, "require.*authority"):
+                linked_subset_exclusions(p, "kadid")
+
+    def test_linked_admission_refuses_retained_child_before_target_reads(self):
+        from subjective_training_leg import dataset_groups, DATASET_FOLDS
+        with tempfile.TemporaryDirectory() as d:
+            p, child, packet = self.linked_fixture(d)
+            guard = p/"datasets/guard.json"
+            guard.write_text(json.dumps(dict(schema="dataset-family-guard-v1", inherited_leaks=0)))
+            packet.update(schema="rev7-dataset-legs-v1",feature_ids=[0],family_guard_path=str(guard),
+                          family_guard_sha256=root.sha(guard))
+            pp = p/"datasets/receipt.json"
+            pp.write_text(json.dumps(packet))
+            frozen = json.loads((p/"wide/frozen.json").read_text())
+            frozen["dataset_legs_sha256"] = root.sha(pp)
+            (p/"wide/frozen.json").write_text(json.dumps(frozen))
+            for route, excluded in [("kadid",()), ("full",DATASET_FOLDS["mos7"])]:
+                with self.assertRaisesRegex(ValueError,"required linked subset"):
+                    dataset_groups(p, [], [0], route, 0, 1101, 101, p, exclude=excluded)
+            self.assertFalse((p/"LABEL_READS.json").exists())
+
+    def test_linked_e21_argument_reaches_the_existing_lodo_owner(self):
+        import byc_cells
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d)
+            recipe = p/"root"
+            recipe.mkdir()
+            recipe, child, _ = self.linked_fixture(recipe)
+            cols = p/"columns.txt"
+            cols.write_text("1,2")
+            def inspect_command(command, **kwargs):
+                self.assertEqual(command[1], str(byc_cells.HERE/"v2_lodo_mlp.py"))
+                self.assertEqual(command[command.index("--heldout")+1], "kadid")
+                self.assertEqual(command[command.index("--exclude-datasets")+1], child)
+                raise RuntimeError("command captured before trainer startup")
+            with patch.object(byc_cells,"ROOT",recipe), patch.object(byc_cells,"CELLS",p/"cells"), \
+                 patch.object(byc_cells,"COLS",cols), patch.dict(byc_cells.os.environ,{"BYC_SCRATCH":str(p/"scratch")}), \
+                 patch.object(byc_cells.subprocess,"run",inspect_command):
+                with self.assertRaisesRegex(RuntimeError,"command captured"):
+                    byc_cells.run_cell("mono:thr:mp32", "kadid", 0)
+
     def test_all_excluded_never_opens_added_targets(self):
         from subjective_training_leg import dataset_groups
         with tempfile.TemporaryDirectory() as d:

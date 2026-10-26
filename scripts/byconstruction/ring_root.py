@@ -643,6 +643,103 @@ def cmd_dataset_report(a):
     return 0
 
 
+def cmd_dataset_links(a):
+    """Freeze label-free collection linkage in a derived metadata-only root."""
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]/"rev4_featpot"))
+    from subjective_training_leg import DATASET_FOLDS
+    source, out = Path(a.root), Path(a.out)
+    if out.exists():
+        raise ValueError("linked root destination must be fresh")
+    parent_pin = sha(source/"wide/frozen.json")
+    if parent_pin != "89b5f88d054200ba35d217094cfc79c3a1ab0d7e3de89dfe9d92cdb04d6ece29":
+        raise ValueError("registered Mlic+sub root required")
+    packet = json.loads((source/"datasets/receipt.json").read_text())
+    added = sorted({r["collection"] for r in packet["groups"] if "protocol" in r})
+    inputs, collections_families, family_hashes = {}, {}, collections.defaultdict(set)
+    def bind(path):
+        inputs[str(path)] = sha(path)
+        return path
+    for directory, pin in ((Path("/mnt/v/zensim/dataset-admission-20261025"),
+            "a4013c0bb1a72b5b4990cc78eb7003acb0e87e2374a01c7d5c8a47bf1d82f9d8"),
+            (Path("/mnt/v/zensim/dataset-subsets-20261025/admission"), SUBSET_ADMISSION_SHA)):
+        receipt = bind(directory/"validation-receipt.json")
+        if inputs[str(receipt)] != pin:
+            raise ValueError("family linkage membership admission changed")
+        for name, record in json.loads(receipt.read_text())["collections"].items():
+            path = bind(directory/name/"membership.parquet")
+            if inputs[str(path)] != record["membership_sha256"]:
+                raise ValueError("family linkage membership changed")
+            rows = pq.read_table(path, columns=["family_id", "source_audit_rgb8_sha256"]).to_pylist()
+            collections_families[name] = {str(r["family_id"]) for r in rows}
+            for r in rows:
+                family_hashes[str(r["family_id"])].update(h for h in r["source_audit_rgb8_sha256"] if h)
+        bind(directory/"source-family-registry.tsv")
+    d4 = Path("/mnt/v/zensim/d4-roles-private")
+    freeze = json.loads(bind(Path("/mnt/v/zensim/dataset-subsets-20261025/admission/family-registry-freeze.json")).read_text())
+    images_path, authority_path = bind(d4/"images.json"), bind(d4/"source-family-authority.json")
+    if (inputs[str(images_path)] != freeze["source_authority_inventory_sha256"]
+            or inputs[str(authority_path)] != freeze["source_authority_sha256"]):
+        raise ValueError("family linkage D4 authority changed")
+    images = json.loads(images_path.read_text())
+    aliases = {images[int(uid)]["rgb_sha256"]: family for uid, family in
+               json.loads(authority_path.read_text())["uid_to_family"].items()}
+    del images
+    def tokens(hashes):
+        return {"pixel:"+h for h in hashes} | {"D4:"+aliases[h] for h in hashes if h in aliases}
+    family_tokens = {f:tokens(h) for f,h in family_hashes.items()}
+    def collection_tokens(names):
+        fs = {f for name in names for f in collections_families[name]}
+        return fs, {t for f in fs for t in family_tokens[f]}
+    real = source/"wide/main/real"
+    real_receipt = json.loads(bind(real/"receipt.json").read_text())
+    bank = Path(real_receipt["admission_view"]["bank_root"])
+    folds = {}
+    for fold in ("kadid", "tid2013", "konfig", "cid22_a25", *DATASET_FOLDS):
+        if fold in DATASET_FOLDS:
+            heldout = DATASET_FOLDS[fold]
+            fs, ts = collection_tokens(heldout)
+        else:
+            heldout = (fold,)
+            path = bind(real/f"{fold}.keys.parquet")
+            if inputs[str(path)] != real_receipt["legs"][fold]["keys_sha256"]:
+                raise ValueError("E21 reference-key inventory changed")
+            rows = pq.read_table(path, columns=["pair_key", "member_set"]).to_pylist()
+            hashes = set()
+            for member in sorted({r["member_set"] for r in rows}):
+                keys_path, manifest_path = bind(bank/member/"keys.parquet"), bind(bank/member/"_MANIFEST.json")
+                if inputs[str(keys_path)] != json.loads(manifest_path.read_text())["keys_sha256"]:
+                    raise ValueError("E21 bank reference-key inventory changed")
+                keys = pq.read_table(keys_path, columns=["pair_key", "ref_pixels_sha256"]).to_pylist()
+                mapping = {r["pair_key"]:r["ref_pixels_sha256"] for r in keys}
+                hashes.update(mapping[r["pair_key"]] for r in rows if r["member_set"] == member)
+            ts = tokens(hashes)
+            fs = {f for f,t in family_tokens.items() if t.intersection(ts)}
+            ts |= {t for f in fs for t in family_tokens[f]}
+        matches = {}
+        for name in added:
+            other_fs, other_ts = collection_tokens((name,))
+            common_families, common_tokens = sorted(fs & other_fs), sorted(ts & other_ts)
+            if common_families or common_tokens:
+                matches[name] = dict(shared_family_ids=common_families, shared_native_or_D4_tokens=common_tokens)
+        folds[fold] = dict(heldout_collections=list(heldout), excluded_subset_collections=sorted(matches), matches=matches)
+    authority = dict(schema="dataset-linked-subset-omissions-v1", parent_frozen_sha256=parent_pin,
+        labels_read=False, added_collections=added, folds=folds, input_sha256=dict(sorted(inputs.items())),
+        method="registered source-family IDs, exact native reference pixels and confirmed D4 aliases; entire linked collection omitted")
+    shutil.copytree(source, out)
+    relative = "datasets/linked-subset-omissions.json"
+    (out/relative).write_text(json.dumps(authority, indent=1)+"\n")
+    packet["linked_subset_omissions"] = dict(path=relative, sha256=sha(out/relative), parent_frozen_sha256=parent_pin)
+    packet_path = out/"datasets/receipt.json"
+    packet_path.write_text(json.dumps(packet, indent=1)+"\n")
+    frozen = json.loads((out/"wide/frozen.json").read_text())
+    frozen["dataset_legs_sha256"] = sha(packet_path)
+    frozen["auxiliary_files"].update({relative:sha(out/relative), "datasets/receipt.json":sha(packet_path)})
+    (out/"wide/frozen.json").write_text(json.dumps(frozen, indent=1)+"\n")
+    print(json.dumps(dict(root=str(out), frozen_sha256=sha(out/"wide/frozen.json"),
+                         linkage_sha256=sha(out/relative), folds={f:r["excluded_subset_collections"] for f,r in folds.items()}),indent=1))
+    return 0
+
+
 def log(msg: str) -> None:
     print(f"{time.strftime('%F %T')} {msg}", flush=True)
 
@@ -1238,6 +1335,10 @@ def main() -> int:
     dr.add_argument("--root", required=True)
     dr.add_argument("--out", required=True)
     dr.set_defaults(fn=cmd_dataset_report)
+    dl = sub.add_parser("dataset-links")
+    dl.add_argument("--root", required=True)
+    dl.add_argument("--out", required=True)
+    dl.set_defaults(fn=cmd_dataset_links)
     p = sub.add_parser("pool")
     p.add_argument("--arm", choices=sorted(ARMS), default="hpm")
     p.add_argument("--bin", required=True)

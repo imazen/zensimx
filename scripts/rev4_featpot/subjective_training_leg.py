@@ -226,6 +226,38 @@ DATASET_FOLDS = {
 }
 
 
+def linked_subset_exclusions(root, fold):
+    """Read the label-free, frozen linkage authority; never infer from labels."""
+    path = root/"datasets/receipt.json"
+    if not path.exists():
+        return ()
+    packet = document(path)
+    link = packet.get("linked_subset_omissions")
+    if link is None:
+        if packet.get("subset_policy_sha256"):
+            raise ValueError("subset holdouts require the frozen linked omission authority")
+        return ()
+    frozen = document(root/"wide/frozen.json")
+    if frozen.get("dataset_legs_sha256") != sha(path):
+        raise ValueError("linked subset root receipt is not frozen")
+    relative = "datasets/linked-subset-omissions.json"
+    if link["path"] != relative or frozen["auxiliary_files"].get(relative) != link["sha256"]:
+        raise ValueError("linked subset authority is not bound by the frozen root")
+    authority = document(root/relative, link["sha256"])
+    if (authority.get("schema") != "dataset-linked-subset-omissions-v1"
+            or authority.get("labels_read") is not False
+            or authority["parent_frozen_sha256"] != link["parent_frozen_sha256"]
+            or set(authority["folds"]) != {"kadid", "tid2013", "konfig", "cid22_a25", *DATASET_FOLDS}):
+        raise ValueError("linked subset authority scope differs")
+    added = {r["collection"] for r in packet["groups"] if "protocol" in r}
+    if set(authority["added_collections"]) != added:
+        raise ValueError("linked subset collection inventory differs")
+    excluded = authority["folds"][fold]["excluded_subset_collections"]
+    if len(excluded) != len(set(excluded)) or not set(excluded) <= added:
+        raise ValueError("linked subset exclusion inventory differs")
+    return tuple(excluded)
+
+
 def log_dataset_read(dest, path, rows, columns, kind, **bindings):
     """Persist a per-cell authorization before interpreting TRAIN target values."""
     ledger = dest / "LABEL_READS.json"
@@ -259,9 +291,15 @@ def dataset_groups(root, groups, selected, route, seed_index, init_seed, sample_
     if guard.get("schema") != "dataset-family-guard-v1" or guard.get("inherited_leaks") != 0:
         raise ValueError("dataset family guard differs")
     exclude = tuple(exclude)
-    supported = {c for group in DATASET_FOLDS.values() for c in group}
+    supported = {c for group in DATASET_FOLDS.values() for c in group} | {r["collection"] for r in p["groups"]}
     if len(exclude) != len(set(exclude)) or not set(exclude) <= supported:
         raise ValueError("unique supported dataset exclusions required")
+    if p.get("linked_subset_omissions"):
+        folds = [route] if route in ("kadid", "tid2013", "konfig", "cid22_a25") else [
+            f for f, cs in DATASET_FOLDS.items() if set(cs) <= set(exclude)]
+        required = {c for fold in folds for c in linked_subset_exclusions(root, fold)}
+        if not required <= set(exclude):
+            raise ValueError("required linked subset was retained in the held-out fit")
     retained = [r for r in p["groups"] if r["collection"] not in exclude]
     selection = dict(schema="dataset-group-selection-v1", root=str(root), root_sha256=sha(root/"wide/frozen.json"),
                      receipt_sha256=pin, requested_exclusions=list(exclude),

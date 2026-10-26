@@ -419,6 +419,10 @@ dataset-root source out admission features library columns weight='0.5' collecti
 dataset-subsets-root source out columns:
     python3 -B scripts/byconstruction/ring_root.py datasets --additional-subsets --root {{quote(source)}} --out {{quote(out)}} --admission /mnt/v/zensim/dataset-subsets-20261025/admission --features /mnt/v/zensim/dataset-subsets-20261025/features --library /mnt/tower/input/iqa/datasets --columns {{quote(columns)}} --nominal-weight 0.5
 
+# Label-free linkage, preserving the original prepared root. No fitting.
+dataset-subsets-links source out:
+    python3 -B scripts/byconstruction/ring_root.py dataset-links --root {{quote(source)}} --out {{quote(out)}}
+
 dataset-full root binary dest columns:
     env REV4_V2_BIN_DIR={{quote(binary)}} ZENSIM_MAX_TIER=v3 RAYON_NUM_THREADS=1 OMP_NUM_THREADS=1 python3 -B scripts/rev4_featpot/v2_confirm_fit.py --root {{quote(root)}} --spec sel:3b7bd5ebe929@h32:H128:cv16:cf98:fx1:mono:thr:mp32 --columns "$(cat {{quote(columns)}})" --head N --seed-index 0 --strict-admission --data-role-decision {{quote(root)}}/human_role_decision.json --dest {{quote(dest)}} --train-only --pack-production --e33-output-stage
     {{quote(binary)}}/bake_dial_refit certify-monotone --bake {{quote(dest)}}/refit/production-f16.bin
