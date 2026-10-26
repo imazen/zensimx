@@ -1,5 +1,45 @@
 # Dataset training mixes — 2026-10-25
 
+## Complete — 2026-10-26
+
+All 123 cells, six-arm TRAIN diagnostics, both all-cell mixture tests and the
+frozen finalists' EVAL assessments are complete. The registered rule selects
+Mlic for balanced performance and Mw025 for the older datasets. Only Mlic
+meets the new-leg licence policy. Its balanced lead is 0.0000016562213902;
+EVAL differences are mixed. Serving profiles are unchanged.
+
+The closed snapshot checked on dev is
+`/var/tmp/byc-mixes-20261025/archive-ready/`. Its verified mounted NAS mirror is
+`/mnt/tower/output/zensim-datamixes-archive-2026-10-25/`.
+All 9,682 artifact files (13,961,632,597 bytes) passed SHA-256 readback, followed
+by three random readbacks. The final inventory has 9,683 entries including the
+receipt. It materializes study symlinks and preserves cell/full-data bakes,
+partial attempts, the coordinator's Mlic full fits, both subset preparation
+roots and the failed subset-root build. No R2 mirror is claimed.
+
+| Closed artifact | SHA-256 |
+|---|---|
+| `NUMERIC_SUMMARY.json` | `842fdde7cbe67bf2a864667368f6dc22131d682e3a53ff6abdbabad9ab5bf1ea` |
+| `MIRROR_VERIFIED.json` | `041c5ff14bc7612038a64ed3d35ce6849a4258b12e2ab6cbe5e47072ddd4d675` |
+| `SHA256SUMS` | `f93e5e7c07f375d3ce4bbebcf7f9be6a0be95a2a1dbf45aa5e7b563ba1dc34ca` |
+
+Snapshot source is c2727d2cb135a06f8bbffceceddad9d557748674. Hashing and
+fsync/POSIX_FADV_DONTNEED readback ran on dev through the mounted export;
+physical NAS cache temperature is unmeasured. No remote process was started.
+The command exited 0 in 344.11 s with `/usr/bin/time -v` maximum RSS 119,448 KiB.
+One 4 GiB/no-swap child ran inside the unchanged 42 GiB fleet scope; six science
+slots were preserved and both child and parent recorded zero OOM.
+
+The closed admission receipt has SHA-256
+`7254fc625190e216b3766ebd0a8b19d5e16132fadec447c813591178963a457a`.
+It and the complete execution log are verified beside the NAS archive as
+`.postprocess.json` and `.mirror.log`. Log SHA-256:
+`717cf9444814208956d94a9c06bdc8b76eb2bd563beca019090d7405742e0cae`.
+
+## Execution history
+
+The observations below preserve the assembly, fitting and assessment sequence.
+
 Checked on dev: `/mnt/v/output/zensim/byconstruction-2026-10-22/data-mixes`
 points to `/var/tmp/byc-mixes-20261025/`. Assembly and implementation checks
 are complete; the training queue is in progress. Finalist selection and

@@ -1,5 +1,27 @@
 # Mlic+sub prepared root — 2026-10-26
 
+## Root archive complete — 2026-10-26
+
+Both the original `89b5f88d...` root and linked-fold `6abfac53...` root are
+materialized under `subset-root-preparation/` in the
+[verified mix archive](dataset_mixes_2026-10-25.pointer.md#complete--2026-10-26):
+`/mnt/tower/output/zensim-datamixes-archive-2026-10-25/`.
+All archive files passed SHA-256 readback on dev. The mirror receipt has SHA-256
+`041c5ff14bc7612038a64ed3d35ce6849a4258b12e2ab6cbe5e47072ddd4d675`.
+
+The fleet owns the subsequent 21 Mlic+sub cells, outside the six-arm study's
+123-cell inventory. Its first two installs were reported at 05:27Z; their
+retained-file and linked-exclusion gates passed. Receipt
+`fleet-coordination/MLIC_SUB_PASS0527_VERIFIED_HARVEST.json`, SHA-256
+`09be19ea504ccf1b7474e804ccff30e32a891ea41b5b903fb79596337f56d5d5`,
+was received after the closed snapshot and is retained in the live mix study.
+The coordinator owns the subset scorecard and subsequent assessment. This lane
+built the roots and fold machinery and launched no subset fits.
+
+## Preparation record
+
+The dated observations below preserve the state before later controls and fits.
+
 Built on dev without fitting or EVAL/TEST target access. The original six-arm study selected Mlic and Mw025 before any subset fit; Mlic+sub stays outside its 123-cell inventory. [Weights were registered](byconstruction_2026-10-22.md#mlicsub-root-preparation--preread-registration-2026-10-26) in 34a323396d81 before source target reads: the five nonempty collections share nominal 0.5, at 0.1 each. DIBR splits 0.1 equally across three protocol legs; no confidence or vote-count loss weighting.
 
 Checked on dev: `/var/tmp/byc-subsets-20261026/Mlic+sub/root`; canonical `/mnt/v/output/zensim/byconstruction-2026-10-22/licence-subsets` points to its study directory. No mirror is claimed yet. All source banks/memberships retain their [verified mirrors](dataset_subsets_rev7_2026-10-25.pointer.md).

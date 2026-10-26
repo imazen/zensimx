@@ -4515,3 +4515,47 @@ BAPPS (36,344 held-out EVAL pairs, hard-pair agreement; seed 0 reuses the data-l
 `b2264f99…`; seeds 1–2 predicted on the byte-identical copy `/var/tmp/byc-dataset-eval-bapps-seeds`): Mlic seeds
 0.673 / 0.663 / 0.668, three-seed mean prediction 0.669 [0.666, 0.672]; M7 0.663 [0.660, 0.666]; Mdata 0.672;
 Mdata64 0.672; B 0.639 [0.636, 0.643]. BAPPS TRAIN is one of Mlic's legs, so this is in distribution.
+
+
+## Dataset mix archive closure — 2026-10-26
+
+The six-arm study is complete: 123 native cell records (111 new fits and 12
+reused), both all-cell mixture sets, 54 native hard-choice comparisons, the
+TRAIN-selected Mlic/Mw025 full-data candidates, and one seed-0 EVAL assessment
+per finalist on each feature bank. Closed `NUMERIC_SUMMARY.json` SHA-256 is
+`842fdde7cbe67bf2a864667368f6dc22131d682e3a53ff6abdbabad9ab5bf1ea`.
+Mlic's point-rule balanced advantage remains 0.0000016562213902; the mixed
+EVAL results do not establish a uniform gain. Only Mlic meets the new-leg
+licence policy. There is no serving-profile change.
+
+The fresh snapshot `/var/tmp/byc-mixes-20261025/archive-ready/` and verified
+NAS mirror `/mnt/tower/output/zensim-datamixes-archive-2026-10-25/` preserve all
+study cell/full bakes, partial attempts and subset-root preparation artifacts.
+All 9,682 artifact files, totalling 13,961,632,597 bytes, passed SHA-256 readback;
+three additional random readbacks passed. The final checksum inventory has
+9,683 entries including the receipt. Receipt SHA-256:
+`041c5ff14bc7612038a64ed3d35ce6849a4258b12e2ab6cbe5e47072ddd4d675`;
+inventory SHA-256:
+`f93e5e7c07f375d3ce4bbebcf7f9be6a0be95a2a1dbf45aa5e7b563ba1dc34ca`.
+Snapshot source: c2727d2cb135a06f8bbffceceddad9d557748674. Readback used client
+fsync/POSIX_FADV_DONTNEED and hashing on dev; physical NAS cache temperature
+is unmeasured. No remote process was started and no R2 mirror is claimed.
+
+The coordinator-prioritized fleet native batch was admitted before this
+single postprocessor. Its 4 GiB/no-swap child stayed under the unchanged
+42 GiB/no-swap ancestor, preserving six science slots. It exited 0 in
+344.11 s with `/usr/bin/time -v` maximum RSS 119,448 KiB; both child and parent
+recorded zero OOM. Closed admission SHA-256:
+`7254fc625190e216b3766ebd0a8b19d5e16132fadec447c813591178963a457a`.
+The admission and full execution log are verified beside the NAS archive as
+`.postprocess.json` and `.mirror.log`. The canonical dev `DATA_PROVENANCE.md`
+records the closure and immutable original fleet archive/object pointers;
+a verified final copy is beside the archive as `.data-provenance.md`.
+
+The linked Mlic+sub root and all seven fold-admission controls are included.
+The subsequent 21 subset cells and coordinator's subset selection remain a
+separate study. The fleet reported its first two verified installs after the
+snapshot; this lane launched no subset fits. Full artifact hashes and the
+historical execution records are in the
+[mix pointer](dataset_mixes_2026-10-25.pointer.md) and
+[subset pointer](mlic_subsets_2026-10-26.pointer.md).
