@@ -36,7 +36,7 @@ def document(path, expected=None):
 def command_binding(authority_path,pin,cell_id,init_seed,sample_seed,width,head,recipe):
     authority = document(authority_path,pin)
     c = authority["cells"][cell_id]
-    expected_width = c["width"] if authority["schema"] == "subjective-training-authority-v2" else 1825
+    expected_width = c["width"] if authority["schema"] in ("subjective-training-authority-v2", "subjective-training-authority-v3") else 1825
     if (c.get("route") not in ("d1","full","loso")
             or not 0<=c["seed_index"]<(3 if c["route"]=="loso" else 10)
             or (c["epochs"],c["pairs_per_epoch"],c["selected_epoch"])!=(120,50000,119)
@@ -46,7 +46,8 @@ def command_binding(authority_path,pin,cell_id,init_seed,sample_seed,width,head,
 
 
 def family_masks(c,records):
-    if c.get("route")!="loso": return
+    if c.get("route")!="loso":
+        return
     masks=document(c["all_leg_masks_path"],c["all_leg_masks_sha256"])
     if (masks.get("schema")!="source-family-native-mask-v1" or masks["excluded_families"]!=c["excluded_families"]
             or set(masks["groups"])!={r["name"] for r in records}):
@@ -69,7 +70,7 @@ def admit(authority_path, authority_sha256, cell_id, groups, selected_ids):
     if len(authority_sha256) != 64:
         raise ValueError("independently pinned authority required")
     a = document(authority_path, authority_sha256)
-    if a.get("schema") == "subjective-training-authority-v2":
+    if a.get("schema") in ("subjective-training-authority-v2", "subjective-training-authority-v3"):
         return admit_datasets(a, cell_id, groups, selected_ids)
     if (a.get("schema") != "subjective-training-authority-v1" or a.get("state") != "approved"
             or a.get("artifact_visibility") != "private" or a.get("selection") != "fixed-final-epoch"):
@@ -149,6 +150,12 @@ def admit_datasets(a, cell_id, groups, selected_ids):
             or a.get("selection") != "fixed-final-epoch"):
         raise ValueError("dataset authority not admitted")
     c = a["cells"][cell_id]
+    if a["schema"] == "subjective-training-authority-v3":
+        if "continuation" not in c:
+            raise ValueError("continuation authority requires checkpoint binding")
+        groups = [g for g in groups if g[0] != "aic_public_train"]
+    elif "continuation" in c:
+        raise ValueError("continuation requires version-3 authority")
     if c["feature_ids"] != selected_ids or c["formula_revision"] != 7 or c["tier"] != "v3":
         raise ValueError("dataset feature/producer contract differs")
     guard = document(c["family_guard_path"], c["family_guard_sha256"])
@@ -209,6 +216,24 @@ def admit_datasets(a, cell_id, groups, selected_ids):
     if not admitted:
         raise ValueError("dataset authority has no subjective groups")
     return admitted
+
+
+def continuation_authority(binding, checkpoint, epochs, lr):
+    """Bind a new continuation without changing the original full-fit authority."""
+    path, pin, cell, selected = binding
+    a = document(path, pin)
+    if a["schema"] != "subjective-training-authority-v2" or epochs not in (0, 4, 8) or lr != 0.00001:
+        raise ValueError("unregistered continuation budget")
+    checkpoint = safe(checkpoint).resolve()
+    a["schema"] = "subjective-training-authority-v3"
+    a["base_authority_sha256"] = pin
+    a["cells"][cell]["continuation"] = dict(checkpoint=str(checkpoint), checkpoint_sha256=sha(checkpoint),
+        epochs=epochs, lr=lr, lr_schedule="constant", optimizer_state="fresh")
+    out = path.with_name("continuation-authority.json")
+    if out.exists():
+        raise ValueError("preserve previous continuation authority")
+    out.write_text(json.dumps(a, sort_keys=True, separators=(",", ":"))+"\n")
+    return out, sha(out), cell, selected
 
 
 def payloads(admitted, groups):

@@ -34,11 +34,29 @@ fn string<'a>(v: &'a Value, key: &str) -> Result<&'a str, String> {
 }
 
 fn run_binding(c: &Value, args: &super::Args, width: usize) -> Result<(), String> {
+    let continuation = c.get("continuation");
+    if let Some(w) = continuation {
+        let path = args
+            .init_from
+            .as_ref()
+            .ok_or("continuation checkpoint required")?;
+        if w["checkpoint_sha256"] != hash(path)?
+            || w["checkpoint"] != path.to_string_lossy().as_ref()
+            || w["epochs"].as_u64() != Some(args.epochs as u64)
+            || !matches!(args.epochs, 0 | 4 | 8)
+            || w["lr"].as_f64() != Some(args.lr)
+            || args.lr != 0.00001
+            || args.lr_schedule != "constant"
+            || w["lr_schedule"] != "constant"
+        {
+            return Err("continuation checkpoint/budget/schedule binding differs".into());
+        }
+    }
     let limit = if c["route"] == "loso" { 3 } else { 10 };
     if !matches!(c["route"].as_str(), Some("full" | "d1" | "loso"))
         || c["seed_index"].as_u64().is_none_or(|v| v >= limit)
         || c["epochs"] != 120
-        || args.epochs != 120
+        || (continuation.is_none() && args.epochs != 120)
         || c["pairs_per_epoch"] != 50000
         || args.pairs_per_epoch != 50000
         || c["selected_epoch"] != 119
@@ -131,7 +149,9 @@ pub(super) fn admit(
     run: Option<&super::Args>,
 ) -> Result<BTreeMap<String, Value>, String> {
     let a = json(authority_path, authority_pin)?;
-    if a["schema"] == "subjective-training-authority-v2" {
+    if a["schema"] == "subjective-training-authority-v2"
+        || a["schema"] == "subjective-training-authority-v3"
+    {
         return admit_datasets(&a, cell, groups, selected, run);
     }
     if a["schema"] != "subjective-training-authority-v1"
@@ -316,6 +336,25 @@ fn admit_datasets(
     selected: &[usize],
     run: Option<&super::Args>,
 ) -> Result<BTreeMap<String, Value>, String> {
+    let filtered;
+    if a["schema"] != "subjective-training-authority-v3"
+        && a["cells"][cell].get("continuation").is_some()
+    {
+        return Err("continuation requires version-3 authority".into());
+    }
+    let groups = if a["schema"] == "subjective-training-authority-v3" {
+        if a["cells"][cell].get("continuation").is_none() {
+            return Err("continuation authority requires its checkpoint binding".into());
+        }
+        filtered = groups
+            .iter()
+            .filter(|g| g.0 != "aic_public_train")
+            .cloned()
+            .collect::<Vec<_>>();
+        filtered.as_slice()
+    } else {
+        groups
+    };
     if a["state"] != "approved"
         || a["artifact_visibility"] != "private"
         || a["selection"] != "fixed-final-epoch"

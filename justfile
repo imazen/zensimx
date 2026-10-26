@@ -3556,3 +3556,18 @@ aic-finetune-fold-verify output:
 # Reader initialization only: the trainer CLI warm-start integration is a separate gate.
 aic-finetune-checkpoint-control source declaration output:
     ZENSIM_WARM_START_SOURCE={{quote(source)}} ZENSIM_WARM_START_DECL={{quote(declaration)}} ZENSIM_WARM_START_OUT={{quote(output)}} cargo test --offline --locked -p zensim-validate --lib mlp_train::warm_start::tests::actual_mlic_zero_step_control -- --exact --ignored --test-threads=1
+
+# One visible chain owns the heavy lock from preflight through all registered fits.
+# The caller supplies private paths in the environment and a content-pinned packet.
+aic-finetune-launch study packet:
+    #!/usr/bin/env bash
+    set -Eeuo pipefail
+    study={{quote(study)}}
+    mkdir -p "$study" "$HOME/tmp/just"
+    export JUST_TEMPDIR="$HOME/tmp/just"
+    test ! -e "$study/launch.log"
+    export AIC_LAUNCH_STUDY="$study"
+    trap 'rc=$?; if ((rc != 0)); then AIC_LAUNCH_RC="$rc" python3 -c '\''import json,os,pathlib; p=pathlib.Path(os.environ["AIC_LAUNCH_STUDY"]); (p/"LAUNCH_FAILED.json").write_text(json.dumps(dict(exit_code=int(os.environ["AIC_LAUNCH_RC"]),pid=os.getpid()))+"\n")'\''; fi' EXIT
+    printf '%s\n' "$$" > "$study/QUEUE_PID"
+    printf '%s waiting for shared heavy lock\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" | tee "$study/launch.log"
+    flock "$HOME/tmp/heavy.lock" "$HOME/work/claudehints/scripts/run-heavy" --mem 24G --jobs 8 -- python3 -B scripts/rev4_featpot/byc_cells.py finetune-chain --study "$study" --packet {{quote(packet)}} --jobs 2 2>&1 | tee -a "$study/launch.log"

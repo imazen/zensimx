@@ -362,6 +362,22 @@ pub(super) fn preflight(
     inputs: &[train_manifest::ManifestInput],
 ) -> Result<(), String> {
     inventory(groups, args, inputs)?;
+    let aic = match &args.aic_public_train_authority {
+        Some(path) => {
+            if args.historical_replay.is_some()
+                || args.target_column != "human_score"
+                || args.target_scale != 1.0
+            {
+                return Err("D6 requires strict quality-target admission".into());
+            }
+            super::aic_public_train::admit(
+                path,
+                args.aic_public_train_authority_sha256.as_deref().unwrap(),
+                groups,
+            )?
+        }
+        None => std::collections::BTreeMap::new(),
+    };
     if args.historical_replay.is_some() {
         if args.hdr_consensus_research || args.upiq_label_disposition.is_some() {
             return Err("research extensions require strict admission".into());
@@ -445,6 +461,17 @@ pub(super) fn preflight(
     // Every group's role/feature declaration must pass before ANY key or table.
     let mut phases = Vec::new();
     for (g, sp, d) in &declarations {
+        if d["schema"] == "aic2026-public-train-rev7-v1" {
+            if aic.get(&g.0) != Some(d) {
+                return Err("D6 independently pinned authority required".into());
+            }
+            phases.push((
+                "aic",
+                d["rows"].as_u64().ok_or("D6 rows required")? as usize,
+                None,
+            ));
+            continue;
+        }
         if d["row_selection"].is_array() && !d["rows_kept"].is_number() {
             use sha2::{Digest, Sha256};
             let bytes = serde_json::to_vec(&d["row_selection"]).map_err(|e| e.to_string())?;
@@ -687,7 +714,7 @@ pub(super) fn preflight(
     }
     // Only label-free keys below. No ordinary header/hash/read until ALL pass.
     for ((g, _, d), (phase, count, _)) in declarations.iter().zip(phases) {
-        if phase == "subjective" {
+        if phase == "subjective" || phase == "aic" {
             continue;
         } // Private owner verified ordered label-free keys.
         if phase == "hdr" {

@@ -28,7 +28,6 @@
 //! model is the one with the highest validation mean.
 
 mod capabilities;
-#[cfg(test)]
 mod warm_start;
 pub use capabilities::validate_training_capabilities;
 
@@ -71,6 +70,10 @@ pub use goals::{ValidationPolicy, compute_goal_scores};
 /// architecture (228 → 32 → 1) with `Min` validation gating.
 #[derive(Clone, Debug)]
 pub struct MlpHyperparams {
+    /// Unpacked same-contract checkpoint; preserves its scaler and starts fresh Adam state.
+    pub init_from: Option<std::path::PathBuf>,
+    /// Keep `initial_lr` fixed on the plain CPU path; false preserves the 50-epoch cosine schedule.
+    pub constant_lr: bool,
     /// Fixed tau1/8 C1 activation, admitted only on the plain N path.
     pub smooth_hinge: bool,
     /// E34 K label-free repair table; absent leaves the training stream unchanged.
@@ -1001,6 +1004,8 @@ pub struct MlpHyperparams {
 impl Default for MlpHyperparams {
     fn default() -> Self {
         Self {
+            init_from: None,
+            constant_lr: false,
             smooth_hinge: false,
             steer_pairs: None,
             steer_lambda: 0.0,
@@ -2889,6 +2894,18 @@ pub fn train_mlp_strategy_pairs(
     );
     let hyperparams = &effective;
 
+    let initial = hyperparams.init_from.as_ref().map(|path| {
+        let bytes = std::fs::read(path)
+            .unwrap_or_else(|e| panic!("initial checkpoint {}: {e}", path.display()));
+        warm_start::InitialWeights::load(
+            &bytes,
+            n_features,
+            hyperparams,
+            input_keep_mask().as_deref(),
+        )
+        .unwrap_or_else(|e| panic!("initial checkpoint: {e}"))
+    });
+
     #[cfg(e36_tv)]
     let mut e36_pool = tv.map(|config| e36_tv::Pool::new(config, hyperparams));
     #[cfg(e36_tv)]
@@ -3047,8 +3064,10 @@ pub fn train_mlp_strategy_pairs(
     // 1. Compute per-feature scaler (mean / std) using ALL training-group
     //    samples. Validation-only groups are excluded from the scaler so
     //    we never look at validation data during fit.
-    let (mut scaler_mean, scaler_scale) =
-        compute_scaler_from_groups(groups, &train_indices, n_features);
+    let (mut scaler_mean, scaler_scale) = match &initial {
+        Some(init) => (init.scaler_mean.clone(), init.scaler_scale.clone()),
+        None => compute_scaler_from_groups(groups, &train_indices, n_features),
+    };
     // `--nonneg-distance`: SCALE-ONLY standardization. The identity feature
     // vector is exactly `0⃗` (MEASURED on all 372 slots of the pinned identity
     // probe, all 38 refs byte-identical), and subtracting a mean would map it
@@ -3056,8 +3075,10 @@ pub fn train_mlp_strategy_pairs(
     // `raw(0⃗) = pin` guarantee. The scale is kept: it is what makes the inputs
     // comparable, and it maps `0` to `0`.
     if hyperparams.nonneg_distance {
-        for m in scaler_mean.iter_mut() {
-            *m = 0.0;
+        if initial.is_none() {
+            for m in scaler_mean.iter_mut() {
+                *m = 0.0;
+            }
         }
         if hyperparams.smooth_hinge {
             log_line(
@@ -3214,7 +3235,7 @@ pub fn train_mlp_strategy_pairs(
             log,
         );
     }
-    if hyperparams.nonneg_thresholds {
+    if hyperparams.nonneg_thresholds && initial.is_none() {
         let sampled = init_thresholds(
             &w1,
             &mut b1,
@@ -3241,6 +3262,16 @@ pub fn train_mlp_strategy_pairs(
                  U[0, {THRESHOLD_INIT_MAX_Q}) over {sampled} training rows; min b1 {:.6}",
                 b1.iter().copied().fold(0.0, f64::min)
             ),
+            log,
+        );
+    }
+    if let Some(init) = initial {
+        w1 = init.w1;
+        b1 = init.b1;
+        w2 = init.w2;
+        b2 = init.b2;
+        log_line(
+            "[init-from] loaded checkpoint parameters and scaler; optimizer state starts fresh",
             log,
         );
     }
@@ -3591,9 +3622,13 @@ pub fn train_mlp_strategy_pairs(
         // schedule is a function of. Unused (and unread) by the uniform
         // draw, which is why adding it changes nothing for a default run.
         let draw_index_base = (epoch as u64).wrapping_mul(hyperparams.pairs_per_epoch as u64);
-        let lr = hyperparams.initial_lr
-            * 0.5
-            * (1.0 + (std::f64::consts::PI * (epoch % 50) as f64 / 50.0).cos());
+        let lr = if hyperparams.constant_lr {
+            hyperparams.initial_lr
+        } else {
+            hyperparams.initial_lr
+                * 0.5
+                * (1.0 + (std::f64::consts::PI * (epoch % 50) as f64 / 50.0).cos())
+        };
 
         let mut total_loss = 0.0f64;
         let mut n_steps = 0u64;

@@ -69,7 +69,9 @@ LABEL = None
 # of cell (E21 fold index i, seed s): (4 s + i) mod AIC_NFOLDS (7 by default), so seeds 0-2 hold out every fold.
 AIC = Path(os.environ.get("AIC_FOLDS", "/mnt/v/output/zensim/byconstruction-2026-10-22/aic2026train/folds_train"))
 AIC_NFOLDS = int(os.environ.get("AIC_NFOLDS", "7"))
+AIC_PAIRS = Path(os.environ.get("AIC_PAIRS_TRAIN", str(AIC / "pairs_train.tsv")))
 AIC_WEIGHT = None
+FINE_TUNE = None
 AIC_REPLAY = "byconstruction AIC2026 TRAIN research fit (owner goal 2026-10-23); reference-held-out folds; never ship"
 
 
@@ -237,8 +239,15 @@ def run_cell(tokens: str, fold: str, seed: int) -> dict:
         cmd += ["--exclude-datasets", ",".join(excluded)]
     if AIC_WEIGHT is not None:
         k = aic_fold(fold, seed)
-        cmd += ["--research-extra-group", f"aic:{AIC}/aic_k{k}_fit.parquet:{AIC_WEIGHT!r}:0:rank",
-                "--research-replay", AIC_REPLAY]
+        if FINE_TUNE is not None:
+            initial_root, epochs, lr = FINE_TUNE
+            cmd += ["--init-from", str(initial_root / f"without_{fold}_s{seed}/refit/last.bin"),
+                    "--fine-tune-epochs", str(epochs), "--fine-tune-lr", str(lr),
+                    "--aic-public-train", str(AIC / f"aic_k{k}_fit.parquet"),
+                    "--research-extra-group", f"aic_public_train:{AIC}/aic_k{k}_fit.parquet:{AIC_WEIGHT!r}:0:rank"]
+        else:
+            cmd += ["--research-extra-group", f"aic:{AIC}/aic_k{k}_fit.parquet:{AIC_WEIGHT!r}:0:rank",
+                    "--research-replay", AIC_REPLAY]
     t0 = time.time()
     proc = subprocess.run(cmd, env=env, capture_output=True, text=True)
     train_s = time.time() - t0
@@ -258,8 +267,12 @@ def run_cell(tokens: str, fold: str, seed: int) -> dict:
            "last_bin_sha256": sha(dest / "refit/last.bin"),
            **({"dataset_train_statistics": dataset_stats} if new_fold else
               {"pred_sha256": sha(dest / f"pred_{fold}.tsv"), "rows": int(len(pred))}),
-           "curve": read_curve(dest / "train.log"), "bin_dir": os.environ["REV4_V2_BIN_DIR"],
+           "curve": continuation_curve(dest / "train.log") if FINE_TUNE else read_curve(dest / "train.log"),
+           "bin_dir": os.environ["REV4_V2_BIN_DIR"],
            "trainer_sha256": sha(Path(os.environ["REV4_V2_BIN_DIR"]) / "zensim_mlp_train")}
+    if FINE_TUNE is not None:
+        rec["continuation"] = dict(initial_checkpoint=str(FINE_TUNE[0] / f"without_{fold}_s{seed}/refit/last.bin"),
+            epochs=FINE_TUNE[1], lr=FINE_TUNE[2], lr_schedule="constant")
     for line in (dest / "train.log").read_text().splitlines():
         if line.startswith("  epoch 119 "):
             rec["epoch119"] = line.split("| t=")[0].strip()
@@ -271,9 +284,22 @@ def run_cell(tokens: str, fold: str, seed: int) -> dict:
     return rec
 
 
+def continuation_curve(log):
+    curve = {int(e): float(v) for e, v in EPOCH_RE.findall(log.read_text())}
+    if sorted(curve) != list(range(FINE_TUNE[1])):
+        raise ValueError(f"{log}: continuation curve is incomplete")
+    return curve
+
+
 def cmd_run(args) -> int:
-    global BASE_SPEC, COLS, LABEL, AIC_WEIGHT
+    global BASE_SPEC, COLS, LABEL, AIC_WEIGHT, FINE_TUNE
     LABEL = args.label
+    if args.init_from_cells is not None:
+        if args.aic_weight is None or args.fine_tune_epochs not in (4, 8) or args.fine_tune_lr != 0.00001:
+            raise ValueError("continuation requires its registered AIC weight, epochs and low LR")
+        if (args.aic_weight, args.fine_tune_epochs, args.label) not in ((8.0, 4, "MlicFT8x4"), (16.0, 8, "MlicFT16x8")):
+            raise ValueError("continuation arm differs from the preregistered strengths")
+        FINE_TUNE = (Path(args.init_from_cells), args.fine_tune_epochs, args.fine_tune_lr)
     if args.aic_weight is not None:
         AIC_WEIGHT = args.aic_weight
         if not args.label:
@@ -316,7 +342,7 @@ def cmd_progress(args) -> int:
                 r = json.loads(record.read_text())
                 if (r["fold"], r["seed"]) != (fold, seed):
                     raise ValueError(f"{record}: cell identity differs")
-                state, epoch = "complete", 119
+                state, epoch = "complete", r.get("continuation", {}).get("epochs", 120) - 1
             elif log.is_file():
                 text = log.read_text()
                 epochs = [int(e) for e, _ in EPOCH_RE.findall(text)]
@@ -348,8 +374,9 @@ def cmd_score(args) -> int:
                 target = np.asarray(d["target"], dtype=float)
                 orient = float(d["orientation"])
                 if args.rule == "best":
-                    read = lambda a: pd.read_csv(BEST / a / f"without_{f}_s{s}" / f"pred_{f}.tsv",
-                                                 sep="\t").pred.to_numpy(dtype=float)
+                    def read(a):
+                        return pd.read_csv(BEST / a / f"without_{f}_s{s}" / f"pred_{f}.tsv",
+                                           sep="\t").pred.to_numpy(dtype=float)
                     pa, pc = read(arm), read(args.control)
                 else:
                     if arm in d["predictions"]:
@@ -939,7 +966,7 @@ def cmd_aicscore(args) -> int:
     import pandas as pd
     sys.path.insert(0, str(HERE.parent / "byconstruction"))
     from aic_train import panel
-    pairs = pd.read_csv(AIC / "pairs_train.tsv", sep="\t")
+    pairs = pd.read_csv(AIC_PAIRS, sep="\t")
     out = {}
     for arm in args.arms.split(","):
         by_fold = {}
@@ -991,7 +1018,7 @@ def cmd_aiczero(args) -> int:
     import pandas as pd
     sys.path.insert(0, str(HERE.parent / "byconstruction"))
     from aic_train import panel
-    pairs = pd.read_csv(AIC / "pairs_train.tsv", sep="\t")
+    pairs = pd.read_csv(AIC_PAIRS, sep="\t")
     out = {}
     for spec in args.arm:
         arm, table = spec.split("=", 1)
@@ -1048,6 +1075,10 @@ def cmd_predict_best(args) -> int:
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
+    ft = sub.add_parser("finetune-chain")
+    ft.add_argument("--study", required=True)
+    ft.add_argument("--packet", required=True)
+    ft.add_argument("--jobs", type=int, choices=(1, 2), default=2)
     pr = sub.add_parser("progress")
     pr.add_argument("--arm", required=True)
     pr.add_argument("--folds", default=",".join(FOLDS))
@@ -1061,6 +1092,9 @@ def main() -> int:
     r.add_argument("--cols", help="comma-separated columns file for --base-spec")
     r.add_argument("--label", help="arm directory name for --base-spec runs")
     r.add_argument("--aic-weight", type=float, help="add the AIC2026 TRAIN leg (rotating held-out fold) at this weight")
+    r.add_argument("--init-from-cells", type=Path)
+    r.add_argument("--fine-tune-epochs", type=int)
+    r.add_argument("--fine-tune-lr", type=float, default=0.00001)
     mx = sub.add_parser("mix-summary")
     mx.add_argument("--study", required=True)
     ma = sub.add_parser("mix-audit")
@@ -1105,6 +1139,9 @@ def main() -> int:
     pb.add_argument("--arm", required=True, help="arm directory name, or base-c for E34's control cells")
     pb.add_argument("--seeds", default="0,1,2")
     args = ap.parse_args()
+    if args.cmd == "finetune-chain":
+        from aic_finetune_chain import run
+        return run(args, sys.modules[__name__])
     return {"run": cmd_run, "score": cmd_score, "seedens": cmd_seedens, "curves": cmd_curves, "pairclass": cmd_pairclass,
             "bytype": cmd_bytype, "knobinv": cmd_knobinv, "predict-best": cmd_predict_best, "aicscore": cmd_aicscore,
             "aiczero": cmd_aiczero, "progress": cmd_progress, "mix-select": cmd_mix_select, "mix-freeze": cmd_mix_freeze, "mix-audit": cmd_mix_audit, "mix-summary": cmd_mix_summary}[args.cmd](args)

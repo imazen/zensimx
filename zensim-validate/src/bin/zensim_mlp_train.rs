@@ -182,6 +182,20 @@ struct Args {
     #[arg(long, default_value_t = 1e-3)]
     lr: f64,
 
+    /// Initialize the plain CPU head from a same-spec unpacked f32 checkpoint, retaining its scaler.
+    #[arg(long)]
+    init_from: Option<PathBuf>,
+
+    /// Plain CPU learning-rate schedule; default retains the historical 50-epoch cosine cycle.
+    #[arg(long, default_value = "cosine", value_parser = ["cosine", "constant"])]
+    lr_schedule: String,
+
+    /// Independently pinned D6 public_train fold inventory; other AIC populations remain refused.
+    #[arg(long, requires = "aic_public_train_authority_sha256")]
+    aic_public_train_authority: Option<PathBuf>,
+    #[arg(long, requires = "aic_public_train_authority")]
+    aic_public_train_authority_sha256: Option<String>,
+
     /// L2 regularization on layer weights (not biases).
     #[arg(long, default_value_t = 1e-5)]
     l2: f64,
@@ -2693,6 +2707,29 @@ fn apply_manifest_to_args(
 /// CLI-only capabilities (data sources and the GPU adapter). Shared head/loss
 /// checks live in mlp_train::validate_training_capabilities.
 fn preflight_cli_capabilities(args: &Args, matches: &clap::ArgMatches, want_gpu: bool) {
+    if args.init_from.is_some() || args.lr_schedule == "constant" {
+        assert!(
+            !want_gpu
+                && args.n_hidden_layers == 1
+                && !args.pool_head
+                && !args.hybrid_head
+                && !args.per_sample_alpha_head
+                && !args.skip_connection
+                && !args.smooth_hinge
+                && args.monotone_ramps == 0
+                && args.free_ramps == 0
+                && !args.monotone_gated_products
+                && args.monotone_feature_mask.is_none()
+                && args.steer_pairs.is_none()
+                && args.feature_transform.is_empty()
+                && args.auto_transforms.is_none(),
+            "--init-from/constant LR require the plain two-layer CPU head"
+        );
+        assert!(
+            args.lr.is_finite() && args.lr > 0.0,
+            "fine-tune LR must be positive and finite"
+        );
+    }
     if args.smooth_hinge {
         assert!(
             !want_gpu
@@ -3069,7 +3106,36 @@ fn stamp_emitted_checkpoints(
     Ok(written.len())
 }
 
-#[cfg(test)]
+fn checkpoint_feature_identity(
+    model: &zenpredict::Model<'_>,
+    admission: &serde_json::Value,
+) -> Result<(), String> {
+    let revision = model
+        .metadata()
+        .get_utf8("zentrain.formula_revision")
+        .map_err(|_| "initial checkpoint revision missing")?
+        .parse::<u64>()
+        .map_err(|_| "initial checkpoint revision malformed")?;
+    if Some(revision) != admission["formula_revision"].as_u64() {
+        return Err("initial checkpoint formula revision differs from training tables".into());
+    }
+    let source = model
+        .metadata()
+        .get_utf8("zentrain.feature_set_id")
+        .map_err(|_| "initial checkpoint feature set missing")?;
+    let tables = admission["tables"]
+        .as_array()
+        .ok_or("admitted training table inventory missing")?;
+    if tables.is_empty()
+        || tables
+            .iter()
+            .any(|table| table["feature_set_id"].as_str() != Some(source))
+    {
+        return Err("initial checkpoint feature set differs from a training leg".into());
+    }
+    Ok(())
+}
+
 #[path = "zensim_mlp_train/aic_public_train.rs"]
 mod aic_public_train;
 #[path = "zensim_mlp_train/e29_hdr_admission.rs"]
@@ -3342,6 +3408,8 @@ fn main() {
         }
     };
     let mut hyperparams = MlpHyperparams {
+        init_from: args.init_from.clone(),
+        constant_lr: args.lr_schedule == "constant",
         smooth_hinge: args.smooth_hinge,
         steer_pairs: args.steer_pairs.clone(),
         steer_lambda: args.steer_lambda,
@@ -3509,7 +3577,7 @@ fn main() {
         eprintln!("native group admission: {e}");
         std::process::exit(2)
     });
-    let subjective_admission = if let Some(path) = &args.subjective_authority {
+    let mut subjective_admission = if let Some(path) = &args.subjective_authority {
         if args.minibatch_size != 1
             || args.pool_head
             || args.hybrid_head
@@ -3540,6 +3608,22 @@ fn main() {
     } else {
         std::collections::BTreeMap::new()
     };
+    if let Some(authority) = &args.aic_public_train_authority {
+        assert!(
+            args.historical_replay.is_none()
+                && args.target_column == "human_score"
+                && args.target_scale == 1.0,
+            "D6 requires strict stored quality targets"
+        );
+        subjective_admission.extend(
+            aic_public_train::admit(
+                authority,
+                args.aic_public_train_authority_sha256.as_deref().unwrap(),
+                &group_modes,
+            )
+            .unwrap_or_else(|e| panic!("D6 admission: {e}")),
+        );
+    }
     // Every ordinary and new declaration/key has passed before payload hashes.
     for g in &group_modes {
         if let Some(d) = subjective_admission.get(&g.0) {
@@ -3582,6 +3666,7 @@ fn main() {
     let admission_paths = group_modes
         .iter()
         .filter(|g| !(args.hdr_consensus_research && g.0 == "hdr"))
+        .filter(|g| !(args.aic_public_train_authority.is_some() && g.0 == "aic_public_train"))
         .map(|g| g.1.clone())
         .collect::<Vec<_>>();
     let mut table_admission = if let Some(decision) = &args.upiq_label_disposition {
@@ -3610,6 +3695,21 @@ fn main() {
         eprintln!("{e}");
         std::process::exit(2)
     });
+    if args.aic_public_train_authority.is_some() {
+        let g = group_modes
+            .iter()
+            .find(|g| g.0 == "aic_public_train")
+            .unwrap();
+        let d = &subjective_admission["aic_public_train"];
+        table_admission["tables"]
+            .as_array_mut()
+            .unwrap()
+            .push(serde_json::json!({"path":g.1,
+            "feature_set_id":d["feature_set_id"],"inferred":false,"stored_declarations":d,
+            "requested_ids":admitted_ids,"actual_width":1853}));
+        table_admission["aic_public_train_authority_sha256"] =
+            serde_json::json!(args.aic_public_train_authority_sha256);
+    }
     if args.hdr_consensus_research {
         assert!(
             args.historical_replay.is_none(),
@@ -3646,6 +3746,18 @@ fn main() {
             ));
     }
     eprintln!("[table-admission] {table_admission}");
+    if let Some(path) = &args.init_from {
+        let bytes = std::fs::read(path).expect("initial checkpoint read");
+        let model = zenpredict::Model::from_bytes(&bytes).expect("initial checkpoint parse");
+        checkpoint_feature_identity(&model, &table_admission).unwrap_or_else(|e| panic!("{e}"));
+        if let Ok(output) = args.out.as_ref().expect("output required").canonicalize() {
+            assert_ne!(
+                output,
+                path.canonicalize().unwrap(),
+                "refuse overwriting the initial checkpoint"
+            );
+        }
+    }
 
     // DATA-INTEGRITY GUARD (2026-05-25, task #215): refuse to TRAIN on a mock
     // target column. The kadid/tid iwssim corruption happened because a
@@ -5185,6 +5297,12 @@ fn main() {
                     "sha256":train_manifest::sha256_file(std::path::Path::new(path)).expect("pair-list hash")})
             }).collect::<Vec<_>>());
         }
+        if let Some(path) = &args.init_from {
+            record["warm_start"] = serde_json::json!({"checkpoint":path,
+                "checkpoint_sha256":train_manifest::sha256_file(path).expect("initial checkpoint digest"),
+                "optimizer_state":"fresh", "scaler":"checkpoint",
+                "learning_rate_schedule":args.lr_schedule});
+        }
         record.to_string()
     };
 
@@ -6265,6 +6383,64 @@ mod checkpoint_admission_tests {
                 .metadata()
                 .get_utf8("zentrain.formula_revision")
                 .is_err()
+        );
+    }
+}
+
+#[cfg(test)]
+mod warm_start_identity_tests {
+    use super::checkpoint_feature_identity;
+    #[test]
+    fn revision_and_each_training_feature_identity_must_match() {
+        let bytes = zensim_validate::mlp_train::bake_two_layer_znpr_v3(
+            &[0.0],
+            &[1.0],
+            &[1.0],
+            &[0.0],
+            &[-1.0],
+            &[100.0],
+            1,
+            1,
+            1,
+            zenpredict::WeightDtype::F32,
+            None,
+            None,
+            zenpredict::Activation::Relu,
+        );
+        let bytes = zenpredict_bake::append_metadata_utf8(&bytes, "zentrain.formula_revision", "7")
+            .unwrap();
+        let bytes = zenpredict_bake::append_metadata_utf8(
+            &bytes,
+            "zentrain.feature_set_id",
+            "registered-rev7",
+        )
+        .unwrap();
+        let model = zenpredict::Model::from_bytes(&bytes).unwrap();
+        let good = serde_json::json!({"formula_revision":7,"tables":[{"feature_set_id":"registered-rev7"}]});
+        checkpoint_feature_identity(&model, &good).unwrap();
+        let mut wrong_revision = good.clone();
+        wrong_revision["formula_revision"] = serde_json::json!(6);
+        assert!(
+            checkpoint_feature_identity(&model, &wrong_revision)
+                .unwrap_err()
+                .contains("revision")
+        );
+        let mut wrong_companion = good.clone();
+        wrong_companion["tables"]
+            .as_array_mut()
+            .unwrap()
+            .push(serde_json::json!({"feature_set_id":"other-era"}));
+        assert!(
+            checkpoint_feature_identity(&model, &wrong_companion)
+                .unwrap_err()
+                .contains("feature set")
+        );
+        assert!(
+            checkpoint_feature_identity(
+                &model,
+                &serde_json::json!({"formula_revision":7,"tables":[]})
+            )
+            .is_err()
         );
     }
 }

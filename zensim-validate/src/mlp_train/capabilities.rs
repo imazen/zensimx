@@ -8,6 +8,22 @@ pub fn validate_training_capabilities(
     has_absolute_group: bool,
     triplet_rows: usize,
 ) -> MlpHyperparams {
+    if hyperparams.init_from.is_some() || hyperparams.constant_lr {
+        assert!(
+            hyperparams.n_hidden_layers == 1
+                && !hyperparams.pool_head
+                && !hyperparams.hybrid_head
+                && !hyperparams.per_sample_alpha_head
+                && !hyperparams.skip_connection
+                && !hyperparams.smooth_hinge
+                && hyperparams.monotone_ramps == 0
+                && hyperparams.free_ramps == 0
+                && hyperparams.monotone_product_pairs.is_empty()
+                && hyperparams.monotone_feature_pin.is_none()
+                && hyperparams.steer_pairs.is_none(),
+            "checkpoint initialization and constant LR require the plain two-layer CPU path"
+        );
+    }
     if hyperparams.smooth_hinge {
         assert!(
             hyperparams.nonneg_distance
