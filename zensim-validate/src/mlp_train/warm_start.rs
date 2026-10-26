@@ -21,9 +21,14 @@ fn flag<'a>(argv: &'a [String], name: &str) -> Result<Option<&'a str>, String> {
     if positions.len() > 1 {
         return Err(format!("duplicate checkpoint option {name}"));
     }
-    Ok(positions
-        .first()
-        .and_then(|(i, _)| argv.get(i + 1).map(String::as_str)))
+    match positions.first() {
+        Some((i, _)) => argv
+            .get(i + 1)
+            .filter(|v| !v.starts_with("--"))
+            .map(|v| Some(v.as_str()))
+            .ok_or_else(|| format!("missing checkpoint value for {name}")),
+        None => Ok(None),
+    }
 }
 
 impl InitialWeights {
@@ -31,6 +36,7 @@ impl InitialWeights {
         bytes: &[u8],
         n_features: usize,
         hp: &MlpHyperparams,
+        keep_mask: Option<&[bool]>,
     ) -> Result<Self, String> {
         let model = Model::from_bytes(bytes).map_err(|e| format!("initial checkpoint: {e}"))?;
         if model.layers().count() != 2
@@ -143,16 +149,16 @@ impl InitialWeights {
             if metadata.get("zensim.derived_inputs").is_some() || model.n_inputs() != n_features {
                 return Err("initial checkpoint feature layout differs".into());
             }
-            if let Some(mask) = super::input_keep_mask() {
-                if let Some(ids) = zensim::declared_feature_ids(&model) {
-                    let expected: Vec<_> = mask
-                        .iter()
-                        .enumerate()
-                        .filter_map(|(i, &k)| k.then_some(i))
-                        .collect();
-                    if ids != expected {
-                        return Err("initial checkpoint read set differs".into());
-                    }
+            if let Some(mask) = keep_mask {
+                let ids = zensim::declared_feature_ids(&model)
+                    .ok_or("initial checkpoint subset has no declared read set")?;
+                let expected: Vec<_> = mask
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(i, &k)| k.then_some(i))
+                    .collect();
+                if ids != expected {
+                    return Err("initial checkpoint read set differs".into());
                 }
             }
             (0..n_features).collect()
@@ -259,7 +265,7 @@ mod tests {
     #[test]
     fn unpacked_weights_and_scaler_roundtrip_exactly() {
         let (bytes, hp) = fixture();
-        let init = InitialWeights::load(&bytes, 2, &hp).unwrap();
+        let init = InitialWeights::load(&bytes, 2, &hp, None).unwrap();
         let after = bake_two_layer_znpr_v3(
             &init.scaler_mean,
             &init.scaler_scale,
@@ -292,7 +298,7 @@ mod tests {
     #[test]
     fn refuses_mismatched_width_head_and_monotone_parameters() {
         let (bytes, hp) = fixture();
-        assert!(InitialWeights::load(&bytes, 3, &hp).is_err());
+        assert!(InitialWeights::load(&bytes, 3, &hp, None).is_err());
         for changed in [
             MlpHyperparams {
                 n_hidden: 3,
@@ -319,7 +325,7 @@ mod tests {
                 ..hp.clone()
             },
         ] {
-            assert!(InitialWeights::load(&bytes, 2, &changed).is_err());
+            assert!(InitialWeights::load(&bytes, 2, &changed, None).is_err());
         }
     }
 
@@ -341,7 +347,7 @@ mod tests {
             None,
             Activation::Relu,
         );
-        assert!(InitialWeights::load(&missing, 2, &hp).is_err());
+        assert!(InitialWeights::load(&missing, 2, &hp, None).is_err());
         let half = bake_two_layer_znpr_v3(
             &[0.0, 0.0],
             &[1.0, 1.0],
@@ -364,6 +370,6 @@ mod tests {
             source.metadata().get_utf8("zentrain.repro").unwrap(),
         )
         .unwrap();
-        assert!(InitialWeights::load(&half, 2, &hp).is_err());
+        assert!(InitialWeights::load(&half, 2, &hp, None).is_err());
     }
 }
