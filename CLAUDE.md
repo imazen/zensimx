@@ -160,6 +160,8 @@ because cleanup tests or a historical training reproduction pass.
 
 ## Known Bugs
 
+* **2026-10-26 — threaded fit runners hide children from main-thread-only process walks. Fixed for dataset progress.** Linux assigns a child to the thread that spawned it. A walk of only `/proc/PID/task/PID/children` missed the live trainer launched by the cell executor. The shared `run_processes.py` owner now walks every task's children, binds PID plus start ticks, rejects zombies/recycled PIDs, and resolves the real compute-lock inode. Real threaded-child and zombie controls pass. A training log alone is reported as log presence, never proof that a process is running.
+
 * **2026-10-26 — DIBR subset pair ingestion. Fixed.** The native table leaves `p_a` blank and stores row-preferred vote counts. The root reader derives the hard direction from the checked `n_a`, `n_b`, `n_tie`, `n` total; votes do not weight the loss. The partial root and TRAIN-read ledger remain preserved. Count-direction parity and inconsistent-total refusal are checked.
 
 * **2026-10-26 — Lazy zero-moment loads after an Adam shortcut. FIXED.** The fixed-point shortcut must retain identity moment stores: on Intel, leaving initially lazy zero pages read-only took 7.806803397 s for the 20,000-step probe; retaining the stores takes 0.840776747 s with identical moment bits and zero FP assists. A per-call opaque +0 prevents dead-store elimination. See `benchmarks/adam_denormal_2026-10-26.md`.

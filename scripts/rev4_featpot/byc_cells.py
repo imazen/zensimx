@@ -307,6 +307,10 @@ def srocc(x, y) -> float:
 
 
 def cmd_progress(args) -> int:
+    from datetime import datetime, timezone
+    from run_processes import bound_worker, compute_lock, process_tree
+    state = json.loads(Path(args.run_state).read_text()) if getattr(args,"run_state",None) else {}
+    worker = bound_worker(state.get("pid"), state.get("start_ticks"))
     cells = []
     for seed in [int(s) for s in args.seeds.split(",")]:
         for fold in args.folds.split(","):
@@ -316,19 +320,34 @@ def cmd_progress(args) -> int:
                 r = json.loads(record.read_text())
                 if (r["fold"], r["seed"]) != (fold, seed):
                     raise ValueError(f"{record}: cell identity differs")
-                state, epoch = "complete", 119
+                cell_state, epoch = "complete", 119
             elif log.is_file():
                 text = log.read_text()
                 epochs = [int(e) for e, _ in EPOCH_RE.findall(text)]
                 # The rank trainer records a progress marker every epoch between
                 # its less frequent metric rows; include those for live status.
                 epochs += [int(e) for e in re.findall(r"subjective-rank epoch=(\d+)", text)]
-                state, epoch = "training", max(epochs) if epochs else None
+                cell_state, epoch = "training-log-present", max(epochs) if epochs else None
             else:
-                state, epoch = "preparing" if path.exists() else "not-started", None
-            cells.append(dict(fold=fold, seed=seed, state=state, latest_logged_epoch=epoch))
-    print(json.dumps(dict(arm=args.arm, complete=sum(r["state"] == "complete" for r in cells),
-                          requested=len(cells), cells=cells), indent=1))
+                cell_state, epoch = "preparing" if path.exists() else "not-started", None
+            cells.append(dict(fold=fold, seed=seed, state=cell_state, latest_logged_epoch=epoch))
+    result = dict(arm=args.arm, complete=sum(r["state"] == "complete" for r in cells),
+                  requested=len(cells), cells=cells, checked_utc=datetime.now(timezone.utc).isoformat())
+    if state:
+        lock = compute_lock(worker["pid"] if worker else None)
+        result.update(run_directory=state["run_directory"], declared_stage=state["stage"],
+                      source_commit=state["source_commit"], binary_sha256=state["binary_sha256"],
+                      live_processes=process_tree(worker["pid"]) if worker else [], compute_lock=lock,
+                      worker_alive=bool(worker), next_action=state["next_action"])
+        result["status"] = ("cells-complete" if result["complete"] == result["requested"] else
+                            "running" if worker and lock["held_by_worker_ancestor"] else "not-running")
+    text = json.dumps(result, indent=1)+"\n"
+    if getattr(args,"output",None):
+        output = Path(args.output)
+        temporary = output.with_suffix(output.suffix+".new")
+        temporary.write_text(text)
+        temporary.replace(output)
+    print(text,end="")
     return 0
 
 
@@ -1150,6 +1169,8 @@ def main() -> int:
     pr.add_argument("--arm", required=True)
     pr.add_argument("--folds", default=",".join(FOLDS))
     pr.add_argument("--seeds", default="0,1,2")
+    pr.add_argument("--run-state", help="recorded worker PID/start ticks, stage and frozen identities")
+    pr.add_argument("--output", help="atomically update durable progress evidence")
     r = sub.add_parser("run")
     r.add_argument("--arm", required=True, help="recipe tokens, e.g. mono:thr or H1:mono")
     r.add_argument("--folds", default=",".join(FOLDS))
