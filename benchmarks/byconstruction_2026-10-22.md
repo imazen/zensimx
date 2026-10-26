@@ -4291,3 +4291,35 @@ before any Mlic+sub cell: KADID, TID2013, KonFiG-IQA, CID22-A, PIPAL and pairs h
 omits `colourlab-cognitive-science-2022`** (all ten of its registered parent families overlap Colourlab). The cells
 use the derived root `/var/tmp/byc-subsets-20261026/Mlic+sub-linked/root` (frozen sha256 `6abfac53…`), whose frozen
 packet binds `datasets/linked-subset-omissions.json` (sha256 `e7772dbc…`); the original root `89b5f88d…` is unchanged.
+
+### Complete mix scorecard and frozen finalists (2026-10-26)
+
+All numbers below come from the completed stored TRAIN diagnostics. Pooled E21 is the equal four-dataset mean, paired by seed against Mdata; SE uses the three seeds. Per-dataset entries are paired differences (seed-unit SE).
+
+| Arm | E21 delta vs Mdata | SE | KADID | TID2013 | KonFiG | CID22 A25 |
+|---|---:|---:|---:|---:|---:|---:|
+| Mw025 | +0.004898 | 0.001757 | +0.003470 (0.004837) | +0.002717 (0.006501) | +0.009377 (0.009935) | +0.004027 (0.001335) |
+| Mw100 | +0.003346 | 0.002193 | +0.003700 (0.001622) | +0.000332 (0.003064) | +0.005121 (0.009291) | +0.004233 (0.000588) |
+| Mmos | +0.001117 | 0.001652 | +0.006370 (0.004231) | -0.003025 (0.003262) | -0.003340 (0.009980) | +0.004465 (0.001062) |
+| Mpair | +0.004571 | 0.000478 | +0.004019 (0.003522) | +0.001996 (0.005482) | +0.009696 (0.003070) | +0.002572 (0.001821) |
+| Mlic | +0.004420 | 0.000250 | +0.006723 (0.004402) | +0.001253 (0.000359) | +0.007543 (0.005197) | +0.002158 (0.000290) |
+
+New-data fold entries are mean (seed-unit SE): within-reference SROCC normalized as `(rho+1)/2` for MOS, hard-direction agreement for pairs. Each arm is evaluated on every collection; an arm omitting a collection reuses its registered full recipe. These are TRAIN assessments, distinct from the later soft-preference EVAL agreement.
+
+| Collection | Mdata | Mw025 | Mw100 | Mmos | Mpair | Mlic |
+|---|---:|---:|---:|---:|---:|---:|
+| bapps | 0.7658 (0.0066) | 0.7622 (0.0073) | 0.7595 (0.0047) | 0.7658 (0.0066) | 0.7597 (0.0092) | 0.7617 (0.0065) |
+| cid-iq | 0.9057 (0.0032) | 0.9050 (0.0037) | 0.9085 (0.0036) | 0.9025 (0.0068) | 0.9035 (0.0034) | 0.9038 (0.0039) |
+| cid-oa | 0.9865 (0.0000) | 0.9865 (0.0000) | 0.9865 (0.0000) | 0.9868 (0.0002) | 0.9865 (0.0000) | 0.9865 (0.0000) |
+| colourlab-rating-variability-2022 | 0.7762 (0.0132) | 0.7865 (0.0086) | 0.7873 (0.0064) | 0.7784 (0.0112) | 0.7730 (0.0145) | 0.7778 (0.0080) |
+| fg-iqa | 0.8985 (0.0007) | 0.8970 (0.0008) | 0.8997 (0.0007) | 0.8985 (0.0007) | 0.8978 (0.0004) | 0.8989 (0.0008) |
+| irccyn-ivc | 0.9460 (0.0019) | 0.9453 (0.0011) | 0.9457 (0.0025) | 0.9486 (0.0006) | 0.9477 (0.0024) | 0.9471 (0.0004) |
+| live-md | 0.9650 (0.0049) | 0.9638 (0.0039) | 0.9597 (0.0059) | 0.9686 (0.0048) | 0.9664 (0.0048) | 0.9652 (0.0033) |
+| mdid | 0.9414 (0.0092) | 0.9430 (0.0079) | 0.9350 (0.0099) | 0.9437 (0.0024) | 0.9392 (0.0088) | 0.9439 (0.0078) |
+| pieapp | 0.6719 (0.0019) | 0.6704 (0.0009) | 0.6714 (0.0013) | 0.6719 (0.0019) | 0.6706 (0.0015) | 0.6703 (0.0003) |
+| pipal | 0.6643 (0.0172) | 0.6588 (0.0146) | 0.6722 (0.0167) | 0.6678 (0.0137) | 0.6674 (0.0190) | 0.6684 (0.0119) |
+| vcl-fer | 0.9374 (0.0078) | 0.9359 (0.0067) | 0.9301 (0.0062) | 0.9382 (0.0067) | 0.9388 (0.0082) | 0.9348 (0.0081) |
+
+Frozen finalists: `FINALISTS.json` SHA256 `8191f8ced4488629c9c8d37b7439df203b0f1a9b58804bd6e9e312c8692c24c8`. Mlic reuses the coordinator’s seed-0 packed SHA256 `7612c2e46154fe9c0c359bfd02e521013f5717e3bf8e11967f5434150e220bcc`; Mw025 packed SHA256 `a6d43ef2ec717cb8f9b07ecb85f7f4c76aae7995cbce9b42e4d39ef7123ea4ac`. Both certify monotone with zero ramps. Mw025 used the registered 120 epochs × 50,000 pairs, fixed epoch119, seed0; its `run-heavy` completion was rc0, 2,271s, peak-RSS2.06GiB, min-avail15,297MiB, peak-load20.03. The RSS is the maximum single process; coordinator-owned Mlic64 work shared the explicitly approved42GiB/no-swap scope and remains separate from this study.
+
+Mw025-s0 is retained in the candidate registry (source a9a7d34997cc). All19 registry bakes passed `sha256sum -c` through the mounted tower mirror, with checksum compute on dev and no remote process. Initial rsync ownership requests failed; the content-only retry passed. Prior registry metadata and both logs are preserved. `CANDIDATE_REGISTRY_VERIFIED.json` SHA256 `20255999ae094ae034fbebed23a5ae59c70c23e42b0820a0c2cddc26ca36a42f`. No AIC2026 target was opened.
