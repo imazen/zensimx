@@ -670,6 +670,15 @@ adam-denormal-trainer-tests:
 adam-denormal-counters pid output events seconds="10":
     perf stat -o {{quote(output)}} -e {{quote(events)}} -p {{pid}} -- sleep {{seconds}}
 
+# Caller pins the CPU and supplies run-heavy; output paths must be fresh.
+adam-denormal-counter-probe binary output events kernel state steps tier pages="":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    test ! -e {{quote(output)}}
+    command=({{quote(binary)}} {{quote(kernel)}} {{quote(state)}} {{quote(steps)}} {{quote(tier)}})
+    if [[ -n {{quote(pages)}} ]]; then command+=({{quote(pages)}}); fi
+    perf stat -o {{quote(output)}} -e {{quote(events)}} -- "${command[@]}"
+
 adam-denormal-compare reference candidate tools root output:
     python3 scripts/byconstruction/adam_denormal_cell.py compare --reference {{quote(reference)}} --candidate {{quote(candidate)}} --tools {{quote(tools)}} --root {{quote(root)}} --out {{quote(output)}}
 

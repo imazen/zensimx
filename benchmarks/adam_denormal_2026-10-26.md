@@ -354,3 +354,33 @@ Its probe SHA is
 Full successor control timings and byte comparisons are measured separately.
 The dev frozen-binary baseline is already running; its subsequent candidate
 phase explicitly validates the successor's native test binary before starting.
+
+## Quiet dev baseline and native successor gate
+
+The frozen `acfb2a9f…fe28` trainer completed all 120 control epochs on dev CPU 2
+in 1766.748224283 s (1763.822494000 user, 0.697226000 system).
+Counters: 9,390,750,362,071 cycles; 27,774,659,110,690 instructions;
+4,995 `fp_disp_faults.all`. GNU time maximum RSS: 2,132,008 KiB; swaps: 0.
+Intel `assists.fp` is not exposed by this AMD PMU (the actual perf rejection
+and full event inventory are retained under `dev/counter-support/`). AMD
+floating-point dispatch faults are a different event and are not presented as
+Intel FP assists.
+
+The source-identical successor gate on dev executes all native x86 dispatch
+permutations, including AVX-512, with unchanged expectations. Its test executable
+SHA is `28ed1b3d3e7b4de68ecbdc61be2561b511203e430365c6769ef63fd3db848944`;
+its command, checksum and complete output are retained in
+`dev/results/dev-after-v4.native-test-command.json` and
+`dev/results/dev-after-v4.native-tests.log`. The after directory's original
+iteration label is retained; its INVOCATION records the actual successor
+trainer `c82bdf97…e44b`. The source hash on Intel and native ARM is
+`4dc9e41f303cd021950936484d7e1a81f537f9282e5301394b6eb13edd06b91e`.
+Final ARM source verification:
+`run-heavy: done rc=0 9s | peak-RSS 0.32GiB | min-avail 26796MiB | peak-load 6.23`.
+The same shared heavy-lock scope covers both quiet dev fits; its final resource
+line and successor counters are recorded after completion.
+
+The original control folder has best/last refit bakes and a dense bake, with no
+pre-existing packed bake. Packed comparisons therefore freshly pack both the
+frozen reference and candidate through the same canonical owner and TRAIN
+anchor. Comparison subprocesses explicitly use one thread and v3 dispatch.

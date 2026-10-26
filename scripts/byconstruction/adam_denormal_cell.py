@@ -105,13 +105,17 @@ def compare():
     args.out.mkdir(parents=True, exist_ok=False)
     os.environ["REV4_V2_ROOT"] = str(args.root)
     os.environ["REV4_V2_BIN_DIR"] = str(args.tools)
+    os.environ.update(ZENSIM_MAX_TIER="v3", RAYON_NUM_THREADS="1", OMP_NUM_THREADS="1",
+                      OPENBLAS_NUM_THREADS="1", MKL_NUM_THREADS="1")
     sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "rev4_featpot"))
     from v2_common import dense_bake
     from v2_production_pack import pack_production
 
     tool = args.tools / "bake_dial_refit"
     results = {"schema": "adam-denormal-byte-comparison-v1", "tool_sha256": digest(tool),
-               "reference": str(args.reference), "candidate": str(args.candidate), "comparisons": {}}
+               "reference": str(args.reference), "candidate": str(args.candidate), "comparisons": {},
+               "environment": {key: os.environ[key] for key in ("ZENSIM_MAX_TIER", "RAYON_NUM_THREADS",
+                               "OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS")}}
     if args.probe:
         results["splice_probe_sha256"] = digest(args.probe)
 
