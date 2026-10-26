@@ -37,6 +37,16 @@ scheme is active. Each proposed change needs its own preregistered comparison;
 the running AIC arms and their selection rule stay frozen. The source review is
 `zenpapers/docs/mlic-recipe-review-2026-10-26.md`, committed revision `4e81c03a`.
 
+Ordering and mass are separate experimental factors. The current
+`PairSampling::Stratified` visits reference/quality-band strata in round-robin
+order with a seeded row permutation, but uses collection weights only for
+eligibility: draw shares follow the number of eligible strata. Flipping that
+flag would therefore change both order/coverage and collection balance. A
+future ordering-only arm must preserve the declared collection masses and
+pair budget, or explicitly preregister the combined change. The owners are
+`zensim-validate/src/mlp_train/{mod.rs,sampling.rs}`; no new sampler is enabled
+by this note.
+
 For the queued HDR metric frontend, preserve the SDR fast path and native input
 precision; establish cost with measurement before claiming no performance
 penalty. The current declared-HDR route uses f32 rows, SIMD PU encoding and the
