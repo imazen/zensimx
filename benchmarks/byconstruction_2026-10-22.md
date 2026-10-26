@@ -4274,3 +4274,13 @@ pairs with Mlic cell for cell. This rule is written at 03:06Z on 2026-10-26, bef
    reported beside it as the reference. EVAL cannot change either choice.
 4. Reported, not deciding: per-collection new-data statistics, knob-concurring inversions, type-bias SD, Z-RMSE,
    error p99 and both mixture tests.
+
+**Amendment, 03:09Z 2026-10-26, before any Mlic+sub cell has started.** The data-legs lane noted that Cognitive
+Science Experiment 2 reuses the exact Colourlab parent stimuli. In Mlic+sub's mos7 holdout, Colourlab's own leg is
+omitted while Cognitive Experiment 2 would stay in the fit, so Mlic+sub's Colourlab score there would share images with
+a trained protocol and favour it in the non-inferiority test (Colourlab is one twenty-second of the balanced score; a
+shift of about 0.02 in its SROCC moves the balanced score by about one seed-unit SE). Therefore **each held-out-new-data
+fold of Mlic+sub also omits every added subset collection that shares a source family with a held-out collection**,
+by the study's source-family registry. The linkage list is computed label-free and recorded before those cells run.
+Folds with no linked subset (the E21 folds, pipal and pairs, unless the registry says otherwise) are unchanged. Every
+other part of the rule stands.
