@@ -4193,3 +4193,26 @@ cells. The independent verification and copied source receipts are under
 and EVAL freeze order remain unchanged. Every candidate cell/full-data bake
 will be retained for later AIC2026 evaluation; new full-data candidates will
 be added to `candidate_registry.py` and its verified private mirror.
+
+### The licence-clean finalist's shape: rule registered before any Mlic64 result (coordinator, 2026-10-26)
+
+Under the owner's licence policy, Mlic is the only eligible arm of the six; the six-arm selection above stays a
+research comparison and is not changed by this section. The shippable candidate is Mlic in one of two shapes: M's
+(`mono:thr:mp32`, as trained in the study) or M64's (`mono:thr:mp64`), which gained +0.0046 (seed-unit SE 0.0017) on
+the Mdata data. Runs, all on the Mlic root (`MLIC_ROOT.json`, frozen sha256 `a7fd4af0…`) with the study's binaries
+(`BIN_SHA256SUMS`): Mlic full-data seeds 0–2, packed and certified monotone (dev); Mlic64's 12 E21 cells and three
+full-data seeds (dev); Mlic64's nine held-out-new-data cells (fleet, after its program accepts `mp64`).
+
+This rule is written at 02:20Z on 2026-10-26, before any Mlic64 cell has finished; no Mlic64 number has been read.
+
+1. **Mlic64 replaces Mlic** if its old-data score (the study's equal mean of the four E21 SROCCs, per seed, paired by
+   seed against Mlic) is higher by at least two seed-unit SEs, and its new-data score (the study's eleven-collection
+   mean) is not lower by more than two seed-unit SEs. If the nine new-data cells are not in yet, the choice is made on
+   old data and reversed if the new-data score later falls by more than two SEs. Otherwise Mlic stays.
+2. The chosen model's full-data seed-0 bake must pass every label-free gate run for revision-7 M (NEARID N1–N3, dial
+   C1–C6 on both grids, G-STEER, identity at 12 SIMD permutations). A failure removes it and the other shape is tried.
+3. After the choice, its three full-data seeds and their mean are read once on the EVAL copies already holding M7,
+   Mdata and Mdata64, with paired comparisons against those three. EVAL cannot change the shape, seed or weights.
+4. Reported, not deciding: knob-concurring inversions, type-bias SD, Z-RMSE, error p99 and both mixture tests.
+
+An arm adding the six admitted library subsets (`Mlic+sub`) registers its own weights and rule when its root is built.
