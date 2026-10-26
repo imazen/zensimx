@@ -1379,6 +1379,11 @@ fn adam_pair_fused_inner_v3_body(token: archmage::X64V3Token, args: &mut AdamW1F
     let eps_v = f64x4::splat_t(token, args.eps);
     let zero_v = f64x4::zero_t(token);
 
+    // Preserve identity stores on the fixed-point path: reading untouched
+    // calloc moment pages repeatedly can stall loads. Hide the constant once
+    // per call so LLVM cannot remove the stores after proving m/v are +0.
+    let materialized_zero_v = f64x4::splat_t(token, std::hint::black_box(0.0));
+
     let nh = args.n_hidden;
     let n = args.w.len();
     let n_rows = n / nh;
@@ -1387,7 +1392,7 @@ fn adam_pair_fused_inner_v3_body(token: archmage::X64V3Token, args: &mut AdamW1F
     let tau = args.group_l1_tau;
     // The canonical all-+0 state is a fixed point for ordinary Adam
     // hyperparameters. Once moments have flushed, dead chunks need no FP
-    // arithmetic or stores. Keep exceptional parameters on the full path.
+    // arithmetic. Keep exceptional parameters on the full path.
     let zero_fixed_point = args.beta1.is_finite()
         && args.beta2.is_finite()
         && args.bc1 >= f64::MIN_POSITIVE
@@ -1468,6 +1473,8 @@ fn adam_pair_fused_inner_v3_body(token: archmage::X64V3Token, args: &mut AdamW1F
                             bits.into_iter().all(|b| b < idle_weight_bound.to_bits())
                         };
                         if unchanged_weights {
+                            materialized_zero_v.store(mc);
+                            materialized_zero_v.store(vc);
                             if !gz {
                                 zero_v.store(gc);
                             }

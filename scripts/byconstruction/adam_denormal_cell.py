@@ -211,9 +211,8 @@ def compare():
         results["refit_inventory"][label] = {p.name: digest(p) for p in sorted((cell / "refit").iterdir()) if p.is_file()}
     first_spec = args.reference / "refit/best.bin.spec.json"
     second_spec = args.candidate / "refit/best.bin.spec.json"
-    if first_spec.is_file() and second_spec.is_file():
-        compare_bytes("refit_best_spec", first_spec, second_spec)
-        results["spec_value_differences"] = json_changes(json.loads(first_spec.read_text()), json.loads(second_spec.read_text()))
+    compare_bytes("refit_best_spec", first_spec, second_spec)
+    results["spec_value_differences"] = json_changes(json.loads(first_spec.read_text()), json.loads(second_spec.read_text()))
     for name in ("best", "last", "dense", "packed"):
         compare_bytes(f"without_repro_{name}", normalized["reference", name], normalized["candidate", name])
         if args.probe:
@@ -269,6 +268,19 @@ def docker_control():
     if args.dry_run:
         print(json.dumps(command, indent=2))
         return
+    tests = plan.get("native_tests", {}).get(args.phase)
+    if tests is not None:
+        tests = Path(tests).resolve(strict=True)
+        record = args.plan.parent / "results" / f"{args.output}.native-test-command.json"
+        with record.open("x") as stream:
+            stream.write(json.dumps({"argv": [str(tests), "--test-threads=1"],
+                                     "sha256": digest(tests)}, indent=2) + "\n")
+        env = dict(os.environ)
+        env.pop("ZENSIM_MAX_TIER", None)
+        log = args.plan.parent / "results" / f"{args.output}.native-tests.log"
+        with log.open("x") as stream:
+            subprocess.run([str(tests), "--test-threads=1"], stdout=stream,
+                           stderr=subprocess.STDOUT, env=env, check=True)
     record = args.plan.parent / "results" / f"{args.output}.docker-command.json"
     with record.open("x") as stream:
         stream.write(json.dumps(command, indent=2) + "\n")

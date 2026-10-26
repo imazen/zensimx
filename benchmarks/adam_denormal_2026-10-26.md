@@ -298,8 +298,9 @@ All final moment bits are +0 in both modes. Writing the initial moment pages
 removes this probe's load stall. Lazy shared-zero-page mappings are the likely
 cause; the precise hardware mechanism is not established. The normal and decay
 probes already initialize moments to nonzero values; the real fit also updates
-moments before they decay. No trainer change follows from this synthetic setup
-finding, and no original lazy timing is replaced or scaled to another size.
+moments before they decay. At this investigation stage the trainer is unchanged; the store-preserving
+successor below addresses the observed cost. No original lazy timing is
+replaced or scaled to another size.
 The new default remains lazy so earlier commands retain their setup.
 
 The updated tool passes its native Intel tests and strict all-target Clippy.
@@ -318,3 +319,38 @@ The final section-splice/page-control tool also passes native Neoverse-N1
 strict all-target Clippy and its applicable Adam tests with the unchanged
 kernel hash. Evidence: `arm/neon-final-splice-page-tool.log`.
 `run-heavy: done rc=0 28s | peak-RSS 0.31GiB | min-avail 26923MiB | peak-load 6.65`.
+
+## Store-preserving successor
+
+The zero-state shortcut introduced a load-bound regression for initially lazy
+zero-moment pages. Retain identity m/v stores while skipping FP arithmetic.
+A single opaque +0 value per call prevents LLVM from deleting those stores
+after the zero-state proof. This changes memory materialization, not arithmetic,
+and retains `adam-f64-normal-moments-v1`. The preceding v4 timings above remain
+intermediate measurements with their original preserved binaries.
+
+For the same 20,000-update tiny-moment probe on i265 CPU 2:
+
+| Store-preserving setup | Elapsed seconds | P-core cycles | Instructions | Load-bound cycles | FP assists |
+|---|---:|---:|---:|---:|---:|
+| lazy | 0.840776747 | 4,334,262,154 | 21,543,699,161 | 430,284,647 | 0 |
+| touched | 0.846275218 | 4,545,693,223 | 21,544,264,911 | 575,981,667 | 0 |
+
+Both final m/v bit patterns remain +0. Preserve the 0.840776747 s observation's
+user time (0.806617000 s) separately; the wall/user gap is not concealed. Strict
+workspace all-target/all-feature Clippy and the existing Adam/L2/precision and
+probe tests pass on Intel with unchanged expectations. Resource records:
+`run-heavy: done rc=0 5s | peak-RSS 0.31GiB | min-avail 22298MiB | peak-load 1.23`
+(probe build/check),
+`run-heavy: done rc=0 2s | peak-RSS 0.02GiB | min-avail 22558MiB | peak-load 1.13`
+(counter pair), and
+`run-heavy: done rc=0 44s | peak-RSS 1.30GiB | min-avail 20628MiB | peak-load 2.42`
+(full trainer checks/rebuild).
+
+The preserved successor trainer SHA-256 is
+`c82bdf978fe05c99f8e0d1a7f8788b15408def271d2145e86c2c3e1325a5e44b`.
+Its probe SHA is
+`5459d9f22685e9f5ddb9e9fd976dcdabbd635dcaf8f841e83e5fcf746d88bbb6`.
+Full successor control timings and byte comparisons are measured separately.
+The dev frozen-binary baseline is already running; its subsequent candidate
+phase explicitly validates the successor's native test binary before starting.
