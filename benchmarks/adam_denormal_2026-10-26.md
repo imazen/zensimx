@@ -213,3 +213,10 @@ slower than the earlier L2-only probe despite fewer instructions. These are
 reported costs, not a claim of improvement on every input. Full-cell timings
 use the final preserved executable. Probe resource record:
 `run-heavy: done rc=0 3s | peak-RSS 0.02GiB | min-avail 20641MiB | peak-load 3.34`.
+
+Final native NEON verification uses the exact kernel hash above on
+Neoverse-N1: all applicable decay, signed-zero, L2-boundary, fused/unfused and
+dispatch checks pass, as does strict all-target release probe Clippy including
+the native provenance reader dependency. Full output:
+`arm/neon-final-versioned-probe.log`. Resource record:
+`run-heavy: done rc=0 14s | peak-RSS 0.32GiB | min-avail 27152MiB | peak-load 6.37`.
