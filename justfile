@@ -3497,3 +3497,11 @@ byc-loop-bins tag note="":
     } > "$dest/PROVENANCE"
     (cd "$dest" && sha256sum steer_rd loop_pairs map_probe zensim-workbench-loop-converge loop_calibrate > SHA256SUMS)
     echo "$dest"
+
+# D6 admission controls are metadata/key-only; no public_test or EVAL payloads.
+aic-finetune-admission-tests:
+    TMPDIR="$HOME/tmp/aic-finetune-20261026" OPENBLAS_NUM_THREADS=1 python3 -B -m unittest scripts.tests.test_aic_finetune_admission scripts.tests.test_shippath2_admission
+
+# Queue behind existing shared-machine timing work; caller supplies frozen source paths.
+aic-finetune-folds table pairs assignment output commit:
+    TMPDIR="$HOME/tmp/aic-finetune-20261026" OPENBLAS_NUM_THREADS=1 flock "$HOME/tmp/heavy.lock" "$HOME/work/claudehints/scripts/run-heavy" --mem 4G --jobs 1 -- python3 -B scripts/byconstruction/aic_train.py rev7-folds --table {{quote(table)}} --pairs {{quote(pairs)}} --assignment {{quote(assignment)}} --output {{quote(output)}} --build-commit {{quote(commit)}}

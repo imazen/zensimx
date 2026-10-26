@@ -8,6 +8,60 @@ PRODUCTION_SOURCES = ("kadid", "tid2013", "konfig", "cid22_a25")
 LEDGER_COMMIT = "1d3bf35a78a149f0925029d71014c6df8535f550"
 MEMBER_SOURCE = {member: source for source in PRODUCTION_SOURCES for member in SOURCES[source]}
 
+# D6 admits one named split and extraction, independently of D1's four-source
+# receipt. These are content bindings, never permission for the AIC family.
+D6_INPUT_PINS = {
+    "source_table_sha256": "a2969c70f2e1c96f18348b0b8e66a28e41ee87ad839636e8329e63408b138b71",
+    "pairs_sha256": "8ce5a1e913d3c4a9c10848560125b3449542301921d5e9316bfe14b1bb854d66",
+    "assignment_sha256": "d67be7b4a5d09dac07ca9ba30ae2acbcfc13bac9369ccd61290f509ab869f267",
+}
+
+
+def aic_public_train_declaration(declaration, keys, *, fit=True):
+    """D6's exact public_train leg; metadata and label-free keys only.
+
+    Callers still hash the table after every group's metadata passes. D1's
+    decision, human and bank allowlists remain unchanged.
+    """
+    d = declaration
+    if (d.get("schema") != "aic2026-public-train-rev7-v1" or d.get("ruling") != "D6"
+            or d.get("split") != "public_train" or d.get("role") != "TRAIN"
+            or d.get("use") != ("fit" if fit else "out-of-fold-score")
+            or d.get("formula_revision") != 7
+            or d.get("feature_set_id") != "basic+peaks+v2@w1825/rev7_rowlanes#36c3f3af"
+            or d.get("target_column") != "human_score" or d.get("target_transform") != "negate-JND_score"
+            or any(d.get(k) != v for k, v in D6_INPUT_PINS.items())):
+        raise ValueError("D6 admits exactly revision-7 AIC2026 public_train")
+    omitted = d.get("omitted_source_fold")
+    if omitted is not None and (type(omitted) is not int or not 0 <= omitted < 7):
+        raise ValueError("D6 source fold differs")
+    from lib.assessment_identity import safe_path
+    assignment_path = safe_path(d["assignment_path"])
+    if sha(assignment_path) != D6_INPUT_PINS["assignment_sha256"]:
+        raise ValueError("D6 assignment pin differs")
+    assignment = json.loads(assignment_path.read_text())["assignment"]
+    if not keys or len(keys) != d.get("rows"):
+        raise ValueError("D6 ordered source-key coverage differs")
+    seen, sources = set(), set()
+    for i, k in enumerate(keys):
+        if (set(k) != {"row", "key", "source", "split", "source_fold"}
+                or k["row"] != i or k["split"] != "public_train"
+                or not isinstance(k["key"], str) or not k["key"]
+                or not isinstance(k["source"], str) or not k["source"]
+                or k["key"] in seen or type(k["source_fold"]) is not int
+                or not 0 <= k["source_fold"] < 7
+                or assignment.get(k["source"]) != k["source_fold"]
+                or (omitted is not None and (k["source_fold"] == omitted) == fit)):
+            raise ValueError("D6 ordered source-key role/fold differs")
+        seen.add(k["key"])
+        sources.add(k["source"])
+    expected_rows = 3920 if omitted is None else (3360 if fit else 560)
+    expected_sources = 28 if omitted is None else (24 if fit else 4)
+    if (len(keys) != expected_rows or len(sources) != expected_sources
+            or sorted(sources) != d.get("sources")
+            or any(sum(k["source"] == s for k in keys) != 140 for s in sources)):
+        raise ValueError("D6 source-fold population differs")
+
 
 def decision_record(path, receipt_sha):
     from lib.assessment_identity import safe_path

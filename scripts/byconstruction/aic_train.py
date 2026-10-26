@@ -17,6 +17,7 @@ Models: nnls (monotone linear), gamcvx / gammono (monotone additive, convex / an
 """
 
 import argparse
+import hashlib
 import json
 import os
 import subprocess
@@ -36,6 +37,89 @@ V2 = ("ssim_mean ssim_dev2 ssim_dev4 art det mse hf_gain hf_loss hf_mag_loss ssi
       "pjnd_fragility gms transducer_lowk transducer_highk blockiness ringing banding edge_width").split()
 GLOBAFF = list(range(1867, 1891))
 DECL = Path(__file__).resolve().parents[1] / "rev4_featpot" / "byc_fx1g_declaration.json"
+
+
+def prepare_rev7_folds(table, pairs, assignment, output, build_commit):
+    """D6 public_train only: preserve the registered source folds and Rev7 rows.
+
+    All products, targets and source identities stay in private output files.
+    Input hashes and the authorization ledger are persisted before target reads.
+    """
+    import pyarrow as pa
+    table, pairs, assignment, output = map(Path, (table, pairs, assignment, output))
+    if output.exists():
+        raise ValueError("preserve existing AIC fold artifacts; choose a fresh output")
+    if pairs.name != "pairs_train.tsv" or assignment.name != "assignment.json":
+        raise ValueError("D6 requires the explicit public_train pair list and assignment")
+    a = json.loads(assignment.read_text())
+    if (a.get("population") != "WG1 m112107 public_train" or a.get("folds") != 7
+            or a.get("labels") != "JND_score (human_score = -JND_score)"
+            or len(a.get("assignment", {})) != 28
+            or any(list(a["assignment"].values()).count(k) != 4 for k in range(7))):
+        raise ValueError("D6 public_train source-fold contract differs")
+    producer = json.loads(table.with_suffix(".json").read_text())
+    if (producer.get("dump_bake_sha256") !=
+            "5fe0a96230badfa4228e314f12b962b3c18408612d8da9a6390d6259c5a9bcd4"
+            or producer.get("ring_form") != "raw"):
+        raise ValueError("AIC features must come from the registered B7 extraction")
+    def digest(path):
+        return hashlib.sha256(path.read_bytes()).hexdigest()
+    bindings = {"source_table_sha256": digest(table), "pairs_sha256": digest(pairs),
+                "assignment_sha256": digest(assignment), "producer_sha256": digest(table.with_suffix(".json"))}
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "rev4_featpot"))
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+    from v2_human_role import D6_INPUT_PINS, aic_public_train_declaration
+    if any(bindings[k] != v for k, v in D6_INPUT_PINS.items()):
+        raise ValueError("D6 public_train input pin differs")
+    output.mkdir(parents=True)
+    def write(path, value):
+        path.write_text(json.dumps(value, indent=1, allow_nan=False) + "\n")
+    write(output / "LABEL_READS.json", dict(role="TRAIN", ruling="D6", reads=[dict(
+        path=str(pairs), columns=["jnd"], population=a["population"],
+        state="authorized-before-read", **bindings)]))
+    p = pd.read_csv(pairs, sep="\t")
+    names = ["key", "ref_basename", *(f"f{i}" for i in range(1853))]
+    t = pq.read_table(table, columns=names).to_pandas()
+    if (len(p) != 3920 or len(t) != len(p) or p.key.duplicated().any()
+            or not np.array_equal(t.key.astype(str), p.key.astype(str))
+            or not np.array_equal(t.ref_basename.astype(str), p.group.astype(str))
+            or set(p.group) != set(a["assignment"])):
+        raise ValueError("AIC public_train ordered rows/source coverage differ")
+    y = -p.jnd.to_numpy(dtype=np.float64)
+    if not np.isfinite(y).all():
+        raise ValueError("nonfinite public_train JND")
+    t["human_score"] = y
+    f = p.group.map(a["assignment"]).to_numpy(dtype=int)
+    records = {}
+    for k in [*range(7), None]:
+        for split in (["fit", "test"] if k is not None else ["fit"]):
+            mask = np.ones(len(p), dtype=bool) if k is None else (f != k if split == "fit" else f == k)
+            name = f"aic_k{k}_{split}" if k is not None else "aic_full_fit"
+            dest = output / f"{name}.parquet"
+            keys = [dict(row=j, key=str(p.key.iloc[i]), source=str(p.group.iloc[i]),
+                         split="public_train", source_fold=int(f[i]))
+                    for j, i in enumerate(np.flatnonzero(mask))]
+            kp = dest.with_suffix(".keys.json")
+            write(kp, keys)
+            frame = pa.Table.from_pandas(t.loc[mask].reset_index(drop=True), preserve_index=False)
+            frame = frame.replace_schema_metadata({b"feature_set_id":
+                b"basic+peaks+v2@w1825/rev7_rowlanes#36c3f3af", b"formula_revision": b"7"})
+            pq.write_table(frame, dest, compression="zstd")
+            rec = dict(schema="aic2026-public-train-rev7-v1", ruling="D6", split="public_train",
+                role="TRAIN", use="fit" if split == "fit" else "out-of-fold-score", omitted_source_fold=k,
+                formula_revision=7, feature_set_id="basic+peaks+v2@w1825/rev7_rowlanes#36c3f3af",
+                rows=len(keys), sources=sorted({r["source"] for r in keys}),
+                assignment_path=str(assignment.resolve()),
+                table_sha256=digest(dest), keys_path=str(kp), keys_sha256=digest(kp),
+                target_column="human_score", target_transform="negate-JND_score", build_commit=build_commit,
+                **bindings)
+            aic_public_train_declaration(rec, keys, fit=split == "fit")
+            write(Path(str(dest) + ".manifest.json"), rec)
+            records[name] = dict(path=str(dest), manifest_sha256=digest(Path(str(dest) + ".manifest.json")), **rec)
+    manifest = dict(schema="aic2026-public-train-rev7-folds-v1", ruling="D6", build_commit=build_commit,
+                    population=a["population"], assignment=a["assignment"], tables=records, **bindings)
+    write(output / "_MANIFEST.json", manifest)
+    return manifest
 
 
 def v2_name(i: int) -> str:
@@ -285,6 +369,10 @@ def cmd_zeroshot(a) -> int:
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
+    f = sub.add_parser("rev7-folds", help="D6: private public_train tables in the registered seven source folds")
+    for option in ("table", "pairs", "assignment", "output", "build-commit"):
+        f.add_argument("--" + option, required=True)
+    f.set_defaults(fn=lambda a: (prepare_rev7_folds(a.table, a.pairs, a.assignment, a.output, a.build_commit), 0)[1])
     z = sub.add_parser("zeroshot")
     z.add_argument("--table", required=True)
     z.add_argument("--pairs", required=True)
