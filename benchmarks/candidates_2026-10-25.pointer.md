@@ -32,3 +32,6 @@ public_test has one sanctioned frozen read, with the exposure recorded (`docs/DA
 | Mlic-s0 | 7 | M recipe on the Mlic root (Mdata's legs without VCL@FER, PieAPP, FG-IQA) | `7612c2e46154fe9c…` | licence-clean under the 2026-10-25 policy |
 | Mlic-s1 | 7 | M recipe on the Mlic root (Mdata's legs without VCL@FER, PieAPP, FG-IQA) | `5618cd8b2206428a…` | licence-clean under the 2026-10-25 policy |
 | Mlic-s2 | 7 | M recipe on the Mlic root (Mdata's legs without VCL@FER, PieAPP, FG-IQA) | `4ecd413abdb70004…` | licence-clean under the 2026-10-25 policy |
+| Mlic64-s0 | 7 | M64 shape on the Mlic root (licence-clean data) | `7a05deec8b630d9d…` | lost the registered shape rule to Mlic on E21 |
+| Mlic64-s1 | 7 | M64 shape on the Mlic root (licence-clean data) | `2f4fbabcb3403410…` | lost the registered shape rule to Mlic on E21 |
+| Mlic64-s2 | 7 | M64 shape on the Mlic root (licence-clean data) | `85532fb18a974660…` | lost the registered shape rule to Mlic on E21 |
