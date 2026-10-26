@@ -4286,3 +4286,8 @@ Folds with no linked subset (the E21 folds, pipal and pairs, unless the registry
 other part of the rule stands.
 The same omission applies to the four E21 folds: a subset collection that shares a source family with KADID, TID2013,
 KonFiG-IQA or CID22-A is left out of that fold's Mlic+sub fit (clarified at 03:10Z, still before any Mlic+sub cell).
+Linkage, computed label-free by the data-legs lane (source `1076a19e`, 19 focused tests), recorded at 03:26Z
+before any Mlic+sub cell: KADID, TID2013, KonFiG-IQA, CID22-A, PIPAL and pairs have no linked added subset; **mos7 also
+omits `colourlab-cognitive-science-2022`** (all ten of its registered parent families overlap Colourlab). The cells
+use the derived root `/var/tmp/byc-subsets-20261026/Mlic+sub-linked/root` (frozen sha256 `6abfac53…`), whose frozen
+packet binds `datasets/linked-subset-omissions.json` (sha256 `e7772dbc…`); the original root `89b5f88d…` is unchanged.
