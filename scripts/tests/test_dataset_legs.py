@@ -221,6 +221,14 @@ class DatasetTargets(unittest.TestCase):
         obs, _ = root.dataset_observations("irccyn-ivc-dibr-images", members, mapping, labels)
         self.assertEqual([r["human_score"] for r in obs], [1., 0., 0., 1.])
         self.assertNotEqual(obs[0]["ref_basename"], obs[2]["ref_basename"])
+        for i, (na, nb) in enumerate(((30, 13), (13, 30))):
+            labels[("pairs.tsv", i)].update(p_a="", n_a=str(na), n_b=str(nb), n_tie="0", n="43")
+        counted, _ = root.dataset_observations("irccyn-ivc-dibr-images", members, mapping, labels)
+        self.assertEqual(counted, obs)
+        labels[("pairs.tsv", 1)]["n"] = "44"
+        with self.assertRaisesRegex(ValueError, "sum"):
+            root.dataset_observations("irccyn-ivc-dibr-images", members, mapping, labels)
+        labels[("pairs.tsv", 1)]["n"] = "43"
         labels[("pairs.tsv", 1)]["ref"] = "another-view"
         with self.assertRaisesRegex(ValueError, "reference"):
             root.dataset_observations("irccyn-ivc-dibr-images", members, mapping, labels)

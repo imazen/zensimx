@@ -294,7 +294,16 @@ def dataset_observations(collection, members, mapping, labels):
         if collection in DATASET_PAIR or r["input_table"] == "pairs.tsv":
             if set(sides) != {"a", "b"} or (lab["a"], lab["b"]) != (r["a_path"], r["b_path"]):
                 raise ValueError("preference side binding differs")
-            p = float(lab["p_a"])
+            if collection == "irccyn-ivc-dibr-images" and lab["p_a"] == "":
+                # The native DIBR table stores row-preferred vote counts, not
+                # a populated probability column. This only derives the same
+                # hard direction; vote totals never weight the loss.
+                na, nb, nt, total = (int(lab[k]) for k in ("n_a", "n_b", "n_tie", "n"))
+                if min(na, nb, nt) < 0 or total <= 0 or na+nb+nt != total:
+                    raise ValueError("DIBR native vote counts do not sum to n")
+                p = (na+0.5*nt)/total
+            else:
+                p = float(lab["p_a"])
             if not np.isfinite(p) or not 0 <= p <= 1:
                 raise ValueError("invalid native preference probability")
             if p == 0.5:
@@ -424,6 +433,8 @@ def cmd_datasets(a):
         labels = {}
         pair_mode = c in DATASET_PAIR or protocol == "pairs.tsv"
         columns = ["ref", "a", "b", "p_a"] if pair_mode else ["ref", "item", "score", "higher_is_better"]
+        if subsets and protocol == "pairs.tsv":
+            columns += ["n_a", "n_b", "n_tie", "n"]
         for table in sorted({r["input_table"] for r in members}):
             wanted = {r["row_index"] for r in members if r["input_table"] == table}
             labels.update({(table,i):v for i,v in dataset_targets(Path(a.library)/c/table, wanted, columns, ledger, c).items()})
