@@ -117,3 +117,21 @@ arm harvest is claimed by these receipts:
 - `fleet-coordination/AMD_CONTROL_PARITY.json`: `2b3409d09d768773ef8067da7c9d92cabe06ea39113492272f6177c3f1091c67`.
 - `fleet-coordination/AMD_CONTROL_HARVEST.json`: `0e5cc3d85570ebd8991c2eeefc221970f4806c1b50f02515c859037e68f89f97`.
 - `fleet-coordination/amd-parity-independent/VERIFIED.json`: `28eec6c3893cd252caa490257cf3e408663f32bfdabc520fa10242dd00fa692b`.
+
+## Completed TRAIN selection — 2026-10-26
+
+All 123 cells pass native inventory and binary controls. Both mixture sets cover every model; full diagnostics are complete. The registered rule selects Mlic (balanced) and Mw025 (old data). Mlic’s balanced lead is only 0.0000016562213902. Only Mlic is licence-eligible. Its seed 0 reuses the certified coordinator bake; Mw025’s required full fit is active. EVAL and final archive remain pending.
+
+- `TRAIN_SELECTION.json`: `7bbda05e870a3cc5efa54f360c09791978d0c96ee9c5c1c00df2a95c6ead3ed1`.
+- `NATIVE_CELL_CONTROLS.json`: `1337c9e49e030e4f3b35db4d0f3c37a89ccdfaf48cb030de497dccf3a5a979ee`.
+- `BINARY_CELL_CONTROLS.json`: `7fa385c55d7a72b006247a9dacf946cec1ea9b6fd1eaa0fb9642aa75a3f237c7`.
+- `FORCED_CHOICE_CONTROLS.json`: `12e47ee46a31b35aabc34a573325c33f2c9b6388c25cb87e8a30717df6fa5597`.
+- `MIXTURE_CELL_CONTROLS.json`: `7f8449ced72ea26c1fd656315a8133536d04e6d369217718b8586e80a32be6d3`.
+- `MLIC_COORDINATOR_FULL_FITS.json`: `12cf83eabda7c0fee16e620c98df2c0296f1a9e0b1fa73ded6b47c705f7371ad`.
+- `PRESERVED_CANDIDATE_BINDINGS.json`: `198c85780e01864fd2ac38e74b1ff4aa4497f3152af03665b030ec2207a420f1`.
+- `fleet-coordination/EXACT60_VERIFIED_HARVEST.json`: `3a8c90727d94d7ff7d15cf5cc9f30819a742ff5c4bf6ec3efacbf10b6d3e7d9d`.
+- `fleet-coordination/ALL_PRESERVED_CANDIDATES_VERIFIED.json`: `dae3ed3702a1400e7ec64677f633f55749c2cda638513bf6b664335d90f1df1c`.
+
+Final original fleet coverage is 60 DONE, zero missing/FAILED/STRANDED/outside-grid/duplicate DONE. Historical failures remain: five lost-lease partials, nine intentional rebalance partials and three failed-output/scratch retries. Every candidate bake is retained. Seventeen preserved candidate directories are bound for materialized archival; scratch remains protected under its fleet inventory. No scientific file or source receipt was rewritten.
+
+Immutable inputs remain in LAN-store bucket `zentrain`, keys `jobs/byc-<ARM>-r2-20261025/inputs/<sha>`; `fleet-coordination/STAGED_INPUTS.json` records exact bytes. Archive digests differ from the frozen-root manifest digests. The workspace DATA_PROVENANCE index records all six object pointers.

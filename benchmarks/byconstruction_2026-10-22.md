@@ -4224,3 +4224,35 @@ Build only: preserve Mlic’s eight legs and their nominal 0.5 weights. The five
 This limits the entire small-data addition to one existing large leg’s nominal mass. Toyama has no admitted TRAIN rows and receives no leg. Replay the hash-bound Cognitive Experiment 2 parent-identifier join and require exact native reference binding. Verify each collection’s A/B tier and train licence policy; reserve all existing and additive held-out families, including excluded memberships. Read only admitted TRAIN targets, with a ledger entry persisted before each read.
 
 This registration precedes all new subset target reads and measurements. Mlic+sub stays outside the original six-arm/123-cell selection. No fit is launched; a later TRAIN-only comparison rule, finalist shape and cell assignment require the original selection first. Root results and exclusions will be appended after assembly.
+
+### Six-arm TRAIN selection completed (2026-10-26)
+
+All 123 registered cells are installed and independently audited: 111 new native fits and 12 reused Mdata E21 cells. Binary controls cover 123/123; both mixture inventories cover every cell, with 1,152 standard and 1,728 global comparisons per model. Diagnostics use TRAIN labels only.
+
+The registered point rule selects Mlic for balanced mean and Mw025 for old-data mean. Their balanced difference is only 0.0000016562213902; this does not establish a clear improvement. Only Mlic is licence-eligible; Mw025 remains research-only.
+
+| Arm | E21 SROCC | New TRAIN mean | Balanced mean | Balanced seed-unit SE |
+|---|---:|---:|---:|---:|
+| Mdata | 0.856865163 | 0.899773554 | 0.914103068 | 0.000526650 |
+| Mw025 | 0.861762900 | 0.899266963 | 0.915074207 | 0.000193175 |
+| Mw100 | 0.860211355 | 0.899369940 | 0.914737809 | 0.000558124 |
+| Mmos | 0.857982613 | 0.900323762 | 0.914657534 | 0.000542511 |
+| Mpair | 0.861435854 | 0.899025803 | 0.914871865 | 0.000544080 |
+| Mlic | 0.861284769 | 0.899509341 | 0.915075863 | 0.000742086 |
+
+Balanced mean averages normalized old-data SROCC `(rho+1)/2` with the eleven-collection new-TRAIN mean. Three seeds are the uncertainty units. No EVAL result chose weights, epochs, arms or the rule.
+
+| Arm | Standard inversions, 12 E21 models | Global inversions, 12 E21 models |
+|---|---:|---:|
+| Mdata | 38 | 0 |
+| Mw025 | 43 | 0 |
+| Mw100 | 39 | 0 |
+| Mmos | 53 | 0 |
+| Mpair | 45 | 0 |
+| Mlic | 41 | 0 |
+
+Raw reports retain all 123 models separately from these primary twelve-model summaries. Type/bias, knob-order, Z-RMSE, rank geometry and tail diagnostics are complete for all six arms and remain non-gating. The original global-mixture MSE exception remains counted; no expectation changed. Scorecard wrapper: `run-heavy: done rc=0 195s | peak-RSS 0.53GiB | min-avail 43666MiB | peak-load 16.50` (16 GiB/jobs 12).
+
+Mlic seed 0 reuses the coordinator’s certified packed bake `7612c2e46154fe9c0c359bfd02e521013f5717e3bf8e11967f5434150e220bcc`. Its three full candidates are registered and mirrored. Mw025’s required packed full seed 0 is active before the finalists’ one frozen EVAL assessment; no new EVAL values are claimed here.
+
+The prepared [Mlic+sub root](mlic_subsets_2026-10-26.pointer.md) stays outside the registered comparison, with no subset fit.
