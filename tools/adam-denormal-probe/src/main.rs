@@ -10,7 +10,11 @@ use std::hint::black_box;
 
 fn main() {
     let argv: Vec<String> = std::env::args().collect();
-    assert_eq!(argv.len(), 5, "usage: probe fused|unfused normal|decay STEPS v3|scalar|native");
+    assert_eq!(
+        argv.len(),
+        5,
+        "usage: probe fused|unfused normal|decay|tiny-l2|subnormal-weight STEPS v3|scalar|native"
+    );
     let steps: usize = argv[3].parse().unwrap();
     let _guard = archmage::testing::lock_token_testing();
     #[cfg(target_arch = "x86_64")]
@@ -24,11 +28,19 @@ fn main() {
         _ => panic!("unknown tier"),
     }
     let n = 820 * 128;
-    let mut w = vec![0.5; n];
+    let mut w = vec![
+        match argv[2].as_str() {
+            "tiny-l2" => 1e-304,
+            "subnormal-weight" => 1e-310,
+            _ => 0.5,
+        };
+        n
+    ];
     let mut g = vec![0.0; n];
     let initial = match argv[2].as_str() {
         "normal" => 0.01,
         "decay" => f64::MIN_POSITIVE * 2.0,
+        "tiny-l2" | "subnormal-weight" => 0.0,
         _ => panic!("unknown state"),
     };
     let mut m = vec![initial; n];
@@ -38,22 +50,54 @@ fn main() {
     for _ in 0..steps {
         match argv[1].as_str() {
             "fused" => adam_update_w1_fused(&mut AdamW1FusedArgs {
-                w: &mut w, g: &mut g, m: &mut m, v: &mut v,
-                xa: &x, xb: &x, dha: &dh, dhb: &dh,
-                n_hidden: 128, l2_scale: 0.0, l2_mult: None,
-                beta1: 0.9, beta2: 0.999, eps: 1e-8,
-                bc1: 1.0, bc2: 1.0, lr: 0.005,
-                active_rows: None, group_l1_tau: None, g_zero_in: true, fwd: None,
+                w: &mut w,
+                g: &mut g,
+                m: &mut m,
+                v: &mut v,
+                xa: &x,
+                xb: &x,
+                dha: &dh,
+                dhb: &dh,
+                n_hidden: 128,
+                l2_scale: if matches!(argv[2].as_str(), "tiny-l2" | "subnormal-weight") {
+                    1e-5
+                } else {
+                    0.0
+                },
+                l2_mult: None,
+                beta1: 0.9,
+                beta2: 0.999,
+                eps: 1e-8,
+                bc1: 1.0,
+                bc2: 1.0,
+                lr: 0.005,
+                active_rows: None,
+                group_l1_tau: None,
+                g_zero_in: true,
+                fwd: None,
             }),
             "unfused" => adam_update(&mut AdamUpdateArgs {
-                w: &mut w, g: &mut g, m: &mut m, v: &mut v,
-                beta1: 0.9, beta2: 0.999, eps: 1e-8,
-                bc1: 1.0, bc2: 1.0, lr: 0.005,
+                w: &mut w,
+                g: &mut g,
+                m: &mut m,
+                v: &mut v,
+                beta1: 0.9,
+                beta2: 0.999,
+                eps: 1e-8,
+                bc1: 1.0,
+                bc2: 1.0,
+                lr: 0.005,
             }),
             _ => panic!("unknown kernel"),
         }
         black_box((&w, &m, &v));
     }
-    println!("kernel={} state={} steps={steps} tier={} params={n} m_bits={:016x} v_bits={:016x}",
-        argv[1], argv[2], argv[4], m[0].to_bits(), v[0].to_bits());
+    println!(
+        "kernel={} state={} steps={steps} tier={} params={n} m_bits={:016x} v_bits={:016x}",
+        argv[1],
+        argv[2],
+        argv[4],
+        m[0].to_bits(),
+        v[0].to_bits()
+    );
 }

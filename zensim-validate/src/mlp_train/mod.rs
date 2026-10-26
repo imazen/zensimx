@@ -1192,86 +1192,20 @@ fn l2_feature_mult() -> Option<std::sync::Arc<Vec<f64>>> {
 fn add_l2_grad_layer1(g: &mut [f64], w: &[f64], scale: f64, n_hidden: usize, mult: Option<&[f64]>) {
     let n = g.len().min(w.len());
     let (g, w) = (&mut g[..n], &w[..n]);
-    let avx = l2_row_avx_available();
     let Some(mult) = mult else {
-        if avx {
-            unsafe { l2_row_avx(g, w, scale) };
-            return;
-        }
-        for (g, &w) in g.iter_mut().zip(w.iter()) {
-            *g += scale * w;
-        }
+        adam_simd::add_l2_grad_row(g, w, scale);
         return;
     };
     if n_hidden == 0 {
-        // Degenerate; the divided-index form would panic on `idx / 0`, so
-        // preserve that rather than inventing behaviour.
+        // Preserve the existing invalid-shape panic.
         for (idx, (g, &w)) in g.iter_mut().zip(w.iter()).enumerate() {
             *g += scale * mult[idx / n_hidden] * w;
         }
         return;
     }
     for (feat, (grow, wrow)) in g.chunks_mut(n_hidden).zip(w.chunks(n_hidden)).enumerate() {
-        // Indexing `mult[feat]` panics on the same feature index the
-        // divided form would have.
         let sm = scale * mult[feat];
-        if avx {
-            unsafe { l2_row_avx(grow, wrow, sm) };
-        } else {
-            for (g, &w) in grow.iter_mut().zip(wrow.iter()) {
-                *g += sm * w;
-            }
-        }
-    }
-}
-
-/// 4-lane f64 `*g += sm * w` as SEPARATE multiply then add — deliberately not
-/// FMA — so each lane keeps the scalar reference's two roundings exactly.
-/// `g`/`w` tails under 4 lanes stay scalar.
-#[cfg(target_arch = "x86_64")]
-#[target_feature(enable = "avx")]
-unsafe fn l2_row_avx(g: &mut [f64], w: &[f64], sm: f64) {
-    use std::arch::x86_64::{
-        _mm256_add_pd, _mm256_loadu_pd, _mm256_mul_pd, _mm256_set1_pd, _mm256_storeu_pd,
-    };
-    unsafe {
-        let sm_v = _mm256_set1_pd(sm);
-        let gp = g.as_mut_ptr();
-        let wp = w.as_ptr();
-        let n = g.len().min(w.len());
-        for c in 0..n / 4 {
-            let off = c * 4;
-            let gv = _mm256_loadu_pd(gp.add(off));
-            let wv = _mm256_loadu_pd(wp.add(off));
-            _mm256_storeu_pd(gp.add(off), _mm256_add_pd(gv, _mm256_mul_pd(sm_v, wv)));
-        }
-        for o in n / 4 * 4..n {
-            *gp.add(o) += sm * *wp.add(o);
-        }
-    }
-}
-
-/// Scalar stand-in so the call sites compile on non-x86 targets; `avx` is
-/// always false there, so this is never reached.
-#[cfg(not(target_arch = "x86_64"))]
-#[allow(dead_code)]
-unsafe fn l2_row_avx(g: &mut [f64], w: &[f64], sm: f64) {
-    for (g, &w) in g.iter_mut().zip(w.iter()) {
-        *g += sm * w;
-    }
-}
-
-/// Runtime AVX detection for `l2_row_avx`; `is_x86_feature_detected!` caches
-/// the cpuid bit, so the per-call cost is one atomic load.
-#[inline]
-fn l2_row_avx_available() -> bool {
-    #[cfg(target_arch = "x86_64")]
-    {
-        std::is_x86_feature_detected!("avx")
-    }
-    #[cfg(not(target_arch = "x86_64"))]
-    {
-        false
+        adam_simd::add_l2_grad_row(grow, wrow, sm);
     }
 }
 

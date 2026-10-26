@@ -32,3 +32,52 @@ and strict probe Clippy pass on this Intel host. Workspace formatting passes.
 
 The optimizer fix and matched complete-cell comparisons are pending in this
 initial record. Existing study binaries and result directories remain frozen.
+
+## Residual-assist investigation
+
+A moments-only repair flushes moment inputs and outputs using safe magetypes
+exponent masks (signed zero preserved; no MXCSR writes). The same decay probe
+then takes 0.161684931 s, with 860,596,132 cycles, 2,976,281,834 instructions and
+368,007 assists. Its final moment bits are both zero. The existing parity tests
+and new cross-boundary decay tests pass.
+
+The first complete-cell attempt with that repair was retained as an incomplete
+diagnostic and stopped before completion. A 10-second sample reports
+53,080,394,583 cycles, 97,670,128,778 instructions and 56,276,665 assists. Sampling
+the assists attributes all 565 samples to the fused Adam owner, immediately
+after the first-moment FMA. A separate contemporaneous sample of the frozen
+trainer reports 53,570,029,752 cycles, 10,180,642,198 instructions and 339,779,789
+assists over 10.001831809 s. These are mechanism samples, not matched epochs or
+full-cell speed measurements. A competing compilation also occurred during the
+incomplete attempt, so its elapsed time is excluded from speed evidence.
+
+Extend the fixed-work probe with `tiny-l2` (w=1e-304) and `subnormal-weight`
+(w=1e-310), initially zero moments, zero input gradients and L2 scale 1e-5.
+Both use the same 2,000 steps, 104,960 parameters and P-core 2:
+
+| Repair / state | Elapsed seconds | FP assists |
+|---|---:|---:|
+| Moments only / tiny-l2 | 3.254515048 | 104,969,618 |
+| Moments only / subnormal-weight | 3.251834918 | 104,969,632 |
+| Also flush incoming gradients / tiny-l2 | 2.093459258 | 52,487,305 |
+| Also bypass underflowing L2 products / tiny-l2 | 0.283669212 | 0 |
+| Also bypass underflowing L2 products / subnormal-weight | 0.281937528 | 0 |
+
+The complete repair shares a safe L2 row owner between fused and unfused
+updates. It bypasses products below the normal range before multiplying,
+classifies the product at the boundary, and keeps multiply/add separate.
+Boundary tests check 64 adjacent representable inputs on each side for seven
+scales, all reachable dispatch permutations, plus fused/unfused parity. The
+existing trainer L2 rounding and shorter-slice tests pass unchanged.
+
+The full trainer's Adam tests pass on i265. Resource records:
+`run-heavy: done rc=0 83s | peak-RSS 1.63GiB | min-avail 18629MiB | peak-load 3.30`
+for the release Adam test build/run; the subsequent trainer rebuild reports
+`run-heavy: done rc=0 29s | peak-RSS 1.32GiB | min-avail 20293MiB | peak-load 3.20`.
+
+Raw evidence is retained on dev under
+`/mnt/v/output/zensim/adam-denormal-20261026/` and on the Intel measurement hosts
+under the task's scratch directory. Full-cell before/after timing, complete
+artifact byte comparisons, AVX-512/NEON execution and final workspace lint are
+still pending. A fresh isolated full baseline is running on i134; a corrected
+full replay is running on i265. Frozen study binaries remain unchanged.

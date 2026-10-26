@@ -602,6 +602,9 @@ adam-denormal-clippy:
 adam-denormal-probe kernel="fused" state="decay" steps="2000" tier="v3":
     tools/adam-denormal-probe/target/release/adam-denormal-probe {{quote(kernel)}} {{quote(state)}} {{steps}} {{quote(tier)}}
 
+adam-denormal-cell argv trainer output events:
+    python3 scripts/byconstruction/adam_denormal_cell.py --argv-json {{quote(argv)}} --trainer {{quote(trainer)}} --out {{quote(output)}} --events {{quote(events)}}
+
 addrfix-cost-report binary:
     python3 scripts/rev4_featpot/addrfix.py cost-report --binary {{quote(binary)}}
 

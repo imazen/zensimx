@@ -5122,6 +5122,7 @@ fn main() {
         let mut record = serde_json::json!({
             "schema": 1,
             "tool": "zensim_mlp_train",
+            "optimizer_arithmetic": if want_gpu { None } else { Some("adam-f64-normal-moments-v1") },
             "table_admission": table_admission,
             "backend": if want_gpu { gpu_runtime_str.as_str() } else { "cpu" },
             "checkpoint_policy": if want_gpu { "final epoch; no early stopping" } else { "CPU validation selection; see argv" },

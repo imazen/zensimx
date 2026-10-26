@@ -47,6 +47,126 @@ use magetypes::simd::generic::f64x4 as GenericF64x4;
 #[cfg(target_arch = "x86_64")]
 use magetypes::simd::generic::{f64x4, f64x8};
 
+// Optimizer arithmetic revision: f64 moments flush to signed zero below the
+// smallest normal value. Local bit operations preserve NaNs, infinities and
+// signed zero without changing the thread's floating-point environment.
+#[inline(always)]
+fn flush_moment(value: f64) -> f64 {
+    let bits = value.to_bits();
+    if bits & 0x7ff0_0000_0000_0000 == 0 {
+        f64::from_bits(bits & 0x8000_0000_0000_0000)
+    } else {
+        value
+    }
+}
+
+#[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
+#[inline(always)]
+fn flush_moment4<T: magetypes::simd::backends::F64x4Backend>(
+    token: T,
+    value: magetypes::simd::generic::f64x4<T>,
+) -> magetypes::simd::generic::f64x4<T> {
+    use magetypes::simd::generic::f64x4;
+    // Compare only the isolated exponent: a comparison on a subnormal value
+    // itself can require an FP assist. Exponents are zero, normal, or infinity.
+    let exponent = value & f64x4::splat_t(token, f64::INFINITY);
+    let tiny = exponent.simd_eq(f64x4::zero_t(token));
+    f64x4::blend(tiny, value & f64x4::splat_t(token, -0.0), value)
+}
+
+#[cfg(target_arch = "x86_64")]
+#[inline(always)]
+fn flush_moment8(
+    token: archmage::X64V4Token,
+    value: f64x8<archmage::X64V4Token>,
+) -> f64x8<archmage::X64V4Token> {
+    let exponent = value & f64x8::splat_t(token, f64::INFINITY);
+    let tiny = exponent.simd_eq(f64x8::zero_t(token));
+    f64x8::blend(tiny, value & f64x8::splat_t(token, -0.0), value)
+}
+
+// Conservative cutoff for a coupled-L2 product. Keep one representable value
+// below the exact normal boundary, then classify the product itself. This keeps
+// products that round up to MIN_POSITIVE while bypassing persistent underflow.
+#[inline]
+fn l2_cutoff(sm: f64) -> f64 {
+    (f64::MIN_POSITIVE / sm.abs().min(1.0))
+        .next_down()
+        .max(f64::MIN_POSITIVE)
+}
+
+#[inline(always)]
+fn l2_product(w: f64, sm: f64, cutoff: f64) -> f64 {
+    let w = flush_moment(w);
+    let safe_w = if w.abs() < cutoff {
+        0.0f64.copysign(w)
+    } else {
+        w
+    };
+    flush_moment(sm * safe_w)
+}
+
+#[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
+#[inline(always)]
+fn l2_product4<T: magetypes::simd::backends::F64x4Backend>(
+    token: T,
+    w: magetypes::simd::generic::f64x4<T>,
+    sm: magetypes::simd::generic::f64x4<T>,
+    cutoff: magetypes::simd::generic::f64x4<T>,
+) -> magetypes::simd::generic::f64x4<T> {
+    use magetypes::simd::generic::f64x4;
+    let w = flush_moment4(token, w);
+    let safe_w = f64x4::blend(w.abs().simd_lt(cutoff), w & f64x4::splat_t(token, -0.0), w);
+    flush_moment4(token, sm * safe_w)
+}
+
+/// Coupled L2 row: separate multiply/add, with local subnormal flushing. Shared
+/// by the unfused trainer and fused composition fallback; supports short tails.
+pub(crate) fn add_l2_grad_row(g: &mut [f64], w: &[f64], sm: f64) {
+    incant!(l2_row(g, w, sm), [+v4])
+}
+
+#[cfg(target_arch = "x86_64")]
+#[arcane]
+fn l2_row_v4(token: archmage::X64V4Token, g: &mut [f64], w: &[f64], sm: f64) {
+    l2_row_v3(token.v3(), g, w, sm);
+}
+
+#[magetypes(v3, neon, -scalar)]
+fn l2_row(token: Token, g: &mut [f64], w: &[f64], sm: f64) {
+    #[allow(non_camel_case_types)]
+    type f64x4 = magetypes::simd::generic::f64x4<Token>;
+    let n = g.len().min(w.len());
+    let head = n - n % 4;
+    let cutoff = l2_cutoff(sm);
+    let sm_v = f64x4::splat_t(token, sm);
+    let cutoff_v = f64x4::splat_t(token, cutoff);
+    for (gc, wc) in g[..head]
+        .as_chunks_mut::<4>()
+        .0
+        .iter_mut()
+        .zip(w[..head].as_chunks::<4>().0)
+    {
+        let contribution = l2_product4(token, f64x4::load_t(token, wc), sm_v, cutoff_v);
+        (f64x4::load_t(token, gc) + contribution).store(gc);
+    }
+    for i in head..n {
+        g[i] += l2_product(w[i], sm, cutoff);
+    }
+}
+
+fn l2_row_scalar(_: archmage::ScalarToken, g: &mut [f64], w: &[f64], sm: f64) {
+    let cutoff = l2_cutoff(sm);
+    for (g, &w) in g.iter_mut().zip(w) {
+        *g += l2_product(w, sm, cutoff);
+    }
+}
+
+#[cfg(target_arch = "wasm32")]
+fn l2_row_wasm128(_: archmage::Wasm128Token, g: &mut [f64], w: &[f64], sm: f64) {
+    l2_row_scalar(archmage::ScalarToken, g, w, sm);
+}
+
 /// Parameter block for a single Adam update. Borrows live during the call;
 /// no allocations.
 ///
@@ -106,9 +226,9 @@ pub fn adam_update_scalar_ref(args: &mut AdamUpdateArgs<'_>) {
     let inv_bc1 = 1.0 / bc1;
     let inv_bc2 = 1.0 / bc2;
     for i in 0..args.w.len() {
-        let g = args.g[i];
-        let m_new = beta1 * args.m[i] + one_minus_b1 * g;
-        let v_new = beta2 * args.v[i] + one_minus_b2 * g * g;
+        let g = flush_moment(args.g[i]);
+        let m_new = flush_moment(beta1 * flush_moment(args.m[i]) + one_minus_b1 * g);
+        let v_new = flush_moment(beta2 * flush_moment(args.v[i]) + one_minus_b2 * g * g);
         args.m[i] = m_new;
         args.v[i] = v_new;
         let m_hat = m_new * inv_bc1;
@@ -167,16 +287,16 @@ fn adam_update_inner_v4(token: archmage::X64V4Token, args: &mut AdamUpdateArgs<'
         // arrays, so LLVM emits straight-line vector loads/stores with no
         // bounds checks.
 
-        let g = f64x8::load_t(token, gc_fixed);
-        let m = f64x8::load_t(token, mc_fixed);
-        let v = f64x8::load_t(token, vc_fixed);
+        let g = flush_moment8(token, f64x8::load_t(token, gc_fixed));
+        let m = flush_moment8(token, f64x8::load_t(token, mc_fixed));
+        let v = flush_moment8(token, f64x8::load_t(token, vc_fixed));
         let w = f64x8::load_t(token, wc_fixed);
 
         // m_new = β1·m + (1-β1)·g  →  fma(one_minus_b1, g, β1*m)
-        let m_new = one_minus_b1_v.mul_add(g, beta1_v * m);
+        let m_new = flush_moment8(token, one_minus_b1_v.mul_add(g, beta1_v * m));
         // v_new = β2·v + (1-β2)·g·g → fma(one_minus_b2, g*g, β2*v)
         let gg = g * g;
-        let v_new = one_minus_b2_v.mul_add(gg, beta2_v * v);
+        let v_new = flush_moment8(token, one_minus_b2_v.mul_add(gg, beta2_v * v));
 
         let m_hat = m_new * inv_bc1_v;
         let v_hat = v_new * inv_bc2_v;
@@ -209,9 +329,10 @@ fn adam_update_inner_v4(token: archmage::X64V4Token, args: &mut AdamUpdateArgs<'
         let inv_bc1 = 1.0 / args.bc1;
         let inv_bc2 = 1.0 / args.bc2;
         for i in rem_start..rem_start + 4 {
-            let g = args.g[i];
-            let m_new = one_minus_b1.mul_add(g, args.beta1 * args.m[i]);
-            let v_new = one_minus_b2.mul_add(g * g, args.beta2 * args.v[i]);
+            let g = flush_moment(args.g[i]);
+            let m_new = flush_moment(one_minus_b1.mul_add(g, args.beta1 * flush_moment(args.m[i])));
+            let v_new =
+                flush_moment(one_minus_b2.mul_add(g * g, args.beta2 * flush_moment(args.v[i])));
             args.m[i] = m_new;
             args.v[i] = v_new;
             let m_hat = m_new * inv_bc1;
@@ -448,20 +569,23 @@ fn adam_update_inner_v4_rsqrt_body<P: RsqrtPrecisionTier>(
         .zip(m_chunks)
         .zip(v_chunks)
     {
-        let g = f64x8::load_t(token, gc_fixed);
-        let m = f64x8::load_t(token, mc_fixed);
-        let v = f64x8::load_t(token, vc_fixed);
+        let g = flush_moment8(token, f64x8::load_t(token, gc_fixed));
+        let m = flush_moment8(token, f64x8::load_t(token, mc_fixed));
+        let v = flush_moment8(token, f64x8::load_t(token, vc_fixed));
         let w = f64x8::load_t(token, wc_fixed);
 
-        let m_new = one_minus_b1_v.mul_add(g, beta1_v * m);
+        let m_new = flush_moment8(token, one_minus_b1_v.mul_add(g, beta1_v * m));
         let gg = g * g;
-        let v_new = one_minus_b2_v.mul_add(gg, beta2_v * v);
+        let v_new = flush_moment8(token, one_minus_b2_v.mul_add(gg, beta2_v * v));
 
         let m_hat = m_new * inv_bc1_v;
         let v_hat = v_new * inv_bc2_v;
 
         // Tier-selected reciprocal sqrt (see the tier docs above).
-        let r1 = P::rsqrt(token, v_hat);
+        // A flushed second moment is zero: rsqrt(0) is infinite and
+        // 0*infinity would turn the otherwise finite epsilon denominator NaN.
+        let rsqrt_input = f64x8::blend(v_hat.simd_eq(zero_v), f64x8::splat_t(token, 1.0), v_hat);
+        let r1 = P::rsqrt(token, rsqrt_input);
 
         // sqrt(v_hat) = v_hat * rsqrt(v_hat), fused with the + eps.
         let denom = v_hat.mul_add(r1, eps_v);
@@ -580,14 +704,14 @@ fn adam_update_inner_v3_body(token: archmage::X64V3Token, args: &mut AdamUpdateA
         .zip(m_chunks)
         .zip(v_chunks)
     {
-        let g = f64x4::load_t(token, gc_fixed);
-        let m = f64x4::load_t(token, mc_fixed);
-        let v = f64x4::load_t(token, vc_fixed);
+        let g = flush_moment4(token, f64x4::load_t(token, gc_fixed));
+        let m = flush_moment4(token, f64x4::load_t(token, mc_fixed));
+        let v = flush_moment4(token, f64x4::load_t(token, vc_fixed));
         let w = f64x4::load_t(token, wc_fixed);
 
-        let m_new = one_minus_b1_v.mul_add(g, beta1_v * m);
+        let m_new = flush_moment4(token, one_minus_b1_v.mul_add(g, beta1_v * m));
         let gg = g * g;
-        let v_new = one_minus_b2_v.mul_add(gg, beta2_v * v);
+        let v_new = flush_moment4(token, one_minus_b2_v.mul_add(gg, beta2_v * v));
 
         let m_hat = m_new * inv_bc1_v;
         let v_hat = v_new * inv_bc2_v;
@@ -654,14 +778,14 @@ fn adam_update_inner(token: Token, args: &mut AdamUpdateArgs<'_>) {
         .zip(m_chunks)
         .zip(v_chunks)
     {
-        let g = f64x4::load_t(token, gc_fixed);
-        let m = f64x4::load_t(token, mc_fixed);
-        let v = f64x4::load_t(token, vc_fixed);
+        let g = flush_moment4(token, f64x4::load_t(token, gc_fixed));
+        let m = flush_moment4(token, f64x4::load_t(token, mc_fixed));
+        let v = flush_moment4(token, f64x4::load_t(token, vc_fixed));
         let w = f64x4::load_t(token, wc_fixed);
 
-        let m_new = one_minus_b1_v.mul_add(g, beta1_v * m);
+        let m_new = flush_moment4(token, one_minus_b1_v.mul_add(g, beta1_v * m));
         let gg = g * g;
-        let v_new = one_minus_b2_v.mul_add(gg, beta2_v * v);
+        let v_new = flush_moment4(token, one_minus_b2_v.mul_add(gg, beta2_v * v));
 
         let m_hat = m_new * inv_bc1_v;
         let v_hat = v_new * inv_bc2_v;
@@ -719,11 +843,11 @@ fn adam_update_scalar_fused(args: &mut AdamUpdateArgs<'_>) {
     let n = args.w.len();
     let n4 = n - n % 4;
     for i in 0..n4 {
-        let g = args.g[i];
+        let g = flush_moment(args.g[i]);
         // Identical fused expression to the AVX2 lane ops:
         // fma(one_minus_b1, g, round(beta1*m)) etc.
-        let m_new = one_minus_b1.mul_add(g, beta1 * args.m[i]);
-        let v_new = one_minus_b2.mul_add(g * g, beta2 * args.v[i]);
+        let m_new = flush_moment(one_minus_b1.mul_add(g, beta1 * flush_moment(args.m[i])));
+        let v_new = flush_moment(one_minus_b2.mul_add(g * g, beta2 * flush_moment(args.v[i])));
         args.m[i] = m_new;
         args.v[i] = v_new;
         let m_hat = m_new * inv_bc1;
@@ -1082,17 +1206,13 @@ fn adam_pair_fused_fallback(args: &mut AdamW1FusedArgs<'_>) {
     if args.l2_scale > 0.0 {
         match args.l2_mult {
             None => {
-                for (g, &w) in args.g.iter_mut().zip(args.w.iter()) {
-                    *g += args.l2_scale * w;
-                }
+                add_l2_grad_row(args.g, args.w, args.l2_scale);
             }
             Some(mult) => {
                 for (feat, (grow, wrow)) in args.g.chunks_mut(nh).zip(args.w.chunks(nh)).enumerate()
                 {
                     let sm = args.l2_scale * mult[feat];
-                    for (g, &w) in grow.iter_mut().zip(wrow.iter()) {
-                        *g += sm * w;
-                    }
+                    add_l2_grad_row(grow, wrow, sm);
                 }
             }
         }
@@ -1191,13 +1311,12 @@ fn adam_pair_fused_inner_v3_body(token: archmage::X64V3Token, args: &mut AdamW1F
                 let sb_v = f64x4::splat_t(token, sb);
                 let do_a = sa != 0.0;
                 let do_b = sb != 0.0;
-                let sm_v = f64x4::splat_t(
-                    token,
-                    match args.l2_mult {
-                        Some(mult) => args.l2_scale * mult[row],
-                        None => args.l2_scale,
-                    },
-                );
+                let sm = match args.l2_mult {
+                    Some(mult) => args.l2_scale * mult[row],
+                    None => args.l2_scale,
+                };
+                let sm_v = f64x4::splat_t(token, sm);
+                let cutoff_v = f64x4::splat_t(token, if l2_on { l2_cutoff(sm) } else { 0.0 });
                 debug_assert!(
                     !gz || args.g[base..base + nh].iter().all(|g| g.to_bits() == 0),
                     "g_zero_in promised an all +0.0 gradient row (row {row})"
@@ -1223,13 +1342,16 @@ fn adam_pair_fused_inner_v3_body(token: archmage::X64V3Token, args: &mut AdamW1F
                     let w = f64x4::load_t(token, wc);
                     if l2_on {
                         // mul+add — two roundings, matching l2_row_avx exactly.
-                        g += sm_v * w;
+                        g += l2_product4(token, w, sm_v, cutoff_v);
                     }
-                    let m = f64x4::load_t(token, mc);
-                    let v = f64x4::load_t(token, vc);
-                    let m_new = one_minus_b1_v.mul_add(g, beta1_v * m);
+                    // Tiny L2 gradients can be subnormal even when w is normal.
+                    // Do not feed them to the moment FMAs on every update.
+                    g = flush_moment4(token, g);
+                    let m = flush_moment4(token, f64x4::load_t(token, mc));
+                    let v = flush_moment4(token, f64x4::load_t(token, vc));
+                    let m_new = flush_moment4(token, one_minus_b1_v.mul_add(g, beta1_v * m));
                     let gg = g * g;
-                    let v_new = one_minus_b2_v.mul_add(gg, beta2_v * v);
+                    let v_new = flush_moment4(token, one_minus_b2_v.mul_add(gg, beta2_v * v));
                     let m_hat = m_new * inv_bc1_v;
                     let v_hat = v_new * inv_bc2_v;
                     let denom = v_hat.sqrt() + eps_v;
@@ -1577,6 +1699,311 @@ mod tests {
         });
         eprintln!("permutations run: {}", report.permutations_run);
         assert!(failures.is_empty(), "{}", failures.join("\n"));
+    }
+
+    #[test]
+    fn moment_flush_preserves_normal_and_special_bits() {
+        let mut values = Vec::new();
+        for bits in [
+            0,
+            1,
+            0x000f_ffff_ffff_ffff,
+            0x0010_0000_0000_0000,
+            0x0010_0000_0000_0001,
+            0x3ff0_0000_0000_0000,
+            0x7ff0_0000_0000_0000,
+            0x7ff8_1234_5678_9abc,
+        ] {
+            for sign in [0, 1u64 << 63] {
+                let value = f64::from_bits(bits | sign);
+                let expected = if value.is_subnormal() {
+                    sign
+                } else {
+                    bits | sign
+                };
+                assert_eq!(flush_moment(value).to_bits(), expected);
+                values.push(value);
+            }
+        }
+        #[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
+        fn check4<T: magetypes::simd::backends::F64x4Backend>(token: T, values: &[f64]) {
+            for chunk in values.as_chunks::<4>().0 {
+                let actual =
+                    flush_moment4(token, magetypes::simd::generic::f64x4::load_t(token, chunk))
+                        .to_array();
+                assert_eq!(
+                    actual.map(f64::to_bits),
+                    chunk.map(|v| flush_moment(v).to_bits())
+                );
+            }
+        }
+        let _lock = archmage::testing::lock_token_testing();
+        #[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
+        check4(archmage::ScalarToken, &values);
+        #[cfg(target_arch = "x86_64")]
+        {
+            use archmage::SimdToken;
+            if let Some(token) = archmage::X64V3Token::summon() {
+                check4(token, &values);
+            }
+            if let Some(token) = archmage::X64V4Token::summon() {
+                for chunk in values.as_chunks::<8>().0 {
+                    let actual = flush_moment8(token, f64x8::load_t(token, chunk)).to_array();
+                    assert_eq!(
+                        actual.map(f64::to_bits),
+                        chunk.map(|v| flush_moment(v).to_bits())
+                    );
+                }
+            }
+        }
+        #[cfg(target_arch = "aarch64")]
+        {
+            use archmage::SimdToken;
+            check4(archmage::NeonToken::summon().expect("NEON host"), &values);
+        }
+    }
+
+    #[test]
+    fn l2_underflow_boundary_matches_classified_product_in_every_tier() {
+        use archmage::testing::{CompileTimePolicy, for_each_token_permutation};
+        let report = for_each_token_permutation(CompileTimePolicy::Warn, |perm| {
+            for sm in [0.0, 1e-5, 0.125, 0.5, 0.9, 1.0, 2.0] {
+                let boundary = l2_cutoff(sm);
+                let mut weights = vec![0.0, 1e-310, 1e-304, f64::MIN_POSITIVE, 0.5];
+                let mut below = boundary;
+                let mut above = boundary;
+                for _ in 0..64 {
+                    weights.extend([below, above, -below, -above]);
+                    below = below.next_down();
+                    above = above.next_up();
+                }
+                let expected: Vec<_> = weights
+                    .iter()
+                    .map(|&w| {
+                        let w = if w.is_subnormal() {
+                            0.0f64.copysign(w)
+                        } else {
+                            w
+                        };
+                        let product = sm * w;
+                        let contribution = if product.is_subnormal() {
+                            0.0f64.copysign(product)
+                        } else {
+                            product
+                        };
+                        0.0 + contribution
+                    })
+                    .collect();
+                let mut actual = vec![0.0; weights.len()];
+                add_l2_grad_row(&mut actual, &weights, sm);
+                // Infinity is reached only by the zero-scale boundary fixture:
+                // both implementations retain the same invalid 0*infinity.
+                for (a, e) in actual.iter().zip(&expected) {
+                    assert!(
+                        a.to_bits() == e.to_bits() || (a.is_nan() && e.is_nan()),
+                        "{} sm={sm} actual={a:?} expected={e:?}",
+                        perm.label
+                    );
+                }
+            }
+        });
+        assert!(report.permutations_run > 0);
+    }
+
+    #[test]
+    fn fused_tiny_l2_matches_unfused_in_every_tier() {
+        use archmage::testing::{CompileTimePolicy, for_each_token_permutation};
+        let report = for_each_token_permutation(CompileTimePolicy::Warn, |perm| {
+            let w0: Vec<_> = (0..24)
+                .map(|i| match i % 3 {
+                    0 => 1e-304,
+                    1 => 1e-310,
+                    _ => 0.5,
+                })
+                .collect();
+            let mut fused = (w0.clone(), vec![0.0; 24], vec![0.0; 24], vec![0.0; 24]);
+            let mut unfused = fused.clone();
+            for _ in 0..10 {
+                add_l2_grad_row(&mut unfused.1, &unfused.0, 1e-5);
+                adam_update(&mut make_args(
+                    &mut unfused.0,
+                    &mut unfused.1,
+                    &mut unfused.2,
+                    &mut unfused.3,
+                    10_000,
+                ));
+                adam_update_w1_fused(&mut AdamW1FusedArgs {
+                    w: &mut fused.0,
+                    g: &mut fused.1,
+                    m: &mut fused.2,
+                    v: &mut fused.3,
+                    xa: &[0.0; 3],
+                    xb: &[0.0; 3],
+                    dha: &[0.0; 8],
+                    dhb: &[0.0; 8],
+                    n_hidden: 8,
+                    l2_scale: 1e-5,
+                    l2_mult: None,
+                    beta1: 0.9,
+                    beta2: 0.999,
+                    eps: 1e-8,
+                    bc1: 1.0 - 0.9f64.powi(10_000),
+                    bc2: 1.0 - 0.999f64.powi(10_000),
+                    lr: 0.005,
+                    active_rows: None,
+                    group_l1_tau: None,
+                    g_zero_in: true,
+                    fwd: None,
+                });
+                for (a, e) in [
+                    (&fused.0, &unfused.0),
+                    (&fused.1, &unfused.1),
+                    (&fused.2, &unfused.2),
+                    (&fused.3, &unfused.3),
+                ] {
+                    assert_eq!(bits_of(a), bits_of(e), "{}", perm.label);
+                }
+            }
+        });
+        assert!(report.permutations_run > 0);
+    }
+
+    #[cfg(target_arch = "x86_64")]
+    #[test]
+    fn rsqrt_flushed_zero_has_a_finite_epsilon_denominator() {
+        let _lock = archmage::testing::lock_token_testing();
+        for tier in [
+            RsqrtPrecision::Full,
+            RsqrtPrecision::Nr1,
+            RsqrtPrecision::Estimate,
+        ] {
+            let mut w = [0.5; 8];
+            let mut g = [0.0; 8];
+            let mut m = [f64::from_bits(1); 8];
+            let mut v = m;
+            adam_update_rsqrt_v4_tiered(&mut make_args(&mut w, &mut g, &mut m, &mut v, 100), tier);
+            assert!(w.iter().all(|&x| x == 0.5), "{tier:?}");
+            assert!(m.iter().chain(&v).all(|&x| x.to_bits() == 0), "{tier:?}");
+        }
+    }
+
+    /// Start above the normal boundary and actually decay across it. Include
+    /// restored subnormal states and every vector/tail boundary. The independent
+    /// oracle uses classification, rather than the owner's exponent-mask code.
+    #[test]
+    fn moments_decay_to_zero_in_every_dispatch_tier() {
+        use archmage::testing::{CompileTimePolicy, for_each_token_permutation};
+        let report = for_each_token_permutation(CompileTimePolicy::Warn, |perm| {
+            for n in 1..=17 {
+                let mut w = vec![0.5; n];
+                let mut g = vec![0.0; n];
+                let mut m = vec![f64::MIN_POSITIVE * 2.0; n];
+                let mut v = m.clone();
+                m[0] = f64::from_bits(1);
+                v[0] = f64::from_bits(0x000f_ffff_ffff_ffff);
+                let (mut expected_m, mut expected_v) = (m.clone(), v.clone());
+                let classify = |x: f64| {
+                    if x.is_subnormal() {
+                        0.0f64.copysign(x)
+                    } else {
+                        x
+                    }
+                };
+                for step in 0..1000 {
+                    for i in 0..n {
+                        expected_m[i] = classify(0.9 * classify(expected_m[i]));
+                        expected_v[i] = classify(0.999 * classify(expected_v[i]));
+                    }
+                    adam_update(&mut make_args(&mut w, &mut g, &mut m, &mut v, 10_000));
+                    assert_eq!(
+                        bits_of(&m),
+                        bits_of(&expected_m),
+                        "{} n={n} step={step} m",
+                        perm.label
+                    );
+                    assert_eq!(
+                        bits_of(&v),
+                        bits_of(&expected_v),
+                        "{} n={n} step={step} v",
+                        perm.label
+                    );
+                    assert!(w.iter().all(|&x| x == 0.5));
+                    assert!(g.iter().all(|&x| x.to_bits() == 0));
+                }
+                assert!(m.iter().chain(&v).all(|&x| x.to_bits() == 0));
+            }
+        });
+        assert!(report.permutations_run > 0);
+    }
+
+    #[test]
+    fn fused_moments_decay_to_zero_in_every_dispatch_tier() {
+        use archmage::testing::{CompileTimePolicy, for_each_token_permutation};
+        let report = for_each_token_permutation(CompileTimePolicy::Warn, |perm| {
+            let mut w = vec![0.5; 12];
+            let mut g = vec![0.0; 12];
+            let mut m = vec![f64::MIN_POSITIVE * 2.0; 12];
+            let mut v = m.clone();
+            m[0] = f64::from_bits(1);
+            v[0] = f64::from_bits(1);
+            let mut reference = (w.clone(), g.clone(), m.clone(), v.clone());
+            for step in 0..1000 {
+                adam_update_w1_fused(&mut AdamW1FusedArgs {
+                    w: &mut w,
+                    g: &mut g,
+                    m: &mut m,
+                    v: &mut v,
+                    xa: &[0.0; 3],
+                    xb: &[0.0; 3],
+                    dha: &[0.0; 4],
+                    dhb: &[0.0; 4],
+                    n_hidden: 4,
+                    l2_scale: 0.0,
+                    l2_mult: None,
+                    beta1: 0.9,
+                    beta2: 0.999,
+                    eps: 1e-8,
+                    bc1: 1.0,
+                    bc2: 1.0,
+                    lr: 0.005,
+                    active_rows: None,
+                    group_l1_tau: None,
+                    g_zero_in: step % 2 == 0,
+                    fwd: None,
+                });
+                adam_update_inner_scalar(
+                    archmage::ScalarToken,
+                    &mut AdamUpdateArgs {
+                        w: &mut reference.0,
+                        g: &mut reference.1,
+                        m: &mut reference.2,
+                        v: &mut reference.3,
+                        beta1: 0.9,
+                        beta2: 0.999,
+                        eps: 1e-8,
+                        bc1: 1.0,
+                        bc2: 1.0,
+                        lr: 0.005,
+                    },
+                );
+                for (actual, expected) in [
+                    (&w, &reference.0),
+                    (&g, &reference.1),
+                    (&m, &reference.2),
+                    (&v, &reference.3),
+                ] {
+                    assert_eq!(
+                        bits_of(actual),
+                        bits_of(expected),
+                        "{} step={step}",
+                        perm.label
+                    );
+                }
+                assert!(!m.iter().chain(&v).any(|x| x.is_subnormal()));
+            }
+            assert!(m.iter().chain(&v).all(|&x| x.to_bits() == 0));
+        });
+        assert!(report.permutations_run > 0);
     }
 
     // ---- fused K=1 pair update (fusedstep lane) ----
