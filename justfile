@@ -408,6 +408,7 @@ dataset-mix-prepare study:
 dataset-leg-tests:
     python3 -B -m unittest discover -s scripts/tests -p 'test_dataset_legs.py' -v
     python3 -B -m unittest discover -s scripts/tests -p 'test_subjective_training_leg.py' -v
+    python3 -B -m unittest discover -s scripts/tests -p 'test_dataset_votes.py' -v
 
 dataset-eval-tests binary:
     ZEN_PANEL_BIN={{quote(binary)}} python3 -B -m unittest discover -s scripts/tests -p 'test_dataset_eval.py' -v
@@ -420,6 +421,11 @@ dataset-tests binary:
 dataset-leg-native-tests target:
     cargo test --locked -p zensim-validate --bin zensim_mlp_train --target-dir {{quote(target)}} subjective_training_leg:: -- --nocapture
     cargo test --locked -p zensim-validate --test subjective_rank --target-dir {{quote(target)}}
+
+# Caller holds heavy.lock and run-heavy; includes the unchanged hard-rank controls.
+dataset-vote-native-tests target:
+    cargo test --locked -p zensim-validate --lib --target-dir {{quote(target)}} mlp_train::subjective_rank::
+    cargo test --locked -p zensim-validate --test subjective_rank --test subjective_vote --target-dir {{quote(target)}}
 
 dataset-trainer-build target:
     cargo build --locked --release -p zensim-validate --bin zensim_mlp_train --target-dir {{quote(target)}}

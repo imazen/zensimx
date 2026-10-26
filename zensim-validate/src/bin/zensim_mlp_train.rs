@@ -3741,7 +3741,16 @@ fn main() {
             eprintln!("{e}");
             std::process::exit(1);
         });
-        if subjective_admission.contains_key(&name) {
+        if let Some(declaration) = subjective_admission.get(&name) {
+            subjective_training_leg::native_votes(
+                declaration,
+                &g.human_scores,
+                g.ref_ids.as_deref(),
+            )
+            .unwrap_or_else(|e| {
+                eprintln!("subjective native votes: {e}");
+                std::process::exit(2)
+            });
             let bad_features = if let Some(c) = &g.compact {
                 c.data.iter().any(|v| !v.is_finite())
             } else {

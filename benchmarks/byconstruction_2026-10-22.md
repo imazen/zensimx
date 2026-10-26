@@ -4771,6 +4771,19 @@ on that host. These are implementation controls, not runtime benchmarks or
 evidence of candidate quality; the registered full-budget Mlic prediction
 control and the 21 candidate cells remain required.
 
+The private v3 declaration binds the native vote sidecar, two ordered sides,
+fit-only role, original nominal mass, producer and feature contract. Python
+and Rust metadata controls accept an absent response file without reading
+it; the later payload phase verifies integer counts, original probabilities,
+ordered keys and loaded targets. Native pairing also rejects references
+that combine comparisons. The v1/v2 admission controls remain unchanged.
+The admission suite and strict workspace clippy passed on i265:
+`run-heavy: done rc=0 15s | peak-RSS 1.31GiB | min-avail 23032MiB | peak-load 4.68`.
+Python `just dataset-leg-tests` passes, including response-before-admission
+and count/target/role corruption controls. Real BAPPS counts have not yet
+been admitted by this implementation; that remains a separate frozen-root
+preparation and full-budget execution gate.
+
 The existing observation mapper now has an explicit vote-preserving mode.
 Synthetic controls retain a `(1,1)` disagreement as two 0.5 targets and reject
 missing, fractional, inconsistent or three-vote counts. The original hard-pair

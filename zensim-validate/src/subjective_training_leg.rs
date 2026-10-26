@@ -394,16 +394,28 @@ fn admit_datasets(
         if r["subjective"] != true {
             continue;
         }
-        if d["schema"] != "subjective-training-leg-v2"
-            || !matches!(
+        let votes = d["schema"] == "subjective-training-leg-v3";
+        let legacy = d["schema"] == "subjective-training-leg-v2"
+            && matches!(
                 d["loss"].as_str(),
                 Some("within-source-rank" | "hard-pair-preference")
             )
+            && d["target_transform"] == "orient-native-quality"
+            && string(r, "name")?.starts_with("subjective_rank_");
+        let vote_contract = votes
+            && d["loss"] == "binomial-two-vote"
+            && d["target_transform"] == "native-vote-probability"
+            && d["collection"] == "bapps"
+            && d["native_votes_per_pair"] == 2
+            && d["nominal_weight"].as_f64() == Some(0.5)
+            && r["name"] == "subjective_vote_bapps"
+            && d["keys_path"] == r["keys_path"]
+            && d["keys_sha256"] == r["keys_sha256"];
+        if !(legacy || vote_contract)
             || d["nominal_weight"]
                 .as_f64()
                 .is_none_or(|w| !w.is_finite() || w <= 0.)
             || d["target_orientation"] != "quality"
-            || d["target_transform"] != "orient-native-quality"
             || d["target_column"] != "human_score"
             || d["formula_revision"] != 7
             || d["tier"] != "v3"
@@ -411,12 +423,22 @@ fn admit_datasets(
             || d["selection"] != "fixed-final-epoch"
             || d["native_role"] != "TRAIN"
             || d["producer_commit"] != c["producer_commit"]
-            || !string(r, "name")?.starts_with("subjective_rank_")
             || r["val_weight"].as_f64() != Some(0.)
             || r["train_weight"].as_f64().is_none_or(|v| v <= 0.)
             || d["table_sha256"] != r["table_sha256"]
         {
             return Err("dataset role/loss/producer/target binding differs".into());
+        }
+        if votes {
+            safe(Path::new(string(&d, "native_votes_path")?))?;
+            let pin = string(&d, "native_votes_sha256")?;
+            if pin.len() != 64
+                || !pin
+                    .bytes()
+                    .all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase())
+            {
+                return Err("native vote payload pin required".into());
+            }
         }
         let keys = json(
             Path::new(string(r, "keys_path")?),
@@ -467,7 +489,7 @@ fn admit_datasets(
         if serde_json::to_value(&counts).map_err(|e| e.to_string())? != r["source_counts"]
             || counts
                 .values()
-                .any(|&n| n < 2 || d["loss"] == "hard-pair-preference" && n != 2)
+                .any(|&n| n < 2 || (d["loss"] == "hard-pair-preference" || votes) && n != 2)
         {
             return Err("dataset source population mismatch".into());
         }
@@ -492,6 +514,81 @@ fn admit_datasets(
         return Err("dataset authority has no subjective groups".into());
     }
     Ok(admitted)
+}
+
+/// Only called after all metadata admission and payload hashes, with the
+/// loaded targets at native scale. No vote counts enter metadata admission.
+pub fn native_votes(d: &Value, targets: &[f64], refs: Option<&[u32]>) -> Result<(), String> {
+    if d["schema"] != "subjective-training-leg-v3" {
+        return Ok(());
+    }
+    let votes = json(
+        Path::new(string(d, "native_votes_path")?),
+        string(d, "native_votes_sha256")?,
+    )?;
+    let keys = json(
+        Path::new(string(d, "keys_path")?),
+        string(d, "keys_sha256")?,
+    )?;
+    let keys = keys.as_array().ok_or("native vote ordered keys required")?;
+    let comparisons = votes["comparisons"]
+        .as_array()
+        .ok_or("native vote comparisons required")?;
+    let refs = refs.ok_or("native vote pairing references required")?;
+    if votes["schema"] != "bapps-native-votes-v1"
+        || comparisons.is_empty()
+        || comparisons.len().checked_mul(2) != Some(keys.len())
+        || keys.len() != targets.len()
+        || refs.len() != targets.len()
+    {
+        return Err("native vote population differs".into());
+    }
+    let mut paired_refs = BTreeSet::new();
+    for (i, v) in comparisons.iter().enumerate() {
+        let fields: BTreeSet<_> = v
+            .as_object()
+            .ok_or("native vote object required")?
+            .keys()
+            .map(String::as_str)
+            .collect();
+        if fields
+            != ["source", "n_a", "n_b", "n_tie", "n", "p_a"]
+                .into_iter()
+                .collect()
+        {
+            return Err("native vote count fields required".into());
+        }
+        let na = v["n_a"]
+            .as_u64()
+            .ok_or("native integer vote count required")?;
+        let nb = v["n_b"]
+            .as_u64()
+            .ok_or("native integer vote count required")?;
+        let p = na as f64 / 2.;
+        if na.checked_add(nb) != Some(2)
+            || v["n_tie"].as_u64() != Some(0)
+            || v["n"].as_u64() != Some(2)
+            || v["p_a"].as_f64() != Some(p)
+        {
+            return Err("native two-vote count/probability binding differs".into());
+        }
+        let source = string(v, "source")?;
+        for (side, probability, row) in [("a", p, 2 * i), ("b", 1. - p, 2 * i + 1)] {
+            if keys[row]["source"] != source
+                || keys[row]["observation"] != format!("{source}:{side}")
+                || targets[row] != probability
+            {
+                return Err("native vote ordered key/target binding differs".into());
+            }
+        }
+        if keys[2 * i]["family"] != keys[2 * i + 1]["family"]
+            || refs[2 * i] != refs[2 * i + 1]
+            || !paired_refs.insert(refs[2 * i])
+        {
+            return Err("native vote pair family/reference differs".into());
+        }
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -639,6 +736,98 @@ mod tests {
         // Intentionally false table pin, and no parquet header. Admission must
         // still succeed here; payload verification is a distinct later phase.
         assert_eq!(f.call().unwrap().len(), 1);
+    }
+
+    fn vote_fixture() -> Fixture {
+        let mut f = Fixture::new();
+        let guard = f.root.join("guard.json");
+        std::fs::write(&guard, br#"{"schema":"dataset-family-guard-v1","protected_families":["reserved"],"inherited_leaks":0}"#).unwrap();
+        f.authority["schema"] = json!("subjective-training-authority-v2");
+        let c = &mut f.authority["cells"]["cell"];
+        c["formula_revision"] = json!(7);
+        c["read_ids"] = c["feature_ids"].clone();
+        c["family_guard_path"] = json!(guard);
+        c["family_guard_sha256"] = json!(hash(&guard).unwrap());
+        c["groups"][0]["name"] = json!("subjective_vote_bapps");
+        c["groups"][0]["train_weight"] = json!(1.);
+        for (i, k) in f.keys.as_array_mut().unwrap().iter_mut().enumerate() {
+            k["reference"] = k["source"].clone();
+            k["observation"] = json!(format!("s:{}", ["a", "b"][i]));
+        }
+        let keys = f.root.join("keys.json");
+        std::fs::write(&keys, serde_json::to_vec(&f.keys).unwrap()).unwrap();
+        let d = &mut f.declaration;
+        d["schema"] = json!("subjective-training-leg-v3");
+        d["formula_revision"] = json!(7);
+        d["nominal_weight"] = json!(0.5);
+        d["loss"] = json!("binomial-two-vote");
+        d["target_transform"] = json!("native-vote-probability");
+        d["native_role"] = json!("TRAIN");
+        d["collection"] = json!("bapps");
+        d["native_votes_per_pair"] = json!(2);
+        d["keys_path"] = json!(keys);
+        d["keys_sha256"] = json!(hash(&keys).unwrap());
+        d["native_votes_path"] = json!(f.root.join("votes.json"));
+        d["native_votes_sha256"] = json!("a".repeat(64));
+        f
+    }
+
+    #[test]
+    fn vote_metadata_admission_never_opens_response_payload_and_refuses_contract_drift() {
+        let mut f = vote_fixture();
+        // The response file deliberately does not exist during admission.
+        assert_eq!(f.call_named("subjective_vote_bapps", 1.).unwrap().len(), 1);
+        assert!(!f.root.join("votes.json").exists());
+        for (field, value) in [
+            ("loss", json!("hard-pair-preference")),
+            ("native_role", json!("EVAL")),
+            ("nominal_weight", json!(1.)),
+            ("collection", json!("pieapp")),
+            ("keys_sha256", json!("b".repeat(64))),
+        ] {
+            let old = f.declaration[field].clone();
+            f.declaration[field] = value;
+            assert!(
+                f.call_named("subjective_vote_bapps", 1.).is_err(),
+                "{field}"
+            );
+            f.declaration[field] = old;
+        }
+    }
+
+    #[test]
+    fn native_votes_bind_integer_counts_to_ordered_sides_targets_and_references() {
+        let mut f = vote_fixture();
+        let path = f.root.join("votes.json");
+        let base = json!({"schema":"bapps-native-votes-v1", "comparisons":[
+            {"source":"s", "n_a":1, "n_b":1, "n_tie":0, "n":2, "p_a":0.5}]});
+        let mut check = |votes: &Value, targets: &[f64], refs: &[u32]| {
+            std::fs::write(&path, serde_json::to_vec(votes).unwrap()).unwrap();
+            f.declaration["native_votes_sha256"] = json!(hash(&path).unwrap());
+            native_votes(&f.declaration, targets, Some(refs))
+        };
+        for na in 0..=2 {
+            let mut v = base.clone();
+            v["comparisons"][0]["n_a"] = json!(na);
+            v["comparisons"][0]["n_b"] = json!(2 - na);
+            v["comparisons"][0]["p_a"] = json!(f64::from(na) / 2.);
+            check(&v, &[f64::from(na) / 2., 1. - f64::from(na) / 2.], &[0, 0]).unwrap();
+        }
+        assert!(check(&base, &[1., 0.], &[0, 0]).is_err());
+        assert!(check(&base, &[0.5, 0.5], &[0, 1]).is_err());
+        for (field, value) in [
+            ("n_a", json!(0.5)),
+            ("n_a", json!(true)),
+            ("n_b", json!(0)),
+            ("n_tie", json!(1)),
+            ("n", json!(3)),
+            ("p_a", json!(1.)),
+            ("source", json!("different")),
+        ] {
+            let mut v = base.clone();
+            v["comparisons"][0][field] = value;
+            assert!(check(&v, &[0.5, 0.5], &[0, 0]).is_err(), "{field}");
+        }
     }
     #[test]
     fn subjective_native_rejects_roles_order_producer_and_leaks() {

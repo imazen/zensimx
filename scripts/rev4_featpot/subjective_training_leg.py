@@ -170,20 +170,34 @@ def admit_datasets(a, cell_id, groups, selected_ids):
     for r, d in pending:
         if not r.get("subjective"):
             continue
-        if (d.get("schema") != "subjective-training-leg-v2" or d.get("loss") not in
-                ("within-source-rank", "hard-pair-preference")
+        votes = d.get("schema") == "subjective-training-leg-v3"
+        legacy = (d.get("schema") == "subjective-training-leg-v2"
+                  and d.get("loss") in ("within-source-rank", "hard-pair-preference")
+                  and d.get("target_transform") == "orient-native-quality"
+                  and r["name"].startswith("subjective_rank_"))
+        vote_contract = (votes and d.get("loss") == "binomial-two-vote"
+                         and d.get("target_transform") == "native-vote-probability"
+                         and d.get("collection") == "bapps" and d.get("native_votes_per_pair") == 2
+                         and d.get("nominal_weight") == 0.5 and r["name"] == "subjective_vote_bapps"
+                         and d.get("keys_path") == r["keys_path"] and d.get("keys_sha256") == r["keys_sha256"])
+        if (not (legacy or vote_contract)
                 or not isinstance(d.get("nominal_weight"), (float, int))
                 or not math.isfinite(d["nominal_weight"]) or d["nominal_weight"] <= 0
                 or d.get("target_orientation") != "quality"
-                or d.get("target_transform") != "orient-native-quality"
                 or d.get("target_column") != "human_score" or d.get("formula_revision") != 7
                 or d.get("tier") != "v3" or d.get("feature_ids") != selected_ids
                 or d.get("selection") != "fixed-final-epoch" or d.get("native_role") != "TRAIN"
                 or d.get("producer_commit") != c["producer_commit"]
-                or not r["name"].startswith("subjective_rank_") or r["mode"] != "withinref,rank"
+                or r["mode"] != "withinref,rank"
                 or r["val_weight"] != 0 or r["train_weight"] <= 0
                 or d.get("table_sha256") != r["table_sha256"]):
             raise ValueError("dataset role/loss/producer/target binding differs")
+        if votes:
+            safe(d["native_votes_path"])
+            if (not isinstance(d.get("native_votes_sha256"), str)
+                    or len(d["native_votes_sha256"]) != 64
+                    or any(c not in "0123456789abcdef" for c in d["native_votes_sha256"])):
+                raise ValueError("native vote payload pin required")
         keys = document(r["keys_path"], r["keys_sha256"])
         if not keys or len(keys) != r["rows"] or d["rows"] != r["rows"]:
             raise ValueError("dataset ordered key count differs")
@@ -200,7 +214,7 @@ def admit_datasets(a, cell_id, groups, selected_ids):
             counts[k["source"]] = counts.get(k["source"], 0)+1
         if counts != r["source_counts"] or any(n < 2 for n in counts.values()):
             raise ValueError("dataset source population mismatch")
-        if d["loss"] == "hard-pair-preference" and any(n != 2 for n in counts.values()):
+        if (d["loss"] == "hard-pair-preference" or votes) and any(n != 2 for n in counts.values()):
             raise ValueError("hard preference requires exactly two sides per comparison")
         weight = d["nominal_weight"]/(sum(1-1/counts[k] for k in sorted(counts))/len(counts))
         if r["train_weight"] != weight:
@@ -216,6 +230,35 @@ def payloads(admitted, groups):
     for name,path,_,_,_ in groups:
         if name in admitted and sha(path) != admitted[name]["table_sha256"]:
             raise ValueError("subjective payload pin changed")
+        if name in admitted and admitted[name]["schema"] == "subjective-training-leg-v3":
+            import pyarrow.parquet as pq
+            d = admitted[name]
+            validate_native_votes(d, pq.read_table(path, columns=["human_score"])["human_score"].to_pylist())
+
+
+def validate_native_votes(declaration, targets):
+    """Payload phase only: bind native counts to both ordered TRAIN targets."""
+    d = declaration
+    votes = document(d["native_votes_path"], d["native_votes_sha256"])
+    keys = document(d["keys_path"], d["keys_sha256"])
+    comparisons = votes.get("comparisons", [])
+    if (votes.get("schema") != "bapps-native-votes-v1" or not comparisons
+            or len(comparisons)*2 != len(keys) or len(keys) != len(targets)):
+        raise ValueError("native vote population differs")
+    for i, v in enumerate(comparisons):
+        if set(v) != {"source", "n_a", "n_b", "n_tie", "n", "p_a"}:
+            raise ValueError("native vote count fields required")
+        if (any(type(v[k]) is not int for k in ("n_a", "n_b", "n_tie", "n"))
+                or min(v["n_a"], v["n_b"]) < 0 or v["n_a"]+v["n_b"] != 2
+                or v["n_tie"] != 0 or v["n"] != 2 or v["p_a"] != v["n_a"]/2):
+            raise ValueError("native two-vote count/probability binding differs")
+        for side, probability, row in (("a", v["p_a"], 2*i), ("b", 1-v["p_a"], 2*i+1)):
+            key = keys[row]
+            if (key["source"] != v["source"] or key["observation"] != v["source"]+":"+side
+                    or targets[row] != probability):
+                raise ValueError("native vote ordered key/target binding differs")
+        if keys[2*i]["family"] != keys[2*i+1]["family"]:
+            raise ValueError("native vote pair family differs")
 
 
 DATASET_FOLDS = {
@@ -315,6 +358,11 @@ def dataset_groups(root, groups, selected, route, seed_index, init_seed, sample_
         log_dataset_read(dest, Path(r["path"]), r["rows"], ["ref_basename", "human_score"], "derived-native-fit",
                          collection=r["collection"], table_sha256=r["table_sha256"],
                          manifest_sha256=r["manifest_sha256"])
+        d = document(str(r["path"])+".manifest.json", r["manifest_sha256"])
+        if d["schema"] == "subjective-training-leg-v3":
+            log_dataset_read(dest, d["native_votes_path"], r["rows"]//2,
+                             ["source", "n_a", "n_b", "n_tie", "n", "p_a"], "native-vote-counts",
+                             table_sha256=d["native_votes_sha256"])
     if not retained:
         return groups, None
     records = []
