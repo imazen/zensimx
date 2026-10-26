@@ -382,3 +382,22 @@ proved scope. Publishing still follows the repository's release authorization.
 
 Success is measured evidence for a useful product, not the number of fits,
 features, documents, tokens or human judgments collected.
+
+
+## October 26 — prospective sampler implementation findings
+
+The existing E29 explicit pair-list owner is not an ordering-only switch either.
+`sampling::list_draw` replaces both `Draw::Pair` and `Draw::SameRow` with a
+listed pair, so it changes accepted-step shares as well as pair exposure.
+Its CLI admission is explicitly limited to the E29 HDR research group.
+A matched-codec TRAIN comparison must get its own admission and preserve the
+registered group masses and collision policy; do not route it through the
+E29 flag or describe it as pure ordering. Reuse the sampling owner and the
+existing sample digest, with explicit tests of per-group exposure and unchanged
+legacy streams.
+
+The existing private `subjective_rank.rs` module already owns the separately
+admitted subjective tie behavior. A prospective vote likelihood belongs beside
+that loss handling, with native and Python admission agreeing on the declaration,
+probability/count binding and exact two-side grouping. Preserve the public
+trainer API and old arithmetic; retain the inference model and feature shape.
