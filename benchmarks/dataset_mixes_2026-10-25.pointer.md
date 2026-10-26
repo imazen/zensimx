@@ -143,3 +143,7 @@ Mw025 full seed0 has completed the registered120×50000/fixed119 fit. The finali
 Mw025-s0 is registered in the durable candidate registry, now19 entries. All19 bakes passed SHA256SUMS on the mounted tower mirror with dev doing checksum work. `CANDIDATE_REGISTRY_VERIFIED.json` SHA256 `20255999ae094ae034fbebed23a5ae59c70c23e42b0820a0c2cddc26ca36a42f`; prior local and mirror metadata and the ownership-error/retry logs are retained. Registry source a9a7d34997cc; mounted-copy recipe0153adc179e6. No tower compute or AIC2026 label read.
 
 The later [linked subset root and seven-fold authority](mlic_subsets_2026-10-26.pointer.md#linked-family-fold-authority) are outside the original123 cells. Their build/control evidence is linked into this study for materialized archival. Coordinator-owned Mlic64 jobs remain separate in `SCOPE_ACCOUNTING.json`. No subset fit was launched by this lane.
+
+## EVAL complete — 2026-10-26
+
+Both finalists have one frozen assessment on each feature bank;54 paired MOS comparisons per model are measured. BAPPS36,344 comparisons: Mlic0.6732583104, Mw0250.6685037429, Mdata0.67392417, M7 0.6617956205, B7 0.6392169278. No image unpack or peer recompute; peers await IMI. `EVAL_COMPLETE.json` SHA256 `c5db7b5929d172732110176f7f75f66b3a3db9862f9aed5a7faeab237ba1947e`. Full point/interval tables and limitations are in the experiment record. Numeric summary and final mirror follow.

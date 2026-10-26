@@ -4472,3 +4472,42 @@ CID:OA −0.014 (p 0.012), NITS −0.004 (p 0.040), the rest level; against Mdat
 −0.004 / −0.007 and VCL@FER −0.004 / −0.005 (the cost of leaving out the validate-only data), Colourlab +0.006 against
 Mdata, the rest level. Seed spread is large on NITS (seed 1 0.692, seed 2 0.732). BAPPS follows (reusing the lane's
 seed 0). EVAL changes neither the shape nor the data choice.
+
+### Final mix EVAL completion (2026-10-26)
+
+Both frozen seed0 candidates were scored once on the copied eleven-collection feature table and once on the separate BAPPS feature table. Corrected peers and Mdata predictions were reused; no image was unpacked or peer recomputed. Both paired reports contain54 measured MOS comparisons (nine collections × six baselines). No EVAL result changes the TRAIN selection.
+
+| BAPPS model | Soft agreement [95%] | Comparisons |
+|---|---:|---:|
+| Mlic | 0.673258310 [0.670479241, 0.676144688] | 36344 |
+| Mw025 | 0.668503743 [0.665523746, 0.671545098] | 36344 |
+| Mdata | 0.673924170 [0.671029194, 0.676816050] | 36344 |
+| M7 | 0.661795620 [0.658752271, 0.664907551] | 36344 |
+| B7 | 0.639216928 [0.636115728, 0.642518780] | 36344 |
+
+BAPPS peer metrics remain deferred to the owner’s IMI archive route. Mlic’s seed0 predictions are reused by the coordinator’s separate three-seed EVAL read: main TSV SHA256 `88953d92fd88c410802faa4281e6f629e9bf5cf43de413aa4d4a1d2c9689c07b`, BAPPS TSV SHA256 `b2264f9944df460c5c947f3d408de146eb2d51e1ca48cd08b8a8d7787d7ee8e0`. No second seed0 model evaluation is needed.
+
+| Collection | Mw025 minus | Delta SROCC [95%] | References |
+|---|---|---:|---:|
+| cid-iq | Mdata | -0.004487 [-0.010211, +0.000730] | 7 |
+| cid-iq | M7 | +0.004781 [-0.002786, +0.012065] | 7 |
+| cid-oa | Mdata | +0.017987 [-0.002640, +0.034435] | 7 |
+| cid-oa | M7 | -0.002949 [-0.008893, +0.002312] | 7 |
+| colourlab-rating-variability-2022 | Mdata | +0.001030 [-0.005308, +0.005740] | 3 |
+| colourlab-rating-variability-2022 | M7 | -0.000097 [-0.001420, +0.002865] | 3 |
+| iqa-odi | Mdata | +0.006839 [-0.003477, +0.024908] | 42 |
+| iqa-odi | M7 | +0.004776 [-0.013952, +0.023866] | 42 |
+| irccyn-ivc | Mdata | +0.003030 [-0.004452, +0.006542] | 4 |
+| irccyn-ivc | M7 | +0.001473 [-0.001902, +0.010006] | 4 |
+| live-md | Mdata | -0.003932 [-0.009445, +0.001779] | 12 |
+| live-md | M7 | -0.003226 [-0.007217, +0.001002] | 12 |
+| mdid | Mdata | -0.014768 [-0.028696, -0.005127] | 6 |
+| mdid | M7 | -0.006579 [-0.011627, -0.002086] | 6 |
+| nits-iqa | Mdata | -0.011931 [-0.019184, -0.006314] | 9 |
+| nits-iqa | M7 | -0.001288 [-0.002621, +0.001194] | 9 |
+| vcl-fer | Mdata | -0.007387 [-0.015144, -0.000064] | 8 |
+| vcl-fer | M7 | -0.000899 [-0.002579, +0.000433] | 8 |
+
+Intervals remain descriptive for the small reference cohorts. Mw025 has negative intervals against Mdata on MDID, NITS and VCL and against M7 on MDID. Its recovered old-data TRAIN mean is not a uniform new-data EVAL gain.
+
+The complete owner command exited0 in40:00.00; `/usr/bin/time -v` maximum RSS1,738,980KiB. It ran inside the existing42GiB/no-swap scope with two native statistics threads. The measured RSS is for the owner process tree, not all separately joined coordinator work. `EVAL_COMPLETE.json` SHA256 `c5db7b5929d172732110176f7f75f66b3a3db9862f9aed5a7faeab237ba1947e`. Coordinator AIC public_train aggregate results were exposed during a post-freeze document merge; `POST_FREEZE_AGGREGATE_EXPOSURE.json` records that no raw AIC target table was opened by this lane and no selection or tuning followed.
