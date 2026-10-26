@@ -597,13 +597,21 @@ adam-denormal-tests:
     cargo test --release --locked --manifest-path tools/adam-denormal-probe/Cargo.toml
 
 adam-denormal-clippy:
-    cargo clippy --release --locked --manifest-path tools/adam-denormal-probe/Cargo.toml -- -D warnings
+    cargo clippy --release --locked --manifest-path tools/adam-denormal-probe/Cargo.toml --all-targets -- -D warnings
 
 adam-denormal-probe kernel="fused" state="decay" steps="2000" tier="v3":
     tools/adam-denormal-probe/target/release/adam-denormal-probe {{quote(kernel)}} {{quote(state)}} {{steps}} {{quote(tier)}}
 
 adam-denormal-cell argv trainer output events:
     python3 scripts/byconstruction/adam_denormal_cell.py --argv-json {{quote(argv)}} --trainer {{quote(trainer)}} --out {{quote(output)}} --events {{quote(events)}}
+
+adam-denormal-trainer-tests:
+    cargo test --locked -p zensim-validate --lib adam_simd
+    cargo test --locked -p zensim-validate --lib l2_row_form
+    cargo test --locked -p zensim-validate --test adam_simd_equivalence --test adam_simd_rsqrt_precision
+
+adam-denormal-counters pid output events seconds="10":
+    perf stat -o {{quote(output)}} -e {{quote(events)}} -p {{pid}} -- sleep {{seconds}}
 
 addrfix-cost-report binary:
     python3 scripts/rev4_featpot/addrfix.py cost-report --binary {{quote(binary)}}

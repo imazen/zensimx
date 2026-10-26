@@ -81,3 +81,34 @@ under the task's scratch directory. Full-cell before/after timing, complete
 artifact byte comparisons, AVX-512/NEON execution and final workspace lint are
 still pending. A fresh isolated full baseline is running on i134; a corrected
 full replay is running on i265. Frozen study binaries remain unchanged.
+
+## Repeated first-moment underflow from a normal gradient
+
+The L2-only repair's real-cell profile still attributed all 262 assist samples
+to the first-moment FMA. A separate ten-second sample measured 52,331,398 assists.
+That incomplete replay is preserved as a diagnostic, not a complete fit.
+
+`tiny-moment` starts w=1e-302, zero moments and L2 scale 1e-5. The gradient is
+normal, but `(1-beta1)*g` is subnormal. With zero m, every first-moment FMA
+underflows and its flushed output stays zero, so clearing stored moments alone
+cannot stop the repeated assists. For the same 2,000 steps / 104,960 parameters:
+
+| First-moment behavior | Elapsed seconds | User seconds | FP assists |
+|---|---:|---:|---:|
+| Compute then flush | 1.930437168 | 1.927052000 | 52,487,710 |
+| Bypass guaranteed flushed zero | 0.395777772 | 0.338942000 | 0 |
+
+The bypass requires m=0, a nonzero gradient, and a conservative magnitude
+bound derived from the actual `(1-beta1)` coefficient. It selects the same
+signed zero that a subnormal result would flush to. Adjacent-value and signed
+zero tests compare it against the independently rounded FMA. Nonpositive or
+nonfinite coefficients retain the original arithmetic. L2 scales above one
+likewise retain products that can turn a subnormal weight into a normal result.
+
+The corrected real-cell diagnostic sample on i265 reports 53,693,626,562 cycles,
+119,215,927,819 instructions and 636,657 assists in 10.002780896 s. It is not an
+epoch-matched speed comparison. Native NEON decay, boundary, fused/unfused and
+dispatch checks pass, as does strict all-target probe Clippy on ARM. Resource
+record: `run-heavy: done rc=0 20s | peak-RSS 0.37GiB | min-avail 26854MiB | peak-load 6.57`.
+The full i134 baseline, corrected i265 replay, queued dev verification and
+complete byte comparisons remain in progress.

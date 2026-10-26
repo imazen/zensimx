@@ -13,7 +13,7 @@ fn main() {
     assert_eq!(
         argv.len(),
         5,
-        "usage: probe fused|unfused normal|decay|tiny-l2|subnormal-weight STEPS v3|scalar|native"
+        "usage: probe fused|unfused normal|decay|tiny-l2|tiny-moment|subnormal-weight STEPS v3|scalar|native"
     );
     let steps: usize = argv[3].parse().unwrap();
     let _guard = archmage::testing::lock_token_testing();
@@ -31,6 +31,7 @@ fn main() {
     let mut w = vec![
         match argv[2].as_str() {
             "tiny-l2" => 1e-304,
+            "tiny-moment" => 1e-302,
             "subnormal-weight" => 1e-310,
             _ => 0.5,
         };
@@ -40,7 +41,7 @@ fn main() {
     let initial = match argv[2].as_str() {
         "normal" => 0.01,
         "decay" => f64::MIN_POSITIVE * 2.0,
-        "tiny-l2" | "subnormal-weight" => 0.0,
+        "tiny-l2" | "tiny-moment" | "subnormal-weight" => 0.0,
         _ => panic!("unknown state"),
     };
     let mut m = vec![initial; n];
@@ -59,7 +60,10 @@ fn main() {
                 dha: &dh,
                 dhb: &dh,
                 n_hidden: 128,
-                l2_scale: if matches!(argv[2].as_str(), "tiny-l2" | "subnormal-weight") {
+                l2_scale: if matches!(
+                    argv[2].as_str(),
+                    "tiny-l2" | "tiny-moment" | "subnormal-weight"
+                ) {
                     1e-5
                 } else {
                     0.0
