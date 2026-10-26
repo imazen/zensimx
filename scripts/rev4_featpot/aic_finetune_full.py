@@ -13,6 +13,8 @@ from pathlib import Path
 import subprocess
 import sys
 import traceback
+import threading
+from datetime import datetime, timezone
 
 HERE = Path(__file__).resolve().parent
 STRENGTHS = {"MlicFT8x4": (4, 8.0), "MlicFT16x8": (8, 16.0)}
@@ -59,6 +61,40 @@ def main():
     parser.add_argument("--folds", required=True, type=Path)
     parser.add_argument("--jobs", type=int, choices=(1, 2), default=2)
     args = parser.parse_args()
+    from aic_finetune_status import status
+    study = args.study.resolve()
+    def update(path, value):
+        temporary = path.with_suffix(path.suffix + ".new")
+        temporary.write_text(json.dumps(value, indent=2, allow_nan=False) + "\n")
+        temporary.replace(path)
+    def state(stage):
+        update(study / "FULL_RUN_STATE.json", dict(stage=stage, pid=os.getpid(),
+            utc=datetime.now(timezone.utc).isoformat(), runner_sha256=sha(Path(__file__))))
+    stop = threading.Event()
+    def progress():
+        while not stop.wait(15):
+            update(study / "PROGRESS.json", status(study))
+    monitor = threading.Thread(target=progress, daemon=True)
+    try:
+        state("full-data-continuation")
+        update(study / "PROGRESS.json", status(study))
+        monitor.start()
+        result = run(args)
+        state("full-data-certified" if result == 0 else "full-data-failed")
+        return result
+    except BaseException as error:
+        update(study / "FULL_LAUNCH_FAILED.json", dict(error=str(error),
+            traceback=traceback.format_exc(), utc=datetime.now(timezone.utc).isoformat(), pid=os.getpid()))
+        state("full-data-failed")
+        raise
+    finally:
+        stop.set()
+        if monitor.is_alive():
+            monitor.join()
+        update(study / "PROGRESS.json", status(study))
+
+
+def run(args):
     study = args.study.resolve()
     frozen = json.loads((study / "BIN_FROZEN.json").read_text())
     packet = json.loads(args.packet.read_text())

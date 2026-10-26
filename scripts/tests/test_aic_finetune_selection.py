@@ -10,6 +10,9 @@ MODULE = Path(__file__).resolve().parents[1] / "rev4_featpot/aic_finetune_full.p
 SPEC = importlib.util.spec_from_file_location("aic_finetune_full", MODULE)
 FULL = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(FULL)
+STATUS_SPEC = importlib.util.spec_from_file_location("aic_finetune_status", MODULE.with_name("aic_finetune_status.py"))
+STATUS = importlib.util.module_from_spec(STATUS_SPEC)
+STATUS_SPEC.loader.exec_module(STATUS)
 
 
 class FrozenSelection(unittest.TestCase):
@@ -52,6 +55,43 @@ class FrozenSelection(unittest.TestCase):
         (self.root / "E21.json").write_text("{}")
         with self.assertRaisesRegex(ValueError, "evidence pin"):
             FULL.selected_arm(self.root)
+
+
+class FullProgress(unittest.TestCase):
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name)
+        (self.root / "FULL_RUN_STATE.json").write_text(json.dumps(dict(stage="full-data-continuation", pid=-1)))
+        (self.root / "EVALUATION_COMPLETE.json").write_text("{}")
+        for arm in FULL.STRENGTHS:
+            for cell in range(12):
+                directory = self.root / "cells" / arm / f"without_test_s{cell}"
+                directory.mkdir(parents=True)
+                (directory / "byc_record.json").write_text("{}")
+
+    def test_completed_train_does_not_hide_a_dead_full_worker(self):
+        value = STATUS.status(self.root)
+        self.assertEqual(value["completed_cells"], 24)
+        self.assertEqual(value["full"]["complete"], 0)
+        self.assertEqual(value["status"], "not-running")
+
+    def test_all_full_receipts_required_and_failure_takes_precedence(self):
+        (self.root / "FULL_COMPLETE.json").write_text("{}")
+        for seed in range(3):
+            directory = self.root / "full/MlicFT16x8" / f"full_s{seed}"
+            directory.mkdir(parents=True)
+            if seed < 2:
+                (directory / "FULL_CELL_VERIFIED.json").write_text("{}")
+        self.assertEqual(STATUS.status(self.root)["status"], "not-running")
+        (directory / "FULL_CELL_VERIFIED.json").write_text("{}")
+        self.assertEqual(STATUS.status(self.root)["status"], "full-data-certified")
+        (self.root / "full/MlicFT16x8/FULL_FAILED.json").write_text('{"error":"failed"}')
+        self.assertEqual(STATUS.status(self.root)["status"], "failed")
+
+    def test_preflight_failure_is_visible_before_output_directory_exists(self):
+        (self.root / "FULL_LAUNCH_FAILED.json").write_text('{"error":"bad pin"}')
+        self.assertEqual(STATUS.status(self.root)["status"], "failed")
 
 
 if __name__ == "__main__":

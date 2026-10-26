@@ -16,6 +16,9 @@ def epoch(path):
 
 def status(study):
     state = json.loads((study / "RUN_STATE.json").read_text()) if (study / "RUN_STATE.json").is_file() else {"stage": "queued"}
+    full_state = study / "FULL_RUN_STATE.json"
+    if full_state.is_file():
+        state.update(json.loads(full_state.read_text()))
     result = {key: value for key, value in state.items() if key != "command"}
     result["checked_utc"] = datetime.now(timezone.utc).isoformat()
     result["study"] = str(study.resolve())
@@ -54,6 +57,19 @@ def status(study):
         (study / "EVALUATION_COMPLETE.json").is_file() and completed == 24 else
         "running" if result["worker_alive"] else "training-complete" if
         (study / "TRAIN_COMPLETE.json").is_file() and completed == 24 else "not-running")
+    if full_state.is_file():
+        cells = [p for p in (study / "full").glob("*/full_s*") if p.is_dir()]
+        failures = list((study / "full").glob("*/FULL_FAILED.json"))
+        if (study / "FULL_LAUNCH_FAILED.json").is_file():
+            failures.append(study / "FULL_LAUNCH_FAILED.json")
+        result["full"] = dict(complete=sum((p / "FULL_CELL_VERIFIED.json").is_file() for p in cells),
+            required=3, active={str(p.relative_to(study / "full")): epoch(p / "train.log")
+                for p in cells if not (p / "FULL_CELL_VERIFIED.json").is_file()},
+            failures={str(p.relative_to(study)): json.loads(p.read_text()) for p in failures})
+        result["status"] = ("failed" if failed or failures else "full-data-certified" if
+            (study / "FULL_COMPLETE.json").is_file() and result["full"]["complete"] == 3 else
+            "no-finalist" if (study / "NO_FINALIST.json").is_file() else
+            "running" if result["worker_alive"] else "not-running")
     return result
 
 
