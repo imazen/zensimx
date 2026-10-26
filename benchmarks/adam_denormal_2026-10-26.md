@@ -504,3 +504,32 @@ preserved alongside the stronger native component audit.
 Strict inspector Clippy/build and real four-bake audit pass:
 `run-heavy: done rc=0 2s | peak-RSS 0.22GiB | min-avail 24602MiB | peak-load 0.63`,
 `run-heavy: done rc=0 3s | peak-RSS 0.03GiB | min-avail 24038MiB | peak-load 0.82`.
+
+## Select the store-preserving implementation from full controls
+
+The later classification rewrite takes 2219.341859097 s on quiet dev
+(2215.765289000 user, 0.688849000 system), 11,713,795,668,350 cycles,
+32,880,700,111,900 instructions and 5,160 AMD FP dispatch faults. Maximum RSS
+is 2,131,140 KiB, swaps zero, trainer exit zero.
+`run-heavy: done rc=0 2222s | peak-RSS 0.03GiB | min-avail 35117MiB | peak-load 7.53`.
+It is slower than the preceding store-preserving implementation on both
+completed full controls. The normal-L2 microbenchmark is insufficient evidence
+to retain that rewrite. Restore the exact store-preserving kernel from
+`fb315e7c7ebe`; preserve all later experiment artifacts and comparisons.
+
+Selected kernel SHA-256:
+`4dc9e41f303cd021950936484d7e1a81f537f9282e5301394b6eb13edd06b91e`.
+Selected preserved trainer:
+`c82bdf978fe05c99f8e0d1a7f8788b15408def271d2145e86c2c3e1325a5e44b`.
+The arithmetic tag remains `adam-f64-normal-moments-v1`; the removed rewrite
+did not change model numeric bits in the registered control. Canonical current
+workspace Clippy, the existing Adam/L2/rsqrt tests and strict probe checks pass
+after restoration, with unchanged expectations:
+`run-heavy: done rc=0 23s | peak-RSS 0.72GiB | min-avail 23580MiB | peak-load 2.38`.
+
+For the closing dev pair, freeze the complete input root and its auxiliary
+manifests before either timing, under the same heavy-lock/resource scope. Use
+the checksum-recorded wrapper snapshot for the entire pair. The i134 baseline
+already uses owned input and coverage snapshots; its after phase selects this
+same preserved trainer and native test binary. Those closing full measurements
+are recorded separately, rather than inferred from the microbenchmarks.

@@ -695,6 +695,18 @@ adam-denormal-docker plan phase output:
 adam-denormal-quiet-pair plan tests before after:
     env TMPDIR="$HOME/tmp" flock "$HOME/tmp/heavy.lock" "${ADAM_RUN_HEAVY:-$HOME/work/zen/scripts/run-heavy}" --mem 12G --jobs 1 -- just adam-denormal-pair-held {{quote(plan)}} {{quote(tests)}} {{quote(before)}} {{quote(after)}}
 
+# Freeze auxiliary manifests too: the trainer resolves them again at emission.
+adam-denormal-quiet-frozen-pair source root plan tests before after:
+    env TMPDIR="$HOME/tmp" flock "$HOME/tmp/heavy.lock" "${ADAM_RUN_HEAVY:-$HOME/work/zen/scripts/run-heavy}" --mem 12G --jobs 1 -- just adam-denormal-freeze-pair-held {{quote(source)}} {{quote(root)}} {{quote(plan)}} {{quote(tests)}} {{quote(before)}} {{quote(after)}}
+
+adam-denormal-freeze-pair-held source root plan tests before after:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    test ! -e {{quote(root)}}
+    mkdir -p {{quote(root)}}
+    rsync -rL --checksum {{quote(source)}}/ {{quote(root)}}/
+    just adam-denormal-pair-held {{quote(plan)}} {{quote(tests)}} {{quote(before)}} {{quote(after)}}
+
 # Reuse a completed quiet baseline when testing a new preserved successor.
 adam-denormal-quiet-cell plan phase output:
     env TMPDIR="$HOME/tmp" flock "$HOME/tmp/heavy.lock" "${ADAM_RUN_HEAVY:-$HOME/work/zen/scripts/run-heavy}" --mem 12G --jobs 1 -- just adam-denormal-cell-held {{quote(plan)}} {{quote(phase)}} {{quote(output)}}
