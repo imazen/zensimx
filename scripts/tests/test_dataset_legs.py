@@ -53,6 +53,67 @@ class DatasetAuthority(unittest.TestCase):
             f.admit()
 
 
+class EffectiveSampleMasses(unittest.TestCase):
+    def populations(self):
+        return dict(pipal=(23200,200), mdid=(800,10), **{
+            "live-md":(210,7), "cid-iq":(330,11), "cid-oa":(143,11),
+            "irccyn-ivc":(105,5), "colourlab-rating-variability-2022":(320,5),
+            "bapps":(223068,111363)})
+
+    def test_proposed_design_effect_preserves_total_and_unknown_parent_mass(self):
+        masses = root.effective_sample_masses(self.populations())
+        self.assertAlmostEqual(sum(v["nominal_weight"] for v in masses.values()), 4.)
+        self.assertEqual(masses["bapps"]["nominal_weight"], 0.5)
+        self.assertIsNone(masses["bapps"]["effective_samples"])
+        self.assertAlmostEqual(masses["live-md"]["effective_samples"], 210/10.57)
+        self.assertAlmostEqual(masses["irccyn-ivc"]["effective_samples"], 105/7.6)
+        self.assertGreater(masses["pipal"]["nominal_weight"], masses["mdid"]["nominal_weight"])
+        invalid = self.populations()
+        invalid["vcl-fer"] = (10,2)
+        with self.assertRaisesRegex(ValueError, "eight Mlic"):
+            root.effective_sample_masses(invalid)
+
+    def test_root_clone_preserves_payloads_and_coalesces_ranking_groups_by_family(self):
+        with tempfile.TemporaryDirectory() as directory:
+            source, out = Path(directory)/"source", Path(directory)/"out"
+            (source/"datasets").mkdir(parents=True)
+            (source/"wide/main/real").mkdir(parents=True)
+            receipt = source/"wide/main/real/receipt.json"
+            receipt.write_text(json.dumps(dict(admission_view=dict(immutable_input_roots=[str(source)]))))
+            groups = []
+            for collection in self.populations():
+                path = source/f"datasets/{collection}.parquet"
+                path.write_bytes(b"opaque-frozen-payload-no-label-parser")
+                keys = path.with_suffix(".keys.json")
+                rows = [dict(row=i,source=f"group-{i//2}",family="one-image",role="fit",tier="T2")
+                        for i in range(4)]
+                keys.write_text(json.dumps(rows))
+                dp = Path(str(path)+".manifest.json")
+                dp.write_text(json.dumps(dict(nominal_weight=.5,native_role="TRAIN",admission_root=str(source))))
+                groups.append(dict(collection=collection,path=str(path),keys_path=str(keys),rows=4,
+                                   source_counts={"group-0":2,"group-1":2},train_weight=1.,
+                                   table_sha256=root.sha(path),keys_sha256=root.sha(keys),manifest_sha256=root.sha(dp)))
+            packet = source/"datasets/receipt.json"
+            packet.write_text(json.dumps(dict(groups=groups)))
+            auxiliary = {str(p.relative_to(source)):root.sha(p) for p in source.rglob("*") if p.is_file()}
+            frozen = source/"wide/frozen.json"
+            frozen.write_text(json.dumps(dict(dataset_legs_sha256=root.sha(packet),auxiliary_files=auxiliary)))
+            original = {str(p.relative_to(source)):p.read_bytes() for p in source.rglob("*") if p.is_file()}
+            policy = root.reweight_dataset_root(source,out)
+            self.assertEqual(policy["collections"]["live-md"]["families"],1)
+            for rel, payload in original.items():
+                self.assertEqual((source/rel).read_bytes(),payload)
+            for group in json.loads((out/"datasets/receipt.json").read_text())["groups"]:
+                self.assertEqual(root.sha(group["path"]),group["table_sha256"])
+                self.assertEqual(root.sha(group["keys_path"]),group["keys_sha256"])
+                self.assertTrue(Path(group["path"]).is_relative_to(out))
+            # Drift must refuse before creating a destination; never repair an input pin.
+            Path(groups[0]["path"]).write_bytes(b"drift")
+            with self.assertRaisesRegex(ValueError, "changed"):
+                root.reweight_dataset_root(source,Path(directory)/"refused")
+            self.assertFalse((Path(directory)/"refused").exists())
+
+
 class DatasetHoldouts(unittest.TestCase):
     def test_e21_family_lookup_binds_full_keys_and_native_reference_hashes(self):
         with tempfile.TemporaryDirectory() as d:

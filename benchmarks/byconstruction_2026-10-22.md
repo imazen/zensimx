@@ -4625,3 +4625,63 @@ Only a qualifying winner receives three full-data continuations from Mlic's
 three unpacked full-data seeds, with all public_train rows in the AIC leg.
 Pack and certify those final bakes, register their hashes, and mirror them.
 The coordinator owns subsequent product gates and the single EVAL assessment.
+
+
+### Effective-sample collection masses: prospective TRAIN registration (2026-10-26)
+
+Registered before any MlicNeff fit or candidate statistic. The hypothesis comes
+from zenpapers `docs/mlic-recipe-review-2026-10-26.md` at `4e81c03a`, using the
+design effect in `docs/composite-jnd-dataset.md` at the same revision. It does
+not come from the completed AIC continuation's EVAL residuals. Those EVAL
+populations are exposed and cannot become fresh selectors for this experiment.
+
+**One changed factor:** collection mass. Keep the Mlic root `a7fd4af0…`, all
+row payloads, family protections, target orientation, memberships, seven
+holdout assignments, Rev7 features, M shape (`mono:thr:mp32`), 120 epochs of
+50,000 pairs, fixed final epoch 119 and seeds 0–2. Use the original frozen
+trainer SHA256 `acfb2a9f24fd7a294f027b552b19eef1b9b4d707cbdf5e0bdf22ef328db3fe28`
+and companion binaries from the completed mix study. This is a derived mass
+view of admitted Mlic data, not a new admission or use of its old confidence
+manifest to admit another collection. No AIC leg is added in this experiment.
+
+For each of the seven MOS collections, count rows N and distinct source-image
+families G from the frozen label-free keys. Fix rho=0.33 and compute
+`N_eff = N / (1 + (N/G - 1)*rho)`, exactly the review's mean-cluster design-effect
+approximation. Rho is a hypothesis transferred from threshold data, not a
+measured correlation for these seven datasets. IRCCyN has unequal family
+sizes; this registration does not substitute another effective-size formula.
+Use nominal mass `3.5*sqrt(N_eff)/sum_MOS(sqrt(N_eff))`. BAPPS keeps 0.5:
+its independent parent-photo count is unresolved, so pair groups and patch
+identities must not be substituted for photos. Total new-data mass remains
+4.0. Preserve the existing within-reference acceptance correction separately.
+LIVE-MD has seven image families but fourteen ranking groups; IRCCyN has five
+families but seven groups. Neither grouping or pair ordering changes.
+
+**Paired control and decision:** first reproduce Mlic's KADID seed-0 cell with
+the frozen binary and require byte-identical held-out predictions. Then fit
+MlicNeff's 21 cells: the four E21 omissions plus pipal, pairs and mos7, each
+with seeds 0–2. Compare against the completed corresponding 21 Mlic cells.
+Use the existing balanced score: half the equal mean of the four E21 SROCCs
+mapped by `(rho+1)/2`, half the equal mean of eleven held-out TRAIN collection
+statistics (MOS mapped similarly, pair accuracy unchanged). The three
+validate-only new collections remain omitted from every fit.
+
+Advance MlicNeff to full-data qualification only if its paired balanced mean
+strictly exceeds Mlic's, its paired old-data mean delta is at least minus two
+seed-unit standard errors, and every candidate cell has zero global-edit
+mixture inversions under the existing inventory and tolerance. Compute seed
+SE as sample SD of the three paired seed means divided by sqrt(3). Exact
+balanced ties retain Mlic. Preserve every existing production gate; this
+screen grants no release/default change. Report per-collection results,
+standard-mixture inversions, knob-concurring inversions, type-bias SD, Z-RMSE
+and error p99 through their existing owners. Do not choose checkpoints,
+weights or variants from these diagnostics or exposed EVAL.
+
+A qualifying candidate gets three full-data fits and the existing label-free,
+steering, numerical and runtime qualification against exact model identities.
+Runtime comparisons use permitted hardware, with no benchmarks on dev and no
+use of r7900x. If the screen fails, retain Mlic and proceed to the separately
+registered vote-loss or ordering proposal; a negative result is not task
+completion. The seamless HDR frontend remains queued behind adoption of a
+stable, qualified candidate. All artifacts live in the separate
+`/mnt/v/output/zensim/mlic-neff-20261026/` study; original studies stay frozen.

@@ -40,6 +40,7 @@ import collections
 import csv
 import hashlib
 import json
+import math
 import os
 import shutil
 import subprocess
@@ -608,6 +609,125 @@ def cmd_mix_licence(a):
         path.write_text(json.dumps(old, indent=1)+"\n")
     (study/"MLIC_ROOT.json").write_text(json.dumps(record, indent=1)+"\n")
     print(json.dumps(record))
+    return 0
+
+
+def effective_sample_masses(populations):
+    """Prospective MlicNeff policy: image families, not pair/ranking groups.
+
+    Use the zenpapers mean-cluster design effect exactly as proposed. The
+    fixed rho is a hypothesis, not an estimate from these collections. BAPPS
+    lacks a parent-photo mapping and retains its original nominal mass.
+    """
+    expected = (set(DATASET_MOS) - {"vcl-fer"}) | {"bapps"}
+    if set(populations) != expected:
+        raise ValueError("effective-sample policy requires the eight Mlic collections")
+    result = {}
+    for collection, (rows, families) in populations.items():
+        if not isinstance(rows, int) or not isinstance(families, int) or not 0 < families <= rows:
+            raise ValueError("positive row and family counts required")
+        if collection == "bapps":
+            result[collection] = dict(rows=rows, effective_samples=None, nominal_weight=0.5,
+                                      reason="parent-photo count unavailable; preserve original mass")
+        else:
+            neff = rows / (1 + (rows/families - 1)*0.33)
+            result[collection] = dict(rows=rows, families=families, effective_samples=neff)
+    denominator = sum(math.sqrt(v["effective_samples"]) for v in result.values()
+                      if v["effective_samples"] is not None)
+    for value in result.values():
+        if value["effective_samples"] is not None:
+            value["nominal_weight"] = 3.5*math.sqrt(value["effective_samples"])/denominator
+    return result
+
+
+def reweight_dataset_root(source, out):
+    """Clone pinned payloads, changing only mass and required receipt bindings."""
+    if out.exists():
+        raise ValueError("reweighted destination must be fresh")
+    frozen = json.loads((source/"wide/frozen.json").read_text())
+    packet_path = source/"datasets/receipt.json"
+    if sha(packet_path) != frozen["dataset_legs_sha256"]:
+        raise ValueError("dataset receipt changed")
+    for rel, pin in frozen["auxiliary_files"].items():
+        if sha(source/rel) != pin:
+            raise ValueError(f"frozen auxiliary changed: {rel}")
+    packet = json.loads(packet_path.read_text())
+    populations, declarations = {}, {}
+    for group in packet["groups"]:
+        collection = group["collection"]
+        if collection in populations:
+            raise ValueError("duplicate Mlic collection")
+        path, keys = Path(group["path"]), Path(group["keys_path"])
+        path.relative_to(source)
+        keys.relative_to(source)
+        declaration_path = Path(str(path)+".manifest.json")
+        if (sha(path) != group["table_sha256"] or sha(keys) != group["keys_sha256"]
+                or sha(declaration_path) != group["manifest_sha256"]):
+            raise ValueError("dataset payload or declaration changed")
+        declaration = json.loads(declaration_path.read_text())
+        if declaration["nominal_weight"] != 0.5 or declaration["native_role"] != "TRAIN":
+            raise ValueError("expected original Mlic TRAIN mass")
+        rows = json.loads(keys.read_text())  # label-free identities only
+        counts = collections.Counter(r["source"] for r in rows)
+        if (len(rows) != group["rows"] or dict(counts) != group["source_counts"]
+                or any(r["role"] != "fit" or r["tier"] != "T2" for r in rows)):
+            raise ValueError("dataset identity population changed")
+        populations[collection] = (len(rows), len({r["family"] for r in rows}))
+        declarations[collection] = declaration
+    masses = effective_sample_masses(populations)
+    # Copy instead of hardlinking: updating a declaration must never mutate its parent.
+    shutil.copytree(source, out)
+    source_pin = sha(source/"wide/frozen.json")
+    policy = dict(schema="mlic-effective-sample-masses-v1", rho=0.33,
+                  formula="N_eff = N / (1 + (N/families - 1) * rho)",
+                  source_root=str(source), source_frozen_sha256=source_pin,
+                  total_nominal_mass=4.0, collections=masses,
+                  new_label_values_read=False, source_payloads_unchanged=True)
+    policy_path = out/"datasets/EFFECTIVE_SAMPLE_MASSES.json"
+    policy_path.write_text(json.dumps(policy, indent=1)+"\n")
+    for group in packet["groups"]:
+        path = out/Path(group["path"]).relative_to(source)
+        keys = out/Path(group["keys_path"]).relative_to(source)
+        declaration = declarations[group["collection"]]
+        weight = masses[group["collection"]]["nominal_weight"]
+        declaration.update(nominal_weight=weight, admission_root=str(out))
+        dp = Path(str(path)+".manifest.json")
+        dp.write_text(json.dumps(declaration, indent=1)+"\n")
+        counts = group["source_counts"]
+        correction = sum(1-1/counts[k] for k in sorted(counts))/len(counts)
+        group.update(path=str(path), keys_path=str(keys), train_weight=weight/correction,
+                     manifest_sha256=sha(dp))
+        if sha(path) != group["table_sha256"] or sha(keys) != group["keys_sha256"]:
+            raise ValueError("cloned payload differs")
+    packet.update(source_frozen_sha256=source_pin, effective_sample_policy_sha256=sha(policy_path))
+    pp = out/"datasets/receipt.json"
+    pp.write_text(json.dumps(packet, indent=1)+"\n")
+    receipt_path = out/"wide/main/real/receipt.json"
+    receipt = json.loads(receipt_path.read_text())
+    view = receipt["admission_view"]
+    view["immutable_input_roots"] = list(dict.fromkeys(
+        [*view["immutable_input_roots"], str(source), str(out)]))
+    receipt_path.write_text(json.dumps(receipt, indent=1)+"\n")
+    frozen.update(admission_view=view, wide_receipts={"main/real":sha(receipt_path)},
+                  dataset_legs_sha256=sha(pp))
+    frozen["auxiliary_files"] = {rel:sha(out/rel) for rel in frozen["auxiliary_files"]}
+    frozen["auxiliary_files"]["datasets/EFFECTIVE_SAMPLE_MASSES.json"] = sha(policy_path)
+    (out/"wide/frozen.json").write_text(json.dumps(frozen, indent=1)+"\n")
+    # Every non-metadata file, including inherited tables and row keys, stays exact.
+    changed = {"wide/frozen.json", "wide/main/real/receipt.json", "datasets/receipt.json"}
+    changed.update(str(Path(g["path"]).relative_to(out))+".manifest.json" for g in packet["groups"])
+    for path in source.rglob("*"):
+        if path.is_file() and str(path.relative_to(source)) not in changed:
+            if sha(path) != sha(out/path.relative_to(source)):
+                raise ValueError(f"inherited payload changed: {path}")
+    return policy
+
+
+def cmd_dataset_neff(a):
+    source, out = Path(a.root), Path(a.out)
+    if sha(source/"wide/frozen.json") != "a7fd4af0c2bb5a8981be636e5c1cb1a51db57496b7c60d7bf6da01d71dd16952":
+        raise ValueError("effective-sample comparison requires frozen Mlic root")
+    print(json.dumps(reweight_dataset_root(source, out), indent=1))
     return 0
 
 
@@ -1339,6 +1459,10 @@ def main() -> int:
     ml.add_argument("--study", required=True)
     ml.add_argument("--confidence", default="/mnt/tower/output/zenpapers/training-confidence-2026-10-25")
     ml.set_defaults(fn=cmd_mix_licence)
+    neff = sub.add_parser("dataset-neff", help="frozen Mlic payloads with prospective effective-sample masses")
+    neff.add_argument("--root", required=True)
+    neff.add_argument("--out", required=True)
+    neff.set_defaults(fn=cmd_dataset_neff)
     dr = sub.add_parser("dataset-report")
     dr.add_argument("--root", required=True)
     dr.add_argument("--out", required=True)
