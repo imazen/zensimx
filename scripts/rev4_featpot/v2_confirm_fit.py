@@ -16,10 +16,7 @@ evaluated on the within-reference permuted confirmatory columns (built label-fre
 import argparse
 import json
 import os
-import sys
 from pathlib import Path
-
-import numpy as np
 
 from v2_common import (load_frozen, recipe_of, EPOCHS, FITBIN, HEADS, HIDDEN, HUMAN_VAL_WEIGHT, NOMINAL_WEIGHT, PANEL, PAIRS_PER_EPOCH, TEACHERS,
                        TRAINER, V2, WIDTH, acceptance_weight, confirm_seeds, parse_spec, sha, split_weight, table_path)
