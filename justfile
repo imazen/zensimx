@@ -3559,6 +3559,9 @@ aic-finetune-checkpoint-control source declaration output:
 
 # One visible chain owns the heavy lock from preflight through all registered fits.
 # The caller supplies private paths in the environment and a content-pinned packet.
+aic-finetune-packet prior output:
+    python3 -B scripts/rev4_featpot/aic_finetune_chain.py {{quote(prior)}} {{quote(output)}}
+
 aic-finetune-launch study packet:
     #!/usr/bin/env bash
     set -Eeuo pipefail

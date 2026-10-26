@@ -27,6 +27,25 @@ def write_json(path, value):
     temporary.replace(path)
 
 
+def packet(prior, output):
+    """Pin a fresh retry after committing source; preserve every earlier packet."""
+    repo = Path(__file__).resolve().parents[2]
+    if subprocess.check_output(["jj", "diff", "--summary"], cwd=repo, text=True).strip():
+        raise ValueError("commit source before creating the launch packet")
+    commit = subprocess.check_output(["jj", "log", "--no-graph", "-r", "@-", "-T", "commit_id"], cwd=repo, text=True).strip()
+    files = subprocess.check_output(["jj", "file", "list", "-r", commit], cwd=repo, text=True).splitlines()
+    value = json.loads(Path(prior).read_text())
+    value["source_commit"] = commit
+    value["source_files"] = {name: digest(repo / name) for name in files
+        if (name.endswith((".rs", ".toml", ".lock", ".py", ".json", ".txt", ".sh")) or name == "justfile")
+        and (repo / name).is_file()}
+    value["prior_packet"] = str(Path(prior).resolve())
+    with Path(output).open("x") as stream:
+        json.dump(value, stream, indent=2)
+        stream.write("\n")
+    print(json.dumps(dict(source_commit=commit, source_files=len(value["source_files"]), packet=str(output))))
+
+
 def run(args, cells):
     study = Path(args.study).resolve()
     packet = json.loads(Path(args.packet).read_text())
@@ -166,3 +185,11 @@ def run(args, cells):
         write_json(study / "FAILED.json", failure)
         print(json.dumps(failure), flush=True)
         return 1
+
+
+if __name__ == "__main__":
+    cli = argparse.ArgumentParser(description="Create a content-pinned guarded continuation retry packet")
+    cli.add_argument("prior")
+    cli.add_argument("output")
+    options = cli.parse_args()
+    packet(options.prior, options.output)
