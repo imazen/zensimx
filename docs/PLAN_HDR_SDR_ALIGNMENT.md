@@ -1,5 +1,76 @@
 # PLAN_HDR_SDR_ALIGNMENT — one dial across SDR, HDR, and tone-mapping (drafted 2026-07-14)
 
+## October 26, 2026: evidence and speed requirement
+
+The controlling [production queue](PRODUCTION_PRIORITIES_2026-09-15.md) places
+implementation after adoption of a stable candidate. The owner now explicitly
+requires maintaining speed and wants something better than PU21. This section
+records evidence and proposed comparisons, not a launched experiment or a
+change to the frozen AIC continuation.
+
+The earlier BHdr work is useful evidence. Its historical UPIQ pooled SROCC was
+0.7536 versus CHdr's 0.6664 on the same pairs, each through its own feature
+regime. That comparison changed the model, training and feature bank together;
+it does not identify which HDR feature family caused the difference. The
+earlier BHdr promotion comparison also selected the best of seven candidates
+on that panel: the subsequent audit reported selection-adjusted p=0.221 and
+withdrew the original significance claim. Preserve that exposure history.
+Sources: [BHdr lineage and audit](../benchmarks/bhdr_improvement_split_lineage_2026-07-12.md),
+[BHdr/CHdr comparison](../benchmarks/balance_campaign_2026-08-28.md).
+
+Feature utility has mixed historical evidence. Removing BANDVIS hurt the
+tested 944 model, but eight highlight-bin slots were zero on those SDR rows;
+that test does not validate their HDR utility. Removing the tested CSFW
+weighted family helped. Its subsequent HDR DMEAN transfer probe also lost
+rank. Reuse the implementations and preserve these negative controls instead
+of treating each old family as a demonstrated improvement. Sources:
+[BANDVIS ablation](../benchmarks/bandvis_loo_944_2026-07-28.md),
+[CSFW ablation](../benchmarks/csfw_g6_loo_2026-07-29.md),
+[HDR DMEAN probe](../benchmarks/hdr_dmean_commensurability_2026-07-29.md).
+
+Current Rev7 serves basic/peaks/v2 and supported global-affine features;
+`feature_plan.rs` does not admit the older append/append2/CSFW regimes.
+Restoring a family or changing the frontend therefore needs an explicit
+feature identity, matching extraction, fitting, serving and maps. Existing
+native HDR conversion preserves u16 PQ/HLG or f32 nits and declared primaries.
+The later opsin clamp and PU21's 0.005-nit floor remain separate boundaries
+to test. Rev7 already implements stable luminance difference forms and
+bounded f32 accumulation into f64; historical cancellation results for older
+revisions are not evidence of the same defect in Rev7.
+
+The smallest proposed matched comparison retains the adopted architecture,
+input pattern, TRAIN populations, source splits, seeds, loss, sampler, epoch
+rule and calibration procedure, while refitting each frontend's scaler/head:
+
+- Current canonical PU21 as the reproduction control.
+- ICtCp with explicit intensity/chroma scaling as a color-aware alternative.
+- One compact monotone luminance curve with separate chroma handling, frozen
+  from independently admitted sensitivity/TRAIN evidence before comparison.
+
+The compact curve is a hypothesis directed at both quality and cost. ICtCp
+is not assumed cheaper, and PQ alone is not an established improvement over
+PU21. Existing PQ code-decoding lookup tables cannot be substituted for an
+LMS encoding transform across a color matrix. A compact bandwise adaptation
+model using existing scales is a later candidate; the failed CSFW summaries
+do not validate it. Primary basis: [PU21](https://www.cl.cam.ac.uk/~rkm38/pdfs/mantiuk2021_PU21.pdf),
+[ICtCp](https://professional.dolby.com/siteassets/pdfs/ictcp_dolbywhitepaper_v071.pdf),
+[castleCSF](https://www.cl.cam.ac.uk/research/rainbow/projects/castleCSF/).
+
+Before fitting, freeze numerical controls for the same displayed light in
+linear/PQ/HLG and sRGB/P3/BT.2020 descriptions, native 10/12/16-bit steps,
+near-black and transfer joins, highlights, negative common-basis components,
+strides, tails, caches and attribution maps. Use independent f64 references
+and preserve existing tolerances. Routing equality is not SDR/HDR dial
+continuity: test equal displayed-light pairs and display-white/peak/ambient
+progressions, retaining the original human linking and seamlessness gates.
+
+Measure complete native scoring, reference preparation, cached scoring and
+steering costs, with the existing quiet-machine paired methodology and memory
+evidence. Historical PU microbenchmarks and route repairs do not establish a
+replacement's current cost. No replacement has yet shown both a quality gain
+and acceptable end-to-end cost for Rev7/Mlic. Keep existing speed gates, and
+register any additional adoption criterion before observing results.
+
 User directive (2026-07-14): examine all techniques for an optimal HDR metric +
 historical achievements, and design SDR↔HDR alignment such that (a) similar
 perceptual differences in SDR and HDR content get similar scores, and (b) a

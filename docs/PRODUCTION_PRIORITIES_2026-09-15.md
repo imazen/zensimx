@@ -47,6 +47,15 @@ cancellation diagnostic is in `metric/bake.rs`; changing feature arithmetic
 requires a new formula revision and qualification. Reuse the existing
 [HDR plan](HDR_PLAN.md) and [PU21 reference](https://www.cl.cam.ac.uk/~rkm38/pdfs/mantiuk2021_PU21.pdf).
 
+**Owner refinement: maintain speed and seek better quality than PU21.** PU21
+is the comparison control, not the predetermined frontend. Consult zenpapers
+and the prior BHdr results before adding features. The October 26 evidence
+review and proposed matched comparisons are recorded in the
+[HDR/SDR alignment plan](PLAN_HDR_SDR_ALIGNMENT.md#october-26-2026-evidence-and-speed-requirement).
+A cheaper approximation of PU21 alone does not establish a perceptually better
+representation. Preserve native precision and the SDR fast path; qualify the
+complete scoring, preparation and steering costs on permitted hardware.
+
 ## Production deliverable
 
 The deliverable is a production-qualified Rev3 model with one useful target
