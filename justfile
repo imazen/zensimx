@@ -2,6 +2,10 @@
 dataset-mix-summary study:
     python3 -B scripts/rev4_featpot/byc_cells.py mix-summary --study {{quote(study)}}
 
+# Caller holds shared heavy.lock and run-heavy; existing bake copies are verified.
+dataset-candidate-registry:
+    python3 -B scripts/byconstruction/candidate_registry.py
+
 # Metadata-only progress; caller can inspect this while another job holds the lock.
 dataset-mix-progress study:
     #!/usr/bin/env bash

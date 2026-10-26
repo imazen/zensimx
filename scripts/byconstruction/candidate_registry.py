@@ -18,7 +18,8 @@ C = [
 ] + [(f"M7-s{s}", f"{H}/tmp/byc/full/mono-thr-mp32-r7_s{s}/refit/production-f16.bin", 7, "M recipe, rev7raw root", f"{B}/gates-M7" if s == 0 else "", "") for s in (0, 1, 2)] \
   + [(f"Mdata-s{s}", f"/var/tmp/datalegs-20261025/rev7data/{'full' if s == 0 else f'full_s{s}'}/refit/production-f16.bin", 7, "M recipe + 11 new datasets' TRAIN legs (rev7data root)", f"{B}/gates-Mdata" if s == 0 else "", "trains on VCL@FER, PieAPP, FG-IQA (validate-only licences)") for s in (0, 1, 2)] \
   + [(f"Mdata64-s{s}", f"/var/tmp/datalegs-20261025/rev7data/full64_s{s}/refit/production-f16.bin", 7, "M64 shape on the Mdata data (rev7data root)", f"{B}/gates-Mdata64" if s == 0 else "", "trains on VCL@FER, PieAPP, FG-IQA (validate-only licences)") for s in (0, 1, 2)] \
-  + [(f"Mlic-s{s}", f"/var/tmp/byc-finalists-20261026/Mlic/full_s{s}/refit/production-f16.bin", 7, "M recipe on the Mlic root (Mdata's legs without VCL@FER, PieAPP, FG-IQA; byc-mixes-20261025)", f"{B}/gates-Mlic" if s == 0 else "", "licence-clean under the 2026-10-25 policy") for s in (0, 1, 2)]
+  + [(f"Mlic-s{s}", f"/var/tmp/byc-finalists-20261026/Mlic/full_s{s}/refit/production-f16.bin", 7, "M recipe on the Mlic root (Mdata's legs without VCL@FER, PieAPP, FG-IQA; byc-mixes-20261025)", f"{B}/gates-Mlic" if s == 0 else "", "licence-clean under the 2026-10-25 policy") for s in (0, 1, 2)] \
+  + [("Mw025-s0", "/var/tmp/byc-mixes-20261025/Mw025/full_s0/refit/production-f16.bin", 7, "M recipe, all 11 new TRAIN legs at nominal 0.25; TRAIN-only old-data finalist", "", "research-only: trains on VCL@FER, PieAPP, FG-IQA (validate-only licences)")]
 sha = lambda p: hashlib.sha256(Path(p).read_bytes()).hexdigest()
 R.mkdir(parents=True, exist_ok=True)
 rows = []
