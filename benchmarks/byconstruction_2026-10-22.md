@@ -4216,3 +4216,11 @@ This rule is written at 02:20Z on 2026-10-26, before any Mlic64 cell has finishe
 4. Reported, not deciding: knob-concurring inversions, type-bias SD, Z-RMSE, error p99 and both mixture tests.
 
 An arm adding the six admitted library subsets (`Mlic+sub`) registers its own weights and rule when its root is built.
+
+### Mlic+sub root preparation — preread registration (2026-10-26)
+
+Build only: preserve Mlic’s eight legs and their nominal 0.5 weights. The five additional collections with admitted TRAIN memberships share nominal total mass 0.5: 0.1 each for Cognitive Science Experiment 2, Broken Arrows, DIBR, DWT/DT-CWT and Enrico. DIBR retains three separate protocol legs at 0.1/3 each: ACR, scaled pairwise scores and pair-local hard preferences. Exact probability ties are removed; no comparison crosses protocols or native references. The existing within-reference self-pair correction remains. These repeated protocols are not independent votes. No item-confidence weighting or binomial loss is introduced.
+
+This limits the entire small-data addition to one existing large leg’s nominal mass. Toyama has no admitted TRAIN rows and receives no leg. Replay the hash-bound Cognitive Experiment 2 parent-identifier join and require exact native reference binding. Verify each collection’s A/B tier and train licence policy; reserve all existing and additive held-out families, including excluded memberships. Read only admitted TRAIN targets, with a ledger entry persisted before each read.
+
+This registration precedes all new subset target reads and measurements. Mlic+sub stays outside the original six-arm/123-cell selection. No fit is launched; a later TRAIN-only comparison rule, finalist shape and cell assignment require the original selection first. Root results and exclusions will be appended after assembly.
