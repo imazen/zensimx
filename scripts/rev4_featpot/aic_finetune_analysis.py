@@ -33,9 +33,11 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--study", required=True, type=Path)
     parser.add_argument("--packet", required=True, type=Path)
+    parser.add_argument("--output", type=Path, help="fresh report directory; prediction caches remain in the study")
     parser.add_argument("--jobs", choices=range(1, 9), type=int, default=8)
     args = parser.parse_args()
     study = args.study.resolve()
+    out = args.output.resolve() if args.output else study / "analysis"
     packet = json.loads(args.packet.read_text())
     if json.loads((study / "TRAIN_COMPLETE.json").read_text())["registered_cells"] != 24:
         raise ValueError("all 24 registered cells must complete before analysis")
@@ -46,7 +48,7 @@ def main():
     os.environ.update(BYC_ROOT=packet["root"], REV4_V2_ROOT=packet["root"],
         BYC_CELLS=str(study / "cells"), REV4_V2_BIN_DIR=str(study / "bin"),
         AIC_BIN=str(study / "bin"), ZEN_PANEL_BIN=str(study / "bin/panel"),
-        BYC_LABEL_LEDGER_DIR=str(study / "analysis/label-reads"),
+        BYC_LABEL_LEDGER_DIR=str(out / "label-reads"),
         ZENSIM_MAX_TIER="v3", ZENSIM_RING_FORM="raw", ZENSIM_PYRAMID="xyb",
         RAYON_NUM_THREADS="1", OMP_NUM_THREADS="1", OPENBLAS_NUM_THREADS="1")
     # Environment must precede imports: the recipe owners bind roots and tools.
@@ -61,10 +63,13 @@ def main():
     from subjective_training_leg import log_dataset_read
     from v2_human_role import D6_INPUT_PINS
 
-    out = study / "analysis"
     out.mkdir()
     baseline = study / "cells/Mlic"
-    baseline.symlink_to(Path(packet["initial_cells"]).resolve(), target_is_directory=True)
+    if baseline.exists():
+        if not baseline.is_symlink() or baseline.resolve() != Path(packet["initial_cells"]).resolve():
+            raise ValueError("Mlic reference link differs")
+    else:
+        baseline.symlink_to(Path(packet["initial_cells"]).resolve(), target_is_directory=True)
     pairs_path = Path(os.environ["AIC_PAIRS_TRAIN"])
     folds = Path(os.environ["AIC_FOLDS"])
     if sha(folds / "_MANIFEST.json") != packet["fold_manifest_sha256"]:
@@ -93,8 +98,8 @@ def main():
         return values
 
     aic_results, metrics_jobs, metrics_labels = {}, [], []
-    reference_cache = out / "Mlic-same-fold"
-    reference_cache.mkdir()
+    reference_cache = study / "Mlic-same-fold"
+    reference_cache.mkdir(exist_ok=True)
     fold_indices = {}
     for k in range(7):
         keys = pd.read_parquet(folds / f"aic_k{k}_test.parquet", columns=["key"]).key.astype(str)
@@ -110,16 +115,21 @@ def main():
             k = cells.aic_fold(fold, seed)
             initial = Path(packet["initial_cells"]) / identity / "refit/last.bin"
             dest = reference_cache / identity
-            dest.mkdir()
             path = dest / f"pred_aic_k{k}.tsv"
-            values = cells.predict_cell(initial, folds / f"aic_k{k}_test.parquet", path,
-                                       cells.spec_of("mono:thr:mp32"))
+            receipt = dest / "PROVENANCE.json"
+            provenance = dict(checkpoint=str(initial), checkpoint_sha256=sha(initial),
+                table_sha256=sha(folds / f"aic_k{k}_test.parquet"), aic_fold=k,
+                tool_sha256=frozen["binaries"]["bake_dial_refit"])
+            if dest.exists():
+                cached = json.loads(receipt.read_text())
+                if any(cached[key] != value for key, value in provenance.items()) or cached["prediction_sha256"] != sha(path):
+                    raise ValueError("cached same-fold reference differs")
+            else:
+                dest.mkdir()
+                cells.predict_cell(initial, folds / f"aic_k{k}_test.parquet", path,
+                                   cells.spec_of("mono:thr:mp32"))
+                write(receipt, dict(**provenance, prediction_sha256=sha(path)))
             old_predictions[identity] = prediction(path, len(fold_indices[k]))
-            if not np.array_equal(values, old_predictions[identity]):
-                raise ValueError("Mlic same-fold reference changed during readback")
-            write(dest / "PROVENANCE.json", dict(checkpoint=str(initial), checkpoint_sha256=sha(initial),
-                table_sha256=sha(folds / f"aic_k{k}_test.parquet"), prediction_sha256=sha(path),
-                aic_fold=k, tool_sha256=frozen["binaries"]["bake_dial_refit"]))
     for arm in ("Mlic", *ARMS):
         per_cell, fold_predictions = {}, {k: [] for k in range(7)}
         for seed in range(3):
@@ -140,6 +150,8 @@ def main():
                 reference = panel(old_predictions[identity], subset)
                 result = panel(values, subset)
                 result["global_delta"] = result["global"] - reference["global"]
+                if not np.isfinite([result["global"], result["global_delta"]]).all():
+                    raise ValueError("selection requires defined same-fold global SROCC")
                 result["aic_fold"] = k
                 result["codec_bias"] = cells.codec_rank_bias(values, -subset.jnd.to_numpy(), subset.codec.to_numpy())
                 per_cell[identity] = result
@@ -171,6 +183,8 @@ def main():
         absolute = measured[arm]["per_dataset_per_seed_srocc"]
         old = measured["Mlic"]["per_dataset_per_seed_srocc"]
         seed_delta = [float(np.mean([absolute[f][s] - old[f][s] for f in cells.FOLDS])) for s in range(3)]
+        if not np.isfinite(seed_delta).all():
+            raise ValueError("selection requires defined E21 paired seed units")
         e21[arm] = dict(control="Mlic", per_seed_delta=seed_delta, delta=float(np.mean(seed_delta)),
             seed_unit_se=float(np.std(seed_delta, ddof=1) / np.sqrt(3)),
             per_dataset_delta={f: float(np.mean(np.asarray(absolute[f]) - np.asarray(old[f]))) for f in cells.FOLDS},
@@ -186,17 +200,26 @@ def main():
     mixtures = {}
     for name in ("mixture", "mixture_global"):
         source = Path(packet["initial_cells"]).parents[1] / name
-        dest = out / name
-        dest.mkdir()
-        shutil.copyfile(source / "manifest.json", dest / "manifest.json")
-        (dest / "img").symlink_to((source / "img").resolve(), target_is_directory=True)
+        dest = study / name
+        if dest.exists():
+            if ((dest / "manifest.json").read_bytes() != (source / "manifest.json").read_bytes()
+                    or (dest / "img").resolve() != (source / "img").resolve()):
+                raise ValueError("cached mixture inventory differs")
+        else:
+            dest.mkdir()
+            shutil.copyfile(source / "manifest.json", dest / "manifest.json")
+            (dest / "img").symlink_to((source / "img").resolve(), target_is_directory=True)
         for arm in ("Mlic", *ARMS):
             for seed in range(3):
                 for fold in cells.FOLDS:
                     label = f"{arm}_{fold}_s{seed}"
                     score_file = f"scores_{label}.json"
                     if arm == "Mlic":
-                        shutil.copyfile(source / score_file, dest / score_file)
+                        if (dest / score_file).exists():
+                            if (dest / score_file).read_bytes() != (source / score_file).read_bytes():
+                                raise ValueError("frozen Mlic mixture reference differs")
+                        else:
+                            shutil.copyfile(source / score_file, dest / score_file)
                     else:
                         cell = study / "cells" / arm / f"without_{fold}_s{seed}"
                         dense = list((cell / "dense").glob("*.bin"))
