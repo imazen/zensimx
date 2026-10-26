@@ -4256,3 +4256,21 @@ Raw reports retain all 123 models separately from these primary twelve-model sum
 Mlic seed 0 reuses the coordinator’s certified packed bake `7612c2e46154fe9c0c359bfd02e521013f5717e3bf8e11967f5434150e220bcc`. Its three full candidates are registered and mirrored. Mw025’s required packed full seed 0 is active before the finalists’ one frozen EVAL assessment; no new EVAL values are claimed here.
 
 The prepared [Mlic+sub root](mlic_subsets_2026-10-26.pointer.md) stays outside the registered comparison, with no subset fit.
+
+### Mlic+sub against Mlic: rule registered before any Mlic+sub cell (coordinator, 2026-10-26)
+
+Mlic+sub (root sha256 `89b5f88d…`, subset weights registered in `34a32339`) runs Mlic's 21 cells (the four E21 folds
+and the three held-out-new-data groups × seeds 0–2) in M's shape (`mono:thr:mp32`) with the study's binaries, so it
+pairs with Mlic cell for cell. This rule is written at 03:06Z on 2026-10-26, before any Mlic+sub cell has started.
+
+1. The subsets' own gain has no TRAIN-only out-of-sample measure in this design (Mlic is the fit without them), so the
+   TRAIN comparison is non-inferiority. **Mlic+sub replaces Mlic** as the shippable data recipe if its balanced score
+   (the study's formula, paired by seed against Mlic) is not lower by more than one seed-unit SE and its old-data score
+   is not lower by more than two seed-unit SEs. Otherwise Mlic stays.
+2. Shape is decided on the chosen data: if Mlic+sub is chosen, the registered shape rule above applies to Mlic+sub64
+   against Mlic+sub (its 12 E21 cells, then three packed full-data seeds).
+3. The chosen model passes every label-free gate on its full-data seed-0 bake, then gets one EVAL read of its three
+   seeds and their mean, which includes the subsets' own EVAL rows. If Mlic+sub is chosen, Mlic's EVAL read is
+   reported beside it as the reference. EVAL cannot change either choice.
+4. Reported, not deciding: per-collection new-data statistics, knob-concurring inversions, type-bias SD, Z-RMSE,
+   error p99 and both mixture tests.
