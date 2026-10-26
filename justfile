@@ -613,6 +613,15 @@ adam-denormal-trainer-tests:
 adam-denormal-counters pid output events seconds="10":
     perf stat -o {{quote(output)}} -e {{quote(events)}} -p {{pid}} -- sleep {{seconds}}
 
+adam-denormal-compare reference candidate tools root output:
+    python3 scripts/byconstruction/adam_denormal_cell.py compare --reference {{quote(reference)}} --candidate {{quote(candidate)}} --tools {{quote(tools)}} --root {{quote(root)}} --out {{quote(output)}}
+
+adam-denormal-status output:
+    python3 scripts/byconstruction/adam_denormal_cell.py status --out {{quote(output)}}
+
+adam-denormal-repro model output:
+    tools/adam-denormal-probe/target/release/adam-denormal-probe --repro {{quote(model)}} {{quote(output)}}
+
 addrfix-cost-report binary:
     python3 scripts/rev4_featpot/addrfix.py cost-report --binary {{quote(binary)}}
 

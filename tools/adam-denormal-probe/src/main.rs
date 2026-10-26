@@ -10,6 +10,25 @@ use std::hint::black_box;
 
 fn main() {
     let argv: Vec<String> = std::env::args().collect();
+    if argv.get(1).map(String::as_str) == Some("--repro") {
+        use std::io::Write;
+        assert_eq!(argv.len(), 4, "usage: probe --repro MODEL OUTPUT.json");
+        let bytes = std::fs::read(&argv[2]).expect("read model");
+        let model =
+            zenpredict::Model::from_bytes(&bytes).expect("parse model with the native owner");
+        let metadata = model.metadata();
+        let repro = metadata
+            .get_utf8("zentrain.repro")
+            .expect("embedded trainer provenance");
+        std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&argv[3])
+            .expect("fresh provenance output")
+            .write_all(repro.as_bytes())
+            .expect("write provenance");
+        return;
+    }
     assert_eq!(
         argv.len(),
         5,

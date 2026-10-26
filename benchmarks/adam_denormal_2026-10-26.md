@@ -112,3 +112,55 @@ dispatch checks pass, as does strict all-target probe Clippy on ARM. Resource
 record: `run-heavy: done rc=0 20s | peak-RSS 0.37GiB | min-avail 26854MiB | peak-load 6.57`.
 The full i134 baseline, corrected i265 replay, queued dev verification and
 complete byte comparisons remain in progress.
+
+## Completed numerical replay before the inactive-state optimization
+
+The versioned repaired trainer completed the registered `Mw025/without_kadid_s0`
+control on i265 CPU 2: 120 epochs, 50,000 draws per epoch, initialization seed
+1101, sampling seed 101, v3 dispatch, one thread. It used the frozen image,
+original argv and authority; only the executable and fresh output paths changed.
+The frozen study's control continued on another P-core. This is an intermediate
+complete replay, not the final matched-host before/after speed comparison.
+
+| Measurement | Repaired replay v3 |
+|---|---:|
+| Perf elapsed seconds | 3081.861411501 |
+| Perf user seconds | 3075.294343000 |
+| P-core cycles | 16,124,958,389,993 |
+| P-core instructions | 35,777,423,536,219 |
+| FP assists | 26,369,672 |
+| `/usr/bin/time -v` maximum RSS (KiB) | 2,131,976 |
+| Swaps | 0 |
+
+The output directory is `intel/intel-after-v3/` under the artifact root above.
+`intel/comparison-v3/COMPARISON.json` records native comparisons, SHA-256s and
+paths to complete zero-based byte-offset listings. Both original and replayed
+predictions contain 7,869 rows / 184,397 bytes and have SHA-256
+`9333a13dff53fa4200166e723a9c33f0a48cf32e6beacd40856163571d536eff`.
+All prediction bytes match; zero rows differ as text or parsed f64 values.
+
+Raw model files differ, because they embed run provenance. Native `strip`
+removing only the `zentrain.repro` key makes the entire files identical:
+
+| Artifact | Original bytes | Replay bytes | Different common offsets | Extra replay tail bytes | Bytes after removing only repro |
+|---|---:|---:|---:|---:|---:|
+| refit best | 37,304 | 37,541 | 16,154 | 237 | 31,496, identical |
+| refit last | 34,808 | 35,064 | 16,331 | 256 | 28,983, identical |
+| native dense | 34,808 | 35,064 | 16,331 | 256 | 28,983, identical |
+| freshly packed f16 | 30,444 | 30,700 | 16,539 | 256 | 24,619, identical |
+| best spec JSON | 11,992 | 13,136 | 11,390 | 1,144 | not stripped |
+
+The spec's changed fields are argv paths, cwd, input paths and timestamp; its
+numerical settings match. Packing uses the existing canonical production packer,
+the frozen CID22 TRAIN anchor and the original E33 output stage; it adds no
+model selection. The frozen predictor itself reproduces the original prediction
+TSV exactly before comparing the candidate. The native model reader confirms
+`optimizer_arithmetic=adam-f64-normal-moments-v1` in the candidate's embedded
+`zentrain.repro`. Raw model bytes are not claimed identical.
+
+The next exact optimization bypasses arithmetic/stores for chunks whose +0
+gradient and moments are a fixed point, including conservatively bounded
+positive weights whose L2 contribution cannot start a normal moment. The full
+scalar composition remains its oracle. Boundary, signed-zero, exceptional
+hyperparameter and ordinary tier-parity tests pass on native Intel; final
+complete timing and AVX-512 execution remain separate gates.
