@@ -473,6 +473,10 @@ dataset-cell root binary cells scratch label fold seed jobs='1':
 dataset-neff-root source out:
     OPENBLAS_NUM_THREADS=1 python3 -B scripts/byconstruction/ring_root.py dataset-neff --root {{quote(source)}} --out {{quote(out)}}
 
+# The caller owns heavy.lock and a 36G/12-job run-heavy scope; no runtime benchmarks.
+dataset-neff-chain study source_commit:
+    OPENBLAS_NUM_THREADS=1 python3 -B scripts/byconstruction/mlic_neff_chain.py {{quote(study)}} --source-commit {{quote(source_commit)}}
+
 dataset-cell-progress cells arm='Mdata' folds='kadid,tid2013,konfig,cid22_a25':
     env BYC_CELLS={{quote(cells)}} OPENBLAS_NUM_THREADS=1 python3 -B scripts/rev4_featpot/byc_cells.py progress --arm {{quote(arm)}} --folds {{quote(folds)}}
 

@@ -339,8 +339,13 @@ def cmd_progress(args) -> int:
                       source_commit=state["source_commit"], binary_sha256=state["binary_sha256"],
                       live_processes=process_tree(worker["pid"]) if worker else [], compute_lock=lock,
                       worker_alive=bool(worker), next_action=state["next_action"])
-        result["status"] = ("cells-complete" if result["complete"] == result["requested"] else
-                            "running" if worker and lock["held_by_worker_ancestor"] else "not-running")
+        result["failure"] = state.get("failure")
+        launch_failure = Path(state["run_directory"])/"LAUNCH_FAILED.json"
+        if launch_failure.is_file():
+            result["failure"] = json.loads(launch_failure.read_text())
+        result["status"] = ("failed" if result["failure"] else
+                            "running" if worker and lock["held_by_worker_ancestor"] else
+                            "cells-complete" if result["complete"] == result["requested"] else "not-running")
     text = json.dumps(result, indent=1)+"\n"
     if getattr(args,"output",None):
         output = Path(args.output)
