@@ -342,7 +342,7 @@ def curate(out: Path) -> int:
                   .pred.to_numpy(np.float64) for k in SOURCE_FOLDS}
         return out_of_fold(values, folds, label)
 
-    def views(frame, prefix, key, x, y, mask=None):
+    def views(frame, prefix, key, x, y, mask=None, digits=3):
         """Logistic fit, rank map and mean/SD match of `x` onto `y` (agreeing in direction), on `mask` rows."""
         idx = np.arange(len(y)) if mask is None else np.flatnonzero(mask)
         st, arr = geometry(x[idx], y[idx], arrays=True)
@@ -351,7 +351,7 @@ def curate(out: Path) -> int:
             col = np.full(len(y), np.nan)
             if values is not None:
                 col[idx] = values
-            frame[f"{v}{prefix}_{key}"] = np.round(col, 3)
+            frame[f"{v}{prefix}_{key}"] = np.round(col, digits)
         return st
 
     jnd = pairs.jnd.to_numpy(np.float64)
@@ -384,7 +384,8 @@ def curate(out: Path) -> int:
                 raise ValueError(f"{f}: {len(x)} predictions for {len(y)} labels")
             for subset, prefix, mask in (("all", "", None), ("codec", "c", cdc)):
                 # Where every row is a codec (CID22-A) the codec views are the full-set views: not stored twice.
-                st = views(frame, prefix, key, x, y, mask) if mask is None or not mask.all() else stats[-1].copy()
+                # E21 views at two decimals keep the rows under the dashboard's 8 MB source limit.
+                st = views(frame, prefix, key, x, y, mask, 2) if mask is None or not mask.all() else stats[-1].copy()
                 if mask is not None and mask.all():
                     st = {k: v for k, v in st.items() if k in GEOMETRY}
                 sel = slice(None) if mask is None else mask

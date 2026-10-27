@@ -7510,3 +7510,23 @@ Vote and the rehearsal leg do not add: Vote + rehearsal at ×256 keeps every che
 rehearsal e59, 0.9377) is not higher than stage C's point after D (×256 + rehearsal e59, 0.9390) by more than 0.002, so
 **stage C runs on ×256 + rehearsal at epoch 59**. Every exploration stage (A, A2, B, D, E, F) is now settled. The best
 keeper of all of them is 0.9390 out of fold; 0.95 was not reached while keeping the older sets.
+
+### Codec-role evidence: result (2026-10-27, omission runs complete 23:17 UTC)
+
+Runs `mlic-aic-omission-codec-{aiconly,x1024,xref1024}-20261027-run01`. E21 out of sample, three-seed mean SROCC on every
+distortion type (from each run's `E21_OUT_OF_SAMPLE.json`), and seed-0 SROCC on compression only (dashboard
+`curate_stats.json`, `/mnt/v/output/zensim/dashboard-curate-20261027/`; compression types as registered):
+
+| Model | AIC-2026 | E21 every type, three seeds | Compression only, seed 0: mean | KADID | TID2013 | KonFiG J2K | CID22-A |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| Mlic | 0.8996 (held out) | 0.8613 | 0.9223 | 0.9444 | 0.9657 | 0.8963 | 0.8827 |
+| ×256 + rehearsal e59 (stage C) | 0.9390 | 0.8610 | 0.9254 | 0.9474 | 0.9639 | 0.8936 | 0.8968 |
+| AIC-only e29 | **0.9515** | 0.8426 | 0.9235 | 0.9458 | 0.9619 | 0.8885 | 0.8979 |
+| ×1024 e59 | 0.9465 | 0.8558 | 0.9248 | 0.9462 | 0.9612 | 0.8862 | 0.9056 |
+| ×1024 + rehearsal e59 | 0.9458 | 0.8573 | 0.9250 | 0.9464 | 0.9626 | 0.8864 | 0.9045 |
+
+On compression, out of sample, every AIC-heavy arm holds the older sets at or above Mlic on average; CID22-A gains
+0.015–0.023 while TID2013's codecs lose 0.003–0.005 and KonFiG's 84 JPEG 2000 rows 0.008–0.010. On every type they lose
+0.004–0.019 (AIC-only most: KADID −0.040, TID2013 −0.030). So a codec model can take AIC-2026 to 0.9515 out of fold
+(AIC-only e29) without losing compression quality on the older sets; ×1024 and ×1024 + rehearsal trade 0.005–0.006 of
+AIC-2026 for less loss elsewhere. As registered, no rule picks the codec model: this goes to the owner's curation.
