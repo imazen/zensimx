@@ -591,6 +591,30 @@ aic-matched-continuation mode plan:
 aic-matched-continuation-plan run commit trainer meta_tool:
     python3 -B scripts/byconstruction/aic_matched_continuation.py plan {{quote(run)}} --source-commit {{quote(commit)}} --trainer {{quote(trainer)}} --meta-tool {{quote(meta_tool)}}
 
+# Label-free gates for one revision-7 packed candidate through gates.py with the
+# revision-7 tools, instrument tables and empty human corpus (dial verdicts C1-C6
+# on both grids, G-STEER, identity at every available SIMD tier; NEARID on request).
+# Caller holds heavy.lock and run-heavy. Refuses an existing output directory.
+candidate-gates-rev7 name model out steps='verdict,steer,identity' tools='/var/tmp/byconstruction-bin/688746b78bee-gates' instruments='/mnt/v/output/zensim/byconstruction-2026-10-22/rev7raw/instruments' corpus='/mnt/v/output/zensim/byconstruction-2026-10-22/rev7raw/no-human-corpus':
+    #!/usr/bin/env bash
+    set -euo pipefail
+    (cd {{quote(tools)}} && sha256sum --quiet -c SHA256SUMS)
+    test ! -e {{quote(out)}}
+    TMPDIR="$HOME/tmp" python3 -B scripts/byconstruction/gates.py --name {{quote(name)}} --model {{quote(model)}} --out {{quote(out)}} --bin-dir {{quote(tools)}} --instruments {{quote(instruments)}} --corpus-root {{quote(corpus)}} --formula-rev 7 --steps {{quote(steps)}}
+    python3 -B scripts/byconstruction/gates.py --summary --out {{quote(out)}} --name {{quote(name)}} > {{quote(out)}}.summary.json
+
+# The same gates for every seed-0 model of a completed full AIC comparison, in
+# FULL_FITS_COMPLETE order (initial models, then continuations), packed bakes.
+candidate-gates-rev7-full fits out:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    mkdir {{quote(out)}}
+    python3 -B -c 'import json,sys; c=json.load(open(sys.argv[1])); rows=[dict(r,arm=k) for k,v in c["initial"].items() for r in v]+c["continued"]; [print(r["arm"].lower(), r["directory"]+"/refit/production-f16.bin", r["packed_sha256"]) for r in rows if r["seed"]==0]' {{quote(fits)}} > {{quote(out)}}/MODELS.tsv
+    while read -r name model pin; do
+      echo "$pin  $model" | sha256sum --quiet -c
+      just candidate-gates-rev7 "$name" "$model" {{quote(out)}}/"$name"
+    done < {{quote(out)}}/MODELS.tsv
+
 aic-matched-continuation-tests:
     python3 -B -m unittest scripts.tests.test_aic_matched_continuation_coordinator scripts.tests.test_aic_adaptation_full_panel
     python3 -B -m unittest discover -s scripts/tests -p 'test_aic_matched_continuation.py'
