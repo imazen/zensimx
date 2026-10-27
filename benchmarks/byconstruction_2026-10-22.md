@@ -5441,3 +5441,24 @@ on i265. Targeted clippy passes with warnings denied. The resource wrapper
 recorded `rc=0 157s | peak-RSS 1.95 GiB | min-avail 19227 MiB | peak-load 5.30`.
 These checks establish admission behavior; the full-budget binary control
 and the actual full-data Order fits have not run yet.
+
+
+### Full-data adaptation coordinator checks (2026-10-27)
+
+The separate full-data coordinator implements the registered follow-through
+for every recipe and both strengths, without consulting historical scalar
+selectors. It waits for the complete fold panel, replays a full Mlic fit with
+the new Order binary, requires identical final and packed models, prepares
+full-model matches, and fits the nine missing original-recipe seeds. Each
+recipe then receives a zero-step initialization control before common AIC
+continuation. The three existing Mlic 16×8 continuations are reused only
+after checkpoint, seed, authority, actual AIC mass and packing checks.
+
+Metadata validation passed for all three original Mlic full fits and all
+three existing 16×8 full continuations. Four new orchestration controls pass
+on i265, including wrong seed, changed initialization, omission, optimizer
+state and AIC mass refusals. The resource wrapper recorded
+`rc=0 0s | peak-RSS 0.02 GiB | min-avail 23316 MiB | peak-load 3.26`.
+This coordinator produces fit artifacts; full-data panels and production
+qualification remain required after it completes. No new full-data fit
+quality result is claimed by these checks.
