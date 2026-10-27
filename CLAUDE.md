@@ -180,6 +180,8 @@ because cleanup tests or a historical training reproduction pass.
 
 ## Known Bugs
 
+* **2026-10-27 — L8 peak pools underflow in f32 at near-identity. OPEN: a fix changes feature bits (new formula revision).** The peaks family forms `d⁸` as `d4 * d4` in f32 lanes before the f64 reduction (`simd_ops.rs` `ssim_channel_extended_*`), so the term is subnormal below a per-pixel error of about 1.6e-5 and zero below about 4e-6. On 24 native PQ HDR pairs at revision 7 production emits exactly 0 in 191 cells where the f64 oracle has up to 9e-7 (`peaks_ssim_l8` and friends); the whole production-versus-oracle difference moves Mlic's score by at most 1.83e-4 points. Batch the fix (scaled or f64 power) with the next revision, e.g. the HDR frontend's. Record: byconstruction "Native HDR precision at revision 7"; recheck with `just hdr-precision`.
+
 * **2026-10-27 — full-control raw hashes included run provenance.** AIC full run02 completed its control, then the new comparator rejected the embedded paths/build/run metadata. Native `strip --key zentrain.repro` on copies proves exact final-f32 and packed serving bytes; the recorded training curves match excluding elapsed time. The corrected comparator follows the existing E33 control owner and also compares all result fields except output paths/model hashes. Preserve failed run02 and dependent panel/confidence failures; recovery requires a fresh pinned plan and unchanged numerical equality.
 
 
