@@ -31,6 +31,18 @@ work. The September chronology below is retained history, including its old
 paused-goal statement. It is not the current queue. No new Mlic/AIC recipe has
 been adopted as the serving model, and the seamless HDR frontend has not started.
 
+### State at 21:09 UTC, 2026-10-27
+
+Stage C's arm is the stage D candidate (×256 + rehearsal e59) unless stage F or E beats it. Dev queue: stage F
+`mlic-aic-wise-20261027-run01` (w21:pB, finishing) → stage E `mlic-aic-recipe-votexref-20261027-run01` (w21:pA) → the
+codec-role omission runs (registered `2daa9781`, code `43efddfb`) `mlic-aic-omission-codec-{aiconly,x1024,xref1024}-20261027-run01`
+(w21:pC/pD/pE, chained) → stage C. The owner is curating two models, one general and one codec-only: the dashboard's
+"Two models" tab (data `/mnt/v/output/zensim/dashboard-curate-20261027/`, built by `aic_dashboard_data.py --out DIR
+--curate` with `ZEN_PANEL_BIN` set to a run's `bin/panel`) compares the candidates on every distortion type and on
+compression only. After the codec omission runs finish, rebuild it (the codec arms' E21 cells are read automatically),
+upload the three files as dashboard assets and update the `curaic`, `cure21` and `ccstats` dataset documents. No EVAL
+rows were read for these candidates; that waits for the owner.
+
 ### State at 20:58 UTC, 2026-10-27
 
 Stage D's E21 run is complete: its candidate (×256 + rehearsal e59, out-of-fold AIC 0.9390) is within 0.005 of the
