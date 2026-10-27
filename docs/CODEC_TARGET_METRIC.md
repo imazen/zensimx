@@ -1,5 +1,12 @@
 # Codec-target metric — the one user-facing quality dial
 
+**Research status, October 27:** the active Mlic/AIC panel study has not changed
+the serving profile. A completed TRAIN fit or in-sample gain is not adoption.
+The [current queue](../SESSION-RESUME.md#current-work--october-27-2026) retains
+runtime, steering, color/precision and production qualification before stable
+adoption. The seamless HDR frontend follows that adoption, with the SDR fast
+path preserved and PU21 retained as a comparison control.
+
 **Current integration guide, checked against source on 2026-10-19.**
 `ZensimProfile::codec_target()` and `latest_preview()` return **B**.
 D is available explicitly; the September 5 change replaced D’s calibration,

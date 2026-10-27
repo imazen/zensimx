@@ -1,5 +1,36 @@
 # PLAN_HDR_SDR_ALIGNMENT — one dial across SDR, HDR, and tone-mapping (drafted 2026-07-14)
 
+## October 27 continuation and precision accounting
+
+No stable candidate has been adopted from the new AIC comparison. Frontend
+implementation remains queued behind that decision; research and exact
+qualification planning may proceed. The [current run index](../SESSION-RESUME.md#current-work--october-27-2026)
+records dependencies, source owners and the still-unfinished confidence arm.
+The goal is better perceptual quality than PU21 while maintaining speed, not
+merely a cheaper approximation to the same transform.
+
+Keep three distinct precision questions separate:
+
+- **Inputs:** preserve native u16 PQ/HLG codes or f32 absolute-light input with
+  declared primaries/display metadata. Never narrow to RGB8 for convenience.
+- **Feature arithmetic:** test near-black PU floors, highlight/output clamps,
+  color transforms, near-identity cancellation and accumulation against the
+  existing f64 oracle. Rev7's stable forms are distinct from older-revision
+  cancellation findings; changing arithmetic requires a new feature identity.
+- **Deployment:** the queued AIC full panels compare final-f32 models with
+  packed, TRAIN-calibrated serving models. That difference combines packing
+  and output calibration; it cannot isolate quantization loss. Native pixel
+  frontend precision and runtime costs require separate measurements.
+
+Do not promote BHdr's historical pooled rank result into an isolated utility
+claim for its frontend or highlight features. Preserve the source/exposure and
+negative ablation evidence below. Preregister matched refits for PU21, ICtCp
+and a compact monotone luminance/chroma alternative after stable adoption;
+freeze source roles, display parameters, seeds, budgets and controls before
+new outcomes. Measure complete scoring, reference preparation and steering
+cost across the production geometries on permitted quiet hardware. No speed
+or no-penalty claim is established for a new frontend yet.
+
 ## October 26, 2026: evidence and speed requirement
 
 The controlling [production queue](PRODUCTION_PRIORITIES_2026-09-15.md) places

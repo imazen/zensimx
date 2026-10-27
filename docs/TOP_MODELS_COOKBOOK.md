@@ -1,5 +1,14 @@
 # TOP MODELS COOKBOOK — the science + exact reproduction paths (2026-07-18)
 
+> **Current work, October 27:** the active Mlic/Neff/Vote/Order AIC comparison
+> uses complete panels without strict SROCC rejection. Confidence still needs
+> admission, linking and native fitting. No new serving model is adopted.
+> Exact run identities, completed/queued work and recovery commands live in
+> [SESSION-RESUME](../SESSION-RESUME.md#current-work--october-27-2026), with
+> registrations/results in [the byconstruction record](../benchmarks/byconstruction_2026-10-22.md).
+> The roster below remains dated evidence. In particular, use the latest
+> [split rulings](DATA_SPLITS.md), not an old roster's corpus defaults.
+
 > **September 14 reading correction:** the statements below describe their
 > recorded experiments, not current universal limits. Non-additive max features
 > now have separate finite rectangle queries; opt-in L2/L4/L8 moment corrections

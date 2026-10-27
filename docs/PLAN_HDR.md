@@ -1,5 +1,12 @@
 # PLAN_HDR — HDR training + dial-continuity alignment (drafted 2026-07-03)
 
+**Current execution, October 27:** this is a historical recipe record. Follow
+[the current HDR/SDR plan](PLAN_HDR_SDR_ALIGNMENT.md#october-27-continuation-and-precision-accounting)
+and [active goal](../SESSION-RESUME.md#current-work--october-27-2026).
+The July “ship pick” below does not adopt a model for the current work.
+Seamless native-precision HDR remains queued after stable candidate adoption;
+better-than-PU21 quality and maintained speed both require measurement.
+
 > **STATUS 2026-07-04 — v3 pipeline COMPLETE; ship pick = linear anchored2.**
 > Steps 1-5 done (corpus 16.9k cells PU-linear, dedup, splits; w5/w6/w7 MLP
 > fans trained; consistency measured ≤0.92pt SDR-anchored). Ship candidate is

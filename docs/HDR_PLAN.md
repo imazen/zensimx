@@ -1,5 +1,12 @@
 # zensim HDR support — process, plan, and test methodology
 
+**Current execution, October 27:** use the
+[HDR/SDR alignment plan](PLAN_HDR_SDR_ALIGNMENT.md#october-27-continuation-and-precision-accounting)
+and [current goal/run index](../SESSION-RESUME.md#current-work--october-27-2026).
+Frontend implementation awaits stable candidate adoption. Preserve native
+precision and speed; PU21 is the control, not the predetermined winner.
+The historical survey below is not current corpus admission or launch authority.
+
 > **⚠ BANNER 2026-07-18:** superseded as the ACTIVE plan by `docs/PLAN_HDR_SDR_ALIGNMENT.md` (2026-07-14); constants/corpus pointers here still valid.
 
 _Synthesized 2026-06-01 from the `zenpapers` corpus (4-agent fan-out over
