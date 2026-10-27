@@ -6685,3 +6685,30 @@ reversal for any candidate. Scores: `mixture/scores_B.json`,
 `mixture/scores_basec_*`, and the full study's `panels/mixture.json`; counts
 from `mixture_test.report`. The residual posterization rows remain a real
 limitation to report with any adoption decision, not a pass.
+
+### Prospective source-fold matched continuation (registered 2026-10-27, before any matched-continuation result)
+
+Registered at 09:55 UTC, before either seed-0 arm above has trained. It runs
+whatever the seed-0 screen shows, so no outcome chooses an arm.
+
+- **Design.** Both diagnostic populations (mixed+AIC16, AIC-only) on the D6
+  seven-fold source assignment: original Mlic full seeds 0, 1 and 2, each
+  continued on `aic_k{k}_fit.parquet` (24 public_train sources, fold k held
+  out, k = 0–6) under the same diagnostic authority and budget as the seed-0
+  screen (60 epochs × 50,000 draws, LR 1e-5 constant, fresh Adam, AIC weight
+  16, every-epoch dumps, fixed epochs 7 and 59). 2 × 3 × 7 = 42 continuations.
+- **Out-of-fold AIC.** For each arm, seed and fixed epoch, the seven fold
+  models predict only their held-out sources, giving one complete out-of-fold
+  prediction of all 3,920 rows. Report pooled, per-source, per-codec and
+  ladder panels, per seed and for the three-seed mean prediction, against the
+  zero-shot initial models. The historical AIC-only T's seven-fold panel
+  (SROCC 0.9527; `qualified_provenance=false`) is a reference point, not a gate.
+- **Drift.** Fitted-source in-sample AIC panels and the four E21 populations
+  (in sample) for every fold model; both pixel-mixture sets at both epochs.
+- **Uncertainty.** Paired seed contrasts; whole-source bootstrap (2,000 draws,
+  seed 1) of out-of-fold SROCC differences, descriptive only.
+- **Controls.** Fold tables have no prior model to reproduce; the seed-0
+  screen's exact epoch-7 control binds the shared machinery, and every fold
+  table, authority and checkpoint hash is pinned in a fresh plan.
+- No selector, packing, calibration, EVAL or public_test read. Any adoption
+  still needs the unchanged production gates. Queued after the candidate gates.
