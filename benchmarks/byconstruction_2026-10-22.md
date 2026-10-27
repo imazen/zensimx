@@ -7066,6 +7066,12 @@ against the initial model in global SROCC / mean within-reference SROCC:
 At ×256 most of the loss is cross-reference scale: the older human legs train only within-reference ranks, so their
 cross-reference order is not rehearsed. With more AIC, the within-reference order goes too.
 
+**Where the AIC gain sits** (stage A's own out-of-fold source and codec panels; no new label read). From the initial
+model to AIC-only e29, pooled out-of-fold SROCC rises +0.042 (0.9094 to 0.9515), but the mean within-source SROCC
+over the 28 sources rises only +0.016 (0.9493 to 0.9655); within one source and codec the ladders are ordered for every
+model (0.9997–0.9998). Most of the AIC gain is cross-source calibration, the same kind of order the older sets lose.
+An AIC leg ranked only within sources could not reach 0.95 pooled, so that variant is not pursued.
+
 ### Stage B details (registered 2026-10-27, 15:10 UTC, before any stage A2 result or stage B fit)
 
 The stage B registration above stands; this fixes its mechanics.
