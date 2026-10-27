@@ -161,6 +161,11 @@ enum Cmd {
     /// (weights byte-untouched; strip's inverse). Added 2026-08-28 to stamp
     /// H-TRAJ checkpoint dumps with `zentrain.repro` post-hoc.
     AppendMeta(AppendMetaArgs),
+    /// Print ONE metadata entry's UTF-8 value to stdout (strip/append's
+    /// read side). Refuses an absent key. Added 2026-10-27 so registered
+    /// studies can report checkpoint sampler receipts
+    /// (`zentrain.sample_coverage`) from the native metadata owner.
+    ReadMeta(ReadMetaArgs),
     /// Lasso-CD fit on a frozen feature-Gram npz, f16 pack, anchor spline,
     /// and bake — the Rust-native BHdr fit chain (reproduces
     /// `linear_projections_2026-07-03.py` `fit` plus `finalize` for one
@@ -2685,6 +2690,30 @@ struct AppendMetaArgs {
     /// File whose UTF-8 contents become the value.
     #[arg(long)]
     value_file: PathBuf,
+}
+
+#[derive(Args)]
+struct ReadMetaArgs {
+    #[arg(long = "in")]
+    input: PathBuf,
+    /// Metadata key to print.
+    #[arg(long)]
+    key: String,
+}
+
+fn read_meta(bytes: &[u8], key: &str) -> Result<String, String> {
+    let model = Model::from_bytes(bytes).map_err(|e| format!("parse bake: {e:?}"))?;
+    model
+        .metadata()
+        .get_utf8(key)
+        .map(str::to_owned)
+        .map_err(|e| format!("metadata key {key:?}: {e:?}"))
+}
+
+fn cmd_read_meta(a: &ReadMetaArgs) -> Result<(), String> {
+    let bytes = std::fs::read(&a.input).map_err(|e| format!("read {:?}: {e}", a.input))?;
+    println!("{}", read_meta(&bytes, &a.key)?);
+    Ok(())
 }
 
 fn cmd_append_meta(a: &AppendMetaArgs) -> Result<(), String> {
@@ -5293,6 +5322,7 @@ fn main() -> ExitCode {
         Cmd::CertifyMonotone(a) => cmd_certify_monotone(a),
         Cmd::Strip(a) => cmd_strip(a).map(|_| false),
         Cmd::AppendMeta(a) => cmd_append_meta(a).map(|_| false),
+        Cmd::ReadMeta(a) => cmd_read_meta(a).map(|_| false),
         Cmd::FitLasso(a) => cmd_fit_lasso(a).map(|_| false),
         Cmd::Gram(a) => cmd_gram(a).map(|_| false),
         Cmd::Predict(a) => cmd_predict(a).map(|_| false),
@@ -5318,6 +5348,35 @@ fn main() -> ExitCode {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn read_meta_returns_one_appended_value_and_refuses_absent_keys() {
+        let bytes = zensim_validate::mlp_train::bake_two_layer_znpr_v3(
+            &[0.0],
+            &[1.0],
+            &[1.0],
+            &[0.0],
+            &[-1.0],
+            &[100.0],
+            1,
+            1,
+            1,
+            zenpredict::WeightDtype::F32,
+            None,
+            None,
+            zenpredict::Activation::Relu,
+        );
+        let value = r#"{"per_group":[{"name":"aic_public_train","n_pairs":7}]}"#;
+        let bytes =
+            zenpredict_bake::append_metadata_utf8(&bytes, "zentrain.sample_coverage", value)
+                .unwrap();
+        assert_eq!(
+            read_meta(&bytes, "zentrain.sample_coverage").unwrap(),
+            value
+        );
+        assert!(read_meta(&bytes, "zentrain.repro").is_err());
+        assert!(read_meta(b"not a bake", "zentrain.sample_coverage").is_err());
+    }
 
     /// `--anchor-weight` count resolution: empty -> all-1 (today's
     /// behavior), exact-length taken verbatim, any other length or a zero

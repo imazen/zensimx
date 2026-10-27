@@ -30,6 +30,7 @@
 mod capabilities;
 mod confidence_weights;
 mod contrast_precision;
+mod warm_start;
 pub use capabilities::validate_training_capabilities;
 
 use rayon::prelude::*;
@@ -71,6 +72,10 @@ pub use goals::{ValidationPolicy, compute_goal_scores};
 /// architecture (228 → 32 → 1) with `Min` validation gating.
 #[derive(Clone, Debug)]
 pub struct MlpHyperparams {
+    /// Unpacked same-contract checkpoint; preserves its scaler and starts fresh Adam state.
+    pub init_from: Option<std::path::PathBuf>,
+    /// Keep `initial_lr` fixed on the plain CPU path; false preserves the 50-epoch cosine schedule.
+    pub constant_lr: bool,
     /// Fixed tau1/8 C1 activation, admitted only on the plain N path.
     pub smooth_hinge: bool,
     /// E34 K label-free repair table; absent leaves the training stream unchanged.
@@ -1001,6 +1006,8 @@ pub struct MlpHyperparams {
 impl Default for MlpHyperparams {
     fn default() -> Self {
         Self {
+            init_from: None,
+            constant_lr: false,
             smooth_hinge: false,
             steer_pairs: None,
             steer_lambda: 0.0,
@@ -1366,6 +1373,18 @@ fn project_plain(
     pin: Option<f64>,
     hp: &MlpHyperparams,
 ) {
+    project_plain_indexed(w1, w2, b1, b2, pin, hp, None);
+}
+
+fn project_plain_indexed(
+    w1: &mut [f64],
+    w2: &mut [f64],
+    b1: &mut [f64],
+    b2: &mut [f64],
+    pin: Option<f64>,
+    hp: &MlpHyperparams,
+    max_pair_positions: Option<&[[usize; 2]]>,
+) {
     // A ramp's upper unit carries `-w2[p] >= 0`; read the pair's tied output
     // weight before the `w2 <= 0` clamp erases it.
     let n_hidden = b1.len();
@@ -1380,15 +1399,19 @@ fn project_plain(
         .collect();
     // Max pairs: keep each v row's sign through the per-unit clamp below, and
     // tie the pair's output weight (mean, then <= 0).
+    let pair_at = |i: usize| max_pair_positions.map_or([2 * i, 2 * i + 1], |pairs| pairs[i]);
     let max_v_rows: Vec<Vec<f64>> = (0..hp.max_pairs)
         .map(|i| {
             w1.chunks_exact(n_hidden)
-                .map(|row| row[2 * i + 1])
+                .map(|row| row[pair_at(i)[1]])
                 .collect()
         })
         .collect();
     let max_w2: Vec<f64> = (0..hp.max_pairs)
-        .map(|i| (0.5 * (w2[2 * i] + w2[2 * i + 1])).min(0.0))
+        .map(|i| {
+            let [u, v] = pair_at(i);
+            (0.5 * (w2[u] + w2[v])).min(0.0)
+        })
         .collect();
     if hp.nonneg_thresholds && pin.is_some() {
         nonneg_project_thresholds(b1);
@@ -1446,7 +1469,7 @@ fn project_plain(
     let free = hp.monotone_feature_pin.as_deref();
     let strict = hp.monotone_strict && !hp.monotone_pin_during_training;
     for (i, (v_row, &c)) in max_v_rows.iter().zip(&max_w2).enumerate() {
-        let (u, v) = (2 * i, 2 * i + 1);
+        let [u, v] = pair_at(i);
         for (k, (row, &bv)) in w1.chunks_exact_mut(n_hidden).zip(v_row).enumerate() {
             if free.is_some_and(|pin| !pin[k]) {
                 row[u] = 0.0;
@@ -2898,6 +2921,30 @@ pub fn train_mlp_strategy_pairs(
         !rank_pairs.is_empty(),
         log,
     );
+    let initial = hyperparams.init_from.as_ref().map(|path| {
+        let bytes = std::fs::read(path)
+            .unwrap_or_else(|e| panic!("initial checkpoint {}: {e}", path.display()));
+        warm_start::InitialWeights::load(
+            &bytes,
+            n_features,
+            hyperparams,
+            input_keep_mask().as_deref(),
+        )
+        .unwrap_or_else(|e| panic!("initial checkpoint: {e}"))
+    });
+
+    let max_pair_positions = initial.as_ref().map(|init| init.max_pair_positions.clone());
+    let project_plain = |w1: &mut [f64],
+                         w2: &mut [f64],
+                         b1: &mut [f64],
+                         b2: &mut [f64],
+                         pin: Option<f64>,
+                         hp: &MlpHyperparams| {
+        match max_pair_positions.as_deref() {
+            Some(pairs) => project_plain_indexed(w1, w2, b1, b2, pin, hp, Some(pairs)),
+            None => project_plain(w1, w2, b1, b2, pin, hp),
+        }
+    };
 
     #[cfg(e36_tv)]
     let mut e36_pool = tv.map(|config| e36_tv::Pool::new(config, hyperparams));
@@ -3057,8 +3104,10 @@ pub fn train_mlp_strategy_pairs(
     // 1. Compute per-feature scaler (mean / std) using ALL training-group
     //    samples. Validation-only groups are excluded from the scaler so
     //    we never look at validation data during fit.
-    let (mut scaler_mean, scaler_scale) =
-        compute_scaler_from_groups(groups, &train_indices, n_features);
+    let (mut scaler_mean, scaler_scale) = match &initial {
+        Some(init) => (init.scaler_mean.clone(), init.scaler_scale.clone()),
+        None => compute_scaler_from_groups(groups, &train_indices, n_features),
+    };
     // `--nonneg-distance`: SCALE-ONLY standardization. The identity feature
     // vector is exactly `0⃗` (MEASURED on all 372 slots of the pinned identity
     // probe, all 38 refs byte-identical), and subtracting a mean would map it
@@ -3066,8 +3115,10 @@ pub fn train_mlp_strategy_pairs(
     // `raw(0⃗) = pin` guarantee. The scale is kept: it is what makes the inputs
     // comparable, and it maps `0` to `0`.
     if hyperparams.nonneg_distance {
-        for m in scaler_mean.iter_mut() {
-            *m = 0.0;
+        if initial.is_none() {
+            for m in scaler_mean.iter_mut() {
+                *m = 0.0;
+            }
         }
         if hyperparams.smooth_hinge {
             log_line(
@@ -3224,7 +3275,7 @@ pub fn train_mlp_strategy_pairs(
             log,
         );
     }
-    if hyperparams.nonneg_thresholds {
+    if hyperparams.nonneg_thresholds && initial.is_none() {
         let sampled = init_thresholds(
             &w1,
             &mut b1,
@@ -3251,6 +3302,20 @@ pub fn train_mlp_strategy_pairs(
                  U[0, {THRESHOLD_INIT_MAX_Q}) over {sampled} training rows; min b1 {:.6}",
                 b1.iter().copied().fold(0.0, f64::min)
             ),
+            log,
+        );
+    }
+    if let Some(init) = initial {
+        w1 = init.w1;
+        b1 = init.b1;
+        w2 = init.w2;
+        b2 = init.b2;
+        log_line(
+            "[init-from] loaded checkpoint parameters and scaler; optimizer state starts fresh",
+            log,
+        );
+        log_line(
+            &format!("[init-from] recovered max-pair positions={max_pair_positions:?}"),
             log,
         );
     }
@@ -3618,9 +3683,13 @@ pub fn train_mlp_strategy_pairs(
         // schedule is a function of. Unused (and unread) by the uniform
         // draw, which is why adding it changes nothing for a default run.
         let draw_index_base = (epoch as u64).wrapping_mul(hyperparams.pairs_per_epoch as u64);
-        let lr = hyperparams.initial_lr
-            * 0.5
-            * (1.0 + (std::f64::consts::PI * (epoch % 50) as f64 / 50.0).cos());
+        let lr = if hyperparams.constant_lr {
+            hyperparams.initial_lr
+        } else {
+            hyperparams.initial_lr
+                * 0.5
+                * (1.0 + (std::f64::consts::PI * (epoch % 50) as f64 / 50.0).cos())
+        };
 
         let mut total_loss = 0.0f64;
         let mut n_steps = 0u64;

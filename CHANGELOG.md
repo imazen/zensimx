@@ -10,10 +10,18 @@
 
 ### QUEUED BREAKING CHANGES
 
-None.
+- Unpublished `zensim-validate`: explicit `MlpHyperparams` struct literals gain the owner-approved `init_from` and `constant_lr` fields (`None` and `false` preserve default behavior). Supported serving-crate APIs are unchanged.
 
 ### Added
 
+- Checkpoint continuation on main: the owner-approved warm-start trainer
+  delta from PR 73 (`87864f94`) is ported with its D6 public_train admission.
+  The frozen 0/4/8-epoch continuation contract is unchanged; a checkpoint
+  without its continuation binding is now refused.
+- Separate version-4 authority and coordinator for the registered matched
+  continuation diagnostic (mixed+AIC16 versus AIC-only, 60 epochs, fixed
+  epochs 7/59, raw f32 panels, exact epoch-7 reproduction control).
+  `bake_dial_refit read-meta` reads checkpoint sampler receipts.
 - Registered common AIC TRAIN continuations and complete fold/full-data panels
   for Mlic, Neff, Vote and Order; final and packed/calibrated representations
   remain separate. No automatic SROCC selector or model promotion (`86748f41`,

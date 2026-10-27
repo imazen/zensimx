@@ -580,6 +580,20 @@ mlic-priority-progress:
     @just aic-recipe-adaptation-full status /mnt/v/output/zensim/mlic-aic-full-20261027-run03/PLAN.json
     @just aic-recipe-adaptation-full-panel status /mnt/v/output/zensim/mlic-aic-full-20261027-run03/PLAN.json /mnt/v/output/zensim/mlic-aic-full-20261027-run03/panels
     @just confidence-followthrough-status /mnt/v/output/zensim/mlic-confidence-followthrough-20261027-run01/CONFIG.json
+    @if [ -f /mnt/v/output/zensim/mlic-matched-continuation-20261027-run01/PLAN.json ]; then just aic-matched-continuation status /mnt/v/output/zensim/mlic-matched-continuation-20261027-run01/PLAN.json; fi
+
+# Registered matched-continuation diagnostic (byconstruction record, 2026-10-27):
+# plan freezes source/tools/inputs; queue waits for the confidence followthrough,
+# then takes heavy.lock + run-heavy; status reads live processes and artifacts.
+aic-matched-continuation mode plan:
+    OPENBLAS_NUM_THREADS=1 python3 -B scripts/byconstruction/aic_matched_continuation.py {{quote(mode)}} {{quote(plan)}}
+
+aic-matched-continuation-plan run commit trainer meta_tool:
+    python3 -B scripts/byconstruction/aic_matched_continuation.py plan {{quote(run)}} --source-commit {{quote(commit)}} --trainer {{quote(trainer)}} --meta-tool {{quote(meta_tool)}}
+
+aic-matched-continuation-tests:
+    python3 -B -m unittest scripts.tests.test_aic_matched_continuation_coordinator scripts.tests.test_aic_adaptation_full_panel
+    python3 -B -m unittest discover -s scripts/tests -p 'test_aic_matched_continuation.py'
 
 dataset-progress-tests:
     python3 -B -m unittest discover -s scripts/tests -p 'test_dataset_study_status.py' -v

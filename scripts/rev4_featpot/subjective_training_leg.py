@@ -36,7 +36,8 @@ def document(path, expected=None):
 def command_binding(authority_path,pin,cell_id,init_seed,sample_seed,width,head,recipe):
     authority = document(authority_path,pin)
     c = authority["cells"][cell_id]
-    expected_width = c["width"] if authority["schema"] == "subjective-training-authority-v2" else 1825
+    expected_width = c["width"] if authority["schema"] in ("subjective-training-authority-v2", "subjective-training-authority-v3",
+                                                           "subjective-training-authority-v4") else 1825
     if (c.get("route") not in ("d1","full","loso")
             or not 0<=c["seed_index"]<(3 if c["route"]=="loso" else 10)
             or (c["epochs"],c["pairs_per_epoch"],c["selected_epoch"])!=(120,50000,119)
@@ -46,7 +47,8 @@ def command_binding(authority_path,pin,cell_id,init_seed,sample_seed,width,head,
 
 
 def family_masks(c,records):
-    if c.get("route")!="loso": return
+    if c.get("route")!="loso":
+        return
     masks=document(c["all_leg_masks_path"],c["all_leg_masks_sha256"])
     if (masks.get("schema")!="source-family-native-mask-v1" or masks["excluded_families"]!=c["excluded_families"]
             or set(masks["groups"])!={r["name"] for r in records}):
@@ -69,7 +71,8 @@ def admit(authority_path, authority_sha256, cell_id, groups, selected_ids):
     if len(authority_sha256) != 64:
         raise ValueError("independently pinned authority required")
     a = document(authority_path, authority_sha256)
-    if a.get("schema") == "subjective-training-authority-v2":
+    if a.get("schema") in ("subjective-training-authority-v2", "subjective-training-authority-v3",
+                           "subjective-training-authority-v4"):
         return admit_datasets(a, cell_id, groups, selected_ids)
     if (a.get("schema") != "subjective-training-authority-v1" or a.get("state") != "approved"
             or a.get("artifact_visibility") != "private" or a.get("selection") != "fixed-final-epoch"):
@@ -149,6 +152,13 @@ def admit_datasets(a, cell_id, groups, selected_ids):
             or a.get("selection") != "fixed-final-epoch"):
         raise ValueError("dataset authority not admitted")
     c = a["cells"][cell_id]
+    aic_only = diagnostic_binding(a, cell_id, groups) if a["schema"] == "subjective-training-authority-v4" else False
+    if a["schema"] in ("subjective-training-authority-v3", "subjective-training-authority-v4"):
+        if "continuation" not in c:
+            raise ValueError("continuation authority requires checkpoint binding")
+        groups = [g for g in groups if g[0] != "aic_public_train"]
+    elif "continuation" in c:
+        raise ValueError("continuation requires version-3 authority")
     if c["feature_ids"] != selected_ids or c["formula_revision"] != 7 or c["tier"] != "v3":
         raise ValueError("dataset feature/producer contract differs")
     guard = document(c["family_guard_path"], c["family_guard_sha256"])
@@ -220,9 +230,108 @@ def admit_datasets(a, cell_id, groups, selected_ids):
         if r["train_weight"] != weight:
             raise ValueError("dataset nominal-weight acceptance correction differs")
         admitted[r["name"]] = d
-    if not admitted:
+    # The AIC-only diagnostic arm explicitly excludes every training leg; the
+    # exclusion is bound to the unmodified base by diagnostic_binding.
+    if not admitted and not aic_only:
         raise ValueError("dataset authority has no subjective groups")
     return admitted
+
+
+# Prospective matched-continuation diagnostic (byconstruction record,
+# 2026-10-27). Separate from the frozen 0/4/8-epoch continuation contract.
+DIAGNOSTIC_PROTOCOL = "aic-matched-continuation-diagnostic-v1"
+DIAGNOSTIC_EPOCHS = 60
+DIAGNOSTIC_AIC_WEIGHT = 16.0
+DIAGNOSTIC_POPULATIONS = ("mixed-aic16", "aic-only")
+
+
+def diagnostic_partition(base_groups, population):
+    """(retained, excluded) base group records; the native owner applies the same rule."""
+    if population not in DIAGNOSTIC_POPULATIONS:
+        raise ValueError("diagnostic population required")
+    if any(not isinstance(r.get("train_weight"), (int, float)) or not math.isfinite(r["train_weight"])
+           or r["train_weight"] < 0 for r in base_groups):
+        raise ValueError("diagnostic base train weights required")
+    if population == "mixed-aic16":
+        return list(base_groups), []
+    return ([r for r in base_groups if r["train_weight"] == 0],
+            [r for r in base_groups if r["train_weight"] > 0])
+
+
+def diagnostic_binding(a, cell_id, groups):
+    """Mirror of the native diagnostic admission; returns whether the arm is AIC-only."""
+    base = document(a["base_authority"], a["base_authority_sha256"])
+    if base.get("schema") != "subjective-training-authority-v2":
+        raise ValueError("diagnostic base must be the original version-2 authority")
+    outer = {"schema", "base_authority", "base_authority_sha256", "cells"}
+    if {k: v for k, v in a.items() if k not in outer} != {k: v for k, v in base.items() if k not in outer}:
+        raise ValueError("diagnostic authority changed a base field")
+    if set(a["cells"]) != set(base["cells"]):
+        raise ValueError("diagnostic cell inventory differs from its base")
+    if any(a["cells"][k] != base["cells"][k] for k in a["cells"] if k != cell_id):
+        raise ValueError("diagnostic authority changed another cell")
+    c, b = a["cells"][cell_id], base["cells"][cell_id]
+    inner = {"groups", "continuation"}
+    if "continuation" in b or {k: v for k, v in c.items() if k not in inner} != {k: v for k, v in b.items() if k not in inner}:
+        raise ValueError("diagnostic cell changed a base binding")
+    w = c["continuation"]
+    retained, excluded = diagnostic_partition(b["groups"], w.get("population"))
+    aic_only = w["population"] == "aic-only"
+    if (w.get("protocol") != DIAGNOSTIC_PROTOCOL or w.get("epochs") != DIAGNOSTIC_EPOCHS
+            or w.get("aic_weight") != DIAGNOSTIC_AIC_WEIGHT or w.get("dump_checkpoints_every") != 1
+            or w.get("retained_checkpoint_epochs") != [7, 59] or w.get("optimizer_state") != "fresh"
+            or c["groups"] != retained or w.get("excluded_groups") != excluded
+            or (aic_only and (not retained or not excluded))):
+        raise ValueError("diagnostic protocol/population/group partition differs")
+    aic = [g for g in groups if g[0] == "aic_public_train"]
+    if len(aic) != 1 or aic[0][2] != DIAGNOSTIC_AIC_WEIGHT:
+        raise ValueError("diagnostic requires one public_train leg at weight 16")
+    return aic_only
+
+
+def diagnostic_authority(binding, checkpoint, population, lr):
+    """Bind one arm of the registered diagnostic to its unmodified version-2 base.
+
+    Returns the new binding and the retained group names. The frozen
+    continuation_authority contract and its 0/4/8-epoch budgets are unchanged.
+    """
+    path, pin, cell, selected = binding
+    a = document(path, pin)
+    if a["schema"] != "subjective-training-authority-v2" or lr != 0.00001:
+        raise ValueError("diagnostic requires the original version-2 authority and LR 1e-5")
+    checkpoint = safe(checkpoint).resolve()
+    retained, excluded = diagnostic_partition(a["cells"][cell]["groups"], population)
+    a["schema"] = "subjective-training-authority-v4"
+    a["base_authority"] = str(Path(path).resolve())
+    a["base_authority_sha256"] = pin
+    a["cells"][cell]["groups"] = retained
+    a["cells"][cell]["continuation"] = dict(checkpoint=str(checkpoint), checkpoint_sha256=sha(checkpoint),
+        epochs=DIAGNOSTIC_EPOCHS, lr=lr, lr_schedule="constant", optimizer_state="fresh",
+        protocol=DIAGNOSTIC_PROTOCOL, population=population, aic_weight=DIAGNOSTIC_AIC_WEIGHT,
+        dump_checkpoints_every=1, retained_checkpoint_epochs=[7, 59], excluded_groups=excluded)
+    out = Path(path).with_name("diagnostic-authority.json")
+    if out.exists():
+        raise ValueError("preserve previous diagnostic authority")
+    out.write_text(json.dumps(a, sort_keys=True, separators=(",", ":"))+"\n")
+    return (out, sha(out), cell, selected), [r["name"] for r in retained]
+
+
+def continuation_authority(binding, checkpoint, epochs, lr):
+    """Bind a new continuation without changing the original full-fit authority."""
+    path, pin, cell, selected = binding
+    a = document(path, pin)
+    if a["schema"] != "subjective-training-authority-v2" or epochs not in (0, 4, 8) or lr != 0.00001:
+        raise ValueError("unregistered continuation budget")
+    checkpoint = safe(checkpoint).resolve()
+    a["schema"] = "subjective-training-authority-v3"
+    a["base_authority_sha256"] = pin
+    a["cells"][cell]["continuation"] = dict(checkpoint=str(checkpoint), checkpoint_sha256=sha(checkpoint),
+        epochs=epochs, lr=lr, lr_schedule="constant", optimizer_state="fresh")
+    out = path.with_name("continuation-authority.json")
+    if out.exists():
+        raise ValueError("preserve previous continuation authority")
+    out.write_text(json.dumps(a, sort_keys=True, separators=(",", ":"))+"\n")
+    return out, sha(out), cell, selected
 
 
 def payloads(admitted, groups):

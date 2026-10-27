@@ -96,6 +96,8 @@ def strict_group_input_roots(groups: list) -> tuple[Path, ...]:
         bound = table_input_roots(path)
         if name == "upiq380":
             bound = (*bound, Path(path).resolve().parent)
+        if name == "aic_public_train":
+            bound = (*bound, Path(path).resolve().parent)
         if not bound:
             raise ValueError(f"{name}: strict outputs require immutable input root bindings; regenerate a fresh admission view")
         roots.extend(bound)
@@ -134,6 +136,14 @@ def train_command(groups: list, init_seed: int, sample_seed: int, width: int, ke
         authority, pin, cell, _ = subjective_authority
         cmd += ["--subjective-authority", str(authority), "--subjective-authority-sha256", pin,
                 "--subjective-cell", cell]
+        continuation = json.loads(Path(authority).read_text())["cells"][cell].get("continuation")
+        if continuation:
+            cmd += ["--init-from", continuation["checkpoint"], "--lr", str(continuation["lr"]),
+                    "--lr-schedule", "constant"]
+    aic = [g for g in groups if g[0] == "aic_public_train"]
+    if aic:
+        authority = Path(aic[0][1]).parent / "_MANIFEST.json"
+        cmd += ["--aic-public-train-authority", str(authority), "--aic-public-train-authority-sha256", sha(authority)]
     for name, path, tw, vw, mode in groups:
         cmd += ["--group", f"{name}:{path}:{tw!r}:{vw!r}:{mode}"]
     recipe = recipe or {}
@@ -261,11 +271,23 @@ def strict_training_groups(groups: list, data_role_decision: Path | None = None,
         authority, pin, cell, selected = subjective_authority
         subjective = admit(authority, pin, cell, groups, selected)
     records = []
+    aic_pending = []
     checked_metadata = []
-    for name, path, train_w, val_w, _ in groups:
+    for name, path, train_w, val_w, mode in groups:
         path = safe_path(path)
         sp = Path(f"{path}.manifest.json")
         d = json.loads(sp.read_text())
+        if d.get("schema") == "aic2026-public-train-rev7-v1":
+            from v2_human_role import aic_public_train_declaration
+            if name != "aic_public_train" or train_w <= 0 or val_w != 0 or mode != "rank":
+                raise ValueError("D6 requires its fit-only pooled-rank group")
+            kp = safe_path(d["keys_path"])
+            if sha(kp) != d["keys_sha256"]:
+                raise ValueError("D6 key pin changed")
+            aic_public_train_declaration(d, json.loads(kp.read_text()))
+            aic_pending.append((path, d))
+            records.append(dict(name=name, manifest=d, manifest_sha256=sha(sp)))
+            continue
         if d.get("schema") in ("subjective-training-leg-v1", "subjective-training-leg-v2",
                                "subjective-training-leg-v3"):
             if subjective.get(name) != d:
@@ -327,6 +349,9 @@ def strict_training_groups(groups: list, data_role_decision: Path | None = None,
             if tw != 4.34410740924913 or vw != 0 or mode != "rank" or sha(path) != TABLE_SHA:
                 raise ValueError("E31 requires the registered pooled rank-only nominal-4 fit group")
     # Every population is admitted before the first table payload is hashed/read.
+    for path, d in aic_pending:
+        if sha(path) != d["table_sha256"]:
+            raise ValueError("D6 payload pin changed")
     for name, path, sp, d, keys in checked_metadata:
         if d["table_sha256"] != sha(path):
             raise ValueError(f"{name}: strict admission requires bound Rev5 table provenance")
@@ -391,17 +416,25 @@ def train_and_select(groups: list, init_seed: int, sample_seed: int, width: int,
         cmd += ["--historical-replay", reason]
     (dest / "refit").mkdir(exist_ok=True)
     ckpt = dest / "ckpt"
-    if EPOCH_RULE == "last":
+    if EPOCH_RULE == "last" and EPOCHS > 0:
         if strict_admission and ckpt.exists() and any(ckpt.iterdir()):
             raise ValueError("strict route requires a fresh checkpoint directory")
         ckpt.mkdir(exist_ok=True)
-        cmd += ["--dump-checkpoints-every", str(max(1, EPOCHS - 1)), "--dump-checkpoints-dir", str(ckpt)]
-    elif EPOCH_RULE != "best_dev":
+        every = max(1, EPOCHS - 1)
+        if subjective_authority is not None:
+            authority, _, cell, _ = subjective_authority
+            # The registered diagnostic binds every-epoch dumps; the native owner refuses any other schedule.
+            every = json.loads(Path(authority).read_text())["cells"][cell].get(
+                "continuation", {}).get("dump_checkpoints_every", every)
+        cmd += ["--dump-checkpoints-every", str(every), "--dump-checkpoints-dir", str(ckpt)]
+    elif EPOCH_RULE not in ("last", "best_dev"):
         raise ValueError(f"unknown EPOCH_RULE {EPOCH_RULE!r}")
     run(cmd, dest / "train.log")
     curve = read_curve(dest / "train.log")
-    best = max(curve, key=curve.get)
-    if EPOCH_RULE == "last":
+    best = max(curve, key=curve.get) if curve else -1
+    if EPOCHS == 0:
+        bake, selected = dest / "refit" / "best.bin", -1
+    elif EPOCH_RULE == "last":
         final = ckpt / f"ckpt_epoch{EPOCHS - 1:03d}.bin"
         if not final.is_file():
             raise ValueError(f"{final}: final-epoch checkpoint missing")
@@ -423,7 +456,7 @@ def train_and_select(groups: list, init_seed: int, sample_seed: int, width: int,
 
 def read_curve(log: Path) -> dict[int, float]:
     curve = {int(e): float(v) for e, v in EPOCH_RE.findall(log.read_text())}
-    expected = sorted(set(range(0, EPOCHS, LOG_EVERY)) | {EPOCHS - 1})
+    expected = sorted(set(range(0, EPOCHS, LOG_EVERY)) | ({EPOCHS - 1} if EPOCHS else set()))
     if sorted(curve) != expected:
         raise ValueError(f"validation curve incomplete: {len(curve)} of {len(expected)} evaluated epochs")
     return curve
@@ -497,11 +530,21 @@ def main() -> None:
     ap.add_argument("--research-extra-group", action="append", default=[],
                     help="by-construction research only: extra trainer group NAME:PATH:TW:VW:FLAGS (needs --research-replay)")
     ap.add_argument("--research-replay", help="replay reason recorded by the trainer for a research-extra fit")
+    ap.add_argument("--init-from", type=Path)
+    ap.add_argument("--fine-tune-epochs", type=int)
+    ap.add_argument("--fine-tune-lr", type=float, default=0.00001)
+    ap.add_argument("--aic-public-train", type=Path)
     from e36_training import add_args
     add_args(ap)
     from matched_codec import add_args as codec_args
     codec_args(ap)
     args = ap.parse_args()
+    if args.init_from is not None or args.fine_tune_epochs is not None:
+        if not args.init_from or args.fine_tune_epochs not in (0, 4, 8) or not args.strict_admission or not args.train_only:
+            ap.error("continuation requires its checkpoint, registered budget and strict TRAIN-only route")
+        globals().update(EPOCHS=args.fine_tune_epochs, LOG_EVERY=1)
+    elif args.aic_public_train is not None:
+        ap.error("D6 leg here requires a registered continuation")
     from e36_training import bootstrap
     bootstrap(args)
     if args.local_smoke_budget:
@@ -649,6 +692,22 @@ def main() -> None:
                                                    exclude=tuple(filter(None, args.exclude_datasets.split(","))))
         if dataset_authority:
             weights.update({name:tw for name,_,tw,_,_ in groups if tw > 0})
+    if args.init_from is not None:
+        if dataset_authority is None:
+            raise ValueError("Mlic continuation requires frozen dataset authority")
+        from subjective_training_leg import continuation_authority
+        dataset_authority = continuation_authority(dataset_authority, args.init_from, EPOCHS, args.fine_tune_lr)
+    if args.aic_public_train is not None:
+        if not args.research_extra_group:
+            raise ValueError("D6 continuation needs its explicitly weighted group")
+        aic_spec = args.research_extra_group
+        if len(aic_spec) != 1:
+            raise ValueError("one D6 continuation leg required")
+        name, path, tw, vw, mode = aic_spec[0].split(":")
+        if name != "aic_public_train" or Path(path).resolve() != args.aic_public_train.resolve() or vw != "0" or mode != "rank":
+            raise ValueError("D6 continuation leg identity differs")
+        groups.append((name, Path(path), float(tw), 0, mode))
+        args.research_extra_group = []
     try:
         from v2_common import refuse_nonfinite_kept
         if args.strict_admission:

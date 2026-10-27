@@ -33,12 +33,52 @@ fn string<'a>(v: &'a Value, key: &str) -> Result<&'a str, String> {
         .ok_or_else(|| format!("subjective {key} required"))
 }
 
-fn run_binding(c: &Value, args: &super::Args, width: usize) -> Result<(), String> {
+/// Prospective matched-continuation diagnostic (byconstruction record,
+/// 2026-10-27). Separate from the frozen 0/4/8-epoch continuation contract.
+const DIAGNOSTIC_PROTOCOL: &str = "aic-matched-continuation-diagnostic-v1";
+const DIAGNOSTIC_EPOCHS: u64 = 60;
+const DIAGNOSTIC_AIC_WEIGHT: f64 = 16.0;
+
+fn run_binding(
+    c: &Value,
+    args: &super::Args,
+    width: usize,
+    diagnostic: bool,
+) -> Result<(), String> {
+    let continuation = c.get("continuation");
+    if args.init_from.is_some() && continuation.is_none() {
+        return Err("checkpoint initialization requires its continuation binding".into());
+    }
+    if let Some(w) = continuation {
+        let path = args
+            .init_from
+            .as_ref()
+            .ok_or("continuation checkpoint required")?;
+        let budget = if diagnostic {
+            w["protocol"] == DIAGNOSTIC_PROTOCOL
+                && args.epochs as u64 == DIAGNOSTIC_EPOCHS
+                && args.dump_checkpoints_every == 1
+                && args.dump_checkpoints_dir.is_some()
+        } else {
+            w.get("protocol").is_none() && matches!(args.epochs, 0 | 4 | 8)
+        };
+        if w["checkpoint_sha256"] != hash(path)?
+            || w["checkpoint"] != path.to_string_lossy().as_ref()
+            || w["epochs"].as_u64() != Some(args.epochs as u64)
+            || !budget
+            || w["lr"].as_f64() != Some(args.lr)
+            || args.lr != 0.00001
+            || args.lr_schedule != "constant"
+            || w["lr_schedule"] != "constant"
+        {
+            return Err("continuation checkpoint/budget/schedule binding differs".into());
+        }
+    }
     let limit = if c["route"] == "loso" { 3 } else { 10 };
     if !matches!(c["route"].as_str(), Some("full" | "d1" | "loso"))
         || c["seed_index"].as_u64().is_none_or(|v| v >= limit)
         || c["epochs"] != 120
-        || args.epochs != 120
+        || (continuation.is_none() && args.epochs != 120)
         || c["pairs_per_epoch"] != 50000
         || args.pairs_per_epoch != 50000
         || c["selected_epoch"] != 119
@@ -131,7 +171,10 @@ pub(super) fn admit(
     run: Option<&super::Args>,
 ) -> Result<BTreeMap<String, Value>, String> {
     let a = json(authority_path, authority_pin)?;
-    if a["schema"] == "subjective-training-authority-v2" {
+    if a["schema"] == "subjective-training-authority-v2"
+        || a["schema"] == "subjective-training-authority-v3"
+        || a["schema"] == "subjective-training-authority-v4"
+    {
         return admit_datasets(&a, cell, groups, selected, run);
     }
     if a["schema"] != "subjective-training-authority-v1"
@@ -143,7 +186,7 @@ pub(super) fn admit(
     }
     let c = &a["cells"][cell];
     if let Some(args) = run {
-        run_binding(c, args, 1825)?;
+        run_binding(c, args, 1825, false)?;
     }
     let ids: Vec<usize> =
         serde_json::from_value(c["feature_ids"].clone()).map_err(|e| e.to_string())?;
@@ -316,6 +359,32 @@ fn admit_datasets(
     selected: &[usize],
     run: Option<&super::Args>,
 ) -> Result<BTreeMap<String, Value>, String> {
+    let filtered;
+    let diagnostic = a["schema"] == "subjective-training-authority-v4";
+    if a["schema"] != "subjective-training-authority-v3"
+        && !diagnostic
+        && a["cells"][cell].get("continuation").is_some()
+    {
+        return Err("continuation requires version-3 authority".into());
+    }
+    let aic_only = if diagnostic {
+        diagnostic_binding(a, cell, groups)?
+    } else {
+        false
+    };
+    let groups = if a["schema"] == "subjective-training-authority-v3" || diagnostic {
+        if a["cells"][cell].get("continuation").is_none() {
+            return Err("continuation authority requires its checkpoint binding".into());
+        }
+        filtered = groups
+            .iter()
+            .filter(|g| g.0 != "aic_public_train")
+            .cloned()
+            .collect::<Vec<_>>();
+        filtered.as_slice()
+    } else {
+        groups
+    };
     if a["state"] != "approved"
         || a["artifact_visibility"] != "private"
         || a["selection"] != "fixed-final-epoch"
@@ -328,7 +397,7 @@ fn admit_datasets(
             .as_u64()
             .filter(|&w| matches!(w, 1825 | 1853))
             .ok_or("dataset declared training width required")? as usize;
-        run_binding(c, args, width)?;
+        run_binding(c, args, width, diagnostic)?;
     }
     let ids: Vec<usize> =
         serde_json::from_value(c["read_ids"].clone()).map_err(|e| e.to_string())?;
@@ -510,10 +579,106 @@ fn admit_datasets(
         }
         admitted.insert(string(r, "name")?.to_owned(), d);
     }
-    if admitted.is_empty() {
+    // The AIC-only diagnostic arm explicitly excludes every training leg,
+    // including all subjective legs; its exclusion is bound to the base above.
+    if admitted.is_empty() && !aic_only {
         return Err("dataset authority has no subjective groups".into());
     }
     Ok(admitted)
+}
+
+/// Bind a diagnostic authority to its unmodified, independently pinned
+/// version-2 base. Returns whether this is the AIC-only arm.
+///
+/// The mixed arm keeps every base group. The AIC-only arm keeps exactly the
+/// base's validation-only groups (train weight zero, base order) and lists
+/// every training group (train weight positive, base order) as excluded.
+/// Every other field of the authority and of every cell must equal the base.
+fn diagnostic_binding(a: &Value, cell: &str, groups: &[Group]) -> Result<bool, String> {
+    let base = json(
+        Path::new(string(a, "base_authority")?),
+        string(a, "base_authority_sha256")?,
+    )?;
+    if base["schema"] != "subjective-training-authority-v2" {
+        return Err("diagnostic base must be the original version-2 authority".into());
+    }
+    let (Some(top), Some(base_top)) = (a.as_object(), base.as_object()) else {
+        return Err("diagnostic authority objects required".into());
+    };
+    let outer = ["schema", "base_authority", "base_authority_sha256", "cells"];
+    let strip = |o: &serde_json::Map<String, Value>, skip: &[&str]| -> BTreeMap<String, Value> {
+        o.iter()
+            .filter(|(k, _)| !skip.contains(&k.as_str()))
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect()
+    };
+    if strip(top, &outer) != strip(base_top, &outer) {
+        return Err("diagnostic authority changed a base field".into());
+    }
+    let (Some(cells), Some(base_cells)) = (a["cells"].as_object(), base["cells"].as_object())
+    else {
+        return Err("diagnostic cell inventory required".into());
+    };
+    if cells.keys().ne(base_cells.keys()) {
+        return Err("diagnostic cell inventory differs from its base".into());
+    }
+    for (name, value) in cells {
+        if name != cell && value != &base_cells[name] {
+            return Err("diagnostic authority changed another cell".into());
+        }
+    }
+    let (Some(c), Some(b)) = (
+        a["cells"][cell].as_object(),
+        base["cells"][cell].as_object(),
+    ) else {
+        return Err("diagnostic cell required".into());
+    };
+    if b.contains_key("continuation")
+        || strip(c, &["groups", "continuation"]) != strip(b, &["groups", "continuation"])
+    {
+        return Err("diagnostic cell changed a base binding".into());
+    }
+    let w = &a["cells"][cell]["continuation"];
+    let aic_only = match w["population"].as_str() {
+        Some("mixed-aic16") => false,
+        Some("aic-only") => true,
+        _ => return Err("diagnostic population required".into()),
+    };
+    let base_groups = base["cells"][cell]["groups"]
+        .as_array()
+        .ok_or("diagnostic base group inventory required")?;
+    let weight = |r: &Value| r["train_weight"].as_f64().filter(|v| v.is_finite());
+    if base_groups.iter().any(|r| weight(r).is_none_or(|v| v < 0.)) {
+        return Err("diagnostic base train weights required".into());
+    }
+    let (retained, excluded): (Vec<Value>, Vec<Value>) = if aic_only {
+        base_groups
+            .iter()
+            .cloned()
+            .partition(|r| weight(r) == Some(0.))
+    } else {
+        (base_groups.clone(), Vec::new())
+    };
+    if w["protocol"] != DIAGNOSTIC_PROTOCOL
+        || w["epochs"].as_u64() != Some(DIAGNOSTIC_EPOCHS)
+        || w["aic_weight"].as_f64() != Some(DIAGNOSTIC_AIC_WEIGHT)
+        || w["dump_checkpoints_every"] != 1
+        || w["retained_checkpoint_epochs"] != serde_json::json!([7, 59])
+        || w["optimizer_state"] != "fresh"
+        || a["cells"][cell]["groups"] != Value::Array(retained.clone())
+        || w["excluded_groups"] != Value::Array(excluded.clone())
+        || aic_only && (retained.is_empty() || excluded.is_empty())
+    {
+        return Err("diagnostic protocol/population/group partition differs".into());
+    }
+    let aic: Vec<_> = groups
+        .iter()
+        .filter(|g| g.0 == "aic_public_train")
+        .collect();
+    if aic.len() != 1 || aic[0].2 != DIAGNOSTIC_AIC_WEIGHT {
+        return Err("diagnostic requires one public_train leg at weight 16".into());
+    }
+    Ok(aic_only)
 }
 
 /// Only called after all metadata admission and payload hashes, with the
@@ -891,5 +1056,211 @@ mod tests {
                 .unwrap_err()
                 .contains("scaler/calibration")
         );
+    }
+
+    /// Version-2 base (one training leg, one validation-only leg) and its
+    /// diagnostic derivation, written to disk with independent pins.
+    fn diagnostic_fixture(root: &Path, population: &str) -> (Value, Value, PathBuf) {
+        let training = json!({"name":"trained","path":root.join("t.parquet"),"train_weight":2.5,"val_weight":0.,
+            "mode":"withinref,rank","subjective":true});
+        let validation = json!({"name":"held_development","path":root.join("v.parquet"),"train_weight":0.,
+            "val_weight":1.,"mode":"withinref,rank"});
+        let base = json!({"schema":"subjective-training-authority-v2","state":"approved",
+            "artifact_visibility":"private","selection":"fixed-final-epoch",
+            "cells":{"full-s0":{"route":"full","width":1853,"groups":[training.clone(), validation.clone()]},
+                     "full-s1":{"route":"full","width":1853,"groups":[]}}});
+        let base_path = root.join("dataset-authority.json");
+        std::fs::write(&base_path, serde_json::to_vec(&base).unwrap()).unwrap();
+        let (retained, excluded) = if population == "aic-only" {
+            (json!([validation]), json!([training]))
+        } else {
+            (base["cells"]["full-s0"]["groups"].clone(), json!([]))
+        };
+        let mut a = base.clone();
+        a["schema"] = json!("subjective-training-authority-v4");
+        a["base_authority"] = json!(base_path);
+        a["base_authority_sha256"] = json!(hash(&base_path).unwrap());
+        a["cells"]["full-s0"]["groups"] = retained;
+        a["cells"]["full-s0"]["continuation"] = json!({"checkpoint":"x","checkpoint_sha256":"y","epochs":60,
+            "lr":0.00001,"lr_schedule":"constant","optimizer_state":"fresh","protocol":DIAGNOSTIC_PROTOCOL,
+            "population":population,"aic_weight":16.0,"dump_checkpoints_every":1,
+            "retained_checkpoint_epochs":[7,59],"excluded_groups":excluded});
+        (base, a, base_path)
+    }
+    fn aic(weight: f64) -> Vec<Group> {
+        vec![(
+            "aic_public_train".into(),
+            PathBuf::from("aic.parquet"),
+            weight,
+            0.,
+            false,
+            GroupLossMode::Rank,
+        )]
+    }
+    #[test]
+    fn diagnostic_authority_binds_its_unmodified_base_and_group_partition() {
+        let root = std::env::temp_dir().join(format!("diagnostic-{}", std::process::id()));
+        std::fs::create_dir_all(&root).unwrap();
+        for population in ["mixed-aic16", "aic-only"] {
+            let (_, a, base_path) = diagnostic_fixture(&root, population);
+            assert_eq!(
+                diagnostic_binding(&a, "full-s0", &aic(16.)).unwrap(),
+                population == "aic-only"
+            );
+            // The public_train leg must be present exactly once at weight 16.
+            assert!(diagnostic_binding(&a, "full-s0", &aic(8.)).is_err());
+            assert!(diagnostic_binding(&a, "full-s0", &[]).is_err());
+            let refuse = |mutate: &dyn Fn(&mut Value), needle: &str| {
+                let mut changed = a.clone();
+                mutate(&mut changed);
+                let error = diagnostic_binding(&changed, "full-s0", &aic(16.)).unwrap_err();
+                assert!(error.contains(needle), "{population}: {error}");
+            };
+            refuse(
+                &|v| v["cells"]["full-s0"]["continuation"]["epochs"] = json!(8),
+                "protocol",
+            );
+            refuse(
+                &|v| v["cells"]["full-s0"]["continuation"]["protocol"] = json!("other"),
+                "protocol",
+            );
+            refuse(
+                &|v| v["cells"]["full-s0"]["continuation"]["dump_checkpoints_every"] = json!(7),
+                "protocol",
+            );
+            refuse(
+                &|v| v["cells"]["full-s0"]["continuation"]["population"] = json!("aic"),
+                "population",
+            );
+            refuse(
+                &|v| {
+                    v["cells"]["full-s0"]["continuation"]["excluded_groups"] = json!([{"name":"x"}])
+                },
+                "partition",
+            );
+            refuse(
+                &|v| v["cells"]["full-s0"]["groups"] = json!([]),
+                "partition",
+            );
+            refuse(
+                &|v| v["cells"]["full-s0"]["width"] = json!(1825),
+                "base binding",
+            );
+            refuse(
+                &|v| v["cells"]["full-s1"]["route"] = json!("d1"),
+                "another cell",
+            );
+            refuse(&|v| v["state"] = json!("draft"), "base field");
+            refuse(
+                &|v| v["base_authority_sha256"] = json!("0".repeat(64)),
+                "pin",
+            );
+            // A base that is itself derived cannot anchor a diagnostic.
+            let mut derived = a.clone();
+            let mut v3 =
+                serde_json::from_slice::<Value>(&std::fs::read(&base_path).unwrap()).unwrap();
+            v3["schema"] = json!("subjective-training-authority-v3");
+            let v3_path = root.join(format!("v3-{population}.json"));
+            std::fs::write(&v3_path, serde_json::to_vec(&v3).unwrap()).unwrap();
+            derived["base_authority"] = json!(v3_path);
+            derived["base_authority_sha256"] = json!(hash(&v3_path).unwrap());
+            assert!(
+                diagnostic_binding(&derived, "full-s0", &aic(16.))
+                    .unwrap_err()
+                    .contains("version-2")
+            );
+        }
+        std::fs::remove_dir_all(&root).unwrap();
+    }
+    #[test]
+    fn continuation_budgets_stay_separate_and_checkpoints_require_a_binding() {
+        use clap::Parser;
+        let root = std::env::temp_dir().join(format!("diagnostic-run-{}", std::process::id()));
+        std::fs::create_dir_all(&root).unwrap();
+        let checkpoint = root.join("initial.bin");
+        std::fs::write(&checkpoint, b"invented checkpoint bytes").unwrap();
+        let args = |epochs: &str, every: &str, init: bool| {
+            let mut argv = vec![
+                "zensim_mlp_train",
+                "--group",
+                "g:x.parquet:1:0",
+                "--out",
+                "o.bin",
+                "--epochs",
+                epochs,
+                "--pairs-per-epoch",
+                "50000",
+                "--hidden",
+                "128",
+                "--max-features",
+                "1853",
+                "--init-seed",
+                "1101",
+                "--sample-seed",
+                "101",
+                "--nonneg-distance",
+                "--lr",
+                "0.00001",
+                "--lr-schedule",
+                "constant",
+                "--dump-checkpoints-every",
+                every,
+                "--dump-checkpoints-dir",
+                "ckpt",
+            ];
+            if init {
+                argv.extend(["--init-from", checkpoint.to_str().unwrap()]);
+            }
+            super::super::Args::parse_from(argv)
+        };
+        let cell = |protocol: Option<&str>, epochs: u64| {
+            let mut w = json!({"checkpoint":checkpoint,"checkpoint_sha256":hash(&checkpoint).unwrap(),
+                "epochs":epochs,"lr":0.00001,"lr_schedule":"constant"});
+            if let Some(p) = protocol {
+                w["protocol"] = json!(p);
+            }
+            json!({"route":"full","seed_index":0,"epochs":120,"pairs_per_epoch":50000,"selected_epoch":119,
+                "init_seed":1101,"sample_seed":101,"continuation":w})
+        };
+        // Frozen registration: 0/4/8 epochs only, and never under a protocol label.
+        run_binding(&cell(None, 8), &args("8", "7", true), 1853, false).unwrap();
+        assert!(run_binding(&cell(None, 60), &args("60", "1", true), 1853, false).is_err());
+        assert!(
+            run_binding(
+                &cell(Some(DIAGNOSTIC_PROTOCOL), 8),
+                &args("8", "7", true),
+                1853,
+                false
+            )
+            .is_err()
+        );
+        // Diagnostic: exactly 60 epochs with every-epoch dumps, only under version 4.
+        run_binding(
+            &cell(Some(DIAGNOSTIC_PROTOCOL), 60),
+            &args("60", "1", true),
+            1853,
+            true,
+        )
+        .unwrap();
+        assert!(
+            run_binding(
+                &cell(Some(DIAGNOSTIC_PROTOCOL), 60),
+                &args("60", "59", true),
+                1853,
+                true
+            )
+            .is_err()
+        );
+        assert!(run_binding(&cell(None, 8), &args("8", "7", true), 1853, true).is_err());
+        // A checkpoint without its binding no longer falls back to a full fit.
+        let mut plain = cell(None, 8);
+        plain.as_object_mut().unwrap().remove("continuation");
+        run_binding(&plain, &args("120", "119", false), 1853, false).unwrap();
+        assert!(
+            run_binding(&plain, &args("120", "119", true), 1853, false)
+                .unwrap_err()
+                .contains("binding")
+        );
+        std::fs::remove_dir_all(&root).unwrap();
     }
 }
