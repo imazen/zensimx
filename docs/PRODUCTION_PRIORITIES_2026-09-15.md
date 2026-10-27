@@ -491,3 +491,14 @@ zenpapers `observer_models.py::sureal` at `4e81c03a` with unchanged arithmetic
 and separate Part 1/Part 2 observer blocks. A synthetic complete path checks
 that only the selected items enter that fit. Actual native source verification
 is the next admission step; no per-item training weight is enabled yet.
+
+The first native uncertainty audit passed the selected KADID, TID2013 and
+Colourlab reads, then refused LIVE-MD before decoding observer responses.
+Its declared MATLAB class is double, but the release stores `dist_diffscores`
+using the exact signed-16-bit numeric storage type (19×225 and 18×225 in the
+two parts). The selected-column reader now supports that lossless storage
+case. A SciPy-oracle control checks signed endpoints and column order after
+conversion to f64; no uncertainty threshold or scientific gate changed.
+The failed audit remains under
+`/mnt/v/output/zensim/mlic-confidence-native-audit-20261027`; the next attempt
+uses a fresh directory and the same frozen population/source hashes.

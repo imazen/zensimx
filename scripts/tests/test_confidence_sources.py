@@ -119,5 +119,20 @@ class NativeUncertainty(unittest.TestCase):
         self.assertEqual({r["n"] for r in result.values()},{18,19})
         self.assertTrue(all(r["se_native"]>0 for r in result.values()))
 
+    def test_native_double_class_can_store_exact_int16_values(self):
+        import struct
+        import numpy as np
+        from scipy.io import savemat, loadmat
+        from live_md_uncertainty import selected_columns
+        stream=io.BytesIO();values=np.array([[-32768,0,32767],[17,-12,300]],dtype=np.int16)
+        savemat(stream,{"dist_diffscores":values},do_compression=False)
+        raw=bytearray(stream.getvalue())
+        # MAT's numeric storage tag is independent of the declared MATLAB class.
+        struct.pack_into("<I",raw,144,6)
+        oracle=loadmat(io.BytesIO(raw))["dist_diffscores"][:,[2,0]]
+        actual=selected_columns(raw,"dist_diffscores",[2,0],(2,3))
+        self.assertEqual(actual.dtype,np.float64)
+        np.testing.assert_array_equal(actual,oracle)
+
 
 if __name__=="__main__":unittest.main()

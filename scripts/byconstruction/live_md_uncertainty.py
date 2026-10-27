@@ -1,7 +1,7 @@
 """Read only admitted LIVE-MD observer columns from its bounded MAT-v5 sources.
 
 Format: https://www.mathworks.com/help/pdf_doc/matlab/matfile_format.pdf
-This adapter supports the released little-endian real-double matrices only.
+This adapter supports little-endian real-double-class matrices with f64 or i16 storage.
 Opaque decompression is not a response read; numeric decoding is column-selected.
 """
 import struct
@@ -54,14 +54,15 @@ def selected_columns(raw,name,columns,shape):
         if (len(parts)!=4 or parts[0][0]!=6 or len(parts[0][1])!=8
                 or struct.unpack("<II",parts[0][1])!=(6,0)
                 or parts[1][0]!=5 or len(parts[1][1])!=8
-                or struct.unpack("<ii",parts[1][1])!=shape or parts[3][0]!=9):
+                or struct.unpack("<ii",parts[1][1])!=shape or parts[3][0] not in (3,9)):
             raise ValueError("native real-double matrix shape/type differs")
+        dtype,size={3:("<i2",2),9:("<f8",8)}[parts[3][0]]
         payload=parts[3][1]
-        if len(payload)!=shape[0]*shape[1]*8:raise ValueError("native matrix byte count differs")
+        if len(payload)!=shape[0]*shape[1]*size:raise ValueError("native matrix byte count differs")
         selected=[]
         for col in columns:
-            start=col*shape[0]*8
-            selected.append(np.frombuffer(payload[start:start+shape[0]*8],dtype="<f8").copy())
+            start=col*shape[0]*size
+            selected.append(np.frombuffer(payload[start:start+shape[0]*size],dtype=dtype).astype(np.float64))
         found=np.stack(selected,axis=1)
         if not np.isfinite(found).all():raise ValueError("selected native observer response is nonfinite")
     if found is None:raise ValueError("required native response matrix absent")
