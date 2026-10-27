@@ -140,6 +140,8 @@ def checked(path, schema="aic-matched-continuation-plan-v1"):
     protocol = PROTOCOL if schema == FOLD_SCHEMA or schema.startswith("aic-matched") else FRONTIER_PROTOCOL
     if schema in (RECIPE_SCHEMA, SEEDS_SCHEMA, OMISSION_SCHEMA, FULL_SCHEMA, XREF_SCHEMA):
         protocol = diagnostic_protocol(next(iter(value["arms"].values())))[0]
+    if schema == WISE_SCHEMA:
+        protocol = WISE_PROTOCOL
     if value["schema"] != schema or value["protocol"] != protocol:
         raise ValueError("diagnostic plan schema differs")
     for item in value["registered_inputs"].values():
@@ -473,7 +475,7 @@ RECIPE_INPUTS = dict(
 def plan_schema(path):
     schema = json.loads(Path(path).read_text()).get("schema")
     if schema not in (FOLD_SCHEMA, FRONTIER_SCHEMA, RECOVERY_SCHEMA, RECIPE_SCHEMA, SEEDS_SCHEMA, OMISSION_SCHEMA, FULL_SCHEMA,
-                      XREF_SCHEMA):
+                      XREF_SCHEMA, WISE_SCHEMA):
         raise ValueError("source-fold or frontier plan required")
     return schema
 
@@ -679,6 +681,43 @@ def xref_plan(run, commit, trainer, meta_tool, after_run):
                                    "decides; no adoption", priority="queued after stage B"))
 
 
+# Stage F (registered 2026-10-27 before any interpolation result): Mlic seed 0 interpolated in weight space toward each
+# fold's seed-0 model of three AIC-heavy arms; no training. The bake owner's `interpolate` emits every point.
+WISE_SCHEMA = "aic-share-wise-plan-v1"
+WISE_PROTOCOL = "aic-share-wise-v1"
+WISE_REGISTRATION = dict(record="benchmarks/byconstruction_2026-10-22.md",
+                         section="Stage F: weight-space interpolation between Mlic and AIC-heavy fold models",
+                         commit="d75866aaeeeb6e769b1f318f264aa48047cccf44")
+WISE_ENDS = {"AICOnly": (FRONTIER_REUSED_RUN, "AICOnly", 29),
+             "MixedAIC1024": (Path("/mnt/v/output/zensim/mlic-aic-share-frontier-20261027-run01"), "MixedAIC1024", 59),
+             "XrefAIC1024": (Path("/mnt/v/output/zensim/mlic-aic-xref-20261027-run01"), "XrefAIC1024", 59)}
+WISE_ALPHAS = (0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9)
+
+
+def wise_arm(end, alpha):
+    return f"Wise{end}A{round(alpha * 100):02d}"
+
+
+def wise_plan(run, commit, trainer, meta_tool, after_run):
+    """Freeze stage F: every interpolation point as an arm whose one checkpoint (epoch 0) the bake owner emits."""
+    ends = {}
+    for name, (run_dir, arm, epoch) in WISE_ENDS.items():
+        if not (run_dir / "COMPLETE.json").exists():
+            raise ValueError(f"{run_dir.name} must be complete")
+        ends[name] = dict(run_dir=str(run_dir), arm=arm, epoch=epoch,
+                          population=json.loads((run_dir / "PLAN.json").read_text())["arms"][arm],
+                          checkpoint_sha256={f"0|{k}": sha(run_dir / "arms" / arm / f"s0_k{k}/ckpt/ckpt_epoch{epoch:03d}.bin")
+                                             for k in SOURCE_FOLDS})
+    interpolations = {wise_arm(end, alpha): dict(end=end, alpha=alpha) for end in WISE_ENDS for alpha in WISE_ALPHAS}
+    seven_fold_plan(run, commit, trainer, meta_tool, schema=WISE_SCHEMA, protocol=WISE_PROTOCOL,
+                    registration=WISE_REGISTRATION, arms={arm: "interpolation" for arm in interpolations},
+                    seeds=FRONTIER_SEEDS, checkpoints=(0,), extra=dict(
+                        ends=ends, interpolations=interpolations,
+                        contrasts=[[f"{arm}@e0", "Initial"] for arm in interpolations], after_run=str(after_run),
+                        assessment="stage F seed-0 weight interpolation; registered rule against Mlic; no adoption",
+                        priority="queued between the omission runs"))
+
+
 # Stage C recipe variant (registered 2026-10-27 after stage B): a recipe point runs stage C on the recipe's own full
 # models, root and omission cells. Recipes with per-seed factors (Order, Confidence) need their own variant.
 RECIPE_C_REGISTRATION = dict(record="benchmarks/byconstruction_2026-10-22.md",
@@ -857,10 +896,28 @@ def fold_run(path):
         write(output / name, finite_json(value), fresh=True)
     environment = dict(os.environ, REV4_V2_BIN_DIR=str(run_dir / "bin"), RAYON_NUM_THREADS="1",
                        OMP_NUM_THREADS="1", OPENBLAS_NUM_THREADS="1", ZENSIM_MAX_TIER="v3")
+    def interpolate(arm, seed, k, dest, label):
+        """Stage F: the bake owner emits this fold's point between the initial model and the end arm's checkpoint."""
+        spec = plan_value["interpolations"][arm]
+        end = plan_value["ends"][spec["end"]]
+        model_b = Path(end["run_dir"]) / "arms" / end["arm"] / f"s{seed}_k{k}/ckpt/ckpt_epoch{end['epoch']:03d}.bin"
+        if sha(model_b) != end["checkpoint_sha256"][f"{seed}|{k}"]:
+            raise ValueError(f"{label}: end checkpoint changed")
+        out = dest / "ckpt/ckpt_epoch000.bin"
+        out.parent.mkdir(parents=True)
+        with (run_dir / "arms" / arm / f"s{seed}_k{k}.log").open("x") as log:
+            if subprocess.run([str(run_dir / "tools/bake_dial_refit"), "interpolate", "--a",
+                               str(Path(plan_value["initial"][str(seed)]["directory"]) / "refit/last.bin"), "--b",
+                               str(model_b), "--alpha", repr(spec["alpha"]), "--out", str(out)],
+                              stdout=log, stderr=subprocess.STDOUT).returncode:
+                raise RuntimeError(f"{label} interpolation failed; preserved in its log")
+        return dict(arm=arm, seed=seed, fold=k, directory=str(dest), checkpoints={"0": sha(out)})
     def fit(run):
         arm, seed, k = run
         label = f"{arm}|s{seed}|k{k}"
         dest = run_dir / "arms" / arm / f"s{seed}_k{k}"
+        if arm in plan_value.get("interpolations", {}):
+            return interpolate(arm, seed, k, dest, label)
         scratch = Path.home() / "tmp" / f"{run_dir.name}-{arm}-s{seed}-k{k}"
         scratch.mkdir(parents=True)
         start = plan_value.get("run_initial", {}).get(f"s{seed}_k{k}")
@@ -995,13 +1052,16 @@ def fold_run(path):
                     raise ValueError(f"reused {arm} checkpoint changed: {label}")
         stage("native-sampling-receipts")
         tool = run_dir / "tools/bake_dial_refit"
-        # Order's matched-codec route trains without sample-coverage replay; its own arm has no receipt.
-        unrecorded = [a for a in arms if plan_value.get("sample_coverage") is False and arms[a] != "aic-only"]
+        # Order's matched-codec route trains without sample-coverage replay; its own arm has no receipt. Stage F's
+        # interpolation points are not trained at all.
+        unrecorded = [a for a in arms if (plan_value.get("sample_coverage") is False and arms[a] != "aic-only")
+                      or a in plan_value.get("interpolations", {})]
         exposure = {f"{arm}@e{e}|s{seed}|k{k}": sampler_receipt(tool, checkpoint(arm, seed, k, e), e)
                     for arm in every_arm if arm not in unrecorded
                     for seed in seeds for k in SOURCE_FOLDS for e in checkpoints}
         write(run_dir / "EXPOSURE.json", dict(source="zentrain.sample_coverage prefix receipts, native replay",
-              runs=exposure, not_recorded={a: "matched-codec route trains without sample-coverage replay"
+              runs=exposure, not_recorded={a: "weight interpolation, not trained" if a in plan_value.get("interpolations", {})
+                                           else "matched-codec route trains without sample-coverage replay"
                                            for a in unrecorded}), fresh=True)
         stage("raw-f32-panels")
         source = Path(fold["warmstart_source"])
@@ -1600,6 +1660,12 @@ if __name__ == "__main__":
     p.add_argument("--start", nargs=3, metavar=("RUN", "ARM", "EPOCH"),
                    help="recovery phase: continue from that run's fold checkpoints")
     p.add_argument("--no-control", action="store_true", help="the recipe's replay control already ran in its first phase")
+    p = sub.add_parser("wise-plan", help="stage F: weight interpolation between Mlic and AIC-heavy fold models")
+    p.add_argument("run", type=Path)
+    p.add_argument("--source-commit", required=True)
+    p.add_argument("--trainer", type=Path, required=True)
+    p.add_argument("--meta-tool", type=Path, required=True, help="bake owner build with `interpolate`")
+    p.add_argument("--after-run", type=Path, required=True)
     p = sub.add_parser("xref-plan", help="stage D: the within-dataset rehearsal frontier at x256 and x1024")
     p.add_argument("run", type=Path)
     p.add_argument("--source-commit", required=True)
@@ -1616,6 +1682,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
     if args.mode == "xref-plan":
         xref_plan(args.run, args.source_commit, args.trainer, args.meta_tool, args.after_run)
+    elif args.mode == "wise-plan":
+        wise_plan(args.run, args.source_commit, args.trainer, args.meta_tool, args.after_run)
     elif args.mode == "full-plan":
         full_plan(args.run, args.source_commit, args.trainer, args.meta_tool, Path(args.point[0]), args.point[1],
                   int(args.point[2]), args.after_run)

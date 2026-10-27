@@ -423,6 +423,31 @@ class RehearsalStage(unittest.TestCase):
             self.assertEqual(owner.plan_schema(path), owner.XREF_SCHEMA)
 
 
+class InterpolationStage(unittest.TestCase):
+    def test_points_cover_every_end_and_weight_once(self):
+        arms = {owner.wise_arm(end, alpha) for end in owner.WISE_ENDS for alpha in owner.WISE_ALPHAS}
+        self.assertEqual(len(arms), 27)
+        self.assertEqual(owner.wise_arm("AICOnly", 0.3), "WiseAICOnlyA30")
+        self.assertEqual({epoch for _, _, epoch in owner.WISE_ENDS.values()}, {29, 59})
+        plan = dict(arms={arm: "interpolation" for arm in arms}, seeds=[0])
+        self.assertEqual(len(owner.fold_runs(plan)), 27 * 7)
+
+    def test_plans_check_their_own_protocol(self):
+        with tempfile.TemporaryDirectory(dir=Path.home() / "tmp") as tmp:
+            path = Path(tmp) / "PLAN.json"
+            path.write_text(json.dumps(dict(schema=owner.WISE_SCHEMA)))
+            self.assertEqual(owner.plan_schema(path), owner.WISE_SCHEMA)
+            path.write_text(json.dumps(dict(schema=owner.WISE_SCHEMA, protocol=owner.WISE_PROTOCOL,
+                                            arms={"WiseAICOnlyA30": "interpolation"}, registered_inputs={},
+                                            input_sha256={}, bin_sha256={}, meta_tool_sha256="", source_archive_sha256="")))
+            with self.assertRaises(FileNotFoundError):  # passes the protocol check, then hashes its inputs
+                owner.checked(path, owner.WISE_SCHEMA)
+            path.write_text(json.dumps(dict(schema=owner.WISE_SCHEMA, protocol=owner.FRONTIER_PROTOCOL,
+                                            arms={"WiseAICOnlyA30": "interpolation"})))
+            with self.assertRaisesRegex(ValueError, "schema differs"):
+                owner.checked(path, owner.WISE_SCHEMA)
+
+
 class RecipeVariant(unittest.TestCase):
     def test_mlic_points_have_no_recipe_and_factor_recipes_refuse_before_any_read(self):
         self.assertEqual(owner.recipe_point(dict(schema=owner.FRONTIER_SCHEMA)), (None, None, None))

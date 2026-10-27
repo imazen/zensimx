@@ -166,6 +166,14 @@ enum Cmd {
     /// studies can report checkpoint sampler receipts
     /// (`zentrain.sample_coverage`) from the native metadata owner.
     ReadMeta(ReadMetaArgs),
+    /// Weight-space interpolation of two bakes of one architecture: every
+    /// weight and bias becomes (1 - alpha)*a + alpha*b (f64, rounded to f32;
+    /// alpha 0 and 1 copy their end exactly). Refuses unless shapes,
+    /// activations, f32 storage, scaler and every non-provenance metadata
+    /// entry match; both ends' run provenance moves into one
+    /// `zentrain.interpolation` entry. Added 2026-10-27 for stage F of the
+    /// AIC-share frontier (byconstruction record).
+    Interpolate(InterpolateArgs),
     /// Lasso-CD fit on a frozen feature-Gram npz, f16 pack, anchor spline,
     /// and bake — the Rust-native BHdr fit chain (reproduces
     /// `linear_projections_2026-07-03.py` `fit` plus `finalize` for one
@@ -761,25 +769,21 @@ fn cmd_add_spline(a: &AddSplineArgs) -> Result<(), String> {
     Ok(())
 }
 
-/// Re-emit an arbitrary bake VERBATIM (every layer, dtype-preserving) with
-/// replacement metadata — the MLP-capable sibling of [`emit_linear`]. f16
-/// weights round-trip exactly; i8 layers error (extend when needed).
-/// `schema_hash`: `add-spline` passes 0 (its established output bytes predate
-/// the parameter — do not change them); `strip` preserves the input's.
-fn emit_full(
-    out: &Path,
-    model: &Model,
-    metadata: &[OwnedMeta],
-    schema_hash: u64,
-) -> std::io::Result<usize> {
-    struct OwnedLayer {
-        in_dim: usize,
-        out_dim: usize,
-        activation: Activation,
-        dtype: WeightDtype,
-        weights: Vec<f32>,
-        biases: Vec<f32>,
-    }
+/// One layer of a bake as owned f32 values plus its stored dtype, so a re-emit can
+/// rewrite weights (or keep them verbatim) before serializing.
+#[derive(Clone)]
+struct OwnedLayer {
+    in_dim: usize,
+    out_dim: usize,
+    activation: Activation,
+    dtype: WeightDtype,
+    weights: Vec<f32>,
+    biases: Vec<f32>,
+}
+
+/// Every layer of `model` as owned values: f32 verbatim, f16 widened exactly;
+/// i8 layers error (extend the dequant like repack when needed).
+fn owned_layers(model: &Model) -> std::io::Result<Vec<OwnedLayer>> {
     let mut owned: Vec<OwnedLayer> = Vec::with_capacity(model.n_layers());
     for l in model.layers() {
         let (dtype, weights) = match &l.weights {
@@ -803,6 +807,52 @@ fn emit_full(
             biases: l.biases.to_vec(),
         });
     }
+    Ok(owned)
+}
+
+/// Re-emit an arbitrary bake VERBATIM (every layer, dtype-preserving) with
+/// replacement metadata — the MLP-capable sibling of [`emit_linear`]. f16
+/// weights round-trip exactly; i8 layers error (extend when needed).
+/// `schema_hash`: `add-spline` passes 0 (its established output bytes predate
+/// the parameter — do not change them); `strip` preserves the input's.
+fn emit_full(
+    out: &Path,
+    model: &Model,
+    metadata: &[OwnedMeta],
+    schema_hash: u64,
+) -> std::io::Result<usize> {
+    emit_layers(
+        out,
+        model.scaler_mean(),
+        model.scaler_scale(),
+        &owned_layers(model)?,
+        metadata,
+        schema_hash,
+    )
+}
+
+/// Serialize owned layers with the given scaler and metadata through the canonical
+/// ZNPR v3 serializer (flags 0, compressed, no optional sections) and write them.
+fn emit_layers(
+    out: &Path,
+    scaler_mean: &[f32],
+    scaler_scale: &[f32],
+    owned: &[OwnedLayer],
+    metadata: &[OwnedMeta],
+    schema_hash: u64,
+) -> std::io::Result<usize> {
+    let bytes = bake_layers(scaler_mean, scaler_scale, owned, metadata, schema_hash);
+    std::fs::write(out, &bytes)?;
+    Ok(bytes.len())
+}
+
+fn bake_layers(
+    scaler_mean: &[f32],
+    scaler_scale: &[f32],
+    owned: &[OwnedLayer],
+    metadata: &[OwnedMeta],
+    schema_hash: u64,
+) -> Vec<u8> {
     let layers: Vec<BakeLayer<'_>> = owned
         .iter()
         .map(|l| BakeLayer {
@@ -822,11 +872,11 @@ fn emit_full(
             value: &m.value,
         })
         .collect();
-    let bytes = bake(&BakeRequest {
+    bake(&BakeRequest {
         schema_hash,
         flags: 0,
-        scaler_mean: model.scaler_mean(),
-        scaler_scale: model.scaler_scale(),
+        scaler_mean,
+        scaler_scale,
         layers: &layers,
         feature_bounds: &[],
         metadata: &md,
@@ -838,9 +888,7 @@ fn emit_full(
         compressed: true,
         hu_permutations: None,
     })
-    .expect("serialize ZNPR v3 bake");
-    std::fs::write(out, &bytes)?;
-    Ok(bytes.len())
+    .expect("serialize ZNPR v3 bake")
 }
 
 // --------------------------------------------------------------------------
@@ -2784,6 +2832,289 @@ fn cmd_strip(a: &StripArgs) -> Result<(), String> {
         metadata.len(),
         a.out
     );
+    Ok(())
+}
+
+// --------------------------------------------------------------------------
+// subcommand: interpolate  (stage F of the AIC-share frontier, 2026-10-27)
+// --------------------------------------------------------------------------
+
+#[derive(Args)]
+struct InterpolateArgs {
+    /// The model at alpha = 0 (before the continuation).
+    #[arg(long)]
+    a: PathBuf,
+    /// The model at alpha = 1 (after the continuation).
+    #[arg(long)]
+    b: PathBuf,
+    /// Weight of `b`, in [0, 1].
+    #[arg(long)]
+    alpha: f64,
+    #[arg(long)]
+    out: PathBuf,
+}
+
+/// Metadata entries that record how one training run produced a bake. An
+/// interpolated bake was produced by neither run alone, so both ends' copies
+/// move into its `zentrain.interpolation` entry; every other entry must match.
+const RUN_PROVENANCE_KEYS: [&str; 2] = ["zentrain.repro", "zentrain.sample_coverage"];
+const INTERPOLATION_KEY: &str = "zentrain.interpolation";
+
+fn mix_f32(a: &[f32], b: &[f32], alpha: f64) -> Vec<f32> {
+    if alpha == 0.0 {
+        return a.to_vec();
+    }
+    if alpha == 1.0 {
+        return b.to_vec();
+    }
+    a.iter()
+        .zip(b)
+        .map(|(&x, &y)| ((1.0 - alpha) * f64::from(x) + alpha * f64::from(y)) as f32)
+        .collect()
+}
+
+fn same_bits(a: &[f32], b: &[f32]) -> bool {
+    a.len() == b.len() && a.iter().zip(b).all(|(x, y)| x.to_bits() == y.to_bits())
+}
+
+/// A unit's match must be at most this fraction of its distance to the nearest
+/// other unit of `a`, or the alignment is refused as ambiguous.
+const MAX_MATCH_RATIO: f64 = 0.5;
+
+/// `b`'s layers with every interior (hidden) dimension permuted into `a`'s unit
+/// order. The forward pass does not depend on hidden-unit order and the
+/// serializer stores units sorted by incoming-weight norm, so two checkpoints of
+/// one run can list the same units in different orders. Each unit of `b` is
+/// matched to the unit of `a` nearest in (incoming weights, bias, outgoing
+/// weights); units of `a` with identical parameters are interchangeable.
+/// Refuses unless the match is one to one and every unit's matched distance is
+/// at most [`MAX_MATCH_RATIO`] of its distance to any other unit. Returns the
+/// aligned layers, the largest such ratio and the number of units that moved.
+fn align_hidden_units(
+    a: &[OwnedLayer],
+    b: &[OwnedLayer],
+) -> Result<(Vec<OwnedLayer>, f64, usize), String> {
+    let mut aligned = b.to_vec();
+    let (mut worst, mut moved) = (0.0f64, 0usize);
+    for i in 0..a.len().saturating_sub(1) {
+        let (n, in_dim, next) = (a[i].out_dim, a[i].in_dim, a[i + 1].out_dim);
+        let signature = |layers: &[OwnedLayer], c: usize| -> Vec<f32> {
+            let mut s: Vec<f32> = (0..in_dim).map(|r| layers[i].weights[r * n + c]).collect();
+            s.push(layers[i].biases[c]);
+            s.extend_from_slice(&layers[i + 1].weights[c * next..(c + 1) * next]);
+            s
+        };
+        let sa: Vec<Vec<f32>> = (0..n).map(|c| signature(a, c)).collect();
+        let sb: Vec<Vec<f32>> = (0..n).map(|c| signature(&aligned, c)).collect();
+        let mut class = vec![usize::MAX; n];
+        let mut members: Vec<Vec<usize>> = Vec::new();
+        for c in 0..n {
+            if class[c] == usize::MAX {
+                let id = members.len();
+                let same: Vec<usize> = (c..n).filter(|&d| same_bits(&sa[c], &sa[d])).collect();
+                for &d in &same {
+                    class[d] = id;
+                }
+                members.push(same);
+            }
+        }
+        let distance = |x: &[f32], y: &[f32]| -> f64 {
+            x.iter()
+                .zip(y)
+                .map(|(&p, &q)| (f64::from(p) - f64::from(q)).powi(2))
+                .sum::<f64>()
+                .sqrt()
+        };
+        let mut assigned: Vec<Vec<usize>> = vec![Vec::new(); members.len()];
+        for (j, s) in sb.iter().enumerate() {
+            let per_class: Vec<f64> = members.iter().map(|m| distance(&sa[m[0]], s)).collect();
+            let best = (0..per_class.len())
+                .min_by(|&x, &y| per_class[x].total_cmp(&per_class[y]))
+                .ok_or("no hidden units")?;
+            let other = (0..per_class.len())
+                .filter(|&x| x != best)
+                .map(|x| per_class[x])
+                .fold(f64::INFINITY, f64::min);
+            let ratio = if per_class[best] == 0.0 {
+                0.0
+            } else {
+                per_class[best] / other
+            };
+            if ratio > MAX_MATCH_RATIO {
+                return Err(format!(
+                    "layer {i} unit {j}: matched distance {:.3e} is {ratio:.3} of the next unit's; ambiguous",
+                    per_class[best]
+                ));
+            }
+            worst = worst.max(ratio);
+            assigned[best].push(j);
+        }
+        let mut perm = vec![0usize; n];
+        for (m, js) in members.iter().zip(&assigned) {
+            if m.len() != js.len() {
+                return Err(format!("layer {i}: hidden units do not match one to one"));
+            }
+            for (&ia, &jb) in m.iter().zip(js) {
+                perm[ia] = jb;
+                moved += usize::from(ia != jb);
+            }
+        }
+        let (old_i, old_next) = (aligned[i].clone(), aligned[i + 1].clone());
+        for (ia, &jb) in perm.iter().enumerate() {
+            for r in 0..in_dim {
+                aligned[i].weights[r * n + ia] = old_i.weights[r * n + jb];
+            }
+            aligned[i].biases[ia] = old_i.biases[jb];
+            aligned[i + 1].weights[ia * next..(ia + 1) * next]
+                .copy_from_slice(&old_next.weights[jb * next..(jb + 1) * next]);
+        }
+    }
+    Ok((aligned, worst, moved))
+}
+
+/// One interpolated bake before serialization.
+struct Interpolated {
+    layers: Vec<OwnedLayer>,
+    metadata: Vec<OwnedMeta>,
+    scaler_mean: Vec<f32>,
+    scaler_scale: Vec<f32>,
+}
+
+/// The interpolated layers and metadata of `a` and `b` at `alpha`, with both
+/// ends' hashes recorded. Refuses any structural difference between the ends.
+fn interpolate_bakes(a: &[u8], b: &[u8], alpha: f64) -> Result<Interpolated, String> {
+    if !(0.0..=1.0).contains(&alpha) {
+        return Err(format!("alpha {alpha} outside [0, 1]"));
+    }
+    let ma = Model::from_bytes(a).map_err(|e| format!("parse a: {e:?}"))?;
+    let mb = Model::from_bytes(b).map_err(|e| format!("parse b: {e:?}"))?;
+    for (end, m) in [("a", &ma), ("b", &mb)] {
+        if !m.feature_bounds().is_empty()
+            || !m.output_specs().is_empty()
+            || !m.discrete_sets().is_empty()
+            || !m.sparse_overrides().is_empty()
+        {
+            return Err(format!(
+                "{end} carries feature_bounds/output_specs/discrete_sets/sparse_overrides, \
+                 which interpolate does not carry"
+            ));
+        }
+    }
+    if ma.schema_hash() != mb.schema_hash() || ma.flags() != mb.flags() {
+        return Err("schema hash or flags differ".into());
+    }
+    if !same_bits(ma.scaler_mean(), mb.scaler_mean())
+        || !same_bits(ma.scaler_scale(), mb.scaler_scale())
+    {
+        return Err("input scalers differ".into());
+    }
+    let (la, lb) = (
+        owned_layers(&ma).map_err(|e| e.to_string())?,
+        owned_layers(&mb).map_err(|e| e.to_string())?,
+    );
+    if la.len() != lb.len() {
+        return Err(format!("{} layers against {}", la.len(), lb.len()));
+    }
+    for (i, (x, y)) in la.iter().zip(&lb).enumerate() {
+        if (x.in_dim, x.out_dim) != (y.in_dim, y.out_dim) || x.activation != y.activation {
+            return Err(format!("layer {i}: shape or activation differs"));
+        }
+        if x.dtype != WeightDtype::F32 || y.dtype != WeightDtype::F32 {
+            return Err(format!("layer {i}: interpolate takes f32 layers only"));
+        }
+        if !x
+            .weights
+            .iter()
+            .chain(&x.biases)
+            .chain(&y.weights)
+            .chain(&y.biases)
+            .all(|v| v.is_finite())
+        {
+            return Err(format!("layer {i}: nonfinite parameter"));
+        }
+    }
+    let (lb, worst_match, moved_units) = align_hidden_units(&la, &lb)?;
+    let mut layers = Vec::with_capacity(la.len());
+    for (x, y) in la.iter().zip(&lb) {
+        layers.push(OwnedLayer {
+            in_dim: x.in_dim,
+            out_dim: x.out_dim,
+            activation: x.activation,
+            dtype: WeightDtype::F32,
+            weights: mix_f32(&x.weights, &y.weights, alpha),
+            biases: mix_f32(&x.biases, &y.biases, alpha),
+        });
+    }
+    let (meta_a, meta_b) = (clone_metadata(&ma), clone_metadata(&mb));
+    let structural = |m: &[OwnedMeta]| -> Vec<(String, MetadataType, Vec<u8>)> {
+        m.iter()
+            .filter(|e| !RUN_PROVENANCE_KEYS.contains(&e.key.as_str()))
+            .map(|e| (e.key.clone(), e.kind, e.value.clone()))
+            .collect()
+    };
+    if meta_a
+        .iter()
+        .chain(&meta_b)
+        .any(|e| e.key == INTERPOLATION_KEY)
+    {
+        return Err("an end is already an interpolation".into());
+    }
+    if structural(&meta_a) != structural(&meta_b) {
+        return Err("non-provenance metadata differs between the ends".into());
+    }
+    let provenance = |m: &[OwnedMeta]| -> serde_json::Map<String, serde_json::Value> {
+        m.iter()
+            .filter(|e| RUN_PROVENANCE_KEYS.contains(&e.key.as_str()))
+            .map(|e| {
+                (
+                    e.key.clone(),
+                    serde_json::Value::String(String::from_utf8_lossy(&e.value).into_owned()),
+                )
+            })
+            .collect()
+    };
+    let record = serde_json::json!({
+        "rule": "every weight and bias = (1 - alpha) * a + alpha * b in f64, rounded to f32; alpha 0 and 1 copy their end",
+        "alpha": alpha,
+        "alignment": {"rule": "each hidden unit of b matched to the nearest unit of a in (incoming weights, bias, outgoing weights)",
+                      "max_match_ratio": worst_match, "moved_units": moved_units},
+        "a": {"sha256": sha256_hex(a), "provenance": provenance(&meta_a)},
+        "b": {"sha256": sha256_hex(b), "provenance": provenance(&meta_b)},
+    });
+    let mut metadata: Vec<OwnedMeta> = meta_a
+        .into_iter()
+        .filter(|e| !RUN_PROVENANCE_KEYS.contains(&e.key.as_str()))
+        .collect();
+    metadata.push(OwnedMeta {
+        key: INTERPOLATION_KEY.into(),
+        kind: MetadataType::Utf8,
+        value: record.to_string().into_bytes(),
+    });
+    Ok(Interpolated {
+        layers,
+        metadata,
+        scaler_mean: ma.scaler_mean().to_vec(),
+        scaler_scale: ma.scaler_scale().to_vec(),
+    })
+}
+
+fn cmd_interpolate(a: &InterpolateArgs) -> Result<(), String> {
+    let bytes_a = std::fs::read(&a.a).map_err(|e| format!("read {:?}: {e}", a.a))?;
+    let bytes_b = std::fs::read(&a.b).map_err(|e| format!("read {:?}: {e}", a.b))?;
+    let schema_hash = Model::from_bytes(&bytes_a)
+        .map_err(|e| format!("parse a: {e:?}"))?
+        .schema_hash();
+    let m = interpolate_bakes(&bytes_a, &bytes_b, a.alpha)?;
+    let sz = emit_layers(
+        &a.out,
+        &m.scaler_mean,
+        &m.scaler_scale,
+        &m.layers,
+        &m.metadata,
+        schema_hash,
+    )
+    .map_err(|e| format!("write {:?}: {e}", a.out))?;
+    eprintln!("interpolated alpha={} -> {:?} ({sz} B)", a.alpha, a.out);
     Ok(())
 }
 
@@ -5323,6 +5654,7 @@ fn main() -> ExitCode {
         Cmd::Strip(a) => cmd_strip(a).map(|_| false),
         Cmd::AppendMeta(a) => cmd_append_meta(a).map(|_| false),
         Cmd::ReadMeta(a) => cmd_read_meta(a).map(|_| false),
+        Cmd::Interpolate(a) => cmd_interpolate(a).map(|_| false),
         Cmd::FitLasso(a) => cmd_fit_lasso(a).map(|_| false),
         Cmd::Gram(a) => cmd_gram(a).map(|_| false),
         Cmd::Predict(a) => cmd_predict(a).map(|_| false),
@@ -5348,6 +5680,182 @@ fn main() -> ExitCode {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A two-input, two-hidden, one-output bake with one structural entry and
+    /// one run-provenance entry, like a trainer checkpoint in miniature.
+    fn interpolation_end(
+        scaler_mean: &[f64],
+        w1: &[f64],
+        b1: &[f64],
+        dtype: zenpredict::WeightDtype,
+        feature_ids: &str,
+        repro: &str,
+    ) -> Vec<u8> {
+        let bytes = zensim_validate::mlp_train::bake_two_layer_znpr_v3(
+            scaler_mean,
+            &[1.0, 1.0],
+            w1,
+            b1,
+            &[1.0, 2.0, 3.0][..w1.len() / 2],
+            &[-1.0],
+            2,
+            w1.len() / 2,
+            1,
+            dtype,
+            None,
+            None,
+            zenpredict::Activation::Relu,
+        );
+        let bytes =
+            zenpredict_bake::append_metadata_utf8(&bytes, "zentrain.feature_ids", feature_ids)
+                .unwrap();
+        zenpredict_bake::append_metadata_utf8(&bytes, "zentrain.repro", repro).unwrap()
+    }
+
+    #[test]
+    fn interpolate_matches_hidden_units_then_mixes_every_parameter() {
+        use zenpredict::WeightDtype::F32;
+        // Unit 0 grows past unit 1 in the continuation, so the serializer (which sorts hidden units by
+        // incoming-weight norm) stores b's units in the opposite order to a's.
+        let a = interpolation_end(
+            &[0.0, 0.0],
+            &[1.0, 0.0, 0.0, 1.05],
+            &[0.25, -0.5],
+            F32,
+            "13,14",
+            "run a",
+        );
+        let b = interpolation_end(
+            &[0.0, 0.0],
+            &[1.1, 0.0, 0.0, 1.05],
+            &[0.5, -0.5],
+            F32,
+            "13,14",
+            "run b",
+        );
+        let stored_b = owned_layers(&Model::from_bytes(&b).unwrap()).unwrap();
+        assert!(same_bits(&stored_b[0].weights, &[0.0, 1.1, 1.05, 0.0]));
+        let layers = interpolate_bakes(&a, &b, 0.0).unwrap().layers;
+        for (x, y) in layers
+            .iter()
+            .zip(&owned_layers(&Model::from_bytes(&a).unwrap()).unwrap())
+        {
+            assert!(same_bits(&x.weights, &y.weights) && same_bits(&x.biases, &y.biases));
+        }
+        // alpha 1 is b in a's unit order; serialized, it is b's stored layers again.
+        let Interpolated {
+            layers,
+            metadata,
+            scaler_mean: mean,
+            scaler_scale: scale,
+        } = interpolate_bakes(&a, &b, 1.0).unwrap();
+        assert!(same_bits(&layers[0].weights, &[1.1, 0.0, 0.0, 1.05]));
+        let back = owned_layers(
+            &Model::from_bytes(&bake_layers(&mean, &scale, &layers, &metadata, 0)).unwrap(),
+        )
+        .unwrap();
+        for (x, y) in back.iter().zip(&stored_b) {
+            assert!(same_bits(&x.weights, &y.weights) && same_bits(&x.biases, &y.biases));
+        }
+        let Interpolated {
+            layers,
+            metadata,
+            scaler_mean: mean,
+            scaler_scale: scale,
+        } = interpolate_bakes(&a, &b, 0.5).unwrap();
+        assert_eq!(layers[0].weights, [1.05, 0.0, 0.0, 1.05]);
+        assert_eq!(layers[0].biases, [0.375, -0.5]);
+        assert!(
+            same_bits(&layers[1].weights, &[1.0, 2.0]) && same_bits(&layers[1].biases, &[-1.0])
+        );
+        assert_eq!(
+            (mean.as_slice(), scale.as_slice()),
+            ([0.0f32, 0.0].as_slice(), [1.0f32, 1.0].as_slice())
+        );
+        let keys: Vec<&str> = metadata.iter().map(|m| m.key.as_str()).collect();
+        assert_eq!(keys, ["zentrain.feature_ids", INTERPOLATION_KEY]);
+        let record: serde_json::Value = serde_json::from_slice(&metadata[1].value).unwrap();
+        assert_eq!(record["alpha"], 0.5);
+        assert_eq!(record["alignment"]["moved_units"], 2);
+        assert!(record["alignment"]["max_match_ratio"].as_f64().unwrap() < 0.2);
+        assert_eq!(record["a"]["provenance"]["zentrain.repro"], "run a");
+        assert_eq!(record["b"]["sha256"], sha256_hex(&b));
+        let bytes = bake_layers(&mean, &scale, &layers, &metadata, 0);
+        assert_eq!(read_meta(&bytes, "zentrain.feature_ids").unwrap(), "13,14");
+        assert!(read_meta(&bytes, "zentrain.repro").is_err());
+    }
+
+    #[test]
+    fn interpolate_refuses_every_structural_difference() {
+        use zenpredict::WeightDtype::{F16, F32};
+        let a = interpolation_end(
+            &[0.0, 0.0],
+            &[1.0, 0.0, 0.0, 1.05],
+            &[0.25, -0.5],
+            F32,
+            "13,14",
+            "run a",
+        );
+        let near =
+            |w1: &[f64], b1: &[f64]| interpolation_end(&[0.0, 0.0], w1, b1, F32, "13,14", "run b");
+        let refusals = [
+            (
+                near(&[1.0, 0.0, 0.0, 1.05], &[0.25, -0.5]),
+                1.5,
+                "outside [0, 1]",
+            ),
+            (
+                near(&[1.0; 6], &[0.0; 3]),
+                0.5,
+                "shape or activation differs",
+            ),
+            (
+                interpolation_end(
+                    &[0.5, 0.0],
+                    &[1.0, 0.0, 0.0, 1.05],
+                    &[0.25, -0.5],
+                    F32,
+                    "13,14",
+                    "b",
+                ),
+                0.5,
+                "input scalers differ",
+            ),
+            (
+                interpolation_end(
+                    &[0.0, 0.0],
+                    &[1.0, 0.0, 0.0, 1.05],
+                    &[0.25, -0.5],
+                    F16,
+                    "13,14",
+                    "b",
+                ),
+                0.5,
+                "f32 layers only",
+            ),
+            (
+                interpolation_end(
+                    &[0.0, 0.0],
+                    &[1.0, 0.0, 0.0, 1.05],
+                    &[0.25, -0.5],
+                    F32,
+                    "13,15",
+                    "b",
+                ),
+                0.5,
+                "metadata differs",
+            ),
+            // both of b's units sit between a's: no unit has a clear partner
+            (near(&[0.5, 0.55, 0.5, 0.45], &[0.0, 0.0]), 0.5, "ambiguous"),
+        ];
+        for (b, alpha, message) in refusals {
+            let error = interpolate_bakes(&a, &b, alpha).err().expect(message);
+            assert!(error.contains(message), "{error}");
+        }
+        let marked = zenpredict_bake::append_metadata_utf8(&a, INTERPOLATION_KEY, "{}").unwrap();
+        let error = interpolate_bakes(&marked, &a, 0.5).err().unwrap();
+        assert!(error.contains("already an interpolation"), "{error}");
+    }
 
     #[test]
     fn read_meta_returns_one_appended_value_and_refuses_absent_keys() {
