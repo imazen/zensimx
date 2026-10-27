@@ -584,6 +584,7 @@ mlic-priority-progress:
     @if [ -f /mnt/v/output/zensim/mlic-candidate-gates-20261027-run02/queue.log ]; then tail -n 2 /mnt/v/output/zensim/mlic-candidate-gates-20261027-run02/queue.log; fi
     @if [ -f /mnt/v/output/zensim/mlic-matched-continuation-folds-20261027-run01/PLAN.json ]; then just aic-matched-continuation fold-status /mnt/v/output/zensim/mlic-matched-continuation-folds-20261027-run01/PLAN.json; fi
     @if [ -f /mnt/v/output/zensim/mlic-aic-share-frontier-20261027-run01/PLAN.json ]; then just aic-matched-continuation fold-status /mnt/v/output/zensim/mlic-aic-share-frontier-20261027-run01/PLAN.json; fi
+    @if [ -f /mnt/v/output/zensim/mlic-aic-recovery-20261027-run01/PLAN.json ]; then just aic-matched-continuation fold-status /mnt/v/output/zensim/mlic-aic-recovery-20261027-run01/PLAN.json; fi
 
 # Registered matched-continuation diagnostic (byconstruction record, 2026-10-27):
 # plan freezes source/tools/inputs; queue waits for the confidence followthrough,
