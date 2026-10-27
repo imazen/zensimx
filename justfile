@@ -3696,6 +3696,16 @@ dataset-confidence-queue study source_commit trainer_sha256 after_full_panel:
 dataset-certify-bake binary bake:
     {{quote(binary)}} certify-monotone --bake {{quote(bake)}}
 
+# Existing N1-N3 owners. Caller freezes inputs and supplies the resource scope.
+# The native candidate label contract is lowercase ASCII letters/digits.
+dataset-nearid-candidate binary packet output label bake bake_sha256:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    label={{quote(label)}}
+    [[ "$label" =~ ^[a-z0-9]+$ ]] || { echo 'candidate label must be lowercase ASCII letters/digits' >&2; exit 64; }
+    ZENSIM_FORMULA_REV=7 ZENSIM_MAX_TIER=v3 RAYON_NUM_THREADS=1 OMP_NUM_THREADS=1 {{quote(binary)}} --nearid {{quote(packet)}} {{quote(output)}} "candidate-$label" {{quote(bake)}} {{quote(bake_sha256)}}
+    python3 scripts/prodqual_label_free.py --nearid-candidate {{quote(output)}} "$label"
+
 # Full-data confidence uses its separately pinned original authorities; no omission registry mutation.
 confidence-full-weight-bindings base output authorities authorities_sha256:
     OPENBLAS_NUM_THREADS=1 python3 -B scripts/byconstruction/confidence_weights.py {{quote(base)}} {{quote(output)}} --full-authorities {{quote(authorities)}} --full-authorities-sha256 {{quote(authorities_sha256)}}
