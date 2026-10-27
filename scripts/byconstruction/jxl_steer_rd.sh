@@ -1,4 +1,5 @@
 #!/bin/bash
+# HISTORICAL: blocked by default; prepend --historical-replay for intentional reproduction.
 # JPEG XL steering maps: our maps against butteraugli and DVIFM 0.3 (benchmarks/byconstruction_2026-10-22.md, "JPEG XL
 # steering"). Every arm is encoded by one steer_rd build (zensim-workbench/loop-converge) on the TRAIN corpus written
 # by jxl_map_corpus.py ($RD/corpus/corpus.tsv): no loop, the built-in butteraugli loop, the workbench maps of B, Tga
@@ -23,6 +24,9 @@
 #     [*_BULK=SCALE,EXPONENT] [ARMS="none butteraugli B Tga M64a dvifm03 Btail Tgatail M64atail dvifm03tail"] \
 #     [THREADS=12] jxl_steer_rd.sh RD_DIR
 set -euo pipefail
+# Fail before argument expansion, output creation, data reads or builds.
+python3 "$(dirname "${BASH_SOURCE[0]}")/historical_guard.py" "${BASH_SOURCE[0]}" "$@"
+shift # explicit --historical-replay, validated above
 RD=$1
 : "${STEER_RD:?set STEER_RD}" "${ZM_BIN:?set ZM_BIN}"
 H=$(cd "$(dirname "$0")" && pwd)

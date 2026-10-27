@@ -1,7 +1,12 @@
-"""The by-construction candidate-bake registry: copy every candidate bake into one durable registry with sha256 and provenance (owner, 2026-10-25: keep candidate
+"""HISTORICAL: blocked by default; intentional replay requires --historical-replay first.
+
+The by-construction candidate-bake registry: copy every candidate bake into one durable registry with sha256 and provenance (owner, 2026-10-25: keep candidate
 bakes for a later AIC2026 evaluation). Re-runnable: existing entries are verified, never overwritten."""
 import hashlib, json, os, shutil, sys
 from pathlib import Path
+from historical_guard import guard_or_exit
+
+sys.argv[1:] = guard_or_exit(sys.argv[1:], Path(__file__).name)
 R = Path("/mnt/v/output/zensim/candidates-2026-10-25")
 B = "/mnt/v/output/zensim/byconstruction-2026-10-22"
 H = os.path.expanduser("~")

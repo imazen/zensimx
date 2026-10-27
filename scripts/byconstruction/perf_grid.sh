@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# HISTORICAL: blocked by default; prepend --historical-replay for intentional reproduction.
 # Paired before/after timing grid for the speed pass: B (revision 5) and Tga (revision 6) at 512² and 2048², at the
 # v4x and v3 tiers, one thread pinned to core 2. Each cell is ring_timing.sh (alternating arm order per round) and
 # timing_summary.py (median per-round ratio with a bootstrap CI). Record: benchmarks/byconstruction_2026-10-22.md.
@@ -8,6 +9,9 @@
 # CASES=<cases.tsv> (perf_cases.py) replaces the two synthetic sizes with its size x content matrix; iterations per
 # call then scale with the case's pixel count (8 at 2048², at most 2000).
 set -euo pipefail
+# Fail before argument expansion, output creation, data reads or builds.
+python3 "$(dirname "${BASH_SOURCE[0]}")/historical_guard.py" "${BASH_SOURCE[0]}" "$@"
+shift # explicit --historical-replay, validated above
 A=$1
 B=$2
 OUT=$3

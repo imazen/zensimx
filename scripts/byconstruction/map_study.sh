@@ -1,7 +1,11 @@
 #!/usr/bin/env bash
+# HISTORICAL: blocked by default; prepend --historical-replay for intentional reproduction.
 # Map-study dumps after the 2026-10-24 map fixes (record: "Attribution-map correctness").
 # TAGS=a,b runs only those tags.
 set -euo pipefail
+# Fail before argument expansion, output creation, data reads or builds.
+python3 "$(dirname "${BASH_SOURCE[0]}")/historical_guard.py" "${BASH_SOURCE[0]}" "$@"
+shift # explicit --historical-replay, validated above
 cd "$(dirname "${BASH_SOURCE[0]}")/../.."
 BIN=zensim-bench/target/release/examples/map_dump
 S=/mnt/v/output/zensim/byconstruction-2026-10-22/maps/study

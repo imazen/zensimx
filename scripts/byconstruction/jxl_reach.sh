@@ -1,4 +1,5 @@
 #!/bin/bash
+# HISTORICAL: blocked by default; prepend --historical-replay for intentional reproduction.
 # Can Tga's map steer jxl-encoder's loop to the requested distance, and does a miss need better placement fits or a
 # different map? (benchmarks/byconstruction_2026-10-22.md, "JPEG XL reachability with Tga"). One steer_rd build
 # (zensim-workbench/loop-converge) on the TRAIN corpus written by jxl_map_corpus.py ($RD/corpus/corpus.tsv):
@@ -16,6 +17,9 @@
 #
 #   STEER_RD=<steer_rd> [TAIL=SCALE,EXPONENT] [THREADS=12] jxl_reach.sh RD_DIR
 set -euo pipefail
+# Fail before argument expansion, output creation, data reads or builds.
+python3 "$(dirname "${BASH_SOURCE[0]}")/historical_guard.py" "${BASH_SOURCE[0]}" "$@"
+shift # explicit --historical-replay, validated above
 RD=$1
 : "${STEER_RD:?set STEER_RD}"
 H=$(cd "$(dirname "$0")" && pwd)

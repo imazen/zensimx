@@ -1,4 +1,6 @@
-"""Served (pixel route) against table route for a by-construction research bake at formula revision 6.
+"""HISTORICAL: blocked by default; intentional replay requires --historical-replay first.
+
+Served (pixel route) against table route for a by-construction research bake at formula revision 6.
 
 Exploration record: benchmarks/byconstruction_2026-10-22.md ("Serving the candidate"). The research bakes read the
 ringhpm ringing form and the globaff descriptor; their table-route scores (`mixture_table.py score --decl`, through
@@ -20,9 +22,10 @@ import hashlib
 import json
 import os
 import subprocess
+import sys
 from pathlib import Path
 
-import numpy as np
+from historical_guard import guard_or_exit
 
 
 def stamp(bin_dir: Path, src: Path, dest: Path) -> str:
@@ -34,6 +37,9 @@ def stamp(bin_dir: Path, src: Path, dest: Path) -> str:
 
 
 def main() -> int:
+    sys.argv[1:] = guard_or_exit(sys.argv[1:], Path(__file__).name)
+    import numpy as np
+
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--bin-dir", required=True)
     ap.add_argument("--mixture")
@@ -85,6 +91,7 @@ def main() -> int:
 
 
 def pairs_parity(a, env) -> int:
+    import numpy as np
     import pandas as pd
     if len(a.bake) != 1 or not a.pred:
         raise SystemExit("--pairs needs --pred and exactly one --bake")

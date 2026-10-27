@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# HISTORICAL: blocked by default; prepend --historical-replay for intentional reproduction.
 # Before/after bit identity for speed work: the score and every emitted feature's bits for B (revision 5) and Tga
 # (revision 6) on synthetic odd geometries and five gb82 photos, at every x86-64 tier with one thread, plus v4x with
 # eight. Compare two output dirs with perf_bits_compare.py. Record: benchmarks/byconstruction_2026-10-22.md.
@@ -6,6 +7,9 @@
 # PERF_BITS_MODELS: optional TSV (name, bake|profile, path|name). PERF_BITS_HDR=1
 # sends the same eleven pairs through the named profile's absolute-nits entry.
 set -euo pipefail
+# Fail before argument expansion, output creation, data reads or builds.
+python3 "$(dirname "${BASH_SOURCE[0]}")/historical_guard.py" "${BASH_SOURCE[0]}" "$@"
+shift # explicit --historical-replay, validated above
 BIN=$(realpath "$1")
 OUT=$(realpath -m "$2")
 mkdir -p "$OUT"

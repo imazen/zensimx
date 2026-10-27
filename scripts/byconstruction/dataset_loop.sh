@@ -1,7 +1,11 @@
 #!/usr/bin/env bash
+# HISTORICAL: blocked by default; prepend --historical-replay for intentional reproduction.
 # Fixed Mdata comparison through the existing float calibration, JXL and BD-rate owners.
 # Caller supplies shared heavy.lock and run-heavy for each build/calibrate/run stage.
 set -euo pipefail
+# Fail before argument expansion, output creation, data reads or builds.
+python3 "$(dirname "${BASH_SOURCE[0]}")/historical_guard.py" "${BASH_SOURCE[0]}" "$@"
+shift # explicit --historical-replay, validated above
 stage=${1:?build|calibrate|run|analyze}
 study=${2:?study directory}
 cd "$(dirname "$0")/../.."
@@ -81,7 +85,7 @@ run)
       RD_COMPARE_MODE=bdrate JUDGE_REPRO_RECEIPT="$study/LOOP_JUDGE_CONTROLS.json" \
       ARMS='Bdatachk MdataMchk Mdata7chk Mdatalintail' \
       LINEAR_ARMS="MdataMchk=zensim-Mfull@rev5@$(placement zensim-Mfull@rev5) Mdata7chk=zensim-Mfull@rev7@$(placement zensim-Mfull@rev7) Mdatalintail=zensim-Mdata@rev7@$(placement zensim-Mdata@rev7)" \
-      bash scripts/byconstruction/jxl_steer_rd.sh "$rd" > "$study/loop-native.log" 2>&1
+      bash scripts/byconstruction/jxl_steer_rd.sh --historical-replay "$rd" > "$study/loop-native.log" 2>&1
     python3 - "$rd/jxl" "$study" <<'PY'
 import csv, json, sys
 from pathlib import Path
