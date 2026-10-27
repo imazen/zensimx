@@ -138,7 +138,7 @@ def plan(run, commit, trainer, meta_tool):
 def checked(path, schema="aic-matched-continuation-plan-v1"):
     value = json.loads(path.read_text())
     protocol = PROTOCOL if schema == FOLD_SCHEMA or schema.startswith("aic-matched") else FRONTIER_PROTOCOL
-    if schema in (RECIPE_SCHEMA, SEEDS_SCHEMA):
+    if schema in (RECIPE_SCHEMA, SEEDS_SCHEMA, OMISSION_SCHEMA):
         protocol = diagnostic_protocol(next(iter(value["arms"].values())))[0]
     if value["schema"] != schema or value["protocol"] != protocol:
         raise ValueError("diagnostic plan schema differs")
@@ -466,7 +466,7 @@ RECIPE_INPUTS = dict(
 
 def plan_schema(path):
     schema = json.loads(Path(path).read_text()).get("schema")
-    if schema not in (FOLD_SCHEMA, FRONTIER_SCHEMA, RECOVERY_SCHEMA, RECIPE_SCHEMA, SEEDS_SCHEMA):
+    if schema not in (FOLD_SCHEMA, FRONTIER_SCHEMA, RECOVERY_SCHEMA, RECIPE_SCHEMA, SEEDS_SCHEMA, OMISSION_SCHEMA):
         raise ValueError("source-fold or frontier plan required")
     return schema
 
@@ -727,8 +727,8 @@ def fold_queue(path):
             time.sleep(60)
         checked(path, schema)
         command = ["flock", str(Path.home() / "tmp/heavy.lock"), str(Path.home() / "work/claudehints/scripts/run-heavy"),
-                   "--mem", "40G", "--jobs", "12", "--", sys.executable, "-B", str(Path(__file__).resolve()), "fold-run",
-                   str(path)]
+                   "--mem", "40G", "--jobs", "12", "--", sys.executable, "-B", str(Path(__file__).resolve()),
+                   "omission-run" if schema == OMISSION_SCHEMA else "fold-run", str(path)]
         state.update(stage="queued-for-compute-lock", command=command, checked_utc=now())
         write(run_dir / "QUEUE.json", state)
         with (run_dir / "launch.log").open("x") as log:
@@ -1066,6 +1066,177 @@ def fold_run(path):
         raise
 
 
+# Stage C, E21 out of sample (registered with stage A): the Mlic omission cells (one per E21 dataset and seed) continue
+# at the advanced budget, each with the same rotating AIC fold table as the common adaptation study; their held-out
+# dataset predictions at every studied epoch are scored by the existing E21 owner against Mlic and MlicFT16x8.
+OMISSION_SCHEMA = "aic-share-omission-plan-v1"
+MLIC_CELLS = Path("/var/tmp/byc-mixes-20261025/cells")
+FT_CELLS = Path("/mnt/v/output/zensim/aic-finetune-20261026/run-05/cells")
+
+
+def omission_cells():
+    return [(fold, seed) for fold in FOLDS for seed in SEEDS]
+
+
+def omission_aic_fold(fold, seed):
+    """The common adaptation study's rotation, so no omission cell shares its AIC held-out sources across seeds."""
+    return (4 * seed + FOLDS.index(fold)) % 7
+
+
+def omission_plan(run, commit, trainer, meta_tool, point_run, arm, after_run):
+    from aic_adaptation import initial_cell
+    point = json.loads((Path(point_run) / "PLAN.json").read_text())
+    if point.get("schema") not in (FRONTIER_SCHEMA, RECIPE_SCHEMA) or arm not in point["arms"]:
+        raise ValueError("the advanced point must be a static frontier or recipe arm")
+    if point["schema"] == RECIPE_SCHEMA:
+        raise ValueError("recipe omission cells need their recipe inputs; not registered yet")
+    run = Path(run).resolve()
+    if run.exists():
+        raise ValueError("preserve existing diagnostic attempts")
+    population = point["arms"][arm]
+    protocol, weight, _ = diagnostic_protocol(population)
+    for path, pin in INPUTS.values():
+        if sha(path) != pin:
+            raise ValueError(f"registered input changed: {path}")
+    fold = json.loads(Path(INPUTS["fold_plan"][0]).read_text())
+    authority = json.loads(Path(INPUTS["aic_authority"][0]).read_text())
+    root = Path(fold["common_root"])
+    from subjective_training_leg import linked_subset_exclusions
+    cells, inputs, tables = {}, [Path(fold["columns"]), root / "human_role_decision.json", root / "wide/frozen.json"], {}
+    for name, seed in omission_cells():
+        cell = initial_cell(MLIC_CELLS / "Mlic" / f"without_{name}_s{seed}", name, seed)
+        k = omission_aic_fold(name, seed)
+        record = authority["tables"][f"aic_k{k}_fit"]
+        table = Path(record["path"])
+        tables[str(k)] = dict(path=str(table), sha256=sha(table))
+        cells[f"{name}_s{seed}"] = dict(cell, aic_fold=k, exclusions=list(linked_subset_exclusions(root, name)))
+        inputs += [*map(Path, cell["input_sha256"]), table, Path(f"{table}.manifest.json")]
+    frozen = freeze(run, commit, trainer, meta_tool, fold)
+    value = dict(schema=OMISSION_SCHEMA, protocol=protocol, registration=FRONTIER_REGISTRATION, **frozen,
+                 arms={arm: population}, aic_weights={arm: weight}, seeds=list(SEEDS), e21_folds=list(FOLDS),
+                 epochs=EPOCHS, checkpoints=list(FRONTIER_CHECKPOINTS), lr=LR, spec=SPEC, root=str(root),
+                 columns=fold["columns"], cells=cells, aic_tables=tables, baselines=dict(
+                     Mlic=str(MLIC_CELLS), MlicFT16x8=str(FT_CELLS)), point=dict(run=str(point_run), arm=arm),
+                 after_run=str(after_run), input_sha256={str(p): sha(p) for p in inputs},
+                 representation="final-f32 checkpoint dumps", selector=None, public_test_opened=False, eval_read=False,
+                 production_qualified=False, assessment="stage C E21 out of sample for the advanced point; no adoption")
+    write(run / "PLAN.json", value, fresh=True)
+    print(json.dumps(dict(plan=str(run / "PLAN.json"), sha256=sha(run / "PLAN.json"))))
+
+
+def omission_command(plan_value, run_dir, arm, name, seed, dest):
+    cell = plan_value["cells"][f"{name}_s{seed}"]
+    table = plan_value["aic_tables"][str(cell["aic_fold"])]["path"]
+    population = plan_value["arms"][arm]
+    weight = diagnostic_protocol(population)[1]
+    root = Path(plan_value["root"])
+    command = [sys.executable, "-B", str(run_dir / "source/scripts/rev4_featpot/v2_lodo_mlp.py"), "--root", str(root),
+               "--spec", SPEC, "--columns", Path(plan_value["columns"]).read_text().strip(), "--head", "N",
+               "--heldout", name, "--seed-index", str(seed), "--strict-admission",
+               "--data-role-decision", str(root / "human_role_decision.json"), "--train-only", "--dest", str(dest),
+               "--init-from", str(Path(cell["directory"]) / "refit/last.bin"), "--fine-tune-epochs", str(EPOCHS),
+               "--fine-tune-lr", str(LR), "--aic-public-train", table,
+               "--research-extra-group", f"aic_public_train:{table}:{weight!r}:0:rank",
+               "--diagnostic-population", population]
+    return command + (["--exclude-datasets", ",".join(cell["exclusions"])] if cell["exclusions"] else [])
+
+
+def omission_run(path):
+    import numpy as np
+    from concurrent.futures import ThreadPoolExecutor
+    if not compute_lock(os.getpid())["held_by_worker_ancestor"]:
+        raise ValueError("the omission study requires the shared compute lock")
+    run_dir = path.parent
+    plan_value = checked(path, OMISSION_SCHEMA)
+    (arm, population), = plan_value["arms"].items()
+    require_clean_factors(os.environ)
+    if (run_dir / "STATE.json").exists():
+        raise ValueError("preserve previous diagnostic run state")
+    state = dict(stage="fit-omission-cells", worker=process_snapshot(os.getpid()), plan_sha256=sha(path),
+                 completed=[], failures=[], required=len(omission_cells()), objective_complete=False,
+                 production_qualified=False)
+    def stage(name, **details):
+        state.update(stage=name, checked_utc=now(), **details)
+        write(run_dir / "STATE.json", state)
+    environment = dict(os.environ, REV4_V2_BIN_DIR=str(run_dir / "bin"), RAYON_NUM_THREADS="1",
+                       OMP_NUM_THREADS="1", OPENBLAS_NUM_THREADS="1", ZENSIM_MAX_TIER="v3")
+    def fit(cell):
+        name, seed = cell
+        label = f"{arm}|{name}|s{seed}"
+        if any(sha(p) != pin for p, pin in plan_value["cells"][f"{name}_s{seed}"]["input_sha256"].items()):
+            raise ValueError(f"{label}: starting cell changed")
+        dest = run_dir / "cells" / arm / f"without_{name}_s{seed}"
+        scratch = Path.home() / "tmp" / f"{run_dir.name}-{name}-s{seed}"
+        scratch.mkdir(parents=True)
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        with (run_dir / "cells" / arm / f"without_{name}_s{seed}.log").open("x") as log:
+            if subprocess.run(omission_command(plan_value, run_dir, arm, name, seed, dest), stdout=log,
+                              stderr=subprocess.STDOUT, env=dict(environment, TMPDIR=str(scratch))).returncode:
+                raise RuntimeError(f"{label} fit failed; preserved in its log")
+        return dict(fold=name, seed=seed, **fixed_outputs(dest, population, label, plan_value["checkpoints"]))
+    try:
+        stage("fit-omission-cells")
+        with ThreadPoolExecutor(max_workers=12) as pool:
+            futures = {pool.submit(fit, cell): cell for cell in omission_cells()}
+            for future, cell in futures.items():
+                try:
+                    state["completed"].append(future.result())
+                except BaseException as error:
+                    state["failures"].append(dict(cell=list(cell), error=repr(error)))
+                stage("fit-omission-cells")
+        if state["failures"]:
+            raise RuntimeError("omission fit failures retained; inspect their complete logs")
+        write(run_dir / "FITS_COMPLETE.json", dict(plan_sha256=sha(path), cells=state["completed"]), fresh=True)
+        stage("held-out-predictions")
+        fold = json.loads(Path(plan_value["registered_inputs"]["fold_plan"]["path"]).read_text())
+        os.environ.update(TMPDIR=str(Path.home() / "tmp"), REV4_V2_BIN_DIR=str(run_dir / "bin"),
+                          BYC_ROOT=plan_value["root"], ZEN_PANEL_BIN=str(run_dir / "bin/panel"),
+                          BYC_LABEL_LEDGER_DIR=str(run_dir / "label-reads"), RAYON_NUM_THREADS="1",
+                          OMP_NUM_THREADS="1", OPENBLAS_NUM_THREADS="1", ZENSIM_MAX_TIER="v3",
+                          ZENSIM_RING_FORM="raw", ZENSIM_PYRAMID="xyb")
+        source = Path(fold["warmstart_source"])
+        sys.path[:0] = [str(source / "scripts/rev4_featpot"), str(source / "scripts")]
+        import byc_cells as cells
+        arms = [f"{arm}e{e}" for e in plan_value["checkpoints"]]
+        for name, seed in omission_cells():
+            for e in plan_value["checkpoints"]:
+                out = run_dir / "cells" / f"{arm}e{e}" / f"without_{name}_s{seed}" / f"pred_{name}.tsv"
+                out.parent.mkdir(parents=True, exist_ok=True)
+                model = run_dir / "cells" / arm / f"without_{name}_s{seed}/ckpt/ckpt_epoch{e:03d}.bin"
+                prediction = cells.predict_cell(model, Path(plan_value["root"]) / "wide/main/real" / f"{name}.parquet",
+                                                out, SPEC)
+                if not np.isfinite(prediction).all():
+                    raise ValueError(f"{out}: nonfinite prediction")
+        stage("e21-score")
+        scores = {}
+        for cells_dir, names in ((run_dir / "cells", arms), *((Path(d), [b]) for b, d in plan_value["baselines"].items())):
+            result = subprocess.run([sys.executable, "-B", str(source / "scripts/rev4_featpot/byc_cells.py"), "score",
+                                     "--arms", ",".join(names), "--control", "base-c", "--seeds", "0,1,2"],
+                                    check=True, capture_output=True, text=True, env=dict(os.environ, BYC_CELLS=str(cells_dir)))
+            scores.update(json.loads(result.stdout))
+        paired = {}
+        for candidate in arms:
+            for baseline in plan_value["baselines"]:
+                a, b = (scores[x]["per_dataset_per_seed_srocc"] for x in (candidate, baseline))
+                delta = [float(np.mean([a[f][s] - b[f][s] for f in FOLDS])) for s in range(3)]
+                paired[f"{candidate}-minus-{baseline}"] = dict(per_seed_delta=delta, mean=float(np.mean(delta)),
+                    seed_unit_se=float(np.std(delta, ddof=1) / np.sqrt(3)), selection_gate=False,
+                    per_dataset_delta={f: float(np.mean(np.asarray(a[f]) - np.asarray(b[f]))) for f in FOLDS})
+        write(run_dir / "E21_OUT_OF_SAMPLE.json", finite_json(dict(scores=scores, paired=paired,
+              note="E21 TRAIN datasets out of sample: each omission cell never trained on its dataset")), fresh=True)
+        inventory = {str(p.relative_to(run_dir)): sha(p) for p in sorted(run_dir.rglob("*"))
+                     if p.is_file() and p.name not in ("STATE.json", "QUEUE.json", "CURRENT.json")
+                     and p.relative_to(run_dir).parts[0] != "source"}
+        write(run_dir / "EVIDENCE_INVENTORY.json", inventory, fresh=True)
+        write(run_dir / "COMPLETE.json", dict(plan_sha256=sha(path), evidence_inventory_sha256=sha(run_dir / "EVIDENCE_INVENTORY.json"),
+              selector=None, production_qualified=False, objective_complete=False,
+              assessment=plan_value["assessment"]), fresh=True)
+        stage("omission-complete", next_action="read E21_OUT_OF_SAMPLE.json against Mlic and MlicFT16x8")
+    except BaseException as error:
+        stage("failed", failures=[*state["failures"], repr(error)])
+        raise
+
+
 def status(path):
     run_dir = path.parent
     state_path = run_dir / "STATE.json"
@@ -1095,11 +1266,11 @@ def fold_status(path):
     if not live and state["stage"] not in ("fold-diagnostic-complete", "run-returned") and not state["failures"]:
         state["failures"].append("recorded diagnostic process exited without completion")
     logged = []
-    for log in sorted(run_dir.glob("arms/*/s*_k*/train.log")):
+    for log in sorted([*run_dir.glob("arms/*/s*_k*/train.log"), *run_dir.glob("cells/*/without_*_s*/train.log")]):
         done = [int(line.split()[1]) for line in log.read_text().splitlines() if line.startswith("  epoch ")]
         logged.append(max(done) if done else -1)
     state.update(checked_utc=now(), live=live, gates_finished=predecessor_finished(json.loads(path.read_text())),
-                 fits_complete=len(json.loads((run_dir / "FITS_COMPLETE.json").read_text())["runs"])
+                 fits_complete=len((lambda v: v.get("runs") or v.get("cells"))(json.loads((run_dir / "FITS_COMPLETE.json").read_text())))
                  if (run_dir / "FITS_COMPLETE.json").exists() else 0,
                  logged_epoch_range=[min(logged), max(logged)] if logged else None, logged_runs=len(logged),
                  compute_lock=compute_lock(worker["pid"] if live else None))
@@ -1117,8 +1288,15 @@ if __name__ == "__main__":
         p.add_argument("--source-commit", required=True)
         p.add_argument("--trainer", type=Path, required=True)
         p.add_argument("--meta-tool", type=Path, required=True)
-    for mode in ("queue", "run", "status", "fold-queue", "fold-run", "fold-status"):
+    for mode in ("queue", "run", "status", "fold-queue", "fold-run", "fold-status", "omission-run"):
         sub.add_parser(mode).add_argument("plan", type=Path)
+    p = sub.add_parser("omission-plan", help="stage C: E21 out of sample through the Mlic omission cells")
+    p.add_argument("run", type=Path)
+    p.add_argument("--source-commit", required=True)
+    p.add_argument("--trainer", type=Path, required=True)
+    p.add_argument("--meta-tool", type=Path, required=True)
+    p.add_argument("--point", nargs=2, metavar=("RUN", "ARM"), required=True, help="the advancing run and arm")
+    p.add_argument("--after-run", type=Path, required=True)
     p = sub.add_parser("recipe-plan", help="stage B: one recipe at the advanced budget")
     p.add_argument("run", type=Path)
     p.add_argument("--source-commit", required=True)
@@ -1140,7 +1318,10 @@ if __name__ == "__main__":
     p.add_argument("--point", nargs=2, metavar=("RUN", "ARM"), required=True, help="the advancing run and arm")
     p.add_argument("--after-run", type=Path, required=True)
     args = parser.parse_args()
-    if args.mode == "seeds-plan":
+    if args.mode == "omission-plan":
+        omission_plan(args.run, args.source_commit, args.trainer, args.meta_tool, Path(args.point[0]), args.point[1],
+                      args.after_run)
+    elif args.mode == "seeds-plan":
         seeds_plan(args.run, args.source_commit, args.trainer, args.meta_tool, Path(args.point[0]), args.point[1],
                    args.after_run)
     elif args.mode == "recipe-plan":

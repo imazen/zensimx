@@ -321,5 +321,39 @@ class SeedsStage(unittest.TestCase):
             self.assertEqual(owner.plan_schema(path), owner.SEEDS_SCHEMA)
 
 
+class OmissionStage(unittest.TestCase):
+    def test_omission_cells_rotate_aic_folds_and_continue_their_cell(self):
+        cells = owner.omission_cells()
+        self.assertEqual(len(cells), 12)
+        for seed in owner.SEEDS:
+            self.assertEqual(len({owner.omission_aic_fold(f, seed) for f in owner.FOLDS}), 4)
+        with tempfile.TemporaryDirectory(dir=Path.home() / "tmp") as tmp:
+            run = Path(tmp)
+            (run / "cols.txt").write_text("13,14\n")
+            plan = dict(root="/invented/root", columns=str(run / "cols.txt"), arms={"MixedAIC256": "mixed-aic256"},
+                        cells={"tid2013_s2": dict(directory="/invented/cells/Mlic/without_tid2013_s2", aic_fold=2,
+                                                  exclusions=["tid2013-linked"])},
+                        aic_tables={"2": dict(path="/invented/aic_k2_fit.parquet")})
+            command = owner.omission_command(plan, run, "MixedAIC256", "tid2013", 2, run / "dest")
+            self.assertEqual(command[command.index("--heldout") + 1], "tid2013")
+            self.assertEqual(command[command.index("--seed-index") + 1], "2")
+            self.assertEqual(command[command.index("--init-from") + 1], "/invented/cells/Mlic/without_tid2013_s2/refit/last.bin")
+            self.assertEqual(command[command.index("--research-extra-group") + 1],
+                             "aic_public_train:/invented/aic_k2_fit.parquet:256.0:0:rank")
+            self.assertEqual(command[command.index("--diagnostic-population") + 1], "mixed-aic256")
+            self.assertEqual(command[command.index("--fine-tune-epochs") + 1], "60")
+            self.assertEqual(command[-2:], ["--exclude-datasets", "tid2013-linked"])
+            self.assertTrue(command[2].endswith("source/scripts/rev4_featpot/v2_lodo_mlp.py"))
+
+    def test_omission_plan_refuses_recipe_and_recovery_points(self):
+        with tempfile.TemporaryDirectory(dir=Path.home() / "tmp") as tmp:
+            point = Path(tmp) / "point"
+            point.mkdir()
+            for schema, arm in ((owner.RECOVERY_SCHEMA, "RecoverAIC64"), (owner.RECIPE_SCHEMA, "MlicOrderAIC256")):
+                (point / "PLAN.json").write_text(json.dumps(dict(schema=schema, arms={arm: "mixed-aic64"})))
+                with self.assertRaises(ValueError):
+                    owner.omission_plan(Path(tmp) / "run", "HEAD", Path(tmp) / "t", Path(tmp) / "m", point, arm, Path(tmp))
+
+
 if __name__ == "__main__":
     unittest.main()
