@@ -6294,3 +6294,21 @@ resource receipts, not performance qualification. No frontend arithmetic,
 feature identity, trained artifact or running experiment was changed.
 
 Targeted clippy (`-p zensim --test native_hdr_color --features custom-profiles -- -D warnings`) also passes: run-heavy rc=0, 10s, peak RSS 0.64 GiB, minimum available 23,212 MiB, peak load 1.42. No source warnings were suppressed.
+
+### October 27: certificates for completed Neff/Vote full initial models
+
+All six completed full-data initial models (Neff and Vote, seeds 0/1/2) pass
+the existing native `bake_dial_refit certify-monotone --pin 100` owner. Inputs
+were bound to their final119/120-epoch fit receipts and packed-model hashes
+before checking. Every certificate reports zero free amplitude and free ramps.
+Max-pair counts are Neff 2/1/2 and Vote 3/1/2. This is coordinate monotonicity
+of those initial models, not pixel-mixture behavior, AIC continuation
+qualification or a product-adoption decision. Order and continued models are
+not covered by this receipt.
+
+Artifacts: shared output `zensim/mlic-full-initial-certificates-20261027-run01/`
+(`PLAN.json`, six frozen model copies/native logs, `COMPLETE.json`). Completion
+SHA256 `3574cc7ede2010b83ae90393d291bc1b772b2613461f2a08cef5011dc64e82d6`.
+The coordinator reread every copied model hash after completion. Run-heavy
+on i265: rc=0, 1s, peak RSS 0.02 GiB, minimum available 23,964 MiB, peak load
+1.25. This is a validation resource receipt, not a runtime benchmark.
