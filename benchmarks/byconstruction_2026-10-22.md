@@ -7527,6 +7527,6 @@ distortion type (from each run's `E21_OUT_OF_SAMPLE.json`), and seed-0 SROCC on 
 
 On compression, out of sample, every AIC-heavy arm holds the older sets at or above Mlic on average; CID22-A gains
 0.015–0.023 while TID2013's codecs lose 0.003–0.005 and KonFiG's 84 JPEG 2000 rows 0.008–0.010. On every type they lose
-0.004–0.019 (AIC-only most: KADID −0.040, TID2013 −0.030). So a codec model can take AIC-2026 to 0.9515 out of fold
+0.004–0.019 (AIC-only most: KADID −0.041, TID2013 −0.033). So a codec model can take AIC-2026 to 0.9515 out of fold
 (AIC-only e29) without losing compression quality on the older sets; ×1024 and ×1024 + rehearsal trade 0.005–0.006 of
 AIC-2026 for less loss elsewhere. As registered, no rule picks the codec model: this goes to the owner's curation.
