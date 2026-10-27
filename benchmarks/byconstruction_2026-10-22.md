@@ -1,5 +1,28 @@
 # Monotone by construction — exploration (2026-10-22)
 
+## Dataset naming for the current October 27 comparison
+
+**AIC-2026 public_train is not AIC-3.** The current Mlic/Neff/Vote/Order
+continuations use D6-admitted AIC-2026 public_train: 3,920 PTC crops from
+28 sources. Fold results split those TRAIN sources into 24 fitted and four
+held-out sources. “Held-out” there means out-of-fold within public_train,
+not AIC-3, AIC-2026 public_test, or an independent final evaluation.
+Full-data results fit all 28 sources and are explicitly in sample, as the
+owner requested. Do not present their correlation or error as test accuracy.
+
+AIC-3 CTC is a separate 600-pair, 10-reference corpus and retains its holdout
+role. This continuation study does not read it. Historical exposure recorded
+in DATA_SPLITS remains recorded; “holdout role” is not a claim that AIC-3 has
+never been inspected. AIC-2026 public_test (14 sources), AIC-4 and SDR25 are
+also outside this new training/comparison read scope. Public_test's earlier
+one-read exposure remains spent; these results do not reopen it.
+
+Use **AIC-2026 public_train** in current result prose and tables. Frozen raw
+artifacts retain their internal `aic` population key and historical filenames;
+for this registered study that key maps to AIC-2026 public_train, with table
+SHA256 `a2969c70f2e1c96f18348b0b8e66a28e41ee87ad839636e8329e63408b138b71`.
+Do not rename or rewrite frozen artifacts to fix display terminology.
+
 Question from the owner: can a metric that is correct **by construction** be competitive with
 B (`diff+frag-820`, the E33/E34 `base-c` recipe)?
 
