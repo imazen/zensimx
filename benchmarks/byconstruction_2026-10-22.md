@@ -4833,3 +4833,50 @@ study's `source/`. `BASELINE.json` binds original models, predictions, binary
 inventory and mixture manifests before candidate results. Live progress now
 refuses a control-cell population when the recorded active command names a
 candidate population. No candidate outcome is claimed here.
+
+### Matched-codec sampling: prospective TRAIN registration (2026-10-27)
+
+MlicOrder tests a bounded version of zenpapers' between-codec sampling
+proposal, independently against original Mlic. It retains original collection
+masses, features, M architecture, seven holdouts, seeds 0–2, 120 × 50,000
+draws and final epoch 119. No mass, vote-loss or AIC continuation change is
+combined with it. The initial admitted codec slice is KADID JPEG/JPEG 2000;
+MIDD-GAR and JND-MID-MA need separate admission and are not part of this arm.
+
+Match distances using the existing Mlic model for the same omission and seed.
+Its fitting population excludes that cell's held-out collection. This is a
+frozen-model matching proxy, not a replication of CVVDP/JND unit calibration.
+For every admitted KADID reference, each JPEG row selects the JPEG 2000 row
+with closest frozen prediction, and conversely; take the unique union of
+these directed nearest-neighbor pairs. Break equal-distance ties by stable
+pair key. Preserve every match and report its prediction-distance gap; do
+not add a post-result distance cutoff. Native human scores remain the loss
+targets. Pair construction uses no held-out response and no human target
+comparison to choose a pair.
+
+The base uniform sampler runs unchanged. For an accepted human-group draw
+whose reference has matched pairs, replace visits 0, 4, 8, … with a matched
+pair from that same reference. The matched pairs cycle in a seeded affine
+permutation; alternate their orientation. This private schedule consumes no
+base-sampler RNG values. Same-row collisions, group choice, reference choice
+and every ineligible draw remain unchanged. This changes pair exposure and
+order, not just order. Group/reference draw counts and collision counts must
+match the original stream exactly in mechanical controls. Keep the legacy
+E29 explicit-pair behavior unchanged; its collision replacement is a different
+registered protocol.
+
+Bind the per-cell list to the original Mlic root, exact fitting row keys,
+promoted-bank codec identity, frozen matching model and prediction hashes.
+Verify every endpoint is a distinct, same-source, cross-codec TRAIN row.
+The KADID-omission cells have no eligible stratum and must reproduce the
+three corresponding original Mlic prediction files exactly. Require a new
+binary's unchanged-Mlic full-budget KADID seed-0 reproduction before candidate
+fits. No public trainer signature or inference feature change is included.
+
+Use the already registered paired screen: balanced TRAIN mean strictly above
+Mlic, old-data paired mean delta at least minus two seed-unit SEs, and zero
+global-edit mixture inversions in every candidate cell. Ties retain Mlic.
+Report all per-collection statistics and the existing mixture/bias/smoothness
+diagnostics. A passing arm receives three full-data fits and unchanged
+production qualification. EVAL cannot select the match rule, share, seed or
+model; combining successful factors requires a separate prospective trial.
