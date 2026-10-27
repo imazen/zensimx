@@ -423,6 +423,9 @@ dataset-order-prepare study:
 dataset-order-tests:
     python3 -B -m unittest discover -s scripts/tests -p 'test_matched_codec.py' -v
 
+dataset-confidence-tests:
+    python3 -B -m unittest discover -s scripts/tests -p 'test_confidence_sources.py' -v
+
 dataset-eval-tests binary:
     ZEN_PANEL_BIN={{quote(binary)}} python3 -B -m unittest discover -s scripts/tests -p 'test_dataset_eval.py' -v
 

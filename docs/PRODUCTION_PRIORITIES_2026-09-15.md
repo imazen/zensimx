@@ -428,3 +428,36 @@ The existing `dvifm_e21.py::cmd_pairs` joins those keys to promoted-bank codec,
 knob and image metadata without labels. Reuse that identity join for a fresh
 TRAIN-only stratum manifest; do not infer codec identity from an unverified
 row number or use held-out responses to construct matched-distance pairs.
+
+## October 27 — native uncertainty semantics for the confidence trial
+
+The [KADID-10k release](https://database.mmsp-kn.de/kadid-10k-database.html)
+specifies 30 degradation-category ratings per image and supplies variance in
+`dmos.csv`. The intended mean-score standard error is therefore
+`sqrt(var / 30)`. The [TID2013 paper, sections 4.1–4.2](https://mcl.usc.edu/wp-content/uploads/2016/01/1-s2.0-S0923596514001490-main.pdf)
+distinguishes variance of individual MOS estimates from variance/RMSE of the
+final MOS and identifies `mos_std.txt` as the latter. Use that published
+MOS uncertainty directly; do not divide it by a rater count again.
+
+Zenpapers' `release_spreads.py` at `4e81c03a` applies those conversions, but
+loads the entire release's uncertainty values before selecting training rows.
+Our adapter must bind item identities first and parse uncertainty only for
+rows present in the frozen fitting population. KADID TERMINAL, development
+rows and the current cell's omitted dataset cannot contribute calibration or
+weights. Missing or invalid selected uncertainty must refuse, not silently
+fall back to a different source or unit.
+
+The LIVE-MD proposal uses `observer_models.py::sureal` estimates. Those depend
+on the set of items used to fit observer biases and inconsistencies; a row
+filter applied after the observer fit is insufficient provenance. Bind the
+fit population, source matrix columns and producer before admitting the
+result. Colourlab's published item spread/count and any observer-model
+alternative must remain distinct, explicitly identified sources.
+
+The existing exported linking units include CEED2016, FG-IQA, PC-IQA,
+JND-MID-MA and MIDD CAP/GAR. None is part of the original 21-collection
+admission except FG-IQA, which is validate-only. A TRAIN-only linking
+reconstruction therefore needs fresh metadata/family admission for its
+eligible calibration sources before their observations are interpreted.
+This is independent of the native uncertainty audit and the active vote and
+queued ordering trials; it does not authorize using the old composite export.
