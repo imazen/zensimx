@@ -7449,3 +7449,33 @@ have no out-of-sample E21 cells. Each gets one omission run: the twelve Mlic omi
 population (AIC-only, mixed ×1024, mixed ×1024 + rehearsal) at the studied epochs, scored by the existing E21 owner,
 with compression-only SROCC from the same predictions. Queued after stage E. These runs are evidence for the owner's
 curation; no registered rule picks the codec model from them.
+
+### Stage F: result (2026-10-27, complete 21:23 UTC)
+
+Run `mlic-aic-wise-20261027-run01` (189 interpolated fold models; no training). Out-of-fold AIC-2026 public_train
+(seed 0) and the worst in-sample older-set change against Mlic (0.9094 zero-shot), by end and mixing weight α:
+
+| α | Mlic ↔ AIC-only e29 | Mlic ↔ static ×1024 e59 | Mlic ↔ ×1024 + rehearsal e59 |
+|---:|---|---|---|
+| 0.1 | 0.9141, KADID −0.0054 | 0.9136, −0.0007 | 0.9134, −0.0004 |
+| 0.2 | 0.9190, KADID −0.0142 | 0.9178, −0.0015 | 0.9174, −0.0010 |
+| 0.3 | 0.9241, KADID −0.0268 | 0.9224, −0.0028 | 0.9217, −0.0019 |
+| 0.4 | 0.9293, KADID −0.0432 | **0.9269**, −0.0043 | 0.9262, −0.0032 |
+| 0.5 | 0.9344, KADID −0.0632 | 0.9314, TID2013 −0.0063 | **0.9305**, −0.0047 |
+| 0.6 | 0.9393, KADID −0.0863 | 0.9355, −0.0090 | 0.9346, −0.0066 |
+| 0.7 | 0.9437, KADID −0.1121 | 0.9392, −0.0122 | 0.9384, −0.0090 |
+| 0.8 | 0.9474, KADID −0.1398 | 0.9423, −0.0160 | 0.9416, −0.0119 |
+| 0.9 | 0.9501, KADID −0.1684 | 0.9448, −0.0206 | 0.9440, −0.0154 |
+
+Bold: each end's best keeper (every older set within 0.005). Local pixel mixtures: at most 3 inversion rows per fold
+model (largest rise +4.9); global mixtures 0.
+
+Interpolation tracks the training trajectory and does not beat it: at a given worst older-set loss, the interpolated
+points sit on or slightly below the trained checkpoints of the same arm (×1024 α = 0.7: 0.9392 at −0.0122; trained
+×1024 e7: 0.9376 at −0.0132; ×1024 + rehearsal α = 0.5: 0.9305 at −0.0047, where ×256 + rehearsal e59 keeps at 0.9390).
+The continuations move only a short way from Mlic, so the straight line between the ends adds little that training
+did not already visit. Toward AIC-only, KADID collapses from the first step.
+
+**Registered decision.** Stage F's candidate is Mlic ↔ ×1024 + rehearsal at α = 0.5 (0.9305). Stage C's point is at
+least the stage D candidate (0.9390), so F's candidate is not higher by more than 0.002 and F replaces nothing,
+whatever stage E decides. No E21 run is frozen for it.
