@@ -31,6 +31,16 @@ work. The September chronology below is retained history, including its old
 paused-goal statement. It is not the current queue. No new Mlic/AIC recipe has
 been adopted as the serving model, and the seamless HDR frontend has not started.
 
+### State at 14:10 UTC, 2026-10-27
+
+All 15 seed-0 candidates pass the label-free gates (dial C1-C6 both grids, identity
+at 12 SIMD permutations; G-STEER 129-135). D1 recommendation to the owner:
+MlicVoteFT16x8 as the interim revision-7 default (alternative MlicFT16x8). Owner
+directive 13:05Z: reach 0.95 on AIC-2026 while recovering the older sets. The
+registered AIC-share frontier is running: stage A (`mlic-aic-share-frontier-20261027-run01`,
+fitting since 14:07Z) and stage A2 recovery (`mlic-aic-recovery-20261027-run01`,
+queued behind it). `just mlic-priority-progress` shows both.
+
 ### State at 11:45 UTC, 2026-10-27
 
 The confidence follow-through finished at 11:25 UTC without failures; confidence
