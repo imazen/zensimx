@@ -210,6 +210,8 @@ def train_command(groups: list, init_seed: int, sample_seed: int, width: int, ke
         cmd += ["--steer-pairs", str(recipe["steer_pairs"]), "--steer-lambda", repr(weight)]
     from e36_training import command_flags
     cmd += command_flags(recipe,trainer)
+    from matched_codec import command_flags as codec_flags
+    cmd += codec_flags(recipe, strict_admission=strict_admission, head=head)
     return cmd
 
 
@@ -495,6 +497,8 @@ def main() -> None:
     ap.add_argument("--research-replay", help="replay reason recorded by the trainer for a research-extra fit")
     from e36_training import add_args
     add_args(ap)
+    from matched_codec import add_args as codec_args
+    codec_args(ap)
     args = ap.parse_args()
     from e36_training import bootstrap
     bootstrap(args)
@@ -633,6 +637,8 @@ def main() -> None:
                                              NOMINAL_WEIGHT["human"] if human_w is None else human_w)
         weights = {name: tw for name, _, tw, _, _ in groups if tw > 0}
     init_seed, sample_seed = seeds(args.heldout, args.seed_index)
+    from matched_codec import attach as attach_codec
+    groups, recipe = attach_codec(args, groups, V2, init_seed, sample_seed, recipe)
     dataset_authority = None
     if args.strict_admission:
         from subjective_training_leg import dataset_groups

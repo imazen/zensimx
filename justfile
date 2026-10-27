@@ -414,6 +414,14 @@ dataset-leg-tests:
 dataset-order-native-tests target:
     cargo test --locked -p zensim-validate --lib sampling:: --target-dir {{quote(target)}}
     cargo test --locked -p zensim-validate --test matched_codec --test subjective_rank --test subjective_vote --target-dir {{quote(target)}}
+    cargo test --locked -p zensim-validate --bin zensim_mlp_train matched_codec:: --target-dir {{quote(target)}}
+
+# Caller holds heavy.lock and run-heavy; this creates fresh matching predictions.
+dataset-order-prepare study:
+    OPENBLAS_NUM_THREADS=1 python3 -B scripts/rev4_featpot/matched_codec.py {{quote(study)}}
+
+dataset-order-tests:
+    python3 -B -m unittest discover -s scripts/tests -p 'test_matched_codec.py' -v
 
 dataset-eval-tests binary:
     ZEN_PANEL_BIN={{quote(binary)}} python3 -B -m unittest discover -s scripts/tests -p 'test_dataset_eval.py' -v
@@ -442,6 +450,10 @@ dataset-root source out admission features library columns weight='0.5' collecti
 # Caller holds heavy.lock and run-heavy, serialized with training/evaluation.
 dataset-vote-root source out admission features library columns confidence:
     python3 -B scripts/byconstruction/ring_root.py datasets --root {{quote(source)}} --out {{quote(out)}} --admission {{quote(admission)}} --features {{quote(features)}} --library {{quote(library)}} --columns {{quote(columns)}} --nominal-weight 0.5 --collections bapps --bapps-votes --confidence {{quote(confidence)}}
+
+# Caller holds heavy.lock and run-heavy; selected native TRAIN judgments only.
+dataset-vote-source-audit root admission library policy archive output:
+    OPENBLAS_NUM_THREADS=1 python3 -B scripts/byconstruction/bapps_vote_audit.py --root {{quote(root)}} --admission {{quote(admission)}} --library {{quote(library)}} --policy {{quote(policy)}} --archive {{quote(archive)}} --output {{quote(output)}}
 
 # Build only. Caller holds heavy.lock and run-heavy; original mix selection stays first.
 dataset-subsets-root source out columns:

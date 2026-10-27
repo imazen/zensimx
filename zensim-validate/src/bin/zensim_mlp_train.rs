@@ -640,6 +640,11 @@ struct Args {
     /// E29 research: explicit NAME:JSON pair-list; existing CPU rank owner only.
     #[arg(long)]
     rank_pair_list: Vec<String>,
+    /// Private MlicOrder admission; separate from E29's explicit-pair protocol.
+    #[arg(long, hide = true, requires = "matched_codec_sha256")]
+    matched_codec_manifest: Option<PathBuf>,
+    #[arg(long, hide = true, requires = "matched_codec_manifest")]
+    matched_codec_sha256: Option<String>,
     /// E29 native HDR subset manifests, admitted separately from strict SDR tables.
     #[arg(long)]
     hdr_consensus_research: bool,
@@ -3073,6 +3078,8 @@ fn stamp_emitted_checkpoints(
 mod e29_hdr_admission;
 #[path = "zensim_mlp_train/group_admission.rs"]
 mod group_admission;
+#[path = "zensim_mlp_train/matched_codec.rs"]
+mod matched_codec;
 #[path = "../training_keys.rs"]
 mod training_keys;
 
@@ -3307,6 +3314,7 @@ fn main() {
     assert!(
         !want_gpu
             || (args.rank_pair_list.is_empty()
+                && args.matched_codec_manifest.is_none()
                 && !args.hdr_consensus_research
                 && args.pooled_leg.is_empty()
                 && args.pooled_rank_share == 0.0
@@ -3537,6 +3545,10 @@ fn main() {
     } else {
         std::collections::BTreeMap::new()
     };
+    let codec_admission = matched_codec::admit(&args, &group_modes).unwrap_or_else(|e| {
+        eprintln!("matched-codec admission: {e}");
+        std::process::exit(2)
+    });
     // Every ordinary and new declaration/key has passed before payload hashes.
     for g in &group_modes {
         if let Some(d) = subjective_admission.get(&g.0) {
@@ -3741,6 +3753,16 @@ fn main() {
             eprintln!("{e}");
             std::process::exit(1);
         });
+        if name == matched_codec::GROUP {
+            codec_admission
+                .as_ref()
+                .expect("admitted matched-codec group")
+                .validate_loaded(g.ref_ids.as_deref())
+                .unwrap_or_else(|e| {
+                    eprintln!("matched-codec loaded identity: {e}");
+                    std::process::exit(2)
+                });
+        }
         if let Some(declaration) = subjective_admission.get(&name) {
             subjective_training_leg::native_votes(
                 declaration,
@@ -4755,6 +4777,12 @@ fn main() {
         .take(args.identity_rows)
         .collect();
 
+    let codec_payload = codec_admission.as_ref().map(|admission| {
+        admission.payload().unwrap_or_else(|e| {
+            eprintln!("matched-codec payload: {e}");
+            std::process::exit(2)
+        })
+    });
     let mut groups: Vec<TrainingGroup> = loaded
         .iter_mut()
         .map(|g| TrainingGroup {
@@ -5030,6 +5058,9 @@ fn main() {
                 _ => None,
             };
         let mut rank_pairs = std::collections::BTreeMap::new();
+        if let Some((pairs, _)) = &codec_payload {
+            rank_pairs.insert(matched_codec::GROUP.to_owned(), pairs.clone());
+        }
         for spec in &args.rank_pair_list {
             let (name, path) = spec.split_once(':').expect("NAME:pair-list.json");
             assert!(
@@ -5190,6 +5221,9 @@ fn main() {
                 serde_json::json!({"group":name,"path":path,
                     "sha256":train_manifest::sha256_file(std::path::Path::new(path)).expect("pair-list hash")})
             }).collect::<Vec<_>>());
+        }
+        if let Some((_, report)) = &codec_payload {
+            record["matched_codecs"] = report.clone();
         }
         record.to_string()
     };

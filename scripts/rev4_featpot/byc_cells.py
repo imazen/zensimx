@@ -194,6 +194,12 @@ def score_dataset_holdout(dest, collections, spec):
 def run_cell(tokens: str, fold: str, seed: int) -> dict:
     dest = CELLS / arm_name(tokens) / f"without_{fold}_s{seed}"
     record = dest / "byc_record.json"
+    codec = None
+    codec_registry = os.environ.get("BYC_MATCHED_CODEC_MANIFESTS")
+    if codec_registry:
+        from matched_codec import cell_binding
+        codec = cell_binding(codec_registry, os.environ["BYC_MATCHED_CODEC_MANIFESTS_SHA256"],
+                             arm_name(tokens), fold, seed)
     linked_pin = None
     packet_path = ROOT/"datasets/receipt.json"
     if packet_path.exists() and fold != "full":
@@ -204,6 +210,8 @@ def run_cell(tokens: str, fold: str, seed: int) -> dict:
             linked_pin = packet["linked_subset_omissions"]["sha256"]
     if record.is_file():
         value = json.loads(record.read_text())
+        if codec_registry and value.get("matched_codec_manifest_sha256") != (codec["sha256"] if codec else None):
+            raise ValueError("cached matched-codec cell changed its admitted schedule")
         if linked_pin is not None:
             fit = json.loads((dest/"result.json").read_text())
             if (value.get("linked_subset_omission_sha256") != linked_pin
@@ -235,6 +243,8 @@ def run_cell(tokens: str, fold: str, seed: int) -> dict:
         excluded = linked_subset_exclusions(ROOT, fold)
     if excluded:
         cmd += ["--exclude-datasets", ",".join(excluded)]
+    if codec:
+        cmd += ["--matched-codec-manifest", codec["path"], "--matched-codec-sha256", codec["sha256"]]
     if AIC_WEIGHT is not None:
         k = aic_fold(fold, seed)
         cmd += ["--research-extra-group", f"aic:{AIC}/aic_k{k}_fit.parquet:{AIC_WEIGHT!r}:0:rank",
@@ -265,6 +275,8 @@ def run_cell(tokens: str, fold: str, seed: int) -> dict:
             rec["epoch119"] = line.split("| t=")[0].strip()
     if linked_pin is not None:
         rec.update(linked_subset_omission_sha256=linked_pin, dataset_exclusions=list(excluded))
+    if codec_registry:
+        rec["matched_codec_manifest_sha256"] = codec["sha256"] if codec else None
     record.write_text(json.dumps(rec, indent=1) + "\n")
     for leftover in scratch.glob("*"):
         leftover.unlink()

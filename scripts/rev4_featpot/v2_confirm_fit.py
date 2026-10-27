@@ -49,6 +49,8 @@ def main() -> None:
     os.environ.setdefault("ZEN_PANEL_BIN", str(PANEL))
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--exclude-datasets", default="", help="TRAIN-only dataset-group holdout, comma-separated collections")
+    from matched_codec import add_args as codec_args
+    codec_args(ap)
     ap.add_argument("--spec", required=True)
     ap.add_argument("--head", choices=HEADS, required=True)
     ap.add_argument("--seed-index", type=int, choices=range(10), required=True)
@@ -147,6 +149,8 @@ def main() -> None:
     groups += [("human", hfit, weights["human"], 0, "withinref,rank"),
                ("human_development", hdev, 0, HUMAN_VAL_WEIGHT, "withinref,rank")]
     init_seed, sample_seed = confirm_seeds(args.seed_index)
+    from matched_codec import attach as attach_codec
+    groups, recipe = attach_codec(args, groups, V2, init_seed, sample_seed, recipe)
     dataset_authority = None
     if args.strict_admission:
         from subjective_training_leg import dataset_groups
