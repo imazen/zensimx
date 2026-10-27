@@ -5913,3 +5913,26 @@ Run on i265: `rc=0 0s | peak-RSS 0.03GiB | min-avail 24171MiB | peak-load 0.12`.
 `just dataset-certify-bake <binary> <bake>` exposes the existing native command.
 The runtime hardware constraint is explicit in the release scorecard; no
 cross-host measurement can silently pass the original 9950X3D performance row.
+
+
+### AIC fold source and codec tradeoffs (2026-10-27)
+
+The native aggregate panel's 16×8 held-out role-specific mean predictions
+were compared within each source/codec group against equally continued Mlic.
+Neff improves the reported MAE on 16/28 sources and 7/14 codec groups; Vote on
+19/28 and 8/14; Order on 17/28 and 9/14. These are descriptive sign counts,
+not independent tests, votes for a winner, or substitutes for full panels.
+
+Vote's held-out codec SROCC differences include JXL +0.007664975243634631,
+JXLM -0.014924647544968361 and PNG -0.01095099604207217. Its corresponding
+MAE differences are -0.007990610424413624, +0.008886379629542918 and
++0.039916098695024105. Original released codec labels are retained verbatim;
+no codec implementation equivalence is inferred from those names.
+Order's largest source MAE regression is PTC_S51_Ref_00 (+0.03815172114033716),
+with SROCC change -0.021329076556384052. These findings reinforce source,
+codec, tail and fixed-seed review without changing the registered fit grid.
+
+The derived review and every stratum delta are stored at
+`/mnt/tower/output/zensim/mlic-priority-20261027/AIC_FOLD_TRADEOFF_REVIEW.json`,
+bound to the unchanged aggregate output hash. No new responses were read,
+no model was selected, and no cutoff was added.
