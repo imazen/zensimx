@@ -6787,3 +6787,11 @@ zero-shot on all 3,920 public_train rows (2026-10-26, `byc_cells.py aiczero`;
 within-source 0.9485, per-cell codec-bias spread 0.0743; the mean prediction of
 the twelve cells reaches 0.9095 (within source 0.9501). The cells agree with
 the full-data three-seed result above.
+
+The full-data Mlic seed-0 model's only two local reversals are posterization
+plus luma noise on smooth backgrounds (references 9870 and 5050): poster12
+scores 27.37 / 29.12 and poster12+luma4 31.78 / 30.51. The added noise breaks
+up the posterization contours, as dither does, so "more error energy is worse"
+is a questionable label for these two rows; B's reversals (blur plus colour
+noise on every reference, up to +44 points) are not of this kind. Image strips
+(reference | poster12 | poster12+luma4): `/mnt/v/output/zensim/mixture-dither-20261027/`.
