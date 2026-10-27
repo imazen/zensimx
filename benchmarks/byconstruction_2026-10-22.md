@@ -5169,3 +5169,71 @@ explicitly **not** membership freeze or calibration-label read permission.
 The queue refuses changed inputs, dead predecessor processes and completion
 markers that disagree with their selection artifact. Failed attempts remain
 on disk with their process identity, stage, error and complete log.
+
+### MlicConfidence: prospective contrast-precision trial (2026-10-27)
+
+This independent arm starts from original Mlic, with its original eight
+dataset-leg masses, features, targets, group/reference sampling and private
+TRAIN controls. It does not combine the Neff, vote-loss, matched-order or AIC
+arms. No linking-calibration responses or confidence candidate outcomes have
+been read to choose the following construction.
+
+Weight only the registered KADID, TID2013, LIVE-MD and Colourlab rating-
+variability fitting populations. Every other reference retains its baseline
+loss explicitly; this is not an assertion that its uncertainty is known.
+Within a covered reference, require complete item coverage, finite native
+uncertainties, its admitted TRAIN-only teacher-scale map, and the legacy
+teacher-placement gate (serialized training Spearman at least 0.600).
+Missing coverage, a failed map or insufficient linking-unit support makes
+the arm INCOMPLETE. Do not substitute band residuals, weight one, zero
+linking variance or a validation-derived estimate for missing prerequisites.
+
+Use the shared multiplicative scale-error model for a ranking contrast.
+For item i, let x_i be its pinned teacher distance and
+s_i = max(0.05, SE_teacher_i), using the existing 0.05-JOD item floor.
+For a legal pair (i,j), freeze
+
+`V_ij = s_i^2 + s_j^2 + sigma_L^2 * (x_i - x_j)^2`,
+
+`a_ij = 1 / V_ij`, and `w_ij = a_ij / Z_gr`.
+
+Here Z_gr is the deterministic expectation of a_ij under the original
+conditional pair law for group g and reference r, after exactly the
+existing same-row and rank-neutral exclusions. Enumerate its complete legal
+support before fitting, including the existing modulo-draw probabilities;
+do not estimate it from the realized minibatch. This keeps the conditional
+expected scalar multiplier one and leaves original group/reference draws,
+RNG consumption and skipped-pair behavior unchanged. A reference with no
+active rank pairs keeps its original no-update behavior and is reported;
+it supplies no invented normalizer. A single legal unordered pair has
+multiplier one. Apply the multiplier to both the existing rank loss and its
+gradient, without adding a new target or changing any absolute-loss term.
+
+This model assumes independent native item errors and a shared first-order
+dataset scale error. The native marginal SEs do not identify observer/item
+covariances. The complete linking term remains present and is never divided
+by an item, pair or observer count. Its cancellation at equal teacher
+distances follows the declared shared-error model. This is a registered
+adaptation of item confidence to rank contrasts; it does not import the
+composite export's equal-band redistribution or global dataset-share cap.
+Do not compare diagonal and shared-error variants and select one afterwards.
+Any weight concentration statistic is descriptive, not a measured human
+effective sample size and not a reason to shrink uncertainty.
+
+Each of the seven original omission roots removes its omitted source
+families and aliases before donor calibration, native observer/scale-map
+fits and normalization. Reuse requires identical permitted-input hashes.
+Use the same three fixed seeds, 120 epochs, 50,000 draws per epoch and
+checkpoint 119 as the other registered Mlic comparisons. Before candidate
+cells, the new binary must reproduce the full-budget unweighted Mlic
+control byte-for-byte. Verify equal-precision loss parity, symmetric pair
+exchange, conditional mean-one weights under unequal draw probabilities,
+unchanged unweighted groups, source-wise masses and refusal on invalid
+inputs. Preserve the original private/public API boundary.
+
+The TRAIN screen remains the previously registered paired balanced-mean
+gain, old-leg change at least minus two standard errors, and zero global
+mixture inversions for all 21 cells. A passing screen proceeds to three
+fixed full fits, fixed assessment seed zero and the unchanged numerical,
+runtime and production qualification. No EVAL-based weighting, reselection
+or serving promotion is authorized by this registration.
