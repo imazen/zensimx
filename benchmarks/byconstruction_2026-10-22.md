@@ -6830,3 +6830,31 @@ Artifacts: tower `/mnt/tower/output/zensim/hdr-precision-20261027/` holds `REFS.
 through the recipe below, with the committed source, and reproduces every dump and score bit for bit:
 
 `just hdr-precision <refs> <out> <tier_audit_features> <predict_features_with_bake> 7 srgb 10000 v3 NAME=BAKE...`
+
+### MlicConfidence fold and full-data results (2026-10-27, follow-through complete 11:25 UTC)
+
+The serial follow-through (`/mnt/v/output/zensim/mlic-confidence-followthrough-20261027-run01`, CONFIG `60cb9ed6…`)
+ran 48 fold continuations (24 new), their panels, three 120-epoch full confidence fits, six new full continuations
+and the full panels, without failures. Pooled SROCC on AIC-2026 public_train (fold: seven folds of 4 held-out
+sources, three seeds) and E21 out of sample, paired by seed:
+
+| Model | Fold fitted | Fold held-out | E21 vs Mlic at the same budget |
+|---|---:|---:|---|
+| MlicFT8x4 | 0.9117 | 0.9080 | reference |
+| MlicConfidenceFT8x4 | 0.9078 | 0.9078 | −0.0040 (SE 0.0039) |
+| MlicFT16x8 | 0.9143 | 0.9097 | reference |
+| MlicConfidenceFT16x8 | 0.9114 | 0.9099 | −0.0037 (SE 0.0038); KonFiG −0.019 |
+
+Initial models: MlicConfidence 0.9060 fitted and 0.8976 held out, against Mlic's 0.9103 and 0.8996.
+
+Full data, in sample, packed serving models (three-seed mean): ConfidenceFT16x8 against MlicFT16x8 scores AIC-2026
+0.9108 against 0.9146, KADID 0.9132 against 0.9124, TID2013 0.8948 against 0.8893, KonFiG 0.8163 against 0.8210
+and CID22-A 0.8828 against 0.8837. MlicConfidence against Mlic scores AIC-2026 0.9038 against 0.9076.
+
+Local mixture reversals are 4, 7 and 6 rows (initial, 8×4, 16×8; up to +8.0 points), against 2–4 for Mlic, Neff,
+Vote and Order. Global mixtures are 0. Near-identity passes for all three seed-0 models (N1, N2; N3 143, 143, 142
+of 144), in `/mnt/tower/output/zensim/mlic-confidence-nearid-20261027-run01/COMPLETE.json`, with the binary,
+packet and reporter of run03.
+
+Confidence weighting does not improve on Mlic in any setting measured here. It stays an experiment. The
+matched-continuation diagnostic took the compute lock at 11:26 UTC.
