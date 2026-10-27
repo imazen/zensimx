@@ -39,7 +39,7 @@ through e59 at out-of-fold AIC 0.9390, 0.0021 above the Vote point (0.9369), so 
 (Vote with the rehearsal leg at ×256 and ×1024) is registered (`e68f7d4a`) and planned (`5313ca25`). Dev queue, each
 run waiting for its predecessor and taking `heavy.lock`: Mlic ×256 omission `mlic-aic-omission-aic256-…` (w21:pF,
 running since 19:55) → Vote ×256 omission `mlic-aic-omission-voteaic256-…` (w21:pG) → D candidate omission
-`mlic-aic-omission-xrefaic256-20261027-run01` (w21:p9) → stage E `mlic-aic-recipe-votexref-20261027-run01` (w21:pA).
+`mlic-aic-omission-xrefaic256-20261027-run01` (w21:p9) → stage E `mlic-aic-recipe-votexref-20261027-run01` (w21:pA). Stage F (weight interpolation between Mlic and three AIC-heavy fold models, registered `d75866aa`, code `613ad594`) `mlic-aic-wise-20261027-run01` (w21:pB) also waits for the Vote omission run.
 Then: `~/tmp/claude-port-20261027/staged_summary.py /mnt/v/output/zensim/mlic-aic-omission-xrefaic256-20261027-run01`
 settles D (copy in `/mnt/v/output/zensim/frontier-summary-20261027/`); `stagee_summary.py <E run> [<E omission run>]`
 settles E (an E omission run is frozen only if E's candidate beats stage C's point by more than 0.002); then freeze

@@ -7401,3 +7401,16 @@ E21 needs the end arm's continuation of the twelve omission cells, interpolated 
 frozen only if the first condition holds, and stage C's steps would interpolate the same way.
 
 **Order.** Built and tested off dev; one run, queued between the omission runs once ready.
+
+**Stage F implementation and queue, 20:31 UTC (before any interpolation result).** The bake serializer stores hidden
+units sorted by incoming-weight norm, so two checkpoints of one run can list the same units in different orders;
+mixing the stored arrays would mix unmatched units. The bake owner's `interpolate` (`613ad594`) therefore first
+matches units: the minimum-cost assignment of squared distances in (incoming weights, bias, outgoing weights), the
+weight matching used in model merging (Ainsworth et al., "Git Re-Basin", ICLR 2023), step by step along the end arm's
+every-epoch dumps from Mlic to the end. A real-checkpoint smoke showed why a simpler rule fails: one epoch of Adam
+moves some units about 0.24 while a few units sit about 0.39 apart, so a nearest-unit match with a fixed ambiguity bar
+refused every end. On fold 0 of each end, α = 0 and α = 1 reproduce the initial and end models' AIC-2026 public_train
+predictions exactly (largest difference 0.0 over 3,920 rows), and every tracked match is its unit's nearest; the
+record keeps per-step moved, contested and non-nearest counts. The plan (`mlic-aic-wise-20261027-run01`, 189
+interpolations, bake owner `8023a49a…` built on i265 from `613ad594`) waits for the Vote omission run, as the D
+omission run does; whichever takes the lock first runs first, and both precede stage E. The decision rule is unchanged.
