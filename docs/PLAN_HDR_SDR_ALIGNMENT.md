@@ -31,6 +31,50 @@ new outcomes. Measure complete scoring, reference preparation and steering
 cost across the production geometries on permitted quiet hardware. No speed
 or no-penalty claim is established for a new frontend yet.
 
+## October 27: draft frontend registration (not frozen)
+
+A draft for the comparison above, written before any HDR outcome of the new
+recipes. It freezes after stable adoption names the architecture and the two
+owner decisions below are made; it changes no running study.
+
+**What exists.** Corrected HDR TRAIN has 7,425 native-PQ pairs (495 reference
+variants, 33 source families) with HDR-VDP-3 and CVVDP teacher labels
+(HDRTEACH). Teacher-only HDR training at Rev5 (E27) did not pass: hp4 kept
+SDR as-good and gained within-reference agreement with both teachers
+(+0.0012), but pooled HDR-VDP-3 rose (+0.123) while pooled CVVDP fell
+(−0.089). Human UPIQ-HDR training (V40/E31, uh4, TRAIN weight 4.344) kept
+SDR as-good; on its 50 held-out development observations (four references)
+pooled SROCC rose from 0.79–0.85 to 0.85–0.94 across 40 cells. These are
+Rev5 results with the PU21 frontend; no frontend comparison exists.
+
+**Arms.** One adopted Rev7 recipe, three frontends, all else matched:
+F0 canonical PU21 (reproduction control), F1 ICtCp with explicit intensity
+and chroma scaling, F2 one compact monotone luminance curve with separate
+chroma handling, frozen before any comparison outcome. Each frontend needs
+its own feature identity, Rev7 HDR extraction of the TRAIN pairs and UPIQ-380,
+and native serving; SDR inputs keep the unchanged SDR path. Same SDR legs,
+HDR legs (teacher pairs at the E27 convention, UPIQ-380 at E31's weight),
+seeds, budgets, sampler, epoch rule and calibration for every arm.
+
+**Assessment, all registered before outcomes.** SDR E21 out-of-sample panels
+under the as-good rule; HDR TRAIN development (UPIQ development references,
+teacher-labelled hdr_v3mix VAL) as development evidence only; one human HDR
+holdout (decision 1); R1 sub-domain identity (p95 |Δ| ≤ 2, rank ≥ 0.99); the
+numerical controls listed above against independent f64 references; and
+complete native scoring, reference preparation and steering cost at the
+production geometries (decision 2). "Better than PU21" means F1 or F2
+improves the human HDR holdout panels over F0 with whole-source uncertainty
+reported, with no SDR regression and no cost regression on that hardware.
+Full panels decide; no single SROCC threshold.
+
+**Owner decisions needed.** (1) A human HDR holdout. HDR-VDC and AVT keep
+only Rev2/944 tables and need fresh sign-off to re-extract through the frozen
+drivers; alternatively admit another organized library dataset (for example
+the two Rousselot HDR compression sets, licence to confirm) as eval-only.
+UPIQ-380 is TRAIN since October 7 and cannot serve. (2) Timing hardware:
+the scalar-performance row names the 9950X3D, where benchmarks are currently
+not permitted.
+
 ## October 26, 2026: evidence and speed requirement
 
 The controlling [production queue](PRODUCTION_PRIORITIES_2026-09-15.md) places
