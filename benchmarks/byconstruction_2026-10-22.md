@@ -7169,3 +7169,10 @@ by more than 0.002 and its E21 out of sample (three-seed mean) is no more than 0
 
 **Order.** After stage B, before stage C. The native admission, Python mirror and coordinator support are built and
 tested before anything runs; the trainer gets a separate registered protocol, and the existing protocols are unchanged.
+
+**Queue, 16:10 UTC.** Stage D's admission is pushed (`4424837b`, protocol `aic-share-xref-v1`; trainer `b3b86f18…`
+from main `8b66cca2`, built on i265). A real-input smoke loaded the rehearsal leg as 10,590 rows paired within 4
+datasets and trained epoch 0. Plans frozen and queued behind stage B: stage D (`mlic-aic-xref-20261027-run01`,
+x256 and x1024 with the rehearsal leg; control: stage A's x256 seed 0 fold 0 refit byte for byte), then stage C step 2
+for stage A's advanced arm (`mlic-aic-omission-aic256-20261027-run01`, the twelve Mlic omission cells at x256, E21 out
+of sample at every studied epoch), which is the comparator stage D's decision needs.
