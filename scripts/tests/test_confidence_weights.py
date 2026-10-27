@@ -9,10 +9,29 @@ import sys
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "byconstruction"))
-from confidence_weights import bind, original_cell, logical_width, cell_binding, verify_receipt, sha
+from confidence_weights import bind, original_cell, logical_width, cell_binding, verify_receipt, sha, validate_full_authorities
 
 
 class Bindings(unittest.TestCase):
+    def test_full_authority_requires_all_original_seed_streams(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            records = []
+            for seed, (init, sample) in enumerate(((1101,101),(1103,100000101),(1107,200000101))):
+                path = root / f"full-s{seed}.json"
+                path.write_text(json.dumps(dict(cells={f"full-s{seed}":dict(
+                    seed_index=seed,route="full",init_seed=init,sample_seed=sample)})))
+                records.append(dict(cell=f"full-s{seed}",path=str(path),sha256=sha(path)))
+            self.assertEqual(validate_full_authorities({"full":records}),{"full":records})
+            for invalid in ({"kadid":records},{"full":records[:2]},{"full":[records[0]]*3}):
+                with self.assertRaises(ValueError):
+                    validate_full_authorities(invalid)
+            path = Path(records[1]["path"])
+            value = json.loads(path.read_text());value["cells"]["full-s1"]["sample_seed"] = 101
+            path.write_text(json.dumps(value));records[1]["sha256"] = sha(path)
+            with self.assertRaisesRegex(ValueError,"seeds"):
+                validate_full_authorities({"full":records})
+
     def test_cell_binding_rejects_wrong_arm_omission_hash_and_receipt(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

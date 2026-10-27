@@ -6003,3 +6003,24 @@ requires its own full-budget unweighted control. Old full run02 and confidence
 run01 are preserved failures; do not restart them. Completed fold evidence,
 scientific inputs, strengths, seeds and all historical verdicts are unchanged.
 
+
+
+### Full-data confidence binding extension — registered October 27, 2026
+
+Before any confidence full-data candidate fit, bind all three original Mlic
+full-data authorities to the already-admitted `full` linking/rating scope.
+Use original init/sample seed pairs (1101,101), (1103,100000101),
+(1107,200000101), 120 epochs × 50,000 draws, final119, original groups/masses,
+logical width 2263, and the same native contrast loss. No new map fit, source
+selection, loss tuning, factor combination or AIC response read is authorized
+by this metadata/manifest step. Full native maps were already purpose-bound
+and admitted. Preserve the 21-cell omission registry byte-for-byte; a separate
+`mlic-full-contrast-manifests-v1` registry contains only full-s0/s1/s2.
+
+The generator requires the exact full-authority index hash, verifies each
+original authority hash and rejects missing/duplicate seeds, omission scopes,
+changed seed streams and non-full routes. It uses the existing native-row,
+complete-reference and map binding checks. `READ_EVENT.json` records any TRAIN
+target/row reads. Existing confidence omission fitting remains first; the full
+extension is preparation for the subsequent common AIC comparison, not evidence
+that confidence has fit, qualified or been adopted.

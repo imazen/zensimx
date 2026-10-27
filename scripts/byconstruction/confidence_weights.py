@@ -122,7 +122,26 @@ def bind(scores, references, selected, maps):
     )
 
 
-def prepare(base, output):
+def validate_full_authorities(authorities):
+    """A full-data extension binds all fixed seeds, never omission authorities."""
+    if set(authorities) != {"full"}:
+        raise ValueError("full confidence requires only the full-data scope")
+    records = authorities["full"]
+    if len(records) != 3 or {r["cell"] for r in records} != {f"full-s{s}" for s in range(3)}:
+        raise ValueError("all three fixed full-data seeds required")
+    expected = ((1101, 101), (1103, 100000101), (1107, 200000101))
+    for record in records:
+        if sha(record["path"]) != record["sha256"]:
+            raise ValueError("original full-data authority changed")
+        authority = json.loads(Path(record["path"]).read_text())
+        seed = int(record["cell"].rsplit("-s", 1)[1])
+        cell = original_cell(authority, "full", seed)
+        if cell["route"] != "full" or (cell["init_seed"], cell["sample_seed"]) != expected[seed]:
+            raise ValueError("original full-data route or seeds differ")
+    return authorities
+
+
+def prepare(base, output, full_authorities=None, full_authorities_sha256=None):
     output.mkdir()
     inputs = {}
 
@@ -135,7 +154,11 @@ def prepare(base, output):
     maps_index = document(base / "RATING_MAPS_COMPLETE.json", MAP_PIN)
     link_index = document(base / "LINKING_FITS_COMPLETE.json", LINK_PIN)
     families = document(base / "rating-families-reviewed-run01.json", FAMILY_PIN)
-    authorities = document(base / "original-cell-authorities/INDEX.json", AUTHORITY_PIN)
+    if (full_authorities is None) != (full_authorities_sha256 is None):
+        raise ValueError("full authority path and exact hash required together")
+    authorities = (document(base / "original-cell-authorities/INDEX.json", AUTHORITY_PIN)
+                   if full_authorities is None else
+                   validate_full_authorities(document(full_authorities, full_authorities_sha256)))
     population = document(
         base / "original-rating-populations.json",
         "e8b80de3006829f87ad8593b819b06d844612419f5eab7b49f2d0c8e379ff078",
@@ -287,7 +310,7 @@ def prepare(base, output):
     write(
         output / "MANIFESTS.json",
         dict(
-            schema="mlic-contrast-manifests-v1",
+            schema="mlic-contrast-manifests-v1" if full_authorities is None else "mlic-full-contrast-manifests-v1",
             cells=manifests,
             source_sha256=sha(__file__),
             read_event_sha256=sha(output / "READ_EVENT.json"),
@@ -306,9 +329,11 @@ if __name__ == "__main__":
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("base", type=Path)
     p.add_argument("output", type=Path)
+    p.add_argument("--full-authorities", type=Path)
+    p.add_argument("--full-authorities-sha256")
     a = p.parse_args()
     try:
-        prepare(a.base, a.output)
+        prepare(a.base, a.output, a.full_authorities, a.full_authorities_sha256)
     except BaseException as error:
         if a.output.is_dir() and not (a.output / "FAILURE.json").exists():
             write(a.output / "FAILURE.json", dict(error=repr(error),
