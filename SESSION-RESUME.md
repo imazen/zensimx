@@ -30,33 +30,29 @@ requirement, not a candidate-selection cutoff. See the prospective
 
 ### Verify live work before doing anything else
 
-**Latest verified observation — 2026-10-27 05:29 UTC:** AIC fold run03 is
-running at **57/96** completed cells (24 verified reuses plus 33 new fits),
-with no reported failures. Compute-lock holder PID 1877247 belongs to its
-worker ancestry. All four recipe zero-step controls completed before the fit
-loop. Fold panels, full fits and full panels remain queued in that order.
-The older dated observations below are history, not current process status.
+**Latest verified observation — 2026-10-27 06:03:37 UTC:** AIC fold run03
+has completed **96/96** cells (24 verified reuses plus 72 new fits), with no
+reported failures. Fold panels have all **144/144** model predictions and are
+running native mixture checks. Compute-lock holder PID 2003152 belongs to the
+panel worker ancestry. Full fits and full panels wait behind that worker.
+Re-resolve these observations with the command below before acting.
 
-Confidence admission has advanced beyond the screen coordinator's final stage:
-review, membership freeze, independent validation, omission-family replay and
-exact preread scope are complete. Read `CONFIDENCE_PROGRESS.json` in the shared
-admission run02 root as well as the coordinator status. The current ledger is
-`linking-preread-run02.json`, SHA256
-`4fef7c7b97099f4591f15f39446369f245acd73ec50323bfc2e2b551c42a2bb8`.
-It binds 225 CEED/600 PC-IQA/70 JND-TV rows per scope except mos7, which has
-195/0/70 after family exclusion. Source owner is private zenpapers `55d3bebb`.
-Run01 is preserved, unexecuted metadata history. No new quality responses or
-teacher values have been read; confidence fits remain **0/21**.
+Confidence admission, all eight linking scopes and all 28 retained native
+rating maps are complete. Exact-scope quality responses and teacher values
+have been read with recorded exposure. Native normalizer and loaded-row
+integration tests pass, but confidence candidate fits remain **0/21**.
+The current machine-readable owner is `CONFIDENCE_PROGRESS.json` in the shared
+admission run02 root; the screen coordinator alone reports an earlier stage.
 
-Next implement the purpose-bound reader against that exact ledger, recording
-the read event before response extraction. Use fresh RNG 20261025 per omission,
-CEED then PC, and the existing native threshold aggregation. Fewer than three
-valid positive linking units means INCOMPLETE, never a zero floor. Then fit
-native rating maps, exact contrast-weight normalizers, the full-budget
-unweighted parity control and 21 fixed-epoch TRAIN cells. Keep AIC supervision
-active throughout. Do not call legacy broad response loaders or reuse the old
-mixed-role linking floor. The private `docs/training-confidence.md` owns the
-read-scope and native-math implementation details.
+**Do not train from `contrast-bindings-run02`.** Its 21 manifests bind rows
+but incorrectly declare logical width 410. The original recipe has 1,853 raw
+inputs plus 410 registered derived products: logical width **2,263**, with
+410 direct and 410 derived selected inputs. This was caught before any
+confidence training. Preserve run02; generate a fresh run03 with the corrected
+producer and exact derived declaration hash. Then verify native receipts,
+complete a full-budget unweighted byte-parity control, and run all 21 fixed-epoch
+TRAIN cells. Maintain the live AIC queue's priority. Do not change frozen
+inputs, sampler/tie behavior, loss definitions or historical verdicts.
 
 
 Observed on dev at **2026-10-27 04:55:32 UTC**: Order had completed **21/21**
@@ -77,9 +73,9 @@ directory when frozen orchestration changes.
 | Order | Run directory, checked on dev | Required work / state at the observation |
 |---|---|---|
 | 1 | `/mnt/v/output/zensim/mlic-order-20261027-run02` | 21/21 omission fits complete; historical screen rejected Order, still eligible for AIC. Source `27ed3745`; trainer `441bda58…`. |
-| 2 | `/mnt/tower/output/zensim/mlic-confidence-admission-20261027-run02` | Native source screen, **PLAN.json**; native decode complete, source screen running. No quality responses. |
-| 3 | `/mnt/v/output/zensim/mlic-aic-adaptation-20261027-run03` | 96 fold continuations: 72 new + 24 identity-checked Mlic reuses; waits for source screen. |
-| 4 | Same fold root, `panels/` | 48 initial + 96 continued models; separate fitted/held-out source panels. |
+| 2 | `/mnt/tower/output/zensim/mlic-confidence-admission-20261027-run02` | Source screen/admission, eight linking scopes and 28 native maps complete; contrast integration under validation; 0/21 candidate fits. |
+| 3 | `/mnt/v/output/zensim/mlic-aic-adaptation-20261027-run03` | 96/96 fold continuations complete: 72 new + 24 identity-checked Mlic reuses. |
+| 4 | Same fold root, `panels/` | 144/144 model predictions complete; native mixture checks running. Separate fitted/held-out source panels. |
 | 5 | `/mnt/v/output/zensim/mlic-aic-full-20261027-run02` | Full-budget control, 9 new base fits + 3 Mlic reuses, then 24 continuations (21 new + 3 reuses). |
 | 6 | Same full root, `panels/` | 36 models × 2 representations × 5 populations = 360 prediction outputs, plus both mixture tests. |
 
@@ -155,8 +151,9 @@ KADID/TID scopes exclude their respective collections. All maps pass the
 unchanged input gate. Two KADID and two TID native SEs are zero; preserve them
 and apply the registered 0.05-JOD floor at contrast construction. Legacy
 unused information diagnostics warned on those zeros, not the map outputs.
-Next implement exact legal-pair normalizers and the native rank-loss multiplier,
-then unweighted parity and all 21 TRAIN cells. The sampler owner is
+Exact legal-pair normalizers and the private native rank-loss multiplier now
+pass targeted tests. Corrected manifests, full-budget unweighted parity and
+all 21 TRAIN cells remain required. The sampler owner is
 `zensim-validate/src/mlp_train/sampling.rs`; tie semantics are owned by
 `zensim-validate/src/mlp_train/subjective_rank.rs`. No confidence weights or
 new confidence candidate fits are complete yet.
@@ -173,8 +170,8 @@ label-free observations below remain dated history. Source owners are private
 `07cdc78d` then `707ee101` (empty registered donor caller repair). Preserve
 run01's four completed scopes and mos7 failure; run02 completes the remaining
 four scopes. Both plans and source snapshots are immutable. No native fitter
-check was weakened. Next freeze per-omission native rating/observer read scopes,
-then construct maps/weights and run controls plus all 21 confidence cells.
+check was weakened. The subsequent native-map step is complete as recorded above; corrected
+contrast manifests, controls and all 21 confidence cells remain required.
 
 
 **2026-10-27 05:13 UTC update:** the replacement source screen is complete;
@@ -195,7 +192,8 @@ changes matched-codec sampling. None implements item-confidence weighting.
 The latter remains outstanding: source screen → retained-match review → frozen
 membership → independent validation → exact omission-bound response ledger →
 linking calibration and teacher maps → native contrast weights → controls/fits.
-Do useful independent preparation while the source screen is queued.
+The source screen and mapping stages are complete; continue native integration
+and controls while the AIC panel/full-fit queue runs.
 
 Native population/audit records are
 `/mnt/v/output/zensim/mlic-confidence-populations-20261027-run03/POPULATIONS.json`

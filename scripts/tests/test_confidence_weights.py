@@ -7,10 +7,17 @@ import sys
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "byconstruction"))
-from confidence_weights import bind, original_cell
+from confidence_weights import bind, original_cell, logical_width
 
 
 class Bindings(unittest.TestCase):
+    def test_logical_width_preserves_raw_space_and_derived_products(self):
+        cell = {"width":1853,"feature_ids":[13,14]}
+        derived = {"direct":[13,14],"products":[[13,422],[14,422]]}
+        self.assertEqual(logical_width(cell,derived),1855)
+        with self.assertRaises(ValueError):
+            logical_width(cell,derived | {"direct":[14,13]})
+
     def test_dataset_omissions_preserve_original_full_authority_namespace(self):
         for fold in ["pipal", "pairs", "mos7", "kadid", "tid2013", "konfig", "cid22_a25"]:
             route = "full" if fold in {"pipal", "pairs", "mos7"} else fold

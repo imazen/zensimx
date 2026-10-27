@@ -5762,3 +5762,42 @@ exposure receipt remain; fresh outputs are required. Three binding/namespace
 controls pass: `rc=0 0s | peak-RSS 0.07GiB | min-avail 24366MiB |
 peak-load 0.13`. Failed real pass: `rc=1 4s | peak-RSS 0.37GiB |
 min-avail 24051MiB | peak-load 0.28`. No confidence candidate fit started.
+
+
+### Native confidence integration and logical-width repair (2026-10-27)
+
+The private trainer integration binds original group order/masses, loaded-row
+hashes, seeds, epoch budget and logical feature width before applying contrast
+precision to native rank loss and gradient. With its research environment
+absent, the original path remains selected. It preserves native ties, pair
+sampling, absolute loss and uncovered references. Two loaded-row integration
+controls and four arithmetic controls pass: `rc=0 94s | peak-RSS 0.95GiB |
+min-avail 23063MiB | peak-load 3.57`. These are implementation tests, not
+full-budget reproduction or model qualification.
+
+The second binding run produced all 21 manifests, index SHA256
+`8e037987ed658efb4c42013e2fc79d1ebdbd2731a3c4cfa4018f69c2deb6c9ff`,
+but remains unexecuted and superseded: `n_features=410` confused selected raw
+IDs with the trainer's logical width. Original raw width is 1,853, selected
+raw IDs 410, registered derived products 410 and logical width 2,263.
+The corrected producer separately records these dimensions and binds the
+registered derived declaration, SHA256
+`a97a5fa63937ed8fade3c56fd7470765a031d1d309afc36e631f371a1796e648`.
+Four Python binding controls pass, including mismatched declaration refusal:
+`rc=0 1s | peak-RSS 0.07GiB | min-avail 24325MiB | peak-load 0.18`.
+No confidence fit used the wrong-width manifests. Generate fresh run03 outputs;
+keep the old exposure/result files. Full-budget unweighted parity and 21
+confidence fits remain outstanding.
+
+At 06:03:37 UTC, AIC fold run03 completed all 96 cells; its panel worker had
+144/144 model predictions and was running mixture checks. Full fits and full
+panels remain queued. No candidate adoption or HDR qualification is implied.
+
+Targeted validation-library Clippy with `-D warnings` passes: `rc=0 21s |
+peak-RSS 0.67GiB | min-avail 23150MiB | peak-load 1.16`. Full-workspace
+Clippy has not been rerun for this private integration.
+
+`just lint-scripts` on i265 reports one unchanged pre-existing dependency:
+`scripts/byconstruction/candidate_registry.py` references the absent historical
+`zensim--rev7main/` checkout. No new confidence-owner lint finding was reported.
+Do not fabricate that checkout or alter frozen candidate provenance to hide it.

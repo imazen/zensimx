@@ -28,6 +28,8 @@
 //! model is the one with the highest validation mean.
 
 mod capabilities;
+mod confidence_weights;
+mod contrast_precision;
 pub use capabilities::validate_training_capabilities;
 
 use rayon::prelude::*;
@@ -2889,6 +2891,14 @@ pub fn train_mlp_strategy_pairs(
     );
     let hyperparams = &effective;
 
+    let confidence = confidence_weights::Plan::from_env(
+        groups,
+        n_features,
+        hyperparams,
+        !rank_pairs.is_empty(),
+        log,
+    );
+
     #[cfg(e36_tv)]
     let mut e36_pool = tv.map(|config| e36_tv::Pool::new(config, hyperparams));
     #[cfg(e36_tv)]
@@ -3843,11 +3853,14 @@ pub fn train_mlp_strategy_pairs(
             // PWRC per-pair weight (default 1.0 when disabled). Scales
             // both loss & dl/dy linearly — the gradient is `pair_weight
             // * dl/dy` because loss is linear in pair_weight.
-            let pair_weight = if hyperparams.pwrc_pair_weight {
+            let mut pair_weight = if hyperparams.pwrc_pair_weight {
                 pwrc_pair_weight(mos_a, mos_b, hyperparams.pwrc_band_weights.as_deref())
             } else {
                 1.0
             };
+            if want_rank && let Some(plan) = &confidence {
+                pair_weight *= plan.weight(g_idx, ia, ib);
+            }
             // RankNet term. Zeroed for `GroupLossMode::Mse` groups and for
             // tied / sub-threshold pairs of a `Both` group.
             let (dl_dya_rn, dl_dyb_rn) = if want_rank {

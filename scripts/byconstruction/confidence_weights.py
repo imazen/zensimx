@@ -42,6 +42,14 @@ def original_cell(authority, fold, seed):
     return cell
 
 
+def logical_width(cell, derived):
+    if cell["feature_ids"] != derived["direct"] or len(derived["products"]) != len(derived["direct"]):
+        raise ValueError("original derived feature declaration differs")
+    if any(not 0 <= value < cell["width"] for pair in derived["products"] for value in pair):
+        raise ValueError("derived product input outside original raw width")
+    return cell["width"] + len(derived["products"])
+
+
 def bind(scores, references, selected, maps):
     """Native loader order: f64 targets, dense references in first-seen order."""
     if len(scores) != len(references):
@@ -100,6 +108,8 @@ def prepare(base, output):
         base / "original-rating-populations.json",
         "e8b80de3006829f87ad8593b819b06d844612419f5eab7b49f2d0c8e379ff078",
     )
+    derived = document(base / "e33_fx1_declaration.json",
+                       "a97a5fa63937ed8fade3c56fd7470765a031d1d309afc36e631f371a1796e648")
     for fold, records in authorities.items():
         for index in (maps_index, link_index):
             entry = index["folds"][fold]
@@ -225,7 +235,10 @@ def prepare(base, output):
                     epochs=120,
                     pairs_per_epoch=50000,
                     selected_epoch=119,
-                    n_features=len(cell["feature_ids"]),
+                    n_features=logical_width(cell, derived),
+                    raw_width=cell["width"],
+                    selected_raw_features=cell["feature_ids"],
+                    derived_products=len(derived["products"]),
                     hidden=128,
                     sigma_L=linking["sigma_L"],
                     item_floor=0.05,

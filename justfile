@@ -3679,3 +3679,7 @@ confidence-weight-bindings-tests:
 
 confidence-weight-bindings base output:
     OPENBLAS_NUM_THREADS=1 python3 -B scripts/byconstruction/confidence_weights.py {{quote(base)}} {{quote(output)}}
+
+confidence-native-tests target:
+    cargo test --locked -p zensim-validate --lib confidence_weights:: --target-dir {{quote(target)}}
+    cargo test --locked -p zensim-validate --test contrast_precision --target-dir {{quote(target)}}

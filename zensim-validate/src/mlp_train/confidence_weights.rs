@@ -1,0 +1,393 @@
+//! Private, hash-bound MlicConfidence admission; absent leaves the trainer unchanged.
+use serde::Deserialize;
+use sha2::{Digest, Sha256};
+use std::collections::BTreeMap;
+use std::path::Path;
+
+use super::contrast_precision::{self, Normalizer, Point};
+use super::{
+    GroupLossMode, MlpHyperparams, OutputPolarity, PairSampling, TrainingGroup, subjective_rank,
+};
+
+#[derive(Deserialize)]
+struct Binding {
+    rows: usize,
+    scores_refs_sha256: String,
+    points: Vec<Option<[f64; 2]>>,
+}
+#[derive(Deserialize)]
+struct Group {
+    name: String,
+    train_weight: f64,
+    validation_weight: f64,
+    mode: String,
+    binding: Option<Binding>,
+}
+#[derive(Deserialize)]
+struct Manifest {
+    schema: String,
+    candidate: String,
+    root_sha256: String,
+    init_seed: u64,
+    sample_seed: u64,
+    epochs: usize,
+    pairs_per_epoch: usize,
+    selected_epoch: usize,
+    n_features: usize,
+    hidden: usize,
+    #[serde(rename = "sigma_L")]
+    sigma: f64,
+    item_floor: f64,
+    input_sha256: BTreeMap<String, String>,
+    groups: Vec<Group>,
+    tie_policy: String,
+    pair_law: String,
+    absolute_loss_changed: bool,
+    group_masses_changed: bool,
+}
+struct WeightedGroup {
+    points: Vec<Option<Point>>,
+    refs: Vec<u32>,
+    normalizers: BTreeMap<u32, Normalizer>,
+}
+pub(super) struct Plan {
+    groups: Vec<Option<WeightedGroup>>,
+    sigma: f64,
+}
+
+fn digest(data: &[u8]) -> String {
+    crate::train_manifest::hex_lower(&Sha256::digest(data))
+}
+fn row_digest(scores: &[f64], refs: &[u32]) -> String {
+    assert_eq!(scores.len(), refs.len());
+    let mut hash = Sha256::new();
+    for (&score, &reference) in scores.iter().zip(refs) {
+        assert!(score.is_finite());
+        hash.update(score.to_le_bytes());
+        hash.update(reference.to_le_bytes());
+    }
+    crate::train_manifest::hex_lower(&hash.finalize())
+}
+
+impl Plan {
+    pub(super) fn from_env(
+        groups: &[TrainingGroup<'_>],
+        width: usize,
+        hp: &MlpHyperparams,
+        has_pair_lists: bool,
+        log: &mut Vec<String>,
+    ) -> Option<Self> {
+        let path = std::env::var_os("ZENSIM_RESEARCH_CONFIDENCE_MANIFEST");
+        let pin = std::env::var_os("ZENSIM_RESEARCH_CONFIDENCE_SHA256");
+        let receipt = std::env::var_os("ZENSIM_RESEARCH_CONFIDENCE_RECEIPT");
+        if path.is_none() && pin.is_none() && receipt.is_none() {
+            return None;
+        }
+        assert_eq!(
+            usize::BITS,
+            64,
+            "registered sampler uses 64-bit modulo words"
+        );
+        let bytes = std::fs::read(path.expect("confidence manifest required"))
+            .expect("read confidence manifest");
+        let expected = pin.expect("independent confidence manifest hash required");
+        assert_eq!(
+            digest(&bytes),
+            expected.to_str().expect("UTF8 manifest hash")
+        );
+        let manifest: Manifest =
+            serde_json::from_slice(&bytes).expect("confidence manifest schema");
+        assert!(
+            !has_pair_lists
+                && !hp.per_sample_alpha_head
+                && !hp.hybrid_head
+                && !hp.pool_head
+                && !(hp.parallel_batch && hp.minibatch_size > 1)
+                && hp.norm_in_norm_weight == 0.
+                && hp.pooled_legs.is_empty()
+                && !hp.pwrc_pair_weight
+                && hp.hard_pair_frac == 0.
+                && hp.stratified_bands == 0
+                && hp.pair_sampling == PairSampling::Uniform
+                && hp.dro_eta == 0.,
+            "confidence requires registered sequential uniform trainer"
+        );
+        assert_eq!(manifest.schema, "mlic-contrast-confidence-v1");
+        assert_eq!(manifest.candidate, "MlicConfidence");
+        assert_eq!(
+            manifest.root_sha256,
+            "a7fd4af0c2bb5a8981be636e5c1cb1a51db57496b7c60d7bf6da01d71dd16952"
+        );
+        assert_eq!(
+            (
+                manifest.epochs,
+                manifest.pairs_per_epoch,
+                manifest.selected_epoch
+            ),
+            (120, 50000, 119)
+        );
+        assert_eq!(
+            (hp.n_epochs, hp.pairs_per_epoch, hp.n_hidden, width),
+            (
+                manifest.epochs,
+                manifest.pairs_per_epoch,
+                manifest.hidden,
+                manifest.n_features
+            )
+        );
+        assert_eq!(hp.init_seed.unwrap_or(hp.seed), manifest.init_seed);
+        assert_eq!(hp.sample_seed.unwrap_or(hp.seed), manifest.sample_seed);
+        assert_eq!(manifest.item_floor, 0.05);
+        assert_eq!(manifest.tie_policy, "existing-native-owner");
+        assert_eq!(manifest.pair_law, "within-ref-u64-modulo");
+        assert!(!manifest.absolute_loss_changed && !manifest.group_masses_changed);
+        assert!(manifest.sigma.is_finite() && manifest.sigma > 0.);
+        for (name, pin) in &manifest.input_sha256 {
+            assert_eq!(
+                crate::train_manifest::sha256_file(Path::new(name))
+                    .expect("confidence input missing"),
+                *pin,
+                "confidence input changed: {name}"
+            );
+        }
+        let (plan, audit) = Self::bind(&manifest, groups, hp);
+        let path = receipt.expect("fresh confidence normalizer receipt required");
+        let file = std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(Path::new(&path))
+            .expect("fresh confidence normalizer receipt");
+        serde_json::to_writer_pretty(
+            file,
+            &serde_json::json!({
+                "schema": "mlic-native-contrast-normalizers-v1", "manifest_sha256": digest(&bytes),
+                "sigma_L": manifest.sigma, "groups": audit, "sampler_changed": false,
+                "absolute_loss_changed": false
+            }),
+        )
+        .expect("write native normalizer receipt");
+        log.push(format!(
+            "confidence manifest {} admitted; native normalizers recorded",
+            digest(&bytes)
+        ));
+        Some(plan)
+    }
+
+    fn bind(
+        manifest: &Manifest,
+        groups: &[TrainingGroup<'_>],
+        hp: &MlpHyperparams,
+    ) -> (Self, Vec<serde_json::Value>) {
+        assert_eq!(
+            groups.len(),
+            manifest.groups.len(),
+            "complete original group inventory required"
+        );
+        let sign = OutputPolarity::for_groups(groups, hp).rank_target_sign();
+        let mut result = Vec::new();
+        let mut audit = Vec::new();
+        for (group, declaration) in groups.iter().zip(&manifest.groups) {
+            assert_eq!(group.name, declaration.name);
+            assert_eq!(
+                group.train_weight.to_bits(),
+                declaration.train_weight.to_bits()
+            );
+            assert_eq!(
+                group.validation_weight.to_bits(),
+                declaration.validation_weight.to_bits()
+            );
+            let tokens: Vec<_> = declaration.mode.split(',').collect();
+            let loss = if tokens.contains(&"both") {
+                GroupLossMode::Both
+            } else if tokens.contains(&"mse") {
+                GroupLossMode::Mse
+            } else {
+                GroupLossMode::Rank
+            };
+            assert_eq!(group.loss_mode, loss);
+            assert_eq!(group.ref_ids.is_some(), tokens.contains(&"withinref"));
+            let Some(binding) = &declaration.binding else {
+                audit.push(serde_json::json!({"group": group.name, "baseline": true}));
+                result.push(None);
+                continue;
+            };
+            assert!(
+                matches!(
+                    group.name.as_str(),
+                    "human"
+                        | "subjective_rank_live_md"
+                        | "subjective_rank_colourlab_rating_variability_2022"
+                ),
+                "unregistered confidence group"
+            );
+            assert_eq!(group.loss_mode, GroupLossMode::Rank);
+            assert!(group.train_weight > 0. && group.validation_weight == 0.);
+            let refs = group
+                .ref_ids
+                .expect("confidence requires original references");
+            assert_eq!(binding.rows, group.human_scores.len());
+            assert_eq!(binding.points.len(), binding.rows);
+            assert_eq!(
+                row_digest(group.human_scores, refs),
+                binding.scores_refs_sha256
+            );
+            let points: Vec<_> = binding
+                .points
+                .iter()
+                .map(|p| p.map(|[x, se]| Point { x, se }))
+                .collect();
+            let mut buckets = BTreeMap::<u32, Vec<usize>>::new();
+            for (i, &reference) in refs.iter().enumerate() {
+                buckets.entry(reference).or_default().push(i);
+            }
+            let mut normalizers = BTreeMap::new();
+            let mut reference_audit = Vec::new();
+            for (reference, indices) in buckets {
+                let covered = indices.iter().filter(|&&i| points[i].is_some()).count();
+                assert!(
+                    covered == 0 || covered == indices.len(),
+                    "partially covered reference"
+                );
+                if covered == 0 {
+                    continue;
+                }
+                let local: Vec<_> = indices.iter().map(|&i| points[i].unwrap()).collect();
+                let norm = contrast_precision::normalize(&local, manifest.sigma, 64, |a, b| {
+                    let (a, b) = (
+                        group.human_scores[indices[a]],
+                        group.human_scores[indices[b]],
+                    );
+                    !subjective_rank::tied(group, a, b, sign * (a - b).signum())
+                });
+                reference_audit.push(serde_json::json!({"reference": reference, "rows": indices.len(),
+                    "mean_precision": norm.as_ref().map(|n| n.mean_precision),
+                    "legal_ordered_pairs": norm.as_ref().map_or(0, |n| n.legal_ordered_pairs),
+                    "legal_draw_multiplicity": norm.as_ref().map(|n| n.legal_draw_multiplicity.to_string())}));
+                if let Some(norm) = norm {
+                    normalizers.insert(reference, norm);
+                }
+            }
+            audit.push(serde_json::json!({"group": group.name, "baseline": false, "references": reference_audit}));
+            result.push(Some(WeightedGroup {
+                points,
+                refs: refs.to_vec(),
+                normalizers,
+            }));
+        }
+        (
+            Self {
+                groups: result,
+                sigma: manifest.sigma,
+            },
+            audit,
+        )
+    }
+
+    pub(super) fn weight(&self, group: usize, a: usize, b: usize) -> f64 {
+        let Some(group) = &self.groups[group] else {
+            return 1.;
+        };
+        assert_eq!(group.refs[a], group.refs[b]);
+        match (group.points[a], group.points[b]) {
+            (None, None) => 1.,
+            (Some(a_point), Some(b_point)) => group
+                .normalizers
+                .get(&group.refs[a])
+                .expect("active pair requires a legal reference normalizer")
+                .weight(a_point, b_point, self.sigma),
+            _ => panic!("partial confidence coverage"),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::mlp_train::FeatureRows;
+
+    fn manifest(group: &TrainingGroup<'_>) -> Manifest {
+        let refs = group.ref_ids.unwrap();
+        serde_json::from_value(serde_json::json!({
+            "schema":"mlic-contrast-confidence-v1", "candidate":"MlicConfidence",
+            "root_sha256":"a7fd4af0c2bb5a8981be636e5c1cb1a51db57496b7c60d7bf6da01d71dd16952",
+            "init_seed":1101, "sample_seed":101, "epochs":120, "pairs_per_epoch":50000,
+            "selected_epoch":119, "n_features":1, "hidden":128, "sigma_L":0.5, "item_floor":0.05,
+            "input_sha256":{}, "tie_policy":"existing-native-owner", "pair_law":"within-ref-u64-modulo",
+            "absolute_loss_changed":false, "group_masses_changed":false,
+            "groups":[{"name":group.name, "train_weight":1., "validation_weight":0.,
+                "mode":"withinref,rank", "binding":{"rows":5,
+                    "scores_refs_sha256":row_digest(group.human_scores,refs),
+                    "points":[[0.,0.],[0.4,0.1],[2.,0.3],null,null]}}]
+        })).unwrap()
+    }
+
+    #[test]
+    fn loaded_rows_use_native_ties_and_keep_baseline_references() {
+        let scores = [1., 1., 2., 3., 4.];
+        let refs = [0, 0, 0, 1, 1];
+        let features: [&[f64]; 5] = [&[0.]; 5];
+        for name in ["human", "subjective_rank_live_md"] {
+            let group = TrainingGroup {
+                name: name.into(),
+                human_scores: &scores,
+                features: FeatureRows::Borrowed(&features),
+                metric_sigmas: None,
+                train_weight: 1.,
+                validation_weight: 0.,
+                ref_ids: Some(&refs),
+                loss_mode: GroupLossMode::Rank,
+            };
+            let declaration = manifest(&group);
+            let hp = MlpHyperparams::default();
+            let (plan, audit) = Plan::bind(&declaration, &[group], &hp);
+            assert_eq!(
+                audit[0]["references"][0]["legal_ordered_pairs"],
+                if name == "human" { 6 } else { 4 }
+            );
+            assert_eq!(plan.weight(0, 3, 4), 1.);
+            assert_eq!(plan.weight(0, 0, 2), plan.weight(0, 2, 0));
+            let mut sum = 0.;
+            let mut count = 0;
+            for a in 0..3 {
+                for b in 0..3 {
+                    if a != b && (name == "human" || scores[a] != scores[b]) {
+                        sum += plan.weight(0, a, b);
+                        count += 1;
+                    }
+                }
+            }
+            assert!((sum / count as f64 - 1.).abs() < 1e-12);
+        }
+    }
+
+    #[test]
+    fn loaded_order_mass_and_partial_reference_changes_refuse() {
+        let scores = [1., 1., 2., 3., 4.];
+        let refs = [0, 0, 0, 1, 1];
+        let features: [&[f64]; 5] = [&[0.]; 5];
+        let group = TrainingGroup {
+            name: "human".into(),
+            human_scores: &scores,
+            features: FeatureRows::Borrowed(&features),
+            metric_sigmas: None,
+            train_weight: 1.,
+            validation_weight: 0.,
+            ref_ids: Some(&refs),
+            loss_mode: GroupLossMode::Rank,
+        };
+        for mutation in 0..3 {
+            let mut d = manifest(&group);
+            match mutation {
+                0 => d.groups[0].binding.as_mut().unwrap().points[0] = None,
+                1 => d.groups[0].binding.as_mut().unwrap().scores_refs_sha256 = "different".into(),
+                _ => d.groups[0].train_weight = 2.,
+            }
+            assert!(
+                std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                    Plan::bind(&d, std::slice::from_ref(&group), &MlpHyperparams::default())
+                }))
+                .is_err()
+            );
+        }
+    }
+}
