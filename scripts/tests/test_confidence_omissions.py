@@ -62,10 +62,11 @@ class OmissionIdentities(unittest.TestCase):
     def test_dataset_family_rows_preserve_identity_and_refuse_wrong_roles(self):
         def row(i, family):
             return dict(row=i, observation=f"pipal:labels.tsv:{i}", source="r", reference="pipal:r",
-                family=family, role="fit", tier="B")
+                family=str(family), role="fit", tier="T2")
         rows = [row(0, 17), row(1, 17), row(2, 23)]
         self.assertEqual(dataset_families("pipal", rows, 3), [17, 23])
-        for bad in [{"role": "EVAL"}, {"family": True}, {"row": 7},
+        for bad in [{"role": "EVAL"}, {"family": True}, {"family": "017"},
+                    {"family": "1e3"}, {"family": "-1"}, {"row": 7},
                     {"observation": "other:labels.tsv:1"}, {"score": 1.}]:
             with self.subTest(bad=bad), self.assertRaises(ValueError):
                 dataset_families("pipal", [rows[0], rows[1] | bad, rows[2]], 3)

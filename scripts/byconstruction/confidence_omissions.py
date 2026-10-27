@@ -73,16 +73,24 @@ def human_scope(fold, all_fit, retained_fit, assessment, banks):
             for k, v in sorted(references.items())])
 
 
+def family_number(value):
+    """Native JSON identifier keys serialize family IDs as canonical decimal strings."""
+    if type(value) is int and value >= 0:
+        return value
+    if isinstance(value, str) and value.isascii() and value.isdecimal() and str(int(value)) == value:
+        return int(value)
+    raise ValueError("original dataset family identity is not a canonical nonnegative integer")
+
+
 def dataset_families(collection, rows, expected_rows):
     if len(rows) != expected_rows or not rows:
         raise ValueError("dataset fitting population incomplete")
     families = set()
     for i, row in enumerate(rows):
-        if (set(row) != DATASET_KEYS or row["role"] != "fit" or row["row"] != i
-                or type(row["family"]) is not int or row["family"] < 0
+        if (set(row) != DATASET_KEYS or row["role"] != "fit" or type(row["row"]) is not int or row["row"] != i
                 or not row["observation"].startswith(collection + ":")):
             raise ValueError("original dataset observation/family identity differs")
-        families.add(row["family"])
+        families.add(family_number(row["family"]))
     return sorted(families)
 
 

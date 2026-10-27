@@ -5564,3 +5564,11 @@ Run01 and its failed join are retained at
 `/mnt/tower/output/zensim/mlic-confidence-omissions-20261027-run01`.
 Run02 has a readback-verified identifier-only snapshot of all six member
 manifests and key tables. No feature/label-bearing bank table was transported.
+
+Run02 then refused the native dataset identifier schema: its family IDs are
+canonical decimal strings, while the new adapter expected JSON integers.
+The adapter now accepts the exact canonical numeric identity and rejects
+booleans, signs, padding and non-integer notation. Four controls pass on i265
+with native-style string IDs (`rc=0 0s | peak-RSS 0.07GiB | min-avail 24522MiB |
+peak-load 0.01`). Run02 and its refusal remain preserved; no output or response
+read resulted. Run03 reuses the verified bank snapshot and a new source identity.
