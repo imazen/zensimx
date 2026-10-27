@@ -5031,3 +5031,27 @@ report running; completed cells without a live worker or the final screen
 marker report an interrupted chain. Synthetic dead-queue and stage-transition
 controls pass. A TRAIN screen never marks the overall production/HDR goal
 complete.
+
+### MlicOrder stimulus-identity repair before launch (2026-10-27)
+
+The initial queued study `mlic-order-20261027` was canceled before it entered
+the compute slot. Its `QUEUE_CANCELLED.json` preserves the exact queue process
+identity. The original fitting loader retains multiple observations that
+share decoded pixels; the new ordering admission had incorrectly required
+unique pixel keys and used the bank's representative codec filename.
+
+The repaired private admission identifies observations by pixel key plus
+source-row ID. It obtains each native codec from the original pinned source
+TSV's filename, without parsing human scores. Equal matching-distance ties
+use `(pair_key, source_row_id)` in that order; the source ID resolves only
+otherwise identical pixel keys. The fixed matching rule, quarter-share
+schedule, budget, reference masses and qualification gates remain unchanged.
+No candidate predictions or outcomes informed this repair. The next launch
+uses a fresh study and rebuilt trainer, with the unchanged full-budget control
+still required before candidate fits.
+
+Python metadata/recipe controls pass. Native sampler, rank/vote and private
+admission controls pass on i265, including repeated pixel keys, distinct
+source observations and stable bidirectional matching.
+`run-heavy: done rc=0 137s | peak-RSS 2.11GiB | min-avail 18705MiB | peak-load 11.39`.
+This is a correctness-check resource record, not an inference benchmark.

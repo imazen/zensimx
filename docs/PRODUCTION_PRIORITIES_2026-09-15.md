@@ -502,3 +502,31 @@ conversion to f64; no uncertainty threshold or scientific gate changed.
 The failed audit remains under
 `/mnt/v/output/zensim/mlic-confidence-native-audit-20261027`; the next attempt
 uses a fresh directory and the same frozen population/source hashes.
+
+### Native population postcheck and corrected audit (October 27)
+
+The first two population packets above are rejected for training weights.
+The promoted bank stores one filename per decoded pixel pair, while the
+fitting table preserves separate observations by `(pair_key, source_row_id)`.
+Four KADID observations sharing pixels were incorrectly mapped to the same
+native uncertainty item. The second source audit's conversion completed, but
+its population binding failed this postcheck; `ADMISSION_REJECTED.json`
+records that rejection. No weights were constructed or used.
+
+The corrected metadata owner binds source-row IDs through the original
+bank's pinned source TSV, without interpreting its response column. The
+fresh `mlic-confidence-populations-20261027-run03/POPULATIONS.json` under
+`/mnt/v/output/zensim` has SHA256
+`e8b80de3006829f87ad8593b819b06d844612419f5eab7b49f2d0c8e379ff078`.
+All 6,659 KADID and 1,680 TID2013 fitting observations now map one-to-one
+to distinct native items. LIVE-MD and Colourlab retain 210 and 320 items.
+
+The corresponding `mlic-confidence-native-audit-20261027-run03` source audit
+verifies all four selected uncertainty sources. Its output SHA256 is
+`a9e65891ab7bfa7e5520dc0791179b14f577bbce8f91576785607919fb209e58`.
+The ledger and producer hashes are preserved with the result. Regression
+controls retain distinct native items when decoded pixel hashes coincide;
+the audit now refuses a collapsed observation population before uncertainty
+reads. This admits native uncertainty only. TRAIN-only linking calibration,
+weight construction, the registered candidate trial and qualification remain
+required.
