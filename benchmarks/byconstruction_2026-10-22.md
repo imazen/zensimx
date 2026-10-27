@@ -6903,3 +6903,70 @@ justfile but not the `benchmarks/speedq.just` it imports, so `just` refused to p
 behind the gates, then took the lock as designed. Run02 (`mlic-candidate-gates-20261027-run02`) uses a complete
 snapshot of main `49a6eba6`. `gates.py` and `scripts/rev4_featpot` are unchanged since run01's `39d6420a`. It runs
 the same 15 models after the fold study.
+
+### Source-fold matched continuation: result (2026-10-27, complete 13:11 UTC)
+
+All 42 fits finished; 87 models were predicted on the five populations. Out of fold on AIC-2026 public_train
+(three-seed mean of the assembled held-out predictions; Initial is zero-shot):
+
+| Model | Three-seed mean | Seeds 0 / 1 / 2 |
+|---|---:|---|
+| Initial (Mlic) | 0.9075 | 0.9094 / 0.9089 / 0.9023 |
+| Mixed + AIC×16, epoch 7 | 0.9117 | 0.9119 / 0.9131 / 0.9092 |
+| Mixed + AIC×16, epoch 59 | 0.9170 | 0.9168 / 0.9159 / 0.9170 |
+| AIC-only, epoch 7 | 0.9410 | 0.9393 / 0.9375 / 0.9381 |
+| AIC-only, epoch 59 | 0.9524 | 0.9498 / 0.9525 / 0.9528 |
+
+Paired by seed (seed-unit SE), out of fold:
+
+| Difference | Mean (SE) | Whole-source 95% interval |
+|---|---|---|
+| mixed epoch 59 − epoch 7 | +0.0051 (0.0014) | [+0.003, +0.007] |
+| mixed epoch 59 − initial | +0.0096 (0.0025) | [+0.005, +0.014] |
+| AIC-only epoch 59 − mixed epoch 59 | +0.0352 (0.0011) | [+0.016, +0.054] |
+
+The older sets, in sample, as the mean over fold models against the initial model:
+- Mixed epoch 59 gains on every set: KADID +0.007, TID2013 +0.004, KonFiG +0.010, CID22-A +0.014.
+- AIC-only epoch 59 loses KADID (−0.227, SE 0.008), TID2013 (−0.130) and KonFiG (−0.018), and gains CID22-A
+  (+0.021).
+
+Local mixtures stay at 4–5 rows per cell (largest rise +6.6, mixed epoch 59). Global mixtures are 0.
+
+The mixed epoch-59 gain holds on held-out AIC sources, and AIC-only reaches the historical AIC-only model's
+out-of-fold 0.9527. These E21 numbers are in sample: every continuation starts from full-data Mlic, so they measure
+forgetting, not generalization.
+
+### AIC-share frontier: can rehearsal reach 0.95 out of fold and keep the older sets? (registered 2026-10-27, before any frontier fit)
+
+Owner, 2026-10-27, about 13:05 UTC, verbatim: "using newer weighting techinques try to get 0.95 aic while recovering
+older dataset perf". The source-fold result above bounds the problem. Mixed + AIC×16 (about 23% of draws) reaches
+0.917 out of fold and keeps the older sets in sample. AIC-only reaches 0.952 and loses KADID and TID2013. The older
+human legs train only within-reference ranks, while the AIC leg ranks pooled across sources, so AIC-heavy training
+reorders what the older legs no longer rehearse.
+
+**Stage A (static mixtures).**
+- Arms: Mlic full seed 0, continued from its final checkpoint for 60 epochs (constant LR 1e-5, fresh Adam) on its
+  original mixture plus AIC-2026 public_train at weight W = 64, 256 or 1024. The mixture's total weight is 60.7, so
+  AIC is about 51%, 81% and 94% of draws. Each arm runs on each of the seven D6 four-source folds.
+- Checkpoints 7, 15, 29 and 59 are retained. The source-fold study's seed-0 fits of mixed ×16 and AIC-only are reused
+  at the same checkpoints.
+- Panels: out-of-fold AIC-2026 public_train (seed 0); the older sets (KADID, TID2013, KonFiG, CID22-A) in sample,
+  as the mean over fold models, which measures forgetting; source, codec and ladder aggregates; both mixture tests;
+  whole-source intervals. No EVAL, public_test or AIC-4 read.
+
+**Advancement (my rule, declared before results; not a winner claim).** A point (W, epoch) keeps the older sets
+when its in-sample SROCC on each of KADID, TID2013, KonFiG and CID22-A is at least the initial model's minus 0.005.
+Among those points, the highest out-of-fold AIC advances, and ties within 0.002 go to the smaller W. If no point
+keeps the older sets, the highest out-of-fold AIC with a worst older-set loss under 0.02 advances, flagged.
+
+**Stage B (registered here, run after A).** At the advanced budget, continue the MlicNeff, MlicVote, MlicOrder and
+MlicConfidence full seed-0 models the same way, on the same folds, with the same panels and rule. Their own
+weighting stays active in their older legs.
+
+**Stage C.** The chosen arm runs seeds 1 and 2 on the folds. Then come full-data continuations of all three full
+seeds, packing, E21 out of sample through the existing omission cells continued the same way, the full panels and
+mixtures, near-identity and the label-free gates. No adoption follows from Stage A or B alone.
+
+The native and Python admissions add a second registered protocol, `aic-share-frontier-v1`, beside the matched
+diagnostic's. It admits only these three populations, each at its own public_train weight, with the four
+checkpoints. The matched diagnostic's own rules are unchanged.
