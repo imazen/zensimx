@@ -5628,3 +5628,14 @@ all existing input pins, full Order source/binary, recipes, thresholds and
 budgets remain unchanged. Old source snapshots remain explicit frozen inputs.
 `just mlic-priority-progress` now resolves the replacement chain. Do not
 restart the preserved failed plans or treat old state files as live progress.
+
+The omission native-pixel audit on i265 matches all 65/65 KADID, 25/25 TID,
+14/14 KonFiG and 25/25 CID22-A assessment references against the original
+486,013-image source inventory. Exact RGB hashes and dimensions all match;
+no source is dropped. The run03 `NATIVE_PIXEL_COVERAGE.json` binds the
+inventory SHA `5c16fb53d31f2407e373bf83eb74b89653c7721499b4c7b6e807c3f25cb51968`.
+Resource receipt: `rc=0 5s | peak-RSS 0.80GiB | min-avail 23477MiB | peak-load 0.10`.
+This is metadata compatibility only. The private family resolver now has six
+passing alias/omission controls; its real graph replay still requires completed
+source screening, frozen membership and independent validation before any
+purpose-bound response ledger. No confidence weights or maps follow yet.

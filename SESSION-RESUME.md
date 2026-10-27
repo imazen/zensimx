@@ -142,7 +142,10 @@ dataset family IDs (200 PIPAL, 111,363 pairs, 38 mos7). Full has no omissions.
 Run01 refused collection-local source-row confusion; run02 refused canonical
 string family IDs. Both remain preserved. Run03 uses original bank snapshot
 keys and manifests, never mutable promoted metadata. No response, feature or
-uncertainty values were interpreted. The next metadata step is an exact join
+uncertainty values were interpreted. All 129 assessment references match the original native source inventory
+by RGB hash and dimensions, with none missing; see the run03
+`NATIVE_PIXEL_COVERAGE.json`. The private native-family resolver is implemented
+and its six controls pass. The next metadata step is the real graph join
 to the independently validated native family registry: reference pixel identity
 and dimensions plus all inherited prior-family aliases. Missing or ambiguous
 joins must fail before any donor, observer, map or normalizer fit.
