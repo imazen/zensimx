@@ -448,8 +448,14 @@ dataset-root source out admission features library columns weight='0.5' collecti
 
 # Fresh root only; fixed original Mlic memberships/masses and corrected policy.
 # Caller holds heavy.lock and run-heavy, serialized with training/evaluation.
-dataset-vote-root source out admission features library columns confidence:
-    python3 -B scripts/byconstruction/ring_root.py datasets --root {{quote(source)}} --out {{quote(out)}} --admission {{quote(admission)}} --features {{quote(features)}} --library {{quote(library)}} --columns {{quote(columns)}} --nominal-weight 0.5 --collections bapps --bapps-votes --confidence {{quote(confidence)}}
+dataset-vote-root source out admission features library columns confidence audit='' audit_sha='':
+    #!/usr/bin/env bash
+    set -euo pipefail
+    extra=()
+    if [[ -n {{quote(audit)}} || -n {{quote(audit_sha)}} ]]; then
+      extra+=(--bapps-vote-audit {{quote(audit)}} --bapps-vote-audit-sha256 {{quote(audit_sha)}})
+    fi
+    python3 -B scripts/byconstruction/ring_root.py datasets --root {{quote(source)}} --out {{quote(out)}} --admission {{quote(admission)}} --features {{quote(features)}} --library {{quote(library)}} --columns {{quote(columns)}} --nominal-weight 0.5 --collections bapps --bapps-votes --confidence {{quote(confidence)}} "${extra[@]}"
 
 # Caller holds heavy.lock and run-heavy; selected native TRAIN judgments only.
 dataset-vote-source-audit root admission library policy archive output:

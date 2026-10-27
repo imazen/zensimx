@@ -348,6 +348,8 @@ def cmd_datasets(a):
     weight = getattr(a, "nominal_weight", 0.5)
     subsets = getattr(a, "additional_subsets", False)
     votes = getattr(a, "bapps_votes", False)
+    if not votes and (getattr(a,"bapps_vote_audit",None) or getattr(a,"bapps_vote_audit_sha256",None)):
+        raise ValueError("source recovery is specific to the native vote trial")
     if subsets and votes:
         raise ValueError("vote replacement and subset append are separate studies")
     available = DATASET_SUBSETS if subsets else (*DATASET_MOS, *DATASET_PAIR)
@@ -365,6 +367,7 @@ def cmd_datasets(a):
     out.parent.mkdir(parents=True, exist_ok=True)
     parent_packet, projection = None, None
     vote_policy = None
+    vote_recovery = None
     if votes:
         if selected_collections != ("bapps",) or weight != 0.5 or not getattr(a, "confidence", None):
             raise ValueError("native votes require BAPPS mass 0.5 and its frozen confidence policy")
@@ -389,6 +392,13 @@ def cmd_datasets(a):
         vote_policy = dict(schema="mlic-native-vote-policy-v1", confidence_sha256=sha(policy_path),
                            source_frozen_sha256=sha(source/"wide/frozen.json"),
                            native_votes_per_pair=2, nominal_weight=0.5, TRAIN_memberships=146003)
+        audit, audit_pin = getattr(a,"bapps_vote_audit",None), getattr(a,"bapps_vote_audit_sha256",None)
+        if audit is not None or audit_pin is not None:
+            if audit is None or audit_pin is None:
+                raise ValueError("vote recovery requires independently pinned source audit")
+            from bapps_vote_audit import admit_recovery
+            vote_recovery = admit_recovery(audit,audit_pin)
+            vote_policy["released_source_audit"] = dict(path=str(audit),sha256=audit_pin,receipt=vote_recovery)
     if subsets:
         if (sha(source/"wide/frozen.json") != "a7fd4af0c2bb5a8981be636e5c1cb1a51db57496b7c60d7bf6da01d71dd16952"
                 or sha(admission/"validation-receipt.json") != SUBSET_ADMISSION_SHA
@@ -511,6 +521,9 @@ def cmd_datasets(a):
         if subsets and c == "colourlab-cognitive-science-2022":
             parent = pq.read_table("/mnt/v/zensim/dataset-admission-20261025/colourlab-rating-variability-2022/membership.parquet").to_pylist()
             labels = subset_parent_binding(members, labels, projection, parent)
+        if votes and vote_recovery is not None:
+            from bapps_vote_audit import apply_recovery
+            labels = apply_recovery(vote_recovery,members,labels,ledger)
         obs, dropped = dataset_observations(c, members, mapping, labels, votes=votes)
         if votes and (len(members) != 146003 or len(obs) != 2*len(members)):
             raise ValueError("native vote root must retain every frozen BAPPS TRAIN comparison")
@@ -1542,6 +1555,8 @@ def main() -> int:
                     help="append the registered subset protocols to the frozen eight-leg Mlic root; build only")
     ds.add_argument("--bapps-votes", action="store_true", help="replace only BAPPS with the registered two-vote likelihood leg")
     ds.add_argument("--confidence", help="frozen corrected confidence policy TSV, required for native votes")
+    ds.add_argument("--bapps-vote-audit", help="verified released TRAIN count source audit")
+    ds.add_argument("--bapps-vote-audit-sha256", help="independently frozen source audit digest")
     ds.set_defaults(fn=cmd_datasets)
     ml = sub.add_parser("mix-licence")
     ml.add_argument("--study", required=True)

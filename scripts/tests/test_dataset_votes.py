@@ -160,6 +160,48 @@ class NativeVotes(unittest.TestCase):
         with self.assertRaises(ValueError):
             judge_path({**member,"reference_path":"val/cnn/ref/000001.png"})
 
+    def test_recovery_admission_is_metadata_only_and_payload_binds_native_response(self):
+        sys.path.insert(0, str(Path(__file__).resolve().parents[1]/"byconstruction"))
+        import bapps_vote_audit as audit
+        directory = self.f.path.parent
+        count_path, receipt_path, ledger = (directory/n for n in ("counts.json","audit.json","reads.json"))
+        receipt = dict(schema="bapps-native-vote-source-audit-v1", role="TRAIN", state="verified", rows=146003,
+            original_root_sha256=audit.ROOT_SHA, membership_sha256=audit.MEMBERSHIP_SHA,
+            confidence_policy_sha256=audit.POLICY_SHA, archive_sha256=audit.ARCHIVE_SHA,
+            source_script_sha256=audit.AUDITOR_SHA, excluded_train_judgments_parsed=0, eval_judgments_parsed=0,
+            count_path=str(count_path),count_sha256="a"*64)
+        receipt_path.write_text(json.dumps(receipt))
+        self.assertEqual(audit.admit_recovery(receipt_path,audit.sha(receipt_path)),receipt)
+        self.assertFalse(count_path.exists())
+        for field,value in (("role","EVAL"),("rows",146002),("source_script_sha256","b"*64),
+                            ("excluded_train_judgments_parsed",1),("eval_judgments_parsed",1)):
+            receipt_path.write_text(json.dumps({**receipt,field:value}))
+            with self.subTest(field=field),self.assertRaises(ValueError):
+                audit.admit_recovery(receipt_path,audit.sha(receipt_path))
+        member = dict(row_index=7,reference_path="train/cnn/ref/000001.png",
+            a_path="train/cnn/p0/000001.png",b_path="train/cnn/p1/000001.png")
+        row = dict(row=7,source="bapps:pairs.tsv:7",judge_member="train/cnn/judge/000001.npy",
+            judge_sha256="c"*64,n_a=1,n_b=1,n_tie=0,n=2,p_a=0.5)
+        label = dict(n="2",p_a="0.5",n_a="",n_b="",n_tie="")
+        def apply(changes=None, label_changes=None):
+            count_path.write_text(json.dumps(dict(schema="bapps-released-two-vote-counts-v1",rows=[{**row,**(changes or {})}])))
+            ledger.write_text(json.dumps(dict(reads=[])))
+            return audit.apply_recovery({**receipt,"count_sha256":audit.sha(count_path)},[member],
+                {("pairs.tsv",7):{**label,**(label_changes or {})}},ledger)
+        self.assertEqual(apply()[("pairs.tsv",7)],{**label,"n_a":"1","n_b":"1","n_tie":"0"})
+        self.assertEqual(json.loads(ledger.read_text())["reads"][-1]["state"],"verified")
+        for field,value in (("row",8),("source","bapps:pairs.tsv:8"),("judge_member","val/cnn/judge/000001.npy"),
+                            ("n_a",True),("n_b",0),("n_tie",1),("n",3),("p_a",1.)):
+            with self.subTest(field=field),self.assertRaises(ValueError):
+                apply({field:value})
+        for change in (dict(n_a="2"),dict(p_a="0.25"),dict(n="5")):
+            with self.subTest(change=change),self.assertRaises(ValueError):
+                apply(label_changes=change)
+        with self.assertRaisesRegex(ValueError,"payload changed"):
+            audit.apply_recovery(receipt,[member],{("pairs.tsv",7):label},ledger)
+        with self.assertRaisesRegex(ValueError,"protected subjective"):
+            audit.admit_recovery(directory/"_sealed"/"audit.json","a"*64)
+
 
 if __name__ == "__main__":
     unittest.main()

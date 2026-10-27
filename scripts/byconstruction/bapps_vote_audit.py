@@ -19,13 +19,14 @@ import numpy as np
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent/"rev4_featpot"))
-from ring_root import dataset_family_guard, dataset_targets
 from run_processes import compute_lock, process_snapshot
+from subjective_training_leg import safe
 
 ARCHIVE_SHA = "b4f5c772c7cd88ac44bcb4ff0741745d434c05f0094f2bfb262ddcd0055bf393"
 MEMBERSHIP_SHA = "96e5acc0d01c412d81e9a5259df5a6af903550a2d85138cc3b45fd6f75f9b669"
 POLICY_SHA = "40407d74cf998da64400b36a7885b798333c886227c9c6aef5927cb1777e3e02"
 ROOT_SHA = "a7fd4af0c2bb5a8981be636e5c1cb1a51db57496b7c60d7bf6da01d71dd16952"
+AUDITOR_SHA = "c18ed6b81dba2f76ab8638c58c1d8dfce35f08d4ea716f25f9d76fd44e80243d"
 
 
 def sha(path):
@@ -62,7 +63,61 @@ def judge_path(member):
     return str(ref.parent.parent/"judge"/ref.with_suffix(".npy").name)
 
 
+def admit_recovery(path, expected):
+    """Metadata phase only. The frozen source auditor is independently pinned."""
+    path = safe(path)
+    if sha(path) != expected:
+        raise ValueError("vote source audit pin changed")
+    receipt = json.loads(Path(path).read_text())
+    pins = dict(original_root_sha256=ROOT_SHA,membership_sha256=MEMBERSHIP_SHA,
+                confidence_policy_sha256=POLICY_SHA,archive_sha256=ARCHIVE_SHA,source_script_sha256=AUDITOR_SHA)
+    if (receipt.get("schema") != "bapps-native-vote-source-audit-v1" or receipt.get("role") != "TRAIN"
+            or receipt.get("state") != "verified" or receipt.get("rows") != 146003
+            or any(receipt.get(k) != v for k,v in pins.items())
+            or receipt.get("excluded_train_judgments_parsed") != 0 or receipt.get("eval_judgments_parsed") != 0):
+        raise ValueError("complete frozen TRAIN vote source audit required")
+    return receipt
+
+
+def apply_recovery(receipt, members, labels, ledger):
+    """Payload phase: supply source-proven integer counts to the unchanged gate."""
+    path = safe(receipt["count_path"])
+    reads = json.loads(ledger.read_text())
+    reads["reads"].append(dict(kind="verified-released-TRAIN-vote-counts", table=str(path),
+        sha256=receipt["count_sha256"], row_count=len(members),
+        columns=["row","source","judge_member","judge_sha256","n_a","n_b","n_tie","n","p_a"],
+        state="authorized-before-read"))
+    ledger.write_text(json.dumps(reads,indent=1)+"\n")
+    if sha(path) != receipt["count_sha256"]:
+        raise ValueError("recovered count payload changed")
+    payload = json.loads(path.read_text())
+    rows = payload.get("rows",[])
+    if payload.get("schema") != "bapps-released-two-vote-counts-v1" or len(rows) != len(members):
+        raise ValueError("recovered count population differs")
+    by_row = {m["row_index"]:m for m in members}
+    if ([r["row"] for r in rows] != sorted(by_row) or len(by_row) != len(members)):
+        raise ValueError("recovered count membership/order differs")
+    for r in rows:
+        member = by_row[r["row"]]
+        label = labels[("pairs.tsv",r["row"])]
+        if (r["source"] != f"bapps:pairs.tsv:{r['row']}" or r["judge_member"] != judge_path(member)
+                or not isinstance(r["judge_sha256"],str) or len(r["judge_sha256"]) != 64
+                or any(type(r[k]) is not int for k in ("n_a","n_b","n_tie","n"))
+                or min(r["n_a"],r["n_b"]) < 0 or r["n_a"]+r["n_b"] != 2
+                or r["n_tie"] != 0 or r["n"] != 2 or r["p_a"] != r["n_a"]/2
+                or float(label["p_a"]) != r["p_a"] or label["n"] != "2"):
+            raise ValueError("recovered counts do not bind native TRAIN response")
+        for k in ("n_a","n_b","n_tie"):
+            if label[k] not in ("",str(r[k])):
+                raise ValueError("recovered count contradicts populated native count")
+            label[k] = str(r[k])
+    reads["reads"][-1]["state"] = "verified"
+    ledger.write_text(json.dumps(reads,indent=1)+"\n")
+    return labels
+
+
 def audit(args):
+    from ring_root import dataset_family_guard, dataset_targets
     if not compute_lock(os.getpid())["held_by_worker_ancestor"]:
         raise ValueError("source audit requires the serialized compute lock")
     if sha(args.root/"wide/frozen.json") != ROOT_SHA or sha(args.policy) != POLICY_SHA:

@@ -4963,3 +4963,29 @@ Strict clippy passed for the changed library, trainer and integration targets:
 `run-heavy: done rc=0 9s | peak-RSS 0.67GiB | min-avail 22915MiB | peak-load 1.55`.
 The full-budget unchanged-Mlic control, source-bound matching preparation,
 21 candidate fits and all quality/production gates remain required.
+
+### Released TRAIN vote audit passed (2026-10-27)
+
+The complete source audit recovered all 146,003 admitted comparisons exactly:
+56,056 have `n_a=0`, 34,469 have `n_a=1`, and 55,478 have `n_a=2`.
+Every recovered probability equals the existing normalized response. Excluded
+TRAIN judge arrays parsed: zero; EVAL judge arrays parsed: zero. The validation
+archive was not opened. The released source and interpretation are linked above.
+
+The immutable audit is under
+`/mnt/v/output/zensim/mlic-vote-source-audit-20261027/audit`; its recovered-count
+payload SHA256 is `d8217592296df5e5819a5b9d0a9a5f74b3290d7bb04e91816f5983134b92b20c`.
+The exact auditor script SHA256 is
+`c18ed6b81dba2f76ab8638c58c1d8dfce35f08d4ea716f25f9d76fd44e80243d`.
+Resource record: `run-heavy: done rc=0 122s | peak-RSS 2.37GiB | min-avail 43188MiB | peak-load 1.22`.
+
+Fresh vote roots may bind this complete audit through independently frozen
+metadata. Recovery logs the selected count read, verifies its digest and ordered
+membership, checks triplet/source identity and every integer count against the
+native response, then supplies the counts to the unchanged observation gate.
+It does not modify the normalized library. Synthetic controls cover metadata-only
+admission, source/role/population corruption, protected paths, payload hash drift,
+count corruption and contradictions with existing native fields. The complete
+Python dataset/subjective/vote admission suite passes. The failed first root
+remains preserved; a fresh attempt still requires the unchanged-Mlic control
+before any candidate fit.

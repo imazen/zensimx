@@ -47,7 +47,11 @@ def main():
         if trainer is None or len(trainer) != 64 or any(c not in "0123456789abcdef" for c in trainer):
             raise ValueError("exact trainer SHA256 must be fixed before queuing")
         build_pin = None
+        vote_audit_pin = None
         if args.candidate == "MlicVote":
+            from bapps_vote_audit import admit_recovery
+            vote_audit_pin = sha(study/"policy/vote-source-audit.json")
+            admit_recovery(study/"policy/vote-source-audit.json",vote_audit_pin)
             build = json.loads((study/"trainer/BUILD.json").read_text())
             if build["binary_sha256"] != trainer or sha(study/"trainer/zensim_mlp_train") != trainer:
                 raise ValueError("frozen vote trainer/build identity differs")
@@ -63,6 +67,7 @@ def main():
         write(study/"SOURCE.json",dict(commit=commit,archive_sha256=sha(archive),
               candidate=args.candidate,trainer_sha256=trainer,
               trainer_build_sha256=build_pin,
+              vote_source_audit_sha256=vote_audit_pin,
               driver_sha256=sha(source/"scripts/byconstruction/mlic_neff_chain.py")))
         os.execv(sys.executable,[sys.executable,"-B",str(source/"scripts/byconstruction/mlic_neff_chain.py"),
                                  str(study),"--frozen"])
@@ -72,6 +77,8 @@ def main():
     candidate, trainer = source["candidate"], source["trainer_sha256"]
     if candidate == "MlicVote" and sha(study/"trainer/BUILD.json") != source["trainer_build_sha256"]:
         raise ValueError("frozen vote build metadata changed")
+    if candidate == "MlicVote" and sha(study/"policy/vote-source-audit.json") != source["vote_source_audit_sha256"]:
+        raise ValueError("frozen vote source audit changed")
     state = dict(stage="prepare",run_directory=str(study),source_commit=source["commit"],
                  binary_sha256=trainer,pid=os.getpid(),start_ticks=process_snapshot(os.getpid())["start_ticks"],
                  next_action="21 paired TRAIN cells, fixed screen, then qualified-candidate follow-through")
@@ -122,7 +129,8 @@ def main():
             run("root",["just","dataset-vote-root",str(OLD/"Mlic/root"),str(study/candidate/"root"),
                 "/mnt/v/zensim/dataset-admission-20261025", "/mnt/v/zensim/dataset-features-rev7-20261025",
                 "/mnt/tower/input/iqa/datasets",str(study/"frozen_configuration/cols_c.txt"),
-                str(study/"policy/datasets_full.tsv")],env)
+                str(study/"policy/datasets_full.tsv"),str(study/"policy/vote-source-audit.json"),
+                source["vote_source_audit_sha256"]],env)
             run("control",[sys.executable,"-B","scripts/rev4_featpot/byc_cells.py","run","--arm","mono:thr:mp32",
                 "--label","MlicControl","--folds","kadid","--seeds","0","--jobs","1"],
                 dict(env,BYC_ROOT=str(OLD/"Mlic/root"),BYC_CELLS=str(study/"control-cells"),
@@ -143,6 +151,7 @@ def main():
         pins[str(study/"CONTROL_VERIFIED.json")] = sha(study/"CONTROL_VERIFIED.json")
         if candidate == "MlicVote":
             pins[str(study/"trainer/BUILD.json")] = source["trainer_build_sha256"]
+            pins[str(study/"policy/vote-source-audit.json")] = source["vote_source_audit_sha256"]
         for root in (OLD/"Mlic/root",study/candidate/"root"):
             for relative in ("wide/frozen.json","datasets/receipt.json"):
                 pins[str(root/relative)] = sha(root/relative)
