@@ -5680,3 +5680,18 @@ The purpose-bound reader, omission linking fits, native maps/weights and all
 21 confidence fits remain outstanding. Missing positive linking units cannot
 be replaced by a zero floor. AIC independently reached 57/96 fold cells with
 no failures; all four zero-step controls precede the fit loop and passed.
+
+### Native omission linking completed (2026-10-27)
+
+The eight scoped linking fits are complete, with index SHA256
+`486aeae1fcc68dcce5ceb56440ca714179700ac55e32c0086d631bbb34924a2d`.
+Seven scopes have four positive units across three studies and sigma_L
+0.4442630190242332; mos7 has three units across two studies and sigma_L
+0.5263977834858703. JPEG/BPG units share observers. No JND threshold was
+dropped. Exact registered responses/teacher values have now been read.
+The first run's empty PC-IQA caller failure is retained; the caller repair
+reports absence without changing native fitter validation. Four initial and
+four repaired results are independently hash-checked, with exact source
+snapshots. Repaired run resource: `rc=0 5s | peak-RSS 0.21GiB |
+min-avail 24210MiB | peak-load 0.23`. Native rating maps, observer fits,
+contrast weights, parity controls and 21 TRAIN fits remain outstanding.

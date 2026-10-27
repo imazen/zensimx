@@ -145,6 +145,21 @@ steering, speed or HDR qualification.
 
 ### Confidence weighting: the unfinished implementation
 
+**2026-10-27 linking update:** all eight omission/full linking scopes are
+complete. The shared admission run02 `LINKING_FITS_COMPLETE.json` has SHA256
+`486aeae1fcc68dcce5ceb56440ca714179700ac55e32c0086d631bbb34924a2d`.
+Seven scopes have four positive units across three studies, sigma_L
+0.4442630190242332; mos7 has three units across two studies, sigma_L
+0.5263977834858703. JPEG/BPG share observers. No JND threshold was dropped.
+Exact-scope responses and teacher values **have now been read**; earlier
+label-free observations below remain dated history. Source owners are private
+`07cdc78d` then `707ee101` (empty registered donor caller repair). Preserve
+run01's four completed scopes and mos7 failure; run02 completes the remaining
+four scopes. Both plans and source snapshots are immutable. No native fitter
+check was weakened. Next freeze per-omission native rating/observer read scopes,
+then construct maps/weights and run controls plus all 21 confidence cells.
+
+
 **2026-10-27 05:13 UTC update:** the replacement source screen is complete;
 AIC fold run03 passed zero-step controls and started new continuation fits.
 The 24 original Mlic cells were identity-verified; status was 30/96 after six
