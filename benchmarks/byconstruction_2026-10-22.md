@@ -5980,3 +5980,26 @@ Diagnostic run-heavy: rc=0, 0s, peak RSS 0.02 GiB, minimum available
 peak RSS 0.08 GiB, minimum available 24,319 MiB, peak load 0.15.
 This is a correction to the new session's comparator, not a tolerance or
 relaxation of an established numerical requirement. No model was adopted.
+
+
+### Latest recovery — 2026-10-27 06:45 UTC
+
+Active full-data root is now `/mnt/v/output/zensim/mlic-aic-full-20261027-run03`;
+plan SHA256 `4684cbb8cd653f5409e292a4c6233ac74a4e797aa696f55be6a64a273a0fa4da`,
+coordinator `d84cfdb235aee5d4e2f507235a9e2fcc324e461a`. Its
+`CONTROL_VERIFIED.json` verifies the preserved full-budget run02 control using
+exact native model bytes excluding only run-specific `zentrain.repro`, plus
+matching recipe/admission/result fields. No numerical tolerance was introduced.
+Matched schedules are complete. Six Neff/Vote seed trainers were verified live
+in the single 24-GiB/6-job scope; Order's three seeds follow. Full coordinator
+PID 2634178/start ticks 230811185; lock holder 2634157. These are dated
+observations: re-resolve with `just mlic-priority-progress` before acting.
+
+The existing full-panel source now waits on run03. Confidence's active queue is
+`/mnt/v/output/zensim/mlic-confidence-20261027-run02`, with unchanged source
+`d77c968934d08d34363ada295e04a6920ef33289`, trainer and corrected manifest index.
+Its `QUEUED.json` binds the new full-panel dependency. It remains 0/21 and
+requires its own full-budget unweighted control. Old full run02 and confidence
+run01 are preserved failures; do not restart them. Completed fold evidence,
+scientific inputs, strengths, seeds and all historical verdicts are unchanged.
+
