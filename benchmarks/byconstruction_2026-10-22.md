@@ -7252,3 +7252,38 @@ packed, every result field). Exposure 82.6% AIC. Initial zero-shot 0.9080.
 Neff learns AIC almost as fast as Mlic but loses KonFiG and TID2013 faster, so no point keeps the older sets (epoch 7
 misses on KonFiG by 0.0001). Its points lie below Mlic's ×256 curve: at a worst change near −0.009 it reaches 0.9327
 against Mlic's 0.9385. Local mixtures 3 rows (largest rise +3.7); global 0.
+
+### Stage B, Vote: result; stage B complete (2026-10-27, Vote complete 19:03 UTC)
+
+Run `mlic-aic-recipe-vote-aic256-20261027-run01`. **The control holds** (Vote's full fit replays byte for byte, raw
+and packed, every result field). Exposure 82.6% AIC. Initial zero-shot 0.9095.
+
+| Point | Out-of-fold AIC | vs Mlic ×256, same epoch (source 95%) | KADID | TID2013 | KonFiG | CID22-A | Keeps |
+|---|---:|---|---:|---:|---:|---:|---|
+| Vote ×256 e7 | 0.9299 | −0.0013 [−0.003, +0.001] | +0.0037 | −0.0024 | −0.0029 | +0.0183 | yes |
+| Vote ×256 e15 | 0.9338 | −0.0021 [−0.004, −0.001] | +0.0030 | −0.0032 | −0.0042 | +0.0205 | yes |
+| **Vote ×256 e29** | **0.9369** | −0.0016 [−0.003, −0.000] | +0.0026 | −0.0048 | −0.0040 | +0.0210 | **yes** |
+| Vote ×256 e59 | 0.9404 | −0.0015 [−0.003, +0.000] | +0.0015 | −0.0058 | −0.0050 | +0.0222 | no |
+
+Vote learns AIC almost as fast as Mlic and forgets less, so its curve lies above Mlic's (KonFiG −0.004 at e29 against
+Mlic's −0.0095). Local mixtures 2 rows (largest rise +5.4, unchanged from Vote's initial model); global 0.
+
+**Stage B under the registered rules** (`/mnt/v/output/zensim/frontier-summary-20261027/STAGEB_SUMMARY.json`). Best
+keepers: Vote e29 0.9369, Order e29 0.9321, Confidence e59 0.9320; Neff has none. All four controls hold. **Stage C's
+arm is Vote ×256 at epoch 29**: it keeps its older sets and exceeds the advanced Mlic point (0.9312) by 0.0057, above the
+0.002 margin. Seed 0; stage C tests it across seeds, out of sample on E21 and as packed full models.
+
+### Stage C recipe variant and the stage D comparator (registered 2026-10-27, 19:10 UTC, after stage B, before any stage D result)
+
+- **Recipe variant of stage C's steps** (needed because the arm is a recipe point; mechanics otherwise unchanged).
+  Vote's own full models (seeds 0–2, `mlic-aic-full-20261027-run03` initial), Vote's own root and Vote's own omission
+  cells (`mlic-vote-20261027-run02/cells/MlicVote`, each trained on that root) replace Mlic's. Step 1 reproduces the
+  Vote run's seed-0 checkpoints byte for byte. Step 2 scores E21 out of sample against Mlic's cells, MlicFT16x8's cells,
+  Vote's own cells and MlicVoteFT16x8's cells. Step 3 adds the packed Vote and MlicVoteFT16x8 full models as
+  baselines, with the TRAIN CID22 anchor of Vote's root. Recipes that carry per-seed factors (Order, Confidence) are
+  refused by this variant.
+- **Stage D's comparator.** Stage D's rule names stage A's advanced point because it was written before stage B. Its
+  intent is the point stage C would run, which is now Vote ×256 e29. D's candidate is therefore judged against it
+  under the same two conditions: out-of-fold AIC more than 0.002 higher, and E21 out of sample (three-seed mean) no
+  more than 0.005 lower on any dataset. That needs the Vote point's step-2 run, queued after the Mlic omission run.
+  The comparison against stage A's Mlic point is still reported.
