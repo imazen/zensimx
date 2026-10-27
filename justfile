@@ -617,6 +617,32 @@ candidate-gates-rev7-full fits out:
       just candidate-gates-rev7 "$name" "$model" {{quote(out)}}/"$name"
     done < {{quote(out)}}/MODELS.tsv
 
+# Native HDR feature precision against the f64 oracle (record: benchmarks/byconstruction_2026-10-22.md,
+# "Native HDR precision"): production and ZENSIM_FEATCANON=exact dumps of every 16-bit PQ reference in refs
+# under four code-space perturbations (tier_audit_features --hdr-pq, one tier), then per-feature errors and
+# each NAME=BAKE's score difference. Build tier_audit_features with --features featcanon-oracle and
+# predict_features_with_bake without it.
+[positional-arguments]
+hdr-precision refs out audit predict rev primaries peak tier +bakes:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    refs=$1 out=$2 audit=$3 predict=$4 rev=$5 prim=$6 peak=$7 tier=$8
+    shift 8
+    test ! -e "$out"
+    mkdir -p "$out/dump-prod" "$out/dump-exact"
+    args=()
+    for ref in "$refs"/*.png; do
+      s=$(basename "$ref" .png)
+      for k in dither1 shift4 blend5 shift64; do args+=(--hdr-pq "hdr-$s-$k" "$ref" "perturb:$k" "$prim" "$peak"); done
+    done
+    export ZENSIM_FORMULA_REV=$rev TIER_AUDIT_ONLY=$tier RAYON_NUM_THREADS=1
+    ZENSIM_FEATCANON_DUMP="$out/dump-prod" "$audit" "${args[@]}" > "$out/run-prod.log" 2>&1
+    ZENSIM_FEATCANON=exact ZENSIM_FEATCANON_DUMP="$out/dump-exact" "$audit" "${args[@]}" > "$out/run-exact.log" 2>&1
+    bakes=()
+    for b in "$@"; do bakes+=(--bake "$b"); done
+    python3 scripts/byconstruction/rev7_forms.py --current "$out/dump-prod" --exact "$out/dump-exact" --tier "$tier" \
+      --out "$out/PRECISION.json" --predict "$predict" "${bakes[@]}" | tee "$out/PRECISION.txt"
+
 aic-matched-continuation-tests:
     python3 -B -m unittest scripts.tests.test_aic_matched_continuation_coordinator scripts.tests.test_aic_adaptation_full_panel
     python3 -B -m unittest discover -s scripts/tests -p 'test_aic_matched_continuation.py'
