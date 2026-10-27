@@ -7195,3 +7195,24 @@ Order learns AIC more slowly than Mlic but forgets much less: it keeps the older
 against Mlic ×256's −0.007 there). Its best keeper (0.9321) exceeds the advanced Mlic point (0.9312) by 0.0009, under the
 registered 0.002 margin. Local pixel mixtures fall to 1–2 rows (largest rise +2.3, against +4.7 to +5.2 for Mlic ×256);
 global mixtures are 0. Seed 0.
+
+### Stage B, Confidence: result (2026-10-27, complete 17:34 UTC)
+
+Run `mlic-aic-recipe-confidence-aic256-20261027-run01`. **The control holds**: the full confidence fit replays byte for
+byte (raw and packed, every result field) and its native normalizer receipt is byte-identical (`14e24ce6…`), so the
+continuation support leaves original confidence fits unchanged. Each fold continuation's native receipt records the
+wrapped full-fit manifest and an unweighted AIC group. Exposure equals Mlic ×256 (82.6% AIC): confidence weights
+pairs, not draws. Initial zero-shot 0.9088.
+
+| Point | Out-of-fold AIC | vs Mlic ×256, same epoch (source 95%) | KADID | TID2013 | KonFiG | CID22-A | Keeps |
+|---|---:|---|---:|---:|---:|---:|---|
+| Confidence ×256 e7 | 0.9179 | −0.0134 [−0.021, −0.006] | +0.0019 | +0.0020 | +0.0002 | +0.0088 | yes |
+| Confidence ×256 e15 | 0.9223 | −0.0136 [−0.022, −0.006] | +0.0007 | +0.0023 | −0.0018 | +0.0119 | yes |
+| Confidence ×256 e29 | 0.9268 | −0.0117 [−0.018, −0.005] | −0.0004 | +0.0023 | −0.0035 | +0.0143 | yes |
+| Confidence ×256 e59 | 0.9320 | −0.0098 [−0.015, −0.005] | −0.0021 | +0.0026 | −0.0032 | +0.0165 | yes |
+
+Confidence learns AIC most slowly and keeps the older sets for all 60 epochs. Its best keeper (0.9320) exceeds the
+advanced Mlic point by 0.0008, under the margin. Local mixtures 2–6 rows (largest rise +5.3 at e7, +2.2 at e59);
+global 0. **Reading so far:** Mlic ×256 e7 (0.9312 at worst −0.0033), Order e29 (0.9321 at −0.0045) and Confidence e59
+(0.9320 at −0.0032) reach about the same AIC for the same older-set cost. The weightings change how fast a model moves
+along the trade-off, not the trade-off itself. Seed 0.
