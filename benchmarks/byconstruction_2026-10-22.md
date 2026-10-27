@@ -6462,26 +6462,26 @@ Full run03 completed all 360 population predictions, 69,552 aggregate panels,
 paired-seed contrasts, source intervals and both pixel-mixture sets. Each
 mixture set covers 36 models × two representations = 72 cells. Every global
 mixture cell has zero inversions. Local mixtures still have reversals: for
-packed/calibrated seed0 at16×8, inversion counts are Mlic3, Neff3, Vote3,
-Order4 (1,152 comparisons per cell). Their maximum score rises are
+packed/calibrated seed0 at 16×8, inversion counts are Mlic 3, Neff 3, Vote 3,
+Order 4 (1,152 comparisons per cell). Their maximum score rises are
 5.644995, 5.004366, 6.430682 and 3.900804 respectively. Coordinate-monotone
 certificates do not eliminate these pixel-mixture failures. No adoption.
 
-The coordinator reread all1,476 inventory-file hashes, source hashes and native
+The coordinator reread all 1,476 inventory-file hashes, source hashes and native
 tool hashes, plus completion/plan/fold dependencies. Shared verification:
 `mlic-priority-20261027/FULL_PANEL_VERIFIED.json`; full completion SHA256
 `fd787030c17f916c06dc8207b30dd353873e983befdea305754cbbb6ce0f805a`.
-Panel run-heavy: rc=0,745s,peak RSS0.65GiB,minimum available43,435MiB,
-peak load5.37. This is an evaluation resource receipt, not runtime qualification.
+Panel run-heavy: rc=0, 745s, peak RSS 0.65 GiB, minimum available 43,435 MiB,
+peak load 5.37. This is an evaluation resource receipt, not runtime qualification.
 
 The confidence run02 dependency completed and its full-budget unweighted
-control started on dev; at08:19UTC its live worker was3388770/start231371214,
-lock holder3388749. Re-resolve with `just mlic-priority-progress`. The control
-must match7,869 original predictions before any of the21 confidence fits.
+control started on dev; at 08:19 UTC its live worker was 3388770/start 231371214,
+lock holder 3388749. Re-resolve with `just mlic-priority-progress`. The control
+must match 7,869 original predictions before any of the 21 confidence fits.
 
-Separately, the existing near-identity owner is running on i265 for all12
-seed0 initial/continued models, using24 frozen TRAIN images, unchanged
-N1/N2≥99 and N3≥122/144 contracts, revision7/v3. Shared root:
+Separately, the existing near-identity owner is running on i265 for all 12
+seed0 initial/continued models, using 24 frozen TRAIN images, unchanged
+N1/N2 ≥99 and N3 ≥122/144 contracts, revision 7/v3. Shared root:
 `mlic-nearid-20261027-run03`; PLAN SHA256
 `b43474f3c414c92a12efc279eda8b781e73bbc5cb14967c08b94ae611fc3e0e7`.
 Its STATE records real PID/start ticks and per-model results. First two models
@@ -6495,4 +6495,28 @@ Run03 uses lowercase labels and the identical native binary/model/image bytes.
 The reusable `just dataset-nearid-candidate` now validates lowercase labels
 before invoking native work, then uses the same native and reporting owners.
 Invalid-label refusal and command expansion were checked. Native build receipt:
-rc=0,15s,peak RSS0.84GiB,minimum available22,950MiB,peak load0.41.
+rc=0, 15s, peak RSS 0.84 GiB, minimum available 22,950 MiB, peak load 0.41.
+
+### October 27: all twelve near-identity checks complete
+
+All twelve registered seed0 initial/continued models pass the unchanged N1,
+N2 and N3 near-identity gates on the 24-reference TRAIN packet. Each model
+has 648 measurement rows. N1 requires both one-pixel rungs ≥99 on every
+reference; N2 requires a nonidentical score ≥99 on every reference; N3 requires
+at least 122 of 144 nonincreasing ladders. Observed N3 counts are:
+
+| Recipe | Initial | 8×4 | 16×8 |
+|---|---:|---:|---:|
+| Mlic | 143 | 143 | 143 |
+| Neff | 140 | 139 | 139 |
+| Vote | 143 | 143 | 143 |
+| Order | 138 | 138 | 138 |
+
+The coordinator checked all twelve metadata/model/packet/revision bindings,
+648-row counts and gate results, then hashed every result/log file. Shared
+receipt: `mlic-nearid-20261027-run03/VERIFIED.json`; completion SHA256
+`c70c483ff5e30ac2e1a2b0eb59e94e8d915906ff4ce5b2b6fa7ab4ee687b6b1a`.
+Run-heavy on i265: rc=0, 136s, peak RSS 0.25 GiB, minimum available
+23,730 MiB, peak load 0.96. This is validation resource evidence, not timing
+qualification. N1–N3 passing does not clear the local-mixture findings,
+other production gates, runtime qualification or stable adoption.
