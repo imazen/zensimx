@@ -2515,3 +2515,31 @@ run-heavy receipt on i265: rc=0, 3s, peak RSS 0.03 GiB, minimum available
 23,793 MiB, peak load 0.16. The dev full-fit receipt is rc=0, 4,822s,
 peak RSS 2.55 GiB, minimum available 26,792 MiB, peak load 9.44.
 These are execution resource receipts, not runtime benchmarks.
+
+### October 27: full-data cell statistics expose an ordering tradeoff
+
+The 360 native cell panels are complete; source/codec/interval and mixture
+work remains in progress. These are partial study results, not a selection.
+For the registered serving seed0, production-f16-calibrated 16×8 arms have
+AIC MAE / p99 distance: Mlic 0.428860 / 0.383393; Neff 0.434599 / 0.391138;
+Vote 0.429270 / 0.374389; Order 0.421418 / 0.363907. Order's AIC p99 distances
+are lower than Mlic's for all three seeds. AIC is in sample here.
+
+Order also has worse seed0 MAE than Mlic on every other TRAIN panel:
+KADID 9.039121 vs 8.763874; TID2013 6.322748 vs 6.132106;
+KonFiG 13.380590 vs 12.363111; CID22-A25 8.075303 vs 8.020150.
+This prevents interpreting its AIC improvement as a universal improvement.
+Full native statistics, geometry and per-seed records are retained in shared
+`mlic-priority-20261027/FULL_CELL_EARLY_REVIEW.json`, bound to the current
+`panels/CELL_PANELS.json` hash. No candidate is adopted or excluded by a new
+SROCC cutoff; wait for the remaining registered panels and confidence arm.
+
+The existing `featcanon_rev7_parity` tests also passed on i265 at source
+`32ea661e768a`: two tests, zero failures/ignores. They check the full Rev7
+feature vector across available dispatch permutations at five geometries,
+including remainder columns and width4133, plus unchanged revision-rounding
+bounds. This does not establish candidate pixel/cache score parity, another
+architecture's behavior, or performance. Receipt:
+`mlic-precision-20261027-run01/REV7_FEATURE_PARITY_VERIFIED.json` and its log.
+Run-heavy rc=0, 47s, peak RSS 2.16 GiB, minimum available 21,557 MiB,
+peak load 1.02; execution resource receipt, not a runtime benchmark.
