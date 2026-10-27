@@ -704,10 +704,12 @@ def wise_plan(run, commit, trainer, meta_tool, after_run):
     for name, (run_dir, arm, epoch) in WISE_ENDS.items():
         if not (run_dir / "COMPLETE.json").exists():
             raise ValueError(f"{run_dir.name} must be complete")
+        ckpt = lambda k, e: run_dir / "arms" / arm / f"s0_k{k}/ckpt/ckpt_epoch{e:03d}.bin"
+        # Every-epoch dumps before the end: the bake owner matches hidden units step by step along them.
         ends[name] = dict(run_dir=str(run_dir), arm=arm, epoch=epoch,
                           population=json.loads((run_dir / "PLAN.json").read_text())["arms"][arm],
-                          checkpoint_sha256={f"0|{k}": sha(run_dir / "arms" / arm / f"s0_k{k}/ckpt/ckpt_epoch{epoch:03d}.bin")
-                                             for k in SOURCE_FOLDS})
+                          checkpoint_sha256={f"0|{k}": sha(ckpt(k, epoch)) for k in SOURCE_FOLDS},
+                          track_sha256={f"0|{k}": [sha(ckpt(k, e)) for e in range(epoch)] for k in SOURCE_FOLDS})
     interpolations = {wise_arm(end, alpha): dict(end=end, alpha=alpha) for end in WISE_ENDS for alpha in WISE_ALPHAS}
     seven_fold_plan(run, commit, trainer, meta_tool, schema=WISE_SCHEMA, protocol=WISE_PROTOCOL,
                     registration=WISE_REGISTRATION, arms={arm: "interpolation" for arm in interpolations},
@@ -900,15 +902,18 @@ def fold_run(path):
         """Stage F: the bake owner emits this fold's point between the initial model and the end arm's checkpoint."""
         spec = plan_value["interpolations"][arm]
         end = plan_value["ends"][spec["end"]]
-        model_b = Path(end["run_dir"]) / "arms" / end["arm"] / f"s{seed}_k{k}/ckpt/ckpt_epoch{end['epoch']:03d}.bin"
-        if sha(model_b) != end["checkpoint_sha256"][f"{seed}|{k}"]:
-            raise ValueError(f"{label}: end checkpoint changed")
+        ckpt = lambda e: Path(end["run_dir"]) / "arms" / end["arm"] / f"s{seed}_k{k}/ckpt/ckpt_epoch{e:03d}.bin"
+        model_b, track = ckpt(end["epoch"]), [ckpt(e) for e in range(end["epoch"])]
+        if (sha(model_b) != end["checkpoint_sha256"][f"{seed}|{k}"]
+                or [sha(c) for c in track] != end["track_sha256"][f"{seed}|{k}"]):
+            raise ValueError(f"{label}: end checkpoint or its track changed")
         out = dest / "ckpt/ckpt_epoch000.bin"
         out.parent.mkdir(parents=True)
         with (run_dir / "arms" / arm / f"s{seed}_k{k}.log").open("x") as log:
             if subprocess.run([str(run_dir / "tools/bake_dial_refit"), "interpolate", "--a",
                                str(Path(plan_value["initial"][str(seed)]["directory"]) / "refit/last.bin"), "--b",
-                               str(model_b), "--alpha", repr(spec["alpha"]), "--out", str(out)],
+                               str(model_b), "--alpha", repr(spec["alpha"]), "--out", str(out),
+                               *(arg for c in track for arg in ("--track", str(c)))],
                               stdout=log, stderr=subprocess.STDOUT).returncode:
                 raise RuntimeError(f"{label} interpolation failed; preserved in its log")
         return dict(arm=arm, seed=seed, fold=k, directory=str(dest), checkpoints={"0": sha(out)})

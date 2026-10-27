@@ -2852,6 +2852,11 @@ struct InterpolateArgs {
     alpha: f64,
     #[arg(long)]
     out: PathBuf,
+    /// Checkpoints of the run between `a` and `b`, in training order
+    /// (repeatable). Hidden units are then matched step by step along them,
+    /// which stays unambiguous where units move far over the whole run.
+    #[arg(long = "track")]
+    track: Vec<PathBuf>,
 }
 
 /// Metadata entries that record how one training run produced a bake. An
@@ -2877,87 +2882,132 @@ fn same_bits(a: &[f32], b: &[f32]) -> bool {
     a.len() == b.len() && a.iter().zip(b).all(|(x, y)| x.to_bits() == y.to_bits())
 }
 
-/// A unit's match must be at most this fraction of its distance to the nearest
-/// other unit of `a`, or the alignment is refused as ambiguous.
-const MAX_MATCH_RATIO: f64 = 0.5;
+/// A unit whose matched distance exceeds this fraction of its distance to the
+/// nearest other unit is counted as contested in the alignment record.
+const CONTESTED_MATCH_RATIO: f64 = 0.5;
+
+/// Minimum-cost perfect matching of a square cost matrix (the Hungarian
+/// algorithm with potentials, O(n^3)): returns `assign[row] = column`.
+fn min_cost_assignment(cost: &[Vec<f64>]) -> Vec<usize> {
+    let n = cost.len();
+    let (mut u, mut v) = (vec![0.0f64; n + 1], vec![0.0f64; n + 1]);
+    let (mut p, mut way) = (vec![0usize; n + 1], vec![0usize; n + 1]);
+    for i in 1..=n {
+        p[0] = i;
+        let mut j0 = 0usize;
+        let mut minv = vec![f64::INFINITY; n + 1];
+        let mut used = vec![false; n + 1];
+        loop {
+            used[j0] = true;
+            let (i0, mut delta, mut j1) = (p[j0], f64::INFINITY, 0usize);
+            for j in 1..=n {
+                if !used[j] {
+                    let cur = cost[i0 - 1][j - 1] - u[i0] - v[j];
+                    if cur < minv[j] {
+                        minv[j] = cur;
+                        way[j] = j0;
+                    }
+                    if minv[j] < delta {
+                        delta = minv[j];
+                        j1 = j;
+                    }
+                }
+            }
+            for j in 0..=n {
+                if used[j] {
+                    u[p[j]] += delta;
+                    v[j] -= delta;
+                } else {
+                    minv[j] -= delta;
+                }
+            }
+            j0 = j1;
+            if p[j0] == 0 {
+                break;
+            }
+        }
+        loop {
+            let j1 = way[j0];
+            p[j0] = p[j1];
+            j0 = j1;
+            if j0 == 0 {
+                break;
+            }
+        }
+    }
+    let mut assign = vec![0usize; n];
+    for j in 1..=n {
+        assign[p[j] - 1] = j - 1;
+    }
+    assign
+}
+
+/// How one alignment step went: units of `b` that moved position, units whose
+/// match is contested, units matched to other than their nearest unit, and the
+/// largest ratio of a matched distance to the distance to the nearest other unit.
+#[derive(Default)]
+struct AlignmentStats {
+    moved: usize,
+    contested: usize,
+    non_nearest: usize,
+    max_ratio: f64,
+}
 
 /// `b`'s layers with every interior (hidden) dimension permuted into `a`'s unit
 /// order. The forward pass does not depend on hidden-unit order and the
 /// serializer stores units sorted by incoming-weight norm, so two checkpoints of
-/// one run can list the same units in different orders. Each unit of `b` is
-/// matched to the unit of `a` nearest in (incoming weights, bias, outgoing
-/// weights); units of `a` with identical parameters are interchangeable.
-/// Refuses unless the match is one to one and every unit's matched distance is
-/// at most [`MAX_MATCH_RATIO`] of its distance to any other unit. Returns the
-/// aligned layers, the largest such ratio and the number of units that moved.
-fn align_hidden_units(
-    a: &[OwnedLayer],
-    b: &[OwnedLayer],
-) -> Result<(Vec<OwnedLayer>, f64, usize), String> {
+/// one run can list the same units in different orders. The permutation is the
+/// minimum-cost assignment of squared distances in (incoming weights, bias,
+/// outgoing weights): weight matching, as in model merging (Ainsworth et al.,
+/// "Git Re-Basin", ICLR 2023). Units with identical parameters (dead units)
+/// are interchangeable; the statistics do not count them as rivals.
+fn align_hidden_units(a: &[OwnedLayer], b: &[OwnedLayer]) -> (Vec<OwnedLayer>, AlignmentStats) {
     let mut aligned = b.to_vec();
-    let (mut worst, mut moved) = (0.0f64, 0usize);
+    let mut stats = AlignmentStats::default();
     for i in 0..a.len().saturating_sub(1) {
         let (n, in_dim, next) = (a[i].out_dim, a[i].in_dim, a[i + 1].out_dim);
-        let signature = |layers: &[OwnedLayer], c: usize| -> Vec<f32> {
-            let mut s: Vec<f32> = (0..in_dim).map(|r| layers[i].weights[r * n + c]).collect();
-            s.push(layers[i].biases[c]);
-            s.extend_from_slice(&layers[i + 1].weights[c * next..(c + 1) * next]);
+        let signature = |layers: &[OwnedLayer], c: usize| -> Vec<f64> {
+            let mut s: Vec<f64> = (0..in_dim)
+                .map(|r| f64::from(layers[i].weights[r * n + c]))
+                .collect();
+            s.push(f64::from(layers[i].biases[c]));
+            s.extend(
+                layers[i + 1].weights[c * next..(c + 1) * next]
+                    .iter()
+                    .map(|&w| f64::from(w)),
+            );
             s
         };
-        let sa: Vec<Vec<f32>> = (0..n).map(|c| signature(a, c)).collect();
-        let sb: Vec<Vec<f32>> = (0..n).map(|c| signature(&aligned, c)).collect();
-        let mut class = vec![usize::MAX; n];
-        let mut members: Vec<Vec<usize>> = Vec::new();
-        for c in 0..n {
-            if class[c] == usize::MAX {
-                let id = members.len();
-                let same: Vec<usize> = (c..n).filter(|&d| same_bits(&sa[c], &sa[d])).collect();
-                for &d in &same {
-                    class[d] = id;
-                }
-                members.push(same);
-            }
-        }
-        let distance = |x: &[f32], y: &[f32]| -> f64 {
-            x.iter()
-                .zip(y)
-                .map(|(&p, &q)| (f64::from(p) - f64::from(q)).powi(2))
-                .sum::<f64>()
-                .sqrt()
-        };
-        let mut assigned: Vec<Vec<usize>> = vec![Vec::new(); members.len()];
-        for (j, s) in sb.iter().enumerate() {
-            let per_class: Vec<f64> = members.iter().map(|m| distance(&sa[m[0]], s)).collect();
-            let best = (0..per_class.len())
-                .min_by(|&x, &y| per_class[x].total_cmp(&per_class[y]))
-                .ok_or("no hidden units")?;
-            let other = (0..per_class.len())
-                .filter(|&x| x != best)
-                .map(|x| per_class[x])
+        let sa: Vec<Vec<f64>> = (0..n).map(|c| signature(a, c)).collect();
+        let sb: Vec<Vec<f64>> = (0..n).map(|c| signature(&aligned, c)).collect();
+        let cost: Vec<Vec<f64>> = sa
+            .iter()
+            .map(|x| {
+                sb.iter()
+                    .map(|y| x.iter().zip(y).map(|(p, q)| (p - q).powi(2)).sum())
+                    .collect()
+            })
+            .collect();
+        let perm = min_cost_assignment(&cost);
+        for (ia, &jb) in perm.iter().enumerate() {
+            let nearest = (0..n)
+                .min_by(|&x, &y| cost[x][jb].total_cmp(&cost[y][jb]))
+                .unwrap_or(ia);
+            // Units of `a` identical to the matched one are interchangeable, not rivals.
+            let other = (0..n)
+                .filter(|&x| sa[x] != sa[ia])
+                .map(|x| cost[x][jb])
                 .fold(f64::INFINITY, f64::min);
-            let ratio = if per_class[best] == 0.0 {
+            let ratio = if cost[ia][jb] == 0.0 {
                 0.0
             } else {
-                per_class[best] / other
+                (cost[ia][jb] / other).sqrt()
             };
-            if ratio > MAX_MATCH_RATIO {
-                return Err(format!(
-                    "layer {i} unit {j}: matched distance {:.3e} is {ratio:.3} of the next unit's; ambiguous",
-                    per_class[best]
-                ));
-            }
-            worst = worst.max(ratio);
-            assigned[best].push(j);
-        }
-        let mut perm = vec![0usize; n];
-        for (m, js) in members.iter().zip(&assigned) {
-            if m.len() != js.len() {
-                return Err(format!("layer {i}: hidden units do not match one to one"));
-            }
-            for (&ia, &jb) in m.iter().zip(js) {
-                perm[ia] = jb;
-                moved += usize::from(ia != jb);
-            }
+            stats.moved += usize::from(ia != jb);
+            stats.contested += usize::from(ratio > CONTESTED_MATCH_RATIO);
+            stats.non_nearest +=
+                usize::from(cost[nearest][jb] < cost[ia][jb] && sa[nearest] != sa[ia]);
+            stats.max_ratio = stats.max_ratio.max(ratio);
         }
         let (old_i, old_next) = (aligned[i].clone(), aligned[i + 1].clone());
         for (ia, &jb) in perm.iter().enumerate() {
@@ -2969,7 +3019,7 @@ fn align_hidden_units(
                 .copy_from_slice(&old_next.weights[jb * next..(jb + 1) * next]);
         }
     }
-    Ok((aligned, worst, moved))
+    (aligned, stats)
 }
 
 /// One interpolated bake before serialization.
@@ -2982,58 +3032,98 @@ struct Interpolated {
 
 /// The interpolated layers and metadata of `a` and `b` at `alpha`, with both
 /// ends' hashes recorded. Refuses any structural difference between the ends.
-fn interpolate_bakes(a: &[u8], b: &[u8], alpha: f64) -> Result<Interpolated, String> {
+/// Every metadata entry except the run provenance, as (key, kind, value).
+fn structural_metadata(m: &[OwnedMeta]) -> Vec<(&str, MetadataType, &[u8])> {
+    m.iter()
+        .filter(|e| !RUN_PROVENANCE_KEYS.contains(&e.key.as_str()))
+        .map(|e| (e.key.as_str(), e.kind, e.value.as_slice()))
+        .collect()
+}
+
+/// `m`'s layers when it has `a`'s structure: no optional sections, the same
+/// schema hash, flags, scaler, layer shapes and activations, f32 storage and
+/// finite parameters.
+fn same_structure(
+    ma: &Model,
+    la: &[OwnedLayer],
+    name: &str,
+    m: &Model,
+) -> Result<Vec<OwnedLayer>, String> {
+    if !m.feature_bounds().is_empty()
+        || !m.output_specs().is_empty()
+        || !m.discrete_sets().is_empty()
+        || !m.sparse_overrides().is_empty()
+    {
+        return Err(format!(
+            "{name} carries feature_bounds/output_specs/discrete_sets/sparse_overrides, \
+             which interpolate does not carry"
+        ));
+    }
+    if ma.schema_hash() != m.schema_hash() || ma.flags() != m.flags() {
+        return Err(format!("{name}: schema hash or flags differ"));
+    }
+    if !same_bits(ma.scaler_mean(), m.scaler_mean())
+        || !same_bits(ma.scaler_scale(), m.scaler_scale())
+    {
+        return Err(format!("{name}: input scalers differ"));
+    }
+    let layers = owned_layers(m).map_err(|e| e.to_string())?;
+    if layers.len() != la.len() {
+        return Err(format!(
+            "{name}: {} layers against {}",
+            layers.len(),
+            la.len()
+        ));
+    }
+    for (i, (x, y)) in la.iter().zip(&layers).enumerate() {
+        if (x.in_dim, x.out_dim) != (y.in_dim, y.out_dim) || x.activation != y.activation {
+            return Err(format!("{name} layer {i}: shape or activation differs"));
+        }
+        if x.dtype != WeightDtype::F32 || y.dtype != WeightDtype::F32 {
+            return Err(format!(
+                "{name} layer {i}: interpolate takes f32 layers only"
+            ));
+        }
+        if !y.weights.iter().chain(&y.biases).all(|v| v.is_finite()) {
+            return Err(format!("{name} layer {i}: nonfinite parameter"));
+        }
+    }
+    Ok(layers)
+}
+
+/// The interpolated layers and metadata of `a` and `b` at `alpha`, with both
+/// ends' hashes recorded. `track` holds the run's checkpoints between them, in
+/// training order, for step-by-step unit matching (empty: match `b` to `a`
+/// directly). Refuses any structural difference between the ends.
+fn interpolate_bakes(
+    a: &[u8],
+    b: &[u8],
+    alpha: f64,
+    track: &[Vec<u8>],
+) -> Result<Interpolated, String> {
     if !(0.0..=1.0).contains(&alpha) {
         return Err(format!("alpha {alpha} outside [0, 1]"));
     }
     let ma = Model::from_bytes(a).map_err(|e| format!("parse a: {e:?}"))?;
     let mb = Model::from_bytes(b).map_err(|e| format!("parse b: {e:?}"))?;
-    for (end, m) in [("a", &ma), ("b", &mb)] {
-        if !m.feature_bounds().is_empty()
-            || !m.output_specs().is_empty()
-            || !m.discrete_sets().is_empty()
-            || !m.sparse_overrides().is_empty()
-        {
-            return Err(format!(
-                "{end} carries feature_bounds/output_specs/discrete_sets/sparse_overrides, \
-                 which interpolate does not carry"
-            ));
+    let la = owned_layers(&ma).map_err(|e| e.to_string())?;
+    let la = same_structure(&ma, &la, "a", &ma)?;
+    let mut path = Vec::with_capacity(track.len() + 1);
+    let (meta_a, meta_b) = (clone_metadata(&ma), clone_metadata(&mb));
+    for (i, bytes) in track.iter().enumerate() {
+        let m = Model::from_bytes(bytes).map_err(|e| format!("parse track {i}: {e:?}"))?;
+        if structural_metadata(&clone_metadata(&m)) != structural_metadata(&meta_a) {
+            return Err(format!("track {i}: non-provenance metadata differs from a"));
         }
+        path.push(same_structure(&ma, &la, &format!("track {i}"), &m)?);
     }
-    if ma.schema_hash() != mb.schema_hash() || ma.flags() != mb.flags() {
-        return Err("schema hash or flags differ".into());
+    path.push(same_structure(&ma, &la, "b", &mb)?);
+    let (mut lb, mut steps) = (la.clone(), Vec::with_capacity(path.len()));
+    for step in &path {
+        let (aligned, stats) = align_hidden_units(&lb, step);
+        lb = aligned;
+        steps.push(stats);
     }
-    if !same_bits(ma.scaler_mean(), mb.scaler_mean())
-        || !same_bits(ma.scaler_scale(), mb.scaler_scale())
-    {
-        return Err("input scalers differ".into());
-    }
-    let (la, lb) = (
-        owned_layers(&ma).map_err(|e| e.to_string())?,
-        owned_layers(&mb).map_err(|e| e.to_string())?,
-    );
-    if la.len() != lb.len() {
-        return Err(format!("{} layers against {}", la.len(), lb.len()));
-    }
-    for (i, (x, y)) in la.iter().zip(&lb).enumerate() {
-        if (x.in_dim, x.out_dim) != (y.in_dim, y.out_dim) || x.activation != y.activation {
-            return Err(format!("layer {i}: shape or activation differs"));
-        }
-        if x.dtype != WeightDtype::F32 || y.dtype != WeightDtype::F32 {
-            return Err(format!("layer {i}: interpolate takes f32 layers only"));
-        }
-        if !x
-            .weights
-            .iter()
-            .chain(&x.biases)
-            .chain(&y.weights)
-            .chain(&y.biases)
-            .all(|v| v.is_finite())
-        {
-            return Err(format!("layer {i}: nonfinite parameter"));
-        }
-    }
-    let (lb, worst_match, moved_units) = align_hidden_units(&la, &lb)?;
     let mut layers = Vec::with_capacity(la.len());
     for (x, y) in la.iter().zip(&lb) {
         layers.push(OwnedLayer {
@@ -3045,13 +3135,6 @@ fn interpolate_bakes(a: &[u8], b: &[u8], alpha: f64) -> Result<Interpolated, Str
             biases: mix_f32(&x.biases, &y.biases, alpha),
         });
     }
-    let (meta_a, meta_b) = (clone_metadata(&ma), clone_metadata(&mb));
-    let structural = |m: &[OwnedMeta]| -> Vec<(String, MetadataType, Vec<u8>)> {
-        m.iter()
-            .filter(|e| !RUN_PROVENANCE_KEYS.contains(&e.key.as_str()))
-            .map(|e| (e.key.clone(), e.kind, e.value.clone()))
-            .collect()
-    };
     if meta_a
         .iter()
         .chain(&meta_b)
@@ -3059,7 +3142,7 @@ fn interpolate_bakes(a: &[u8], b: &[u8], alpha: f64) -> Result<Interpolated, Str
     {
         return Err("an end is already an interpolation".into());
     }
-    if structural(&meta_a) != structural(&meta_b) {
+    if structural_metadata(&meta_a) != structural_metadata(&meta_b) {
         return Err("non-provenance metadata differs between the ends".into());
     }
     let provenance = |m: &[OwnedMeta]| -> serde_json::Map<String, serde_json::Value> {
@@ -3076,8 +3159,14 @@ fn interpolate_bakes(a: &[u8], b: &[u8], alpha: f64) -> Result<Interpolated, Str
     let record = serde_json::json!({
         "rule": "every weight and bias = (1 - alpha) * a + alpha * b in f64, rounded to f32; alpha 0 and 1 copy their end",
         "alpha": alpha,
-        "alignment": {"rule": "each hidden unit of b matched to the nearest unit of a in (incoming weights, bias, outgoing weights)",
-                      "max_match_ratio": worst_match, "moved_units": moved_units},
+        "alignment": {
+            "rule": "minimum-cost assignment of hidden units by squared distance in (incoming weights, bias, outgoing weights), step by step from a along the track to b",
+            "track_sha256": track.iter().map(|t| sha256_hex(t)).collect::<Vec<_>>(),
+            "moved_units": steps.last().map_or(0, |s| s.moved),
+            "contested_units": steps.iter().map(|s| s.contested).collect::<Vec<_>>(),
+            "non_nearest_matches": steps.iter().map(|s| s.non_nearest).collect::<Vec<_>>(),
+            "max_match_ratio": steps.iter().map(|s| s.max_ratio).fold(0.0f64, f64::max)
+        },
         "a": {"sha256": sha256_hex(a), "provenance": provenance(&meta_a)},
         "b": {"sha256": sha256_hex(b), "provenance": provenance(&meta_b)},
     });
@@ -3104,7 +3193,12 @@ fn cmd_interpolate(a: &InterpolateArgs) -> Result<(), String> {
     let schema_hash = Model::from_bytes(&bytes_a)
         .map_err(|e| format!("parse a: {e:?}"))?
         .schema_hash();
-    let m = interpolate_bakes(&bytes_a, &bytes_b, a.alpha)?;
+    let track = a
+        .track
+        .iter()
+        .map(|p| std::fs::read(p).map_err(|e| format!("read {p:?}: {e}")))
+        .collect::<Result<Vec<_>, _>>()?;
+    let m = interpolate_bakes(&bytes_a, &bytes_b, a.alpha, &track)?;
     let sz = emit_layers(
         &a.out,
         &m.scaler_mean,
@@ -5681,61 +5775,58 @@ fn main() -> ExitCode {
 mod tests {
     use super::*;
 
-    /// A two-input, two-hidden, one-output bake with one structural entry and
-    /// one run-provenance entry, like a trainer checkpoint in miniature.
+    /// A one-output, one-hidden-layer bake (inputs from the scaler, hidden units
+    /// from `w2`) with one structural entry and one run-provenance entry, like a
+    /// trainer checkpoint in miniature.
     fn interpolation_end(
         scaler_mean: &[f64],
         w1: &[f64],
         b1: &[f64],
-        dtype: zenpredict::WeightDtype,
-        feature_ids: &str,
-        repro: &str,
+        w2: &[f64],
+        ids: &str,
     ) -> Vec<u8> {
         let bytes = zensim_validate::mlp_train::bake_two_layer_znpr_v3(
             scaler_mean,
-            &[1.0, 1.0],
+            &vec![1.0; scaler_mean.len()],
             w1,
             b1,
-            &[1.0, 2.0, 3.0][..w1.len() / 2],
+            w2,
             &[-1.0],
-            2,
-            w1.len() / 2,
+            scaler_mean.len(),
+            w2.len(),
             1,
-            dtype,
+            zenpredict::WeightDtype::F32,
             None,
             None,
             zenpredict::Activation::Relu,
         );
         let bytes =
-            zenpredict_bake::append_metadata_utf8(&bytes, "zentrain.feature_ids", feature_ids)
-                .unwrap();
-        zenpredict_bake::append_metadata_utf8(&bytes, "zentrain.repro", repro).unwrap()
+            zenpredict_bake::append_metadata_utf8(&bytes, "zentrain.feature_ids", ids).unwrap();
+        zenpredict_bake::append_metadata_utf8(&bytes, "zentrain.repro", &format!("run {}", w1[0]))
+            .unwrap()
     }
 
     #[test]
     fn interpolate_matches_hidden_units_then_mixes_every_parameter() {
-        use zenpredict::WeightDtype::F32;
         // Unit 0 grows past unit 1 in the continuation, so the serializer (which sorts hidden units by
         // incoming-weight norm) stores b's units in the opposite order to a's.
         let a = interpolation_end(
             &[0.0, 0.0],
             &[1.0, 0.0, 0.0, 1.05],
             &[0.25, -0.5],
-            F32,
+            &[1.0, 2.0],
             "13,14",
-            "run a",
         );
         let b = interpolation_end(
             &[0.0, 0.0],
             &[1.1, 0.0, 0.0, 1.05],
             &[0.5, -0.5],
-            F32,
+            &[1.0, 2.0],
             "13,14",
-            "run b",
         );
         let stored_b = owned_layers(&Model::from_bytes(&b).unwrap()).unwrap();
         assert!(same_bits(&stored_b[0].weights, &[0.0, 1.1, 1.05, 0.0]));
-        let layers = interpolate_bakes(&a, &b, 0.0).unwrap().layers;
+        let layers = interpolate_bakes(&a, &b, 0.0, &[]).unwrap().layers;
         for (x, y) in layers
             .iter()
             .zip(&owned_layers(&Model::from_bytes(&a).unwrap()).unwrap())
@@ -5743,69 +5834,127 @@ mod tests {
             assert!(same_bits(&x.weights, &y.weights) && same_bits(&x.biases, &y.biases));
         }
         // alpha 1 is b in a's unit order; serialized, it is b's stored layers again.
-        let Interpolated {
-            layers,
-            metadata,
-            scaler_mean: mean,
-            scaler_scale: scale,
-        } = interpolate_bakes(&a, &b, 1.0).unwrap();
-        assert!(same_bits(&layers[0].weights, &[1.1, 0.0, 0.0, 1.05]));
-        let back = owned_layers(
-            &Model::from_bytes(&bake_layers(&mean, &scale, &layers, &metadata, 0)).unwrap(),
-        )
-        .unwrap();
-        for (x, y) in back.iter().zip(&stored_b) {
+        let m = interpolate_bakes(&a, &b, 1.0, &[]).unwrap();
+        assert!(same_bits(&m.layers[0].weights, &[1.1, 0.0, 0.0, 1.05]));
+        let bytes = bake_layers(&m.scaler_mean, &m.scaler_scale, &m.layers, &m.metadata, 0);
+        for (x, y) in owned_layers(&Model::from_bytes(&bytes).unwrap())
+            .unwrap()
+            .iter()
+            .zip(&stored_b)
+        {
             assert!(same_bits(&x.weights, &y.weights) && same_bits(&x.biases, &y.biases));
         }
-        let Interpolated {
-            layers,
-            metadata,
-            scaler_mean: mean,
-            scaler_scale: scale,
-        } = interpolate_bakes(&a, &b, 0.5).unwrap();
-        assert_eq!(layers[0].weights, [1.05, 0.0, 0.0, 1.05]);
-        assert_eq!(layers[0].biases, [0.375, -0.5]);
+        let m = interpolate_bakes(&a, &b, 0.5, &[]).unwrap();
+        assert_eq!(m.layers[0].weights, [1.05, 0.0, 0.0, 1.05]);
+        assert_eq!(m.layers[0].biases, [0.375, -0.5]);
         assert!(
-            same_bits(&layers[1].weights, &[1.0, 2.0]) && same_bits(&layers[1].biases, &[-1.0])
+            same_bits(&m.layers[1].weights, &[1.0, 2.0]) && same_bits(&m.layers[1].biases, &[-1.0])
         );
         assert_eq!(
-            (mean.as_slice(), scale.as_slice()),
+            (m.scaler_mean.as_slice(), m.scaler_scale.as_slice()),
             ([0.0f32, 0.0].as_slice(), [1.0f32, 1.0].as_slice())
         );
-        let keys: Vec<&str> = metadata.iter().map(|m| m.key.as_str()).collect();
+        let keys: Vec<&str> = m.metadata.iter().map(|e| e.key.as_str()).collect();
         assert_eq!(keys, ["zentrain.feature_ids", INTERPOLATION_KEY]);
-        let record: serde_json::Value = serde_json::from_slice(&metadata[1].value).unwrap();
+        let record: serde_json::Value = serde_json::from_slice(&m.metadata[1].value).unwrap();
         assert_eq!(record["alpha"], 0.5);
         assert_eq!(record["alignment"]["moved_units"], 2);
+        assert_eq!(
+            record["alignment"]["contested_units"],
+            serde_json::json!([0])
+        );
         assert!(record["alignment"]["max_match_ratio"].as_f64().unwrap() < 0.2);
-        assert_eq!(record["a"]["provenance"]["zentrain.repro"], "run a");
+        assert_eq!(record["a"]["provenance"]["zentrain.repro"], "run 1");
         assert_eq!(record["b"]["sha256"], sha256_hex(&b));
-        let bytes = bake_layers(&mean, &scale, &layers, &metadata, 0);
+        let bytes = bake_layers(&m.scaler_mean, &m.scaler_scale, &m.layers, &m.metadata, 0);
         assert_eq!(read_meta(&bytes, "zentrain.feature_ids").unwrap(), "13,14");
         assert!(read_meta(&bytes, "zentrain.repro").is_err());
     }
 
     #[test]
+    fn interpolate_tracks_units_through_the_run() {
+        // Two units with equal outgoing weights trade places over the run, passing apart in the third input.
+        // Matched directly, each end unit pairs with the start unit at its final position; matched along the
+        // run, each keeps its identity.
+        let end = |w1: &[f64]| {
+            interpolation_end(&[0.0, 0.0, 0.0], w1, &[0.0, 0.0], &[1.0, 1.0], "13,14,15")
+        };
+        let a = end(&[1.0, 0.0, 0.0, 1.0, 0.0, 0.0]);
+        let t1 = end(&[0.8, 0.1, 0.1, 0.8, 0.5, -0.5]);
+        let t2 = end(&[0.2, 0.7, 0.7, 0.2, 0.55, -0.55]);
+        let b = end(&[0.0, 1.0, 1.0, 0.0, 0.0, 0.0]);
+        let stored = |x: &[u8]| owned_layers(&Model::from_bytes(x).unwrap()).unwrap();
+        let direct = interpolate_bakes(&a, &b, 0.5, &[]).unwrap();
+        assert!(same_bits(&direct.layers[0].weights, &stored(&a)[0].weights));
+        let tracked = interpolate_bakes(&a, &b, 0.5, &[t1.clone(), t2.clone()]).unwrap();
+        assert!(same_bits(
+            &tracked.layers[0].weights,
+            &mix_f32(&stored(&a)[0].weights, &stored(&b)[0].weights, 0.5)
+        ));
+        let record: serde_json::Value =
+            serde_json::from_slice(&tracked.metadata.last().unwrap().value).unwrap();
+        assert_eq!(
+            record["alignment"]["track_sha256"],
+            serde_json::json!([sha256_hex(&t1), sha256_hex(&t2)])
+        );
+        assert_eq!(
+            record["alignment"]["non_nearest_matches"],
+            serde_json::json!([0, 0, 0])
+        );
+        let other = interpolation_end(
+            &[0.0, 0.0, 0.0],
+            &[0.8, 0.1, 0.1, 0.8, 0.5, -0.5],
+            &[0.0, 0.0],
+            &[1.0, 1.0],
+            "13,14,16",
+        );
+        let error = interpolate_bakes(&a, &b, 0.5, &[other]).err().unwrap();
+        assert!(
+            error.contains("track 0: non-provenance metadata differs"),
+            "{error}"
+        );
+    }
+
+    #[test]
     fn interpolate_refuses_every_structural_difference() {
-        use zenpredict::WeightDtype::{F16, F32};
         let a = interpolation_end(
             &[0.0, 0.0],
             &[1.0, 0.0, 0.0, 1.05],
             &[0.25, -0.5],
-            F32,
+            &[1.0, 2.0],
             "13,14",
-            "run a",
         );
-        let near =
-            |w1: &[f64], b1: &[f64]| interpolation_end(&[0.0, 0.0], w1, b1, F32, "13,14", "run b");
+        let f16 = zensim_validate::mlp_train::bake_two_layer_znpr_v3(
+            &[0.0, 0.0],
+            &[1.0, 1.0],
+            &[1.0, 0.0, 0.0, 1.05],
+            &[0.25, -0.5],
+            &[1.0, 2.0],
+            &[-1.0],
+            2,
+            2,
+            1,
+            zenpredict::WeightDtype::F16,
+            None,
+            None,
+            zenpredict::Activation::Relu,
+        );
+        let f16 =
+            zenpredict_bake::append_metadata_utf8(&f16, "zentrain.feature_ids", "13,14").unwrap();
         let refusals = [
             (
-                near(&[1.0, 0.0, 0.0, 1.05], &[0.25, -0.5]),
+                interpolation_end(
+                    &[0.0, 0.0],
+                    &[1.0, 0.0, 0.0, 1.05],
+                    &[0.25, -0.5],
+                    &[1.0, 2.0],
+                    "13,14",
+                ),
                 1.5,
                 "outside [0, 1]",
             ),
             (
-                near(&[1.0; 6], &[0.0; 3]),
+                interpolation_end(&[0.0, 0.0], &[1.0; 6], &[0.0; 3], &[1.0, 2.0, 3.0], "13,14"),
                 0.5,
                 "shape or activation differs",
             ),
@@ -5814,46 +5963,31 @@ mod tests {
                     &[0.5, 0.0],
                     &[1.0, 0.0, 0.0, 1.05],
                     &[0.25, -0.5],
-                    F32,
+                    &[1.0, 2.0],
                     "13,14",
-                    "b",
                 ),
                 0.5,
                 "input scalers differ",
             ),
+            (f16, 0.5, "f32 layers only"),
             (
                 interpolation_end(
                     &[0.0, 0.0],
                     &[1.0, 0.0, 0.0, 1.05],
                     &[0.25, -0.5],
-                    F16,
-                    "13,14",
-                    "b",
-                ),
-                0.5,
-                "f32 layers only",
-            ),
-            (
-                interpolation_end(
-                    &[0.0, 0.0],
-                    &[1.0, 0.0, 0.0, 1.05],
-                    &[0.25, -0.5],
-                    F32,
+                    &[1.0, 2.0],
                     "13,15",
-                    "b",
                 ),
                 0.5,
                 "metadata differs",
             ),
-            // both of b's units sit between a's: no unit has a clear partner
-            (near(&[0.5, 0.55, 0.5, 0.45], &[0.0, 0.0]), 0.5, "ambiguous"),
         ];
         for (b, alpha, message) in refusals {
-            let error = interpolate_bakes(&a, &b, alpha).err().expect(message);
+            let error = interpolate_bakes(&a, &b, alpha, &[]).err().expect(message);
             assert!(error.contains(message), "{error}");
         }
         let marked = zenpredict_bake::append_metadata_utf8(&a, INTERPOLATION_KEY, "{}").unwrap();
-        let error = interpolate_bakes(&marked, &a, 0.5).err().unwrap();
+        let error = interpolate_bakes(&marked, &a, 0.5, &[]).err().unwrap();
         assert!(error.contains("already an interpolation"), "{error}");
     }
 
