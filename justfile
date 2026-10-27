@@ -3705,3 +3705,10 @@ confidence-full-fit plan:
 
 confidence-full-fit-tests:
     OPENBLAS_NUM_THREADS=1 python3 -B -m unittest scripts.tests.test_mlic_confidence_full
+
+confidence-followthrough-tests:
+    OPENBLAS_NUM_THREADS=1 python3 -B -m unittest scripts.tests.test_confidence_followthrough
+
+# Run the source-frozen copy, attached; each heavy stage acquires the shared lock itself.
+confidence-followthrough source config:
+    OPENBLAS_NUM_THREADS=1 python3 -B {{quote(source)}}/scripts/byconstruction/confidence_followthrough.py {{quote(config)}}

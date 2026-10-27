@@ -139,6 +139,30 @@ changed reuse evidence and partial full-panel completion. Run-heavy rc=0, 0s,
 peak RSS 0.12 GiB, minimum available 24,296 MiB, peak load 0.16. These are
 orchestration controls, not evidence of completed confidence fits or adoption.
 
+### Attached confidence followthrough supervisor — October 27, 2026
+
+`confidence_followthrough.py` freezes its own source/config before waiting for
+the independent confidence omission study. It checks the live PID/start time
+while waiting, refuses failed/exited prerequisites, and verifies actual complete
+paired evidence and source/trainer identities before constructing plans. A
+historical rejection does not stop the new AIC comparison. Missing future
+completion hashes are never invented: they are bound only when the corresponding
+stage completes, under the already registered recipes and budgets.
+
+Execution is serial: 48 matched fold continuation cells (24 Mlic reuses),
+72-model fitted/held-out panels, three original full-confidence fits, twelve
+full continuations (six Mlic reuses), then 180 full-panel prediction outputs
+and both mixture tests. Each existing heavy owner acquires the shared lock and
+run-heavy scope; the waiting supervisor holds neither. All commands/logs and
+terminal failures are durable in its run directory. No detached agent or
+background daemon is created. No automatic model adoption occurs.
+
+Four supervisor tests pass on i265: live-wait versus PID reuse/death,
+historical rejection with complete evidence, unchanged common fold recipe,
+and correct full-control reuse/budgets. Run-heavy rc=0, 0s, peak RSS 0.07 GiB,
+minimum available 24,297 MiB, peak load 0.03. Full native execution remains
+pending the original AIC and confidence omission dependencies.
+
 ### Active goal and decisions
 
 Keep working toward a stable, production-qualified candidate while preserving
