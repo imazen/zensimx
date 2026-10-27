@@ -8,6 +8,13 @@ a record of what happened, not authority to restart its abandoned work.
 
 ## Owner queue update — October 26, 2026
 
+**Execution update, October 27:** [SESSION-RESUME](../SESSION-RESUME.md#current-work--october-27-2026)
+is the current queue/recovery index. The active goal continues through stable
+adoption and native HDR qualification; September paused-goal statements are
+historical. Run `just mlic-priority-progress` before reporting status. Immutable
+registrations and results remain in
+[the byconstruction record](../benchmarks/byconstruction_2026-10-22.md).
+
 **Owner refinement, October 27: compare AIC adaptation using complete panels.**
 Compare Mlic, the effective-sample mass arm, vote likelihood and matched
 ordering under the same AIC2026 public_train continuation recipe, including
@@ -38,17 +45,28 @@ of a proven global optimum.
 The owner's follow-up asks whether the zenpapers weighting and ordering
 proposals were adopted. The registered AIC continuation still uses inherited
 collection masses with pair-acceptance correction and `--pair-sampling uniform`.
-These prospective recipe comparisons remain outstanding:
+The separate recipe comparisons now have these states (04:16:59 UTC,
+October 27; verify live artifacts before relying on them):
 
-- Binomial vote likelihood retaining ties.
-- Collection masses proportional to the square root of effective sample count,
-  preserving the registered total new-data mass in a future comparison.
-- Per-item confidence weights with their linking uncertainty accounted for.
-- Same-source, between-codec sampling strata at matched distortion distance.
+- **Vote:** native binomial likelihood retaining ties completed 21/21 omission
+  cells. Its historical screen rejected it; it remains in the new AIC panels.
+- **Neff:** square-root effective-sample collection masses at unchanged total
+  new-data mass completed 21/21 cells. The historical rejection remains evidence,
+  not exclusion from the new AIC panels.
+- **Confidence:** native population and uncertainty audits exist. Source
+  screening is queued; membership, omission-bound response reads, linking maps
+  and the native contrast-weighted loss are unfinished. No weights are adopted.
+- **Order:** same-source matched JPEG/JPEG2000 strata passed full-budget control
+  parity; 12/21 cells completed, the remaining nine were running. No adoption.
 
-The existing stratified sampler is not evidence that this specific sampling
-scheme is active. Each proposed change needs its own preregistered comparison;
-the running AIC arms and their selection rule stay frozen. The source review is
+All four completed/active base recipes feed both common AIC strengths. The
+fold comparison, full panels, all three full-data seeds and both strengths
+are queued without a SROCC eligibility gate. Confidence joins after its
+independent admission and fits. Do not combine factors accidentally.
+
+The generic stratified sampler is not the registered Order implementation.
+Each factor has its own preregistered comparison; old AIC arms and their
+historical selection rule stay frozen. The source review is
 `zenpapers/docs/mlic-recipe-review-2026-10-26.md`, committed revision `4e81c03a`.
 
 Ordering and mass are separate experimental factors. The current
@@ -56,7 +74,7 @@ Ordering and mass are separate experimental factors. The current
 order with a seeded row permutation, but uses collection weights only for
 eligibility: draw shares follow the number of eligible strata. Flipping that
 flag would therefore change both order/coverage and collection balance. A
-future ordering-only arm must preserve the declared collection masses and
+separate ordering-only arm must preserve the declared collection masses and
 pair budget, or explicitly preregister the combined change. The owners are
 `zensim-validate/src/mlp_train/{mod.rs,sampling.rs}`; no new sampler is enabled
 by this note.

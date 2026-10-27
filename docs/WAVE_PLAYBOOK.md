@@ -1,5 +1,28 @@
 # Develop, train and evaluate zensim
 
+## October 27 active owners
+
+Start with [the current goal and run index](../SESSION-RESUME.md#current-work--october-27-2026),
+then `just mlic-priority-progress`. These additive owners implement the current
+registered Mlic/AIC comparison; the September owner map remains background.
+Read frozen plans/sources rather than relaunching live work from moving main.
+
+| Work | Owner | Required evidence |
+|---|---|---|
+| Study/process supervision | `scripts/byconstruction/{dataset_study_status,run_processes}.py` | Actual outputs, PID plus start ticks, all thread children, real lock holder, failure sentinels |
+| Native confidence source screen | `scripts/byconstruction/confidence_admission.py` | Plan-v2, calibrated source match controls, immutable source authority; not response permission |
+| Native fitting populations/uncertainty | `scripts/byconstruction/{confidence_population,confidence_audit}.py` | Original observation IDs and source rows, exact memberships, finite native uncertainty; no fitted linking map yet |
+| Order matching | `scripts/rev4_featpot/matched_codec.py`, native `zensim_mlp_train/matched_codec.rs` | Paired original Mlic prediction identity; separate omission/full schemas; unchanged draw law |
+| AIC fold continuation | `scripts/byconstruction/aic_adaptation.py` | 48 bound initial models, zero-step parity, 96 final continuation cells, role/fold/seed identity |
+| Fold statistics | `scripts/byconstruction/{aic_adaptation_panel,aic_adaptation_diagnostics}.py` | Native full statistics, fitted/held-out isolation, source-level uncertainty, canonical mixture cache checks |
+| Full recipes/continuation | `scripts/byconstruction/aic_adaptation_full.py` | Full-budget binary control; 12 initial + 24 continued models; fixed seeds and both strengths |
+| Full serving-model panels | `scripts/byconstruction/aic_adaptation_full_panel.py` | Final-f32 versus packed/calibrated output, 360 predictions, mixtures, complete inventories; no automatic winner |
+
+Confidence admission/calibration metadata owners are in the separate private
+zenpapers repository. Their purpose-bound response adapter and zensim's native
+contrast-confidence loss remain unfinished. A metadata declaration, source
+screen, completed fit, or TRAIN report alone does not qualify a product.
+
 **Controlling work order (September 15):** follow
 [the production priorities](PRODUCTION_PRIORITIES_2026-09-15.md) before older
 task lists. It preserves the completed recovery and assigns concrete next

@@ -1,5 +1,23 @@
 # Production release scorecard
 
+## October 27 AIC development comparison
+
+The owner directs the new Mlic/Neff/Vote/Order AIC TRAIN comparison to use
+complete panels and other statistics **without strict SROCC rejection or a
+scalar automatic winner**. Confidence joins after separate admission/fitting.
+Review source/codec/local rankings, calibration/tails, seed/source uncertainty,
+mixtures and production behavior together. Keep historical screen results
+visible, but do not use their cutoffs to exclude arms from this new comparison.
+See [the registered protocol](../benchmarks/byconstruction_2026-10-22.md#aic-adaptation-across-training-recipes-prospective-panel-study-2026-10-27)
+and [current queue](../SESSION-RESUME.md#current-work--october-27-2026).
+
+This is a prospective development comparison, not a retroactive change to
+frozen experiments or a release waiver. In-sample AIC/full E21 panels remain
+explicitly in sample. Preserve protected roles, pixel/numeric correctness and
+provenance; freeze any eventual assessment before permitted EVAL reads.
+Serving, steering, runtime and HDR requirements remain separate. No recipe
+has been adopted through this comparison yet.
+
 ## September 14 split clarification
 
 The later [user clarification](DATA_SPLITS.md#september-14-clarification-test-evaluation-when-no-eval-split-exists)

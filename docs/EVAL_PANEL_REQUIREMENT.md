@@ -1,5 +1,26 @@
 # Eval panel requirement — MANDATORY for every ship-grade bake (2026-05-29)
 
+## October 27 active development panels
+
+The [new AIC recipe protocol](../benchmarks/byconstruction_2026-10-22.md#aic-adaptation-across-training-recipes-prospective-panel-study-2026-10-27)
+implements the owner's complete-panel decision rule without strict SROCC
+rejection. Its TRAIN reports do not invoke the historical corpus defaults below.
+No EVAL, public_test or TERMINAL response is admitted by these commands.
+
+Report fitted and held-out AIC sources separately, with global and per-source,
+codec and ladder statistics, raw PLCC/MAE, calibration and error tails, rank
+bias, inversions, paired seeds and source-cluster uncertainty. Preserve every
+undefined statistic and denominator. Both mixture tests use canonical cache
+identity checks. AIC's quality field is a distortion-level index, not a native
+codec knob. Full-data continuations are in sample on all 28 TRAIN sources;
+full E21 panels are also in sample and do not replace omission evidence.
+
+Full reports include final-f32 and packed/TRAIN-calibrated models. The contrast
+combines quantization with calibration and must not be labeled pure f16 loss.
+These reports are queued, not measured quality or speed wins. Follow
+[the current run index](../SESSION-RESUME.md#current-work--october-27-2026) and
+the later split rulings before using any historical panel command.
+
 Every ship/no-ship, A/B, or "is this bake better" decision MUST run the **full
 two-panel eval**, not just the rank panel. SROCC-on-static-corpora alone hides
 dial defects that break the codec-target use case (see the V0_5 wave: high rank
