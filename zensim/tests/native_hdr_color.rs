@@ -798,3 +798,95 @@ fn rev7_native_pq_hlg_match_independent_display_light_through_supported_hdr_entr
         }
     }
 }
+
+/// Rev7 display model at the declared PQ peak: code differences entirely above
+/// the 1000-nit peak clip to the same display light (identical features), while
+/// a step below the peak remains visible.
+#[test]
+fn rev7_pq_steps_above_the_declared_peak_clip_and_below_it_stay_visible() {
+    use zensim::feature_v2::FormulaRevision;
+    if zensim::feature_v2::active_formula_revision() != FormulaRevision::Rev7 {
+        let status = std::process::Command::new(std::env::current_exe().unwrap())
+            .env("ZENSIM_FORMULA_REV", "7")
+            .args([
+                "--exact",
+                "rev7_pq_steps_above_the_declared_peak_clip_and_below_it_stay_visible",
+                "--test-threads=1",
+            ])
+            .status()
+            .unwrap();
+        assert!(status.success());
+        return;
+    }
+    fn native(p: &[[u16; 4]], w: usize, h: usize) -> StridedBytes<'_> {
+        StridedBytes::with_alpha_mode(
+            bytemuck::cast_slice(p),
+            w,
+            h,
+            w * 8,
+            PixelFormat::Srgb16Rgba,
+            AlphaMode::Opaque,
+        )
+        .with_color_primaries(ColorPrimaries::Bt2020)
+    }
+    // 1000 nits is PQ code 0.7518 of full scale (about 49,271 of 65,535): every
+    // channel of the right third sits above 1,500 nits (code 52,400 and up), the
+    // rest below 400 nits (code 42,299 and down) even after the +300 step.
+    let (w, h) = (96, 64);
+    let a: Vec<[u16; 4]> = (0..w * h)
+        .map(|i| {
+            let (x, y) = (i % w, i / w);
+            let base = if x >= 2 * w / 3 {
+                54000 + (x * 37 + y * 11) % 6000
+            } else {
+                20000 + (x * 211 + y * 97) % 22000
+            };
+            [
+                base as u16,
+                (base - 800) as u16,
+                (base - 1600) as u16,
+                65535,
+            ]
+        })
+        .collect();
+    let lift = |above: bool| -> Vec<[u16; 4]> {
+        a.iter()
+            .enumerate()
+            .map(|(i, p)| {
+                let x = i % w;
+                if (x >= 2 * w / 3) == above {
+                    [p[0] + 300, p[1] + 300, p[2] + 300, p[3]]
+                } else {
+                    *p
+                }
+            })
+            .collect()
+    };
+    let z = Zensim::new(ZensimProfile::B).with_parallel(false);
+    let toggles = V2NewFeatureToggles::default();
+    let encoding = HdrEncoding::Pq { peak_nits: 1000. };
+    let features = |b: &[[u16; 4]]| {
+        z.compute_folded720_features_hdr(
+            &native(&a, w, h),
+            &native(b, w, h),
+            encoding,
+            toggles,
+            &mut V2Scratch::new(),
+        )
+        .unwrap()
+        .features()
+        .to_vec()
+    };
+    let identity = features(&a);
+    assert_eq!(
+        features(&lift(true)),
+        identity,
+        "steps entirely above the declared peak must clip to the same display light"
+    );
+    let below = features(&lift(false));
+    assert!(below.iter().all(|v| v.is_finite()));
+    assert_ne!(
+        below, identity,
+        "a step below the declared peak must stay visible"
+    );
+}
