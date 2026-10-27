@@ -7314,6 +7314,9 @@ trade-off rather than escaping it. At ×1024 it shrinks the losses by about a qu
 static's −0.026 at e59) but keeps at no checkpoint. TID2013 and KonFiG remain the binding sets, as in every earlier
 stage.
 
+Local pixel mixtures: at most 3 inversion rows per fold model (largest rise +6.5 at ×256 e59; the initial model has 2,
++5.0); global mixtures 0 for every model. Run complete 19:54 UTC.
+
 **Registered decision.** D's candidate is ×256 + rehearsal at e59 (0.93899). It is 0.00210 above the Vote point
 (0.93689), just past the 0.002 bar, so E21 out of sample decides: the candidate's omission run
 (`mlic-aic-omission-xrefaic256-20261027-run01`, the twelve Mlic omission cells continued at ×256 with the leg) is
@@ -7342,3 +7345,9 @@ fixed by stage D's decision, only if its out-of-fold AIC is higher by more than 
 omission run is frozen only if the first condition holds.
 
 **Order.** After stage D's omission run, before stage C, so that stage C runs once, on the final point.
+
+**Queue, 19:58 UTC.** Stage E's plan is frozen (`mlic-aic-recipe-votexref-20261027-run01`, both weights in one run,
+source `5313ca25`, trainer `b3b86f18…`) and waits behind the stage D candidate's omission run. A real-input smoke of
+its ×1024 fold 0 fit loaded the rehearsal leg on Vote's root (10,590 rows paired within 4 datasets) beside Vote's
+BAPPS vote leg and trained epoch 0. Dev order: Mlic ×256 omission (running since 19:55) → Vote ×256 omission → D
+candidate omission → stage E → stage C.
