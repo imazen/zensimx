@@ -31,6 +31,21 @@ work. The September chronology below is retained history, including its old
 paused-goal statement. It is not the current queue. No new Mlic/AIC recipe has
 been adopted as the serving model, and the seamless HDR frontend has not started.
 
+### State at 15:25 UTC, 2026-10-27
+
+Frontier stage A completed at 15:05Z (byconstruction record, "AIC-share frontier stage A:
+result"): ×256 epoch 7 advances under the registered rule (out-of-fold AIC 0.9312); no
+static mixture reaches 0.95 while keeping the older sets. Stage A2 recovery
+(`mlic-aic-recovery-20261027-run01`, herdr w21:pD) is fitting since 15:06Z; its points join
+the frontier. Stage B is ready: native Order/Confidence continuation admission
+(`d7cad238`), coordinator `recipe-plan` (`216481a8`), trainer `587e4764…` built on i265
+from `216481a8` (record and binaries in `~/tmp/claude-port-20261027/stageb/`), dry-run
+plans for all four recipes and real-input admission smokes for Order and Confidence
+(epoch 0 trained) in `~/tmp/claude-port-20261027/{dryrun-stageb,stageb-smoke}/`. After A2
+completes: apply the rule (`~/tmp/claude-port-20261027/frontier_summary.py`), freeze one
+`recipe-plan` per recipe at the advanced budget (chained by `--after-run`; Order,
+Confidence, Neff, Vote), launch each `fold-queue` in an idle w21 shell pane.
+
 ### State at 14:10 UTC, 2026-10-27
 
 All 15 seed-0 candidates pass the label-free gates (dial C1-C6 both grids, identity
