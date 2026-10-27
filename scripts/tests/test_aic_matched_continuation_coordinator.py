@@ -95,5 +95,55 @@ class PlanFreeze(unittest.TestCase):
             self.assertFalse((root / "fresh").exists())
 
 
+class SourceFoldStudy(unittest.TestCase):
+    def test_registered_inventory_is_two_populations_three_seeds_seven_folds(self):
+        runs = owner.fold_runs()
+        self.assertEqual(len(runs), 42)
+        self.assertEqual(len(set(runs)), 42)
+        self.assertEqual({r[0] for r in runs}, set(owner.ARMS))
+        self.assertEqual({r[1] for r in runs}, {0, 1, 2})
+        self.assertEqual({r[2] for r in runs}, set(range(7)))
+
+    def test_fold_fit_binds_its_seed_initial_model_and_fold_table(self):
+        with tempfile.TemporaryDirectory(dir=Path.home() / "tmp") as tmp:
+            run = Path(tmp)
+            (run / "cols.txt").write_text("13,14\n")
+            plan = dict(root="/invented/root", columns=str(run / "cols.txt"))
+            command = owner.fit_command(plan, run, "AICOnly", 2, "/invented/Mlic/full_s2",
+                                        "/invented/aic_k5_fit.parquet", run / "arms/AICOnly/s2_k5")
+            self.assertEqual(command[command.index("--seed-index") + 1], "2")
+            self.assertEqual(command[command.index("--init-from") + 1], "/invented/Mlic/full_s2/refit/last.bin")
+            self.assertEqual(command[command.index("--aic-public-train") + 1], "/invented/aic_k5_fit.parquet")
+            self.assertEqual(command[command.index("--dest") + 1], str(run / "arms/AICOnly/s2_k5"))
+            self.assertEqual(command[command.index("--diagnostic-population") + 1], "aic-only")
+
+    def test_out_of_fold_uses_only_each_models_held_out_sources(self):
+        import numpy as np
+        folds = np.repeat(np.arange(7), 3)
+        values = {f"A|s0|k{k}": np.where(folds == k, 100.0 + k, -1.0) for k in range(7)}
+        oof = owner.out_of_fold(values, folds, "A|s0")
+        self.assertTrue(np.array_equal(oof, 100.0 + folds))
+        values["A|s0|k3"] = np.where(folds == 3, np.nan, -1.0)
+        with self.assertRaisesRegex(ValueError, "incomplete"):
+            owner.out_of_fold(values, folds, "A|s0")
+
+    def test_gates_queue_end_requires_a_terminal_line(self):
+        with tempfile.TemporaryDirectory(dir=Path.home() / "tmp") as tmp:
+            log = Path(tmp) / "queue.log"
+            with patch.object(owner, "GATES_LOG", log):
+                self.assertFalse(owner.gates_finished())
+                log.write_text("2026-10-27T09:24:58Z waiting for the matched-continuation diagnostic\n")
+                self.assertFalse(owner.gates_finished())
+                log.write_text(log.read_text() + "2026-10-27T14:00:00Z GATES-DONE rc=0\n")
+                self.assertTrue(owner.gates_finished())
+                log.write_text("2026-10-27T14:00:00Z GATES-EXIT rc=1\n")
+                self.assertTrue(owner.gates_finished())
+
+    def test_fold_plan_refuses_an_existing_run(self):
+        with tempfile.TemporaryDirectory(dir=Path.home() / "tmp") as tmp:
+            with self.assertRaisesRegex(ValueError, "preserve"):
+                owner.fold_plan(Path(tmp), "HEAD", Path(tmp) / "t", Path(tmp) / "m")
+
+
 if __name__ == "__main__":
     unittest.main()
