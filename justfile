@@ -3690,3 +3690,7 @@ dataset-confidence-chain study source_commit trainer_sha256:
 
 dataset-confidence-queue study source_commit trainer_sha256 after_full_panel:
     OPENBLAS_NUM_THREADS=1 python3 -B scripts/byconstruction/dataset_queue.py {{quote(study)}} {{quote(source_commit)}} {{quote(trainer_sha256)}} --candidate MlicConfidence --after-full-panel {{quote(after_full_panel)}}
+
+# Existing native certificate; caller supplies frozen model paths and resource scope.
+dataset-certify-bake binary bake:
+    {{quote(binary)}} certify-monotone --bake {{quote(bake)}}

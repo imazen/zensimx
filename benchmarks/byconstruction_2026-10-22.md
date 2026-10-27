@@ -5895,3 +5895,21 @@ Validation-library/test Clippy with `-D warnings` passes:
 The preserved fixture checkpoints, manifests, logs and hash inventory are in
 shared admission run02 `native-parity-run01/VERIFIED.json`; production trainer
 bytes and the already queued experiment source remain unchanged.
+
+
+### Frozen Mlic packed-control certificates (2026-10-27)
+
+All three original full-data Mlic packed seeds pass the existing native
+`bake_dial_refit certify-monotone` owner: certified/monotone true, zero free
+ramps; live max-pair counts 3/2/2 for seeds 0/1/2. Seed zero was previously
+certified; the same check now explicitly covers all three controls. No fit,
+quality-response read, model edit or promotion occurred. This feature-coordinate
+certificate does not imply pixel-space mixture monotonicity or a release pass.
+
+The pinned models, native binary, input inventory and certificates are retained
+at `/mnt/tower/output/zensim/mlic-qualification-20261027-run01/`.
+`CERTIFICATES.json` binds each original result/model hash and certificate log.
+Run on i265: `rc=0 0s | peak-RSS 0.03GiB | min-avail 24171MiB | peak-load 0.12`.
+`just dataset-certify-bake <binary> <bake>` exposes the existing native command.
+The runtime hardware constraint is explicit in the release scorecard; no
+cross-host measurement can silently pass the original 9950X3D performance row.

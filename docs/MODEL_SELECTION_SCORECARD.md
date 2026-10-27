@@ -18,6 +18,17 @@ provenance; freeze any eventual assessment before permitted EVAL reads.
 Serving, steering, runtime and HDR requirements remain separate. No recipe
 has been adopted through this comparison yet.
 
+## Current runtime admission constraint — October 27
+
+The owner's current host rule prohibits benchmarks on dev and excludes r7900x
+from this work. The scalar-performance row below still requires the named
+9950X3D hardware. Preserve both requirements: measurements on another eligible
+host are diagnostics, not a substitute pass for that hardware-specific row.
+That row remains INCOMPLETE unless an eligible matching host is available or
+the owner explicitly changes the restriction. Continue training, numerical,
+serving and other independently executable qualification in the meantime.
+Do not infer permission to benchmark dev from the historical scorecard.
+
 ## September 14 split clarification
 
 The later [user clarification](DATA_SPLITS.md#september-14-clarification-test-evaluation-when-no-eval-split-exists)
