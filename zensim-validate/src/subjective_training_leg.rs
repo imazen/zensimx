@@ -38,7 +38,7 @@ fn string<'a>(v: &'a Value, key: &str) -> Result<&'a str, String> {
 /// public_train weight, and its retained checkpoint epochs. Every one runs 60
 /// epochs at constant LR 1e-5, fresh Adam, a checkpoint dump every epoch. The
 /// Python mirror holds the same table.
-const DIAGNOSTIC_EPOCHS: u64 = 60;
+pub(super) const DIAGNOSTIC_EPOCHS: u64 = 60;
 type Protocol = (&'static str, &'static [(&'static str, f64)], &'static [u64]);
 const DIAGNOSTIC_PROTOCOLS: [Protocol; 2] = [
     (
@@ -64,6 +64,26 @@ fn diagnostic_protocol(w: &Value) -> Option<(f64, &'static [u64])> {
         DIAGNOSTIC_PROTOCOLS.iter().find(|p| w["protocol"] == p.0)?;
     let weight = populations.iter().find(|p| w["population"] == p.0)?.1;
     Some((weight, checkpoints))
+}
+
+/// The registered population of the continuation that this run's pinned
+/// version-4 authority binds to its cell; None for any other authority. The
+/// recipe owners (matched codecs) call this after `admit` has bound the run.
+pub(super) fn continuation_population(args: &super::Args) -> Result<Option<String>, String> {
+    let (Some(path), Some(pin), Some(cell)) = (
+        &args.subjective_authority,
+        &args.subjective_authority_sha256,
+        &args.subjective_cell,
+    ) else {
+        return Ok(None);
+    };
+    let a = json(path, pin)?;
+    if a["schema"] != "subjective-training-authority-v4" {
+        return Ok(None);
+    }
+    let w = &a["cells"][cell.as_str()]["continuation"];
+    diagnostic_protocol(w).ok_or("registered continuation protocol required")?;
+    Ok(Some(string(w, "population")?.to_owned()))
 }
 
 fn run_binding(

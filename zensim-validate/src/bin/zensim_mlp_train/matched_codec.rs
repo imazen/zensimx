@@ -155,6 +155,17 @@ pub(super) fn admit(args: &Args, groups: &[Group]) -> Result<Option<Admitted>, S
         }
         return Ok(None);
     };
+    // A full fit runs the registered 120 epochs. A registered continuation
+    // (AIC-share frontier stage B) keeps the original matched schedule for
+    // its 60 epochs; the AIC-only population has no human group to match.
+    let budget = match super::subjective_training_leg::continuation_population(args)? {
+        None => args.epochs == 120 && args.init_from.is_none(),
+        Some(population) => {
+            population != "aic-only"
+                && args.init_from.is_some()
+                && args.epochs as u64 == super::subjective_training_leg::DIAGNOSTIC_EPOCHS
+        }
+    };
     if matched.len() != 1
         || args.historical_replay.is_some()
         || args.hdr_consensus_research
@@ -166,7 +177,7 @@ pub(super) fn admit(args: &Args, groups: &[Group]) -> Result<Option<Admitted>, S
         || args.minibatch_size != 1
         || args.pair_sampling != "uniform"
         || !args.no_sample_coverage
-        || args.epochs != 120
+        || !budget
         || args.pairs_per_epoch != 50000
         || args.subjective_authority.is_none()
     {

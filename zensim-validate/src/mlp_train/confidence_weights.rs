@@ -45,6 +45,53 @@ struct Manifest {
     absolute_loss_changed: bool,
     group_masses_changed: bool,
 }
+/// A registered 60-epoch continuation of a full confidence fit (AIC-share
+/// frontier stage B): the unchanged full-fit manifest, the starting checkpoint
+/// and one appended, unweighted AIC public_train group. The subjective
+/// authority binds the protocol, population and AIC weight independently.
+#[derive(Deserialize)]
+struct Continuation {
+    schema: String,
+    base_manifest: String,
+    base_manifest_sha256: String,
+    checkpoint: String,
+    checkpoint_sha256: String,
+    epochs: usize,
+    pairs_per_epoch: usize,
+    added_group: Group,
+}
+const CONTINUATION_EPOCHS: usize = 60;
+
+/// The continuation's (epochs, pairs per epoch), after binding its starting
+/// checkpoint bytes and its one unweighted AIC group.
+fn continuation_budget(c: &Continuation, base: &Manifest, hp: &MlpHyperparams) -> (usize, usize) {
+    assert_eq!(c.schema, "mlic-contrast-confidence-continuation-v1");
+    assert_eq!(
+        (c.epochs, c.pairs_per_epoch),
+        (CONTINUATION_EPOCHS, base.pairs_per_epoch)
+    );
+    let start = hp
+        .init_from
+        .as_deref()
+        .expect("confidence continuation requires its checkpoint");
+    assert_eq!(start, Path::new(&c.checkpoint));
+    assert_eq!(
+        crate::train_manifest::sha256_file(start).expect("continuation checkpoint"),
+        c.checkpoint_sha256,
+        "confidence continuation checkpoint changed"
+    );
+    let g = &c.added_group;
+    assert!(
+        g.name == "aic_public_train"
+            && g.mode == "rank"
+            && g.validation_weight == 0.
+            && g.train_weight.is_finite()
+            && g.train_weight > 0.
+            && g.binding.is_none(),
+        "unregistered confidence continuation group"
+    );
+    (c.epochs, c.pairs_per_epoch)
+}
 struct WeightedGroup {
     points: Vec<Option<Point>>,
     refs: Vec<u32>,
@@ -95,8 +142,24 @@ impl Plan {
             digest(&bytes),
             expected.to_str().expect("UTF8 manifest hash")
         );
-        let manifest: Manifest =
-            serde_json::from_slice(&bytes).expect("confidence manifest schema");
+        let value: serde_json::Value =
+            serde_json::from_slice(&bytes).expect("confidence manifest JSON");
+        let (manifest, continuation): (Manifest, Option<Continuation>) =
+            if value["schema"] == "mlic-contrast-confidence-continuation-v1" {
+                let c: Continuation =
+                    serde_json::from_value(value).expect("confidence continuation schema");
+                let base = std::fs::read(&c.base_manifest).expect("read base confidence manifest");
+                assert_eq!(
+                    digest(&base),
+                    c.base_manifest_sha256,
+                    "base confidence manifest changed"
+                );
+                let base = serde_json::from_slice(&base).expect("confidence manifest schema");
+                (base, Some(c))
+            } else {
+                let manifest = serde_json::from_value(value).expect("confidence manifest schema");
+                (manifest, None)
+            };
         assert!(
             !has_pair_lists
                 && !hp.per_sample_alpha_head
@@ -126,14 +189,13 @@ impl Plan {
             ),
             (120, 50000, 119)
         );
+        let budget = match &continuation {
+            None => (manifest.epochs, manifest.pairs_per_epoch),
+            Some(c) => continuation_budget(c, &manifest, hp),
+        };
         assert_eq!(
             (hp.n_epochs, hp.pairs_per_epoch, hp.n_hidden, width),
-            (
-                manifest.epochs,
-                manifest.pairs_per_epoch,
-                manifest.hidden,
-                manifest.n_features
-            )
+            (budget.0, budget.1, manifest.hidden, manifest.n_features)
         );
         assert_eq!(hp.init_seed.unwrap_or(hp.seed), manifest.init_seed);
         assert_eq!(hp.sample_seed.unwrap_or(hp.seed), manifest.sample_seed);
@@ -150,22 +212,26 @@ impl Plan {
                 "confidence input changed: {name}"
             );
         }
-        let (plan, audit) = Self::bind(&manifest, groups, hp);
+        let added = continuation.as_ref().map(|c| &c.added_group);
+        let (plan, audit) = Self::bind(&manifest, added, groups, hp);
         let path = receipt.expect("fresh confidence normalizer receipt required");
         let file = std::fs::OpenOptions::new()
             .write(true)
             .create_new(true)
             .open(Path::new(&path))
             .expect("fresh confidence normalizer receipt");
-        serde_json::to_writer_pretty(
-            file,
-            &serde_json::json!({
-                "schema": "mlic-native-contrast-normalizers-v1", "manifest_sha256": digest(&bytes),
-                "sigma_L": manifest.sigma, "groups": audit, "sampler_changed": false,
-                "absolute_loss_changed": false
-            }),
-        )
-        .expect("write native normalizer receipt");
+        let mut record = serde_json::json!({
+            "schema": "mlic-native-contrast-normalizers-v1", "manifest_sha256": digest(&bytes),
+            "sigma_L": manifest.sigma, "groups": audit, "sampler_changed": false,
+            "absolute_loss_changed": false
+        });
+        if let Some(c) = &continuation {
+            record["continuation"] = serde_json::json!({
+                "base_manifest_sha256": c.base_manifest_sha256,
+                "checkpoint_sha256": c.checkpoint_sha256, "epochs": c.epochs,
+                "added_group": c.added_group.name, "added_group_weighted": false});
+        }
+        serde_json::to_writer_pretty(file, &record).expect("write native normalizer receipt");
         log.push(format!(
             "confidence manifest {} admitted; native normalizers recorded",
             digest(&bytes)
@@ -175,18 +241,20 @@ impl Plan {
 
     fn bind(
         manifest: &Manifest,
+        added: Option<&Group>,
         groups: &[TrainingGroup<'_>],
         hp: &MlpHyperparams,
     ) -> (Self, Vec<serde_json::Value>) {
+        let declarations: Vec<&Group> = manifest.groups.iter().chain(added).collect();
         assert_eq!(
             groups.len(),
-            manifest.groups.len(),
+            declarations.len(),
             "complete original group inventory required"
         );
         let sign = OutputPolarity::for_groups(groups, hp).rank_target_sign();
         let mut result = Vec::new();
         let mut audit = Vec::new();
-        for (group, declaration) in groups.iter().zip(&manifest.groups) {
+        for (group, declaration) in groups.iter().zip(declarations) {
             assert_eq!(group.name, declaration.name);
             assert_eq!(
                 group.train_weight.to_bits(),
@@ -339,7 +407,7 @@ mod tests {
             };
             let declaration = manifest(&group);
             let hp = MlpHyperparams::default();
-            let (plan, audit) = Plan::bind(&declaration, &[group], &hp);
+            let (plan, audit) = Plan::bind(&declaration, None, &[group], &hp);
             assert_eq!(
                 audit[0]["references"][0]["legal_ordered_pairs"],
                 if name == "human" { 6 } else { 4 }
@@ -384,11 +452,144 @@ mod tests {
             }
             assert!(
                 std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                    Plan::bind(&d, std::slice::from_ref(&group), &MlpHyperparams::default())
+                    Plan::bind(
+                        &d,
+                        None,
+                        std::slice::from_ref(&group),
+                        &MlpHyperparams::default(),
+                    )
                 }))
                 .is_err()
             );
         }
+    }
+
+    fn aic_declaration(weight: f64) -> Group {
+        serde_json::from_value(
+            serde_json::json!({"name":"aic_public_train", "train_weight":weight,
+            "validation_weight":0., "mode":"rank", "binding":null}),
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn continuation_appends_one_unweighted_aic_group() {
+        static REFS: [u32; 5] = [0, 0, 0, 1, 1];
+        let scores = [1., 1., 2., 3., 4.];
+        let features: [&[f64]; 5] = [&[0.]; 5];
+        let group = |name: &str, weight: f64, refs: Option<&'static [u32]>| TrainingGroup {
+            name: name.into(),
+            human_scores: &scores,
+            features: FeatureRows::Borrowed(&features),
+            metric_sigmas: None,
+            train_weight: weight,
+            validation_weight: 0.,
+            ref_ids: refs,
+            loss_mode: GroupLossMode::Rank,
+        };
+        let human = group("human", 1., Some(&REFS));
+        let declaration = manifest(&human);
+        let aic = aic_declaration(256.);
+        let hp = MlpHyperparams::default();
+        let groups = [human, group("aic_public_train", 256., None)];
+        let (plan, audit) = Plan::bind(&declaration, Some(&aic), &groups, &hp);
+        assert_eq!(
+            audit[1],
+            serde_json::json!({"group":"aic_public_train", "baseline":true})
+        );
+        assert_eq!(plan.weight(1, 0, 4), 1.);
+        // The human group keeps its full-fit weighting.
+        let (alone, _) = Plan::bind(&declaration, None, &groups[..1], &hp);
+        assert_eq!(plan.weight(0, 0, 2), alone.weight(0, 0, 2));
+        for (groups, added) in [
+            (&groups[..1], Some(&aic)),
+            (&groups[..], None),
+            (&groups[..], Some(&aic_declaration(64.))),
+        ] {
+            assert!(
+                std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                    Plan::bind(&declaration, added, groups, &hp)
+                }))
+                .is_err()
+            );
+        }
+    }
+
+    #[test]
+    fn continuation_budget_binds_checkpoint_epochs_and_unweighted_group() {
+        let scores = [1., 1., 2., 3., 4.];
+        let refs = [0, 0, 0, 1, 1];
+        let features: [&[f64]; 5] = [&[0.]; 5];
+        let human = TrainingGroup {
+            name: "human".into(),
+            human_scores: &scores,
+            features: FeatureRows::Borrowed(&features),
+            metric_sigmas: None,
+            train_weight: 1.,
+            validation_weight: 0.,
+            ref_ids: Some(&refs),
+            loss_mode: GroupLossMode::Rank,
+        };
+        let base = manifest(&human);
+        let dir = std::path::PathBuf::from(std::env::var_os("HOME").unwrap())
+            .join("tmp")
+            .join(format!("confidence-continuation-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let start = dir.join("start.bin");
+        std::fs::write(&start, b"model").unwrap();
+        let other = dir.join("other.bin");
+        std::fs::write(&other, b"other").unwrap();
+        let continuation = |value: serde_json::Value| -> Continuation {
+            let mut c = serde_json::json!({"schema":"mlic-contrast-confidence-continuation-v1",
+                "base_manifest":"unused", "base_manifest_sha256":"unused",
+                "checkpoint":start, "checkpoint_sha256":digest(b"model"), "epochs":60,
+                "pairs_per_epoch":50000, "added_group":serde_json::to_value(
+                    serde_json::json!({"name":"aic_public_train", "train_weight":256.,
+                        "validation_weight":0., "mode":"rank", "binding":null})).unwrap()});
+            for (k, v) in value.as_object().unwrap() {
+                c[k] = v.clone();
+            }
+            serde_json::from_value(c).unwrap()
+        };
+        let hp = MlpHyperparams {
+            n_epochs: 60,
+            init_from: Some(start.clone()),
+            ..MlpHyperparams::default()
+        };
+        assert_eq!(
+            continuation_budget(&continuation(serde_json::json!({})), &base, &hp),
+            (60, 50000)
+        );
+        let refused = |c: Continuation, hp: &MlpHyperparams| {
+            std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                continuation_budget(&c, &base, hp)
+            }))
+            .is_err()
+        };
+        for change in [
+            serde_json::json!({"epochs":59}),
+            serde_json::json!({"pairs_per_epoch":40000}),
+            serde_json::json!({"schema":"mlic-contrast-confidence-v1"}),
+            serde_json::json!({"checkpoint_sha256":digest(b"other")}),
+            serde_json::json!({"checkpoint":other}),
+            serde_json::json!({"added_group":{"name":"aic", "train_weight":256.,
+                "validation_weight":0., "mode":"rank", "binding":null}}),
+            serde_json::json!({"added_group":{"name":"aic_public_train", "train_weight":256.,
+                "validation_weight":0., "mode":"withinref,rank", "binding":null}}),
+            serde_json::json!({"added_group":{"name":"aic_public_train", "train_weight":256.,
+                "validation_weight":1., "mode":"rank", "binding":null}}),
+            serde_json::json!({"added_group":{"name":"aic_public_train", "train_weight":256.,
+                "validation_weight":0., "mode":"rank", "binding":{"rows":5,
+                    "scores_refs_sha256":"x", "points":[null, null, null, null, null]}}}),
+        ] {
+            assert!(refused(continuation(change.clone()), &hp), "{change}");
+        }
+        let unbound = MlpHyperparams {
+            n_epochs: 60,
+            ..MlpHyperparams::default()
+        };
+        assert!(refused(continuation(serde_json::json!({})), &unbound));
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 
     #[test]
