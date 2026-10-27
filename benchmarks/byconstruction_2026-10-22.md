@@ -6728,7 +6728,7 @@ The dev queue is now serial: confidence omissions → confidence follow-through
 
 Why does Mlic (0.9075, zero-shot) trail the historical AIC-only T (0.9527 out
 of fold)? Per-codec SROCC (rows of one codec pooled over sources; final f32;
-full-study Mlic seed 0 zero-shot and three-seed mean continuations, against
+the full study's three-seed mean predictions for every Mlic column, against
 T's saved seven-fold out-of-fold panel `rust/folds_train/T/oof_panel.json`):
 
 | Codec | T out of fold | Mlic zero-shot | MlicFT16x8 | MlicVoteFT16x8 | MlicOrderFT16x8 |
