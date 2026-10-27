@@ -5152,3 +5152,20 @@ semantics, fixed bounds and slope floor. Native targets remain unchanged.
 Store the fitted coefficients, complete read ledger and all rejected units.
 The inverse-variance weight construction, normalization and rank-pair mapping
 still require prospective registration before candidate fitting.
+
+The label-blind inventory at zenpapers `cf1efd5c3547` contains CEED2016's
+450 pairs and 30 reference paths, PC-IQA's 1,800 pairs and 15 reference paths,
+and JND-MID-MA's 210 threshold identities and 105 reference paths. The JND
+views retain 35 shared scene tokens. Path preflight found all 210, 240 and
+105 distinct projected paths, respectively; it read no pixels or responses.
+
+`dataset-confidence-admission` supervises the next native source screen. Its
+plan pins the committed producer, identifiers and original screening inputs.
+The attached queue waits for the registered ordering study's verified screen
+completion, then acquires the same resource lock. Native decoding, the fixed
+D4 calibration and feature replay, and conservative match retention remain
+owned by zenpapers. Completion requires the actual screen artifacts and is
+explicitly **not** membership freeze or calibration-label read permission.
+The queue refuses changed inputs, dead predecessor processes and completion
+markers that disagree with their selection artifact. Failed attempts remain
+on disk with their process identity, stage, error and complete log.

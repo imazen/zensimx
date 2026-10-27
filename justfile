@@ -544,6 +544,13 @@ dataset-vote-full study output:
 dataset-vote-full-tests:
     python3 -B -m unittest discover -s scripts/tests -p 'test_mlic_vote_full.py' -v
 
+# Native source admission follows the pinned TRAIN queue; this is not a benchmark.
+dataset-confidence-admission mode plan:
+    OPENBLAS_NUM_THREADS=1 python3 -B scripts/byconstruction/confidence_admission.py {{quote(mode)}} {{quote(plan)}}
+
+dataset-confidence-admission-tests:
+    python3 -B -m unittest discover -s scripts/tests -p 'test_confidence_admission.py' -v
+
 dataset-cell-progress cells arm='Mdata' folds='kadid,tid2013,konfig,cid22_a25':
     env BYC_CELLS={{quote(cells)}} OPENBLAS_NUM_THREADS=1 python3 -B scripts/rev4_featpot/byc_cells.py progress --arm {{quote(arm)}} --folds {{quote(folds)}}
 
