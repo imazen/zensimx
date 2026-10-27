@@ -9,7 +9,53 @@ pub(super) const GROUP: &str = "human_codec_strata";
 const ROOT_SHA: &str = "a7fd4af0c2bb5a8981be636e5c1cb1a51db57496b7c60d7bf6da01d71dd16952";
 const SOURCE_SHA: &str = "caf94cfc8b9bfad6ff2bb527dc07e49733a296c27c5a1e0d9d543ed513cce430";
 const FOLDS: &[&str] = &["tid2013", "konfig", "cid22_a25", "pipal", "pairs", "mos7"];
+const FULL_REGISTRATION: &str = "c6dcbfdd301063cb1283446d9c244abc90b505db";
+const FULL_RECORDS: [&str; 3] = [
+    "352a9fabacd012cc6307a396141bb6f52e91825f7aa625ff117b63ae58810964",
+    "a7bd8e86dcb8897377302c3079d6f95a7f5d4b446fee0af00f0cc220eb7290cc",
+    "6895e40f0fd6beb4d49af8f621c43c3550013cbfa03ddc12a3b368bc5f1f5424",
+];
 type Group = (String, PathBuf, f64, f64, bool, GroupLossMode);
+
+fn full_population(d: &Value, fold: &str, seed: u64, cell: Option<&str>) -> Result<bool, String> {
+    if d["schema"] == "mlic-matched-codecs-full-v1" {
+        if fold != "full"
+            || seed > 2
+            || d["registration"] != FULL_REGISTRATION
+            || d["original_cell_record_sha256"] != FULL_RECORDS[seed as usize]
+            || cell != Some(format!("full-s{seed}").as_str())
+        {
+            return Err("full matched-codec registration, source or target cell differs".into());
+        }
+        Ok(true)
+    } else if d["schema"] == "mlic-matched-codecs-v1" && FOLDS.contains(&fold) {
+        Ok(false)
+    } else {
+        Err("unregistered matched-codec population".into())
+    }
+}
+
+fn verify_full_record(d: &Value, record: &Value, seed: u64, cell: &Path) -> Result<(), String> {
+    if record["schema"] != "rev5-qualified-training-cell-v1"
+        || record["training_only"] != true
+        || record["execution_contract"] != "registered-fit"
+        || record["seed_index"] != seed
+        || record["epochs"] != 120
+        || record["pairs_per_epoch"] != 50000
+        || record["selection"]["epoch_rule"] != "last"
+        || record["selection"]["selected_epoch"] != 119
+        || record["frozen_sha256"] != ROOT_SHA
+        || record["selected_bake_sha256"] != d["matching_model_sha256"]
+        || Path::new(string(record, "selected_bake")?) != cell.join("refit/last.bin")
+        || Path::new(string(d, "matching_model")?) != cell.join("refit/last.bin")
+        || record["init_seed"] != d["init_seed"]
+        || record["sample_seed"] != d["sample_seed"]
+        || record["output_stage"] != "e33-identity-knot-tail2"
+    {
+        return Err("matched-codec model is not the corresponding frozen full Mlic fit".into());
+    }
+    Ok(())
+}
 
 fn read(path: &Path, expected: &str) -> Result<Value, String> {
     group_admission::safe(path)?;
@@ -139,10 +185,9 @@ pub(super) fn admit(args: &Args, groups: &[Group]) -> Result<Option<Admitted>, S
     let seed = d["seed_index"]
         .as_u64()
         .ok_or("matched-codec seed index required")?;
-    if d["schema"] != "mlic-matched-codecs-v1"
-        || d["role"] != "TRAIN"
+    let full = full_population(&d, fold, seed, args.subjective_cell.as_deref())?;
+    if d["role"] != "TRAIN"
         || d["candidate"] != "MlicOrder"
-        || !FOLDS.contains(&fold)
         || seed > 2
         || d["policy"]
             != "bidirectional-nearest-frozen-Mlic;quarter-accepted-reference;affine-alternate-cycles"
@@ -188,12 +233,22 @@ pub(super) fn admit(args: &Args, groups: &[Group]) -> Result<Option<Admitted>, S
         .parent()
         .and_then(Path::parent)
         .ok_or("original study root required")?;
-    let cell = old.join(format!("cells/Mlic/without_{fold}_s{seed}"));
+    let cell = if full {
+        PathBuf::from(format!("/var/tmp/byc-finalists-20261026/Mlic/full_s{seed}"))
+    } else {
+        old.join(format!("cells/Mlic/without_{fold}_s{seed}"))
+    };
     let record = read(
-        &cell.join("byc_record.json"),
+        &cell.join(if full {
+            "result.json"
+        } else {
+            "byc_record.json"
+        }),
         string(&d, "original_cell_record_sha256")?,
     )?;
-    if record["fold"] != fold
+    if full {
+        verify_full_record(&d, &record, seed, &cell)?;
+    } else if record["fold"] != fold
         || record["seed"] != seed
         || record["last_bin_sha256"] != d["matching_model_sha256"]
         || Path::new(string(&d, "matching_model")?) != cell.join("refit/last.bin")
@@ -213,6 +268,13 @@ pub(super) fn admit(args: &Args, groups: &[Group]) -> Result<Option<Admitted>, S
             .any(|c| c["init_seed"] != d["init_seed"] || c["sample_seed"] != d["sample_seed"])
     {
         return Err("matched-codec original cell seeds changed".into());
+    }
+    if full
+        && (cells
+            .get(&format!("full-s{seed}"))
+            .is_none_or(|c| c["route"] != "full" || c["seed_index"] != seed))
+    {
+        return Err("matched-codec original full authority differs".into());
     }
     let keys = training_keys::read(
         &g.1.with_extension("keys.parquet"),
@@ -423,6 +485,51 @@ impl Admitted {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn full_population_cannot_substitute_omission_model_or_target() {
+        let mut d = json!({"schema":"mlic-matched-codecs-full-v1", "registration":FULL_REGISTRATION,
+            "original_cell_record_sha256":FULL_RECORDS[1]});
+        assert!(full_population(&d, "full", 1, Some("full-s1")).unwrap());
+        for (fold, seed, cell) in [
+            ("pipal", 1, "full-s1"),
+            ("full", 0, "full-s0"),
+            ("full", 1, "pipal-s1"),
+            ("full", 3, "full-s3"),
+        ] {
+            assert!(full_population(&d, fold, seed, Some(cell)).is_err());
+        }
+        d["schema"] = json!("mlic-matched-codecs-v1");
+        assert!(full_population(&d, "full", 1, Some("full-s1")).is_err());
+        assert!(!full_population(&d, "pipal", 1, Some("full-s1")).unwrap());
+    }
+
+    #[test]
+    fn full_record_binds_final_epoch_source_seed_and_checkpoint() {
+        let cell = Path::new("full_s0");
+        let d = json!({"matching_model":"full_s0/refit/last.bin", "matching_model_sha256":"model",
+                       "init_seed":1101, "sample_seed":101});
+        let r = json!({"schema":"rev5-qualified-training-cell-v1", "training_only":true,
+            "execution_contract":"registered-fit", "seed_index":0, "epochs":120, "pairs_per_epoch":50000,
+            "selection":{"epoch_rule":"last", "selected_epoch":119}, "frozen_sha256":ROOT_SHA,
+            "selected_bake":"full_s0/refit/last.bin", "selected_bake_sha256":"model", "init_seed":1101,
+            "sample_seed":101, "output_stage":"e33-identity-knot-tail2"});
+        verify_full_record(&d, &r, 0, cell).unwrap();
+        for (key, value) in [
+            ("training_only", json!(false)),
+            ("seed_index", json!(1)),
+            ("sample_seed", json!(100000101)),
+            ("selected_bake_sha256", json!("other")),
+            ("selected_bake", json!("without_pipal_s0/refit/last.bin")),
+            ("epochs", json!(119)),
+        ] {
+            let mut changed = r.clone();
+            changed[key] = value;
+            assert!(verify_full_record(&d, &changed, 0, cell).is_err());
+        }
+        let mut changed = r;
+        changed["selection"]["selected_epoch"] = json!(118);
+        assert!(verify_full_record(&d, &changed, 0, cell).is_err());
+    }
     #[test]
     fn private_group_requires_manifest_before_any_table_read() {
         let args = <Args as clap::Parser>::parse_from([

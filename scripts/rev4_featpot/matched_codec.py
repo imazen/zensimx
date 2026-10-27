@@ -18,30 +18,47 @@ OLD = Path("/var/tmp/byc-mixes-20261025")
 ROOT_SHA = "a7fd4af0c2bb5a8981be636e5c1cb1a51db57496b7c60d7bf6da01d71dd16952"
 FOLDS = ("kadid", "tid2013", "konfig", "cid22_a25", "pipal", "pairs", "mos7")
 POLICY = "bidirectional-nearest-frozen-Mlic;quarter-accepted-reference;affine-alternate-cycles"
+FULL_REGISTRATION = "c6dcbfdd301063cb1283446d9c244abc90b505db"
+FULL_ROOT = Path("/var/tmp/byc-finalists-20261026/Mlic")
+FULL_RECORDS = (
+    "352a9fabacd012cc6307a396141bb6f52e91825f7aa625ff117b63ae58810964",
+    "a7bd8e86dcb8897377302c3079d6f95a7f5d4b446fee0af00f0cc220eb7290cc",
+    "6895e40f0fd6beb4d49af8f621c43c3550013cbfa03ddc12a3b368bc5f1f5424",
+)
 
 
 def add_args(parser):
     parser.add_argument("--matched-codec-manifest", type=Path, help=argparse.SUPPRESS)
     parser.add_argument("--matched-codec-sha256", help=argparse.SUPPRESS)
+    parser.add_argument("--matched-codec-full", action="store_true", help=argparse.SUPPRESS)
 
 
 def attach(args, groups, root, init_seed, sample_seed, recipe):
     path, pin = args.matched_codec_manifest, args.matched_codec_sha256
+    full = getattr(args, "matched_codec_full", False)
     if path is None and pin is None:
+        if full:
+            raise ValueError("full matched codecs require their explicit manifest")
         return groups, recipe
     if path is None or pin is None or not (args.strict_admission and args.train_only):
         raise ValueError("matched codecs require pinned strict TRAIN admission")
     d = document(path, pin)
     fold = getattr(args, "heldout", None)
-    if fold is None:
+    if full:
+        if fold is not None or args.exclude_datasets:
+            raise ValueError("full matching cannot use an omission route")
+        fold = "full"
+        if d.get("registration") != FULL_REGISTRATION:
+            raise ValueError("full matched-codec registration differs")
+    elif fold is None:
         excluded = set(filter(None, args.exclude_datasets.split(",")))
         choices = [f for f, collections in DATASET_FOLDS.items() if excluded == set(collections)]
         if len(choices) != 1:
             raise ValueError("matched-codec confirmation route requires an exact registered omission")
         fold = choices[0]
-    if (d.get("schema") != "mlic-matched-codecs-v1" or d.get("role") != "TRAIN"
+    if (d.get("schema") != ("mlic-matched-codecs-full-v1" if full else "mlic-matched-codecs-v1") or d.get("role") != "TRAIN"
             or d.get("candidate") != "MlicOrder" or d.get("policy") != POLICY
-            or fold not in FOLDS[1:] or d.get("fold") != fold or d.get("seed_index") != args.seed_index
+            or fold not in (("full",) if full else FOLDS[1:]) or d.get("fold") != fold or d.get("seed_index") != args.seed_index
             or (d.get("init_seed"), d.get("sample_seed")) != (init_seed, sample_seed)
             or d.get("original_root_sha256") != ROOT_SHA or sha(root/"wide/frozen.json") != ROOT_SHA):
         raise ValueError("matched-codec cell, seed, policy or original root differs")
@@ -80,6 +97,89 @@ def cell_binding(registry_path, pin, arm, fold, seed):
     if d.get("fold") != fold or d.get("seed_index") != seed or d.get("policy") != POLICY:
         raise ValueError("matched-codec manifest identity differs")
     return cell
+
+
+def full_binding(seed):
+    """Exact already-completed full Mlic fit; no omission checkpoint substitution."""
+    from v2_common import confirm_seeds
+    if seed not in (0, 1, 2):
+        raise ValueError("three registered full-data seeds required")
+    directory = FULL_ROOT / f"full_s{seed}"
+    result = document(directory / "result.json", FULL_RECORDS[seed])
+    authority = document(directory / "dataset-authority.json")
+    selection = document(directory / "DATASET_GROUP_SELECTION.json")
+    if (result["training_only"] is not True or result["execution_contract"] != "registered-fit"
+            or result["epochs"] != 120 or result["pairs_per_epoch"] != 50000
+            or result["selection"]["epoch_rule"] != "last" or result["selection"]["selected_epoch"] != 119
+            or result["seed_index"] != seed or (result["init_seed"], result["sample_seed"]) != confirm_seeds(seed)
+            or result["frozen_sha256"] != ROOT_SHA or result["output_stage"] != "e33-identity-knot-tail2"
+            or result["selected_bake"] != str(directory / "refit/last.bin")
+            or sha(directory / "refit/last.bin") != result["selected_bake_sha256"]
+            or selection["root_sha256"] != ROOT_SHA or selection["requested_exclusions"] != []
+            or selection["omitted_collections"] != [] or set(authority["cells"]) != {f"full-s{seed}"}):
+        raise ValueError("original full Mlic identity differs")
+    cell = authority["cells"][f"full-s{seed}"]
+    if (cell["route"] != "full" or cell["seed_index"] != seed
+            or (cell["init_seed"], cell["sample_seed"]) != confirm_seeds(seed)):
+        raise ValueError("original full Mlic authority differs")
+    return directory, result, cell
+
+
+def prepare_full(output):
+    from run_processes import compute_lock
+    from v2_human_role import preflight_recipe
+    from v2_lodo_mlp import predict, strict_training_groups
+    if not compute_lock(os.getpid())["held_by_worker_ancestor"]:
+        raise ValueError("full matching predictions require the shared compute lock")
+    root = OLD / "Mlic/root"
+    if sha(root / "wide/frozen.json") != ROOT_SHA:
+        raise ValueError("original full matching root changed")
+    preflight_recipe(root, root / "human_role_decision.json")
+    receipt = document(root / "wide/main/real/receipt.json")
+    fit = receipt["legs"]["human_all"]["fit"]
+    table = root / fit["rel"]
+    _, _, inputs = promoted_stimuli(("kadid_train", "kadid_select"))
+    paths = [p for p, pin in inputs.items() if pin == PAIRS_SHA]
+    if len(paths) != 1:
+        raise ValueError("full matching stimulus source is ambiguous")
+    banks = {}
+    for member in ("kadid_train", "kadid_select"):
+        path = Path("/var/tmp/rev4-featbank/bank") / member / "keys.parquet"
+        banks[member] = dict(keys_path=str(path), keys_sha256=sha(path))
+    originals = [full_binding(seed) for seed in range(3)]
+    output.mkdir()
+    manifests = {}
+    for seed, (directory, result, cell) in enumerate(originals):
+        human = [g for g in cell["groups"] if g["name"] == "human"]
+        if len(human) != 1:
+            raise ValueError("full matching requires the original human group")
+        dest = output / f"full_s{seed}"
+        dest.mkdir()
+        log_dataset_read(dest, table, fit["rows"], ["ref_basename", "human_score", "f[registered read set]"],
+                         "frozen-full-model-TRAIN-matching-prediction", table_sha256=fit["sha256"],
+                         labels_used_for_matching=False)
+        strict_training_groups([("human", table, human[0]["train_weight"], 0, "withinref,rank")],
+                               root / "human_role_decision.json")
+        model = directory / "refit/last.bin"
+        prediction = dest / "predictions.tsv"
+        predict(model, table, prediction)
+        d = dict(schema="mlic-matched-codecs-full-v1", registration=FULL_REGISTRATION, role="TRAIN",
+            candidate="MlicOrder", policy=POLICY, fold="full", seed_index=seed,
+            init_seed=cell["init_seed"], sample_seed=cell["sample_seed"],
+            original_root=str(root), original_root_sha256=ROOT_SHA,
+            table_sha256=fit["sha256"], keys_sha256=fit["keys_sha256"], codec_banks=banks,
+            stimulus_source=dict(path=paths[0], sha256=PAIRS_SHA), metadata_source_sha256=inputs,
+            original_cell_record_sha256=FULL_RECORDS[seed],
+            original_authority_sha256=sha(directory / "dataset-authority.json"),
+            matching_model=str(model), matching_model_sha256=result["selected_bake_sha256"],
+            predictions=str(prediction), predictions_sha256=sha(prediction))
+        path = dest / "manifest.json"
+        path.write_text(json.dumps(d, indent=2) + "\n")
+        manifests[str(seed)] = dict(path=str(path), sha256=sha(path))
+    path = output / "MANIFESTS.json"
+    path.write_text(json.dumps(dict(schema="mlic-full-codec-cells-v1", cells=manifests,
+                                   registration=FULL_REGISTRATION), indent=2) + "\n")
+    print(json.dumps(dict(path=str(path), sha256=sha(path))))
 
 
 def prepare(study):
@@ -156,4 +256,6 @@ def prepare(study):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("study",type=Path)
-    prepare(parser.parse_args().study)
+    parser.add_argument("--full", action="store_true")
+    args = parser.parse_args()
+    (prepare_full if args.full else prepare)(args.study)

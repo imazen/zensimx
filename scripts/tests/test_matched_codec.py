@@ -81,6 +81,27 @@ class MatchingAdmission(unittest.TestCase):
         registry.write_text(json.dumps(dict(schema="mlic-codec-cells-v1",original_root_sha256=codec.ROOT_SHA,cells=cells)))
         with self.assertRaises(ValueError):codec.cell_binding(registry,sha(registry),"MlicOrder","tid2013",2)
 
+    def test_full_matching_requires_explicit_distinct_route(self):
+        self.args.heldout = None
+        self.args.matched_codec_full = True
+        self.d.update(schema="mlic-matched-codecs-full-v1", fold="full", registration=codec.FULL_REGISTRATION)
+        groups, recipe = self.attach()
+        self.assertEqual(groups, [(codec.GROUP, *self.groups[0][1:]), self.groups[1]])
+        self.assertIn("matched_codec", recipe)
+        for key, value in (("schema", "mlic-matched-codecs-v1"), ("fold", "pipal"), ("registration", "other")):
+            old = self.d[key]
+            self.d[key] = value
+            with self.subTest(key=key), self.assertRaises(ValueError):
+                self.attach()
+            self.d[key] = old
+        self.args.exclude_datasets = "pipal"
+        with self.assertRaisesRegex(ValueError, "omission route"):
+            self.attach()
+        self.args.exclude_datasets = ""
+        self.args.matched_codec_full = False
+        with self.assertRaisesRegex(ValueError, "exact registered omission"):
+            self.attach()
+
     def test_order_screen_and_omission_control_preserve_registered_gates(self):
         from byc_cells import neff_decision, verify_omitted_codec_predictions
         arms={a:{m:dict(per_seed=[0.8]*3) for m in ("old","new","balanced")}

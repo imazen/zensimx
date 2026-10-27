@@ -5425,3 +5425,19 @@ zero-step export, wrong-recipe refusal, cohort isolation, undefined-denominator
 handling and changed mixture model/settings/coverage refusal. The resource
 wrapper recorded `rc=0 0s | peak-RSS 0.12 GiB | min-avail 24490 MiB | peak-load 0.03`.
 These are implementation checks, not measured candidate-quality results.
+
+
+### Full-data Order admission for the AIC panel study (2026-10-27)
+
+The full-data continuation registration now has a separate matching admission
+path. It uses the three original full Mlic models, bound to their completed
+result hashes and fixed seeds, to predict the unchanged human fitting table.
+The native owner requires the exact full-data schema, original model, full
+target cell and matching seed. Omission admission keeps its previous schema
+and refusal behavior. No matching pair is selected using human responses.
+
+Five native admission/metadata controls and six Python matching controls pass
+on i265. Targeted clippy passes with warnings denied. The resource wrapper
+recorded `rc=0 157s | peak-RSS 1.95 GiB | min-avail 19227 MiB | peak-load 5.30`.
+These checks establish admission behavior; the full-budget binary control
+and the actual full-data Order fits have not run yet.
