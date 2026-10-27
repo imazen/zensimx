@@ -96,6 +96,36 @@ class ContinuationEvidence(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "starting checkpoint contract"):
                 owner.initial_cell(self.initial, "kadid", 0)
 
+    def test_zero_step_uses_owner_selected_best_and_preserves_parity(self):
+        directory = self.root / "zero"
+        (directory / "refit").mkdir(parents=True)
+        best = directory / "refit/best.bin"
+        best.write_bytes(b"zero-step-selected-model")
+        result = dict(epochs=0, selection=dict(selected_epoch=-1), training_only=True, spec=owner.SPEC,
+                      selected_bake=str(best), selected_bake_sha256=owner.sha(best))
+        (directory / "result.json").write_text(json.dumps(result))
+        self.assertFalse((directory / "refit/last.bin").exists())
+        self.assertEqual(owner.zero_checkpoint(directory), best)
+        actual, reference = directory / "actual.tsv", directory / "reference.tsv"
+        actual.write_text("row_idx\tpred\n0\t3.25\n")
+        reference.write_bytes(actual.read_bytes())
+        owner.require_prediction_parity(actual, reference)
+        actual.write_text("row_idx\tpred\n0\t3.2501\n")
+        with self.assertRaisesRegex(ValueError, "byte-for-byte"):
+            owner.require_prediction_parity(actual, reference)
+        best.write_bytes(b"substituted-model")
+        with self.assertRaisesRegex(ValueError, "selected checkpoint"):
+            owner.zero_checkpoint(directory)
+
+    def test_recipe_label_cannot_be_attached_to_another_valid_model(self):
+        row = dict(directory=str(self.initial), fold="kadid", seed=0)
+        selection = dict(cells=[dict(arm="MlicVote", fold="kadid", seed=0, model_sha256="vote-model-pin")])
+        with self.assertRaisesRegex(ValueError, "declared recipe cell"):
+            owner.bind_recipe_cell("MlicVote", row, self.root, selection, "1,2")
+        selection["cells"][0]["model_sha256"] = owner.sha(self.initial / "refit/last.bin")
+        with self.assertRaisesRegex(ValueError, "declared recipe cell"):
+            owner.bind_recipe_cell("MlicNeff", row, self.root, selection, "1,2")
+
 
 if __name__ == "__main__":
     unittest.main()

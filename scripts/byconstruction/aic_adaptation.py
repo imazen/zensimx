@@ -11,6 +11,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import shlex
 import subprocess
 import sys
@@ -121,6 +122,52 @@ def initial_cell(directory, fold, seed):
                 input_sha256={str(directory / f): sha(directory / f) for f in files})
 
 
+def bind_recipe_cell(recipe, row, study, selection, columns):
+    directory = Path(row["directory"])
+    matches = [r for r in selection["cells"] if (r["arm"], r["fold"], r["seed"]) == (recipe, row["fold"], row["seed"])]
+    if len(matches) != 1 or matches[0]["model_sha256"] != sha(directory / "refit/last.bin"):
+        raise ValueError("initial model does not belong to the declared recipe cell")
+    original = study / "cells" / recipe / directory.name
+    for name in ("result.json", "byc_record.json"):
+        if selection["input_sha256"][str(original / name)] != sha(directory / name):
+            raise ValueError("recipe cell receipt differs from its completed study")
+    group = json.loads((directory / "DATASET_GROUP_SELECTION.json").read_text())
+    result = json.loads((directory / "result.json").read_text())
+    root = Path(group["root"])
+    expected = selection["input_sha256"][str(study / recipe / "root/wide/frozen.json")]
+    if (group["schema"] != "dataset-group-selection-v1" or group["root_sha256"] != expected
+            or result["frozen_sha256"] != expected or sha(root / "wide/frozen.json") != expected
+            or sha(root / "datasets/receipt.json") != group["receipt_sha256"]):
+        raise ValueError("recipe root or dataset omission authority differs")
+    receipt = json.loads((root / "datasets/receipt.json").read_text())
+    all_collections = {r["collection"] for r in receipt["groups"]}
+    retained, omitted = set(group["retained_collections"]), set(group["omitted_collections"])
+    if retained & omitted or retained | omitted != all_collections:
+        raise ValueError("recipe collection partition differs")
+    if re.split(r"[,\s]+", (directory / "keep_features.txt").read_text().strip()) != re.split(r"[,\s]+", columns.strip()):
+        raise ValueError("recipe feature binding differs")
+    row["recipe_binding"] = dict(recipe=recipe, study=str(study),
+        selection_sha256=sha(study / "TRAIN_SELECTION.json"), root_sha256=expected,
+        dataset_receipt_sha256=group["receipt_sha256"])
+    return row
+
+
+def zero_checkpoint(directory):
+    result = json.loads((directory / "result.json").read_text())
+    model = Path(result["selected_bake"])
+    if (result["epochs"] != 0 or result["selection"]["selected_epoch"] != -1
+            or result["training_only"] is not True or result["spec"] != SPEC
+            or not model.resolve().is_relative_to((directory / "refit").resolve())
+            or sha(model) != result["selected_bake_sha256"]):
+        raise ValueError("zero-step selected checkpoint receipt differs")
+    return model
+
+
+def require_prediction_parity(actual, reference):
+    if actual.read_bytes() != reference.read_bytes():
+        raise ValueError("zero-step predictions differ byte-for-byte")
+
+
 def continuation_cell(directory, initial, fold, seed, weight, epochs, plan):
     result = json.loads((directory / "result.json").read_text())
     record = json.loads((directory / "byc_record.json").read_text())
@@ -158,7 +205,9 @@ def continuation_cell(directory, initial, fold, seed, weight, epochs, plan):
         raise ValueError("continuation AIC mass differs")
     return dict(directory=str(directory), fold=fold, seed=seed, aic_fold=record["aic_fold"],
                 epochs=epochs, weight=weight, checkpoint_sha256=record["last_bin_sha256"],
-                result_sha256=sha(directory / "result.json"), record_sha256=sha(directory / "byc_record.json"))
+                result_sha256=sha(directory / "result.json"), record_sha256=sha(directory / "byc_record.json"),
+                continuation_authority_sha256=sha(directory / "continuation-authority.json"),
+                train_log_sha256=sha(directory / "train.log"))
 
 
 def run(path):
@@ -177,6 +226,13 @@ def run(path):
                 raise ValueError("starting study completion differs")
         inputs = {recipe: [initial_cell(Path(plan["initial_cells"][recipe]) / f"without_{fold}_s{seed}", fold, seed)
                           for seed in range(3) for fold in FOLDS] for recipe in RECIPES}
+        for recipe in RECIPES:
+            study = Path(plan["recipe_authority"][recipe])
+            selection = json.loads((study / "TRAIN_SELECTION.json").read_text())
+            if sha(study / "TRAIN_SELECTION.json") != json.loads((study / "TRAIN_SCREEN_COMPLETE.json").read_text())["selection_sha256"]:
+                raise ValueError("recipe study completion differs")
+            inputs[recipe] = [bind_recipe_cell(recipe, row, study, selection, Path(plan["columns"]).read_text())
+                              for row in inputs[recipe]]
         write(root / "INITIAL_CHECKPOINTS.json", inputs, fresh=True)
         source = Path(plan["warmstart_source"])
         os.environ.update(BYC_ROOT=plan["common_root"], REV4_V2_ROOT=plan["common_root"],
@@ -188,6 +244,7 @@ def run(path):
             ZENSIM_RING_FORM="raw", ZENSIM_PYRAMID="xyb")
         sys.path[:0] = [str(source / "scripts/rev4_featpot"), str(source / "scripts")]
         import byc_cells as cells
+        from subjective_training_leg import linked_subset_exclusions
         if cells.HERE.resolve() != source / "scripts/rev4_featpot":
             raise ValueError("warm-start owner resolved outside the frozen source")
         # Each different initial recipe must survive actual zero-step continuation.
@@ -203,14 +260,18 @@ def run(path):
                 "--init-from", str(original / "refit/last.bin"), "--fine-tune-epochs", "0", "--fine-tune-lr", "0.00001",
                 "--aic-public-train", str(Path(plan["aic_folds"]) / "aic_k0_fit.parquet"),
                 "--research-extra-group", f"aic_public_train:{plan['aic_folds']}/aic_k0_fit.parquet:8.0:0:rank"]
+            exclusions = linked_subset_exclusions(Path(plan["common_root"]), "kadid")
+            if exclusions:
+                cmd += ["--exclude-datasets", ",".join(exclusions)]
             with (dest.parent / f"{recipe}.log").open("x") as log:
                 subprocess.run(cmd, check=True, stdout=log, stderr=subprocess.STDOUT)
             output = dest / "pred_kadid.tsv"
-            cells.predict_cell(dest / "refit/last.bin", Path(plan["common_root"]) / "wide/main/real/kadid.parquet", output, SPEC)
-            if output.read_bytes() != (original / "pred_kadid.tsv").read_bytes():
-                raise ValueError(f"{recipe}: zero-step predictions differ byte-for-byte")
+            selected = zero_checkpoint(dest)
+            cells.predict_cell(selected, Path(plan["common_root"]) / "wide/main/real/kadid.parquet", output, SPEC)
+            require_prediction_parity(output, original / "pred_kadid.tsv")
             write(dest / "CONTROL_VERIFIED.json", dict(byte_identical=True, rows=7869,
-                  prediction_sha256=sha(output), initial_sha256=sha(original / "refit/last.bin")), fresh=True)
+                  prediction_sha256=sha(output), initial_sha256=sha(original / "refit/last.bin"),
+                  selected_checkpoint=str(selected), selected_sha256=sha(selected)), fresh=True)
         for recipe in RECIPES:
             for weight, epochs in STRENGTHS:
                 label = f"{recipe}FT{weight}x{epochs}"
@@ -252,6 +313,12 @@ def run(path):
 
 def status(path):
     root = path.parent
+    if (root / "QUEUE_CANCELLED.json").exists():
+        cancelled = json.loads((root / "QUEUE_CANCELLED.json").read_text())
+        write(root / "CURRENT_RUN.json", dict(stage="cancelled-before-fitting", **cancelled))
+        print(json.dumps(dict(stage="cancelled-before-fitting", reason=cancelled["reason"],
+                              completed=cancelled["completed_new_cells"])))
+        return
     state = json.loads((root / "RUN_STATE.json").read_text())
     worker = state.get("worker", state["queue_process"])
     live = bound_worker(worker["pid"], worker["start_ticks"])

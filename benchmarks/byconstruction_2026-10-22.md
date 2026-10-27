@@ -5371,3 +5371,25 @@ The native wrapper recorded
 `rc=0 0s | peak-RSS 0.04 GiB | min-avail 24489 MiB | peak-load 0.12`;
 Python undefined-name/import checks also passed. These checks verify the
 orchestration and role partition; they are not measured model-quality results.
+
+
+Source-only review found that the new caller assumed `refit/last.bin` for its
+zero-step control, whereas the frozen owner selects `refit/best.bin` at zero
+epochs and records that path/hash in result.json. Run01 was cancelled while
+waiting, before any control or continuation fit; its plan and cancellation
+receipt remain intact. The repaired caller follows and verifies that receipt
+(selected epoch -1), retains byte-exact prediction parity, and applies the
+same linked omission exclusions as the fit owner. Positive-step fits still
+require the registered final checkpoint. No historical owner was changed.
+
+Initial recipe identity now joins each model to its completed study's exact
+recipe/fold/seed inventory, model and receipt hashes, frozen root, dataset
+partition and feature list. This prevents another same-shaped recipe from
+acquiring the requested label. All 36 currently completed Mlic/Neff/vote
+checkpoint bindings passed; Order binds after its own study completes.
+Continuation receipts also bind their native authority and complete train log.
+Eleven refusal/partition/owner-interface tests pass on i265, including the
+zero-step directory containing only best.bin and a wrong-recipe model:
+`rc=0 0s | peak-RSS 0.04 GiB | min-avail 24479 MiB | peak-load 0.39`.
+The review also identified panel provenance and diagnostic coverage work;
+those corrections precede acceptance of the new panel evidence.
