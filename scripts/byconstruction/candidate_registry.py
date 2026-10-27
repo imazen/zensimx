@@ -14,7 +14,7 @@ H = os.path.expanduser("~")
 # verified, never overwritten). Mirror: tower /mnt/tower/output/zensim/candidates-2026-10-25/ (copy, then sha256sum -c).
 C = [
  # name, bake, formula revision, data / recipe, gates summary, note
- ("B-rev5", f"{H}/work/zen/zensim--rev7main/zensim/weights/b_sdr_diff_frag_820_rev5_2026-10-19.bin", 5, "today's default B (diff+frag-820)", "", "shipped profile B"),
+ ("B-rev5", str(Path(__file__).resolve().parents[2] / "zensim/weights/b_sdr_diff_frag_820_rev5_2026-10-19.bin"), 5, "today's default B (diff+frag-820)", "", "shipped profile B"),
  ("B7", f"{H}/tmp/byc/perf/b_rev7.bin", 7, "B's weights stamped revision 7", "", "byte-identical weights to B-rev5"),
  ("M-rev5-s0", f"{H}/tmp/byc/full/mono-thr-mp32_s0/refit/production-f16.bin", 5, "M recipe mono:thr:mp32, v2e29 root (rev5)", f"{B}/gates-M", ""),
  ("M64-rev5-s0", f"{H}/tmp/byc/full/mono-thr-mp64_s0/refit/production-f16.bin", 5, "M64 recipe mono:thr:mp64, rev5", f"{B}/gates-m64full", ""),
