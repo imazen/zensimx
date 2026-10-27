@@ -269,6 +269,37 @@ class RecipeStage(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "stage B recipe"):
             owner.recipe_inputs("Mlic")
 
+    def test_recipe_runs_take_the_rehearsal_populations_on_their_own_root(self):
+        with tempfile.TemporaryDirectory(dir=Path.home() / "tmp") as tmp:
+            run = Path(tmp)
+            (run / "cols.txt").write_text("13,14\n")
+            for population, weight in (("mixed-aic256-xref", 256.0), ("mixed-aic1024-xref", 1024.0)):
+                arm = "MlicVote" + owner.RECIPE_ARM[population]
+                self.assertEqual(arm, f"MlicVoteXrefAIC{int(weight)}")
+                plan = dict(root="/invented/MlicVote/root", columns=str(run / "cols.txt"), arms={arm: population}, seeds=[0])
+                command = owner.fit_command(plan, run, arm, 0, "/invented/MlicVote/full_s0", "/invented/t", run)
+                self.assertEqual(command[command.index("--diagnostic-population") + 1], population)
+                self.assertEqual(float(command[command.index("--aic-weight") + 1]), weight)
+                self.assertEqual(command[command.index("--root") + 1], "/invented/MlicVote/root")
+                path = run / "PLAN.json"
+                path.write_text(json.dumps(dict(schema=owner.RECIPE_SCHEMA, protocol=owner.diagnostic_protocol(population)[0],
+                                                arms={arm: population}, registered_inputs={}, input_sha256={}, bin_sha256={},
+                                                meta_tool_sha256="", source_archive_sha256="")))
+                with self.assertRaises(FileNotFoundError):  # passes the rehearsal protocol check, then hashes its inputs
+                    owner.checked(path, owner.RECIPE_SCHEMA)
+
+    def test_multi_population_recipe_plans_refuse_before_any_read(self):
+        both = ["mixed-aic256-xref", "mixed-aic1024-xref"]
+        two = [(Path("/invented/d"), "XrefAIC256"), (Path("/invented/d"), "XrefAIC1024")]
+        for populations, compares, start, message in (
+                (["mixed-aic256", "mixed-aic256-xref"], two, None, "one registered protocol"),
+                (both, two[:1], None, "one comparison point"),
+                (["mixed-aic256-xref", "mixed-aic256-xref"], two, None, "one comparison point"),
+                (both, two, ("/invented/d", "XrefAIC256", 7), "one population")):
+            with self.assertRaisesRegex(ValueError, message):
+                owner.recipe_plan(Path("/invented/run"), "0" * 40, Path("/invented/t"), Path("/invented/m"), "MlicVote",
+                                  populations, Path("/invented/after"), compares, start)
+
 
 class ConfidenceContinuation(unittest.TestCase):
     def test_manifest_wraps_the_unchanged_base_and_receipt_must_match(self):

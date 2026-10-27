@@ -460,7 +460,7 @@ XREF_REGISTRATION = dict(record="benchmarks/byconstruction_2026-10-22.md",
                          commit="58c56ef37b972fabb252fc75dd6add5e2d973a2a")
 XREF_ARMS = {"XrefAIC256": "mixed-aic256-xref", "XrefAIC1024": "mixed-aic1024-xref"}
 RECIPE_ARM = {"aic-only": "AICOnly", "mixed-aic16": "AIC16", "mixed-aic64": "AIC64", "mixed-aic256": "AIC256",
-              "mixed-aic1024": "AIC1024"}
+              "mixed-aic1024": "AIC1024", "mixed-aic256-xref": "XrefAIC256", "mixed-aic1024-xref": "XrefAIC1024"}
 RECIPE_INPUTS = dict(
     confidence_full=("/mnt/v/output/zensim/mlic-confidence-followthrough-20261027-run01/full/FULL_FITS_COMPLETE.json",
                      "b8b6fb9240e84b1f7d3d375ef929c6f3dcd45d765d8f38f7ca1c962bc51b20dc"),
@@ -606,20 +606,41 @@ def reused_arm(run_dir, arm, seeds=FRONTIER_SEEDS, checkpoints=FRONTIER_CHECKPOI
         for seed in seeds for k in SOURCE_FOLDS for e in checkpoints})
 
 
-def recipe_plan(run, commit, trainer, meta_tool, recipe, population, after_run, compare, start=None, control=True):
-    """Freeze one stage B run: the recipe's full seed-0 model continued under `population` on the seven folds.
-    `compare` = (run, arm): Mlic's point at the same budget. `start` = (run, arm, epoch): a two-phase schedule
-    continues from that run's fold checkpoints instead of the full model (the recovery phase)."""
+# Stage E (registered 2026-10-27 after stage D's result): MlicVote with the rehearsal leg at x256 and x1024, both
+# weights in one recipe plan.
+RECIPE_E_REGISTRATION = dict(record="benchmarks/byconstruction_2026-10-22.md",
+                             section="Stage E: Vote with the rehearsal leg",
+                             commit="e68f7d4add0c12501b489210f86de9195c16f040")
+
+
+def recipe_plan(run, commit, trainer, meta_tool, recipe, populations, after_run, compares, start=None, control=True):
+    """Freeze one stage B run: the recipe's full seed-0 model continued under each of `populations` on the seven
+    folds (stage E runs both rehearsal weights in one plan). `compares` = one (run, arm) per population: Mlic's point
+    at the same budget. `start` = (run, arm, epoch): a two-phase schedule continues from that run's fold checkpoints
+    instead of the full model (the recovery phase)."""
+    if len(set(populations)) != len(populations) or len(compares) != len(populations):
+        raise ValueError("one comparison point per distinct population")
+    protocols = {diagnostic_protocol(p)[0] for p in populations}
+    if len(protocols) != 1:
+        raise ValueError("a recipe plan's populations share one registered protocol")
+    if start and len(populations) != 1:
+        raise ValueError("a recovery phase continues one population")
     record, root, factors = recipe_inputs(recipe)
-    arm = recipe + RECIPE_ARM[population]
-    protocol, weight, _ = diagnostic_protocol(population)
-    reused = {compare[1]: reused_arm(*compare)}
-    extra = dict(recipe=recipe, **factors, aic_weights={arm: weight}, reused_arms=reused, after_run=str(after_run),
-                 assessment="stage B seed-0 recipe continuation; registered rule against the recipe's own initial "
-                            "model; no adoption", priority="queued after its predecessor run")
-    contrasts = [*((f"{arm}@e{e}", "Initial") for e in FRONTIER_CHECKPOINTS),
-                 *((f"{arm}@e{e}", f"{compare[1]}@e{e}") for e in FRONTIER_CHECKPOINTS)]
+    arms = {recipe + RECIPE_ARM[p]: p for p in populations}
+    reused, contrasts = {}, []
+    for (arm, population), (compare_run, compare_arm) in zip(arms.items(), compares):
+        reused[compare_arm] = reused_arm(Path(compare_run), compare_arm)
+        if diagnostic_protocol(reused[compare_arm]["population"])[1] != diagnostic_protocol(population)[1]:
+            raise ValueError(f"{compare_arm} runs another AIC weight than {arm}")
+        contrasts += [*((f"{arm}@e{e}", "Initial") for e in FRONTIER_CHECKPOINTS),
+                      *((f"{arm}@e{e}", f"{compare_arm}@e{e}") for e in FRONTIER_CHECKPOINTS)]
+    rehearsal = protocols == {diagnostic_protocol("mixed-aic256-xref")[0]}
+    extra = dict(recipe=recipe, **factors, aic_weights={arm: diagnostic_protocol(p)[1] for arm, p in arms.items()},
+                 reused_arms=reused, after_run=str(after_run),
+                 assessment=f"stage {'E' if rehearsal else 'B'} seed-0 recipe continuation; registered rule against the "
+                            "recipe's own initial model; no adoption", priority="queued after its predecessor run")
     if start:
+        (arm, _), = arms.items()
         start_run, start_arm, start_epoch = Path(start[0]), start[1], int(start[2])
         if start_epoch not in FRONTIER_CHECKPOINTS:
             raise ValueError("the recovery phase starts from a studied checkpoint")
@@ -634,9 +655,9 @@ def recipe_plan(run, commit, trainer, meta_tool, recipe, population, after_run, 
                                 purpose="this trainer replays the recipe's 120-epoch full fit byte for byte without "
                                         "zentrain.repro (existing E33 control owner)")
     extra["contrasts"] = [list(c) for c in contrasts]
-    seven_fold_plan(run, commit, trainer, meta_tool, schema=RECIPE_SCHEMA, protocol=protocol,
-                    registration=RECIPE_REGISTRATION, arms={arm: population}, seeds=FRONTIER_SEEDS,
-                    checkpoints=FRONTIER_CHECKPOINTS, extra=extra, initial={"0": record}, root=root)
+    seven_fold_plan(run, commit, trainer, meta_tool, schema=RECIPE_SCHEMA, protocol=protocols.pop(),
+                    registration=RECIPE_E_REGISTRATION if rehearsal else RECIPE_REGISTRATION, arms=arms,
+                    seeds=FRONTIER_SEEDS, checkpoints=FRONTIER_CHECKPOINTS, extra=extra, initial={"0": record}, root=root)
 
 
 def xref_plan(run, commit, trainer, meta_tool, after_run):
@@ -1572,10 +1593,10 @@ if __name__ == "__main__":
     p.add_argument("--trainer", type=Path, required=True)
     p.add_argument("--meta-tool", type=Path, required=True)
     p.add_argument("--recipe", choices=RECIPES, required=True)
-    p.add_argument("--population", choices=sorted(RECIPE_ARM), required=True)
+    p.add_argument("--population", choices=sorted(RECIPE_ARM), nargs="+", required=True)
     p.add_argument("--after-run", type=Path, required=True, help="predecessor run; this one waits for it")
-    p.add_argument("--compare", nargs=2, metavar=("RUN", "ARM"), required=True,
-                   help="Mlic's point at the same budget, from stage A or A2")
+    p.add_argument("--compare", nargs=2, metavar=("RUN", "ARM"), action="append", required=True,
+                   help="Mlic's point at the same budget, from stage A, A2 or D; once per population, in order")
     p.add_argument("--start", nargs=3, metavar=("RUN", "ARM", "EPOCH"),
                    help="recovery phase: continue from that run's fold checkpoints")
     p.add_argument("--no-control", action="store_true", help="the recipe's replay control already ran in its first phase")
@@ -1606,7 +1627,7 @@ if __name__ == "__main__":
                    args.after_run)
     elif args.mode == "recipe-plan":
         recipe_plan(args.run, args.source_commit, args.trainer, args.meta_tool, args.recipe, args.population,
-                    args.after_run, (Path(args.compare[0]), args.compare[1]), args.start, not args.no_control)
+                    args.after_run, [(Path(r), a) for r, a in args.compare], args.start, not args.no_control)
     elif args.mode in ("plan", "fold-plan", "frontier-plan", "recovery-plan"):
         globals()[args.mode.replace("-", "_")](args.run, args.source_commit, args.trainer, args.meta_tool)
     else:
