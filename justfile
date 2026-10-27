@@ -2,7 +2,7 @@
 dataset-mix-summary study:
     python3 -B scripts/rev4_featpot/byc_cells.py mix-summary --study {{quote(study)}}
 
-# Caller holds shared heavy.lock and run-heavy; existing bake copies are verified.
+# Historical registry: refuses by default. See scripts/byconstruction/historical_guard.py.
 dataset-candidate-registry:
     python3 -B scripts/byconstruction/candidate_registry.py
 
@@ -3544,12 +3544,12 @@ aic2026-jnd-reproduced-suite scored spec peer_images output:
 default-b-verdict-jnd-tests:
     cargo test -p zensim-validate --bin bake_verdict
 
-# By-construction exploration (benchmarks/byconstruction_2026-10-22.md): revision 6 (ringhpm + globaff) and the
-# research map painting modes. Heavy: run through ~/work/zen/scripts/run-heavy.
+# Historical Rev6 regression coverage remains enabled; these tests protect old contracts.
+# Heavy: use run-heavy on an eligible host, not dev or r7900x.
 byc-rev6-tests:
     cargo test --release -p zensim --features custom-profiles,feature-regime-v2,training --lib -- globaff map_paint ring_form feature_defs feature_plan research::
 
-# Served (pixel route) against table route for revision-6 research bakes on the mixture images.
+# Historical Rev6 parity launcher: refuses by default before restamping or scoring.
 byc-serve-parity bin_dir mixture out +bakes:
     python3 scripts/byconstruction/serve_parity.py --bin-dir {{quote(bin_dir)}} --mixture {{quote(mixture)}} --out {{quote(out)}} {{ prepend("--bake ", bakes) }}
 
@@ -3724,3 +3724,7 @@ mlic-precision-audit plan output:
 # Existing native input/color/cache contracts at the current research arithmetic.
 mlic-native-input-tests:
     cargo test -p zensim --test native_hdr_color --features custom-profiles -- --test-threads=1
+
+# Refusal controls launch no workloads and require no model/data dependencies.
+byc-historical-guard-tests:
+    python3 -B -m unittest discover -s scripts/tests -p 'test_historical_guard.py' -v

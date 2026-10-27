@@ -2452,3 +2452,41 @@ SHA256 `3574cc7ede2010b83ae90393d291bc1b772b2613461f2a08cef5011dc64e82d6`.
 The coordinator reread every copied model hash after completion. Run-heavy
 on i265: rc=0, 1s, peak RSS 0.02 GiB, minimum available 23,964 MiB, peak load
 1.25. This is a validation resource receipt, not a runtime benchmark.
+
+### October 27: obsolete research entry points now fail before work
+
+Owner request: block outdated paths that waste compute, beginning with silent
+Rev6 restamping. `historical_guard.py` now denies new default invocations of
+`serve_parity.py`, `candidate_registry.py`, `perf_grid.sh`, `perf_bits.sh`,
+`map_study.sh`, `jxl_steer_rd.sh`, `jxl_reach.sh` and `dataset_loop.sh`. The guard
+runs before argument expansion requiring data paths, scientific dependencies,
+output creation or subprocess work. Exit 64 explains the obsolete assumption
+and points at the current session/priority owner. The dated registry includes
+a deleted checkout; the old parity owner always restamps to Rev6; the shell
+studies carry fixed historical model, placement, judge or output defaults.
+
+Intentional reproduction requires `--historical-replay` as the first argument
+to the script. A trailing flag or environment setting does not authorize it.
+That opt-in does not waive science, input freezing or resource rules. Historical
+benchmark/map/RD launchers still refuse dev, and all guarded paths refuse
+r7900x. Historical regression tests and valid old-model serving remain enabled.
+Frozen as-run source snapshots, current AIC/confidence queues, artifacts and
+existing numerical gates are unchanged. The parent Mdata loop propagates its
+explicit replay authorization to its historical JXL child.
+
+`just byc-historical-guard-tests` checks all eight entry points without model
+files, optional Python dependencies or positional arguments; each must fail
+with the guard's diagnostic instead of loading data or launching work. It also
+checks explicit first-argument handling, host restrictions and unknown-entry
+refusal. This is a targeted guard inventory, not a claim that every historical
+script in the repository has been audited. New research launchers should use
+the current frozen-plan owners instead of copying these dated defaults.
+
+### October 27: all full-data initial fits complete
+
+Run03 now has all twelve initial models: three original Mlic reuses and nine
+new Neff/Vote/Order fits. Every seed inventory, final119/120-epoch receipt and
+packed model hash was reread from `INITIAL_FULL.json`. The coordinator reached
+`common-full-continuation`; six new continuation trainers were verified live.
+Full panels and the separate confidence queue still follow. This is not
+candidate adoption. Shared progress evidence: `mlic-priority-20261027/FULL_INITIAL_VERIFIED.json`.

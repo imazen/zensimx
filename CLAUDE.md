@@ -807,3 +807,14 @@ training command. Its ledger and container remain retained; worker exit0 did
 not qualify the cell. `docker/Dockerfile.e36fit` now bakes pinned GNU time at
 image build and exercises its verbose receipt before installing the program.
 No boot installation or scientific-fit retry is authorized by this repair.
+
+### Known Bugs: obsolete research launcher defaults (2026-10-27)
+
+Fixed for eight byconstruction entry points: silent Rev6 restamping and dated
+model/checkout/placement/output defaults could launch irrelevant work before
+admission. `scripts/byconstruction/historical_guard.py` now refuses these
+launchers before work unless the caller explicitly requests historical replay.
+Host bans still apply. Preserve this guard; do not "repair" its refusal by
+automatically adding `--historical-replay`. Use the current registered study.
+Regression tests and frozen historical source snapshots remain unchanged.
+Inventory and test evidence: `benchmarks/byconstruction_2026-10-22.md`.
