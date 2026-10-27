@@ -5584,3 +5584,20 @@ omissions. This is not the native family join or permission to read responses.
 The run receipt explicitly records both as false. Every reference pixel identity
 and inherited prior-family alias must resolve against the independently
 validated native registry before omission-specific calibration can start.
+
+### Admission dependency path repair, 2026-10-27
+
+Order finished 21/21 cells at final epoch119. The next source screen failed
+at 04:52:35 UTC while writing its decode receipt because its generic packed
+reader path did not exist. The original verified binary is preserved under
+its SHA-suffixed name; no source threshold or numeric implementation changed.
+The failed attempt recorded `rc=1 2s | peak-RSS 0.05GiB | min-avail 43632MiB |
+peak-load 7.49`. No screen completion or response read resulted. Each of the
+four AIC downstream stages refused its failed dependency before fitting.
+
+The coordinator now requires the packed reader to be an existing input with
+an explicit SHA binding before queueing. Five controls pass on i265, including
+missing/unbound reader refusal before native work (`rc=0 0s | peak-RSS 0.02GiB |
+min-avail 24506MiB | peak-load 0.04`). Fresh admission/fold/full run directories
+preserve failed outputs. Their scientific populations, recipe/seed budgets,
+source-screen controls and full-panel policy remain unchanged.

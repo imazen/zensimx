@@ -40,6 +40,9 @@ def checked_plan(path):
         raise ValueError("native admission plan schema differs")
     if plan["quality_responses_permitted"] is not False:
         raise ValueError("source admission cannot read quality responses")
+    packed = plan["packed_binary"]
+    if packed not in plan["input_sha256"] or not Path(packed).is_file():
+        raise ValueError("native packed binary requires an existing hash-bound input")
     for name, pin in plan["input_sha256"].items():
         if sha(name) != pin:
             raise ValueError(f"native admission input changed: {name}")

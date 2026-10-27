@@ -40,11 +40,28 @@ class AdmissionQueue(unittest.TestCase):
         source.write_text("original")
         self.save("plan.json", {"schema": "mlic-confidence-native-admission-plan-v1",
                   "quality_responses_permitted": False,
+                  "packed_binary": str(source),
                   "coordinator_sha256": admission.sha(admission.__file__),
                   "input_sha256": {str(source): admission.sha(source)}})
         admission.checked_plan(self.root / "plan.json")
         source.write_text("changed")
         with self.assertRaisesRegex(ValueError, "input changed"):
+            admission.checked_plan(self.root / "plan.json")
+
+    def test_packed_reader_is_checked_before_work(self):
+        source = self.root / "native-packed"
+        source.write_bytes(b"frozen binary identity")
+        plan = {"schema": "mlic-confidence-native-admission-plan-v1",
+                "quality_responses_permitted": False, "packed_binary": str(source),
+                "coordinator_sha256": admission.sha(admission.__file__), "input_sha256": {}}
+        self.save("plan.json", plan)
+        with self.assertRaisesRegex(ValueError, "hash-bound"):
+            admission.checked_plan(self.root / "plan.json")
+        plan["input_sha256"][str(source)] = admission.sha(source)
+        self.save("plan.json", plan)
+        admission.checked_plan(self.root / "plan.json")
+        source.rename(self.root / "preserved-native-packed")
+        with self.assertRaisesRegex(ValueError, "existing"):
             admission.checked_plan(self.root / "plan.json")
 
     def test_finished_state_requires_actual_artifact(self):
