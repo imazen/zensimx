@@ -46,8 +46,9 @@ continuation of original Mlic full seed 0, 60 epochs) is implemented on main
 `/mnt/v/output/zensim/mlic-matched-continuation-20261027-run01`. Its queue
 waits, holding no lock, for the confidence followthrough to complete, then
 takes `heavy.lock`. It runs in herdr tab `matched-continuation-queue`.
-After it: label-free gates for the 12 seed-0 full-data candidates
-(`mlic-candidate-gates-20261027-run01`, tab `candidate-gates-queue`), then the
+After it: label-free gates for the 12 seed-0 four-recipe candidates plus the
+three seed-0 MlicConfidence models (`mlic-candidate-gates-20261027-run01`,
+`QUEUE3.sh`, tab `candidate-gates-queue`), then the
 registered source-fold study (`mlic-matched-continuation-folds-20261027-run01`,
 tab `matched-folds-queue`; 42 continuations, out-of-fold AIC panels). Each
 waiter holds no lock until its predecessor ends. `just mlic-priority-progress`
