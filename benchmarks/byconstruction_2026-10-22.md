@@ -7015,3 +7015,77 @@ For comparison, B (revision 5) has G-STEER 128. The gate summaries are in the ru
 `GATES_SUMMARY.json`. These gates are label-free. Open for every candidate, B included: the registered runtime
 gate (hardware decision), G-TARGET (every dial, peers included, failed its last run), G-RD (loop parked by the
 owner) and an integrity head.
+
+### AIC-share frontier stage A: result (2026-10-27, complete 15:05 UTC)
+
+Run `/mnt/v/output/zensim/mlic-aic-share-frontier-20261027-run01` (PLAN `966ca45d…`, trainer `5558ea6d…` from main
+`e6f6829c`). All 21 fits finished. **The control holds.** This trainer's refit of mixed ×16, seed 0, fold 0 equals the
+source-fold study's fit at epochs 7, 15, 29 and 59, byte for byte once only `zentrain.repro` is removed
+(`CONTROL.json`). **Exposure** (native sample-coverage replay, mean over the seven fold models): AIC is 22.9% of
+draws at ×16, 54.2% at ×64, 82.6% at ×256 and 95.0% at ×1024.
+
+Out-of-fold AIC-2026 public_train (seed 0; the initial model is zero-shot at 0.9094). The older sets are in sample,
+as the mean over fold models minus the initial model's SROCC. "Keeps" is the registered rule (every older set within
+0.005 of the initial model).
+
+| Point | Out-of-fold AIC | KADID | TID2013 | KonFiG | CID22-A | Keeps |
+|---|---:|---:|---:|---:|---:|---|
+| ×16 e59 (reused) | 0.9168 | +0.0096 | +0.0016 | +0.0060 | +0.0149 | yes |
+| ×64 e7 | 0.9203 | +0.0094 | −0.0002 | +0.0017 | +0.0151 | yes |
+| ×64 e59 | 0.9288 | +0.0088 | −0.0005 | +0.0024 | +0.0182 | yes |
+| **×256 e7** | **0.9312** | +0.0063 | −0.0028 | −0.0033 | +0.0130 | **yes** |
+| ×256 e15 | 0.9359 | +0.0060 | −0.0049 | −0.0070 | +0.0179 | no |
+| ×256 e59 | 0.9418 | +0.0034 | −0.0086 | −0.0108 | +0.0222 | no |
+| ×1024 e7 | 0.9376 | −0.0020 | −0.0132 | −0.0111 | +0.0172 | no |
+| ×1024 e59 | 0.9465 | −0.0194 | −0.0259 | −0.0208 | +0.0252 | no |
+| AIC-only e29 (reused) | 0.9515 | −0.1968 | −0.1141 | −0.0223 | +0.0172 | no |
+| AIC-only e59 (reused) | 0.9498 | −0.2436 | −0.1421 | −0.0324 | +0.0182 | no |
+
+All twenty points are in the run's `panels/OUT_OF_FOLD_PANELS.json` and `panels/PAIRED_SEEDS.json`. Under the
+registered rule, **×256 at epoch 7 advances** (0.9312; the next keeper, ×64 e59, is 0.0024 lower). Stage A2's
+points join before stage B uses the budget. Whole-source 95% intervals of the out-of-fold AIC difference (28 sources,
+2,000 resamples, descriptive): ×256 e7 − initial [+0.010, +0.033]; ×256 e7 − ×16 e7 [+0.008, +0.030]; ×1024 e59 −
+×16 e59 [+0.012, +0.048]; AIC-only e59 − ×1024 e59 [−0.003, +0.011]. Local mixtures stay at 1–3 rows per cell
+(largest rise +6.6, ×16 e59; the AIC-heavy models rise least); global mixtures are 0.
+
+**Reading.** Static mixing trades AIC against TID2013 and KonFiG; KADID holds up to ×256 and CID22-A gains at every
+weight, AIC-only included. No static mixture reaches 0.95 out of fold while keeping the older sets: ×1024 e59 gets
+0.9465 and loses about 0.02 on three sets, and AIC-only gets 0.9515 and loses KADID by 0.20. Seed 0 only.
+
+**Diagnostic: where the older sets lose** (frozen predictions, the canonical `panel --per-group`; TRAIN labels read
+under a ledger; `/mnt/v/output/zensim/frontier-withinref-diagnostic-20261027/`). Mean over fold models, change
+against the initial model in global SROCC / mean within-reference SROCC:
+
+| Point | TID2013 | KonFiG | KADID |
+|---|---|---|---|
+| ×256 e7 | −0.003 / +0.001 | −0.003 / −0.001 | +0.006 / +0.007 |
+| ×256 e59 | −0.009 / −0.003 | −0.011 / −0.004 | +0.003 / +0.005 |
+| ×1024 e59 | −0.026 / −0.018 | −0.021 / −0.007 | −0.019 / −0.017 |
+| AIC-only e29 | −0.114 / −0.108 | −0.022 / −0.008 | −0.197 / −0.197 |
+
+At ×256 most of the loss is cross-reference scale: the older human legs train only within-reference ranks, so their
+cross-reference order is not rehearsed. With more AIC, the within-reference order goes too.
+
+### Stage B details (registered 2026-10-27, 15:10 UTC, before any stage A2 result or stage B fit)
+
+The stage B registration above stands; this fixes its mechanics.
+- **Budget.** The point that advances after stage A2 joins, under the registered rule. A static point (W, epoch)
+  runs each recipe 60 epochs at W on the seven folds with checkpoints 7, 15, 29 and 59. A recovery point runs each
+  recipe's AIC-only continuation first (60 epochs; no older training leg, so no recipe weighting), then the recovery
+  at W with the weighting active.
+- **One run per recipe**, each with its own initial model (the recipe's full seed-0 fit), root and recipe inputs:
+  Neff and Vote on their own roots; Order on the Mlic root with its full-model matching schedule
+  (`mlic-aic-full-20261027-run03/matching/full_s0`, matching model still the frozen full Mlic seed 0); Confidence
+  on its root with its full-fit confidence manifest.
+- **Native admission.** Order's matched-codec admission now accepts a registered 60-epoch continuation (version-4
+  authority, a population with the human group) and keeps every other check. Confidence accepts a continuation
+  manifest (`mlic-contrast-confidence-continuation-v1`) that wraps the unchanged full-fit manifest, binds the starting
+  checkpoint's bytes and the 60-epoch budget, and appends AIC public_train unweighted; its receipt records the
+  continuation. Original full-fit behaviour and receipts are unchanged.
+- **Control, per recipe:** this trainer replays the recipe's 120-epoch seed-0 full fit through its original wrapper
+  route and frozen tools. The existing E33 control owner must find the final raw and packed models byte-identical
+  without `zentrain.repro`, and every result field equal apart from paths and model hashes; for Confidence the native
+  normalizer receipt must match too. A failed control stops that recipe's contrasts.
+- **Panels and rule:** as stage A, with each recipe's own initial model as "Initial". Contrasts: each point against
+  its own initial and against Mlic's point at the same budget from stage A or A2. Order's matched-codec route has no
+  sample-coverage replay, so its exposure is not recorded. Seed 0; no adoption from stage B alone.
