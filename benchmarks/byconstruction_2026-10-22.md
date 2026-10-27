@@ -5462,3 +5462,29 @@ state and AIC mass refusals. The resource wrapper recorded
 This coordinator produces fit artifacts; full-data panels and production
 qualification remain required after it completes. No new full-data fit
 quality result is claimed by these checks.
+
+
+### Full-data panel representations (2026-10-27, before new full fits)
+
+The full-data report compares the final f32 model and the packed, TRAIN-
+calibrated serving model for every recipe, strength and fixed seed. All AIC
+continuation sources are explicitly in sample; each initialization is
+zero-shot on AIC. The four original E21 populations are also in sample for
+these full fits, including original development rows. Their separate
+omission panels remain linked evidence. No EVAL or public_test is opened.
+
+Retain the complete native statistics, source/codec/ladder panels, codec
+rank bias, scatter/error tails, AIC level-concurring inversions, paired
+three-seed changes and both mixture tests. The same registered 2,000 whole-
+source bootstrap draws (seed 1, linear quantiles) describe each AIC
+mean-prediction contrast, conditional on the fitted models. Fixed seed zero
+remains the assessment model; the three-seed mean is only a stability
+diagnostic. Undefined statistics retain their denominators.
+
+The deployment contrast includes f16 quantization and the existing output
+calibration together. It must not be described as isolated precision loss.
+Runtime cost and native HDR precision remain separate qualification work.
+Three new controls pass on i265 for exact seed coverage, explicit undefined
+seeds and refusal of a stale or incomplete preceding fit. The resource
+wrapper recorded `rc=0 0s | peak-RSS 0.04 GiB | min-avail 24500 MiB | peak-load 0.71`.
+No full-panel quality or speed result has been measured by these controls.

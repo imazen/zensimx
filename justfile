@@ -3635,7 +3635,7 @@ aic-recipe-adaptation mode plan:
     OPENBLAS_NUM_THREADS=1 python3 -B scripts/byconstruction/aic_adaptation.py {{quote(mode)}} {{quote(plan)}}
 
 aic-recipe-adaptation-tests:
-    python3 -B -m unittest scripts.tests.test_aic_adaptation scripts.tests.test_aic_adaptation_panel scripts.tests.test_aic_adaptation_full
+    python3 -B -m unittest scripts.tests.test_aic_adaptation scripts.tests.test_aic_adaptation_panel scripts.tests.test_aic_adaptation_full scripts.tests.test_aic_adaptation_full_panel
 
 # Caller holds heavy.lock/run-heavy; separate fitted and held-out source panels.
 aic-recipe-adaptation-panel mode plan output:
@@ -3648,3 +3648,7 @@ aic-finetune-folds table pairs assignment output commit:
 # Full recipe fits and both AIC strengths; the queue waits for complete fold panels.
 aic-recipe-adaptation-full mode plan:
     OPENBLAS_NUM_THREADS=1 python3 -B scripts/byconstruction/aic_adaptation_full.py {{quote(mode)}} {{quote(plan)}}
+
+# Full fitted populations; final-f32 and packed TRAIN-calibrated serving representations.
+aic-recipe-adaptation-full-panel mode plan output:
+    OPENBLAS_NUM_THREADS=1 python3 -B scripts/byconstruction/aic_adaptation_full_panel.py {{quote(mode)}} {{quote(plan)}} {{quote(output)}}
