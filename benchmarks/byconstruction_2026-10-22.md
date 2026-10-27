@@ -6091,3 +6091,37 @@ cannot be frozen until that study completes. The next implementation step is
 the separate confidence AIC continuation/panel extension, preserving the
 running four-recipe study and its frozen sources.
 
+
+
+### Separate confidence AIC fold extension — registered October 27, 2026
+
+The new `aic-confidence-adaptation-plan-v1` contract contains exactly Mlic and
+MlicConfidence. It requires 48 continuation cells: 24 hash-verified original
+Mlic reuses and 24 confidence fits (four original omissions × three seeds ×
+two strengths). Its panel includes the 24 initial models plus 48 continuations,
+72 total. The original four-arm contract still requires its exact four recipes,
+96 continuations and 144 panel models. Neither contract can substitute the
+other's smaller/larger inventory. Running source snapshots are unchanged.
+
+The confidence extension reuses the same zero-step prediction parity,
+strict native warm-start owner, original Mlic root/losses, fresh Adam at 1e-5,
+50,000 draws/epoch, 8×4 and 16×8 strengths, source-fold rotation and final-epoch
+checks. Only the starting model differs. It verifies each confidence manifest
+and native normalizer receipt against the completed omission record and pinned
+baseline registry. Inherited native or wrapper confidence environment variables
+are rejected before any continuation or panel read; the common recipe cannot
+accidentally retain its starting model's confidence factor.
+
+The same panel owner preserves fitted/held-out separation, native statistics,
+source/codec/ladder diagnostics, seed contrasts, whole-source bootstrap and
+both mixture tests. It compares confidence against its own initialization and
+matched Mlic continuation, with no SROCC selector. No extension plan is queued
+until real confidence omission completion and artifact hashes exist. The
+separate full-confidence AIC continuation/panel extension remains required.
+
+All 28 AIC orchestration/panel tests pass on i265, including rejection of mixed
+protocol inventories, an incomplete original study masquerading as an extension,
+and inherited confidence factors. Run-heavy rc=0, 0s, peak RSS 0.12 GiB,
+minimum available 24,299 MiB, peak load 0.12. This validates orchestration
+boundaries; confidence adaptation has not run yet.
+

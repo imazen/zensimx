@@ -43,11 +43,25 @@ def write(path, value, *, fresh=False):
         temporary.replace(path)
 
 
+def registered_recipes(plan):
+    """Frozen four-arm study and separate confidence extension have exact inventories."""
+    schemas = {"aic-recipe-adaptation-plan-v1": RECIPES,
+               "aic-confidence-adaptation-plan-v1": ("Mlic", "MlicConfidence")}
+    recipes = schemas.get(plan.get("schema"))
+    if recipes is None or plan.get("recipes") != list(recipes):
+        raise ValueError("registered recipe inventory differs")
+    return recipes
+
+
+def require_clean_factors(environment):
+    if any(k.startswith(("ZENSIM_RESEARCH_CONFIDENCE_", "BYC_CONFIDENCE_")) for k in environment):
+        raise ValueError("common AIC continuation cannot inherit confidence factors")
+
+
 def checked_plan(path):
     plan = json.loads(path.read_text())
-    if (plan["schema"] != "aic-recipe-adaptation-plan-v1"
-            or plan["recipes"] != list(RECIPES)
-            or plan["selection"] != "full-panel-no-srocc-cutoff"
+    registered_recipes(plan)
+    if (plan["selection"] != "full-panel-no-srocc-cutoff"
             or plan["target_role"] != "D6-public_train-only"
             or plan["coordinator_sha256"] != sha(__file__)):
         raise ValueError("registered panel-study contract differs")
@@ -79,7 +93,7 @@ def update(root, state, stage, **details):
 def queue(path):
     plan, root = checked_plan(path), path.parent
     state = dict(plan_sha256=sha(path), queue_process=process_snapshot(os.getpid()),
-                 run_directory=str(root), completed=[], required=96, failures=[],
+                 run_directory=str(root), completed=[], required=24 * len(registered_recipes(plan)), failures=[],
                  source_commit=plan["coordinator_commit"], binary_sha256=plan["trainer_sha256"],
                  objective_complete=False, next_action="wait for source screening, then bind all starting checkpoints")
     if (root / "RUN_STATE.json").exists():
@@ -215,6 +229,8 @@ def run(path):
     state = json.loads((root / "RUN_STATE.json").read_text())
     try:
         plan = checked_plan(path)
+        recipes = registered_recipes(plan)
+        require_clean_factors(os.environ)
         if state["plan_sha256"] != sha(path) or not compute_lock(os.getpid())["held_by_worker_ancestor"]:
             raise ValueError("queued plan and shared compute lock required")
         state["worker"] = process_snapshot(os.getpid())
@@ -225,12 +241,29 @@ def run(path):
             if complete["selection_sha256"] != sha(directory / "TRAIN_SELECTION.json"):
                 raise ValueError("starting study completion differs")
         inputs = {recipe: [initial_cell(Path(plan["initial_cells"][recipe]) / f"without_{fold}_s{seed}", fold, seed)
-                          for seed in range(3) for fold in FOLDS] for recipe in RECIPES}
-        for recipe in RECIPES:
+                          for seed in range(3) for fold in FOLDS] for recipe in recipes}
+        for recipe in recipes:
             study = Path(plan["recipe_authority"][recipe])
             selection = json.loads((study / "TRAIN_SELECTION.json").read_text())
             if sha(study / "TRAIN_SELECTION.json") != json.loads((study / "TRAIN_SCREEN_COMPLETE.json").read_text())["selection_sha256"]:
                 raise ValueError("recipe study completion differs")
+            if recipe == "MlicConfidence":
+                from confidence_weights import cell_binding, verify_receipt
+                registry = study / "policy/confidence-manifests.json"
+                baseline_path = study / "BASELINE.json"
+                if sha(baseline_path) != selection["input_sha256"][str(baseline_path)]:
+                    raise ValueError("confidence baseline changed")
+                baseline = json.loads(baseline_path.read_text())
+                registry_pin = baseline["input_sha256"][str(registry)]
+                for row in inputs[recipe]:
+                    binding = cell_binding(registry, registry_pin,
+                                           recipe, row["fold"], row["seed"])
+                    receipt = Path(row["directory"]) / "CONFIDENCE_NORMALIZERS.json"
+                    record = json.loads((Path(row["directory"]) / "byc_record.json").read_text())
+                    if (record["confidence_manifest_sha256"] != binding["sha256"]
+                            or record["confidence_receipt_sha256"] != verify_receipt(receipt, binding)):
+                        raise ValueError("confidence starting receipt differs")
+                    row["input_sha256"].update({binding["path"]:binding["sha256"], str(receipt):sha(receipt)})
             inputs[recipe] = [bind_recipe_cell(recipe, row, study, selection, Path(plan["columns"]).read_text())
                               for row in inputs[recipe]]
         write(root / "INITIAL_CHECKPOINTS.json", inputs, fresh=True)
@@ -248,7 +281,7 @@ def run(path):
         if cells.HERE.resolve() != source / "scripts/rev4_featpot":
             raise ValueError("warm-start owner resolved outside the frozen source")
         # Each different initial recipe must survive actual zero-step continuation.
-        for recipe in RECIPES:
+        for recipe in recipes:
             update(root, state, "zero-step-control", current_recipe=recipe)
             original = Path(plan["initial_cells"][recipe]) / "without_kadid_s0"
             dest = root / "zero-step" / recipe
@@ -272,13 +305,13 @@ def run(path):
             write(dest / "CONTROL_VERIFIED.json", dict(byte_identical=True, rows=7869,
                   prediction_sha256=sha(output), initial_sha256=sha(original / "refit/last.bin"),
                   selected_checkpoint=str(selected), selected_sha256=sha(selected)), fresh=True)
-        for recipe in RECIPES:
+        for recipe in recipes:
             for weight, epochs in STRENGTHS:
                 label = f"{recipe}FT{weight}x{epochs}"
                 cells.LABEL, cells.AIC_WEIGHT = label, float(weight)
                 cells.FINE_TUNE = (Path(plan["initial_cells"][recipe]), epochs, 0.00001)
                 update(root, state, "continuation-cells", current_recipe=recipe, current_arm=label,
-                       next_action="complete all 96 matched cells, then fitted/held-out full panels")
+                       next_action=f"complete all {state['required']} matched cells, then fitted/held-out full panels")
                 def fit(row):
                     fold, seed = row["fold"], row["seed"]
                     if any(sha(name) != pin for name, pin in row["input_sha256"].items()):

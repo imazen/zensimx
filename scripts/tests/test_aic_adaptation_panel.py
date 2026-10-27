@@ -48,6 +48,17 @@ class SeparateRoles(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "finite ordered prediction"):
             owner.role_average(rows, self.folds, "fitted")
 
+    def test_extension_completion_does_not_satisfy_original_population(self):
+        with tempfile.TemporaryDirectory(dir=Path.home() / "tmp") as tmp:
+            root = Path(tmp)
+            receipt = root / "FOLD_FITS_COMPLETE.json"
+            receipt.write_text(json.dumps(dict(plan_sha256="pin", cells=[{}]*48)))
+            self.assertTrue(owner.fits_finished(root,"pin",48))
+            with self.assertRaisesRegex(ValueError,"completion"):
+                owner.fits_finished(root,"pin")
+            with self.assertRaisesRegex(ValueError,"population"):
+                owner.fits_finished(root,"pin",24)
+
     def test_undefined_remains_explicit_not_zero(self):
         self.assertEqual(owner.finite_json(dict(metric=float("nan"), rows=17)), dict(metric=None, rows=17))
 

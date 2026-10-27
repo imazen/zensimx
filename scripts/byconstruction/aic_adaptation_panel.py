@@ -15,6 +15,7 @@ import time
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from aic_adaptation import FOLDS, RECIPES, SPEC, STRENGTHS, bound_worker, compute_lock, process_snapshot, process_tree, sha, write
+from aic_adaptation import registered_recipes, require_clean_factors
 from aic_adaptation import __file__ as coordinator_source
 from aic_adaptation_diagnostics import checked_statistics, cohort, complete_mean, ladder_diagnostics, paired_seeds
 from aic_adaptation_diagnostics import __file__ as diagnostics_source
@@ -63,10 +64,12 @@ def role_average(rows, folds, role):
     return total / count, count
 
 
-def fits_finished(root, plan_pin):
+def fits_finished(root, plan_pin, required=96):
+    if required not in (48, 96):
+        raise ValueError("registered complete continuation population required")
     if (root / "FOLD_FITS_COMPLETE.json").exists():
         complete = json.loads((root / "FOLD_FITS_COMPLETE.json").read_text())
-        if complete["plan_sha256"] != plan_pin or len(complete["cells"]) != 96:
+        if complete["plan_sha256"] != plan_pin or len(complete["cells"]) != required:
             raise ValueError("preceding fit completion differs")
         return True
     state = json.loads((root / "RUN_STATE.json").read_text())
@@ -81,6 +84,7 @@ def fits_finished(root, plan_pin):
 def queue(plan_path, output):
     root, pin, owner_pin = plan_path.parent, sha(plan_path), sha(__file__)
     plan = json.loads(plan_path.read_text())
+    recipes = registered_recipes(plan)
     diagnostics_pin = sha(diagnostics_source)
     if sha(coordinator_source) != plan["coordinator_sha256"]:
         raise ValueError("panel imported a different continuation owner")
@@ -89,7 +93,7 @@ def queue(plan_path, output):
                  checked_utc=datetime.now(timezone.utc).isoformat())
     write(root / "PANEL_QUEUE.json", state, fresh=True)
     try:
-        while not fits_finished(root, pin):
+        while not fits_finished(root, pin, 24 * len(recipes)):
             time.sleep(30)
         if (sha(plan_path) != pin or sha(__file__) != owner_pin
                 or sha(coordinator_source) != plan["coordinator_sha256"] or sha(diagnostics_source) != diagnostics_pin):
@@ -133,6 +137,7 @@ def run(plan_path, output):
     if not compute_lock(os.getpid())["held_by_worker_ancestor"]:
         raise ValueError("panel evaluation requires the shared compute lock")
     plan = json.loads(plan_path.read_text())
+    recipes = registered_recipes(plan)
     queued = json.loads((plan_path.parent / "PANEL_QUEUE.json").read_text())
     if (queued["panel_owner_sha256"] != sha(__file__)
             or queued["diagnostics_sha256"] != sha(diagnostics_source)
@@ -140,7 +145,7 @@ def run(plan_path, output):
         raise ValueError("queued panel owners changed")
     root = plan_path.parent
     fits = json.loads((root / "FOLD_FITS_COMPLETE.json").read_text())
-    if fits["plan_sha256"] != sha(plan_path) or len(fits["cells"]) != 96:
+    if fits["plan_sha256"] != sha(plan_path) or len(fits["cells"]) != 24 * len(recipes):
         raise ValueError("all registered continuation cells required")
     initial_path = root / "INITIAL_CHECKPOINTS.json"
     if sha(initial_path) != fits["initial_checkpoints_sha256"]:
@@ -152,6 +157,7 @@ def run(plan_path, output):
     table = Path(plan["aic_source_table"])
     if sha(table) != plan["aic_source_table_sha256"]:
         raise ValueError("original revision-7 AIC extraction changed")
+    require_clean_factors(os.environ)
     source = Path(plan["warmstart_source"])
     os.environ.update(BYC_ROOT=plan["common_root"], REV4_V2_ROOT=plan["common_root"],
         REV4_V2_BIN_DIR=plan["bin"], AIC_BIN=plan["bin"], ZEN_PANEL_BIN=str(Path(plan["bin"]) / "panel"),
@@ -180,7 +186,7 @@ def run(plan_path, output):
     for name, pin in native_tools.items():
         if plan["input_sha256"][str(Path(plan["bin"]) / name)] != pin:
             raise ValueError("panel native tool identity differs")
-    state = dict(stage="read-admitted-TRAIN", worker=process_snapshot(os.getpid()), completed_models=0, required_models=144,
+    state = dict(stage="read-admitted-TRAIN", worker=process_snapshot(os.getpid()), completed_models=0, required_models=36 * len(recipes),
                  plan_sha256=sha(plan_path), panel_owner_sha256=sha(__file__), binary_sha256=plan["trainer_sha256"],
                  failures=[], objective_complete=False)
     def stage(name, **details):
@@ -216,7 +222,7 @@ def run(plan_path, output):
         (output / "cells").mkdir()
         (output / "predictions").mkdir()
         records = []
-        for recipe in RECIPES:
+        for recipe in recipes:
             for row in initial[recipe]:
                 if any(sha(name) != pin for name, pin in row["input_sha256"].items()):
                     raise ValueError("initial checkpoint evidence changed")
@@ -283,7 +289,7 @@ def run(plan_path, output):
                 for category, group, index in groups:
                     label = f"{arm}|{role}|{category}|{group}"
                     jobs.append((label, value[index], target[index]))
-                    descriptions.append(dict(arm=arm, role=role, **cohort(arm not in RECIPES, role), category=category, group=group, label=label,
+                    descriptions.append(dict(arm=arm, role=role, **cohort(arm not in recipes, role), category=category, group=group, label=label,
                         rows=len(index), geometry=geometry(value[index], target[index]) if category in ("all", "codec") else None,
                         contributions_min=int(count[index].min()), contributions_max=int(count[index].max())))
                 save(f"{arm}-{role}-ladder.json", ladder_diagnostics(pairs, value, target, np.ones(3920, dtype=bool), logistic_fit))
@@ -300,7 +306,7 @@ def run(plan_path, output):
         del batch, jobs
         stage("paired-seed-summaries")
         seed_results, contrasts = {}, []
-        for recipe in RECIPES:
+        for recipe in recipes:
             for weight, epochs in STRENGTHS:
                 arm = f"{recipe}FT{weight}x{epochs}"
                 contrasts.append((arm, recipe))

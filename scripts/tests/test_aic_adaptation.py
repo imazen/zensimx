@@ -10,6 +10,24 @@ from unittest.mock import patch
 from scripts.byconstruction import aic_adaptation as owner
 
 
+class RegisteredInventories(unittest.TestCase):
+    def test_confidence_extension_cannot_shrink_original_study(self):
+        original = dict(schema="aic-recipe-adaptation-plan-v1",recipes=list(owner.RECIPES))
+        extension = dict(schema="aic-confidence-adaptation-plan-v1",recipes=["Mlic","MlicConfidence"])
+        self.assertEqual(24*len(owner.registered_recipes(original)),96)
+        self.assertEqual(24*len(owner.registered_recipes(extension)),48)
+        for bad in (dict(original,recipes=extension["recipes"]),
+                    dict(extension,recipes=original["recipes"]),dict(extension,recipes=["MlicConfidence"])):
+            with self.assertRaises(ValueError):
+                owner.registered_recipes(bad)
+
+    def test_continuation_refuses_inherited_confidence_weighting(self):
+        owner.require_clean_factors({"PATH":"unchanged"})
+        for key in ("ZENSIM_RESEARCH_CONFIDENCE_MANIFEST","BYC_CONFIDENCE_MANIFESTS"):
+            with self.assertRaisesRegex(ValueError,"inherit"):
+                owner.require_clean_factors({key:"stale-parent-binding"})
+
+
 class ContinuationEvidence(unittest.TestCase):
     def setUp(self):
         self.scratch = tempfile.TemporaryDirectory(dir=Path.home() / "tmp")
