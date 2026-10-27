@@ -5237,3 +5237,101 @@ mixture inversions for all 21 cells. A passing screen proceeds to three
 fixed full fits, fixed assessment seed zero and the unchanged numerical,
 runtime and production qualification. No EVAL-based weighting, reselection
 or serving promotion is authorized by this registration.
+
+
+### Native-vote TRAIN outcome and owner-directed follow-through (2026-10-27)
+
+All 21 MlicVote cells completed epoch 119 in
+`/mnt/v/output/zensim/mlic-vote-20261027-run02`. The full-budget Mlic control
+reproduced all 7,869 predictions byte-for-byte (SHA256
+`0cae0f6fcc1ca3f83108df4c3fd400751a6321842a56a0e942ecba09ab4bd8fa`).
+The frozen trainer SHA256 is
+`dafda1f44e0dc2b18e0bbe8b878061cd9441e8ad58f656a6c8da6763ab390972`;
+coordinator source is `39419ed821205201216d10e9369c4cf5305b6176`.
+
+| TRAIN statistic | Mlic | MlicVote | Paired change | Seed-unit SE |
+|---|---:|---:|---:|---:|
+| Old collections | 0.9306423842555338 | 0.9292780130858365 | -0.0013643711696972316 | 0.00010319529093388322 |
+| New collections | 0.899509341379377 | 0.9000448749395029 | 0.0005355335601258485 | 0.0002495605749905272 |
+| Balanced | 0.9150758628174555 | 0.9146614440126698 | -0.00041441880478569154 | 0.00015546942979057443 |
+
+All 21 global-mixture inversion counts were zero. The original registered
+screen rejects this arm: balanced change is negative and the old-leg change
+is below its -0.00020639058186776643 bound. Independent reconstruction of
+that decision matched every stored decision field. `TRAIN_SELECTION.json`
+SHA256 is `c8f07927432949f2892eb42af459cc431f79a7bba07722b4b4f42ea250a89de2`.
+No EVAL read or serving adoption followed. The resource wrapper recorded
+`rc=0 6854s | peak-RSS 12.05 GiB | min-avail 16734 MiB | peak-load 14.32`.
+
+The owner's subsequent instruction requests an independent AIC adaptation
+comparison and full-panel interpretation instead of strict SROCC gates.
+This does not rewrite the completed screen or its numerical result. It
+explicitly keeps this arm eligible for the prospective comparison below.
+
+### AIC adaptation across training recipes: prospective panel study (2026-10-27)
+
+Registered after observing the earlier Mlic, Neff and vote TRAIN studies and
+Mlic AIC continuation, and before any new cross-recipe AIC continuation.
+The owner requests in-sample AIC2026 public_train adaptation and complete
+panels rather than strict SROCC cutoffs. Prior development exposure is known;
+these are development comparisons, not a clean unseen-population claim.
+No public_test, EVAL, TEST or TERMINAL target is admitted by this study.
+
+Compare the original Mlic, MlicNeff, MlicVote and MlicOrder starting models.
+The confidence arm joins only after its separately registered native-input
+admission, calibration and TRAIN fitting. A failed historical SROCC screen
+does not remove an arm. Keep its result visible in the panel. Do not merge
+base-recipe factors or retune their finished fits.
+
+First use each arm's twelve existing E21-omission checkpoints (four omitted
+collections, seeds 0–2), preserving the same omission/seed pairing. Use the
+original Mlic continuation inputs and losses for every arm: only initial
+weights differ. In particular, Neff mass, vote likelihood and matched-order
+sampling are properties of the starting checkpoint, not additional changes
+to the common continuation. Use both previously registered strengths,
+weight 8 for four epochs and weight 16 for eight, constant LR 0.00001,
+50,000 draws per epoch, fresh Adam state, unchanged seed streams and final
+epoch. Preserve revision-7 features, D6 admission, existing native source
+folds and the rotation `(4*seed + E21_fold_index) mod 7`.
+
+For each cell report predictions on both the 24 fitted AIC sources and the
+four held-out AIC sources. Keep those panels separate. Report each starting
+checkpoint on the identical rows, the post-continuation absolute statistics
+and paired changes. Aggregate a row only over models with its declared
+fitted/held-out status; expose the unequal model count per source. A fitted
+panel is explicitly in-sample. Reuse completed Mlic continuations only when
+the checkpoint, root, fold, binary, budget and prediction identities match.
+
+Then compare all 28 public_train sources in three fixed full-data seeds for
+each recipe and both strengths, using the original recipe to produce any
+missing pre-AIC full fit. This follow-through is not gated on SROCC. Order
+full fits require matches from the paired full Mlic model, not an omission
+model. Fixed seed zero remains the assessment model; seeds one and two show
+stability. No best-seed or best-epoch selection. Controls and immutable input
+receipts precede each new stage; no partial stage is called complete.
+
+For both fitted and held-out AIC panels report global signed SROCC and
+Kendall correlation; within-source and within-codec-ladder rankings; every
+source and codec's statistics; rank residual codec bias; canonical full
+panel calibration statistics, Z-RMSE and error p99; knob-concurring
+inversions; and paired seed summaries. Retain the source-level results and
+use source-cluster intervals as descriptive uncertainty, never treating
+repeated predictions of one source as independent observations. Report the
+complete old-data panels, both mixture tests and new-data TRAIN results
+alongside AIC. Record undefined metrics and denominators explicitly.
+
+There is no scalar SROCC pass/fail or automatic winner. Compare the complete
+tradeoffs and retain nondominated alternatives; explain any recommendation
+using the panel. Existing pixel, arithmetic, source-separation, monotonicity
+and production correctness requirements still apply. Serving adoption also
+requires full runtime and steering qualification on permitted hardware;
+identical model shape alone is not a speed measurement. This study neither
+changes old EVAL outcomes nor authorizes EVAL-based fitting or reselection.
+
+Reuse the frozen warm-start implementation and its existing default-run
+control without merging its public-API PR. For every new starting recipe,
+verify zero-step prediction parity before positive-step fitting. Pin all
+starting checkpoints and their fit/omission receipts before launch, plus the
+common root, continuation binary, source owners and public_train manifests.
+Keep complete logs and process/lock-backed progress, and serialize compute
+behind the active TRAIN study and its queued source-admission evaluation.

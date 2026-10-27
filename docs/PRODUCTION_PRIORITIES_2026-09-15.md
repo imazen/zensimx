@@ -8,6 +8,20 @@ a record of what happened, not authority to restart its abandoned work.
 
 ## Owner queue update — October 26, 2026
 
+**Owner refinement, October 27: compare AIC adaptation using complete panels.**
+Compare Mlic, the effective-sample mass arm, vote likelihood and matched
+ordering under the same AIC2026 public_train continuation recipe, including
+in-sample results. Add the confidence arm after its input admission is complete.
+Use full panels and other statistics instead of strict SROCC rejection gates:
+local ranking, source/codec variation, calibration and tail errors, seed/source
+uncertainty, mixtures, steering and measured runtime all inform the decision.
+Earlier frozen experiments and their original verdicts remain historical
+evidence; their SROCC cutoffs do not exclude an arm from this new comparison.
+Pixel correctness, numerical integrity, source-role protection and provenance
+requirements remain binding. A fitted-source result is not held-out evidence.
+The prospective adaptation protocol is registered in
+`benchmarks/byconstruction_2026-10-22.md`.
+
 Zensim training and evaluation take priority. Finish the registered Mlic AIC2026
 public_train comparison and preserve its existing scientific and production
 qualification gates. Model-agent availability is separate from experiment
