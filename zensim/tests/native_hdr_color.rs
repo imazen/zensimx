@@ -989,3 +989,146 @@ fn rev7_native_hdr_strided_rows_match_packed_rows() {
         }
     }
 }
+
+/// Rev7 prepared HDR steering workers (the cached-reference serving path)
+/// reproduce the supported entry's canonical features and the direct
+/// `compute_hdr` score, for native u16 and f32 inputs, sequential and parallel,
+/// at both map bins; identity scores 100 and a failed call leaves no state.
+#[test]
+fn rev7_prepared_native_hdr_workers_match_canonical_features() {
+    use zensim::feature_v2::FormulaRevision;
+    if zensim::feature_v2::active_formula_revision() != FormulaRevision::Rev7 {
+        let status = std::process::Command::new(std::env::current_exe().unwrap())
+            .env("ZENSIM_FORMULA_REV", "7")
+            .args([
+                "--exact",
+                "rev7_prepared_native_hdr_workers_match_canonical_features",
+                "--test-threads=1",
+            ])
+            .status()
+            .unwrap();
+        assert!(status.success());
+        return;
+    }
+    // Mlic's 410 direct Rev7 reads (its derived fx1 products omitted).
+    let ids: Vec<usize> = [
+        (13, 25),
+        (39, 155),
+        (401, 421),
+        (423, 429),
+        (459, 479),
+        (481, 508),
+        (510, 537),
+        (539, 566),
+        (568, 595),
+        (597, 624),
+        (626, 653),
+        (655, 682),
+        (684, 711),
+        (713, 719),
+    ]
+    .into_iter()
+    .flat_map(|(a, b)| a..=b)
+    .collect();
+    let n = ids.len();
+    assert_eq!(n, 410);
+    let recipe = serde_json::json!({
+        "schema_hash":1, "scaler_mean":vec![0.;n], "scaler_scale":vec![1.;n],
+        "metadata":[
+            {"key":"zentrain.feature_ids","type":"utf8","text":ids.iter().map(usize::to_string).collect::<Vec<_>>().join(" ")},
+            {"key":"zentrain.formula_revision","type":"utf8","text":"7"}
+        ],
+        "layers":[{"in_dim":n,"out_dim":1,"activation":"identity","dtype":"f32",
+            "weights":(0..n).map(|i| -(i as f32+1.)/1000.).collect::<Vec<_>>(),"biases":[100.]}]
+    });
+    let bytes = zenpredict_bake::bake_from_json_str(&recipe.to_string()).unwrap();
+    let model = zenpredict::Model::from_bytes(&bytes).unwrap();
+    for (w, h) in [(17, 9), (97, 65)] {
+        for encoding in [
+            HdrEncoding::Linear,
+            HdrEncoding::Pq { peak_nits: 1000. },
+            HdrEncoding::Hlg {
+                peak_nits: 1000.,
+                ambient_lux: 5.,
+            },
+        ] {
+            let factor = if matches!(encoding, HdrEncoding::Linear) {
+                1000.
+            } else {
+                1.
+            };
+            let a: Vec<[f32; 4]> = (0..w * h)
+                .map(|i| {
+                    [
+                        factor * (0.05 + (i * 17 % 233) as f32 / 256.),
+                        factor * (0.01 + (i * 37 % 239) as f32 / 256.),
+                        factor * (0.02 + (i * 53 % 241) as f32 / 256.),
+                        1.,
+                    ]
+                })
+                .collect();
+            let mut b = a.clone();
+            for y in h / 3..h * 2 / 3 {
+                for x in w / 3..w * 2 / 3 {
+                    b[y * w + x][0] *= 0.8;
+                    b[y * w + x][2] *= 0.9;
+                }
+            }
+            let src = source(&a, w, h, ColorPrimaries::Bt2020);
+            let dst = source(&b, w, h, ColorPrimaries::Bt2020);
+            let canonical = Zensim::new(ZensimProfile::B)
+                .with_parallel(false)
+                .compute_folded720_features_hdr(
+                    &src,
+                    &dst,
+                    encoding,
+                    V2NewFeatureToggles::default(),
+                    &mut V2Scratch::new(),
+                )
+                .unwrap()
+                .features()
+                .to_vec();
+            let expected = zensim::BakeScorer::new(&model)
+                .unwrap()
+                .with_parallel(false)
+                .compute_hdr(&src, &dst, encoding, None)
+                .unwrap();
+            for parallel in [false, true] {
+                for bin in [1, 8] {
+                    let mut scorer = zensim::BakeScorer::new(&model)
+                        .unwrap()
+                        .with_parallel(parallel)
+                        .with_finite_moment_refinement(true);
+                    let mut worker = scorer.prepare_steering_hdr(&src, encoding, bin).unwrap();
+                    let first = worker.compute(&dst, None).unwrap();
+                    for &id in &ids {
+                        let (actual, value) = (first.result().features()[id], canonical[id]);
+                        assert!(
+                            (actual - value).abs() <= 2e-9 * value.abs().max(1.),
+                            "{encoding:?} {w}x{h} parallel={parallel} bin={bin} f{id}: {actual} vs {value}"
+                        );
+                    }
+                    assert_eq!(first.result().score(), expected, "{encoding:?} {w}x{h}");
+                    assert!(first.unsupported_refinement_feature_ids().is_empty());
+                    assert!(first.refinement_gain(0, 0, w, h).is_finite());
+                    let identity = worker.compute(&src, None).unwrap();
+                    assert_eq!(identity.result().score(), 100.);
+                    assert_eq!(identity.refinement_gain(0, 0, w, h), 0.);
+                    let bad = [[0u8; 3]; 64];
+                    assert!(
+                        worker
+                            .compute(&zensim::RgbSlice::new(&bad, 8, 8), None)
+                            .is_err()
+                    );
+                    let again = worker.compute(&dst, None).unwrap();
+                    assert_eq!(first.result().features(), again.result().features());
+                    assert_eq!(first.result().score(), again.result().score());
+                    assert_eq!(
+                        first.refinement_gain(0, 0, w, h),
+                        again.refinement_gain(0, 0, w, h)
+                    );
+                }
+            }
+        }
+    }
+}

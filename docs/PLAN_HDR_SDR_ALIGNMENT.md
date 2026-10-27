@@ -72,9 +72,14 @@ Full panels decide; no single SROCC threshold.
 independent f64 display-light decode within 1e-3 relative; one-code u16
 steps survive the supported entry; PQ changes confined above the declared
 1000-nit peak clip to identity while changes below it stay visible; padded
-strided rows give bit-identical features to packed rows. Each has a failing
-negative control (wrong reference lift; 4000-nit peak; stride misread).
-Near-black lift, transfer joins, caches and maps still need Rev7 controls.
+strided rows give bit-identical features to packed rows; prepared HDR
+steering workers (cached reference, sequential and parallel, map bins 1 and
+8) reproduce the canonical features and the direct `compute_hdr` score for
+a bake over Mlic's 410 direct Rev7 reads. Each has a failing negative
+control (wrong reference lift; 4000-nit peak; stride misread; another pair's
+features). A bake over basic ids 0–227 is refused at Rev7 with "incomplete
+refinement coverage": Rev7 steering covers its served read set, not arbitrary
+basic ids. Near-black lift and transfer joins still need Rev7 controls.
 
 **Owner decisions needed.** (1) A human HDR holdout. HDR-VDC and AVT keep
 only Rev2/944 tables and need fresh sign-off to re-extract through the frozen
