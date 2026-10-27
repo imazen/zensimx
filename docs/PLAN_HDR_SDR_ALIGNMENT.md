@@ -93,6 +93,22 @@ UPIQ-380 is TRAIN since October 7 and cannot serve. (2) Timing hardware:
 the scalar-performance row names the 9950X3D, where benchmarks are currently
 not permitted.
 
+**Library survey for decision 1 (2026-10-27, catalogue and READMEs only, no
+labels read).** No organized human HDR image set is unexposed. Outside UPIQ
+(Narwaria + Korshunov = UPIQ-380), the only codec-relevant ones are
+Rousselot HDdtb and 4Kdtb (8 sources each; HEVC, chroma-QP, gamut and chroma
+noise; BVM-X300, 1000 nit). Their labels were read in the 2026-07-29 chroma
+validation and in the August external-read panels
+([chroma record](../benchmarks/rousselot_chroma_validation_2026-07-29.md)).
+SI-HDR (27 scenes, CC BY 4.0) was read and even added to a probe's training
+side ([transfer record](../benchmarks/sihdr_transfer_2026-07-29.md)), its
+JOD is anchored within each scene and clip block, and the release omits the
+camera-response correction applied to the rated reconstructions, so its files
+are not the rated stimuli. HDR-VDC, AVT and CHUG were external reads too. The
+Ghent inverse-tone-mapping set and the tone-mapping sets test other tasks.
+A frontend claim on any of these is development evidence with its exposure
+recorded; only a new human HDR collection would give an unexposed holdout.
+
 ## October 26, 2026: evidence and speed requirement
 
 The controlling [production queue](PRODUCTION_PRIORITIES_2026-09-15.md) places
