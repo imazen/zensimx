@@ -7122,3 +7122,27 @@ two phases, as stage A2 did: AIC-only for 60 epochs, then the recovery from that
 (built and pushed in `df36955c`, 15:37 UTC, still before any stage A2 result). A recipe point needs recipe variants
 of steps 2 and 3, which are not built yet; they would be built and registered before they run. Smokes (scratch, not evidence): Order and Confidence continuations passed native admission and trained
 epoch 0; a LODO omission continuation did the same; the packing snippet packed a stage A checkpoint.
+
+### Stage A2 result and stage B launch (2026-10-27, A2 fits and panels complete 15:51 UTC)
+
+Run `mlic-aic-recovery-20261027-run01`: each fold's seed-0 AIC-only epoch-59 model (out-of-fold AIC 0.9498) recovered 60
+epochs on the mixture. Exposure equals the static arms at the same weight (×16 22.7–22.9% AIC, ×64 54.1–54.2%, ×256
+82.6%), because the sampler depends only on seed, groups and weights. Out-of-fold AIC; the older sets in sample against
+the initial Mlic model:
+
+| Point | Out-of-fold AIC | KADID | TID2013 | KonFiG | CID22-A | Keeps |
+|---|---:|---:|---:|---:|---:|---|
+| recover ×16 e7 | 0.9214 | −0.0653 | −0.0589 | −0.0632 | +0.0121 | no |
+| recover ×16 e59 | 0.9147 | −0.0064 | −0.0197 | −0.0167 | +0.0129 | no |
+| recover ×64 e59 | 0.9295 | −0.0122 | −0.0235 | −0.0238 | +0.0196 | no |
+| recover ×256 e7 | 0.9323 | −0.1043 | −0.0828 | −0.0695 | +0.0188 | no |
+| recover ×256 e59 | 0.9428 | −0.0303 | −0.0338 | −0.0380 | +0.0246 | no |
+
+No recovery point keeps the older sets, so **×256 at epoch 7 (stage A, 0.9312) stays the advanced point**. Recovery
+converges to about the static arm's AIC at the same weight (e59: 0.9147 / 0.9295 / 0.9428 against 0.9168 / 0.9288 /
+0.9418) while the older sets are still recovering: the AIC-only detour buys no lasting AIC and costs the older sets.
+
+**Stage B launched** (15:56 UTC; registered mechanics above): four chained runs at ×256,
+`mlic-aic-recipe-{order,confidence,neff,vote}-aic256-20261027-run01`, trainer `587e4764…` (main `216481a8`, built on
+i265), source `1f334203`. Each fits its recipe's full seed-0 model on the seven folds and replays the recipe's
+120-epoch full fit as its control.
