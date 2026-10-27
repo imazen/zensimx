@@ -31,6 +31,19 @@ work. The September chronology below is retained history, including its old
 paused-goal statement. It is not the current queue. No new Mlic/AIC recipe has
 been adopted as the serving model, and the seamless HDR frontend has not started.
 
+### State at 11:45 UTC, 2026-10-27
+
+The confidence follow-through finished at 11:25 UTC without failures; confidence
+weighting does not improve on Mlic (byconstruction record, "MlicConfidence fold
+and full-data results"). All 15 seed-0 candidates pass near-identity. The
+matched-continuation diagnostic took `heavy.lock` at 11:26 UTC (mixed arm done,
+AIC-only arm fitting); the gates queue (now 15 models) and the source-fold study
+follow it. Native HDR controls and the f64 precision probe are on main
+(`just hdr-precision`). Reports: the dev.lan session report (addenda 11:22 and
+11:28 UTC, archived under the priority directory's `reports/`) and the
+"AIC2026 monotone push" dashboard, both refreshed at 11:28 UTC. D1 waits for the
+gates; the runtime-hardware and HDR-holdout decisions wait for the owner.
+
 ### Ownership and queue — 2026-10-27 09:21 UTC
 
 The owner returned all zensim work to the original Claude session
