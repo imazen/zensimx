@@ -137,7 +137,8 @@ def plan(run, commit, trainer, meta_tool):
 
 def checked(path, schema="aic-matched-continuation-plan-v1"):
     value = json.loads(path.read_text())
-    if value["schema"] != schema or value["protocol"] != (FRONTIER_PROTOCOL if schema == FRONTIER_SCHEMA else PROTOCOL):
+    if value["schema"] != schema or value["protocol"] != (PROTOCOL if schema == FOLD_SCHEMA or schema.startswith("aic-matched")
+                                                           else FRONTIER_PROTOCOL):
         raise ValueError("diagnostic plan schema differs")
     for item in value["registered_inputs"].values():
         if sha(item["path"]) != item["sha256"]:
@@ -186,8 +187,9 @@ def queue(path):
         raise
 
 
-def fit_command(plan_value, run_dir, arm, seed=0, initial=None, aic_table=None, dest=None):
-    """The registered diagnostic route; the seed-0 screen uses the full table, the fold study one fold table."""
+def fit_command(plan_value, run_dir, arm, seed=0, initial=None, aic_table=None, dest=None, checkpoint=None):
+    """The registered diagnostic route; the seed-0 screen uses the full table, the fold study one fold table.
+    `checkpoint` continues from an explicit model (the recovery stage) instead of a full fit's final checkpoint."""
     source = run_dir / "source/scripts/rev4_featpot"
     initial = initial or plan_value["initial"]["directory"]
     population = plan_value.get("arms", ARMS)[arm]
@@ -195,7 +197,7 @@ def fit_command(plan_value, run_dir, arm, seed=0, initial=None, aic_table=None, 
             "--columns", Path(plan_value["columns"]).read_text().strip(), "--head", "N", "--seed-index", str(seed),
             "--strict-admission", "--data-role-decision", str(Path(plan_value["root"]) / "human_role_decision.json"),
             "--dest", str(dest or run_dir / "arms" / arm / "full_s0"), "--train-only",
-            "--init-from", str(Path(initial) / "refit/last.bin"),
+            "--init-from", str(checkpoint or Path(initial) / "refit/last.bin"),
             "--fine-tune-epochs", str(EPOCHS), "--fine-tune-lr", str(LR),
             "--aic-public-train", aic_table or plan_value["registered_inputs"]["aic_table"]["path"],
             "--aic-weight", str(diagnostic_protocol(population)[1]), "--diagnostic-population", population]
@@ -209,8 +211,9 @@ def fixed_outputs(dest, population, label, checkpoints=CHECKPOINTS):
     if (result["epochs"] != EPOCHS or diagnostic.get("population") != population
             or result["selection"]["selected_epoch"] != EPOCHS - 1
             or dumps != [f"ckpt_epoch{e:03d}.bin" for e in range(EPOCHS)]
-            or any(sha(dest / "ckpt" / f"ckpt_epoch{e:03d}.bin") != diagnostic["fixed_checkpoints"][str(e)]["sha256"]
-                   for e in checkpoints)):
+            or not {str(e) for e in checkpoints} & set(diagnostic["fixed_checkpoints"])
+            or any(sha(dest / "ckpt" / f"ckpt_epoch{int(e):03d}.bin") != record["sha256"]
+                   for e, record in diagnostic["fixed_checkpoints"].items())):
         raise ValueError(f"{label}: registered fixed-epoch outputs incomplete")
     return dict(directory=str(dest), result_sha256=sha(dest / "result.json"),
                 checkpoints={str(e): sha(dest / "ckpt" / f"ckpt_epoch{e:03d}.bin") for e in range(EPOCHS)})
@@ -429,13 +432,31 @@ FRONTIER_ARMS = {"MixedAIC64": "mixed-aic64", "MixedAIC256": "mixed-aic256", "Mi
 FRONTIER_SEEDS, FRONTIER_CHECKPOINTS = (0,), (7, 15, 29, 59)
 FRONTIER_REUSED_RUN = Path("/mnt/v/output/zensim/mlic-matched-continuation-folds-20261027-run01")
 FRONTIER_AFTER = Path("/mnt/v/output/zensim/mlic-candidate-gates-20261027-run02/queue.log")
+# Stage A2 (registered 2026-10-27 before any stage A result): each fold's seed-0 AIC-only epoch-59 model continues on
+# the original mixture plus the same fold's AIC table at W = 16, 64 or 256.
+RECOVERY_SCHEMA = "aic-share-recovery-plan-v1"
+RECOVERY_REGISTRATION = dict(record="benchmarks/byconstruction_2026-10-22.md",
+                             section="Stage A2, recovery continuation", commit="b492099e78bbf1b69b5291d23c733b3d315fa09d")
+RECOVERY_ARMS = {"RecoverAIC16": "mixed-aic16", "RecoverAIC64": "mixed-aic64", "RecoverAIC256": "mixed-aic256"}
+RECOVERY_START = ("AICOnly", 59)
+RECOVERY_AFTER = Path("/mnt/v/output/zensim/mlic-aic-share-frontier-20261027-run01")
 
 
 def plan_schema(path):
     schema = json.loads(Path(path).read_text()).get("schema")
-    if schema not in (FOLD_SCHEMA, FRONTIER_SCHEMA):
+    if schema not in (FOLD_SCHEMA, FRONTIER_SCHEMA, RECOVERY_SCHEMA):
         raise ValueError("source-fold or frontier plan required")
     return schema
+
+
+def predecessor_finished(plan_value):
+    """A plan waits for the gates log, or for a predecessor run's completion or failure."""
+    run = plan_value.get("after_run")
+    if run is None:
+        return gates_finished(plan_value.get("after_log"))
+    run = Path(run)
+    state = json.loads((run / "STATE.json").read_text()) if (run / "STATE.json").exists() else {}
+    return (run / "COMPLETE.json").exists() or state.get("stage") == "failed"
 
 
 def fold_runs(plan_value=None):
@@ -482,6 +503,30 @@ def frontier_plan(run, commit, trainer, meta_tool):
                                contrasts=[list(c) for c in contrasts], after_log=str(FRONTIER_AFTER),
                                assessment="stage A seed-0 AIC-share frontier; advancement by the registered rule; no adoption",
                                priority="queued after the candidate gates run02"))
+
+
+def recovery_plan(run, commit, trainer, meta_tool):
+    """Freeze stage A2: each fold's AIC-only epoch-59 model continues on the mixture at W = 16, 64 or 256."""
+    if not (FRONTIER_REUSED_RUN / "COMPLETE.json").exists():
+        raise ValueError("the source-fold study must be complete")
+    arm, epoch = RECOVERY_START
+    starts = {f"s{seed}_k{k}": FRONTIER_REUSED_RUN / "arms" / arm / f"s{seed}_k{k}/ckpt/ckpt_epoch{epoch:03d}.bin"
+              for seed in FRONTIER_SEEDS for k in SOURCE_FOLDS}
+    reused = {name: dict(run_dir=str(FRONTIER_REUSED_RUN), population=ARMS[name], checkpoint_sha256={
+        f"{seed}|{k}|{e}": sha(FRONTIER_REUSED_RUN / "arms" / name / f"s{seed}_k{k}/ckpt/ckpt_epoch{e:03d}.bin")
+        for seed in FRONTIER_SEEDS for k in SOURCE_FOLDS for e in FRONTIER_CHECKPOINTS}) for name in ARMS}
+    groups = [f"{a}@e{e}" for a in RECOVERY_ARMS for e in FRONTIER_CHECKPOINTS]
+    contrasts = [*((g, "Initial") for g in groups), *((g, f"{arm}@e{epoch}") for g in groups)]
+    seven_fold_plan(run, commit, trainer, meta_tool, schema=RECOVERY_SCHEMA, protocol=FRONTIER_PROTOCOL,
+                    registration=RECOVERY_REGISTRATION, arms=RECOVERY_ARMS, seeds=FRONTIER_SEEDS,
+                    checkpoints=FRONTIER_CHECKPOINTS,
+                    extra=dict(aic_weights={a: diagnostic_protocol(p)[1] for a, p in RECOVERY_ARMS.items()},
+                               run_initial={k: dict(path=str(v), sha256=sha(v)) for k, v in starts.items()},
+                               start=dict(arm=arm, epoch=epoch), reused_arms=reused,
+                               reused_complete_sha256=sha(FRONTIER_REUSED_RUN / "COMPLETE.json"),
+                               contrasts=[list(c) for c in contrasts], after_run=str(RECOVERY_AFTER),
+                               assessment="stage A2 seed-0 recovery continuation; advancement by the registered rule; no adoption",
+                               priority="queued after the stage A frontier run"))
 
 
 def seven_fold_plan(run, commit, trainer, meta_tool, schema, protocol, registration, arms, seeds, checkpoints, extra):
@@ -535,12 +580,14 @@ def fold_queue(path):
     """Wait, holding no lock, for the candidate gates queue to end; then take the shared lock."""
     run_dir = path.parent
     schema = plan_schema(path)
-    after = json.loads(path.read_text()).get("after_log", str(GATES_LOG))
-    state = dict(plan_sha256=sha(path), worker=process_snapshot(os.getpid()), stage="waiting-for-candidate-gates",
+    plan_value = json.loads(path.read_text())
+    after = plan_value.get("after_run") or plan_value.get("after_log", str(GATES_LOG))
+    state = dict(plan_sha256=sha(path), worker=process_snapshot(os.getpid()),
+                 stage="waiting-for-predecessor" if "after_run" in plan_value else "waiting-for-candidate-gates",
                  after_log=after, failures=[], checked_utc=now())
     write(run_dir / "QUEUE.json", state, fresh=True)
     try:
-        while not gates_finished(after):
+        while not predecessor_finished(plan_value):
             time.sleep(60)
         checked(path, schema)
         command = ["flock", str(Path.home() / "tmp/heavy.lock"), str(Path.home() / "work/claudehints/scripts/run-heavy"),
@@ -603,8 +650,11 @@ def fold_run(path):
         dest = run_dir / "arms" / arm / f"s{seed}_k{k}"
         scratch = Path.home() / "tmp" / f"{run_dir.name}-{arm}-s{seed}-k{k}"
         scratch.mkdir(parents=True)
+        start = plan_value.get("run_initial", {}).get(f"s{seed}_k{k}")
+        if start and sha(start["path"]) != start["sha256"]:
+            raise ValueError(f"{label}: continuation checkpoint changed")
         command = fit_command(plan_value, run_dir, arm, seed, plan_value["initial"][str(seed)]["directory"],
-                              plan_value["fold_tables"][str(k)]["path"], dest)
+                              plan_value["fold_tables"][str(k)]["path"], dest, start["path"] if start else None)
         dest.parent.mkdir(parents=True, exist_ok=True)
         with (run_dir / "arms" / arm / f"s{seed}_k{k}.log").open("x") as log:
             if subprocess.run(command, stdout=log, stderr=subprocess.STDOUT, env=dict(environment, TMPDIR=str(scratch))).returncode:
@@ -832,8 +882,7 @@ def fold_status(path):
     for log in sorted(run_dir.glob("arms/*/s*_k*/train.log")):
         done = [int(line.split()[1]) for line in log.read_text().splitlines() if line.startswith("  epoch ")]
         logged.append(max(done) if done else -1)
-    state.update(checked_utc=now(), live=live,
-                 gates_finished=gates_finished(json.loads(path.read_text()).get("after_log", str(GATES_LOG))),
+    state.update(checked_utc=now(), live=live, gates_finished=predecessor_finished(json.loads(path.read_text())),
                  fits_complete=len(json.loads((run_dir / "FITS_COMPLETE.json").read_text())["runs"])
                  if (run_dir / "FITS_COMPLETE.json").exists() else 0,
                  logged_epoch_range=[min(logged), max(logged)] if logged else None, logged_runs=len(logged),
@@ -846,7 +895,7 @@ def fold_status(path):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="mode", required=True)
-    for mode in ("plan", "fold-plan", "frontier-plan"):
+    for mode in ("plan", "fold-plan", "frontier-plan", "recovery-plan"):
         p = sub.add_parser(mode)
         p.add_argument("run", type=Path)
         p.add_argument("--source-commit", required=True)
@@ -855,7 +904,7 @@ if __name__ == "__main__":
     for mode in ("queue", "run", "status", "fold-queue", "fold-run", "fold-status"):
         sub.add_parser(mode).add_argument("plan", type=Path)
     args = parser.parse_args()
-    if args.mode in ("plan", "fold-plan", "frontier-plan"):
+    if args.mode in ("plan", "fold-plan", "frontier-plan", "recovery-plan"):
         globals()[args.mode.replace("-", "_")](args.run, args.source_commit, args.trainer, args.meta_tool)
     else:
         globals()[args.mode.replace("-", "_")](args.plan.resolve())

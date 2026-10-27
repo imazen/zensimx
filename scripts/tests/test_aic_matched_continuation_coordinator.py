@@ -170,12 +170,62 @@ class SourceFoldStudy(unittest.TestCase):
     def test_plan_schema_accepts_only_fold_and_frontier_plans(self):
         with tempfile.TemporaryDirectory(dir=Path.home() / "tmp") as tmp:
             path = Path(tmp) / "PLAN.json"
-            for schema in (owner.FOLD_SCHEMA, owner.FRONTIER_SCHEMA):
+            for schema in (owner.FOLD_SCHEMA, owner.FRONTIER_SCHEMA, owner.RECOVERY_SCHEMA):
                 path.write_text(json.dumps(dict(schema=schema)))
                 self.assertEqual(owner.plan_schema(path), schema)
             path.write_text(json.dumps(dict(schema="aic-matched-continuation-plan-v1")))
             with self.assertRaisesRegex(ValueError, "frontier plan required"):
                 owner.plan_schema(path)
+
+    def test_recovery_continues_from_each_folds_checkpoint_at_its_weight(self):
+        with tempfile.TemporaryDirectory(dir=Path.home() / "tmp") as tmp:
+            run = Path(tmp)
+            (run / "cols.txt").write_text("13,14\n")
+            plan = dict(root="/invented/root", columns=str(run / "cols.txt"), arms=owner.RECOVERY_ARMS, seeds=[0])
+            start = "/invented/AICOnly/s0_k2/ckpt/ckpt_epoch059.bin"
+            command = owner.fit_command(plan, run, "RecoverAIC64", 0, "/invented/Mlic/full_s0",
+                                        "/invented/aic_k2_fit.parquet", run / "arms/RecoverAIC64/s0_k2", start)
+            self.assertEqual(command[command.index("--init-from") + 1], start)
+            self.assertEqual(float(command[command.index("--aic-weight") + 1]), 64.0)
+            self.assertEqual(command[command.index("--aic-public-train") + 1], "/invented/aic_k2_fit.parquet")
+            low = owner.fit_command(plan, run, "RecoverAIC16", 0, "/invented/Mlic/full_s0", "/invented/t", run, start)
+            self.assertEqual(low[low.index("--diagnostic-population") + 1], "mixed-aic16")
+            self.assertEqual(len(owner.fold_runs(plan)), 21)
+
+    def test_predecessor_is_a_completed_or_failed_run(self):
+        with tempfile.TemporaryDirectory(dir=Path.home() / "tmp") as tmp:
+            run = Path(tmp)
+            plan = dict(after_run=str(run))
+            self.assertFalse(owner.predecessor_finished(plan))
+            (run / "STATE.json").write_text(json.dumps(dict(stage="fit-folds")))
+            self.assertFalse(owner.predecessor_finished(plan))
+            (run / "STATE.json").write_text(json.dumps(dict(stage="failed")))
+            self.assertTrue(owner.predecessor_finished(plan))
+            (run / "STATE.json").write_text(json.dumps(dict(stage="fit-folds")))
+            (run / "COMPLETE.json").write_text("{}")
+            self.assertTrue(owner.predecessor_finished(plan))
+            log = run / "queue.log"
+            log.write_text("2026-10-27T14:00:00Z GATES-DONE\n")
+            self.assertTrue(owner.predecessor_finished(dict(after_log=str(log))))
+
+    def test_studied_epochs_beyond_the_declared_fixed_checkpoints_use_the_dumps(self):
+        with tempfile.TemporaryDirectory(dir=Path.home() / "tmp") as tmp:
+            dest = Path(tmp)
+            (dest / "ckpt").mkdir()
+            for e in range(owner.EPOCHS):
+                (dest / "ckpt" / f"ckpt_epoch{e:03d}.bin").write_bytes(f"epoch {e}".encode())
+            def result(fixed):
+                (dest / "result.json").write_text(json.dumps(dict(epochs=owner.EPOCHS, selection=dict(selected_epoch=owner.EPOCHS - 1),
+                    diagnostic=dict(population="mixed-aic16", fixed_checkpoints={
+                        str(e): dict(sha256=owner.sha(dest / "ckpt" / f"ckpt_epoch{e:03d}.bin")) for e in fixed}))))
+            result([7, 59])
+            owner.fixed_outputs(dest, "mixed-aic16", "x", (7, 15, 29, 59))
+            (dest / "ckpt/ckpt_epoch059.bin").write_bytes(b"changed")
+            with self.assertRaisesRegex(ValueError, "incomplete"):
+                owner.fixed_outputs(dest, "mixed-aic16", "x", (7, 15, 29, 59))
+            result([7, 59])
+            with self.assertRaisesRegex(ValueError, "incomplete"):
+                owner.fixed_outputs(dest, "mixed-aic16", "x", (15, 29))
 
     def test_fold_plan_refuses_an_existing_run(self):
         with tempfile.TemporaryDirectory(dir=Path.home() / "tmp") as tmp:
