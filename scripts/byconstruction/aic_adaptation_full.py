@@ -151,6 +151,12 @@ def checked_plan(path):
     for name, pin in plan["input_sha256"].items():
         if sha(name) != pin:
             raise ValueError(f"full-data input changed: {name}")
+    if "replay_control" in plan:
+        control = Path(plan["replay_control"])
+        required = ["result.json", "refit/last.bin", "refit/production-f16.bin",
+                    "DATASET_GROUP_SELECTION.json", "dataset-authority.json", "keep_features.txt", "train.log"]
+        if any(str(control / name) not in plan["input_sha256"] for name in required):
+            raise ValueError("reused full control must bind all artifacts and authority")
     return plan
 
 
