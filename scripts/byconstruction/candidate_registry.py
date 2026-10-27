@@ -52,6 +52,11 @@ def full_study(path, pin):
 C += [r for r in full_study("/mnt/v/output/zensim/mlic-aic-full-20261027-run03/FULL_FITS_COMPLETE.json",
                             "18e4c56c28089f340355caaf6d39660087ce1a208ac2bc41d40482cb475cdb25")
       if r[0] not in {c[0] for c in C} and not r[0].startswith("Mlic-")]
+# 2026-10-27: the confidence follow-through's full study (MlicConfidence x initial/8x4/16x8 x 3 seeds; its Mlic and
+# MlicFT rows are the ones registered above).
+C += [r for r in full_study("/mnt/v/output/zensim/mlic-confidence-followthrough-20261027-run01/full/FULL_FITS_COMPLETE.json",
+                            "b8b6fb9240e84b1f7d3d375ef929c6f3dcd45d765d8f38f7ca1c962bc51b20dc")
+      if r[0] not in {c[0] for c in C} and not r[0].startswith("Mlic-")]
 R.mkdir(parents=True, exist_ok=True)
 rows = []
 for name, src, rev, data, gates, note in C:
