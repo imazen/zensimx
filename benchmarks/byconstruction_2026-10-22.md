@@ -5018,3 +5018,16 @@ and requires all three KADID-omission predictions to reproduce the originals
 exactly. Synthetic decision controls retain Mlic on a tie, old-data regression
 or any global inversion. No candidate quality or production qualification has
 yet been measured for this arm.
+
+### Stage-aware supervision (2026-10-27)
+
+`just dataset-study-progress <study>...` resolves the active control/candidate
+population from the recorded command and checks the actual process identity
+and compute-lock ancestry. It also checks a queued launch's PID/start identity
+before reporting it queued. Each study gets a durable `CURRENT_RUN.json` with
+source/binary identity, active population, completed/required cells, current
+processes, lock owner, last check, failure and next action. A dead queue cannot
+report running; completed cells without a live worker or the final screen
+marker report an interrupted chain. Synthetic dead-queue and stage-transition
+controls pass. A TRAIN screen never marks the overall production/HDR goal
+complete.

@@ -528,6 +528,12 @@ dataset-cell-progress cells arm='Mdata' folds='kadid,tid2013,konfig,cid22_a25':
 dataset-run-progress study cells arm folds seeds='0,1,2':
     env BYC_CELLS={{quote(cells)}} OPENBLAS_NUM_THREADS=1 python3 -B scripts/rev4_featpot/byc_cells.py progress --arm {{quote(arm)}} --folds {{quote(folds)}} --seeds {{quote(seeds)}} --run-state {{quote(study)}}/RUN_STATE.json --output {{quote(study)}}/CURRENT_RUN.json --brief
 
+dataset-study-progress +studies:
+    OPENBLAS_NUM_THREADS=1 python3 -B scripts/byconstruction/dataset_study_status.py {{studies}}
+
+dataset-progress-tests:
+    python3 -B -m unittest discover -s scripts/tests -p 'test_dataset_study_status.py' -v
+
 dataset-counts root out:
     OPENBLAS_NUM_THREADS=1 python3 -B scripts/byconstruction/ring_root.py dataset-report --root {{quote(root)}} --out {{quote(out)}}
 
