@@ -9,6 +9,42 @@ from unittest.mock import patch
 from scripts.byconstruction import aic_adaptation_full as owner
 
 
+class FullExtensionInventory(unittest.TestCase):
+    def test_original_and_extension_inventory_cannot_be_interchanged(self):
+        original = dict(schema="aic-recipe-full-plan-v1",recipes=list(owner.RECIPES))
+        extension = dict(schema="aic-confidence-full-plan-v1",recipes=["Mlic","MlicConfidence"])
+        self.assertEqual(6*len(owner.full_recipes(original)),24)
+        self.assertEqual(6*len(owner.full_recipes(extension)),12)
+        with self.assertRaisesRegex(ValueError,"inventory"):
+            owner.full_recipes(dict(original,recipes=extension["recipes"]))
+        with self.assertRaisesRegex(ValueError,"inventory"):
+            owner.full_recipes(dict(extension,recipes=["MlicConfidence"]))
+
+    def test_reuse_requires_all_seeds_without_duplicates(self):
+        rows = [dict(seed=s, value=s+10) for s in range(3)]
+        self.assertEqual(owner.unique_seed(list(reversed(rows)),1)["value"],11)
+        for bad in (rows[:2], [rows[0],rows[0],rows[2]]):
+            with self.assertRaisesRegex(ValueError,"distinct"):
+                owner.unique_seed(bad,0)
+
+    def test_reused_continuation_must_match_strength_and_receipts(self):
+        with tempfile.TemporaryDirectory(dir=Path.home() / "tmp") as tmp:
+            root = Path(tmp)
+            (root / "PLAN.json").write_text("original plan")
+            evidence = root / "result.json"; evidence.write_text("original result")
+            rows = [dict(arm="MlicFT8x4",recipe="Mlic",seed=s,weight=8,epochs=4,
+                         directory=str(root / f"full_s{s}"),input_sha256={str(evidence):owner.sha(evidence)})
+                    for s in range(3)]
+            complete = dict(plan_sha256=owner.sha(root / "PLAN.json"),selector=None,continued=rows)
+            receipt = root / "FULL_FITS_COMPLETE.json";receipt.write_text(json.dumps(complete))
+            self.assertEqual(owner.reused_mlic(dict(reuse_mlic_full=str(root)),1,(8,4)),root / "full_s1")
+            with self.assertRaisesRegex(ValueError,"distinct"):
+                owner.reused_mlic(dict(reuse_mlic_full=str(root)),1,(16,8))
+            evidence.write_text("changed result")
+            with self.assertRaisesRegex(ValueError,"evidence changed"):
+                owner.reused_mlic(dict(reuse_mlic_full=str(root)),1,(8,4))
+
+
 class FullCommands(unittest.TestCase):
     def test_base_recipe_and_common_continuation_are_distinct(self):
         args = [Path("source"), Path("root"), Path("dest"), "1,2,3", 0]

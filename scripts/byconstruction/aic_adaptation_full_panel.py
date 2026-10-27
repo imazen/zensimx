@@ -11,6 +11,8 @@ import time
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from aic_adaptation import FOLDS, RECIPES, SPEC, STRENGTHS, bound_worker, compute_lock, process_snapshot, sha, write
 from aic_adaptation_panel import finite_json
+from aic_adaptation_full import full_recipes
+from aic_adaptation import require_clean_factors
 from aic_adaptation_diagnostics import checked_statistics, complete_mean, ladder_diagnostics
 
 METRICS = ("srocc_signed", "krocc", "plcc", "plcc_raw", "or", "pwrc", "z_rmse", "mae")
@@ -39,12 +41,14 @@ def seed_delta(candidate, baseline):
                 selection_gate=False)
 
 
-def finished(root, pin):
+def finished(root, pin, recipes=RECIPES):
+    if recipes not in (RECIPES, ("Mlic", "MlicConfidence")):
+        raise ValueError("registered full panel recipes required")
     complete = root / "FULL_FITS_COMPLETE.json"
     if complete.exists():
         value = json.loads(complete.read_text())
-        if (value["plan_sha256"] != pin or set(value["initial"]) != set(RECIPES)
-                or any(len(v) != 3 for v in value["initial"].values()) or len(value["continued"]) != 24):
+        if (value["plan_sha256"] != pin or set(value["initial"]) != set(recipes)
+                or any(len(v) != 3 for v in value["initial"].values()) or len(value["continued"]) != 6 * len(recipes)):
             raise ValueError("full-fit completion population differs")
         return True
     state = json.loads((root / "FULL_STATE.json").read_text())
@@ -58,16 +62,18 @@ def finished(root, pin):
 
 def source_pins():
     return {str(p): sha(p) for p in (Path(__file__), Path(__file__).with_name("aic_adaptation_panel.py"),
-            Path(__file__).with_name("aic_adaptation_diagnostics.py"), Path(__file__).with_name("aic_adaptation.py"))}
+            Path(__file__).with_name("aic_adaptation_diagnostics.py"), Path(__file__).with_name("aic_adaptation.py"),
+            Path(__file__).with_name("aic_adaptation_full.py"))}
 
 
 def queue(path, output):
     root, pin, pins = path.parent, sha(path), source_pins()
+    recipes = full_recipes(json.loads(path.read_text()))
     state = dict(stage="waiting-for-full-fits", worker=process_snapshot(os.getpid()), plan_sha256=pin,
                  source_sha256=pins, failures=[], output=str(output), checked_utc=datetime.now(timezone.utc).isoformat())
     write(root / "FULL_PANEL_QUEUE.json", state, fresh=True)
     try:
-        while not finished(root, pin):
+        while not finished(root, pin, recipes):
             time.sleep(30)
         if sha(path) != pin or any(sha(p) != digest for p, digest in pins.items()):
             raise ValueError("queued full panel changed")
@@ -105,8 +111,10 @@ def run(path, output):
     if queued["plan_sha256"] != sha(path) or queued["source_sha256"] != source_pins():
         raise ValueError("full panel source or input identity changed")
     plan = json.loads(path.read_text())
+    recipes = full_recipes(plan)
+    require_clean_factors(os.environ)
     fold = json.loads(Path(plan["fold_plan"]).read_text())
-    if sha(plan["fold_plan"]) != plan["fold_plan_sha256"] or not finished(path.parent, sha(path)):
+    if sha(plan["fold_plan"]) != plan["fold_plan_sha256"] or not finished(path.parent, sha(path), recipes):
         raise ValueError("full-fit prerequisite changed")
     for name, pin in plan["input_sha256"].items():
         if sha(name) != pin:
@@ -126,7 +134,7 @@ def run(path, output):
     from v2_human_role import D6_INPUT_PINS
     output.mkdir()
     state = dict(stage="bind-full-evidence", worker=process_snapshot(os.getpid()), source_sha256=source_pins(),
-                 completed_predictions=0, required_predictions=360, failures=[], objective_complete=False)
+                 completed_predictions=0, required_predictions=90 * len(recipes), failures=[], objective_complete=False)
     def stage(name, **details):
         state.update(stage=name, checked_utc=datetime.now(timezone.utc).isoformat(), **details)
         write(output / "STATE.json", state)
@@ -136,8 +144,8 @@ def run(path, output):
         stage("bind-full-evidence")
         fits = json.loads((path.parent / "FULL_FITS_COMPLETE.json").read_text())
         records = [dict(r, arm=recipe) for recipe, rows in fits["initial"].items() for r in rows] + fits["continued"]
-        expected = {(arm, s) for recipe in RECIPES for arm in [recipe, *(f"{recipe}FT{w}x{e}" for w, e in STRENGTHS)] for s in range(3)}
-        if len(records) != 36 or {(r["arm"], r["seed"]) for r in records} != expected:
+        expected = {(arm, s) for recipe in recipes for arm in [recipe, *(f"{recipe}FT{w}x{e}" for w, e in STRENGTHS)] for s in range(3)}
+        if len(records) != 9 * len(recipes) or {(r["arm"], r["seed"]) for r in records} != expected:
             raise ValueError("all full recipe/strength/seed cells required")
         for row in records:
             directory = Path(row["directory"])
@@ -185,7 +193,7 @@ def run(path, output):
                     jobs.append((label, values, target))
                     description = dict(arm=row["arm"], seed=row["seed"], representation=representation, population=name,
                         label=label, prediction_sha256=sha(destination), geometry=legacy.geometry(values, target),
-                        sample="zero-shot initialization" if name == "aic" and row["arm"] in RECIPES else "in sample")
+                        sample="zero-shot initialization" if name == "aic" and row["arm"] in recipes else "in sample")
                     if name == "aic":
                         description["ladder"] = ladder_diagnostics(pairs, values, target, np.ones(len(target), bool), logistic_fit)
                     descriptions.append(description)
@@ -221,8 +229,8 @@ def run(path, output):
             row["statistics"] = value
         save("AGGREGATE_PANELS.json", dict(panels=aggregate_rows, aggregation="three fixed seeds' mean predictions",
               serving_model="fixed seed zero; the three-seed mean is a stability diagnostic, not the serving model"))
-        contrasts = [(f"{recipe}FT{w}x{e}", recipe) for recipe in RECIPES for w, e in STRENGTHS]
-        contrasts += [(f"{recipe}FT{w}x{e}", f"MlicFT{w}x{e}") for recipe in RECIPES[1:] for w, e in STRENGTHS]
+        contrasts = [(f"{recipe}FT{w}x{e}", recipe) for recipe in recipes for w, e in STRENGTHS]
+        contrasts += [(f"{recipe}FT{w}x{e}", f"MlicFT{w}x{e}") for recipe in recipes[1:] for w, e in STRENGTHS]
         paired = {}
         for arm, control in contrasts:
             for representation in REPRESENTATIONS:

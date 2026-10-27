@@ -17,7 +17,7 @@ import time
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from aic_adaptation import RECIPES, SPEC, STRENGTHS, bound_worker, compute_lock, process_snapshot, process_tree, sha, write
-from aic_adaptation import require_prediction_parity, zero_checkpoint
+from aic_adaptation import require_prediction_parity, zero_checkpoint, require_clean_factors
 
 
 def fit_command(source, root, output, columns, seed, *, initial=None, strength=None, aic=None, matching=None):
@@ -142,15 +142,79 @@ def panel_finished(plan):
     return False
 
 
+def full_recipes(plan):
+    expected = {"aic-recipe-full-plan-v1": RECIPES,
+                "aic-confidence-full-plan-v1": ("Mlic", "MlicConfidence")}.get(plan.get("schema"))
+    if expected is None or plan.get("recipes") != list(expected):
+        raise ValueError("registered full recipe inventory differs")
+    return expected
+
+
+def unique_seed(rows, seed):
+    if len(rows) != 3 or {r["seed"] for r in rows} != {0, 1, 2}:
+        raise ValueError("all three distinct fixed seeds required")
+    return next(r for r in rows if r["seed"] == seed)
+
+
+def confidence_initial(plan, seed, root_pin):
+    from mlic_confidence_full import full_binding
+    from confidence_weights import verify_receipt
+    root = Path(plan["confidence_full"])
+    complete = json.loads((root / "FULL_FITS_COMPLETE.json").read_text())
+    if complete["plan_sha256"] != sha(root / "PLAN.json") or complete["selector"] is not None:
+        raise ValueError("confidence full-fit completion differs")
+    prior_plan = json.loads((root / "PLAN.json").read_text())
+    for name, pin in prior_plan["input_sha256"].items():
+        if sha(name) != pin:
+            raise ValueError("confidence full-fit prerequisite changed")
+    row = unique_seed(complete["models"], seed)
+    dest = Path(row["directory"])
+    current = check_fit(dest, seed, root_pin)
+    if any(current[k] != row[k] for k in current):
+        raise ValueError("completed confidence model or recipe changed")
+    binding = full_binding(prior_plan["registry"], prior_plan["input_sha256"][prior_plan["registry"]], seed)
+    receipt = dest / "CONFIDENCE_NORMALIZERS.json"
+    if (row["confidence_manifest_sha256"] != binding["sha256"]
+            or row["confidence_receipt_sha256"] != verify_receipt(receipt, binding)):
+        raise ValueError("full confidence native receipt changed")
+    current["input_sha256"].update({binding["path"]:binding["sha256"], str(receipt):sha(receipt)})
+    return dict(current, recipe="MlicConfidence", reused=True)
+
+
+def reused_mlic(plan, seed, strength):
+    root = Path(plan["reuse_mlic_full"])
+    complete = json.loads((root / "FULL_FITS_COMPLETE.json").read_text())
+    if complete["plan_sha256"] != sha(root / "PLAN.json") or complete["selector"] is not None:
+        raise ValueError("original Mlic continuation completion differs")
+    weight, epochs = strength
+    arm = f"MlicFT{weight}x{epochs}"
+    rows = [r for r in complete["continued"] if r["arm"] == arm]
+    row = unique_seed(rows, seed)
+    if row["recipe"] != "Mlic" or (row["weight"], row["epochs"]) != strength:
+        raise ValueError("reused Mlic recipe/strength changed")
+    for name, pin in row["input_sha256"].items():
+        if sha(name) != pin:
+            raise ValueError("reused Mlic continuation evidence changed")
+    return Path(row["directory"])
+
+
 def checked_plan(path):
     plan = json.loads(path.read_text())
-    if (plan["schema"] != "aic-recipe-full-plan-v1" or plan["selection"] != "full-panel-no-srocc-cutoff"
-            or plan["recipes"] != list(RECIPES) or plan["coordinator_sha256"] != sha(__file__)
+    full_recipes(plan)
+    if (plan["selection"] != "full-panel-no-srocc-cutoff"
+            or plan["coordinator_sha256"] != sha(__file__)
             or sha(plan["fold_plan"]) != plan["fold_plan_sha256"]):
         raise ValueError("full-data study registration differs")
     for name, pin in plan["input_sha256"].items():
         if sha(name) != pin:
             raise ValueError(f"full-data input changed: {name}")
+    if plan["schema"] == "aic-confidence-full-plan-v1":
+        required = [Path(plan[key]) / name for key in ("confidence_full", "reuse_mlic_full")
+                    for name in ("PLAN.json", "FULL_FITS_COMPLETE.json")]
+        required += [Path(__file__).with_name(name) for name in
+                     ("mlic_confidence_full.py", "confidence_weights.py", "aic_adaptation.py")]
+        if any(str(p) not in plan["input_sha256"] for p in required):
+            raise ValueError("full confidence extension requires pinned completed initial fits and Mlic controls")
     if "replay_control" in plan:
         control = Path(plan["replay_control"])
         required = ["result.json", "refit/last.bin", "refit/production-f16.bin",
@@ -168,7 +232,7 @@ def record(root, state, stage, **changes):
 def queue(path):
     plan, root = checked_plan(path), path.parent
     state = dict(stage="waiting-for-fold-panel", plan_sha256=sha(path), worker=process_snapshot(os.getpid()),
-                 completed=[], failures=[], required_initial=12, required_continued=24, objective_complete=False,
+                 completed=[], failures=[], required_initial=3 * len(full_recipes(plan)), required_continued=6 * len(full_recipes(plan)), objective_complete=False,
                  source_commit=plan["coordinator_commit"], next_action="complete every registered full-data recipe")
     write(root / "FULL_STATE.json", state, fresh=True)
     try:
@@ -227,6 +291,8 @@ def status(path):
 
 def run(path):
     plan, output = checked_plan(path), path.parent
+    recipes = full_recipes(plan)
+    require_clean_factors(os.environ)
     if not compute_lock(os.getpid())["held_by_worker_ancestor"]:
         raise ValueError("full-data work requires the canonical compute lock")
     fold_plan = json.loads(Path(plan["fold_plan"]).read_text())
@@ -257,14 +323,18 @@ def run(path):
                                            order_bin / "bake_dial_refit", output / "control-parity")
         write(output / "CONTROL_VERIFIED.json", dict(nonrepro_byte_identical=True, parity=parity,
               original=original[0], replay=control_result), fresh=True)
-        record(output, state, "full-matching")
-        execute("matching", [sys.executable, "-B", str(order_source / "scripts/rev4_featpot/matched_codec.py"),
-                              str(output / "matching"), "--full"], order_bin)
-        matching = json.loads((output / "matching/MANIFESTS.json").read_text())
-        if matching["schema"] != "mlic-full-codec-cells-v1" or set(matching["cells"]) != {"0", "1", "2"}:
-            raise ValueError("three full-model matching schedules required")
+        matching = None
+        if "MlicOrder" in recipes:
+            record(output, state, "full-matching")
+            execute("matching", [sys.executable, "-B", str(order_source / "scripts/rev4_featpot/matched_codec.py"),
+                                  str(output / "matching"), "--full"], order_bin)
+            matching = json.loads((output / "matching/MANIFESTS.json").read_text())
+            if matching["schema"] != "mlic-full-codec-cells-v1" or set(matching["cells"]) != {"0", "1", "2"}:
+                raise ValueError("three full-model matching schedules required")
         initial = dict(Mlic=[dict(r, recipe="Mlic", reused=True) for r in original.values()])
         def base_fit(recipe, seed):
+            if recipe == "MlicConfidence":
+                return confidence_initial(plan, seed, fold_plan["common_root_sha256"])
             study = Path(fold_plan["recipe_authority"][recipe])
             source = order_source if recipe == "MlicOrder" else study / "source"
             binary = order_bin if recipe == "MlicOrder" else study / "bin"
@@ -278,7 +348,7 @@ def run(path):
             return dict(row, recipe=recipe, trainer_sha256=sha(binary / "zensim_mlp_train"))
         record(output, state, "initial-full-fits")
         with ThreadPoolExecutor(max_workers=6) as pool:
-            futures = {pool.submit(base_fit, recipe, seed): (recipe, seed) for recipe in RECIPES[1:] for seed in range(3)}
+            futures = {pool.submit(base_fit, recipe, seed): (recipe, seed) for recipe in recipes[1:] for seed in range(3)}
             for future in as_completed(futures):
                 try:
                     row = future.result()
@@ -303,7 +373,7 @@ def run(path):
         from subjective_training_leg import linked_subset_exclusions
         if cells.HERE.resolve() != source / "scripts/rev4_featpot":
             raise ValueError("full zero-step owner resolved outside frozen source")
-        for recipe in RECIPES:
+        for recipe in recipes:
             start = Path(initial[recipe][0]["directory"]) / "refit/last.bin"
             dest = output / "zero-step" / recipe
             command = [sys.executable, "-B", str(source / "scripts/rev4_featpot/v2_lodo_mlp.py"),
@@ -332,8 +402,11 @@ def run(path):
             start = Path(initial[recipe][seed]["directory"]) / "refit/last.bin"
             if sha(start) != initial[recipe][seed]["checkpoint_sha256"]:
                 raise ValueError("full initial checkpoint changed")
-            reused = recipe == "Mlic" and strength == (16, 8)
-            dest = (Path(fold_plan["reuse_mlic"]) / "full" / arm / f"full_s{seed}") if reused else output / "continued" / arm / f"full_s{seed}"
+            reused = recipe == "Mlic" and ("reuse_mlic_full" in plan or strength == (16, 8))
+            if recipe == "Mlic" and "reuse_mlic_full" in plan:
+                dest = reused_mlic(plan, seed, strength)
+            else:
+                dest = (Path(fold_plan["reuse_mlic"]) / "full" / arm / f"full_s{seed}") if reused else output / "continued" / arm / f"full_s{seed}"
             if not reused:
                 execute(f"{arm}-s{seed}", fit_command(Path(fold_plan["warmstart_source"]), common, dest, columns, seed,
                     initial=start, strength=strength, aic=Path(fold_plan["aic_folds"]) / "aic_full_fit.parquet"), Path(fold_plan["bin"]))
@@ -342,7 +415,7 @@ def run(path):
         continued = []
         with ThreadPoolExecutor(max_workers=6) as pool:
             futures = {pool.submit(continuation, recipe, seed, strength): (recipe, seed, strength)
-                       for recipe in RECIPES for seed in range(3) for strength in STRENGTHS}
+                       for recipe in recipes for seed in range(3) for strength in STRENGTHS}
             for future in as_completed(futures):
                 try:
                     row = future.result()

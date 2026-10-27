@@ -31,6 +31,19 @@ class FullPanelIntegrity(unittest.TestCase):
         with self.assertRaises(ValueError):
             owner.seed_delta({0: 2.}, {0: 1.})
 
+    def test_confidence_population_cannot_replace_original_four_arms(self):
+        with tempfile.TemporaryDirectory(dir=Path.home() / "tmp") as tmp:
+            root = Path(tmp)
+            recipes = ("Mlic", "MlicConfidence")
+            complete = dict(plan_sha256="pin",initial={r:[{}, {}, {}] for r in recipes},continued=[{}]*12)
+            path = root / "FULL_FITS_COMPLETE.json";path.write_text(json.dumps(complete))
+            self.assertTrue(owner.finished(root,"pin",recipes))
+            with self.assertRaisesRegex(ValueError,"population"):
+                owner.finished(root,"pin")
+            complete["continued"].pop();path.write_text(json.dumps(complete))
+            with self.assertRaisesRegex(ValueError,"population"):
+                owner.finished(root,"pin",recipes)
+
     def test_stale_fitter_or_partial_completion_cannot_start_panels(self):
         with tempfile.TemporaryDirectory(dir=Path.home() / "tmp") as directory:
             root = Path(directory)

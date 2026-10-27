@@ -105,6 +105,40 @@ and inherited confidence factors. Run-heavy rc=0, 0s, peak RSS 0.12 GiB,
 minimum available 24,299 MiB, peak load 0.12. This validates orchestration
 boundaries; confidence adaptation has not run yet.
 
+### Separate confidence AIC full-data extension — registered October 27, 2026
+
+`aic-confidence-full-plan-v1` is exactly Mlic plus MlicConfidence. It requires
+six initial models and twelve continuations: the three original Mlic full
+models, three completed independent confidence full fits, and both common AIC
+strengths for all seeds. The six Mlic continuations are reused from the complete
+four-arm full-data study, with their completion-plan identity, three-seed
+inventory, recipe/strength, result/input hashes and final model checks. Only
+six new confidence continuations are needed. No best-seed selection or SROCC
+eligibility cutoff is introduced.
+
+Confidence initial reuse requires its completed full-fit plan, every pinned
+prerequisite, exact recipe/final119/packed identity and per-seed manifest/native
+normalizer receipt. It does not refit the base model inside the continuation
+owner. Common continuation rejects inherited confidence factors and keeps the
+same original Mlic root, fresh Adam, fixed budgets and zero-step prediction
+identity controls. Order matching is performed only in the original four-arm
+protocol. The original protocol remains 12 initial models plus 24 continuations;
+its smaller confidence counterpart cannot satisfy those counts.
+
+The same full panel owner covers 18 models × two representations × five
+populations = 180 prediction outputs, plus both mixture checks and the existing
+statistics/source/codec/seed/whole-source uncertainty panels. The original
+four-arm panel remains 36 models / 360 predictions. Serving-f16 versus final-f32
+still includes calibration and is not isolated packing error. Running plans,
+source snapshots and results remain immutable. No confidence extension is yet
+queued: exact completed omission/full-fit hashes must exist first.
+
+All 32 AIC orchestration/panel controls pass on i265, including refusal of
+missing/duplicate seeds, mismatched protocol inventories, wrong reuse strength,
+changed reuse evidence and partial full-panel completion. Run-heavy rc=0, 0s,
+peak RSS 0.12 GiB, minimum available 24,296 MiB, peak load 0.16. These are
+orchestration controls, not evidence of completed confidence fits or adoption.
+
 ### Active goal and decisions
 
 Keep working toward a stable, production-qualified candidate while preserving
