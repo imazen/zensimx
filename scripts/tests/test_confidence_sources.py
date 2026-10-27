@@ -58,5 +58,19 @@ class NativeUncertainty(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,"population authority"):
             source.kadid(path,pin,{"a"},self.ledger)
 
+    def test_population_join_uses_frozen_keys_and_exact_native_reference(self):
+        import confidence_population as population
+        p,_=self.put("ids.tsv","item\tref\tscore\nd/I02_01_1.bmp\tr/I02.bmp\tforbidden\n")
+        native={"kadid-10k":{},"tid2013":population.identities(p)}
+        keys=[dict(pair_key="a"*64,member_set="tid2013",ref_basename="tid:I02")]
+        bank=dict(ref_group="tid:I02",dist_path="d/I02_01_1.png",ref_path="r/I02.png",
+                  ref_pixels_sha256="b"*64,dist_pixels_sha256="c"*64)
+        rows=population.bind_human(keys,{"tid2013":{"a"*64:bank}},native)
+        self.assertEqual(rows[0]["native"]["row"],0)
+        self.assertEqual(rows[0]["table_row"],0)
+        bank["ref_group"]="tid:I03"
+        with self.assertRaisesRegex(ValueError,"reference identity"):
+            population.bind_human(keys,{"tid2013":{"a"*64:bank}},native)
+
 
 if __name__=="__main__":unittest.main()

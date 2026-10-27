@@ -461,3 +461,21 @@ reconstruction therefore needs fresh metadata/family admission for its
 eligible calibration sources before their observations are interpreted.
 This is independent of the native uncertainty audit and the active vote and
 queued ordering trials; it does not authorize using the old composite export.
+
+The metadata-only fitting-population audit now binds the original root's
+frozen receipts and row keys to native item/reference identifiers. Its
+`POPULATIONS.json` is preserved under
+`/mnt/v/output/zensim/mlic-confidence-populations-20261027`, SHA256
+`38abff1307e1c3c7246d00f76ae341fd58b3024f8545ae590bf1dace79847773`.
+The full fitting leg contains 6,659 KADID and 1,680 TID2013 eligible rows;
+its separate omission views exclude the corresponding dataset. The two new
+MOS legs bind 210 LIVE-MD and 320 Colourlab rows. No response or uncertainty
+value was parsed. Synthetic identity tests reject a mismatched reference.
+
+The next source audit may read only those selected native uncertainty values,
+using the pinned release variance/count semantics above and a preread ledger.
+It must preserve native targets, report missing uncertainty as an explicit
+failure, and keep LIVE-MD's observer-model admission pending until its exact
+fit population is verified. This audit constructs no training weights and
+fits no calibration or model; the subsequent confidence experiment still
+requires its own complete TRAIN-only calibration and registration.

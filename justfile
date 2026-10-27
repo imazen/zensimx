@@ -426,6 +426,10 @@ dataset-order-tests:
 dataset-confidence-tests:
     python3 -B -m unittest discover -s scripts/tests -p 'test_confidence_sources.py' -v
 
+# Small metadata/key reads only; no feature, score or uncertainty payloads.
+dataset-confidence-populations output:
+    OPENBLAS_NUM_THREADS=1 python3 -B scripts/byconstruction/confidence_population.py {{quote(output)}}
+
 dataset-eval-tests binary:
     ZEN_PANEL_BIN={{quote(binary)}} python3 -B -m unittest discover -s scripts/tests -p 'test_dataset_eval.py' -v
 
