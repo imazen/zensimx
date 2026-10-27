@@ -2737,3 +2737,25 @@ first be implemented without relaxing the frozen 0/4/8-epoch authority.
 The historical evidence and input hashes are linked from the session results
 page. Confidence control was verified live at epoch 76/120 at 08:41 UTC;
 resolve current processes and artifacts before reusing that observation.
+
+### Owner-directed return to original Claude session — October 27, 2026
+
+The owner requested transfer of the entire production-candidate objective,
+all live jobs, new directives and subsequent seamless native-precision HDR
+qualification back to the original Claude session. This is a transfer of
+supervision, not completion or adoption. The current report, completed study
+receipts and latest matched-continuation registration remain authoritative.
+Confidence control and its queued follow-through must continue under the
+receiving session; neither should be restarted from the old compacted recap.
+At 08:47:45 UTC the control was live at logged epoch98/120, and the existing
+follow-through worker was alive waiting for omissions. Re-resolve both.
+
+All implementation changes are committed. The matched population/budget
+continuation diagnostic is registered but not implemented or launched.
+Main lacks the frozen warm-start integration: reuse its verified historical
+owner selectively, preserving newer vote/confidence/ordering code and all
+admission guards. This source integration is the next preparation step;
+it does not replace supervision of the active confidence sequence.
+A dated non-release checkpoint tag records the outgoing state. The receiving
+session must acknowledge actual live job identities before Codex relinquishes
+supervision. No model is production-qualified by this transfer.
