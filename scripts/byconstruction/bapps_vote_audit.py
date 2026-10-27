@@ -6,6 +6,7 @@ probability and the published two-judge protocol. It never predicts a vote.
 """
 import argparse
 from collections import Counter
+from datetime import datetime, timezone
 import hashlib
 import io
 import json
@@ -19,7 +20,7 @@ import numpy as np
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent/"rev4_featpot"))
 from ring_root import dataset_family_guard, dataset_targets
-from run_processes import compute_lock
+from run_processes import compute_lock, process_snapshot
 
 ARCHIVE_SHA = "b4f5c772c7cd88ac44bcb4ff0741745d434c05f0094f2bfb262ddcd0055bf393"
 MEMBERSHIP_SHA = "96e5acc0d01c412d81e9a5259df5a6af903550a2d85138cc3b45fd6f75f9b669"
@@ -67,6 +68,14 @@ def audit(args):
     if sha(args.root/"wide/frozen.json") != ROOT_SHA or sha(args.policy) != POLICY_SHA:
         raise ValueError("original Mlic root and corrected policy required")
     args.output.mkdir()
+    state = dict(run_directory=str(args.output), pid=os.getpid(),
+        start_ticks=process_snapshot(os.getpid())["start_ticks"], source_sha256=sha(__file__),
+        compute_lock=compute_lock(os.getpid()), required=146003, complete=0,
+        next_action="verify every frozen TRAIN judge before supplying recovered counts")
+    def progress(stage, **details):
+        state.update(stage=stage,checked_utc=datetime.now(timezone.utc).isoformat(),**details)
+        (args.output/"CURRENT_RUN.json").write_text(json.dumps(state,indent=2)+"\n")
+    progress("metadata-admission")
     guard, memberships = dataset_family_guard(args.admission, args.root, args.output/"FAMILY_GUARD.json")
     if guard["membership_sha256"]["bapps"] != MEMBERSHIP_SHA or guard["inherited_leaks"]:
         raise ValueError("frozen TRAIN membership/family guard changed")
@@ -80,6 +89,7 @@ def audit(args):
     ledger.write_text(json.dumps(dict(role="TRAIN", reads=[dict(kind="opaque-archive-integrity-hash",
         path=str(args.archive), expected_sha256=ARCHIVE_SHA, interpreted_judgments=0,
         parsed_judgment_members=sorted(wanted), excluded_judgments_parsed=False)]),indent=1)+"\n")
+    progress("opaque-archive-integrity-hash")
     if sha(args.archive) != ARCHIVE_SHA:
         raise ValueError("released TRAIN archive pin changed")
     labels = dataset_targets(args.library/"bapps/pairs.tsv", {m["row_index"] for m in members},
@@ -89,6 +99,7 @@ def audit(args):
                                     archive_sha256=ARCHIVE_SHA,state="authorized-before-read"))
     ledger.write_text(json.dumps(ledger_data,indent=1)+"\n")
     rows = {}
+    progress("native-TRAIN-judge-audit")
     # The pinned .tar.gz is an uncompressed tar. Seek past image bodies and
     # excluded judge arrays; no extraction and no member cache.
     with tarfile.open(args.archive, "r:", stream=True) as archive:
@@ -107,6 +118,8 @@ def audit(args):
                 raw = stream.read()
             rows[index] = dict(row=index, source=f"bapps:pairs.tsv:{index}", judge_member=name,
                 judge_sha256=hashlib.sha256(raw).hexdigest(), **recover(raw,label))
+            if len(rows) % 10000 == 0:
+                progress("native-TRAIN-judge-audit",complete=len(rows))
     if set(rows) != {m["row_index"] for m in members}:
         raise ValueError("released judge coverage incomplete")
     counts = args.output/"recovered-counts.json"
@@ -125,6 +138,7 @@ def audit(args):
     (args.output/"AUDIT.json").write_text(json.dumps(receipt,indent=2)+"\n")
     ledger_data["reads"][-1]["state"] = "verified"
     ledger.write_text(json.dumps(ledger_data,indent=1)+"\n")
+    progress("verified",complete=len(rows),next_action="fresh vote preparation with independently pinned audit")
     print(json.dumps(receipt))
 
 
@@ -132,4 +146,13 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ("root","admission","library","policy","archive","output"):
         parser.add_argument("--"+name,type=Path,required=True)
-    audit(parser.parse_args())
+    args = parser.parse_args()
+    try:
+        audit(args)
+    except Exception as error:
+        progress_path = args.output/"CURRENT_RUN.json"
+        if progress_path.exists():
+            state = json.loads(progress_path.read_text())
+            state.update(stage="failed",failure=repr(error),checked_utc=datetime.now(timezone.utc).isoformat())
+            progress_path.write_text(json.dumps(state,indent=2)+"\n")
+        raise
