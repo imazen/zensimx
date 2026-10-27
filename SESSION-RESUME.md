@@ -30,11 +30,11 @@ requirement, not a candidate-selection cutoff. See the prospective
 
 ### Verify live work before doing anything else
 
-**Latest verified observation — 2026-10-27 06:03:37 UTC:** AIC fold run03
+**Latest verified observation — 2026-10-27 06:06:03 UTC:** AIC fold run03
 has completed **96/96** cells (24 verified reuses plus 72 new fits), with no
-reported failures. Fold panels have all **144/144** model predictions and are
-running native mixture checks. Compute-lock holder PID 2003152 belongs to the
-panel worker ancestry. Full fits and full panels wait behind that worker.
+reported failures. Fold panels, including both mixture checks, are complete for **144/144** models.
+Full-data training is running its unweighted control; compute-lock holder PID
+2521269 belongs to that worker ancestry. Full panels wait behind full fits.
 Re-resolve these observations with the command below before acting.
 
 Confidence admission, all eight linking scopes and all 28 retained native
@@ -48,8 +48,9 @@ admission run02 root; the screen coordinator alone reports an earlier stage.
 but incorrectly declare logical width 410. The original recipe has 1,853 raw
 inputs plus 410 registered derived products: logical width **2,263**, with
 410 direct and 410 derived selected inputs. This was caught before any
-confidence training. Preserve run02; generate a fresh run03 with the corrected
-producer and exact derived declaration hash. Then verify native receipts,
+confidence training. Preserve run02. Corrected run03 is complete for all 21 manifests, index SHA256
+`9dd58d78711449b9c699165ae8651ae632010acfd8875bed4cc4affdec73ad16`,
+source `482485e8`. Next build that native trainer on i265, verify native receipts,
 complete a full-budget unweighted byte-parity control, and run all 21 fixed-epoch
 TRAIN cells. Maintain the live AIC queue's priority. Do not change frozen
 inputs, sampler/tie behavior, loss definitions or historical verdicts.
@@ -75,8 +76,8 @@ directory when frozen orchestration changes.
 | 1 | `/mnt/v/output/zensim/mlic-order-20261027-run02` | 21/21 omission fits complete; historical screen rejected Order, still eligible for AIC. Source `27ed3745`; trainer `441bda58…`. |
 | 2 | `/mnt/tower/output/zensim/mlic-confidence-admission-20261027-run02` | Source screen/admission, eight linking scopes and 28 native maps complete; contrast integration under validation; 0/21 candidate fits. |
 | 3 | `/mnt/v/output/zensim/mlic-aic-adaptation-20261027-run03` | 96/96 fold continuations complete: 72 new + 24 identity-checked Mlic reuses. |
-| 4 | Same fold root, `panels/` | 144/144 model predictions complete; native mixture checks running. Separate fitted/held-out source panels. |
-| 5 | `/mnt/v/output/zensim/mlic-aic-full-20261027-run02` | Full-budget control, 9 new base fits + 3 Mlic reuses, then 24 continuations (21 new + 3 reuses). |
+| 4 | Same fold root, `panels/` | 144/144 model panels and both mixture checks complete; separate fitted/held-out source panels. |
+| 5 | `/mnt/v/output/zensim/mlic-aic-full-20261027-run02` | Full-budget control running; 9 new base fits + 3 Mlic reuses, then 24 continuations (21 new + 3 reuses). |
 | 6 | Same full root, `panels/` | 36 models × 2 representations × 5 populations = 360 prediction outputs, plus both mixture tests. |
 
 The compute lock holder was PID 1832007, an ancestor of the replacement

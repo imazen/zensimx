@@ -5801,3 +5801,12 @@ Clippy has not been rerun for this private integration.
 `scripts/byconstruction/candidate_registry.py` references the absent historical
 `zensim--rev7main/` checkout. No new confidence-owner lint finding was reported.
 Do not fabricate that checkout or alter frozen candidate provenance to hide it.
+
+
+Corrected binding run03 is complete for all 21 cells, each logical width 2,263;
+index SHA256 `9dd58d78711449b9c699165ae8651ae632010acfd8875bed4cc4affdec73ad16`,
+source `482485e8`. Source snapshot and provenance are beside the manifests.
+`rc=0 3s | peak-RSS 0.37GiB | min-avail 24083MiB | peak-load 0.43`.
+At 06:06:03 UTC, AIC fold panels and both mixture reports are complete;
+full-data followthrough has started its unweighted control. No new confidence
+fit or production adoption has occurred.
