@@ -14,7 +14,7 @@ import pyarrow.parquet as pq
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "rev4_featpot"))
 from subjective_training_leg import DATASET_FOLDS, document, sha
-from stimulus_identity import PAIRS_SHA, source_metadata
+from bank_pins import PINNED_MANIFEST_SHA
 
 # Exact frozen root; kept separate from its transport/archive location.
 ROOT_SHA = "a7fd4af0c2bb5a8981be636e5c1cb1a51db57496b7c60d7bf6da01d71dd16952"
@@ -34,7 +34,7 @@ def identity(row):
     return tuple(row[name] for name in sorted(KEYS))
 
 
-def human_scope(fold, all_fit, retained_fit, assessment, sources):
+def human_scope(fold, all_fit, retained_fit, assessment, banks):
     """Preserve the complete omitted assessment population, including non-fit references."""
     members = MEMBERS[fold]
     if not all_fit or not assessment:
@@ -53,19 +53,24 @@ def human_scope(fold, all_fit, retained_fit, assessment, sources):
         raise ValueError("omitted fitting observations are not in the full assessment")
     references = {}
     for row in assessment:
-        source = sources[row["source_row_id"]]
+        source = banks[row["member_set"]][row["pair_key"]]
         name = row["ref_basename"]
-        if Path(source["ref_path"]).stem.lower() != name.split(":")[-1].lower():
-            raise ValueError("source-row reference differs from frozen reference identity")
-        entry = references.setdefault(name, dict(reference_group=name, source_paths=set(), members=set()))
+        if source["ref_group"] != name:
+            raise ValueError("bank reference differs from frozen reference identity")
+        entry = references.setdefault(name, dict(reference_group=name, source_paths=set(), members=set(), pixels=set()))
         entry["source_paths"].add(source["ref_path"])
         entry["members"].add(row["member_set"])
+        pixel = (source["ref_pixels_sha256"], source["width"], source["height"])
+        if len(pixel[0]) != 64 or any(type(v) is not int or v <= 0 for v in pixel[1:]):
+            raise ValueError("native reference pixel identity or dimensions differ")
+        entry["pixels"].add(pixel)
     return dict(omitted_members=sorted(members), removed_fit_rows=len(removed),
         retained_fit_rows=len(retained_fit), full_assessment_rows=len(assessment),
         fitting_reference_count=len({r["ref_basename"] for r in removed}),
         full_assessment_reference_count=len(references),
         reference_identities=[dict(reference_group=k, source_paths=sorted(v["source_paths"]),
-            members=sorted(v["members"])) for k, v in sorted(references.items())])
+            members=sorted(v["members"]), pixels=[dict(sha256=h, width=w, height=t) for h, w, t in sorted(v["pixels"])])
+            for k, v in sorted(references.items())])
 
 
 def dataset_families(collection, rows, expected_rows):
@@ -81,13 +86,25 @@ def dataset_families(collection, rows, expected_rows):
     return sorted(families)
 
 
-def prepare(root, source_pairs, output):
+def prepare(root, bank, output):
     frozen = document(root / "wide/frozen.json", ROOT_SHA)
     wide_path = root / "wide/main/real/receipt.json"
     wide = document(wide_path, frozen["wide_receipts"]["main/real"])
-    inputs = {str(root / "wide/frozen.json"): ROOT_SHA, str(wide_path): sha(wide_path),
-        str(source_pairs): PAIRS_SHA}
-    sources = source_metadata(source_pairs, PAIRS_SHA)
+    inputs = {str(root / "wide/frozen.json"): ROOT_SHA, str(wide_path): sha(wide_path)}
+    banks = {}
+    for member in sorted(set().union(*MEMBERS.values())):
+        mp = bank / member / "_MANIFEST.json"
+        manifest = document(mp, PINNED_MANIFEST_SHA[member])
+        kp = bank / member / "keys.parquet"
+        pin = manifest["files"]["keys.parquet"]["sha256"]
+        if sha(kp) != pin:
+            raise ValueError("original promoted reference keys changed")
+        inputs[str(mp)] = PINNED_MANIFEST_SHA[member]
+        inputs[str(kp)] = pin
+        rows = pq.read_table(kp, columns=["pair_key", "ref_group", "ref_path", "ref_pixels_sha256", "width", "height"]).to_pylist()
+        banks[member] = {r["pair_key"]: r for r in rows}
+        if len(banks[member]) != len(rows):
+            raise ValueError("ambiguous promoted pixel key")
 
     def keys(description):
         path = root / description["rel"]
@@ -110,7 +127,7 @@ def prepare(root, source_pairs, output):
     for fold in MEMBERS:
         retained = keys(wide["legs"][f"human_without_{fold}"]["fit"])
         assessment = keys(wide["legs"][fold]["full"])
-        human = human_scope(fold, all_fit, retained, assessment, sources)
+        human = human_scope(fold, all_fit, retained, assessment, banks)
         if human["full_assessment_reference_count"] != wide["legs"][fold]["full"]["references"]:
             raise ValueError("full assessment reference coverage differs")
         folds[fold] = dict(human=human, prior_dataset_family_ids=[], omitted_collections=[])
@@ -158,7 +175,7 @@ def prepare(root, source_pairs, output):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("root", type=Path)
-    parser.add_argument("source_pairs", type=Path)
+    parser.add_argument("bank", type=Path)
     parser.add_argument("output", type=Path)
     args = parser.parse_args()
-    prepare(args.root, args.source_pairs, args.output)
+    prepare(args.root, args.bank, args.output)

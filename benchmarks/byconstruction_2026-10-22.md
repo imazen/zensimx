@@ -5547,3 +5547,20 @@ or family mutations. The resource wrapper recorded
 `rc=0 0s | peak-RSS 0.07GiB | min-avail 24494MiB | peak-load 0.03`.
 The owner is `scripts/byconstruction/confidence_omissions.py`, exposed through
 `just dataset-confidence-omissions`; the real metadata run follows this check.
+
+The first real metadata run refused before output: KonFiG/CID22 source-row
+numbers are local to their collections and do not index the KADID/TID source
+file. Its reference guard caught this mismatch; no source was admitted and no
+response interpreted. The corrected adapter uses each collection's pinned
+bank pair key/reference group and retains reference pixel hashes/dimensions.
+Distinct observation IDs remain distinct. Original manifest constants were
+moved unchanged into a passive shared owner, avoiding filesystem reads merely
+to import those identities. The canonical bank resolver selected the original
+preserved snapshot, since mutable promoted manifests have changed.
+
+Four controls now pass, including colliding row numbers across collections:
+`rc=0 1s | peak-RSS 0.07GiB | min-avail 24508MiB | peak-load 0.07`.
+Run01 and its failed join are retained at
+`/mnt/tower/output/zensim/mlic-confidence-omissions-20261027-run01`.
+Run02 has a readback-verified identifier-only snapshot of all six member
+manifests and key tables. No feature/label-bearing bank table was transported.

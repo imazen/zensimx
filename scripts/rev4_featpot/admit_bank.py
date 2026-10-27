@@ -14,23 +14,15 @@ import numpy as np
 import pyarrow as pa
 import pyarrow.parquet as pq
 
+from bank_pins import PINNED_MANIFEST_SHA
+
 
 PROMOTED_BANK = Path("/var/tmp/rev4-featbank/bank")
 SNAPSHOT_BANK = Path("/var/tmp/rev4-featpot/bank_snapshot")
 SNAPSHOT_RECEIPT_SHA = "1c61f154e3f8f263e2c7e2f3ac125f98a9d94653cf616518087bd00048e899fc"
 OUT = Path("/var/tmp/rev4-featpot/admitted")
 FEATURE_SET_ID = "basic+peaks+masked+iw+v2+append+append2@w944/ceiling_rev3#b782e349"
-PINNED_MANIFEST_SHA = {
-    "kadid_train": "6976a3ce05fa52552883ac380c85bdfd4cbeb800be23077299069d2b78769b30",
-    "tid2013": "ec305b5e610dc36815a91c7faf533dd1000cdba5f4faa59a14f4ab924bb69c1d",
-    "konfig_train": "2a48a0c3f3686dce24ef9e1288cec0907df17531df32f345d91eda0b1ad8e405",
-    "konjnd_bpg_train": "f0badfe8d26e69fb79839458749c385b32d04734e36116bd5c40f25749046292",
-    "konjnd_bpg_val": "59f7099930cde8b2899ad3f76f826a7e12f3615938356fa370ec0ad79d9c2cf9",
-    "cid22_a25": "38474bc10a3ad6d89965dcf3cabdc10e7fb677b0ce76606ccd9e73c4ef9009f4",
-    "aic3": "e73441296ec64433198a537b5fe0dd340003a3bced446848a8b38c4ba22dc389",
-    "kadid_select": "c8807a25089e0d354c8cff068477edca410b33cc82085ddc2ec86930af24183b",
-    "konfig_val": "b2fc90e103312ec86968ede3fc0d820b4dc45a48df7e37c3bebd4efff945605e",
-}
+
 EXPECTED_TARGET = {
     "kadid_train": "human_score",
     "tid2013": "human_score",
