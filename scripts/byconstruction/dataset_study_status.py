@@ -46,12 +46,16 @@ def status(study):
         live = bound_worker(q["pid"],q["start_ticks"])
         failure_path = study/"LAUNCH_FAILED.json"
         failure = json.loads(failure_path.read_text()) if failure_path.exists() else None
+        cancel_path = study/"QUEUE_CANCELLED.json"
+        cancellation = json.loads(cancel_path.read_text()) if cancel_path.exists() else None
         result = dict(run_directory=str(study),source_commit=queue["source_commit"],
             binary_sha256=queue["binary_sha256"],declared_stage="queued",complete=0,requested=21,
             checked_utc=datetime.now(timezone.utc).isoformat(),worker_alive=False,queue_alive=bool(live),
             live_processes=process_tree(q["pid"]) if live else [],compute_lock=compute_lock(q["pid"] if live else None),
-            status="failed" if failure else "queued" if live else "queue-exited-without-starting",
-            failure=failure,next_action=queue["next_action"],objective_complete=False)
+            status="failed" if failure else "queued" if live else "canceled-before-start" if cancellation else "queue-exited-without-starting",
+            cancellation=cancellation,failure=failure,
+            next_action="preserve canceled attempt; inspect replacement study" if cancellation and not live else queue["next_action"],
+            objective_complete=False)
     path = study/"CURRENT_RUN.json"
     temporary = path.with_suffix(".json.new")
     temporary.write_text(json.dumps(result,indent=1)+"\n")

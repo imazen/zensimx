@@ -5055,3 +5055,11 @@ admission controls pass on i265, including repeated pixel keys, distinct
 source observations and stable bidirectional matching.
 `run-heavy: done rc=0 137s | peak-RSS 2.11GiB | min-avail 18705MiB | peak-load 11.39`.
 This is a correctness-check resource record, not an inference benchmark.
+
+The replacement queue uses `just dataset-order-queue`, an attached coordinator
+that records its PID/start identity before waiting for the shared compute
+slot. It verifies committed source and trainer pins, preserves the complete
+launch log, and writes a durable failure if launching the chain fails. Status
+distinguishes an intentionally canceled queue from an unexplained dead one;
+neither is reported running. A synthetic failed-launch control checks the
+actual command construction and durable failure path without running a fit.

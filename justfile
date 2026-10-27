@@ -533,6 +533,10 @@ dataset-vote-chain study source_commit trainer_sha256:
 dataset-order-chain study source_commit trainer_sha256:
     OPENBLAS_NUM_THREADS=1 python3 -B scripts/byconstruction/mlic_neff_chain.py {{quote(study)}} --source-commit {{quote(source_commit)}} --candidate MlicOrder --trainer-sha256 {{quote(trainer_sha256)}}
 
+# Attached coordinator records queue identity before acquiring the shared slot.
+dataset-order-queue study source_commit trainer_sha256:
+    OPENBLAS_NUM_THREADS=1 python3 -B scripts/byconstruction/dataset_queue.py {{quote(study)}} {{quote(source_commit)}} {{quote(trainer_sha256)}}
+
 dataset-cell-progress cells arm='Mdata' folds='kadid,tid2013,konfig,cid22_a25':
     env BYC_CELLS={{quote(cells)}} OPENBLAS_NUM_THREADS=1 python3 -B scripts/rev4_featpot/byc_cells.py progress --arm {{quote(arm)}} --folds {{quote(folds)}}
 
