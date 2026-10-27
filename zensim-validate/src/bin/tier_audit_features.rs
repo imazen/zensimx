@@ -137,6 +137,16 @@ impl Input {
 
 fn decode_rgb16(path: &str) -> (Vec<[u16; 4]>, usize, usize) {
     let img = image::open(path).unwrap_or_else(|e| panic!("decode {path}: {e}"));
+    // Widening 8-bit samples would silently invent code values; translucency has no
+    // meaning on the opaque HDR route.
+    match img.color() {
+        image::ColorType::Rgb16 => {}
+        image::ColorType::Rgba16 => assert!(
+            img.to_rgba16().pixels().all(|p| p[3] == u16::MAX),
+            "{path}: translucent pixels; --hdr-pq needs opaque input"
+        ),
+        other => panic!("{path}: {other:?}; --hdr-pq needs 16-bit RGB code values"),
+    }
     let rgb = img.to_rgb16();
     let (w, h) = (rgb.width() as usize, rgb.height() as usize);
     let raw = rgb.into_raw();
