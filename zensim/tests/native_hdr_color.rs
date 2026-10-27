@@ -65,6 +65,52 @@ fn transform(pixels: &[[f32; 4]], primaries: ColorPrimaries) -> Vec<[f32; 4]> {
         .collect()
 }
 
+/// Independent f64 display light for native PQ/HLG codes on the default
+/// display (1000-nit peak, black plus reflected-ambient lift), expressed in
+/// sRGB primaries through the checked f32 matrix.
+fn independent_display_light(
+    pixels: &[[u16; 4]],
+    encoding: HdrEncoding,
+    prim: ColorPrimaries,
+) -> Vec<[f32; 4]> {
+    let lift = 0.005 + 250. * 0.005 / std::f64::consts::PI;
+    let v: Vec<[f32; 4]> = pixels
+        .iter()
+        .map(|p| {
+            let c: [f64; 3] = core::array::from_fn(|i| f64::from(p[i]) / 65535.);
+            let rgb = match encoding {
+                HdrEncoding::Pq { .. } => c.map(|v| {
+                    let t = v.powf(32. / 2523.);
+                    let l = 10000.
+                        * ((t - 3424. / 4096.).max(0.) / (2413. / 128. - 2392. / 128. * t))
+                            .powf(16384. / 2610.);
+                    l.min(1000.) + lift
+                }),
+                HdrEncoding::Hlg { .. } => {
+                    let c = c.map(|v| {
+                        if v <= 0.5 {
+                            v * v / 3.
+                        } else {
+                            ((v - 0.55991073) / 0.17883277).exp() / 12.
+                                + (1. - 4. * 0.17883277) / 12.
+                        }
+                    });
+                    let y = match prim {
+                        ColorPrimaries::Srgb => [0.2126390059, 0.7151686788, 0.0721923154],
+                        ColorPrimaries::DisplayP3 => [0.2289745641, 0.6917385218, 0.0792869141],
+                        _ => [0.2627, 0.6780, 0.0593],
+                    };
+                    let l = (0..3).map(|i| y[i] * c[i]).sum::<f64>();
+                    c.map(|v| 1000. * l.powf(0.2) * v + lift)
+                }
+                _ => unreachable!(),
+            };
+            [rgb[0] as f32, rgb[1] as f32, rgb[2] as f32, 1.]
+        })
+        .collect();
+    transform(&v, prim)
+}
+
 fn source(pixels: &[[f32; 4]], w: usize, h: usize, p: ColorPrimaries) -> StridedBytes<'_> {
     StridedBytes::with_alpha_mode(
         bytemuck::cast_slice(pixels),
@@ -182,7 +228,6 @@ fn pq_and_hlg_native_u16_agree_with_independent_display_light() {
         .enumerate()
         .map(|(i, p)| [p[0] - 400, p[1] + (i % 500) as u16, p[2] - 200, 65535])
         .collect();
-    let lift = 0.005 + 250. * 0.005 / std::f64::consts::PI;
     for prim in [
         ColorPrimaries::Srgb,
         ColorPrimaries::DisplayP3,
@@ -195,48 +240,7 @@ fn pq_and_hlg_native_u16_agree_with_independent_display_light() {
                 ambient_lux: 5.,
             },
         ] {
-            let decode = |pixels: &[[u16; 4]]| -> Vec<[f32; 4]> {
-                let v: Vec<[f32; 4]> = pixels
-                    .iter()
-                    .map(|p| {
-                        let c: [f64; 3] = core::array::from_fn(|i| f64::from(p[i]) / 65535.);
-                        let rgb = match encoding {
-                            HdrEncoding::Pq { .. } => c.map(|v| {
-                                let t = v.powf(32. / 2523.);
-                                let l = 10000.
-                                    * ((t - 3424. / 4096.).max(0.)
-                                        / (2413. / 128. - 2392. / 128. * t))
-                                        .powf(16384. / 2610.);
-                                l.min(1000.) + lift
-                            }),
-                            HdrEncoding::Hlg { .. } => {
-                                let c = c.map(|v| {
-                                    if v <= 0.5 {
-                                        v * v / 3.
-                                    } else {
-                                        ((v - 0.55991073) / 0.17883277).exp() / 12.
-                                            + (1. - 4. * 0.17883277) / 12.
-                                    }
-                                });
-                                let y = match prim {
-                                    ColorPrimaries::Srgb => {
-                                        [0.2126390059, 0.7151686788, 0.0721923154]
-                                    }
-                                    ColorPrimaries::DisplayP3 => {
-                                        [0.2289745641, 0.6917385218, 0.0792869141]
-                                    }
-                                    _ => [0.2627, 0.6780, 0.0593],
-                                };
-                                let l = (0..3).map(|i| y[i] * c[i]).sum::<f64>();
-                                c.map(|v| 1000. * l.powf(0.2) * v + lift)
-                            }
-                            _ => unreachable!(),
-                        };
-                        [rgb[0] as f32, rgb[1] as f32, rgb[2] as f32, 1.]
-                    })
-                    .collect();
-                transform(&v, prim)
-            };
+            let decode = |pixels: &[[u16; 4]]| independent_display_light(pixels, encoding, prim);
             let ar = decode(&a);
             let br = decode(&b);
             let native = |p: &[[u16; 4]]| {
@@ -693,6 +697,104 @@ fn rev7_native_u16_preserves_one_code_steps_through_supported_hdr_entry() {
                 identity.features(),
                 "one u16 code step disappeared: {encoding:?} {prim:?}"
             );
+        }
+    }
+}
+
+/// Rev7's supported HDR entry decodes native PQ/HLG codes to the same display
+/// light as the independent f64 reference, in every tested container, within
+/// the legacy test's unchanged tolerance.
+#[test]
+fn rev7_native_pq_hlg_match_independent_display_light_through_supported_hdr_entry() {
+    use zensim::feature_v2::FormulaRevision;
+    if zensim::feature_v2::active_formula_revision() != FormulaRevision::Rev7 {
+        let status = std::process::Command::new(std::env::current_exe().unwrap())
+            .env("ZENSIM_FORMULA_REV", "7")
+            .args([
+                "--exact",
+                "rev7_native_pq_hlg_match_independent_display_light_through_supported_hdr_entry",
+                "--test-threads=1",
+            ])
+            .status()
+            .unwrap();
+        assert!(status.success());
+        return;
+    }
+    let (w, h) = (97, 65);
+    let a: Vec<[u16; 4]> = (0..w * h)
+        .map(|i| {
+            [
+                10000 + (i * 37 % 35000) as u16,
+                15000 + (i * 19 % 30000) as u16,
+                12000 + (i * 11 % 28000) as u16,
+                65535,
+            ]
+        })
+        .collect();
+    let b: Vec<_> = a
+        .iter()
+        .enumerate()
+        .map(|(i, p)| [p[0] - 400, p[1] + (i % 500) as u16, p[2] - 200, 65535])
+        .collect();
+    fn native(p: &[[u16; 4]], w: usize, h: usize, prim: ColorPrimaries) -> StridedBytes<'_> {
+        StridedBytes::with_alpha_mode(
+            bytemuck::cast_slice(p),
+            w,
+            h,
+            w * 8,
+            PixelFormat::Srgb16Rgba,
+            AlphaMode::Opaque,
+        )
+        .with_color_primaries(prim)
+    }
+    let z = Zensim::new(ZensimProfile::B).with_parallel(false);
+    let toggles = V2NewFeatureToggles::default();
+    for prim in [
+        ColorPrimaries::Srgb,
+        ColorPrimaries::DisplayP3,
+        ColorPrimaries::Bt2020,
+    ] {
+        for encoding in [
+            HdrEncoding::Pq { peak_nits: 1000. },
+            HdrEncoding::Hlg {
+                peak_nits: 1000.,
+                ambient_lux: 5.,
+            },
+        ] {
+            let actual = z
+                .compute_folded720_features_hdr(
+                    &native(&a, w, h, prim),
+                    &native(&b, w, h, prim),
+                    encoding,
+                    toggles,
+                    &mut V2Scratch::new(),
+                )
+                .unwrap();
+            let (ar, br) = (
+                independent_display_light(&a, encoding, prim),
+                independent_display_light(&b, encoding, prim),
+            );
+            let expected = z
+                .compute_folded720_features_hdr(
+                    &source(&ar, w, h, ColorPrimaries::Srgb),
+                    &source(&br, w, h, ColorPrimaries::Srgb),
+                    HdrEncoding::Linear,
+                    toggles,
+                    &mut V2Scratch::new(),
+                )
+                .unwrap();
+            assert_eq!(actual.features().len(), expected.features().len());
+            for (id, (x, y)) in actual
+                .features()
+                .iter()
+                .zip(expected.features())
+                .enumerate()
+            {
+                assert!(
+                    x.is_finite() && (x - y).abs() < 1e-3 * y.abs().max(1.),
+                    "Rev7 {prim:?} {encoding:?} f{id}: {x} vs {y}"
+                );
+            }
         }
     }
 }
