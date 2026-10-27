@@ -6970,3 +6970,16 @@ mixtures, near-identity and the label-free gates. No adoption follows from Stage
 The native and Python admissions add a second registered protocol, `aic-share-frontier-v1`, beside the matched
 diagnostic's. It admits only these three populations, each at its own public_train weight, with the four
 checkpoints. The matched diagnostic's own rules are unchanged.
+
+**Stage A2, recovery continuation (registered 2026-10-27, about 13:50 UTC, before any stage A result).**
+- Schedule: AIC first, then recovery. Each fold's seed-0 AIC-only epoch-59 model from the source-fold study
+  continues 60 more epochs (constant LR 1e-5, fresh Adam). It trains on the original mixture plus the same fold's AIC
+  table, at W = 16, 64 or 256.
+- Checkpoints 7, 15, 29 and 59.
+- Out-of-fold validity holds: in neither phase does a fold model see its held-out sources.
+- Its points join stage A's frontier under the same panels and the same advancement rule.
+- Comparisons: the starting AIC-only model (how much AIC the recovery gives back) and the initial Mlic (what the older
+  sets regain).
+- Admission is unchanged: the populations are the registered ones, and only the continuation checkpoint differs.
+- The sampler stays a declared function of seed, groups and weights. Loss-driven reweighting would break that
+  replay contract and is not used.
