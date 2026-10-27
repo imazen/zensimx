@@ -30,10 +30,11 @@ requirement, not a candidate-selection cutoff. See the prospective
 
 ### Verify live work before doing anything else
 
-Observed on dev at **2026-10-27 04:51:06 UTC**: Order was running, **20/21**
-cells complete; the remaining cells had entered training. Its full-budget
-unweighted control was byte-identical on all 7,869 predictions. The five
-downstream stages were queued with no reported failure. This is a dated
+Observed on dev at **2026-10-27 04:55:32 UTC**: Order had completed **21/21**
+cells and both mixture checks. Its full-budget unweighted control was
+byte-identical on all 7,869 predictions. The replacement confidence screen
+was running after successful native decoding; four replacement AIC stages
+were queued with no reported failure. This is a dated
 observation, not a future claim that the processes are still alive.
 
 Run `TMPDIR="$HOME/tmp" JUST_TEMPDIR="$HOME/tmp" just mlic-priority-progress`.
@@ -46,23 +47,23 @@ directory when frozen orchestration changes.
 
 | Order | Run directory, checked on dev | Required work / state at the observation |
 |---|---|---|
-| 1 | `/mnt/v/output/zensim/mlic-order-20261027-run02` | 21 omission fits; 20 complete, 1 active. Source `27ed3745`; trainer `441bda58…`. |
-| 2 | `/mnt/tower/output/zensim/mlic-confidence-admission-20261027-run01` | Native source screen, **PLAN-v2.json**; waits for Order. No quality responses. |
-| 3 | `/mnt/v/output/zensim/mlic-aic-adaptation-20261027-run02` | 96 fold continuations: 72 new + 24 identity-checked Mlic reuses; waits for source screen. |
+| 1 | `/mnt/v/output/zensim/mlic-order-20261027-run02` | 21/21 omission fits complete; historical screen rejected Order, still eligible for AIC. Source `27ed3745`; trainer `441bda58…`. |
+| 2 | `/mnt/tower/output/zensim/mlic-confidence-admission-20261027-run02` | Native source screen, **PLAN.json**; native decode complete, source screen running. No quality responses. |
+| 3 | `/mnt/v/output/zensim/mlic-aic-adaptation-20261027-run03` | 96 fold continuations: 72 new + 24 identity-checked Mlic reuses; waits for source screen. |
 | 4 | Same fold root, `panels/` | 48 initial + 96 continued models; separate fitted/held-out source panels. |
-| 5 | `/mnt/v/output/zensim/mlic-aic-full-20261027-run01` | Full-budget control, 9 new base fits + 3 Mlic reuses, then 24 continuations (21 new + 3 reuses). |
+| 5 | `/mnt/v/output/zensim/mlic-aic-full-20261027-run02` | Full-budget control, 9 new base fits + 3 Mlic reuses, then 24 continuations (21 new + 3 reuses). |
 | 6 | Same full root, `panels/` | 36 models × 2 representations × 5 populations = 360 prediction outputs, plus both mixture tests. |
 
-The compute lock holder was PID 1017472, an ancestor of Order coordinator
-1341080 (start ticks 229427382). Re-resolve it with the status command; do not
+The compute lock holder was PID 1832007, an ancestor of the replacement
+confidence source-screen worker. Re-resolve it with the status command; do not
 act on these old PID numbers. Queues use frozen source snapshots and serialized
 resource scopes. Do not rerun from moving main over their frozen paths.
 
 Plan SHA-256 bindings:
 
-- Confidence source screen: `8e33269e3ec70b71f48a1c74b508fe3ed493a156afea9202d1c2eee82024576a`.
-- AIC fold run02: `1cfdfdf601efefc79a8e8292cf077776f52c071ddc780965051cb503bc3adca7`.
-- AIC full run01: `633362ce633d5f172041ac88728c61552c0b16e4368480933c8d27c092144bf7`.
+- Confidence source screen run02: `5514892579153da37ae638aa30e4194917fdf3bb6282aeb6ca793f9430268fc1`.
+- AIC fold run03: `98f72bda706481f885ddd1c295e0ce3ab9c1f38f29d8afd0c59115022a8afa54`.
+- AIC full run02: `220bc378937354fc5cc7ca394eda580a343765ba83a39a3c94f471a840c1147a`.
 
 Source owners: fold adaptation `86748f41`, fold panels `3ab3f980`, full-data
 Order admission `042c89e0`, full fits `7ec5f55f`, full panels `aa300e1d`.
@@ -73,9 +74,19 @@ The full Order binary is separate from the running omission binary.
 
 **Do not restart AIC fold run01.** It was cancelled before fitting because the
 new caller assumed `last.bin` at zero steps; the frozen trainer exports the
-receipt-selected `best.bin` at zero epochs. Run02 checks that receipt and exact
+receipt-selected `best.bin` at zero epochs. Run03 retains run02's correction and checks that receipt and exact
 prediction parity. Positive-step continuation still requires the final epoch.
-The old run01's frozen warm-start source remains a pinned input to run02.
+The old run01's frozen warm-start source remains a pinned input to run03.
+
+**Do not restart the failed dependency chain.** At 04:52:35 UTC admission
+run01 failed on an absent generic packed-reader path; fold run02, its panel,
+and full run01 plus panel then refused their failed dependencies before fitting.
+All are preserved. Admission run02 uses the unchanged original reader under
+its verified hash-suffixed name and coordinator `fc8836f1`, which now requires
+that dependency before queueing. Fold run03/full run02 retain identical source,
+scientific inputs, recipes and budgets; only dependency/output bindings change.
+The new source-screen root also contains the remapped metadata-only
+`FREEZE_REQUEST.json`. It is not queued and grants no response permission.
 
 ### What the AIC comparison means
 
@@ -157,8 +168,8 @@ adapter and purpose-bound calibration-response adapter are not implemented yet.
 
 ### Completed evidence and next production work
 
-Neff and Vote each completed 21/21 original TRAIN cells and failed their
-historical SROCC screen. Both remain in the new AIC comparison. Their immutable
+Neff, Vote and Order each completed 21/21 original TRAIN cells and failed
+their historical SROCC screens. All remain in the new AIC comparison. Their immutable
 roots are `/mnt/v/output/zensim/mlic-neff-20261026` and
 `/mnt/v/output/zensim/mlic-vote-20261027-run02`; the study record carries paired
 statistics and resource logs. No new default or qualified winner follows.

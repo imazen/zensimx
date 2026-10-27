@@ -574,11 +574,11 @@ dataset-study-progress +studies:
 # Read live processes and artifacts for the registered October 27 queue; starts no work.
 mlic-priority-progress:
     @just dataset-study-progress /mnt/v/output/zensim/mlic-order-20261027-run02
-    @just dataset-confidence-admission status /mnt/tower/output/zensim/mlic-confidence-admission-20261027-run01/PLAN-v2.json
-    @just aic-recipe-adaptation status /mnt/v/output/zensim/mlic-aic-adaptation-20261027-run02/PLAN.json
-    @just aic-recipe-adaptation-panel status /mnt/v/output/zensim/mlic-aic-adaptation-20261027-run02/PLAN.json /mnt/v/output/zensim/mlic-aic-adaptation-20261027-run02/panels
-    @just aic-recipe-adaptation-full status /mnt/v/output/zensim/mlic-aic-full-20261027-run01/PLAN.json
-    @just aic-recipe-adaptation-full-panel status /mnt/v/output/zensim/mlic-aic-full-20261027-run01/PLAN.json /mnt/v/output/zensim/mlic-aic-full-20261027-run01/panels
+    @just dataset-confidence-admission status /mnt/tower/output/zensim/mlic-confidence-admission-20261027-run02/PLAN.json
+    @just aic-recipe-adaptation status /mnt/v/output/zensim/mlic-aic-adaptation-20261027-run03/PLAN.json
+    @just aic-recipe-adaptation-panel status /mnt/v/output/zensim/mlic-aic-adaptation-20261027-run03/PLAN.json /mnt/v/output/zensim/mlic-aic-adaptation-20261027-run03/panels
+    @just aic-recipe-adaptation-full status /mnt/v/output/zensim/mlic-aic-full-20261027-run02/PLAN.json
+    @just aic-recipe-adaptation-full-panel status /mnt/v/output/zensim/mlic-aic-full-20261027-run02/PLAN.json /mnt/v/output/zensim/mlic-aic-full-20261027-run02/panels
 
 dataset-progress-tests:
     python3 -B -m unittest discover -s scripts/tests -p 'test_dataset_study_status.py' -v

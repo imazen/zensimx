@@ -5601,3 +5601,30 @@ missing/unbound reader refusal before native work (`rc=0 0s | peak-RSS 0.02GiB |
 min-avail 24506MiB | peak-load 0.04`). Fresh admission/fold/full run directories
 preserve failed outputs. Their scientific populations, recipe/seed budgets,
 source-screen controls and full-panel policy remain unchanged.
+
+Order's immutable TRAIN result SHA256 is
+`e82ab44b6f9d6a62ed1a50e754af0d1e5979cc206ded92ef09440b663262e9db`.
+Paired old/new/balanced mean deltas were -0.002100909334729025,
++0.0005991971695652835 and -0.0007508560825818522, with seed-unit SEs
+0.00042630698299435675, 0.000633077031635272 and 0.0005203539720612126.
+All 21 Order cells have zero global-mixture inversions. The frozen screen
+retains Mlic; no EVAL read or adoption follows. Order remains eligible in
+the owner's new full-panel AIC study. Resource receipt:
+`rc=0 7084s | peak-RSS 3.43GiB | min-avail 19911MiB | peak-load 15.35`.
+
+At 04:55:32 UTC replacement admission run02 was running its source screen,
+native decode complete, with lock-holder PID1832007. The four replacement
+AIC stages were alive/queued, without failure. Current plans are:
+
+- `/mnt/tower/output/zensim/mlic-confidence-admission-20261027-run02/PLAN.json`,
+  SHA `5514892579153da37ae638aa30e4194917fdf3bb6282aeb6ca793f9430268fc1`.
+- `/mnt/v/output/zensim/mlic-aic-adaptation-20261027-run03/PLAN.json`,
+  SHA `98f72bda706481f885ddd1c295e0ce3ab9c1f38f29d8afd0c59115022a8afa54`.
+- `/mnt/v/output/zensim/mlic-aic-full-20261027-run02/PLAN.json`,
+  SHA `220bc378937354fc5cc7ca394eda580a343765ba83a39a3c94f471a840c1147a`.
+
+Only the admission preflight owner changes (`fc8836f1`). AIC source owners,
+all existing input pins, full Order source/binary, recipes, thresholds and
+budgets remain unchanged. Old source snapshots remain explicit frozen inputs.
+`just mlic-priority-progress` now resolves the replacement chain. Do not
+restart the preserved failed plans or treat old state files as live progress.
