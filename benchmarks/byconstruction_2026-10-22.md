@@ -7287,3 +7287,58 @@ arm is Vote ×256 at epoch 29**: it keeps its older sets and exceeds the advance
   under the same two conditions: out-of-fold AIC more than 0.002 higher, and E21 out of sample (three-seed mean) no
   more than 0.005 lower on any dataset. That needs the Vote point's step-2 run, queued after the Mlic omission run.
   The comparison against stage A's Mlic point is still reported.
+
+### Stage D: result (2026-10-27, fits complete 19:40 UTC)
+
+Run `mlic-aic-xref-20261027-run01`. **The control holds**: this trainer refits stage A's ×256 seed 0 fold 0 byte for
+byte at epochs 7, 15, 29 and 59 (without zentrain.repro). Exposure at e59: ×256 draws 74.8% AIC, 9.5% rehearsal and
+9.3% human; ×1024 draws 92.2% AIC, 2.9% rehearsal and 2.9% human. Initial zero-shot 0.9094. Older sets in sample,
+mean over fold models, against the initial model; "vs static" is the same weight and epoch without the leg (stage A),
+with the whole-source 95% interval.
+
+| Point | Out-of-fold AIC | vs static, same W and epoch | KADID | TID2013 | KonFiG | CID22-A | Keeps |
+|---|---:|---|---:|---:|---:|---:|---|
+| ×256 + rehearsal e7 | 0.9288 | −0.0024 [−0.004, −0.000] | +0.0076 | −0.0008 | +0.0019 | +0.0163 | yes |
+| ×256 + rehearsal e15 | 0.9338 | −0.0021 [−0.004, −0.001] | +0.0069 | −0.0033 | +0.0011 | +0.0168 | yes |
+| ×256 + rehearsal e29 | 0.9362 | −0.0023 [−0.004, −0.001] | +0.0060 | −0.0032 | +0.0007 | +0.0205 | yes |
+| **×256 + rehearsal e59** | **0.9390** | −0.0029 [−0.005, −0.001] | +0.0053 | −0.0049 | +0.0012 | +0.0237 | **yes** |
+| ×1024 + rehearsal e7 | 0.9366 | −0.0010 [−0.002, −0.000] | +0.0015 | −0.0101 | −0.0071 | +0.0168 | no |
+| ×1024 + rehearsal e15 | 0.9393 | −0.0018 [−0.003, −0.001] | −0.0022 | −0.0136 | −0.0118 | +0.0206 | no |
+| ×1024 + rehearsal e29 | 0.9425 | −0.0009 [−0.002, +0.001] | −0.0056 | −0.0161 | −0.0133 | +0.0240 | no |
+| ×1024 + rehearsal e59 | 0.9458 | −0.0007 [−0.002, +0.001] | −0.0101 | −0.0196 | −0.0138 | +0.0263 | no |
+
+The leg does what it was meant to: at ×256 the older sets stay within 0.005 through epoch 59, where static ×256 loses
+KonFiG −0.011 and TID2013 −0.009. These are in-sample panels, whose order the leg trains directly, so they do
+not decide; E21 out of sample does. It costs 0.001–0.003 out-of-fold AIC at the same weight and epoch, so it moves the
+trade-off rather than escaping it. At ×1024 it shrinks the losses by about a quarter to a half (TID2013 −0.020 against
+static's −0.026 at e59) but keeps at no checkpoint. TID2013 and KonFiG remain the binding sets, as in every earlier
+stage.
+
+**Registered decision.** D's candidate is ×256 + rehearsal at e59 (0.93899). It is 0.00210 above the Vote point
+(0.93689), just past the 0.002 bar, so E21 out of sample decides: the candidate's omission run
+(`mlic-aic-omission-xrefaic256-20261027-run01`, the twelve Mlic omission cells continued at ×256 with the leg) is
+frozen and queued behind the Vote point's. Against stage A's Mlic point (0.9312) the margin is +0.0078 (reported).
+The best keeper so far is therefore 0.939 out of fold. 0.95 is still out of reach while keeping the older sets:
+AIC-only continuation reaches 0.9515 (KADID −0.197) and ×1024 + rehearsal 0.9458 (TID2013 −0.020); neither keeps.
+
+### Stage E: Vote with the rehearsal leg (registered 2026-10-27, 19:49 UTC, after stage D's result, before any stage E fit)
+
+**Why.** Vote (stage B) and the rehearsal leg (stage D) each cut the older-set loss at a given AIC weight, through
+different legs: Vote changes how BAPPS votes enter the loss; the rehearsal leg adds each older human set's
+cross-reference order. At ×256 e29, Vote's TID2013/KonFiG losses are −0.0048/−0.0040 and the rehearsal leg's
+−0.0032/+0.0007, against static's −0.0073/−0.0095. Stage E asks whether the two add, which would move the keeping
+frontier further toward 0.95.
+
+**Arms.** MlicVote's full seed 0, on its own root, continued at AIC ×256 and ×1024 with the rehearsal leg (the same
+human table and weight 32.37, pairs within each dataset). Seven folds, 60 epochs, LR 1e-5, fresh Adam, checkpoints 7,
+15, 29 and 59, the same panels. Contrasts: Vote's initial model and stage D's rehearsal arm at the same weight and
+epoch. Control: this trainer (`b3b86f18…`) replays Vote's 120-epoch full fit byte for byte without zentrain.repro
+(stage B's control owner). Both weights run in one plan so their fits run together.
+
+**Decision (mine, declared before results; not a winner claim).** E's candidate is its highest out-of-fold AIC point
+whose in-sample older sets stay within 0.005 of Vote's initial model. It replaces the point stage C would run, as
+fixed by stage D's decision, only if its out-of-fold AIC is higher by more than 0.002 and its E21 out of sample
+(three-seed mean, Vote's omission cells continued the same way) is no more than 0.005 lower on every dataset. An E
+omission run is frozen only if the first condition holds.
+
+**Order.** After stage D's omission run, before stage C, so that stage C runs once, on the final point.
