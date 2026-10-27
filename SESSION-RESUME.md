@@ -31,6 +31,19 @@ work. The September chronology below is retained history, including its old
 paused-goal statement. It is not the current queue. No new Mlic/AIC recipe has
 been adopted as the serving model, and the seamless HDR frontend has not started.
 
+### State at 22:07 UTC, 2026-10-27
+
+Every exploration stage is settled (A, A2, B, D, E, F; record sections "Stage D/E/F: result"): **stage C runs on ×256 +
+rehearsal at epoch 59** (`XrefAIC256@e59` of `mlic-aic-xref-20261027-run01`, out-of-fold AIC 0.9390, E21 out of sample
+within 0.005 of every comparator). 0.95 was not reached while keeping the older sets. Dev queue: stage E's mixture
+panels finishing → codec-role omission runs `mlic-aic-omission-codec-{aiconly,x1024,xref1024}-20261027-run01` (w21:pC/pD/pE)
+→ stage C `mlic-aic-seeds-xrefaic256e59-20261027-run01` (w21:pF) → `mlic-aic-fulldata-xrefaic256e59-20261027-run01`
+(w21:pG). Then near-identity (`~/tmp/claude-port-20261027/nearid/run.py` pattern on i265 with run03's pinned binary and
+packet) and the label-free gates (`just candidate-gates-rev7 NAME MODEL OUT`) for the packed seed-0 model at
+`full/XrefAIC256/full_s0/pack_e059/refit/production-f16.bin`. After the codec runs: rebuild the dashboard's two-model
+views (`aic_dashboard_data.py --out /mnt/v/output/zensim/dashboard-curate-20261027 --curate`, `ZEN_PANEL_BIN` from a run's
+`bin/panel`), upload the three files and update the `curaic`, `cure21` and `ccstats` dataset documents.
+
 ### State at 21:09 UTC, 2026-10-27
 
 Stage C's arm is the stage D candidate (×256 + rehearsal e59) unless stage F or E beats it. Dev queue: stage F
