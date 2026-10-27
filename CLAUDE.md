@@ -160,6 +160,8 @@ because cleanup tests or a historical training reproduction pass.
 
 ## Known Bugs
 
+* **2026-10-27 — native-vote wrapper schema dispatch. Fixed before trial launch.** The Python strict group wrapper recognized v1/v2 subjective declarations but sent the admitted v3 native-vote declaration into the ordinary feature-table gate. Its dispatch now includes v3 and retains the independent authority and native-count checks. An invented Parquet/count fixture exercises the actual trainer-command wrapper; missing authority still refuses. No candidate fit used the broken wrapper.
+
 * **2026-10-26 — threaded fit runners hide children from main-thread-only process walks. Fixed for dataset progress.** Linux assigns a child to the thread that spawned it. A walk of only `/proc/PID/task/PID/children` missed the live trainer launched by the cell executor. The shared `run_processes.py` owner now walks every task's children, binds PID plus start ticks, rejects zombies/recycled PIDs, and resolves the real compute-lock inode. Real threaded-child and zombie controls pass. A training log alone is reported as log presence, never proof that a process is running.
 
 * **2026-10-26 — DIBR subset pair ingestion. Fixed.** The native table leaves `p_a` blank and stores row-preferred vote counts. The root reader derives the hard direction from the checked `n_a`, `n_b`, `n_tie`, `n` total; votes do not weight the loss. The partial root and TRAIN-read ledger remain preserved. Count-direction parity and inconsistent-total refusal are checked.

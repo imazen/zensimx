@@ -57,6 +57,26 @@ class NativeVotes(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "target binding"):
             self.payload((0.5, 0.5))
 
+    def test_actual_training_wrapper_admits_v3_with_external_authority(self):
+        import v2_lodo_mlp as wrapper
+        import pyarrow as pa
+        import pyarrow.parquet as pq
+        f = self.f
+        pq.write_table(pa.table({"human_score": [0.5, 0.5]}), f.path)
+        self.payload()
+        f.decl["table_sha256"] = f.record["table_sha256"] = leg.sha(f.path)
+        f.decl["immutable_input_roots"] = [str(f.path.parent)]
+        f.cell["width"] = 1825
+        pin = f.save()
+        output = f.path.parent.parent/(f.path.parent.name+"-vote-output")
+        argv = wrapper.train_command(f.groups, 1101, 101, 1825, output/"keep.txt", "N", output/"last.bin",
+            recipe={"hidden":128}, strict_admission=True,
+            subjective_authority=(f.authority_path,pin,"invented-cell",[0,1]))
+        self.assertIn("--subjective-authority", argv)
+        self.assertIn("subjective_vote_bapps:"+str(f.path)+":1.0:0.0:withinref,rank", argv)
+        with self.assertRaisesRegex(ValueError, "independently pinned authority"):
+            wrapper.strict_training_groups(f.groups)
+
     def test_count_and_identity_corruption_refused(self):
         original = copy.deepcopy(self.counts)
         for field, value in (("n_a", 0.5), ("n_a", True), ("n_b", 0), ("n_tie", 1),
