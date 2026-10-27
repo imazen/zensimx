@@ -2881,6 +2881,7 @@ pub fn train_mlp_strategy_pairs(
     rank_pairs: &std::collections::BTreeMap<String, Vec<[usize; 2]>>,
 ) -> Vec<u8> {
     subjective_rank::validate_votes(groups, hyperparams, !rank_pairs.is_empty());
+    sampling::matched_codec::validate(groups, hyperparams, rank_pairs);
     let effective = validate_training_capabilities(
         hyperparams,
         groups.iter().any(|g| g.loss_mode.has_mse()),
@@ -3521,7 +3522,24 @@ pub fn train_mlp_strategy_pairs(
     }
     let pair_lists: Vec<Option<&[[usize; 2]]>> = train_indices
         .iter()
-        .map(|&gi| rank_pairs.get(&groups[gi].name).map(Vec::as_slice))
+        .map(|&gi| {
+            (groups[gi].name != sampling::matched_codec::GROUP)
+                .then(|| rank_pairs.get(&groups[gi].name).map(Vec::as_slice))
+                .flatten()
+        })
+        .collect();
+    let mut matched_plans: Vec<_> = train_indices
+        .iter()
+        .map(|&gi| {
+            let group = &groups[gi];
+            (group.name == sampling::matched_codec::GROUP).then(|| {
+                sampling::matched_codec::Plan::new(
+                    group.ref_ids.expect("matched reference IDs"),
+                    &rank_pairs[&group.name],
+                    hyperparams.sample_seed.unwrap_or(hyperparams.seed),
+                )
+            })
+        })
         .collect();
     let mut pearson_rng = SplitMix64::new(
         hyperparams.sample_seed.unwrap_or(hyperparams.seed) ^ 0xe280_7065_6172_736f,
@@ -3639,6 +3657,7 @@ pub fn train_mlp_strategy_pairs(
                 drawn
             };
             let drawn = sampling::list_draw(drawn, &pair_lists, &mut rng);
+            let drawn = sampling::matched_codec::draw(drawn, &mut matched_plans);
             if let Some(d) = sample_digest.as_mut() {
                 d.push(drawn);
             }

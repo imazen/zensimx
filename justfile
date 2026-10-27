@@ -410,6 +410,11 @@ dataset-leg-tests:
     python3 -B -m unittest discover -s scripts/tests -p 'test_subjective_training_leg.py' -v
     python3 -B -m unittest discover -s scripts/tests -p 'test_dataset_votes.py' -v
 
+# Caller holds heavy.lock and run-heavy; preserves pinned sampler and E29 controls.
+dataset-order-native-tests target:
+    cargo test --locked -p zensim-validate --lib sampling:: --target-dir {{quote(target)}}
+    cargo test --locked -p zensim-validate --test matched_codec --test subjective_rank --test subjective_vote --target-dir {{quote(target)}}
+
 dataset-eval-tests binary:
     ZEN_PANEL_BIN={{quote(binary)}} python3 -B -m unittest discover -s scripts/tests -p 'test_dataset_eval.py' -v
 

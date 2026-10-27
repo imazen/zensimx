@@ -45,6 +45,8 @@
 use super::RefBuckets;
 use super::SplitMix64;
 
+pub(super) mod matched_codec;
+
 /// Sample-stream seed for every entry point except
 /// `train_mlp_per_sample_alpha_head`.
 ///

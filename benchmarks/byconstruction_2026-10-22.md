@@ -4944,3 +4944,22 @@ unchanged, as do the loss, masses, budgets and selection/production gates.
 Absent a verified complete audit, the vote trial remains blocked while the
 independent ordering trial proceeds. Synthetic controls check exact recovery,
 wrong aggregate/direction/count refusal and validation-path refusal.
+
+### Matched-codec sampler implementation controls (2026-10-27)
+
+The private schedule passes a draw-by-draw comparison against the base
+sampler: identical RNG continuation, group/reference choice, collisions and
+ineligible draws; only every fourth eligible accepted-reference visit can
+change endpoints. An affine cycle covers every admitted match, reversing
+each pair on the following cycle, including even-length lists. The legacy
+E29 pair-list control and the pinned legacy sample digest also pass.
+
+Actual trainer controls confirm that admitted matches affect training,
+reversing a pair preserves its updates, and unsupported heads/mining or an
+empty schedule refuse. Existing hard-rank and native-vote controls pass.
+Checks ran on i265, not as performance benchmarks:
+`run-heavy: done rc=0 108s | peak-RSS 1.43GiB | min-avail 20919MiB | peak-load 7.66`.
+Strict clippy passed for the changed library, trainer and integration targets:
+`run-heavy: done rc=0 9s | peak-RSS 0.67GiB | min-avail 22915MiB | peak-load 1.55`.
+The full-budget unchanged-Mlic control, source-bound matching preparation,
+21 candidate fits and all quality/production gates remain required.
