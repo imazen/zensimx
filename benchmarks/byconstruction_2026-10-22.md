@@ -7236,3 +7236,19 @@ against the initial model:
 The largest within-type losses are on distortions AIC-2026 does not contain (saturation and the noise types), and most of
 AIC-only's global loss is cross-type scale. This is the drift stage D's within-dataset pairs rehearse (they span types as
 well as references); the codec types themselves lose little.
+
+### Stage B, Neff: result (2026-10-27, complete 18:19 UTC)
+
+Run `mlic-aic-recipe-neff-aic256-20261027-run01`. **The control holds** (Neff's full fit replays byte for byte, raw and
+packed, every result field). Exposure 82.6% AIC. Initial zero-shot 0.9080.
+
+| Point | Out-of-fold AIC | vs Mlic ×256, same epoch (source 95%) | KADID | TID2013 | KonFiG | CID22-A | Keeps |
+|---|---:|---|---:|---:|---:|---:|---|
+| Neff ×256 e7 | 0.9281 | −0.0031 [−0.007, +0.000] | +0.0043 | −0.0041 | −0.0051 | +0.0116 | no |
+| Neff ×256 e15 | 0.9327 | −0.0032 [−0.007, −0.000] | +0.0042 | −0.0058 | −0.0094 | +0.0179 | no |
+| Neff ×256 e29 | 0.9360 | −0.0024 [−0.005, −0.000] | +0.0037 | −0.0075 | −0.0116 | +0.0210 | no |
+| Neff ×256 e59 | 0.9399 | −0.0019 [−0.004, −0.000] | +0.0019 | −0.0091 | −0.0131 | +0.0236 | no |
+
+Neff learns AIC almost as fast as Mlic but loses KonFiG and TID2013 faster, so no point keeps the older sets (epoch 7
+misses on KonFiG by 0.0001). Its points lie below Mlic's ×256 curve: at a worst change near −0.009 it reaches 0.9327
+against Mlic's 0.9385. Local mixtures 3 rows (largest rise +3.7); global 0.
