@@ -6712,3 +6712,14 @@ whatever the seed-0 screen shows, so no outcome chooses an arm.
   table, authority and checkpoint hash is pinned in a fresh plan.
 - No selector, packing, calibration, EVAL or public_test read. Any adoption
   still needs the unchanged production gates. Queued after the candidate gates.
+
+Source-fold study implemented and queued (09:50 UTC): coordinator `9da7d041`
+(`aic_matched_continuation.py fold-plan/fold-queue/fold-run/fold-status`);
+plan `/mnt/v/output/zensim/mlic-matched-continuation-folds-20261027-run01/PLAN.json`,
+SHA256 `ca11bdee2da8b64128cdae3d69d364f41207cc49d637b76cc0368982f56bb454`; same
+trainer `d5275ca5…` and frozen panel tools as the seed-0 screen; seed-1/seed-2
+initial models `a1283179…`/`346a5e0f…`. Python admission dry runs pass for
+AICOnly s1/k3 and MixedAIC16 s2/k0 with the original seeds and fold tables.
+The dev queue is now serial: confidence omissions → confidence follow-through
+→ seed-0 screen → candidate gates (12 models) → this study (run-heavy 40 GiB,
+12 concurrent single-thread fits). No result exists yet.

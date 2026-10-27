@@ -581,6 +581,8 @@ mlic-priority-progress:
     @just aic-recipe-adaptation-full-panel status /mnt/v/output/zensim/mlic-aic-full-20261027-run03/PLAN.json /mnt/v/output/zensim/mlic-aic-full-20261027-run03/panels
     @just confidence-followthrough-status /mnt/v/output/zensim/mlic-confidence-followthrough-20261027-run01/CONFIG.json
     @if [ -f /mnt/v/output/zensim/mlic-matched-continuation-20261027-run01/PLAN.json ]; then just aic-matched-continuation status /mnt/v/output/zensim/mlic-matched-continuation-20261027-run01/PLAN.json; fi
+    @if [ -f /mnt/v/output/zensim/mlic-candidate-gates-20261027-run01/queue.log ]; then tail -n 2 /mnt/v/output/zensim/mlic-candidate-gates-20261027-run01/queue.log; fi
+    @if [ -f /mnt/v/output/zensim/mlic-matched-continuation-folds-20261027-run01/PLAN.json ]; then just aic-matched-continuation fold-status /mnt/v/output/zensim/mlic-matched-continuation-folds-20261027-run01/PLAN.json; fi
 
 # Registered matched-continuation diagnostic (byconstruction record, 2026-10-27):
 # plan freezes source/tools/inputs; queue waits for the confidence followthrough,
@@ -588,8 +590,8 @@ mlic-priority-progress:
 aic-matched-continuation mode plan:
     OPENBLAS_NUM_THREADS=1 python3 -B scripts/byconstruction/aic_matched_continuation.py {{quote(mode)}} {{quote(plan)}}
 
-aic-matched-continuation-plan run commit trainer meta_tool:
-    python3 -B scripts/byconstruction/aic_matched_continuation.py plan {{quote(run)}} --source-commit {{quote(commit)}} --trainer {{quote(trainer)}} --meta-tool {{quote(meta_tool)}}
+aic-matched-continuation-plan run commit trainer meta_tool mode='plan':
+    python3 -B scripts/byconstruction/aic_matched_continuation.py {{quote(mode)}} {{quote(run)}} --source-commit {{quote(commit)}} --trainer {{quote(trainer)}} --meta-tool {{quote(meta_tool)}}
 
 # Label-free gates for one revision-7 packed candidate through gates.py with the
 # revision-7 tools, instrument tables and empty human corpus (dial verdicts C1-C6
