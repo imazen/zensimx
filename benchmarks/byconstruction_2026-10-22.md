@@ -7142,7 +7142,7 @@ No recovery point keeps the older sets, so **×256 at epoch 7 (stage A, 0.9312) 
 converges to about the static arm's AIC at the same weight (e59: 0.9147 / 0.9295 / 0.9428 against 0.9168 / 0.9288 /
 0.9418) while the older sets are still recovering: the AIC-only detour buys no lasting AIC and costs the older sets.
 
-**Stage B launched** (15:56 UTC; registered mechanics above): four chained runs at ×256,
+**Stage B launched** (queues started 15:51 UTC; registered mechanics above): four chained runs at ×256,
 `mlic-aic-recipe-{order,confidence,neff,vote}-aic256-20261027-run01`, trainer `587e4764…` (main `216481a8`, built on
 i265), source `1f334203`. Each fits its recipe's full seed-0 model on the seven folds and replays the recipe's
 120-epoch full fit as its control.
