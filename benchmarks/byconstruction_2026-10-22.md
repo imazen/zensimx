@@ -6613,3 +6613,54 @@ legacy/default arithmetic and the frozen source trees. Native and Python
 admission must agree on excluded groups, checkpoint, budget and D6 inputs.
 Retain intermediate artifacts for the new diagnostic. The active confidence
 control/omission/follow-through sequence keeps its compute priority.
+
+### Matched-continuation admission implemented and queued (2026-10-27, 09:21 UTC)
+
+Ownership returned to the original Claude session at 08:51 UTC (tag
+`zensim-claude-handoff-20261027`). The confidence run02 full-budget
+unweighted control then matched all 7,869 original predictions byte for byte
+(`CONTROL_VERIFIED.json`); its 21 omission cells started at 08:53 UTC.
+
+The registered diagnostic above now has its admission, in `fb3b0a79`:
+
+- **Continuation on main.** The owner-approved warm-start trainer delta from
+  PR 73 (`87864f94`) was applied to main from the branch's own diffs; four
+  overlaps with confidence, matched-codec and vote code keep both sides. The
+  frozen 0/4/8-epoch contract is unchanged. A checkpoint without its
+  continuation binding is now refused: before, a version-2 authority plus
+  `--init-from` at 120 epochs passed admission.
+- **Separate version-4 authority**, mirrored natively and in Python, bound to
+  its unmodified version-2 base by pin. Mixed+AIC16 keeps every base group.
+  AIC-only keeps exactly the base's validation-only groups and lists every
+  training group (positive train weight, base order) as excluded, so the
+  logged development curve stays and no older-data leg updates. Both arms:
+  60 epochs, LR 1e-5 constant, fresh Adam, AIC weight 16, every-epoch dumps;
+  epochs 7 and 59 are the fixed assessment checkpoints.
+- **Coordinator** `scripts/byconstruction/aic_matched_continuation.py`
+  (plan/queue/run/status). It reuses the full-panel owner's five-population
+  and pixel-mixture blocks, extracted as functions with unchanged behavior.
+  Group weights are sampling probabilities only, so the AIC-only arm's
+  single leg draws all 50,000 pairs per epoch; actual exposure is read from
+  each checkpoint's `zentrain.sample_coverage` through the new
+  `bake_dial_refit read-meta`.
+- **Controls:** mixed epoch 7 versus `MlicFT16x8` seed 0 `refit/last.bin`
+  (`dee9b5de…`) after the native strip of `zentrain.repro`, plus 14 shared
+  result fields; Initial and mixed-epoch-7 predictions versus the stored full
+  study predictions, byte for byte.
+
+Checks on i265, with source identical to `fb3b0a79`: rustfmt; 348 library
+tests (2 ignored), 54 trainer CLI tests, the read-meta test and strict clippy
+pass (run-heavy rc=0, 36 s, peak RSS 1.59 GiB). Python: 6 authority, 5
+coordinator, 32 AIC owner, 6 subjective, 23 dataset-leg, 9 vote and 2 vote
+full-route tests pass. A dry run of both arms through the frozen source's
+Python admission, stopped before training, passes; the mixed arm's trainer
+argv equals the reference's except epochs, dumps, output and authority paths,
+and its keep list and derived-input declaration hash to the reference's.
+
+Plan `/mnt/v/output/zensim/mlic-matched-continuation-20261027-run01/PLAN.json`,
+SHA256 `bf4cf8e39e92a965be01e1895009d0d7d11325875045853435f7c206ec2c32f2`;
+trainer `d5275ca5…` (built on i265, receipt `TRAINER_BUILD.json`); panel and
+prediction tools are the fold study's frozen run-05 binaries. The queue waits,
+holding no lock, until the confidence followthrough completes, then takes
+`heavy.lock` with run-heavy (24 GiB, 4 jobs). Queue PID 3572059, start ticks
+231746803, in herdr tab `matched-continuation-queue`. No result exists yet.

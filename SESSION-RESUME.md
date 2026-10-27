@@ -31,6 +31,25 @@ work. The September chronology below is retained history, including its old
 paused-goal statement. It is not the current queue. No new Mlic/AIC recipe has
 been adopted as the serving model, and the seamless HDR frontend has not started.
 
+### Ownership and queue — 2026-10-27 09:21 UTC
+
+The owner returned all zensim work to the original Claude session
+(f9f1f552, herdr w21:p1) at 08:51 UTC; checkpoint tag
+`zensim-claude-handoff-20261027`. Do not restart aic-finetune. Codex's
+app-server is the parent of the running confidence followthrough: do not
+stop it. The confidence run02 control matched all 7,869 original
+predictions exactly; its 21 omission cells started at 08:53 UTC.
+
+The registered matched-continuation diagnostic (mixed+AIC16 versus AIC-only
+continuation of original Mlic full seed 0, 60 epochs) is implemented on main
+(`fb3b0a79`) and queued at
+`/mnt/v/output/zensim/mlic-matched-continuation-20261027-run01`. Its queue
+waits, holding no lock, for the confidence followthrough to complete, then
+takes `heavy.lock`. It runs in herdr tab `matched-continuation-queue`.
+`just mlic-priority-progress` includes its status. Details, controls and
+hashes: the byconstruction record's
+"Matched-continuation admission implemented and queued" section.
+
 ### Latest recovery — 2026-10-27 06:45 UTC
 
 Active full-data root is now `/mnt/v/output/zensim/mlic-aic-full-20261027-run03`;
