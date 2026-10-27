@@ -296,7 +296,7 @@ def extend(prev: Path, out: Path, eval_dir: Path | None = None) -> int:
 CODEC_TYPES = {"kadid": ("kadid_09", "kadid_10"), "tid2013": ("tid_10", "tid_11", "tid_21"), "konfig": ("jpeg2000",),
                "cid22_a25": None}  # None: every row (CID22-A is codecs only)
 Z = Path("/mnt/v/output/zensim")
-CURATE = (  # key, name, AIC-2026 public_train source, E21 out-of-sample cells (None: none yet)
+CURATE = (  # key, name, AIC-2026 public_train source, E21 out-of-sample cells (skipped until they exist)
     ("mlic", "Mlic (no AIC leg)", ("heldout", "Mlic"), Path("/var/tmp/byc-mixes-20261025/cells/Mlic")),
     ("mlicft", "MlicFT16x8", ("heldout", "MlicFT16x8"), Z / "aic-finetune-20261026/run-05/cells/MlicFT16x8"),
     ("mvote", "MlicVote (no AIC leg)", ("heldout", "MlicVote"), Z / "mlic-vote-20261027-run02/cells/MlicVote"),
@@ -305,9 +305,12 @@ CURATE = (  # key, name, AIC-2026 public_train source, E21 out-of-sample cells (
      Z / "mlic-aic-omission-voteaic256-20261027-run01/cells/MlicVoteAIC256e29"),
     ("xref256", "×256 + rehearsal, epoch 59", ("fold", Z / "mlic-aic-xref-20261027-run01", "XrefAIC256@e59"),
      Z / "mlic-aic-omission-xrefaic256-20261027-run01/cells/XrefAIC256e59"),
-    ("aiconly", "AIC-only, epoch 29", ("fold", Z / "mlic-aic-share-frontier-20261027-run01", "AICOnly@e29"), None),
-    ("x1024", "×1024, epoch 59", ("fold", Z / "mlic-aic-share-frontier-20261027-run01", "MixedAIC1024@e59"), None),
-    ("xref1024", "×1024 + rehearsal, epoch 59", ("fold", Z / "mlic-aic-xref-20261027-run01", "XrefAIC1024@e59"), None),
+    ("aiconly", "AIC-only, epoch 29", ("fold", Z / "mlic-aic-share-frontier-20261027-run01", "AICOnly@e29"),
+     Z / "mlic-aic-omission-codec-aiconly-20261027-run01/cells/AICOnlye29"),
+    ("x1024", "×1024, epoch 59", ("fold", Z / "mlic-aic-share-frontier-20261027-run01", "MixedAIC1024@e59"),
+     Z / "mlic-aic-omission-codec-x1024-20261027-run01/cells/MixedAIC1024e59"),
+    ("xref1024", "×1024 + rehearsal, epoch 59", ("fold", Z / "mlic-aic-xref-20261027-run01", "XrefAIC1024@e59"),
+     Z / "mlic-aic-omission-codec-xref1024-20261027-run01/cells/XrefAIC1024e59"),
 )
 
 
