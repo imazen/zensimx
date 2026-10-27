@@ -534,16 +534,21 @@ def main() -> None:
     ap.add_argument("--fine-tune-epochs", type=int)
     ap.add_argument("--fine-tune-lr", type=float, default=0.00001)
     ap.add_argument("--aic-public-train", type=Path)
+    from subjective_training_leg import DIAGNOSTIC_EPOCHS, DIAGNOSTIC_POPULATIONS, diagnostic_protocol
+    ap.add_argument("--diagnostic-population", choices=DIAGNOSTIC_POPULATIONS,
+                    help="registered 60-epoch continuation of an omission cell (AIC-share frontier stage C, "
+                         "byconstruction record): every-epoch checkpoints, raw f32 only")
     from e36_training import add_args
     add_args(ap)
     from matched_codec import add_args as codec_args
     codec_args(ap)
     args = ap.parse_args()
     if args.init_from is not None or args.fine_tune_epochs is not None:
-        if not args.init_from or args.fine_tune_epochs not in (0, 4, 8) or not args.strict_admission or not args.train_only:
+        budgets = (DIAGNOSTIC_EPOCHS,) if args.diagnostic_population else (0, 4, 8)
+        if not args.init_from or args.fine_tune_epochs not in budgets or not args.strict_admission or not args.train_only:
             ap.error("continuation requires its checkpoint, registered budget and strict TRAIN-only route")
         globals().update(EPOCHS=args.fine_tune_epochs, LOG_EVERY=1)
-    elif args.aic_public_train is not None:
+    elif args.aic_public_train is not None or args.diagnostic_population:
         ap.error("D6 leg here requires a registered continuation")
     from e36_training import bootstrap
     bootstrap(args)
@@ -692,11 +697,23 @@ def main() -> None:
                                                    exclude=tuple(filter(None, args.exclude_datasets.split(","))))
         if dataset_authority:
             weights.update({name:tw for name,_,tw,_,_ in groups if tw > 0})
+    diagnostic = None
     if args.init_from is not None:
         if dataset_authority is None:
             raise ValueError("Mlic continuation requires frozen dataset authority")
-        from subjective_training_leg import continuation_authority
-        dataset_authority = continuation_authority(dataset_authority, args.init_from, EPOCHS, args.fine_tune_lr)
+        if args.diagnostic_population:
+            from subjective_training_leg import diagnostic_authority
+            dataset_authority, retained = diagnostic_authority(dataset_authority, args.init_from,
+                                                               args.diagnostic_population, args.fine_tune_lr)
+            excluded = [g[0] for g in groups if g[0] not in retained]
+            groups = [g for g in groups if g[0] in retained]
+            weights = {name: w for name, w in weights.items() if name in retained}
+            protocol, _, fixed = diagnostic_protocol(args.diagnostic_population)
+            diagnostic = dict(protocol=protocol, population=args.diagnostic_population,
+                              excluded_groups=excluded, retained_groups=[g[0] for g in groups])
+        else:
+            from subjective_training_leg import continuation_authority
+            dataset_authority = continuation_authority(dataset_authority, args.init_from, EPOCHS, args.fine_tune_lr)
     if args.aic_public_train is not None:
         if not args.research_extra_group:
             raise ValueError("D6 continuation needs its explicitly weighted group")
@@ -706,6 +723,8 @@ def main() -> None:
         name, path, tw, vw, mode = aic_spec[0].split(":")
         if name != "aic_public_train" or Path(path).resolve() != args.aic_public_train.resolve() or vw != "0" or mode != "rank":
             raise ValueError("D6 continuation leg identity differs")
+        if diagnostic and float(tw) != diagnostic_protocol(args.diagnostic_population)[1]:
+            raise ValueError("diagnostic continuation leg weight differs from its registered population")
         groups.append((name, Path(path), float(tw), 0, mode))
         args.research_extra_group = []
     try:
@@ -753,6 +772,15 @@ def main() -> None:
             "selected_bake": str(bake), "selected_bake_sha256": sha(bake), "dev_curve": curve,
             "spec": args.spec, "head": args.head, "init_seed": init_seed, "sample_seed": sample_seed,
             "train_weights": weights, "coverage_leg": coverage_record,
+            **({"continuation": dict(initial_checkpoint=str(args.init_from),
+                initial_checkpoint_sha256=sha(args.init_from), epochs=args.fine_tune_epochs,
+                lr=args.fine_tune_lr, lr_schedule="constant", optimizer_state="fresh"),
+                "diagnostic": dict(diagnostic, fixed_checkpoints={
+                    str(e): {"path": str(dest / "ckpt" / f"ckpt_epoch{e:03d}.bin"),
+                             "sha256": sha(dest / "ckpt" / f"ckpt_epoch{e:03d}.bin")} for e in fixed},
+                    checkpoint_selection=f"fixed epochs {', '.join(map(str, fixed[:-1]))} and {fixed[-1]}; no development selection",
+                    representation="final-f32 checkpoint dumps; no packing or calibration")}
+               if diagnostic is not None else {}),
             **({"derived_inputs": {"token": recipe["derived_inputs"], "declaration_sha256": __import__("v2_common").derived_declaration(recipe["derived_inputs"])[1]}}
                if recipe.get("derived_inputs") else {})}) + "\n")
         from e36_training import model_binding

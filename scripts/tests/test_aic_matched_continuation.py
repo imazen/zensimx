@@ -139,5 +139,25 @@ class DiagnosticCommandLine(unittest.TestCase):
             self.assertIn("registered D6 strength", self.refuse(*base, *extra))
 
 
+class LodoDiagnosticCommandLine(unittest.TestCase):
+    """Stage C: omission cells continue under a registered 60-epoch population; the 0/4/8 contract is unchanged."""
+    def refuse(self, *extra):
+        result = subprocess.run([sys.executable, "-B", str(SCRIPTS / "rev4_featpot/v2_lodo_mlp.py"), "--spec", "x",
+                                 "--head", "N", "--heldout", "kadid", "--seed-index", "0", *extra],
+                                capture_output=True, text=True, timeout=120)
+        self.assertEqual(result.returncode, 2, result.stderr)
+        return result.stderr
+
+    def test_diagnostic_population_requires_its_registered_continuation(self):
+        base = ["--init-from", "/nonexistent", "--aic-public-train", "x", "--strict-admission", "--train-only"]
+        self.assertIn("registered continuation", self.refuse("--diagnostic-population", "mixed-aic256"))
+        for extra in (["--fine-tune-epochs", "60"],  # no diagnostic population: the frozen 0/4/8 contract
+                      ["--diagnostic-population", "mixed-aic256", "--fine-tune-epochs", "8"],
+                      ["--diagnostic-population", "aic-only", "--fine-tune-epochs", "59"]):
+            self.assertIn("registered budget", self.refuse(*base, *extra))
+        self.assertIn("registered budget", self.refuse("--init-from", "/nonexistent", "--diagnostic-population",
+                                                       "mixed-aic64", "--fine-tune-epochs", "60", "--train-only"))
+
+
 if __name__ == "__main__":
     unittest.main()
