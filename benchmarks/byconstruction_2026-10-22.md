@@ -7176,3 +7176,22 @@ datasets and trained epoch 0. Plans frozen and queued behind stage B: stage D (`
 x256 and x1024 with the rehearsal leg; control: stage A's x256 seed 0 fold 0 refit byte for byte), then stage C step 2
 for stage A's advanced arm (`mlic-aic-omission-aic256-20261027-run01`, the twelve Mlic omission cells at x256, E21 out
 of sample at every studied epoch), which is the comparator stage D's decision needs.
+
+### Stage B, Order: result (2026-10-27, complete 16:48 UTC)
+
+Run `mlic-aic-recipe-order-aic256-20261027-run01`. **The control holds.** This trainer (`587e4764…`) replays Order's
+120-epoch full seed-0 fit byte for byte without `zentrain.repro`, raw and packed models, with every result field equal.
+Order's matched-codec route has no sample-coverage replay, so its exposure is not recorded. The initial Order model
+scores 0.9099 zero-shot. Out-of-fold AIC; the older sets in sample against Order's own initial model:
+
+| Point | Out-of-fold AIC | vs Mlic ×256, same epoch (source 95%) | KADID | TID2013 | KonFiG | CID22-A | Keeps |
+|---|---:|---|---:|---:|---:|---:|---|
+| Order ×256 e7 | 0.9222 | −0.0090 [−0.014, −0.004] | +0.0004 | +0.0004 | −0.0020 | +0.0127 | yes |
+| Order ×256 e15 | 0.9279 | −0.0080 [−0.014, −0.003] | −0.0015 | −0.0012 | −0.0038 | +0.0172 | yes |
+| Order ×256 e29 | 0.9321 | −0.0063 [−0.011, −0.002] | −0.0034 | −0.0013 | −0.0045 | +0.0194 | yes |
+| Order ×256 e59 | 0.9367 | −0.0052 [−0.009, −0.002] | −0.0061 | −0.0017 | −0.0043 | +0.0209 | no |
+
+Order learns AIC more slowly than Mlic but forgets much less: it keeps the older sets through epoch 29 (TID2013 −0.001
+against Mlic ×256's −0.007 there). Its best keeper (0.9321) exceeds the advanced Mlic point (0.9312) by 0.0009, under the
+registered 0.002 margin. Local pixel mixtures fall to 1–2 rows (largest rise +2.3, against +4.7 to +5.2 for Mlic ×256);
+global mixtures are 0. Seed 0.
