@@ -537,6 +537,13 @@ dataset-order-chain study source_commit trainer_sha256:
 dataset-order-queue study source_commit trainer_sha256:
     OPENBLAS_NUM_THREADS=1 python3 -B scripts/byconstruction/dataset_queue.py {{quote(study)}} {{quote(source_commit)}} {{quote(trainer_sha256)}}
 
+# Caller holds the compute lock and run-heavy; rejected screens refuse fitting.
+dataset-vote-full study output:
+    OPENBLAS_NUM_THREADS=1 python3 -B scripts/byconstruction/mlic_vote_full.py {{quote(study)}} {{quote(output)}}
+
+dataset-vote-full-tests:
+    python3 -B -m unittest discover -s scripts/tests -p 'test_mlic_vote_full.py' -v
+
 dataset-cell-progress cells arm='Mdata' folds='kadid,tid2013,konfig,cid22_a25':
     env BYC_CELLS={{quote(cells)}} OPENBLAS_NUM_THREADS=1 python3 -B scripts/rev4_featpot/byc_cells.py progress --arm {{quote(arm)}} --folds {{quote(folds)}}
 

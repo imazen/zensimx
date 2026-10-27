@@ -11,6 +11,18 @@ import dataset_study_status as progress
 
 
 class StudyProgress(unittest.TestCase):
+    def test_completed_full_fit_requires_actual_matching_artifacts(self):
+        with tempfile.TemporaryDirectory() as directory:
+            p=Path(directory)
+            state=dict(pid=1,start_ticks=2,completed=[dict(seed=0,sha256="a"*64,result_sha256="b"*64)],
+                stage="full-fits",source_commit="a"*40,binary_sha256="b"*64,next_action="qualify",failures=[])
+            with mock.patch.object(progress,"bound_worker",return_value=None),mock.patch.object(progress,"compute_lock",return_value={}):
+                r=progress.full_status(p,state)
+            self.assertEqual(r["status"],"failed")
+            self.assertEqual(r["complete"],0)
+            self.assertIn("artifact changed or missing",r["failure"][0]["error"])
+            self.assertFalse(r["objective_complete"])
+
     def test_queued_launch_failure_is_durable_and_cannot_report_completion(self):
         import dataset_queue as queue
         with tempfile.TemporaryDirectory() as directory:

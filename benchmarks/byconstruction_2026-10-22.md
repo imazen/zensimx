@@ -5063,3 +5063,21 @@ launch log, and writes a durable failure if launching the chain fails. Status
 distinguishes an intentionally canceled queue from an unexplained dead one;
 neither is reported running. A synthetic failed-launch control checks the
 actual command construction and durable failure path without running a fit.
+
+### Native-vote full-fit follow-through prepared (2026-10-27)
+
+`just dataset-vote-full <screen-study> <fresh-output>` requires a completed,
+passing native-vote screen. It recomputes the registered decision, verifies
+the screen's input hashes, and uses that study's frozen training owners and
+exact screened trainer. It fits seeds 0–2 at the unchanged full budget and
+packs/certifies each final epoch through the existing production-pack owner.
+Assessment seed 0 is fixed; the other seeds measure stability, not a pool
+from which to choose a favorable result. Full fits do not establish production
+qualification or authorize a serving change.
+
+The runner writes process identity, completed models and failures as each cell
+finishes. `dataset-study-progress` checks those models against their recorded
+hashes and resolves the live process/lock before reporting progress. Synthetic
+controls reject a changed or failing screen and a missing claimed-complete
+model. No full vote fit is launched by this preparation; the independent
+screen remains in progress.

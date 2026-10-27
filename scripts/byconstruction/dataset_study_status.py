@@ -6,6 +6,7 @@ import argparse
 from datetime import datetime, timezone
 import json
 import os
+import re
 from pathlib import Path
 import subprocess
 import sys
@@ -13,6 +14,7 @@ import sys
 REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0,str(REPO/"scripts/rev4_featpot"))
 from run_processes import bound_worker, compute_lock, process_tree
+from v2_common import sha
 
 FOLDS = "kadid,tid2013,konfig,cid22_a25,pipal,pairs,mos7"
 
@@ -26,19 +28,58 @@ def population(study,state,candidate):
     return study/"cells", candidate, FOLDS, "0,1,2"
 
 
+def full_status(study,state):
+    from byc_cells import EPOCH_RE
+    worker=bound_worker(state["pid"],state["start_ticks"])
+    lock=compute_lock(worker["pid"] if worker else None)
+    records={r["seed"]:r for r in state["completed"]}
+    failure=state.get("failures") or None
+    cells=[]
+    for seed in range(3):
+        dest=study/f"full_s{seed}";record=records.get(seed);epoch=None
+        valid=False
+        if record:
+            model=dest/"refit/production-f16.bin";result=dest/"result.json"
+            valid=(model.is_file() and result.is_file() and sha(model)==record["sha256"]
+                   and sha(result)==record["result_sha256"])
+            if not valid:failure=with_failure(failure,seed)
+        log=dest/"train.log"
+        if log.is_file():
+            text=log.read_text()
+            epochs=[int(e) for e,_ in EPOCH_RE.findall(text)]
+            epochs += [int(e) for e in re.findall(r"subjective-rank epoch=(\d+)",text)]
+            epoch=max(epochs) if epochs else None
+        cells.append(dict(seed=seed,state="complete" if valid else "incomplete",latest_logged_epoch=119 if valid else epoch))
+    complete=sum(c["state"]=="complete" for c in cells)
+    status=("failed" if failure else "running" if worker and lock["held_by_worker_ancestor"] else
+            "full-fits-complete-requires-qualification" if complete==3 and (study/"FULL_FITS.json").is_file()
+            else "interrupted-before-full-fit-completion")
+    return dict(run_directory=str(study),declared_stage=state["stage"],status=status,complete=complete,requested=3,
+        source_commit=state["source_commit"],binary_sha256=state["binary_sha256"],cells=cells,worker_alive=bool(worker),
+        live_processes=process_tree(worker["pid"]) if worker else [],compute_lock=lock,failure=failure,
+        checked_utc=datetime.now(timezone.utc).isoformat(),next_action=state["next_action"],objective_complete=False)
+
+
+def with_failure(failures,seed):
+    return [*(failures or []),dict(seed=seed,error="completed full-fit artifact changed or missing")]
+
+
 def status(study):
     state_path = study/"RUN_STATE.json"
     if state_path.exists():
         state = json.loads(state_path.read_text())
-        source = json.loads((study/"SOURCE.json").read_text())
-        cells,arm,folds,seeds = population(study,state,source["candidate"])
-        subprocess.run([sys.executable,"-B",str(REPO/"scripts/rev4_featpot/byc_cells.py"),"progress",
-            "--arm",arm,"--folds",folds,"--seeds",seeds,"--run-state",str(state_path),
-            "--output",str(study/"CURRENT_RUN.json")],env=dict(os.environ,BYC_CELLS=str(cells)),
-            stdout=subprocess.PIPE,check=True,text=True)
-        result = json.loads((study/"CURRENT_RUN.json").read_text())
-        if not result["worker_alive"] and not result["failure"] and not (study/"TRAIN_SCREEN_COMPLETE.json").exists():
-            result["status"] = "interrupted-before-screen-completion"
+        if state.get("screen_study"):
+            result=full_status(study,state)
+        else:
+            source = json.loads((study/"SOURCE.json").read_text())
+            cells,arm,folds,seeds = population(study,state,source["candidate"])
+            subprocess.run([sys.executable,"-B",str(REPO/"scripts/rev4_featpot/byc_cells.py"),"progress",
+                "--arm",arm,"--folds",folds,"--seeds",seeds,"--run-state",str(state_path),
+                "--output",str(study/"CURRENT_RUN.json")],env=dict(os.environ,BYC_CELLS=str(cells)),
+                stdout=subprocess.PIPE,check=True,text=True)
+            result = json.loads((study/"CURRENT_RUN.json").read_text())
+            if not result["worker_alive"] and not result["failure"] and not (study/"TRAIN_SCREEN_COMPLETE.json").exists():
+                result["status"] = "interrupted-before-screen-completion"
         result["objective_complete"] = False
     else:
         queue = json.loads((study/"QUEUED.json").read_text())
