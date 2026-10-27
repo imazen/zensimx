@@ -6211,3 +6211,33 @@ all six original full trainers were advancing at logged epochs 72–88/120,
 with no reported failure. This timestamped observation does not replace a live
 check. No candidate is adopted and the production/HDR objective remains active.
 
+
+### October 27: isolate original-Mlic parameter packing on TRAIN
+
+The registered diagnostic `mlic-parameter-packing-train-v1` compares all three
+original full-data seeds on the frozen TRAIN calibration table (SHA256
+`07e2f4b71fe0ccc67848f2896344e6d0b6a255b0e91a7da9062d471ea3e11100`).
+It does not select a model, change a gate, read EVAL or claim runtime speed.
+Owner: `scripts/byconstruction/mlic_precision_audit.py`; entry point:
+`just mlic-precision-audit <plan> <fresh-output>`, under the shared compute lock
+and `run-heavy` on an eligible idle host.
+
+Inputs, source and native binary are SHA256-bound before prediction. The
+existing native pack owner creates an f32 control with zero zerobias, protected
+last layer and no pruning. The existing strip owner removes only output spline
+metadata from that control and the original production-f16 bake. Both use the
+production score predictor, which builds derived inputs correctly; the raw
+predictor explicitly refuses derived-input models and is not substituted.
+Original pack logs must confirm zero removed weights and no pruned columns.
+The f32 control must exactly reproduce every original dense-model prediction
+before any f16 difference is accepted. Report all rows, mean signed/absolute
+delta, RMSE, nearest-rank p99 and maximum absolute delta in pre-spline score
+units. This isolates this parameter-packing path on this TRAIN population;
+it does not measure feature extraction precision or f64-reference error.
+
+Preregistration SHA256:
+`e9f31fafcab9575e49d2afed6826ae74f328f0e033f0cd216ed3ba6d7df14538`.
+Artifacts: shared output `zensim/mlic-precision-20261027-run01/`, preserving
+`PLAN.json`, `SOURCE.py`, original model/log copies and all native command logs.
+Execution waits for the existing build to leave i265 before acquiring its
+compute lock. Results are pending; no precision bound is claimed yet.

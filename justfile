@@ -3716,3 +3716,7 @@ confidence-followthrough source config:
 
 confidence-followthrough-status config:
     OPENBLAS_NUM_THREADS=1 python3 -B scripts/byconstruction/confidence_followthrough.py {{quote(config)}} --status
+
+# Frozen TRAIN-only parameter-packing diagnostic; caller owns run-heavy/compute lock.
+mlic-precision-audit plan output:
+    OPENBLAS_NUM_THREADS=1 python3 -B scripts/byconstruction/mlic_precision_audit.py {{quote(plan)}} {{quote(output)}}
