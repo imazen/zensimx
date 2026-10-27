@@ -358,6 +358,11 @@ fn main() {
         return;
     }
     #[cfg(feature = "feature-regime-v2")]
+    if args.first().map(String::as_str) == Some("--prodqual-rev7") {
+        prodqual::run_rev7(&args[1..]);
+        return;
+    }
+    #[cfg(feature = "feature-regime-v2")]
     if args.first().map(String::as_str) == Some("--nearid-contact") {
         nearid::contact(&args[1..]);
         return;

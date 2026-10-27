@@ -2667,3 +2667,32 @@ Run-heavy on i265: rc=0, 136s, peak RSS 0.25 GiB, minimum available
 23,730 MiB, peak load 0.96. This is validation resource evidence, not timing
 qualification. N1–N3 passing does not clear the local-mixture findings,
 other production gates, runtime qualification or stable adoption.
+
+### October 27: explicit Rev7 synthetic serving parity
+
+The existing `serve_custom_bake` probe now has a separate `--prodqual-rev7`
+entry, exposed by `just dataset-serving-parity-rev7`. The original `--prodqual`
+still requires revision 5. Both entries require their process and bake revisions
+to match exactly; no model is restamped. Three actual refusal controls cover
+Rev7 process through the old entry, Rev5 process through the new entry, and
+Rev5 model through the new entry. All refuse before synthetic measurements.
+The arithmetic, geometries, identity bands and exact-bit comparisons are unchanged.
+
+All twelve frozen initial/continued seed0 models completed the new probe on
+i265: four geometries × seven bit-truncation levels × eight available dispatch
+permutations per model, 2,688 model/pair/permutation rows. Direct pixel scores,
+prepared-cache scores and identity-aware feature scores agree exactly; consumed
+and cached features agree exactly; cross-permutation row mismatches are zero.
+All scores are finite, pixel identity is exactly 100, feature identity remains
+in the unchanged 97.5–100 band, and no tested distortion exceeds 100. The original
+synthetic ladder observations remain report-only. The raw artifact's `seed`
+field is the argument index, not the fitting seed: all inputs here are seed0.
+No WASM, ARM, AVX-512, real-corpus or speed claim follows from this i265 run.
+
+Shared evidence: `zensim/mlic-serving-parity-20261027-run01/` with preregistered
+PLAN, frozen source/binary binding, NATIVE, SUMMARY, refusal logs and VERIFIED.
+The coordinator checked source/model/binary hashes and every summary comparison.
+Build run-heavy: rc=0, 14s, peak RSS 0.84 GiB, minimum available 23,132 MiB, peak load 0.48.
+Measurement run-heavy: rc=0, 17s, peak RSS 0.24 GiB, minimum available 23,693 MiB,
+peak load 0.96. Resource receipts are not runtime benchmarks. Rust formatting
+checks pass. Confidence control training continues; no candidate is adopted.

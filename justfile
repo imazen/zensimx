@@ -3696,6 +3696,15 @@ dataset-confidence-queue study source_commit trainer_sha256 after_full_panel:
 dataset-certify-bake binary bake:
     {{quote(binary)}} certify-monotone --bake {{quote(bake)}}
 
+# Synthetic serving parity only, using a caller-pinned binary and explicit models.
+[positional-arguments]
+dataset-serving-parity-rev7 binary +models:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    binary="$1"
+    shift
+    ZENSIM_FORMULA_REV=7 "$binary" --prodqual-rev7 "$@"
+
 # Existing N1-N3 owners. Caller freezes inputs and supplies the resource scope.
 # The native candidate label contract is lowercase ASCII letters/digits.
 dataset-nearid-candidate binary packet output label bake bake_sha256:

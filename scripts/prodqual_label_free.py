@@ -56,7 +56,10 @@ def summarize(native, wasm):
             "no_distortion_above_identity": all(r["pixel_score"] <= 100.0 for r in baseline),
             "ladders_report_only": ladders,
         })
-    return {"schema": 2, "scope": "three independent packed seeds; label-free synthetic SDR only",
+    scope = "three independent packed seeds; label-free synthetic SDR only"
+    if native.get("formula_revision") == 7:
+        scope = f"{len(results)} explicitly named Rev7 models; label-free synthetic SDR only"
+    return {"schema": 2, "scope": scope,
             "geometries": native["geometries"], "dropped_bits": native["dropped_bits"], "seeds": results}
 
 

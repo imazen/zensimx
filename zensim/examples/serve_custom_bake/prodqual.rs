@@ -27,11 +27,20 @@ fn reference(w: usize, h: usize) -> Vec<[u8; 3]> {
 }
 
 pub(super) fn run(paths: &[String]) {
+    run_revision(paths, "5");
+}
+
+/// Explicit Rev7 probe; the original Rev5 entry retains its revision contract.
+pub(super) fn run_rev7(paths: &[String]) {
+    run_revision(paths, "7");
+}
+
+fn run_revision(paths: &[String], revision: &str) {
     assert!(
         !paths.is_empty(),
         "--prodqual requires explicit model paths"
     );
-    assert_eq!(std::env::var("ZENSIM_FORMULA_REV").as_deref(), Ok("5"));
+    assert_eq!(std::env::var("ZENSIM_FORMULA_REV").as_deref(), Ok(revision));
     let _guard = archmage::testing::lock_token_testing();
     let mut seeds = Vec::new();
     for (seed, path) in paths.iter().enumerate() {
@@ -43,7 +52,7 @@ pub(super) fn run(paths: &[String]) {
                 .metadata()
                 .get_utf8("zentrain.formula_revision")
                 .unwrap(),
-            "5"
+            revision
         );
         let request = Request::for_bake_bytes(&bytes).expect("declared extraction plan");
         let mut permutations = Vec::new();
@@ -136,7 +145,7 @@ pub(super) fn run(paths: &[String]) {
     }
     println!(
         "{}",
-        json!({"schema":2, "formula_revision":5,
+        json!({"schema":2, "formula_revision":revision.parse::<u32>().unwrap(),
         "input":"synthetic integer texture; cumulative low-bit truncation",
         "geometries":GEOMETRIES, "dropped_bits":DROPPED_BITS, "seeds":seeds})
     );
