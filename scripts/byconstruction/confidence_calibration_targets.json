@@ -1,0 +1,8 @@
+{
+  "schema": "library-admission-targets-v1",
+  "collections": {
+    "ceed2016": {"tables": ["pairs.tsv"]},
+    "pc-iqa": {"tables": ["pairs.tsv"]},
+    "jnd-mid-ma": {"tables": ["labels.tsv"]}
+  }
+}

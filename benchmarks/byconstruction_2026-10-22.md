@@ -5081,3 +5081,74 @@ hashes and resolves the live process/lock before reporting progress. Synthetic
 controls reject a changed or failing screen and a missing claimed-complete
 model. No full vote fit is launched by this preparation; the independent
 screen remains in progress.
+
+### Confidence linking calibration: prospective admission and read scope (2026-10-27)
+
+This registration defines the calibration prerequisite for the requested
+per-item confidence experiment. It does not authorize a candidate fit before
+its complete weight/sampler registration. It preserves original Mlic inputs,
+all existing studies and every held-out source restriction. No new calibration
+response has been interpreted to choose this scope or method.
+
+Reuse zenpapers `jnd_utility_analyze.py` at `4e81c03a46fe2a9d86a73c3da75edaaec7fd9b9c`.
+The old aggregate linking dispersion is inadmissible: validate-only FG-IQA
+influenced its fit before final item-policy filtering. In addition, zensim's
+owner-approved D4 roles in `docs/DATA_SPLITS.md` reserve MIDD-CAP and MIDD-GAR
+for validation/source-exposed diagnostics. Their labels cannot fit a linking
+parameter even though zenpapers' policy calls them trainable. Exclude all
+three collections before reading fitting responses. VLIC is outside this
+reconstruction; its visually-lossless criterion is not an existing donor
+under the estimator's criterion rule.
+
+The candidate donors are CEED2016 and PC-IQA pairwise slopes, plus the JPEG
+and BPG first-JND units from JND-MID-MA's colour JND-TV protocol: at most four
+aggregate units across three collections. CEED/PC require newly frozen,
+source-cleared TRAIN membership. JND-TV retains its calibration-anchor
+purpose and requires exact source-family admission for this linking use.
+Its raw thresholds never become Mlic training targets. Inventory all three
+JND modalities for shared-scene reservations, but fit only the colour protocol.
+The tracked `confidence_calibration_targets.json` names the identifier tables.
+
+Before responses, run the canonical native source-identity screen, unchanged
+26-positive/3,181-unrelated calibration and inherited family/role checks.
+Keep every unresolved match excluded. Inherit prior admissions, completed
+fit exposures and protected estates; do not use a broad source allowlist to
+clear them. Every scene, crop, modality and codec ladder shares its original
+family. Newly assigned roles follow the existing canonical origin rule;
+empty release split strings do not imply TRAIN. Freeze exact permitted
+tables, rows, families, native source hashes, teacher identity intersection
+and read-purpose receipts. The CEED img12 teacher omission (native size
+mismatch, all six methods) is fixed before calibration; do not resize it.
+
+After admission, the requested confidence experiment authorizes reading only
+these frozen TRAIN/calibration observations, with a preread ledger. Teacher
+distance remains `max(0, 10 - CVVDP_JOD)` from the pinned existing extraction.
+Pairwise slopes retain the existing probit-binomial likelihood, half-vote tie
+rule, at least ten usable pairs, 200 reference-bootstrap resamples, positive
+lower bootstrap slope bound and teacher-majority agreement at least 0.7.
+Process CEED then PC with the existing RNG seed 20261025 freshly initialized
+for each independently admitted omission root. Preserve native vote counts;
+missing values refuse rather than becoming hard preferences.
+
+JND-TV uses the existing within-ladder linear interpolation and separate
+JPEG/BPG axes. Never extrapolate a criterion beyond scored ladder support.
+Keep full unit provenance (study, condition, codec, tables and family set).
+Preserve the legacy three-decimal unit serialization before synthesis and
+the population-SD convention: the linking floor is `std(log(u))` over at
+least three positive, valid admitted unit entries. Retain the full linking
+variance term; an insufficient or nonfinite calibration is INCOMPLETE,
+never zero variance, a borrowed validation estimate or a chosen constant.
+The two JND-TV codecs are not independent studies. Report study/family
+dependence and retained support; this is an effective heterogeneity model,
+not a demonstrated universal JND variance.
+
+Each omission removes its held-out source families and aliases from donor
+fits as well as native rating/observer fits, then recomputes affected units
+and the floor. Reuse a calibration only when its entire permitted input set
+is hash-identical. An omitted rating collection contributes no scale-map or
+observer fit. Fit each retained rating collection's existing four-parameter
+teacher-scale map using only its exact Mlic fitting rows, native uncertainty
+semantics, fixed bounds and slope floor. Native targets remain unchanged.
+Store the fitted coefficients, complete read ledger and all rejected units.
+The inverse-variance weight construction, normalization and rank-pair mapping
+still require prospective registration before candidate fitting.
