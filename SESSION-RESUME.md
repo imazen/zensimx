@@ -2696,3 +2696,28 @@ Build run-heavy: rc=0, 14s, peak RSS 0.84 GiB, minimum available 23,132 MiB, pea
 Measurement run-heavy: rc=0, 17s, peak RSS 0.24 GiB, minimum available 23,693 MiB,
 peak load 0.96. Resource receipts are not runtime benchmarks. Rust formatting
 checks pass. Confidence control training continues; no candidate is adopted.
+
+### October 27: matched original-Mlic baseline, not a cross-cohort comparison
+
+The original full Mlic models give AIC-2026 public_train pooled SROCC
+0.907609 when the three packed/calibrated seed predictions are averaged on
+all 3,920 rows. The same-population full 16×8 continuations give Mlic 0.914556,
+Neff 0.911525, Vote 0.913928 and Order 0.915738. Thus the Mlic continuation
+improves over the original Mlic baseline; none is yet a stable production
+replacement. The older approximately 0.93 claim concerned different Tga/M64a
+recipes, not original Mlic, and must not be used as Mlic's starting number.
+
+Full-model numbers and fold aggregates are different estimands: fold models
+also omit an E21 leg, have different starting fits, see 24 rather than 28
+AIC-2026 TRAIN sources, and average different numbers of predictions per row.
+Vote's full in-sample SROCC 0.913928 is below its fold-held-out aggregate 0.914591;
+that observation is real, but it is not the train/test comparison of a single
+fixed model. The precise causal reason has not been isolated. Likewise,
+within-ladder SROCC near 0.9998 is not pooled SROCC near 0.908.
+
+The completed continuation schedule is only four/eight epochs at constant
+learning rate 1e-5 with mixed losses, not direct SROCC optimization or a
+convergence demonstration. Do not claim a feature-capacity limit, convergence,
+or an optimizer defect from these numbers. A matched TRAIN-only convergence
+and objective diagnostic is the next question alongside the already registered
+confidence study. Keep frozen outcomes and all independent evaluation roles.
