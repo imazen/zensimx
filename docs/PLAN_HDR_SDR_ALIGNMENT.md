@@ -90,13 +90,29 @@ underflow in f32 below a per-pixel error of about 4e-6; the
 [record](../benchmarks/byconstruction_2026-10-22.md) has the details, and
 `just hdr-precision` repeats the check for a new frontend.
 
-**Owner decisions needed.** (1) A human HDR holdout. HDR-VDC and AVT keep
-only Rev2/944 tables and need fresh sign-off to re-extract through the frozen
-drivers; alternatively admit another organized library dataset (for example
-the two Rousselot HDR compression sets, licence to confirm) as eval-only.
-UPIQ-380 is TRAIN since October 7 and cannot serve. (2) Timing hardware:
-the scalar-performance row names the 9950X3D, where benchmarks are currently
-not permitted.
+**Owner decision 1 (2026-10-27): "use all human hdr data".** The frontend
+comparison is judged on every human HDR set in the tower library that a
+full-reference metric can score, each reported separately with its exposure
+recorded. There is no single unexposed holdout, and no single SROCC threshold
+decides.
+- Compression and distortion: UPIQ-380 (TRAIN; cross-validated by source fold
+  only), Rousselot HDdtb and 4Kdtb, HDR-VDC, AVT-VQDB-UHD-1-HDR, CHUG and the
+  Nantes mobile HDR VQA set.
+- Reconstruction and inverse tone mapping: SI-HDR (rated stimuli not
+  released, see the survey) and the Ghent colour-graded ITM set.
+- Tone mapping: TMQI-DB, Krasula's TMQID and IRCCyN PairComp TMO, which test
+  the cross-domain dial.
+- Not scorable full-reference: ESPL-LIVE HDR and RV-TMO, reported as such.
+- Video: HDR-VDC and AVT are re-extracted through the frozen drivers
+  (`scripts/external_reads/asrun`; this decision is the sign-off those drivers
+  require). CHUG and Nantes are decoded the same way. All four are evaluation
+  only.
+- Training: the registered HDR legs are unchanged (UPIQ-380 at E31's weight
+  plus the teacher pairs). Adding CC-BY sets as training legs would move them
+  to source-fold evaluation and needs a separate decision.
+
+**Owner decision still needed.** (2) Timing hardware: the scalar-performance
+row names the 9950X3D, where benchmarks are currently not permitted.
 
 **Library survey for decision 1 (2026-10-27, catalogue and READMEs only, no
 labels read).** No organized human HDR image set is unexposed. Outside UPIQ

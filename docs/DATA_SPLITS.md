@@ -2803,3 +2803,19 @@ Their rows are read for `source_id` only in every zenpapers training-row reader,
 TERMINAL's labels are no longer unread. Aggregate statistics over them shaped a zenpapers tier and composite weights,
 and these reads must accompany the D2 confirmatory read. Whether TERMINAL still serves as D2's set is the owner's
 decision.
+
+## 2026-10-27: owner decision — all human HDR data judges the HDR frontend
+
+Owner, verbatim: "use all human hdr data". For the HDR frontend comparison (PU21 against ICtCp and a compact
+monotone curve; `docs/PLAN_HDR_SDR_ALIGNMENT.md`), every human HDR set in the tower library that a full-reference
+metric can score is evaluation data. Each is reported separately with its earlier exposure (the 2026-07-29 chroma
+and SI-HDR studies, the August external reads), and no single set or threshold decides.
+
+The decision reads as sign-off to re-extract HDR-VDC and AVT-VQDB-UHD-1-HDR through the frozen
+`scripts/external_reads/asrun` drivers, and to decode CHUG and the Nantes mobile set the same way. All four are
+evaluation only.
+
+Roles are otherwise unchanged. UPIQ-380 stays TRAIN and enters the comparison only through source folds. Training
+legs stay as registered. Non-commercial or unstated licences (CHUG's CC BY-NC-SA reading, Rousselot HDdtb) validate
+and never train, per the 2026-10-25 licence policy.
+
