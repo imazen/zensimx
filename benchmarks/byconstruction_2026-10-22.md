@@ -7414,3 +7414,23 @@ predictions exactly (largest difference 0.0 over 3,920 rows), and every tracked 
 record keeps per-step moved, contested and non-nearest counts. The plan (`mlic-aic-wise-20261027-run01`, 189
 interpolations, bake owner `8023a49a…` built on i265 from `613ad594`) waits for the Vote omission run, as the D
 omission run does; whichever takes the lock first runs first, and both precede stage E. The decision rule is unchanged.
+
+### Stage D: E21 out of sample and the registered decision (20:58 UTC)
+
+Omission runs complete: Mlic ×256 (`mlic-aic-omission-aic256-20261027-run01`), Vote ×256
+(`mlic-aic-omission-voteaic256-20261027-run01`) and the stage D candidate
+(`mlic-aic-omission-xrefaic256-20261027-run01`). E21 out of sample, three-seed mean SROCC per dataset:
+
+| Point | KADID | TID2013 | KonFiG | CID22-A | Mean | vs Mlic (SE) |
+|---|---:|---:|---:|---:|---:|---:|
+| Mlic | 0.8825 | 0.8741 | 0.8078 | 0.8808 | 0.8613 | — |
+| Mlic ×256 e7 (stage A point) | 0.8823 | 0.8740 | 0.8063 | 0.8815 | 0.8610 | −0.0003 (0.0019) |
+| Vote ×256 e29 (stage B point) | 0.8801 | 0.8763 | 0.7964 | 0.8964 | 0.8623 | +0.0010 (0.0012) |
+| ×256 + rehearsal e59 (stage D candidate) | 0.8785 | 0.8730 | 0.8007 | 0.8918 | 0.8610 | −0.0003 (0.0020) |
+
+**Decision under the registered rule:** against the Vote point, the D candidate's E21 differences are KADID −0.0016,
+TID2013 −0.0032, KonFiG +0.0043 and CID22-A −0.0046, none more than 0.005 lower, and its out-of-fold AIC is 0.0021
+higher, so **the D candidate (×256 + rehearsal, epoch 59) replaces the Vote point as stage C's arm**, subject to
+stages F and E (queued, registered before their results). Against stage A's Mlic point (reported) KonFiG is −0.0056,
+so it would not have replaced that point. Out of sample, none of these continuations moves the four-set mean by more
+than 0.001 from Mlic; CID22-A gains and KonFiG loses.

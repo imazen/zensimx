@@ -31,6 +31,17 @@ work. The September chronology below is retained history, including its old
 paused-goal statement. It is not the current queue. No new Mlic/AIC recipe has
 been adopted as the serving model, and the seamless HDR frontend has not started.
 
+### State at 20:58 UTC, 2026-10-27
+
+Stage D's E21 run is complete: its candidate (×256 + rehearsal e59, out-of-fold AIC 0.9390) is within 0.005 of the
+Vote point on every E21 set, so **stage C's arm is now the D candidate** unless stage F or E beats it (record, "Stage D:
+E21 out of sample and the registered decision"). Stage F (`mlic-aic-wise-20261027-run01`, w21:pB) is scoring; stage E
+(`mlic-aic-recipe-votexref-20261027-run01`, w21:pA) waits for the lock. Then `stagef_summary.py` and
+`stagee_summary.py <E run>` (in `/mnt/v/output/zensim/frontier-summary-20261027/`), then stage C's `seeds-plan` and
+`full-plan` for the final point (`stagec_launch.py POINT_RUN ARM EPOCH AFTER_RUN SOURCE_COMMIT`; its omission run
+exists for the D candidate). The owner asked (20:50 UTC) for MlicVoteFT16x8's panels and scatter plots in the dashboard
+and for two curated models, one general and one codec-only; that dashboard work is in progress.
+
 ### State at 19:56 UTC, 2026-10-27
 
 Stage D is complete (control byte-identical): ×256 + the within-dataset rehearsal leg keeps the older sets in sample
