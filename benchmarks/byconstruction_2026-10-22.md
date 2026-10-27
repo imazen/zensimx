@@ -4912,3 +4912,35 @@ from `def6372e067a02b13b398b2a43327874c7854a8e`, including the checked v3
 wrapper dispatch, and first requires native-count admission and a full-budget
 unchanged-Mlic reproduction with its separately built trainer. The production
 candidate/HDR objective remains active after this negative screen.
+
+### BAPPS released-aggregate source audit, before vote fits (2026-10-27)
+
+The first MlicVote preparation refused blank `n_a`, `n_b` and `n_tie`
+fields in the normalized library. No control or candidate fit started.
+The failed preparation, source archive, ledger and logs remain preserved.
+
+The original [BAPPS paper, Appendix B](https://arxiv.org/html/1801.03924#Sx4)
+specifies two training judgments grouped into a target, with 0.5 for a split
+vote. The [released dataset documentation](https://github.com/richzhang/PerceptualSimilarity#c-about-the-dataset)
+also specifies two judgments per training triplet and the `judge` direction.
+The library's pinned importer stores `p_a=1-judge` and `n=2`, leaving the
+separate count columns blank. This admits a lossless source-format recovery,
+not an inferred preference or an additional observation.
+
+Before any vote fit, independently verify the released TRAIN archive SHA256
+`b4f5c772c7cd88ac44bcb4ff0741745d434c05f0094f2bfb262ddcd0055bf393`.
+Interpret only the 146,003 frozen TRAIN judge members, binding their triplet
+paths to the existing membership and their original array bytes to hashes.
+Require a single native aggregate exactly in `{0, 0.5, 1}`, normalized
+`p_a=1-judge`, and stored `n=2`. Then the sufficient statistics are uniquely
+`n_b=2*judge`, `n_a=2-n_b`, `n_tie=0`. No rounding, tolerance, model output,
+new vote or changed membership is permitted. Do not parse excluded TRAIN
+judge arrays or open the validation archive. Log the opaque archive hash
+separately from the selected response reads.
+
+A complete audit may supply an explicitly pinned count-recovery sidecar to
+a fresh preparation. The direct missing/inconsistent-count gate remains
+unchanged, as do the loss, masses, budgets and selection/production gates.
+Absent a verified complete audit, the vote trial remains blocked while the
+independent ordering trial proceeds. Synthetic controls check exact recovery,
+wrong aggregate/direction/count refusal and validation-path refusal.

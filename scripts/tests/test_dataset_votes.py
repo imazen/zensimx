@@ -1,5 +1,6 @@
 """Invented native counts; metadata admission never reads vote responses."""
 import copy
+import io
 import json
 from pathlib import Path
 import sys
@@ -137,6 +138,27 @@ class NativeVotes(unittest.TestCase):
         (candidate/"pred_dataset_bapps.tsv").write_text("key\tprediction\ninvented\t1.1\n")
         with self.assertRaisesRegex(ValueError, "omission predictions differ"):
             verify_omitted_vote_predictions(control, candidate)
+
+    def test_released_two_judge_aggregate_recovers_only_exact_sufficient_statistics(self):
+        import numpy as np
+        sys.path.insert(0, str(Path(__file__).resolve().parents[1]/"byconstruction"))
+        from bapps_vote_audit import recover, judge_path
+        def raw(value):
+            stream = io.BytesIO()
+            np.save(stream,np.array([value],dtype=np.float64),allow_pickle=False)
+            return stream.getvalue()
+        for p1 in (0.,0.5,1.):
+            label = dict(split="train",n="2",p_a=str(1-p1),n_a="",n_b="",n_tie="")
+            self.assertEqual(recover(raw(p1),label),dict(n_a=int(2*(1-p1)),n_b=int(2*p1),n_tie=0,n=2,p_a=1-p1))
+        for change in (dict(split="val"),dict(n=""),dict(n="5"),dict(p_a="0.75"),dict(n_a="2")):
+            with self.subTest(change=change), self.assertRaises(ValueError):
+                recover(raw(0.5),{**label,"p_a":"0.5",**change})
+        with self.assertRaises(ValueError):
+            recover(raw(0.25),{**label,"p_a":"0.75"})
+        member=dict(reference_path="train/cnn/ref/000001.png",a_path="train/cnn/p0/000001.png",b_path="train/cnn/p1/000001.png")
+        self.assertEqual(judge_path(member),"train/cnn/judge/000001.npy")
+        with self.assertRaises(ValueError):
+            judge_path({**member,"reference_path":"val/cnn/ref/000001.png"})
 
 
 if __name__ == "__main__":
