@@ -818,3 +818,12 @@ Host bans still apply. Preserve this guard; do not "repair" its refusal by
 automatically adding `--historical-replay`. Use the current registered study.
 Regression tests and frozen historical source snapshots remain unchanged.
 Inventory and test evidence: `benchmarks/byconstruction_2026-10-22.md`.
+
+## Known Bugs — checkpoint retention (October 27, 2026)
+
+The canonical `v2_lodo_mlp.py::train_and_select` used to delete the entire
+checkpoint directory after copying the final epoch to `refit/last.bin`.
+That removed protected experiment artifacts, including the epoch-zero control.
+New executions retain the directory; final-epoch selection and model bytes are
+unchanged. Frozen source snapshots retain their as-run behavior and must not
+be modified. Old completed runs cannot supply the deleted checkpoints.

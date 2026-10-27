@@ -407,7 +407,9 @@ def train_and_select(groups: list, init_seed: int, sample_seed: int, width: int,
             raise ValueError(f"{final}: final-epoch checkpoint missing")
         bake = dest / "refit" / "last.bin"
         shutil.copyfile(final, bake)
-        shutil.rmtree(ckpt)
+        # Checkpoints are experiment artifacts, including the epoch-zero control.
+        # Retain them for provenance and prospective convergence diagnostics;
+        # selecting the final epoch does not make the other outputs disposable.
         selected = EPOCHS - 1
     else:
         bake, selected = dest / "refit" / "best.bin", best
