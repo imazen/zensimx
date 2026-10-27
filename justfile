@@ -3720,3 +3720,7 @@ confidence-followthrough-status config:
 # Frozen TRAIN-only parameter-packing diagnostic; caller owns run-heavy/compute lock.
 mlic-precision-audit plan output:
     OPENBLAS_NUM_THREADS=1 python3 -B scripts/byconstruction/mlic_precision_audit.py {{quote(plan)}} {{quote(output)}}
+
+# Existing native input/color/cache contracts at the current research arithmetic.
+mlic-native-input-tests:
+    cargo test -p zensim --test native_hdr_color --features custom-profiles -- --test-threads=1

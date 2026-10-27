@@ -291,3 +291,31 @@ generalization of "HDR metric"; defer until R1–R3 land.
   not as an absolute target (that lesson is already paid for — twice).
 - LIVE image files may not be on disk yet (scores are; check
   `upiq_extracted` coverage before step 1 and pull LIVE release if needed).
+
+### October 27: native input baseline at Rev7
+
+`just mlic-native-input-tests` preserves the five legacy native-HDR tests and
+adds a separate Rev7 child-process check of the supported 720-feature HDR
+entry. Running the legacy append-family tests wholesale with
+`ZENSIM_FORMULA_REV=7` fails before color arithmetic because that feature family
+is deliberately unsupported. The rejection and old test expectations remain
+unchanged; this failed invocation is retained in `native-hdr-rev7.log`.
+
+The new check uses a 97×65 image with native u16 codes and a one-code red-channel
+distortion. For PQ and HLG, each in sRGB, Display-P3 and BT.2020, the native-u16
+features match the equivalent normalized-f32 code features exactly, remain
+finite, and differ from identity. All six cases pass. This proves the tested
+input-container and supported-entry behavior; it does not prove every possible
+code step survives display clamps, establish a new f64 error bound, qualify
+Mlic's full model/input composition, or show HDR perceptual quality or speed.
+The original five tests also pass, retaining their independent f64 color/display
+reference and prepared-map checks under their original arithmetic.
+
+Evidence: shared output `zensim/mlic-precision-20261027-run01/`, including
+`native-hdr-build-initial.log`, `native-hdr-rev7.log` and
+`native-hdr-supported-rev7-run02.log`. The first build/default-five-test run:
+run-heavy rc=0, 147s, peak RSS 1.92 GiB, minimum available 21,921 MiB, peak load
+3.80. The final six-test run including explicit Rev7 child: rc=0, 9s, peak RSS
+0.59 GiB, minimum available 23,443 MiB, peak load 1.41. These are validation
+resource receipts, not performance qualification. No frontend arithmetic,
+feature identity, trained artifact or running experiment was changed.

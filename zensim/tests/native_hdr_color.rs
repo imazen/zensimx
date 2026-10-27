@@ -580,3 +580,119 @@ fn prepared_native_maps_match_canonical_features_and_survive_failed_calls() {
         );
     }
 }
+
+/// The append-family tests above intentionally cover their legacy contract.
+/// Rev7 admits basic/peaks/v2 instead: exercise the supported 720 entry without
+/// enabling append families or changing the legacy expectations.
+#[test]
+fn rev7_native_u16_preserves_one_code_steps_through_supported_hdr_entry() {
+    fn native(p: &[[u16; 4]], w: usize, h: usize, prim: ColorPrimaries) -> StridedBytes<'_> {
+        StridedBytes::with_alpha_mode(
+            bytemuck::cast_slice(p),
+            w,
+            h,
+            w * 8,
+            PixelFormat::Srgb16Rgba,
+            AlphaMode::Opaque,
+        )
+        .with_color_primaries(prim)
+    }
+    use zensim::feature_v2::FormulaRevision;
+    // This test is independently invoked under Rev7 by mlic-native-input-tests.
+    // Explicitly bind its arithmetic, rather than silently testing the default.
+    let revision = zensim::feature_v2::active_formula_revision();
+    if revision != FormulaRevision::Rev7 {
+        // Exercise this revision in a child so the ordinary suite still covers it.
+        let status = std::process::Command::new(std::env::current_exe().unwrap())
+            .env("ZENSIM_FORMULA_REV", "7")
+            .args([
+                "--exact",
+                "rev7_native_u16_preserves_one_code_steps_through_supported_hdr_entry",
+                "--test-threads=1",
+            ])
+            .status()
+            .unwrap();
+        assert!(status.success());
+        return;
+    }
+    let (w, h) = (97, 65);
+    let a: Vec<[u16; 4]> = (0..w * h)
+        .map(|i| {
+            [
+                (i * 37 % 65535) as u16,
+                (i * 19 % 65535) as u16,
+                (i * 11 % 65535) as u16,
+                65535,
+            ]
+        })
+        .collect();
+    let b: Vec<_> = a.iter().map(|p| [p[0] + 1, p[1], p[2], p[3]]).collect();
+    let as_float = |pixels: &[[u16; 4]]| -> Vec<[f32; 4]> {
+        pixels
+            .iter()
+            .map(|p| {
+                [
+                    f32::from(p[0]) * (1.0 / 65535.0),
+                    f32::from(p[1]) * (1.0 / 65535.0),
+                    f32::from(p[2]) * (1.0 / 65535.0),
+                    1.,
+                ]
+            })
+            .collect()
+    };
+    let (af, bf) = (as_float(&a), as_float(&b));
+    for prim in [
+        ColorPrimaries::Srgb,
+        ColorPrimaries::DisplayP3,
+        ColorPrimaries::Bt2020,
+    ] {
+        for encoding in [
+            HdrEncoding::Pq { peak_nits: 1000. },
+            HdrEncoding::Hlg {
+                peak_nits: 1000.,
+                ambient_lux: 5.,
+            },
+        ] {
+            let z = Zensim::new(ZensimProfile::B).with_parallel(false);
+            let toggles = V2NewFeatureToggles::default();
+            let actual = z
+                .compute_folded720_features_hdr(
+                    &native(&a, w, h, prim),
+                    &native(&b, w, h, prim),
+                    encoding,
+                    toggles,
+                    &mut V2Scratch::new(),
+                )
+                .unwrap();
+            let expected = z
+                .compute_folded720_features_hdr(
+                    &source(&af, w, h, prim),
+                    &source(&bf, w, h, prim),
+                    encoding,
+                    toggles,
+                    &mut V2Scratch::new(),
+                )
+                .unwrap();
+            assert_eq!(
+                actual.features(),
+                expected.features(),
+                "{encoding:?} {prim:?}"
+            );
+            assert!(actual.features().iter().all(|v| v.is_finite()));
+            let identity = z
+                .compute_folded720_features_hdr(
+                    &native(&a, w, h, prim),
+                    &native(&a, w, h, prim),
+                    encoding,
+                    toggles,
+                    &mut V2Scratch::new(),
+                )
+                .unwrap();
+            assert_ne!(
+                actual.features(),
+                identity.features(),
+                "one u16 code step disappeared: {encoding:?} {prim:?}"
+            );
+        }
+    }
+}
