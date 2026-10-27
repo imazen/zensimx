@@ -77,9 +77,13 @@ steering workers (cached reference, sequential and parallel, map bins 1 and
 8) reproduce the canonical features and the direct `compute_hdr` score for
 a bake over Mlic's 410 direct Rev7 reads. Each has a failing negative
 control (wrong reference lift; 4000-nit peak; stride misread; another pair's
-features). A bake over basic ids 0–227 is refused at Rev7 with "incomplete
-refinement coverage": Rev7 steering covers its served read set, not arbitrary
-basic ids. Near-black lift and transfer joins still need Rev7 controls.
+features). Near-black codes (at most 0.032 nit PQ, about 0.1 nit HLG, under
+the 0.403 nit black-plus-ambient lift) match the same reference; that test
+fails on a 10% gain or lift error and on a missing lift, but not on a 1% gain
+error. The mid-range codes cross HLG's segment join, and moving the join to
+0.45 or a 1% gain on the upper segment fails the test. A bake over basic ids
+0–227 is refused at Rev7 with "incomplete refinement coverage": Rev7 steering
+covers its served read set, not arbitrary basic ids.
 
 **Owner decisions needed.** (1) A human HDR holdout. HDR-VDC and AVT keep
 only Rev2/944 tables and need fresh sign-off to re-extract through the frozen
