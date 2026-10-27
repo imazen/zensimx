@@ -663,8 +663,8 @@ def seeds_plan(run, commit, trainer, meta_tool, point_run, arm, after_run):
     Its seed-0 fits must reproduce the advancing run's checkpoints byte for byte (all folds and epochs)."""
     point_run = Path(point_run)
     point = json.loads((point_run / "PLAN.json").read_text())
-    if point.get("schema") not in (FRONTIER_SCHEMA, RECOVERY_SCHEMA) or arm not in point["arms"]:
-        raise ValueError("the advanced point must be an Mlic frontier or recovery arm (x16 already has three seeds)")
+    if point.get("schema") not in (FRONTIER_SCHEMA, RECOVERY_SCHEMA, XREF_SCHEMA) or arm not in point["arms"]:
+        raise ValueError("the advanced point must be an Mlic frontier, recovery or rehearsal arm (x16 already has three seeds)")
     population = point["arms"][arm]
     protocol, weight, _ = diagnostic_protocol(population)
     reused = {name: reused_arm(FRONTIER_REUSED_RUN, name, seeds=SEEDS) for name in ARMS}
@@ -1288,9 +1288,9 @@ PACK = ("import json, sys; from pathlib import Path; from v2_production_pack imp
 
 def full_plan(run, commit, trainer, meta_tool, point_run, arm, epoch, after_run):
     point = json.loads((Path(point_run) / "PLAN.json").read_text())
-    if (point.get("schema") not in (FRONTIER_SCHEMA, RECOVERY_SCHEMA) or arm not in point["arms"]
+    if (point.get("schema") not in (FRONTIER_SCHEMA, RECOVERY_SCHEMA, XREF_SCHEMA) or arm not in point["arms"]
             or epoch not in FRONTIER_CHECKPOINTS):
-        raise ValueError("the advanced point must be a frontier or recovery arm at a studied epoch")
+        raise ValueError("the advanced point must be a frontier, recovery or rehearsal arm at a studied epoch")
     population = point["arms"][arm]
     protocol, weight, _ = diagnostic_protocol(population)
     fits = json.loads(Path(INPUTS["full_fits"][0]).read_text())
