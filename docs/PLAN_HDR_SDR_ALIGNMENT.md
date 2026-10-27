@@ -67,6 +67,14 @@ improves the human HDR holdout panels over F0 with whole-source uncertainty
 reported, with no SDR regression and no cost regression on that hardware.
 Full panels decide; no single SROCC threshold.
 
+**Numerical controls already in place at Rev7** (`zensim/tests/native_hdr_color.rs`,
+2026-10-27): native PQ/HLG codes in sRGB, Display-P3 and BT.2020 match an
+independent f64 display-light decode within 1e-3 relative; one-code u16
+steps survive the supported entry; PQ changes confined above the declared
+1000-nit peak clip to identity while changes below it stay visible. Each has
+a failing negative control (wrong reference lift; 4000-nit peak). Near-black
+lift, transfer joins, strides, caches and maps still need Rev7 controls.
+
 **Owner decisions needed.** (1) A human HDR holdout. HDR-VDC and AVT keep
 only Rev2/944 tables and need fresh sign-off to re-extract through the frozen
 drivers; alternatively admit another organized library dataset (for example
