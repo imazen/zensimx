@@ -5874,3 +5874,24 @@ Confidence study run01 is queued after the pinned AIC full panels, with source
 Its unweighted control and 21 cells are not yet complete. The first launch
 command supplied a malformed source revision and refused before queue creation;
 the actual queue resolves the full committed revision and verifies ancestry.
+
+
+### Native confidence equal-precision control (2026-10-27)
+
+A process-isolated test now runs the actual trainer in baseline, equal-precision
+and unequal-precision modes, each for 120 epochs × 50,000 draws. The invented
+five-row fixture includes a covered rank reference, an uncovered reference,
+and a separate MSE group with unchanged source mass. All 120 exported f32
+checkpoint byte sequences and all 120 logged loss/validation lines (excluding
+elapsed time) match baseline under equal precision. Unequal precision changes
+the trajectory and final checkpoint, proving the branch is engaged.
+This is exported-model/log parity, not a claim to inspect every f64 optimizer
+bit, and does not replace the queued full original-Mlic reproduction.
+
+All three native binding/training tests and four arithmetic tests pass:
+`rc=0 14s | peak-RSS 0.80GiB | min-avail 23511MiB | peak-load 1.54`.
+Validation-library/test Clippy with `-D warnings` passes:
+`rc=0 12s | peak-RSS 0.67GiB | min-avail 23026MiB | peak-load 1.31`.
+The preserved fixture checkpoints, manifests, logs and hash inventory are in
+shared admission run02 `native-parity-run01/VERIFIED.json`; production trainer
+bytes and the already queued experiment source remain unchanged.

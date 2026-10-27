@@ -390,4 +390,159 @@ mod tests {
             );
         }
     }
+
+    #[test]
+    fn native_equal_precision_training_parity() {
+        use std::process::Command;
+        let scores = [1., 1., 2., 3., 4.];
+        let refs = [0, 0, 0, 1, 1];
+        let features: [&[f64]; 5] = [
+            &[0.1, 0.8],
+            &[0.2, 0.7],
+            &[0.4, 0.5],
+            &[0.6, 0.3],
+            &[0.9, 0.1],
+        ];
+        let mut groups = [
+            TrainingGroup {
+                name: "human".into(),
+                human_scores: &scores,
+                features: FeatureRows::Borrowed(&features),
+                metric_sigmas: None,
+                train_weight: 0.8,
+                validation_weight: 0.,
+                ref_ids: Some(&refs),
+                loss_mode: GroupLossMode::Rank,
+            },
+            TrainingGroup {
+                name: "absolute_control".into(),
+                human_scores: &scores,
+                features: FeatureRows::Borrowed(&features),
+                metric_sigmas: None,
+                train_weight: 0.2,
+                validation_weight: 1.,
+                ref_ids: None,
+                loss_mode: GroupLossMode::Mse,
+            },
+        ];
+        if let Some(child) = std::env::var_os("ZENSIM_CONFIDENCE_PARITY_CHILD") {
+            let child = std::path::PathBuf::from(child);
+            let hp = MlpHyperparams {
+                n_hidden: 8,
+                n_epochs: 120,
+                pairs_per_epoch: 50000,
+                init_seed: Some(1101),
+                sample_seed: Some(101),
+                minibatch_size: 1,
+                parallel_batch: false,
+                log_every: 1,
+                early_stop_patience: 0,
+                dump_checkpoints_every: 1,
+                dump_checkpoints_dir: Some(child.clone()),
+                ..MlpHyperparams::default()
+            };
+            let mut log = Vec::new();
+            let bytes = crate::mlp_train::train_mlp_strategy_pairs(
+                &mut groups,
+                2,
+                &hp,
+                &mut log,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                &BTreeMap::new(),
+            );
+            std::fs::write(child.join("result.bin"), bytes).unwrap();
+            std::fs::write(child.join("train.json"), serde_json::to_vec(&log).unwrap()).unwrap();
+        } else {
+            let root = std::path::PathBuf::from(std::env::var_os("HOME").unwrap())
+                .join("tmp")
+                .join(format!("confidence-native-parity-{}", std::process::id()));
+            std::fs::create_dir(&root).unwrap();
+            let base = serde_json::json!({
+                "schema":"mlic-contrast-confidence-v1", "candidate":"MlicConfidence",
+                "root_sha256":"a7fd4af0c2bb5a8981be636e5c1cb1a51db57496b7c60d7bf6da01d71dd16952",
+                "init_seed":1101, "sample_seed":101, "epochs":120, "pairs_per_epoch":50000,
+                "selected_epoch":119, "n_features":2, "hidden":8, "sigma_L":0.5, "item_floor":0.05,
+                "input_sha256":{}, "tie_policy":"existing-native-owner", "pair_law":"within-ref-u64-modulo",
+                "absolute_loss_changed":false, "group_masses_changed":false,
+                "groups":[{"name":"human", "train_weight":0.8, "validation_weight":0.,
+                    "mode":"withinref,rank", "binding":{"rows":5,
+                        "scores_refs_sha256":row_digest(&scores,&refs),
+                        "points":[[0.,0.1],[0.,0.1],[0.,0.1],null,null]}},
+                    {"name":"absolute_control","train_weight":0.2,"validation_weight":1.,"mode":"mse","binding":null}]
+            });
+            for arm in ["baseline", "equal", "unequal"] {
+                let dir = root.join(arm);
+                std::fs::create_dir(&dir).unwrap();
+                let mut command = Command::new(std::env::current_exe().unwrap());
+                command.args(["--exact", "mlp_train::confidence_weights::tests::native_equal_precision_training_parity", "--nocapture"])
+                    .env("ZENSIM_CONFIDENCE_PARITY_CHILD", &dir)
+                    .env("RAYON_NUM_THREADS", "1").env("ZENSIM_MAX_TIER", "v3")
+                    .env_remove("ZENSIM_RESEARCH_CONFIDENCE_MANIFEST")
+                    .env_remove("ZENSIM_RESEARCH_CONFIDENCE_SHA256")
+                    .env_remove("ZENSIM_RESEARCH_CONFIDENCE_RECEIPT");
+                if arm != "baseline" {
+                    let mut value = base.clone();
+                    if arm == "unequal" {
+                        value["groups"][0]["binding"]["points"][2] = serde_json::json!([2., 0.3]);
+                    }
+                    let bytes = serde_json::to_vec(&value).unwrap();
+                    let path = dir.join("manifest.json");
+                    std::fs::write(&path, &bytes).unwrap();
+                    command
+                        .env("ZENSIM_RESEARCH_CONFIDENCE_MANIFEST", path)
+                        .env("ZENSIM_RESEARCH_CONFIDENCE_SHA256", digest(&bytes))
+                        .env(
+                            "ZENSIM_RESEARCH_CONFIDENCE_RECEIPT",
+                            dir.join("receipt.json"),
+                        );
+                }
+                let log = std::fs::File::create(dir.join("child.log")).unwrap();
+                command.stdout(log.try_clone().unwrap()).stderr(log);
+                assert!(
+                    command.status().unwrap().success(),
+                    "native child failed: {}",
+                    dir.display()
+                );
+            }
+            for epoch in 0..120 {
+                let file = format!("ckpt_epoch{epoch:03}.bin");
+                assert_eq!(
+                    std::fs::read(root.join("baseline").join(&file)).unwrap(),
+                    std::fs::read(root.join("equal").join(&file)).unwrap(),
+                    "epoch {epoch}"
+                );
+            }
+            let epoch_logs = |arm: &str| -> Vec<String> {
+                let log: Vec<String> = serde_json::from_slice(
+                    &std::fs::read(root.join(arm).join("train.json")).unwrap(),
+                )
+                .unwrap();
+                log.into_iter()
+                    .filter(|line| line.starts_with("  epoch "))
+                    .map(|line| line.split(" | t=").next().unwrap().to_owned())
+                    .collect()
+            };
+            let baseline_logs = epoch_logs("baseline");
+            assert_eq!(baseline_logs.len(), 120);
+            assert_eq!(baseline_logs, epoch_logs("equal"));
+            assert_ne!(baseline_logs, epoch_logs("unequal"));
+            let baseline = std::fs::read(root.join("baseline/result.bin")).unwrap();
+            assert_eq!(
+                baseline,
+                std::fs::read(root.join("equal/result.bin")).unwrap()
+            );
+            assert_ne!(
+                std::fs::read(root.join("baseline/ckpt_epoch119.bin")).unwrap(),
+                std::fs::read(root.join("unequal/ckpt_epoch119.bin")).unwrap()
+            );
+            assert!(root.join("equal/receipt.json").is_file());
+            assert!(root.join("unequal/receipt.json").is_file());
+            eprintln!("native confidence parity artifacts: {}", root.display());
+        }
+    }
 }
