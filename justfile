@@ -3631,7 +3631,11 @@ aic-recipe-adaptation mode plan:
     OPENBLAS_NUM_THREADS=1 python3 -B scripts/byconstruction/aic_adaptation.py {{quote(mode)}} {{quote(plan)}}
 
 aic-recipe-adaptation-tests:
-    python3 -B -m unittest scripts.tests.test_aic_adaptation
+    python3 -B -m unittest scripts.tests.test_aic_adaptation scripts.tests.test_aic_adaptation_panel
+
+# Caller holds heavy.lock/run-heavy; separate fitted and held-out source panels.
+aic-recipe-adaptation-panel mode plan output:
+    OPENBLAS_NUM_THREADS=1 python3 -B scripts/byconstruction/aic_adaptation_panel.py {{quote(mode)}} {{quote(plan)}} {{quote(output)}}
 
 # Queue behind existing shared-machine timing work; caller supplies frozen source paths.
 aic-finetune-folds table pairs assignment output commit:

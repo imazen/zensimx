@@ -5335,3 +5335,39 @@ starting checkpoints and their fit/omission receipts before launch, plus the
 common root, continuation binary, source owners and public_train manifests.
 Keep complete logs and process/lock-backed progress, and serialize compute
 behind the active TRAIN study and its queued source-admission evaluation.
+
+
+The adaptation runner is frozen at `91cf6403db0d`, with the original
+warm-start owners at `87864f94` and trainer SHA256
+`eae55210ab1a0b7efd1cb9bd07b2a745bb5b77dd0f139dc30b31f05d7cca1ded`.
+Its plan lives in `/mnt/v/output/zensim/mlic-aic-adaptation-20261027-run01`;
+PLAN.json SHA256 is
+`d0a53135a567f190303e032d19e8003fc84d4a06c94b429802497dcb95b5a284`.
+It is queued behind the active ordering study and the native source screen.
+The fold stage requires 72 new continuations plus 24 verified Mlic reuses.
+A reader check against actual Mlic checkpoint/continuation receipts passed.
+Five refusal/contract tests passed on i265 under the resource wrapper:
+`rc=0 0s | peak-RSS 0.03 GiB | min-avail 24494 MiB | peak-load 0.03`.
+
+Before new panel results, fix the uncertainty display to the canonical
+native full statistics, three paired seed units, and 2,000 whole-source
+paired bootstrap draws with NumPy default_rng seed 1, percentile 2.5/97.5
+bounds using linear interpolation. Reuse identical source draws across
+contrasts; never resample rows independently. Show both each continuation
+minus its own initial recipe and each alternative minus Mlic at the same
+continuation strength. Source intervals describe the role-specific mean
+prediction, not independent replication across overlapping fitted models.
+Undefined values remain explicit with their denominators. Native full-panel
+Kendall/PWRC magnitudes retain their owner's polarity convention; signed
+SROCC is reported alongside them. Logistic calibration/tail statistics use
+the canonical diagnostic fit on the reported cohort, not a new deployed
+calibrator. No diagnostic fit or source interval is a selection gate.
+
+
+The panel partition/refusal checks pass on i265 (nine tests total), including
+unequal source-fold coverage, exclusion of fitted predictions from held-out
+means, changed initialization/predictions and stale process/completion refusal.
+The native wrapper recorded
+`rc=0 0s | peak-RSS 0.04 GiB | min-avail 24489 MiB | peak-load 0.12`;
+Python undefined-name/import checks also passed. These checks verify the
+orchestration and role partition; they are not measured model-quality results.
