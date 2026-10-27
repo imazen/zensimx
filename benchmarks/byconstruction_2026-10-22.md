@@ -7351,3 +7351,24 @@ source `5313ca25`, trainer `b3b86f18…`) and waits behind the stage D candidate
 its ×1024 fold 0 fit loaded the rehearsal leg on Vote's root (10,590 rows paired within 4 datasets) beside Vote's
 BAPPS vote leg and trained epoch 0. Dev order: Mlic ×256 omission (running since 19:55) → Vote ×256 omission → D
 candidate omission → stage E → stage C.
+
+### Where the remaining gap to 0.95 sits: fitted sources versus out of fold (2026-10-27, existing outputs, no new fit)
+
+Seed 0, mean over the seven fold models, from each run's `MODEL_PANELS.json` ("fitted sources, in sample": the 24
+public_train sources a fold model trained on) and `OUT_OF_FOLD_PANELS.json` (its four held-out sources, pooled).
+
+| Arm | Fitted sources e7 → e59 | Out of fold e7 → e59 | Gap at e59 |
+|---|---|---|---:|
+| AIC-only | 0.9538 → 0.9707 | 0.9393 → 0.9498 (0.9515 at e29) | 0.021 |
+| Static ×1024 | 0.9468 → 0.9590 | 0.9376 → 0.9465 | 0.012 |
+| ×1024 + rehearsal | 0.9457 → 0.9573 | 0.9366 → 0.9458 | 0.012 |
+| Static ×256 | 0.9403 → 0.9531 | 0.9312 → 0.9418 | 0.011 |
+| ×256 + rehearsal | 0.9367 → 0.9497 | 0.9288 → 0.9390 | 0.011 |
+| Vote ×256 | 0.9388 → 0.9513 | 0.9299 → 0.9404 | 0.011 |
+| Static ×16 | 0.9146 → 0.9227 | 0.9119 → 0.9168 | 0.006 |
+
+Two limits stack. Every mixed arm loses about 0.01 from fitted to held-out sources, so 0.95 out of fold needs about
+0.96 on the fitted sources; no mixed arm reaches that within 60 epochs (best: static ×1024, 0.959, with KADID, TID2013
+and KonFiG all down 0.02). And even AIC-only, which fits the training sources to 0.971, generalizes to 0.950 at best: 0.95
+is about this model family's ceiling on four unseen public_train sources, before any older set is protected.
+Weighting moves points along this trade-off and rehearsal shifts it a little; neither raises the ceiling.
