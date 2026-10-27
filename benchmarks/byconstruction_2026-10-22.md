@@ -6343,3 +6343,28 @@ script in the repository has been audited. New research launchers should use
 the current frozen-plan owners instead of copying these dated defaults.
 
 Guard verification on i265: all four tests pass, including actual refusal of all eight entrypoints under dependency-free invocations. Run-heavy rc=0, 0s, peak RSS 0.02 GiB, minimum available 23,824 MiB, peak load 0.08. Six shell launchers pass `bash -n`; no experiment was launched by these tests. Logs: shared output `zensim/obsolete-entrypoint-guards-20261027/tests.log`.
+
+### October 27: full AIC fits and remaining coordinate certificates complete
+
+Full run03 finished all 12 initial models and 24 continuations. The coordinator
+reread both model hashes and every recorded input hash for all 36 records in
+`FULL_FITS_COMPLETE.json`. Full-data panels subsequently started and reached
+350/360 population predictions at the recorded check; this is not panel or
+mixture completion. No failures were recorded. The independent confidence
+omission queue still waits for full-panel completion.
+
+The existing native `certify-monotone --pin 100` owner also passed for all
+27 remaining packed models: three Order initial models and all 24 continued
+models. Every certificate reports monotone/certified true and zero free
+amplitude/ramps. Earlier receipts cover the nine Mlic/Neff/Vote initial models.
+This completes coordinate-certificate coverage of the 36 models, not pixel
+monotonicity, mixture behavior, runtime qualification or candidate adoption.
+
+Evidence: shared output `zensim/mlic-full-certificates-20261027-run01/`, with
+frozen PLAN, model copies, native logs and COMPLETE. Completion SHA256:
+`d54070c71ee3628121803b771e7011132b51fb119b4891fbe9ab1a66d96bbc05`.
+All copied model and log hashes were reread after completion. Certificate
+run-heavy receipt on i265: rc=0, 3s, peak RSS 0.03 GiB, minimum available
+23,793 MiB, peak load 0.16. The dev full-fit receipt is rc=0, 4,822s,
+peak RSS 2.55 GiB, minimum available 26,792 MiB, peak load 9.44.
+These are execution resource receipts, not runtime benchmarks.
