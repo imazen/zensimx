@@ -31,6 +31,19 @@ work. The September chronology below is retained history, including its old
 paused-goal statement. It is not the current queue. No new Mlic/AIC recipe has
 been adopted as the serving model, and the seamless HDR frontend has not started.
 
+### State at 16:10 UTC, 2026-10-27
+
+Frontier: stage A2 done (no recovery point keeps the older sets); the registered rule over A+A2 advances
+`MixedAIC256@e7` (out-of-fold AIC 0.9312; summary in `/mnt/v/output/zensim/frontier-summary-20261027/`). The dev
+queue is chained (each run waits for its predecessor, then takes `heavy.lock`): stage B
+`mlic-aic-recipe-{order,confidence,neff,vote}-aic256-20261027-run01` (herdr w21:p9/pA/pB/pC; order fitting since
+16:03Z), stage D `mlic-aic-xref-20261027-run01` (w21:pE), stage C step 2 for the advanced arm
+`mlic-aic-omission-aic256-20261027-run01` (w21:pF). Trainers: stage B `587e4764…` (main `216481a8`), stage D and
+omission `b3b86f18…` (main `8b66cca2`), build records in each run's `TRAINER_BUILD.json`. `just mlic-priority-progress`
+lists every run. After stage B: `~/tmp/claude-port-20261027/stageb_summary.py` (copy in the summary folder) applies the
+registered B→C choice. After stage D and the omission run: compare D's candidate on E21 out of sample (needs a D
+omission run for its arm) before freezing stage C's `seeds-plan`/`full-plan` for the chosen point.
+
 ### State at 15:25 UTC, 2026-10-27
 
 Frontier stage A completed at 15:05Z (byconstruction record, "AIC-share frontier stage A:
