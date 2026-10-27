@@ -31,6 +31,19 @@ work. The September chronology below is retained history, including its old
 paused-goal statement. It is not the current queue. No new Mlic/AIC recipe has
 been adopted as the serving model, and the seamless HDR frontend has not started.
 
+### State at 19:10 UTC, 2026-10-27
+
+Stage B is complete (every recipe's replay control byte-identical). Under the registered B→C choice, **Vote ×256
+epoch 29 (out-of-fold AIC 0.9369, keeps the older sets) is stage C's arm**; Order 0.9321 and Confidence 0.9320 sit on
+Mlic's curve, Neff below (`/mnt/v/output/zensim/frontier-summary-20261027/STAGEB_SUMMARY.json`). The stage C recipe
+variant (Vote's own full models, root and omission cells) is registered (`a29bb316`) and pushed (`667cea58`). Dev
+queue: stage D `mlic-aic-xref-20261027-run01` fitting (w21:pE) → Mlic ×256 omission `mlic-aic-omission-aic256-…`
+(w21:pF) → Vote ×256 omission `mlic-aic-omission-voteaic256-…` (w21:pG). Then: run
+`~/tmp/claude-port-20261027/staged_summary.py <D omission run>` (D is judged against the Vote point; freeze a D
+omission run first only if D's candidate beats 0.9369 by more than 0.002), then freeze stage C's `seeds-plan` and
+`full-plan` for the chosen point with `stagec_launch.py`, then near-identity (`just dataset-nearid-candidate`) and
+gates (`just candidate-gates-rev7`) for its packed seed-0 model.
+
 ### State at 16:10 UTC, 2026-10-27
 
 Frontier: stage A2 done (no recovery point keeps the older sets); the registered rule over A+A2 advances
