@@ -1,5 +1,13 @@
 # Current agent priorities
 
+The October 26–27 owner refinements and active queue are recorded at the top of
+[SESSION-RESUME.md](SESSION-RESUME.md). Read that current section first; its
+September chronology is historical. Verify live work with
+`just mlic-priority-progress`. Complete AIC panels replace strict SROCC rejection
+for the new recipe comparison; frozen studies and data/numeric protections
+remain unchanged. The goal continues through stable adoption and subsequent
+native-precision HDR qualification while preserving speed.
+
 Read [CLAUDE.md](CLAUDE.md) for this repository's complete working rules.
 
 The user's September 15 directive makes

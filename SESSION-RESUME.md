@@ -1,5 +1,182 @@
 # Start here — one target score, one development path
 
+## Current work — October 27, 2026
+
+This section and the October 26–27 owner updates in
+[the production plan](docs/PRODUCTION_PRIORITIES_2026-09-15.md) control the active
+work. The September chronology below is retained history, including its old
+paused-goal statement. It is not the current queue. No new Mlic/AIC recipe has
+been adopted as the serving model, and the seamless HDR frontend has not started.
+
+### Active goal and decisions
+
+Keep working toward a stable, production-qualified candidate while preserving
+speed, scientific integrity and frozen studies. A completed experiment,
+negative result, report or PR is not completion. Execute the next registered
+TRAIN-only step; do not tune on EVAL. Test effective-sample masses, native
+vote likelihood, matched ordering and contrast-confidence weighting separately.
+After stable adoption, implement and qualify seamless native-precision HDR
+that improves on PU21 while maintaining speed. Five hours is not a stopping
+condition. Continue independent work when one path is blocked.
+
+The owner's latest decision is to compare which recipes fine-tune best on
+AIC2026 public_train, including in-sample panels, using **complete panels and
+other statistics, without strict SROCC rejection or an automatic scalar winner**.
+Earlier study verdicts remain immutable and do not exclude Neff/Vote/Order.
+Source roles, numerical/pixel correctness, provenance and existing production
+requirements remain binding. Confidence-map validity is an input-admission
+requirement, not a candidate-selection cutoff. See the prospective
+[AIC protocol](benchmarks/byconstruction_2026-10-22.md#aic-adaptation-across-training-recipes-prospective-panel-study-2026-10-27).
+
+### Verify live work before doing anything else
+
+Observed on dev at **2026-10-27 04:16:59 UTC**: Order was running, **12/21**
+cells complete; the remaining cells had entered training. Its full-budget
+unweighted control was byte-identical on all 7,869 predictions. The five
+downstream stages were queued with no reported failure. This is a dated
+observation, not a future claim that the processes are still alive.
+
+Run `TMPDIR="$HOME/tmp" JUST_TEMPDIR="$HOME/tmp" just mlic-priority-progress`.
+This refreshes the existing per-stage status artifacts, including PID/start-time
+checks, actual completed outputs, failures and compute-lock ownership. Read the
+plan and queue receipt before restarting anything. A stale `RUN_STATE.json`, a
+log, or an agent's “working” label is insufficient. Never duplicate a live queue
+or bypass its lock. Preserve failed outputs and make repairs in a fresh run
+directory when frozen orchestration changes.
+
+| Order | Run directory, checked on dev | Required work / state at the observation |
+|---|---|---|
+| 1 | `/mnt/v/output/zensim/mlic-order-20261027-run02` | 21 omission fits; 12 complete, 9 active. Source `27ed3745`; trainer `441bda58…`. |
+| 2 | `/mnt/tower/output/zensim/mlic-confidence-admission-20261027-run01` | Native source screen, **PLAN-v2.json**; waits for Order. No quality responses. |
+| 3 | `/mnt/v/output/zensim/mlic-aic-adaptation-20261027-run02` | 96 fold continuations: 72 new + 24 identity-checked Mlic reuses; waits for source screen. |
+| 4 | Same fold root, `panels/` | 48 initial + 96 continued models; separate fitted/held-out source panels. |
+| 5 | `/mnt/v/output/zensim/mlic-aic-full-20261027-run01` | Full-budget control, 9 new base fits + 3 Mlic reuses, then 24 continuations (21 new + 3 reuses). |
+| 6 | Same full root, `panels/` | 36 models × 2 representations × 5 populations = 360 prediction outputs, plus both mixture tests. |
+
+The compute lock holder was PID 1017472, an ancestor of Order coordinator
+1341080 (start ticks 229427382). Re-resolve it with the status command; do not
+act on these old PID numbers. Queues use frozen source snapshots and serialized
+resource scopes. Do not rerun from moving main over their frozen paths.
+
+Plan SHA-256 bindings:
+
+- Confidence source screen: `8e33269e3ec70b71f48a1c74b508fe3ed493a156afea9202d1c2eee82024576a`.
+- AIC fold run02: `1cfdfdf601efefc79a8e8292cf077776f52c071ddc780965051cb503bc3adca7`.
+- AIC full run01: `633362ce633d5f172041ac88728c61552c0b16e4368480933c8d27c092144bf7`.
+
+Source owners: fold adaptation `86748f41`, fold panels `3ab3f980`, full-data
+Order admission `042c89e0`, full fits `7ec5f55f`, full panels `aa300e1d`.
+Their frozen snapshots and complete binary hashes are in each run's plan and
+`source/`. The common warm-start source is `87864f94`; its public API remains
+under [PR 73](https://github.com/imazen/zensim/pull/73), not merged by this work.
+The full Order binary is separate from the running omission binary.
+
+**Do not restart AIC fold run01.** It was cancelled before fitting because the
+new caller assumed `last.bin` at zero steps; the frozen trainer exports the
+receipt-selected `best.bin` at zero epochs. Run02 checks that receipt and exact
+prediction parity. Positive-step continuation still requires the final epoch.
+The old run01's frozen warm-start source remains a pinned input to run02.
+
+### What the AIC comparison means
+
+Four initial recipes, each with both 8×4 and 16×8 continuation strengths, use
+the same original Mlic inputs/losses, fresh Adam, LR 1e-5 and 50,000 draws per
+epoch. Only initial weights differ. Do not carry Neff/Vote/Order factors into
+the common continuation. Fold cells preserve the registered 24 fitted/four
+held-out source split and seed rotation. Full fits use all 28 AIC TRAIN
+sources (3,920 rows); those continuation panels are explicitly in sample.
+Fixed seed zero is the assessment model; the three-seed mean is a stability
+diagnostic, never best-seed selection.
+
+Reports retain native statistics, source/codec/ladder results, calibration,
+tails, rank bias, inversions, seed variation and both mixture tests. Source
+bootstrap uses 2,000 whole-source draws, seed 1 and linear quantiles; its
+contrast is the role-specific mean prediction and is conditional on fitted
+models. Undefined components keep their denominators and never become zero.
+AIC `quality` is the released distortion-level index, lower being better,
+not a codec-native quality knob ([dataset](https://doi.org/10.18419/DARUS-6156)).
+
+Full reports distinguish `final-f32` and `production-f16-calibrated`.
+Their difference includes packing **and** the existing TRAIN output calibration;
+it is not isolated f16 precision loss. Full E21 rows are in sample, including
+development rows; omission panels remain separate. No EVAL/public_test read is
+authorized by these new reports. AIC gains alone do not establish serving,
+steering, speed or HDR qualification.
+
+### Confidence weighting: the unfinished implementation
+
+Neff changes collection mass; Vote changes native pair likelihood; Order
+changes matched-codec sampling. None implements item-confidence weighting.
+The latter remains outstanding: source screen → retained-match review → frozen
+membership → independent validation → exact omission-bound response ledger →
+linking calibration and teacher maps → native contrast weights → controls/fits.
+Do useful independent preparation while the source screen is queued.
+
+Native population/audit records are
+`/mnt/v/output/zensim/mlic-confidence-populations-20261027-run03/POPULATIONS.json`
+(SHA `e8b80de3006829f87ad8593b819b06d844612419f5eab7b49f2d0c8e379ff078`)
+and `/mnt/v/output/zensim/mlic-confidence-native-audit-20261027-run03/NATIVE_UNCERTAINTY.json`
+(SHA `a9e65891ab7bfa7e5520dc0791179b14f577bbce8f91576785607919fb209e58`).
+They cover 6,659 KADID, 1,680 TID, 210 LIVE-MD and 320 Colourlab observations;
+they are not fitted linking maps or permission to read new responses. Rejected
+run02 collapsed four distinct KADID observations sharing pixel identity;
+run03 preserves native `source_row_id` as well as `pair_key`.
+
+Private research owners and exact execution paths are in the separately
+committed `zenpapers/docs/mlic-recipe-review-2026-10-26.md` and
+`zenpapers/docs/training-confidence.md`. The shared source-screen directory's
+`FREEZE_REQUEST.json` is a concrete metadata-only request, **not queued** and
+not response-read permission. The prospective JND declaration permits only
+TV first-JND linking: 70 TV rows, with 140 GR/IR rows reserved; 35 scene
+families across 105 views. No global JND source allowlist is permitted.
+
+Registered contrast precision is
+`Vij = si² + sj² + sigmaL² (xi-xj)²`, `si = max(0.05, SE_teacher_i)`,
+`wij = (1/Vij) / Z_group,reference`. Compute Z under the exact original legal
+conditional pair law, including modulo probabilities and exclusions. Preserve
+collection/reference draw mass, RNG, skip behavior and absolute loss. Equal
+legal precisions must give exactly one; zero legal pairs retain no update.
+Remove omitted source families before any donor/map/normalizer fit. Missing
+finite uncertainty, map validity or at least three admitted positive linking
+units means INCOMPLETE, never an invented zero floor. The actual native loss
+adapter and purpose-bound calibration-response adapter are not implemented yet.
+
+### Completed evidence and next production work
+
+Neff and Vote each completed 21/21 original TRAIN cells and failed their
+historical SROCC screen. Both remain in the new AIC comparison. Their immutable
+roots are `/mnt/v/output/zensim/mlic-neff-20261026` and
+`/mnt/v/output/zensim/mlic-vote-20261027-run02`; the study record carries paired
+statistics and resource logs. No new default or qualified winner follows.
+
+After panels, assess full tradeoffs and run outstanding production qualification
+on the actual serving bytes/API. No benchmarks or unrelated builds run on dev;
+it is reserved for zensim training/evaluation. Do not use r7900x. Current builds
+and regression checks use i265 after verifying its live work/lock and memory.
+All heavy jobs use the shared compute lock and `run-heavy`; scratch is `~/tmp`.
+Recheck private global/workspace rules for machine policy, never a historical
+benchmark command. Keep completed outputs; mirror/verify before any cleanup.
+
+Stable adoption releases the HDR frontend dependency. Reuse the existing
+[HDR/SDR plan](docs/PLAN_HDR_SDR_ALIGNMENT.md): preserve native u16 PQ/HLG and
+f32 nits, the SDR fast path, explicit color/display interpretation and f64
+numeric controls. Compare PU21 with independently registered alternatives;
+previous BHdr success is not an isolated feature-utility proof. Runtime,
+near-black precision, highlight clamps, mixed SDR/HDR behavior and full steering
+cost remain unmeasured for a new frontend. Do not promise a free speed win.
+
+### Documentation and recovery discipline
+
+Update owning docs and run artifacts as work changes; do not rely on an agent's
+memory or a one-off handoff. Read global/workspace/project instructions, verify
+checkout ownership and dirty state, inspect the active goal, then run the
+status command above. Preserve other work and frozen snapshots. Continue the
+next registered task after each result. A lost agent or model-limit error
+requires inspecting its real job, taking over supervision, and recording any
+verified blocker. Documentation alone does not complete the active goal.
+
+## Historical chronology — September 15 and earlier
+
 ## September 15, latest directive: production priorities and paid-study readiness
 
 [The controlling execution plan](docs/PRODUCTION_PRIORITIES_2026-09-15.md)

@@ -1,5 +1,25 @@
 # zensim — current working rules
 
+## Current continuation — October 27, 2026
+
+Read the current section of [SESSION-RESUME.md](SESSION-RESUME.md) before the
+historical chronology. It records the active goal, frozen queue identities,
+completed and unfinished science, exact status command and recovery order.
+`just mlic-priority-progress` checks real processes, locks and artifacts; a
+queued stage is not a completed experiment. Continue after negative results.
+
+The owner's AIC refinement compares Mlic/Neff/Vote/Order (Confidence after
+admission) with complete panels, including in-sample results, without strict
+SROCC rejection or an automatic winner. Historical cutoffs/verdicts remain
+unchanged. Preserve source roles, numerical/pixel correctness and provenance.
+Production qualification and stable adoption precede the queued seamless HDR
+frontend; maintain speed and compare against PU21 rather than assume it wins.
+
+Dev compute is reserved for zensim training/evaluation. No benchmarks or
+unrelated builds there; do not use r7900x for this work. Resolve live locks
+before work on another eligible host. A stopped agent requires immediate
+job inspection and supervision takeover, not an unverified “running” report.
+
 ## Controlling user priorities — September 15, 2026
 
 Follow [the production execution plan](docs/PRODUCTION_PRIORITIES_2026-09-15.md)
@@ -159,6 +179,8 @@ and unresolved product limitations; do not declare a model qualified merely
 because cleanup tests or a historical training reproduction pass.
 
 ## Known Bugs
+
+* **2026-10-27 — zero-step AIC export selection. Fixed before continuation.** A new caller assumed `last.bin` for a zero-epoch control; the frozen owner selects `best.bin` and records its hash in `result.json`. AIC adaptation run01 was cancelled before fitting. Run02 follows that receipt, requires selected epoch -1 and byte-identical predictions; positive-step fits still require the final checkpoint. The frozen warm-start owner and old results are unchanged.
 
 * **2026-10-27 — native metadata confused pixel identity with observation identity.** The first confidence population adapter used the promoted bank's representative filename for every fitting row sharing its pixel hash. Four distinct KADID observations consequently mapped to one native item. The audit was rejected before weights were used. The queued ordering trial was canceled before fitting because its admission also rejected repeated pixel hashes. Both adapters now preserve `source_row_id` alongside `pair_key`, bind native filenames through the original pinned source metadata, and reject duplicate observation identities. Frozen studies and their training loader are unchanged.
 
