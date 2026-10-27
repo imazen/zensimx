@@ -374,5 +374,22 @@ class OmissionStage(unittest.TestCase):
             self.assertEqual(second[second.index("--diagnostic-population") + 1], "mixed-aic64")
 
 
+class RehearsalStage(unittest.TestCase):
+    def test_rehearsal_arms_run_their_registered_population_and_weight(self):
+        with tempfile.TemporaryDirectory(dir=Path.home() / "tmp") as tmp:
+            run = Path(tmp)
+            (run / "cols.txt").write_text("13,14\n")
+            plan = dict(root="/invented/root", columns=str(run / "cols.txt"), arms=owner.XREF_ARMS, seeds=[0])
+            for arm, (population, weight) in zip(owner.XREF_ARMS, (("mixed-aic256-xref", 256.0), ("mixed-aic1024-xref", 1024.0))):
+                command = owner.fit_command(plan, run, arm, 0, "/invented/Mlic/full_s0", "/invented/aic_k1_fit.parquet",
+                                            run / "arms" / arm / "s0_k1")
+                self.assertEqual(command[command.index("--diagnostic-population") + 1], population)
+                self.assertEqual(float(command[command.index("--aic-weight") + 1]), weight)
+            self.assertEqual(len(owner.fold_runs(plan)), 14)
+            path = run / "PLAN.json"
+            path.write_text(json.dumps(dict(schema=owner.XREF_SCHEMA)))
+            self.assertEqual(owner.plan_schema(path), owner.XREF_SCHEMA)
+
+
 if __name__ == "__main__":
     unittest.main()

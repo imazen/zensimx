@@ -138,7 +138,7 @@ def plan(run, commit, trainer, meta_tool):
 def checked(path, schema="aic-matched-continuation-plan-v1"):
     value = json.loads(path.read_text())
     protocol = PROTOCOL if schema == FOLD_SCHEMA or schema.startswith("aic-matched") else FRONTIER_PROTOCOL
-    if schema in (RECIPE_SCHEMA, SEEDS_SCHEMA, OMISSION_SCHEMA, FULL_SCHEMA):
+    if schema in (RECIPE_SCHEMA, SEEDS_SCHEMA, OMISSION_SCHEMA, FULL_SCHEMA, XREF_SCHEMA):
         protocol = diagnostic_protocol(next(iter(value["arms"].values())))[0]
     if value["schema"] != schema or value["protocol"] != protocol:
         raise ValueError("diagnostic plan schema differs")
@@ -453,6 +453,12 @@ RECIPE_REGISTRATION = dict(record="benchmarks/byconstruction_2026-10-22.md",
 RECIPES = ("MlicNeff", "MlicVote", "MlicOrder", "MlicConfidence")
 # Stage C (registered with stage A): the chosen Mlic point on the folds for seeds 0-2.
 SEEDS_SCHEMA = "aic-share-seeds-plan-v1"
+# Stage D (registered 2026-10-27 before any stage B result): the human leg rehearsed within each older dataset.
+XREF_SCHEMA = "aic-share-xref-plan-v1"
+XREF_REGISTRATION = dict(record="benchmarks/byconstruction_2026-10-22.md",
+                         section="Stage D: within-dataset rehearsal of the older sets",
+                         commit="58c56ef37b972fabb252fc75dd6add5e2d973a2a")
+XREF_ARMS = {"XrefAIC256": "mixed-aic256-xref", "XrefAIC1024": "mixed-aic1024-xref"}
 RECIPE_ARM = {"aic-only": "AICOnly", "mixed-aic16": "AIC16", "mixed-aic64": "AIC64", "mixed-aic256": "AIC256",
               "mixed-aic1024": "AIC1024"}
 RECIPE_INPUTS = dict(
@@ -466,7 +472,8 @@ RECIPE_INPUTS = dict(
 
 def plan_schema(path):
     schema = json.loads(Path(path).read_text()).get("schema")
-    if schema not in (FOLD_SCHEMA, FRONTIER_SCHEMA, RECOVERY_SCHEMA, RECIPE_SCHEMA, SEEDS_SCHEMA, OMISSION_SCHEMA, FULL_SCHEMA):
+    if schema not in (FOLD_SCHEMA, FRONTIER_SCHEMA, RECOVERY_SCHEMA, RECIPE_SCHEMA, SEEDS_SCHEMA, OMISSION_SCHEMA, FULL_SCHEMA,
+                      XREF_SCHEMA):
         raise ValueError("source-fold or frontier plan required")
     return schema
 
@@ -630,6 +637,25 @@ def recipe_plan(run, commit, trainer, meta_tool, recipe, population, after_run, 
     seven_fold_plan(run, commit, trainer, meta_tool, schema=RECIPE_SCHEMA, protocol=protocol,
                     registration=RECIPE_REGISTRATION, arms={arm: population}, seeds=FRONTIER_SEEDS,
                     checkpoints=FRONTIER_CHECKPOINTS, extra=extra, initial={"0": record}, root=root)
+
+
+def xref_plan(run, commit, trainer, meta_tool, after_run):
+    """Freeze stage D: stage A's x256 and x1024 continuations plus the within-dataset human rehearsal leg."""
+    frontier = Path("/mnt/v/output/zensim/mlic-aic-share-frontier-20261027-run01")
+    reused = {name: reused_arm(frontier, name) for name in ("MixedAIC256", "MixedAIC1024")}
+    contrasts = [*((f"{arm}@e{e}", "Initial") for arm in XREF_ARMS for e in FRONTIER_CHECKPOINTS),
+                 *((f"XrefAIC{w}@e{e}", f"MixedAIC{w}@e{e}") for w in (256, 1024) for e in FRONTIER_CHECKPOINTS)]
+    protocol = diagnostic_protocol("mixed-aic256-xref")[0]
+    seven_fold_plan(run, commit, trainer, meta_tool, schema=XREF_SCHEMA, protocol=protocol,
+                    registration=XREF_REGISTRATION, arms=XREF_ARMS, seeds=FRONTIER_SEEDS,
+                    checkpoints=FRONTIER_CHECKPOINTS, extra=dict(
+                        aic_weights={arm: diagnostic_protocol(p)[1] for arm, p in XREF_ARMS.items()},
+                        reused_arms=reused, contrasts=[list(c) for c in contrasts], after_run=str(after_run),
+                        control=dict(arm="MixedAIC256", population="mixed-aic256", seed=0, fold=0,
+                                     epochs=list(FRONTIER_CHECKPOINTS), purpose="this trainer reproduces stage A's "
+                                     "x256 seed 0 fold 0 fit, byte-identical without zentrain.repro"),
+                        assessment="stage D seed-0 rehearsal frontier; in-sample rule reported, E21 out of sample "
+                                   "decides; no adoption", priority="queued after stage B"))
 
 
 def seeds_plan(run, commit, trainer, meta_tool, point_run, arm, after_run):
@@ -1086,8 +1112,8 @@ def omission_aic_fold(fold, seed):
 def omission_plan(run, commit, trainer, meta_tool, point_run, arm, after_run):
     from aic_adaptation import initial_cell
     point = json.loads((Path(point_run) / "PLAN.json").read_text())
-    if point.get("schema") not in (FRONTIER_SCHEMA, RECOVERY_SCHEMA, RECIPE_SCHEMA) or arm not in point["arms"]:
-        raise ValueError("the advanced point must be a frontier, recovery or recipe arm")
+    if point.get("schema") not in (FRONTIER_SCHEMA, RECOVERY_SCHEMA, RECIPE_SCHEMA, XREF_SCHEMA) or arm not in point["arms"]:
+        raise ValueError("the advanced point must be a frontier, recovery, rehearsal or recipe arm")
     if point["schema"] == RECIPE_SCHEMA:
         raise ValueError("recipe omission cells need their recipe inputs; not registered yet")
     run = Path(run).resolve()
@@ -1506,6 +1532,12 @@ if __name__ == "__main__":
     p.add_argument("--start", nargs=3, metavar=("RUN", "ARM", "EPOCH"),
                    help="recovery phase: continue from that run's fold checkpoints")
     p.add_argument("--no-control", action="store_true", help="the recipe's replay control already ran in its first phase")
+    p = sub.add_parser("xref-plan", help="stage D: the within-dataset rehearsal frontier at x256 and x1024")
+    p.add_argument("run", type=Path)
+    p.add_argument("--source-commit", required=True)
+    p.add_argument("--trainer", type=Path, required=True)
+    p.add_argument("--meta-tool", type=Path, required=True)
+    p.add_argument("--after-run", type=Path, required=True)
     p = sub.add_parser("seeds-plan", help="stage C: the advanced Mlic point for seeds 0-2 on the folds")
     p.add_argument("run", type=Path)
     p.add_argument("--source-commit", required=True)
@@ -1514,7 +1546,9 @@ if __name__ == "__main__":
     p.add_argument("--point", nargs=2, metavar=("RUN", "ARM"), required=True, help="the advancing run and arm")
     p.add_argument("--after-run", type=Path, required=True)
     args = parser.parse_args()
-    if args.mode == "full-plan":
+    if args.mode == "xref-plan":
+        xref_plan(args.run, args.source_commit, args.trainer, args.meta_tool, args.after_run)
+    elif args.mode == "full-plan":
         full_plan(args.run, args.source_commit, args.trainer, args.meta_tool, Path(args.point[0]), args.point[1],
                   int(args.point[2]), args.after_run)
     elif args.mode == "omission-plan":
