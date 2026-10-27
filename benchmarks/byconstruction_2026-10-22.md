@@ -7095,3 +7095,29 @@ The stage B registration above stands; this fixes its mechanics.
 - **Panels and rule:** as stage A, with each recipe's own initial model as "Initial". Contrasts: each point against
   its own initial and against Mlic's point at the same budget from stage A or A2. Order's matched-codec route has no
   sample-coverage replay, so its exposure is not recorded. Seed 0; no adoption from stage B alone.
+
+### Stage C mechanics and the stage B → C choice (registered 2026-10-27, 15:40 UTC, before any stage A2 or B result)
+
+**Which arm stage C runs.** The point that advances after stage A2 joins is Mlic's. A stage B recipe point replaces
+it only if that point keeps the older sets against the recipe's own initial model and its out-of-fold AIC exceeds
+the advanced Mlic point's by more than 0.002. Ties and smaller gains keep Mlic, the simpler recipe.
+
+**Steps** (coordinator `aic_matched_continuation.py`, all built and smoke-tested on real inputs before this entry):
+1. `seeds-plan`: the chosen point on the seven folds for seeds 0, 1 and 2. Seed 0 must reproduce the advancing
+   run's 28 checkpoints (7 folds × 4 epochs) byte for byte without `zentrain.repro`; a mismatch stops the step.
+   Out-of-fold AIC and the in-sample older sets, paired by seed with seed-unit SE, against the initial model,
+   ×16 and AIC-only.
+2. `omission-plan`: E21 out of sample. Each Mlic omission cell (four E21 datasets × three seeds) continues 60 epochs
+   at the chosen population on the LODO diagnostic route (`v2_lodo_mlp.py --diagnostic-population`), with the
+   common adaptation study's rotating AIC fold table. The existing E21 owner scores the held-out dataset at every
+   studied epoch against Mlic's and MlicFT16x8's cells, paired by seed.
+3. `full-plan`: full Mlic seeds 0–2 continue on all of public_train; the chosen epoch's checkpoint is packed in the
+   canonical deployment order (densify, f16, E33 output stage, TRAIN CID22 calibration). Every packed model is scored
+   in sample with the packed Mlic and MlicFT16x8 models, paired by seed, and pixel mixtures run.
+4. Near-identity and the label-free gates (dial C1–C6 on both grids, G-STEER, identity at every SIMD permutation)
+   through their existing owners, for the packed seed-0 model.
+
+Stage C reports; it does not adopt. Adoption stays the owner's D1 decision. A recovery point or a recipe point needs
+two-phase or recipe variants of steps 2 and 3, which are not built yet; they would be built and registered before
+they run. Smokes (scratch, not evidence): Order and Confidence continuations passed native admission and trained
+epoch 0; a LODO omission continuation did the same; the packing snippet packed a stage A checkpoint.
