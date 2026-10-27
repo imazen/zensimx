@@ -448,6 +448,18 @@ class InterpolationStage(unittest.TestCase):
                 owner.checked(path, owner.WISE_SCHEMA)
 
 
+class CodecEvidence(unittest.TestCase):
+    def test_only_the_registered_aic_heavy_arms_take_omission_runs_from_other_studies(self):
+        self.assertEqual({arm for _, arm in owner.CODEC_EVIDENCE_POINTS}, {"AICOnly", "MixedAIC1024", "XrefAIC1024"})
+        with tempfile.TemporaryDirectory(dir=Path.home() / "tmp") as tmp:
+            point = Path(tmp) / "point"
+            point.mkdir()
+            (point / "PLAN.json").write_text(json.dumps(dict(schema=owner.FOLD_SCHEMA, arms={"AICOnly": "aic-only"})))
+            with self.assertRaisesRegex(ValueError, "codec-evidence arm"):
+                owner.omission_plan(Path(tmp) / "run", "0" * 40, Path("/invented/t"), Path("/invented/m"), point,
+                                    "AICOnly", Path("/invented/after"))
+
+
 class RecipeVariant(unittest.TestCase):
     def test_mlic_points_have_no_recipe_and_factor_recipes_refuse_before_any_read(self):
         self.assertEqual(owner.recipe_point(dict(schema=owner.FRONTIER_SCHEMA)), (None, None, None))

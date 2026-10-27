@@ -1225,11 +1225,23 @@ def omission_aic_fold(fold, seed):
     return (4 * seed + FOLDS.index(fold)) % 7
 
 
+# Codec-role evidence (registered 2026-10-27 at the owner's request): E21 out of sample for the AIC-heavy arms, through
+# the same omission runs; reported for the owner's curation of a codec model, no rule picks from them.
+CODEC_EVIDENCE_REGISTRATION = dict(record="benchmarks/byconstruction_2026-10-22.md",
+                                   section="Codec-role evidence: E21 out of sample for the AIC-heavy arms",
+                                   commit="2daa9781cf69c8c3d7ccc022c11ade631f4cbfa0")
+CODEC_EVIDENCE_POINTS = {(str(FRONTIER_REUSED_RUN), "AICOnly"),
+                         ("/mnt/v/output/zensim/mlic-aic-share-frontier-20261027-run01", "MixedAIC1024"),
+                         ("/mnt/v/output/zensim/mlic-aic-xref-20261027-run01", "XrefAIC1024")}
+
+
 def omission_plan(run, commit, trainer, meta_tool, point_run, arm, after_run):
     from aic_adaptation import initial_cell
     point = json.loads((Path(point_run) / "PLAN.json").read_text())
-    if point.get("schema") not in (FRONTIER_SCHEMA, RECOVERY_SCHEMA, RECIPE_SCHEMA, XREF_SCHEMA) or arm not in point["arms"]:
-        raise ValueError("the advanced point must be a frontier, recovery, rehearsal or recipe arm")
+    codec_evidence = (str(Path(point_run)), arm) in CODEC_EVIDENCE_POINTS
+    schemas = (FRONTIER_SCHEMA, RECOVERY_SCHEMA, RECIPE_SCHEMA, XREF_SCHEMA, *((FOLD_SCHEMA,) if codec_evidence else ()))
+    if point.get("schema") not in schemas or arm not in point["arms"]:
+        raise ValueError("the advanced point must be a frontier, recovery, rehearsal or recipe arm, or a codec-evidence arm")
     recipe, _, recipe_root = recipe_point(point)
     run = Path(run).resolve()
     if run.exists():
@@ -1261,7 +1273,8 @@ def omission_plan(run, commit, trainer, meta_tool, point_run, arm, after_run):
         inputs += [*map(Path, cell["input_sha256"]), table, Path(f"{table}.manifest.json")]
     frozen = freeze(run, commit, trainer, meta_tool, fold)
     value = dict(schema=OMISSION_SCHEMA, protocol=protocol,
-                 registration=RECIPE_C_REGISTRATION if recipe else FRONTIER_REGISTRATION, **frozen, recipe=recipe,
+                 registration=(RECIPE_C_REGISTRATION if recipe else CODEC_EVIDENCE_REGISTRATION if codec_evidence
+                               else FRONTIER_REGISTRATION), **frozen, recipe=recipe,
                  arms={arm: population}, aic_weights={arm: weight}, seeds=list(SEEDS), e21_folds=list(FOLDS),
                  epochs=EPOCHS, checkpoints=list(FRONTIER_CHECKPOINTS), lr=LR, spec=SPEC, root=str(root),
                  columns=fold["columns"], cells=cells, aic_tables=tables, baselines=baselines,
@@ -1269,7 +1282,9 @@ def omission_plan(run, commit, trainer, meta_tool, point_run, arm, after_run):
                  phases=two_phases(point, arm, population),
                  after_run=str(after_run), input_sha256={str(p): sha(p) for p in inputs},
                  representation="final-f32 checkpoint dumps", selector=None, public_test_opened=False, eval_read=False,
-                 production_qualified=False, assessment="stage C E21 out of sample for the advanced point; no adoption")
+                 production_qualified=False,
+                 assessment=("codec-role E21 out of sample for an AIC-heavy arm; the owner's curation, no rule picks"
+                             if codec_evidence else "stage C E21 out of sample for the advanced point; no adoption"))
     write(run / "PLAN.json", value, fresh=True)
     print(json.dumps(dict(plan=str(run / "PLAN.json"), sha256=sha(run / "PLAN.json"))))
 
