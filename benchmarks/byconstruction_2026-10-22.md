@@ -7117,7 +7117,8 @@ the advanced Mlic point's by more than 0.002. Ties and smaller gains keep Mlic, 
 4. Near-identity and the label-free gates (dial C1–C6 on both grids, G-STEER, identity at every SIMD permutation)
    through their existing owners, for the packed seed-0 model.
 
-Stage C reports; it does not adopt. Adoption stays the owner's D1 decision. A recovery point or a recipe point needs
-two-phase or recipe variants of steps 2 and 3, which are not built yet; they would be built and registered before
-they run. Smokes (scratch, not evidence): Order and Confidence continuations passed native admission and trained
+Stage C reports; it does not adopt. Adoption stays the owner's D1 decision. A recovery point runs steps 2 and 3 in
+two phases, as stage A2 did: AIC-only for 60 epochs, then the recovery from that phase's registered start epoch
+(built and pushed in `df36955c`, 15:37 UTC, still before any stage A2 result). A recipe point needs recipe variants
+of steps 2 and 3, which are not built yet; they would be built and registered before they run. Smokes (scratch, not evidence): Order and Confidence continuations passed native admission and trained
 epoch 0; a LODO omission continuation did the same; the packing snippet packed a stage A checkpoint.
