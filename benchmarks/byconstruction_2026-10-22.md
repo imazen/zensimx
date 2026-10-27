@@ -5836,3 +5836,41 @@ recipe, no native-CPU flags, SHA256
 `e2ffd0c0279ed31f69c2b6ba4f32656372b9de4359051765a56819a9d3ba3c82`.
 Build: `rc=0 31s | peak-RSS 1.30GiB | min-avail 22883MiB | peak-load 1.01`.
 A successful build does not establish unweighted parity or fit completion.
+
+
+### Completed AIC fold panels: observed tradeoffs (2026-10-27)
+
+All 96 fold fits and panels for 144 models are complete in AIC fold run03.
+The following are native aggregate metrics of role-specific mean predictions,
+rounded to six decimals. Held-out sources are within AIC public_train; they are
+not public_test/EVAL. Fitted and held-out predictions are never pooled.
+
+| 16×8 initialization | Fitted raw PLCC | Fitted MAE | Held-out raw PLCC | Held-out MAE | Held-out p99d |
+|---|---:|---:|---:|---:|---:|
+| Mlic | 0.873138 | 0.424413 | 0.864285 | 0.437603 | 0.381582 |
+| Neff | 0.875803 | 0.421144 | 0.870400 | 0.428946 | 0.355456 |
+| Vote | 0.877119 | 0.420159 | 0.874990 | 0.427192 | 0.344673 |
+| Order | 0.874942 | 0.422257 | 0.867990 | 0.432921 | 0.368828 |
+
+Vote leads these aggregate AIC measures, but the paired held-out MAE deltas
+versus Mlic are -0.00014676607301669642, -0.0003682783077534335 and
+-0.03486738937983683 across seeds 0/1/2. The advantage is dominated by seed 2.
+The E21 KonFiG omission SROCC delta versus equally continued Mlic is
+-0.00754409939712571 for Vote; its four-dataset mean delta is
+-0.0013182671225938636. Neither is a new rejection cutoff.
+All 12 arms have zero global-mixture inversions across their 12 fold/seed
+cells. Local-mixture inversions remain: at 16×8 Mlic 53, Neff 50, Vote 50,
+Order 46; original Mlic has 41. These are totals over cells, not unique images.
+No production adoption follows from aggregate AIC gains. Full-data fixed-seed
+and packed-model panels remain necessary, followed by production qualification.
+
+Evidence owner `panels/PANEL_COMPLETE.json` binds all native outputs, including
+`AIC_AGGREGATE_PANELS.json` SHA256
+`d7009c02fa44f12ee33a1999acac6dfeb79ab9a150262babd981ecd9d7a35244`,
+paired seeds, E21 panels and both mixture reports. No scalar selector ran.
+
+Confidence study run01 is queued after the pinned AIC full panels, with source
+`d77c968934d08d34363ada295e04a6920ef33289` and the native binary above.
+Its unweighted control and 21 cells are not yet complete. The first launch
+command supplied a malformed source revision and refused before queue creation;
+the actual queue resolves the full committed revision and verifies ancestry.

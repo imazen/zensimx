@@ -50,8 +50,8 @@ inputs plus 410 registered derived products: logical width **2,263**, with
 410 direct and 410 derived selected inputs. This was caught before any
 confidence training. Preserve run02. Corrected run03 is complete for all 21 manifests, index SHA256
 `9dd58d78711449b9c699165ae8651ae632010acfd8875bed4cc4affdec73ad16`,
-source `482485e8`. Next build that native trainer on i265, verify native receipts,
-complete a full-budget unweighted byte-parity control, and run all 21 fixed-epoch
+source `482485e8`. The release trainer is built and the queue below owns the remaining native
+receipts, full-budget unweighted byte-parity control, and all 21 fixed-epoch
 TRAIN cells. Maintain the live AIC queue's priority. Do not change frozen
 inputs, sampler/tie behavior, loss definitions or historical verdicts.
 
@@ -139,6 +139,18 @@ it is not isolated f16 precision loss. Full E21 rows are in sample, including
 development rows; omission panels remain separate. No EVAL/public_test read is
 authorized by these new reports. AIC gains alone do not establish serving,
 steering, speed or HDR qualification.
+
+### Confidence execution queue — 2026-10-27 06:13 UTC
+
+`/mnt/v/output/zensim/mlic-confidence-20261027-run01` is queued, with a verified
+live attached worker. `QUEUED.json` binds source `d77c968934d08d34363ada295e04a6920ef33289`,
+trainer SHA256 `e2ffd0c0279ed31f69c2b6ba4f32656372b9de4359051765a56819a9d3ba3c82`,
+and corrected run03 manifest index. It explicitly waits for AIC full run02's
+full-panel completion before taking the compute lock. It then runs the original
+full-budget unweighted control, all 21 confidence cells and the registered
+TRAIN panels/screen through existing owners. No confidence cell has run yet.
+`just mlic-priority-progress` now includes this queue. Preserve all old outputs;
+this queue is the next action, not a request to launch a duplicate control.
 
 ### Confidence weighting: the unfinished implementation
 

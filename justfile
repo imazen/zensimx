@@ -573,7 +573,7 @@ dataset-study-progress +studies:
 
 # Read live processes and artifacts for the registered October 27 queue; starts no work.
 mlic-priority-progress:
-    @just dataset-study-progress /mnt/v/output/zensim/mlic-order-20261027-run02
+    @just dataset-study-progress /mnt/v/output/zensim/mlic-order-20261027-run02 /mnt/v/output/zensim/mlic-confidence-20261027-run01
     @just dataset-confidence-admission status /mnt/tower/output/zensim/mlic-confidence-admission-20261027-run02/PLAN.json
     @just aic-recipe-adaptation status /mnt/v/output/zensim/mlic-aic-adaptation-20261027-run03/PLAN.json
     @just aic-recipe-adaptation-panel status /mnt/v/output/zensim/mlic-aic-adaptation-20261027-run03/PLAN.json /mnt/v/output/zensim/mlic-aic-adaptation-20261027-run03/panels
