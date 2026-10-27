@@ -7,10 +7,18 @@ import sys
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "byconstruction"))
-from confidence_weights import bind
+from confidence_weights import bind, original_cell
 
 
 class Bindings(unittest.TestCase):
+    def test_dataset_omissions_preserve_original_full_authority_namespace(self):
+        for fold in ["pipal", "pairs", "mos7", "kadid", "tid2013", "konfig", "cid22_a25"]:
+            route = "full" if fold in {"pipal", "pairs", "mos7"} else fold
+            authority = {"cells": {f"{route}-s1": {"seed_index": 1}}}
+            self.assertEqual(original_cell(authority, fold, 1)["seed_index"], 1)
+            with self.assertRaises(ValueError):
+                original_cell(authority, fold, 0)
+
     def rows(self):
         return [
             dict(

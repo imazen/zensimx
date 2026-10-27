@@ -29,6 +29,19 @@ def write(path, value):
         stream.write("\n")
 
 
+def original_cell(authority, fold, seed):
+    # Dataset omissions use the original full human route with explicit
+    # excluded dataset legs; their frozen authority retains full-sN naming.
+    route = "full" if fold in {"pipal", "pairs", "mos7"} else fold
+    key = f"{route}-s{seed}"
+    if seed not in range(3) or set(authority["cells"]) != {key}:
+        raise ValueError("original cell namespace or seed differs")
+    cell = authority["cells"][key]
+    if cell["seed_index"] != seed:
+        raise ValueError("original seed index differs")
+    return cell
+
+
 def bind(scores, references, selected, maps):
     """Native loader order: f64 targets, dense references in first-seen order."""
     if len(scores) != len(references):
@@ -167,7 +180,8 @@ def prepare(base, output):
             )
         for record in records:
             authority = document(Path(record["path"]), record["sha256"])
-            cell = authority["cells"][record["cell"]]
+            seed = int(record["cell"].rsplit("-s", 1)[1])
+            cell = original_cell(authority, fold, seed)
             if (cell["epochs"], cell["pairs_per_epoch"], cell["selected_epoch"]) != (
                 120,
                 50000,
@@ -248,4 +262,10 @@ if __name__ == "__main__":
     p.add_argument("base", type=Path)
     p.add_argument("output", type=Path)
     a = p.parse_args()
-    prepare(a.base, a.output)
+    try:
+        prepare(a.base, a.output)
+    except BaseException as error:
+        if a.output.is_dir() and not (a.output / "FAILURE.json").exists():
+            write(a.output / "FAILURE.json", dict(error=repr(error),
+                response_read_started=(a.output / "READ_EVENT.json").exists()))
+        raise

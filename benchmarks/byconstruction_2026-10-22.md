@@ -5753,3 +5753,12 @@ The private native integration will consume a hash-pinned research manifest
 without extending the public training API, validate the loaded row digest
 and exact cell configuration, and apply the multiplier only to rank loss
 and gradient. No sampler RNG, pair replacement or absolute-loss changes.
+
+The first real row-binding pass stopped after 12 cell manifests because dataset
+omission authorities retain their original `full-sN` namespace. The caller
+now resolves that exact historical namespace for pipal/pairs/mos7, checks seed
+identity, and preserves the source authority unchanged. The partial run and
+exposure receipt remain; fresh outputs are required. Three binding/namespace
+controls pass: `rc=0 0s | peak-RSS 0.07GiB | min-avail 24366MiB |
+peak-load 0.13`. Failed real pass: `rc=1 4s | peak-RSS 0.37GiB |
+min-avail 24051MiB | peak-load 0.28`. No confidence candidate fit started.
