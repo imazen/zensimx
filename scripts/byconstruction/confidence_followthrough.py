@@ -166,7 +166,7 @@ def status(config_path):
     if not live and state["stage"] != "confidence-AIC-panels-complete" and not state["failures"]:
         state["failures"].append("followthrough exited without completion")
     state.update(checked_utc=datetime.now(timezone.utc).isoformat(),
-                 live_processes=process_tree(worker["pid"]) if live else [], compute_lock=compute_lock())
+                 live_processes=process_tree(worker["pid"]) if live else [], compute_lock=compute_lock(None))
     write(config_path.parent / "CURRENT.json", state)
     print(json.dumps({key:state[key] for key in ("stage","completed","failures","worker","compute_lock")}))
 

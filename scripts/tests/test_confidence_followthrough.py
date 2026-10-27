@@ -1,5 +1,7 @@
 """Followthrough waits on process identity and preserves the registered recipes."""
 import copy
+import contextlib
+import io
 import json
 import os
 from pathlib import Path
@@ -10,6 +12,25 @@ from scripts.byconstruction import confidence_followthrough as owner
 
 
 class Followthrough(unittest.TestCase):
+    def test_status_resolves_worker_and_reports_stale_identity(self):
+        with tempfile.TemporaryDirectory(dir=Path.home() / "tmp") as tmp:
+            root = Path(tmp);config = root / "CONFIG.json"
+            state = dict(stage="waiting-for-confidence-omissions",completed=[],failures=[],
+                         worker=owner.process_snapshot(os.getpid()))
+            (root / "STATE.json").write_text(json.dumps(state))
+            with contextlib.redirect_stdout(io.StringIO()):
+                owner.status(config)
+            current=json.loads((root / "CURRENT.json").read_text())
+            self.assertEqual(current["failures"],[])
+            self.assertTrue(current["live_processes"])
+            state["worker"]["start_ticks"] = -1
+            (root / "STATE.json").write_text(json.dumps(state))
+            with contextlib.redirect_stdout(io.StringIO()):
+                owner.status(config)
+            current=json.loads((root / "CURRENT.json").read_text())
+            self.assertIn("exited without completion",current["failures"][0])
+            self.assertEqual(current["live_processes"],[])
+
     def test_live_queue_is_wait_not_completion_and_reused_pid_refuses(self):
         with tempfile.TemporaryDirectory(dir=Path.home() / "tmp") as tmp:
             root = Path(tmp)
