@@ -30,6 +30,35 @@ requirement, not a candidate-selection cutoff. See the prospective
 
 ### Verify live work before doing anything else
 
+**Latest verified observation — 2026-10-27 05:29 UTC:** AIC fold run03 is
+running at **57/96** completed cells (24 verified reuses plus 33 new fits),
+with no reported failures. Compute-lock holder PID 1877247 belongs to its
+worker ancestry. All four recipe zero-step controls completed before the fit
+loop. Fold panels, full fits and full panels remain queued in that order.
+The older dated observations below are history, not current process status.
+
+Confidence admission has advanced beyond the screen coordinator's final stage:
+review, membership freeze, independent validation, omission-family replay and
+exact preread scope are complete. Read `CONFIDENCE_PROGRESS.json` in the shared
+admission run02 root as well as the coordinator status. The current ledger is
+`linking-preread-run02.json`, SHA256
+`4fef7c7b97099f4591f15f39446369f245acd73ec50323bfc2e2b551c42a2bb8`.
+It binds 225 CEED/600 PC-IQA/70 JND-TV rows per scope except mos7, which has
+195/0/70 after family exclusion. Source owner is private zenpapers `55d3bebb`.
+Run01 is preserved, unexecuted metadata history. No new quality responses or
+teacher values have been read; confidence fits remain **0/21**.
+
+Next implement the purpose-bound reader against that exact ledger, recording
+the read event before response extraction. Use fresh RNG 20261025 per omission,
+CEED then PC, and the existing native threshold aggregation. Fewer than three
+valid positive linking units means INCOMPLETE, never a zero floor. Then fit
+native rating maps, exact contrast-weight normalizers, the full-budget
+unweighted parity control and 21 fixed-epoch TRAIN cells. Keep AIC supervision
+active throughout. Do not call legacy broad response loaders or reuse the old
+mixed-role linking floor. The private `docs/training-confidence.md` owns the
+read-scope and native-math implementation details.
+
+
 Observed on dev at **2026-10-27 04:55:32 UTC**: Order had completed **21/21**
 cells and both mixture checks. Its full-budget unweighted control was
 byte-identical on all 7,869 predictions. The replacement confidence screen

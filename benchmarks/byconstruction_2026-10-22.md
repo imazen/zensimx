@@ -5666,3 +5666,17 @@ reference identities remain represented through seven confirmed components.
 Unknown/ambiguous identities were not dropped. The next step is the exact
 omission-bound preread ledger and purpose-bound linking reader, followed by
 native maps/weights and controls. Fresh confidence fits remain outstanding.
+
+### Exact confidence preread scope completed (2026-10-27 05:29 UTC)
+
+The metadata-only run02 ledger is frozen at SHA256
+`4fef7c7b97099f4591f15f39446369f245acd73ec50323bfc2e2b551c42a2bb8`,
+private owner `55d3bebb`. Its row scopes and input hashes equal run01; it adds
+the explicit teacher column `cvvdp_cpu_imazen_v0_1_0_standard_fhd`.
+Permitted counts are 225 CEED/600 PC-IQA/70 JND-TV except mos7's 195/0/70.
+No quality responses or teacher values were extracted. Resource receipt:
+`rc=0 1s | peak-RSS 0.24GiB | min-avail 24354MiB | peak-load 0.00`.
+The purpose-bound reader, omission linking fits, native maps/weights and all
+21 confidence fits remain outstanding. Missing positive linking units cannot
+be replaced by a zero floor. AIC independently reached 57/96 fold cells with
+no failures; all four zero-step controls precede the fit loop and passed.
