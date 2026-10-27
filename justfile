@@ -3698,3 +3698,10 @@ dataset-certify-bake binary bake:
 # Full-data confidence uses its separately pinned original authorities; no omission registry mutation.
 confidence-full-weight-bindings base output authorities authorities_sha256:
     OPENBLAS_NUM_THREADS=1 python3 -B scripts/byconstruction/confidence_weights.py {{quote(base)}} {{quote(output)}} --full-authorities {{quote(authorities)}} --full-authorities-sha256 {{quote(authorities_sha256)}}
+
+# Caller must hold heavy.lock/run-heavy. Requires complete independently pinned omission evidence.
+confidence-full-fit plan:
+    OPENBLAS_NUM_THREADS=1 python3 -B scripts/byconstruction/mlic_confidence_full.py {{quote(plan)}}
+
+confidence-full-fit-tests:
+    OPENBLAS_NUM_THREADS=1 python3 -B -m unittest scripts.tests.test_mlic_confidence_full

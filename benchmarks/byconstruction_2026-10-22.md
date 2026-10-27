@@ -6049,3 +6049,22 @@ then clear the confidence factors for the common AIC continuation. Do not feed
 the full registry to the frozen 21-cell omission queue or modify that queue.
 All full-fit/AIC steps retain the original seeds, strengths and panel policy.
 
+
+
+### Confidence full-data launch owner — October 27, 2026
+
+`scripts/byconstruction/mlic_confidence_full.py` reuses the existing strict
+full-fit command and final-checkpoint/packing verifier. Before any fit it
+requires a pinned plan/runner/imported owners, the completed independent
+confidence screen, the entire 42-cell paired omission inventory, and every
+screen input hash. A historical rejection is retained and does not exclude
+the arm from the new AIC study. All three original full seeds are required.
+
+Only each native fit subprocess gets its own manifest/hash/fresh-normalizer
+receipt environment; inherited confidence variables are rejected. Certification
+and later callers retain the clean parent environment. Completion requires
+final119, exact recipe/seed/root/packed identity, native normalizer receipt and
+native monotonic certificate for all three models. It does not launch AIC or
+promote a model. Plan creation and execution await actual omission completion;
+no missing completion hash is invented. Common AIC continuation must use the
+existing warm-start owner with original Mlic losses and no confidence factors.
