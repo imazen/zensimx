@@ -890,3 +890,102 @@ fn rev7_pq_steps_above_the_declared_peak_clip_and_below_it_stay_visible() {
         "a step below the declared peak must stay visible"
     );
 }
+
+/// Rev7's supported HDR entry reads strided native rows exactly as packed ones:
+/// padded rows (with garbage in the padding) give bit-identical features.
+#[test]
+fn rev7_native_hdr_strided_rows_match_packed_rows() {
+    use zensim::feature_v2::FormulaRevision;
+    if zensim::feature_v2::active_formula_revision() != FormulaRevision::Rev7 {
+        let status = std::process::Command::new(std::env::current_exe().unwrap())
+            .env("ZENSIM_FORMULA_REV", "7")
+            .args([
+                "--exact",
+                "rev7_native_hdr_strided_rows_match_packed_rows",
+                "--test-threads=1",
+            ])
+            .status()
+            .unwrap();
+        assert!(status.success());
+        return;
+    }
+    let (w, h, pad) = (97usize, 65usize, 5usize);
+    let packed = |seed: usize| -> Vec<[u16; 4]> {
+        (0..w * h)
+            .map(|i| {
+                [
+                    (8000 + (i * 37 + seed) % 40000) as u16,
+                    (9000 + (i * 19 + seed) % 38000) as u16,
+                    (7000 + (i * 11 + seed) % 36000) as u16,
+                    65535,
+                ]
+            })
+            .collect()
+    };
+    let padded = |p: &[[u16; 4]]| -> Vec<[u16; 4]> {
+        let mut out = Vec::with_capacity((w + pad) * h);
+        for row in p.chunks_exact(w) {
+            out.extend_from_slice(row);
+            out.extend((0..pad).map(|k| [(k * 7919) as u16, 65535, (k * 104729) as u16, 0]));
+        }
+        out
+    };
+    let (a, b) = (packed(0), packed(13));
+    let (ap, bp) = (padded(&a), padded(&b));
+    fn view(
+        p: &[[u16; 4]],
+        w: usize,
+        h: usize,
+        stride: usize,
+        prim: ColorPrimaries,
+    ) -> StridedBytes<'_> {
+        StridedBytes::with_alpha_mode(
+            bytemuck::cast_slice(p),
+            w,
+            h,
+            stride * 8,
+            PixelFormat::Srgb16Rgba,
+            AlphaMode::Opaque,
+        )
+        .with_color_primaries(prim)
+    }
+    let z = Zensim::new(ZensimProfile::B).with_parallel(false);
+    let toggles = V2NewFeatureToggles::default();
+    for prim in [
+        ColorPrimaries::Srgb,
+        ColorPrimaries::DisplayP3,
+        ColorPrimaries::Bt2020,
+    ] {
+        for encoding in [
+            HdrEncoding::Pq { peak_nits: 1000. },
+            HdrEncoding::Hlg {
+                peak_nits: 1000.,
+                ambient_lux: 5.,
+            },
+        ] {
+            let tight = z
+                .compute_folded720_features_hdr(
+                    &view(&a, w, h, w, prim),
+                    &view(&b, w, h, w, prim),
+                    encoding,
+                    toggles,
+                    &mut V2Scratch::new(),
+                )
+                .unwrap();
+            let strided = z
+                .compute_folded720_features_hdr(
+                    &view(&ap, w, h, w + pad, prim),
+                    &view(&bp, w, h, w + pad, prim),
+                    encoding,
+                    toggles,
+                    &mut V2Scratch::new(),
+                )
+                .unwrap();
+            assert_eq!(
+                tight.features(),
+                strided.features(),
+                "{encoding:?} {prim:?}"
+            );
+        }
+    }
+}

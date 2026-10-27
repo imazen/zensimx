@@ -71,9 +71,10 @@ Full panels decide; no single SROCC threshold.
 2026-10-27): native PQ/HLG codes in sRGB, Display-P3 and BT.2020 match an
 independent f64 display-light decode within 1e-3 relative; one-code u16
 steps survive the supported entry; PQ changes confined above the declared
-1000-nit peak clip to identity while changes below it stay visible. Each has
-a failing negative control (wrong reference lift; 4000-nit peak). Near-black
-lift, transfer joins, strides, caches and maps still need Rev7 controls.
+1000-nit peak clip to identity while changes below it stay visible; padded
+strided rows give bit-identical features to packed rows. Each has a failing
+negative control (wrong reference lift; 4000-nit peak; stride misread).
+Near-black lift, transfer joins, caches and maps still need Rev7 controls.
 
 **Owner decisions needed.** (1) A human HDR holdout. HDR-VDC and AVT keep
 only Rev2/944 tables and need fresh sign-off to re-extract through the frozen
