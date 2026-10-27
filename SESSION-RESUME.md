@@ -145,6 +145,23 @@ steering, speed or HDR qualification.
 
 ### Confidence weighting: the unfinished implementation
 
+**Latest map update:** all eight scopes / 28 retained native rating maps are
+complete. `RATING_MAPS_COMPLETE.json` in the shared admission run02 root has
+SHA256 `aefbc62b2aceaed2b648e1d8bd346d2bd5c10dc0fff974fa4287896b6f0b14fb`.
+Read ledger SHA `d24dabc1af9d9a575ea1b0430662d302a93f71b1d493556c5b3597eac54b37cd`;
+private source owner `5a073e2f`. Native uncertainty reuse was permitted only
+for identical complete populations. Mos7 excludes LIVE-MD and Colourlab;
+KADID/TID scopes exclude their respective collections. All maps pass the
+unchanged input gate. Two KADID and two TID native SEs are zero; preserve them
+and apply the registered 0.05-JOD floor at contrast construction. Legacy
+unused information diagnostics warned on those zeros, not the map outputs.
+Next implement exact legal-pair normalizers and the native rank-loss multiplier,
+then unweighted parity and all 21 TRAIN cells. The sampler owner is
+`zensim-validate/src/mlp_train/sampling.rs`; tie semantics are owned by
+`zensim-validate/src/mlp_train/subjective_rank.rs`. No confidence weights or
+new confidence candidate fits are complete yet.
+
+
 **2026-10-27 linking update:** all eight omission/full linking scopes are
 complete. The shared admission run02 `LINKING_FITS_COMPLETE.json` has SHA256
 `486aeae1fcc68dcce5ceb56440ca714179700ac55e32c0086d631bbb34924a2d`.

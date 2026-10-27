@@ -5695,3 +5695,17 @@ four repaired results are independently hash-checked, with exact source
 snapshots. Repaired run resource: `rc=0 5s | peak-RSS 0.21GiB |
 min-avail 24210MiB | peak-load 0.23`. Native rating maps, observer fits,
 contrast weights, parity controls and 21 TRAIN fits remain outstanding.
+
+### Native rating maps completed (2026-10-27)
+
+All eight scopes / 28 retained maps pass the unchanged input-validity gate.
+Completion index SHA256:
+`aefbc62b2aceaed2b648e1d8bd346d2bd5c10dc0fff974fa4287896b6f0b14fb`.
+Serialized teacher correlations: KADID 0.850, TID 0.861, LIVE-MD 0.863,
+Colourlab 0.692. These are calibration-input checks, not candidate selection.
+Full-precision coefficients and native item SEs are preserved. Two KADID and
+two TID SEs are zero; the registered 0.05-JOD contrast floor remains binding.
+Legacy unused per-band information diagnostics warned on those zeros; no
+infinite item SE was exported. `rc=0 7s | peak-RSS 0.26GiB |
+min-avail 24127MiB | peak-load 0.26`. Exact contrast normalizers, private native
+loss integration, full-budget parity and 21 TRAIN fits are next.
