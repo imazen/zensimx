@@ -33,11 +33,38 @@ fn string<'a>(v: &'a Value, key: &str) -> Result<&'a str, String> {
         .ok_or_else(|| format!("subjective {key} required"))
 }
 
-/// Prospective matched-continuation diagnostic (byconstruction record,
-/// 2026-10-27). Separate from the frozen 0/4/8-epoch continuation contract.
-const DIAGNOSTIC_PROTOCOL: &str = "aic-matched-continuation-diagnostic-v1";
+/// Registered continuation protocols beyond the frozen 0/4/8-epoch contract
+/// (byconstruction record, 2026-10-27): each names its populations with their
+/// public_train weight, and its retained checkpoint epochs. Every one runs 60
+/// epochs at constant LR 1e-5, fresh Adam, a checkpoint dump every epoch. The
+/// Python mirror holds the same table.
 const DIAGNOSTIC_EPOCHS: u64 = 60;
-const DIAGNOSTIC_AIC_WEIGHT: f64 = 16.0;
+type Protocol = (&'static str, &'static [(&'static str, f64)], &'static [u64]);
+const DIAGNOSTIC_PROTOCOLS: [Protocol; 2] = [
+    (
+        "aic-matched-continuation-diagnostic-v1",
+        &[("mixed-aic16", 16.0), ("aic-only", 16.0)],
+        &[7, 59],
+    ),
+    (
+        "aic-share-frontier-v1",
+        &[
+            ("mixed-aic64", 64.0),
+            ("mixed-aic256", 256.0),
+            ("mixed-aic1024", 1024.0),
+        ],
+        &[7, 15, 29, 59],
+    ),
+];
+
+/// The public_train weight and retained checkpoints of a continuation's
+/// registered protocol and population.
+fn diagnostic_protocol(w: &Value) -> Option<(f64, &'static [u64])> {
+    let (_, populations, checkpoints) =
+        DIAGNOSTIC_PROTOCOLS.iter().find(|p| w["protocol"] == p.0)?;
+    let weight = populations.iter().find(|p| w["population"] == p.0)?.1;
+    Some((weight, checkpoints))
+}
 
 fn run_binding(
     c: &Value,
@@ -55,7 +82,7 @@ fn run_binding(
             .as_ref()
             .ok_or("continuation checkpoint required")?;
         let budget = if diagnostic {
-            w["protocol"] == DIAGNOSTIC_PROTOCOL
+            DIAGNOSTIC_PROTOCOLS.iter().any(|p| w["protocol"] == p.0)
                 && args.epochs as u64 == DIAGNOSTIC_EPOCHS
                 && args.dump_checkpoints_every == 1
                 && args.dump_checkpoints_dir.is_some()
@@ -639,11 +666,9 @@ fn diagnostic_binding(a: &Value, cell: &str, groups: &[Group]) -> Result<bool, S
         return Err("diagnostic cell changed a base binding".into());
     }
     let w = &a["cells"][cell]["continuation"];
-    let aic_only = match w["population"].as_str() {
-        Some("mixed-aic16") => false,
-        Some("aic-only") => true,
-        _ => return Err("diagnostic population required".into()),
-    };
+    let (aic_weight, checkpoints) =
+        diagnostic_protocol(w).ok_or("diagnostic protocol/population required")?;
+    let aic_only = w["population"] == "aic-only";
     let base_groups = base["cells"][cell]["groups"]
         .as_array()
         .ok_or("diagnostic base group inventory required")?;
@@ -659,11 +684,10 @@ fn diagnostic_binding(a: &Value, cell: &str, groups: &[Group]) -> Result<bool, S
     } else {
         (base_groups.clone(), Vec::new())
     };
-    if w["protocol"] != DIAGNOSTIC_PROTOCOL
-        || w["epochs"].as_u64() != Some(DIAGNOSTIC_EPOCHS)
-        || w["aic_weight"].as_f64() != Some(DIAGNOSTIC_AIC_WEIGHT)
+    if w["epochs"].as_u64() != Some(DIAGNOSTIC_EPOCHS)
+        || w["aic_weight"].as_f64() != Some(aic_weight)
         || w["dump_checkpoints_every"] != 1
-        || w["retained_checkpoint_epochs"] != serde_json::json!([7, 59])
+        || w["retained_checkpoint_epochs"] != serde_json::json!(checkpoints)
         || w["optimizer_state"] != "fresh"
         || a["cells"][cell]["groups"] != Value::Array(retained.clone())
         || w["excluded_groups"] != Value::Array(excluded.clone())
@@ -675,8 +699,10 @@ fn diagnostic_binding(a: &Value, cell: &str, groups: &[Group]) -> Result<bool, S
         .iter()
         .filter(|g| g.0 == "aic_public_train")
         .collect();
-    if aic.len() != 1 || aic[0].2 != DIAGNOSTIC_AIC_WEIGHT {
-        return Err("diagnostic requires one public_train leg at weight 16".into());
+    if aic.len() != 1 || aic[0].2 != aic_weight {
+        return Err(format!(
+            "diagnostic requires one public_train leg at weight {aic_weight}"
+        ));
     }
     Ok(aic_only)
 }
@@ -1058,6 +1084,20 @@ mod tests {
         );
     }
 
+    const DIAGNOSTIC_PROTOCOL: &str = DIAGNOSTIC_PROTOCOLS[0].0;
+    const FRONTIER_PROTOCOL: &str = DIAGNOSTIC_PROTOCOLS[1].0;
+    /// (protocol, public_train weight, retained checkpoints) of a population.
+    fn registered(population: &str) -> (&'static str, f64, &'static [u64]) {
+        DIAGNOSTIC_PROTOCOLS
+            .iter()
+            .find_map(|(p, pops, ck)| {
+                pops.iter()
+                    .find(|(n, _)| *n == population)
+                    .map(|(_, w)| (*p, *w, *ck))
+            })
+            .unwrap()
+    }
+
     /// Version-2 base (one training leg, one validation-only leg) and its
     /// diagnostic derivation, written to disk with independent pins.
     fn diagnostic_fixture(root: &Path, population: &str) -> (Value, Value, PathBuf) {
@@ -1081,10 +1121,11 @@ mod tests {
         a["base_authority"] = json!(base_path);
         a["base_authority_sha256"] = json!(hash(&base_path).unwrap());
         a["cells"]["full-s0"]["groups"] = retained;
+        let (protocol, weight, checkpoints) = registered(population);
         a["cells"]["full-s0"]["continuation"] = json!({"checkpoint":"x","checkpoint_sha256":"y","epochs":60,
-            "lr":0.00001,"lr_schedule":"constant","optimizer_state":"fresh","protocol":DIAGNOSTIC_PROTOCOL,
-            "population":population,"aic_weight":16.0,"dump_checkpoints_every":1,
-            "retained_checkpoint_epochs":[7,59],"excluded_groups":excluded});
+            "lr":0.00001,"lr_schedule":"constant","optimizer_state":"fresh","protocol":protocol,
+            "population":population,"aic_weight":weight,"dump_checkpoints_every":1,
+            "retained_checkpoint_epochs":checkpoints,"excluded_groups":excluded});
         (base, a, base_path)
     }
     fn aic(weight: f64) -> Vec<Group> {
@@ -1101,21 +1142,49 @@ mod tests {
     fn diagnostic_authority_binds_its_unmodified_base_and_group_partition() {
         let root = std::env::temp_dir().join(format!("diagnostic-{}", std::process::id()));
         std::fs::create_dir_all(&root).unwrap();
-        for population in ["mixed-aic16", "aic-only"] {
+        for population in [
+            "mixed-aic16",
+            "aic-only",
+            "mixed-aic64",
+            "mixed-aic256",
+            "mixed-aic1024",
+        ] {
             let (_, a, base_path) = diagnostic_fixture(&root, population);
+            let (protocol, weight, _) = registered(population);
             assert_eq!(
-                diagnostic_binding(&a, "full-s0", &aic(16.)).unwrap(),
+                diagnostic_binding(&a, "full-s0", &aic(weight)).unwrap(),
                 population == "aic-only"
             );
-            // The public_train leg must be present exactly once at weight 16.
+            // The public_train leg must be present exactly once at its registered weight.
             assert!(diagnostic_binding(&a, "full-s0", &aic(8.)).is_err());
             assert!(diagnostic_binding(&a, "full-s0", &[]).is_err());
             let refuse = |mutate: &dyn Fn(&mut Value), needle: &str| {
                 let mut changed = a.clone();
                 mutate(&mut changed);
-                let error = diagnostic_binding(&changed, "full-s0", &aic(16.)).unwrap_err();
+                let error = diagnostic_binding(&changed, "full-s0", &aic(weight)).unwrap_err();
                 assert!(error.contains(needle), "{population}: {error}");
             };
+            // A population is admitted only under its own protocol, weight and checkpoints.
+            let other = if protocol == DIAGNOSTIC_PROTOCOL {
+                FRONTIER_PROTOCOL
+            } else {
+                DIAGNOSTIC_PROTOCOL
+            };
+            refuse(
+                &|v| v["cells"]["full-s0"]["continuation"]["protocol"] = json!(other),
+                "protocol",
+            );
+            refuse(
+                &|v| v["cells"]["full-s0"]["continuation"]["aic_weight"] = json!(weight * 2.),
+                "protocol",
+            );
+            refuse(
+                &|v| {
+                    v["cells"]["full-s0"]["continuation"]["retained_checkpoint_epochs"] =
+                        json!([7, 15, 29, 58])
+                },
+                "protocol",
+            );
             refuse(
                 &|v| v["cells"]["full-s0"]["continuation"]["epochs"] = json!(8),
                 "protocol",
@@ -1165,7 +1234,7 @@ mod tests {
             derived["base_authority"] = json!(v3_path);
             derived["base_authority_sha256"] = json!(hash(&v3_path).unwrap());
             assert!(
-                diagnostic_binding(&derived, "full-s0", &aic(16.))
+                diagnostic_binding(&derived, "full-s0", &aic(weight))
                     .unwrap_err()
                     .contains("version-2")
             );
@@ -1252,6 +1321,23 @@ mod tests {
             .is_err()
         );
         assert!(run_binding(&cell(None, 8), &args("8", "7", true), 1853, true).is_err());
+        // The frontier shares the budget; an unregistered protocol label does not.
+        run_binding(
+            &cell(Some(FRONTIER_PROTOCOL), 60),
+            &args("60", "1", true),
+            1853,
+            true,
+        )
+        .unwrap();
+        assert!(
+            run_binding(
+                &cell(Some("aic-share-frontier-v2"), 60),
+                &args("60", "1", true),
+                1853,
+                true
+            )
+            .is_err()
+        );
         // A checkpoint without its binding no longer falls back to a full fit.
         let mut plain = cell(None, 8);
         plain.as_object_mut().unwrap().remove("continuation");

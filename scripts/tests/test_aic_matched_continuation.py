@@ -88,6 +88,30 @@ class DiagnosticAuthority(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "population"):
             leg.diagnostic_partition([self.human], "aic")
 
+    def test_frontier_populations_bind_only_their_own_weight_and_checkpoints(self):
+        for population, weight in (("mixed-aic64", 64.0), ("mixed-aic256", 256.0), ("mixed-aic1024", 1024.0)):
+            with self.subTest(population=population):
+                (self.root / "diagnostic-authority.json").unlink(missing_ok=True)
+                binding, retained, a = self.derive(population)
+                c = a["cells"]["full-s0"]["continuation"]
+                self.assertEqual((c["protocol"], c["aic_weight"], c["retained_checkpoint_epochs"], c["excluded_groups"]),
+                                 ("aic-share-frontier-v1", weight, [7, 15, 29, 59], []))
+                self.assertEqual(retained, ["human", "human_development", "subjective_rank_invented"])
+                legs = [("aic_public_train", self.root / "aic.parquet", weight, 0, "rank")]
+                self.assertFalse(leg.diagnostic_binding(a, "full-s0", legs))
+                with self.assertRaisesRegex(ValueError, f"weight {weight:g}"):
+                    leg.diagnostic_binding(a, "full-s0", self.aic)
+                for mutate in (lambda w: w.update(protocol="aic-matched-continuation-diagnostic-v1"),
+                               lambda w: w.update(aic_weight=16.0),
+                               lambda w: w.update(retained_checkpoint_epochs=[7, 59])):
+                    changed = json.loads(json.dumps(a))
+                    mutate(changed["cells"]["full-s0"]["continuation"])
+                    with self.assertRaisesRegex(ValueError, "protocol"):
+                        leg.diagnostic_binding(changed, "full-s0", legs)
+        # The matched diagnostic's own table is unchanged.
+        self.assertEqual(leg.diagnostic_protocol("mixed-aic16"), ("aic-matched-continuation-diagnostic-v1", 16.0, [7, 59]))
+        self.assertEqual(leg.diagnostic_protocol("aic-only"), ("aic-matched-continuation-diagnostic-v1", 16.0, [7, 59]))
+
     def test_frozen_continuation_budgets_are_unchanged(self):
         for epochs in (60, 12):
             with self.assertRaisesRegex(ValueError, "unregistered"):
@@ -109,7 +133,9 @@ class DiagnosticCommandLine(unittest.TestCase):
                       ["--diagnostic-population", "aic-only", "--fine-tune-epochs", "8", "--aic-weight", "16"],
                       ["--diagnostic-population", "aic-only", "--fine-tune-epochs", "60", "--aic-weight", "8"],
                       ["--diagnostic-population", "mixed-aic16", "--fine-tune-epochs", "60", "--aic-weight", "16",
-                       "--pack-production"]):
+                       "--pack-production"],
+                      ["--diagnostic-population", "mixed-aic256", "--fine-tune-epochs", "60", "--aic-weight", "16"],
+                      ["--diagnostic-population", "mixed-aic64", "--fine-tune-epochs", "8", "--aic-weight", "64"]):
             self.assertIn("registered D6 strength", self.refuse(*base, *extra))
 
 

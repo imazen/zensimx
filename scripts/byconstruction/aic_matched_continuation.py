@@ -23,10 +23,12 @@ import time
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parents[1]
 sys.path.insert(0, str(HERE))
+sys.path.insert(1, str(HERE.parent / "rev4_featpot"))
 from aic_adaptation import FOLDS, SPEC, bound_worker, compute_lock, process_snapshot, require_clean_factors, sha, write
 from aic_adaptation_diagnostics import checked_statistics, ladder_diagnostics
 from aic_adaptation_full_panel import full_populations, pixel_mixtures, seed_delta
 from aic_adaptation_panel import finite_json
+from subjective_training_leg import diagnostic_protocol
 
 PROTOCOL = "aic-matched-continuation-diagnostic-v1"
 REGISTRATION = dict(record="benchmarks/byconstruction_2026-10-22.md",
@@ -135,7 +137,7 @@ def plan(run, commit, trainer, meta_tool):
 
 def checked(path, schema="aic-matched-continuation-plan-v1"):
     value = json.loads(path.read_text())
-    if value["schema"] != schema or value["protocol"] != PROTOCOL:
+    if value["schema"] != schema or value["protocol"] != (FRONTIER_PROTOCOL if schema == FRONTIER_SCHEMA else PROTOCOL):
         raise ValueError("diagnostic plan schema differs")
     for item in value["registered_inputs"].values():
         if sha(item["path"]) != item["sha256"]:
@@ -188,6 +190,7 @@ def fit_command(plan_value, run_dir, arm, seed=0, initial=None, aic_table=None, 
     """The registered diagnostic route; the seed-0 screen uses the full table, the fold study one fold table."""
     source = run_dir / "source/scripts/rev4_featpot"
     initial = initial or plan_value["initial"]["directory"]
+    population = plan_value.get("arms", ARMS)[arm]
     return [sys.executable, "-B", str(source / "v2_confirm_fit.py"), "--root", plan_value["root"], "--spec", SPEC,
             "--columns", Path(plan_value["columns"]).read_text().strip(), "--head", "N", "--seed-index", str(seed),
             "--strict-admission", "--data-role-decision", str(Path(plan_value["root"]) / "human_role_decision.json"),
@@ -195,10 +198,10 @@ def fit_command(plan_value, run_dir, arm, seed=0, initial=None, aic_table=None, 
             "--init-from", str(Path(initial) / "refit/last.bin"),
             "--fine-tune-epochs", str(EPOCHS), "--fine-tune-lr", str(LR),
             "--aic-public-train", aic_table or plan_value["registered_inputs"]["aic_table"]["path"],
-            "--aic-weight", str(AIC_WEIGHT), "--diagnostic-population", ARMS[arm]]
+            "--aic-weight", str(diagnostic_protocol(population)[1]), "--diagnostic-population", population]
 
 
-def fixed_outputs(dest, population, label):
+def fixed_outputs(dest, population, label, checkpoints=CHECKPOINTS):
     """The registered every-epoch dumps and fixed checkpoints of one completed diagnostic fit."""
     result = json.loads((dest / "result.json").read_text())
     diagnostic = result.get("diagnostic") or {}
@@ -207,7 +210,7 @@ def fixed_outputs(dest, population, label):
             or result["selection"]["selected_epoch"] != EPOCHS - 1
             or dumps != [f"ckpt_epoch{e:03d}.bin" for e in range(EPOCHS)]
             or any(sha(dest / "ckpt" / f"ckpt_epoch{e:03d}.bin") != diagnostic["fixed_checkpoints"][str(e)]["sha256"]
-                   for e in CHECKPOINTS)):
+                   for e in checkpoints)):
         raise ValueError(f"{label}: registered fixed-epoch outputs incomplete")
     return dict(directory=str(dest), result_sha256=sha(dest / "result.json"),
                 checkpoints={str(e): sha(dest / "ckpt" / f"ckpt_epoch{e:03d}.bin") for e in range(EPOCHS)})
@@ -414,14 +417,75 @@ FOLD_REGISTRATION = dict(record="benchmarks/byconstruction_2026-10-22.md",
                          commit="fcb745ff6bc1f86d1750a44881a9d846c49d0f8f")
 SEEDS, SOURCE_FOLDS = (0, 1, 2), tuple(range(7))
 GATES_LOG = Path("/mnt/v/output/zensim/mlic-candidate-gates-20261027-run01/queue.log")
+# Stage A of the AIC-share frontier (byconstruction record, registered 2026-10-27 before any frontier fit): Mlic
+# seed 0 continued at public_train weights 64/256/1024 on the seven folds; the source-fold study's seed-0 x16 and
+# AIC-only fits are reused at the same checkpoints.
+FRONTIER_SCHEMA = "aic-share-frontier-plan-v1"
+FRONTIER_PROTOCOL = "aic-share-frontier-v1"
+FRONTIER_REGISTRATION = dict(record="benchmarks/byconstruction_2026-10-22.md",
+                             section="AIC-share frontier: can rehearsal reach 0.95 out of fold and keep the older sets?",
+                             commit="0a8a00e1dd396aa0aacba8eb64d1f1770bf04d5b")
+FRONTIER_ARMS = {"MixedAIC64": "mixed-aic64", "MixedAIC256": "mixed-aic256", "MixedAIC1024": "mixed-aic1024"}
+FRONTIER_SEEDS, FRONTIER_CHECKPOINTS = (0,), (7, 15, 29, 59)
+FRONTIER_REUSED_RUN = Path("/mnt/v/output/zensim/mlic-matched-continuation-folds-20261027-run01")
+FRONTIER_AFTER = Path("/mnt/v/output/zensim/mlic-candidate-gates-20261027-run02/queue.log")
 
 
-def fold_runs():
-    return [(arm, seed, k) for arm in ARMS for seed in SEEDS for k in SOURCE_FOLDS]
+def plan_schema(path):
+    schema = json.loads(Path(path).read_text()).get("schema")
+    if schema not in (FOLD_SCHEMA, FRONTIER_SCHEMA):
+        raise ValueError("source-fold or frontier plan required")
+    return schema
+
+
+def fold_runs(plan_value=None):
+    """The fits a fold plan runs: its own arms and seeds (default: the registered source-fold study)."""
+    arms, seeds = (plan_value["arms"], plan_value["seeds"]) if plan_value else (ARMS, SEEDS)
+    return [(arm, seed, k) for arm in arms for seed in seeds for k in SOURCE_FOLDS]
+
+
+def paired_delta(candidate, baseline, seeds):
+    """Seed-paired difference: the three-seed owner's summary, or single-seed deltas without an SE."""
+    if list(seeds) == [0, 1, 2]:
+        return seed_delta(candidate, baseline)
+    values = [candidate[s] - baseline[s] for s in seeds]
+    return dict(per_seed_delta=values, mean=sum(values) / len(values), seed_unit_se=None, selection_gate=False)
 
 
 def fold_plan(run, commit, trainer, meta_tool):
     """Freeze the registered source-fold study: 2 populations x 3 Mlic full seeds x 7 D6 source folds."""
+    seven_fold_plan(run, commit, trainer, meta_tool, schema=FOLD_SCHEMA, protocol=PROTOCOL,
+                    registration=FOLD_REGISTRATION, arms=ARMS, seeds=SEEDS, checkpoints=CHECKPOINTS,
+                    extra=dict(aic_weight=AIC_WEIGHT, priority="queued after the candidate gates"))
+
+
+def frontier_plan(run, commit, trainer, meta_tool):
+    """Freeze stage A of the AIC-share frontier, pinning the reused source-fold checkpoints."""
+    reused_complete = FRONTIER_REUSED_RUN / "COMPLETE.json"
+    if not reused_complete.exists():
+        raise ValueError("the reused source-fold study must be complete")
+    reused = {arm: dict(run_dir=str(FRONTIER_REUSED_RUN), population=ARMS[arm], checkpoint_sha256={
+        f"{seed}|{k}|{e}": sha(FRONTIER_REUSED_RUN / "arms" / arm / f"s{seed}_k{k}/ckpt/ckpt_epoch{e:03d}.bin")
+        for seed in FRONTIER_SEEDS for k in SOURCE_FOLDS for e in FRONTIER_CHECKPOINTS}) for arm in ARMS}
+    groups = [f"{arm}@e{e}" for arm in [*FRONTIER_ARMS, *ARMS] for e in FRONTIER_CHECKPOINTS]
+    contrasts = [*((g, "Initial") for g in groups),
+                 *((f"{arm}@e{e}", f"MixedAIC16@e{e}") for arm in FRONTIER_ARMS for e in FRONTIER_CHECKPOINTS),
+                 *((f"AICOnly@e{e}", f"{arm}@e{e}") for arm in FRONTIER_ARMS for e in FRONTIER_CHECKPOINTS)]
+    seven_fold_plan(run, commit, trainer, meta_tool, schema=FRONTIER_SCHEMA, protocol=FRONTIER_PROTOCOL,
+                    registration=FRONTIER_REGISTRATION, arms=FRONTIER_ARMS, seeds=FRONTIER_SEEDS,
+                    checkpoints=FRONTIER_CHECKPOINTS,
+                    extra=dict(aic_weights={arm: diagnostic_protocol(p)[1] for arm, p in FRONTIER_ARMS.items()},
+                               control=dict(arm="MixedAIC16", population=ARMS["MixedAIC16"], seed=0, fold=0,
+                                            epochs=list(FRONTIER_CHECKPOINTS), purpose="this trainer reproduces the "
+                                            "reused fits: refit x16 seed 0 fold 0, byte-identical without zentrain.repro"),
+                               reused_arms=reused, reused_complete_sha256=sha(reused_complete),
+                               contrasts=[list(c) for c in contrasts], after_log=str(FRONTIER_AFTER),
+                               assessment="stage A seed-0 AIC-share frontier; advancement by the registered rule; no adoption",
+                               priority="queued after the candidate gates run02"))
+
+
+def seven_fold_plan(run, commit, trainer, meta_tool, schema, protocol, registration, arms, seeds, checkpoints, extra):
+    """Freeze a continuation study over the seven D6 source folds (shared by the fold study and the frontier)."""
     run = Path(run).resolve()
     if run.exists():
         raise ValueError("preserve existing diagnostic attempts")
@@ -430,7 +494,7 @@ def fold_plan(run, commit, trainer, meta_tool):
             raise ValueError(f"registered input changed: {path}")
     fold = json.loads(Path(INPUTS["fold_plan"][0]).read_text())
     fits = json.loads(Path(INPUTS["full_fits"][0]).read_text())
-    initial = {str(seed): full_record(fits, "Mlic", seed) for seed in SEEDS}
+    initial = {str(seed): full_record(fits, "Mlic", seed) for seed in seeds}
     if any(sha(Path(r["directory"]) / "refit/last.bin") != r["checkpoint_sha256"] for r in initial.values()):
         raise ValueError("completed initial model changed")
     authority = json.loads(Path(INPUTS["aic_authority"][0]).read_text())
@@ -449,32 +513,36 @@ def fold_plan(run, commit, trainer, meta_tool):
     for record in initial.values():
         inputs += [Path(record["directory"]) / "refit/last.bin", *map(Path, record["input_sha256"])]
     inputs += [Path(fold["columns"]), root / "human_role_decision.json"]
-    value = dict(schema=FOLD_SCHEMA, protocol=PROTOCOL, registration=FOLD_REGISTRATION, **frozen, arms=ARMS,
-                 seeds=list(SEEDS), source_folds=list(SOURCE_FOLDS), epochs=EPOCHS, checkpoints=list(CHECKPOINTS),
-                 aic_weight=AIC_WEIGHT, lr=LR, spec=SPEC, root=str(root), columns=fold["columns"], initial=initial,
-                 fold_tables=tables, assignment_sha256=authority["assignment_sha256"], runs=len(fold_runs()),
+    value = dict(schema=schema, protocol=protocol, registration=registration, **frozen, arms=dict(arms),
+                 seeds=list(seeds), source_folds=list(SOURCE_FOLDS), epochs=EPOCHS, checkpoints=list(checkpoints),
+                 lr=LR, spec=SPEC, root=str(root), columns=fold["columns"], initial=initial,
+                 fold_tables=tables, assignment_sha256=authority["assignment_sha256"],
+                 runs=len(fold_runs(dict(arms=arms, seeds=seeds))),
                  input_sha256={str(p): sha(p) for p in inputs}, populations=["aic", *FOLDS],
                  representation="final-f32 checkpoint dumps", selector=None, public_test_opened=False,
-                 eval_read=False, production_qualified=False, priority="queued after the candidate gates")
+                 eval_read=False, production_qualified=False, **extra)
     write(run / "PLAN.json", value, fresh=True)
     print(json.dumps(dict(plan=str(run / "PLAN.json"), sha256=sha(run / "PLAN.json"))))
 
 
-def gates_finished():
-    lines = GATES_LOG.read_text().splitlines() if GATES_LOG.exists() else []
+def gates_finished(log=None):
+    log = Path(GATES_LOG if log is None else log)
+    lines = log.read_text().splitlines() if log.exists() else []
     return any(line.split(" ", 1)[-1].startswith(("GATES-DONE", "GATES-EXIT")) for line in lines)
 
 
 def fold_queue(path):
     """Wait, holding no lock, for the candidate gates queue to end; then take the shared lock."""
     run_dir = path.parent
+    schema = plan_schema(path)
+    after = json.loads(path.read_text()).get("after_log", str(GATES_LOG))
     state = dict(plan_sha256=sha(path), worker=process_snapshot(os.getpid()), stage="waiting-for-candidate-gates",
-                 failures=[], checked_utc=now())
+                 after_log=after, failures=[], checked_utc=now())
     write(run_dir / "QUEUE.json", state, fresh=True)
     try:
-        while not gates_finished():
+        while not gates_finished(after):
             time.sleep(60)
-        checked(path, FOLD_SCHEMA)
+        checked(path, schema)
         command = ["flock", str(Path.home() / "tmp/heavy.lock"), str(Path.home() / "work/claudehints/scripts/run-heavy"),
                    "--mem", "40G", "--jobs", "12", "--", sys.executable, "-B", str(Path(__file__).resolve()), "fold-run",
                    str(path)]
@@ -508,13 +576,20 @@ def fold_run(path):
     if not compute_lock(os.getpid())["held_by_worker_ancestor"]:
         raise ValueError("the diagnostic requires the shared compute lock")
     run_dir, output = path.parent, path.parent / "panels"
-    plan_value = checked(path, FOLD_SCHEMA)
+    plan_value = checked(path, plan_schema(path))
+    arms, seeds, checkpoints = plan_value["arms"], plan_value["seeds"], plan_value["checkpoints"]
+    reused = plan_value.get("reused_arms", {})
+    every_arm = [*arms, *reused]
+    mean_label = f"mean{len(seeds)}"
+    def checkpoint(arm, seed, k, e):
+        base = Path(reused[arm]["run_dir"]) if arm in reused else run_dir
+        return base / "arms" / arm / f"s{seed}_k{k}/ckpt/ckpt_epoch{e:03d}.bin"
     require_clean_factors(os.environ)
     fold = json.loads(Path(plan_value["registered_inputs"]["fold_plan"]["path"]).read_text())
     if (run_dir / "STATE.json").exists():
         raise ValueError("preserve previous diagnostic run state")
     state = dict(stage="fit-folds", worker=process_snapshot(os.getpid()), plan_sha256=sha(path), completed=[],
-                 failures=[], required=len(fold_runs()), objective_complete=False, production_qualified=False)
+                 failures=[], required=len(fold_runs(plan_value)), objective_complete=False, production_qualified=False)
     def stage(name, **details):
         state.update(stage=name, checked_utc=now(), **details)
         write(run_dir / "STATE.json", state)
@@ -534,25 +609,55 @@ def fold_run(path):
         with (run_dir / "arms" / arm / f"s{seed}_k{k}.log").open("x") as log:
             if subprocess.run(command, stdout=log, stderr=subprocess.STDOUT, env=dict(environment, TMPDIR=str(scratch))).returncode:
                 raise RuntimeError(f"{label} fit failed; preserved in its log")
-        return dict(arm=arm, seed=seed, fold=k, **fixed_outputs(dest, ARMS[arm], label))
+        return dict(arm=arm, seed=seed, fold=k, **fixed_outputs(dest, arms[arm], label, checkpoints))
+    control = plan_value.get("control")
+    def fit_control():
+        dest = run_dir / "control" / f"{control['arm']}_s{control['seed']}_k{control['fold']}"
+        scratch = Path.home() / "tmp" / f"{run_dir.name}-control"
+        scratch.mkdir(parents=True)
+        command = fit_command(dict(plan_value, arms={control["arm"]: control["population"]}), run_dir, control["arm"],
+                              control["seed"], plan_value["initial"][str(control["seed"])]["directory"],
+                              plan_value["fold_tables"][str(control["fold"])]["path"], dest)
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        with (run_dir / "control" / "fit.log").open("x") as log:
+            if subprocess.run(command, stdout=log, stderr=subprocess.STDOUT, env=dict(environment, TMPDIR=str(scratch))).returncode:
+                raise RuntimeError("control fit failed; preserved in its log")
+        return dest
     try:
         stage("fit-folds")
         with ThreadPoolExecutor(max_workers=12) as pool:
-            futures = {pool.submit(fit, run): run for run in fold_runs()}
+            control_future = pool.submit(fit_control) if control else None
+            futures = {pool.submit(fit, run): run for run in fold_runs(plan_value)}
             for future, run in futures.items():
                 try:
                     state["completed"].append(future.result())
                 except BaseException as error:
                     state["failures"].append(dict(run=list(run), error=repr(error)))
                 stage("fit-folds")
+            control_dest = control_future.result() if control_future else None
         if state["failures"]:
             raise RuntimeError("fold fit failures retained; inspect their complete logs")
         write(run_dir / "FITS_COMPLETE.json", dict(plan_sha256=sha(path), runs=state["completed"]), fresh=True)
+        if control:
+            stage("trainer-identity-control")
+            comparisons = {str(e): nonrepro_identical(run_dir / "tools/bake_dial_refit",
+                                                      control_dest / "ckpt" / f"ckpt_epoch{e:03d}.bin",
+                                                      checkpoint(control["arm"], control["seed"], control["fold"], e),
+                                                      run_dir / "control" / f"epoch{e:03d}")
+                           for e in control["epochs"]}
+            identical = all(c["identical"] for c in comparisons.values())
+            write(run_dir / "CONTROL.json", dict(control, comparisons=comparisons, identical=identical), fresh=True)
+            if not identical:
+                raise ValueError("this trainer does not reproduce the reused fits; the frontier contrasts are not interpretable")
+        for arm, info in reused.items():
+            for label, pin in info["checkpoint_sha256"].items():
+                seed, k, e = (int(x) for x in label.split("|"))
+                if sha(checkpoint(arm, seed, k, e)) != pin:
+                    raise ValueError(f"reused {arm} checkpoint changed: {label}")
         stage("native-sampling-receipts")
         tool = run_dir / "tools/bake_dial_refit"
-        exposure = {f"{arm}@e{e}|s{seed}|k{k}": sampler_receipt(
-            tool, run_dir / "arms" / arm / f"s{seed}_k{k}/ckpt/ckpt_epoch{e:03d}.bin", e)
-            for arm, seed, k in fold_runs() for e in CHECKPOINTS}
+        exposure = {f"{arm}@e{e}|s{seed}|k{k}": sampler_receipt(tool, checkpoint(arm, seed, k, e), e)
+                    for arm in every_arm for seed in seeds for k in SOURCE_FOLDS for e in checkpoints}
         write(run_dir / "EXPOSURE.json", dict(source="zentrain.sample_coverage prefix receipts, native replay",
               runs=exposure), fresh=True)
         stage("raw-f32-panels")
@@ -573,9 +678,9 @@ def fold_run(path):
             raise ValueError("D6 seven-fold source assignment differs")
         save("POPULATIONS.json", {k: dict(table=str(v["table"]), sha256=sha(v["table"]), rows=len(v["target"]))
                                   for k, v in populations.items()})
-        models = {f"Initial|s{seed}": Path(plan_value["initial"][str(seed)]["directory"]) / "refit/last.bin" for seed in SEEDS}
-        models.update({f"{arm}@e{e}|s{seed}|k{k}": run_dir / "arms" / arm / f"s{seed}_k{k}/ckpt/ckpt_epoch{e:03d}.bin"
-                       for arm, seed, k in fold_runs() for e in CHECKPOINTS})
+        models = {f"Initial|s{seed}": Path(plan_value["initial"][str(seed)]["directory"]) / "refit/last.bin" for seed in seeds}
+        models.update({f"{arm}@e{e}|s{seed}|k{k}": checkpoint(arm, seed, k, e)
+                       for arm in every_arm for seed in seeds for k in SOURCE_FOLDS for e in checkpoints})
         (output / "predictions").mkdir()
         values = {}
         for label, model in models.items():
@@ -590,16 +695,16 @@ def fold_run(path):
                     raise ValueError("ordered finite prediction coverage differs")
                 values[label, name] = prediction
         aic_target = populations["aic"]["target"]
-        oof = {f"Initial|s{seed}": values[f"Initial|s{seed}", "aic"] for seed in SEEDS}
-        for arm in ARMS:
-            for e in CHECKPOINTS:
-                for seed in SEEDS:
+        oof = {f"Initial|s{seed}": values[f"Initial|s{seed}", "aic"] for seed in seeds}
+        for arm in every_arm:
+            for e in checkpoints:
+                for seed in seeds:
                     oof[f"{arm}@e{e}|s{seed}"] = out_of_fold({f"{arm}@e{e}|s{seed}|k{k}": values[f"{arm}@e{e}|s{seed}|k{k}", "aic"]
                                                               for k in SOURCE_FOLDS}, folds, f"{arm}@e{e}|s{seed}")
-        groups = ["Initial", *(f"{arm}@e{e}" for arm in ARMS for e in CHECKPOINTS)]
-        mean = {g: np.mean([oof[f"{g}|s{seed}"] for seed in SEEDS], axis=0) for g in groups}
+        groups = ["Initial", *(f"{arm}@e{e}" for arm in every_arm for e in checkpoints)]
+        mean = {g: np.mean([oof[f"{g}|s{seed}"] for seed in seeds], axis=0) for g in groups}
         jobs, rows = [], []
-        for label, prediction in [*oof.items(), *((f"{g}|mean3", v) for g, v in mean.items())]:
+        for label, prediction in [*oof.items(), *((f"{g}|{mean_label}", v) for g, v in mean.items())]:
             jobs.append((f"{label}|out-of-fold", prediction, aic_target))
             rows.append(dict(model=label, scope="out-of-fold (Initial: zero-shot)", geometry=legacy.geometry(prediction, aic_target),
                              ladder=ladder_diagnostics(pairs, prediction, aic_target, np.ones(len(prediction), bool), logistic_fit)))
@@ -614,10 +719,10 @@ def fold_run(path):
             for category, columns in (("source", ["group"]), ("codec", ["codec"]), ("ladder", ["group", "codec"])):
                 for key, index in pairs.groupby(columns, sort=True).indices.items():
                     index = np.asarray(index, dtype=int)
-                    aggregate_jobs.append((f"{g}|mean3|{category}|{key!r}", prediction[index], aic_target[index]))
-                    aggregate_rows.append(dict(model=f"{g}|mean3", category=category, group=repr(key),
+                    aggregate_jobs.append((f"{g}|{mean_label}|{category}|{key!r}", prediction[index], aic_target[index]))
+                    aggregate_rows.append(dict(model=f"{g}|{mean_label}", category=category, group=repr(key),
                                                geometry=legacy.geometry(prediction[index], aic_target[index]) if category == "codec" else None))
-            save(f"bias-{g}|mean3|out-of-fold.json", cells.codec_rank_bias(prediction, aic_target, pairs.codec.to_numpy()))
+            save(f"bias-{g}|{mean_label}|out-of-fold.json", cells.codec_rank_bias(prediction, aic_target, pairs.codec.to_numpy()))
         stage("out-of-fold-source-codec-ladder-panels")
         stats = panel_batch(aggregate_jobs, stats="full")
         checked_statistics(aggregate_jobs, stats)
@@ -641,23 +746,25 @@ def fold_run(path):
             row["statistics"] = value
         save("MODEL_PANELS.json", rows)
         by_model = {(r["model"], r["population"]): r["statistics"] for r in rows}
-        contrasts = [("AICOnly@e59", "MixedAIC16@e59"), ("AICOnly@e7", "MixedAIC16@e7"),
-                     ("MixedAIC16@e59", "MixedAIC16@e7"), ("AICOnly@e59", "AICOnly@e7"),
-                     *((g, "Initial") for g in groups if g != "Initial")]
+        contrasts = [tuple(c) for c in plan_value.get("contrasts", [])] or [
+            ("AICOnly@e59", "MixedAIC16@e59"), ("AICOnly@e7", "MixedAIC16@e7"),
+            ("MixedAIC16@e59", "MixedAIC16@e7"), ("AICOnly@e59", "AICOnly@e7"),
+            *((g, "Initial") for g in groups if g != "Initial")]
         oof_stats = {r["model"]: r["statistics"] for r in json.loads((output / "OUT_OF_FOLD_PANELS.json").read_text())}
         paired = {}
         for candidate, baseline in contrasts:
-            paired[f"{candidate}-minus-{baseline}|out-of-fold"] = {m: seed_delta(
-                {s: oof_stats[f"{candidate}|s{s}"][m] for s in SEEDS}, {s: oof_stats[f"{baseline}|s{s}"][m] for s in SEEDS})
-                for m in METRICS}
+            paired[f"{candidate}-minus-{baseline}|out-of-fold"] = {m: paired_delta(
+                {s: oof_stats[f"{candidate}|s{s}"][m] for s in seeds}, {s: oof_stats[f"{baseline}|s{s}"][m] for s in seeds},
+                seeds) for m in METRICS}
             for name in FOLDS:
                 def e21(group, seed):
                     if group == "Initial":
                         return by_model[f"Initial|s{seed}", name]
                     return {m: float(np.mean([by_model[f"{group}|s{seed}|k{k}", name][m] for k in SOURCE_FOLDS]))
                             for m in METRICS}
-                paired[f"{candidate}-minus-{baseline}|{name}|mean over fold models"] = {m: seed_delta(
-                    {s: e21(candidate, s)[m] for s in SEEDS}, {s: e21(baseline, s)[m] for s in SEEDS}) for m in METRICS}
+                paired[f"{candidate}-minus-{baseline}|{name}|mean over fold models"] = {m: paired_delta(
+                    {s: e21(candidate, s)[m] for s in seeds}, {s: e21(baseline, s)[m] for s in seeds}, seeds)
+                    for m in METRICS}
         save("PAIRED_SEEDS.json", dict(contrasts=paired, selection_gate=False,
              note="E21 populations are in sample for every model; out-of-fold covers AIC public_train only"))
         rng = np.random.default_rng(1)
@@ -672,7 +779,7 @@ def fold_run(path):
             checked_statistics([(label, index, index) for label, _, _, index in tasks], result)
             delta = np.asarray([result[i + 1]["srocc_signed"] - result[i]["srocc_signed"] for i in range(0, len(result), 2)])
             good = delta[np.isfinite(delta)]
-            intervals[f"{candidate}-minus-{baseline}"] = dict(metric="srocc_signed", aggregation="three-seed mean out-of-fold",
+            intervals[f"{candidate}-minus-{baseline}"] = dict(metric="srocc_signed", aggregation=f"{len(seeds)}-seed mean out-of-fold",
                 resamples=2000, source_clusters=28, seed=1, defined_resamples=len(good), quantile_method="linear",
                 interval_95=np.quantile(good, [.025, .975], method="linear").tolist() if len(good) else None,
                 uncertainty="whole-source resampling conditional on fitted models", descriptive_only=True, selection_gate=False)
@@ -685,7 +792,8 @@ def fold_run(path):
         write(run_dir / "EVIDENCE_INVENTORY.json", inventory, fresh=True)
         write(run_dir / "COMPLETE.json", dict(plan_sha256=sha(path), evidence_inventory_sha256=sha(run_dir / "EVIDENCE_INVENTORY.json"),
               selector=None, production_qualified=False, objective_complete=False,
-              assessment="three-seed source-fold mechanism/stability evidence; no adoption"), fresh=True)
+              assessment=plan_value.get("assessment", "three-seed source-fold mechanism/stability evidence; no adoption")),
+              fresh=True)
         stage("fold-diagnostic-complete", next_action="review out-of-fold and drift panels; no adoption from this study")
     except BaseException as error:
         stage("failed", failures=[*state["failures"], repr(error)])
@@ -724,7 +832,8 @@ def fold_status(path):
     for log in sorted(run_dir.glob("arms/*/s*_k*/train.log")):
         done = [int(line.split()[1]) for line in log.read_text().splitlines() if line.startswith("  epoch ")]
         logged.append(max(done) if done else -1)
-    state.update(checked_utc=now(), live=live, gates_finished=gates_finished(),
+    state.update(checked_utc=now(), live=live,
+                 gates_finished=gates_finished(json.loads(path.read_text()).get("after_log", str(GATES_LOG))),
                  fits_complete=len(json.loads((run_dir / "FITS_COMPLETE.json").read_text())["runs"])
                  if (run_dir / "FITS_COMPLETE.json").exists() else 0,
                  logged_epoch_range=[min(logged), max(logged)] if logged else None, logged_runs=len(logged),
@@ -737,7 +846,7 @@ def fold_status(path):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="mode", required=True)
-    for mode in ("plan", "fold-plan"):
+    for mode in ("plan", "fold-plan", "frontier-plan"):
         p = sub.add_parser(mode)
         p.add_argument("run", type=Path)
         p.add_argument("--source-commit", required=True)
@@ -746,7 +855,7 @@ if __name__ == "__main__":
     for mode in ("queue", "run", "status", "fold-queue", "fold-run", "fold-status"):
         sub.add_parser(mode).add_argument("plan", type=Path)
     args = parser.parse_args()
-    if args.mode in ("plan", "fold-plan"):
+    if args.mode in ("plan", "fold-plan", "frontier-plan"):
         globals()[args.mode.replace("-", "_")](args.run, args.source_commit, args.trainer, args.meta_tool)
     else:
         globals()[args.mode.replace("-", "_")](args.plan.resolve())

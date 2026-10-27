@@ -139,6 +139,44 @@ class SourceFoldStudy(unittest.TestCase):
                 log.write_text("2026-10-27T14:00:00Z GATES-EXIT rc=1\n")
                 self.assertTrue(owner.gates_finished())
 
+    def test_frontier_fits_use_each_arms_registered_weight_and_inventory(self):
+        with tempfile.TemporaryDirectory(dir=Path.home() / "tmp") as tmp:
+            run = Path(tmp)
+            (run / "cols.txt").write_text("13,14\n")
+            plan = dict(root="/invented/root", columns=str(run / "cols.txt"), arms=owner.FRONTIER_ARMS, seeds=[0])
+            for arm, (population, weight) in zip(owner.FRONTIER_ARMS, (("mixed-aic64", 64.0), ("mixed-aic256", 256.0),
+                                                                      ("mixed-aic1024", 1024.0))):
+                command = owner.fit_command(plan, run, arm, 0, "/invented/Mlic/full_s0", "/invented/aic_k3_fit.parquet",
+                                            run / "arms" / arm / "s0_k3")
+                self.assertEqual(command[command.index("--diagnostic-population") + 1], population)
+                self.assertEqual(float(command[command.index("--aic-weight") + 1]), weight)
+                self.assertEqual(int(command[command.index("--fine-tune-epochs") + 1]), 60)
+            runs = owner.fold_runs(plan)
+            self.assertEqual(len(runs), 21)
+            self.assertEqual({r[0] for r in runs}, set(owner.FRONTIER_ARMS))
+            self.assertEqual({r[1] for r in runs}, {0})
+            # The registered source-fold study keeps its own inventory and weight.
+            self.assertEqual(len(owner.fold_runs()), 42)
+            matched = owner.fit_command(dict(plan, arms=owner.ARMS), run, "AICOnly", 0, "/invented/i", "/invented/t", run)
+            self.assertEqual(float(matched[matched.index("--aic-weight") + 1]), 16.0)
+
+    def test_single_seed_deltas_carry_no_standard_error(self):
+        one = owner.paired_delta({0: 0.95}, {0: 0.91}, [0])
+        self.assertAlmostEqual(one["mean"], 0.04)
+        self.assertIsNone(one["seed_unit_se"])
+        three = owner.paired_delta({0: 0.95, 1: 0.94, 2: 0.96}, {0: 0.91, 1: 0.91, 2: 0.92}, [0, 1, 2])
+        self.assertIsNotNone(three["seed_unit_se"])
+
+    def test_plan_schema_accepts_only_fold_and_frontier_plans(self):
+        with tempfile.TemporaryDirectory(dir=Path.home() / "tmp") as tmp:
+            path = Path(tmp) / "PLAN.json"
+            for schema in (owner.FOLD_SCHEMA, owner.FRONTIER_SCHEMA):
+                path.write_text(json.dumps(dict(schema=schema)))
+                self.assertEqual(owner.plan_schema(path), schema)
+            path.write_text(json.dumps(dict(schema="aic-matched-continuation-plan-v1")))
+            with self.assertRaisesRegex(ValueError, "frontier plan required"):
+                owner.plan_schema(path)
+
     def test_fold_plan_refuses_an_existing_run(self):
         with tempfile.TemporaryDirectory(dir=Path.home() / "tmp") as tmp:
             with self.assertRaisesRegex(ValueError, "preserve"):

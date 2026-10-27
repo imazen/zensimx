@@ -72,14 +72,17 @@ def main() -> None:
     ap.add_argument("--fine-tune-lr", type=float, default=0.00001)
     ap.add_argument("--aic-public-train", type=Path)
     ap.add_argument("--aic-weight", type=float)
-    ap.add_argument("--diagnostic-population", choices=("mixed-aic16", "aic-only"),
-                    help="registered matched-continuation diagnostic arm (byconstruction record, 2026-10-27): 60 epochs, "
-                         "AIC weight 16, every-epoch checkpoints, raw f32 only")
+    from subjective_training_leg import DIAGNOSTIC_POPULATIONS, diagnostic_protocol
+    ap.add_argument("--diagnostic-population", choices=DIAGNOSTIC_POPULATIONS,
+                    help="registered continuation arm (byconstruction record, 2026-10-27): the matched diagnostic "
+                         "(AIC weight 16) or the AIC-share frontier (64/256/1024); 60 epochs, every-epoch checkpoints, "
+                         "raw f32 only")
     from e36_training import add_args
     add_args(ap)
     args = ap.parse_args()
     if args.init_from is not None or args.fine_tune_epochs is not None:
-        registered = ((60, 16.0),) if args.diagnostic_population else ((4, 8.0), (8, 16.0))
+        registered = (((60, diagnostic_protocol(args.diagnostic_population)[1]),) if args.diagnostic_population
+                      else ((4, 8.0), (8, 16.0)))
         if (not args.init_from or not args.strict_admission or not args.train_only
                 or args.exclude_datasets or args.local_smoke_budget or args.research_extra_group
                 or args.research_replay or args.aic_public_train is None or args.fine_tune_lr != 0.00001
@@ -189,7 +192,8 @@ def main() -> None:
             excluded = [g[0] for g in groups if g[0] not in retained]
             groups = [g for g in groups if g[0] in retained]
             weights = {name: w for name, w in weights.items() if name in retained}
-            diagnostic = dict(protocol="aic-matched-continuation-diagnostic-v1", population=args.diagnostic_population,
+            protocol, _, fixed = diagnostic_protocol(args.diagnostic_population)
+            diagnostic = dict(protocol=protocol, population=args.diagnostic_population,
                               excluded_groups=excluded, retained_groups=[g[0] for g in groups])
         else:
             from subjective_training_leg import continuation_authority
@@ -261,8 +265,8 @@ def main() -> None:
                 if args.init_from is not None else {}),
             **({"diagnostic": dict(diagnostic, fixed_checkpoints={
                 str(e): {"path": str(dest / "ckpt" / f"ckpt_epoch{e:03d}.bin"),
-                         "sha256": sha(dest / "ckpt" / f"ckpt_epoch{e:03d}.bin")} for e in (7, 59)},
-                checkpoint_selection="fixed epochs 7 and 59; no development selection",
+                         "sha256": sha(dest / "ckpt" / f"ckpt_epoch{e:03d}.bin")} for e in fixed},
+                checkpoint_selection=f"fixed epochs {', '.join(map(str, fixed[:-1]))} and {fixed[-1]}; no development selection",
                 representation="final-f32 checkpoint dumps; no packing or calibration")}
                 if diagnostic is not None else {}),
             **({"derived_inputs": {"token": recipe["derived_inputs"], "declaration_sha256": __import__("v2_common").derived_declaration(recipe["derived_inputs"])[1]}}

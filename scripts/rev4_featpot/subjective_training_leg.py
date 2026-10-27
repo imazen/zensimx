@@ -237,22 +237,36 @@ def admit_datasets(a, cell_id, groups, selected_ids):
     return admitted
 
 
-# Prospective matched-continuation diagnostic (byconstruction record,
-# 2026-10-27). Separate from the frozen 0/4/8-epoch continuation contract.
+# Registered continuation protocols beyond the frozen 0/4/8-epoch contract
+# (byconstruction record, 2026-10-27): each names its populations with their
+# public_train weight, and its retained checkpoint epochs. Every one runs 60
+# epochs at constant LR 1e-5, fresh Adam, a checkpoint dump every epoch. The
+# native owner holds the same table.
 DIAGNOSTIC_PROTOCOL = "aic-matched-continuation-diagnostic-v1"
+FRONTIER_PROTOCOL = "aic-share-frontier-v1"
+DIAGNOSTIC_PROTOCOLS = {
+    DIAGNOSTIC_PROTOCOL: ({"mixed-aic16": 16.0, "aic-only": 16.0}, [7, 59]),
+    FRONTIER_PROTOCOL: ({"mixed-aic64": 64.0, "mixed-aic256": 256.0, "mixed-aic1024": 1024.0}, [7, 15, 29, 59]),
+}
 DIAGNOSTIC_EPOCHS = 60
-DIAGNOSTIC_AIC_WEIGHT = 16.0
-DIAGNOSTIC_POPULATIONS = ("mixed-aic16", "aic-only")
+DIAGNOSTIC_POPULATIONS = tuple(p for populations, _ in DIAGNOSTIC_PROTOCOLS.values() for p in populations)
+
+
+def diagnostic_protocol(population):
+    """(protocol, public_train weight, retained checkpoint epochs) of one registered population."""
+    for protocol, (populations, checkpoints) in DIAGNOSTIC_PROTOCOLS.items():
+        if population in populations:
+            return protocol, populations[population], list(checkpoints)
+    raise ValueError("diagnostic population required")
 
 
 def diagnostic_partition(base_groups, population):
     """(retained, excluded) base group records; the native owner applies the same rule."""
-    if population not in DIAGNOSTIC_POPULATIONS:
-        raise ValueError("diagnostic population required")
+    diagnostic_protocol(population)
     if any(not isinstance(r.get("train_weight"), (int, float)) or not math.isfinite(r["train_weight"])
            or r["train_weight"] < 0 for r in base_groups):
         raise ValueError("diagnostic base train weights required")
-    if population == "mixed-aic16":
+    if population != "aic-only":
         return list(base_groups), []
     return ([r for r in base_groups if r["train_weight"] == 0],
             [r for r in base_groups if r["train_weight"] > 0])
@@ -275,17 +289,18 @@ def diagnostic_binding(a, cell_id, groups):
     if "continuation" in b or {k: v for k, v in c.items() if k not in inner} != {k: v for k, v in b.items() if k not in inner}:
         raise ValueError("diagnostic cell changed a base binding")
     w = c["continuation"]
-    retained, excluded = diagnostic_partition(b["groups"], w.get("population"))
+    protocol, weight, checkpoints = diagnostic_protocol(w.get("population"))
+    retained, excluded = diagnostic_partition(b["groups"], w["population"])
     aic_only = w["population"] == "aic-only"
-    if (w.get("protocol") != DIAGNOSTIC_PROTOCOL or w.get("epochs") != DIAGNOSTIC_EPOCHS
-            or w.get("aic_weight") != DIAGNOSTIC_AIC_WEIGHT or w.get("dump_checkpoints_every") != 1
-            or w.get("retained_checkpoint_epochs") != [7, 59] or w.get("optimizer_state") != "fresh"
+    if (w.get("protocol") != protocol or w.get("epochs") != DIAGNOSTIC_EPOCHS
+            or w.get("aic_weight") != weight or w.get("dump_checkpoints_every") != 1
+            or w.get("retained_checkpoint_epochs") != checkpoints or w.get("optimizer_state") != "fresh"
             or c["groups"] != retained or w.get("excluded_groups") != excluded
             or (aic_only and (not retained or not excluded))):
         raise ValueError("diagnostic protocol/population/group partition differs")
     aic = [g for g in groups if g[0] == "aic_public_train"]
-    if len(aic) != 1 or aic[0][2] != DIAGNOSTIC_AIC_WEIGHT:
-        raise ValueError("diagnostic requires one public_train leg at weight 16")
+    if len(aic) != 1 or aic[0][2] != weight:
+        raise ValueError(f"diagnostic requires one public_train leg at weight {weight:g}")
     return aic_only
 
 
@@ -300,6 +315,7 @@ def diagnostic_authority(binding, checkpoint, population, lr):
     if a["schema"] != "subjective-training-authority-v2" or lr != 0.00001:
         raise ValueError("diagnostic requires the original version-2 authority and LR 1e-5")
     checkpoint = safe(checkpoint).resolve()
+    protocol, weight, checkpoints = diagnostic_protocol(population)
     retained, excluded = diagnostic_partition(a["cells"][cell]["groups"], population)
     a["schema"] = "subjective-training-authority-v4"
     a["base_authority"] = str(Path(path).resolve())
@@ -307,8 +323,8 @@ def diagnostic_authority(binding, checkpoint, population, lr):
     a["cells"][cell]["groups"] = retained
     a["cells"][cell]["continuation"] = dict(checkpoint=str(checkpoint), checkpoint_sha256=sha(checkpoint),
         epochs=DIAGNOSTIC_EPOCHS, lr=lr, lr_schedule="constant", optimizer_state="fresh",
-        protocol=DIAGNOSTIC_PROTOCOL, population=population, aic_weight=DIAGNOSTIC_AIC_WEIGHT,
-        dump_checkpoints_every=1, retained_checkpoint_epochs=[7, 59], excluded_groups=excluded)
+        protocol=protocol, population=population, aic_weight=weight,
+        dump_checkpoints_every=1, retained_checkpoint_epochs=checkpoints, excluded_groups=excluded)
     out = Path(path).with_name("diagnostic-authority.json")
     if out.exists():
         raise ValueError("preserve previous diagnostic authority")
