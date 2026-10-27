@@ -6723,3 +6723,41 @@ AICOnly s1/k3 and MixedAIC16 s2/k0 with the original seeds and fold tables.
 The dev queue is now serial: confidence omissions → confidence follow-through
 → seed-0 screen → candidate gates (12 models) → this study (run-heavy 40 GiB,
 12 concurrent single-thread fits). No result exists yet.
+
+### Where the AIC-2026 gap sits: per-codec ranking versus cross-codec scale (2026-10-27, existing outputs)
+
+Why does Mlic (0.9075, zero-shot) trail the historical AIC-only T (0.9527 out
+of fold)? Per-codec SROCC (rows of one codec pooled over sources; final f32;
+full-study Mlic seed 0 zero-shot and three-seed mean continuations, against
+T's saved seven-fold out-of-fold panel `rust/folds_train/T/oof_panel.json`):
+
+| Codec | T out of fold | Mlic zero-shot | MlicFT16x8 | MlicVoteFT16x8 | MlicOrderFT16x8 |
+|---|---:|---:|---:|---:|---:|
+| AVIF | 0.9550 | 0.9569 | 0.9607 | 0.9609 | 0.9629 |
+| AVIFQ | 0.9806 | 0.9549 | 0.9560 | 0.9547 | 0.9556 |
+| CCW | 0.9697 | 0.9450 | 0.9485 | 0.9458 | 0.9482 |
+| HEVC | 0.9533 | 0.9638 | 0.9661 | 0.9663 | 0.9663 |
+| J2K | 0.9712 | 0.9131 | 0.9215 | 0.9174 | 0.9226 |
+| JAI | 0.9542 | 0.9081 | 0.9173 | 0.9157 | 0.9147 |
+| JPG | 0.9569 | 0.9346 | 0.9434 | 0.9444 | 0.9411 |
+| JPGL | 0.9700 | 0.9796 | 0.9797 | 0.9784 | 0.9781 |
+| JPGR | 0.9615 | 0.9568 | 0.9595 | 0.9570 | 0.9607 |
+| JXL | 0.9544 | 0.9093 | 0.9199 | 0.9150 | 0.9187 |
+| JXLM | 0.9026 | 0.8336 | 0.8620 | 0.8378 | 0.8504 |
+| PNG | 0.9205 | 0.9363 | 0.9427 | 0.9413 | 0.9400 |
+| VVC | 0.9081 | 0.9737 | 0.9721 | 0.9732 | 0.9729 |
+| WEBP | 0.9525 | 0.9037 | 0.9179 | 0.9144 | 0.9111 |
+| All rows | 0.9527 | 0.9075 | 0.9146 | 0.9139 | 0.9158 |
+
+Mlic already ranks five codecs as well as or better than T (VVC +0.066, PNG
++0.016, HEVC +0.011, JPGL +0.010, AVIF +0.002), and trails on J2K, JAI, JXL,
+JXLM, WebP, CCW, AVIFQ and JPG. The pooled gap (0.045) is larger than most
+per-codec gaps because the codecs sit on different scales: Mlic's codec rank
+bias spreads 0.075 (PNG +0.211, VVC +0.142, HEVC +0.105; JPG −0.059, WebP
+−0.041), and eight epochs of continuation leave it there (MlicFT16x8 0.076,
+Order 0.0715; `bias-*|final-f32|aic.json`). The mixed-data model has learned a
+cross-codec scale that AIC's observers do not share; the short continuations
+fix little of it. The matched continuation (60 epochs, AIC-only arm) and the
+source-fold study measure how much more AIC exposure moves that scale. T's
+cells are seven-fold out of fold; the continuation columns are in sample;
+T's provenance remains unqualified. Read only, no new fit.
