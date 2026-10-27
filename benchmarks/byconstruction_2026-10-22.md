@@ -6795,3 +6795,38 @@ up the posterization contours, as dither does, so "more error energy is worse"
 is a questionable label for these two rows; B's reversals (blur plus colour
 noise on every reference, up to +44 points) are not of this kind. Image strips
 (reference | poster12 | poster12+luma4): `/mnt/v/output/zensim/mixture-dither-20261027/`.
+
+### Native HDR precision at revision 7 (2026-10-27, label-free)
+
+The precision run of October 27 left one gap open: no f64 error bound for HDR features. This entry measures it.
+`tier_audit_features --hdr-pq` (new) reads 16-bit PQ PNG codes as opaque `Srgb16Rgba` and extracts basic, peaks
+and v2 through `research::extract_hdr`. A pair's distorted side can be a deterministic code-space perturbation of
+the reference: `dither1` moves about one value in ten by ±1 code, `shift4` and `shift64` add 4 or 64 codes, and
+`blend5` moves 5% toward a 3×3 box mean. Inputs are six imazen-26-hdr TRAIN references, chosen as the first six by
+sha256 of the stem (1064, 1234, 1547, 1534, 1533, 1544). They are 384×512, BT.709 primaries, PQ (cICP 1/16/0/1),
+peak 10000. That gives 24 pairs at revision 7, tier v3 (i265, one thread); Zen 5 / v4x was not measured.
+
+The two arms are the production canonical arithmetic and `ZENSIM_FEATCANON=exact`. The exact arm uses f64 PU-XYB
+elements, a fresh f64 blur and compensated accumulation. Both arms share the f32 PQ decode table and f32 plane
+storage; the display-light parity tests in `native_hdr_color.rs` cover the decode. `rev7_forms.py` (now with a
+single-arm mode and a score step) gives the errors. `predict_features_with_bake --f64-wire --production` scores
+both arms' rows with the packed seed-0 Mlic and MlicFT16x8 bakes.
+
+- **Score:** Mlic moves by at most 1.83e-4 points (median 3.7e-5) and MlicFT16x8 by 1.65e-4 (median 4.5e-5), on
+  scores of 94.4–99.99.
+- **Moderate distortion** (`blend5`, feature magnitudes around 1e-4): the median per-feature relative error is
+  1.1e-5 (basic), 2.5e-5 (peaks) and 1.8e-5 (v2), with a worst of 1.3e-3. That is the same class as the SDR
+  revision-7 measurement above (5.1e-5).
+- **Near-identity** (`dither1`, `shift4`, magnitudes 1e-8 to 1e-7): relative errors run from 1e-3 to 1. Absolute
+  errors stay at most 8.3e-5 over all pairs, with a p99 of 3e-6 or less.
+- **Finding: the L8 peak pools underflow.** They form `d⁸` as `d4 * d4` in f32 lanes before the f64 reduction. That
+  term is subnormal below a per-pixel error of about 1.6e-5 and zero below about 4e-6. Production emits exactly 0 in
+  191 cells where the oracle has up to 9e-7 (for example `peaks_ssim_l8` at near-identity). The score bound above
+  includes it. A fix changes feature bits, so it belongs to a future revision, for instance the HDR frontend's.
+
+Artifacts: tower `/mnt/tower/output/zensim/hdr-precision-20261027/` holds `REFS.json`, the dumps, `PRECISION.*`,
+`SCORE_IMPACT.json`, the bakes and `bin/SHA256SUMS`: `tier_audit_features` 1d7a817f…, built with
+`--features featcanon-oracle`, and `predict_features_with_bake` a53c55ad…. `replay-final/` reruns the same probe
+through the recipe below, with the committed source, and reproduces every dump and score bit for bit:
+
+`just hdr-precision <refs> <out> <tier_audit_features> <predict_features_with_bake> 7 srgb 10000 v3 NAME=BAKE...`

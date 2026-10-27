@@ -83,7 +83,12 @@ fails on a 10% gain or lift error and on a missing lift, but not on a 1% gain
 error. The mid-range codes cross HLG's segment join, and moving the join to
 0.45 or a 1% gain on the upper segment fails the test. A bake over basic ids
 0–227 is refused at Rev7 with "incomplete refinement coverage": Rev7 steering
-covers its served read set, not arbitrary basic ids.
+covers its served read set, not arbitrary basic ids. Feature arithmetic
+against the f64 oracle on native PQ inputs moves the Mlic and MlicFT16x8
+scores by at most 1.8e-4 points (24 pairs, tier v3). The L8 peak pools
+underflow in f32 below a per-pixel error of about 4e-6; the
+[record](../benchmarks/byconstruction_2026-10-22.md) has the details, and
+`just hdr-precision` repeats the check for a new frontend.
 
 **Owner decisions needed.** (1) A human HDR holdout. HDR-VDC and AVT keep
 only Rev2/944 tables and need fresh sign-off to re-extract through the frozen
