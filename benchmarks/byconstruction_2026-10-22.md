@@ -5393,3 +5393,35 @@ zero-step directory containing only best.bin and a wrong-recipe model:
 `rc=0 0s | peak-RSS 0.04 GiB | min-avail 24479 MiB | peak-load 0.39`.
 The review also identified panel provenance and diagnostic coverage work;
 those corrections precede acceptance of the new panel evidence.
+
+
+### AIC panel integrity controls (2026-10-27)
+
+The new comparison owner retains complete native statistics, including raw
+PLCC, MAE and dropped-row counts. Undefined folds or seeds remain explicit;
+the declared mean is undefined when a required component is missing. Source
+bootstrap intervals accompany their own mean-prediction SROCC difference,
+not the distinct mean-cell delta. Initialization rows are labeled zero-shot
+on their paired continuation cohorts. Historical scalar decisions are
+retained as evidence but excluded from this study's selection.
+
+AIC ladder diagnostics bind the `quality` field to the published filename's
+distortion-level index, lower being better; it is not a codec-native quality
+knob. The provenance is the [dataset description](https://doi.org/10.18419/DARUS-6156),
+whose local copy is pinned in the panel. Counts separate human-concurring
+pairs, human disagreement, ties and undefined comparisons. Inversion sizes
+use the canonical cohort-fitted diagnostic logistic map and p99-p1 span.
+Fitted and held-out sources remain separate throughout.
+
+Mixture evaluation derives each dense model in a fresh cache through the
+existing bit-identity gate. Copied scores pass the canonical cache validator,
+which checks model hash, settings, exact image coverage and finite scores.
+The image inventories are compared by bytes and recorded with the scorer
+identity. A completion inventory closes over generated predictions, scores,
+metadata, logs and label-read ledgers.
+
+Fifteen runner and panel controls pass on i265, including the best-only
+zero-step export, wrong-recipe refusal, cohort isolation, undefined-denominator
+handling and changed mixture model/settings/coverage refusal. The resource
+wrapper recorded `rc=0 0s | peak-RSS 0.12 GiB | min-avail 24490 MiB | peak-load 0.03`.
+These are implementation checks, not measured candidate-quality results.
