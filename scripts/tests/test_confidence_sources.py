@@ -1,9 +1,11 @@
 """Invented uncertainty sources; forbidden rows contain nonnumeric sentinels."""
 import json
+import io
 from pathlib import Path
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/"byconstruction"))
 import confidence_sources as source
@@ -71,6 +73,51 @@ class NativeUncertainty(unittest.TestCase):
         bank["ref_group"]="tid:I03"
         with self.assertRaisesRegex(ValueError,"reference identity"):
             population.bind_human(keys,{"tid2013":{"a"*64:bank}},native)
+
+    def test_mat_selected_columns_match_scipy_without_decoding_excluded_responses(self):
+        import numpy as np
+        from scipy.io import savemat, loadmat
+        import live_md_uncertainty as live
+        values=np.array([[1.,float("nan"),3.],[4.,float("nan"),6.]],dtype=np.float64)
+        for compressed in (False,True):
+            stream=io.BytesIO()
+            savemat(stream,{"ignored":np.array([float("nan")]),"dist_diffscores":values},do_compression=compressed)
+            raw=stream.getvalue()
+            oracle=loadmat(io.BytesIO(raw))["dist_diffscores"][:,[2,0]]
+            original=np.frombuffer
+            converted=[]
+            def record(buf,*args,**kwargs):
+                converted.append(len(buf));return original(buf,*args,**kwargs)
+            with mock.patch.object(live.np,"frombuffer",record):
+                actual=live.selected_columns(raw,"dist_diffscores",[2,0],(2,3))
+            np.testing.assert_array_equal(actual,oracle)
+            self.assertEqual(converted,[16,16])
+            with self.assertRaisesRegex(ValueError,"nonfinite"):
+                live.selected_columns(raw,"dist_diffscores",[1],(2,3))
+            with self.assertRaises(ValueError): live.selected_columns(raw,"dist_diffscores",[0],(3,2))
+            with self.assertRaises(ValueError): live.selected_columns(raw[:-1],"dist_diffscores",[0],(2,3))
+
+    def test_live_observer_fit_contains_only_selected_items_and_preserves_part_observers(self):
+        import numpy as np
+        from scipy.io import savemat
+        import confidence_audit as audit
+        population=[];pins={}
+        for part,nobs in (("Part 1",19),("Part 2",18)):
+            directory=self.root/"live-md/labels"/part;directory.mkdir(parents=True)
+            names=np.empty((225,1),dtype=object)
+            for i in range(225):names[i,0]=f"item{i}.bmp"
+            data=np.full((nobs,225),np.nan)
+            for j in range(5):
+                data[:,j]=j+np.arange(nobs)*0.01
+                item=f"images/{part}/item{j}.bmp"
+                population.append(dict(native=dict(item=item)))
+            for filename,values in (("Imagelists.mat",dict(distimgs=names)),("Scores.mat",dict(dist_diffscores=data))):
+                p=directory/filename;savemat(p,values,do_compression=True);pins[str(p)]=source.digest(p)
+        with mock.patch.object(audit,"LIBRARY",self.root):
+            result=audit.live_md(population,pins,self.ledger)
+        self.assertEqual(len(result),10)
+        self.assertEqual({r["n"] for r in result.values()},{18,19})
+        self.assertTrue(all(r["se_native"]>0 for r in result.values()))
 
 
 if __name__=="__main__":unittest.main()

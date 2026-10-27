@@ -121,7 +121,8 @@ def prepare(output):
         tables[group["name"]]=dict(table=group["path"],table_sha256=group["table_sha256"],
             keys_sha256=group["keys_sha256"],rows=group["rows"],selection=selected)
     raw={}
-    for dataset,files in {"kadid-10k":["labels/dmos.csv"],"tid2013":["labels/mos_with_names.txt","labels/mos_std.txt"]}.items():
+    for dataset,files in {"kadid-10k":["labels/dmos.csv"],"tid2013":["labels/mos_with_names.txt","labels/mos_std.txt"],
+            "live-md":[f"labels/Part {p}/{f}.mat" for p in (1,2) for f in ("Imagelists","Scores")]}.items():
         raw[dataset]={str(LIBRARY/dataset/f):digest(LIBRARY/dataset/f) for f in files}
     value=dict(schema="mlic-native-uncertainty-populations-v1",role="TRAIN",original_root_sha256=ROOT_SHA,
         response_values_parsed=False,uncertainty_values_parsed=False,input_sha256=inputs,raw_sources=raw,tables=tables,

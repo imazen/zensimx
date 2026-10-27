@@ -430,6 +430,10 @@ dataset-confidence-tests:
 dataset-confidence-populations output:
     OPENBLAS_NUM_THREADS=1 python3 -B scripts/byconstruction/confidence_population.py {{quote(output)}}
 
+# Native fitting rows only; source audit creates no weights or calibration.
+dataset-confidence-audit populations sha256 output:
+    OPENBLAS_NUM_THREADS=1 python3 -B scripts/byconstruction/confidence_audit.py {{quote(populations)}} {{quote(sha256)}} {{quote(output)}}
+
 dataset-eval-tests binary:
     ZEN_PANEL_BIN={{quote(binary)}} python3 -B -m unittest discover -s scripts/tests -p 'test_dataset_eval.py' -v
 

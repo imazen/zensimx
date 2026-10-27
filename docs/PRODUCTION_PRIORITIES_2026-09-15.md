@@ -479,3 +479,15 @@ failure, and keep LIVE-MD's observer-model admission pending until its exact
 fit population is verified. This audit constructs no training weights and
 fits no calibration or model; the subsequent confidence experiment still
 requires its own complete TRAIN-only calibration and registration.
+
+LIVE-MD source admission now has a bounded reader for its released MAT-v5
+real-double matrices. It decompresses opaque bytes, binds native matrix shape
+and item-column identities, and converts only admitted columns to numeric
+responses. The [MathWorks MAT-file format](https://www.mathworks.com/help/pdf_doc/matlab/matfile_format.pdf)
+is the format authority; SciPy is the independent synthetic-file oracle.
+Compressed and uncompressed controls agree exactly, including selected-column
+order; excluded nonfinite sentinels are never decoded. The observer fit reuses
+zenpapers `observer_models.py::sureal` at `4e81c03a` with unchanged arithmetic
+and separate Part 1/Part 2 observer blocks. A synthetic complete path checks
+that only the selected items enter that fit. Actual native source verification
+is the next admission step; no per-item training weight is enabled yet.
