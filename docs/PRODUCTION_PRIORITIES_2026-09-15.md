@@ -53,15 +53,17 @@ October 27; verify live artifacts before relying on them):
 - **Neff:** square-root effective-sample collection masses at unchanged total
   new-data mass completed 21/21 cells. The historical rejection remains evidence,
   not exclusion from the new AIC panels.
-- **Confidence:** native population and uncertainty audits exist. Source
-  screening is queued; membership, omission-bound response reads, linking maps
-  and the native contrast-weighted loss are unfinished. No weights are adopted.
-- **Order:** same-source matched JPEG/JPEG2000 strata passed full-budget control
-  parity; 12/21 cells completed, the remaining nine were running. No adoption.
+- **Confidence:** source admission, eight linking scopes, 28 native rating maps,
+  corrected manifests and native contrast-loss integration are complete. Its
+  live queue waits for the AIC full panels, then requires full-budget unweighted
+  parity and 21 TRAIN fits. Candidate fits remain 0/21; no weights are adopted.
+- **Order:** all 21 omission cells and both mixture checks completed. Its
+  historical rejection remains evidence, not exclusion from AIC; no adoption.
 
 All four completed/active base recipes feed both common AIC strengths. The
-fold comparison, full panels, all three full-data seeds and both strengths
-are queued without a SROCC eligibility gate. Confidence joins after its
+fold comparison completed 96/96 fits and 144/144 model panels. Full-data
+training is running its control before all three seeds and both strengths,
+without a SROCC eligibility gate. Confidence joins after its
 independent admission and fits. Do not combine factors accidentally.
 
 The generic stratified sampler is not the registered Order implementation.

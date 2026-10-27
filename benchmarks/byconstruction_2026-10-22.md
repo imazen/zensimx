@@ -5936,3 +5936,18 @@ The derived review and every stratum delta are stored at
 `/mnt/tower/output/zensim/mlic-priority-20261027/AIC_FOLD_TRADEOFF_REVIEW.json`,
 bound to the unchanged aggregate output hash. No new responses were read,
 no model was selected, and no cutoff was added.
+
+
+### Live epoch reporting verification — October 27, 2026, 06:38 UTC
+
+The moving-main full-data status reader now binds logged epochs to trainers in
+the verified worker process tree (`active_training` in `CURRENT_FULL.json`).
+It records PID/start ticks, output directory and epoch budget; old logs cannot
+create a live trainer or imply completion. Missing logs and malformed argument
+bindings remain explicit. All 24 AIC adaptation/orchestration/panel controls
+passed on i265: `just aic-recipe-adaptation-tests`; run-heavy rc=0, 0s,
+peak RSS 0.08 GiB, minimum available 24,332 MiB, peak load 0. The actual AIC
+full control was live at logged epoch 110 with no reported failure. Its
+completion still requires native artifact/control verification. Frozen worker
+source, recipe, inputs and gates are unchanged. Confidence remains queued at
+0/21 behind the full-panel dependency.

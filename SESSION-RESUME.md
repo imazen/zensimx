@@ -30,11 +30,13 @@ requirement, not a candidate-selection cutoff. See the prospective
 
 ### Verify live work before doing anything else
 
-**Latest verified observation — 2026-10-27 06:06:03 UTC:** AIC fold run03
+**Latest verified observation — 2026-10-27 06:38:03 UTC:** AIC fold run03
 has completed **96/96** cells (24 verified reuses plus 72 new fits), with no
 reported failures. Fold panels, including both mixture checks, are complete for **144/144** models.
 Full-data training is running its unweighted control; compute-lock holder PID
-2521269 belongs to that worker ancestry. Full panels wait behind full fits.
+2521269 belongs to that worker ancestry. Trainer PID 2521663, start ticks
+230573015, was live at logged epoch 110/120 (zero-based final epoch 119).
+Full panels wait behind full fits. This is progress, not control completion.
 Re-resolve these observations with the command below before acting.
 
 Confidence admission, all eight linking scopes and all 28 retained native
@@ -74,7 +76,7 @@ directory when frozen orchestration changes.
 | Order | Run directory, checked on dev | Required work / state at the observation |
 |---|---|---|
 | 1 | `/mnt/v/output/zensim/mlic-order-20261027-run02` | 21/21 omission fits complete; historical screen rejected Order, still eligible for AIC. Source `27ed3745`; trainer `441bda58…`. |
-| 2 | `/mnt/tower/output/zensim/mlic-confidence-admission-20261027-run02` | Source screen/admission, eight linking scopes and 28 native maps complete; contrast integration under validation; 0/21 candidate fits. |
+| 2 | `/mnt/tower/output/zensim/mlic-confidence-admission-20261027-run02` | Source screen/admission, eight linking scopes and 28 native maps complete; native contrast integration validated; corrected run03 manifests and live queue; 0/21 candidate fits. |
 | 3 | `/mnt/v/output/zensim/mlic-aic-adaptation-20261027-run03` | 96/96 fold continuations complete: 72 new + 24 identity-checked Mlic reuses. |
 | 4 | Same fold root, `panels/` | 144/144 model panels and both mixture checks complete; separate fitted/held-out source panels. |
 | 5 | `/mnt/v/output/zensim/mlic-aic-full-20261027-run02` | Full-budget control running; 9 new base fits + 3 Mlic reuses, then 24 continuations (21 new + 3 reuses). |
@@ -114,6 +116,25 @@ scientific inputs, recipes and budgets; only dependency/output bindings change.
 The new source-screen root also contains the remapped metadata-only
 `FREEZE_REQUEST.json`. It is not queued and grants no response permission.
 
+### Recovery checks after an interrupted session
+
+The status reader now reports `active_training` from the verified live process
+tree, binding each trainer's PID/start ticks to its output directory, epoch
+budget and last logged epoch. It never infers completion from epoch 119 or an
+old log. Missing logs and unbound arguments remain explicit. The 24 AIC
+orchestration/panel controls passed on i265 on October 27; frozen running
+coordinators and scientific inputs were not changed.
+
+First re-run the status command above. For the full control require its
+`CONTROL_VERIFIED.json` and exact original final-f32/packed model hashes before
+accepting the transition to matched schedules and nine new base fits. Inspect
+`CURRENT_FULL.json` and live descendants, then the full-panel owner. Confidence
+must wait for that pinned panel dependency; inspect its `QUEUED.json` before
+considering a launch. A dead or failed worker needs diagnosis, not a duplicate
+queue. The authoritative private recovery archive includes exact active goal,
+document hashes, source identities and dated supervision snapshots; the archive
+receipt is `DOCUMENTATION_VERIFIED.json` under the shared priority output root.
+
 ### What the AIC comparison means
 
 Four initial recipes, each with both 8×4 and 16×8 continuation strengths, use
@@ -152,7 +173,7 @@ TRAIN panels/screen through existing owners. No confidence cell has run yet.
 `just mlic-priority-progress` now includes this queue. Preserve all old outputs;
 this queue is the next action, not a request to launch a duplicate control.
 
-### Confidence weighting: the unfinished implementation
+### Confidence weighting: implementation validated, candidate experiment pending
 
 **Latest map update:** all eight scopes / 28 retained native rating maps are
 complete. `RATING_MAPS_COMPLETE.json` in the shared admission run02 root has
@@ -165,11 +186,10 @@ unchanged input gate. Two KADID and two TID native SEs are zero; preserve them
 and apply the registered 0.05-JOD floor at contrast construction. Legacy
 unused information diagnostics warned on those zeros, not the map outputs.
 Exact legal-pair normalizers and the private native rank-loss multiplier now
-pass targeted tests. Corrected manifests, full-budget unweighted parity and
-all 21 TRAIN cells remain required. The sampler owner is
+pass targeted tests. Corrected run03 manifests are complete. Full-budget original-Mlic unweighted
+parity and all 21 TRAIN cells remain required. The sampler owner is
 `zensim-validate/src/mlp_train/sampling.rs`; tie semantics are owned by
-`zensim-validate/src/mlp_train/subjective_rank.rs`. No confidence weights or
-new confidence candidate fits are complete yet.
+`zensim-validate/src/mlp_train/subjective_rank.rs`. No confidence-weighted candidate fit or adoption is complete yet.
 
 
 **2026-10-27 linking update:** all eight omission/full linking scopes are

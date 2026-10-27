@@ -29,6 +29,33 @@ class FullCommands(unittest.TestCase):
             owner.fit_command(*args[:-1], 3)
 
 
+class LiveTrainingProgress(unittest.TestCase):
+    def test_stale_logs_do_not_create_live_trainers(self):
+        with tempfile.TemporaryDirectory(dir=Path.home() / "tmp") as tmp:
+            root = Path(tmp)
+            (root / "train.log").write_text("subjective-rank epoch=119 exact_target_ties=2\n")
+            self.assertEqual(owner.active_training([]), [])
+            worker = dict(pid=123,start_ticks=456,state="R",cpu_ticks=789,
+                          argv=["/bin/zensim_mlp_train","--epochs","120","--out",str(root/"refit/best.bin")])
+            result = owner.active_training([worker])
+            self.assertEqual(result[0]["latest_logged_epoch"],119)
+            self.assertFalse(result[0]["completion_inferred"])
+            self.assertEqual(result[0]["start_ticks"],456)
+            (root / "train.log").write_text("  epoch  10 | lr=0.1\nsubjective-rank epoch=13 exact_target_ties=2\n")
+            self.assertEqual(owner.active_training([worker])[0]["latest_logged_epoch"],13)
+
+    def test_missing_log_and_unbound_arguments_are_explicit(self):
+        with tempfile.TemporaryDirectory(dir=Path.home() / "tmp") as tmp:
+            worker = dict(pid=123,start_ticks=456,state="R",cpu_ticks=789,
+                          argv=["zensim_mlp_train","--epochs","8","--out",str(Path(tmp)/"refit/best.bin")])
+            result = owner.active_training([worker])[0]
+            self.assertIsNone(result["latest_logged_epoch"])
+            self.assertFalse(result["log_present"])
+            self.assertEqual(result["epochs"],8)
+            worker["argv"] = ["zensim_mlp_train"]
+            self.assertIn("error",owner.active_training([worker])[0])
+
+
 class FullEvidence(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(dir=Path.home() / "tmp")

@@ -8,6 +8,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 import json
 import os
+import re
 from pathlib import Path
 import shlex
 import subprocess
@@ -145,6 +146,32 @@ def queue(path):
         raise
 
 
+def active_training(processes):
+    """Report logged epochs only for trainers present in the verified live tree."""
+    rows = []
+    for process in processes:
+        argv = process["argv"]
+        if not argv or Path(argv[0]).name != "zensim_mlp_train":
+            continue
+        identity = {key: process[key] for key in ("pid", "start_ticks", "state", "cpu_ticks")}
+        try:
+            directory = Path(argv[argv.index("--out") + 1]).parent.parent
+            epochs = int(argv[argv.index("--epochs") + 1])
+        except (ValueError, IndexError):
+            rows.append(dict(**identity, error="cannot bind live trainer output and budget"))
+            continue
+        path = directory / "train.log"
+        logged = []
+        if path.exists():
+            text = path.read_text()
+            logged = [int(v) for v in re.findall(r"subjective-rank epoch=(\d+)", text)]
+            logged += [int(v) for v in re.findall(r"^\s*epoch\s+(\d+)\s*\|", text, re.MULTILINE)]
+        rows.append(dict(**identity, directory=str(directory), epochs=epochs,
+                         latest_logged_epoch=max(logged) if logged else None,
+                         log_present=path.exists(), completion_inferred=False))
+    return rows
+
+
 def status(path):
     state = json.loads((path.parent / "FULL_STATE.json").read_text())
     worker = state["worker"]
@@ -153,8 +180,9 @@ def status(path):
         state["failures"].append("recorded worker exited without completion")
     state.update(checked_utc=datetime.now(timezone.utc).isoformat(),
                  live_processes=process_tree(worker["pid"]) if live else [], compute_lock=compute_lock(worker["pid"] if live else None))
+    state["active_training"] = active_training(state["live_processes"])
     write(path.parent / "CURRENT_FULL.json", state)
-    print(json.dumps({k: state[k] for k in ("stage", "completed", "failures", "compute_lock")}))
+    print(json.dumps({k: state[k] for k in ("stage", "completed", "failures", "compute_lock", "active_training")}))
 
 
 def run(path):
