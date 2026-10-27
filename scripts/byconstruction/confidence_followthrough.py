@@ -14,7 +14,7 @@ import sys
 import time
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from aic_adaptation import bound_worker, process_snapshot, sha, write, require_clean_factors
+from aic_adaptation import bound_worker, process_snapshot, process_tree, compute_lock, sha, write, require_clean_factors
 from mlic_confidence_full import completed_omissions
 
 
@@ -159,7 +159,21 @@ def run(config_path):
         raise
 
 
+def status(config_path):
+    state = json.loads((config_path.parent / "STATE.json").read_text())
+    worker = state["worker"]
+    live = bound_worker(worker["pid"], worker["start_ticks"])
+    if not live and state["stage"] != "confidence-AIC-panels-complete" and not state["failures"]:
+        state["failures"].append("followthrough exited without completion")
+    state.update(checked_utc=datetime.now(timezone.utc).isoformat(),
+                 live_processes=process_tree(worker["pid"]) if live else [], compute_lock=compute_lock())
+    write(config_path.parent / "CURRENT.json", state)
+    print(json.dumps({key:state[key] for key in ("stage","completed","failures","worker","compute_lock")}))
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("config", type=Path)
-    run(parser.parse_args().config.resolve())
+    parser.add_argument("--status", action="store_true")
+    args = parser.parse_args()
+    (status if args.status else run)(args.config.resolve())

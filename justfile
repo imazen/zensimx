@@ -3712,3 +3712,6 @@ confidence-followthrough-tests:
 # Run the source-frozen copy, attached; each heavy stage acquires the shared lock itself.
 confidence-followthrough source config:
     OPENBLAS_NUM_THREADS=1 python3 -B {{quote(source)}}/scripts/byconstruction/confidence_followthrough.py {{quote(config)}}
+
+confidence-followthrough-status config:
+    OPENBLAS_NUM_THREADS=1 python3 -B scripts/byconstruction/confidence_followthrough.py {{quote(config)}} --status
