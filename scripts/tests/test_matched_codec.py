@@ -81,5 +81,23 @@ class MatchingAdmission(unittest.TestCase):
         registry.write_text(json.dumps(dict(schema="mlic-codec-cells-v1",original_root_sha256=codec.ROOT_SHA,cells=cells)))
         with self.assertRaises(ValueError):codec.cell_binding(registry,sha(registry),"MlicOrder","tid2013",2)
 
+    def test_order_screen_and_omission_control_preserve_registered_gates(self):
+        from byc_cells import neff_decision, verify_omitted_codec_predictions
+        arms={a:{m:dict(per_seed=[0.8]*3) for m in ("old","new","balanced")}
+              for a in ("Mlic","MlicOrder")}
+        self.assertIsNone(neff_decision(arms,[0]*21,"MlicOrder")["finalist"])
+        arms["MlicOrder"]["balanced"]["per_seed"]=[0.81]*3
+        self.assertEqual(neff_decision(arms,[0]*21,"MlicOrder")["finalist"],"MlicOrder")
+        self.assertIsNone(neff_decision(arms,[0]*20+[1],"MlicOrder")["finalist"])
+        arms["MlicOrder"]["old"]["per_seed"]=[0.79]*3
+        self.assertIsNone(neff_decision(arms,[0]*21,"MlicOrder")["finalist"])
+        control,candidate=(self.root/n for n in ("control","candidate"))
+        for p in (control,candidate):
+            p.mkdir();(p/"pred_kadid.tsv").write_text("row_idx\tpred\n0\t1.\n")
+        self.assertEqual(len(verify_omitted_codec_predictions(control,candidate)),1)
+        (candidate/"pred_kadid.tsv").write_text("row_idx\tpred\n0\t1.00001\n")
+        with self.assertRaisesRegex(ValueError,"omission predictions differ"):
+            verify_omitted_codec_predictions(control,candidate)
+
 
 if __name__=="__main__":unittest.main()

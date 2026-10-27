@@ -515,6 +515,10 @@ dataset-neff-chain study source_commit:
 dataset-vote-chain study source_commit trainer_sha256:
     OPENBLAS_NUM_THREADS=1 python3 -B scripts/byconstruction/mlic_neff_chain.py {{quote(study)}} --source-commit {{quote(source_commit)}} --candidate MlicVote --trainer-sha256 {{quote(trainer_sha256)}}
 
+# Independent original-Mlic comparison; match preparation follows binary control.
+dataset-order-chain study source_commit trainer_sha256:
+    OPENBLAS_NUM_THREADS=1 python3 -B scripts/byconstruction/mlic_neff_chain.py {{quote(study)}} --source-commit {{quote(source_commit)}} --candidate MlicOrder --trainer-sha256 {{quote(trainer_sha256)}}
+
 dataset-cell-progress cells arm='Mdata' folds='kadid,tid2013,konfig,cid22_a25':
     env BYC_CELLS={{quote(cells)}} OPENBLAS_NUM_THREADS=1 python3 -B scripts/rev4_featpot/byc_cells.py progress --arm {{quote(arm)}} --folds {{quote(folds)}}
 

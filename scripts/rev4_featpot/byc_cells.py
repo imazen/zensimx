@@ -606,9 +606,9 @@ def cmd_mix_select(args):
 
 
 def neff_decision(arms, global_inversions, candidate="MlicNeff"):
-    """Shared prospectively fixed screen for the independent mass and vote arms."""
+    """Shared prospectively fixed screen for independent mass/vote/order arms."""
     import numpy as np
-    if candidate not in ("MlicNeff", "MlicVote") or set(arms) != {"Mlic", candidate}:
+    if candidate not in ("MlicNeff", "MlicVote", "MlicOrder") or set(arms) != {"Mlic", candidate}:
         raise ValueError("one registered candidate and original Mlic control required")
     delta = {}
     for metric in ("old", "new", "balanced"):
@@ -639,6 +639,14 @@ def verify_omitted_vote_predictions(control, candidate):
     return pins
 
 
+def verify_omitted_codec_predictions(control, candidate):
+    """KADID omission cannot activate the registered JPEG/JPEG2000 schedule."""
+    old, new = (root/"pred_kadid.tsv" for root in (control,candidate))
+    if old.read_bytes() != new.read_bytes():
+        raise ValueError("KADID-omission predictions differ from original Mlic")
+    return {str(new):sha(new)}
+
+
 def cmd_neff_select(args):
     """Bind every cell and mixture model before freezing the prospective decision."""
     from subjective_training_leg import DATASET_FOLDS
@@ -646,7 +654,7 @@ def cmd_neff_select(args):
     from mixture_test import report
     study = Path(args.study)
     candidate = getattr(args, "candidate", "MlicNeff")
-    if candidate not in ("MlicNeff", "MlicVote"):
+    if candidate not in ("MlicNeff", "MlicVote", "MlicOrder"):
         raise ValueError("unregistered paired dataset candidate")
     output = study/"TRAIN_SELECTION.json"
     if output.exists():
@@ -681,7 +689,7 @@ def cmd_neff_select(args):
                         or result["frozen_sha256"] != pin or selected["root_sha256"] != pin
                         or set(selected["retained_collections"]) != trained-set(DATASET_FOLDS.get(fold,()))
                         or rec["trainer_sha256"] != (baseline["candidate_trainer_sha256"]
-                            if arm == "MlicVote" else baseline["trainer_sha256"])
+                            if arm in ("MlicVote", "MlicOrder") else baseline["trainer_sha256"])
                         or rec["last_bin_sha256"] != sha(cell/"refit/last.bin")):
                     raise ValueError(f"native cell binding differs: {cell}")
                 predictions = {f"pred_{fold}.tsv":rec["pred_sha256"]} if fold in FOLDS else {
@@ -691,6 +699,16 @@ def cmd_neff_select(args):
                         raise ValueError("cell prediction changed")
                 if arm == "MlicVote" and fold == "pairs":
                     inputs.update(verify_omitted_vote_predictions(CELLS/"Mlic"/cell.name, cell))
+                if arm == "MlicOrder":
+                    from matched_codec import cell_binding
+                    registry = study/"matching/MANIFESTS.json"
+                    binding = cell_binding(registry,baseline["input_sha256"][str(registry)],arm,fold,seed)
+                    if rec.get("matched_codec_manifest_sha256") != (binding["sha256"] if binding else None):
+                        raise ValueError("candidate matching schedule differs")
+                    if binding:
+                        inputs[binding["path"]] = binding["sha256"]
+                    if fold == "kadid":
+                        inputs.update(verify_omitted_codec_predictions(CELLS/"Mlic"/cell.name,cell))
                 inputs[str(cell/"byc_record.json")] = sha(cell/"byc_record.json")
                 inputs[str(cell/"result.json")] = sha(cell/"result.json")
                 inventory.append(dict(arm=arm,fold=fold,seed=seed,model_sha256=rec["last_bin_sha256"]))
@@ -709,8 +727,9 @@ def cmd_neff_select(args):
     arms[candidate]["eligible_under_new_leg_licence_policy"] = True
     inversions = [mixtures["mixture_global"][f'{candidate}_{c["fold"]}_s{c["seed"]}']["inversions"]
                   for c in inventory if c["arm"] == candidate]
-    schema, rule = ("mlic-native-vote-TRAIN-selection-v1", "b2ee920aa351") if candidate == "MlicVote" else (
-        "mlic-effective-sample-TRAIN-selection-v1", "89d3e738af4e")
+    schema, rule = {"MlicVote":("mlic-native-vote-TRAIN-selection-v1", "b2ee920aa351"),
+                    "MlicNeff":("mlic-effective-sample-TRAIN-selection-v1", "89d3e738af4e"),
+                    "MlicOrder":("mlic-matched-codec-TRAIN-selection-v1", "751c9aea17d3")}[candidate]
     value = dict(schema=schema,rule_commit=rule,
                  eval_labels_used=False,arms=arms,mixtures=mixtures,cells=inventory,input_sha256=inputs,
                  **neff_decision(arms,inversions,candidate))
@@ -1245,7 +1264,7 @@ def main() -> int:
     ms.add_argument("--arms", default=",".join(MIX_ARMS))
     ns = sub.add_parser("neff-select")
     ns.add_argument("--study", required=True)
-    ns.add_argument("--candidate", choices=("MlicNeff", "MlicVote"), default="MlicNeff")
+    ns.add_argument("--candidate", choices=("MlicNeff", "MlicVote", "MlicOrder"), default="MlicNeff")
     mf = sub.add_parser("mix-freeze")
     mf.add_argument("--study", required=True)
     z = sub.add_parser("aiczero")

@@ -4989,3 +4989,32 @@ count corruption and contradictions with existing native fields. The complete
 Python dataset/subjective/vote admission suite passes. The failed first root
 remains preserved; a fresh attempt still requires the unchanged-Mlic control
 before any candidate fit.
+
+### Matched-codec admission and execution wiring (2026-10-27)
+
+The producer now freezes each original matching model, its fitting-table
+predictions, row keys, promoted-bank codec keys and exact omission/seed. Native
+admission constructs the bidirectional nearest-prediction matches, checks
+same-reference identity and retains the pair/gap report in the trainer's
+reproduction metadata. Matching never compares human targets. The candidate
+registry contains 18 active cells and three inactive KADID omissions.
+
+Metadata tests refuse changed policies, cells, seeds, roots and row keys before
+response reads; attaching the schedule preserves group masses and development
+legs. Native tests cover the nearest-prediction union and missing-manifest
+refusal before table access. Final native checks and strict clippy on i265:
+`run-heavy: done rc=0 4s | peak-RSS 0.54GiB | min-avail 24033MiB | peak-load 0.06`.
+
+Portable release trainer source: `cbda4f0c734a38fa4c362f435f75f6d649c7a242`;
+binary SHA256 `a13d014d65ff8c3e925bee21f0421c4c9dd18a9ba821290cd1ac4c4256342b54`.
+Build record: `run-heavy: done rc=0 60s | peak-RSS 1.85GiB | min-avail 20783MiB | peak-load 3.26`.
+Binary, compiler/configuration identity and logs are preserved outside Cargo
+output. These are correctness/build records, not inference speed measurements.
+
+The shared coordinator executes MlicOrder independently against original Mlic:
+unchanged-Mlic control, matching preparation, 21 cells, existing diagnostics and
+mixtures, then the unchanged registered screen. It binds each cell's schedule
+and requires all three KADID-omission predictions to reproduce the originals
+exactly. Synthetic decision controls retain Mlic on a tie, old-data regression
+or any global inversion. No candidate quality or production qualification has
+yet been measured for this arm.
