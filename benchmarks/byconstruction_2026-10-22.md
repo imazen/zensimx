@@ -7372,3 +7372,32 @@ Two limits stack. Every mixed arm loses about 0.01 from fitted to held-out sourc
 and KonFiG all down 0.02). And even AIC-only, which fits the training sources to 0.971, generalizes to 0.950 at best: 0.95
 is about this model family's ceiling on four unseen public_train sources, before any older set is protected.
 Weighting moves points along this trade-off and rehearsal shifts it a little; neither raises the ceiling.
+
+### Stage F: weight-space interpolation between Mlic and AIC-heavy fold models (registered 2026-10-27, 20:10 UTC, before any interpolation result)
+
+**Why.** Every trained point so far trades AIC against the older sets along its own trajectory, and the analysis
+above puts the ceiling near 0.95 even for AIC-only. WiSE-FT (Wortsman et al., "Robust fine-tuning of zero-shot
+models", CVPR 2022) interpolates the weights of a model before and after fine-tuning; across the mixing weight it often
+keeps most of the fine-tuning gain while recovering the original model's behaviour on its original data, a better
+trade-off than any point on the fine-tuning trajectory. Our continuations start from Mlic and move a short way (LR 1e-5,
+60 epochs), so both ends should share a basin. Stage F asks whether a point on the straight line between Mlic and an
+AIC-heavy fold model keeps the older sets at a higher out-of-fold AIC than any trained point. It needs no training.
+
+**Points.** For each of the seven D6 folds, θ(α) = (1 − α)·θ_Mlic + α·θ_end, applied to every weight and bias (f64, rounded
+to f32; α = 0 and 1 copy their end exactly). θ_Mlic is Mlic full seed 0, the common starting model; θ_end is that fold's
+seed-0 model of one AIC-heavy arm, so neither end has seen the fold's held-out sources and out-of-fold validity holds.
+Ends: AIC-only e29 (source-fold study), static ×1024 e59 (stage A) and ×1024 + rehearsal e59 (stage D). α = 0.1, 0.2,
+…, 0.9. The interpolation refuses unless both ends have identical layer shapes, activations, f32 storage, input scaler,
+feature ids, formula revision and derived-input declaration; the per-run provenance entries (`zentrain.repro`,
+`zentrain.sample_coverage`) of both ends move into one `zentrain.interpolation` entry with both hashes and α. The
+existing panels score every point exactly as the trained ones: out-of-fold AIC, the older sets in sample against
+Mlic, source/codec/ladder aggregates, whole-source intervals and both mixture tests.
+
+**Decision (mine, declared before results; not a winner claim).** A point keeps the older sets under the frontier rule
+(each of KADID, TID2013, KonFiG and CID22-A in sample at least Mlic's minus 0.005). F's candidate is its highest
+out-of-fold AIC keeper. It replaces the point stage C would run (as fixed by stages D and E) only if its out-of-fold AIC is
+higher by more than 0.002 and its E21 out of sample (three-seed mean) is no more than 0.005 lower on every dataset. That
+E21 needs the end arm's continuation of the twelve omission cells, interpolated per cell at the candidate's α; it is
+frozen only if the first condition holds, and stage C's steps would interpolate the same way.
+
+**Order.** Built and tested off dev; one run, queued between the omission runs once ready.
