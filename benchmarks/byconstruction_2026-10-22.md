@@ -6983,3 +6983,35 @@ checkpoints. The matched diagnostic's own rules are unchanged.
 - Admission is unchanged: the populations are the registered ones, and only the continuation checkpoint differs.
 - The sampler stays a declared function of seed, groups and weights. Loss-driven reweighting would break that
   replay contract and is not used.
+
+### Label-free gates for all 15 seed-0 candidates (2026-10-27, complete 14:06 UTC)
+
+Gates run02 (`mlic-candidate-gates-20261027-run02`; run01 failed before any gate, see above) ran `gates.py` through
+the E33/E34 owners on each packed seed-0 serving model. It used the revision-7 tools
+(`688746b78bee-gates`), the rev7raw instruments and the empty human corpus.
+
+All 15 pass the dial contract C1–C6 on both grids. All 15 pass identity on 62 sources at all 12 SIMD
+permutations. G-STEER (135 cases):
+
+| Model | C1 standard / ladder | C3 | G-STEER |
+|---|---|---:|---:|
+| Mlic | 0.9977 / 0.9932 | 0.7885 | 132 |
+| MlicFT8x4 | 0.9977 / 0.9928 | 0.7575 | 133 |
+| MlicFT16x8 | 0.9977 / 0.9926 | 0.7685 | 129 |
+| MlicNeff | 0.9975 / 0.9931 | 0.7685 | 134 |
+| MlicNeffFT8x4 | 0.9977 / 0.9926 | 0.7655 | 131 |
+| MlicNeffFT16x8 | 0.9977 / 0.9925 | 0.7765 | 134 |
+| MlicVote | 0.9975 / 0.9930 | 0.7880 | 134 |
+| MlicVoteFT8x4 | 0.9975 / 0.9925 | 0.7490 | 134 |
+| MlicVoteFT16x8 | 0.9977 / 0.9920 | 0.7755 | 135 |
+| MlicOrder | 0.9975 / 0.9931 | 0.8000 | 135 |
+| MlicOrderFT8x4 | 0.9977 / 0.9922 | 0.7795 | 135 |
+| MlicOrderFT16x8 | 0.9975 / 0.9921 | 0.7890 | 135 |
+| MlicConfidence | 0.9986 / 0.9931 | 0.7215 | 135 |
+| MlicConfidenceFT8x4 | 0.9984 / 0.9930 | 0.7230 | 134 |
+| MlicConfidenceFT16x8 | 0.9986 / 0.9930 | 0.7250 | 134 |
+
+For comparison, B (revision 5) has G-STEER 128. The gate summaries are in the run's `out/`; the compact table is
+`GATES_SUMMARY.json`. These gates are label-free. Open for every candidate, B included: the registered runtime
+gate (hardware decision), G-TARGET (every dial, peers included, failed its last run), G-RD (loop parked by the
+owner) and an integrity head.
