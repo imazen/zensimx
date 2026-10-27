@@ -27,6 +27,31 @@ C = [
   + [("Mw025-s0", "/var/tmp/byc-mixes-20261025/Mw025/full_s0/refit/production-f16.bin", 7, "M recipe, all 11 new TRAIN legs at nominal 0.25; TRAIN-only old-data finalist", "", "research-only: trains on VCL@FER, PieAPP, FG-IQA (validate-only licences)")] \
   + [(f"Mlic64-s{s}", f"/var/tmp/byc-finalists-20261026/Mlic64/full_s{s}/refit/production-f16.bin", 7, "M64 shape on the Mlic root (licence-clean data)", "", "licence-clean; lost the registered shape rule to Mlic on E21 (6690a44b)") for s in (0, 1, 2)]
 sha = lambda p: hashlib.sha256(Path(p).read_bytes()).hexdigest()
+
+
+def full_study(path, pin):
+    """Every packed full-data model of a completed AIC recipe comparison (not yet registered), read from its pinned record."""
+    if sha(path) != pin:
+        raise SystemExit(f"{path}: completion record changed")
+    done = json.loads(Path(path).read_text())
+    rows = [dict(r, arm=arm) for arm, v in done["initial"].items() for r in v] + done["continued"]
+    out = []
+    for r in rows:
+        bake = Path(r["directory"]) / "refit/production-f16.bin"
+        if sha(bake) != r["packed_sha256"]:
+            raise SystemExit(f"{bake}: packed model differs from its completion record")
+        what = (f"{r['arm']} recipe, original full fit" if "FT" not in r["arm"] else
+                f"{r['arm']}: full model continued on AIC-2026 public_train (weight {r['weight']}, {r['epochs']} epochs, LR 1e-5)")
+        out.append((f"{r['arm']}-s{r['seed']}", str(bake), 7, what, "",
+                    "AIC-2026 public_train in sample" if "FT" in r["arm"] else "zero-shot on AIC-2026 public_train"))
+    return out
+
+
+# 2026-10-27: the four-recipe full AIC comparison (Mlic/Neff/Vote/Order x initial/8x4/16x8 x 3 seeds); Mlic's three
+# initial models are the Mlic rows above, and MlicFT16x8's were registered by the aic-finetune lane.
+C += [r for r in full_study("/mnt/v/output/zensim/mlic-aic-full-20261027-run03/FULL_FITS_COMPLETE.json",
+                            "18e4c56c28089f340355caaf6d39660087ce1a208ac2bc41d40482cb475cdb25")
+      if r[0] not in {c[0] for c in C} and not r[0].startswith("Mlic-")]
 R.mkdir(parents=True, exist_ok=True)
 rows = []
 for name, src, rev, data, gates, note in C:
