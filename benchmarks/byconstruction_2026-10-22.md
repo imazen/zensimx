@@ -6664,3 +6664,24 @@ prediction tools are the fold study's frozen run-05 binaries. The queue waits,
 holding no lock, until the confidence followthrough completes, then takes
 `heavy.lock` with run-heavy (24 GiB, 4 jobs). Queue PID 3572059, start ticks
 231746803, in herdr tab `matched-continuation-queue`. No result exists yet.
+
+### Local pixel mixtures in context (2026-10-27, existing scores, no new fit)
+
+The full-data candidates' remaining local mixture reversals are small next to
+the current default's. On the same 1,152-row local mixture set (48 TRAIN
+references × 24 distortion combinations, `mixture/manifest.json`), the shipped
+B bake reverses 148 rows (131 by more than one point), up to +44.21 points.
+Its worst combination is blur1.2+chroma8, reversed on all 48 references, then
+blur1.2+chroma16 (41) and blur1.2+luma4 (19): adding colour noise to a blurred
+image raises B's score, the known colour-noise inversion. B's recipe out of
+sample (base-c, 12 E21 cells) reverses 86–171 rows per cell.
+
+Every seed-0 full-data candidate (Mlic, Neff, Vote, Order; initial, 8×4 and
+16×8; final f32 and packed) reverses 2–4 rows, up to +3.00 to +6.43 points.
+They concentrate in poster12+luma4 (2–3 references) and poster12+chroma8 (one
+reference); none is a blur+colour-noise row. Their E21 cells show the same
+pattern (Mlic 2–5 per cell, maximum rise 6.17). The global mixture set has no
+reversal for any candidate. Scores: `mixture/scores_B.json`,
+`mixture/scores_basec_*`, and the full study's `panels/mixture.json`; counts
+from `mixture_test.report`. The residual posterization rows remain a real
+limitation to report with any adoption decision, not a pass.
