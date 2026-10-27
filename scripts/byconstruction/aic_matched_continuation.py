@@ -1086,8 +1086,8 @@ def omission_aic_fold(fold, seed):
 def omission_plan(run, commit, trainer, meta_tool, point_run, arm, after_run):
     from aic_adaptation import initial_cell
     point = json.loads((Path(point_run) / "PLAN.json").read_text())
-    if point.get("schema") not in (FRONTIER_SCHEMA, RECIPE_SCHEMA) or arm not in point["arms"]:
-        raise ValueError("the advanced point must be a static frontier or recipe arm")
+    if point.get("schema") not in (FRONTIER_SCHEMA, RECOVERY_SCHEMA, RECIPE_SCHEMA) or arm not in point["arms"]:
+        raise ValueError("the advanced point must be a frontier, recovery or recipe arm")
     if point["schema"] == RECIPE_SCHEMA:
         raise ValueError("recipe omission cells need their recipe inputs; not registered yet")
     run = Path(run).resolve()
@@ -1117,6 +1117,7 @@ def omission_plan(run, commit, trainer, meta_tool, point_run, arm, after_run):
                  epochs=EPOCHS, checkpoints=list(FRONTIER_CHECKPOINTS), lr=LR, spec=SPEC, root=str(root),
                  columns=fold["columns"], cells=cells, aic_tables=tables, baselines=dict(
                      Mlic=str(MLIC_CELLS), MlicFT16x8=str(FT_CELLS)), point=dict(run=str(point_run), arm=arm),
+                 phases=two_phases(point, arm, population),
                  after_run=str(after_run), input_sha256={str(p): sha(p) for p in inputs},
                  representation="final-f32 checkpoint dumps", selector=None, public_test_opened=False, eval_read=False,
                  production_qualified=False, assessment="stage C E21 out of sample for the advanced point; no adoption")
@@ -1124,17 +1125,25 @@ def omission_plan(run, commit, trainer, meta_tool, point_run, arm, after_run):
     print(json.dumps(dict(plan=str(run / "PLAN.json"), sha256=sha(run / "PLAN.json"))))
 
 
-def omission_command(plan_value, run_dir, arm, name, seed, dest):
+def two_phases(point, arm, population):
+    """[(arm, population, start epoch of the previous phase or None)]: a recovery point first continues AIC-only."""
+    if point["schema"] != RECOVERY_SCHEMA:
+        return [[arm, population, None]]
+    start = point["start"]
+    return [[start["arm"], ARMS[start["arm"]], None], [arm, population, int(start["epoch"])]]
+
+
+def omission_command(plan_value, run_dir, arm, name, seed, dest, init=None, population=None):
     cell = plan_value["cells"][f"{name}_s{seed}"]
     table = plan_value["aic_tables"][str(cell["aic_fold"])]["path"]
-    population = plan_value["arms"][arm]
+    population = population or plan_value["arms"][arm]
     weight = diagnostic_protocol(population)[1]
     root = Path(plan_value["root"])
     command = [sys.executable, "-B", str(run_dir / "source/scripts/rev4_featpot/v2_lodo_mlp.py"), "--root", str(root),
                "--spec", SPEC, "--columns", Path(plan_value["columns"]).read_text().strip(), "--head", "N",
                "--heldout", name, "--seed-index", str(seed), "--strict-admission",
                "--data-role-decision", str(root / "human_role_decision.json"), "--train-only", "--dest", str(dest),
-               "--init-from", str(Path(cell["directory"]) / "refit/last.bin"), "--fine-tune-epochs", str(EPOCHS),
+               "--init-from", str(init or Path(cell["directory"]) / "refit/last.bin"), "--fine-tune-epochs", str(EPOCHS),
                "--fine-tune-lr", str(LR), "--aic-public-train", table,
                "--research-extra-group", f"aic_public_train:{table}:{weight!r}:0:rank",
                "--diagnostic-population", population]
@@ -1165,15 +1174,21 @@ def omission_run(path):
         label = f"{arm}|{name}|s{seed}"
         if any(sha(p) != pin for p, pin in plan_value["cells"][f"{name}_s{seed}"]["input_sha256"].items()):
             raise ValueError(f"{label}: starting cell changed")
-        dest = run_dir / "cells" / arm / f"without_{name}_s{seed}"
-        scratch = Path.home() / "tmp" / f"{run_dir.name}-{name}-s{seed}"
-        scratch.mkdir(parents=True)
-        dest.parent.mkdir(parents=True, exist_ok=True)
-        with (run_dir / "cells" / arm / f"without_{name}_s{seed}.log").open("x") as log:
-            if subprocess.run(omission_command(plan_value, run_dir, arm, name, seed, dest), stdout=log,
-                              stderr=subprocess.STDOUT, env=dict(environment, TMPDIR=str(scratch))).returncode:
-                raise RuntimeError(f"{label} fit failed; preserved in its log")
-        return dict(fold=name, seed=seed, **fixed_outputs(dest, population, label, plan_value["checkpoints"]))
+        phases, init = [], None
+        # A recovery point's cell continues AIC-only first, then recovers from that phase's start epoch.
+        for phase_arm, phase_population, start_epoch in plan_value.get("phases", [[arm, population, None]]):
+            if start_epoch is not None:
+                init = phases[-1]["directory"] + f"/ckpt/ckpt_epoch{start_epoch:03d}.bin"
+            dest = run_dir / "cells" / phase_arm / f"without_{name}_s{seed}"
+            scratch = Path.home() / "tmp" / f"{run_dir.name}-{phase_arm}-{name}-s{seed}"
+            scratch.mkdir(parents=True)
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            with (run_dir / "cells" / phase_arm / f"without_{name}_s{seed}.log").open("x") as log:
+                if subprocess.run(omission_command(plan_value, run_dir, phase_arm, name, seed, dest, init, phase_population),
+                                  stdout=log, stderr=subprocess.STDOUT, env=dict(environment, TMPDIR=str(scratch))).returncode:
+                    raise RuntimeError(f"{phase_arm}|{name}|s{seed} fit failed; preserved in its log")
+            phases.append(fixed_outputs(dest, phase_population, f"{phase_arm}|{name}|s{seed}", plan_value["checkpoints"]))
+        return dict(fold=name, seed=seed, **phases[-1], phases=phases)
     try:
         stage("fit-omission-cells")
         with ThreadPoolExecutor(max_workers=12) as pool:
@@ -1247,8 +1262,9 @@ PACK = ("import json, sys; from pathlib import Path; from v2_production_pack imp
 
 def full_plan(run, commit, trainer, meta_tool, point_run, arm, epoch, after_run):
     point = json.loads((Path(point_run) / "PLAN.json").read_text())
-    if point.get("schema") != FRONTIER_SCHEMA or arm not in point["arms"] or epoch not in FRONTIER_CHECKPOINTS:
-        raise ValueError("the advanced point must be a static frontier arm at a studied epoch")
+    if (point.get("schema") not in (FRONTIER_SCHEMA, RECOVERY_SCHEMA) or arm not in point["arms"]
+            or epoch not in FRONTIER_CHECKPOINTS):
+        raise ValueError("the advanced point must be a frontier or recovery arm at a studied epoch")
     population = point["arms"][arm]
     protocol, weight, _ = diagnostic_protocol(population)
     fits = json.loads(Path(INPUTS["full_fits"][0]).read_text())
@@ -1272,6 +1288,7 @@ def full_plan(run, commit, trainer, meta_tool, point_run, arm, epoch, after_run)
                     registration=FRONTIER_REGISTRATION, arms={arm: population}, seeds=SEEDS,
                     checkpoints=FRONTIER_CHECKPOINTS, extra=dict(
                         aic_weights={arm: weight}, packed_epoch=epoch, anchor=dict(path=str(anchor), sha256=leg["sha256"]),
+                        phases=two_phases(point, arm, population),
                         baselines={k: dict(path=v, sha256=sha(v)) for k, v in baselines.items()},
                         point=dict(run=str(point_run), arm=arm, epoch=epoch), after_run=str(after_run),
                         assessment="stage C full-data continuation of the advanced point; in-sample panels; no adoption"))
@@ -1302,16 +1319,23 @@ def full_run(path):
                        ZEN_PANEL_BIN=str(run_dir / "bin/panel"), RAYON_NUM_THREADS="1", OMP_NUM_THREADS="1",
                        OPENBLAS_NUM_THREADS="1", ZENSIM_MAX_TIER="v3")
     def fit(seed):
-        dest = run_dir / "full" / arm / f"full_s{seed}"
-        scratch = Path.home() / "tmp" / f"{run_dir.name}-full-s{seed}"
-        scratch.mkdir(parents=True)
-        dest.parent.mkdir(parents=True, exist_ok=True)
-        env = dict(environment, TMPDIR=str(scratch))
-        with (run_dir / "full" / arm / f"full_s{seed}.log").open("x") as log:
-            if subprocess.run(fit_command(plan_value, run_dir, arm, seed, plan_value["initial"][str(seed)]["directory"],
-                                          None, dest), stdout=log, stderr=subprocess.STDOUT, env=env).returncode:
-                raise RuntimeError(f"full seed {seed} fit failed; preserved in its log")
-        outputs = fixed_outputs(dest, population, f"{arm}|full|s{seed}", plan_value["checkpoints"])
+        phases, init = [], None
+        # A recovery point first continues AIC-only on all of public_train, then recovers from its start epoch.
+        for phase_arm, phase_population, start_epoch in plan_value.get("phases", [[arm, population, None]]):
+            if start_epoch is not None:
+                init = Path(phases[-1]["directory"]) / "ckpt" / f"ckpt_epoch{start_epoch:03d}.bin"
+            dest = run_dir / "full" / phase_arm / f"full_s{seed}"
+            scratch = Path.home() / "tmp" / f"{run_dir.name}-{phase_arm}-full-s{seed}"
+            scratch.mkdir(parents=True)
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            env = dict(environment, TMPDIR=str(scratch))
+            with (run_dir / "full" / phase_arm / f"full_s{seed}.log").open("x") as log:
+                if subprocess.run(fit_command(dict(plan_value, arms={phase_arm: phase_population}), run_dir, phase_arm,
+                                              seed, plan_value["initial"][str(seed)]["directory"], None, dest, init),
+                                  stdout=log, stderr=subprocess.STDOUT, env=env).returncode:
+                    raise RuntimeError(f"full {phase_arm} seed {seed} fit failed; preserved in its log")
+            phases.append(fixed_outputs(dest, phase_population, f"{phase_arm}|full|s{seed}", plan_value["checkpoints"]))
+        outputs = dict(phases[-1], phases=phases)
         if sha(plan_value["anchor"]["path"]) != plan_value["anchor"]["sha256"]:
             raise ValueError("TRAIN CID22 calibration anchor changed")
         pack = dest / f"pack_e{epoch:03d}"

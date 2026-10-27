@@ -345,14 +345,33 @@ class OmissionStage(unittest.TestCase):
             self.assertEqual(command[-2:], ["--exclude-datasets", "tid2013-linked"])
             self.assertTrue(command[2].endswith("source/scripts/rev4_featpot/v2_lodo_mlp.py"))
 
-    def test_omission_plan_refuses_recipe_and_recovery_points(self):
+    def test_omission_plan_refuses_recipe_points(self):
         with tempfile.TemporaryDirectory(dir=Path.home() / "tmp") as tmp:
             point = Path(tmp) / "point"
             point.mkdir()
-            for schema, arm in ((owner.RECOVERY_SCHEMA, "RecoverAIC64"), (owner.RECIPE_SCHEMA, "MlicOrderAIC256")):
-                (point / "PLAN.json").write_text(json.dumps(dict(schema=schema, arms={arm: "mixed-aic64"})))
-                with self.assertRaises(ValueError):
-                    owner.omission_plan(Path(tmp) / "run", "HEAD", Path(tmp) / "t", Path(tmp) / "m", point, arm, Path(tmp))
+            (point / "PLAN.json").write_text(json.dumps(dict(schema=owner.RECIPE_SCHEMA, arms={"MlicOrderAIC256": "mixed-aic256"})))
+            with self.assertRaisesRegex(ValueError, "recipe"):
+                owner.omission_plan(Path(tmp) / "run", "HEAD", Path(tmp) / "t", Path(tmp) / "m", point,
+                                    "MlicOrderAIC256", Path(tmp))
+
+    def test_recovery_points_continue_aic_only_then_recover_from_its_start(self):
+        static = dict(schema=owner.FRONTIER_SCHEMA, arms={"MixedAIC256": "mixed-aic256"})
+        self.assertEqual(owner.two_phases(static, "MixedAIC256", "mixed-aic256"), [["MixedAIC256", "mixed-aic256", None]])
+        recovery = dict(schema=owner.RECOVERY_SCHEMA, start=dict(arm="AICOnly", epoch=59))
+        self.assertEqual(owner.two_phases(recovery, "RecoverAIC64", "mixed-aic64"),
+                         [["AICOnly", "aic-only", None], ["RecoverAIC64", "mixed-aic64", 59]])
+        with tempfile.TemporaryDirectory(dir=Path.home() / "tmp") as tmp:
+            run = Path(tmp)
+            (run / "cols.txt").write_text("13,14\n")
+            plan = dict(root="/invented/root", columns=str(run / "cols.txt"), arms={"RecoverAIC64": "mixed-aic64"},
+                        cells={"kadid_s0": dict(directory="/invented/cells/Mlic/without_kadid_s0", aic_fold=0, exclusions=[])},
+                        aic_tables={"0": dict(path="/invented/aic_k0_fit.parquet")})
+            first = owner.omission_command(plan, run, "AICOnly", "kadid", 0, run / "a", None, "aic-only")
+            self.assertEqual(first[first.index("--diagnostic-population") + 1], "aic-only")
+            self.assertEqual(first[first.index("--research-extra-group") + 1], "aic_public_train:/invented/aic_k0_fit.parquet:16.0:0:rank")
+            second = owner.omission_command(plan, run, "RecoverAIC64", "kadid", 0, run / "b", run / "a/ckpt/ckpt_epoch059.bin")
+            self.assertEqual(second[second.index("--init-from") + 1], str(run / "a/ckpt/ckpt_epoch059.bin"))
+            self.assertEqual(second[second.index("--diagnostic-population") + 1], "mixed-aic64")
 
 
 if __name__ == "__main__":
