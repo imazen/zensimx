@@ -5733,3 +5733,23 @@ Next bind exact original group rows and reference order to the admitted maps,
 then multiply only native rank loss/gradient and run the full-budget parity
 control before confidence candidate cells. No public API change is required
 by this arithmetic owner.
+
+### Exact confidence row binding (2026-10-27)
+
+The prospective binder reads only original TRAIN `human_score` and
+`ref_basename` columns after verifying complete calibration results, original
+cell authorities and archived table hashes. It records an exposure event
+before target interpretation. Its digest follows the native loader: f64 target
+bytes and u32 dense first-seen reference IDs, row by row. Native item identities
+bind calibrated x/SE to original table positions; duplicate, missing,
+nonfinite, wrong-reference and partially covered reference inputs refuse.
+Uncovered references remain explicit baseline rows. All original group
+weights, modes, seeds and full training budgets remain in the cell declaration.
+
+Two binding controls pass on i265: `rc=0 1s | peak-RSS 0.07GiB |
+min-avail 24365MiB | peak-load 0.03`; lint passes. These tests establish the
+row-binding contract, not native training integration or candidate fitting.
+The private native integration will consume a hash-pinned research manifest
+without extending the public training API, validate the loaded row digest
+and exact cell configuration, and apply the multiplier only to rank loss
+and gradient. No sampler RNG, pair replacement or absolute-loss changes.

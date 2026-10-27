@@ -3673,3 +3673,9 @@ aic-recipe-adaptation-full-panel mode plan output:
 confidence-contrast-tests output:
     rustc --edition=2024 --test zensim-validate/tests/contrast_precision.rs -o {{quote(output)}}
     {{quote(output)}}
+
+confidence-weight-bindings-tests:
+    OPENBLAS_NUM_THREADS=1 python3 -B scripts/tests/test_confidence_weights.py
+
+confidence-weight-bindings base output:
+    OPENBLAS_NUM_THREADS=1 python3 -B scripts/byconstruction/confidence_weights.py {{quote(base)}} {{quote(output)}}
