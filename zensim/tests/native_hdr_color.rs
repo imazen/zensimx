@@ -701,41 +701,27 @@ fn rev7_native_u16_preserves_one_code_steps_through_supported_hdr_entry() {
     }
 }
 
-/// Rev7's supported HDR entry decodes native PQ/HLG codes to the same display
-/// light as the independent f64 reference, in every tested container, within
-/// the legacy test's unchanged tolerance.
-#[test]
-fn rev7_native_pq_hlg_match_independent_display_light_through_supported_hdr_entry() {
+/// Run the calling Rev7 test body in a `ZENSIM_FORMULA_REV=7` child process when
+/// the parent runs another revision; true means the caller should return.
+fn delegate_to_rev7_child(name: &str) -> bool {
     use zensim::feature_v2::FormulaRevision;
-    if zensim::feature_v2::active_formula_revision() != FormulaRevision::Rev7 {
-        let status = std::process::Command::new(std::env::current_exe().unwrap())
-            .env("ZENSIM_FORMULA_REV", "7")
-            .args([
-                "--exact",
-                "rev7_native_pq_hlg_match_independent_display_light_through_supported_hdr_entry",
-                "--test-threads=1",
-            ])
-            .status()
-            .unwrap();
-        assert!(status.success());
-        return;
+    if zensim::feature_v2::active_formula_revision() == FormulaRevision::Rev7 {
+        return false;
     }
+    let status = std::process::Command::new(std::env::current_exe().unwrap())
+        .env("ZENSIM_FORMULA_REV", "7")
+        .args(["--exact", name, "--test-threads=1"])
+        .status()
+        .unwrap();
+    assert!(status.success());
+    true
+}
+
+/// Rev7's supported HDR entry decodes native PQ/HLG codes `a`/`b` (97x65) to the
+/// same display light as the independent f64 reference, in every tested
+/// container, within the legacy test's unchanged tolerance.
+fn rev7_display_light_parity(a: &[[u16; 4]], b: &[[u16; 4]]) {
     let (w, h) = (97, 65);
-    let a: Vec<[u16; 4]> = (0..w * h)
-        .map(|i| {
-            [
-                10000 + (i * 37 % 35000) as u16,
-                15000 + (i * 19 % 30000) as u16,
-                12000 + (i * 11 % 28000) as u16,
-                65535,
-            ]
-        })
-        .collect();
-    let b: Vec<_> = a
-        .iter()
-        .enumerate()
-        .map(|(i, p)| [p[0] - 400, p[1] + (i % 500) as u16, p[2] - 200, 65535])
-        .collect();
     fn native(p: &[[u16; 4]], w: usize, h: usize, prim: ColorPrimaries) -> StridedBytes<'_> {
         StridedBytes::with_alpha_mode(
             bytemuck::cast_slice(p),
@@ -763,16 +749,16 @@ fn rev7_native_pq_hlg_match_independent_display_light_through_supported_hdr_entr
         ] {
             let actual = z
                 .compute_folded720_features_hdr(
-                    &native(&a, w, h, prim),
-                    &native(&b, w, h, prim),
+                    &native(a, w, h, prim),
+                    &native(b, w, h, prim),
                     encoding,
                     toggles,
                     &mut V2Scratch::new(),
                 )
                 .unwrap();
             let (ar, br) = (
-                independent_display_light(&a, encoding, prim),
-                independent_display_light(&b, encoding, prim),
+                independent_display_light(a, encoding, prim),
+                independent_display_light(b, encoding, prim),
             );
             let expected = z
                 .compute_folded720_features_hdr(
@@ -797,6 +783,62 @@ fn rev7_native_pq_hlg_match_independent_display_light_through_supported_hdr_entr
             }
         }
     }
+}
+
+/// Mid-range codes, crossing HLG's segment join at code 32,768.
+#[test]
+fn rev7_native_pq_hlg_match_independent_display_light_through_supported_hdr_entry() {
+    if delegate_to_rev7_child(
+        "rev7_native_pq_hlg_match_independent_display_light_through_supported_hdr_entry",
+    ) {
+        return;
+    }
+    let (w, h) = (97, 65);
+    let a: Vec<[u16; 4]> = (0..w * h)
+        .map(|i| {
+            [
+                10000 + (i * 37 % 35000) as u16,
+                15000 + (i * 19 % 30000) as u16,
+                12000 + (i * 11 % 28000) as u16,
+                65535,
+            ]
+        })
+        .collect();
+    let b: Vec<_> = a
+        .iter()
+        .enumerate()
+        .map(|(i, p)| [p[0] - 400, p[1] + (i % 500) as u16, p[2] - 200, 65535])
+        .collect();
+    rev7_display_light_parity(&a, &b);
+}
+
+/// Near-black codes (at most 0.032 nit through PQ and about 0.1 nit through HLG,
+/// below the 0.403 nit black-plus-ambient lift) follow the same independent
+/// reference. Negative controls (2026-10-27, scratch copies): a 10% gain error
+/// in either transfer, a missing lift or a 10% lift error fails this test; a 1%
+/// gain error does not.
+#[test]
+fn rev7_native_near_black_codes_match_independent_display_light() {
+    if delegate_to_rev7_child("rev7_native_near_black_codes_match_independent_display_light") {
+        return;
+    }
+    let (w, h) = (97usize, 65usize);
+    let a: Vec<[u16; 4]> = (0..w * h)
+        .map(|i| {
+            [
+                (i * 37 % 2400) as u16,
+                (i * 19 % 2200) as u16,
+                (i * 11 % 2000) as u16,
+                65535,
+            ]
+        })
+        .collect();
+    let b: Vec<_> = a
+        .iter()
+        .enumerate()
+        .map(|(i, p)| [p[0] + 64, p[1] + (i % 128) as u16, p[2] + 32, 65535])
+        .collect();
+    rev7_display_light_parity(&a, &b);
 }
 
 /// Rev7 display model at the declared PQ peak: code differences entirely above
