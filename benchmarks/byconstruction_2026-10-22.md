@@ -4880,3 +4880,35 @@ Report all per-collection statistics and the existing mixture/bias/smoothness
 diagnostics. A passing arm receives three full-data fits and unchanged
 production qualification. EVAL cannot select the match rule, share, seed or
 model; combining successful factors requires a separate prospective trial.
+
+### MlicNeff TRAIN screen completed: retain Mlic (2026-10-27)
+
+All 21 registered cells finished epoch 119. The unchanged-Mlic driver control
+had already reproduced all 7,869 predictions exactly. The fixed selection
+rejects MlicNeff: balanced gain and old-data non-inferiority both fail;
+the zero-global-inversion gate passes. No EVAL labels were used.
+
+| TRAIN aggregate | Mlic | MlicNeff | Paired delta | Seed-unit SE of delta |
+|---|---:|---:|---:|---:|
+| Old four datasets, mapped rho | 0.930642384256 | 0.929448387557 | -0.001193996699 | 0.000499447448 |
+| Eleven new dataset statistics | 0.899509341379 | 0.900327695895 | 0.000818354515 | 0.000333598169 |
+| Equal old/new balance | 0.915075862817 | 0.914888041726 | -0.000187821092 | 0.000324928923 |
+
+The old-data paired delta is below the registered minus-two-SE floor,
+`-0.0009988948954513645`. The new-dataset mean gain does not override that
+failure or the balanced regression. This rejects this fixed mass allocation;
+it does not test per-item confidence weighting. No serving model was changed
+and no full-data candidate fits were warranted by this screen.
+
+Artifacts remain under `/mnt/v/output/zensim/mlic-neff-20261026`, including
+`TRAIN_SELECTION.json` (SHA256
+`3bc5c83846244a395e7862a0da5ff8ac70d066d2a7ff858225e7eea75d1ba59c`),
+all per-collection results, diagnostics, mixtures, models and the frozen source. The supervised chain reported:
+`run-heavy: done rc=0 4121s | peak-RSS 3.43GiB | min-avail 21560MiB | peak-load 15.64`.
+This is an execution record, not a runtime performance benchmark.
+
+The next registered independent trial is MlicVote. Its coordinator is frozen
+from `def6372e067a02b13b398b2a43327874c7854a8e`, including the checked v3
+wrapper dispatch, and first requires native-count admission and a full-budget
+unchanged-Mlic reproduction with its separately built trainer. The production
+candidate/HDR objective remains active after this negative screen.
