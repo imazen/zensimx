@@ -581,7 +581,7 @@ mlic-priority-progress:
     @just aic-recipe-adaptation-full-panel status /mnt/v/output/zensim/mlic-aic-full-20261027-run03/PLAN.json /mnt/v/output/zensim/mlic-aic-full-20261027-run03/panels
     @just confidence-followthrough-status /mnt/v/output/zensim/mlic-confidence-followthrough-20261027-run01/CONFIG.json
     @if [ -f /mnt/v/output/zensim/mlic-matched-continuation-20261027-run01/PLAN.json ]; then just aic-matched-continuation status /mnt/v/output/zensim/mlic-matched-continuation-20261027-run01/PLAN.json; fi
-    @if [ -f /mnt/v/output/zensim/mlic-candidate-gates-20261027-run01/queue.log ]; then tail -n 2 /mnt/v/output/zensim/mlic-candidate-gates-20261027-run01/queue.log; fi
+    @if [ -f /mnt/v/output/zensim/mlic-candidate-gates-20261027-run02/queue.log ]; then tail -n 2 /mnt/v/output/zensim/mlic-candidate-gates-20261027-run02/queue.log; fi
     @if [ -f /mnt/v/output/zensim/mlic-matched-continuation-folds-20261027-run01/PLAN.json ]; then just aic-matched-continuation fold-status /mnt/v/output/zensim/mlic-matched-continuation-folds-20261027-run01/PLAN.json; fi
 
 # Registered matched-continuation diagnostic (byconstruction record, 2026-10-27):

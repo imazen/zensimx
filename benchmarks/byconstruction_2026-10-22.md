@@ -6858,3 +6858,48 @@ packet and reporter of run03.
 
 Confidence weighting does not improve on Mlic in any setting measured here. It stays an experiment. The
 matched-continuation diagnostic took the compute lock at 11:26 UTC.
+
+### Matched-continuation diagnostic: result (2026-10-27, complete 11:44 UTC)
+
+Run `/mnt/v/output/zensim/mlic-matched-continuation-20261027-run01`. **Controls hold.** Mixed epoch 7 equals the
+registered 8-epoch MlicFT16x8 seed 0 byte for byte once only `zentrain.repro` is removed, and every result field
+matches (`CONTROL.json`). The initial model's and mixed epoch 7's predictions equal the full study's on all five
+populations (`panels/PREDICTION_CONTROLS.json`). **Exposure** (native replay of the sample coverage): over 60
+epochs the mixed arm drew 626,417 AIC pairs of 2,738,532 (22.9%); the AIC-only arm drew 2,999,262, all AIC. Both
+touched every AIC row.
+
+Seed 0, raw f32 models, in sample on every population:
+
+| Model | AIC-2026 public_train | KADID | TID2013 | KonFiG | CID22-A |
+|---|---:|---:|---:|---:|---:|
+| Initial (Mlic) | 0.9094 | 0.9037 | 0.8937 | 0.8270 | 0.8739 |
+| Mixed + AIC×16, epoch 7 (= MlicFT16x8) | 0.9139 | 0.9134 | 0.8930 | 0.8303 | 0.8870 |
+| Mixed + AIC×16, epoch 59 | 0.9219 | 0.9132 | 0.8953 | 0.8330 | 0.8889 |
+| AIC-only, epoch 7 | 0.9527 | 0.8432 | 0.8564 | 0.8173 | 0.8859 |
+| AIC-only, epoch 59 | 0.9698 | 0.6604 | 0.7505 | 0.7944 | 0.8929 |
+
+Whole-source bootstrap, 95% interval of the AIC SROCC difference (28 sources, 2,000 resamples, in sample,
+descriptive):
+
+| Difference | 95% interval |
+|---|---|
+| mixed epoch 59 − epoch 7 | [+0.0042, +0.0117] |
+| mixed epoch 59 − initial | [+0.0061, +0.0197] |
+| AIC-only epoch 59 − mixed epoch 59 | [+0.0315, +0.0622] |
+| AIC-only epoch 7 − initial | [+0.0241, +0.0612] |
+
+Local mixtures are 2–3 rows for every model; the largest rise is +6.5 (mixed epoch 59) and the AIC-only models'
+rises are the smallest (+0.75 at epoch 59). Global mixtures are 0.
+
+**Reading.** Trained on AIC alone, Mlic's recipe fits AIC-2026 public_train almost as tightly as the historical
+AIC-only model (0.9698 in sample at epoch 59; T 0.974). Neither its inputs nor its capacity cap AIC; the mixed
+population does. Fifty-two more mixed epochs gain +0.008 on AIC in sample and hold the other four sets. AIC-only
+continuation gains about +0.06 on AIC by giving up KADID (0.904 to 0.660) and TID2013 (0.894 to 0.751). All of this
+is in sample and seed 0. The source-fold study (42 fits, three seeds, out-of-fold AIC and E21) tests whether the
+mixed epoch-59 gain survives on held-out sources; it is running.
+
+**Gates queue repair.** The gates' run01 queue exited at 11:44 UTC before any gate. Its source snapshot carried the
+justfile but not the `benchmarks/speedq.just` it imports, so `just` refused to parse. The source-fold study, queued
+behind the gates, then took the lock as designed. Run02 (`mlic-candidate-gates-20261027-run02`) uses a complete
+snapshot of main `49a6eba6`. `gates.py` and `scripts/rev4_featpot` are unchanged since run01's `39d6420a`. It runs
+the same 15 models after the fold study.
