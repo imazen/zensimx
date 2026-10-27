@@ -7479,3 +7479,11 @@ did not already visit. Toward AIC-only, KADID collapses from the first step.
 **Registered decision.** Stage F's candidate is Mlic ↔ ×1024 + rehearsal at α = 0.5 (0.9305). Stage C's point is at
 least the stage D candidate (0.9390), so F's candidate is not higher by more than 0.002 and F replaces nothing,
 whatever stage E decides. No E21 run is frozen for it.
+
+**Codec role, preliminary (in sample, from saved fold predictions; not the registered evidence).** On the E21 sets'
+compression types, mean SROCC over the seven seed-0 fold models, change from Mlic (0.9189 compression-only, 0.8746 every
+type): AIC-only e29 −0.0017 on compression (every type −0.0790); ×1024 e59 −0.0015 (−0.0102); ×1024 + rehearsal e59
+−0.0005 (−0.0043); ×256 + rehearsal e59 +0.0029 (+0.0063). Per set, AIC-only moves KADID JPEG/JPEG 2000 +0.0034,
+TID2013 codecs −0.0096, KonFiG JPEG 2000 (84 rows) −0.0175 and CID22-A +0.0172. So the AIC-heavy arms roughly hold
+compression performance in sample while losing the other distortion types, which is what a codec-only model may do. Mlic
+trained on these sets, so this is in sample; the out-of-sample omission runs above decide what the dashboard shows.
