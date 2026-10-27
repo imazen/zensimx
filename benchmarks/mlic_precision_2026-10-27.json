@@ -1,0 +1,61 @@
+{
+  "schema": "mlic-parameter-packing-train-v1",
+  "plan_sha256": "e9f31fafcab9575e49d2afed6826ae74f328f0e033f0cd216ed3ba6d7df14538",
+  "population": "frozen TRAIN calibration; in-sample diagnostic only",
+  "selection_gate": false,
+  "performance_claim": false,
+  "rows": [
+    {
+      "seed": 0,
+      "rows": 12163,
+      "f32_control_exact": true,
+      "unequal_rows": 12152,
+      "mean_signed": -0.0009190944291196116,
+      "mean_absolute": 0.0009243709617839934,
+      "max_absolute": 0.003734588623046875,
+      "rmse": 0.0010419825652603807,
+      "p99_absolute_nearest_rank": 0.0021514892578125,
+      "units": "score units before output spline; native f32 inference",
+      "model_sha256": {
+        "original": "117982abe40f6d900319e5e75b0dc3987607bf3fe36e28581f4a02003d0a4455",
+        "f32": "117982abe40f6d900319e5e75b0dc3987607bf3fe36e28581f4a02003d0a4455",
+        "f16": "bb49fc210b5aa888a9481e34ae06c8c9260adc3b30ae03c8274fff896e7b40e4"
+      }
+    },
+    {
+      "seed": 1,
+      "rows": 12163,
+      "f32_control_exact": true,
+      "unequal_rows": 12089,
+      "mean_signed": 4.454536441124594e-05,
+      "mean_absolute": 0.0003979407005244196,
+      "max_absolute": 0.00321197509765625,
+      "rmse": 0.0005317919486774719,
+      "p99_absolute_nearest_rank": 0.001613616943359375,
+      "units": "score units before output spline; native f32 inference",
+      "model_sha256": {
+        "original": "a12831796f8ef7cd8f63b448980c6bece4fe3ccc94ceaac38e5628348d4d6eda",
+        "f32": "a12831796f8ef7cd8f63b448980c6bece4fe3ccc94ceaac38e5628348d4d6eda",
+        "f16": "56ea76e2c4ab31c7256be16b98ec898cb2cce36efb0f93679032f8bdfe8d9d39"
+      }
+    },
+    {
+      "seed": 2,
+      "rows": 12163,
+      "f32_control_exact": true,
+      "unequal_rows": 12155,
+      "mean_signed": -0.0009104291888764449,
+      "mean_absolute": 0.0009171691250959862,
+      "max_absolute": 0.003612518310546875,
+      "rmse": 0.0010316236184799642,
+      "p99_absolute_nearest_rank": 0.0022430419921875,
+      "units": "score units before output spline; native f32 inference",
+      "model_sha256": {
+        "original": "346a5e0feb543f4828f4342a64a1344e26759737634e44a692360ab96927a917",
+        "f32": "346a5e0feb543f4828f4342a64a1344e26759737634e44a692360ab96927a917",
+        "f16": "f1036770988b5fd1bb72d180f37ce190a048c869c8c6ee6e71deaeaa60affdb2"
+      }
+    }
+  ],
+  "checked_utc": "2026-10-27T07:21:35.169747+00:00"
+}

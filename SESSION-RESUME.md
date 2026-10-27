@@ -2383,3 +2383,26 @@ Windows copy under `~/work/zensim-validation-2026-09-08/jxl-native-interventions
 Next spatial hypothesis: preregister a coarse-region/rate-cost intervention
 before tuning allocation. Model qualification and JPEG/WebP actual targeting
 remain open; no new training or terminal holdout in this packet.
+
+### October 27, 07:21 UTC: isolated parameter-packing result
+
+The registered three-seed TRAIN audit completed. All three stripped f32 controls
+are byte-identical to their original dense models; every one of the 12,163
+predictions per seed is exactly identical. All artifact hashes and paired TSV
+coverage were independently reread after completion. Before output calibration:
+
+| Seed | Mean absolute delta | RMSE | p99 absolute (nearest rank) | Maximum absolute |
+|---|---:|---:|---:|---:|
+| 0 | 0.000924370962 | 0.001041982565 | 0.002151489258 | 0.003734588623 |
+| 1 | 0.000397940701 | 0.000531791949 | 0.001613616943 | 0.003211975098 |
+| 2 | 0.000917169125 | 0.001031623618 | 0.002243041992 | 0.003612518311 |
+
+These are native f32-inference score-unit changes caused by the original f16
+parameter pack with the spline removed, on the frozen TRAIN calibration
+population. They are not native HDR precision, feature extraction error,
+post-calibration bounds or speed qualification. No candidate is adopted.
+Evidence: shared `zensim/mlic-precision-20261027-run01/results/COMPLETE.json`,
+with sibling `VERIFIED.json` at the run root.
+Completion SHA256: `47e3ab97651a81b5a9caa4825eeee291b459f6c1d150954510f211f6ae09dd7b`.
+
+Run-heavy on i265: rc=0, 7s, peak RSS 0.47 GiB, minimum available 23,044 MiB, peak load 6.13. The duration is an execution receipt, not a runtime benchmark.
