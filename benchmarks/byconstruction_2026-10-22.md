@@ -5639,3 +5639,30 @@ This is metadata compatibility only. The private family resolver now has six
 passing alias/omission controls; its real graph replay still requires completed
 source screening, frozen membership and independent validation before any
 purpose-bound response ledger. No confidence weights or maps follow yet.
+
+### Source admission completed; AIC continuation running (2026-10-27)
+
+The repaired screen completed all 150 native paths (147 unique query pixels)
+against 486,039 images, retaining 45 possible matches. All 26 positive controls
+and the original one-of-3,181 unrelated survivor remain unchanged; 3,603 native
+calibration feature arrays are bit-identical. Screen summary SHA256:
+`3575b1ced6dce17be0ff0d67ea438e93bb46e36604c2b015c4a33b011920148c`.
+`rc=0 937s | peak-RSS 8.31GiB | min-avail 35731MiB | peak-load 1.98`.
+AIC fold run03 acquired the lock, passed zero-step controls, verified all 24
+Mlic reused cells and began new fits; observed completion reached 30/96.
+
+Forty source matches were already within declared/confirmed families. The
+remaining five were visually verified color/grayscale versions of identical
+scenes. The reviewed freeze and independent validation preserve 225 CEED
+TRAIN pairs, 600 PC-IQA TRAIN pairs, and exactly 70 JND-TV calibration rows;
+140 GR/IR rows remain reservation-only. No current fit/held-out family or
+prior reserved-family intersection remains. These are metadata admissions,
+not new label reads or model-quality results.
+
+The complete omission-family replay matches the registry and inherited aliases.
+Its output SHA256 is `ca0629ca172daee0196c1f4f383b3c8bc5e4e6ad3b694c52f517bc2b25d6a845`;
+TID and mos7 each intersect five current registry families. All 14 KonFiG
+reference identities remain represented through seven confirmed components.
+Unknown/ambiguous identities were not dropped. The next step is the exact
+omission-bound preread ledger and purpose-bound linking reader, followed by
+native maps/weights and controls. Fresh confidence fits remain outstanding.

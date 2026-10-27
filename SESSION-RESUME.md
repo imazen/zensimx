@@ -116,6 +116,19 @@ steering, speed or HDR qualification.
 
 ### Confidence weighting: the unfinished implementation
 
+**2026-10-27 05:13 UTC update:** the replacement source screen is complete;
+AIC fold run03 passed zero-step controls and started new continuation fits.
+The 24 original Mlic cells were identity-verified; status was 30/96 after six
+new cells completed. Refresh the status command for actual current counts.
+Native retained-match review, reviewed membership, independent validation and
+the real omission-family graph replay also completed on i265. Use the shared
+run02 `FREEZE_REVIEWED_REQUEST.json`, `membership-reviewed-run01`,
+`membership-reviewed-validation-run01.json` and
+`omission-families-reviewed-run01.json`, not the earlier unexecuted requests.
+The exact omission-bound response ledger and reader are the next work; none of
+these metadata results grants permission to read quality responses by itself.
+
+
 Neff changes collection mass; Vote changes native pair likelihood; Order
 changes matched-codec sampling. None implements item-confidence weighting.
 The latter remains outstanding: source screen → retained-match review → frozen
