@@ -1,5 +1,30 @@
 # Zensim Dataset & Experiment History — accurate record
 
+## October 27 — current recipe-comparison evidence index
+
+The [current run index](../SESSION-RESUME.md#current-work--october-27-2026) and
+[prospective protocols/results](../benchmarks/byconstruction_2026-10-22.md)
+record the separate Neff, Vote, Order and confidence work plus the owner-directed
+AIC TRAIN adaptation panels. Historical data and verdicts below are unchanged.
+Neff/Vote finished 21 cells each; Order's dated 04:16:59 UTC observation was
+12/21 with the rest running. Source screening and AIC stages were queued, not
+completed. Re-resolve these counts with `just mlic-priority-progress`.
+
+The new AIC fold study is run02, plan SHA256
+`1cfdfdf601efefc79a8e8292cf077776f52c071ddc780965051cb503bc3adca7`.
+Run01 was cancelled before fitting and retained. The full study is run01,
+plan SHA256 `633362ce633d5f172041ac88728c61552c0b16e4368480933c8d27c092144bf7`.
+Neither opens public_test or changes D6. Full fitted panels cannot be reported
+as held-out evidence, and final-f32 versus serving differences include output
+calibration as well as packing.
+
+Confidence population/audit run03 corrected observation identity before any
+weights were used: four KADID observations sharing pixel identity retain their
+native source rows. The new linking donor screen grants no response reads;
+membership review/validation, omission-bound reads, map fitting and native
+contrast weighting remain unfinished. See the current
+[split boundaries](DATA_SPLITS.md#october-27--current-mlicaic-and-confidence-read-boundaries).
+
 All 1,103 additive FROZEN rows now have every required native image side in the
 pinned Rev7 banks: 753 distinct pairs, zero decode failures or unresolved feature
 rows. The [subset pointer](../benchmarks/dataset_subsets_rev7_2026-10-25.pointer.md)

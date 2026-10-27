@@ -5488,3 +5488,39 @@ Three new controls pass on i265 for exact seed coverage, explicit undefined
 seeds and refusal of a stale or incomplete preceding fit. The resource
 wrapper recorded `rc=0 0s | peak-RSS 0.04 GiB | min-avail 24500 MiB | peak-load 0.71`.
 No full-panel quality or speed result has been measured by these controls.
+
+### Active execution index and recovery, 2026-10-27
+
+The owner requested durable documentation independent of agent memory.
+[SESSION-RESUME](../SESSION-RESUME.md#current-work--october-27-2026) now owns
+the current goal, exact run roots, plan hashes, process-backed status commands,
+source owners, pending confidence implementation and HDR dependency. Run
+`just mlic-priority-progress` before any status claim or restart. This additive
+index does not alter any registration, frozen source snapshot or prior verdict.
+
+At 04:19:40 UTC, Order was running with 12/21 cells complete, no failure and
+the remaining nine advancing. The verified compute lock belonged to its
+ancestor PID 1017472; coordinator 1341080 had start ticks 229427382. The source
+screen, AIC fold fits, fold panels, full fits and full panels were all queued
+with no failure. These are observations to re-resolve, not permanent liveness
+claims. Full qualification and adoption remain outstanding.
+
+The operative AIC fold plan is **run02**, SHA256
+`1cfdfdf601efefc79a8e8292cf077776f52c071ddc780965051cb503bc3adca7`,
+source `86748f41`. The earlier run01 paragraph above describes the preserved,
+cancelled attempt; its frozen warm-start source is still an input, not a live
+queue. Fold panels use `3ab3f980`. The full-data plan is
+`/mnt/v/output/zensim/mlic-aic-full-20261027-run01/PLAN.json`, SHA256
+`633362ce633d5f172041ac88728c61552c0b16e4368480933c8d27c092144bf7`,
+with full fit owner `7ec5f55f` and full panel owner `aa300e1d`.
+Its separate full-Order trainer SHA256 is
+`a34ab388f205a9641090ab9838be9d91ee0ae6630b0e1a616351bddc02b50dad`;
+the active omission study retains `441bda583ed1ff728a4cc50565a0a114d00b12e0b22a282d36ea2ddf15614571`.
+
+Confidence source screening uses PLAN-v2, SHA256
+`8e33269e3ec70b71f48a1c74b508fe3ed493a156afea9202d1c2eee82024576a`.
+Its metadata-only `FREEZE_REQUEST.json` is prepared, not queued or executed.
+Screen completion still requires retained-match review before membership;
+membership then requires independent validation and an exact preread ledger.
+The purpose-bound response adapter and native contrast-weighted training
+implementation remain work to do. No historical composite floor is reused.

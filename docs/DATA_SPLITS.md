@@ -1,5 +1,33 @@
 # DATA_SPLITS.md — canonical train/val/test conventions (locked 2026-07-02)
 
+## October 27 — current Mlic/AIC and confidence read boundaries
+
+The [new recipe comparison](../benchmarks/byconstruction_2026-10-22.md#aic-adaptation-across-training-recipes-prospective-panel-study-2026-10-27)
+uses only D6-admitted AIC2026 **public_train**, with its existing source folds.
+Separate the 24 fitted/four held-out sources in each fold. All-source
+continuations use all 28 TRAIN sources and are explicitly in sample; full E21
+models also saw their fitting/development rows. The complete-panel decision
+rule grants no new EVAL/TEST/TERMINAL access. Do not reinterpret public_test
+or older AIC populations as TRAIN.
+
+Confidence linking remains **prospective admission**, not a completed role
+assignment. The source-screen queue covers CEED, PC-IQA and JND-MID-MA native
+references without reading quality responses. Its completion must be followed
+by retained-match review, membership freezing and independent validation.
+The exact JND declaration reserves each scene's three views together and
+requests only TV first-JND calibration; GR/IR responses and direct training
+targets are not authorized. No broad source allowlist replaces this scope.
+Keep prior reserved/excluded families, including inherited exposure, and remove
+each omitted family before donor responses, teacher maps or normalizers.
+
+Population run03 preserves native observation IDs even when pixels coincide;
+its native uncertainty audit is not a linking fit. Missing admission or
+uncertainty means INCOMPLETE. Historical mixed-role composite exports must not
+be reused as weights. Exact scopes and pending implementation are in
+[SESSION-RESUME](../SESSION-RESUME.md#confidence-weighting-the-unfinished-implementation).
+Frozen studies retain their original copies of this authority file; updating
+this document does not mutate their inputs or confer retroactive permission.
+
 All 1,103 additive FROZEN rows now have every required native image side in the
 pinned Rev7 banks: 753 distinct pairs, zero decode failures or unresolved feature
 rows. The [subset pointer](../benchmarks/dataset_subsets_rev7_2026-10-25.pointer.md)

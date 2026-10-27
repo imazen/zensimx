@@ -14,6 +14,16 @@ None.
 
 ### Added
 
+- Registered common AIC TRAIN continuations and complete fold/full-data panels
+  for Mlic, Neff, Vote and Order; final and packed/calibrated representations
+  remain separate. No automatic SROCC selector or model promotion (`86748f41`,
+  `3ab3f980`, `7ec5f55f`, `aa300e1d`).
+- Separate native admission for full-data Order matching, bound to the original
+  full Mlic models and seeds; omission admission stays unchanged (`042c89e0`).
+- Process-backed `mlic-priority-progress` and current recovery/goal index;
+  queued work, incomplete confidence weighting and HDR dependencies remain
+  explicit (`f430d62d`).
+
 - Private BAPPS two-vote likelihood training with count-bound TRAIN admission;
   disagreement responses remain in the loss, and unsupported trainer paths
   refuse. Existing hard-rank controls pass (`58d79167`); candidate quality and
