@@ -7487,3 +7487,26 @@ type): AIC-only e29 −0.0017 on compression (every type −0.0790); ×1024 e59 
 TID2013 codecs −0.0096, KonFiG JPEG 2000 (84 rows) −0.0175 and CID22-A +0.0172. So the AIC-heavy arms roughly hold
 compression performance in sample while losing the other distortion types, which is what a codec-only model may do. Mlic
 trained on these sets, so this is in sample; the out-of-sample omission runs above decide what the dashboard shows.
+
+### Stage E: result (2026-10-27, fits complete 22:01 UTC)
+
+Run `mlic-aic-recipe-votexref-20261027-run01`. **The control holds** (Vote's 120-epoch full fit replays byte for byte).
+Exposure at e59: ×256 draws 74.8% AIC, ×1024 92.2%. Vote's initial model zero-shot 0.9095. Older sets in sample
+against Vote's initial model; "vs D" is stage D's arm at the same weight and epoch.
+
+| Point | Out-of-fold AIC | vs D | KADID | TID2013 | KonFiG | CID22-A | Keeps |
+|---|---:|---:|---:|---:|---:|---:|---|
+| Vote ×256 + rehearsal e7 | 0.9279 | −0.0010 | +0.0052 | −0.0009 | +0.0036 | +0.0181 | yes |
+| Vote ×256 + rehearsal e15 | 0.9319 | −0.0019 | +0.0047 | −0.0014 | +0.0044 | +0.0204 | yes |
+| Vote ×256 + rehearsal e29 | 0.9344 | −0.0018 | +0.0039 | −0.0015 | +0.0054 | +0.0216 | yes |
+| **Vote ×256 + rehearsal e59** | **0.9377** | −0.0013 | +0.0033 | −0.0030 | +0.0069 | +0.0236 | **yes** |
+| Vote ×1024 + rehearsal e7 | 0.9355 | −0.0011 | −0.0022 | −0.0067 | −0.0063 | +0.0180 | no |
+| Vote ×1024 + rehearsal e15 | 0.9392 | −0.0001 | −0.0068 | −0.0115 | −0.0106 | +0.0183 | no |
+| Vote ×1024 + rehearsal e29 | 0.9428 | +0.0002 | −0.0102 | −0.0162 | −0.0128 | +0.0212 | no |
+| Vote ×1024 + rehearsal e59 | 0.9452 | −0.0006 | −0.0141 | −0.0201 | −0.0134 | +0.0233 | no |
+
+Vote and the rehearsal leg do not add: Vote + rehearsal at ×256 keeps every checkpoint, like Mlic + rehearsal, but at
+0.001–0.002 lower out-of-fold AIC; at ×1024 it keeps none. **Registered decision:** E's candidate (Vote ×256 +
+rehearsal e59, 0.9377) is not higher than stage C's point after D (×256 + rehearsal e59, 0.9390) by more than 0.002, so
+**stage C runs on ×256 + rehearsal at epoch 59**. Every exploration stage (A, A2, B, D, E, F) is now settled. The best
+keeper of all of them is 0.9390 out of fold; 0.95 was not reached while keeping the older sets.
