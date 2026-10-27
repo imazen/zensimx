@@ -5524,3 +5524,26 @@ Screen completion still requires retained-match review before membership;
 membership then requires independent validation and an exact preread ledger.
 The purpose-bound response adapter and native contrast-weighted training
 implementation remain work to do. No historical composite floor is reused.
+
+### Confidence omission identities before calibration (2026-10-27)
+
+The metadata adapter now freezes all eight omission/full scopes from the
+original Mlic receipts. For an E21 omission it uses the complete assessment
+identifier table, not only the smaller fitting subset: the original receipts
+declare 65 KADID, 25 TID, 14 KonFiG and 25 CID22-A assessment references.
+It verifies the retained fitting keys against the exact original filter,
+preserves distinct source-row observations, and binds original source paths
+through the pinned stimulus metadata. Dataset omissions retain every original
+TRAIN family ID from the receipt-bound identifier keys. No feature, target or
+uncertainty value is interpreted by this preparation.
+
+This is identity preparation, not completed native family admission. The next
+step must join every source reference and old-family alias against the
+independently validated native source registry before selecting donor or rating
+responses. Unknown/ambiguous joins cannot be silently omitted. Three metadata
+controls pass on i265, including an assessment reference absent from fitting,
+pixel-identical distinct observations, wrong omission/source refusal and role
+or family mutations. The resource wrapper recorded
+`rc=0 0s | peak-RSS 0.07GiB | min-avail 24494MiB | peak-load 0.03`.
+The owner is `scripts/byconstruction/confidence_omissions.py`, exposed through
+`just dataset-confidence-omissions`; the real metadata run follows this check.

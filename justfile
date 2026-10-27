@@ -437,6 +437,13 @@ dataset-confidence-tests:
 dataset-confidence-populations output:
     OPENBLAS_NUM_THREADS=1 python3 -B scripts/byconstruction/confidence_population.py {{quote(output)}}
 
+# Metadata only: complete omitted assessment references and original dataset families.
+dataset-confidence-omissions root source_pairs output:
+    OPENBLAS_NUM_THREADS=1 python3 -B scripts/byconstruction/confidence_omissions.py {{quote(root)}} {{quote(source_pairs)}} {{quote(output)}}
+
+dataset-confidence-omission-tests:
+    python3 -B -m unittest discover -s scripts/tests -p 'test_confidence_omissions.py' -v
+
 # Native fitting rows only; source audit creates no weights or calibration.
 dataset-confidence-audit populations sha256 output:
     OPENBLAS_NUM_THREADS=1 python3 -B scripts/byconstruction/confidence_audit.py {{quote(populations)}} {{quote(sha256)}} {{quote(output)}}
