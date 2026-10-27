@@ -401,3 +401,30 @@ admitted subjective tie behavior. A prospective vote likelihood belongs beside
 that loss handling, with native and Python admission agreeing on the declaration,
 probability/count binding and exact two-side grouping. Preserve the public
 trainer API and old arithmetic; retain the inference model and feature shape.
+
+## October 27 — per-item confidence and codec-stratum admission
+
+Source review at zenpapers `4e81c03a` confirms that
+`scripts/iqa_library/jnd_utility_analyze.py::composite` exports more than
+per-item precision. Its `weight` column also equalizes distortion-band mass,
+caps each slice's share and removes slices below its teacher-agreement bar.
+Directly using that column would combine confidence, collection balance and
+exposure changes. A separate confidence trial must preserve its registered
+collection masses and explicitly define pair weighting and normalization.
+
+The shared linking spread is estimated by `synthesis` from the entries in
+`analysis/units.tsv`; an identity-only audit of that file includes FG-IQA,
+whose current policy is validate-only. Consequently, the exported composite
+variance is not yet admitted as a training input here. Reconstruct the
+conversion and linking inputs from eligible TRAIN rows, with each cell's
+omissions applied, and bind that provenance before reading per-item values.
+The exported table has identifier, policy, standard-error, variance and weight
+columns, but its exact producer/run binding still needs verification. The
+audit read headers and unit identities, not response or uncertainty values.
+
+For codec strata, the frozen human fitting table carries native targets and
+features, with only `pair_key`, `source_row_id`, reference and member-set keys.
+The existing `dvifm_e21.py::cmd_pairs` joins those keys to promoted-bank codec,
+knob and image metadata without labels. Reuse that identity join for a fresh
+TRAIN-only stratum manifest; do not infer codec identity from an unverified
+row number or use held-out responses to construct matched-distance pairs.
