@@ -50,6 +50,38 @@ def logical_width(cell, derived):
     return cell["width"] + len(derived["products"])
 
 
+def cell_binding(registry, pin, candidate, fold, seed):
+    """Bind one subprocess to its own frozen omission, never mutate process env."""
+    if candidate != "MlicConfidence" or seed not in range(3):
+        raise ValueError("confidence requires its independent registered arm")
+    if sha(registry) != pin:
+        raise ValueError("confidence manifest index changed")
+    index = json.loads(Path(registry).read_text())
+    required = {f"{f}-s{s}" for f in
+                ("kadid", "tid2013", "konfig", "cid22_a25", "pipal", "pairs", "mos7")
+                for s in range(3)}
+    if index["schema"] != "mlic-contrast-manifests-v1" or set(index["cells"]) != required:
+        raise ValueError("complete confidence cell inventory required")
+    binding = index["cells"][f"{fold}-s{seed}"]
+    if sha(binding["path"]) != binding["sha256"]:
+        raise ValueError("confidence cell manifest changed")
+    cell = json.loads(Path(binding["path"]).read_text())
+    if (cell["candidate"], cell["fold"], cell["seed_index"], cell["n_features"]) != (
+            candidate, fold, seed, 2263):
+        raise ValueError("confidence manifest has wrong cell or logical width")
+    return binding
+
+
+def verify_receipt(path, binding):
+    receipt = json.loads(Path(path).read_text())
+    if (receipt["schema"] != "mlic-native-contrast-normalizers-v1"
+            or receipt["manifest_sha256"] != binding["sha256"]
+            or receipt["sampler_changed"] is not False
+            or receipt["absolute_loss_changed"] is not False):
+        raise ValueError("native confidence receipt differs")
+    return sha(path)
+
+
 def bind(scores, references, selected, maps):
     """Native loader order: f64 targets, dense references in first-seen order."""
     if len(scores) != len(references):

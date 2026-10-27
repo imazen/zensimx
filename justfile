@@ -3683,3 +3683,10 @@ confidence-weight-bindings base output:
 confidence-native-tests target:
     cargo test --locked -p zensim-validate --lib confidence_weights:: --target-dir {{quote(target)}}
     cargo test --locked -p zensim-validate --test contrast_precision --target-dir {{quote(target)}}
+
+# Independent confidence arm: native receipts, original-Mlic parity, frozen 21 cells.
+dataset-confidence-chain study source_commit trainer_sha256:
+    OPENBLAS_NUM_THREADS=1 python3 -B scripts/byconstruction/mlic_neff_chain.py {{quote(study)}} --source-commit {{quote(source_commit)}} --candidate MlicConfidence --trainer-sha256 {{quote(trainer_sha256)}}
+
+dataset-confidence-queue study source_commit trainer_sha256 after_full_panel:
+    OPENBLAS_NUM_THREADS=1 python3 -B scripts/byconstruction/dataset_queue.py {{quote(study)}} {{quote(source_commit)}} {{quote(trainer_sha256)}} --candidate MlicConfidence --after-full-panel {{quote(after_full_panel)}}

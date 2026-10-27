@@ -200,6 +200,15 @@ def run_cell(tokens: str, fold: str, seed: int) -> dict:
         from matched_codec import cell_binding
         codec = cell_binding(codec_registry, os.environ["BYC_MATCHED_CODEC_MANIFESTS_SHA256"],
                              arm_name(tokens), fold, seed)
+    confidence = None
+    confidence_registry = os.environ.get("BYC_CONFIDENCE_MANIFESTS")
+    if confidence_registry:
+        sys.path.insert(0, str(HERE.parent / "byconstruction"))
+        from confidence_weights import cell_binding as confidence_binding, verify_receipt
+        if codec_registry or AIC_WEIGHT is not None:
+            raise ValueError("confidence cannot combine ordering or AIC factors")
+        confidence = confidence_binding(confidence_registry,
+            os.environ["BYC_CONFIDENCE_MANIFESTS_SHA256"], arm_name(tokens), fold, seed)
     linked_pin = None
     packet_path = ROOT/"datasets/receipt.json"
     if packet_path.exists() and fold != "full":
@@ -212,6 +221,11 @@ def run_cell(tokens: str, fold: str, seed: int) -> dict:
         value = json.loads(record.read_text())
         if codec_registry and value.get("matched_codec_manifest_sha256") != (codec["sha256"] if codec else None):
             raise ValueError("cached matched-codec cell changed its admitted schedule")
+        if confidence:
+            if (value.get("confidence_manifest_sha256") != confidence["sha256"]
+                    or value.get("confidence_receipt_sha256") != verify_receipt(
+                        dest / "CONFIDENCE_NORMALIZERS.json", confidence)):
+                raise ValueError("cached confidence cell binding changed")
         if linked_pin is not None:
             fit = json.loads((dest/"result.json").read_text())
             if (value.get("linked_subset_omission_sha256") != linked_pin
@@ -223,6 +237,12 @@ def run_cell(tokens: str, fold: str, seed: int) -> dict:
     scratch = Path(os.environ.get("BYC_SCRATCH", str(Path.home() / "tmp/byc/scratch"))) / arm_name(tokens) / f"{fold}_s{seed}"
     scratch.mkdir(parents=True, exist_ok=True)
     env = dict(os.environ, TMPDIR=str(scratch), ZENSIM_MAX_TIER="v3")
+    if any(key.startswith("ZENSIM_RESEARCH_CONFIDENCE_") for key in env):
+        raise ValueError("confidence native settings must be owned by the cell wrapper")
+    if confidence:
+        env.update(ZENSIM_RESEARCH_CONFIDENCE_MANIFEST=confidence["path"],
+                   ZENSIM_RESEARCH_CONFIDENCE_SHA256=confidence["sha256"],
+                   ZENSIM_RESEARCH_CONFIDENCE_RECEIPT=str(dest / "CONFIDENCE_NORMALIZERS.json"))
     from subjective_training_leg import DATASET_FOLDS
     new_fold = fold in (*DATASET_FOLDS, "full")
     if fold not in (*FOLDS, *DATASET_FOLDS, "full"):
@@ -277,6 +297,9 @@ def run_cell(tokens: str, fold: str, seed: int) -> dict:
         rec.update(linked_subset_omission_sha256=linked_pin, dataset_exclusions=list(excluded))
     if codec_registry:
         rec["matched_codec_manifest_sha256"] = codec["sha256"] if codec else None
+    if confidence:
+        rec.update(confidence_manifest_sha256=confidence["sha256"],
+                   confidence_receipt_sha256=verify_receipt(dest / "CONFIDENCE_NORMALIZERS.json", confidence))
     record.write_text(json.dumps(rec, indent=1) + "\n")
     for leftover in scratch.glob("*"):
         leftover.unlink()
@@ -608,7 +631,7 @@ def cmd_mix_select(args):
 def neff_decision(arms, global_inversions, candidate="MlicNeff"):
     """Shared prospectively fixed screen for independent mass/vote/order arms."""
     import numpy as np
-    if candidate not in ("MlicNeff", "MlicVote", "MlicOrder") or set(arms) != {"Mlic", candidate}:
+    if candidate not in ("MlicNeff", "MlicVote", "MlicOrder", "MlicConfidence") or set(arms) != {"Mlic", candidate}:
         raise ValueError("one registered candidate and original Mlic control required")
     delta = {}
     for metric in ("old", "new", "balanced"):
@@ -654,7 +677,7 @@ def cmd_neff_select(args):
     from mixture_test import report
     study = Path(args.study)
     candidate = getattr(args, "candidate", "MlicNeff")
-    if candidate not in ("MlicNeff", "MlicVote", "MlicOrder"):
+    if candidate not in ("MlicNeff", "MlicVote", "MlicOrder", "MlicConfidence"):
         raise ValueError("unregistered paired dataset candidate")
     output = study/"TRAIN_SELECTION.json"
     if output.exists():
@@ -689,7 +712,7 @@ def cmd_neff_select(args):
                         or result["frozen_sha256"] != pin or selected["root_sha256"] != pin
                         or set(selected["retained_collections"]) != trained-set(DATASET_FOLDS.get(fold,()))
                         or rec["trainer_sha256"] != (baseline["candidate_trainer_sha256"]
-                            if arm in ("MlicVote", "MlicOrder") else baseline["trainer_sha256"])
+                            if arm in ("MlicVote", "MlicOrder", "MlicConfidence") else baseline["trainer_sha256"])
                         or rec["last_bin_sha256"] != sha(cell/"refit/last.bin")):
                     raise ValueError(f"native cell binding differs: {cell}")
                 predictions = {f"pred_{fold}.tsv":rec["pred_sha256"]} if fold in FOLDS else {
@@ -699,6 +722,16 @@ def cmd_neff_select(args):
                         raise ValueError("cell prediction changed")
                 if arm == "MlicVote" and fold == "pairs":
                     inputs.update(verify_omitted_vote_predictions(CELLS/"Mlic"/cell.name, cell))
+                if arm == "MlicConfidence":
+                    from confidence_weights import cell_binding as confidence_binding, verify_receipt
+                    registry = study / "policy/confidence-manifests.json"
+                    binding = confidence_binding(registry, baseline["input_sha256"][str(registry)], arm, fold, seed)
+                    receipt = cell / "CONFIDENCE_NORMALIZERS.json"
+                    if (rec.get("confidence_manifest_sha256") != binding["sha256"]
+                            or rec.get("confidence_receipt_sha256") != verify_receipt(receipt, binding)):
+                        raise ValueError("completed confidence cell binding differs")
+                    inputs[binding["path"]] = binding["sha256"]
+                    inputs[str(receipt)] = sha(receipt)
                 if arm == "MlicOrder":
                     from matched_codec import cell_binding
                     registry = study/"matching/MANIFESTS.json"
@@ -729,7 +762,8 @@ def cmd_neff_select(args):
                   for c in inventory if c["arm"] == candidate]
     schema, rule = {"MlicVote":("mlic-native-vote-TRAIN-selection-v1", "b2ee920aa351"),
                     "MlicNeff":("mlic-effective-sample-TRAIN-selection-v1", "89d3e738af4e"),
-                    "MlicOrder":("mlic-matched-codec-TRAIN-selection-v1", "751c9aea17d3")}[candidate]
+                    "MlicOrder":("mlic-matched-codec-TRAIN-selection-v1", "751c9aea17d3"),
+                    "MlicConfidence":("mlic-contrast-confidence-TRAIN-selection-v1", "d37a01340fa9")}[candidate]
     value = dict(schema=schema,rule_commit=rule,
                  eval_labels_used=False,arms=arms,mixtures=mixtures,cells=inventory,input_sha256=inputs,
                  **neff_decision(arms,inversions,candidate))
@@ -1264,7 +1298,7 @@ def main() -> int:
     ms.add_argument("--arms", default=",".join(MIX_ARMS))
     ns = sub.add_parser("neff-select")
     ns.add_argument("--study", required=True)
-    ns.add_argument("--candidate", choices=("MlicNeff", "MlicVote", "MlicOrder"), default="MlicNeff")
+    ns.add_argument("--candidate", choices=("MlicNeff", "MlicVote", "MlicOrder", "MlicConfidence"), default="MlicNeff")
     mf = sub.add_parser("mix-freeze")
     mf.add_argument("--study", required=True)
     z = sub.add_parser("aiczero")

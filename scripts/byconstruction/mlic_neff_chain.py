@@ -33,7 +33,7 @@ def main():
     parser.add_argument("study",type=Path)
     parser.add_argument("--frozen",action="store_true")
     parser.add_argument("--source-commit",help="exact committed driver snapshot, fixed before queuing")
-    parser.add_argument("--candidate", choices=("MlicNeff", "MlicVote", "MlicOrder"), default="MlicNeff")
+    parser.add_argument("--candidate", choices=("MlicNeff", "MlicVote", "MlicOrder", "MlicConfidence"), default="MlicNeff")
     parser.add_argument("--trainer-sha256", help="independently pinned native-vote trainer")
     args = parser.parse_args()
     study = args.study.resolve()
@@ -43,17 +43,28 @@ def main():
         commit = args.source_commit
         if commit is None or len(commit) != 40 or any(c not in "0123456789abcdef" for c in commit):
             raise ValueError("exact committed source must be fixed before queuing")
-        trainer = args.trainer_sha256 if args.candidate in ("MlicVote", "MlicOrder") else TRAINER_SHA
+        trainer = args.trainer_sha256 if args.candidate in ("MlicVote", "MlicOrder", "MlicConfidence") else TRAINER_SHA
         if trainer is None or len(trainer) != 64 or any(c not in "0123456789abcdef" for c in trainer):
             raise ValueError("exact trainer SHA256 must be fixed before queuing")
         build_pin = None
         vote_audit_pin = None
-        if args.candidate in ("MlicVote", "MlicOrder"):
+        confidence_pin = None
+        if args.candidate in ("MlicVote", "MlicOrder", "MlicConfidence"):
             build = json.loads((study/"trainer/BUILD.json").read_text())
             if build["binary_sha256"] != trainer or sha(study/"trainer/zensim_mlp_train") != trainer:
                 raise ValueError("frozen candidate trainer/build identity differs")
             subprocess.run(["git","merge-base","--is-ancestor",build["source_commit"],commit],cwd=REPO,check=True)
             build_pin = sha(study/"trainer/BUILD.json")
+        if args.candidate == "MlicConfidence":
+            from confidence_weights import cell_binding
+            registry = study / "policy/confidence-manifests.json"
+            confidence_pin = sha(registry)
+            queued = json.loads((study / "QUEUED.json").read_text())
+            if confidence_pin != queued["confidence_manifest_index_sha256"]:
+                raise ValueError("confidence registry changed while queued")
+            for fold in FOLDS:
+                for seed in range(3):
+                    cell_binding(registry, confidence_pin, args.candidate, fold, seed)
         if args.candidate == "MlicVote":
             from bapps_vote_audit import admit_recovery
             vote_audit_pin = sha(study/"policy/vote-source-audit.json")
@@ -69,6 +80,7 @@ def main():
               candidate=args.candidate,trainer_sha256=trainer,
               trainer_build_sha256=build_pin,
               vote_source_audit_sha256=vote_audit_pin,
+              confidence_manifest_index_sha256=confidence_pin,
               driver_sha256=sha(source/"scripts/byconstruction/mlic_neff_chain.py")))
         os.execv(sys.executable,[sys.executable,"-B",str(source/"scripts/byconstruction/mlic_neff_chain.py"),
                                  str(study),"--frozen"])
@@ -76,7 +88,7 @@ def main():
     if sha(Path(__file__)) != source["driver_sha256"] or REPO != study/"source":
         raise ValueError("frozen coordinator source differs")
     candidate, trainer = source["candidate"], source["trainer_sha256"]
-    if candidate in ("MlicVote", "MlicOrder") and sha(study/"trainer/BUILD.json") != source["trainer_build_sha256"]:
+    if candidate in ("MlicVote", "MlicOrder", "MlicConfidence") and sha(study/"trainer/BUILD.json") != source["trainer_build_sha256"]:
         raise ValueError("frozen candidate build metadata changed")
     if candidate == "MlicVote" and sha(study/"policy/vote-source-audit.json") != source["vote_source_audit_sha256"]:
         raise ValueError("frozen vote source audit changed")
@@ -99,7 +111,7 @@ def main():
         (study/"Mlic/root").symlink_to(OLD/"Mlic/root",target_is_directory=True)
         (study/"cells").mkdir()
         (study/"cells/Mlic").symlink_to(OLD/"cells/Mlic",target_is_directory=True)
-        if candidate in ("MlicVote", "MlicOrder"):
+        if candidate in ("MlicVote", "MlicOrder", "MlicConfidence"):
             (study/"bin").mkdir()
             for path in (OLD/"bin").iterdir():
                 target = study/"trainer/zensim_mlp_train" if path.name == "zensim_mlp_train" else path
@@ -132,10 +144,10 @@ def main():
                 "/mnt/tower/input/iqa/datasets",str(study/"frozen_configuration/cols_c.txt"),
                 str(study/"policy/datasets_full.tsv"),str(study/"policy/vote-source-audit.json"),
                 source["vote_source_audit_sha256"]],env)
-        if candidate == "MlicOrder":
+        if candidate in ("MlicOrder", "MlicConfidence"):
             (study/candidate).mkdir()
             (study/candidate/"root").symlink_to(OLD/"Mlic/root",target_is_directory=True)
-        if candidate in ("MlicVote", "MlicOrder"):
+        if candidate in ("MlicVote", "MlicOrder", "MlicConfidence"):
             run("control",[sys.executable,"-B","scripts/rev4_featpot/byc_cells.py","run","--arm","mono:thr:mp32",
                 "--label","MlicControl","--folds","kadid","--seeds","0","--jobs","1"],
                 dict(env,BYC_ROOT=str(OLD/"Mlic/root"),BYC_CELLS=str(study/"control-cells"),
@@ -154,10 +166,17 @@ def main():
         pins = dict(binaries)
         pins[str(study/"bin/zensim_mlp_train")] = trainer
         pins[str(study/"CONTROL_VERIFIED.json")] = sha(study/"CONTROL_VERIFIED.json")
-        if candidate in ("MlicVote", "MlicOrder"):
+        if candidate in ("MlicVote", "MlicOrder", "MlicConfidence"):
             pins[str(study/"trainer/BUILD.json")] = source["trainer_build_sha256"]
         if candidate == "MlicVote":
             pins[str(study/"policy/vote-source-audit.json")] = source["vote_source_audit_sha256"]
+        if candidate == "MlicConfidence":
+            registry = study / "policy/confidence-manifests.json"
+            if sha(registry) != source["confidence_manifest_index_sha256"]:
+                raise ValueError("confidence registry changed after freezing")
+            env.update(BYC_CONFIDENCE_MANIFESTS=str(registry),
+                       BYC_CONFIDENCE_MANIFESTS_SHA256=sha(registry))
+            pins[str(registry)] = sha(registry)
         if candidate == "MlicOrder":
             run("matching",["just","dataset-order-prepare",str(study)],env)
             manifests = study/"matching/MANIFESTS.json"
@@ -185,7 +204,8 @@ def main():
         write(study/"BASELINE.json",dict(trainer_sha256=TRAINER_SHA,input_sha256=pins,
                                         candidate_trainer_sha256=trainer,
                                         registration_commit={"MlicVote":"b2ee920aa351","MlicNeff":"89d3e738af4e",
-                                                             "MlicOrder":"751c9aea17d3"}[candidate]))
+                                                             "MlicOrder":"751c9aea17d3",
+                                                             "MlicConfidence":"d37a01340fa9"}[candidate]))
         run("cells",[sys.executable,"-B","scripts/rev4_featpot/byc_cells.py","run","--arm","mono:thr:mp32",
                      "--label",candidate,"--folds",",".join(FOLDS),"--seeds","0,1,2","--jobs","12"],env)
         (study/"scorecard/label_reads").mkdir(parents=True)
@@ -203,7 +223,8 @@ def main():
                      next_action="full-data fits and production qualification" if selection["finalist"] else
                                  {"MlicVote":"retain Mlic; execute separately registered ordering comparison",
                                   "MlicNeff":"retain Mlic; execute separately registered vote-loss/ordering comparison",
-                                  "MlicOrder":"retain Mlic; reconstruct TRAIN-only per-item confidence proposal"}[candidate])
+                                  "MlicOrder":"retain Mlic; reconstruct TRAIN-only per-item confidence proposal",
+                                  "MlicConfidence":"retain evidence; compare full AIC panels without scalar exclusion"}[candidate])
         write(study/"RUN_STATE.json",state)
         write(study/"TRAIN_SCREEN_COMPLETE.json",dict(selection_sha256=sha(study/"TRAIN_SELECTION.json"),
                                                      objective_complete=False))

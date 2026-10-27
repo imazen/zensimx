@@ -5810,3 +5810,29 @@ source `482485e8`. Source snapshot and provenance are beside the manifests.
 At 06:06:03 UTC, AIC fold panels and both mixture reports are complete;
 full-data followthrough has started its unweighted control. No new confidence
 fit or production adoption has occurred.
+
+
+### Confidence execution binding (2026-10-27)
+
+The existing dataset coordinator and cell wrapper now admit MlicConfidence
+as its independent registered arm (`d37a01340fa9`). The unweighted full-budget
+Mlic control runs first with no confidence environment. Each subsequent child
+receives its own omission/seed manifest and fresh native normalizer receipt;
+parent process environment remains unchanged. Cached cells and the final
+historical TRAIN screen verify both hashes. Original numerical screen rules,
+root, group masses, seeds and final epoch are unchanged. AIC eligibility is
+not determined by that historical screen.
+
+The attached confidence queue waits for the pinned AIC full-panel completion
+before competing for the compute lock. A failed/exited dependency is reported;
+a stale state file cannot authorize progress. Seven binding/wrapper/dependency
+controls pass, including cross-cell substitution, mutated inputs, parent-env
+isolation and stale PID refusal. Existing six ordering, 23 dataset-leg and nine
+vote controls also pass. Binding-test resource: `rc=0 0s | peak-RSS 0.11GiB |
+min-avail 24321MiB | peak-load 0.08`.
+
+Native trainer source `482485e8` built on i265 with the existing release
+recipe, no native-CPU flags, SHA256
+`e2ffd0c0279ed31f69c2b6ba4f32656372b9de4359051765a56819a9d3ba3c82`.
+Build: `rc=0 31s | peak-RSS 1.30GiB | min-avail 22883MiB | peak-load 1.01`.
+A successful build does not establish unweighted parity or fit completion.
