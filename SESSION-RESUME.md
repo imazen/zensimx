@@ -52,6 +52,27 @@ then clear the confidence factors for the common AIC continuation. Do not feed
 the full registry to the frozen 21-cell omission queue or modify that queue.
 All full-fit/AIC steps retain the original seeds, strengths and panel policy.
 
+### Confidence full-fit launcher — October 27, 2026
+
+Committed owner `88155360` adds `just confidence-full-fit <plan>`. It requires
+completed paired omission evidence and frozen source/binary/registry hashes;
+it does not exclude confidence based on the historical SROCC verdict. It
+launches all three original full seeds through the existing strict owner,
+checks final119/packing and native normalizer receipts, then certifies each
+packed model. Confidence environment variables are child-only, and inherited
+ones are rejected. It does not perform common AIC continuation or promotion.
+
+Four boundary tests pass on i265: complete evidence despite historical
+rejection, missing plan pins, full-versus-omission/swapped-seed rejection,
+and child environment/receipt isolation. Run-heavy rc=0, 1s, peak RSS
+0.07 GiB, minimum available 24,285 MiB, peak load 0.21. The actual three full
+manifests also pass the launch consumer's checks: rc=0, 0s, peak RSS 0.07 GiB,
+minimum available 24,291 MiB, peak load 0.23. This is preparation, not an
+executed full-confidence fit. A plan with real omission completion hashes
+cannot be frozen until that study completes. The next implementation step is
+the separate confidence AIC continuation/panel extension, preserving the
+running four-recipe study and its frozen sources.
+
 ### Active goal and decisions
 
 Keep working toward a stable, production-qualified candidate while preserving
