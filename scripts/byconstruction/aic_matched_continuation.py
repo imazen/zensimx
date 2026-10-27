@@ -658,17 +658,47 @@ def xref_plan(run, commit, trainer, meta_tool, after_run):
                                    "decides; no adoption", priority="queued after stage B"))
 
 
+# Stage C recipe variant (registered 2026-10-27 after stage B): a recipe point runs stage C on the recipe's own full
+# models, root and omission cells. Recipes with per-seed factors (Order, Confidence) need their own variant.
+RECIPE_C_REGISTRATION = dict(record="benchmarks/byconstruction_2026-10-22.md",
+                             section="Stage C recipe variant and the stage D comparator",
+                             commit="a29bb316db8eb45824463be0825646fd4fe7421c")
+RECIPE_CELLS = {"MlicVote": Path("/mnt/v/output/zensim/mlic-vote-20261027-run02/cells"),
+                "MlicNeff": Path("/mnt/v/output/zensim/mlic-neff-20261026/cells")}
+RECIPE_FT_CELLS = Path("/mnt/v/output/zensim/mlic-aic-adaptation-20261027-run03/cells")
+
+
+def recipe_point(point):
+    """(recipe, {seed: full record}, root) for a stage B recipe point; (None, None, None) for an Mlic point."""
+    if point.get("schema") != RECIPE_SCHEMA:
+        return None, None, None
+    recipe, initial, roots = point["recipe"], {}, set()
+    if recipe not in RECIPE_CELLS:
+        raise ValueError(f"{recipe}: its per-seed factors need their own stage C variant")
+    for seed in SEEDS:
+        record, root, factors = recipe_inputs(recipe, seed)
+        if factors:
+            raise ValueError(f"{recipe}: its per-seed factors need their own stage C variant")
+        initial[str(seed)] = record
+        roots.add(str(root))
+    if len(roots) != 1:
+        raise ValueError(f"{recipe}: one root across seeds required")
+    return recipe, initial, Path(roots.pop())
+
+
 def seeds_plan(run, commit, trainer, meta_tool, point_run, arm, after_run):
     """Stage C, first step (registered with stage A): the advanced Mlic point on the seven folds for seeds 0-2.
     Its seed-0 fits must reproduce the advancing run's checkpoints byte for byte (all folds and epochs)."""
     point_run = Path(point_run)
     point = json.loads((point_run / "PLAN.json").read_text())
-    if point.get("schema") not in (FRONTIER_SCHEMA, RECOVERY_SCHEMA, XREF_SCHEMA) or arm not in point["arms"]:
-        raise ValueError("the advanced point must be an Mlic frontier, recovery or rehearsal arm (x16 already has three seeds)")
+    if (point.get("schema") not in (FRONTIER_SCHEMA, RECOVERY_SCHEMA, XREF_SCHEMA, RECIPE_SCHEMA)
+            or arm not in point["arms"]):
+        raise ValueError("the advanced point must be a frontier, recovery, rehearsal or recipe arm (x16 already has three seeds)")
     population = point["arms"][arm]
     protocol, weight, _ = diagnostic_protocol(population)
+    recipe, initial, root = recipe_point(point)
     reused = {name: reused_arm(FRONTIER_REUSED_RUN, name, seeds=SEEDS) for name in ARMS}
-    extra = dict(aic_weights={arm: weight}, reused_arms=reused, after_run=str(after_run),
+    extra = dict(aic_weights={arm: weight}, reused_arms=reused, after_run=str(after_run), recipe=recipe,
                  reproduces=dict(reused_arm(point_run, arm), arm=arm, seed=0),
                  assessment="stage C three-seed fold study of the advanced point; no adoption from it alone",
                  priority="queued after stage B")
@@ -684,8 +714,8 @@ def seeds_plan(run, commit, trainer, meta_tool, point_run, arm, after_run):
         contrasts += [(f"{arm}@e{e}", f"{start_arm}@e{start_epoch}") for e in FRONTIER_CHECKPOINTS]
     extra["contrasts"] = [list(c) for c in contrasts]
     seven_fold_plan(run, commit, trainer, meta_tool, schema=SEEDS_SCHEMA, protocol=protocol,
-                    registration=FRONTIER_REGISTRATION, arms={arm: population}, seeds=SEEDS,
-                    checkpoints=FRONTIER_CHECKPOINTS, extra=extra)
+                    registration=RECIPE_C_REGISTRATION if recipe else FRONTIER_REGISTRATION, arms={arm: population},
+                    seeds=SEEDS, checkpoints=FRONTIER_CHECKPOINTS, extra=extra, initial=initial, root=root)
 
 
 def seven_fold_plan(run, commit, trainer, meta_tool, schema, protocol, registration, arms, seeds, checkpoints, extra,
@@ -1114,8 +1144,7 @@ def omission_plan(run, commit, trainer, meta_tool, point_run, arm, after_run):
     point = json.loads((Path(point_run) / "PLAN.json").read_text())
     if point.get("schema") not in (FRONTIER_SCHEMA, RECOVERY_SCHEMA, RECIPE_SCHEMA, XREF_SCHEMA) or arm not in point["arms"]:
         raise ValueError("the advanced point must be a frontier, recovery, rehearsal or recipe arm")
-    if point["schema"] == RECIPE_SCHEMA:
-        raise ValueError("recipe omission cells need their recipe inputs; not registered yet")
+    recipe, _, recipe_root = recipe_point(point)
     run = Path(run).resolve()
     if run.exists():
         raise ValueError("preserve existing diagnostic attempts")
@@ -1126,11 +1155,18 @@ def omission_plan(run, commit, trainer, meta_tool, point_run, arm, after_run):
             raise ValueError(f"registered input changed: {path}")
     fold = json.loads(Path(INPUTS["fold_plan"][0]).read_text())
     authority = json.loads(Path(INPUTS["aic_authority"][0]).read_text())
-    root = Path(fold["common_root"])
+    root = recipe_root or Path(fold["common_root"])
+    cell_dir = RECIPE_CELLS[recipe] / recipe if recipe else MLIC_CELLS / "Mlic"
+    baselines = dict(Mlic=str(MLIC_CELLS), MlicFT16x8=str(FT_CELLS))
+    if recipe:  # the recipe's own omission cells and its common 16x8 continuation
+        baselines.update({recipe: str(RECIPE_CELLS[recipe]), f"{recipe}FT16x8": str(RECIPE_FT_CELLS)})
     from subjective_training_leg import linked_subset_exclusions
     cells, inputs, tables = {}, [Path(fold["columns"]), root / "human_role_decision.json", root / "wide/frozen.json"], {}
     for name, seed in omission_cells():
-        cell = initial_cell(MLIC_CELLS / "Mlic" / f"without_{name}_s{seed}", name, seed)
+        cell = initial_cell(cell_dir / f"without_{name}_s{seed}", name, seed)
+        selection = json.loads((cell_dir / f"without_{name}_s{seed}/DATASET_GROUP_SELECTION.json").read_text())
+        if Path(selection["root"]) != root:
+            raise ValueError(f"{name} s{seed}: omission cell trained on another root")
         k = omission_aic_fold(name, seed)
         record = authority["tables"][f"aic_k{k}_fit"]
         table = Path(record["path"])
@@ -1138,11 +1174,12 @@ def omission_plan(run, commit, trainer, meta_tool, point_run, arm, after_run):
         cells[f"{name}_s{seed}"] = dict(cell, aic_fold=k, exclusions=list(linked_subset_exclusions(root, name)))
         inputs += [*map(Path, cell["input_sha256"]), table, Path(f"{table}.manifest.json")]
     frozen = freeze(run, commit, trainer, meta_tool, fold)
-    value = dict(schema=OMISSION_SCHEMA, protocol=protocol, registration=FRONTIER_REGISTRATION, **frozen,
+    value = dict(schema=OMISSION_SCHEMA, protocol=protocol,
+                 registration=RECIPE_C_REGISTRATION if recipe else FRONTIER_REGISTRATION, **frozen, recipe=recipe,
                  arms={arm: population}, aic_weights={arm: weight}, seeds=list(SEEDS), e21_folds=list(FOLDS),
                  epochs=EPOCHS, checkpoints=list(FRONTIER_CHECKPOINTS), lr=LR, spec=SPEC, root=str(root),
-                 columns=fold["columns"], cells=cells, aic_tables=tables, baselines=dict(
-                     Mlic=str(MLIC_CELLS), MlicFT16x8=str(FT_CELLS)), point=dict(run=str(point_run), arm=arm),
+                 columns=fold["columns"], cells=cells, aic_tables=tables, baselines=baselines,
+                 point=dict(run=str(point_run), arm=arm),
                  phases=two_phases(point, arm, population),
                  after_run=str(after_run), input_sha256={str(p): sha(p) for p in inputs},
                  representation="final-f32 checkpoint dumps", selector=None, public_test_opened=False, eval_read=False,
@@ -1288,14 +1325,23 @@ PACK = ("import json, sys; from pathlib import Path; from v2_production_pack imp
 
 def full_plan(run, commit, trainer, meta_tool, point_run, arm, epoch, after_run):
     point = json.loads((Path(point_run) / "PLAN.json").read_text())
-    if (point.get("schema") not in (FRONTIER_SCHEMA, RECOVERY_SCHEMA, XREF_SCHEMA) or arm not in point["arms"]
-            or epoch not in FRONTIER_CHECKPOINTS):
-        raise ValueError("the advanced point must be a frontier, recovery or rehearsal arm at a studied epoch")
+    if (point.get("schema") not in (FRONTIER_SCHEMA, RECOVERY_SCHEMA, XREF_SCHEMA, RECIPE_SCHEMA)
+            or arm not in point["arms"] or epoch not in FRONTIER_CHECKPOINTS):
+        raise ValueError("the advanced point must be a frontier, recovery, rehearsal or recipe arm at a studied epoch")
     population = point["arms"][arm]
     protocol, weight, _ = diagnostic_protocol(population)
+    recipe, initial, recipe_root = recipe_point(point)
     fits = json.loads(Path(INPUTS["full_fits"][0]).read_text())
     baselines = {}
     for seed in SEEDS:
+        if recipe:  # the recipe's own packed full model and its common 16x8 continuation
+            own = initial[str(seed)]
+            ft = [r for r in fits["continued"] if r["arm"] == f"{recipe}FT16x8" and r["seed"] == seed]
+            if (len(ft) != 1 or sha(Path(own["directory"]) / "refit/production-f16.bin") != own["packed_sha256"]
+                    or sha(Path(ft[0]["directory"]) / "refit/production-f16.bin") != ft[0]["packed_sha256"]):
+                raise ValueError(f"packed {recipe} baselines differ")
+            baselines[f"{recipe}|s{seed}"] = str(Path(own["directory"]) / "refit/production-f16.bin")
+            baselines[f"{recipe}FT16x8|s{seed}"] = str(Path(ft[0]["directory"]) / "refit/production-f16.bin")
         ft = [r for r in fits["continued"] if r["arm"] == "MlicFT16x8" and r["seed"] == seed]
         if len(ft) != 1 or sha(Path(ft[0]["directory"]) / "refit/production-f16.bin") != ft[0]["packed_sha256"]:
             raise ValueError("packed MlicFT16x8 baseline differs")
@@ -1305,14 +1351,15 @@ def full_plan(run, commit, trainer, meta_tool, point_run, arm, epoch, after_run)
         baselines[f"Mlic|s{seed}"] = str(Path(mlic["directory"]) / "refit/production-f16.bin")
         baselines[f"MlicFT16x8|s{seed}"] = str(Path(ft[0]["directory"]) / "refit/production-f16.bin")
     fold = json.loads(Path(INPUTS["fold_plan"][0]).read_text())
-    root = Path(fold["common_root"])
+    root = recipe_root or Path(fold["common_root"])
     leg = json.loads((root / "wide/main/real/receipt.json").read_text())["legs"]["cid22"]["fit"]
     anchor = root / leg["rel"]
     if sha(anchor) != leg["sha256"]:
         raise ValueError("TRAIN CID22 calibration anchor differs")
     seven_fold_plan(run, commit, trainer, meta_tool, schema=FULL_SCHEMA, protocol=protocol,
-                    registration=FRONTIER_REGISTRATION, arms={arm: population}, seeds=SEEDS,
-                    checkpoints=FRONTIER_CHECKPOINTS, extra=dict(
+                    registration=RECIPE_C_REGISTRATION if recipe else FRONTIER_REGISTRATION, arms={arm: population},
+                    seeds=SEEDS, checkpoints=FRONTIER_CHECKPOINTS, initial=initial, root=recipe_root, extra=dict(
+                        recipe=recipe,
                         aic_weights={arm: weight}, packed_epoch=epoch, anchor=dict(path=str(anchor), sha256=leg["sha256"]),
                         phases=two_phases(point, arm, population),
                         baselines={k: dict(path=v, sha256=sha(v)) for k, v in baselines.items()},
@@ -1429,7 +1476,7 @@ def full_run(path):
         save("MODEL_PANELS.json", rows)
         by_model = {(r["model"], r["population"]): r["statistics"] for r in rows}
         paired = {}
-        for baseline in ("Mlic", "MlicFT16x8"):
+        for baseline in sorted({name.split("|")[0] for name in plan_value["baselines"]}):
             for name in populations:
                 paired[f"{arm}e{epoch}-minus-{baseline}|{name}"] = {m: seed_delta(
                     {s: by_model[f"{arm}e{epoch}|s{s}", name][m] for s in SEEDS},

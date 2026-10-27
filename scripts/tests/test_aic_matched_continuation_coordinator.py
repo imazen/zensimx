@@ -349,8 +349,9 @@ class OmissionStage(unittest.TestCase):
         with tempfile.TemporaryDirectory(dir=Path.home() / "tmp") as tmp:
             point = Path(tmp) / "point"
             point.mkdir()
-            (point / "PLAN.json").write_text(json.dumps(dict(schema=owner.RECIPE_SCHEMA, arms={"MlicOrderAIC256": "mixed-aic256"})))
-            with self.assertRaisesRegex(ValueError, "recipe"):
+            (point / "PLAN.json").write_text(json.dumps(dict(schema=owner.RECIPE_SCHEMA, recipe="MlicOrder",
+                                                             arms={"MlicOrderAIC256": "mixed-aic256"})))
+            with self.assertRaisesRegex(ValueError, "per-seed factors"):
                 owner.omission_plan(Path(tmp) / "run", "HEAD", Path(tmp) / "t", Path(tmp) / "m", point,
                                     "MlicOrderAIC256", Path(tmp))
 
@@ -389,6 +390,15 @@ class RehearsalStage(unittest.TestCase):
             path = run / "PLAN.json"
             path.write_text(json.dumps(dict(schema=owner.XREF_SCHEMA)))
             self.assertEqual(owner.plan_schema(path), owner.XREF_SCHEMA)
+
+
+class RecipeVariant(unittest.TestCase):
+    def test_mlic_points_have_no_recipe_and_factor_recipes_refuse_before_any_read(self):
+        self.assertEqual(owner.recipe_point(dict(schema=owner.FRONTIER_SCHEMA)), (None, None, None))
+        for recipe in ("MlicOrder", "MlicConfidence"):
+            with self.assertRaisesRegex(ValueError, "per-seed factors"):
+                owner.recipe_point(dict(schema=owner.RECIPE_SCHEMA, recipe=recipe))
+        self.assertEqual(set(owner.RECIPE_CELLS), {"MlicVote", "MlicNeff"})
 
 
 if __name__ == "__main__":
