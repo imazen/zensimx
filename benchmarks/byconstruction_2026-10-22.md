@@ -6761,3 +6761,21 @@ fix little of it. The matched continuation (60 epochs, AIC-only arm) and the
 source-fold study measure how much more AIC exposure moves that scale. T's
 cells are seven-fold out of fold; the continuation columns are in sample;
 T's provenance remains unqualified. Read only, no new fit.
+
+### MlicConfidence TRAIN screen complete (2026-10-27, 10:18 UTC)
+
+Confidence run02 completed all 21 omission cells after its exact control
+(7,869 predictions byte-identical) and wrote `TRAIN_SCREEN_COMPLETE.json`.
+Against Mlic, paired by seed (seed-unit SE): balanced −0.00097 (0.00137),
+old-data E21 −0.00249 (0.00181), new data +0.00055 (0.00102). The
+registered checks: balanced gain false, old-data non-inferiority true, zero
+global-edit mixture inversions true; finalist none, Mlic retained. Against
+B's recipe, E21 SROCC per set (three-seed mean): MlicConfidence KADID 0.8841,
+TID2013 0.8799, KonFiG 0.7819, CID22-A 0.8793 (Mlic 0.8825 / 0.8741 / 0.8078 /
+0.8808): better on TID2013, 0.026 worse on KonFiG. Local mixtures are worse
+than Mlic's: 0–16 reversals per cell (Mlic 2–5), largest rise +6.66 (Mlic
++6.17); the worst cells add blur-plus-luma-noise reversals (pipal s2: 16,
+mostly blur1.2+luma4) that Mlic's cells do not show. Global edits: none.
+As registered, the historical screen does not exclude the arm from the AIC
+comparison; the follow-through started its fold continuations at 10:19 UTC.
+Evidence: `mlic-confidence-20261027-run02/TRAIN_SELECTION.json`, `scorecard/`.
