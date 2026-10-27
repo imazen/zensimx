@@ -7216,3 +7216,23 @@ advanced Mlic point by 0.0008, under the margin. Local mixtures 2–6 rows (larg
 global 0. **Reading so far:** Mlic ×256 e7 (0.9312 at worst −0.0033), Order e29 (0.9321 at −0.0045) and Confidence e59
 (0.9320 at −0.0032) reach about the same AIC for the same older-set cost. The weightings change how fast a model moves
 along the trade-off, not the trade-off itself. Seed 0.
+
+**Diagnostic: which TID2013 distortion types AIC-heavy training reorders** (frozen stage A predictions, canonical
+`panel --per-group` by distortion type, mean over fold models; TRAIN labels under a ledger;
+`/mnt/v/output/zensim/frontier-pertype-diagnostic-20261027/`). Change in within-type SROCC (pooled across references)
+against the initial model:
+
+| Type | Initial | ×256 e59 | ×1024 e59 | AIC-only e29 |
+|---|---:|---:|---:|---:|
+| all types (global) | 0.8937 | −0.0086 | −0.0259 | −0.1141 |
+| saturation change | 0.8076 | −0.0676 | −0.0905 | −0.1178 |
+| multiplicative noise | 0.8624 | −0.0162 | −0.0292 | −0.0257 |
+| additive Gaussian noise | 0.9337 | −0.0148 | −0.0271 | −0.0234 |
+| high-frequency noise | 0.9142 | −0.0137 | −0.0195 | −0.0152 |
+| JPEG | 0.9438 | −0.0104 | −0.0136 | −0.0150 |
+| JPEG 2000 | 0.9659 | −0.0060 | −0.0069 | −0.0082 |
+| contrast change | 0.5625 | +0.0963 | +0.1620 | +0.1720 |
+
+The largest within-type losses are on distortions AIC-2026 does not contain (saturation and the noise types), and most of
+AIC-only's global loss is cross-type scale. This is the drift stage D's within-dataset pairs rehearse (they span types as
+well as references); the codec types themselves lose little.
