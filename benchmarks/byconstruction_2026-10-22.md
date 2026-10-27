@@ -7146,3 +7146,26 @@ converges to about the static arm's AIC at the same weight (e59: 0.9147 / 0.9295
 `mlic-aic-recipe-{order,confidence,neff,vote}-aic256-20261027-run01`, trainer `587e4764…` (main `216481a8`, built on
 i265), source `1f334203`. Each fits its recipe's full seed-0 model on the seven folds and replays the recipe's
 120-epoch full fit as its control.
+
+### Stage D: within-dataset rehearsal of the older sets (registered 2026-10-27, 16:00 UTC, before any stage B result)
+
+**Why.** Stages A and A2 show that the AIC gain is mostly cross-source calibration and that the older sets lose
+cross-reference order. Mlic's human leg (KADID, TID2013, KonFiG, CID22-A) draws its ranking pairs within one reference,
+so nothing rehearses that order. UNIQUE (Zhang et al., "Uncertainty-Aware Blind Image Quality Assessment in the
+Laboratory and Wild", TIP 2021, in the zenpapers corpus) trains several datasets together on pairs drawn within each
+dataset. Stage D asks whether rehearsing each older dataset's own cross-reference order lets AIC rise further without
+the loss, or whether the two orders genuinely conflict.
+
+**Arms.** Mlic seed 0 continued as in stage A at AIC ×256 and ×1024, plus one added leg: the same human table and train
+weight (32.37), its pairs drawn within each dataset (the keys' member sets: kadid_train and kadid_select as KADID,
+konfig_train and konfig_val as KonFiG, tid2013, cid22_a25), rank loss. Seven folds, 60 epochs, LR 1e-5, fresh Adam,
+checkpoints 7, 15, 29 and 59, the same panels.
+
+**Decision.** The added leg trains the in-sample panel order directly, so the in-sample rule is reported but does not
+decide. D's candidate is its highest out-of-fold AIC point whose in-sample older sets stay within 0.005. It is judged on
+E21 out of sample through the omission cells continued the same way (three seeds), against stage A's advanced point
+(stage C step 2 runs for both). D's point replaces the advanced point for stage C only if its out-of-fold AIC is higher
+by more than 0.002 and its E21 out of sample (three-seed mean) is no more than 0.005 lower on every dataset.
+
+**Order.** After stage B, before stage C. The native admission, Python mirror and coordinator support are built and
+tested before anything runs; the trainer gets a separate registered protocol, and the existing protocols are unchanged.
