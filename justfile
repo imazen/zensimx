@@ -579,6 +579,7 @@ mlic-priority-progress:
     @just aic-recipe-adaptation-panel status /mnt/v/output/zensim/mlic-aic-adaptation-20261027-run03/PLAN.json /mnt/v/output/zensim/mlic-aic-adaptation-20261027-run03/panels
     @just aic-recipe-adaptation-full status /mnt/v/output/zensim/mlic-aic-full-20261027-run03/PLAN.json
     @just aic-recipe-adaptation-full-panel status /mnt/v/output/zensim/mlic-aic-full-20261027-run03/PLAN.json /mnt/v/output/zensim/mlic-aic-full-20261027-run03/panels
+    @just confidence-followthrough-status /mnt/v/output/zensim/mlic-confidence-followthrough-20261027-run01/CONFIG.json
 
 dataset-progress-tests:
     python3 -B -m unittest discover -s scripts/tests -p 'test_dataset_study_status.py' -v

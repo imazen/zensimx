@@ -6187,3 +6187,27 @@ and correct full-control reuse/budgets. Run-heavy rc=0, 0s, peak RSS 0.07 GiB,
 minimum available 24,297 MiB, peak load 0.03. Full native execution remains
 pending the original AIC and confidence omission dependencies.
 
+
+
+### Live serial confidence followthrough — October 27, 2026, 07:09 UTC
+
+The attached supervisor is running at
+`/mnt/v/output/zensim/mlic-confidence-followthrough-20261027-run01`.
+Frozen source `5474e6b4d99ad432830e2d89fca900a6eec5f97c`; CONFIG.json SHA256
+`60cb9ed63f18ef6e8f0af6f27adbac3fb1e8f78f63c77a5c6ec101279eb557a3`.
+Verified worker PID 2703508/start ticks 230955857 waits for confidence run02's
+complete omission evidence, without taking the compute lock. It then runs the
+registered fold fits/panels, full confidence fits and full AIC fits/panels in
+sequence. `just mlic-priority-progress` includes its live status. Read its
+STATE.json/CURRENT.json and actual process tree before any intervention; never
+launch duplicate stages while this supervisor is live. Its source snapshots,
+config, stage plans and logs remain preserved on failure.
+
+Five supervisor tests pass, including real process status and stale PID reuse:
+run-heavy rc=0, 0s, peak RSS 0.07 GiB, minimum available 24,298 MiB, peak load
+0.02 on i265. No confidence fit has started; the supervisor waits behind the
+original AIC full pipeline and confidence omission queue. As of this observation,
+all six original full trainers were advancing at logged epochs 72–88/120,
+with no reported failure. This timestamped observation does not replace a live
+check. No candidate is adopted and the production/HDR objective remains active.
+
