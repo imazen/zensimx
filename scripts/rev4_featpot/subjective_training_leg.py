@@ -244,9 +244,14 @@ def admit_datasets(a, cell_id, groups, selected_ids):
 # native owner holds the same table.
 DIAGNOSTIC_PROTOCOL = "aic-matched-continuation-diagnostic-v1"
 FRONTIER_PROTOCOL = "aic-share-frontier-v1"
+# Stage D: the base mixture plus one rehearsal leg, the human leg again with its pairs drawn within each older
+# dataset (the native owner names the datasets from the keys' member sets).
+XREF_PROTOCOL = "aic-share-xref-v1"
+WITHIN_SET_GROUP = "human_xref"
 DIAGNOSTIC_PROTOCOLS = {
     DIAGNOSTIC_PROTOCOL: ({"mixed-aic16": 16.0, "aic-only": 16.0}, [7, 59]),
     FRONTIER_PROTOCOL: ({"mixed-aic64": 64.0, "mixed-aic256": 256.0, "mixed-aic1024": 1024.0}, [7, 15, 29, 59]),
+    XREF_PROTOCOL: ({"mixed-aic256-xref": 256.0, "mixed-aic1024-xref": 1024.0}, [7, 15, 29, 59]),
 }
 DIAGNOSTIC_EPOCHS = 60
 DIAGNOSTIC_POPULATIONS = tuple(p for populations, _ in DIAGNOSTIC_PROTOCOLS.values() for p in populations)
@@ -266,10 +271,20 @@ def diagnostic_partition(base_groups, population):
     if any(not isinstance(r.get("train_weight"), (int, float)) or not math.isfinite(r["train_weight"])
            or r["train_weight"] < 0 for r in base_groups):
         raise ValueError("diagnostic base train weights required")
+    if diagnostic_protocol(population)[0] == XREF_PROTOCOL:
+        return [*base_groups, xref_record(base_groups)], []
     if population != "aic-only":
         return list(base_groups), []
     return ([r for r in base_groups if r["train_weight"] == 0],
             [r for r in base_groups if r["train_weight"] > 0])
+
+
+def xref_record(base_groups):
+    """The rehearsal leg: the base within-reference human leg's own record under its name, paired by dataset."""
+    human = [r for r in base_groups if r["name"] == "human"]
+    if len(human) != 1 or human[0]["mode"] != "withinref,rank" or human[0].get("subjective"):
+        raise ValueError("rehearsal requires the base within-reference human leg")
+    return dict(human[0], name=WITHIN_SET_GROUP, mode="withinset,rank")
 
 
 def diagnostic_binding(a, cell_id, groups):

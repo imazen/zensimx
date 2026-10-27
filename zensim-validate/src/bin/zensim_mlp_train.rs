@@ -2046,10 +2046,12 @@ fn parse_group_spec(
     let train_w: f64 = parts[2].parse().map_err(|e| format!("bad train_w: {e}"))?;
     let val_w: f64 = parts[3].parse().map_err(|e| format!("bad val_w: {e}"))?;
     let mut within_ref = false;
+    let mut within_set = false;
     let mut loss_mode: Option<GroupLossMode> = None;
     for flag in parts.get(4).into_iter().flat_map(|f| f.split(',')) {
         match flag {
             "withinref" => within_ref = true,
+            "withinset" => within_set = true,
             "rank" | "mse" | "both" => {
                 let m = match flag {
                     "rank" => GroupLossMode::Rank,
@@ -2065,11 +2067,21 @@ fn parse_group_spec(
             other => {
                 return Err(format!(
                     "unknown group flag {other:?} in {spec:?} \
-                     (accepted: withinref, rank, mse, both)"
+                     (accepted: withinref, withinset, rank, mse, both)"
                 ));
             }
         }
     }
+    // `withinset` (pairs within each older dataset) belongs to the one
+    // registered rehearsal leg, and that leg pairs no other way.
+    if within_set != (parts[0] == subjective_training_leg::WITHIN_SET_GROUP)
+        || within_set && within_ref
+    {
+        return Err(format!(
+            "{spec:?}: withinset is the registered rehearsal leg's own pairing"
+        ));
+    }
+    within_ref |= within_set;
     Ok((
         parts[0].to_string(),
         PathBuf::from(parts[1]),
@@ -3868,6 +3880,14 @@ fn main() {
             eprintln!("{e}");
             std::process::exit(1);
         });
+        if name == subjective_training_leg::WITHIN_SET_GROUP {
+            let ids = subjective_training_leg::dataset_ids(&path, g.human_scores.len())
+                .unwrap_or_else(|e| {
+                    eprintln!("rehearsal pairing: {e}");
+                    std::process::exit(2)
+                });
+            g.ref_ids = Some(ids);
+        }
         if name == matched_codec::GROUP {
             codec_admission
                 .as_ref()

@@ -112,6 +112,30 @@ class DiagnosticAuthority(unittest.TestCase):
         self.assertEqual(leg.diagnostic_protocol("mixed-aic16"), ("aic-matched-continuation-diagnostic-v1", 16.0, [7, 59]))
         self.assertEqual(leg.diagnostic_protocol("aic-only"), ("aic-matched-continuation-diagnostic-v1", 16.0, [7, 59]))
 
+    def test_rehearsal_populations_add_the_human_leg_paired_within_each_dataset(self):
+        for population, weight in (("mixed-aic256-xref", 256.0), ("mixed-aic1024-xref", 1024.0)):
+            with self.subTest(population=population):
+                (self.root / "diagnostic-authority.json").unlink(missing_ok=True)
+                binding, retained, a = self.derive(population)
+                c = a["cells"]["full-s0"]["continuation"]
+                self.assertEqual((c["protocol"], c["aic_weight"], c["retained_checkpoint_epochs"], c["excluded_groups"]),
+                                 ("aic-share-xref-v1", weight, [7, 15, 29, 59], []))
+                self.assertEqual(retained, ["human", "human_development", "subjective_rank_invented", "human_xref"])
+                added = a["cells"]["full-s0"]["groups"][-1]
+                self.assertEqual(added, dict(self.human, name="human_xref", mode="withinset,rank"))
+                legs = [("aic_public_train", self.root / "aic.parquet", weight, 0, "rank")]
+                self.assertFalse(leg.diagnostic_binding(a, "full-s0", legs))
+                for mutate in (lambda v: v["cells"]["full-s0"]["groups"].pop(),
+                               lambda v: v["cells"]["full-s0"]["groups"][-1].update(mode="withinref,rank"),
+                               lambda v: v["cells"]["full-s0"]["groups"][-1].update(train_weight=64.0),
+                               lambda v: v["cells"]["full-s0"]["continuation"].update(protocol="aic-share-frontier-v1")):
+                    changed = json.loads(json.dumps(a))
+                    mutate(changed)
+                    with self.assertRaisesRegex(ValueError, "protocol|partition"):
+                        leg.diagnostic_binding(changed, "full-s0", legs)
+        with self.assertRaisesRegex(ValueError, "human leg"):
+            leg.diagnostic_partition([self.development], "mixed-aic256-xref")
+
     def test_frozen_continuation_budgets_are_unchanged(self):
         for epochs in (60, 12):
             with self.assertRaisesRegex(ValueError, "unregistered"):

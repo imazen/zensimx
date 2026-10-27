@@ -40,7 +40,61 @@ fn string<'a>(v: &'a Value, key: &str) -> Result<&'a str, String> {
 /// Python mirror holds the same table.
 pub(super) const DIAGNOSTIC_EPOCHS: u64 = 60;
 type Protocol = (&'static str, &'static [(&'static str, f64)], &'static [u64]);
-const DIAGNOSTIC_PROTOCOLS: [Protocol; 2] = [
+/// Stage D (byconstruction record, 2026-10-27): the one registered rehearsal
+/// leg repeats the human leg with its ranking pairs drawn within each older
+/// dataset, named by the keys' member sets.
+pub(super) const WITHIN_SET_GROUP: &str = "human_xref";
+const XREF_PROTOCOL: &str = "aic-share-xref-v1";
+const DATASET_OF_MEMBER: [(&str, &str); 6] = [
+    ("kadid_train", "kadid"),
+    ("kadid_select", "kadid"),
+    ("tid2013", "tid2013"),
+    ("cid22_a25", "cid22_a25"),
+    ("konfig_train", "konfig"),
+    ("konfig_val", "konfig"),
+];
+
+/// The rehearsal leg's record: the base human leg's own record (path,
+/// weights, manifest and keys) under its name, pairing within each dataset.
+fn xref_record(base_groups: &[Value]) -> Result<Value, String> {
+    let human: Vec<_> = base_groups
+        .iter()
+        .filter(|r| r["name"] == "human")
+        .collect();
+    if human.len() != 1 || human[0]["mode"] != "withinref,rank" || human[0]["subjective"] == true {
+        return Err("rehearsal requires the base within-reference human leg".into());
+    }
+    let mut record = human[0].clone();
+    record["name"] = Value::from(WITHIN_SET_GROUP);
+    record["mode"] = Value::from("withinset,rank");
+    Ok(record)
+}
+
+/// Dense per-row dataset ids of the rehearsal leg, in table order, from its
+/// keys file; any unregistered member set refuses.
+pub(super) fn dataset_ids(table: &Path, rows: usize) -> Result<Vec<u32>, String> {
+    let columns = ["pair_key", "source_row_id", "ref_basename", "member_set"];
+    let keys =
+        super::training_keys::read(&table.with_extension("keys.parquet"), &columns, &columns)?;
+    if keys.rows.len() != rows {
+        return Err("rehearsal keys and table row counts differ".into());
+    }
+    let member = keys.column("member_set")?;
+    let mut ids = BTreeMap::new();
+    keys.rows
+        .iter()
+        .map(|row| {
+            let (_, dataset) = DATASET_OF_MEMBER
+                .iter()
+                .find(|(m, _)| *m == row[member])
+                .ok_or("unregistered rehearsal member set")?;
+            let next = ids.len() as u32;
+            Ok(*ids.entry(*dataset).or_insert(next))
+        })
+        .collect()
+}
+
+const DIAGNOSTIC_PROTOCOLS: [Protocol; 3] = [
     (
         "aic-matched-continuation-diagnostic-v1",
         &[("mixed-aic16", 16.0), ("aic-only", 16.0)],
@@ -53,6 +107,11 @@ const DIAGNOSTIC_PROTOCOLS: [Protocol; 2] = [
             ("mixed-aic256", 256.0),
             ("mixed-aic1024", 1024.0),
         ],
+        &[7, 15, 29, 59],
+    ),
+    (
+        XREF_PROTOCOL,
+        &[("mixed-aic256-xref", 256.0), ("mixed-aic1024-xref", 1024.0)],
         &[7, 15, 29, 59],
     ),
 ];
@@ -487,7 +546,14 @@ fn admit_datasets(
         {
             return Err("dataset cell group path/mode/weight mismatch".into());
         }
-        let mode = if g.4 { "withinref," } else { "" }.to_string()
+        let pairing = if g.0 == WITHIN_SET_GROUP {
+            "withinset,"
+        } else if g.4 {
+            "withinref,"
+        } else {
+            ""
+        };
+        let mode = pairing.to_string()
             + match g.5 {
                 GroupLossMode::Rank => "rank",
                 GroupLossMode::Both => "both",
@@ -696,7 +762,7 @@ fn diagnostic_binding(a: &Value, cell: &str, groups: &[Group]) -> Result<bool, S
     if base_groups.iter().any(|r| weight(r).is_none_or(|v| v < 0.)) {
         return Err("diagnostic base train weights required".into());
     }
-    let (retained, excluded): (Vec<Value>, Vec<Value>) = if aic_only {
+    let (mut retained, excluded): (Vec<Value>, Vec<Value>) = if aic_only {
         base_groups
             .iter()
             .cloned()
@@ -704,6 +770,9 @@ fn diagnostic_binding(a: &Value, cell: &str, groups: &[Group]) -> Result<bool, S
     } else {
         (base_groups.clone(), Vec::new())
     };
+    if w["protocol"] == XREF_PROTOCOL {
+        retained.push(xref_record(base_groups)?);
+    }
     if w["epochs"].as_u64() != Some(DIAGNOSTIC_EPOCHS)
         || w["aic_weight"].as_f64() != Some(aic_weight)
         || w["dump_checkpoints_every"] != 1
@@ -1158,6 +1227,111 @@ mod tests {
             GroupLossMode::Rank,
         )]
     }
+    #[test]
+    fn rehearsal_leg_pairs_within_each_registered_dataset() {
+        use arrow::array::{ArrayRef, Int64Array, StringArray};
+        use arrow::record_batch::RecordBatch;
+        use parquet::arrow::ArrowWriter;
+        use std::sync::Arc;
+        let root = std::env::temp_dir().join(format!("rehearsal-{}", std::process::id()));
+        std::fs::create_dir_all(&root).unwrap();
+        let table = root.join("human.parquet");
+        let write = |members: &[&str]| {
+            let n = members.len();
+            let keys: Vec<String> = (0..n).map(|i| format!("k{i}")).collect();
+            let batch = RecordBatch::try_from_iter([
+                ("pair_key", Arc::new(StringArray::from(keys)) as ArrayRef),
+                (
+                    "source_row_id",
+                    Arc::new(Int64Array::from((0..n as i64).collect::<Vec<_>>())) as ArrayRef,
+                ),
+                (
+                    "ref_basename",
+                    Arc::new(StringArray::from(vec!["r"; n])) as ArrayRef,
+                ),
+                (
+                    "member_set",
+                    Arc::new(StringArray::from(members.to_vec())) as ArrayRef,
+                ),
+            ])
+            .unwrap();
+            let file = std::fs::File::create(table.with_extension("keys.parquet")).unwrap();
+            let mut writer = ArrowWriter::try_new(file, batch.schema(), None).unwrap();
+            writer.write(&batch).unwrap();
+            writer.close().unwrap();
+        };
+        write(&[
+            "kadid_train",
+            "tid2013",
+            "kadid_select",
+            "konfig_val",
+            "cid22_a25",
+            "konfig_train",
+        ]);
+        assert_eq!(dataset_ids(&table, 6).unwrap(), vec![0, 1, 0, 2, 3, 2]);
+        assert!(dataset_ids(&table, 5).unwrap_err().contains("row counts"));
+        write(&["kadid_train", "pipal"]);
+        assert!(dataset_ids(&table, 2).unwrap_err().contains("member set"));
+        std::fs::remove_dir_all(&root).unwrap();
+        // The flag belongs to the one registered leg, and that leg pairs no other way.
+        let parse = super::super::parse_group_spec;
+        let (name, _, _, _, within, _) = parse("human_xref:t.parquet:32:0:withinset,rank").unwrap();
+        assert!(name == WITHIN_SET_GROUP && within);
+        for spec in [
+            "human:t.parquet:32:0:withinset,rank",
+            "human_xref:t.parquet:32:0:withinref,rank",
+            "human_xref:t.parquet:32:0:withinset,withinref,rank",
+            "human_xref:t.parquet:32:0:rank",
+        ] {
+            assert!(parse(spec).is_err(), "{spec}");
+        }
+    }
+
+    #[test]
+    fn rehearsal_protocol_adds_exactly_the_human_legs_dataset_pairing() {
+        let root = std::env::temp_dir().join(format!("xref-{}", std::process::id()));
+        std::fs::create_dir_all(&root).unwrap();
+        let human = json!({"name":"human","path":root.join("h.parquet"),"train_weight":32.37,"val_weight":0.,
+            "mode":"withinref,rank","subjective":false,"manifest_sha256":"m","keys_path":root.join("h.keys.parquet")});
+        let validation = json!({"name":"human_development","path":root.join("d.parquet"),"train_weight":0.,
+            "val_weight":1.,"mode":"withinref,rank"});
+        let base = json!({"schema":"subjective-training-authority-v2","state":"approved",
+            "artifact_visibility":"private","selection":"fixed-final-epoch",
+            "cells":{"full-s0":{"route":"full","width":1853,"groups":[human.clone(), validation.clone()]}}});
+        let base_path = root.join("dataset-authority.json");
+        std::fs::write(&base_path, serde_json::to_vec(&base).unwrap()).unwrap();
+        let mut xref = human.clone();
+        xref["name"] = json!(WITHIN_SET_GROUP);
+        xref["mode"] = json!("withinset,rank");
+        for (population, weight) in [("mixed-aic256-xref", 256.), ("mixed-aic1024-xref", 1024.)] {
+            let mut a = base.clone();
+            a["schema"] = json!("subjective-training-authority-v4");
+            a["base_authority"] = json!(base_path);
+            a["base_authority_sha256"] = json!(hash(&base_path).unwrap());
+            a["cells"]["full-s0"]["groups"] = json!([human, validation, xref]);
+            a["cells"]["full-s0"]["continuation"] = json!({"checkpoint":"x","checkpoint_sha256":"y","epochs":60,
+                "lr":0.00001,"lr_schedule":"constant","optimizer_state":"fresh","protocol":XREF_PROTOCOL,
+                "population":population,"aic_weight":weight,"dump_checkpoints_every":1,
+                "retained_checkpoint_epochs":[7, 15, 29, 59],"excluded_groups":[]});
+            assert!(!diagnostic_binding(&a, "full-s0", &aic(weight)).unwrap());
+            let refuse = |mutate: &dyn Fn(&mut Value)| {
+                let mut changed = a.clone();
+                mutate(&mut changed);
+                assert!(diagnostic_binding(&changed, "full-s0", &aic(weight)).is_err());
+            };
+            refuse(&|v| v["cells"]["full-s0"]["groups"] = json!([human, validation]));
+            refuse(&|v| v["cells"]["full-s0"]["groups"][2]["mode"] = json!("withinref,rank"));
+            refuse(&|v| v["cells"]["full-s0"]["groups"][2]["train_weight"] = json!(64.));
+            refuse(&|v| {
+                v["cells"]["full-s0"]["continuation"]["protocol"] = json!(FRONTIER_PROTOCOL)
+            });
+            refuse(&|v| {
+                v["cells"]["full-s0"]["continuation"]["population"] = json!("mixed-aic256")
+            });
+        }
+        std::fs::remove_dir_all(&root).unwrap();
+    }
+
     #[test]
     fn diagnostic_authority_binds_its_unmodified_base_and_group_partition() {
         let root = std::env::temp_dir().join(format!("diagnostic-{}", std::process::id()));

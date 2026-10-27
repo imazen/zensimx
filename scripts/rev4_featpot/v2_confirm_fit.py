@@ -193,6 +193,11 @@ def main() -> None:
             groups = [g for g in groups if g[0] in retained]
             weights = {name: w for name, w in weights.items() if name in retained}
             protocol, _, fixed = diagnostic_protocol(args.diagnostic_population)
+            from subjective_training_leg import WITHIN_SET_GROUP
+            if WITHIN_SET_GROUP in retained:  # stage D: the human leg again, paired within each dataset
+                (human,) = [g for g in groups if g[0] == "human"]
+                groups.append((WITHIN_SET_GROUP, human[1], human[2], human[3], "withinset,rank"))
+                weights[WITHIN_SET_GROUP] = human[2]
             diagnostic = dict(protocol=protocol, population=args.diagnostic_population,
                               excluded_groups=excluded, retained_groups=[g[0] for g in groups])
         else:
