@@ -29,6 +29,29 @@ requires its own full-budget unweighted control. Old full run02 and confidence
 run01 are preserved failures; do not restart them. Completed fold evidence,
 scientific inputs, strengths, seeds and all historical verdicts are unchanged.
 
+### Full confidence manifest preparation — October 27, 2026
+
+Three full-data manifests are verified under the shared admission run02
+`full-contrast-bindings-run01/`. Source `2f9268f2`; manifest index SHA256
+`d73a3422de00f6150f50e934dc6821ab7894f6eb85fe4a3e732fefbacc088bfc`;
+original full-authority index SHA256
+`7dbf9cb8deabdfc4b42b72637dd17112a41281e01094a5fe65ae987525f58923`.
+`SOURCE.py`, `READ_EVENT.json` and `VERIFIED.json` preserve source/exposure and
+all three seed bindings. Each full seed covers 8,339/10,590 human rows,
+210/210 LIVE-MD and 320/320 Colourlab rows; uncovered references retain the
+original loss. Complete-reference coverage checks pass. The 21 omission
+manifests are byte-unchanged. Full native normalizers and fits have **not** run.
+
+Eight binding/wrapper/dependency tests pass on i265 using the existing
+confidence-admission Python environment (system Python lacks pyarrow).
+Generator run-heavy: rc=0, 3s, peak RSS 0.36 GiB, minimum available 24,006 MiB,
+peak load 0.06. This prepares the original full-data confidence fits; their
+launcher must validate the separate full registry, use child-only native
+confidence environment variables, verify normalizer receipts and final119,
+then clear the confidence factors for the common AIC continuation. Do not feed
+the full registry to the frozen 21-cell omission queue or modify that queue.
+All full-fit/AIC steps retain the original seeds, strengths and panel policy.
+
 ### Active goal and decisions
 
 Keep working toward a stable, production-qualified candidate while preserving
