@@ -3668,3 +3668,8 @@ aic-recipe-adaptation-full mode plan:
 # Full fitted populations; final-f32 and packed TRAIN-calibrated serving representations.
 aic-recipe-adaptation-full-panel mode plan output:
     OPENBLAS_NUM_THREADS=1 python3 -B scripts/byconstruction/aic_adaptation_full_panel.py {{quote(mode)}} {{quote(plan)}} {{quote(output)}}
+
+# Standalone native arithmetic owner; run on an eligible non-dev build host.
+confidence-contrast-tests output:
+    rustc --edition=2024 --test zensim-validate/tests/contrast_precision.rs -o {{quote(output)}}
+    {{quote(output)}}

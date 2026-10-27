@@ -5709,3 +5709,27 @@ Legacy unused per-band information diagnostics warned on those zeros; no
 infinite item SE was exported. `rc=0 7s | peak-RSS 0.26GiB |
 min-avail 24127MiB | peak-load 0.26`. Exact contrast normalizers, private native
 loss integration, full-budget parity and 21 TRAIN fits are next.
+
+### Native conditional contrast normalizer (2026-10-27)
+
+`zensim-validate/src/mlp_train/contrast_precision.rs` now implements the
+registered inverse variance and deterministic conditional mean precision.
+It counts modulo residue multiplicities with u128 integers, enumerates all
+ordered legal pairs in original bucket order, and consumes no RNG. The
+caller must supply the existing tie predicate: legacy human distinct rows
+with equal finite scores remain legal; subjective-rank groups exclude exact
+ties. No sampling or tie rule changes are authorized. Equal precision returns
+exact weight one; one unordered legal pair does too. Empty support produces
+no normalizer. Equal SE alone does not imply equal precision.
+
+Four native tests pass on i265, including exhaustive 3/5/8-bit RNG spaces
+with unequal modulo probabilities, both legal-support policies, 64-bit mass
+counts, symmetry, the unchanged item floor/linking term and invalid inputs.
+`rc=0 0s | peak-RSS 0.12GiB | min-avail 24368MiB | peak-load 0.08`.
+The initial exhaustive oracle used uncompensated repeated sums; replacing
+only that oracle accumulation with compensated summation passes the same
+2e-12 tolerance. The arithmetic owner is not yet integrated into training.
+Next bind exact original group rows and reference order to the admitted maps,
+then multiply only native rank loss/gradient and run the full-budget parity
+control before confidence candidate cells. No public API change is required
+by this arithmetic owner.
