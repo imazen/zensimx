@@ -138,7 +138,7 @@ def plan(run, commit, trainer, meta_tool):
 def checked(path, schema="aic-matched-continuation-plan-v1"):
     value = json.loads(path.read_text())
     protocol = PROTOCOL if schema == FOLD_SCHEMA or schema.startswith("aic-matched") else FRONTIER_PROTOCOL
-    if schema in (RECIPE_SCHEMA, SEEDS_SCHEMA, OMISSION_SCHEMA):
+    if schema in (RECIPE_SCHEMA, SEEDS_SCHEMA, OMISSION_SCHEMA, FULL_SCHEMA):
         protocol = diagnostic_protocol(next(iter(value["arms"].values())))[0]
     if value["schema"] != schema or value["protocol"] != protocol:
         raise ValueError("diagnostic plan schema differs")
@@ -466,7 +466,7 @@ RECIPE_INPUTS = dict(
 
 def plan_schema(path):
     schema = json.loads(Path(path).read_text()).get("schema")
-    if schema not in (FOLD_SCHEMA, FRONTIER_SCHEMA, RECOVERY_SCHEMA, RECIPE_SCHEMA, SEEDS_SCHEMA, OMISSION_SCHEMA):
+    if schema not in (FOLD_SCHEMA, FRONTIER_SCHEMA, RECOVERY_SCHEMA, RECIPE_SCHEMA, SEEDS_SCHEMA, OMISSION_SCHEMA, FULL_SCHEMA):
         raise ValueError("source-fold or frontier plan required")
     return schema
 
@@ -728,7 +728,7 @@ def fold_queue(path):
         checked(path, schema)
         command = ["flock", str(Path.home() / "tmp/heavy.lock"), str(Path.home() / "work/claudehints/scripts/run-heavy"),
                    "--mem", "40G", "--jobs", "12", "--", sys.executable, "-B", str(Path(__file__).resolve()),
-                   "omission-run" if schema == OMISSION_SCHEMA else "fold-run", str(path)]
+                   {OMISSION_SCHEMA: "omission-run", FULL_SCHEMA: "full-run"}.get(schema, "fold-run"), str(path)]
         state.update(stage="queued-for-compute-lock", command=command, checked_utc=now())
         write(run_dir / "QUEUE.json", state)
         with (run_dir / "launch.log").open("x") as log:
@@ -1237,6 +1237,171 @@ def omission_run(path):
         raise
 
 
+# Stage C, full data (registered with stage A): full Mlic seeds 0-2 continue at the advanced budget on all of
+# public_train; the advanced epoch's checkpoint is packed by the canonical deployment order (densify, f16, E33 output
+# stage, TRAIN CID22 calibration), then scored in sample with Mlic and MlicFT16x8 packed models and mixture-tested.
+FULL_SCHEMA = "aic-share-full-plan-v1"
+PACK = ("import json, sys; from pathlib import Path; from v2_production_pack import pack_production; "
+        "print(json.dumps(pack_production(Path(sys.argv[1]), Path(sys.argv[2]), Path(sys.argv[3]), e33_output_stage=True)))")
+
+
+def full_plan(run, commit, trainer, meta_tool, point_run, arm, epoch, after_run):
+    point = json.loads((Path(point_run) / "PLAN.json").read_text())
+    if point.get("schema") != FRONTIER_SCHEMA or arm not in point["arms"] or epoch not in FRONTIER_CHECKPOINTS:
+        raise ValueError("the advanced point must be a static frontier arm at a studied epoch")
+    population = point["arms"][arm]
+    protocol, weight, _ = diagnostic_protocol(population)
+    fits = json.loads(Path(INPUTS["full_fits"][0]).read_text())
+    baselines = {}
+    for seed in SEEDS:
+        ft = [r for r in fits["continued"] if r["arm"] == "MlicFT16x8" and r["seed"] == seed]
+        if len(ft) != 1 or sha(Path(ft[0]["directory"]) / "refit/production-f16.bin") != ft[0]["packed_sha256"]:
+            raise ValueError("packed MlicFT16x8 baseline differs")
+        mlic = full_record(fits, "Mlic", seed)
+        if sha(Path(mlic["directory"]) / "refit/production-f16.bin") != mlic["packed_sha256"]:
+            raise ValueError("packed Mlic baseline differs")
+        baselines[f"Mlic|s{seed}"] = str(Path(mlic["directory"]) / "refit/production-f16.bin")
+        baselines[f"MlicFT16x8|s{seed}"] = str(Path(ft[0]["directory"]) / "refit/production-f16.bin")
+    fold = json.loads(Path(INPUTS["fold_plan"][0]).read_text())
+    root = Path(fold["common_root"])
+    leg = json.loads((root / "wide/main/real/receipt.json").read_text())["legs"]["cid22"]["fit"]
+    anchor = root / leg["rel"]
+    if sha(anchor) != leg["sha256"]:
+        raise ValueError("TRAIN CID22 calibration anchor differs")
+    seven_fold_plan(run, commit, trainer, meta_tool, schema=FULL_SCHEMA, protocol=protocol,
+                    registration=FRONTIER_REGISTRATION, arms={arm: population}, seeds=SEEDS,
+                    checkpoints=FRONTIER_CHECKPOINTS, extra=dict(
+                        aic_weights={arm: weight}, packed_epoch=epoch, anchor=dict(path=str(anchor), sha256=leg["sha256"]),
+                        baselines={k: dict(path=v, sha256=sha(v)) for k, v in baselines.items()},
+                        point=dict(run=str(point_run), arm=arm, epoch=epoch), after_run=str(after_run),
+                        assessment="stage C full-data continuation of the advanced point; in-sample panels; no adoption"))
+
+
+def full_run(path):
+    import numpy as np
+    import pandas as pd
+    from concurrent.futures import ThreadPoolExecutor
+    if not compute_lock(os.getpid())["held_by_worker_ancestor"]:
+        raise ValueError("the full-data stage requires the shared compute lock")
+    run_dir, output = path.parent, path.parent / "panels"
+    plan_value = checked(path, FULL_SCHEMA)
+    (arm, population), = plan_value["arms"].items()
+    epoch = plan_value["packed_epoch"]
+    require_clean_factors(os.environ)
+    if (run_dir / "STATE.json").exists():
+        raise ValueError("preserve previous diagnostic run state")
+    state = dict(stage="fit-full", worker=process_snapshot(os.getpid()), plan_sha256=sha(path), completed=[],
+                 failures=[], required=len(SEEDS), objective_complete=False, production_qualified=False)
+    def stage(name, **details):
+        state.update(stage=name, checked_utc=now(), **details)
+        write(run_dir / "STATE.json", state)
+    def save(name, value):
+        write(output / name, finite_json(value), fresh=True)
+    source = run_dir / "source/scripts"
+    environment = dict(os.environ, REV4_V2_BIN_DIR=str(run_dir / "bin"), REV4_V2_ROOT=plan_value["root"],
+                       ZEN_PANEL_BIN=str(run_dir / "bin/panel"), RAYON_NUM_THREADS="1", OMP_NUM_THREADS="1",
+                       OPENBLAS_NUM_THREADS="1", ZENSIM_MAX_TIER="v3")
+    def fit(seed):
+        dest = run_dir / "full" / arm / f"full_s{seed}"
+        scratch = Path.home() / "tmp" / f"{run_dir.name}-full-s{seed}"
+        scratch.mkdir(parents=True)
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        env = dict(environment, TMPDIR=str(scratch))
+        with (run_dir / "full" / arm / f"full_s{seed}.log").open("x") as log:
+            if subprocess.run(fit_command(plan_value, run_dir, arm, seed, plan_value["initial"][str(seed)]["directory"],
+                                          None, dest), stdout=log, stderr=subprocess.STDOUT, env=env).returncode:
+                raise RuntimeError(f"full seed {seed} fit failed; preserved in its log")
+        outputs = fixed_outputs(dest, population, f"{arm}|full|s{seed}", plan_value["checkpoints"])
+        if sha(plan_value["anchor"]["path"]) != plan_value["anchor"]["sha256"]:
+            raise ValueError("TRAIN CID22 calibration anchor changed")
+        pack = dest / f"pack_e{epoch:03d}"
+        (pack / "refit").mkdir(parents=True)
+        with (pack / "pack-wrapper.log").open("x") as log:
+            result = subprocess.run([sys.executable, "-B", "-c", PACK, str(dest / "ckpt" / f"ckpt_epoch{epoch:03d}.bin"),
+                                     str(pack), plan_value["anchor"]["path"], "--root", plan_value["root"]],
+                                    stdout=subprocess.PIPE, stderr=log, text=True, env=dict(env, PYTHONPATH=os.pathsep.join(
+                                        [str(source / "rev4_featpot"), str(source)])))
+        if result.returncode:
+            raise RuntimeError(f"full seed {seed} packing failed; preserved in its log")
+        packed = json.loads(result.stdout.strip().splitlines()[-1])
+        write(pack / "PACKED.json", dict(packed, source_checkpoint=str(dest / "ckpt" / f"ckpt_epoch{epoch:03d}.bin"),
+              source_checkpoint_sha256=sha(dest / "ckpt" / f"ckpt_epoch{epoch:03d}.bin")), fresh=True)
+        return dict(seed=seed, **outputs, packed=packed)
+    try:
+        stage("fit-full")
+        with ThreadPoolExecutor(max_workers=3) as pool:
+            for seed, future in [(s, pool.submit(fit, s)) for s in SEEDS]:
+                try:
+                    state["completed"].append(future.result())
+                except BaseException as error:
+                    state["failures"].append(dict(seed=seed, error=repr(error)))
+                stage("fit-full")
+        if state["failures"]:
+            raise RuntimeError("full fit failures retained; inspect their complete logs")
+        write(run_dir / "FITS_COMPLETE.json", dict(plan_sha256=sha(path), cells=state["completed"]), fresh=True)
+        for name, record in plan_value["baselines"].items():
+            if sha(record["path"]) != record["sha256"]:
+                raise ValueError(f"packed baseline changed: {name}")
+        stage("raw-panels")
+        fold = json.loads(Path(plan_value["registered_inputs"]["fold_plan"]["path"]).read_text())
+        os.environ.update(TMPDIR=str(Path.home() / "tmp"), REV4_V2_BIN_DIR=str(run_dir / "bin"), AIC_BIN=str(run_dir / "bin"),
+                          BYC_ROOT=fold["common_root"], ZEN_PANEL_BIN=str(run_dir / "bin/panel"),
+                          BYC_LABEL_LEDGER_DIR=str(output / "label-reads"), RAYON_NUM_THREADS="1", OMP_NUM_THREADS="1",
+                          OPENBLAS_NUM_THREADS="1", ZENSIM_MAX_TIER="v3", ZENSIM_RING_FORM="raw", ZENSIM_PYRAMID="xyb")
+        warm = Path(fold["warmstart_source"])
+        sys.path[:0] = [str(warm / "scripts/rev4_featpot"), str(warm / "scripts/byconstruction"), str(warm / "scripts")]
+        import byc_cells as cells
+        from lib.zen_stats import panel_batch
+        output.mkdir()
+        _, populations = full_populations(fold, output, "registered-AIC-share-full-panels")
+        models = {f"{arm}e{epoch}|s{s}": run_dir / "full" / arm / f"full_s{s}/pack_e{epoch:03d}/refit/production-f16.bin"
+                  for s in SEEDS}
+        models.update({name: Path(record["path"]) for name, record in plan_value["baselines"].items()})
+        (output / "predictions").mkdir()
+        jobs, rows = [], []
+        for label, model in models.items():
+            stage("predict", current_model=label)
+            for name, population in populations.items():
+                destination = output / "predictions" / f"{label}|{name}.tsv"
+                cells.predict_cell(model, population["table"], destination, SPEC)
+                frame = pd.read_csv(destination, sep="\t")
+                prediction = frame.pred.to_numpy(dtype=float)
+                if (list(frame.columns) != ["row_idx", "pred"] or len(prediction) != len(population["target"])
+                        or not np.array_equal(frame.row_idx, np.arange(len(prediction))) or not np.isfinite(prediction).all()):
+                    raise ValueError("ordered finite prediction coverage differs")
+                jobs.append((f"{label}|{name}|in sample", prediction, population["target"]))
+                rows.append(dict(model=label, population=name, scope="in sample", rows=len(prediction)))
+        stage("per-model-panels")
+        stats = panel_batch(jobs, stats="full")
+        checked_statistics(jobs, stats)
+        for row, value in zip(rows, stats, strict=True):
+            row["statistics"] = value
+        save("MODEL_PANELS.json", rows)
+        by_model = {(r["model"], r["population"]): r["statistics"] for r in rows}
+        paired = {}
+        for baseline in ("Mlic", "MlicFT16x8"):
+            for name in populations:
+                paired[f"{arm}e{epoch}-minus-{baseline}|{name}"] = {m: seed_delta(
+                    {s: by_model[f"{arm}e{epoch}|s{s}", name][m] for s in SEEDS},
+                    {s: by_model[f"{baseline}|s{s}", name][m] for s in SEEDS}) for m in METRICS}
+        save("PAIRED_SEEDS.json", dict(contrasts=paired, selection_gate=False, representation="packed f16, calibrated",
+                                       note="every population is in sample for every full model"))
+        stage("pixel-mixtures")
+        pixel_mixtures(fold, warm, output, {label.replace("|", "_"): model for label, model in models.items()
+                                            if label.startswith(arm) or label.endswith("|s0")}, save)
+        inventory = {str(p.relative_to(run_dir)): sha(p) for p in sorted(run_dir.rglob("*"))
+                     if p.is_file() and p.name not in ("STATE.json", "QUEUE.json", "CURRENT.json")
+                     and p.relative_to(run_dir).parts[0] != "source"}
+        write(run_dir / "EVIDENCE_INVENTORY.json", inventory, fresh=True)
+        write(run_dir / "COMPLETE.json", dict(plan_sha256=sha(path), evidence_inventory_sha256=sha(run_dir / "EVIDENCE_INVENTORY.json"),
+              selector=None, production_qualified=False, objective_complete=False,
+              assessment=plan_value["assessment"]), fresh=True)
+        stage("full-complete", next_action="near-identity and the label-free gates for the packed seed-0 model")
+    except BaseException as error:
+        stage("failed", failures=[*state["failures"], repr(error)])
+        raise
+
+
 def status(path):
     run_dir = path.parent
     state_path = run_dir / "STATE.json"
@@ -1288,8 +1453,15 @@ if __name__ == "__main__":
         p.add_argument("--source-commit", required=True)
         p.add_argument("--trainer", type=Path, required=True)
         p.add_argument("--meta-tool", type=Path, required=True)
-    for mode in ("queue", "run", "status", "fold-queue", "fold-run", "fold-status", "omission-run"):
+    for mode in ("queue", "run", "status", "fold-queue", "fold-run", "fold-status", "omission-run", "full-run"):
         sub.add_parser(mode).add_argument("plan", type=Path)
+    p = sub.add_parser("full-plan", help="stage C: full Mlic seeds 0-2 at the advanced point, packed at its epoch")
+    p.add_argument("run", type=Path)
+    p.add_argument("--source-commit", required=True)
+    p.add_argument("--trainer", type=Path, required=True)
+    p.add_argument("--meta-tool", type=Path, required=True)
+    p.add_argument("--point", nargs=3, metavar=("RUN", "ARM", "EPOCH"), required=True)
+    p.add_argument("--after-run", type=Path, required=True)
     p = sub.add_parser("omission-plan", help="stage C: E21 out of sample through the Mlic omission cells")
     p.add_argument("run", type=Path)
     p.add_argument("--source-commit", required=True)
@@ -1318,7 +1490,10 @@ if __name__ == "__main__":
     p.add_argument("--point", nargs=2, metavar=("RUN", "ARM"), required=True, help="the advancing run and arm")
     p.add_argument("--after-run", type=Path, required=True)
     args = parser.parse_args()
-    if args.mode == "omission-plan":
+    if args.mode == "full-plan":
+        full_plan(args.run, args.source_commit, args.trainer, args.meta_tool, Path(args.point[0]), args.point[1],
+                  int(args.point[2]), args.after_run)
+    elif args.mode == "omission-plan":
         omission_plan(args.run, args.source_commit, args.trainer, args.meta_tool, Path(args.point[0]), args.point[1],
                       args.after_run)
     elif args.mode == "seeds-plan":
