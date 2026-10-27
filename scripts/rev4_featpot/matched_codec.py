@@ -11,6 +11,7 @@ from pathlib import Path
 
 from subjective_training_leg import DATASET_FOLDS, document, log_dataset_read
 from v2_common import sha
+from stimulus_identity import PAIRS_SHA, promoted_stimuli
 
 GROUP = "human_codec_strata"
 OLD = Path("/var/tmp/byc-mixes-20261025")
@@ -94,6 +95,10 @@ def prepare(study):
     receipt = document(root/"wide/main/real/receipt.json")
     output = study/"matching"
     output.mkdir()  # Never overwrite partial preparation.
+    _, _, source_inputs = promoted_stimuli(("kadid_train", "kadid_select"))
+    source_paths = [p for p, pin in source_inputs.items() if pin == PAIRS_SHA]
+    if len(source_paths) != 1:
+        raise ValueError("matched codec stimulus source is ambiguous")
     banks = {}
     for member in ("kadid_train", "kadid_select"):
         path = Path("/var/tmp/rev4-featbank/bank")/member/"keys.parquet"
@@ -134,6 +139,8 @@ def prepare(study):
                 fold=fold, seed_index=seed, init_seed=cell["init_seed"], sample_seed=cell["sample_seed"],
                 original_root=str(root), original_root_sha256=ROOT_SHA,
                 table_sha256=fit["sha256"], keys_sha256=fit["keys_sha256"], codec_banks=banks,
+                stimulus_source=dict(path=source_paths[0],sha256=PAIRS_SHA),
+                metadata_source_sha256=source_inputs,
                 original_cell_record_sha256=sha(source/"byc_record.json"),
                 original_authority_sha256=sha(source/"dataset-authority.json"),
                 matching_model=str(model), matching_model_sha256=sha(model),

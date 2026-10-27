@@ -7,6 +7,7 @@ use zensim_validate::{mlp_train::GroupLossMode, train_manifest};
 
 pub(super) const GROUP: &str = "human_codec_strata";
 const ROOT_SHA: &str = "a7fd4af0c2bb5a8981be636e5c1cb1a51db57496b7c60d7bf6da01d71dd16952";
+const SOURCE_SHA: &str = "caf94cfc8b9bfad6ff2bb527dc07e49733a296c27c5a1e0d9d543ed513cce430";
 const FOLDS: &[&str] = &["tid2013", "konfig", "cid22_a25", "pipal", "pairs", "mos7"];
 type Group = (String, PathBuf, f64, f64, bool, GroupLossMode);
 
@@ -29,9 +30,68 @@ fn string<'a>(v: &'a Value, key: &str) -> Result<&'a str, String> {
 #[derive(Clone)]
 struct Row {
     index: usize,
-    key: String,
+    key: (String, u64),
     reference: String,
     jpeg: bool,
+}
+
+// Paths precede the response; source_row_id follows it. Never parse response text.
+fn stimulus_rows(text: &str) -> Result<BTreeMap<u64, (String, String)>, String> {
+    let mut lines = text.lines();
+    if lines.next() != Some("ref_path\tdist_path\thuman_score\trow_id") {
+        return Err("stimulus source schema changed".into());
+    }
+    let mut rows = BTreeMap::new();
+    for line in lines {
+        if line.bytes().filter(|b| *b == b'\t').count() != 3 {
+            return Err("stimulus source row shape changed".into());
+        }
+        let mut prefix = line.splitn(3, '\t');
+        let reference = prefix.next().ok_or("missing source reference")?;
+        let distorted = prefix.next().ok_or("missing source stimulus")?;
+        let id = line.rsplit_once('\t').ok_or("missing source row ID")?.1;
+        let row_id = id.parse::<u64>().map_err(|_| "invalid source row ID")?;
+        if row_id.to_string() != id
+            || reference.is_empty()
+            || distorted.is_empty()
+            || rows
+                .insert(row_id, (reference.into(), distorted.into()))
+                .is_some()
+        {
+            return Err("duplicate or invalid stimulus identity".into());
+        }
+    }
+    Ok(rows)
+}
+
+fn stem(path: &str) -> Result<String, String> {
+    Path::new(path)
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .map(str::to_ascii_lowercase)
+        .ok_or_else(|| "invalid stimulus path".into())
+}
+
+fn native_codec(reference: &str, distorted: &str, group: &str) -> Result<String, String> {
+    let reference = stem(reference)?;
+    let distorted = stem(distorted)?;
+    let parts: Vec<_> = distorted.split('_').collect();
+    if parts.len() != 3
+        || parts[0] != reference
+        || reference.len() != 3
+        || !reference.starts_with('i')
+        || !reference[1..].bytes().all(|b| b.is_ascii_digit())
+        || group.to_ascii_lowercase() != format!("kadid:{reference}")
+        || parts[1].len() != 2
+        || parts[2].len() != 2
+        || !parts[1].bytes().all(|b| b.is_ascii_digit())
+        || !parts[2].bytes().all(|b| b.is_ascii_digit())
+        || !parts[1].parse::<u32>().is_ok_and(|n| (1..=25).contains(&n))
+        || !parts[2].parse::<u32>().is_ok_and(|n| (1..=5).contains(&n))
+    {
+        return Err("native KADID stimulus identity differs".into());
+    }
+    Ok(format!("kadid_{}", parts[1]))
 }
 
 pub(super) struct Admitted {
@@ -156,17 +216,27 @@ pub(super) fn admit(args: &Args, groups: &[Group]) -> Result<Option<Admitted>, S
     }
     let keys = training_keys::read(
         &g.1.with_extension("keys.parquet"),
-        &["pair_key", "ref_basename", "member_set"],
+        &["pair_key", "source_row_id", "ref_basename", "member_set"],
         &["pair_key", "source_row_id", "ref_basename", "member_set"],
     )?;
     if keys.file_digest != string(&d, "keys_sha256")? {
         return Err("matched-codec fitting keys changed".into());
     }
-    let (key, reference, member) = (
+    let (key, source_row, reference, member) = (
         keys.column("pair_key")?,
+        keys.column("source_row_id")?,
         keys.column("ref_basename")?,
         keys.column("member_set")?,
     );
+    let source = &d["stimulus_source"];
+    let source_path = Path::new(string(source, "path")?);
+    group_admission::safe(source_path)?;
+    if source["sha256"] != SOURCE_SHA
+        || train_manifest::sha256_file(source_path).map_err(|e| e.to_string())? != SOURCE_SHA
+    {
+        return Err("matched-codec stimulus source changed".into());
+    }
+    let stimuli = stimulus_rows(&std::fs::read_to_string(source_path).map_err(|e| e.to_string())?)?;
     let banks = d["codec_banks"]
         .as_object()
         .ok_or("matched-codec bank identity required")?;
@@ -175,7 +245,7 @@ pub(super) fn admit(args: &Args, groups: &[Group]) -> Result<Option<Admitted>, S
     {
         return Err("matched-codec bank members differ".into());
     }
-    let mut codec = BTreeMap::new();
+    let mut references = BTreeMap::new();
     for (member, bank) in banks {
         let path = Path::new(string(bank, "keys_path")?);
         group_admission::safe(path)?;
@@ -201,18 +271,13 @@ pub(super) fn admit(args: &Args, groups: &[Group]) -> Result<Option<Admitted>, S
         if keys.file_digest != string(bank, "keys_sha256")? {
             return Err("codec bank keys changed".into());
         }
-        let (k, r, c) = (
-            keys.column("pair_key")?,
-            keys.column("ref_group")?,
-            keys.column("codec")?,
-        );
+        let (k, r) = (keys.column("pair_key")?, keys.column("ref_group")?);
         for row in keys.rows {
-            let identity = (row[r].clone(), row[c].clone());
-            if codec
-                .insert((member.clone(), row[k].clone()), identity.clone())
-                .is_some_and(|old| old != identity)
+            if references
+                .insert((member.clone(), row[k].clone()), row[r].clone())
+                .is_some()
             {
-                return Err("ambiguous promoted codec identity".into());
+                return Err("duplicate promoted pixel identity".into());
             }
         }
     }
@@ -220,23 +285,29 @@ pub(super) fn admit(args: &Args, groups: &[Group]) -> Result<Option<Admitted>, S
     let mut refs = Vec::new();
     let mut seen = BTreeSet::new();
     for (index, row) in keys.rows.into_iter().enumerate() {
-        if !seen.insert(row[key].clone()) {
-            return Err("duplicate fitting pair key".into());
+        let id = row[source_row]
+            .parse::<u64>()
+            .map_err(|_| "invalid fitting source row ID")?;
+        if !seen.insert((row[member].clone(), row[key].clone(), id)) {
+            return Err("duplicate fitting stimulus identity".into());
         }
         refs.push(row[reference].clone());
         if !row[member].starts_with("kadid_") {
             continue;
         }
-        let (source, codec) = codec
+        let source = references
             .get(&(row[member].clone(), row[key].clone()))
-            .ok_or("KADID key has no promoted codec")?;
+            .ok_or("KADID key has no promoted reference")?;
         if source != &row[reference] {
             return Err("promoted reference differs from fitting reference".into());
         }
+        let (reference_path, distorted_path) =
+            stimuli.get(&id).ok_or("fitting stimulus source missing")?;
+        let codec = native_codec(reference_path, distorted_path, source)?;
         if ["kadid_09", "kadid_10"].contains(&codec.as_str()) {
             rows.push(Row {
                 index,
-                key: row[key].clone(),
+                key: (row[key].clone(), id),
                 reference: source.clone(),
                 jpeg: codec == "kadid_10",
             });
@@ -384,7 +455,7 @@ mod tests {
             .enumerate()
             .map(|(index, (key, jpeg))| Row {
                 index,
-                key: key.into(),
+                key: (key.into(), index as u64),
                 reference: "r".into(),
                 jpeg,
             })
@@ -394,5 +465,44 @@ mod tests {
         let reversed: Vec<_> = rows.iter().rev().cloned().collect();
         assert_eq!(nearest_pairs(&reversed, &[0., 2., 1., 1.]).unwrap(), pairs);
         assert!(nearest_pairs(&rows[..2], &[0., 2.]).is_err());
+    }
+
+    #[test]
+    fn native_stimulus_metadata_never_uses_representative_codec_or_response() {
+        let text = "ref_path\tdist_path\thuman_score\trow_id\n\
+            r/I18.png\td/I18_09_01.png\tforbidden\t1750\n\
+            r/I18.png\td/I18_10_01.png\tforbidden\t1760\n";
+        let sources = stimulus_rows(text).unwrap();
+        assert_eq!(
+            native_codec(&sources[&1750].0, &sources[&1750].1, "kadid:I18").unwrap(),
+            "kadid_09"
+        );
+        assert_eq!(
+            native_codec(&sources[&1760].0, &sources[&1760].1, "kadid:I18").unwrap(),
+            "kadid_10"
+        );
+        assert!(native_codec("r/I17.png", "d/I18_10_01.png", "kadid:I17").is_err());
+        assert!(
+            stimulus_rows(&format!(
+                "{text}r/I18.png\td/I18_10_01.png\tforbidden\t1760\n"
+            ))
+            .is_err()
+        );
+        let rows: Vec<_> = [(10, true), (20, true), (30, false), (40, false)]
+            .into_iter()
+            .enumerate()
+            .map(|(index, (id, jpeg))| Row {
+                index,
+                key: ("same-pixels".into(), id),
+                reference: "r".into(),
+                jpeg,
+            })
+            .collect();
+        let pairs = nearest_pairs(&rows, &[1.; 4]).unwrap();
+        assert_eq!(pairs, vec![[0, 2], [0, 3], [1, 2]]);
+        assert_eq!(
+            nearest_pairs(&rows.iter().rev().cloned().collect::<Vec<_>>(), &[1.; 4]).unwrap(),
+            pairs
+        );
     }
 }

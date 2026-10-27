@@ -64,6 +64,7 @@ def audit(populations,pin,output):
         producer_sources={name:sha(Path(__file__).with_name(name)) for name in
             ("confidence_sources.py","confidence_population.py","live_md_uncertainty.py")},
         updated_utc=datetime.now(timezone.utc).isoformat(),weights_constructed=False,candidate_model_fit=False)
+    state["producer_sources"]["stimulus_identity.py"]=sha(Path(__file__).parents[1]/"rev4_featpot/stimulus_identity.py")
     def record():
         (output/"STATE.json").write_text(json.dumps(state,indent=1)+"\n")
     record()
@@ -76,6 +77,11 @@ def audit(populations,pin,output):
             if digest(path)!=expected:raise ValueError("frozen population metadata/source changed")
         raw=d["raw_sources"]
         human=d["tables"]["human_all"]["selection"]
+        for collection in ("kadid-10k","tid2013"):
+            selected=[r for r in human if r["collection"]==collection]
+            if (any("source_row_id" not in r for r in selected)
+                    or len({r["native"]["item"] for r in selected})!=len(selected)):
+                raise ValueError("native uncertainty must preserve every fitting stimulus")
         result={}
         state["stage"]="kadid-10k";record()
         wanted={Path(r["native"]["item"]).name.lower() for r in human if r["collection"]=="kadid-10k"}

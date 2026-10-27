@@ -14,6 +14,7 @@ import pyarrow.parquet as pq
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/"rev4_featpot"))
 from subjective_training_leg import document, safe, sha
 from confidence_sources import digest
+from stimulus_identity import promoted_stimuli, resolve
 
 ROOT_SHA = "a7fd4af0c2bb5a8981be636e5c1cb1a51db57496b7c60d7bf6da01d71dd16952"
 ROOT = Path("/var/tmp/byc-mixes-20261025/Mlic/root")
@@ -39,7 +40,7 @@ def identities(path):
     return result
 
 
-def bind_human(keys,banks,native):
+def bind_human(keys,banks,native,sources):
     by_name = {}
     for dataset in sorted(set(MEMBERS.values())):
         rows = native[dataset]
@@ -50,18 +51,22 @@ def bind_human(keys,banks,native):
                 raise ValueError("ambiguous native stimulus stem")
             by_name[dataset][key] = row
     result=[]
+    seen=set()
     for index,key in enumerate(keys):
         member = key["member_set"]
         if member not in MEMBERS:
             continue
+        identity=(member,key["pair_key"],key["source_row_id"])
+        if identity in seen:
+            raise ValueError("duplicate fitting stimulus identity")
+        seen.add(identity)
         bank = banks[member][key["pair_key"]]
-        if bank["ref_group"] != key["ref_basename"]:
-            raise ValueError("promoted/fitting reference identity differs")
+        source = resolve(key,banks,sources)
         dataset = MEMBERS[member]
-        native_row = by_name[dataset][Path(bank["dist_path"]).stem.lower()]
-        if Path(native_row["reference"]).stem.lower() != Path(bank["ref_path"]).stem.lower():
+        native_row = by_name[dataset][Path(source["dist_path"]).stem.lower()]
+        if Path(native_row["reference"]).stem.lower() != Path(source["ref_path"]).stem.lower():
             raise ValueError("native/promoted reference identity differs")
-        result.append(dict(table_row=index,pair_key=key["pair_key"],member_set=member,collection=dataset,
+        result.append(dict(table_row=index,pair_key=key["pair_key"],source_row_id=key["source_row_id"],member_set=member,collection=dataset,
             reference_group=key["ref_basename"],native=native_row,ref_pixels_sha256=bank["ref_pixels_sha256"],
             dist_pixels_sha256=bank["dist_pixels_sha256"]))
     return result
@@ -78,13 +83,8 @@ def prepare(output):
         p=LIBRARY/dataset/"labels.tsv"
         inputs[str(p)]=digest(p)
         native[dataset]=identities(p)
-    banks={}
-    for member in MEMBERS:
-        p=Path("/var/tmp/rev4-featbank/bank")/member/"keys.parquet"
-        inputs[str(p)]=sha(p)
-        rows=pq.read_table(p).to_pylist()
-        banks[member]={r["pair_key"]:r for r in rows}
-        if len(banks[member])!=len(rows): raise ValueError("duplicate promoted key")
+    banks,sources,source_inputs=promoted_stimuli(MEMBERS)
+    inputs.update(source_inputs)
     tables={}
     for name,leg in receipt["legs"].items():
         if name!="human_all" and not name.startswith("human_without_"): continue
@@ -97,7 +97,7 @@ def prepare(output):
         inputs[str(kp)]=fit["keys_sha256"];inputs[str(manifest)]=fit["manifest_sha256"]
         keys=pq.read_table(kp).to_pylist()
         tables[name]=dict(table=str(table),table_sha256=fit["sha256"],keys_sha256=fit["keys_sha256"],
-            rows=len(keys),selection=bind_human(keys,banks,native))
+            rows=len(keys),selection=bind_human(keys,banks,native,sources))
     packet=document(ROOT/"datasets/receipt.json",frozen["auxiliary_files"]["datasets/receipt.json"])
     inputs[str(ROOT/"datasets/receipt.json")]=sha(ROOT/"datasets/receipt.json")
     for group in packet["groups"]:

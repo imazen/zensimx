@@ -64,15 +64,41 @@ class NativeUncertainty(unittest.TestCase):
         import confidence_population as population
         p,_=self.put("ids.tsv","item\tref\tscore\nd/I02_01_1.bmp\tr/I02.bmp\tforbidden\n")
         native={"kadid-10k":{},"tid2013":population.identities(p)}
-        keys=[dict(pair_key="a"*64,member_set="tid2013",ref_basename="tid:I02")]
+        keys=[dict(pair_key="a"*64,source_row_id=7,member_set="tid2013",ref_basename="tid:I02")]
         bank=dict(ref_group="tid:I02",dist_path="d/I02_01_1.png",ref_path="r/I02.png",
                   ref_pixels_sha256="b"*64,dist_pixels_sha256="c"*64)
-        rows=population.bind_human(keys,{"tid2013":{"a"*64:bank}},native)
+        sources={7:dict(ref_path="r/I02.png",dist_path="d/I02_01_1.png")}
+        rows=population.bind_human(keys,{"tid2013":{"a"*64:bank}},native,sources)
         self.assertEqual(rows[0]["native"]["row"],0)
         self.assertEqual(rows[0]["table_row"],0)
         bank["ref_group"]="tid:I03"
         with self.assertRaisesRegex(ValueError,"reference identity"):
-            population.bind_human(keys,{"tid2013":{"a"*64:bank}},native)
+            population.bind_human(keys,{"tid2013":{"a"*64:bank}},native,sources)
+
+    def test_pixel_identical_stimuli_keep_distinct_native_uncertainty_identity(self):
+        import confidence_population as population
+        from stimulus_identity import source_metadata, resolve
+        p,pin=self.put("pairs.tsv","ref_path\tdist_path\thuman_score\trow_id\n"
+            "r/I18.png\td/I18_01_01.png\tforbidden\t1750\n"
+            "r/I18.png\td/I18_03_01.png\tforbidden\t1760\n")
+        sources=source_metadata(p,pin)
+        ids,_=self.put("ids.tsv","item\tref\tscore\n"
+            "d/I18_01_01.png\tr/I18.png\tforbidden\n"
+            "d/I18_03_01.png\tr/I18.png\tforbidden\n")
+        native={"kadid-10k":population.identities(ids),"tid2013":{}}
+        keys=[dict(pair_key="a"*64,source_row_id=i,member_set="kadid_train",ref_basename="kadid:I18")
+              for i in (1750,1760)]
+        banks={"kadid_train":{"a"*64:dict(ref_group="kadid:I18",ref_path="r/I18.png",
+            dist_path="d/I18_01_01.png",ref_pixels_sha256="b"*64,dist_pixels_sha256="c"*64)}}
+        actual=population.bind_human(keys,banks,native,sources)
+        self.assertEqual([r["native"]["row"] for r in actual],[0,1])
+        self.assertEqual([r["source_row_id"] for r in actual],[1750,1760])
+        self.assertEqual(resolve(keys[1],banks,sources)["codec"],"kadid_03")
+        with self.assertRaisesRegex(ValueError,"duplicate fitting stimulus"):
+            population.bind_human(keys+[keys[0]],banks,native,sources)
+        p.write_text(p.read_text()+"r/I18.png\td/I18_03_01.png\tforbidden\t1760\n")
+        with self.assertRaisesRegex(ValueError,"duplicate"):
+            source_metadata(p,source.digest(p))
 
     def test_mat_selected_columns_match_scipy_without_decoding_excluded_responses(self):
         import numpy as np

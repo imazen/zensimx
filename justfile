@@ -416,6 +416,9 @@ dataset-order-native-tests target:
     cargo test --locked -p zensim-validate --test matched_codec --test subjective_rank --test subjective_vote --target-dir {{quote(target)}}
     cargo test --locked -p zensim-validate --bin zensim_mlp_train matched_codec:: --target-dir {{quote(target)}}
 
+dataset-trainer-clippy target:
+    cargo clippy --locked -p zensim-validate --lib --bin zensim_mlp_train --target-dir {{quote(target)}} -- -D warnings
+
 # Caller holds heavy.lock and run-heavy; this creates fresh matching predictions.
 dataset-order-prepare study:
     OPENBLAS_NUM_THREADS=1 python3 -B scripts/rev4_featpot/matched_codec.py {{quote(study)}}
