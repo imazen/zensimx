@@ -87,6 +87,40 @@ def check_fit(directory, seed, root_pin, *, initial=None, strength=None):
                     ("result.json", "DATASET_GROUP_SELECTION.json", "keep_features.txt", "train.log", authority_file.name)})
 
 
+def require_full_control_parity(original, replay, tool, output):
+    """Compare all model bytes except run-specific reproduction metadata.
+
+    This uses the existing E33 native strip owner; original artifacts remain
+    untouched and complete result/admission records must match apart from their
+    output paths and model hashes, which are independently bound by check_fit.
+    """
+    original, replay, output = Path(original), Path(replay), Path(output)
+    a, b = [json.loads((p / "result.json").read_text()) for p in (original, replay)]
+    transport = {"selected_bake", "selected_bake_sha256", "dense_model_sha256",
+                 "packed_model", "packed_model_sha256"}
+    if {k: v for k, v in a.items() if k not in transport} != {k: v for k, v in b.items() if k not in transport}:
+        raise ValueError("full control recipe/admission/result fields changed")
+    output.mkdir(exist_ok=False)
+    rows = []
+    for name in ("last.bin", "production-f16.bin"):
+        copies = []
+        for label, cell in (("original", original), ("replay", replay)):
+            dest = output / f"{label}-{name}"
+            with (output / f"{label}-{name}.log").open("x") as log:
+                subprocess.run([str(tool), "strip", "--in", str(cell / "refit" / name),
+                                "--out", str(dest), "--key", "zentrain.repro"],
+                               stdout=log, stderr=subprocess.STDOUT, check=True)
+            copies.append(dest)
+        if copies[0].read_bytes() != copies[1].read_bytes():
+            raise ValueError(f"full control numerical/serving bytes changed: {name}")
+        rows.append(dict(model=name, nonrepro_sha256=sha(copies[0]),
+                         original_sha256=sha(original / "refit" / name),
+                         replay_sha256=sha(replay / "refit" / name)))
+    return dict(comparison="exact native model bytes excluding zentrain.repro only",
+                original_artifacts_unchanged=True, result_fields_equal=True,
+                native_owner_sha256=sha(tool), models=rows)
+
+
 def panel_finished(plan):
     output = Path(plan["fold_panel"])
     complete = output / "PANEL_COMPLETE.json"
@@ -209,12 +243,14 @@ def run(path):
             original[seed] = check_fit(directory, seed, fold_plan["common_root_sha256"])
         order_source, order_bin = Path(plan["order_source"]), Path(plan["order_bin"])
         record(output, state, "full-control", binary_sha256=sha(order_bin / "zensim_mlp_train"))
-        control = output / "control"
-        execute("control", fit_command(order_source, common, control, columns, 0), order_bin)
+        control = Path(plan["replay_control"]) if "replay_control" in plan else output / "control"
+        if "replay_control" not in plan:
+            execute("control", fit_command(order_source, common, control, columns, 0), order_bin)
         control_result = check_fit(control, 0, fold_plan["common_root_sha256"])
-        if any(control_result[k] != original[0][k] for k in ("checkpoint_sha256", "packed_sha256")):
-            raise ValueError("new native binary changed original full Mlic control")
-        write(output / "CONTROL_VERIFIED.json", dict(byte_identical=True, original=original[0], replay=control_result), fresh=True)
+        parity = require_full_control_parity(Path(plan["original_full"]) / "full_s0", control,
+                                           order_bin / "bake_dial_refit", output / "control-parity")
+        write(output / "CONTROL_VERIFIED.json", dict(nonrepro_byte_identical=True, parity=parity,
+              original=original[0], replay=control_result), fresh=True)
         record(output, state, "full-matching")
         execute("matching", [sys.executable, "-B", str(order_source / "scripts/rev4_featpot/matched_codec.py"),
                               str(output / "matching"), "--full"], order_bin)

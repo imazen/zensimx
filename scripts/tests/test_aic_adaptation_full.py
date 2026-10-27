@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from scripts.byconstruction import aic_adaptation_full as owner
 
@@ -27,6 +28,31 @@ class FullCommands(unittest.TestCase):
             owner.fit_command(*args, strength=(16, 8))
         with self.assertRaises(ValueError):
             owner.fit_command(*args[:-1], 3)
+
+
+class FullControlParity(unittest.TestCase):
+    def test_changed_result_or_model_cannot_pass(self):
+        with tempfile.TemporaryDirectory(dir=Path.home() / "tmp") as tmp:
+            root = Path(tmp)
+            tool = root / "native-owner"
+            tool.write_bytes(b"fixture-owner")
+            cells = [root / label for label in ("original", "replay")]
+            for cell in cells:
+                (cell / "refit").mkdir(parents=True)
+                (cell / "result.json").write_text(json.dumps(dict(epochs=120, selected_bake=str(cell))))
+                for name in ("last.bin", "production-f16.bin"):
+                    (cell / "refit" / name).write_bytes(b"exact numerical and serving bytes")
+            def native_copy(argv, **kwargs):
+                Path(argv[argv.index("--out") + 1]).write_bytes(Path(argv[argv.index("--in") + 1]).read_bytes())
+            with patch.object(owner.subprocess, "run", side_effect=native_copy):
+                result = owner.require_full_control_parity(*cells, tool, root / "equal")
+                self.assertEqual(len(result["models"]), 2)
+                (cells[1] / "refit/production-f16.bin").write_bytes(b"changed calibration")
+                with self.assertRaisesRegex(ValueError, "numerical/serving"):
+                    owner.require_full_control_parity(*cells, tool, root / "different")
+            (cells[1] / "result.json").write_text(json.dumps(dict(epochs=119)))
+            with self.assertRaisesRegex(ValueError, "recipe/admission"):
+                owner.require_full_control_parity(*cells, tool, root / "bad-recipe")
 
 
 class LiveTrainingProgress(unittest.TestCase):

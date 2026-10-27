@@ -180,6 +180,9 @@ because cleanup tests or a historical training reproduction pass.
 
 ## Known Bugs
 
+* **2026-10-27 — full-control raw hashes included run provenance.** AIC full run02 completed its control, then the new comparator rejected the embedded paths/build/run metadata. Native `strip --key zentrain.repro` on copies proves exact final-f32 and packed serving bytes; the recorded training curves match excluding elapsed time. The corrected comparator follows the existing E33 control owner and also compares all result fields except output paths/model hashes. Preserve failed run02 and dependent panel/confidence failures; recovery requires a fresh pinned plan and unchanged numerical equality.
+
+
 * **2026-10-27 — confidence manifest logical width.** Binding run02 declared the 410 selected raw IDs as the model width, omitting the 1,853 raw-input extent plus 410 registered derived products. Caught before candidate fitting. The producer now binds the exact derived declaration and records logical width 2,263 separately; old manifests remain unexecuted and superseded. Fresh manifests and full-budget unweighted parity are required before confidence fits.
 
 * **2026-10-27 — queued admission referenced an absent generic binary name.** The preserved reader is hash-suffixed, while the first confidence plan named `admission-packed` without binding it in `input_sha256`. Native decoding finished but receipt writing refused before a screen or response read. The coordinator now requires the actual packed reader as an existing, hash-bound input before queueing. Failed source-screen/AIC dependency attempts remain preserved; replacement plans retain scientific inputs and thresholds.

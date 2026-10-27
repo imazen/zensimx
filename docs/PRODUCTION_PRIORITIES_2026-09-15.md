@@ -15,6 +15,19 @@ historical. Run `just mlic-priority-progress` before reporting status. Immutable
 registrations and results remain in
 [the byconstruction record](../benchmarks/byconstruction_2026-10-22.md).
 
+**06:41 UTC failure and diagnosis:** full run02 finished its 120-epoch control,
+but the newly written raw-file hash check rejected different embedded run
+provenance. Both final-f32 and production-f16 models are byte-identical after
+the existing native owner removes only `zentrain.repro` from diagnostic copies;
+all other result fields match except output paths/model hashes. Original files
+are preserved. Full panels and confidence run01 refused their failed dependency
+before fitting. No worker from those failed queues should be called running.
+The repaired comparison follows the established E33 control method: exact
+non-provenance model bytes plus matching full recipe/admission/result fields.
+It retains all numerical/serving metadata, including calibration. Run02 remains
+failed historical evidence; use a fresh pinned recovery plan, binding the
+completed control artifacts, instead of rerunning or overwriting its outputs.
+
 **Owner refinement, October 27: compare AIC adaptation using complete panels.**
 Compare Mlic, the effective-sample mass arm, vote likelihood and matched
 ordering under the same AIC2026 public_train continuation recipe, including

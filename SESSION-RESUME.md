@@ -30,7 +30,20 @@ requirement, not a candidate-selection cutoff. See the prospective
 
 ### Verify live work before doing anything else
 
-**Latest verified observation — 2026-10-27 06:38:03 UTC:** AIC fold run03
+**06:41 UTC failure and diagnosis:** full run02 finished its 120-epoch control,
+but the newly written raw-file hash check rejected different embedded run
+provenance. Both final-f32 and production-f16 models are byte-identical after
+the existing native owner removes only `zentrain.repro` from diagnostic copies;
+all other result fields match except output paths/model hashes. Original files
+are preserved. Full panels and confidence run01 refused their failed dependency
+before fitting. No worker from those failed queues should be called running.
+The repaired comparison follows the established E33 control method: exact
+non-provenance model bytes plus matching full recipe/admission/result fields.
+It retains all numerical/serving metadata, including calibration. Run02 remains
+failed historical evidence; use a fresh pinned recovery plan, binding the
+completed control artifacts, instead of rerunning or overwriting its outputs.
+
+**Earlier verified observation — 2026-10-27 06:38:03 UTC:** AIC fold run03
 has completed **96/96** cells (24 verified reuses plus 72 new fits), with no
 reported failures. Fold panels, including both mixture checks, are complete for **144/144** models.
 Full-data training is running its unweighted control; compute-lock holder PID

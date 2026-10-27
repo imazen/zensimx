@@ -5951,3 +5951,32 @@ full control was live at logged epoch 110 with no reported failure. Its
 completion still requires native artifact/control verification. Frozen worker
 source, recipe, inputs and gates are unchanged. Confidence remains queued at
 0/21 behind the full-panel dependency.
+
+
+### Full control provenance comparison repair — October 27, 2026
+
+**06:41 UTC failure and diagnosis:** full run02 finished its 120-epoch control,
+but the newly written raw-file hash check rejected different embedded run
+provenance. Both final-f32 and production-f16 models are byte-identical after
+the existing native owner removes only `zentrain.repro` from diagnostic copies;
+all other result fields match except output paths/model hashes. Original files
+are preserved. Full panels and confidence run01 refused their failed dependency
+before fitting. No worker from those failed queues should be called running.
+The repaired comparison follows the established E33 control method: exact
+non-provenance model bytes plus matching full recipe/admission/result fields.
+It retains all numerical/serving metadata, including calibration. Run02 remains
+failed historical evidence; use a fresh pinned recovery plan, binding the
+completed control artifacts, instead of rerunning or overwriting its outputs.
+
+Diagnostic root: `/mnt/v/output/zensim/mlic-aic-full-20261027-control-diagnostic-run01`.
+Native owner SHA256 `ce9ff24b62b940877ddc94c1a794437c0a1b07075cbe6ddcf21ad404f116b942`.
+Final-f32 non-repro SHA256 on both sides:
+`6a0f762eae417bae2dc9f94066c54cccc97f7d7e191e2b43219a9b314643adb7`;
+packed non-repro SHA256 on both sides:
+`4fcc35b13dca0f8059770cb467400c9069df1a1a9d35ded839754dd2ca541a24`.
+Diagnostic run-heavy: rc=0, 0s, peak RSS 0.02 GiB, minimum available
+41,037 MiB, peak load 0.78. Repaired orchestration tests on i265 pass all
+25 cases, including changed recipe and serving-byte rejection: rc=0, 0s,
+peak RSS 0.08 GiB, minimum available 24,319 MiB, peak load 0.15.
+This is a correction to the new session's comparator, not a tolerance or
+relaxation of an established numerical requirement. No model was adopted.
