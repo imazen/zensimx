@@ -10,6 +10,7 @@ the frozen-B row comes from panel_public_test_frozen.json and the candidate's fr
 
   python3 aic_dashboard_data.py --out DIR --arms Tga,Ma,Bga,... [--commits-since 322930e4]
   python3 aic_dashboard_data.py --out NEW --extend OLD    E21 scatter and revision-7 rows only (Mr7, Mdata, Mlic, ...)
+  python3 aic_dashboard_data.py --out NEW --curate         the two curated roles: general and codec-only views
 """
 
 import argparse
@@ -28,7 +29,7 @@ from scipy.stats import spearmanr
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import aic_train as A  # noqa: E402
-from aic_panel import TYPE_NAMES, geometry  # noqa: E402
+from aic_panel import GEOMETRY, TYPE_NAMES, geometry  # noqa: E402
 from lib.zen_stats import panel_batch  # noqa: E402
 
 REPO = HERE.parents[1]
@@ -287,6 +288,132 @@ def extend(prev: Path, out: Path, eval_dir: Path | None = None) -> int:
     return 0
 
 
+# The two models the owner is curating (2026-10-27): a general model, judged on every distortion type, and a codec
+# model, judged on compression only (AIC-2026 public_train and the compression types of the E21 sets). Seed 0, read
+# from the October 27 studies' saved outputs: held-out AIC-2026 public_train predictions (the adaptation study's
+# omission cells, mean over the cells holding each source out; or each frontier fold model on its held-out sources)
+# and E21 out-of-sample cells. No fit, and no EVAL read.
+CODEC_TYPES = {"kadid": ("kadid_09", "kadid_10"), "tid2013": ("tid_10", "tid_11", "tid_21"), "konfig": ("jpeg2000",),
+               "cid22_a25": None}  # None: every row (CID22-A is codecs only)
+Z = Path("/mnt/v/output/zensim")
+CURATE = (  # key, name, AIC-2026 public_train source, E21 out-of-sample cells (None: none yet)
+    ("mlic", "Mlic (no AIC leg)", ("heldout", "Mlic"), Path("/var/tmp/byc-mixes-20261025/cells/Mlic")),
+    ("mlicft", "MlicFT16x8", ("heldout", "MlicFT16x8"), Z / "aic-finetune-20261026/run-05/cells/MlicFT16x8"),
+    ("mvote", "MlicVote (no AIC leg)", ("heldout", "MlicVote"), Z / "mlic-vote-20261027-run02/cells/MlicVote"),
+    ("mvoteft", "MlicVoteFT16x8", ("heldout", "MlicVoteFT16x8"), Z / "mlic-aic-adaptation-20261027-run03/cells/MlicVoteFT16x8"),
+    ("vote256", "Vote ×256, epoch 29", ("fold", Z / "mlic-aic-recipe-vote-aic256-20261027-run01", "MlicVoteAIC256@e29"),
+     Z / "mlic-aic-omission-voteaic256-20261027-run01/cells/MlicVoteAIC256e29"),
+    ("xref256", "×256 + rehearsal, epoch 59", ("fold", Z / "mlic-aic-xref-20261027-run01", "XrefAIC256@e59"),
+     Z / "mlic-aic-omission-xrefaic256-20261027-run01/cells/XrefAIC256e59"),
+    ("aiconly", "AIC-only, epoch 29", ("fold", Z / "mlic-aic-share-frontier-20261027-run01", "AICOnly@e29"), None),
+    ("x1024", "×1024, epoch 59", ("fold", Z / "mlic-aic-share-frontier-20261027-run01", "MixedAIC1024@e59"), None),
+    ("xref1024", "×1024 + rehearsal, epoch 59", ("fold", Z / "mlic-aic-xref-20261027-run01", "XrefAIC1024@e59"), None),
+)
+
+
+def curate(out: Path) -> int:
+    """curate.json (one row per AIC-2026 public_train crop and E21 stimulus, each candidate on that set's label scale
+    three ways, plus codec-only views fitted on the compression rows) and curate_stats.json (statistics per set,
+    subset and candidate, and one summary row per candidate)."""
+    sys.path.insert(0, str(HERE))
+    from aic_matched_continuation import INPUTS, SOURCE_FOLDS, out_of_fold
+    from aic_adaptation_full_panel import full_populations
+    from aic_panel import dvifm_e21
+    fold = json.loads(Path(INPUTS["fold_plan"][0]).read_text())
+    sys.path[:0] = [str(Path(fold["warmstart_source"]) / "scripts/rev4_featpot"), str(Path(fold["warmstart_source"]) / "scripts")]
+    pairs, populations = full_populations(fold, out, "dashboard-curation-views")
+    assignment = json.loads(Path(INPUTS["aic_authority"][0]).read_text())["assignment"]
+    folds = pairs.group.map(assignment).to_numpy(dtype=int)
+    _, types = dvifm_e21()
+    adapt = Path(INPUTS["fold_plan"][0]).parent / "panels"
+    rows, stats = [], []
+
+    def aic_pred(source):
+        if source[0] == "heldout":
+            h = pd.read_csv(adapt / f"{source[1]}-heldout.tsv", sep="\t").set_index("key").pred
+            if set(h.index) != set(pairs.key):
+                raise ValueError(f"{source[1]}: held-out predictions do not cover public_train")
+            return h.loc[pairs.key].to_numpy(np.float64)
+        run, label = source[1], source[2]
+        values = {f"{label}|k{k}": pd.read_csv(run / "panels/predictions" / f"{label}|s0|k{k}|aic.tsv", sep="\t")
+                  .pred.to_numpy(np.float64) for k in SOURCE_FOLDS}
+        return out_of_fold(values, folds, label)
+
+    def views(frame, prefix, key, x, y, mask=None):
+        """Logistic fit, rank map and mean/SD match of `x` onto `y` (agreeing in direction), on `mask` rows."""
+        idx = np.arange(len(y)) if mask is None else np.flatnonzero(mask)
+        st, arr = geometry(x[idx], y[idx], arrays=True)
+        for v, values in (("f", arr["fit"]), ("r", arr["rank"]),
+                          ("a", y[idx].mean() + (x[idx] - x[idx].mean()) * (y[idx].std() / x[idx].std()))):
+            col = np.full(len(y), np.nan)
+            if values is not None:
+                col[idx] = values
+            frame[f"{v}{prefix}_{key}"] = np.round(col, 3)
+        return st
+
+    jnd = pairs.jnd.to_numpy(np.float64)
+    aic_frame = {"ds": "aic", "jnd": np.round(jnd, 3), "codec": pairs.codec.to_numpy(), "cdc": 1}
+    e21_frames = {}
+    for ds in ("kadid", "tid2013", "konfig", "cid22_a25"):
+        y = np.asarray(populations[ds]["target"], np.float64)
+        ty = np.asarray(types[ds])
+        if len(ty) != len(y):
+            raise ValueError(f"{ds}: {len(ty)} distortion types for {len(y)} labels")
+        cdc = np.ones(len(y), bool) if CODEC_TYPES[ds] is None else np.isin(ty, CODEC_TYPES[ds])
+        e21_frames[ds] = ({"ds": ds, "label": np.round(y, 4), "type": [TYPE_NAMES.get(x, x) for x in ty],
+                           "cdc": cdc.astype(int)}, y, cdc)
+    for key, name, source, cells in CURATE:
+        pred = aic_pred(source)
+        worse = -pred  # the AIC views sit on the JND scale like the dashboard's other AIC scatters (higher is worse)
+        st = views(aic_frame, "", key, worse, jnd)
+        pn = panel_batch([(key, pred, -jnd)], stats="full")[0]
+        for subset in ("all", "codec"):  # every public_train crop is a codec
+            stats.append({"table": "cscatter", "id": f"aic_{subset}_{key}", "dataset": "AIC2026 public_train",
+                          "subset": subset, "key": key, "model": name, "n": int(pn["n"]), "srocc": pn["srocc_signed"],
+                          "plcc": pn["plcc"], "krocc": pn["krocc"], "or": pn["or"], "pwrc": pn["pwrc"],
+                          "z_rmse": pn["z_rmse"], "sample": "held out" if source[0] == "heldout" else "out of fold", **st})
+        for ds, (frame, y, cdc) in e21_frames.items():
+            f = None if cells is None else cells / f"without_{ds}_s0" / f"pred_{ds}.tsv"
+            if f is None or not f.is_file():
+                continue
+            x = pd.read_csv(f, sep="\t").pred.to_numpy(np.float64)
+            if len(x) != len(y):
+                raise ValueError(f"{f}: {len(x)} predictions for {len(y)} labels")
+            for subset, prefix, mask in (("all", "", None), ("codec", "c", cdc)):
+                # Where every row is a codec (CID22-A) the codec views are the full-set views: not stored twice.
+                st = views(frame, prefix, key, x, y, mask) if mask is None or not mask.all() else stats[-1].copy()
+                if mask is not None and mask.all():
+                    st = {k: v for k, v in st.items() if k in GEOMETRY}
+                sel = slice(None) if mask is None else mask
+                pn = panel_batch([(key, x[sel], y[sel])], stats="full")[0]
+                stats.append({"table": "cscatter", "id": f"{ds}_{subset}_{key}", "dataset": NAMES[ds], "subset": subset,
+                              "key": key, "model": name, "n": int(pn["n"]), "srocc": pn["srocc_signed"], "plcc": pn["plcc"],
+                              "krocc": pn["krocc"], "or": pn["or"], "pwrc": pn["pwrc"], "z_rmse": pn["z_rmse"],
+                              "sample": "out of sample", **st})
+    for key, name, source, cells in CURATE:
+        mine = {(s["dataset"], s["subset"]): s for s in stats if s["table"] == "cscatter" and s["key"] == key}
+        e21 = {sub: [mine[(NAMES[d], sub)]["srocc"] for d in ("kadid", "tid2013", "konfig", "cid22_a25")
+                     if (NAMES[d], sub) in mine] for sub in ("all", "codec")}
+        stats.append({"table": "cmodels", "id": key, "model": name,
+                      "aic": mine[("AIC2026 public_train", "all")]["srocc"],
+                      "aic_sample": mine[("AIC2026 public_train", "all")]["sample"],
+                      "e21_all": float(np.mean(e21["all"])) if len(e21["all"]) == 4 else None,
+                      "e21_codec": float(np.mean(e21["codec"])) if len(e21["codec"]) == 4 else None,
+                      **{f"{d}_{sub}": mine[(NAMES[d], sub)]["srocc"] if (NAMES[d], sub) in mine else None
+                         for d in ("kadid", "tid2013", "konfig", "cid22_a25") for sub in ("all", "codec")},
+                      "e21_status": "out of sample, seed 0" if len(e21["all"]) == 4 else "no out-of-sample cells yet"})
+    def records(frames, name):  # shuffled rows, empty views left out (the dashboard's 8 MB source limit)
+        df = pd.concat([pd.DataFrame(f) for f in frames], ignore_index=True).sample(frac=1, random_state=0)
+        recs = [{k: v for k, v in r.items() if not (isinstance(v, float) and np.isnan(v))} for r in df.to_dict("records")]
+        (out / name).write_text(json.dumps(recs, separators=(",", ":"), default=lambda v: v.item()) + "\n")
+        return len(recs)
+    n_aic = records([aic_frame], "curate_aic.json")
+    n_e21 = records([f for f, _, _ in e21_frames.values()], "curate_e21.json")
+    (out / "curate_stats.json").write_text(json.dumps(stats, indent=0) + "\n")
+    print(f"{n_aic} AIC rows, {n_e21} E21 rows; {len(stats)} statistic rows; models {[k for k, *_ in CURATE]}")
+    return 0
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--out", required=True)
@@ -294,9 +421,12 @@ def main() -> int:
     ap.add_argument("--commits-since", default="322930e4")
     ap.add_argument("--extend", help="an earlier build's directory: refresh only its E21 scatter and revision-7 rows")
     ap.add_argument("--eval-scatter", help="with --extend: a dataset_eval.py directory whose scatter stats to add")
+    ap.add_argument("--curate", action="store_true", help="only the two curated roles' views and statistics")
     a = ap.parse_args()
     out = Path(a.out)
     out.mkdir(parents=True, exist_ok=True)
+    if a.curate:
+        return curate(out)
     if a.extend:
         return extend(Path(a.extend), out, Path(a.eval_scatter) if a.eval_scatter else None)
     if not a.arms:

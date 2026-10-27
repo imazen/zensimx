@@ -7434,3 +7434,18 @@ higher, so **the D candidate (×256 + rehearsal, epoch 59) replaces the Vote poi
 stages F and E (queued, registered before their results). Against stage A's Mlic point (reported) KonFiG is −0.0056,
 so it would not have replaced that point. Out of sample, none of these continuations moves the four-set mean by more
 than 0.001 from Mlic; CID22-A gains and KonFiG loses.
+
+### Codec-role evidence: E21 out of sample for the AIC-heavy arms (registered 2026-10-27, 21:06 UTC, owner request, before any of these runs)
+
+The owner asked (about 20:50 UTC) to curate two models: one robust in general and one specific to codecs, which may be
+worse on other distortion types. The dashboard's new "Two models" tab compares the October 27 candidates for both roles:
+SROCC on AIC-2026 public_train (held out) and on the E21 sets out of sample, on every distortion type and on compression
+only (KADID JPEG and JPEG 2000; TID2013 JPEG, JPEG 2000 and lossy compression of noisy images; KonFiG JPEG 2000; all of
+CID22-A). Seed-0 compression-only SROCC, mean of the four sets: Mlic 0.9223, MlicFT16x8 0.9219, MlicVoteFT16x8 0.9202,
+Vote ×256 e29 0.9230, ×256 + rehearsal e59 0.9254.
+
+The AIC-heavy arms lead on AIC-2026 out of fold (AIC-only e29 0.9515, ×1024 e59 0.9465, ×1024 + rehearsal e59 0.9458) but
+have no out-of-sample E21 cells. Each gets one omission run: the twelve Mlic omission cells continued under its
+population (AIC-only, mixed ×1024, mixed ×1024 + rehearsal) at the studied epochs, scored by the existing E21 owner,
+with compression-only SROCC from the same predictions. Queued after stage E. These runs are evidence for the owner's
+curation; no registered rule picks the codec model from them.
