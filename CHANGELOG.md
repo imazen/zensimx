@@ -242,6 +242,7 @@ None.
 - Exact feature gradients accept identity models with appended constant size axes and return errors for short inputs, preserving forward scores.
 
 - Browser WASM releases large streaming buffers without spawning unsupported native threads; Rayon metric computation is retained.
+- `ZensimResult::{approx_ssim2, approx_dssim, approx_butteraugli}` on bake-scored profiles (A, B, C, D, BHdr, CHdr). `set_mlp_score` replaced `raw_distance` with the bake's output, a calibrated score, and the helpers fed it to power laws fitted on the linear preview-v0.2 distance: on 868 real-photo JPEG/AVIF/JPEG XL pairs under B, `approx_ssim2` sat at its -100 floor on 716 and `approx_butteraugli` read 10-38, and a negative score (D reaches one) read as a perfect 100 / 0. The result now keeps the linear distance every bake profile still computes, and the helpers read it; on the SDR profiles it matches `PreviewV0_2` to about 1e-7. Against libjxl on those pairs, B's `approx_ssim2` MAE went from 167.8 (r = -0.755) to 4.72 (r = 0.992). Scores, `raw_distance()`, linear profiles and signatures are unchanged.
 
 ### Changed
 
