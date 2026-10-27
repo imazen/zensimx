@@ -6549,3 +6549,67 @@ Build run-heavy: rc=0, 14s, peak RSS 0.84 GiB, minimum available 23,132 MiB, pea
 Measurement run-heavy: rc=0, 17s, peak RSS 0.24 GiB, minimum available 23,693 MiB,
 peak load 0.96. Resource receipts are not runtime benchmarks. Rust formatting
 checks pass. Confidence control training continues; no candidate is adopted.
+
+## October 27 — AIC-only historical evidence and matched continuation diagnostic
+
+The saved `aic2026train/panel_mohammadi.json` and
+`rust/folds_train/T_full/train.log` were inspected again. The historical T fit
+used one AIC-2026 public_train group, 3,920 crops from 28 sources, 60 epochs
+of 20,000 pairs, initial learning rate 0.001, and 844 fx1g inputs. Its saved
+in-sample panel is SROCC 0.9742999206247418, PLCC 0.9641750402938799,
+Kendall 0.8587809369174624 and Z-RMSE 0.2652668310857874. The seven-source-fold
+panel is SROCC 0.9526610561260485, PLCC 0.9332146636245136, Kendall
+0.8113205128561868 and Z-RMSE 0.3593193448677381. These are the saved panel's
+statistics and conventions, not newly computed raw calibration errors.
+The training receipt explicitly has `qualified_provenance=false` and unknown
+feature-set identity. This is historical research evidence, not a qualified
+Rev7 Mlic control. AIC-3 and AIC-2026 public_test are not part of this read.
+
+This evidence changes the next mechanism question. The current mixed-data
+continuations do not establish an AIC-specific fit ceiling. Their `dev_curve`
+tracks the older development groups; AIC is explicitly not evaluated during
+training. `train_and_select` retains the final checkpoint but deletes its
+checkpoint directory, so those outputs do not provide an AIC convergence
+trajectory. Do not infer convergence from the rounded mixed training loss.
+
+### Prospective bounded screen: population versus continuation budget
+
+Before any new fit, register the following paired TRAIN-only diagnostic in a
+fresh directory with exact source, binary, table, authority and checkpoint
+hashes. This section fixes the design; it does not claim a launch.
+
+- Start both arms from original Mlic full seed 0 `refit/last.bin`, keeping its
+  Rev7 feature identities, Mlic architecture and parameter constraints.
+- Use the admitted D6 all-public_train table and unchanged target orientation.
+  One arm retains the existing full-data group mixture plus AIC weight 16;
+  the other updates on AIC alone. The latter is **AIC-only continuation of a
+  mixed-data pretrained model**, not training from scratch on AIC alone.
+- Both arms use fresh optimizer state, constant learning rate 0.00001, the
+  existing seed-0 streams and 50,000 draws per epoch. Run 60 epochs per arm;
+  preserve checkpoints after epochs 7 and 59. No adaptive early stopping or
+  best-checkpoint selection. Compare matched draw budgets; actual AIC
+  exposure differs by design and must be reported from native sampling receipts.
+- Require the mixed arm's epoch-7 checkpoint to reproduce the existing
+  eight-epoch Mlic continuation exactly after removing only run-specific
+  reproduction metadata with the existing native owner. Failure blocks
+  interpretation of the matched contrast, not preservation of its artifacts.
+- Evaluate both fixed checkpoints and the shared initial checkpoint using
+  existing native prediction and panel owners on the five already admitted
+  TRAIN reporting populations. Report raw-f32 panels first: pooled, source,
+  codec and ladder ranks; calibration/scatter/tails; paired-source differences;
+  global and local mixtures. Do not silently include older-data calibration
+  in an artifact called an AIC-only fit. Packing/calibration is a separate
+  explicitly named stage if the diagnostic advances.
+- This seed-0 screen diagnoses a mechanism; it cannot establish stability or
+  adoption. Review full panels without a new SROCC cutoff. Any advancing
+  recipe receives a separate preregistered three-seed/source-fold comparison
+  and all unchanged production gates. No EVAL/public_test read is authorized.
+
+The existing frozen continuation authority accepts only 0/4/8 epochs and
+retains its original groups. It must not be edited or passed a relabeled
+60-epoch/AIC-only command. Extend the canonical admission/continuation owners
+with a separate explicit diagnostic authority and refusal tests; preserve
+legacy/default arithmetic and the frozen source trees. Native and Python
+admission must agree on excluded groups, checkpoint, budget and D6 inputs.
+Retain intermediate artifacts for the new diagnostic. The active confidence
+control/omission/follow-through sequence keeps its compute priority.

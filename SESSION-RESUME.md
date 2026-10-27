@@ -2721,3 +2721,19 @@ convergence demonstration. Do not claim a feature-capacity limit, convergence,
 or an optimizer defect from these numbers. A matched TRAIN-only convergence
 and objective diagnostic is the next question alongside the already registered
 confidence study. Keep frozen outcomes and all independent evaluation roles.
+
+### AIC-only comparison recovered — October 27, 08:46 UTC
+
+The old T model's saved AIC-2026-only in-sample SROCC is 0.9742999206247418;
+its seven-source-fold SROCC is 0.9526610561260485. The fit log confirms one
+training group, 3,920 rows, 28 sources and 60×20,000 draws. Its feature
+provenance is explicitly unqualified, and its fx1g model is not Mlic. Do not
+conflate this result with AIC-3 or current qualified Rev7 measurements.
+The byconstruction record now preregisters a matched seed-0 mixed-versus-
+AIC-only continuation diagnostic at fixed epochs 7/59, starting from the same
+Mlic checkpoint. AIC-only continuation still inherits mixed-data pretraining.
+The diagnostic has not launched: its separate native/Python admission must
+first be implemented without relaxing the frozen 0/4/8-epoch authority.
+The historical evidence and input hashes are linked from the session results
+page. Confidence control was verified live at epoch 76/120 at 08:41 UTC;
+resolve current processes and artifacts before reusing that observation.
