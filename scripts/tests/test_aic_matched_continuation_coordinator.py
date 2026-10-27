@@ -233,5 +233,78 @@ class SourceFoldStudy(unittest.TestCase):
                 owner.fold_plan(Path(tmp), "HEAD", Path(tmp) / "t", Path(tmp) / "m")
 
 
+class RecipeStage(unittest.TestCase):
+    def test_recipe_inputs_ride_only_on_populations_with_older_legs(self):
+        with tempfile.TemporaryDirectory(dir=Path.home() / "tmp") as tmp:
+            run = Path(tmp)
+            (run / "cols.txt").write_text("13,14\n")
+            flags = ["--matched-codec-full", "--matched-codec-manifest", "/invented/m.json", "--matched-codec-sha256", "ab"]
+            plan = dict(root="/invented/MlicOrder/root", columns=str(run / "cols.txt"), fit_extra_args=flags,
+                        arms={"MlicOrderAIC256": "mixed-aic256", "MlicOrderAICOnly": "aic-only"}, seeds=[0])
+            mixed = owner.fit_command(plan, run, "MlicOrderAIC256", 0, "/invented/MlicOrder/full_s0", "/invented/t", run)
+            self.assertEqual(mixed[-len(flags):], flags)
+            self.assertEqual(float(mixed[mixed.index("--aic-weight") + 1]), 256.0)
+            self.assertEqual(mixed[mixed.index("--root") + 1], "/invented/MlicOrder/root")
+            alone = owner.fit_command(plan, run, "MlicOrderAICOnly", 0, "/invented/MlicOrder/full_s0", "/invented/t", run)
+            self.assertNotIn("--matched-codec-full", alone)
+            self.assertEqual(alone[alone.index("--diagnostic-population") + 1], "aic-only")
+
+    def test_recipe_plans_use_their_populations_protocol(self):
+        with tempfile.TemporaryDirectory(dir=Path.home() / "tmp") as tmp:
+            path = Path(tmp) / "PLAN.json"
+            path.write_text(json.dumps(dict(schema=owner.RECIPE_SCHEMA)))
+            self.assertEqual(owner.plan_schema(path), owner.RECIPE_SCHEMA)
+            for population, protocol in (("mixed-aic16", owner.PROTOCOL), ("mixed-aic256", owner.FRONTIER_PROTOCOL)):
+                path.write_text(json.dumps(dict(schema=owner.RECIPE_SCHEMA, protocol=protocol, arms={"x": population},
+                                                registered_inputs={}, input_sha256={}, bin_sha256={},
+                                                meta_tool_sha256="", source_archive_sha256="")))
+                with self.assertRaises(FileNotFoundError):  # passes the protocol check, then hashes its inputs
+                    owner.checked(path, owner.RECIPE_SCHEMA)
+                other = owner.FRONTIER_PROTOCOL if protocol == owner.PROTOCOL else owner.PROTOCOL
+                path.write_text(json.dumps(dict(schema=owner.RECIPE_SCHEMA, protocol=other, arms={"x": population})))
+                with self.assertRaisesRegex(ValueError, "schema differs"):
+                    owner.checked(path, owner.RECIPE_SCHEMA)
+
+    def test_unknown_recipe_refuses_before_any_read(self):
+        with self.assertRaisesRegex(ValueError, "stage B recipe"):
+            owner.recipe_inputs("Mlic")
+
+
+class ConfidenceContinuation(unittest.TestCase):
+    def test_manifest_wraps_the_unchanged_base_and_receipt_must_match(self):
+        sys.path.insert(0, str(Path(owner.__file__).parent))
+        import confidence_weights as cw
+        with tempfile.TemporaryDirectory(dir=Path.home() / "tmp") as tmp:
+            tmp = Path(tmp)
+            (tmp / "base.json").write_text("{}")
+            (tmp / "start.bin").write_bytes(b"model")
+            base = dict(path=str(tmp / "base.json"), sha256=owner.sha(tmp / "base.json"))
+            binding = cw.continuation_manifest(base, tmp / "start.bin", 256.0, tmp / "c.json")
+            value = json.loads((tmp / "c.json").read_text())
+            self.assertEqual(value["schema"], cw.CONTINUATION_SCHEMA)
+            self.assertEqual(value["added_group"], dict(name="aic_public_train", train_weight=256.0,
+                                                        validation_weight=0.0, mode="rank", binding=None))
+            self.assertEqual((value["epochs"], value["pairs_per_epoch"]), (60, 50000))
+            self.assertEqual(value["checkpoint"], str((tmp / "start.bin").resolve()))
+            with self.assertRaises(FileExistsError):
+                cw.continuation_manifest(base, tmp / "start.bin", 256.0, tmp / "c.json")
+            receipt = dict(schema="mlic-native-contrast-normalizers-v1", manifest_sha256=binding["sha256"],
+                           sampler_changed=False, absolute_loss_changed=False,
+                           continuation=dict(base_manifest_sha256=base["sha256"], checkpoint_sha256=owner.sha(tmp / "start.bin"),
+                                             epochs=60, added_group="aic_public_train", added_group_weighted=False))
+            (tmp / "r.json").write_text(json.dumps(receipt))
+            cw.verify_continuation_receipt(tmp / "r.json", binding, base)
+            for change in (dict(added_group_weighted=True), dict(epochs=59), dict(base_manifest_sha256="other")):
+                (tmp / "r.json").write_text(json.dumps(dict(receipt, continuation=dict(receipt["continuation"], **change))))
+                with self.assertRaisesRegex(ValueError, "continuation receipt"):
+                    cw.verify_continuation_receipt(tmp / "r.json", binding, base)
+            (tmp / "r.json").write_text(json.dumps({k: v for k, v in receipt.items() if k != "continuation"}))
+            with self.assertRaisesRegex(ValueError, "continuation receipt"):
+                cw.verify_continuation_receipt(tmp / "r.json", binding, base)
+            (tmp / "base.json").write_text('{"changed": true}')
+            with self.assertRaisesRegex(ValueError, "manifest changed"):
+                cw.continuation_manifest(base, tmp / "start.bin", 256.0, tmp / "d.json")
+
+
 if __name__ == "__main__":
     unittest.main()

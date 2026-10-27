@@ -82,6 +82,37 @@ def verify_receipt(path, binding):
     return sha(path)
 
 
+CONTINUATION_SCHEMA = "mlic-contrast-confidence-continuation-v1"
+
+
+def continuation_manifest(base, checkpoint, aic_weight, path):
+    """Wrap an unchanged full-fit manifest for a registered 60-epoch continuation (AIC-share frontier stage B).
+    The native owner binds the checkpoint bytes and budget and leaves the appended AIC group unweighted."""
+    if sha(base["path"]) != base["sha256"]:
+        raise ValueError("full confidence manifest changed")
+    checkpoint = Path(checkpoint).resolve()
+    value = dict(schema=CONTINUATION_SCHEMA, base_manifest=base["path"], base_manifest_sha256=base["sha256"],
+                 checkpoint=str(checkpoint), checkpoint_sha256=sha(checkpoint), epochs=60, pairs_per_epoch=50000,
+                 added_group=dict(name="aic_public_train", train_weight=float(aic_weight), validation_weight=0.0,
+                                  mode="rank", binding=None))
+    with Path(path).open("x") as stream:
+        json.dump(value, stream, indent=1)
+        stream.write("\n")
+    return dict(path=str(path), sha256=sha(path))
+
+
+def verify_continuation_receipt(path, binding, base):
+    """The native receipt of one continuation: its manifest, unchanged base and unweighted AIC group."""
+    digest = verify_receipt(path, binding)
+    manifest = json.loads(Path(binding["path"]).read_text())
+    continuation = json.loads(Path(path).read_text()).get("continuation") or {}
+    if (manifest.get("schema") != CONTINUATION_SCHEMA
+            or continuation != dict(base_manifest_sha256=base["sha256"], checkpoint_sha256=manifest["checkpoint_sha256"],
+                                    epochs=60, added_group="aic_public_train", added_group_weighted=False)):
+        raise ValueError("native confidence continuation receipt differs")
+    return digest
+
+
 def bind(scores, references, selected, maps):
     """Native loader order: f64 targets, dense references in first-seen order."""
     if len(scores) != len(references):
