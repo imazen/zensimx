@@ -306,5 +306,20 @@ class ConfidenceContinuation(unittest.TestCase):
                 cw.continuation_manifest(base, tmp / "start.bin", 256.0, tmp / "d.json")
 
 
+class SeedsStage(unittest.TestCase):
+    def test_seeds_plan_accepts_only_frontier_or_recovery_points(self):
+        with tempfile.TemporaryDirectory(dir=Path.home() / "tmp") as tmp:
+            point = Path(tmp) / "point"
+            point.mkdir()
+            for schema, arms in ((owner.FOLD_SCHEMA, owner.ARMS), (owner.FRONTIER_SCHEMA, owner.FRONTIER_ARMS)):
+                (point / "PLAN.json").write_text(json.dumps(dict(schema=schema, arms=arms)))
+                with self.assertRaisesRegex(ValueError, "advanced point"):
+                    owner.seeds_plan(Path(tmp) / "run", "HEAD", Path(tmp) / "t", Path(tmp) / "m", point,
+                                     "MixedAIC16", Path(tmp))
+            path = Path(tmp) / "PLAN.json"
+            path.write_text(json.dumps(dict(schema=owner.SEEDS_SCHEMA)))
+            self.assertEqual(owner.plan_schema(path), owner.SEEDS_SCHEMA)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -138,7 +138,7 @@ def plan(run, commit, trainer, meta_tool):
 def checked(path, schema="aic-matched-continuation-plan-v1"):
     value = json.loads(path.read_text())
     protocol = PROTOCOL if schema == FOLD_SCHEMA or schema.startswith("aic-matched") else FRONTIER_PROTOCOL
-    if schema == RECIPE_SCHEMA:
+    if schema in (RECIPE_SCHEMA, SEEDS_SCHEMA):
         protocol = diagnostic_protocol(next(iter(value["arms"].values())))[0]
     if value["schema"] != schema or value["protocol"] != protocol:
         raise ValueError("diagnostic plan schema differs")
@@ -451,6 +451,8 @@ RECIPE_SCHEMA = "aic-share-recipe-plan-v1"
 RECIPE_REGISTRATION = dict(record="benchmarks/byconstruction_2026-10-22.md",
                            section="Stage B details", commit="219e15c183a762c688d8c3534d931567a8e6d966")
 RECIPES = ("MlicNeff", "MlicVote", "MlicOrder", "MlicConfidence")
+# Stage C (registered with stage A): the chosen Mlic point on the folds for seeds 0-2.
+SEEDS_SCHEMA = "aic-share-seeds-plan-v1"
 RECIPE_ARM = {"aic-only": "AICOnly", "mixed-aic16": "AIC16", "mixed-aic64": "AIC64", "mixed-aic256": "AIC256",
               "mixed-aic1024": "AIC1024"}
 RECIPE_INPUTS = dict(
@@ -464,7 +466,7 @@ RECIPE_INPUTS = dict(
 
 def plan_schema(path):
     schema = json.loads(Path(path).read_text()).get("schema")
-    if schema not in (FOLD_SCHEMA, FRONTIER_SCHEMA, RECOVERY_SCHEMA, RECIPE_SCHEMA):
+    if schema not in (FOLD_SCHEMA, FRONTIER_SCHEMA, RECOVERY_SCHEMA, RECIPE_SCHEMA, SEEDS_SCHEMA):
         raise ValueError("source-fold or frontier plan required")
     return schema
 
@@ -628,6 +630,36 @@ def recipe_plan(run, commit, trainer, meta_tool, recipe, population, after_run, 
     seven_fold_plan(run, commit, trainer, meta_tool, schema=RECIPE_SCHEMA, protocol=protocol,
                     registration=RECIPE_REGISTRATION, arms={arm: population}, seeds=FRONTIER_SEEDS,
                     checkpoints=FRONTIER_CHECKPOINTS, extra=extra, initial={"0": record}, root=root)
+
+
+def seeds_plan(run, commit, trainer, meta_tool, point_run, arm, after_run):
+    """Stage C, first step (registered with stage A): the advanced Mlic point on the seven folds for seeds 0-2.
+    Its seed-0 fits must reproduce the advancing run's checkpoints byte for byte (all folds and epochs)."""
+    point_run = Path(point_run)
+    point = json.loads((point_run / "PLAN.json").read_text())
+    if point.get("schema") not in (FRONTIER_SCHEMA, RECOVERY_SCHEMA) or arm not in point["arms"]:
+        raise ValueError("the advanced point must be an Mlic frontier or recovery arm (x16 already has three seeds)")
+    population = point["arms"][arm]
+    protocol, weight, _ = diagnostic_protocol(population)
+    reused = {name: reused_arm(FRONTIER_REUSED_RUN, name, seeds=SEEDS) for name in ARMS}
+    extra = dict(aic_weights={arm: weight}, reused_arms=reused, after_run=str(after_run),
+                 reproduces=dict(reused_arm(point_run, arm), arm=arm, seed=0),
+                 assessment="stage C three-seed fold study of the advanced point; no adoption from it alone",
+                 priority="queued after stage B")
+    contrasts = [*((f"{arm}@e{e}", "Initial") for e in FRONTIER_CHECKPOINTS),
+                 *((f"{arm}@e{e}", f"MixedAIC16@e{e}") for e in FRONTIER_CHECKPOINTS),
+                 *((f"AICOnly@e{e}", f"{arm}@e{e}") for e in FRONTIER_CHECKPOINTS)]
+    if point.get("start"):
+        start_arm, start_epoch = point["start"]["arm"], point["start"]["epoch"]
+        starts = {f"s{seed}_k{k}": FRONTIER_REUSED_RUN / "arms" / start_arm / f"s{seed}_k{k}/ckpt/ckpt_epoch{start_epoch:03d}.bin"
+                  for seed in SEEDS for k in SOURCE_FOLDS}
+        extra.update(run_initial={k: dict(path=str(v), sha256=sha(v)) for k, v in starts.items()},
+                     start=dict(arm=start_arm, epoch=start_epoch))
+        contrasts += [(f"{arm}@e{e}", f"{start_arm}@e{start_epoch}") for e in FRONTIER_CHECKPOINTS]
+    extra["contrasts"] = [list(c) for c in contrasts]
+    seven_fold_plan(run, commit, trainer, meta_tool, schema=SEEDS_SCHEMA, protocol=protocol,
+                    registration=FRONTIER_REGISTRATION, arms={arm: population}, seeds=SEEDS,
+                    checkpoints=FRONTIER_CHECKPOINTS, extra=extra)
 
 
 def seven_fold_plan(run, commit, trainer, meta_tool, schema, protocol, registration, arms, seeds, checkpoints, extra,
@@ -848,6 +880,26 @@ def fold_run(path):
             write(run_dir / "CONTROL.json", outcome, fresh=True)
             if not outcome["identical"]:
                 raise ValueError("this trainer does not replay the recipe's full fit; its contrasts are not interpretable")
+        elif plan_value.get("reproduces"):
+            # Stage C: this run's seed-0 fits must equal the advancing run's, every fold and epoch.
+            stage("reproduction-control")
+            reproduces = plan_value["reproduces"]
+            (run_dir / "control").mkdir()
+            comparisons = {}
+            for label, pin in reproduces["checkpoint_sha256"].items():
+                seed, k, e = (int(x) for x in label.split("|"))
+                original = (Path(reproduces["run_dir"]) / "arms" / reproduces["arm"] / f"s{seed}_k{k}/ckpt"
+                            / f"ckpt_epoch{e:03d}.bin")
+                if sha(original) != pin:
+                    raise ValueError(f"reproduced checkpoint changed: {label}")
+                comparisons[label] = nonrepro_identical(run_dir / "tools/bake_dial_refit",
+                                                        checkpoint(reproduces["arm"], seed, k, e), original,
+                                                        run_dir / "control" / f"s{seed}_k{k}_e{e:03d}")
+            identical = all(c["identical"] for c in comparisons.values())
+            write(run_dir / "CONTROL.json", dict(reproduces=reproduces["run_dir"], arm=reproduces["arm"],
+                                                 comparisons=comparisons, identical=identical), fresh=True)
+            if not identical:
+                raise ValueError("seed 0 does not reproduce the advancing run; the three-seed study is not interpretable")
         elif control:
             stage("trainer-identity-control")
             comparisons = {str(e): nonrepro_identical(run_dir / "tools/bake_dial_refit",
@@ -1080,8 +1132,18 @@ if __name__ == "__main__":
     p.add_argument("--start", nargs=3, metavar=("RUN", "ARM", "EPOCH"),
                    help="recovery phase: continue from that run's fold checkpoints")
     p.add_argument("--no-control", action="store_true", help="the recipe's replay control already ran in its first phase")
+    p = sub.add_parser("seeds-plan", help="stage C: the advanced Mlic point for seeds 0-2 on the folds")
+    p.add_argument("run", type=Path)
+    p.add_argument("--source-commit", required=True)
+    p.add_argument("--trainer", type=Path, required=True)
+    p.add_argument("--meta-tool", type=Path, required=True)
+    p.add_argument("--point", nargs=2, metavar=("RUN", "ARM"), required=True, help="the advancing run and arm")
+    p.add_argument("--after-run", type=Path, required=True)
     args = parser.parse_args()
-    if args.mode == "recipe-plan":
+    if args.mode == "seeds-plan":
+        seeds_plan(args.run, args.source_commit, args.trainer, args.meta_tool, Path(args.point[0]), args.point[1],
+                   args.after_run)
+    elif args.mode == "recipe-plan":
         recipe_plan(args.run, args.source_commit, args.trainer, args.meta_tool, args.recipe, args.population,
                     args.after_run, (Path(args.compare[0]), args.compare[1]), args.start, not args.no_control)
     elif args.mode in ("plan", "fold-plan", "frontier-plan", "recovery-plan"):
