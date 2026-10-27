@@ -6779,3 +6779,11 @@ mostly blur1.2+luma4) that Mlic's cells do not show. Global edits: none.
 As registered, the historical screen does not exclude the arm from the AIC
 comparison; the follow-through started its fold continuations at 10:19 UTC.
 Evidence: `mlic-confidence-20261027-run02/TRAIN_SELECTION.json`, `scorecard/`.
+
+Mlic's twelve out-of-sample E21 cells (models that never saw AIC-2026 data),
+zero-shot on all 3,920 public_train rows (2026-10-26, `byc_cells.py aiczero`;
+`/var/tmp/byc-finalists-20261026/aic-rev7/aiczero_Mlic_cells.json`, sha256
+`f2037e57…`): mean per-cell global SROCC 0.9075 (range 0.8991–0.9163), mean
+within-source 0.9485, per-cell codec-bias spread 0.0743; the mean prediction of
+the twelve cells reaches 0.9095 (within source 0.9501). The cells agree with
+the full-data three-seed result above.
