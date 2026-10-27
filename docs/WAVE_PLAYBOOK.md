@@ -9,7 +9,7 @@ Read frozen plans/sources rather than relaunching live work from moving main.
 
 | Work | Owner | Required evidence |
 |---|---|---|
-| Study/process supervision | `scripts/byconstruction/{dataset_study_status,run_processes}.py` | Actual outputs, PID plus start ticks, all thread children, real lock holder, failure sentinels |
+| Study/process supervision | `scripts/byconstruction/dataset_study_status.py`, `scripts/rev4_featpot/run_processes.py` | Actual outputs, PID plus start ticks, all thread children, real lock holder, failure sentinels |
 | Native confidence source screen | `scripts/byconstruction/confidence_admission.py` | Plan-v2, calibrated source match controls, immutable source authority; not response permission |
 | Native fitting populations/uncertainty | `scripts/byconstruction/{confidence_population,confidence_audit}.py` | Original observation IDs and source rows, exact memberships, finite native uncertainty; no fitted linking map yet |
 | Order matching | `scripts/rev4_featpot/matched_codec.py`, native `zensim_mlp_train/matched_codec.rs` | Paired original Mlic prediction identity; separate omission/full schemas; unchanged draw law |
