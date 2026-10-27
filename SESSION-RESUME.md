@@ -2543,3 +2543,39 @@ architecture's behavior, or performance. Receipt:
 `mlic-precision-20261027-run01/REV7_FEATURE_PARITY_VERIFIED.json` and its log.
 Run-heavy rc=0, 47s, peak RSS 2.16 GiB, minimum available 21,557 MiB,
 peak load 1.02; execution resource receipt, not a runtime benchmark.
+
+### October 27: full-data source/codec and seed review
+
+All 69,552 aggregate native panels and registered source intervals are now
+written; pixel-mixture checks remain live. The descriptive review compares
+16×8 packed/calibrated arms with Mlic16×8 using the mean predictions of three
+fixed seeds. This stability diagnostic is distinct from serving seed0 and
+from averaging three seed-level statistics. All AIC sources are in sample.
+
+| Arm | AIC sources with lower MAE | AIC codecs with lower MAE | Aggregate AIC MAE delta |
+|---|---:|---:|---:|
+| Neff16×8 | 10/28 | 3/14 | +0.007089 |
+| Vote16×8 | 16/28 | 3/14 | +0.002324 |
+| Order16×8 | 13/28 | 6/14 | −0.002510 |
+
+Every count has complete defined coverage. Order's aggregate MAE deltas on
+KADID/TID2013/KonFiG/CID22-A25 are +0.204870/+0.115273/+0.435511/−0.053202.
+Thus its seed0 regression on all four other populations is not identical to
+the three-seed aggregate: CID22-A25 improves in the latter. Vote's corresponding
+deltas are −0.043590/+0.016107/−0.082979/−0.051431. These mixed changes do not
+establish a stable replacement, and no arm is rejected by a new SROCC gate.
+
+Paired individual-seed AIC MAE deltas for Order are
+−0.007442/+0.002467/−0.002893; Vote +0.000410/+0.016214/−0.007568;
+Neff +0.005739/+0.016832/−0.000588. The registered 2,000 whole-source bootstrap
+intervals are descriptive, conditional on these fitted models, and in-sample;
+they do not measure independent test uncertainty. Preserve them alongside the
+full panels rather than treating interval crossing as a selection threshold.
+
+Evidence: shared `zensim/mlic-full-panel-review-20261027-run01/`, including
+five source-artifact copies and hashes, full per-source/codec deltas in
+`REVIEW.json` (SHA256 `823461f1d650307d8df519e5bde82227f8ca0d6a6909a89fde804802a7022b63`), and the exact review command/log. The i265
+run-heavy receipt is rc=0, 2s, peak RSS 0.17 GiB, minimum available
+23,819 MiB, peak load 0.15. No new training or calibration was performed.
+Next remains the registered mixture completion and independent confidence
+comparison, followed by outstanding production qualification; no adoption.
