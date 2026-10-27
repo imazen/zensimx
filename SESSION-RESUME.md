@@ -30,7 +30,7 @@ requirement, not a candidate-selection cutoff. See the prospective
 
 ### Verify live work before doing anything else
 
-Observed on dev at **2026-10-27 04:16:59 UTC**: Order was running, **12/21**
+Observed on dev at **2026-10-27 04:51:06 UTC**: Order was running, **20/21**
 cells complete; the remaining cells had entered training. Its full-budget
 unweighted control was byte-identical on all 7,869 predictions. The five
 downstream stages were queued with no reported failure. This is a dated
@@ -46,7 +46,7 @@ directory when frozen orchestration changes.
 
 | Order | Run directory, checked on dev | Required work / state at the observation |
 |---|---|---|
-| 1 | `/mnt/v/output/zensim/mlic-order-20261027-run02` | 21 omission fits; 12 complete, 9 active. Source `27ed3745`; trainer `441bda58…`. |
+| 1 | `/mnt/v/output/zensim/mlic-order-20261027-run02` | 21 omission fits; 20 complete, 1 active. Source `27ed3745`; trainer `441bda58…`. |
 | 2 | `/mnt/tower/output/zensim/mlic-confidence-admission-20261027-run01` | Native source screen, **PLAN-v2.json**; waits for Order. No quality responses. |
 | 3 | `/mnt/v/output/zensim/mlic-aic-adaptation-20261027-run02` | 96 fold continuations: 72 new + 24 identity-checked Mlic reuses; waits for source screen. |
 | 4 | Same fold root, `panels/` | 48 initial + 96 continued models; separate fitted/held-out source panels. |
@@ -121,6 +121,20 @@ They cover 6,659 KADID, 1,680 TID, 210 LIVE-MD and 320 Colourlab observations;
 they are not fitted linking maps or permission to read new responses. Rejected
 run02 collapsed four distinct KADID observations sharing pixel identity;
 run03 preserves native `source_row_id` as well as `pair_key`.
+
+The original omission identities now pass on real metadata in
+`/mnt/tower/output/zensim/mlic-confidence-omissions-20261027-run03/identities/OMISSION_IDENTITIES.json`,
+SHA `b9760b0be03fc33997d5bc054285269b77b170c36e16681c520519a47ec71194`.
+Source `8369c385` binds all 65 KADID, 25 TID, 14 KonFiG and 25 CID22-A
+assessment references, including references absent from fitting, and original
+dataset family IDs (200 PIPAL, 111,363 pairs, 38 mos7). Full has no omissions.
+Run01 refused collection-local source-row confusion; run02 refused canonical
+string family IDs. Both remain preserved. Run03 uses original bank snapshot
+keys and manifests, never mutable promoted metadata. No response, feature or
+uncertainty values were interpreted. The next metadata step is an exact join
+to the independently validated native family registry: reference pixel identity
+and dimensions plus all inherited prior-family aliases. Missing or ambiguous
+joins must fail before any donor, observer, map or normalizer fit.
 
 Private research owners and exact execution paths are in the separately
 committed `zenpapers/docs/mlic-recipe-review-2026-10-26.md` and

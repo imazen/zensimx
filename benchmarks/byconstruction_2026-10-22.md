@@ -5572,3 +5572,15 @@ booleans, signs, padding and non-integer notation. Four controls pass on i265
 with native-style string IDs (`rc=0 0s | peak-RSS 0.07GiB | min-avail 24522MiB |
 peak-load 0.01`). Run02 and its refusal remain preserved; no output or response
 read resulted. Run03 reuses the verified bank snapshot and a new source identity.
+
+Run03 completed the real metadata preparation with source `8369c385`:
+`rc=0 2s | peak-RSS 0.42GiB | min-avail 24521MiB | peak-load 0.00`.
+Its `identities/OMISSION_IDENTITIES.json` SHA256 is
+`b9760b0be03fc33997d5bc054285269b77b170c36e16681c520519a47ec71194`,
+under `/mnt/tower/output/zensim/mlic-confidence-omissions-20261027-run03`.
+It retains 65/25/14/25 complete KADID/TID/KonFiG/CID22-A assessment references
+and 200/111,363/38 original PIPAL/pairs/mos7 dataset family IDs. Full has no
+omissions. This is not the native family join or permission to read responses.
+The run receipt explicitly records both as false. Every reference pixel identity
+and inherited prior-family alias must resolve against the independently
+validated native registry before omission-specific calibration can start.

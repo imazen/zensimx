@@ -12,6 +12,7 @@ Read frozen plans/sources rather than relaunching live work from moving main.
 | Study/process supervision | `scripts/byconstruction/dataset_study_status.py`, `scripts/rev4_featpot/run_processes.py` | Actual outputs, PID plus start ticks, all thread children, real lock holder, failure sentinels |
 | Native confidence source screen | `scripts/byconstruction/confidence_admission.py` | Plan-v2, calibrated source match controls, immutable source authority; not response permission |
 | Native fitting populations/uncertainty | `scripts/byconstruction/{confidence_population,confidence_audit}.py` | Original observation IDs and source rows, exact memberships, finite native uncertainty; no fitted linking map yet |
+| Confidence omission identities | `scripts/byconstruction/confidence_omissions.py` | Complete E21 assessment references and original dataset family IDs; run03 verified; native family join still required before response selection |
 | Order matching | `scripts/rev4_featpot/matched_codec.py`, native `zensim_mlp_train/matched_codec.rs` | Paired original Mlic prediction identity; separate omission/full schemas; unchanged draw law |
 | AIC fold continuation | `scripts/byconstruction/aic_adaptation.py` | 48 bound initial models, zero-step parity, 96 final continuation cells, role/fold/seed identity |
 | Fold statistics | `scripts/byconstruction/{aic_adaptation_panel,aic_adaptation_diagnostics}.py` | Native full statistics, fitted/held-out isolation, source-level uncertainty, canonical mixture cache checks |
