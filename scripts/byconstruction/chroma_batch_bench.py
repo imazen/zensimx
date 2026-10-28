@@ -45,8 +45,18 @@ def prepare(ctl,teacher):
         subprocess.run([str(ctl),'declare-evif','--spec',str(directory/'spec.json'),'--out',str(directory/'manifest.json'),'--grid-out',str(directory/'rungs.jsonl')],check=True)
     save(ROOT/'PREPARED.json',dict(cells=144,views=12,families=4,expected_sha256=sha(ROOT/'EXPECTED.json'),before_sha256=sha(ROOT/'before.json')))
 
+def prepare_both():
+    path=ROOT/'before-both.json';assert not path.exists()
+    jobs=[]
+    for metric in json.loads((ROOT/'before.json').read_text()):
+        encode=json.loads(json.dumps(metric));cell=encode['cell']
+        encode['kind']=dict(kind='encode',codec=cell['codec'],q=cell['q'],knobs=cell['knob_tuple_json'])
+        jobs.extend([encode,metric])
+    assert len(jobs)==288
+    save(path,jobs)
+
 def measure(host,case,serial):
-    manifest=ROOT/'before.json' if case=='before' else ROOT/('plan-'+('all' if case=='batch-all' else 'none'))/'manifest.json'
+    manifest=ROOT/(case+'.json') if case.startswith('before') else ROOT/('plan-'+('all' if case=='batch-all' else 'none'))/'manifest.json'
     directory=ROOT/host/case;directory.mkdir(parents=True);archive=directory/'cas';archive.mkdir()
     env=os.environ.copy();env['ZEN_ARCHIVE_BLOBS_DIR']=str(archive)
     env['ZEN_CHUNK_WALL_SEC']='0' if serial else '300'
@@ -57,13 +67,17 @@ def measure(host,case,serial):
     save(directory/'TIMING.json',dict(wall_seconds=seconds))
     files=[directory/'ledger.parquet'] if (directory/'ledger.parquet').exists() else sorted(directory.glob('ledger.chunk-*.parquet'))
     assert files,'worker ledger missing'
-    rows=[r for f in files for r in pq.read_table(f).to_pylist()];assert len(rows)==(144 if case=='before' else 12)
+    rows=[r for f in files for r in pq.read_table(f).to_pylist()];assert len(rows)==(288 if case=='before-both' else 144 if case=='before' else 12)
     assert all(r['status']=='done' for r in rows),'inspect failed worker rows before timing admission'
     expected={(r['image_path'],r['family'],r['params_json']):r for r in json.loads((ROOT/'EXPECTED.json').read_text())}
     checked=0;output=[]
     for row in rows:
         path=cas(archive,row['output_sha']);assert sha(path)==row['output_sha']
-        if case=='before':
+        if case=='before-both' and json.loads(row['kind_json'])['kind']=='encode':
+            parts=chunks(path.read_bytes());native=hashlib.sha256(parts['BITS'][4:]).hexdigest()
+            assert cas(archive,native).read_bytes()==parts['BITS'][4:]
+            continue
+        if case.startswith('before'):
             params=json.loads(row['knob_tuple_json']);family='xyb-capped' if row['codec'].endswith('color') else 'xyb-extended' if params.get('xyb') else 'ycc444' if params['subsampling']=='s444' else 'ycc420'
             cells=[dict(family=family,params_json=row['knob_tuple_json'],evif_sha256=row['output_sha'])]
         else:cells=json.loads(path.read_text())['cells']
@@ -81,10 +95,14 @@ def measure(host,case,serial):
             checked+=1;output.append(dict(image_path=row['image_path'],family=cell['family'],params_json=cell['params_json'],evif_sha256=cell['evif_sha256'],target_bits=struct.pack('>d',target['value']).hex()))
     assert checked==144
     save(directory/'PARITY.json',dict(passed=True,cells=checked,full_container_identity=case!='batch-none',target_bits_exact=True,media_and_recipes_exact=True))
-    save(directory/'RESULT.json',dict(host=host,case=case,cells=checked,views=12,wall_seconds=seconds,seconds_per_cell=seconds/checked,seconds_per_view=seconds/12,cells_per_second=checked/seconds,view_jobs=len(rows),serial=serial,worker_time_scope='worker process; warm children are separate processes',parity='144 exact target doubles; full containers exact in before/batch-all'))
+    save(directory/'RESULT.json',dict(host=host,case=case,cells=checked,views=12,wall_seconds=seconds,seconds_per_cell=seconds/checked,seconds_per_view=seconds/12,cells_per_second=checked/seconds,view_jobs=len(rows),serial=serial,includes_separate_encode_arm=case=='before-both',worker_time_scope='worker process; warm children are separate processes',parity='144 exact target doubles; full containers exact in before/batch-all'))
     save(directory/'CELLS.json',output);print((directory/'RESULT.json').read_text(),flush=True)
 if __name__=='__main__':
     parser=argparse.ArgumentParser();sub=parser.add_subparsers(dest='command',required=True)
     p=sub.add_parser('prepare');p.add_argument('ctl',type=Path);p.add_argument('teacher',type=Path)
-    p=sub.add_parser('measure');p.add_argument('host');p.add_argument('case',choices=['before','batch-all','batch-none']);p.add_argument('--serial',action='store_true')
-    args=parser.parse_args();prepare(args.ctl,args.teacher) if args.command=='prepare' else measure(args.host,args.case,args.serial)
+    sub.add_parser('prepare-both')
+    p=sub.add_parser('measure');p.add_argument('host');p.add_argument('case',choices=['before','before-both','batch-all','batch-none']);p.add_argument('--serial',action='store_true')
+    args=parser.parse_args()
+    if args.command=='prepare':prepare(args.ctl,args.teacher)
+    elif args.command=='prepare-both':prepare_both()
+    else:measure(args.host,args.case,args.serial)

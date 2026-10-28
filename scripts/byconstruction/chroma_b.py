@@ -2,6 +2,7 @@
 """Scientific Stage B specification/admission; zenfleet owns execution and retries."""
 import argparse
 from collections import Counter, defaultdict
+from concurrent.futures import ThreadPoolExecutor
 import hashlib
 import json
 import os
@@ -53,15 +54,33 @@ def specification(out, one_view):
     print(json.dumps(dict(spec=str(out), views=len(sources), cells=len(sources)*76)), flush=True)
 
 
-def admit(ledger, archive, out):
+def audit_cell(archive, cell, check_native):
+    path=cas(archive,cell['evif_sha256']);data=path.read_bytes()
+    assert hashlib.sha256(data).hexdigest()==cell['evif_sha256']
+    parts=chunks(data);jpeg=parts['BITS'][4:]
+    assert hashlib.sha256(jpeg).hexdigest()==cell['jpeg_sha256']
+    if check_native:assert cas(archive,cell['jpeg_sha256']).read_bytes()==jpeg
+    target=json.loads(parts['scor'])['scores'];assert len(target)==1 and target[0]['metric']=='ssim2'
+    assert target[0]['variant']=='safesyn-teacher' and target[0]['better']=='higher'
+    assert target[0]['implementation']=='fast-ssim2@b7c2b4b33f3a26b753caabd5264a7fef9c4f4545;crate=0.8.2;source-helper-sha256='+PINS[1]
+    assert struct.pack('>d',target[0]['value']).hex()==cell['teacher_bits']
+
+
+def admit(ledger, archive, out, qualification=False, verify_threads=1):
+    assert 1<=verify_threads<=32
     out.mkdir()
     views = {v['path']:v for v in json.loads((ROOT/'VIEWS.json').read_text())}
     rows = pq.read_table(ledger).to_pylist()
-    assert len(rows) == len(views) == 9162 and all(r['status']=='done' for r in rows)
-    assert len({r['image_path'] for r in rows}) == len(views)
+    if qualification:
+        assert len(rows)==1 and out.name.startswith('qualification-'), 'one-view qualification stays separate from full data'
+    else:
+        assert len(rows)==len(views)==9162, 'full Stage B admission requires every declared view'
+    assert all(r['status']=='done' for r in rows)
+    assert len({r['image_path'] for r in rows})==len(rows) and all(r['image_path'] in views for r in rows)
     families = {k:(backend,scales,params) for k,(backend,scales,params) in specs().items() if not k.startswith('band-')}
     ladders=[]; selections=[]; buffer=[]; count=0; native_verified=set(); totals=Counter(); classes=defaultdict(Counter)
     writer = None
+    verifier=ThreadPoolExecutor(max_workers=verify_threads)
     try:
         for i, row in enumerate(sorted(rows,key=lambda r:r['image_path'])):
             view=views[row['image_path']]
@@ -69,6 +88,13 @@ def admit(ledger, archive, out):
             manifest=json.loads(manifest_path.read_text())
             assert manifest['source_sha256']==view['sha256'] and manifest['reference_pixels_sha256']==view['pixels_sha256']
             assert manifest['image_path']==row['image_path'] and manifest['knob_tuple_json']==row['knob_tuple_json']
+            assert manifest['runtime']['canonical_teacher_helper']==PINS[1] and manifest['runtime']['diagnostics']=='none'
+            assert manifest['runtime']['batch_binaries']=={'evif-batch':PINS[3],'chroma-frozen-batch-teacher':PINS[4]}
+            new_native={}
+            for cell in manifest['cells']:
+                if cell['jpeg_sha256'] not in native_verified:new_native.setdefault(cell['jpeg_sha256'],id(cell))
+            list(verifier.map(lambda cell:audit_cell(archive,cell,new_native.get(cell['jpeg_sha256'])==id(cell)),manifest['cells']))
+            native_verified.update(new_native)
             by_family=defaultdict(list)
             for cell in manifest['cells']:by_family[cell['family']].append(cell)
             assert set(by_family)==set(families)
@@ -89,15 +115,6 @@ def admit(ledger, archive, out):
                     assert cell['rung']==rung and json.loads(cell['params_json'])==params[rung]
                     assert cell['teacher_bits']==struct.pack('>d',cell['teacher_ssim2']).hex()
                     assert cell['reference_pixels_sha256']==view['pixels_sha256']
-                    path=cas(archive,cell['evif_sha256']);data=path.read_bytes()
-                    assert hashlib.sha256(data).hexdigest()==cell['evif_sha256']
-                    parts=chunks(data);jpeg=parts['BITS'][4:]
-                    assert hashlib.sha256(jpeg).hexdigest()==cell['jpeg_sha256']
-                    if cell['jpeg_sha256'] not in native_verified:
-                        assert cas(archive,cell['jpeg_sha256']).read_bytes()==jpeg
-                        native_verified.add(cell['jpeg_sha256'])
-                    target=json.loads(parts['scor'])['scores'];assert len(target)==1 and target[0]['metric']=='ssim2'
-                    assert struct.pack('>d',target[0]['value']).hex()==cell['teacher_bits']
                     sample=int(hashlib.sha256((view['id']+'|'+family+'|'+str(rung)).encode()).hexdigest(),16)%20==0
                     if sample or rung in endpoints:
                         selected.append(cell['evif_sha256'])
@@ -116,11 +133,21 @@ def admit(ledger, archive, out):
                 writer.write_table(table);buffer=[]
                 save(out/'PROGRESS.json',dict(views=i+1,required_views=len(rows),cells=count,stage='hash verification and admission'))
     finally:
+        verifier.shutdown(wait=True)
         if writer:writer.close()
-    assert count==696312
+    persisted=pq.ParquetFile(out/'CELLS.parquet')
+    assert persisted.schema_arrow.field('teacher_ssim2').type==pa.float64()
+    readback=0
+    for batch in persisted.iter_batches(columns=['teacher_ssim2','teacher_bits']):
+        for value,bits in zip(batch.column(0).to_pylist(),batch.column(1).to_pylist()):
+            assert struct.pack('>d',value).hex()==bits,'Parquet target bits differ'
+            readback+=1
+    assert readback==count
+    assert count==len(rows)*76
+    if not qualification:assert count==696312
     pq.write_table(pa.Table.from_pylist(ladders),out/'LADDERS.parquet',compression='zstd')
     pq.write_table(pa.Table.from_pylist(selections),out/'DIAGNOSTICS_SELECTION.parquet',compression='zstd')
-    save(out/'SUMMARY.json',dict(cells=count,views=len(rows),ladders=len(ladders),totals=dict(totals),
+    save(out/'SUMMARY.json',dict(qualified_full_grid=not qualification,cells=count,views=len(rows),ladders=len(ladders),totals=dict(totals),
                                  per_class={k:dict(v) for k,v in classes.items()},native_objects_verified=len(native_verified),
                                  diagnostics_selected=len(selections),ledger_sha256=sha(ledger)))
     save(out/'PROGRESS.json',dict(stage='complete',views=len(rows),cells=count))
@@ -145,10 +172,10 @@ def verify_first(ledger, archive, evif, out):
                   checks=['canonical launcher and native S3 claims/ledger','all76 native EVIF seal checks','separate JPEG CAS and embedded bytes exact','frozen target doubles exact on readback'],runtime=result['runtime']))
 
 
-def diagnostic_proof(ctl, image, out):
+def diagnostic_proof(ctl, image, out, view):
     out.mkdir();archive=out/'cas';archive.mkdir();scratch=out/'scratch';scratch.mkdir()
     case=NAS/'b/walltime/i270-r9/batch-none'
-    row=next(r for r in pq.read_table(case/'ledger.parquet').to_pylist() if r['image_path'].endswith('im5044_m32.png'))
+    row=next(r for r in pq.read_table(case/'ledger.parquet').to_pylist() if r['image_path'].endswith(view))
     result=json.loads(cas(case/'cas',row['output_sha']).read_text())
     raw=Path(row['image_path']).read_bytes();w,h=struct.unpack('>II',raw[16:24])
     source=dict(image_path=row['image_path'],source_sha256=hashlib.sha256(raw).hexdigest(),pixels_sha256=result['reference_pixels_sha256'],identity='frozen144-diagnostic-proof',width=w,height=h)
@@ -159,7 +186,7 @@ def diagnostic_proof(ctl, image, out):
     save(spec,dict(sources=[dict(source=source,evif_shas=[c['evif_sha256'] for c in result['cells']])],implementation_shas=PINS,peak_mem_bytes=256*1024*1024))
     subprocess.run([str(ctl),'declare-evif-diagnostics','--spec',str(spec),'--out',str(manifest)],check=True)
     endpoint=os.environ['CHROMA_S3_ENDPOINT']
-    args=['docker','run','--name','chroma-diagnostic-proof','--cpu-shares=256','--cpuset-cpus=0','--memory=1g','--memory-swap=1g',
+    args=['docker','run','--name','chroma-'+out.name,'--cpu-shares=256','--cpuset-cpus=0','--memory=1g','--memory-swap=1g',
           '-e','AWS_ACCESS_KEY_ID','-e','AWS_SECRET_ACCESS_KEY','-e','ZEN_R2_ENDPOINT='+endpoint,'-e','ZEN_BUCKET=zentrain','-e','ZEN_RUN=jobs/chroma-b-diagnostic-proof-20261028',
           '-e','ZEN_ARCHIVE_BLOBS_DIR='+str(archive),'-e','TMPDIR='+str(scratch),'-e','HOME='+str(scratch),'-e','ZEN_CHUNK_WALL_SEC=0',
           '-v',str(NAS)+':'+str(NAS)+':ro','-v',str(out)+':'+str(out),'-v',str(Path.home()/'tmp/chroma-run-heavy')+':/opt/private/run-heavy:ro',
@@ -228,15 +255,17 @@ def diagnostic_spec(admission_dir, out):
 if __name__=='__main__':
     p=argparse.ArgumentParser();s=p.add_subparsers(dest='command',required=True)
     a=s.add_parser('spec');a.add_argument('out',type=Path);a.add_argument('--one-view',action='store_true')
-    a=s.add_parser('admit');a.add_argument('ledger',type=Path);a.add_argument('archive',type=Path);a.add_argument('out',type=Path)
+    a=s.add_parser('admit');a.add_argument('ledger',type=Path);a.add_argument('archive',type=Path);a.add_argument('out',type=Path);a.add_argument('--verify-threads',type=int,default=1)
+    a=s.add_parser('qualify-admission');a.add_argument('ledger',type=Path);a.add_argument('archive',type=Path);a.add_argument('out',type=Path);a.add_argument('--verify-threads',type=int,default=1)
     a=s.add_parser('verify-first');a.add_argument('ledger',type=Path);a.add_argument('archive',type=Path);a.add_argument('evif',type=Path);a.add_argument('out',type=Path)
-    a=s.add_parser('diagnostic-proof');a.add_argument('ctl',type=Path);a.add_argument('image');a.add_argument('out',type=Path)
+    a=s.add_parser('diagnostic-proof');a.add_argument('ctl',type=Path);a.add_argument('image');a.add_argument('out',type=Path);a.add_argument('--view',default='im5044_m32.png')
     a=s.add_parser('snapshot');a.add_argument('ledger',type=Path);a.add_argument('out',type=Path);a.add_argument('--previous',type=Path)
     a=s.add_parser('diagnostics-spec');a.add_argument('admission_dir',type=Path);a.add_argument('out',type=Path)
     a=p.parse_args()
     if a.command=='spec':specification(a.out,a.one_view)
-    elif a.command=='admit':admit(a.ledger,a.archive,a.out)
+    elif a.command=='admit':admit(a.ledger,a.archive,a.out,verify_threads=a.verify_threads)
+    elif a.command=='qualify-admission':admit(a.ledger,a.archive,a.out,qualification=True,verify_threads=a.verify_threads)
     elif a.command=='verify-first':verify_first(a.ledger,a.archive,a.evif,a.out)
-    elif a.command=='diagnostic-proof':diagnostic_proof(a.ctl,a.image,a.out)
+    elif a.command=='diagnostic-proof':diagnostic_proof(a.ctl,a.image,a.out,a.view)
     elif a.command=='snapshot':snapshot(a.ledger,a.out,a.previous)
     else:diagnostic_spec(a.admission_dir,a.out)
