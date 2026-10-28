@@ -50,7 +50,8 @@ def select(a):
         if not dest.exists():
             if url:
                 print("download", identity, url, flush=True)
-                with urllib.request.urlopen(url, timeout=90) as stream, dest.open("xb") as out:
+                request = urllib.request.Request(url, headers={"User-Agent": "chroma-pilot/1.0"})
+                with urllib.request.urlopen(request, timeout=90) as stream, dest.open("xb") as out:
                     shutil.copyfileobj(stream, out, length=1024 * 1024)
             else:
                 shutil.copyfile(path, dest)
@@ -58,7 +59,9 @@ def select(a):
         if expected and digest != expected:
             raise ValueError(f"source bytes differ from canonical LFS identity: {identity}")
         with Image.open(dest) as image:
-            if image.mode not in ["RGB", "L"] or image.format != "PNG":
+            opaque_rgba = image.mode == "RGBA" and image.getchannel("A").getextrema() == (255, 255)
+            opaque_indexed = image.mode in ["1", "P"] and "transparency" not in image.info
+            if (image.mode not in ["RGB", "L"] and not opaque_rgba and not opaque_indexed) or image.format != "PNG":
                 raise ValueError(f"{identity}: pilot requires opaque RGB8/gray8 PNG, got {image.mode}")
             w, h = image.size
         source = {"id": identity, "type": kind, "class_group": cls, "content_class": source_class,
@@ -148,6 +151,8 @@ def select(a):
                 obj = a.imazen / ".git/lfs/objects" / expected[:2] / expected[2:4] / expected
                 if obj.exists():
                     path = obj
+                elif a.mirror and (a.mirror / rel).is_file():
+                    path = a.mirror / rel
                 else:
                     url = r["url"]
             include(path, f"im{identity}", "imazen26", cls, r["content_class"],
@@ -163,5 +168,6 @@ if __name__ == "__main__":
     p.add_argument("--bank", required=True, type=Path)
     p.add_argument("--imazen", required=True, type=Path)
     p.add_argument("--safe-candidates", required=True, type=Path)
+    p.add_argument("--mirror", type=Path, help="Optional byte-verified mirror of canonical PNG-v3 files")
     p.add_argument("--build-commit", required=True)
     select(p.parse_args())

@@ -68,12 +68,14 @@ def grids():
 def command(root, label, argv):
     print(label, " ".join(map(str, argv)), flush=True)
     start = time.monotonic()
+    existing = set((root / "enc").glob("*.jpg")) if label in grids() else set()
     with (root / "logs" / f"{label}.log").open("x") as log:
         with subprocess.Popen(list(map(str, argv)), stdout=log, stderr=subprocess.STDOUT) as proc:
             first = False
             while proc.poll() is None:
                 if label in grids() and not first:
-                    p = next((root / "enc").glob("*.jpg"), None)
+                    p = next((p for p in (root / "enc").glob("*.jpg") if p not in existing
+                              and (root / "dist" / f"{p.stem}.png").is_file()), None)
                     if p is not None:
                         save(root / f"{label}.first-artifact.json", {
                             "path": str(p), "bytes": p.stat().st_size, "sha256": sha(p)})
@@ -138,6 +140,12 @@ def run(root):
     actual = [by_pair[(str(root / "raw" / c["raw"]), str(root / "raw" / c["dist_raw"]))]
               for c in spec["controls"]]
     expected = [c["expected_ssim2"] for c in spec["controls"]]
+    by_pair_record = {(r["reference"], r["distorted"]): r for r in audit}
+    for c in spec["controls"]:
+        r = by_pair_record[(str(root / "raw" / c["raw"]), str(root / "raw" / c["dist_raw"]))]
+        for key in ["reference_pixels_sha256", "distorted_pixels_sha256"]:
+            if r[key] != c[key]:
+                raise ValueError(f"frozen control pixel identity differs: {key}")
     if actual != expected:
         save(root / "CONTROL.json", {"pass": False, "actual": actual, "expected": expected})
         raise ValueError("frozen SafeSyn teacher replay differs")
@@ -223,7 +231,15 @@ def main():
     p.add_argument("action", choices=["run", "analyze"])
     p.add_argument("root", type=Path)
     a = p.parse_args()
-    {"run": run, "analyze": analyze}[a.action](a.root.resolve())
+    root = a.root.resolve()
+    try:
+        {"run": run, "analyze": analyze}[a.action](root)
+    except Exception as error:
+        if a.action == "run":
+            progress = json.loads((root / "PROGRESS.json").read_text()) if (root / "PROGRESS.json").exists() else {}
+            progress.update(failed_stage=progress.get("stage"), stage="FAILED", error=str(error))
+            save(root / "PROGRESS.json", progress)
+        raise
 
 
 if __name__ == "__main__":
