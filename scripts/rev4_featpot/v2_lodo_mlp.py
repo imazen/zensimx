@@ -695,7 +695,7 @@ def main() -> None:
         groups, dataset_authority = dataset_groups(V2, groups, keep, args.heldout, args.seed_index,
                                                    init_seed, sample_seed, dest,
                                                    exclude=tuple(filter(None, args.exclude_datasets.split(","))),
-                                                   declaration=recipe_of(args.spec).get("derived_inputs") or "fx1")
+                                                   derived_inputs=recipe_of(args.spec).get("derived_inputs") or "fx1")
         if dataset_authority:
             weights.update({name:tw for name,_,tw,_,_ in groups if tw > 0})
     diagnostic = None

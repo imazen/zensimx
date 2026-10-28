@@ -143,8 +143,15 @@ class SelectionRebind(unittest.TestCase):
             dest.mkdir()
             with self.assertRaisesRegex(ValueError, "leg recipe differs"):
                 dataset_groups(out, [], fx1, "full", 0, 1101, 101, dest)
+            # An inherited group (its manifest is read before the check) must not displace the token.
+            inherited = Path(d)/"inherited.parquet"
+            pq.write_table(pa.table({"ref_basename": ["a"], "human_score": [1.0]}), inherited)
+            Path(str(inherited)+".manifest.json").write_text(json.dumps(dict(rows_kept=1)))
+            groups = [("human", inherited, 1.0, 0.0, "withinref,rank")]
             with self.assertRaisesRegex(ValueError, "pinned direct columns"):
-                dataset_groups(out, [], fx2, "full", 0, 1101, 101, dest, declaration="fx1")
+                dataset_groups(out, groups, fx2, "full", 0, 1101, 101, dest, derived_inputs="fx1")
+            with self.assertRaisesRegex(ValueError, "leg recipe differs"):
+                dataset_groups(out, groups, fx1, "full", 0, 1101, 101, dest, derived_inputs="fx2")
 
 class EffectiveSampleMasses(unittest.TestCase):
     def test_selection_requires_gain_noninferiority_and_every_global_cell(self):
