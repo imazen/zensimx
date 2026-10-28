@@ -31,6 +31,21 @@ work. The September chronology below is retained history, including its old
 paused-goal statement. It is not the current queue. No new Mlic/AIC recipe has
 been adopted as the serving model, and the seamless HDR frontend has not started.
 
+### State at 10:50 UTC, 2026-10-28: scale-0 chroma (fx2) retrain of the curated models
+
+Owner, 2026-10-28: retrain the general and codec models with full-resolution chroma (the `fx2` declaration), the fx1
+artifacts as control, gates decide; the slim crate's 0.3.0 waits (registration: record, "Scale-0 chroma for the
+revision-7 models (fx2)"). No re-extraction: the Mlic root and AIC folds hold all 84 scale-0 X/B ids at revision 7.
+
+- Study `/var/tmp/byc-fx2-20261028` (driver `scripts/byconstruction/fx2_study.sh`; source pin `SOURCE_COMMIT.txt`;
+  fx2 root `root/`, frozen sha256 `b5a15c1a…`, built by `ring_root.py selection-rebind` from the Mlic root `a7fd4af0…`).
+- Stage 1: the 12 Mlicfx2 E21 cells are complete (`cells/Mlicfx2`, 0 errors). Round 2 (fx1 control cell
+  `cells/Mlic/without_kadid_s0` + full seeds `full/Mlicfx2/full_s{0,1,2}`) runs under `~/tmp/heavy.lock`; logs in
+  `logs/`. Then `fx2_study.sh compare` (refuses without `CONTROL.json` pass) writes `scorecard/`.
+- Stage 2 (continuations to the general/codec points, panels, gates) is the Codex lane `fx2cont` (herdr tab, brief and
+  report in `~/tmp/handoff/fx2-continuations/`).
+- Status check: `pgrep -c -x zensim_mlp_trai`, the train logs' last `epoch=`, and the study's `logs/`.
+
 ### State at 07:00 UTC, 2026-10-28: the repository split
 
 The owner approved the split at about 04:00 UTC (branch at zensim-v0.2.7; `zensim` stays the package name here with
