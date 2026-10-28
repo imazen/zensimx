@@ -8208,3 +8208,29 @@ XYB at quality 95 over the knob's full 0.1-5.0 range: 80 of 162 admitted; the en
   build stays the training target; EVIF's own judges are diagnostics. EVIF has no HDR path yet, so the HDR family uses
   the zenmetrics sweep until it does.
 - *XYB range:* any widening beyond 5.0 is shown to the owner with measurements before it is adopted.
+
+### Chroma-only ladders: Stage A2 result (2026-10-28)
+
+The EVIF rerun and native HDR pilot are complete; Stage B remains unstarted.
+[Measured receipts and pins](chroma_a2_2026-10-28.pointer.md). At quality 95 with
+unit Y-table multipliers and AQ on, EVIF admits 138/162 YCbCr 444 and 133/162
+YCbCr 420 ladders. Capped XYB admits 95/162 with 646 rungs; raw XYB admits the
+same 95 with 1,484 rungs, including 794 above raw multiplier 5. The shared numeric
+ranges use different frequency mappings; their total difference is not a pure
+extension gain. The proposal retains both labelled controls pending review.
+DC-only subset admits 0/12 and AC-only 12/12; band shaping remains pilot evidence.
+
+All 12,696 scored containers preserve BITS, CAS encodes, recipes and raster
+identities. The exact SafeSyn teacher remains the target: the current EVIF
+fast-ssim2 pin differs on all four exact-pixel reproduction controls. Native HDR
+uses the tested direct zenavif driver, then exact PQ16 PNG renditions for E26's
+frozen teacher ingress. All 68 10-bit PQ BT.2020 420 encodes score, but 0/4 ladders
+meet the unchanged one-point admission margin. The pinned SVT adapter explicitly
+refuses 444. These limits do not admit an HDR training leg.
+
+Keep the owner’s <1MP scope, Mitchell and crops; no 1024–2048 size expansion.
+The 36-view cost pilot has six tiny views and six native crops. im2402’s source
+guard stays unchanged. Per coordinator, its replacement is the nearest-feature
+same-class TRAIN unit im2406/c25_br, distance 6.464481384162533, not a certified
+cluster-mate: the historical cluster replay reproduced 457/500 representatives
+and no membership artifact survives. No feature/root/model stage was launched.
