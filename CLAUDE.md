@@ -1,5 +1,7 @@
 # zensim — current working rules
 
+**Repository split (2026-10-28).** This checkout is **zensimx**, the research repository (`imazen/zensimx`, at `~/work/zen/zensimx`; renamed from imazen/zensim). The published crate is developed in the new `imazen/zensim` (at `~/work/zen/zensim`), which continues from 0.2.7. Here the `zensim` and `zensim-regress` packages are `publish = false`. Record: [docs/REPO_SPLIT_PLAN_2026-10-28.md](docs/REPO_SPLIT_PLAN_2026-10-28.md).
+
 ## Current continuation — October 27, 2026
 
 Read the current section of [SESSION-RESUME.md](SESSION-RESUME.md) before the

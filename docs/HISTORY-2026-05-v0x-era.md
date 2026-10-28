@@ -558,7 +558,7 @@ claim as provisional. Aggregate numbers and the 4-band CID22 cuts
 are pipeline-health checks, not release gates.
 
 **Site requirement**: the interactive comparison site at
-<https://imazen.github.io/zensim/> MUST render the 10-band table
+<https://imazen.github.io/zensimx/> MUST render the 10-band table
 alongside the legacy 4-band table for every (corpus, X, Y)
 selection.
 
@@ -1494,7 +1494,7 @@ Implementation must:
 
 10. **No regressions**: the existing methodology page +
     pre-computed chart sections (8 chart sections at
-    <https://imazen.github.io/zensim/>) stay intact. The new
+    <https://imazen.github.io/zensimx/>) stay intact. The new
     interactive widget is ADDITIVE — a new page (or a top
     section on index.html) — not a replacement.
 

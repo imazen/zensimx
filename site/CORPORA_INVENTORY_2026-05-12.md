@@ -1,7 +1,7 @@
 # Comparison-site corpus inventory (2026-05-12)
 
 All 5 in-repo human-rated corpora available via the interactive
-comparison site at <https://imazen.github.io/zensim/compare.html>.
+comparison site at <https://imazen.github.io/zensimx/compare.html>.
 Parquets live under `site/data/parquet/`, queried client-side via
 DuckDB-WASM with HTTP-range fetch.
 

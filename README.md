@@ -21,7 +21,7 @@ adaptation are active; no new serving model has been adopted. Agent/operator
 state, scientific boundaries and verified run commands are in
 [SESSION-RESUME](SESSION-RESUME.md#current-work--october-27-2026).
 
-**Interactive chart exploration**: <https://imazen.github.io/zensim/> — scatter zensim / fast-ssim2 / butteraugli against human MOS across CID22 / KADID / TID / AIC corpora, filter by codec + version, with per-band SROCC tables and step-5 (20-bin) breakdowns.
+**Interactive chart exploration**: <https://imazen.github.io/zensimx/> — scatter zensim / fast-ssim2 / butteraugli against human MOS across CID22 / KADID / TID / AIC corpora, filter by codec + version, with per-band SROCC tables and step-5 (20-bin) breakdowns.
 
 <!-- crates.io:skip-start -->
 ## Historical speed measurements

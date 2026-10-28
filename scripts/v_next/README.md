@@ -82,7 +82,7 @@ owners, retired July pipelines and their frozen source revision.
 | Script | Role |
 |---|---|
 | `gauntlet.py` / `bandwise_dashboard.py --fulleval-dir` | Build the current offline summer-gauntlet board from stored verdicts. Per-codec q-vs-score charts share a score axis spanning at least 0–100 and all visible medians, including negative scores; toggling bakes rescales it. Run `gauntlet_gates.sh <html>` after every regeneration. |
-| `build_site_data.py` / `build_scatter_data.py` | Generate the per-corpus data files for the interactive comparison site at `https://imazen.github.io/zensim/`. |
+| `build_site_data.py` / `build_scatter_data.py` | Generate the per-corpus data files for the interactive comparison site at `https://imazen.github.io/zensimx/`. |
 | `make_v02_v18_candlestick.py` | The V_2 → V_18 candlestick chart used in commit / handoff narratives. |
 | ~~`generate_v16_chunks.py` / `launch_v16_sweep.sh`~~ | **Deleted 2026-07-15.** Hand-rolled chunk splitters — the thing CLAUDE.md's fleet rule forbids outright. Superseded by the zenfleet job system (`zenmetrics/scripts/jobsys/`); never produced output; marked "reference only" here for 10 weeks, which is the queued-for-removal anti-pattern rather than a reprieve. In git history if needed. |
 

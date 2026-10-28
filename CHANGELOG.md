@@ -6218,7 +6218,7 @@ Permanent record: `benchmarks/cycle_14_per_band_tv_outcomes_2026-05-13.md`
 
 **Site visibility**: V0_17 added as `score_zensim_v0_17` column in all 3
 site parquets + compare.js dropdown (zensim `195a6cac`). Users can compare
-V0_17 vs V0_16 side-by-side on https://imazen.github.io/zensim/.
+V0_17 vs V0_16 side-by-side on https://imazen.github.io/zensimx/.
 
 Ship procedure (executed 2026-05-13):
 1. ✓ Copied source bake into `zensim/weights/v0_17_2026-05-13.bin`
@@ -6347,7 +6347,7 @@ posted earlier were V0_2 outputs. The numbers above (and the new
 `score_zensim_v0_16` columns in all three parquets) are the TRUE
 V0_16 baseline.
 
-**Comparison-site live** at <https://imazen.github.io/zensim/compare.html>:
+**Comparison-site live** at <https://imazen.github.io/zensimx/compare.html>:
 - 5 in-repo human-rated parquets (AIC-3 / AIC-4 / CID22 / KADID / TID)
 - 4 V_X bake binaries (V0_4 / V0_16 / V0_20 / V0_22) shipped under
   `site/weights/` for JS-MLP path
@@ -6378,7 +6378,7 @@ V0_16 baseline.
   `per_band_step5.py`, `build_scatter_data.py`,
   `content_class_explore.py`.
 - **Methodology page**: 10 sections + TL;DR. Live at
-  <https://imazen.github.io/zensim/methodology.html>.
+  <https://imazen.github.io/zensimx/methodology.html>.
 - **Site charts**: 8 chart sections (aggregate, per-band, scatter,
   step-5, 2D Pareto, non-mono Pareto, cross-codec smoothness, bake
   history).

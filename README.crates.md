@@ -13,7 +13,7 @@ valid. The benchmark tables below are historical measurements, not a fresh
 qualification of today's profiles. See the [current integration guide](https://github.com/imazen/zensimx/blob/main/docs/CODEC_TARGET_METRIC.md)
 for bake identities, actual consumer behavior and the remaining dial requirements.
 
-**Interactive chart exploration**: <https://imazen.github.io/zensim/> — scatter zensim / fast-ssim2 / butteraugli against human MOS across CID22 / KADID / TID / AIC corpora, filter by codec + version, with per-band SROCC tables and step-5 (20-bin) breakdowns.
+**Interactive chart exploration**: <https://imazen.github.io/zensimx/> — scatter zensim / fast-ssim2 / butteraugli against human MOS across CID22 / KADID / TID / AIC corpora, filter by codec + version, with per-band SROCC tables and step-5 (20-bin) breakdowns.
 
 
 ## Correlation with human perception
