@@ -7565,3 +7565,21 @@ mixtures 2 rows per model (largest rise +6.3), global 0.
 xrefaic256e59-20261028-run01`): the packed seed-0 model (sha256 `7642eff4…`) passes N1, N2 and N3, 142 of 144
 monotone ladders (bar 122). The label-free gates (verdict, steer, identity) for it and the codec model run next
 (`mlic-candidate-gates-20261028-run03`, after the codec full-data run).
+
+### Codec model (AIC-only e29): full data and near-identity (2026-10-28, full data 01:51 UTC, near-identity 01:53 UTC)
+
+**Three seeds on the folds** (from the source-fold study, scored by stage C's seeds run): out-of-fold AIC-2026
+public_train 0.9515 / 0.9527 / 0.9520, three-seed mean prediction 0.9531. **E21 out of sample** (codec-role evidence,
+three seeds): every type 0.8426 (Mlic 0.8613); compression only (seed 0) 0.9235 (Mlic 0.9223).
+
+**Full data** (`mlic-aic-fulldata-aiconlye29-20261027-run01`): Mlic's three full seeds continued AIC-only on all of
+public_train, packed at epoch 29 with the TRAIN CID22 anchor. In sample, mean of the three packed models: AIC-2026
+0.9654 (Mlic 0.9069); every distortion type KADID 0.7329 (0.9043), TID2013 0.7860 (0.8851), KonFiG 0.8021 (0.8124),
+CID22-A 0.8952 (0.8727); compression types only, mean of the four sets 0.9169 / 0.9178 / 0.9191 by seed (Mlic 0.9189 /
+0.9195 / 0.9164): KADID codecs +0.004, TID2013 codecs −0.007, KonFiG JPEG 2000 −0.020, CID22-A +0.022. Local pixel
+mixtures 0–2 rows (largest rise +0.5), global 0. The general model's packed models on compression only: 0.9223 /
+0.9248 / 0.9215.
+
+**Near-identity** (`/mnt/tower/output/zensim/mlic-nearid-aiconlye29-20261028-run01`): the packed seed-0 model (sha256
+`63a1c5d3…`) passes N1, N2 and N3, 142 of 144 monotone ladders. The label-free gates for both packed models run in
+`mlic-candidate-gates-20261028-run03`.
