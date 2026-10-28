@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Independent AV1 header/decode oracle. External pixels never feed training."""
+import argparse
 import json
 import os
 from pathlib import Path
@@ -7,7 +8,8 @@ import re
 import subprocess
 import sys
 from chroma_pilot import save,sha
-root=Path(sys.argv[1]);base=root.parent;env=os.environ.copy();env['LD_LIBRARY_PATH']=str(base/'ffmpeg-libs')
+parser=argparse.ArgumentParser();parser.add_argument('root',type=Path);parser.add_argument('--quality-grid',action='store_true');parser.add_argument('--oracle-base',type=Path);args=parser.parse_args()
+root=args.root;base=args.oracle_base or root.parent;env=os.environ.copy();env['LD_LIBRARY_PATH']=str(base/'ffmpeg-libs')
 records=json.loads((root/'ENCODES.json').read_text());tested=[]
 for r in records:
     p=Path(r['encoded_path'])
@@ -31,13 +33,22 @@ for r in records:
         with decoded.open('w') as f:subprocess.run([str(base/'bin/ffmpeg'),'-v','error','-threads','1','-i',str(p),'-threads','1','-pix_fmt','yuv420p10le','-f','framemd5','-'],env=env,stdout=f,stderr=subprocess.STDOUT,check=True)
     if fields.get('separate_uv_delta_q')!=[0]:raise ValueError('shared UV signaling changed')
     fields['delta_q_v_dc']=fields['delta_q_u_dc'];fields['delta_q_v_ac']=fields['delta_q_u_ac']
-    tested.append(dict(encoded_path=str(p),chroma_q=r['chroma_q'],header=fields,stream={k:info.get(k) for k in ['width','height','pix_fmt','color_primaries','color_transfer','color_space','color_range']}))
+    tested.append(dict(encoded_path=str(p),quality=r['quality'],chroma_q=r['chroma_q'],header=fields,stream={k:info.get(k) for k in ['width','height','pix_fmt','color_primaries','color_transfer','color_space','color_range']}))
 base_q={tuple(r['header'].get('base_q_idx',[])) for r in tested}
-if len(base_q)!=1 or not next(iter(base_q)):raise ValueError('luma base qindex is missing or changes')
+if not args.quality_grid and (len(base_q)!=1 or not next(iter(base_q))):raise ValueError('luma base qindex is missing or changes')
+byquality={}
+for r in tested:byquality.setdefault(r['quality'],set()).add(tuple(r['header'].get('base_q_idx',[])))
+for q,values in byquality.items():
+    if len(values)!=1 or not next(iter(values)):raise ValueError('luma qindex varies at fixed quality')
+quality_indices={int(q):list(next(iter(values))) for q,values in byquality.items()}
+if args.quality_grid:
+    assert len(quality_indices)==20
+    ladder=[quality_indices[q][0] for q in sorted(quality_indices,reverse=True)]
+    assert all(b>a for a,b in zip(ladder,ladder[1:])), 'positive control qindices must strictly increase'
 for r in tested:
     delta=r['chroma_q'][0]
     # trace_headers names signed AV1 fields delta_q_u_{dc,ac} and V likewise.
     for field in ['delta_q_u_dc','delta_q_u_ac','delta_q_v_dc','delta_q_v_ac']:
         if r['header'].get(field)!=[delta]:raise ValueError(f'chroma override absent/different: {r}')
-save(root/'ORACLE.json',dict(passed=True,cells=len(tested),oracle='FFmpeg/libdav1d 8.0.1-3ubuntu2',base_q_idx=list(next(iter(base_q))),checks=['all streams independently decode','10-bit PQ BT2020 full-range 420','BT601 matrix signaled, matching pinned adapter','luma base qindex fixed','U/V chroma DC/AC deltas match requested override, shared UV flag=0'],records=tested))
-print(json.dumps(dict(cells=len(tested),base_q_idx=list(next(iter(base_q))))),flush=True)
+save(root/'ORACLE.json',dict(passed=True,cells=len(tested),oracle='FFmpeg/libdav1d 8.0.1-3ubuntu2',base_q_idx=sorted(list(q) for q in base_q),quality_qindices=quality_indices,checks=['all streams independently decode','10-bit PQ BT2020 full-range 420','BT601 matrix signaled, matching pinned adapter','luma base qindex fixed within each quality; positive-control indices strictly increase' if args.quality_grid else 'luma base qindex fixed','U/V chroma DC/AC deltas match requested override, shared UV flag=0'],records=tested))
+print(json.dumps(dict(cells=len(tested),quality_qindices=quality_indices)),flush=True)

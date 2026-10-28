@@ -8234,3 +8234,44 @@ guard stays unchanged. Per coordinator, its replacement is the nearest-feature
 same-class TRAIN unit im2406/c25_br, distance 6.464481384162533, not a certified
 cluster-mate: the historical cluster replay reproduced 457/500 representatives
 and no membership artifact survives. No feature/root/model stage was launched.
+
+### Chroma Stage B: frozen teacher, census and view batching (2026-10-28)
+
+The source-built target is fast-ssim2 0.8.2, source
+`b7c2b4b33f3a26b753caabd5264a7fef9c4f4545`, with the archived decode/math
+lock. All132 stored-control/A2 score doubles replay exactly on each of the
+four eligible hosts. This reconstructs the metric component, not the whole
+historical feature extractor. The batch adapter consumes EVIF's one decoded
+RGB8 reference; its actual binary identity is recorded separately from the
+canonical replay implementation.
+
+Qualified sources:485 SafeSyn fitting tiles,201 CID22 oracle TRAIN references
+(with inherited fit/dev/calibration roles),386 canonical imazen-26 TRAIN origins.
+The accepted nearest-feature im2406 substitution remains labelled as such.
+Mitchell fits and native crops yield9162 unique views, including1918 tiny views
+and1304 native crops; maximum921600pixels,1615 duplicate views removed.
+Every view's frozen RGB projection matches its independently checked pixels.
+The four labelled families have16/16/14/30 rungs:696312 cells,9162 merged jobs.
+
+Before declaration, the same144-cell sample on one pinned i270 core measured
+52.641960185952485s unbatched,40.86745742382482s batched with diagnostics,
+27.672819413943216s batched target-only. Every target double matches; full
+containers match byte for byte with diagnostics, and target-only media/recipes
+match exactly with diagnostics absent. The shared-archive target-only sample
+measured14.907248772163076,14.874061461149156,10.886925267752662 and
+6.6596189245183846cells/s on i270/i265/r3800x/r3500 respectively. These are
+12-view sample rates, not full-grid throughput: tail packing underfills larger
+hosts and full jobs carry76rungs per view. Serial run-heavy peak RSS0.14GiB;
+Docker separately enforces its hard memory/swap cap. Worker-only RSS excludes
+warm executors and is not a whole-job memory figure.
+
+The canonical zenfleet launcher proof completes one full76-rung960×960 view:
+all native EVIF verifications pass, separately addressed JPEGs equal embedded
+BITS, and frozen target doubles survive readback. Targets run without diagnostic
+work on their critical path. A later ScoreFile pass reads persisted renditions;
+its declared selection is deterministic5% within each view/family plus every
+admitted ladder's two endpoints. No diagnostic pass encodes again.
+
+Supporting receipts and generated tables: tower archive
+`output/zensim/byc-chroma-20261028/b/{walltime,first76,full}`; local generation
+owner i270 `/var/tmp/byc-chroma-20261028/b`. Stage C remains unstarted.

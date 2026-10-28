@@ -3902,3 +3902,36 @@ chroma-a2-report root report state:
 
 chroma-b0-teacher-replay root binary:
     python3 -B scripts/byconstruction/chroma_b0_replay.py {{quote(root)}} {{quote(binary)}}
+
+chroma-hdr-a3 base:
+    python3 scripts/byconstruction/chroma_hdr_a3.py '{{base}}'
+
+chroma-census out:
+    python3 scripts/byconstruction/chroma_census.py '{{out}}'
+
+chroma-b0-worker trial image *flags:
+    python3 scripts/byconstruction/chroma_b0_worker.py '{{trial}}' '{{image}}' {{flags}}
+
+chroma-stage-sources:
+    python3 scripts/byconstruction/chroma_stage_sources.py
+
+chroma-geometry root:
+    python3 scripts/byconstruction/chroma_geometry.py '{{root}}'
+
+chroma-host-replay host image:
+    python3 scripts/byconstruction/chroma_host_replay.py '{{host}}' '{{image}}'
+
+chroma-hdr-a3-oracle root base:
+    python3 scripts/byconstruction/chroma_hdr_oracle.py '{{root}}' --quality-grid --oracle-base '{{base}}'
+
+chroma-cost:
+    python3 scripts/byconstruction/chroma_cost.py
+
+chroma-reference-replay:
+    python3 scripts/byconstruction/chroma_reference_replay.py
+
+chroma-batch-bench *args:
+    python3 scripts/byconstruction/chroma_batch_bench.py {{args}}
+
+chroma-stage-b *args:
+    python3 scripts/byconstruction/chroma_b.py {{args}}
