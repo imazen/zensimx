@@ -7599,3 +7599,44 @@ through `just candidate-gates-rev7`, tools `688746b78bee-gates`), on the packed 
 Both curated models pass every label-free gate. Neither is adopted: the defaults are the owner's decision (D1). Still
 open for both: the frozen EVAL read (waits for the owner), the registered runtime gate (the owner chooses its hardware),
 and, after adoption, the seamless HDR frontend.
+
+### Owner decisions on the two curated models (2026-10-28, about 02:08 UTC)
+
+D1: both, as two profiles — the general model (×256 + rehearsal e59) as the revision-7 default and the codec model
+(AIC-only e29) as a separate codec-only profile. The frozen EVAL read: yes, both finalists, once each. The runtime gate:
+one quiet run on dev (the scorecard's named 9950X3D), an explicit exception to the host rule for this run only.
+
+### Runtime gate for the two curated models: timing (2026-10-28, owner's one quiet run on dev)
+
+`/mnt/v/output/zensim/r7-runtime-20261028/` (dev): `costcmp_run.py --r7-grid`, instrument `costcmp-r7-instrument`
+(SHA-256 `c028cd13…`, built off dev from main `ba365c88` with `zensim-bench/r7-runtime`; release bench profile, no
+target-cpu flags), the unchanged paired-round analyzer (`798d9386…`) and SPEEDQ's collectors: quiet gate (load1 < 2.0,
+no build or training processes) before setup and before rounds, first 32 clean of at most 64 rounds, all eleven arms
+paired in every round, the shared compute lock per segment. Parity: all 110 cells PASS (cached and map arms serve
+their model's uncached score bits; the curated models are bit-identical at 1 and 8 threads). All ten timing cells
+admitted, 0–5 flagged rounds excluded per cell, no foreign process during any attempt (1,017 s in all).
+
+p95 per call in ms (v4x; `fast-ssim2 main` is 0.9.0 at `09ec3e7c`; butteraugli is 0.9.3's 3-norm):
+
+| Threads, size | General | Codec | General cached | General score + map | Frozen D | Default B | fast-ssim2 0.8.2 | fast-ssim2 main | Butteraugli |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| 1, 64² | 0.205 | 0.207 | 0.206 | 0.865 | 0.296 | 0.510 | 0.361 | 0.329 | 0.592 |
+| 1, 256² | 0.980 | 0.988 | 0.924 | 2.312 | 2.151 | 1.724 | 4.164 | 3.578 | 5.547 |
+| 1, 1024² | 11.202 | 11.207 | 10.292 | 22.320 | 22.992 | 19.811 | 70.581 | 63.541 | 90.864 |
+| 1, 2048² | 41.486 | 41.110 | 37.155 | 95.042 | 92.303 | 69.259 | 311.876 | 320.647 | 417.625 |
+| 1, 4096² | 151.103 | 150.208 | 134.374 | 403.478 | 371.864 | 264.033 | 1,362.383 | 1,528.850 | 1,944.626 |
+| 8, 64² | 0.325 | 0.324 | 0.333 | 1.153 | 0.502 | 0.762 | 0.625 | 0.397 | 0.440 |
+| 8, 256² | 0.519 | 0.555 | 0.538 | 1.546 | 0.877 | 1.145 | 4.510 | 2.409 | 2.944 |
+| 8, 1024² | 3.196 | 3.171 | 3.752 | 12.098 | 7.546 | 7.480 | 76.416 | 30.265 | 34.453 |
+| 8, 2048² | 10.124 | 10.112 | 13.556 | 53.029 | 21.856 | 23.105 | 311.169 | 124.663 | 204.898 |
+| 8, 4096² | 63.512 | 59.570 | 65.027 | 256.885 | 90.930 | 93.349 | 1,370.167 | 589.934 | 900.118 |
+
+**Scorecard scalar performance** (one pinned worker, uncached): general 11.20 ms at 1024² and 41.49 ms at 2048² (bars
+50 and 200 ms), 0.49× and 0.45× frozen D (bar 1.25×), 0.16× and 0.13× fast-ssim2 0.8.2 (bar 1×): PASS on every term,
+for the codec model too (11.21 / 41.11 ms). **Spatial cost**: cached-reference score + map 22.32 / 95.04 ms = 1.99× /
+2.29× the uncached scalar p95 (bar 3×): PASS. Peak RSS: below, when the fresh-process pass completes.
+
+Findings beside the bars: at one thread the cached reference saves 8–11% (1024²–4096²); at eight threads it is
+slower than uncached from 1024² up (3.75 against 3.20 ms at 1024², 13.56 against 10.12 at 2048²), so the cached path
+parallelizes worse. fast-ssim2 0.8.2 gains nothing from eight threads here. Eight threads give the curated models
+3.5× at 1024² and 2.4× at 4096² over one thread.
