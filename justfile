@@ -3868,3 +3868,34 @@ mlic-native-input-tests:
 # Refusal controls launch no workloads and require no model/data dependencies.
 byc-historical-guard-tests:
     python3 -B -m unittest discover -s scripts/tests -p 'test_historical_guard.py' -v
+
+# A2 EVIF pilot on one preselected idle worker, inside run-heavy.
+chroma-evif root *families:
+    python3 scripts/byconstruction/chroma_evif.py {{quote(root)}} --families {{families}}
+
+chroma-cluster root:
+    python3 scripts/byconstruction/chroma_cluster.py {{quote(root)}}
+
+chroma-size-cost root:
+    python3 -B scripts/byconstruction/chroma_size.py {{quote(root)}}
+
+chroma-hdr-pilot root:
+    python3 -B scripts/byconstruction/chroma_hdr.py {{quote(root)}}
+
+chroma-evif-oracle root:
+    python3 -B scripts/byconstruction/chroma_evif_oracle.py {{quote(root)}}
+
+chroma-substitute root:
+    python3 -B scripts/byconstruction/chroma_substitute.py {{quote(root)}}
+
+chroma-judge-replay root:
+    python3 -B scripts/byconstruction/chroma_diagnostics.py {{quote(root)}}
+
+chroma-hdr-oracle root:
+    python3 -B scripts/byconstruction/chroma_hdr_oracle.py {{quote(root)}}
+
+chroma-archive action root *args:
+    python3 -B scripts/byconstruction/chroma_archive.py {{quote(action)}} {{quote(root)}} {{args}}
+
+chroma-a2-report root report state:
+    python3 -B scripts/byconstruction/chroma_a2_report.py {{quote(root)}} {{quote(report)}} --mirror-state {{quote(state)}}
