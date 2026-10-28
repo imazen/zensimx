@@ -7,6 +7,9 @@
 #   fx2_study.sh control STUDY   Mlic's KADID seed-0 cell retrained (fx1); must reproduce the stored cell
 #   fx2_study.sh cells STUDY     Mlicfx2's 12 E21 cells (seeds 0-2)
 #   fx2_study.sh full STUDY      Mlicfx2's three full-data seeds, packed for the gates
+#   fx2_study.sh compare STUDY   E21 scorecard against Mlic's stored cells (requires the passing control):
+#                                paired E21 SROCC, per-type bias, knob-concurring inversions, geometry panel,
+#                                standard and global-edit mixtures; TRAIN labels only
 #
 # Cells and full fits may run before or beside the control; no comparison uses them unless CONTROL.json passes.
 # The caller holds ~/tmp/heavy.lock and run-heavy (dev: zensim training only). No label outside TRAIN is read.
@@ -103,5 +106,36 @@ PY
     failed=0
     for pid in "${pids[@]}"; do wait "$pid" || failed=1; done
     exit "$failed" ;;
+  compare)
+    python3 -c "import json,sys; sys.exit(0 if json.load(open('$study/CONTROL.json'))['pass'] else 1)"
+    out="$study/scorecard"
+    test ! -e "$out"
+    mkdir -p "$out/label_reads" "$study/compare/cells"
+    ln -sfn "$mixes/cells/Mlic" "$study/compare/cells/Mlic"
+    ln -sfn "$study/cells/Mlicfx2" "$study/compare/cells/Mlicfx2"
+    export BYC_ROOT="$root" BYC_CELLS="$study/compare/cells" REV4_V2_BIN_DIR="$study/bin" AIC_BIN="$study/bin"
+    export ZEN_PANEL_BIN="$study/bin/panel" ZENSIM_MAX_TIER=v3 BYC_LABEL_LEDGER_DIR="$out/label_reads"
+    export RAYON_NUM_THREADS=1 OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1
+    tool="$repo/scripts/rev4_featpot/byc_cells.py"
+    python3 -B "$tool" score --arms Mlic,Mlicfx2 --paired-with Mlic > "$out/e21.json"
+    for arm in Mlic Mlicfx2; do python3 -B "$tool" bytype --arm "$arm" > "$out/bytype_$arm.json"; done
+    python3 -B "$repo/scripts/byconstruction/type_bias.py" Mlic Mlicfx2 --out "$out/type_bias.json" > "$out/type_bias.txt"
+    python3 -B "$tool" knobinv --arms Mlic,Mlicfx2 --out "$out/knobinv.json" > "$out/knobinv.txt"
+    python3 -B "$repo/scripts/byconstruction/aic_panel.py" --out "$out/panel.json" --arms base-c,Mlic,Mlicfx2 \
+      --geo --no-aic --no-public-test > "$out/panel.txt" 2>&1
+    for set in mixture mixture_global; do
+      mix="$study/$set"
+      mkdir -p "$mix"
+      cp -n "$mixes/$set/manifest.json" "$mix/manifest.json"
+      cmp "$mixes/$set/manifest.json" "$mix/manifest.json"
+      ln -sfn "$(readlink -f "$mixes/$set/img")" "$mix/img"
+      for fold in kadid tid2013 konfig cid22_a25; do
+        for seed in 0 1 2; do cp -n "$mixes/$set/scores_Mlic_${fold}_s$seed.json" "$mix/"; done
+      done
+      MIX="$mix" BYC_MIX_FOLDS=kadid,tid2013,konfig,cid22_a25 ZENSIM_PYRAMID=xyb \
+        bash "$repo/scripts/byconstruction/ring_mixture.sh" "$study/bin" raw 12 Mlicfx2
+      python3 -B "$repo/scripts/byconstruction/mixture_test.py" summary --out "$mix" --json-out "$out/$set.json" \
+        Mlic Mlicfx2 > "$out/$set.txt" 2>&1
+    done ;;
   *) echo "unknown command $cmd" >&2; exit 2 ;;
 esac
