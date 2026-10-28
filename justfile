@@ -650,6 +650,10 @@ aic-matched-continuation-tests:
     python3 -B -m unittest scripts.tests.test_aic_matched_continuation_coordinator scripts.tests.test_aic_adaptation_full_panel
     python3 -B -m unittest discover -s scripts/tests -p 'test_aic_matched_continuation.py'
 
+# Plan bindings and the legacy fx1 continuation contracts used by the fx2 study.
+fx2-continuation-tests:
+    OPENBLAS_NUM_THREADS=1 python3 -B -m unittest scripts.tests.test_aic_matched_continuation_coordinator scripts.tests.test_aic_matched_continuation scripts.tests.test_aic_adaptation scripts.tests.test_aic_adaptation_full scripts.tests.test_aic_adaptation_panel scripts.tests.test_aic_adaptation_full_panel scripts.tests.test_subjective_training_leg
+
 dataset-progress-tests:
     python3 -B -m unittest discover -s scripts/tests -p 'test_dataset_study_status.py' -v
 

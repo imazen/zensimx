@@ -17,14 +17,14 @@ import time
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from aic_adaptation import RECIPES, SPEC, STRENGTHS, bound_worker, compute_lock, process_snapshot, process_tree, sha, write
-from aic_adaptation import require_prediction_parity, zero_checkpoint, require_clean_factors
+from aic_adaptation import require_prediction_parity, zero_checkpoint, require_clean_factors, declared_width
 
 
-def fit_command(source, root, output, columns, seed, *, initial=None, strength=None, aic=None, matching=None):
+def fit_command(source, root, output, columns, seed, *, initial=None, strength=None, aic=None, matching=None, spec=SPEC):
     if seed not in (0, 1, 2):
         raise ValueError("three fixed full-data seeds required")
     command = [sys.executable, "-B", str(source / "scripts/rev4_featpot/v2_confirm_fit.py"),
-        "--root", str(root), "--spec", SPEC, "--columns", columns, "--head", "N", "--seed-index", str(seed),
+        "--root", str(root), "--spec", spec, "--columns", columns, "--head", "N", "--seed-index", str(seed),
         "--strict-admission", "--data-role-decision", str(root / "human_role_decision.json"),
         "--dest", str(output), "--train-only", "--pack-production", "--e33-output-stage"]
     if initial is not None:
@@ -41,18 +41,18 @@ def fit_command(source, root, output, columns, seed, *, initial=None, strength=N
     return command
 
 
-def check_fit(directory, seed, root_pin, *, initial=None, strength=None):
+def check_fit(directory, seed, root_pin, *, initial=None, strength=None, spec=SPEC):
     result = json.loads((directory / "result.json").read_text())
     epochs = 120 if initial is None else strength[1]
     # Same fixed seed streams as the canonical full-fit owner.
     seeds = ((1101, 101), (1103, 100000101), (1107, 200000101))
     if (result["schema"] != "rev5-qualified-training-cell-v1" or result["training_only"] is not True
             or result["execution_contract"] != "registered-fit" or result["seed_index"] != seed
-            or result["spec"] != SPEC or result["head"] != "N" or result["epochs"] != epochs
+            or result["spec"] != spec or result["head"] != "N" or result["epochs"] != epochs
             or result["pairs_per_epoch"] != 50000 or result["selection"]["epoch_rule"] != "last"
             or result["selection"]["selected_epoch"] != epochs - 1
             or (result["init_seed"], result["sample_seed"]) != seeds[seed]
-            or result["frozen_sha256"] != root_pin or result["width"] != 1853 or result["kept_features"] != 410
+            or result["frozen_sha256"] != root_pin or result["width"] != 1853 or result["kept_features"] != declared_width(spec)
             or result["output_stage"] != "e33-identity-knot-tail2"
             or result["selected_bake_sha256"] != sha(directory / "refit/last.bin")
             or result["packed_model_sha256"] != sha(directory / "refit/production-f16.bin")):

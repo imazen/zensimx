@@ -7782,3 +7782,19 @@ codec models and the three Mlicfx2 seeds all have 0 such inversions over the 10 
 the signed-weight E33/E34 models; the monotone revision-7 models do not show it, with or without scale-0 chroma.
 
 Stage 2 (the continuations to the general and codec points, their panels and gates) runs in the Codex lane `fx2cont`.
+
+
+### fx2 continuation owners: plan bindings (2026-10-28)
+
+The continuation coordinator now forwards each plan's spec to fitting and prediction, and can bind an exact ordered
+column list and its derived-input declaration. Explicit input configurations use their own frozen panel wrappers,
+root and tools; historical plans retain their original panel wrappers. Full/omission receipt checks accept an
+explicit spec and derive its input count from the declaration (fx1 410; fx2 492). Source freezing resolves the
+underlying Git directory through jj, including an isolated workspace without a `.git` entry.
+
+`just fx2-continuation-tests` checks both declarations, legacy command defaults, the explicit fx2 routes, exact-ID
+refusal and existing admission/receipt contracts. `reproduction-plan` / `reproduction-run` replay seed 0/source fold 0
+of XrefAIC256 and AICOnly using their stored plans, initial models and tables. The existing diagnostic owner requires
+60 epochs; the control compares all 60 checkpoints of each arm through the native E33 comparator, removing only
+`zentrain.repro` from copies. A failed control stops the study before interpretation. No fx2 continuation result is
+claimed by this implementation entry.

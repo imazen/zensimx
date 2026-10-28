@@ -66,6 +66,17 @@ class FullCommands(unittest.TestCase):
             owner.fit_command(*args[:-1], 3)
 
 
+    def test_explicit_fx2_spec_is_forwarded_without_changing_legacy_default(self):
+        args = [Path("source"), Path("root"), Path("dest"), "1,2,3", 0]
+        spec = owner.SPEC.replace("fx1", "fx2")
+        command = owner.fit_command(*args, spec=spec)
+        self.assertEqual(command[command.index("--spec") + 1], spec)
+        self.assertEqual(owner.declared_width(spec), 492)
+        default = owner.fit_command(*args)
+        self.assertEqual(default[default.index("--spec") + 1], owner.SPEC)
+        self.assertEqual(owner.declared_width(owner.SPEC), 410)
+
+
 class FullControlParity(unittest.TestCase):
     def test_changed_result_or_model_cannot_pass(self):
         with tempfile.TemporaryDirectory(dir=Path.home() / "tmp") as tmp:
@@ -144,6 +155,18 @@ class FullEvidence(unittest.TestCase):
                               epochs=8, lr=.00001, lr_schedule="constant", optimizer_state="fresh"))})
         self.command = "$ trainer --group aic_public_train:/frozen/aic_full_fit.parquet:16.0:0:rank\n"
         self.save()
+
+    def test_fx2_receipt_requires_the_declared_spec_and_width(self):
+        spec = owner.SPEC.replace("fx1", "fx2")
+        self.result.update(spec=spec, kept_features=492)
+        self.save()
+        owner.check_fit(self.root, 1, "root-pin", initial=self.initial, strength=(16, 8), spec=spec)
+        with self.assertRaises(ValueError):
+            owner.check_fit(self.root, 1, "root-pin", initial=self.initial, strength=(16, 8))
+        self.result["kept_features"] = 410
+        self.save()
+        with self.assertRaises(ValueError):
+            owner.check_fit(self.root, 1, "root-pin", initial=self.initial, strength=(16, 8), spec=spec)
 
     def save(self):
         for name, value in (("result.json", self.result), ("DATASET_GROUP_SELECTION.json", self.selection),

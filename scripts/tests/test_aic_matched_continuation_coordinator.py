@@ -39,6 +39,55 @@ class RegisteredRoute(unittest.TestCase):
                 self.assertIs(options["--train-only"], True)
 
 
+class PlanConfiguration(unittest.TestCase):
+    def test_explicit_fx2_spec_reaches_fit_and_omission_routes(self):
+        with tempfile.TemporaryDirectory(dir=Path.home() / "tmp") as tmp:
+            run = Path(tmp)
+            cols = run / "columns.txt"
+            cols.write_text("0,1,2")
+            spec = owner.SPEC.replace("3b7bd5ebe929", "45acffa603e8").replace("fx1", "fx2")
+            value = dict(spec=spec, root="/invented/fx2-root", columns=str(cols),
+                         arms={"AICOnly": "aic-only"}, epochs=60, lr=0.00001,
+                         cells={"kadid_s0": dict(aic_fold=0, directory="/invented/initial", exclusions=[])},
+                         aic_tables={"0": dict(path="/invented/aic_k0_fit.parquet")})
+            fit = owner.fit_command(value, run, "AICOnly", 0, "/invented/initial", "/invented/table", run / "fit")
+            omission = owner.omission_command(value, run, "AICOnly", "kadid", 0, run / "omission")
+            for command in (fit, omission):
+                self.assertEqual(command[command.index("--spec") + 1], spec)
+                self.assertEqual(command[command.index("--root") + 1], value["root"])
+                self.assertEqual(command[command.index("--columns") + 1], "0,1,2")
+                self.assertEqual(command[command.index("--init-from") + 1], "/invented/initial/refit/last.bin")
+
+    def test_exact_ids_and_declaration_pin_are_required(self):
+        from v2_common import derived_declaration
+        with tempfile.TemporaryDirectory(dir=Path.home() / "tmp") as tmp:
+            columns = Path(tmp) / "columns.txt"
+            for token, width in (("fx1", 410), ("fx2", 492)):
+                spec = owner.SPEC.replace("fx1", token)
+                declaration, pin, content = derived_declaration(token)
+                columns.write_text(",".join(map(str, content["direct"])))
+                binding = owner.declaration_binding(spec, columns)
+                self.assertEqual((binding["token"], binding["sha256"], binding["direct"]), (token, pin, width))
+                # Same width with a different raw ID is not the same declaration.
+                columns.write_text(",".join(map(str, [99999, *content["direct"][1:]])))
+                with self.assertRaisesRegex(ValueError, "columns differ"):
+                    owner.declaration_binding(spec, columns)
+
+    def test_panel_root_and_wrapper_follow_only_explicit_configuration(self):
+        with tempfile.TemporaryDirectory(dir=Path.home() / "tmp") as tmp:
+            run = Path(tmp)
+            fold = dict(common_root="/invented/old-root", warmstart_source="/invented/old-source", bin="/invented/old-bin")
+            path = run / "fold.json"
+            path.write_text(json.dumps(fold))
+            value = dict(root="/invented/fx2-root", columns="/invented/fx2-cols",
+                         registered_inputs=dict(fold_plan=dict(path=str(path))))
+            self.assertEqual(owner.execution_fold(value, run), fold)
+            explicit = owner.execution_fold(dict(value, input_configuration=dict(token="fx2")), run)
+            self.assertEqual(explicit["common_root"], value["root"])
+            self.assertEqual(explicit["warmstart_source"], str(run / "source"))
+            self.assertEqual(explicit["bin"], str(run / "bin"))
+
+
 class PriorityWait(unittest.TestCase):
     def state(self, root, **value):
         (root / "STATE.json").write_text(json.dumps(dict(failures=[], **value)))

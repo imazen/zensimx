@@ -27,6 +27,13 @@ STRENGTHS = ((8, 4), (16, 8))
 SPEC = "sel:3b7bd5ebe929@h32:H128:cv16:cf98:fx1:mono:thr:mp32"
 
 
+def declared_width(spec):
+    """The declared damage inputs, independent of fx1/fx2's different raw read sets."""
+    from v2_common import derived_declaration, recipe_of
+    token = recipe_of(spec).get("derived_inputs")
+    return len(derived_declaration(token)[2]["direct"]) if token else 410
+
+
 def sha(path):
     with Path(path).open("rb") as stream:
         return hashlib.file_digest(stream, "sha256").hexdigest()
@@ -115,16 +122,16 @@ def queue(path):
         raise
 
 
-def initial_cell(directory, fold, seed):
+def initial_cell(directory, fold, seed, *, spec=SPEC):
     """Bind actual model bytes to their existing fit and prediction receipts."""
     result = json.loads((directory / "result.json").read_text())
     record = json.loads((directory / "byc_record.json").read_text())
     model, prediction = directory / "refit/last.bin", directory / f"pred_{fold}.tsv"
     if (result["training_only"] is not True or result["execution_contract"] != "registered-fit"
             or result["epochs"] != 120 or result["pairs_per_epoch"] != 50000
-            or result["seed_index"] != seed or result["heldout"] != fold or result["spec"] != SPEC
+            or result["seed_index"] != seed or result["heldout"] != fold or result["spec"] != spec
             or result["head"] != "N" or result["research_extra_groups"] is not None
-            or result["width"] != 1853 or result["kept_features"] != 410
+            or result["width"] != 1853 or result["kept_features"] != declared_width(spec)
             or result["selection"]["selected_epoch"] != 119
             or result["selected_bake_sha256"] != sha(model)
             or record["last_bin_sha256"] != sha(model) or record["pred_sha256"] != sha(prediction)
@@ -166,11 +173,11 @@ def bind_recipe_cell(recipe, row, study, selection, columns):
     return row
 
 
-def zero_checkpoint(directory):
+def zero_checkpoint(directory, *, spec=SPEC):
     result = json.loads((directory / "result.json").read_text())
     model = Path(result["selected_bake"])
     if (result["epochs"] != 0 or result["selection"]["selected_epoch"] != -1
-            or result["training_only"] is not True or result["spec"] != SPEC
+            or result["training_only"] is not True or result["spec"] != spec
             or not model.resolve().is_relative_to((directory / "refit").resolve())
             or sha(model) != result["selected_bake_sha256"]):
         raise ValueError("zero-step selected checkpoint receipt differs")
@@ -189,7 +196,7 @@ def continuation_cell(directory, initial, fold, seed, weight, epochs, plan):
     continuation = authority["cells"][f"{fold}-s{seed}"]["continuation"]
     if (result["training_only"] is not True or result["epochs"] != epochs
             or result["pairs_per_epoch"] != 50000 or result["heldout"] != fold
-            or result["seed_index"] != seed or result["spec"] != SPEC
+            or result["seed_index"] != seed or result["spec"] != plan.get("spec", SPEC)
             or result["frozen_sha256"] != plan["common_root_sha256"]
             or record["aic_fold"] != (4 * seed + FOLDS.index(fold)) % 7
             or record["trainer_sha256"] != plan["trainer_sha256"]

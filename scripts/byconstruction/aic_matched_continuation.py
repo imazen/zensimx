@@ -15,6 +15,7 @@ from datetime import datetime, timezone
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import sys
@@ -73,6 +74,38 @@ def full_record(fits, arm, seed=0):
     return rows[0]
 
 
+def declaration_binding(spec, columns):
+    """Bind the recipe token and exact ordered raw IDs, never infer a declaration from width."""
+    from v2_common import derived_declaration, recipe_of
+    token = recipe_of(spec).get("derived_inputs")
+    path, pin, declaration = derived_declaration(token)
+    ids = [int(c) for c in re.split(r"[,\s]+", Path(columns).read_text().strip())]
+    if ids != declaration["direct"]:
+        raise ValueError("plan columns differ from its derived-input declaration")
+    return dict(token=token, path=str(path), sha256=pin, direct=len(ids))
+
+
+def validate_declaration(value, run):
+    binding = value["derived_inputs"]
+    actual = declaration_binding(value["spec"], value["columns"])
+    if actual != binding:
+        # A frozen source lives at a different path; the content identity must still match.
+        if {k: v for k, v in actual.items() if k != "path"} != {k: v for k, v in binding.items() if k != "path"}:
+            raise ValueError("plan derived-input binding changed")
+    frozen = run / "source/scripts/rev4_featpot" / Path(binding["path"]).name
+    if sha(binding["path"]) != binding["sha256"] or sha(frozen) != binding["sha256"]:
+        raise ValueError("frozen derived-input declaration changed")
+
+
+def execution_fold(value, run):
+    """Legacy plans retain their frozen panel wrappers; explicit configurations use their own snapshot."""
+    fold = json.loads(Path(value["registered_inputs"]["fold_plan"]["path"]).read_text())
+    if value.get("input_configuration"):
+        fold.update(common_root=value["root"], columns=value["columns"], bin=str(run / "bin"),
+                    warmstart_source=str(run / "source"))
+    return fold
+
+
 def freeze(run, commit, trainer, meta_tool, fold):
     """Fresh run directory with the pushed source snapshot, the new trainer and the fold study's frozen tools."""
     if run.exists():
@@ -80,12 +113,13 @@ def freeze(run, commit, trainer, meta_tool, fold):
     for path, pin in INPUTS.values():
         if sha(path) != pin:
             raise ValueError(f"registered input changed: {path}")
-    if subprocess.run(["git", "-C", str(REPO), "merge-base", "--is-ancestor", commit, "origin/main"]).returncode:
+    git = ["git", "--git-dir", subprocess.check_output(["jj", "git", "root"], cwd=REPO, text=True).strip()]
+    if subprocess.run([*git, "merge-base", "--is-ancestor", commit, "origin/main"]).returncode:
         raise ValueError("diagnostic source must be pushed to origin/main")
     run.mkdir(parents=True)
     archive = run / "source.tar"
     with archive.open("xb") as stream:
-        subprocess.run(["git", "-C", str(REPO), "archive", "--format=tar", commit, "scripts"], stdout=stream, check=True)
+        subprocess.run([*git, "archive", "--format=tar", commit, "scripts"], stdout=stream, check=True)
     (run / "source").mkdir()
     subprocess.run(["tar", "-xf", str(archive), "-C", str(run / "source")], check=True)
     (run / "bin").mkdir()
@@ -142,6 +176,8 @@ def checked(path, schema="aic-matched-continuation-plan-v1"):
         protocol = diagnostic_protocol(next(iter(value["arms"].values())))[0]
     if schema == WISE_SCHEMA:
         protocol = WISE_PROTOCOL
+    if schema == REPRO_SCHEMA:
+        protocol = PROTOCOL
     if value["schema"] != schema or value["protocol"] != protocol:
         raise ValueError("diagnostic plan schema differs")
     for item in value["registered_inputs"].values():
@@ -152,6 +188,8 @@ def checked(path, schema="aic-matched-continuation-plan-v1"):
                       str(path.parent / "source.tar"): value["source_archive_sha256"]}.items():
         if sha(name) != pin:
             raise ValueError(f"diagnostic input changed: {name}")
+    if value.get("derived_inputs"):
+        validate_declaration(value, path.parent)
     return value
 
 
@@ -200,12 +238,12 @@ def fit_command(plan_value, run_dir, arm, seed=0, initial=None, aic_table=None, 
     # A recipe's own training inputs (stage B: Order's matching schedule) ride only on populations that keep
     # the older legs; the AIC-only population has no group for them to act on.
     recipe = [] if population == "aic-only" else plan_value.get("fit_extra_args", [])
-    return [sys.executable, "-B", str(source / "v2_confirm_fit.py"), "--root", plan_value["root"], "--spec", SPEC,
+    return [sys.executable, "-B", str(source / "v2_confirm_fit.py"), "--root", plan_value["root"], "--spec", plan_value.get("spec", SPEC),
             "--columns", Path(plan_value["columns"]).read_text().strip(), "--head", "N", "--seed-index", str(seed),
             "--strict-admission", "--data-role-decision", str(Path(plan_value["root"]) / "human_role_decision.json"),
             "--dest", str(dest or run_dir / "arms" / arm / "full_s0"), "--train-only",
             "--init-from", str(checkpoint or Path(initial) / "refit/last.bin"),
-            "--fine-tune-epochs", str(EPOCHS), "--fine-tune-lr", str(LR),
+            "--fine-tune-epochs", str(plan_value.get("epochs", EPOCHS)), "--fine-tune-lr", str(plan_value.get("lr", LR)),
             "--aic-public-train", aic_table or plan_value["registered_inputs"]["aic_table"]["path"],
             "--aic-weight", str(diagnostic_protocol(population)[1]), "--diagnostic-population", population, *recipe]
 
@@ -262,7 +300,7 @@ def run(path):
     run_dir = path.parent
     plan_value = checked(path)
     require_clean_factors(os.environ)
-    fold = json.loads(Path(plan_value["registered_inputs"]["fold_plan"]["path"]).read_text())
+    fold = execution_fold(plan_value, run_dir)
     state = dict(stage="fit-arms", worker=process_snapshot(os.getpid()), plan_sha256=sha(path), failures=[],
                  objective_complete=False, production_qualified=False)
     def stage(name, **details):
@@ -333,7 +371,7 @@ def run(path):
         for label, model in models.items():
             for name, population in populations.items():
                 destination = output / "predictions" / f"{label}|{name}.tsv"
-                cells.predict_cell(model, population["table"], destination, SPEC)
+                cells.predict_cell(model, population["table"], destination, plan_value.get("spec", SPEC))
                 frame = pd.read_csv(destination, sep="\t")
                 prediction, target = frame.pred.to_numpy(dtype=float), population["target"]
                 if (list(frame.columns) != ["row_idx", "pred"] or len(prediction) != len(target)
@@ -781,7 +819,7 @@ def seeds_plan(run, commit, trainer, meta_tool, point_run, arm, after_run):
 
 
 def seven_fold_plan(run, commit, trainer, meta_tool, schema, protocol, registration, arms, seeds, checkpoints, extra,
-                    initial=None, root=None):
+                    initial=None, root=None, spec=SPEC, columns=None, input_configuration=None):
     """Freeze a continuation study over the seven D6 source folds (shared by the fold study and the frontier).
     `initial` and `root` replace full Mlic and the common root for a recipe's own study (stage B)."""
     run = Path(run).resolve()
@@ -811,11 +849,15 @@ def seven_fold_plan(run, commit, trainer, meta_tool, schema, protocol, registrat
     root = Path(root or fold["common_root"])
     for record in initial.values():
         inputs += [Path(record["directory"]) / "refit/last.bin", *map(Path, record["input_sha256"])]
-    inputs += [Path(fold["columns"]), root / "human_role_decision.json", root / "wide/frozen.json"]
+    columns = columns or fold["columns"]
+    declaration = declaration_binding(spec, columns)
+    declaration["path"] = str(run / "source/scripts/rev4_featpot" / Path(declaration["path"]).name)
+    inputs += [Path(columns), root / "human_role_decision.json", root / "wide/frozen.json", Path(declaration["path"])]
     value = dict(schema=schema, protocol=protocol, registration=registration, **frozen, arms=dict(arms),
                  seeds=list(seeds), source_folds=list(SOURCE_FOLDS), epochs=EPOCHS, checkpoints=list(checkpoints),
-                 lr=LR, spec=SPEC, root=str(root), columns=fold["columns"], initial=initial,
-                 fold_tables=tables, assignment_sha256=authority["assignment_sha256"],
+                 lr=LR, spec=spec, root=str(root), columns=str(columns), initial=initial,
+                 derived_inputs=declaration,
+                 **({"input_configuration": input_configuration} if input_configuration else {}), fold_tables=tables, assignment_sha256=authority["assignment_sha256"],
                  runs=len(fold_runs(dict(arms=arms, seeds=seeds))),
                  input_sha256={str(p): sha(p) for p in inputs}, populations=["aic", *FOLDS],
                  representation="final-f32 checkpoint dumps", selector=None, public_test_opened=False,
@@ -886,7 +928,7 @@ def fold_run(path):
         base = Path(reused[arm]["run_dir"]) if arm in reused else run_dir
         return base / "arms" / arm / f"s{seed}_k{k}/ckpt/ckpt_epoch{e:03d}.bin"
     require_clean_factors(os.environ)
-    fold = json.loads(Path(plan_value["registered_inputs"]["fold_plan"]["path"]).read_text())
+    fold = execution_fold(plan_value, run_dir)
     if (run_dir / "STATE.json").exists():
         raise ValueError("preserve previous diagnostic run state")
     state = dict(stage="fit-folds", worker=process_snapshot(os.getpid()), plan_sha256=sha(path), completed=[],
@@ -961,7 +1003,7 @@ def fold_run(path):
         dest.parent.mkdir(parents=True, exist_ok=True)
         command = full_fit_command(run_dir / "source", Path(plan_value["root"]), dest,
                                    Path(plan_value["columns"]).read_text().strip(), control["seed"],
-                                   matching=plan_value.get("matching"))
+                                   matching=plan_value.get("matching"), spec=plan_value.get("spec", SPEC))
         env = child_environment(dict(environment, TMPDIR=str(scratch), ZEN_PANEL_BIN=str(run_dir / "bin/panel")),
                                 plan_value.get("confidence"), dest)
         with (run_dir / "control" / "fit.log").open("x") as log:
@@ -1005,7 +1047,7 @@ def fold_run(path):
             original = Path(control["original"])
             outcome = dict(control, replay=str(control_dest))
             try:
-                outcome["replay_record"] = check_fit(control_dest, control["seed"], sha(Path(plan_value["root"]) / "wide/frozen.json"))
+                outcome["replay_record"] = check_fit(control_dest, control["seed"], sha(Path(plan_value["root"]) / "wide/frozen.json"), spec=plan_value.get("spec", SPEC))
                 outcome["parity"] = require_full_control_parity(original, control_dest, run_dir / "tools/bake_dial_refit",
                                                                 run_dir / "control" / "parity")
                 if plan_value.get("confidence"):
@@ -1095,7 +1137,7 @@ def fold_run(path):
             stage("predict", current_model=label)
             for name, population in populations.items():
                 destination = output / "predictions" / f"{label}|{name}.tsv"
-                cells.predict_cell(model, population["table"], destination, SPEC)
+                cells.predict_cell(model, population["table"], destination, plan_value.get("spec", SPEC))
                 frame = pd.read_csv(destination, sep="\t")
                 prediction = frame.pred.to_numpy(dtype=float)
                 if (list(frame.columns) != ["row_idx", "pred"] or len(prediction) != len(population["target"])
@@ -1304,11 +1346,11 @@ def omission_command(plan_value, run_dir, arm, name, seed, dest, init=None, popu
     weight = diagnostic_protocol(population)[1]
     root = Path(plan_value["root"])
     command = [sys.executable, "-B", str(run_dir / "source/scripts/rev4_featpot/v2_lodo_mlp.py"), "--root", str(root),
-               "--spec", SPEC, "--columns", Path(plan_value["columns"]).read_text().strip(), "--head", "N",
+               "--spec", plan_value.get("spec", SPEC), "--columns", Path(plan_value["columns"]).read_text().strip(), "--head", "N",
                "--heldout", name, "--seed-index", str(seed), "--strict-admission",
                "--data-role-decision", str(root / "human_role_decision.json"), "--train-only", "--dest", str(dest),
-               "--init-from", str(init or Path(cell["directory"]) / "refit/last.bin"), "--fine-tune-epochs", str(EPOCHS),
-               "--fine-tune-lr", str(LR), "--aic-public-train", table,
+               "--init-from", str(init or Path(cell["directory"]) / "refit/last.bin"), "--fine-tune-epochs", str(plan_value.get("epochs", EPOCHS)),
+               "--fine-tune-lr", str(plan_value.get("lr", LR)), "--aic-public-train", table,
                "--research-extra-group", f"aic_public_train:{table}:{weight!r}:0:rank",
                "--diagnostic-population", population]
     return command + (["--exclude-datasets", ",".join(cell["exclusions"])] if cell["exclusions"] else [])
@@ -1367,7 +1409,7 @@ def omission_run(path):
             raise RuntimeError("omission fit failures retained; inspect their complete logs")
         write(run_dir / "FITS_COMPLETE.json", dict(plan_sha256=sha(path), cells=state["completed"]), fresh=True)
         stage("held-out-predictions")
-        fold = json.loads(Path(plan_value["registered_inputs"]["fold_plan"]["path"]).read_text())
+        fold = execution_fold(plan_value, run_dir)
         os.environ.update(TMPDIR=str(Path.home() / "tmp"), REV4_V2_BIN_DIR=str(run_dir / "bin"),
                           BYC_ROOT=plan_value["root"], ZEN_PANEL_BIN=str(run_dir / "bin/panel"),
                           BYC_LABEL_LEDGER_DIR=str(run_dir / "label-reads"), RAYON_NUM_THREADS="1",
@@ -1383,7 +1425,7 @@ def omission_run(path):
                 out.parent.mkdir(parents=True, exist_ok=True)
                 model = run_dir / "cells" / arm / f"without_{name}_s{seed}/ckpt/ckpt_epoch{e:03d}.bin"
                 prediction = cells.predict_cell(model, Path(plan_value["root"]) / "wide/main/real" / f"{name}.parquet",
-                                                out, SPEC)
+                                                out, plan_value.get("spec", SPEC))
                 if not np.isfinite(prediction).all():
                     raise ValueError(f"{out}: nonfinite prediction")
         stage("e21-score")
@@ -1553,7 +1595,7 @@ def full_run(path):
             if sha(record["path"]) != record["sha256"]:
                 raise ValueError(f"packed baseline changed: {name}")
         stage("raw-panels")
-        fold = json.loads(Path(plan_value["registered_inputs"]["fold_plan"]["path"]).read_text())
+        fold = execution_fold(plan_value, run_dir)
         os.environ.update(TMPDIR=str(Path.home() / "tmp"), REV4_V2_BIN_DIR=str(run_dir / "bin"), AIC_BIN=str(run_dir / "bin"),
                           BYC_ROOT=fold["common_root"], ZEN_PANEL_BIN=str(run_dir / "bin/panel"),
                           BYC_LABEL_LEDGER_DIR=str(output / "label-reads"), RAYON_NUM_THREADS="1", OMP_NUM_THREADS="1",
@@ -1573,7 +1615,7 @@ def full_run(path):
             stage("predict", current_model=label)
             for name, population in populations.items():
                 destination = output / "predictions" / f"{label}|{name}.tsv"
-                cells.predict_cell(model, population["table"], destination, SPEC)
+                cells.predict_cell(model, population["table"], destination, plan_value.get("spec", SPEC))
                 frame = pd.read_csv(destination, sep="\t")
                 prediction = frame.pred.to_numpy(dtype=float)
                 if (list(frame.columns) != ["row_idx", "pred"] or len(prediction) != len(population["target"])
@@ -1654,16 +1696,118 @@ def fold_status(path):
                                                  "logged_epoch_range", "failures", "compute_lock")}))
 
 
+REPRO_SCHEMA = "aic-continuation-reproduction-plan-v1"
+
+
+def reproduction_plan(run, commit, trainer, meta_tool):
+    """Replay seed 0, source fold 0 of both curated recipes, preserving every old artifact."""
+    references = {
+        "XrefAIC256": Path("/mnt/v/output/zensim/mlic-aic-seeds-xrefaic256e59-20261027-run01"),
+        "AICOnly": FRONTIER_REUSED_RUN,
+    }
+    run = Path(run).resolve()
+    plans = {arm: json.loads((directory / "PLAN.json").read_text()) for arm, directory in references.items()}
+    base = plans["XrefAIC256"]
+    if any(p["spec"] != SPEC or p["root"] != base["root"] or p["columns"] != base["columns"]
+           or p["initial"]["0"] != base["initial"]["0"] for p in plans.values()):
+        raise ValueError("reproduction controls must share the stored fx1 inputs")
+    declaration = declaration_binding(base["spec"], base["columns"])
+    cases, inputs = {}, [Path(base["columns"]), Path(declaration["path"]),
+                         Path(base["root"]) / "wide/frozen.json",
+                         Path(base["root"]) / "human_role_decision.json"]
+    for arm, directory in references.items():
+        original = directory / "arms" / arm / "s0_k0"
+        result = json.loads((original / "result.json").read_text())
+        if result["spec"] != base["spec"] or result["epochs"] != EPOCHS:
+            raise ValueError("stored reproduction case differs")
+        table = plans[arm]["fold_tables"]["0"]
+        if sha(table["path"]) != table["sha256"]:
+            raise ValueError("stored fold table changed")
+        initial = base["initial"]["0"]
+        if sha(Path(initial["directory"]) / "refit/last.bin") != initial["checkpoint_sha256"]:
+            raise ValueError("stored initial model changed")
+        inputs += [directory / "PLAN.json", original / "result.json", Path(table["path"]),
+                   Path(table["path"] + ".manifest.json"), Path(initial["directory"]) / "refit/last.bin"]
+        checkpoints = [original / "ckpt" / f"ckpt_epoch{e:03d}.bin" for e in range(EPOCHS)]
+        inputs += checkpoints
+        cases[arm] = dict(population=plans[arm]["arms"][arm], original=str(original), table=table["path"],
+                          initial=initial["directory"], checkpoints={str(e): sha(p) for e, p in enumerate(checkpoints)})
+    fold = json.loads(Path(INPUTS["fold_plan"][0]).read_text())
+    frozen = freeze(run, commit, trainer, meta_tool, fold)
+    inputs.remove(Path(declaration["path"]))
+    declaration["path"] = str(run / "source/scripts/rev4_featpot" / Path(declaration["path"]).name)
+    inputs.append(Path(declaration["path"]))
+    value = dict(schema=REPRO_SCHEMA, protocol=PROTOCOL, **frozen, spec=base["spec"], columns=base["columns"],
+                 root=base["root"], derived_inputs=declaration, epochs=EPOCHS, lr=LR, cases=cases,
+                 input_sha256={str(p): sha(p) for p in inputs}, public_test_opened=False, eval_read=False,
+                 assessment="two stored fx1 seed-0 source-fold continuations; exact bytes excluding zentrain.repro")
+    write(run / "PLAN.json", value, fresh=True)
+    print(json.dumps(dict(plan=str(run / "PLAN.json"), sha256=sha(run / "PLAN.json"))))
+
+
+def reproduction_run(path):
+    if not compute_lock(os.getpid())["held_by_worker_ancestor"]:
+        raise ValueError("reproduction requires the shared compute lock")
+    value, run = checked(path, REPRO_SCHEMA), path.parent
+    require_clean_factors(os.environ)
+    state = dict(stage="reproduction-control", worker=process_snapshot(os.getpid()), plan_sha256=sha(path),
+                 completed=[], required=len(value["cases"]), failures=[])
+    write(run / "STATE.json", state, fresh=True)
+    comparisons = {}
+    try:
+        for arm, case in value["cases"].items():
+            dest = run / "arms" / arm / "s0_k0"
+            dest.parent.mkdir(parents=True)
+            command = fit_command(dict(value, arms={arm: case["population"]}), run, arm, 0,
+                                  case["initial"], case["table"], dest)
+            scratch = Path.home() / "tmp" / f"{run.name}-{arm}"
+            scratch.mkdir(parents=True)
+            env = dict(os.environ, TMPDIR=str(scratch), REV4_V2_BIN_DIR=str(run / "bin"),
+                       RAYON_NUM_THREADS="1", OMP_NUM_THREADS="1", OPENBLAS_NUM_THREADS="1", ZENSIM_MAX_TIER="v3")
+            with (run / f"{arm}.log").open("x") as log:
+                log.write(json.dumps(command) + "\n")
+                log.flush()
+                subprocess.run(command, env=env, stdout=log, stderr=subprocess.STDOUT, check=True)
+            fixed_outputs(dest, case["population"], arm)
+            for e, pin in case["checkpoints"].items():
+                original = Path(case["original"]) / "ckpt" / f"ckpt_epoch{int(e):03d}.bin"
+                if sha(original) != pin:
+                    raise ValueError("frozen reproduction checkpoint changed")
+                out = run / "control" / f"{arm}_e{int(e):03d}"
+                out.parent.mkdir(exist_ok=True)
+                comparisons[f"{arm}|{e}"] = nonrepro_identical(run / "tools/bake_dial_refit",
+                    dest / "ckpt" / original.name, original, out)
+            if not all(c["identical"] for c in comparisons.values()):
+                raise ValueError("fx1 reproduction failed; stop before interpreting any fx2 result")
+            state["completed"].append(arm)
+            state["checked_utc"] = now()
+            write(run / "STATE.json", state)
+        write(run / "CONTROL.json", dict({"pass": True}, identical=True, comparisons=comparisons), fresh=True)
+        inventory = {str(p.relative_to(run)): sha(p) for p in sorted(run.rglob("*"))
+                     if p.is_file() and p.name != "STATE.json" and p.relative_to(run).parts[0] != "source"}
+        write(run / "EVIDENCE_INVENTORY.json", inventory, fresh=True)
+        write(run / "COMPLETE.json", dict(plan_sha256=sha(path),
+              evidence_inventory_sha256=sha(run / "EVIDENCE_INVENTORY.json")), fresh=True)
+        state.update(stage="reproduction-complete", checked_utc=now())
+        write(run / "STATE.json", state)
+    except BaseException as error:
+        if not (run / "CONTROL.json").exists():
+            write(run / "CONTROL.json", dict({"pass": False}, identical=False, comparisons=comparisons, error=repr(error)), fresh=True)
+        state.update(stage="failed", checked_utc=now(), failures=[repr(error)])
+        write(run / "STATE.json", state)
+        raise
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="mode", required=True)
-    for mode in ("plan", "fold-plan", "frontier-plan", "recovery-plan"):
+    for mode in ("plan", "fold-plan", "frontier-plan", "recovery-plan", "reproduction-plan"):
         p = sub.add_parser(mode)
         p.add_argument("run", type=Path)
         p.add_argument("--source-commit", required=True)
         p.add_argument("--trainer", type=Path, required=True)
         p.add_argument("--meta-tool", type=Path, required=True)
-    for mode in ("queue", "run", "status", "fold-queue", "fold-run", "fold-status", "omission-run", "full-run"):
+    for mode in ("queue", "run", "status", "fold-queue", "fold-run", "fold-status", "omission-run", "full-run", "reproduction-run"):
         sub.add_parser(mode).add_argument("plan", type=Path)
     p = sub.add_parser("full-plan", help="stage C: full Mlic seeds 0-2 at the advanced point, packed at its epoch")
     p.add_argument("run", type=Path)
@@ -1728,7 +1872,7 @@ if __name__ == "__main__":
     elif args.mode == "recipe-plan":
         recipe_plan(args.run, args.source_commit, args.trainer, args.meta_tool, args.recipe, args.population,
                     args.after_run, [(Path(r), a) for r, a in args.compare], args.start, not args.no_control)
-    elif args.mode in ("plan", "fold-plan", "frontier-plan", "recovery-plan"):
+    elif args.mode in ("plan", "fold-plan", "frontier-plan", "recovery-plan", "reproduction-plan"):
         globals()[args.mode.replace("-", "_")](args.run, args.source_commit, args.trainer, args.meta_tool)
     else:
         globals()[args.mode.replace("-", "_")](args.plan.resolve())
