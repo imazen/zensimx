@@ -29,6 +29,11 @@ the owner explicitly changes the restriction. Continue training, numerical,
 serving and other independently executable qualification in the meantime.
 Do not infer permission to benchmark dev from the historical scorecard.
 
+2026-10-28: the owner allowed one quiet run on dev for the two curated revision-7 models. That run measured both
+models on the named hardware and passes the scalar-performance and spatial/memory rows at 1024² and 2048²
+(`benchmarks/byconstruction_2026-10-22.md`, "Runtime gate for the two curated models"). The exception covered that
+run only; the host rule above is otherwise unchanged.
+
 ## September 14 split clarification
 
 The later [user clarification](DATA_SPLITS.md#september-14-clarification-test-evaluation-when-no-eval-split-exists)

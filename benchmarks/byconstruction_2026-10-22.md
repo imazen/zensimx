@@ -7640,3 +7640,24 @@ Findings beside the bars: at one thread the cached reference saves 8–11% (1024
 slower than uncached from 1024² up (3.75 against 3.20 ms at 1024², 13.56 against 10.12 at 2048²), so the cached path
 parallelizes worse. fast-ssim2 0.8.2 gains nothing from eight threads here. Eight threads give the curated models
 3.5× at 1024² and 2.4× at 4096² over one thread.
+
+### Runtime gate for the two curated models: peak memory and verdict (2026-10-28)
+
+Fresh-process peak RSS (`/usr/bin/time -v`, one quiet-gated process per arm, size and thread count; 104 records,
+237 s). Incremental RSS is the arm's peak minus its baseline arm (inputs, model and scorer loaded, nothing scored):
+
+| Threads, size | Baseline | General score | Cached score | Score + map | Bar (128 B/px + 64 MiB) |
+|---|---:|---:|---:|---:|---:|
+| 1, 1024² | 12.1 MiB | +15.4 MiB | +31.4 MiB | +148.5 MiB | 192 MiB |
+| 1, 2048² | 29.8 MiB | +29.3 MiB | +93.3 MiB | +561.3 MiB | 576 MiB |
+| 1, 4096² | 101.8 MiB | +56.6 MiB | +312.0 MiB | +2,186.2 MiB | 2,112 MiB |
+| 8, 4096² | 101.9 MiB | +271.9 MiB | +542.5 MiB | +2,494.8 MiB | (per worker: 1 thread) |
+
+Peers' whole-process peaks at 4096² (one thread): fast-ssim2 0.8.2 2,468 MiB, fast-ssim2 main 1,797 MiB,
+butteraugli 2,646 MiB, frozen D 157 MiB, default B 158 MiB, the general model 158 MiB.
+
+**Verdict on the registered rows, both models: scalar performance PASS, spatial cost PASS, memory PASS** at 1024² and
+2048² (score + map 148.5 and 561.3 MiB against 192 and 576 MiB: the 2048² margin is 2.6%). Outside the registered
+sizes, score + map at 4096² takes 136.6 B/px, above the 128 B/px allowance by 74 MiB (3.5%); the score alone takes
+3.5 B/px. The map's retained planes, not the scorer, set the memory cost. Summary tables:
+`/mnt/v/output/zensim/r7-runtime-20261028/R7_RUNTIME.md` and `.json` (dev).
