@@ -14,6 +14,12 @@
 
 ### Added
 
+- Plan-bound fx2 continuation studies with an exact two-arm fx1 reproduction
+  control, complete fold/full/omission panels and immutable evidence audits
+  (`8cb362a8`, `96b8b350`, `c70c8fdc`). Candidate identity extraction uses each
+  bake's own consumed inputs; exact fx2 assessment population registration
+  preserves strict feature coverage (`28bf74f1`, `d02d2e07`).
+
 - Checkpoint continuation on main: the owner-approved warm-start trainer
   delta from PR 73 (`87864f94`) is ported with its D6 public_train admission.
   The frozen 0/4/8-epoch continuation contract is unchanged; a checkpoint

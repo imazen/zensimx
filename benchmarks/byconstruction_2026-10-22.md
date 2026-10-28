@@ -8024,3 +8024,40 @@ All per-type pooled changes, per-seed values, ladder RMS and inversion-size diag
 ### fx2 gate population identity (2026-10-28)
 
 Fresh assessment tables bind the exact canonical 504-slot population `basic+v2@w720/rev7_rowlanes#ee342d8c` and a matching empty human-corpus root. Every table and key is byte-identical before and after the metadata repair. The native verdict embeds its producer registry, so the exact population is registered alongside fx1; unregistered identities correctly refuse. Neither the default views nor gate thresholds changed.
+
+### fx2 serving controls and general-model verdict (2026-10-28)
+
+The rebuilt identity harness (source `28bf74f1`, binary `df38ebfc…`)
+reproduces every original field of the stored fx1 744-row identity proof.
+The rebuilt verdict (source `d02d2e07`, binary `cb0a130f…`) reproduces
+byte-identical fx1 predictions and identical checks, pins and contracts on
+both grids. Both native producer-registry tests pass. A supplemental i265
+control compares the rebuilt serving binary with the frozen run03 binary:
+all 648 near-identity rows for each fx2 model match every field, including
+consumed feature bits. The original pinned N1–N3 results remain the gate.
+
+| Completed gate | fx1 general | fx2 general | fx1 codec | fx2 codec |
+|---|---|---|---|---|
+| Pinned N1 / N2 / N3 | PASS / PASS / PASS | PASS / PASS / PASS | PASS / PASS / PASS | PASS / PASS / PASS |
+| N3 monotone ladders, fixed bar 122 | 142/144 | 141/144 | 142/144 | 141/144 |
+| C1–C6 contract, standard / ladder | PASS / PASS | PASS / PASS | PASS / PASS | PASS / PASS |
+| G-STEER | 135/135 | 134/135 | 135/135 | running |
+| Identity, 62 sources × 12 permutations | PASS | PASS, 744/744 | PASS | pending |
+
+General fails the requirement to retain every label-free gate its counterpart
+passed. Its failed G-STEER case is `broad-10-b8`: M2
+0.9878390005063202, M3f 0.9427956594553657. All 217152 engine feature
+comparisons agree; this is a measured gate failure. Thresholds are unchanged.
+No model asset or default changes in this lane.
+
+Actual packed read sets differ: general reads 504 raw IDs, codec 422.
+The codec retains fx1's 420 and adds only f400/f458 (finest X/B
+edge-width change); the other newly allowed inputs are dead. An allowed
+fx2 declaration does not imply that every allowed input is consumed.
+
+Full packed-model local mixture inversion counts by seed are general
+1/2/1 (largest rise 5.140324) and codec 0/1/0 (largest rise 0.274798).
+Every full packed model has zero global-mixture inversions. Fold and
+full mixture panels remain distinct in the local artifacts.
+Evidence: `/var/tmp/byc-fx2-20261028/stage2/`; native builds and both
+near-identity runs are archived under the corresponding tower output.
