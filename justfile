@@ -2,6 +2,9 @@
 chroma-pilot action root:
     python3 -B scripts/byconstruction/chroma_pilot.py {{quote(action)}} {{quote(root)}}
 
+chroma-pilot-report root report:
+    python3 -B scripts/byconstruction/chroma_pilot.py report {{quote(root)}} --report {{quote(report)}}
+
 chroma-pilot-sources root mlic bank imazen candidates commit mirror:
     python3 -B scripts/byconstruction/chroma_sources.py --root {{quote(root)}} --mlic-root {{quote(mlic)}} --bank {{quote(bank)}} --imazen {{quote(imazen)}} --safe-candidates {{quote(candidates)}} --build-commit {{quote(commit)}} --mirror {{quote(mirror)}}
 

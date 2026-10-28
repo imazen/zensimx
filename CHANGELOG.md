@@ -14,6 +14,10 @@
 
 ### Added
 
+- Local chroma-only JPEG pilot transport, exact frozen-teacher replay,
+  source-byte admission and per-ladder score/admission reporting
+  (`b9da3ad8`, `7b4a2341`, `6c9ce8b8`). No serving model or public Rust API changed.
+
 - Plan-bound fx2 continuation studies with an exact two-arm fx1 reproduction
   control, complete fold/full/omission panels and immutable evidence audits
   (`8cb362a8`, `96b8b350`, `c70c8fdc`). Candidate identity extraction uses each

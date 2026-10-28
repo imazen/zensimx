@@ -8141,3 +8141,49 @@ ports as independent judges).
 
 **Compute.** Encodes and scoring through zenfleet on the worker hosts (i265, i270, r3500, r3800x); extraction likewise;
 training on dev only. Nothing reads EVAL or holdout labels.
+
+### Chroma-only JPEG ladders: Stage A pilot result (2026-10-28)
+
+Stage A executed on one idle worker, i270: three sequential `zenmetrics sweep` invocations in one capped job, as the
+coordinator clarified. Nothing entered Stage B, a training leg, or a model fit. Exact pins and full local report:
+[chroma pilot pointer](chroma_pilot_2026-10-28.pointer.md). Generation owner `6c9ce8b8`; admission/report owner
+`scripts/byconstruction/chroma_pilot.py`.
+
+The completed pilot contains 81 TRAIN sources: 40 visually grouped SafeSyn tiles, eight CID22 oracle TRAIN references
+and 33 distinct K500_even imazen-26 sources covering all 21 classes. All 162 prepared views fit a 256/512 long-edge
+box using the existing imazen Mitchell owner; the largest raster is 262,144 pixels. One 8736×11648 texture original
+exceeded that owner's source decode limit and was excluded before scoring. Only one unique imazen-26 texture source
+remains; SafeSyn has no screen/plot source in this pilot. These gaps are explicit, not class qualification claims.
+
+All 12,636 cells encoded/decoded/scored without failure, with JPEG CAS persistence (11,526 distinct SHA256s).
+The exact preserved SafeSyn teacher executable reproduced four stored scores and eight pixel hashes, then scored
+all persisted distorted PNG pairs. Independent Pillow 12.3.0 decoded every JPEG, matched all CAS identities and
+matched every distorted PNG's RGB bytes to its frozen teacher input. The Y DQT remains fixed within every ladder;
+the all-ones arm has exactly 64 unit entries. Incidental Rev3 teacher feature CSVs are not Stage C Rev7 features.
+
+| family | fixed luma | kept ladders / views | kept rungs | median base bpp | median all-rung bpp |
+|---|---|---:|---:|---:|---:|
+| ycc444 | all-ones | 140/162 | 1,583 | 6.506775 | 3.999815 |
+| ycc444 | multiplier 0.05 | 140/162 | 1,580 | 5.522629 | 2.949890 |
+| ycc420 | all-ones | 140/162 | 1,601 | 4.760483 | 3.906588 |
+| ycc420 | multiplier 0.05 | 140/162 | 1,600 | 3.736979 | 2.858887 |
+| xyb | generic q95, B-quarter | 80/162 | 509 | 3.461139 | 2.542664 |
+
+Keep the registered admission rule. The implementation stops at the first adjacent tie/increase, retains only
+at-least-one-point steps from the last kept rung and drops prefixes shorter than three. YCbCr's median curves
+reverse after multiplier 22.6274; those late rungs are not admitted after a stop. Recommend all-ones Y: the fine arm
+saved bytes but recovered no additional ladder. XYB's 0.1–5.0 range reaches damage without extension: median endpoint
+loss 7.929322, minimum 0.222943, maximum 18.552545; 152/162 views lose at least one point, 133/162 at least five.
+Early ties/reversals still reject 82 XYB ladders, including most document and screen examples. Per-class counts and
+every ladder's scores/stops are retained in the local report; a majority of patent-scan ladders fail both YCbCr arms.
+
+Observed sweep wall costs for 5,184/5,184/2,268 cells: 29.871185/25.941082/15.037252 seconds; same-build teacher plus
+incidental features 64.632502 seconds for 12,636 cells. These are eight-thread pilot costs, not a runtime benchmark.
+`run-heavy: done rc=0 152s | peak-RSS 0.50GiB | min-avail 25963MiB | peak-load 7.07`; 16G hard cap. Independent readback:
+`run-heavy: done rc=0 52s | peak-RSS 0.14GiB | min-avail 26737MiB | peak-load 0.96`.
+
+The proposed full grid remains unlaunched: 16 size caps from 32 to 960, both crops and Mitchell fits, no upscaling,
+all actual rasters below one megapixel, all-ones Y and the existing chroma rungs. Nominal matrix ceilings and source
+censuses are in the local report; actual source/family, geometry, storage and split admission precede declaration.
+No validation-bucket pixel or label was read by this pilot. The later Rev7 extractor identity and Mlic fit replay
+controls remain prerequisites for their corresponding stages.

@@ -12,6 +12,7 @@ import hashlib
 import json
 from pathlib import Path
 import shutil
+import subprocess
 import urllib.request
 from urllib.parse import unquote, urlparse
 
@@ -41,6 +42,7 @@ def select(a):
     rawdir = a.root / "raw"
     rawdir.mkdir(exist_ok=True)
     spec = {"schema": "chroma-pilot-sources-v1", "build_commit": a.build_commit,
+            "max_source_pixels": a.max_source_pixels,
             "binary_sha256": {p.name: sha(p) for p in (a.root / "bin").iterdir()},
             "sources": [], "controls": [], "pins": {}, "source_exclusions": []}
 
@@ -59,11 +61,15 @@ def select(a):
         if expected and digest != expected:
             raise ValueError(f"source bytes differ from canonical LFS identity: {identity}")
         with Image.open(dest) as image:
+            w, h = image.size
+            if w * h > a.max_source_pixels:
+                spec["source_exclusions"].append({"id": identity, "source_sha256": digest,
+                    "reason": "caller-declared source decoder capacity", "width": w, "height": h})
+                return None
             opaque_rgba = image.mode == "RGBA" and image.getchannel("A").getextrema() == (255, 255)
             opaque_indexed = image.mode in ["1", "P"] and "transparency" not in image.info
             if (image.mode not in ["RGB", "L"] and not opaque_rgba and not opaque_indexed) or image.format != "PNG":
                 raise ValueError(f"{identity}: pilot requires opaque RGB8/gray8 PNG, got {image.mode}")
-            w, h = image.size
         source = {"id": identity, "type": kind, "class_group": cls, "content_class": source_class,
                   "reference_group": reference_group, "split": "train", "source_path": str(path),
                   "url": url, "source_sha256": digest, "raw": name, "width": w, "height": h}
@@ -93,6 +99,8 @@ def select(a):
             raise ValueError("SafeSyn source outside Mlic fitting partition")
         source = include(Path(path), f"safe{i:02}", "safesyn", class_of.get(i, "photo"),
                          "safesyn_visual_class", ref)
+        if source is None:
+            raise ValueError("source capacity excludes a registered SafeSyn pilot tile")
         if i in [0, 4, 6, 15]:
             r = first_by_group[ref]
             dist = Path(r["dist_path"])
@@ -117,6 +125,11 @@ def select(a):
     representatives = a.imazen / "manifests/imazen26_representatives_K500_even_2026-06-18.tsv"
     for p in [splitpath, representatives, a.safe_candidates]:
         spec["pins"][str(p)] = sha(p)
+    for p in [a.bank / "safesyn/keys.parquet", a.bank / "safesyn/labels__ssim2_oracle.parquet",
+              a.bank / "cid22_train/keys.parquet"]:
+        spec["pins"][str(p)] = sha(p)
+    spec["canonical_imazen_git_commit"] = subprocess.check_output(
+        ["git", "--git-dir=" + str(a.imazen / ".git"), "rev-parse", "HEAD"], text=True).strip()
     split = {r["id"]: r for r in csv.DictReader(splitpath.open(), delimiter="\t")}
     buckets = defaultdict(lambda: defaultdict(list))
     seen = set()
@@ -144,7 +157,11 @@ def select(a):
         for r, rel, identity in selected[:8]:
             path = a.imazen / "png-v3" / rel
             initial = path.read_bytes() if path.stat().st_size < 1024 else b""
-            expected = None
+            pointer = subprocess.check_output(
+                ["git", "--git-dir=" + str(a.imazen / ".git"), "show", "HEAD:png-v3/" + rel])
+            if not pointer.startswith(b"version https://git-lfs.github.com/spec/v1"):
+                raise ValueError("canonical PNG source lacks its expected LFS identity")
+            expected = pointer.decode().split("oid sha256:")[1].split()[0]
             url = None
             if initial.startswith(b"version https://git-lfs.github.com/spec/v1"):
                 expected = initial.decode().split("oid sha256:")[1].split()[0]
@@ -155,8 +172,12 @@ def select(a):
                     path = a.mirror / rel
                 else:
                     url = r["url"]
-            include(path, f"im{identity}", "imazen26", cls, r["content_class"],
-                    f"imazen26:{identity}", url, expected)
+            source = include(path, f"im{identity}", "imazen26", cls, r["content_class"],
+                             f"imazen26:{identity}", url, expected)
+            if source is None:
+                continue
+            source["url"] = r["url"]  # Preserve the hyperlink even when copying a local mirror.
+            source["representative"] = r
     (a.root / "SOURCES.json").write_text(json.dumps(spec, indent=2) + "\n")
     print("Frozen", len(spec["sources"]), "sources", flush=True)
 
@@ -169,5 +190,7 @@ if __name__ == "__main__":
     p.add_argument("--imazen", required=True, type=Path)
     p.add_argument("--safe-candidates", required=True, type=Path)
     p.add_argument("--mirror", type=Path, help="Optional byte-verified mirror of canonical PNG-v3 files")
+    p.add_argument("--max-source-pixels", type=int, default=64_000_000,
+                   help="Explicit capacity admission before the frozen preparation decoder")
     p.add_argument("--build-commit", required=True)
     select(p.parse_args())
