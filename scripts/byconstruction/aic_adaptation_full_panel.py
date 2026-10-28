@@ -188,6 +188,8 @@ def e21_group(group):
             raise ValueError("source fit inventory differs")
         source_inventory = json.loads(inventory.read_text())
         fits_file = directory / "FITS_COMPLETE.json"
+        if sha(fits_file) != source_inventory["FITS_COMPLETE.json"]:
+            raise ValueError("completed source fit records changed")
         fits = json.loads(fits_file.read_text())
         if fits["plan_sha256"] != sha(plan_file):
             raise ValueError("source fit records differ from the plan")

@@ -37,6 +37,7 @@ class E21SubsetInputs(unittest.TestCase):
                     p.write_text("row_idx\tpred\n0\t1\n1\t2\n")
                     inventory[str(p.relative_to(root))] = owner.sha(p)
             (root / "FITS_COMPLETE.json").write_text(json.dumps(dict(plan_sha256=owner.sha(root / "PLAN.json"), cells=fits)))
+            inventory["FITS_COMPLETE.json"] = owner.sha(root / "FITS_COMPLETE.json")
             (root / "EVIDENCE_INVENTORY.json").write_text(json.dumps(inventory))
             (root / "COMPLETE.json").write_text(json.dumps(dict(plan_sha256=owner.sha(root / "PLAN.json"),
                 evidence_inventory_sha256=owner.sha(root / "EVIDENCE_INVENTORY.json"))))
@@ -51,6 +52,13 @@ class E21SubsetInputs(unittest.TestCase):
             self.assertIn(str(prediction), inputs)
             prediction.write_text("row_idx\tpred\n0\t100\n1\t200\n")
             with self.assertRaisesRegex(ValueError, "source prediction changed"):
+                owner.e21_group(group)
+            prediction.write_text("row_idx\tpred\n0\t1\n1\t2\n")
+            # Updating a model receipt alone cannot silently rebind a completed source.
+            changed = json.loads((root / "FITS_COMPLETE.json").read_text())
+            changed["cells"][0]["packed"]["packed_model_sha256"] = "0" * 64
+            (root / "FITS_COMPLETE.json").write_text(json.dumps(changed))
+            with self.assertRaisesRegex(ValueError, "source fit records changed"):
                 owner.e21_group(group)
 
     def test_paired_contrasts_cannot_mix_fitted_and_omitted_populations(self):
