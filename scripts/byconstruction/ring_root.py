@@ -28,6 +28,9 @@ right pixels and that the arm moved nothing else. Arms (`--arm`, default hpm):
                                                scale and channel cell, as an f32 product of f32 factors. XYB (default)
                                                gates all 410 (f1891-f2300); Y only the 164 luminance-cell differences
                                                (f1891-f2054)
+  selection-rebind --root ROOT --parent-sha256 PIN --declaration TOKEN --out ROOT2
+                                               a dataset-leg root bound to another pinned declaration (fx2: scale-0
+                                               chroma); metadata only, tables byte-identical
   gated-decl --decl FX1G.json --out DECL.json [--channels XYB|Y]
                                                the training declaration of a gated root: fx1's 410 differences and the
                                                gated ids direct, fx1's 410 fragility products
@@ -967,6 +970,73 @@ def cmd_dataset_links(a):
     return 0
 
 
+def cmd_selection_rebind(a):
+    """Bind a frozen dataset-leg root to another pinned input declaration, metadata only.
+
+    The leg tables carry every measured revision-7 column whatever the selection; only their
+    declarations and the receipt name the selected ids. The new root copies the parent, checks every
+    leg table is byte-identical and holds no NaN in a selected column, points the receipt and the leg
+    declarations at its own copies with the declaration's direct ids, and re-pins the freeze.
+    No target is read."""
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]/"rev4_featpot"))
+    from v2_common import derived_declaration
+    source, out = Path(a.root), Path(a.out)
+    if out.exists():
+        raise ValueError("rebind destination must be fresh")
+    parent_pin = sha(source/"wide/frozen.json")
+    if parent_pin != a.parent_sha256:
+        raise ValueError("registered parent root required")
+    decl_path, decl_pin, decl = derived_declaration(a.declaration)
+    selected = list(decl["direct"])
+    packet = json.loads((source/"datasets/receipt.json").read_text())
+    if packet.get("schema") != "rev7-dataset-legs-v1" or packet.get("linked_subset_omissions"):
+        raise ValueError("a plain revision-7 dataset-leg root is required")
+    frozen = json.loads((source/"wide/frozen.json").read_text())
+    if frozen.get("dataset_legs_sha256") != sha(source/"datasets/receipt.json"):
+        raise ValueError("parent receipt pin differs")
+    for g in packet["groups"]:
+        table = Path(g["path"])
+        if table.parent != source/"datasets" or sha(table) != g["table_sha256"]:
+            raise ValueError(f"{table}: parent leg table differs from its receipt")
+        if sha(str(table)+".manifest.json") != g["manifest_sha256"] or sha(g["keys_path"]) != g["keys_sha256"]:
+            raise ValueError(f"{table}: parent leg declaration differs from its receipt")
+        columns = pq.read_table(table, columns=[f"f{i}" for i in selected])
+        if any(np.isnan(c.to_numpy(zero_copy_only=False)).any() for c in columns.columns):
+            raise ValueError(f"{table}: a selected column is not measured")
+    shutil.copytree(source, out)
+    moved = lambda path: str(out/Path(path).relative_to(source))
+    rewritten = {}
+    for g in packet["groups"]:
+        manifest = Path(moved(g["path"])+".manifest.json")
+        d = json.loads(manifest.read_text())
+        if d.get("feature_ids") != packet["feature_ids"]:
+            raise ValueError(f"{manifest}: leg declaration selection differs from the receipt")
+        d["feature_ids"], d["admission_root"] = selected, str(out)
+        manifest.write_text(json.dumps(d, indent=1)+"\n")
+        g["path"], g["keys_path"], g["manifest_sha256"] = moved(g["path"]), moved(g["keys_path"]), sha(manifest)
+        rewritten[str(manifest.relative_to(out))] = g["manifest_sha256"]
+    previous = packet["feature_ids"]
+    packet.update(feature_ids=selected, family_guard_path=moved(packet["family_guard_path"]),
+                  selection_rebind=dict(parent_frozen_sha256=parent_pin, previous_feature_ids_sha256=hashlib.sha256(
+                      ",".join(map(str, previous)).encode()).hexdigest(), declaration=a.declaration,
+                      declaration_path=str(decl_path), declaration_sha256=decl_pin, labels_read=False,
+                      method="leg tables byte-identical to the parent; every selected column measured (no NaN)"))
+    packet_path = out/"datasets/receipt.json"
+    packet_path.write_text(json.dumps(packet, indent=1)+"\n")
+    rewritten["datasets/receipt.json"] = sha(packet_path)
+    frozen = json.loads((out/"wide/frozen.json").read_text())
+    for rel in frozen["auxiliary_files"]:
+        now = sha(out/rel)
+        if now != frozen["auxiliary_files"][rel] and rel not in rewritten:
+            raise ValueError(f"{rel}: changed outside the rebind")
+        frozen["auxiliary_files"][rel] = now
+    frozen["dataset_legs_sha256"] = sha(packet_path)
+    (out/"wide/frozen.json").write_text(json.dumps(frozen, indent=1)+"\n")
+    print(json.dumps(dict(root=str(out), frozen_sha256=sha(out/"wide/frozen.json"), parent_frozen_sha256=parent_pin,
+                          declaration=a.declaration, feature_ids=len(selected), rewritten=sorted(rewritten)), indent=1))
+    return 0
+
+
 def log(msg: str) -> None:
     print(f"{time.strftime('%F %T')} {msg}", flush=True)
 
@@ -1574,6 +1644,12 @@ def main() -> int:
     dl.add_argument("--root", required=True)
     dl.add_argument("--out", required=True)
     dl.set_defaults(fn=cmd_dataset_links)
+    sr = sub.add_parser("selection-rebind", help="bind a frozen dataset-leg root to another pinned declaration")
+    sr.add_argument("--root", required=True)
+    sr.add_argument("--parent-sha256", required=True)
+    sr.add_argument("--declaration", required=True)
+    sr.add_argument("--out", required=True)
+    sr.set_defaults(fn=cmd_selection_rebind)
     p = sub.add_parser("pool")
     p.add_argument("--arm", choices=sorted(ARMS), default="hpm")
     p.add_argument("--bin", required=True)

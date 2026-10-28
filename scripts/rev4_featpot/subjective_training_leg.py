@@ -461,8 +461,12 @@ def read_train_panel(path):
     return document(path)
 
 
-def dataset_groups(root, groups, selected, route, seed_index, init_seed, sample_seed, dest, exclude=()):
-    """Attach the frozen derived root's dataset legs to the canonical fitter."""
+def dataset_groups(root, groups, selected, route, seed_index, init_seed, sample_seed, dest, exclude=(),
+                   declaration="fx1"):
+    """Attach the frozen derived root's dataset legs to the canonical fitter.
+
+    `declaration` is the run's pinned derived-input recipe; the root's legs must have been admitted
+    for exactly its direct ids (`ring_root.py selection-rebind` binds a root to another one)."""
     frozen = document(root/"wide/frozen.json")
     pin = frozen.get("dataset_legs_sha256")
     if pin is None:
@@ -519,7 +523,7 @@ def dataset_groups(root, groups, selected, route, seed_index, init_seed, sample_
                 width=document(root/"wide/main/real/receipt.json")["width"],
                 family_guard_path=p["family_guard_path"],family_guard_sha256=p["family_guard_sha256"])
     from v2_common import derived_declaration
-    direct = derived_declaration("fx1")[2]
+    direct = derived_declaration(declaration)[2]
     if selected != direct["direct"]:
         raise ValueError("dataset M recipe requires its pinned direct columns")
     cell["read_ids"] = sorted(set(selected) | {b for _,b in direct["products"]})

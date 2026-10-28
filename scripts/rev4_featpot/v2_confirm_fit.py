@@ -178,7 +178,8 @@ def main() -> None:
         from subjective_training_leg import dataset_groups
         groups, dataset_authority = dataset_groups(V2, groups, keep, "full", args.seed_index,
                                                    init_seed, sample_seed, dest,
-                                                   exclude=tuple(filter(None, args.exclude_datasets.split(","))))
+                                                   exclude=tuple(filter(None, args.exclude_datasets.split(","))),
+                                                   declaration=recipe.get("derived_inputs") or "fx1")
         if dataset_authority:
             weights.update({name:tw for name,_,tw,_,_ in groups if tw > 0})
     diagnostic = None

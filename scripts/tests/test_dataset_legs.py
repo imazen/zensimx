@@ -53,6 +53,99 @@ class DatasetAuthority(unittest.TestCase):
             f.admit()
 
 
+
+class SelectionRebind(unittest.TestCase):
+    """`ring_root.py selection-rebind`: metadata-only binding of a dataset-leg root to another declaration."""
+
+    def fixture(self, directory, nan_column=None):
+        import numpy as np
+        from v2_common import derived_declaration
+        fx1 = derived_declaration("fx1")[2]["direct"]
+        p = Path(directory)/"parent"
+        (p/"wide/main/real").mkdir(parents=True)
+        (p/"wide/main/real/receipt.json").write_text(json.dumps(dict(width=1853)))
+        (p/"datasets").mkdir()
+        rows = 4
+        cols = {f"f{i}": pa.array(np.full(rows, 0.25 + i * 1e-4, dtype=np.float32)) for i in range(1853)}
+        if nan_column is not None:
+            cols[f"f{nan_column}"] = pa.array(np.full(rows, np.nan, dtype=np.float32))
+        cols["ref_basename"] = pa.array(["a", "a", "b", "b"])
+        cols["human_score"] = pa.array([1.0, 2.0, 3.0, 4.0])
+        table = p/"datasets/pipal.parquet"
+        pq.write_table(pa.table(cols), table)
+        keys = p/"datasets/pipal.keys.json"
+        keys.write_text(json.dumps([dict(row=i) for i in range(rows)]))
+        manifest = Path(str(table)+".manifest.json")
+        manifest.write_text(json.dumps(dict(schema="subjective-training-leg-v2", feature_ids=fx1,
+                                            admission_root=str(p), table_sha256=root.sha(table))))
+        guard = p/"datasets/FAMILY_GUARD.json"
+        guard.write_text(json.dumps(dict(schema="dataset-family-guard-v1", inherited_leaks=0)))
+        packet = p/"datasets/receipt.json"
+        packet.write_text(json.dumps(dict(schema="rev7-dataset-legs-v1", feature_ids=fx1, producer_commit="x",
+            family_guard_path=str(guard), family_guard_sha256=root.sha(guard),
+            groups=[dict(collection="pipal", name="subjective_rank_pipal", train_weight=0.5, val_weight=0.0,
+                         mode="withinref,rank", subjective=True, path=str(table), table_sha256=root.sha(table),
+                         manifest_sha256=root.sha(manifest), keys_path=str(keys), keys_sha256=root.sha(keys),
+                         rows=rows)])))
+        aux = {f"datasets/{f.name}": root.sha(f) for f in (table, keys, manifest, guard)}
+        (p/"wide/frozen.json").write_text(json.dumps(dict(dataset_legs_sha256=root.sha(packet), auxiliary_files=aux)))
+        return p
+
+    def rebind(self, parent, out, pin=None, declaration="fx2"):
+        args = SimpleNamespace(root=str(parent), out=str(out), declaration=declaration,
+                               parent_sha256=pin or root.sha(parent/"wide/frozen.json"))
+        return root.cmd_selection_rebind(args)
+
+    def test_rebind_rewrites_only_declarations_and_pins(self):
+        from v2_common import derived_declaration
+        fx2 = derived_declaration("fx2")[2]["direct"]
+        with tempfile.TemporaryDirectory() as d:
+            parent = self.fixture(d)
+            before = {f: root.sha(f) for f in parent.rglob("*") if f.is_file()}
+            out = Path(d)/"fx2"
+            self.assertEqual(self.rebind(parent, out), 0)
+            self.assertEqual(before, {f: root.sha(f) for f in parent.rglob("*") if f.is_file()})
+            self.assertEqual(root.sha(out/"datasets/pipal.parquet"), root.sha(parent/"datasets/pipal.parquet"))
+            packet = json.loads((out/"datasets/receipt.json").read_text())
+            self.assertEqual(packet["feature_ids"], fx2)
+            group = packet["groups"][0]
+            self.assertEqual(group["path"], str(out/"datasets/pipal.parquet"))
+            manifest = json.loads(Path(group["path"]+".manifest.json").read_text())
+            self.assertEqual((manifest["feature_ids"], manifest["admission_root"]), (fx2, str(out)))
+            self.assertEqual(group["manifest_sha256"], root.sha(group["path"]+".manifest.json"))
+            frozen = json.loads((out/"wide/frozen.json").read_text())
+            self.assertEqual(frozen["dataset_legs_sha256"], root.sha(out/"datasets/receipt.json"))
+            for rel, pin in frozen["auxiliary_files"].items():
+                self.assertEqual(pin, root.sha(out/rel), rel)
+            self.assertFalse(packet["selection_rebind"]["labels_read"])
+
+    def test_rebind_refuses_changed_parent_and_unmeasured_columns(self):
+        with tempfile.TemporaryDirectory() as d:
+            parent = self.fixture(d)
+            with self.assertRaisesRegex(ValueError, "registered parent"):
+                self.rebind(parent, Path(d)/"a", pin="0"*64)
+            self.assertFalse((Path(d)/"a").exists())
+        with tempfile.TemporaryDirectory() as d:
+            parent = self.fixture(d, nan_column=0)  # scale-0 X SSIM mean: in fx2, not in fx1
+            with self.assertRaisesRegex(ValueError, "not measured"):
+                self.rebind(parent, Path(d)/"b")
+            self.assertFalse((Path(d)/"b").exists())
+
+    def test_fitter_declaration_must_match_the_rebound_root(self):
+        from subjective_training_leg import dataset_groups
+        from v2_common import derived_declaration
+        fx1 = derived_declaration("fx1")[2]["direct"]
+        fx2 = derived_declaration("fx2")[2]["direct"]
+        with tempfile.TemporaryDirectory() as d:
+            out = Path(d)/"fx2"
+            self.rebind(self.fixture(d), out)
+            dest = Path(d)/"cell"
+            dest.mkdir()
+            with self.assertRaisesRegex(ValueError, "leg recipe differs"):
+                dataset_groups(out, [], fx1, "full", 0, 1101, 101, dest)
+            with self.assertRaisesRegex(ValueError, "pinned direct columns"):
+                dataset_groups(out, [], fx2, "full", 0, 1101, 101, dest, declaration="fx1")
+
 class EffectiveSampleMasses(unittest.TestCase):
     def test_selection_requires_gain_noninferiority_and_every_global_cell(self):
         from byc_cells import neff_decision
