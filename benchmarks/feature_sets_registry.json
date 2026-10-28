@@ -1101,6 +1101,19 @@
    "evidence": "benchmarks/shippath7_REGISTRATION.md",
    "note": "Features-only projection of the pinned Rev5 bank onto the existing by_v2fy consumed IDs; all other slots NaN. Rust owner checks the hash."
   },
+  "basic+v2@w720/rev7_rowlanes#ee342d8c": {
+   "compute": "basic+v2",
+   "layout": 720,
+   "era": "rev7_rowlanes",
+   "slots": "0-155,372-719",
+   "slots_hash8": "ee342d8c",
+   "n_slots": 504,
+   "role": "producer",
+   "kind": "set",
+   "slot_selection": "fx2_consumed_504",
+   "evidence": "benchmarks/byconstruction_2026-10-22.md; scripts/rev4_featpot/color_noise_fx2_declaration.json",
+   "note": "Explicit fx2 assessment projection from immutable revision-7 instrument banks; unselected slots are NaN."
+  },
   "basic+v2@w720/rev7_rowlanes#62adfc93": {
    "compute": "basic+v2",
    "layout": 720,

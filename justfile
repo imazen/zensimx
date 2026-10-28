@@ -683,6 +683,11 @@ fx2-identity-build target:
     TMPDIR="$HOME/tmp" cargo clippy --locked --release -p zensim --example serve_custom_bake --features custom-profiles --target-dir {{quote(target)}}
     TMPDIR="$HOME/tmp" cargo build --locked --release -p zensim --example serve_custom_bake --features custom-profiles --target-dir {{quote(target)}}
 
+# The verdict embeds the exact producer population registry; caller holds heavy.lock/run-heavy.
+fx2-verdict-build target:
+    TMPDIR="$HOME/tmp" cargo test --locked --release -p zensim-validate --lib --target-dir {{quote(target)}} assessment_projection -- --nocapture
+    TMPDIR="$HOME/tmp" cargo build --locked --release -p zensim-validate --bin bake_verdict --target-dir {{quote(target)}}
+
 dataset-progress-tests:
     python3 -B -m unittest discover -s scripts/tests -p 'test_dataset_study_status.py' -v
 

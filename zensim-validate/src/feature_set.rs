@@ -1467,6 +1467,33 @@ mod training_admission_tests {
     }
 
     #[test]
+    fn fx2_assessment_projection_resolves_every_declared_raw_input() {
+        let declaration: serde_json::Value = serde_json::from_str(include_str!(
+            "../../scripts/rev4_featpot/color_noise_fx2_declaration.json"
+        ))
+        .unwrap();
+        let mut ids: Vec<usize> = serde_json::from_value(declaration["direct"].clone()).unwrap();
+        for pair in declaration["products"].as_array().unwrap() {
+            ids.extend(serde_json::from_value::<Vec<usize>>(pair.clone()).unwrap());
+        }
+        let slots = SlotSet::from_slots(ids);
+        let id = FeatureSetId::from_slots_with_layout(
+            compute_parts_for_slots(&slots),
+            720,
+            "rev7_rowlanes",
+            &slots,
+        )
+        .unwrap();
+        assert_eq!(id.to_string(), "basic+v2@w720/rev7_rowlanes#ee342d8c");
+        assert_eq!(
+            resolve_declared_set(id, "explicit fx2 assessment".into())
+                .unwrap()
+                .slots,
+            slots
+        );
+    }
+
+    #[test]
     #[ignore = "requires explicitly pinned features-only assessment manifest"]
     fn external_assessment_tables_admission() {
         let p = std::path::PathBuf::from(std::env::var("SHIPPATH7_ASSESSMENT").unwrap());
