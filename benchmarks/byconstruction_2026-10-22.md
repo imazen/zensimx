@@ -7530,3 +7530,19 @@ On compression, out of sample, every AIC-heavy arm holds the older sets at or ab
 0.004–0.019 (AIC-only most: KADID −0.041, TID2013 −0.033). So a codec model can take AIC-2026 to 0.9515 out of fold
 (AIC-only e29) without losing compression quality on the older sets; ×1024 and ×1024 + rehearsal trade 0.005–0.006 of
 AIC-2026 for less loss elsewhere. As registered, no rule picks the codec model: this goes to the owner's curation.
+
+### Codec model follow-through: AIC-only e29 (owner's pick, registered 2026-10-27, 01:31 UTC, before any of these runs)
+
+The owner picked AIC-only at epoch 29 as the codec-only model (about 23:22 UTC), from the codec-role evidence above.
+Its follow-through mirrors stage C, using what already exists:
+
+- **Three seeds on the folds.** The source-fold study already holds seeds 0–2 of the AIC-only arm with every-epoch dumps;
+  each seed's out-of-fold AIC-2026 public_train SROCC at epoch 29 is scored from those checkpoints (no new fit).
+- **E21 out of sample.** `mlic-aic-omission-codec-aiconly-20261027-run01` (three seeds), reported on every type and on
+  compression only.
+- **Full data.** Mlic's three full seeds continue AIC-only on all of public_train for 60 epochs (LR 1e-5, fresh Adam),
+  packed at epoch 29 with the TRAIN CID22 anchor (the full-data step's existing owner), queued after stage C's.
+- **Gates.** Near-identity and the label-free gates on the packed seed-0 model.
+
+It is judged as a codec model: compression-only E21 is the older-set evidence, and its losses on other distortion types
+are reported, not gating. The general model's stage C is unchanged.
