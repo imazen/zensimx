@@ -67,14 +67,23 @@ PY
     env_for "$root"
     python3 -B "$repo/scripts/rev4_featpot/byc_cells.py" run --arm mono:thr:mp32 --base-spec "$fx1_spec" \
       --cols "$study/frozen_configuration/cols_c.txt" --label Mlic --folds kadid --seeds 0 --jobs 1
+    # The bake embeds run provenance (zentrain.repro: paths, run time), so the model bytes are compared
+    # with that one entry removed by the pinned bake owner (the E33 control's rule).
+    for side in new stored; do
+      if [ $side = new ]; then cell="$study/cells/Mlic/without_kadid_s0"; else cell="$mixes/cells/Mlic/without_kadid_s0"; fi
+      "$study/bin/bake_dial_refit" strip --in "$cell/refit/last.bin" --out "$study/control_$side.norepro.bin" \
+        --key zentrain.repro > /dev/null
+    done
     python3 -B - "$study" "$mixes" <<'PY'
 import json, sys, hashlib
 study, mixes = sys.argv[1:]
 def sha(p): return hashlib.sha256(open(p, "rb").read()).hexdigest()
 new, old = f"{study}/cells/Mlic/without_kadid_s0", f"{mixes}/cells/Mlic/without_kadid_s0"
-out = {k: {"new": sha(f"{new}/{f}"), "stored": sha(f"{old}/{f}")}
-       for k, f in (("prediction", "pred_kadid.tsv"), ("last_bin", "refit/last.bin"))}
-out["pass"] = all(v["new"] == v["stored"] for v in out.values())
+out = {"prediction": {"new": sha(f"{new}/pred_kadid.tsv"), "stored": sha(f"{old}/pred_kadid.tsv")},
+       "last_bin_without_repro": {"new": sha(f"{study}/control_new.norepro.bin"),
+                                  "stored": sha(f"{study}/control_stored.norepro.bin")},
+       "last_bin_raw": {"new": sha(f"{new}/refit/last.bin"), "stored": sha(f"{old}/refit/last.bin")}}
+out["pass"] = all(out[k]["new"] == out[k]["stored"] for k in ("prediction", "last_bin_without_repro"))
 json.dump(out, open(f"{study}/CONTROL.json", "w"), indent=1)
 print(json.dumps(out))
 if not out["pass"]:
