@@ -7967,3 +7967,60 @@ controls for each severe case. An exposed case with no eligible control
 has an undefined comparison, serialized as null. Scoring retains the exact
 previously exposed manifest; it does not read additional response rows.
 Tests distinguish absent comparisons from a measured zero inversion count.
+
+### fx2 continuations: completed E21 panels (2026-10-28)
+
+All 72 registered continuation fits completed: 42 fold fits, six full-data fits and 24 omission fits. The codec full-data packs reuse the completed fits in run02 with explicit no-prune. All five terminal study inventories were independently rehashed. The two-arm fx1 reproduction control matches all 120 checkpoints after stripping only zentrain.repro.
+
+The following are means of three per-seed SROCC values. Full models are in sample; omission cells are out of sample. E21 is diagnostic, not the deciding gate.
+
+| Role / scope | Set | Every type, fx1 → fx2 | Compression, fx1 → fx2 |
+|---|---|---|---|
+| general / full | kadid | 0.90594658 → 0.90878442 | 0.94664833 → 0.94550616 |
+| general / full | tid2013 | 0.88405562 → 0.88956826 | 0.96272473 → 0.96457296 |
+| general / full | konfig | 0.81840435 → 0.82643813 | 0.88200391 → 0.88954200 |
+| general / full | cid22_a25 | 0.90014030 → 0.88610824 | 0.90014030 → 0.88610824 |
+| general / oos | kadid | 0.87852368 → 0.88273570 | 0.94747386 → 0.94578455 |
+| general / oos | tid2013 | 0.87303216 → 0.87202577 | 0.96371541 → 0.96373039 |
+| general / oos | konfig | 0.80066661 → 0.79609803 | 0.88366323 → 0.88518033 |
+| general / oos | cid22_a25 | 0.89179017 → 0.87451084 | 0.89179017 → 0.87451084 |
+| codec / full | kadid | 0.73291900 → 0.82466229 | 0.94705802 → 0.94711472 |
+| codec / full | tid2013 | 0.78595022 → 0.83636503 | 0.95860460 → 0.96073102 |
+| codec / full | konfig | 0.80213960 → 0.79630035 | 0.87086270 → 0.87683628 |
+| codec / full | cid22_a25 | 0.89517986 → 0.89758884 | 0.89517986 → 0.89758884 |
+| codec / oos | kadid | 0.84128007 → 0.83145516 | 0.94625307 → 0.94680327 |
+| codec / oos | tid2013 | 0.84121201 → 0.82638260 | 0.96135013 → 0.96108764 |
+| codec / oos | konfig | 0.79546574 → 0.78928890 | 0.88323655 → 0.88276246 |
+| codec / oos | cid22_a25 | 0.89242491 → 0.89384631 | 0.89242491 → 0.89384631 |
+
+CID22-A full-model bias spread, computed from seed-averaged per-type biases: general 0.02640971035 → 0.03202510056; codec 0.03527023017 → 0.03590123882. The general increase exceeds 0.005; the codec increase stays within it. Per-seed spreads are retained separately: both seed-0 spreads improve, while seed 1 worsens by more than 0.005 for both recipes. This is not an all-seed pass claim.
+
+| OOS knob-concurring inversion rate | General fx1 → fx2 | Codec fx1 → fx2 |
+|---|---|---|
+| kadid | 0.01358078 → 0.01374994 | 0.01469238 → 0.01507902 |
+| tid2013 | 0.01044308 → 0.01002052 | 0.00742485 → 0.00694193 |
+| konfig | 0.00019357 → 0.00012905 | 0.00019357 → 0.00019357 |
+| cid22_a25 | 0.00040048 → 0.00020024 | 0.00033373 → 0.00013349 |
+
+Noise-type ladder comparisons below are the mean per-seed change in within-reference SROCC, fx2 minus fx1; type indices are zero-based in the native TRAIN panel. Zero means the within-reference ordering did not change; it does not imply identical scores.
+
+| Set / type | General delta | Codec delta |
+|---|---|---|
+| kadid / white noise | +0.00000000 | +0.00000000 |
+| kadid / color noise | +0.00000000 | +0.00000000 |
+| kadid / impulse | +0.00000000 | +0.00000000 |
+| kadid / multiplicative noise | +0.00000000 | +0.00000000 |
+| tid2013 / AWGN | +0.00000000 | +0.00000000 |
+| tid2013 / AWGN color | +0.00000000 | +0.00000000 |
+| tid2013 / spatial noise | +0.00000000 | +0.00000000 |
+| tid2013 / masked noise | +0.00000000 | +0.00000000 |
+| tid2013 / high-frequency noise | +0.00000000 | +0.00000000 |
+| tid2013 / impulse | +0.00000000 | +0.00000000 |
+| tid2013 / multiplicative noise | +0.00000000 | +0.00000000 |
+| tid2013 / comfort noise | +0.00000000 | +0.00000000 |
+
+All per-type pooled changes, per-seed values, ladder RMS and inversion-size diagnostics remain in `fx2-e21-report-run01` and `fx2-e21-diagnostics-run01` under `/var/tmp/byc-fx2-20261028/stage2/`. Local/global mixture panels, private AIC comparisons and the registered comparison decisions remain only in that stage2 directory and `~/tmp/handoff/fx2-continuations/report.md`. No additional holdout was opened.
+
+### fx2 gate population identity (2026-10-28)
+
+Fresh assessment tables bind the exact canonical 504-slot population `basic+v2@w720/rev7_rowlanes#ee342d8c` and a matching empty human-corpus root. Every table and key is byte-identical before and after the metadata repair. The native verdict embeds its producer registry, so the exact population is registered alongside fx1; unregistered identities correctly refuse. Neither the default views nor gate thresholds changed.
