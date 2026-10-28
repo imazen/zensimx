@@ -488,7 +488,8 @@ def cmd_scatter(a):
             frame[f"r_{k}"] = np.round(arr["rank"], 4) if arr["rank"] is not None else [None] * len(y)
             frame[f"a_{k}"] = np.round(y.mean() + (x - x.mean()) * (y.std() / x.std()), 4)
             stats.append({"collection": c, "key": k, "model": n, "n": int(pn["n"]), "srocc": pn["srocc_signed"],
-                          "plcc": pn["plcc"], "z_rmse": pn["z_rmse"], "or": pn["or"], **st})
+                          "plcc": pn["plcc"], "krocc": pn["krocc"], "pwrc": pn["pwrc"], "z_rmse": pn["z_rmse"],
+                          "or": pn["or"], **st})
         frames.append(pd.DataFrame(frame))
     df = pd.concat(frames, ignore_index=True)
     df.sample(frac=1, random_state=0).reset_index(drop=True).to_json(out / "eval_scatter.json", orient="records")

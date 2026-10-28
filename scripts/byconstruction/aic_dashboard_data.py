@@ -293,6 +293,12 @@ def extend(prev: Path, out: Path, eval_dir: Path | None = None) -> int:
 # from the October 27 studies' saved outputs: held-out AIC-2026 public_train predictions (the adaptation study's
 # omission cells, mean over the cells holding each source out; or each frontier fold model on its held-out sources)
 # and E21 out-of-sample cells. No fit, and no EVAL read.
+def keyed_scores(df):
+    """A judge score table indexed by distorted-image name without `.png` (the AIC-2026 crop key)."""
+    col = "distorted" if "distorted" in df.columns else "dist_path"
+    return df.assign(key=df[col].astype(str).str.split("/").str[-1].str.removesuffix(".png")).set_index("key")
+
+
 CODEC_TYPES = {"kadid": ("kadid_09", "kadid_10"), "tid2013": ("tid_10", "tid_11", "tid_21"), "konfig": ("jpeg2000",),
                "cid22_a25": None}  # None: every row (CID22-A is codecs only)
 Z = Path("/mnt/v/output/zensim")
@@ -312,6 +318,28 @@ CURATE = (  # key, name, AIC-2026 public_train source, E21 out-of-sample cells (
     ("xref1024", "×1024 + rehearsal, epoch 59", ("fold", Z / "mlic-aic-xref-20261027-run01", "XrefAIC1024@e59"),
      Z / "mlic-aic-omission-codec-xref1024-20261027-run01/cells/XrefAIC1024e59"),
 )
+
+
+# Zero-shot peers on the same pixels for the curated views: SSIMULACRA2 (fast-ssim2) and butteraugli's 3-norm (imazen
+# crate), both from the pinned judge build, oriented higher = better. AIC-2026 public_train: the existing crop scores
+# (SCORES). E21 sets: `zenmetrics batch` over the E21 rows' own pixel pairs (dvifm03/rows.parquet, E21 order), in
+# E21_PEERS; no label is read to make them. Their views go to separate files (the dashboard's 8 MB source limit).
+E21_PEERS = Z / "e21-peers-20261028"
+CURATE_PEERS = (("ssim2", "SSIMULACRA2 (zero-shot)", "judge_ssim2.tsv", "ssim2", 1),
+                ("butter3", "butteraugli 3-norm (zero-shot)", "judge_butteraugli.tsv", "butteraugli_pnorm3", -1))
+
+
+def e21_peer_scores(ds: str) -> dict:
+    """Each peer's score per E21 row of `ds`, higher = better, in E21 order (joined on pair_key)."""
+    rows = pd.read_parquet(Path("/mnt/v/output/zensim/byconstruction-2026-10-22/dvifm03/rows.parquet"))
+    rows = rows[rows.dataset == ds].sort_values("e21_row")
+    if not (rows.e21_row.to_numpy() == np.arange(len(rows))).all():
+        raise ValueError(f"{ds}: E21 rows are not contiguous")
+    out = {}
+    for key, _, name, col, sign in CURATE_PEERS:
+        judge = pd.read_csv(E21_PEERS / name, sep="\t").drop_duplicates("pair_key").set_index("pair_key")
+        out[key] = sign * judge.loc[rows.pair_key, col].to_numpy(np.float64)
+    return out
 
 
 def curate(out: Path) -> int:
@@ -394,6 +422,37 @@ def curate(out: Path) -> int:
                               "key": key, "model": name, "n": int(pn["n"]), "srocc": pn["srocc_signed"], "plcc": pn["plcc"],
                               "krocc": pn["krocc"], "or": pn["or"], "pwrc": pn["pwrc"], "z_rmse": pn["z_rmse"],
                               "sample": "out of sample", **st})
+    aic_peer_frame = {"ds": "aic", "jnd": np.round(jnd, 3), "codec": pairs.codec.to_numpy(), "cdc": 1}
+    e21_peer_frames = {ds: ({"ds": ds, "label": f["label"], "type": f["type"], "cdc": f["cdc"]}, y, cdc)
+                       for ds, (f, y, cdc) in e21_frames.items()}
+    aic_scores = {"ssim2": keyed_scores(pd.read_csv(SCORES / "ssim2.tsv", sep="\t")).loc[pairs.key].ssim2,
+                  "butter3": -keyed_scores(pd.read_csv(SCORES / "butteraugli.tsv", sep="\t")).loc[pairs.key]
+                  .butteraugli_pnorm3}
+    for key, name, *_ in CURATE_PEERS:
+        x = np.asarray(aic_scores[key], np.float64)
+        st = views(aic_peer_frame, "", key, -x, jnd)
+        pn = panel_batch([(key, x, -jnd)], stats="full")[0]
+        for subset in ("all", "codec"):
+            stats.append({"table": "cscatter", "id": f"aic_{subset}_{key}", "dataset": "AIC2026 public_train",
+                          "subset": subset, "key": key, "model": name, "n": int(pn["n"]), "srocc": pn["srocc_signed"],
+                          "plcc": pn["plcc"], "krocc": pn["krocc"], "or": pn["or"], "pwrc": pn["pwrc"],
+                          "z_rmse": pn["z_rmse"], "sample": "zero-shot", **st})
+    for ds, (frame, y, cdc) in e21_peer_frames.items():
+        scores = e21_peer_scores(ds)
+        for key, name, *_ in CURATE_PEERS:
+            x = scores[key]
+            if len(x) != len(y) or not np.isfinite(x).all():
+                raise ValueError(f"{ds} {key}: {len(x)} finite peer scores required for {len(y)} rows")
+            for subset, prefix, mask in (("all", "", None), ("codec", "c", cdc)):
+                if mask is not None and mask.all():
+                    continue  # every row is a codec: the full-set row stands for both
+                st = views(frame, prefix, key, x, y, mask, 2)
+                sel = slice(None) if mask is None else mask
+                pn = panel_batch([(key, x[sel], y[sel])], stats="full")[0]
+                stats.append({"table": "cscatter", "id": f"{ds}_{subset}_{key}", "dataset": NAMES[ds], "subset": subset,
+                              "key": key, "model": name, "n": int(pn["n"]), "srocc": pn["srocc_signed"], "plcc": pn["plcc"],
+                              "krocc": pn["krocc"], "or": pn["or"], "pwrc": pn["pwrc"], "z_rmse": pn["z_rmse"],
+                              "sample": "zero-shot", **st})
     for key, name, source, cells in CURATE:
         mine = {(s["dataset"], s["subset"]): s for s in stats if s["table"] == "cscatter" and s["key"] == key}
         e21 = {sub: [mine[(NAMES[d], sub)]["srocc"] for d in ("kadid", "tid2013", "konfig", "cid22_a25")
@@ -413,6 +472,8 @@ def curate(out: Path) -> int:
         return len(recs)
     n_aic = records([aic_frame], "curate_aic.json")
     n_e21 = records([f for f, _, _ in e21_frames.values()], "curate_e21.json")
+    records([aic_peer_frame], "curate_aic_peers.json")
+    records([f for f, _, _ in e21_peer_frames.values()], "curate_e21_peers.json")
     (out / "curate_stats.json").write_text(json.dumps(stats, indent=0) + "\n")
     print(f"{n_aic} AIC rows, {n_e21} E21 rows; {len(stats)} statistic rows; models {[k for k, *_ in CURATE]}")
     return 0
@@ -571,9 +632,7 @@ def main() -> int:
         add("sources", id=src, source=src, split="public_test", rows=int(len(gr)), codecs=int(gr.codec.nunique()),
             category=int(meta[meta.src == src].iloc[0][catcol]), mean_jnd=None, max_jnd=None, b=None, t=None, tga=None)
 
-    def keyed(df):
-        col = "distorted" if "distorted" in df.columns else "dist_path"
-        return df.assign(key=df[col].astype(str).str.split("/").str[-1].str.removesuffix(".png")).set_index("key")
+    keyed = keyed_scores
     bu, s2 = keyed(pd.read_csv(SCORES / "butteraugli.tsv", sep="\t")), keyed(pd.read_csv(SCORES / "ssim2.tsv", sep="\t"))
     gm, dv = keyed(pd.read_csv(SCORES / "gmsd.tsv", sep="\t")), keyed(pd.read_csv(SCORES / "dvifm-v03-rs.tsv", sep="\t"))
     sup = pd.read_csv(A.PEER_TABLE, low_memory=False)
