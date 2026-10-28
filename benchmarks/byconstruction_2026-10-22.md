@@ -7877,3 +7877,33 @@ and inventory against COMPLETE.json and refuses changed or missing files.
 The audit prints a separate receipt, preserving the run's original inventory.
 Tests cover changed content, changed inventories and unfinished controllers;
 the focused owner tests and script lint pass.
+
+### fx2 continuation fold study: older TRAIN sets and mixtures (2026-10-28)
+
+The fixed-plan fold study completed. Its COMPLETE plan/inventory pins and
+every recorded file passed the independent rehash audit. Both prerequisite
+reproduction controls passed; sampling receipts match their fx1 counterparts.
+Run and audit: `/var/tmp/byc-fx2-20261028/stage2/fx2-folds-run01` and
+`/var/tmp/byc-fx2-20261028/stage2/audits/fx2-folds-run01.json`. AIC results stay
+only in these local artifacts and `~/tmp/handoff/fx2-continuations/report.md`.
+
+Older-set SROCC change against each seed's own initial model: first average
+the seven fold models within each seed, then the three paired seed changes.
+These older populations are in sample; they do not decide replacement.
+
+| Point | KADID | TID2013 | KonFiG | CID22-A |
+|---|---:|---:|---:|---:|
+| fx1 XrefAIC256@e59 | +0.001670 | -0.001025 | +0.006484 | +0.026568 |
+| fx2 XrefAIC256@e59 | +0.002109 | +0.002889 | +0.005867 | +0.013757 |
+| fx1 AICOnly@e29 | -0.168923 | -0.096733 | -0.010853 | +0.021633 |
+| fx2 AICOnly@e29 | -0.088846 | -0.053697 | -0.023974 | +0.023272 |
+
+Local pixel-mixture inversion ranges across the 21 fold models per point:
+
+| Point | fx1 inversions | fx2 inversions | fx1 largest rise | fx2 largest rise |
+|---|---:|---:|---:|---:|
+| XrefAIC256_e59 | 1–3 | 1–5 | 6.484169 | 5.644052 |
+| AICOnly_e29 | 0–3 | 0–3 | 1.234085 | 1.090287 |
+
+Global mixture inversions are zero for both points in both declarations.
+Full-data packing, omission diagnostics and packed-model gates remain in progress.
