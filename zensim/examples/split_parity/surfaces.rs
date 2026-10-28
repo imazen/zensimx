@@ -69,8 +69,8 @@ fn surf_rgba16(p: &[[u8; 3]], w: usize) -> Vec<u8> {
     let mut out = Vec::with_capacity(p.len() * 8);
     for (i, px) in p.iter().enumerate() {
         let (x, y) = (i % w, i / w);
-        for c in 0..3 {
-            let v = (px[c] as u32 * 257).saturating_sub(((x + 2 * y + c) % 97) as u32) as u16;
+        for (c, &v8) in px.iter().enumerate() {
+            let v = (v8 as u32 * 257).saturating_sub(((x + 2 * y + c) % 97) as u32) as u16;
             out.extend_from_slice(&v.to_ne_bytes());
         }
         let a = surf_alpha(x, y) as u16 * 257;
@@ -88,8 +88,8 @@ fn surf_srgb_to_linear(v: u8) -> f32 {
 fn surf_linear_rgba(p: &[[u8; 3]]) -> Vec<u8> {
     let mut out = Vec::with_capacity(p.len() * 16);
     for px in p {
-        for c in 0..3 {
-            out.extend_from_slice(&surf_srgb_to_linear(px[c]).to_ne_bytes());
+        for &v8 in px {
+            out.extend_from_slice(&surf_srgb_to_linear(v8).to_ne_bytes());
         }
         out.extend_from_slice(&1.0f32.to_ne_bytes());
     }
@@ -230,6 +230,8 @@ fn extra_surfaces(
                 id,
                 surf_result(Zensim::new(*profile).with_parallel(false).compute(&src, &dst)),
             );
+            // The research crate's options carry one more field than the slim crate's.
+            #[allow(clippy::needless_update)]
             let full = DiffmapOptions {
                 weighting: DiffmapWeighting::Balanced,
                 masking_strength: Some(4.0),

@@ -112,7 +112,7 @@ fn distort(kind: &str, src: &[u8], w: usize, h: usize, seed: u64) -> Vec<u8> {
             }
         }
         "shift" => {
-            for p in out.chunks_exact_mut(3) {
+            for p in out.as_chunks_mut::<3>().0 {
                 p[0] = clamp8(p[0] as i32 + 6);
                 p[2] = clamp8(p[2] as i32 - 4);
             }
