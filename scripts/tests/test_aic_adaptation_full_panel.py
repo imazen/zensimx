@@ -11,6 +11,33 @@ import numpy as np
 from scripts.byconstruction import aic_adaptation_full_panel as owner
 
 
+class ExposedLiveScope(unittest.TestCase):
+    def rows(self):
+        return [dict(index=i, case=i < 10, ref=f"source{i % 10}", dist=f"image{i}", human=float(i))
+                for i in range(36)]
+
+    def test_only_fixed_exposed_rows_are_retained(self):
+        rows = self.rows()
+        rows[0]["old_model"] = 5
+        scoped = owner.live_rows(dict(rows=rows, rows_read=36))
+        self.assertEqual(len(scoped), 36)
+        self.assertNotIn("old_model", scoped[0])
+        self.assertEqual(scoped[0]["human"], 0)
+
+    def test_population_duplicates_missing_controls_and_nonfinite_targets_refuse(self):
+        for change in (lambda r: r.pop(), lambda r: r[0].update(index=1),
+                       lambda r: r[0].update(ref="unmatched"), lambda r: r[0].update(human=float("nan"))):
+            rows = self.rows()
+            change(rows)
+            with self.assertRaises(ValueError):
+                owner.live_rows(dict(rows=rows, rows_read=36))
+
+    def test_pixel_scoring_requires_compute_lock_before_opening_plan(self):
+        with patch.object(owner, "compute_lock", return_value=dict(held_by_worker_ancestor=False)):
+            with self.assertRaisesRegex(ValueError, "shared compute lock"):
+                owner.live_run(Path("invented-plan"), Path("invented-output"))
+
+
 class E21SubsetInputs(unittest.TestCase):
     def test_compression_cohorts_reuse_the_established_type_memberships(self):
         np.testing.assert_array_equal(owner.compression_mask("kadid", ["kadid_08", "kadid_09", "kadid_10"]),

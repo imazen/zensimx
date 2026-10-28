@@ -18,6 +18,81 @@ from aic_adaptation_diagnostics import checked_statistics, complete_mean, ladder
 
 METRICS = ("srocc_signed", "krocc", "plcc", "plcc_raw", "or", "pwrc", "z_rmse", "mae")
 REPRESENTATIONS = {"final-f32": "last.bin", "production-f16-calibrated": "production-f16.bin"}
+LIVE_EXPOSED = Path("/var/tmp/byc-fx2-20261028/live/LIVE.json")
+
+
+def live_rows(value):
+    """Use only the previously exposed manifest, without reopening a LIVE table."""
+    import math
+    rows = value["rows"]
+    if (len(rows) != 36 or value["rows_read"] != 36 or len({r["index"] for r in rows}) != 36
+            or sum(r["case"] is True for r in rows) != 10
+            or any(type(r["case"]) is not bool or not math.isfinite(r["human"]) for r in rows)):
+        raise ValueError("the fixed 36-row, ten-case exposed LIVE scope differs")
+    for row in rows:
+        if row["case"] and not any(not c["case"] and c["ref"] == row["ref"] for c in rows):
+            raise ValueError("exposed LIVE case lacks a same-source control")
+    return [{k: r[k] for k in ("index", "case", "ref", "dist", "human")} for r in rows]
+
+
+def live_plan(config, output):
+    value = json.loads(config.read_text())
+    exposed = json.loads(LIVE_EXPOSED.read_text())
+    rows = live_rows(exposed)
+    models, inputs = {}, [LIVE_EXPOSED, config, Path(value["binary"])]
+    for name, path in value["models"].items():
+        if not re.fullmatch(r"[a-z0-9]+", name):
+            raise ValueError("safe distinct LIVE model names required")
+        models[name] = dict(path=str(Path(path).resolve()), sha256=sha(path))
+        inputs.append(Path(path))
+    if not models:
+        raise ValueError("LIVE diagnostic models required")
+    inputs += [Path(r[k]) for r in rows for k in ("ref", "dist")]
+    output.mkdir()
+    write(output / "PLAN.json", dict(schema="fx2-exposed-live-v1", rows=rows, models=models,
+          exposed=str(LIVE_EXPOSED), binary=str(Path(value["binary"]).resolve()), source_sha256=source_pins(),
+          input_sha256={str(p.resolve()): sha(p) for p in inputs}, new_label_read=False,
+          diagnostic_only=True, selection_gate=False), fresh=True)
+
+
+def live_run(path, output):
+    import math
+    from concurrent.futures import ThreadPoolExecutor
+    if not compute_lock(os.getpid())["held_by_worker_ancestor"]:
+        raise ValueError("LIVE pixel scoring requires the shared compute lock")
+    value = json.loads(path.read_text())
+    if value["schema"] != "fx2-exposed-live-v1" or value["source_sha256"] != source_pins():
+        raise ValueError("frozen LIVE diagnostic source differs")
+    if any(sha(p) != digest for p, digest in value["input_sha256"].items()):
+        raise ValueError("frozen LIVE diagnostic input changed")
+    rows = live_rows(dict(rows=value["rows"], rows_read=len(value["rows"])))
+    output.mkdir()
+    env = dict(os.environ, ZENSIM_FORMULA_REV="7", ZENSIM_MAX_TIER="v3", ZENSIM_RING_FORM="raw",
+               ZENSIM_PYRAMID="xyb", RAYON_NUM_THREADS="1", OMP_NUM_THREADS="1", TMPDIR=str(Path.home() / "tmp"))
+    def score(item):
+        name, model, row = item
+        result = subprocess.run([value["binary"], "--bake", model["path"], "--bake-post", "raw",
+            "--ref", row["ref"], "--dist", row["dist"]], capture_output=True, text=True, env=env)
+        with (output / f"{name}-{row['index']}.log").open("x") as log:
+            log.write(result.stdout + result.stderr)
+        result.check_returncode()
+        number = float(result.stdout.strip().splitlines()[-1])
+        if not math.isfinite(number):
+            raise ValueError("nonfinite exposed LIVE score")
+        return number
+    scores = {}
+    with ThreadPoolExecutor(max_workers=12) as pool:
+        for name, model in value["models"].items():
+            scores[name] = list(pool.map(score, [(name, model, row) for row in rows]))
+    results = [dict(row, **{name: score[i] for name, score in scores.items()}) for i, row in enumerate(rows)]
+    inversions = {str(case["index"]): {name: sum(not c["case"] and c["ref"] == case["ref"]
+        and c["human"] > case["human"] and case[name] > c[name] for c in results) for name in scores}
+        for case in results if case["case"]}
+    write(output / "LIVE.json", dict(rows=results, severe_above_less_damaged_controls=inversions,
+          plan_sha256=sha(path), diagnostic_only=True, selection_gate=False), fresh=True)
+    write(output / "EVIDENCE_INVENTORY.json", {p.name: sha(p) for p in sorted(output.iterdir())}, fresh=True)
+    write(output / "COMPLETE.json", dict(plan_sha256=sha(path),
+          evidence_inventory_sha256=sha(output / "EVIDENCE_INVENTORY.json")), fresh=True)
 
 
 def seed_average(rows):
@@ -533,7 +608,7 @@ def run(path, output):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("mode", choices=("queue", "run", "status", "e21-plan", "e21-run"))
+    parser.add_argument("mode", choices=("queue", "run", "status", "e21-plan", "e21-run", "live-plan", "live-run"))
     parser.add_argument("plan", type=Path)
     parser.add_argument("output", type=Path)
     args = parser.parse_args()

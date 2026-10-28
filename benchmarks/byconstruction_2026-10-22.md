@@ -7858,3 +7858,13 @@ stage with a dead controller remains a failure. This changes observation only;
 frozen plans, fitting code and numerical gates are unchanged. Focused tests
 and script lint pass. Live stage-2 evidence remains in
 `/var/tmp/byc-fx2-20261028/stage2/` and the local continuation report.
+
+### Exposed LIVE diagnostic for continuation bakes (2026-10-28)
+
+The full-panel owner can freeze and score the stage-1 LIVE manifest's exact
+36 exposed rows and ten severe cases for named continuation bakes. It reuses
+the archived responses and same-source controls; it never opens the LIVE
+pair table. Source, model, image and native-tool hashes are bound before
+pixel scoring under the shared compute lock. Raw network scores retain the
+existing severe-above-less-damaged comparison. This diagnostic does not
+select a model. Scope and lock controls pass with the focused owner tests.
