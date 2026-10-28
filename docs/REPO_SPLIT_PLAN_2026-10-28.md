@@ -5,6 +5,11 @@ branches off before the history grew, keeping churn low against the last crates.
 nothing on GitHub has changed. The outward steps (rename, new repository, pushes to other repositories) wait for the
 owner's go-ahead.
 
+**Status 2026-10-28 (owner approved at about 04:00 UTC):** branch at `zensim-v0.2.7`; the `zensim` package
+inside zensimx keeps its name with `publish = false`; the slim crate ships as 0.3.0; its scope is the two
+curated revision-7 profiles plus legacy A (the 0.2.7 preview profiles stay, since removing them would break
+0.2.7 users). Progress is recorded under "Execution log" at the end.
+
 ## Measured facts
 
 Measured with `git_growth.py` (first-parent history of `main`, each blob counted once, at the commit that first
@@ -73,3 +78,39 @@ to `imazen/zensimx` before the new repository is created.
 - **Crate name inside zensimx:** keep the package `zensim` with `publish = false`, or rename it `zensimx`.
 - **Version:** 0.2.8 if strictly additive, or 0.3.0 because the default profile's scores change.
 - **Scope of the slim crate:** revision 7 and legacy A only, or also today's B, C and D profiles.
+
+## Execution log (2026-10-28)
+
+The order differs from the sequence above in one respect: the consumers could only be repointed after the
+rename, because `github.com/imazen/zensimx` did not resolve before it. Until the new repository existed, the
+old URL redirected, so nothing broke in between.
+
+1. **Freeze.** Tag `research-before-split` = `9677bc51` pushed.
+2. **Rename.** `imazen/zensim` → `imazen/zensimx`; local remote updated.
+3. **Git consumers repointed** (same revision, URL only; each lock re-resolved with `cargo metadata --locked`):
+   aom-rs/zenav1-aom `22295806` (one repository under two names), heic `a9ea9f67`, zensquoosh `637e9480`,
+   zenwebp `2495c7e5`, zenjpeg `7b5dd4de`, zenavif `47dd4c0d` (also its CI sibling clone), zenpipe `4992aa08`
+   (fuzz's lock already failed `--locked` before the change), zenmetrics `a5940f25` (margarine, deny
+   allow-list). butteraugli's main no longer referenced zensim. imazen26-gainmap-scan (not a repository) was
+   edited in place.
+4. **Path consumers repointed to `../zensimx`** (CI clones and sibling pins included): jxl-encoder `c978839d`,
+   coefficient `ab299941` (its manifest already failed to resolve: zenjpeg lost the `decoder` feature),
+   zenmetrics `7402d0e4` (through its `safe_push.sh`; `lock.sh --check` passed), jxl-gpu `1d4b6a7e`,
+   zensysbench `bb32fa29`. A temporary symlink `~/work/zen/zensimx → zensim` kept local builds working until
+   the checkout move.
+5. **Clones elsewhere** whose `origin` still named `imazen/zensim` now name zensimx: 11 on dev, 41 on i265,
+   6 on r5900xt, 14 on lilith-wsl, 1 on zen-arm-xl, 4 on r7900x (remote URL only). mac was unreachable; its
+   clones, if any, still name the old URL.
+6. **New `imazen/zensim`** created public with Actions disabled; `2894042d` (0.2.7) pushed as `main` with the
+   16 release tags (all ancestors of 0.2.7), then `6748cdf4` (README and changelog note). Ruleset
+   "main: no force push or deletion" is active; a forced backwards push was rejected (negative control). The
+   16 GitHub releases were recreated from zensimx's notes, with the six `regress_report` binaries on each of
+   the two tool releases; zensim v0.2.7 is Latest.
+7. **zensimx self-update:** `zensim` and `zensim-regress` are `publish = false` with zensimx as their
+   repository; links and `imazen/zensim#N` references outside `benchmarks/` name zensimx; living scripts use
+   `~/work/zen/zensimx`.
+
+Left as they were: imageflow's stale `review/zencodecs-v2` clone (no upstream), zen-workspace's Superwork
+map (it names the published crate, which is correct), the frozen asrun drivers, and links inside experiment
+records under `benchmarks/` (they now resolve to the new repository, where those files do not exist; the
+same paths exist in zensimx).
