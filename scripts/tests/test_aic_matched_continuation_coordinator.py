@@ -111,6 +111,18 @@ class PriorityWait(unittest.TestCase):
 
 
 class ExactControl(unittest.TestCase):
+    def test_reproduction_status_refuses_a_stale_running_stage(self):
+        with tempfile.TemporaryDirectory(dir=Path.home() / "tmp") as tmp:
+            root = Path(tmp)
+            (root / "STATE.json").write_text(json.dumps(dict(stage="reproduction-control", failures=[],
+                worker=dict(pid=os.getpid(), start_ticks=-1))))
+            with patch.object(owner, "compute_lock", return_value=dict(held_by_worker_ancestor=False)):
+                owner.reproduction_status(root / "PLAN.json")
+            current = json.loads((root / "CURRENT.json").read_text())
+            self.assertFalse(current["live"])
+            self.assertFalse(current["complete"])
+            self.assertIn("exited without completion", current["failures"][0])
+
     def test_strip_compare_uses_copies_and_reports_differences(self):
         with tempfile.TemporaryDirectory(dir=Path.home() / "tmp") as tmp:
             root = Path(tmp)

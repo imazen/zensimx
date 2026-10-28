@@ -1798,6 +1798,30 @@ def reproduction_run(path):
         raise
 
 
+def reproduction_status(path):
+    """Resolve the recorded worker and completed artifacts rather than trusting a stale stage."""
+    run = path.parent
+    value = json.loads((run / "STATE.json").read_text())
+    worker = value["worker"]
+    live = bound_worker(worker["pid"], worker["start_ticks"])
+    complete = False
+    if (run / "COMPLETE.json").exists() and (run / "CONTROL.json").exists():
+        receipt = json.loads((run / "COMPLETE.json").read_text())
+        control = json.loads((run / "CONTROL.json").read_text())
+        complete = (control.get("pass") is True and receipt["plan_sha256"] == sha(path)
+                    and receipt["evidence_inventory_sha256"] == sha(run / "EVIDENCE_INVENTORY.json"))
+    if not live and not complete and not value["failures"]:
+        value["failures"].append("reproduction process exited without completion")
+    epochs = {}
+    for log in sorted(run.glob("arms/*/s0_k0/train.log")):
+        done = [int(line.split()[1]) for line in log.read_text().splitlines() if line.startswith("  epoch ")]
+        epochs[log.parent.parent.name] = max(done) if done else None
+    value.update(checked_utc=now(), live=live, complete=complete, logged_epochs=epochs,
+                 compute_lock=compute_lock(worker["pid"] if live else None))
+    write(run / "CURRENT.json", value)
+    print(json.dumps(value))
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="mode", required=True)
@@ -1807,7 +1831,8 @@ if __name__ == "__main__":
         p.add_argument("--source-commit", required=True)
         p.add_argument("--trainer", type=Path, required=True)
         p.add_argument("--meta-tool", type=Path, required=True)
-    for mode in ("queue", "run", "status", "fold-queue", "fold-run", "fold-status", "omission-run", "full-run", "reproduction-run"):
+    for mode in ("queue", "run", "status", "fold-queue", "fold-run", "fold-status", "omission-run", "full-run",
+                 "reproduction-run", "reproduction-status"):
         sub.add_parser(mode).add_argument("plan", type=Path)
     p = sub.add_parser("full-plan", help="stage C: full Mlic seeds 0-2 at the advanced point, packed at its epoch")
     p.add_argument("run", type=Path)

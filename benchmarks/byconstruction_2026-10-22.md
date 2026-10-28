@@ -7798,3 +7798,13 @@ of XrefAIC256 and AICOnly using their stored plans, initial models and tables. T
 60 epochs; the control compares all 60 checkpoints of each arm through the native E33 comparator, removing only
 `zentrain.repro` from copies. A failed control stops the study before interpretation. No fx2 continuation result is
 claimed by this implementation entry.
+
+
+### fx2 continuation supervision and result destination (2026-10-28)
+
+`reproduction-status` resolves the recorded PID/start ticks, compute-lock ancestry, epoch logs and completion
+receipts; a stale running stage with a dead process is a failure. The replay's working directory is
+`/var/tmp/byc-fx2-20261028/stage2/`; its local report is `~/tmp/handoff/fx2-continuations/report.md`.
+The owner's corrected destination rule keeps every new AIC-2026 public_train statistic, fold and full-data, only in
+those local artifacts. Committed records may contain the controls, label-free gates and older TRAIN-set panels,
+with pointers for the AIC results. Existing committed AIC results remain unchanged.
