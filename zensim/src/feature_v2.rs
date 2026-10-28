@@ -9981,9 +9981,13 @@ fn foldapp_streaming_walk_impl<S: ImageSource, D: ImageSource, const ALL_CHANNEL
 
         for ch in 0..3 {
             let (gsrc, gdst) = grads[ch];
+            // A channel the walk skipped at either scale has no gradient sums
+            // there, so its slot keeps the structural 0.
             if let Some((prev_gsrc, prev_gdst)) = prev_grad[ch]
                 && compute.at_scale(scale).gradient
                 && compute.at_scale(scale - 1).gradient
+                && (ALL_CHANNELS
+                    || compute.channel_active(scale, ch) && compute.channel_active(scale - 1, ch))
             {
                 let decay_src = gsrc / (prev_gsrc + C_GRAD_DECAY);
                 let decay_dst = gdst / (prev_gdst + C_GRAD_DECAY);

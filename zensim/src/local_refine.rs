@@ -858,16 +858,18 @@ impl LocalRefineSnapshot {
         // EDGE_WIDTH_CHANGE: `features[prev+EWC] =
         // 1 - bsim(mg[s+1].0/(mg[s].0 + C_DECAY), mg[s+1].1/(mg[s].1 +
         // C_DECAY), C_EW)`; the coarsest scale copies the second-coarsest
-        // (production foldapp finalize). Production writes the slot for
-        // EVERY channel — gated on the per-scale `gradient` toggle at the
-        // two mixed scales, NOT on `channel_active` — so an inactive
-        // channel still emits a real EWC (its `(0,0)` grads are exactly
-        // what `ret.mg` and `snap.mg` hold there). The coarsest-scale
-        // copy is likewise unconditional.
+        // (production foldapp finalize). As in production, the slot is
+        // written only where both mixed scales run gradient work and the
+        // channel at both; elsewhere it keeps the structural 0, which the
+        // coarsest-scale copy then repeats.
         for si in 0..LOCAL_SCALES {
             for ch in 0..3 {
                 if si + 1 < LOCAL_SCALES {
-                    if !(self.gradient_on[si] && self.gradient_on[si + 1]) {
+                    if !(self.gradient_on[si]
+                        && self.gradient_on[si + 1]
+                        && self.served[si][ch]
+                        && self.served[si + 1][ch])
+                    {
                         continue;
                     }
                     let (bs, bd) = self.mg[si + 1][ch];

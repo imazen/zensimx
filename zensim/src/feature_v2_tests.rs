@@ -6486,6 +6486,114 @@ pub(crate) mod tests {
         }
     }
 
+    /// Edge-width change pairs two adjacent scales (the last scale's slot copies
+    /// the one below). A declared plan that reads it for a chroma channel
+    /// computes that channel at both scales, and every edge-width-change slot of
+    /// any plan either carries the full plan's bits (its channel ran gradient
+    /// work at both scales) or the structural 0.
+    #[test]
+    fn edge_width_change_slots_match_the_full_plan_or_stay_zero() {
+        use crate::feature_defs::FormulaRevision;
+        use crate::feature_layout::Layout;
+        use crate::feature_plan::Plan;
+        use crate::feature_set_id::SlotSet;
+        let (w, h) = (160, 128);
+        let src: Vec<[u8; 3]> = (0..w * h)
+            .map(|i| {
+                let (x, y) = (i % w, i / w);
+                [((x * 7 + y * 3) % 256) as u8, ((x * x + y) % 256) as u8, ((y * 5 + x / 3) % 256) as u8]
+            })
+            .collect();
+        let dst: Vec<[u8; 3]> = src
+            .iter()
+            .enumerate()
+            .map(|(i, p)| p.map(|v| v.saturating_add((i * 2654435761 % 7) as u8)))
+            .collect();
+        let (sref, dref) = (RgbSlice::new(&src, w, h), RgbSlice::new(&dst, w, h));
+        let run = |plan: &Plan| {
+            foldapp_streaming_walk(
+                &sref,
+                &dref,
+                false,
+                plan.toggles(),
+                crate::feature_v2_stream::FrontEnd::Sdr,
+                &mut V2Scratch::new(),
+                FoldWalkExtras {
+                    compute: Some(plan.compute),
+                    ..FoldWalkExtras::default()
+                },
+            )
+            .into_features()
+        };
+        let ns = crate::NUM_SCALES;
+        let ewc = |scale: usize, ch: usize| {
+            372 + (scale * 3 + ch) * FEATURES_PER_CHANNEL_V2_TOTAL + idx::EDGE_WIDTH_CHANGE
+        };
+        let all: Vec<usize> = (0..228).chain(372..720).collect();
+        // Every Y-channel v2 slot keeps v2 work live at every scale, so the
+        // chroma channel is skipped at scales where its gradients exist.
+        let luma: Vec<usize> = (0..ns)
+            .flat_map(|scale| {
+                let base = 372 + (scale * 3 + 1) * FEATURES_PER_CHANNEL_V2_TOTAL;
+                base..base + FEATURES_PER_CHANNEL_V2_TOTAL
+            })
+            .collect();
+        for revision in [FormulaRevision::Rev1, FormulaRevision::Rev7] {
+            let plan_for = |ids: &[usize]| {
+                Plan::derive_with_layout_at(
+                    &SlotSet::from_slots(ids.iter().copied()),
+                    Layout::identity(720),
+                    revision,
+                )
+                .unwrap()
+            };
+            let f_full = run(&plan_for(&all));
+            for ch in [0, 2] {
+                for scale in 0..ns {
+                    for with_luma in [false, true] {
+                        let id = ewc(scale, ch);
+                        let mut ids = vec![id];
+                        if with_luma {
+                            ids.extend(&luma);
+                        }
+                        let plan = plan_for(&ids);
+                        let s = scale.min(ns - 2);
+                        for at in [s, s + 1] {
+                            assert!(
+                                plan.compute.channel_active(at, ch),
+                                "{revision:?} f{id}: channel {ch} off at scale {at}"
+                            );
+                        }
+                        let f = run(&plan);
+                        // Computed iff the slot's channel ran gradient work at
+                        // both scales it pairs.
+                        let computed = |sc: usize, c: usize| {
+                            let s = sc.min(ns - 2);
+                            [s, s + 1].into_iter().all(|x| {
+                                plan.compute.at_scale(x).gradient && plan.compute.channel_active(x, c)
+                            })
+                        };
+                        assert!(computed(scale, ch), "{revision:?} f{id} not computed by its own plan");
+                        for (sc, c) in (0..ns).flat_map(|sc| (0..3).map(move |c| (sc, c))) {
+                            let i = ewc(sc, c);
+                            if computed(sc, c) {
+                                assert_eq!(
+                                    f[i].to_bits(),
+                                    f_full[i].to_bits(),
+                                    "{revision:?} f{id} (luma {with_luma}): f{i} {} vs {}",
+                                    f[i],
+                                    f_full[i]
+                                );
+                            } else {
+                                assert_eq!(f[i], 0.0, "{revision:?} f{id} (luma {with_luma}): f{i} not computed");
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     #[test]
     fn coarse_pools_execute_only_at_requested_resolutions() {
         use crate::feature_plan::Plan;
