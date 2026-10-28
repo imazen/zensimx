@@ -14,12 +14,13 @@
 //! metadata-stripped copies the slim crate embeds; their rows prove stripping changed no score.
 //!
 //! ```text
-//! cargo run --release -p zensim --features custom-profiles --example split_parity_golden -- \
+//! cargo run --release -p zensim --features custom-profiles,training,classification --example split_parity_golden -- \
 //!     <general.bin> <codec.bin> [<general-stripped.bin> <codec-stripped.bin>] > golden.tsv
 //! ```
 #![allow(deprecated)]
 
 include!("split_parity/pairs.rs");
+include!("split_parity/surfaces.rs");
 
 use std::sync::OnceLock;
 use zensim::profile::ProfileParams;
@@ -161,4 +162,5 @@ fn main() {
             line("bake_scorer", pname, &pair.id, v);
         }
     }
+    extra_surfaces(&profiles[..5], &pairs, &line);
 }
