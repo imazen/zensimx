@@ -674,6 +674,15 @@ aic-matched-continuation-tests:
 fx2-continuation-tests:
     TMPDIR="$HOME/tmp" OPENBLAS_NUM_THREADS=1 python3 -B -m unittest scripts.tests.test_aic_matched_continuation_coordinator scripts.tests.test_aic_matched_continuation scripts.tests.test_aic_adaptation scripts.tests.test_aic_adaptation_full scripts.tests.test_aic_adaptation_panel scripts.tests.test_aic_adaptation_full_panel scripts.tests.test_subjective_training_leg scripts.tests.test_rev5_assessment scripts.tests.test_v2_production_pack
 
+# Caller holds heavy.lock/run-heavy on an eligible build host; never build on dev.
+fx2-identity-tests target:
+    TMPDIR="$HOME/tmp" ZENSIM_FORMULA_REV=7 RAYON_NUM_THREADS=1 OMP_NUM_THREADS=1 cargo test --locked --release -p zensim --example serve_custom_bake --features custom-profiles --target-dir {{quote(target)}} nearid::tests -- --nocapture
+
+fx2-identity-build target:
+    just fx2-identity-tests {{quote(target)}}
+    TMPDIR="$HOME/tmp" cargo clippy --locked --release -p zensim --example serve_custom_bake --features custom-profiles --target-dir {{quote(target)}}
+    TMPDIR="$HOME/tmp" cargo build --locked --release -p zensim --example serve_custom_bake --features custom-profiles --target-dir {{quote(target)}}
+
 dataset-progress-tests:
     python3 -B -m unittest discover -s scripts/tests -p 'test_dataset_study_status.py' -v
 

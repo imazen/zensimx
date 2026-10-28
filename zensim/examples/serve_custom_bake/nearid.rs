@@ -434,6 +434,31 @@ fn e33_nonneg_bake(fx1: &Fx1, products: bool, pin: f64, revision: &str) -> Vec<u
     zenpredict_bake::bake_from_json_str(&recipe.to_string()).unwrap()
 }
 
+/// Extract each candidate's declared inputs for an audit pair.
+fn candidate_audit_features(
+    requests: &[zensim::research::Request],
+    view: &RgbSlice<'_>,
+    other: &RgbSlice<'_>,
+) -> Vec<Vec<f64>> {
+    requests
+        .iter()
+        .map(|request| {
+            let canonical = zensim::research::extract(request, view, other).unwrap();
+            for id in request.want().iter_slots() {
+                assert!(
+                    canonical.values()[id].is_finite(),
+                    "identity candidate f{id}"
+                );
+            }
+            canonical
+                .values()
+                .iter()
+                .map(|value| f64::from(*value as f32))
+                .collect()
+        })
+        .collect()
+}
+
 /// E33 registration §7 E1/E3/E4/E7: on every admitted identity source and
 /// every SIMD token permutation, the 410 direct (Difference) ids are exactly
 /// ±0 after the declared f32 storage round trip, each fragility factor is
@@ -494,6 +519,14 @@ pub(super) fn e33_identity(args: &[String]) {
         .iter()
         .map(|m| BakeScorer::new(m).unwrap().with_parallel(false))
         .collect();
+    let extra_requests: Vec<_> = extra_bytes
+        .iter()
+        .map(|(_, bytes)| zensim::research::Request::for_bake_bytes(bytes).unwrap())
+        .collect();
+    let extra_ids: Vec<Vec<usize>> = extra_requests
+        .iter()
+        .map(|request| request.want().iter_slots().collect())
+        .collect();
     let mut output = fs::OpenOptions::new()
         .write(true)
         .create_new(true)
@@ -514,6 +547,7 @@ pub(super) fn e33_identity(args: &[String]) {
         decoded.push((source.ref_group.clone(), pixels, w, h));
     }
     let mut reference: Vec<Option<Vec<u64>>> = vec![None; decoded.len()];
+    let mut extra_reference = vec![vec![None; decoded.len()]; extra.len()];
     let mut perm_names = Vec::new();
     let report = archmage::testing::for_each_token_permutation(
         archmage::testing::CompileTimePolicy::WarnStderr,
@@ -551,9 +585,33 @@ pub(super) fn e33_identity(args: &[String]) {
                 let score_c = scorer_c
                     .score_features(&f, *w as u32, *h as u32, None)
                     .unwrap();
+                let extra_features = candidate_audit_features(&extra_requests, &view, &view);
                 let extra_scores: Vec<f64> = extra
                     .iter_mut()
-                    .map(|s| s.score_features(&f, *w as u32, *h as u32, None).unwrap())
+                    .zip(&extra_features)
+                    .map(|(scorer, features)| {
+                        scorer
+                            .score_features(features, *w as u32, *h as u32, None)
+                            .unwrap()
+                    })
+                    .collect();
+                let extra_tier_identical: Vec<bool> = extra_features
+                    .iter()
+                    .zip(&extra_ids)
+                    .zip(&mut extra_reference)
+                    .map(|((features, ids), references)| {
+                        let bits = ids
+                            .iter()
+                            .map(|&id| features[id].to_bits())
+                            .collect::<Vec<_>>();
+                        match &references[i] {
+                            None => {
+                                references[i] = Some(bits);
+                                true
+                            }
+                            Some(first) => *first == bits,
+                        }
+                    })
                     .collect();
                 let bits: Vec<u64> = want.iter().map(|&id| f[id].to_bits()).collect();
                 let tier_identical = match &reference[i] {
@@ -569,6 +627,7 @@ pub(super) fn e33_identity(args: &[String]) {
                     "bad_fragility":bad_fragility,"nonzero_products":nonzero_products,
                     "nonneg_a_score_bits":score_a.to_bits(),"nonneg_c_score_bits":score_c.to_bits(),
                     "pin_bits":pin.to_bits(),"read_set_bits_equal_first_permutation":tier_identical,
+                    "candidate_read_set_bits_equal_first_permutation":extra_tier_identical,
                     "candidate_score_bits":extra_scores.iter().map(|v| v.to_bits()).collect::<Vec<_>>()});
                 writeln!(output, "{row}").unwrap();
                 assert!(
@@ -594,6 +653,10 @@ pub(super) fn e33_identity(args: &[String]) {
                     tier_identical,
                     "{group} {perm}: read set differs across tiers"
                 );
+                assert!(
+                    extra_tier_identical.iter().all(|same| *same),
+                    "{group} {perm}: candidate read set differs across tiers"
+                );
                 for ((path, _), score) in extra_bytes.iter().zip(&extra_scores) {
                     assert_eq!(
                         score.to_bits(),
@@ -609,6 +672,7 @@ pub(super) fn e33_identity(args: &[String]) {
     let summary = json!({"summary":true,"sources":decoded.len(),"permutations":perm_names,
         "fx1_sha256":sha(&fx1_bytes),"production_model_sha256":sha(&bytes),
         "sources_sha256":sha(&fs::read(&args[0]).unwrap()),"rows":decoded.len()*perm_names.len(),
+        "candidate_consumed_feature_ids":extra_ids,
         "candidates":extra_bytes.iter().map(|(p, b)| json!({"path":p,"sha256":sha(b)})).collect::<Vec<_>>()});
     writeln!(output, "{summary}").unwrap();
     output.flush().unwrap();
@@ -617,6 +681,71 @@ pub(super) fn e33_identity(args: &[String]) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn identity_candidates_extract_their_own_complete_read_sets() {
+        let fx1: Fx1 = serde_json::from_str(include_str!(
+            "../../../scripts/rev4_featpot/e33_fx1_declaration.json"
+        ))
+        .unwrap();
+        let fx2: Fx1 = serde_json::from_str(include_str!(
+            "../../../scripts/rev4_featpot/color_noise_fx2_declaration.json"
+        ))
+        .unwrap();
+        // The codec continuation keeps just these two new direct inputs.
+        let mut sparse = Fx1 {
+            schema: fx1.schema.clone(),
+            direct: fx1.direct.clone(),
+            products: fx1.products.clone(),
+        };
+        sparse.direct.extend([400, 458]);
+        sparse.direct.sort_unstable();
+        let requests = [&fx1, &fx2, &sparse].map(|declaration| {
+            zensim::research::Request::for_bake_bytes(&e33_nonneg_bake(
+                declaration,
+                true,
+                100.0,
+                "7",
+            ))
+            .unwrap()
+        });
+        assert_eq!(requests[0].want().iter_slots().count(), 420);
+        assert_eq!(requests[1].want().iter_slots().count(), 504);
+        assert_eq!(requests[2].want().iter_slots().count(), 422);
+        let mut state = 20261028;
+        let pixels: Vec<[u8; 3]> = (0..128 * 128)
+            .map(|_| core::array::from_fn(|_| random(&mut state) as u8))
+            .collect();
+        let view = RgbSlice::new(&pixels, 128, 128);
+        let distorted = noise(&pixels, 3);
+        let noisy_view = RgbSlice::new(&distorted, 128, 128);
+        // The frozen revision-7 bank measures basic + peaks + v2; other
+        // registered families are deliberately unavailable at this revision.
+        let complete = zensim::research::Request::for_slots(
+            zensim::feature_set_id::SlotSet::from_ranges([(0, 228), (372, 720)]),
+            1825,
+        );
+        for other in [&view, &noisy_view] {
+            let features = candidate_audit_features(&requests, &view, other);
+            let canonical = zensim::research::extract(&complete, &view, other).unwrap();
+            for (request, candidate) in requests.iter().zip(&features) {
+                for id in request.want().iter_slots() {
+                    assert_eq!(
+                        candidate[id].to_bits(),
+                        f64::from(canonical.values()[id] as f32).to_bits(),
+                        "candidate f{id}"
+                    );
+                }
+            }
+        }
+        let features = candidate_audit_features(&requests, &view, &view);
+        assert!(
+            [393, 451]
+                .into_iter()
+                .any(|id| features[0][id].to_bits() != features[1][id].to_bits()),
+            "the fx1 vector cannot stand in for the candidate's finest chroma fragility inputs"
+        );
+    }
+
     #[test]
     fn fraction_is_nested_and_always_changes_selected_pixels() {
         let pixels = vec![[0, 255, 128]; 101];
