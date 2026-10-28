@@ -7907,3 +7907,12 @@ Local pixel-mixture inversion ranges across the 21 fold models per point:
 
 Global mixture inversions are zero for both points in both declarations.
 Full-data packing, omission diagnostics and packed-model gates remain in progress.
+
+### Frozen continuation launcher (2026-10-28)
+
+`just fx2-continuation-run MODE PLAN` launches the frozen fold/full/omission
+owner behind heavy.lock and run-heavy, exporting its tool paths and root
+before Python imports. It refuses existing state or launch logs and keeps
+stdout/resource logs outside the run inventory. Shell syntax, unsupported
+modes and refusal to relaunch an active run are verified. The caller still
+resolves the current lock holder and queued work before launching.

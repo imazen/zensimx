@@ -593,6 +593,26 @@ mlic-priority-progress:
 aic-matched-continuation mode plan:
     OPENBLAS_NUM_THREADS=1 python3 -B scripts/byconstruction/aic_matched_continuation.py {{quote(mode)}} {{quote(plan)}}
 
+# Execute a frozen stage-2 plan, with tool paths bound before Python imports.
+# The caller resolves current heavy.lock ownership/queues before using this recipe.
+fx2-continuation-run mode plan:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    case {{quote(mode)}} in fold-run|full-run|omission-run) ;; *) echo 'expected fold-run, full-run or omission-run' >&2; exit 2 ;; esac
+    plan_file=$(realpath {{quote(plan)}})
+    run_dir=$(dirname "$plan_file")
+    root_dir=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["root"])' "$plan_file")
+    log_file="$(dirname "$run_dir")/logs/$(basename "$run_dir").log"
+    test ! -e "$run_dir/STATE.json"
+    test ! -e "$log_file"
+    mkdir -p "$(dirname "$log_file")"
+    free -g
+    TMPDIR="$HOME/tmp" flock "$HOME/tmp/heavy.lock" "$HOME/work/claudehints/scripts/run-heavy" --mem 30G --jobs 12 -- env \
+      OPENBLAS_NUM_THREADS=1 REV4_V2_BIN_DIR="$run_dir/bin" REV4_V2_ROOT="$root_dir" BYC_ROOT="$root_dir" \
+      AIC_BIN="$run_dir/bin" ZEN_PANEL_BIN="$run_dir/bin/panel" \
+      python3 -B "$run_dir/source/scripts/byconstruction/aic_matched_continuation.py" {{quote(mode)}} "$plan_file" \
+      2>&1 | tee "$log_file"
+
 aic-matched-continuation-plan run commit trainer meta_tool mode='plan':
     python3 -B scripts/byconstruction/aic_matched_continuation.py {{quote(mode)}} {{quote(run)}} --source-commit {{quote(commit)}} --trainer {{quote(trainer)}} --meta-tool {{quote(meta_tool)}}
 
