@@ -144,4 +144,78 @@ class CostcmpTest(unittest.TestCase):
             self.assertEqual(segment.call_args.kwargs['baseline'],cmp.ARMS[0])
             self.assertEqual(segment.call_args.kwargs['ready_check'],'validator')
 
+class CostcmpR7Test(unittest.TestCase):
+    """The revision-7 grid: two curated models against frozen D, fast-ssim2, butteraugli and the current default B."""
+    PINS={'general':'a'*64,'codec':'b'*64}
+    def setUp(self):
+        self.temp=tempfile.TemporaryDirectory(dir=Path.home()/'tmp');self.addCleanup(self.temp.cleanup)
+        self.path=Path(self.temp.name)/'receipt.json'
+        env=patch.dict('os.environ',{f'ZEN_S2_R7_SHA_{k.upper()}':v for k,v in self.PINS.items()});env.start();self.addCleanup(env.stop)
+        records=[]
+        for g,t,n in cmp.cells(e33='r7'):
+            w,h=map(int,g.split('x'))
+            for a in cmp.R7_ARMS:
+                model=({'revision':'7','source_sha256':self.PINS['general' if 'general' in a else 'codec']} if a.startswith('r7_') else
+                       {'revision':'5','source_sha256':cmp.DEFAULT_B} if a=='zensim_B_rev5' else
+                       {'revision':'5','peer':'butteraugli0.9.3','score':'pnorm3'} if a=='e34_butter_scalar' else
+                       {'revision':'1','source_sha256':'d'*64} if a=='zensim_D' else
+                       {'commit':cmp.FAST_MAIN} if a=='fast_ssim2_main' else {'version':'0.8.2'})
+                bits='4049000000000000' if 'general' in a else '4048000000000000' if 'codec' in a else '4047000000000000'
+                records.append(dict(name=a,arm=a,width=w,height=h,tier=t,threads=str(n),model=model,input_sha256=g,
+                                    score=50.,score_bits=bits,feature_values=[]))
+        self.value=dict(schema='costcmp-r7-preflight-v1',status='PASS',records=records)
+    def save(self,value):self.path.write_text(json.dumps(value))
+    def test_grid_admits_and_surface_model_or_revision_changes_refuse(self):
+        self.save(self.value);self.assertEqual(len(cmp.receipt(self.path,e33='r7')),10*len(cmp.R7_ARMS))
+        index={(r['width'],r['threads'],r['name']):i for i,r in enumerate(self.value['records'])}
+        mutations=[((1024,'1','r7_general_map'),lambda r:r.update(score_bits='4048000000000000')),
+                   ((2048,'8','r7_codec_cached'),lambda r:r.update(score_bits='4049000000000000')),
+                   ((64,'1','r7_codec'),lambda r:r['model'].update(revision='5')),
+                   ((4096,'8','r7_general'),lambda r:r['model'].update(source_sha256='c'*64)),
+                   ((1024,'1','zensim_B_rev5'),lambda r:r['model'].update(source_sha256='0'*64)),
+                   ((256,'1','e34_butter_scalar'),lambda r:r['model'].update(score='max')),
+                   ((2048,'1','zensim_D'),lambda r:r['model'].update(revision='7')),
+                   ((1024,'8','fast_ssim2'),lambda r:r.update(input_sha256='other'))]
+        for key,mutate in mutations:
+            bad=copy.deepcopy(self.value);mutate(bad['records'][index[key]]);self.save(bad)
+            with self.assertRaises(AssertionError,msg=str(key)):cmp.receipt(self.path,e33='r7')
+        bad=copy.deepcopy(self.value);del bad['records'][index[(64,'8','r7_codec_map')]];self.save(bad)
+        with self.assertRaises(AssertionError):cmp.receipt(self.path,e33='r7')
+    def test_worker_revisions(self):
+        self.assertEqual([owner.worker_revision(a) for a in ('r7_general','r7_codec_map','r7_baseline_codec','zensim_B_rev5','zensim_D')],
+                         [7,7,7,5,1])
+    def test_summary_bars(self):
+        root=Path(self.temp.name);timing=root/'runtime'/'timing';rss=root/'runtime'/'rss';rss.mkdir(parents=True)
+        scorecard={'v4x-t1-1024x1024':dict(zensim_D=35,fast_ssim2=60,r7_general=40,r7_codec=45,r7_general_map=100,r7_codec_map=150),
+                   'v4x-t1-2048x2048':dict(zensim_D=140,fast_ssim2=240,r7_general=160,r7_codec=210,r7_general_map=400,r7_codec_map=500)}
+        for g,t,n in cmp.cells(e33='r7'):
+            cell=f'{t}-t{n}-{g}';d=timing/cell;d.mkdir(parents=True)
+            arms={a:scorecard.get(cell,{}).get(a,20) for a in cmp.R7_ARMS}
+            (d/'COMPLETE.json').write_text(json.dumps(dict(status='PASS')))
+            (d/'header.json').write_text(json.dumps(dict(quiet_gate={'admitted':True})))
+            (d/'interference.json').write_text(json.dumps(dict(admitted=True,foreign=[])))
+            (d/'zenbench.inner.json').write_text(json.dumps(dict(gate_clean=[True]*32,zenbench_unreliable=False,
+                paired_rounds={a:[v*10**6]*30+[v*10**6+10**5]*2 for a,v in arms.items()})))
+        for geometries,threads in cmp.R7_RSS:
+            for g in geometries:
+                for n in threads:
+                    px=int(g.split('x')[0])**2
+                    for a in cmp.R7_ARMS+cmp.R7_BASELINES:
+                        kib=100000+(0 if 'baseline' in a else 200*px//1024 if a=='r7_codec_map' else 40*px//1024)
+                        (rss/f'v4x-t{n}-{g}-{a}.json').write_text(json.dumps(dict(max_rss_kib=kib)))
+        cmp.r7_summary(root)
+        rows=json.loads((root/'R7_RUNTIME.json').read_text())['rows']
+        g1,c1,g2,c2=(rows[k] for k in ('general v4x-t1-1024x1024','codec v4x-t1-1024x1024','general v4x-t1-2048x2048','codec v4x-t1-2048x2048'))
+        self.assertTrue(g1['scalar']['passes']);self.assertAlmostEqual(g1['uncached_p95_ms'],40.1)
+        self.assertAlmostEqual(g1['uncached_median_ms'],40.)  # nearest-rank p95 of 32 is the 31st value
+        self.assertFalse(c1['scalar']['passes'])  # 45.1 ms > 1.25 x D (43.9 ms)
+        self.assertFalse(c2['scalar']['passes'])  # 210.1 ms > 200 ms
+        self.assertTrue(g2['scalar']['passes']);self.assertAlmostEqual(g2['scalar']['ratio_D'],160.1/140.1)
+        self.assertAlmostEqual(g1['spatial']['ratio'],100.1/40.1);self.assertTrue(g1['spatial']['passes'])
+        self.assertFalse(c1['spatial']['passes'])  # 150.1 / 45.1 > 3
+        self.assertTrue(g1['memory']['passes']);self.assertFalse(c1['memory']['passes'])  # 200 B/px > 128 B/px + 64 MiB at 1 MP
+        self.assertEqual(c2['memory']['incremental_kib']['map'],200*2048**2//1024)
+        self.assertIn('| e34_butter_scalar |',(root/'R7_RUNTIME.md').read_text())
+        with self.assertRaises(FileExistsError):cmp.r7_summary(root)
+
 if __name__=='__main__':unittest.main()

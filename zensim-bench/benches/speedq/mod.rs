@@ -374,6 +374,20 @@ pub(super) fn run() {
         ("e34_butter_map", "e34_butter_map", "5"),
         #[cfg(feature = "costcmp")]
         ("e34_butter_baseline", "e34_butter_baseline", "5"),
+        #[cfg(feature = "costcmp")]
+        ("zensim_B_rev5", "zensim_B_rev5", "5"),
+        #[cfg(feature = "costcmp")]
+        ("r7_general", "r7_general", "7"),
+        #[cfg(feature = "costcmp")]
+        ("r7_codec", "r7_codec", "7"),
+        #[cfg(feature = "costcmp")]
+        ("r7_general_cached", "r7_general_cached", "7"),
+        #[cfg(feature = "costcmp")]
+        ("r7_codec_cached", "r7_codec_cached", "7"),
+        #[cfg(feature = "costcmp")]
+        ("r7_general_map", "r7_general_map", "7"),
+        #[cfg(feature = "costcmp")]
+        ("r7_codec_map", "r7_codec_map", "7"),
     ];
     let only = std::env::var("ZEN_S2_ARMS").expect("explicit arm inventory");
     let mut owners = Vec::new();

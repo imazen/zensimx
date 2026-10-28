@@ -512,6 +512,135 @@ pub(super) fn action(
             });
             Some((action, info))
         }
+        "zensim_B_rev5" => {
+            // The current default B (diff+frag-820, selected 2026-10-19): report-only context for the
+            // two curated revision-7 models, served through the named profile as callers see it.
+            let bytes: &[u8] =
+                include_bytes!("../../../zensim/weights/b_sdr_diff_frag_820_rev5_2026-10-19.bin");
+            let model = Model::from_bytes(bytes).unwrap();
+            let declared = model.metadata().get_utf8("zentrain.formula_revision").ok();
+            assert_eq!(declared, Some("5"), "default B arithmetic changed");
+            assert_eq!(std::env::var("ZENSIM_FORMULA_REV").unwrap(), "5");
+            let info = json!({"source_sha256":super::digest(bytes),"revision":"5",
+                "declared_revision":declared,"profile":"B","n_inputs":model.n_inputs(),
+                "surface":"Zensim::compute; current default B (report-only)"});
+            let z = Zensim::new(ZensimProfile::B).with_parallel(true);
+            let action: Action = Box::new(move || {
+                z.compute(&RgbSlice::new(src, w, h), &RgbSlice::new(dst, w, h))
+                    .unwrap()
+                    .score()
+            });
+            Some((action, info))
+        }
+        "r7_general"
+        | "r7_codec"
+        | "r7_general_cached"
+        | "r7_codec_cached"
+        | "r7_general_map"
+        | "r7_codec_map"
+        | "r7_baseline_general"
+        | "r7_baseline_codec" => {
+            // The two curated revision-7 models (general: x256 + rehearsal e59; codec only: AIC-only
+            // e29), pinned by path and SHA from the caller and served through BakeScorer at their
+            // declared revision. Scorecard rows: scalar performance (uncached; cached reported
+            // separately) and spatial/memory cost (cached-reference score + map; RSS baselines).
+            let label = if arm.contains("general") {
+                "GENERAL"
+            } else {
+                "CODEC"
+            };
+            let path = std::env::var(format!("ZEN_S2_R7_BAKE_{label}"))
+                .expect("pinned curated model path");
+            let expected =
+                std::env::var(format!("ZEN_S2_R7_SHA_{label}")).expect("pinned curated model SHA");
+            let bytes = std::fs::read(path).unwrap();
+            assert_eq!(
+                super::digest(&bytes),
+                expected,
+                "curated model bytes changed"
+            );
+            assert_eq!(
+                std::env::var("ZENSIM_FORMULA_REV").unwrap(),
+                "7",
+                "curated models serve revision 7"
+            );
+            let model: &'static Model = Box::leak(Box::new(Model::from_bytes(&bytes).unwrap()));
+            assert_eq!(
+                model.metadata().get_utf8("zentrain.formula_revision").ok(),
+                Some("7"),
+                "curated model declares revision 7"
+            );
+            assert_eq!(model.layers().next().unwrap().out_dim, 128, "H128 shape");
+            assert_eq!(model.n_outputs(), 1);
+            let scorer: &'static mut zensim::BakeScorer<'static> = Box::leak(Box::new(
+                zensim::BakeScorer::new(model).unwrap().with_parallel(true),
+            ));
+            let consumed = scorer.consumed_feature_ids().unwrap().len();
+            let mut info = json!({"source_sha256":expected,"revision":"7","hidden":128,
+                "consumed_ids":consumed,"n_inputs":model.n_inputs(),"source_bytes":bytes.len(),
+                "surface":arm});
+            let source: &'static RgbSlice<'static> = Box::leak(Box::new(RgbSlice::new(src, w, h)));
+            let action: Action = if arm.starts_with("r7_baseline_") {
+                // RSS baseline for the incremental memory bar: inputs, model and scorer, no scoring.
+                Box::new(move || {
+                    std::hint::black_box(&scorer);
+                    0.0
+                })
+            } else if arm.ends_with("_cached") {
+                let reference = scorer.precompute_reference(source).unwrap();
+                let direct = scorer
+                    .compute(source, &RgbSlice::new(dst, w, h), None)
+                    .unwrap();
+                let cached = scorer
+                    .compute_with_ref(source, &reference, &RgbSlice::new(dst, w, h), None)
+                    .unwrap();
+                assert_eq!(direct.score().to_bits(), cached.score().to_bits());
+                assert_eq!(
+                    direct.raw_distance().to_bits(),
+                    cached.raw_distance().to_bits()
+                );
+                assert_eq!(
+                    direct
+                        .features()
+                        .iter()
+                        .map(|v| v.to_bits())
+                        .collect::<Vec<_>>(),
+                    cached
+                        .features()
+                        .iter()
+                        .map(|v| v.to_bits())
+                        .collect::<Vec<_>>()
+                );
+                info["cached_complete_result_parity"] = json!(true);
+                Box::new(move || {
+                    let result = scorer
+                        .compute_with_ref(source, &reference, &RgbSlice::new(dst, w, h), None)
+                        .unwrap();
+                    let score = result.score();
+                    std::hint::black_box(result);
+                    score
+                })
+            } else if arm.ends_with("_map") {
+                // The reference is prepared once, untimed (map bin 1, as in G-STEER); each call
+                // returns the complete score and map, retained until the call returns.
+                info["map_bin"] = json!(1);
+                let mut session = scorer.prepare_steering(source, 1).unwrap();
+                Box::new(move || {
+                    let result = session.compute(&RgbSlice::new(dst, w, h), None).unwrap();
+                    let score = result.result().score();
+                    std::hint::black_box(result);
+                    score
+                })
+            } else {
+                Box::new(move || {
+                    scorer
+                        .compute(source, &RgbSlice::new(dst, w, h), None)
+                        .unwrap()
+                        .score()
+                })
+            };
+            Some((action, info))
+        }
         _ => None,
     }
 }

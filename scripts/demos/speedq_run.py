@@ -114,8 +114,10 @@ def worker_revision(name):
         revision = name.removeprefix('by_v2fy_r').split('_')[0]
         assert revision in ('3', '4', '5'), 'unknown formula revision'
         return int(revision)
-    if name.startswith(('e33_', 'e34_')):  # Registered candidate bakes use Rev5.
+    if name.startswith(('e33_', 'e34_')) or name == 'zensim_B_rev5':  # Registered candidate bakes and default B use Rev5.
         return 5
+    if name.startswith('r7_'):  # The two curated revision-7 models.
+        return 7
     return 1
 
 

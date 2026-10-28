@@ -53,6 +53,21 @@ E33_GEOMETRIES = ['64x64', '256x256', '1024x1024']
 QUAL_ARMS = ['by_v2fy_r5', 'e33_a', 'e33_c', 'zensim_D', 'fast_ssim2', 'fast_ssim2_main',
              'e33_a_map', 'e33_c_map', 'e33_seed0_map']
 QUAL_GEOMETRIES = ['1024x1024', '2048x2048']
+# The two curated revision-7 models (byconstruction record, "Runtime gate for the two curated models"): QUAL-A's
+# scorecard rows (one pinned worker, 1024^2 and 2048^2), inside a size sweep (64^2 to 4096^2) at one and eight threads.
+# Frozen D is the paired baseline, fast-ssim2 0.8.2 and main are the peer bars, butteraugli's 3-norm and the current
+# default B are report-only peers. Cached-reference scalar arms are reported separately; the map arms are the spatial
+# row's cached-reference score + map; the baseline arms (no scoring) anchor incremental RSS.
+R7_ARMS = ['zensim_D', 'r7_general', 'r7_codec', 'fast_ssim2', 'fast_ssim2_main', 'zensim_B_rev5', 'e34_butter_scalar',
+           'r7_general_cached', 'r7_codec_cached', 'r7_general_map', 'r7_codec_map']
+R7_GEOMETRIES = ['64x64', '256x256', '1024x1024', '2048x2048', '4096x4096']
+R7_THREADS = [1, 8]
+# Fresh-process RSS: every geometry at one thread, the scorecard sizes and 4096^2 at eight.
+R7_RSS = [(R7_GEOMETRIES, [1]), (['1024x1024', '2048x2048', '4096x4096'], [8])]
+R7_BASELINES = ['r7_baseline_general', 'r7_baseline_codec']
+R7_SURFACES = {'r7_general_cached': 'r7_general', 'r7_codec_cached': 'r7_codec',
+               'r7_general_map': 'r7_general', 'r7_codec_map': 'r7_codec'}
+DEFAULT_B = '89cb4861e2651ff8d4a98bb879feed83a0f9eb3f22b83e644e42eb2291d74b2e'
 
 
 def configuration(scaling=False, budget=False, floor=False, e33=False):
@@ -60,6 +75,9 @@ def configuration(scaling=False, budget=False, floor=False, e33=False):
     if e33 == 'qual':
         assert not (scaling or budget or floor), 'select one COSTCMP grid'
         return ['v4x'], [1], QUAL_GEOMETRIES, QUAL_ARMS, 'costcmp-qual-preflight-v1'
+    if e33 == 'r7':
+        assert not (scaling or budget or floor), 'select one COSTCMP grid'
+        return ['v4x'], R7_THREADS, R7_GEOMETRIES, R7_ARMS, 'costcmp-r7-preflight-v1'
     if e33:
         assert not (scaling or budget or floor), 'select one COSTCMP grid'
         return TIERS, [1], E33_GEOMETRIES, E33_ARMS, 'costcmp-e33-preflight-v1'
@@ -137,6 +155,14 @@ def validate_ready(rows, name, geometry, tier, threads, rec):
         label = name[4:].removesuffix('_map').upper()
         assert rec['model']['source_sha256'] == os.environ[f"ZEN_S2_E33_SHA_{label}"]
         assert rec['model']['revision'] == '5'
+    elif name.startswith('r7_'):
+        label = 'GENERAL' if 'general' in name else 'CODEC'
+        assert rec['model']['source_sha256'] == os.environ[f"ZEN_S2_R7_SHA_{label}"]
+        assert rec['model']['revision'] == '7'
+    elif name == 'zensim_B_rev5':
+        assert (rec['model']['revision'], rec['model']['source_sha256']) == ('5', DEFAULT_B)
+    elif name == 'e34_butter_scalar':
+        assert (rec['model']['peer'], rec['model']['score']) == ('butteraugli0.9.3', 'pnorm3')
     elif name in ('zensim_A', 'zensim_B', 'zensim_D'):
         assert rec['model']['revision'] == '1'
         assert len(rec['model']['source_sha256']) == 64
@@ -160,7 +186,12 @@ def receipt(path, scaling=False, budget=False, floor=False, e33=False):
         for g,t,n in cells(scaling,budget,floor,e33):
             for m,u in (('e33_a_map','e33_a'),('e33_c_map','e33_c'),('e33_seed0_map','by_v2fy_r5')):
                 assert rows[(g,t,n,m)]['score_bits'] == rows[(g,t,n,u)]['score_bits'], f'{m} score differs from {u}'
-    groups = [arms] if budget else ([['by_v2fy_r5','by_v2fy_r5_before'], ['by_v2fy_r4']] if scaling else [[ARMS[0]]])
+    if e33 == 'r7':  # cached-reference and map arms serve their model's uncached score
+        for g,t,n in cells(scaling,budget,floor,e33):
+            for m,u in R7_SURFACES.items():
+                assert rows[(g,t,n,m)]['score_bits'] == rows[(g,t,n,u)]['score_bits'], f'{m} score differs from {u}'
+    # The revision-7 grid has no production by_v2fy arm; its parity is the surface check above.
+    groups = [] if e33 == 'r7' else [arms] if budget else ([['by_v2fy_r5','by_v2fy_r5_before'], ['by_v2fy_r4']] if scaling else [[ARMS[0]]])
     for g in geometries:
         for group in groups:
             production = [rows[(g,t,n,a)] for t in tiers for n in threads for a in group]
@@ -200,9 +231,67 @@ def preflight(binary, dest, scaling=False, before_binary=None, budget=False, wor
         path.rename(root/'PREFLIGHT_FAILED.json')
         raise
 
+def r7_summary(root):
+    """The scorecard's runtime rows for the two curated revision-7 models (QUAL-A's bars, p95 owner and layout:
+    root/runtime/timing, root/runtime/rss) plus the size/thread sweep and peak RSS of every arm.
+    Writes R7_RUNTIME.json and R7_RUNTIME.md in root."""
+    import sys
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'rev4_featpot'))
+    from qual_a_report import runtime
+    root = Path(root)
+    rt = runtime(root)
+    assert rt is not None, 'every timing cell must be complete'
+    assert set(rt['cells']) == {f'{t}-t{n}-{g}' for g, t, n in cells(e33='r7')}, 'timing cells differ from the grid'
+    ok = lambda b: 'PASS' if b else 'FAIL'
+    rows = {}
+    lines = ['## Scorecard rows (one pinned worker, v4x)', '',
+             '| Model | Geometry | Uncached p95 | vs frozen D | vs fast-ssim2 0.8.2 | Cached-reference p95 | '
+             'Score + map p95 (× uncached) | Peak incremental RSS (score / map) | Scalar | Spatial | Memory |',
+             '|---|---|---:|---:|---:|---:|---:|---:|---|---|---|']
+    for cell, bar_ms, px in (('v4x-t1-1024x1024', 50, 1024 * 1024), ('v4x-t1-2048x2048', 200, 2048 * 2048)):
+        c = rt['cells'][cell]
+        timing = root / 'runtime' / 'timing' / cell
+        header = json.loads((timing / 'header.json').read_text())
+        interference = json.loads((timing / 'interference.json').read_text())
+        peers = {a: c[a]['p95_ms'] for a in ('zensim_D', 'fast_ssim2', 'fast_ssim2_main', 'zensim_B_rev5', 'e34_butter_scalar')}
+        bar_kib = (128 * px + 64 * 2**20) / 1024
+        for m in ('general', 'codec'):
+            arm = f'r7_{m}'
+            u, cached, mapped = (c[a]['p95_ms'] for a in (arm, arm + '_cached', arm + '_map'))
+            base = rt['rss_kib'][f'{cell}-r7_baseline_{m}']
+            inc = {s: rt['rss_kib'][f'{cell}-{a}'] - base for s, a in (('score', arm), ('cached', arm + '_cached'), ('map', arm + '_map'))}
+            r = dict(cell=cell, model=m, rounds=c[arm]['n'], uncached_p95_ms=u, uncached_median_ms=c[arm]['median_ms'],
+                     cached_p95_ms=cached, map_p95_ms=mapped, peers_p95_ms=peers,
+                     scalar=dict(bar_ms=bar_ms, ratio_D=u / peers['zensim_D'], ratio_fast_ssim2=u / peers['fast_ssim2'],
+                                 passes=u <= bar_ms and u <= 1.25 * peers['zensim_D'] and u <= peers['fast_ssim2']),
+                     spatial=dict(ratio=mapped / u, passes=mapped <= 3 * u),
+                     memory=dict(bar_kib=bar_kib, baseline_kib=base, incremental_kib=inc, passes=max(inc.values()) <= bar_kib),
+                     quiet_gate=header['quiet_gate'], interference_admitted=interference['admitted'])
+            rows[f'{m} {cell}'] = r
+            lines.append(f"| {m} | {cell.split('-')[-1]} | {u:.2f} ms | {r['scalar']['ratio_D']:.2f}× | "
+                         f"{r['scalar']['ratio_fast_ssim2']:.2f}× | {cached:.2f} ms | {mapped:.2f} ms ({r['spatial']['ratio']:.2f}×) | "
+                         f"{inc['score']:,} / {inc['map']:,} KiB (bar {bar_kib:,.0f}) | {ok(r['scalar']['passes'])} | "
+                         f"{ok(r['spatial']['passes'])} | {ok(r['memory']['passes'])} |")
+    order = [f'v4x-t{n}-{g}' for n in R7_THREADS for g in R7_GEOMETRIES]
+    lines += ['', '## Median / p95 per call (ms), 32 retained paired rounds', '',
+              '| Arm | ' + ' | '.join(c.removeprefix('v4x-') for c in order) + ' |', '|---|' + '---:|' * len(order)]
+    for a in R7_ARMS:
+        lines.append(f'| {a} | ' + ' | '.join(f"{rt['cells'][c][a]['median_ms']:.2f} / {rt['cells'][c][a]['p95_ms']:.2f}"
+                                               for c in order) + ' |')
+    blocks = [f'v4x-t{n}-{g}' for gs, ns in R7_RSS for n in ns for g in gs]
+    lines += ['', '## Fresh-process peak RSS (MiB)', '',
+              '| Arm | ' + ' | '.join(c.removeprefix('v4x-') for c in blocks) + ' |', '|---|' + '---:|' * len(blocks)]
+    for a in R7_BASELINES + R7_ARMS:
+        lines.append(f'| {a} | ' + ' | '.join(f"{rt['rss_kib'][f'{c}-{a}'] / 1024:.1f}" for c in blocks) + ' |')
+    owner.write(root / 'R7_RUNTIME.json', dict(schema='costcmp-r7-runtime-v1', rows=rows, runtime=rt))
+    with (root / 'R7_RUNTIME.md').open('x') as f:
+        f.write('\n'.join(lines) + '\n')
+    print('\n'.join(lines))
+
+
 def main():
     ap=argparse.ArgumentParser(description=__doc__)
-    ap.add_argument('mode',choices=['parity','timing','rss','status'])
+    ap.add_argument('mode',choices=['parity','timing','rss','status','summary'])
     ap.add_argument('--binary',type=Path);ap.add_argument('--dest',type=Path,required=True)
     ap.add_argument('--parity',type=Path);ap.add_argument('--analyzer',type=Path)
     ap.add_argument('--lock',type=Path);ap.add_argument('--only')
@@ -214,17 +303,20 @@ def main():
     ap.add_argument('--floor-arm',action='store_true',help='floor grid: add the floor-3 and floor-17 (original route) builds and the 3/4-slot widths (v3 inventory); RSS measures only the floor arms')
     ap.add_argument('--e33-grid',type=Path,metavar='CANDIDATES_JSON',help='E33 9.3 grid; JSON {"a":{"path","sha256"},"c":{...}} pins the candidate bakes')
     ap.add_argument('--qual-grid',type=Path,metavar='CANDIDATES_JSON',help='QUAL-A scorecard runtime grid; JSON pins a, c and seed0')
+    ap.add_argument('--r7-grid',type=Path,metavar='CANDIDATES_JSON',help='the same scorecard runtime grid for the two curated revision-7 models; JSON pins general and codec')
     args=ap.parse_args()
-    if args.e33_grid is not None and args.qual_grid is not None:ap.error('select one COSTCMP grid')
-    e33='qual' if args.qual_grid is not None else args.e33_grid is not None
-    pins=args.qual_grid if args.qual_grid is not None else args.e33_grid
+    if sum(g is not None for g in (args.e33_grid,args.qual_grid,args.r7_grid))>1:ap.error('select one COSTCMP grid')
+    e33='qual' if args.qual_grid is not None else 'r7' if args.r7_grid is not None else args.e33_grid is not None
+    pins=next((g for g in (args.qual_grid,args.r7_grid,args.e33_grid) if g is not None),None)
+    if args.mode=='summary' and e33!='r7':ap.error('summary applies to --r7-grid')
     if e33:
-        if args.scaling or args.budget_grid or args.floor_arm or args.rss_under_load:ap.error('--e33-grid/--qual-grid is its own grid')
+        if args.scaling or args.budget_grid or args.floor_arm or args.rss_under_load:ap.error('--e33-grid/--qual-grid/--r7-grid is its own grid')
         labels=json.loads(pins.read_text())
-        assert set(labels)==({'a','c','seed0'} if e33=='qual' else {'a','c'})
+        assert set(labels)==({'a','c','seed0'} if e33=='qual' else {'general','codec'} if e33=='r7' else {'a','c'})
+        prefix='ZEN_S2_R7' if e33=='r7' else 'ZEN_S2_E33'
         for label,rec in labels.items():
             assert hashlib.sha256(Path(rec['path']).read_bytes()).hexdigest()==rec['sha256']
-            os.environ[f'ZEN_S2_E33_BAKE_{label.upper()}']=rec['path'];os.environ[f'ZEN_S2_E33_SHA_{label.upper()}']=rec['sha256']
+            os.environ[f'{prefix}_BAKE_{label.upper()}']=rec['path'];os.environ[f'{prefix}_SHA_{label.upper()}']=rec['sha256']
     if args.floor_arm and not args.budget_grid:ap.error('--floor-arm applies only to the budget grid')
     if args.floor_arm and args.rss_under_load:ap.error('floor-arm RSS keeps the quiet gate')
     if args.rss_under_load and (args.mode!='rss' or not args.budget_grid):ap.error('--rss-under-load applies only to budget-grid RSS')
@@ -233,9 +325,11 @@ def main():
     if args.budget_binaries is not None and not args.budget_grid:ap.error('--budget-binaries requires --budget-grid')
     if args.scaling and args.before_binary is None:ap.error('--scaling requires --before-binary')
     if args.mode=='status':
-        expected_timing = 2 if e33=='qual' else 6 if e33 else (15 if args.floor_arm else 9) if args.budget_grid else (48 if args.scaling else 64)
-        expected_rss = 2*len(QUAL_ARMS) if e33=='qual' else 3 if e33 else (36+30 if args.floor_arm else 36) if args.budget_grid else (48 if args.scaling else 80)
+        expected_timing = 2 if e33=='qual' else len(cells(e33='r7')) if e33=='r7' else 6 if e33 else (15 if args.floor_arm else 9) if args.budget_grid else (48 if args.scaling else 64)
+        expected_rss = 2*len(QUAL_ARMS) if e33=='qual' else sum(len(g)*len(n) for g,n in R7_RSS)*(len(R7_ARMS)+len(R7_BASELINES)) if e33=='r7' else 3 if e33 else (36+30 if args.floor_arm else 36) if args.budget_grid else (48 if args.scaling else 80)
         owner.collection_status(args.dest,expected_timing=expected_timing,expected_rss=expected_rss);return
+    if args.mode=='summary':
+        r7_summary(args.dest);return
     if args.binary is None:ap.error('--binary is required')
     binaries = budget_inventory(args.budget_binaries,args.floor_arm) if args.budget_grid else ({'by_v2fy_r5_before':args.before_binary} if args.scaling else None)
     if args.budget_grid:assert args.binary.resolve() in {p.resolve() for p in binaries.values()}
@@ -255,6 +349,13 @@ def main():
     else:
         if args.lock is None:ap.error('--lock is required')
         with owner.segment_lock(args.lock):
+            if e33=='r7':
+                for geometries,threads in R7_RSS:  # baseline arms (no scoring) first, for incremental RSS
+                    owner.rss(args.binary,args.dest,args.parity,arms=R7_BASELINES,parity_loader=loader,ready_check=None,
+                              geometries=geometries,thread_counts=threads)
+                    owner.rss(args.binary,args.dest,args.parity,arms=R7_ARMS,parity_loader=loader,ready_check=check,
+                              geometries=geometries,thread_counts=threads)
+                return
             if e33=='qual':  # baseline arms (inputs + model + scorer, no scoring) for incremental RSS
                 owner.rss(args.binary,args.dest,args.parity,arms=['e33_baseline_a','e33_baseline_c','e33_baseline_seed0'],
                           parity_loader=loader,ready_check=None,geometries=QUAL_GEOMETRIES,thread_counts=[1])
