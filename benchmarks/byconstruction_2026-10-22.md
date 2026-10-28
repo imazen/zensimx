@@ -7700,3 +7700,44 @@ The white paper (methods, data, evaluation, overfitting precautions, MLP limits,
 a private Claude Doc, because it carries AIC-2026 results; its tables and figures come from
 `scripts/byconstruction/paper/` over `/mnt/v/output/zensim/paper-20261028/`. The dashboard's Two models tab now shows
 the EVAL collections and both peers.
+
+### Scale-0 chroma for the revision-7 models (fx2): registration (2026-10-28, owner decision, before any run)
+
+Owner, 2026-10-28: retrain the general and codec models at revision 7 with full-resolution chroma allowed, keep the
+luma-only read set as the control, let the gates decide; the slim crate's 0.3.0 release waits for the result. The
+curated models read no scale-0 X or B input (fx1: at scale 0 only Y's 41 damage inputs; at scales 1–3 all three
+channels). The white paper lists this as a blind spot, and the 2026-10-18 colour-noise trace tied the E33/E34 models'
+severe-LIVE-noise inversion to the missing finest chroma. No formula revision is needed: revision 7 already serves
+scale-0 X/B when a bake reads them (`full_res_xb`), and every table of the frozen Mlic root (27 tables, `a7fd4af0…`)
+and of the AIC-2026 public_train folds (`aic-finetune-20261026/folds-rev7`, 15 tables) holds all 84 scale-0 X/B ids at
+revision 7 (`basic+peaks+v2@w1825/rev7_rowlanes#36c3f3af`) with no NaN (checked 2026-10-28). No re-extraction.
+
+**Arms.** Same recipe, data, seeds, budgets and pinned trainer binaries; only the input declaration differs.
+
+- *fx1 (control):* the existing artifacts: Mlic's E21 cells and full-data seeds, the general model's
+  `XrefAIC256@e59` runs and the codec model's AIC-only `e29` runs. They are not retrained. One control cell (Mlic,
+  KADID held out, seed 0) is retrained in the new study and must reproduce the stored predictions bit for bit, or no
+  comparison is made.
+- *fx2:* the `fx2` declaration (`scripts/rev4_featpot/color_noise_fx2_declaration.json`, SHA-256 `a3802dde…`): fx1's
+  410 damage inputs plus scale-0 X and B's 82, each with its own cell's fragility product (slots 393 and 451), 492 + 492
+  inputs. `BYC_COLS` lists the 492 damage ids.
+
+**Stages.**
+
+1. *Mlicfx2:* Mlic's 12 E21 cells (KADID, TID2013, KonFiG and CID22-A held out, seeds 0–2) and its three full-data
+   seeds, Mlic's spec otherwise (`mono:thr:mp32`, 120 epochs × 50,000 pairs).
+2. *Continuations* from the Mlicfx2 full-data seeds with the curated models' plans: `XrefAIC256@e59` (general) and
+   AIC-only `e29` (codec), seven folds out of fold on AIC-2026 public_train (seeds 0–2) and full data.
+3. *Gates* for the packed seed-0 models: certified monotone and the identity pin, near-identity (NEARID), the
+   label-free gates (`just candidate-gates-rev7`), the mixture tests, G-STEER, and the runtime gate (timing and peak
+   memory). Cost is reported, never a reason to reject.
+
+**Reading (my bars, set before any result).** An fx2 model replaces its fx1 counterpart if it passes every label-free
+gate the counterpart passed, its out-of-fold AIC-2026 SROCC is not lower by more than two seed-unit SEs, and CID22-A's
+codec bias spread stays within 0.005 of the counterpart's. Reported, not deciding: E21 out of sample per set and pooled
+(a diagnostic since 2026-10-25), knob-concurring inversions and ladder error, the KADID/TID2013 noise-type ladders, and
+the LIVE colour-noise pair of the 2026-10-18 trace (diagnostic examples, never fitted or selected on). A finalist's
+frozen EVAL read waits for the owner's yes and happens once.
+
+**Compute.** Dev, one heavy job at a time behind `~/tmp/heavy.lock`; study directory `/var/tmp/byc-fx2-20261028`,
+archived to tower when complete.
