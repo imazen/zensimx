@@ -6658,3 +6658,9 @@ Known external migrations needed:
 
 The original `[0.4.0]` draft covered only the `MontageOptions::#[non_exhaustive]` change. It was never tagged or pushed to crates.io (latest published: 0.3.1), so the breaking changes above ride on the same 0.4.0 bump.
 </details>
+
+### Chroma generation qualification (2026-10-28)
+
+- Qualify the TRAIN source census and frozen geometry, record native natural-HDR
+  sensitivity with its AV1 oracle, and measure the zenfleet batch path against
+  immutable control containers (`6edc3794`). Stage C is not started.

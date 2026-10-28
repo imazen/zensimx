@@ -27,6 +27,7 @@ def cas(root, digest):
 
 
 def specification(out, one_view):
+    assert not out.exists(), 'preserve existing declaration specification'
     views = json.loads((ROOT / 'VIEWS.json').read_text())
     frozen = {r['id']: r for r in json.loads((ROOT / 'FROZEN_REFERENCE_PIXELS.json').read_text())}
     assert json.loads((ROOT / 'REFERENCE_REPLAY.json').read_text())['passed']
@@ -141,6 +142,7 @@ def verify_first(ledger, archive, evif, out):
 
 
 def diagnostic_spec(admission_dir, out):
+    assert not out.exists(), 'preserve existing diagnostic specification'
     views={v['id']:v for v in json.loads((ROOT/'VIEWS.json').read_text())}
     selected=defaultdict(list)
     for row in pq.read_table(admission_dir/'DIAGNOSTICS_SELECTION.parquet').to_pylist():
