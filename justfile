@@ -1,3 +1,14 @@
+# Chroma Stage A transport: the caller places this in one worker run-heavy scope.
+chroma-pilot action root:
+    python3 -B scripts/byconstruction/chroma_pilot.py {{quote(action)}} {{quote(root)}}
+
+chroma-pilot-sources root mlic bank imazen candidates commit:
+    python3 -B scripts/byconstruction/chroma_sources.py --root {{quote(root)}} --mlic-root {{quote(mlic)}} --bank {{quote(bank)}} --imazen {{quote(imazen)}} --safe-candidates {{quote(candidates)}} --build-commit {{quote(commit)}}
+
+chroma-pilot-check:
+    python3 -B -m unittest discover -s scripts/tests -p test_chroma_pilot.py
+    just lint-scripts
+
 # Aggregate only completed owner outputs; no new target table is read.
 dataset-mix-summary study:
     python3 -B scripts/rev4_featpot/byc_cells.py mix-summary --study {{quote(study)}}
