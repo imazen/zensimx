@@ -31,6 +31,20 @@ work. The September chronology below is retained history, including its old
 paused-goal statement. It is not the current queue. No new Mlic/AIC recipe has
 been adopted as the serving model, and the seamless HDR frontend has not started.
 
+### State at 01:35 UTC, 2026-10-28
+
+Two models, as the owner asked (2026-10-27): a general model and a codec-only model.
+- **General: ×256 + rehearsal e59.** Stage C is complete (record, "Stage C on ×256 + rehearsal e59: results"):
+  out-of-fold AIC-2026 0.9390/0.9386/0.9383 over three seeds, older sets kept, packed full-data models in
+  `mlic-aic-fulldata-xrefaic256e59-20261027-run01/full/XrefAIC256/full_s*/pack_e059/refit/production-f16.bin`,
+  near-identity passes (142/144).
+- **Codec-only: AIC-only e29** (the owner's pick, about 01:30 UTC): out of fold 0.9515/0.9527/0.9520; compression-only
+  E21 out of sample at Mlic's level. Its full-data run `mlic-aic-fulldata-aiconlye29-20261027-run01` (w21:p9) is fitting.
+- Label-free gates for both packed seed-0 models: `mlic-candidate-gates-20261028-run03` (w21:pA, `QUEUE.sh`) runs
+  after the codec full-data run; then near-identity for the codec model on i265 (the
+  `/mnt/tower/output/zensim/mlic-nearid-xrefaic256e59-20261028-run01/run.py` pattern).
+Neither model is adopted: adoption (D1) is the owner's.
+
 ### State at 22:07 UTC, 2026-10-27
 
 Every exploration stage is settled (A, A2, B, D, E, F; record sections "Stage D/E/F: result"): **stage C runs on ×256 +
