@@ -7661,3 +7661,42 @@ butteraugli 2,646 MiB, frozen D 157 MiB, default B 158 MiB, the general model 15
 sizes, score + map at 4096² takes 136.6 B/px, above the 128 B/px allowance by 74 MiB (3.5%); the score alone takes
 3.5 B/px. The map's retained planes, not the scorer, set the memory cost. Summary tables:
 `/mnt/v/output/zensim/r7-runtime-20261028/R7_RUNTIME.md` and `.json` (dev).
+
+### Frozen EVAL read for the two curated models (2026-10-28, owner's yes; read once per finalist)
+
+`/mnt/v/output/zensim/mlic-aic-finalists-eval-20261028/` (dev): `FINALISTS.json` binds both packed seed-0 models
+(`7642eff4…`, `63a1c5d3…`) and the TRAIN-only selection (`TRAIN_SELECTION.json`, `selection_uses_EVAL: false`) before
+any EVAL label read; `dataset_eval.py mix-eval` scored them on the frozen EVAL copy (nine MOS collections, FG-IQA,
+PieAPP and BAPPS), with the label reads in `LABEL_READS.json` and `EVAL_DERIVED_LABEL_READS.json`. Paired differences
+against Mlic (whole-reference cluster bootstrap, 2,000 resamples; 3–12 references except IQA-ODI's 42, so descriptive):
+
+| Collection | General − Mlic | Codec − Mlic |
+|---|---|---|
+| CID:IQ | −0.0052 [−0.0136, +0.0026] | −0.1276 [−0.2012, −0.0819] |
+| CID:OA | −0.0037 [−0.0131, +0.0093] | −0.0794 [−0.2138, +0.0546] |
+| Colourlab | −0.0109 [−0.0378, +0.0056] | −0.2442 [−0.3540, −0.1322] |
+| IQA-ODI | +0.0233 [+0.0027, +0.0610] | −0.0136 [−0.0606, +0.0328] |
+| IRCCyN/IVC | +0.0139 [−0.0036, +0.0483] | +0.0087 [−0.0069, +0.0304] |
+| LIVE-MD | +0.0035 [−0.0050, +0.0114] | +0.0195 [−0.0056, +0.0457] |
+| MDID | −0.0281 [−0.0438, −0.0143] | −0.2067 [−0.3091, −0.1283] |
+| NITS-IQA | −0.0174 [−0.0275, −0.0095] | +0.0006 [−0.0194, +0.0198] |
+| VCL@FER | −0.0104 [−0.0194, −0.0029] | −0.0358 [−0.0507, −0.0228] |
+
+Two-alternative agreement: FG-IQA general 0.759 / codec 0.761 (Mlic 0.759), PieAPP 0.585 / 0.574 (0.585), BAPPS
+0.667 / 0.667 (Mlic's own earlier read 0.673). Against the zero-shot peers on the same pixels, the general model is ahead
+of butteraugli's 3-norm on 8 of the 9 MOS collections (NITS-IQA level) and of SSIMULACRA2 on 5 (CID:IQ +0.107,
+Colourlab +0.107, MDID +0.083, CID:OA +0.042, IQA-ODI +0.011; behind on NITS-IQA −0.070, LIVE-MD −0.019, VCL@FER −0.015,
+IRCCyN/IVC −0.008). Nothing was selected or changed after this read.
+
+**Zero-shot peers on the selection data** (`e21-peers-20261028`: SSIMULACRA2 and butteraugli from the pinned judge build
+over the 13,817 E21 pairs' own pixels; AIC-2026 from the existing crop scores; `aic_dashboard_data.py --curate`). SROCC,
+models out of fold (AIC-2026) or out of sample (E21, seed 0): AIC-2026 general 0.939, codec 0.952, Mlic 0.900,
+SSIMULACRA2 0.901, butteraugli 3-norm 0.930. Every type: KADID 0.877 / 0.843 / 0.882 / 0.800 / 0.493, TID2013 0.874 /
+0.845 / 0.867 / 0.846 / 0.662, KonFiG 0.807 / 0.795 / 0.809 / 0.723 / 0.670, CID22-A 0.897 / 0.898 / 0.883 / 0.874 /
+0.804. On the compression rows butteraugli is level (KADID 0.943, TID2013 0.939, KonFiG 0.896). SSIMULACRA2 was tuned
+on all four older sets, so those numbers are partly in sample for it.
+
+The white paper (methods, data, evaluation, overfitting precautions, MLP limits, feature math and citations, speed) is
+a private Claude Doc, because it carries AIC-2026 results; its tables and figures come from
+`scripts/byconstruction/paper/` over `/mnt/v/output/zensim/paper-20261028/`. The dashboard's Two models tab now shows
+the EVAL collections and both peers.
