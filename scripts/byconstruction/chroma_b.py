@@ -7,6 +7,7 @@ import json
 import os
 import shutil
 import gzip
+from datetime import datetime, timezone
 from pathlib import Path
 import struct
 import subprocess
@@ -83,7 +84,7 @@ def admit(ledger, archive, out):
                 ladders.append(dict(view_id=view['id'],source=view['source'],reference_group=view['reference_group'],
                                     mlic_role=view['mlic_role'],content_class=view['content_class'],family=family,
                                     scores=values,kept_indices=gate['kept_indices'],candidate_indices=gate['candidate_indices'],
-                                    stop_index=gate['stop_index'],admitted=bool(gate['kept_indices'])))
+                                    stop_index=gate['stop_index'],drop_reason=gate['drop_reason'],admitted=bool(gate['kept_indices'])))
                 for rung,cell in enumerate(cells):
                     assert cell['rung']==rung and json.loads(cell['params_json'])==params[rung]
                     assert cell['teacher_bits']==struct.pack('>d',cell['teacher_ssim2']).hex()
@@ -188,6 +189,26 @@ def diagnostic_proof(ctl, image, out):
     save(out/'PROOF.json',dict(passed=True,cells=12,maps=maps,scalar_doubles='all3 diagnostics exact to unbatched144 control',targets_unchanged=True,image=image,primary_sha256=rows[0]['output_sha']))
 
 
+def snapshot(ledger, out, previous):
+    assert not out.exists(), 'preserve earlier snapshot observation'
+    rows=pq.read_table(ledger).to_pylist();assert len({r['job_id'] for r in rows})==len(rows)
+    counts=Counter();failed=[]
+    for row in rows:
+        if row['status']!='done':failed.append(dict(job_id=row['job_id'],error_class=row['error_class']));continue
+        host=row['worker'].split('-chroma-',1)[0]
+        assert host in ['i270','i265','r3800x','r3500']
+        counts[host]+=1
+    now=datetime.now(timezone.utc)
+    result=dict(observed_utc=now.isoformat(),ledger_sha256=sha(ledger),done_views=sum(counts.values()),done_cells=sum(counts.values())*76,required_views=9162,required_cells=696312,by_host_views=dict(counts),failed=failed)
+    if previous:
+        old=json.loads(previous.read_text());elapsed=(now-datetime.fromisoformat(old['observed_utc'])).total_seconds();assert elapsed>0
+        delta={h:counts[h]-old['by_host_views'].get(h,0) for h in ['i270','i265','r3800x','r3500']}
+        result.update(previous=str(previous),elapsed_seconds=elapsed,delta_views=delta)
+        if all(n>=0 for n in delta.values()):result['cells_per_second_by_host']={h:n*76/elapsed for h,n in delta.items()}
+        else:result['rate_not_qualified']='native first-wins attribution changed between observations'
+    save(out,result);print(json.dumps(result),flush=True)
+
+
 def diagnostic_spec(admission_dir, out):
     assert not out.exists(), 'preserve existing diagnostic specification'
     views={v['id']:v for v in json.loads((ROOT/'VIEWS.json').read_text())}
@@ -210,10 +231,12 @@ if __name__=='__main__':
     a=s.add_parser('admit');a.add_argument('ledger',type=Path);a.add_argument('archive',type=Path);a.add_argument('out',type=Path)
     a=s.add_parser('verify-first');a.add_argument('ledger',type=Path);a.add_argument('archive',type=Path);a.add_argument('evif',type=Path);a.add_argument('out',type=Path)
     a=s.add_parser('diagnostic-proof');a.add_argument('ctl',type=Path);a.add_argument('image');a.add_argument('out',type=Path)
+    a=s.add_parser('snapshot');a.add_argument('ledger',type=Path);a.add_argument('out',type=Path);a.add_argument('--previous',type=Path)
     a=s.add_parser('diagnostics-spec');a.add_argument('admission_dir',type=Path);a.add_argument('out',type=Path)
     a=p.parse_args()
     if a.command=='spec':specification(a.out,a.one_view)
     elif a.command=='admit':admit(a.ledger,a.archive,a.out)
     elif a.command=='verify-first':verify_first(a.ledger,a.archive,a.evif,a.out)
     elif a.command=='diagnostic-proof':diagnostic_proof(a.ctl,a.image,a.out)
+    elif a.command=='snapshot':snapshot(a.ledger,a.out,a.previous)
     else:diagnostic_spec(a.admission_dir,a.out)
