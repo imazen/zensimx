@@ -40,6 +40,35 @@ class RegisteredRoute(unittest.TestCase):
 
 
 class PlanConfiguration(unittest.TestCase):
+    def test_fx2_plan_runs_both_recipes_all_folds_and_three_initial_seeds(self):
+        initial = {str(s): dict(directory=f"/invented/full_s{s}") for s in range(3)}
+        config = dict(token="fx2", input_sha256={})
+        spec = owner.SPEC.replace("fx1", "fx2")
+        with patch.object(owner, "fx2_prerequisites", return_value=(spec, Path("/invented/cols"), initial, config)), \
+                patch.object(owner, "seven_fold_plan") as freeze:
+            owner.fx2_plan(Path("/invented/run"), "HEAD", Path("t"), Path("m"),
+                           Path("/invented/study"), Path("/invented/reproduction"))
+        value = freeze.call_args.kwargs
+        self.assertEqual(value["arms"], dict(XrefAIC256="mixed-aic256-xref", AICOnly="aic-only"))
+        self.assertEqual(value["seeds"], owner.SEEDS)
+        self.assertEqual(value["checkpoints"], (7, 15, 29, 59))
+        self.assertEqual(len(owner.fold_runs(value)), 42)
+        self.assertEqual((value["spec"], value["initial"], value["input_configuration"]), (spec, initial, config))
+        self.assertEqual(value["extra"]["aic_weights"], dict(XrefAIC256=256.0, AICOnly=16.0))
+
+    def test_fx2_prerequisites_refuse_failed_controls_before_any_model_read(self):
+        with tempfile.TemporaryDirectory(dir=Path.home() / "tmp") as tmp:
+            study, repro = Path(tmp) / "study", Path(tmp) / "repro"
+            study.mkdir()
+            repro.mkdir()
+            (study / "CONTROL.json").write_text('{"pass":false}')
+            with self.assertRaisesRegex(ValueError, "stage-1 control"):
+                owner.fx2_prerequisites(study, repro)
+            (study / "CONTROL.json").write_text('{"pass":true}')
+            (repro / "CONTROL.json").write_text('{"pass":false}')
+            with self.assertRaisesRegex(ValueError, "two-arm fx1 reproduction"):
+                owner.fx2_prerequisites(study, repro)
+
     def test_inherited_prerequisites_cannot_be_silently_repinned(self):
         with tempfile.TemporaryDirectory(dir=Path.home() / "tmp") as tmp:
             path = Path(tmp) / "control.json"

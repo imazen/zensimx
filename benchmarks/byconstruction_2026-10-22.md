@@ -7813,3 +7813,19 @@ receipts; a stale running stage with a dead process is a failure. The replay's w
 The owner's corrected destination rule keeps every new AIC-2026 public_train statistic, fold and full-data, only in
 those local artifacts. Committed records may contain the controls, label-free gates and older TRAIN-set panels,
 with pointers for the AIC results. Existing committed AIC results remain unchanged.
+
+
+### fx2 continuations: reproduction control and plan entry point (2026-10-28)
+
+Task 1's fx1 reproduction is complete in `/var/tmp/byc-fx2-20261028/stage2/fx1-reproduction-run02`: seed 0, source fold 0,
+XrefAIC256 and AICOnly, 60 epochs each. All 120 completed checkpoints match their stored fx1 counterparts after the
+native owner removes only `zentrain.repro` from copies. An independent audit rehashed all comparison copies. The
+original inventory's mutable CURRENT/launch-log entries are documented by FINAL_VERIFIED.json and a final inventory;
+all other original entries match. Run01's unsupported-trainer-CLI refusal remains preserved. Resource record:
+`run-heavy: done rc=0 2014s | peak-RSS 1.97GiB | min-avail 41475MiB | peak-load 2.21`.
+
+`aic_matched_continuation.py fx2-plan` admits the two-recipe source-fold plan only after the stage-1 control and the
+two-arm replay pass. It verifies the three full seeds, their certificates and declarations, and the twelve initial
+omission cells against the fx2 root. The plan binds the exact spec, column order, initial checkpoints and prerequisite
+hashes. Full-data and omission descendants use the existing plan/run owners. All new AIC-2026 statistics remain only
+in the local run artifacts and `~/tmp/handoff/fx2-continuations/report.md`.

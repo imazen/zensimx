@@ -1860,6 +1860,79 @@ def reproduction_status(path):
     print(json.dumps(value))
 
 
+def fx2_prerequisites(study, reproduction):
+    """Require both independent fx1 controls and the three certified Mlicfx2 full seeds."""
+    from aic_adaptation import initial_cell
+    from aic_adaptation_full import check_fit
+    study, reproduction = Path(study).resolve(), Path(reproduction).resolve()
+    files = [study / "CONTROL.json", study / "root/wide/frozen.json",
+             reproduction / "PLAN.json", reproduction / "CONTROL.json", reproduction / "COMPLETE.json",
+             reproduction / "EVIDENCE_INVENTORY.json", reproduction / "FINAL_EVIDENCE_INVENTORY.json",
+             reproduction / "FINAL_VERIFIED.json"]
+    if json.loads(files[0].read_text()).get("pass") is not True:
+        raise ValueError("stage-1 control has not passed")
+    control = json.loads((reproduction / "CONTROL.json").read_text())
+    if (control.get("pass") is not True or len(control["comparisons"]) != 2 * EPOCHS
+            or not all(c["identical"] for c in control["comparisons"].values())):
+        raise ValueError("two-arm fx1 reproduction control has not passed")
+    complete = json.loads((reproduction / "COMPLETE.json").read_text())
+    final = json.loads((reproduction / "FINAL_VERIFIED.json").read_text())
+    if (complete["plan_sha256"] != sha(reproduction / "PLAN.json")
+            or final.get("pass") is not True or final["compared_checkpoints"] != 2 * EPOCHS
+            or final["final_inventory_sha256"] != sha(reproduction / "FINAL_EVIDENCE_INVENTORY.json")):
+        raise ValueError("two-arm fx1 reproduction control has not passed")
+    columns = study / "frozen_configuration/cols_fx2.txt"
+    files.append(columns)
+    initial, specs, root_pin = {}, set(), sha(study / "root/wide/frozen.json")
+    for seed in SEEDS:
+        directory = study / "full/Mlicfx2" / f"full_s{seed}"
+        result = json.loads((directory / "result.json").read_text())
+        spec = result["spec"]
+        binding = declaration_binding(spec, columns)
+        if binding["token"] != "fx2" or result.get("derived_inputs") != dict(
+                token="fx2", declaration_sha256=binding["sha256"]):
+            raise ValueError("initial full model has another derived-input declaration")
+        declaration_binding(spec, directory / "keep_features.txt")
+        initial[str(seed)] = check_fit(directory, seed, root_pin, spec=spec)
+        specs.add(spec)
+        certificate = study / "full" / f"full_s{seed}.certify.json"
+        cert = json.loads(certificate.read_text())
+        if (cert.get("certified") is not True or cert.get("monotone") is not True
+                or Path(cert["bake"]).resolve() != (directory / "refit/production-f16.bin").resolve()):
+            raise ValueError("initial full model lacks its monotone certificate")
+        files.append(certificate)
+    if len(specs) != 1:
+        raise ValueError("one spec across the three initial seeds is required")
+    spec = specs.pop()
+    for name, seed in omission_cells():
+        directory = study / "cells/Mlicfx2" / f"without_{name}_s{seed}"
+        cell = initial_cell(directory, name, seed, spec=spec)
+        if Path(json.loads((directory / "DATASET_GROUP_SELECTION.json").read_text())["root"]).resolve() != study / "root":
+            raise ValueError("initial omission cell trained on another root")
+        declaration_binding(spec, directory / "keep_features.txt")
+        files += [Path(p) for p in cell["input_sha256"]]
+    configuration = dict(token="fx2", study=str(study), reproduction=str(reproduction),
+                         input_sha256={str(p): sha(p) for p in files})
+    return spec, columns, initial, configuration
+
+
+def fx2_plan(run, commit, trainer, meta_tool, study, reproduction):
+    """The registered two-recipe fx2 source-fold study; descendants reuse full-plan and omission-plan."""
+    spec, columns, initial, configuration = fx2_prerequisites(study, reproduction)
+    arms = {"XrefAIC256": "mixed-aic256-xref", "AICOnly": "aic-only"}
+    registration = dict(record="benchmarks/byconstruction_2026-10-22.md",
+                        section="Scale-0 chroma for the revision-7 models (fx2): registration", commit="47cdfe8e")
+    seven_fold_plan(run, commit, trainer, meta_tool, schema=SEEDS_SCHEMA,
+        protocol=diagnostic_protocol("mixed-aic256-xref")[0], registration=registration,
+        arms=arms, seeds=SEEDS, checkpoints=FRONTIER_CHECKPOINTS, initial=initial, root=Path(study) / "root",
+        spec=spec, columns=columns, input_configuration=configuration, extra=dict(
+            recipe=None, initial_label="Mlicfx2", initial_cells=str(Path(study).resolve() / "cells/Mlicfx2"),
+            aic_weights={a: diagnostic_protocol(p)[1] for a, p in arms.items()},
+            contrasts=[[f"{a}@e{e}", "Initial"] for a in arms for e in FRONTIER_CHECKPOINTS],
+            after_run=str(Path(reproduction).resolve()),
+            assessment="registered fx2 continuations; AIC-2026 statistics stay in local artifacts; no adoption"))
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="mode", required=True)
@@ -1872,6 +1945,13 @@ if __name__ == "__main__":
     for mode in ("queue", "run", "status", "fold-queue", "fold-run", "fold-status", "omission-run", "full-run",
                  "reproduction-run", "reproduction-status"):
         sub.add_parser(mode).add_argument("plan", type=Path)
+    p = sub.add_parser("fx2-plan", help="registered fx2 source-fold plans after both controls and all full seeds pass")
+    p.add_argument("run", type=Path)
+    p.add_argument("--source-commit", required=True)
+    p.add_argument("--trainer", type=Path, required=True)
+    p.add_argument("--meta-tool", type=Path, required=True)
+    p.add_argument("--study", type=Path, required=True)
+    p.add_argument("--reproduction", type=Path, required=True)
     p = sub.add_parser("full-plan", help="stage C: full Mlic seeds 0-2 at the advanced point, packed at its epoch")
     p.add_argument("run", type=Path)
     p.add_argument("--source-commit", required=True)
@@ -1919,7 +1999,9 @@ if __name__ == "__main__":
     p.add_argument("--point", nargs=2, metavar=("RUN", "ARM"), required=True, help="the advancing run and arm")
     p.add_argument("--after-run", type=Path, required=True)
     args = parser.parse_args()
-    if args.mode == "xref-plan":
+    if args.mode == "fx2-plan":
+        fx2_plan(args.run, args.source_commit, args.trainer, args.meta_tool, args.study, args.reproduction)
+    elif args.mode == "xref-plan":
         xref_plan(args.run, args.source_commit, args.trainer, args.meta_tool, args.after_run)
     elif args.mode == "wise-plan":
         wise_plan(args.run, args.source_commit, args.trainer, args.meta_tool, args.after_run)
