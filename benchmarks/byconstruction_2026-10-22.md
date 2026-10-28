@@ -7531,9 +7531,9 @@ On compression, out of sample, every AIC-heavy arm holds the older sets at or ab
 (AIC-only e29) without losing compression quality on the older sets; ×1024 and ×1024 + rehearsal trade 0.005–0.006 of
 AIC-2026 for less loss elsewhere. As registered, no rule picks the codec model: this goes to the owner's curation.
 
-### Codec model follow-through: AIC-only e29 (owner's pick, registered 2026-10-27, 01:31 UTC, before any of these runs)
+### Codec model follow-through: AIC-only e29 (owner's pick, registered 2026-10-28, 01:31 UTC, before any of these runs)
 
-The owner picked AIC-only at epoch 29 as the codec-only model (about 23:22 UTC), from the codec-role evidence above.
+The owner picked AIC-only at epoch 29 as the codec-only model (2026-10-28, about 01:30 UTC), from the codec-role evidence above.
 Its follow-through mirrors stage C, using what already exists:
 
 - **Three seeds on the folds.** The source-fold study already holds seeds 0–2 of the AIC-only arm with every-epoch dumps;
