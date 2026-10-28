@@ -7547,7 +7547,7 @@ Its follow-through mirrors stage C, using what already exists:
 It is judged as a codec model: compression-only E21 is the older-set evidence, and its losses on other distortion types
 are reported, not gating. The general model's stage C is unchanged.
 
-### Stage C on ×256 + rehearsal e59: results (2026-10-28, seeds 23:5x UTC, full data 00:46 UTC, near-identity 01:34 UTC)
+### Stage C on ×256 + rehearsal e59: results (2026-10-28, seeds 00:28 UTC, full data 00:46 UTC, near-identity 01:34 UTC)
 
 **Three seeds on the folds** (`mlic-aic-seeds-xrefaic256e59-20261027-run01`): seed 0 reproduces stage D's checkpoints
 byte for byte (28 of 28). Out-of-fold AIC-2026 public_train at epoch 59: seeds 0/1/2 0.9390 / 0.9386 / 0.9383; the
