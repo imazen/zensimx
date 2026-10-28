@@ -2,7 +2,8 @@
 # Scale-0 chroma (fx2) for the revision-7 models, stage 1: Mlic's recipe with the fx2 declaration.
 # Registration: benchmarks/byconstruction_2026-10-22.md, "Scale-0 chroma for the revision-7 models (fx2)".
 #
-#   fx2_study.sh prepare STUDY   pinned binaries, columns, root link, source pin
+#   fx2_study.sh prepare STUDY   pinned binaries, columns, source pin; then build STUDY/root with
+#                                ring_root.py selection-rebind --declaration fx2 (parent a7fd4af0...)
 #   fx2_study.sh control STUDY   Mlic's KADID seed-0 cell retrained (fx1); must reproduce the stored cell
 #   fx2_study.sh cells STUDY     Mlicfx2's 12 E21 cells (seeds 0-2)
 #   fx2_study.sh full STUDY      Mlicfx2's three full-data seeds, packed for the gates
@@ -13,11 +14,11 @@ set -euo pipefail
 cmd=$1 study=$2
 repo=$(cd "$(dirname "$0")/../.." && pwd)
 mixes=/var/tmp/byc-mixes-20261025
-root=$mixes/Mlic/root
+root=$mixes/Mlic/root  # fx1 (control); fx2 runs use "$study/root", its selection-rebind
 fx1_spec=sel:3b7bd5ebe929@h32:H128:cv16:cf98:fx1
 
 env_for() {
-  export BYC_ROOT="$root" REV4_V2_BIN_DIR="$study/bin" BYC_CELLS="$study/cells" BYC_SCRATCH="$study/scratch"
+  export BYC_ROOT="$1" REV4_V2_BIN_DIR="$study/bin" BYC_CELLS="$study/cells" BYC_SCRATCH="$study/scratch"
   export ZENSIM_MAX_TIER=v3 RAYON_NUM_THREADS=1 OMP_NUM_THREADS=1 ZEN_PANEL_BIN="$study/bin/panel"
 }
 
@@ -60,7 +61,7 @@ PY
     touch "$study/PREPARE_COMPLETE" ;;
   control)
     test -f "$study/PREPARE_COMPLETE"
-    env_for
+    env_for "$root"
     python3 -B "$repo/scripts/rev4_featpot/byc_cells.py" run --arm mono:thr:mp32 --base-spec "$fx1_spec" \
       --cols "$study/frozen_configuration/cols_c.txt" --label Mlic --folds kadid --seeds 0 --jobs 1
     python3 -B - "$study" "$mixes" <<'PY'
@@ -78,14 +79,14 @@ if not out["pass"]:
 PY
     ;;
   cells)
-    test -f "$study/PREPARE_COMPLETE"
-    env_for
+    test -f "$study/PREPARE_COMPLETE" -a -f "$study/root/wide/frozen.json"
+    env_for "$study/root"
     python3 -B "$repo/scripts/rev4_featpot/byc_cells.py" run --arm mono:thr:mp32 --base-spec "$(fx2_spec)" \
       --cols "$study/frozen_configuration/cols_fx2.txt" --label Mlicfx2 \
       --folds kadid,tid2013,konfig,cid22_a25 --seeds 0,1,2 --jobs 12 ;;
   full)
-    test -f "$study/PREPARE_COMPLETE"
-    env_for
+    test -f "$study/PREPARE_COMPLETE" -a -f "$study/root/wide/frozen.json"
+    env_for "$study/root"
     spec="$(fx2_spec):mono:thr:mp32"
     mkdir -p "$study/full/Mlicfx2"
     pids=()
@@ -94,8 +95,8 @@ PY
       test ! -e "$dest"
       mkdir -p "$study/scratch/full_s$seed"
       TMPDIR="$study/scratch/full_s$seed" python3 -B "$repo/scripts/rev4_featpot/v2_confirm_fit.py" \
-        --root "$root" --spec "$spec" --columns "$(cat "$study/frozen_configuration/cols_fx2.txt")" \
-        --head N --seed-index "$seed" --strict-admission --data-role-decision "$root/human_role_decision.json" \
+        --root "$study/root" --spec "$spec" --columns "$(cat "$study/frozen_configuration/cols_fx2.txt")" \
+        --head N --seed-index "$seed" --strict-admission --data-role-decision "$study/root/human_role_decision.json" \
         --dest "$dest" --train-only --pack-production --e33-output-stage > "$study/full/full_s$seed.log" 2>&1 &
       pids+=($!)
     done
