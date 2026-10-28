@@ -45,10 +45,14 @@ to `imazen/zensimx` before the new repository is created.
    `zensim`.
 4. **Create the slim repository.** A new public `imazen/zensim` holding history up to `zensim-v0.2.7` with tags
    v0.1.0–v0.2.7 (packed about 0.7 MiB).
-5. **Port in small commits** on that base: the revision-7 serving path (XYB, the pyramid, the basic and v2 families at
-   revision 7, the extraction plan, `BakeScorer` over zenpredict), the two curated bakes as profiles, and legacy A
-   (October 25 direction: revision 7 plus legacy A). The public API stays additive against 0.2.7 (new profile
-   variants, no removals), checked with `cargo semver-checks`, with CHANGELOG and README.
+5. **Port by pruning, in small commits** on that base. Re-implementing revision 7 inside 0.2.7's code is not
+   realistic: the serving path (XYB, the pyramid, the basic and v2 families at revision 7, the extraction plan,
+   `BakeScorer` over zenpredict) is interwoven with the research code across about 70 modules (`zensim/src` is 5.6 MB
+   against 0.55 MB at 0.2.7). Instead, copy today's crate, delete revisions 1–6 except what legacy A needs, the research
+   families, sidecars and training hooks, keep the two curated bakes as profiles plus legacy A (October 25 direction),
+   and commit the result on top of the 0.2.7 history. Low churn means the public API: additive against 0.2.7 (new
+   profile variants, no removals), checked with `cargo semver-checks` against the 0.2.7 release, with CHANGELOG and
+   README.
 6. **Local checkouts.** Move this checkout to `~/work/zen/zensimx` and clone the new repository at
    `~/work/zen/zensim`. Path consumers then build against the slim crate; check each, since some use API that only
    exists in 0.3.0.
