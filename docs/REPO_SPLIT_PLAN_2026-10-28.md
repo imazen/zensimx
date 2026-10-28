@@ -28,6 +28,14 @@ zenmetrics (`margarine`), zenpipe (with its demo, fuzz, metadata-services and wa
 butteraugli's `margarine` experiment and imazen26-gainmap-scan. Many more use crates.io `zensim` 0.2.x or a path
 dependency on `../zensim/zensim`.
 
+**Public API today against 0.2.7** (`cargo public-api -p zensim -sss diff 0.2.7`, default features, main `0fa5afec`;
+full list in `/mnt/v/output/zensim/repo-split-20261028/public-api-diff-0.2.7-to-main-0fa5afec.txt` on dev): one
+removal (`ZensimResult::nan`), two breaking attribute changes (`#[non_exhaustive]` on `ProfileParams` and
+`ZensimError`) and about 400 added items. The additions are mostly research surface: `feature_v2` (237 lines of the
+listing), `feature_set_id` (100) and `source` (95), then `ZensimError` variants (50), `profile` (34), `Zensim` methods
+(29), `BakeScorer` (12) and the JND types (18). A low-churn slim crate restores `nan()`, drops the two attribute changes
+(or ships as 0.3.0), and keeps only what serving the new profiles needs.
+
 ## The redirect trap
 
 Renaming `imazen/zensim` to `imazen/zensimx` makes GitHub redirect the old URL, so nothing breaks at first. Creating
