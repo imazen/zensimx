@@ -8041,8 +8041,8 @@ consumed feature bits. The original pinned N1–N3 results remain the gate.
 | Pinned N1 / N2 / N3 | PASS / PASS / PASS | PASS / PASS / PASS | PASS / PASS / PASS | PASS / PASS / PASS |
 | N3 monotone ladders, fixed bar 122 | 142/144 | 141/144 | 142/144 | 141/144 |
 | C1–C6 contract, standard / ladder | PASS / PASS | PASS / PASS | PASS / PASS | PASS / PASS |
-| G-STEER | 135/135 | 134/135 | 135/135 | running |
-| Identity, 62 sources × 12 permutations | PASS | PASS, 744/744 | PASS | pending |
+| G-STEER | 135/135 | 134/135 | 135/135 | 133/135 |
+| Identity, 62 sources × 12 permutations | PASS | PASS, 744/744 | PASS | PASS, 744/744 |
 
 General fails the requirement to retain every label-free gate its counterpart
 passed. Its failed G-STEER case is `broad-10-b8`: M2
@@ -8061,3 +8061,44 @@ Every full packed model has zero global-mixture inversions. Fold and
 full mixture panels remain distinct in the local artifacts.
 Evidence: `/var/tmp/byc-fx2-20261028/stage2/`; native builds and both
 near-identity runs are archived under the corresponding tower output.
+
+### fx2 continuation gates: final result (2026-10-28)
+
+Both packed seed-0 models are certified monotone. Both pass pinned N1–N3,
+both C1–C6 grid contracts and every identity row at all 12 permutations.
+Both fail to retain the fx1 counterparts' 135/135 G-STEER result:
+general is 134/135 and codec is 133/135. Neither replaces its counterpart.
+The original models, defaults and scientific thresholds remain unchanged.
+Private statistical comparisons are recorded only in the local report
+and stage2 artifacts named above.
+
+The codec's failed cases are `city-384-20` (M2 0.9689484054224864,
+M3f 0.7953508513697161) and `girl-256-20` (M2
+0.9583791208791207, M3f 0.49977106227106216). The fixed bars are
+M2 ≥ 0.99 and M3f ≥ 0.70. Every engine feature comparison agrees.
+For both models, the 135-case steering job equals the stored fx1 job
+after removing only model bindings and the output destination.
+
+General and codec gate resource records respectively: rc0/369s,
+peak RSS 0.20GiB/0.20GiB, minimum available 44257MiB/44246MiB,
+peak load 1.89/3.10. Certification: rc0/0s, peak RSS0.03GiB,
+minimum available44637MiB, peak load1.65. These are evaluation
+resource records, not runtime benchmark measurements.
+`GATE_SCORECARD.json` and `GATE_EVIDENCE_INVENTORIES.json` retain the
+outcomes, exact model hashes and 72 evidence-file hashes under stage2.
+
+**Learnings.** Bind a candidate's actual consumed inputs at every serving
+gate, separately from its allowed training declaration. Native verdicts
+embed the producer population registry; fixing table values alone does
+not admit a new population. Preserve failed attempts, use fresh paths,
+and keep strict coverage checks. An exposed severe case with no same-source
+control has an undefined comparison; the fixed LIVE subset supports only
+one of ten cases (26 comparisons), not ten zero-inversion measurements.
+The broader runtime qualification remains unmeasured by this lane, and
+no new EVAL or holdout read is authorized or performed.
+
+Validation:121 focused Python tests,1360-script lint, four native identity
+tests and both native registry tests pass. Release builds and strict
+clippy pass on i265; the final verdict-library/binary clippy run used
+`-D warnings` (rc0/26s,peak RSS0.65GiB,minimum available23738MiB,
+peak load1.33). No CI dispatch or new model promotion is implied.

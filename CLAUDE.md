@@ -182,7 +182,7 @@ because cleanup tests or a historical training reproduction pass.
 
 ## Known Bugs
 
-* **2026-10-28 — fx2 general continuation loses one steering case.** Its packed seed-0 model passes both C1–C6 contracts and all 744 identity rows, but G-STEER is134/135 against the fx1 counterpart's135/135. Failed case broad-10-b8 has zero engine feature disagreements. Preserve the fixed gate and keep this model unadopted; evidence is under `/var/tmp/byc-fx2-20261028/stage2/gates-fx2general-run03` and the by-construction record.
+* **2026-10-28 — fx2 continuations lose steering cases.** Packed seed-0 general and codec models pass both C1–C6 contracts, all744 identity rows and monotone certification, but G-STEER is134/135 and133/135 against each fx1 counterpart's135/135. Failed cases general broad-10-b8 and codec city-384-20/girl-256-20 have zero engine feature disagreements. Preserve the fixed gate and keep both models unadopted; evidence is under `/var/tmp/byc-fx2-20261028/stage2/GATE_SCORECARD.json` and the by-construction record.
 
 * **2026-10-28 — C5 candidate extraction used the fx1 control read set.** The identity harness passed the fixed fx1 reference vector to every candidate, leaving additional fx2 inputs outside its extraction scope. Candidate identity scoring now uses each bake's declared request, checks every consumed value is finite and compares its consumed f32 bits across token permutations. The original fx1 reference checks and exact-100 score pin remain. Use the rebuilt identity binary for fx2; the frozen run03 binary remains the separate N1–N3 owner.
 
