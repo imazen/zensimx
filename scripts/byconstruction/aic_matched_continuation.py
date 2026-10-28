@@ -1712,6 +1712,35 @@ def status(path):
     print(json.dumps({k: state.get(k) for k in ("stage", "live", "logged_epochs", "followthrough", "failures", "compute_lock")}))
 
 
+def verify_run(path):
+    """Rehash a finished run's recorded evidence without changing its frozen receipts."""
+    run = path.parent
+    complete_path, inventory_path = run / "COMPLETE.json", run / "EVIDENCE_INVENTORY.json"
+    complete = json.loads(complete_path.read_text())
+    if complete["plan_sha256"] != sha(path) or complete["evidence_inventory_sha256"] != sha(inventory_path):
+        raise ValueError("completed run plan or inventory changed")
+    state = json.loads((run / "STATE.json").read_text())
+    if state["stage"] not in ("fold-diagnostic-complete", "full-complete", "omission-complete") or state["failures"]:
+        raise ValueError("run has not reached a successful terminal stage")
+    inventory = json.loads(inventory_path.read_text())
+    if not inventory or "FITS_COMPLETE.json" not in inventory:
+        raise ValueError("completed fitting evidence absent from inventory")
+    mismatches = []
+    for name, pin in inventory.items():
+        relative = Path(name)
+        if relative.is_absolute() or ".." in relative.parts:
+            raise ValueError("evidence inventory requires relative paths within its run")
+        item = run / relative
+        if not item.is_file() or sha(item) != pin:
+            mismatches.append(name)
+    if mismatches:
+        raise ValueError(f"completed run evidence changed: {mismatches}")
+    result = dict(verified=True, run=str(run), files_checked=len(inventory), plan_sha256=sha(path),
+                  complete_sha256=sha(complete_path), evidence_inventory_sha256=sha(inventory_path))
+    print(json.dumps(result))
+    return result
+
+
 def active_fit_processes(pid):
     """Use the shared threaded-child walker and exact executable names, never command-line pattern matching."""
     children = []
@@ -1964,7 +1993,7 @@ if __name__ == "__main__":
         p.add_argument("--trainer", type=Path, required=True)
         p.add_argument("--meta-tool", type=Path, required=True)
     for mode in ("queue", "run", "status", "fold-queue", "fold-run", "fold-status", "omission-run", "full-run",
-                 "reproduction-run", "reproduction-status"):
+                 "reproduction-run", "reproduction-status", "verify-run"):
         sub.add_parser(mode).add_argument("plan", type=Path)
     p = sub.add_parser("fx2-plan", help="registered fx2 source-fold plans after both controls and all full seeds pass")
     p.add_argument("run", type=Path)

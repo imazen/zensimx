@@ -173,6 +173,28 @@ class PlanConfiguration(unittest.TestCase):
 
 
 class PriorityWait(unittest.TestCase):
+    def test_finished_inventory_rehashes_content_and_refuses_nonterminal_runs(self):
+        with tempfile.TemporaryDirectory(dir=Path.home() / "tmp") as tmp:
+            root = Path(tmp)
+            plan, fits, inventory = [root / n for n in ("PLAN.json", "FITS_COMPLETE.json", "EVIDENCE_INVENTORY.json")]
+            plan.write_text("{}")
+            fits.write_text("invented fitting receipt")
+            inventory.write_text(json.dumps({fits.name: owner.sha(fits)}))
+            (root / "COMPLETE.json").write_text(json.dumps(dict(plan_sha256=owner.sha(plan),
+                evidence_inventory_sha256=owner.sha(inventory))))
+            self.state(root, stage="full-complete")
+            self.assertTrue(owner.verify_run(plan)["verified"])
+            self.state(root, stage="fit-full")
+            with self.assertRaisesRegex(ValueError, "terminal stage"):
+                owner.verify_run(plan)
+            self.state(root, stage="full-complete")
+            fits.write_text("changed")
+            with self.assertRaisesRegex(ValueError, "evidence changed"):
+                owner.verify_run(plan)
+            inventory.write_text("{}")
+            with self.assertRaisesRegex(ValueError, "inventory changed"):
+                owner.verify_run(plan)
+
     def test_progress_includes_full_logs_and_accepts_completed_full_and_omission_workers(self):
         with tempfile.TemporaryDirectory(dir=Path.home() / "tmp") as tmp:
             root = Path(tmp)

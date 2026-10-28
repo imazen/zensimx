@@ -7868,3 +7868,12 @@ pair table. Source, model, image and native-tool hashes are bound before
 pixel scoring under the shared compute lock. Raw network scores retain the
 existing severe-above-less-damaged comparison. This diagnostic does not
 select a model. Scope and lock controls pass with the focused owner tests.
+
+### Completed continuation inventory audit (2026-10-28)
+
+`just aic-matched-continuation verify-run PLAN` rehashes the recorded evidence
+of a successful terminal fold, full-data or omission run. It checks the plan
+and inventory against COMPLETE.json and refuses changed or missing files.
+The audit prints a separate receipt, preserving the run's original inventory.
+Tests cover changed content, changed inventories and unfinished controllers;
+the focused owner tests and script lint pass.
