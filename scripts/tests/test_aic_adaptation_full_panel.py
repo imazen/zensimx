@@ -4,10 +4,67 @@ import os
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 import numpy as np
 
 from scripts.byconstruction import aic_adaptation_full_panel as owner
+
+
+class E21SubsetInputs(unittest.TestCase):
+    def test_compression_cohorts_reuse_the_established_type_memberships(self):
+        np.testing.assert_array_equal(owner.compression_mask("kadid", ["kadid_08", "kadid_09", "kadid_10"]),
+                                      [False, True, True])
+        np.testing.assert_array_equal(owner.compression_mask("tid2013", ["tid_09", "tid_10", "tid_11", "tid_21"]),
+                                      [False, True, True, True])
+        np.testing.assert_array_equal(owner.compression_mask("konfig", ["jpeg2000", "other"]), [True, False])
+        np.testing.assert_array_equal(owner.compression_mask("cid22_a25", ["a", "b"]), [True, True])
+
+    def test_full_predictions_bind_to_their_completed_model_and_inventory(self):
+        with tempfile.TemporaryDirectory(dir=Path.home() / "tmp") as tmp:
+            root = Path(tmp)
+            plan = dict(schema="aic-share-full-plan-v1", arms=dict(XrefAIC256="mixed-aic256-xref"), packed_epoch=59)
+            (root / "PLAN.json").write_text(json.dumps(plan))
+            fits, inventory = [], {}
+            for seed in range(3):
+                model = root / "full/XrefAIC256" / f"full_s{seed}/pack_e059/refit/production-f16.bin"
+                model.parent.mkdir(parents=True)
+                model.write_bytes(f"invented seed {seed}".encode())
+                fits.append(dict(seed=seed, packed=dict(packed_model_sha256=owner.sha(model))))
+                for dataset in owner.FOLDS:
+                    p = root / "panels/predictions" / f"XrefAIC256e59|s{seed}|{dataset}.tsv"
+                    p.parent.mkdir(parents=True, exist_ok=True)
+                    p.write_text("row_idx\tpred\n0\t1\n1\t2\n")
+                    inventory[str(p.relative_to(root))] = owner.sha(p)
+            (root / "FITS_COMPLETE.json").write_text(json.dumps(dict(plan_sha256=owner.sha(root / "PLAN.json"), cells=fits)))
+            (root / "EVIDENCE_INVENTORY.json").write_text(json.dumps(inventory))
+            (root / "COMPLETE.json").write_text(json.dumps(dict(plan_sha256=owner.sha(root / "PLAN.json"),
+                evidence_inventory_sha256=owner.sha(root / "EVIDENCE_INVENTORY.json"))))
+            group = dict(name="full", kind="full", run=str(root), model="candidate")
+            rows, inputs = owner.e21_group(group)
+            self.assertEqual(len(rows), 12)
+            self.assertEqual({r["scope"] for r in rows}, {"in sample"})
+            self.assertEqual({r["seed"] for r in rows}, {0, 1, 2})
+            with self.assertRaisesRegex(ValueError, "omission plan"):
+                owner.e21_group(dict(group, kind="omission"))
+            prediction = Path(rows[0]["prediction"])
+            self.assertIn(str(prediction), inputs)
+            prediction.write_text("row_idx\tpred\n0\t100\n1\t200\n")
+            with self.assertRaisesRegex(ValueError, "source prediction changed"):
+                owner.e21_group(group)
+
+    def test_paired_contrasts_cannot_mix_fitted_and_omitted_populations(self):
+        with tempfile.TemporaryDirectory(dir=Path.home() / "tmp") as tmp:
+            root = Path(tmp)
+            config = root / "config.json"
+            config.write_text(json.dumps(dict(groups=[dict(name="full"), dict(name="omission")],
+                                             contrasts=[["full", "omission"]])))
+            with patch.object(owner, "e21_group", side_effect=[
+                    ([dict(group="full", scope="in sample")], {}),
+                    ([dict(group="omission", scope="out of sample")], {})]):
+                with self.assertRaisesRegex(ValueError, "cannot form a paired contrast"):
+                    owner.e21_plan(config, root / "report")
+            self.assertFalse((root / "report").exists())
 
 
 class FullPanelIntegrity(unittest.TestCase):

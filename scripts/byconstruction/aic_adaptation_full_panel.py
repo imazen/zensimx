@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 import json
 import os
 from pathlib import Path
+import re
 import subprocess
 import sys
 import time
@@ -160,6 +161,200 @@ def pixel_mixtures(fold, source, output, models, save):
             raise ValueError("full-panel mixture image changed")
         save(f"{name}.json", dict(per_cell=mixture_test.report(dest), images_sha256=pins,
             scorer_sha256=sha(Path(fold["bin"]) / "score_pair_with_bake")))
+
+
+def compression_mask(dataset, types):
+    """The dashboard's existing compression cohort, without a second type definition."""
+    import numpy as np
+    from aic_dashboard_data import CODEC_TYPES
+    values = np.asarray(types)
+    return np.ones(len(values), bool) if CODEC_TYPES[dataset] is None else np.isin(values, CODEC_TYPES[dataset])
+
+
+def e21_group(group):
+    """Bind existing completed full/omission predictions to their actual model receipts."""
+    from aic_adaptation import initial_cell
+    directory, kind = Path(group["run"]), group["kind"]
+    inputs, records = {}, []
+    if kind not in ("full", "omission", "initial"):
+        raise ValueError("E21 group must be full, omission or initial")
+    if kind != "initial":
+        plan_file, complete_file = directory / "PLAN.json", directory / "COMPLETE.json"
+        plan, complete = json.loads(plan_file.read_text()), json.loads(complete_file.read_text())
+        if complete["plan_sha256"] != sha(plan_file):
+            raise ValueError("source fit completion differs from its plan")
+        inventory = directory / "EVIDENCE_INVENTORY.json"
+        if sha(inventory) != complete["evidence_inventory_sha256"]:
+            raise ValueError("source fit inventory differs")
+        source_inventory = json.loads(inventory.read_text())
+        fits_file = directory / "FITS_COMPLETE.json"
+        fits = json.loads(fits_file.read_text())
+        if fits["plan_sha256"] != sha(plan_file):
+            raise ValueError("source fit records differ from the plan")
+        inputs.update({str(p): sha(p) for p in (plan_file, complete_file, inventory, fits_file)})
+        if kind == "full" and plan["schema"] != "aic-share-full-plan-v1":
+            raise ValueError("full-data E21 group requires its full-data plan")
+        if kind == "omission" and plan["schema"] != "aic-share-omission-plan-v1":
+            raise ValueError("omission E21 group requires its omission plan")
+    for seed in (0, 1, 2):
+        for dataset in FOLDS:
+            if kind == "initial":
+                cell = directory / f"without_{dataset}_s{seed}"
+                result = json.loads((cell / "result.json").read_text())
+                row = initial_cell(cell, dataset, seed, spec=result["spec"])
+                inputs.update(row["input_sha256"])
+                model, prediction = cell / "refit/last.bin", cell / f"pred_{dataset}.tsv"
+                scope = "out of sample"
+            elif kind == "full":
+                label = group["model"]
+                if label == "candidate":
+                    (arm, _), = plan["arms"].items()
+                    epoch = plan["packed_epoch"]
+                    label = f"{arm}e{epoch}"
+                    rows = [r for r in fits["cells"] if r["seed"] == seed]
+                    if len(rows) != 1:
+                        raise ValueError("one completed full fit per seed required")
+                    model = directory / "full" / arm / f"full_s{seed}/pack_e{epoch:03d}/refit/production-f16.bin"
+                    expected = rows[0]["packed"]["packed_model_sha256"]
+                else:
+                    baseline = plan["baselines"][f"{label}|s{seed}"]
+                    model, expected = Path(baseline["path"]), baseline["sha256"]
+                if sha(model) != expected:
+                    raise ValueError("packed full model changed")
+                prediction = directory / "panels/predictions" / f"{label}|s{seed}|{dataset}.tsv"
+                scope = "in sample"
+            else:
+                (arm, _), = plan["arms"].items()
+                epoch = group["epoch"]
+                if epoch not in plan["checkpoints"]:
+                    raise ValueError("omission report must use a registered checkpoint")
+                rows = [r for r in fits["cells"] if r["seed"] == seed and r["fold"] == dataset]
+                if len(rows) != 1:
+                    raise ValueError("one completed omission fit per dataset and seed required")
+                model = directory / "cells" / arm / f"without_{dataset}_s{seed}/ckpt/ckpt_epoch{epoch:03d}.bin"
+                if sha(model) != rows[0]["checkpoints"][str(epoch)]:
+                    raise ValueError("omission checkpoint changed")
+                prediction = directory / "cells" / f"{arm}e{epoch}" / f"without_{dataset}_s{seed}/pred_{dataset}.tsv"
+                scope = "out of sample"
+            if kind != "initial" and sha(prediction) != source_inventory[str(prediction.relative_to(directory))]:
+                raise ValueError("completed source prediction changed")
+            inputs.update({str(model): sha(model), str(prediction): sha(prediction)})
+            records.append(dict(group=group["name"], seed=seed, dataset=dataset, scope=scope,
+                                model=str(model), prediction=str(prediction)))
+    return records, inputs
+
+
+def e21_plan(config_path, output):
+    """Freeze the E21-only report's exact model/prediction/metadata/native-panel inputs."""
+    import aic_panel as legacy
+    if output.exists():
+        raise ValueError("preserve existing E21 report attempts")
+    config = json.loads(config_path.read_text())
+    groups = config["groups"]
+    names = [g["name"] for g in groups]
+    if (len(set(names)) != len(names) or not groups
+            or any(not re.fullmatch(r"[A-Za-z0-9_-]+", n) for n in names)):
+        raise ValueError("distinct nonempty report groups required")
+    records, inputs = [], {str(config_path): sha(config_path)}
+    for group in groups:
+        rows, pins = e21_group(group)
+        records += rows
+        inputs.update(pins)
+    for candidate, baseline in config["contrasts"]:
+        if candidate not in names or baseline not in names:
+            raise ValueError("contrast group absent")
+        scopes = {r["scope"] for r in records if r["group"] in (candidate, baseline)}
+        if len(scopes) != 1:
+            raise ValueError("in-sample and out-of-sample groups cannot form a paired contrast")
+    source = Path(__file__).resolve().parent
+    files = [legacy.E34, legacy.DVIFM / "rows.parquet", legacy.DVIFM / "dvifm.tsv",
+             source / "type_bias.py", source / "aic_dashboard_data.py", source / "aic_panel.py",
+             Path(config["panel_binary"]), *map(Path, source_pins())]
+    inputs.update({str(p): sha(p) for p in files})
+    output.mkdir(parents=True)
+    write(output / "PLAN.json", dict(schema="aic-e21-subset-report-plan-v1", records=records,
+          contrasts=config["contrasts"], groups=groups, panel_binary=config["panel_binary"],
+          metadata=str(legacy.E34), input_sha256=inputs, source_sha256=source_pins(),
+          public_test_opened=False, eval_read=False), fresh=True)
+
+
+def e21_run(path, output):
+    """All-type/compression-only E21 panels through native zenstats, plus the existing type-bias owner."""
+    import numpy as np
+    import pandas as pd
+    import aic_panel as legacy
+    from subjective_training_leg import read_train_panel
+    from lib.zen_stats import panel_batch
+    if not compute_lock(os.getpid())["held_by_worker_ancestor"]:
+        raise ValueError("E21 panels require the shared compute lock")
+    value = json.loads(path.read_text())
+    if value["schema"] != "aic-e21-subset-report-plan-v1" or value["source_sha256"] != source_pins():
+        raise ValueError("E21 report owner changed")
+    for name, pin in value["input_sha256"].items():
+        if sha(name) != pin:
+            raise ValueError(f"E21 report input changed: {name}")
+    output.mkdir()
+    os.environ.update(BYC_LABEL_LEDGER_DIR=str(output / "label-reads"), ZEN_PANEL_BIN=value["panel_binary"],
+                      OPENBLAS_NUM_THREADS="1", OMP_NUM_THREADS="1", RAYON_NUM_THREADS="1", TMPDIR=str(Path.home() / "tmp"))
+    state = dict(stage="E21-subset-panels", worker=process_snapshot(os.getpid()), failures=[], plan_sha256=sha(path))
+    write(output / "STATE.json", state, fresh=True)
+    try:
+        metadata = {d["name"]: d for d in read_train_panel(Path(value["metadata"]))["datasets"]}
+        if set(metadata) != set(FOLDS):
+            raise ValueError("E21 metadata population differs")
+        _, types = legacy.dvifm_e21()
+        jobs, rows = [], []
+        aliases = output / "cells"
+        for record in value["records"]:
+            group, seed, dataset = record["group"], record["seed"], record["dataset"]
+            d = metadata[dataset]
+            if group in d["predictions"]:
+                raise ValueError("report group collides with a cached metadata prediction")
+            target = np.asarray(d["target"], float) * float(d["orientation"])
+            frame = pd.read_csv(record["prediction"], sep="\t")
+            prediction = frame.pred.to_numpy(float)
+            if (list(frame.columns) != ["row_idx", "pred"] or len(prediction) != len(target)
+                    or not np.array_equal(frame.row_idx, np.arange(len(target))) or not np.isfinite(prediction).all()
+                    or not np.isfinite(target).all() or len(types[dataset]) != len(target)):
+                raise ValueError("E21 prediction order/coverage differs")
+            link = aliases / group / f"without_{dataset}_s{seed}" / f"pred_{dataset}.tsv"
+            link.parent.mkdir(parents=True)
+            link.symlink_to(Path(record["prediction"]).resolve())
+            for subset, mask in (("all", np.ones(len(target), bool)), ("compression", compression_mask(dataset, types[dataset]))):
+                if not mask.any():
+                    raise ValueError("registered E21 subset is empty")
+                jobs.append((f"{group}|s{seed}|{dataset}|{subset}", prediction[mask], target[mask]))
+                rows.append(dict(group=group, seed=seed, dataset=dataset, subset=subset,
+                                 scope=record["scope"], rows=int(mask.sum())))
+        stats = panel_batch(jobs, stats="full")
+        checked_statistics(jobs, stats)
+        for row, result in zip(rows, stats, strict=True):
+            row["statistics"] = result
+        write(output / "MODEL_PANELS.json", finite_json(rows), fresh=True)
+        by_model = {(r["group"], r["seed"], r["dataset"], r["subset"]): r["statistics"] for r in rows}
+        paired = {}
+        for candidate, baseline in value["contrasts"]:
+            for dataset in FOLDS:
+                for subset in ("all", "compression"):
+                    paired[f"{candidate}-minus-{baseline}|{dataset}|{subset}"] = {m: seed_delta(
+                        {s: by_model[candidate, s, dataset, subset][m] for s in (0, 1, 2)},
+                        {s: by_model[baseline, s, dataset, subset][m] for s in (0, 1, 2)}) for m in METRICS}
+        write(output / "PAIRED_SEEDS.json", finite_json(paired), fresh=True)
+        with (output / "type-bias.log").open("x") as log:
+            subprocess.run([sys.executable, "-B", str(Path(__file__).with_name("type_bias.py")),
+                *[g["name"] for g in value["groups"]], "--out", str(output / "TYPE_BIAS.json")],
+                env=dict(os.environ, BYC_CELLS=str(aliases)), stdout=log, stderr=subprocess.STDOUT, check=True)
+        inventory = {str(p.relative_to(output)): sha(p) for p in sorted(output.rglob("*"))
+                     if p.is_file() and p.name != "STATE.json"}
+        write(output / "EVIDENCE_INVENTORY.json", inventory, fresh=True)
+        write(output / "COMPLETE.json", dict(plan_sha256=sha(path),
+              evidence_inventory_sha256=sha(output / "EVIDENCE_INVENTORY.json"), eval_read=False), fresh=True)
+        state.update(stage="E21-subset-panels-complete", checked_utc=datetime.now(timezone.utc).isoformat())
+        write(output / "STATE.json", state)
+    except BaseException as error:
+        state.update(stage="failed", failures=[repr(error)])
+        write(output / "STATE.json", state)
+        raise
 
 
 def run(path, output):
@@ -336,8 +531,8 @@ def run(path, output):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("mode", choices=("queue", "run", "status"))
+    parser.add_argument("mode", choices=("queue", "run", "status", "e21-plan", "e21-run"))
     parser.add_argument("plan", type=Path)
     parser.add_argument("output", type=Path)
     args = parser.parse_args()
-    globals()[args.mode](args.plan.resolve(), args.output.resolve())
+    globals()[args.mode.replace("-", "_")](args.plan.resolve(), args.output.resolve())

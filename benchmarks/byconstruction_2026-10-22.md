@@ -7829,3 +7829,14 @@ two-arm replay pass. It verifies the three full seeds, their certificates and de
 omission cells against the fx2 root. The plan binds the exact spec, column order, initial checkpoints and prerequisite
 hashes. Full-data and omission descendants use the existing plan/run owners. All new AIC-2026 statistics remain only
 in the local run artifacts and `~/tmp/handoff/fx2-continuations/report.md`.
+
+
+### fx2 E21 report bindings (2026-10-28)
+
+The full-panel owner now provides `e21-plan` / `e21-run` for completed full-data, omission and initial-cell predictions.
+It requires source completion receipts, model hashes and prediction hashes from the completed source inventories.
+Full-data evidence remains in sample; omission and initial omission cells remain out of sample. A paired contrast
+cannot cross those scopes. All-type and compression-only statistics use the existing native panel; compression
+memberships come from the dashboard's existing CODEC_TYPES, and codec-bias spread comes from the existing type_bias
+owner. It reads only the four E21 TRAIN populations; it does not open AIC labels or EVAL tables. Outputs are separately
+pinned reports, leaving the frozen fit runs unchanged. This entry describes tooling, not an fx2 result.
