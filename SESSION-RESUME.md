@@ -31,6 +31,15 @@ work. The September chronology below is retained history, including its old
 paused-goal statement. It is not the current queue. No new Mlic/AIC recipe has
 been adopted as the serving model, and the seamless HDR frontend has not started.
 
+### State at 02:00 UTC, 2026-10-28
+
+Both curated models are complete and pass every label-free gate (record, "Label-free gates for the two curated
+models"): general ×256 + rehearsal e59 (`mlic-aic-fulldata-xrefaic256e59-20261027-run01`, seed-0 bake `7642eff4…`) and
+codec-only AIC-only e29 (`mlic-aic-fulldata-aiconlye29-20261027-run01`, seed-0 bake `63a1c5d3…`). Dev is idle. Waiting on
+the owner: D1 (which model is the revision-7 default; the suggestion is the general model as default and the codec model
+as a separate profile), the frozen EVAL read for these finalists, and the runtime gate's hardware. The seamless HDR
+frontend starts after adoption.
+
 ### State at 01:35 UTC, 2026-10-28
 
 Two models, as the owner asked (2026-10-27): a general model and a codec-only model.
