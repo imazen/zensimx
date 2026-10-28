@@ -8102,3 +8102,42 @@ tests and both native registry tests pass. Release builds and strict
 clippy pass on i265; the final verdict-library/binary clippy run used
 `-D warnings` (rc0/26s,peak RSS0.65GiB,minimum available23738MiB,
 peak load1.33). No CI dispatch or new model promotion is implied.
+
+### Chroma-only JPEG ladders with an SSIMULACRA2 teacher: registration (2026-10-28, owner request, before any encode)
+
+Owner, 2026-10-28: "add test data where we override zenjpeg so we subsample chroma at increasingly worse quant levels
+while keeping luma fixed, high. synthetic data, cid 22 and scaled or cropped imazen26. ssim2 teacher. representative
+samples of different image types - make sure all show ssim2 differences", and "also use some xyb jpegs, same chroma only
+thing". Why now: the fx2 continuations (above) were offered the 82 full-resolution chroma inputs and the codec model used
+two of them; no training leg isolates chroma damage at fixed luma, so the inputs had little to learn from.
+
+**Sources** (each keeps its source's split; derivatives inherit it):
+- *SafeSyn tiles:* the SafeSyn leg's own TRAIN source tiles (`safesyn:` references of the Mlic root), a stratified subset.
+- *CID22 training references:* the oracle leg's 201 training references (never the 49 human-rated references).
+- *imazen-26:* the canonical png-v3 copy (`~/work/zen/imazen-26-png-v3`), the k-means representatives of the train
+  bucket (`manifests/imazen26_representatives_K500_even_2026-06-18.tsv`, all 21 content classes), as crops and
+  downscales (Mitchell, never upscaled) at several sizes; validate-bucket representatives as the held-out diagnostic.
+
+**Families** (zenjpeg through `zenmetrics sweep`, luma fixed at a high setting, only chroma moves):
+- `ycc444` and `ycc420`: `plane_tables` with the luma table fixed (all-ones or a fine multiplier, chosen in the pilot)
+  and Cb = Cr multipliers on a log ladder (about 14 rungs, 0.5 to 64).
+- `xyb`: XYB colour mode (B quarter-resolution, the default) at a fixed high quality with `chroma_distance_scales`
+  [X, B] = [s, s] on a ladder over the knob's allowed range (0.1 to 5.0). If the pilot shows that range does not reach
+  clear SSIMULACRA2 damage, the range limit is reported to the owner before any extension of zenmetrics or zenjpeg.
+
+**Teacher and admission (my bars).** SSIMULACRA2 from the same implementation and build that labelled the SafeSyn leg.
+Within each (source, family) ladder, a rung is kept only if its score is at least 1.0 below the previously kept rung; the
+ladder stops at the first rung that does not fall, so the desaturation reversal (CHROMAQ: SSIMULACRA2 scores a grey image
+above posterized colour in 26 of 32 images) never enters. A ladder with fewer than three kept rungs is dropped (for
+example a near-grey source). Admission counts are reported per content class; a class that loses most of its ladders is
+reported, not hidden.
+
+**Use.** A teacher leg like SafeSyn's (target = SSIMULACRA2, within-source ranking plus its scale), added to a new root
+derived from the Mlic root; features from the identical pinned revision-7 extractor build as the Mlic root's banks (no
+column mixing across builds); encoded bytes persisted content-addressed. Arms: Mlic + chroma leg with fx1 and with fx2,
+against Mlic and Mlicfx2, then the stage-2 continuations and the same gates as the fx2 study. The validate-bucket
+ladders are a reported diagnostic (within-ladder SROCC against SSIMULACRA2, and against the imazen butteraugli and CVVDP
+ports as independent judges).
+
+**Compute.** Encodes and scoring through zenfleet on the worker hosts (i265, i270, r3500, r3800x); extraction likewise;
+training on dev only. Nothing reads EVAL or holdout labels.
