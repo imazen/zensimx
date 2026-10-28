@@ -31,6 +31,21 @@ work. The September chronology below is retained history, including its old
 paused-goal statement. It is not the current queue. No new Mlic/AIC recipe has
 been adopted as the serving model, and the seamless HDR frontend has not started.
 
+### State at 07:00 UTC, 2026-10-28: the repository split
+
+The owner approved the split at about 04:00 UTC (branch at zensim-v0.2.7; `zensim` stays the package name here with
+`publish = false`; the slim crate ships as 0.3.0; scope = revision-7 general and codec profiles plus legacy A). Done:
+this repository is now **imazen/zensimx** (checkout `~/work/zen/zensimx`, tag `research-before-split`); a new public
+**imazen/zensim** holds the 0.2.7 history, its 16 releases and a no-force-push rule (checkout `~/work/zen/zensim`);
+every git and path consumer points at zensimx (execution log in `docs/REPO_SPLIT_PLAN_2026-10-28.md`). The slim crate
+is draft PR imazen/zensim#1 (branch `slim-0.3.0`, assigned to lilith): profiles `E` (= latest(), the ×256 + rehearsal
+e59 model) and `ECodec` (= codec_target(), AIC-only e29), legacy `A`, the 0.2.7 previews; public API = 0.2.7's plus
+about 25 items; parity 6,930/6,930 rows against `zensim/examples/split_parity_golden.rs` here; tests pass; timing within
+1% of this crate on i265. Open in the PR: the owner's API and naming review, the AIC-2026 training-data disclosure,
+release blockers (zenpredict 0.2.0 on crates.io, README approval), and the remaining internal prune (research
+families' runtime structures, formula revisions 2-6), which continues on the branch with the parity gate after every
+step. Tooling: `scripts/split/`.
+
 ### State at 03:45 UTC, 2026-10-28
 
 Done: the frozen EVAL read with paired-vs-Mlic tables and zero-shot SSIMULACRA2 / butteraugli peers on every selection
