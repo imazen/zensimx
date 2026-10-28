@@ -7799,6 +7799,11 @@ of XrefAIC256 and AICOnly using their stored plans, initial models and tables. T
 `zentrain.repro` from copies. A failed control stops the study before interpretation. No fx2 continuation result is
 claimed by this implementation entry.
 
+Explicit source-point plans also carry their spec, columns, root and all three initial models into the full-data and
+omission plan builders. The full-data TRAIN anchor comes from that root; initial packed models appear as paired
+baselines. Descendants verify inherited prerequisite hashes before binding them, so a changed control cannot be
+silently repinned. Historical fx1 point paths and defaults remain available.
+
 
 ### fx2 continuation supervision and result destination (2026-10-28)
 

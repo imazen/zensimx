@@ -106,6 +106,16 @@ def execution_fold(value, run):
     return fold
 
 
+def configuration_inputs(configuration):
+    """A descendant may inherit prerequisite pins; it must never silently repin changed inputs."""
+    if not configuration:
+        return []
+    for path, pin in configuration["input_sha256"].items():
+        if sha(path) != pin:
+            raise ValueError(f"explicit configuration prerequisite changed: {path}")
+    return [Path(p) for p in configuration["input_sha256"]]
+
+
 def freeze(run, commit, trainer, meta_tool, fold):
     """Fresh run directory with the pushed source snapshot, the new trainer and the fold study's frozen tools."""
     if run.exists():
@@ -770,6 +780,10 @@ RECIPE_FT_CELLS = Path("/mnt/v/output/zensim/mlic-aic-adaptation-20261027-run03/
 
 def recipe_point(point):
     """(recipe, {seed: full record}, root) for a stage B recipe point; (None, None, None) for an Mlic point."""
+    if point.get("input_configuration"):
+        if set(point["initial"]) != {str(s) for s in SEEDS}:
+            raise ValueError("explicit continuation inputs require all three initial seeds")
+        return None, point["initial"], Path(point["root"])
     if point.get("schema") != RECIPE_SCHEMA:
         return None, None, None
     recipe, initial, roots = point["recipe"], {}, set()
@@ -852,6 +866,9 @@ def seven_fold_plan(run, commit, trainer, meta_tool, schema, protocol, registrat
     columns = columns or fold["columns"]
     declaration = declaration_binding(spec, columns)
     declaration["path"] = str(run / "source/scripts/rev4_featpot" / Path(declaration["path"]).name)
+    inputs += configuration_inputs(input_configuration)
+    if input_configuration and extra.get("point"):
+        inputs.append(Path(extra["point"]["run"]) / "PLAN.json")
     inputs += [Path(columns), root / "human_role_decision.json", root / "wide/frozen.json", Path(declaration["path"])]
     value = dict(schema=schema, protocol=protocol, registration=registration, **frozen, arms=dict(arms),
                  seeds=list(seeds), source_folds=list(SOURCE_FOLDS), epochs=EPOCHS, checkpoints=list(checkpoints),
@@ -1281,7 +1298,9 @@ def omission_plan(run, commit, trainer, meta_tool, point_run, arm, after_run):
     from aic_adaptation import initial_cell
     point = json.loads((Path(point_run) / "PLAN.json").read_text())
     codec_evidence = (str(Path(point_run)), arm) in CODEC_EVIDENCE_POINTS
-    schemas = (FRONTIER_SCHEMA, RECOVERY_SCHEMA, RECIPE_SCHEMA, XREF_SCHEMA, *((FOLD_SCHEMA,) if codec_evidence else ()))
+    explicit = point.get("input_configuration")
+    schemas = (FRONTIER_SCHEMA, RECOVERY_SCHEMA, RECIPE_SCHEMA, XREF_SCHEMA,
+               *((FOLD_SCHEMA,) if codec_evidence else ()), *((SEEDS_SCHEMA,) if explicit else ()))
     if point.get("schema") not in schemas or arm not in point["arms"]:
         raise ValueError("the advanced point must be a frontier, recovery, rehearsal or recipe arm, or a codec-evidence arm")
     recipe, _, recipe_root = recipe_point(point)
@@ -1296,14 +1315,18 @@ def omission_plan(run, commit, trainer, meta_tool, point_run, arm, after_run):
     fold = json.loads(Path(INPUTS["fold_plan"][0]).read_text())
     authority = json.loads(Path(INPUTS["aic_authority"][0]).read_text())
     root = recipe_root or Path(fold["common_root"])
-    cell_dir = RECIPE_CELLS[recipe] / recipe if recipe else MLIC_CELLS / "Mlic"
+    spec, columns = point.get("spec", SPEC), point.get("columns", fold["columns"])
+    cell_dir = (Path(point["initial_cells"]) if explicit else
+                RECIPE_CELLS[recipe] / recipe if recipe else MLIC_CELLS / "Mlic")
     baselines = dict(Mlic=str(MLIC_CELLS), MlicFT16x8=str(FT_CELLS))
+    if explicit:
+        baselines[point["initial_label"]] = str(cell_dir.parent)
     if recipe:  # the recipe's own omission cells and its common 16x8 continuation
         baselines.update({recipe: str(RECIPE_CELLS[recipe]), f"{recipe}FT16x8": str(RECIPE_FT_CELLS)})
     from subjective_training_leg import linked_subset_exclusions
-    cells, inputs, tables = {}, [Path(fold["columns"]), root / "human_role_decision.json", root / "wide/frozen.json"], {}
+    cells, inputs, tables = {}, [Path(columns), root / "human_role_decision.json", root / "wide/frozen.json"], {}
     for name, seed in omission_cells():
-        cell = initial_cell(cell_dir / f"without_{name}_s{seed}", name, seed)
+        cell = initial_cell(cell_dir / f"without_{name}_s{seed}", name, seed, spec=spec)
         selection = json.loads((cell_dir / f"without_{name}_s{seed}/DATASET_GROUP_SELECTION.json").read_text())
         if Path(selection["root"]) != root:
             raise ValueError(f"{name} s{seed}: omission cell trained on another root")
@@ -1314,12 +1337,18 @@ def omission_plan(run, commit, trainer, meta_tool, point_run, arm, after_run):
         cells[f"{name}_s{seed}"] = dict(cell, aic_fold=k, exclusions=list(linked_subset_exclusions(root, name)))
         inputs += [*map(Path, cell["input_sha256"]), table, Path(f"{table}.manifest.json")]
     frozen = freeze(run, commit, trainer, meta_tool, fold)
+    declaration = declaration_binding(spec, columns)
+    declaration["path"] = str(run / "source/scripts/rev4_featpot" / Path(declaration["path"]).name)
+    inputs += [Path(declaration["path"]), Path(point_run) / "PLAN.json"]
+    inputs += configuration_inputs(explicit)
     value = dict(schema=OMISSION_SCHEMA, protocol=protocol,
-                 registration=(RECIPE_C_REGISTRATION if recipe else CODEC_EVIDENCE_REGISTRATION if codec_evidence
+                 registration=(point["registration"] if explicit else
+                               RECIPE_C_REGISTRATION if recipe else CODEC_EVIDENCE_REGISTRATION if codec_evidence
                                else FRONTIER_REGISTRATION), **frozen, recipe=recipe,
                  arms={arm: population}, aic_weights={arm: weight}, seeds=list(SEEDS), e21_folds=list(FOLDS),
-                 epochs=EPOCHS, checkpoints=list(FRONTIER_CHECKPOINTS), lr=LR, spec=SPEC, root=str(root),
-                 columns=fold["columns"], cells=cells, aic_tables=tables, baselines=baselines,
+                 epochs=EPOCHS, checkpoints=list(FRONTIER_CHECKPOINTS), lr=LR, spec=spec, root=str(root),
+                 columns=columns, cells=cells, aic_tables=tables, baselines=baselines, derived_inputs=declaration,
+                 **({"input_configuration": explicit} if explicit else {}),
                  point=dict(run=str(point_run), arm=arm),
                  phases=two_phases(point, arm, population),
                  after_run=str(after_run), input_sha256={str(p): sha(p) for p in inputs},
@@ -1476,7 +1505,9 @@ CODEC_MODEL_POINT = (str(FRONTIER_REUSED_RUN), "AICOnly", 29)
 def full_plan(run, commit, trainer, meta_tool, point_run, arm, epoch, after_run):
     point = json.loads((Path(point_run) / "PLAN.json").read_text())
     codec_model = (str(Path(point_run)), arm, epoch) == CODEC_MODEL_POINT
-    schemas = (FRONTIER_SCHEMA, RECOVERY_SCHEMA, XREF_SCHEMA, RECIPE_SCHEMA, *((FOLD_SCHEMA,) if codec_model else ()))
+    explicit = point.get("input_configuration")
+    schemas = (FRONTIER_SCHEMA, RECOVERY_SCHEMA, XREF_SCHEMA, RECIPE_SCHEMA,
+               *((FOLD_SCHEMA,) if codec_model else ()), *((SEEDS_SCHEMA,) if explicit else ()))
     if point.get("schema") not in schemas or arm not in point["arms"] or epoch not in FRONTIER_CHECKPOINTS:
         raise ValueError("the advanced point must be a frontier, recovery, rehearsal or recipe arm at a studied epoch, "
                          "or the codec model")
@@ -1486,6 +1517,11 @@ def full_plan(run, commit, trainer, meta_tool, point_run, arm, epoch, after_run)
     fits = json.loads(Path(INPUTS["full_fits"][0]).read_text())
     baselines = {}
     for seed in SEEDS:
+        if explicit:
+            baseline = Path(initial[str(seed)]["directory"]) / "refit/production-f16.bin"
+            if sha(baseline) != initial[str(seed)]["packed_sha256"]:
+                raise ValueError("explicit packed initial model changed")
+            baselines[f"Initial|s{seed}"] = str(baseline)
         if recipe:  # the recipe's own packed full model and its common 16x8 continuation
             own = initial[str(seed)]
             ft = [r for r in fits["continued"] if r["arm"] == f"{recipe}FT16x8" and r["seed"] == seed]
@@ -1509,9 +1545,11 @@ def full_plan(run, commit, trainer, meta_tool, point_run, arm, epoch, after_run)
     if sha(anchor) != leg["sha256"]:
         raise ValueError("TRAIN CID22 calibration anchor differs")
     seven_fold_plan(run, commit, trainer, meta_tool, schema=FULL_SCHEMA, protocol=protocol,
-                    registration=(RECIPE_C_REGISTRATION if recipe else CODEC_MODEL_REGISTRATION if codec_model
+                    registration=(point["registration"] if explicit else
+                                  RECIPE_C_REGISTRATION if recipe else CODEC_MODEL_REGISTRATION if codec_model
                                   else FRONTIER_REGISTRATION), arms={arm: population},
-                    seeds=SEEDS, checkpoints=FRONTIER_CHECKPOINTS, initial=initial, root=recipe_root, extra=dict(
+                    seeds=SEEDS, checkpoints=FRONTIER_CHECKPOINTS, initial=initial, root=recipe_root,
+                    spec=point.get("spec", SPEC), columns=point.get("columns"), input_configuration=explicit, extra=dict(
                         recipe=recipe,
                         aic_weights={arm: weight}, packed_epoch=epoch, anchor=dict(path=str(anchor), sha256=leg["sha256"]),
                         phases=two_phases(point, arm, population),

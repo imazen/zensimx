@@ -40,6 +40,61 @@ class RegisteredRoute(unittest.TestCase):
 
 
 class PlanConfiguration(unittest.TestCase):
+    def test_inherited_prerequisites_cannot_be_silently_repinned(self):
+        with tempfile.TemporaryDirectory(dir=Path.home() / "tmp") as tmp:
+            path = Path(tmp) / "control.json"
+            path.write_text('{"pass":true}')
+            configuration = dict(input_sha256={str(path): owner.sha(path)})
+            self.assertEqual(owner.configuration_inputs(configuration), [path])
+            path.write_text('{"pass":false}')
+            with self.assertRaisesRegex(ValueError, "prerequisite changed"):
+                owner.configuration_inputs(configuration)
+
+    def test_explicit_initials_cannot_fall_back_to_mlic(self):
+        value = dict(schema=owner.SEEDS_SCHEMA, root="/invented/fx2-root",
+                     input_configuration=dict(token="fx2"), initial={str(s): dict(seed=s) for s in range(3)})
+        self.assertEqual(owner.recipe_point(value), (None, value["initial"], Path(value["root"])))
+        with self.assertRaisesRegex(ValueError, "all three initial seeds"):
+            owner.recipe_point(dict(value, initial={"0": value["initial"]["0"]}))
+
+    def test_full_plan_preserves_explicit_root_columns_and_initial_models(self):
+        with tempfile.TemporaryDirectory(dir=Path.home() / "tmp") as tmp:
+            root = Path(tmp)
+            source, common, point = root / "fx2-root", root / "old-root", root / "point"
+            real = source / "wide/main/real"
+            real.mkdir(parents=True)
+            anchor = real / "cid22_fit.parquet"
+            anchor.write_bytes(b"invented TRAIN anchor")
+            (real / "receipt.json").write_text(json.dumps(dict(legs=dict(cid22=dict(fit=dict(
+                rel="wide/main/real/cid22_fit.parquet", sha256=owner.sha(anchor)))))))
+            initial = {}
+            for seed in range(3):
+                dest = root / f"initial_s{seed}"
+                (dest / "refit").mkdir(parents=True)
+                (dest / "refit/production-f16.bin").write_bytes(f"seed {seed}".encode())
+                initial[str(seed)] = dict(directory=str(dest), packed_sha256=owner.sha(dest / "refit/production-f16.bin"))
+            configuration = dict(token="fx2", input_sha256={})
+            spec = owner.SPEC.replace("fx1", "fx2")
+            value = dict(schema=owner.SEEDS_SCHEMA, spec=spec, root=str(source), columns="/invented/fx2-cols",
+                         input_configuration=configuration, initial=initial, registration=dict(section="invented"),
+                         arms={"XrefAIC256": "mixed-aic256-xref", "AICOnly": "aic-only"})
+            point.mkdir()
+            (point / "PLAN.json").write_text(json.dumps(value))
+            fold, fits = root / "fold.json", root / "fits.json"
+            fold.write_text(json.dumps(dict(common_root=str(common), columns="/invented/old-cols")))
+            fits.write_text(json.dumps(dict(continued=[dict(initial[str(s)], seed=s, arm="MlicFT16x8") for s in range(3)])))
+            inputs = dict(owner.INPUTS, fold_plan=(str(fold), owner.sha(fold)), full_fits=(str(fits), owner.sha(fits)))
+            with patch.object(owner, "INPUTS", inputs), patch.object(owner, "seven_fold_plan") as freeze, \
+                    patch.object(owner, "full_record", side_effect=lambda fits, arm, seed: initial[str(seed)]):
+                owner.full_plan(root / "run", "HEAD", root / "t", root / "m", point, "AICOnly", 29, point)
+            kwargs = freeze.call_args.kwargs
+            self.assertEqual((kwargs["root"], kwargs["spec"], kwargs["columns"]), (source, spec, value["columns"]))
+            self.assertEqual(kwargs["initial"], initial)
+            self.assertEqual(kwargs["input_configuration"], configuration)
+            self.assertEqual(kwargs["extra"]["anchor"]["path"], str(anchor))
+            self.assertEqual({k for k in kwargs["extra"]["baselines"] if k.startswith("Initial|")},
+                             {f"Initial|s{s}" for s in range(3)})
+
     def test_explicit_fx2_spec_reaches_fit_and_omission_routes(self):
         with tempfile.TemporaryDirectory(dir=Path.home() / "tmp") as tmp:
             run = Path(tmp)
