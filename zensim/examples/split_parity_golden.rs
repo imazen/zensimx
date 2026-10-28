@@ -76,7 +76,10 @@ fn f32s(v: &[f32]) -> u64 {
 
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
-    assert!(args.len() == 2 || args.len() == 4, "usage: <general.bin> <codec.bin> [<general-stripped.bin> <codec-stripped.bin>]");
+    assert!(
+        args.len() == 2 || args.len() == 4,
+        "usage: <general.bin> <codec.bin> [<general-stripped.bin> <codec-stripped.bin>]"
+    );
     let bytes: Vec<&'static [u8]> = args
         .iter()
         .map(|p| &*Box::leak(std::fs::read(p).expect("read bake").into_boxed_slice()))
@@ -92,23 +95,38 @@ fn main() {
     ];
     if args.len() == 4 {
         profiles.push(("E-stripped", rev7_profile(bake2, "rev7-general-stripped")));
-        profiles.push(("ECodec-stripped", rev7_profile(bake3, "rev7-codec-stripped")));
+        profiles.push((
+            "ECodec-stripped",
+            rev7_profile(bake3, "rev7-codec-stripped"),
+        ));
     }
     let models: Vec<(&str, zenpredict::Model)> = [("E", 0usize), ("ECodec", 1)]
         .into_iter()
-        .map(|(n, i)| (n, zenpredict::Model::from_bytes(BAKES.get().unwrap()[i]).expect("parse bake")))
+        .map(|(n, i)| {
+            (
+                n,
+                zenpredict::Model::from_bytes(BAKES.get().unwrap()[i]).expect("parse bake"),
+            )
+        })
         .collect();
 
     let pairs = split_parity_pairs();
     let hex = |x: f64| format!("{:016x}", x.to_bits());
-    let line = |surface: &str, profile: &str, pair: &str, value: String| println!("{surface}\t{profile}\t{pair}\t{value}");
+    let line = |surface: &str, profile: &str, pair: &str, value: String| {
+        println!("{surface}\t{profile}\t{pair}\t{value}")
+    };
     for pair in &pairs {
         let src = RgbSlice::new(bytemuck::cast_slice(&pair.src), pair.width, pair.height);
         let dst = RgbSlice::new(bytemuck::cast_slice(&pair.dst), pair.width, pair.height);
         for (pname, profile) in &profiles {
             let z = Zensim::new(*profile);
             let v = match z.compute(&src, &dst) {
-                Ok(r) => format!("{} {} {:016x}", hex(r.score()), hex(r.raw_distance()), f64s(r.features())),
+                Ok(r) => format!(
+                    "{} {} {:016x}",
+                    hex(r.score()),
+                    hex(r.raw_distance()),
+                    f64s(r.features())
+                ),
                 Err(e) => format!("ERR {e:?}"),
             };
             line("compute", pname, &pair.id, v);
@@ -138,10 +156,12 @@ fn main() {
             };
             line("compute_with_diffmap", pname, &pair.id, v);
             let v = match &pre {
-                Ok(pre) => match z.compute_with_ref_and_diffmap(pre, &dst, DiffmapOptions::default()) {
-                    Ok(d) => format!("{} {:016x}", hex(d.score()), f32s(d.diffmap())),
-                    Err(e) => format!("ERR {e:?}"),
-                },
+                Ok(pre) => {
+                    match z.compute_with_ref_and_diffmap(pre, &dst, DiffmapOptions::default()) {
+                        Ok(d) => format!("{} {:016x}", hex(d.score()), f32s(d.diffmap())),
+                        Err(e) => format!("ERR {e:?}"),
+                    }
+                }
                 Err(e) => format!("ERR {e:?}"),
             };
             line("compute_with_ref_and_diffmap", pname, &pair.id, v);
@@ -154,7 +174,12 @@ fn main() {
         for (pname, model) in &models {
             let v = match zensim::BakeScorer::new(model) {
                 Ok(s) => match s.with_parallel(true).compute(&src, &dst, None) {
-                    Ok(r) => format!("{} {} {:016x}", hex(r.score()), hex(r.raw_distance()), f64s(r.features())),
+                    Ok(r) => format!(
+                        "{} {} {:016x}",
+                        hex(r.score()),
+                        hex(r.raw_distance()),
+                        f64s(r.features())
+                    ),
                     Err(e) => format!("ERR {e:?}"),
                 },
                 Err(e) => format!("ERR {e:?}"),
