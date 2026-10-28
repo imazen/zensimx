@@ -7546,3 +7546,22 @@ Its follow-through mirrors stage C, using what already exists:
 
 It is judged as a codec model: compression-only E21 is the older-set evidence, and its losses on other distortion types
 are reported, not gating. The general model's stage C is unchanged.
+
+### Stage C on ×256 + rehearsal e59: results (2026-10-28, seeds 23:5x UTC, full data 00:46 UTC, near-identity 01:34 UTC)
+
+**Three seeds on the folds** (`mlic-aic-seeds-xrefaic256e59-20261027-run01`): seed 0 reproduces stage D's checkpoints
+byte for byte (28 of 28). Out-of-fold AIC-2026 public_train at epoch 59: seeds 0/1/2 0.9390 / 0.9386 / 0.9383; the
+three-seed mean prediction 0.9396 (Mlic's 0.9075). Older sets in sample against each seed's initial model, mean over
+seeds (seed-unit SE): KADID +0.0017 (0.0031), TID2013 −0.0010 (0.0042), KonFiG +0.0065 (0.0032), CID22-A +0.0266
+(0.0018); seed 2's TID2013 is −0.0055. The same run scores the codec model's three seeds from the source-fold study:
+AIC-only e29 0.9515 / 0.9527 / 0.9520, three-seed mean prediction 0.9531.
+
+**Full data** (`mlic-aic-fulldata-xrefaic256e59-20261027-run01`): Mlic's three full seeds continued, packed at epoch 59
+with the TRAIN CID22 anchor. In sample, mean of the three packed models: AIC-2026 0.9482 (Mlic 0.9069, MlicFT16x8
+0.9142), KADID 0.9059 (0.9043), TID2013 0.8841 (0.8851), KonFiG 0.8184 (0.8124), CID22-A 0.9001 (0.8727). Local pixel
+mixtures 2 rows per model (largest rise +6.3), global 0.
+
+**Near-identity** (unchanged N1–N3 on i265, run03's pinned binary and packet; `/mnt/tower/output/zensim/mlic-nearid-
+xrefaic256e59-20261028-run01`): the packed seed-0 model (sha256 `7642eff4…`) passes N1, N2 and N3, 142 of 144
+monotone ladders (bar 122). The label-free gates (verdict, steer, identity) for it and the codec model run next
+(`mlic-candidate-gates-20261028-run03`, after the codec full-data run).
