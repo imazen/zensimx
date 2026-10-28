@@ -25,7 +25,7 @@ HERE = Path(__file__).resolve().parent
 REPO = HERE.parents[1]
 sys.path.insert(0, str(HERE))
 sys.path.insert(1, str(HERE.parent / "rev4_featpot"))
-from aic_adaptation import FOLDS, SPEC, bound_worker, compute_lock, process_snapshot, require_clean_factors, sha, write
+from aic_adaptation import FOLDS, SPEC, bound_worker, compute_lock, process_snapshot, process_tree, require_clean_factors, sha, write
 from aic_adaptation_diagnostics import checked_statistics, ladder_diagnostics
 from aic_adaptation_full_panel import full_populations, pixel_mixtures, seed_delta
 from aic_adaptation_panel import finite_json
@@ -1712,6 +1712,19 @@ def status(path):
     print(json.dumps({k: state.get(k) for k in ("stage", "live", "logged_epochs", "followthrough", "failures", "compute_lock")}))
 
 
+def active_fit_processes(pid):
+    """Use the shared threaded-child walker and exact executable names, never command-line pattern matching."""
+    children = []
+    for process in process_tree(pid):
+        argv = process["argv"]
+        if not argv or Path(argv[0]).name != "zensim_mlp_train" or process["state"] in ("Z", "X"):
+            continue
+        out = Path(argv[argv.index("--out") + 1]) if "--out" in argv else None
+        children.append({k: process[k] for k in ("pid", "start_ticks", "state", "cpu_ticks")} |
+                        dict(cell=str(out.parent.parent) if out else None))
+    return children
+
+
 def fold_status(path):
     run_dir = path.parent
     state_path = run_dir / "STATE.json"
@@ -1724,14 +1737,19 @@ def fold_status(path):
     for log in sorted([*run_dir.glob("arms/*/s*_k*/train.log"), *run_dir.glob("cells/*/without_*_s*/train.log")]):
         done = [int(line.split()[1]) for line in log.read_text().splitlines() if line.startswith("  epoch ")]
         logged.append(max(done) if done else -1)
+    wrapper_failures = [str(p.relative_to(run_dir)) for p in
+                        [*run_dir.glob("arms/*/s*_k*.log"), *run_dir.glob("cells/*/without_*_s*.log")]
+                        if "Traceback (most recent call last):" in p.read_text()]
     state.update(checked_utc=now(), live=live, gates_finished=predecessor_finished(json.loads(path.read_text())),
                  fits_complete=len((lambda v: v.get("runs") or v.get("cells"))(json.loads((run_dir / "FITS_COMPLETE.json").read_text())))
                  if (run_dir / "FITS_COMPLETE.json").exists() else 0,
                  logged_epoch_range=[min(logged), max(logged)] if logged else None, logged_runs=len(logged),
+                 active_fit_processes=active_fit_processes(worker["pid"]) if live else [], wrapper_failures=wrapper_failures,
                  compute_lock=compute_lock(worker["pid"] if live else None))
     write(run_dir / "CURRENT.json", state)
     print(json.dumps({k: state.get(k) for k in ("stage", "live", "gates_finished", "fits_complete", "logged_runs",
-                                                 "logged_epoch_range", "failures", "compute_lock")}))
+                                                 "logged_epoch_range", "active_fit_processes", "wrapper_failures",
+                                                 "failures", "compute_lock")}))
 
 
 REPRO_SCHEMA = "aic-continuation-reproduction-plan-v1"

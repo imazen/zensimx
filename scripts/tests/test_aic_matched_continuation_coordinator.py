@@ -173,6 +173,19 @@ class PlanConfiguration(unittest.TestCase):
 
 
 class PriorityWait(unittest.TestCase):
+    def test_active_fits_require_exact_program_names_and_live_processes(self):
+        def process(pid, program, state="R"):
+            return dict(pid=pid, start_ticks=pid + 100, state=state, cpu_ticks=10,
+                        argv=[program, "--out", f"/invented/s{pid}_k0/refit/best.bin"])
+        children = [process(1, "/invented/bin/zensim_mlp_train"),
+                    process(2, "/invented/bin/zensim_mlp_train", "Z"),
+                    process(3, "/invented/python3")]
+        children[2]["argv"].append("zensim_mlp_train")
+        with patch.object(owner, "process_tree", return_value=children):
+            rows = owner.active_fit_processes(100)
+        self.assertEqual([r["pid"] for r in rows], [1])
+        self.assertEqual(rows[0]["cell"], "/invented/s1_k0")
+
     def state(self, root, **value):
         (root / "STATE.json").write_text(json.dumps(dict(failures=[], **value)))
 

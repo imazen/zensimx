@@ -7840,3 +7840,11 @@ cannot cross those scopes. All-type and compression-only statistics use the exis
 memberships come from the dashboard's existing CODEC_TYPES, and codec-bias spread comes from the existing type_bias
 owner. It reads only the four E21 TRAIN populations; it does not open AIC labels or EVAL tables. Outputs are separately
 pinned reports, leaving the frozen fit runs unchanged. This entry describes tooling, not an fx2 result.
+
+
+### fx2 live fit supervision (2026-10-28)
+
+The continuation progress reader uses the shared threaded-child process walker to enumerate exact native trainer
+executables, carrying PID/start ticks, CPU ticks and cell paths. It also scans wrapper logs for uncaught tracebacks,
+so a failed later future is visible while the controller waits for an earlier fit. Zombie processes and command-line
+mentions of the trainer do not count as active fits. This observer does not change frozen run sources or inputs.
