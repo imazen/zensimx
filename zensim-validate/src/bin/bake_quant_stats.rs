@@ -30,8 +30,8 @@ use std::path::{Path, PathBuf};
 
 use zenpredict::{Model, WeightStorage};
 
-const REPO_ROOT: &str = "/home/lilith/work/zen/zensim";
-const OUT_DIR: &str = "/home/lilith/work/zen/zensim/benchmarks/bake_quant_stats_2026-05-25";
+const REPO_ROOT: &str = "/home/lilith/work/zen/zensimx";
+const OUT_DIR: &str = "/home/lilith/work/zen/zensimx/benchmarks/bake_quant_stats_2026-05-25";
 const N_SCALES: usize = 4;
 const N_CHANNELS: usize = 3;
 

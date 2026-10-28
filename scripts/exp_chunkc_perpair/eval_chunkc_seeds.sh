@@ -3,9 +3,9 @@
 # ship bakes use 372col parquets — both row-aligned per inspection.
 set -euo pipefail
 
-VERDICT=/home/lilith/work/zen/zensim/target/release/bake_verdict
+VERDICT=/home/lilith/work/zen/zensimx/target/release/bake_verdict
 BAKE_DIR=/mnt/v/zen/zensim-eval/exp_chunkc_perpair_2026-05-18
-SHIP_WEIGHTS=/home/lilith/work/zen/zensim/zensim/weights
+SHIP_WEIGHTS=/home/lilith/work/zen/zensimx/zensim/weights
 FEAT_343=/tmp/exp_chunkc_perpair_features_root
 FEAT_372=/mnt/v/zen/zensim-training/2026-05-15-full-features
 OUT_DIR=$BAKE_DIR/verdicts

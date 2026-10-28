@@ -3,7 +3,7 @@
 set -euo pipefail
 
 OUT_DIR="/mnt/v/zen/zensim-eval/exp_persample_capacity_2026-05-18"
-BV="/home/lilith/work/zen/zensim/target/release/bake_verdict"
+BV="/home/lilith/work/zen/zensimx/target/release/bake_verdict"
 
 mkdir -p "$OUT_DIR/verdicts"
 

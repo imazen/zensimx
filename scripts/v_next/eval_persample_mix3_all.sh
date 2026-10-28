@@ -8,14 +8,14 @@
 set -euo pipefail
 
 OUT_DIR="/mnt/v/zen/zensim-eval/exp_persample_mix3_2026-05-18"
-WS="/home/lilith/work/zen/zensim"
+WS="/home/lilith/work/zen/zensimx"
 BAKE_VERDICT="${WS}/target/release/bake_verdict"
 BAKE_COMPARE="${WS}/target/release/bake_compare"
 ZENPREDICT="/home/lilith/work/zen/zenanalyze/target/release/zenpredict"
 
 # Ship comparators
-SHIP_COMPRESSION="/home/lilith/work/zen/zensim/zensim/weights/v_compression_persample_2026-05-18.bin"
-SHIP_BALANCED="/home/lilith/work/zen/zensim/zensim/weights/v22_mix_cv40_konjnd_002_LARGE_iwssim_2026-05-18.bin"
+SHIP_COMPRESSION="/home/lilith/work/zen/zensimx/zensim/weights/v_compression_persample_2026-05-18.bin"
+SHIP_BALANCED="/home/lilith/work/zen/zensimx/zensim/weights/v22_mix_cv40_konjnd_002_LARGE_iwssim_2026-05-18.bin"
 
 mkdir -p "${OUT_DIR}/verdicts" "${OUT_DIR}/compares_vs_compression" "${OUT_DIR}/compares_vs_balanced"
 

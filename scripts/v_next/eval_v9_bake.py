@@ -29,11 +29,11 @@ V9_ANCHOR_PARQUET = Path(
     "/mnt/v/zen/zensim-training/2026-05-20-v9-anchors/anchors_v9_372col.parquet"
 )
 PREDICT_BIN = Path(
-    "/home/lilith/work/zen/zensim/target/release/"
+    "/home/lilith/work/zen/zensimx/target/release/"
     "predict_features_with_bake"
 )
 BAKE_VERDICT_BIN = Path(
-    "/home/lilith/work/zen/zensim/target/release/bake_verdict"
+    "/home/lilith/work/zen/zensimx/target/release/bake_verdict"
 )
 BUTTER_DIR = Path("/mnt/v/zen/picker-training/2026-05-19/butter")
 

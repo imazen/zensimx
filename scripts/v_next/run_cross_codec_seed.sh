@@ -59,7 +59,7 @@ if [ ! -f "${CONF}" ]; then
 fi
 
 CC_ROOT="${CC_ROOT:-/mnt/v}"
-CC_TRAINER="${CC_TRAINER:-/home/lilith/work/zen/zensim/target/release/zensim_mlp_train}"
+CC_TRAINER="${CC_TRAINER:-/home/lilith/work/zen/zensimx/target/release/zensim_mlp_train}"
 CC_DRY_RUN="${CC_DRY_RUN:-0}"
 
 # ---------------------------------------------------------------------------

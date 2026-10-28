@@ -4,7 +4,7 @@
 # KADID / TID / KonJND / AIC-3 / AIC-4 SROCC per seed.
 set -euo pipefail
 
-BAKE_VERDICT="/home/lilith/work/zen/zensim/target/release/bake_verdict"
+BAKE_VERDICT="/home/lilith/work/zen/zensimx/target/release/bake_verdict"
 SWEEP_DIR="${SWEEP_DIR:-/mnt/v/zen/zensim-eval/exp_v11_cc_eq_sweep_2026-05-20}"
 VERDICTS_DIR="${SWEEP_DIR}/verdicts"
 mkdir -p "${VERDICTS_DIR}"

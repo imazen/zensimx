@@ -44,7 +44,7 @@ from pathlib import Path
 import numpy as np
 import pyarrow.parquet as pq
 
-REPO_ROOT = Path("/home/lilith/work/zen/zensim")
+REPO_ROOT = Path("/home/lilith/work/zen/zensimx")
 SUBSTRATE_PARQUET = Path(
     "/mnt/v/zen/zensim-training/2026-05-20-v11-substrate/"
     "cross_codec_equivalence_ssim2_372col_v4.parquet"

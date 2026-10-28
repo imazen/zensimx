@@ -521,7 +521,7 @@ def source_archives(args):
         commit=binding["build_commit"]
         archive=dest/(commit+".tar")
         if not archive.exists():
-            subprocess.run(["git","--git-dir",str(Path.home()/"work/zen/zensim/.git"),
+            subprocess.run(["git","--git-dir",str(Path.home()/"work/zen/zensimx/.git"),
                 "archive","--format=tar","--output",str(archive),commit],check=True)
         wanted=binding["source_inputs"]
         actual={}

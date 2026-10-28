@@ -27,7 +27,7 @@ from pathlib import Path
 import numpy as np
 import pyarrow.parquet as pq
 
-REPO = Path.home() / "work/zen/zensim"
+REPO = Path.home() / "work/zen/zensimx"
 BV = str(REPO / "target/release/bake_verdict")
 PREDICT = str(REPO / "target/release/predict_features_with_bake")
 ZP = str(Path.home() / "work/zen/zenanalyze/target/release/zenpredict")

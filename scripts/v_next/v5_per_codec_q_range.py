@@ -21,7 +21,7 @@ from pathlib import Path
 import numpy as np
 import pyarrow.parquet as pq
 
-REPO = Path("/home/lilith/work/zen/zensim")
+REPO = Path("/home/lilith/work/zen/zensimx")
 BAKE = REPO / "zensim-experimental/weights/v_tuner_v11_2026-05-24.bin"
 PREDICT = REPO / "target/release/predict_features_with_bake"
 PARQ_ROOT = Path("/mnt/v/zen/picker-training/2026-05-19/butter")

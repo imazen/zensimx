@@ -2,7 +2,7 @@
 
 Python helpers for corpus preparation, screening, baking via the
 ZNPR v3 JSON pipeline, and analysis. All scripts assume the
-`/mnt/v` mount + the zensim workspace at `/home/lilith/work/zen/zensim`.
+`/mnt/v` mount + the zensim workspace at `/home/lilith/work/zen/zensimx`.
 
 ## Where to look first
 

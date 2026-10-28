@@ -15,7 +15,7 @@
 
 set -euo pipefail
 
-REPO="/home/lilith/work/zen/zensim"
+REPO="/home/lilith/work/zen/zensimx"
 OUT_DIR="/mnt/v/zen/zensim-eval/exp_tuner_v11_sweep_2026-05-24"
 SUMMARY="${OUT_DIR}/sweep_summary_$(date -u +%Y-%m-%d).md"
 

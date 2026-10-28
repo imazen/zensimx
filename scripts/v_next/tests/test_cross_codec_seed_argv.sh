@@ -55,7 +55,7 @@ for variant in v2 v3 v4 v4b v5 v6 v7 v8 v9 v9cons v9mono; do
 
     # shellcheck disable=SC2046  # word splitting of the sample args is intended
     actual="$(CC_DRY_RUN=1 CC_ROOT=/mnt/v \
-        CC_TRAINER=/home/lilith/work/zen/zensim/target/release/zensim_mlp_train \
+        CC_TRAINER=/home/lilith/work/zen/zensimx/target/release/zensim_mlp_train \
         "${shim}" $(run_variant "${variant}") 2>&1)" || {
         echo "FAIL ${variant}: dry run exited nonzero"
         printf '%s\n' "${actual}"

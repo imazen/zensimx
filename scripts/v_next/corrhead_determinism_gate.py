@@ -78,7 +78,7 @@ DEFAULT_SHIPPED_BAKE = f"{ROOT}/d228/corruption_head_d228.bin"
 DEFAULT_BAKE_BIN = os.path.expanduser(
     "~/work/zen/zenanalyze/target/release/zenpredict-bake")
 DEFAULT_PREDICT_BIN = os.path.expanduser(
-    "~/work/zen/zensim/target/release/predict_features_with_bake")
+    "~/work/zen/zensimx/target/release/predict_features_with_bake")
 
 THREAD_ENV_VARS = ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS",
                    "VECLIB_MAXIMUM_THREADS", "NUMEXPR_NUM_THREADS", "BLIS_NUM_THREADS")

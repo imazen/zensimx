@@ -14,7 +14,7 @@
 //!    XYB conversion are bounded so cache behavior is friendlier).
 //!
 //! Per the acceptance gates in
-//! `~/work/zen/zensim/STREAMING_372_PLAN.md` (Phase 1).
+//! `~/work/zen/zensimx/STREAMING_372_PLAN.md` (Phase 1).
 
 #![allow(deprecated)] // exercises the deprecated `ZensimProfile::A` (still shipped behind the default-on `deprecated-profiles` feature)
 

@@ -8,11 +8,11 @@
 # is the constraint's intrinsic cost. Compare V46b vs V46 (1-layer,
 # mix_cv40_iw60, tanh=20) → that delta is the recipe-choice cost.
 set -euo pipefail
-TRAIN="/home/lilith/work/zen/zensim/target/release/zensim_mlp_train"
+TRAIN="/home/lilith/work/zen/zensimx/target/release/zensim_mlp_train"
 OUT="/mnt/v/output/zensim/bakes/v46b_v32faithful_monotone_2026-05-26.bin"
-LOG="/home/lilith/work/zen/zensim/benchmarks/v46b_v32faithful_monotone_2026-05-26.log"
+LOG="/home/lilith/work/zen/zensimx/benchmarks/v46b_v32faithful_monotone_2026-05-26.log"
 CANON="/mnt/v/zen/zensim-training/canonical-2026-05-21/train"
-TXFORM="/home/lilith/work/zen/zensim/benchmarks/yeo_johnson_screen_widest_2026-05-25/screen_results_cross_corpus_safe.tsv"
+TXFORM="/home/lilith/work/zen/zensimx/benchmarks/yeo_johnson_screen_widest_2026-05-25/screen_results_cross_corpus_safe.tsv"
 mkdir -p "$(dirname "$OUT")"
 "$TRAIN" \
   --group safesyn:$CANON/safesyn.parquet:1.0:0.5 \

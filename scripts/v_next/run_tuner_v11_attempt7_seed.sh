@@ -39,7 +39,7 @@ KONJND_AGG_WEIGHT="${KONJND_AGG_WEIGHT:-0.3}"
 KONJND_AGG_STEP_P="${KONJND_AGG_STEP_P:-0.30}"
 TANH_SCALE="${TANH_SCALE:-30.0}"
 
-REPO="/home/lilith/work/zen/zensim"
+REPO="/home/lilith/work/zen/zensimx"
 OUT_DIR="/mnt/v/zen/zensim-eval/exp_tuner_v11_attempt7_2026-05-24"
 TRAINER="${REPO}/target/release/zensim_mlp_train"
 PARQ_DIR="/mnt/v/zen/zensim-training/canonical-2026-05-21/train"

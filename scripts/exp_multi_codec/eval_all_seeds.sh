@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Eval all 5 control seeds via bake_verdict, extract CID22 SROCC.
 set -euo pipefail
-BAKE_VERDICT=/home/lilith/work/zen/zensim/target/release/bake_verdict
+BAKE_VERDICT=/home/lilith/work/zen/zensimx/target/release/bake_verdict
 DIR=/mnt/v/zen/zensim-eval/exp_multi_codec_2026-05-18/control
 VERDICTS=/mnt/v/zen/zensim-eval/exp_multi_codec_2026-05-18/verdicts
 mkdir -p "$VERDICTS"

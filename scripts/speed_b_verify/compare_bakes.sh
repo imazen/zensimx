@@ -3,7 +3,7 @@
 set -euo pipefail
 
 VERIFY_DIR="/mnt/v/zen/zensim-eval/speed_b_verify_2026-05-19"
-BV="/home/lilith/work/zen/zensim/target/release/bake_verdict"
+BV="/home/lilith/work/zen/zensimx/target/release/bake_verdict"
 
 if [ ! -x "${BV}" ]; then
     echo "bake_verdict not found at ${BV}" >&2

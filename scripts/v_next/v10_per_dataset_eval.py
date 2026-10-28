@@ -56,9 +56,9 @@ import pyarrow.parquet as pq
 
 BUTTER_ROOT = Path("/mnt/v/zen/picker-training/2026-05-19/butter")
 HUMAN_VAL_ROOT = Path("/mnt/v/zen/zensim-training/canonical-2026-05-18/val")
-WEIGHTS_ROOT = Path("/home/lilith/work/zen/zensim/zensim/weights")
+WEIGHTS_ROOT = Path("/home/lilith/work/zen/zensimx/zensim/weights")
 PREDICT_TOOL = Path(
-    "/home/lilith/work/zen/zensim/target/release/predict_features_with_bake"
+    "/home/lilith/work/zen/zensimx/target/release/predict_features_with_bake"
 )
 
 # 19-q grid present in the butter parquets.

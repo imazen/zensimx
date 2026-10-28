@@ -17,8 +17,8 @@ SRC=/mnt/v/output/imazen-26-variants/cleanpicker-ladder11@2026-08-23
 FIXTURES=$WORK/fixtures
 CAL=/var/tmp/zensim-validation-2026-09-15/recovery/calibrated
 ZMB=/var/tmp/cvvdp-safesyn/target-zenmetrics/release/zenmetrics
-PANEL=/home/lilith/work/zen/zensim/target/release/panel
-TUNER=/home/lilith/work/zen/zensim/target/release/score_pairs_tuner
+PANEL=/home/lilith/work/zen/zensimx/target/release/panel
+TUNER=/home/lilith/work/zen/zensimx/target/release/score_pairs_tuner
 
 M3=$TARGET/release/examples/m3_fixture_gen
 SCORER=$TARGET/release/examples/e5a_render_score

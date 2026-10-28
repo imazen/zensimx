@@ -13,7 +13,7 @@ import re
 import subprocess
 from pathlib import Path
 
-REPO = Path.home() / "work/zen/zensim"
+REPO = Path.home() / "work/zen/zensimx"
 BV = str(REPO / "target/release/bake_verdict")
 REPORTS = Path("/mnt/v/output/zensim/reports/b_negatives")
 WEIGHTS = REPO / "zensim/weights"

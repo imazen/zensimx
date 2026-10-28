@@ -24,7 +24,7 @@
 set -euo pipefail
 
 SEED="${1:-17}"
-REPO="/home/lilith/work/zen/zensim"
+REPO="/home/lilith/work/zen/zensimx"
 TRAINER="${REPO}/target/release/zensim_mlp_train"
 DIAL_DIR="/mnt/v/output/zensim/iphone14-cvvdp-2026-05-25"
 BAKE_DIR="/mnt/v/output/zensim/bakes"

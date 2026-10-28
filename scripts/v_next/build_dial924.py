@@ -15,7 +15,7 @@ D = os.path.expanduser("~/tmp/dial924")
 # v2_ab_extract from THIS repo (env override for a custom build); the
 # original as-run used a since-deleted sibling worktree — same source.
 EXTRACT = os.environ.get("ZM924_BIN") or os.path.expanduser(
-    "~/work/zen/zensim/target/release/examples/v2_ab_extract"
+    "~/work/zen/zensimx/target/release/examples/v2_ab_extract"
 )
 OLD = "/mnt/v/output/zensim/v2-eval-720-2026-07-22/dial_grid_720col_2026-07-22.parquet"
 OUT = "/mnt/v/output/zensim/v2-eval-924-2026-07-27/dial_grid_924col_2026-07-28.parquet"

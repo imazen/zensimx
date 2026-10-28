@@ -33,7 +33,7 @@ from pathlib import Path
 import numpy as np
 import pyarrow.parquet as pq
 
-REPO = Path.home() / "work/zen/zensim"
+REPO = Path.home() / "work/zen/zensimx"
 PROBE = Path("/mnt/v/output/zensim-multicodec-probe")
 COCAL = Path("/mnt/v/output/zensim/reports/bhdr_cocal")
 SHIPPED = REPO / "zensim/weights/bhdr_linear_shaped_cvvdpmix_2026-07-12.bin"

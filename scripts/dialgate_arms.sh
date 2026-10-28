@@ -31,7 +31,7 @@
 # Individual overrides (ZL_GRID / ZL_NEGTAIL / ZL_IDENTITY / ZL_ROOT / ZL_OUT)
 # still win, so a one-off instrument needs no new era name.
 set -euo pipefail
-REPO=/home/lilith/work/zen/zensim
+REPO=/home/lilith/work/zen/zensimx
 D=/mnt/v/output/zensim/dialgate-2026-09-04
 I=/mnt/v/output/zensim/dpeaks372-2026-09-05/instruments
 L=/mnt/v/output/zensim/ladder-2026-09-05/instruments

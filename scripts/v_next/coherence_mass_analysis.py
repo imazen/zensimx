@@ -268,7 +268,7 @@ def main() -> int:
         "mass_total", "bake",
     ]
     git = subprocess.run(
-        ["git", "-C", "/home/lilith/work/zen/zensim", "rev-parse", "--short", "HEAD"],
+        ["git", "-C", "/home/lilith/work/zen/zensimx", "rev-parse", "--short", "HEAD"],
         capture_output=True, text=True,
     ).stdout.strip()
     with open(args.out, "w") as fh:

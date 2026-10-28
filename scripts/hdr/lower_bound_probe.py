@@ -24,7 +24,7 @@ import sys
 import numpy as np
 import pyarrow.parquet as pq
 
-REPO = os.path.expanduser("~/work/zen/zensim")
+REPO = os.path.expanduser("~/work/zen/zensimx")
 CORRUPTION = "/mnt/v/output/zensim/eval_panels_2026-05-29/corruption_grid_372col_2026-05-28.parquet"
 RESCORE = f"{REPO}/target/release/rescore_parquet"
 

@@ -265,7 +265,7 @@ def main():
     ap.add_argument("--n-images", type=int, default=20)
     ap.add_argument(
         "--predict-tool",
-        default="/home/lilith/work/zen/zensim/target/release/predict_features_with_bake",
+        default="/home/lilith/work/zen/zensimx/target/release/predict_features_with_bake",
     )
     ap.add_argument(
         "--zen-metrics",

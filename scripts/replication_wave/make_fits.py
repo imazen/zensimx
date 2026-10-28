@@ -1,7 +1,7 @@
 import json, os, shlex, sys
 FE='/mnt/v/output/zensim/reports/fulleval'
 ROOT='/mnt/v/output/zensim/replication-2026-09-05'
-TRAINER='/home/lilith/work/zen/zensim/target/release/zensim_mlp_train'
+TRAINER='/home/lilith/work/zen/zensimx/target/release/zensim_mlp_train'
 # recipe -> (source fulleval cell, anchor seed S0)
 REC={'LSTAR':('LSTAR_s4021_packed',4021),'LSTAR3':('LSTAR3_s4041_packed',4041),
      'A5_r4':('A5_r4_s4004',4004),'A3b':('A3b_s4004',4004)}

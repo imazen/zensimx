@@ -15,7 +15,7 @@
 # Binaries come from the MAIN repo (never a sibling worktree — those get cleaned
 # up and take committed scripts down with them); override with ZL_BV.
 set -euo pipefail
-REPO=/home/lilith/work/zen/zensim
+REPO=/home/lilith/work/zen/zensimx
 BV="${ZL_BV:-$REPO/target/release/bake_verdict}"
 SRC="${ZL_SRC:-/mnt/v/output/zensim/gaddr-board-2026-09-04}"   # the 2026-09-04 as-run
 OUT="${ZL_OUT:-/mnt/v/output/zensim/gaddr-board-2026-09-05}"   # this re-grade

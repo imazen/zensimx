@@ -5,7 +5,7 @@
 # ship-table decision matches the V11 falsification documentation.
 set -euo pipefail
 
-BAKE_VERDICT="/home/lilith/work/zen/zensim/target/release/bake_verdict"
+BAKE_VERDICT="/home/lilith/work/zen/zensimx/target/release/bake_verdict"
 SWEEP_DIR="${SWEEP_DIR:-/mnt/v/output/zensim/exp_v11_d_pjnd_2026-05-20}"
 VERDICTS_DIR="${SWEEP_DIR}/verdicts"
 mkdir -p "${VERDICTS_DIR}"

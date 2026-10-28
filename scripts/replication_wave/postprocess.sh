@@ -3,7 +3,7 @@
 # a late wake-up must cost nothing). Fails LOUD: a failure writes a marker,
 # appends to FAILURES, and makes the final exit nonzero.
 set -uo pipefail
-REPO=/home/lilith/work/zen/zensim
+REPO=/home/lilith/work/zen/zensimx
 W=/mnt/v/output/zensim/replication-2026-09-05
 CANON=/mnt/v/zen/zensim-training/ext944-canonical-2026-08-01
 export ZENSIM_FULLEVAL_OUT=$W/fulleval

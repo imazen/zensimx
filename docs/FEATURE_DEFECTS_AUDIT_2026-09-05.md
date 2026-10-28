@@ -450,7 +450,7 @@ Raw output: `serve_weights.txt`, `serve_board.txt`, `profiles.tsv` in
 ## 6. Reproduce
 
 ```bash
-cd ~/work/zen/zensim
+cd ~/work/zen/zensimx
 cargo test --release -p zensim \
   --features training,feature-regime-v2,custom-profiles,classification \
   --test feature_invariants                       # 10 gates

@@ -29,7 +29,7 @@ from pathlib import Path
 
 from PIL import Image
 
-ROOT = Path("/home/lilith/work/zen/zensim")
+ROOT = Path("/home/lilith/work/zen/zensimx")
 SCORE_BAKE_BIN = ROOT / "target/release/score_pair_with_bake"
 ZEN_METRICS = Path("/home/lilith/work/zen/zenmetrics/target/release/zenmetrics")
 OUT_DIR = Path("/mnt/v/output/zensim/cross_codec_consistency_2026-05-19")

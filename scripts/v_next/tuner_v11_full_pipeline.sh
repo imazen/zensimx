@@ -19,7 +19,7 @@
 
 set -euo pipefail
 
-REPO="/home/lilith/work/zen/zensim"
+REPO="/home/lilith/work/zen/zensimx"
 OUT_DIR="/mnt/v/zen/zensim-eval/exp_tuner_v11_2026-05-24"
 SEEDS="${SEEDS:-1 2 3 4 5}"
 

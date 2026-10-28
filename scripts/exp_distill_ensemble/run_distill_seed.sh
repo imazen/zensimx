@@ -15,7 +15,7 @@ set -euo pipefail
 
 SEED="${1:?usage: $0 <seed>}"
 OUT_DIR="/mnt/v/zen/zensim-eval/exp_distill_ensemble_2026-05-18"
-WORKSPACE="/home/lilith/work/zen/zensim"
+WORKSPACE="/home/lilith/work/zen/zensimx"
 TRAINER="${WORKSPACE}/target/release/zensim_mlp_train"
 PARQ_DIR="/mnt/v/zen/zensim-training/2026-05-18-distill-ensemble"
 

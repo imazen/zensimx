@@ -4,13 +4,13 @@
 set -euo pipefail
 PACKED="${1:?packed_bake}"
 
-BC=/home/lilith/work/zen/zensim/target/release/bake_compare
+BC=/home/lilith/work/zen/zensimx/target/release/bake_compare
 OUT_DIR=/mnt/v/zen/zensim-eval/exp_multi_codec_2026-05-18/bake_compare
 mkdir -p "$OUT_DIR"
 
 # Current ships:
-COMPRESSION_SHIP=/home/lilith/work/zen/zensim/zensim/weights/v_compression_persample_2026-05-18.bin
-BALANCED_SHIP=/home/lilith/work/zen/zensim/zensim/weights/v22_mix_cv40_konjnd_002_LARGE_iwssim_2026-05-18.bin
+COMPRESSION_SHIP=/home/lilith/work/zen/zensimx/zensim/weights/v_compression_persample_2026-05-18.bin
+BALANCED_SHIP=/home/lilith/work/zen/zensimx/zensim/weights/v22_mix_cv40_konjnd_002_LARGE_iwssim_2026-05-18.bin
 
 for ship in compression:"$COMPRESSION_SHIP" balanced:"$BALANCED_SHIP"; do
     name="${ship%%:*}"

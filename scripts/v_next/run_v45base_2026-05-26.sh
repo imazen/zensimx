@@ -5,7 +5,7 @@
 # by construction). NO konjnd-aggregation (the G5 lever craters the panel).
 # Goal: retain V39's Mohammadi panel while gaining the G1+G3 guarantees.
 set -euo pipefail
-REPO="/home/lilith/work/zen/zensim"
+REPO="/home/lilith/work/zen/zensimx"
 TRAIN="$REPO/target/release/zensim_mlp_train"
 CANON="/mnt/v/zen/zensim-training/canonical-2026-05-21/train"
 OUTDIR="/mnt/v/output/zensim/bakes"

@@ -21,7 +21,7 @@ from origin_split import split_of
 
 FEAT = "/mnt/v/output/hdrgrid-2026-08-06/harvest-feat944-2026-08-26/%s/features_folded720append2.parquet"
 ERA = "/mnt/v/output/hdrgrid-2026-08-06/zensim_scores_by_judge_era.parquet"
-CENSUS_TSV = os.path.expanduser("~/work/zen/zensim/benchmarks/hdr_instrument_refs_2026-08-27.tsv")
+CENSUS_TSV = os.path.expanduser("~/work/zen/zensimx/benchmarks/hdr_instrument_refs_2026-08-27.tsv")
 
 def main():
     ap = argparse.ArgumentParser()
@@ -116,7 +116,7 @@ def main():
                       "sha256": hashlib.sha256(open(p, "rb").read()).hexdigest()}
         print(name, tt.num_rows, "->", p)
 
-    build_commit = subprocess.run(["git", "-C", os.path.expanduser("~/work/zen/zensim"),
+    build_commit = subprocess.run(["git", "-C", os.path.expanduser("~/work/zen/zensimx"),
                                    "rev-parse", "--short=12", "HEAD"], capture_output=True, text=True).stdout.strip()
     man = {
         "leg": "hdrgrid-mc944-T2 (HDR-944 L1, era-B zensim target)",

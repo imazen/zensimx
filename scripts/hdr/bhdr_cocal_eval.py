@@ -28,7 +28,7 @@ ap.add_argument("--label", default="candidate")
 a = ap.parse_args()
 sys.argv = ["xdi"]
 
-REPO = os.path.expanduser("~/work/zen/zensim")
+REPO = os.path.expanduser("~/work/zen/zensimx")
 PROBE = "/mnt/v/output/zensim-multicodec-probe"
 SHIPPED = f"{REPO}/zensim/weights/bhdr_linear_shaped_cvvdpmix_2026-07-12.bin"
 HDR_FEATS = f"{PROBE}/upiq_features_372_pulinear.parquet"

@@ -3,7 +3,7 @@ package name `zen_corpus_join`.
 
 This file exists so that other repos (zenmetrics, zenanalyze) can:
 
-    pip install -e /home/lilith/work/zen/zensim/scripts/canonical_corpus
+    pip install -e /home/lilith/work/zen/zensimx/scripts/canonical_corpus
     from zen_corpus_join import safe_metric_join, ...
 
 Without the wrapper, cross-repo consumers must `sys.path.insert` to point at

@@ -22,7 +22,7 @@ set -euo pipefail
 
 SEED="${1:?usage: $0 <seed>}"
 OUT_DIR="${OUT_DIR:-/mnt/v/zen/zensim-eval/exp_v11_balanced_v2_alt_2026-05-20}"
-TRAINER="/home/lilith/work/zen/zensim/target/release/zensim_mlp_train"
+TRAINER="/home/lilith/work/zen/zensimx/target/release/zensim_mlp_train"
 PARQ_DIR="/mnt/v/zen/zensim-training/canonical-2026-05-21/train"
 ANCHOR="/mnt/v/zen/zensim-training/2026-05-20-v11-substrate/anchors_ssim2_300col_v2.parquet"
 EQUIV="/mnt/v/zen/zensim-training/2026-05-20-v11-substrate/cross_codec_equivalence_ssim2_v2.parquet"

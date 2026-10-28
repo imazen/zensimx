@@ -89,7 +89,7 @@ Two jj traps the script already handles, which hand-rolled one-liners keep
 re-learning: a successful push makes `@` immutable and jj creates a **fresh empty
 `@` on top**, so `-r @` one command later targets the wrong commit; and a jj
 **workspace has no `.git`**, so read-only `git` verification must run as
-`git -C ~/work/zen/zensim …` against the primary checkout.
+`git -C ~/work/zen/zensimx …` against the primary checkout.
 
 ## Known Bugs
 
@@ -3402,7 +3402,7 @@ Record: `benchmarks/sota944_campaign_2026-08-03.md` APPENDIX T.R11.
 
 ### Bake evaluation (per-bake instant verdict from parquet sidecars)
 **`bake_verdict` binary** at
-`/home/lilith/work/zen/zensim/zensim-validate/src/bin/bake_verdict.rs`.
+`/home/lilith/work/zen/zensimx/zensim-validate/src/bin/bake_verdict.rs`.
 Build with `cargo build --release --bin bake_verdict -p zensim-validate`.
 
 ```sh
@@ -3545,7 +3545,7 @@ provenance copies live in `scripts/external_reads/asrun/`. See its README.
 
 ### Replay a training run's pair sampler / describe a drawn subset
 **`subset_sim` binary** at
-`/home/lilith/work/zen/zensim/zensim-validate/src/bin/subset_sim.rs`.
+`/home/lilith/work/zen/zensimx/zensim-validate/src/bin/subset_sim.rs`.
 Build with `cargo build --release -p zensim-validate --bin subset_sim`.
 
 ```sh
@@ -3561,7 +3561,7 @@ a real run's `ZENSIM_SAMPLE_DIGEST=1` output.
 
 ### IQA statistical panel on arbitrary (predicted, target) pairs
 **`panel` binary** at
-`/home/lilith/work/zen/zensim/zensim-validate/src/bin/panel.rs`.
+`/home/lilith/work/zen/zensimx/zensim-validate/src/bin/panel.rs`.
 Build with `cargo build --release -p zensim-validate --bin panel`.
 
 THE canonical entry point for the full Mohammadi 2025 panel (SROCC +
@@ -3601,7 +3601,7 @@ recorded outputs, 3× faster).
 
 ### Bake training (MLP supervised learning)
 **`zensim_mlp_train` binary** at
-`/home/lilith/work/zen/zensim/zensim-validate/src/bin/zensim_mlp_train.rs`.
+`/home/lilith/work/zen/zensimx/zensim-validate/src/bin/zensim_mlp_train.rs`.
 Supports `--group <name>:<path.parquet>:train_w:val_w` (auto-detects
 .csv vs .parquet by extension), `--target-column NAME`,
 `--feature-set extended_iw|extended|standard`, full PWRC+NiN flags,
@@ -3609,13 +3609,13 @@ auto-transforms via `--auto-transforms <screen.tsv>`.
 
 ### Eval matrix comparison (N bakes side-by-side)
 **`scripts/cvvdp_matrix_compare.sh`** at
-`/home/lilith/work/zen/zensim/scripts/cvvdp_matrix_compare.sh`. Runs
+`/home/lilith/work/zen/zensimx/scripts/cvvdp_matrix_compare.sh`. Runs
 bake_verdict on every `*.bin` in a dir + emits a per-corpus
 SROCC/Z-RMSE/PWRC table for ship-decision review.
 
 ### Bake dial / spline refit + tail gate (bake_dial_refit)
 **`bake_dial_refit` binary** at
-`/home/lilith/work/zen/zensim/zensim-validate/src/bin/bake_dial_refit.rs`.
+`/home/lilith/work/zen/zensimx/zensim-validate/src/bin/bake_dial_refit.rs`.
 Build with `cargo build --release -p zensim-validate --bin bake_dial_refit`.
 
 THE canonical Rust home for editing a ZNPR bake's output-calibration

@@ -16,7 +16,7 @@ LR="${1:?usage: $0 <lr> <seed>}"
 SEED="${2:?usage: $0 <lr> <seed>}"
 
 OUT_DIR="/mnt/v/zen/zensim-eval/speed_b_lr_retune_2026-05-19"
-TRAINER="/home/lilith/work/zen/zensim/target/release/zensim_mlp_train"
+TRAINER="/home/lilith/work/zen/zensimx/target/release/zensim_mlp_train"
 PARQ_DIR="/mnt/v/zen/zensim-training/canonical-2026-05-18/train"
 ANCHOR="/mnt/v/zen/zensim-training/2026-05-19-multi-band-anchors/anchors_multi_band_372col.parquet"
 EQUIV="/mnt/v/zen/picker-training/2026-05-19-v2/cross_codec_equivalence_tight_v3.parquet"

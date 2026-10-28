@@ -24,7 +24,7 @@ import importlib.util
 spec = importlib.util.spec_from_file_location(
     "xdi", os.path.join(os.path.dirname(__file__), "upiq_crossdomain_instrument.py"))
 
-REPO = os.path.expanduser("~/work/zen/zensim")
+REPO = os.path.expanduser("~/work/zen/zensimx")
 PROBE = "/mnt/v/output/zensim-multicodec-probe"
 
 ap = argparse.ArgumentParser()

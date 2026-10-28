@@ -19,7 +19,7 @@ KBATCH="${KBATCH:-1}"  # per-sample-α head requires --minibatch-size 1
 USE_GPU="${USE_GPU:-cuda}"  # cuda | cpu
 
 OUT_DIR="/mnt/v/zen/zensim-eval/exp_v11_balanced_v2_2026-05-20"
-TRAINER="/home/lilith/work/zen/zensim/target/release/zensim_mlp_train"
+TRAINER="/home/lilith/work/zen/zensimx/target/release/zensim_mlp_train"
 
 PARQ_DIR="/mnt/v/zen/zensim-training/canonical-2026-05-21/train"
 

@@ -37,7 +37,7 @@ const HF: usize = 48; // free MLP hidden
 const DELTA: f64 = 25.0; // bounded free-modulation magnitude
 const CANON: &str = "/mnt/v/zen/zensim-training/canonical-2026-05-21/train";
 const VAL: &str = zensim_validate::eval_roots::STORED_FEATURES_ROOT_2026_05_15;
-const MASK: &str = "/home/lilith/work/zen/zensim/benchmarks/feature_sign_mask_2026-05-26.tsv";
+const MASK: &str = "/home/lilith/work/zen/zensimx/benchmarks/feature_sign_mask_2026-05-26.tsv";
 
 struct Rng(u64);
 impl Rng {

@@ -28,7 +28,7 @@ SEED="${1:?usage: $0 <seed>}"
 KBATCH="${KBATCH:-32}"  # SPEED-B default
 
 OUT_DIR="/mnt/v/zen/zensim-eval/exp_cross_codec_v11a_ssim2_2026-05-20"
-TRAINER="/home/lilith/work/zen/zensim/target/release/zensim_mlp_train"
+TRAINER="/home/lilith/work/zen/zensimx/target/release/zensim_mlp_train"
 
 # Canonical-2026-05-21 training parquets (per task brief)
 PARQ_DIR="/mnt/v/zen/zensim-training/canonical-2026-05-21/train"

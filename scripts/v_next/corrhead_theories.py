@@ -46,10 +46,10 @@ NEGRICH = os.environ.get("CORRTH_NEGRICH", f"{ROOT}/negrich_372_postC.parquet")
 GATE = os.environ.get("CORRTH_GATE",
                       f"{ROOT}/corruption_grid_372col_postC_2026-09-05.parquet")
 DBAKE = os.environ.get("CORRTH_DBAKE", os.path.expanduser(
-    "~/work/zen/zensim/zensim/weights/"
+    "~/work/zen/zensimx/zensim/weights/"
     "d_sdr_add156_id100_negrich_dial_2026-09-05.bin"))
 FWD = os.environ.get("CORRTH_FWD", os.path.expanduser(
-    "~/work/zen/zensim/target/release/predict_features_with_bake"))
+    "~/work/zen/zensimx/target/release/predict_features_with_bake"))
 CACHE = os.environ.get("CORRTH_CACHE", f"{OUT}/dataset_rev1.npz")
 GATE_CACHE = os.environ.get("CORRTH_GATE_CACHE", f"{OUT}/gate_rev1.npz")
 NFEAT_SLICE = 228          # d228: f0..f227, free at D's V1PoolsMode::Peaks walk

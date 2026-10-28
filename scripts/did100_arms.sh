@@ -13,7 +13,7 @@
 #
 # Binaries come from the MAIN repo by default; override with ZL_BDR / ZL_BV.
 set -euo pipefail
-REPO=/home/lilith/work/zen/zensim
+REPO=/home/lilith/work/zen/zensimx
 R="${ZL_BDR:-$REPO/target/release/bake_dial_refit}"
 W=/mnt/v/output/zensim/did100-2026-09-04
 GRAM_SAFESYN=/mnt/v/output/zensim-multicodec-probe/linear-probe/grams/safesyn.npz

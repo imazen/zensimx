@@ -279,7 +279,7 @@ worth doing until profiling confirms `map_init` is the cause).
 Pick Optimization 1. It's the highest-impact single change.
 
 ```sh
-cd ~/work/zen/zensim
+cd ~/work/zen/zensimx
 git checkout feat/streaming-372-phase1   # this branch
 # implement the trait + view, cascade signatures (~300 LOC)
 cargo test --release --features threads -p zensim --lib \

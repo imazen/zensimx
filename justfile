@@ -2884,8 +2884,8 @@ shipgates-jxl-progress encodes judges:
     python3 scripts/rev4_featpot/shipgates_progress.py --encodes {{quote(encodes)}} --judges {{quote(judges)}}
 
 e36-source-archives root commit producer:
-    git -C /home/lilith/work/zen/zensim archive --format=tar --output={{quote(root + "/sources/preparation-code.tar")}} {{quote(commit)}}
-    git -C /home/lilith/work/zen/zensim archive --format=tar --output={{quote(root + "/sources/cohort-producer-code.tar")}} {{quote(producer)}}
+    git -C /home/lilith/work/zen/zensimx archive --format=tar --output={{quote(root + "/sources/preparation-code.tar")}} {{quote(commit)}}
+    git -C /home/lilith/work/zen/zensimx archive --format=tar --output={{quote(root + "/sources/cohort-producer-code.tar")}} {{quote(producer)}}
     just e36-evidence-manifest {{quote(root)}} {{quote(commit)}}
     just e36-archive {{quote(root)}} /mnt/tower/output/zensim/e36-2026-10-16
 
@@ -3180,7 +3180,7 @@ e36-allocation-status lock scope:
 # Export a committed source tree for a nontraining build, preserving prior versions.
 e36-build-source root commit version:
     test ! -e {{quote(root + "/" + version + ".tar")}}
-    nice -n19 ionice -c3 git -C /home/lilith/work/zen/zensim archive --format=tar --output={{quote(root + "/" + version + ".tar")}} {{quote(commit)}}
+    nice -n19 ionice -c3 git -C /home/lilith/work/zen/zensimx archive --format=tar --output={{quote(root + "/" + version + ".tar")}} {{quote(commit)}}
     python3 -c 'import hashlib,json,socket,sys; from pathlib import Path; p=Path(sys.argv[1]); a=Path(str(p)+".tar"); h=hashlib.sha256(); f=a.open("rb"); [h.update(b) for b in iter(lambda:f.read(1048576),b"")]; f.close(); r=dict(source_commit=sys.argv[2],archive_sha256=h.hexdigest(),archive_bytes=a.stat().st_size,source_host=socket.gethostname(),fits=0); o=Path(str(p)+".json").open("x"); json.dump(r,o,indent=2); o.write("\n"); o.close(); print(json.dumps(r))' {{quote(root + "/" + version)}} {{quote(commit)}}
 
 e36-budget-amendment-check:

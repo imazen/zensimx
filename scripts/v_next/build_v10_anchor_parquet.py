@@ -421,7 +421,7 @@ def main() -> None:
         "--comparison-md",
         type=Path,
         default=Path(
-            "/home/lilith/work/zen/zensim/benchmarks/"
+            "/home/lilith/work/zen/zensimx/benchmarks/"
             "v10_anchor_design_2026-05-20.md"
         ),
     )

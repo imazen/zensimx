@@ -191,7 +191,7 @@ def main():
     ap.add_argument("--tuner")
     ap.add_argument("--maps", required=True)
     ap.add_argument("--peer-maps", required=True)
-    ap.add_argument("--panel", default="/home/lilith/work/zen/zensim/target/release/panel")
+    ap.add_argument("--panel", default="/home/lilith/work/zen/zensimx/target/release/panel")
     ap.add_argument("--out", required=True)
     args = ap.parse_args()
 

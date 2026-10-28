@@ -23,7 +23,7 @@ import random
 import sys
 
 # Repo-relative, like every other driver in this lane. The first draft
-# hardcoded `~/work/zen/zensim/scripts` — the PRIMARY checkout — from a script
+# hardcoded `~/work/zen/zensimx/scripts` — the PRIMARY checkout — from a script
 # that runs in a sibling workspace, so a lane-local change to the stat owner
 # would have been invisible to the lane's own bootstrap. (Review 2026-09-06.)
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__))))

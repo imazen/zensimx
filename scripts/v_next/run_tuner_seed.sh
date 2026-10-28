@@ -26,7 +26,7 @@ set -euo pipefail
 SEED="${1:?usage: $0 <seed>}"
 
 OUT_DIR="/mnt/v/zen/zensim-eval/exp_tuner_2026-05-18"
-TRAINER="/home/lilith/work/zen/zensim/target/release/zensim_mlp_train"
+TRAINER="/home/lilith/work/zen/zensimx/target/release/zensim_mlp_train"
 PARQ_DIR="/mnt/v/zen/zensim-training/canonical-2026-05-18/train"
 VAL_DIR="/mnt/v/zen/zensim-training/canonical-2026-05-18/val"
 

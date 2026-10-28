@@ -31,7 +31,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 from scipy.stats import spearmanr
 
-REPO = os.path.expanduser("~/work/zen/zensim")
+REPO = os.path.expanduser("~/work/zen/zensimx")
 PROBE = "/mnt/v/output/zensim-multicodec-probe"
 
 ap = argparse.ArgumentParser()

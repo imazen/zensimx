@@ -40,7 +40,7 @@ KBATCH="${KBATCH:-32}"
 USE_GPU="${USE_GPU:-cuda}"
 
 OUT_DIR="${OUT_DIR:-/mnt/v/zen/zensim-eval/exp_v13_cvvdp_distill_2026-05-20}"
-TRAINER="/home/lilith/work/zen/zensim/target/release/zensim_mlp_train"
+TRAINER="/home/lilith/work/zen/zensimx/target/release/zensim_mlp_train"
 
 PARQ_DIR="/mnt/v/zen/zensim-training/canonical-2026-05-21/train"
 

@@ -20,7 +20,7 @@ from datetime import datetime, timezone
 
 # Resolve everything relative to THIS FILE's checkout, never a hard-coded repo
 # root: this script is run from jj sibling workspaces, and a hard-coded
-# `~/work/zen/zensim` made it append to the PRIMARY checkout's registry — which was
+# `~/work/zen/zensimx` made it append to the PRIMARY checkout's registry — which was
 # sitting on an older commit, so the append landed on a stale copy of the file.
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 REG_DEFAULT = os.path.join(REPO, "benchmarks/dial_addressability_floor_2026-09-04.json")

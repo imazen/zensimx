@@ -13,7 +13,7 @@ set -euo pipefail
 
 SEED="${1:?usage: $0 <seed>}"
 OUT_DIR="${OUT_DIR:-/mnt/v/zen/zensim-eval/exp_v11_balanced_v2_372feat_2026-05-20}"
-TRAINER="/home/lilith/work/zen/zensim/target/release/zensim_mlp_train"
+TRAINER="/home/lilith/work/zen/zensimx/target/release/zensim_mlp_train"
 PARQ_DIR="/mnt/v/zen/zensim-training/canonical-2026-05-21/train"
 
 BAKE="${OUT_DIR}/cc4v11a_v2_372_s${SEED}.bin"

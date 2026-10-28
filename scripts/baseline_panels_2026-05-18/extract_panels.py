@@ -29,7 +29,7 @@ from panel import PanelStats, compute_panel  # noqa: E402
 # ---------------------------------------------------------------------------
 
 PER_PAIR_CSV = (
-    "/home/lilith/work/zen/zensim/benchmarks/"
+    "/home/lilith/work/zen/zensimx/benchmarks/"
     "v0_22_iw_v3_seed1_2026-05-17_eval_per_pair.csv"
 )  # provides fast_ssim2_score per pair for CID22, KADID, TID, AIC-3
 
@@ -54,7 +54,7 @@ TID_MOS_STD_TXT = "/mnt/v/dataset/tid2013/mos_std.txt"
 KONJND_SUBJ_CSV = "/mnt/v/datasets/KonJND-1k/KonJND-1k/subjective_ratings.csv"
 
 OUTPUT_MD = (
-    "/home/lilith/work/zen/zensim/benchmarks/"
+    "/home/lilith/work/zen/zensimx/benchmarks/"
     "baseline_panels_2026-05-18.md"
 )
 LOG_PATH = "/tmp/baseline_panels_2026-05-18.log"

@@ -12,7 +12,7 @@
 # Binaries come from the MAIN repo by default (never a sibling worktree — those
 # get cleaned up and take committed scripts down with them); override ZL_BDR/ZL_BV.
 set -euo pipefail
-REPO=/home/lilith/work/zen/zensim
+REPO=/home/lilith/work/zen/zensimx
 R="${ZL_BDR:-$REPO/target/release/bake_dial_refit}"
 V="${ZL_BV:-$REPO/target/release/bake_verdict}"
 W=/mnt/v/output/zensim/dfree-2026-09-05

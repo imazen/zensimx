@@ -75,7 +75,7 @@ User-facing flow:
 
 ## New workspace member: `zensim-train-wasm`
 
-Path: `~/work/zen/zensim/zensim-train-wasm/`
+Path: `~/work/zen/zensimx/zensim-train-wasm/`
 
 ```
 zensim-train-wasm/

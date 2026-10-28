@@ -79,7 +79,7 @@ DEFAULT_OUT = Path(
     "/mnt/v/zen/zensim-training/2026-05-19-empirical-band-anchors/anchors_empirical_372col.parquet"
 )
 DEFAULT_COMPARISON = Path(
-    "/home/lilith/work/zen/zensim/benchmarks/v_tuner_v7_anchor_target_comparison_2026-05-19.md"
+    "/home/lilith/work/zen/zensimx/benchmarks/v_tuner_v7_anchor_target_comparison_2026-05-19.md"
 )
 
 

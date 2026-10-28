@@ -9,7 +9,7 @@ mkdir -p "$OUT_DIR"
 
 BAKE="$OUT_DIR/persample_s${SEED}_h128.bin"
 LOG="$OUT_DIR/persample_s${SEED}_h128.log"
-TRAINER=/home/lilith/work/zen/zensim/target/release/zensim_mlp_train
+TRAINER=/home/lilith/work/zen/zensimx/target/release/zensim_mlp_train
 
 CORPUS_ROOT=/mnt/v/zen/zensim-training/2026-05-17-cvvdp-merged-trainer
 

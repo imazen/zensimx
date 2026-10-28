@@ -11,7 +11,7 @@
 
 set -euo pipefail
 
-ROOT="/home/lilith/work/zen/zensim"
+ROOT="/home/lilith/work/zen/zensimx"
 BAKES_DIR="/mnt/v/zen/zensim-eval/exp_cross_codec_v2_2026-05-19"
 EVAL_OUT_DIR="/mnt/v/output/zensim/cross_codec_metric_2026-05-19-v2"
 VERDICT_DIR="${BAKES_DIR}/verdicts"

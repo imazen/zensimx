@@ -13,7 +13,7 @@ mkdir -p "$OUT_DIR"
 
 BAKE="$OUT_DIR/larger_large_s${SEED}_h${HIDDEN}.bin"
 LOG="$OUT_DIR/larger_large_s${SEED}_h${HIDDEN}.log"
-TRAINER=/home/lilith/work/zen/zensim/target/release/zensim_mlp_train
+TRAINER=/home/lilith/work/zen/zensimx/target/release/zensim_mlp_train
 
 CANONICAL=/mnt/v/zen/zensim-training/2026-05-17-cvvdp-merged-trainer
 

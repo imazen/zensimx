@@ -33,7 +33,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pyarrow.parquet as pq
 
-REPO = Path.home() / "work/zen/zensim"
+REPO = Path.home() / "work/zen/zensimx"
 SCORER = str(REPO / "target/release/predict_features_with_bake")
 CORRLQ = Path("/mnt/v/output/zensim/corr-lq")
 TSV = Path("/mnt/v/output/zensim/corruption_gate_results/corruption_multimetric_2026-05-28.tsv")

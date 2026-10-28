@@ -98,7 +98,7 @@ def main():
     counts["test_heldout"] = sum(1 for r in rows if r["split"] == "test")
     counts["unsplittable"] = sum(1 for r in rows if r["split"] == "none")
 
-    zen_commit = subprocess.run(["git", "-C", os.path.expanduser("~/work/zen/zensim"),
+    zen_commit = subprocess.run(["git", "-C", os.path.expanduser("~/work/zen/zensimx"),
                                  "rev-parse", "--short", "HEAD"],
                                 capture_output=True, text=True).stdout.strip()
     man = {

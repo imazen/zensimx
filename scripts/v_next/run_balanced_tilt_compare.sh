@@ -7,7 +7,7 @@ BAKE_A="${1:?bake_a}"
 BAKE_B="${2:?bake_b}"
 OUT_MD="${3:?out_md}"
 
-BC=/home/lilith/work/zen/zensim/target/release/bake_compare
+BC=/home/lilith/work/zen/zensimx/target/release/bake_compare
 
 "$BC" --a "$BAKE_A" --b "$BAKE_B" \
   --corpora cid22,kadid,tid,konjnd,aic3 \

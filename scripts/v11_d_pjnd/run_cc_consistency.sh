@@ -13,9 +13,9 @@ SWEEP_DIR="${SWEEP_DIR:-/mnt/v/output/zensim/exp_v11_d_pjnd_2026-05-20}"
 CCC_DIR="${SWEEP_DIR}/cc_consistency"
 mkdir -p "${CCC_DIR}"
 
-TARGET_PREDICT_TOOL="/home/lilith/work/zen/zensim/target/release/predict_features_with_bake"
+TARGET_PREDICT_TOOL="/home/lilith/work/zen/zensimx/target/release/predict_features_with_bake"
 TARGET_ZEN_METRICS="/home/lilith/work/zen/zenmetrics/target/release/zenmetrics"
-CONSISTENCY=/home/lilith/work/zen/zensim/scripts/v_next/cross_codec_consistency.py
+CONSISTENCY=/home/lilith/work/zen/zensimx/scripts/v_next/cross_codec_consistency.py
 
 # Tier → KonJND-median seed (populated by the caller via env / arg).
 # Default fallback: median = s3 across all tiers.

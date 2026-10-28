@@ -93,7 +93,7 @@ gout_cmd = ["/home/lilith/.venvs/pytools/bin/python", "scripts/v_next/outlier_ga
 for p in ("peer_ssim2", "peer_butteraugli", "peer_cvvdp", "peer_iwssim"):
     gout_cmd += ["--peer", f"{FE}/{p}.fulleval.json"]
 gout_cmd += [f"{FE}/{FE_STEM.get(t, t)}.fulleval.json" for t in CELLS]
-go = subprocess.run(gout_cmd, capture_output=True, text=True, cwd="/home/lilith/work/zen/zensim")
+go = subprocess.run(gout_cmd, capture_output=True, text=True, cwd="/home/lilith/work/zen/zensimx")
 print("=== G-OUT v2 (owner output; full copy at ~/tmp/w12ubat/gout_full.txt) ===")
 open(os.path.expanduser("~/tmp/w12ubat/gout_full.txt"), "w").write(go.stdout)
 print("\n".join(l for l in go.stdout.splitlines() if "=>" in l or "kadid" in l))

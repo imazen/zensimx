@@ -16,9 +16,9 @@
 #     encoder ≥0, rank_w ≤0, α≡1 → bake monotone-by-construction in every
 #     non-negative dissimilarity feature.
 set -euo pipefail
-TRAIN="/home/lilith/work/zen/zensim/target/release/zensim_mlp_train"
+TRAIN="/home/lilith/work/zen/zensimx/target/release/zensim_mlp_train"
 OUT="/mnt/v/output/zensim/bakes/v46c_no_konjnd_agg_seed17_2026-05-26.bin"
-LOG="/home/lilith/work/zen/zensim/benchmarks/v46c_no_konjnd_agg_seed17_2026-05-26.log"
+LOG="/home/lilith/work/zen/zensimx/benchmarks/v46c_no_konjnd_agg_seed17_2026-05-26.log"
 mkdir -p "$(dirname "$OUT")"
 "$TRAIN" \
   --group safesyn:/mnt/v/zen/zensim-training/canonical-2026-05-21/train/safesyn.parquet:1.0:0.0 \

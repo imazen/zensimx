@@ -7,7 +7,7 @@ set -euo pipefail
 SEED="${1:?usage: $0 <seed>}"
 OUT_DIR="/mnt/v/zen/zensim-eval/exp_persample_mix3_2026-05-18"
 ZENPREDICT="/home/lilith/work/zen/zenanalyze/target/release/zenpredict"
-WS="/home/lilith/work/zen/zensim"
+WS="/home/lilith/work/zen/zensimx"
 BAKE_VERDICT="${WS}/target/release/bake_verdict"
 
 IN_BAKE="${OUT_DIR}/persample_mix3_s${SEED}_h128.bin"

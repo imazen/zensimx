@@ -5,7 +5,7 @@
 #   usage: eval_bake_blur_monotonicity.sh <bake.bin> <label>
 set -euo pipefail
 BAKE="$1"; LABEL="${2:-$(basename "$BAKE")}"
-PRED=/home/lilith/work/zen/zensim/target/release/predict_features_with_bake
+PRED=/home/lilith/work/zen/zensimx/target/release/predict_features_with_bake
 echo "=== $LABEL  ($BAKE) ==="
 TOTAL_INV=0; TOTAL_ABOVE_ID=0
 GMIN=1e9; GMAX=-1e9

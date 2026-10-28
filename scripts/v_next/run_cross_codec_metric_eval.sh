@@ -13,9 +13,9 @@ set -euo pipefail
 BAKE="${1:?usage: $0 <bake_path> <label>}"
 LABEL="${2:?usage: $0 <bake_path> <label>}"
 
-ROOT="/home/lilith/work/zen/zensim"
+ROOT="/home/lilith/work/zen/zensimx"
 SCRIPT="${ROOT}/scripts/v_next/cross_codec_consistency.py"
-TOOL="/home/lilith/work/zen/zensim/target/release/score_pair_with_bake"
+TOOL="/home/lilith/work/zen/zensimx/target/release/score_pair_with_bake"
 ZEN_METRICS="/home/lilith/work/zen/zenmetrics/target/release/zenmetrics"
 
 OUT_DIR="/mnt/v/output/zensim/cross_codec_metric_2026-05-19/${LABEL}"

@@ -19,7 +19,7 @@ mkdir -p "$OUT_DIR" "$LOG_DIR"
 
 BAKE="$OUT_DIR/metric_inputs_s${SEED}_h128.bin"
 LOG="$LOG_DIR/metric_inputs_s${SEED}.log"
-TRAINER=/home/lilith/work/zen/zensim/target/release/zensim_mlp_train
+TRAINER=/home/lilith/work/zen/zensimx/target/release/zensim_mlp_train
 DATA=/mnt/v/zen/zensim-training/2026-05-18-metric-inputs
 
 "$TRAINER" \

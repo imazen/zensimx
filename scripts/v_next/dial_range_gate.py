@@ -217,7 +217,7 @@ def main():
                           "gap/attain": "goal-derived (ratified +/-2 loop tolerance)",
                           "zones": "peer-derived (ssim2 >= 83 entry)",
                           "mono": "convention"}}
-    op = "/home/lilith/work/zen/zensim/benchmarks/dial_addressability_2026-08-28.json"
+    op = "/home/lilith/work/zen/zensimx/benchmarks/dial_addressability_2026-08-28.json"
     json.dump(out, open(op, "w"), indent=1)
     print(f"\nwrote {op}")
 

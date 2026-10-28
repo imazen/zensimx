@@ -10,7 +10,7 @@
 #   TID 0.932 | AIC-3 0.802 | AIC-4 0.905 | G1 dial 1.00
 set -euo pipefail
 
-REPO="/home/lilith/work/zen/zensim/.claude/worktrees/agent-a9484c7118fac8ded"
+REPO="/home/lilith/work/zen/zensimx/.claude/worktrees/agent-a9484c7118fac8ded"
 TRAIN="$REPO/target/release/zensim_mlp_train"
 CANON="/mnt/v/zen/zensim-training/canonical-2026-05-21/train"
 OUTDIR="/mnt/v/output/zensim/bakes"

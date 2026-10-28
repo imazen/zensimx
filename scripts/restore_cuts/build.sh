@@ -38,10 +38,10 @@ build_in() {
       sha256sum "$CARGO_TARGET_DIR/release/examples/extract_features_372col" )
 }
 if [ "$which" = base ]; then
-    rev=$(git -C /home/lilith/work/zen/zensim rev-parse refs/remotes/origin/main)
+    rev=$(git -C /home/lilith/work/zen/zensimx rev-parse refs/remotes/origin/main)
     B=$ROOT/base
     rm -rf "$B"; mkdir -p "$B/zensim"
-    git -C /home/lilith/work/zen/zensim archive "$rev" | tar -x -C "$B/zensim"
+    git -C /home/lilith/work/zen/zensimx archive "$rev" | tar -x -C "$B/zensim"
     for d in "$ROOT"/src/*/; do n=$(basename "$d"); [ "$n" = zensim ] || ln -s "$ROOT/src/$n" "$B/$n"; done
     overlay "$B/zensim"
     echo "BASE_COMMIT=$rev"

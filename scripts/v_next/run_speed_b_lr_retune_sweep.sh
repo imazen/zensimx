@@ -4,7 +4,7 @@
 # Each bake uses RAYON_NUM_THREADS=6 (5 procs × 6 threads = 30 threads on 32-core box).
 set -euo pipefail
 
-DRIVER="/home/lilith/work/zen/zensim/scripts/v_next/run_speed_b_lr_retune_seed.sh"
+DRIVER="/home/lilith/work/zen/zensimx/scripts/v_next/run_speed_b_lr_retune_seed.sh"
 OUT_DIR="/mnt/v/zen/zensim-eval/speed_b_lr_retune_2026-05-19"
 PAIRS_FILE="${OUT_DIR}/sweep_pairs.txt"
 

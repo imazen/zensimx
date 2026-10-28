@@ -11,9 +11,9 @@
 # inputs (safesyn + cid22_train) + konjnd-aggregation + cross-codec-eq +
 # dynamic-range-floor; NOT 5 explicit human-MOS groups.
 set -euo pipefail
-TRAIN="/home/lilith/work/zen/zensim/target/release/zensim_mlp_train"
+TRAIN="/home/lilith/work/zen/zensimx/target/release/zensim_mlp_train"
 OUT="/mnt/v/output/zensim/bakes/repro_tuner_v11_s1_2026-05-26.bin"
-LOG="/home/lilith/work/zen/zensim/benchmarks/repro_tuner_v11_s1_2026-05-26.log"
+LOG="/home/lilith/work/zen/zensimx/benchmarks/repro_tuner_v11_s1_2026-05-26.log"
 mkdir -p "$(dirname "$OUT")"
 "$TRAIN" \
   --group safesyn:/mnt/v/zen/zensim-training/canonical-2026-05-21/train/safesyn.parquet:1.0:0.0 \

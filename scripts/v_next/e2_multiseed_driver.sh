@@ -10,7 +10,7 @@ ZM=target/release/zensim_mlp_train
 BV=target/release/bake_verdict
 BAKES=/mnt/v/output/zensim/bakes
 LOGD=/home/lilith/tmp
-MARK=/home/lilith/work/zen/zensim/.workongoing
+MARK=/home/lilith/work/zen/zensimx/.workongoing
 
 for SEED in 7 13; do
   for ARM in ext720 v1372; do

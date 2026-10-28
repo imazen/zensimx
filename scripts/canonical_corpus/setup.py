@@ -2,7 +2,7 @@
 
 Install (from any repo's CI or dev shell):
 
-    pip install -e /home/lilith/work/zen/zensim/scripts/canonical_corpus
+    pip install -e /home/lilith/work/zen/zensimx/scripts/canonical_corpus
 
 Then:
 

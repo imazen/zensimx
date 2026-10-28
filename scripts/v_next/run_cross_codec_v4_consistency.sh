@@ -14,9 +14,9 @@ V4_DIR="/mnt/v/zen/zensim-eval/exp_cross_codec_v4_2026-05-19"
 OUT_DIR="${V4_DIR}/cross_codec_t63"
 mkdir -p "${OUT_DIR}"
 
-TOOL=/home/lilith/work/zen/zensim/target/release/score_pair_with_bake
+TOOL=/home/lilith/work/zen/zensimx/target/release/score_pair_with_bake
 ZEN_METRICS=/home/lilith/work/zen/zenmetrics/target/release/zenmetrics
-CONSISTENCY=/home/lilith/work/zen/zensim/scripts/v_next/cross_codec_consistency.py
+CONSISTENCY=/home/lilith/work/zen/zensimx/scripts/v_next/cross_codec_consistency.py
 
 for bake in "${V4_DIR}"/cc4v4_*.bin; do
     [ -f "$bake" ] || continue

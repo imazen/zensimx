@@ -44,7 +44,7 @@ CANONICAL = Path("/mnt/v/zen/zensim-training/canonical-2026-05-18")
 OUT_ROOT = Path("/mnt/v/zen/zensim-training/2026-05-18-metric-inputs")
 SCORES_CVVDP = Path("/mnt/v/zen/zensim-eval")
 SCORES_IWSSIM = Path("/mnt/v/zen/zensim-training/2026-05-18-iwssim-panels")
-SSIM2_PER_PAIR_CSV = Path("/home/lilith/work/zen/zensim/benchmarks/v0_22_iw_v3_seed1_2026-05-17_eval_per_pair.csv")
+SSIM2_PER_PAIR_CSV = Path("/home/lilith/work/zen/zensimx/benchmarks/v0_22_iw_v3_seed1_2026-05-17_eval_per_pair.csv")
 
 # Mapping from "corpus" key used internally to "dataset" column values in the per-pair CSV
 SSIM2_DATASET_MAP = {

@@ -29,7 +29,7 @@ import argparse, os, struct, subprocess, sys, tempfile
 import numpy as np, pyarrow.parquet as pq
 
 FWD = os.path.expanduser(
-    "~/work/zen/zensim/target/release/predict_features_with_bake")
+    "~/work/zen/zensimx/target/release/predict_features_with_bake")
 
 
 def main():

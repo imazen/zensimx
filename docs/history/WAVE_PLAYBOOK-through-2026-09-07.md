@@ -152,8 +152,8 @@ But an agent that only *runs* binaries should not build at all. Every driver
 honours env pointers:
 
 ```bash
-export ZL_BV=/home/lilith/work/zen/zensim/target/release/bake_verdict
-export ZL_TRAIN=/home/lilith/work/zen/zensim/target/release/zensim_mlp_train
+export ZL_BV=/home/lilith/work/zen/zensimx/target/release/bake_verdict
+export ZL_TRAIN=/home/lilith/work/zen/zensimx/target/release/zensim_mlp_train
 # or, to reuse a whole tree:
 export CARGO_TARGET_DIR=$HOME/tmp/zensimw8-target
 ```
@@ -334,7 +334,7 @@ silently — no human nudge needed to *orient*. User-side snippet (optional, in
 
 ```json
 "SessionStart": [{ "matcher": "*", "hooks": [{ "type": "command",
-  "command": "bash /home/lilith/work/zen/zensim/scripts/wave_resume_probe.sh" }] }]
+  "command": "bash /home/lilith/work/zen/zensimx/scripts/wave_resume_probe.sh" }] }]
 ```
 
 ## Residual notification ticks from closed lanes — determination (2026-08-05)

@@ -34,7 +34,7 @@ from pathlib import Path
 
 from PIL import Image
 
-ROOT = Path("/home/lilith/work/zen/zensim")
+ROOT = Path("/home/lilith/work/zen/zensimx")
 ZENSIM_BIN = ROOT / "target/release/examples/zensim_score_named"
 ZEN_METRICS = Path("/home/lilith/work/zen/zenmetrics/target/release/zenmetrics")
 QSWEEP_TSV = Path("/mnt/v/output/zensim/exp_tuner_2026-05-18/qsweep/qsweep_manifest.tsv")

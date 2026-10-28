@@ -12,7 +12,7 @@
 set -euo pipefail
 
 OUT_DIR="${1:-/mnt/v/zen/zensim-eval/exp_tuner_v11_2026-05-24}"
-REPO="/home/lilith/work/zen/zensim"
+REPO="/home/lilith/work/zen/zensimx"
 VERDICT="${REPO}/target/release/bake_verdict"
 QSWEEP="${REPO}/target/release/qsweep_eval"
 CROSS_CODEC="${REPO}/scripts/v_next/measure_tuner_v10_cross_codec.py"

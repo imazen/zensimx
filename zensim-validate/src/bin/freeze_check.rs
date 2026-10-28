@@ -5097,7 +5097,7 @@ mod tests {
         ]);
         let mut o = run("4031", "/mnt/v/bakes/LSTAR2_s4031_ckpts");
         o["repro"]["argv"] = json!([
-            "/home/lilith/work/zen/zensim/target/release/zensim_mlp_train",
+            "/home/lilith/work/zen/zensimx/target/release/zensim_mlp_train",
             "--epochs",
             "120",
             "--seed",
@@ -5115,7 +5115,7 @@ mod tests {
         // ...but the basename still separates two different TOOLS.
         let mut t = o.clone();
         t["repro"]["argv"] = json!([
-            "/home/lilith/work/zen/zensim/target/release/bake_dial_refit",
+            "/home/lilith/work/zen/zensimx/target/release/bake_dial_refit",
             "--epochs",
             "120",
             "--seed",

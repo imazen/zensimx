@@ -2,7 +2,7 @@
 # After the r7 runtime grid: peer scores on the E21 sets' pixels, EVAL paired-vs-Mlic and scatter for both finalists,
 # and the curated TRAIN-population views with peers. Evaluation only (no fits); all under the shared compute lock.
 set -euo pipefail
-cd /home/lilith/work/zen/zensim
+cd /home/lilith/work/zen/zensimx
 P=/mnt/v/output/zensim/e21-peers-20261028
 S=/mnt/v/output/zensim/mlic-aic-finalists-eval-20261028
 ZM=/var/tmp/byconstruction-bin/zenmetrics-judge-7a0f8394/zenmetrics

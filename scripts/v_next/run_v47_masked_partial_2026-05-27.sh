@@ -8,11 +8,11 @@
 # is the constraint's intrinsic cost. Compare V46b vs V46 (1-layer,
 # mix_cv40_iw60, tanh=20) → that delta is the recipe-choice cost.
 set -euo pipefail
-TRAIN="/home/lilith/work/zen/zensim/target/release/zensim_mlp_train"
+TRAIN="/home/lilith/work/zen/zensimx/target/release/zensim_mlp_train"
 OUT="/mnt/v/output/zensim/bakes/v47_masked_partial_2026-05-26.bin"
-LOG="/home/lilith/work/zen/zensim/benchmarks/v47_masked_partial_2026-05-26.log"
+LOG="/home/lilith/work/zen/zensimx/benchmarks/v47_masked_partial_2026-05-26.log"
 CANON="/mnt/v/zen/zensim-training/canonical-2026-05-21/train"
-TXFORM="/home/lilith/work/zen/zensim/benchmarks/yeo_johnson_screen_widest_2026-05-25/screen_results_cross_corpus_safe.tsv"
+TXFORM="/home/lilith/work/zen/zensimx/benchmarks/yeo_johnson_screen_widest_2026-05-25/screen_results_cross_corpus_safe.tsv"
 mkdir -p "$(dirname "$OUT")"
 "$TRAIN" \
   --group safesyn:$CANON/safesyn.parquet:1.0:0.5 \
@@ -29,6 +29,6 @@ mkdir -p "$(dirname "$OUT")"
   --anchor-parquet $CANON/multiband_anchor_dial100.parquet \
   --anchor-loss-weight 0.01 --anchor-step-p 0.05 \
   --minibatch-size 32 --log-every 25 \
-  --monotone-cbc --monotone-feature-mask /home/lilith/work/zen/zensim/benchmarks/feature_sign_mask_2026-05-26.tsv \
+  --monotone-cbc --monotone-feature-mask /home/lilith/work/zen/zensimx/benchmarks/feature_sign_mask_2026-05-26.tsv \
   --out "$OUT" --log-path "$LOG" 2>&1 | tee "${LOG}.stdout"
 echo "DONE: $OUT"
