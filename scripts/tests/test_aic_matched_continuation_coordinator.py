@@ -460,6 +460,18 @@ class CodecEvidence(unittest.TestCase):
                                     "AICOnly", Path("/invented/after"))
 
 
+class CodecModel(unittest.TestCase):
+    def test_full_data_takes_only_the_picked_codec_point_from_the_fold_study(self):
+        self.assertEqual(owner.CODEC_MODEL_POINT, (str(owner.FRONTIER_REUSED_RUN), "AICOnly", 29))
+        with tempfile.TemporaryDirectory(dir=Path.home() / "tmp") as tmp:
+            point = Path(tmp) / "point"
+            point.mkdir()
+            (point / "PLAN.json").write_text(json.dumps(dict(schema=owner.FOLD_SCHEMA, arms={"AICOnly": "aic-only"})))
+            with self.assertRaisesRegex(ValueError, "or the codec model"):
+                owner.full_plan(Path(tmp) / "run", "0" * 40, Path("/invented/t"), Path("/invented/m"), point, "AICOnly",
+                                29, Path("/invented/after"))
+
+
 class RecipeVariant(unittest.TestCase):
     def test_mlic_points_have_no_recipe_and_factor_recipes_refuse_before_any_read(self):
         self.assertEqual(owner.recipe_point(dict(schema=owner.FRONTIER_SCHEMA)), (None, None, None))

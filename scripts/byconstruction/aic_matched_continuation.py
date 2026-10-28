@@ -1424,11 +1424,20 @@ PACK = ("import json, sys; from pathlib import Path; from v2_production_pack imp
         "print(json.dumps(pack_production(Path(sys.argv[1]), Path(sys.argv[2]), Path(sys.argv[3]), e33_output_stage=True)))")
 
 
+# The codec model's follow-through (registered 2026-10-27 after the owner picked AIC-only e29 as the codec-only model).
+CODEC_MODEL_REGISTRATION = dict(record="benchmarks/byconstruction_2026-10-22.md",
+                                section="Codec model follow-through: AIC-only e29 (owner's pick)",
+                                commit="5a0eadacc2a74ebadcffa2cc96d856b11e975d00")
+CODEC_MODEL_POINT = (str(FRONTIER_REUSED_RUN), "AICOnly", 29)
+
+
 def full_plan(run, commit, trainer, meta_tool, point_run, arm, epoch, after_run):
     point = json.loads((Path(point_run) / "PLAN.json").read_text())
-    if (point.get("schema") not in (FRONTIER_SCHEMA, RECOVERY_SCHEMA, XREF_SCHEMA, RECIPE_SCHEMA)
-            or arm not in point["arms"] or epoch not in FRONTIER_CHECKPOINTS):
-        raise ValueError("the advanced point must be a frontier, recovery, rehearsal or recipe arm at a studied epoch")
+    codec_model = (str(Path(point_run)), arm, epoch) == CODEC_MODEL_POINT
+    schemas = (FRONTIER_SCHEMA, RECOVERY_SCHEMA, XREF_SCHEMA, RECIPE_SCHEMA, *((FOLD_SCHEMA,) if codec_model else ()))
+    if point.get("schema") not in schemas or arm not in point["arms"] or epoch not in FRONTIER_CHECKPOINTS:
+        raise ValueError("the advanced point must be a frontier, recovery, rehearsal or recipe arm at a studied epoch, "
+                         "or the codec model")
     population = point["arms"][arm]
     protocol, weight, _ = diagnostic_protocol(population)
     recipe, initial, recipe_root = recipe_point(point)
@@ -1458,14 +1467,17 @@ def full_plan(run, commit, trainer, meta_tool, point_run, arm, epoch, after_run)
     if sha(anchor) != leg["sha256"]:
         raise ValueError("TRAIN CID22 calibration anchor differs")
     seven_fold_plan(run, commit, trainer, meta_tool, schema=FULL_SCHEMA, protocol=protocol,
-                    registration=RECIPE_C_REGISTRATION if recipe else FRONTIER_REGISTRATION, arms={arm: population},
+                    registration=(RECIPE_C_REGISTRATION if recipe else CODEC_MODEL_REGISTRATION if codec_model
+                                  else FRONTIER_REGISTRATION), arms={arm: population},
                     seeds=SEEDS, checkpoints=FRONTIER_CHECKPOINTS, initial=initial, root=recipe_root, extra=dict(
                         recipe=recipe,
                         aic_weights={arm: weight}, packed_epoch=epoch, anchor=dict(path=str(anchor), sha256=leg["sha256"]),
                         phases=two_phases(point, arm, population),
                         baselines={k: dict(path=v, sha256=sha(v)) for k, v in baselines.items()},
                         point=dict(run=str(point_run), arm=arm, epoch=epoch), after_run=str(after_run),
-                        assessment="stage C full-data continuation of the advanced point; in-sample panels; no adoption"))
+                        assessment=("the codec model's full-data continuation (AIC-only e29); in-sample panels; no adoption"
+                                    if codec_model else
+                                    "stage C full-data continuation of the advanced point; in-sample panels; no adoption")))
 
 
 def full_run(path):
