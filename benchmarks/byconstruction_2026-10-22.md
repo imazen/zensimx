@@ -7848,3 +7848,13 @@ The continuation progress reader uses the shared threaded-child process walker t
 executables, carrying PID/start ticks, CPU ticks and cell paths. It also scans wrapper logs for uncaught tracebacks,
 so a failed later future is visible while the controller waits for an earlier fit. Zombie processes and command-line
 mentions of the trainer do not count as active fits. This observer does not change frozen run sources or inputs.
+
+### Continuation progress across run shapes (2026-10-28)
+
+The continuation progress observer includes full-data wrapper logs and native
+trainer children, alongside fold and omission cells. Completed full-data and
+omission stages remain terminal after their controller exits; an unfinished
+stage with a dead controller remains a failure. This changes observation only;
+frozen plans, fitting code and numerical gates are unchanged. Focused tests
+and script lint pass. Live stage-2 evidence remains in
+`/var/tmp/byc-fx2-20261028/stage2/` and the local continuation report.

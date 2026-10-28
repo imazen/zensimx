@@ -173,6 +173,27 @@ class PlanConfiguration(unittest.TestCase):
 
 
 class PriorityWait(unittest.TestCase):
+    def test_progress_includes_full_logs_and_accepts_completed_full_and_omission_workers(self):
+        with tempfile.TemporaryDirectory(dir=Path.home() / "tmp") as tmp:
+            root = Path(tmp)
+            cell = root / "full/XrefAIC256/full_s0"
+            cell.mkdir(parents=True)
+            (cell / "train.log").write_text("  epoch 17 | diagnostic\n")
+            wrapper = cell.with_suffix(".log")
+            wrapper.write_text("Traceback (most recent call last):\n")
+            plan = root / "PLAN.json"
+            plan.write_text("{}")
+            for stage in ("full-complete", "omission-complete", "fit-full"):
+                self.state(root, stage=stage, worker=dict(pid=123, start_ticks=1))
+                with patch.object(owner, "bound_worker", return_value=False), \
+                        patch.object(owner, "compute_lock", return_value={}), \
+                        patch.object(owner, "predecessor_finished", return_value=True):
+                    owner.fold_status(plan)
+                current = json.loads((root / "CURRENT.json").read_text())
+                self.assertEqual(current["logged_epoch_range"], [17, 17])
+                self.assertEqual(current["wrapper_failures"], [str(wrapper.relative_to(root))])
+                self.assertEqual(bool(current["failures"]), stage == "fit-full")
+
     def test_active_fits_require_exact_program_names_and_live_processes(self):
         def process(pid, program, state="R"):
             return dict(pid=pid, start_ticks=pid + 100, state=state, cpu_ticks=10,

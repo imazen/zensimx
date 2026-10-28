@@ -1731,14 +1731,17 @@ def fold_status(path):
     state = json.loads((state_path if state_path.exists() else run_dir / "QUEUE.json").read_text())
     worker = state["worker"]
     live = bound_worker(worker["pid"], worker["start_ticks"])
-    if not live and state["stage"] not in ("fold-diagnostic-complete", "run-returned") and not state["failures"]:
+    if not live and state["stage"] not in ("fold-diagnostic-complete", "full-complete", "omission-complete",
+                                           "run-returned") and not state["failures"]:
         state["failures"].append("recorded diagnostic process exited without completion")
     logged = []
-    for log in sorted([*run_dir.glob("arms/*/s*_k*/train.log"), *run_dir.glob("cells/*/without_*_s*/train.log")]):
+    for log in sorted([*run_dir.glob("arms/*/s*_k*/train.log"), *run_dir.glob("cells/*/without_*_s*/train.log"),
+                       *run_dir.glob("full/*/full_s*/train.log")]):
         done = [int(line.split()[1]) for line in log.read_text().splitlines() if line.startswith("  epoch ")]
         logged.append(max(done) if done else -1)
     wrapper_failures = [str(p.relative_to(run_dir)) for p in
-                        [*run_dir.glob("arms/*/s*_k*.log"), *run_dir.glob("cells/*/without_*_s*.log")]
+                        [*run_dir.glob("arms/*/s*_k*.log"), *run_dir.glob("cells/*/without_*_s*.log"),
+                         *run_dir.glob("full/*/full_s*.log")]
                         if "Traceback (most recent call last):" in p.read_text()]
     state.update(checked_utc=now(), live=live, gates_finished=predecessor_finished(json.loads(path.read_text())),
                  fits_complete=len((lambda v: v.get("runs") or v.get("cells"))(json.loads((run_dir / "FITS_COMPLETE.json").read_text())))
