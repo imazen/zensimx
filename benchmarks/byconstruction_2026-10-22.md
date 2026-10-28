@@ -7741,3 +7741,44 @@ frozen EVAL read waits for the owner's yes and happens once.
 
 **Compute.** Dev, one heavy job at a time behind `~/tmp/heavy.lock`; study directory `/var/tmp/byc-fx2-20261028`,
 archived to tower when complete.
+
+### Scale-0 chroma (fx2), stage 1: Mlicfx2 against Mlic (2026-10-28)
+
+**Setup.** `scripts/byconstruction/fx2_study.sh` on dev, study `/var/tmp/byc-fx2-20261028`, the Mlic study's six pinned
+binaries (`BIN_SHA256SUMS`, trainer `acfb2a9f…`). The Mlic root's dataset legs were admitted for fx1's ids only, so
+`ring_root.py selection-rebind` (new, `d8b695d8`) bound a copy of it to fx2: tables byte-identical, every selected column
+measured, only the leg declarations and receipt rewritten (root `root/`, frozen `b5a15c1a…`). Three launches refused
+before any fit and are kept aside (`cells/Mlicfx2.refused-*`): the leg owner accepted only fx1 (fixed in `d8b695d8`),
+then received the wrong token twice (`eabb7703`, `9110bb10`).
+
+**Control.** Mlic's KADID seed-0 cell retrained in this study reproduces the stored cell's predictions bit for bit
+(`pred_kadid.tsv` `0cae0f6f…`); its bake equals the stored one once `zentrain.repro` (paths and run time) is stripped by
+the pinned bake owner (`0e03eaf0…` both), the E33 control's rule. `CONTROL.json` passes.
+
+**E21 out of sample** (12 cells, seeds 0–2, paired with Mlic by seed; `scorecard/e21.json`):
+
+| Set | Mlic | Mlicfx2 | Paired difference (seed-unit SE) |
+|---|---:|---:|---:|
+| KADID | 0.8825 | 0.8868 | +0.0043 (0.0016) |
+| TID2013 | 0.8741 | 0.8737 | −0.0003 (0.0052) |
+| KonFiG | 0.8078 | 0.7956 | −0.0122 (0.0077); seed 0 −0.0266 |
+| CID22-A | 0.8808 | 0.8800 | −0.0008 (0.0010) |
+| Mean of four | | | −0.0023 (0.0017) |
+
+Reported, not deciding (the bars apply to the stage-2 models): knob-concurring inversions KADID 0.0136 (Mlic 0.0131),
+TID2013 0.0095 (0.0101), KonFiG 0.0000 (0.0001), CID22-A 0.0002 (0.0002); ladder error KADID 0.0878 (0.0873), TID2013
+0.0601 (0.0586), KonFiG 0.1335 (0.1287), CID22-A 0.0704 (0.0703). Per-type bias spread KADID 0.0720 (0.0775), TID2013
+0.0835 (0.0848), KonFiG 0.0876 (0.0846), CID22-A 0.0382 (0.0387); the colour types move toward the base: KADID colour
+quantization −0.053 (−0.067), TID2013 pattern noise −0.169 (−0.189). Standard mixtures 64 inversions over 12 cells (Mlic
+41), 30 of them in one cell (KonFiG held out, seed 0, 25 at `blur1.2+luma4`); the other 11 cells 2–6 each. Global edits 0
+(Mlic 0).
+
+**Full data.** Three seeds, 120 epochs, packed f16 (`03ce20e4…`, `3a365a39…`, `b90f4440…`), each certified monotone (zero
+free ramps).
+
+**LIVE colour noise** (`live/LIVE.json`; the 2026-10-18 trace's 36 exposed rows, raw network output, open external
+read). No model scores a severe noise case above a less-damaged control of its own source: Mlic, the curated general and
+codec models and the three Mlicfx2 seeds all have 0 such inversions over the 10 cases. The trace's inversion belonged to
+the signed-weight E33/E34 models; the monotone revision-7 models do not show it, with or without scale-0 chroma.
+
+Stage 2 (the continuations to the general and codec points, their panels and gates) runs in the Codex lane `fx2cont`.
