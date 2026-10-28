@@ -179,9 +179,9 @@ def receipt(path, scaling=False, budget=False, floor=False, e33=False):
     rows = {(f"{r['width']}x{r['height']}", r['tier'], int(r['threads']), r['name']): r for r in value['records']}
     assert len(rows) == len(value['records']) == len(cells(scaling,budget,floor,e33))*len(arms)
     assert set(rows) == {(g,t,n,a) for g,t,n in cells(scaling,budget,floor,e33) for a in arms}
-    if e33:  # each candidate serves bit-identically across dispatch tiers, as production does
+    if e33:  # each candidate serves bit-identically across dispatch tiers, as production does (r7: and thread counts)
         for g in geometries:
-            for a in arms[1:]:
+            for a in ([a for a in arms if a.startswith('r7_')] if e33 == 'r7' else arms[1:]):
                 assert len({rows[(g,t,n,a)]['score_bits'] for t in tiers for n in threads}) == 1, f'strict {a} score parity differs'
     if e33 == 'qual':  # the cached-reference map arm serves the same score as its model's uncached arm
         for g,t,n in cells(scaling,budget,floor,e33):

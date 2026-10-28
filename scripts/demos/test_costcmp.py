@@ -181,6 +181,17 @@ class CostcmpR7Test(unittest.TestCase):
             with self.assertRaises(AssertionError,msg=str(key)):cmp.receipt(self.path,e33='r7')
         bad=copy.deepcopy(self.value);del bad['records'][index[(64,'8','r7_codec_map')]];self.save(bad)
         with self.assertRaises(AssertionError):cmp.receipt(self.path,e33='r7')
+    def test_thread_invariance_binds_the_curated_models_only(self):
+        index={(r['width'],r['threads'],r['name']):i for i,r in enumerate(self.value['records'])}
+        peer=copy.deepcopy(self.value)
+        for name in ('fast_ssim2','fast_ssim2_main','e34_butter_scalar'):
+            peer['records'][index[(2048,'8',name)]]['score_bits']='4046000000000000'
+        self.save(peer);self.assertEqual(len(cmp.receipt(self.path,e33='r7')),10*len(cmp.R7_ARMS))
+        bad=copy.deepcopy(self.value)
+        for name in ('r7_general','r7_general_cached','r7_general_map'):
+            bad['records'][index[(2048,'8',name)]]['score_bits']='4049000000000001'
+        self.save(bad)
+        with self.assertRaises(AssertionError):cmp.receipt(self.path,e33='r7')
     def test_worker_revisions(self):
         self.assertEqual([owner.worker_revision(a) for a in ('r7_general','r7_codec_map','r7_baseline_codec','zensim_B_rev5','zensim_D')],
                          [7,7,7,5,1])
