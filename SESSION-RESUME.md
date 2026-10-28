@@ -31,6 +31,19 @@ work. The September chronology below is retained history, including its old
 paused-goal statement. It is not the current queue. No new Mlic/AIC recipe has
 been adopted as the serving model, and the seamless HDR frontend has not started.
 
+### State at 12:36 UTC, 2026-10-28: fx2 continuation lane active
+
+Stage 1 is complete. The isolated `fx2cont` workspace owns the stage-2 continuation work. Its fx1 replay control
+passes for both curated recipes: seed 0/source fold 0, all 60 checkpoints per recipe, exact bytes after native removal
+of `zentrain.repro`. Five fx2 plans are frozen under `/var/tmp/byc-fx2-20261028/stage2/`; the 42-fit source-fold study
+is running serially behind `heavy.lock` with twelve one-thread workers inside a 30G scope. Both full-data plans and
+both omission plans wait for it. No fx2 model has completed qualification or been adopted by this lane.
+
+Status: `just aic-matched-continuation fold-status /var/tmp/byc-fx2-20261028/stage2/fx2-folds-run01/PLAN.json`.
+Current missing work, process/lock evidence and run pins: `~/tmp/handoff/fx2-continuations/report.md`. This repository
+is public; every new AIC-2026 public_train statistic remains only in that local report and the run artifacts. Public
+record entries cover controls, permitted E21 evidence, gates and pointers. Existing AIC figures on main are unchanged.
+
 ### State at 10:50 UTC, 2026-10-28: scale-0 chroma (fx2) retrain of the curated models
 
 Owner, 2026-10-28: retrain the general and codec models with full-resolution chroma (the `fx2` declaration), the fx1
