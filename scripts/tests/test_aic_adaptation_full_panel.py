@@ -39,6 +39,32 @@ class ExposedLiveScope(unittest.TestCase):
 
 
 class E21SubsetInputs(unittest.TestCase):
+    def test_diagnostic_contrasts_require_out_of_sample_groups(self):
+        records = [dict(group=f'fx{family}{role}_oos', scope='out of sample')
+                   for family in (1, 2) for role in ('general', 'codec', 'initial')]
+        self.assertEqual(len(owner.e21_diagnostic_pairs(dict(records=records))), 5)
+        records[0]['scope'] = 'in sample'
+        with self.assertRaisesRegex(ValueError, 'out-of-sample'):
+            owner.e21_diagnostic_pairs(dict(records=records))
+
+    def test_completed_report_requires_unchanged_evidence_before_label_access(self):
+        with tempfile.TemporaryDirectory(dir=Path.home() / 'tmp') as tmp:
+            root = Path(tmp)
+            report = root / 'panels'
+            report.mkdir()
+            plan = root / 'PLAN.json'
+            plan.write_text(json.dumps(dict(input_sha256={})))
+            evidence = report / 'predictions.tsv'
+            evidence.write_text('invented evidence')
+            inventory = report / 'EVIDENCE_INVENTORY.json'
+            inventory.write_text(json.dumps({evidence.name: owner.sha(evidence)}))
+            (report / 'COMPLETE.json').write_text(json.dumps(dict(plan_sha256=owner.sha(plan),
+                evidence_inventory_sha256=owner.sha(inventory))))
+            self.assertEqual(owner.completed_e21_report(plan), dict(input_sha256={}))
+            evidence.write_text('changed')
+            with self.assertRaisesRegex(ValueError, 'evidence changed'):
+                owner.completed_e21_report(plan)
+
     def test_compression_cohorts_reuse_the_established_type_memberships(self):
         np.testing.assert_array_equal(owner.compression_mask("kadid", ["kadid_08", "kadid_09", "kadid_10"]),
                                       [False, True, True])

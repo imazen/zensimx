@@ -434,6 +434,90 @@ def e21_run(path, output):
         raise
 
 
+def completed_e21_report(path):
+    report = path.parent / "panels"
+    complete = json.loads((report / "COMPLETE.json").read_text())
+    if complete["plan_sha256"] != sha(path) or complete["evidence_inventory_sha256"] != sha(report / "EVIDENCE_INVENTORY.json"):
+        raise ValueError("completed E21 report receipt changed")
+    inventory = json.loads((report / "EVIDENCE_INVENTORY.json").read_text())
+    if any(sha(report / name) != pin for name, pin in inventory.items()):
+        raise ValueError("completed E21 report evidence changed")
+    value = json.loads(path.read_text())
+    if any(sha(name) != pin for name, pin in value["input_sha256"].items()):
+        raise ValueError("completed E21 report input changed")
+    return value
+
+
+def e21_diagnostic_pairs(value):
+    pairs = [(f"fx2{role}_oos", f"fx1{role}_oos") for role in ("general", "codec", "initial")]
+    pairs += [(f"fx2{role}_oos", "fx2initial_oos") for role in ("general", "codec")]
+    if not {g for pair in pairs for g in pair} <= {r["group"] for r in value["records"] if r["scope"] == "out of sample"}:
+        raise ValueError("complete named out-of-sample E21 diagnostic groups required")
+    return pairs
+
+
+def e21_diagnostics(path, output):
+    """Reuse existing type/ladder owners; retain each packed seed's CID22 bias separately."""
+    import numpy as np
+    import pandas as pd
+    import pyarrow.parquet as pq
+    if not compute_lock(os.getpid())["held_by_worker_ancestor"]:
+        raise ValueError("E21 diagnostics require the shared compute lock")
+    value = completed_e21_report(path)
+    pairs = e21_diagnostic_pairs(value)
+    output.mkdir()
+    os.environ.update(BYC_CELLS=str(path.parent / "panels/cells"), BYC_LABEL_LEDGER_DIR=str(output / "label-reads"),
+                      ZEN_PANEL_BIN=value["panel_binary"], OPENBLAS_NUM_THREADS="1", RAYON_NUM_THREADS="1",
+                      OMP_NUM_THREADS="1", TMPDIR=str(Path.home() / "tmp"))
+    source = Path(__file__).resolve().parents[1] / "rev4_featpot"
+    sys.path.insert(0, str(source))
+    import byc_cells as cells
+    from subjective_training_leg import read_train_panel
+    metadata = {r["name"]: r for r in read_train_panel(Path(value["metadata"]))["datasets"]}
+    if set(metadata) != set(FOLDS) or any(r["orientation"] != 1 for r in metadata.values()):
+        raise ValueError("existing bytype owner requires these four quality-oriented TRAIN populations")
+    keys = [cells.ROOT / "wide/main/real" / f"{d}.keys.parquet" for d in FOLDS]
+    members = {m for key in keys for m in pq.read_table(key, columns=["member_set"]).column(0).to_pylist()}
+    inputs = {str(p): sha(p) for p in [path, path.parent / "panels/COMPLETE.json", Path(value["metadata"]), *keys,
+              *[cells.BANK / m / "keys.parquet" for m in sorted(members)], source / "byc_cells.py"]}
+    write(output / "INPUTS.json", dict(input_sha256=inputs, source_sha256=source_pins()), fresh=True)
+    state = dict(stage="E21-type-diagnostics", worker=process_snapshot(os.getpid()), failures=[])
+    write(output / "STATE.json", state, fresh=True)
+    try:
+        for candidate, baseline in pairs:
+            state.update(current=f"{candidate}-minus-{baseline}")
+            write(output / "STATE.json", state)
+            with (output / f"{state['current']}.json").open("x") as result, (output / f"{state['current']}.log").open("x") as log:
+                subprocess.run([sys.executable, "-B", str(source / "byc_cells.py"), "bytype", "--arm", candidate,
+                    "--control", baseline, "--seeds", "0,1,2"], stdout=result, stderr=log, check=True)
+        state.update(stage="E21-knob-diagnostics")
+        write(output / "STATE.json", state)
+        arms = sorted({g for pair in pairs for g in pair})
+        with (output / "knob.log").open("x") as log:
+            subprocess.run([sys.executable, "-B", str(source / "byc_cells.py"), "knobinv", "--arms", ",".join(arms),
+                "--seeds", "0,1,2", "--out", str(output / "KNOB_INVERSION.json")], stdout=log, stderr=subprocess.STDOUT, check=True)
+        cid = metadata["cid22_a25"]
+        biases = {}
+        for record in value["records"]:
+            if record["dataset"] == "cid22_a25":
+                frame = pd.read_csv(record["prediction"], sep="\t")
+                biases.setdefault(record["group"], {})[str(record["seed"])] = cells.codec_rank_bias(
+                    frame.pred.to_numpy(float), np.asarray(cid["target"], float), np.asarray(cid["codec"]))
+        write(output / "PER_SEED_CID22_BIAS.json", finite_json(biases), fresh=True)
+        if any(sha(p) != pin for p, pin in inputs.items()):
+            raise ValueError("E21 diagnostic source keys or evidence changed")
+        completed_e21_report(path)
+        inventory = {str(p.relative_to(output)): sha(p) for p in sorted(output.rglob("*")) if p.is_file() and p.name != "STATE.json"}
+        write(output / "EVIDENCE_INVENTORY.json", inventory, fresh=True)
+        write(output / "COMPLETE.json", dict(plan_sha256=sha(path), evidence_inventory_sha256=sha(output / "EVIDENCE_INVENTORY.json")), fresh=True)
+        state.update(stage="E21-diagnostics-complete")
+        write(output / "STATE.json", state)
+    except BaseException as error:
+        state.update(stage="failed", failures=[repr(error)])
+        write(output / "STATE.json", state)
+        raise
+
+
 def run(path, output):
     import numpy as np
     import pandas as pd
@@ -608,7 +692,7 @@ def run(path, output):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("mode", choices=("queue", "run", "status", "e21-plan", "e21-run", "live-plan", "live-run"))
+    parser.add_argument("mode", choices=("queue", "run", "status", "e21-plan", "e21-run", "e21-diagnostics", "live-plan", "live-run"))
     parser.add_argument("plan", type=Path)
     parser.add_argument("output", type=Path)
     args = parser.parse_args()

@@ -7949,3 +7949,13 @@ checkpoint are reused.
 Focused tests cover recipe/anchor preservation, source mutation and packing
 command parity; failed and recovered evidence lives under
 `/var/tmp/byc-fx2-20261028/stage2/`.
+
+### E21 continuation diagnostics after completion (2026-10-28)
+
+The full-panel owner's `e21-diagnostics` mode verifies a completed E21
+report before invoking the existing per-type and knob-inversion owners.
+It binds source keys, keeps out-of-sample contrasts separate and retains
+CID22-A bias spread for each seed, alongside the three-seed type-bias panel.
+Each seed's spread differs conceptually from the spread of averaged
+per-type biases. Receipt mutation and scope refusal controls pass.
+Outputs remain under `/var/tmp/byc-fx2-20261028/stage2/`.
