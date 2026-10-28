@@ -149,6 +149,25 @@ def main():
             rw.edits.append((rw.line_start(lead), rw.after_line(en), ""))
             print(f"remove {f}:{line}: {text}")
             removed += 1
+            # A hand-written tier variant (`NAME_scalar`, `NAME_v3`, ...) of a `#[magetypes]` /
+            # `#[arcane]` family: rustc never reports the macro-generated siblings as unused,
+            # so a dead fallback means the whole family is unused. Remove the generic source
+            # item and every hand-written sibling with it; the next compile proves it.
+            m = re.match(r"(?:function|method) `([A-Za-z0-9_]+?)_(scalar|v1|v2|v3|v4|v4x|neon|wasm128)`", text)
+            if m:
+                stem = m.group(1)
+                for i, (k, s0, e0) in enumerate(rw.toks):
+                    if k != "ident" or rw.text(i) != "fn":
+                        continue
+                    nm = rw.sig(i + 1)
+                    name = rw.text(nm)
+                    if name == stem or re.fullmatch(re.escape(stem) + r"_(scalar|v1|v2|v3|v4|v4x|neon|wasm128)", name):
+                        fb = item_bounds(rw, rw.toks[nm][1])
+                        if fb is None:
+                            continue
+                        fl = rw.leading_start(fb[0])
+                        rw.edits.append((rw.line_start(fl), rw.after_line(fb[1]), ""))
+                        print(f"remove-family {f}: fn {name}")
         if rw.edits and not a.dry_run:
             rw.edits = merge_overlaps(rw.edits)
             out = re.sub(r"\n{3,}", "\n\n", rw.apply())

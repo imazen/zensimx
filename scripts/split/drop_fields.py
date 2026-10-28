@@ -65,6 +65,9 @@ def receiver_start(rw, field_tok):
     return start
 
 
+READ_AS = "false"
+
+
 def fix_sites(root, log):
     sites = defaultdict(list)
     for line in open(log):
@@ -87,7 +90,19 @@ def fix_sites(root, log):
                 rw.edits.append((rw.line_start(ti), rw.after_line(end), ""))
                 continue
             nxt = rw.sig(ti + 1)
-            if nxt < len(rw.toks) and rw.text(nxt) in ("=", "|=", "&=", "^="):
+            st0 = receiver_start(rw, ti)
+            stmt_start = rw.text(rw.sig(st0 - 1, -1)) in (";", "{", "}")
+            # `recv.Y.method(..);` / `recv.Y[i].method(..);` as a whole statement: a write
+            # through the removed field (accumulate, push, merge, ...): drop the statement
+            if stmt_start and nxt < len(rw.toks) and rw.text(nxt) in (".", "["):
+                end = nxt
+                while end < len(rw.toks) and rw.text(end) != ";":
+                    if rw.text(end) in ("(", "[", "{"):
+                        end = rw.match[end]
+                    end += 1
+                rw.edits.append((rw.line_start(st0), rw.after_line(end), ""))
+                continue
+            if nxt < len(rw.toks) and rw.text(nxt) in ("=", "|=", "&=", "^=", "+=", "-=", "*=", "/=", "%=", "<<=", ">>="):
                 st = receiver_start(rw, ti)
                 end = nxt
                 while end < len(rw.toks) and rw.text(end) != ";":
@@ -97,7 +112,7 @@ def fix_sites(root, log):
                 rw.edits.append((rw.line_start(st), rw.after_line(end), ""))
                 continue
             st = receiver_start(rw, ti)
-            rw.edits.append((rw.toks[st][1], rw.toks[ti][2], "false"))
+            rw.edits.append((rw.toks[st][1], rw.toks[ti][2], READ_AS))
         rw.edits = merge_overlaps(rw.edits)
         p.write_text(rw.apply())
         print(f"{f}: {len(rw.edits)} edits")
@@ -107,10 +122,14 @@ def fix_sites(root, log):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--root", required=True)
+    ap.add_argument("--read-as", default="false",
+                    help="what a read of a removed field becomes (`false` for a bool, `None` for an Option)")
     ap.add_argument("--simplify-only", nargs="*", default=None,
                     help="skip the error-driven step and only simplify these files")
     ap.add_argument("log", nargs="?")
     a = ap.parse_args()
+    global READ_AS
+    READ_AS = a.read_as
     files = a.simplify_only if a.simplify_only is not None else fix_sites(a.root, a.log)
     for f in files:
         p = Path(a.root) / f if not Path(f).is_absolute() else Path(f)

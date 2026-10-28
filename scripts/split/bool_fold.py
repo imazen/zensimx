@@ -114,6 +114,32 @@ class Folder:
         n = len(self.sig)
         for k in range(n):
             t = T(k)
+            # `{ LIT }` used as an expression (not a fn/impl/match body): unwrap
+            if t == "{" and T(k + 2) == "}" and T(k + 1) in LIT + ("0", "None") and T(k - 1) in ("=", "(", ",", "=>"):
+                self.edit(k, k + 2, T(k + 1))
+                return True
+            # `false.then(..)` / `false.then_some(..)` -> `None`
+            if t == "false" and T(k + 1) == "." and T(k + 2) in ("then", "then_some") and T(k + 3) == "(":
+                self.edit(k, self.mate(k + 3), "None")
+                return True
+            # `ident.filter(|_| false)` -> `None`
+            if (t == "." and T(k + 1) == "filter" and T(k + 2) == "(" and T(k + 3) == "|"
+                    and T(k + 4) == "_" and T(k + 5) == "|" and T(k + 6) == "false" and T(k + 7) == ")"
+                    and self.kind(k - 1) == "ident" and T(k - 2) not in (".", "::")):
+                self.edit(k - 1, k + 7, "None")
+                return True
+            # `if let Some(..) = None { A } [else B]` -> `B`
+            if t == "if" and T(k + 1) == "let" and T(k + 2) == "Some" and T(k + 3) == "(":
+                c = self.mate(k + 3)
+                if T(c + 1) == "=" and T(c + 2) == "None" and T(c + 3) == "{":
+                    close = self.mate(c + 3)
+                    if T(close + 1) == "else":
+                        self.rw.edits.append((self.span(k, k)[0], self.span(close + 2, close + 2)[0], ""))
+                    elif T(k - 1) == "else":
+                        self.edit(k - 1, close, "")
+                    else:
+                        self.rw.edits.append((self.rw.line_start(self.sig[k]), self.rw.after_line(self.sig[close]), ""))
+                    return True
             # !LIT
             if t == "!" and T(k + 1) in LIT:
                 self.edit(k, k + 1, "true" if T(k + 1) == "false" else "false")
@@ -198,7 +224,7 @@ class Folder:
                         self.rw.edits.append((self.span(close, close)[1], self.span(chain_end, chain_end)[1], ""))
                     return True
             # let NAME = LIT;
-            if t == "let" and self.kind(k + 1) == "ident" and T(k + 1) != "mut" and T(k + 2) == "=" and T(k + 3) in LIT and T(k + 4) == ";":
+            if t == "let" and self.kind(k + 1) == "ident" and T(k + 1) != "mut" and T(k + 2) == "=" and T(k + 3) in LIT + ("None",) and T(k + 4) == ";":
                 # no attributes on the statement
                 if T(k - 1) == "]":
                     continue

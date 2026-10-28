@@ -96,8 +96,9 @@ def main():
                 continue
             enclosing.sort(key=lambda r: rw.toks[r[0]][1])  # outermost first
             # test context: an enclosing item with #[test] / #[cfg(test)] / cfg(all(test..)),
-            # or a file included only into a test module
-            in_test = whole_file_test or f.endswith("_tests.rs") or f.endswith("feature_v2_oracle.rs")
+            # or a file included only into a test module. (feature_v2_oracle.rs is NOT one:
+            # it also holds the production era-2 dense kernels.)
+            in_test = whole_file_test or f.endswith("_tests.rs")
             target = None
             for r in enclosing:
                 attrs = r[3]

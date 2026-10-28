@@ -57,6 +57,13 @@ def main():
                     j += 1
                 if not seen_arrow:
                     continue
+                # the head of an or-pattern (`A | B =>`): drop `A |` only, B stays live
+                if k + n < len(texts) and texts[k + n] == "|":
+                    rw.edits.append((rw.toks[sig[k]][1], rw.toks[sig[k + n + 1]][1], ""))
+                    line = src.count("\n", 0, rw.toks[sig[k]][1]) + 1
+                    print(f"{f}:{line}: removing or-pattern head {pat}")
+                    total += 1
+                    continue
                 start = rw.leading_start(sig[k])
                 end = rw.item_end(sig[k])
                 line = src.count("\n", 0, rw.toks[sig[k]][1]) + 1

@@ -55,6 +55,19 @@ class BoolFoldTest(unittest.TestCase):
         self.assertEqual(f("let a = g(false);\n"), "let a = g(false);\n")
         self.assertEqual(f("g((false));\n"), "g(false);\n")
 
+    def test_flag_fold_leftovers(self):
+        self.assertEqual(f("let a = { 0 };\n"), "let a = 0;\n")
+        self.assertEqual(f("fn f() {\n    let b = false.then(|| X { y: 1 });\n    g(b);\n}\n"),
+                         "fn f() {\n    g(None);\n}\n")
+        self.assertEqual(f("fn f() {\n    let c = d.filter(|_| false);\n    if let Some(x) = c {\n        h(x);\n    }\n}\n"),
+                         "fn f() {\n}\n")
+        self.assertEqual(f("fn f() {\n    if let Some(v) = None {\n        g(v);\n    } else {\n        h();\n    }\n}\n"),
+                         "fn f() {\n    {\n        h();\n    }\n}\n")
+        self.assertEqual(f("fn f() {\n    let n = None;\n    foo(n);\n    S { n, m: 1 };\n}\n"),
+                         "fn f() {\n    foo(None);\n    S { n: None, m: 1 };\n}\n")
+        # a field filter on a path is not a local: left alone
+        self.assertEqual(f("let c = a.b.filter(|_| false);\n"), "let c = a.b.filter(|_| false);\n")
+
 
 if __name__ == "__main__":
     unittest.main()
