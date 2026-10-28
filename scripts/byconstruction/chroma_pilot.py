@@ -131,9 +131,9 @@ def run(root):
     controls = root / "controls.tsv"
     with controls.open("x") as stream:
         writer = csv.writer(stream, delimiter="\t")
-        writer.writerow(["ref_path", "dist_path"])
+        writer.writerow(["ref_path", "dist_path", "human_score"])
         for c in spec["controls"]:
-            writer.writerow([root / "raw" / c["raw"], root / "raw" / c["dist_raw"]])
+            writer.writerow([root / "raw" / c["raw"], root / "raw" / c["dist_raw"], 0])
     teacher(root, "control", controls)
     audit = [json.loads(s) for s in (root / "control.jsonl").read_text().splitlines()]
     by_pair = {(r["reference"], r["distorted"]): r["peer_ssim2"]["score"] for r in audit}
@@ -188,10 +188,10 @@ def run(root):
     pairfile = root / "teacher-pairs.tsv"
     with pairfile.open("x") as stream:
         writer = csv.writer(stream, delimiter="\t")
-        writer.writerow(["ref_path", "dist_path"])
+        writer.writerow(["ref_path", "dist_path", "human_score"])
         for family in grids():
             for r in rows(root / f"{family}.pairs.tsv"):
-                writer.writerow([r["ref_path"], r["dist_path"]])
+                writer.writerow([r["ref_path"], r["dist_path"], 0])
     progress["stage"] = "frozen-teacher"
     save(root / "PROGRESS.json", progress)
     elapsed["frozen_teacher"] = teacher(root, "teacher", pairfile)
