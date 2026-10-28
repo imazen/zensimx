@@ -3899,3 +3899,6 @@ chroma-archive action root *args:
 
 chroma-a2-report root report state:
     python3 -B scripts/byconstruction/chroma_a2_report.py {{quote(root)}} {{quote(report)}} --mirror-state {{quote(state)}}
+
+chroma-b0-teacher-replay root binary:
+    python3 -B scripts/byconstruction/chroma_b0_replay.py {{quote(root)}} {{quote(binary)}}
