@@ -31,6 +31,27 @@ work. The September chronology below is retained history, including its old
 paused-goal statement. It is not the current queue. No new Mlic/AIC recipe has
 been adopted as the serving model, and the seamless HDR frontend has not started.
 
+### State at 03:10 UTC, 2026-10-28
+
+Owner decisions (about 02:08 UTC): D1 = both models as profiles (general = revision-7 default, codec = codec-only
+profile); the frozen EVAL read for both finalists; one quiet runtime run on dev. Done since:
+
+- **EVAL read** (`/mnt/v/output/zensim/mlic-aic-finalists-eval-20261028/`, once per finalist): the general model is
+  within about ±0.03 SROCC of Mlic on the nine MOS collections (below it on MDID −0.029 and NITS −0.018); the codec model
+  drops on non-codec collections (CID:IQ 0.742, Colourlab 0.477, MDID 0.692). Paired-vs-Mlic tables and the EVAL
+  scatter run in `paper-20261028/post_runtime.sh` (after the E21 peer judges).
+- **Runtime gate PASS** for both models on the 9950X3D (record, "Runtime gate for the two curated models"): 11.2 / 41.5
+  ms at 1024² / 2048² on one thread (0.49× / 0.45× frozen D), score + map 1.99× / 2.29×, memory inside the allowance
+  (2.6% margin at 2048²; the map exceeds it by 3.5% at 4096²).
+- **White paper** in progress as a Claude Doc (https://claude.ai/artifact/XBiysqDr8utop2Dr5HvUfN): summary, metric,
+  model, training sets, methodology, evaluation, overfitting, limits, speed, appendices A–C written; results and
+  comparative scatters wait for the post-runtime chain (E21 peers SSIMULACRA2 and butteraugli 3-norm, paired vs Mlic,
+  curated views with peers via `aic_dashboard_data.py --curate` into `dashboard-curate-20261028`, then
+  `paper-20261028/paper_data.py`).
+- **Repo split** (owner: rename to zensimx, new zensim from before the history grew, low churn against 0.2.7): measured
+  and planned in `docs/REPO_SPLIT_PLAN_2026-10-28.md`; nothing on GitHub changed; waits for the owner's go-ahead and
+  the four decisions listed there. D1's profile wiring follows that decision (it lands in whichever repository ships).
+
 ### State at 02:00 UTC, 2026-10-28
 
 Both curated models are complete and pass every label-free gate (record, "Label-free gates for the two curated
