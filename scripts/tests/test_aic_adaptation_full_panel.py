@@ -24,13 +24,26 @@ class ExposedLiveScope(unittest.TestCase):
         self.assertNotIn("old_model", scoped[0])
         self.assertEqual(scoped[0]["human"], 0)
 
-    def test_population_duplicates_missing_controls_and_nonfinite_targets_refuse(self):
+    def test_population_duplicates_and_nonfinite_targets_refuse(self):
         for change in (lambda r: r.pop(), lambda r: r[0].update(index=1),
-                       lambda r: r[0].update(ref="unmatched"), lambda r: r[0].update(human=float("nan"))):
+                       lambda r: r[0].update(human=float("nan"))):
             rows = self.rows()
             change(rows)
             with self.assertRaises(ValueError):
                 owner.live_rows(dict(rows=rows, rows_read=36))
+
+    def test_unexposed_controls_are_undefined_instead_of_zero_inversions(self):
+        rows = self.rows()
+        rows[0]['ref'] = 'no-exposed-control'
+        for row in rows:
+            row['model'] = 100.0 if row['case'] else 0.0
+        scoped = owner.live_rows(dict(rows=rows, rows_read=36))
+        self.assertEqual(scoped[0]['ref'], 'no-exposed-control')
+        inversions, coverage = owner.live_comparisons(rows, ['model'])
+        self.assertIsNone(inversions['0']['model'])
+        self.assertEqual(coverage['0']['eligible_controls'], 0)
+        self.assertGreater(inversions['1']['model'], 0)
+        self.assertEqual(inversions['1']['model'], coverage['1']['eligible_controls'])
 
     def test_pixel_scoring_requires_compute_lock_before_opening_plan(self):
         with patch.object(owner, "compute_lock", return_value=dict(held_by_worker_ancestor=False)):

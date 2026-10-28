@@ -7959,3 +7959,11 @@ CID22-A bias spread for each seed, alongside the three-seed type-bias panel.
 Each seed's spread differs conceptually from the spread of averaged
 per-type biases. Receipt mutation and scope refusal controls pass.
 Outputs remain under `/var/tmp/byc-fx2-20261028/stage2/`.
+
+### Exposed comparison coverage (2026-10-28)
+
+The bounded LIVE diagnostic records the number of eligible same-source
+controls for each severe case. An exposed case with no eligible control
+has an undefined comparison, serialized as null. Scoring retains the exact
+previously exposed manifest; it does not read additional response rows.
+Tests distinguish absent comparisons from a measured zero inversion count.

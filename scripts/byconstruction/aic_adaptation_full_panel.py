@@ -29,10 +29,18 @@ def live_rows(value):
             or sum(r["case"] is True for r in rows) != 10
             or any(type(r["case"]) is not bool or not math.isfinite(r["human"]) for r in rows)):
         raise ValueError("the fixed 36-row, ten-case exposed LIVE scope differs")
-    for row in rows:
-        if row["case"] and not any(not c["case"] and c["ref"] == row["ref"] for c in rows):
-            raise ValueError("exposed LIVE case lacks a same-source control")
     return [{k: r[k] for k in ("index", "case", "ref", "dist", "human")} for r in rows]
+
+
+def live_comparisons(rows, models):
+    inversions, coverage = {}, {}
+    for case in (r for r in rows if r["case"]):
+        controls = [r for r in rows if not r["case"] and r["ref"] == case["ref"]]
+        eligible = [r for r in controls if r["human"] > case["human"]]
+        key = str(case["index"])
+        coverage[key] = dict(same_source_controls=len(controls), eligible_controls=len(eligible))
+        inversions[key] = {name: sum(case[name] > r[name] for r in eligible) if eligible else None for name in models}
+    return inversions, coverage
 
 
 def live_plan(config, output):
@@ -85,11 +93,9 @@ def live_run(path, output):
         for name, model in value["models"].items():
             scores[name] = list(pool.map(score, [(name, model, row) for row in rows]))
     results = [dict(row, **{name: score[i] for name, score in scores.items()}) for i, row in enumerate(rows)]
-    inversions = {str(case["index"]): {name: sum(not c["case"] and c["ref"] == case["ref"]
-        and c["human"] > case["human"] and case[name] > c[name] for c in results) for name in scores}
-        for case in results if case["case"]}
+    inversions, coverage = live_comparisons(results, scores)
     write(output / "LIVE.json", dict(rows=results, severe_above_less_damaged_controls=inversions,
-          plan_sha256=sha(path), diagnostic_only=True, selection_gate=False), fresh=True)
+          comparison_coverage=coverage, plan_sha256=sha(path), diagnostic_only=True, selection_gate=False), fresh=True)
     write(output / "EVIDENCE_INVENTORY.json", {p.name: sha(p) for p in sorted(output.iterdir())}, fresh=True)
     write(output / "COMPLETE.json", dict(plan_sha256=sha(path),
           evidence_inventory_sha256=sha(output / "EVIDENCE_INVENTORY.json")), fresh=True)
