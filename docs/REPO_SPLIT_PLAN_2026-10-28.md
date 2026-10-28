@@ -110,6 +110,16 @@ old URL redirected, so nothing broke in between.
    repository; links and `imazen/zensim#N` references outside `benchmarks/` name zensimx; living scripts use
    `~/work/zen/zensimx`.
 
+8. **Slim pruning** on imazen/zensim `slim-0.3.0` (draft PR imazen/zensim#1), every step behind the parity gate
+   (`examples/split_parity_check.rs` there against `split_parity_golden` here, i265): the diff against 0.2.7's
+   `zensim/src` went from +67,482 / −3,047 lines at the first cut to +36,571 / −3,011 at `97956420`; public API delta:
+   nothing removed, two `#[non_exhaustive]`, about 25 additions. Two defects found while porting are fixed in both
+   repositories (`47cdfe8e` here): edge-width change for a channel skipped at one of its two scales, and the planner's
+   last-scale chroma case. A third (`compute_all_features` at the process revision) is fixed in the slim crate and
+   recorded as open here. Parity: 25,175 of 25,179 rows identical; the other 4 are explained in the PR.
+9. **Slim release on hold** (owner, 2026-10-28) for the scale-0 chroma retrain of both revision-7 models
+   (record: "Scale-0 chroma for the revision-7 models (fx2)").
+
 Left as they were: imageflow's stale `review/zencodecs-v2` clone (no upstream), zen-workspace's Superwork
 map (it names the published crate, which is correct), the frozen asrun drivers, and links inside experiment
 records under `benchmarks/` (they now resolve to the new repository, where those files do not exist; the
