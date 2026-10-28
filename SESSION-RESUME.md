@@ -44,6 +44,15 @@ Current missing work, process/lock evidence and run pins: `~/tmp/handoff/fx2-con
 is public; every new AIC-2026 public_train statistic remains only in that local report and the run artifacts. Public
 record entries cover controls, permitted E21 evidence, gates and pointers. Existing AIC figures on main are unchanged.
 
+### State at 18:05 UTC, 2026-10-28: fx2 retrain complete, both fx2 models rejected; the fx1 models stay
+
+All 72 registered continuation fits, panels and gates finished (lane `fx2cont`, record sections "fx2 continuations",
+archive `/mnt/tower/output/zensim/byc-fx2-20261028/stage2/dev-artifacts`). Under the registered rules neither fx2 model
+replaces its fx1 counterpart: G-STEER 134/135 (general) and 133/135 (codec) against 135/135; the general model also
+misses the out-of-fold bar and the CID22-A bias allowance. The curated general and codec models (`7642eff4…`,
+`63a1c5d3…`) remain the revision-7 models; the slim crate's 0.3.0 release hold is resolved. AIC-2026 statistics for
+fx2 stay local (`~/tmp/handoff/fx2-continuations/report.md`, stage2 JSONs): this repository is public.
+
 ### State at 10:50 UTC, 2026-10-28: scale-0 chroma (fx2) retrain of the curated models
 
 Owner, 2026-10-28: retrain the general and codec models with full-resolution chroma (the `fx2` declaration), the fx1
