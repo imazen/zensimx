@@ -31,6 +31,16 @@ work. The September chronology below is retained history, including its old
 paused-goal statement. It is not the current queue. No new Mlic/AIC recipe has
 been adopted as the serving model, and the seamless HDR frontend has not started.
 
+### State at 03:45 UTC, 2026-10-28
+
+Done: the frozen EVAL read with paired-vs-Mlic tables and zero-shot SSIMULACRA2 / butteraugli peers on every selection
+set (record, "Frozen EVAL read for the two curated models"); the runtime gate PASS (record); the white paper, complete
+with full panels, comparative scatters, speed and memory, feature math and citations
+(https://claude.ai/artifact/XBiysqDr8utop2Dr5HvUfN, private: AIC-2026 results); the dashboard's Two models tab now shows
+the EVAL collections and both peers (page v21). Waiting on the owner: the repo split go-ahead and its four decisions
+(`docs/REPO_SPLIT_PLAN_2026-10-28.md`, now with the public-API diff against 0.2.7), which also decide where D1's two
+profiles are wired; and the paper's public-version question (a comment in the doc). Dev is idle.
+
 ### State at 03:10 UTC, 2026-10-28
 
 Owner decisions (about 02:08 UTC): D1 = both models as profiles (general = revision-7 default, codec = codec-only
