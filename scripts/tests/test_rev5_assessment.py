@@ -67,6 +67,33 @@ class Assessment(unittest.TestCase):
                 self.assertTrue(np.isnan(v).all())
         self.assertEqual(record['tables'][0]['sha256'], identity.sha(record['tables'][0]['path']))
 
+    def test_fx2_requires_explicit_revision7_and_preserves_new_measured_slots(self):
+        from v2_common import derived_declaration
+        _, pin, declaration = derived_declaration('fx2')
+        ids = sorted(set(declaration['direct']) | {i for p in declaration['products'] for i in p})
+        with self.assertRaises(ValueError):
+            wide.build_assessment(self.source, self.root/'old-profile', ['fixture'], ids, 'fx2')
+        wide.PROFILE = wide.rev5_profile('rev7_rowlanes', 'basic+peaks+v2@w1825/rev7_rowlanes#36c3f3af',
+                                       'fixture-binary', 'fixture-build', None, 7)
+        self.manifest.update(formula_revision='Rev7', era_label=wide.PROFILE.era,
+                             feature_set_id=wide.PROFILE.feature_set_id)
+        self.pin()
+        with self.assertRaises(ValueError):
+            wide.build_assessment(self.source, self.root/'implicit', ['fixture'], ids)
+        with self.assertRaises(ValueError):
+            wide.build_assessment(self.source, self.root/'incomplete', ['fixture'], ids[:-1], 'fx2')
+        record = wide.build_assessment(self.source, self.root/'fx2', ['fixture'], ids, 'fx2')
+        self.assertEqual(record['derived_inputs']['sha256'], pin)
+        table = pq.read_table(record['tables'][0]['path'])
+        for i in ids:
+            np.testing.assert_array_equal(table[f'f{i}'].to_numpy().view('uint32'),
+                                          self.features[f'f{i}'].to_numpy().astype('float32').view('uint32'))
+        self.assertEqual(len(ids), 504)
+        self.assertEqual(table['pair_key'].to_pylist(), ['a', 'b'])
+        manifest = json.loads(Path(record['tables'][0]['declaration']['path']).read_text())
+        self.assertEqual(manifest['feature_ids'], ids)
+        self.assertEqual(manifest['derived_inputs'], record['derived_inputs'])
+
     def test_refuses_wrong_ids_hash_order_nan_and_label_schema_before_output(self):
         for case in ['ids', 'hash', 'order', 'nan', 'labels']:
             with self.subTest(case=case):

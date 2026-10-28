@@ -898,13 +898,24 @@ def admit_recipe(bank: Path, source: Path, out: Path) -> None:
                       "human_role_decision": "PENDING"}))
 
 
-def build_assessment(bank: Path, out: Path, names: list[str], ids: list[int]) -> dict:
+def build_assessment(bank: Path, out: Path, names: list[str], ids: list[int], derived_inputs=None) -> dict:
     """Declared Rev5 features-only views; preserve every key including identities."""
     from v2_common import refuse_immutable_output
     from rev5_bank import ASSESSMENT_KEY_COLUMNS
     registered_ids = json.loads((REPO / "benchmarks/costset2_2026-10-03.candidate_ids.json").read_text())["candidates"]["by_v2fy"]
-    if PROFILE.revision not in (5, 7) or ids != registered_ids:
-        raise ValueError("Rev5 (or by-construction revision 7) by_v2fy420 assessment required")
+    binding = None
+    if derived_inputs is None:
+        if PROFILE.revision not in (5, 7) or ids != registered_ids:
+            raise ValueError("Rev5 (or by-construction revision 7) by_v2fy420 assessment required")
+    elif derived_inputs == "fx2":
+        from v2_common import derived_declaration
+        path, pin, declaration = derived_declaration("fx2")
+        expected = sorted(set(declaration["direct"]) | {i for pair in declaration["products"] for i in pair})
+        if PROFILE.revision != 7 or ids != expected:
+            raise ValueError("revision-7 assessment requires every pinned fx2 consumed feature, in order")
+        binding = dict(token="fx2", path=str(path), sha256=pin)
+    else:
+        raise ValueError("unregistered assessment derived-input token")
     bank = assessment_path(bank)
     refuse_immutable_output(out, [bank])
     if assessment_path(out).exists():
@@ -940,6 +951,8 @@ def build_assessment(bank: Path, out: Path, names: list[str], ids: list[int]) ->
         "feature_ids":ids,"feature_set_id":"basic+v2@w720/"+PROFILE.era+"#62adfc93",
         "formula_revision":PROFILE.revision,"decoder_era":f"legacy-rgb8/extract_features_372col@sha256:{PROFILE.binary}",
         "table_code":code_identity(),"bank_root":str(bank.resolve()),"tables":[]}
+    if binding is not None:
+        record["derived_inputs"] = binding
     for name, m, keys, X, paths in prepared:
         kp = out / (name + ".keys.parquet");pq.write_table(keys, kp, compression="zstd")
         columns = {k:keys.column(k) for k in keys.column_names}
@@ -950,6 +963,8 @@ def build_assessment(bank: Path, out: Path, names: list[str], ids: list[int]) ->
         table = out / (name + ".parquet");pq.write_table(pa.table(columns), table, compression="zstd")
         ordered = hashlib.sha256(json.dumps(keys.to_pydict(),sort_keys=True,separators=(",",":"),allow_nan=False).encode()).hexdigest()
         declaration = {k:record[k] for k in ["feature_set_id","formula_revision","decoder_era","features_only","labels_read"]}
+        if binding is not None:
+            declaration["derived_inputs"] = binding
         declaration.update(source_bank_feature_set_id=m["feature_set_id"], extractor_build_commit=m["build_commit"],
             extractor_binary_sha256=m["binary_sha256"], source_root=str(bank.resolve()),
             source_files={f:{"path":str(p),"sha256":sha(p)} for f,p in paths.items()},
@@ -1024,6 +1039,7 @@ def main() -> None:
     ap.add_argument("--hdr-bank", type=Path)
     ap.add_argument("--assessment-set", action="append", default=[])
     ap.add_argument("--assessment-ids", type=Path)
+    ap.add_argument("--assessment-derived", choices=["fx2"], help="explicit registered revision-7 fx2 assessment")
     ap.add_argument("--source-root", type=Path, help="admit-teachers: immutable frozen Rev5 instrument root")
     ap.add_argument("--bank", type=Path, default=CANON_BANK)
     ap.add_argument("--out", "--root", dest="out", type=Path, default=OUT_DEFAULT)
@@ -1058,7 +1074,7 @@ def main() -> None:
         if not args.assessment_set or args.assessment_ids is None:
             ap.error("assessment needs explicit sets and IDs")
         ids = json.loads(safe_path(args.assessment_ids).read_text())
-        print(json.dumps(build_assessment(args.bank,args.out,args.assessment_set,ids)["tables"]))
+        print(json.dumps(build_assessment(args.bank,args.out,args.assessment_set,ids,args.assessment_derived)["tables"]))
     elif args.action in ("admit-teachers", "admit-recipe"):
         if args.source_root is None:
             ap.error("admit-teachers requires --source-root")

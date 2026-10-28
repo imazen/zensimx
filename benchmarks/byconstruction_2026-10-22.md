@@ -7916,3 +7916,19 @@ before Python imports. It refuses existing state or launch logs and keeps
 stdout/resource logs outside the run inventory. Shell syntax, unsupported
 modes and refusal to relaunch an active run are verified. The caller still
 resolves the current lock holder and queued work before launching.
+
+### fx2 verdict input coverage (2026-10-28)
+
+The default revision-7 verdict assessment views declare only fx1's 420 raw
+inputs; their 82 new fx2 damage slots are NaN. Their immutable 1825-column
+source banks declare the required slots as measured. The existing assessment
+owner now accepts an explicit revision-7 fx2 declaration with all 504 consumed
+raw IDs (492 damage and 12 fragility), while retaining the existing fx1 check.
+It preserves keys, row order, identity rows and the original f64-to-f32 cast;
+unselected slots remain NaN. Tests cover explicit admission, incomplete-ID
+refusal and bit parity of the newly selected values.
+
+The continuation verdict runs require a fresh fx2 view passed through the
+existing instruments argument. The default views and source banks remain
+unchanged. Gate thresholds are unchanged. Coverage evidence is local at
+`/var/tmp/byc-fx2-20261028/stage2/GATE_INSTRUMENT_COVERAGE.json`.
