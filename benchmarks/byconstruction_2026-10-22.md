@@ -7586,7 +7586,7 @@ mixtures 0–2 rows (largest rise +0.5), global 0. The general model's packed mo
 
 ### Label-free gates for the two curated models (2026-10-28, complete 01:58 UTC)
 
-`mlic-candidate-gates-20261028-run03` (source snapshot of main `2111bc76`; unchanged steps verdict, steer and identity
+`mlic-candidate-gates-20261028-run03` (source snapshot of main `54b71341`; unchanged steps verdict, steer and identity
 through `just candidate-gates-rev7`, tools `688746b78bee-gates`), on the packed seed-0 models:
 
 | Gate | General: ×256 + rehearsal e59 (`7642eff4…`) | Codec only: AIC-only e29 (`63a1c5d3…`) |
