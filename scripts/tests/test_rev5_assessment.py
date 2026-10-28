@@ -82,7 +82,21 @@ class Assessment(unittest.TestCase):
             wide.build_assessment(self.source, self.root/'implicit', ['fixture'], ids)
         with self.assertRaises(ValueError):
             wide.build_assessment(self.source, self.root/'incomplete', ['fixture'], ids[:-1], 'fx2')
-        record = wide.build_assessment(self.source, self.root/'fx2', ['fixture'], ids, 'fx2')
+        with self.assertRaises(ValueError):
+            wide.build_assessment(self.source, self.root/'no-owner', ['fixture'], ids, 'fx2')
+        tool = self.root/'byc_fsid'; tool.write_bytes(b'canonical-owner-fixture')
+        response = 'basic+v2@w720/rev7_rowlanes#ee342d8c slots_hash8=ee342d8c n_slots=504'
+        with patch.object(wide.subprocess, 'check_output', return_value=response) as compute:
+            record = wide.build_assessment(self.source, self.root/'fx2', ['fixture'], ids, 'fx2', tool)
+        compute.assert_called_once_with([str(tool), 'basic+v2', '720', wide.PROFILE.era, ','.join(map(str, ids))], text=True)
+        self.assertEqual(record['feature_set_id'], response.split()[0])
+        empty = Path(record['empty_corpus']['path'])
+        self.assertEqual([p.name for p in empty.iterdir()], ['_MANIFEST.json'])
+        self.assertEqual(json.loads((empty/'_MANIFEST.json').read_text())['feature_set_id'], record['feature_set_id'])
+        with patch.object(wide.subprocess, 'check_output', return_value=response.replace('n_slots=504', 'n_slots=503')):
+            with self.assertRaises(ValueError):
+                wide.build_assessment(self.source, self.root/'wrong-owner-response', ['fixture'], ids, 'fx2', tool)
+        self.assertFalse((self.root/'wrong-owner-response').exists())
         self.assertEqual(record['derived_inputs']['sha256'], pin)
         table = pq.read_table(record['tables'][0]['path'])
         for i in ids:

@@ -898,13 +898,14 @@ def admit_recipe(bank: Path, source: Path, out: Path) -> None:
                       "human_role_decision": "PENDING"}))
 
 
-def build_assessment(bank: Path, out: Path, names: list[str], ids: list[int], derived_inputs=None) -> dict:
+def build_assessment(bank: Path, out: Path, names: list[str], ids: list[int], derived_inputs=None, fsid_tool=None) -> dict:
     """Declared Rev5 features-only views; preserve every key including identities."""
     from v2_common import refuse_immutable_output
     from rev5_bank import ASSESSMENT_KEY_COLUMNS
-    registered_ids = json.loads((REPO / "benchmarks/costset2_2026-10-03.candidate_ids.json").read_text())["candidates"]["by_v2fy"]
-    binding = None
+    binding, identity_owner = None, None
+    feature_set_id = "basic+v2@w720/" + PROFILE.era + "#62adfc93"
     if derived_inputs is None:
+        registered_ids = json.loads((REPO / "benchmarks/costset2_2026-10-03.candidate_ids.json").read_text())["candidates"]["by_v2fy"]
         if PROFILE.revision not in (5, 7) or ids != registered_ids:
             raise ValueError("Rev5 (or by-construction revision 7) by_v2fy420 assessment required")
     elif derived_inputs == "fx2":
@@ -913,6 +914,15 @@ def build_assessment(bank: Path, out: Path, names: list[str], ids: list[int], de
         expected = sorted(set(declaration["direct"]) | {i for pair in declaration["products"] for i in pair})
         if PROFILE.revision != 7 or ids != expected:
             raise ValueError("revision-7 assessment requires every pinned fx2 consumed feature, in order")
+        if fsid_tool is None:
+            raise ValueError("fx2 assessment requires the canonical byc_fsid owner")
+        result = subprocess.check_output([str(fsid_tool), "basic+v2", "720", PROFILE.era, ",".join(map(str, ids))], text=True).strip()
+        fields = result.split()
+        if (len(fields) != 3 or fields[2] != f"n_slots={len(ids)}" or not fields[1].startswith("slots_hash8=")
+                or fields[0] != f"basic+v2@w720/{PROFILE.era}#{fields[1].split('=', 1)[1]}"):
+            raise ValueError("canonical assessment identity response differs")
+        feature_set_id = fields[0]
+        identity_owner = dict(path=str(Path(fsid_tool).resolve()), sha256=sha(fsid_tool), response=result)
         binding = dict(token="fx2", path=str(path), sha256=pin)
     else:
         raise ValueError("unregistered assessment derived-input token")
@@ -948,11 +958,12 @@ def build_assessment(bank: Path, out: Path, names: list[str], ids: list[int], de
         prepared.append((name, m, keys, X, paths))
     out.mkdir(parents=True)
     record = {"schema":"rev5-assessment-tables-v1", "features_only":True,"labels_read":False,
-        "feature_ids":ids,"feature_set_id":"basic+v2@w720/"+PROFILE.era+"#62adfc93",
+        "feature_ids":ids,"feature_set_id":feature_set_id,
         "formula_revision":PROFILE.revision,"decoder_era":f"legacy-rgb8/extract_features_372col@sha256:{PROFILE.binary}",
         "table_code":code_identity(),"bank_root":str(bank.resolve()),"tables":[]}
     if binding is not None:
         record["derived_inputs"] = binding
+        record["feature_identity_owner"] = identity_owner
     for name, m, keys, X, paths in prepared:
         kp = out / (name + ".keys.parquet");pq.write_table(keys, kp, compression="zstd")
         columns = {k:keys.column(k) for k in keys.column_names}
@@ -975,6 +986,13 @@ def build_assessment(bank: Path, out: Path, names: list[str], ids: list[int], de
         record["tables"].append({"set":name,"path":str(table.resolve()),"sha256":sha(table),"rows":keys.num_rows,
             "declaration":{"path":str(sidecar.resolve()),"sha256":sha(sidecar)},
             "keys":{"path":str(kp.resolve()),"sha256":sha(kp)},"ordered_keys_sha256":ordered})
+    if binding is not None:
+        empty = out / "no-human-corpus"
+        empty.mkdir()
+        manifest = {k: record[k] for k in ("feature_set_id", "formula_revision", "decoder_era", "features_only", "labels_read", "feature_ids")}
+        manifest.update(scope="empty human-corpus selection for the registered fx2 engineering verdict", feature_identity_owner=identity_owner)
+        (empty / "_MANIFEST.json").write_text(json.dumps(manifest, indent=1) + "\n")
+        record["empty_corpus"] = dict(path=str(empty.resolve()), manifest_sha256=sha(empty / "_MANIFEST.json"))
     (out/"ASSESSMENT.json").write_text(json.dumps(record,indent=1)+"\n")
     return record
 
@@ -1040,6 +1058,7 @@ def main() -> None:
     ap.add_argument("--assessment-set", action="append", default=[])
     ap.add_argument("--assessment-ids", type=Path)
     ap.add_argument("--assessment-derived", choices=["fx2"], help="explicit registered revision-7 fx2 assessment")
+    ap.add_argument("--assessment-fsid-tool", type=Path, help="canonical byc_fsid owner for an explicit fx2 population")
     ap.add_argument("--source-root", type=Path, help="admit-teachers: immutable frozen Rev5 instrument root")
     ap.add_argument("--bank", type=Path, default=CANON_BANK)
     ap.add_argument("--out", "--root", dest="out", type=Path, default=OUT_DEFAULT)
@@ -1074,7 +1093,7 @@ def main() -> None:
         if not args.assessment_set or args.assessment_ids is None:
             ap.error("assessment needs explicit sets and IDs")
         ids = json.loads(safe_path(args.assessment_ids).read_text())
-        print(json.dumps(build_assessment(args.bank,args.out,args.assessment_set,ids,args.assessment_derived)["tables"]))
+        print(json.dumps(build_assessment(args.bank,args.out,args.assessment_set,ids,args.assessment_derived,args.assessment_fsid_tool)["tables"]))
     elif args.action in ("admit-teachers", "admit-recipe"):
         if args.source_root is None:
             ap.error("admit-teachers requires --source-root")
