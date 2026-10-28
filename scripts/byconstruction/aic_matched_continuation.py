@@ -1495,6 +1495,57 @@ PACK = ("import json, sys; from pathlib import Path; from v2_production_pack imp
         "print(json.dumps(pack_production(Path(sys.argv[1]), Path(sys.argv[2]), Path(sys.argv[3]), e33_output_stage=True)))")
 
 
+def packing_program(value):
+    prune = value.get("packing", {}).get("prune", True)
+    if type(prune) is not bool:
+        raise ValueError("packing prune option must be an explicit boolean")
+    return PACK if prune else PACK.replace("e33_output_stage=True", "e33_output_stage=True, no_prune=True")
+
+
+def full_repack_plan(run, commit, previous):
+    """Recover packing only, pinning completed fits rather than fitting another set of seeds."""
+    previous = Path(previous)
+    value = checked(previous / "PLAN.json", FULL_SCHEMA)
+    state = json.loads((previous / "STATE.json").read_text())
+    seed_errors = [r for r in state["failures"] if isinstance(r, dict) and "seed" in r]
+    if (state["stage"] != "failed" or bound_worker(state["worker"]["pid"], state["worker"]["start_ticks"])
+            or value.get("reuse_full_fits") or len(value["phases"]) != 1
+            or {r["seed"] for r in seed_errors} != set(SEEDS)
+            or any("packing failed" not in r["error"] for r in seed_errors)):
+        raise ValueError("packing recovery requires a stopped single-phase full-data attempt")
+    (arm, population), = value["arms"].items()
+    inputs = dict(value["input_sha256"])
+    inputs.update({str(previous / n): sha(previous / n) for n in ("PLAN.json", "STATE.json")})
+    reused = {}
+    for seed in SEEDS:
+        cell = previous / "full" / arm / f"full_s{seed}"
+        outputs = fixed_outputs(cell, population, f"{arm}|full|s{seed}", value["checkpoints"])
+        if json.loads((cell / "result.json").read_text())["spec"] != value["spec"]:
+            raise ValueError("completed full fit has a different spec")
+        files = {str(p.relative_to(cell)): sha(p) for p in sorted(cell.rglob("*"))
+                 if p.is_file() and not p.relative_to(cell).parts[0].startswith("pack_e")}
+        inputs.update({str(cell / name): pin for name, pin in files.items()})
+        reused[str(seed)] = dict(**outputs, files_sha256=files)
+    fold = json.loads(Path(INPUTS["fold_plan"][0]).read_text())
+    frozen = freeze(run, commit, previous / "bin/zensim_mlp_train", previous / "tools/bake_dial_refit", fold)
+    write(run / "PLAN.json", dict(value | frozen, input_sha256=inputs,
+          packing=dict(prune=False), reuse_full_fits=reused, recovery_from=str(previous),
+          recovery_reason="native pack refused pruning of derived-input positions; completed fitting is reused"), fresh=True)
+
+
+def reuse_full_fit(record, dest):
+    source = Path(record["directory"])
+    if any(sha(source / name) != pin for name, pin in record["files_sha256"].items()):
+        raise ValueError("completed full fit changed before packing recovery")
+    dest.mkdir(parents=True)
+    for name in record["files_sha256"]:
+        output = dest / name
+        output.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source / name, output)
+        if sha(output) != record["files_sha256"][name]:
+            raise ValueError("copied full fit differs from its frozen source")
+
+
 # The codec model's follow-through (registered 2026-10-27 after the owner picked AIC-only e29 as the codec-only model).
 CODEC_MODEL_REGISTRATION = dict(record="benchmarks/byconstruction_2026-10-22.md",
                                 section="Codec model follow-through: AIC-only e29 (owner's pick)",
@@ -1586,8 +1637,13 @@ def full_run(path):
                        OPENBLAS_NUM_THREADS="1", ZENSIM_MAX_TIER="v3")
     def fit(seed):
         phases, init = [], None
+        env = dict(environment, TMPDIR=str(Path.home() / "tmp"))
+        if plan_value.get("reuse_full_fits"):
+            dest = run_dir / "full" / arm / f"full_s{seed}"
+            reuse_full_fit(plan_value["reuse_full_fits"][str(seed)], dest)
+            phases.append(fixed_outputs(dest, population, f"{arm}|full|s{seed}", plan_value["checkpoints"]))
         # A recovery point first continues AIC-only on all of public_train, then recovers from its start epoch.
-        for phase_arm, phase_population, start_epoch in plan_value.get("phases", [[arm, population, None]]):
+        for phase_arm, phase_population, start_epoch in ([] if phases else plan_value.get("phases", [[arm, population, None]])):
             if start_epoch is not None:
                 init = Path(phases[-1]["directory"]) / "ckpt" / f"ckpt_epoch{start_epoch:03d}.bin"
             dest = run_dir / "full" / phase_arm / f"full_s{seed}"
@@ -1607,7 +1663,7 @@ def full_run(path):
         pack = dest / f"pack_e{epoch:03d}"
         (pack / "refit").mkdir(parents=True)
         with (pack / "pack-wrapper.log").open("x") as log:
-            result = subprocess.run([sys.executable, "-B", "-c", PACK, str(dest / "ckpt" / f"ckpt_epoch{epoch:03d}.bin"),
+            result = subprocess.run([sys.executable, "-B", "-c", packing_program(plan_value), str(dest / "ckpt" / f"ckpt_epoch{epoch:03d}.bin"),
                                      str(pack), plan_value["anchor"]["path"], "--root", plan_value["root"]],
                                     stdout=subprocess.PIPE, stderr=log, text=True, env=dict(env, PYTHONPATH=os.pathsep.join(
                                         [str(source / "rev4_featpot"), str(source)])))
@@ -1995,6 +2051,10 @@ if __name__ == "__main__":
     for mode in ("queue", "run", "status", "fold-queue", "fold-run", "fold-status", "omission-run", "full-run",
                  "reproduction-run", "reproduction-status", "verify-run"):
         sub.add_parser(mode).add_argument("plan", type=Path)
+    p = sub.add_parser("full-repack-plan", help="reuse completed full fits in a fresh no-prune packing attempt")
+    p.add_argument("run", type=Path)
+    p.add_argument("--source-commit", required=True)
+    p.add_argument("--previous", type=Path, required=True)
     p = sub.add_parser("fx2-plan", help="registered fx2 source-fold plans after both controls and all full seeds pass")
     p.add_argument("run", type=Path)
     p.add_argument("--source-commit", required=True)
@@ -2049,7 +2109,9 @@ if __name__ == "__main__":
     p.add_argument("--point", nargs=2, metavar=("RUN", "ARM"), required=True, help="the advancing run and arm")
     p.add_argument("--after-run", type=Path, required=True)
     args = parser.parse_args()
-    if args.mode == "fx2-plan":
+    if args.mode == "full-repack-plan":
+        full_repack_plan(args.run.resolve(), args.source_commit, args.previous.resolve())
+    elif args.mode == "fx2-plan":
         fx2_plan(args.run, args.source_commit, args.trainer, args.meta_tool, args.study, args.reproduction)
     elif args.mode == "xref-plan":
         xref_plan(args.run, args.source_commit, args.trainer, args.meta_tool, args.after_run)

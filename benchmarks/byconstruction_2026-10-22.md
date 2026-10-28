@@ -7932,3 +7932,20 @@ The continuation verdict runs require a fresh fx2 view passed through the
 existing instruments argument. The default views and source banks remain
 unchanged. Gate thresholds are unchanged. Coverage evidence is local at
 `/var/tmp/byc-fx2-20261028/stage2/GATE_INSTRUMENT_COVERAGE.json`.
+
+### Codec fx2 packing recovery (2026-10-28)
+
+All three full-data fits completed their fixed 60 epochs. Packing epoch 29
+refused: removing dead layer-0 inputs would desynchronize the derived-input
+declaration. The failed run and its checkpoints remain preserved.
+
+`full-repack-plan` freezes those completed fit files into a fresh attempt.
+The runner verifies source hashes, copies the fit files and verifies the
+copies before packing. Explicit `--no-prune` retains input positions; the
+canonical f16 conversion, zero zerobias, protected last layer, identity knot,
+tail extension and TRAIN CID22 anchor are unchanged. The legacy packing
+command remains the default. Completed fitting and the registered epoch-29
+checkpoint are reused.
+Focused tests cover recipe/anchor preservation, source mutation and packing
+command parity; failed and recovered evidence lives under
+`/var/tmp/byc-fx2-20261028/stage2/`.

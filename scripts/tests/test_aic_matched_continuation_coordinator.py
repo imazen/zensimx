@@ -173,6 +173,67 @@ class PlanConfiguration(unittest.TestCase):
 
 
 class PriorityWait(unittest.TestCase):
+    def test_repacking_plan_keeps_registered_recipe_and_exact_completed_sources(self):
+        with tempfile.TemporaryDirectory(dir=Path.home() / 'tmp') as tmp:
+            root = Path(tmp)
+            previous, output = root / 'failed', root / 'repacked'
+            previous.mkdir()
+            (previous / 'PLAN.json').write_text('{}')
+            (previous / 'STATE.json').write_text(json.dumps(dict(stage='failed', worker=dict(pid=1, start_ticks=-1),
+                failures=[dict(seed=s, error='packing failed') for s in range(3)])))
+            fold = root / 'fold.json'
+            fold.write_text('{}')
+            value = dict(phases=[['AICOnly', 'aic-only', None]], arms=dict(AICOnly='aic-only'),
+                         input_sha256={}, checkpoints=[7, 15, 29, 59], spec='invented-fx2',
+                         packed_epoch=29, root='unchanged-root', anchor=dict(path='unchanged-anchor'),
+                         source_commit='old')
+            for s in range(3):
+                cell = previous / 'full/AICOnly' / f'full_s{s}'
+                (cell / 'pack_e029').mkdir(parents=True)
+                (cell / 'pack_e029/pack.log').write_text('preserved failure')
+                (cell / 'result.json').write_text(json.dumps(dict(spec=value['spec'])))
+            def freeze(run, *args):
+                run.mkdir()
+                return dict(source_commit='new')
+            def completed(cell, *args):
+                return dict(directory=str(cell), checkpoints={})
+            with patch.object(owner, 'checked', return_value=value), \
+                    patch.object(owner, 'bound_worker', return_value=False), \
+                    patch.object(owner, 'fixed_outputs', side_effect=completed), \
+                    patch.object(owner, 'freeze', side_effect=freeze), \
+                    patch.object(owner, 'INPUTS', dict(fold_plan=(str(fold), 'invented'))):
+                owner.full_repack_plan(output, 'new', previous)
+            result = json.loads((output / 'PLAN.json').read_text())
+            for key in ['arms', 'phases', 'spec', 'packed_epoch', 'root', 'anchor', 'checkpoints']:
+                self.assertEqual(result[key], value[key])
+            self.assertEqual(result['source_commit'], 'new')
+            self.assertEqual(result['packing'], dict(prune=False))
+            self.assertEqual(set(result['reuse_full_fits']), {'0', '1', '2'})
+            self.assertTrue(all(set(r['files_sha256']) == {'result.json'} for r in result['reuse_full_fits'].values()))
+
+    def test_packing_recovery_keeps_legacy_program_and_requires_explicit_boolean(self):
+        self.assertEqual(owner.packing_program({}), owner.PACK)
+        self.assertIn('no_prune=True', owner.packing_program(dict(packing=dict(prune=False))))
+        with self.assertRaisesRegex(ValueError, 'boolean'):
+            owner.packing_program(dict(packing=dict(prune='false')))
+
+    def test_reused_full_fit_is_copied_and_changed_sources_refuse_before_output(self):
+        with tempfile.TemporaryDirectory(dir=Path.home() / 'tmp') as tmp:
+            root = Path(tmp)
+            source = root / 'completed'
+            source.mkdir()
+            checkpoint = source / 'checkpoint.bin'
+            checkpoint.write_bytes(b'invented trained checkpoint')
+            record = dict(directory=str(source), files_sha256={checkpoint.name: owner.sha(checkpoint)})
+            owner.reuse_full_fit(record, root / 'copy')
+            copied = root / 'copy/checkpoint.bin'
+            self.assertEqual(copied.read_bytes(), checkpoint.read_bytes())
+            self.assertFalse(copied.is_symlink())
+            checkpoint.write_bytes(b'changed')
+            with self.assertRaisesRegex(ValueError, 'changed'):
+                owner.reuse_full_fit(record, root / 'refused')
+            self.assertFalse((root / 'refused').exists())
+
     def test_finished_inventory_rehashes_content_and_refuses_nonterminal_runs(self):
         with tempfile.TemporaryDirectory(dir=Path.home() / "tmp") as tmp:
             root = Path(tmp)

@@ -182,6 +182,8 @@ because cleanup tests or a historical training reproduction pass.
 
 ## Known Bugs
 
+* **2026-10-28 — codec fx2 packing finds dead derived inputs.** All three 60-epoch full-data fits completed, but the epoch-29 packer correctly refused automatic pruning because it would desynchronize the derived-input declaration. Preserve run01. A fresh `full-repack-plan` binds and copies the completed fits, verifies the copies and packs with explicit `--no-prune`; f16 quantization, zero zerobias, protected last layer and TRAIN CID22 calibration remain unchanged. No refitting or checkpoint selection is involved.
+
 * **2026-10-28 — default revision-7 verdict views cover fx1 only.** Their declared 420 raw inputs omit fx2's 82 new damage slots (stored as NaN). Use a fresh assessment view from the immutable instrument banks with `v2c_wide.py assessment --assessment-derived fx2`, supplying all 504 pinned consumed IDs and the revision-7 bank profile, then pass that view to `candidate-gates-rev7` through its instruments argument. The default fx1 views and all gate thresholds remain unchanged. The assessment owner refuses incomplete declarations, wrong revisions and nonfinite selected values.
 
 * **2026-10-28 — stage-1 full-fit trainer lacks continuation CLI.** The fx2 continuation replay run01 was refused before training because stage 1's frozen `acfb2a9f…` executable does not recognize `--init-from`. Run01 remains preserved under `/var/tmp/byc-fx2-20261028/stage2/`. Run02 uses the existing continuation trainer `b3b86f18…` from the curated general-model run; its `--help` confirms initialization, constant-LR and derived-input options. Resolve capabilities from the actual pinned binary before reusing it; model arithmetic and gates are unchanged.
