@@ -1,0 +1,47 @@
+# Assessment-only build of the existing benchmark source for the curated
+# revision-7 models' runtime grid (costcmp_run.py --r7-grid). Same closure as
+# E34's manifest, whose archmage =0.9.29 pin current zensim (magetypes 0.9.30)
+# no longer resolves; E34's manifest and lock stay frozen for its replays.
+[package]
+name = "zensim-r7-runtime"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[features]
+default = ["costcmp"]
+speedq = []
+costcmp = ["speedq", "ssim2-rayon"]
+ssim2-rayon = ["fast-ssim2/rayon"]
+
+[dependencies]
+zensim = { path = "../../zensim", default-features = false, features = ["threads", "avx512", "imgref", "deprecated-profiles", "feature-regime-v2", "candidate-profiles", "corruption-head", "custom-profiles"] }
+zenpredict = { git = "https://github.com/imazen/zenanalyze", rev = "f0903489300aea240ffae2e3f1359f8f2b9a0ba4" }
+zenpredict-bake = { git = "https://github.com/imazen/zenanalyze", rev = "f0903489300aea240ffae2e3f1359f8f2b9a0ba4" }
+zenbench = { git = "https://github.com/imazen/zenbench", rev = "82ff70a3f0c212cf88f53d6e9c3e02de13f32eec" }
+archmage = { version = "=0.9.30", features = ["std", "testable_dispatch"] }
+fast-ssim2 = { version = "=0.8.2", features = ["imgref"] }
+fast-ssim2-main = { package = "fast-ssim2", git = "https://github.com/imazen/fast-ssim2", rev = "09ec3e7c78bd230b1545572a188e162313c59fda", features = ["imgref", "rayon"] }
+ssimulacra2 = "=0.5.1"
+butteraugli = { version = "=0.9.3", features = ["avx512"] }
+linear-srgb = { version = "=0.6.12", default-features = false, features = ["std"] }
+imgref = "=1.12.3"
+rgb = { version = "=0.8.53", default-features = false, features = ["bytemuck"] }
+bytemuck = { version = "=1.25.2", default-features = false, features = ["derive"] }
+serde_json = "=1.0.151"
+sha2 = "=0.11.0"
+rayon = "=1.12.0"
+
+[[bench]]
+name = "ssim2_speed_bar"
+path = "../benches/ssim2_speed_bar.rs"
+harness = false
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(feature, values("gmsd-arm"))', 'cfg(has_cpp_ssimulacra2)', 'cfg(has_cpp_butteraugli)'] }

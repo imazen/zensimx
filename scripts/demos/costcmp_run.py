@@ -53,6 +53,7 @@ E33_GEOMETRIES = ['64x64', '256x256', '1024x1024']
 QUAL_ARMS = ['by_v2fy_r5', 'e33_a', 'e33_c', 'zensim_D', 'fast_ssim2', 'fast_ssim2_main',
              'e33_a_map', 'e33_c_map', 'e33_seed0_map']
 QUAL_GEOMETRIES = ['1024x1024', '2048x2048']
+# Build: zensim-bench/r7-runtime/Cargo.toml (`just costcmp-r7-build`).
 # The two curated revision-7 models (byconstruction record, "Runtime gate for the two curated models"): QUAL-A's
 # scorecard rows (one pinned worker, 1024^2 and 2048^2), inside a size sweep (64^2 to 4096^2) at one and eight threads.
 # Frozen D is the paired baseline, fast-ssim2 0.8.2 and main are the peer bars, butteraugli's 3-norm and the current

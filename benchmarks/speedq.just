@@ -55,6 +55,13 @@ costcmp-build:
 costcmp-clippy:
     ZENSIM_BENCH_SKIP_CPP_FFI=1 cargo clippy --manifest-path zensim-bench/Cargo.toml --bench ssim2_speed_bar --features costcmp -- -D warnings
 
+# The curated revision-7 models' runtime grid (costcmp_run.py --r7-grid): its own assessment manifest, built off dev.
+costcmp-r7-build:
+    CARGO_TARGET_DIR=zensim-bench/target cargo bench --locked --no-run --message-format=json-render-diagnostics --manifest-path zensim-bench/r7-runtime/Cargo.toml --bench ssim2_speed_bar --features costcmp
+
+costcmp-r7-clippy:
+    CARGO_TARGET_DIR=zensim-bench/target cargo clippy --locked --manifest-path zensim-bench/r7-runtime/Cargo.toml --bench ssim2_speed_bar --features costcmp -- -D warnings
+
 costcmp-test:
     python3 -m unittest discover -s scripts/demos -p 'test_costcmp.py' -v
 
