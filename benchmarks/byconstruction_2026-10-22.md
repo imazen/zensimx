@@ -8187,3 +8187,24 @@ all actual rasters below one megapixel, all-ones Y and the existing chroma rungs
 censuses are in the local report; actual source/family, geometry, storage and split admission precede declaration.
 No validation-bucket pixel or label was read by this pilot. The later Rev7 extractor identity and Mlic fit replay
 controls remain prerequisites for their corresponding stages.
+
+### Chroma-only ladders: pilot result and amendment (2026-10-28, before any full-grid encode)
+
+**Pilot** (lane `chromaladder`, i270, 81 TRAIN sources over all 21 imazen-26 classes, SafeSyn and CID22, 162 views at
+256/512 px; the SafeSyn teacher executable replays its stored scores exactly). YCbCr with all-ones luma: 140 of 162
+ladders admitted in both 4:4:4 and 4:2:0 (about 11 kept rungs each; the median teacher score falls from 95.6 to about 23
+at chroma x22.6 and rises again beyond, so admission stops there). Patent scans drop every ladder (near-grey sources).
+XYB at quality 95 over the knob's full 0.1-5.0 range: 80 of 162 admitted; the endpoint drop is median 7.9 points (max
+18.6), too small for most document, plot, screenshot and product images to keep three rungs.
+
+**Amendment (owner, 2026-10-28).**
+- *HDR:* "don't forget hdr" — an HDR family of 10-bit PQ AVIF through zenavif's SVT backend, luma quantizer fixed and
+  `chroma_q` stepped (owner's pick; the 2026-09-04 AVIF hold is lifted), on imazen-26-hdr TRAIN origins. The teacher is
+  not plain SSIMULACRA2 (not HDR-aware): the pilot proposes one from the registered HDR teacher work (HDRTEACH, E26) and
+  reports its ladders under the same admission rule before any full run.
+- *EVIF:* "also use imazen/evif for this" — generate the SDR families with EVIF's `zenjpeg-expert` (per-component quant
+  multipliers, subsampling) and `zenjpeg-color` (XYB) families and store every admitted sample as an `.evif` container
+  (scored pixels, recipe, encoded size, scores), so the set can be rescored by any metric later. The SafeSyn teacher
+  build stays the training target; EVIF's own judges are diagnostics. EVIF has no HDR path yet, so the HDR family uses
+  the zenmetrics sweep until it does.
+- *XYB range:* any widening beyond 5.0 is shown to the owner with measurements before it is adopted.
