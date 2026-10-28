@@ -8,9 +8,9 @@ score, and encoders choose the settings to reach it.
 Built on the same psychovisual foundations as SSIMULACRA2 and butteraugli — multi-scale SSIM, edge artifacts, detail loss, and high-frequency features in XYB color space — but with trained weights, fused SIMD kernels, and multi-threaded computation.
 
 **Current checkout (2026-10-19):** the user-facing control is one target score.
-`codec_target()` returns **B / zensim-b: diff+frag-820 (Rev5)**; D is an explicit fast profile. See the [B promotion record](https://github.com/imazen/zensim/blob/main/docs/PROFILE_B_DIFF_FRAG_820_2026-10-19.md) for its exact bake, known color-noise inversions and remaining qualification. Negative scores are
+`codec_target()` returns **B / zensim-b: diff+frag-820 (Rev5)**; D is an explicit fast profile. See the [B promotion record](https://github.com/imazen/zensimx/blob/main/docs/PROFILE_B_DIFF_FRAG_820_2026-10-19.md) for its exact bake, known color-noise inversions and remaining qualification. Negative scores are
 valid. The benchmark tables below are historical measurements, not a fresh
-qualification of today's profiles. See the [current integration guide](https://github.com/imazen/zensim/blob/main/docs/CODEC_TARGET_METRIC.md)
+qualification of today's profiles. See the [current integration guide](https://github.com/imazen/zensimx/blob/main/docs/CODEC_TARGET_METRIC.md)
 for bake identities, actual consumer behavior and the remaining dial requirements.
 
 **Interactive chart exploration**: <https://imazen.github.io/zensim/> — scatter zensim / fast-ssim2 / butteraugli against human MOS across CID22 / KADID / TID / AIC corpora, filter by codec + version, with per-band SROCC tables and step-5 (20-bin) breakdowns.
@@ -20,11 +20,11 @@ for bake identities, actual consumer behavior and the remaining dial requirement
 
 Quality targeting requires both perceptual agreement and a useful score range.
 The tables below preserve the older v0.3/A evaluation; B's dated methodology is
-in its [July record](https://github.com/imazen/zensim/blob/main/benchmarks/profile_b_methodology_2026-07-12.md).
+in its [July record](https://github.com/imazen/zensimx/blob/main/benchmarks/profile_b_methodology_2026-07-12.md).
 They do not qualify the current profiles against September's stricter dial
 requirements. CID22 has also been consulted repeatedly during model selection;
 it is not an untouched final test. Current split policy and exceptions are in
-[DATA_SPLITS](https://github.com/imazen/zensim/blob/main/docs/DATA_SPLITS.md).
+[DATA_SPLITS](https://github.com/imazen/zensimx/blob/main/docs/DATA_SPLITS.md).
 
 
 ## Quick start
@@ -134,7 +134,7 @@ The CLI and library default to `codec-target` (currently B). Use
 `--profile tuner-v4` to reproduce the earlier CLI default. JPEG, WebP, AVIF and PNG are enabled by
 default; JXL encode/decode requires `--features zenjxl` before `--`.
 The historical May 18 demo matrix at
-[`benchmarks/zensim_target_demo_2026-05-18.md`](https://github.com/imazen/zensim/blob/main/benchmarks/zensim_target_demo_2026-05-18.md):
+[`benchmarks/zensim_target_demo_2026-05-18.md`](https://github.com/imazen/zensimx/blob/main/benchmarks/zensim_target_demo_2026-05-18.md):
 reported 33 / 36 cells within ±1.5 score units, median 5 iterations. Those
 are dated demo results; inspect today's returned `converged` and achieved
 score rather than assuming the target was reached.
@@ -174,7 +174,7 @@ JPEG quality mapping accuracy is ±7 quality units MAE — individual images var
 
 ## Regression testing
 
-[**zensim-regress**](https://github.com/imazen/zensim/blob/main/zensim-regress/README.md) tracks pixel output across platforms and dependency updates. Hash-based checksums for fast exact matches; perceptual comparison with forensic evidence when hashes diverge. Amplified diff images, error classification, architecture-specific tolerances, CI manifests, and HTML reports.
+[**zensim-regress**](https://github.com/imazen/zensimx/blob/main/zensim-regress/README.md) tracks pixel output across platforms and dependency updates. Hash-based checksums for fast exact matches; perceptual comparison with forensic evidence when hashes diverge. Amplified diff images, error classification, architecture-specific tolerances, CI manifests, and HTML reports.
 
 ```rust
 use zensim_regress::checksums::{ChecksumManager, CheckResult};
@@ -185,7 +185,7 @@ let result = mgr.check_pixels("resize", "bicubic", "200x200",
 assert!(result.passed(), "{result}");
 ```
 
-Run with `UPDATE_CHECKSUMS=1` to create baselines. See the [zensim-regress guide](https://github.com/imazen/zensim/blob/main/zensim-regress/README.md) for the full workflow.
+Run with `UPDATE_CHECKSUMS=1` to create baselines. See the [zensim-regress guide](https://github.com/imazen/zensimx/blob/main/zensim-regress/README.md) for the full workflow.
 
 ## Batch comparison
 
@@ -229,7 +229,7 @@ reproducing scores. Current checkout mapping, checked October 19, 2026:
 | `PreviewV0_1` / `PreviewV0_2` | Original 228-weight linear profiles, retained for compatibility | In-source arrays |
 
 Exact filenames, hashes, serving limitations and evaluation records are in the
-[integration guide](https://github.com/imazen/zensim/blob/main/docs/CODEC_TARGET_METRIC.md).
+[integration guide](https://github.com/imazen/zensimx/blob/main/docs/CODEC_TARGET_METRIC.md).
 
 `ZensimProfile::codec_target()` and `latest_preview()` both return `B` — the canonical production codec-target the zen codecs dial against (the deprecated `latest()` also returns `B`). `A` (the prior default, the v47 MLP) is now `#[deprecated]` and lives behind the default-on `deprecated-profiles` feature — build with `--no-default-features` to drop it. For dynamically loaded candidates, `zensim::BakeScorer` borrows a parsed model and serves the complete head/spline/ensemble/corruption composition; evaluation uses that same surface. Static custom profiles remain available through `ZensimProfile::Custom` and `ProfileParams::builder()`. Results are deterministic for the same input on the same architecture; cross-architecture scores (AVX2 vs scalar vs AVX-512) may differ by small ULP.
 
@@ -261,7 +261,7 @@ The historical `PreviewV0_4` / `PreviewV0_5*` SOTA-trail variants, `A_Phone`, an
 | Crate | Description |
 |-------|-------------|
 | [`zensim`](https://crates.io/crates/zensim) | Metric library |
-| [`zensim-regress`](https://crates.io/crates/zensim-regress) | Visual regression testing ([guide](https://github.com/imazen/zensim/blob/main/zensim-regress/README.md)) |
+| [`zensim-regress`](https://crates.io/crates/zensim-regress) | Visual regression testing ([guide](https://github.com/imazen/zensimx/blob/main/zensim-regress/README.md)) |
 | `zensim-experimental` | Historical / research profiles via the `Custom` extension point (unpublished) |
 | `zensim-validate` | Evaluation and training CLI (internal) |
 | `zensim-bench` | Comparative benchmarks (standalone root, sibling-dep) |
@@ -273,7 +273,7 @@ Rust 1.93.0 (2024 edition).
 
 ## License
 
-[MIT](https://github.com/imazen/zensim/blob/main/LICENSE-MIT) OR [Apache-2.0](https://github.com/imazen/zensim/blob/main/LICENSE-APACHE)
+[MIT](https://github.com/imazen/zensimx/blob/main/LICENSE-MIT) OR [Apache-2.0](https://github.com/imazen/zensimx/blob/main/LICENSE-APACHE)
 
 ## AI-Generated Code Notice
 

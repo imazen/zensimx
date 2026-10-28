@@ -504,7 +504,7 @@ Source owners: fold adaptation `86748f41`, fold panels `3ab3f980`, full-data
 Order admission `042c89e0`, full fits `7ec5f55f`, full panels `aa300e1d`.
 Their frozen snapshots and complete binary hashes are in each run's plan and
 `source/`. The common warm-start source is `87864f94`; its public API remains
-under [PR 73](https://github.com/imazen/zensim/pull/73), not merged by this work.
+under [PR 73](https://github.com/imazen/zensimx/pull/73), not merged by this work.
 The full Order binary is separate from the running omission binary.
 
 **Do not restart AIC fold run01.** It was cancelled before fitting because the
@@ -2121,7 +2121,7 @@ before fitting it. See the report for negative controls and chronology.
 
 ## September 9: SSIM correction — handed off, then taken up
 
-The correction was written up as https://github.com/imazen/zensim/issues/61 for
+The correction was written up as https://github.com/imazen/zensimx/issues/61 for
 someone else to tackle, and then tackled. The handoff draft that was sitting
 uncommitted against `f7b9f39a` is preserved as its own labelled commit and the
 integration was finished on top of it, so the earlier instruction to pause this

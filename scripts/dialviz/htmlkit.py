@@ -8,7 +8,7 @@ from __future__ import annotations
 import html
 import re
 
-GITHUB_BLOB = "https://github.com/imazen/zensim/blob/main/"
+GITHUB_BLOB = "https://github.com/imazen/zensimx/blob/main/"
 
 # Set by the build (gitref.Linker): maps a cited path and line to a GitHub permalink.
 _LINKER = None

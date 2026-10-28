@@ -214,7 +214,7 @@ pub const C_RING_ERR: f64 = 0.05;
 /// `ZENSIM_HF_GAIN` ([`crate::hf_gain_form::active_gain_form`]): no shipping
 /// path sets it, and every stored table and bake is [`Self::Raw`].
 ///
-/// imazen/zensim#72 (`benchmarks/byconstruction_2026-10-22.md`): [`Self::Raw`]
+/// imazen/zensimx#72 (`benchmarks/byconstruction_2026-10-22.md`): [`Self::Raw`]
 /// saturates `|src − dst|`, which a global offset, contrast or saturation
 /// change makes uniformly large off edges. Measured on 24 references, a
 /// +8 luma shift was ringing's largest response, 2.4× a visible σ1.2 blur.

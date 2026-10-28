@@ -6,7 +6,7 @@ members = ["zensim", "zensim-experimental", "zensim-validate", "zensim-regress",
 # butteraugli fork that only exist on dev machines with the full ~/work/zen
 # sibling layout. Keeping them as workspace members made `cargo metadata` fail
 # on every bare checkout (CI, fresh clones) before a single crate compiled —
-# imazen/zensim#43. Each is now its own standalone workspace root; build them
+# imazen/zensimx#43. Each is now its own standalone workspace root; build them
 # from their directory or via `cargo <cmd> --manifest-path <crate>/Cargo.toml`.
 # `apidoc/` is the CI-free public-API snapshot runner: excluded so plain
 # `cargo test` and every CI job (incl. --all-features) never compile its
@@ -88,7 +88,7 @@ zenpredict-bake = { git = "https://github.com/imazen/zenanalyze", rev = "f090348
 # on zensim, so the dep direction is zensim → zenmetrics/crates/zenmetrics-stats
 # only — no cycle, the zenmetrics workspace root is NOT pulled in).
 # Pinned to a specific git rev for CI portability (same contract as the
-# zenpredict pin above — fixes imazen/zensim#43, where the sibling path
+# zenpredict pin above — fixes imazen/zensimx#43, where the sibling path
 # dep made `cargo metadata` fail on every bare checkout). Local
 # developers wanting auto-sync with the sibling worktree add to their
 # personal `.cargo/config.toml`:

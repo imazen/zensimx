@@ -204,7 +204,7 @@ HF-NL per-ref +0.464, LIVE +0.061, dial mono +4.3 pp, all outside noise).
 ### 4.0 Build
 
 ```sh
-git clone https://github.com/imazen/zensim && cd zensim
+git clone https://github.com/imazen/zensimx && cd zensim
 # sibling checkout of imazen/zenanalyze is required (path deps zenpredict/zenpredict-bake)
 cargo build --release -p zensim-validate   # zensim_mlp_train, bake_verdict, bake_dial_refit, freeze_check
 ```

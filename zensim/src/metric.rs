@@ -146,7 +146,7 @@ impl Default for BlurKernel {
 /// profiles are calibrated for and the only implemented variant; the
 /// enum stays `#[non_exhaustive]` so alternative kernels can be added
 /// without a breaking change. (Speculative `zenresize`-gated
-/// Mitchell/Lanczos variants were removed pre-0.3.0 — imazen/zensim#47 —
+/// Mitchell/Lanczos variants were removed pre-0.3.0 — imazen/zensimx#47 —
 /// because no compute path ever dispatched on them.)
 #[non_exhaustive]
 #[derive(Debug, Clone, Copy, Default, PartialEq)]
@@ -2916,7 +2916,7 @@ impl Zensim {
     /// HLG: OOTF at display peak) — that conversion lives in the caller
     /// (e.g. zenpixels-convert), not here. Absolute-score calibration
     /// against a trained HDR bake is tracked in
-    /// [imazen/zensim#38](https://github.com/imazen/zensim/issues/38).
+    /// [imazen/zensimx#38](https://github.com/imazen/zensimx/issues/38).
     ///
     /// `ref_stride` / `dist_stride` count f32 elements between row starts
     /// (≥ `3 * width`; tightly packed = `3 * width`). Row padding beyond
@@ -3595,7 +3595,7 @@ fn compute_rounding_bias(delta_stats: &DeltaStats) -> RoundingBias {
 ///
 /// HDR pairs are scored via [`Zensim::compute_pu_linear`]
 /// (absolute-luminance linear RGB); trained-bake calibration is
-/// tracked in imazen/zensim#38. [`ImageSource::is_hdr`] exists
+/// tracked in imazen/zensimx#38. [`ImageSource::is_hdr`] exists
 /// specifically to make this refusal possible — without the signal,
 /// HDR pixels in a `LinearF32Rgba` source are indistinguishable from
 /// SDR and would be silently clamped.

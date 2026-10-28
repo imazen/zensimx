@@ -25,7 +25,7 @@ FROM ubuntu:24.04 AS runtime
 
 LABEL org.opencontainers.image.title="zensim-stats"
 LABEL org.opencontainers.image.description="Run the full Mohammadi panel + per-band + monotonicity + cross-codec eval on the shipped zensim PreviewV0_3 bake."
-LABEL org.opencontainers.image.source="https://github.com/imazen/zensim"
+LABEL org.opencontainers.image.source="https://github.com/imazen/zensimx"
 LABEL org.opencontainers.image.licenses="MIT OR Apache-2.0"
 
 ENV DEBIAN_FRONTEND=noninteractive

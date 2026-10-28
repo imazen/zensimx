@@ -3,7 +3,7 @@
 > **⚠ BANNER 2026-07-18:** protocol reusable; results (2026-04-17) predate Profile A/B + the 372-feature IW pool. Re-run against B if scale-invariance regresses.
 
 This document reports the first-run results from the scale-invariance protocol
-defined in [issue #12](https://github.com/imazen/zensim/issues/12). It answers
+defined in [issue #12](https://github.com/imazen/zensimx/issues/12). It answers
 the practical question: *if I render the same source at two different resolutions
 and apply the same codec/quality, do the metric scores stay comparable?*
 

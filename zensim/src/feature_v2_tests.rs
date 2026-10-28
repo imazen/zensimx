@@ -406,7 +406,7 @@ pub(crate) mod tests {
         }
     }
 
-    /// imazen/zensim#56 regression gate: the MSCN divisive normalizer must
+    /// imazen/zensimx#56 regression gate: the MSCN divisive normalizer must
     /// be the CORRECTLY-ROUNDED IEEE `resid / sqrt(var + c)` on every SIMD
     /// tier, lane for lane, bit for bit. That is what makes the
     /// `MSCN_DIFF_MEAN`/`MSCN_DIFF_L2` slots CPU-vendor-deterministic: IEEE

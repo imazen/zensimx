@@ -484,7 +484,7 @@ pub enum FormulaRevision {
     /// `ssim_form::refuse_rev4_mix` refuses every cross-boundary mix.
     Rev5,
     /// Revision 5 with the corrected ringing measurement (the `ringhpm` era,
-    /// imazen/zensim#72, `benchmarks/byconstruction_2026-10-22.md`).
+    /// imazen/zensimx#72, `benchmarks/byconstruction_2026-10-22.md`).
     ///
     /// The twelve v2 `ringing` slots measure the error after removing each
     /// image's SSIM local mean, `(src − mu1) − (dst − mu2)`, instead of
@@ -898,7 +898,7 @@ const DEFECT_RING_GLOBAL: Defect = Defect {
            from edges. MEASURED on 24 references (feature_probe.py, \
            benchmarks/byconstruction_2026-10-22.md): a +8 luma shift was \
            ringing's largest response, 2.4x a visible blur sigma 1.2 \
-           (median 0.334 vs 0.139). imazen/zensim#72.",
+           (median 0.334 vs 0.139). imazen/zensimx#72.",
 };
 
 /// The `ringhpm` era: ringing measures the error after removing each image's

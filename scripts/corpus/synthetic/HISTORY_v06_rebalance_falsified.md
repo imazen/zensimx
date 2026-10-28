@@ -20,7 +20,7 @@
 
 Branch: `v06-rebalanced-corpus`
 Worktree: `/home/lilith/work/zen/zensim--v06-rebalance/`
-Commit: `af95701` (push: https://github.com/imazen/zensim/tree/v06-rebalanced-corpus)
+Commit: `af95701` (push: https://github.com/imazen/zensimx/tree/v06-rebalanced-corpus)
 
 ## What landed
 

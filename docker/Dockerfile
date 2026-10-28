@@ -67,7 +67,7 @@ ARG RUST_VERSION=1.93
 # `docker run` time. The image is portable across machines.
 #
 FROM debian:bookworm-slim AS source-git
-ARG GIT_URL=https://github.com/imazen/zensim
+ARG GIT_URL=https://github.com/imazen/zensimx
 ARG GIT_REF=main
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git ca-certificates && rm -rf /var/lib/apt/lists/*

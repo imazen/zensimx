@@ -166,7 +166,7 @@ imazen/zensim`.
 - `src/target_quality.rs:409` — production quality-targeting path, `ZensimProfile::latest()`.
 - ~6 sites in `tests/linku_corpus.rs`, `examples/{phase2_oat,predictor_sweep,encode_sweep,sweep_validate}.rs` — `latest()`, regression-sweep tooling with `zensim_regress` tolerance checks (class c).
 
-**zenpipe** (`~/work/zen/zenpipe`, workspace incl. `zenfilters`, `zencodecs` members) — git dependency with **no rev pinned** at the workspace level (`Cargo.toml:258`, `zensim = { git = "https://github.com/imazen/zensim" }`); `Cargo.lock` currently resolves commit `062bb3cedfbb6e723235044fb0818efaaa493d93` (2026-06-12, **158 commits behind** current zensim HEAD, predates B). Unlike zenjpeg's disciplined explicit-rev pin, this floats — the next `cargo update -p zensim` in this repo silently adopts whatever is on zensim `main`, with zero version-number signal (Cargo.toml still just says "the git repo", `zensim`'s own `Cargo.toml` version stays `0.3.0` either way).
+**zenpipe** (`~/work/zen/zenpipe`, workspace incl. `zenfilters`, `zencodecs` members) — git dependency with **no rev pinned** at the workspace level (`Cargo.toml:258`, `zensim = { git = "https://github.com/imazen/zensimx" }`); `Cargo.lock` currently resolves commit `062bb3cedfbb6e723235044fb0818efaaa493d93` (2026-06-12, **158 commits behind** current zensim HEAD, predates B). Unlike zenjpeg's disciplined explicit-rev pin, this floats — the next `cargo update -p zensim` in this repo silently adopts whatever is on zensim `main`, with zero version-number signal (Cargo.toml still just says "the git repo", `zensim`'s own `Cargo.toml` version stays `0.3.0` either way).
 
 - `zenpipe/zencodecs/src/transcode.rs:463-467` — **production code** (`#[cfg(all(feature = "transcode-iqa", feature = "jxl-decode"))]`, not test-gated), the JPEG→JXL coefficient-domain recompression path: `let metric = Zensim::new(ZensimProfile::A);` feeds this scorer into `zenjxl::jpeg_lossy::recompress_jpeg_lossy_target`. Explicit `A`, no stated rationale in the doc comment (unlike zenjpeg's measure.rs) — worth asking zenpipe's owner whether this pin is deliberate or incidental.
 - `zenpipe/zenfilters/tests/{parameter_calibration,quality_validation,reference_validation,imagemagick_comparison}.rs` — `ZensimProfile::codec_target()`, filter-parameter **calibration** tests (class c — these very likely assert against specific expected score values tuned to A).
@@ -315,7 +315,7 @@ correct as shipped. Documented here so a future session doesn't re-open it.
 
 Per §2's dependency table: imageflow, zenwebp-main, and zenavif are stuck on
 registry `0.2.7` and cannot reach **either** current-A or B without (a)
-`imazen/zensim#46` being resolved, (b) an actual `0.3.0` (or later) publish,
+`imazen/zensimx#46` being resolved, (b) an actual `0.3.0` (or later) publish,
 and (c) each consumer bumping its own `Cargo.toml`/lockfile. This is a
 precondition for those three repos to participate in *any* phase of this
 plan beyond "does not apply yet" — flagged, not solved, here.
@@ -520,7 +520,7 @@ migrating" was already tried and abandoned this same campaign.
 | 3 | Flip `latest_preview()`/`codec_target()` | ~1 day execution, but gated | G1 (SDR25), G2 (dial study) — each independently multi-day, unscoped here |
 | 4a | zenmetrics, coefficient, zenwebp-recompress (live-pinned, opt-in) | ~1-2 days each | Phase 2 |
 | 4b | zenjpeg, zenpipe (rev-pin hygiene + calibration) | ~3-5 days each | G3 (per-consumer regression diff), GEXP recalibration if measure.rs pins move |
-| 4c | zenwebp-main, zenavif, imageflow | blocked, not estimable | G6 (zensim 0.3.0 publish — external prerequisite, tracked as `imazen/zensim#46`) |
+| 4c | zenwebp-main, zenavif, imageflow | blocked, not estimable | G6 (zensim 0.3.0 publish — external prerequisite, tracked as `imazen/zensimx#46`) |
 | 5 | Retain A | ongoing, zero effort | n/a |
 
 **No tracking issue for this specific migration was found** (`gh issue list

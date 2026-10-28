@@ -234,7 +234,7 @@ pub fn train_ranknet(
 #[cfg(test)]
 mod tests {
     use super::*;
-    // Canonical midrank Spearman (imazen/zensim#41): the test used to carry
+    // Canonical midrank Spearman (imazen/zensimx#41): the test used to carry
     // its own ordinal-rank copy.
     use crate::panel::spearman;
 

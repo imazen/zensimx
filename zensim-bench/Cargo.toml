@@ -8,7 +8,7 @@ publish = false
 # Standalone workspace root (NOT a member of the zensim root workspace).
 # This crate is internal sibling-required tooling: it path-deps crates that
 # only exist in the full ~/work/zen dev layout. Excluding it from the root
-# workspace keeps `cargo metadata` green on bare checkouts (imazen/zensim#43).
+# workspace keeps `cargo metadata` green on bare checkouts (imazen/zensimx#43).
 # Build with `cargo <cmd> --manifest-path zensim-bench/Cargo.toml` or from this dir.
 [workspace]
 

@@ -1,4 +1,4 @@
-//! imazen/zensim#41 Tier-1 #2 gate: `zensim-validate` must not define its
+//! imazen/zensimx#41 Tier-1 #2 gate: `zensim-validate` must not define its
 //! own IQA correlation primitives — `zenstats` (reached as
 //! `zensim_validate::panel::*` or `zenstats::*`) is the single owner.
 //!

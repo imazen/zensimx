@@ -17,7 +17,7 @@ use zenpredict_bake::{BakeLayer, BakeMetadataEntry, BakeRequest, bake};
 use zensim_validate::dial_spline::{fit_spline_knots, spline_payload};
 use zensim_validate::mlp_train::minmax_monotone::{MinMaxMonotone, train_ranknet};
 use zensim_validate::parquet_loader::load_parquet;
-// Canonical Spearman (imazen/zensim#41 Tier-1 #2): this bin carried its own
+// Canonical Spearman (imazen/zensimx#41 Tier-1 #2): this bin carried its own
 // ORDINAL-rank copy (ties broken by sort order, `+1e-12` denominator guard);
 // zenstats uses midranks, so the reported SROCC differs only when the
 // prediction or target vectors contain exact ties.

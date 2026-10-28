@@ -15,7 +15,7 @@ from pathlib import Path
 
 from .mdparse import SourceShapeError
 
-GITHUB = {"zensim": "https://github.com/imazen/zensim", "zenanalyze": "https://github.com/imazen/zenanalyze"}
+GITHUB = {"zensim": "https://github.com/imazen/zensimx", "zenanalyze": "https://github.com/imazen/zenanalyze"}
 
 
 def _git(git_dir: Path, *args: str, binary: bool = False):

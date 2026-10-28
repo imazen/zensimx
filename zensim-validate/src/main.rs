@@ -2300,7 +2300,7 @@ fn load_synthetic(csv_path: &Path, target_metric: Option<TargetMetric>) -> Vec<I
 // `zenstats::pearson`'s `< 1e-12` guard (both reject same values in
 // practice). See `zensim/CHANGELOG.md` Unreleased / Changed.
 //
-// imazen/zensim#41: the three delegating wrapper fns that lived here are now
+// imazen/zensimx#41: the three delegating wrapper fns that lived here are now
 // plain `use zenstats::{...}` aliases in the import block at the top of this
 // file, so `zensim-validate/src` defines NO fn named spearman/pearson/ranks
 // (gated by `tests/no_private_iqa_stats.rs`). `fast_kendall` above is NOT

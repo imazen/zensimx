@@ -94,7 +94,7 @@ owners, retired July pipelines and their frozen source revision.
 
 On September 7 the obsolete July blend and negative/diverse training families
 were retired along with their private report path. Their source, recipes and
-instrument definitions remain at [revision `45e1ec9a`](https://github.com/imazen/zensim/tree/45e1ec9a95f0cbbb58decef46155aa46d6d1b8b6/scripts/v_next).
+instrument definitions remain at [revision `45e1ec9a`](https://github.com/imazen/zensimx/tree/45e1ec9a95f0cbbb58decef46155aa46d6d1b8b6/scripts/v_next).
 This is archival retirement, not a claim of same-recipe training parity with
 Rust. Stored results and bake inputs remain intact. `bandwise_dashboard.py`
 now forwards to `gauntlet.py`; its old NPZ/Matplotlib mode is retired. The board

@@ -273,7 +273,7 @@ fn saturate_v<V: Vf32>(token: V::Tok, x: V, c: V) -> V {
 /// (`vrsqrtps`, whose seed table is CPU-VENDOR-specific) plus one
 /// Newton-Raphson step, which leaves a ~1e-8 rel vendor residue — the
 /// AMD-vs-Intel divergence measured on exactly the `MSCN_DIFF_MEAN` /
-/// `MSCN_DIFF_L2` append slots in the bf944 wave (imazen/zensim#56,
+/// `MSCN_DIFF_L2` append slots in the bf944 wave (imazen/zensimx#56,
 /// `benchmarks/backfill944_bigcodec_2026-08-02.md`); on NEON it is
 /// `1/sqrt` then a multiply (double rounding), a third distinct result. The
 /// scalar tail, the f64 reference in `attr_pass_b_main_px`, and the

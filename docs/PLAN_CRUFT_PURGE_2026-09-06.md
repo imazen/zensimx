@@ -162,7 +162,7 @@ remaining work below are still open.** No new model was trained or admitted.
 
 Fourteen obsolete source files were retired. Their exact source, historical
 instrument definitions and invocation recipes remain in
-[the preceding revision, `45e1ec9a`](https://github.com/imazen/zensim/tree/45e1ec9a95f0cbbb58decef46155aa46d6d1b8b6).
+[the preceding revision, `45e1ec9a`](https://github.com/imazen/zensimx/tree/45e1ec9a95f0cbbb58decef46155aa46d6d1b8b6).
 Tracked caller searches found no remaining executable consumers after retiring
 the obsolete families together. Historical TOML manifests, benchmark records,
 bake inputs and data remain intact. A private source backup was also retained.

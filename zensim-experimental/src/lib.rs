@@ -41,7 +41,7 @@
 #![forbid(unsafe_code)]
 
 // Per-codec affine calibration for the Tuner profile. Relocated from
-// `zensim::codec_calibration` (2026-06-12, imazen/zensim#47): the zensim
+// `zensim::codec_calibration` (2026-06-12, imazen/zensimx#47): the zensim
 // runtime parses its own private per-codec calibration from bake metadata,
 // so these standalone types' only consumer is this crate's tooling/examples.
 pub mod codec_calibration;

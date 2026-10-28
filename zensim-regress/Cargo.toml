@@ -3,7 +3,9 @@ name = "zensim-regress"
 version = "0.4.0"
 edition = "2024"
 description = "Visual regression testing persistence and workflow for zensim"
-repository = "https://github.com/imazen/zensim"
+repository = "https://github.com/imazen/zensimx"
+# Research copy: the published crate is released from imazen/zensim (2026-10-28 split).
+publish = false
 license = "MIT OR Apache-2.0"
 rust-version = "1.93.0"
 keywords = ["visual", "regression", "testing", "image", "checksum"]

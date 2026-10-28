@@ -113,5 +113,5 @@ Per scale at scale `s`: `tile_count = strip_inner_rows[s] × (padded_w[s] - 2*bl
 
 ## Tracking
 
-- imazen/zensim#40 (acumen) — Mode B-lite work intersects here
+- imazen/zensimx#40 (acumen) — Mode B-lite work intersects here
 - imazen/zensim — new issue for this work (TBD)

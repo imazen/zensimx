@@ -89,7 +89,7 @@ pub enum ZensimError {
     /// [`compute_pu_linear_planar`](crate::Zensim::compute_pu_linear_planar)) —
     /// the PU21 front-end. Its output calibration against a trained HDR
     /// bake is still open — see
-    /// [imazen/zensim#38](https://github.com/imazen/zensim/issues/38).
+    /// [imazen/zensimx#38](https://github.com/imazen/zensimx/issues/38).
     #[error(
         "HDR input cannot be scored by the SDR entry points — decode to \
          absolute-luminance linear RGB and use compute_pu_linear"

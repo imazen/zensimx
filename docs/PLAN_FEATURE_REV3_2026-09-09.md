@@ -1,7 +1,7 @@
 # FEATURE REVISION 3 — the stable SSIM moments, and what a refit needs
 
 Sibling of [`PLAN_FEATURE_REV2_2026-09-05.md`](PLAN_FEATURE_REV2_2026-09-05.md),
-same lane, same gates. Executes [issue #61](https://github.com/imazen/zensim/issues/61).
+same lane, same gates. Executes [issue #61](https://github.com/imazen/zensimx/issues/61).
 
 Source of the defect: [`benchmarks/nonmax_diagnosis_2026-09-08.md`](../benchmarks/nonmax_diagnosis_2026-09-08.md).
 Source of the mechanism and the integration record:

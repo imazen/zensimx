@@ -617,7 +617,7 @@ def render():
     for name in ['e34_registration_freeze_draft_2026-10-15.md',
                  'e34_frozen_launch_2026-10-15.json', 'e34_results_2026-10-15.json']:
         complete = complete.replace(f']({name})',
-            f'](https://github.com/imazen/zensim/blob/main/benchmarks/{name})')
+            f'](https://github.com/imazen/zensimx/blob/main/benchmarks/{name})')
     assert all(not path.exists() for path in [out.with_suffix('.json'),out.with_suffix('.md'),
                                              appendix_path,full_readout]), 'fresh publication paths required'
     with full_readout.open('x') as f:

@@ -25,7 +25,7 @@
 
 use std::path::PathBuf;
 use zensim_validate::parquet_loader::load_parquet;
-// Spearman is zenstats' — the single owner of stat math (imazen/zensim#41).
+// Spearman is zenstats' — the single owner of stat math (imazen/zensimx#41).
 use zenstats::panel::spearman;
 
 const NF: usize = 372;
