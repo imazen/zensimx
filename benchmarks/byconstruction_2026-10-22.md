@@ -7583,3 +7583,19 @@ mixtures 0–2 rows (largest rise +0.5), global 0. The general model's packed mo
 **Near-identity** (`/mnt/tower/output/zensim/mlic-nearid-aiconlye29-20261028-run01`): the packed seed-0 model (sha256
 `63a1c5d3…`) passes N1, N2 and N3, 142 of 144 monotone ladders. The label-free gates for both packed models run in
 `mlic-candidate-gates-20261028-run03`.
+
+### Label-free gates for the two curated models (2026-10-28, complete 01:58 UTC)
+
+`mlic-candidate-gates-20261028-run03` (source snapshot of main `2111bc76`; unchanged steps verdict, steer and identity
+through `just candidate-gates-rev7`, tools `688746b78bee-gates`), on the packed seed-0 models:
+
+| Gate | General: ×256 + rehearsal e59 (`7642eff4…`) | Codec only: AIC-only e29 (`63a1c5d3…`) |
+|---|---|---|
+| Dial contract C1–C6, standard and ladder grids | PASS, PASS | PASS, PASS |
+| G-STEER | 135/135 | 135/135 |
+| Identity at every SIMD tier (12 permutations, 62 sources) | pass, 0 failing rows | pass, 0 failing rows |
+| Near-identity N1–N3 (above) | pass, 142/144 | pass, 142/144 |
+
+Both curated models pass every label-free gate. Neither is adopted: the defaults are the owner's decision (D1). Still
+open for both: the frozen EVAL read (waits for the owner), the registered runtime gate (the owner chooses its hardware),
+and, after adoption, the seamless HDR frontend.
