@@ -4,6 +4,9 @@ import argparse
 from collections import Counter, defaultdict
 import hashlib
 import json
+import os
+import shutil
+import gzip
 from pathlib import Path
 import struct
 import subprocess
@@ -141,6 +144,50 @@ def verify_first(ledger, archive, evif, out):
                   checks=['canonical launcher and native S3 claims/ledger','all76 native EVIF seal checks','separate JPEG CAS and embedded bytes exact','frozen target doubles exact on readback'],runtime=result['runtime']))
 
 
+def diagnostic_proof(ctl, image, out):
+    out.mkdir();archive=out/'cas';archive.mkdir();scratch=out/'scratch';scratch.mkdir()
+    case=NAS/'b/walltime/i270-r9/batch-none'
+    row=next(r for r in pq.read_table(case/'ledger.parquet').to_pylist() if r['image_path'].endswith('im5044_m32.png'))
+    result=json.loads(cas(case/'cas',row['output_sha']).read_text())
+    raw=Path(row['image_path']).read_bytes();w,h=struct.unpack('>II',raw[16:24])
+    source=dict(image_path=row['image_path'],source_sha256=hashlib.sha256(raw).hexdigest(),pixels_sha256=result['reference_pixels_sha256'],identity='frozen144-diagnostic-proof',width=w,height=h)
+    for c in result['cells']:
+        dest=cas(archive,c['evif_sha256']);dest.parent.mkdir(parents=True,exist_ok=True)
+        shutil.copyfile(cas(case/'cas',c['evif_sha256']),dest);assert sha(dest)==c['evif_sha256']
+    spec=out/'spec.json';manifest=out/'manifest.json'
+    save(spec,dict(sources=[dict(source=source,evif_shas=[c['evif_sha256'] for c in result['cells']])],implementation_shas=PINS,peak_mem_bytes=256*1024*1024))
+    subprocess.run([str(ctl),'declare-evif-diagnostics','--spec',str(spec),'--out',str(manifest)],check=True)
+    endpoint=os.environ['CHROMA_S3_ENDPOINT']
+    args=['docker','run','--name','chroma-diagnostic-proof','--cpu-shares=256','--cpuset-cpus=0','--memory=1g','--memory-swap=1g',
+          '-e','AWS_ACCESS_KEY_ID','-e','AWS_SECRET_ACCESS_KEY','-e','ZEN_R2_ENDPOINT='+endpoint,'-e','ZEN_BUCKET=zentrain','-e','ZEN_RUN=jobs/chroma-b-diagnostic-proof-20261028',
+          '-e','ZEN_ARCHIVE_BLOBS_DIR='+str(archive),'-e','TMPDIR='+str(scratch),'-e','HOME='+str(scratch),'-e','ZEN_CHUNK_WALL_SEC=0',
+          '-v',str(NAS)+':'+str(NAS)+':ro','-v',str(out)+':'+str(out),'-v',str(Path.home()/'tmp/chroma-run-heavy')+':/opt/private/run-heavy:ro',
+          '--entrypoint','/opt/private/run-heavy',image,'--mem','1G','--jobs','1','--','zenfleet-worker','--manifest',str(manifest),'--ledger-out',str(out/'ledger.parquet'),
+          '--blobs-r2-bucket','zentrain','--blobs-r2-prefix','unused-diagnostic-proof','--r2-endpoint',endpoint,'--exec','/usr/local/bin/evif-exec','--worker','i270-chroma-diagnostic-proof','--provider','lan']
+    with (out/'worker.log').open('w') as log:subprocess.run(args,stdout=log,stderr=subprocess.STDOUT,check=True)
+    rows=pq.read_table(out/'ledger.parquet').to_pylist();assert len(rows)==1 and rows[0]['status']=='done'
+    primary=cas(archive,rows[0]['output_sha']);assert sha(primary)==rows[0]['output_sha'];actual=json.loads(primary.read_text())
+    expected={(r['image_path'],r['family'],r['params_json']):r for r in json.loads((NAS/'b/walltime/EXPECTED.json').read_text())}
+    recipes={c['evif_sha256']:c for c in result['cells']};maps=0
+    assert len(actual['cells'])==12
+    for cell in actual['cells']:
+        original=recipes[cell['evif_sha256']];old=expected[(source['image_path'],original['family'],original['params_json'])]
+        scores=json.loads(chunks(Path(old['path']).read_bytes())['scor'])['scores']
+        for metric,value in cell['scores'].items():
+            want=next(s['value'] for s in scores if s['metric']==metric)
+            assert struct.pack('>d',value)==struct.pack('>d',want),'diagnostic scalar differs from frozen control'
+        assert struct.pack('>d',cell['teacher']['value']).hex()==original['teacher_bits']
+        assert set(cell['diffmaps'])=={'butteraugli','cvvdp@standard_4k'}
+        for binding in cell['diffmaps'].values():
+            path=cas(archive,binding['sha256']);assert sha(path)==binding['sha256']
+            fields=gzip.decompress(path.read_bytes()).split(b'\n',3)
+            assert fields[:3]==[b'Pf',f'{w} {h}'.encode(),b'-1.0'] and len(fields[3])==w*h*4
+            maps+=1
+        assert sha(cas(archive,cell['evif_sha256']))==cell['evif_sha256']
+    for digest in actual['sidecars'].values():assert sha(cas(archive,digest))==digest
+    save(out/'PROOF.json',dict(passed=True,cells=12,maps=maps,scalar_doubles='all3 diagnostics exact to unbatched144 control',targets_unchanged=True,image=image,primary_sha256=rows[0]['output_sha']))
+
+
 def diagnostic_spec(admission_dir, out):
     assert not out.exists(), 'preserve existing diagnostic specification'
     views={v['id']:v for v in json.loads((ROOT/'VIEWS.json').read_text())}
@@ -162,9 +209,11 @@ if __name__=='__main__':
     a=s.add_parser('spec');a.add_argument('out',type=Path);a.add_argument('--one-view',action='store_true')
     a=s.add_parser('admit');a.add_argument('ledger',type=Path);a.add_argument('archive',type=Path);a.add_argument('out',type=Path)
     a=s.add_parser('verify-first');a.add_argument('ledger',type=Path);a.add_argument('archive',type=Path);a.add_argument('evif',type=Path);a.add_argument('out',type=Path)
+    a=s.add_parser('diagnostic-proof');a.add_argument('ctl',type=Path);a.add_argument('image');a.add_argument('out',type=Path)
     a=s.add_parser('diagnostics-spec');a.add_argument('admission_dir',type=Path);a.add_argument('out',type=Path)
     a=p.parse_args()
     if a.command=='spec':specification(a.out,a.one_view)
     elif a.command=='admit':admit(a.ledger,a.archive,a.out)
     elif a.command=='verify-first':verify_first(a.ledger,a.archive,a.evif,a.out)
+    elif a.command=='diagnostic-proof':diagnostic_proof(a.ctl,a.image,a.out)
     else:diagnostic_spec(a.admission_dir,a.out)
