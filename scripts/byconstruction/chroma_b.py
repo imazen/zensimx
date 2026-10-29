@@ -431,7 +431,8 @@ def harvest_diagnostics(ledger, admission_dir, archive, out, qualification=False
     out.mkdir()
     if not qualification:
         summary=json.loads((admission_dir/'SUMMARY.json').read_text())
-        assert summary['qualified_full_grid'] and summary['cells']==696312
+        assert summary['qualified_full_grid'] and summary['cells'] in (696312,146592),'core or band-ac admission only'
+        expected_selected=summary['diagnostics_selected']
     selected=defaultdict(dict)
     for row in pq.read_table(admission_dir/'DIAGNOSTICS_SELECTION.parquet').to_pylist():
         key=(row['family'],row['rung'])
@@ -528,6 +529,7 @@ def harvest_diagnostics(ledger, admission_dir, archive, out, qualification=False
     finally:
         if writer:writer.close()
     assert counts['selected_cells']==sum(len(v) for v in selected.values())
+    assert qualification or counts['selected_cells']==expected_selected,'readback must reconcile the admission summary'
     save(out/'SUMMARY.json',dict(passed=True,qualified_full_grid=not qualification,views=len(rows),**counts,unique_objects_verified=len(verified),
                                  per_class=dict(classes),per_role=dict(roles),selection_reasons=dict(reasons),
                                  ledger_sha256=sha(ledger),selection_sha256=sha(admission_dir/'DIAGNOSTICS_SELECTION.parquet'),

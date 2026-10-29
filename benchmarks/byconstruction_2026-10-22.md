@@ -8363,3 +8363,30 @@ at7,810/8,319 jobs; their full artifact readback is unrun. All lane workers
 were stopped; remaining work is final bank reconciliation, leg/root builds and
 actual root qualification. No stage-C-ready receipt or new model exists.
 The unexecuted checker source is preserved in `c/unrun-owner-work/`.
+
+## Profile F (chroma-aware revision-7.1): stage C resume and the registered chroma-ladder gate (2026-10-29)
+
+**Stage C state.** The footerless AC feature readback was redone from the immutable CAS into a fresh local directory
+(the Parquet close failed on the NFS mount): 65,323 pairs, 7,182 views, rc 0 under run-heavy (435 s, peak RSS 2.28 GiB).
+The three wave banks (core wave 1 and 2, AC) merged with `chroma_c.py merge-banks --ac-admission`: 317,008 pairs,
+fitting 293,318 (fit 133,962 + new-train 159,356), diagnostic 23,690 (dev 17,059 + calibration 6,631), exactly the
+media-admitted totals. `ring_root.py chroma` built the derived root (fit leg 293,318 rows, held-out 23,690) and
+`selection-rebind --declaration fx2` its fx2 twin; `chroma_leg_check.py` (preserved unrun owner work, now in the repo)
+read both back: all 1825 f32 columns, every f64 target bit and the ordered source/role/family/rung keys exact. The
+LAN store had refused every write since the cache pool filled (filer leveldb latched on ENOSPC); restarting it cleared
+that. `harvest_diagnostics` now accepts the band-ac admission summary (146,592 cells) and reconciles the selected-cell
+count with the summary's `diagnostics_selected`.
+
+**G-CHROMA, registered before any model is scored on the held-out chroma ladders.**
+- Population: the 23,690 diagnostic rows (roles dev and calibration; never fitted, never selected on), grouped into
+  ladders by `(view, family)` with at least 3 kept rungs; families ycc444, ycc420, xyb-capped, xyb-extended, band-ac.
+- Model input: each rung's scored pixels and its reference through the packed bake (`score_pair_with_bake`,
+  `--bake-post raw`), the same pixels the extractor read.
+- Statistic: per ladder, Spearman rho between the model score and the teacher SSIMULACRA2 over the kept rungs (the teacher
+  strictly falls along a kept ladder, so rho = 1 is the correct damage order). Per family: median rho and the share of
+  ladders with rho >= 0.9; per content class the same, reported where a class has at least 10 ladders.
+- Pass for a model: in every one of the five families the median rho >= 0.90 and the share with rho >= 0.9 is >= 0.80.
+- Comparison F against E (and F's codec counterpart against ECodec): per family the paired difference of ladder rho
+  (F minus E), mean with a 95% bootstrap interval resampling views. F is chroma-aware only if no family's mean difference is
+  negative beyond its interval and the pooled mean difference is positive with its interval above zero. E's absolute
+  numbers are reported whether or not E passes the absolute bar.
