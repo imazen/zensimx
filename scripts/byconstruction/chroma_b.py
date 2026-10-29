@@ -362,12 +362,16 @@ def prepare_diagnostic_selection(ledger, archive, out):
     pq.write_table(pa.Table.from_pylist(selections),out/'DIAGNOSTICS_SELECTION.parquet',compression='zstd')
     save(out/'SUMMARY.json',dict(qualified_full_grid=False,purpose='diagnostic sample declaration only; full media admission and exact selection reconciliation required',views=len(rows),selected_cells=len(selections),ledger_sha256=sha(ledger)))
     diagnostic_spec(out,out/'spec.json')
+    save(out/'PROGRESS.json',dict(stage='complete; diagnostic selection only',views=len(rows),selected_cells=len(selections),qualified_full_grid=False))
 
 
 def harvest_diagnostics(ledger, admission_dir, archive, out, qualification=False):
     """Read back the declared sample; diagnostics never change target admission."""
     import numpy as np
     out.mkdir()
+    if not qualification:
+        summary=json.loads((admission_dir/'SUMMARY.json').read_text())
+        assert summary['qualified_full_grid'] and summary['cells']==696312
     selected=defaultdict(dict)
     for row in pq.read_table(admission_dir/'DIAGNOSTICS_SELECTION.parquet').to_pylist():
         key=(row['family'],row['rung'])
@@ -462,7 +466,7 @@ def seal_stage_b(out, build_commit, diagnostic_ledger, diagnostic_result):
     assert set(diagnostic_summary['per_class'])==set(admission_summary['per_class'])
     assert audit['unique_done_jobs']==9162 and audit['conflicting_jobs']==0
     files=[p for p in ROOT.glob('*.json') if p.name not in ['PROGRESS.json','SNAPSHOT-A.json','SNAPSHOT-T0.json','SNAPSHOT-T1.json']]
-    for directory in [ROOT/'plan',ROOT/'admission-r1',ROOT/'ledger-audit-final',diagnostic_result]:
+    for directory in [ROOT/'plan',ROOT/'diagnostic-plan',ROOT/'admission-r1',ROOT/'ledger-audit-final',diagnostic_result]:
         files.extend(p for p in directory.iterdir() if p.is_file() and p.name!='PROGRESS.json')
     files.extend([ROOT/'final-ledger/snap_chroma-b-20261028.parquet',diagnostic_ledger,NAS/'b/binaries/_MANIFEST.json'])
     for name in ['ENCODES.json','LADDERS.json','SUMMARY.json','ORACLE.json','hdrvdp3.parquet','natural-scores.jsonl','pairs.tsv']:
