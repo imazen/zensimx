@@ -205,6 +205,8 @@ def diagnostic_proof(ctl, image, out, view):
     with (out/'worker.log').open('w') as log:subprocess.run(args,stdout=log,stderr=subprocess.STDOUT,check=True)
     rows=pq.read_table(out/'ledger.parquet').to_pylist();assert len(rows)==1 and rows[0]['status']=='done'
     primary=cas(archive,rows[0]['output_sha']);assert sha(primary)==rows[0]['output_sha'];actual=json.loads(primary.read_text())
+    assert actual['source_sha256']==source['source_sha256']
+    assert actual['reference_pixels_sha256']==source['pixels_sha256']
     expected={(r['image_path'],r['family'],r['params_json']):r for r in json.loads((NAS/'b/walltime/EXPECTED.json').read_text())}
     recipes={c['evif_sha256']:c for c in result['cells']};maps=0
     assert len(actual['cells'])==12
@@ -362,7 +364,7 @@ def prepare_diagnostic_selection(ledger, archive, out):
     diagnostic_spec(out,out/'spec.json')
 
 
-def harvest_diagnostics(ledger, admission_dir, archive, out):
+def harvest_diagnostics(ledger, admission_dir, archive, out, qualification=False):
     """Read back the declared sample; diagnostics never change target admission."""
     import numpy as np
     out.mkdir()
@@ -373,6 +375,10 @@ def harvest_diagnostics(ledger, admission_dir, archive, out):
         selected[row['image_path']][key]=row
     views={v['path']:v for v in json.loads((ROOT/'VIEWS.json').read_text())}
     rows=pq.read_table(ledger).to_pylist()
+    if qualification:
+        assert len(rows)==1 and out.name.startswith('qualification-')
+        assert rows[0]['image_path'] in selected
+        selected={rows[0]['image_path']:selected[rows[0]['image_path']]}
     assert len(rows)==len(selected) and all(r['status']=='done' for r in rows)
     assert {r['image_path'] for r in rows}==set(selected)
     assert len({r['job_id'] for r in rows})==len(rows)
@@ -436,8 +442,8 @@ def harvest_diagnostics(ledger, admission_dir, archive, out):
                 save(out/'PROGRESS.json',dict(stage='diagnostic readback',views=index+1,required_views=len(rows),**counts))
     finally:
         if writer:writer.close()
-    assert counts['selected_cells']==pq.ParquetFile(admission_dir/'DIAGNOSTICS_SELECTION.parquet').metadata.num_rows
-    save(out/'SUMMARY.json',dict(passed=True,views=len(rows),**counts,unique_objects_verified=len(verified),
+    assert counts['selected_cells']==sum(len(v) for v in selected.values())
+    save(out/'SUMMARY.json',dict(passed=True,qualified_full_grid=not qualification,views=len(rows),**counts,unique_objects_verified=len(verified),
                                  per_class=dict(classes),per_role=dict(roles),selection_reasons=dict(reasons),
                                  ledger_sha256=sha(ledger),selection_sha256=sha(admission_dir/'DIAGNOSTICS_SELECTION.parquet'),
                                  diagnostic_implementation=implementation,targets_unchanged=True,admission_unchanged=True))
@@ -451,7 +457,7 @@ def seal_stage_b(out, build_commit, diagnostic_ledger, diagnostic_result):
     diagnostic_summary=json.loads((diagnostic_result/'SUMMARY.json').read_text())
     audit=json.loads((ROOT/'ledger-audit-final/SUMMARY.json').read_text())
     assert admission_summary['qualified_full_grid'] and admission_summary['cells']==696312
-    assert diagnostic_summary['passed'] and diagnostic_summary['targets_unchanged']
+    assert diagnostic_summary['passed'] and diagnostic_summary['qualified_full_grid'] and diagnostic_summary['targets_unchanged']
     assert diagnostic_summary['selected_cells']==admission_summary['diagnostics_selected']
     assert set(diagnostic_summary['per_class'])==set(admission_summary['per_class'])
     assert audit['unique_done_jobs']==9162 and audit['conflicting_jobs']==0
@@ -484,6 +490,7 @@ if __name__=='__main__':
     a=s.add_parser('diagnostics-spec');a.add_argument('admission_dir',type=Path);a.add_argument('out',type=Path)
     a=s.add_parser('prepare-diagnostics');a.add_argument('ledger',type=Path);a.add_argument('archive',type=Path);a.add_argument('out',type=Path)
     a=s.add_parser('harvest-diagnostics');a.add_argument('ledger',type=Path);a.add_argument('admission_dir',type=Path);a.add_argument('archive',type=Path);a.add_argument('out',type=Path)
+    a=s.add_parser('qualify-diagnostics');a.add_argument('ledger',type=Path);a.add_argument('admission_dir',type=Path);a.add_argument('archive',type=Path);a.add_argument('out',type=Path)
     a=s.add_parser('seal');a.add_argument('out',type=Path);a.add_argument('build_commit');a.add_argument('diagnostic_ledger',type=Path);a.add_argument('diagnostic_result',type=Path)
     a=p.parse_args()
     if a.command=='spec':specification(a.out,a.one_view)
@@ -498,4 +505,5 @@ if __name__=='__main__':
     elif a.command=='diagnostics-spec':diagnostic_spec(a.admission_dir,a.out)
     elif a.command=='prepare-diagnostics':prepare_diagnostic_selection(a.ledger,a.archive,a.out)
     elif a.command=='harvest-diagnostics':harvest_diagnostics(a.ledger,a.admission_dir,a.archive,a.out)
+    elif a.command=='qualify-diagnostics':harvest_diagnostics(a.ledger,a.admission_dir,a.archive,a.out,qualification=True)
     else:seal_stage_b(a.out,a.build_commit,a.diagnostic_ledger,a.diagnostic_result)
