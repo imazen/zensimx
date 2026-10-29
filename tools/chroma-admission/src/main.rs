@@ -94,6 +94,8 @@ fn main() -> Result<(), String> {
         ("mlic_role", "dev"),
         ("mlic_role", "calibration"),
         ("codec_family", "band-dc"),
+        ("codec_family", "ycc444"),
+        ("mlic_role", "new-train"),
     ] {
         let substitute = |path: &Path, pin: &str| {
             let mut v = document(path, pin)?;

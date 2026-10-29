@@ -93,6 +93,7 @@ pub(super) fn admit(
     let mut observations = BTreeSet::new();
     let mut counts = BTreeMap::<String, usize>::new();
     let mut ladders = BTreeMap::<String, BTreeSet<u64>>::new();
+    let mut role_families = BTreeMap::<(String, String), u64>::new();
     for (i, key) in keys.iter().enumerate() {
         let text = |name: &str| {
             key[name]
@@ -115,12 +116,34 @@ pub(super) fn admit(
             return Err("chroma row/role/family identity differs".into());
         }
         *counts.entry(source.to_owned()).or_default() += 1;
+        *role_families
+            .entry((
+                text("mlic_role")?.to_owned(),
+                text("codec_family")?.to_owned(),
+            ))
+            .or_default() += 1;
         if !ladders
             .entry(text("ladder")?.to_owned())
             .or_default()
             .insert(key["rung"].as_u64().ok_or("chroma rung required")?)
         {
             return Err("duplicate chroma ladder rung".into());
+        }
+    }
+    for role in ["fit", "new-train"] {
+        for family in ["ycc444", "ycc420", "xyb-capped", "xyb-extended", "band-ac"] {
+            let summary = if family == "band-ac" { &ac } else { &admission };
+            let expected = summary["per_role"][role][format!("{family}_kept")]
+                .as_u64()
+                .ok_or("family admission count required")?;
+            if role_families
+                .get(&(role.to_owned(), family.to_owned()))
+                .copied()
+                .unwrap_or(0)
+                != expected
+            {
+                return Err("chroma labelled family/role population differs".into());
+            }
         }
     }
     if ladders.values().any(|r| r.len() < 3) || serde_json::json!(counts) != record["source_counts"]

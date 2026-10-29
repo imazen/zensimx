@@ -171,7 +171,7 @@ def admit_chroma_teacher(record, declaration, selected_ids, excluded):
     keys=document(d['keys_path'],d['keys_sha256'])
     if len(keys)!=fit_rows or d.get('rows')!=len(keys) or r.get('rows')!=len(keys):
         raise ValueError('chroma fitting population differs')
-    observations=set();counts={};ladders={}
+    observations=set();counts={};ladders={};role_families={}
     for i,k in enumerate(keys):
         fields=['source','reference','observation','family','ladder','codec_family','mlic_role']
         if (any(not isinstance(k.get(f),str) or not k[f] for f in fields)
@@ -181,11 +181,17 @@ def admit_chroma_teacher(record, declaration, selected_ids, excluded):
                 or type(k.get('rung')) is not int or k['rung']<0):
             raise ValueError('chroma row/role/family identity differs')
         observations.add(k['observation']);counts[k['source']]=counts.get(k['source'],0)+1
+        family_key=(k['mlic_role'],k['codec_family']);role_families[family_key]=role_families.get(family_key,0)+1
         rungs=ladders.setdefault(k['ladder'],set())
         if k['rung'] in rungs:raise ValueError('duplicate chroma ladder rung')
         rungs.add(k['rung'])
     if any(len(r)<3 for r in ladders.values()) or counts!=r['source_counts']:
         raise ValueError('chroma admitted source/ladder population differs')
+    for role in ['fit','new-train']:
+        for family in ['ycc444','ycc420','xyb-capped','xyb-extended','band-ac']:
+            summary=ac if family=='band-ac' else admission
+            if role_families.get((role,family),0)!=summary['per_role'][role][family+'_kept']:
+                raise ValueError('chroma labelled family/role population differs')
     # Match the native owner's ordered f64 operations exactly.
     total=0.0
     for key in sorted(counts):total+=1.0-1.0/counts[key]
