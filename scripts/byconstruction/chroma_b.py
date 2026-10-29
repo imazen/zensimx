@@ -549,7 +549,7 @@ def seal_stage_b(out, build_commit, diagnostic_ledger, diagnostic_result):
     files=[p for p in ROOT.glob('*.json') if p.name not in ['PROGRESS.json','SNAPSHOT-A.json','SNAPSHOT-T0.json','SNAPSHOT-T1.json']]
     for directory in [ROOT/'plan',ROOT/'diagnostic-plan',ROOT/'admission-r1',ROOT/'ledger-audit-final',ROOT/'diagnostic-repeat-audit',diagnostic_result]:
         files.extend(p for p in directory.iterdir() if p.is_file() and p.name!='PROGRESS.json')
-    files.extend([ROOT/'final-ledger/snap_chroma-b-20261028.parquet',diagnostic_ledger,NAS/'b/binaries/_MANIFEST.json'])
+    files.extend([ROOT/'final-ledger/snap_chroma-b-20261028.parquet',diagnostic_ledger,NAS/'b/binaries/_MANIFEST.json',NAS/'b/binaries/EXECUTED_IMAGES.json'])
     for name in ['ENCODES.json','LADDERS.json','SUMMARY.json','ORACLE.json','hdrvdp3.parquet','natural-scores.jsonl','pairs.tsv']:
         files.append(NAS/'b/hdr-a3'/name)
     identities={str(p.relative_to(NAS)):dict(sha256=sha(p),bytes=p.stat().st_size) for p in sorted(set(files))}
