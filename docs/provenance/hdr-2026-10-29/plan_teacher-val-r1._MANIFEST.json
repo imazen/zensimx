@@ -1,0 +1,17 @@
+{
+  "schema": "hdr-native-rev7-fleet-plan-v1",
+  "build_commit": "a86520ca68dc92f98abfd8a526d81f8abf112de6",
+  "producer_sha256": "7614fcb7111b0c26b848d4527271e145e9c7e6be473d336ed7054fa19cc20d7e",
+  "source_path": "/mnt/v/output/zensim/hdrteach-2026-10-04/hdrteach_val.parquet",
+  "source_sha256": "4b0f39dea0255659232f248070c8683dd7edf5916c63621cbb099b4afb6c9057",
+  "target_values_read": false,
+  "agreement_flags_read": true,
+  "pixels_read": false,
+  "views": 300,
+  "rows": 3900,
+  "extractor_sha256": "63bed9a64ed265d2e8b8bad4aabaae5d952215afda935ec911a0c82d1c204aa7",
+  "executor_sha256": "3cc3fce19754404559209fdcc409a8e25518c1e207238311183527e12e70dd84",
+  "spec_sha256": "e2e0af330af9aac5a6c05ea041c65f52edda2fcd2ce6f3c1f1472c54373952c8",
+  "mapping_sha256": "335aeed47df6ae97e137c29177acb12df327980e96a77e1ae85b8e767f538b35",
+  "state": "DECLARATION_INPUT_ONLY; use zenfleet-ctl declare-views; no extraction or TRAIN admission"
+}

@@ -1,0 +1,17 @@
+{
+  "schema": "hdr-ladder-native-rev7-fleet-plan-v1",
+  "build_commit": "a86520ca68dc92f98abfd8a526d81f8abf112de6",
+  "producer_sha256": "a7c5a9096b92473d773d515bfcb8659dbecafd286a19f25788f7e183ac098346",
+  "cells_sha256": "aecf43a6dfaf6258029304d1d958dee0df77c5a9576718805d45c57ab2ebfb4a",
+  "roles_sha256": "e57c7044b4ba52a8f2465d4e62af0ddbd16d75744319fb2cb9006f6ec90b4939",
+  "library_root": "/mnt/tower/output/zensim/byc-chroma-20261028/hdr-full",
+  "target_values_read": false,
+  "pixels_read": true,
+  "views": 452,
+  "rows": 10422,
+  "extractor_sha256": "63bed9a64ed265d2e8b8bad4aabaae5d952215afda935ec911a0c82d1c204aa7",
+  "executor_sha256": "3cc3fce19754404559209fdcc409a8e25518c1e207238311183527e12e70dd84",
+  "spec_sha256": "280d10526650a3370256d17d064b8101ad0dd7fb48bc8de361957c6b185b006e",
+  "mapping_sha256": "fc71b067d002c6a588572ef69d1e3ae88a88ef64604aead58c9830e087b1aedb",
+  "state": "DECLARATION_INPUT_ONLY; use zenfleet-ctl declare-views; no extraction"
+}

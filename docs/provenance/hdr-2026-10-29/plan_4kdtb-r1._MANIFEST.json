@@ -1,0 +1,17 @@
+{
+  "schema": "hdr-native-rev7-fleet-plan-v1",
+  "build_commit": "a86520ca68dc92f98abfd8a526d81f8abf112de6",
+  "producer_sha256": "7614fcb7111b0c26b848d4527271e145e9c7e6be473d336ed7054fa19cc20d7e",
+  "source_path": "/var/tmp/byc-hdr-20261029/membership-v2/memberships.json",
+  "source_sha256": "946058e666c2a4f83bff9b1c1de78b8c4c195c2898e9762ee52bca9ba9d39f29",
+  "target_values_read": false,
+  "agreement_flags_read": false,
+  "pixels_read": false,
+  "views": 8,
+  "rows": 96,
+  "extractor_sha256": "63bed9a64ed265d2e8b8bad4aabaae5d952215afda935ec911a0c82d1c204aa7",
+  "executor_sha256": "3cc3fce19754404559209fdcc409a8e25518c1e207238311183527e12e70dd84",
+  "spec_sha256": "7590a115d0dd8b99e2336656a04816d9c49bd21a8dde31173ed9acf3986c5ad3",
+  "mapping_sha256": "309c2d6b8016327ee65ea3f38999a6940425e088f849d23913fbd22f85f01649",
+  "state": "DECLARATION_INPUT_ONLY; use zenfleet-ctl declare-views; no extraction or TRAIN admission"
+}

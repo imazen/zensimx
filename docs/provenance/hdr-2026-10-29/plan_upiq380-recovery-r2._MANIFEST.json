@@ -1,0 +1,11 @@
+{
+  "schema": "upiq380-native-rev7-fleet-plan-v1",
+  "build_commit": "d86b3b44383433e56ebc6161ee6c8db12639c5af",
+  "producer_sha256": "fa0b682ba39a160556dee1365b5176fc2c23238d4987ca1286274b44f2479c98",
+  "admission_sha256": "d5e5f18a60c4f3594c1c74f07aafddc62e68fdca30bd84019372660bc765a5b5",
+  "spec_sha256": "f19825828ad76c5c57a16fba501968d11896a41aac550f91c2f073bc82f00628",
+  "target_values_read": false,
+  "pixels_read": false,
+  "rows": 380,
+  "state": "DECLARATION_INPUT_ONLY"
+}
