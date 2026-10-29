@@ -114,7 +114,41 @@ def verify_controls(controls, output, receipt):
     assert not failures,'frozen Mlic extractor identity failed; feature declaration forbidden'
 
 
-def feature_spec(cells, proof, out, exclude):
+def prepare_band_selection(ledger, archive, out):
+    """Schedule features from authenticated target receipts during media readback.
+
+    This is not admission: the merged bank still needs the complete independent
+    media readback and an exact kept-row reconciliation before training.
+    """
+    from concurrent.futures import ThreadPoolExecutor
+    out.mkdir();views={v['path']:v for v in json.loads((NAS/'b/full/VIEWS.json').read_text())}
+    rows=pq.read_table(ledger).to_pylist()
+    assert len(rows)==len(views)==9162 and all(r['status']=='done' for r in rows)
+    assert {r['image_path'] for r in rows}==set(views)
+    def load(row):
+        data=cas(archive,row['output_sha']).read_bytes();assert hashlib.sha256(data).hexdigest()==row['output_sha']
+        return row,json.loads(data)
+    records=[]
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        for start in range(0,len(rows),32):
+            for row,result in pool.map(load,rows[start:start+32]):
+                v=views[row['image_path']]
+                assert result['image_path']==row['image_path'] and result['knob_tuple_json']==row['knob_tuple_json']
+                assert result['source_sha256']==v['sha256'] and result['reference_pixels_sha256']==v['pixels_sha256']
+                assert result['runtime']['canonical_teacher_helper']==PINS[1] and result['runtime']['diagnostics']=='none'
+                cells=sorted(result['cells'],key=lambda c:c['rung']);assert len(cells)==16
+                assert all(c['family']=='band-ac' for c in cells)
+                gate=admission([c['teacher_ssim2'] for c in cells])
+                for c in cells:
+                    records.append(dict(**c,view_id=v['id'],source=v['source'],image_path=v['path'],reference_group=v['reference_group'],
+                        mlic_role=v['mlic_role'],content_class=v['content_class'],source_type=v['type'],width=v['width'],height=v['height'],
+                        kept=c['rung'] in gate['kept_indices']))
+            save(out/'PROGRESS.json',dict(views=min(start+32,len(rows)),required_views=len(rows),stage='selection only; full media admission still required'))
+    pq.write_table(pa.Table.from_pylist(records),out/'CELLS.parquet',compression='zstd')
+    save(out/'_MANIFEST.json',dict(qualified_for_leg=False,selection_only=True,rows=len(records),ledger_sha256=sha(ledger)))
+
+
+def feature_spec(cells, proof, out, exclude, band_ac=False):
     """Freeze a disjoint wave; full B readback must qualify every row before leg assembly."""
     qualification=json.loads(proof.read_text())
     assert qualification['passed'] and qualification['extractor_sha256']==EXTRACTOR_SHA
@@ -127,17 +161,17 @@ def feature_spec(cells, proof, out, exclude):
     for batch in pq.ParquetFile(cells).iter_batches():
         for row in batch.to_pylist():
             if row['image_path'] not in excluded:grouped[row['image_path']].append(row)
-    selections=[];sources=[];families={k:v for k,v in specs().items() if not k.startswith('band-')}
+    selections=[];sources=[];families={k:v for k,v in specs().items() if (k=='band-ac' if band_ac else not k.startswith('band-'))}
     for image,rows in sorted(grouped.items()):
         assert image in views;view=views[image]
-        assert len(rows)==76
+        assert len(rows)==(16 if band_ac else 76)
         by_family=defaultdict(list)
         for r in rows:
             assert struct.pack('>d',r['teacher_ssim2']).hex()==r['teacher_bits']
             assert r['reference_pixels_sha256']==view['pixels_sha256']
             assert r['mlic_role']==view['mlic_role'] and r['reference_group']==view['reference_group']
             by_family[r['family']].append(r)
-        assert set(by_family)==set(families),'AC-band and unregistered families cannot enter Stage C'
+        assert set(by_family)==set(families),'only the explicitly declared family set may enter this feature wave'
         selected=[]
         for family,(_,_,params) in families.items():
             ladder=sorted(by_family[family],key=lambda r:r['rung']);assert len(ladder)==len(params)
@@ -160,7 +194,8 @@ def feature_spec(cells, proof, out, exclude):
         source_cells=str(cells),source_cells_sha256=sha(cells),identity_proof=str(proof),identity_proof_sha256=sha(proof),
         selection_sha256=sha(out/'SELECTION.parquet'),excluded_waves=[str(p) for p in exclude],
         data_roles='all admitted pairs extracted; only fit/new-train may enter training; dev/calibration stay diagnostic',
-        final_gate='exact selection reconciliation against fully verified B admission before leg/root assembly'))
+        family_set='band-ac' if band_ac else 'core',
+        final_gate='exact selection reconciliation against the fully verified family admission before leg/root assembly'))
 
 
 def harvest_features(ledger, wave, archive, out, qualification=False):
@@ -201,6 +236,7 @@ def harvest_features(ledger, wave, archive, out, qualification=False):
             raw,columns=read_feature_csv(feature_csv,feature_ids,1825)
             audits=[json.loads(line) for line in read(result['sidecars']['features.audit.jsonl']).splitlines()]
             audit_by_png={Path(r['distorted']).stem:r for r in audits};assert len(audits)==len(audit_by_png)==len(feature_ids)
+            raw_f32=np.column_stack([raw[f'f{i}'].to_numpy() for i in range(1825)]).astype('<f4')
             digest_by_row={}
             for cell in actual.values():
                 audit=audit_by_png[cell['png_sha256']]
@@ -209,8 +245,7 @@ def harvest_features(ledger, wave, archive, out, qualification=False):
                 assert audit['distorted_pixels_sha256']==cell['distorted_pixels_sha256']
                 rid=cell['row_id']
                 if rid not in digest_by_row:
-                    values=np.array([raw[f'f{i}'][rid].as_py() for i in range(1825)],dtype='<f4')
-                    digest_by_row[rid]=hashlib.sha256(values.tobytes()).hexdigest()
+                    digest_by_row[rid]=hashlib.sha256(raw_f32[rid].tobytes()).hexdigest()
                 assert audit['canonical_features_f32_le_sha256']==digest_by_row[rid]
             view_keys=[];take=[]
             for selection in expected:
@@ -244,8 +279,80 @@ def harvest_features(ledger, wave, archive, out, qualification=False):
         requested_slot_ranges=[[0,228],[372,720]],feature_set_id=FEATURE_ID,build_commit=BUILD,binary_sha256=EXTRACTOR_SHA,
         features_parquet_sha256=sha(out/'features.parquet'),keys_sha256=sha(out/'keys.parquet'),source_selection_sha256=sha(wave/'SELECTION.parquet'),
         ledger_sha256=sha(ledger),unique_objects_verified=len(verified),per_class=dict(classes),per_role=dict(roles),
-        final_gate='full B selection reconciliation; every target/pixel/feature digest exact; AC-band excluded'))
+        final_gate='full family selection reconciliation required before leg assembly; every target/pixel/feature digest exact'))
     save(out/'PROGRESS.json',dict(stage='complete',views=len(rows),pairs=count))
+
+
+def merge_banks(banks, out, build_commit, ac_admission=None):
+    """Reconcile disjoint waves with every fully verified B kept row."""
+    out.mkdir();admission=NAS/'b/full/admission-r1';summary=json.loads((admission/'SUMMARY.json').read_text())
+    assert summary['qualified_full_grid'] and summary['cells']==696312
+    expected={}
+    identity=['image_path','family','rung']
+    bindings=['evif_sha256','jpeg_sha256','teacher_bits','reference_pixels_sha256','distorted_pixels_sha256','mlic_role','reference_group']
+    admissions=[admission];required=251685;fit_required=232888;diagnostic_required=18797
+    if ac_admission is not None:
+        ac_summary=json.loads((ac_admission/'SUMMARY.json').read_text())
+        assert ac_summary['qualified_full_grid'] and ac_summary['cells']==146592 and ac_summary['views']==9162
+        assert ac_summary['training_allowed'] and set(ac_summary['totals'])=={'band-ac_ladders','band-ac_admitted','band-ac_kept'}
+        required+=ac_summary['totals']['band-ac_kept']
+        fit_required+=sum(ac_summary['per_role'][r]['band-ac_kept'] for r in ['fit','new-train'])
+        diagnostic_required+=sum(ac_summary['per_role'][r]['band-ac_kept'] for r in ['dev','calibration'])
+        admissions.append(ac_admission)
+    for directory in admissions:
+        for batch in pq.ParquetFile(directory/'CELLS.parquet').iter_batches(columns=identity+bindings+['kept']):
+            for r in batch.to_pylist():
+                if r['kept']:
+                    key=tuple(r[k] for k in identity);assert key not in expected;expected[key]=tuple(r[k] for k in bindings)
+    assert len(expected)==required
+    bank_writer=None;key_writer=None;total=0;role_counts=defaultdict(int);class_counts=defaultdict(int);inputs={};pair_keys=set();measured=set(IDS)
+    try:
+        for bank in banks:
+            manifest=json.loads((bank/'_MANIFEST.json').read_text())
+            assert manifest['stage_c_wave'] and not manifest['qualification_only']
+            assert manifest['feature_set_id']==FEATURE_ID and manifest['binary_sha256']==EXTRACTOR_SHA and manifest['build_commit']==BUILD
+            assert sha(bank/'features.parquet')==manifest['features_parquet_sha256'] and sha(bank/'keys.parquet')==manifest['keys_sha256']
+            inputs[str(bank/'_MANIFEST.json')]=sha(bank/'_MANIFEST.json')
+            features=pq.ParquetFile(bank/'features.parquet');keys=pq.ParquetFile(bank/'keys.parquet');local=0
+            for fb,kb in zip(features.iter_batches(batch_size=1000),keys.iter_batches(batch_size=1000),strict=True):
+                assert fb.num_rows==kb.num_rows
+                f=pa.Table.from_batches([fb]);k=pa.Table.from_batches([kb]);records=k.to_pylist()
+                assert f['pair_key'].to_pylist()==k['pair_key'].to_pylist()
+                assert f['row_id'].to_pylist()==k['row_id'].to_pylist()==list(range(local,local+len(records)))
+                for i in range(1825):
+                    a=f[f'f{i}'].to_numpy();assert f[f'f{i}'].type==pa.float64()
+                    assert (np.isfinite(a).all() if i in measured else np.isnan(a).all())
+                for record in records:
+                    key=tuple(record[n] for n in identity)
+                    assert expected.pop(key)==tuple(record[n] for n in bindings),'feature wave differs from full B admission'
+                    assert record['pair_key'] not in pair_keys;pair_keys.add(record['pair_key'])
+                    assert struct.pack('>d',record['teacher_ssim2']).hex()==record['teacher_bits']
+                    role_counts[record['mlic_role']]+=1;class_counts[record['content_class']]+=1
+                ids=pa.array(range(total,total+len(records)),type=pa.int64())
+                f=f.set_column(f.schema.get_field_index('row_id'),'row_id',ids)
+                k=k.set_column(k.schema.get_field_index('row_id'),'row_id',ids)
+                if bank_writer is None:
+                    bank_writer=pq.ParquetWriter(out/'features.parquet',f.schema,compression='zstd',compression_level=3)
+                    key_writer=pq.ParquetWriter(out/'keys.parquet',k.schema,compression='zstd')
+                bank_writer.write_table(f);key_writer.write_table(k);total+=len(records);local+=len(records)
+                save(out/'PROGRESS.json',dict(stage='full B/feature reconciliation',pairs=total,required_pairs=required))
+            assert local==manifest['rows']
+    finally:
+        if bank_writer:bank_writer.close();key_writer.close()
+    assert not expected and total==required and role_counts['fit']+role_counts['new-train']==fit_required
+    assert role_counts['dev']+role_counts['calibration']==diagnostic_required
+    save(out/'_MANIFEST.json',dict(schema='rev5-featbank-v1',set='chroma',qualified_for_leg=ac_admission is not None,qualified_core=True,rows=total,
+        feature_width=1825,dtype='float64',absent_slots='NaN',requested_slot_ranges=[[0,228],[372,720]],
+        feature_set_id=FEATURE_ID,binary_sha256=EXTRACTOR_SHA,build_commit=BUILD,assembly_build_commit=build_commit,
+        features_parquet_sha256=sha(out/'features.parquet'),keys_sha256=sha(out/'keys.parquet'),
+        band_ac_included=ac_admission is not None,core_rows=251685,source_banks=inputs,per_role=dict(role_counts),per_class=dict(class_counts),
+        full_ac_cells_sha256=sha(ac_admission/'CELLS.parquet') if ac_admission else None,
+        ac_admission_summary_path=str(ac_admission/'SUMMARY.json') if ac_admission else None,
+        ac_admission_summary_sha256=sha(ac_admission/'SUMMARY.json') if ac_admission else None,
+        full_b_cells_sha256=sha(admission/'CELLS.parquet'),full_b_admission_summary_sha256=sha(admission/'SUMMARY.json'),
+        checks=['all kept B identities exactly once','pixel identities exact','every native f32 digest exact in wave readback',
+                'all576 f64 slots finite;1249 absent slotsNaN','target doubles preserve original bits','development/calibration excluded from fitting']))
+    save(out/'PROGRESS.json',dict(stage='complete',pairs=total,qualified_for_leg=ac_admission is not None))
 
 
 if __name__=='__main__':
@@ -253,12 +360,16 @@ if __name__=='__main__':
     p=sub.add_parser('prepare-controls');p.add_argument('out',type=Path)
     p=sub.add_parser('run-controls');p.add_argument('binary',type=Path);p.add_argument('controls',type=Path);p.add_argument('out',type=Path)
     p=sub.add_parser('verify-controls');p.add_argument('controls',type=Path);p.add_argument('output',type=Path);p.add_argument('receipt',type=Path)
-    p=sub.add_parser('feature-spec');p.add_argument('cells',type=Path);p.add_argument('proof',type=Path);p.add_argument('out',type=Path);p.add_argument('--exclude-wave',action='append',type=Path,default=[])
+    p=sub.add_parser('prepare-band-selection');p.add_argument('ledger',type=Path);p.add_argument('archive',type=Path);p.add_argument('out',type=Path)
+    p=sub.add_parser('feature-spec');p.add_argument('cells',type=Path);p.add_argument('proof',type=Path);p.add_argument('out',type=Path);p.add_argument('--exclude-wave',action='append',type=Path,default=[]);p.add_argument('--band-ac',action='store_true')
     for name in ['harvest-features','qualify-features']:
         p=sub.add_parser(name);p.add_argument('ledger',type=Path);p.add_argument('wave',type=Path);p.add_argument('archive',type=Path);p.add_argument('out',type=Path)
+    p=sub.add_parser('merge-banks');p.add_argument('out',type=Path);p.add_argument('build_commit');p.add_argument('banks',nargs='+',type=Path);p.add_argument('--ac-admission',type=Path)
     args=parser.parse_args()
     if args.command=='prepare-controls':prepare_controls(args.out)
     elif args.command=='run-controls':run_controls(args.binary,args.controls,args.out)
     elif args.command=='verify-controls':verify_controls(args.controls,args.output,args.receipt)
-    elif args.command=='feature-spec':feature_spec(args.cells,args.proof,args.out,args.exclude_wave)
+    elif args.command=='prepare-band-selection':prepare_band_selection(args.ledger,args.archive,args.out)
+    elif args.command=='feature-spec':feature_spec(args.cells,args.proof,args.out,args.exclude_wave,args.band_ac)
+    elif args.command=='merge-banks':merge_banks(args.banks,args.out,args.build_commit,args.ac_admission)
     else:harvest_features(args.ledger,args.wave,args.archive,args.out,qualification=args.command=='qualify-features')

@@ -3946,3 +3946,13 @@ hdr-source-membership-check:
 chroma-hdr-full +args:
     python3 -B scripts/byconstruction/chroma_hdr_full.py {{args}}
 
+
+# Scientific controls, feature-bank reconciliation and root construction (no fitting).
+chroma-stage-c +args:
+    python3 -B scripts/byconstruction/chroma_c.py {{args}}
+
+chroma-root +args:
+    OPENBLAS_NUM_THREADS=1 python3 -B scripts/byconstruction/ring_root.py chroma {{args}}
+
+chroma-admission-check root receipt:
+    cargo run --release --manifest-path tools/chroma-admission/Cargo.toml -- {{quote(root)}} {{quote(receipt)}}
