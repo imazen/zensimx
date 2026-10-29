@@ -4,7 +4,7 @@ Registered 2026-10-29 before any new subjective-label or pixel read, feature
 extraction, fit, checkpoint selection or evaluation in this study.
 
 **MISSING:** new source memberships and official-split verification, native
-revision-7 feature banks, exact reproduction control, P1's completed root,
+revision-7 feature banks, P1's completed root,
 the full HDR chroma leg, and P2/P3 results. This is an admission record,
 not a completed split or training result. E and ECodec remain unchanged.
 
@@ -239,3 +239,9 @@ run directories, incomplete/failure states and source/binary identities;
 never report a queued stage as an active fit. No job has been started by
 this admission record, and neither P1 nor the full HDR ladder root was
 available in the producing lanes' reports at this registration.
+
+## Executed replay control
+
+The [new replay](../benchmarks/hdr_training_control_2026-10-29.pointer.md) passes
+prediction-byte and stripped-model-byte equality. Native HDR banks, P2/P3 fits
+and qualification remain incomplete. No candidate comparison has run.
