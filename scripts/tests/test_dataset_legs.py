@@ -119,6 +119,37 @@ class SelectionRebind(unittest.TestCase):
                 self.assertEqual(pin, root.sha(out/rel), rel)
             self.assertFalse(packet["selection_rebind"]["labels_read"])
 
+    def test_chroma_rebind_moves_embedded_keys_and_diagnostic_paths(self):
+        with tempfile.TemporaryDirectory() as d:
+            parent = self.fixture(d)
+            packet_path = parent/"datasets/receipt.json"
+            packet = json.loads(packet_path.read_text())
+            record = packet["groups"][0]
+            manifest_path = Path(record["path"]+".manifest.json")
+            manifest = json.loads(manifest_path.read_text())
+            manifest.update(schema="chroma-teacher-leg-v1", keys_path=record["keys_path"])
+            manifest_path.write_text(json.dumps(manifest))
+            record["manifest_sha256"] = root.sha(manifest_path)
+            packet["chroma_teacher"] = dict(diagnostics_path=str(parent/"diagnostics/chroma.parquet"))
+            packet_path.write_text(json.dumps(packet))
+            frozen_path = parent/"wide/frozen.json"
+            frozen = json.loads(frozen_path.read_text())
+            frozen["dataset_legs_sha256"] = root.sha(packet_path)
+            frozen["auxiliary_files"]["datasets/pipal.parquet.manifest.json"] = root.sha(manifest_path)
+            frozen_path.write_text(json.dumps(frozen))
+            (parent/"_MANIFEST.json").write_text(json.dumps(dict(schema="chroma-derived-root-v1")))
+            out = Path(d)/"fx2"
+            self.rebind(parent, out)
+            rebound = json.loads((out/"datasets/pipal.parquet.manifest.json").read_text())
+            self.assertEqual(rebound["keys_path"], str(out/"datasets/pipal.keys.json"))
+            packet = json.loads((out/"datasets/receipt.json").read_text())
+            self.assertEqual(packet["chroma_teacher"]["diagnostics_path"], str(out/"diagnostics/chroma.parquet"))
+            frozen = json.loads((out/"wide/frozen.json").read_text())
+            self.assertEqual(frozen["byc_chroma"], packet["chroma_teacher"])
+            manifest = json.loads((out/"_MANIFEST.json").read_text())
+            self.assertEqual(manifest["frozen_sha256"], root.sha(out/"wide/frozen.json"))
+            self.assertEqual(root.sha(parent/"datasets/pipal.parquet"), root.sha(out/"datasets/pipal.parquet"))
+
     def test_rebind_refuses_changed_parent_and_unmeasured_columns(self):
         with tempfile.TemporaryDirectory() as d:
             parent = self.fixture(d)

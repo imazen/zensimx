@@ -191,7 +191,9 @@ def cmd_chroma(a):
     frozen.update(admission_view=view,wide_receipts={'main/real':sha(receipt_path)},dataset_legs_sha256=sha(pp),byc_chroma=packet['chroma_teacher'])
     frozen['auxiliary_files']={rel:sha(out/rel) for rel in frozen['auxiliary_files']}
     frozen['auxiliary_files'].update({'datasets/receipt.json':sha(pp),'datasets/chroma.parquet':sha(train_path),
-        'datasets/chroma.parquet.manifest.json':sha(dp),'datasets/chroma.keys.json':sha(kp)})
+        'datasets/chroma.parquet.manifest.json':sha(dp),'datasets/chroma.keys.json':sha(kp),
+        'diagnostics/chroma.parquet':sha(diagnostic_path),
+        'diagnostics/chroma.keys.parquet':sha(out/'diagnostics/chroma.keys.parquet')})
     (out/'wide/frozen.json').write_text(json.dumps(frozen,indent=1)+'\n')
     changed={'wide/frozen.json','wide/main/real/receipt.json','datasets/receipt.json','_MANIFEST.json'}
     for path in source.rglob('*'):
