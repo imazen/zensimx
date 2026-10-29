@@ -48,6 +48,13 @@ LEGS = {
                                 commit=HDR_COMMIT, extractor=HDR_EXTRACT_SHA),
 }
 SCHEMA = "hdr-native-leg-v1"
+# TRAIN rows left after holding out the families of dev fold k (registered; mirrored in the admissions)
+FOLD_ROWS = {"hdr_upiq380": [150, 180], "hdr_4kdtb_train": [0, 48], "hdr_ladder_chroma": [2709, 4468],
+             "hdr_teacher_hdrvdp3": [4484, 2906]}
+
+
+def fold_of(family):
+    return int(hashlib.sha256(("hdr-p2p3-dev-fold-v1:" + family).encode()).hexdigest(), 16) % 2
 
 
 def table_of(path, cols=None):
@@ -86,7 +93,7 @@ def fourk_rows(bank, labels_tsv):
             continue
         item = m["dist_path"].split("/content/")[1]
         rows.append(dict(i=i, obs="4kdtb:" + m["dist_path"].split("/content/")[1], ref="4kdtb:" + m["source_id"],
-                         family="hdr:4kdtb:" + m["source_id"], target=lab[item]))
+                         family="hdr:" + m["family_id"], target=lab[item]))
     return feats, rows
 
 
@@ -122,10 +129,25 @@ def teacher_rows(bank, table):
     return feats, rows
 
 
-def build_leg(name, feats, rows, bank, out, selected, width, scale):
+def build_leg(name, feats, rows, bank, out, selected, width, scale, fold=None):
     spec = LEGS[name]
-    if len(rows) != spec["rows"]:
-        raise ValueError(f"{name}: {len(rows)} rows, registered {spec['rows']}")
+    registered = spec["rows"]
+    if len(rows) != registered:
+        raise ValueError(f"{name}: {len(rows)} rows, registered {registered}")
+    if fold is not None:
+        dev = [r for r in rows if fold_of(r["family"]) == fold]
+        rows = [r for r in rows if fold_of(r["family"]) != fold]
+        if len(rows) != FOLD_ROWS[name][fold]:
+            raise ValueError(f"{name}: fold {fold} leaves {len(rows)} rows, registered {FOLD_ROWS[name][fold]}")
+        if dev:
+            devdir = out / "hdr_dev"
+            devdir.mkdir(exist_ok=True)
+            dtab = bank_transport(feats.take(pa.array([r["i"] for r in dev])).select([f"f{i}" for i in range(1825)]),
+                                  [r["ref"] for r in dev], [r["target"] for r in dev], width)
+            pq.write_table(dtab, devdir / f"{name}.parquet", compression="zstd")
+            (devdir / f"{name}.keys.json").write_text(json.dumps([dict(row=i, ref=r["ref"], family=r["family"]) for i, r in enumerate(dev)]) + "\n")
+        if not rows:
+            return None, None
     man = json.loads((bank / "_MANIFEST.json").read_text())
     if man["build_commit"] != spec["commit"] or sha(bank / "features.parquet") != man["features_parquet_sha256"]:
         raise ValueError(f"{name}: bank producer/hash differs")
@@ -147,7 +169,7 @@ def build_leg(name, feats, rows, bank, out, selected, width, scale):
     nominal = spec["mass"] * scale
     decl = dict(schema=SCHEMA, leg=name, loss=spec["loss"], nominal_weight=nominal, target_orientation="quality",
                 target_transform=spec["transform"], target_column="human_score", selection="fixed-final-epoch",
-                formula_revision=7, tier="v3", feature_ids=selected, feature_set_id=FEATURES,
+                formula_revision=7, tier="v3", feature_ids=selected, feature_set_id=FEATURES, dev_fold=fold,
                 producer_commit=spec["commit"], extractor_sha256=spec["extractor"], native_role="TRAIN", rows=len(rows),
                 table_sha256=sha(path), keys_path=str(kp), keys_sha256=sha(kp), training_width=width,
                 feature_bank_manifest_path=str(bank / "_MANIFEST.json"), feature_bank_manifest_sha256=sha(bank / "_MANIFEST.json"))
@@ -177,6 +199,7 @@ def main():
     ap.add_argument("--teacher-bank", required=True)
     ap.add_argument("--teacher-table", required=True)
     ap.add_argument("--scale", type=float, default=1.0, help="registered scale on every leg's base nominal mass")
+    ap.add_argument("--holdout-fold", type=int, choices=[0, 1], default=None, help="hold out the families of this registered TRAIN-side dev fold; held-out rows go to hdr_dev/ and never into a leg")
     ap.add_argument("--legs", default=",".join(LEGS))
     ap.add_argument("--build-commit", required=True)
     a = ap.parse_args()
@@ -211,11 +234,14 @@ def main():
         feats, rows = loaders[name]()
         if any(r["family"] in protected for r in rows):
             raise ValueError(f"{name}: family reserved by another role")
-        record, decl = build_leg(name, feats, rows, banks[name], out, selected, width, a.scale)
+        record, decl = build_leg(name, feats, rows, banks[name], out, selected, width, a.scale, a.holdout_fold)
+        if record is None:
+            print(name, "absent in this fold (every family held out)", flush=True)
+            continue
         packet["groups"].append(record)
         new.append(record)
         print(name, len(rows), "rows", len(record["source_counts"]), "groups", "weight", record["train_weight"], flush=True)
-    packet["hdr_legs"] = dict(parent_frozen_sha256=parent_pin, scale=a.scale, legs=chosen, build_only=True)
+    packet["hdr_legs"] = dict(parent_frozen_sha256=parent_pin, scale=a.scale, legs=[r["name"] for r in new], holdout_fold=a.holdout_fold, build_only=True)
     pp = out / "datasets/receipt.json"
     pp.write_text(json.dumps(packet, indent=1) + "\n")
     frozen = json.loads((out / "wide/frozen.json").read_text())
@@ -238,7 +264,7 @@ def main():
             raise ValueError("inherited root payload changed")
     (out / "_MANIFEST.json").write_text(json.dumps(dict(schema="hdr-derived-root-v1", build_commit=a.build_commit, parent_root=str(source),
         parent_frozen_sha256=parent_pin, frozen_sha256=sha(out / "wide/frozen.json"), legs={r["name"]: dict(rows=r["rows"], train_weight=r["train_weight"], nominal_weight=r["nominal_weight"]) for r in new},
-        scale=a.scale, training_launched=False), indent=1) + "\n")
+        scale=a.scale, holdout_fold=a.holdout_fold, training_launched=False), indent=1) + "\n")
 
 
 if __name__ == "__main__":

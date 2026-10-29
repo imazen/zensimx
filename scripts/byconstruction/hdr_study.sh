@@ -115,7 +115,7 @@ PY
     spec="$(arm_spec):mono:thr:mp32"
     mkdir -p "$study/full/$label"
     pids=()
-    for seed in 0 1 2; do
+    for seed in ${SEEDS:-0 1 2}; do
       dest="$study/full/$label/full_s$seed"
       test ! -e "$dest"
       mkdir -p "$study/scratch/full_s$seed"
@@ -128,6 +128,11 @@ PY
     failed=0
     for pid in "${pids[@]}"; do wait "$pid" || failed=1; done
     exit "$failed" ;;
+  certify)
+    for seed in ${SEEDS:-0 1 2}; do
+      "$study/bin/bake_dial_refit" certify-monotone --bake "$study/full/$label/full_s$seed/refit/production-f16.bin" \
+        > "$study/full/full_s$seed.certify.json"
+    done ;;
   compare)
     python3 -c "import json,sys; sys.exit(0 if json.load(open('$study/CONTROL.json'))['pass'] else 1)"
     out="$study/scorecard"

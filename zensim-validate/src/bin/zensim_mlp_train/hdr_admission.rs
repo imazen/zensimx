@@ -2,6 +2,7 @@
 //! Mirrors `admit_hdr_leg` in scripts/rev4_featpot/subjective_training_leg.py; registration in
 //! docs/HDR_P2P3_EXECUTION_2026-10-29.md.
 use serde_json::Value;
+use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
@@ -18,6 +19,21 @@ const LEGS: [(&str, bool, &str, &str, &str, u64, &str, &str); 4] = [
     ("hdr_ladder_chroma", false, "withinref,both", "within-source-rank-and-scale", "identity-ssimulacra2-unclipped", 7177, HDR_COMMIT, HDR_NATIVE),
     ("hdr_teacher_hdrvdp3", false, "withinref,both", "within-source-rank-and-scale", "score=10*q_jod;no-clipping", 7390, HDR_COMMIT, HDR_NATIVE),
 ];
+
+/// TRAIN rows left when dev fold 0 / 1 is held out (registered; mirrors `HDR_FOLD_ROWS` in subjective_training_leg.py).
+fn fold_rows(name: &str) -> [u64; 2] {
+    match name {
+        "hdr_upiq380" => [150, 180],
+        "hdr_4kdtb_train" => [0, 48],
+        "hdr_ladder_chroma" => [2709, 4468],
+        _ => [4484, 2906],
+    }
+}
+
+fn fold_of(family: &str) -> u8 {
+    let digest = Sha256::digest(format!("hdr-p2p3-dev-fold-v1:{family}").as_bytes());
+    digest[31] & 1 // the integer is big-endian: its parity is the last byte's low bit
+}
 
 pub(super) fn admit(
     declaration: &Value,
@@ -54,10 +70,17 @@ pub(super) fn admit(
         || record["subjective"] != human
         || record["mode"] != mode
         || record["val_weight"].as_f64() != Some(0.)
-        || d["rows"] != rows
-        || record["rows"] != rows
+        || record["rows"] != d["rows"]
     {
         return Err("HDR leg role/loss/producer binding differs".into());
+    }
+    let fold = match &d["dev_fold"] {
+        Value::Null => None,
+        v => Some(v.as_u64().filter(|f| *f < 2).ok_or("HDR dev fold must be 0 or 1")? as u8),
+    };
+    let expected_rows = fold.map_or(rows, |f| fold_rows(name)[f as usize]);
+    if d["rows"] != expected_rows {
+        return Err("HDR leg population (or dev fold) differs".into());
     }
     let read = |path_key: &str, pin_key: &str| {
         document(
@@ -75,7 +98,7 @@ pub(super) fn admit(
     }
     let keys = read("keys_path", "keys_sha256")?;
     let keys = keys.as_array().ok_or("HDR ordered keys required")?;
-    if keys.len() as u64 != rows {
+    if keys.len() as u64 != expected_rows {
         return Err("HDR leg population differs".into());
     }
     let mut observations = BTreeSet::new();
@@ -99,6 +122,9 @@ pub(super) fn admit(
             || !observations.insert(text("observation")?.to_owned())
         {
             return Err("HDR leg row/role/family identity differs".into());
+        }
+        if fold == Some(fold_of(text("family")?)) {
+            return Err("HDR leg holds a family of its own held-out dev fold".into());
         }
         text("reference")?;
         *counts.entry(text("source")?.to_owned()).or_default() += 1;
@@ -170,6 +196,13 @@ mod tests {
         let mut bad = bank.clone();
         bad["labels_read"] = json!(true);
         assert!(run(&d, &r, &bad, &keys, &none).is_err());
+        let mut bad = d.clone();
+        bad["dev_fold"] = json!(0);
+        assert!(run(&bad, &r, &bank, &keys, &none).is_err());
+        assert_eq!(fold_of("hdr:upiq:narwaria:01"), {
+            let h = Sha256::digest(b"hdr-p2p3-dev-fold-v1:hdr:upiq:narwaria:01");
+            (h[31] & 1) as u8
+        });
         let reserved = BTreeSet::from(["hdr:4kdtb:S0".to_owned()]);
         assert!(run(&d, &r, &bank, &keys, &reserved).is_err());
         let mut bad = r.clone();

@@ -214,6 +214,13 @@ HDR_LEGS={
 }
 
 
+HDR_FOLD_ROWS={'hdr_upiq380':[150,180],'hdr_4kdtb_train':[0,48],'hdr_ladder_chroma':[2709,4468],'hdr_teacher_hdrvdp3':[4484,2906]}
+
+
+def hdr_fold_of(family):
+    return int(hashlib.sha256(('hdr-p2p3-dev-fold-v1:'+family).encode()).hexdigest(),16)%2
+
+
 def admit_hdr_leg(record, declaration, selected_ids, excluded):
     """Registered native-HDR TRAIN legs (paths P2/P3): metadata, keys and population only; no target-table read."""
     r,d=record,declaration
@@ -230,14 +237,17 @@ def admit_hdr_leg(record, declaration, selected_ids, excluded):
             or not isinstance(d.get('nominal_weight'),(int,float)) or not (0<d['nominal_weight']<float('inf'))
             or d.get('table_sha256')!=r.get('table_sha256') or d.get('keys_sha256')!=r.get('keys_sha256')
             or r.get('teacher') is not (not human) or r.get('subjective') is not human or r.get('mode')!=mode
-            or r.get('val_weight')!=0 or d.get('rows')!=rows or r.get('rows')!=rows):
+            or r.get('val_weight')!=0 or r.get('rows')!=d.get('rows')):
         raise ValueError('HDR leg role/loss/producer binding differs')
+    fold=d.get('dev_fold')
+    if fold not in (None,0,1) or d.get('rows')!=(rows if fold is None else HDR_FOLD_ROWS[r['name']][fold]):
+        raise ValueError('HDR leg population (or dev fold) differs')
     bank=document(d['feature_bank_manifest_path'],d['feature_bank_manifest_sha256'])
     if (bank.get('schema')!='hdr-native-rev7-bank-v1' or bank.get('build_commit')!=commit
             or bank.get('research',{}).get('feature_set_id')!=HDR_FEATURES or bank.get('labels_read') is not False):
         raise ValueError('HDR native feature bank identity differs')
     keys=document(d['keys_path'],d['keys_sha256'])
-    if len(keys)!=rows:
+    if len(keys)!=d['rows']:
         raise ValueError('HDR leg population differs')
     observations=set();counts={}
     for i,k in enumerate(keys):
@@ -245,6 +255,8 @@ def admit_hdr_leg(record, declaration, selected_ids, excluded):
                 or k['tier']!='T2' or k['source']!=k['reference'] or k['family'] in excluded
                 or k['observation'] in observations or any(not isinstance(k[f],str) or not k[f] for f in ('observation','source','family','reference'))):
             raise ValueError('HDR leg row/role/family identity differs')
+        if fold is not None and hdr_fold_of(k['family'])==fold:
+            raise ValueError('HDR leg holds a family of its own held-out dev fold')
         observations.add(k['observation']);counts[k['source']]=counts.get(k['source'],0)+1
     if counts!=r['source_counts'] or any(n<2 for n in counts.values()):
         raise ValueError('HDR leg source population differs')
