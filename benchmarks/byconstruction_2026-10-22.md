@@ -8301,3 +8301,53 @@ fixed chroma-ladder base qindices12/40/64/100 and requested U/V deltas.
 No PU score or HDR full grid enters this result. Natural scoring8.02477837097831s,
 E26 comparison466.5033559240401s; run-heavy475s, peak RSS0.24GiB,
 minimum available26577MiB. Receipts: `b/hdr-a3/{LADDERS,SUMMARY,ORACLE}.json`.
+
+## Chroma-only ladders: full media admission (2026-10-29)
+
+The frozen four-family grid completed696,312 cells over9,162 prepared views.
+Full readback authenticates every EVIF seal, embedded native JPEG, recipe,
+source pixel identity and frozen-teacher double;545,662 unique native JPEG
+objects were checked. The separately declared AC-band grid completed146,592
+cells and authenticated146,418 unique native JPEG objects. All views remain
+below1 MP, with Mitchell downscales and native crops. No decoder guard changed.
+
+| Labelled family | Admitted ladders /9,162 | Kept pairs |
+|---|---:|---:|
+| YCbCr444 |7,127|77,628|
+| YCbCr420 |6,810|71,530|
+| Capped XYB |5,006|36,764|
+| Raw-table XYB |5,008|65,763|
+| Chroma AC-band |7,182|65,323|
+
+The owner approved raw-table XYB and AC-band for the stage-C leg. The largest
+kept raw-table multiplier is128, within the owner's181x bound; the generation
+range went further and remains archived. The two XYB paths use different
+frequency scaling, so their comparison does not isolate multiplier range.
+Renders and public patents lose a majority of ladders in all five families;
+the per-class admission tables are retained in each admission receipt.
+
+The317,008 kept pairs inherit293,318 FIT/new-TRAIN and23,690 development/
+calibration roles. The latter are diagnostic only. Sources deduplicate from
+1,072 candidates to959 contributing references:372 SafeSyn,201 CID22 and386
+canonical imazen-26 TRAIN origins. All113 wholly deduplicated SafeSyn aliases
+match CID22 FIT references. No role is promoted.
+
+The core diagnostic pass checks80,095 selected cells and160,190 bound native
+butteraugli/CVVDP maps; targets and admission are unchanged. Its131 repeated
+jobs (135 extra completions) agree exactly in scientific cells, scalar doubles
+and map hashes. Per-attempt staging paths and original provenance hashes are
+retained. The raw core target ledger has189 extra completions, zero conflicting
+outputs; AC-band has84, also zero conflicting outputs. The rejected first
+diagnostic namespace remains excluded; fixed source identity receipts use
+zenmetrics `dd9439c48656`. The AC-band diagnostic sample is a separate later
+pass of20,858 cells; it does not relabel targets.
+
+Stage B seal: `/mnt/tower/output/zensim/byc-chroma-20261028/b/STAGE_B_VERIFIED.json`.
+Core and AC admission tables: `b/full/admission-r1/` and
+`b/band-ac/admission-r1/` under the same archive. Source owners and runtime
+images are pinned there; binaries are preserved outside Cargo output.
+
+Core media readback: run-heavy2010s, peakRSS0.66GiB, minimum available23642MiB.
+AC media readback:548s, peakRSS0.36GiB, minimum25184MiB. Core diagnostic
+readback:1858s, peakRSS0.59GiB, minimum24564MiB. These are readback measurements,
+not encoder or extractor throughput. Stage-C root qualification follows.

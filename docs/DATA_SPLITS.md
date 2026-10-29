@@ -2938,3 +2938,33 @@ Roles are otherwise unchanged. UPIQ-380 stays TRAIN and enters the comparison on
 legs stay as registered. Non-commercial or unstated licences (CHUG's CC BY-NC-SA reading, Rousselot HDdtb) validate
 and never train, per the 2026-10-25 licence policy.
 
+
+## 2026-10-29: SDR chroma teacher leg
+
+The chroma-ladder population inherits every source's frozen Mlic role. Its
+1,072 qualified candidate records deduplicate to959 contributing references:
+372 SafeSyn,201 CID22 and386 canonical imazen-26 TRAIN origins. The113
+wholly deduplicated SafeSyn aliases match CID22 FIT references; no role is
+promoted. Mitchell downscales and native crops yield9,162 unique views, all
+below1,000,000 pixels. Tiny32–64 views are a minority. im2402's pixel guard
+stays fixed; im2406 is its recorded nearest-feature same-class TRAIN substitute,
+not a certified frozen cluster member.
+
+The five labelled families are YCbCr444, YCbCr420, capped XYB, raw-table XYB
+and chroma AC-band. Their targets are the exact frozen SafeSyn SSIMULACRA2
+teacher, not human ratings. Admission stops at the first adjacent non-drop,
+keeps steps of at least1 point and requires at least3 kept rungs. Raw-table
+XYB and AC-band were explicitly approved for the training leg on2026-10-29.
+
+Complete media admission retains317,008 pairs:293,318 FIT/new-TRAIN and
+23,690 inherited development/calibration pairs. The latter belong only to
+separate diagnostic tables. All families and view/rung identities remain
+labelled; native revision-7 features and the unclipped teacher doubles remain
+bound to their source pixels. Within-reference grouping uses each prepared
+view across its admitted families, with nominal teacher mass1. This is a
+constructed teacher population, not an unseen external test. No model fitting
+is authorized by the generation/leg registration.
+
+Artifact and qualification pointers: the byconstruction record's chroma
+sections and `/mnt/tower/output/zensim/byc-chroma-20261028/`. The stage-C
+readiness receipt, once present, identifies the qualified fx1/fx2 roots.
