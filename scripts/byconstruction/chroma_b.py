@@ -5,6 +5,7 @@ from collections import Counter, defaultdict
 from concurrent.futures import ThreadPoolExecutor
 import hashlib
 import json
+import math
 import os
 import shutil
 import gzip
@@ -29,6 +30,11 @@ PINS = ['232434619478f3ce076e895f3b4342b00f86e8b633a0da5123867d2e45dab800',
 
 def cas(root, digest):
     return root / digest[:2] / digest[2:4] / digest
+
+
+def diagnostic_reason(view_id, family, rung, endpoints):
+    sample=int(hashlib.sha256((view_id+'|'+family+'|'+str(rung)).encode()).hexdigest(),16)%20==0
+    return 'endpoint+sample' if sample and rung in endpoints else 'endpoint' if rung in endpoints else 'sample' if sample else None
 
 
 def specification(out, one_view):
@@ -119,17 +125,17 @@ def admit(ledger, archive, out, qualification=False, verify_threads=1):
                     assert cell['rung']==rung and json.loads(cell['params_json'])==params[rung]
                     assert cell['teacher_bits']==struct.pack('>d',cell['teacher_ssim2']).hex()
                     assert cell['reference_pixels_sha256']==view['pixels_sha256']
-                    sample=int(hashlib.sha256((view['id']+'|'+family+'|'+str(rung)).encode()).hexdigest(),16)%20==0
-                    if sample or rung in endpoints:
+                    reason=diagnostic_reason(view['id'],family,rung,endpoints)
+                    if reason:
                         selected.append(cell['evif_sha256'])
                         selections.append(dict(view_id=view['id'],image_path=view['path'],family=family,rung=rung,
                                                evif_sha256=cell['evif_sha256'],jpeg_sha256=cell['jpeg_sha256'],
-                                               reason='endpoint+sample' if sample and rung in endpoints else 'endpoint' if rung in endpoints else 'sample',
+                                               reason=reason,
                                                content_class=view['content_class'],mlic_role=view['mlic_role']))
                     buffer.append(dict(**cell,view_id=view['id'],source=view['source'],image_path=view['path'],
                                        reference_group=view['reference_group'],mlic_role=view['mlic_role'],
                                        content_class=view['content_class'],source_type=view['type'],width=view['width'],height=view['height'],
-                                       kept=rung in gate['kept_indices'],diagnostic_selected=sample or rung in endpoints))
+                                       kept=rung in gate['kept_indices'],diagnostic_selected=bool(reason)))
                     count+=1
             if len(buffer)>=7600 or i+1==len(rows):
                 table=pa.Table.from_pylist(buffer)
@@ -312,6 +318,149 @@ def diagnostic_spec(admission_dir, out):
     print(json.dumps(dict(views=len(sources),selected=sum(len(r['evif_shas']) for r in sources))),flush=True)
 
 
+def prepare_diagnostic_selection(ledger, archive, out):
+    """Declare from authenticated view receipts while full media readback continues.
+
+    This is selection only, never a substitute for full artifact admission.
+    Harvest subsequently requires exact coverage of the fully verified selection.
+    """
+    out.mkdir();views={v['path']:v for v in json.loads((ROOT/'VIEWS.json').read_text())}
+    rows=pq.read_table(ledger).to_pylist()
+    assert len(rows)==len(views)==9162 and all(r['status']=='done' for r in rows)
+    assert {r['image_path'] for r in rows}==set(views)
+    selections=[]
+    families={k:v for k,v in specs().items() if not k.startswith('band-')}
+    for row in sorted(rows,key=lambda r:r['image_path']):
+        path=cas(archive,row['output_sha']);assert sha(path)==row['output_sha']
+        result=json.loads(path.read_text());view=views[row['image_path']]
+        assert result['source_sha256']==view['sha256'] and result['reference_pixels_sha256']==view['pixels_sha256']
+        grouped=defaultdict(list)
+        for c in result['cells']:grouped[c['family']].append(c)
+        assert set(grouped)==set(families)
+        for family,(_,_,params) in families.items():
+            cells=sorted(grouped[family],key=lambda c:c['rung']);assert len(cells)==len(params)
+            gate=admission([c['teacher_ssim2'] for c in cells])
+            endpoints={gate['kept_indices'][0],gate['kept_indices'][-1]} if gate['kept_indices'] else set()
+            for rung,cell in enumerate(cells):
+                assert cell['rung']==rung and json.loads(cell['params_json'])==params[rung]
+                assert struct.pack('>d',cell['teacher_ssim2']).hex()==cell['teacher_bits']
+                reason=diagnostic_reason(view['id'],family,rung,endpoints)
+                if reason:selections.append(dict(view_id=view['id'],image_path=view['path'],family=family,rung=rung,
+                    evif_sha256=cell['evif_sha256'],jpeg_sha256=cell['jpeg_sha256'],reason=reason,
+                    content_class=view['content_class'],mlic_role=view['mlic_role']))
+    pq.write_table(pa.Table.from_pylist(selections),out/'DIAGNOSTICS_SELECTION.parquet',compression='zstd')
+    save(out/'SUMMARY.json',dict(qualified_full_grid=False,purpose='diagnostic sample declaration only; full media admission and exact selection reconciliation required',views=len(rows),selected_cells=len(selections),ledger_sha256=sha(ledger)))
+    diagnostic_spec(out,out/'spec.json')
+
+
+def harvest_diagnostics(ledger, admission_dir, archive, out):
+    """Read back the declared sample; diagnostics never change target admission."""
+    import numpy as np
+    out.mkdir()
+    selected=defaultdict(dict)
+    for row in pq.read_table(admission_dir/'DIAGNOSTICS_SELECTION.parquet').to_pylist():
+        key=(row['family'],row['rung'])
+        assert key not in selected[row['image_path']]
+        selected[row['image_path']][key]=row
+    views={v['path']:v for v in json.loads((ROOT/'VIEWS.json').read_text())}
+    rows=pq.read_table(ledger).to_pylist()
+    assert len(rows)==len(selected) and all(r['status']=='done' for r in rows)
+    assert {r['image_path'] for r in rows}==set(selected)
+    assert len({r['job_id'] for r in rows})==len(rows)
+    verified=set();verified_maps=set();counts=Counter();classes=Counter();roles=Counter();reasons=Counter();buffer=[];writer=None
+    implementation='zenmetrics@0a61830db89a768ab9462f166d1412e948e4efa9;display=standard_4k;exe-sha256='+PINS[2]
+    def read_object(digest):
+        data=cas(archive,digest).read_bytes()
+        assert hashlib.sha256(data).hexdigest()==digest
+        verified.add(digest)
+        return data
+    try:
+        for index,row in enumerate(sorted(rows,key=lambda r:r['image_path'])):
+            view=views[row['image_path']];expected=selected[row['image_path']]
+            result=json.loads(read_object(row['output_sha']))
+            assert result['schema']=='evif-diagnostics-v1' and result['implementation']==implementation
+            assert result['image_path']==row['image_path'] and result['knob_tuple_json']==row['knob_tuple_json']
+            assert result['source_sha256']==view['sha256'] and result['reference_pixels_sha256']==view['pixels_sha256']
+            knobs=json.loads(row['knob_tuple_json'])
+            assert knobs['width']==view['width'] and knobs['height']==view['height']
+            actual={r['evif_sha256']:r for r in result['cells']}
+            assert len(actual)==len(result['cells'])
+            assert set(actual)==set(knobs['evif_shas'])=={r['evif_sha256'] for r in expected.values()}
+            assert result['sidecars']['variant-index.tsv']==result['variant_index_sha256']
+            map_digests={b['sha256'] for c in actual.values() for b in c['diffmaps'].values()}
+            assert map_digests<=set(result['sidecars'].values())
+            for digest in set(result['sidecars'].values())-map_digests:
+                if digest not in verified:read_object(digest)
+            for cell in actual.values():
+                parts=chunks(read_object(cell['evif_sha256']))
+                assert json.loads(parts['scor'])['scores']==[cell['teacher']]
+                assert hashlib.sha256(parts['BITS'][4:]).hexdigest()==cell['jpeg_sha256']
+                assert hashlib.sha256(parts['PNGF']).hexdigest()==cell['png_sha256']
+                assert set(cell['scores'])=={'butteraugli_max','butteraugli_pnorm3','cvvdp_cpu_imazen_v0_1_0_standard_4k'}
+                assert all(math.isfinite(v) for v in cell['scores'].values())
+                assert set(cell['diffmaps'])=={'butteraugli','cvvdp@standard_4k'}
+                for metric,binding in cell['diffmaps'].items():
+                    w,h=view['width'],view['height']
+                    assert (binding['width'],binding['height'],binding['format'])==(w,h,'gzip-PFM-f32le')
+                    want=hashlib.sha256((view['pixels_sha256']+'|'+cell['png_sha256']+'|'+metric+'|'+PINS[2]).encode()).hexdigest()
+                    assert binding['input_binding']==want
+                    map_key=(binding['sha256'],w,h)
+                    if map_key not in verified_maps:
+                        fields=gzip.decompress(read_object(binding['sha256'])).split(b'\n',3)
+                        assert fields[:3]==[b'Pf',f'{w} {h}'.encode(),b'-1.0'] and len(fields[3])==w*h*4
+                        assert np.isfinite(np.frombuffer(fields[3],dtype='<f4')).all()
+                        verified_maps.add(map_key)
+                    counts['map_bindings']+=1
+            for identity,selection in expected.items():
+                cell=actual[selection['evif_sha256']]
+                assert cell['jpeg_sha256']==selection['jpeg_sha256']
+                buffer.append(dict(**selection,reference_group=view['reference_group'],width=view['width'],height=view['height'],
+                                   teacher_ssim2=cell['teacher']['value'],teacher_bits=struct.pack('>d',cell['teacher']['value']).hex(),
+                                   png_sha256=cell['png_sha256'],**cell['scores'],
+                                   butteraugli_map_sha256=cell['diffmaps']['butteraugli']['sha256'],
+                                   cvvdp_map_sha256=cell['diffmaps']['cvvdp@standard_4k']['sha256'],primary_sha256=row['output_sha']))
+                counts['selected_cells']+=1;classes[view['content_class']]+=1;roles[view['mlic_role']]+=1;reasons[selection['reason']]+=1
+            if len(buffer)>=1000 or index+1==len(rows):
+                table=pa.Table.from_pylist(buffer)
+                if writer is None:writer=pq.ParquetWriter(out/'DIAGNOSTICS.parquet',table.schema,compression='zstd')
+                writer.write_table(table);buffer=[]
+                save(out/'PROGRESS.json',dict(stage='diagnostic readback',views=index+1,required_views=len(rows),**counts))
+    finally:
+        if writer:writer.close()
+    assert counts['selected_cells']==pq.ParquetFile(admission_dir/'DIAGNOSTICS_SELECTION.parquet').metadata.num_rows
+    save(out/'SUMMARY.json',dict(passed=True,views=len(rows),**counts,unique_objects_verified=len(verified),
+                                 per_class=dict(classes),per_role=dict(roles),selection_reasons=dict(reasons),
+                                 ledger_sha256=sha(ledger),selection_sha256=sha(admission_dir/'DIAGNOSTICS_SELECTION.parquet'),
+                                 diagnostic_implementation=implementation,targets_unchanged=True,admission_unchanged=True))
+    save(out/'PROGRESS.json',dict(stage='complete',views=len(rows),**counts))
+
+
+def seal_stage_b(out, build_commit, diagnostic_ledger, diagnostic_result):
+    """Freeze indices of the verified CAS graph, without rewriting its blobs."""
+    assert not out.exists()
+    admission_summary=json.loads((ROOT/'admission-r1/SUMMARY.json').read_text())
+    diagnostic_summary=json.loads((diagnostic_result/'SUMMARY.json').read_text())
+    audit=json.loads((ROOT/'ledger-audit-final/SUMMARY.json').read_text())
+    assert admission_summary['qualified_full_grid'] and admission_summary['cells']==696312
+    assert diagnostic_summary['passed'] and diagnostic_summary['targets_unchanged']
+    assert diagnostic_summary['selected_cells']==admission_summary['diagnostics_selected']
+    assert set(diagnostic_summary['per_class'])==set(admission_summary['per_class'])
+    assert audit['unique_done_jobs']==9162 and audit['conflicting_jobs']==0
+    files=[p for p in ROOT.glob('*.json') if p.name not in ['PROGRESS.json','SNAPSHOT-A.json','SNAPSHOT-T0.json','SNAPSHOT-T1.json']]
+    for directory in [ROOT/'plan',ROOT/'admission-r1',ROOT/'ledger-audit-final',diagnostic_result]:
+        files.extend(p for p in directory.iterdir() if p.is_file() and p.name!='PROGRESS.json')
+    files.extend([ROOT/'final-ledger/snap_chroma-b-20261028.parquet',diagnostic_ledger,NAS/'b/binaries/_MANIFEST.json'])
+    for name in ['ENCODES.json','LADDERS.json','SUMMARY.json','ORACLE.json','hdrvdp3.parquet','natural-scores.jsonl','pairs.tsv']:
+        files.append(NAS/'b/hdr-a3'/name)
+    identities={str(p.relative_to(NAS)):dict(sha256=sha(p),bytes=p.stat().st_size) for p in sorted(set(files))}
+    save(out,dict(schema='chroma-stage-b-verified-indices-v1',build_commit=build_commit,
+                  observed_utc=datetime.now(timezone.utc).isoformat(),files=identities,
+                  closure='Target ledger indexes all view manifests; CELLS indexes every verified EVIF/native JPEG. Diagnostic ledger and joined Parquet index all verified diagnostic maps/raw tables/logs. Raw-ledger audit lists every contributing ledger file hash.',
+                  targets=admission_summary,diagnostics=diagnostic_summary,
+                  duplicate_execution=dict(unique_jobs=audit['unique_done_jobs'],extra_done_records=audit['extra_done_records'],conflicting_jobs=0),
+                  stage_c='not started',stage_d='not started'))
+
+
 if __name__=='__main__':
     p=argparse.ArgumentParser();s=p.add_subparsers(dest='command',required=True)
     a=s.add_parser('spec');a.add_argument('out',type=Path);a.add_argument('--one-view',action='store_true')
@@ -324,6 +473,9 @@ if __name__=='__main__':
     a=s.add_parser('audit-ledgers');a.add_argument('directory',type=Path);a.add_argument('out',type=Path)
     a=s.add_parser('source-accounting');a.add_argument('out',type=Path)
     a=s.add_parser('diagnostics-spec');a.add_argument('admission_dir',type=Path);a.add_argument('out',type=Path)
+    a=s.add_parser('prepare-diagnostics');a.add_argument('ledger',type=Path);a.add_argument('archive',type=Path);a.add_argument('out',type=Path)
+    a=s.add_parser('harvest-diagnostics');a.add_argument('ledger',type=Path);a.add_argument('admission_dir',type=Path);a.add_argument('archive',type=Path);a.add_argument('out',type=Path)
+    a=s.add_parser('seal');a.add_argument('out',type=Path);a.add_argument('build_commit');a.add_argument('diagnostic_ledger',type=Path);a.add_argument('diagnostic_result',type=Path)
     a=p.parse_args()
     if a.command=='spec':specification(a.out,a.one_view)
     elif a.command=='admit':admit(a.ledger,a.archive,a.out,verify_threads=a.verify_threads)
@@ -334,4 +486,7 @@ if __name__=='__main__':
     elif a.command=='archive-binaries':archive_binaries(a.out,a.build_commit)
     elif a.command=='audit-ledgers':audit_ledgers(a.directory,a.out)
     elif a.command=='source-accounting':source_accounting(a.out)
-    else:diagnostic_spec(a.admission_dir,a.out)
+    elif a.command=='diagnostics-spec':diagnostic_spec(a.admission_dir,a.out)
+    elif a.command=='prepare-diagnostics':prepare_diagnostic_selection(a.ledger,a.archive,a.out)
+    elif a.command=='harvest-diagnostics':harvest_diagnostics(a.ledger,a.admission_dir,a.archive,a.out)
+    else:seal_stage_b(a.out,a.build_commit,a.diagnostic_ledger,a.diagnostic_result)
