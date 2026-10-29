@@ -140,12 +140,16 @@ def admit(authority_path, authority_sha256, cell_id, groups, selected_ids):
     return {name:d for name,(_,d) in admitted.items()}
 
 
+# Registered chroma-leg weight scales (round 2, benchmarks/byconstruction_2026-10-22.md): 1 is round 1, the rest are exact halvings.
+CHROMA_NOMINAL_WEIGHTS=(1.0,0.5,0.25,0.125)
+
+
 def admit_chroma_teacher(record, declaration, selected_ids, excluded):
     """Metadata-only counterpart of the native frozen chroma admission owner."""
     r,d=record,declaration
     required=dict(schema='chroma-teacher-leg-v1',loss='within-source-rank-and-scale',
         target_transform='identity-ssimulacra2-unclipped',target_column='human_score',target_orientation='quality',
-        native_role='TRAIN',selection='fixed-final-epoch',nominal_weight=1.0,formula_revision=7,tier='v3',
+        native_role='TRAIN',selection='fixed-final-epoch',formula_revision=7,tier='v3',
         feature_set_id='basic+peaks+v2@w1825/rev7_rowlanes#36c3f3af',
         producer_commit='b77883be18db5933a9db4b9e2670a2ba88a9729b',
         extractor_sha256='ed4957417339779dd8ed25fe59a6166326ba9db86d5c1530b1e1c788c9d614d8',
@@ -153,6 +157,7 @@ def admit_chroma_teacher(record, declaration, selected_ids, excluded):
     if (any(d.get(k)!=v for k,v in required.items()) or r.get('name')!='chroma_teacher'
             or r.get('teacher') is not True or r.get('subjective') is not False
             or r.get('mode')!='withinref,both' or r.get('val_weight')!=0
+            or d.get('nominal_weight') not in CHROMA_NOMINAL_WEIGHTS
             or d.get('feature_ids')!=selected_ids or d.get('table_sha256')!=r.get('table_sha256')
             or d.get('keys_sha256')!=r.get('keys_sha256')):
         raise ValueError('chroma teacher role/loss/producer binding differs')
@@ -195,7 +200,7 @@ def admit_chroma_teacher(record, declaration, selected_ids, excluded):
     # Match the native owner's ordered f64 operations exactly.
     total=0.0
     for key in sorted(counts):total+=1.0-1.0/counts[key]
-    if r['train_weight']!=1.0/(total/len(counts)):
+    if r['train_weight']!=d['nominal_weight']/(total/len(counts)):
         raise ValueError('chroma nominal-weight acceptance correction differs')
     return d
 

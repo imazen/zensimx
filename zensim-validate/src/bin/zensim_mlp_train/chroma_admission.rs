@@ -28,7 +28,7 @@ pub(super) fn admit(
         || d["target_orientation"] != "quality"
         || d["native_role"] != "TRAIN"
         || d["selection"] != "fixed-final-epoch"
-        || d["nominal_weight"].as_f64() != Some(1.)
+        || !matches!(d["nominal_weight"].as_f64(), Some(1.0 | 0.5 | 0.25 | 0.125))
         || d["formula_revision"] != 7
         || d["tier"] != "v3"
         || d["feature_ids"] != serde_json::json!(selected)
@@ -150,8 +150,10 @@ pub(super) fn admit(
     {
         return Err("chroma admitted source/ladder population differs".into());
     }
+    // Registered scales (1, 1/2, 1/4, 1/8) are exact in f64, so scale 1 keeps the round-1 bits.
+    let nominal = d["nominal_weight"].as_f64().ok_or("chroma nominal weight required")?;
     let weight =
-        1. / (counts.values().map(|n| 1. - 1. / *n as f64).sum::<f64>() / counts.len() as f64);
+        nominal / (counts.values().map(|n| 1. - 1. / *n as f64).sum::<f64>() / counts.len() as f64);
     if record["train_weight"].as_f64() != Some(weight) {
         return Err("chroma nominal-weight acceptance correction differs".into());
     }

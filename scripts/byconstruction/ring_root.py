@@ -160,7 +160,7 @@ def cmd_chroma(a):
     pq.write_table(pa.Table.from_pylist(diagnostic_keys),out/'diagnostics/chroma.keys.parquet',compression='zstd')
     total=0.0
     for key in sorted(counts):total+=1.0-1.0/counts[key]
-    weight=1.0/(total/len(counts))
+    weight=a.weight_scale/(total/len(counts))
     # Parent payloads and declarations stay byte-identical; only receipt paths move.
     for r in packet['groups']:
         for field in ['path','keys_path']:r[field]=str(out/Path(r[field]).relative_to(original_paths))
@@ -168,7 +168,7 @@ def cmd_chroma(a):
         if sha(r['path']+'.manifest.json')!=r['manifest_sha256']:raise ValueError('inherited declaration changed')
     packet['family_guard_path']=str(out/Path(packet['family_guard_path']).relative_to(original_paths))
     admission=Path(a.admission)
-    declaration=dict(schema='chroma-teacher-leg-v1',loss='within-source-rank-and-scale',nominal_weight=1.0,
+    declaration=dict(schema='chroma-teacher-leg-v1',loss='within-source-rank-and-scale',nominal_weight=a.weight_scale,
         target_orientation='quality',target_transform='identity-ssimulacra2-unclipped',target_column='human_score',
         selection='fixed-final-epoch',formula_revision=7,tier='v3',feature_ids=selected,feature_set_id=manifest['feature_set_id'],
         producer_commit=manifest['build_commit'],extractor_sha256=manifest['binary_sha256'],
@@ -180,7 +180,7 @@ def cmd_chroma(a):
     dp=Path(str(train_path)+'.manifest.json');dp.write_text(json.dumps(declaration,indent=1)+'\n')
     record=dict(name='chroma_teacher',path=str(train_path),teacher=True,subjective=False,train_weight=weight,val_weight=0.0,
         mode='withinref,both',table_sha256=declaration['table_sha256'],manifest_sha256=sha(dp),keys_path=str(kp),keys_sha256=sha(kp),
-        rows=train_rows,source_counts=dict(sorted(counts.items())),collection='chroma',groups=len(counts),nominal_weight=1.0)
+        rows=train_rows,source_counts=dict(sorted(counts.items())),collection='chroma',groups=len(counts),nominal_weight=a.weight_scale)
     packet['groups'].append(record);packet['chroma_teacher']=dict(parent_frozen_sha256=parent_pin,feature_bank_manifest_sha256=sha(bank/'_MANIFEST.json'),
         diagnostics_path=str(diagnostic_path),diagnostic_rows=diagnostic_rows,diagnostics_in_training=False,band_ac_included=True,build_only=True)
     pp=out/'datasets/receipt.json';pp.write_text(json.dumps(packet,indent=1)+'\n')
@@ -202,7 +202,7 @@ def cmd_chroma(a):
     (out/'_MANIFEST.json').write_text(json.dumps(dict(schema='chroma-derived-root-v1',build_commit=a.build_commit,
         parent_root=str(source),parent_frozen_sha256=parent_pin,frozen_sha256=sha(out/'wide/frozen.json'),
         feature_bank_manifest_sha256=sha(bank/'_MANIFEST.json'),fit_rows=train_rows,diagnostic_rows=diagnostic_rows,
-        source_groups=len(counts),ladder_groups=len(ladder_counts),nominal_weight=1.0,train_weight=weight,
+        source_groups=len(counts),ladder_groups=len(ladder_counts),nominal_weight=a.weight_scale,train_weight=weight,
         grouping='within each prepared reference view, across all five labelled admitted families',diagnostics_in_training=False,
         band_ac_included=True,training_launched=False),indent=1)+'\n')
     return 0
@@ -1728,6 +1728,8 @@ def main() -> int:
     ch = sub.add_parser("chroma", help="append the qualified five-family SDR teacher leg; build only")
     for flag in ("root", "out", "bank", "admission", "build-commit"):
         ch.add_argument("--"+flag, required=True)
+    ch.add_argument("--weight-scale", type=float, default=1.0, choices=(1.0, 0.5, 0.25, 0.125),
+                    help="registered chroma-leg weight scale (round 2); 1 is the round-1 root")
     ch.set_defaults(fn=cmd_chroma)
     dg = sub.add_parser("dataset-guard")
     dg.add_argument("--admission", required=True)
