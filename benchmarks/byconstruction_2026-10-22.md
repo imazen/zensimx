@@ -8351,3 +8351,15 @@ Core media readback: run-heavy2010s, peakRSS0.66GiB, minimum available23642MiB.
 AC media readback:548s, peakRSS0.36GiB, minimum25184MiB. Core diagnostic
 readback:1858s, peakRSS0.59GiB, minimum24564MiB. These are readback measurements,
 not encoder or extractor throughput. Stage-C root qualification follows.
+
+### Owner stop during stage C (2026-10-29)
+
+All317,008 admitted feature pairs were generated. Core wave banks251,685
+rows passed readback; AC-band readback was interrupted at the owner's stop.
+Its two output Parquet files lack valid footers after an NFS close error and
+remain preserved, unqualified, under `c/wave3-ac/bank-prefix-owner-stop.bak`.
+Restart from immutable CAS in a fresh output directory. AC diagnostics stopped
+at7,810/8,319 jobs; their full artifact readback is unrun. All lane workers
+were stopped; remaining work is final bank reconciliation, leg/root builds and
+actual root qualification. No stage-C-ready receipt or new model exists.
+The unexecuted checker source is preserved in `c/unrun-owner-work/`.

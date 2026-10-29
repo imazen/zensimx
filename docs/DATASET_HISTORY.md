@@ -5221,3 +5221,16 @@ provenance states its author constants were trained on AIC2026; this
 comparison is not an unseen-corpus test for DVIFM. Original target and
 image hashes remain bound.
 [Complete results and runtime bindings](../benchmarks/jnd_reconstruction_b_2026-10-19.pointer.md).
+
+## 2026-10-29 — SDR chroma media admission; stage C unfinished
+
+Five labelled families retain317,008 teacher pairs from842,904 generated
+EVIF/JPEG cells;293,318 inherit FIT/new-TRAIN roles,23,690 stay diagnostic.
+Core feature-bank readback passes251,685 pairs. The remaining65,323 AC-band
+pairs were generated; their bank readback was interrupted on owner stop.
+NFS writer close failed and both partial Parquet files lack valid footers;
+they are protected and unqualified, requiring fresh readback from the CAS.
+No combined bank or derived training root is qualified. Exact provenance,
+coverage and continuation pointers are in the byconstruction record's
+"Chroma-only ladders" sections and the archive
+`/mnt/tower/output/zensim/byc-chroma-20261028/`.

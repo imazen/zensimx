@@ -16,6 +16,8 @@
 
 ### Added
 
+- Frozen five-family SDR chroma teacher data owners, exact source-role admission guards and derived-root/rebind support (`f9dc5af7`, `084b03da`, `b1f59d01`, `4f6a9024`). Final combined bank and root qualification remain unrun at the owner stop.
+
 - Committed-tree HDR chroma source admission, exact teacher and native-media
   qualification, full zenfleet generation and unchanged rung admission
   (`343d93ab`; executor `zenmetrics:c375a124`). The data record keeps features
