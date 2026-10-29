@@ -18,3 +18,18 @@ conditions are retained, including distinct rated conditions with identical
 encoded bytes. Training labels remain forbidden until admission completes.
 
 See [DATA_SPLITS](../docs/DATA_SPLITS.md) for roles and historical exposure.
+
+## Active membership-v2: Ghent fallback
+
+Owner light-contract decision supersedes Ghent's provisional TRAIN assignment.
+All108 Ghent conditions are EVAL; 4Kdtb retains48TRAIN/48EVAL. No new labels
+were read. Native source screening still gates the 4Kdtb TRAIN admission.
+
+Producer `a245e1e5a4d3`; local (checked on dev)
+`/var/tmp/byc-hdr-20261029/membership-v2/`; byte-identical mirror
+`/mnt/tower/output/zensim/byc-hdr-20261029/membership-v2/`.
+
+- `memberships.json`: `946058e666c2a4f83bff9b1c1de78b8c4c195c2898e9762ee52bca9ba9d39f29`
+- `_MANIFEST.json`: `c98ffdd3b44466f4bb468ad25f1eb7f6ebf3619aeea043adbe71467c73e1c7b3`
+
+v1 is retained as historical exposure evidence. No R2 copy created.

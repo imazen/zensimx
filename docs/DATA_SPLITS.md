@@ -39,7 +39,7 @@ ranks with a scale-robustness check; an assumed scale is not product-training
 ground truth. P2/P3 human training uses existing UPIQ-380 and 4Kdtb's TRAIN half,
 plus admitted teacher legs. No Ghent labels were read before this decision.
 
-### Frozen source assignments, membership-v1
+### Superseded provisional assignments, membership-v1
 
 Source-only release inventories produce 204 condition memberships, SHA-256
 `8f8cba8f408e4ac7899c3b88c257809e3249205f7880859356749d6e9b656a44`. Producer `944bbbd5`; full receipt and
