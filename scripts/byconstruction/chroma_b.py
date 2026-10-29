@@ -78,7 +78,7 @@ def admit(ledger, archive, out, qualification=False, verify_threads=1):
     assert all(r['status']=='done' for r in rows)
     assert len({r['image_path'] for r in rows})==len(rows) and all(r['image_path'] in views for r in rows)
     families = {k:(backend,scales,params) for k,(backend,scales,params) in specs().items() if not k.startswith('band-')}
-    ladders=[]; selections=[]; buffer=[]; count=0; native_verified=set(); totals=Counter(); classes=defaultdict(Counter)
+    ladders=[]; selections=[]; buffer=[]; count=0; native_verified=set(); totals=Counter(); classes=defaultdict(Counter); roles=defaultdict(Counter)
     writer = None
     verifier=ThreadPoolExecutor(max_workers=verify_threads)
     try:
@@ -105,6 +105,10 @@ def admit(ledger, archive, out, qualification=False, verify_threads=1):
                 values=[c['teacher_ssim2'] for c in cells];gate=admission(values)
                 endpoints={gate['kept_indices'][0],gate['kept_indices'][-1]} if gate['kept_indices'] else set()
                 totals[family+'_ladders']+=1;totals[family+'_admitted']+=bool(gate['kept_indices']);totals[family+'_kept']+=len(gate['kept_indices'])
+                classes[view['content_class']][family+'_ladders']+=1
+                roles[view['mlic_role']][family+'_ladders']+=1
+                roles[view['mlic_role']][family+'_admitted']+=bool(gate['kept_indices'])
+                roles[view['mlic_role']][family+'_kept']+=len(gate['kept_indices'])
                 classes[view['content_class']][family+'_admitted']+=bool(gate['kept_indices'])
                 classes[view['content_class']][family+'_kept']+=len(gate['kept_indices'])
                 ladders.append(dict(view_id=view['id'],source=view['source'],reference_group=view['reference_group'],
@@ -148,7 +152,7 @@ def admit(ledger, archive, out, qualification=False, verify_threads=1):
     pq.write_table(pa.Table.from_pylist(ladders),out/'LADDERS.parquet',compression='zstd')
     pq.write_table(pa.Table.from_pylist(selections),out/'DIAGNOSTICS_SELECTION.parquet',compression='zstd')
     save(out/'SUMMARY.json',dict(qualified_full_grid=not qualification,cells=count,views=len(rows),ladders=len(ladders),totals=dict(totals),
-                                 per_class={k:dict(v) for k,v in classes.items()},native_objects_verified=len(native_verified),
+                                 per_class={k:dict(v) for k,v in classes.items()},per_role={k:dict(v) for k,v in roles.items()},native_objects_verified=len(native_verified),
                                  diagnostics_selected=len(selections),ledger_sha256=sha(ledger)))
     save(out/'PROGRESS.json',dict(stage='complete',views=len(rows),cells=count))
 
