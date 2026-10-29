@@ -582,7 +582,7 @@ fn admit_datasets(
             continue;
         }
         if d["schema"] == "hdr-native-leg-v1" {
-            super::hdr_admission::admit(&d, r, selected, &excluded, json)?;
+            super::hdr_admission::admit(&d, r, &c["feature_ids"], &excluded, json)?;
             admitted.insert(string(r, "name")?.to_owned(), d);
             continue;
         }

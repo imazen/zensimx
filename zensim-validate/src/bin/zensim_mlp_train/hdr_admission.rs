@@ -38,7 +38,7 @@ fn fold_of(family: &str) -> u8 {
 pub(super) fn admit(
     declaration: &Value,
     record: &Value,
-    selected: &[usize],
+    feature_ids: &Value, // the authority cell's `feature_ids` (the leg declarations bind these, as the subjective legs do)
     excluded: &BTreeSet<String>,
     document: impl Fn(&Path, &str) -> Result<Value, String>,
 ) -> Result<(), String> {
@@ -49,30 +49,32 @@ pub(super) fn admit(
         .ok_or("unregistered HDR leg")?;
     let (name, human, mode, loss, transform, rows, commit, extractor) = *leg;
     let nominal = d["nominal_weight"].as_f64().filter(|w| w.is_finite() && *w > 0.);
-    if d["schema"] != "hdr-native-leg-v1"
-        || d["leg"] != name
-        || d["loss"] != loss
-        || d["target_transform"] != transform
-        || d["target_column"] != "human_score"
-        || d["target_orientation"] != "quality"
-        || d["native_role"] != "TRAIN"
-        || d["selection"] != "fixed-final-epoch"
-        || d["formula_revision"] != 7
-        || d["tier"] != "v3"
-        || d["feature_ids"] != serde_json::json!(selected)
-        || d["feature_set_id"] != FEATURES
-        || d["producer_commit"] != commit
-        || d["extractor_sha256"] != extractor
-        || nominal.is_none()
-        || d["table_sha256"] != record["table_sha256"]
-        || d["keys_sha256"] != record["keys_sha256"]
-        || record["teacher"] != !human
-        || record["subjective"] != human
-        || record["mode"] != mode
-        || record["val_weight"].as_f64() != Some(0.)
-        || record["rows"] != d["rows"]
-    {
-        return Err("HDR leg role/loss/producer binding differs".into());
+    let checks: [(&str, bool); 22] = [
+        ("schema", d["schema"] != "hdr-native-leg-v1"),
+        ("leg", d["leg"] != name),
+        ("loss", d["loss"] != loss),
+        ("target_transform", d["target_transform"] != transform),
+        ("target_column", d["target_column"] != "human_score"),
+        ("target_orientation", d["target_orientation"] != "quality"),
+        ("native_role", d["native_role"] != "TRAIN"),
+        ("selection", d["selection"] != "fixed-final-epoch"),
+        ("formula_revision", d["formula_revision"] != 7),
+        ("tier", d["tier"] != "v3"),
+        ("feature_ids", d["feature_ids"] != *feature_ids),
+        ("feature_set_id", d["feature_set_id"] != FEATURES),
+        ("producer_commit", d["producer_commit"] != commit),
+        ("extractor_sha256", d["extractor_sha256"] != extractor),
+        ("nominal_weight", nominal.is_none()),
+        ("table_sha256", d["table_sha256"] != record["table_sha256"]),
+        ("keys_sha256", d["keys_sha256"] != record["keys_sha256"]),
+        ("record.teacher", record["teacher"] != !human),
+        ("record.subjective", record["subjective"] != human),
+        ("record.mode", record["mode"] != mode),
+        ("record.val_weight", record["val_weight"].as_f64() != Some(0.)),
+        ("record.rows", record["rows"] != d["rows"]),
+    ];
+    if let Some((which, _)) = checks.iter().find(|(_, failed)| *failed) {
+        return Err(format!("HDR leg role/loss/producer binding differs: {which} ({name})"));
     }
     let fold = match &d["dev_fold"] {
         Value::Null => None,
@@ -174,7 +176,7 @@ mod tests {
     }
 
     fn run(d: &Value, r: &Value, bank: &Value, keys: &Value, excluded: &BTreeSet<String>) -> Result<(), String> {
-        admit(d, r, &[1, 2], excluded, |p, _| {
+        admit(d, r, &json!([1, 2]), excluded, |p, _| {
             Ok(if p == Path::new("bank") { bank.clone() } else { keys.clone() })
         })
     }

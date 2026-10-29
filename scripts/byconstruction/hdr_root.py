@@ -171,7 +171,7 @@ def build_leg(name, feats, rows, bank, out, selected, width, scale, fold=None):
                 target_transform=spec["transform"], target_column="human_score", selection="fixed-final-epoch",
                 formula_revision=7, tier="v3", feature_ids=selected, feature_set_id=FEATURES, dev_fold=fold,
                 producer_commit=spec["commit"], extractor_sha256=spec["extractor"], native_role="TRAIN", rows=len(rows),
-                table_sha256=sha(path), keys_path=str(kp), keys_sha256=sha(kp), training_width=width,
+                table_sha256=sha(path), keys_path=str(kp), keys_sha256=sha(kp), training_width=width, admission_root=str(out),
                 feature_bank_manifest_path=str(bank / "_MANIFEST.json"), feature_bank_manifest_sha256=sha(bank / "_MANIFEST.json"))
     dp = Path(str(path) + ".manifest.json")
     dp.write_text(json.dumps(decl, indent=1) + "\n")
