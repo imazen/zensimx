@@ -9,6 +9,8 @@ import shutil
 import struct
 from collections import defaultdict
 import sys
+import subprocess
+import os
 
 import numpy as np
 import pyarrow as pa
@@ -27,6 +29,19 @@ EXTRACTOR_SHA='ed4957417339779dd8ed25fe59a6166326ba9db86d5c1530b1e1c788c9d614d8'
 BUILD='b77883be18db5933a9db4b9e2670a2ba88a9729b'
 FEATURE_ID='basic+peaks+v2@w1825/rev7_rowlanes#36c3f3af'
 IDS=list(range(228))+list(range(372,720))
+
+
+def run_controls(binary, controls, out):
+    assert sha(binary)==EXTRACTOR_SHA
+    out.mkdir();output=out/'features.csv'
+    env=os.environ.copy();env.update(ZENSIM_FORMULA_REV='7',ZENSIM_ROOT_FORM='sqrt',RAYON_NUM_THREADS='1',OMP_NUM_THREADS='1')
+    env.pop('ZENSIM_MAX_TIER',None)
+    command=[str(binary),'--corpus','pairs-tsv','--path',str(controls/'pairs.tsv'),'--out',str(output),
+             '--restore-cuts','basic,peaks,v2','--input-contract','legacy-rgb8','--era-label','rev7_rowlanes',
+             '--force-tier','native','--audit-jsonl',str(output)+'.audit.jsonl']
+    with (out/'extract.log').open('w') as log:subprocess.run(command,env=env,stdout=log,stderr=subprocess.STDOUT,check=True)
+    verify_controls(controls,output,out/'PROOF.json')
+    save(out/'COMMAND.json',dict(argv=command,extractor_sha256=EXTRACTOR_SHA,environment={k:env[k] for k in ['ZENSIM_FORMULA_REV','ZENSIM_ROOT_FORM','RAYON_NUM_THREADS','OMP_NUM_THREADS']}))
 
 
 def prepare_controls(out):
@@ -236,12 +251,14 @@ def harvest_features(ledger, wave, archive, out, qualification=False):
 if __name__=='__main__':
     parser=argparse.ArgumentParser();sub=parser.add_subparsers(dest='command',required=True)
     p=sub.add_parser('prepare-controls');p.add_argument('out',type=Path)
+    p=sub.add_parser('run-controls');p.add_argument('binary',type=Path);p.add_argument('controls',type=Path);p.add_argument('out',type=Path)
     p=sub.add_parser('verify-controls');p.add_argument('controls',type=Path);p.add_argument('output',type=Path);p.add_argument('receipt',type=Path)
     p=sub.add_parser('feature-spec');p.add_argument('cells',type=Path);p.add_argument('proof',type=Path);p.add_argument('out',type=Path);p.add_argument('--exclude-wave',action='append',type=Path,default=[])
     for name in ['harvest-features','qualify-features']:
         p=sub.add_parser(name);p.add_argument('ledger',type=Path);p.add_argument('wave',type=Path);p.add_argument('archive',type=Path);p.add_argument('out',type=Path)
     args=parser.parse_args()
     if args.command=='prepare-controls':prepare_controls(args.out)
+    elif args.command=='run-controls':run_controls(args.binary,args.controls,args.out)
     elif args.command=='verify-controls':verify_controls(args.controls,args.output,args.receipt)
     elif args.command=='feature-spec':feature_spec(args.cells,args.proof,args.out,args.exclude_wave)
     else:harvest_features(args.ledger,args.wave,args.archive,args.out,qualification=args.command=='qualify-features')
