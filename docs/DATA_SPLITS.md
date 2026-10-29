@@ -1,5 +1,29 @@
 # DATA_SPLITS.md — canonical train/val/test conventions (locked 2026-07-02)
 
+## October 29 — HDR P1/P2/P3 admission, metadata-only exposure
+
+The [HDR training-path inventory](HDR_TRAINING_PATHS_2026-10-29.md)
+registers the prospective general/codec chroma, HDR and combined paths.
+This entry changes no existing membership or read permission. UPIQ-380
+keeps its T2 fit/development roles; all remaining UPIQ stays T0. HDR-VDC,
+AVT and existing eval-only assignments remain evaluation-only.
+
+This lane read committed catalogue/adapters, library README/MANIFEST
+metadata, protocol READMEs and Ghent's source-only `images.csv`; no label
+payload, objective-score table or pixels were read. The nine candidate
+datasets are organized. Their adapters specify no official split, which
+does not prove the original publications specify none. Any newly admitted
+collection needs official-split verification, source-family overlap
+screening, a frozen member list and an exposure entry before target reads.
+
+IRCCyN HDR-JPEG duplicates Narwaria's UPIQ population. Ghent source metadata
+names SI-HDR scenes 066 and 195; cross-collection families must share roles.
+The October 27 frontend-evaluation scope and the requested new TRAIN
+subsets need reconciliation before assigning 4Kdtb/Ghent TRAIN membership.
+HDdtb's unstated licence and TMQID's research-only licence remain training
+exclusions. SI-HDR's released raw outputs are not its corrected rated
+stimuli. UPIQ cannot independently test an HDR-VDP-3-supervised student.
+
 ## Dataset naming for the current October 27 comparison
 
 **AIC-2026 public_train is not AIC-3.** The current Mlic/Neff/Vote/Order
