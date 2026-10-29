@@ -279,7 +279,239 @@ def admit(root, mirror, ledger, out, qualification=False):
     print(canonical({k:v for k,v in result.items() if k not in ['outputs','per_class']}),flush=True)
 
 
+def seal(root,mirror,build_commit):
+    import random
+    import pyarrow.parquet as pq
+    if len(build_commit)!=40 or any(c not in '0123456789abcdef' for c in build_commit):raise ValueError('full sealing source commit required')
+    admission=json.loads((mirror/'admission-r1/SUMMARY.json').read_text())
+    oracle=json.loads((mirror/'oracle-full-r1/SUMMARY.json').read_text())
+    comparison_result=json.loads((root/'comparison-r2/SUMMARY.json').read_text())
+    audit=json.loads((mirror/'ledger-audit-final/SUMMARY.json').read_text())
+    copied=json.loads((root/'CAS_MIRROR.json').read_text())
+    if not admission['passed'] or not admission['qualified_full_grid'] or admission['cells']!=16480 or admission['views']!=456:raise ValueError('full admission missing')
+    if not oracle['passed'] or oracle['cells']!=16480 or oracle['ledger_sha256']!=admission['ledger_sha256']:raise ValueError('independent full decode proof missing')
+    if not comparison_result['passed'] or comparison_result['cells']!=352 or not comparison_result['targets_unchanged']:raise ValueError('declared comparison missing')
+    if not audit['passed'] or audit['unique_done_jobs']!=456 or audit['conflicting_jobs']!=0:raise ValueError('raw ledger audit missing')
+    if not copied['passed']:raise ValueError('complete CAS copy missing')
+    def copy_file(source,destination):
+        if source.resolve()==destination.resolve():return
+        destination.parent.mkdir(parents=True,exist_ok=True)
+        expected=sha(source)
+        if not destination.exists():shutil.copyfile(source,destination)
+        if sha(destination)!=expected:raise ValueError('metadata mirror differs: '+str(destination))
+    roots=['plan','admission-r1','oracle-full-r1','ledger-audit-final','ledger-raw-final','rates','qualification','ledgers','binaries']
+    for directory in roots:
+        for source in sorted((mirror/directory).rglob('*')):
+            if source.is_file():copy_file(source,root/source.relative_to(mirror))
+    # The sample is read from already verified media, not a new encode.
+    for source in sorted((root/'comparison-r2').rglob('*')):
+        if source.is_file():copy_file(source,mirror/source.relative_to(root))
+    filenames=['SOURCE_CENSUS.json','VIEWS.json','GEOMETRY.json','DUPLICATE_VIEWS.json','PLAN.json','COMPARISON_SELECTION.json','SPEC.json','BINARY_PINS.json','INPUT_MIRROR.json','CAS_MIRROR.json','HOST_SAMPLE_PARITY.json','PRODUCTION_RATES.json']
+    for name in filenames:
+        source=root/name if (root/name).is_file() else mirror/name
+        copy_file(source,root/name);copy_file(source,mirror/name)
+    # Adjacent native/rendition paths on the primary share the authenticated CAS.
+    cells=pq.read_table(root/'admission-r1/CELLS.parquet').to_pylist()
+    pairdir=root/'artifacts/zenavif';pairdir.mkdir(parents=True,exist_ok=True)
+    for cell in cells:
+        for name,value in [(cell['encoded_sha256']+'.avif',cell['encoded_sha256']),(cell['encoded_sha256']+'.pq.png',cell['rendition_sha256'])]:
+            source=cas(root/'cas',value);dest=pairdir/name
+            if not source.exists():raise ValueError('primary canonical media object missing')
+            if not dest.exists():os.link(source,dest)
+    samples=[]
+    for record in random.Random(20261029).sample(copied['records'],3):
+        for base in [root,mirror]:
+            if sha(base/record['path'])!=record['sha256']:raise ValueError('final random mirror readback differs')
+        samples.append(record)
+    metadata=[]
+    for name in filenames:
+        path=root/name;metadata.append(dict(path=name,bytes=path.stat().st_size,sha256=sha(path)))
+    for directory in roots+['comparison-r2']:
+        for path in sorted((root/directory).rglob('*')):
+            if path.is_file():metadata.append(dict(path=str(path.relative_to(root)),bytes=path.stat().st_size,sha256=sha(path)))
+    inputs=json.loads((root/'INPUT_MIRROR.json').read_text())
+    record=dict(schema='hdr-chroma-complete-v1',build_commit=build_commit,postprocess_source_sha256=sha(Path(__file__)),qualified_generation_and_admission=True,features=False,training=False,
+                corpus=json.loads((root/'SOURCE_CENSUS.json').read_text()),geometry=json.loads((root/'GEOMETRY.json').read_text()),
+                admission={k:v for k,v in admission.items() if k!='outputs'},comparison=comparison_result,
+                independent_oracle={k:v for k,v in oracle.items() if k!='records'},raw_ledger_audit={k:v for k,v in audit.items() if k!='raw_files'},
+                production_rates=json.loads((root/'PRODUCTION_RATES.json').read_text()),
+                cas=dict(objects=copied['objects'],bytes=copied['bytes'],index_sha256=sha(root/'CAS_MIRROR.json')),
+                input_files=inputs['records'],metadata_files=metadata,random_readbacks=samples,
+                color_contract=dict(encoded_cicp=[9,16,6,True],encoded_bit_depth=10,rendition_cicp=[9,16,0,True],rendition_bit_depth=16,natural_ingress='unclipped absolute linear BT709 divided by100; standard SSIMULACRA2 cube-root'),
+                scalar_map_availability='frozen natural SSIMULACRA2 JSONL and E26 score-pairs interfaces expose scalars; no approximate map is substituted',
+                source_identity='committed manifests and LFS OIDs; pre-existing corpus working files were never edited',
+                retained_exclusions=['failed orchestration attempts','initial declaration before corrected source-commit binding','CAS staging cleanup residue','scratch'],
+                canonical_directories=['cas','raw','views',*roots,'comparison-r2','artifacts/zenavif'])
+    if (root/'_MANIFEST.json').exists() or (mirror/'_MANIFEST.json').exists():raise ValueError('preserve the existing final archive seal')
+    save(root/'_MANIFEST.json',record);copy_file(root/'_MANIFEST.json',mirror/'_MANIFEST.json')
+    result=dict(passed=True,build_commit=build_commit,manifest_sha256=sha(root/'_MANIFEST.json'),mirrored_manifest_sha256=sha(mirror/'_MANIFEST.json'),metadata_files=len(metadata),cas_objects=copied['objects'],cas_bytes=copied['bytes'],cells=16480,views=456,features=False,training=False)
+    save(root/'FINAL.json',result);copy_file(root/'FINAL.json',mirror/'FINAL.json')
+    print(canonical(result),flush=True)
+
+
+def mirror_cas(root,mirror,receipt):
+    """Copy every immutable hash object to the primary host; verify both copies."""
+    from concurrent.futures import ThreadPoolExecutor
+    archive=mirror/'cas';local=root/'cas';local.mkdir(exist_ok=True)
+    objects=[]
+    for first in sorted(archive.iterdir()):
+        if not first.is_dir() or len(first.name)!=2:continue
+        for second in sorted(first.iterdir()):
+            if not second.is_dir() or len(second.name)!=2:continue
+            for path in second.iterdir():
+                if len(path.name)==64 and all(c in '0123456789abcdef' for c in path.name):objects.append(path)
+    if not objects:raise ValueError('canonical CAS is empty')
+    def copy(path):
+        destination=local/path.relative_to(archive);destination.parent.mkdir(parents=True,exist_ok=True)
+        expected=path.name
+        if not destination.exists():
+            check=hashlib.sha256()
+            with path.open('rb') as source,destination.open('xb') as target:
+                while chunk:=source.read(1024*1024):check.update(chunk);target.write(chunk)
+            if check.hexdigest()!=expected:raise ValueError('NAS CAS source hash differs')
+        if sha(destination)!=expected:raise ValueError('primary CAS copy differs')
+        return dict(path=str(destination.relative_to(root)),sha256=expected,bytes=destination.stat().st_size)
+    records=[]
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        for item in pool.map(copy,sorted(objects)):
+            records.append(item)
+            if len(records)%250==0:
+                save(root/'CAS_MIRROR_PROGRESS.json',dict(stage='verified canonical CAS copy',completed=len(records),required=len(objects)))
+                print('copied+verified',len(records),'/',len(objects),flush=True)
+    result=dict(passed=True,objects=len(records),bytes=sum(r['bytes'] for r in records),records=records)
+    save(receipt,result);save(root/'CAS_MIRROR_PROGRESS.json',dict(stage='complete',objects=len(records),bytes=result['bytes']))
+    print(canonical({k:v for k,v in result.items() if k!='records'}),flush=True)
+
+
+def audit_raw_ledgers(directory,out):
+    import pyarrow.parquet as pq
+    out.mkdir()
+    groups=defaultdict(list);status=Counter();files=[]
+    for path in sorted(directory.glob('*.parquet')):
+        rows=pq.read_table(path).to_pylist();files.append(dict(path=path.name,sha256=sha(path),rows=len(rows)))
+        for row in rows:
+            status[row['status']]+=1
+            if row['status']=='done':groups[row['job_id']].append(row)
+    repeats=[];conflicts=[]
+    for key,rows in groups.items():
+        outputs={r['output_sha'] for r in rows}
+        identities={(r['image_path'],r['codec'],r['q'],r['knob_tuple_json']) for r in rows}
+        if len(outputs)!=1 or len(identities)!=1 or None in outputs:conflicts.append(dict(job_id=key,rows=rows))
+        if len(rows)>1:repeats.append(dict(job_id=key,records=len(rows),outputs=sorted(outputs),workers=sorted({r['worker'] for r in rows}),cross_host=len({r['worker'].split('-chromahdr-',1)[0] for r in rows})>1))
+    save(out/'REPEATS.json',repeats);save(out/'CONFLICTS.json',conflicts)
+    result=dict(passed=not conflicts and len(groups)==456 and set(status)=={'done'},raw_files=files,statuses=dict(status),unique_done_jobs=len(groups),extra_done_records=sum(r['records']-1 for r in repeats),repeated_jobs=len(repeats),cross_host_repeated_jobs=sum(r['cross_host'] for r in repeats),conflicting_jobs=len(conflicts))
+    save(out/'SUMMARY.json',result)
+    if not result['passed']:raise ValueError('full raw ledger audit failed; inspect preserved conflict/coverage records')
+    print(canonical({k:v for k,v in result.items() if k!='raw_files'}),flush=True)
+
+
+def snapshot_rates(root,out):
+    import pyarrow.parquet as pq
+    from datetime import datetime,timezone
+    snapshots=[]
+    for name in ['t1','t2','t3']:
+        path=root/'ledgers'/name/'snap_chroma-hdr-full-20261029.parquet'
+        rows=pq.read_table(path).to_pylist();byhost=Counter()
+        for row in rows:
+            if row['status']!='done':raise ValueError('production rate snapshot contains failed row')
+            n=52 if json.loads(row['knob_tuple_json'])['control'] else 36
+            byhost[row['worker'].split('-chromahdr-',1)[0]]+=n
+        snapshots.append(dict(stage=name,ledger_sha256=sha(path),modified_ns=path.stat().st_mtime_ns,snapshot_written_utc=datetime.fromtimestamp(path.stat().st_mtime,timezone.utc).isoformat(),done_views=len(rows),done_cells=sum(byhost.values()),by_host_cells=dict(byhost)))
+    before,after=snapshots[:2];seconds=(after['modified_ns']-before['modified_ns'])/1e9
+    if seconds<=0:raise ValueError('snapshot observation timestamps not ordered')
+    delta={host:after['by_host_cells'].get(host,0)-before['by_host_cells'].get(host,0) for host in ['i270','i265','r3500','r3800x']}
+    if any(v<0 for v in delta.values()):raise ValueError('rate attribution regressed')
+    result=dict(passed=True,measurement='actual unique first-wins completed cells between native ledger snapshot file-write timestamps',snapshots=snapshots,window_seconds=seconds,delta_cells=delta,cells_per_second={k:v/seconds for k,v in delta.items()})
+    save(out,result);print(canonical({k:v for k,v in result.items() if k!='snapshots'}),flush=True)
+
+
+def oracle_all(ledger,archive,oracle_base,golden,script,out,threads):
+    import pyarrow.parquet as pq
+    from concurrent.futures import ThreadPoolExecutor
+    out.mkdir()
+    rows=pq.read_table(ledger).to_pylist()
+    if len(rows)!=456 or any(r['status']!='done' for r in rows):raise ValueError('independent full oracle requires all456 DONE views')
+    if not 1<=threads<=4:raise ValueError('independent oracle concurrency must stay in1..4')
+    def execute(row):
+        receipt=cas(archive,row['output_sha'])
+        identity=Path(row['image_path']).parent.name+'_'+Path(row['image_path']).stem
+        dest=out/identity
+        with (out/(identity+'.log')).open('x') as log:
+            subprocess.run([sys.executable,'-B',str(script),'--view-receipt',str(receipt),'--archive',str(archive),'--oracle-base',str(oracle_base),'--out',str(dest),'--golden',str(golden)],stdout=log,stderr=subprocess.STDOUT,check=True)
+        result=json.loads((dest/'ORACLE.json').read_text())
+        if not result['passed'] or result['receipt_sha256']!=row['output_sha']:raise ValueError('independent oracle receipt differs')
+        return dict(view_id=identity,receipt_sha256=row['output_sha'],cells=result['cells'],oracle_sha256=sha(dest/'ORACLE.json'),headers_sha256=result['headers_sha256'],framemd5_sha256=result['framemd5_sha256'])
+    tested=[]
+    with ThreadPoolExecutor(max_workers=threads) as pool:
+        for result in pool.map(execute,sorted(rows,key=lambda r:r['image_path'])):
+            tested.append(result)
+            save(out/'PROGRESS.json',dict(stage='independent AV1 decode and quantizer headers',completed_views=len(tested),required_views=len(rows),cells=sum(r['cells'] for r in tested)))
+    result=dict(passed=True,views=len(tested),cells=sum(r['cells'] for r in tested),ledger_sha256=sha(ledger),oracle_script_sha256=sha(script),ffmpeg_sha256=sha(oracle_base/'bin/ffmpeg'),records=tested,checks=['every native AVIF independently decoded by libdav1d','PQ BT2020 full-range10-bit420 and explicit matrix6','luma base quantizer fixed at each quality','shared U/V deltas match every requested rung'])
+    if result['cells']!=16480:raise ValueError('full independent oracle cell census differs')
+    save(out/'SUMMARY.json',result);save(out/'PROGRESS.json',dict(stage='complete',views=len(tested),cells=result['cells']))
+    print(canonical({k:v for k,v in result.items() if k!='records'}),flush=True)
+
+
+def comparison(root,mirror,teacher,base,out):
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+    out.mkdir()
+    if sha(teacher)!='1278c6935ad4ebbb624e6213c56ad672602b05433b288ea1f9274dbf02dee721':raise ValueError('E26 executable differs')
+    conditions=['--hdr','--hdr-common-primaries','--gpu-runtime','cpu','--group-by-ref','--hdrvdp3-ppd','60','--hdrvdp3-task','quality','--hdrvdp3-input','rgb-bt709','--hdrvdp3-emission','led-lcd-srgb','--hdrvdp3-age','24','--hdrvdp3-surround','none']
+    sources=json.loads((base/'a2/hdr/SOURCES.json').read_text())
+    control=next(r for r in sources if r.get('pilot_control_dist'))
+    def locate(path):
+        p=Path(path)
+        if p.exists():return p
+        return base/str(p).split('/byc-chroma-20261028/',1)[1]
+    ref,dist=locate(control['pilot_ref']),locate(control['pilot_control_dist'])
+    if sha(ref)!=control['ref_sha256'] or sha(dist)!=control['dist_sha256']:raise ValueError('E26 control bytes differ')
+    with (out/'control.tsv').open('x') as f:
+        w=csv.writer(f,delimiter='\t');w.writerow(['ref_path','dist_path']);w.writerow([ref,dist])
+    with (out/'control.log').open('x') as f:subprocess.run([str(teacher),'score-pairs','--metric','hdrvdp3',*conditions,'--pairs-tsv',str(out/'control.tsv'),'--out-parquet',str(out/'control.parquet')],stdout=f,stderr=subprocess.STDOUT,check=True)
+    control_rows=pq.read_table(out/'control.parquet').to_pylist();column='hdrvdp3_jod_imazen_v0_0_1'
+    actual=control_rows[0][column]
+    save(out/'CONTROL.json',dict(passed=actual==control['hdrvdp3_q_jod'],actual=actual,expected=control['hdrvdp3_q_jod'],teacher_sha256=sha(teacher),conditions=conditions))
+    if actual!=control['hdrvdp3_q_jod']:raise ValueError('frozen E26 score replay differs')
+    selected={r['view_id']:r for r in json.loads((root/'COMPARISON_SELECTION.json').read_text())}
+    cells=[r for r in pq.read_table(mirror/'qualification/admission/CELLS.parquet').to_pylist() if r['view_id'] in selected]
+    if len(cells)!=352 or len({r['view_id'] for r in cells})!=8:raise ValueError('declared comparison coverage differs')
+    archive=mirror/'cas'
+    named=out/'pq16';named.mkdir()
+    def named_png(value):
+        path=named/(value+'.pq.png')
+        if not path.exists():shutil.copyfile(cas(archive,value),path)
+        if sha(path)!=value:raise ValueError('E26 named native PNG differs from CAS')
+        return path
+    with (out/'pairs.tsv').open('x') as f:
+        w=csv.writer(f,delimiter='\t');w.writerow(['ref_path','dist_path','image_path','codec','q','knob_tuple_json'])
+        for c in cells:
+            reference,rendition=named_png(c['reference_sha256']),named_png(c['rendition_sha256'])
+            if sha(reference)!=c['reference_sha256'] or sha(rendition)!=c['rendition_sha256']:raise ValueError('comparison pair bytes differ')
+            w.writerow([reference,rendition,c['view_id']+'|'+c['encoded_sha256'],'zenavif-svt-hdr',c['quality'],canonical(dict(chroma_q=c['chroma_q']))])
+    with (out/'teacher.log').open('x') as f:subprocess.run([str(teacher),'score-pairs','--metric','hdrvdp3',*conditions,'--pairs-tsv',str(out/'pairs.tsv'),'--out-parquet',str(out/'hdrvdp3.parquet')],stdout=f,stderr=subprocess.STDOUT,check=True)
+    rows=pq.read_table(out/'hdrvdp3.parquet').to_pylist()
+    bykey={(r['image_path'],float(r['q']),canonical(json.loads(r['knob_tuple_json']))):r for r in rows}
+    if len(bykey)!=len(cells):raise ValueError('comparison lost/duplicated pair identities')
+    for c in cells:
+        key=(c['view_id']+'|'+c['encoded_sha256'],float(c['quality']),canonical(dict(chroma_q=c['chroma_q'])))
+        c['hdrvdp3_jod']=bykey[key][column];c['hdrvdp3_score']=10*c['hdrvdp3_jod']
+    ladders=[]
+    for identity,selection in selected.items():
+        subset=[c for c in cells if c['view_id']==identity]
+        groups=[('chroma-q'+str(q),[(q,d) for d in DELTAS]) for q in QUALITIES]
+        if selection['control']:groups.append(('luma-control',[(q,0) for q in CONTROLS]))
+        recipes={(c['quality'],c['chroma_q'][0]):c for c in subset}
+        for family,keys in groups:
+            natural=[recipes[k]['natural_ssim2'] for k in keys];vdp=[recipes[k]['hdrvdp3_score'] for k in keys]
+            ladders.append(dict(view_id=identity,content_class=selection['content_class'],family=family,natural_scores=natural,comparison_scores=vdp,natural_admission=admission(natural),comparison_admission=admission(vdp),natural_endpoint_drop=natural[0]-natural[-1],comparison_endpoint_drop=vdp[0]-vdp[-1]))
+    pq.write_table(pa.Table.from_pylist(cells),out/'CELLS.parquet',compression='zstd');pq.write_table(pa.Table.from_pylist(ladders),out/'LADDERS.parquet',compression='zstd')
+    result=dict(passed=True,views=8,cells=len(cells),chroma_ladders=sum(r['family']!='luma-control' for r in ladders),natural_chroma_admitted=sum(bool(r['natural_admission']['kept_indices']) for r in ladders if r['family']!='luma-control'),comparison_chroma_admitted=sum(bool(r['comparison_admission']['kept_indices']) for r in ladders if r['family']!='luma-control'),control_ladders=sum(r['family']=='luma-control' for r in ladders),natural_controls_admitted=sum(bool(r['natural_admission']['kept_indices']) for r in ladders if r['family']=='luma-control'),comparison_controls_admitted=sum(bool(r['comparison_admission']['kept_indices']) for r in ladders if r['family']=='luma-control'),teacher_sha256=sha(teacher),selection_sha256=sha(root/'COMPARISON_SELECTION.json'),conditions=conditions,targets_unchanged=True)
+    save(out/'SUMMARY.json',result);print(canonical(result),flush=True)
+
+
 def declare_production(root,mirror,ctl,build_commit,image):
+    if len(build_commit)!=40 or any(c not in '0123456789abcdef' for c in build_commit):raise ValueError('full source commit hash required')
     rates=[json.loads((mirror/'rates'/host/'RATE.json').read_text()) for host in ['i270','i265','r3500','r3800x']]
     if any(not r['passed'] or r['cells']!=640 or r['outputs']!=rates[0]['outputs'] for r in rates):raise ValueError('all host byte/score receipts must match before production')
     admission_proof=json.loads((mirror/'qualification/admission/SUMMARY.json').read_text())
@@ -449,6 +681,12 @@ if __name__ == '__main__':
     a = s.add_parser('host-sample'); a.add_argument('root', type=Path); a.add_argument('mirror', type=Path); a.add_argument('image'); a.add_argument('host'); a.add_argument('cpuset'); a.add_argument('memory')
     a = s.add_parser('admit'); a.add_argument('root', type=Path); a.add_argument('mirror', type=Path); a.add_argument('ledger', type=Path); a.add_argument('out', type=Path); a.add_argument('--qualification',action='store_true')
     a = s.add_parser('declare-production'); a.add_argument('root', type=Path); a.add_argument('mirror', type=Path); a.add_argument('ctl', type=Path); a.add_argument('build_commit'); a.add_argument('image')
+    a = s.add_parser('comparison'); a.add_argument('root', type=Path); a.add_argument('mirror', type=Path); a.add_argument('teacher', type=Path); a.add_argument('base', type=Path); a.add_argument('out', type=Path)
+    a = s.add_parser('oracle-all'); a.add_argument('ledger', type=Path); a.add_argument('archive', type=Path); a.add_argument('oracle_base', type=Path); a.add_argument('golden', type=Path); a.add_argument('script', type=Path); a.add_argument('out', type=Path); a.add_argument('--threads',type=int,default=4)
+    a = s.add_parser('audit-raw-ledgers'); a.add_argument('directory',type=Path); a.add_argument('out',type=Path)
+    a = s.add_parser('snapshot-rates'); a.add_argument('root',type=Path); a.add_argument('out',type=Path)
+    a = s.add_parser('mirror-cas'); a.add_argument('root',type=Path); a.add_argument('mirror',type=Path); a.add_argument('receipt',type=Path)
+    a = s.add_parser('seal'); a.add_argument('root',type=Path); a.add_argument('mirror',type=Path); a.add_argument('build_commit')
     a = p.parse_args()
     if a.command == 'census': census(a.repo, a.out)
     elif a.command == 'prepare': prepare(a.root, a.renderer)
@@ -459,4 +697,10 @@ if __name__ == '__main__':
     elif a.command == 'declare-production': declare_production(a.root,a.mirror,a.ctl,a.build_commit,a.image)
     elif a.command == 'host-sample': host_sample(a.root,a.mirror,a.image,a.host,a.cpuset,a.memory)
     elif a.command == 'admit': admit(a.root,a.mirror,a.ledger,a.out,a.qualification)
+    elif a.command == 'comparison': comparison(a.root,a.mirror,a.teacher,a.base,a.out)
+    elif a.command == 'audit-raw-ledgers': audit_raw_ledgers(a.directory,a.out)
+    elif a.command == 'mirror-cas': mirror_cas(a.root,a.mirror,a.receipt)
+    elif a.command == 'seal': seal(a.root,a.mirror,a.build_commit)
+    elif a.command == 'snapshot-rates': snapshot_rates(a.root,a.out)
+    elif a.command == 'oracle-all': oracle_all(a.ledger,a.archive,a.oracle_base,a.golden,a.script,a.out,a.threads)
     else: specification(a.root, a.mirror, a.pins, a.executor, a.out)

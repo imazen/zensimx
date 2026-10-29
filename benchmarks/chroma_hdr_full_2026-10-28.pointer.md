@@ -1,6 +1,6 @@
 # HDR chroma-only teacher generation
 
-Status: predeclaration qualification passed; full generation/admission pending. No feature bank or model.
+Status: full generation, media/rung admission and independent decoding pass. Final archive receipt is being sealed. No feature bank or model.
 
 The committed PNG-v3 corpus tree `b1faae550eba4d29efee1de1a32954ef11a0e1ed`
 selects 38 TRAIN HDR origins from 76 total, across four photographic classes.
@@ -74,3 +74,42 @@ Renderer `7e0a8236d974e86ade3a0c21af47da70a54011d9c7c547522fa96cf4913b58d5`;
 reference-reuse helper `f8e5c1c7e74ebebe1884df51b27c6827fa70c0613c5fe2cf99102da4fccb0ad1`;
 executor `9ad4012c958530f4042f0d0fae72059878384fcdb75e110ffef8d39a7561e3ac`.
 These are zenmetrics commits5b4f5373,2d2a3194 andc375a124 on master.
+
+Full generation/admission:456 views,16480 native AVIF/PQ16 cells,16480 unique
+AVIF hashes. The1824 chroma ladders admit1461, retaining10422 chroma rungs.
+By fixed luma quality: q95434/456 (3467 kept), q85398/456 (2774), q75301/456
+(1933), q60328/456 (2248). All4 luma controls admit, retaining77 diagnostic
+rungs. Keep control-only cells outside the chroma training leg; no feature
+extraction or fitting is part of this record.
+
+The frozen eight-view352-cell comparison admits28/32 natural chroma ladders
+and0/32 HDR-VDP-3 ladders; both admit all4 luma controls. E26's stored
+9.579838179794153 control replays exactly. Its native ingress dispatches by
+filename extension, so comparison copies carry `.pq.png` names and are
+hash-identical to their CAS objects. The frozen executable is unchanged.
+
+Every one of the16480 native AVIFs independently decodes with libdav1d and
+passes full header checks:10-bit PQ BT.2020 full-range420, matrix6, fixed
+luma qindices per quality and every requested shared U/V delta.
+All target doubles survive Parquet readback exactly. The raw ledger audit
+finds507 DONE records,456 unique jobs,51 extra completions over41 repeated
+jobs (33 cross-host),zero conflicting outputs andzero failures. Repeated
+executions are retained in the raw archive.
+
+The observed261.473512092-second production window measures unique cells/s:
+i27015.144937505588198, i26513.07971875482617,
+r35001.927537500711225, r3800x6.471018752387684. These are first-wins
+ledger observations under concurrent fleet load, not isolated CPU timings.
+The complete result/log/command headers remain in PRODUCTION_RATES.json
+and the run logs. Admission run-heavy: rc0,511s,peak-RSS0.03GiB,
+min-avail22070MiB,peak-load15.47 (Docker client only; validation has an
+explicit2GiB container cap). Independent native oracle: rc0,240s,
+peak-RSS0.14GiB,min-avail24767MiB,peak-load21.60.
+
+All34781 immutable CAS objects/9341015837 bytes were copied from the mirror
+to the primary worker and read back by SHA256; the copy receipt is
+CAS_MIRROR.json. Copy run-heavy: rc0,162s,peak-RSS0.21GiB,
+min-avail12138MiB,peak-load15.54. Full input mirror:536 files/2431917988
+bytes. CAS and per-view receipts retain the exact PQ16 renditions. Encoded
+CICP/depth fields describe10-bit matrix6 AVIF; rendition PNGs are16-bit
+RGB with CICP9/16/0/full-range.

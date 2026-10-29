@@ -14,6 +14,12 @@
 
 ### Added
 
+- Committed-tree HDR chroma source admission, exact teacher and native-media
+  qualification, full zenfleet generation and unchanged rung admission
+  (`343d93ab`; executor `zenmetrics:c375a124`). The data record keeps features
+  and training outside this task.
+
+
 - Register the prospective HDR/chroma/combined training paths, label-blind
   human-data inventory and preserved split/exposure constraints (`79f26d2e`).
   Feature extraction, new source splits and fitting remain unstarted.
