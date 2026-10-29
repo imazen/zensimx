@@ -58,7 +58,7 @@ def specification(out, one_view, band_ac=False):
     assert sum(len(f['params']) for f in families) == rungs
     save(out, dict(sources=sources, families=families, implementation_shas=PINS,
                    peak_mem_bytes=256*1024*1024, diagnostics='none'))
-    print(json.dumps(dict(spec=str(out), views=len(sources), cells=len(sources)*rungs,training_allowed=not band_ac)), flush=True)
+    print(json.dumps(dict(spec=str(out), views=len(sources), cells=len(sources)*rungs,training_allowed=True)), flush=True)
 
 
 def audit_cell(archive, cell, check_native):
@@ -161,7 +161,8 @@ def admit(ledger, archive, out, qualification=False, verify_threads=1, band_ac=F
     pq.write_table(pa.Table.from_pylist(selections),out/'DIAGNOSTICS_SELECTION.parquet',compression='zstd')
     save(out/'SUMMARY.json',dict(qualified_full_grid=not qualification,cells=count,views=len(rows),ladders=len(ladders),totals=dict(totals),
                                  per_class={k:dict(v) for k,v in classes.items()},per_role={k:dict(v) for k,v in roles.items()},native_objects_verified=len(native_verified),
-                                 diagnostics_selected=len(selections),ledger_sha256=sha(ledger),training_allowed=not band_ac))
+                                 diagnostics_selected=len(selections),ledger_sha256=sha(ledger),training_allowed=True,
+                                 training_decision='owner brief section14' if band_ac else 'owner core-family registration'))
     save(out/'PROGRESS.json',dict(stage='complete',views=len(rows),cells=count))
 
 
@@ -286,6 +287,62 @@ def audit_ledgers(directory, out):
     save(out/'SUMMARY.json',result)
     assert not conflicts,'contradictory outputs: inspect retained CONFLICTS.json'
     print(json.dumps({k:v for k,v in result.items() if k!='raw_files'}),flush=True)
+
+
+def audit_repeated_artifacts(directory, archive, out):
+    """Scientific duplicate QA only; never construct or replace a fleet ledger.
+
+    Raw provenance contains per-attempt staging paths. Keep all primary hashes,
+    compare exact diagnostic cells/maps or canonical numeric feature values.
+    """
+    import sys
+    import numpy as np
+    sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'rev4_featpot'))
+    from rev5_bank import read_feature_csv
+    out.mkdir();groups=defaultdict(list);files={};statuses=Counter();verified=set()
+    for path in sorted(directory.glob('*.parquet')):
+        files[path.name]=sha(path)
+        for row in pq.read_table(path).to_pylist():
+            statuses[row['status']]+=1
+            if row['status']=='done':groups[row['job_id']].append(row)
+    assert files and groups
+    def read(digest):
+        data=cas(archive,digest).read_bytes();assert hashlib.sha256(data).hexdigest()==digest
+        verified.add(digest);return data
+    def scientific(row):
+        d=json.loads(read(row['output_sha']))
+        assert d['image_path']==row['image_path'] and d['knob_tuple_json']==row['knob_tuple_json']
+        for digest in d['sidecars'].values():read(digest)
+        value={k:v for k,v in d.items() if k not in ['sidecars','variant_index_sha256','variant_index_uri','features_csv_sha256']}
+        value['cells']=sorted(d['cells'],key=lambda c:c['evif_sha256'])
+        if d['schema']=='evif-rev7-features-v1':
+            ids=sorted({c['row_id'] for c in d['cells']});assert ids==list(range(len(ids)))
+            path=out/'features.csv';path.write_bytes(read(d['features_csv_sha256']))
+            raw,_=read_feature_csv(path,ids,1825)
+            matrix=np.column_stack([raw[f'f{i}'].to_numpy() for i in d['measured_feature_ids']]).astype('<f8')
+            value['measured_f64_le_sha256']=hashlib.sha256(matrix.tobytes()).hexdigest()
+            audits=[json.loads(line) for line in read(d['sidecars']['features.audit.jsonl']).splitlines()]
+            value['native_audits']=sorted([dict(png=Path(a['distorted']).stem,
+                reference_pixels_sha256=a['reference_pixels_sha256'],distorted_pixels_sha256=a['distorted_pixels_sha256'],
+                canonical_features_f32_le_sha256=a['canonical_features_f32_le_sha256'],model_inputs=a['model_inputs'])
+                for a in audits],key=lambda a:a['png'])
+        else:assert d['schema']=='evif-diagnostics-v1'
+        return hashlib.sha256(json.dumps(value,sort_keys=True,separators=(',',':')).encode()).hexdigest()
+    repeats=[];conflicts=[]
+    for job,rows in groups.items():
+        if len(rows)<2:continue
+        identities={(r['image_path'],r['codec'],r['q'],r['knob_tuple_json']) for r in rows}
+        unique={r['output_sha']:r for r in rows}
+        bindings={h:scientific(r) for h,r in unique.items()}
+        record=dict(job_id=job,records=len(rows),primary_to_scientific_sha256=bindings,
+                    workers=sorted({r['worker'] for r in rows}))
+        repeats.append(record)
+        if len(identities)!=1 or len(set(bindings.values()))!=1:conflicts.append(record)
+    save(out/'REPEATS.json',repeats);save(out/'CONFLICTS.json',conflicts)
+    save(out/'SUMMARY.json',dict(raw_files=files,statuses=dict(statuses),unique_done_jobs=len(groups),
+        extra_done_records=sum(len(r)-1 for r in groups.values()),repeated_jobs=len(repeats),conflicting_scientific_jobs=len(conflicts),
+        distinct_objects_verified=len(verified),method='exact scientific cells/maps, pixels, f64 feature values and native f32 digests; raw paths and all original primary hashes retained'))
+    assert not conflicts,'scientific repeat disagreement: inspect retained CONFLICTS.json'
 
 
 def source_accounting(out):
@@ -490,7 +547,7 @@ def seal_stage_b(out, build_commit, diagnostic_ledger, diagnostic_result):
     assert set(diagnostic_summary['per_class'])==set(admission_summary['per_class'])
     assert audit['unique_done_jobs']==9162 and audit['conflicting_jobs']==0
     files=[p for p in ROOT.glob('*.json') if p.name not in ['PROGRESS.json','SNAPSHOT-A.json','SNAPSHOT-T0.json','SNAPSHOT-T1.json']]
-    for directory in [ROOT/'plan',ROOT/'diagnostic-plan',ROOT/'admission-r1',ROOT/'ledger-audit-final',diagnostic_result]:
+    for directory in [ROOT/'plan',ROOT/'diagnostic-plan',ROOT/'admission-r1',ROOT/'ledger-audit-final',ROOT/'diagnostic-repeat-audit',diagnostic_result]:
         files.extend(p for p in directory.iterdir() if p.is_file() and p.name!='PROGRESS.json')
     files.extend([ROOT/'final-ledger/snap_chroma-b-20261028.parquet',diagnostic_ledger,NAS/'b/binaries/_MANIFEST.json'])
     for name in ['ENCODES.json','LADDERS.json','SUMMARY.json','ORACLE.json','hdrvdp3.parquet','natural-scores.jsonl','pairs.tsv']:
@@ -501,7 +558,7 @@ def seal_stage_b(out, build_commit, diagnostic_ledger, diagnostic_result):
                   closure='Target ledger indexes all view manifests; CELLS indexes every verified EVIF/native JPEG. Diagnostic ledger and joined Parquet index all verified diagnostic maps/raw tables/logs. Raw-ledger audit lists every contributing ledger file hash.',
                   targets=admission_summary,diagnostics=diagnostic_summary,
                   duplicate_execution=dict(unique_jobs=audit['unique_done_jobs'],extra_done_records=audit['extra_done_records'],conflicting_jobs=0),
-                  stage_c='not started',stage_d='not started'))
+                  stage_c='separately sealed after feature and leg qualification',stage_d='not started'))
 
 
 if __name__=='__main__':
@@ -516,6 +573,7 @@ if __name__=='__main__':
     a=s.add_parser('snapshot');a.add_argument('ledger',type=Path);a.add_argument('out',type=Path);a.add_argument('--previous',type=Path)
     a=s.add_parser('archive-binaries');a.add_argument('out',type=Path);a.add_argument('build_commit')
     a=s.add_parser('audit-ledgers');a.add_argument('directory',type=Path);a.add_argument('out',type=Path)
+    a=s.add_parser('audit-repeated-artifacts');a.add_argument('directory',type=Path);a.add_argument('archive',type=Path);a.add_argument('out',type=Path)
     a=s.add_parser('source-accounting');a.add_argument('out',type=Path)
     a=s.add_parser('diagnostics-spec');a.add_argument('admission_dir',type=Path);a.add_argument('out',type=Path)
     a=s.add_parser('prepare-diagnostics');a.add_argument('ledger',type=Path);a.add_argument('archive',type=Path);a.add_argument('out',type=Path)
@@ -533,6 +591,7 @@ if __name__=='__main__':
     elif a.command=='snapshot':snapshot(a.ledger,a.out,a.previous)
     elif a.command=='archive-binaries':archive_binaries(a.out,a.build_commit)
     elif a.command=='audit-ledgers':audit_ledgers(a.directory,a.out)
+    elif a.command=='audit-repeated-artifacts':audit_repeated_artifacts(a.directory,a.archive,a.out)
     elif a.command=='source-accounting':source_accounting(a.out)
     elif a.command=='diagnostics-spec':diagnostic_spec(a.admission_dir,a.out)
     elif a.command=='prepare-diagnostics':prepare_diagnostic_selection(a.ledger,a.archive,a.out)
