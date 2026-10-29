@@ -33,3 +33,20 @@ Producer `a245e1e5a4d3`; local (checked on dev)
 - `_MANIFEST.json`: `c98ffdd3b44466f4bb468ad25f1eb7f6ebf3619aeea043adbe71467c73e1c7b3`
 
 v1 is retained as historical exposure evidence. No R2 copy created.
+
+## UPIQ-380 library relocation, feature metadata only
+
+Native Rev7 admission remains380conditions,330fit/50report-only development;
+all410 distinct original-image hashes match the reviewed admission and library
+inventory. No targets or pixels were read. Historical label provenance remains
+unchanged; this does not supply a new independent UPIQ evaluation.
+
+Producer `86b8c0ac3008`; local (checked on dev)
+`/var/tmp/byc-hdr-20261029/upiq380-metadata-v2/`; byte-identical mirror
+`/mnt/tower/output/zensim/byc-hdr-20261029/upiq380-metadata-v2/`.
+
+- `extraction-admission.json`: `d5e5f18a60c4f3594c1c74f07aafddc62e68fdca30bd84019372660bc765a5b5`
+- `_MANIFEST.json`: `704797c1edb10c5d5ecdf020a36a5a624051ba227b12999951b550baac948058`
+
+The excluded v1 metadata is retained: its caller producer-commit pin predated
+this relocation implementation. Only v2 may be consumed. No R2 copy created.
