@@ -574,7 +574,10 @@ fn admit_datasets(
     let mut admitted = BTreeMap::new();
     for (r, d) in declarations {
         if d["schema"] == "chroma-teacher-leg-v1" {
-            super::chroma_admission::admit(&d, r, selected, &excluded, json)?;
+            // The leg declares the cell's direct ids; `selected` is the (larger) read set of a derived declaration.
+            let direct: Vec<usize> =
+                serde_json::from_value(c["feature_ids"].clone()).map_err(|e| e.to_string())?;
+            super::chroma_admission::admit(&d, r, &direct, &excluded, json)?;
             admitted.insert(string(r, "name")?.to_owned(), d);
             continue;
         }
