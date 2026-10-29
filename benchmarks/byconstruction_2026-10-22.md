@@ -8258,7 +8258,7 @@ Every view's frozen RGB projection matches its independently checked pixels.
 The four labelled families have16/16/14/30 rungs:696312 cells,9162 merged jobs.
 
 Before declaration, the same144-cell sample on one pinned i270 core measured
-52.641960185952485s unbatched,40.86745742382482s batched with diagnostics,
+52.641960185952485s for the unbatched Metric arm (its separate Encode arm excluded),40.86745742382482s batched with diagnostics,
 27.672819413943216s batched target-only. Every target double matches; full
 containers match byte for byte with diagnostics, and target-only media/recipes
 match exactly with diagnostics absent. The shared-archive target-only sample
@@ -8279,3 +8279,25 @@ admitted ladder's two endpoints. No diagnostic pass encodes again.
 Supporting receipts and generated tables: tower archive
 `output/zensim/byc-chroma-20261028/b/{walltime,first76,full}`; local generation
 owner i270 `/var/tmp/byc-chroma-20261028/b`. Stage C remains unstarted.
+
+The supplemental whole-path comparison includes both old Encode and Metric arms:
+143.03535945503972s for288 jobs/144 cells,60.47189978789538s for the12 batched
+jobs with diagnostics,40.48805077304132s for the12 target-only jobs. This ran
+after declaration under concurrent production load, so it is a separate timing
+series. All144 target doubles and full diagnostic containers match exactly;
+separately stored JPEG bytes match too. Each serial run reports run-heavy
+peak RSS0.14GiB; minimum available memory24829/25209/25710MiB respectively.
+Receipts: `b/walltime/i270-whole/{before-both,batch-all,batch-none}/RESULT.json`.
+
+The cheap HDR-A3 probe uses natural SSIMULACRA2 (fast-ssim2 0.8.2, standard
+cube-root opsin) on unclipped linear BT.709 in nits/100, per the owner ruling.
+Across208 unique10-bit PQ420 AVIF cells, it admits15/16 chroma ladders; the
+frozen E26 HDR-VDP-3 comparison admits0/16. Both admit4/4 positive-control
+quality ladders. The latter step the shared base/luma quantizer with chroma
+delta zero, rather than isolating luma from chroma quantization. The rejected
+natural ladder stops at its first early reversal. All208 independent AV1
+readbacks verify PQ/BT.2020, explicitly signaled matrix6, full-range10-bit420,
+fixed chroma-ladder base qindices12/40/64/100 and requested U/V deltas.
+No PU score or HDR full grid enters this result. Natural scoring8.02477837097831s,
+E26 comparison466.5033559240401s; run-heavy475s, peak RSS0.24GiB,
+minimum available26577MiB. Receipts: `b/hdr-a3/{LADDERS,SUMMARY,ORACLE}.json`.
