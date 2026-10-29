@@ -3956,3 +3956,7 @@ chroma-root +args:
 
 chroma-admission-check root receipt:
     cargo run --release --manifest-path tools/chroma-admission/Cargo.toml -- {{quote(root)}} {{quote(receipt)}}
+
+chroma-worker-logs +args:
+    python3 -B scripts/byconstruction/chroma_worker_logs.py {{args}}
+
