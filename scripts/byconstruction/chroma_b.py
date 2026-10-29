@@ -257,6 +257,27 @@ def archive_binaries(out, build_commit):
                                  diagnostic_image='ghcr.io/imazen/zenfleet-worker@sha256:b04a59d67b7962bb8914232817dc546de760a92e2c3e00588a90bad56b5b03cb'))
 
 
+def audit_ledgers(directory, out):
+    out.mkdir();groups=defaultdict(list);statuses=Counter();files={}
+    for file in sorted(directory.glob('*.parquet')):
+        files[file.name]=sha(file)
+        for row in pq.read_table(file).to_pylist():
+            statuses[row['status']]+=1
+            if row['status']=='done':groups[row['job_id']].append(row)
+    assert files and groups
+    repeats=[];conflicts=[]
+    for key,rows in groups.items():
+        outputs={r['output_sha'] for r in rows}
+        identities={(r['image_path'],r['codec'],r['q'],r['knob_tuple_json']) for r in rows}
+        if len(outputs)!=1 or len(identities)!=1 or None in outputs:conflicts.append(dict(job_id=key,rows=rows))
+        if len(rows)>1:repeats.append(dict(job_id=key,records=len(rows),outputs=sorted(outputs,key=lambda v:'' if v is None else v),workers=sorted({r['worker'] for r in rows}),cross_host=len({r['worker'].split('-chroma-',1)[0] for r in rows})>1))
+    save(out/'REPEATS.json',repeats);save(out/'CONFLICTS.json',conflicts)
+    result=dict(raw_files=files,statuses=dict(statuses),unique_done_jobs=len(groups),extra_done_records=sum(r['records']-1 for r in repeats),repeated_jobs=len(repeats),cross_host_repeated_jobs=sum(r['cross_host'] for r in repeats),conflicting_jobs=len(conflicts))
+    save(out/'SUMMARY.json',result)
+    assert not conflicts,'contradictory outputs: inspect retained CONFLICTS.json'
+    print(json.dumps({k:v for k,v in result.items() if k!='raw_files'}),flush=True)
+
+
 def diagnostic_spec(admission_dir, out):
     assert not out.exists(), 'preserve existing diagnostic specification'
     views={v['id']:v for v in json.loads((ROOT/'VIEWS.json').read_text())}
@@ -282,6 +303,7 @@ if __name__=='__main__':
     a=s.add_parser('diagnostic-proof');a.add_argument('ctl',type=Path);a.add_argument('image');a.add_argument('out',type=Path);a.add_argument('--view',default='im5044_m32.png')
     a=s.add_parser('snapshot');a.add_argument('ledger',type=Path);a.add_argument('out',type=Path);a.add_argument('--previous',type=Path)
     a=s.add_parser('archive-binaries');a.add_argument('out',type=Path);a.add_argument('build_commit')
+    a=s.add_parser('audit-ledgers');a.add_argument('directory',type=Path);a.add_argument('out',type=Path)
     a=s.add_parser('diagnostics-spec');a.add_argument('admission_dir',type=Path);a.add_argument('out',type=Path)
     a=p.parse_args()
     if a.command=='spec':specification(a.out,a.one_view)
@@ -291,4 +313,5 @@ if __name__=='__main__':
     elif a.command=='diagnostic-proof':diagnostic_proof(a.ctl,a.image,a.out,a.view)
     elif a.command=='snapshot':snapshot(a.ledger,a.out,a.previous)
     elif a.command=='archive-binaries':archive_binaries(a.out,a.build_commit)
+    elif a.command=='audit-ledgers':audit_ledgers(a.directory,a.out)
     else:diagnostic_spec(a.admission_dir,a.out)
