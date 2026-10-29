@@ -355,6 +355,30 @@ def merge_banks(banks, out, build_commit, ac_admission=None):
     save(out/'PROGRESS.json',dict(stage='complete',pairs=total,qualified_for_leg=ac_admission is not None))
 
 
+def seal_stage_c(out, build_commit, bank, roots, feature_audit, diagnostic_audit, diagnostic_result, leg_checks):
+    """Freeze the identities of the verified stage-C closure; every input must already have passed its own gate."""
+    assert not out.exists()
+    manifest=json.loads((bank/'_MANIFEST.json').read_text())
+    assert manifest['qualified_for_leg'] and manifest['qualified_core'] and manifest['band_ac_included'] and manifest['rows']==317008
+    roles=manifest['per_role']
+    assert roles['fit']+roles['new-train']==293318 and roles['dev']+roles['calibration']==23690
+    for audit in (feature_audit,diagnostic_audit):
+        summary=json.loads((audit/'SUMMARY.json').read_text());assert summary['conflicting_scientific_jobs']==0
+    result=json.loads((diagnostic_result/'SUMMARY.json').read_text())
+    assert result['passed'] and result['qualified_full_grid'] and result['targets_unchanged'] and result['admission_unchanged']
+    assert result['selected_cells']==20858 and result['views']==8319
+    checks=[json.loads((c).read_text()) for c in leg_checks];assert all(c['passed'] for c in checks)
+    assert all(c['fitting_rows']==293318 and c['diagnostic_rows']==23690 for c in checks)
+    files=[bank/'_MANIFEST.json',bank/'features.parquet',bank/'keys.parquet',feature_audit/'SUMMARY.json',diagnostic_audit/'SUMMARY.json',
+           diagnostic_result/'SUMMARY.json',diagnostic_result/'DIAGNOSTICS.parquet',*leg_checks,*[r/'wide/frozen.json' for r in roots]]
+    save(out,dict(schema='chroma-stage-c-ready-v1',build_commit=build_commit,observed_utc=__import__('datetime').datetime.now(
+        __import__('datetime').timezone.utc).isoformat(),totals=dict(pairs=manifest['rows'],fitting=293318,diagnostic=23690),
+        per_role=roles,files={str(f):dict(sha256=sha(f),bytes=f.stat().st_size) for f in files},
+        roots={str(r):sha(r/'wide/frozen.json') for r in roots},
+        repeat_audits=dict(feature_extra_completions=334,diagnostic_extra_completions=185,conflicts=0),
+        note='full-grid hash/seal validation, not independent decoder coverage; HDR legs not included'))
+
+
 if __name__=='__main__':
     parser=argparse.ArgumentParser();sub=parser.add_subparsers(dest='command',required=True)
     p=sub.add_parser('prepare-controls');p.add_argument('out',type=Path)
@@ -365,8 +389,13 @@ if __name__=='__main__':
     for name in ['harvest-features','qualify-features']:
         p=sub.add_parser(name);p.add_argument('ledger',type=Path);p.add_argument('wave',type=Path);p.add_argument('archive',type=Path);p.add_argument('out',type=Path)
     p=sub.add_parser('merge-banks');p.add_argument('out',type=Path);p.add_argument('build_commit');p.add_argument('banks',nargs='+',type=Path);p.add_argument('--ac-admission',type=Path)
+    p=sub.add_parser('seal');p.add_argument('out',type=Path);p.add_argument('build_commit');p.add_argument('bank',type=Path)
+    p.add_argument('--root',action='append',type=Path,required=True);p.add_argument('--feature-audit',type=Path,required=True)
+    p.add_argument('--diagnostic-audit',type=Path,required=True);p.add_argument('--diagnostic-result',type=Path,required=True)
+    p.add_argument('--leg-check',action='append',type=Path,required=True)
     args=parser.parse_args()
-    if args.command=='prepare-controls':prepare_controls(args.out)
+    if args.command=='seal':seal_stage_c(args.out,args.build_commit,args.bank,args.root,args.feature_audit,args.diagnostic_audit,args.diagnostic_result,args.leg_check)
+    elif args.command=='prepare-controls':prepare_controls(args.out)
     elif args.command=='run-controls':run_controls(args.binary,args.controls,args.out)
     elif args.command=='verify-controls':verify_controls(args.controls,args.output,args.receipt)
     elif args.command=='prepare-band-selection':prepare_band_selection(args.ledger,args.archive,args.out)
