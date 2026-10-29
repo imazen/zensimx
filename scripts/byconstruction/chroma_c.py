@@ -7,12 +7,16 @@ import json
 from pathlib import Path
 import shutil
 import struct
+from collections import defaultdict
 
 import numpy as np
 import pyarrow as pa
 import pyarrow.csv as pacsv
 import pyarrow.parquet as pq
 from chroma_pilot import save, sha
+from chroma_pilot import admission
+from chroma_b import PINS
+from chroma_evif import specs
 
 NAS=Path('/mnt/tower/output/zensim/byc-chroma-20261028')
 PARENT=Path('/var/tmp/byc-mixes-20261025/Mlic/root')
@@ -93,10 +97,61 @@ def verify_controls(controls, output, receipt):
     assert not failures,'frozen Mlic extractor identity failed; feature declaration forbidden'
 
 
+def feature_spec(cells, proof, out, exclude):
+    """Freeze a disjoint wave; full B readback must qualify every row before leg assembly."""
+    qualification=json.loads(proof.read_text())
+    assert qualification['passed'] and qualification['extractor_sha256']==EXTRACTOR_SHA
+    assert qualification['bank_f64']==qualification['mlic_f32']=='bit-identical'
+    out.mkdir();views={v['path']:v for v in json.loads((NAS/'b/full/VIEWS.json').read_text())}
+    excluded=set()
+    for wave in exclude:
+        excluded.update(pq.read_table(wave/'SELECTION.parquet',columns=['image_path'])['image_path'].to_pylist())
+    grouped=defaultdict(list)
+    for batch in pq.ParquetFile(cells).iter_batches():
+        for row in batch.to_pylist():
+            if row['image_path'] not in excluded:grouped[row['image_path']].append(row)
+    selections=[];sources=[];families={k:v for k,v in specs().items() if not k.startswith('band-')}
+    for image,rows in sorted(grouped.items()):
+        assert image in views;view=views[image]
+        assert len(rows)==76
+        by_family=defaultdict(list)
+        for r in rows:
+            assert struct.pack('>d',r['teacher_ssim2']).hex()==r['teacher_bits']
+            assert r['reference_pixels_sha256']==view['pixels_sha256']
+            assert r['mlic_role']==view['mlic_role'] and r['reference_group']==view['reference_group']
+            by_family[r['family']].append(r)
+        assert set(by_family)==set(families),'AC-band and unregistered families cannot enter Stage C'
+        selected=[]
+        for family,(_,_,params) in families.items():
+            ladder=sorted(by_family[family],key=lambda r:r['rung']);assert len(ladder)==len(params)
+            gate=admission([r['teacher_ssim2'] for r in ladder])
+            for index,r in enumerate(ladder):
+                assert r['rung']==index and json.loads(r['params_json'])==params[index]
+                assert r['kept']==(index in gate['kept_indices'])
+                if r['kept']:selected.append(r)
+        if not selected:continue
+        evifs=sorted({r['evif_sha256'] for r in selected})
+        source=dict(image_path=image,source_sha256=view['sha256'],pixels_sha256=view['pixels_sha256'],
+                    identity=json.dumps({k:view[k] for k in ['id','reference_group','mlic_role','type','content_class']},sort_keys=True),
+                    width=view['width'],height=view['height'])
+        sources.append(dict(source=source,evif_shas=evifs));selections.extend(selected)
+    assert sources and selections
+    pq.write_table(pa.Table.from_pylist(selections),out/'SELECTION.parquet',compression='zstd')
+    save(out/'spec.json',dict(sources=sources,implementation_shas=PINS+[EXTRACTOR_SHA],peak_mem_bytes=512*1024*1024))
+    save(out/'_MANIFEST.json',dict(schema='chroma-stage-c-feature-wave-v1',qualified_for_leg=False,
+        feature_set_id=FEATURE_ID,extractor_sha256=EXTRACTOR_SHA,views=len(sources),pairs=len(selections),
+        source_cells=str(cells),source_cells_sha256=sha(cells),identity_proof=str(proof),identity_proof_sha256=sha(proof),
+        selection_sha256=sha(out/'SELECTION.parquet'),excluded_waves=[str(p) for p in exclude],
+        data_roles='all admitted pairs extracted; only fit/new-train may enter training; dev/calibration stay diagnostic',
+        final_gate='exact selection reconciliation against fully verified B admission before leg/root assembly'))
+
+
 if __name__=='__main__':
     parser=argparse.ArgumentParser();sub=parser.add_subparsers(dest='command',required=True)
     p=sub.add_parser('prepare-controls');p.add_argument('out',type=Path)
     p=sub.add_parser('verify-controls');p.add_argument('controls',type=Path);p.add_argument('output',type=Path);p.add_argument('receipt',type=Path)
+    p=sub.add_parser('feature-spec');p.add_argument('cells',type=Path);p.add_argument('proof',type=Path);p.add_argument('out',type=Path);p.add_argument('--exclude-wave',action='append',type=Path,default=[])
     args=parser.parse_args()
     if args.command=='prepare-controls':prepare_controls(args.out)
-    else:verify_controls(args.controls,args.output,args.receipt)
+    elif args.command=='verify-controls':verify_controls(args.controls,args.output,args.receipt)
+    else:feature_spec(args.cells,args.proof,args.out,args.exclude_wave)
