@@ -14,6 +14,10 @@
 
 ### Added
 
+- Register the prospective HDR/chroma/combined training paths, label-blind
+  human-data inventory and preserved split/exposure constraints (`79f26d2e`).
+  Feature extraction, new source splits and fitting remain unstarted.
+
 - Local chroma-only JPEG pilot transport, exact frozen-teacher replay,
   source-byte admission and per-ladder score/admission reporting
   (`b9da3ad8`, `7b4a2341`, `6c9ce8b8`). No serving model or public Rust API changed.
