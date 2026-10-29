@@ -236,6 +236,23 @@ def snapshot(ledger, out, previous):
     save(out,result);print(json.dumps(result),flush=True)
 
 
+def archive_binaries(out, build_commit):
+    out.mkdir()
+    base=Path('/var/tmp/byc-chroma-20261028')
+    files={p.name:p for p in (base/'b/bin').iterdir() if p.is_file()}
+    files.update({'frozen-safesyn-extractor-7c7f':base/'bin/teacher','frozen-view-prepare':base/'bin/prepare',
+                  'zenfleet-worker-r10':base/'b/fleet-target/release/zenfleet-worker','zenfleet-ctl':base/'b/fleet-target/release/zenfleet-ctl'})
+    records=[]
+    for name,source in sorted(files.items()):
+        digest=sha(source);destination=out/name
+        shutil.copyfile(source,destination);assert sha(destination)==digest
+        records.append(dict(name=name,source=str(source),sha256=digest,bytes=destination.stat().st_size))
+    toolchain=subprocess.check_output([str(Path.home()/'.cargo/bin/rustc'),'--version'],text=True).strip()
+    save(out/'_MANIFEST.json',dict(build_commit=build_commit,toolchain=toolchain,host='i270',files=records,
+                                 target_image='ghcr.io/imazen/zenfleet-worker@sha256:9ad684d702187387e1f6a4f70933598da32aa213e84917fde8eb4939d3cd0200',
+                                 diagnostic_image='ghcr.io/imazen/zenfleet-worker@sha256:b04a59d67b7962bb8914232817dc546de760a92e2c3e00588a90bad56b5b03cb'))
+
+
 def diagnostic_spec(admission_dir, out):
     assert not out.exists(), 'preserve existing diagnostic specification'
     views={v['id']:v for v in json.loads((ROOT/'VIEWS.json').read_text())}
@@ -260,6 +277,7 @@ if __name__=='__main__':
     a=s.add_parser('verify-first');a.add_argument('ledger',type=Path);a.add_argument('archive',type=Path);a.add_argument('evif',type=Path);a.add_argument('out',type=Path)
     a=s.add_parser('diagnostic-proof');a.add_argument('ctl',type=Path);a.add_argument('image');a.add_argument('out',type=Path);a.add_argument('--view',default='im5044_m32.png')
     a=s.add_parser('snapshot');a.add_argument('ledger',type=Path);a.add_argument('out',type=Path);a.add_argument('--previous',type=Path)
+    a=s.add_parser('archive-binaries');a.add_argument('out',type=Path);a.add_argument('build_commit')
     a=s.add_parser('diagnostics-spec');a.add_argument('admission_dir',type=Path);a.add_argument('out',type=Path)
     a=p.parse_args()
     if a.command=='spec':specification(a.out,a.one_view)
@@ -268,4 +286,5 @@ if __name__=='__main__':
     elif a.command=='verify-first':verify_first(a.ledger,a.archive,a.evif,a.out)
     elif a.command=='diagnostic-proof':diagnostic_proof(a.ctl,a.image,a.out,a.view)
     elif a.command=='snapshot':snapshot(a.ledger,a.out,a.previous)
+    elif a.command=='archive-binaries':archive_binaries(a.out,a.build_commit)
     else:diagnostic_spec(a.admission_dir,a.out)
