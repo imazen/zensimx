@@ -8390,3 +8390,37 @@ count with the summary's `diagnostics_selected`.
   (F minus E), mean with a 95% bootstrap interval resampling views. F is chroma-aware only if no family's mean difference is
   negative beyond its interval and the pooled mean difference is positive with its interval above zero. E's absolute
   numbers are reported whether or not E passes the absolute bar.
+
+### Profile F round 2: level gate G-CHROMA-L and the weight selection rule (registered 2026-10-29 after round-1 results were seen)
+
+**Why.** Round 1 (chroma-leg weight 1.0410771004695145) left F general at G-STEER 133/135 (broad-220-b8, broad-220-b16), cost E21
+(mean SROCC against stored Mlic −0.0152; CID22-A −0.040), and could not show a rank gain because the round-1 rank gate is saturated
+(E already has median rho 1.0). The measured gain was level: lower mean absolute error and bias against the teacher in every family.
+The owner asked for a level gate and a lower chroma-leg weight. Everything below was fixed **before any round-2 model was scored**;
+it is labelled as registered after round-1 results were seen, and is not a prospective test of round-1 outcomes.
+
+**G-CHROMA-L (level).** On the held-out chroma ladders (same population and ladder definition as the round-1 gate: (view, family),
+at least 3 kept rungs), per family, pooled over rows: MAE of the model score against the frozen SSIMULACRA2 teacher. The model score is the
+packed bake on the stored f64 feature row (`predict_features_with_bake --f64-wire --production`). A candidate passes iff, in **every** family
+(ycc444, ycc420, xyb-capped, xyb-extended, band-ac): candidate MAE < E's MAE, and the 95% percentile interval of the per-row difference
+(candidate absolute error − E absolute error), resampling ladders with replacement, 10,000 draws, numpy `default_rng(20261029)`, has an upper
+bound below 0. E is the curated general model (Mlic x256 + rehearsal, e59, seed 0, `7642eff4…`). Reported alongside, not decisive: the same for
+stored Mlic seed 0 (same recipe, no chroma leg) and signed bias. The round-1 rank gate (median rho >= 0.90 and share of ladders with rho >= 0.9
+at least 0.80, per family) stays as a non-regression check.
+
+**Data use.** Selection reads the **dev** ladders (17,059 rows). The final gate reads the **calibration** ladders (6,631 rows) once, for the
+chosen weight only (and, for the record, E and Mlic). Neither role is ever fitted.
+
+**Arms.** The chroma-leg weight is the leg's `train_weight` = 1 / mean over source groups of (1 − 1/n), computed by `ring_root.py chroma`.
+Round-1 value w0 = 1.0410771004695145. Arms: w0 (round 1, already measured), w0/2 = 0.5205385502347572, w0/4 = 0.2602692751173786,
+w0/8 = 0.1301346375586893. The scale is a declared field of the leg (`weight_scale`, allowed values 1, 1/2, 1/4, 1/8, default 1) that the native
+admission checks against the receipt's train_weight; nothing else about the leg, root or recipe changes.
+
+**Selection rule.** Per arm: the seed-0 Mlic-recipe packed model (fx2 declaration, chroma root) is scored against all of:
+(1) G-STEER 135/135 on the fixed 135-case packet; (2) the E21 no-regression bar against stored Mlic: mean over the four populations of
+(arm − Mlic) SROCC >= −0.002 and every population >= −0.005 (twelve cells per arm, seeds 0–2 means); (3) G-CHROMA-L on dev; the round-1
+rank gate as non-regression. Choose the **largest** weight that passes all of them. If none passes, the verified result is negative for F
+and is reported as such; no threshold is loosened. Only the chosen weight gets three seeds, the continuations (general e59, codec e29) and
+the full gate set plus G-CHROMA-L on calibration.
+
+**Hosts.** Every fitting host first reproduces the stored Mlic cell byte for byte with the trainer that fits there (per-host control).
