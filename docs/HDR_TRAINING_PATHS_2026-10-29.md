@@ -204,6 +204,11 @@ correctness/SDR gates and the full HDR evidence panel; adoption remains a
 separate owner review. Historical exposure and HDR-VDP-3/UPIQ dependence are
 mandatory on that panel.
 
+UPIQ-380's reserved 50-row development population remains final-checkpoint
+report-only under its original admission; it never selects weights, calibration
+or epochs. Any new UPIQ weight selection uses source folds inside the 330 fit
+rows. HDRTEACH VAL and hdr_v3mix VAL likewise stay report-only.
+
 TRAIN-side selection is lexicographic: reject any cell failing an inherited
 correctness or SDR no-regression gate; then maximize the unweighted mean of
 within-reference HDR rank correlations across admitted human, ladder and
