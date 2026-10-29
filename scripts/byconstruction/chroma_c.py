@@ -8,6 +8,7 @@ from pathlib import Path
 import shutil
 import struct
 from collections import defaultdict
+import sys
 
 import numpy as np
 import pyarrow as pa
@@ -17,6 +18,7 @@ from chroma_pilot import save, sha
 from chroma_pilot import admission
 from chroma_b import PINS
 from chroma_evif import specs
+from chroma_b import cas
 
 NAS=Path('/mnt/tower/output/zensim/byc-chroma-20261028')
 PARENT=Path('/var/tmp/byc-mixes-20261025/Mlic/root')
@@ -146,12 +148,100 @@ def feature_spec(cells, proof, out, exclude):
         final_gate='exact selection reconciliation against fully verified B admission before leg/root assembly'))
 
 
+def harvest_features(ledger, wave, archive, out, qualification=False):
+    """Reuse the bank owner's CSV ingress and verify exact pixels/feature digests."""
+    sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'rev4_featpot'))
+    from rev5_bank import read_feature_csv
+    out.mkdir();selected=defaultdict(list)
+    for r in pq.read_table(wave/'SELECTION.parquet').to_pylist():selected[r['image_path']].append(r)
+    rows=pq.read_table(ledger).to_pylist()
+    if qualification:
+        assert len(rows)==1 and out.name.startswith('qualification-')
+        selected={rows[0]['image_path']:selected[rows[0]['image_path']]}
+    assert len(rows)==len(selected) and all(r['status']=='done' for r in rows)
+    assert len({r['image_path'] for r in rows})==len(rows) and {r['image_path'] for r in rows}==set(selected)
+    bank_writer=None;key_writer=None;buffers=[];keys=[];count=0;verified=set();classes=defaultdict(int);roles=defaultdict(int)
+    work=out/'readback';work.mkdir()
+    def read(digest):
+        path=cas(archive,digest);data=path.read_bytes();assert hashlib.sha256(data).hexdigest()==digest
+        verified.add(digest);return data
+    try:
+        for index,row in enumerate(sorted(rows,key=lambda r:r['image_path'])):
+            result=json.loads(read(row['output_sha']))
+            assert result['schema']=='evif-rev7-features-v1' and result['feature_set_id']==FEATURE_ID
+            assert result['extractor_sha256']==EXTRACTOR_SHA and result['build_commit']==BUILD
+            assert result['feature_width']==1825 and result['measured_feature_ids']==IDS
+            assert result['image_path']==row['image_path'] and result['knob_tuple_json']==row['knob_tuple_json']
+            expected=sorted(selected[row['image_path']],key=lambda r:(r['family'],r['rung']))
+            actual={c['evif_sha256']:c for c in result['cells']};assert len(actual)==len(result['cells'])
+            assert set(actual)=={r['evif_sha256'] for r in expected}
+            assert set(actual)==set(json.loads(row['knob_tuple_json'])['evif_shas'])
+            assert result['source_sha256']==json.loads(row['knob_tuple_json'])['source_sha256']
+            assert all(r['reference_pixels_sha256']==result['reference_pixels_sha256'] for r in expected)
+            for digest in result['sidecars'].values():
+                if digest not in verified:read(digest)
+            feature_csv=work/'features.csv';feature_csv.write_bytes(read(result['features_csv_sha256']))
+            feature_ids=sorted({c['row_id'] for c in actual.values()})
+            assert feature_ids==list(range(len(feature_ids)))
+            raw,columns=read_feature_csv(feature_csv,feature_ids,1825)
+            audits=[json.loads(line) for line in read(result['sidecars']['features.audit.jsonl']).splitlines()]
+            audit_by_png={Path(r['distorted']).stem:r for r in audits};assert len(audits)==len(audit_by_png)==len(feature_ids)
+            digest_by_row={}
+            for cell in actual.values():
+                audit=audit_by_png[cell['png_sha256']]
+                assert not audit['model_inputs'] and audit['reference']==row['image_path']
+                assert audit['reference_pixels_sha256']==result['reference_pixels_sha256']
+                assert audit['distorted_pixels_sha256']==cell['distorted_pixels_sha256']
+                rid=cell['row_id']
+                if rid not in digest_by_row:
+                    values=np.array([raw[f'f{i}'][rid].as_py() for i in range(1825)],dtype='<f4')
+                    digest_by_row[rid]=hashlib.sha256(values.tobytes()).hexdigest()
+                assert audit['canonical_features_f32_le_sha256']==digest_by_row[rid]
+            view_keys=[];take=[]
+            for selection in expected:
+                cell=actual[selection['evif_sha256']]
+                assert cell['jpeg_sha256']==selection['jpeg_sha256']
+                assert cell['distorted_pixels_sha256']==selection['distorted_pixels_sha256']
+                assert struct.pack('>d',selection['teacher_ssim2']).hex()==selection['teacher_bits']
+                identity=json.dumps([selection['view_id'],selection['family'],selection['rung'],selection['evif_sha256']],separators=(',',':'))
+                pair_key=hashlib.sha256(identity.encode()).hexdigest();global_row=count+len(view_keys)
+                view_keys.append(dict(**selection,pair_key=pair_key,row_id=global_row,png_sha256=cell['png_sha256'],
+                    canonical_features_f32_le_sha256=digest_by_row[cell['row_id']],feature_primary_sha256=row['output_sha']))
+                take.append(cell['row_id']);classes[selection['content_class']]+=1;roles[selection['mlic_role']]+=1
+            features=pa.table(columns).take(pa.array(take))
+            features=features.add_column(0,'row_id',pa.array([r['row_id'] for r in view_keys],type=pa.int64()))
+            features=features.add_column(0,'pair_key',pa.array([r['pair_key'] for r in view_keys]))
+            buffers.append(features);keys.extend(view_keys);count+=len(view_keys)
+            if len(keys)>=5000 or index+1==len(rows):
+                bank=pa.concat_tables(buffers);key_table=pa.Table.from_pylist(keys)
+                if bank_writer is None:
+                    bank_writer=pq.ParquetWriter(out/'features.parquet',bank.schema,compression='zstd',compression_level=3)
+                    key_writer=pq.ParquetWriter(out/'keys.parquet',key_table.schema,compression='zstd')
+                bank_writer.write_table(bank,row_group_size=5000);key_writer.write_table(key_table,row_group_size=5000)
+                buffers=[];keys=[]
+                save(out/'PROGRESS.json',dict(stage='feature readback',views=index+1,required_views=len(rows),pairs=count))
+    finally:
+        if bank_writer:bank_writer.close();key_writer.close()
+    assert count==sum(len(r) for r in selected.values())
+    assert pq.ParquetFile(out/'features.parquet').metadata.num_rows==pq.ParquetFile(out/'keys.parquet').metadata.num_rows==count
+    save(out/'_MANIFEST.json',dict(schema='rev5-featbank-v1',set='chroma',stage_c_wave=True,qualified_for_leg=False,
+        qualification_only=qualification,rows=count,views=len(rows),feature_width=1825,dtype='float64',absent_slots='NaN',
+        requested_slot_ranges=[[0,228],[372,720]],feature_set_id=FEATURE_ID,build_commit=BUILD,binary_sha256=EXTRACTOR_SHA,
+        features_parquet_sha256=sha(out/'features.parquet'),keys_sha256=sha(out/'keys.parquet'),source_selection_sha256=sha(wave/'SELECTION.parquet'),
+        ledger_sha256=sha(ledger),unique_objects_verified=len(verified),per_class=dict(classes),per_role=dict(roles),
+        final_gate='full B selection reconciliation; every target/pixel/feature digest exact; AC-band excluded'))
+    save(out/'PROGRESS.json',dict(stage='complete',views=len(rows),pairs=count))
+
+
 if __name__=='__main__':
     parser=argparse.ArgumentParser();sub=parser.add_subparsers(dest='command',required=True)
     p=sub.add_parser('prepare-controls');p.add_argument('out',type=Path)
     p=sub.add_parser('verify-controls');p.add_argument('controls',type=Path);p.add_argument('output',type=Path);p.add_argument('receipt',type=Path)
     p=sub.add_parser('feature-spec');p.add_argument('cells',type=Path);p.add_argument('proof',type=Path);p.add_argument('out',type=Path);p.add_argument('--exclude-wave',action='append',type=Path,default=[])
+    for name in ['harvest-features','qualify-features']:
+        p=sub.add_parser(name);p.add_argument('ledger',type=Path);p.add_argument('wave',type=Path);p.add_argument('archive',type=Path);p.add_argument('out',type=Path)
     args=parser.parse_args()
     if args.command=='prepare-controls':prepare_controls(args.out)
     elif args.command=='verify-controls':verify_controls(args.controls,args.output,args.receipt)
-    else:feature_spec(args.cells,args.proof,args.out,args.exclude_wave)
+    elif args.command=='feature-spec':feature_spec(args.cells,args.proof,args.out,args.exclude_wave)
+    else:harvest_features(args.ledger,args.wave,args.archive,args.out,qualification=args.command=='qualify-features')
