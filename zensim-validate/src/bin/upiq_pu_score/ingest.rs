@@ -86,14 +86,19 @@ fn digest(bytes: &[u8]) -> String {
 }
 
 fn validate(a: &Admission) -> Result<(), String> {
-    if a.schema != "upiq380-extraction-admission-v1"
+    let (schema, revision, ids) = if a.schema == "upiq380-extraction-admission-rev7-v1" {
+        ("upiq380-extraction-admission-rev7-v1", 7, (0..228).chain(372..720).collect())
+    } else {
+        ("upiq380-extraction-admission-v1", 5, canonical_ids())
+    };
+    if a.schema != schema
         || a.role != "train"
         || a.tier != "T2"
         || a.authority != "D3-2026-10-07"
         || a.input_contract != "upiq-exr-bt709-nits-v1"
-        || a.formula_revision != 5
+        || a.formula_revision != revision
         || !a.image_root.is_absolute()
-        || a.requested_ids != canonical_ids()
+        || a.requested_ids != ids
         || a.rows.len() != 380
     {
         return Err("not the registered TRAIN-only Rev5 UPIQ-380 contract".into());
@@ -179,14 +184,16 @@ pub(super) fn run(args: &[String]) -> Result<(), String> {
     }
     let a: Admission = serde_json::from_slice(&bytes).map_err(|e| e.to_string())?;
     validate(&a)?; // Complete metadata admission precedes every pixel payload.
-    if zensim::feature_v2::active_formula_revision() != zensim::feature_v2::FormulaRevision::Rev5 {
-        return Err("UPIQ extraction requires process FormulaRevision::Rev5".into());
+    let revision = if a.formula_revision == 7 { zensim::feature_v2::FormulaRevision::Rev7 }
+        else { zensim::feature_v2::FormulaRevision::Rev5 };
+    if zensim::feature_v2::active_formula_revision() != revision {
+        return Err("UPIQ extraction process revision must match its explicit admission".into());
     }
     let req = zensim::research::Request::for_slots(
         zensim::feature_set_id::SlotSet::from_slots(a.requested_ids.iter().copied()),
         TRANSPORT_WIDTH,
     )
-    .with_era_label("e31-upiq380-native-hdr-rev5")
+    .with_era_label(if a.formula_revision == 7 { "rev7_rowlanes" } else { "e31-upiq380-native-hdr-rev5" })
     .with_parallel(false);
     let mut refs = HashMap::new();
     let mut reads = vec![path.clone()];
@@ -249,11 +256,11 @@ pub(super) fn run(args: &[String]) -> Result<(), String> {
         }
         output.push('\n');
         if (i + 1) % 10 == 0 {
-            eprintln!("UPIQ-380 Rev5 extraction: {}/380", i + 1);
+            eprintln!("UPIQ-380 Rev{} extraction: {}/380", a.formula_revision, i + 1);
         }
     }
     let metadata = serde_json::json!({"schema":"upiq380-extraction-result-v1", "rows":a.rows.len(),
-        "formula_revision":5,"input_contract":a.input_contract,"requested_ids":a.requested_ids,
+        "formula_revision":a.formula_revision,"input_contract":a.input_contract,"requested_ids":a.requested_ids,
         "allowlist_sha256":pin,"build_commit":zensim::research::BUILD_COMMIT,
         "research":serde_json::from_str::<serde_json::Value>(&manifest.ok_or("empty extraction")?).map_err(|e| e.to_string())?,
         "files_read":reads,"reference_count":refs.len(),"decoder":"zenexr; native BT.709 f32 absolute nits; finite opaque samples"});
@@ -386,6 +393,19 @@ mod tests {
         assert!(checked(v).is_err());
         let mut v = fixture();
         v["rows"][379]["distorted_sha256"] = "not-a-hash".into();
+        assert!(checked(v).is_err());
+    }
+
+    #[test]
+    fn rev7_requires_a_new_schema_and_exact_native_read_set() {
+        let mut v = fixture();
+        v["formula_revision"] = 7.into();
+        assert!(checked(v.clone()).is_err()); // Old admission remains frozen.
+        v["schema"] = "upiq380-extraction-admission-rev7-v1".into();
+        assert!(checked(v.clone()).is_err()); // Old 420 IDs are insufficient.
+        v["requested_ids"] = serde_json::json!((0..228).chain(372..720).collect::<Vec<_>>());
+        assert!(checked(v.clone()).is_ok());
+        v["role"] = "eval".into();
         assert!(checked(v).is_err());
     }
 

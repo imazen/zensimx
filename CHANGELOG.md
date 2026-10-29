@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Add a separate TRAIN-only Rev7 UPIQ extraction admission while preserving the frozen Rev5 contract and original source membership. Native extraction tests and the 380-row computation pass; feature publication and HDR training qualification remain incomplete.
+
 ### Dependency compatibility
 
 - Update training-core and Adam constructor calls to equivalent token-explicit aliases; strict workspace lint passes. No arithmetic or dependency-version change (`872adce9`).
