@@ -15,11 +15,11 @@ dev-fold score or checkpoint selection**. It adds to, and weakens nothing in,
 
 | Bank | Rows | Producer | `_MANIFEST.json` SHA-256 prefix |
 |---|---|---|---|
-| UPIQ-380 (stored-byte recovery, native `upiq_pu_score` rows) | 380 (330 fit / 50 development) | `d86b3b44` / `73d1374f…` | 4755536aa30099f4 |
-| HDR chroma ladders, all kept rungs (consumer TRAIN 7,177 + EVAL 3,245) | 10,422 | `a86520ca` / `63bed9a6…` | 37713a36113021f9 |
-| 4Kdtb (Bike TRAIN 48, Regatta EVAL 48) | 96 | same | c3b97fdaed77414f |
-| HDRTEACH train (agree rows) | 7,390 | same | e16ea551f20753b5 |
-| HDRTEACH val (report-only) | 3,900 | same | c23e9415e7730b19 |
+| UPIQ-380 (stored-byte recovery, native `upiq_pu_score` rows) | 380 (330 fit / 50 development) | `d86b3b44` / `73d1374f…` | deac782cedeb51e9 |
+| HDR chroma ladders, all kept rungs (consumer TRAIN 7,177 + EVAL 3,245) | 10,422 | `a86520ca` / `63bed9a6…` | 498fc951548b0f55 |
+| 4Kdtb (Bike TRAIN 48, Regatta EVAL 48) | 96 | same | d56f504a7f2fcfe2 |
+| HDRTEACH train (agree rows) | 7,390 | same | 3adf609d2d4a285c |
+| HDRTEACH val (report-only) | 3,900 | same | fc39bfb662fdbdc0 |
 
 4Kdtb source screen (limits stated): byte-identical references vs every library inventory (no match, prior record); in addition a
 24x24 log-luminance thumbnail correlation of the eight 4Kdtb references against the eight HDdtb source images found a maximum of 0.70
@@ -54,3 +54,12 @@ ordered keys, family reservation and the nominal-weight correction; it reads no 
 ## Not claimed
 
 No HDR-eval number exists at registration. HDR-VDC/AVT stored Rev7 features do not exist: those rows stay INCOMPLETE.
+
+## Amendment 2026-10-29 (before any fit): absent-slot encoding, dev-fold admission
+
+The first assembly wrote absent feature slots as parquet nulls (empty TSV cells); the trainer's loader refuses nulls. Banks were
+reassembled from the same CAS objects with absent slots as NaN (the convention of every other bank); the null-bearing banks are kept as
+`*.nullbug.bak`, no model saw them, and the manifest prefixes above are the reassembled ones. Dev folds, their registered row counts
+(`FOLD_ROWS`) and the "a leg never holds a family of its own held-out fold" admission rule are in `hdr_root.py`,
+`subjective_training_leg.py` and `hdr_admission.rs`; 4Kdtb TRAIN has the single family `4kdtb:Bike`, so fold 0 drops the leg and fold 1 holds none out
+(4Kdtb is report-only for selection).

@@ -17,6 +17,7 @@ import sys
 from pathlib import Path
 
 import pyarrow as pa
+import pyarrow.compute as pc
 import pyarrow.csv as pacsv
 import pyarrow.parquet as pq
 
@@ -73,6 +74,8 @@ def assemble(plan, shards, out, build_commit, foreign_ok=False):
         t = pacsv.read_csv(feat, parse_options=pacsv.ParseOptions(delimiter="\t"),
                            convert_options=pacsv.ConvertOptions(column_types={"q": pa.string(), "dist_basename": pa.string(),
                                                                               **{f"f{i}": pa.float64() for i in range(WIDTH)}}))
+        # absent slots arrive as empty TSV cells (null); the bank stores them as NaN like every other bank
+        t = pa.table({n: (pc.fill_null(t[n], float("nan")) if n.startswith("f") and n[1:].isdigit() else t[n]) for n in t.column_names})
         if t.num_rows != len(controls["candidates"]):
             raise ValueError("feature row count differs from candidates")
         for i in IDS:

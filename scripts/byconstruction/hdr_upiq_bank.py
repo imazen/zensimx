@@ -2,7 +2,7 @@
 """Assemble the UPIQ-380 native revision-7 bank from the verified published CAS objects (no recomputation, no labels)."""
 import hashlib, json, math, sys
 from pathlib import Path
-import pyarrow as pa, pyarrow.csv as pacsv, pyarrow.parquet as pq
+import pyarrow as pa, pyarrow.compute as pc, pyarrow.csv as pacsv, pyarrow.parquet as pq
 
 IDS = list(range(228)) + list(range(372, 720))
 
@@ -31,6 +31,7 @@ def main(run, admission, out, build_commit):
         raise ValueError("UPIQ producer identity differs")
     t = pacsv.read_csv(feat, parse_options=pacsv.ParseOptions(delimiter="\t"),
                        convert_options=pacsv.ConvertOptions(column_types={"condition_id": pa.string(), **{f"f{i}": pa.float64() for i in range(1825)}}))
+    t = pa.table({n: (pc.fill_null(t[n], float('nan')) if n.startswith('f') and n[1:].isdigit() else t[n]) for n in t.column_names})  # absent slots: NaN, not null
     a = json.loads(Path(admission).read_text())
     if t["condition_id"].to_pylist() != [r["condition_id"] for r in a["rows"]]:
         raise ValueError("UPIQ condition order differs from the admission")
