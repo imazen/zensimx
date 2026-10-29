@@ -578,6 +578,11 @@ fn admit_datasets(
             admitted.insert(string(r, "name")?.to_owned(), d);
             continue;
         }
+        if d["schema"] == "hdr-native-leg-v1" {
+            super::hdr_admission::admit(&d, r, selected, &excluded, json)?;
+            admitted.insert(string(r, "name")?.to_owned(), d);
+            continue;
+        }
         if r["subjective"] != true {
             continue;
         }

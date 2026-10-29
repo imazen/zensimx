@@ -110,7 +110,7 @@ core-gen = ["zen-decode", "m3-fixtures", "zenavif/encode", "zenjxl/encode"]
 # `hdr944_extract` example (SOTA-944 hdr_v3mix amendment): decode the HDR
 # datagen's (PQ-PNG ref, .jxl dist) pairs in memory and extract the 944
 # folded+append2 HDR-PQ features — no PNG decode-cache on disk.
-hdr944-extract = ["dep:zencodec", "dep:zenpng", "dep:enough", "dep:serde_json", "dep:sha2", "dep:zenjxl", "dep:zenpixels", "zensim/feature-regime-v2", "zensim/custom-profiles"]
+hdr944-extract = ["dep:zenbitmaps-hdr", "dep:zencodec", "dep:zenpng", "dep:enough", "dep:serde_json", "dep:sha2", "dep:zenjxl", "dep:zenpixels", "zensim/feature-regime-v2", "zensim/custom-profiles"]
 
 # `sdr944_extract` example (2026-08-28 era-lessons revisit): local SDR twin of
 # hdr944_extract — 944 Folded720Append2 features for arbitrary (ref, dist) PNG
@@ -214,7 +214,7 @@ arrow = { version = "58.3.0", default-features = false, optional = true }
 # Mirror the path policy used by zensim-target. AGPL-3.0-only OR
 # Imazen commercial — zensim-bench is internal-only and not published.
 zenavif = { path = "../../zenavif",          optional = true, default-features = false }
-zenjxl  = { path = "../../zenjxl",           optional = true, default-features = false, features = ["decode"] }
+zenjxl  = { git = "https://github.com/imazen/zenjxl", rev = "561849318d6839f478fa7cbc73d67e6d489d4860",           optional = true, default-features = false, features = ["decode"] }
 zenpixels = { version = ">=0.2.10, <0.4.0", default-features = false, optional = true }
 
 # `verify_bitstream_decode` decode path (zencodec unified API).
@@ -225,7 +225,7 @@ zenjpeg = { path = "../../zenjpeg/zenjpeg", optional = true }
 zenwebp = { path = "../../zenwebp", package = "zenwebp", optional = true, default-features = false }
 # --decode-list PNG writer (R1b): re-encode the decoded RGB8 so the PNG/JPEG-only
 # zensim feature extractors can read avif/jxl/webp corpus rows.
-zenpng = { version = "0.1.4", optional = true, default-features = false }
+zenpng = { version = ">=0.1.4, <0.3.0", optional = true, default-features = false }
 # The canonical pixel-format converter (u16->u8 `v>>8`, gray broadcast, alpha
 # drop, channel reorder). Same crate zenmetrics' decode.rs funnels through, so
 # a bitstream decoded by --decode-list matches what the fleet extractor saw.
@@ -385,10 +385,20 @@ check-cfg = ['cfg(feature, values("training"))', 'cfg(has_cpp_ssimulacra2)', 'cf
 # deps (zenjxl wants jxl-encoder 0.4.0 + zenjpeg 0.8.7; max published are
 # lower). A dependency's own patch table is ignored — only a workspace
 # ROOT's applies, and this crate is now its own root, so declare them here.
+# Native RGBE ingress for the owner-authorized Rousselot display contract.
+[dependencies.zenbitmaps-hdr]
+package = "zenbitmaps"
+git = "https://github.com/imazen/zenbitmaps"
+rev = "11fbd887985e59769d2aeb48295767b7d04209b9"
+default-features = false
+features = ["std", "hdr"]
+optional = true
+
 [patch.crates-io]
-# The current optional WebP source requires the unpublished 0.1.27 codec
-# contract. Pin the same source as the JPEG sibling for native audit builds.
-zencodec = { git = "https://github.com/imazen/zencodec", rev = "d327434b0826a3e39633665c76f5081c0ceb34cc" }
+# Share the zenpixels-0.3-compatible PNG adapter with the native HDR graph.
+zenpng = { git = "https://github.com/imazen/zenpng", rev = "e04f734ac699a0657a0dc8821ba5dca0eaaae429" }
+# Match the native PNG adapter's coordinated exact-animation timing contract.
+zencodec = { git = "https://github.com/imazen/zencodec", rev = "a81daf7605dc63074d4a39757e7b4399057d4a8f" }
 # NOTE 2026-09-05: this plain path patch was briefly WRONG and is right again.
 # `~/work/zen/jxl-encoder` bumped 0.3.2 -> 0.4.0 on 2026-08-29 (`4363a3d5`) while
 # the `~/work/zen/zenjxl` checkout still required `^0.3.2` — which was never
@@ -408,23 +418,23 @@ zencodec = { git = "https://github.com/imazen/zencodec", rev = "d327434b0826a3e3
 # `,zenjxl/encode` added (pulls in jxl-encoder itself + zenjxl's encode-gated
 # `codec.rs` module) both finish rc=0, zero errors. Full record + proof logs:
 # benchmarks/d_inversions_2026-09-05.md §6 addendum.
-jxl-encoder = { path = "../../jxl-encoder/jxl-encoder" }
+jxl-encoder = { git = "https://github.com/imazen/jxl-encoder", rev = "3cd8475b8a42e299b785319d30bb108b52e91239" }
 zenjpeg = { path = "../../zenjpeg/zenjpeg" }
 # use local sibling codecs so the whole graph resolves to one version (2026-07-18):
 # transitive crates.io zenavif/zenpixels were skewing against the local siblings.
 # Forcing local unifies them. (zencodec no longer needs a patch: every sibling
 # requires the published 0.1.26 taxonomy release — rollout 2026-08-27.)
 zenavif = { path = "../../zenavif" }
-zenjxl = { path = "../../zenjxl" }
+zenjxl = { git = "https://github.com/imazen/zenjxl", rev = "561849318d6839f478fa7cbc73d67e6d489d4860" }
 # zenjxl@HEAD consumes the UNPUBLISHED zenjxl-decoder error-taxonomy API
 # (jxl::api::ErrorClass) — patch the local sibling in (SOTA-944 hdr944
 # amendment; the "patch it in and KEEP WORKING" rule).
-zenjxl-decoder = { path = "../../zenjxl-decoder/zenjxl-decoder" }
-zenpixels = { path = "../../zenpixels/zenpixels" }
+zenjxl-decoder = { git = "https://github.com/imazen/zenjxl-decoder", rev = "ce1a28b41b71b66b19240dce0d1b6f0579c8064d" }
+zenpixels = { git = "https://github.com/imazen/zenpixels", rev = "789d69dbc314e748676b7f2f19542c17473ba40b" }
 # The unpublished local 0.2.17 narrows u16 to u8 correctly rounded (`round(v / 257)`); registry 0.2.16 does not, and
 # moved 4.5% of the safesyn AVIF samples by one level against the stored training root (2026-10-24; see the
 # "AVIF decode drift" record in benchmarks/byconstruction_2026-10-22.md). Drop when 0.2.17 is published.
-zenpixels-convert = { path = "../../zenpixels/zenpixels-convert" }
+zenpixels-convert = { git = "https://github.com/imazen/zenpixels", rev = "789d69dbc314e748676b7f2f19542c17473ba40b" }
 # zenjpeg@0.9.0 requires unpublished zenanalyze 0.2.x — dev-only local patch (2026-08-30).
 zenanalyze = { path = "../../zenanalyze" }
 

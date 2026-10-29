@@ -200,6 +200,61 @@ def admit_chroma_teacher(record, declaration, selected_ids, excluded):
     return d
 
 
+HDR_FEATURES='basic+peaks+v2@w1825/rev7_rowlanes#36c3f3af'
+HDR_NATIVE='63bed9a64ed265d2e8b8bad4aabaae5d952215afda935ec911a0c82d1c204aa7'
+HDR_COMMIT='a86520ca68dc92f98abfd8a526d81f8abf112de6'
+HDR_UPIQ='73d1374f1cbb2ca2f5166812d69ee49e22486174b56337263fa27d9689c79214'
+HDR_UPIQ_COMMIT='d86b3b44383433e56ebc6161ee6c8db12639c5af'
+# name: (human, mode, loss, target_transform, rows, producer commit, extractor sha); mirrored in group_admission/hdr_admission.rs
+HDR_LEGS={
+    'hdr_upiq380':(True,'withinref,rank','within-source-rank','score=100+10*human_JOD;no-clipping',330,HDR_UPIQ_COMMIT,HDR_UPIQ),
+    'hdr_4kdtb_train':(True,'withinref,rank','within-source-rank','orient-native-quality;MOS-0-100',48,HDR_COMMIT,HDR_NATIVE),
+    'hdr_ladder_chroma':(False,'withinref,both','within-source-rank-and-scale','identity-ssimulacra2-unclipped',7177,HDR_COMMIT,HDR_NATIVE),
+    'hdr_teacher_hdrvdp3':(False,'withinref,both','within-source-rank-and-scale','score=10*q_jod;no-clipping',7390,HDR_COMMIT,HDR_NATIVE),
+}
+
+
+def admit_hdr_leg(record, declaration, selected_ids, excluded):
+    """Registered native-HDR TRAIN legs (paths P2/P3): metadata, keys and population only; no target-table read."""
+    r,d=record,declaration
+    spec=HDR_LEGS.get(r.get('name'))
+    if spec is None:
+        raise ValueError('unregistered HDR leg')
+    human,mode,loss,transform,rows,commit,extractor=spec
+    if (d.get('schema')!='hdr-native-leg-v1' or d.get('leg')!=r['name'] or d.get('loss')!=loss
+            or d.get('target_transform')!=transform or d.get('target_column')!='human_score'
+            or d.get('target_orientation')!='quality' or d.get('native_role')!='TRAIN'
+            or d.get('selection')!='fixed-final-epoch' or d.get('formula_revision')!=7 or d.get('tier')!='v3'
+            or d.get('feature_ids')!=selected_ids or d.get('feature_set_id')!=HDR_FEATURES
+            or d.get('producer_commit')!=commit or d.get('extractor_sha256')!=extractor
+            or not isinstance(d.get('nominal_weight'),(int,float)) or not (0<d['nominal_weight']<float('inf'))
+            or d.get('table_sha256')!=r.get('table_sha256') or d.get('keys_sha256')!=r.get('keys_sha256')
+            or r.get('teacher') is not (not human) or r.get('subjective') is not human or r.get('mode')!=mode
+            or r.get('val_weight')!=0 or d.get('rows')!=rows or r.get('rows')!=rows):
+        raise ValueError('HDR leg role/loss/producer binding differs')
+    bank=document(d['feature_bank_manifest_path'],d['feature_bank_manifest_sha256'])
+    if (bank.get('schema')!='hdr-native-rev7-bank-v1' or bank.get('build_commit')!=commit
+            or bank.get('research',{}).get('feature_set_id')!=HDR_FEATURES or bank.get('labels_read') is not False):
+        raise ValueError('HDR native feature bank identity differs')
+    keys=document(d['keys_path'],d['keys_sha256'])
+    if len(keys)!=rows:
+        raise ValueError('HDR leg population differs')
+    observations=set();counts={}
+    for i,k in enumerate(keys):
+        if (set(k)!={'observation','source','family','reference','role','tier','row'} or k['row']!=i or k['role']!='fit'
+                or k['tier']!='T2' or k['source']!=k['reference'] or k['family'] in excluded
+                or k['observation'] in observations or any(not isinstance(k[f],str) or not k[f] for f in ('observation','source','family','reference'))):
+            raise ValueError('HDR leg row/role/family identity differs')
+        observations.add(k['observation']);counts[k['source']]=counts.get(k['source'],0)+1
+    if counts!=r['source_counts'] or any(n<2 for n in counts.values()):
+        raise ValueError('HDR leg source population differs')
+    total=0.0
+    for key in sorted(counts):total+=1.0-1.0/counts[key]
+    if r['train_weight']!=d['nominal_weight']/(total/len(counts)):
+        raise ValueError('HDR leg nominal-weight acceptance correction differs')
+    return d
+
+
 def admit_datasets(a, cell_id, groups, selected_ids):
     """Revision-7 TRAIN datasets; v1's registered experiment stays unchanged.
 
@@ -240,6 +295,9 @@ def admit_datasets(a, cell_id, groups, selected_ids):
     for r, d in pending:
         if d.get('schema')=='chroma-teacher-leg-v1':
             admitted[r['name']]=admit_chroma_teacher(r,d,selected_ids,excluded)
+            continue
+        if d.get('schema')=='hdr-native-leg-v1':
+            admitted[r['name']]=admit_hdr_leg(r,d,selected_ids,excluded)
             continue
         if not r.get("subjective"):
             continue

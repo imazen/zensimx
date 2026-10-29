@@ -101,6 +101,8 @@ mod contamination_guard;
 
 #[path = "zensim_mlp_train/chroma_admission.rs"]
 mod chroma_admission;
+#[path = "zensim_mlp_train/hdr_admission.rs"]
+mod hdr_admission;
 mod e36_tv;
 #[path = "../subjective_training_leg.rs"]
 mod subjective_training_leg;

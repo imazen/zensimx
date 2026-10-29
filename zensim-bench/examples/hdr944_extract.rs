@@ -33,6 +33,7 @@ use zensim::{Zensim, ZensimProfile};
 
 struct Pq16Image {
     data: Vec<[u16; 4]>,
+    linear: Option<Vec<[f32; 4]>>,
     w: usize,
     h: usize,
     primaries: zensim::ColorPrimaries,
@@ -42,6 +43,7 @@ impl Pq16Image {
     fn from_rgb16(px: &[[u16; 3]], w: usize, h: usize, primaries: zensim::ColorPrimaries) -> Self {
         Self {
             data: px.iter().map(|&[r, g, b]| [r, g, b, 65535]).collect(),
+            linear: None,
             w,
             h,
             primaries,
@@ -57,10 +59,14 @@ impl zensim::source::ImageSource for Pq16Image {
         self.h
     }
     fn pixel_format(&self) -> zensim::source::PixelFormat {
-        zensim::source::PixelFormat::Srgb16Rgba
+        if self.linear.is_some() { zensim::source::PixelFormat::LinearF32Rgba }
+        else { zensim::source::PixelFormat::Srgb16Rgba }
     }
     fn row_bytes(&self, y: usize) -> &[u8] {
-        bytemuck::cast_slice(&self.data[y * self.w..(y + 1) * self.w])
+        match &self.linear {
+            Some(px) => bytemuck::cast_slice(&px[y * self.w..(y + 1) * self.w]),
+            None => bytemuck::cast_slice(&self.data[y * self.w..(y + 1) * self.w]),
+        }
     }
     fn alpha_mode(&self) -> zensim::source::AlphaMode {
         zensim::source::AlphaMode::Opaque
@@ -71,6 +77,28 @@ impl zensim::source::ImageSource for Pq16Image {
     fn color_primaries(&self) -> zensim::ColorPrimaries {
         self.primaries
     }
+}
+
+/// Registered July-29 display mapping; the as-is BT.2020 reinterpretation is
+/// deliberate owner policy, not a general BT.2020-to-BT.709 conversion.
+fn decode_rousselot(path: &Path, factor: f32) -> Result<Pq16Image, String> {
+    let bytes = std::fs::read(path).map_err(|e| e.to_string())?;
+    let decoded = zenbitmaps_hdr::decode_hdr(&bytes, enough::Unstoppable).map_err(|e| e.to_string())?;
+    if decoded.layout != zenbitmaps_hdr::PixelLayout::RgbF32 {
+        return Err("native RGBE decoder must preserve f32 samples".into());
+    }
+    let mut pixels = Vec::with_capacity(decoded.width as usize * decoded.height as usize);
+    for p in decoded.pixels().chunks_exact(12) {
+        let mut rgba = [0., 0., 0., 1.];
+        for c in 0..3 {
+            let raw = f32::from_ne_bytes(p[c * 4..c * 4 + 4].try_into().unwrap());
+            if !raw.is_finite() { return Err("nonfinite RGBE sample".into()); }
+            rgba[c] = (raw * factor).clamp(0., 1000.);
+        }
+        pixels.push(rgba);
+    }
+    Ok(Pq16Image { data: Vec::new(), linear: Some(pixels), w: decoded.width as usize,
+        h: decoded.height as usize, primaries: zensim::ColorPrimaries::Srgb })
 }
 
 #[derive(Clone)]
@@ -193,6 +221,32 @@ fn decode_dist_jxl16(path: &Path) -> Result<DecodedPq16, String> {
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
+    // Source-identity adapter only. The existing D4 owner performs fingerprints
+    // and match review on these native-decoder views; they never train a model.
+    if args.get(1).map(String::as_str) == Some("--source-fingerprint-view") {
+        assert_eq!(args.len(), 5, "source-fingerprint-view INPUT NEW_PPM MIDGRAY_NITS");
+        let midgray: f32 = args[4].parse().expect("midgray nits");
+        assert!([32., 100., 320.].contains(&midgray), "frozen source-screen exposure grid");
+        let source = decode_rousselot(Path::new(&args[2]), 179.).expect("native RGBE reference");
+        let rgb: Vec<u8> = source.linear.as_ref().unwrap().iter().flat_map(|p| {
+            p[..3].iter().map(|&n| ((n / (n + midgray)).sqrt() * 255.).round() as u8)
+        }).collect();
+        let ppm = zenbitmaps_hdr::encode_ppm(&rgb, source.w as u32, source.h as u32,
+            zenbitmaps_hdr::PixelLayout::Rgb8, enough::Unstoppable).expect("native source view encoder");
+        std::fs::OpenOptions::new().write(true).create_new(true).open(&args[3]).unwrap().write_all(&ppm).unwrap();
+        use sha2::Digest as _;
+        let receipt = serde_json::json!({"schema":"hdr-source-identity-view-v1", "source":args[2],
+            "source_sha256":sha2::Sha256::digest(std::fs::read(&args[2]).unwrap()).iter().map(|b| format!("{b:02x}")).collect::<String>(),
+            "output_sha256":sha2::Sha256::digest(&ppm).iter().map(|b| format!("{b:02x}")).collect::<String>(),
+            "midgray_nits":midgray,"mapping":"sqrt(nits/(nits+midgray))*255;nearest-u8",
+            "native_ingress":"registered Rousselot K179;1000-nit ceiling;as-is primaries",
+            "scope":"D4 source-identity screening only; never features, teacher targets or training images"});
+        let mut receipt_file = std::fs::OpenOptions::new().write(true).create_new(true)
+            .open(format!("{}.manifest.json",args[3])).unwrap();
+        serde_json::to_writer_pretty(&mut receipt_file,&receipt).unwrap();
+        return;
+    }
+
     let mut pairs_tsvs: Vec<PathBuf> = Vec::new();
     let mut enc_roots: Vec<PathBuf> = Vec::new();
     let mut ref_root = PathBuf::new();
@@ -203,6 +257,8 @@ fn main() {
     let mut score_bakes: Vec<PathBuf> = Vec::new();
     let mut requested_ids: Option<Vec<u16>> = None;
     let mut absolute_pairs = false;
+    let mut era_label = String::from("e26-native-hdr-rev5");
+    let mut pq_png_distortions = false;
     let mut i = 1;
     while i < args.len() {
         match args[i].as_str() {
@@ -226,6 +282,14 @@ fn main() {
                 assert!(input_contract.is_none(), "duplicate input contract");
                 input_contract = Some(args[i + 1].clone());
                 i += 2;
+            }
+            "--era-label" => {
+                era_label = args[i + 1].clone();
+                i += 2;
+            }
+            "--pq-png-distortions" => {
+                pq_png_distortions = true;
+                i += 1;
             }
             "--threads" => {
                 n_threads = args[i + 1].parse().expect("threads");
@@ -262,10 +326,15 @@ fn main() {
     assert!(
         matches!(
             input_contract.as_deref(),
-            Some("hdr-common-primaries-v2-bt2020-pq10000" | "hdr-common-primaries-v2-cicp-pq10000")
+            Some("hdr-common-primaries-v2-bt2020-pq10000" | "hdr-common-primaries-v2-cicp-pq10000" | "rousselot-registered-k179-as-is" | "rousselot-registered-k100-as-is")
         ),
         "explicit current HDR input contract required; old caches are incompatible"
     );
+    let rousselot_factor = match input_contract.as_deref() {
+        Some("rousselot-registered-k179-as-is") => Some(179.),
+        Some("rousselot-registered-k100-as-is") => Some(100.),
+        _ => None,
+    };
     let declared_cicp = input_contract.as_deref() == Some("hdr-common-primaries-v2-cicp-pq10000");
     assert!(
         n_threads > 0 && !out_path.exists(),
@@ -331,17 +400,34 @@ fn main() {
         requested_ids.is_none() || (score_bakes.is_empty() && audit_composition.is_none()),
         "research extraction is a separate mode"
     );
+    if requested_ids.is_some() {
+        match zensim::feature_v2::active_formula_revision() {
+            zensim::feature_v2::FormulaRevision::Rev5 => {
+                assert_eq!(era_label, "e26-native-hdr-rev5", "preserve E26 era");
+            }
+            zensim::feature_v2::FormulaRevision::Rev7 => {
+                assert_eq!(era_label, "rev7_rowlanes", "Rev7 requires its explicit era");
+            }
+            _ => panic!("research HDR extraction admits only registered Rev5 or Rev7"),
+        }
+    }
+    if pq_png_distortions {
+        assert!(declared_cicp, "PQ PNG distortions require explicit per-image cICP");
+    }
+    // Match the frozen Rev7 bank layout, even as research adds unrelated families.
+    let research_width = if zensim::feature_v2::active_formula_revision()
+        == zensim::feature_v2::FormulaRevision::Rev7 { 1825 } else { zensim::research::full_width() };
     let research_req = requested_ids.as_ref().map(|ids| {
         assert!(
             ids.iter()
-                .all(|&x| usize::from(x) < zensim::research::full_width()),
+                .all(|&x| usize::from(x) < research_width),
             "feature id out of range"
         );
         zensim::research::Request::for_slots(
             zensim::feature_set_id::SlotSet::from_slots(ids.iter().map(|&x| usize::from(x))),
-            zensim::research::full_width(),
+            research_width,
         )
-        .with_era_label("e26-native-hdr-rev5")
+        .with_era_label(era_label.clone())
         .with_parallel(false)
     });
     let research_manifest = std::sync::Mutex::new(None::<String>);
@@ -408,9 +494,16 @@ fn main() {
                     }
                     let c = &cells[i];
                     let row = (|| -> Result<String, String> {
+                        let (source, distorted, encoding) = if let Some(factor) = rousselot_factor {
+                            (decode_rousselot(&c.ref_file, factor)?, decode_rousselot(&c.dist_file, factor)?, HdrEncoding::Linear)
+                        } else {
                         let (r16, rw, rh, primaries) =
                             decode_ref_png16(&c.ref_file, declared_cicp)?;
-                        let (d16, dw, dh, dist_primaries) = decode_dist_jxl16(&c.dist_file)?;
+                        let (d16, dw, dh, dist_primaries) = if pq_png_distortions {
+                            decode_ref_png16(&c.dist_file, true)?
+                        } else {
+                            decode_dist_jxl16(&c.dist_file)?
+                        };
                         if (rw, rh) != (dw, dh) {
                             return Err(format!(
                                 "dim mismatch {}: ref {rw}x{rh} vs dist {dw}x{dh}",
@@ -419,8 +512,13 @@ fn main() {
                         }
                         let source = Pq16Image::from_rgb16(&r16, rw, rh, primaries);
                         let distorted = Pq16Image::from_rgb16(&d16, dw, dh, dist_primaries);
-                        identities.lock().unwrap()[i] = primaries == dist_primaries && r16 == d16;
-                        let encoding = HdrEncoding::Pq { peak_nits: 10_000.0 };
+
+                        (source, distorted, HdrEncoding::Pq { peak_nits: 10_000.0 })
+                        };
+                        let (rw, rh) = (source.w, source.h);
+                        if (rw, rh) != (distorted.w, distorted.h) { return Err("native HDR dimension mismatch".into()); }
+                        let identical = source.primaries == distorted.primaries && source.data == distorted.data && source.linear == distorted.linear;
+                        identities.lock().unwrap()[i] = identical;
                         if !score_scorers.is_empty() {
                             let mut line = format!("{}\t{}", c.ref_file.display(), c.dist_file.display());
                             for (j, scorer) in score_scorers.iter_mut().enumerate() {
@@ -486,7 +584,6 @@ fn main() {
                         let feats = &canonical;
                         if let Some(scorer) = &mut scorer {
                             let ids = scorer.consumed_feature_ids().map_err(|e| e.to_string())?;
-                            let identical = primaries == dist_primaries && r16 == d16;
                             let cached = scorer.score_features_with_identity(feats, rw as u32, rh as u32, None, identical).map_err(|e|e.to_string())?;
                             let scalar = scorer.compute_hdr(&source, &distorted, encoding, None).map_err(|e|e.to_string())?;
                             let mut worker = scorer.prepare_steering_hdr(&source, encoding, 8).map_err(|e|e.to_string())?;
@@ -536,15 +633,20 @@ fn main() {
     let refused_count = refusals.lock().unwrap().len();
     let manifest = serde_json::json!({
         "input_contract":input_contract,
+        "era_label":era_label,
+        "distortion_storage":if pq_png_distortions { "native PQ16 PNG with cICP" } else { "native PQ JXL with cICP" },
         "formula_revision":format!("{:?}",zensim::feature_v2::active_formula_revision()),
-        "rows":cells.len(), "feature_count":if score_bakes.is_empty() { Some(if requested_ids.is_some() || (composition.is_some() && zensim::feature_v2::active_formula_revision() == zensim::feature_v2::FormulaRevision::Rev5) { zensim::research::full_width() } else { 944 }) } else { None },
+        "rows":cells.len(), "feature_count":if score_bakes.is_empty() { Some(if requested_ids.is_some() { research_width } else if composition.is_some() && zensim::feature_v2::active_formula_revision() == zensim::feature_v2::FormulaRevision::Rev5 { zensim::research::full_width() } else { 944 }) } else { None },
         "score_bakes":score_bakes,
         "refused_scores":refused_count,
-        "reference_primaries":if declared_cicp { "per-image cICP" } else { "BT.2020" },
-        "v1_pools":"full", "distorted_primaries":"per-image codestream cICP",
-        "transfer":"PQ", "display_peak_nits":10000,
+        "reference_primaries":if rousselot_factor.is_some() { "BT.2020 reinterpreted as-is under registered protocol" } else if declared_cicp { "per-image cICP" } else { "BT.2020" },
+        "v1_pools":"full", "distorted_primaries":if rousselot_factor.is_some() { "same registered reinterpretation as reference" } else { "per-image cICP" },
+        "transfer":if rousselot_factor.is_some() { "linear nits" } else { "PQ" },
+        "display_peak_nits":if rousselot_factor.is_some() { 1000 } else { 10000 },
+        "rousselot_raw_to_nits":rousselot_factor,
+        "rousselot_color_policy":rousselot_factor.map(|_| "BT.2020 values reinterpreted as-is per registered July-29 protocol; no gamut conversion"),
         "untagged_reference_policy":"explicit datagen declaration; never inferred from bit depth",
-        "source_manifests":pairs_tsvs, "decoder":"zenpng native16 + zenjxl RGB16_BT2100_PQ",
+        "source_manifests":pairs_tsvs, "decoder":if rousselot_factor.is_some() { "zenbitmaps HDR native f32" } else if pq_png_distortions { "zenpng native16 for both sides" } else { "zenpng native16 + zenjxl RGB16_BT2100_PQ" },
         "feature_input_era":"hdr-common-primaries-v2",
         "requested_ids":requested_ids,
         "pixels_identical":identities.into_inner().unwrap(),
@@ -580,10 +682,11 @@ fn main() {
         String::from("ref_path\tdist_path")
     };
     if score_bakes.is_empty() {
-        for i in 0..if requested_ids.is_some()
-            || (composition.is_some()
+        for i in 0..if requested_ids.is_some() {
+            research_width
+        } else if composition.is_some()
                 && zensim::feature_v2::active_formula_revision()
-                    == zensim::feature_v2::FormulaRevision::Rev5)
+                    == zensim::feature_v2::FormulaRevision::Rev5
         {
             zensim::research::full_width()
         } else {
@@ -628,3 +731,29 @@ fn main() {
 #[cfg(test)]
 #[path = "hdr944_extract/tests.rs"]
 mod tests;
+
+#[cfg(test)]
+mod registered_display_tests {
+    use super::*;
+
+    #[test]
+    fn rgbe_display_mapping_and_robustness_keep_the_registered_policy() {
+        let scratch = std::env::var_os("TMPDIR").expect("disk-backed TMPDIR required");
+        let path = PathBuf::from(scratch).join(format!("hdr-display-contract-{}.hdr", std::process::id()));
+        let mut fixture = b"#?RADIANCE\nFORMAT=32-bit_rle_rgbe\n\n-Y 1 +X 2\n".to_vec();
+        fixture.extend_from_slice(&[128, 64, 32, 129, 128, 128, 128, 136]);
+        std::fs::OpenOptions::new().create_new(true).write(true).open(&path)
+            .unwrap().write_all(&fixture).unwrap();
+        let primary = decode_rousselot(&path, 179.).unwrap();
+        let robustness = decode_rousselot(&path, 100.).unwrap();
+        assert_eq!((primary.w, primary.h), (2, 1));
+        let px = primary.linear.as_ref().unwrap();
+        // Independent RGBE fixture: half-bin reconstruction, then the registered
+        // efficacy and display ceiling. Above-SDR light must survive ingress.
+        assert_eq!(px[0], [179.699_22, 90.199_22, 45.449_22, 1.]);
+        assert_eq!(px[1], [1000., 1000., 1000., 1.]);
+        assert_eq!(robustness.linear.unwrap()[0], [100.390625, 50.390625, 25.390625, 1.]);
+        assert_eq!(primary.primaries, zensim::ColorPrimaries::Srgb);
+        std::fs::remove_file(path).unwrap();
+    }
+}

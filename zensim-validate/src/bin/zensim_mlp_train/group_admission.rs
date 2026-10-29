@@ -490,13 +490,17 @@ pub(super) fn preflight(
                     | "subjective-training-leg-v2"
                     | "subjective-training-leg-v3"
                     | "chroma-teacher-leg-v1"
+                    | "hdr-native-leg-v1"
             )
         ) {
             if subjective.get(&g.0) != Some(d) {
                 return Err("unnamed leg has no independently pinned authority".into());
             }
             phases.push((
-                if d["schema"] == "chroma-teacher-leg-v1" {
+                if matches!(
+                    d["schema"].as_str(),
+                    Some("chroma-teacher-leg-v1" | "hdr-native-leg-v1")
+                ) {
                     "chroma"
                 } else {
                     "subjective"

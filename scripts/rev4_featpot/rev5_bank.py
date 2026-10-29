@@ -17,6 +17,7 @@ Identity gate (`--revision 4`): the same request at Rev4 must reproduce the Rev4
 
 import argparse
 import csv
+import collections
 import hashlib
 import json
 import os
@@ -43,6 +44,79 @@ HDR_TEACHER_SHA = {
     "val": "4b0f39dea0255659232f248070c8683dd7edf5916c63621cbb099b4afb6c9057",
 }
 HDR_TRANSFORM = "score=10*q_jod;no-clipping"
+# Sealed lane chromahdr admission: 10,422 retained chroma rungs, 26 TRAIN / 12 EVAL consumer origins.
+LADDER_EXPECT = dict(rungs=10422, train=26, eval=12)
+
+
+def _hdr_ladder_plan(a, executor_sha, binary_sha):
+    """Native Rev7 views for the sealed HDR chroma-ladder rungs (kept_chroma only).
+
+    Reads the admission cells' keys and hashes, never a quality target. Reference
+    and candidate PQ16 PNGs are read in place under --hdr-ladder-root; the
+    executor re-hashes every file before the kernel runs.
+    """
+    from collections import defaultdict
+
+    root = Path(a.hdr_ladder_root).resolve(strict=True)
+    roles = json.loads(Path(a.hdr_ladder_roles).read_text())
+    if roles.get("schema") != "hdr-chroma-consumer-origin-roles-v1":
+        raise ValueError("unregistered consumer role file")
+    role_of = {r["source"]: r["consumer_role"] for r in roles["sources"]}
+    if sorted(collections.Counter(role_of.values()).items()) != [("eval", LADDER_EXPECT["eval"]), ("train", LADDER_EXPECT["train"])]:
+        raise ValueError("consumer roles are not the registered 26 TRAIN / 12 EVAL origins")
+    cols = ["view_id", "source", "kind", "encoded_sha256", "rendition_sha256", "reference_sha256", "chroma_q", "quality", "kept_chroma"]
+    rows = [r for r in pq.read_table(a.hdr_ladder_cells, columns=cols).to_pylist() if r["kept_chroma"]]
+    if len(rows) != LADDER_EXPECT["rungs"]:
+        raise ValueError("kept chroma rung count differs from the sealed admission")
+    groups = defaultdict(list)
+    for r in rows:
+        stem = r["view_id"].split("_", 1)[1]
+        groups[(str(root / "views" / r["source"] / f"{stem}.png"), r["reference_sha256"])].append(r)
+    contract = "hdr-common-primaries-v2-cicp-pq10000"
+    views, mapping = [], []
+    for (reference, reference_sha), members in sorted(groups.items()):
+        if sha256_file(reference) != reference_sha:
+            raise ValueError(f"ladder reference changed: {reference}")
+        unique = {}
+        for r in members:
+            unique.setdefault(r["rendition_sha256"], str(root / "artifacts" / "zenavif" / f"{r['encoded_sha256']}.pq.png"))
+        ordered = sorted(unique)
+        for lo in range(0, len(ordered), 128):
+            selected = ordered[lo:lo + 128]
+            controls = dict(reference_sha256=reference_sha, candidates=selected,
+                            candidate_paths=[unique[d] for d in selected], input_contract=contract,
+                            extractor_sha256=binary_sha, extractor_build_commit=a.build_commit,
+                            executor_sha256=executor_sha)
+            canonical = json.dumps(controls, sort_keys=True, separators=(",", ":"))
+            inputs = sorted({reference_sha, *selected, binary_sha, executor_sha,
+                             hashlib.sha256(canonical.encode()).hexdigest(),
+                             hashlib.sha256(a.build_commit.encode()).hexdigest()})
+            vi = len(views)
+            views.append(dict(view="hdr-native-rev7-features-v1", inputs=inputs,
+                              cell=dict(image_path=reference, codec="hdr:features", q=-1, knob_tuple_json=canonical),
+                              requires=["hdr-native-rev7-features-v1"],
+                              hint=dict(peak_mem_bytes=2 * 1024**3, threads=1, vram_bytes=None)))
+            pos = {d: i for i, d in enumerate(selected)}
+            for r in members:
+                if r["rendition_sha256"] in pos:
+                    mapping.append(dict(view_index=vi, feature_row=pos[r["rendition_sha256"]], view_id=r["view_id"],
+                                        source=r["source"], consumer_role=role_of[r["source"]], encoded_sha256=r["encoded_sha256"],
+                                        rendition_sha256=r["rendition_sha256"], chroma_q=[int(x) for x in r["chroma_q"]],
+                                        quality=int(r["quality"])))
+    if len(mapping) != LADDER_EXPECT["rungs"]:
+        raise ValueError("ladder rung mapping incomplete")
+    out = Path(a.out) / a.set
+    out.mkdir(parents=True, exist_ok=False)
+    write = lambda name, value: (out / name).write_text(json.dumps(value, indent=2) + "\n")
+    write("views.spec.json", dict(schema=1, views=views))
+    write("membership-feature-map.json", sorted(mapping, key=lambda m: (m["view_index"], m["feature_row"])))
+    write("_MANIFEST.json", dict(schema="hdr-ladder-native-rev7-fleet-plan-v1", build_commit=a.build_commit,
+          producer_sha256=sha256_file(__file__), cells_sha256=sha256_file(a.hdr_ladder_cells),
+          roles_sha256=sha256_file(a.hdr_ladder_roles), library_root=str(root), target_values_read=False, pixels_read=True,
+          views=len(views), rows=len(mapping), extractor_sha256=binary_sha, executor_sha256=executor_sha,
+          spec_sha256=sha256_file(out / "views.spec.json"), mapping_sha256=sha256_file(out / "membership-feature-map.json"),
+          state="DECLARATION_INPUT_ONLY; use zenfleet-ctl declare-views; no extraction"))
+    return 0
 
 
 def cmd_hdr_fleet_plan(a):
@@ -56,6 +130,53 @@ def cmd_hdr_fleet_plan(a):
         raise ValueError("complete explicit native Rev7 feature planning required")
     executor = Path(a.hdr_fleet_executor)
     executor_sha, binary_sha = sha256_file(executor), sha256_file(a.bin)
+    if a.upiq_native_admission:
+        source = Path(a.upiq_native_admission)
+        admission = json.loads(source.read_text())
+        parent = json.loads((source.parent / "_MANIFEST.json").read_text())
+        if (parent.get("schema") != "upiq380-native-rev7-relocation-v1"
+                or parent.get("admission_sha256") != sha256_file(source)
+                or admission.get("schema") != "upiq380-extraction-admission-rev7-v1"
+                or admission.get("requested_ids") != requested_ids()
+                or admission.get("role") != "train" or admission.get("tier") != "T2"
+                or admission.get("authority") != "D3-2026-10-07"
+                or len(admission.get("rows", [])) != 380):
+            raise ValueError("unreviewed native UPIQ metadata")
+        controls = dict(admission_sha256=sha256_file(source), extractor_sha256=binary_sha,
+                        extractor_build_commit=a.build_commit, executor_sha256=executor_sha)
+        if a.upiq_native_recovery:
+            recovery = json.loads(Path(a.upiq_native_recovery).read_text())
+            if set(recovery) != {"root", "sha256", "failed_job_id"} or set(recovery["sha256"]) != {"features.tsv", "features.tsv.manifest.json", "extract.log"}:
+                raise ValueError("incomplete native extraction recovery receipt")
+            for name, digest in recovery["sha256"].items():
+                if sha256_file(Path(recovery["root"]) / name) != digest:
+                    raise ValueError("retained native bytes changed")
+            producer = json.loads((Path(recovery["root"]) / "features.tsv.manifest.json").read_text())
+            if producer["allowlist_sha256"] != controls["admission_sha256"] or producer["research"]["zensim_build_commit"] != a.build_commit:
+                raise ValueError("retained native extraction does not bind this admission/build")
+            controls["stored_extraction"] = recovery
+        canonical = json.dumps(controls, sort_keys=True, separators=(",", ":"))
+        inputs = {sha256_file(source), binary_sha, executor_sha, hashlib.sha256(canonical.encode()).hexdigest(),
+                  hashlib.sha256(a.build_commit.encode()).hexdigest()}
+        if a.upiq_native_recovery:
+            inputs.update(recovery["sha256"].values())
+            inputs.add(recovery["failed_job_id"])
+        for row in admission["rows"]:
+            inputs.update([row["reference_sha256"], row["distorted_sha256"]])
+        out = Path(a.out) / a.set
+        out.mkdir(parents=True, exist_ok=False)
+        spec = dict(schema=1, views=[dict(view="hdr-upiq380-rev7-features-v1", inputs=sorted(inputs),
+                    cell=dict(image_path=str(source), codec="hdr:upiq380-features", q=-1, knob_tuple_json=canonical),
+                    requires=["hdr-upiq380-rev7-features-v1"],
+                    hint=dict(peak_mem_bytes=4 * 1024**3, threads=1, vram_bytes=None))])
+        (out / "views.spec.json").write_text(json.dumps(spec, indent=2) + "\n")
+        (out / "_MANIFEST.json").write_text(json.dumps(dict(schema="upiq380-native-rev7-fleet-plan-v1",
+            build_commit=a.build_commit, producer_sha256=sha256_file(__file__),
+            admission_sha256=sha256_file(source), spec_sha256=sha256_file(out / "views.spec.json"),
+            target_values_read=False, pixels_read=False, rows=380, state="DECLARATION_INPUT_ONLY"), indent=2) + "\n")
+        return 0
+    if getattr(a, "hdr_ladder_cells", None):
+        return _hdr_ladder_plan(a, executor_sha, binary_sha)
     if a.hdr_teacher:
         source = Path(a.hdr_teacher)
         columns = ["row_id", "role", "agree", "ref_path", "dist_path", "ref_sha256", "dist_sha256"]
@@ -72,6 +193,10 @@ def cmd_hdr_fleet_plan(a):
         if len(rows) != {"train": 7390, "val": 3900}[role]:
             raise ValueError("teacher agreement membership differs")
         contract = "hdr-common-primaries-v2-cicp-pq10000"
+        if getattr(a, "hdr_path_map", None):
+            src, dst = a.hdr_path_map.split("=", 1)
+            rows = [dict(r, ref_path=dst + r["ref_path"][len(src):] if r["ref_path"].startswith(src) else r["ref_path"],
+                         dist_path=dst + r["dist_path"][len(src):] if r["dist_path"].startswith(src) else r["dist_path"]) for r in rows]
     else:
         source = Path(a.hdr_fleet_keys)
         manifest = json.loads((source.parent / "_MANIFEST.json").read_text())
@@ -751,9 +876,15 @@ def main() -> int:
     ap.add_argument("--palette-chromaq", help="existing CHROMAQ ladder owner directory, diagnostic only")
     ap.add_argument("--palette-instrument", help="authorized v2c5 TRAIN/external features-only sidecars")
     ap.add_argument("--instrument-manifest", type=Path, help="explicit label-free assessment keys; historical bank default unchanged")
+    ap.add_argument("--upiq-native-recovery", type=Path, help="explicit hash-bound stored-extraction publication recovery; no recomputation")
+    ap.add_argument("--upiq-native-admission", type=Path, help="reviewed tower UPIQ-380 Rev7 admission")
     ap.add_argument("--hdr-fleet-executor", type=Path, help="emit native Rev7 declare-views inputs; no quality target values")
     ap.add_argument("--hdr-fleet-keys", type=Path, help="frozen human HDR source memberships")
     ap.add_argument("--hdr-teacher", help="immutable HDRTEACH role; native E26 extraction")
+    ap.add_argument("--hdr-path-map", help="FROM=TO prefix rewrite for teacher inputs staged on tower; hashes still bind every file")
+    ap.add_argument("--hdr-ladder-cells", type=Path, help="sealed HDR chroma-ladder admission-r1/CELLS.parquet; native Rev7 views for kept chroma rungs")
+    ap.add_argument("--hdr-ladder-roles", type=Path, help="consumer-roles-r1/ORIGIN_ROLES.json for the ladder cells")
+    ap.add_argument("--hdr-ladder-root", type=Path, help="sealed hdr-full root holding views/ and artifacts/zenavif/; read in place")
     ap.add_argument("--build-commit", default="")
     ap.add_argument("--revision", type=int, choices=[4, 5, 7], default=5)
     ap.add_argument("--era", default="")
@@ -778,7 +909,7 @@ def main() -> int:
         if a.palette_instrument:
             return cmd_palette(a)
         if a.hdr_fleet_executor:
-            if bool(a.hdr_teacher) == bool(a.hdr_fleet_keys):
+            if sum(bool(v) for v in (a.hdr_teacher, a.hdr_fleet_keys, a.upiq_native_admission, a.hdr_ladder_cells)) != 1:
                 ap.error("native HDR planning requires exactly one teacher or human metadata source")
             return cmd_hdr_fleet_plan(a)
         return cmd_hdr_extract(a) if a.hdr_teacher else cmd_extract(a)

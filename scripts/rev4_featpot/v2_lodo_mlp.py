@@ -289,7 +289,7 @@ def strict_training_groups(groups: list, data_role_decision: Path | None = None,
             records.append(dict(name=name, manifest=d, manifest_sha256=sha(sp)))
             continue
         if d.get("schema") in ("subjective-training-leg-v1", "subjective-training-leg-v2",
-                               "subjective-training-leg-v3", "chroma-teacher-leg-v1"):
+                               "subjective-training-leg-v3", "chroma-teacher-leg-v1", "hdr-native-leg-v1"):
             if subjective.get(name) != d:
                 raise ValueError("unnamed leg requires independently pinned authority")
             records.append(dict(name=name, manifest=d, manifest_sha256=sha(sp)))

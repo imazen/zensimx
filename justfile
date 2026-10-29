@@ -3960,3 +3960,24 @@ chroma-admission-check root receipt:
 chroma-worker-logs +args:
     python3 -B scripts/byconstruction/chroma_worker_logs.py {{args}}
 
+# Run on an eligible build host, under run-heavy; target storage is explicit.
+hdr-native-build target_dir:
+    test "$(hostname)" != dev
+    ZENSIM_BUILD_COMMIT="$(jj log --no-graph -r @ -T commit_id)" CARGO_TARGET_DIR={{target_dir}} cargo test --manifest-path zensim-bench/Cargo.toml --release --example hdr944_extract --features hdr944-extract
+    ZENSIM_BUILD_COMMIT="$(jj log --no-graph -r @ -T commit_id)" CARGO_TARGET_DIR={{target_dir}} cargo build --manifest-path zensim-bench/Cargo.toml --release --example hdr944_extract --features hdr944-extract
+
+# Existing UPIQ owner with separate Rev7 metadata admission; original Rev5 checks stay.
+upiq-native-rev7-check target_dir:
+    test "$(hostname)" != dev
+    ZENSIM_BUILD_COMMIT="$(jj log --no-graph -r @ -T commit_id)" CARGO_TARGET_DIR={{target_dir}} cargo test -p zensim-validate --bin upiq_pu_score
+    ZENSIM_BUILD_COMMIT="$(jj log --no-graph -r @ -T commit_id)" CARGO_TARGET_DIR={{target_dir}} cargo build --release -p zensim-validate --bin upiq_pu_score
+
+# Existing teacher-table integration contract, using an explicit verified panel.
+hdr-teacher-admission-check panel_bin:
+    TMPDIR="$HOME/tmp" ZEN_PANEL_BIN={{panel_bin}} python3 scripts/tests/test_hdr_teacher_admission.py
+
+hdr-native-plan-check:
+    python3 -m unittest discover -s scripts/tests -p test_hdr_native_fleet_plan.py
+
+upiq-rev7-library-metadata out build_commit:
+    python3 scripts/rev4_featpot/upiq380.py relocate-rev7 --dest {{out}} --images /mnt/tower/input/iqa/datasets/upiq/content/upiq_dataset/images --parent-admission /mnt/v/output/zensim/upiq380-rev5-r2-2026-10-07/extraction-admission.json --library-inventory /mnt/tower/input/iqa/datasets/upiq/SHA256SUMS --build-commit {{build_commit}}
