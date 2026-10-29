@@ -8412,8 +8412,8 @@ at least 0.80, per family) stays as a non-regression check.
 chosen weight only (and, for the record, E and Mlic). Neither role is ever fitted.
 
 **Arms.** The chroma-leg weight is the leg's `train_weight` = 1 / mean over source groups of (1 − 1/n), computed by `ring_root.py chroma`.
-Round-1 value w0 = 1.0410771004695145. Arms: w0 (round 1, already measured), w0/2 = 0.5205385502347572, w0/4 = 0.2602692751173786,
-w0/8 = 0.1301346375586893. The scale is a declared field of the leg (`weight_scale`, allowed values 1, 1/2, 1/4, 1/8, default 1) that the native
+Round-1 value w0 = 1.0410771004695145. Arms: w0 (round 1, already measured), w0/2 = 0.5205385502347573, w0/4 = 0.26026927511737863,
+w0/8 = 0.13013463755868931 (exact binary halvings of w0; the trainer-computed values). The scale is a declared field of the leg (`weight_scale`, allowed values 1, 1/2, 1/4, 1/8, default 1) that the native
 admission checks against the receipt's train_weight; nothing else about the leg, root or recipe changes.
 
 **Selection rule.** Per arm: the seed-0 Mlic-recipe packed model (fx2 declaration, chroma root) is scored against all of:

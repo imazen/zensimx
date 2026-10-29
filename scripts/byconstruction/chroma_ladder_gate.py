@@ -47,11 +47,11 @@ def spearman(a, b):
     return float(np.corrcoef(ra, rb)[0, 1])
 
 
-def held_out_rows(bank):
-    """(keys table, f64 matrix) of the held-out rows, in bank order."""
+def held_out_rows(bank, roles_wanted=HELD_OUT):
+    """(keys table, f64 matrix) of the held-out rows of the wanted roles, in bank order."""
     keys = pq.read_table(Path(bank) / "keys.parquet")
     roles = keys["mlic_role"].to_pylist()
-    take = [i for i, r in enumerate(roles) if r in HELD_OUT]
+    take = [i for i, r in enumerate(roles) if r in roles_wanted]
     features = pq.ParquetFile(Path(bank) / "features.parquet")
     names = [f"f{i}" for i in range(1825)]
     rows, offset, wanted = [], 0, set(take)
@@ -79,7 +79,7 @@ def score_rows(predict, bake, matrix):
 def cmd_score(a):
     out = Path(a.out)
     out.mkdir(parents=True)
-    keys, matrix = held_out_rows(a.bank)
+    keys, matrix = held_out_rows(a.bank, tuple(a.roles.split(",")))
     pq.write_table(keys.select(["pair_key", "view_id", "family", "rung", "content_class", "mlic_role", "teacher_ssim2"]),
                    out / "rows.parquet")
     index = {}
@@ -148,6 +148,54 @@ def paired(out, new, old, boot=2000, seed=0):
     return dict(per_family=result, pooled=pooled, chroma_aware=chroma_aware, ladders=len(keys), views=len(views))
 
 
+LEVEL_DRAWS, LEVEL_SEED = 10000, 20261029
+
+
+def level_gate(out, candidate, baseline):
+    """per family pooled MAE of candidate and baseline, and the ladder-bootstrap interval of mean(|c-t| - |b-t|)."""
+    rows, groups = ladders(out)
+    t = np.array([float(r["teacher_ssim2"]) for r in rows])
+    c, b = np.load(Path(out) / f"scores_{candidate}.npy"), np.load(Path(out) / f"scores_{baseline}.npy")
+    ec, eb = np.abs(c - t), np.abs(b - t)
+    by_family = defaultdict(list)
+    for (view, family), members in groups.items():
+        by_family[family].append(np.array([i for _, i in members]))
+    rng = np.random.default_rng(LEVEL_SEED)
+    result = {}
+    for family in FAMILIES:
+        ladders_f = by_family.get(family)
+        if not ladders_f:
+            continue
+        d_sum = np.array([(ec[ix] - eb[ix]).sum() for ix in ladders_f])
+        n = np.array([len(ix) for ix in ladders_f])
+        draws = rng.integers(0, len(ladders_f), size=(LEVEL_DRAWS, len(ladders_f)))
+        boot = d_sum[draws].sum(axis=1) / n[draws].sum(axis=1)
+        allrows = np.concatenate(ladders_f)
+        lo, hi = float(np.percentile(boot, 2.5)), float(np.percentile(boot, 97.5))
+        mc, mb = float(ec[allrows].mean()), float(eb[allrows].mean())
+        result[family] = dict(ladders=len(ladders_f), rows=int(len(allrows)), mae_candidate=mc, mae_baseline=mb,
+                              bias_candidate=float((c - t)[allrows].mean()), bias_baseline=float((b - t)[allrows].mean()),
+                              mean_diff=mc - mb, ci95=[lo, hi], passes=bool(mc < mb and hi < 0))
+    return dict(per_family=result, passes=all(result.get(f, {}).get("passes") for f in FAMILIES))
+
+
+def cmd_level(a):
+    out = Path(a.out)
+    report = dict(registration="benchmarks/byconstruction_2026-10-22.md, G-CHROMA-L (registered 2026-10-29 after round-1 results were seen)",
+                  baseline=a.baseline, draws=LEVEL_DRAWS, seed=LEVEL_SEED, candidates={}, also={})
+    for cand in a.candidate:
+        entry = level_gate(out, cand, a.baseline)
+        entry["rank_non_regression"] = summarize(per_ladder_rho(out, cand))
+        report["candidates"][cand] = entry
+    for other in a.also:
+        for cand in a.candidate:
+            report["also"][f"{cand}-vs-{other}"] = level_gate(out, cand, other)["per_family"]
+    (out / "G_CHROMA_L.json").write_text(json.dumps(report, indent=1) + "\n")
+    for cand, e in report["candidates"].items():
+        print(cand, "L-PASS" if e["passes"] else "L-FAIL", "rank-ok" if e["rank_non_regression"]["passes"] else "rank-FAIL",
+              {f: (round(v["mae_candidate"], 2), round(v["mae_baseline"], 2), round(v["ci95"][1], 2)) for f, v in e["per_family"].items()})
+
+
 def cmd_report(a):
     out = Path(a.out)
     names = json.loads((out / "SCORED.json").read_text())["bakes"]
@@ -169,7 +217,14 @@ if __name__ == "__main__":
     s.add_argument("--predict", required=True)
     s.add_argument("--bake", action="append", required=True)
     s.add_argument("--out", required=True)
+    s.add_argument("--roles", default="dev,calibration", help="selection reads only dev; the final gate reads calibration once")
     s.set_defaults(fn=cmd_score)
+    lv = sub.add_parser("level", help="G-CHROMA-L (registered 2026-10-29 after round-1 results were seen)")
+    lv.add_argument("--out", required=True)
+    lv.add_argument("--baseline", default="E")
+    lv.add_argument("--candidate", action="append", required=True)
+    lv.add_argument("--also", action="append", default=[], help="reported alongside, not decisive")
+    lv.set_defaults(fn=cmd_level)
     r = sub.add_parser("report")
     r.add_argument("--out", required=True)
     r.add_argument("--compare", action="append", default=[])
