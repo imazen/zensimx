@@ -63,3 +63,17 @@ reassembled from the same CAS objects with absent slots as NaN (the convention o
 (`FOLD_ROWS`) and the "a leg never holds a family of its own held-out fold" admission rule are in `hdr_root.py`,
 `subjective_training_leg.py` and `hdr_admission.rs`; 4Kdtb TRAIN has the single family `4kdtb:Bike`, so fold 0 drops the leg and fold 1 holds none out
 (4Kdtb is report-only for selection).
+
+## Amendment 2026-10-29 (owner cut; registered before any dev-fold result exists)
+
+Owner-approved cut: the HDR leg scale (0.5 vs 1.0) is chosen **first, on the TRAIN-side dev folds only, separately for P2 and P3**; E21 cells,
+full seeds and continuations then run only for the chosen scale of each path. Rule, fixed now: for each path and scale, train one seed-0 fit
+on each of the two registered dev-fold roots; score the held-out HDR TRAIN rows (`hdr_devfold_score.py`: within-reference Spearman, groups of
+two or more rows); the statistic of a (path, scale) is the unweighted mean over legs of the mean over folds of each leg's within-reference
+mean Spearman, counting only (leg, fold) pairs with at least two held-out families and a defined correlation; the larger statistic is chosen,
+and an exact tie goes to the smaller scale. The SDR no-regression rule of the earlier section is then applied to the chosen scale's E21 cells;
+if it fails, that is recorded as a failed gate (the other scale is not run). The unchosen scale's fold results are recorded and not extended.
+E21 cells already running for p2-s10 when the cut arrived are finished and recorded as in-flight work, not used for selection.
+
+Parallel fits on the fleet hosts run in containers; each host first reproduces the stored Mlic KADID seed-0 cell byte for byte (prediction hash
+and repro-stripped bake, `ZENSIM_MAX_TIER=v3`) with the same trainer binary; a host that fails is excluded and recorded.
