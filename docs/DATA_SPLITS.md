@@ -1,10 +1,34 @@
 # DATA_SPLITS.md — canonical train/val/test conventions (locked 2026-07-02)
 
+## October 29 — owner override for two human HDR collections
+
+Owner decision, verbatim: **"for hdr, we probs need human training data, as well as eval sets"**.
+The October 29 instruction supersedes the October 27 frontend-evaluation-only
+role **only** for `rousselot-4kdtb` and `itm-color-graded-hdr-images`.
+They may receive deterministic, source-disjoint approximately 70/30 TRAIN/EVAL
+partitions, registered before training-label reads. Related frames belong to
+one source family; the ratio is subordinate to source disjointness.
+This authorization is not evidence that admission or extraction is complete.
+
+All other human HDR collections retain their existing roles; in particular,
+UPIQ-380 retains its already registered T2 fit/development partition and the
+rest of UPIQ stays T0. No additional human HDR collection is promoted to TRAIN.
+Rousselot HDdtb (unstated licence) and CHUG (non-commercial) validate only.
+The frozen HDR video sets remain evaluation-only.
+
+**Prior exposure:** both newly authorized collections were already assigned to
+the October 27 frontend evaluation. Their new EVAL partitions are historically
+exposed, not untouched tests. Existing Rousselot measurements and Ghent
+protocol/metric investigation remain part of the exposure history; the new
+partition does not erase them. SI-HDR sources 066 and 195 appearing in Ghent
+retain evaluation roles across collections. Other retained cross-collection
+matches must be resolved before any corresponding TRAIN admission.
+
 ## October 29 — HDR P1/P2/P3 admission, metadata-only exposure
 
 The [HDR training-path inventory](HDR_TRAINING_PATHS_2026-10-29.md)
 registers the prospective general/codec chroma, HDR and combined paths.
-This entry changes no existing membership or read permission. UPIQ-380
+The metadata inventory below predates the narrow owner override above. UPIQ-380
 keeps its T2 fit/development roles; all remaining UPIQ stays T0. HDR-VDC,
 AVT and existing eval-only assignments remain evaluation-only.
 
@@ -18,8 +42,8 @@ screening, a frozen member list and an exposure entry before target reads.
 
 IRCCyN HDR-JPEG duplicates Narwaria's UPIQ population. Ghent source metadata
 names SI-HDR scenes 066 and 195; cross-collection families must share roles.
-The October 27 frontend-evaluation scope and the requested new TRAIN
-subsets need reconciliation before assigning 4Kdtb/Ghent TRAIN membership.
+The owner override above resolves the scope for 4Kdtb/Ghent; source
+admission and exact membership freezing remain required before target reads.
 HDdtb's unstated licence and TMQID's research-only licence remain training
 exclusions. SI-HDR's released raw outputs are not its corrected rated
 stimuli. UPIQ cannot independently test an HDR-VDP-3-supervised student.

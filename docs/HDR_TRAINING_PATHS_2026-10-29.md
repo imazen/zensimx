@@ -39,7 +39,7 @@ are library metadata counts, not new payload measurements.
 | [UPIQ](https://doi.org/10.17863/CAM.68372) | 4,159 conditions; HDR subset 380 | Only UPIQ-380 is T2 TRAIN. Retain its existing 330 fit / 50 development observations; all other UPIQ remains T0. |
 | [SI-HDR](https://doi.org/10.17863/CAM.87333) | 27 rated scenes; six reconstruction methods at two exposures | Released raw reconstructions lack the camera-response correction used for the rated stimuli. Historical raw-output diagnostics do not establish training-target fidelity. |
 | [IRCCyN HDR-JPEG](https://doi.org/10.5281/zenodo.21408688) | 10 references; 140 compressed images | Narwaria's UPIQ subset, not an additional independent collection. Preserve its UPIQ source roles and disclose inherited exposure. |
-| [Rousselot 4Kdtb](https://doi.org/10.3390/jimaging5010018) | 8 references; 96 distorted images | Previously evaluated; archive/page disagree on CC BY version. October 27 evaluation scope must be reconciled before any TRAIN assignment. |
+| [Rousselot 4Kdtb](https://doi.org/10.3390/jimaging5010018) | 8 references; 96 distorted images | Previously evaluated; archive/page disagree on CC BY version. October 29 owner decision permits source-disjoint TRAIN/EVAL admission with prior exposure disclosed. |
 | [Rousselot HDdtb](https://doi.org/10.23919/EUSIPCO.2018.8553212) | 8 references; 96 distorted images, naive/expert protocols | Licence unstated; existing policy permits validation, not training. Keep protocols distinct. |
 | [Ghent colour-graded ITM](https://doi.org/10.5281/zenodo.7669815) | 12 rated scenes; 108 HDR outputs; 432 comparison pairs | JOD is centered within scene, not a shared absolute-quality scale. Source metadata names SI-HDR scenes 066 and 195: reserve cross-dataset families together before splitting. |
 | [TMQI-DB](https://doi.org/10.1109/TIP.2012.2221725) | 15 HDR sources; 120 tone-mapped images | SDR-display, cross-domain evaluation. Mean rank is lower-is-better and comparable within source only. |
@@ -58,7 +58,8 @@ TRAIN admission. Do not read labels to discover a split.
 
 [DATA_SPLITS](DATA_SPLITS.md), including its October 27 HDR decision, is
 the authority over the catalogue's older `not assigned` descriptions.
-Existing T0/eval-only memberships never move to TRAIN. UPIQ-380's existing
+Existing T0/eval-only memberships remain fixed except for the two explicitly
+authorized October 29 collections below. UPIQ-380's existing
 source-hash fit/development rule is retained, not replaced by a new 70/30
 partition. HDR-VDC and AVT-VQDB-UHD-1-HDR remain frozen evaluation-only.
 
@@ -72,12 +73,13 @@ dataset-local filename hash cannot establish family independence. Freeze
 the exact member list, rule, producer commit, metadata hashes and excluded
 families, then append an exposure entry before any TRAIN label read.
 
-**Unresolved role question:** October 27 designated all scoreable human HDR
-sets as evaluation for the frontend and explicitly left training legs
-unchanged. The new study requests additional human training splits while
-preserving prior eval-only assignments. Whether CC-BY 4Kdtb/Ghent may
-receive new TRAIN subsets needs an explicit scope resolution. Until then
-they receive no new fit permission. This record grants no such permission.
+**Owner decision (October 29):** "for hdr, we probs need human training data, as well as eval sets".
+This supersedes the October 27 eval-only role for `rousselot-4kdtb` and
+`itm-color-graded-hdr-images` only. Both require source-disjoint approximately
+70/30 partitions and historical-exposure disclosure. Every other human HDR
+collection retains its existing role; non-commercial/unstated licences,
+including CHUG and Rousselot HDdtb, permit validation only. This resolves
+permission, not native-input fidelity, source screening or completed admission.
 
 **Exposure in this lane:** catalogue, adapter source, README/MANIFEST
 metadata and Ghent's source-only `images.csv`; no subjective response table,
@@ -121,8 +123,8 @@ composition/selection-rebind in `scripts/byconstruction/ring_root.py`.
 
 This contract applies separately to all six path/role combinations. A
 missing measurement is INCOMPLETE. No candidate is selected on EVAL, TEST,
-TERMINAL, the frozen video sets or the T0 portion of UPIQ. The unresolved
-human-data scope above also prevents freezing a complete training plan.
+TERMINAL, the frozen video sets or the T0 portion of UPIQ. Exact admitted memberships and native-input contracts must be frozen before
+any training plan executes.
 
 ### Reproduction, features and serving
 
