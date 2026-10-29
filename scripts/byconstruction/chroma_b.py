@@ -278,6 +278,24 @@ def audit_ledgers(directory, out):
     print(json.dumps({k:v for k,v in result.items() if k!='raw_files'}),flush=True)
 
 
+def source_accounting(out):
+    assert not out.exists()
+    sources=json.loads((ROOT/'SOURCES.json').read_text());views=json.loads((ROOT/'VIEWS.json').read_text())
+    represented={v['source'] for v in views};by_id={r['source']['id']:r for r in sources}
+    cid={(r['width'],r['height'],r['source_pixels_sha256']):r['source'] for r in sources if r['source']['type']=='cid22'}
+    aliases=[]
+    for key in sorted(set(by_id)-represented):
+        row=by_id[key];source=row['source'];assert source['type']=='safesyn'
+        winner=cid[(row['width'],row['height'],row['source_pixels_sha256'])]
+        assert winner['id'] in represented
+        aliases.append(dict(alias_source=key,alias_role=source['mlic_role'],retained_source=winner['id'],retained_reference_group=winner['reference_group'],retained_role=winner['mlic_role'],pixels_sha256=row['source_pixels_sha256']))
+    save(out,dict(qualified_candidates=len(sources),qualified_candidate_types=dict(Counter(r['source']['type'] for r in sources)),
+                  contributing_reference_groups=len({v['reference_group'] for v in views}),contributing_sources=len(represented),
+                  contributing_source_types=dict(Counter(by_id[k]['source']['type'] for k in represented)),
+                  wholly_deduplicated_sources=len(aliases),alias_retained_roles=dict(Counter(r['retained_role'] for r in aliases)),aliases=aliases,
+                  note='geometry SUMMARY.sources counts qualified source records before exact-pixel dedup; source roles are never promoted'))
+
+
 def diagnostic_spec(admission_dir, out):
     assert not out.exists(), 'preserve existing diagnostic specification'
     views={v['id']:v for v in json.loads((ROOT/'VIEWS.json').read_text())}
@@ -304,6 +322,7 @@ if __name__=='__main__':
     a=s.add_parser('snapshot');a.add_argument('ledger',type=Path);a.add_argument('out',type=Path);a.add_argument('--previous',type=Path)
     a=s.add_parser('archive-binaries');a.add_argument('out',type=Path);a.add_argument('build_commit')
     a=s.add_parser('audit-ledgers');a.add_argument('directory',type=Path);a.add_argument('out',type=Path)
+    a=s.add_parser('source-accounting');a.add_argument('out',type=Path)
     a=s.add_parser('diagnostics-spec');a.add_argument('admission_dir',type=Path);a.add_argument('out',type=Path)
     a=p.parse_args()
     if a.command=='spec':specification(a.out,a.one_view)
@@ -314,4 +333,5 @@ if __name__=='__main__':
     elif a.command=='snapshot':snapshot(a.ledger,a.out,a.previous)
     elif a.command=='archive-binaries':archive_binaries(a.out,a.build_commit)
     elif a.command=='audit-ledgers':audit_ledgers(a.directory,a.out)
+    elif a.command=='source-accounting':source_accounting(a.out)
     else:diagnostic_spec(a.admission_dir,a.out)

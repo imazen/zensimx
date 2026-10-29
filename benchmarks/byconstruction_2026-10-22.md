@@ -8245,9 +8245,13 @@ historical feature extractor. The batch adapter consumes EVIF's one decoded
 RGB8 reference; its actual binary identity is recorded separately from the
 canonical replay implementation.
 
-Qualified sources:485 SafeSyn fitting tiles,201 CID22 oracle TRAIN references
+Qualified candidate references:485 SafeSyn fitting tiles,201 CID22 oracle TRAIN references
 (with inherited fit/dev/calibration roles),386 canonical imazen-26 TRAIN origins.
 The accepted nearest-feature im2406 substitution remains labelled as such.
+Exact-pixel dedup leaves959 contributing sources:372 SafeSyn,201 CID22 and386
+imazen-26. The113 entirely duplicated SafeSyn references retain CID22 roles;
+development/calibration aliases stay diagnostic. The geometry summary source
+count records qualified candidates before this dedup.
 Mitchell fits and native crops yield9162 unique views, including1918 tiny views
 and1304 native crops; maximum921600pixels,1615 duplicate views removed.
 Every view's frozen RGB projection matches its independently checked pixels.
