@@ -45,6 +45,86 @@ HDR_TEACHER_SHA = {
 HDR_TRANSFORM = "score=10*q_jod;no-clipping"
 
 
+def cmd_hdr_fleet_plan(a):
+    """Declare native Rev7 views through zenfleet's existing declare-views owner.
+
+    Target values are not projected. Historical Rev5 extraction stays frozen.
+    """
+    from collections import defaultdict
+
+    if a.revision != 7 or a.era != "rev7_rowlanes" or a.limit:
+        raise ValueError("complete explicit native Rev7 feature planning required")
+    executor = Path(a.hdr_fleet_executor)
+    executor_sha, binary_sha = sha256_file(executor), sha256_file(a.bin)
+    if a.hdr_teacher:
+        source = Path(a.hdr_teacher)
+        columns = ["row_id", "role", "agree", "ref_path", "dist_path", "ref_sha256", "dist_sha256"]
+        rows = pq.read_table(source, columns=columns).to_pylist()
+        roles = {r["role"] for r in rows}
+        if len(roles) != 1:
+            raise ValueError("mixed teacher roles")
+        role = next(iter(roles))
+        if role not in HDR_TEACHER_SHA or sha256_file(source) != HDR_TEACHER_SHA[role]:
+            raise ValueError("unregistered teacher bytes")
+        if len(rows) != {"train": 7425, "val": 3900}[role]:
+            raise ValueError("incomplete teacher role")
+        rows = [r for r in rows if role == "val" or r["agree"]]
+        if len(rows) != {"train": 7390, "val": 3900}[role]:
+            raise ValueError("teacher agreement membership differs")
+        contract = "hdr-common-primaries-v2-cicp-pq10000"
+    else:
+        source = Path(a.hdr_fleet_keys)
+        manifest = json.loads((source.parent / "_MANIFEST.json").read_text())
+        if (manifest.get("schema") != "hdr-human-source-membership-v1"
+                or manifest.get("memberships_sha256") != sha256_file(source)):
+            raise ValueError("human source membership receipt differs")
+        rows = [r for r in json.loads(source.read_text()) if r["dataset_id"] == "rousselot-4kdtb"]
+        if len(rows) != 96 or {r["role"] for r in rows} != {"TRAIN", "EVAL"}:
+            raise ValueError("frozen complete 4Kdtb role metadata required")
+        contract = "rousselot-registered-k179-as-is"
+    groups = defaultdict(list)
+    for index, row in enumerate(rows):
+        groups[(row["ref_path"], row["ref_sha256"])].append((index, row))
+    views, mapping = [], []
+    for (reference, reference_sha), members in sorted(groups.items()):
+        unique = {}
+        for _, row in members:
+            unique.setdefault(row["dist_sha256"], row["dist_path"])
+        ordered = sorted(unique)
+        for lo in range(0, len(ordered), 128):
+            selected = ordered[lo:lo + 128]
+            controls = dict(reference_sha256=reference_sha, candidates=selected,
+                            candidate_paths=[unique[d] for d in selected], input_contract=contract,
+                            extractor_sha256=binary_sha, extractor_build_commit=a.build_commit,
+                            executor_sha256=executor_sha)
+            canonical = json.dumps(controls, sort_keys=True, separators=(",", ":"))
+            inputs = sorted({reference_sha, *selected, binary_sha, executor_sha,
+                             hashlib.sha256(canonical.encode()).hexdigest(),
+                             hashlib.sha256(a.build_commit.encode()).hexdigest()})
+            view_index = len(views)
+            views.append(dict(view="hdr-native-rev7-features-v1", inputs=inputs,
+                              cell=dict(image_path=reference, codec="hdr:features", q=-1, knob_tuple_json=canonical),
+                              requires=["hdr-native-rev7-features-v1"],
+                              hint=dict(peak_mem_bytes=2 * 1024**3, threads=1, vram_bytes=None)))
+            positions = {digest: i for i, digest in enumerate(selected)}
+            for index, row in members:
+                if row["dist_sha256"] in positions:
+                    mapping.append(dict(source_index=index, view_index=view_index,
+                                        feature_row=positions[row["dist_sha256"]], metadata=row))
+    out = Path(a.out) / a.set
+    out.mkdir(parents=True, exist_ok=False)
+    write = lambda name, value: (out / name).write_text(json.dumps(value, indent=2) + "\n")
+    write("views.spec.json", dict(schema=1, views=views))
+    write("membership-feature-map.json", sorted(mapping, key=lambda r: r["source_index"]))
+    write("_MANIFEST.json", dict(schema="hdr-native-rev7-fleet-plan-v1", build_commit=a.build_commit,
+          producer_sha256=sha256_file(__file__), source_path=str(source), source_sha256=sha256_file(source),
+          target_values_read=False, agreement_flags_read=bool(a.hdr_teacher), pixels_read=False,
+          views=len(views), rows=len(rows), extractor_sha256=binary_sha, executor_sha256=executor_sha,
+          spec_sha256=sha256_file(out / "views.spec.json"), mapping_sha256=sha256_file(out / "membership-feature-map.json"),
+          state="DECLARATION_INPUT_ONLY; use zenfleet-ctl declare-views; no extraction or TRAIN admission"))
+    return 0
+
+
 def cmd_hdr_extract(a) -> int:
     """The same bank owner, explicit native HDR research mode and original teacher order."""
     import csv
@@ -671,6 +751,8 @@ def main() -> int:
     ap.add_argument("--palette-chromaq", help="existing CHROMAQ ladder owner directory, diagnostic only")
     ap.add_argument("--palette-instrument", help="authorized v2c5 TRAIN/external features-only sidecars")
     ap.add_argument("--instrument-manifest", type=Path, help="explicit label-free assessment keys; historical bank default unchanged")
+    ap.add_argument("--hdr-fleet-executor", type=Path, help="emit native Rev7 declare-views inputs; no quality target values")
+    ap.add_argument("--hdr-fleet-keys", type=Path, help="frozen human HDR source memberships")
     ap.add_argument("--hdr-teacher", help="immutable HDRTEACH role; native E26 extraction")
     ap.add_argument("--build-commit", default="")
     ap.add_argument("--revision", type=int, choices=[4, 5, 7], default=5)
@@ -695,6 +777,10 @@ def main() -> int:
             return cmd_palette_chromaq(a)
         if a.palette_instrument:
             return cmd_palette(a)
+        if a.hdr_fleet_executor:
+            if bool(a.hdr_teacher) == bool(a.hdr_fleet_keys):
+                ap.error("native HDR planning requires exactly one teacher or human metadata source")
+            return cmd_hdr_fleet_plan(a)
         return cmd_hdr_extract(a) if a.hdr_teacher else cmd_extract(a)
     return cmd_verify_against(a)
 
