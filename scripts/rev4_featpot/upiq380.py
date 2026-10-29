@@ -98,6 +98,45 @@ def admit_metadata(a, *, native_rev7=False):
     return rows
 
 
+def relocate_rev7(args):
+    """Bind the reviewed UPIQ hashes to the identical tower-library originals.
+
+    Only admission JSON, release inventory and directory entries are read.
+    The native extractor verifies every payload hash again before use.
+    """
+    parent = Path(args.parent_admission)
+    parent_sha = "a64c1dba3640e623f485b7f267120c5fd8fb48fb7bba4d78226f90ef460df454"
+    if sha(parent) != parent_sha:
+        raise ValueError("not the reviewed UPIQ-380 parent admission")
+    a = json.loads(parent.read_text())
+    admit_metadata(a)
+    inventory = Path(args.library_inventory)
+    if sha(inventory) != "d08a8652cda5d24a47421e5be879a659ae58df284978f6b61a108a0acab4a80d":
+        raise ValueError("UPIQ library inventory changed")
+    hashes = dict((rel, digest) for digest, rel in (line.split("  ", 1) for line in inventory.read_text().splitlines()))
+    prefix = "content/upiq_dataset/images/"
+    for row in a["rows"]:
+        for kind in ("reference", "distorted"):
+            if hashes.get(prefix + row[kind + "_rel"]) != row[kind + "_sha256"]:
+                raise ValueError("library bytes do not match reviewed UPIQ source hashes")
+    a.update(schema="upiq380-extraction-admission-rev7-v1", formula_revision=7,
+             requested_ids=list(range(228)) + list(range(372, 720)), image_root=args.images,
+             build_commit=args.build_commit, parent_admission_sha256=parent_sha,
+             library_inventory_sha256=sha(inventory))
+    admit_metadata(a, native_rev7=True)
+    counts = {s: sum(r["split"] == s for r in a["rows"]) for s in ("fit", "development")}
+    if counts != {"fit": 330, "development": 50}:
+        raise ValueError("original UPIQ split changed")
+    out = Path(args.dest)
+    out.mkdir(parents=True, exist_ok=False)
+    write(out / "extraction-admission.json", a)
+    write(out / "_MANIFEST.json", dict(schema="upiq380-native-rev7-relocation-v1", build_commit=args.build_commit,
+          admission_sha256=sha(out / "extraction-admission.json"), parent_admission_sha256=parent_sha,
+          inventory_sha256=sha(inventory), producer_sha256=sha(__file__),
+          counts=counts, pixels_read=False, labels_read=False, original_mixed_UPIQ_CSV_read=False,
+          state="METADATA_ONLY; original native payload hashes still verified by extractor"))
+
+
 def prepare(args):
     native_rev7 = args.command == "prepare-rev7"
     dest = Path(args.dest)
@@ -280,15 +319,17 @@ def verify(args):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("command", choices=["prepare", "prepare-rev7", "ingest", "verify"])
+    ap.add_argument("command", choices=["prepare", "prepare-rev7", "relocate-rev7", "ingest", "verify"])
     ap.add_argument("--dest", required=True)
     ap.add_argument("--images", default=str(ROOT))
     ap.add_argument("--build-commit", required=True)
+    ap.add_argument("--parent-admission")
+    ap.add_argument("--library-inventory")
     ap.add_argument("--features")
     ap.add_argument("--binary")
     ap.add_argument("--audit-out", help="Fresh verification receipt path; preserves existing canonical receipts")
     args = ap.parse_args()
-    {"prepare": prepare, "prepare-rev7": prepare, "ingest": ingest, "verify": verify}[args.command](args)
+    {"prepare": prepare, "prepare-rev7": prepare, "relocate-rev7": relocate_rev7, "ingest": ingest, "verify": verify}[args.command](args)
 
 
 if __name__ == "__main__":
