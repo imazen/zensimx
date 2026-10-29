@@ -421,8 +421,11 @@ def freeze_hdr_membership(args):
             assert len(pairs) == 108
         counts = collections.Counter(s for s, _ in pairs)
         assert set(counts) == set(sources) and set(counts.values()) == {12 if name == names[0] else 9}
-        roles = hdr_source_partition(sources, reserved)
-        summaries[name] = {"sources": sources, "roles": roles, "reserved": reserved,
+        proposed_roles = hdr_source_partition(sources, reserved)
+        # Owner fallback: Ghent has no established EXR-value-to-nits contract.
+        # Preserve its proposed partition for exposure; grant no new TRAIN use.
+        roles = proposed_roles if name == names[0] else {s: "EVAL" for s in sources}
+        summaries[name] = {"sources": sources, "roles": roles, "proposed_roles": proposed_roles, "reserved": reserved,
                            "source_counts": dict(collections.Counter(roles.values())),
                            "pair_counts": dict(collections.Counter(roles[s] for s, _ in pairs))}
         for source, dist in sorted(pairs):

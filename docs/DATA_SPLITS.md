@@ -24,6 +24,21 @@ partition does not erase them. SI-HDR sources 066 and 195 appearing in Ghent
 retain evaluation roles across collections. Other retained cross-collection
 matches must be resolved before any corresponding TRAIN admission.
 
+### Owner light-contract decision and Ghent fallback (October 29)
+
+Reuse 4Kdtb's registered display model exactly: raw RGBE ×179, clamp each
+channel to [0,1000] cd/m², BT.2020 input retained. K=100 remains the separate
+registered robustness leg. Authority: [July 29 display model](../benchmarks/rousselot_chroma_validation_2026-07-29.md).
+
+Ghent's inventoried release contains no paper PDF; its original README and
+source list do not specify the EXR absolute-light convention. Per the owner's
+explicit fallback, **all Ghent rows remain evaluation-only**. The provisional
+8/4 roles below never granted training access and are superseded. Preserve
+them as exposure evidence, not active TRAIN assignments. Evaluate per-scene
+ranks with a scale-robustness check; an assumed scale is not product-training
+ground truth. P2/P3 human training uses existing UPIQ-380 and 4Kdtb's TRAIN half,
+plus admitted teacher legs. No Ghent labels were read before this decision.
+
 ### Frozen source assignments, membership-v1
 
 Source-only release inventories produce 204 condition memberships, SHA-256
