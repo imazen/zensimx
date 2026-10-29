@@ -45,9 +45,16 @@ case "$cmd" in
   prepare)
     test ! -e "$study/PREPARE_COMPLETE"
     mkdir -p "$study/bin" "$study/frozen_configuration" "$study/cells" "$study/scratch"
+    if [ -n "${BIN_SRC:-}" ]; then  # a trainer set built from a newer commit (chroma-leg admission); see BUILD_COMMIT
+      (cd "$BIN_SRC" && sha256sum -c SHA256SUMS --quiet)
+      cp -p "$BIN_SRC"/* "$study/bin/"
+      (cd "$study/bin" && sha256sum zensim_mlp_train bake_dial_refit panel score_pair_with_bake byc_fsid byc_predict) > "$study/BIN_SHA256SUMS"
+      sed -i "s#  #  $study/bin/#" "$study/BIN_SHA256SUMS"
+    else
     (cd "$mixes/bin" && sha256sum -c "$mixes/BIN_SHA256SUMS" --quiet)
     cp -p "$mixes"/bin/* "$study/bin/"
     sed "s#$mixes/bin#$study/bin#" "$mixes/BIN_SHA256SUMS" > "$study/BIN_SHA256SUMS"
+    fi
     (cd "$study/bin" && sha256sum -c "$study/BIN_SHA256SUMS" --quiet)
     python3 -B - "$repo" "$study" "$mixes" <<'PY'
 import json, sys
