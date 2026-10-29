@@ -24,6 +24,33 @@ partition does not erase them. SI-HDR sources 066 and 195 appearing in Ghent
 retain evaluation roles across collections. Other retained cross-collection
 matches must be resolved before any corresponding TRAIN admission.
 
+### Frozen source assignments, membership-v1
+
+Source-only release inventories produce 204 condition memberships, SHA-256
+`8f8cba8f408e4ac7899c3b88c257809e3249205f7880859356749d6e9b656a44`. Producer `944bbbd5`; full receipt and
+mirror: [HDR membership pointer](../benchmarks/hdr_membership_2026-10-29.pointer.md).
+These are frozen assignments, **not yet admitted training inputs**: native
+source screening and photometric contracts remain pending. No targets read.
+
+| Collection | TRAIN sources | EVAL sources | TRAIN / EVAL conditions |
+|---|---|---|---|
+| 4Kdtb | Bike: 20s, 30s, 81s, 110s | Regatta: 11s, 24s, 80s, 95s | 48 / 48 |
+| Ghent ITM | 00008880, 00409, airbellowsgap, fireplace_092609, goldengate2, sec404, strangers, valley | 066, 195, Outdoor_IMG011, showgirl_02_302300 | 72 / 36 |
+
+4Kdtb has only two parent sequences. A nonempty source-disjoint split is
+therefore 4/4 references (50/50); a 6/2 reference split would share a sequence.
+Ghent is 8/4 references; the two Tears of Steel frames remain together.
+SI-HDR 066/195 are reserved; Showgirl is conservatively reserved against the
+HDdtb family alias. Additional retained matches can only exclude TRAIN
+membership pending review, never move protected EVAL sources into TRAIN.
+
+No official training partition appears in the shipped 4Kdtb ReadMe or its
+stored paper, or in Ghent's shipped README/source list. The fallback minimizes
+`abs(10 * train_sources - 7 * total_sources)` over whole eligible families;
+ties use SHA-256 of `hdr-source-split-v1` plus sorted family IDs. This fixes
+membership without labels or metrics. Pixel similarity screening is still
+required; metadata-name nonmatches are not evidence of unrelated content.
+
 ## October 29 — HDR P1/P2/P3 admission, metadata-only exposure
 
 The [HDR training-path inventory](HDR_TRAINING_PATHS_2026-10-29.md)
