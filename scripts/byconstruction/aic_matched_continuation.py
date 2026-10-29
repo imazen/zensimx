@@ -1502,7 +1502,7 @@ def packing_program(value):
     return PACK if prune else PACK.replace("e33_output_stage=True", "e33_output_stage=True, no_prune=True")
 
 
-def full_repack_plan(run, commit, previous):
+def full_repack_plan(run, commit, previous, prune=False):
     """Recover packing only, pinning completed fits rather than fitting another set of seeds."""
     previous = Path(previous)
     value = checked(previous / "PLAN.json", FULL_SCHEMA)
@@ -1529,8 +1529,9 @@ def full_repack_plan(run, commit, previous):
     fold = json.loads(Path(INPUTS["fold_plan"][0]).read_text())
     frozen = freeze(run, commit, previous / "bin/zensim_mlp_train", previous / "tools/bake_dial_refit", fold)
     write(run / "PLAN.json", dict(value | frozen, input_sha256=inputs,
-          packing=dict(prune=False), reuse_full_fits=reused, recovery_from=str(previous),
-          recovery_reason="native pack refused pruning of derived-input positions; completed fitting is reused"), fresh=True)
+          packing=dict(prune=bool(prune)), reuse_full_fits=reused, recovery_from=str(previous),
+          recovery_reason=("pack subprocess could not import its numerical dependencies; completed fitting is reused and packed with the default pruning"
+                           if prune else "native pack refused pruning of derived-input positions; completed fitting is reused")), fresh=True)
 
 
 def reuse_full_fit(record, dest):
@@ -2055,6 +2056,7 @@ if __name__ == "__main__":
     p.add_argument("run", type=Path)
     p.add_argument("--source-commit", required=True)
     p.add_argument("--previous", type=Path, required=True)
+    p.add_argument("--prune", action="store_true", help="keep the default pruning (the failure was not a pruning refusal)")
     p = sub.add_parser("fx2-plan", help="registered fx2 source-fold plans after both controls and all full seeds pass")
     p.add_argument("run", type=Path)
     p.add_argument("--source-commit", required=True)
@@ -2120,7 +2122,7 @@ if __name__ == "__main__":
     p.add_argument("--after-run", type=Path, required=True)
     args = parser.parse_args()
     if args.mode == "full-repack-plan":
-        full_repack_plan(args.run.resolve(), args.source_commit, args.previous.resolve())
+        full_repack_plan(args.run.resolve(), args.source_commit, args.previous.resolve(), args.prune)
     elif args.mode == "fx2-plan":
         fx2_plan(args.run, args.source_commit, args.trainer, args.meta_tool, args.study, args.reproduction)
     elif args.mode == "hdr-plan":
