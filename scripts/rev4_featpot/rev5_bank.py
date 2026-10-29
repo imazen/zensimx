@@ -155,6 +155,28 @@ def requested_ids() -> list[int]:
     return [i for lo, hi in SLOT_RANGES for i in range(lo, hi)]
 
 
+def read_feature_csv(csv_path, expected_row_ids, width):
+    """Canonical bank ingress: exact f64 values and NaN for unrequested slots."""
+    conv = pacsv.ConvertOptions(column_types={"row_id": pa.int64(), **{f"f{i}": pa.float64() for i in range(width)}},
+                               include_columns=["row_id"] + [f"f{i}" for i in range(width)])
+    tab = pacsv.read_csv(csv_path, convert_options=conv)
+    rid = tab.column("row_id").to_numpy()
+    order = np.argsort(rid, kind="stable")
+    expected = np.asarray(expected_row_ids, dtype=np.int64)
+    if tab.num_rows != len(expected) or not (rid[order] == expected).all():
+        raise ValueError("row_id join failed")
+    tab = tab.take(pa.array(order)); want = set(requested_ids()); cols = {}
+    for i in range(width):
+        v = tab.column(f"f{i}").to_numpy()
+        if i in want:
+            if not np.isfinite(v).all():
+                raise ValueError(f"non-finite value in requested slot f{i}")
+            cols[f"f{i}"] = pa.array(v)
+        else:
+            cols[f"f{i}"] = pa.array(np.full(len(v), np.nan))
+    return tab, cols
+
+
 def cmd_extract(a) -> int:
     s = a.set
     assessment = getattr(a, "instrument_manifest", None)
@@ -233,23 +255,10 @@ def cmd_extract(a) -> int:
         width = width or w
         if w != width or not want <= set(range(w)):
             sys.exit(f"chunk {ci}: width {w} (first chunk {width}) does not cover the requested slots")
-        conv = pacsv.ConvertOptions(column_types={"row_id": pa.int64(), **{f"f{i}": pa.float64() for i in range(w)}},
-                                    include_columns=["row_id"] + [f"f{i}" for i in range(w)])
-        tab = pacsv.read_csv(csvp, convert_options=conv)
-        rid = tab.column("row_id").to_numpy()
-        order = np.argsort(rid, kind="stable")
-        if tab.num_rows != hi - lo or not (rid[order] == np.arange(lo, hi)).all():
-            sys.exit(f"chunk {ci}: row_id join failed")
-        tab = tab.take(pa.array(order))
-        cols = {}
-        for i in range(w):
-            v = tab.column(f"f{i}").to_numpy()
-            if i in want:
-                if not np.isfinite(v).all():
-                    sys.exit(f"chunk {ci}: non-finite value in requested slot f{i}")
-                cols[f"f{i}"] = pa.array(v)
-            else:
-                cols[f"f{i}"] = pa.array(np.full(len(v), np.nan))  # absent, not zero
+        try:
+            tab, cols = read_feature_csv(csvp, np.arange(lo, hi), w)
+        except ValueError as error:
+            sys.exit(f"chunk {ci}: {error}")
         out = pa.table({"pair_key": pa.array(pk[lo:hi]), "row_id": tab.column("row_id"), **cols})
         if writer is None:
             writer = pq.ParquetWriter(outdir / "features.parquet", out.schema, compression="zstd", compression_level=3)
