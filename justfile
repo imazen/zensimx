@@ -3935,3 +3935,10 @@ chroma-batch-bench *args:
 
 chroma-stage-b *args:
     python3 scripts/byconstruction/chroma_b.py {{args}}
+
+# Human HDR source memberships, without target or pixel reads.
+hdr-source-membership out build_commit:
+    python3 scripts/byconstruction/dataset_keys.py hdr-membership --out {{out}} --build-commit {{build_commit}}
+
+hdr-source-membership-check:
+    python3 -m unittest discover -s scripts/tests -p test_hdr_source_membership.py

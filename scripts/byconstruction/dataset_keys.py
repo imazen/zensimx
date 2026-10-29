@@ -14,6 +14,7 @@ import hashlib
 import json
 import re
 import time
+import sys
 
 import pyarrow as pa
 import pyarrow.parquet as pq
@@ -326,6 +327,134 @@ def prepare(args):
     print(json.dumps(receipt), flush=True)
 
 
+def hdr_source_partition(sources, reserved):
+    """Nearest 70/30 reference count, keeping related frames and reservations whole.
+
+    Ties use a fixed hash of family IDs, never labels or metric results.
+    Returned TRAIN roles are prospective until native source screening passes.
+    """
+    import itertools
+
+    families = collections.defaultdict(list)
+    for source, family in sources.items():
+        families[family].append(source)
+    if not set(reserved) <= set(sources):
+        raise ValueError("unknown reserved HDR source")
+    excluded = {sources[s] for s in reserved}
+    eligible = sorted(set(families) - excluded)
+    candidates = []
+    for n in range(1, len(eligible) + 1):
+        for train in itertools.combinations(eligible, n):
+            count = sum(len(families[f]) for f in train)
+            if count == len(sources):
+                continue
+            tie = hashlib.sha256(("hdr-source-split-v1\n" + "\n".join(train)).encode()).hexdigest()
+            candidates.append((abs(10 * count - 7 * len(sources)), tie, train))
+    if not candidates:
+        raise ValueError("no source-disjoint nonempty TRAIN/EVAL partition")
+    train = set(min(candidates)[2])
+    return {s: "TRAIN" if f in train else "EVAL" for s, f in sorted(sources.items())}
+
+
+def freeze_hdr_membership(args):
+    """Read only explicit release metadata; never enumerate or open target files."""
+    import csv
+
+    names = ("rousselot-4kdtb", "itm-color-graded-hdr-images")
+    rows = []
+    pins = {}
+    summaries = {}
+    for name in names:
+        root = args.library / name
+        inventory = root / "SHA256SUMS"
+        pins[str(inventory)] = sha(inventory)
+        files = {}
+        for line in inventory.read_text().splitlines():
+            digest, rel = line.split("  ", 1)
+            if len(digest) != 64 or rel in files or Path(rel).is_absolute() or ".." in Path(rel).parts:
+                raise ValueError("invalid or duplicate inventory path")
+            files[rel] = digest
+        sources = {}
+        refs = {}
+        reserved = {}
+        if name == "rousselot-4kdtb":
+            prefix = "content/Subjective_test_4Kdtb/Original_Images/"
+            for rel in files:
+                if rel.startswith(prefix) and rel.endswith("_RGB_444.hdr"):
+                    source = Path(rel).name.removesuffix("_RGB_444.hdr")
+                    family = source.split("_", 1)[0]
+                    if family not in {"Bike", "Regatta"}:
+                        raise ValueError("unreviewed 4Kdtb source family")
+                    sources[source] = "4kdtb:" + family
+                    refs[source] = rel
+            assert len(sources) == 8 and collections.Counter(sources.values()) == {"4kdtb:Bike": 4, "4kdtb:Regatta": 4}
+            pairs = []
+            for rel in files:
+                if "/Distorted_Images/" in rel and rel.endswith(".hdr"):
+                    source = Path(rel).parent.name
+                    if source not in sources:
+                        raise ValueError("distortion without reference")
+                    pairs.append((source, rel))
+            assert len(pairs) == 96
+        else:
+            source_csv = root / "labels/images.csv"
+            pins[str(source_csv)] = sha(source_csv)
+            with source_csv.open(newline="") as stream:
+                for row in csv.DictReader(stream):
+                    source = Path(row["HDR"]).stem
+                    if source in sources or Path(row["HDR"]).name != row["HDR"]:
+                        raise ValueError("duplicate/invalid Ghent source")
+                    family = "ghent:" + source
+                    if source in {"00409", "00008880"}:
+                        family = "tears-of-steel"
+                    if source in {"066", "195"}:
+                        family = "si-hdr:" + source
+                        reserved[source] = "SI-HDR evaluation source alias"
+                    if source == "showgirl_02_302300":
+                        family = "stuttgart:showgirl"
+                        reserved[source] = "conservative HDdtb Showgirl family reservation"
+                    sources[source] = family
+                    refs[source] = "content/hdr/" + row["HDR"]
+            assert len(sources) == 12
+            pairs = [(Path(rel).stem, rel) for rel in files
+                     if rel.startswith("content/hdr_itmo/") and Path(rel).stem in sources and rel.endswith(".exr")]
+            assert len(pairs) == 108
+        counts = collections.Counter(s for s, _ in pairs)
+        assert set(counts) == set(sources) and set(counts.values()) == {12 if name == names[0] else 9}
+        roles = hdr_source_partition(sources, reserved)
+        summaries[name] = {"sources": sources, "roles": roles, "reserved": reserved,
+                           "source_counts": dict(collections.Counter(roles.values())),
+                           "pair_counts": dict(collections.Counter(roles[s] for s, _ in pairs))}
+        for source, dist in sorted(pairs):
+            ref = refs[source]
+            rows.append(dict(dataset_id=name, source_id=source, family_id=sources[source],
+                             role=roles[source], ref_path=str(root / ref), dist_path=str(root / dist),
+                             ref_sha256=files[ref], dist_sha256=files[dist],
+                             admission_state="SOURCE_SCREEN_AND_LIGHT_CONTRACT_PENDING"))
+    args.out.mkdir(parents=True, exist_ok=False)
+    write_json(args.out / "memberships.json", rows)
+    write_json(args.out / "_MANIFEST.json", dict(
+        schema="hdr-human-source-membership-v1", build_commit=args.build_commit,
+        rule="hdr-source-split-v1; minimize abs(10*n_train-7*n_total); hashed family-set tie break",
+        owner_quote="for hdr, we probs need human training data, as well as eval sets",
+        owner_override_collections=list(names), metadata_sha256=pins,
+        memberships_sha256=sha(args.out / "memberships.json"), sources=summaries,
+        producer_sha256=sha(__file__), labels_read=False, pixels_read=False,
+        training_permitted=False,
+        remaining_gates=["native source-family screen and retained-match review",
+                         "verified photometric/primaries contract", "registered feature extraction"],
+        exposure="Historically evaluated; new EVAL membership is not an untouched test"))
+    print(json.dumps(summaries, indent=2))
+
+
+def hdr_membership_main():
+    ap = argparse.ArgumentParser(description="Freeze label-blind HDR source roles; admission remains gated")
+    ap.add_argument("--out", type=Path, required=True)
+    ap.add_argument("--build-commit", required=True)
+    ap.add_argument("--library", type=Path, default=Path("/mnt/tower/input/iqa/datasets"))
+    freeze_hdr_membership(ap.parse_args(sys.argv[2:]))
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("collection")
@@ -349,4 +478,7 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    if sys.argv[1:2] == ["hdr-membership"]:
+        hdr_membership_main()
+    else:
+        main()
