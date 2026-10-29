@@ -37,7 +37,7 @@ def diagnostic_reason(view_id, family, rung, endpoints):
     return 'endpoint+sample' if sample and rung in endpoints else 'endpoint' if rung in endpoints else 'sample' if sample else None
 
 
-def specification(out, one_view):
+def specification(out, one_view, band_ac=False):
     assert not out.exists(), 'preserve existing declaration specification'
     views = json.loads((ROOT / 'VIEWS.json').read_text())
     frozen = {r['id']: r for r in json.loads((ROOT / 'FROZEN_REFERENCE_PIXELS.json').read_text())}
@@ -53,11 +53,12 @@ def specification(out, one_view):
                             width=v['width'], height=v['height']))
     families = [dict(label=label, codec='evif:'+codec,
                      params=[json.dumps(p,sort_keys=True,separators=(',',':')) for p in params])
-                for label,(codec,_,params) in specs().items() if not label.startswith('band-')]
-    assert sum(len(f['params']) for f in families) == 76
+                for label,(codec,_,params) in specs().items() if (label=='band-ac' if band_ac else not label.startswith('band-'))]
+    rungs=16 if band_ac else 76
+    assert sum(len(f['params']) for f in families) == rungs
     save(out, dict(sources=sources, families=families, implementation_shas=PINS,
                    peak_mem_bytes=256*1024*1024, diagnostics='none'))
-    print(json.dumps(dict(spec=str(out), views=len(sources), cells=len(sources)*76)), flush=True)
+    print(json.dumps(dict(spec=str(out), views=len(sources), cells=len(sources)*rungs,training_allowed=not band_ac)), flush=True)
 
 
 def audit_cell(archive, cell, check_native):
@@ -72,7 +73,7 @@ def audit_cell(archive, cell, check_native):
     assert struct.pack('>d',target[0]['value']).hex()==cell['teacher_bits']
 
 
-def admit(ledger, archive, out, qualification=False, verify_threads=1):
+def admit(ledger, archive, out, qualification=False, verify_threads=1, band_ac=False):
     assert 1<=verify_threads<=32
     out.mkdir()
     views = {v['path']:v for v in json.loads((ROOT/'VIEWS.json').read_text())}
@@ -83,7 +84,8 @@ def admit(ledger, archive, out, qualification=False, verify_threads=1):
         assert len(rows)==len(views)==9162, 'full Stage B admission requires every declared view'
     assert all(r['status']=='done' for r in rows)
     assert len({r['image_path'] for r in rows})==len(rows) and all(r['image_path'] in views for r in rows)
-    families = {k:(backend,scales,params) for k,(backend,scales,params) in specs().items() if not k.startswith('band-')}
+    families = {k:(backend,scales,params) for k,(backend,scales,params) in specs().items() if (k=='band-ac' if band_ac else not k.startswith('band-'))}
+    rungs=16 if band_ac else 76
     ladders=[]; selections=[]; buffer=[]; count=0; native_verified=set(); totals=Counter(); classes=defaultdict(Counter); roles=defaultdict(Counter)
     writer = None
     verifier=ThreadPoolExecutor(max_workers=verify_threads)
@@ -153,22 +155,22 @@ def admit(ledger, archive, out, qualification=False, verify_threads=1):
             assert struct.pack('>d',value).hex()==bits,'Parquet target bits differ'
             readback+=1
     assert readback==count
-    assert count==len(rows)*76
-    if not qualification:assert count==696312
+    assert count==len(rows)*rungs
+    if not qualification:assert count==(146592 if band_ac else 696312)
     pq.write_table(pa.Table.from_pylist(ladders),out/'LADDERS.parquet',compression='zstd')
     pq.write_table(pa.Table.from_pylist(selections),out/'DIAGNOSTICS_SELECTION.parquet',compression='zstd')
     save(out/'SUMMARY.json',dict(qualified_full_grid=not qualification,cells=count,views=len(rows),ladders=len(ladders),totals=dict(totals),
                                  per_class={k:dict(v) for k,v in classes.items()},per_role={k:dict(v) for k,v in roles.items()},native_objects_verified=len(native_verified),
-                                 diagnostics_selected=len(selections),ledger_sha256=sha(ledger)))
+                                 diagnostics_selected=len(selections),ledger_sha256=sha(ledger),training_allowed=not band_ac))
     save(out/'PROGRESS.json',dict(stage='complete',views=len(rows),cells=count))
 
 
-def verify_first(ledger, archive, evif, out):
+def verify_first(ledger, archive, evif, out, expected=76):
     rows=pq.read_table(ledger).to_pylist()
     assert len(rows)==1 and rows[0]['status']=='done'
     manifest=cas(archive,rows[0]['output_sha'])
     assert sha(manifest)==rows[0]['output_sha']
-    result=json.loads(manifest.read_text());assert len(result['cells'])==76
+    result=json.loads(manifest.read_text());assert len(result['cells'])==expected
     with out.with_suffix('.verify.log').open('w') as log:
         for cell in result['cells']:
             path=cas(archive,cell['evif_sha256']);assert sha(path)==cell['evif_sha256']
@@ -178,8 +180,8 @@ def verify_first(ledger, archive, evif, out):
             value=json.loads(parts['scor'])['scores'][0]['value']
             assert struct.pack('>d',value).hex()==cell['teacher_bits']
             subprocess.run([str(evif),'verify',str(path)],stdout=log,stderr=subprocess.STDOUT,check=True)
-    save(out,dict(passed=True,view=result['image_path'],cells=76,primary_sha256=rows[0]['output_sha'],
-                  checks=['canonical launcher and native S3 claims/ledger','all76 native EVIF seal checks','separate JPEG CAS and embedded bytes exact','frozen target doubles exact on readback'],runtime=result['runtime']))
+    save(out,dict(passed=True,view=result['image_path'],cells=expected,primary_sha256=rows[0]['output_sha'],
+                  checks=['canonical launcher and native S3 claims/ledger',f'all{expected} native EVIF seal checks','separate JPEG CAS and embedded bytes exact','frozen target doubles exact on readback'],runtime=result['runtime']))
 
 
 def diagnostic_proof(ctl, image, out, view):
@@ -482,10 +484,12 @@ def seal_stage_b(out, build_commit, diagnostic_ledger, diagnostic_result):
 
 if __name__=='__main__':
     p=argparse.ArgumentParser();s=p.add_subparsers(dest='command',required=True)
-    a=s.add_parser('spec');a.add_argument('out',type=Path);a.add_argument('--one-view',action='store_true')
+    a=s.add_parser('spec');a.add_argument('out',type=Path);a.add_argument('--one-view',action='store_true');a.add_argument('--band-ac',action='store_true')
     a=s.add_parser('admit');a.add_argument('ledger',type=Path);a.add_argument('archive',type=Path);a.add_argument('out',type=Path);a.add_argument('--verify-threads',type=int,default=1)
+    a=s.add_parser('admit-band-ac');a.add_argument('ledger',type=Path);a.add_argument('archive',type=Path);a.add_argument('out',type=Path);a.add_argument('--verify-threads',type=int,default=1)
     a=s.add_parser('qualify-admission');a.add_argument('ledger',type=Path);a.add_argument('archive',type=Path);a.add_argument('out',type=Path);a.add_argument('--verify-threads',type=int,default=1)
     a=s.add_parser('verify-first');a.add_argument('ledger',type=Path);a.add_argument('archive',type=Path);a.add_argument('evif',type=Path);a.add_argument('out',type=Path)
+    a=s.add_parser('verify-band-first');a.add_argument('ledger',type=Path);a.add_argument('archive',type=Path);a.add_argument('evif',type=Path);a.add_argument('out',type=Path)
     a=s.add_parser('diagnostic-proof');a.add_argument('ctl',type=Path);a.add_argument('image');a.add_argument('out',type=Path);a.add_argument('--view',default='im5044_m32.png')
     a=s.add_parser('snapshot');a.add_argument('ledger',type=Path);a.add_argument('out',type=Path);a.add_argument('--previous',type=Path)
     a=s.add_parser('archive-binaries');a.add_argument('out',type=Path);a.add_argument('build_commit')
@@ -497,10 +501,12 @@ if __name__=='__main__':
     a=s.add_parser('qualify-diagnostics');a.add_argument('ledger',type=Path);a.add_argument('admission_dir',type=Path);a.add_argument('archive',type=Path);a.add_argument('out',type=Path)
     a=s.add_parser('seal');a.add_argument('out',type=Path);a.add_argument('build_commit');a.add_argument('diagnostic_ledger',type=Path);a.add_argument('diagnostic_result',type=Path)
     a=p.parse_args()
-    if a.command=='spec':specification(a.out,a.one_view)
+    if a.command=='spec':specification(a.out,a.one_view,a.band_ac)
     elif a.command=='admit':admit(a.ledger,a.archive,a.out,verify_threads=a.verify_threads)
+    elif a.command=='admit-band-ac':admit(a.ledger,a.archive,a.out,verify_threads=a.verify_threads,band_ac=True)
     elif a.command=='qualify-admission':admit(a.ledger,a.archive,a.out,qualification=True,verify_threads=a.verify_threads)
     elif a.command=='verify-first':verify_first(a.ledger,a.archive,a.evif,a.out)
+    elif a.command=='verify-band-first':verify_first(a.ledger,a.archive,a.evif,a.out,expected=16)
     elif a.command=='diagnostic-proof':diagnostic_proof(a.ctl,a.image,a.out,a.view)
     elif a.command=='snapshot':snapshot(a.ledger,a.out,a.previous)
     elif a.command=='archive-binaries':archive_binaries(a.out,a.build_commit)
