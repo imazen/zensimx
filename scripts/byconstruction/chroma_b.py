@@ -330,9 +330,17 @@ def prepare_diagnostic_selection(ledger, archive, out):
     assert {r['image_path'] for r in rows}==set(views)
     selections=[]
     families={k:v for k,v in specs().items() if not k.startswith('band-')}
-    for row in sorted(rows,key=lambda r:r['image_path']):
-        path=cas(archive,row['output_sha']);assert sha(path)==row['output_sha']
-        result=json.loads(path.read_text());view=views[row['image_path']]
+    def load(row):
+        data=cas(archive,row['output_sha']).read_bytes()
+        assert hashlib.sha256(data).hexdigest()==row['output_sha']
+        return row,json.loads(data)
+    def receipts():
+        ordered=sorted(rows,key=lambda r:r['image_path'])
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            for start in range(0,len(ordered),32):
+                yield from list(pool.map(load,ordered[start:start+32]))
+    for index,(row,result) in enumerate(receipts()):
+        view=views[row['image_path']]
         assert result['source_sha256']==view['sha256'] and result['reference_pixels_sha256']==view['pixels_sha256']
         grouped=defaultdict(list)
         for c in result['cells']:grouped[c['family']].append(c)
@@ -348,6 +356,7 @@ def prepare_diagnostic_selection(ledger, archive, out):
                 if reason:selections.append(dict(view_id=view['id'],image_path=view['path'],family=family,rung=rung,
                     evif_sha256=cell['evif_sha256'],jpeg_sha256=cell['jpeg_sha256'],reason=reason,
                     content_class=view['content_class'],mlic_role=view['mlic_role']))
+        if (index+1)%100==0:save(out/'PROGRESS.json',dict(stage='diagnostic selection only',views=index+1,required_views=len(rows)))
     pq.write_table(pa.Table.from_pylist(selections),out/'DIAGNOSTICS_SELECTION.parquet',compression='zstd')
     save(out/'SUMMARY.json',dict(qualified_full_grid=False,purpose='diagnostic sample declaration only; full media admission and exact selection reconciliation required',views=len(rows),selected_cells=len(selections),ledger_sha256=sha(ledger)))
     diagnostic_spec(out,out/'spec.json')
