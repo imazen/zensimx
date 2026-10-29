@@ -140,6 +140,60 @@ def admit(authority_path, authority_sha256, cell_id, groups, selected_ids):
     return {name:d for name,(_,d) in admitted.items()}
 
 
+def admit_chroma_teacher(record, declaration, selected_ids, excluded):
+    """Metadata-only counterpart of the native frozen chroma admission owner."""
+    r,d=record,declaration
+    required=dict(schema='chroma-teacher-leg-v1',loss='within-source-rank-and-scale',
+        target_transform='identity-ssimulacra2-unclipped',target_column='human_score',target_orientation='quality',
+        native_role='TRAIN',selection='fixed-final-epoch',nominal_weight=1.0,formula_revision=7,tier='v3',
+        feature_set_id='basic+peaks+v2@w1825/rev7_rowlanes#36c3f3af',
+        producer_commit='b77883be18db5933a9db4b9e2670a2ba88a9729b',
+        extractor_sha256='ed4957417339779dd8ed25fe59a6166326ba9db86d5c1530b1e1c788c9d614d8',
+        teacher_helper_sha256='2e6d5f77f54062c9a08c6390668eb075474ff8772926720b5475d8ca179eb3a6')
+    if (any(d.get(k)!=v for k,v in required.items()) or r.get('name')!='chroma_teacher'
+            or r.get('teacher') is not True or r.get('subjective') is not False
+            or r.get('mode')!='withinref,both' or r.get('val_weight')!=0
+            or d.get('feature_ids')!=selected_ids or d.get('table_sha256')!=r.get('table_sha256')
+            or d.get('keys_sha256')!=r.get('keys_sha256')):
+        raise ValueError('chroma teacher role/loss/producer binding differs')
+    admission=document(d['admission_summary_path'],d['admission_summary_sha256'])
+    bank=document(d['feature_bank_manifest_path'],d['feature_bank_manifest_sha256'])
+    ac=document(d['ac_admission_summary_path'],d['ac_admission_summary_sha256'])
+    ac_kept=ac['totals']['band-ac_kept']
+    fit_rows=232888+sum(ac['per_role'][role]['band-ac_kept'] for role in ['fit','new-train'])
+    if (admission.get('qualified_full_grid') is not True or admission.get('cells')!=696312 or admission.get('views')!=9162
+            or bank.get('qualified_for_leg') is not True or bank.get('rows')!=251685+ac_kept or bank.get('band_ac_included') is not True
+            or ac.get('qualified_full_grid') is not True or ac.get('cells')!=146592 or ac.get('views')!=9162 or ac.get('training_allowed') is not True
+            or bank.get('ac_admission_summary_sha256')!=d['ac_admission_summary_sha256']
+            or bank.get('feature_set_id')!=required['feature_set_id'] or bank.get('binary_sha256')!=required['extractor_sha256']
+            or bank.get('build_commit')!=required['producer_commit']):
+        raise ValueError('complete frozen chroma admission and feature reconciliation required')
+    keys=document(d['keys_path'],d['keys_sha256'])
+    if len(keys)!=fit_rows or d.get('rows')!=len(keys) or r.get('rows')!=len(keys):
+        raise ValueError('chroma fitting population differs')
+    observations=set();counts={};ladders={}
+    for i,k in enumerate(keys):
+        fields=['source','reference','observation','family','ladder','codec_family','mlic_role']
+        if (any(not isinstance(k.get(f),str) or not k[f] for f in fields)
+                or type(k.get('row')) is not int or k['row']!=i or k.get('role')!='fit'
+                or k['mlic_role'] not in ['fit','new-train'] or k['codec_family'] not in ['ycc444','ycc420','xyb-extended','xyb-capped','band-ac']
+                or k['source']!=k['reference'] or k['family'] in excluded or k['observation'] in observations
+                or type(k.get('rung')) is not int or k['rung']<0):
+            raise ValueError('chroma row/role/family identity differs')
+        observations.add(k['observation']);counts[k['source']]=counts.get(k['source'],0)+1
+        rungs=ladders.setdefault(k['ladder'],set())
+        if k['rung'] in rungs:raise ValueError('duplicate chroma ladder rung')
+        rungs.add(k['rung'])
+    if any(len(r)<3 for r in ladders.values()) or counts!=r['source_counts']:
+        raise ValueError('chroma admitted source/ladder population differs')
+    # Match the native owner's ordered f64 operations exactly.
+    total=0.0
+    for key in sorted(counts):total+=1.0-1.0/counts[key]
+    if r['train_weight']!=1.0/(total/len(counts)):
+        raise ValueError('chroma nominal-weight acceptance correction differs')
+    return d
+
+
 def admit_datasets(a, cell_id, groups, selected_ids):
     """Revision-7 TRAIN datasets; v1's registered experiment stays unchanged.
 
@@ -178,6 +232,9 @@ def admit_datasets(a, cell_id, groups, selected_ids):
         pending.append((r, document(str(path)+".manifest.json", r["manifest_sha256"])))
     admitted = {}
     for r, d in pending:
+        if d.get('schema')=='chroma-teacher-leg-v1':
+            admitted[r['name']]=admit_chroma_teacher(r,d,selected_ids,excluded)
+            continue
         if not r.get("subjective"):
             continue
         votes = d.get("schema") == "subjective-training-leg-v3"

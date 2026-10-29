@@ -573,6 +573,11 @@ fn admit_datasets(
         .collect::<Result<_, String>>()?;
     let mut admitted = BTreeMap::new();
     for (r, d) in declarations {
+        if d["schema"] == "chroma-teacher-leg-v1" {
+            super::chroma_admission::admit(&d, r, selected, &excluded, json)?;
+            admitted.insert(string(r, "name")?.to_owned(), d);
+            continue;
+        }
         if r["subjective"] != true {
             continue;
         }

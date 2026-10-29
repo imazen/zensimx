@@ -1,0 +1,13 @@
+[package]
+name = "chroma-admission-check"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[dependencies]
+serde_json = "=1.0.154"
+
+[profile.release]
+lto = "thin"

@@ -489,13 +489,18 @@ pub(super) fn preflight(
                 "subjective-training-leg-v1"
                     | "subjective-training-leg-v2"
                     | "subjective-training-leg-v3"
+                    | "chroma-teacher-leg-v1"
             )
         ) {
             if subjective.get(&g.0) != Some(d) {
                 return Err("unnamed leg has no independently pinned authority".into());
             }
             phases.push((
-                "subjective",
+                if d["schema"] == "chroma-teacher-leg-v1" {
+                    "chroma"
+                } else {
+                    "subjective"
+                },
                 d["rows"].as_u64().ok_or("subjective rows required")? as usize,
                 None,
             ));
@@ -718,7 +723,7 @@ pub(super) fn preflight(
     }
     // Only label-free keys below. No ordinary header/hash/read until ALL pass.
     for ((g, _, d), (phase, count, _)) in declarations.iter().zip(phases) {
-        if phase == "subjective" || phase == "aic" {
+        if phase == "subjective" || phase == "aic" || phase == "chroma" {
             continue;
         } // Private owner verified ordered label-free keys.
         if phase == "hdr" {

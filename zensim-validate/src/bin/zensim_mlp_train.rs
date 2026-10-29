@@ -99,6 +99,8 @@ use zensim_validate::train_manifest;
 #[path = "../contamination_guard.rs"]
 mod contamination_guard;
 
+#[path = "zensim_mlp_train/chroma_admission.rs"]
+mod chroma_admission;
 mod e36_tv;
 #[path = "../subjective_training_leg.rs"]
 mod subjective_training_leg;
