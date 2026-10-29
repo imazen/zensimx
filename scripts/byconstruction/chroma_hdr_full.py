@@ -279,6 +279,61 @@ def admit(root, mirror, ledger, out, qualification=False):
     print(canonical({k:v for k,v in result.items() if k not in ['outputs','per_class']}),flush=True)
 
 
+def consumer_roles(root, mirror, build_commit):
+    """Freeze source-only roles before joining already admitted targets."""
+    import pyarrow.parquet as pq
+    final=json.loads((root/'FINAL.json').read_text())
+    if not final['passed'] or sha(root/'_MANIFEST.json')!=final['manifest_sha256']:
+        raise ValueError('qualified parent archive required')
+    if len(build_commit)!=40 or any(c not in '0123456789abcdef' for c in build_commit):
+        raise ValueError('full role source commit required')
+    sources=json.loads((root/'SOURCE_CENSUS.json').read_text())['sources']
+    grouped=defaultdict(list)
+    for source in sources:
+        if source['split']!='train':raise ValueError('canonical role must remain TRAIN')
+        grouped[source['content_class']].append(source)
+    roles=[]
+    for content_class,items in sorted(grouped.items()):
+        def key(source):return digest(('hdr-chroma-consumer-origin-v1:'+source['id']).encode())
+        ordered=sorted(items,key=key)
+        count=max(1,min(len(items)-1,(3*len(items)+5)//10))
+        for index,source in enumerate(ordered):
+            roles.append(dict(source=source['id'],source_sha256=source['source_sha256'],content_class=content_class,
+                              canonical_split='train',consumer_role='eval' if index<count else 'train',selection_sha256=key(source)))
+    out=root/'consumer-roles-r1';out.mkdir()
+    plan=dict(schema='hdr-chroma-consumer-origin-roles-v1',build_commit=build_commit,parent_manifest_sha256=final['manifest_sha256'],
+              algorithm='Within each class sort sha256(UTF8(hdr-chroma-consumer-origin-v1:<four-digit-id>)); first round-half-up(0.3*n), bounded to [1,n-1], reserved for eval',
+              scope='TRAIN-side holdout for future model fits; canonical corpus split remains train; all views and rungs follow source',
+              prior_exposure='Generation, admission and declared metric comparison already observed; no feature extraction or model training; not an untouched external test',
+              sources=roles)
+    # This label-independent assignment is durable before any target join.
+    save(out/'ORIGIN_ROLES.json',plan)
+    by_source={r['source']:r['consumer_role'] for r in roles}
+    if len(by_source)!=38:raise ValueError('origin role coverage differs')
+    counts={role:Counter(origins=sum(r['consumer_role']==role for r in roles)) for role in ['train','eval']}
+    ladders=pq.read_table(root/'admission-r1/LADDERS.parquet').to_pylist()
+    for ladder in ladders:
+        role=by_source[ladder['source']]
+        if ladder['split']!='train':raise ValueError('canonical ladder role differs')
+        if ladder['family'].startswith('chroma-'):
+            counts[role]['chroma_ladders']+=1
+            counts[role]['admitted_chroma_ladders']+=bool(ladder['kept_indices'])
+            counts[role]['kept_chroma_rungs']+=len(ladder['kept_indices'])
+    views={role:set() for role in counts}
+    for cell in pq.read_table(root/'admission-r1/CELLS.parquet',columns=['source','view_id']).to_pylist():
+        role=by_source[cell['source']];views[role].add(cell['view_id']);counts[role]['cells']+=1
+    for role in counts:counts[role]['views']=len(views[role])
+    if sum(x['kept_chroma_rungs'] for x in counts.values())!=10422:raise ValueError('role join lost admitted rungs')
+    result=dict(passed=True,build_commit=build_commit,parent_manifest_sha256=final['manifest_sha256'],
+                origin_roles_sha256=sha(out/'ORIGIN_ROLES.json'),counts=counts,features=False,training=False)
+    save(out/'SUMMARY.json',result)
+    destination=mirror/out.name;destination.mkdir()
+    for source in sorted(out.iterdir()):
+        shutil.copyfile(source,destination/source.name)
+        if sha(source)!=sha(destination/source.name):raise ValueError('consumer role mirror differs')
+    print(canonical(result),flush=True)
+
+
 def seal(root,mirror,build_commit):
     import random
     import pyarrow.parquet as pq
@@ -686,6 +741,7 @@ if __name__ == '__main__':
     a = s.add_parser('audit-raw-ledgers'); a.add_argument('directory',type=Path); a.add_argument('out',type=Path)
     a = s.add_parser('snapshot-rates'); a.add_argument('root',type=Path); a.add_argument('out',type=Path)
     a = s.add_parser('mirror-cas'); a.add_argument('root',type=Path); a.add_argument('mirror',type=Path); a.add_argument('receipt',type=Path)
+    a = s.add_parser('consumer-roles'); a.add_argument('root',type=Path); a.add_argument('mirror',type=Path); a.add_argument('build_commit')
     a = s.add_parser('seal'); a.add_argument('root',type=Path); a.add_argument('mirror',type=Path); a.add_argument('build_commit')
     a = p.parse_args()
     if a.command == 'census': census(a.repo, a.out)
@@ -700,6 +756,7 @@ if __name__ == '__main__':
     elif a.command == 'comparison': comparison(a.root,a.mirror,a.teacher,a.base,a.out)
     elif a.command == 'audit-raw-ledgers': audit_raw_ledgers(a.directory,a.out)
     elif a.command == 'mirror-cas': mirror_cas(a.root,a.mirror,a.receipt)
+    elif a.command == 'consumer-roles': consumer_roles(a.root,a.mirror,a.build_commit)
     elif a.command == 'seal': seal(a.root,a.mirror,a.build_commit)
     elif a.command == 'snapshot-rates': snapshot_rates(a.root,a.out)
     elif a.command == 'oracle-all': oracle_all(a.ledger,a.archive,a.oracle_base,a.golden,a.script,a.out,a.threads)

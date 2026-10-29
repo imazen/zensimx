@@ -1,5 +1,34 @@
 # DATA_SPLITS.md — canonical train/val/test conventions (locked 2026-07-02)
 
+## October 29 — HDR chroma teacher origin holdout
+
+The consumer addendum requests source-disjoint held-out HDR ladders. All 38
+origins retain their canonical imazen-26 TRAIN role. For future fitting only,
+26 origins are fit/development TRAIN and 12 are reserved EVAL within TRAIN;
+all views, qualities and chroma rungs inherit the origin role. Canonical
+validation/test origins were never generated or read.
+
+Within each content class, sort SHA-256 of the UTF-8 string
+`hdr-chroma-consumer-origin-v1:<four-digit-id>`. Reserve the first
+round-half-up(0.3*n), bounded to [1,n-1], for EVAL. This source-only rule uses
+no score, admission rate or model result. Exact memberships:
+
+| Class | Consumer TRAIN origins | Consumer EVAL origins |
+|---|---|---|
+| 1000-lilith-photos-general | 1064, 1070 | 1066 |
+| 1200-lilith-interiors | 1228, 1230, 1234, 1236, 1238, 1242, 1244 | 1232, 1240, 1246 |
+| 1400-lilith-nature | 1488, 1490, 1492, 1494, 1496, 1498, 1504, 1520, 1522, 1526, 1528, 1530, 1532, 1536, 1540, 1546 | 1502, 1508, 1516, 1524, 1534, 1542, 1544 |
+| 1600-lilith-food | 1640 | 1638 |
+
+Exposure: generation, admission and the declared metric comparison preceded
+this assignment. No features or model fits were produced. This is a reserved
+future-fit gate, not an untouched external test. EVAL sources must be excluded
+from every P2/P3 fit, rehearsal and weight-selection leg; choose weights using
+a separate partition within consumer TRAIN. Luma controls stay diagnostic.
+The immutable generation archive remains unchanged; `consumer-roles-r1/`
+links its membership receipt to the parent manifest SHA-256. See the
+[complete HDR chroma pointer](../benchmarks/chroma_hdr_full_2026-10-28.pointer.md).
+
 ## October 29 — owner override for two human HDR collections
 
 Owner decision, verbatim: **"for hdr, we probs need human training data, as well as eval sets"**.
