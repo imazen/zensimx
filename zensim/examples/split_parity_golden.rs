@@ -19,6 +19,7 @@
 //! ```
 #![allow(deprecated)]
 
+include!("split_parity/hdr.rs");
 include!("split_parity/pairs.rs");
 include!("split_parity/surfaces.rs");
 
@@ -188,4 +189,89 @@ fn main() {
         }
     }
     extra_surfaces(&profiles[..5], &pairs, &line);
+    hdr_surfaces(&line);
+}
+
+/// HDR cases — the native HDR feature route (`Basic ∪ Peaks ∪ V2` at the
+/// pinned revision) over the shared `hdr.rs` fixtures. The slim crate must
+/// reproduce every emitted feature bit for bit.
+///
+/// Rows: `hdrfeat` — one `<caseid>:f<slot>` row per emitted slot (f64 bits)
+/// plus one `<caseid>:sum` row hashing the whole vector.
+#[cfg(feature = "feature-regime-v2")]
+fn hdr_surfaces(line: &impl Fn(&str, &str, &str, String)) {
+    use zensim::feature_set_id::ComputeToken;
+    use zensim::feature_v2::HdrEncoding;
+    use zensim::research::{Request, extract_hdr, family_slots};
+    use zensim::source::{AlphaMode, ColorPrimaries, PixelFormat, StridedBytes};
+
+    let slots = family_slots(ComputeToken::Basic)
+        .union(&family_slots(ComputeToken::Peaks))
+        .union(&family_slots(ComputeToken::V2));
+    for c in hdr_cases() {
+        let enc = match c.enc {
+            0 => HdrEncoding::Linear,
+            1 => HdrEncoding::Pq { peak_nits: 1000.0 },
+            2 => HdrEncoding::Pq {
+                peak_nits: 10_000.0,
+            },
+            _ => HdrEncoding::Hlg {
+                peak_nits: 1000.0,
+                ambient_lux: 5.0,
+            },
+        };
+        let fmt = if c.srgb16 {
+            PixelFormat::Srgb16Rgba
+        } else {
+            PixelFormat::LinearF32Rgba
+        };
+        let pri = if c.bt2020 {
+            ColorPrimaries::Bt2020
+        } else {
+            ColorPrimaries::Srgb
+        };
+        let mk = |dst: bool| {
+            let (bytes, stride) = gen_hdr_image(&c, dst);
+            let bytes: &'static [u8] = Box::leak(bytes.into_boxed_slice());
+            StridedBytes::try_with_alpha_mode(
+                bytes,
+                c.width,
+                c.height,
+                stride,
+                fmt,
+                AlphaMode::Opaque,
+            )
+            .expect("hdr fixture source")
+            .with_color_primaries(pri)
+        };
+        let src = mk(false);
+        let dst = mk(true);
+        let req = Request::for_slots(slots.clone(), HDR_FEATURE_WIDTH).with_parallel(c.parallel);
+        let id = hdr_case_id(&c);
+        match extract_hdr(&req, &src, &dst, enc) {
+            Ok(x) => {
+                let v = x.values();
+                line(
+                    "hdrfeat",
+                    c.enc_name,
+                    &format!("{id}:sum"),
+                    format!("{:016x}", f64s(v)),
+                );
+                for (i, f) in v.iter().enumerate() {
+                    line(
+                        "hdrfeat",
+                        c.enc_name,
+                        &format!("{id}:f{i}"),
+                        format!("{:016x}", f.to_bits()),
+                    );
+                }
+            }
+            Err(e) => line(
+                "hdrfeat",
+                c.enc_name,
+                &format!("{id}:sum"),
+                format!("ERR {e:?}"),
+            ),
+        }
+    }
 }
