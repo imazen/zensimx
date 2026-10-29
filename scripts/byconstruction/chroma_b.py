@@ -367,9 +367,10 @@ def prepare_diagnostic_selection(ledger, archive, out):
     save(out/'PROGRESS.json',dict(stage='complete; diagnostic selection only',views=len(rows),selected_cells=len(selections),qualified_full_grid=False))
 
 
-def harvest_diagnostics(ledger, admission_dir, archive, out, qualification=False):
+def harvest_diagnostics(ledger, admission_dir, archive, out, qualification=False, verify_threads=1):
     """Read back the declared sample; diagnostics never change target admission."""
     import numpy as np
+    assert 1<=verify_threads<=8
     out.mkdir()
     if not qualification:
         summary=json.loads((admission_dir/'SUMMARY.json').read_text())
@@ -390,13 +391,34 @@ def harvest_diagnostics(ledger, admission_dir, archive, out, qualification=False
     assert len({r['job_id'] for r in rows})==len(rows)
     verified=set();verified_maps=set();counts=Counter();classes=Counter();roles=Counter();reasons=Counter();buffer=[];writer=None
     implementation='zenmetrics@0a61830db89a768ab9462f166d1412e948e4efa9;display=standard_4k;exe-sha256='+PINS[2]
+    current_objects=None
     def read_object(digest):
-        data=cas(archive,digest).read_bytes()
+        data=current_objects[digest] if current_objects is not None else cas(archive,digest).read_bytes()
         assert hashlib.sha256(data).hexdigest()==digest
         verified.add(digest)
         return data
+    def prefetch(row):
+        primary=cas(archive,row['output_sha']).read_bytes()
+        assert hashlib.sha256(primary).hexdigest()==row['output_sha']
+        result=json.loads(primary);digests=set(result['sidecars'].values())
+        for cell in result['cells']:
+            digests.add(cell['evif_sha256'])
+            digests.update(b['sha256'] for b in cell['diffmaps'].values())
+        objects={row['output_sha']:primary}
+        for digest in digests:
+            assert len(digest)==64 and all(c in '0123456789abcdef' for c in digest)
+            objects[digest]=cas(archive,digest).read_bytes()
+        return row,objects
+    def receipts():
+        ordered=sorted(rows,key=lambda r:r['image_path'])
+        if verify_threads==1:
+            yield from ((row,None) for row in ordered)
+        else:
+            with ThreadPoolExecutor(max_workers=verify_threads) as pool:
+                for start in range(0,len(ordered),verify_threads):
+                    yield from pool.map(prefetch,ordered[start:start+verify_threads])
     try:
-        for index,row in enumerate(sorted(rows,key=lambda r:r['image_path'])):
+        for index,(row,current_objects) in enumerate(receipts()):
             view=views[row['image_path']];expected=selected[row['image_path']]
             result=json.loads(read_object(row['output_sha']))
             assert result['schema']=='evif-diagnostics-v1' and result['implementation']==implementation
@@ -497,8 +519,8 @@ if __name__=='__main__':
     a=s.add_parser('source-accounting');a.add_argument('out',type=Path)
     a=s.add_parser('diagnostics-spec');a.add_argument('admission_dir',type=Path);a.add_argument('out',type=Path)
     a=s.add_parser('prepare-diagnostics');a.add_argument('ledger',type=Path);a.add_argument('archive',type=Path);a.add_argument('out',type=Path)
-    a=s.add_parser('harvest-diagnostics');a.add_argument('ledger',type=Path);a.add_argument('admission_dir',type=Path);a.add_argument('archive',type=Path);a.add_argument('out',type=Path)
-    a=s.add_parser('qualify-diagnostics');a.add_argument('ledger',type=Path);a.add_argument('admission_dir',type=Path);a.add_argument('archive',type=Path);a.add_argument('out',type=Path)
+    a=s.add_parser('harvest-diagnostics');a.add_argument('ledger',type=Path);a.add_argument('admission_dir',type=Path);a.add_argument('archive',type=Path);a.add_argument('out',type=Path);a.add_argument('--verify-threads',type=int,default=1)
+    a=s.add_parser('qualify-diagnostics');a.add_argument('ledger',type=Path);a.add_argument('admission_dir',type=Path);a.add_argument('archive',type=Path);a.add_argument('out',type=Path);a.add_argument('--verify-threads',type=int,default=1)
     a=s.add_parser('seal');a.add_argument('out',type=Path);a.add_argument('build_commit');a.add_argument('diagnostic_ledger',type=Path);a.add_argument('diagnostic_result',type=Path)
     a=p.parse_args()
     if a.command=='spec':specification(a.out,a.one_view,a.band_ac)
@@ -514,6 +536,6 @@ if __name__=='__main__':
     elif a.command=='source-accounting':source_accounting(a.out)
     elif a.command=='diagnostics-spec':diagnostic_spec(a.admission_dir,a.out)
     elif a.command=='prepare-diagnostics':prepare_diagnostic_selection(a.ledger,a.archive,a.out)
-    elif a.command=='harvest-diagnostics':harvest_diagnostics(a.ledger,a.admission_dir,a.archive,a.out)
-    elif a.command=='qualify-diagnostics':harvest_diagnostics(a.ledger,a.admission_dir,a.archive,a.out,qualification=True)
+    elif a.command=='harvest-diagnostics':harvest_diagnostics(a.ledger,a.admission_dir,a.archive,a.out,verify_threads=a.verify_threads)
+    elif a.command=='qualify-diagnostics':harvest_diagnostics(a.ledger,a.admission_dir,a.archive,a.out,qualification=True,verify_threads=a.verify_threads)
     else:seal_stage_b(a.out,a.build_commit,a.diagnostic_ledger,a.diagnostic_result)
