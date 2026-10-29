@@ -2,7 +2,8 @@
 
 The original mixed subjective/objective CSVs and all SDR images are forbidden.
 Extraction uses upiq_pu_score's pinned label-free mode, the production Rev5
-research HDR walk and zenexr native BT.709 absolute nits. No model is fitted.
+research HDR walk and zenexr native BT.709 absolute nits. prepare-rev7 binds a
+separate 576-slot native feature admission and does not authorize label ingestion. No model is fitted.
 """
 import argparse
 import csv
@@ -60,12 +61,15 @@ def metadata_rows(root):
     return rows
 
 
-def admit_metadata(a):
+def admit_metadata(a, *, native_rev7=False):
     """Check the complete member/path declaration before payload hashing."""
-    if (a.get("schema") != "upiq380-extraction-admission-v1" or a.get("role") != "train"
+    revision = 7 if native_rev7 else 5
+    schema = "upiq380-extraction-admission-rev7-v1" if native_rev7 else "upiq380-extraction-admission-v1"
+    ids = list(range(228)) + list(range(372, 720)) if native_rev7 else columns("by_v2fy")
+    if (a.get("schema") != schema or a.get("role") != "train"
             or a.get("tier") != "T2" or a.get("authority") != "D3-2026-10-07"
-            or a.get("formula_revision") != 5 or a.get("input_contract") != "upiq-exr-bt709-nits-v1"
-            or a.get("requested_ids") != columns("by_v2fy") or a.get("split_rule") != RULE
+            or a.get("formula_revision") != revision or a.get("input_contract") != "upiq-exr-bt709-nits-v1"
+            or a.get("requested_ids") != ids or a.get("split_rule") != RULE
             or a.get("target_transform") != TRANSFORM
             or a.get("label_file_approved") != str(LABEL) or a.get("label_sha256") != LABEL_SHA
             or not Path(a.get("image_root", "")).is_absolute()):
@@ -95,17 +99,19 @@ def admit_metadata(a):
 
 
 def prepare(args):
+    native_rev7 = args.command == "prepare-rev7"
     dest = Path(args.dest)
     dest.mkdir(parents=True, exist_ok=False)
     root = Path(args.images)
     rows = metadata_rows(root)
-    a = dict(schema="upiq380-extraction-admission-v1", role="train", tier="T2", authority="D3-2026-10-07",
-        input_contract="upiq-exr-bt709-nits-v1", formula_revision=5, requested_ids=columns("by_v2fy"),
+    a = dict(schema="upiq380-extraction-admission-rev7-v1" if native_rev7 else "upiq380-extraction-admission-v1", role="train", tier="T2", authority="D3-2026-10-07",
+        input_contract="upiq-exr-bt709-nits-v1", formula_revision=7 if native_rev7 else 5,
+        requested_ids=list(range(228)) + list(range(372, 720)) if native_rev7 else columns("by_v2fy"),
         image_root=str(root), rows=rows, split_rule=RULE, target_transform=TRANSFORM,
         label_file_approved=str(LABEL), label_sha256=LABEL_SHA, build_commit=args.build_commit,
         metadata_readme=str(README), metadata_readme_sha256=sha(README),
         legacy_label_subset_producer_commit=None, original_mixed_UPIQ_CSV_read=False)
-    admit_metadata(a)
+    admit_metadata(a, native_rev7=native_rev7)
     # Persist the member set and label-independent rule before any pixel/label read.
     write(dest / "membership-before-payloads.json", a)
     hashes = {}
@@ -274,7 +280,7 @@ def verify(args):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("command", choices=["prepare", "ingest", "verify"])
+    ap.add_argument("command", choices=["prepare", "prepare-rev7", "ingest", "verify"])
     ap.add_argument("--dest", required=True)
     ap.add_argument("--images", default=str(ROOT))
     ap.add_argument("--build-commit", required=True)
@@ -282,7 +288,7 @@ def main():
     ap.add_argument("--binary")
     ap.add_argument("--audit-out", help="Fresh verification receipt path; preserves existing canonical receipts")
     args = ap.parse_args()
-    {"prepare": prepare, "ingest": ingest, "verify": verify}[args.command](args)
+    {"prepare": prepare, "prepare-rev7": prepare, "ingest": ingest, "verify": verify}[args.command](args)
 
 
 if __name__ == "__main__":

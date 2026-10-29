@@ -60,6 +60,16 @@ class UpiqAdmission(unittest.TestCase):
                 a[field] = value
                 self.refuse_without_opens(a)
 
+    def test_rev7_is_explicit_and_does_not_grant_label_ingestion(self):
+        a = copy.deepcopy(self.a)
+        a.update(schema="upiq380-extraction-admission-rev7-v1", formula_revision=7,
+                 requested_ids=list(range(228)) + list(range(372, 720)))
+        self.assertEqual(len(u.admit_metadata(a, native_rev7=True)), 380)
+        self.refuse_without_opens(a)  # Existing Rev5 target reader still refuses it.
+        a["rows"][-1]["dataset"] = "live"
+        with self.assertRaises(ValueError):
+            u.admit_metadata(a, native_rev7=True)
+
     def test_bad_last_member_and_duplicate_refuse_before_any_label_open(self):
         for field, value in [("dataset", "live"), ("distorted_rel", "../live/image.png"),
                 ("condition_id", "l-i01-l-01-1"), ("reference_rel", "tid2013/01/i01.png")]:
