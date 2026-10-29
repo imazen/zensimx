@@ -8,6 +8,58 @@ import re
 import subprocess
 import sys
 from chroma_pilot import save,sha
+
+def batch_view(receipt_path,archive,oracle_base,out,golden):
+    """One independent decoder/header process per whole view, no re-encode."""
+    out.mkdir(parents=True)
+    env=os.environ.copy();env['LD_LIBRARY_PATH']=str(oracle_base/'ffmpeg-libs')
+    receipt=json.loads(receipt_path.read_text());cells=receipt['cells']
+    def cas(value):return archive/value[:2]/value[2:4]/value
+    files=[]
+    for cell in cells:
+        path=cas(cell['encoded_sha256'])
+        if sha(path)!=cell['encoded_sha256']:raise ValueError('independent oracle CAS differs')
+        files.append(path)
+    listing=out/'files.ffconcat'
+    listing.write_text('ffconcat version 1.0\n'+''.join("file '"+str(p)+"'\n" for p in files))
+    ffmpeg=str(oracle_base/'bin/ffmpeg')
+    trace=out/'headers.log'
+    with trace.open('x') as log:
+        subprocess.run([ffmpeg,'-v','verbose','-threads','1','-f','concat','-safe','0','-i',str(listing),'-map','0:v:0','-c:v','copy','-bsf:v','trace_headers','-f','null','-'],env=env,stdout=log,stderr=subprocess.STDOUT,check=True)
+    text=trace.read_text()
+    def field(chunk,key):
+        values=re.findall(r'\b'+key+r'(?:\.delta_q)?\s+[^\n]*?=\s*(-?\d+)',chunk)
+        if values:return sorted(set(map(int,values)))
+        coded=re.findall(r'\b'+key+r'\.delta_coded\s+[^\n]*?=\s*(-?\d+)',chunk)
+        return [0] if coded and set(coded)=={'0'} else []
+    for key,value in [('color_primaries',9),('transfer_characteristics',16),('matrix_coefficients',6),('color_range',1),('seq_profile',0),('mono_chrome',0),('high_bitdepth',1),('separate_uv_delta_q',0)]:
+        actual=field(text,key)
+        if actual!=[value]:raise ValueError(f'AV1 coding {key}={actual} expected{value}')
+    info=json.loads(subprocess.check_output([str(oracle_base/'bin/ffprobe'),'-v','error','-show_streams','-of','json',str(files[0])],env=env,text=True))['streams'][0]
+    for key,value in dict(codec_name='av1',pix_fmt='yuv420p10le',color_primaries='bt2020',color_transfer='smpte2084',color_space='smpte170m',color_range='pc').items():
+        if info.get(key)!=value:raise ValueError('independent AVIF stream coding differs: '+key)
+    chunks=re.split(r'(?=\bbase_q_idx\s)',text)[1:]
+    if len(chunks)!=len(cells):raise ValueError(f'AV1 frame count differs: {len(chunks)} vs {len(cells)}')
+    expected=json.loads(golden.read_text())['quality_qindices']
+    results=[]
+    for cell,chunk in zip(cells,chunks):
+        header={key:field(chunk,key) for key in ['base_q_idx','delta_q_y_dc','delta_q_u_dc','delta_q_u_ac']}
+        if header['base_q_idx']!=expected[str(cell['quality'])]:raise ValueError('luma quantizer differs from frozen A3')
+        if header['delta_q_y_dc']!=[0]:raise ValueError('luma DC delta changed')
+        for key in ['delta_q_u_dc','delta_q_u_ac']:
+            if header[key]!=[cell['chroma_q'][0]]:raise ValueError('shared chroma qindex delta differs')
+        results.append(dict(encoded_sha256=cell['encoded_sha256'],quality=cell['quality'],chroma_q=cell['chroma_q'],header=header))
+    with (out/'dav1d.framemd5').open('x') as log,(out/'dav1d.stderr').open('x') as err:
+        subprocess.run([ffmpeg,'-v','error','-xerror','-threads','1','-c:v','libdav1d','-f','concat','-safe','0','-i',str(listing),'-map','0:v:0','-threads','1','-pix_fmt','yuv420p10le','-fps_mode','passthrough','-f','framemd5','-'],env=env,stdout=log,stderr=err,check=True)
+    frames=[line for line in (out/'dav1d.framemd5').read_text().splitlines() if line and not line.startswith('#')]
+    if len(frames)!=len(cells):raise ValueError('independent dav1d decode lost/added frames')
+    result=dict(passed=True,cells=len(cells),receipt_sha256=sha(receipt_path),ffmpeg_sha256=sha(oracle_base/'bin/ffmpeg'),headers_sha256=sha(trace),framemd5_sha256=sha(out/'dav1d.framemd5'),records=results,oracle='FFmpeg/libdav1d 8.0.1-3ubuntu2; decode/inspect only')
+    save(out/'ORACLE.json',result);print(json.dumps(dict(passed=True,cells=len(cells))),flush=True)
+
+if '--view-receipt' in sys.argv:
+    p=argparse.ArgumentParser();p.add_argument('--view-receipt',type=Path,required=True);p.add_argument('--archive',type=Path,required=True);p.add_argument('--oracle-base',type=Path,required=True);p.add_argument('--out',type=Path,required=True);p.add_argument('--golden',type=Path,required=True)
+    a=p.parse_args();batch_view(a.view_receipt,a.archive,a.oracle_base,a.out,a.golden);sys.exit(0)
+
 parser=argparse.ArgumentParser();parser.add_argument('root',type=Path);parser.add_argument('--quality-grid',action='store_true');parser.add_argument('--oracle-base',type=Path);args=parser.parse_args()
 root=args.root;base=args.oracle_base or root.parent;env=os.environ.copy();env['LD_LIBRARY_PATH']=str(base/'ffmpeg-libs')
 records=json.loads((root/'ENCODES.json').read_text());tested=[]

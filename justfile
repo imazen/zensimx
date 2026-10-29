@@ -3942,3 +3942,7 @@ hdr-source-membership out build_commit:
 
 hdr-source-membership-check:
     python3 -m unittest discover -s scripts/tests -p test_hdr_source_membership.py
+
+chroma-hdr-full +args:
+    python3 -B scripts/byconstruction/chroma_hdr_full.py {{args}}
+
