@@ -98,6 +98,112 @@ def sha(p) -> str:
 DATASET_MOS = ("pipal", "mdid", "live-md", "cid-iq", "cid-oa", "vcl-fer", "irccyn-ivc",
                "colourlab-rating-variability-2022")
 DATASET_PAIR = ("bapps", "pieapp", "fg-iqa")
+
+
+def bank_transport(table, references, targets, width):
+    """The canonical gapped bank -> f32 trainer transport; target doubles retained."""
+    table=table.select([f'f{i}' for i in range(1825)]).cast(pa.schema([(f'f{i}',pa.float32()) for i in range(1825)]))
+    for i in range(1825,width):table=table.append_column(f'f{i}',pa.array(np.full(table.num_rows,np.nan,dtype=np.float32)))
+    table=table.append_column('ref_basename',pa.array(references))
+    return table.append_column('human_score',pa.array(targets,type=pa.float64()))
+
+
+def cmd_chroma(a):
+    """Append the frozen SDR teacher leg; keep development/calibration separate."""
+    source,out,bank=Path(a.root),Path(a.out),Path(a.bank)
+    parent_pin=sha(source/'wide/frozen.json')
+    if parent_pin!='a7fd4af0c2bb5a8981be636e5c1cb1a51db57496b7c60d7bf6da01d71dd16952':
+        raise ValueError('registered Mlic parent required')
+    manifest=json.loads((bank/'_MANIFEST.json').read_text())
+    if (not manifest.get('qualified_for_leg') or manifest.get('core_rows')!=251685 or manifest.get('band_ac_included') is not True
+            or manifest.get('binary_sha256')!='ed4957417339779dd8ed25fe59a6166326ba9db86d5c1530b1e1c788c9d614d8'
+            or manifest.get('feature_set_id')!='basic+peaks+v2@w1825/rev7_rowlanes#36c3f3af'):
+        raise ValueError('complete frozen chroma feature reconciliation required')
+    for name,field in [('features.parquet','features_parquet_sha256'),('keys.parquet','keys_sha256')]:
+        if sha(bank/name)!=manifest[field]:raise ValueError('chroma feature bank changed')
+    if out.exists():raise ValueError('chroma root destination must be fresh')
+    packet=json.loads((source/'datasets/receipt.json').read_text());selected=packet['feature_ids']
+    original_paths=Path(packet['family_guard_path']).parent.parent
+    width=json.loads((source/'wide/main/real/receipt.json').read_text())['width']
+    shutil.copytree(source,out);(out/'diagnostics').mkdir()
+    train_path=out/'datasets/chroma.parquet';diagnostic_path=out/'diagnostics/chroma.parquet'
+    train_writer=None;diagnostic_writer=None;keys=[];diagnostic_keys=[];counts=collections.Counter();roles=collections.Counter();ladder_counts=collections.Counter();train_rows=0;diagnostic_rows=0
+    features=pq.ParquetFile(bank/'features.parquet');bank_keys=pq.ParquetFile(bank/'keys.parquet')
+    try:
+        for fb,kb in zip(features.iter_batches(batch_size=1000),bank_keys.iter_batches(batch_size=1000),strict=True):
+            f=pa.Table.from_batches([fb]);k=pa.Table.from_batches([kb]);records=k.to_pylist()
+            if f['pair_key'].to_pylist()!=k['pair_key'].to_pylist():raise ValueError('chroma key/feature order differs')
+            for training in [True,False]:
+                indices=[i for i,r in enumerate(records) if (r['mlic_role'] in ['fit','new-train'])==training]
+                if not indices:continue
+                rows=[records[i] for i in indices]
+                refs=['chroma:'+r['view_id'] for r in rows]
+                transported=bank_transport(f.take(pa.array(indices)),refs,[r['teacher_ssim2'] for r in rows],width)
+                for value,r in zip(transported['human_score'].to_pylist(),rows):
+                    if __import__('struct').pack('>d',value).hex()!=r['teacher_bits']:raise ValueError('chroma target bits changed')
+                if training:
+                    if train_writer is None:train_writer=pq.ParquetWriter(train_path,transported.schema,compression='zstd')
+                    train_writer.write_table(transported)
+                    for ref,r in zip(refs,rows):
+                        keys.append(dict(row=train_rows,observation=r['pair_key'],source=ref,reference=ref,family=r['reference_group'],
+                            role='fit',mlic_role=r['mlic_role'],codec_family=r['family'],ladder=r['view_id']+'|'+r['family'],rung=r['rung']))
+                        counts[ref]+=1;roles[r['mlic_role']]+=1;ladder_counts[r['view_id']+'|'+r['family']]+=1;train_rows+=1
+                else:
+                    if diagnostic_writer is None:diagnostic_writer=pq.ParquetWriter(diagnostic_path,transported.schema,compression='zstd')
+                    diagnostic_writer.write_table(transported);diagnostic_keys.extend(rows);diagnostic_rows+=len(rows)
+            (out/'CHROMA_PROGRESS.json').write_text(json.dumps(dict(stage='teacher transport',fit=train_rows,diagnostic=diagnostic_rows))+'\n')
+    finally:
+        if train_writer:train_writer.close()
+        if diagnostic_writer:diagnostic_writer.close()
+    if (train_rows,diagnostic_rows)!=(manifest['per_role']['fit']+manifest['per_role']['new-train'],manifest['per_role']['dev']+manifest['per_role']['calibration']) or min(ladder_counts.values())<3:raise ValueError('chroma role/ladder population differs')
+    kp=out/'datasets/chroma.keys.json';kp.write_text(json.dumps(keys,separators=(',',':'))+'\n')
+    pq.write_table(pa.Table.from_pylist(diagnostic_keys),out/'diagnostics/chroma.keys.parquet',compression='zstd')
+    total=0.0
+    for key in sorted(counts):total+=1.0-1.0/counts[key]
+    weight=1.0/(total/len(counts))
+    # Parent payloads and declarations stay byte-identical; only receipt paths move.
+    for r in packet['groups']:
+        for field in ['path','keys_path']:r[field]=str(out/Path(r[field]).relative_to(original_paths))
+        if sha(r['path'])!=r['table_sha256'] or sha(r['keys_path'])!=r['keys_sha256']:raise ValueError('inherited leg changed')
+        if sha(r['path']+'.manifest.json')!=r['manifest_sha256']:raise ValueError('inherited declaration changed')
+    packet['family_guard_path']=str(out/Path(packet['family_guard_path']).relative_to(original_paths))
+    admission=Path(a.admission)
+    declaration=dict(schema='chroma-teacher-leg-v1',loss='within-source-rank-and-scale',nominal_weight=1.0,
+        target_orientation='quality',target_transform='identity-ssimulacra2-unclipped',target_column='human_score',
+        selection='fixed-final-epoch',formula_revision=7,tier='v3',feature_ids=selected,feature_set_id=manifest['feature_set_id'],
+        producer_commit=manifest['build_commit'],extractor_sha256=manifest['binary_sha256'],
+        teacher_helper_sha256='2e6d5f77f54062c9a08c6390668eb075474ff8772926720b5475d8ca179eb3a6',
+        native_role='TRAIN',rows=train_rows,table_sha256=sha(train_path),keys_path=str(kp),keys_sha256=sha(kp),
+        admission_root=str(out),training_width=width,admission_summary_path=str(admission),admission_summary_sha256=sha(admission),
+        feature_bank_manifest_path=str(bank/'_MANIFEST.json'),feature_bank_manifest_sha256=sha(bank/'_MANIFEST.json'),
+        ac_admission_summary_path=manifest['ac_admission_summary_path'],ac_admission_summary_sha256=manifest['ac_admission_summary_sha256'])
+    dp=Path(str(train_path)+'.manifest.json');dp.write_text(json.dumps(declaration,indent=1)+'\n')
+    record=dict(name='chroma_teacher',path=str(train_path),teacher=True,subjective=False,train_weight=weight,val_weight=0.0,
+        mode='withinref,both',table_sha256=declaration['table_sha256'],manifest_sha256=sha(dp),keys_path=str(kp),keys_sha256=sha(kp),
+        rows=train_rows,source_counts=dict(sorted(counts.items())),collection='chroma',groups=len(counts),nominal_weight=1.0)
+    packet['groups'].append(record);packet['chroma_teacher']=dict(parent_frozen_sha256=parent_pin,feature_bank_manifest_sha256=sha(bank/'_MANIFEST.json'),
+        diagnostics_path=str(diagnostic_path),diagnostic_rows=diagnostic_rows,diagnostics_in_training=False,band_ac_included=True,build_only=True)
+    pp=out/'datasets/receipt.json';pp.write_text(json.dumps(packet,indent=1)+'\n')
+    frozen=json.loads((out/'wide/frozen.json').read_text());view=dict(frozen['admission_view'])
+    view['immutable_input_roots']=list(dict.fromkeys(view['immutable_input_roots']+[str(source),str(bank),str(out)]))
+    receipt_path=out/'wide/main/real/receipt.json';receipt=json.loads(receipt_path.read_text());receipt['admission_view']=view
+    receipt_path.write_text(json.dumps(receipt,indent=1)+'\n')
+    frozen.update(admission_view=view,wide_receipts={'main/real':sha(receipt_path)},dataset_legs_sha256=sha(pp),byc_chroma=packet['chroma_teacher'])
+    frozen['auxiliary_files']={rel:sha(out/rel) for rel in frozen['auxiliary_files']}
+    frozen['auxiliary_files'].update({'datasets/receipt.json':sha(pp),'datasets/chroma.parquet':sha(train_path),
+        'datasets/chroma.parquet.manifest.json':sha(dp),'datasets/chroma.keys.json':sha(kp)})
+    (out/'wide/frozen.json').write_text(json.dumps(frozen,indent=1)+'\n')
+    changed={'wide/frozen.json','wide/main/real/receipt.json','datasets/receipt.json','_MANIFEST.json'}
+    for path in source.rglob('*'):
+        if path.is_file() and str(path.relative_to(source)) not in changed:
+            if sha(path)!=sha(out/path.relative_to(source)):raise ValueError('inherited root payload changed')
+    (out/'_MANIFEST.json').write_text(json.dumps(dict(schema='chroma-derived-root-v1',build_commit=a.build_commit,
+        parent_root=str(source),parent_frozen_sha256=parent_pin,frozen_sha256=sha(out/'wide/frozen.json'),
+        feature_bank_manifest_sha256=sha(bank/'_MANIFEST.json'),fit_rows=train_rows,diagnostic_rows=diagnostic_rows,
+        source_groups=len(counts),ladder_groups=len(ladder_counts),nominal_weight=1.0,train_weight=weight,
+        grouping='within each prepared reference view, across all five labelled admitted families',diagnostics_in_training=False,
+        band_ac_included=True,training_launched=False),indent=1)+'\n')
+    return 0
 DATASET_SUBSETS = ("colourlab-cognitive-science-2022", "irccyn-ivc-broken-arrows",
                    "irccyn-ivc-dibr-images", "irccyn-ivc-dwt-dtcwt", "irccyn-ivc-enrico",
                    "irccyn-ivc-toyama-scores")
@@ -537,16 +643,8 @@ def cmd_datasets(a):
         if len(index) != tab.num_rows:
             raise ValueError("duplicate dataset bank key")
         tab = tab.take(pa.array([index[r["pair_key"]] for r in obs]))
-        # Keep the canonical gapped width; absent slots stay NaN, never zero-filled.
-        tab = tab.select([f"f{i}" for i in range(1825)]).cast(pa.schema(
-            [(f"f{i}", pa.float32()) for i in range(1825)]))
-        # The inherited v2 trainer transport is width1853 even though the
-        # registered measurement surface ends at1824. Match that transport;
-        # these unmeasured tail columns remain NaN and are never selected.
-        for i in range(1825, training_width):
-            tab = tab.append_column(f"f{i}",pa.array(np.full(len(obs),np.nan,dtype=np.float32)))
-        tab = tab.append_column("ref_basename",pa.array([r["ref_basename"] for r in obs]))
-        tab = tab.append_column("human_score",pa.array([r["human_score"] for r in obs]))
+        tab = bank_transport(tab, [r["ref_basename"] for r in obs],
+                             [r["human_score"] for r in obs], training_width)
         leg_token = c if protocol is None else c+"--"+protocol.removesuffix(".tsv")
         path = legdir/f"{leg_token}.parquet"
         write(tab, path)
@@ -1012,6 +1110,8 @@ def cmd_selection_rebind(a):
         if d.get("feature_ids") != packet["feature_ids"]:
             raise ValueError(f"{manifest}: leg declaration selection differs from the receipt")
         d["feature_ids"], d["admission_root"] = selected, str(out)
+        if d.get("schema") == "chroma-teacher-leg-v1":
+            d["keys_path"] = moved(d["keys_path"])
         manifest.write_text(json.dumps(d, indent=1)+"\n")
         g["path"], g["keys_path"], g["manifest_sha256"] = moved(g["path"]), moved(g["keys_path"]), sha(manifest)
         rewritten[str(manifest.relative_to(out))] = g["manifest_sha256"]
@@ -1021,6 +1121,8 @@ def cmd_selection_rebind(a):
                       ",".join(map(str, previous)).encode()).hexdigest(), declaration=a.declaration,
                       declaration_path=str(decl_path), declaration_sha256=decl_pin, labels_read=False,
                       method="leg tables byte-identical to the parent; every selected column measured (no NaN)"))
+    if "chroma_teacher" in packet:
+        packet["chroma_teacher"]["diagnostics_path"] = moved(packet["chroma_teacher"]["diagnostics_path"])
     packet_path = out/"datasets/receipt.json"
     packet_path.write_text(json.dumps(packet, indent=1)+"\n")
     rewritten["datasets/receipt.json"] = sha(packet_path)
@@ -1031,7 +1133,17 @@ def cmd_selection_rebind(a):
             raise ValueError(f"{rel}: changed outside the rebind")
         frozen["auxiliary_files"][rel] = now
     frozen["dataset_legs_sha256"] = sha(packet_path)
+    if "chroma_teacher" in packet:
+        frozen["byc_chroma"] = packet["chroma_teacher"]
     (out/"wide/frozen.json").write_text(json.dumps(frozen, indent=1)+"\n")
+    manifest_path = out/"_MANIFEST.json"
+    if manifest_path.exists():
+        manifest = json.loads(manifest_path.read_text())
+        if manifest.get("schema") == "chroma-derived-root-v1":
+            manifest.update(frozen_sha256=sha(out/"wide/frozen.json"),
+                            parent_fx1_frozen_sha256=parent_pin,
+                            selection_rebind=packet["selection_rebind"])
+            manifest_path.write_text(json.dumps(manifest, indent=1)+"\n")
     print(json.dumps(dict(root=str(out), frozen_sha256=sha(out/"wide/frozen.json"), parent_frozen_sha256=parent_pin,
                           declaration=a.declaration, feature_ids=len(selected), rewritten=sorted(rewritten)), indent=1))
     return 0
@@ -1611,6 +1723,10 @@ def cmd_gated(a) -> int:
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
+    ch = sub.add_parser("chroma", help="append the qualified five-family SDR teacher leg; build only")
+    for flag in ("root", "out", "bank", "admission", "build-commit"):
+        ch.add_argument("--"+flag, required=True)
+    ch.set_defaults(fn=cmd_chroma)
     dg = sub.add_parser("dataset-guard")
     dg.add_argument("--admission", required=True)
     dg.add_argument("--root", required=True)
