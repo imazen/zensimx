@@ -194,13 +194,30 @@ metric-teacher labels and chroma-ladder teacher ranks are separate evidence.
 | Held-out HDR chroma ladders | Per-source/per-view rank agreement with natural SSIMULACRA2, inversion/tie counts and paired baseline changes; no pooling unrelated source score offsets. Keep the lane's existing source-role and admission rules. |
 | Tone-mapping and raw SI-HDR diagnostics | Report their cross-domain/rated-stimulus limitations separately; they cannot stand in for exact native-HDR compression targets. |
 
-HDR human SROCC/PLCC acceptance and any tradeoff with SDR must be frozen
-after the role question is resolved and before any fit. The October 27
-instruction says no single human-set threshold decides. Do not invent a
-pooled cross-study target, use retrospective test thresholds, or claim a
-new source split is untouched after historical exposure. A decision on
-which datasets may train determines which independent human checks can be
-required; this is the outstanding owner decision, not a passed HDR gate.
+The owner scope decision is resolved. Freeze the following additional decision
+rule before fitting: no single human collection is an automatic winner or veto.
+Report every dataset's signed SROCC/raw PLCC, with source-family paired
+resampling (all frames of a sequence together). Undefined correlations and
+insufficient family counts remain explicit missing uncertainty, never zero.
+Do not tune on these EVAL readouts. Qualification requires complete inherited
+correctness/SDR gates and the full HDR evidence panel; adoption remains a
+separate owner review. Historical exposure and HDR-VDP-3/UPIQ dependence are
+mandatory on that panel.
+
+TRAIN-side selection is lexicographic: reject any cell failing an inherited
+correctness or SDR no-regression gate; then maximize the unweighted mean of
+within-reference HDR rank correlations across admitted human, ladder and
+teacher TRAIN-development legs. A leg with fewer than two development families
+cannot select a weight and is report-only for that fold. Break exact ties by
+lower added HDR weight, then lower seed-independent configuration identifier.
+Report all eligible and rejected configurations. Seed 0/1/2 means and whole
+source-family resampling assess stability; EVAL never resolves a tie.
+
+For P3, each corresponding TRAIN-development SDR and HDR population must retain
+its selected P1/P2 score within the already registered no-regression allowances
+(mean -0.002, population -0.005, W2 > -2 SE). Report any infeasible combination;
+never weaken a gate or change the frozen recipe after reading EVAL. The external
+human panel remains descriptive evidence, as required by the October 27 rule.
 
 ### Plan and execution admission
 
