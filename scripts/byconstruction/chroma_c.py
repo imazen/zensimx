@@ -1,0 +1,102 @@
+#!/usr/bin/env python3
+"""Stage C scientific controls and joins; zenfleet owns distributed execution."""
+import argparse
+import csv
+import hashlib
+import json
+from pathlib import Path
+import shutil
+import struct
+
+import numpy as np
+import pyarrow as pa
+import pyarrow.csv as pacsv
+import pyarrow.parquet as pq
+from chroma_pilot import save, sha
+
+NAS=Path('/mnt/tower/output/zensim/byc-chroma-20261028')
+PARENT=Path('/var/tmp/byc-mixes-20261025/Mlic/root')
+BANK=Path('/mnt/v/output/zensim/byconstruction-2026-10-22/rev7raw/bank')
+EXTRACTOR_SHA='ed4957417339779dd8ed25fe59a6166326ba9db86d5c1530b1e1c788c9d614d8'
+BUILD='b77883be18db5933a9db4b9e2670a2ba88a9729b'
+FEATURE_ID='basic+peaks+v2@w1825/rev7_rowlanes#36c3f3af'
+IDS=list(range(228))+list(range(372,720))
+
+
+def prepare_controls(out):
+    out.mkdir();(out/'src').mkdir();records=[];expected=[];mlic=[];pins={}
+    for name,member in [('safesyn','safesyn'),('cid22','cid22_train')]:
+        kp=PARENT/'wide/main/real'/f'{name}_fit.keys.parquet'
+        selected=pq.read_table(kp).slice(0,6).to_pylist()
+        bank=BANK/member
+        manifest=json.loads((bank/'_MANIFEST.json').read_text())
+        assert manifest['binary_sha256']==EXTRACTOR_SHA and manifest['feature_set_id']==FEATURE_ID
+        assert manifest['build_commit']==BUILD and manifest['tier_request']=='native'
+        keys=pq.read_table(bank/'keys.parquet').to_pylist()
+        table=pq.ParquetFile(bank/'features.parquet');root=pq.ParquetFile(PARENT/'wide/main/real'/f'{name}_fit.parquet')
+        rootrows=next(root.iter_batches(batch_size=6,columns=[f'f{i}' for i in IDS])).to_pylist()
+        cache={};offsets=np.cumsum([0]+[table.metadata.row_group(i).num_rows for i in range(table.num_row_groups)])
+        for index,item in enumerate(selected):
+            rowid=item['source_row_id'];key=keys[rowid];assert item['pair_key']==key['pair_key']
+            rg=int(np.searchsorted(offsets,rowid,side='right')-1)
+            if rg not in cache:cache[rg]=table.read_row_group(rg,columns=[f'f{i}' for i in IDS])
+            values=cache[rg].slice(rowid-int(offsets[rg]),1).to_pylist()[0]
+            record=dict(set=name,source_row_id=rowid,pair_key=key['pair_key'],root_row=index)
+            for prefix in ['ref','dist']:
+                source=Path(key[prefix+'_path']);digest=sha(source);dest=out/'src'/(digest+source.suffix)
+                if not dest.exists():shutil.copyfile(source,dest)
+                assert sha(dest)==digest
+                record[prefix+'_path']=str(dest);record[prefix+'_sha256']=digest
+                record[prefix+'_pixels_sha256']=key[prefix+'_pixels_sha256']
+            record['row_id']=len(records);records.append(record)
+            expected.append(dict(row_id=record['row_id'],**values));mlic.append(dict(row_id=record['row_id'],**rootrows[index]))
+        for path in [kp,bank/'_MANIFEST.json',bank/'keys.parquet']:
+            pins[str(path)]=sha(path)
+        pins[str(bank/'features.parquet')]=manifest['features_parquet_sha256']
+    pq.write_table(pa.Table.from_pylist(expected),out/'EXPECTED_BANK_F64.parquet',compression='zstd')
+    pq.write_table(pa.Table.from_pylist(mlic),out/'EXPECTED_MLIC_F32.parquet',compression='zstd')
+    with (out/'pairs.tsv').open('w') as f:
+        writer=csv.writer(f,delimiter='\t');writer.writerow(['ref_path','dist_path','human_score','row_id'])
+        for r in records:writer.writerow([r['ref_path'],r['dist_path'],0,r['row_id']])
+    save(out/'CONTROLS.json',dict(extractor_sha256=EXTRACTOR_SHA,build_commit=BUILD,feature_set_id=FEATURE_ID,
+        feature_ids=IDS,records=records,parent_root=str(PARENT),parent_frozen_sha256=sha(PARENT/'wide/frozen.json'),input_pins=pins))
+
+
+def verify_controls(controls, output, receipt):
+    assert not receipt.exists()
+    specification=json.loads((controls/'CONTROLS.json').read_text())
+    manifest=json.loads(Path(str(output)+'.manifest.json').read_text())
+    assert manifest['feature_set_id']==FEATURE_ID and str(manifest['formula_revision'])=='7'
+    assert manifest['era_label']=='rev7_rowlanes'
+    columns=['row_id']+[f'f{i}' for i in IDS]
+    actual=pacsv.read_csv(output,convert_options=pacsv.ConvertOptions(include_columns=columns,column_types={'row_id':pa.int64(),**{f'f{i}':pa.float64() for i in IDS}}))
+    actual=actual.sort_by('row_id');expected=pq.read_table(controls/'EXPECTED_BANK_F64.parquet').sort_by('row_id')
+    root=pq.read_table(controls/'EXPECTED_MLIC_F32.parquet').sort_by('row_id')
+    assert actual['row_id'].to_pylist()==expected['row_id'].to_pylist()==list(range(12))
+    failures=[]
+    for i in IDS:
+        name=f'f{i}';a=actual[name].to_numpy();e=expected[name].to_numpy();r=root[name].to_numpy()
+        assert np.isfinite(a).all() and np.isfinite(e).all()
+        bad=np.flatnonzero(a.view('u8')!=e.view('u8'))
+        cast=np.flatnonzero(a.astype('f4').view('u4')!=r.astype('f4').view('u4'))
+        if len(bad) or len(cast):failures.append(dict(feature=i,bank_rows=bad.tolist(),mlic_rows=cast.tolist()))
+    audit=[json.loads(line) for line in Path(str(output)+'.audit.jsonl').read_text().splitlines()]
+    assert len(audit)==12
+    for record,original in zip(audit,specification['records']):
+        assert record['reference']==original['ref_path'] and record['distorted']==original['dist_path']
+        for actual_key,expected_key in [('reference_pixels_sha256','ref_pixels_sha256'),('distorted_pixels_sha256','dist_pixels_sha256')]:
+            assert record[actual_key]==original[expected_key]
+    save(receipt,dict(passed=not failures,rows=12,measured_features=576,feature_width=1825,
+        extractor_sha256=EXTRACTOR_SHA,build_commit=BUILD,feature_set_id=FEATURE_ID,
+        bank_f64='bit-identical' if not failures else 'failed',mlic_f32='bit-identical' if not failures else 'failed',
+        output_sha256=sha(output),controls_sha256=sha(controls/'CONTROLS.json'),failures=failures))
+    assert not failures,'frozen Mlic extractor identity failed; feature declaration forbidden'
+
+
+if __name__=='__main__':
+    parser=argparse.ArgumentParser();sub=parser.add_subparsers(dest='command',required=True)
+    p=sub.add_parser('prepare-controls');p.add_argument('out',type=Path)
+    p=sub.add_parser('verify-controls');p.add_argument('controls',type=Path);p.add_argument('output',type=Path);p.add_argument('receipt',type=Path)
+    args=parser.parse_args()
+    if args.command=='prepare-controls':prepare_controls(args.out)
+    else:verify_controls(args.controls,args.output,args.receipt)
