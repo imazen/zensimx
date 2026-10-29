@@ -1,0 +1,306 @@
+{
+  "schema": "hdr-chroma-measured-results-v1",
+  "build_commit": "342c2d0d1ffabbfe3114ae0c5e077f657a6bd70e",
+  "role_commit": "b65a2292a1de05ea4464b5ba7d01ad896ab81734",
+  "commands": "just chroma-hdr-full <command> <args>; complete command lines and run-heavy receipts in archived logs",
+  "source_corpus_commit": "b1faae550eba4d29efee1de1a32954ef11a0e1ed",
+  "admission": {
+    "passed": true,
+    "qualified_full_grid": true,
+    "views": 456,
+    "cells": 16480,
+    "unique_avif": 16480,
+    "ladders": 1828,
+    "totals": {
+      "chroma-q95_ladders": 456,
+      "chroma-q95_admitted": 434,
+      "chroma-q95_kept": 3467,
+      "chroma-q85_ladders": 456,
+      "chroma-q85_admitted": 398,
+      "chroma-q85_kept": 2774,
+      "chroma-q75_ladders": 456,
+      "chroma-q75_admitted": 301,
+      "chroma-q75_kept": 1933,
+      "chroma-q60_ladders": 456,
+      "chroma-q60_admitted": 328,
+      "chroma-q60_kept": 2248,
+      "luma-control_ladders": 4,
+      "luma-control_admitted": 4,
+      "luma-control_kept": 77
+    },
+    "per_class": {
+      "1000-lilith-photos-general": {
+        "chroma-q95_ladders": 36,
+        "chroma-q95_admitted": 35,
+        "chroma-q95_kept": 292,
+        "chroma-q85_ladders": 36,
+        "chroma-q85_admitted": 33,
+        "chroma-q85_kept": 224,
+        "chroma-q75_ladders": 36,
+        "chroma-q75_admitted": 27,
+        "chroma-q75_kept": 170,
+        "chroma-q60_ladders": 36,
+        "chroma-q60_admitted": 28,
+        "chroma-q60_kept": 184,
+        "luma-control_ladders": 1,
+        "luma-control_admitted": 1,
+        "luma-control_kept": 19
+      },
+      "1200-lilith-interiors": {
+        "chroma-q95_ladders": 120,
+        "chroma-q95_admitted": 112,
+        "chroma-q95_kept": 894,
+        "chroma-q85_ladders": 120,
+        "chroma-q85_admitted": 103,
+        "chroma-q85_kept": 695,
+        "chroma-q75_ladders": 120,
+        "chroma-q75_admitted": 68,
+        "chroma-q75_kept": 424,
+        "chroma-q60_ladders": 120,
+        "chroma-q60_admitted": 77,
+        "chroma-q60_kept": 508,
+        "luma-control_ladders": 1,
+        "luma-control_admitted": 1,
+        "luma-control_kept": 20
+      },
+      "1400-lilith-nature": {
+        "chroma-q95_ladders": 276,
+        "chroma-q95_admitted": 264,
+        "chroma-q95_kept": 2090,
+        "chroma-q85_ladders": 276,
+        "chroma-q85_admitted": 239,
+        "chroma-q85_kept": 1684,
+        "chroma-q75_ladders": 276,
+        "chroma-q75_admitted": 187,
+        "chroma-q75_kept": 1210,
+        "chroma-q60_ladders": 276,
+        "chroma-q60_admitted": 204,
+        "chroma-q60_kept": 1418,
+        "luma-control_ladders": 1,
+        "luma-control_admitted": 1,
+        "luma-control_kept": 19
+      },
+      "1600-lilith-food": {
+        "chroma-q95_ladders": 24,
+        "chroma-q95_admitted": 23,
+        "chroma-q95_kept": 191,
+        "chroma-q85_ladders": 24,
+        "chroma-q85_admitted": 23,
+        "chroma-q85_kept": 171,
+        "chroma-q75_ladders": 24,
+        "chroma-q75_admitted": 19,
+        "chroma-q75_kept": 129,
+        "chroma-q60_ladders": 24,
+        "chroma-q60_admitted": 19,
+        "chroma-q60_kept": 138,
+        "luma-control_ladders": 1,
+        "luma-control_admitted": 1,
+        "luma-control_kept": 19
+      }
+    },
+    "ledger_sha256": "4bdf05694c4439dc33cfd1c903d12846086c991798e09b7d90fa55ac5943f750",
+    "features": false,
+    "training": false
+  },
+  "comparison": {
+    "passed": true,
+    "views": 8,
+    "cells": 352,
+    "chroma_ladders": 32,
+    "natural_chroma_admitted": 28,
+    "comparison_chroma_admitted": 0,
+    "control_ladders": 4,
+    "natural_controls_admitted": 4,
+    "comparison_controls_admitted": 4,
+    "teacher_sha256": "1278c6935ad4ebbb624e6213c56ad672602b05433b288ea1f9274dbf02dee721",
+    "selection_sha256": "3df682842df491ddcde30d3c99c364b466808217a52eef7d7528c549a1d0fd21",
+    "conditions": [
+      "--hdr",
+      "--hdr-common-primaries",
+      "--gpu-runtime",
+      "cpu",
+      "--group-by-ref",
+      "--hdrvdp3-ppd",
+      "60",
+      "--hdrvdp3-task",
+      "quality",
+      "--hdrvdp3-input",
+      "rgb-bt709",
+      "--hdrvdp3-emission",
+      "led-lcd-srgb",
+      "--hdrvdp3-age",
+      "24",
+      "--hdrvdp3-surround",
+      "none"
+    ],
+    "targets_unchanged": true
+  },
+  "production_rates": {
+    "passed": true,
+    "measurement": "actual unique first-wins completed cells between native ledger snapshot file-write timestamps",
+    "snapshots": [
+      {
+        "stage": "t1",
+        "ledger_sha256": "a5bf2bfdabfda82d1a583d2e20cf10dce0bea5630fd2d1d4410f10b0b6ec12f0",
+        "modified_ns": 1793238139894744288,
+        "snapshot_written_utc": "2026-10-29T01:42:19.894744+00:00",
+        "done_views": 172,
+        "done_cells": 6256,
+        "by_host_cells": {
+          "i270": 3304,
+          "r3800x": 540,
+          "i265": 1980,
+          "r3500": 432
+        }
+      },
+      {
+        "stage": "t2",
+        "ledger_sha256": "86f10743f6ddb5af5f289b5874411806fb215b4d635eac8a301a670aa77f84f4",
+        "modified_ns": 1793238401368256380,
+        "snapshot_written_utc": "2026-10-29T01:46:41.368256+00:00",
+        "done_views": 438,
+        "done_cells": 15832,
+        "by_host_cells": {
+          "i270": 7264,
+          "i265": 5400,
+          "r3800x": 2232,
+          "r3500": 936
+        }
+      },
+      {
+        "stage": "t3",
+        "ledger_sha256": "4bdf05694c4439dc33cfd1c903d12846086c991798e09b7d90fa55ac5943f750",
+        "modified_ns": 1793238541330932134,
+        "snapshot_written_utc": "2026-10-29T01:49:01.330932+00:00",
+        "done_views": 456,
+        "done_cells": 16480,
+        "by_host_cells": {
+          "i270": 7480,
+          "i265": 5688,
+          "r3800x": 2304,
+          "r3500": 1008
+        }
+      }
+    ],
+    "window_seconds": 261.473512092,
+    "delta_cells": {
+      "i270": 3960,
+      "i265": 3420,
+      "r3500": 504,
+      "r3800x": 1692
+    },
+    "cells_per_second": {
+      "i270": 15.144937505588198,
+      "i265": 13.07971875482617,
+      "r3500": 1.927537500711225,
+      "r3800x": 6.471018752387684
+    }
+  },
+  "archive": {
+    "passed": true,
+    "build_commit": "342c2d0d1ffabbfe3114ae0c5e077f657a6bd70e",
+    "manifest_sha256": "5bdd7b4a359bf02140c337f1f8771817c4db1b4ee4f187e78b0bf943f9650b50",
+    "mirrored_manifest_sha256": "5bdd7b4a359bf02140c337f1f8771817c4db1b4ee4f187e78b0bf943f9650b50",
+    "metadata_files": 3275,
+    "cas_objects": 34781,
+    "cas_bytes": 9341015837,
+    "cells": 16480,
+    "views": 456,
+    "features": false,
+    "training": false
+  },
+  "consumer_roles": {
+    "passed": true,
+    "build_commit": "b65a2292a1de05ea4464b5ba7d01ad896ab81734",
+    "parent_manifest_sha256": "5bdd7b4a359bf02140c337f1f8771817c4db1b4ee4f187e78b0bf943f9650b50",
+    "origin_roles_sha256": "e57c7044b4ba52a8f2465d4e62af0ddbd16d75744319fb2cb9006f6ec90b4939",
+    "counts": {
+      "train": {
+        "origins": 26,
+        "chroma_ladders": 1248,
+        "admitted_chroma_ladders": 1006,
+        "kept_chroma_rungs": 7177,
+        "cells": 11280,
+        "views": 312
+      },
+      "eval": {
+        "origins": 12,
+        "chroma_ladders": 576,
+        "admitted_chroma_ladders": 455,
+        "kept_chroma_rungs": 3245,
+        "cells": 5200,
+        "views": 144
+      }
+    },
+    "features": false,
+    "training": false
+  },
+  "resources": {
+    "source_prepare": {
+      "host": "r3800x",
+      "seconds": 521,
+      "rc": 0,
+      "peak_rss_gib": 0.45,
+      "min_available_mib": 11316,
+      "peak_load": 12.17
+    },
+    "a3_new_replay": {
+      "host": "i270",
+      "seconds": 62,
+      "rc": 0,
+      "peak_rss_gib": 0.04,
+      "min_available_mib": 25139,
+      "peak_load": 36.72
+    },
+    "full_admission": {
+      "host": "i265",
+      "seconds": 511,
+      "rc": 0,
+      "peak_rss_gib": 0.03,
+      "min_available_mib": 22070,
+      "peak_load": 15.47,
+      "rss_scope": "Docker client only; container capped at2GiB"
+    },
+    "independent_oracle": {
+      "host": "i270",
+      "seconds": 240,
+      "rc": 0,
+      "peak_rss_gib": 0.14,
+      "min_available_mib": 24767,
+      "peak_load": 21.6
+    },
+    "comparison": {
+      "host": "r3800x",
+      "seconds": 1411,
+      "rc": 0,
+      "peak_rss_gib": 0.03,
+      "min_available_mib": 11646,
+      "peak_load": 22.34,
+      "rss_scope": "Docker client only"
+    },
+    "cas_copy": {
+      "host": "r3800x",
+      "seconds": 162,
+      "rc": 0,
+      "peak_rss_gib": 0.21,
+      "min_available_mib": 12138,
+      "peak_load": 15.54
+    },
+    "seal": {
+      "host": "r3800x",
+      "seconds": 27,
+      "rc": 0,
+      "peak_rss_gib": 0.03,
+      "min_available_mib": 12696,
+      "peak_load": 8.01,
+      "rss_scope": "Docker client only; container capped at3GiB"
+    }
+  },
+  "serial_sample_seconds": {
+    "i270": 164.7548229941167,
+    "i265": 172.32136089692358,
+    "r3500": 370.7443624588195,
+    "r3800x": 273.35085832607
+  },
+  "serial_sample_cells_per_host": 640
+}

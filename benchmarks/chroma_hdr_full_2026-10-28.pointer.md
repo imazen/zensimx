@@ -1,6 +1,6 @@
 # HDR chroma-only teacher generation
 
-Status: full generation, media/rung admission and independent decoding pass. Final archive receipt is being sealed. No feature bank or model.
+Status: full generation, media/rung admission and independent decoding pass. Primary and mirror seals match. No feature bank or model.
 
 The committed PNG-v3 corpus tree `b1faae550eba4d29efee1de1a32954ef11a0e1ed`
 selects 38 TRAIN HDR origins from 76 total, across four photographic classes.
@@ -47,9 +47,9 @@ Frozen natural SSIMULACRA2 exposes no per-pixel map; none is approximated.
 
 Worker data root: `/var/tmp/byc-chroma-20261028/hdr-full/`.
 Mirror: `/mnt/tower/output/zensim/byc-chroma-20261028/hdr-full/`.
-Full run/host/hash and resource receipts are kept with the data and in the
-operator report. Final source/geometry, per-host rates, admission by quality
-and class, comparison and mirror qualification remain incomplete here.
+Full run/host/hash and resource receipts are kept with the data. Compact
+[measured results](chroma_hdr_full_2026-10-28.results.json) retain admission
+by quality/class, per-host measurements and resource-wrapper receipts.
 
 Qualification receipts: 456 prepared views (76 tiny,76 native crops,zero
 duplicates,max746880 pixels); all536 input mirror files/2431917988 bytes
@@ -59,7 +59,7 @@ HDR classes at64/256/512/960. All sixteen primary receipt hashes match
 across i270/i265/r3500/r3800x; the sample's entire media graph and float64
 Parquet targets pass admission readback. An independent FFmpeg/libdav1d
 whole-view decode/header check passes36 cells, including fixed luma/base
-quantizers and shared U/V deltas. Full coverage remains a separate gate.
+quantizers and shared U/V deltas. The subsequent full oracle passes all16480 cells (below).
 
 Serial sample measurements (cells divided by measured Docker-worker elapsed):
 i270640/164.7548229941167s; i265640/172.32136089692358s;
@@ -113,3 +113,26 @@ min-avail12138MiB,peak-load15.54. Full input mirror:536 files/2431917988
 bytes. CAS and per-view receipts retain the exact PQ16 renditions. Encoded
 CICP/depth fields describe10-bit matrix6 AVIF; rendition PNGs are16-bit
 RGB with CICP9/16/0/full-range.
+
+
+Final archive qualification (2026-10-29): `_MANIFEST.json` is identical on
+r3800x and the tower mirror, SHA-256
+`5bdd7b4a359bf02140c337f1f8771817c4db1b4ee4f187e78b0bf943f9650b50`.
+It binds3275 metadata files, all CAS/input indexes and three seeded random
+SHA-256 readbacks from both copies. Sealing source342c2d0d; immutable source
+is also preserved as `chroma_hdr_full.seal-342c2d0d.py`. Seal run-heavy:
+rc0,27s,peak-RSS0.03GiB,min-avail12696MiB,peak-load8.01 (Docker client only,
+3GiB container cap). No feature extraction or training was performed.
+
+The consumer addendum reserves12 of the38 canonical TRAIN origins for
+future-fit EVAL, stratified by class with source-only SHA-256 ordering.
+The other26 origins supply fit/development TRAIN. Every view/rung follows
+its origin. Canonical corpus roles remain unchanged; no canonical EVAL or
+TEST source was generated. Consumer TRAIN has1006 admitted chroma ladders
+and7177 kept rungs; consumer EVAL has455 admitted ladders and3245 kept rungs.
+These are reserved future-fit gates with generation/admission exposure,
+not untouched external tests. Full memberships and exclusions are registered
+in [DATA_SPLITS.md](../docs/DATA_SPLITS.md); `consumer-roles-r1/ORIGIN_ROLES.json`
+SHA-256 `e57c7044b4ba52a8f2465d4e62af0ddbd16d75744319fb2cb9006f6ec90b4939`
+is identical on both data hosts and links the immutable parent seal.
+Consumer-role sourceb65a2292; luma controls remain diagnostic.
