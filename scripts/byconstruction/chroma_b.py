@@ -192,7 +192,7 @@ def diagnostic_proof(ctl, image, out, view):
     endpoint=os.environ['CHROMA_S3_ENDPOINT']
     args=['docker','run','--name','chroma-'+out.name,'--cpu-shares=256','--cpuset-cpus=0','--memory=1g','--memory-swap=1g',
           '-e','AWS_ACCESS_KEY_ID','-e','AWS_SECRET_ACCESS_KEY','-e','ZEN_R2_ENDPOINT='+endpoint,'-e','ZEN_BUCKET=zentrain','-e','ZEN_RUN=jobs/chroma-b-diagnostic-proof-20261028',
-          '-e','ZEN_ARCHIVE_BLOBS_DIR='+str(archive),'-e','TMPDIR='+str(scratch),'-e','HOME='+str(scratch),'-e','ZEN_CHUNK_WALL_SEC=0',
+          '-e','ZEN_ARCHIVE_BLOBS_DIR='+str(archive),'-e','TMPDIR='+str(scratch),'-e','ZEN_CHUNK_WALL_SEC=0',
           '-v',str(NAS)+':'+str(NAS)+':ro','-v',str(out)+':'+str(out),'-v',str(Path.home()/'tmp/chroma-run-heavy')+':/opt/private/run-heavy:ro',
           '--entrypoint','/opt/private/run-heavy',image,'--mem','1G','--jobs','1','--','zenfleet-worker','--manifest',str(manifest),'--ledger-out',str(out/'ledger.parquet'),
           '--blobs-r2-bucket','zentrain','--blobs-r2-prefix','unused-diagnostic-proof','--r2-endpoint',endpoint,'--exec','/usr/local/bin/evif-exec','--worker','i270-chroma-diagnostic-proof','--provider','lan']

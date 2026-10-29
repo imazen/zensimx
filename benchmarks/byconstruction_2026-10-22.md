@@ -8249,8 +8249,8 @@ Qualified candidate references:485 SafeSyn fitting tiles,201 CID22 oracle TRAIN 
 (with inherited fit/dev/calibration roles),386 canonical imazen-26 TRAIN origins.
 The accepted nearest-feature im2406 substitution remains labelled as such.
 Exact-pixel dedup leaves959 contributing sources:372 SafeSyn,201 CID22 and386
-imazen-26. The113 entirely duplicated SafeSyn references retain CID22 roles;
-development/calibration aliases stay diagnostic. The geometry summary source
+imazen-26. All113 entirely duplicated SafeSyn references match CID22 fitting
+references. Existing development/calibration views retain their original roles. The geometry summary source
 count records qualified candidates before this dedup.
 Mitchell fits and native crops yield9162 unique views, including1918 tiny views
 and1304 native crops; maximum921600pixels,1615 duplicate views removed.
