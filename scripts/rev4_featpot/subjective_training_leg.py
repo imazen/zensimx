@@ -173,6 +173,21 @@ def admit_chroma_teacher(record, declaration, selected_ids, excluded):
             or bank.get('feature_set_id')!=required['feature_set_id'] or bank.get('binary_sha256')!=required['extractor_sha256']
             or bank.get('build_commit')!=required['producer_commit']):
         raise ValueError('complete frozen chroma admission and feature reconciliation required')
+    # Optional declared view-size filter: fitting views with a long edge <= 64 px are dropped (SSIMULACRA2 is not valid there).
+    view_filter=None
+    if 'view_filter_path' in d or 'drop_long_edge_at_most' in d:
+        view_filter=document(d['view_filter_path'],d['view_filter_sha256'])
+        if (view_filter.get('schema')!='chroma-view-size-filter-v1' or view_filter.get('drop_long_edge_at_most')!=64
+                or d.get('drop_long_edge_at_most')!=64 or view_filter.get('bank_keys_sha256')!=bank.get('keys_sha256')):
+            raise ValueError('chroma view-size filter binding differs')
+    families=['ycc444','ycc420','xyb-capped','xyb-extended','band-ac']
+    def expected_kept(role,family):
+        admitted=(ac if family=='band-ac' else admission)['per_role'][role][family+'_kept']
+        if view_filter is None:return admitted
+        c=view_filter['per_role'][role][family]
+        if c['kept']+c['dropped']!=admitted:raise ValueError('chroma view-size filter population differs')
+        return c['kept']
+    if view_filter is not None:fit_rows=sum(expected_kept(role,f) for role in ['fit','new-train'] for f in families)
     keys=document(d['keys_path'],d['keys_sha256'])
     if len(keys)!=fit_rows or d.get('rows')!=len(keys) or r.get('rows')!=len(keys):
         raise ValueError('chroma fitting population differs')
@@ -183,7 +198,8 @@ def admit_chroma_teacher(record, declaration, selected_ids, excluded):
                 or type(k.get('row')) is not int or k['row']!=i or k.get('role')!='fit'
                 or k['mlic_role'] not in ['fit','new-train'] or k['codec_family'] not in ['ycc444','ycc420','xyb-extended','xyb-capped','band-ac']
                 or k['source']!=k['reference'] or k['family'] in excluded or k['observation'] in observations
-                or type(k.get('rung')) is not int or k['rung']<0):
+                or type(k.get('rung')) is not int or k['rung']<0
+                or (view_filter is not None and not (type(k.get('long_edge')) is int and k['long_edge']>64))):
             raise ValueError('chroma row/role/family identity differs')
         observations.add(k['observation']);counts[k['source']]=counts.get(k['source'],0)+1
         family_key=(k['mlic_role'],k['codec_family']);role_families[family_key]=role_families.get(family_key,0)+1
@@ -193,9 +209,8 @@ def admit_chroma_teacher(record, declaration, selected_ids, excluded):
     if any(len(r)<3 for r in ladders.values()) or counts!=r['source_counts']:
         raise ValueError('chroma admitted source/ladder population differs')
     for role in ['fit','new-train']:
-        for family in ['ycc444','ycc420','xyb-capped','xyb-extended','band-ac']:
-            summary=ac if family=='band-ac' else admission
-            if role_families.get((role,family),0)!=summary['per_role'][role][family+'_kept']:
+        for family in families:
+            if role_families.get((role,family),0)!=expected_kept(role,family):
                 raise ValueError('chroma labelled family/role population differs')
     # Match the native owner's ordered f64 operations exactly.
     total=0.0

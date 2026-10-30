@@ -128,6 +128,9 @@ def cmd_chroma(a):
     shutil.copytree(source,out);(out/'diagnostics').mkdir()
     train_path=out/'datasets/chroma.parquet';diagnostic_path=out/'diagnostics/chroma.parquet'
     train_writer=None;diagnostic_writer=None;keys=[];diagnostic_keys=[];counts=collections.Counter();roles=collections.Counter();ladder_counts=collections.Counter();train_rows=0;diagnostic_rows=0
+    # Optional view-size filter: fitting views with a long edge <= 64 px are dropped (SSIMULACRA2 is not valid there,
+    # benchmarks/ssim2_small_view_validity_2026-10-30.md); held-out diagnostics stay complete.
+    cut=a.drop_long_edge_at_most;kept_by=collections.Counter();dropped_by=collections.Counter();dropped_views=set()
     features=pq.ParquetFile(bank/'features.parquet');bank_keys=pq.ParquetFile(bank/'keys.parquet')
     try:
         for fb,kb in zip(features.iter_batches(batch_size=1000),bank_keys.iter_batches(batch_size=1000),strict=True):
@@ -135,6 +138,12 @@ def cmd_chroma(a):
             if f['pair_key'].to_pylist()!=k['pair_key'].to_pylist():raise ValueError('chroma key/feature order differs')
             for training in [True,False]:
                 indices=[i for i,r in enumerate(records) if (r['mlic_role'] in ['fit','new-train'])==training]
+                if training and cut is not None:
+                    for i in indices:
+                        r=records[i];small=max(r['width'],r['height'])<=cut
+                        (dropped_by if small else kept_by)[(r['mlic_role'],r['family'])]+=1
+                        if small:dropped_views.add(r['view_id'])
+                    indices=[i for i in indices if max(records[i]['width'],records[i]['height'])>cut]
                 if not indices:continue
                 rows=[records[i] for i in indices]
                 refs=['chroma:'+r['view_id'] for r in rows]
@@ -146,7 +155,8 @@ def cmd_chroma(a):
                     train_writer.write_table(transported)
                     for ref,r in zip(refs,rows):
                         keys.append(dict(row=train_rows,observation=r['pair_key'],source=ref,reference=ref,family=r['reference_group'],
-                            role='fit',mlic_role=r['mlic_role'],codec_family=r['family'],ladder=r['view_id']+'|'+r['family'],rung=r['rung']))
+                            role='fit',mlic_role=r['mlic_role'],codec_family=r['family'],ladder=r['view_id']+'|'+r['family'],rung=r['rung'],
+                            **({} if cut is None else dict(long_edge=max(r['width'],r['height'])))))
                         counts[ref]+=1;roles[r['mlic_role']]+=1;ladder_counts[r['view_id']+'|'+r['family']]+=1;train_rows+=1
                 else:
                     if diagnostic_writer is None:diagnostic_writer=pq.ParquetWriter(diagnostic_path,transported.schema,compression='zstd')
@@ -155,7 +165,15 @@ def cmd_chroma(a):
     finally:
         if train_writer:train_writer.close()
         if diagnostic_writer:diagnostic_writer.close()
-    if (train_rows,diagnostic_rows)!=(manifest['per_role']['fit']+manifest['per_role']['new-train'],manifest['per_role']['dev']+manifest['per_role']['calibration']) or min(ladder_counts.values())<3:raise ValueError('chroma role/ladder population differs')
+    if (train_rows+sum(dropped_by.values()),diagnostic_rows)!=(manifest['per_role']['fit']+manifest['per_role']['new-train'],manifest['per_role']['dev']+manifest['per_role']['calibration']) or min(ladder_counts.values())<3:raise ValueError('chroma role/ladder population differs')
+    if cut is not None:
+        if sum(kept_by.values())!=train_rows:raise ValueError('chroma view-size filter count differs')
+        fp=out/'datasets/chroma.view_filter.json'
+        fp.write_text(json.dumps(dict(schema='chroma-view-size-filter-v1',drop_long_edge_at_most=cut,bank_keys_sha256=manifest['keys_sha256'],
+            reason='SSIMULACRA2 is not valid on 32 and 64 px views (benchmarks/ssim2_small_view_validity_2026-10-30.md)',
+            per_role={role:{f:dict(kept=kept_by[(role,f)],dropped=dropped_by[(role,f)]) for f in ['ycc444','ycc420','xyb-capped','xyb-extended','band-ac']}
+                      for role in ['fit','new-train']},
+            kept_rows=train_rows,dropped_rows=sum(dropped_by.values()),dropped_views=sorted(dropped_views)),indent=1)+'\n')
     kp=out/'datasets/chroma.keys.json';kp.write_text(json.dumps(keys,separators=(',',':'))+'\n')
     pq.write_table(pa.Table.from_pylist(diagnostic_keys),out/'diagnostics/chroma.keys.parquet',compression='zstd')
     total=0.0
@@ -176,7 +194,8 @@ def cmd_chroma(a):
         native_role='TRAIN',rows=train_rows,table_sha256=sha(train_path),keys_path=str(kp),keys_sha256=sha(kp),
         admission_root=str(out),training_width=width,admission_summary_path=str(admission),admission_summary_sha256=sha(admission),
         feature_bank_manifest_path=str(bank/'_MANIFEST.json'),feature_bank_manifest_sha256=sha(bank/'_MANIFEST.json'),
-        ac_admission_summary_path=manifest['ac_admission_summary_path'],ac_admission_summary_sha256=manifest['ac_admission_summary_sha256'])
+        ac_admission_summary_path=manifest['ac_admission_summary_path'],ac_admission_summary_sha256=manifest['ac_admission_summary_sha256'],
+        **({} if cut is None else dict(drop_long_edge_at_most=cut,view_filter_path=str(fp),view_filter_sha256=sha(fp))))
     dp=Path(str(train_path)+'.manifest.json');dp.write_text(json.dumps(declaration,indent=1)+'\n')
     record=dict(name='chroma_teacher',path=str(train_path),teacher=True,subjective=False,train_weight=weight,val_weight=0.0,
         mode='withinref,both',table_sha256=declaration['table_sha256'],manifest_sha256=sha(dp),keys_path=str(kp),keys_sha256=sha(kp),
@@ -194,6 +213,7 @@ def cmd_chroma(a):
         'datasets/chroma.parquet.manifest.json':sha(dp),'datasets/chroma.keys.json':sha(kp),
         'diagnostics/chroma.parquet':sha(diagnostic_path),
         'diagnostics/chroma.keys.parquet':sha(out/'diagnostics/chroma.keys.parquet')})
+    if cut is not None:frozen['auxiliary_files']['datasets/chroma.view_filter.json']=sha(fp)
     (out/'wide/frozen.json').write_text(json.dumps(frozen,indent=1)+'\n')
     changed={'wide/frozen.json','wide/main/real/receipt.json','datasets/receipt.json','_MANIFEST.json'}
     for path in source.rglob('*'):
@@ -204,7 +224,8 @@ def cmd_chroma(a):
         feature_bank_manifest_sha256=sha(bank/'_MANIFEST.json'),fit_rows=train_rows,diagnostic_rows=diagnostic_rows,
         source_groups=len(counts),ladder_groups=len(ladder_counts),nominal_weight=a.weight_scale,train_weight=weight,
         grouping='within each prepared reference view, across all five labelled admitted families',diagnostics_in_training=False,
-        band_ac_included=True,training_launched=False),indent=1)+'\n')
+        band_ac_included=True,training_launched=False,
+        **({} if cut is None else dict(drop_long_edge_at_most=cut,dropped_fit_rows=sum(dropped_by.values()),dropped_views=len(dropped_views)))),indent=1)+'\n')
     return 0
 DATASET_SUBSETS = ("colourlab-cognitive-science-2022", "irccyn-ivc-broken-arrows",
                    "irccyn-ivc-dibr-images", "irccyn-ivc-dwt-dtcwt", "irccyn-ivc-enrico",
@@ -1730,6 +1751,8 @@ def main() -> int:
         ch.add_argument("--"+flag, required=True)
     ch.add_argument("--weight-scale", type=float, default=1.0, choices=(1.0, 0.5, 0.25, 0.125),
                     help="registered chroma-leg weight scale (round 2); 1 is the round-1 root")
+    ch.add_argument("--drop-long-edge-at-most", type=int, choices=(64,), default=None,
+                    help="drop fitting views whose long edge is at most this (round 3); default keeps every view")
     ch.set_defaults(fn=cmd_chroma)
     dg = sub.add_parser("dataset-guard")
     dg.add_argument("--admission", required=True)

@@ -85,6 +85,50 @@ pub(super) fn admit(
     {
         return Err("complete frozen chroma admission and feature reconciliation required".into());
     }
+    // Optional declared view-size filter: fitting views with a long edge of 64 px or less are dropped, because
+    // SSIMULACRA2 is not valid there (benchmarks/ssim2_small_view_validity_2026-10-30.md). Absent = the full leg.
+    let filter = if d.get("view_filter_path").is_some() || d.get("drop_long_edge_at_most").is_some() {
+        let f = read("view_filter_path", "view_filter_sha256")?;
+        if f["schema"] != "chroma-view-size-filter-v1"
+            || f["drop_long_edge_at_most"] != 64
+            || d["drop_long_edge_at_most"] != 64
+            || f["bank_keys_sha256"] != bank["keys_sha256"]
+        {
+            return Err("chroma view-size filter binding differs".into());
+        }
+        Some(f)
+    } else {
+        None
+    };
+    let expected_kept = |role: &str, family: &str| -> Result<u64, String> {
+        let summary = if family == "band-ac" { &ac } else { &admission };
+        let admitted = summary["per_role"][role][format!("{family}_kept")]
+            .as_u64()
+            .ok_or("family admission count required")?;
+        let Some(f) = &filter else {
+            return Ok(admitted);
+        };
+        let counts = &f["per_role"][role][family];
+        let (kept, dropped) = (
+            counts["kept"].as_u64().ok_or("filter kept count required")?,
+            counts["dropped"].as_u64().ok_or("filter dropped count required")?,
+        );
+        if kept + dropped != admitted {
+            return Err("chroma view-size filter population differs".into());
+        }
+        Ok(kept)
+    };
+    let fit_rows = if filter.is_some() {
+        let mut n = 0;
+        for role in ["fit", "new-train"] {
+            for family in ["ycc444", "ycc420", "xyb-capped", "xyb-extended", "band-ac"] {
+                n += expected_kept(role, family)?;
+            }
+        }
+        n
+    } else {
+        fit_rows
+    };
     let keys = read("keys_path", "keys_sha256")?;
     let keys = keys.as_array().ok_or("chroma ordered keys required")?;
     if keys.len() as u64 != fit_rows || d["rows"] != keys.len() || record["rows"] != keys.len() {
@@ -112,6 +156,7 @@ pub(super) fn admit(
             || key["reference"] != source
             || excluded.contains(text("family")?)
             || !observations.insert(text("observation")?.to_owned())
+            || (filter.is_some() && !key["long_edge"].as_u64().is_some_and(|e| e > 64))
         {
             return Err("chroma row/role/family identity differs".into());
         }
@@ -132,10 +177,7 @@ pub(super) fn admit(
     }
     for role in ["fit", "new-train"] {
         for family in ["ycc444", "ycc420", "xyb-capped", "xyb-extended", "band-ac"] {
-            let summary = if family == "band-ac" { &ac } else { &admission };
-            let expected = summary["per_role"][role][format!("{family}_kept")]
-                .as_u64()
-                .ok_or("family admission count required")?;
+            let expected = expected_kept(role, family)?;
             if role_families
                 .get(&(role.to_owned(), family.to_owned()))
                 .copied()
