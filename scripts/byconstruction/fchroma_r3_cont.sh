@@ -4,7 +4,7 @@
 #
 #   fchroma_r3_cont.sh ready     prerequisites: w100 control PASS, full seeds 0-2 packed and certified, 12 E21 cells
 #   fchroma_r3_cont.sh plans     fx2-plan (source folds), then full-plan general e59 and codec e29 (round 1's pattern)
-#   fchroma_r3_cont.sh run NAME  folds | general | codec: run that plan under the dev compute lock (run-heavy)
+#   fchroma_r3_cont.sh run NAME  folds | general | codec | codecrepack (no-prune repack after the codec pack refusal): run that plan under the dev compute lock (run-heavy)
 #
 # Everything lands in R3/stage2/. Labels stay Mlicfx2 (the arms are the filtered-root fx2 study). dev only, behind heavy.lock.
 set -euo pipefail
@@ -32,10 +32,14 @@ case $cmd in
       python3 -B $ac fx2-plan $R/fx2-folds --source-commit $C --trainer $ST/bin/zensim_mlp_train --meta-tool $O/bake_dial_refit --study $ST --reproduction $REPRO
       python3 -B $ac full-plan $R/fx2-full-general-e59 --source-commit $C --trainer $ST/bin/zensim_mlp_train --meta-tool $O/bake_dial_refit --point $R/fx2-folds XrefAIC256 59 --after-run $R/fx2-folds
       python3 -B $ac full-plan $R/fx2-full-codec-e29 --source-commit $C --trainer $ST/bin/zensim_mlp_train --meta-tool $O/bake_dial_refit --point $R/fx2-folds AICOnly 29 --after-run $R/fx2-full-general-e59 ) ;;
+  foldplan)  # the fold study needs the bake owner build with read-meta (the first fx2-folds plan carried a build without it and failed after its 42 fits)
+    python3 -B $ac fx2-plan $R/fx2-folds-r2 --source-commit $C --trainer $ST/bin/zensim_mlp_train \
+      --meta-tool /var/tmp/byc-fx2-20261028/stage2/fx1-reproduction-run02/tools/bake_dial_refit --study $ST --reproduction $REPRO ;;
   run)
     name=$2
     case $name in
-      folds) dir=$R/fx2-folds mode=run jobs=4 ;;
+      folds) dir=$R/fx2-folds-r2 mode=fold-run jobs=4 ;;
+      codecrepack) dir=$R/fx2-full-codec-e29-repack mode=full-run jobs=12 ;;
       general) dir=$R/fx2-full-general-e59 mode=full-run jobs=12 ;;
       codec) dir=$R/fx2-full-codec-e29 mode=full-run jobs=12 ;;
     esac
