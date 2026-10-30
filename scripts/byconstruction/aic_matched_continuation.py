@@ -1045,7 +1045,7 @@ def fold_run(path):
         return dest
     try:
         stage("fit-folds")
-        with ThreadPoolExecutor(max_workers=12) as pool:
+        with ThreadPoolExecutor(max_workers=int(os.environ.get("ZEN_CONTINUATION_WORKERS", "12"))) as pool:
             control_future = pool.submit(fit_control) if control else None
             futures = {pool.submit(fit, run): run for run in fold_runs(plan_value)}
             for future, run in futures.items():
@@ -1426,7 +1426,7 @@ def omission_run(path):
         return dict(fold=name, seed=seed, **phases[-1], phases=phases)
     try:
         stage("fit-omission-cells")
-        with ThreadPoolExecutor(max_workers=12) as pool:
+        with ThreadPoolExecutor(max_workers=int(os.environ.get("ZEN_CONTINUATION_WORKERS", "12"))) as pool:
             futures = {pool.submit(fit, cell): cell for cell in omission_cells()}
             for future, cell in futures.items():
                 try:
