@@ -8525,3 +8525,42 @@ F3 and F3codec; a different selected weight gets the same. Added for the continu
 continuation source-fold study (the fx2 study's held-out panels) for F3 and F3codec against E and ECodec.
 
 **Hosts.** Every fitting host first reproduces the stored Mlic cell byte for byte with the round-3 trainer (per-host control).
+
+#### Round 3 selection result (2026-10-30)
+
+All runs on dev, trainer `b0e70f30` (built on i265); study dirs `/var/tmp/byc-fchroma-20261029/r3/{w100,w50,w25,w12}/`, driver
+`scripts/byconstruction/fchroma_r3.sh`. Per-host control: the stored Mlic KADID seed-0 cell reproduced byte for byte (prediction
+`0cae0f6f…`, bake without `zentrain.repro` `0e03eaf0…`). 55 of 55 jobs done (control, 6 full fits, 48 E21 cells); every full fit
+certified monotone. Ten cells were killed by the job pool's memory cap at startup (14 trainers under a 34G cap); their partial
+directories are kept in `r3/aborted-1643/` and the cells were rerun from scratch at 10 trainers under 40G.
+
+E21, arm minus stored Mlic, signed SROCC, mean of seeds 0-2 (bar: mean ≥ −0.002, every population ≥ −0.005):
+
+| Weight | Mean | Seed SE | KADID | TID2013 | KonFiG | CID22-A25 |
+|---|---|---|---|---|---|---|
+| 1 | −0.00146 | 0.00121 | +0.00267 | −0.00227 | −0.00369 | −0.00254 |
+| 1/2 | +0.00051 | 0.00145 | +0.00277 | +0.00038 | −0.00057 | −0.00056 |
+| 1/4 | −0.00008 | 0.00161 | +0.00301 | −0.00270 | +0.00029 | −0.00091 |
+| 1/8 | +0.00039 | 0.00176 | +0.00283 | −0.00132 | −0.00138 | +0.00142 |
+| round 1 (weight 1, unfiltered) | −0.01515 | | −0.00234 | −0.01375 | −0.00448 | −0.04005 |
+| round 2, weight 1/2 (unfiltered) | −0.00597 | | −0.00095 | −0.00282 | −0.00248 | −0.01762 |
+
+G-STEER (seed-0 packed model): weight 1 135/135; 1/2 134 (fails `city-256-20`); 1/4 134 (`broad-206-b64`); 1/8 133
+(`broad-31-b32`, `broad-31-b64`).
+
+G-CHROMA-L on dev views above 64 px (12,694 rows, 1,097 ladders), per-family MAE against the teacher; all four arms pass against E
+(upper bound of the ladder bootstrap below 0 in every family) and the rank check:
+
+| Arm | ycc444 | ycc420 | xyb-capped | xyb-extended | band-ac |
+|---|---|---|---|---|---|
+| E | 5.46 | 6.11 | 3.92 | 6.85 | 3.51 |
+| weight 1 | 2.77 | 2.89 | 1.73 | 3.89 | 1.99 |
+| weight 1/2 | 2.72 | 2.83 | 1.76 | 3.91 | 1.95 |
+| weight 1/4 | 2.73 | 2.83 | 1.75 | 4.15 | 1.99 |
+| weight 1/8 | 2.90 | 3.02 | 1.78 | 4.42 | 1.99 |
+
+Descriptive, same rows: round 1's F fails against E (xyb-capped 6.20, band-ac 4.44).
+
+**Selected: weight 1** (the largest weight passing every gate; the smaller weights fail only G-STEER). The E21 mean passes on the point
+estimate with 0.0005 of margin against a seed SE of 0.0012. Removing the ≤64 px views removes most of round 1's E21 cost (CID22-A25
+−0.040 → −0.003). F3 and F3codec are weight 1's continuations; their results follow below when complete.
