@@ -8564,3 +8564,36 @@ Descriptive, same rows: round 1's F fails against E (xyb-capped 6.20, band-ac 4.
 **Selected: weight 1** (the largest weight passing every gate; the smaller weights fail only G-STEER). The E21 mean passes on the point
 estimate with 0.0005 of margin against a seed SE of 0.0012. Removing the ≤64 px views removes most of round 1's E21 cost (CID22-A25
 −0.040 → −0.003). F3 and F3codec are weight 1's continuations; their results follow below when complete.
+
+#### Round 3: F3 and F3codec results (2026-10-30)
+
+F3 is weight 1's general continuation (x256 + rehearsal, e59) and F3codec its codec continuation (AIC-only, e29), both from the three
+filtered-root fx2 seeds (`r3/w100`, control PASS), seed-0 packed models, packs certified monotone for all three seeds. F3 packed
+directly; F3codec needed the no-prune repack (the pack refuses prunable layer-0 inputs on a derived-input bake), the fits unchanged.
+Driver: `scripts/byconstruction/fchroma_r3_cont.sh`; collector `fchroma_round3.py` (output kept outside the repository: it holds
+AIC-2026 public_train statistics).
+
+| Gate | F3 | F3codec |
+|---|---|---|
+| C1-C6 (standard and ladder) | pass | pass |
+| G-STEER | 135/135 | **133/135** (fails `broad-94-b64`, `girl-256-20`) |
+| N1-N3 (frozen run03 runner, i265) | pass (140 monotone ladders) | pass (141) |
+| 12-permutation identity (62 sources, 744 rows) | pass | pass |
+| G-CHROMA-L, dev (12,694 rows, over 64 px) | pass, all 5 families | pass, all 5 families |
+| G-CHROMA-L, calibration (4,974 rows, read once) | pass, all 5 families | pass, all 5 families |
+| G-CHROMA rank check (dev, calibration) | pass | pass |
+
+For comparison, E's codec counterpart ECodec and round 1's Fcodec both score 135/135 on G-STEER, so F3codec's two failures are a
+regression in the codec model; F3 passes.
+
+G-CHROMA-L per-family MAE against the teacher (candidate; E or ECodec in brackets), order ycc444 / ycc420 / xyb-capped /
+xyb-extended / band-ac; the upper bound of every ladder-bootstrap 95% interval of the difference is below 0:
+
+| Rows | F3 (E) | F3codec (ECodec) |
+|---|---|---|
+| dev | 3.12 (5.46), 3.30 (6.11), 2.18 (3.92), 3.75 (6.85), 2.17 (3.51) | 3.43 (5.79), 3.77 (5.56), 2.26 (3.15), 3.93 (5.87), 2.76 (3.76) |
+| calibration | 3.01 (6.16), 3.72 (7.42), 1.85 (3.97), 3.17 (6.79), 2.15 (3.76) | 3.14 (6.12), 3.95 (6.65), 1.80 (2.84), 3.20 (5.42), 2.33 (3.90) |
+
+Continuation source-fold study (42 fits, held-out folds; the first attempt carried a bake-owner build without `read-meta` and failed
+after its fits, kept; rerun as `fx2-folds-r2` with the fx2 lane's build) and the panel numbers are in the local `results_round3.json`.
+The F3codec G-STEER regression is a finding, not a tuning target: nothing was loosened.
