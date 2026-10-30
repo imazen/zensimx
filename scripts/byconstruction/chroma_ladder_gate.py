@@ -7,7 +7,7 @@ into ladders by (view, family) with at least 3 kept rungs. A packed bake scores 
 (`predict_features_with_bake --f64-wire --production`, identity layout); per ladder the statistic is the Spearman rho
 between the model score and the teacher over the rungs.
 
-  chroma_ladder_gate.py score  --bank BANK --predict BIN --bake NAME=PATH [--bake ...] --out DIR
+  chroma_ladder_gate.py score  --bank BANK --predict BIN --bake NAME=PATH [--bake ...] --out DIR [--drop-long-edge-at-most 64]
   chroma_ladder_gate.py report --out DIR --compare F=E [--compare Fcodec=ECodec]
 """
 import argparse
@@ -47,11 +47,16 @@ def spearman(a, b):
     return float(np.corrcoef(ra, rb)[0, 1])
 
 
-def held_out_rows(bank, roles_wanted=HELD_OUT):
-    """(keys table, f64 matrix) of the held-out rows of the wanted roles, in bank order."""
+def held_out_rows(bank, roles_wanted=HELD_OUT, drop_long_edge_at_most=None):
+    """(keys table, f64 matrix) of the held-out rows of the wanted roles, in bank order.
+
+    drop_long_edge_at_most=64 leaves out views whose long edge is 64 px or less (round 3: SSIMULACRA2 is not valid
+    there, benchmarks/ssim2_small_view_validity_2026-10-30.md)."""
     keys = pq.read_table(Path(bank) / "keys.parquet")
     roles = keys["mlic_role"].to_pylist()
-    take = [i for i, r in enumerate(roles) if r in roles_wanted]
+    edges = [max(w, h) for w, h in zip(keys["width"].to_pylist(), keys["height"].to_pylist())]
+    take = [i for i, r in enumerate(roles) if r in roles_wanted
+            and (drop_long_edge_at_most is None or edges[i] > drop_long_edge_at_most)]
     features = pq.ParquetFile(Path(bank) / "features.parquet")
     names = [f"f{i}" for i in range(1825)]
     rows, offset, wanted = [], 0, set(take)
@@ -79,8 +84,9 @@ def score_rows(predict, bake, matrix):
 def cmd_score(a):
     out = Path(a.out)
     out.mkdir(parents=True)
-    keys, matrix = held_out_rows(a.bank, tuple(a.roles.split(",")))
-    pq.write_table(keys.select(["pair_key", "view_id", "family", "rung", "content_class", "mlic_role", "teacher_ssim2"]),
+    keys, matrix = held_out_rows(a.bank, tuple(a.roles.split(",")), a.drop_long_edge_at_most)
+    pq.write_table(keys.select(["pair_key", "view_id", "family", "rung", "content_class", "mlic_role", "teacher_ssim2",
+                                "width", "height"]),
                    out / "rows.parquet")
     index = {}
     for spec in a.bake:
@@ -88,7 +94,8 @@ def cmd_score(a):
         scores = score_rows(a.predict, path, matrix)
         np.save(out / f"scores_{name}.npy", scores)
         index[name] = path
-    (out / "SCORED.json").write_text(json.dumps(dict(rows=len(matrix), bakes=index), indent=1) + "\n")
+    (out / "SCORED.json").write_text(json.dumps(dict(rows=len(matrix), bakes=index,
+                                                     drop_long_edge_at_most=a.drop_long_edge_at_most), indent=1) + "\n")
 
 
 def ladders(out):
@@ -218,6 +225,8 @@ if __name__ == "__main__":
     s.add_argument("--bake", action="append", required=True)
     s.add_argument("--out", required=True)
     s.add_argument("--roles", default="dev,calibration", help="selection reads only dev; the final gate reads calibration once")
+    s.add_argument("--drop-long-edge-at-most", type=int, choices=(64,), default=None,
+                   help="round 3: leave out views with a long edge of 64 px or less")
     s.set_defaults(fn=cmd_score)
     lv = sub.add_parser("level", help="G-CHROMA-L (registered 2026-10-29 after round-1 results were seen)")
     lv.add_argument("--out", required=True)

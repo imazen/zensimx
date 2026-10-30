@@ -8497,3 +8497,31 @@ ladders that hold a decided-WORSE pair (824 of 3,105), ECodec 31.8 %. Small stra
 (all worse). Under the proposed bar (not adopted), in the primary stratum ECodec fails on (a); F and Fcodec pass (a) and (a2) and fail (b).
 Training-leg grid (6,975 views, bitstream-only) and the dev/calibration diagnostic roles were still to finish when this was written.
 Run record: `~/tmp/handoff/chroma-trade/report.md`; public summary in imazen/evif `benchmarks/trade-gauntlet-2026-10-30.md`.
+
+### Profile F round 3: chroma leg without the ≤64 px views (registered 2026-10-30, before any round-3 fit)
+
+Owner, 2026-10-30, after the small-view finding (`benchmarks/ssim2_small_view_validity_2026-10-30.md`): "yes, drop ≤64px and redo
+F/Fcodec". Registered after round 1, round 2 and the small-view finding were seen; not a prospective test of any of them.
+
+**Leg.** `ring_root.py chroma --drop-long-edge-at-most 64` (`b0e70f30`) drops every fitting view whose long edge is 64 px or less:
+1,444 of 7,089 views, 61,951 of 293,318 rows (21.1 %). Kept: 231,367 rows in 5,645 source groups and 22,413 ladders; no ladder falls
+below 3 rungs; the smallest kept long edge is 128 px. The kept rows are bit-identical to round 1's rows in all 1,855 columns, in the
+same order. The drop is a declared field of the leg (`chroma.view_filter.json`: kept and dropped per role and family, the dropped view
+ids, bound to the bank keys); the native and Python admission require it and check every key's long edge. Nothing else about the leg,
+root, recipe, declaration (fx2) or trainer changes. Roots (dev, `/var/tmp/byc-fchroma-20261029/r3/`), weight scale → train weight:
+1 → 1.042499080424873 (`w100-root`, frozen `f7249596…`), 1/2 → 0.5212495402124365, 1/4 → 0.26062477010621826,
+1/8 → 0.13031238505310913.
+
+**Gate populations.** G-CHROMA and G-CHROMA-L as registered for rounds 1 and 2, on the held-out views with a long edge above 64 px only
+(`chroma_ladder_gate.py score --drop-long-edge-at-most 64`): dev 12,694 rows / 1,097 ladders for selection, calibration 4,974 rows /
+446 ladders read once at the end. E and ECodec are rescored on the same rows. The ≤64 px rows are reported separately, never decisive.
+
+**Arms and selection.** The four weight scales, each the seed-0 Mlic-recipe packed model (fx2, filtered root) plus its 12 E21 cells.
+The round-2 rule applies unchanged: the largest weight with G-STEER 135/135, E21 mean (arm − stored Mlic) SROCC ≥ −0.002 and every
+population ≥ −0.005, G-CHROMA-L on dev, and the rank non-regression check. Every arm's numbers are reported side by side whatever the
+rule selects. Because the owner asked for F and Fcodec to be redone, the weight-1 arm (round 1's configuration) is carried through to
+three seeds, the general (x256 + rehearsal, e59) and codec (AIC-only, e29) continuations and the full gate set in any case, labelled
+F3 and F3codec; a different selected weight gets the same. Added for the continuations, which round 1 did not have: the
+continuation source-fold study (the fx2 study's held-out panels) for F3 and F3codec against E and ECodec.
+
+**Hosts.** Every fitting host first reproduces the stored Mlic cell byte for byte with the round-3 trainer (per-host control).
