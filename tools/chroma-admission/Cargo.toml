@@ -7,7 +7,7 @@ publish = false
 [workspace]
 
 [dependencies]
-serde_json = "=1.0.154"
+serde_json = { version = "=1.0.154", features = ["float_roundtrip"] }  # the trainer parses receipt weights the same way
 
 [profile.release]
 lto = "thin"
