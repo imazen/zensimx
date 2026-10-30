@@ -8474,3 +8474,26 @@ fail on (b) and improve (a); the gate figures wait for the 1,691-view gauntlet g
 
 Not decided here: the bar (owner), a model refit on trade data (none was done), the HDR family. Run record: `~/tmp/handoff/chroma-trade/`
 (`report.md`, `PROGRESS.md`, `results.json`).
+
+### Trade ladders: gauntlet grid result and the 64 px amendment (lane `chromatrade`, 2026-10-30)
+
+**Amendment (evif `5b37c2c4`, pushed 10:58Z, "after the coordinator's SSIMULACRA2 small-view finding, before reading any G-TRADE result").**
+On views with a long edge of 64 px or less SSIMULACRA2 does not vote (butteraugli and CVVDP must both agree; finds need both margins
+positive) and G-TRADE is reported per stratum (above 64 px primary, 64 px or less, pooled). Declared reads before it: the pilot including
+its 15-source gauntlet slice (256 and 512 px views, unaffected); no grid figure. The search objective was not changed. It applies to 1,918
+of the 9,162 Stage-B views. In the grid's rung-0 data SSIMULACRA2 falls at 32 and 64 px for the XYB family only (78.4 and 73.9 against
+91-93 from 128 px; YCbCr 93.8 and 93.2), butteraugli and CVVDP stay level.
+
+**Result (gauntlet partition: 173 sources, 1,691 views, 2,755 family jobs, 1,952,564 rows; all controls passed; store verified, 308 GB;
+1,000 sampled EVIFs bit-exact; an independent recount matches).** Primary stratum (1,345 views above 64 px; 18,267 decided-WORSE adjacent
+trade pairs): (a) inversion share E 7.61 % [6.38, 8.95], ECodec 9.02 % (+1.41 pts [+0.43, +2.48] worse than E), F 2.90 % (-4.71
+[-5.78, -3.73] better), Fcodec 4.44 % (-3.17 [-4.13, -2.27] better). (a2) byte-matched, 51,361 pairs: E 1.19 %, ECodec 1.38 % (not
+distinguishable), F 0.68 % (-0.51 [-0.67, -0.35]), Fcodec 0.83 % (-0.36 [-0.54, -0.17]). (b) DE finds per 1,000: E 461.6 [443.5, 479.4],
+ECodec 446.0 (-15.7 [-27.9, -3.6]), F 492.3 (+30.7 [+17.3, +44.6] worse), Fcodec 569.0 (+107.3 [+93.6, +121.4] worse); the random arm
+shows the same ordering (+36 and +114 over E). Per family E inverts xyb-extended 15.5 % (869 of 5,607), ycc444 4.9 %, ycc420 3.3 %;
+ECodec 20.0 %, 4.9 %, 3.3 %; xyb-capped and svt-420 hold 36 and 1 decided pairs. Per ladder E inverts on 26.5 % of the xyb-extended
+ladders that hold a decided-WORSE pair (824 of 3,105), ECodec 31.8 %. Small stratum (346 views, B + C): (a) E 8.74 % (75 of 858), ECodec
+12.70 % (+3.96 [+0.34, +7.73] worse), F 6.41 %, Fcodec 7.93 % (both not distinguishable); (b) E 206.8, ECodec +12.0, F +44.9, Fcodec +92.4
+(all worse). Under the proposed bar (not adopted), in the primary stratum ECodec fails on (a); F and Fcodec pass (a) and (a2) and fail (b).
+Training-leg grid (6,975 views, bitstream-only) and the dev/calibration diagnostic roles were still to finish when this was written.
+Run record: `~/tmp/handoff/chroma-trade/report.md`; public summary in imazen/evif `benchmarks/trade-gauntlet-2026-10-30.md`.
