@@ -8424,3 +8424,19 @@ and is reported as such; no threshold is loosened. Only the chosen weight gets t
 the full gate set plus G-CHROMA-L on calibration.
 
 **Hosts.** Every fitting host first reproduces the stored Mlic cell byte for byte with the trainer that fits there (per-host control).
+
+**Round 2 result (2026-10-29): negative for F under the registered rule.** Four arms, seed-0 Mlic-recipe packed model (fx2 declaration, chroma root;
+w0 is the round-1 root) and twelve E21 cells each, all on controlled hosts (each host reproduced the stored Mlic cell byte for byte with the
+round-2 trainer `4bca1062`, main `bad8e5f6`, before fitting). Dev ladders only; calibration ladders were not read.
+
+| chroma-leg weight | G-CHROMA-L (dev) | E21 mean ΔSROCC vs stored Mlic | KADID / TID2013 / KonFiG / CID22-A Δ | G-STEER |
+|---|---|---:|---|---|
+| w0 = 1.0411 | pass | −0.0152 | −0.0023 / −0.0137 / −0.0045 / −0.0400 | not run (fails E21) |
+| w0/2 | **fail** (band-ac upper bound +0.51) | −0.0060 | −0.0010 / −0.0028 / −0.0025 / −0.0176 | not run |
+| w0/4 | **fail** (all five families at or above E's MAE) | −0.0043 | −0.0006 / +0.0006 / −0.0008 / −0.0165 | not run |
+| w0/8 | pass (all five families, upper bounds −0.5 to −1.7) | −0.0036 | +0.0022 / −0.0030 / −0.0016 / −0.0119 | 135/135 |
+
+The bars are mean ≥ −0.002 and every population ≥ −0.005. No arm passes G-STEER, the E21 bar and G-CHROMA-L together, so nothing is selected; no seeds,
+continuations or full gates were run, and no threshold was loosened. Two observations, reported as such: the level gain is not monotone in the weight
+(w0/2 and w0/4 fail while w0 and w0/8 pass, the arms being single seeds), and the CID22-A cost does not vanish as the weight falls (−0.040 → −0.012 at w0/8),
+against −0.0008 for fx2 without the chroma leg (stage-1 record). Round-1 F-model results are unchanged.
