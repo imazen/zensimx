@@ -8440,3 +8440,37 @@ The bars are mean ≥ −0.002 and every population ≥ −0.005. No arm passes 
 continuations or full gates were run, and no threshold was loosened. Two observations, reported as such: the level gain is not monotone in the weight
 (w0/2 and w0/4 fail while w0 and w0/8 pass, the arms being single seeds), and the CID22-A cost does not vanish as the weight falls (−0.040 → −0.012 at w0/8),
 against −0.0008 for fx2 without the chroma leg (stage-1 record). Round-1 F-model results are unchanged.
+
+### Trade ladders and G-TRADE: registration and pilot (lane `chromatrade`, 2026-10-30)
+
+Owner question (2026-10-30): "do we have cases of xyb encodes with tiny luma gains with catastrophic chroma quant losses, as part of
+ladders where luma isnt a valid proxy". Before this lane: no, every chroma ladder held luma exactly fixed and the admission rule stopped
+each ladder at SSIMULACRA2's first tie or reversal. Owner decision: "via evif, yes, it should be designed to do that". The capability
+is in imazen/evif (`evif trade`, `evif trade-bootstrap`; record `docs/trade-ladders.md`, registered in `8950be8d` before any scoring,
+amended in `c1b3f96b` before the pilot: a trade pair accepts `luma601-psnr` OR `lumrel-psnr` as the luma proxy because XYB codes opsin
+Y). Families: ycc444, ycc420 (zenjpeg-expert luma and chroma multipliers, chroma to x64), xyb-extended (raw XYB tables, X/B to x1024),
+xyb-capped (zenjpeg-color, quality 95 to 99.6, scales to 5), svt-420 (zenav1-svt quality and U/V delta). Luma ramps none/tiny/medium/large;
+byte-matched allocation pairs; a DE search with the trade dimensions (16 samples x 3 budgets x 4 targets x DE/random).
+
+**Truth rule (registered):** frozen SSIMULACRA2 (margin 1.0), butteraugli (0.5), CVVDP CPU port standard_4k (0.25 JOD); a pair is WORSE
+when two references vote worse, so SSIMULACRA2 can never decide alone; every dissent is stored. An inversion is truth WORSE with
+`score(b) >= score(a)`.
+
+**G-TRADE (registered after the owner saw the chroma results), gauntlet partition only (source hash mod 5 == 0):** (a) trade-ladder
+inversion share, (a2) byte-matched inversion share, (b) DE finds per 1,000 encodes; E and ECodec absolutely, candidates (F, Fcodec) paired
+against E by a bootstrap over sources (10,000 draws, seed 20261030, percentile 95 %). **Proposed bar, not adopted:** a candidate fails
+when the interval of (candidate - E) lies entirely above zero on (a), (a2) or (b).
+
+**Pilot (81 TRAIN sources x 2 views = 162 views, 185,520 rows, all controls passed, 1,825 sampled EVIFs bit-checked):**
+the catastrophic region exists in xyb-extended (median SSIMULACRA2 91.9 -> 35.2 at X/B x1024 while relative luminance rises 1.14 dB and
+bytes stay at 44.5 -> 45.1 KB) and in the YCbCr families (x64: 93.1 -> 43.5, 90.1 -> 51.7); it does not exist in xyb-capped (91.9 -> 91.4)
+or svt-420 (91.8 -> 88.1). Only 13-19 % of adjacent trade pairs have a decided truth (CVVDP is most often outside the deciding pair).
+Over 2,313 decided-WORSE adjacent trade pairs (all 81 sources, descriptive): E inverts 153 (6.6 %; xyb-extended 11.3 %, ycc444 4.0 %,
+ycc420 4.4 %), ECodec 199 (8.6 %), F 27 (1.2 %), Fcodec 51 (2.2 %). Per ladder, E inverts on 21.6 % of xyb-extended ladders that hold a
+decided-WORSE pair, ECodec on 26.1 %. Byte-matched (a2): E 0.87 %, ECodec 1.15 %, F 0.50 %, Fcodec 0.69 %. DE finds per 1,000 (b): E 475,
+ECodec 466, F 506 (+31 [+3, +59] vs E), Fcodec 588 (+112 [+85, +139]). Gauntlet slice of the pilot (15 sources): (a) E 2.2 %, ECodec 8.8 %,
+F 1.7 %, Fcodec 2.2 % (all not distinguishable from E); (b) Fcodec +115 [+60, +176] worse than E. Under the proposed bar F and Fcodec would
+fail on (b) and improve (a); the gate figures wait for the 1,691-view gauntlet grid (running through zenfleet).
+
+Not decided here: the bar (owner), a model refit on trade data (none was done), the HDR family. Run record: `~/tmp/handoff/chroma-trade/`
+(`report.md`, `PROGRESS.md`, `results.json`).
