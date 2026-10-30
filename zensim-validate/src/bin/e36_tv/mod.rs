@@ -341,6 +341,7 @@ pub(super) fn load(
                 n_rows: 1,
                 n_features: raw_width,
                 kept: m.feature_ids.iter().map(|&x| x as u32).collect(),
+                derived: None,
             };
             derived.extend_compact(&mut compact, raw_width)?;
             if !compact.data.iter().all(|x| x.is_finite()) {

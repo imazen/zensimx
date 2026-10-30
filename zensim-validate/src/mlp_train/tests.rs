@@ -804,6 +804,7 @@ fn compact_rows_train_identically_to_zero_masked_dense() {
             n_rows,
             n_features,
             kept: kept.clone(),
+            derived: None,
         }
     };
 
@@ -925,6 +926,228 @@ fn compact_rows_train_identically_to_zero_masked_dense() {
             ca.data.is_empty() && cb.data.is_empty(),
             "{label}: compact buffers not taken"
         );
+    }
+}
+
+/// A lazily-extended compact table (`Fx1Declaration::extend_compact_lazy`,
+/// products computed where the row is read) MUST train to bit-identical
+/// bake bytes against the materializing `extend_compact` and against the
+/// dense `extend_dense` oracle, on every plain-head code path that reads
+/// standardized rows — the shipped fx1 and fx2 declarations both.
+#[test]
+fn derived_lazy_compact_trains_identically_to_materialized() {
+    use crate::derived_inputs::Fx1Declaration;
+
+    fn mk<'a>(
+        name: &str,
+        scores: &'a [f64],
+        features: FeatureRows<'a>,
+        tw: f64,
+        vw: f64,
+    ) -> TrainingGroup<'a> {
+        TrainingGroup {
+            name: name.to_string(),
+            human_scores: scores,
+            features,
+            metric_sigmas: None,
+            train_weight: tw,
+            validation_weight: vw,
+            ref_ids: None,
+            loss_mode: GroupLossMode::default(),
+        }
+    }
+
+    let base = 720usize;
+    for (name, d) in [
+        (
+            "fx1",
+            Fx1Declaration::parse(include_str!(
+                "../../../scripts/rev4_featpot/e33_fx1_declaration.json"
+            ))
+            .unwrap(),
+        ),
+        (
+            "fx2",
+            Fx1Declaration::parse(include_str!(
+                "../../../scripts/rev4_featpot/color_noise_fx2_declaration.json"
+            ))
+            .unwrap(),
+        ),
+    ] {
+        let load = d.load_ids();
+        let width = base + d.products.len();
+        // (rows, seed) per group; stored values exactly representable in
+        // f32 (narrowed then re-widened, as the parquet path delivers).
+        let make = |n: usize, seed: u64| -> (Vec<f64>, Vec<f32>) {
+            let (rows, targets) = make_synth_dataset(seed, n, base);
+            let mut stored = Vec::with_capacity(n * load.len());
+            for row in &rows {
+                for &id in &load {
+                    stored.push(row[id] as f32);
+                }
+            }
+            (targets, stored)
+        };
+        let kept: Vec<u32> = load.iter().map(|&i| i as u32).collect();
+        let compact_of = |stored: &[f32], n_rows: usize| -> CompactRows {
+            CompactRows {
+                data: stored.to_vec(),
+                n_rows,
+                n_features: base,
+                kept: kept.clone(),
+                derived: None,
+            }
+        };
+        let (targets_a, stored_a) = make(300, 61);
+        let (targets_b, stored_b) = make(1300, 62);
+        // The equivalent zero-masked dense tables: `width`-wide rows holding
+        // only the expanded kept columns. (extend_dense keeps non-direct
+        // factor columns as inputs — a deliberately different logical
+        // table — so the dense leg is built from the materialized compact.)
+        let dense_of = |c: &CompactRows| -> Vec<f64> {
+            let mut flat = vec![0.0f64; c.n_rows * width];
+            let k = c.kept.len();
+            for r in 0..c.n_rows {
+                for j in 0..k {
+                    flat[r * width + c.kept[j] as usize] = f64::from(c.data[r * k + j]);
+                }
+            }
+            flat
+        };
+        let mut ca_oracle = compact_of(&stored_a, 300);
+        let mut cb_oracle = compact_of(&stored_b, 1300);
+        d.extend_compact(&mut ca_oracle, base).unwrap();
+        d.extend_compact(&mut cb_oracle, base).unwrap();
+        let flat_a = dense_of(&ca_oracle);
+        let flat_b = dense_of(&cb_oracle);
+        let identity_scores = vec![0.0f64; 3];
+        let identity_flat = vec![0.0f64; 3 * width];
+        let identity_refs: Vec<&[f64]> = identity_flat.chunks(width).collect();
+
+        let hyper = MlpHyperparams {
+            n_hidden: 6,
+            n_epochs: 4,
+            pairs_per_epoch: 400,
+            initial_lr: 0.005,
+            seed: 11,
+            log_every: 1,
+            early_stop_patience: 0,
+            validation_policy: ValidationPolicy::Mean,
+            ..Default::default()
+        };
+        let recipes: Vec<(&str, MlpHyperparams)> = vec![
+            ("sequential", hyper.clone()),
+            (
+                "parallel-minibatch",
+                MlpHyperparams {
+                    minibatch_size: 16,
+                    parallel_batch: true,
+                    ..hyper.clone()
+                },
+            ),
+            (
+                "nin-minibatch",
+                MlpHyperparams {
+                    minibatch_size: 32,
+                    norm_in_norm_weight: 0.5,
+                    ..hyper.clone()
+                },
+            ),
+            (
+                "nonneg-distance",
+                MlpHyperparams {
+                    nonneg_distance: true,
+                    ..hyper.clone()
+                },
+            ),
+        ];
+        for (label, hyper) in recipes {
+            // Dense oracle: the expanded table as zero-masked f64 rows.
+            let (mut a_dense, mut b_dense) = (flat_a.clone(), flat_b.clone());
+            // Materialized compact oracle.
+            let mut ca = compact_of(&stored_a, 300);
+            let mut cb = compact_of(&stored_b, 1300);
+            d.extend_compact(&mut ca, base).unwrap();
+            d.extend_compact(&mut cb, base).unwrap();
+            // Lazy compact under test.
+            let mut la = compact_of(&stored_a, 300);
+            let mut lb = compact_of(&stored_b, 1300);
+            d.extend_compact_lazy(&mut la, base).unwrap();
+            d.extend_compact_lazy(&mut lb, base).unwrap();
+
+            let run = |a: FeatureRows, b: FeatureRows, log: &mut Vec<String>| -> Vec<u8> {
+                train_mlp(
+                    &mut [
+                        mk("a", &targets_a, a, 1.0, 1.0),
+                        mk("b", &targets_b, b, 0.0, 0.5),
+                        mk(
+                            "identity",
+                            &identity_scores,
+                            FeatureRows::Borrowed(&identity_refs),
+                            0.3,
+                            0.0,
+                        ),
+                    ],
+                    width,
+                    &hyper,
+                    log,
+                )
+            };
+            let mut log_dense = Vec::new();
+            let bake_dense = run(
+                FeatureRows::Releasable {
+                    data: &mut a_dense,
+                    n_rows: 300,
+                    n_features: width,
+                },
+                FeatureRows::Releasable {
+                    data: &mut b_dense,
+                    n_rows: 1300,
+                    n_features: width,
+                },
+                &mut log_dense,
+            );
+            let mut log_mat = Vec::new();
+            let bake_mat = run(
+                FeatureRows::Compact(&mut ca),
+                FeatureRows::Compact(&mut cb),
+                &mut log_mat,
+            );
+            let mut log_lazy = Vec::new();
+            let bake_lazy = run(
+                FeatureRows::Compact(&mut la),
+                FeatureRows::Compact(&mut lb),
+                &mut log_lazy,
+            );
+            assert_eq!(
+                bake_dense, bake_lazy,
+                "{name}/{label}: lazy-derived compact changed the bake"
+            );
+            assert_eq!(
+                bake_mat, bake_lazy,
+                "{name}/{label}: lazy-derived vs materialized compact"
+            );
+            let strip = |l: &Vec<String>| -> Vec<String> {
+                l.iter()
+                    .filter(|x| x.contains("epoch"))
+                    .map(|x| x.split(" | t=").next().unwrap().to_string())
+                    .collect()
+            };
+            assert_eq!(
+                strip(&log_dense),
+                strip(&log_lazy),
+                "{name}/{label}: epoch lines dense vs lazy"
+            );
+            assert_eq!(
+                strip(&log_mat),
+                strip(&log_lazy),
+                "{name}/{label}: epoch lines materialized vs lazy"
+            );
+            assert!(
+                la.data.is_empty() && lb.data.is_empty(),
+                "{name}/{label}: lazy buffers not taken"
+            );
+        }
     }
 }
 

@@ -2104,12 +2104,105 @@ pub enum FeatureRows<'a> {
 #[derive(Debug)]
 pub struct CompactRows {
     /// `n_rows × kept.len()`; column `j` is logical feature `kept[j]`.
+    /// With `derived` set this buffer holds only the declaration's read set —
+    /// the one table the trainer keeps resident.
     pub data: Vec<f32>,
     pub n_rows: usize,
-    /// Logical (full) width.
+    /// Logical (full) width of the expanded table.
     pub n_features: usize,
     /// Logical feature ids stored, ascending and unique, all `< n_features`.
     pub kept: Vec<u32>,
+    /// `Some` when the model-visible table is wider than the stored rows
+    /// (derived product columns computed where the row is read, so no
+    /// expanded buffer is ever resident). `None` means the stored columns
+    /// ARE the logical columns.
+    pub derived: Option<DerivedColumns>,
+}
+
+/// How one column of an expanded [`CompactRows`] is produced from its stored
+/// row. `Stored(p)` copies the stored value at position `p`; `Product(a, b)`
+/// is the IEEE f32 product `row[a] * row[b]` — the `fx1`/`fx2` lazy form,
+/// the same single multiply `extend_compact` materializes.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ColumnSource {
+    /// Copy the stored row's value at this position.
+    Stored(u32),
+    /// `f32` product of the stored row's values at the two positions.
+    Product(u32, u32),
+}
+
+/// The lazy expansion of a [`CompactRows`]: expanded column `j` (logical
+/// feature `kept[j]`) reads the stored row per `sources[j]`. Owned by
+/// `Fx1Declaration::extend_compact_lazy`.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct DerivedColumns {
+    /// Logical feature id of expanded column `j`, ascending and unique,
+    /// parallel to `sources`.
+    pub kept: Vec<u32>,
+    /// Source of expanded column `j` within the stored row.
+    pub sources: Vec<ColumnSource>,
+}
+
+impl CompactRows {
+    /// The model-visible column ids in read order: `derived.kept` when a lazy
+    /// extension is active, else `kept`.
+    pub fn expanded_kept(&self) -> &[u32] {
+        self.derived.as_ref().map_or(&self.kept, |d| &d.kept)
+    }
+
+    /// `(value, logical column)` pairs of the stored `row`
+    /// (`row.len() == kept.len()`), in expanded order. For a plain table this
+    /// is `row` zipped with `kept` — the pairs every consumer always saw.
+    #[inline]
+    pub(crate) fn for_each_expanded(&self, row: &[f32], mut f: impl FnMut(f32, u32)) {
+        debug_assert_eq!(row.len(), self.kept.len());
+        match &self.derived {
+            None => {
+                for (&v, &d) in row.iter().zip(self.kept.iter()) {
+                    f(v, d);
+                }
+            }
+            Some(d) => {
+                for (&s, &l) in d.sources.iter().zip(d.kept.iter()) {
+                    let v = match s {
+                        ColumnSource::Stored(p) => row[p as usize],
+                        ColumnSource::Product(a, b) => {
+                            crate::derived_inputs::product_f32(row[a as usize], row[b as usize])
+                        }
+                    };
+                    f(v, l);
+                }
+            }
+        }
+    }
+
+    /// Stored row `i` as the expanded `expanded_kept()` order — materializes
+    /// one row; the fixture tests compare it to the materialized extension.
+    #[cfg(test)]
+    pub(crate) fn expanded_row(&self, i: usize) -> Vec<f32> {
+        let k = self.kept.len();
+        let row = &self.data[i * k..(i + 1) * k];
+        match &self.derived {
+            None => row.to_vec(),
+            Some(d) => {
+                let mut out = Vec::with_capacity(d.kept.len());
+                self.for_each_expanded(row, |v, _| out.push(v));
+                out
+            }
+        }
+    }
+
+    /// Whether `sources` is this table's column-source list — the implied
+    /// `Stored(j)` sequence for a plain table, `derived.sources` otherwise.
+    fn sources_match(&self, sources: &[ColumnSource]) -> bool {
+        match &self.derived {
+            None => sources
+                .iter()
+                .enumerate()
+                .all(|(j, &s)| s == ColumnSource::Stored(j as u32)),
+            Some(d) => d.sources == sources,
+        }
+    }
 }
 
 impl<'a> FeatureRows<'a> {
@@ -2135,10 +2228,24 @@ impl<'a> FeatureRows<'a> {
                 data,
             } => *nf == n_features && data.len() == *n_rows * n_features,
             Self::Compact(c) => {
-                c.n_features == n_features
-                    && c.data.len() == c.n_rows * c.kept.len()
+                let stored_ok = c.data.len() == c.n_rows * c.kept.len()
                     && c.kept.windows(2).all(|w| w[0] < w[1])
-                    && c.kept.last().is_none_or(|&d| (d as usize) < n_features)
+                    && c.kept.last().is_none_or(|&d| (d as usize) < n_features);
+                let derived_ok = match &c.derived {
+                    None => true,
+                    Some(d) => {
+                        d.kept.len() == d.sources.len()
+                            && d.kept.windows(2).all(|w| w[0] < w[1])
+                            && d.kept.last().is_none_or(|&l| (l as usize) < n_features)
+                            && d.sources.iter().all(|s| match *s {
+                                ColumnSource::Stored(p) => (p as usize) < c.kept.len(),
+                                ColumnSource::Product(a, b) => {
+                                    (a as usize) < c.kept.len() && (b as usize) < c.kept.len()
+                                }
+                            })
+                    }
+                };
+                c.n_features == n_features && stored_ok && derived_ok
             }
         }
     }
@@ -7235,10 +7342,10 @@ fn standardize_group_releasing_raw(
                 // Heads that read a full-width standardized buffer: expand
                 // the compact rows ONCE into it. Same expression as the
                 // arms above on the same values — kept columns widen the
-                // exact f32, every other column is the literal `+0.0` the
-                // zero-masked table holds.
-                assert_eq!(c.n_features, n_features, "Compact width / trainer width");
-                let lazy = LazyStd::new(&c.kept, n_features, scaler_mean, scaler_scale);
+                // exact f32 (products recomputed on the fly under a lazy
+                // derived extension), every other column is the literal
+                // `+0.0` the zero-masked table holds.
+                let lazy = LazyStd::for_compact(c, n_features, scaler_mean, scaler_scale);
                 let mut buf = vec![0.0f64; c.n_rows * n_features];
                 let k = c.kept.len();
                 for i in 0..c.n_rows {
@@ -7266,7 +7373,15 @@ fn standardize_group_releasing_raw(
 /// expression evaluated at `raw = +0.0`. Division and subtraction are single
 /// IEEE operations, so no evaluation order or fusion can change a bit.
 pub(crate) struct LazyStd {
+    /// Stored values per row — the stride of the compact raw buffer
+    /// (`CompactRows::kept.len()`, narrower than `kept` under a lazy
+    /// derived extension).
+    stored_width: usize,
+    /// Expanded logical column ids (`CompactRows::expanded_kept()`).
     kept: Vec<u32>,
+    /// How each expanded column is produced from the stored row, parallel
+    /// to `kept` — all `Stored(j)` for a plain table.
+    sources: Vec<ColumnSource>,
     mean: Vec<f64>,
     /// `scale[d].max(1e-12)` — the divisor the in-place pass uses.
     denom: Vec<f64>,
@@ -7276,7 +7391,19 @@ pub(crate) struct LazyStd {
 }
 
 impl LazyStd {
-    fn new(kept: &[u32], n_features: usize, scaler_mean: &[f64], scaler_scale: &[f64]) -> Self {
+    fn for_compact(
+        c: &CompactRows,
+        n_features: usize,
+        scaler_mean: &[f64],
+        scaler_scale: &[f64],
+    ) -> Self {
+        assert_eq!(c.n_features, n_features, "Compact width / trainer width");
+        let sources: Vec<ColumnSource> = match &c.derived {
+            None => (0..c.kept.len() as u32).map(ColumnSource::Stored).collect(),
+            Some(d) => d.sources.clone(),
+        };
+        let kept = c.expanded_kept().to_vec();
+        debug_assert_eq!(kept.len(), sources.len());
         let denom: Vec<f64> = scaler_scale[..n_features]
             .iter()
             .map(|s| s.max(1e-12))
@@ -7285,19 +7412,33 @@ impl LazyStd {
             .map(|d| (0.0f64 - scaler_mean[d]) / denom[d])
             .collect();
         Self {
-            kept: kept.to_vec(),
+            stored_width: c.kept.len(),
+            kept,
+            sources,
             mean: scaler_mean[..n_features].to_vec(),
             denom,
             template,
         }
     }
 
-    /// Write the full standardized row for compact row `raw` into `out`
-    /// (`out.len() == n_features`).
+    /// Write the full standardized row for compact row `raw` (`raw.len() ==
+    /// stored_width`) into `out` (`out.len() == n_features`).
+    ///
+    /// Bit-identity: `Stored(p)` widens the same stored f32 the materialized
+    /// table held; `Product(a, b)` recomputes `product_f32(row[a], row[b])` —
+    /// the identical single f32 multiply — widened exactly as the stored
+    /// product was. The `(v − mean[d]) / denom[d]` expression is unchanged.
     #[inline]
     fn expand_into(&self, raw: &[f32], out: &mut [f64]) {
+        debug_assert_eq!(raw.len(), self.stored_width);
         out.copy_from_slice(&self.template);
-        for (&v, &d) in raw.iter().zip(self.kept.iter()) {
+        for (&s, &d) in self.sources.iter().zip(self.kept.iter()) {
+            let v = match s {
+                ColumnSource::Stored(p) => raw[p as usize],
+                ColumnSource::Product(a, b) => {
+                    crate::derived_inputs::product_f32(raw[a as usize], raw[b as usize])
+                }
+            };
             let d = d as usize;
             out[d] = (v as f64 - self.mean[d]) / self.denom[d];
         }
@@ -7334,16 +7475,31 @@ impl StdFeatures {
             .iter_mut()
             .map(|g| {
                 if let FeatureRows::Compact(c) = &mut g.features {
-                    assert_eq!(c.n_features, n_features, "Compact width / trainer width");
                     match &lazy {
                         None => {
-                            lazy =
-                                Some(LazyStd::new(&c.kept, n_features, scaler_mean, scaler_scale))
+                            lazy = Some(LazyStd::for_compact(
+                                c,
+                                n_features,
+                                scaler_mean,
+                                scaler_scale,
+                            ))
                         }
-                        Some(l) => assert_eq!(
-                            l.kept, c.kept,
-                            "all Compact groups must share one column subset"
-                        ),
+                        Some(l) => {
+                            assert_eq!(
+                                l.kept,
+                                c.expanded_kept(),
+                                "all Compact groups must share one column subset"
+                            );
+                            assert_eq!(
+                                l.stored_width,
+                                c.kept.len(),
+                                "all Compact groups must share one stored width"
+                            );
+                            assert!(
+                                c.sources_match(&l.sources),
+                                "all Compact groups must share one column subset"
+                            );
+                        }
                     }
                     return StdGroup::Lazy {
                         raw: std::mem::take(&mut c.data),
@@ -7373,7 +7529,7 @@ impl StdFeatures {
             StdGroup::Dense(buf) => &buf[i * nf..(i + 1) * nf],
             StdGroup::Lazy { raw, .. } => {
                 let lazy = self.lazy.as_ref().expect("Lazy group implies LazyStd");
-                let k = lazy.kept.len();
+                let k = lazy.stored_width;
                 scratch.resize(nf, 0.0);
                 lazy.expand_into(&raw[i * k..(i + 1) * k], scratch);
                 scratch
@@ -7463,9 +7619,7 @@ fn compute_scaler_from_groups(
             FeatureRows::Compact(c) => {
                 let k = c.kept.len();
                 for row in c.data.chunks_exact(k.max(1)).take(c.n_rows) {
-                    for (&v, &d) in row.iter().zip(c.kept.iter()) {
-                        mean[d as usize] += v as f64;
-                    }
+                    c.for_each_expanded(row, |v, d| mean[d as usize] += v as f64);
                     count += 1;
                 }
             }
@@ -7489,10 +7643,10 @@ fn compute_scaler_from_groups(
             FeatureRows::Compact(c) => {
                 let k = c.kept.len();
                 for row in c.data.chunks_exact(k.max(1)).take(c.n_rows) {
-                    for (&v, &d) in row.iter().zip(c.kept.iter()) {
+                    c.for_each_expanded(row, |v, d| {
                         let dx = v as f64 - mean[d as usize];
                         var[d as usize] += dx * dx;
-                    }
+                    });
                 }
             }
             other => {

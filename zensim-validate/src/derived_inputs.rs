@@ -22,7 +22,7 @@
 //! by zensim when the compact bake loads, so no second copy of the feature
 //! registry lives here.
 
-use crate::mlp_train::CompactRows;
+use crate::mlp_train::{ColumnSource, CompactRows, DerivedColumns};
 use zenpredict::{Model, WeightStorage};
 use zenpredict_bake::{BakeLayer, BakeMetadataEntry, BakeRequest, bake};
 
@@ -33,6 +33,14 @@ pub const DERIVED_INPUTS_KEY: &str = "zensim.derived_inputs";
 /// Schema tag of the declaration file.
 pub const FX1_SCHEMA: &str = "zensim-fx1-v1";
 const HEADER: &str = "zensim-derived-inputs v1";
+
+/// The declaration's product term: one IEEE f32 multiply. Every producer of
+/// a product column — materialized or lazy — runs this exact expression, so
+/// the widened `f64` the trainer standardizes is bit-identical either way.
+#[inline]
+pub(crate) fn product_f32(a: f32, b: f32) -> f32 {
+    a * b
+}
 
 /// One layer copied out of a bake, each keeping its own dtype.
 struct OwnedLayer {
@@ -155,7 +163,7 @@ impl Fx1Declaration {
         out.extend(
             self.products
                 .iter()
-                .map(|&[a, b]| Self::product_f32(row[a] as f32, row[b] as f32)),
+                .map(|&[a, b]| product_f32(row[a] as f32, row[b] as f32)),
         );
     }
 
@@ -180,14 +188,10 @@ impl Fx1Declaration {
         s
     }
 
-    fn product_f32(a: f32, b: f32) -> f32 {
-        a * b
-    }
-
-    /// Replace a compact group (kept = [`Self::load_ids`]) by its extended
-    /// form: direct ids, then products at `base + j`. Reference factors that
-    /// are not direct inputs leave the kept set.
-    pub fn extend_compact(&self, rows: &mut CompactRows, base: usize) -> Result<(), String> {
+    /// Check `rows` is the table this declaration's loader produced: kept
+    /// ids equal [`Self::load_ids`], logical width `base`. Returns the load
+    /// set (sorted ids; position = stored column).
+    fn check_compact_base(&self, rows: &CompactRows, base: usize) -> Result<Vec<usize>, String> {
         let load = self.load_ids();
         let kept: Vec<usize> = rows.kept.iter().map(|&k| k as usize).collect();
         if kept != load {
@@ -203,6 +207,14 @@ impl Fx1Declaration {
                 rows.n_features
             ));
         }
+        Ok(load)
+    }
+
+    /// Replace a compact group (kept = [`Self::load_ids`]) by its extended
+    /// form: direct ids, then products at `base + j`. Reference factors that
+    /// are not direct inputs leave the kept set.
+    pub fn extend_compact(&self, rows: &mut CompactRows, base: usize) -> Result<(), String> {
+        let load = self.check_compact_base(rows, base)?;
         let col = |id: usize| load.binary_search(&id).expect("declared id is loaded");
         let direct: Vec<usize> = self.direct.iter().map(|&id| col(id)).collect();
         let products: Vec<(usize, usize)> = self
@@ -216,14 +228,39 @@ impl Fx1Declaration {
         for r in 0..rows.n_rows {
             let row = &rows.data[r * k_in..(r + 1) * k_in];
             data.extend(direct.iter().map(|&c| row[c]));
-            data.extend(
-                products
-                    .iter()
-                    .map(|&(a, b)| Self::product_f32(row[a], row[b])),
-            );
+            data.extend(products.iter().map(|&(a, b)| product_f32(row[a], row[b])));
         }
         rows.data = data;
         rows.kept = self.kept_columns(base).iter().map(|&c| c as u32).collect();
+        rows.n_features = base + self.products.len();
+        rows.derived = None;
+        Ok(())
+    }
+
+    /// The memory-shaped form of [`Self::extend_compact`]: the stored table
+    /// keeps only the declared read set and each product is computed where
+    /// the row is read (`CompactRows::for_each_expanded`), so no expanded
+    /// buffer is ever resident — the double-buffered extension peak is gone
+    /// too.
+    ///
+    /// The expanded view — [`CompactRows::expanded_kept`] and the per-row
+    /// values — is bit-identical to the materialized form: `Stored` columns
+    /// copy the same stored f32, `Product` columns run the identical single
+    /// f32 multiply [`product_f32`] on the same stored operands.
+    pub fn extend_compact_lazy(&self, rows: &mut CompactRows, base: usize) -> Result<(), String> {
+        let load = self.check_compact_base(rows, base)?;
+        let col = |id: usize| load.binary_search(&id).expect("declared id is loaded");
+        let mut sources = Vec::with_capacity(self.direct.len() + self.products.len());
+        for &id in &self.direct {
+            sources.push(ColumnSource::Stored(col(id) as u32));
+        }
+        for &[a, b] in &self.products {
+            sources.push(ColumnSource::Product(col(a) as u32, col(b) as u32));
+        }
+        rows.derived = Some(DerivedColumns {
+            kept: self.kept_columns(base).iter().map(|&c| c as u32).collect(),
+            sources,
+        });
         rows.n_features = base + self.products.len();
         Ok(())
     }
@@ -250,7 +287,7 @@ impl Fx1Declaration {
             out.extend(
                 self.products
                     .iter()
-                    .map(|&[a, b]| f64::from(Self::product_f32(row[a] as f32, row[b] as f32))),
+                    .map(|&[a, b]| f64::from(product_f32(row[a] as f32, row[b] as f32))),
             );
         }
         *flat = out;
@@ -447,7 +484,7 @@ impl Fx1Declaration {
                 ext[id] = row[id] as f32;
             }
             for (j, &[a, b]) in self.products.iter().enumerate() {
-                ext[base + j] = Self::product_f32(row[a] as f32, row[b] as f32);
+                ext[base + j] = product_f32(row[a] as f32, row[b] as f32);
             }
             let want = predictor
                 .predict(&ext)
@@ -519,6 +556,7 @@ mod tests {
             n_rows: 2,
             n_features: base,
             kept: vec![13, 401, 422],
+            derived: None,
         };
         d.extend_compact(&mut c, base).unwrap();
         assert_eq!(c.kept, vec![13, 401, 720, 721]);
@@ -540,6 +578,125 @@ mod tests {
                     (flat[r * 722 + 720 + j] as f32).to_bits(),
                     c.data[r * 4 + 2 + j].to_bits()
                 );
+            }
+        }
+    }
+
+    /// Lazy derived extension must produce, per row, exactly the expanded
+    /// f32 values the materializing [`Fx1Declaration::extend_compact`] writes
+    /// — checked against the materialized path, a declaration-local
+    /// reference and the dense [`Fx1Declaration::extend_dense`] oracle, on
+    /// the shipped fx1 and fx2 declarations.
+    #[test]
+    fn compact_lazy_extension_matches_materialized() {
+        for (name, d) in [
+            (
+                "fx1",
+                Fx1Declaration::parse(include_str!(
+                    "../../scripts/rev4_featpot/e33_fx1_declaration.json"
+                ))
+                .unwrap(),
+            ),
+            (
+                "fx2",
+                Fx1Declaration::parse(include_str!(
+                    "../../scripts/rev4_featpot/color_noise_fx2_declaration.json"
+                ))
+                .unwrap(),
+            ),
+        ] {
+            let load = d.load_ids();
+            let base = 720;
+            let n_rows = 17;
+            // Deterministic stored rows over the load set, covering the
+            // sign-of-zero and magnitude edges a product must carry.
+            let mut data = Vec::with_capacity(n_rows * load.len());
+            for r in 0..n_rows {
+                for j in 0..load.len() {
+                    data.push(match (r + j) % 7 {
+                        0 => 0.0,
+                        1 => -0.0,
+                        2 => (r * load.len() + j) as f32 * 0.001 - 1.0,
+                        3 => -2.5 + 0.25 * j as f32,
+                        4 => 1e-4 * (r + 1) as f32,
+                        5 => 100.0 - 3.0 * r as f32,
+                        _ => -0.5,
+                    });
+                }
+            }
+            // Reference expansion straight from the declaration fields — an
+            // independent implementation of the same semantics.
+            let expanded_ids = d.kept_columns(base);
+            let k_out = expanded_ids.len();
+            let reference_row = |stored: &[f32], r: usize| -> Vec<f32> {
+                let row = &stored[r * load.len()..(r + 1) * load.len()];
+                let col = |id: usize| load.binary_search(&id).unwrap();
+                let mut out = Vec::with_capacity(k_out);
+                out.extend(d.direct.iter().map(|&id| row[col(id)]));
+                out.extend(
+                    d.products
+                        .iter()
+                        .map(|&[a, b]| product_f32(row[col(a)], row[col(b)])),
+                );
+                out
+            };
+            let kept: Vec<u32> = load.iter().map(|&i| i as u32).collect();
+            let mut materialized = CompactRows {
+                data: data.clone(),
+                n_rows,
+                n_features: base,
+                kept: kept.clone(),
+                derived: None,
+            };
+            d.extend_compact(&mut materialized, base).unwrap();
+            let mut lazy = CompactRows {
+                data,
+                n_rows,
+                n_features: base,
+                kept,
+                derived: None,
+            };
+            d.extend_compact_lazy(&mut lazy, base).unwrap();
+            assert_eq!(lazy.expanded_kept(), materialized.kept.as_slice(), "{name}");
+            assert_eq!(lazy.expanded_kept().len(), k_out, "{name}");
+            for r in 0..n_rows {
+                let lrow = lazy.expanded_row(r);
+                let mrow = &materialized.data[r * k_out..(r + 1) * k_out];
+                let rrow = reference_row(&lazy.data, r);
+                for j in 0..k_out {
+                    assert_eq!(
+                        lrow[j].to_bits(),
+                        mrow[j].to_bits(),
+                        "{name} row {r} col {} lazy vs materialized",
+                        expanded_ids[j]
+                    );
+                    assert_eq!(
+                        lrow[j].to_bits(),
+                        rrow[j].to_bits(),
+                        "{name} row {r} col {} lazy vs reference",
+                        expanded_ids[j]
+                    );
+                }
+            }
+            // Dense oracle: the untouched dense materializer, fed the same
+            // stored values widened, must see every expanded value too.
+            let mut flat = vec![0.0f64; n_rows * base];
+            for r in 0..n_rows {
+                for (j, &id) in load.iter().enumerate() {
+                    flat[r * base + id] = f64::from(lazy.data[r * load.len() + j]);
+                }
+            }
+            d.extend_dense(&mut flat, n_rows, base).unwrap();
+            let width = base + d.products.len();
+            for r in 0..n_rows {
+                let lrow = lazy.expanded_row(r);
+                for (j, &l) in lazy.expanded_kept().iter().enumerate() {
+                    assert_eq!(
+                        (flat[r * width + l as usize] as f32).to_bits(),
+                        lrow[j].to_bits(),
+                        "{name} row {r} col {l} lazy vs dense"
+                    );
+                }
             }
         }
     }

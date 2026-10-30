@@ -13,11 +13,57 @@ const UPIQ_NATIVE: &str = "73d1374f1cbb2ca2f5166812d69ee49e22486174b56337263fa27
 const UPIQ_COMMIT: &str = "d86b3b44383433e56ebc6161ee6c8db12639c5af";
 
 /// name, human, mode, loss, target transform, rows, producer commit, extractor sha
-const LEGS: [(&str, bool, &str, &str, &str, u64, &str, &str); 4] = [
-    ("hdr_upiq380", true, "withinref,rank", "within-source-rank", "score=100+10*human_JOD;no-clipping", 330, UPIQ_COMMIT, UPIQ_NATIVE),
-    ("hdr_4kdtb_train", true, "withinref,rank", "within-source-rank", "orient-native-quality;MOS-0-100", 48, HDR_COMMIT, HDR_NATIVE),
-    ("hdr_ladder_chroma", false, "withinref,both", "within-source-rank-and-scale", "identity-ssimulacra2-unclipped", 7177, HDR_COMMIT, HDR_NATIVE),
-    ("hdr_teacher_hdrvdp3", false, "withinref,both", "within-source-rank-and-scale", "score=10*q_jod;no-clipping", 7390, HDR_COMMIT, HDR_NATIVE),
+type LegSpec = (
+    &'static str,
+    bool,
+    &'static str,
+    &'static str,
+    &'static str,
+    u64,
+    &'static str,
+    &'static str,
+);
+const LEGS: [LegSpec; 4] = [
+    (
+        "hdr_upiq380",
+        true,
+        "withinref,rank",
+        "within-source-rank",
+        "score=100+10*human_JOD;no-clipping",
+        330,
+        UPIQ_COMMIT,
+        UPIQ_NATIVE,
+    ),
+    (
+        "hdr_4kdtb_train",
+        true,
+        "withinref,rank",
+        "within-source-rank",
+        "orient-native-quality;MOS-0-100",
+        48,
+        HDR_COMMIT,
+        HDR_NATIVE,
+    ),
+    (
+        "hdr_ladder_chroma",
+        false,
+        "withinref,both",
+        "within-source-rank-and-scale",
+        "identity-ssimulacra2-unclipped",
+        7177,
+        HDR_COMMIT,
+        HDR_NATIVE,
+    ),
+    (
+        "hdr_teacher_hdrvdp3",
+        false,
+        "withinref,both",
+        "within-source-rank-and-scale",
+        "score=10*q_jod;no-clipping",
+        7390,
+        HDR_COMMIT,
+        HDR_NATIVE,
+    ),
 ];
 
 /// TRAIN rows left when dev fold 0 / 1 is held out (registered; mirrors `HDR_FOLD_ROWS` in subjective_training_leg.py).
@@ -203,7 +249,7 @@ mod tests {
         assert!(run(&bad, &r, &bank, &keys, &none).is_err());
         assert_eq!(fold_of("hdr:upiq:narwaria:01"), {
             let h = Sha256::digest(b"hdr-p2p3-dev-fold-v1:hdr:upiq:narwaria:01");
-            (h[31] & 1) as u8
+            h[31] & 1
         });
         let reserved = BTreeSet::from(["hdr:4kdtb:S0".to_owned()]);
         assert!(run(&d, &r, &bank, &keys, &reserved).is_err());

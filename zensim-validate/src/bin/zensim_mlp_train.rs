@@ -1883,6 +1883,7 @@ fn load_group_dispatch(
                     n_rows,
                     n_features: o.n_features,
                     kept: o.kept,
+                    derived: None,
                 }),
                 metric_sigmas: o.metric_sigmas,
                 n_features: o.n_features,
@@ -3982,7 +3983,10 @@ fn main() {
         }
         if let Some((decl, _)) = &derived {
             let extended = match g.compact.as_mut() {
-                Some(c) => decl.extend_compact(c, cap),
+                // Keep only the declared read set resident; each product is
+                // computed where the trainer reads the row — no expanded
+                // buffer, bit-identical to the materialized form.
+                Some(c) => decl.extend_compact_lazy(c, cap),
                 None if g.n_features == cap => {
                     decl.extend_dense(&mut g.feature_rows, g.human_scores.len(), cap)
                 }
