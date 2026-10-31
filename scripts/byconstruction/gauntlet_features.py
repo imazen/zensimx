@@ -27,8 +27,10 @@ features (DE non-finds) are copied unchanged. When a key already exists in the l
 which checks the bank against the judges row by row.
 """
 import argparse
+from concurrent.futures import ProcessPoolExecutor
 import hashlib
 import json
+import multiprocessing
 from pathlib import Path
 import struct
 import subprocess
@@ -52,90 +54,104 @@ def sha(data):
     return hashlib.sha256(data).hexdigest()
 
 
-def harvest(ledger_dir, archive, index, out):
+_OWNER = {}
+_SOURCES = {}
+
+
+def read_object(archive, digest):
+    data = (archive / digest[:2] / digest[2:4] / digest).read_bytes()
+    if sha(data) != digest:
+        raise ValueError(f'CAS object {digest} differs')
+    return data
+
+
+def harvest_job(archive, row):
+    """Verify one feature job's outputs; return (feature columns, keys without row ids, objects read)."""
+    knobs = json.loads(row['knob_tuple_json'])
+    read = []
+
+    def get(digest):
+        read.append(digest)
+        return read_object(archive, digest)
+    result = json.loads(get(row['output_sha']))
+    assert result['schema'] == 'evif-rev7-features-v1' and result['feature_set_id'] == FEATURE_ID
+    assert result['extractor_sha256'] == EXTRACTOR_SHA and result['build_commit'] == BUILD
+    assert result['feature_width'] == 1825 and result['measured_feature_ids'] == IDS
+    assert result['image_path'] == row['image_path'] and result['knob_tuple_json'] == row['knob_tuple_json']
+    cells = {c['evif_sha256']: c for c in result['cells']}
+    assert len(cells) == len(result['cells']) and set(cells) == set(knobs['evif_shas'])
+    views = {_OWNER[d][0] for d in cells}
+    assert len(views) == 1
+    source = _SOURCES[views.pop()]
+    assert source['image_path'] == row['image_path'] and source['pixels_sha256'] == result['reference_pixels_sha256']
+    blobs = {name: get(digest) for name, digest in result['sidecars'].items()}
+    assert sha(blobs['features.csv']) == result['features_csv_sha256']
+    with tempfile.NamedTemporaryFile(dir=Path.home() / 'tmp', suffix='.csv') as f:
+        f.write(blobs['features.csv'])
+        f.flush()
+        feature_ids = sorted({c['row_id'] for c in cells.values()})
+        assert feature_ids == list(range(len(feature_ids)))
+        raw, columns = read_feature_csv(Path(f.name), feature_ids, 1825)
+    audits = [json.loads(line) for line in blobs['features.audit.jsonl'].splitlines()]
+    audit_by_png = {Path(a['distorted']).stem: a for a in audits}
+    assert len(audits) == len(audit_by_png) == len(feature_ids)
+    raw_f32 = np.column_stack([raw[f'f{i}'].to_numpy() for i in range(1825)]).astype('<f4')
+    digest_by_row = {}
+    keys, take = [], []
+    for digest in sorted(cells):
+        cell = cells[digest]
+        audit = audit_by_png[cell['png_sha256']]
+        assert not audit['model_inputs'] and audit['reference'] == row['image_path']
+        assert audit['reference_pixels_sha256'] == result['reference_pixels_sha256']
+        assert audit['distorted_pixels_sha256'] == cell['distorted_pixels_sha256']
+        rid = cell['row_id']
+        if rid not in digest_by_row:
+            digest_by_row[rid] = sha(raw_f32[rid].tobytes())
+        assert audit['canonical_features_f32_le_sha256'] == digest_by_row[rid]
+        view, trade_job = _OWNER[digest]
+        keys.append(dict(encoded_sha256=cell['jpeg_sha256'], evif_sha256=digest, png_sha256=cell['png_sha256'],
+                         distorted_pixels_sha256=cell['distorted_pixels_sha256'],
+                         reference_pixels_sha256=result['reference_pixels_sha256'],
+                         view_id=view, trade_job=trade_job, image_path=row['image_path'],
+                         width=source['width'], height=source['height'],
+                         canonical_features_f32_le_sha256=digest_by_row[rid], feature_primary_sha256=row['output_sha']))
+        take.append(rid)
+    return pa.table(columns).take(pa.array(take)), keys, read
+
+
+def harvest(ledger_dir, archive, index, out, workers):
     out.mkdir(parents=True)
-    owner = {}
-    sources = {}
     for line in (index / 'selection.jsonl').open():
         sel = json.loads(line)
-        sources[sel['view']] = sel['source']
+        _SOURCES[sel['view']] = sel['source']
         for digest in sel['evif_shas']:
-            owner.setdefault(digest, (sel['view'], sel['job']))
+            _OWNER.setdefault(digest, (sel['view'], sel['job']))
     rows = pq.read_table(sorted(Path(ledger_dir).glob('*.parquet'))).to_pylist()
     done = {}
     for r in rows:
         if r['status'] == 'done':
             done.setdefault(r['job_id'], r)
     duplicates = sum(1 for r in rows if r['status'] == 'done') - len(done)
+    ordered = sorted(done.values(), key=lambda r: r['job_id'])
     verified = set()
-    work = out / 'readback'
-    work.mkdir()
-
-    def read(digest):
-        data = (archive / digest[:2] / digest[2:4] / digest).read_bytes()
-        if sha(data) != digest:
-            raise ValueError(f'CAS object {digest} differs')
-        verified.add(digest)
-        return data
-
     writer = key_writer = None
     buffers, keys, count, seen = [], [], 0, set()
+    # Workers inherit the selection maps by fork; results come back in job order.
+    pool = ProcessPoolExecutor(max_workers=workers, mp_context=multiprocessing.get_context('fork'))
     try:
-        for index_n, row in enumerate(sorted(done.values(), key=lambda r: r['job_id'])):
-            knobs = json.loads(row['knob_tuple_json'])
-            result = json.loads(read(row['output_sha']))
-            assert result['schema'] == 'evif-rev7-features-v1' and result['feature_set_id'] == FEATURE_ID
-            assert result['extractor_sha256'] == EXTRACTOR_SHA and result['build_commit'] == BUILD
-            assert result['feature_width'] == 1825 and result['measured_feature_ids'] == IDS
-            assert result['image_path'] == row['image_path'] and result['knob_tuple_json'] == row['knob_tuple_json']
-            cells = {c['evif_sha256']: c for c in result['cells']}
-            assert len(cells) == len(result['cells']) and set(cells) == set(knobs['evif_shas'])
-            views = {owner[d][0] for d in cells}
-            assert len(views) == 1
-            source = sources[views.pop()]
-            assert source['image_path'] == row['image_path'] and source['pixels_sha256'] == result['reference_pixels_sha256']
-            for digest in result['sidecars'].values():
-                if digest not in verified:
-                    read(digest)
-            feature_csv = work / 'features.csv'
-            feature_csv.write_bytes(read(result['features_csv_sha256']))
-            feature_ids = sorted({c['row_id'] for c in cells.values()})
-            assert feature_ids == list(range(len(feature_ids)))
-            raw, columns = read_feature_csv(feature_csv, feature_ids, 1825)
-            audits = [json.loads(line) for line in read(result['sidecars']['features.audit.jsonl']).splitlines()]
-            audit_by_png = {Path(a['distorted']).stem: a for a in audits}
-            assert len(audits) == len(audit_by_png) == len(feature_ids)
-            raw_f32 = np.column_stack([raw[f'f{i}'].to_numpy() for i in range(1825)]).astype('<f4')
-            digest_by_row = {}
-            view_keys, take = [], []
-            for digest in sorted(cells):
-                cell = cells[digest]
-                audit = audit_by_png[cell['png_sha256']]
-                assert not audit['model_inputs'] and audit['reference'] == row['image_path']
-                assert audit['reference_pixels_sha256'] == result['reference_pixels_sha256']
-                assert audit['distorted_pixels_sha256'] == cell['distorted_pixels_sha256']
-                rid = cell['row_id']
-                if rid not in digest_by_row:
-                    digest_by_row[rid] = sha(raw_f32[rid].tobytes())
-                assert audit['canonical_features_f32_le_sha256'] == digest_by_row[rid]
-                assert digest not in seen
-                seen.add(digest)
-                view, trade_job = owner[digest]
-                view_keys.append(dict(row_id=count + len(view_keys), encoded_sha256=cell['jpeg_sha256'],
-                                      evif_sha256=digest, png_sha256=cell['png_sha256'],
-                                      distorted_pixels_sha256=cell['distorted_pixels_sha256'],
-                                      reference_pixels_sha256=result['reference_pixels_sha256'],
-                                      view_id=view, trade_job=trade_job, image_path=row['image_path'],
-                                      width=source['width'], height=source['height'],
-                                      canonical_features_f32_le_sha256=digest_by_row[rid],
-                                      feature_primary_sha256=row['output_sha']))
-                take.append(rid)
-            features = pa.table(columns).take(pa.array(take))
-            features = features.add_column(0, 'row_id', pa.array([k['row_id'] for k in view_keys], type=pa.int64()))
+        for index_n, (features, job_keys, read) in enumerate(pool.map(harvest_job, [archive] * len(ordered), ordered, chunksize=4)):
+            verified.update(read)
+            numbered = []
+            for k in job_keys:
+                assert k['evif_sha256'] not in seen
+                seen.add(k['evif_sha256'])
+                numbered.append(dict(row_id=count, **k))
+                count += 1
+            job_keys = numbered
+            features = features.add_column(0, 'row_id', pa.array([k['row_id'] for k in job_keys], type=pa.int64()))
             buffers.append(features)
-            keys.extend(view_keys)
-            count += len(view_keys)
-            if len(keys) >= 5000 or index_n + 1 == len(done):
+            keys.extend(job_keys)
+            if len(keys) >= 5000 or index_n + 1 == len(ordered):
                 bank = pa.concat_tables(buffers)
                 key_table = pa.Table.from_pylist(keys)
                 if writer is None:
@@ -146,10 +162,11 @@ def harvest(ledger_dir, archive, index, out):
                 buffers, keys = [], []
                 (out / 'PROGRESS.json').write_text(json.dumps(dict(jobs=index_n + 1, required=len(done), rows=count)) + '\n')
     finally:
+        pool.shutdown(cancel_futures=True)
         if writer:
             writer.close()
             key_writer.close()
-    selected = len(owner)
+    selected = len(_OWNER)
     manifest = dict(schema='rev5-featbank-v1', set='chroma-trade-gauntlet', rows=count, selected_containers=selected,
                     missing_containers=selected - count, feature_jobs=len(done), duplicate_executions=duplicates,
                     feature_width=1825, dtype='float64', absent_slots='NaN', requested_slot_ranges=[[0, 228], [372, 720]],
@@ -233,6 +250,7 @@ def main():
     h = sub.add_parser('harvest')
     for name in ['ledger_dir', 'cas', 'index', 'out']:
         h.add_argument(name, type=Path)
+    h.add_argument('--workers', type=int, default=8)
     s = sub.add_parser('score')
     s.add_argument('bank', type=Path)
     s.add_argument('out', type=Path)
@@ -245,7 +263,7 @@ def main():
     g.add_argument('--key', action='append', required=True, help='NAME=LEDGER_KEY (score column -> ledger score key)')
     a = ap.parse_args()
     if a.command == 'harvest':
-        harvest(a.ledger_dir, a.cas, a.index, a.out)
+        harvest(a.ledger_dir, a.cas, a.index, a.out, a.workers)
     elif a.command == 'score':
         score(a.bank, a.out, a.predict, pairs(a.bake))
     else:
