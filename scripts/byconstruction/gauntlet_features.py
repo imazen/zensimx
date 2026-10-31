@@ -8,6 +8,8 @@ basic+peaks+v2@w1825/rev7_rowlanes#36c3f3af) runs on them unchanged; zenmetrics
 `evif_features.py` reads them out of the run's CAS tar packs (`evif_pack_index.py`).
 
     harvest LEDGER_DIR CAS INDEX_DIR OUT
+    score BANK OUT --predict BIN --bake NAME=PATH ...
+    augment SCORES ASSEMBLED OUT --key NAME=LEDGER_KEY ...
 
 LEDGER_DIR holds the zenfleet ledger parquet chunks of the feature run, CAS the run's
 objects, INDEX_DIR the pack index (selection.jsonl, MANIFEST.json). OUT gets
@@ -15,13 +17,23 @@ features.parquet (f0..f1824, float64, NaN for unrequested slots, as in the stage
 keys.parquet (one row per `.evif` sample, keyed on `encoded_sha256`, the ledger's bitstream
 hash) and _MANIFEST.json. Every feature row is checked against the extractor's audit
 (reference and distorted pixel hashes, canonical f32 feature digest), as stage C did.
+
+`score` runs bakes over the bank (`predict_features_with_bake --f64-wire --production`,
+as chroma_ladder_gate.py does) into scores.parquet keyed on encoded_sha256. `augment`
+copies each gauntlet job's ledger.jsonl into OUT/<job>/ with the named scores added
+under new ledger keys, for evif `tools/trade_gate.py --models ...`; rows without
+features (DE non-finds) are copied unchanged. When a key already exists in the ledger
+(a bake the gauntlet ran inline), augment refuses unless the values are bit-identical,
+which checks the bank against the judges row by row.
 """
 import argparse
-from collections import defaultdict
 import hashlib
 import json
 from pathlib import Path
+import struct
+import subprocess
 import sys
+import tempfile
 
 import numpy as np
 import pyarrow as pa
@@ -151,14 +163,93 @@ def harvest(ledger_dir, archive, index, out):
     print(json.dumps(manifest))
 
 
+def score(bank, out, predict, bakes):
+    out.mkdir(parents=True)
+    keys = pq.read_table(bank / 'keys.parquet', columns=['encoded_sha256']).column(0)
+    features = pq.ParquetFile(bank / 'features.parquet')
+    names = [f'f{i}' for i in range(1825)]
+    columns = {name: [] for name, _ in bakes}
+    for batch in features.iter_batches(batch_size=20000, columns=names):
+        matrix = np.column_stack([batch.column(i).to_numpy(zero_copy_only=False) for i in range(1825)]).astype('<f8')
+        with tempfile.NamedTemporaryFile(dir=Path.home() / 'tmp', suffix='.bin') as f:
+            f.write(struct.pack('<II', matrix.shape[1], matrix.shape[0]) + matrix.tobytes())
+            f.flush()
+            for name, path in bakes:
+                values = subprocess.run([str(predict), '--bake', str(path), '--features-file', f.name, '--f64-wire',
+                                         '--production'], capture_output=True, text=True, check=True).stdout.split()
+                if len(values) != len(matrix):
+                    raise ValueError(f'{name}: {len(values)} scores for {len(matrix)} rows')
+                columns[name].extend(float(v) for v in values)
+    table = pa.table({'encoded_sha256': keys, **{n: pa.array(v, type=pa.float64()) for n, v in columns.items()}})
+    pq.write_table(table, out / 'scores.parquet', compression='zstd')
+    manifest = dict(rows=table.num_rows, bank_manifest_sha256=sha((bank / '_MANIFEST.json').read_bytes()),
+                    predict_sha256=sha(Path(predict).read_bytes()),
+                    bakes={n: dict(path=str(p), sha256=sha(Path(p).read_bytes())) for n, p in bakes},
+                    scores_sha256=sha((out / 'scores.parquet').read_bytes()))
+    (out / 'SCORED.json').write_text(json.dumps(manifest, indent=1) + '\n')
+    print(json.dumps(manifest))
+
+
+def augment(scores, assembled, out, keys):
+    table = pq.read_table(scores / 'scores.parquet').to_pydict()
+    by_encode = {}
+    for i, digest in enumerate(table['encoded_sha256']):
+        row = {key: table[name][i] for name, key in keys}
+        if by_encode.setdefault(digest, row) != row:
+            raise ValueError(f'{digest}: one bitstream, two feature rows with different scores')
+    out.mkdir(parents=True)
+    counts = dict(rows=0, scored=0, unscored=0, checked_existing=0)
+    for job in sorted(p for p in assembled.iterdir() if p.is_dir()):
+        (out / job.name).mkdir()
+        with (job / 'ledger.jsonl').open() as src, (out / job.name / 'ledger.jsonl').open('w') as dst:
+            for line in src:
+                r = json.loads(line)
+                counts['rows'] += 1
+                extra = by_encode.get(r.get('encoded_sha256')) if 'scores' in r else None
+                if extra is None:
+                    counts['unscored'] += 'scores' in r
+                    dst.write(line)
+                    continue
+                for key, value in extra.items():
+                    if key in r['scores']:
+                        if struct.pack('<d', r['scores'][key]) != struct.pack('<d', value):
+                            raise ValueError(f'{job.name}: {key} {r["scores"][key]!r} != bank {value!r}')
+                        counts['checked_existing'] += 1
+                    r['scores'][key] = value
+                counts['scored'] += 1
+                dst.write(json.dumps(r) + '\n')
+    (out / 'AUGMENTED.json').write_text(json.dumps(dict(counts, scores_sha256=sha((scores / 'scores.parquet').read_bytes()),
+                                                        keys=dict(keys)), indent=1) + '\n')
+    print(json.dumps(counts))
+
+
+def pairs(values):
+    return [tuple(v.split('=', 1)) for v in values]
+
+
 def main():
     ap = argparse.ArgumentParser()
     sub = ap.add_subparsers(dest='command', required=True)
     h = sub.add_parser('harvest')
     for name in ['ledger_dir', 'cas', 'index', 'out']:
         h.add_argument(name, type=Path)
+    s = sub.add_parser('score')
+    s.add_argument('bank', type=Path)
+    s.add_argument('out', type=Path)
+    s.add_argument('--predict', type=Path, required=True)
+    s.add_argument('--bake', action='append', required=True, help='NAME=PATH')
+    g = sub.add_parser('augment')
+    g.add_argument('scores', type=Path)
+    g.add_argument('assembled', type=Path)
+    g.add_argument('out', type=Path)
+    g.add_argument('--key', action='append', required=True, help='NAME=LEDGER_KEY (score column -> ledger score key)')
     a = ap.parse_args()
-    harvest(a.ledger_dir, a.cas, a.index, a.out)
+    if a.command == 'harvest':
+        harvest(a.ledger_dir, a.cas, a.index, a.out)
+    elif a.command == 'score':
+        score(a.bank, a.out, a.predict, pairs(a.bake))
+    else:
+        augment(a.scores, a.assembled, a.out, pairs(a.key))
 
 
 if __name__ == '__main__':
