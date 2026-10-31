@@ -8481,8 +8481,10 @@ Not decided here: the bar (owner), a model refit on trade data (none was done), 
 On views with a long edge of 64 px or less SSIMULACRA2 does not vote (butteraugli and CVVDP must both agree; finds need both margins
 positive) and G-TRADE is reported per stratum (above 64 px primary, 64 px or less, pooled). Declared reads before it: the pilot including
 its 15-source gauntlet slice (256 and 512 px views, unaffected); no grid figure. The search objective was not changed. It applies to 1,918
-of the 9,162 Stage-B views. In the grid's rung-0 data SSIMULACRA2 falls at 32 and 64 px for the XYB family only (78.4 and 73.9 against
-91-93 from 128 px; YCbCr 93.8 and 93.2), butteraugli and CVVDP stay level.
+of the 9,162 Stage-B views. In the grid's rung-0 data SSIMULACRA2 falls at 32 and 64 px for every family that subsamples chroma
+(xyb-extended and xyb-capped 78.4 and 73.9, ycc420 77.9 and 74.3, svt-420 78.3 and 74.2, against 89-93 from 128 px) and stays flat for
+ycc444 (93.8 and 93.2); butteraugli and CVVDP stay level. (An earlier version of this note said the XYB family only; the full table,
+`SMALL_SANITY.md`, shows the other subsampling families drop too.)
 
 **Result (gauntlet partition: 173 sources, 1,691 views, 2,755 family jobs, 1,952,564 rows; all controls passed; store verified, 308 GB;
 1,000 sampled EVIFs bit-exact; an independent recount matches).** Primary stratum (1,345 views above 64 px; 18,267 decided-WORSE adjacent
