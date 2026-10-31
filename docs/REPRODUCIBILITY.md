@@ -32,6 +32,28 @@ either names the gate that enforces it or is listed in §4 as a known gap. A
 rule with no enforcement is not a rule — that lesson is the whole reason this
 file exists (see §5).
 
+## Training releases and replays (October 31, 2026)
+
+The spine below binds a number to a bake. A training release binds a bake to the bytes it was trained from, so a
+reader can rebuild it. Revision 7's models (E, ECodec) and the 7.1 candidates (F3, F3codec) have one: every file
+their trainers, extractors and packers read, content-addressed in a private bucket with a manifest, in the private
+repository `imazen/zensim-training` (licence-restricted images and members-only AIC-2026 labels keep it private).
+It is checked in rungs, each from the previous rung's released output:
+
+| Rung | From → to | Checked by |
+|---|---|---|
+| R0 | distributed dataset files → released pixels | sha256 against the IQA library's lists; decoded pixels for format conversions |
+| R1 | pixels → feature banks | re-running the frozen extractor (ed495741) on the recorded pair lists, every slot bit for bit |
+| R2 | banks and label files → training tables | float32 of the bank value and the documented label transform, exact |
+| R3, R4 | tables → base fits → continuations | replaying the recorded fit in a bubblewrap sandbox that hides `/var/tmp`, `/mnt/v` and `~/tmp` and mounts only released bytes at the recorded paths; checkpoints and bakes compared with `zentrain.repro` removed |
+| R5 | packed bake → shipped weights | `bake_dial_refit strip` of `zentrain.repro` and `zentrain.sample_coverage` |
+
+Measured on October 31: the four continuations (seed 0) replay from the release with every checkpoint identical,
+and E's and ECodec's replayed bakes strip to the bytes zensim ships (e460a214, f7ecd602). Every feature bank the
+models read re-extracts bit-identically from released pixels (BAPPS and the chroma leg by sample). The sandbox found
+four inputs that no run record listed, now released. The lineage of any run's records can be closed with
+`scripts/repro/lineage.py`. The release repository's STATUS.md lists what is not yet reproduced.
+
 ---
 
 ## 1. The spine
