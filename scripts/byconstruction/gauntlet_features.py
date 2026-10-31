@@ -15,16 +15,18 @@ LEDGER_DIR holds the zenfleet ledger parquet chunks of the feature run, CAS the 
 objects, INDEX_DIR the pack index (selection.jsonl, MANIFEST.json). OUT gets
 features.parquet (f0..f1824, float64, NaN for unrequested slots, as in the stage-C bank),
 keys.parquet (one row per `.evif` sample, keyed on `encoded_sha256`, the ledger's bitstream
-hash) and _MANIFEST.json. Every feature row is checked against the extractor's audit
+hash; the same bytes can occur in two tiny views at the lowest qualities, so a row is
+identified by (view_id, encoded_sha256)) and _MANIFEST.json. Every feature row is checked against the extractor's audit
 (reference and distorted pixel hashes, canonical f32 feature digest), as stage C did.
 
 `score` runs bakes over the bank (`predict_features_with_bake --f64-wire --production`,
-as chroma_ladder_gate.py does) into scores.parquet keyed on encoded_sha256. `augment`
+as chroma_ladder_gate.py does) into scores.parquet keyed on (view_id, encoded_sha256). `augment`
 copies each gauntlet job's ledger.jsonl into OUT/<job>/ with the named scores added
 under new ledger keys, for evif `tools/trade_gate.py --models ...`; rows without
 features (DE non-finds) are copied unchanged. When a key already exists in the ledger
-(a bake the gauntlet ran inline), augment refuses unless the values are bit-identical,
-which checks the bank against the judges row by row.
+(a bake the gauntlet ran inline), augment refuses unless the values are bit-identical or,
+below the predictor's printed precision (17 decimal places), print identically; this
+checks the bank against the judges row by row.
 """
 import argparse
 from concurrent.futures import ProcessPoolExecutor
@@ -175,14 +177,14 @@ def harvest(ledger_dir, archive, index, out, workers):
                     features_parquet_sha256=sha((out / 'features.parquet').read_bytes()),
                     keys_sha256=sha((out / 'keys.parquet').read_bytes()), unique_objects_verified=len(verified),
                     scope='every .evif sample of the 2,755 gauntlet trade jobs; DE non-finds were stored as bitstreams only and are not here',
-                    join='keys.encoded_sha256 = gauntlet ledger encoded_sha256')
+                    join='(keys.view_id, keys.encoded_sha256) = gauntlet ledger (view, encoded_sha256)')
     (out / '_MANIFEST.json').write_text(json.dumps(manifest, indent=1) + '\n')
     print(json.dumps(manifest))
 
 
 def score(bank, out, predict, bakes):
     out.mkdir(parents=True)
-    keys = pq.read_table(bank / 'keys.parquet', columns=['encoded_sha256']).column(0)
+    keys = pq.read_table(bank / 'keys.parquet', columns=['view_id', 'encoded_sha256'])
     features = pq.ParquetFile(bank / 'features.parquet')
     names = [f'f{i}' for i in range(1825)]
     columns = {name: [] for name, _ in bakes}
@@ -197,7 +199,8 @@ def score(bank, out, predict, bakes):
                 if len(values) != len(matrix):
                     raise ValueError(f'{name}: {len(values)} scores for {len(matrix)} rows')
                 columns[name].extend(float(v) for v in values)
-    table = pa.table({'encoded_sha256': keys, **{n: pa.array(v, type=pa.float64()) for n, v in columns.items()}})
+    table = pa.table({'view_id': keys.column('view_id'), 'encoded_sha256': keys.column('encoded_sha256'),
+                      **{n: pa.array(v, type=pa.float64()) for n, v in columns.items()}})
     pq.write_table(table, out / 'scores.parquet', compression='zstd')
     manifest = dict(rows=table.num_rows, bank_manifest_sha256=sha((bank / '_MANIFEST.json').read_bytes()),
                     predict_sha256=sha(Path(predict).read_bytes()),
@@ -212,26 +215,31 @@ def augment(scores, assembled, out, keys):
     by_encode = {}
     for i, digest in enumerate(table['encoded_sha256']):
         row = {key: table[name][i] for name, key in keys}
-        if by_encode.setdefault(digest, row) != row:
-            raise ValueError(f'{digest}: one bitstream, two feature rows with different scores')
+        if by_encode.setdefault((table['view_id'][i], digest), row) != row:
+            raise ValueError(f'{digest}: one bitstream in one view, two feature rows with different scores')
     out.mkdir(parents=True)
-    counts = dict(rows=0, scored=0, unscored=0, checked_existing=0)
+    counts = dict(rows=0, scored=0, unscored=0, checked_existing=0, checked_existing_at_17_decimals=0)
     for job in sorted(p for p in assembled.iterdir() if p.is_dir()):
         (out / job.name).mkdir()
         with (job / 'ledger.jsonl').open() as src, (out / job.name / 'ledger.jsonl').open('w') as dst:
             for line in src:
                 r = json.loads(line)
                 counts['rows'] += 1
-                extra = by_encode.get(r.get('encoded_sha256')) if 'scores' in r else None
+                extra = by_encode.get((r.get('view'), r.get('encoded_sha256'))) if 'scores' in r else None
                 if extra is None:
                     counts['unscored'] += 'scores' in r
                     dst.write(line)
                     continue
                 for key, value in extra.items():
                     if key in r['scores']:
-                        if struct.pack('<d', r['scores'][key]) != struct.pack('<d', value):
+                        # The predictor prints 17 decimal places, so below 0.1 its value can differ from
+                        # the judge's double in the last bits; both must then print identically.
+                        if struct.pack('<d', r['scores'][key]) == struct.pack('<d', value):
+                            counts['checked_existing'] += 1
+                        elif '%.17f' % r['scores'][key] == '%.17f' % value:
+                            counts['checked_existing_at_17_decimals'] += 1
+                        else:
                             raise ValueError(f'{job.name}: {key} {r["scores"][key]!r} != bank {value!r}')
-                        counts['checked_existing'] += 1
                     r['scores'][key] = value
                 counts['scored'] += 1
                 dst.write(json.dumps(r) + '\n')
