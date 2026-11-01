@@ -1,5 +1,6 @@
-//! Private E36 protocol. No optimizer calls: scheduled gradients join the
-//! existing primary Adam boundary. Ordinary builds do not compile this module.
+//! External feature-pool hinge: the private E36 protocol and, in public builds, `--tv-pool`.
+//! No optimizer calls: scheduled gradients join the existing primary Adam boundary. The E36 build
+//! asserts its registered constants; a public build takes them from the pool's configuration.
 use super::{AdamState, MlpHyperparams, SplitMix64, TvRegularizer, smooth_hinge};
 
 pub(super) struct Pool<'a> {
@@ -14,29 +15,30 @@ impl<'a> Pool<'a> {
     pub(super) fn new(config: &'a TvRegularizer, h: &MlpHyperparams) -> Self {
         assert!(h.nonneg_distance && h.minibatch_size == 1);
         assert!(!h.per_sample_alpha_head && !h.hybrid_head && !h.pool_head);
-        assert_eq!(config.band_weights, Some([2.0, 1.0, 0.0, 0.0]));
-        assert_eq!(config.apply_every, 50);
-        assert_eq!(config.batch, 32);
-        assert_eq!(config.margin, 0.05);
-        assert!([0.0, 1.0, 10.0].contains(&config.weight));
+        if cfg!(e36_tv) {
+            assert_eq!(config.band_weights, Some([2.0, 1.0, 0.0, 0.0]));
+            assert_eq!(config.apply_every, 50);
+            assert_eq!(config.batch, 32);
+            assert_eq!(config.margin, 0.05);
+            assert!([0.0, 1.0, 10.0].contains(&config.weight));
+        }
+        assert!(config.apply_every > 0 && config.batch > 0);
         assert!(!config.pairs.is_empty());
         let classes = config
             .band_id
             .as_ref()
             .expect("E36 pair weight classes required");
+        let weights = config.band_weights.expect("pool class weights required");
         assert_eq!(classes.len(), config.pairs.len());
-        assert!(classes.iter().all(|&c| c <= 1));
+        assert!(classes.iter().all(|&c| weights[c as usize] > 0.0));
         assert!(
             config
                 .pairs
                 .iter()
                 .all(|&(a, b)| a < config.features.len() && b < config.features.len() && a != b)
         );
-        let mean_weight = classes
-            .iter()
-            .map(|&c| if c == 0 { 2.0 } else { 1.0 })
-            .sum::<f64>()
-            / classes.len() as f64;
+        let mean_weight =
+            classes.iter().map(|&c| weights[c as usize]).sum::<f64>() / classes.len() as f64;
         let mask = super::input_keep_mask().expect("E36 frozen input keep mask required");
         let columns: Vec<_> = mask
             .iter()
@@ -79,7 +81,9 @@ impl<'a> Pool<'a> {
     }
 
     pub(super) fn scheduled(&self, primary_steps: u64) -> bool {
-        self.config.weight > 0.0 && primary_steps > 0 && primary_steps.is_multiple_of(50)
+        self.config.weight > 0.0
+            && primary_steps > 0
+            && primary_steps.is_multiple_of(self.config.apply_every as u64)
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -135,11 +139,8 @@ impl<'a> Pool<'a> {
                 h.smooth_hinge,
             );
             let violation = polarity * (yh - yl) + self.config.margin;
-            let pair_weight = if self.config.band_id.as_ref().unwrap()[i] == 0 {
-                2.0
-            } else {
-                1.0
-            };
+            let pair_weight = self.config.band_weights.unwrap()
+                [self.config.band_id.as_ref().unwrap()[i] as usize];
             let scale =
                 self.config.weight * pair_weight / (self.config.batch as f64 * self.mean_weight);
             loss += scale * violation.max(0.0);
@@ -195,6 +196,7 @@ mod tests {
             band_id: Some(vec![0, 1]),
             band_weights: Some([2., 1., 0., 0.]),
             margin: 0.05,
+            pool: true,
         };
         let c = config(1.);
         let mut pool = Pool::new(&c, &h);

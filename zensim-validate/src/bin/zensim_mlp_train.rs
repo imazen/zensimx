@@ -101,11 +101,12 @@ mod contamination_guard;
 
 #[path = "zensim_mlp_train/chroma_admission.rs"]
 mod chroma_admission;
+mod e36_tv;
 #[path = "zensim_mlp_train/hdr_admission.rs"]
 mod hdr_admission;
-mod e36_tv;
 #[path = "../subjective_training_leg.rs"]
 mod subjective_training_leg;
+mod tv_pool;
 #[path = "zensim_mlp_train/upiq_training.rs"]
 mod upiq_training;
 
@@ -402,6 +403,13 @@ struct Args {
     /// Penalty: `max(0, polarity.ladder_sign() * (pred[hi] - pred[lo]) + margin)`.
     #[arg(long)]
     tv_pairs_file: Option<PathBuf>,
+
+    /// External label-free pool for the within-ladder hinge (manifest schema `tv-pool-v1`: a features
+    /// parquet of the --derived-inputs read set, a pairs parquet `worse_idx, better_idx, class`, class weights).
+    /// Rows pass through the derived-input transform and the run's scaler. Uses --tv-weight, --tv-apply-every,
+    /// --tv-batch and --tv-margin; its draws use their own RNG stream, so the primary sampler is unchanged.
+    #[arg(long, conflicts_with_all = ["tv_pairs_file", "e36_tv_manifest"], requires = "derived_inputs")]
+    tv_pool: Option<PathBuf>,
 
     /// Private E36 versioned external feature pool; requires E36_TV_PROTOCOL=1 build.
     #[arg(long, conflicts_with = "tv_pairs_file", requires_all = ["derived_inputs", "e36_tv_contract", "e36_tv_contract_sha256"])]
@@ -2873,7 +2881,7 @@ fn preflight_cli_capabilities(args: &Args, matches: &clap::ArgMatches, want_gpu:
         (
             "--tv-weight",
             args.tv_weight > 0.0,
-            args.tv_pairs_file.is_some(),
+            args.tv_pairs_file.is_some() || args.tv_pool.is_some(),
         ),
     ] {
         assert!(
@@ -2917,6 +2925,7 @@ fn preflight_cli_capabilities(args: &Args, matches: &clap::ArgMatches, want_gpu:
             "--tv-pairs-file",
             args.tv_pairs_file.is_some() && args.tv_weight > 0.0,
         ),
+        ("--tv-pool", args.tv_pool.is_some()),
         ("--norm-in-norm-weight", args.norm_in_norm_weight > 0.0),
         (
             "--init-seed / --sample-seed",
@@ -3254,6 +3263,10 @@ fn main() {
     }
     if cfg!(e36_tv) && args.tv_pairs_file.is_some() {
         eprintln!("E36 private build refuses legacy TV pair files");
+        std::process::exit(2);
+    }
+    if cfg!(e36_tv) && args.tv_pool.is_some() {
+        eprintln!("E36 private build refuses --tv-pool");
         std::process::exit(2);
     }
 
@@ -4437,7 +4450,37 @@ fn main() {
             band_id,
             band_weights,
             margin: args.tv_margin,
+            pool: false,
         })
+    } else if let Some(path) = &args.tv_pool {
+        assert!(
+            args.nonneg_distance && args.minibatch_size == 1,
+            "--tv-pool requires the plain nonnegative-distance K=1 recipe"
+        );
+        let pool = tv_pool::load(
+            path,
+            args.derived_inputs.as_ref().unwrap(),
+            args.max_features,
+            args.tv_weight,
+            args.tv_apply_every,
+            args.tv_batch,
+            args.tv_margin,
+        )
+        .unwrap_or_else(|e| {
+            eprintln!("--tv-pool: {e}");
+            std::process::exit(2)
+        });
+        println!(
+            "Loaded TV pool {path:?}: {} rows, {} pairs (weight {}, every {}, batch {}, margin {}, class weights {:?})",
+            pool.features.len(),
+            pool.pairs.len(),
+            pool.weight,
+            pool.apply_every,
+            pool.batch,
+            pool.margin,
+            pool.band_weights,
+        );
+        Some(pool)
     } else {
         None
     };
@@ -5349,6 +5392,14 @@ fn main() {
                 .map(|d| d.as_secs())
                 .unwrap_or(0),
         });
+        if let Some(path) = &args.tv_pool {
+            record["tv_pool"] = tv_pool::receipt(
+                path,
+                tv_regularizer.as_ref().unwrap(),
+                hyperparams.sample_seed.unwrap_or(hyperparams.seed),
+            )
+            .expect("tv pool reproduction receipt");
+        }
         if let Some(e36) = e36_repro {
             record["e36_tv"] = e36;
         }
