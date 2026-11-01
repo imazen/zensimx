@@ -111,7 +111,9 @@ def harvest(ledger_dir, archive, index, out, workers):
     buffers, keys, count, seen = [], [], 0, set()
     pool = ProcessPoolExecutor(max_workers=workers, mp_context=multiprocessing.get_context('fork'))
     try:
-        for n, (features, job_keys, _) in enumerate(pool.map(harvest_job, [archive] * len(ordered), ordered, chunksize=4)):
+        # buffersize bounds the finished-but-unwritten jobs; unbounded, they outran the writer to a 24 GB OOM
+        for n, (features, job_keys, _) in enumerate(pool.map(harvest_job, [archive] * len(ordered), ordered,
+                                                               buffersize=4 * workers)):
             for k in job_keys:
                 key = (k['reference_sha256'], k['png_sha256'])
                 assert key not in seen, key
