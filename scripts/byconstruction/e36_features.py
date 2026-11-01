@@ -7,8 +7,8 @@ audit: reference and distorted pixel hashes, canonical f32 feature digest), plus
 
     harvest LEDGER_DIR CAS INDEX_DIR OUT     bank: features.parquet + keys.parquet (row per reference x decoded view)
     score BANK OUT --predict BIN --bake NAME=PATH ...      (gauntlet_features.py score; view_id = reference sha)
-    inversions SCORES INDEX_DIR PHYSICAL_INDEX OUT --model NAME ...     step 0 tables
-    pool BANK SCORES INDEX_DIR PHYSICAL_INDEX OUT --model F3 --derived-inputs JSON   the registered pool
+    inversions SCORES INDEX_DIR POOLS OUT --model NAME ...     step 0 tables (POOLS = E36 pools-full-v1)
+    pool BANK SCORES INDEX_DIR POOLS OUT --model F3 --derived-inputs JSON   the registered pool
 
 A decoded view can belong to two references (tiny views of different sources that encode to the same pixels), so a
 bank row is keyed on (reference_sha256, png_sha256), never the PNG alone.
@@ -20,7 +20,6 @@ import hashlib
 import json
 import multiprocessing
 from pathlib import Path
-import sqlite3
 import sys
 import tempfile
 
@@ -145,21 +144,124 @@ def harvest(ledger_dir, archive, index, out, workers):
     print(json.dumps(manifest))
 
 
-def consensus_pairs(index, physical):
-    """E36's registered consensus pairs, one row per pair, with both endpoints' (reference, png) keys and strata."""
+def consensus_pairs(index, pools):
+    """E36's registered consensus pairs (pools-full-v1 edge proofs, fit and selection) as a DataFrame keyed on
+    (reference_sha256, png) of the worse and better endpoints, with codec, content, size, quality and split."""
+    import pandas as pd
     cells = pq.read_table(index / 'cells.parquet', columns=['reference_sha256', 'encoded_sha256', 'distorted_sha256',
-                                                            'content', 'codec', 'size', 'q', 'split']).to_pandas()
-    enc_to_png = dict(zip(zip(cells.reference_sha256, cells.encoded_sha256), cells.distorted_sha256))
-    db = sqlite3.connect(f'file:{physical}?mode=ro', uri=True)
-    feats = dict(((i), (r, e)) for i, r, e in db.execute('select id, ref, enc from features'))
-    out = []
-    for a, b, cls, band, codec, content, size, split, qlo, qhi in db.execute(
-            'select a, b, class, band, codec, content, size, split, qlo, qhi from pairs'):
-        ra, ea = feats[a]
-        rb, eb = feats[b]
-        assert ra == rb
-        out.append((ra, enc_to_png.get((ra, ea)), enc_to_png.get((rb, eb)), codec, content, size, split, qlo, qhi))
-    return out
+                                                            'content']).to_pandas()
+    png = dict(zip(zip(cells.reference_sha256, cells.encoded_sha256), cells.distorted_sha256))
+    content = dict(zip(cells.reference_sha256, cells.content))
+    frames = []
+    for split in ('fit', 'selection'):
+        e = pq.read_table(pools / split / 'edge-proof.parquet',
+                          columns=['reference_sha256', 'codec', 'size', 'mode_key', 'q_low', 'q_high',
+                                   'worse_encoded_sha256', 'better_encoded_sha256']).to_pandas()
+        e['split'] = split
+        frames.append(e)
+    e = pd.concat(frames, ignore_index=True)
+    e['worse_png'] = [png.get(k) for k in zip(e.reference_sha256, e.worse_encoded_sha256)]
+    e['better_png'] = [png.get(k) for k in zip(e.reference_sha256, e.better_encoded_sha256)]
+    e['content'] = e.reference_sha256.map(content)
+    e['size_band'] = e['size'].map(size_band)
+    e['q_band'] = e.q_low.map(q_band)
+    return e
+
+
+def attach_scores(pairs, scores, models):
+    t = pq.read_table(scores / 'scores.parquet').to_pandas().set_index(['view_id', 'encoded_sha256'])
+    for side in ('worse', 'better'):
+        idx = list(zip(pairs.reference_sha256, pairs[side + '_png']))
+        sub = t.reindex(idx)
+        for m in models:
+            pairs[f'{m}_{side}'] = sub[m].to_numpy()
+    pairs['scored'] = np.all([np.isfinite(pairs[f'{m}_{s}']) for m in models for s in ('worse', 'better')], axis=0)
+    for m in models:
+        pairs[f'{m}_inv'] = pairs[f'{m}_better'] <= pairs[f'{m}_worse']
+    return pairs
+
+
+def inversions(scores, index, pools, out, models):
+    out.mkdir(parents=True)
+    p = attach_scores(consensus_pairs(index, pools), scores, models)
+    report = dict(pairs=len(p), scored=int(p.scored.sum()), unscored_by_reason=dict(
+        reference_area_ge_1mp_or_missing=int((~p.scored).sum())), tables={})
+    s = p[p.scored]
+    for split in ('fit', 'selection'):
+        sp = s[s.split == split]
+        block = dict(all=dict(pairs=len(sp), **{m: float(sp[f'{m}_inv'].mean()) for m in models}))
+        for col in ('codec', 'content', 'size_band', 'q_band'):
+            for k, g in sp.groupby(col):
+                block[f'{col}={k}'] = dict(pairs=len(g), **{m: float(g[f'{m}_inv'].mean()) for m in models})
+        report['tables'][split] = block
+        report.setdefault('inverted_counts', {})[split] = {m: int(sp[f'{m}_inv'].sum()) for m in models}
+    (out / 'INVERSIONS.json').write_text(json.dumps(report, indent=1) + '\n')
+    p.to_parquet(out / 'pairs_scored.parquet', compression='zstd')
+    print(json.dumps(dict(pairs=report['pairs'], scored=report['scored'], inverted=report['inverted_counts'],
+                          all={k: v['all'] for k, v in report['tables'].items()})))
+
+
+def pool(bank, scores, index, pools, out, model, derived):
+    """The registered pool: F3's inverted fit pairs plus an equal random sample of its correct ones."""
+    out.mkdir(parents=True)
+    p = attach_scores(consensus_pairs(index, pools), scores, [model])
+    fit = p[(p.split == 'fit') & p.scored].reset_index(drop=True)
+    inv = fit[fit[f'{model}_inv']]
+    ok = fit[~fit[f'{model}_inv']]
+    rng = np.random.default_rng(SEED)
+    anchor = ok.iloc[np.sort(rng.choice(len(ok), size=min(len(inv), len(ok)), replace=False))]
+    chosen = pd_concat([inv, anchor])
+    chosen['cls'] = (2 * chosen.content.isin(['screen', 'lineart']).astype(int) + (chosen.q_low <= 40).astype(int)).astype('uint8')
+    ids = read_ids(derived)
+    keys = pq.read_table(bank / 'keys.parquet', columns=['row_id', 'reference_sha256', 'png_sha256']).to_pandas()
+    row_of = dict(zip(zip(keys.reference_sha256, keys.png_sha256), keys.row_id))
+    needed = sorted({row_of[(r, w)] for r, w in zip(chosen.reference_sha256, chosen.worse_png)}
+                    | {row_of[(r, b)] for r, b in zip(chosen.reference_sha256, chosen.better_png)})
+    local = {b: i for i, b in enumerate(needed)}
+    f = pq.ParquetFile(bank / 'features.parquet')
+    want = set(needed)
+    rows = {}
+    for batch in f.iter_batches(batch_size=50000, columns=['row_id'] + [f'f{i}' for i in ids]):
+        rid = batch.column(0).to_numpy()
+        mask = np.isin(rid, list(want))
+        if not mask.any():
+            continue
+        mat = np.column_stack([batch.column(j + 1).to_numpy(zero_copy_only=False) for j in range(len(ids))])[mask]
+        for r, v in zip(rid[mask], mat):
+            rows[int(r)] = v.astype('<f4')
+    assert len(rows) == len(needed)
+    feats = pa.table({'row_idx': pa.array(range(len(needed)), type=pa.uint64()),
+                      'features': pa.array([rows[b].tolist() for b in needed], type=pa.list_(pa.float32()))})
+    pairs = pa.table({'worse_idx': pa.array([local[row_of[(r, w)]] for r, w in zip(chosen.reference_sha256, chosen.worse_png)], type=pa.uint64()),
+                      'better_idx': pa.array([local[row_of[(r, b)]] for r, b in zip(chosen.reference_sha256, chosen.better_png)], type=pa.uint64()),
+                      'class': pa.array(chosen.cls.to_numpy(), type=pa.uint8())})
+    pq.write_table(feats, out / 'features.parquet', compression='zstd')
+    pq.write_table(pairs, out / 'pairs.parquet', compression='zstd')
+    manifest = dict(schema='tv-pool-v1',
+                    features=dict(path=str((out / 'features.parquet').resolve()), sha256=sha((out / 'features.parquet').read_bytes())),
+                    pairs=dict(path=str((out / 'pairs.parquet').resolve()), sha256=sha((out / 'pairs.parquet').read_bytes())),
+                    feature_ids=ids, class_weights=[1.0, 2.0, 2.0, 4.0], feature_rows=len(needed), pair_rows=len(chosen),
+                    provenance=dict(registration='zensimx benchmarks/e36_subset_test_2026-11-01.md', model=model,
+                                    inverted=len(inv), anchor=len(anchor), seed=SEED,
+                                    bank_manifest_sha256=sha((bank / '_MANIFEST.json').read_bytes()),
+                                    scores_manifest_sha256=sha((scores / 'SCORED.json').read_bytes()),
+                                    derived_inputs_sha256=sha(Path(derived).read_bytes()),
+                                    class_rule='2*[screen or lineart] + [q_low <= 40]',
+                                    classes={int(k): int(v) for k, v in chosen.cls.value_counts().items()}))
+    (out / 'manifest.json').write_text(json.dumps(manifest, indent=1) + '\n')
+    print(json.dumps(manifest['provenance']))
+
+
+def pd_concat(frames):
+    import pandas as pd
+    return pd.concat(frames, ignore_index=True)
+
+
+def read_ids(derived):
+    """The declaration's read set, as the trainer's Fx1Declaration::load_ids computes it."""
+    d = json.loads(Path(derived).read_text())
+    assert d['schema'] == 'zensim-fx1-v1'
+    return sorted(set(d['direct']) | {p[1] for p in d['products']})
 
 
 def size_band(s):
@@ -182,8 +284,21 @@ def main():
     s.add_argument('out', type=Path)
     s.add_argument('--predict', type=Path, required=True)
     s.add_argument('--bake', action='append', required=True)
+    i = sub.add_parser('inversions')
+    for x in ('scores', 'index', 'pools', 'out'):
+        i.add_argument(x, type=Path)
+    i.add_argument('--model', action='append', required=True)
+    q = sub.add_parser('pool')
+    for x in ('bank', 'scores', 'index', 'pools', 'out'):
+        q.add_argument(x, type=Path)
+    q.add_argument('--model', required=True)
+    q.add_argument('--derived-inputs', type=Path, required=True)
     a = ap.parse_args()
-    if a.cmd == 'harvest':
+    if a.cmd == 'inversions':
+        inversions(a.scores, a.index, a.pools, a.out, a.model)
+    elif a.cmd == 'pool':
+        pool(a.bank, a.scores, a.index, a.pools, a.out, a.model, a.derived_inputs)
+    elif a.cmd == 'harvest':
         harvest(a.ledger_dir, a.cas, a.index, a.out, a.workers)
     elif a.cmd == 'score':
         gf.score(a.bank, a.out, a.predict, [tuple(b.split('=', 1)) for b in a.bake])
