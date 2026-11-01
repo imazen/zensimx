@@ -125,9 +125,13 @@ def harvest(ledger_dir, archive, index, out, workers):
             keys.extend(job_keys)
             if len(keys) >= 20000 or n + 1 == len(ordered):
                 bank, key_table = pa.concat_tables(buffers), pa.Table.from_pylist(keys)
+                # f32 bank: every scoring and training path casts each raw feature to f32 before use
+                # (prep_bake_input_f32, derived fill_f32, the minmax path, the trainer), so E/ECodec/F3/F3codec
+                # score the smoke bank bit-identically from f32 and f64. Byte-split + zstd: 1.9 KB/row against
+                # 3.8 KB/row for f64 byte-split and 14.4 KB/row as worker CSV (4,508-row E36 sample, 2026-11-01).
+                bank = bank.cast(pa.schema([pa.field(f.name, pa.float32()) if pa.types.is_floating(f.type) else f
+                                            for f in bank.schema]))
                 if writer is None:
-                    # f64 features are not f32-exact, so stay f64; byte-split + zstd stores them losslessly
-                    # at 3.8 KB/row against 5.0 KB/row for plain zstd (4,508-row E36 sample, 2026-11-01).
                     floats = [f.name for f in bank.schema if pa.types.is_floating(f.type)]
                     writer = pq.ParquetWriter(out / 'features.parquet', bank.schema, compression='zstd',
                                               compression_level=19, use_dictionary=False,
@@ -141,7 +145,7 @@ def harvest(ledger_dir, archive, index, out, workers):
         if writer is not None:
             writer.close()
             key_writer.close()
-    manifest = dict(schema='e36-rev7-bank-v1', rows=count, jobs=len(ordered),
+    manifest = dict(schema='e36-rev7-bank-v1', feature_dtype='float32', rows=count, jobs=len(ordered),
                     duplicate_done_rows=sum(1 for r in rows if r['status'] == 'done') - len(done),
                     feature_set_id=gf.FEATURE_ID, extractor_sha256=gf.EXTRACTOR_SHA, build_commit=gf.BUILD,
                     index_manifest_sha256=sha((index / 'MANIFEST.json').read_bytes()),
