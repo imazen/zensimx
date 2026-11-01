@@ -243,22 +243,35 @@ def pool(bank, scores, index, pools, out, model, derived):
     assert len(rows) == len(needed)
     feats = pa.table({'row_idx': pa.array(range(len(needed)), type=pa.uint64()),
                       'features': pa.array([rows[b].tolist() for b in needed], type=pa.list_(pa.float32()))})
-    pairs = pa.table({'worse_idx': pa.array([local[row_of[(r, w)]] for r, w in zip(chosen.reference_sha256, chosen.worse_png)], type=pa.uint64()),
-                      'better_idx': pa.array([local[row_of[(r, b)]] for r, b in zip(chosen.reference_sha256, chosen.better_png)], type=pa.uint64()),
-                      'class': pa.array(chosen.cls.to_numpy(), type=pa.uint8())})
+    # Distinct E36 encodes can decode to the same pixels (e.g. JPEG q5 and q10 of one 64 px view), so two consensus
+    # pairs can be one view pair. The trainer refuses duplicate pairs; keep the first (inverted before anchor).
+    worse = np.array([local[row_of[(r, w)]] for r, w in zip(chosen.reference_sha256, chosen.worse_png)], dtype=np.uint64)
+    better = np.array([local[row_of[(r, b)]] for r, b in zip(chosen.reference_sha256, chosen.better_png)], dtype=np.uint64)
+    seen, keep = set(), np.zeros(len(worse), dtype=bool)
+    for i, wb in enumerate(zip(worse.tolist(), better.tolist())):
+        if wb not in seen:
+            seen.add(wb)
+            keep[i] = True
+    assert not any((b, w) in seen for w, b in seen), 'a view pair appears in both orders'
+    n_inv_kept = int(keep[:len(inv)].sum())
+    pairs = pa.table({'worse_idx': pa.array(worse[keep], type=pa.uint64()),
+                      'better_idx': pa.array(better[keep], type=pa.uint64()),
+                      'class': pa.array(chosen.cls.to_numpy()[keep], type=pa.uint8())})
     pq.write_table(feats, out / 'features.parquet', compression='zstd')
     pq.write_table(pairs, out / 'pairs.parquet', compression='zstd')
     manifest = dict(schema='tv-pool-v1',
                     features=dict(path=str((out / 'features.parquet').resolve()), sha256=sha((out / 'features.parquet').read_bytes())),
                     pairs=dict(path=str((out / 'pairs.parquet').resolve()), sha256=sha((out / 'pairs.parquet').read_bytes())),
-                    feature_ids=ids, class_weights=[1.0, 2.0, 2.0, 4.0], feature_rows=len(needed), pair_rows=len(chosen),
+                    feature_ids=ids, class_weights=[1.0, 2.0, 2.0, 4.0], feature_rows=len(needed), pair_rows=int(keep.sum()),
                     provenance=dict(registration='zensimx benchmarks/e36_subset_test_2026-11-01.md', model=model,
                                     inverted=len(inv), anchor=len(anchor), seed=SEED,
+                                    duplicate_view_pairs_dropped=int((~keep).sum()), inverted_kept=n_inv_kept,
+                                    anchor_kept=int(keep.sum()) - n_inv_kept,
                                     bank_manifest_sha256=sha((bank / '_MANIFEST.json').read_bytes()),
                                     scores_manifest_sha256=sha((scores / 'SCORED.json').read_bytes()),
                                     derived_inputs_sha256=sha(Path(derived).read_bytes()),
                                     class_rule='2*[screen or lineart] + [q_low <= 40]',
-                                    classes={int(k): int(v) for k, v in chosen.cls.value_counts().items()}))
+                                    classes={int(k): int(v) for k, v in chosen.cls[keep].value_counts().items()}))
     (out / 'manifest.json').write_text(json.dumps(manifest, indent=1) + '\n')
     print(json.dumps(manifest['provenance']))
 
