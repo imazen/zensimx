@@ -12,7 +12,8 @@ gauntlet's samples. Any bake now scores the gauntlet's ladders and size-matched 
   containers (split-family templates of one view share some). These hold the decoded pixels the
   judges saw.
 - Not covered: the 452,335 DE non-finds, which were stored as bitstreams only. They matter only for
-  the search measure (b), which needs new searches for any new target anyway.
+  the search measure (b), which needs new searches for any new target anyway (done for F3 and F3codec on
+  2026-11-01, below).
 - Extractor: the frozen stage-C one (`evif-rev7-features-v1`, binary ed495741, feature set
   basic+peaks+v2 w1825 rev7_rowlanes, hash 36c3f3af, build b77883be), unchanged. zenmetrics
   `evif_features.py` reads the containers out of the run's CAS tar packs (efc5dbeb), indexed by
@@ -76,6 +77,43 @@ Reading: the inversion gain of F3 and F3codec over E also appears on the 25 sour
 trained on, so it is not only memorised content. Those 25 sources are few, and their intervals are wide.
 F3codec removes most of the size-matched regression that ECodec and Fcodec show on the clean
 sources.
+
+## Search measure (b): a search aimed at F3 and F3codec (2026-11-01)
+
+(b) counts DE finds per 1,000 search encodes aimed at a model: encodes it rates better than an honest encode of the same
+size while two of SSIMULACRA2, butteraugli and CVVDP disagree. The grid searched only E, ECodec, F and Fcodec, so evif
+run `evif-f3-search-20261031` searched again with `zensim-f3` (F3 seed 0, 54f54b22) and `zensim-f3-codec` (F3codec seed 0,
+c7c7a371) as targets, pinned to the grid (binary b7d6d89c, same templates, seeds keyed on source, family and target). E
+and ECodec ran again on 90 control views: all 28,800 of their samples and all 124,593 baseline encodes are identical to
+the grid's, and every value of the grid's `TALLIES.json` is reproduced. Run, controls and data: evif
+`benchmarks/trade-f3-search-2026-11-01.md`.
+
+Primary stratum (views above 64 px, 107,600 DE encodes per model, 173 sources; paired source bootstrap against E):
+
+| Model | (b) DE | vs E [95%] | Random arm |
+|---|---|---|---|
+| E | 461.6 [443.5, 479.4] | | 406.7 |
+| ECodec | 446.0 | -15.7 [-27.9, -3.6] better | 393.1 |
+| F | 492.3 | +30.7 [+17.3, +44.6] worse | 442.9 |
+| Fcodec | 569.0 | +107.3 [+93.6, +121.4] worse | 521.0 |
+| **F3** | **562.8** [541.6, 583.9] | **+101.2 [+87.7, +115.4] worse** | 514.3 |
+| **F3codec** | **507.9** [489.8, 525.7] | **+46.3 [+34.8, +57.9] worse** | 463.1 |
+
+By family (DE, per 1,000): ycc444 E 491.0, F3 640.1, F3codec 546.0; ycc420 495.8, 683.1, 576.7; xyb-extended 706.4, 804.8,
+782.2; xyb-capped 225.7, 231.3, 228.1; svt-420 389.3, 454.8, 406.6.
+
+Small views (64 px or less, butteraugli + CVVDP must both agree, 27,680 encodes): E 206.8, F3 291.3 (+84.5 [+69.0, +99.8]
+worse), F3codec 264.8 (+58.1 [+44.9, +70.8] worse).
+
+Reading: F3 and F3codec are easier to fool than E, by 22% and 10%. F3 (562.8) sits near round-1 Fcodec (569.0) and above
+round-1 F (492.3); F3codec improves on Fcodec but does not reach E. The random arm shows the same order (F3 +107.6, F3codec +56.4
+over E), so the excess is the models' response to these encodes, not something the optimizer exploits. It sits in the
+YCbCr and raw-XYB families; on capped XYB F3 matches E. Under the
+proposed G-TRADE bar (not adopted; a candidate may not be worse than E on (a), (a2) or (b)) F3 and F3codec pass (a) and
+(a2) and fail (b), as F and Fcodec did.
+
+Gate outputs (dev `~/tmp/f3-search/gate-f3search/`, tower `output/evif/f3-search-2026-10-31/gate-f3search/`):
+`TALLIES.json` 6e45fada, `BOOTSTRAP.json` 964c3e7b.
 
 ## Where the data is (dev, checked 2026-10-31; tower mirror verified by sha256)
 
