@@ -324,3 +324,16 @@ not a result.
 - **Statistic:** BD-rate (`rd_probe_analyze --bdrate-vs`) of each arm against the butteraugli loop and against F3,
   under SSIMULACRA2 and CVVDP. Reading: an arm steers better when its BD-rate saving is positive with the interval
   above zero under both judges; an interval across zero under either is a tie.
+
+### Experiment 3a amendment (2026-11-02, before any arm was judged)
+
+The repo's host guard refuses `jxl_steer_rd.sh` on dev (benchmarks never run there), so the loop runs on i270. There
+the registered bitstream control fails for a host reason, not a build one: the new build's B arm differs from the
+stored (dev-encoded) B bitstreams in 74 of 702 encodes, and so does the original study build (`3ba4f4ba1cb8`) run on
+i270; the new build reproduces the original build on i270 in 702 of 702 (zensim's map extraction is tier-dependent,
+dev has AVX-512 and i270 does not). Stored dev arms are therefore not comparable with i270 encodes.
+
+Amended: every compared arm is encoded on i270 in a fresh RD directory (`none`, `butteraugli`, `B`, `M7lintail`,
+`F3lintail`, `p30Llintail`, `p230lintail`) and judged there with the same judge build; the control is "the new build
+reproduces the original build's B arm on the same host" (702 of 702, measured above). Statistic, placements and
+reading unchanged. No arm had been judged when this was written.
