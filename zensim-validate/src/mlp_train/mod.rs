@@ -1375,6 +1375,11 @@ fn project_plain(
     project_plain_indexed(w1, w2, b1, b2, pin, hp, None);
 }
 
+thread_local! {
+    /// Reused capture buffer for `project_plain_indexed`'s max pairs (one per training thread).
+    static MAX_V_SCRATCH: std::cell::RefCell<Vec<f64>> = const { std::cell::RefCell::new(Vec::new()) };
+}
+
 fn project_plain_indexed(
     w1: &mut [f64],
     w2: &mut [f64],
@@ -1399,13 +1404,23 @@ fn project_plain_indexed(
     // Max pairs: keep each v row's sign through the per-unit clamp below, and
     // tie the pair's output weight (mean, then <= 0).
     let pair_at = |i: usize| max_pair_positions.map_or([2 * i, 2 * i + 1], |pairs| pairs[i]);
-    let max_v_rows: Vec<Vec<f64>> = (0..hp.max_pairs)
-        .map(|i| {
-            w1.chunks_exact(n_hidden)
-                .map(|row| row[pair_at(i)[1]])
-                .collect()
-        })
-        .collect();
+    // Every max-pair value is element-wise and independent across rows and pairs, so the capture and the
+    // projection below run as single row-major passes over `w1` (one pass per pair strided through every row
+    // dominated training time). `v_cap[k * max_pairs + i]` is row k's v entry of pair i before any clamp.
+    // F3's shape (monotone clamp of every `w1` entry, max pairs, no product pairs, ramps or feature pin): the
+    // clamp, the pre-clamp v capture and the gate run below as one pass per row, in the same per-element order.
+    let fused = hp.monotone_cbc
+        && hp.monotone_product_pairs.is_empty()
+        && hp.monotone_feature_pin.is_none()
+        && n_pairs == 0
+        && hp.max_pairs > 0;
+    let mut v_cap = MAX_V_SCRATCH.with_borrow_mut(std::mem::take);
+    v_cap.clear();
+    if hp.max_pairs > 0 && !fused {
+        for row in w1.chunks_exact(n_hidden) {
+            v_cap.extend((0..hp.max_pairs).map(|i| row[pair_at(i)[1]]));
+        }
+    }
     let max_w2: Vec<f64> = (0..hp.max_pairs)
         .map(|i| {
             let [u, v] = pair_at(i);
@@ -1417,6 +1432,33 @@ fn project_plain_indexed(
         nonneg_project_w2b2(w2, b2, pin);
     } else {
         nonneg_project(w2, b1, b2, pin);
+    }
+    if fused {
+        let pos: Vec<[usize; 2]> = (0..hp.max_pairs).map(pair_at).collect();
+        let mut cap = vec![0.0; hp.max_pairs];
+        for row in w1.chunks_exact_mut(n_hidden) {
+            for (c, &[_, v]) in cap.iter_mut().zip(&pos) {
+                *c = row[v];
+            }
+            for x in row.iter_mut() {
+                *x = x.max(0.0);
+            }
+            for (&bv, &[u, v]) in cap.iter().zip(&pos) {
+                let (a, b) = project_gate(row[u], bv, 1.0, 1.0);
+                row[u] = a;
+                row[v] = b;
+            }
+        }
+        MAX_V_SCRATCH.set(v_cap);
+        for (&[u, v], &c) in pos.iter().zip(&max_w2) {
+            b1[u] = 0.0;
+            if b1[v] > 0.0 {
+                b1[v] = 0.0;
+            }
+            w2[u] = c;
+            w2[v] = c;
+        }
+        return;
     }
     if hp.monotone_cbc && !hp.monotone_product_pairs.is_empty() {
         let n_in = w1.len() / n_hidden;
@@ -1467,18 +1509,29 @@ fn project_plain_indexed(
     // still `c·max(a·x, b·x + f·x_free - t)` (non-increasing in every masked-monotone input, convex in all of them).
     let free = hp.monotone_feature_pin.as_deref();
     let strict = hp.monotone_strict && !hp.monotone_pin_during_training;
-    for (i, (v_row, &c)) in max_v_rows.iter().zip(&max_w2).enumerate() {
-        let [u, v] = pair_at(i);
-        for (k, (row, &bv)) in w1.chunks_exact_mut(n_hidden).zip(v_row).enumerate() {
-            if free.is_some_and(|pin| !pin[k]) {
-                row[u] = 0.0;
-                row[v] = if strict { 0.0 } else { bv };
-                continue;
+    if hp.max_pairs > 0 {
+        for (k, (row, caps)) in w1
+            .chunks_exact_mut(n_hidden)
+            .zip(v_cap.chunks_exact(hp.max_pairs))
+            .enumerate()
+        {
+            let pinned = free.is_some_and(|pin| !pin[k]);
+            for (i, &bv) in caps.iter().enumerate() {
+                let [u, v] = pair_at(i);
+                if pinned {
+                    row[u] = 0.0;
+                    row[v] = if strict { 0.0 } else { bv };
+                    continue;
+                }
+                let (a, b) = project_gate(row[u], bv, 1.0, 1.0);
+                row[u] = a;
+                row[v] = b;
             }
-            let (a, b) = project_gate(row[u], bv, 1.0, 1.0);
-            row[u] = a;
-            row[v] = b;
         }
+    }
+    MAX_V_SCRATCH.set(v_cap);
+    for (i, &c) in max_w2.iter().enumerate() {
+        let [u, v] = pair_at(i);
         b1[u] = 0.0;
         if b1[v] > 0.0 {
             b1[v] = 0.0;
