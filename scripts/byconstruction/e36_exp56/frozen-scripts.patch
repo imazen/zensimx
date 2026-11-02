@@ -1,0 +1,94 @@
+--- frozen/rev4_featpot/v2_confirm_fit.py
++++ exp/rev4_featpot/v2_confirm_fit.py
+@@ -46,6 +46,12 @@
+     os.environ.setdefault("ZEN_PANEL_BIN", str(PANEL))
+     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+     ap.add_argument("--exclude-datasets", default="", help="TRAIN-only dataset-group holdout, comma-separated collections")
++    # Experiment 5 (zensimx benchmarks/e36_subset_test_2026-11-01.md): MOS transfer arms. Defaults change nothing.
++    ap.add_argument("--human-sources", default=None, help="keep only these production sources of the human leg, or 'none'")
++    ap.add_argument("--drop-groups", default="", help="drop these training groups (e.g. cid22); validation groups stay")
++    ap.add_argument("--mos-share", type=float, default=None, help="split this total train weight equally over kept MOS groups")
++    ap.add_argument("--human-rows", type=Path, default=None,
++                    help="experiment 6: JSON {label, keep: [parent row indices]} pruning the human leg")
+     from matched_codec import add_args as codec_args
+     codec_args(ap)
+     ap.add_argument("--spec", required=True)
+@@ -168,8 +174,21 @@
+         raise ValueError(f"{args.spec}: the confirm fitter implements the coverage leg only (no ko/ts recipe tokens)")
+     hfit, hdev = checked(legs["human_all"]["fit"]), checked(legs["human_all"]["dev"])
+     weights["human"] = acceptance_weight(NOMINAL_WEIGHT["human"] if human_w is None else human_w, refs_of(hfit))
++    if args.human_sources not in (None, "none"):
++        from human_subset import subset
++        hfit = subset(hfit, args.human_sources.split(","), dest / "human_subset")
++    if args.human_rows is not None:
++        from human_subset import subset
++        from v2_human_role import PRODUCTION_SOURCES
++        if args.human_sources is not None:
++            raise ValueError("--human-rows prunes the full human leg; it does not combine with --human-sources")
++        pr = json.loads(args.human_rows.read_text())
++        hfit = subset(hfit, list(PRODUCTION_SOURCES), dest / "human_subset", rows=pr["keep"], label=pr["label"])
+     groups += [("human", hfit, weights["human"], 0, "withinref,rank"),
+                ("human_development", hdev, 0, HUMAN_VAL_WEIGHT, "withinref,rank")]
++    if args.human_sources == "none":
++        groups = [g for g in groups if g[0] != "human"]
++        weights.pop("human")
+     init_seed, sample_seed = confirm_seeds(args.seed_index)
+     from matched_codec import attach as attach_codec
+     groups, recipe = attach_codec(args, groups, V2, init_seed, sample_seed, recipe)
+@@ -179,9 +198,18 @@
+         groups, dataset_authority = dataset_groups(V2, groups, keep, "full", args.seed_index,
+                                                    init_seed, sample_seed, dest,
+                                                    exclude=tuple(filter(None, args.exclude_datasets.split(","))),
++                                                   mos_share=args.mos_share,
+                                                    derived_inputs=recipe_of(args.spec).get("derived_inputs") or "fx1")
+         if dataset_authority:
+             weights.update({name:tw for name,_,tw,_,_ in groups if tw > 0})
++    drop = set(filter(None, args.drop_groups.split(",")))
++    if drop:
++        groups = [g for g in groups if g[0] not in drop]
++        weights = {k: v for k, v in weights.items() if k not in drop}
++    if args.human_sources is not None or drop or args.mos_share is not None:
++        print(json.dumps({"experiment5": dict(human_sources=args.human_sources, human_rows=str(args.human_rows), drop_groups=sorted(drop),
++                                             mos_share=args.mos_share,
++                                             train_groups={n: tw for n, _, tw, _, _ in groups if tw > 0})}))
+     diagnostic = None
+     if args.init_from is not None:
+         if dataset_authority is None:
+--- frozen/rev4_featpot/subjective_training_leg.py
++++ exp/rev4_featpot/subjective_training_leg.py
+@@ -380,6 +380,8 @@
+         if (d["loss"] == "hard-pair-preference" or votes) and any(n != 2 for n in counts.values()):
+             raise ValueError("hard preference requires exactly two sides per comparison")
+         weight = d["nominal_weight"]/(sum(1-1/counts[k] for k in sorted(counts))/len(counts))
++        if "experiment5_scale" in r:  # experiment 5 --mos-share: the recorded scale times the corrected weight
++            weight = weight * r["experiment5_scale"]
+         if r["train_weight"] != weight:
+             raise ValueError("dataset nominal-weight acceptance correction differs")
+         admitted[r["name"]] = d
+@@ -615,7 +617,7 @@
+ 
+ 
+ def dataset_groups(root, groups, selected, route, seed_index, init_seed, sample_seed, dest, exclude=(),
+-                   derived_inputs="fx1"):
++                   derived_inputs="fx1", mos_share=None):
+     """Attach the frozen derived root's dataset legs to the canonical fitter.
+ 
+     `derived_inputs` is the run's pinned derived-input recipe token; the root's legs must have been admitted
+@@ -668,6 +670,17 @@
+                             manifest_sha256=sha(str(path)+".manifest.json"),
+                             keys_path=str(path.with_suffix(".keys.parquet")), subjective=False))
+     records += retained
++    if mos_share is not None:  # experiment 5: equal split of the total MOS weight, written into the authority itself
++        mos = [r for r in records if r["train_weight"] > 0 and (r["name"] == "human" or
++               (r["name"].startswith("subjective_rank_") and r["name"] != "subjective_rank_bapps"))]
++        if not mos:
++            raise ValueError("--mos-share with no MOS training group kept")
++        for r in mos:
++            if r["name"] == "human":
++                r["train_weight"] = mos_share / len(mos)
++            else:  # dataset legs: admission re-derives the weight from the pinned manifest times this scale
++                r["experiment5_scale"] = (mos_share / len(mos)) / r["train_weight"]
++                r["train_weight"] = r["train_weight"] * r["experiment5_scale"]
+     expanded = [(r["name"],Path(r["path"]),r["train_weight"],r["val_weight"],r["mode"]) for r in records]
+     cell_id = f"{route}-s{seed_index}"
+     cell = dict(route="full" if route == "full" else "d1",seed_index=seed_index,epochs=120,pairs_per_epoch=50000,
