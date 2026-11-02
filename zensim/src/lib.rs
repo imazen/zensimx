@@ -575,9 +575,9 @@ pub use source::{
 pub use attribution::{AttributionResult, AttributionSession};
 #[cfg(all(feature = "custom-profiles", feature = "feature-regime-v2"))]
 pub use attribution::{Fused944Session, ScoredAttribution};
+pub use diffmap::{DiffmapOptions, DiffmapResult, DiffmapWeighting};
 #[cfg(all(feature = "custom-profiles", feature = "feature-regime-v2"))]
 pub use metric::FeatureBlockIntegrands;
-pub use diffmap::{DiffmapOptions, DiffmapResult, DiffmapWeighting};
 pub use streaming::{PrecomputedReference, ZensimScratch};
 
 /// Score a precomputed feature vector under a [`ZensimProfile`] —

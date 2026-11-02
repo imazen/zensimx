@@ -12,7 +12,7 @@
 //! `PAIRS.tsv` has a header with `key`, `ref_path`, `dist_path` (map_dump's format). Per pair:
 //! `DIR/<key>.integrands.f32` (row-major little-endian f32, one row per spatialized feature in the JSON's `ids`
 //! order, `blocks_x * blocks_y` columns), `DIR/<key>.butter_sum.f32` and `DIR/<key>.butter_max.f32` (one value per
-//! block), and one JSON object per pair on stdout. Without the paint options the scorer's served map modes apply.
+//! block), `DIR/<key>.served.f32` (the served density's block sums), and one JSON object per pair on stdout. Without the paint options the scorer's served map modes apply.
 //! Inputs are PNG files decoded by the `image` crate. No labels are read.
 
 use std::io::Write;
@@ -34,7 +34,11 @@ fn main() {
     let (mut pairs, mut out, mut bake) = (None, None, None);
     let mut block = 8usize;
     let mut paint: Option<[String; 3]> = None;
-    let mut modes = [String::from("box"), String::from("nearest"), String::from("repair")];
+    let mut modes = [
+        String::from("box"),
+        String::from("nearest"),
+        String::from("repair"),
+    ];
     while let Some(a) = args.next() {
         match a.as_str() {
             "--pairs" => pairs = args.next().map(PathBuf::from),
@@ -42,7 +46,10 @@ fn main() {
             "--bake" => bake = args.next().map(PathBuf::from),
             "--block" => block = args.next().expect("--block N").parse().expect("block"),
             "--window" | "--paint" | "--split" => {
-                let i = ["--window", "--paint", "--split"].iter().position(|f| *f == a).unwrap();
+                let i = ["--window", "--paint", "--split"]
+                    .iter()
+                    .position(|f| *f == a)
+                    .unwrap();
                 modes[i] = args.next().expect("mode");
                 paint = Some(modes.clone());
             }
@@ -58,13 +65,21 @@ fn main() {
         .from_path(&pairs)
         .expect("pairs");
     let hdr = rdr.headers().expect("header").clone();
-    let col = |n: &str| hdr.iter().position(|h| h == n).unwrap_or_else(|| panic!("{n} column"));
+    let col = |n: &str| {
+        hdr.iter()
+            .position(|h| h == n)
+            .unwrap_or_else(|| panic!("{n} column"))
+    };
     let (ki, ri, di) = (col("key"), col("ref_path"), col("dist_path"));
     let rows: Vec<(String, PathBuf, PathBuf)> = rdr
         .records()
         .map(|r| {
             let r = r.expect("row");
-            (r[ki].to_string(), PathBuf::from(&r[ri]), PathBuf::from(&r[di]))
+            (
+                r[ki].to_string(),
+                PathBuf::from(&r[ri]),
+                PathBuf::from(&r[di]),
+            )
         })
         .collect();
     let lines: Vec<String> = rows
@@ -73,13 +88,21 @@ fn main() {
             let rd = image::open(reference).expect("decode ref").to_rgb8();
             let dd = image::open(distorted).expect("decode dist").to_rgb8();
             let (w, h) = (rd.width() as usize, rd.height() as usize);
-            assert_eq!((w, h), (dd.width() as usize, dd.height() as usize), "{key}: size mismatch");
+            assert_eq!(
+                (w, h),
+                (dd.width() as usize, dd.height() as usize),
+                "{key}: size mismatch"
+            );
             let rpx: &[[u8; 3]] = rd.as_raw().as_chunks::<3>().0;
             let dpx: &[[u8; 3]] = dd.as_raw().as_chunks::<3>().0;
             let (rs, ds) = (RgbSlice::new(rpx, w, h), RgbSlice::new(dpx, w, h));
-            let mut scorer = BakeScorer::new(&model).expect("bake scorer").with_parallel(false);
+            let mut scorer = BakeScorer::new(&model)
+                .expect("bake scorer")
+                .with_parallel(false);
             if let Some([window, paint, split]) = &paint {
-                scorer = scorer.with_map_paint(window, paint, split).expect("paint modes");
+                scorer = scorer
+                    .with_map_paint(window, paint, split)
+                    .expect("paint modes");
             }
             let pre = scorer.precompute_reference(&rs).expect("reference");
             let mut session = Fused944Session::new();
@@ -87,12 +110,25 @@ fn main() {
                 .compute_with_ref_and_attribution(&rs, &pre, &ds, None, &mut session, block)
                 .expect("attribution");
             let sens = served.sensitivities().to_vec();
-            let reads: Vec<usize> = scorer
+            // The served density on the same grid, from this build, for checking sum_k s_k I_k against it.
+            write_f32(
+                &out.join(format!("{key}.served.f32")),
+                served
+                    .attribution()
+                    .block_sums(block)
+                    .iter()
+                    .map(|&v| v as f32),
+            );
+            // The declared read set plus every id the served sensitivities touch.
+            let mut reads: Vec<usize> = scorer
                 .consumed_feature_ids()
                 .expect("read set")
                 .into_iter()
                 .map(usize::from)
+                .chain((0..sens.len()).filter(|&i| sens[i] != 0.0))
                 .collect();
+            reads.sort_unstable();
+            reads.dedup();
             let mut fresh = Fused944Session::new();
             let integrands = scorer
                 .feature_block_integrands(&rs, &pre, &ds, &mut fresh, block, &reads)
@@ -101,7 +137,9 @@ fn main() {
                 &out.join(format!("{key}.integrands.f32")),
                 integrands.values.iter().flatten().map(|&v| v as f32),
             );
-            let to_rgb8 = |px: &[[u8; 3]]| -> Vec<RGB8> { px.iter().map(|q| RGB8::new(q[0], q[1], q[2])).collect() };
+            let to_rgb8 = |px: &[[u8; 3]]| -> Vec<RGB8> {
+                px.iter().map(|q| RGB8::new(q[0], q[1], q[2])).collect()
+            };
             let (r8, d8) = (to_rgb8(rpx), to_rgb8(dpx));
             let b = butteraugli(
                 Img::new(&r8[..], w, h),
@@ -119,8 +157,14 @@ fn main() {
                     max[i] = max[i].max(v);
                 }
             }
-            write_f32(&out.join(format!("{key}.butter_sum.f32")), sum.iter().map(|&v| v as f32));
-            write_f32(&out.join(format!("{key}.butter_max.f32")), max.iter().copied());
+            write_f32(
+                &out.join(format!("{key}.butter_sum.f32")),
+                sum.iter().map(|&v| v as f32),
+            );
+            write_f32(
+                &out.join(format!("{key}.butter_max.f32")),
+                max.iter().copied(),
+            );
             serde_json::json!({
                 "key": key, "width": w, "height": h, "block": block, "blocks": [bx, by],
                 "ids": integrands.ids, "unsupported": integrands.unsupported,

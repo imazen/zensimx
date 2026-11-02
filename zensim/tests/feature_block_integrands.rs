@@ -61,7 +61,10 @@ fn weighted_integrands_reproduce_the_served_density() {
         let served = scorer
             .compute_with_ref_and_attribution(&rs, &pre, &ds, None, &mut session, 8)
             .unwrap();
-        assert!(served.unsupported_feature_ids().is_empty(), "rev {revision}");
+        assert!(
+            served.unsupported_feature_ids().is_empty(),
+            "rev {revision}"
+        );
         let expected = served.attribution().block_sums(8);
         let s = served.sensitivities().to_vec();
 
@@ -88,7 +91,10 @@ fn weighted_integrands_reproduce_the_served_density() {
         }
         // Each feature carries signal somewhere.
         for (id, v) in integrands.ids.iter().zip(&integrands.values) {
-            assert!(v.iter().any(|x| *x != 0.0), "rev {revision} f{id} has an all-zero integrand");
+            assert!(
+                v.iter().any(|x| *x != 0.0),
+                "rev {revision} f{id} has an all-zero integrand"
+            );
         }
     }
 }

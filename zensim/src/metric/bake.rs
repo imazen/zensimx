@@ -1669,13 +1669,13 @@ impl<'a> BakeScorer<'a> {
         let parallel = crate::metric::effective_parallel(self.parallel);
         let (features, _) =
             session.planned_features(source, precomputed, distorted, &plan, parallel, None)?;
-        let width = plan
-            .walk_width()
-            .max(features.len())
-            .max(crate::fold_engine::v1_feature_width(&config_from_params(
-                ZensimProfile::BHdr.params(),
-                parallel,
-            )));
+        let width =
+            plan.walk_width()
+                .max(features.len())
+                .max(crate::fold_engine::v1_feature_width(&config_from_params(
+                    ZensimProfile::BHdr.params(),
+                    parallel,
+                )));
         let zensim = Zensim::new(ZensimProfile::BHdr).with_parallel(parallel);
         let paint = self
             .map_paint
