@@ -12,9 +12,15 @@
 
 ### QUEUED BREAKING CHANGES
 
+- Unpublished `zensim-validate`: explicit `TvRegularizer` struct literals gain `pool` and `level` (`false` and `None` keep the earlier behavior; `2857ca0c`, two integration tests updated in `0ee6c5ea`).
+
 - Unpublished `zensim-validate`: explicit `MlpHyperparams` struct literals gain the owner-approved `init_from` and `constant_lr` fields (`None` and `false` preserve default behavior). Supported serving-crate APIs are unchanged.
 
 ### Added
+
+- `zensim_mlp_train --pair-sampling walk`: the uniform draw's group sequence and random stream, with each within-reference group visiting its references round-robin and each reference's rows on a seeded bijection, so row and reference coverage stop depending on the seed (`0ee6c5ea`, E36 experiment 6). The coverage replay and `subset_sim` follow it.
+
+- Recorded `experiment5_scale` on dataset legs of a subjective authority: admission checks the manifest-derived weight times the scale, so `--mos-share` arms can rescale MOS legs (`0ee6c5ea`, E36 experiment 5).
 
 - Frozen five-family SDR chroma teacher data owners, exact source-role admission guards and derived-root/rebind support (`f9dc5af7`, `084b03da`, `b1f59d01`, `4f6a9024`). Final combined bank and root qualification remain unrun at the owner stop.
 
