@@ -306,3 +306,21 @@ pool-10 (-0.643), pool-1 (-0.188). The three lambda-30 arms are within 0.03 poin
 
 Process note: G-STEER with 30 concurrent shard processes ran at ~10 s per case against ~1.5-2 s alone (the
 instrument is memory-bound on dev); about 9 concurrent shards, one model at a time, is the efficient setting.
+
+## Experiment 3a (2026-11-02, before any loop run): do the candidates' maps steer JPEG XL better?
+
+The owner's ruling: map choices are decided in the JPEG XL loop, by BD-rate. F3 and the hinge arms have never
+steered it. Their attribution maps already agree more with butteraugli's on 240 E36 TRAIN views (served exact-split
+map, median per-view Spearman of 8 px block sums: F3 0.700, p30L 0.740, pool-100 0.764), which is a reason to look,
+not a result.
+
+- **Arms** (seed-0 packed models, served map, linear float input, tail placement fitted by `loop_calibrate`
+  `LOOP_CAL_TAIL=1` on the 2026-10-24-hq calibration pairs, as the Mdata study's `*lintail` arms): F3, p30L, p2-30.
+- **Controls** (stop before any arm's result is read if either fails): the new build's `zensim-B@rev5` and
+  `zensim-Mfull@rev7` placement rows equal the 2026-10-25r7win calibration's exactly, and their check arms reproduce
+  the stored B and M7lintail bitstreams (702 each) byte for byte.
+- **Everything else as the steering study:** the 78 TRAIN images, effort 7, 4 iterations, distances 0.3-10, the same
+  judge build (`zenmetrics-judge-7a0f8394`).
+- **Statistic:** BD-rate (`rd_probe_analyze --bdrate-vs`) of each arm against the butteraugli loop and against F3,
+  under SSIMULACRA2 and CVVDP. Reading: an arm steers better when its BD-rate saving is positive with the interval
+  above zero under both judges; an interval across zero under either is a tie.
