@@ -446,3 +446,38 @@ wrong.
 - `strat` cannot run under this recipe. `--pair-sampling stratified` pairs only inside (reference, quality band)
   strata, so each BAPPS comparison whose two sides fall in different bands becomes a singleton stratum and is
   dropped, and the gate refuses it. The arm is recorded as not run, for that reason.
+
+## Experiment 3, steps 2-4 (2026-11-02, before any map-term run): fit the attribution map to butteraugli
+
+Step 1 (above, experiment 3a) measured headroom: on 240 E36 fit views, the per-view Spearman between a model's
+attribution map and butteraugli's diffmap at 16 px blocks is 0.713 for F3, 0.752 for p30L and 0.760 for pool-100.
+The owner trusts butteraugli spatially, and the JPEG XL loop with butteraugli's map leads every zensim map by 2-4%.
+
+**Step 2, data.** `BakeScorer::feature_block_integrands` (PR #75, under review) gives each read feature's block
+integrand `I_k(b)`; the served density is `sum_k s_k I_k`. The `integrand_dump` example writes them for a bake's
+read set, with butteraugli's block sums on the same grid. The sample is 1,967 E36 fit views (128-1024 px), stratified
+by codec x content x quality band (seed 20261103). `scripts/byconstruction/map_pool.py` joins the dump to the views'
+bank feature rows as a `map-pool-v1`. Integrand rows that are all zero (reference-only ids) are dropped, and the
+targets are each view's butteraugli block sums and their within-view rank z-scores.
+
+**Step 3, the term.** `zensim_mlp_train --map-pool` (beside `--tv-pool`; `mlp_train/map_term.rs`). On each scheduled
+pool step it draws `--map-batch` views on the pool's RNG stream and adds
+`--map-weight * mean(1 - pearson(m, t))`. Here `m_b = sign * sum_k dy/df_k I_k(b)` and `t` is the rank z-score
+target. The sensitivities run back through the derived inputs and the network analytically; a finite-difference
+test checks the gradient.
+
+**Arms (continuations from F3's base fit, as p30L; seed 0 first).** p30L plus the map term at `--map-weight` 1, 10
+and 30 (batch 8, 16 px blocks). The control is p30L's seed-0 run from amendment 2. Before any arm runs, a fidelity
+check must pass: on dumped views, `sum_k s_k I_k` from the served sensitivities must reproduce the same build's served
+density (max block error under 1e-4 of the largest block).
+
+**Outcome.**
+1. Map agreement on 240 held-out E36 selection views (seed 20261104): median per-view Spearman against butteraugli
+   at 8 and 16 px blocks.
+2. The amendment-2 measurements: primary, error against human ratings, G-CHROMA-L and G-STEER.
+3. For the arm with the best map agreement that keeps the product gates: the JPEG XL loop (experiment 3a protocol,
+   i270), BD-rate against p30L.
+
+**Caveats stated before results.** The map term supervises the frozen density. The served revision-7 map replaces
+the coarse v2 pools (f459-719) with exact neighbour deltas, so the loop can differ from what the term fits.
+Butteraugli is a model of human vision, not a human rating.

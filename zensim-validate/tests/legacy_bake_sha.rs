@@ -164,6 +164,7 @@ fn bake_sha_inner(
             margin,
             pool: false,
             level: None,
+            map: None,
         })
     } else {
         None

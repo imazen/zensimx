@@ -1474,13 +1474,20 @@ mod tests {
         for _ in 0..1000 {
             let (du, dw) = (draw_pair(&cu, &mut ru), draw_pair(&cw, &mut rw));
             assert_eq!(pos_of(du), pos_of(dw));
-            if let Draw::Pair { train_pos: 1, ia, ib } = dw {
+            if let Draw::Pair {
+                train_pos: 1,
+                ia,
+                ib,
+            } = dw
+            {
                 assert_eq!(refs_b[ia], refs_b[ib]);
             }
         }
         assert_eq!(ru.next_u64(), rw.next_u64());
 
-        let rb = RefBuckets::build(&refs_b).unwrap().with_walk(walk_seed(9001, 1));
+        let rb = RefBuckets::build(&refs_b)
+            .unwrap()
+            .with_walk(walk_seed(9001, 1));
         let mut a_rows = std::collections::BTreeSet::new();
         let mut rng = SplitMix64::new(5);
         for _ in 0..refs_b.len() {
@@ -1488,11 +1495,27 @@ mod tests {
             assert_eq!(refs_b[a], refs_b[b]);
             a_rows.insert(a);
         }
-        assert_eq!(a_rows.len(), refs_b.len(), "every row is an A once per cycle");
+        assert_eq!(
+            a_rows.len(),
+            refs_b.len(),
+            "every row is an A once per cycle"
+        );
 
         let gs = vec![
-            g("a", 1.0, (0..40).map(|i| i as f64 * 2.5).collect(), Some(refs_a.clone()), true),
-            g("b", 3.0, (0..60).map(|i| i as f64).collect(), Some(refs_b.clone()), true),
+            g(
+                "a",
+                1.0,
+                (0..40).map(|i| i as f64 * 2.5).collect(),
+                Some(refs_a.clone()),
+                true,
+            ),
+            g(
+                "b",
+                3.0,
+                (0..60).map(|i| i as f64).collect(),
+                Some(refs_b.clone()),
+                true,
+            ),
         ];
         let mut uniform = params(9001);
         uniform.epochs = 1;
@@ -1505,7 +1528,12 @@ mod tests {
         assert_ne!(u.digest.finish(), w.digest.finish());
         let (pu, pw) = (&u.full.per_group[1], &w.full.per_group[1]);
         assert_eq!(pw.refs_touched, pw.n_refs);
-        assert!(pw.rows_touched > pu.rows_touched, "walk {} vs uniform {}", pw.rows_touched, pu.rows_touched);
+        assert!(
+            pw.rows_touched > pu.rows_touched,
+            "walk {} vs uniform {}",
+            pw.rows_touched,
+            pu.rows_touched
+        );
     }
 
     /// Cross-image is the default: the same group WITHOUT the opt-in must

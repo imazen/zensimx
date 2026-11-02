@@ -1023,7 +1023,10 @@ mod tests {
         f.authority["cells"]["cell"]["groups"][0]["train_weight"] = json!(3.);
         assert!(f.call_named("subjective_rank_fixture", 3.).is_err());
         f.authority["cells"]["cell"]["groups"][0]["experiment5_scale"] = json!(3.);
-        assert_eq!(f.call_named("subjective_rank_fixture", 3.).unwrap().len(), 1);
+        assert_eq!(
+            f.call_named("subjective_rank_fixture", 3.).unwrap().len(),
+            1
+        );
         f.authority["cells"]["cell"]["groups"][0]["experiment5_scale"] = json!(-3.);
         assert!(f.call_named("subjective_rank_fixture", 3.).is_err());
         f.authority["cells"]["cell"]["groups"][0]

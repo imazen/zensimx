@@ -193,6 +193,7 @@ fn plain_tv_pair_order_controls_the_served_preference_in_both_polarities() {
                 margin: 0.5,
                 pool: false,
                 level: None,
+                map: None,
             };
             let bytes = train_mlp_strategy(
                 &mut groups,

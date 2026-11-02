@@ -435,6 +435,25 @@ struct Args {
     #[arg(long, default_value_t = 32)]
     level_batch: usize,
 
+    /// Map supervision beside `--tv-pool` (manifest schema `map-pool-v1`, `scripts/byconstruction/map_pool.py`):
+    /// views with per-feature block integrands and a block target. Each scheduled pool step also draws --map-batch
+    /// views on the pool's RNG stream and adds `--map-weight * mean(1 - pearson(map, target))`, the map being
+    /// `--map-sign * sum_k dy/df_k * integrand_k` (E36 experiment 3).
+    #[arg(long, requires = "tv_pool")]
+    map_pool: Option<PathBuf>,
+
+    /// `--map-pool` loss weight.
+    #[arg(long, default_value_t = 1.0)]
+    map_weight: f64,
+
+    /// `--map-pool` views per scheduled pool step.
+    #[arg(long, default_value_t = 8)]
+    map_batch: usize,
+
+    /// `--map-pool` sign: +1 when the raw output runs with the score, -1 for a distance-shaped output.
+    #[arg(long, default_value_t = -1.0, allow_hyphen_values = true)]
+    map_sign: f64,
+
     /// Private E36 versioned external feature pool; requires E36_TV_PROTOCOL=1 build.
     #[arg(long, conflicts_with = "tv_pairs_file", requires_all = ["derived_inputs", "e36_tv_contract", "e36_tv_contract_sha256"])]
     e36_tv_manifest: Option<PathBuf>,
@@ -4479,6 +4498,7 @@ fn main() {
             margin: args.tv_margin,
             pool: false,
             level: None,
+            map: None,
         })
     } else if let Some(path) = &args.tv_pool {
         assert!(
@@ -4520,6 +4540,28 @@ fn main() {
                 args.level_ref.as_ref().unwrap(),
             );
             pool.level = Some(level);
+        }
+        if let Some(map_path) = &args.map_pool {
+            let map = tv_pool::load_map(
+                map_path,
+                args.derived_inputs.as_ref().unwrap(),
+                args.max_features,
+                args.map_weight,
+                args.map_batch,
+                args.map_sign,
+            )
+            .unwrap_or_else(|e| {
+                eprintln!("--map-pool: {e}");
+                std::process::exit(2)
+            });
+            println!(
+                "Loaded map pool {map_path:?}: {} views (weight {}, batch {}, sign {})",
+                map.views.len(),
+                map.weight,
+                map.batch,
+                map.sign,
+            );
+            pool.map = Some(map);
         }
         println!(
             "Loaded TV pool {path:?}: {} rows, {} pairs (weight {}, every {}, batch {}, margin {}, class weights {:?})",
@@ -5456,6 +5498,12 @@ fn main() {
                 record["level_pool"] =
                     tv_pool::level_receipt(level_path, args.level_ref.as_ref().unwrap(), level)
                         .expect("level pool reproduction receipt");
+            }
+            if let (Some(map_path), Some(map)) =
+                (&args.map_pool, tv_regularizer.as_ref().and_then(|t| t.map.as_ref()))
+            {
+                record["map_pool"] =
+                    tv_pool::map_receipt(map_path, map).expect("map pool reproduction receipt");
             }
         }
         if let Some(e36) = e36_repro {

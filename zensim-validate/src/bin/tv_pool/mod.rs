@@ -167,7 +167,13 @@ pub(super) fn load(
     if m.feature_ids != derived.load_ids() {
         return Err("tv pool feature ids differ from the --derived-inputs read set".into());
     }
-    let features = read_rows(&m.features.path, &m.feature_ids, m.feature_rows, &derived, raw_width)?;
+    let features = read_rows(
+        &m.features.path,
+        &m.feature_ids,
+        m.feature_rows,
+        &derived,
+        raw_width,
+    )?;
     let mut pairs = Vec::with_capacity(m.pair_rows);
     let mut classes = Vec::with_capacity(m.pair_rows);
     let mut seen = HashSet::new();
@@ -221,6 +227,7 @@ pub(super) fn load(
         margin,
         pool: true,
         level: None,
+        map: None,
     })
 }
 
@@ -277,16 +284,32 @@ pub(super) fn load_level(
     if m.feature_ids != derived.load_ids() {
         return Err("level pool feature ids differ from the --derived-inputs read set".into());
     }
-    let features = read_rows(&m.features.path, &m.feature_ids, m.feature_rows, &derived, raw_width)?;
+    let features = read_rows(
+        &m.features.path,
+        &m.feature_ids,
+        m.feature_rows,
+        &derived,
+        raw_width,
+    )?;
     if features.len() != m.feature_rows || features.is_empty() {
         return Err("level pool row count differs from the manifest".into());
     }
-    let reference = std::fs::read(reference).map_err(|e| format!("{}: {e}", reference.display()))?;
-    Ok(LevelPool { features, reference, weight, batch })
+    let reference =
+        std::fs::read(reference).map_err(|e| format!("{}: {e}", reference.display()))?;
+    Ok(LevelPool {
+        features,
+        reference,
+        weight,
+        batch,
+    })
 }
 
 /// What `zentrain.repro` records about the level pool.
-pub(super) fn level_receipt(path: &Path, reference: &Path, level: &LevelPool) -> Result<serde_json::Value, String> {
+pub(super) fn level_receipt(
+    path: &Path,
+    reference: &Path,
+    level: &LevelPool,
+) -> Result<serde_json::Value, String> {
     let manifest: serde_json::Value =
         serde_json::from_slice(&std::fs::read(path).map_err(|e| e.to_string())?)
             .map_err(|e| e.to_string())?;
@@ -295,4 +318,182 @@ pub(super) fn level_receipt(path: &Path, reference: &Path, level: &LevelPool) ->
         "reference":reference.display().to_string(),"reference_sha256":sha256_file(reference).map_err(|e|e.to_string())?,
         "weight":level.weight,"batch":level.batch,"rows":level.features.len(),
         "loss":"weight*mean((raw-raw_reference)^2) over batch rows drawn on the tv pool's RNG stream at each scheduled pool step"}))
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct MapManifest {
+    schema: String,
+    features: Bound,
+    views: Bound,
+    integrands: Bound,
+    targets: Bound,
+    feature_ids: Vec<usize>,
+    view_count: usize,
+    #[serde(default)]
+    #[allow(dead_code)]
+    provenance: serde_json::Value,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct MapViewRecord {
+    #[allow(dead_code)]
+    key: String,
+    blocks: usize,
+    positions: Vec<usize>,
+    integrand_offset: usize,
+    target_offset: usize,
+}
+
+fn f32_file(path: &Path) -> Result<Vec<f32>, String> {
+    let bytes = std::fs::read(path).map_err(|e| format!("{}: {e}", path.display()))?;
+    if bytes.len() % 4 != 0 {
+        return Err(format!("{}: not a whole number of f32", path.display()));
+    }
+    Ok(bytes
+        .as_chunks::<4>()
+        .0
+        .iter()
+        .map(|&c| f32::from_le_bytes(c))
+        .collect())
+}
+
+/// The raw read-set rows of a pool parquet, in order.
+fn read_raw(path: &Path, width: usize) -> Result<Vec<Vec<f64>>, String> {
+    let mut rows = Vec::new();
+    for batch in reader(path, &["row_idx", "features"])? {
+        let b = batch.map_err(|e| e.to_string())?;
+        let values = b
+            .column(1)
+            .as_any()
+            .downcast_ref::<ListArray>()
+            .ok_or("features must be a list")?;
+        for i in 0..b.num_rows() {
+            let v = values.value(i);
+            let v = v
+                .as_any()
+                .downcast_ref::<Float32Array>()
+                .ok_or("features must be f32")?;
+            if v.len() != width {
+                return Err("map pool row width differs from the read set".into());
+            }
+            rows.push(v.values().iter().map(|&x| f64::from(x)).collect());
+        }
+    }
+    Ok(rows)
+}
+
+/// Load the `--map-pool` views (manifest schema `map-pool-v1`, from `scripts/byconstruction/map_pool.py`).
+pub(super) fn load_map(
+    path: &Path,
+    derived_path: &Path,
+    raw_width: usize,
+    weight: f64,
+    batch: usize,
+    sign: f64,
+) -> Result<zensim_validate::mlp_train::map_term::MapPool, String> {
+    use zensim_validate::mlp_train::map_term::{MapColumn, MapPool, MapView};
+    let m: MapManifest = serde_json::from_slice(&std::fs::read(path).map_err(|e| e.to_string())?)
+        .map_err(|e| e.to_string())?;
+    if m.schema != "map-pool-v1" {
+        return Err("map pool manifest schema must be map-pool-v1".into());
+    }
+    if !(weight > 0.0 && weight.is_finite() && batch > 0 && (sign == 1.0 || sign == -1.0)) {
+        return Err(
+            "--map-pool needs --map-weight > 0, --map-batch > 0 and --map-sign +1 or -1".into(),
+        );
+    }
+    for b in [&m.features, &m.views, &m.integrands, &m.targets] {
+        bound(b)?;
+    }
+    let (derived, _) = Fx1Declaration::load(derived_path)?;
+    let ids = derived.load_ids();
+    if m.feature_ids != ids {
+        return Err("map pool feature ids differ from the --derived-inputs read set".into());
+    }
+    let pos = |id: usize| {
+        ids.binary_search(&id)
+            .map_err(|_| format!("f{id} is not in the read set"))
+    };
+    let mut columns = Vec::new();
+    for &id in &derived.direct {
+        columns.push(MapColumn::Direct(pos(id)?));
+    }
+    for &[a, b] in &derived.products {
+        columns.push(MapColumn::Product(pos(a)?, pos(b)?));
+    }
+    if columns.len() != derived.kept_columns(raw_width).len() {
+        return Err("map pool column sources differ from the kept inputs".into());
+    }
+    let derived_rows = read_rows(
+        &m.features.path,
+        &m.feature_ids,
+        m.view_count,
+        &derived,
+        raw_width,
+    )?;
+    let raw = read_raw(&m.features.path, ids.len())?;
+    let records: Vec<MapViewRecord> =
+        serde_json::from_slice(&std::fs::read(&m.views.path).map_err(|e| e.to_string())?)
+            .map_err(|e| e.to_string())?;
+    if derived_rows.len() != m.view_count
+        || raw.len() != m.view_count
+        || records.len() != m.view_count
+    {
+        return Err("map pool view count differs from the manifest".into());
+    }
+    let integrands = f32_file(&m.integrands.path)?;
+    let targets = f32_file(&m.targets.path)?;
+    let mut views = Vec::with_capacity(m.view_count);
+    for ((r, derived), raw) in records.into_iter().zip(derived_rows).zip(raw) {
+        let n = r.positions.len() * r.blocks;
+        let rows = integrands
+            .get(r.integrand_offset..r.integrand_offset + n)
+            .ok_or("map pool integrand offset out of range")?;
+        // Targets hold the block sums, then their rank z-scores; the term fits the z-scores.
+        let target: Vec<f64> = targets
+            .get(r.target_offset + r.blocks..r.target_offset + 2 * r.blocks)
+            .ok_or("map pool target offset out of range")?
+            .iter()
+            .map(|&v| f64::from(v))
+            .collect();
+        if r.blocks < 2
+            || r.positions.iter().any(|&p| p >= ids.len())
+            || !rows.iter().all(|v| v.is_finite())
+            || !target.iter().all(|v| v.is_finite())
+        {
+            return Err("map pool view is malformed".into());
+        }
+        views.push(MapView {
+            derived,
+            raw,
+            positions: r.positions,
+            blocks: r.blocks,
+            integrands: rows.to_vec(),
+            target,
+        });
+    }
+    Ok(MapPool {
+        views,
+        columns,
+        read_width: ids.len(),
+        weight,
+        batch,
+        sign,
+    })
+}
+
+/// What `zentrain.repro` records about the map pool.
+pub(super) fn map_receipt(
+    path: &Path,
+    map: &zensim_validate::mlp_train::map_term::MapPool,
+) -> Result<serde_json::Value, String> {
+    let manifest: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(path).map_err(|e| e.to_string())?)
+            .map_err(|e| e.to_string())?;
+    Ok(serde_json::json!({"schema":"map-pool-effective-v1",
+        "manifest_sha256":sha256_file(path).map_err(|e|e.to_string())?,"manifest":manifest,
+        "weight":map.weight,"batch":map.batch,"sign":map.sign,"views":map.views.len(),
+        "loss":"weight*mean(1-pearson(sign*sum_k dy/df_k I_k, rank-z target)) over batch views drawn on the tv pool's RNG stream at each scheduled pool step"}))
 }

@@ -172,12 +172,39 @@ impl<'a> Pool<'a> {
         if let Some(level) = &self.config.level {
             loss += self.accumulate_level(level, rng, w1, b1, w2, b2, adam, nf, nh, h);
         }
+        if let Some(map) = &self.config.map {
+            assert!(
+                !h.smooth_hinge,
+                "--map-pool needs the piecewise-linear hidden layer"
+            );
+            loss += super::map_term::accumulate(
+                map,
+                rng,
+                &self.columns,
+                &self.mean,
+                &self.scale,
+                w1,
+                b1,
+                w2,
+                b2,
+                adam,
+                nf,
+                nh,
+                h.leaky_alpha,
+            );
+        }
         loss
     }
 
     /// The reference checkpoint's raw output on every level row, each row standardized with the reference's own
     /// scaler exactly as that model saw its inputs.
-    fn level_reference_targets(&self, level: &LevelPool, nf: usize, nh: usize, h: &MlpHyperparams) -> Vec<f64> {
+    fn level_reference_targets(
+        &self,
+        level: &LevelPool,
+        nf: usize,
+        nh: usize,
+        h: &MlpHyperparams,
+    ) -> Vec<f64> {
         let keep = super::input_keep_mask();
         let r = super::warm_start::InitialWeights::load(&level.reference, nf, h, keep.as_deref())
             .unwrap_or_else(|e| panic!("--level-pool reference: {e}"));
@@ -192,7 +219,16 @@ impl<'a> Pool<'a> {
                     assert!(x[c].is_finite());
                 }
                 let (y, ..) = smooth_hinge::forward_pair(
-                    &x, &x, &r.w1, &r.b1, &r.w2, &r.b2, nf, nh, h.leaky_alpha, h.smooth_hinge,
+                    &x,
+                    &x,
+                    &r.w1,
+                    &r.b1,
+                    &r.w2,
+                    &r.b2,
+                    nf,
+                    nh,
+                    h.leaky_alpha,
+                    h.smooth_hinge,
                 );
                 assert!(y.is_finite());
                 y
@@ -233,8 +269,18 @@ impl<'a> Pool<'a> {
             for (k, &c) in self.columns.iter().enumerate() {
                 x[c] = (level.features[i][k] - self.mean[k]) / self.scale[k];
             }
-            let (y, pre, hid, ..) =
-                smooth_hinge::forward_pair(&x, &x, w1, b1, w2, b2, nf, nh, h.leaky_alpha, h.smooth_hinge);
+            let (y, pre, hid, ..) = smooth_hinge::forward_pair(
+                &x,
+                &x,
+                w1,
+                b1,
+                w2,
+                b2,
+                nf,
+                nh,
+                h.leaky_alpha,
+                h.smooth_hinge,
+            );
             let r = y - targets[i];
             loss += scale * r * r;
             smooth_hinge::backprop_step(
@@ -261,9 +307,13 @@ impl<'a> Pool<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The tests set and restore the process-wide input keep mask; run them one at a time.
+    static MASK_TESTS: std::sync::Mutex<()> = std::sync::Mutex::new(());
     #[test]
     fn level_pool_gradient_matches_finite_difference() {
         // Invented rows and targets; the reference checkpoint is replaced by preset targets.
+        let _serial = MASK_TESTS.lock().unwrap_or_else(|e| e.into_inner());
         let previous = super::super::INPUT_KEEP_MASK
             .lock()
             .unwrap()
@@ -285,11 +335,17 @@ mod tests {
             margin: 0.05,
             pool: true,
             level: Some(LevelPool {
-                features: vec![vec![0.5, 0.2], vec![0.1, 0.9], vec![0.7, 0.4], vec![0.3, 0.3]],
+                features: vec![
+                    vec![0.5, 0.2],
+                    vec![0.1, 0.9],
+                    vec![0.7, 0.4],
+                    vec![0.3, 0.3],
+                ],
                 reference: Vec::new(),
                 weight: level_weight,
                 batch: 16,
             }),
+            map: None,
         };
         let mut w1: Vec<f64> = (0..12).map(|i| 0.05 + 0.03 * i as f64).collect();
         let mut b1 = vec![0.1, -0.2, 0.05, 0.0];
@@ -309,7 +365,10 @@ mod tests {
         let (l1, g1) = evaluate(&w1, &b1, &w2, &b2, 1.);
         let (l0, g0) = evaluate(&w1, &b1, &w2, &b2, 1e-300);
         assert!(l1 > l0, "the level term adds loss");
-        assert!(g1.iter().zip(&g0).any(|(a, b)| a != b), "the level term adds gradient");
+        assert!(
+            g1.iter().zip(&g0).any(|(a, b)| a != b),
+            "the level term adds gradient"
+        );
         let n = w1.len() + b1.len() + w2.len() + b2.len();
         fn nudge(j: usize, delta: f64, slices: [&mut Vec<f64>; 4]) {
             let mut k = j;
@@ -327,7 +386,12 @@ mod tests {
             nudge(j, -2e-6, [&mut w1, &mut b1, &mut w2, &mut b2]);
             let (lm, _) = evaluate(&w1, &b1, &w2, &b2, 1.);
             nudge(j, 1e-6, [&mut w1, &mut b1, &mut w2, &mut b2]);
-            assert!(((lp - lm) / 2e-6 - g1[j]).abs() < 1e-8, "parameter {j}: fd {} vs {}", (lp - lm) / 2e-6, g1[j]);
+            assert!(
+                ((lp - lm) / 2e-6 - g1[j]).abs() < 1e-8,
+                "parameter {j}: fd {} vs {}",
+                (lp - lm) / 2e-6,
+                g1[j]
+            );
         }
         *super::super::INPUT_KEEP_MASK.lock().unwrap() = previous;
     }
@@ -336,6 +400,7 @@ mod tests {
     fn e36_preupdate_gradient_objective_and_inactive_control() {
         // Invented feature vectors only. No training group, optimizer call,
         // label load, bake or scaler fit occurs in this numerical admission.
+        let _serial = MASK_TESTS.lock().unwrap_or_else(|e| e.into_inner());
         let previous = super::super::INPUT_KEEP_MASK
             .lock()
             .unwrap()
@@ -357,6 +422,7 @@ mod tests {
             margin: 0.05,
             pool: true,
             level: None,
+            map: None,
         };
         let c = config(1.);
         let mut pool = Pool::new(&c, &h);

@@ -532,6 +532,7 @@ pub(super) fn load(
         margin: 0.05,
         pool: true,
         level: None,
+        map: None,
     })
 }
 

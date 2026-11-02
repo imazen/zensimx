@@ -56,6 +56,7 @@ use crate::adam_simd;
 // added to the RankNet per-prediction backprop direction. See module
 // docs for the exact formula and gradient derivation.
 mod e36_tv;
+pub mod map_term;
 mod loss_norm_in_norm;
 mod loss_pearson;
 mod loss_steer;
@@ -2929,6 +2930,8 @@ pub struct TvRegularizer {
     pub pool: bool,
     /// `--level-pool`: rows whose raw output is held near a reference checkpoint's (pool runs only).
     pub level: Option<LevelPool>,
+    /// `--map-pool`: views whose attribution map is fit to a block target (pool runs only; see [`map_term`]).
+    pub map: Option<map_term::MapPool>,
 }
 
 /// A level anchor beside the external pool's hinge: `features` are rows in the pool's derived-input space;
