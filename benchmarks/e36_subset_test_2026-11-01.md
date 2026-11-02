@@ -202,3 +202,33 @@ broad-97-b64; pool-100: I21_10_05 / I21_10_05 / broad-17-b64; control seed 2: br
 control's (bar 5%), and G-STEER is below F3's 135/135 on seed 0 and below the control's three-seed mean (134.33)
 for both. pool-10 remains the arm that meets every registered condition. Error against human ratings falls
 monotonically with lambda (reported, not used to select).
+
+## Amendment 2 (2026-11-02, before any experiment 1, 2 or 4 run): level anchor, pool refresh, pool ablations
+
+Owner, 2026-11-02: "work to optimize this so it can run 4x faster, then proceed through all of these". Every arm below
+is F3's general continuation (same recipe, seeds 0-2, packed at epoch 59) with the trainer build named in its results,
+whose control reproduces F3's 60 checkpoints; primary, guards and decision rule are unchanged; error against human
+ratings is reported as in amendment 1.
+
+**Experiment 1, level anchor.** The hinge constrains order only; pool-30 and pool-100 drifted G-CHROMA-L's ycc420
+level 5.1% while keeping per-ladder rank. A level term `--level-pool` holds the raw output on TRAIN chroma ladder
+rows near the control's: 32,768 rows drawn (seed 20261102) from the merged chroma bank's `fit` and `new-train` roles
+(`/mnt/v/zensim/e36-features/2026-11-01/level-chroma-32k`, scripts/byconstruction/level_pool.py; ycc420 7,340,
+ycc444 8,088, xyb-extended 6,749, band-ac 6,739, xyb-capped 3,852 rows)
+(never `dev` or `calibration`, which G-CHROMA-L reads), features in the same derived-input read set and scaler as the
+training rows; target = the same seed's control checkpoint (epoch 59) raw output on each row, computed by the trainer
+at start; every 50 primary pairs, 32 rows on their own RNG stream, loss `mu * mean((raw - target)^2)` added to that
+step's gradient. Arms: pool-30+level and pool-100+level, mu = 1. The term's finite-difference gradient test passes
+(zensimx 2857ca0c). The control (no pool, no level) runs with the same build in the same set; no arm result is read
+unless it reproduces F3's 60 checkpoints.
+
+**Experiment 2, pool refresh.** Pool v2 = every scored fit pair inverted by F3 seed 0 or by pool-100 seed 0, plus an
+equal random sample (seed 20261101) of pairs neither inverts; duplicate view pairs dropped as before; same classes and
+weights. Built: 66,694 inverted + 67,084 anchor pairs after 444 duplicates (`pool-v2-F3-p100s0`). Arms: pool2-30 and pool2-100.
+
+**Experiment 4, pool ablations at lambda 30** (pool v1 unless named): flat class weights (1,1,1,1); margin 0.02;
+margin 0.1; three anchors per inverted pair (`pool-F3-ar3`: 61,376 inverted + 185,145 anchors). The flat-weight
+pool's pairs are byte-identical to pool v1; only its manifest's class weights differ (`pool-F3-flat`).
+
+**Selection among arms.** Among arms that meet the decision rule, the recommendation is the lowest primary; ties
+within 0.1 points go to the lower lambda. Runs go up to 16 at a time on dev (each trainer peaks at about 2 GiB) and, after a per-host control, on i270 and r3800x.
