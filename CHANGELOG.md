@@ -18,6 +18,8 @@
 
 ### Added
 
+- `BakeScorer::feature_block_integrands` and `FeatureBlockIntegrands` (research, `custom-profiles` + `feature-regime-v2`): per-feature block sums of a candidate's density map, so a trainer can form the map for its own sensitivities; the `integrand_dump` example writes them with butteraugli block values (E36 experiment 3).
+
 - `zensim_mlp_train --pair-sampling walk`: the uniform draw's group sequence and random stream, with each within-reference group visiting its references round-robin and each reference's rows on a seeded bijection, so row and reference coverage stop depending on the seed (`0ee6c5ea`, E36 experiment 6). The coverage replay and `subset_sim` follow it.
 
 - Recorded `experiment5_scale` on dataset legs of a subjective authority: admission checks the manifest-derived weight times the scale, so `--mos-share` arms can rescale MOS legs (`0ee6c5ea`, E36 experiment 5).

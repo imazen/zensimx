@@ -1284,6 +1284,8 @@ use crate::source::ImageSource;
 mod bake;
 pub use bake::BakeScorer;
 #[cfg(all(feature = "custom-profiles", feature = "feature-regime-v2"))]
+pub use bake::FeatureBlockIntegrands;
+#[cfg(all(feature = "custom-profiles", feature = "feature-regime-v2"))]
 pub use bake::SteeringSession;
 
 /// Metric configuration. Methods on this struct are the primary API.

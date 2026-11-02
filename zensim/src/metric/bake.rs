@@ -1624,6 +1624,121 @@ impl<'a> BakeScorer<'a> {
             neighbour_exact,
         })
     }
+
+    /// Per-feature block integrands of this candidate's density map, for research on supervising the map
+    /// (E36 experiment 3, `benchmarks/e36_subset_test_2026-11-01.md`).
+    ///
+    /// The density [`Self::compute_with_ref_and_attribution`] serves is linear in the sensitivities it is
+    /// given: `D = sum_k s_k d_k`. For each requested feature id this returns `d_k` summed over
+    /// `block x block` source-pixel blocks (row-major, `div_ceil` grid), from one extraction and one density
+    /// pass per id, so a trainer can form `sum_k s_k(theta) d_k(B)` with its own sensitivities. Ids the map
+    /// cannot spatialize are listed in [`FeatureBlockIntegrands::unsupported`] and have no column.
+    ///
+    /// This is the frozen density only: the neighbour-exact replay (which zeroes f459-719 in the served
+    /// density and adds them back as exact deltas) and the hard-maximum refinement terms are not included.
+    /// `precomputed` and `session` follow [`Self::compute_with_ref_and_attribution`]'s contract.
+    ///
+    /// # Errors
+    /// Refuses `block == 0` and the same inputs [`Self::compute_with_ref_and_attribution`] refuses.
+    #[cfg(all(feature = "custom-profiles", feature = "feature-regime-v2"))]
+    pub fn feature_block_integrands(
+        &mut self,
+        source: &impl ImageSource,
+        precomputed: &crate::PrecomputedReference,
+        distorted: &impl ImageSource,
+        session: &mut crate::Fused944Session,
+        block: usize,
+        feature_ids: &[usize],
+    ) -> Result<FeatureBlockIntegrands, ZensimError> {
+        if block == 0 {
+            return Err(ZensimError::ModelForwardFailed {
+                reason: "integrand block must be nonzero",
+            });
+        }
+        self.check_pixel_revision()?;
+        validate_pair(source, distorted)?;
+        validate_ref_dimensions(precomputed, distorted)?;
+        validate_cached_revision(precomputed, self.plan()?.compute.formula_revision)?;
+        check_within_max_pixels(source.width(), source.height(), Some(120_000_000))?;
+        let plan = self.plan()?;
+        if precomputed.sampling != plan.compute.sampling {
+            return Err(ZensimError::ModelLoadFailed {
+                reason: "reference cache sampling contract differs from model",
+            });
+        }
+        let parallel = crate::metric::effective_parallel(self.parallel);
+        let (features, _) =
+            session.planned_features(source, precomputed, distorted, &plan, parallel, None)?;
+        let width = plan
+            .walk_width()
+            .max(features.len())
+            .max(crate::fold_engine::v1_feature_width(&config_from_params(
+                ZensimProfile::BHdr.params(),
+                parallel,
+            )));
+        let zensim = Zensim::new(ZensimProfile::BHdr).with_parallel(parallel);
+        let paint = self
+            .map_paint
+            .unwrap_or_else(crate::map_paint::MapPaint::from_env);
+        let blocks_x = source.width().div_ceil(block);
+        let blocks_y = source.height().div_ceil(block);
+        let mut out = FeatureBlockIntegrands {
+            block,
+            blocks_x,
+            blocks_y,
+            ids: Vec::new(),
+            values: Vec::new(),
+            unsupported: Vec::new(),
+        };
+        for &id in feature_ids {
+            if id >= width {
+                out.unsupported.push(id);
+                continue;
+            }
+            let mut one_hot = vec![0.0; width];
+            one_hot[id] = 1.0;
+            let (spatial, unsupported) =
+                crate::attribution::candidate_map_sensitivities(&plan, &one_hot);
+            if !unsupported.is_empty() {
+                out.unsupported.push(id);
+                continue;
+            }
+            let (_, attribution) = zensim.attribution_from_retention_binned(
+                precomputed,
+                distorted,
+                &spatial,
+                one_hot.get(156..width.min(228)).unwrap_or(&[]),
+                None,
+                None,
+                session,
+                block,
+                Some(plan.compute.formula_revision),
+                paint,
+            )?;
+            out.ids.push(id);
+            out.values.push(attribution.block_sums(block));
+        }
+        Ok(out)
+    }
+}
+
+/// Per-feature block integrands from [`BakeScorer::feature_block_integrands`].
+#[cfg(all(feature = "custom-profiles", feature = "feature-regime-v2"))]
+#[derive(Clone, Debug)]
+#[non_exhaustive]
+pub struct FeatureBlockIntegrands {
+    /// Block edge in source pixels.
+    pub block: usize,
+    /// Blocks per row (`width.div_ceil(block)`).
+    pub blocks_x: usize,
+    /// Block rows (`height.div_ceil(block)`).
+    pub blocks_y: usize,
+    /// The spatialized feature ids, in request order.
+    pub ids: Vec<usize>,
+    /// Per id in [`Self::ids`]: its integrand summed over each block, row-major.
+    pub values: Vec<Vec<f64>>,
+    /// Requested ids the map does not spatialize.
+    pub unsupported: Vec<usize>,
 }
 
 /// Feature IDs a steering session serves with a complete score and map: basic and peaks (f0-227), v2
