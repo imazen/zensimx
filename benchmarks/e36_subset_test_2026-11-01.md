@@ -160,3 +160,20 @@ pool-10 lowers the selection inversion share by 19% of the control's and holds e
 Artifacts: bakes (production-f16 and provenance-stripped) with SHA256SUMS at
 `/mnt/v/output/zensim/e36-subset-test-2026-11-01/bakes/` and `/mnt/tower/output/zensim/e36-subset-test-2026-11-01/bakes/`;
 E36 scores of all nine models `/mnt/v/zensim/e36-features/2026-11-01/scores-arms`; inversion tables `inversions-arms/`.
+
+## Amendment (2026-11-02, before any pool-30 or pool-100 run)
+
+Owner, 2026-11-02: "what about the lambda 30 exploration to find better candidates to lower median error vs human".
+pool-10 beat pool-1 and kept margin on every guard, so the lambda axis is extended upward.
+
+- **New arms:** pool-30 (lambda 30) and pool-100 (lambda 100, a bracket), seeds 0, 1 and 2, otherwise identical to
+  pool-1 and pool-10: the same pool (`pool-F3/manifest.json`, 123,127 pairs), hinge, class weights, trainer build and
+  packing.
+- **Primary, guards and decision rule:** unchanged, against the same control. Among arms that meet the decision rule,
+  the recommendation is the one with the lowest primary.
+- **Error against human ratings (reported, not used to select):** for each MOS collection among the 11 EVAL
+  collections, the median absolute residual around the panel's 4-parameter logistic fit of the model's score to the
+  human score, divided by the collection's target span (`aic_panel.geometry` arrays), plus its 90th percentile and
+  zenstats `z_rmse`; three-seed means for every arm including control, pool-1 and pool-10. The 2AFC collections
+  (fg-iqa, pieapp) have no MOS and are left out of this table. EVAL is the held-out guard set: choosing an arm by these
+  numbers would make it selection data, so they are reported alongside and do not change the recommendation.
