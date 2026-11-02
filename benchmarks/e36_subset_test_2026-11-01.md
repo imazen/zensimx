@@ -360,3 +360,27 @@ agreement with butteraugli's map (0.70 -> 0.74 at 8 px) buys at most a few tenth
 remains 2-4% behind butteraugli's own loop. The candidates cost nothing in steering, which removes the loop as an
 obstacle to adopting one. Encodes, judge tables and BD-rate tables: `/mnt/tower/output/zensim/e36-subset-test-2026-11-01/exp3a-jxl-i270/`
 (SHA256SUMS).
+
+## Experiment 5 (2026-11-02, before any run): which human MOS sources transfer to the other MOS sets?
+
+Owner, 2026-11-02: "experiment with which human mos, or pair of mos, produce the best score medians in the other
+human mos sets". Base fits from scratch (F3's `base-fit` step: `sel:45acffa603e8@h32:H128:cv16:cf98:fx2:mono:thr:mp32`,
+strict admission, packed), trainer build `d2e89524`, with the non-human legs unchanged (SafeSyn and CID22 oracle
+teachers, coverage, BAPPS, chroma teacher) and the human MOS training legs varied.
+
+- **MOS sources (11, TRAIN parts only):** the design-released human table's four sources (KADID, TID2013, KonFiG,
+  CID22-A25; split by each row's `member_set` into strict-admissible subset tables with their own pins) and the
+  dataset legs PIPAL, MDID, LIVE-MD, CID-IQ, CID-OA, IRCCyN-IVC, Colourlab.
+- **Mechanism:** a recorded copy of the frozen scripts (`~/tmp/e36test/src-exp5`, `v2_confirm_fit.py` +
+  `human_subset.py`) adds `--human-sources`, `--drop-groups` and `--mos-share`; dataset legs use the existing
+  `--exclude-datasets`. Every strict admission check still runs.
+- **Weight:** in every arm the kept MOS groups share the full recipe's total MOS train weight (36.035) equally.
+- **Stage 1 (seed 0):** control (no new option), `allsub` (all four human sources through the subset path; must equal
+  the control), `none` (no MOS group), `all-equal` (all 11 kept, equal split), and each of the 11 sources alone.
+- **Stage 2:** pairs among the five best singles (10 arms, seed 0); then the three best configurations of stages 1-2
+  at seeds 0-2.
+- **Outcome (owner's measure):** per arm, the mean over the EVAL MOS collections the arm did not train on of the
+  median absolute residual around each collection's logistic fit, over its target span (the human-error readout of
+  amendment 1); also SROCC, and the TRAIN-side human_development and cid22_development values the trainer logs.
+- **Caveat stated before results:** choosing a training mix by EVAL makes EVAL selection data for this question; a
+  final claim about a chosen mix needs a confirmation on collections no arm used (other tower IQA library sets).
