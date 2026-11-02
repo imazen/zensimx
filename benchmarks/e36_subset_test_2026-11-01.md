@@ -72,3 +72,91 @@ excludes zero and it holds every guard. Both arms are reported either way, with 
 
 After the features are extracted and checked, E36's decoded PNGs may be dropped (owner); the encoded files, metadata
 and maps stay until the owner decides on the maps.
+
+## Results (2026-11-02)
+
+Everything below follows the registration above; the deviations are listed at the end.
+
+**Data.** Run `e36-features-20261101` (zenfleet, i270 + r3800x) extracted all 8,657 jobs (820,466 decoded views of 3,074
+references below 1 MP; 20,228 views refused at or above 1 MP), every view's reference and distorted pixel hashes equal
+to E36's. Bank: `/mnt/v/zensim/e36-features/2026-11-01/bank` (f32, `features_sha256` `001480f4…`, keys `bd5e8a51…`).
+
+**Control check.** The control's three seeds with the new trainer (`zensim_mlp_train` `a1f7620f`, build of `cc2add0b`)
+reproduce F3's continuation: 60 of 60 checkpoints per seed identical apart from provenance, packed models identical after
+stripping provenance (seed 0 `e17e6175…`). Control seed 0 scores every E36 view, every gauntlet row and every gate
+exactly as F3.
+
+**Step 0.** Of 2,866,213 consensus pairs, 2,787,241 have both views scored (78,972 have a reference at or above 1 MP).
+Inversion share, `score(better) <= score(worse)`:
+
+| split | pairs | E | ECodec | F3 | F3codec |
+|---|---:|---:|---:|---:|---:|
+| fit | 2,140,564 | 4.61% | 6.43% | 2.89% | 3.84% |
+| selection | 646,677 | 5.25% | 7.06% | 3.35% | 4.47% |
+
+F3 inverts 61,769 fit pairs, so the arms ran. Per-stratum tables:
+`/mnt/v/zensim/e36-features/2026-11-01/inversions/INVERSIONS.json`.
+
+**Pool.** 61,769 inverted + 61,769 anchor pairs; 411 of them repeat another pair's two decoded views (distinct
+encodes, such as JPEG q5 and q10 of one 64 px view, decode to identical pixels) and the trainer refuses duplicates, so
+the pool keeps the first copy: 61,376 inverted + 61,751 anchor = 123,127 pairs over 186,425 views (classes 0-3: 28,307
+/ 32,054 / 28,779 / 33,987). Pool manifest: `/mnt/v/zensim/e36-features/2026-11-01/pool-F3/manifest.json`.
+
+**Primary** (40 selection sources, 646,677 pairs, mean of seeds 0-2, 10,000 source draws, seed 20261101):
+
+| arm | inversion share | seeds 0 / 1 / 2 | minus control | 95% interval |
+|---|---:|---|---:|---|
+| control | 3.358% | 3.351 / 3.367 / 3.355 | | |
+| pool-1 | 3.170% | 3.165 / 3.186 / 3.159 | **-0.188 points** | [-0.269, -0.124] |
+| pool-10 | 2.714% | 2.707 / 2.716 / 2.720 | **-0.643 points** | [-0.841, -0.484] |
+
+Every selection stratum is lower for both arms (three-seed means):
+
+| stratum | pairs | control | pool-1 | Δ | pool-10 | Δ |
+|---|---:|---:|---:|---:|---:|---:|
+| all | 646,677 | 3.36% | 3.17% | -0.19 | 2.71% | -0.64 |
+| codec=jpeg | 191,381 | 3.76% | 3.50% | -0.26 | 2.83% | -0.93 |
+| codec=jxl | 135,980 | 3.14% | 3.00% | -0.14 | 2.59% | -0.55 |
+| codec=svt | 147,586 | 2.01% | 1.83% | -0.18 | 1.53% | -0.47 |
+| codec=webp | 171,730 | 4.25% | 4.09% | -0.16 | 3.70% | -0.54 |
+| content=lineart | 146,029 | 4.34% | 3.95% | -0.40 | 3.21% | -1.14 |
+| content=mixed | 162,131 | 3.61% | 3.47% | -0.14 | 3.03% | -0.58 |
+| content=photo | 176,203 | 2.19% | 2.08% | -0.12 | 1.79% | -0.41 |
+| content=screen | 162,314 | 3.48% | 3.36% | -0.12 | 2.96% | -0.52 |
+| size_band=320-1024 | 173,210 | 1.06% | 0.99% | -0.07 | 0.79% | -0.27 |
+| size_band=80-256 | 284,008 | 2.42% | 2.26% | -0.16 | 1.91% | -0.51 |
+| size_band=<=64 | 189,459 | 6.86% | 6.52% | -0.34 | 5.68% | -1.18 |
+| q_band=0-20 | 188,339 | 4.11% | 3.95% | -0.15 | 3.48% | -0.63 |
+| q_band=22-60 | 285,388 | 3.52% | 3.30% | -0.22 | 2.84% | -0.68 |
+| q_band=62-100 | 172,950 | 2.28% | 2.11% | -0.17 | 1.67% | -0.60 |
+
+**Guards** (each against the control's three-seed mean):
+
+1. Product gates. C1-C6 pass on both grids for all nine models; identity passes at all 12 SIMD permutations for all
+   nine; NEARID N1-N3 pass for all nine (monotone ladders: control 140/140/140, pool-1 140/140/140, pool-10
+   140/139/139; bar 122 of 144); G-STEER: control 135/135/133, pool-1 135/135/134, pool-10 135/135/134 (seed 0 of
+   both arms 135/135, F3's bar). **Pass, both arms.**
+2. Held-out human collections (11 EVAL collections, three-seed mean SROCC or 2AFC): pool-1 worst collection -0.0011
+   (irccyn-ivc), mean +0.0002; pool-10 worst -0.0032 (live-md), mean +0.0010. Bars -0.01 / -0.003. **Pass, both arms.**
+3. G-TRADE (a), gauntlet views above 64 px (18,267 trade pairs, 173 sources): control 2.36%, pool-1 2.30%, pool-10
+   2.36%. Bar: control + 0.5 points. **Pass, both arms.**
+4. G-CHROMA-L (dev rows, 12,694; views of 64 px or less dropped): pool-1 MAE ratio to control 0.992-0.997 per family;
+   pool-10 0.962 (band-ac) to 1.018 (ycc420). Bar 1.05. Per-ladder Spearman 1.0 in every family for all nine models.
+   **Pass, both arms.**
+
+**Decision rule.** Both arms meet it: negative primary difference with an interval excluding zero, and every guard held.
+pool-10 lowers the selection inversion share by 19% of the control's and holds every guard with margin.
+
+**Deviations and incidents.**
+- The pool drops 411 duplicate view pairs (above); the registered rule did not anticipate distinct encodes decoding to
+  identical pixels.
+- Guard 2 ran `dataset_eval.py score` + `report` on a copy of the EVAL folder's non-image files, which is what
+  `mix-eval` does for the 11 collections (mix-eval also writes a BAPPS copy, which is not part of the guard).
+- The first G-CHROMA-L scoring of the controls used the tool's default roles (dev and calibration) and so read the
+  calibration rows once for F3 and the three controls; that output was set aside unused, and every number above is
+  from the dev rows only.
+- Training ran the six arms concurrently on one host, each pinned to one thread as the recipe requires.
+
+Artifacts: bakes (production-f16 and provenance-stripped) with SHA256SUMS at
+`/mnt/v/output/zensim/e36-subset-test-2026-11-01/bakes/` and `/mnt/tower/output/zensim/e36-subset-test-2026-11-01/bakes/`;
+E36 scores of all nine models `/mnt/v/zensim/e36-features/2026-11-01/scores-arms`; inversion tables `inversions-arms/`.
