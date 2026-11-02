@@ -232,3 +232,44 @@ pool's pairs are byte-identical to pool v1; only its manifest's class weights di
 
 **Selection among arms.** Among arms that meet the decision rule, the recommendation is the lowest primary; ties
 within 0.1 points go to the lower lambda. Runs go up to 16 at a time on dev (each trainer peaks at about 2 GiB) and, after a per-host control, on i270 and r3800x.
+
+## Amendment 2 results (2026-11-02)
+
+Trainer build `d2e89524` (zensimx 2857ca0c); its control (no pool, no level, seed 0) reproduces F3's 60 checkpoints
+after stripping provenance, so the arms below are read. Three-seed means against the same control as above.
+
+| arm | primary (selection inversions) | minus control [95%] | G-CHROMA-L worst ratio | EVAL worst / mean | G-TRADE (a) | G-STEER s0/s1/s2 | NEARID, C1-C6, identity | rule |
+|---|---:|---|---|---|---:|---|---|---|
+| p30L (lambda 30 + level) | 2.382% | -0.975 [-1.181, -0.799] | 0.998 (ycc420) | -0.0053 / +0.0032 | 2.20% | 135/134/135 | pass | **meets** |
+| p100L (lambda 100 + level) | 1.911% | -1.447 [-1.663, -1.235] | 1.028 (ycc444) | -0.0053 / +0.0073 | 1.91% | 134/133/134 | pass | G-STEER |
+| p2-30 (pool v2, lambda 30) | 2.375% | -0.983 [-1.183, -0.804] | 1.025 (ycc420) | -0.0086 / +0.0022 | 2.14% | 135/135/135 | pass | **meets** |
+| p2-100 (pool v2, lambda 100) | 1.888% | -1.470 [-1.674, -1.264] | **1.078** (band-ac) | **-0.0206** / +0.0038 | 1.84% | 134/133/135 | pass | 3 guards |
+| p30-flat | 2.383% | -0.975 [-1.177, -0.795] | **1.054** (ycc420) | -0.0055 / +0.0026 | 2.32% | 132/134/134 | pass | 2 guards |
+| p30-m002 (margin 0.02) | 2.358% | -1.000 [-1.203, -0.818] | **1.051** (ycc420) | -0.0059 / +0.0030 | 2.23% | 132/134/134 | pass | 2 guards |
+| p30-m01 (margin 0.1) | 2.339% | -1.019 [-1.221, -0.836] | **1.051** (ycc420) | -0.0049 / +0.0031 | 2.24% | 131/135/132 | pass | 2 guards |
+| p30-ar3 (3 anchors per inversion) | 2.588% | -0.770 [-0.977, -0.599] | 1.027 (ycc420) | -0.0049 / +0.0015 | 2.35% | 135/134/135 | pass | **meets** |
+
+Control: 3.358% primary, G-TRADE 2.36%, G-STEER 135/135/133. EVAL worst is the most negative collection difference
+(irccyn-ivc for every arm); bars -0.01 / -0.003. G-STEER failures: the lambda-100 arms fail I21_10_05 on m3f
+(0.674-0.698, bar 0.70) with or without the level term; the lambda-30 ablations fail m2 (local linearity) on
+broad-38/97/143 at 32 and 64 px blocks.
+
+Error against human ratings (median / p90 absolute logistic-fit residual over the target span, mean of the 9 MOS
+collections, three-seed means; reported, not used to select): control 8.55% / 21.87%; p30L 8.39% / 21.48%;
+p100L 8.13% / 21.14%; p2-30 8.44% / 21.55%; p2-100 8.17% / 21.29%; p30-flat 8.36% / 21.47%; p30-m002 8.36% /
+21.45%; p30-m01 8.36% / 21.43%; p30-ar3 8.41% / 21.66%.
+
+**Readings.** The level term does what it was registered to do: at lambda 30 it brings G-CHROMA-L's ycc420 ratio from
+1.051 (pool-30) to 0.998 at a primary cost of 0.034 points, and it holds every guard. It does not rescue lambda 100's
+G-STEER case. Refreshing the pool (p2-30) gives the same primary as pool-30 with a clean G-STEER on all seeds; at
+lambda 100 it costs held-out human ratings (irccyn-ivc -0.021). Class weights and margin are not what limits lambda
+30: flat weights and both margins land within 0.05 points of pool-30 and keep its ycc420 failure. Three anchors per
+inversion trade primary (-0.77) for chroma margin.
+
+**Selection under the registered rule.** p30L, p2-30 and p30-ar3 meet the rule (with pool-1 and pool-10). The lowest
+primary is p2-30 (2.375%) by 0.007 points over p30L (2.382%); the tie rule (lower lambda within 0.1 points) does not
+separate them. The registered recommendation is therefore p2-30; p30L is within its interval and better on chroma
+level, EVAL worst and error against human ratings.
+
+Process: 25 runs in three waves of 7-9 on dev (about 15 min each); measurement chain 68 min, of which G-STEER (24
+models one after another, 27 shards each) took 44 min.
