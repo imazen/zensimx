@@ -15,7 +15,7 @@ use std::{
 };
 use zensim_validate::{
     derived_inputs::Fx1Declaration,
-    mlp_train::{CompactRows, TvRegularizer},
+    mlp_train::{CompactRows, LevelPool, TvRegularizer},
     train_manifest::sha256_file,
 };
 
@@ -38,7 +38,9 @@ struct Manifest {
     class_weights: Vec<f64>,
     feature_rows: usize,
     pair_rows: usize,
+    // Parsed so deny_unknown_fields accepts it; the receipt records it by re-reading the manifest.
     #[serde(default)]
+    #[allow(dead_code)]
     provenance: serde_json::Value,
 }
 
@@ -73,39 +75,17 @@ fn reader(
     b.with_batch_size(1024).build().map_err(|e| e.to_string())
 }
 
-/// Load and derive the pool. `weight`, `apply_every`, `batch` and `margin` are the run's `--tv-*` values.
-pub(super) fn load(
+/// The `row_idx, features` rows of a pool parquet, derived and widened exactly as training rows are.
+fn read_rows(
     path: &Path,
-    derived_path: &Path,
+    feature_ids: &[usize],
+    rows: usize,
+    derived: &Fx1Declaration,
     raw_width: usize,
-    weight: f64,
-    apply_every: usize,
-    batch: usize,
-    margin: f64,
-) -> Result<TvRegularizer, String> {
-    let m: Manifest = serde_json::from_slice(&std::fs::read(path).map_err(|e| e.to_string())?)
-        .map_err(|e| e.to_string())?;
-    if m.schema != "tv-pool-v1" {
-        return Err("tv pool manifest schema must be tv-pool-v1".into());
-    }
-    bound(&m.features)?;
-    bound(&m.pairs)?;
-    if m.class_weights.is_empty()
-        || m.class_weights.len() > 4
-        || m.class_weights.iter().any(|w| !w.is_finite() || *w <= 0.0)
-    {
-        return Err("tv pool class weights: one to four finite positive values".into());
-    }
-    if !(weight > 0.0 && apply_every > 0 && batch > 0 && margin.is_finite() && margin >= 0.0) {
-        return Err("--tv-pool needs --tv-weight > 0, --tv-apply-every > 0, --tv-batch > 0, --tv-margin >= 0".into());
-    }
-    let (derived, _) = Fx1Declaration::load(derived_path)?;
-    if m.feature_ids != derived.load_ids() {
-        return Err("tv pool feature ids differ from the --derived-inputs read set".into());
-    }
-    let kept: Vec<u32> = m.feature_ids.iter().map(|&x| x as u32).collect();
-    let mut features = Vec::with_capacity(m.feature_rows);
-    for batch in reader(&m.features.path, &["row_idx", "features"])? {
+) -> Result<Vec<Vec<f64>>, String> {
+    let kept: Vec<u32> = feature_ids.iter().map(|&x| x as u32).collect();
+    let mut features = Vec::with_capacity(rows);
+    for batch in reader(path, &["row_idx", "features"])? {
         let b = batch.map_err(|e| e.to_string())?;
         if b.columns().iter().any(|a| a.null_count() != 0) {
             return Err("tv pool null feature column".into());
@@ -154,6 +134,40 @@ pub(super) fn load(
             features.push(compact.data.iter().map(|&x| f64::from(x)).collect());
         }
     }
+    Ok(features)
+}
+
+/// Load and derive the pool. `weight`, `apply_every`, `batch` and `margin` are the run's `--tv-*` values.
+pub(super) fn load(
+    path: &Path,
+    derived_path: &Path,
+    raw_width: usize,
+    weight: f64,
+    apply_every: usize,
+    batch: usize,
+    margin: f64,
+) -> Result<TvRegularizer, String> {
+    let m: Manifest = serde_json::from_slice(&std::fs::read(path).map_err(|e| e.to_string())?)
+        .map_err(|e| e.to_string())?;
+    if m.schema != "tv-pool-v1" {
+        return Err("tv pool manifest schema must be tv-pool-v1".into());
+    }
+    bound(&m.features)?;
+    bound(&m.pairs)?;
+    if m.class_weights.is_empty()
+        || m.class_weights.len() > 4
+        || m.class_weights.iter().any(|w| !w.is_finite() || *w <= 0.0)
+    {
+        return Err("tv pool class weights: one to four finite positive values".into());
+    }
+    if !(weight > 0.0 && apply_every > 0 && batch > 0 && margin.is_finite() && margin >= 0.0) {
+        return Err("--tv-pool needs --tv-weight > 0, --tv-apply-every > 0, --tv-batch > 0, --tv-margin >= 0".into());
+    }
+    let (derived, _) = Fx1Declaration::load(derived_path)?;
+    if m.feature_ids != derived.load_ids() {
+        return Err("tv pool feature ids differ from the --derived-inputs read set".into());
+    }
+    let features = read_rows(&m.features.path, &m.feature_ids, m.feature_rows, &derived, raw_width)?;
     let mut pairs = Vec::with_capacity(m.pair_rows);
     let mut classes = Vec::with_capacity(m.pair_rows);
     let mut seen = HashSet::new();
@@ -206,6 +220,7 @@ pub(super) fn load(
         band_weights: Some(band_weights),
         margin,
         pool: true,
+        level: None,
     })
 }
 
@@ -224,4 +239,60 @@ pub(super) fn receipt(
         "class_weights":pool.band_weights,"feature_rows":pool.features.len(),"pairs":pool.pairs.len(),
         "tv_rng_seed":sample_seed^0xe360_7476_726e_6700_u64,
         "hinge":"max(0, ladder_sign*(raw(better)-raw(worse)) + margin), scaled lambda*class_weight/(batch*mean class weight)"}))
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct LevelManifest {
+    schema: String,
+    features: Bound,
+    /// Raw feature ids of each row's values, in order: the declaration's read set.
+    feature_ids: Vec<usize>,
+    feature_rows: usize,
+    // Parsed so deny_unknown_fields accepts it; the receipt records it by re-reading the manifest.
+    #[serde(default)]
+    #[allow(dead_code)]
+    provenance: serde_json::Value,
+}
+
+/// Load the `--level-pool` rows and the reference checkpoint bytes.
+pub(super) fn load_level(
+    path: &Path,
+    derived_path: &Path,
+    raw_width: usize,
+    reference: &Path,
+    weight: f64,
+    batch: usize,
+) -> Result<LevelPool, String> {
+    let m: LevelManifest = serde_json::from_slice(&std::fs::read(path).map_err(|e| e.to_string())?)
+        .map_err(|e| e.to_string())?;
+    if m.schema != "level-pool-v1" {
+        return Err("level pool manifest schema must be level-pool-v1".into());
+    }
+    if !(weight > 0.0 && weight.is_finite() && batch > 0) {
+        return Err("--level-pool needs --level-weight > 0 and --level-batch > 0".into());
+    }
+    bound(&m.features)?;
+    let (derived, _) = Fx1Declaration::load(derived_path)?;
+    if m.feature_ids != derived.load_ids() {
+        return Err("level pool feature ids differ from the --derived-inputs read set".into());
+    }
+    let features = read_rows(&m.features.path, &m.feature_ids, m.feature_rows, &derived, raw_width)?;
+    if features.len() != m.feature_rows || features.is_empty() {
+        return Err("level pool row count differs from the manifest".into());
+    }
+    let reference = std::fs::read(reference).map_err(|e| format!("{}: {e}", reference.display()))?;
+    Ok(LevelPool { features, reference, weight, batch })
+}
+
+/// What `zentrain.repro` records about the level pool.
+pub(super) fn level_receipt(path: &Path, reference: &Path, level: &LevelPool) -> Result<serde_json::Value, String> {
+    let manifest: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(path).map_err(|e| e.to_string())?)
+            .map_err(|e| e.to_string())?;
+    Ok(serde_json::json!({"schema":"level-pool-effective-v1",
+        "manifest_sha256":sha256_file(path).map_err(|e|e.to_string())?,"manifest":manifest,
+        "reference":reference.display().to_string(),"reference_sha256":sha256_file(reference).map_err(|e|e.to_string())?,
+        "weight":level.weight,"batch":level.batch,"rows":level.features.len(),
+        "loss":"weight*mean((raw-raw_reference)^2) over batch rows drawn on the tv pool's RNG stream at each scheduled pool step"}))
 }

@@ -531,6 +531,7 @@ pub(super) fn load(
         band_weights: Some([2., 1., 0., 0.]),
         margin: 0.05,
         pool: true,
+        level: None,
     })
 }
 

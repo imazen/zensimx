@@ -1,7 +1,7 @@
 //! External feature-pool hinge: the private E36 protocol and, in public builds, `--tv-pool`.
 //! No optimizer calls: scheduled gradients join the existing primary Adam boundary. The E36 build
 //! asserts its registered constants; a public build takes them from the pool's configuration.
-use super::{AdamState, MlpHyperparams, SplitMix64, TvRegularizer, smooth_hinge};
+use super::{AdamState, LevelPool, MlpHyperparams, SplitMix64, TvRegularizer, smooth_hinge};
 
 pub(super) struct Pool<'a> {
     config: &'a TvRegularizer,
@@ -9,6 +9,8 @@ pub(super) struct Pool<'a> {
     columns: Vec<usize>,
     mean: Vec<f64>,
     scale: Vec<f64>,
+    /// `--level-pool` targets: the reference checkpoint's raw output on each level row, computed on first use.
+    level_targets: std::cell::OnceCell<Vec<f64>>,
 }
 
 impl<'a> Pool<'a> {
@@ -57,6 +59,7 @@ impl<'a> Pool<'a> {
             columns,
             mean: Vec::new(),
             scale: Vec::new(),
+            level_targets: std::cell::OnceCell::new(),
         }
     }
 
@@ -166,6 +169,91 @@ impl<'a> Pool<'a> {
                 }
             }
         }
+        if let Some(level) = &self.config.level {
+            loss += self.accumulate_level(level, rng, w1, b1, w2, b2, adam, nf, nh, h);
+        }
+        loss
+    }
+
+    /// The reference checkpoint's raw output on every level row, each row standardized with the reference's own
+    /// scaler exactly as that model saw its inputs.
+    fn level_reference_targets(&self, level: &LevelPool, nf: usize, nh: usize, h: &MlpHyperparams) -> Vec<f64> {
+        let keep = super::input_keep_mask();
+        let r = super::warm_start::InitialWeights::load(&level.reference, nf, h, keep.as_deref())
+            .unwrap_or_else(|e| panic!("--level-pool reference: {e}"));
+        assert_eq!(r.b1.len(), nh, "--level-pool reference hidden width");
+        let mut x = vec![0.0; nf];
+        level
+            .features
+            .iter()
+            .map(|row| {
+                for (k, &c) in self.columns.iter().enumerate() {
+                    x[c] = (row[k] - r.scaler_mean[c]) / r.scaler_scale[c].max(1e-12);
+                    assert!(x[c].is_finite());
+                }
+                let (y, ..) = smooth_hinge::forward_pair(
+                    &x, &x, &r.w1, &r.b1, &r.w2, &r.b2, nf, nh, h.leaky_alpha, h.smooth_hinge,
+                );
+                assert!(y.is_finite());
+                y
+            })
+            .collect()
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn accumulate_level(
+        &self,
+        level: &LevelPool,
+        rng: &mut SplitMix64,
+        w1: &[f64],
+        b1: &[f64],
+        w2: &[f64],
+        b2: &[f64],
+        adam: &mut AdamState,
+        nf: usize,
+        nh: usize,
+        h: &MlpHyperparams,
+    ) -> f64 {
+        let targets = self
+            .level_targets
+            .get_or_init(|| self.level_reference_targets(level, nf, nh, h));
+        let n = level.features.len() as u64;
+        let limit = u64::MAX - (u64::MAX % n);
+        let scale = level.weight / level.batch as f64;
+        let mut x = vec![0.0; nf];
+        let mut loss = 0.0;
+        for _ in 0..level.batch {
+            let draw = loop {
+                let v = rng.next_u64();
+                if v < limit {
+                    break v;
+                }
+            };
+            let i = (draw % n) as usize;
+            for (k, &c) in self.columns.iter().enumerate() {
+                x[c] = (level.features[i][k] - self.mean[k]) / self.scale[k];
+            }
+            let (y, pre, hid, ..) =
+                smooth_hinge::forward_pair(&x, &x, w1, b1, w2, b2, nf, nh, h.leaky_alpha, h.smooth_hinge);
+            let r = y - targets[i];
+            loss += scale * r * r;
+            smooth_hinge::backprop_step(
+                &x,
+                &pre,
+                &hid,
+                2.0 * scale * r,
+                w1,
+                &mut adam.gw1,
+                &mut adam.gb1,
+                w2,
+                &mut adam.gw2,
+                &mut adam.gb2,
+                nf,
+                nh,
+                h.leaky_alpha,
+                h.smooth_hinge,
+            );
+        }
         loss
     }
 }
@@ -173,6 +261,77 @@ impl<'a> Pool<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn level_pool_gradient_matches_finite_difference() {
+        // Invented rows and targets; the reference checkpoint is replaced by preset targets.
+        let previous = super::super::INPUT_KEEP_MASK
+            .lock()
+            .unwrap()
+            .replace(vec![true, false, true]);
+        let h = MlpHyperparams {
+            nonneg_distance: true,
+            minibatch_size: 1,
+            n_hidden: 4,
+            ..Default::default()
+        };
+        let config = |weight: f64, level_weight: f64| TvRegularizer {
+            pairs: vec![(0, 1), (0, 2)],
+            features: vec![vec![0.2, 0.4], vec![0.3, 0.7], vec![0.6, 0.1]],
+            weight,
+            apply_every: 50,
+            batch: 8,
+            band_id: Some(vec![0, 1]),
+            band_weights: Some([2., 1., 0., 0.]),
+            margin: 0.05,
+            pool: true,
+            level: Some(LevelPool {
+                features: vec![vec![0.5, 0.2], vec![0.1, 0.9], vec![0.7, 0.4], vec![0.3, 0.3]],
+                reference: Vec::new(),
+                weight: level_weight,
+                batch: 16,
+            }),
+        };
+        let mut w1: Vec<f64> = (0..12).map(|i| 0.05 + 0.03 * i as f64).collect();
+        let mut b1 = vec![0.1, -0.2, 0.05, 0.0];
+        let mut w2 = vec![-0.3, -0.1, -0.2, -0.05];
+        let mut b2 = vec![0.4];
+        let evaluate = |w1: &[f64], b1: &[f64], w2: &[f64], b2: &[f64], lw: f64| {
+            let c = config(0.5, lw);
+            let mut p = Pool::new(&c, &h);
+            p.bind_scaler(&[0.1, 9., 0.2], &[2., 7., 4.]);
+            p.level_targets.set(vec![0.2, -0.1, 0.35, 0.0]).unwrap();
+            let mut a = AdamState::new(12, 4, 4, 1);
+            let mut r = SplitMix64::new(36);
+            let loss = p.accumulate(&mut r, w1, b1, w2, b2, &mut a, 3, 4, &h, 1.);
+            assert_eq!(a.t, 0, "gradient admission must never call Adam");
+            (loss, [a.gw1, a.gb1, a.gw2, a.gb2].concat())
+        };
+        let (l1, g1) = evaluate(&w1, &b1, &w2, &b2, 1.);
+        let (l0, g0) = evaluate(&w1, &b1, &w2, &b2, 1e-300);
+        assert!(l1 > l0, "the level term adds loss");
+        assert!(g1.iter().zip(&g0).any(|(a, b)| a != b), "the level term adds gradient");
+        let n = w1.len() + b1.len() + w2.len() + b2.len();
+        fn nudge(j: usize, delta: f64, slices: [&mut Vec<f64>; 4]) {
+            let mut k = j;
+            for slice in slices {
+                if k < slice.len() {
+                    slice[k] += delta;
+                    return;
+                }
+                k -= slice.len();
+            }
+        }
+        for j in 0..n {
+            nudge(j, 1e-6, [&mut w1, &mut b1, &mut w2, &mut b2]);
+            let (lp, _) = evaluate(&w1, &b1, &w2, &b2, 1.);
+            nudge(j, -2e-6, [&mut w1, &mut b1, &mut w2, &mut b2]);
+            let (lm, _) = evaluate(&w1, &b1, &w2, &b2, 1.);
+            nudge(j, 1e-6, [&mut w1, &mut b1, &mut w2, &mut b2]);
+            assert!(((lp - lm) / 2e-6 - g1[j]).abs() < 1e-8, "parameter {j}: fd {} vs {}", (lp - lm) / 2e-6, g1[j]);
+        }
+        *super::super::INPUT_KEEP_MASK.lock().unwrap() = previous;
+    }
+
     #[test]
     fn e36_preupdate_gradient_objective_and_inactive_control() {
         // Invented feature vectors only. No training group, optimizer call,
@@ -197,6 +356,7 @@ mod tests {
             band_weights: Some([2., 1., 0., 0.]),
             margin: 0.05,
             pool: true,
+            level: None,
         };
         let c = config(1.);
         let mut pool = Pool::new(&c, &h);

@@ -411,6 +411,24 @@ struct Args {
     #[arg(long, conflicts_with_all = ["tv_pairs_file", "e36_tv_manifest"], requires = "derived_inputs")]
     tv_pool: Option<PathBuf>,
 
+    /// Level anchor beside `--tv-pool` (manifest schema `level-pool-v1`: a features parquet `row_idx, features` of
+    /// the --derived-inputs read set). Each scheduled pool step also draws --level-batch rows on the pool's RNG stream
+    /// and adds `--level-weight * mean((raw - target)^2)`, target = `--level-ref`'s raw output on the row.
+    #[arg(long, requires_all = ["tv_pool", "level_ref"])]
+    level_pool: Option<PathBuf>,
+
+    /// Reference checkpoint (same architecture) whose raw outputs are the `--level-pool` targets.
+    #[arg(long, requires = "level_pool")]
+    level_ref: Option<PathBuf>,
+
+    /// `--level-pool` loss weight.
+    #[arg(long, default_value_t = 1.0)]
+    level_weight: f64,
+
+    /// `--level-pool` rows per scheduled pool step.
+    #[arg(long, default_value_t = 32)]
+    level_batch: usize,
+
     /// Private E36 versioned external feature pool; requires E36_TV_PROTOCOL=1 build.
     #[arg(long, conflicts_with = "tv_pairs_file", requires_all = ["derived_inputs", "e36_tv_contract", "e36_tv_contract_sha256"])]
     e36_tv_manifest: Option<PathBuf>,
@@ -4451,6 +4469,7 @@ fn main() {
             band_weights,
             margin: args.tv_margin,
             pool: false,
+            level: None,
         })
     } else if let Some(path) = &args.tv_pool {
         assert!(
@@ -4470,6 +4489,29 @@ fn main() {
             eprintln!("--tv-pool: {e}");
             std::process::exit(2)
         });
+        let mut pool = pool;
+        if let Some(level_path) = &args.level_pool {
+            let level = tv_pool::load_level(
+                level_path,
+                args.derived_inputs.as_ref().unwrap(),
+                args.max_features,
+                args.level_ref.as_ref().unwrap(),
+                args.level_weight,
+                args.level_batch,
+            )
+            .unwrap_or_else(|e| {
+                eprintln!("--level-pool: {e}");
+                std::process::exit(2)
+            });
+            println!(
+                "Loaded level pool {level_path:?}: {} rows (weight {}, batch {}, reference {:?})",
+                level.features.len(),
+                level.weight,
+                level.batch,
+                args.level_ref.as_ref().unwrap(),
+            );
+            pool.level = Some(level);
+        }
         println!(
             "Loaded TV pool {path:?}: {} rows, {} pairs (weight {}, every {}, batch {}, margin {}, class weights {:?})",
             pool.features.len(),
@@ -5399,6 +5441,13 @@ fn main() {
                 hyperparams.sample_seed.unwrap_or(hyperparams.seed),
             )
             .expect("tv pool reproduction receipt");
+            if let (Some(level_path), Some(level)) =
+                (&args.level_pool, tv_regularizer.as_ref().and_then(|t| t.level.as_ref()))
+            {
+                record["level_pool"] =
+                    tv_pool::level_receipt(level_path, args.level_ref.as_ref().unwrap(), level)
+                        .expect("level pool reproduction receipt");
+            }
         }
         if let Some(e36) = e36_repro {
             record["e36_tv"] = e36;

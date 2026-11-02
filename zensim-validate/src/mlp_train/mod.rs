@@ -2906,6 +2906,19 @@ pub struct TvRegularizer {
     /// `features` is an external pool in derived-input space (the E36 pool or `--tv-pool`), trained by
     /// `e36_tv::Pool` on its own RNG stream, instead of rows of the training groups.
     pub pool: bool,
+    /// `--level-pool`: rows whose raw output is held near a reference checkpoint's (pool runs only).
+    pub level: Option<LevelPool>,
+}
+
+/// A level anchor beside the external pool's hinge: `features` are rows in the pool's derived-input space;
+/// `reference` is a checkpoint of the same architecture whose raw output on each row is the target. Every
+/// scheduled pool step also draws `batch` rows on the pool's RNG stream and adds
+/// `weight * mean((raw - target)^2)` to that step's gradient.
+pub struct LevelPool {
+    pub features: Vec<Vec<f64>>,
+    pub reference: Vec<u8>,
+    pub weight: f64,
+    pub batch: usize,
 }
 
 impl TvRegularizer {
