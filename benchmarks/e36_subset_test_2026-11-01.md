@@ -481,3 +481,10 @@ density (max block error under 1e-4 of the largest block).
 **Caveats stated before results.** The map term supervises the frozen density. The served revision-7 map replaces
 the coarse v2 pools (f459-719) with exact neighbour deltas, so the loop can differ from what the term fits.
 Butteraugli is a model of human vision, not a human rating.
+
+### Experiment 3 amendment (2026-11-02, at the first map-term batch)
+
+The map arms first started with `--map-sign -1`. Their first batch logged `1 - pearson` 1.684, a map running
+opposite to butteraugli, and they were stopped at epoch 0 before any checkpoint. They rerun with `--map-sign 1`,
+which is now the default. `p30L-mapbuild` (no map term) runs on the same build and must reproduce amendment 2's
+p30L seed 0.

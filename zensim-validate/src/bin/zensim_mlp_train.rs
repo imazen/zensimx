@@ -450,8 +450,9 @@ struct Args {
     #[arg(long, default_value_t = 8)]
     map_batch: usize,
 
-    /// `--map-pool` sign: +1 when the raw output runs with the score, -1 for a distance-shaped output.
-    #[arg(long, default_value_t = -1.0, allow_hyphen_values = true)]
+    /// `--map-pool` sign applied to `sum_k dy/df_k I_k`. +1 for the E36 recipe: with -1, F3's first batch measured
+    /// 1 - pearson 1.684 (the map ran opposite to butteraugli); check the startup line for any other recipe.
+    #[arg(long, default_value_t = 1.0, allow_hyphen_values = true)]
     map_sign: f64,
 
     /// Private E36 versioned external feature pool; requires E36_TV_PROTOCOL=1 build.

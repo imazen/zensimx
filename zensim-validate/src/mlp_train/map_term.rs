@@ -46,7 +46,8 @@ pub struct MapPool {
     pub read_width: usize,
     pub weight: f64,
     pub batch: usize,
-    /// `+1` or `-1`: the served map is `dscore/df`, and a distance-shaped raw output runs opposite to the score.
+    /// `+1` or `-1`, chosen so the map runs with its target; `+1` for the E36 recipe (the startup line logs the
+    /// first batch's `1 - pearson`, which sits above 1 when the sign is wrong).
     pub sign: f64,
 }
 
