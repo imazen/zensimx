@@ -273,3 +273,15 @@ level, EVAL worst and error against human ratings.
 
 Process: 25 runs in three waves of 7-9 on dev (about 15 min each); measurement chain 68 min, of which G-STEER (24
 models one after another, 27 shards each) took 44 min.
+
+## Amendment 3 (2026-11-02, before any of these arms runs): combination and the lambda boundary
+
+Amendment 2 left two questions: whether pool v2 and the level term combine, and where between lambda 30 and 100
+G-STEER's I21_10_05 case breaks with the level term. Same build (`d2e89524`, its control reproduced F3), recipe,
+control, primary, guards, decision rule and selection rule as amendment 2.
+
+| arm | pool | lambda | level term |
+|---|---|---:|---|
+| p2-30L | pool v2 (`pool-v2-F3-p100s0`) | 30 | as p30L |
+| p2-50L | pool v2 | 50 | as p30L |
+| p50L | pool v1 (`pool-F3`) | 50 | as p30L |
