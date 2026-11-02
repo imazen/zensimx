@@ -337,3 +337,26 @@ Amended: every compared arm is encoded on i270 in a fresh RD directory (`none`, 
 `F3lintail`, `p30Llintail`, `p230lintail`) and judged there with the same judge build; the control is "the new build
 reproduces the original build's B arm on the same host" (702 of 702, measured above). Statistic, placements and
 reading unchanged. No arm had been judged when this was written.
+
+### Experiment 3a results (2026-11-02, i270)
+
+Control passed: the new build's B arm equals the original study build's B arm on i270 in 702 of 702 encodes. All
+seven arms encoded and judged on i270 (78 TRAIN images, effort 7, 4 iterations, 9 distances; judge build
+`zenmetrics-judge-7a0f8394`). BD-rate, % fewer bytes (positive = the arm saves bytes), 95% bootstrap over images.
+
+| arm vs F3 | all: SSIMULACRA2 | all: CVVDP | photo: SSIMULACRA2 | photo: CVVDP | screen: SSIMULACRA2 / CVVDP |
+|---|---|---|---|---|---|
+| p30L | +0.03 [-0.17, +0.22] | +0.12 [-0.16, +0.38] | +0.10 [-0.02, +0.23] | **+0.17 [+0.05, +0.30]** | +0.37 / +0.17 (both across 0) |
+| p2-30 | +0.11 [-0.11, +0.33] | +0.37 [-0.07, +0.81] | **+0.19 [+0.03, +0.37]** | **+0.26 [+0.15, +0.40]** | +0.48 / +0.95 (both across 0) |
+| M7 (reference) | +0.15 [-0.16, +0.47] | +0.12 [-0.45, +0.67] | +0.58 / +0.56 (both above 0) | | -0.30 / -0.77 |
+| butteraugli loop | +2.22 [+1.48, +3.05] | +4.08 [+3.31, +5.00] | +1.34 / +3.68 | | +5.12 / +6.77 |
+
+Against the butteraugli loop every zensim map costs bytes over all images: F3 -2.42% (SSIMULACRA2) / -4.44% (CVVDP),
+p30L -2.39 / -4.34, p2-30 -2.34 / -4.10, M7 -2.32 / -4.32 (B, bulk placement: -3.32 / -5.53).
+
+**Reading (the registered rule).** Neither p30L nor p2-30 steers JPEG XL better than F3 over all images: both are
+ties. On photos p2-30 is better under both judges (+0.19% / +0.26%), p30L under CVVDP only. The hinge arms' higher
+agreement with butteraugli's map (0.70 -> 0.74 at 8 px) buys at most a few tenths of a percent, and every zensim map
+remains 2-4% behind butteraugli's own loop. The candidates cost nothing in steering, which removes the loop as an
+obstacle to adopting one. Encodes, judge tables and BD-rate tables: `/mnt/tower/output/zensim/e36-subset-test-2026-11-01/exp3a-jxl-i270/`
+(SHA256SUMS).
