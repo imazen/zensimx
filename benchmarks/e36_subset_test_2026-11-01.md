@@ -177,3 +177,28 @@ pool-10 beat pool-1 and kept margin on every guard, so the lambda axis is extend
   zenstats `z_rmse`; three-seed means for every arm including control, pool-1 and pool-10. The 2AFC collections
   (fg-iqa, pieapp) have no MOS and are left out of this table. EVAL is the held-out guard set: choosing an arm by these
   numbers would make it selection data, so they are reported alongside and do not change the recommendation.
+
+## Amendment results (2026-11-02): pool-30 and pool-100
+
+Same measurements as above, all five arms side by side (three-seed means; the control is unchanged).
+
+| | control | pool-1 | pool-10 | pool-30 | pool-100 |
+|---|---:|---:|---:|---:|---:|
+| **Primary**: selection inversion share | 3.358% | 3.170% | 2.714% | 2.349% | 1.896% |
+| minus control [95% interval, 40 sources] | | -0.188 [-0.269, -0.124] | -0.643 [-0.841, -0.484] | -1.009 [-1.211, -0.827] | -1.462 [-1.680, -1.252] |
+| G1 C1-C6 (both grids), identity, NEARID | pass | pass | pass | pass | pass |
+| G1 NEARID monotone ladders (s0/s1/s2) | 140/140/140 | 140/140/140 | 140/139/139 | 139/139/139 | 140/139/139 |
+| G1 G-STEER of 135 (s0/s1/s2) | 135/135/133 | 135/135/134 | 135/135/134 | **133/133/134** | **134/134/134** |
+| G2 EVAL worst collection vs control | | -0.0011 | -0.0032 | -0.0059 | -0.0070 |
+| G2 EVAL mean vs control | | +0.0002 | +0.0010 | +0.0030 | +0.0064 |
+| G3 G-TRADE (a) >64 px | 2.36% | 2.30% | 2.36% | 2.24% | 1.93% |
+| G4 G-CHROMA-L worst MAE ratio (family) | | 0.997 | 1.018 (ycc420) | **1.0508 (ycc420)** | **1.0514 (ycc420)** |
+| Error vs human, median / p90 (mean of 9 MOS collections) | 8.55% / 21.87% | 8.52% / 21.82% | 8.41% / 21.70% | 8.35% / 21.45% | 8.16% / 21.15% |
+
+G-STEER's failing cases differ by seed (pool-30: broad-38-b64 and broad-143-b64 / broad-38-b32 and broad-38-b64 /
+broad-97-b64; pool-100: I21_10_05 / I21_10_05 / broad-17-b64; control seed 2: broad-97-b64 and dog-256-50).
+
+**Decision rule.** pool-30 and pool-100 do not meet it: G-CHROMA-L's ycc420 MAE is 5.08% and 5.14% above the
+control's (bar 5%), and G-STEER is below F3's 135/135 on seed 0 and below the control's three-seed mean (134.33)
+for both. pool-10 remains the arm that meets every registered condition. Error against human ratings falls
+monotonically with lambda (reported, not used to select).
