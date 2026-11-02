@@ -488,3 +488,46 @@ The map arms first started with `--map-sign -1`. Their first batch logged `1 - p
 opposite to butteraugli, and they were stopped at epoch 0 before any checkpoint. They rerun with `--map-sign 1`,
 which is now the default. `p30L-mapbuild` (no map term) runs on the same build and must reproduce amendment 2's
 p30L seed 0.
+
+## Experiment 5 stage 1 and experiment 6 seed 0: results (2026-11-02)
+
+Base fits at seed 0, scored on EVAL's nine MOS collections (error = median absolute residual around each
+collection's logistic fit, over the target span, averaged over collections). "Held-out" averages over the
+collections the arm did not train on, so its set differs by arm; the three collections no arm trains on (IQA-ODI,
+NITS-IQA, VCL-FER) are the common comparison. Readout `scripts/byconstruction/e36_exp56/readout.py`.
+
+| arm (seed 0) | held-out sets | held-out median | 3 shared sets: median / SROCC | all 9 median |
+|---|---:|---:|---:|---:|
+| tid2013 | 9 | 8.33% | 8.27% / 0.853 | 8.33% |
+| pipal | 9 | 8.33% | 8.97% / 0.827 | 8.33% |
+| cid-iq | 8 | 8.45% | 8.21% / 0.856 | 8.42% |
+| mdid | 8 | 8.46% | 8.45% / 0.847 | 8.21% |
+| kadid | 9 | 8.51% | 9.08% / 0.829 | 8.51% |
+| konfig | 9 | 8.65% | 8.71% / 0.836 | 8.65% |
+| cid-oa | 8 | 8.70% | 8.29% / 0.855 | 8.69% |
+| live-md | 8 | 8.72% | 8.17% / 0.864 | 8.57% |
+| x6-prune-g5 | 3 | 8.77% | 8.77% / 0.836 | 8.33% |
+| cid22_a25 | 9 | 8.78% | 8.33% / 0.859 | 8.78% |
+| all-equal | 3 | 8.80% | 8.80% / 0.836 | 8.35% |
+| control | 3 | 8.81% | 8.81% / 0.834 | 8.38% |
+| allsub | 3 | 8.81% | 8.81% / 0.834 | 8.38% |
+| x6-control-wb | 3 | 8.81% | 8.81% / 0.834 | 8.38% |
+| none | 9 | 8.85% | 8.42% / 0.856 | 8.85% |
+| x6-prune-r10 | 3 | 8.86% | 8.86% / 0.835 | 8.35% |
+| x6-prune-g10 | 3 | 8.87% | 8.87% / 0.837 | 8.38% |
+| x6-prune-s10 | 3 | 8.93% | 8.93% / 0.833 | 8.43% |
+| colourlab | 8 | 9.27% | 9.90% / 0.803 | 9.38% |
+| irccyn-ivc | 8 | 9.53% | 8.63% / 0.857 | 9.17% |
+
+- `allsub` (all four human sources through the subset path) reproduces the control's scores exactly, and `control-wb`
+  (the walk build in uniform mode) reproduces the control's checkpoints bit-exactly (2/2).
+- **Every single MOS source beats the full mix on the collections it did not train on** except IRCCyN-IVC and
+  Colourlab. TID2013 alone is best by the registered measure (8.33% vs 8.81%) and among the best on the three shared
+  collections (8.27%, SROCC 0.853 vs 0.834). With no MOS leg at all, error on the shared collections (8.42%) is lower
+  than with the full mix (8.81%); the MOS legs mainly fit the collections they come from (MDID 7.71% vs 9.92%,
+  Colourlab 12.10% vs 15.06%).
+- Stage 2 runs the 10 pairs among the five best singles (TID2013, PIPAL, CID-IQ, MDID, KADID).
+- **Experiment 6 at seed 0:** no pruning arm moves the all-nine error beyond what the control's own seeds may spread
+  (control 8.38%; prune 5% 8.33%, random 10% 8.35%, discordance 10% 8.38%, per-source 10% 8.43%). Control seeds 1-2
+  are training. The walk arm reruns on the build that admits it.
+- One seed each: these rank candidates; the registered stage 2 confirms at seeds 0-2.
