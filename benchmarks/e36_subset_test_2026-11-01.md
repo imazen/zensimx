@@ -285,3 +285,24 @@ control, primary, guards, decision rule and selection rule as amendment 2.
 | p2-30L | pool v2 (`pool-v2-F3-p100s0`) | 30 | as p30L |
 | p2-50L | pool v2 | 50 | as p30L |
 | p50L | pool v1 (`pool-F3`) | 50 | as p30L |
+
+## Amendment 3 results (2026-11-02)
+
+Same build and control (60/60 again). Three-seed means against the same control.
+
+| arm | primary | minus control [95%] | G-CHROMA-L worst | EVAL worst / mean | G-TRADE (a) | G-STEER s0/s1/s2 | error vs human (median / p90) | rule |
+|---|---:|---|---|---|---:|---|---|---|
+| p2-30L | 2.404% | -0.954 [-1.155, -0.778] | 0.984 (ycc444) | -0.0088 / +0.0023 | 2.05% | 135/135/134 | 8.45% / 21.54% | **meets** |
+| p2-50L | 2.175% | -1.183 [-1.380, -0.995] | 0.991 (band-ac) | **-0.0117** / +0.0033 | 1.90% | **131**/134/135 | 8.34% / 21.31% | 2 guards |
+| p50L | 2.171% | -1.186 [-1.386, -0.996] | 1.006 (ycc444) | -0.0075 / +0.0046 | 2.05% | **132**/133/135 | 8.34% / 21.30% | G-STEER |
+
+Both lambda-50 arms fail G-STEER's I21_10_05 on m3f (0.685-0.697) on two seeds, as lambda 100 did; p2-50L adds
+broad-97 linearity misses and irccyn-ivc -0.0117. So the boundary for the level-anchored hinge lies between lambda 30
+and 50, and it is the I21_10_05 steering case that sets it. Combining pool v2 with the level term (p2-30L) gives the
+best chroma level of any arm (every family below the control's MAE) at a primary between p30L and p2-30.
+
+Arms meeting the registered rule, by primary: p2-30 (-0.983), p30L (-0.975), p2-30L (-0.954), p30-ar3 (-0.770),
+pool-10 (-0.643), pool-1 (-0.188). The three lambda-30 arms are within 0.03 points of each other.
+
+Process note: G-STEER with 30 concurrent shard processes ran at ~10 s per case against ~1.5-2 s alone (the
+instrument is memory-bound on dev); about 9 concurrent shards, one model at a time, is the efficient setting.
