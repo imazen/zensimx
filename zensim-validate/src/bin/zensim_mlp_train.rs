@@ -282,7 +282,13 @@ struct Args {
     /// trainer prints the stratum count and WARNS loudly when it is not met
     /// (the schedule still cycles, so coverage stays seed-invariant across
     /// the run).
-    #[arg(long, default_value = "uniform", value_parser = ["uniform", "stratified"])]
+    ///
+    /// `walk` (2026-11-02, E36 experiment 6) keeps the uniform draw's group
+    /// sequence and weights and walks each within-ref group's refs
+    /// round-robin and each ref's rows on a seeded bijection, so a group's
+    /// ref and row coverage stop depending on the seed. CPU strategy
+    /// trainer only.
+    #[arg(long, default_value = "uniform", value_parser = ["uniform", "stratified", "walk"])]
     pair_sampling: String,
 
     /// Skip the `zentrain.sample_coverage` embed (2026-09-04).
@@ -3488,10 +3494,10 @@ fn main() {
         initial_lr: args.lr,
         leaky_alpha: args.leaky_alpha,
         seed: args.seed,
-        pair_sampling: if args.pair_sampling == "stratified" {
-            mlp_train::PairSampling::Stratified
-        } else {
-            mlp_train::PairSampling::Uniform
+        pair_sampling: match args.pair_sampling.as_str() {
+            "stratified" => mlp_train::PairSampling::Stratified,
+            "walk" => mlp_train::PairSampling::Walk,
+            _ => mlp_train::PairSampling::Uniform,
         },
         init_seed: args.init_seed,
         sample_seed: args.sample_seed,
@@ -5552,6 +5558,7 @@ fn main() {
                     pooled_rank_share: hyperparams.pooled_rank_share,
                     stratified_pairs: hyperparams.pair_sampling
                         == mlp_train::PairSampling::Stratified,
+                    walk_pairs: hyperparams.pair_sampling == mlp_train::PairSampling::Walk,
                 };
                 let t0 = std::time::Instant::now();
                 let sim = mlp_train::sampling::simulate(&sim_groups, &params);

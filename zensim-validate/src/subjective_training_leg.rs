@@ -688,8 +688,19 @@ fn admit_datasets(
         {
             return Err("dataset source population mismatch".into());
         }
+        // E36 experiment 5 (benchmarks/e36_subset_test_2026-11-01.md): `--mos-share` rescales the
+        // kept MOS legs to share one total; the authority records each leg's scale, and the
+        // corrected weight is checked times that scale. Absent, the scale is 1.
+        let scale = match r.get("experiment5_scale") {
+            None => 1.,
+            Some(v) => v
+                .as_f64()
+                .filter(|s| s.is_finite() && *s > 0.)
+                .ok_or("experiment5_scale must be a positive finite number")?,
+        };
         let corrected = d["nominal_weight"].as_f64().unwrap()
-            / (counts.values().map(|&n| 1. - 1. / n as f64).sum::<f64>() / counts.len() as f64);
+            / (counts.values().map(|&n| 1. - 1. / n as f64).sum::<f64>() / counts.len() as f64)
+            * scale;
         // Python 3.12+ sums with compensation; Iterator::sum uses ordinary
         // ordered addition. Bind the CLI weight exactly above, allowing only
         // final arithmetic roundoff when independently checking its formula.
@@ -1007,6 +1018,18 @@ mod tests {
                 1
             );
         }
+        // E36 experiment 5: a recorded scale admits exactly the scaled weight.
+        f.declaration["nominal_weight"] = json!(0.5);
+        f.authority["cells"]["cell"]["groups"][0]["train_weight"] = json!(3.);
+        assert!(f.call_named("subjective_rank_fixture", 3.).is_err());
+        f.authority["cells"]["cell"]["groups"][0]["experiment5_scale"] = json!(3.);
+        assert_eq!(f.call_named("subjective_rank_fixture", 3.).unwrap().len(), 1);
+        f.authority["cells"]["cell"]["groups"][0]["experiment5_scale"] = json!(-3.);
+        assert!(f.call_named("subjective_rank_fixture", 3.).is_err());
+        f.authority["cells"]["cell"]["groups"][0]
+            .as_object_mut()
+            .unwrap()
+            .remove("experiment5_scale");
         f.declaration["nominal_weight"] = json!(0.5);
         f.authority["cells"]["cell"]["groups"][0]["train_weight"] = json!(1.);
         f.keys[0]["family"] = json!("reserved");

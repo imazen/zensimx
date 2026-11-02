@@ -2462,7 +2462,11 @@ pub enum PairSampling {
     /// Group weights only determine eligibility in this mode: relative draw
     /// shares follow each group's number of non-singleton strata. Use
     /// [`Self::Uniform`] for weighted group draws and singleton-band coverage.
-    Stratified,
+    Stratified,    /// The uniform draw's group sequence and rng consumption, with each
+    /// within-ref group walking its refs round-robin and each ref's rows on
+    /// a seeded bijection, so every ref and row of a group is visited before
+    /// any repeats. See [`sampling::RefWalk`]. CPU strategy trainer only.
+    Walk,
 }
 
 /// Build the `--pair-sampling stratified` schedule for a run, or `None`
@@ -2547,6 +2551,8 @@ pub(crate) struct RefBuckets {
     /// dropped as unusable. Lets a partner be re-drawn from the same ref
     /// (see `redraw_partner`).
     slot_of_row: Vec<u32>,
+    /// `--pair-sampling walk` state; `None` keeps the uniform draw.
+    walk: Option<sampling::RefWalk>,
 }
 
 impl RefBuckets {
@@ -2581,7 +2587,15 @@ impl RefBuckets {
             flat,
             spans,
             slot_of_row,
+            walk: None,
         })
+    }
+
+    /// Switch this group to the `--pair-sampling walk` draw (see
+    /// `sampling::RefWalk`), seeded per run and group.
+    pub(crate) fn with_walk(mut self, seed: u64) -> Self {
+        self.walk = Some(sampling::RefWalk::build(&self.spans, seed));
+        self
     }
 
     /// Number of refs with at least one drawable pair.
@@ -2598,7 +2612,14 @@ impl RefBuckets {
     /// Draw a within-ref pair: a ref uniformly, then two rows in it.
     /// May return `ia == ib`; the caller already skips that case, which
     /// keeps the RNG draw count identical to the uniform path.
+    /// Under `--pair-sampling walk` the same three values are consumed and
+    /// only `u_b` is read.
     pub(crate) fn draw(&self, u_ref: u64, u_a: u64, u_b: u64) -> (usize, usize) {
+        if let Some(walk) = &self.walk {
+            let (slot, a, b) = walk.next(&self.spans, u_b);
+            let start = self.spans[slot].0;
+            return (self.flat[start + a], self.flat[start + b]);
+        }
         let (start, len) = self.spans[(u_ref as usize) % self.spans.len()];
         (
             self.flat[start + (u_a as usize) % len],
@@ -3582,7 +3603,17 @@ pub fn train_mlp_strategy_pairs(
     // without it keep the uniform cross-image draw, byte-for-byte.
     let ref_buckets: Vec<Option<RefBuckets>> = train_indices
         .iter()
-        .map(|&gi| groups[gi].ref_ids.and_then(RefBuckets::build))
+        .enumerate()
+        .map(|(pos, &gi)| {
+            let rb = groups[gi].ref_ids.and_then(RefBuckets::build);
+            match hyperparams.pair_sampling {
+                PairSampling::Walk => rb.map(|rb| rb.with_walk(sampling::walk_seed(
+                    hyperparams.sample_seed.unwrap_or(hyperparams.seed),
+                    pos,
+                ))),
+                _ => rb,
+            }
+        })
         .collect();
     // Row counts by position-in-train_indices, for the owner draw step.
     // `FeatureRows::len` is cached at construction (it stays correct after
@@ -5029,6 +5060,10 @@ fn train_mlp_pool_head_with_tv(
     // groups the caller opted in via `TrainingGroup::ref_ids` (the binary
     // sets that only when the group spec asked for within-ref). Groups
     // without it keep the uniform cross-image draw, byte-for-byte.
+    assert!(
+        hyperparams.pair_sampling != PairSampling::Walk,
+        "--pair-sampling walk is implemented for the CPU strategy trainer only"
+    );
     let ref_buckets: Vec<Option<RefBuckets>> = train_indices
         .iter()
         .map(|&gi| groups[gi].ref_ids.and_then(RefBuckets::build))
@@ -5909,6 +5944,10 @@ fn train_mlp_hybrid_head_with_tv(
     // groups the caller opted in via `TrainingGroup::ref_ids` (the binary
     // sets that only when the group spec asked for within-ref). Groups
     // without it keep the uniform cross-image draw, byte-for-byte.
+    assert!(
+        hyperparams.pair_sampling != PairSampling::Walk,
+        "--pair-sampling walk is implemented for the CPU strategy trainer only"
+    );
     let ref_buckets: Vec<Option<RefBuckets>> = train_indices
         .iter()
         .map(|&gi| groups[gi].ref_ids.and_then(RefBuckets::build))
@@ -9514,6 +9553,10 @@ fn train_mlp_per_sample_alpha_head(
     // groups the caller opted in via `TrainingGroup::ref_ids` (the binary
     // sets that only when the group spec asked for within-ref). Groups
     // without it keep the uniform cross-image draw, byte-for-byte.
+    assert!(
+        hyperparams.pair_sampling != PairSampling::Walk,
+        "--pair-sampling walk is implemented for the CPU strategy trainer only"
+    );
     let ref_buckets: Vec<Option<RefBuckets>> = train_indices
         .iter()
         .map(|&gi| groups[gi].ref_ids.and_then(RefBuckets::build))

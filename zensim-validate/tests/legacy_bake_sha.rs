@@ -162,6 +162,8 @@ fn bake_sha_inner(
             band_id: None,
             band_weights: None,
             margin,
+            pool: false,
+            level: None,
         })
     } else {
         None

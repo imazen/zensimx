@@ -153,6 +153,87 @@ impl Stratum {
     }
 }
 
+// ── `--pair-sampling walk` ───────────────────────────────────────────────
+//
+// The uniform within-ref draw picks a ref uniformly and two rows uniformly,
+// so a group drawn fewer times than it has rows (SafeSyn, BAPPS and the
+// chroma teacher in the F3 recipe) touches a seed-dependent ~60-75% of its
+// rows and a seed-dependent subset of its refs. The walk keeps EVERYTHING
+// the uniform draw decides about groups — the same three rng values per
+// within-ref draw, so the group sequence and the per-group draw counts are
+// identical to uniform — and replaces only the within-group choice:
+//
+//   * the ref is the group's next one on a seeded round-robin (a bijection
+//     over the group's refs), so every ref is visited once per `n_refs`
+//     draws of the group;
+//   * row A is that ref's next row on its own seeded bijection, so every
+//     row of a ref is an A once per `len` visits of the ref;
+//   * row B is drawn from the third rng value uniformly over the ref's
+//     rows, exactly as uniform draws it, so the same-row skip rate (1/2 for
+//     BAPPS's two-row refs) and therefore each group's effective weight stay
+//     the uniform draw's.
+//
+// The state is per-run interior mutability, advanced once per draw in draw
+// order; `simulate` builds fresh buckets, so a replay walks identically.
+
+/// Seed of one group's walk: the run's sample seed and the group's
+/// position in `train_indices`.
+pub(crate) fn walk_seed(sample_seed: u64, train_pos: usize) -> u64 {
+    sample_seed
+        .wrapping_mul(0x9E37_79B9_7F4A_7C15)
+        .wrapping_add(0x5741_4C4B_0000_0000 ^ train_pos as u64)
+}
+
+/// One within-ref group's `--pair-sampling walk` state.
+#[derive(Debug)]
+pub(crate) struct RefWalk {
+    ref_step: usize,
+    ref_offset: usize,
+    draws: std::cell::Cell<u64>,
+    /// Per ref slot: the row bijection's (step, offset).
+    rows: Vec<(usize, usize)>,
+    /// Per ref slot: visits so far.
+    visits: Vec<std::cell::Cell<u64>>,
+}
+
+impl RefWalk {
+    pub(crate) fn build(spans: &[(usize, usize)], seed: u64) -> Self {
+        let mut sm = SplitMix64::new(seed);
+        let k = sm.next_u64();
+        let n = spans.len();
+        let rows = spans
+            .iter()
+            .map(|&(_, len)| {
+                let k = sm.next_u64();
+                (coprime_step(len, k), (k >> 32) as usize % len)
+            })
+            .collect();
+        Self {
+            ref_step: coprime_step(n, k),
+            ref_offset: (k >> 32) as usize % n,
+            draws: std::cell::Cell::new(0),
+            rows,
+            visits: (0..n).map(|_| std::cell::Cell::new(0)).collect(),
+        }
+    }
+
+    /// (slot, A position, B position) of the next draw; positions are
+    /// offsets within the slot's span. B may equal A, as in the uniform draw.
+    pub(crate) fn next(&self, spans: &[(usize, usize)], u_b: u64) -> (usize, usize, usize) {
+        let n = spans.len();
+        let c = self.draws.get();
+        self.draws.set(c + 1);
+        let slot = ((c % n as u64) as usize * self.ref_step + self.ref_offset) % n;
+        let len = spans[slot].1;
+        let v = self.visits[slot].get();
+        self.visits[slot].set(v + 1);
+        let (step, offset) = self.rows[slot];
+        let a = ((v % len as u64) as usize * step + offset) % len;
+        let b = (u_b as usize) % len;
+        (slot, a, b)
+    }
+}
+
 /// The stratified visiting schedule for a whole run.
 #[derive(Clone, Debug)]
 pub struct StratifiedPlan {
@@ -529,6 +610,8 @@ pub struct SimParams {
     /// Replay a `--pair-sampling stratified` run. `false` (default for a
     /// legacy bake, which had no such flag) replays the uniform draw.
     pub stratified_pairs: bool,
+    /// Replay a `--pair-sampling walk` run.
+    pub walk_pairs: bool,
     /// Optional within-leg pooled rank sampling, matching the live CPU trainer.
     pub pooled_legs: Vec<String>,
     pub pooled_rank_share: f64,
@@ -929,11 +1012,21 @@ pub fn simulate(groups: &[SimGroup], params: &SimParams) -> SimResult {
             )
         })
         .collect();
+    assert!(
+        !(params.walk_pairs && (params.stratified_pairs || params.per_sample_alpha_head)),
+        "walk replay requires the CPU strategy trainer's uniform group draw"
+    );
     let ref_buckets: Vec<Option<RefBuckets>> = groups
         .iter()
-        .map(|g| {
+        .enumerate()
+        .map(|(pos, g)| {
             if g.within_ref {
-                g.ref_ids.as_deref().and_then(RefBuckets::build)
+                let rb = g.ref_ids.as_deref().and_then(RefBuckets::build);
+                if params.walk_pairs {
+                    rb.map(|rb| rb.with_walk(walk_seed(params.seed, pos)))
+                } else {
+                    rb
+                }
             } else {
                 None
             }
@@ -1109,7 +1202,13 @@ pub fn run_coverage_json(
         "mid_q_boost": params.mid_q_boost,
         "high_q_boost": params.high_q_boost,
         "stratified_bands": params.stratified_bands,
-        "pair_sampling": if params.stratified_pairs { "stratified" } else { "uniform" },
+        "pair_sampling": if params.stratified_pairs {
+            "stratified"
+        } else if params.walk_pairs {
+            "walk"
+        } else {
+            "uniform"
+        },
         "per_sample_alpha_head": params.per_sample_alpha_head,
         "band_edges": "B0 <50, B1 [50,65), B2 [65,90), B3 >=90 (human_score 0-100), the \
                        trainer's own q-boost bands",
@@ -1162,6 +1261,7 @@ mod tests {
             early_window: 100,
             per_sample_alpha_head: false,
             stratified_pairs: false,
+            walk_pairs: false,
             pooled_legs: Vec::new(),
             pooled_rank_share: 0.0,
         }
@@ -1343,6 +1443,71 @@ mod tests {
         );
     }
 
+    /// `--pair-sampling walk` changes only the within-group choice: the
+    /// group sequence and rng consumption match uniform draw for draw, row A
+    /// walks every row of a ref once per cycle, both rows share a ref, and
+    /// a run touches every ref and more rows than uniform does.
+    #[test]
+    fn walk_keeps_group_draws_and_covers_every_row() {
+        let refs_a: Vec<u32> = (0..40).map(|i| i / 4).collect();
+        let refs_b: Vec<u32> = (0..60).map(|i| i / 3).collect();
+        let pos_of = |d: Draw| match d {
+            Draw::Pair { train_pos, .. } | Draw::SameRow { train_pos, .. } => train_pos,
+            Draw::GroupTooSmall => usize::MAX,
+        };
+        let plain = [RefBuckets::build(&refs_a), RefBuckets::build(&refs_b)];
+        let walked = [
+            RefBuckets::build(&refs_a).map(|rb| rb.with_walk(walk_seed(9001, 0))),
+            RefBuckets::build(&refs_b).map(|rb| rb.with_walk(walk_seed(9001, 1))),
+        ];
+        let ctx = |rb| PairDrawCtx {
+            cdf: &[0.25, 1.0],
+            row_counts: &[40, 60],
+            per_row_cdfs: &[None, None],
+            ref_buckets: rb,
+            strat_bands: &[],
+            plan: None,
+            draw_index: 0,
+        };
+        let (cu, cw) = (ctx(&plain), ctx(&walked));
+        let (mut ru, mut rw) = (SplitMix64::new(77), SplitMix64::new(77));
+        for _ in 0..1000 {
+            let (du, dw) = (draw_pair(&cu, &mut ru), draw_pair(&cw, &mut rw));
+            assert_eq!(pos_of(du), pos_of(dw));
+            if let Draw::Pair { train_pos: 1, ia, ib } = dw {
+                assert_eq!(refs_b[ia], refs_b[ib]);
+            }
+        }
+        assert_eq!(ru.next_u64(), rw.next_u64());
+
+        let rb = RefBuckets::build(&refs_b).unwrap().with_walk(walk_seed(9001, 1));
+        let mut a_rows = std::collections::BTreeSet::new();
+        let mut rng = SplitMix64::new(5);
+        for _ in 0..refs_b.len() {
+            let (a, b) = rb.draw(rng.next_u64(), rng.next_u64(), rng.next_u64());
+            assert_eq!(refs_b[a], refs_b[b]);
+            a_rows.insert(a);
+        }
+        assert_eq!(a_rows.len(), refs_b.len(), "every row is an A once per cycle");
+
+        let gs = vec![
+            g("a", 1.0, (0..40).map(|i| i as f64 * 2.5).collect(), Some(refs_a.clone()), true),
+            g("b", 3.0, (0..60).map(|i| i as f64).collect(), Some(refs_b.clone()), true),
+        ];
+        let mut uniform = params(9001);
+        uniform.epochs = 1;
+        uniform.pairs_per_epoch = 160;
+        let mut walk = params(9001);
+        walk.epochs = 1;
+        walk.pairs_per_epoch = 160;
+        walk.walk_pairs = true;
+        let (u, w) = (simulate(&gs, &uniform), simulate(&gs, &walk));
+        assert_ne!(u.digest.finish(), w.digest.finish());
+        let (pu, pw) = (&u.full.per_group[1], &w.full.per_group[1]);
+        assert_eq!(pw.refs_touched, pw.n_refs);
+        assert!(pw.rows_touched > pu.rows_touched, "walk {} vs uniform {}", pw.rows_touched, pu.rows_touched);
+    }
+
     /// Cross-image is the default: the same group WITHOUT the opt-in must
     /// draw mostly across references (the negative control for the test
     /// above).
@@ -1456,6 +1621,7 @@ mod tests {
             early_window: 0,
             per_sample_alpha_head: false,
             stratified_pairs: false,
+            walk_pairs: false,
             pooled_legs: Vec::new(),
             pooled_rank_share: 0.0,
         };
@@ -1536,6 +1702,7 @@ mod tests {
             early_window: 0,
             per_sample_alpha_head: false,
             stratified_pairs: false,
+            walk_pairs: false,
             pooled_legs: Vec::new(),
             pooled_rank_share: 0.0,
         };
@@ -1616,6 +1783,7 @@ mod tests {
             early_window: 0,
             per_sample_alpha_head: false,
             stratified_pairs: true,
+            walk_pairs: false,
             pooled_legs: Vec::new(),
             pooled_rank_share: 0.0,
         }

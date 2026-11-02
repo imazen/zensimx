@@ -384,3 +384,55 @@ teachers, coverage, BAPPS, chroma teacher) and the human MOS training legs varie
   amendment 1); also SROCC, and the TRAIN-side human_development and cid22_development values the trainer logs.
 - **Caveat stated before results:** choosing a training mix by EVAL makes EVAL selection data for this question; a
   final claim about a chosen mix needs a confirmation on collections no arm used (other tower IQA library sets).
+
+## Experiment 6 (2026-11-02, before any run): pruning human rows, and coverage that does not depend on the seed
+
+Owner, 2026-11-02: "how we can prune rows from training or ensure a wider set of source images are involved in
+training regardless of seeds, in order to raise scores". Base fits as in experiment 5 (F3's `base-fit` step, strict
+admission, packed); the control is experiment 5's `control-s0`.
+
+**Where the seed decides coverage (from the F3 recipe's weights, 120 epochs x 50,000 draws = 6.0 M draws per run).**
+The human leg (10,590 rows over 100 references) gets 52% of draws, about 600 per row; the coverage leg, CID22 and the
+small MOS legs are similarly saturated, so every one of their rows is used whatever the seed. Three legs are not:
+SafeSyn (141,054 rows over 2,312 references, about 99 k draws), the chroma teacher (231,367 rows over 5,645
+references, about 101 k draws) and BAPPS (223,068 rows in 111,534 two-row references, about 97 k draws, half of them
+same-row skips). Which of their rows, and which BAPPS references, a run sees is a property of the sample seed. The
+measured per-leg coverage is in each run's `[coverage]` line and embedded `zentrain.sample_coverage`.
+
+**Arms (seed 0):**
+
+- `walk`: new `--pair-sampling walk` (this commit). It keeps the uniform draw's group sequence and random-number
+  consumption, so group weights and per-group draw counts are unchanged. Within a within-reference group, the
+  reference is the next one on a seeded round-robin and row A is the reference's next row on a seeded bijection.
+  Row B stays uniform over the reference's rows, so same-row skip rates and effective group weights are also
+  unchanged. Every reference and row of a group is visited before any repeats. Run with `ZENSIM_SAMPLE_DIGEST=1`:
+  the trainer's digest must equal the coverage replay's.
+- `control-wb`: the walk build in uniform mode. It must reproduce `control-s0`'s 120 checkpoints bit-exactly, or the
+  walk arm has no control.
+- `strat`: the existing `--pair-sampling stratified` (2026-09-04). It ignores group weights: each (reference,
+  quality band) stratum gets equal draws, and pairs come from one band. It is a different mixture, run because it is
+  the existing seed-independent mode.
+- `prune-g5`, `prune-g10`: drop the 5% / 10% of human fit rows with the highest within-reference discordance under
+  the F3 base-fit seed-0 bake (`full_s0/refit/production-f16.bin`, sha256 `6afaf106…`). A row's discordance is
+  `sum_j |y_i - y_j| [sign(p_i - p_j) != sign(y_i - y_j)] / sum_j |y_i - y_j|` over the rows of its reference
+  (y = human score, p = bake score). Over all rows the median is 0.036 and the 90th percentile 0.110.
+- `prune-s10`: drop the top 10% within each source, so the source mix is kept.
+- `prune-r10`: drop a random 10% (numpy `default_rng(20261102)`). This separates "fewer rows" from "these rows".
+- The human group's weight and its 100 references are unchanged in every prune arm.
+
+| source | rows | median discordance | share in the global top 10% |
+|---|---:|---:|---:|
+| CID22-A25 | 1,579 | 0.011 | 0.4% |
+| KADID | 6,659 | 0.040 | 10.3% |
+| KonFiG | 672 | 0.026 | 17.7% |
+| TID2013 | 1,680 | 0.047 | 14.6% |
+
+**Outcome:** experiment 5's readout over all nine EVAL MOS collections (every arm trains the same six dataset legs):
+the mean over collections of the median absolute residual around each collection's logistic fit (over the target
+span), and SROCC; also the trainer-logged development values. **Stage 2:** arms whose seed-0 result beats the
+control by more than the spread of the control's seeds 0-2 run at seeds 0-2. The prune lists were chosen with a seed-0
+model of the same recipe, so seeds 1-2 are the cleaner test.
+
+**Caveats stated before results:** as in experiment 5, choosing by EVAL makes EVAL selection data for this question.
+A pruning arm that wins removes rows a model of this recipe disagrees with; it is not evidence that those ratings are
+wrong.

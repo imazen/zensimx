@@ -155,6 +155,7 @@ fn main() {
     let mut strat = args.stratified_bands;
     let mut psa = args.per_sample_alpha_head;
     let mut strat_pairs = args.stratified_pairs;
+    let mut walk_pairs = false;
     let mut pooled_legs = args.pooled_legs.clone();
     let mut pooled_rank_share = args.pooled_rank_share;
     let mut source = String::from("cli");
@@ -246,6 +247,8 @@ fn main() {
             strat_pairs = strat_pairs
                 || repro.get("pair_sampling").and_then(|v| v.as_str()) == Some("stratified")
                 || argv_val(argv, "--pair-sampling").as_deref() == Some("stratified");
+            walk_pairs = repro.get("pair_sampling").and_then(|v| v.as_str()) == Some("walk")
+                || argv_val(argv, "--pair-sampling").as_deref() == Some("walk");
         }
         // Row-count cross-check against the recorded repro.
         if let Some(arr) = repro.get("inputs").and_then(|v| v.as_array()) {
@@ -353,6 +356,7 @@ fn main() {
             early_window: args.early_window,
             per_sample_alpha_head: psa,
             stratified_pairs: strat_pairs,
+            walk_pairs,
             pooled_legs: pooled_legs.clone(),
             pooled_rank_share,
         };
