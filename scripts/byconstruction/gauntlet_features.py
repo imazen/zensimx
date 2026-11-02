@@ -29,10 +29,11 @@ below the predictor's printed precision (17 decimal places), print identically; 
 checks the bank against the judges row by row.
 """
 import argparse
-from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 import hashlib
 import json
 import multiprocessing
+import os
 from pathlib import Path
 import struct
 import subprocess
@@ -193,9 +194,14 @@ def score(bank, out, predict, bakes):
         with tempfile.NamedTemporaryFile(dir=Path.home() / 'tmp', suffix='.bin') as f:
             f.write(struct.pack('<II', matrix.shape[1], matrix.shape[0]) + matrix.tobytes())
             f.flush()
-            for name, path in bakes:
-                values = subprocess.run([str(predict), '--bake', str(path), '--features-file', f.name, '--f64-wire',
-                                         '--production'], capture_output=True, text=True, check=True).stdout.split()
+            # One single-threaded predictor process per bake, run concurrently; each bake's column is filled in
+            # batch order, so the table is identical to running them one after another.
+            def run(path, rows=f.name):
+                return subprocess.run([str(predict), '--bake', str(path), '--features-file', rows, '--f64-wire',
+                                       '--production'], capture_output=True, text=True, check=True).stdout.split()
+            with ThreadPoolExecutor(max_workers=min(len(bakes), os.cpu_count() or 1)) as pool:
+                outputs = list(pool.map(run, [path for _, path in bakes]))
+            for (name, _), values in zip(bakes, outputs):
                 if len(values) != len(matrix):
                     raise ValueError(f'{name}: {len(values)} scores for {len(matrix)} rows')
                 columns[name].extend(float(v) for v in values)
