@@ -212,15 +212,21 @@ def inversions(scores, index, pools, out, models):
                           all={k: v['all'] for k, v in report['tables'].items()})))
 
 
-def pool(bank, scores, index, pools, out, model, derived):
-    """The registered pool: F3's inverted fit pairs plus an equal random sample of its correct ones."""
+def pool(bank, scores, index, pools, out, model, derived, anchor_ratio=1.0, class_weights=(1.0, 2.0, 2.0, 4.0)):
+    """The registered pool: F3's inverted fit pairs plus an equal random sample of its correct ones.
+
+    `model` may name several score columns (comma-separated): a pair is inverted when any of them inverts it and an
+    anchor only when none does. `anchor_ratio` sets anchors per inverted pair. The defaults build the registered
+    pool exactly."""
     out.mkdir(parents=True)
-    p = attach_scores(consensus_pairs(index, pools), scores, [model])
+    models = model.split(',')
+    p = attach_scores(consensus_pairs(index, pools), scores, models)
     fit = p[(p.split == 'fit') & p.scored].reset_index(drop=True)
-    inv = fit[fit[f'{model}_inv']]
-    ok = fit[~fit[f'{model}_inv']]
+    bad = np.any([fit[f'{m}_inv'].to_numpy() for m in models], axis=0)
+    inv = fit[bad]
+    ok = fit[~bad]
     rng = np.random.default_rng(SEED)
-    anchor = ok.iloc[np.sort(rng.choice(len(ok), size=min(len(inv), len(ok)), replace=False))]
+    anchor = ok.iloc[np.sort(rng.choice(len(ok), size=min(int(round(anchor_ratio * len(inv))), len(ok)), replace=False))]
     chosen = pd_concat([inv, anchor])
     chosen['cls'] = (2 * chosen.content.isin(['screen', 'lineart']).astype(int) + (chosen.q_low <= 40).astype(int)).astype('uint8')
     ids = read_ids(derived)
@@ -262,8 +268,9 @@ def pool(bank, scores, index, pools, out, model, derived):
     manifest = dict(schema='tv-pool-v1',
                     features=dict(path=str((out / 'features.parquet').resolve()), sha256=sha((out / 'features.parquet').read_bytes())),
                     pairs=dict(path=str((out / 'pairs.parquet').resolve()), sha256=sha((out / 'pairs.parquet').read_bytes())),
-                    feature_ids=ids, class_weights=[1.0, 2.0, 2.0, 4.0], feature_rows=len(needed), pair_rows=int(keep.sum()),
+                    feature_ids=ids, class_weights=[float(w) for w in class_weights], feature_rows=len(needed), pair_rows=int(keep.sum()),
                     provenance=dict(registration='zensimx benchmarks/e36_subset_test_2026-11-01.md', model=model,
+                                    anchor_ratio=anchor_ratio,
                                     inverted=len(inv), anchor=len(anchor), seed=SEED,
                                     duplicate_view_pairs_dropped=int((~keep).sum()), inverted_kept=n_inv_kept,
                                     anchor_kept=int(keep.sum()) - n_inv_kept,
@@ -317,11 +324,14 @@ def main():
         q.add_argument(x, type=Path)
     q.add_argument('--model', required=True)
     q.add_argument('--derived-inputs', type=Path, required=True)
+    q.add_argument('--anchor-ratio', type=float, default=1.0)
+    q.add_argument('--class-weights', default='1,2,2,4')
     a = ap.parse_args()
     if a.cmd == 'inversions':
         inversions(a.scores, a.index, a.pools, a.out, a.model)
     elif a.cmd == 'pool':
-        pool(a.bank, a.scores, a.index, a.pools, a.out, a.model, a.derived_inputs)
+        pool(a.bank, a.scores, a.index, a.pools, a.out, a.model, a.derived_inputs, a.anchor_ratio,
+             tuple(float(w) for w in a.class_weights.split(',')))
     elif a.cmd == 'harvest':
         harvest(a.ledger_dir, a.cas, a.index, a.out, a.workers)
     elif a.cmd == 'score':
