@@ -436,3 +436,13 @@ model of the same recipe, so seeds 1-2 are the cleaner test.
 **Caveats stated before results:** as in experiment 5, choosing by EVAL makes EVAL selection data for this question.
 A pruning arm that wins removes rows a model of this recipe disagrees with; it is not evidence that those ratings are
 wrong.
+
+### Experiment 6 amendment (2026-11-02, before the walk and strat arms trained)
+
+- The trainer admits subjective (MOS and BAPPS) legs only on the uniform pair path. `walk` keeps that path's
+  within-reference pairs, random stream and same-row skips; BAPPS's two-row comparisons are drawn exactly as uniform
+  draws them. The gate now also accepts `walk` (CLI and the native-vote check). The walk arm trains on that build;
+  it differs from the `control-wb` build only in those two admission checks.
+- `strat` cannot run under this recipe. `--pair-sampling stratified` pairs only inside (reference, quality band)
+  strata, so each BAPPS comparison whose two sides fall in different bands becomes a singleton stratum and is
+  dropped, and the gate refuses it. The arm is recorded as not run, for that reason.

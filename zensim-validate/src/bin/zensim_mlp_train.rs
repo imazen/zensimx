@@ -3644,7 +3644,10 @@ fn main() {
             || args.pool_head
             || args.hybrid_head
             || args.per_sample_alpha_head
-            || args.pair_sampling != "uniform"
+            // `walk` keeps the uniform path's within-ref pairs, rng stream and
+            // same-row skips (E36 experiment 6); `stratified` pairs only inside
+            // quality bands and drops cross-band comparisons, so it stays refused.
+            || !matches!(args.pair_sampling.as_str(), "uniform" | "walk")
             || args.pwrc_pair_weight
             || args.norm_in_norm_weight != 0.
         {

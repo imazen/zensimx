@@ -26,7 +26,7 @@ pub(super) fn validate_votes(
                 && !hp.pwrc_pair_weight
                 && hp.hard_pair_frac == 0.
                 && hp.stratified_bands == 0
-                && hp.pair_sampling == PairSampling::Uniform
+                && matches!(hp.pair_sampling, PairSampling::Uniform | PairSampling::Walk)
                 && hp.dro_eta == 0.
                 && !has_pair_lists,
             "native votes require the registered plain sequential uniform trainer"
