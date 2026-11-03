@@ -694,3 +694,20 @@ Means over seeds 0-2 (per-seed values where they matter):
 p30L + map 300 improves on p30L in every measure at every seed and keeps every product gate. Map 1000 is stronger on
 the primary, the shared collections and agreement, but misses one G-STEER case at seeds 1 and 2 and costs more
 in-distribution development SROCC. The JPEG XL loop (step 4) for both is running on i270.
+
+### Experiment 3 step 4 result: the map term in the JPEG XL loop (2026-11-02, i270)
+
+Every arm encoded fresh on i270 by one loop build (zensimx c7556f66, `e36_loop_map.sh`); B/M7 placement rows reproduce
+the earlier calibration exactly; placements p30L 2.277e-2, map 300 3.527e-2, map 1000 4.826e-2 (exponent 0.7).
+BD-rate against p30L, 78 images (positive = fewer bytes for equal judged quality; 95% CI):
+
+| arm | ssim2 | butteraugli | zensim | DVIFM | CVVDP |
+|---|---|---|---|---|---|
+| p30L + map 300 | +0.51 [+0.27, +0.72] | +0.86 [+0.51, +1.18] | +0.29 [-0.08, +0.64] | +0.49 [-0.64, +1.67] | +0.86 [+0.53, +1.22] |
+| p30L + map 1000 | +0.94 [+0.67, +1.19] | +1.51 [+1.24, +1.78] | +0.39 [+0.05, +0.71] | +0.36 [-0.64, +1.38] | +1.72 [+1.36, +2.06] |
+| F3 | -0.04 [-0.22, +0.16] | -0.30 [-0.51, -0.12] | -0.21 [-0.49, +0.04] | +0.09 [-0.70, +0.94] | -0.13 [-0.40, +0.14] |
+| butteraugli loop | +2.21 [+1.51, +3.03] | +4.55 [+3.88, +5.28] | +1.52 [+0.74, +2.32] | +2.60 [+1.36, +3.85] | +4.00 [+3.18, +4.84] |
+
+Against the butteraugli loop (CVVDP judge): p30L -4.34%, map 300 -3.49%, map 1000 -2.53%. The map term closes about a
+fifth (300) to two fifths (1000) of the gap to butteraugli's own loop, and the gain shows on the judges the term did
+not train toward (ssim2, CVVDP), not only butteraugli. Full tables: `benchmarks/e36_loop_map_2026-11-02/`.
