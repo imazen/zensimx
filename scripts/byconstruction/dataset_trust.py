@@ -106,6 +106,36 @@ def colour_tags(path):
     return tags
 
 
+def icc_description(path):
+    """The `desc` of a PNG's embedded ICC profile (iCCP), or None; read from the bytes, nothing decoded."""
+    import zlib
+    b = Path(path).read_bytes()
+    if b[:8] != b"\x89PNG\r\n\x1a\n":
+        return None
+    i = 8
+    while i + 8 <= len(b):
+        n = int.from_bytes(b[i:i + 4], "big")
+        if b[i + 4:i + 8] == b"iCCP":
+            d = b[i + 8:i + 8 + n]
+            name = d.split(b"\0", 1)[0]
+            prof = zlib.decompress(d[len(name) + 2:])
+            for k in range(int.from_bytes(prof[128:132], "big")):
+                e = prof[132 + 12 * k:144 + 12 * k]
+                if e[:4] == b"desc":
+                    off, ln = int.from_bytes(e[4:8], "big"), int.from_bytes(e[8:12], "big")
+                    body = prof[off:off + ln]
+                    if body[:4] == b"desc":
+                        return body[12:12 + int.from_bytes(body[8:12], "big")].rstrip(b"\0").decode("latin-1")
+                    if body[:4] == b"mluc":
+                        so, sl = int.from_bytes(body[20:24], "big"), int.from_bytes(body[24:28], "big")
+                        return body[so:so + sl].decode("utf-16-be")
+            return name.decode("latin-1")
+        if b[i + 4:i + 8] == b"IEND":
+            return None
+        i += 12 + n
+    return None
+
+
 # ---------------------------------------------------------------------------------------------------------- plan
 def cmd_plan(a):
     out = Path(a.out)
@@ -340,6 +370,29 @@ def cmd_report(a):
                 acc, lo, hi, n = de.pair_agreement(rows_k, s)
                 rep["metrics"][m] = dict(agreement=acc, ci=[lo, hi], n=n)
             items = sorted({(r["ref"], d) for r in rr for d in (r["a"], r["b"])})
+        # Colour sensitivity: rows whose reference or distorted image embeds a non-sRGB ICC profile (the judges compare
+        # raw values), dropped and re-scored.
+        colour = json.loads((out / "colour_tags.json").read_text())
+        flagged = {p for p, t in colour.items() if "iCCP" in t and "sRGB" not in (icc_description(p) or "")}
+        sides = (lambda r: (r["ref"], r["dist"])) if kind == "mos" else (lambda r: (r["ref"], r["a"], r["b"]))
+        clean = [r for r in rr if not set(sides(r)) & flagged]
+        if len(clean) < len(rr):
+            sens = {}
+            for m in names:
+                if kind == "mos":
+                    s = {f"{r['row']}": metrics[m][(r["ref"], r["dist"])] for r in clean}
+                    ci, n = de.mos_interval([dict(r, a=f"{r['row']}") for r in clean], s)
+                    sens[m] = dict(srocc=ci["signed"]["estimate"], n=n)
+                else:
+                    s, rows_k = {}, []
+                    for k, r in enumerate(clean):
+                        s[f"{k}a"], s[f"{k}b"] = metrics[m][(r["ref"], r["a"])], metrics[m][(r["ref"], r["b"])]
+                        rows_k.append(dict(r, a=f"{k}a", b=f"{k}b"))
+                    acc, lo, hi, n = de.pair_agreement(rows_k, s)
+                    sens[m] = dict(agreement=acc, ci=[lo, hi], n=n)
+            rep["without_non_srgb_icc"] = dict(rows=len(clean), dropped=len(rr) - len(clean),
+                                               profiles=sorted({icc_description(p) for p in flagged
+                                                                if Path(p).is_relative_to(LIB / ds)}), metrics=sens)
         # How much the metrics agree with each other on this set's images (Spearman, unique distorted images).
         vec = {m: [metrics[m][i] for i in items] for m in names}
         jobs = [(f"{m1}|{m2}", vec[m1], vec[m2]) for i, m1 in enumerate(names) for m2 in names[i + 1:]]

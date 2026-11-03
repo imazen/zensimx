@@ -30,6 +30,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 import dataset_eval as de  # noqa: E402
 from e36_exp56.m3_rows import TIER_C, TIER_N  # noqa: E402
+from e36_exp56.ceval import compression_rows  # noqa: E402
 
 ROOT = Path("/var/tmp/byc-fchroma-20261029/r3/w100/root")
 HUMAN = ROOT / "wide/main/real/human_all_fit.parquet"
@@ -179,6 +180,7 @@ def main(dest):
     fe = fe[~fe.index.duplicated()]
     Xe = fe.loc[[r["a"] for r in rows], cols].to_numpy(float)
     colls = sorted({r["collection"] for r in rows})
+    crow = compression_rows(EVAL)
     result = {}
     scores = de.load_scores(EVAL)
     for s0 in range(3):  # the experiment 6 walk control, for scale
@@ -202,12 +204,18 @@ def main(dest):
             ci, n = de.mos_interval(rr, s)
             per[c] = dict(srocc=ci["signed"]["estimate"], lo=ci["signed"]["lo"], hi=ci["signed"]["hi"],
                           within=de.within(rr, s), n=n)
+        cs = {}
+        for c in sorted({r["collection"] for r in crow}):
+            rr = [r for r in crow if r["collection"] == c]
+            cs[c] = (spearmanr([s[r["a"]] for r in rr], [r["target"] for r in rr]).statistic, len(rr))
+        comp = sum(v * n for v, n in cs.values()) / sum(n for _, n in cs.values())
         trained = {c for c in colls if name == f"leg {c}"}
         held = [c for c in colls if c not in trained]
-        result[name] = dict(fit=info, per=per, mean_heldout=float(np.mean([per[c]["srocc"] for c in held])),
+        result[name] = dict(fit=info, per=per, compression_rows=float(comp), compression_per={c: v for c, (v, _) in cs.items()},
+                            mean_heldout=float(np.mean([per[c]["srocc"] for c in held])),
                             mean_common3=float(np.mean([per[c]["srocc"] for c in COMMON])))
         print(f"{name:34s} rows {info['rows']:5d} alpha {info['alpha']:g} cv {info['cv_srocc']:.3f} | held-out "
-              f"{result[name]['mean_heldout']:.3f} common-3 {result[name]['mean_common3']:.3f} | "
+              f"{result[name]['mean_heldout']:.3f} common-3 {result[name]['mean_common3']:.3f} compression rows {comp:.3f} | "
               + " ".join(f"{c[:8]} {per[c]['srocc']:.3f}" for c in colls), flush=True)
     Path(dest).write_text(json.dumps(result, indent=1) + "\n")
 

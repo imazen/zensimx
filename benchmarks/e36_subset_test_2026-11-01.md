@@ -841,3 +841,52 @@ Within one source the compression rows transfer about as well as all rows and be
 across sources, compression-only is worse than all rows. All three objectives agree on the single-source ordering;
 the global ridge's pooled sets are distorted by each source's label scale (pooled compression rows 0.524), which the
 rank objective removes. R2's retrains are the check on whether the probe predicts a trained network.
+
+### Method review readouts on the measured arms (2026-11-03)
+
+**EVAL compression rows** (`ceval.py`, 417 rows in six collections; row-weighted SROCC / mean logistic-fit error):
+
+| model | seed 0 | seed 1 | seed 2 | error (s0) |
+|---|---:|---:|---:|---:|
+| F3 control | 0.8949 | 0.8926 | 0.8935 | 7.03% |
+| F3 walk control | 0.8861 | 0.8892 | 0.8951 | 7.43% |
+| p30L | 0.8956 | 0.8957 | 0.8935 | 6.82% |
+| p30L + map 300 | 0.8954 | 0.8942 | 0.8945 | 6.88% |
+| mix + p30L | 0.8978 | 0.8987 | 0.8982 | 6.61% |
+| mix + p30L + map 300 | 0.8982 | 0.8975 | 0.8976 | 6.60% |
+| experiment 5, no human MOS (s0) | 0.8948 | | | 7.03% |
+| experiment 5, KADID only (s0) | 0.8892 | | | 7.13% |
+| B7 / M7 | 0.8934 / 0.8904 | | | 7.01% / 7.33% |
+| SSIMULACRA2 | 0.8963 | | | 6.92% |
+| CVVDP | 0.8763 | | | 7.07% |
+| butteraugli | 0.8544 | | | 8.61% |
+
+Within each reference, SSIMULACRA2 leads every zensim arm on CID:IQ (0.948 vs 0.942-0.943), IRCCyN-IVC (0.986 vs
+0.967-0.974) and Colourlab (0.876 vs 0.837; 18 rows, 2 references), and ties on NITS-IQA and VCL-FER. On the
+product's distortions the program's arms sit at SSIMULACRA2's level; the gains reported on all nine collections come
+mostly from their non-compression rows.
+
+**M1 paired panel** (`dataset_eval.py paired` per seed, arm minus comparator, 1,000 whole-reference resamples;
+`m1_summary.py`). Seed-mean change in SROCC per collection, and how many of the three seeds' intervals lie wholly
+above zero:
+
+| collection (rows / refs) | p30L − control | map 300 − p30L | mix + map 300 − p30L | mix − p30L |
+|---|---|---|---|---|
+| CID:IQ (210 / 7) | +0.0005 (0) | +0.0177 (3) | +0.0279 (3) | +0.0103 (3) |
+| CID:OA (91 / 7) | +0.0046 (0) | +0.0103 (0) | +0.0194 (0) | +0.0142 (0) |
+| Colourlab (192 / 3) | +0.0126 (2) | −0.0020 (0) | −0.0066 (0) | +0.0248 (0) |
+| IQA-ODI (48 / 42) | +0.0085 (0) | +0.0073 (0) | +0.0141 (1) | +0.0094 (0) |
+| IRCCyN-IVC (60 / 4) | −0.0053 (0) | −0.0043 (0) | +0.0002 (0) | +0.0055 (0) |
+| LIVE-MD (180 / 12) | −0.0041 (0) | +0.0067 (0) | +0.0014 (0) | +0.0041 (0) |
+| MDID (480 / 6) | +0.0070 (3) | +0.0071 (3) | +0.0259 (3) | +0.0302 (3) |
+| NITS-IQA (405 / 9) | +0.0120 (3) | +0.0161 (3) | +0.0415 (3) | +0.0255 (3) |
+| VCL-FER (192 / 8) | +0.0014 (0) | +0.0050 (3) | +0.0112 (3) | +0.0102 (3) |
+| row-weighted mean | +0.0058 | +0.0089 | +0.0208 | +0.0197 |
+
+No seed of any comparison has an interval wholly below zero on any collection. The mix arms train on MDID's TRAIN
+split and not on CID:IQ's, and still gain on CID:IQ's EVAL rows over p30L, which trains on both. Collections with
+fewer than about 30 references give descriptive intervals only.
+
+**R5 on the compression rows** (rank objective): all four human sources 0.872, compression rows only (m3c) 0.828,
+compression + encoder-like rows (m3cn) 0.845; single sources: KADID 0.854 vs its compression rows 0.847, TID2013
+0.864 vs 0.850 (C) and 0.896 (C+N). The probe predicts that R2's arms will not beat the walk control.
