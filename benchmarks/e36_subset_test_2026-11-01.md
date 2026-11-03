@@ -1130,3 +1130,12 @@ source folds, each arm's continuation command with only the fold table and desti
 **Comparison:** each arm against F3's control folds and against p30L's, with the private record's whole-source
 bootstrap. CLIC 2021 is not read. **Reading:** an arm whose interval against F3's control contains zero is reported
 to the owner as keeping F3's pairwise level, beside its E36 numbers; nothing is adopted on this read alone.
+
+### R8 result (2026-11-03)
+
+Neither lighter hinge keeps F3's pairwise level on AIC2026 out of fold: both arms' intervals against F3's control
+lie below zero (numbers in the training repository). The cost grows with lambda, pool-1 < pool-10 < p30L, at a nearly
+constant rate per point of E36 misordering removed. **Reading (registered):** no arm is reported as keeping F3's
+pairwise level. At every weight tried the hinge trades agreement with these human labels for agreement with the
+two reference metrics it is built from. The first attempt (one wave of all 14 runs) was stopped by run-heavy at
+3.8 GiB available; the results are from the rerun in two waves of 7.
