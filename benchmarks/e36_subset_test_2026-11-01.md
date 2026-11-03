@@ -687,7 +687,7 @@ Means over seeds 0-2 (per-seed values where they matter):
 | arm | primary (CI) | shared-three error / SROCC | all-nine error | agreement 8 px full / served | G-STEER | G-CHROMA-L | NEARID (seed 0) |
 |---|---|---|---:|---|---|---|---|
 | control (F3) | 0 | 8.80% / 0.835 | 8.55% | | | | |
-| p30L | -0.975 (-1.181, -0.799) | 8.88% / 0.843 | 8.39% | 0.738 / 0.754 (seed 0) | 135, 135, 135 | pass | pass |
+| p30L | -0.975 (-1.181, -0.799) | 8.88% / 0.843 | 8.39% | 0.738 / 0.754 (seed 0) | 135, 134, 135 | pass | pass |
 | p30L + map 300 | -1.241 (-1.436, -1.057) | 8.68% / 0.852 | 8.07% | 0.789-0.796 / 0.800-0.810 | 135, 135, 135 | pass x3 | pass (N3 137 ladders) |
 | p30L + map 1000 | -1.339 (-1.502, -1.183) | 8.32% / 0.865 | 8.23% | 0.836-0.840 / 0.839-0.841 | 135, 134, 134 | pass x3 | pass (136) |
 
@@ -729,7 +729,7 @@ seed spread; map 300 reaches 0.827. The continuation route (p30L + map 300) stay
 
 | arm (means over seeds 0-2) | held-out error | shared three: error / SROCC | all nine | primary (CI) | agreement 8 px full / served | G-STEER | G-CHROMA-L | NEARID (s0) |
 |---|---:|---|---:|---|---|---|---|---|
-| p30L | 8.88% | 8.88% / 0.843 | 8.39% | -0.975 (-1.181, -0.799) | 0.738 / 0.754 (s0) | 135, 135, 135 | pass | pass |
+| p30L | 8.88% | 8.88% / 0.843 | 8.39% | -0.975 (-1.181, -0.799) | 0.738 / 0.754 (s0) | 135, 134, 135 | pass | pass |
 | p30L + map 300 | 8.68% | 8.68% / 0.852 | 8.07% | -1.241 (-1.436, -1.057) | 0.789-0.796 / 0.800-0.810 | 135, 135, 135 | pass | pass |
 | mix + p30L + map 300 | 7.82% | 8.03% / 0.865 | 7.63% | -1.296 (-1.499, -1.094) | 0.783-0.788 / 0.806-0.816 | 135, 134, 134 | pass | pass |
 
@@ -895,7 +895,7 @@ compression + encoder-like rows (m3cn) 0.845; single sources: KADID 0.854 vs its
 
 | arm | primary (vs control) | shared three: error / SROCC | all nine | compression rows (s0/s1/s2) | map agreement 8 px full | G-STEER | G-CHROMA-L | NEARID (s0) |
 |---|---|---|---|---|---|---|---|---|
-| p30L | -0.98 | 8.88% / 0.843 | 8.39% | 0.896 / 0.896 / 0.894 | 0.738 | 135, 135, 135 | pass | pass |
+| p30L | -0.98 | 8.88% / 0.843 | 8.39% | 0.896 / 0.896 / 0.894 | 0.738 | 135, 134, 135 | pass | pass |
 | mix + p30L + map 30 | -1.08 | 8.29% / 0.858 | 7.85% | 0.898 / 0.899 / 0.898 | 0.729-0.743 | 134, 133, 133 | pass | pass |
 | mix + p30L + map 100 | -1.18 | 8.32% / 0.859 | 7.83% | 0.899 / 0.899 / 0.898 | 0.753-0.756 | 134, 130, 132 | pass | pass |
 | mix + p30L + map 300 | -1.30 | 8.03% / 0.865 | 7.63% | 0.898 / 0.898 / 0.898 | 0.783-0.788 | 135, 134, 134 | pass | pass |
@@ -958,3 +958,88 @@ rows, held-out map agreement; NEARID at seed 0), the M1 panel against each ungat
 check. **Rule:** a gated arm is a candidate only if G-STEER passes 135/135 at every seed; it removes the near-threshold
 cost if its out-of-fold difference against p30L has an interval containing zero. A gated arm that does both goes to
 the JPEG XL loop.
+
+### R2 result (2026-11-03): human rows by distortion type
+
+Six walk base fits (`m3c` and `m3cn` at seeds 0-2) against experiment 6's walk arm at the same seeds.
+
+| measure | walk (s0 / s1 / s2) | m3c (compression rows only) | m3cn (compression and encoder-like rows) |
+|---|---|---|---|
+| compression-row SROCC | 0.8861 / 0.8892 / 0.8951 | 0.8872 / 0.8895 / 0.8939 (mean +0.0001) | 0.8851 / 0.8887 / 0.8903 (mean -0.0021) |
+| all-nine error | 8.61 / 8.51 / 8.60% | 8.86 / 8.70 / 8.49% (mean +0.11) | 8.50 / 8.50 / 8.63% (mean -0.03) |
+| shared-three error | 9.17 / 9.09 / 8.96% | 9.00 / 8.92 / 8.69% (mean -0.20) | 8.91 / 8.75 / 9.01% (mean -0.18) |
+| shared-three SROCC | 0.830 / 0.834 / 0.835 | 0.845 / 0.847 / 0.850 | 0.839 / 0.848 / 0.838 |
+| primary minus walk [95%] | | -0.124 [-0.228, -0.014] | +0.043 [-0.050, +0.126] |
+| M1 panel, row-weighted ΔSROCC | | +0.0049 | +0.0044 |
+
+**Rule (amendment 1): neither arm helps.** Compression-row SROCC does not rise at all three seeds, and its seed mean
+moves +0.0001 and -0.0021 against a bar of +0.005, as R5's probe screen predicted. The original rule fails too
+(all-nine error +0.11 and -0.03 against a required fall of 0.10). Not adopted. Reported either way: keeping only
+compression rows lowers the shared-three error by about 0.2 points at every seed, and the M1 panel moves NITS-IQA up
+(m3c +0.036, interval above zero at all three seeds) and CID:IQ (+0.015, two seeds) while Colourlab (-0.016) and MDID
+(-0.017) move down. The shared-three error is not the registered statistic, and experiment 5's TID2013 + MDID mix
+lowers it by 0.5-0.85 points, so no follow-up arm is registered. Readouts: `~/tmp/e36test/postR2/` on dev.
+
+### R3 result (2026-11-03): the map term on views at quality <= 60
+
+| arm (seeds 0-2) | G-STEER | primary (CI) | shared-three / all-nine error | compression rows | agreement 8 px full | M1 vs ungated twin |
+|---|---|---|---|---|---|---|
+| p30L + map 300 | 135, 135, 135 | -1.241 (-1.436, -1.057) | 8.64-8.71 / 8.03-8.10% | 0.894-0.895 | 0.789-0.796 | |
+| p30L + map 300, q <= 60 | **131, 133, 133** | -1.234 (-1.423, -1.061) | 8.65-8.70 / 8.13-8.15% | 0.892-0.894 | 0.781-0.786 | -0.0007 |
+| mix + p30L + map 300 | 135, 134, 134 | -1.296 (-1.499, -1.094) | 8.00-8.07 / 7.58-7.67% | 0.8975-0.8982 | 0.783-0.788 | |
+| mix + p30L + map 300, q <= 60 | **131, 134, 134** | -1.305 (-1.508, -1.105) | 8.06-8.15 / 7.67-7.73% | 0.8974-0.8978 | 0.784-0.786 | -0.0016 |
+
+G-CHROMA-L passes for all six runs; NEARID passes at seed 0 (138 and 136 of 144 ladders monotone). G-STEER misses:
+broad-220-b8 at every seed of both gated arms (m3f 0.671-0.695, bar 0.70), I21_10_05 at seeds 0-1 of the p30L arm
+(m3f 0.692-0.694), broad-206 at b8/b16/b64 at seed 0 of both (m2 0.951-0.981, bar 0.99) and broad-73-b64 at seed 2
+of the p30L arm (m2 0.988). The M1 panel against the ungated twins is at or below zero in every collection but
+NITS-IQA; the mix arm's CID:IQ and MDID intervals lie below zero at all three seeds.
+
+**Rule: neither gated arm is a candidate** (G-STEER fails at every seed). The private out-of-fold check (numbers in
+the training repository) finds the gate leaves the map term's AIC2026 cost in place: both gated arms' intervals
+against p30L still exclude zero. **Reading:** the cost does not come from the high-quality views, and those views
+carry the map rank that G-STEER's broad-220-b8 and I21_10_05 cases check. The hypothesis is not supported; the ungated
+map 300 arms stand as before. Readouts: `~/tmp/e36test/postR3/` on dev.
+
+### Correction (2026-11-03): p30L's G-STEER is 135, 134, 135
+
+p30L's seed 1 misses broad-206-b64 (m2 0.979, bar 0.99). Amendment 2's table had this right; the experiment 3,
+experiment 5 and amendment 7 tables listed p30L as 135, 135, 135 and are corrected above. Consequence: amendments 5
+and 7 and R3 made "135/135 at every seed" the candidate rule, which p30L itself does not meet. Under amendment 2's
+guard (G-STEER as F3 passed it: 135 at seed 0 and a three-seed mean not below the control's 134.33), p30L (mean
+134.67) and mix + p30L + map 300 (135, 134, 134; mean 134.33) both pass. Which rule governs the choice between them is
+the owner's decision; the registered rules are not changed after the fact.
+
+### Confirmation read 1 registration (2026-11-03, before the read): CLIC 2021 validation
+
+Owner, 2026-11-03: "use CLIC 2021 validation". **Set:** `clic-2021-perceptual`, the native validation pairs only
+(4,812 questions over 315 reference crops); exposure entry in `docs/DATA_SPLITS.md` (2026-11-03). **Disclosures**
+(D4): CLIC 2021 shares CLIC's test protocol with CLIC 2024, R7's proposed training leg; the M2 screen already scored
+these pairs with third-party metrics (SSIMULACRA2 0.626, butteraugli 0.606, CVVDP 0.639, DVIFM 0.629; observer
+agreement 0.769). **Features:** the EVAL collections' extractor and bank format (revision 7, basic+peaks+v2@w1825), keys
+built from paths only. **Statistic:** two-alternative agreement in `dataset_eval.py`'s soft-label form per model, and
+each challenger's paired difference against p30L at the same seed through a whole-reference cluster bootstrap (315
+references, 10,000 draws, seed 20261103), summarized as the seed-mean difference with the interval of the seed-mean
+difference. **Models:** F3 control, p30L, p30L + map 300 and mix + p30L + map 300, seeds 0-2 each. **Reading rule:** a
+challenger is "supported" if its interval lies wholly above zero, "contradicted" if wholly below, otherwise
+"neutral". A contradicted challenger is not recommended; otherwise the existing measures and the owner decide.
+Nothing is fitted, tuned or selected on this read beyond that rule.
+
+### R7 registration (2026-11-03, before the leg builder reads any label): CLIC 2024 as a training leg
+
+Owner, 2026-11-03: "go ahead with R7". **Data:** `clic-2024-perceptual-image`, all 24,805 questions (native split test).
+Per D4 the 24,786 reference crops are exact subimages of 32 originals that are SafeSyn training sources, so the set
+can only train. **Leg:** each question becomes a two-row comparison in the BAPPS leg's form: (reference crop, a) and
+(reference crop, b) with targets p_a = (n_a + n_tie/2)/n and 1 - p_a, mode `withinref,rank`, nominal weight 0.5 (train
+weight 1.0 after the two-sided acceptance correction); questions with p_a = 1/2 carry no order and are dropped. Family:
+the question's original, from D4's crop-to-original table (`followup/clic-2024-perceptual-image-source-disposition.tsv`).
+**Features:** the same extractor and bank format; every crop is 768x768. **Arms** (the leg added to the base fit,
+everything else unchanged): (a) p30L's recipe, (b) mix + p30L + map 300's recipe; seeds 0-2, plus the AIC2026 folds
+at seed 0 (private). **Twins:** p30L and mix + p30L + map 300 at the same seeds. **Measures:** the amendment-2 set
+(primary, G-STEER, G-CHROMA-L, NEARID at seed 0, error against human ratings, EVAL compression rows, map agreement),
+the M1 panel against each twin, the private out-of-fold check, and confirmation read 2 on CLIC 2021 validation (read
+1's statistic and reading rule, each arm against its twin). **Rule:** an arm helps if its compression-row SROCC seed
+mean falls by no more than 0.003 against its twin, its all-nine error rises by no more than 0.30 points, G-STEER
+passes amendment 2's guard (the stricter every-seed rule reported alongside), G-CHROMA-L and NEARID pass, and read 2
+supports it. **Disclosure:** for R7 the CLIC 2021 read is the decision statistic, so an adopted R7 arm has no
+independent confirmation on CLIC 2021; its read there is a selection read.

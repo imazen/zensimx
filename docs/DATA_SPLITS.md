@@ -2990,3 +2990,22 @@ judge zensim candidates, before one of them is registered as E36's confirmation 
 - **Consequence:** the set later registered as the confirmation set carries this screen's third-party statistics as
   disclosed exposure. NNCD-IQA and both MIDD sets share every source photo with TID2013 (a training source) and
   mucped23 uses CID22's references, so none of those four can support an independent-validation claim (D4 table).
+
+## Exposure registration — 2026-11-03: E36 confirmation set (CLIC 2021 validation) and R7 (CLIC 2024 training leg)
+
+Owner, 2026-11-03: "use CLIC 2021 validation, and go ahead with R7". The reads, models and decision rules are in the
+zensimx record `benchmarks/e36_subset_test_2026-11-01.md` (confirmation read 1 and R7 registrations).
+
+- **CLIC 2021 perceptual, native validation pairs only** (`split` = `valid`: 4,812 questions over the 315 validation
+  crops), now E36's confirmation set. Each read is registered in the record before it happens, names its models and
+  reading rule, and lists the rows it parses in its `LABEL_READS.json`. No model is fitted, tuned or selected on these
+  rows except by a registered reading rule. The 3,540 native test crops stay unread. Prior exposure: the M2 trust
+  screen (third-party metrics only). Disclose wherever it is read that it shares CLIC's test protocol with CLIC 2024
+  (D4) and that CLIC 2024's library README names it as 2024's validation set.
+- **CLIC 2024 perceptual image, all 24,805 questions, TRAIN** (R7's leg; the D4 role "TRAIN candidate" becomes
+  TRAIN for this experiment). The leg builder reads `n_a`, `n_b` and `n_tie` for every question and ledgers the read.
+  Families come from D4's crop-to-original table; all 32 originals are SafeSyn training sources, so the set never
+  serves as an assessment pool. **Disclosure:** on 2026-11-03, while checking the table's header before this entry
+  was committed, two rows' vote counts were printed (single votes, both for a), and the library README's check
+  (raters side with the higher-PSNR crop in 1,080 of 1,500 sampled votes) had been read. Neither touches an
+  assessment set.
