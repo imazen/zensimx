@@ -605,3 +605,16 @@ m2 0.958; dog-256-20, m2 0.941; the bar is m2 >= 0.99 and m3f >= 0.70). The no-m
 dog-256-20 map 30 raises m3f (the map's rank agreement with the true repair gains) from 0.851 to 0.902, but m2 (the
 first-order prediction from the exact feature changes against the true score change) falls from 1.000 to 0.941: the
 term makes the score less linear around that case. That is the same failure as the hinge at lambda >= 50.
+
+### Experiment 6 result: the walk makes training less seed-dependent (2026-11-02)
+
+| sampler | all-nine error, seeds 0 / 1 / 2 | mean | spread | shared-three spread | pooled row coverage |
+|---|---|---:|---:|---:|---:|
+| uniform (control) | 8.38 / 8.71 / 8.38 | 8.49% | 0.33 | 0.61 | 0.563 |
+| `--pair-sampling walk` | 8.61 / 8.51 / 8.60 | 8.57% | 0.10 | 0.21 | 0.630 |
+
+The walk cuts the seed-to-seed spread of error against human ratings about threefold at a similar mean (8.57% vs
+8.49%, well inside the control's own spread). Three seeds per arm make the spread estimate coarse. Pruning (seed 0)
+gave nothing beyond the control's spread, and stratified sampling cannot run under this recipe. Recipe consequence:
+the walk is a candidate default for E36-family base fits, because it makes a single-seed comparison more
+trustworthy; it does not by itself lower error.
