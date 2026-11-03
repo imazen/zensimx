@@ -1,0 +1,14 @@
+
+| driver | illustration ms | photo ms | screen ms |
+|---|---|---|---|
+| none | 66 | 72 | 65 |
+| B | 495 | 573 | 559 |
+| F3lintail | 602 | 648 | 570 |
+| M7lintail | 489 | 524 | 462 |
+| butteraugli | 376 | 411 | 356 |
+| map300lintail | 596 | 616 | 591 |
+| mixmap300lintail | 606 | 621 | 579 |
+| p30Llintail | 624 | 611 | 582 |
+
+ALL-DONE
+rc=0

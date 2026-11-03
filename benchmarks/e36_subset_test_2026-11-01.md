@@ -741,3 +741,17 @@ By the registered rule it does not pass G-STEER, so its loop run is not a select
 **Amendment 6, before running:** the JPEG XL loop (step 4 protocol, i270) for mix + p30L + map 300 at seed 0 (its
 G-STEER-clean seed), recorded as information for the owner's decision on the single-case G-STEER misses, against p30L,
 p30L + map 300 and the butteraugli loop.
+
+### Experiment 5 amendment 6 result: the mix with p30L and map 300 in the JPEG XL loop (seed 0, i270)
+
+Fresh loop build (zensimx f9e05d82, `e36_loop_mix.sh`); B/M7 placements reproduce, and the arms shared with step 4
+(p30L, p30L + map 300, butteraugli, F3, M7, B) give the same BD-rates. 78 images; positive = fewer bytes:
+
+| arm | vs | ssim2 | butteraugli | zensim | DVIFM | CVVDP |
+|---|---|---|---|---|---|---|
+| mix + p30L + map 300 | p30L | +0.88 [+0.62, +1.15] | +0.98 [+0.65, +1.31] | +0.61 [+0.21, +1.02] | +1.04 [+0.39, +1.74] | +1.02 [+0.60, +1.37] |
+| mix + p30L + map 300 | p30L + map 300 | +0.36 [+0.06, +0.70] | +0.10 [-0.23, +0.47] | +0.28 [-0.14, +0.76] | +0.51 [-0.30, +1.30] | +0.16 [-0.22, +0.50] |
+| mix + p30L + map 300 | butteraugli loop | -1.52 | -3.91 | -1.01 | -1.72 | -3.31 |
+
+The mix arm improves on p30L for every judge, with every interval above zero, and is the best zensim arm in the loop.
+Its only failed check is G-STEER at seeds 1-2 (one case each). Tables: `benchmarks/e36_loop_mix_2026-11-02/`.

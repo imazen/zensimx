@@ -1,0 +1,1 @@
+M7lintail=zensim-Mfull@rev7@2.586523e-2,0.7 F3lintail=zensim-F3@rev7@2.292213e-2,0.7 p30Llintail=zensim-p30L@rev7@2.277448e-2,0.7 map300lintail=zensim-map300@rev7@3.526694e-2,0.7 mixmap300lintail=zensim-mixmap300@rev7@3.686635e-2,0.7
