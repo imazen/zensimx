@@ -724,3 +724,20 @@ The base-fit route keeps the trainer's in-distribution development score (0.958,
 the primary, but not error against human ratings, and map 100 misses one G-STEER case. Base fits alone: map 100 at
 seeds 0-2 gives agreement 0.792 / 0.789 / 0.791 (control 0.720) with error against human ratings inside the control's
 seed spread; map 300 reaches 0.827. The continuation route (p30L + map 300) stays the candidate.
+
+### Experiment 5 amendment 5 result: the TID2013 + MDID mix with p30L and map 300 (seeds 0-2)
+
+| arm (means over seeds 0-2) | held-out error | shared three: error / SROCC | all nine | primary (CI) | agreement 8 px full / served | G-STEER | G-CHROMA-L | NEARID (s0) |
+|---|---:|---|---:|---|---|---|---|---|
+| p30L | 8.88% | 8.88% / 0.843 | 8.39% | -0.975 (-1.181, -0.799) | 0.738 / 0.754 (s0) | 135, 135, 135 | pass | pass |
+| p30L + map 300 | 8.68% | 8.68% / 0.852 | 8.07% | -1.241 (-1.436, -1.057) | 0.789-0.796 / 0.800-0.810 | 135, 135, 135 | pass | pass |
+| mix + p30L + map 300 | 7.82% | 8.03% / 0.865 | 7.63% | -1.296 (-1.499, -1.094) | 0.783-0.788 / 0.806-0.816 | 135, 134, 134 | pass | pass |
+
+The mix with the map term has the lowest error against human ratings of any arm at every seed (shared three
+8.02 / 8.07 / 8.00%) and the best primary among gate-tested 3-seed arms, and the map term cut the mix's G-STEER misses
+from 3-4 per seed to 0-1: seed 1 misses broad-220-b8 (m3f 0.686, bar 0.70), seed 2 broad-164-b64 (m2 0.986, bar 0.99).
+By the registered rule it does not pass G-STEER, so its loop run is not a selection step.
+
+**Amendment 6, before running:** the JPEG XL loop (step 4 protocol, i270) for mix + p30L + map 300 at seed 0 (its
+G-STEER-clean seed), recorded as information for the owner's decision on the single-case G-STEER misses, against p30L,
+p30L + map 300 and the butteraugli loop.

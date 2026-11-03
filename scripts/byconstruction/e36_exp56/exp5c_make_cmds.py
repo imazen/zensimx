@@ -16,8 +16,11 @@ FLAGS = ['--human-sources', 'tid2013', '--exclude-datasets', ','.join(d for d in
 base = json.loads((H / 'control-s0.cmd.json').read_text())
 
 
-def command(seed):
-    tag = f'tid2013_mdid-p30L-s{seed}'
+MAP = O / 'map-pool-16/manifest.json'
+
+
+def command(seed, map_weight=None):
+    tag = f'tid2013_mdid-p30L-s{seed}' if map_weight is None else f'tid2013_mdid-p30L-map{map_weight:g}-s{seed}'
     bindir = OUT / f'bin-{tag}'
     bindir.mkdir(parents=True, exist_ok=True)
     for f in (H / 'bin-fast').iterdir():
@@ -25,6 +28,8 @@ def command(seed):
             os.symlink(f.resolve(), bindir / f.name)
     extra = (f'--tv-pool {O / "pool-F3" / "manifest.json"} --tv-weight 30.0 --tv-apply-every 50 --tv-batch 32 '
              f'--tv-margin 0.05 --level-pool {LEVEL} --level-ref {REF[seed]} --level-weight 1.0 --level-batch 32')
+    if map_weight is not None:
+        extra += f' --map-pool {MAP} --map-weight {map_weight!r} --map-batch 8 --map-sign 1'
     w = bindir / 'zensim_mlp_train'
     w.write_text(f'#!/bin/sh\n# E36 experiment 5 stage 3 arm {tag}\nexec {TRAINER} "$@" {extra}\n')
     w.chmod(0o755)
@@ -44,4 +49,5 @@ def command(seed):
     return tag
 
 
-print(' '.join(command(s) for s in (0, 1, 2)))
+w = float(sys.argv[1]) if len(sys.argv) > 1 else None
+print(' '.join(command(s, w) for s in (0, 1, 2)))
