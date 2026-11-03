@@ -1,0 +1,6 @@
+none 702 encodes; 0 differ from experiment 5 amendment 6
+butteraugli 702 encodes; 0 differ from experiment 5 amendment 6
+B 702 encodes; 0 differ from experiment 5 amendment 6
+M7lintail 702 encodes; 0 differ from experiment 5 amendment 6
+F3lintail 702 encodes; 0 differ from experiment 5 amendment 6
+p30Llintail 702 encodes; 0 differ from experiment 5 amendment 6

@@ -35,6 +35,7 @@ admission checks still run on every arm.
   home directory as `$HOME`. The AIC2026 fold scoring scripts are in the private training repository.
 - Dial comparison (record: "Dial comparison"): `ladder_smoothness.py` (label-free reversal and wrong-way shares on
   E36's held-out ladders) and `inversion_by_gap.py` (inversion share by quality-setting gap).
-- R10 (the mix on F3's recipe): `r10_make_cmds.py` (in the runs' layout `r10/make_cmds.py`), `chainR10.sh`, `postR10.sh`.
+- R10 (the mix on F3's recipe): `r10_make_cmds.py` (in the runs' layout `r10/make_cmds.py`), `chainR10.sh`, `postR10.sh`;
+  its JPEG XL loop (amendment 1): `../e36_loop_r10.sh`, `r10_chainLoop.sh` and `r10_loop_i270_run.sh`.
 
 Paths inside the scripts are the dev host's scratch layout (`~/tmp/e36test`) where the runs live.

@@ -1276,3 +1276,27 @@ reproduce amendment 6's i270 bitstreams. **Statistic:** BD-rate (`rd_probe_analy
 F3 and against the butteraugli loop. **Reading:** `mixF3` shows no steering cost if its BD-rate against F3 has an
 interval containing or above zero under both SSIMULACRA2 and butteraugli; CVVDP, zensim and DVIFM are reported
 beside them (CVVDP does not decide, per the dial comparison).
+
+### R10 amendment 1 result (2026-11-03, i270): the mix on F3's recipe in the JPEG XL loop
+
+Fresh loop build (`e36_loop_r10.sh`); the B and M7 placement rows reproduce the 2026-10-25r7win calibration (4 of 4),
+and all six shared arms (none, butteraugli, B, M7, F3, p30L) reproduce experiment 5 amendment 6's i270 bitstreams in
+702 of 702 encodes each. Placements: F3 2.292e-2, p30L 2.277e-2, `mixF3` 2.248e-2 (exponent 0.7). BD-rate, 78
+images, positive = fewer bytes at equal judged quality, 95% bootstrap over images:
+
+| `mixF3` against | ssim2 | butteraugli | zensim | DVIFM | CVVDP |
+|---|---|---|---|---|---|
+| F3, all images | +0.19 [-0.09, +0.46] | -0.21 [-0.56, +0.12] | +0.26 [-0.02, +0.56] | -0.25 [-0.99, +0.40] | +0.17 [-0.22, +0.59] |
+| F3, photo (38) | +0.37 [+0.22, +0.51] | -0.22 [-0.40, -0.03] | +0.27 [-0.01, +0.53] | +0.12 [-0.48, +0.95] | -0.03 [-0.18, +0.12] |
+| F3, illustration (22) / screen (18) | -0.43 / +0.56 (both across 0) | -0.64 / +0.35 (both across 0) | | | |
+| butteraugli loop, all images | -2.18 | -5.31 | -1.66 | -3.04 | -4.22 |
+
+**Reading (registered):** `mixF3` shows no steering cost: against F3 both deciding intervals (SSIMULACRA2 and
+butteraugli) contain zero over all images. On photos it gains under SSIMULACRA2 (+0.37%) and loses slightly under
+butteraugli (-0.22%). Like every zensim arm it stays 2-5% behind butteraugli's own loop (F3: -2.42 / -5.17 / -4.44).
+G-STEER's broad-220-b8 miss does not show in the loop. Whether a single-case G-STEER miss with a clean loop result is
+acceptable for adoption is the owner's decision; nothing is adopted on this read. Tables:
+`benchmarks/e36_loop_r10_2026-11-03/`; encodes and judge tables on tower
+`/mnt/tower/output/zensim/e36-subset-test-2026-11-01/r10-amend1-jxl-i270/` (SHA256SUMS), beside the experiment 3
+step 4 and experiment 5 amendment 6 runs (`exp3-step4-jxl-i270/`, `exp5-amend6-jxl-i270/`), mirrored from i270 the
+same day.
