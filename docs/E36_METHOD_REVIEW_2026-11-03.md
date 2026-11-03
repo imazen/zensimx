@@ -33,7 +33,7 @@ catalogue. AIC2026 numbers stay in the private training repo.
    source beats the full mix on untrained collections) is what that predicts. The D1 four-source decision was about
    licence and role, not about which rows deserve weight.
 3. **The error-against-human readout is weaker than the data allows.** It fits a 4-parameter logistic per collection on
-   the EVAL rows themselves (the papers fit the mapping on training data), normalises by the target's 1-99% span (so a
+   the EVAL rows themselves (ITU-T P.1401's convention, so the residuals are in-sample), normalises by the target's 1-99% span (so a
    hard collection and an easy one count the same), takes a median (tails invisible), averages 48-row and 480-row
    collections equally, and carries no interval. KADID and TID2013 ship per-stimulus standard deviations, so Z-RMSE and
    the outlier ratio (the papers' decisive statistics) are computable on them and were never used. No comparison in the
@@ -56,22 +56,28 @@ catalogue. AIC2026 numbers stay in the private training repo.
 
 ## Revised methodology (register, then run)
 
-**M1. Readout.** Replace the median-residual readout with the papers' panel per collection: SROCC, KROCC, PLCC after a
-mapping fitted on TRAIN rows only, RMSE on the collection's own scale, and Z-RMSE and OR where per-stimulus sigma
+**M1. Readout.** Replace the median-residual readout with the papers' panel per collection: SROCC, KROCC, PLCC after the
+P.1401 4PL mapping, RMSE on the collection's own scale, and Z-RMSE and OR where per-stimulus sigma
 exists (KADID, TID2013, and any library set with `std`). Aggregate with sources as the resampling unit (pigeonhole
 bootstrap over source x codec where codecs exist) and report every arm-vs-control difference as a paired interval.
 Weight collections by their row count or report them separately; never a flat mean over collections.
 
 **M2. One registered confirmation set, read once.** Compression-centric human sets in the library that no training
-leg or EVAL touches: NNCD-IQA (320 MOS, learned codecs + JPEG 2000; the set DVIFM's authors used), JND-MID-MA (210
-first-JND thresholds, JPEG and BPG, 105 scenes), MIDD-CAP (near-lossless JPEG identification rates), MMSPG-JPEG-XR
-(208 MOS), VLIC Cambridge (visually-lossless thresholds). Register the set and the statistic, read once for the final
-two candidates and p30L, after everything else.
+leg or EVAL touches: NNCD-IQA (320 MOS, learned codecs + JPEG 2000; the set DVIFM's authors used), MIDD-CAP and
+MIDD-GAR (near-lossless identification rates), MMSPG-JPEG-XR (186 MOS), CLIC 2021's 315 validation crops (2AFC),
+CIQA (2AFC between JPEG qualities), mucped23 (2AFC, jpegli), Fidelity-LIC (learned codecs), and the threshold sets
+JND-MID-MA and VLIC Cambridge. `docs/DATA_SPLITS.md` limits what each can claim: NNCD and both MIDD sets share every
+source photo with TID2013, a training source, so they are source-exposed diagnostics; mucped23 uses CID22's
+references; CLIC 2021's validation crops and CIQA are source-independent; CSIQ, LIVE release 2 and KonJND JPEG stay
+reserved for the Rev4 confirmation and CLIC 2022 is TERMINAL. Screen the candidates with third-party metrics first
+(which labels are reliable and agree with SSIMULACRA2 and its peers), then register one set and its statistic and
+read it once for the final two candidates and p30L, after everything else.
 
 **M3. Human training rows by distortion relevance, not by dataset.** Build the human leg from the compression rows of
-KADID (distortions 07 JPEG 2000, 08 JPEG) and TID2013 (10 JPEG, 11 JPEG 2000, 12-13 transmission errors), plus
-KonFiG, CID22-A25, and the dataset legs, at equal per-row weight; keep the synthetic distortions as a small integrity
-leg (weight 1) rather than the bulk. Compare with equal total weight, so weighting and identity are separated.
+KADID (09 JPEG 2000, 10 JPEG), TID2013 (10 JPEG, 11 JPEG 2000, 21 lossy compression of noisy images), KonFiG-IQA
+(JPEG 2000 only; its other six types are synthetic) and all of CID22-A25, beside the dataset legs; keep the synthetic
+distortions as a small integrity leg rather than the bulk. Compare at equal total weight, so weighting and identity
+are separated.
 
 **M4. Cheap screens before retrains.** For any "which data helps" question, fit ridge or 4PL heads on the frozen F3
 features per source and score on the others (minutes), then retrain only the top two configurations.
@@ -106,3 +112,11 @@ judges that did not train it agree. Report butteraugli and CVVDP as diagnostics 
 - "Scale 0 mandatory", "no NEON", "p30L for now" are untouched by this review.
 - The D1 human-role decision (four sources) does not say the sources' synthetic-distortion rows must carry the human
   leg's weight; M3 stays within it.
+
+## Corrections (2026-11-03, after the review was committed)
+
+KADID-10k's compression types are 09 (JPEG 2000) and 10 (JPEG), not 07 and 08 (DeepFL-IQA, arXiv:2001.08113, lists
+the types). KonFiG-IQA's types are colour diffusion, high sharpen, jitter, JPEG 2000, lens blur, motion blur and
+multiplicative noise, so only its JPEG 2000 rows are compression. P.1401 fits the mapping on the evaluated data
+itself; the review had said the papers fit it on training data. M2 now carries `docs/DATA_SPLITS.md`'s exposure
+limits for each candidate set.

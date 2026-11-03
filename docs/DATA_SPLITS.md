@@ -2968,3 +2968,25 @@ is authorized by the generation/leg registration.
 Artifact and qualification pointers: the byconstruction record's chroma
 sections and `/mnt/tower/output/zensim/byc-chroma-20261028/`. The stage-C
 readiness receipt, once present, identifies the qualified fx1/fx2 roots.
+
+## Exposure registration — 2026-11-03: dataset trust screen (E36 method review M2), before any read
+
+Owner, 2026-11-03: "on m2, it would be good to know which datasets are trustworthy and seem to reasonably correlate
+with ssim2 and other leading models". The screen decides which compression-centric human sets are reliable enough to
+judge zensim candidates, before one of them is registered as E36's confirmation set.
+
+- **Labels read** (each read listed in the screen's `LABEL_READS.json`): NNCD-IQA (320 MOS rows), MMSPG JPEG XR (186
+  MOS rows), MIDD-CAP (192 identification-rate rows), MIDD-GAR (200), CLIC 2021 perceptual native validation pairs
+  only (rows whose `split` is `valid`; the test pairs' labels are not parsed), mucped23 (9,314 pairs) and Fidelity
+  LIC VCIP 2023 (132 pairs).
+- **Scored:** pixels only, with third-party metrics: SSIMULACRA2, butteraugli (max and 3-norm) and CVVDP from the
+  pinned zenmetrics judge build (`zenmetrics-judge-7a0f8394`), and DVIFM 0.3 from its frozen runtime. BMP and PNM
+  inputs are decoded with zenbitmaps (`scripts/byconstruction/trust_decode`) and written as RGB8 PNG. **No zensim
+  model is scored, fitted or selected on these rows**; the screen chooses datasets, never models.
+- **Not read:** CIQA (the TensorFlow pipeline's adjusted reference pixels are not stored, so a full-reference score
+  needs them first), CLIC 2022 (TERMINAL) and CLIC 2021's test pairs, CSIQ, LIVE release 2 and KonJND JPEG (reserved
+  for the Rev4 confirmation), CID22-B, KADID TERMINAL and AIC2026 public_test (sealed), and the threshold sets
+  (JND-MID-MA, VLIC Cambridge, Konstanz PJND), which need a threshold analysis rather than a rank screen.
+- **Consequence:** the set later registered as the confirmation set carries this screen's third-party statistics as
+  disclosed exposure. NNCD-IQA and both MIDD sets share every source photo with TID2013 (a training source) and
+  mucped23 uses CID22's references, so none of those four can support an independent-validation claim (D4 table).

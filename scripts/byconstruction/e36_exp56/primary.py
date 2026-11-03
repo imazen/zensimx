@@ -8,6 +8,7 @@ for line in open(selection):
     origin[s['source_sha256']] = json.loads(s['identity'])['origin']
 import os
 SEEDS = [int(x) for x in os.environ.get('SEEDS', '0,1,2').split(',')]  # SEEDS=0 for a seed-0 screen
+CONTROL = os.environ.get('CONTROL', 'control')  # the arm every other arm is compared with
 arms = {a: [f"{a.replace('-', '_')}_s{s}" for s in SEEDS] for a in (sys.argv[4].split(',') if len(sys.argv) > 4 else ['control', 'pool-1', 'pool-10'])}
 cols = ['reference_sha256', 'split', 'scored'] + [f'{m}_inv' for v in arms.values() for m in v]
 p = pq.read_table(pairs, columns=cols).to_pandas()
@@ -24,16 +25,16 @@ def share(w, arm):  # mean over seeds of weighted inversion share
 rng = np.random.default_rng(20261101)
 W = rng.multinomial(len(origins), np.full(len(origins), 1 / len(origins)), size=10000).astype(float).T  # origins x draws
 res = {}
-base = share(np.ones(len(origins)), 'control'); base_b = share(W.T, 'control') if False else None
-ctrl_b = np.mean([(K[m] @ W) / (N @ W) for m in arms['control']], axis=0)
-for arm in [a for a in arms if a != 'control']:
+base = share(np.ones(len(origins)), CONTROL)
+ctrl_b = np.mean([(K[m] @ W) / (N @ W) for m in arms[CONTROL]], axis=0)
+for arm in [a for a in arms if a != CONTROL]:
     est = share(np.ones(len(origins)), arm) - base
     arm_b = np.mean([(K[m] @ W) / (N @ W) for m in arms[arm]], axis=0)
     d = arm_b - ctrl_b
     lo, hi = np.quantile(d, [0.025, 0.975])
     seeds = {m: float(K[m].sum() / N.sum()) for m in arms[arm]}
     res[arm] = dict(diff=float(est), ci95=[float(lo), float(hi)], arm_share=float(share(np.ones(len(origins)), arm)), seeds=seeds)
-res['control'] = dict(share=float(base), seeds={m: float(K[m].sum() / N.sum()) for m in arms['control']})
+res[CONTROL] = dict(share=float(base), seeds={m: float(K[m].sum() / N.sum()) for m in arms[CONTROL]})
 res['meta'] = dict(sources=len(origins), pairs=int(N.sum()), draws=10000, seed=20261101, unit='selection source (origin)')
 json.dump(res, open(out, 'w'), indent=1)
 print(json.dumps(res, indent=1))

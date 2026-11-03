@@ -764,3 +764,42 @@ alone fails G-STEER (3-4 cases per seed), and map 300 brought that to 0-1. **Arm
 mix + p30L + map 100, seeds 0-2, full recipe, measured with the amendment-2 set (G-STEER, G-CHROMA-L, primary,
 error against human ratings, held-out map agreement; NEARID at seed 0), plus the AIC2026 out-of-fold check. A
 configuration is a candidate only if G-STEER passes 135/135 at every seed.
+
+## Revised plan (method review, `docs/E36_METHOD_REVIEW_2026-11-03.md`)
+
+The review's experiments are numbered R1-R6 here, so they don't collide with experiments 1-6 above.
+
+### R2 registration (2026-11-03, before any run): human rows by distortion type (method review M3)
+
+Owner, 2026-11-03: "m3, yes, reweight away from synthetic rows if it seems to help". `scripts/byconstruction/e36_exp56/m3_rows.py`
+tags each of the 10,590 human fit rows with its distortion type (the E36 bank's `codec`, joined on
+`member_set`/`pair_key`) and writes `--human-rows` keep lists:
+
+| tier | types | rows |
+|---|---|---:|
+| C, compression | KADID 09 JPEG 2000, 10 JPEG; TID2013 10 JPEG, 11 JPEG 2000, 21 lossy compression of noisy images; KonFiG JPEG 2000; all eight CID22-A25 codecs | 2,411 |
+| N, encoder-like artifacts | KADID 01 Gaussian blur, 06 colour quantization, 15 denoise, 21 pixelate, 22 quantization; TID2013 07 quantization noise, 08 Gaussian blur, 09 image denoising, 22 colour quantization with dither | 1,604 |
+| S, the rest | noise, colour and brightness shifts, contrast, jitter, transmission errors, sharpening, ... | 6,575 |
+
+**Arms:** `m3c` keeps tier C (2,411 rows), `m3cn` tiers C and N (4,015 rows). Both keep 93 of the 100 references:
+KonFiG's seven part-B references hold only motion blur and leave the leg. **Control:** experiment 6's walk arm (all
+rows). **Recipe:** F3's base-fit step through the experiment copy, walk sampler (trainer bdf7a835), seeds 0-2. The
+human group's weight and its uniform draw over references are unchanged, so a kept reference keeps an equal share and
+an arm changes only which rows its pairs compare.
+
+**Measures:** error against human ratings (the experiment 5 readout: shared three and all nine), the M1 panel per
+collection (`dataset_eval.py paired`, arm minus walk control at each seed, whole-reference bootstrap), and the E36
+primary against the walk control. **Rule:** the reweighting "helps" if the seed-mean all-nine error falls by more than
+the walk control's seed spread (0.10 points) and the shared-three error does not rise; then it moves into the full
+recipe (continuation with p30L) and the gate set. Otherwise it is recorded as not adopted.
+
+### M2 registration (2026-11-03, before any read): dataset trust screen
+
+Owner, 2026-11-03: "on m2, it would be good to know which datasets are trustworthy and seem to reasonably correlate
+with ssim2 and other leading models". Exposure registered in `docs/DATA_SPLITS.md` (2026-11-03 entry): NNCD-IQA, MMSPG
+JPEG XR, MIDD-CAP, MIDD-GAR, CLIC 2021's validation pairs, mucped23 and Fidelity-LIC, scored with SSIMULACRA2,
+butteraugli, CVVDP (pinned judge build) and DVIFM 0.3 (frozen runtime). No zensim model is scored on them. Per set:
+each metric's rank agreement (SROCC overall and within reference for MOS sets, two-alternative agreement for pair
+sets, with whole-reference intervals), the metrics' agreement with each other, and label-quality signals (rater
+counts, standard errors, whether ratings fall as the codec setting gets worse). The EVAL collections' existing
+SSIMULACRA2, butteraugli and CVVDP scores join the table without a new read.
