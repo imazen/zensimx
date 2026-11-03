@@ -547,3 +547,28 @@ registered rule no pruning arm goes to stage 2. The walk (all-nine 8.61% at seed
 0.563; its trainer digest equals the coverage replay's) is for seed independence, which one seed cannot show.
 **Amendment, before running:** the walk also runs at seeds 1-2. Its outcome is the spread of all-nine error across
 seeds 0-2 against the control's (0.33 points), with the mean reported beside it.
+
+### Experiment 5 three-seed confirmation (2026-11-02)
+
+| configuration | held-out error, seeds 0 / 1 / 2 (mean) | shared three: error / SROCC (means) | all nine (mean) |
+|---|---|---:|---:|
+| full MOS mix (control) | 8.81 / 9.41 / 8.90 (9.04%) | 9.04% / 0.832 | 8.49% |
+| TID2013 + MDID | 8.31 / 8.53 / 8.30 (8.38%) | 8.45% / 0.846 | 8.17% |
+| TID2013 alone | 8.33 / 8.55 / 8.47 (8.45%) | 8.46% / 0.849 | 8.45% |
+| PIPAL alone | 8.33 / 8.71 / 8.33 (8.46%) | 9.04% / 0.828 | 8.46% |
+
+TID2013 + MDID (the human leg restricted to TID2013's rows and the MDID dataset leg, sharing the full MOS weight
+equally) is better than the full mix at every seed: its worst held-out seed (8.53%) beats the control's best (8.81%),
+and on the three collections no arm trains on it lowers error by 0.59 points and raises SROCC by 0.014. These are
+base fits; EVAL chose the configuration, so EVAL is now selection data for it.
+
+### Experiment 5 stage 3 (registered 2026-11-02, before any run): the TID2013 + MDID mix through the full recipe
+
+- **Arms (seeds 0-2):** F3's continuation step (60 epochs, AIC x256) from the TID2013 + MDID base fits, with the same
+  MOS mix in the continuation, plus p30L's hinge and level terms (pool-F3 lambda 30, level weight 1, the level
+  reference unchanged: F3's control at epoch 59). Control: p30L seeds 0-2 (amendment 2).
+- **Measures:** amendment 2's set (primary, error against human ratings over EVAL, G-CHROMA-L dev, G-STEER, NEARID) and
+  the held-out map agreement of experiment 3.
+- **Confirmation on data no arm selected with:** the tower IQA library's MOS datasets that are in no training leg and
+  not in EVAL, scored with each dataset's official test split. Which datasets qualify is resolved from the library
+  catalogue before any is scored, and listed here with the result.
