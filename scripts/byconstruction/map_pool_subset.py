@@ -2,10 +2,11 @@
 """A `map-pool-v1` holding a subset of another pool's views (E36 revised plan R3: the map term on low-quality views).
 
 Keeps the parent's views whose encoder quality setting (the third field of the view key, `<codec>-<size>-<q>-<sha8>`)
-lies in [--q-min, --q-max], in the parent's order, and rewrites the integrand and target offsets. Feature rows,
-integrands and targets are copied byte for byte; the manifest binds the new files and names the parent.
+lies in [--q-min, --q-max] and whose key is not listed in --exclude-keys (one key per line; R4 drops the views whose
+new target is flat), in the parent's order, and rewrites the integrand and target offsets. Feature rows, integrands
+and targets are copied byte for byte; the manifest binds the new files and names the parent.
 
-    map_pool_subset.py PARENT_DIR OUT_DIR --q-max 60 [--q-min 0]
+    map_pool_subset.py PARENT_DIR OUT_DIR --q-max 60 [--q-min 0] [--exclude-keys FILE]
 """
 import argparse
 import hashlib
@@ -25,7 +26,9 @@ def main():
     ap.add_argument("parent", type=Path)
     ap.add_argument("out", type=Path)
     ap.add_argument("--q-min", type=int, default=0)
-    ap.add_argument("--q-max", type=int, required=True)
+    ap.add_argument("--q-max", type=int, default=100)
+    ap.add_argument("--exclude-keys", type=Path)
+    ap.add_argument("--registration", default="revised plan R3")
     a = ap.parse_args()
     pm = json.loads((a.parent / "manifest.json").read_text())
     for part in ("features", "views", "integrands", "targets"):
@@ -35,7 +38,11 @@ def main():
     side = json.loads(Path(pm["provenance"]["views_meta"]["path"]).read_text())
     if [v["key"] for v in views] != [s["key"] for s in side]:
         raise SystemExit("views and views_meta disagree")
-    keep = [i for i, v in enumerate(views) if a.q_min <= int(v["key"].split("-")[2]) <= a.q_max]
+    drop = set(a.exclude_keys.read_text().split()) if a.exclude_keys else set()
+    if drop - {v["key"] for v in views}:
+        raise SystemExit(f"--exclude-keys names views the parent lacks: {sorted(drop - {v['key'] for v in views})[:5]}")
+    keep = [i for i, v in enumerate(views)
+            if a.q_min <= int(v["key"].split("-")[2]) <= a.q_max and v["key"] not in drop]
     a.out.mkdir(parents=True)
     integ = np.fromfile(pm["integrands"]["path"], "<f4")
     targ = np.fromfile(pm["targets"]["path"], "<f4")
@@ -64,8 +71,9 @@ def main():
              provenance=dict(pm["provenance"], views_meta=bound("views_meta.json"),
                              subset_of=dict(manifest=str((a.parent / "manifest.json").resolve()),
                                             manifest_sha256=sha(a.parent / "manifest.json"), views=len(views)),
-                             subset_rule=f"encoder quality setting in [{a.q_min}, {a.q_max}] (view key field 3)",
-                             registration="zensimx benchmarks/e36_subset_test_2026-11-01.md (revised plan R3)"))
+                             subset_rule=f"encoder quality setting in [{a.q_min}, {a.q_max}] (view key field 3)"
+                             + (f"; {len(drop)} views excluded by key ({a.exclude_keys.resolve()})" if drop else ""),
+                             registration=f"zensimx benchmarks/e36_subset_test_2026-11-01.md ({a.registration})"))
     (a.out / "manifest.json").write_text(json.dumps(m, indent=1) + "\n")
     print(json.dumps(dict(views=len(keep), of=len(views), integrand_floats=oi, target_floats=ot)))
 
