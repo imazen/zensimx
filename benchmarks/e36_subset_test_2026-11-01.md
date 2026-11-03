@@ -654,3 +654,9 @@ broke the first scoring pass).
 **Amendment 4, before running:** p30L + map 300 and p30L + map 1000 at seeds 1-2; NEARID for both; and step 4, the
 JPEG XL loop (experiment 3a protocol on i270, BD-rate) for p30L + map 300 and p30L + map 1000 against p30L and the
 butteraugli loop.
+
+**Primary for the continuation map arms (seed 0; registered primary, 95% bootstrap over the 40 selection sources):**
+p30L -0.964 (CI -1.173 to -0.783, inversion share 2.387%); + map 100 -1.110 (-1.321 to -0.918, 2.240%); + map 300
+-1.225 (-1.424 to -1.036, 2.125%); + map 1000 -1.322 (-1.486 to -1.168, 2.029%). The map term lowers within-ladder
+misordering as well as raising map agreement and lowering error against human ratings. Its only measured cost so
+far is the trainer's in-distribution development SROCC. Seeds 1-2, NEARID and the JPEG XL loop are running.
