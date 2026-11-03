@@ -33,5 +33,7 @@ admission checks still run on every arm.
   (`postR7.sh` holds confirmation read 2); `confirm1.sh` is confirmation read 1; `pack_nolock.sh` is F3's pack step
   for one run; `m1_run_existing.sh` ran the M1 panels for arms measured before the review. `confirm1.sh` writes the
   home directory as `$HOME`. The AIC2026 fold scoring scripts are in the private training repository.
+- Dial comparison (record: "Dial comparison"): `ladder_smoothness.py` (label-free reversal and wrong-way shares on
+  E36's held-out ladders) and `inversion_by_gap.py` (inversion share by quality-setting gap).
 
 Paths inside the scripts are the dev host's scratch layout (`~/tmp/e36test`) where the runs live.
