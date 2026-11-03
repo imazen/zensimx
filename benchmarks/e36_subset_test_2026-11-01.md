@@ -1139,3 +1139,72 @@ constant rate per point of E36 misordering removed. **Reading (registered):** no
 pairwise level. At every weight tried the hinge trades agreement with these human labels for agreement with the
 two reference metrics it is built from. The first attempt (one wave of all 14 runs) was stopped by run-heavy at
 3.8 GiB available; the results are from the rerun in two waves of 7.
+
+### Dial comparison (2026-11-03, after R8; descriptive, nothing selected or adopted)
+
+Owner, 2026-11-03: "what is best as a dial model? smoothest and most consistently aligned across codecs with human
+perception?" and "I'm unsure cvvdp is a decent metric, it has high volatility across images and codecs compared to
+butteraugli." No new label read: the smoothness readout is label-free and the codec readout reuses the private
+out-of-fold check's labels.
+
+**Where p30L's E36 gain sits** (`e36_exp56/inversion_by_gap.py` on `inversions-R7`, seed means, selection split), by
+the gap between a pair's two quality settings:
+
+| gap | pairs | F3 control | p30L | share of p30L's reduction |
+|---|---:|---:|---:|---:|
+| 1-2 | 125,702 | 9.80% | 7.42% | 47.5% |
+| 3-4 | 131,898 | 4.57% | 3.07% | 31.4% |
+| 5-8 | 135,853 | 1.74% | 1.03% | 15.3% |
+| 9-16 | 130,591 | 0.62% | 0.39% | 4.6% |
+| 17-32 | 122,633 | 0.17% | 0.10% | 1.3% |
+
+The fit split is the same within a point or two (51.2% / 31.1% / 13.5% / 3.7% / 0.5%).
+
+**Smoothness along held-out ladders** (`e36_exp56/ladder_smoothness.py`): 2,833 ladders (one reference view x codec x
+mode, baseline panel, the 40 selection sources, views below 1 MP), 144,956 steps after removing steps whose two encodes
+decode to identical pixels; every metric on the same steps, oriented higher = better. A reversal is a pair of settings
+where the higher one scores strictly worse; the wrong-way share is a ladder's downward movement over its total movement
+(0 = monotone; scale-free); seed means for the zensim arms.
+
+| model | reversals, steps 1 / 4 / 8 / 16 apart | wrong-way share | ladders with no reversal |
+|---|---|---:|---:|
+| butteraugli 3-norm | 15.90 / 3.51 / 1.07 / 0.69% | 10.15% | 6.8% |
+| CVVDP | 13.13 / 3.00 / 1.19 / 0.83% | 7.27% | 15.7% |
+| E (shipped) | 18.43 / 5.29 / 1.99 / 0.95% | 11.93% | 7.3% |
+| ECodec (shipped) | 22.08 / 7.50 / 2.86 / 1.10% | 15.75% | 5.4% |
+| F3 control | 15.22 / 3.12 / 0.85 / 0.65% | 9.47% | 9.4% |
+| F3 control + CLIC 2024 | 15.34 / 3.14 / 0.86 / 0.66% | 9.51% | 9.3% |
+| pool-1 | 14.79 / 2.95 / 0.80 / 0.64% | 9.09% | 10.0% |
+| pool-10 | 13.72 / 2.59 / 0.73 / 0.66% | 8.32% | 11.4% |
+| p30L | 12.75 / 2.29 / 0.70 / 0.68% | 7.66% | 12.8% |
+| mix + p30L | 12.74 / 2.41 / 0.72 / 0.69% | 8.05% | 12.3% |
+| p30L + map 300 | 11.77 / 2.12 / 0.66 / 0.67% | 6.99% | 14.4% |
+| mix + p30L + map 300 | 11.60 / 2.12 / 0.67 / 0.68% | 7.23% | 14.5% |
+
+- Neighbouring settings often differ by less than any metric resolves: every model reverses 11.6-22.1% of adjacent
+  steps, and 0.7-2.9% of steps 8 apart.
+- JPEG XL ladders reverse in about 4% of pairs 16 steps apart under every metric (butteraugli 4.07%, CVVDP 4.52%, the
+  zensim models 3.92-4.26%), against at most 1.02% for any other codec under any metric. Both reference metrics agree, so this is the
+  encoder's setting order going backwards over wide spans, not metric noise.
+- CVVDP against butteraugli along a ladder: fewer reversals between close settings (4 apart: 3.00% against 3.51%;
+  wrong-way share 7.27% against 10.15%), slightly more between distant ones (16 apart: 0.83% against 0.69%), and
+  0.16% exact ties (it saturates at 10 JOD near lossless).
+- The hinge and map arms are the smoothest zensim models; the shipped E and ECodec are the roughest.
+
+**Consistency across codecs with people** (AIC2026 public_train, 14 codecs, out of fold; private, numbers in the
+training repository, `evaluations/scripts/aic2026_codec_uniformity.py`): the per-codec rank-bias spread (byc_cells.py's
+codec-uniformity statistic) is lowest, and level within whole-source intervals, for F3's control, mix + p30L, pool-1
+and SSIMULACRA2. p30L, pool-10 and p30L + map 300 are less uniform than F3's control, with intervals that exclude zero;
+butteraugli's 3-norm is higher, with an interval against F3 that includes zero. CVVDP is the least uniform of every
+metric scored, PSNR included, and nearly all of that comes from one codec, PNG (palette), where people see far more
+damage than CVVDP predicts. Without PNG's rows CVVDP is level with F3's control and SSIMULACRA2, and butteraugli's
+3-norm is the least uniform of the three reference metrics (SSIMULACRA2, butteraugli 3-norm, CVVDP). CVVDP orders
+images across sources (global SROCC) worst of those three, with or without PNG.
+
+**Reading.** No candidate leads on both properties. The hinge buys smoothness along ladders, mostly between settings
+1-4 apart, and costs consistency across codecs with people, as it cost agreement on CLIC 2021 and AIC2026 (read 1,
+R8). F3's control is among the most codec-uniform, leads both pairwise human sets and sits in the middle on
+smoothness. mix + p30L comes within 0.12 points of p30L's smoothness at 4 steps apart and ties F3's control on codec
+uniformity, but it fails G-STEER at every seed (broad-220-b8 map rank) and has not been read on CLIC 2021. On the
+owner's CVVDP question: the AIC2026 data support it for ordering across images and for palette damage, while along
+a single ladder CVVDP is about as smooth as butteraugli. Readouts: `~/tmp/e36test/dial/` on dev.
