@@ -27,5 +27,11 @@ admission checks still run on every arm.
   (held-out Spearman against butteraugli), `exp3m_make_cmds.py` (map term in the continuation), `exp3b_make_cmds.py`
   (map term in the base fit), `exp3m_post.sh`, `postF.sh`, `postG.sh` (post-run measurements), `primary.py`
   (the registered primary, `SEEDS=0` for seed-0 screens).
+- Revised plan (`docs/E36_METHOD_REVIEW_2026-11-03.md`), as run: `exp7_make_cmds.py` (R2), `exp8_make_cmds.py` (R3)
+  and `exp9_make_cmds.py` (R7) write the commands; `chainK.sh`, `chainR2.sh`, `chainR3.sh` and `chainR7.sh` run the
+  waves; `postK.sh` (experiment 5 amendment 7), `postR2.sh`, `postR3.sh` and `postR7.sh` take the measurements
+  (`postR7.sh` holds confirmation read 2); `confirm1.sh` is confirmation read 1; `pack_nolock.sh` is F3's pack step
+  for one run; `m1_run_existing.sh` ran the M1 panels for arms measured before the review. `confirm1.sh` writes the
+  home directory as `$HOME`. The AIC2026 fold scoring scripts are in the private training repository.
 
 Paths inside the scripts are the dev host's scratch layout (`~/tmp/e36test`) where the runs live.
