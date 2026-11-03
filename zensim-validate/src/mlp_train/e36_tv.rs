@@ -25,7 +25,8 @@ impl<'a> Pool<'a> {
             assert!([0.0, 1.0, 10.0].contains(&config.weight));
         }
         assert!(config.apply_every > 0 && config.batch > 0);
-        assert!(!config.pairs.is_empty());
+        // A map-only pool (`--map-pool` without `--tv-pool`) has no hinge pairs.
+        assert!(!config.pairs.is_empty() || (config.weight == 0.0 && config.map.is_some()));
         let classes = config
             .band_id
             .as_ref()
@@ -39,8 +40,11 @@ impl<'a> Pool<'a> {
                 .iter()
                 .all(|&(a, b)| a < config.features.len() && b < config.features.len() && a != b)
         );
-        let mean_weight =
-            classes.iter().map(|&c| weights[c as usize]).sum::<f64>() / classes.len() as f64;
+        let mean_weight = if classes.is_empty() {
+            1.0
+        } else {
+            classes.iter().map(|&c| weights[c as usize]).sum::<f64>() / classes.len() as f64
+        };
         let mask = super::input_keep_mask().expect("E36 frozen input keep mask required");
         let columns: Vec<_> = mask
             .iter()
@@ -84,7 +88,7 @@ impl<'a> Pool<'a> {
     }
 
     pub(super) fn scheduled(&self, primary_steps: u64) -> bool {
-        self.config.weight > 0.0
+        (self.config.weight > 0.0 || self.config.map.is_some())
             && primary_steps > 0
             && primary_steps.is_multiple_of(self.config.apply_every as u64)
     }
@@ -111,7 +115,12 @@ impl<'a> Pool<'a> {
             self.columns.len(),
             "E36 base scaler must be bound"
         );
-        for _ in 0..self.config.batch {
+        let hinge_batch = if self.config.pairs.is_empty() {
+            0
+        } else {
+            self.config.batch
+        };
+        for _ in 0..hinge_batch {
             // Rejection sampling avoids modulo bias while retaining a TV-only
             // RNG stream; no primary sampler or scaler state is consumed.
             let n = self.config.pairs.len() as u64;
@@ -393,6 +402,95 @@ mod tests {
                 g1[j]
             );
         }
+        *super::super::INPUT_KEEP_MASK.lock().unwrap() = previous;
+    }
+
+    #[test]
+    fn map_only_pool_runs_the_map_term_alone() {
+        use super::super::map_term::{MapColumn, MapPool, MapView};
+        let _serial = MASK_TESTS.lock().unwrap_or_else(|e| e.into_inner());
+        let previous = super::super::INPUT_KEEP_MASK
+            .lock()
+            .unwrap()
+            .replace(vec![true, false, true]);
+        let h = MlpHyperparams {
+            nonneg_distance: true,
+            minibatch_size: 1,
+            n_hidden: 4,
+            ..Default::default()
+        };
+        let view = MapView {
+            derived: vec![0.4, -0.7],
+            raw: vec![0.4, -0.7],
+            positions: vec![0, 1],
+            blocks: 4,
+            integrands: vec![0.3, -0.2, 0.5, 0.1, -0.4, 0.6, 0.2, -0.1],
+            target: vec![-1.3, 0.2, 1.4, -0.3],
+        };
+        let map = MapPool {
+            views: vec![view],
+            columns: vec![MapColumn::Direct(0), MapColumn::Direct(1)],
+            read_width: 2,
+            weight: 2.0,
+            batch: 3,
+            sign: 1.0,
+        };
+        let config = TvRegularizer {
+            pairs: Vec::new(),
+            features: Vec::new(),
+            weight: 0.0,
+            apply_every: 50,
+            batch: 32,
+            band_id: Some(Vec::new()),
+            band_weights: Some([1.0; 4]),
+            margin: 0.0,
+            pool: true,
+            level: None,
+            map: Some(map),
+        };
+        let mut p = Pool::new(&config, &h);
+        assert!(!p.scheduled(49) && p.scheduled(50));
+        p.bind_scaler(&[0.1, 9., 0.2], &[2., 7., 4.]);
+        let w1: Vec<f64> = (0..12).map(|i| 0.1 * i as f64 - 0.5).collect();
+        let (b1, w2, b2) = (
+            vec![0.1, -0.2, 0.3, 0.0],
+            vec![0.4, -0.3, 0.2, 0.5],
+            vec![0.1],
+        );
+        let mut a = AdamState::new(12, 4, 4, 1);
+        let loss = p.accumulate(
+            &mut SplitMix64::new(9),
+            &w1,
+            &b1,
+            &w2,
+            &b2,
+            &mut a,
+            3,
+            4,
+            &h,
+            -1.0,
+        );
+        let mut direct = AdamState::new(12, 4, 4, 1);
+        let want = super::super::map_term::accumulate(
+            config.map.as_ref().unwrap(),
+            &mut SplitMix64::new(9),
+            &[0, 2],
+            &[0.1, 0.2],
+            &[2., 4.],
+            &w1,
+            &b1,
+            &w2,
+            &b2,
+            &mut direct,
+            3,
+            4,
+            h.leaky_alpha,
+        );
+        assert_eq!(loss, want);
+        assert!(loss > 0.0);
+        assert_eq!(a.gw1, direct.gw1);
+        assert_eq!(a.gw2, direct.gw2);
+        assert!(a.gb1.iter().chain(&a.gb2).all(|v| *v == 0.0));
         *super::super::INPUT_KEEP_MASK.lock().unwrap() = previous;
     }
 

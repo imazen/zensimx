@@ -589,3 +589,19 @@ against butteraugli on the 240 held-out selection views (10th percentile in brac
 The effect grows with the weight but is small at 30. The continuation trains at a constant 1e-5 for 60 epochs.
 **Amendment, before running:** p30L + map at weights 100, 300 and 1000 (seed 0, same pool and batch), measured the
 same way; the product gates follow for any arm whose agreement gain over p30L exceeds 0.02 at 8 px.
+
+### Experiment 3 amendment 2 (2026-11-02, before any run): the map term in the base fit
+
+The continuation trains at a constant 1e-5, so a term added there has little room. The base fit (120 epochs from
+scratch, cosine restarts from 1e-3) is where the network forms. `--map-pool` without `--tv-pool` now runs the map
+term alone on the pool schedule (every 50 primary steps, batch 8). **Arms:** F3's base fit plus the map term at
+weights 10, 30 and 100, seed 0. Control: experiment 5's control-s0, which reproduces F3's base fit. **Measures:**
+held-out map agreement, primary, and error against human ratings on the base fits. If agreement gains more than 0.02
+at 8 px over the control, the arm continues through p30L's continuation and the product gates.
+Early-run results so far: G-CHROMA-L passes for p30L + map 1/10/30. Against p30L, map 30 moves the primary from
+-0.964 to -1.013 (CI -1.22 to -0.83) and all-nine error against human ratings from 8.40% to 8.32%.
+G-STEER for the continuation map arms: map 1 passes 135/135, map 10 and map 30 each fail one case (broad-206-b64,
+m2 0.958; dog-256-20, m2 0.941; the bar is m2 >= 0.99 and m3f >= 0.70). The no-map reproduction passes 135/135. On
+dog-256-20 map 30 raises m3f (the map's rank agreement with the true repair gains) from 0.851 to 0.902, but m2 (the
+first-order prediction from the exact feature changes against the true score change) falls from 1.000 to 0.941: the
+term makes the score less linear around that case. That is the same failure as the hinge at lambda >= 50.

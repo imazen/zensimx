@@ -439,7 +439,8 @@ struct Args {
     /// views with per-feature block integrands and a block target. Each scheduled pool step also draws --map-batch
     /// views on the pool's RNG stream and adds `--map-weight * mean(1 - pearson(map, target))`, the map being
     /// `--map-sign * sum_k dy/df_k * integrand_k` (E36 experiment 3).
-    #[arg(long, requires = "tv_pool")]
+    /// Without `--tv-pool` the pool step runs the map term alone, every `--tv-apply-every` primary steps.
+    #[arg(long, requires = "derived_inputs")]
     map_pool: Option<PathBuf>,
 
     /// `--map-pool` loss weight.
@@ -3222,6 +3223,31 @@ mod matched_codec;
 #[path = "../training_keys.rs"]
 mod training_keys;
 
+/// `--map-pool`, loaded and logged; `None` without it.
+fn load_map_arg(args: &Args) -> Option<zensim_validate::mlp_train::map_term::MapPool> {
+    let map_path = args.map_pool.as_ref()?;
+    let map = tv_pool::load_map(
+        map_path,
+        args.derived_inputs.as_ref().unwrap(),
+        args.max_features,
+        args.map_weight,
+        args.map_batch,
+        args.map_sign,
+    )
+    .unwrap_or_else(|e| {
+        eprintln!("--map-pool: {e}");
+        std::process::exit(2)
+    });
+    println!(
+        "Loaded map pool {map_path:?}: {} views (weight {}, batch {}, sign {})",
+        map.views.len(),
+        map.weight,
+        map.batch,
+        map.sign,
+    );
+    Some(map)
+}
+
 fn main() {
     zensim_validate::tier_cap::apply_from_env();
     // We parse via ArgMatches (not Args::parse) so --manifest can apply
@@ -4542,28 +4568,7 @@ fn main() {
             );
             pool.level = Some(level);
         }
-        if let Some(map_path) = &args.map_pool {
-            let map = tv_pool::load_map(
-                map_path,
-                args.derived_inputs.as_ref().unwrap(),
-                args.max_features,
-                args.map_weight,
-                args.map_batch,
-                args.map_sign,
-            )
-            .unwrap_or_else(|e| {
-                eprintln!("--map-pool: {e}");
-                std::process::exit(2)
-            });
-            println!(
-                "Loaded map pool {map_path:?}: {} views (weight {}, batch {}, sign {})",
-                map.views.len(),
-                map.weight,
-                map.batch,
-                map.sign,
-            );
-            pool.map = Some(map);
-        }
+        pool.map = load_map_arg(&args);
         println!(
             "Loaded TV pool {path:?}: {} rows, {} pairs (weight {}, every {}, batch {}, margin {}, class weights {:?})",
             pool.features.len(),
@@ -4575,6 +4580,25 @@ fn main() {
             pool.band_weights,
         );
         Some(pool)
+    } else if args.map_pool.is_some() {
+        // Map term alone (E36 experiment 3): an empty hinge pool on the --tv-apply-every schedule.
+        assert!(
+            args.nonneg_distance && args.minibatch_size == 1,
+            "--map-pool requires the plain nonnegative-distance K=1 recipe"
+        );
+        Some(TvRegularizer {
+            pairs: Vec::new(),
+            features: Vec::new(),
+            weight: 0.0,
+            apply_every: args.tv_apply_every,
+            batch: args.tv_batch,
+            band_id: Some(Vec::new()),
+            band_weights: Some([1.0; 4]),
+            margin: 0.0,
+            pool: true,
+            level: None,
+            map: load_map_arg(&args),
+        })
     } else {
         None
     };
@@ -5500,12 +5524,12 @@ fn main() {
                     tv_pool::level_receipt(level_path, args.level_ref.as_ref().unwrap(), level)
                         .expect("level pool reproduction receipt");
             }
-            if let (Some(map_path), Some(map)) =
-                (&args.map_pool, tv_regularizer.as_ref().and_then(|t| t.map.as_ref()))
-            {
-                record["map_pool"] =
-                    tv_pool::map_receipt(map_path, map).expect("map pool reproduction receipt");
-            }
+        }
+        if let (Some(map_path), Some(map)) =
+            (&args.map_pool, tv_regularizer.as_ref().and_then(|t| t.map.as_ref()))
+        {
+            record["map_pool"] =
+                tv_pool::map_receipt(map_path, map).expect("map pool reproduction receipt");
         }
         if let Some(e36) = e36_repro {
             record["e36_tv"] = e36;
