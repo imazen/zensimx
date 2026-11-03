@@ -711,3 +711,16 @@ BD-rate against p30L, 78 images (positive = fewer bytes for equal judged quality
 Against the butteraugli loop (CVVDP judge): p30L -4.34%, map 300 -3.49%, map 1000 -2.53%. The map term closes about a
 fifth (300) to two fifths (1000) of the gap to butteraugli's own loop, and the gain shows on the judges the term did
 not train toward (ssim2, CVVDP), not only butteraugli. Full tables: `benchmarks/e36_loop_map_2026-11-02/`.
+
+### Experiment 3 amendment 3 result: map term in the base fit, then p30L's continuation (seed 0)
+
+| arm | agreement 8 px full / served | primary (CI) | shared-three / all-nine error | G-STEER | G-CHROMA-L |
+|---|---|---|---|---|---|
+| p30L | 0.738 / 0.754 | -0.964 (-1.173, -0.783) | 8.96% / 8.40% | 135/135 | pass |
+| base map 30, then p30L | 0.754 / 0.758 | -1.075 (-1.289, -0.883) | 8.96% / 8.42% | 135/135 | pass |
+| base map 100, then p30L | 0.782 / 0.768 | -1.265 (-1.467, -1.072) | 8.87% / 8.40% | 134/135 | pass |
+
+The base-fit route keeps the trainer's in-distribution development score (0.958, as p30L) and improves agreement and
+the primary, but not error against human ratings, and map 100 misses one G-STEER case. Base fits alone: map 100 at
+seeds 0-2 gives agreement 0.792 / 0.789 / 0.791 (control 0.720) with error against human ratings inside the control's
+seed spread; map 300 reaches 0.827. The continuation route (p30L + map 300) stays the candidate.
