@@ -1118,3 +1118,15 @@ folds exist, ranks F3's control above p30L, as read 1 did. Arm (b)'s CLIC 2021 r
 at registration). Which candidate ships stays the owner's decision. Readouts: `~/tmp/e36test/postR7/` and
 `~/tmp/e36test/clic21-confirm-2/` on dev; bakes under `/mnt/v/output/zensim/e36-subset-test-2026-11-01/bakes/r7-*`
 (tower mirror hash-checked, 176 files).
+
+### R8 registration (2026-11-03, before any run): the hinge's weight on the pairwise human sets
+
+After R7, two held-out pairwise human sets rank F3's control above p30L: CLIC 2021 (read 1, +0.0029 [+0.0002,
++0.0056]) and AIC2026 out of fold (private record, same direction), while E36's primary favours p30L by 0.98 points
+and the JPEG XL loop ties them. **Question:** does a lighter hinge keep part of the E36 gain without the pairwise
+cost? **Arms:** pool-10 and pool-1 (the subset test's arms: pool v1, lambda 10 and 1, no level term; primary -0.64
+and -0.19; both met the registered rule) at seed 0, through the private AIC2026 out-of-fold protocol: D6's seven
+source folds, each arm's continuation command with only the fold table and destination changed (14 runs).
+**Comparison:** each arm against F3's control folds and against p30L's, with the private record's whole-source
+bootstrap. CLIC 2021 is not read. **Reading:** an arm whose interval against F3's control contains zero is reported
+to the owner as keeping F3's pairwise level, beside its E36 numbers; nothing is adopted on this read alone.
