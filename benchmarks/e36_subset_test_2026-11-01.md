@@ -635,3 +635,22 @@ Inside the base fit the term works: at weight 100 the full density gains 0.072 a
 registered 0.02. **Amendment 3, before running:** (a) p30L's continuation from the map-30 and map-100 base fits
 (seed 0), measured with the amendment-2 set including G-STEER; (b) the map term at weight 300 in the base fit (seed 0),
 since the gain still rises with weight; (c) map-100 base fits at seeds 1-2.
+
+### Experiment 3, continuation map weights 100-1000 (seed 0) and amendment 4 (2026-11-02)
+
+| arm | agreement 8 px full / served (p10 full) | agreement 16 px full / served | shared-three error / SROCC | all-nine error | G-STEER | G-CHROMA-L | human_development SROCC |
+|---|---|---|---:|---:|---|---|---:|
+| p30L | 0.738 / 0.754 (0.440) | 0.801 / 0.794 | 8.96% / 0.843 | 8.40% | 135/135 | pass | 0.835 |
+| + map 100 | 0.760 / 0.778 (0.478) | 0.820 / 0.809 | 8.80% / 0.846 | 8.31% | 135/135 | pass | |
+| + map 300 | 0.789 / 0.810 (0.539) | 0.846 / 0.836 | 8.64% / 0.852 | 8.03% | 135/135 | pass | 0.824 |
+| + map 1000 | 0.836 / 0.841 (0.602) | 0.877 / 0.879 | 8.30% / 0.864 | 8.24% | 135/135 | pass | 0.799 |
+
+p30L's seeds 1-2 give shared-three error 8.85% and 8.82%. At weights 100 and above G-STEER passes every case and its
+median m3f rises (0.962, 0.968, 0.979); weights 10 and 30 had each missed one case. The cost is in-distribution: at
+weight 1000 the trainer's development SROCC falls (human 0.835 to 0.799, CID22 0.984 to 0.971, SafeSyn 0.991 to
+0.984); at 300 it falls less (human 0.824). The primary for these arms is being rescored (a duplicated control column
+broke the first scoring pass).
+
+**Amendment 4, before running:** p30L + map 300 and p30L + map 1000 at seeds 1-2; NEARID for both; and step 4, the
+JPEG XL loop (experiment 3a protocol on i270, BD-rate) for p30L + map 300 and p30L + map 1000 against p30L and the
+butteraugli loop.

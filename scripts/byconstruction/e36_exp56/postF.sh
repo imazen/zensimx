@@ -21,7 +21,7 @@ D=/mnt/v/output/zensim/e36-subset-test-2026-11-01/bakes; for x in $CONT; do n=${
 step "held-out map agreement"; E=$T/exp3
 for x in $CONT; do n=${x#*:}; for b in 8 16; do $LOCK --mem 12G --jobs 8 -- $E/integrand_dump.bin --pairs $E/heldout/pairs.tsv --out $E/heldout/$n-$b --bake $(bake $x) --block $b > $E/heldout/$n-$b.jsonl 2>/dev/null
   echo "$n $b $(python3 $E/map_agreement.py $E/heldout/$n-$b.jsonl $E/heldout/$n-$b)"; done; done > $L/agreement.txt 2>&1
-step "E36 score"; args="--bake control_s0=$T/control-s0/pack_e059/refit/production-f16.bin"
+step "E36 score"; args=""
 for s in 0 1 2; do args="$args --bake control_s$s=$( [ $s = 0 ] && echo $T/control-s0 || echo $T/arms/control-s$s)/pack_e059/refit/production-f16.bin --bake p30L_s$s=$T/arms/p30L-s$s/pack_e059/refit/production-f16.bin"; done
 for x in $CONT; do args="$args --bake $(col $x)=$(bake $x)"; done
 $LOCK --mem 36G --jobs 24 -- python3 scripts/byconstruction/e36_features.py score $O/bank $O/scores-F --predict $PRED $args > $L/score.log 2>&1 || echo FAIL score
