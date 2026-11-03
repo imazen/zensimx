@@ -130,3 +130,13 @@ the executor and qualified contract come from successor native owner v3.
 A separate native local-smoke program uses the same data and numerical
 trainer,2epochs/128draws/900s,raw-only epoch1,tv10/fullseed0.
 Actual smoke verification and measured resource plan still precede fit go.
+
+## Tower archives repacked; originals deleted (2026-11-03)
+
+The tower archives under `/mnt/disk1/coefficient/output/zensim/e36-bulk-2026-10-17{,-cache,-disk1}/` (500,804
+archives, 940.3 GB) were repacked on 2026-11-02/03 into `/mnt/tower/output/zensim/e36-imi-repack-v1/` with the same
+relative paths: maps re-encoded losslessly (bit-exact against the originals, every archive verified twice), decoded
+PNG views dropped, every other member byte-identical, and the trees' 4,184 non-archive files (run records, staging
+manifests, scripts) copied with their SHA-256 list at `_repack/nonarchive-files.sha256`. The owner had the originals
+deleted on 2026-11-03 (13:52 UTC). Resolve an archive path recorded above by prefixing `e36-imi-repack-v1/`. The
+repack tool, its ledgers and the verify table are in the private training repository (`tools/e36repack`).
