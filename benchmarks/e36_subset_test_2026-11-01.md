@@ -1228,3 +1228,37 @@ F3's control if its out-of-fold interval against F3's control does not lie wholl
 seed mean is no more than 0.003 below F3's, G-STEER passes amendment 2's guard (135 at seed 0, mean at least 134.33),
 G-CHROMA-L and NEARID pass, and its shared-three error seed mean is below F3's control's (8.80%). Nothing is adopted on
 this read; the owner decides.
+
+### R10 result (2026-11-03): the TID2013 + MDID mix on F3's recipe, without the hinge
+
+Ten runs on dev in two waves (800 s for the first seven), then `postR10.sh`; the G-CHROMA-L level check (MAE against
+the teacher, against F3's control seed 0) ran after it, as `chroma_ladder_gate.py level`. Seeds 0 / 1 / 2:
+
+| measure | F3 control | mix on F3's recipe (`mixF3`) | R10 rule |
+|---|---|---|---|
+| error vs human, shared three | 8.79 / 8.74 / 8.89% | 8.27 / 8.39 / 8.40% | below F3's mean (8.81%): **passes** |
+| SROCC, shared three | 0.835 / 0.835 / 0.836 | 0.850 / 0.848 / 0.849 | |
+| error vs human, all nine | 8.54 / 8.58 / 8.52% | 7.94 / 8.09 / 8.05% | |
+| EVAL compression rows, SROCC | 0.8949 / 0.8926 / 0.8935 | 0.8954 / 0.8941 / 0.8940 | mean at most 0.003 lower: **passes** (+0.0008) |
+| AIC2026 out of fold vs F3's control | | interval contains 0 (private) | not wholly below 0: **passes** |
+| G-STEER | 135, 135, 133 | 133, 134, 134 | 135 at seed 0, mean >= 134.33: **fails** |
+| G-CHROMA-L | | rank gate passes; worst MAE ratio 1.008 (ycc420, seed 0) | **passes** |
+| NEARID (seed 0) | | N1-N3 pass, 132 of 144 ladders monotone | **passes** |
+| E36 primary vs F3's control | 3.36% | 3.40%: +0.04 [-0.06, +0.14] points | |
+| ladder smoothness, reversals 4 steps apart / wrong-way share | 3.12% / 9.47% | 3.23% / 9.88% | |
+| map agreement, 8 px full | 0.706 (seed 0) | 0.701 / 0.690 / 0.698 | |
+| M1 panel vs F3's control, row-weighted SROCC | | +0.0215; above 0 at all three seeds on MDID, NITS-IQA and VCL-FER, below 0 nowhere | |
+
+G-STEER misses broad-220-b8 at every seed (m3f 0.694 / 0.685 / 0.686, bar 0.70), the case the mix also missed with
+p30L's terms, and broad-13-b64 at seed 0 (m2 0.959, bar 0.99). On AIC2026's 14 codecs (private numbers in the
+training repository) `mixF3` is more uniform than F3's control, with an interval that excludes zero, and the most
+uniform of every model and reference metric scored, SSIMULACRA2 included; most of the gain is on palette PNG, and
+without PNG it is level with F3's control.
+
+**Reading (registered rule):** `mixF3` meets every condition but G-STEER, so it is not reported as a candidate to
+replace F3's control. Beside the rule: the mix's error gain does not depend on the hinge (shared-three error 0.46
+points below F3's control at every seed, as mix + p30L's 0.47), and without the hinge the mix costs no pairwise
+agreement on AIC2026 and improves consistency across codecs, while E36 misordering and ladder smoothness stay at
+F3's level. Its only failure is the steering map's rank on one G-STEER case at every seed, which the map term repaired
+for mix + p30L at a CLIC 2021 cost (read 1). Readouts: `~/tmp/e36test/postR10/` on dev; bakes
+`/mnt/v/output/zensim/e36-subset-test-2026-11-01/bakes/r10-mixF3-s*` (tower mirror hash-checked, 182 files).
