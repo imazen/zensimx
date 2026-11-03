@@ -316,6 +316,10 @@ name = "map_dump"
 required-features = ["map-dump"]
 
 [[example]]
+name = "integrand_dump"
+required-features = ["map-dump"]
+
+[[example]]
 name = "m3_fixture_gen"
 required-features = ["m3-fixtures"]
 
