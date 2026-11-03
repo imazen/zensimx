@@ -1262,3 +1262,17 @@ agreement on AIC2026 and improves consistency across codecs, while E36 misorderi
 F3's level. Its only failure is the steering map's rank on one G-STEER case at every seed, which the map term repaired
 for mix + p30L at a CLIC 2021 cost (read 1). Readouts: `~/tmp/e36test/postR10/` on dev; bakes
 `/mnt/v/output/zensim/e36-subset-test-2026-11-01/bakes/r10-mixF3-s*` (tower mirror hash-checked, 182 files).
+
+### R10 amendment 1 (2026-11-03, before any loop run): the mix on F3's recipe in the JPEG XL loop
+
+`mixF3`'s only failed condition is G-STEER (broad-220-b8's map rank at every seed), and the owner's rule is that
+steering is decided in the JPEG XL loop. Run, recorded as information for the owner's decision: experiment 5
+amendment 6's protocol (`scripts/byconstruction/e36_loop_r10.sh`, built from `e36_loop_mix.sh` with the arm list
+changed; i270, 78 TRAIN images, effort 7, 4 iterations, 9 distances, judge build `zenmetrics-judge-7a0f8394`,
+`e36_exp56/r10_loop_i270_run.sh`). Arms, all encoded fresh in one directory: none, butteraugli, B, M7, F3, p30L and
+`mixF3` at seed 0, the zensim arms with loop_calibrate tail placements. **Controls:** the new build's B and M7
+placement rows equal the 2026-10-25r7win calibration's, and the shared arms (none, butteraugli, B, M7, F3, p30L)
+reproduce amendment 6's i270 bitstreams. **Statistic:** BD-rate (`rd_probe_analyze --bdrate-vs`) of `mixF3` against
+F3 and against the butteraugli loop. **Reading:** `mixF3` shows no steering cost if its BD-rate against F3 has an
+interval containing or above zero under both SSIMULACRA2 and butteraugli; CVVDP, zensim and DVIFM are reported
+beside them (CVVDP does not decide, per the dial comparison).
