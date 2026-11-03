@@ -944,3 +944,17 @@ least two votes predicted by the majority of the pair's other votes.
   interval, 315 references), with NNCD-IQA and MIDD-CAP as source-exposed diagnostics. CIQA (JPEG at paired
   qualities, source-independent) would add the product's codec but needs its TensorFlow-adjusted reference pixels,
   which were not stored; regenerating them needs the owner's sign-off.
+
+### R3 registration (2026-11-03, before any run): the map term on low-quality views only
+
+**Hypothesis** (method review, experiment 3 of the revised plan): butteraugli's block map misleads near the
+visibility threshold, where AIC2026 public_train lives; the private out-of-fold check found the map term's AIC2026 cost
+growing with its weight. **Arms:** p30L + map 300 and mix + p30L + map 300 with the map pool restricted to views whose
+encoder quality setting is at most 60: 1,310 of the pool's 1,967 views (`scripts/byconstruction/map_pool_subset.py`,
+`map-pool-16-q0-60`; the dropped band is q62-100, 657 views). Each is its ungated twin with only the pool path changed
+(commands differ in the pool path and destination). Full data at seeds 0-2, and the AIC2026 public_train folds at
+seed 0. **Measures:** the amendment-2 set (G-STEER, G-CHROMA-L, primary, error against human ratings, EVAL compression
+rows, held-out map agreement; NEARID at seed 0), the M1 panel against each ungated twin, and the private out-of-fold
+check. **Rule:** a gated arm is a candidate only if G-STEER passes 135/135 at every seed; it removes the near-threshold
+cost if its out-of-fold difference against p30L has an interval containing zero. A gated arm that does both goes to
+the JPEG XL loop.
