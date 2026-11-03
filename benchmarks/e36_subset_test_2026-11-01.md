@@ -572,3 +572,20 @@ base fits; EVAL chose the configuration, so EVAL is now selection data for it.
 - **Confirmation on data no arm selected with:** the tower IQA library's MOS datasets that are in no training leg and
   not in EVAL, scored with each dataset's official test split. Which datasets qualify is resolved from the library
   catalogue before any is scored, and listed here with the result.
+
+### Experiment 3 step 3, seed 0: held-out map agreement, and an amendment (2026-11-02)
+
+The map build without the map term reproduces p30L's seed-0 checkpoints (60/60 identical). Median per-view Spearman
+against butteraugli on the 240 held-out selection views (10th percentile in brackets):
+
+| arm | 8 px, full density | 8 px, served | 16 px, full density | 16 px, served |
+|---|---:|---:|---:|---:|
+| F3 | 0.706 (0.413) | 0.702 (0.366) | 0.784 (0.436) | 0.764 (0.478) |
+| p30L (map build, no term) | 0.738 (0.440) | 0.754 (0.422) | 0.801 (0.462) | 0.794 (0.476) |
+| p30L + map 1 | 0.738 (0.444) | 0.754 (0.421) | 0.801 (0.462) | 0.793 (0.476) |
+| p30L + map 10 | 0.740 (0.452) | 0.756 (0.424) | 0.802 (0.467) | 0.794 (0.480) |
+| p30L + map 30 | 0.745 (0.462) | 0.764 (0.431) | 0.805 (0.479) | 0.797 (0.483) |
+
+The effect grows with the weight but is small at 30. The continuation trains at a constant 1e-5 for 60 epochs.
+**Amendment, before running:** p30L + map at weights 100, 300 and 1000 (seed 0, same pool and batch), measured the
+same way; the product gates follow for any arm whose agreement gain over p30L exceeds 0.02 at 8 px.
