@@ -660,3 +660,22 @@ p30L -0.964 (CI -1.173 to -0.783, inversion share 2.387%); + map 100 -1.110 (-1.
 -1.225 (-1.424 to -1.036, 2.125%); + map 1000 -1.322 (-1.486 to -1.168, 2.029%). The map term lowers within-ladder
 misordering as well as raising map agreement and lowering error against human ratings. Its only measured cost so
 far is the trainer's in-distribution development SROCC. Seeds 1-2, NEARID and the JPEG XL loop are running.
+
+### Experiment 5 stage 3 result and amendment 5 (2026-11-02)
+
+The TID2013 + MDID mix through the full recipe (continuation + p30L), seeds 0 / 1 / 2, against p30L's seeds:
+
+| measure | p30L | TID2013 + MDID + p30L |
+|---|---|---|
+| shared-three error | 8.96 / 8.85 / 8.82% | 8.38 / 8.37 / 8.28% |
+| shared-three SROCC | 0.843 / 0.843 / 0.841 | 0.857 / 0.858 / 0.858 |
+| all-nine error | 8.40 / 8.37 / 8.41% | 7.86 / 7.90 / 7.85% |
+| primary (mean of seeds) | -0.975 | -1.009 (CI -1.215 to -0.811) |
+| G-CHROMA-L | pass | pass |
+| G-STEER | 135/135 | 132 / 132 / 131 of 135 |
+| held-out map agreement, 8 px full | 0.738 (seed 0) | 0.723 / 0.732 / 0.735 |
+
+The human-agreement gain survives the full recipe at every seed, but the mix fails G-STEER: broad-220-b8 at every
+seed (m3f 0.675-0.688 against 0.70), plus m2 near-misses (0.947-0.987) that change with the seed. **Amendment 5,
+before running:** the mix with p30L and the map term at weight 300 (seeds 0-2), since the map term raised m3f and
+kept G-STEER clean on p30L. Measured with the same set; its JPEG XL loop follows if it passes the gates.
