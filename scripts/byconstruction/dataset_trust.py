@@ -45,12 +45,12 @@ DATASETS = {
     "mucped23": ("pairs.tsv", "pair", None),
     "fidelity-lic-vcip2023": ("pairs.tsv", "pair", None),
 }
-# Library tables whose answer orientation is wrong, corrected here (the owner's fix belongs in zenpapers'
-# `scripts/iqa_library/organize.py`). mucped23: the authors' compute_elo.ipynb counts a win for method X when the
-# OTHER method is named in `answerValue`, so `answerValue` names the distortion judged farther from the original; the
-# library counts it as the closer one. Checked 2026-11-03: `answerValue == A` agrees with the authors' published Elo
-# order in 3,609 of 13,488 answers (26.8%).
-INVERTED_ANSWERS = {"mucped23"}
+# Library tables whose answer orientation is wrong, corrected here. Empty since 2026-11-03: mucped23's table was
+# inverted (`answerValue` names the distortion judged farther from the original, per the authors' compute_elo.ipynb;
+# the library counted it as the closer one) until zenpapers 5bbd3ed0 fixed the adapter and the library was rebuilt
+# (old build kept as datasets/mucped23.bak-20261103T134815Z). The M2 screen's recorded numbers used this correction
+# on the old table and are unchanged on the rebuilt one.
+INVERTED_ANSWERS = set()
 DVIFM_RUNTIME = Path("/mnt/v/output/zensim/jnd-reconstruction-2026-10-20-dvifm03/dvifm-runtime")
 JUDGES = ("ssim2", "butteraugli", "cvvdp")
 # Metric column read from each judge output, and its direction (+1: higher = better quality).

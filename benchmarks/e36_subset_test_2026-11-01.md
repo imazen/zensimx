@@ -931,7 +931,10 @@ least two votes predicted by the majority of the pair's other votes.
   other method is named in `answerValue`, so `answerValue` names the distortion judged farther from the original;
   `answerValue == A` agrees with the authors' published Elo order in 3,609 of 13,488 answers (26.8%). The library
   (zenpapers `scripts/iqa_library/organize.py`, mucped23 adapter) counts it as the closer one. The screen corrects the
-  orientation (`INVERTED_ANSWERS`); uncorrected, every metric scored 0.26.
+  orientation (`INVERTED_ANSWERS`); uncorrected, every metric scored 0.26. **Fixed in the library on 2026-11-03:** zenpapers 5bbd3ed0
+  corrects the adapter (with a check against the authors' Elo: 9,879 of 13,488 answers agree), the rebuilt table
+  swaps n_a and n_b in all 9,314 rows with every image unchanged, and the screen's correction is removed; the old
+  build is kept as `datasets/mucped23.bak-20261103T134815Z`.
 - **Fidelity-LIC measures something fidelity metrics miss.** Observers chose the GAN crop as closer to the reference
   at low rates while the non-GAN crop has the higher PSNR in 128 of 132 triplets; only DVIFM agrees above chance.
   Ten references embed a non-sRGB ICC profile (Adobe RGB (1998), "c2") while their encodes are tagged sRGB; without
