@@ -803,3 +803,41 @@ each metric's rank agreement (SROCC overall and within reference for MOS sets, t
 sets, with whole-reference intervals), the metrics' agreement with each other, and label-quality signals (rater
 counts, standard errors, whether ratings fall as the codec setting gets worse). The EVAL collections' existing
 SSIMULACRA2, butteraugli and CVVDP scores join the table without a new read.
+
+### R2 amendment 1 (2026-11-03, before any R2 run): decide on the EVAL compression rows
+
+The registered measure (error on all nine EVAL collections) is mostly non-codec distortions: 417 of the 1,858 EVAL
+MOS rows are compression (`scripts/byconstruction/e36_exp56/ceval.py`: CID:IQ JPEG and JPEG 2000 70, Colourlab 18,
+IQA-ODI 48, IRCCyN-IVC 50, NITS-IQA D7-D9 135, VCL-FER 96). R2 tests compression relevance, so it is judged on
+those rows. On existing arms (seed 0 unless noted), row-weighted SROCC on the compression rows: control 0.893-0.895
+(seeds 0-2), walk control 0.886 / 0.889 / 0.895, p30L 0.894-0.896, mix + p30L + map 300 0.898, SSIMULACRA2 0.896,
+CVVDP 0.876, butteraugli 0.854.
+
+**Amended rule.** An R2 arm helps if, against the walk control at the same seed, (1) its row-weighted SROCC on the
+compression rows rises at all three seeds and by at least 0.005 on the seed mean, (2) the E36 primary's interval
+(arm minus walk control) does not lie wholly above zero, and (3) its all-nine error rises by no more than 0.30
+points on the seed mean. The all-nine readout and the M1 per-collection panel are reported either way.
+
+### R5 (method review M4): linear-probe transfer screen (2026-11-03)
+
+`scripts/byconstruction/e36_exp56/probe_transfer.py` fits a linear head on F3's 492 input features per training set
+and scores the nine EVAL MOS collections (mean SROCC over the collections a set does not train on). Three objectives:
+ridge on z-scored targets (global), ridge on within-reference deviations (within), and a pairwise-logistic ranker on
+pairs inside each reference (rank, the trainer's human-leg shape). The F3 walk control scores 0.851-0.854 on the same
+mean. Rank objective, held-out mean SROCC:
+
+| training set | rows | held-out | | training set | rows | held-out |
+|---|---:|---:|---|---|---:|---:|
+| KADID all | 6,659 | 0.822 | | TID2013 all | 1,680 | 0.832 |
+| KADID C | 550 | 0.827 | | TID2013 C | 210 | 0.831 |
+| KADID C+N | 1,874 | 0.792 | | TID2013 C+N | 490 | 0.849 |
+| KADID S | 4,785 | 0.806 | | TID2013 S | 1,190 | 0.808 |
+| human, four sources | 10,590 | 0.823 | | CID22-A25 | 1,579 | 0.803 |
+| human C (R2 m3c) | 2,411 | 0.786 | | KonFiG | 672 | 0.765 |
+| human C+N (R2 m3cn) | 4,015 | 0.803 | | leg CID:IQ | 330 | 0.849 |
+| leg MDID | 800 | 0.832 | | leg CID:OA | 143 | 0.675 |
+
+Within one source the compression rows transfer about as well as all rows and better than the synthetic rows; pooled
+across sources, compression-only is worse than all rows. All three objectives agree on the single-source ordering;
+the global ridge's pooled sets are distorted by each source's label scale (pooled compression rows 0.524), which the
+rank objective removes. R2's retrains are the check on whether the probe predicts a trained network.
