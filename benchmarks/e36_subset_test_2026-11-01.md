@@ -755,3 +755,12 @@ Fresh loop build (zensimx f9e05d82, `e36_loop_mix.sh`); B/M7 placements reproduc
 
 The mix arm improves on p30L for every judge, with every interval above zero, and is the best zensim arm in the loop.
 Its only failed check is G-STEER at seeds 1-2 (one case each). Tables: `benchmarks/e36_loop_mix_2026-11-02/`.
+
+### Experiment 5 amendment 7 (2026-11-03, before any run): the mix with a light map term
+
+An out-of-fold check on AIC2026 public_train (members-only numbers, kept in the private training repo) found the map
+term's cost there growing with its weight, and the TID2013 + MDID mix without the map term costing nothing; the mix
+alone fails G-STEER (3-4 cases per seed), and map 300 brought that to 0-1. **Arms:** mix + p30L + map 30 and
+mix + p30L + map 100, seeds 0-2, full recipe, measured with the amendment-2 set (G-STEER, G-CHROMA-L, primary,
+error against human ratings, held-out map agreement; NEARID at seed 0), plus the AIC2026 out-of-fold check. A
+configuration is a candidate only if G-STEER passes 135/135 at every seed.
