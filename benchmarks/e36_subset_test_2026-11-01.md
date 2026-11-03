@@ -1208,3 +1208,23 @@ smoothness. mix + p30L comes within 0.12 points of p30L's smoothness at 4 steps 
 uniformity, but it fails G-STEER at every seed (broad-220-b8 map rank) and has not been read on CLIC 2021. On the
 owner's CVVDP question: the AIC2026 data support it for ordering across images and for palette damage, while along
 a single ladder CVVDP is about as smooth as butteraugli. Readouts: `~/tmp/e36test/dial/` on dev.
+
+### R10 registration (2026-11-03, before any run): the TID2013 + MDID mix on F3's recipe, without the hinge
+
+**Question.** The dial comparison and read 1 favour F3's control over p30L on every independent human measure of
+agreement across images and codecs, and the TID2013 + MDID mix gave the program's lowest error against human ratings,
+but only ever with p30L's terms (experiment 5 stage 3; its AIC2026 out-of-fold check was neutral). Does the mix keep its
+error gain on F3's recipe, without the hinge's pairwise cost? **Arm** `mixF3`: each command is experiment 5 stage 3's
+mix + p30L at the same seed (`exp5c` `tid2013_mdid-p30L-s{seed}`: continuation from the mix's base fit, mix flags,
+F3's continuation otherwise) with the trainer wrapper's hinge and level arguments removed, and only the destination and
+scratch directory changed (`e36_exp56/r10_make_cmds.py`). The trainer is the map build, whose run without the map term
+reproduced p30L's seed 0 (60 of 60 checkpoints), and the hinge and level terms draw on their own RNG streams, so the
+primary sampler's path is F3's. Seeds 0-2, plus the AIC2026 public_train folds at seed 0 (the fold twins of `mix-k*`,
+private). **Measures:** the amendment-2 set (primary, G-STEER, G-CHROMA-L, NEARID at seed 0, error against human
+ratings on the shared three and all nine, EVAL compression rows, map agreement), the M1 panel against F3's control,
+the dial comparison's ladder smoothness, the private out-of-fold check against F3's control and against mix + p30L,
+and the codec-uniformity readout. CLIC 2021 is not read. **Reading:** `mixF3` is reported as a candidate to replace
+F3's control if its out-of-fold interval against F3's control does not lie wholly below zero, its compression-row SROCC
+seed mean is no more than 0.003 below F3's, G-STEER passes amendment 2's guard (135 at seed 0, mean at least 134.33),
+G-CHROMA-L and NEARID pass, and its shared-three error seed mean is below F3's control's (8.80%). Nothing is adopted on
+this read; the owner decides.
