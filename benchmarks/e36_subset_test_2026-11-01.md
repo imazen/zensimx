@@ -679,3 +679,18 @@ The human-agreement gain survives the full recipe at every seed, but the mix fai
 seed (m3f 0.675-0.688 against 0.70), plus m2 near-misses (0.947-0.987) that change with the seed. **Amendment 5,
 before running:** the mix with p30L and the map term at weight 300 (seeds 0-2), since the map term raised m3f and
 kept G-STEER clean on p30L. Measured with the same set; its JPEG XL loop follows if it passes the gates.
+
+### Experiment 3 amendment 4 result: p30L + map at three seeds (2026-11-02)
+
+Means over seeds 0-2 (per-seed values where they matter):
+
+| arm | primary (CI) | shared-three error / SROCC | all-nine error | agreement 8 px full / served | G-STEER | G-CHROMA-L | NEARID (seed 0) |
+|---|---|---|---:|---|---|---|---|
+| control (F3) | 0 | 8.80% / 0.835 | 8.55% | | | | |
+| p30L | -0.975 (-1.181, -0.799) | 8.88% / 0.843 | 8.39% | 0.738 / 0.754 (seed 0) | 135, 135, 135 | pass | pass |
+| p30L + map 300 | -1.241 (-1.436, -1.057) | 8.68% / 0.852 | 8.07% | 0.789-0.796 / 0.800-0.810 | 135, 135, 135 | pass x3 | pass (N3 137 ladders) |
+| p30L + map 1000 | -1.339 (-1.502, -1.183) | 8.32% / 0.865 | 8.23% | 0.836-0.840 / 0.839-0.841 | 135, 134, 134 | pass x3 | pass (136) |
+
+p30L + map 300 improves on p30L in every measure at every seed and keeps every product gate. Map 1000 is stronger on
+the primary, the shared collections and agreement, but misses one G-STEER case at seeds 1 and 2 and costs more
+in-distribution development SROCC. The JPEG XL loop (step 4) for both is running on i270.
