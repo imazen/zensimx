@@ -1076,3 +1076,45 @@ control at the same seeds); arm (a) is unchanged. Both arms continue from the sa
 step with the CLIC 2024 leg), so the mix base fits are dropped. The AIC2026 folds at seed 0 run for both arms and,
 since none exist yet, for F3's control recipe too (seven twin folds). Rule, measures and confirmation read 2 are as
 registered, each arm against its twin.
+
+### R7 result (2026-11-03): CLIC 2024 as a training leg
+
+**As run:** the R7 root (the original root with the leg appended, `clic.py leg`) replaced the original root in every
+R7 command, base fit and continuation alike (`exp9/make_cmds.py`), so the continuation trains on the leg too; the
+registration's "the leg added to the base fit" is narrower than what ran. Each step loaded 49,608 rows (24,804
+questions; one with p_a = 1/2 dropped). Read 2's `LABEL_READS.json` names "confirmation read 1" as its registration,
+a label fixed in the script; read 2 was registered with R7 above, and `clic.py confirm` now takes `--registration`.
+
+Each arm against its twin, seeds 0-2 (means unless stated):
+
+| R7 rule | p30L + CLIC 2024 vs p30L | F3 control + CLIC 2024 vs F3 control |
+|---|---|---|
+| EVAL compression-row SROCC (fall at most 0.003) | -0.0045 (0.8904 vs 0.8949; seeds -0.0145, -0.0004, +0.0013): fails | -0.0009 (0.8927 vs 0.8937): passes |
+| all-nine error (rise at most 0.30 points) | +0.03 (8.42% vs 8.39%): passes | +0.05 (8.60% vs 8.55%): passes |
+| G-STEER, amendment 2's guard (135 at seed 0, mean at least 134.33) | 134, 134, 135: fails (seed 0 misses broad-34-b64, m2 0.944; seed 1 broad-206-b64, m2 0.965) | 135, 134, 135 (mean 134.67): passes; the every-seed rule fails (seed 1 misses dog-256-50, m2 0.909, m3f 0.777) |
+| G-CHROMA-L (dev) | passes at every seed | passes at every seed |
+| NEARID (seed 0) | passes (N3 139 of 144 ladders) | passes (N3 139 of 144) |
+| confirmation read 2, CLIC 2021 validation | -0.0004 [-0.0016, +0.0008], neutral: fails | +0.0026 [+0.0012, +0.0040], supported: passes |
+| **reading** | **does not help** | **helps** |
+
+Beside the rule:
+
+| measure | p30L | p30L + CLIC 2024 | F3 control | F3 control + CLIC 2024 |
+|---|---|---|---|---|
+| E36 primary vs F3 control, points [95%] | -0.975 [-1.181, -0.799] | -1.047 [-1.251, -0.869] | 0 (3.36%) | +0.053 [+0.028, +0.076] |
+| shared-three error / SROCC | 8.88% / 0.843 | 8.93% / 0.840 | 8.80% / 0.835 | 8.80% / 0.834 |
+| CLIC 2021 agreement, seeds 0 / 1 / 2 | 0.6411 / 0.6417 / 0.6373 | 0.6346 / 0.6425 / 0.6417 | 0.6445 / 0.6443 / 0.6398 | 0.6431 / 0.6470 / 0.6462 |
+| map agreement, 8 px full / served | 0.738 / 0.754 (seed 0) | 0.762 / 0.762, 0.740 / 0.752, 0.741 / 0.755 | 0.706 / 0.702 (seed 0) | 0.718 / 0.703, 0.707 / 0.702, 0.707 / 0.701 |
+| M1 row-weighted SROCC change vs twin (descriptive) | | -0.0026 | | -0.0017 |
+| G-STEER | 135, 134, 135 | 134, 134, 135 | 135, 135, 133 | 135, 134, 135 |
+
+**Reading (registered rule):** the leg helps F3's control recipe and does not help p30L's. For F3's control it raises
+CLIC 2021 agreement by 0.0026 (seeds -0.0014, +0.0027, +0.0064) with no measured change in error against human
+ratings or on the compression rows, and adds 0.05 points of E36 misordering (interval above zero). With p30L the
+leg's seed 0 is worse on every human measure (compression rows 0.8811, CLIC 2021 0.6346, all-nine error 8.53%) while
+having the lowest misordering of any seed (2.11%); seeds 1 and 2 sit near the twin. The private AIC2026 out-of-fold
+check (numbers in the training repository) finds no change from the leg for either arm and, now that F3's control
+folds exist, ranks F3's control above p30L, as read 1 did. Arm (b)'s CLIC 2021 read is a selection read (disclosed
+at registration). Which candidate ships stays the owner's decision. Readouts: `~/tmp/e36test/postR7/` and
+`~/tmp/e36test/clic21-confirm-2/` on dev; bakes under `/mnt/v/output/zensim/e36-subset-test-2026-11-01/bakes/r7-*`
+(tower mirror hash-checked, 176 files).

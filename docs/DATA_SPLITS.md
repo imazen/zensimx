@@ -3009,3 +3009,6 @@ zensimx record `benchmarks/e36_subset_test_2026-11-01.md` (confirmation read 1 a
   was committed, two rows' vote counts were printed (single votes, both for a), and the library README's check
   (raters side with the higher-PSNR crop in 1,080 of 1,500 sampled votes) had been read. Neither touches an
   assessment set.
+- **Reads of the confirmation set so far:** read 1 (2026-11-03; F3 control, p30L and the two map-300 arms) and read 2
+  (2026-11-03; R7's arms against their twins). Read 2 was R7's decision statistic, so it is a selection read for the
+  arm it supported (F3 control + CLIC 2024). Each read's `LABEL_READS.json` lists the 4,812 validation questions only.

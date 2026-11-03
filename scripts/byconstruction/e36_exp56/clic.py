@@ -109,7 +109,7 @@ def cmd_confirm(a):
     if not reads.exists():
         ledger(reads, dict(table=str(table), sha256=sha(table), rows=f"split == {split}",
                            columns=["ref", "a", "b", "n_a", "n_b", "n_tie", "split"], state="authorized-before-read",
-                           registration="zensimx benchmarks/e36_subset_test_2026-11-01.md, confirmation read 1"))
+                           registration=f"zensimx benchmarks/e36_subset_test_2026-11-01.md, {a.registration}"))
         merged = {}
         with open(table, newline="") as f:
             for i, r in enumerate(csv.DictReader(f, delimiter="\t")):
@@ -302,6 +302,8 @@ def main():
     c.add_argument("--arm", action="append", default=[],
                    help="LABEL=NAME@SEED,...[;vs=BASE_s@] (each seed against --vs, or the arm's own baseline)")
     c.add_argument("--draws", type=int, default=10000)
+    # The record section that registered this read; it goes into the read's LABEL_READS.json.
+    c.add_argument("--registration", required=True)
     a = ap.parse_args()
     {"keys": cmd_keys, "confirm": cmd_confirm, "leg": cmd_leg}[a.cmd](a)
 
