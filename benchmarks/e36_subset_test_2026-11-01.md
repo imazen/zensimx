@@ -1256,8 +1256,8 @@ uniform of every model and reference metric scored, SSIMULACRA2 included; most o
 without PNG it is level with F3's control.
 
 **Reading (registered rule):** `mixF3` meets every condition but G-STEER, so it is not reported as a candidate to
-replace F3's control. Beside the rule: the mix's error gain does not depend on the hinge (shared-three error 0.46
-points below F3's control at every seed, as mix + p30L's 0.47), and without the hinge the mix costs no pairwise
+replace F3's control. Beside the rule: the mix's error gain does not depend on the hinge (shared-three error 0.45
+points below F3's control's mean and lower at every seed; mix + p30L sits 0.53 below p30L), and without the hinge the mix costs no pairwise
 agreement on AIC2026 and improves consistency across codecs, while E36 misordering and ladder smoothness stay at
 F3's level. Its only failure is the steering map's rank on one G-STEER case at every seed, which the map term repaired
 for mix + p30L at a CLIC 2021 cost (read 1). Readouts: `~/tmp/e36test/postR10/` on dev; bakes
