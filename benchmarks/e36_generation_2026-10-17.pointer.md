@@ -140,3 +140,18 @@ PNG views dropped, every other member byte-identical, and the trees' 4,184 non-a
 manifests, scripts) copied with their SHA-256 list at `_repack/nonarchive-files.sha256`. The owner had the originals
 deleted on 2026-11-03 (13:52 UTC). Resolve an archive path recorded above by prefixing `e36-imi-repack-v1/`. The
 repack tool, its ledgers and the verify table are in the private training repository (`tools/e36repack`).
+
+## Reduced copy; lossless copy deleted (2026-11-03)
+
+On the owner's instruction the archives were reduced again and the lossless repack deleted. The only copy is now
+`/mnt/tower/output/zensim/e36-imi-reduce-v2/` (checked from dev 2026-11-03; resolve with `ls /mnt/tower/output/zensim/
+| grep e36-imi`), same relative paths: butteraugli maps per pixel with each value rounded to 10 mantissa bits
+(`maps/<sha>.mant10.imi`, worst relative error 2^-11 = 4.9e-4), CVVDP maps as 8x8 blocks of L2, max and p3
+(`maps/<sha>.blk8.imi`), every other member byte-identical and each archive's `repack.json` carrying the lossless
+repack's record. 500,804 archives, 183.99 GB (0.283 of the lossless 649.57 GB), verified inline and again by an
+independent pass (0 failures), plus the 4,184 non-archive files matched against their SHA-256 list
+(`_repack/nonarchive-files.sha256`); the lossless run's ledgers and logs are in `_repack/lossless-run-v1/`. The
+lossless copy `e36-imi-repack-v1` was deleted on 2026-11-03 (22:52 UTC). Resolve an archive path recorded above by
+prefixing `e36-imi-reduce-v2/`. Full maps at f32 no longer exist: a butteraugli map reads back at 10-bit mantissa
+precision and a CVVDP map only as 8x8 block statistics. Tool, ledgers and spec: the private training repository
+(`tools/e36repack`).
