@@ -49,7 +49,7 @@ def command(name, seed):
     elif name == 'strat':
         bd = bindir('bin-fast', 'stratified', tag)
     elif name == 'walk':
-        bd = bindir('bin-walk', 'walk', tag)
+        bd = bindir('bin-walk2', 'walk', tag)  # bdf7a835: walk admitted on the subjective pair path
     elif name == 'control-wb':
         bd = bindir('bin-walk', 'uniform', tag)
     else:

@@ -21,5 +21,11 @@ admission checks still run on every arm.
 - `run_cmd.py`, `wave.sh`: run a wave of commands, staggered, under one heavy lock.
 - `prune_scores.py`, `make_prunes.py`: experiment 6's within-reference discordance and the prune row lists.
 - `score_runs.sh`, `readout.py`: EVAL scoring of the packed base fits and the error-against-human readout.
+- `exp5c_make_cmds.py`: experiment 5 stage 3, the TID2013 + MDID mix through F3's continuation with p30L's terms. The
+  patch lets a continuation exclude dataset legs only when an experiment 5 option is given.
+- Experiment 3: `step2_prep.py` / `heldout_prep.py` (the fit and held-out view samples), `map_agreement.py`
+  (held-out Spearman against butteraugli), `exp3m_make_cmds.py` (map term in the continuation), `exp3b_make_cmds.py`
+  (map term in the base fit), `exp3m_post.sh`, `postF.sh`, `postG.sh` (post-run measurements), `primary.py`
+  (the registered primary, `SEEDS=0` for seed-0 screens).
 
 Paths inside the scripts are the dev host's scratch layout (`~/tmp/e36test`) where the runs live.

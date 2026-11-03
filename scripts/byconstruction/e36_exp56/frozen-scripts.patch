@@ -13,7 +13,18 @@
      from matched_codec import add_args as codec_args
      codec_args(ap)
      ap.add_argument("--spec", required=True)
-@@ -168,8 +174,21 @@
+@@ -84,7 +90,9 @@
+         registered = (((60, diagnostic_protocol(args.diagnostic_population)[1]),) if args.diagnostic_population
+                       else ((4, 8.0), (8, 16.0)))
+         if (not args.init_from or not args.strict_admission or not args.train_only
+-                or args.exclude_datasets or args.local_smoke_budget or args.research_extra_group
++                # E36 experiment 5 stage 3: a registered MOS mix may exclude dataset legs in the continuation.
++                or (args.exclude_datasets and args.mos_share is None and args.human_sources is None)
++                or args.local_smoke_budget or args.research_extra_group
+                 or args.research_replay or args.aic_public_train is None or args.fine_tune_lr != 0.00001
+                 or (args.diagnostic_population and args.pack_production)
+                 or (args.fine_tune_epochs, args.aic_weight) not in registered):
+@@ -168,8 +176,21 @@
          raise ValueError(f"{args.spec}: the confirm fitter implements the coverage leg only (no ko/ts recipe tokens)")
      hfit, hdev = checked(legs["human_all"]["fit"]), checked(legs["human_all"]["dev"])
      weights["human"] = acceptance_weight(NOMINAL_WEIGHT["human"] if human_w is None else human_w, refs_of(hfit))
@@ -35,7 +46,7 @@
      init_seed, sample_seed = confirm_seeds(args.seed_index)
      from matched_codec import attach as attach_codec
      groups, recipe = attach_codec(args, groups, V2, init_seed, sample_seed, recipe)
-@@ -179,9 +198,18 @@
+@@ -179,9 +200,18 @@
          groups, dataset_authority = dataset_groups(V2, groups, keep, "full", args.seed_index,
                                                     init_seed, sample_seed, dest,
                                                     exclude=tuple(filter(None, args.exclude_datasets.split(","))),
