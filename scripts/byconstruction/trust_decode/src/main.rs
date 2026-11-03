@@ -1,10 +1,13 @@
 //! The dataset trust screen's decoder (zensimx `scripts/byconstruction/dataset_trust.py`): the pinned judge build
-//! reads PNG, JPEG and WebP only, so BMP and PNM inputs are decoded here with zenbitmaps and written as RGB8 PNG.
+//! reads PNG, JPEG and WebP only, so BMP and PNM inputs are decoded here with zenbitmaps and written as RGB8 PNG;
+//! the frozen DVIFM runtime also lacks WebP, so WebP inputs are decoded with zenwebp (`oneshot::decode_rgba`, its
+//! default upsampling) for that runtime alone.
 //!
 //!     trust_decode LIST OUT_DIR > MAP.tsv
 //!
 //! LIST holds one input path per line. Each output is `OUT_DIR/<sha256 of the packed RGB8 pixels>.png`; MAP.tsv has
-//! `input`, `png`, `width`, `height`, `rgb8_sha256` per input. Gray inputs are expanded to RGB; alpha is refused.
+//! `input`, `png`, `width`, `height`, `rgb8_sha256` per input. Gray inputs are expanded to RGB; an alpha channel is
+//! dropped only when every pixel is opaque, otherwise refused.
 #![forbid(unsafe_code)]
 use std::borrow::Cow;
 use std::io::{BufRead, Write};
@@ -55,6 +58,19 @@ fn rgb8(pb: &PixelBuffer) -> Result<Vec<u8>, String> {
     Ok(out)
 }
 
+/// WebP through zenwebp's native one-shot decoder (RGBA8, alpha 255 where opaque), as packed RGB8.
+fn webp_rgb8(bytes: &[u8]) -> Result<(u32, u32, Vec<u8>), String> {
+    let (rgba, w, h) = zenwebp::oneshot::decode_rgba(bytes).map_err(|e| format!("webp decode: {e:?}"))?;
+    let mut out = Vec::with_capacity(w as usize * h as usize * 3);
+    for px in rgba.as_chunks::<4>().0 {
+        if px[3] != 255 {
+            return Err("webp has non-opaque alpha".into());
+        }
+        out.extend_from_slice(&px[..3]);
+    }
+    Ok((w, h, out))
+}
+
 fn main() {
     let args: Vec<String> = std::env::args().collect();
     if args.len() != 3 {
@@ -72,9 +88,13 @@ fn main() {
             continue;
         }
         let bytes = std::fs::read(&input).unwrap_or_else(|e| panic!("{input}: {e}"));
-        let pb = decode(&bytes).unwrap_or_else(|e| panic!("{input}: {e}"));
-        let (w, h) = (pb.width(), pb.height());
-        let px = rgb8(&pb).unwrap_or_else(|e| panic!("{input}: {e}"));
+        let (w, h, px) = if bytes.len() >= 12 && &bytes[..4] == b"RIFF" && &bytes[8..12] == b"WEBP" {
+            webp_rgb8(&bytes).unwrap_or_else(|e| panic!("{input}: {e}"))
+        } else {
+            let pb = decode(&bytes).unwrap_or_else(|e| panic!("{input}: {e}"));
+            let px = rgb8(&pb).unwrap_or_else(|e| panic!("{input}: {e}"));
+            (pb.width(), pb.height(), px)
+        };
         let digest: String = Sha256::digest(&px).iter().map(|b| format!("{b:02x}")).collect();
         let dst = out_dir.join(format!("{digest}.png"));
         if !dst.exists() {

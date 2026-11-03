@@ -890,3 +890,57 @@ fewer than about 30 references give descriptive intervals only.
 **R5 on the compression rows** (rank objective): all four human sources 0.872, compression rows only (m3c) 0.828,
 compression + encoder-like rows (m3cn) 0.845; single sources: KADID 0.854 vs its compression rows 0.847, TID2013
 0.864 vs 0.850 (C) and 0.896 (C+N). The probe predicts that R2's arms will not beat the walk control.
+
+### Experiment 5 amendment 7 result: the mix with a light map term (seeds 0-2)
+
+| arm | primary (vs control) | shared three: error / SROCC | all nine | compression rows (s0/s1/s2) | map agreement 8 px full | G-STEER | G-CHROMA-L | NEARID (s0) |
+|---|---|---|---|---|---|---|---|---|
+| p30L | -0.98 | 8.88% / 0.843 | 8.39% | 0.896 / 0.896 / 0.894 | 0.738 | 135, 135, 135 | pass | pass |
+| mix + p30L + map 30 | -1.08 | 8.29% / 0.858 | 7.85% | 0.898 / 0.899 / 0.898 | 0.729-0.743 | 134, 133, 133 | pass | pass |
+| mix + p30L + map 100 | -1.18 | 8.32% / 0.859 | 7.83% | 0.899 / 0.899 / 0.898 | 0.753-0.756 | 134, 130, 132 | pass | pass |
+| mix + p30L + map 300 | -1.30 | 8.03% / 0.865 | 7.63% | 0.898 / 0.898 / 0.898 | 0.783-0.788 | 135, 134, 134 | pass | pass |
+
+Neither light map term is a candidate under the registered rule: every seed misses broad-220-b8 on map rank (m3f
+0.62-0.67, bar 0.70), and seeds 1-2 add one to four m2 near-misses (0.956-0.98, bar 0.99) on broad-38, broad-76 and
+broad-143 cases. The private out-of-fold check (numbers in the training repository) found no AIC2026 cost for either,
+like the mix without a map term. M1 panel against p30L: map 30 +0.0197 and map 100 +0.0205 row-weighted SROCC, every
+collection's seed mean at or above zero, positive at all three seeds on CID:IQ, MDID, NITS-IQA and VCL-FER.
+
+**Reading.** Map 300 remains the only mix configuration within one case of G-STEER at every seed; lighter map terms
+lose map rank on broad-220-b8 without buying anything on the other measures, and on the EVAL compression rows every
+mix arm sits at 0.898, level with SSIMULACRA2 (0.896).
+
+### M2 result: dataset trust screen (2026-11-03)
+
+`scripts/byconstruction/dataset_trust.py` on i270 (`trust_decode` decodes BMP/PNM with zenbitmaps and, for DVIFM only,
+WebP with zenwebp). MOS sets: SROCC with a whole-reference interval (within-reference SROCC after "w"). Pair sets:
+two-alternative agreement (soft labels, whole-reference interval). Observer agreement: each vote of a pair with at
+least two votes predicted by the majority of the pair's other votes.
+
+| set | rows / refs | label quality | SSIMULACRA2 | butteraugli 3-norm | CVVDP | DVIFM 0.3 | exposure |
+|---|---|---|---|---|---|---|---|
+| NNCD-IQA (learned codecs, JPEG 2000) | 320 / 16 | 0.4% of ladder steps against the ladder | 0.930 [0.908, 0.953] w 0.961 | 0.928 w 0.950 | 0.922 w 0.957 | 0.925 w 0.956 | TID2013 / Kodak sources |
+| MMSPG JPEG XR (JPEG XR, JPEG, JPEG 2000) | 186 / 6 | reliability 0.978 (13 raters); 10.7% ladder steps against | 0.928 [0.891, 0.953] w 0.938 | 0.892 | 0.911 | 0.928 | none known; 6 sources |
+| MIDD-CAP (near-lossless JPEG, identification) | 192 / 24 | 6.0% against | 0.877 [0.839, 0.920] w 0.977 | 0.892 w 0.977 | 0.848 w 0.977 | 0.910 w 0.977 | TID2013 sources |
+| MIDD-GAR (grayscale, JPEG/WebP, identification) | 200 / 10 | 5.0% against | 0.782 [0.712, 0.852] w 0.852 | 0.749 | 0.756 | 0.780 | TID2013 sources |
+| CLIC 2021 validation (learned codecs, 2AFC) | 4,812 / 315 | observer agreement 0.769 (262 pairs); 1 vote median | 0.626 [0.612, 0.641] | 0.606 | 0.639 | 0.629 | source-independent |
+| mucped23 (jpegli, MozJPEG, libjpeg-turbo q55-95) | 9,314 / 49 | observer agreement 0.637 (3,091 pairs); 1 vote median | 0.739 [0.721, 0.756] | 0.740 | 0.725 | 0.740 | 17 of its 49 sources are CID22-A25 training sources |
+| Fidelity-LIC (GAN vs non-GAN learned codec) | 132 / 42 | observer agreement 0.675; 20 votes, 34% ties | 0.361 [0.328, 0.396] | 0.412 | 0.322 | 0.598 | some sources protected (D4) |
+
+- **mucped23's library table is inverted.** The authors' `compute_elo.ipynb` counts a win for a method when the
+  other method is named in `answerValue`, so `answerValue` names the distortion judged farther from the original;
+  `answerValue == A` agrees with the authors' published Elo order in 3,609 of 13,488 answers (26.8%). The library
+  (zenpapers `scripts/iqa_library/organize.py`, mucped23 adapter) counts it as the closer one. The screen corrects the
+  orientation (`INVERTED_ANSWERS`); uncorrected, every metric scored 0.26.
+- **Fidelity-LIC measures something fidelity metrics miss.** Observers chose the GAN crop as closer to the reference
+  at low rates while the non-GAN crop has the higher PSNR in 128 of 132 triplets; only DVIFM agrees above chance.
+  Ten references embed a non-sRGB ICC profile (Adobe RGB (1998), "c2") while their encodes are tagged sRGB; without
+  the 31 triplets that touch them the agreements barely move (SSIMULACRA2 0.356, DVIFM 0.588).
+- **CLIC 2021's validation pairs are hard for every metric:** 0.61-0.64 against an observer agreement of 0.77.
+- **Trust.** NNCD, MMSPG JPEG XR and MIDD-CAP have consistent labels and leading metrics agree with them (0.85-0.93);
+  all but MMSPG reuse TID2013's sources. CLIC 2021's validation crops are the only large, source-independent
+  compression set; mucped23 is product-relevant (JPEG encoders) but noisy and shares 17 sources with our training.
+- **Recommended confirmation set:** CLIC 2021's validation pairs (statistic: two-alternative agreement, whole-reference
+  interval, 315 references), with NNCD-IQA and MIDD-CAP as source-exposed diagnostics. CIQA (JPEG at paired
+  qualities, source-independent) would add the product's codec but needs its TensorFlow-adjusted reference pixels,
+  which were not stored; regenerating them needs the owner's sign-off.

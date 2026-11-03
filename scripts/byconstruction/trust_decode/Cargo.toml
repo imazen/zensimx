@@ -3,7 +3,7 @@ name = "trust-decode"
 version = "0.0.0"
 edition = "2024"
 publish = false
-description = "Dataset trust screen: BMP/PNM inputs decoded by zenbitmaps and written as RGB8 PNG for the pinned judges"
+description = "Dataset trust screen: BMP/PNM (zenbitmaps) and WebP (zenwebp) inputs written as RGB8 PNG for judges that cannot read them"
 
 [workspace]
 
@@ -12,6 +12,7 @@ zenbitmaps = { version = "0.1.5", default-features = false, features = ["std", "
 zencodec = "0.1.26"
 zenpixels = { version = ">=0.2.10, <0.4.0", default-features = false }
 zenpng = { version = "0.1.4", default-features = false }
+zenwebp = { version = "0.4.6", default-features = false, features = ["std"] }
 enough = "0.4"
 imgref = "1.12"
 rgb = { version = "0.8", default-features = false, features = ["bytemuck"] }

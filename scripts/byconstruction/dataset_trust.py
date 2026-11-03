@@ -45,6 +45,12 @@ DATASETS = {
     "mucped23": ("pairs.tsv", "pair", None),
     "fidelity-lic-vcip2023": ("pairs.tsv", "pair", None),
 }
+# Library tables whose answer orientation is wrong, corrected here (the owner's fix belongs in zenpapers'
+# `scripts/iqa_library/organize.py`). mucped23: the authors' compute_elo.ipynb counts a win for method X when the
+# OTHER method is named in `answerValue`, so `answerValue` names the distortion judged farther from the original; the
+# library counts it as the closer one. Checked 2026-11-03: `answerValue == A` agrees with the authors' published Elo
+# order in 3,609 of 13,488 answers (26.8%).
+INVERTED_ANSWERS = {"mucped23"}
 DVIFM_RUNTIME = Path("/mnt/v/output/zensim/jnd-reconstruction-2026-10-20-dvifm03/dvifm-runtime")
 JUDGES = ("ssim2", "butteraugli", "cvvdp")
 # Metric column read from each judge output, and its direction (+1: higher = better quality).
@@ -249,11 +255,22 @@ def cmd_score(a):
         if sha(binary) != frozen["binary_sha256"]:
             raise SystemExit("not the frozen DVIFM runtime")
         rows = read_table(out / "judge_pairs.tsv")
+        # The frozen runtime reads no WebP: those inputs go through zenwebp (`trust_decode`) for DVIFM alone.
+        webp = sorted({p for r in rows for p in (r["ref_path"], r["dist_path"])
+                       if Path(p).read_bytes()[:12][8:12] == b"WEBP"})
+        m = {}
+        if webp:
+            if not a.tool:
+                raise SystemExit(f"{len(webp)} WebP inputs need --tool for DVIFM")
+            (out / "decode_list_webp.txt").write_text("".join(p + "\n" for p in webp))
+            with open(out / "decode_map_webp.tsv", "w") as f:
+                subprocess.run([a.tool, str(out / "decode_list_webp.txt"), str(out / "png")], stdout=f, check=True)
+            m = {r["input"]: r["png"] for r in read_table(out / "decode_map_webp.tsv")}
         src = out / "dvifm_pairs.tsv"
         with open(src, "w", newline="") as f:
             w = csv.writer(f, delimiter="\t", lineterminator="\n")
             w.writerow(["ref_path", "dist_path"])
-            w.writerows([r["ref_path"], r["dist_path"]] for r in rows)
+            w.writerows([m.get(r["ref_path"], r["ref_path"]), m.get(r["dist_path"], r["dist_path"])] for r in rows)
         subprocess.run(["nice", "-n19", str(binary), "batch", "--pairs", str(src), "--out", str(dest), "--preset",
                         frozen["preset"], "--threads", str(a.threads)], check=True)
     print(json.dumps({p.name: sha(p) for p in sorted(out.glob("judge_*.tsv"))}, indent=1))
@@ -265,18 +282,20 @@ def load_metrics(out):
     keys = {r["pair_key"]: (r["ref_path"], r["dist_path"]) for r in read_table(out / "judge_pairs.original.tsv")} \
         if (out / "judge_pairs.original.tsv").exists() else \
         {r["pair_key"]: (r["ref_path"], r["dist_path"]) for r in read_table(out / "judge_pairs.tsv")}
-    decoded = [(r["ref_path"], r["dist_path"]) for r in read_table(out / "judge_pairs.tsv")]
     order = list(keys.values())
     metrics = {}
     for metric in JUDGES:
         t = read_table(out / f"judge_{metric}.tsv")
         for name, (col, sign) in COLUMNS.items():
-            if t and col in t[0]:
-                metrics[name] = {keys[r["pair_key"]]: sign * float(r[col]) for r in t}
+            hit = [c for c in (t[0] if t else {}) if c == col or c.startswith(col + "_")]
+            if hit:
+                metrics[name] = {keys[r["pair_key"]]: sign * float(r[hit[0]]) for r in t}
     t = read_table(out / "judge_dvifm.tsv")
-    if len(t) != len(order) or [(r["ref_path"], r["dist_path"]) for r in t] != decoded:
-        raise SystemExit("DVIFM rows do not match the judge pairs")
-    metrics["dvifm"] = {k: -float(r["jnd"]) for k, r in zip(order, t)}
+    dv = [(r["ref_path"], r["dist_path"]) for r in read_table(out / "dvifm_pairs.tsv")]
+    if len(dv) != len(order) or len(t) != len(order) or any(
+            (r["ref_path"], r["dist_path"]) != dv[int(r["row"])] for r in t):
+        raise SystemExit("DVIFM rows do not match its pair list")
+    metrics["dvifm"] = {order[int(r["row"])]: -float(r["jnd"]) for r in t}
     for name, v in metrics.items():
         if len(v) != len(order) or not all(math.isfinite(x) for x in v.values()):
             raise SystemExit(f"{name}: missing or non-finite scores")
@@ -318,6 +337,10 @@ def label_quality_mos(rr):
 def cmd_report(a):
     out = Path(a.out)
     rows = json.loads((out / "rows.json").read_text())
+    for r in rows:
+        if r["ds"] in INVERTED_ANSWERS:
+            r["n_a"], r["n_b"] = r["n_b"], r["n_a"]
+            r["target"] = (r["n_a"] + 0.5 * r["n_tie"]) / r["n"]
     metrics = load_metrics(out)
     names = list(metrics)
     report = {}
@@ -440,6 +463,7 @@ def main():
     s.add_argument("--out", required=True)
     s.add_argument("--zm", default="/var/tmp/byconstruction-bin/zenmetrics-judge-7a0f8394/zenmetrics")
     s.add_argument("--threads", type=int, default=16)
+    s.add_argument("--tool", help="trust_decode binary, for WebP inputs DVIFM cannot read")
     r = sub.add_parser("report")
     r.add_argument("--out", required=True)
     a = ap.parse_args()
