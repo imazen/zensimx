@@ -1,6 +1,7 @@
 """E36 CLIC sets (record, 2026-11-03): CLIC 2021 validation as the confirmation set, CLIC 2024 as R7's training leg.
 
   clic.py keys SET ROOT                 label-free assessment keys for rev5_bank.py extract (SET: clic21_valid, clic24)
+  clic.py leg ROOT OUT --bank BANK      R7: ROOT copied to OUT with CLIC 2024 appended as a hard-pair-preference leg
   clic.py confirm EVAL --bank BANK --predict BIN --model NAME=BAKE ... --vs BASE --arm LABEL=NAME@0,NAME@1,... ...
                                         confirmation read: two-alternative agreement per model and seed-mean paired
                                         differences against BASE (whole-reference cluster bootstrap)
@@ -160,11 +161,12 @@ def cmd_confirm(a):
     draws = np.stack([np.bincount(rng.integers(0, len(groups), len(groups)), minlength=len(groups))
                       for _ in range(a.draws)])
     for spec in a.arm:
+        spec, _, vs = spec.partition(";vs=")
         label, members = spec.split("=", 1)
         pairs = []
         for m in members.split(","):
             arm, seed = m.split("@")
-            pairs.append((arm, a.vs.replace("@", seed)))
+            pairs.append((arm, (vs or a.vs).replace("@", seed)))
         diff = np.mean([(per[x] - per[y]) for x, y in pairs], axis=0)
         point = diff.sum() / den.sum()
         boots = (draws @ diff) / (draws @ den)
@@ -180,17 +182,128 @@ def cmd_confirm(a):
         print(f"{label:40s} {v['diff']:+.4f} [{v['lo']:+.4f}, {v['hi']:+.4f}] {v['reading']}")
 
 
+D4_PARENTS = Path("/mnt/v/zensim/d4-roles-private/followup/clic-2024-perceptual-image-source-disposition.tsv")
+
+
+def cmd_leg(a):
+    """R7: a copy of a frozen training root with CLIC 2024 appended as a hard-pair-preference leg (the BAPPS leg's
+    form), then re-frozen. Inherited legs and tables are copied unchanged; only datasets/receipt.json, the new leg's
+    files and wide/frozen.json's bindings change."""
+    import collections
+    import shutil
+    from ring_root import bank_transport, write
+    source, out, bank = Path(a.root), Path(a.out), Path(a.bank)
+    if out.exists():
+        raise SystemExit("fresh root destination required")
+    dataset = "clic-2024-perceptual-image"
+    table = LIB / dataset / "pairs.tsv"
+    manifest = json.loads((bank / "_MANIFEST.json").read_text())
+    if (manifest["feature_set_id"] != "basic+peaks+v2@w1825/rev7_rowlanes#36c3f3af"
+            or manifest["build_commit"] != "b77883be18db5933a9db4b9e2670a2ba88a9729b"
+            or sha(bank / "features.parquet") != manifest["features_parquet_sha256"]):
+        raise SystemExit("CLIC 2024 bank producer/hash differs")
+    parents = {}
+    with open(D4_PARENTS, newline="") as f:
+        for r in csv.DictReader(f, delimiter="\t"):
+            parents[r["source_ids"]] = r["original_parents"]
+    shutil.copytree(source, out)
+    legdir = out / "datasets"
+    ledger = out.parent / f"{out.name}.LABEL_READS.json"
+    ledger_entry = dict(table=str(table), sha256=sha(table), rows="all", columns=["ref", "a", "b", "n_a", "n_b", "n_tie"],
+                        state="authorized-before-read", role="TRAIN",
+                        registration="zensimx benchmarks/e36_subset_test_2026-11-01.md, R7 registration")
+    v = dict(schema="e36-clic-label-reads-v1", reads=[ledger_entry])
+    ledger.write_text(json.dumps(v, indent=1) + "\n")
+    merged = {}
+    with open(table, newline="") as f:
+        for i, r in enumerate(csv.DictReader(f, delimiter="\t")):
+            na, nb, nt = (float(r[c] or 0) for c in ("n_a", "n_b", "n_tie"))
+            x, y = r["a"], r["b"]
+            if x > y:
+                x, y, na, nb = y, x, nb, na
+            m = merged.setdefault((r["ref"], x, y), dict(n_a=0.0, n_b=0.0, n_tie=0.0, rows=[]))
+            m["n_a"] += na; m["n_b"] += nb; m["n_tie"] += nt; m["rows"].append(i)
+    v["reads"][0]["state"] = "read"
+    v["reads"][0]["questions_after_merge"] = len(merged)
+    ledger.write_text(json.dumps(v, indent=1) + "\n")
+    obs, dropped = [], collections.Counter()
+    for (ref, x, y), m in merged.items():
+        n = m["n_a"] + m["n_b"] + m["n_tie"]
+        if n <= 0:
+            dropped["no_votes"] += 1
+            continue
+        p = (m["n_a"] + 0.5 * m["n_tie"]) / n
+        if p == 0.5:
+            dropped["exact_probability_tie"] += 1
+            continue
+        identity = f"{dataset}:pairs.tsv:{m['rows'][0]}"
+        family = "clic24:" + parents[Path(ref).name]
+        for side, d in (("a", x), ("b", y)):
+            obs.append(dict(pair_key=pair_key("clic24", ref, d), ref_basename=identity,
+                            human_score=float((p > 0.5) == (side == "a")), observation=f"{identity}:{side}", family=family))
+    guard = json.loads((legdir / "FAMILY_GUARD.json").read_text())
+    if {o["family"] for o in obs} & set(guard["protected_families"]):
+        raise SystemExit("a CLIC 2024 family is protected")
+    tab = pq.read_table(bank / "features.parquet")
+    index = {k: i for i, k in enumerate(tab["pair_key"].to_pylist())}
+    tab = tab.take(pa.array([index[o["pair_key"]] for o in obs]))
+    width = json.loads((out / "wide/main/real/receipt.json").read_text())["width"]
+    tab = bank_transport(tab, [o["ref_basename"] for o in obs], [o["human_score"] for o in obs], width)
+    path = legdir / "clic-2024-perceptual-image.parquet"
+    write(tab, path)
+    counts = dict(sorted(collections.Counter(o["ref_basename"] for o in obs).items()))
+    keys = [dict(row=i, observation=o["observation"], source=o["ref_basename"], reference=o["ref_basename"],
+                 family=o["family"], role="fit", tier="T2") for i, o in enumerate(obs)]
+    kp = legdir / "clic-2024-perceptual-image.keys.json"
+    kp.write_text(json.dumps(keys, separators=(",", ":")) + "\n")
+    packet = json.loads((legdir / "receipt.json").read_text())
+    selected = packet["feature_ids"]
+    decl = dict(schema="subjective-training-leg-v2", loss="hard-pair-preference", nominal_weight=0.5,
+                target_orientation="quality", target_transform="orient-native-quality", target_column="human_score",
+                selection="fixed-final-epoch", formula_revision=7, tier="v3", feature_ids=selected,
+                producer_commit=manifest["build_commit"], feature_set_id=manifest["feature_set_id"], native_role="TRAIN",
+                rows=len(obs), table_sha256=sha(path), admission_root=str(out), training_width=width,
+                membership_sha256=sha(Path(a.bank).parents[1] / "inputs/clic24/keys.parquet"),
+                feature_manifest_sha256=sha(bank / "_MANIFEST.json"),
+                label_reads_path=str(ledger), family_source=str(D4_PARENTS), family_source_sha256=sha(D4_PARENTS))
+    dp = Path(str(path) + ".manifest.json")
+    dp.write_text(json.dumps(decl, indent=1) + "\n")
+    weight = 0.5 / (sum(1 - 1 / c for c in counts.values()) / len(counts))
+    packet["groups"].append(dict(
+        name="subjective_rank_clic_2024_perceptual_image", path=str(path), train_weight=weight, val_weight=0.0,
+        mode="withinref,rank", subjective=True, table_sha256=sha(path), manifest_sha256=sha(dp), keys_path=str(kp),
+        keys_sha256=sha(kp), rows=len(obs), source_counts=counts, collection=dataset, membership_rows=len(merged),
+        dropped=dict(dropped), groups=len(counts), pairs=sum(c * (c - 1) // 2 for c in counts.values())))
+    packet["r7"] = dict(parent_frozen_sha256=sha(source / "wide/frozen.json"), parent_receipt_sha256=sha(source / "datasets/receipt.json"),
+                        label_reads_path=str(ledger), registration="zensimx benchmarks/e36_subset_test_2026-11-01.md, R7")
+    packet["family_guard_path"] = str(legdir / "FAMILY_GUARD.json")
+    for g in packet["groups"][:-1]:  # inherited legs now live in the copy
+        for k in ("path", "keys_path"):
+            if k in g:
+                g[k] = str(out / Path(g[k]).relative_to(source))
+    (legdir / "receipt.json").write_text(json.dumps(packet, indent=1) + "\n")
+    frozen = json.loads((out / "wide/frozen.json").read_text())
+    frozen["dataset_legs_sha256"] = sha(legdir / "receipt.json")
+    frozen["auxiliary_files"] = {rel: sha(out / rel) for rel in frozen["auxiliary_files"]}
+    frozen["auxiliary_files"].update({str(p.relative_to(out)): sha(p) for p in legdir.iterdir()})
+    (out / "wide/frozen.json").write_text(json.dumps(frozen, indent=1) + "\n")
+    print(json.dumps(dict(root=str(out), questions=len(merged), comparisons=len(counts), rows=len(obs),
+                          dropped=dict(dropped), families=len({o["family"] for o in obs}), train_weight=weight)))
+
+
 def main():
     ap = argparse.ArgumentParser()
     sub = ap.add_subparsers(dest="cmd", required=True)
     k = sub.add_parser("keys"); k.add_argument("set", choices=sorted(SETS)); k.add_argument("root")
+    lg = sub.add_parser("leg"); lg.add_argument("root"); lg.add_argument("out"); lg.add_argument("--bank", required=True)
     c = sub.add_parser("confirm"); c.add_argument("eval"); c.add_argument("--bank", required=True)
     c.add_argument("--predict", required=True); c.add_argument("--model", action="append", default=[])
     c.add_argument("--vs", required=True, help="baseline name with @ for the seed, e.g. p30L_s@")
-    c.add_argument("--arm", action="append", default=[], help="LABEL=NAME@SEED,... (each seed against --vs)")
+    c.add_argument("--arm", action="append", default=[],
+                   help="LABEL=NAME@SEED,...[;vs=BASE_s@] (each seed against --vs, or the arm's own baseline)")
     c.add_argument("--draws", type=int, default=10000)
     a = ap.parse_args()
-    {"keys": cmd_keys, "confirm": cmd_confirm}[a.cmd](a)
+    {"keys": cmd_keys, "confirm": cmd_confirm, "leg": cmd_leg}[a.cmd](a)
 
 
 if __name__ == "__main__":

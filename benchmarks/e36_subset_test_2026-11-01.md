@@ -1046,3 +1046,33 @@ mean falls by no more than 0.003 against its twin, its all-nine error rises by n
 passes amendment 2's guard (the stricter every-seed rule reported alongside), G-CHROMA-L and NEARID pass, and read 2
 supports it. **Disclosure:** for R7 the CLIC 2021 read is the decision statistic, so an adopted R7 arm has no
 independent confirmation on CLIC 2021; its read there is a selection read.
+
+### Confirmation read 1 result (2026-11-03): CLIC 2021 validation
+
+4,812 questions over 315 references; features from the EVAL extractor (2,415 distinct pairs,
+`/mnt/v/zensim/dataset-features-rev7-clic-20261103/`, `scripts/byconstruction/e36_exp56/clic.py`). Two-alternative
+agreement (soft labels), per seed; for reference, the M2 screen's metrics on the same questions: SSIMULACRA2 0.626,
+butteraugli 0.606, CVVDP 0.639, DVIFM 0.629; observer agreement 0.769.
+
+| model | seed 0 | seed 1 | seed 2 | seed-mean difference vs p30L [95%] | reading |
+|---|---:|---:|---:|---|---|
+| F3 control | 0.6445 | 0.6443 | 0.6398 | +0.0029 [+0.0002, +0.0056] | above p30L |
+| p30L | 0.6411 | 0.6417 | 0.6373 | | incumbent |
+| p30L + map 300 | 0.6348 | 0.6357 | 0.6340 | -0.0052 [-0.0085, -0.0019] | contradicted |
+| mix + p30L + map 300 | 0.6353 | 0.6357 | 0.6351 | -0.0047 [-0.0084, -0.0010] | contradicted |
+
+**Reading (registered rule):** both map-300 challengers are contradicted, so neither is recommended. p30L stays the
+incumbent. Reported beside the rule: F3's control scores above p30L at every seed (+0.0034, +0.0026, +0.0025), so
+the hinge and level terms cost about 0.3 points of agreement here, and the map term about another 0.5. AIC2026
+public_train (private out-of-fold check) showed the map term's cost too, so two independent pairwise human sets now
+disagree with the map term's direction while E36's primary, EVAL's error and the JPEG XL loop favour it. Every
+zensim model here is above SSIMULACRA2 (0.626); F3's control is also above CVVDP (0.639). Readout:
+`~/tmp/e36test/clic21-confirm-1/CONFIRM.json` on dev.
+
+### R7 amendment 1 (2026-11-03, after confirmation read 1, before any R7 run)
+
+Read 1 contradicts mix + p30L + map 300, so arm (b) changes to F3's control recipe with the leg added (twin: F3's
+control at the same seeds); arm (a) is unchanged. Both arms continue from the same three base fits (F3's base-fit
+step with the CLIC 2024 leg), so the mix base fits are dropped. The AIC2026 folds at seed 0 run for both arms and,
+since none exist yet, for F3's control recipe too (seven twin folds). Rule, measures and confirmation read 2 are as
+registered, each arm against its twin.
