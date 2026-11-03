@@ -618,3 +618,20 @@ The walk cuts the seed-to-seed spread of error against human ratings about three
 gave nothing beyond the control's spread, and stratified sampling cannot run under this recipe. Recipe consequence:
 the walk is a candidate default for E36-family base fits, because it makes a single-seed comparison more
 trustworthy; it does not by itself lower error.
+
+### Experiment 3 amendment 2 result and amendment 3 (2026-11-02, before the amendment-3 runs)
+
+Base fits with the map term (seed 0), held-out agreement at 8 px (median per-view Spearman against butteraugli,
+10th percentile in brackets):
+
+| base fit | full density | served map |
+|---|---:|---:|
+| control (F3's base fit) | 0.720 (0.441) | 0.751 (0.466) |
+| + map 10 | 0.728 (0.449) | 0.756 (0.469) |
+| + map 30 | 0.744 (0.474) | 0.762 (0.478) |
+| + map 100 | 0.792 (0.527) | 0.779 (0.454) |
+
+Inside the base fit the term works: at weight 100 the full density gains 0.072 and the served map 0.027, past the
+registered 0.02. **Amendment 3, before running:** (a) p30L's continuation from the map-30 and map-100 base fits
+(seed 0), measured with the amendment-2 set including G-STEER; (b) the map term at weight 300 in the base fit (seed 0),
+since the gain still rises with weight; (c) map-100 base fits at seeds 1-2.
