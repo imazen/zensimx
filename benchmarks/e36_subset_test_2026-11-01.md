@@ -531,3 +531,19 @@ NITS-IQA, VCL-FER) are the common comparison. Readout `scripts/byconstruction/e3
   (control 8.38%; prune 5% 8.33%, random 10% 8.35%, discordance 10% 8.38%, per-source 10% 8.43%). Control seeds 1-2
   are training. The walk arm reruns on the build that admits it.
 - One seed each: these rank candidates; the registered stage 2 confirms at seeds 0-2.
+
+### Experiment 5 stage 2 and experiment 6, seed 0 (2026-11-02), and an amendment before any further seed
+
+Control base fits at seeds 0-2 give all-nine error 8.38%, 8.71% and 8.38%, and shared-three error 8.81%, 9.41%
+and 8.90%: the seed alone moves these by up to 0.6 points. Pairs (seed 0, held-out / shared-three / all nine):
+TID2013+MDID 8.31% / 8.38% / 8.11%; PIPAL+MDID 8.39% / 8.83% / 8.18%; MDID+KADID 8.43% / 8.84% / 8.24%;
+CID-IQ+KADID 8.54% / 8.98% / 8.41%; CID-IQ+MDID 8.56% / 8.30% / 8.12%; PIPAL+CID-IQ 8.58% / 8.86% / 8.46%;
+TID2013+CID-IQ 8.62% / 8.37% / 8.61%; TID2013+PIPAL 8.63% / 9.37% / 8.63%; TID2013+KADID 8.48% / 9.03% / 8.48%;
+PIPAL+KADID 9.08% / 9.67% / 9.08%. The three best configurations by the registered measure, TID2013+MDID, TID2013 and
+PIPAL, now run at seeds 1-2.
+
+Experiment 6: no arm beats the control by more than the control's seed spread (0.33 points all-nine), so by the
+registered rule no pruning arm goes to stage 2. The walk (all-nine 8.61% at seed 0; pooled row coverage 0.630 vs
+0.563; its trainer digest equals the coverage replay's) is for seed independence, which one seed cannot show.
+**Amendment, before running:** the walk also runs at seeds 1-2. Its outcome is the spread of all-nine error across
+seeds 0-2 against the control's (0.33 points), with the mean reported beside it.
