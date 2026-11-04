@@ -172,6 +172,7 @@ assert.equal(terms.formula_replay_bit_identity, true);
 const raw = await (
   await page.request.get(new URL(terms.data_file, headerUrl).href)
 ).body();
+const cursorSamples = [];
 const checkCursor = async (
   u,
   v,
@@ -200,6 +201,13 @@ const checkCursor = async (
     Number(await page.locator("#formula-demo").getAttribute("data-result")),
     expected,
   );
+  cursorSamples.push({
+    feature: await page.locator("#formula-demo").getAttribute("data-feature"),
+    index,
+    result,
+    value: expected,
+    readout: await page.locator("#formula-demo").textContent(),
+  });
 };
 await checkCursor(0.413, 0.297);
 await page.locator("#zoom").focus();
@@ -293,8 +301,8 @@ await page.locator("#pair").selectOption("pair-01");
 await page.waitForFunction(() =>
   document.querySelector("#subject").textContent.includes("Architecture"),
 );
-await page.locator("#feature-search").fill("edge_det");
-await page.locator("#matrix .cell").first().click();
+await page.locator("#feature-search").fill("f20");
+await page.locator("#matrix [data-feature=input20]").click();
 await page.locator("#feature-search").fill("");
 await page.locator(".reference-panel").evaluate((n) => (n.scrollTop = 0));
 const screenshots = [];
@@ -368,7 +376,7 @@ const review = {
   sidebar_ids: ids.length,
   virtual_rows_visited: visited.length,
   equations_rendered: Object.keys(refs.entries).length,
-  native_cursor_samples: 4,
+  native_cursor_samples: cursorSamples,
   reference_flag_count: flags20,
   source_commit: process.env.VIZ_REVIEW_COMMIT || null,
   resized_left_px: resizedLeft,

@@ -26,24 +26,16 @@ await page.waitForSelector("#matrix .cell:not(.hollow)");
 await page.waitForLoadState("networkidle");
 assert.equal(await page.locator("#colour").inputValue(), "percentile");
 assert.match(await page.locator("#pins").textContent(), /pin a feature: Enter/);
-assert.equal(
-  await page
-    .locator("#matrix .cell.hollow")
-    .evaluateAll((cells) =>
-      cells.every(
-        (c) =>
-          c.closest(".channel") === c.closest(".matrix-row").lastElementChild,
-      ),
-    ),
-  true,
-);
-assert.equal(
-  await page
-    .locator("#matrix .matrix-row:not(.matrix-header)")
-    .evaluateAll((rows) =>
-      rows.every((r) => r.querySelectorAll(".global-cell").length <= 1),
-    ),
-  true,
+// Design 2 presents global scalar channels within the virtual tree. Their
+// values and map absence remain in the stored atlas, without a substituted map.
+const catalogMeta = await (
+  await page.request.get(new URL(manifest.pairs[0].meta, base).href)
+).json();
+assert.ok(catalogMeta.features.some((f) => !f.map_file));
+assert.ok(
+  catalogMeta.features
+    .filter((f) => !f.map_file)
+    .every((f) => Number.isFinite(f.value)),
 );
 const cell = page.locator("#matrix .cell:not(.hollow)").first();
 await cell.hover();
@@ -60,15 +52,16 @@ const alpha = await page.locator("#overlay").evaluate((c) => {
   return { zero, partial };
 });
 assert.deepEqual(alpha, { zero: true, partial: true });
-await page.locator("#map-only").check();
+await page.locator("#map-mode-button").click();
 await page.waitForFunction(() => {
   const c = document.querySelector("#overlay"),
     d = c.getContext("2d").getImageData(0, 0, c.width, c.height).data;
   for (let i = 3; i < d.length; i += 4) if (d[i] !== 255) return false;
   return true;
 });
-await page.locator("#map-only").uncheck();
+await page.locator("#map-mode-button").click();
 await page.waitForTimeout(50);
+await page.locator(".reference-options").evaluate((n) => (n.open = true));
 await page.locator("#colour").selectOption("signed");
 const meta = await (
   await page.request.get(new URL(manifest.pairs[0].meta, base).href)
@@ -88,6 +81,7 @@ for (const cell of encoded) {
 await page.locator("#colour").selectOption("percentile");
 await page.getByRole("button", { name: "MLP lens", exact: true }).click();
 await page.waitForSelector("#pdp-chart .iqr-band");
+await page.locator("[data-exhibit-tab=Concerns]").click();
 assert.ok((await page.locator("#concern-table tbody tr").count()) <= 50);
 assert.match(
   await page.locator("#concern-title").textContent(),
@@ -103,6 +97,7 @@ assert.ok((await page.locator("#concern-table tbody tr").count()) <= 50);
 assert.match(await page.locator("#concern-table").textContent(), /note/);
 await page.locator("#severity").selectOption("");
 await page.locator("#kind").selectOption("");
+await page.locator("[data-exhibit-tab=Weights]").click();
 await page.locator("#input").selectOption("371");
 await page.waitForFunction(() =>
   document.querySelector("#weight-detail").textContent.includes("33 of 128"),
@@ -178,6 +173,7 @@ await page.waitForFunction(
 assert.equal(await page.locator("#pdp-chart .ice").count(), 40);
 assert.ok((await page.locator("#pdp-table th").count()) >= 205);
 const original = await page.locator("#pdp-chart .mean").getAttribute("d");
+await page.locator("[data-exhibit-tab=Dependence]").click();
 await page.locator("#center-ice").check();
 await page.waitForFunction(() =>
   document.querySelector("#pdp-chart").textContent.includes("Δ served score"),
@@ -186,7 +182,9 @@ assert.notEqual(
   await page.locator("#pdp-chart .mean").getAttribute("d"),
   original,
 );
+await page.locator("[data-exhibit-tab=Concerns]").click();
 await page.locator("#compare").selectOption("E");
+await page.locator("[data-exhibit-tab=Dependence]").click();
 await page.waitForSelector("#pdp-chart .compare");
 assert.match(
   await page.locator("#pdp-legend").textContent(),
@@ -216,6 +214,7 @@ const capture = async (view, theme) => {
   assert.equal(existsSync(path), false, "preserve earlier captures");
   await page.screenshot({ path, fullPage: true });
 };
+await page.locator("[data-exhibit-tab=Weights]").click();
 await page.locator("#hidden-units button").filter({ hasText: /^126$/ }).click();
 await capture("mlp-lens", "dark");
 await capture("mlp-lens", "light");
@@ -230,6 +229,7 @@ await page.locator("#bake").selectOption("F1");
 await page.waitForFunction(() =>
   document.querySelector("#audit-summary").textContent.includes("126,080"),
 );
+await page.locator("[data-exhibit-tab=Concerns]").click();
 await page.locator("#kind").selectOption("dead-input");
 await page.waitForFunction(
   () => document.querySelectorAll("#concern-table tbody tr").length === 2,
