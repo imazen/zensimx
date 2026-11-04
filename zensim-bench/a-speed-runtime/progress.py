@@ -81,6 +81,10 @@ def main():
     (root / "LIVE_CHECK.json").write_text(json.dumps(value, indent=2) + "\n")
     if parallel_gate and task_root != root:
         task = json.loads((task_root / "PROGRESS.json").read_text())
+        # Retire build-era process fields; their observations remain in the
+        # supervision history and must not masquerade as current identities.
+        for key in ("launcher", "compiler_pids", "verified_pid", "lock_holder_pid"):
+            task.pop(key, None)
         task.update({"last_check": value["checked_utc"], "stage": f"{root.name}: {stage}",
                      "source": str(task_root / "source/a-speed-runtime"),
                      "binary_sha256": actual,
