@@ -5,7 +5,7 @@
   "reporting_source_sha256": "486816c73509c148bee363fb4e4b8ce0f5c02197abc49b2a25f447118d532949",
   "trainer_source_scope": "original numerical source; W4 adds its separately registered admission overlay",
   "wall_time_method": "sum of recorded GNU time payload elapsed fields; queued waits excluded; stage strings retain printed precision",
-  "complete_fits": 5,
+  "complete_fits": 6,
   "required_fits": 6,
   "models": [
     {
@@ -212,11 +212,50 @@
       "finished": "2026-11-04T22:26:49.214759+00:00",
       "native_trainer_sha256": "267a3492e14bd2c2988e49a056b9a1840b188aada796804974f635b733c670cf",
       "admission_registration": "25e772922fd5a40d576e12af47778ce81bed5e08"
+    },
+    {
+      "name": "W4-s0",
+      "hidden": 4,
+      "initial_max_pairs": 1,
+      "seed": 0,
+      "packed_sha256": "53ca43065c5d7bf33f1123851845af53b5f4bf8df353b0d457c74889600a2c00",
+      "packed_bytes": 27818,
+      "certified": true,
+      "certified_max_pairs": 0,
+      "capacity": {
+        "dead": 2,
+        "residual": 1,
+        "live": 1
+      },
+      "wall_seconds_excluding_lock_waits": 252.38,
+      "stage_times": [
+        {
+          "stage": "base",
+          "seconds": 124.39,
+          "elapsed": "2:04.39"
+        },
+        {
+          "stage": "continuation",
+          "seconds": 127.47,
+          "elapsed": "2:07.47"
+        },
+        {
+          "stage": "pack",
+          "seconds": 0.52,
+          "elapsed": "0:00.52"
+        }
+      ],
+      "resource_receipts": {
+        "base": "run-heavy: done rc=0 125s | peak-RSS 2.11GiB | min-avail 38677MiB | peak-load 1.29",
+        "continuation": "run-heavy: done rc=0 127s | peak-RSS 2.12GiB | min-avail 38707MiB | peak-load 1.48",
+        "pack": "run-heavy: done rc=0 1s | peak-RSS 0.28GiB | min-avail 41092MiB | peak-load 1.36"
+      },
+      "finished": "2026-11-04T23:07:00.319094+00:00",
+      "native_trainer_sha256": "d14d9c8b69067fa0761608f12248c6801a9e4ace0a678ee11602beee6dd0d2c9",
+      "admission_registration": "397d67be879339e7014d3b29c2a99d3fe51df6b2"
     }
   ],
-  "pending": [
-    "W4-s0"
-  ],
+  "pending": [],
   "omitted": [
     {
       "name": "W32-s1",

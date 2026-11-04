@@ -2444,6 +2444,23 @@ cells; candidate across-seed stability is unmeasured. No R13 EVAL or gate result
 has been read or used for this cut, and no new selection rule is introduced.
 
 
+**R13 retained fit freeze (2026-11-04, before R13 assessment reads).** All six
+candidate seed-0 fits, W4/W16/W32/W64/W256/W512, completed the full fixed
+119/59 recipe. W4 follows W16 and includes the public_train ×256 continuation
+with original rehearsal. No seed-1/seed-2 optimization began; all ten omitted
+cells retain the owner-cut status. All six packed monotone certificates pass,
+and all 984 inputs and the exact A derived-input declaration remain. Removing
+the two shipping-only metadata keys preserves every native inference inspection
+exactly. Frozen inventory SHA-256:
+`7cbcb2e7e5726e4b31738da1de6ac480a7c58786cd3c6b12970969a4ea12e9b1`.
+[Fit identities and resource receipts](r13_fit_progress_2026-11-04.json);
+[complete artifact pointer](r13_hidden_width_2026-11-04.pointer.md).
+W4's legacy-parser setup failure preceded optimization; its explicit,
+amendment-scoped parser repair preserves the old default rejection. The failed
+setup is retained separately and does not select or shorten a fit. No R13 EVAL
+or product-gate result has been read at this fit freeze.
+
+
 ### R14 registration (2026-11-04, before screening, fitting or assessment): smooth per-input transforms
 
 Owner requests transforms on A's 984 caller inputs: 492 declared damage values
