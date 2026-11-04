@@ -1326,3 +1326,26 @@ than 0.003, all-nine error rises by no more than 0.30 points, G-STEER passes ame
 NEARID pass. **Reading:** an arm that passes the guards and whose out-of-fold interval against the twin lies above
 zero is reported as reducing the map term's pairwise cost; if its interval against p30L also contains zero, it is
 reported as a map-term arm without a measured pairwise cost, beside its loop result. Nothing is adopted on this read.
+
+### R10 amendment 2 (2026-11-03, before any of these run): remaining product gates and confirmation read 3
+
+Owner, 2026-11-03: "The mix looks promising, but we need to do more evals". R10's post (like every post since
+experiment 3) ran G-STEER, G-CHROMA-L and NEARID at seed 0 only; the subset test's guards and amendment 2's set also
+ran G-TRADE, the dial contract and identity at every seed. For `mixF3` seeds 0-2, with the same tools
+(`e36_exp56/postR10b.sh`):
+
+- **G-TRADE (a):** the gauntlet trade pairs above 64 px both references call worse (`gauntlet_features.py`, evif
+  `tools/trade_gate.py`), share the model scores better (`e36_exp56/gtrade_guard.py`, which reproduces the subset
+  test's recorded values: E 0.0761, F3 0.0250 over 18,267 pairs). Guard: the three-seed mean no more than 0.5 points
+  above F3's control's (2.36%).
+- **Dial contract C1-C6 on both grids and identity at 12 SIMD permutations** (`fchroma-gates.sh` steps verdict and
+  identity): every seed must pass, as F3 does.
+- **NEARID at seeds 1 and 2:** N1-N3 must pass.
+- **Confirmation read 3, CLIC 2021 validation** (registered here, before the read): `mixF3` and mix + p30L, seeds
+  0-2, each against F3's control at the same seed; read 1's features, statistic (two-alternative agreement, soft
+  labels), whole-reference bootstrap (315 references, 10,000 draws) and reading rule (supported if the seed-mean
+  difference's interval lies above zero, contradicted if below, otherwise neutral). Disclosure: this is CLIC 2021's
+  third read, and F3's control has been read twice.
+
+Reading: `mixF3` passes this amendment if every gate above passes and read 3 does not contradict it against F3's
+control. Its R10 G-STEER miss stands as recorded; nothing is adopted on this read.
