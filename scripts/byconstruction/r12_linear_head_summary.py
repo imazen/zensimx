@@ -31,7 +31,14 @@ def timing(root):
                             clean=len(clean), total=len(samples),
                             all_round_baseline_ns=mean(values(samples, 0)),
                             all_round_candidate_ns=mean(values(samples, 1)))
-    (root / 'heads/SUMMARY.json').write_text(json.dumps(result, indent=2) + '\n')
+    path = root / 'heads/SUMMARY.json'
+    payload = json.dumps(result, indent=2) + '\n'
+    if path.exists() and path.read_text() != payload:
+        number = 1
+        while path.with_name(f'SUMMARY.bak{number}.json').exists():
+            number += 1
+        path.rename(path.with_name(f'SUMMARY.bak{number}.json'))
+    path.write_text(payload)
 
 
 def sparse_formula(root, destination):

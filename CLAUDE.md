@@ -188,6 +188,13 @@ because cleanup tests or a historical training reproduction pass.
   view switching recomputes image fit. `tools/zensim-viz/tests/design2.mjs`
   checks readable controls and image bounds at both supported viewport sizes.
 
+- **2026-11-04 — padded HDR row-test constructor drift, repaired.** Three
+  strip-producer test calls still supplied only an HDR encoding after the
+  internal `FrontEnd::Hdr` acquired an explicit front-end argument. They now
+  pass `HdrFrontEnd::Pu21`, preserving the previous tested behavior and all
+  bit-equality expectations. The targeted all-feature release test and the
+  CI-exact workspace clippy command pass.
+
 - **2026-11-04 — R12 assessment command logging. Fixed before model scoring.**
   The new orchestration passed `Path` objects to JSON logging, which refused
   before the first predictor launch. Arguments now become strings at the
