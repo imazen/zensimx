@@ -3,7 +3,7 @@
   "registration": "25e772922fd5a40d576e12af47778ce81bed5e08",
   "trainer_source_commit": "ccdb5c7aa0d4b67d52f0e2874f325fbc84ddb11c",
   "reporting_source_sha256": "36d00b9b84bdac205a79dc79d447aeac05a953de0191aabafa87260f6ba0f06a",
-  "complete_fits": 2,
+  "complete_fits": 3,
   "required_fits": 15,
   "models": [
     {
@@ -83,10 +83,48 @@
         "pack": "run-heavy: done rc=0 1s | peak-RSS 0.28GiB | min-avail 41719MiB | peak-load 1.86"
       },
       "finished": "2026-11-04T19:27:36.600900+00:00"
+    },
+    {
+      "name": "W64-s0",
+      "hidden": 64,
+      "initial_max_pairs": 16,
+      "seed": 0,
+      "packed_sha256": "332ee1188188d4cae23f9b17c51d95e9629c1819159669a23ab19c6ef367face",
+      "packed_bytes": 35213,
+      "certified": true,
+      "certified_max_pairs": 1,
+      "capacity": {
+        "dead": 47,
+        "residual": 15,
+        "live": 2
+      },
+      "wall_seconds_excluding_lock_waits": 1244.9,
+      "stage_times": [
+        {
+          "stage": "base",
+          "seconds": 863.99,
+          "elapsed": "14:23.99"
+        },
+        {
+          "stage": "continuation",
+          "seconds": 380.33,
+          "elapsed": "6:20.33"
+        },
+        {
+          "stage": "pack",
+          "seconds": 0.58,
+          "elapsed": "0:00.58"
+        }
+      ],
+      "resource_receipts": {
+        "base": "run-heavy: done rc=0 864s | peak-RSS 1.99GiB | min-avail 39153MiB | peak-load 2.93",
+        "continuation": "run-heavy: done rc=0 381s | peak-RSS 1.98GiB | min-avail 39230MiB | peak-load 3.39",
+        "pack": "run-heavy: done rc=0 1s | peak-RSS 0.28GiB | min-avail 41794MiB | peak-load 2.55"
+      },
+      "finished": "2026-11-04T19:48:25.535979+00:00"
     }
   ],
   "pending": [
-    "W64-s0",
     "W512-s0",
     "W16-s0",
     "W32-s1",
