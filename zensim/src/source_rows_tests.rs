@@ -283,7 +283,7 @@ fn result_bits(r: crate::ZensimResult) -> (u64, u64, [u64; 3], Vec<u64>) {
 #[test]
 fn padded_rows_subset_and_strip_producer() {
     let _tokens = archmage::testing::lock_token_testing();
-    use crate::feature_v2::HdrEncoding;
+    use crate::feature_v2::{HdrEncoding, HdrFrontEnd};
     use crate::feature_v2_stream::{FrontEnd, Side, StripPlaneProducer};
     for format in FORMATS {
         for mode in [MODES[0], MODES[1], MODES[4]] {
@@ -301,12 +301,18 @@ fn padded_rows_subset_and_strip_producer() {
                         let mut fronts = vec![FrontEnd::Sdr];
                         if matches!(format, PixelFormat::Srgb16Rgba | PixelFormat::LinearF32Rgba) {
                             fronts.extend([
-                                FrontEnd::Hdr(HdrEncoding::Linear),
-                                FrontEnd::Hdr(HdrEncoding::Pq { peak_nits: 1000.0 }),
-                                FrontEnd::Hdr(HdrEncoding::Hlg {
-                                    peak_nits: 1000.0,
-                                    ambient_lux: 5.0,
-                                }),
+                                FrontEnd::Hdr(HdrEncoding::Linear, HdrFrontEnd::Pu21),
+                                FrontEnd::Hdr(
+                                    HdrEncoding::Pq { peak_nits: 1000.0 },
+                                    HdrFrontEnd::Pu21,
+                                ),
+                                FrontEnd::Hdr(
+                                    HdrEncoding::Hlg {
+                                        peak_nits: 1000.0,
+                                        ambient_lux: 5.0,
+                                    },
+                                    HdrFrontEnd::Pu21,
+                                ),
                             ]);
                         }
                         for front in fronts {
