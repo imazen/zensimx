@@ -1523,3 +1523,28 @@ control at the same seed: seed-mean SROCC and error differences, whole-reference
 20261103). **Disclosure stated before the read:** six references cannot support a bootstrap interval; the read is
 descriptive, with the within-reference SROCC (which does not depend on cross-photograph level) the more informative
 number. Nothing is adopted on it.
+
+### R10 amendment 4 result (2026-11-03): MMSPG JPEG XR, neutral for every arm
+
+`mos_confirm.py confirm` (`/mnt/v/zensim/e36-read4-mmspg/confirm-1/`; features 186 pairs in 2.8 s). 186 rated conditions,
+6 photographs; intervals are the canonical whole-reference bootstrap over those 6 photographs (descriptive, as
+disclosed before the read).
+
+| model (seeds 0 / 1 / 2) | SROCC | within-reference SROCC | error (median |residual| around the 4PL fit, of the 1-99% span) |
+|---|---|---|---|
+| F3 control | 0.9203 / 0.9217 / 0.9212 | 0.925 / 0.928 / 0.928 | 5.44 / 5.47 / 5.43% |
+| p30L | 0.9172 / 0.9175 / 0.9171 | 0.925 / 0.925 / 0.927 | 5.19 / 5.30 / 5.27% |
+| `mixF3` | 0.9201 / 0.9219 / 0.9215 | 0.931 / 0.928 / 0.928 | 5.63 / 5.53 / 5.47% |
+| mix + p30L | 0.9191 / 0.9192 / 0.9200 | 0.924 / 0.929 / 0.926 | 5.48 / 5.76 / 5.65% |
+
+Each model's SROCC interval is about [0.88, 0.95]. Arms against F3's control (seed-mean SROCC difference, bootstrap
+over the 6 photographs; error difference in points): p30L -0.0038 [-0.0082, +0.0001], -0.20 points; `mixF3` +0.0001
+[-0.0052, +0.0055], +0.09 points; mix + p30L -0.0016 [-0.0110, +0.0099], +0.18 points: all **neutral**. For scale,
+the M2 screen's third-party metrics on the same rows: SSIMULACRA2 0.928, DVIFM 0.3 0.928, CVVDP 0.911, butteraugli
+3-norm 0.892; every zensim candidate sits between butteraugli and SSIMULACRA2.
+
+Reading: the set does not separate the candidates either. With this read, every evaluation registered for the mix is
+done except its JPEG XL loop, which already ran (amendment 1): the mix passes every product gate but one G-STEER case,
+no held-out human read contradicts it (CLIC 2021, CIQA and MMSPG neutral; AIC2026 out of fold level, codec
+consistency better), and its gains are the EVAL human sets it was chosen on. The choice between F3 and the mix is the
+owner's.

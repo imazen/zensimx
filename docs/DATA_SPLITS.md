@@ -3049,3 +3049,7 @@ E36's four dial candidates (F3 control, p30L, `mixF3`, mix + p30L; seeds 0-2) ag
 the M2 trust screen (third-party metrics only, 2026-11-03). Pixels: the screen's zenbitmaps decodes. Six references:
 the read is descriptive. `scripts/byconstruction/e36_exp56/mos_confirm.py`: `keys` reads `item` and `ref` only;
 `confirm` ledgers `LABEL_READS.json` before parsing `score`.
+- **Read on 2026-11-03** (`confirm-1/LABEL_READS.json` under `/mnt/v/zensim/e36-read4-mmspg/`): all 186 rows, once, for
+  F3's control, p30L, `mixF3` and mix + p30L at seeds 0-2. SROCC 0.917-0.922 for every model (within-reference
+  0.924-0.931); every arm neutral against F3's control (zensimx record, R10 amendment 4 result). No model was selected
+  on it. Any later read must disclose this one.
