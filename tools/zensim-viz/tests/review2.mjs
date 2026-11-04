@@ -119,6 +119,15 @@ assert.match(
 );
 assert.equal(await page.locator("#tree-chip-legend i").count(), 5);
 await page.locator("[data-mode=difference]").click();
+const deltaImage = await page.locator("#pair-image").evaluate(async (image) => {
+  await image.decode();
+  await new Promise(requestAnimationFrame);
+  return image.currentSrc;
+});
+assert.equal(
+  deltaImage,
+  new URL(atlas.difference, new URL(manifest.pairs[0].meta, base)).href,
+);
 assert.equal(
   await page.locator("#pair-image").evaluate((n) => getComputedStyle(n).filter),
   "none",
@@ -303,6 +312,7 @@ const result = {
   weights_geometry: weightsGeometry,
   capacities,
   delta: deltaGeometry,
+  delta_image: deltaImage,
   uncaught_errors: errors,
 };
 if (directory) {
