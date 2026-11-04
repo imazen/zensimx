@@ -47,6 +47,33 @@ class SubjectiveAdmission(unittest.TestCase):
     def admit(self):
         return leg.admit(self.authority_path,self.save(),"invented-cell",self.groups,[0,1])
 
+    def test_r12_linear_is_an_explicit_architecture_authorization(self):
+        self.authority['schema'] = 'subjective-training-authority-v2'
+        self.cell.update(width=1853, feature_ids=list(range(492)))
+        recipe = dict(hidden=1, mono_all=True, derived_inputs='fx2')
+        def check():
+            return leg.command_binding(self.authority_path, self.save(), 'invented-cell',
+                                       1101, 101, 1853, 'N', recipe)
+        with self.assertRaises(ValueError):
+            check()  # historical H128 authority does not authorize H1
+        self.cell['r12_linear'] = dict(registration=leg.R12_REGISTRATION, arm='L1', mask_sha256=None)
+        check()
+        for field, value in [('hidden', 8), ('thresholds', True), ('max_pairs', 1), ('derived_inputs', 'fx1')]:
+            with self.subTest(field=field):
+                old = recipe.get(field)
+                recipe[field] = value
+                with self.assertRaises(ValueError):
+                    check()
+                if old is None:
+                    del recipe[field]
+                else:
+                    recipe[field] = old
+        self.cell['r12_linear']['arm'] = 'L2'
+        with self.assertRaises(ValueError):
+            check()  # sparse mask cannot be omitted
+        self.cell['r12_linear']['mask_sha256'] = 'c' * 64
+        check()
+
     def test_valid_metadata_never_opens_target(self):
         with mock.patch.object(Path,"read_bytes",autospec=True,side_effect=self.read_guard):
             self.assertEqual(set(self.admit()),{"subjective_rank"})

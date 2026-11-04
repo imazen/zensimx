@@ -33,6 +33,28 @@ def document(path, expected=None):
     return json.loads(data)
 
 
+R12_REGISTRATION = "9088eacf781c5b3cb70049f8e190a69d32474757d"
+
+
+def r12_head_binding(cell, recipe):
+    """Only the preregistered H1 linear class; legacy H128 admission is unchanged."""
+    r = cell.get("r12_linear")
+    if r is None:
+        return False
+    if (r.get("registration") != R12_REGISTRATION or r.get("arm") not in ("L1", "L2", "L3")
+            or cell.get("width") != 1853 or len(cell.get("feature_ids", [])) != 492
+            or recipe.get("hidden") != 1 or not recipe.get("mono_all")
+            or recipe.get("derived_inputs") != "fx2"
+            or any(recipe.get(k) for k in ("thresholds", "max_pairs", "ramps", "free_ramps", "gated_products"))):
+        raise ValueError("R12 registered linear head binding differs")
+    if r["arm"] == "L2":
+        if not isinstance(r.get("mask_sha256"), str) or len(r["mask_sha256"]) != 64:
+            raise ValueError("R12 sparse mask pin required")
+    elif r.get("mask_sha256") is not None:
+        raise ValueError("R12 dense head has no sparse mask")
+    return True
+
+
 def command_binding(authority_path,pin,cell_id,init_seed,sample_seed,width,head,recipe):
     authority = document(authority_path,pin)
     c = authority["cells"][cell_id]
@@ -42,7 +64,8 @@ def command_binding(authority_path,pin,cell_id,init_seed,sample_seed,width,head,
             or not 0<=c["seed_index"]<(3 if c["route"]=="loso" else 10)
             or (c["epochs"],c["pairs_per_epoch"],c["selected_epoch"])!=(120,50000,119)
             or (c["init_seed"],c["sample_seed"])!=(init_seed,sample_seed)
-            or width!=expected_width or head!="N" or (recipe or {}).get("hidden",32)!=128):
+            or width!=expected_width or head!="N"
+            or ((recipe or {}).get("hidden",32)!=128 and not r12_head_binding(c, recipe or {}))):
         raise ValueError("subjective registered cell/seed/full-budget/head binding differs")
 
 

@@ -145,6 +145,40 @@ pub(super) fn continuation_population(args: &super::Args) -> Result<Option<Strin
     Ok(Some(string(w, "population")?.to_owned()))
 }
 
+// R12 is a distinct, preregistered architecture authorization. Historical H128
+// authorities retain their exact contract; population/seed/budget guards below apply.
+fn r12_head_binding(c: &Value, args: &super::Args) -> Result<bool, String> {
+    let Some(r) = c.get("r12_linear") else {
+        return Ok(false);
+    };
+    let masked = r["arm"] == "L2";
+    let mask_ok = match (&args.monotone_feature_mask, masked) {
+        (Some(path), true) => r["mask_sha256"] == hash(path)?,
+        (None, false) => r["mask_sha256"].is_null(),
+        _ => false,
+    };
+    if r["registration"] != "9088eacf781c5b3cb70049f8e190a69d32474757d"
+        || !matches!(r["arm"].as_str(), Some("L1" | "L2" | "L3"))
+        || c["width"] != 1853
+        || c["feature_ids"].as_array().is_none_or(|v| v.len() != 492)
+        || args.hidden != 1
+        || !args.monotone_cbc
+        || !args.nonneg_distance
+        || args.nonneg_thresholds
+        || args.max_pairs != 0
+        || args.monotone_ramps != 0
+        || args.free_ramps != 0
+        || args.monotone_gated_products
+        || args.n_hidden_layers != 1
+        || args.derived_inputs.is_none()
+        || args.monotone_strict != masked
+        || !mask_ok
+    {
+        return Err("R12 registered linear head/mask binding differs".into());
+    }
+    Ok(true)
+}
+
 fn run_binding(
     c: &Value,
     args: &super::Args,
@@ -188,7 +222,7 @@ fn run_binding(
         || c["pairs_per_epoch"] != 50000
         || args.pairs_per_epoch != 50000
         || c["selected_epoch"] != 119
-        || args.hidden != 128
+        || (args.hidden != 128 && !r12_head_binding(c, args)?)
         || args.max_features != width
         || c["init_seed"].as_u64() != args.init_seed
         || c["sample_seed"].as_u64() != args.sample_seed
@@ -1474,6 +1508,48 @@ mod tests {
         }
         std::fs::remove_dir_all(&root).unwrap();
     }
+    #[test]
+    fn r12_linear_requires_its_exact_architecture_and_mask_binding() {
+        use clap::Parser;
+        let mut args = super::super::Args::parse_from([
+            "zensim_mlp_train",
+            "--group",
+            "g:x:1:0",
+            "--out",
+            "o.bin",
+            "--hidden",
+            "1",
+            "--nonneg-distance",
+            "--monotone-cbc",
+            "--derived-inputs",
+            "fx2.json",
+        ]);
+        let mut c = json!({"width":1853,"feature_ids":vec![0;492]});
+        assert!(!r12_head_binding(&c, &args).unwrap());
+        c["r12_linear"] = json!({"registration":"9088eacf781c5b3cb70049f8e190a69d32474757d",
+            "arm":"L1","mask_sha256":null});
+        assert!(r12_head_binding(&c, &args).unwrap());
+        args.nonneg_thresholds = true;
+        assert!(r12_head_binding(&c, &args).is_err());
+        args.nonneg_thresholds = false;
+        args.hidden = 128;
+        assert!(r12_head_binding(&c, &args).is_err());
+        args.hidden = 1;
+        c["r12_linear"]["arm"] = json!("L2");
+        assert!(r12_head_binding(&c, &args).is_err());
+        let dir = std::env::temp_dir().join(format!("r12-mask-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let mask = dir.join("mask.tsv");
+        std::fs::write(&mask, b"feat_idx\tsign_mask\n0\tdrop\n").unwrap();
+        c["r12_linear"]["mask_sha256"] = json!(hash(&mask).unwrap());
+        args.monotone_feature_mask = Some(mask.clone());
+        args.monotone_strict = true;
+        assert!(r12_head_binding(&c, &args).unwrap());
+        std::fs::write(mask, b"changed").unwrap();
+        assert!(r12_head_binding(&c, &args).is_err());
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
     #[test]
     fn continuation_budgets_stay_separate_and_checkpoints_require_a_binding() {
         use clap::Parser;
