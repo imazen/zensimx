@@ -3076,3 +3076,7 @@ HDR-VDP-3 labels, the 4Kdtb EVAL half's MOS (48 rows) and the label-free chroma 
 the stored June 2026 UPIQ panels and SSIMULACRA2, butteraugli, FSIMc and HaarPSI scored on the stored 8-bit PU
 renderings of the same pairs. Report-only; no model was selected on it and nothing was adopted (zensimx record, R10
 amendment 6 result).
+- 2026-11-04 (HDR front-end experiment result): UPIQ-380 JOD labels read again, report-only, for the five front-end arms
+  (PU21 control + anchored cube root at 100/203/255/1000 cd/m²) × F seeds 0-2, F3 seeds 0-2 and E through
+  `hdr_panel_upiq_all.py --upiq-bank` and `hdr_frontend_compare.py`; T2 TRAIN rows no candidate trained on; no fit, no
+  selection; PU21 stands (benchmarks/e36_subset_test_2026-11-01.md, "HDR front-end experiment result").

@@ -1905,3 +1905,43 @@ amendment 6's: pooled and per-study SROCC, within-reference SROCC, and the paire
 each arm minus PU21 for the same model. **Reading rule:** an anchored front end counts as better only if, for F at
 every seed, its pooled and both per-study differences against PU21 are non-negative and the pooled interval lies above
 zero; otherwise PU21 stands. Nothing ships from this read; a front-end change is a revision-8 decision for the owner.
+
+### HDR front-end experiment result (2026-11-04): PU21 stands; the anchored cube root trades Narwaria for Korshunov
+
+Run as registered. **Extraction:** `upiq_pu_score --training-allowlist` (zensimx `60223363`, binary sha256
+`aa23606d…`, built on i270, run on dev, `ZENSIM_FORMULA_REV=7`, five arms in parallel at one thread each, 50-53 s and
+1.2 GB peak per arm). The PU21 control arm's `features.tsv` is **byte-identical** to the stored 2026-10-29 fleet
+extraction (sha256 `668f726d…`), so the refactor left the shipped front end untouched and dev reproduces the fleet
+build. Banks assembled with `hdr_upiq_bank.py --tsv` (schema `hdr-native-rev7-bank-v1`, `hdr_front_end` recorded),
+scored with `hdr_panel_upiq_all.py --upiq-bank` and `byc_predict` (`10d087cd`), compared with `hdr_frontend_compare.py`
+(paired bootstrap over the 30 references, 2,000 draws). The PU21 rows reproduce amendment 6 exactly. Tables and
+per-arm manifests: `~/tmp/e36test/hdr-fe/` on dev (`compare/frontend_compare.md`, `arm-*/`). Models: F = `mixF3`
+seeds 0-2, F3 seeds 0-2, E (the 2026-10-30 read's bake); all trained through the PU21 front end on SDR data, so every
+arm is a zero-shot front-end swap.
+
+| front end | F (seeds 0/1/2): pooled | Narwaria | Korshunov | within-ref | F3 (s0): pooled / Narw. / Korsh. | E: pooled / Narw. / Korsh. |
+|---|---:|---:|---:|---:|---:|---:|
+| PU21 (shipped) | 0.783 / 0.786 / 0.785 | 0.884 / 0.879 / 0.876 | 0.945 / 0.944 / 0.944 | 0.954-0.956 | 0.775 / 0.883 / 0.945 | 0.792 / 0.900 / 0.947 |
+| cube root, 100 cd/m² ↦ 1 | 0.809 / 0.810 / 0.809 | 0.838 / 0.841 / 0.842 | 0.956 / 0.956 / 0.955 | 0.961 | 0.814 / 0.829 / 0.949 | 0.830 / 0.875 / 0.952 |
+| cube root, 203 | 0.811 / 0.812 / 0.811 | 0.823 / 0.828 / 0.828 | 0.958 / 0.957 / 0.956 | 0.962-0.963 | 0.813 / 0.808 / 0.952 | 0.830 / 0.852 / 0.954 |
+| cube root, 255 | 0.811 / 0.812 / 0.813 | 0.814 / 0.822 / 0.820 | 0.958 / 0.957 / 0.957 | 0.962-0.963 | 0.812 / 0.796 / 0.953 | 0.830 / 0.841 / 0.955 |
+| cube root, 1000 | 0.809 / 0.811 / 0.811 | 0.731 / 0.740 / 0.738 | 0.959 / 0.958 / 0.958 | 0.962-0.964 | 0.807 / 0.717 / 0.954 | 0.826 / 0.758 / 0.956 |
+
+Paired bootstrap, cube root minus PU21 for F (seed 0; seeds 1-2 within 0.003): at 100 cd/m² pooled +0.025 [-0.024,
++0.074], Narwaria -0.040 [-0.119, +0.052], Korshunov +0.012 [-0.001, +0.025], within-reference +0.006 [-0.004,
++0.016]; at 203: +0.028 / -0.053 / +0.013 [+0.000, +0.028] / +0.008; at 255: +0.028 / -0.061 / +0.013 [+0.000,
++0.028] / +0.008; at 1,000: +0.026 [-0.058, +0.101] / -0.136 [-0.294, +0.024] / +0.014 [+0.000, +0.030] / +0.010.
+F3 and E move the same way (pooled +0.03 to +0.04, Narwaria -0.02 to -0.15, Korshunov +0.004 to +0.010).
+
+**Reading (registered rule).** No anchored arm has non-negative deltas on both studies for F: Korshunov and the
+within-reference order improve a little at every unit (+0.011 to +0.014, intervals touching zero), Narwaria worsens
+at every unit and progressively with the unit (-0.04 at 100 cd/m², -0.14 at 1,000; intervals through zero below
+1,000). The pooled gain (+0.025) is mostly the two studies' JOD scales lining up differently, the caveat amendment 6
+already noted. **PU21 stands**; nothing ships from this read. What the sweep says: the unit that keeps the shipped
+model's dark-end behaviour closest (100 cd/m², PU21's normalisation point) loses least on Narwaria, and a large unit
+pushes HDR content into the SDR model's dark regime. The anchored cube root with the same 255 cd/m² convention as
+SSIMULACRA2's native path puts F at 0.811 / 0.814 / 0.958 against SSIMULACRA2's own 0.765 / 0.662 / 0.962 (amendment 6
+addendum), so under one convention zensim is far ahead on Narwaria and level on Korshunov. Options for the owner (a
+revision-8 decision): keep PU21 (the default), or register a fit through the cube-root front end at 100 cd/m² (this read
+only swapped the front end under PU21-trained weights; a fit would say whether the Narwaria loss is the front end or the
+training), or a front end that is PU21-like below about 100 cd/m² and cube-root above (a design, not a measurement).
