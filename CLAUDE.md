@@ -182,6 +182,20 @@ because cleanup tests or a historical training reproduction pass.
 
 ## Known Bugs
 
+- **2026-11-04 — ignored stable-pool tier identity fails on the unchanged baseline.**
+  Explicit `ssim_form::tests::stable_moments_are_exact_across_simd_tiers`
+  runs at revisions 1 and 7 differ in 41 pooled values natively and 40 under
+  Intel SDE; the stable pixel outputs agree. The fusion study leaves the test,
+  assertions, ignore marker and legacy arithmetic unchanged. Each experiment
+  compares the complete before/after failure lists; see
+  `benchmarks/a_extraction_fusion_2026-11-04.md` for commands and receipts.
+
+- **2026-11-04 — registered fx2 selection missing from the test helper.** The
+  unmodified extraction-fusion baseline failed both registry/servability gates
+  on `fx2_consumed_504`. The test-only selection helper now derives all 504
+  consumed IDs from the existing fx2 declaration's direct and product-factor
+  IDs. Recorded slot/hash equalities and producer coverage remain exact.
+
 - **2026-11-04 — default-feature HDR steering test compile failure, fixed.** The
   `rev7_prepared_native_hdr_workers_match_canonical_features` integration test
   called `prepare_steering_hdr` without its `custom-profiles` feature gate.

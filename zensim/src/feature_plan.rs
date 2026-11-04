@@ -1761,6 +1761,21 @@ pub(crate) fn apply_registered_slot_selection(
                 .iter_slots()
                 .filter(|&id| !crate::feature_v2::ComputeSet::is_full_res_xb(id, ns)),
         ),
+        "fx2_consumed_504" => {
+            let declaration: serde_json::Value = serde_json::from_str(include_str!(
+                "../../scripts/rev4_featpot/color_noise_fx2_declaration.json"
+            ))
+            .expect("registered fx2 declaration");
+            let direct: Vec<usize> =
+                serde_json::from_value(declaration["direct"].clone()).expect("fx2 direct IDs");
+            let products: Vec<[usize; 2]> = serde_json::from_value(declaration["products"].clone())
+                .expect("fx2 product factor IDs");
+            let selected =
+                SlotSet::from_slots(direct.into_iter().chain(products.into_iter().flatten()));
+            assert_eq!(selected.len(), 504, "fx2 consumed IDs");
+            assert!(derived.covers(&selected), "fx2 selects unavailable slots");
+            selected
+        }
         // The pinned by_v2fy consumed IDs (SHIPPATH7's features-only Rev5
         // projection; all other slots are NaN in that bank).
         "by_v2fy_420" => {
