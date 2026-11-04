@@ -4175,3 +4175,10 @@ viz-review2-verify root out prefix="review2-":
     python3 -B tools/zensim-viz/verify_design2.py {{quote(root)}} {{quote(out)}} --prefix {{quote(prefix)}}
 
 
+
+r12-linear-final-check:
+    flock ~/tmp/heavy.lock ~/work/claudehints/scripts/run-heavy --mem 24G --jobs 8 -- bash scripts/byconstruction/r12_linear_final_check.sh
+
+r12-linear-archive:
+    flock ~/tmp/heavy.lock ~/work/claudehints/scripts/run-heavy --mem 24G --jobs 8 -- bash scripts/byconstruction/r12_linear_archive.sh
+
