@@ -4137,3 +4137,29 @@ a-speed-report-check:
 
 a-speed-progress host root:
     ssh {{quote(host)}} python3 -B {{quote(root + "/harness/a-speed-runtime/progress.py")}} {{quote(root)}}
+
+r12-linear-extra-build:
+    flock ~/tmp/heavy.lock ~/work/claudehints/scripts/run-heavy --mem 24G --jobs 8 -- bash scripts/byconstruction/r12_linear_extra_build.sh
+
+r12-linear-extra-fits:
+    flock ~/tmp/heavy.lock ~/work/claudehints/scripts/run-heavy --mem 24G --jobs 8 -- bash scripts/byconstruction/r12_linear_extra_fits.sh
+
+r12-pruning-proof:
+    flock ~/tmp/heavy.lock ~/work/claudehints/scripts/run-heavy --mem 24G --jobs 8 -- python3 -B scripts/byconstruction/r12_pruning_proof.py --root /var/tmp/byc-linear-20261104
+
+
+r12-linear-extra-heads:
+    flock ~/tmp/heavy.lock ~/work/claudehints/scripts/run-heavy --mem 24G --jobs 8 -- bash scripts/byconstruction/r12_linear_heads.sh /var/tmp/byc-linear-20261104/extra
+
+r12-pruning-pixel-proof:
+    python3 -B scripts/byconstruction/r12_pruning_pixel_proof.py
+
+
+r12-linear-head-summary root:
+    python3 -B scripts/byconstruction/r12_linear_head_summary.py --root {{quote(root)}}
+
+r12-source-rows-check:
+    flock ~/tmp/heavy.lock ~/work/claudehints/scripts/run-heavy --mem 24G --jobs 8 -- env TMPDIR="$HOME/tmp/zensim-linear" CARGO_TARGET_DIR=/var/tmp/byc-linear-20261104/target cargo test --release -p zensim --all-features --lib padded_rows_subset_and_strip_producer
+
+r12-linear-tables output:
+    python3 -B scripts/byconstruction/r12_linear_tables.py --root /var/tmp/byc-linear-20261104 --with-extra --out {{quote(output)}}

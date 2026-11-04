@@ -2,8 +2,8 @@
 # Head-only inspection and paired zenbench rounds. Caller holds heavy.lock/run-heavy.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
-O=/var/tmp/byc-linear-20261104
-B=$O/target/release/examples/prune_forward_bench
+O=${1:-/var/tmp/byc-linear-20261104}
+B=${R12_HEAD_BIN:-/var/tmp/byc-linear-20261104/target/release/examples/prune_forward_bench}
 mkdir -p "$O/heads"
 export RAYON_NUM_THREADS=1 OMP_NUM_THREADS=1 ZENSIM_MAX_TIER=v3
 python3 - "$O" <<'PY' > "$O/heads/jobs.tsv"

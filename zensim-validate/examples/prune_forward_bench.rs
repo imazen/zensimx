@@ -17,7 +17,7 @@
 //! Usage:
 //!   cargo run --release -p zensim-validate --example prune_forward_bench -- \
 //!       <unpruned.bin> <pruned.bin> [rows] [results.json]
-//! R12: prepend `--heads` to compare A-MLP against linear-H1, without pruning labels.
+//! R12: prepend `--heads` to compare A-MLP against a candidate head, without pruning labels.
 //!
 //! Produce the pair with:
 //!   bake_dial_refit pack --in X_dial.bin --out unpruned.bin --no-prune ...
@@ -86,7 +86,7 @@ fn main() {
         args.remove(1);
     }
     let a_label = if heads { "A-MLP" } else { "unpruned" };
-    let b_label = if heads { "linear-H1" } else { "pruned" };
+    let b_label = if heads { "candidate" } else { "pruned" };
     if args.len() < 3 {
         eprintln!(
             "usage: prune_forward_bench <unpruned.bin> <pruned.bin> [rows]\n\
