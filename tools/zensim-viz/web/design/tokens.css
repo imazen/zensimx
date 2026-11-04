@@ -1,0 +1,138 @@
+/* zensim-viz design tokens — owned by the coordinating Claude session. Dark is the default (images and maps read
+   better on dark surfaces); light is selected, not inverted. Categorical series are assigned in fixed order and
+   never cycled; status colours are reserved for flags. Validated with design/dataviz/validate_palette.js. */
+
+:root {
+  color-scheme: dark light;
+
+  /* type */
+  --font-ui: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  --fs-0: 12px; --fs-1: 13px; --fs-2: 15px; --fs-3: 20px;
+  --lh: 1.4;
+
+  /* spacing (4 px grid) and shape */
+  --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-6: 24px;
+  --r-cell: 2px; --r-ctl: 4px;
+  --cell: 14px; --cell-gap: 2px; --hairline: 1px;
+
+  /* surfaces and ink: dark default (the dataviz reference palette, validated) */
+  --surface-0: #0d0d0d;   /* page */
+  --surface-1: #1a1a19;   /* panels, chart surface */
+  --surface-2: #2c2c2a;   /* active control, hover rows */
+  --border: #383835;
+  --ink: #f0efec;         /* primary text */
+  --ink-2: #c3c2b7;       /* secondary text, axis labels */
+  --ink-3: #898781;       /* muted text, grid lines */
+  --overlay-alpha: 0.65;
+
+  /* categorical series, fixed order (1 = the subject, 2 = the comparison); reference theme, dark steps */
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --series-3: #199e70;
+  --series-4: #c98500;
+  --series-5: #d55181;
+  --series-6: #008300;
+
+  /* sequential ramp (blue): near zero recedes toward the dark surface, large values brighten */
+  --ramp-seq-0: #0d366b; --ramp-seq-1: #184f95; --ramp-seq-2: #256abf; --ramp-seq-3: #3987e5;
+  --ramp-seq-4: #6da7ec; --ramp-seq-5: #9ec5f4; --ramp-seq-6: #cde2fb;
+
+  /* diverging ramp about zero: blue negative, neutral grey at zero, red positive; both arms brighten with magnitude */
+  --ramp-div-n3: #86b6ef; --ramp-div-n2: #3987e5; --ramp-div-n1: #1c5cab;
+  --ramp-div-0:  #383835;
+  --ramp-div-p1: #8c3434; --ramp-div-p2: #d03b3b; --ramp-div-p3: #f08f8f;
+
+  /* status palette (fixed, never themed): reserved for flags, always with an icon and a word */
+  --status-good: #0ca30c;
+  --status-warning: #fab219;
+  --status-serious: #ec835a;
+  --status-critical: #d03b3b;
+
+  /* focus and selection */
+  --focus: #e8ebf0;
+  --dim: 0.4;             /* opacity of unselected rows/columns in the weight matrix */
+}
+
+:root[data-theme="light"] {
+  --surface-0: #f9f9f7;
+  --surface-1: #fcfcfb;
+  --surface-2: #e1e0d9;
+  --border: #c3c2b7;
+  --ink: #0b0b0b;
+  --ink-2: #52514e;
+  --ink-3: #898781;
+  --overlay-alpha: 0.6;
+
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+  --series-4: #eda100;
+  --series-5: #e87ba4;
+  --series-6: #008300;
+
+  /* sequential: lightest = near zero recedes toward the light surface */
+  --ramp-seq-0: #cde2fb; --ramp-seq-1: #9ec5f4; --ramp-seq-2: #6da7ec; --ramp-seq-3: #3987e5;
+  --ramp-seq-4: #256abf; --ramp-seq-5: #184f95; --ramp-seq-6: #0d366b;
+
+  --ramp-div-n3: #256abf; --ramp-div-n2: #3987e5; --ramp-div-n1: #86b6ef;
+  --ramp-div-0:  #f0efec;
+  --ramp-div-p1: #f2a3a2; --ramp-div-p2: #e86b6a; --ramp-div-p3: #c93a39;
+
+  --status-good: #0ca30c;
+  --status-warning: #fab219;
+  --status-serious: #ec835a;
+  --status-critical: #d03b3b;
+  --focus: #0b0b0b;
+}
+
+html, body {
+  margin: 0; background: var(--surface-0); color: var(--ink);
+  font: var(--fs-1)/var(--lh) var(--font-ui);
+  font-variant-numeric: tabular-nums;
+}
+.panel { background: var(--surface-1); border: var(--hairline) solid var(--border); border-radius: var(--r-ctl); }
+.mono { font-family: var(--font-mono); }
+.ink-2 { color: var(--ink-2); } .ink-3 { color: var(--ink-3); }
+
+/* segmented control */
+.seg { display: inline-flex; border: var(--hairline) solid var(--border); border-radius: var(--r-ctl); overflow: hidden; }
+.seg > button { background: transparent; color: var(--ink-2); border: 0; padding: var(--sp-1) var(--sp-3); font: inherit; cursor: pointer; }
+.seg > button[aria-pressed="true"] { background: var(--surface-2); color: var(--ink); }
+.seg > button:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+
+/* feature matrix */
+.matrix { display: grid; gap: var(--cell-gap); }
+.matrix .cell { width: var(--cell); height: var(--cell); border-radius: var(--r-cell); cursor: crosshair; }
+.matrix .cell.hollow { background: transparent; box-shadow: inset 0 0 0 1px var(--ink-3); }
+.matrix .cell:hover, .matrix .cell[data-hover="true"] { box-shadow: 0 0 0 2px var(--ink); }
+.matrix .cell[data-pinned="true"] { box-shadow: 0 0 0 2px var(--series-1); }
+.matrix .dimmed { opacity: var(--dim); }
+
+/* status chips: icon + word, never colour alone */
+.chip { display: inline-flex; align-items: center; gap: var(--sp-1); padding: 0 var(--sp-2); border-radius: var(--r-ctl);
+        font-size: var(--fs-0); border: var(--hairline) solid var(--border); color: var(--ink); }
+.chip[data-severity="critical"] { border-color: var(--status-critical); }
+.chip[data-severity="serious"]  { border-color: var(--status-serious); }
+.chip[data-severity="warning"]  { border-color: var(--status-warning); }
+.chip[data-severity="note"]     { border-color: var(--ink-3); }
+
+/* charts (SVG): recessive grid and axes, ink text */
+.chart text { fill: var(--ink-2); font: var(--fs-0) var(--font-ui); }
+.chart .grid line { stroke: var(--ink-3); stroke-opacity: 0.35; stroke-width: 1; }
+.chart .axis path, .chart .axis line { stroke: var(--ink-3); }
+.chart .line { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.chart .ice { fill: none; stroke: var(--series-1); stroke-opacity: 0.2; stroke-width: 1; }
+.chart .mean { stroke: var(--series-1); }
+.chart .compare { stroke: var(--series-2); stroke-dasharray: 6 4; }
+.chart .marker { r: 4px; }
+.chart .whisker { stroke: var(--ink-2); stroke-width: 1.5; }
+.chart .bar { rx: 4px; }
+.chart .tooltip { fill: var(--surface-2); stroke: var(--border); }
+.chart .crosshair { stroke: var(--ink-2); stroke-dasharray: 2 3; }
+
+/* image stage */
+.stage { background: var(--surface-0); image-rendering: pixelated; }
+.stage .overlay { mix-blend-mode: normal; opacity: var(--overlay-alpha); }
+.legend { display: flex; align-items: center; gap: var(--sp-2); font-size: var(--fs-0); color: var(--ink-2); }
+.legend .ramp { width: 120px; height: 8px; border-radius: 2px; }
