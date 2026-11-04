@@ -2,6 +2,7 @@
 import importlib.util
 import json
 from pathlib import Path
+import sys
 import tempfile
 import unittest
 from unittest import mock
@@ -9,9 +10,19 @@ from unittest import mock
 SPEC = importlib.util.spec_from_file_location('r13_width', Path(__file__).parents[1]/'byconstruction/r13_width.py')
 OWNER = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(OWNER)
+STATUS_SPEC=importlib.util.spec_from_file_location('r13_width_status',Path(__file__).parents[1]/'byconstruction/r13_width_status.py')
+STATUS=importlib.util.module_from_spec(STATUS_SPEC)
+with mock.patch.dict(sys.modules,{'r13_width':OWNER}):STATUS_SPEC.loader.exec_module(STATUS)
 
 
 class Capacity(unittest.TestCase):
+    def test_failed_receipt_cannot_be_hidden_by_a_later_lock_holder(self):
+        self.assertEqual(STATUS.execution_state({'rc':1},[{'pid':123}],False),'failed')
+        self.assertEqual(STATUS.execution_state({'rc':0},[],False),'complete')
+        self.assertEqual(STATUS.execution_state(None,[],False),'process-exited-without-receipt')
+        self.assertEqual(STATUS.execution_state(None,[{'pid':123}],False),'waiting-for-shared-lock')
+        self.assertEqual(STATUS.execution_state(None,[{'pid':123}],True),'running')
+
     def test_owner_cut_keeps_only_seed_zero_and_appends_w4_after_w16(self):
         with tempfile.TemporaryDirectory() as directory, mock.patch.object(OWNER,'O',Path(directory)):
             self.assertEqual(OWNER.required_fits(),15)

@@ -11,6 +11,14 @@ from run_processes import process_tree, compute_lock
 import r13_width as owner
 
 
+def execution_state(receipt, live, held):
+    if receipt is not None:
+        return 'complete' if receipt['rc']==0 else 'failed'
+    if not live:
+        return 'process-exited-without-receipt'
+    return 'running' if held else 'waiting-for-shared-lock'
+
+
 def main():
     if sys.argv[1:] not in ([], ['--compact']):
         raise ValueError('expected no arguments or --compact')
@@ -37,6 +45,12 @@ def main():
                fits=done,epochs=epochs,source_pins=str(root/'SOURCE_PINS.json'),
                owner_cost_cut=(root/'OWNER_COST_CUT.json').exists(),
                next_action='finish registered fits, freeze before assessment' if len(done)<owner.required_fits() else 'complete registered assessments')
+    receipt_path=root/'logs'/f"{active.get('stage')}.receipt.json"
+    receipt=json.loads(receipt_path.read_text()) if receipt_path.exists() else None
+    state['job_state']=execution_state(receipt,live,state['lock']['held_by_worker_ancestor'])
+    state['last_job_rc']=receipt['rc'] if receipt is not None else None
+    if state['job_state']=='failed':
+        state['next_action']=f'investigate failed job before any retry: {receipt_path}'
     queue_path=root/'QUEUED_W4_BUILD.json'
     if queue_path.exists():
         queue=json.loads(queue_path.read_text())
@@ -54,7 +68,7 @@ def main():
         state['w4_build']=queue
     (root/'SUPERVISION.json').write_text(json.dumps(state,indent=2)+'\n')
     if sys.argv[1:] == ['--compact']:
-        state = {k:state[k] for k in ('checked','stage','completed_fits','required_fits','epochs','lock')}
+        state = {k:state[k] for k in ('checked','stage','job_state','last_job_rc','completed_fits','required_fits','epochs','lock')}
         state['trainer'] = [p for p in live if p['executable'] and p['executable'].endswith('zensim_mlp_train')]
         if queue_path.exists():state['w4_build']={k:queue[k] for k in ('state','checked','native_pins_present')}
     print(json.dumps(state,indent=2))
