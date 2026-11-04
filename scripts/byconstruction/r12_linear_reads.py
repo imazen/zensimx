@@ -20,9 +20,13 @@ def main():
     ap.add_argument('--out', type=Path, required=True)
     ap.add_argument('--models', type=Path, required=True)
     ap.add_argument('--only', default='eval,e36,chroma,steer,dial,nearid,hdr')
+    ap.add_argument('--bin-dir', type=Path, help='explicit rebuilt serving tools; historical defaults when absent')
     ap.add_argument('--include-model', help='run pixel gates only for this frozen model; retain full model pins')
     a = ap.parse_args()
     x = Path(__file__).resolve().parents[2]
+    bdir = a.bin_dir.resolve() if a.bin_dir else None
+    def binary(name, historical):
+        return str(bdir/name) if bdir else historical
     out = a.out.resolve()
     out.mkdir(parents=True, exist_ok=True)
     models = json.loads(a.models.read_text())
@@ -40,16 +44,18 @@ def main():
     pin_path.write_text(json.dumps(pins, indent=2)+'\n')
     env = dict(os.environ, ZENSIM_FORMULA_REV='7', ZENSIM_MAX_TIER='v3', RAYON_NUM_THREADS='1',
                OMP_NUM_THREADS='1', OPENBLAS_NUM_THREADS='1', TMPDIR=str(out/'scratch'),
-               ZEN_PANEL_BIN='/var/tmp/byc-hdr-20261104/bin/panel',
+               ZEN_PANEL_BIN=binary('panel','/var/tmp/byc-hdr-20261104/bin/panel'),
                PYTHONPATH=str(x/'scripts/rev4_featpot')+':'+str(x/'scripts/byconstruction')+':'+str(x/'scripts'))
     (out/'scratch').mkdir(exist_ok=True)
     py = sys.executable
     scripts = x/'scripts/byconstruction'
-    pred = '/var/tmp/byc-fchroma-20261029/r3/tools/predict_features_with_bake'
-    fitbin = '/var/tmp/byc-hdr-20261104/bin/bake_dial_refit'
-    tools=[pred,fitbin,env['ZEN_PANEL_BIN'],'/var/tmp/zensim-bin-10d087cd/byc_predict',
-           '/var/tmp/byc-fx2-20261028/stage2/gate-tools-d02d2e07/steer_instrument',
-           str(Path.home()/'tmp/e36test/nearid/bin/serve_custom_bake')]
+    pred = binary('predict_features_with_bake','/var/tmp/byc-fchroma-20261029/r3/tools/predict_features_with_bake')
+    fitbin = binary('bake_dial_refit','/var/tmp/byc-hdr-20261104/bin/bake_dial_refit')
+    byc = binary('byc_predict','/var/tmp/zensim-bin-10d087cd/byc_predict')
+    steer = binary('steer_instrument','/var/tmp/byc-fx2-20261028/stage2/gate-tools-d02d2e07/steer_instrument')
+    serve = binary('serve_custom_bake',str(Path.home()/'tmp/e36test/nearid/bin/serve_custom_bake'))
+    tools=[pred,fitbin,env['ZEN_PANEL_BIN'],byc,steer,serve]
+    if bdir: tools.append(str(bdir/'bake_verdict'))
     tool_pins={p:digest(p) for p in tools}
     tool_pin_path=out/'TOOL_PINS.json'
     if tool_pin_path.exists() and json.loads(tool_pin_path.read_text())!=tool_pins:
@@ -118,14 +124,14 @@ def main():
             for n in models: args += ['--candidate',n]
             run('chroma-level',args)
             run('chroma-report',[py,scripts/'chroma_ladder_gate.py','report','--out',out/'chroma'])
-    tools = '/var/tmp/byc-fx2-20261028/stage2/gate-tools-d02d2e07'
+    tools = str(bdir) if bdir else '/var/tmp/byc-fx2-20261028/stage2/gate-tools-d02d2e07'
     instruments = '/var/tmp/byc-fx2-20261028/stage2/fx2-gate-instruments-run02'
     for n,p in models.items():
         if a.include_model and n != a.include_model:
             continue
         if 'steer' in todo:
             run(f'steer-{n}',[py,scripts/'gates_steer_sharded.py','--name',n,'--model',p,'--out',out/f'gates/{n}',
-                              '--bin',tools+'/steer_instrument','--formula-rev','7','--shards','9'])
+                              '--bin',steer,'--formula-rev','7','--shards','9'])
         if 'dial' in todo:
             run(f'dial-{n}',[py,scripts/'gates.py','--name',n,'--model',p,'--out',out/f'gates/{n}',
                              '--bin-dir',tools,'--instruments',instruments,'--corpus-root',instruments+'/no-human-corpus',
@@ -133,15 +139,15 @@ def main():
                 {'PYTHONPATH':'/var/tmp/byc-chroma-20261028/a2/cluster-libs:'+env['PYTHONPATH']})
             run(f'gate-summary-{n}',[py,scripts/'gates.py','--summary','--out',out/f'gates/{n}','--name',n])
         if 'nearid' in todo:
-            run(f'nearid-{n}', ['just','dataset-nearid-candidate',Path.home()/'tmp/e36test/nearid/bin/serve_custom_bake',
+            run(f'nearid-{n}', ['just','dataset-nearid-candidate',serve,
                               '/mnt/tower/output/zensim/mlic-nearid-20261027-run01/PACKET.json',out/f'nearid/{n}',
                               n.replace('_','').lower(),p,digest(p)])
     if 'hdr' in todo:
         banks = Path('/mnt/v/output/zensim/byc-hdr-20261104/banks-cube-root-203-aliases')
         args = [f'{n}={p}:fx2' for n,p in all_models.items()]
-        run('hdr-panel',[py,scripts/'hdr_panel.py','--models',*args,'--byc-predict','/var/tmp/zensim-bin-10d087cd/byc_predict',
+        run('hdr-panel',[py,scripts/'hdr_panel.py','--models',*args,'--byc-predict',byc,
                          '--banks',banks,'--out',out/'hdr-panel'])
-        run('hdr-upiq',[py,scripts/'hdr_panel_upiq_all.py','--models',*args,'--byc-predict','/var/tmp/zensim-bin-10d087cd/byc_predict',
+        run('hdr-upiq',[py,scripts/'hdr_panel_upiq_all.py','--models',*args,'--byc-predict',byc,
                         '--upiq-bank',banks/'upiq-r2-bank','--out',out/'hdr-upiq'])
     (out/'STAGE').write_text(f'{datetime.now(timezone.utc).isoformat()} finished\n')
     if any(r['rc'] for r in records): raise SystemExit(1)
