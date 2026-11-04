@@ -288,6 +288,12 @@ harness = false
 name = "hdr944_extract"
 required-features = ["hdr944-extract"]
 
+# HC1 continuity check: an SDR PNG shown at the SDR white through compute_hdr (cube-root and PU21
+# front ends) against its SDR score, for any bake (benchmarks/e36_subset_test_2026-11-01.md, "HC1").
+[[example]]
+name = "hdr_continuity"
+required-features = ["hdr944-extract"]
+
 [[example]]
 name = "sdr944_extract"
 required-features = ["sdr944-extract"]

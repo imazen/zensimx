@@ -2130,3 +2130,13 @@ HDR legs load as 330 / 48 / 7,177 / 7,390 rows at 1,853 columns and rehearse at 
 cont_s{0,1,2}/pack_e059/refit/`):** `production-f16.bin` `18f37bea…` / `a53446e8…` / `eee01349…`, `shipped.bin`
 `f065d81e…` (24,444 B) / `4f915e08…` (23,212 B) / `3174aaee…` (24,398 B). Whole phase 2,448 s, peak RSS 1.99 GiB. No label
 of any read set has been read yet; the registered reads follow (research name of these bakes: `mixHC1` seeds 0–2).
+
+**Continuity read (2026-11-04; `zensim-bench/examples/hdr_continuity.rs`, result `benchmarks/hc1_continuity_2026-11-04.tsv`).**
+`BakeScorer` gained `with_hdr_front_end` (default `Pu21`; HDR steering and attribution refuse any other front end). Six
+CLIC 2025 1024² PNGs from codec-corpus, four pairs each (identity, box blur r=1 and r=2, ±8 noise), scored by the
+`mixHC1` seed-0 and the mix F seed-0 bakes three ways: the SDR path, `compute_hdr` on linear nits = sRGB EOTF × 203 cd/m²
+through the cube-root front end at 203, and through PU21. **Cube root: |HDR − SDR| mean 0.0001, max 0.0003 for both bakes
+(24 pairs each)**; the residual is the production SDR path's clamped sRGB kernel against the unclamped HDR opsin. **PU21:
+mean |gap| 4.74 (mixHC1) and 4.51 (F), max 33.4 and 31.1** (the ±8-noise pair of one image), the HDR reading always lower.
+Identity pairs score 100 on every path. The property is the front end's, not the model's: F through the cube root is as
+continuous as mixHC1; what the HDR legs buy is calibration on HDR content, which the HDR panel reads measure.

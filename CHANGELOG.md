@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- research: `BakeScorer::with_hdr_front_end` (HC1): `compute_hdr` through `HdrFrontEnd::CubeRoot { unit_nits }` for models fitted through the cube-root banks; default `Pu21` unchanged; HDR steering and attribution refuse other front ends. New `hdr_continuity` bench example and `hdr_panel.py --banks`.
+
 - `HdrFrontEnd { Pu21, CubeRoot { unit_nits } }`: the declared-HDR walk's opsin step is a parameter orthogonal to
   `HdrEncoding` (`research::extract_hdr_with_front_end`; `upiq_pu_score` and `hdr944_extract` take `--front-end`
   and record `hdr_front_end`). The cube root is the SDR opsin on `nits / unit_nits`, unclamped, bit-exact with the

@@ -32,7 +32,8 @@ def pearson(a, b):
     return float(np.corrcoef(a, b)[0, 1])
 
 
-def populations(width):
+def populations(width, banks=BANKS):
+    BANKS = banks  # noqa: N806  (the bank directory of one producer set; the default is the 2026-10-29 PU21 fleet extraction)
     out = {}
     # 4Kdtb EVAL
     keys = pq.read_table(BANKS / "4kdtb-r1-bank/keys.parquet").to_pylist()
@@ -131,11 +132,13 @@ def main():
     ap.add_argument("--byc-predict", required=True)
     ap.add_argument("--width-root", default="/var/tmp/byc-mixes-20261025/Mlic/root")
     ap.add_argument("--out", type=Path, required=True)
+    ap.add_argument("--banks", type=Path, default=BANKS,
+                    help="bank directory holding 4kdtb-r1-bank, ladders-r1-bank, teacher-val-bank, upiq-r2-bank (or symlinks of those names); default: the 2026-10-29 PU21 banks")
     a = ap.parse_args()
     from v2_common import derived_declaration
     width = json.loads((Path(a.width_root) / "wide/main/real/receipt.json").read_text())["width"]
     a.out.mkdir(parents=True, exist_ok=True)
-    pops = populations(width)
+    pops = populations(width, a.banks)
     models = {m.split("=")[0]: m.split("=")[1].rsplit(":", 1) for m in a.models}
     result, base = {}, a.models[0].split("=")[0]
     for pname, (feats, idx, ref, y, fam) in pops.items():

@@ -37,6 +37,11 @@ pub struct BakeScorer<'a> {
     parallel: bool,
     #[cfg(feature = "feature-regime-v2")]
     finite_moments: bool,
+    /// The HDR front end [`Self::compute_hdr`] feeds (HC1, 2026-11-04): `Pu21`
+    /// for the frozen PU21-era models, `CubeRoot { unit_nits }` for models fitted
+    /// through the cube-root banks. Steering and attribution serve PU21 only.
+    #[cfg(feature = "feature-regime-v2")]
+    hdr_front_end: crate::feature_v2::HdrFrontEnd,
     /// Research map painting for the attribution map; `None` reads the
     /// process selection (`crate::map_paint::MapPaint::from_env`).
     #[cfg(feature = "custom-profiles")]
@@ -79,6 +84,18 @@ impl<'a> BakeScorer<'a> {
     #[must_use]
     pub fn with_parallel(mut self, parallel: bool) -> Self {
         self.parallel = parallel;
+        self
+    }
+
+    /// Research (HC1, 2026-11-04): the HDR front end [`Self::compute_hdr`]
+    /// feeds. The default `Pu21` serves the frozen PU21-era models; a model
+    /// fitted through the cube-root banks takes `CubeRoot { unit_nits: 203.0 }`.
+    /// The SDR path is unchanged; HDR steering and attribution refuse any
+    /// front end but `Pu21`.
+    #[cfg(feature = "feature-regime-v2")]
+    #[must_use]
+    pub fn with_hdr_front_end(mut self, front_end: crate::feature_v2::HdrFrontEnd) -> Self {
+        self.hdr_front_end = front_end;
         self
     }
 
@@ -260,6 +277,11 @@ impl<'a> BakeScorer<'a> {
             if self.plan()?.compute.sampling.is_some() {
                 return Err(ZensimError::HdrInputRequiresPuPath);
             }
+            if self.hdr_front_end != crate::feature_v2::HdrFrontEnd::Pu21 {
+                return Err(ZensimError::ModelLoadFailed {
+                    reason: "HDR steering serves the PU21 front end only",
+                });
+            }
             crate::feature_v2::validate_hdr_pair(
                 source,
                 source,
@@ -334,6 +356,8 @@ impl<'a> BakeScorer<'a> {
             parallel: true,
             #[cfg(feature = "feature-regime-v2")]
             finite_moments: false,
+            #[cfg(feature = "feature-regime-v2")]
+            hdr_front_end: crate::feature_v2::HdrFrontEnd::Pu21,
             #[cfg(feature = "custom-profiles")]
             map_paint: None,
             members: Vec::new(),
@@ -1029,10 +1053,11 @@ impl<'a> BakeScorer<'a> {
                 reason: "sampling v1 is SDR only; HDR needs a separately validated PU sampling contract",
             });
         }
-        let mut features = crate::feature_v2::compute_folded720_hdr_streaming_impl(
+        let mut features = crate::feature_v2::compute_folded720_hdr_streaming_impl_with_front_end(
             source,
             distorted,
             encoding,
+            self.hdr_front_end,
             Some(120_000_000),
             crate::metric::effective_parallel(self.parallel),
             plan.toggles(),
@@ -1388,6 +1413,12 @@ impl<'a> BakeScorer<'a> {
         }
         self.check_pixel_revision()?;
         if let Some(encoding) = encoding {
+            #[cfg(feature = "feature-regime-v2")]
+            if self.hdr_front_end != crate::feature_v2::HdrFrontEnd::Pu21 {
+                return Err(ZensimError::ModelLoadFailed {
+                    reason: "HDR attribution serves the PU21 front end only",
+                });
+            }
             crate::feature_v2::validate_hdr_pair(
                 source,
                 distorted,

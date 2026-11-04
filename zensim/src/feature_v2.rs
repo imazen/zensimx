@@ -7914,11 +7914,39 @@ pub(crate) fn compute_folded720_hdr_streaming_impl(
     scratch: &mut V2Scratch,
     planned_compute: Option<ComputeSet>,
 ) -> Result<ZensimV2Result, ZensimError> {
-    compute_folded720_hdr_streaming_extras(
+    compute_folded720_hdr_streaming_impl_with_front_end(
         source,
         distorted,
         encoding,
         HdrFrontEnd::Pu21,
+        max_pixels,
+        parallel,
+        toggles,
+        scratch,
+        planned_compute,
+    )
+}
+
+/// [`compute_folded720_hdr_streaming_impl`] through a chosen HDR front end
+/// (HC1: `HdrFrontEnd::CubeRoot { unit_nits }` for models fitted through the
+/// cube-root banks; the frozen PU21-era models keep `HdrFrontEnd::Pu21`).
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn compute_folded720_hdr_streaming_impl_with_front_end(
+    source: &impl ImageSource,
+    distorted: &impl ImageSource,
+    encoding: HdrEncoding,
+    front_end: HdrFrontEnd,
+    max_pixels: Option<usize>,
+    parallel: bool,
+    toggles: V2NewFeatureToggles,
+    scratch: &mut V2Scratch,
+    planned_compute: Option<ComputeSet>,
+) -> Result<ZensimV2Result, ZensimError> {
+    compute_folded720_hdr_streaming_extras(
+        source,
+        distorted,
+        encoding,
+        front_end,
         max_pixels,
         parallel,
         toggles,
