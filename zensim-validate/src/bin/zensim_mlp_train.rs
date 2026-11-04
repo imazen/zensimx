@@ -592,6 +592,9 @@ struct Args {
     /// Exact R14 registration; transform table is additionally bound by the subjective authority.
     #[arg(long, requires = "subjective_authority")]
     r14_transforms_registration: Option<String>,
+    /// R14 T2 only: frozen TRAIN p05/p99 records; authority binds their hash.
+    #[arg(long, requires = "r14_transforms_registration")]
+    r14_knee_bounds: Option<PathBuf>,
 
     /// V0_20 input-shaping: auto-load per-feature transforms from a
     /// greedy-screen TSV (winning transform per feature with
@@ -3579,6 +3582,7 @@ fn main() {
         out_dtype,
         feature_transforms: None,
         r14_transforms_registration: args.r14_transforms_registration.clone(),
+        r14_trainable_knees: None,
         feature_transform_params: None,
         minibatch_size: args.minibatch_size.max(1),
         parallel_batch: args.parallel_batch,
@@ -4163,6 +4167,7 @@ fn main() {
     // from the screen TSV first; then `--feature-transform` flags
     // override per-feature (or extend if the auto set didn't cover
     // that feature).
+    let mut r14_knee_plan = None;
     let (feature_transforms, feature_transform_params): (
         Option<Vec<zenpredict::FeatureTransform>>,
         Option<Vec<Vec<f32>>>,
@@ -4325,6 +4330,23 @@ fn main() {
             mlp_train::transforms::validate(&transforms, Some(&params))
                 .expect("R14 transform contract");
         }
+        if let Some(path) = &args.r14_knee_bounds {
+            assert!(
+                loaded.iter().all(|g| g.compact.is_none()),
+                "T2 needs pre-transform dense rows"
+            );
+            let statistics = serde_json::from_slice(&std::fs::read(path).expect("T2 TRAIN bounds"))
+                .expect("T2 TRAIN bounds JSON");
+            let raw: Vec<_> = loaded
+                .iter()
+                .map(|g| (g.feature_rows.as_slice(), g.train_w > 0.))
+                .collect();
+            let plan =
+                mlp_train::r14_knees::KneePlan::capture(&transforms, &params, &statistics, &raw)
+                    .expect("T2 pre-transform caller capture");
+            println!("R14 T2 {plan:?}");
+            r14_knee_plan = Some(std::sync::Arc::new(plan));
+        }
         // Apply per-feature transforms in-place across every group's
         // feature_rows. The trainer's scaler sees the transformed
         // distribution and the bake's metadata records the list so
@@ -4380,6 +4402,12 @@ fn main() {
             if any_params { Some(params) } else { None },
         )
     };
+
+    assert_eq!(
+        args.r14_knee_bounds.is_some(),
+        r14_knee_plan.is_some(),
+        "T2 requires a transform table with eligible soft-clip knees"
+    );
 
     // FEATURE-SUBSET ablation (`--keep-features`): zero the raw values of
     // every dropped column, in every loaded group, BEFORE the scaler is
@@ -4460,6 +4488,7 @@ fn main() {
     });
 
     hyperparams.feature_transforms = feature_transforms.clone();
+    hyperparams.r14_trainable_knees = r14_knee_plan;
     hyperparams.feature_transform_params = feature_transform_params.clone();
     hyperparams.monotone_feature_pin = monotone_feature_pin;
     if args.monotone_gated_products {

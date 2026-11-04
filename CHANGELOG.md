@@ -19,13 +19,15 @@
 
 ### QUEUED BREAKING CHANGES
 
-- Unpublished `zensim-validate`: explicit `MlpHyperparams` literals gain `r14_transforms_registration`; `None` preserves the historical transform refusal. R14 requires its registered smooth, zero-preserving transform table.
+- Unpublished `zensim-validate`: explicit `MlpHyperparams` literals gain `r14_transforms_registration` and `r14_trainable_knees`; `None` preserves the historical transform refusal and fixed preprocessing. R14 requires its registered smooth, zero-preserving transform table (`5b5a0134`).
 
 - Unpublished `zensim-validate`: explicit `TvRegularizer` struct literals gain `pool` and `level` (`false` and `None` keep the earlier behavior; `2857ca0c`, two integration tests updated in `0ee6c5ea`).
 
 - Unpublished `zensim-validate`: explicit `MlpHyperparams` struct literals gain the owner-approved `init_from` and `constant_lr` fields (`None` and `false` preserve default behavior). Supported serving-crate APIs are unchanged.
 
 ### Added
+
+- Research R14 T2: native log-knee gradients, TRAIN-quantile projection, current-transform checkpoint scaling, and a release binding to the registered teacher-development comparison. Other transforms remain fixed; no T2 fit is released merely by building this support.
 
 - Research R14: smooth zero-preserving transforms on derived caller inputs, native finite-zero-slope certification and transform-aware layer inspection. The frozen A no-transform split golden remains byte-identical (`5b5a0134`, `51d9e36c`).
 

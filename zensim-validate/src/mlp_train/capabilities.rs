@@ -237,6 +237,29 @@ pub fn validate_training_capabilities(
 
     // Historical E34 L keeps its no-transform identity contract. R14 alone
     // authorizes validated smooth, zero-preserving caller transforms.
+    if hyperparams.r14_trainable_knees.is_some() {
+        assert_eq!(
+            hyperparams.r14_transforms_registration.as_deref(),
+            Some(super::transforms::REGISTRATION)
+        );
+        assert!(
+            hyperparams.nonneg_distance
+                && hyperparams.monotone_cbc
+                && hyperparams.nonneg_thresholds
+                && hyperparams.n_hidden > 0
+                && hyperparams.n_hidden.is_multiple_of(4)
+                && hyperparams.minibatch_size == 1
+                && hyperparams.norm_in_norm_weight == 0.
+                && hyperparams.n_hidden_layers == 1
+                && !hyperparams.pool_head
+                && !hyperparams.hybrid_head
+                && !hyperparams.per_sample_alpha_head
+                && !hyperparams.skip_connection
+                && hyperparams.steer_pairs.is_none()
+                && hyperparams.pooled_legs.is_empty(),
+            "T2 requires the registered plain K=1 head"
+        );
+    }
     if hyperparams.nonneg_distance
         && hyperparams.monotone_cbc
         && let Some(ts) = &hyperparams.feature_transforms

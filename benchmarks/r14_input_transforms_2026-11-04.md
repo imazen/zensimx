@@ -146,6 +146,42 @@ available memory 39,930 MiB, exit 0. Producer commit `bfa87dd7` verifies the
 screen-owner source bytes before loading data. Artifact paths and SHA256s are
 recorded in [the pointer](r14_input_transforms_2026-11-04.pointer.md).
 
+## Conditional T2 implementation
+
+T2 starts a fresh A seed-0 network with the best T1 transform table. Only its
+eligible soft-clip knees learn; softness remains tied to the knee. The native
+K=1 loop propagates both RankNet and MSE through the same pre-update encoder
+weights. Above the knee, the parameter derivative is
+`dt/dlog(k) = k*ln(x/k)`; inside the identity core it is zero.
+The native Adam kernel uses the network's learning-rate schedule and its
+existing 0.9/0.999/1e-8 constants and moment policy. Log knees project to the registered TRAIN bounds; nonfinite states
+and nonpositive/nonrepresentable stored proposals are refused without an epsilon.
+
+The optimizer uses the initial post-transform scale throughout each fit.
+Each serialized checkpoint recomputes the learned columns' current
+post-transform TRAIN scales and compensates their encoder rows by the positive
+scale ratio. This preserves the real-valued function and monotone constraints;
+serialization has the ordinary f64-to-f32 parameter rounding. The independent
+four-hidden-unit export fixture checks function preservation to 1e-12 before casting and 3e-5
+after native f32 serialization/inference. This tolerance is for T2 checkpoint
+quantization; the serving parity and no-transform A gates remain exact-bit gates.
+Validation-only rows are excluded from both initial and serialized scale fits.
+
+The native CLI binds `--r14-knee-bounds` to the frozen TRAIN statistics and
+best initial table, and hashes the teacher-development decision. It recomputes
+the best-arm/zero-allowance release rule before loading training payloads.
+T1 arms refuse the learning flag; T2 refuses an absent flag or failed release.
+The existing T1 wrapper is unchanged. A separate T2 wrapper composes the same
+canonical fit owners and carries the binding through continuation.
+
+ARM checks pass for native learning, finite-difference parameter gradients,
+projection, zero-lower-bound refusal, transform/warm-start regressions and the
+release binding. The final combined sequence takes 74 seconds (peak RSS
+1.39 GiB, minimum available 26,157 MiB). The all-targets compile check also
+passes in 26 seconds (peak RSS 0.56 GiB, minimum available 26,460 MiB).
+T2's scientific fit is still unreleased pending the registered T1 comparison.
+T1's running binary and all serving/read binaries remain pinned to `912609aa`.
+
 ## Results
 
 Not measured yet. Complete every registered arm/read or report a verified blocker;

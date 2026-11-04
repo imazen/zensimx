@@ -224,7 +224,7 @@ fn r13_head_binding(c: &Value, args: &super::Args) -> Result<bool, String> {
 // R14 keeps the exact A head; only its pinned input-transform table differs.
 fn r14_transform_binding(c: &Value, args: &super::Args) -> Result<bool, String> {
     let Some(r) = c.get("r14_transforms") else {
-        if args.r14_transforms_registration.is_some() {
+        if args.r14_transforms_registration.is_some() || args.r14_knee_bounds.is_some() {
             return Err("R14 transform authority required".into());
         }
         return Ok(false);
@@ -253,6 +253,45 @@ fn r14_transform_binding(c: &Value, args: &super::Args) -> Result<bool, String> 
         || !args.feature_transform.is_empty()
     {
         return Err("R14 registered transform/head binding differs".into());
+    }
+    let learning = r["arm"] == "T2";
+    if learning != args.r14_knee_bounds.is_some() {
+        return Err("R14 T2 requires its learnable-knee inputs; fixed T1 arms refuse them".into());
+    }
+    if learning {
+        let binding = &c["r14_knee_learning"];
+        if binding["registration"] != "5b5a013482db4944042883995ad6892f92244c69"
+            || binding["bounds_sha256"] != hash(args.r14_knee_bounds.as_ref().unwrap())?
+            || r["table_sha256"] != hash(Path::new(string(binding, "initial_table_path")?))?
+        {
+            return Err("R14 T2 bounds or initial table differ".into());
+        }
+        let development = json(
+            Path::new(string(binding, "feasibility_path")?),
+            string(binding, "feasibility_sha256")?,
+        )?;
+        let score = |name: &str| -> Result<f64, String> {
+            development["pooled"][name]
+                .as_f64()
+                .filter(|v| v.is_finite())
+                .ok_or_else(|| format!("T2 finite TRAIN-development MAE required: {name}"))
+        };
+        let mut best = "T1a";
+        for arm in ["T1b", "T1c"] {
+            if score(&format!("{arm}_s0"))? < score(&format!("{best}_s0"))? {
+                best = arm;
+            }
+        }
+        if development["best_arm"] != best
+            || binding["best_arm"] != best
+            || development["T2_feasible"] != true
+            || score(&format!("{best}_s0"))? > score("F_s0")?
+            || development["trainable_soft_clip_inputs"]
+                .as_array()
+                .is_none_or(Vec::is_empty)
+        {
+            return Err("R14 T2 TRAIN-development feasibility rule not met".into());
+        }
     }
     if args.init_from.is_none() {
         let table = args
@@ -1694,7 +1733,7 @@ mod tests {
         args.sample_seed = Some(101);
         args.auto_transforms = Some(table.clone());
         args.auto_transforms_min_lift = 0.005;
-        let c = json!({"width":1853,"feature_ids":vec![0;492],"seed_index":0,"route":"full",
+        let mut c = json!({"width":1853,"feature_ids":vec![0;492],"seed_index":0,"route":"full",
             "epochs":120,"pairs_per_epoch":50000,"selected_epoch":119,"init_seed":1101,"sample_seed":101,
             "r14_transforms":{"registration":"5b5a013482db4944042883995ad6892f92244c69","arm":"T1b","table_sha256":hash(&table).unwrap()}});
         assert!(run_binding(&c, &args, 1853, false).is_err());
@@ -1708,6 +1747,30 @@ mod tests {
         args.auto_transforms = Some(table.clone());
         std::fs::write(&table, "changed table").unwrap();
         assert!(run_binding(&c, &args, 1853, false).is_err());
+        std::fs::write(
+            &table,
+            "feat_idx\tbest_transform\tparams_csv\tlift\n13\tsoft_clip\t0.5,0.5\t1\n",
+        )
+        .unwrap();
+        let bounds = root.join("INPUTS.json");
+        let development = root.join("DEVELOPMENT.json");
+        std::fs::write(&bounds, "[]").unwrap();
+        let mut decision = json!({"best_arm":"T1b","T2_feasible":true,
+            "trainable_soft_clip_inputs":[0],"pooled":{"T1a_s0":2.,"T1b_s0":0.9,"T1c_s0":1.2,"F_s0":1.}});
+        std::fs::write(&development, decision.to_string()).unwrap();
+        args.r14_knee_bounds = Some(bounds.clone());
+        assert!(run_binding(&c, &args, 1853, false).is_err()); // T1 refuses learning
+        c["r14_transforms"]["arm"] = json!("T2");
+        c["r14_knee_learning"] = json!({"registration":"5b5a013482db4944042883995ad6892f92244c69",
+            "bounds_sha256":hash(&bounds).unwrap(),"initial_table_path":table,
+            "best_arm":"T1b","feasibility_path":development,"feasibility_sha256":hash(&development).unwrap()});
+        assert!(run_binding(&c, &args, 1853, false).is_ok());
+        decision["pooled"]["T1b_s0"] = json!(1.1);
+        std::fs::write(&development, decision.to_string()).unwrap();
+        c["r14_knee_learning"]["feasibility_sha256"] = json!(hash(&development).unwrap());
+        assert!(run_binding(&c, &args, 1853, false).is_err()); // zero allowance
+        args.r14_knee_bounds = None;
+        assert!(run_binding(&c, &args, 1853, false).is_err()); // T2 must learn
         std::fs::remove_dir_all(root).unwrap();
     }
 

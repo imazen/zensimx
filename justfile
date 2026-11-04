@@ -4360,6 +4360,14 @@ r14-continuation-checks:
     cargo test -p zensim-validate --bin zensim_mlp_train capability_preflight_tests -- --test-threads=1
     cargo clippy -p zensim-validate --bin zensim_mlp_train
 
+r14-t2-checks:
+    cargo fmt --check -p zensim-validate
+    cargo test -p zensim-validate --lib mlp_train::r14_knees -- --test-threads=1
+    cargo test -p zensim-validate --lib mlp_train::transforms -- --test-threads=1
+    cargo test -p zensim-validate --lib mlp_train::warm_start -- --test-threads=1
+    cargo test -p zensim-validate --bin zensim_mlp_train r14_authority -- --test-threads=1
+    cargo clippy -p zensim-validate --lib --bin zensim_mlp_train
+
 r14-transform-build:
     python3 -B scripts/byconstruction/r14_transforms.py job --label final-build -- bash scripts/byconstruction/r14_transforms_build.sh
 

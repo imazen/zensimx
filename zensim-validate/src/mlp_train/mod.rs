@@ -30,6 +30,7 @@
 mod capabilities;
 mod confidence_weights;
 mod contrast_precision;
+pub mod r14_knees;
 pub mod transforms;
 mod warm_start;
 pub use capabilities::validate_training_capabilities;
@@ -272,6 +273,8 @@ pub struct MlpHyperparams {
     pub feature_transforms: Option<Vec<FeatureTransform>>,
     /// Exact R14 registration authorization; absent preserves historical refusals.
     pub r14_transforms_registration: Option<String>,
+    /// Frozen pre-transform caller rows and TRAIN bounds for R14 T2 only.
+    pub r14_trainable_knees: Option<std::sync::Arc<r14_knees::KneePlan>>,
 
     /// V0_20 parameterized feature-transform params (added 2026-05-15).
     /// Parallel to `feature_transforms`; each inner `Vec<f32>` is the
@@ -1046,6 +1049,7 @@ impl Default for MlpHyperparams {
             out_dtype: WeightDtype::F32,
             feature_transforms: None,
             r14_transforms_registration: None,
+            r14_trainable_knees: None,
             feature_transform_params: None,
             minibatch_size: 1,
             parallel_batch: true,
@@ -3119,6 +3123,24 @@ pub fn train_mlp_strategy_pairs(
     rank_pairs: &std::collections::BTreeMap<String, Vec<[usize; 2]>>,
 ) -> Vec<u8> {
     subjective_rank::validate_votes(groups, hyperparams, !rank_pairs.is_empty());
+    if hyperparams.r14_trainable_knees.is_some() {
+        assert!(
+            groups
+                .iter()
+                .all(|g| !matches!(&g.features, FeatureRows::Compact(_))),
+            "T2 requires dense post-transform rows and separately captured raw callers"
+        );
+        assert!(
+            tv.is_none()
+                && anchor.is_none()
+                && equiv.is_none()
+                && pjnd_anchor.is_none()
+                && konjnd_agg.is_none()
+                && triplets.is_none()
+                && rank_pairs.is_empty(),
+            "T2 supports the registered rank/MSE recipe only"
+        );
+    }
     sampling::matched_codec::validate(groups, hyperparams, rank_pairs);
     let effective = validate_training_capabilities(
         hyperparams,
@@ -3377,6 +3399,15 @@ pub fn train_mlp_strategy_pairs(
     //    Group g's standardized features live in std_features[g], shape
     //    (n_pairs[g] × n_features).
     let std_features = StdFeatures::build(groups, n_features, &scaler_mean, &scaler_scale);
+    let mut knees = r14_knees::KneeState::new(
+        hyperparams,
+        &scaler_mean,
+        &scaler_scale,
+        &groups
+            .iter()
+            .map(|g| (g.features.len(), g.train_weight > 0.))
+            .collect::<Vec<_>>(),
+    );
     let steer_images = hyperparams.steer_pairs.as_deref().map(|path| {
         assert!(
             tv.is_none()
@@ -4095,8 +4126,8 @@ pub fn train_mlp_strategy_pairs(
                 let (ra, rb) = la_rows.as_ref().unwrap();
                 (ra.as_ref(), rb.as_ref(), ya, hpa, ha, yb, hpb, hb)
             } else {
-                let xa = std_features.row(g_idx, ia, &mut scratch_a);
-                let xb = std_features.row(g_idx, ib, &mut scratch_b);
+                let xa = std_features.row_with_knees(knees.as_ref(), g_idx, ia, &mut scratch_a);
+                let xb = std_features.row_with_knees(knees.as_ref(), g_idx, ib, &mut scratch_b);
                 let (ya, hpa, ha, yb, hpb, hb) = smooth_hinge::forward_pair(
                     xa,
                     xb,
@@ -4246,6 +4277,9 @@ pub fn train_mlp_strategy_pairs(
                     hyperparams.leaky_alpha,
                     hyperparams.smooth_hinge,
                 );
+                if let Some(k) = knees.as_mut() {
+                    k.step(g_idx, ia, ib, &w1, &dh_a, &dh_b, lr);
+                }
                 if hyperparams.l2_lambda > 0.0 {
                     for (g, &w) in adam.gw2.iter_mut().zip(w2.iter()) {
                         *g += hyperparams.l2_lambda * w;
@@ -4696,7 +4730,8 @@ pub fn train_mlp_strategy_pairs(
                     if skipped[gi] {
                         return crate::panel::LightPanel::default();
                     }
-                    let preds = std_features.predict(
+                    let preds = std_features.predict_with_knees(
+                        knees.as_ref(),
                         gi,
                         g.features.len(),
                         &w1,
@@ -4770,7 +4805,8 @@ pub fn train_mlp_strategy_pairs(
             if hyperparams.dump_checkpoints_every > 0
                 && epoch % hyperparams.dump_checkpoints_every == 0
             {
-                let ckpt_bytes = bake_two_layer_znpr_v3(
+                let ckpt_bytes = r14_knees::checkpoint(
+                    knees.as_ref(),
                     &scaler_mean,
                     &scaler_scale,
                     &w1,
@@ -4795,7 +4831,8 @@ pub fn train_mlp_strategy_pairs(
             if val_score > best_val_score {
                 best_val_score = val_score;
                 stale_epochs = 0;
-                best_bake = Some(bake_two_layer_znpr_v3(
+                best_bake = Some(r14_knees::checkpoint(
+                    knees.as_ref(),
                     &scaler_mean,
                     &scaler_scale,
                     &w1,
@@ -4837,7 +4874,8 @@ pub fn train_mlp_strategy_pairs(
         println!("ZENSIM_SAMPLE_DIGEST {}", d.hex());
     }
     best_bake.unwrap_or_else(|| {
-        bake_two_layer_znpr_v3(
+        r14_knees::checkpoint(
+            knees.as_ref(),
             &scaler_mean,
             &scaler_scale,
             &w1,
