@@ -1,0 +1,20 @@
+{
+  "bake_sha256": "185f43f7e5e1327c34ad18f0b73b96b872663726a0fac6ff524430d0d8430088",
+  "bank_sha256": "07e2f4b71fe0ccc67848f2896344e6d0b6a255b0e91a7da9062d471ea3e11100",
+  "bank_rows": 12163,
+  "sampled_rows": 12163,
+  "weight_count": 126080,
+  "counts": {
+    "bias_outlier": 0,
+    "column_outlier": 2275,
+    "constant_input": 0,
+    "dead_hidden": 95,
+    "dead_input": 64,
+    "drift": 0,
+    "duplicate_input": 54,
+    "row_outlier": 32344,
+    "saturated_hidden": 95,
+    "scaler_sign": 0,
+    "sign": 0
+  }
+}

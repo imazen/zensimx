@@ -2,11 +2,10 @@
 
 ## Coverage and current limits
 
-Neither visualizer is qualified yet (0/2 complete). Missing: compiled F/E
-weight-audit counts and regression pins; real atlas bundles and bit-parity
-results; numerical lens tests; browser checks with real data; screenshots.
-The first build is queued behind the shared training lock. No audit census
-or numerical/pixel parity result is claimed before that build executes.
+Neither visualizer is qualified yet (0/2 complete). Missing: regression replay; real atlas bundles and bit-parity results;
+numerical lens tests; browser checks with real data; screenshots. F and E
+audits have completed on the whole admitted CID22 TRAIN teacher fit bank.
+The pinned regression and map/PDP oracle tests are now running.
 
 ## Verified findings
 
@@ -46,8 +45,8 @@ alignment. Weight drift alone does not establish functional change.
 
 | Bake | Native certificate | Live max pairs | Individual flag counts |
 | --- | --- | ---: | --- |
-| F seed 0 | certified | 1 | not yet measured |
-| E | certified | 3 | not yet measured |
+| F seed 0 | certified | 1 | 0 sign; 32,344 row outliers; 2,275 column outliers; 64 near-zero outgoing rows; 0 constant inputs; 95 inactive/flat hidden units; 54 correlated input pairs |
+| E | certified | 3 | 0 sign; 20,564 row outliers; 3,375 column outliers; 122 near-zero outgoing rows; 0 constant inputs; 93 inactive/flat hidden units; 46 correlated input pairs |
 
 ## Design questions for the coordinator
 
@@ -67,3 +66,34 @@ alignment. Weight drift alone does not establish functional change.
 http://dev.lan:3310/
 
 This is currently the interface frame; measured bundles are pending.
+
+## First F audit (completed)
+
+The packed F seed-0 bake has 126,080 weights (984 × 128 plus 128 × 1).
+The audit read every one of the 12,163 rows of the admitted CID22 TRAIN
+oracle-teacher fit bank. It found zero sign/scaler violations and zero
+constant inputs. One paired witness is hidden units 126/127.
+
+There are 95/128 hidden units in their inactive ReLU region on this bank;
+this does not establish deadness on the full training mixture. The 64
+near-zero outgoing rows are in layer 1 (hidden→output), not dead raw inputs.
+There are 54 input-pair flags at |Pearson| > 0.999. Row-MAD flags: 32,344;
+column-MAD flags: 2,275. Zero-MAD deviations are explicitly undefined z
+scores and diagnostic notes. No drift bank was supplied for this first run.
+
+The complete local audit is under
+`/mnt/v/output/zensim/viz/2026-11-04/audit-f-s0/`; the compact census and
+input hashes are in `f-audit-census.json`. Regression replay is pending.
+The first successful build and audit logs are preserved. Audit resource
+receipt: `run-heavy: done rc=0 9s | peak-RSS 0.29GiB | min-avail 38062MiB | peak-load 4.57`.
+
+## E comparison census (completed)
+
+E has 105,088 weights and was assessed on the same 12,163 CID22 TRAIN teacher
+rows and table hash as F. It has zero sign/scaler violations; 93/128 hidden
+units are inactive on this bank; 122 outgoing rows are within 1e-6; zero
+inputs are constant; 46 input-pair correlations exceed 0.999 in magnitude.
+Its 20,564 row and 3,375 column outlier flags are diagnostic notes. Counts
+and hashes are in `e-audit-census.json`; full JSON/TSV are in the local
+`audit-e/` bundle. No drift comparison has run yet. Resource receipt:
+`run-heavy: done rc=0 7s | peak-RSS 0.25GiB | min-avail 38097MiB | peak-load 2.25`.
