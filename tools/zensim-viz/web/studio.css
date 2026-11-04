@@ -571,3 +571,246 @@ body[data-instrument="lens"] .stage-controls {
   margin: 0;
   border: 0;
 }
+
+/* Review 2.1: hue belongs to the selected detector, with visible nonzero marks. */
+#pair-image.mapped-base {
+  filter: grayscale(1);
+}
+#range-mode {
+  flex: none;
+}
+#range-mode button {
+  padding: 5px 6px;
+  font-size: 10px;
+}
+body[data-instrument="lens"] #range-mode {
+  display: none;
+}
+
+/* Review 2.2: plot coordinates are redrawn for the available stage pixels. */
+.exhibits.diagnostics > figure {
+  justify-content: flex-start;
+}
+#pdp-chart .chart,
+#range-chart .chart {
+  width: 100%;
+  height: auto;
+}
+#pdp-note {
+  flex: none;
+  margin-top: 8px;
+}
+#weight-wrap {
+  height: calc(var(--stage-height, 900px) * 0.63);
+  align-items: stretch;
+}
+#weight-wrap > div {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+#weight-minimap-scroll {
+  flex: 1;
+  height: auto;
+  max-height: none;
+}
+#weight-zoom {
+  height: calc(100% - 20px);
+  width: auto;
+  max-width: 100%;
+  object-fit: contain;
+  object-position: left top;
+}
+#network-path {
+  padding: 0 0 8px;
+}
+#weight-detail {
+  min-height: 0;
+}
+
+/* Review 2.3: the model's standing is visible before the paper detail. */
+.reference-value {
+  padding: 12px 0 8px;
+  margin-bottom: 8px;
+}
+.model-strip {
+  height: 40px;
+  flex: none;
+  font-size: 10px;
+  line-height: 18px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 4px;
+}
+.model-strip > div {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.model-strip .chip {
+  font-size: 9px;
+  padding: 0 3px;
+  line-height: 14px;
+}
+
+/* Review 2.4–5: retain the instrument note without a permanent sidebar footer. */
+#status {
+  position: absolute;
+  bottom: 12px;
+  left: 16px;
+  right: 16px;
+  z-index: 8;
+  padding: 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  font-size: 12px;
+  max-height: 100px;
+}
+#instrument-note {
+  font-size: 10px;
+  margin: 8px 0 0;
+  flex: none;
+}
+.bank-picker {
+  position: relative;
+  display: inline-grid;
+}
+.bank-selected {
+  display: none;
+}
+@media (max-width: 1399px) {
+  .topbar label {
+    font-size: 0;
+  }
+  .bank-picker {
+    width: 148px;
+    height: 28px;
+  }
+  .bank-picker #bank {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+  }
+  .bank-selected {
+    display: block;
+    border: 1px solid var(--border);
+    border-radius: var(--r-ctl);
+    color: var(--ink);
+    background: var(--surface-1);
+    font-size: 12px;
+    padding: 4px 24px 4px 8px;
+    pointer-events: none;
+  }
+  .bank-picker::after {
+    content: "▾";
+    position: absolute;
+    right: 8px;
+    top: 5px;
+    color: var(--ink-2);
+    font-size: 12px;
+    pointer-events: none;
+  }
+  .bank-picker:focus-within {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+    border-radius: var(--r-ctl);
+  }
+}
+
+/* Review 2.6: percentile marks and global statistics have visible names. */
+.tree-chip-legend {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 6px 8px;
+  font-size: 9px;
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+.mini-ramp {
+  display: inline-flex;
+  flex: none;
+  height: 8px;
+}
+.mini-ramp i {
+  width: 3px;
+  height: 8px;
+  display: block;
+}
+#global-weight-label {
+  white-space: nowrap;
+}
+
+/* Review 2.7: status is carried by the unit cells, labels stay in ink. */
+.capacity-strip {
+  margin-bottom: 8px;
+}
+.capacity-counts {
+  font-size: 11px;
+  color: var(--ink-2);
+  margin-bottom: 4px;
+}
+.capacity-cells {
+  display: flex;
+  gap: 1px;
+  height: 14px;
+}
+.capacity-cells button {
+  flex: 1;
+  min-width: 0;
+  height: 14px;
+  border: 0;
+  border-radius: 1px;
+  padding: 0;
+}
+.capacity-cells [data-status="dead"] {
+  background: var(--ink-3);
+  opacity: var(--dim);
+}
+.capacity-cells [data-status="residual"] {
+  background: var(--status-warning);
+}
+.capacity-cells [data-status="live"] {
+  background: var(--series-1);
+}
+.capacity-cells [aria-pressed="true"] {
+  outline: 2px solid var(--ink);
+  outline-offset: 1px;
+}
+
+/* The primary weights region fits the pane; the full audit and ranked strips
+   remain reachable through details and the pane's internal scroll. */
+#weights-primary {
+  height: calc(var(--stage-height, 900px) - 44px - 48px);
+  display: grid;
+  grid-template-rows: auto auto auto minmax(0, 1fr) auto;
+  gap: 8px;
+}
+.weights-controls {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.weights-controls #network-path {
+  padding: 0;
+}
+#weight-readout {
+  padding: 0;
+}
+#weight-readout-summary {
+  font-size: 12px;
+}
+#weights-primary #weight-wrap {
+  height: 100%;
+  margin: 0;
+  min-height: 0;
+}
+#weights-primary #weight-legend {
+  padding: 0;
+  font-size: 10px;
+}
+#weights-primary .capacity-strip {
+  margin: 0;
+}

@@ -6,6 +6,7 @@ buildFrame();
 const $ = (id) => document.getElementById(id);
 const state = {
   fullPrecision: false,
+  rangeMode: "robust",
   manifest: null,
   pair: null,
   feature: null,
@@ -75,6 +76,7 @@ async function get(path) {
 }
 function status(message) {
   $("status").textContent = message;
+  $("status").hidden = !message || message === state.manifest?.note;
 }
 function options(select, items, value) {
   select.replaceChildren(
@@ -145,6 +147,12 @@ function table(headers, rows, onSelect) {
 }
 $("full-precision").onchange = () => {
   state.fullPrecision = $("full-precision").checked;
+  document
+    .querySelectorAll("[data-raw-correlation]")
+    .forEach(
+      (cell) =>
+        (cell.textContent = `r ${state.fullPrecision ? cell.dataset.rawCorrelation : fmt(Number(cell.dataset.rawCorrelation))}`),
+    );
   document.querySelectorAll("td[data-raw-text]").forEach((cell) => {
     cell.textContent = state.fullPrecision
       ? cell.dataset.rawText
@@ -311,6 +319,39 @@ async function loadMap(f) {
     );
   return state.maps.get(url);
 }
+function displayRange(f) {
+  if (state.rangeMode === "own") return f.map_range;
+  const bank = state.manifest.banks.find((b) => b.id === $("bank").value);
+  const range =
+    state.rangeMode === "bank"
+      ? f.bank_plot_ranges?.[bank?.sha256]
+      : f.map_robust_range;
+  if (!range)
+    throw Error(
+      `Native ${state.rangeMode} range missing for ${f.key}; export review-2 display metadata.`,
+    );
+  return range;
+}
+function rangeLabel() {
+  return state.rangeMode === "robust"
+    ? "p2–p98 map pixels"
+    : state.rangeMode === "bank"
+      ? "Bank p1–p99 feature values"
+      : "Own map range";
+}
+$("range-mode")
+  .querySelectorAll("button")
+  .forEach(
+    (button) =>
+      (button.onclick = () => {
+        state.rangeMode = button.dataset.range;
+        $("range-mode")
+          .querySelectorAll("button")
+          .forEach((b) => b.setAttribute("aria-pressed", String(b === button)));
+        preview(state.feature).catch((e) => status(e.message));
+        renderPins().catch((e) => status(e.message));
+      }),
+  );
 let mapPalette;
 async function paint(canvas, f, range, alphaByValue = false) {
   const map = await loadMap(f);
@@ -325,7 +366,7 @@ async function paint(canvas, f, range, alphaByValue = false) {
   const ctx = canvas.getContext("2d"),
     data = ctx.createImageData(map.width, map.height),
     own = f.map_range,
-    [lo, hi] = range || own,
+    [lo, hi] = range || displayRange(f),
     palette = (mapPalette ||= Array.from({ length: 256 }, (_, i) =>
       ramp(i / 255),
     ));
@@ -337,7 +378,9 @@ async function paint(canvas, f, range, alphaByValue = false) {
     data.data[i + 1] = rgb[1];
     data.data[i + 2] = rgb[2];
     data.data[i + 3] = alphaByValue
-      ? Math.round(Math.max(0, Math.min(1, t)) * 255)
+      ? v <= 0
+        ? 0
+        : Math.round((0.25 + 0.75 * Math.max(0, Math.min(1, t))) * 255)
       : 255;
   }
   ctx.putImageData(data, 0, 0);
@@ -387,6 +430,10 @@ async function preview(f) {
   const generation = ++previewGeneration;
   if (!f) return;
   state.feature = f;
+  $("pair-image").classList.toggle(
+    "mapped-base",
+    Boolean(f.map_file) && imageMode !== "difference",
+  );
   studio.reference(f);
   renderFamilyLane().catch((e) => status(e.message));
   $("feature-detail").textContent =
@@ -412,13 +459,15 @@ async function preview(f) {
   overlay.getContext("2d").drawImage(painted, 0, 0);
   overlay.dataset.map = f.key ?? String(f.id);
   overlay.dataset.latency = String(performance.now() - started);
+  const range = displayRange(f);
+  overlay.dataset.range = state.rangeMode;
   $("map-legend").replaceChildren(
-    el("span", fmt(f.map_range[0])),
+    el("span", fmt(range[0])),
     el("span", null, "ramp"),
-    el("span", fmt(f.map_range[1])),
+    el("span", fmt(range[1])),
     el(
       "span",
-      `Own range · pooled ${fmt(f.value)} · ${f.pooling} · pooling grid ${(f.pooling_grid || []).join("×")}`,
+      `${rangeLabel()} · pooled ${fmt(f.value)} · ${f.pooling} · pooling grid ${(f.pooling_grid || []).join("×")}`,
     ),
   );
   studio.updateLegend();
@@ -444,8 +493,8 @@ async function renderPins() {
   const maps = pins.filter((f) => f.map_file),
     range = maps.length
       ? [
-          Math.min(...maps.map((f) => f.map_range[0])),
-          Math.max(...maps.map((f) => f.map_range[1])),
+          Math.min(...maps.map((f) => displayRange(f)[0])),
+          Math.max(...maps.map((f) => displayRange(f)[1])),
         ]
       : [0, 0];
   $("pins").replaceChildren();
@@ -490,6 +539,10 @@ function showImage() {
   if (!state.pair) return;
   const file = state.pair[imageMode] || state.pair.images?.[imageMode];
   $("pair-image").src = new URL(file, state.pair._url).href;
+  $("pair-image").classList.toggle(
+    "mapped-base",
+    Boolean(state.feature?.map_file) && imageMode !== "difference",
+  );
   $("pair-image").alt = `${imageMode}: ${state.pair.name}`;
   document
     .querySelectorAll("[data-mode]")
@@ -596,8 +649,8 @@ $("bank").onchange = () => {
 };
 // Lens charts and data loaders are appended below.
 function chartFrame(xmin, xmax, ymin, ymax, xlabel, ylabel, xticks) {
-  const W = 800,
-    H = 300,
+  const W = Math.max(420, $("center-stage").clientWidth - 48),
+    H = Math.max(300, $("center-stage").clientHeight - 44 - 208),
     L = 64,
     R = 28,
     T = 20,
@@ -607,6 +660,7 @@ function chartFrame(xmin, xmax, ymin, ymax, xlabel, ylabel, xticks) {
     class: "chart",
     role: "img",
     "aria-label": `${ylabel} by ${xlabel}`,
+    "data-plot-height": H - T - B,
   });
   if (xmin === xmax) xmax = xmin + 1;
   if (ymin === ymax) ymax = ymin + 1;
@@ -1092,6 +1146,15 @@ function selectConcern(f) {
   renderWeights();
   loadLens().catch((e) => status(e.message));
 }
+function correlationCell(value) {
+  const cell = el(
+    "span",
+    `r ${state.fullPrecision ? full(value) : fmt(value)}`,
+  );
+  cell.dataset.rawCorrelation = full(value);
+  cell.title = `Pearson r ${full(value)}`;
+  return cell;
+}
 function renderConcerns() {
   if (!state.audit) return;
   const a = state.audit,
@@ -1168,7 +1231,7 @@ function renderConcerns() {
       "Kind",
       "Input / unit",
       "Count",
-      "Worst magnitude",
+      "Correlation / magnitude",
       "Worst witness",
       "Reason",
     ],
@@ -1177,7 +1240,9 @@ function renderConcerns() {
       g.kind,
       g.input,
       g.flags.length,
-      full(magnitude(g.worst)),
+      g.kind === "duplicate_input"
+        ? correlationCell(g.worst.value)
+        : full(magnitude(g.worst)),
       g.worst.location,
       g.reason,
     ]),
@@ -1550,6 +1615,10 @@ async function selectBake() {
   const generation = ++bakeGeneration;
   ++lensGeneration;
   state.weights = null;
+  state.lens = state.compare = null;
+  $("capacity-strip").textContent = "Loading native unit classification…";
+  $("capacity-strip").dataset.bake = "";
+  studio.reference(studio.hold || state.feature, true);
   $("input").disabled = $("lens-family").disabled = true;
   document.querySelector(".diagnostics").classList.add("loading");
   const bake = bankScopedBake(
@@ -1583,6 +1652,8 @@ async function selectBake() {
     $("center-ice").disabled = true;
     $("architecture").replaceChildren();
     $("weight-detail").textContent = "No evidence for this bake and bank.";
+    $("capacity-strip").textContent = "No evidence for this bake and bank.";
+    studio.reference(studio.hold || state.feature, true);
     $("weight-legend").replaceChildren();
     $("comparison-panel").hidden = true;
     renderInputRanking();
@@ -1744,5 +1815,8 @@ const studio = new Studio({
   renderWeights,
   loadLens,
   status,
+  resizeExhibits: () => {
+    if (state.weights) renderLens();
+  },
 });
 boot();

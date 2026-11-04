@@ -72,6 +72,7 @@ export class WeightView {
     const { state, $, css, fmt, full, el, table } = this,
       m = state.weights;
     if (!m) return;
+    this.renderCapacity();
     const l = m.layers[0];
     this.rows = m.row_order || Array.from({ length: l.in_dim }, (_, i) => i);
     this.cols =
@@ -105,6 +106,16 @@ export class WeightView {
         i = Math.min(5, Math.floor(t)),
         f = t - i;
       return stops[i].map((n, k) => Math.round(n + (stops[i + 1][k] - n) * f));
+    };
+    const isGlobal = (i) => {
+      const input = m.inputs[i],
+        feature = state.pair?.features.find(
+          (f) =>
+            f.id === input.feature && f.fragility === (input.factor != null),
+        );
+      return feature
+        ? !feature.map_file && feature.map_status?.startsWith("global")
+        : input.pooling === "ratio";
     };
     const family = $("lens-family").value;
     const selectedRow = (i) =>
@@ -169,6 +180,7 @@ export class WeightView {
       z.globalAlpha = 1;
       z.fillStyle = css("--ink-2");
       z.fillText(`in ${i}`, 0, 24 + r * 16 + 7);
+      if (isGlobal(i)) z.fillText("◇", 48, 24 + r * 16 + 7);
       this.windowCols.forEach((j, c) => {
         z.globalAlpha = selectedRow(i) || j === state.unit ? 1 : 0.4;
         z.fillStyle = `rgb(${rgb(l.weights[i * l.out_dim + j]).join(",")})`;
@@ -190,10 +202,18 @@ export class WeightView {
     const vr = this.windowRows.indexOf(state.input),
       vc = this.windowCols.indexOf(state.unit);
     if (vr >= 0 && vc >= 0) z.strokeRect(64 + vc * 16, 24 + vr * 16, 14, 14);
+    const nonzero = m.nonzero_counts[state.input];
+    $("weight-readout-summary").textContent =
+      `input ${state.input} → h${state.unit} · weight ${full(l.weights[state.input * l.out_dim + state.unit])} · ${nonzero === 0 ? `all ${l.out_dim} weights zero: dead input` : `${nonzero}/${l.out_dim} nonzero`} · detailed audit`;
     $("weight-detail").textContent =
       `input ${state.input} · ${m.inputs[state.input].short_name || m.inputs[state.input].name} → h${state.unit}: ${full(l.weights[state.input * l.out_dim + state.unit])}\n${this.describe(state.input, state.unit)}`;
     $("weight-legend").textContent =
       `${fmt(-maximum)} … 0 … ${fmt(maximum)} · 1:1 minimap / selected 24×16 window · ink corner = flagged weight`;
+    const globalLabel = el("span", " · ◇ global");
+    globalLabel.id = "global-weight-label";
+    globalLabel.title =
+      "◇ marks a globally pooled input with no spatial detector map.";
+    $("weight-legend").append(globalLabel);
     $("weight-table").replaceChildren(
       table(
         ["Hidden unit", "Weight", "Row z", "Column z", "Flags"],
@@ -222,6 +242,57 @@ export class WeightView {
       (m.per_input_columns?.[state.input] || this.cols).slice(0, 16),
       "unit",
     );
+  }
+  renderCapacity() {
+    const root = this.$("capacity-strip"),
+      capacity = this.state.weights?.capacity;
+    if (!capacity) {
+      root.textContent = "Native unit classification has not been exported.";
+      return;
+    }
+    const active = root.contains(document.activeElement),
+      counts = capacity.counts;
+    root.dataset.bake = this.state.bake.id;
+    root.title = capacity.rule;
+    root.replaceChildren(
+      this.el(
+        "div",
+        `${counts.live} live · ${counts.residual} residual · ${counts.dead} dead`,
+        "capacity-counts",
+      ),
+    );
+    const cells = this.el("div", null, "capacity-cells");
+    cells.setAttribute("role", "group");
+    cells.setAttribute("aria-label", "One cell per stored hidden unit");
+    for (const unit of capacity.units) {
+      const b = this.el("button");
+      b.dataset.unit = unit.unit;
+      b.dataset.status = unit.status;
+      b.tabIndex = unit.unit === this.state.unit ? 0 : -1;
+      b.setAttribute("aria-label", `h${unit.unit} ${unit.status}`);
+      b.setAttribute("aria-pressed", String(unit.unit === this.state.unit));
+      b.title = `h${unit.unit} · ${unit.status}\nOutput coefficient ${this.full(unit.output_coefficient)} · bias ${this.full(unit.bias)}\n${capacity.rule}`;
+      b.onclick = () => this.select(this.state.input, unit.unit);
+      b.onkeydown = (e) => {
+        let next = unit.unit;
+        if (e.key === "ArrowRight") next++;
+        else if (e.key === "ArrowLeft") next--;
+        else if (e.key === "Home") next = 0;
+        else if (e.key === "End") next = capacity.units.length - 1;
+        else return;
+        e.preventDefault();
+        this.select(
+          this.state.input,
+          Math.max(0, Math.min(capacity.units.length - 1, next)),
+        );
+      };
+      cells.append(b);
+    }
+    root.append(cells);
+    if (active)
+      root
+        .querySelector(`[data-unit="${this.state.unit}"]`)
+        ?.focus({ preventScroll: true });
   }
   strip(root, order, type) {
     const { state, svg, fmt, full, tip } = this,

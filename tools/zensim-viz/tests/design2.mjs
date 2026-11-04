@@ -371,7 +371,7 @@ for (const size of [
 }
 assert.deepEqual(errors, []);
 const review = {
-  review: "DESIGN-2",
+  review: process.env.VIZ_REVIEW_NAME || "DESIGN-2",
   coverage: refs.counts,
   sidebar_ids: ids.length,
   virtual_rows_visited: visited.length,
@@ -387,7 +387,7 @@ const review = {
 };
 if (process.env.VIZ_CAPTURE_DIR)
   writeFileSync(
-    `${process.env.VIZ_CAPTURE_DIR}/browser-review.json`,
+    `${process.env.VIZ_CAPTURE_DIR}/${process.env.VIZ_BROWSER_RECEIPT || "browser-review.json"}`,
     JSON.stringify(review, null, 2) + "\n",
     { flag: "wx" },
   );

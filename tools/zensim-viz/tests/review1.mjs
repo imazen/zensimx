@@ -248,6 +248,11 @@ await page.waitForFunction(() =>
     .textContent.includes("no exported evidence"),
 );
 assert.equal(await page.locator("#concern-table tbody tr").count(), 0);
+assert.equal(await page.locator("#capacity-strip button").count(), 0);
+assert.match(
+  await page.locator("#model-strip").textContent(),
+  /no bank evidence/,
+);
 assert.deepEqual(errors, []);
 if (process.env.VIZ_CAPTURE_DIR)
   writeFileSync(

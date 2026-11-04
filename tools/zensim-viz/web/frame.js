@@ -13,13 +13,16 @@ export function buildFrame() {
   const old = document.querySelector("header");
   const header = node("header", "topbar");
   header.append(
-    node("strong", "", "zensim-viz"),
+    node("strong", "app-name", "zensim-viz"),
     $("bake").closest("label"),
     $("pair").closest("label"),
     $("bank").closest("label"),
     old.querySelector("nav"),
     $("theme"),
   );
+  const bankWrapper = node("span", "bank-picker");
+  $("bank").replaceWith(bankWrapper);
+  bankWrapper.append($("bank"), node("span", "bank-selected"));
   const subject = $("subject");
   subject.hidden = true;
   const workspace = node("div", "workspace");
@@ -31,7 +34,22 @@ export function buildFrame() {
   const matrix = $("matrix");
   matrix.setAttribute("role", "tree");
   matrix.setAttribute("aria-label", "Feature tree");
-  sidebar.append(matrix, $("status"));
+  const chipLegend = node("div", "tree-chip-legend");
+  chipLegend.id = "tree-chip-legend";
+  chipLegend.append(node("span", "", "p0"));
+  const miniRamp = node("span", "mini-ramp");
+  for (const step of [0, 1, 3, 5, 6]) {
+    const mark = node("i");
+    mark.style.background = `var(--ramp-seq-${step})`;
+    miniRamp.append(mark);
+  }
+  chipLegend.append(
+    miniRamp,
+    node("span", "", "p100"),
+    node("span", "", "chip = bank percentile of this pair's value"),
+  );
+  chipLegend.title = "x · y · b: chip = bank percentile of this pair's value";
+  sidebar.append(chipLegend, matrix);
   const center = node("div", "center-stage");
   center.id = "center-stage";
   const atlas = $("atlas"),
@@ -51,8 +69,36 @@ export function buildFrame() {
   concerns.prepend(concernFilters);
   concerns.dataset.exhibit = "Concerns";
   concerns.append($("comparison-panel"));
+  const instrumentNote = node("p", "ink-3");
+  instrumentNote.id = "instrument-note";
+  concerns.append(instrumentNote);
   const network = document.querySelector(".network");
   network.dataset.exhibit = "Weights";
+  const pathDetails = node("details");
+  pathDetails.id = "network-path";
+  pathDetails.append(node("summary", "", "Model path"), $("architecture"));
+  network.querySelector("h2").remove();
+  const capacity = node("div", "capacity-strip");
+  capacity.id = "capacity-strip";
+  capacity.setAttribute("aria-label", "Hidden-unit capacity");
+  const weightAudit = node("details");
+  weightAudit.id = "weight-readout";
+  const weightSummary = node("summary", "", "Selected weight · detailed audit");
+  weightSummary.id = "weight-readout-summary";
+  weightAudit.append(weightSummary, $("weight-detail"));
+  const weightControls = node("div", "weights-controls");
+  weightControls.append(pathDetails, $("column-order").closest("label"));
+  const weightPrimary = node("div", "weights-primary");
+  weightPrimary.id = "weights-primary";
+  network.querySelector("h2").remove();
+  weightPrimary.append(
+    capacity,
+    weightControls,
+    weightAudit,
+    $("weight-wrap"),
+    $("weight-legend"),
+  );
+  network.prepend(weightPrimary);
   const figures = [...document.querySelectorAll(".diagnostics > figure")];
   figures[0].dataset.exhibit = "Dependence";
   figures[1].dataset.exhibit = "Ranges";
@@ -78,7 +124,7 @@ export function buildFrame() {
   for (const e of exhibits.children)
     e.hidden = e.dataset.exhibit !== "Dependence";
   lens.replaceChildren(tabs, exhibits);
-  center.append(atlas, lens);
+  center.append(atlas, lens, $("status"));
   const reference = node("aside", "reference-panel");
   reference.id = "reference-panel";
   reference.setAttribute("aria-label", "Feature reference");
@@ -119,6 +165,19 @@ export function buildFrame() {
   const only = node("button", "", "Map");
   only.id = "map-mode-button";
   modes.append(only);
+  const ranges = node("div", "seg");
+  ranges.id = "range-mode";
+  ranges.setAttribute("aria-label", "Map range");
+  for (const [mode, label] of [
+    ["robust", "p2–p98"],
+    ["own", "own"],
+    ["bank", "bank"],
+  ]) {
+    const button = node("button", "", label);
+    button.dataset.range = mode;
+    button.setAttribute("aria-pressed", String(mode === "robust"));
+    ranges.append(button);
+  }
   const controls = node("div", "stage-controls");
   for (const id of ["zoom", "alpha"]) controls.append($(id).closest("label"));
   controls.append($("reset-pan"));
@@ -126,6 +185,7 @@ export function buildFrame() {
   bottom.append(
     $("pins"),
     $("map-legend"),
+    ranges,
     modes,
     controls,
     node(

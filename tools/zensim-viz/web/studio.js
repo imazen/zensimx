@@ -30,6 +30,7 @@ export class Studio {
         document
           .querySelectorAll("[data-exhibit]")
           .forEach((p) => (p.hidden = p.dataset.exhibit !== this.exhibit));
+        this.resizeExhibits();
         this.updateLegend();
       };
     this.exhibit = "Dependence";
@@ -91,6 +92,12 @@ export class Studio {
     new ResizeObserver(() => {
       fit();
       this.drawRows();
+      document.documentElement.style.setProperty(
+        "--stage-height",
+        `${this.$("center-stage").clientHeight}px`,
+      );
+      cancelAnimationFrame(this.resizeFrame);
+      this.resizeFrame = requestAnimationFrame(() => this.resizeExhibits());
     }).observe(this.$("center-stage"));
     for (const gutter of document.querySelectorAll(".gutter")) {
       const resize = (delta) => {
@@ -145,8 +152,13 @@ export class Studio {
       root.style.removeProperty("--right");
     });
     this.$("stage").addEventListener("pointermove", (e) => this.demoAt(e));
+    this.$("bank").addEventListener("change", () => this.compactBanks());
+    window.addEventListener("resize", () => this.compactBanks());
   }
   ready() {
+    document.querySelector(".app-name").title = this.state.manifest.note || "";
+    this.$("instrument-note").textContent = this.state.manifest.note || "";
+    this.compactBanks();
     this.renderTree();
     this.reference(this.state.feature, true);
     // This is also the complete source-ID join used by the browser acceptance.
@@ -172,6 +184,29 @@ export class Studio {
     };
     document.body.dataset.instrument = this.state.view;
     this.preload("basic");
+  }
+  compactBanks() {
+    if (!this.state.manifest) return;
+    const bank = this.state.manifest.banks.find(
+      (b) => b.id === this.$("bank").value,
+    );
+    if (!bank) return;
+    for (const option of this.$("bank").options) {
+      const source = this.state.manifest.banks.find(
+        (b) => b.id === option.value,
+      );
+      option.label = source.label;
+      option.title = source.label;
+    }
+    const short =
+      bank.id === "cid22-fit"
+        ? "CID22 TRAIN"
+        : bank.id === "hdr-teacher"
+          ? "HDR TRAIN"
+          : bank.label.split("·")[0].trim();
+    document.querySelector(".bank-selected").textContent = short;
+    this.$("bank").title = bank.label;
+    document.querySelector(".bank-picker").title = bank.label;
   }
   async preload(family) {
     await Promise.all(
@@ -432,6 +467,57 @@ export class Studio {
     } else focus = buttons.find((b) => b._feature?.channel === ch) || focus;
     focus?.focus({ preventScroll: true });
   }
+  renderModelStrip(f, strip) {
+    const w = this.state.weights,
+      input = w?.inputs.find(
+        (i) => i.feature === f.id && Boolean(i.factor != null) === f.fragility,
+      );
+    if (!input) {
+      strip.textContent = "Not consumed / no bank evidence";
+      return;
+    }
+    const rows = this.state.lens?.input_attribution || [],
+      rank = rows.findIndex((r) => r.features.includes(f.id));
+    const readers = (w.per_input_columns[input.index] || []).filter(
+      (j) => w.layers[0].weights[input.index * w.layers[0].out_dim + j] !== 0,
+    );
+    const flags = [
+      ...(this.state.audit?.flags || []),
+      ...(this.state.bake?.monotonicity_flags || []),
+    ].filter(
+      (flag) =>
+        flag.feature === f.id ||
+        (flag.layer === 0 && flag.from === input.index),
+    );
+    const priority = { critical: 0, serious: 1, warning: 2, note: 3 };
+    const worst = flags.toSorted(
+      (a, b) => priority[a.severity] - priority[b.severity],
+    )[0];
+    const first = this.el(
+      "div",
+      `|w| ${w.input_l1 ? this.fmt(w.input_l1[input.index]) : "unavailable"} · ablation ${rank < 0 ? "loading" : `${rank + 1} of ${rows.length}`}`,
+    );
+    const second = this.el(
+      "div",
+      `read by ${
+        readers
+          .slice(0, 2)
+          .map((j) => `h${j}`)
+          .join(" ") || "none"
+      }${readers.length > 2 ? ` +${readers.length - 2}` : ""} · `,
+    );
+    const chip = this.el(
+      "span",
+      `${flags.length ? "⚑" : "○"} ${flags.length} flags${worst ? ` · ${worst.severity}` : ""}`,
+      "chip",
+    );
+    if (worst) chip.dataset.severity = worst.severity;
+    second.append(chip);
+    strip.append(first, second);
+    strip.title = `${first.textContent}\n${second.textContent}\nAll reading units: ${readers.map((j) => `h${j}`).join(" ")}`;
+    strip.dataset.input = input.index;
+    strip.dataset.flags = flags.length;
+  }
   reference(f, force = false) {
     if (!f || !this.references) return;
     if (this.hold && !force) f = this.hold;
@@ -439,7 +525,9 @@ export class Studio {
     const r = this.references.entries[`${f.family}/${f.signal}`],
       root = this.$("reference-body");
     if (!r) return;
+    if (root.dataset.feature !== f.key) this.$("reference-panel").scrollTop = 0;
     root.dataset.feature = f.key;
+    root.dataset.flagCount = "0";
     root.replaceChildren();
     root.append(
       this.el("div", `f${f.id} · ${f.short_name || f.name}`, "reference-id"),
@@ -454,6 +542,10 @@ export class Studio {
         "reference-value",
       ),
     );
+    const modelStrip = this.el("div", null, "model-strip");
+    modelStrip.id = "model-strip";
+    root.append(modelStrip);
+    this.renderModelStrip(f, modelStrip);
     root.append(this.el("h2", "Formula"));
     const formula = this.el("div", null, "formula");
     root.append(formula);
@@ -522,16 +614,18 @@ export class Studio {
     code.target = "_blank";
     code.rel = "noopener";
     root.append(code);
-    root.append(this.el("h2", "At the cursor"));
-    const demo = this.el(
-      "div",
-      f.family === "basic" && f.id % 13 < 10
-        ? "Move over the image to inspect its sampled native window."
-        : "terms not exported for this family",
-      "demo",
-    );
-    demo.id = "formula-demo";
-    root.append(demo);
+    if (this.state.view === "atlas") {
+      root.append(this.el("h2", "At the cursor"));
+      const demo = this.el(
+        "div",
+        f.family === "basic" && f.id % 13 < 10
+          ? "Move over the image to inspect its sampled native window."
+          : "terms not exported for this family",
+        "demo",
+      );
+      demo.id = "formula-demo";
+      root.append(demo);
+    }
     root.append(
       this.el(
         "h2",
