@@ -7,7 +7,53 @@ from pathlib import Path
 import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts/rev4_featpot"))
-from run_processes import compute_lock, process_snapshot, process_tree
+from run_processes import bound_worker, compute_lock, process_snapshot, process_tree
+
+
+def research_checks(root, stem="RESEARCH"):
+    """Observe the check launcher separately from its stage-writer receipt."""
+    path = root / f"{stem}_CHECKS.json"
+    if not path.exists():
+        return None
+    state = json.loads(path.read_text())
+    pid = state["launcher_pid"]
+    identity_path = root / f"research-launcher-{pid}.json"
+    if identity_path.exists():
+        identity = json.loads(identity_path.read_text())
+        launcher = bound_worker(pid, identity["start_ticks"])
+    else:
+        launcher = process_snapshot(pid)
+        if launcher and launcher["state"] not in ("Z", "X"):
+            try:
+                matches = Path(f"/proc/{pid}/cwd").resolve() == Path(state["source"])
+            except OSError:
+                matches = False
+            if matches:
+                identity_path.write_text(json.dumps(launcher, indent=2) + "\n")
+            else:
+                launcher = None
+        else:
+            launcher = None
+    processes = process_tree(pid) if launcher else []
+    lock = compute_lock(pid)
+    owns = bool(set(lock.get("holder_pids", [])) & {p["pid"] for p in processes})
+    complete = set(state["completed"]) == set(state["required"])
+    stage = state["stage"]
+    if launcher and not complete and not state["failure"]:
+        stage = ("between checks" if stage.endswith(" passed") else
+                 stage.split()[0] + (" running" if owns else " queued"))
+    elif not launcher and not complete and not state["failure"]:
+        stage = "launcher stopped before completion"
+    actual = hashlib.sha256((Path(state["source"]) / "zensim/src/feature_v2.rs").read_bytes()).hexdigest()
+    value = {**state, "checked_utc": datetime.datetime.now(datetime.UTC).isoformat(),
+             "observed_stage": stage, "launcher": launcher, "compute_lock": lock,
+             "owns_compute_lock": owns, "source_hash_matches": actual == state["kernel_sha256"],
+             "processes": processes}
+    (root / f"{stem}_LIVE_CHECK.json").write_text(json.dumps(value, indent=2) + "\n")
+    with (root / f"{stem}_SUPERVISION.jsonl").open("a") as stream:
+        stream.write(json.dumps(value) + "\n")
+    return {"stage": stage, "completed": len(state["completed"]),
+            "required": len(state["required"]), "source_hash_matches": value["source_hash_matches"]}
 
 
 def main():
@@ -79,6 +125,8 @@ def main():
         "admission": "Final admission is owned by report.py; output presence is not qualification.",
     }
     (root / "LIVE_CHECK.json").write_text(json.dumps(value, indent=2) + "\n")
+    checks = research_checks(task_root) if parallel_gate else None
+    goldens = research_checks(task_root, "RESEARCH_GOLDEN") if parallel_gate else None
     if parallel_gate and task_root != root:
         task = json.loads((task_root / "PROGRESS.json").read_text())
         # Retire build-era process fields; their observations remain in the
@@ -92,6 +140,8 @@ def main():
                      "required_timing_cells": 50,
                      "verified_workers": workers, "collector": collector,
                      "compute_lock": lock, "lock_holders": lock_holders,
+                     "research_checks": checks,
+                     "research_goldens": goldens,
                      "admission": value["admission"]})
         (task_root / "PROGRESS.json").write_text(json.dumps(task, indent=2) + "\n")
     with (root / "SUPERVISION.jsonl").open("a") as stream:
@@ -108,6 +158,8 @@ def main():
                      "owns_lock": p["compute_lock"]["held_by_worker_ancestor"]} for p in workers],
         "binary_verified": True,
         "lock_holder_pids": lock.get("holder_pids"),
+        "research_checks": checks,
+        "research_goldens": goldens,
     }))
 
 
