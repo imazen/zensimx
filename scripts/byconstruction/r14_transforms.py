@@ -29,11 +29,11 @@ def args_for(arm,dest,seed=0):
         'pipal,live-md,cid-iq,cid-oa,irccyn-ivc,colourlab-rating-variability-2022','--mos-share','36.035']
 
 
-def pack(arm):
+def pack(arm,continuation_name='continuation'):
     from v2_production_pack import pack_production
-    cell=O/f'fits/{arm}-s0';dest=cell/'continuation/pack_e059'
+    cell=O/f'fits/{arm}-s0';continuation=cell/continuation_name;dest=continuation/'pack_e059'
     (dest/'refit').mkdir(parents=True,exist_ok=False)
-    row=pack_production(cell/'continuation/ckpt/ckpt_epoch059.bin',dest,
+    row=pack_production(continuation/'ckpt/ckpt_epoch059.bin',dest,
         owner.R/'wide/main/real/cid22_fit.parquet',e33_output_stage=True,no_prune=True)
     bake=Path(row['packed_model'])
     cert=json.loads(subprocess.check_output([str(O/'bin/bake_dial_refit'),'certify-monotone','--bake',str(bake)]))
@@ -44,7 +44,8 @@ def pack(arm):
     owner.write(cell/'PACK.json',row)
 
 
-def fit(arm):
+def fit(arm,trainer_dir=None,continuation_retry=None):
+    driver_sha256=owner.sha(__file__)
     pins=json.loads((O/'SOURCE_PINS.json').read_text())
     screen=json.loads((O/'screen/SUMMARY.json').read_text())
     proof=json.loads((O/'native-noop/PROOF.json').read_text())
@@ -63,19 +64,69 @@ def fit(arm):
             raise ValueError(f'fit owner changed since native freeze: {source}')
     cell=O/f'fits/{arm}-s0';cell.mkdir(parents=True,exist_ok=True)
     if (cell/'FIT.json').exists():raise ValueError('fit already frozen; preserve it')
-    owner.job(f'{arm}-s0-base',args_for(arm,cell/'base')+['--pack-production','--e33-output-stage'])
-    owner.job(f'{arm}-s0-continuation',args_for(arm,cell/'continuation')+[
+    native=dict(path=str(O/'bin/zensim_mlp_train'),sha256=pins['binary_sha256']['zensim_mlp_train'],source_commit=pins['source_commit'])
+    active=O/'ACTIVE_TRAINER.json'
+    if trainer_dir is None and active.exists():
+        selected=json.loads(active.read_text())
+        trainer_dir=Path(selected['trainer_dir'])
+        if (selected['schema']!='r14-selected-caller-loader-v1'
+                or owner.sha(trainer_dir/'TRAINER_PINS.json')!=selected['trainer_pins_sha256']):
+            raise ValueError('active trainer selection differs')
+    prefix=[]
+    if trainer_dir:
+        trainer_dir=trainer_dir.resolve()
+        replacement=json.loads((trainer_dir/'TRAINER_PINS.json').read_text())
+        if (replacement['registration']!='5b5a013482db4944042883995ad6892f92244c69'
+                or replacement['serving_pins_sha256']!=owner.sha(O/'SOURCE_PINS.json')
+                or owner.sha(trainer_dir/'zensim_mlp_train')!=replacement['trainer_sha256']):
+            raise ValueError('replacement trainer identity differs')
+        native=dict(path=str(trainer_dir/'zensim_mlp_train'),sha256=replacement['trainer_sha256'],source_commit=replacement['source_commit'])
+        prefix=['env',f'REV4_V2_BIN_DIR={trainer_dir}']
+    labels={stage:f'{arm}-s0-{stage}' for stage in ('base','continuation','pack')}
+    continuation_name='continuation'
+    failed_attempts=[]
+    if continuation_retry:
+        if continuation_retry!='r2' or trainer_dir is None:
+            raise ValueError('only the documented pre-optimizer continuation repair is admitted')
+        old=json.loads((O/'logs'/f'{arm}-s0-continuation.receipt.json').read_text())
+        oldlog=cell/'continuation/train.log'
+        import re
+        if (old['rc']==0 or re.search(r'epoch=\d+',oldlog.read_text())
+                or list((cell/'continuation/ckpt').glob('ckpt_epoch*.bin'))
+                or 'null feature value' not in oldlog.read_text()):
+            raise ValueError('repair requires the retained unused-null failure before any optimizer step')
+        failed_attempts.append(dict(label=f'{arm}-s0-continuation',rc=old['rc'],
+            receipt_sha256=owner.sha(O/'logs'/f'{arm}-s0-continuation.receipt.json'),
+            log_sha256=owner.sha(oldlog),optimizer_steps=0))
+        labels['continuation']+=f'-{continuation_retry}'
+        continuation_name+=f'-{continuation_retry}'
+    base_done=(O/'logs'/f'{arm}-s0-base.receipt.json').exists()
+    base_native_path=cell/'BASE_NATIVE.json'
+    if base_native_path.exists():
+        base_native=json.loads(base_native_path.read_text())
+    else:
+        base_native=native
+        if base_done:
+            previous=json.loads((O/'logs'/f'{arm}-s0-base.receipt.json').read_text())
+            if previous['argv'][0]=='env':raise ValueError('missing prior overridden base trainer identity')
+            base_native=dict(path=str(O/'bin/zensim_mlp_train'),sha256=pins['binary_sha256']['zensim_mlp_train'],source_commit=pins['source_commit'])
+        owner.write(base_native_path,base_native)
+    if owner.sha(base_native['path'])!=base_native['sha256']:raise ValueError('base trainer identity changed')
+    owner.job(labels['base'],prefix+args_for(arm,cell/'base')+['--pack-production','--e33-output-stage'])
+    owner.job(labels['continuation'],prefix+args_for(arm,cell/continuation_name)+[
         '--init-from',cell/'base/refit/last.bin','--fine-tune-epochs',60,'--fine-tune-lr','0.00001',
         '--aic-public-train','/mnt/v/output/zensim/aic-finetune-20261026/folds-rev7/aic_full_fit.parquet',
         '--aic-weight',256,'--diagnostic-population','mixed-aic256-xref'])
-    owner.job(f'{arm}-s0-pack',[sys.executable,'-B',__file__,'pack','--arm',arm])
+    owner.job(labels['pack'],[sys.executable,'-B',__file__,'pack','--arm',arm,'--continuation-name',continuation_name])
     row=json.loads((cell/'PACK.json').read_text());times=[]
     for stage in ('base','continuation','pack'):
-        raw=(O/'logs'/f'{arm}-s0-{stage}.time.txt').read_text()
+        raw=(O/'logs'/f'{labels[stage]}.time.txt').read_text()
         elapsed=next(v.split(': ',1)[1].strip() for v in raw.splitlines() if 'Elapsed (wall clock)' in v)
         parts=[float(v) for v in elapsed.split(':')]
-        times.append(dict(stage=stage,seconds=sum(v*60**i for i,v in enumerate(reversed(parts)))))
-    row.update(arm=arm,seed=0,wall_seconds=sum(v['seconds'] for v in times),stage_times=times,finished=owner.now())
+        times.append(dict(stage=stage,label=labels[stage],seconds=sum(v*60**i for i,v in enumerate(reversed(parts)))))
+    row.update(arm=arm,seed=0,wall_seconds=sum(v['seconds'] for v in times),stage_times=times,
+        native_stages=dict(base=base_native,continuation=native),driver_sha256=driver_sha256,
+        failed_attempts=failed_attempts,continuation_name=continuation_name,finished=owner.now())
     owner.write(cell/'FIT.json',row)
     print('PACKED '+json.dumps(dict(arm=arm,wall_seconds=row['wall_seconds'],capacity=row['capacity'])),flush=True)
 
@@ -182,8 +233,9 @@ def fit_progress(destination):
                or t['derivative_at_zero']<=0 for t in transforms):
             raise ValueError('packed transform zero-slope contract differs')
         resources={}
+        stage_labels={v['stage']:v.get('label',f'{arm}-s0-{v["stage"]}') for v in fit['stage_times']}
         for stage in ('base','continuation','pack'):
-            lines=[v for v in (O/'logs'/f'{arm}-s0-{stage}.log').read_text().splitlines()
+            lines=[v for v in (O/'logs'/f'{stage_labels[stage]}.log').read_text().splitlines()
                    if v.startswith('run-heavy: done')]
             if len(lines)!=1:raise ValueError('unique complete resource receipt required')
             resources[stage]=lines[0]
@@ -192,7 +244,8 @@ def fit_progress(destination):
             wall_seconds_excluding_lock_waits=fit['wall_seconds'],stage_times=fit['stage_times'],
             capacity={k:fit['capacity'][k] for k in ('dead','residual','live')},
             certified=True,certified_max_pairs=fit['certificate']['max_pairs'],
-            token_counts=tokens,resource_receipts=resources,finished=fit['finished']))
+            token_counts=tokens,resource_receipts=resources,native_stages=fit.get('native_stages'),
+            failed_attempts=fit.get('failed_attempts',[]),finished=fit['finished']))
     owner.write(destination,dict(registration='5b5a013482db4944042883995ad6892f92244c69',
         trainer_source_commit=pins['source_commit'],trainer_sha256=pins['binary_sha256']['zensim_mlp_train'],
         screen_summary_sha256=owner.sha(O/'screen/SUMMARY.json'),models=rows,pending=pending,
@@ -206,12 +259,16 @@ def main():
     ap.add_argument('--arm',choices=ARMS)
     ap.add_argument('--label')
     ap.add_argument('--out',type=Path)
+    ap.add_argument('--trainer-dir',type=Path)
+    ap.add_argument('--continuation-retry',choices=('r2',))
+    ap.add_argument('--continuation-name',default='continuation',choices=('continuation','continuation-r2'))
     a,argv=ap.parse_known_args()
     if argv and a.command!='job':ap.error('unexpected arguments')
     for p in (O/'logs',owner.SCRATCH):p.mkdir(parents=True,exist_ok=True)
     if a.command in ('fit','pack'):
         if not a.arm:ap.error('--arm required')
-        globals()[a.command](a.arm)
+        if a.command=='fit':fit(a.arm,a.trainer_dir,a.continuation_retry)
+        else:pack(a.arm,a.continuation_name)
     elif a.command=='development':
         owner.job('development',[sys.executable,'-B',__file__,'development-worker'])
     elif a.command=='job':

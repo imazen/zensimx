@@ -1432,11 +1432,8 @@ fn parse_pwrc_band_weights(s: &str) -> Result<Vec<f64>, String> {
 }
 
 fn compact_subset_wanted(args: &Args, want_gpu: bool) -> bool {
-    args.feature_transform.is_empty()
-        && args.auto_transforms.is_none()
-        // The checkpoint table is restored after loading. R14 continuations
-        // need dense rows for the transform pass; lazy products carry no table.
-        && !(args.init_from.is_some() && args.r14_transforms_registration.is_some())
+    (args.r14_transforms_registration.as_deref() == Some(mlp_train::transforms::REGISTRATION)
+        || (args.feature_transform.is_empty() && args.auto_transforms.is_none()))
         && args.tv_pairs_file.is_none()
         && !want_gpu
         && !args.pool_head
@@ -4117,6 +4114,19 @@ fn main() {
         std::process::exit(2);
     }
 
+    // R14 reads only its declared raw operands, like A. Materialize their
+    // expanded callers before restoring/applying transforms; unused nullable
+    // columns never enter the loader, while required nulls still fail there.
+    if args.r14_transforms_registration.is_some() {
+        for g in &mut loaded {
+            if let Some(c) = g.compact.take() {
+                g.feature_rows = c
+                    .into_dense_for_transforms()
+                    .expect("R14 caller materialization");
+            }
+        }
+    }
+
     if let Some(path) = &args.init_from {
         let bytes = std::fs::read(path).expect("initial checkpoint bytes");
         let model = zenpredict::Model::from_bytes(&bytes).expect("initial checkpoint model");
@@ -6431,10 +6441,116 @@ mod capability_preflight_tests {
         assert!(compact_subset_wanted(&a, false)); // historical untransformed A
         a.r14_transforms_registration = Some(mlp_train::transforms::REGISTRATION.into());
         assert!(a.feature_transform.is_empty() && a.auto_transforms.is_none());
-        assert!(!compact_subset_wanted(&a, false)); // table is not parsed yet
+        assert!(compact_subset_wanted(&a, false)); // subset is materialized before the transform pass
         a.init_from = None;
         a.auto_transforms = Some("screen.tsv".into());
-        assert!(!compact_subset_wanted(&a, false));
+        assert!(compact_subset_wanted(&a, false));
+    }
+
+    #[test]
+    fn r14_materialized_callers_match_f32_products_then_transforms_on_256_rows() {
+        use mlp_train::{ColumnSource, CompactRows, DerivedColumns};
+        let raw: Vec<f32> = (0..256)
+            .flat_map(|i| [i as f32 / 31., (i % 17) as f32 / 17.])
+            .collect();
+        let c = CompactRows {
+            data: raw.clone(),
+            n_rows: 256,
+            n_features: 4,
+            kept: vec![0, 1],
+            derived: Some(DerivedColumns {
+                kept: vec![0, 3],
+                sources: vec![ColumnSource::Stored(0), ColumnSource::Product(0, 1)],
+            }),
+        };
+        let mut dense = c.into_dense_for_transforms().unwrap();
+        for (i, row) in dense.chunks_exact_mut(4).enumerate() {
+            assert_eq!(row[0], f64::from(raw[2 * i]));
+            assert_eq!(row[3], f64::from(raw[2 * i] * raw[2 * i + 1]));
+            row[0] = f64::from(
+                zenpredict::FeatureTransform::SoftSign.apply_with_params(row[0] as f32, &[0.25]),
+            );
+            row[3] = f64::from(
+                zenpredict::FeatureTransform::SoftClip
+                    .apply_with_params(row[3] as f32, &[0.5, 0.5]),
+            );
+            let expected = [
+                zenpredict::FeatureTransform::SoftSign.apply_with_params(raw[2 * i], &[0.25]),
+                0.,
+                0.,
+                zenpredict::FeatureTransform::SoftClip
+                    .apply_with_params(raw[2 * i] * raw[2 * i + 1], &[0.5, 0.5]),
+            ];
+            assert_eq!(
+                row.iter()
+                    .map(|v| (*v as f32).to_bits())
+                    .collect::<Vec<_>>(),
+                expected.map(f32::to_bits)
+            );
+        }
+    }
+
+    #[test]
+    fn r14_subset_load_ignores_only_undeclared_nulls_and_rejects_required_nulls() {
+        use arrow::{
+            array::{Float32Array, Float64Array},
+            datatypes::{DataType, Field, Schema},
+            record_batch::RecordBatch,
+        };
+        use parquet::arrow::ArrowWriter;
+        use std::sync::Arc;
+        let path =
+            std::env::temp_dir().join(format!("r14-subset-nulls-{}.parquet", std::process::id()));
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("human_score", DataType::Float64, false),
+            Field::new("f0", DataType::Float32, false),
+            Field::new("f1", DataType::Float32, true),
+        ]));
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                Arc::new(Float64Array::from(vec![1., 2.])),
+                Arc::new(Float32Array::from(vec![0.1, 0.2])),
+                Arc::new(Float32Array::from(vec![None::<f32>; 2])),
+            ],
+        )
+        .unwrap();
+        let mut writer =
+            ArrowWriter::try_new(std::fs::File::create(&path).unwrap(), schema, None).unwrap();
+        writer.write(&batch).unwrap();
+        writer.close().unwrap();
+        let load = zensim_validate::parquet_loader::load_parquet_flat_f32(
+            &path,
+            "invented",
+            "human_score",
+            1.,
+            &[0],
+            2,
+        )
+        .unwrap()
+        .unwrap();
+        let dense = mlp_train::CompactRows {
+            data: load.data,
+            n_rows: 2,
+            n_features: 2,
+            kept: load.kept,
+            derived: None,
+        }
+        .into_dense_for_transforms()
+        .unwrap();
+        assert_eq!(dense, vec![f64::from(0.1_f32), 0., f64::from(0.2_f32), 0.]);
+        assert!(
+            zensim_validate::parquet_loader::load_parquet_flat_f32(
+                &path,
+                "invented",
+                "human_score",
+                1.,
+                &[1],
+                2
+            )
+            .is_err()
+        );
+        std::fs::remove_file(path).unwrap();
     }
 
     #[test]

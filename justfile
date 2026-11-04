@@ -4375,6 +4375,12 @@ r14-transform-build:
 r14-transform-fit arm:
     python3 -B scripts/byconstruction/r14_transforms.py fit --arm {{arm}}
 
+r14-trainer-build:
+    python3 -B scripts/byconstruction/r14_transforms.py job --label selected-caller-trainer-build -- bash scripts/byconstruction/r14_trainer_build.sh
+
+r14-transform-retry-continuation arm:
+    python3 -B scripts/byconstruction/r14_transforms.py fit --arm {{arm}} --continuation-retry r2
+
 r14-transform-status:
     python3 -B scripts/byconstruction/r14_transforms_status.py
 

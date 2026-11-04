@@ -2,11 +2,13 @@
 
 ## Known Bugs — R14 checkpoint transform preprocessing (2026-11-04)
 
-Fixed before the first R14 fit: checkpoint transforms are restored after row
-loading. The compact lazy loader carries raw products without transforms, so
-registered R14 continuations must use dense loading and the normal transform
-pass before scaling. Historical untransformed checkpoint loading is unchanged.
-The native CLI regression check covers the pre-restore loader decision.
+Checkpoint transforms are restored after row loading. R14 now loads the
+declared raw subset and materializes its expanded caller columns before the
+normal transform pass. Direct dense loading encountered unused nullable
+columns in the continuation; lazy raw rows would bypass transforms. Required
+null columns still fail the existing subset loader. Native fixtures cover
+nullable undeclared columns and exact products-then-transforms materialization.
+Historical untransformed checkpoint loading is unchanged.
 
 **Repository split (2026-10-28).** This checkout is **zensimx**, the research repository (`imazen/zensimx`, at `~/work/zen/zensimx`; renamed from imazen/zensim). The published crate is developed in the new `imazen/zensim` (at `~/work/zen/zensim`), which continues from 0.2.7. Here the `zensim` and `zensim-regress` packages are `publish = false`. Record: [docs/REPO_SPLIT_PLAN_2026-10-28.md](docs/REPO_SPLIT_PLAN_2026-10-28.md).
 

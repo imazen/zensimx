@@ -2214,6 +2214,39 @@ pub struct DerivedColumns {
 }
 
 impl CompactRows {
+    /// Materialize model-visible columns for preprocessing. Undeclared
+    /// columns remain zero; lazy products use the same f32 expansion as the
+    /// compact trainer. No additional parquet columns are read.
+    pub fn into_dense_for_transforms(self) -> Result<Vec<f64>, String> {
+        let total = self
+            .n_rows
+            .checked_mul(self.n_features)
+            .ok_or("dense transform shape overflow")?;
+        if self.data.len()
+            != self
+                .n_rows
+                .checked_mul(self.kept.len())
+                .ok_or("stored transform shape overflow")?
+            || self
+                .expanded_kept()
+                .iter()
+                .any(|&c| c as usize >= self.n_features)
+        {
+            return Err("compact transform shape differs".into());
+        }
+        let mut dense = Vec::new();
+        dense
+            .try_reserve_exact(total)
+            .map_err(|e| format!("dense transform allocation: {e}"))?;
+        dense.resize(total, 0.);
+        for (r, row) in self.data.chunks_exact(self.kept.len().max(1)).enumerate() {
+            self.for_each_expanded(row, |v, c| {
+                dense[r * self.n_features + c as usize] = f64::from(v)
+            });
+        }
+        Ok(dense)
+    }
+
     /// The model-visible column ids in read order: `derived.kept` when a lazy
     /// extension is active, else `kept`.
     pub fn expanded_kept(&self) -> &[u32] {

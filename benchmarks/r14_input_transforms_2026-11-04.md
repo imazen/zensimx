@@ -71,10 +71,21 @@ Before the first fit, a continuation-loader audit found that checkpoint
 transforms are restored after loading, while lazy compact rows carry raw
 products. R14 continuations now select dense rows so the normal transform pass
 runs before scaling. Untransformed A keeps its original loader selection.
-The native CLI regression and preflight tests, formatting check and targeted
+The initial native CLI regression and preflight tests, formatting check and targeted
 clippy pass on ARM in 35 seconds (peak RSS 1.17 GiB, minimum available memory
 26,108 MiB). Parameter-count checks for the newly admitted CLI kinds are scoped
 to R14; historical non-R14 argument admission is preserved.
+
+The first T1a base fit completed all 120 epochs, but its continuation failed
+before any optimizer step because direct dense loading encountered an unused
+nullable column. The follow-up loads A's declared raw subset through the
+existing compact reader, then materializes the model-visible callers before
+the transform pass. Required-column nulls still fail; no data or expectation
+was relaxed. A 256-row products/transform fixture is exact-bit, and a nullable
+parquet fixture checks both the allowed and refused cases. The ARM sequence
+passes in 69 seconds (peak RSS 1.18 GiB, minimum available 26,622 MiB).
+The completed base checkpoint and failed continuation remain immutable; the
+retry uses a separate directory and records native identities per stage.
 
 The untouched ARM strict-library-clippy baseline reports eight unused-item
 warnings as errors; this baseline receipt is retained without suppressing them.
@@ -180,7 +191,8 @@ release binding. The final combined sequence takes 74 seconds (peak RSS
 1.39 GiB, minimum available 26,157 MiB). The all-targets compile check also
 passes in 26 seconds (peak RSS 0.56 GiB, minimum available 26,460 MiB).
 T2's scientific fit is still unreleased pending the registered T1 comparison.
-T1's running binary and all serving/read binaries remain pinned to `912609aa`.
+All serving/read binaries remain pinned to `912609aa`. Trainer successors
+are pinned separately, including each fit stage's native identity.
 
 ## Results
 
