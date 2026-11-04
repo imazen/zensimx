@@ -90,6 +90,23 @@ class ReportAdmission(unittest.TestCase):
         with self.assertRaises(AssertionError):
             report.summarize(self.root)
 
+    def test_command_startup_requires_single_calls(self):
+        for threads in (1, 16):
+            run = {"unreliable": False, "comparisons": [{
+                "group_name": "margarine/command-help-startup",
+                "benchmarks": [{"name": "margarine_help"}],
+                "samples": [{"gate_clean": True, "iterations": 1,
+                             "execution_order": [0], "elapsed_ns": [1000000 + i]}
+                            for i in range(64)]}]}
+            path = self.root / f"startup-{threads}t.json"
+            path.write_text(json.dumps(run))
+            path.with_suffix(".log").write_text("invented startup fixture\n")
+        self.assertEqual(report.command_startup(self.root)[0]["calls"], 32)
+        run["comparisons"][0]["samples"][0]["iterations"] = 2
+        path.write_text(json.dumps(run))
+        with self.assertRaises(AssertionError):
+            report.command_startup(self.root)
+
 
 if __name__ == "__main__":
     unittest.main()

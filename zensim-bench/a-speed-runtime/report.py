@@ -12,6 +12,10 @@ ARMS = ("zensim_a", "fast_ssim2", "margarine")
 SIZES = (64, 256, 1024, 4096)
 
 
+def size_label(size):
+    return f"{size}²" if size != 4096 else "large (12 MP class)"
+
+
 def quantile(values, p):
     values = sorted(values)
     position = (len(values) - 1) * p
@@ -28,6 +32,29 @@ def fit(points):
     residual = sum((y - alpha - beta * x) ** 2 for x, y in points)
     total = sum((y - my) ** 2 for y in ys)
     return {"alpha_ms": alpha, "beta_ms_per_MP": beta * 1e6, "r_squared": 1 - residual / total}
+
+
+def command_startup(root):
+    rows = []
+    for threads in (1, 16):
+        path = root / f"startup-{threads}t.json"
+        log = path.with_suffix(".log").read_text()
+        assert not re.findall(r'foreign pid=\d+ name="(cc1plus|cc1|rustc|cargo|cmake|ninja|zensim_mlp_trai)"', log)
+        run = json.loads(path.read_text())
+        assert not run["unreliable"]
+        assert len(run["comparisons"]) == 1
+        group = run["comparisons"][0]
+        assert group["group_name"] == "margarine/command-help-startup"
+        assert [b["name"] for b in group["benchmarks"]] == ["margarine_help"]
+        assert all(s["iterations"] == 1 for s in group["samples"])
+        clean = [s for s in group["samples"] if s["gate_clean"] is True][:32]
+        assert len(clean) == 32
+        assert all(s["execution_order"] == [0] for s in clean)
+        values = [s["elapsed_ns"][0] / 1e6 for s in clean]
+        assert all(math.isfinite(v) and v > 0 for v in values)
+        rows.append({"host": "i270", "threads_environment": threads, "calls": 32,
+                     "p50_ms": quantile(values, .5), "p95_ms": quantile(values, .95)})
+    return rows
 
 
 def summarize(root):
@@ -136,13 +163,27 @@ def render(root, result):
              "|---|---:|---|---:|---:|---:|---:|---:|"]
     for row in result["rows"]:
         vals = [f'{row[a]["p50_ms"]:.4f}/{row[a]["p95_ms"]:.4f}' for a in ARMS]
-        lines.append(f'| i270 | {row["threads"]} | {row["size"]} class | '+" | ".join(vals)+f' | {row["a_over_fast"]:.3f} | {row["a_over_margarine"]:.3f} |')
+        lines.append(f'| i270 | {row["threads"]} | {size_label(row["size"])} | '+" | ".join(vals)+f' | {row["a_over_fast"]:.3f} | {row["a_over_margarine"]:.3f} |')
+    conclusions = []
+    for threads in (1, 16):
+        subset = [r for r in result["rows"] if r["threads"] == threads]
+        for peer, label in (("fast_ssim2", "fast-ssim2"), ("margarine", "margarine")):
+            faster = [size_label(r["size"]) for r in subset if r["zensim_a"]["p50_ms"] < r[peer]["p50_ms"]]
+            slower = [size_label(r["size"]) for r in subset if r["zensim_a"]["p50_ms"] > r[peer]["p50_ms"]]
+            conclusions.append(f'On i270 at {threads} thread{"s" if threads != 1 else ""}, A has lower p50 than {label} at {", ".join(faster) or "no sizes"}'
+                               + (f' and higher p50 at {", ".join(slower)}.' if slower else '.'))
+    for threads in (1, 16):
+        subset = [r for r in result["rows"] if r["threads"] == threads]
+        first, last = subset[0], subset[-1]
+        conclusions.append(f'At {threads} thread{"s" if threads != 1 else ""}, A/fast changes from {first["a_over_fast"]:.3f} at 64² to {last["a_over_fast"]:.3f} at large, '
+                           f'and A/margarine from {first["a_over_margarine"]:.3f} to {last["a_over_margarine"]:.3f}.')
+    lines += ["", " ".join(conclusions)]
     lines += ["", "Ratios below one favor A. The large-cell actual pixel count ranges from "
               f'{result["rows"][3]["min_pixels"]:,} to {result["rows"][3]["max_pixels"]:,}; '
               f'mean {result["rows"][3]["mean_pixels"]:,.1f}.', "",
               "| Host | Size | A 16-thread speedup | fast-ssim2 speedup | margarine speedup |", "|---|---|---:|---:|---:|"]
     for row in result["rows"][:4]:
-        lines.append(f'| i270 | {row["size"]} class | '+" | ".join(f'{row[a]["speedup_16t"]:.3f}×' for a in ARMS)+" |")
+        lines.append(f'| i270 | {size_label(row["size"])} | '+" | ".join(f'{row[a]["speedup_16t"]:.3f}×' for a in ARMS)+" |")
     lines += ["", "OLS fits use the 80 per-image medians against actual pixels, separately for each arm/thread count: "
               "`time_ms = alpha_ms + beta_ms_per_MP * pixels / 1,000,000`. Intercepts are unconstrained regression terms, "
               "not measured process-start costs. Content changes at the largest size, so these are descriptive fits rather than causal scaling laws.", "",
@@ -154,14 +195,29 @@ def render(root, result):
               "run-heavy's rounded total-process line is retained below.", "",
               "| Host | Threads | Size | A peak KiB | fast-ssim2 peak KiB | margarine peak KiB |", "|---|---:|---|---:|---:|---:|"]
     for row in result["rows"]:
-        lines.append(f'| i270 | {row["threads"]} | {row["size"]} class | '+" | ".join(str(row[a]["rss_kib"]) for a in ARMS)+" |")
+        lines.append(f'| i270 | {row["threads"]} | {size_label(row["size"])} | '+" | ".join(str(row[a]["rss_kib"]) for a in ARMS)+" |")
     lines += ["", "```text"]
     for row in result["rows"]:
         for arm in ARMS:
             lines.append(f'i270 {row["threads"]}t {row["size"]} {arm}: {row[arm]["run_heavy"]}')
-    lines += ["```", "", "Source/build identities and exact reproduction commands are recorded in the adjacent metadata file. "
-              "Raw outputs, fixture bytes and hashes are retained outside git in the adjacent artifact pointer.", "",
-              "Canonical large-cell source bytes (paths relative to `imazen-26-png-v3/`):", "",
+    mismatches = sum(len(d["printed_score_mismatches"]) for d in result["printed_score_thread_diagnostics"])
+    lines += ["```", "", f"The isolated RSS calls also supply 240 per-pair, per-arm comparisons of printed scores between thread counts; {mismatches} differ. "
+              "This diagnostic compares printed values, not a separate numerical qualification study.", "",
+              "Source/build identities and exact reproduction commands are recorded in the "
+              "[metadata](a_speed_vs_fastssim2_margarine_2026-11-04.meta.md). "
+              "Raw outputs, fixture bytes and hashes are retained outside git in the "
+              "[artifact pointer](a_speed_vs_fastssim2_margarine_2026-11-04.artifacts.md).", "",
+              ]
+    if "command_startup" in result:
+        lines += ["The original margarine CLI is also built unchanged against the frozen dependency graph. "
+                  "Separate zenbench measurements time a fresh `margarine --help` process, including spawn, executable loading, argument handling and exit. "
+                  "This no-input baseline does not initialize image decoding or the scoring Rayon pool, and is not subtracted from resident-pixel timings. "
+                  "It does not measure end-to-end CLI scoring latency. Warmup is 100 ms; the first 32 clean single-call rounds are retained.", "",
+                  "| Host | RAYON_NUM_THREADS environment | Command startup p50/p95 ms |", "|---|---:|---:|"]
+        for row in result["command_startup"]:
+            lines.append(f'| i270 | {row["threads_environment"]} | {row["p50_ms"]:.4f}/{row["p95_ms"]:.4f} |')
+        lines.append("")
+    lines += ["Canonical large-cell source bytes (paths relative to `imazen-26-png-v3/`):", "",
               "| File | SHA-256 |", "|---|---|"]
     for row in json.loads((root / "source-provenance.json").read_text()):
         if "/png-v3/" in row["source"]:
@@ -174,8 +230,11 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("root", type=Path)
     parser.add_argument("output", type=Path)
+    parser.add_argument("--command-startup", action="store_true", help="require both separate command-startup runs")
     args = parser.parse_args()
     result = summarize(args.root)
+    if args.command_startup:
+        result["command_startup"] = command_startup(args.root)
     args.output.write_text(render(args.root, result))
     summary = args.root / "SUMMARY.json"
     summary.write_text(json.dumps(result, indent=2) + "\n")

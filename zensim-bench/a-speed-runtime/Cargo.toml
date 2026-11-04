@@ -50,6 +50,10 @@ zenjpeg = { git = "https://github.com/imazen/zenjpeg", rev = "4933461f2b6d760b7b
 name = "a-speed-prepare"
 path = "prepare.rs"
 
+[[bin]]
+name = "a-speed-cli-startup"
+path = "cli_startup.rs"
+
 [[bench]]
 name = "a_speed_peers"
 path = "../benches/a_speed_peers/instrument.rs"

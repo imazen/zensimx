@@ -4093,7 +4093,7 @@ a-speed-collect root binary cpus:
     env BENCH_CPUS={{quote(cpus)}} bash zensim-bench/a-speed-runtime/run.sh {{quote(root)}} {{quote(binary)}}
 
 a-speed-report root output:
-    python3 -B zensim-bench/a-speed-runtime/report.py {{quote(root)}} {{quote(output)}}
+    python3 -B zensim-bench/a-speed-runtime/report.py {{quote(root)}} {{quote(output)}} --command-startup
 
 # R12 registered linear-head fits; the shared lock serializes resource-heavy work.
 r12-linear-fits:
@@ -4137,6 +4137,16 @@ a-speed-report-check:
 
 a-speed-progress host root:
     ssh {{quote(host)}} python3 -B {{quote(root + "/harness/a-speed-runtime/progress.py")}} {{quote(root)}}
+
+# The caller supplies the same resource wrapper, affinity and thread environment.
+a-speed-cli-startup binary output:
+    zensim-bench/a-speed-runtime/target/release/a-speed-cli-startup {{quote(binary)}} {{quote(output)}}
+
+a-speed-artifact-manifest root:
+    python3 -B zensim-bench/a-speed-runtime/artifact_manifest.py {{quote(root)}}
+
+a-speed-command-startup root instrument:
+    bash zensim-bench/a-speed-runtime/startup.sh {{quote(root)}} {{quote(instrument)}}
 
 r12-linear-extra-build:
     flock ~/tmp/heavy.lock ~/work/claudehints/scripts/run-heavy --mem 24G --jobs 8 -- bash scripts/byconstruction/r12_linear_extra_build.sh
