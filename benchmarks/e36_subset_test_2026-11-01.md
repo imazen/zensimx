@@ -1967,3 +1967,52 @@ the adopted F itself (the mix's general continuation, `refit/last.bin` = the che
 continued on the AIC-2026 public_train table alone with the same flags (`--aic-weight 16.0 --diagnostic-population
 aic-only --train-only`, 60 epochs at lr 1e-5, F3codec's build and source), epoch 29 packed the same way; runs under
 `~/tmp/e36test/r11/runs/mixF3codecB-s{0,1,2}`. Both arms get the reads registered above, side by side.
+
+### R11 result (2026-11-04): the codec-only continuations of the mix
+
+Run as registered (`~/tmp/e36test/r11/run_mixF3codec{,B}.sh`, F3codec's build and source, 60 epochs at lr 1e-5, AIC
+public_train ×16, epoch 29 packed with the codec pack program; seeds 0-2 each, 1,146 s and 1,132 s wall for the three
+seeds in parallel). Packed bakes: arm A `66492cab…`, `9649c36b…`, `805a2c10…`; arm B `b82f1a47…`, `8d776f0c…`,
+`514b2cba…` (kept under `/mnt/v/output/zensim/e36-subset-test-2026-11-01/bakes/r11-*`). Reads by `~/tmp/e36test/postR11.sh`:
+E36 scored into `scores-R11`/`inversions-R11`, `primary.py` with F3codec as the control; the EVAL study gained ECodec,
+F3codec and both arms (seeds 0-2) and `readout.py` / `ceval.py` ran over all five models. Tables: `~/tmp/e36test/postR11/`.
+
+**E36 selection-source inversion share** (646,677 consensus pairs on the 40 selection sources, mean of seeds; lower is
+better; paired bootstrap over sources, arm minus F3codec):
+
+| stratum | F3codec | ECodec | F (mix, general) | arm A `mixF3codec` | arm B `mixF3codecB` |
+|---|---:|---:|---:|---:|---:|
+| all | 4.50% | 6.65% | **3.40%** | 4.38% (-0.12 pp [-0.20, -0.04]) | 4.60% (+0.11 pp [+0.04, +0.17]) |
+| codec = jpeg / jxl / svt / webp | 5.20 / 4.39 / 2.69 / 5.35 | 7.08 / 6.29 / 4.59 / 8.21 | 3.73 / 3.00 / 2.14 / 4.42 | 5.01 / 4.13 / 2.70 / 5.32 | 5.26 / 4.41 / 2.86 / 5.51 |
+| content = lineart / mixed / photo / screen | 6.80 / 4.75 / 2.68 / 4.14 | 9.97 / 7.31 / 3.89 / 5.99 | 4.22 / 3.64 / 2.32 / 3.59 | 6.59 / 4.50 / 2.64 / 4.15 | 6.85 / 4.85 / 2.75 / 4.34 |
+| size ≤64 / 80-256 / 320-1024 | 8.74 / 3.40 / 1.66 | 11.90 / 5.36 / 3.02 | 6.78 / 2.55 / 1.09 | 8.58 / 3.31 / 1.54 | 8.86 / 3.53 / 1.70 |
+| quality 0-20 / 22-60 / 62-100 | 5.15 / 4.73 / 3.41 | 6.62 / 6.87 / 6.32 | 4.17 / 3.59 / 2.24 | 5.15 / 4.62 / 3.14 | 5.32 / 4.87 / 3.38 |
+
+Seeds: F 3.39 / 3.36 / 3.44%; arm A 4.31 / 4.41 / 4.42%; arm B 4.57 / 4.60 / 4.64%; F3codec 4.47 / 4.47 / 4.56%.
+
+**Held-out panel** (`readout.py`: median absolute residual around each collection's logistic fit; `ceval.py`: row-weighted
+SROCC and mean error on the 417 compression rows of six collections and the 871 non-codec rows of seven):
+
+| model (seeds 0-2) | held-out 3 median | all-9 median | common-3 SROCC | compression SROCC / error | non-codec SROCC / error |
+|---|---:|---:|---:|---:|---:|
+| F (mix, general) | 8.27-8.40% | 7.94-8.09% | 0.848-0.850 | 0.894-0.895 / 6.95-7.13% | 0.786-0.790 / 8.45-8.66% |
+| arm A `mixF3codec` | 8.63-8.68% | 8.73-8.83% | 0.853-0.854 | **0.897-0.898 / 6.76-6.83%** | 0.787-0.788 / 9.34-9.45% |
+| arm B `mixF3codecB` | 8.70-8.78% | 8.67-8.76% | 0.851-0.852 | 0.895-0.897 / 6.90-6.95% | 0.785-0.787 / 9.24-9.35% |
+| F3codec | 9.10-9.20% | 9.13-9.18% | 0.838-0.843 | 0.893-0.895 / 6.90-7.03% | 0.761-0.768 / 9.86-9.99% |
+| ECodec | 9.24-10.02% | 9.91-10.32% | 0.812-0.819 | 0.888-0.890 / 7.04-7.30% | 0.726-0.738 / 9.98-10.91% |
+
+Per collection on the compression rows (seed 0, arm A against F): IRCCyN/IVC 0.932 against 0.912, NITS-IQA 0.862 against
+0.853, Colourlab 0.810 against 0.801, VCL@FER 0.937 against 0.950, CID:IQ and IQA-ODI level. On the non-codec rows arm A
+loses Colourlab (0.603 against 0.714) and gains CID:OA (0.925 against 0.911), LIVE-MD (0.922 against 0.903) and NITS-IQA
+(0.723 against 0.672).
+
+**Reading.** Against the registered bar, arm A qualifies as a candidate (every seed below F3codec's inversion share;
+compression rows ahead of ECodec on every codec-heavy collection) and arm B does not (above F3codec at every seed). But
+the bar was set against the codec models, and the adopted general F beats both arms and both codec models on the E36
+ladders in every stratum (3.40% against 4.38% and 4.60%; every codec, content, size and quality band) and on held-out
+error (8.3% against 8.7%). What the AIC-only continuation buys is +0.003 row-weighted SROCC and -0.2 points of error on
+the 417 compression rows, mostly IRCCyN/IVC and NITS-IQA, at the cost of a point of inversion share on the encoder
+ladders, a 0.4-point error rise on the held-out collections and Colourlab's non-codec rows. Continuing the adopted F
+itself (arm B) is worse than continuing its base (arm A) on every read. **Recommendation:** no codec variant of the mix
+ships now; F covers codec output better than any codec-only continuation on the ladders the product optimises. If the
+owner wants a codec profile regardless, arm A is the one, and it would still need the R6 label-free gates.
