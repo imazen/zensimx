@@ -1,0 +1,40 @@
+[package]
+name = "zensim-viz-export"
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "AGPL-3.0-or-later OR LicenseRef-Imazen-Commercial"
+
+[workspace]
+
+[[bin]]
+name = "zensim-viz-export"
+path = "export/main.rs"
+
+[features]
+real-bake-tests = []
+
+[dependencies]
+zensim = { path = "../../zensim", features = ["custom-profiles", "feature-regime-v2", "training", "viz-export"] }
+zenpredict = { version = "0.2.0", git = "https://github.com/imazen/zenanalyze", rev = "f0903489300aea240ffae2e3f1359f8f2b9a0ba4" }
+zenpredict-bake = { git = "https://github.com/imazen/zenanalyze", rev = "f0903489300aea240ffae2e3f1359f8f2b9a0ba4" }
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = { version = "1.0.145", features = ["float_roundtrip"] }
+sha2 = "0.11.0"
+parquet = { version = "59.1.0", default-features = false, features = ["arrow", "zstd"] }
+arrow = { version = "59.1.0", default-features = false }
+zenpng = { version = "=0.1.4", default-features = false }
+zenpixels = { version = "=0.2.16", default-features = false }
+enough = "0.4.2"
+rgb = "0.8.52"
+imgref = "1.12.0"
+bytemuck = "1.25.0"
+zenjpeg = { version = "0.8.4", default-features = false, features = ["decoder"] }
+
+zenstats = { package = "zenmetrics-stats", git = "https://github.com/imazen/zenmetrics", rev = "48665c8fb1bb3de5c99d792ae4ed4f3f1e854629", default-features = false }
+
+[profile.release]
+lto = "thin"
+
+[build-dependencies]
+sha2 = "0.11.0"
