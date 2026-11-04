@@ -1960,3 +1960,10 @@ The JPEG XL loop is not read here. **What would make it a candidate:** a codec-s
 F3codec's at every seed and held-out MOS no worse than ECodec's on the codec-heavy collections (LIVE-MD, VCL@FER,
 IRCCyN/IVC, NITS-IQA) within the intervals. Shipping would additionally need the R6 label-free gates (dial contract
 C1-C6, G-STEER, identity at the SIMD permutations) and an owner decision.
+
+**R11 amendment (owner, 2026-11-04: "to be clear this is a continuation of the adopted new F, yes?").** Arm A above is
+F3codec's recipe on F's *base fit* (the relationship ECodec has to E, F3codec to F3). The literal reading is **arm B**:
+the adopted F itself (the mix's general continuation, `refit/last.bin` = the checkpoint after epoch 59, seeds 0-2)
+continued on the AIC-2026 public_train table alone with the same flags (`--aic-weight 16.0 --diagnostic-population
+aic-only --train-only`, 60 epochs at lr 1e-5, F3codec's build and source), epoch 29 packed the same way; runs under
+`~/tmp/e36test/r11/runs/mixF3codecB-s{0,1,2}`. Both arms get the reads registered above, side by side.
