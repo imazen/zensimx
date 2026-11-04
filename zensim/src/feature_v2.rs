@@ -13512,3 +13512,6 @@ fn compute_v2_append_attribution_impl(
 include!("feature_v2_tests.rs");
 
 include!("feature_v2_oracle.rs");
+
+#[cfg(feature = "viz-export")]
+include!("feature_v2_viz.rs");

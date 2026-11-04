@@ -1010,6 +1010,10 @@ fn extract_impl(
 
     let mut scratch = crate::feature_v2::V2Scratch::new();
     let toggles = plan.toggles();
+    #[cfg(feature = "viz-export")]
+    let mut viz_retention =
+        std::env::var_os("ZENSIM_VIZ_MAP_DIR").map(|_| crate::feature_v2::FoldRetention::new());
+
     #[cfg(feature = "training")]
     let extras = crate::feature_v2::FoldWalkExtras {
         compute: Some(plan.compute),
@@ -1019,6 +1023,11 @@ fn extract_impl(
     let extras = crate::feature_v2::FoldWalkExtras {
         compute: Some(plan.compute),
         ..Default::default()
+    };
+    #[cfg(feature = "viz-export")]
+    let extras = crate::feature_v2::FoldWalkExtras {
+        retention: viz_retention.as_mut(),
+        ..extras
     };
     let palette_slots = feature_defs::family_slots(Family::Palette, ns);
     let palette_only =
@@ -1053,6 +1062,16 @@ fn extract_impl(
         .map_err(ResearchError::Compute)?;
         result.into_features()
     };
+
+    #[cfg(feature = "viz-export")]
+    if let Some(retention) = viz_retention.as_ref() {
+        crate::feature_v2::viz_export_maps(
+            retention,
+            &plan.emit,
+            (source.width(), source.height()),
+        )
+        .map_err(|e| ResearchError::Plan(format!("map export: {e}")))?;
+    }
 
     // GATHER into the declared LAYOUT. The walk emits at its own identity
     // width; the layout says which id lives at which position, so a narrower
