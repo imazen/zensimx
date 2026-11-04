@@ -1602,3 +1602,83 @@ existing `confirm` scripts report them. Disclosures: these are further reads of 
 (by metrics, no zensim model); the AIC-4 Haar configs were fitted by their author on AIC data, so their AIC2026
 numbers are in-sample and a Haar-taught zensim leg would carry that fit (which may include the sealed public_test)
 into training. Nothing is adopted on these reads; the teacher question is decided afterwards, on the held-out sets.
+
+### R10 amendment 5 result (2026-11-03): reference metrics on the confirmation sets
+
+Scored as registered: `jnd-ladder-score` (zenmetrics-private `experiments/jnd-ladder` at `040c780f`, built on i265)
+on the pair lists of EVAL (4,678 decoded pairs), CLIC 2021 validation (4,812 questions), MMSPG JPEG XR (186) and CIQA
+(7,902), judge files written by `refmetric_judges.py`, statistics by the same `confirm` scripts, `readout.py`,
+`ceval.py` and the new `refmetric_eval_readout.py` (every MOS collection, with coverage). Driver:
+`e36_exp56/refmetrics_run.sh`. Memory: the Haar pyramids take ~14 GB per pair per thread on IQA-ODI's 8K JPEGs; a
+16-thread run died at its 28G cap and a 6-thread run under 44G pushed dev out of memory machine-wide (other sessions'
+jobs were killed) before the cap fired, so EVAL's IQA-ODI pairs were rescored one pair and one config at a time under
+20G (peak RSS 11.2 GiB). AIC2026 is in the private evaluation
+(`zensim-training/evaluations/aic2026_codec_uniformity_refmetrics_2026-11-03.md`).
+
+**Held-out sets** (the candidates' numbers are the confirmation reads above; metrics on the same rows):
+
+| score | CLIC 2021 validation, agreement [95%] | MMSPG JPEG XR: SROCC / within-reference / error | CIQA, agreement |
+|---|---|---|---|
+| mix on F3's recipe, seeds 0 / 1 / 2 | 0.6417 / 0.6456 / 0.6444 [about ±0.013] | 0.920-0.922 / 0.928-0.931 / 5.47-5.63% | 0.6752-0.6753 |
+| F3 control, seeds 0 / 1 / 2 | 0.6445 / 0.6443 / 0.6398 | 0.920-0.922 / 0.925-0.928 / 5.43-5.47% | 0.6752-0.6753 |
+| SSIMULACRA2 | 0.6261 [0.6122, 0.6404] | 0.934 / 0.942 / 5.19% | 0.6753 |
+| butteraugli 3-norm | 0.6056 [0.5915, 0.6204] | 0.902 / 0.896 / 6.58% | 0.6750 |
+| FSIMc | 0.6374 [0.6241, 0.6515] | 0.929 / 0.912 / 4.69% | 0.6748 |
+| FSIM (luma) | 0.6381 [0.6245, 0.6522] | 0.931 / 0.922 / 4.26% | 0.6748 |
+| HaarPSI | 0.6031 [0.5894, 0.6178] | 0.921 / 0.923 / 5.64% | 0.6757 |
+| HaarXYB-SSIM-deltaL1248 (AIC-4) | 0.6100 [0.5966, 0.6247] | 0.923 / 0.922 / 4.89% | 0.6752 |
+| HaarXYB-SSIM-mask-deltaL1248 (AIC-4) | 0.6303 [0.6163, 0.6449] | 0.926 / 0.926 / 5.10% | 0.6753 |
+
+**EVAL** (`refmetric_eval_readout.py` over the nine MOS collections: error = median absolute residual around the 4PL
+fit over the target's 1-99% span, mean over collections; `ceval.py` compression rows, 417 rows in six collections).
+"Eight" = the collections the mix holds out (all but MDID, which the mix trains on; F3 trains on six of the nine, so
+its eight-collection number is in-sample on five); the three shared sets are IQA-ODI, NITS-IQA and VCL-FER.
+
+| score | eight held-out: error / SROCC | three shared: error / SROCC | compression rows: SROCC / error | MDID SROCC |
+|---|---|---|---|---|
+| mix, seeds 0 / 1 / 2 | 8.18 / 8.32 / 8.28% · 0.861 / 0.858 / 0.858 | 8.27 / 8.39 / 8.40% · 0.850 / 0.848 / 0.849 | 0.8954 / 0.8941 / 0.8940 · 6.95 / 6.99 / 7.13% | 0.927 (trained) |
+| F3, seeds 0 / 1 / 2 | 8.67 / 8.72 / 8.66% · 0.848 / 0.848 / 0.848 | 8.79 / 8.74 / 8.89% · 0.835 / 0.835 / 0.836 | 0.8949 / 0.8926 / 0.8935 · 7.03 / 7.08 / 7.01% | 0.886 (trained) |
+| SSIMULACRA2 | 9.13% · 0.831 | 8.52% · 0.859 | 0.8963 · 6.92% | 0.787 |
+| butteraugli 3-norm | 11.57% · 0.709 | 10.47% · 0.796 | 0.8544 · 8.61% | 0.572 |
+| CVVDP | 9.82% · 0.823 | 9.52% · 0.829 | 0.8763 · 7.07% | 0.829 |
+| FSIMc | 9.97% · 0.830 | 8.84% · 0.864 | 0.9055 · 6.73% | 0.893 |
+| FSIM (luma) | 10.06% · 0.822 | 8.86% · 0.857 | 0.9021 · 6.67% | 0.886 |
+| HaarPSI | 8.92% · 0.843 | 8.99% · 0.828 | 0.8878 · 6.90% | 0.920 |
+| HaarXYB-SSIM-deltaL1248 | 9.66% · 0.805 | 9.63% · 0.822 | 0.8848 · 7.32% | 0.770 |
+| HaarXYB-SSIM-mask-deltaL1248 | 9.38% · 0.810 | 9.19% · 0.829 | 0.8927 · 7.18% | 0.777 |
+
+Per collection (SROCC, seed 0 for the models): NITS-IQA SSIMULACRA2 0.777, FSIMc 0.746, mix 0.734, F3 0.708;
+IQA-ODI FSIMc 0.900, FSIM 0.898, mix 0.867, F3 0.858, SSIMULACRA2 0.854; Colourlab mix 0.735, HaarPSI 0.727, F3
+0.689, FSIMc 0.624, SSIMULACRA2 0.604, HaarXYB-mask 0.558; CID:IQ mix 0.868, F3 0.863, HaarPSI 0.816, SSIMULACRA2
+0.757, FSIMc 0.710; IRCCyN-IVC HaarXYB 0.952, SSIMULACRA2 0.949, F3 0.926, mix 0.919. Full tables:
+`~/tmp/e36test/refmetrics/{eval-refmetrics,eval-ceval,heldout_refmetrics_table}.md` on dev.
+
+**Reading.** No reference metric matches the mix across the sets. CLIC 2021, the registered confirmation set, puts
+the mix (0.644) above every metric: FSIM/FSIMc 0.638, HaarXYB-mask 0.630, SSIMULACRA2 0.626, HaarXYB 0.610,
+butteraugli 0.606, HaarPSI 0.603. On EVAL's eight held-out collections the mix leads by 0.7 points of error and
+0.018 of SROCC over the best metric (HaarPSI); SSIMULACRA2 and FSIMc rank better than the mix on the three shared
+sets (0.859 and 0.864 against 0.850, from NITS-IQA and IQA-ODI) while the mix's residual error there is the lowest.
+On the compression rows FSIMc (0.906) and FSIM (0.902) edge SSIMULACRA2 (0.896), the mix (0.895) and F3 (0.895),
+all within 0.011; on MMSPG every score lies within one interval (SSIMULACRA2 0.934 and FSIM 0.931 against the mix's
+0.921, the mix ahead within reference); CIQA is flat for everything (the quality-setting ceiling, amendment 3).
+**Teacher question (the owner's):** HaarXYB-SSIM-mask-deltaL1248 trails the mix on CLIC (0.630 vs 0.644), on
+EVAL's eight (SROCC 0.810 vs 0.861) and on the compression rows (0.893 vs 0.895), is level on MMSPG, and leads only
+on AIC2026, where its author fitted it (private evaluation; in-sample, and a Haar-taught leg could carry the sealed
+public_test into training). It is not a teacher candidate on this evidence; nothing is adopted.
+
+**Why the CLIC 2021 agreement curve zigzags** (owner question on the methodology doc's chart;
+`e36_exp56/clic21_pair_agreement.py`, `--gallery` output at `/mnt/v/output/zensim/clic21-dip-2026-11-03/`,
+http://dev.lan:3300/zensim/clic21-dip-2026-11-03/ on the LAN). Agreement with the raters by equal-count bin of the
+absolute F3 score difference: 0.482, 0.554, 0.635, 0.674, 0.719, 0.743, **0.643**, 0.705 (601-602 questions each,
+binomial s.e. 0.02). The dip at 20-27 points is in the questions, not the models: the same questions dip for F3 and
+the mix at every seed; on every question with a difference over 8 points SSIMULACRA2, butteraugli, FSIMc and
+HaarXYB-mask order the pair as zensim does, and the organisers' PSNR label does too in 100% of the two top bins; among
+the questions answered by two or more raters agreement is 0.80 at 12-20 points, 0.54 at 20-27 and 0.65 above 27. At
+the other end, where zensim is within 2.4 points of a tie, the raters side against PSNR in 75% of the answers and
+against the four reference metrics' consensus on 254 of the 357 questions where those agree; zensim's near-tie is the
+better answer there, and the mix leans a little toward the metrics' side (agreement 0.434-0.458 in that bin against
+F3's 0.482-0.486, three seeds each). Which content property makes those pairs special is not established (the crops
+are anonymised, so the methods are unknown; a sharper, noisier crop against a smoother one is the natural reading but
+was not verified by eye). The rated reference images in EVAL (CID:OA 7, Colourlab 3; both models score an image
+identical to its reference 100 by construction, the observers rated them 3.2-4.9 of 5) were drawn as coincident
+dots in the doc's scatter chart and looked like a ceiling only the mix hit; they are rings now.

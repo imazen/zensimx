@@ -43,7 +43,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("eval_dir")
     ap.add_argument("pairs")
-    ap.add_argument("--haar")
+    ap.add_argument("--haar", action="append", default=[],
+                    help="jnd-ladder-score output; repeatable (later files fill ids and columns the earlier lack)")
     ap.add_argument("--fsim")
     ap.add_argument("--haarpsi")
     ap.add_argument("--keep-ssim2", action="store_true", help="never write judge_ssim2 / judge_butteraugli")
@@ -63,20 +64,30 @@ def main():
         if missing:
             raise SystemExit(f"judge_pairs.tsv lacks {len(missing)} of the pair list's keys, e.g. {missing[:2]}")
     if a.haar:
-        rows = {r["id"]: r for r in read_tsv(a.haar)}
-        for r in rows.values():
-            if pairs.get(r["id"]) != (r["ref"], r["dist"]):
-                raise SystemExit(f"{a.haar}: row {r['id']} does not match the pair list")
-        cols = [c for c in next(iter(rows.values())) if c.endswith("_jnd")]
-        for c in cols:
+        # Column -> {id: value}, first file wins per (column, id); a later file may carry ids or configs the
+        # earlier lacks (EVAL's 8K IQA-ODI pairs were scored one Haar config at a time).
+        vals = {}
+        for path in a.haar:
+            for r in read_tsv(path):
+                if pairs.get(r["id"]) != (r["ref"], r["dist"]):
+                    raise SystemExit(f"{path}: row {r['id']} does not match the pair list")
+                for c, v in r.items():
+                    if c in ("id", "ref", "dist", "width", "height") or v in ("", "nan"):
+                        continue
+                    vals.setdefault(c, {}).setdefault(r["id"], float(v))
+        for c in [c for c in vals if c.endswith("_jnd")]:
             short = {"HaarXYB-SSIM-deltaL1248_jnd": "haar_ssim", "HaarXYB-SSIM-mask-deltaL1248_jnd": "haar_mask",
                      "HaarXYB-SSIM-deltaL1248-fit_jnd": "haar_ssim_fit",
                      "HaarXYB-SSIM-mask-deltaL1248-fit_jnd": "haar_mask_fit"}.get(c, c.replace("_jnd", "").replace("-", "_"))
-            write_judge(out, short, pairs, {k: -float(r[c]) for k, r in rows.items() if r[c] not in ("", "nan")})
+            write_judge(out, short, pairs, {k: -v for k, v in vals[c].items()})
         if not a.keep_ssim2:
-            write_judge(out, "ssim2", pairs, {k: float(r["ssim2"]) for k, r in rows.items()}, overwrite=False)
+            write_judge(out, "ssim2", pairs, vals.get("ssim2", {}), overwrite=False)
             # positive values; load_scores negates every `butteraugli*` file
-            write_judge(out, "butteraugli", pairs, {k: float(r["ba_p3"]) for k, r in rows.items()}, overwrite=False)
+            write_judge(out, "butteraugli", pairs, vals.get("ba_p3", {}), overwrite=False)
+        # jnd-ladder-score also carries zenmetrics' FSIM / FSIMc / HaarPSI ports (higher = better).
+        for col, short in (("fsimc", "fsimc"), ("fsim_y", "fsim_y"), ("haarpsi", "haarpsi")):
+            if col in vals:
+                write_judge(out, short, pairs, vals[col])
     for opt, names in ((a.fsim, {"fsimc_imazen_v0_1_0": "fsimc", "fsim_imazen_v0_1_0": "fsim_y"}),
                        (a.haarpsi, {"haarpsi_imazen_v0_1_0": "haarpsi"})):
         if not opt:
