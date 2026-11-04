@@ -418,11 +418,15 @@ legacy test still fails with exactly the original 41-value native and
 values match (`activity-qualified/stable-diff/receipt.json`).
 Combined normal build/code-gate receipt:
 `rc=0 687s | peak-RSS 2.22GiB | min-avail 20781MiB | peak-load 8.77`.
-Full-vector pixel replay is in progress; performance is **not yet measured**.
+The full-vector pixel replay passes all 720 returned values and score bits:
+4,678 EVAL pairs, 744 identity cells, 648 NEARID rows, 135 steering bases and
+55,380 repairs, plus all 768 ladder scores. Receipts: `pixel-bits.json`,
+`pixel-features.json`, `eval-bits.json`; driver:
+`rc=0 679s | peak-RSS 0.52GiB | min-avail 24145MiB | peak-load 6.30`.
 
 Main subsequently acquired the parallel-size gate (`bfabf0d50e31`): below
-192² the walk stays serial. A fresh baseline/activity timing pair is being
-built with that same parent on both arms. The earlier moment-ring table
+192² the walk stays serial. A fresh baseline/activity timing pair was built
+with that same parent on both arms. The earlier moment-ring table
 retains its own unchanged before/after binaries and source hashes.
 
 ### Other trial state
@@ -435,3 +439,47 @@ Band interleaving and the first shared-leaf prototype pass strict native
 release clippy/build. A vector-accumulator refinement of the shared-leaf
 prototype still needs compilation and full qualification. No speed claim is
 made for those builds. Panel and era qualification is outstanding.
+
+### Full-width activity-ring rejection
+
+This implementation is **rejected**: three of four required p50 comparisons
+lose. The common-parent timing workers differ only in `blur.rs` and
+`feature_v2_kernels.rs` (the activity module is identical on disk, included
+only by the candidate). Their native source-compatibility receipt is
+`activity-current/GATE_SOURCE_COMPATIBILITY.json`. All six cells admitted
+32 clean paired rounds. Times are medians of twenty per-image percentiles.
+
+| Size | Threads | Before p50 ms | After p50 ms | Before p95 ms | After p95 ms | p50 change |
+|---|---:|---:|---:|---:|---:|---:|
+| 256² | 1 | 1.861314 | 1.89195225 | 1.8761556 | 1.91038685 | +1.646% |
+| 1024² | 1 | 27.27656625 | 27.59267175 | 28.21516105 | 28.7371612 | +1.159% |
+| Large | 1 | 327.72765975 | 330.0050795 | 337.87387945 | 341.870055775 | +0.695% |
+| 256² | 16 | 0.894088 | 0.8674865 | 1.31848935 | 1.2035196 | −2.975% |
+| 1024² | 16 | 7.323532 | 7.18946225 | 8.2222606 | 8.11347905 | −1.831% |
+| Large | 16 | 99.44721675 | 99.52491775 | 107.0192824 | 106.613366425 | +0.078% |
+
+Per-worker `run-heavy` receipts below use
+`seconds / peak-RSS GiB / min-avail MiB / peak-load`; all exits are zero.
+
+| Size / threads | Before receipt | After receipt | Before / after time-v max RSS, KiB |
+|---|---|---|---|
+| 256 / 1 | 8 / 0.02 / 25238 / 1.01 | 8 / 0.02 / 25243 / 1.01 | 24080 / 24708 |
+| 1024 / 1 | 46 / 0.15 / 25151 / 1.13 | 45 / 0.15 / 25118 / 1.13 | 152664 / 152144 |
+| large / 1 | 468 / 1.44 / 22312 / 2.04 | 459 / 1.43 / 22294 / 2.04 | 1511908 / 1503296 |
+| 256 / 16 | 8 / 0.05 / 25590 / 1.74 | 8 / 0.05 / 25590 / 1.74 | 48840 / 49392 |
+| 1024 / 16 | 15 / 0.27 / 25098 / 2.35 | 15 / 0.27 / 25098 / 2.35 | 285808 / 286232 |
+| large / 16 | 152 / 1.90 / 21360 / 11.24 | 149 / 1.88 / 21361 / 11.24 | 1987252 / 1970308 |
+
+Batch: `rc=0 698s | peak-RSS 1.90GiB | min-avail 21370MiB |
+peak-load 11.24`. Directory:
+`$STUDY/activity-current/timing/{256,1024,large}-{1,16}t/`.
+Before worker SHA-256:
+`213659ebc0d7368540fd3f0ed2a31799dfbbbb758ffc2ecdd26b398f311fb35e`;
+after worker:
+`e5dc899b970686ebebf03c9259b4a9d400a125bbd2a3d2bea058af250df7e268`.
+
+The same ranked activity-fusion candidate now has a 128-column row-ring
+prototype in qualification. It preserves the H/V trees, intermediate f32
+rounding and final scalar tails, with the absolute-deviation row's mirrored
+halo prepared before the H tree. Neither its gates nor its speed are claimed
+passed yet. Both full-width rings remain outside main's served path.
