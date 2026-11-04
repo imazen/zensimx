@@ -1689,3 +1689,67 @@ PSNR order those pairs as zensim does, and among the questions answered by two o
 12-20 points, 0.54 at 20-27 and 0.65 above 27. The rated reference images in EVAL (CID:OA 7, Colourlab 3; both models
 score an image identical to its reference 100 by construction, the observers rated them 3.2-4.9 of 5) were drawn as
 coincident dots in the doc's scatter chart and looked like a ceiling only the mix hit; they are rings now.
+
+**Follow-up (2026-11-04; owner: "verify the sharper-crop reading on a few dip pairs, and eval the iqa metrics against
+the non-codec distortions"). Both are further analyses of rows already read; nothing new was exposed.**
+
+*Sharper-crop reading, verified* (`clic21_pair_agreement.py --sharpness`; sharpness = a crop's high-pass energy, luma
+minus a sigma-1.5 Gaussian, over its original's, so 1 = the original's fine detail and below 1 = smoothed; the 686
+questions whose crops differ by under 0.02 are excluded; luma from the library PNGs through PIL, no colour management
+involved). The raters choose the crop with more fine detail on 75% of the 4,126 decidable questions and on 71-78% in
+every band. What changes by band is whether a score's preferred crop is the sharper one: F3's is on 58% of all
+questions, 68% in the band before the top-end dip, 57% in the dip and 46% in its own near-tie band; the mix's on 57%
+overall and **34% in its own near-tie band** (SSIMULACRA2 16%, PSNR 17% there). Where the raters went against the mix
+in that band (314 questions) their crop is the sharper one on 85%; where they agreed, on 64%. Over all questions the
+mix's score difference minus F3's correlates with the sharpness difference at Spearman -0.20 (and +0.01 with the two
+crops' total high-pass energy): relative to F3 the mix moves against the sharper crop of a pair. In the top-end dip
+the lower-scored crop is the sharper one on 43% of the questions, and on 70% of those where the raters chose it. Four
+zoomed near-tie questions (`zoom/` under the gallery: full-resolution 256-pixel crops at the region of largest
+high-pass difference, original | A | B): in three the crop the raters chose visibly keeps dock icons, branch texture or
+a knit pattern that the other crop smooths, and in one of them (`neartie_4`) F3 preferred that crop while the mix
+preferred the smoothed one; the fourth pair differs by 0.02 and cannot be called by eye. Median sharpness ratio 0.89
+over all questions, 0.82 in the near-tie band.
+
+*Non-codec distortions* (`ceval.py --rows noncodec --by-distortion`; 871 EVAL rows in seven collections: CID:IQ blur,
+Poisson noise and the two gamut mappings; Colourlab's nineteen other KADID-style distortions and its rated references;
+CID:OA's optical aberrations and references; IRCCyN-IVC blur; LIVE-MD blur+noise; NITS-IQA D1-D6; VCL-FER white noise
+and blur. MDID, LIVE-MD blur+JPEG and IQA-ODI have a codec in every row and are left out). Row-weighted SROCC / mean
+error, seed 0 for the models (seeds 1-2 within 0.005 and 0.2 points):
+
+| score | non-codec rows: SROCC / error | CID:IQ | Colourlab | CID:OA | IRCCyN blur (20) | LIVE-MD blur+noise | NITS D1-D6 | VCL-FER noise, blur |
+|---|---|---|---|---|---|---|---|---|
+| mix | 0.790 / 8.66% | 0.837 | 0.714 | 0.911 | 0.915 | 0.903 | 0.672 | 0.955 |
+| F3 | 0.767 / 9.28% | 0.832 | 0.664 | 0.905 | 0.915 | 0.885 | 0.643 | 0.947 |
+| HaarPSI | 0.774 / 9.76% | 0.768 | 0.708 | 0.882 | 0.976 | 0.890 | 0.672 | 0.956 |
+| SSIMULACRA2 | 0.759 / 10.59% | 0.698 | 0.575 | 0.847 | 0.915 | 0.921 | 0.748 | 0.960 |
+| CVVDP | 0.755 / 10.76% | 0.744 | 0.579 | 0.912 | 0.915 | 0.891 | 0.699 | 0.950 |
+| FSIMc | 0.745 / 10.79% | 0.657 | 0.596 | 0.889 | 0.976 | 0.896 | 0.712 | 0.938 |
+| HaarXYB-SSIM-mask-deltaL1248 | 0.735 / 10.63% | 0.723 | 0.524 | 0.895 | 0.915 | 0.876 | 0.693 | 0.954 |
+| FSIM (luma) | 0.734 / 11.02% | 0.645 | 0.577 | 0.887 | 0.976 | 0.891 | 0.706 | 0.907 |
+| HaarXYB-SSIM-deltaL1248 | 0.723 / 11.03% | 0.661 | 0.526 | 0.900 | 0.915 | 0.863 | 0.687 | 0.951 |
+| butteraugli 3-norm | 0.661 / 13.07% | 0.652 | 0.316 | 0.577 | 0.794 | 0.840 | 0.749 | 0.950 |
+
+Per distortion type (20 rows or more; SROCC): CID:IQ Gaussian blur CVVDP 0.82, mix 0.81, HaarXYB-mask 0.81, F3 0.79,
+HaarPSI 0.71, FSIMc 0.66, SSIMULACRA2 0.64; SGCK gamut mapping CVVDP 0.94, SSIMULACRA2 0.93, F3 0.91, mix 0.87, FSIMc
+0.86; DeltaE gamut mapping and Poisson noise 0.94-0.97 for everything but butteraugli. CID:OA defocus / spherical
+aberration / vertical astigmatism: mix 0.88 / 0.85 / 0.87, F3 0.87 / 0.83 / 0.86, CVVDP 0.88 / 0.86 / 0.86, FSIMc 0.85
+/ 0.85 / 0.78, SSIMULACRA2 0.79 / 0.82 / 0.67, butteraugli 0.42 / 0.53 / 0.37. NITS-IQA D1-D3 (Gaussian blur, Gaussian
+and uniform noise) 0.89-0.94 for everything; D4 contrast change fails for every score (zensim 0.22, SSIMULACRA2 0.46,
+butteraugli 0.43, the rest 0.39-0.41), which is where zensim loses its pooled NITS number (0.64-0.67 against
+SSIMULACRA2's 0.75); D5 pixelate mosaic butteraugli 0.85, HaarPSI 0.85, FSIMc 0.83, zensim 0.76-0.80; D6 motion blur
+0.61-0.64 for everything. VCL-FER white noise 0.95-0.98 (SSIMULACRA2, CVVDP, HaarPSI 0.97; zensim 0.95-0.96), blur
+0.94-0.96. Colourlab pooled by KADID family: blur (27 rows) CVVDP 0.96, HaarPSI 0.95, SSIMULACRA2 0.94, zensim 0.89,
+FSIMc 0.78; noise (27) zensim 0.92-0.93, the metrics 0.88-0.90; colour (36: colour shift, colour quantization,
+saturation up and down) SSIMULACRA2 0.60, FSIMc 0.59, mix 0.54, F3 0.48, CVVDP 0.38, HaarPSI 0.37;
+brightness/contrast (45) HaarPSI 0.77, FSIMc 0.76, mix 0.74, F3 0.73, SSIMULACRA2 0.72, butteraugli 0.58;
+sharpen/quantize (18) HaarXYB-mask 0.82, CVVDP 0.79, mix 0.73, F3 0.70; geometric (18) 0.47-0.55 for everything.
+
+Reading: on distortions with no codec in them the mix leads every reference metric by 0.016-0.13 of row-weighted SROCC
+and by at least 1.1 points of error (HaarPSI nearest), and its gain over F3 (0.790 against 0.767) comes from
+Colourlab's colour, brightness/contrast and sharpen/quantize families, LIVE-MD blur+noise and NITS, while it gives back
+0.04 on CID:IQ's SGCK gamut mapping. The reference metrics' strengths are specific: CVVDP and HaarPSI on blur,
+SSIMULACRA2 and FSIMc on Colourlab's colour family, SSIMULACRA2 on LIVE-MD blur+noise, butteraugli and HaarPSI on
+pixelation; butteraugli is weak on optical aberrations and colour. Contrast and brightness changes, geometric
+distortions and NITS D4 defeat every score here, zensim included. With the compression rows (FSIMc 0.906, mix 0.895)
+this is the shape of the comparison: the metrics sit at or just above zensim on codec distortions and below it on
+everything else.
