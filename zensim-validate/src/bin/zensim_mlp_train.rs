@@ -4257,11 +4257,13 @@ fn main() {
                     } else {
                         1
                     };
-                    assert_eq!(
-                        parsed_params.len(),
-                        expected,
-                        "--feature-transform {token}:{idx}: wrong parameter count"
-                    );
+                    if args.r14_transforms_registration.is_some() {
+                        assert_eq!(
+                            parsed_params.len(),
+                            expected,
+                            "--feature-transform {token}:{idx}: wrong parameter count"
+                        );
+                    }
                 }
                 zenpredict::FeatureTransform::ClipThenLog1p => {
                     if !parsed_params.is_empty() && parsed_params.len() != 1 {

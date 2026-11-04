@@ -67,6 +67,15 @@ run-heavy peak-RSS1.31GiB, minimum available26745MiB, with no warning in the
 new transform module. R14 identity slots narrow to f32 alongside nonidentity
 slots, matching the compact baseline loader and inference caller arithmetic.
 
+Before the first fit, a continuation-loader audit found that checkpoint
+transforms are restored after loading, while lazy compact rows carry raw
+products. R14 continuations now select dense rows so the normal transform pass
+runs before scaling. Untransformed A keeps its original loader selection.
+The native CLI regression and preflight tests, formatting check and targeted
+clippy pass on ARM in 35 seconds (peak RSS 1.17 GiB, minimum available memory
+26,108 MiB). Parameter-count checks for the newly admitted CLI kinds are scoped
+to R14; historical non-R14 argument admission is preserved.
+
 The untouched ARM strict-library-clippy baseline reports eight unused-item
 warnings as errors; this baseline receipt is retained without suppressing them.
 
