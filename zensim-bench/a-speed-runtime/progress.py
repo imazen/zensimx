@@ -87,9 +87,18 @@ def main():
     actual = hashlib.sha256(binary.read_bytes()).hexdigest()
     assert actual == identity["binary_sha256"], "frozen benchmark binary changed"
     collector_pid = int((root / "collector.pid").read_text())
-    collector = process_snapshot(collector_pid)
-    if collector and not any("run.sh" in arg for arg in collector["argv"]):
-        collector = None
+    collector_identity = root / f"collector-{collector_pid}.json"
+    if collector_identity.exists():
+        recorded = json.loads(collector_identity.read_text())
+        collector = bound_worker(collector_pid, recorded["start_ticks"])
+    else:
+        collector = process_snapshot(collector_pid)
+        if collector and collector["argv"][-2:] == [str(root), str(binary)] and any(
+            Path(arg).name == "run.sh" for arg in collector["argv"]
+        ):
+            collector_identity.write_text(json.dumps(collector, indent=2) + "\n")
+        else:
+            collector = None
     processes = process_tree(collector_pid) if collector else []
     workers = [p for p in processes if p["argv"] and p["argv"][0] == str(binary) and p["state"] not in ("Z", "X")]
     for worker in workers:
