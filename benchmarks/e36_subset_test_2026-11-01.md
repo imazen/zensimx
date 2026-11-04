@@ -2122,3 +2122,11 @@ options ported) reproduce the adopted model byte for byte. Derived roots `roots/
 0.9606; 4Kdtb report-only, 0.9137 / 0.9006 at s05 / s10 fold 0), s10 0.9713 (0.9530 / 1.0000 / 0.9608): **scale 0.5
 chosen**, as P3 chose on the PU21 banks. Five single-thread fits took 28–31 min each in parallel (whole phase 1,878 s,
 peak RSS 1.97 GiB). Phase B (three seeds at s05, then the continuations, pack, strip) started 10:40:45Z.
+
+**Step 2, phase B result (2026-11-04, 10:40–11:21Z on dev).** Three full seeds on `roots/mix-cr203-s05` (28–29 min
+each, in parallel), the AIC ×256 continuation with rehearsal from each `refit/last.bin` (60 epochs, 12 min each; the
+HDR legs load as 330 / 48 / 7,177 / 7,390 rows at 1,853 columns and rehearse at their s05 weights), pack of
+`ckpt_epoch059` with the CID22 fit anchor (e33 output stage), strip. **Bakes (`/var/tmp/byc-hdr-20261104/cont-s05/
+cont_s{0,1,2}/pack_e059/refit/`):** `production-f16.bin` `18f37bea…` / `a53446e8…` / `eee01349…`, `shipped.bin`
+`f065d81e…` (24,444 B) / `4f915e08…` (23,212 B) / `3174aaee…` (24,398 B). Whole phase 2,448 s, peak RSS 1.99 GiB. No label
+of any read set has been read yet; the registered reads follow (research name of these bakes: `mixHC1` seeds 0–2).
