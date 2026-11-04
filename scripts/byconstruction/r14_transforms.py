@@ -205,6 +205,42 @@ def development():
     print(json.dumps(result),flush=True)
 
 
+
+def development_final():
+    """Report-only development reads after the conditional T2 decision is final."""
+    import numpy as np
+    import pyarrow.parquet as pq
+    release=json.loads((O/'T2_RELEASE.json').read_text())
+    frozen=json.loads((O/'FROZEN_FITS.json').read_text())
+    models=json.loads((O/'MODELS.json').read_text())
+    if len(frozen['models'])!=3+int(release['run']) or len(models)!=len(frozen['models']):
+        raise ValueError('final development reads require completed T1/T2 inventory')
+    for row in frozen['models']:
+        if owner.sha(row['packed_model'])!=row['packed_sha256']:raise ValueError('frozen bake changed')
+    models.update({f'F_s{s}':str(owner.H/f'tmp/e36test/r10/runs/mixF3-s{s}/pack_e059/refit/production-f16.bin') for s in range(3)})
+    dest=O/'development-final';dest.mkdir(exist_ok=False);groups={}
+    for group in ('safesyn','cid22'):
+        table=owner.R/f'wide/main/real/{group}_dev.parquet'
+        target=np.asarray(pq.read_table(table,columns=['human_score'])['human_score'])
+        if not np.isfinite(target).all():raise ValueError('invalid development target')
+        groups[group]=dict(rows=len(target),table_sha256=owner.sha(table),mae={})
+        for name,bake in models.items():
+            path=dest/f'{group}-{name}.tsv'
+            subprocess.run([str(O/'bin/bake_dial_refit'),'predict','--bake',bake,'--corpus',str(table),
+                '--score-units','--out',str(path)],check=True)
+            prediction=np.loadtxt(path,delimiter='\t',skiprows=1,usecols=[1])
+            if len(prediction)!=len(target) or not np.isfinite(prediction).all():raise ValueError('incomplete predictions')
+            groups[group]['mae'][name]=float(abs(prediction-target).mean())
+    n=sum(v['rows'] for v in groups.values())
+    pooled={name:sum(v['mae'][name]*v['rows'] for v in groups.values())/n for name in models}
+    initial=json.loads((O/'DEVELOPMENT.json').read_text())
+    if any(pooled[name]!=value for name,value in initial['pooled'].items()):
+        raise ValueError('frozen T1/A0 development statistic changed')
+    owner.write(O/'FINAL_DEVELOPMENT.json',dict(groups=groups,pooled=pooled,
+        units=initial['units'],role='report only; conditional T2 release already fixed',
+        T2_release_sha256=owner.sha(O/'T2_RELEASE.json')))
+
+
 def capacity():
     import r13_width_analysis as audit
     pins=json.loads((O/'SOURCE_PINS.json').read_text())
@@ -285,7 +321,7 @@ def fit_progress(destination):
 
 def main():
     ap=argparse.ArgumentParser(description=__doc__)
-    ap.add_argument('command',choices=('fit','pack','freeze','development','capacity','reads','finalize','fit-progress','job'))
+    ap.add_argument('command',choices=('fit','pack','freeze','development','development-final','capacity','reads','finalize','fit-progress','job'))
     ap.add_argument('--arm',choices=ARMS)
     ap.add_argument('--label')
     ap.add_argument('--out',type=Path)
@@ -301,6 +337,8 @@ def main():
         else:pack(a.arm,a.continuation_name)
     elif a.command=='development':
         owner.job('development',[sys.executable,'-B',__file__,'development-worker'])
+    elif a.command=='development-final':
+        owner.job('development-final',[sys.executable,'-B',__file__,'development-final-worker'])
     elif a.command=='job':
         if not a.label:ap.error('--label required')
         owner.job(a.label,argv[1:] if argv[:1]==['--'] else argv)
@@ -317,4 +355,5 @@ def main():
 if __name__=='__main__':
     if sys.argv[1:]==['development-worker']:development()
     elif sys.argv[1:]==['finalize-worker']:finalize()
+    elif sys.argv[1:]==['development-final-worker']:development_final()
     else:main()
