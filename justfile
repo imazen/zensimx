@@ -4230,6 +4230,12 @@ r13-width-tables output:
 r13-width-status:
     python3 -B scripts/byconstruction/r13_width_status.py
 
+r13-width-report output:
+    python3 -B scripts/byconstruction/r13_width_report.py --out {{quote(output)}}
+
+r13-width-archive:
+    python3 -B scripts/byconstruction/r13_width.py job --label archive -- bash scripts/byconstruction/r13_width_archive.sh
+
 
 
 a-family-cost-report study out host:
