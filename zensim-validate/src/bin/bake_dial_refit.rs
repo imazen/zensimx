@@ -157,6 +157,8 @@ enum Cmd {
     /// re-emit everything else verbatim (reproduces
     /// `strip_spline_metadata.py`).
     Strip(StripArgs),
+    /// R12: remove structurally dead ReLU units, preserving retained-unit order.
+    PruneHidden(PruneHiddenArgs),
     /// Append ONE metadata entry via zenpredict-bake's section splice
     /// (weights byte-untouched; strip's inverse). Added 2026-08-28 to stamp
     /// H-TRAJ checkpoint dumps with `zentrain.repro` post-hoc.
@@ -853,6 +855,24 @@ fn bake_layers(
     metadata: &[OwnedMeta],
     schema_hash: u64,
 ) -> Vec<u8> {
+    bake_layers_hu(
+        scaler_mean,
+        scaler_scale,
+        owned,
+        metadata,
+        schema_hash,
+        None,
+    )
+}
+
+fn bake_layers_hu(
+    scaler_mean: &[f32],
+    scaler_scale: &[f32],
+    owned: &[OwnedLayer],
+    metadata: &[OwnedMeta],
+    schema_hash: u64,
+    hu: Option<&[&[u32]]>,
+) -> Vec<u8> {
     let layers: Vec<BakeLayer<'_>> = owned
         .iter()
         .map(|l| BakeLayer {
@@ -886,7 +906,7 @@ fn bake_layers(
         feature_order: None,
         output_order: None,
         compressed: true,
-        hu_permutations: None,
+        hu_permutations: hu,
     })
     .expect("serialize ZNPR v3 bake")
 }
@@ -2784,6 +2804,99 @@ fn cmd_append_meta(a: &AppendMetaArgs) -> Result<(), String> {
         value.len(),
         a.out,
         out_bytes.len()
+    );
+    Ok(())
+}
+
+#[derive(Args)]
+struct PruneHiddenArgs {
+    #[arg(long = "in")]
+    input: PathBuf,
+    #[arg(long)]
+    out: PathBuf,
+    /// Explicit approximate diagnostic; default removes structural dead units only.
+    #[arg(long, value_delimiter = ',')]
+    keep_units: Vec<usize>,
+}
+
+fn hidden_pruned_layers(
+    model: &Model,
+    explicit: &[usize],
+) -> Result<(Vec<OwnedLayer>, Vec<usize>), String> {
+    let mut layers = owned_layers(model).map_err(|e| e.to_string())?;
+    if layers.len() != 2
+        || layers[0].activation != Activation::Relu
+        || layers[1].activation != Activation::Identity
+        || layers[1].out_dim != 1
+        || layers[0].out_dim != layers[1].in_dim
+        || layers
+            .iter()
+            .any(|l| l.weights.iter().chain(&l.biases).any(|v| !v.is_finite()))
+    {
+        return Err("hidden pruning requires a finite two-layer ReLU scalar bake".into());
+    }
+    let old = layers[0].out_dim;
+    let keep: Vec<usize> = if explicit.is_empty() {
+        (0..old)
+            .filter(|&j| {
+                !(layers[0].biases[j] <= 0.0
+                    && (0..layers[0].in_dim).all(|i| layers[0].weights[i * old + j] == 0.0))
+            })
+            .collect()
+    } else {
+        if explicit.windows(2).any(|p| p[0] >= p[1]) || explicit.iter().any(|&j| j >= old) {
+            return Err("explicit units must be unique, increasing and in range".into());
+        }
+        explicit.to_vec()
+    };
+    if keep.is_empty() {
+        return Err("cannot emit an empty hidden layer".into());
+    }
+    let first: Vec<f32> = layers[0]
+        .weights
+        .chunks_exact(old)
+        .flat_map(|row| keep.iter().map(|&j| row[j]))
+        .collect();
+    layers[0].weights = first;
+    layers[0].biases = keep.iter().map(|&j| layers[0].biases[j]).collect();
+    layers[0].out_dim = keep.len();
+    layers[1].weights = keep.iter().map(|&j| layers[1].weights[j]).collect();
+    layers[1].in_dim = keep.len();
+    Ok((layers, keep))
+}
+
+fn cmd_prune_hidden(a: &PruneHiddenArgs) -> Result<(), String> {
+    if a.out.exists() {
+        return Err("preserve existing pruning output".into());
+    }
+    let model = Model::from_bytes(&std::fs::read(&a.input).map_err(|e| e.to_string())?)
+        .map_err(|e| e.to_string())?;
+    if !model.feature_bounds().is_empty()
+        || !model.output_specs().is_empty()
+        || !model.discrete_sets().is_empty()
+        || !model.sparse_overrides().is_empty()
+    {
+        return Err("pruning refuses auxiliary sections it cannot preserve".into());
+    }
+    let (layers, keep) = hidden_pruned_layers(&model, &a.keep_units)?;
+    // The generic composer defaults to norm-based hidden reordering. Explicit
+    // identity preserves the exact live output accumulation order for L0.
+    let identity: Vec<u32> = (0..keep.len() as u32).collect();
+    let hu: &[&[u32]] = &[&identity];
+    let bytes = bake_layers_hu(
+        model.scaler_mean(),
+        model.scaler_scale(),
+        &layers,
+        &clone_metadata(&model),
+        model.schema_hash(),
+        Some(hu),
+    );
+    std::fs::write(&a.out, &bytes).map_err(|e| e.to_string())?;
+    println!(
+        "{}",
+        serde_json::json!({"kept":keep,"old_hidden":model.layer(0).out_dim,
+        "new_hidden":layers[0].out_dim,"bytes":bytes.len(),"structural_only":a.keep_units.is_empty(),
+        "served_bit_identity":"requires registered fixture proof"})
     );
     Ok(())
 }
@@ -5746,6 +5859,7 @@ fn main() -> ExitCode {
         Cmd::Densify(a) => cmd_densify(a).map(|_| false),
         Cmd::CertifyMonotone(a) => cmd_certify_monotone(a),
         Cmd::Strip(a) => cmd_strip(a).map(|_| false),
+        Cmd::PruneHidden(a) => cmd_prune_hidden(a).map(|_| false),
         Cmd::AppendMeta(a) => cmd_append_meta(a).map(|_| false),
         Cmd::ReadMeta(a) => cmd_read_meta(a).map(|_| false),
         Cmd::Interpolate(a) => cmd_interpolate(a).map(|_| false),
@@ -5804,6 +5918,58 @@ mod tests {
             zenpredict_bake::append_metadata_utf8(&bytes, "zentrain.feature_ids", ids).unwrap();
         zenpredict_bake::append_metadata_utf8(&bytes, "zentrain.repro", &format!("run {}", w1[0]))
             .unwrap()
+    }
+
+    #[test]
+    fn r12_hidden_pruning_preserves_live_order_and_positive_bias_constants() {
+        let layers = vec![
+            OwnedLayer {
+                in_dim: 2,
+                out_dim: 4,
+                activation: Activation::Relu,
+                dtype: WeightDtype::F32,
+                weights: vec![0., 0., 1., 2., 0., 0., 3., 4.],
+                biases: vec![-2., 1., -10., 0.],
+            },
+            OwnedLayer {
+                in_dim: 4,
+                out_dim: 1,
+                activation: Activation::Identity,
+                dtype: WeightDtype::F32,
+                weights: vec![7., -0.5, -2., -3.],
+                biases: vec![100.],
+            },
+        ];
+        let original = bake_layers_hu(
+            &[0., 0.],
+            &[1., 1.],
+            &layers,
+            &[],
+            0,
+            Some(&[&[0, 1, 2, 3]]),
+        );
+        let model = Model::from_bytes(&original).unwrap();
+        let (pruned, keep) = hidden_pruned_layers(&model, &[]).unwrap();
+        assert_eq!(keep, vec![1, 2, 3]);
+        let compact = bake_layers_hu(
+            model.scaler_mean(),
+            model.scaler_scale(),
+            &pruned,
+            &[],
+            0,
+            Some(&[&[0, 1, 2]]),
+        );
+        let other = Model::from_bytes(&compact).unwrap();
+        let mut a = zenpredict::Predictor::new(&model);
+        let mut b = zenpredict::Predictor::new(&other);
+        for i in 0..256 {
+            let x = [i as f32 / 17., (255 - i) as f32 / 23.];
+            assert_eq!(
+                a.predict(&x).unwrap()[0].to_bits(),
+                b.predict(&x).unwrap()[0].to_bits()
+            );
+        }
+        assert!(hidden_pruned_layers(&model, &[3, 2]).is_err());
     }
 
     #[test]

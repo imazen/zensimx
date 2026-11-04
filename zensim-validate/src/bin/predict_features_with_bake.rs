@@ -22,6 +22,7 @@
 //! features as a CLI arg, identical semantics to a 1-row input file.
 //!
 //! Output: one score per row, one `%.6f` per line on stdout.
+//! `--score-bits` emits the exact native served f64 bit pattern as u64 instead.
 //!
 //! Honors the same `--bake-post {raw|clamp|mapped[:a,b]}` semantics as
 //! `score_pair_with_bake`, plus the full V_24 dispatch path
@@ -106,12 +107,14 @@ fn main() -> ExitCode {
     let mut codec_hint: Option<String> = None;
     let mut f64_wire = false;
     let mut production = false;
+    let mut score_bits = false;
     let mut research_palette_cached = false;
     while let Some(a) = args.next() {
         match a.as_str() {
             "--research-palette-cached" => research_palette_cached = true,
             "--f64-wire" => f64_wire = true,
             "--production" => production = true,
+            "--score-bits" => score_bits = true,
             "--codec" => {
                 codec_hint = match args.next() {
                     Some(v) => Some(v),
@@ -232,7 +235,13 @@ fn main() -> ExitCode {
         };
         for row in feature_buf.chunks_exact(n_features_in) {
             match scorer.score(row) {
-                Ok(score) => println!("{score:.17}"),
+                Ok(score) => {
+                    if score_bits {
+                        println!("{}", score.to_bits());
+                    } else {
+                        println!("{score:.17}");
+                    }
+                }
                 Err(e) => {
                     eprintln!("{e}");
                     return ExitCode::FAILURE;
@@ -263,7 +272,9 @@ fn main() -> ExitCode {
         let score = scorer
             .score_features(&row_f64, 0, 0, codec_hint.as_deref())
             .expect("invalid feature row");
-        let written = if f64_wire {
+        let written = if score_bits {
+            writeln!(out, "{}", score.to_bits())
+        } else if f64_wire {
             writeln!(out, "{score:.17}")
         } else {
             writeln!(out, "{score:.6}")
