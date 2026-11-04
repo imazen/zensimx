@@ -2,6 +2,9 @@
 // Licensed under AGPL-3.0-or-later OR the Imazen commercial license.
 //! Measurement-only owner for the 2026-11-04 A low-effect-family cost study.
 //! No feature, bake, model, or serving arithmetic is modified.
+#[cfg(unix)]
+#[path = "support/a_fusion.rs"]
+mod a_fusion;
 #[path = "support/zen_io.rs"]
 mod zen_io;
 
@@ -189,6 +192,12 @@ fn perf_control(command: &[u8]) {
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
+    if args.get(1).map(String::as_str) == Some("fusion") {
+        #[cfg(unix)]
+        return a_fusion::run(&args[2..]);
+        #[cfg(not(unix))]
+        panic!("fusion experiments require the Unix measurement host");
+    }
     assert!(
         args.len() >= 4,
         "prepare SOURCES OUT | bench/profile PAIRS BAKE AUDIT SIZE OUT THREADS [REPEATS]"

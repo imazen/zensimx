@@ -101,6 +101,18 @@ struct Case {
     objective: Objective,
     block: usize,
 }
+fn feature_bits_sha(features: &[f64]) -> String {
+    let mut digest = Sha256::new();
+    for value in features {
+        digest.update(value.to_bits().to_le_bytes());
+    }
+    digest
+        .finalize()
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect()
+}
+
 fn sha(bytes: &[u8]) -> String {
     Sha256::digest(bytes)
         .iter()
@@ -275,6 +287,7 @@ fn engineering_packet() {
         let mut true_linear = Vec::new();
         let mut predicted = Vec::new();
         let mut served_bits = Vec::new();
+        let mut repair_feature_hashes = Vec::new();
         let mut bad = 0usize;
         let mut compared = 0usize;
         let mut max_abs = 0f64;
@@ -331,6 +344,7 @@ fn engineering_packet() {
                 true_linear.push(linear);
                 predicted.push(gain);
                 served_bits.push(complete_score.to_bits());
+                repair_feature_hashes.push(feature_bits_sha(&repair_features));
                 let mut ca = 0.0;
                 let mut cl = 0.0;
                 if job.engine {
@@ -379,6 +393,8 @@ fn engineering_packet() {
                 "s":s,"c":c,"negative_input_rows":negative_rows})),
             "sensitivity_objective":format!("{:?}",sensitivity_objective),
             "base_score":base.score(),"served_base_bits":served_base.score().to_bits(),"served_repair_bits":served_bits,
+            "served_base_features_sha256":feature_bits_sha(served_base.features()),
+            "served_repair_features_sha256":repair_feature_hashes,
             "m2":m2,"m3f":m3f,"pass":m2>=0.99 && m3f>=0.70,"engine":job.engine,"blocks":blocks,
             "engine_feature_comparisons":compared,"engine_feature_disagreements":bad,"engine_max_abs_error":max_abs,
             "engine_max_tolerance_ratio":max_tol_ratio,"coarse_gain_rank":if job.engine {Some(stats::spearman(&coarse_local,&coarse_actual))} else {None},
