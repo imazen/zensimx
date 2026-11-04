@@ -56,8 +56,8 @@ case "$stage" in
         mkfifo "$control"
         export A_COST_PERF_CONTROL="$control"
         heavy taskset -c "$cpus" perf record -e cycles:u -F 997 -g --call-graph fp --delay=-1 --control="fifo:$control" -o "$study/perf/$size/perf.data" -- "$bin" profile "$study/pairs" "$study/production-f16.bin" "$study/inputs-A0.tsv" "$size" "$study/perf/$size" 1 "$repeats" 2>&1 | tee "$study/logs/perf-${size}.log"
-        perf report -i "$study/perf/$size/perf.data" --stdio --no-children --percent-limit 0 -F overhead,symbol > "$study/perf/$size/self.txt"
-        perf report -i "$study/perf/$size/perf.data" --stdio --children --percent-limit 0 -F overhead,overhead_children,symbol > "$study/perf/$size/children.txt"
+        heavy perf report -i "$study/perf/$size/perf.data" --stdio --no-inline --no-children --percent-limit 0 -F overhead,symbol > "$study/perf/$size/self.txt" 2> "$study/perf/$size/self-receipt.log"
+        heavy perf report -i "$study/perf/$size/perf.data" --stdio --no-inline --children --percent-limit 0 -F overhead,overhead_children,symbol > "$study/perf/$size/children.txt" 2> "$study/perf/$size/children-receipt.log"
         ;;
     timings)
         shift 2
@@ -70,6 +70,12 @@ case "$stage" in
                 export A_COST_CPUS=${A_COST_CPUS_16:?sixteen-thread affinity}
             fi
             bash "$runner" bench "$study" "$threads" "$size"
+        done
+        ;;
+    profiles)
+        shift 2
+        for cell in "$@"; do
+            bash "$runner" profile "$study" "${cell%:*}" "${cell#*:}"
         done
         ;;
     *) exit 2 ;;
