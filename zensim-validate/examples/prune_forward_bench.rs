@@ -16,7 +16,8 @@
 //!
 //! Usage:
 //!   cargo run --release -p zensim-validate --example prune_forward_bench -- \
-//!       <unpruned.bin> <pruned.bin> [rows]
+//!       <unpruned.bin> <pruned.bin> [rows] [results.json]
+//! R12: prepend `--heads` to compare A-MLP against linear-H1, without pruning labels.
 //!
 //! Produce the pair with:
 //!   bake_dial_refit pack --in X_dial.bin --out unpruned.bin --no-prune ...
@@ -24,14 +25,14 @@
 
 use std::env;
 
-use zenpredict::{Model, Predictor};
+use zenpredict::{Model, Predictor, WeightStorage};
 
 /// Deterministic pseudo-random feature rows. Values are irrelevant to
 /// the timing (the kernel is branch-free per weight) as long as the
 /// standardized inputs are generically nonzero, which is the whole
 /// point — a zero input would let the `s == 0.0` fast path skip the
 /// row and hide the cost pruning removes.
-fn make_rows(n_rows: usize, width: usize) -> Vec<Vec<f32>> {
+fn make_rows(n_rows: usize, width: usize, nonnegative: bool) -> Vec<Vec<f32>> {
     let mut state = 0x2545_F491_4F6C_DD1Du64;
     (0..n_rows)
         .map(|_| {
@@ -41,7 +42,12 @@ fn make_rows(n_rows: usize, width: usize) -> Vec<Vec<f32>> {
                     state ^= state >> 7;
                     state ^= state << 17;
                     // [-4, 4): a plausible standardized-feature range.
-                    ((state >> 40) as f32 / 1024.0) - 4.0
+                    if nonnegative {
+                        // R12 positive damage inputs; fixed synthetic bank, no extraction.
+                        ((state >> 40) as f32 + 1.0) / 16_777_216.0
+                    } else {
+                        ((state >> 40) as f32 / 1024.0) - 4.0
+                    }
                 })
                 .collect()
         })
@@ -49,7 +55,38 @@ fn make_rows(n_rows: usize, width: usize) -> Vec<Vec<f32>> {
 }
 
 fn main() {
-    let args: Vec<String> = env::args().collect();
+    let mut args: Vec<String> = env::args().collect();
+    if args.get(1).is_some_and(|s| s == "--inspect") {
+        let model =
+            Model::from_bytes(&std::fs::read(&args[2]).expect("read bake")).expect("parse bake");
+        let layers: Vec<_> = (0..model.n_layers()).map(|i| {
+            let layer = model.layer(i);
+            let weights: Vec<f32> = match layer.weights {
+                WeightStorage::F32(w) => w.to_vec(),
+                WeightStorage::F16(w) => w.iter().map(|&v| zenpredict::f16_bits_to_f32(v)).collect(),
+                WeightStorage::I8 { .. } => panic!("R12 inspection expects f32/f16"),
+            };
+            serde_json::json!({"in_dim":layer.in_dim,"out_dim":layer.out_dim,
+                "activation":format!("{:?}",layer.activation),"weights":weights,"biases":layer.biases})
+        }).collect();
+        let spline = zensim_validate::output_calibration_spline::extract(&model)
+            .map(|s| serde_json::json!({"xs":s.xs,"ys":s.ys,"derivs":s.derivs}));
+        let doc = serde_json::json!({"scaler_mean":model.scaler_mean(),"scaler_scale":model.scaler_scale(),
+            "layers":layers,"derived_inputs":model.metadata().get_utf8("zensim.derived_inputs").expect("derived declaration"),
+            "spline":spline});
+        std::fs::write(
+            &args[3],
+            serde_json::to_vec_pretty(&doc).expect("serialize"),
+        )
+        .expect("write inspection");
+        return;
+    }
+    let heads = args.get(1).is_some_and(|s| s == "--heads");
+    if heads {
+        args.remove(1);
+    }
+    let a_label = if heads { "A-MLP" } else { "unpruned" };
+    let b_label = if heads { "linear-H1" } else { "pruned" };
     if args.len() < 3 {
         eprintln!(
             "usage: prune_forward_bench <unpruned.bin> <pruned.bin> [rows]\n\
@@ -82,25 +119,24 @@ fn main() {
         "the two bakes must accept the same caller width — that is the whole contract"
     );
     eprintln!(
-        "unpruned: caller_width {} layer0_in_dim {} ({} B file)\n\
-         pruned:   caller_width {} layer0_in_dim {} ({} B file)\n\
-         layer-0 rows removed: {} ({:.1}%)  rows={n_rows}",
-        width,
-        a_model.n_inputs(),
-        a_bytes.len(),
-        width,
-        b_model.n_inputs(),
-        b_bytes.len(),
-        a_model.n_inputs() - b_model.n_inputs(),
-        100.0 * (a_model.n_inputs() - b_model.n_inputs()) as f64 / a_model.n_inputs() as f64,
+        "{a_label}: caller_width {width} layer0 {}x{} ({} B file)",
+        a_model.layer(0).in_dim,
+        a_model.layer(0).out_dim,
+        a_bytes.len()
+    );
+    eprintln!(
+        "{b_label}: caller_width {width} layer0 {}x{} ({} B file); rows={n_rows}",
+        b_model.layer(0).in_dim,
+        b_model.layer(0).out_dim,
+        b_bytes.len()
     );
 
-    let rows: &'static [Vec<f32>] = Box::leak(make_rows(n_rows, width).into_boxed_slice());
+    let rows: &'static [Vec<f32>] = Box::leak(make_rows(n_rows, width, heads).into_boxed_slice());
 
     let result = zenbench::run(|suite| {
         suite.compare("predict_transformed", |group| {
             group.config().max_rounds(200);
-            group.bench("unpruned", move |b| {
+            group.bench(a_label, move |b| {
                 let mut p = Predictor::new(a_model);
                 b.iter(move || {
                     let mut acc = 0f32;
@@ -110,7 +146,7 @@ fn main() {
                     zenbench::black_box(acc);
                 })
             });
-            group.bench("pruned", move |b| {
+            group.bench(b_label, move |b| {
                 let mut p = Predictor::new(b_model);
                 b.iter(move || {
                     let mut acc = 0f32;
@@ -122,5 +158,7 @@ fn main() {
             });
         });
     });
-    let _ = result;
+    if let Some(path) = args.get(4) {
+        result.save(path).expect("save retained rounds");
+    }
 }

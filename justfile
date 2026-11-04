@@ -4092,3 +4092,36 @@ a-speed-collect root binary cpus:
 
 a-speed-report root output:
     python3 -B zensim-bench/a-speed-runtime/report.py {{quote(root)}} {{quote(output)}}
+
+# R12 registered linear-head fits; the shared lock serializes resource-heavy work.
+r12-linear-fits:
+    flock ~/tmp/heavy.lock ~/work/claudehints/scripts/run-heavy --mem 24G -- bash scripts/byconstruction/r12_linear_fits.sh
+
+r12-linear-reads models output:
+    flock ~/tmp/heavy.lock ~/work/claudehints/scripts/run-heavy --mem 24G --jobs 16 -- python3 -B scripts/byconstruction/r12_linear_reads.py --models {{quote(models)}} --out {{quote(output)}}
+
+r12-linear-dev output:
+    flock ~/tmp/heavy.lock ~/work/claudehints/scripts/run-heavy --mem 24G --jobs 8 -- python3 -B scripts/byconstruction/r12_linear_dev.py {{quote(output)}}
+
+r12-linear-native-check:
+    flock ~/tmp/heavy.lock ~/work/claudehints/scripts/run-heavy --mem 24G --jobs 8 -- env TMPDIR="$HOME/tmp/zensim-linear" CARGO_TARGET_DIR=/var/tmp/byc-linear-20261104/target cargo test --release -p zensim-validate --bin zensim_mlp_train subjective_training_leg::tests
+
+r12-linear-head-build:
+    flock ~/tmp/heavy.lock ~/work/claudehints/scripts/run-heavy --mem 24G --jobs 8 -- env TMPDIR="$HOME/tmp/zensim-linear" CARGO_TARGET_DIR=/var/tmp/byc-linear-20261104/target cargo build --release -p zensim-validate --example prune_forward_bench
+
+r12-linear-status:
+    python3 -B scripts/byconstruction/r12_linear_status.py
+
+
+r12-linear-continuation:
+    flock ~/tmp/heavy.lock ~/work/claudehints/scripts/run-heavy --mem 24G -- bash scripts/byconstruction/r12_linear_continuation.sh
+
+r12-linear-freeze:
+    flock ~/tmp/heavy.lock ~/work/claudehints/scripts/run-heavy --mem 24G --jobs 8 -- python3 -B scripts/byconstruction/r12_linear_freeze.py
+
+r12-linear-heads:
+    flock ~/tmp/heavy.lock ~/work/claudehints/scripts/run-heavy --mem 24G --jobs 8 -- bash scripts/byconstruction/r12_linear_heads.sh
+
+r12-linear-clippy:
+    flock ~/tmp/heavy.lock ~/work/claudehints/scripts/run-heavy --mem 24G --jobs 8 -- env TMPDIR="$HOME/tmp/zensim-linear" CARGO_TARGET_DIR=/var/tmp/byc-linear-20261104/target just clippy
+
