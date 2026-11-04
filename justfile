@@ -4112,6 +4112,13 @@ a-parallel-gate-test:
 a-parallel-gate-hdr-test:
     cargo test -p zensim --features custom-profiles --test native_hdr_color -- --test-threads=1
 
+# Requires the outer shared lock and resource wrapper; keeps release controls.
+a-parallel-gate-reclaim root label:
+    python3 -B zensim-bench/a-speed-runtime/reclaim_cargo.py {{quote(root)}} {{quote(label)}}
+
+a-parallel-gate-admission-test:
+    python3 -B -m unittest discover -s zensim-bench/a-speed-runtime -p 'test_*.py'
+
 # Whole-process hardware counters over the same tiny score pairs, before/after.
 # The caller supplies the shared compute lock and run-heavy resource scope.
 a-parallel-gate-profile root phase:
