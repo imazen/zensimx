@@ -11,6 +11,15 @@ use std::time::Instant;
 
 const BAKE_SHA: &str = "185f43f7e5e1327c34ad18f0b73b96b872663726a0fac6ff524430d0d8430088";
 
+fn full_feature_hash(features: &[f64]) -> String {
+    hash(
+        &features
+            .iter()
+            .flat_map(|value| value.to_bits().to_le_bytes())
+            .collect::<Vec<_>>(),
+    )
+}
+
 fn worker(args: &[String]) {
     assert_eq!(args.len(), 4, "worker PAIRS BAKE SIZE THREADS");
     let threads: usize = args[3].parse().unwrap();
@@ -441,6 +450,8 @@ fn pairs(args: &[String]) {
             "reference_pixels_sha256":hash(bytemuck::cast_slice(&r)),
             "distorted_pixels_sha256":hash(bytemuck::cast_slice(&d)),
             "score_bits":result.score().to_bits(),"score":result.score(),
+            "full_feature_count":result.features().len(),
+            "full_feature_bits_sha256":full_feature_hash(result.features()),
             "consumed_ids":consumed,"consumed_feature_bits":consumed.iter()
                 .map(|&id|result.features()[usize::from(id)].to_bits()).collect::<Vec<_>>()})
         )
@@ -519,6 +530,8 @@ fn identity(args: &[String]) {
                     "{}",
                     json!({"permutation":perm.to_string(), "reference":group,
                     "candidate_score_bits":[score.to_bits()], "score":score,
+                    "full_feature_count":result.features().len(),
+                    "full_feature_bits_sha256":full_feature_hash(result.features()),
                     "consumed_ids":ids,"pixels_sha256":hash(bytemuck::cast_slice(pixels)),
                     "consumed_feature_bits":ids.iter().map(|&id|result.features()[usize::from(id)].to_bits()).collect::<Vec<_>>()})
                 )

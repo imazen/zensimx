@@ -331,6 +331,11 @@ pub(super) fn run(args: &[String]) {
                 let canonical = zensim::research::extract(&request, &source_view, &dest).unwrap();
                 let f = canonical.values();
                 let native = native_features.as_ref().unwrap();
+                row["full_feature_count"] = json!(native.len());
+                row["full_feature_bits_sha256"] = json!(sha(&native
+                    .iter()
+                    .flat_map(|value| value.to_bits().to_le_bytes())
+                    .collect::<Vec<_>>()));
                 for id in request.want().iter_slots() {
                     assert_eq!(
                         native[id].to_bits(),
