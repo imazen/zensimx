@@ -297,14 +297,19 @@ COVERAGE_FAMILIES = {"blur": (1, 2, 3), "colour": (4, 5, 7), "noise": (11, 12, 1
 # Design log E14: `ko<w>` adds the KADIS ordinal ladder leg (v2_teacher.ORDINAL_NAME) at nominal weight w, rank-only within ladders.
 
 
-def recipe_of(spec: str) -> dict:
+def recipe_of(spec: str, *, r13_w4_registration: str | None = None) -> dict:
     """Training-recipe tokens after the human weight (design log E8): 'r0@h32:H128:gl0.0001' -> {'hidden': 128,
     'group_l1': 0.0001}; E13 adds 'ts<name>' -> {'teacher_subset': name}. No tokens -> {} (the registered recipe: H = HIDDEN,
     no group lasso, full teachers), so every existing spec, cell name and trainer argv is unchanged."""
+    if r13_w4_registration is not None and (
+            r13_w4_registration != "397d67be879339e7014d3b29c2a99d3fe51df6b2"
+            or spec != "sel:45acffa603e8@h32:H4:cv16:cf98:fx2:mono:thr:mp1"):
+        raise ValueError("R13 W4 recipe requires its exact registered spec and amendment")
     _, _, w = spec.partition("@h")
     out: dict = {}
     for tok in w.split(":")[1:]:
-        if tok.startswith("H") and tok[1:].isdigit() and (int(tok[1:]) in (1, 2) or 8 <= int(tok[1:]) <= 512) and "hidden" not in out:
+        if tok.startswith("H") and tok[1:].isdigit() and (int(tok[1:]) in (1, 2) or 8 <= int(tok[1:]) <= 512
+                or (int(tok[1:]) == 4 and r13_w4_registration is not None)) and "hidden" not in out:
             out["hidden"] = int(tok[1:])
         elif tok.startswith("gl") and "group_l1" not in out and 0 < float(tok[2:]) <= 100:
             out["group_l1"] = float(tok[2:])

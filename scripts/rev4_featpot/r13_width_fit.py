@@ -22,8 +22,14 @@ def main():
     import v2_production_pack as packing
     import subjective_training_leg as admission
     canonical_groups = admission.dataset_groups
+    canonical_recipe = owner.recipe_of
     canonical_command = trainer.train_command
     canonical_pack = packing.pack_production
+
+    def recipe(spec):
+        if args.r13_width == 4:
+            return canonical_recipe(spec,r13_w4_registration=admission.R13_W4_REGISTRATION)
+        return canonical_recipe(spec)
 
     def groups(*a, **kw):
         expanded, binding = canonical_groups(*a, **kw)
@@ -51,6 +57,8 @@ def main():
         return canonical_pack(*a, **kw)
 
     admission.dataset_groups = groups
+    owner.recipe_of = recipe
+    trainer.recipe_of = recipe
     trainer.train_command = command
     packing.pack_production = pack
     owner.main()

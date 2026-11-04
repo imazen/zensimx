@@ -190,6 +190,8 @@ because cleanup tests or a historical training reproduction pass.
 
 ## Known Bugs
 
+* **2026-11-04 — R13 W4 recipe token rejected before optimization. FIXED.** The native/Python admission accepted the amendment-bound width-4 head, but the canonical recipe parser still rejected `H4`. The parser now accepts only the exact R13 W4 specification with its explicit amendment token; the historical default H4 rejection remains unchanged. The regression checks the complete recipe, absent/wrong authority and wrong pair allocation. The failed setup wrote no checkpoint and is retained with its resource receipt.
+
 - **2026-11-04 — split examples lacked feature requirements, fixed.** Cargo's
   default example discovery compiled `split_parity_golden` and `split_timing`
   without their custom-profile APIs; the golden also reads training exports.

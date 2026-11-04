@@ -16,6 +16,20 @@ with mock.patch.dict(sys.modules,{'r13_width':OWNER}):STATUS_SPEC.loader.exec_mo
 
 
 class Capacity(unittest.TestCase):
+    def test_w4_full_recipe_parses_only_with_its_exact_amendment(self):
+        import v2_common as common
+        spec='sel:45acffa603e8@h32:H4:cv16:cf98:fx2:mono:thr:mp1'
+        registration='397d67be879339e7014d3b29c2a99d3fe51df6b2'
+        for unbound in ('r0@h32:H4',spec):
+            with self.assertRaises(ValueError):common.recipe_of(unbound)
+        parsed=common.recipe_of(spec,r13_w4_registration=registration)
+        expected=common.recipe_of(spec.replace(':H4:',':H16:'));expected['hidden']=4
+        self.assertEqual(parsed,expected)
+        self.assertEqual((parsed['hidden'],parsed['max_pairs']),(4,1))
+        for wrong in (spec.replace(':mp1',':mp2'),'r0@h32:H4'):
+            with self.assertRaises(ValueError):common.recipe_of(wrong,r13_w4_registration=registration)
+        with self.assertRaises(ValueError):common.recipe_of(spec,r13_w4_registration='25e772922fd5a40d576e12af47778ce81bed5e08')
+
     def test_failed_receipt_cannot_be_hidden_by_a_later_lock_holder(self):
         self.assertEqual(STATUS.execution_state({'rc':1},[{'pid':123}],False),'failed')
         self.assertEqual(STATUS.execution_state({'rc':0},[],False),'complete')

@@ -4277,6 +4277,7 @@ r13-width-clippy:
     flock ~/tmp/heavy.lock ~/work/claudehints/scripts/run-heavy --mem 24G --jobs 8 -- env TMPDIR="$HOME/tmp/zensim-width" CARGO_TARGET_DIR=/var/tmp/byc-width-20261104/target just clippy
 
 r13-width-python-check:
+    env TMPDIR="$HOME/tmp/zensim-width" python3 -B -m unittest scripts.tests.test_v2c.TrainRecipe.test_recipe_tokens
     env TMPDIR="$HOME/tmp/zensim-width" python3 -B -m unittest discover -s scripts/tests -p test_subjective_training_leg.py
     env TMPDIR="$HOME/tmp/zensim-width" python3 -B -m unittest discover -s scripts/tests -p test_r13_width.py
     env TMPDIR="$HOME/tmp/zensim-width" python3 -B -m unittest discover -s scripts/tests -p test_e36_primary_inventory.py

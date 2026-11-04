@@ -60,6 +60,9 @@ def main():
            'metadata-only finalization; its execution receipt appears below.','',
            'Fit wall totals sum the recorded GNU time payload elapsed fields and exclude queued waits.',
            'The W512 base elapsed field is printed at whole-second resolution; its recorded sum is not a centisecond-precise whole-fit measurement.','',
+           'W4’s first setup attempt rejected the `H4` recipe token before optimization; no checkpoint was written.',
+           'The repair admits only the exact amendment-bound W4 specification and preserves the legacy default rejection.',
+           'That 1.24 s setup attempt is retained under `failed-attempts/W4-s0-recipe-parser-v1/` and excluded from the successful fit’s wall total.','',
            '| Width | Seed | Base final dev geomean3 | TRAIN dev MAE | E36 inversions (%) | All-nine MOS error (%) | Chroma level | Dead / residual / live | Largest pair (%) | Inputs 50/90/99% | Head (µs) | Fit wall (s) |',
            '|---|---:|---:|---:|---:|---:|---|---|---:|---|---:|---:|']
     compact=[]
@@ -148,10 +151,10 @@ def main():
               '`/mnt/tower/output/zensim/r13-width-20261104/`; verification receipt `ARCHIVE_VERIFIED.json`.',
               'Every base/continuation/pack/audit/read job takes and releases the shared heavy lock individually.','',
               '## Per-job resource receipts','']
-    for path in sorted((O/'logs').glob('*.log'))+[O/'w4-build.log']:
+    for path in sorted((O/'logs').glob('*.log'))+[O/'w4-build.log']+sorted((O/'failed-attempts').glob('*/logs/*.log')):
         for line in path.read_text(errors='replace').splitlines():
             if line.startswith('run-heavy: done'):
-                lines.append(f"- `{path.name}`: {line}")
+                lines.append(f"- `{path.relative_to(O)}`: {line}")
     lines += ['', '## Verdict', '', 'Measured interpretation is written after reviewing every table; no model is adopted by this report.', '']
     a.out.write_text('\n'.join(lines))
     owner.write(O/'REPORT_ROWS.json',compact)
