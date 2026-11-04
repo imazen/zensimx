@@ -1866,3 +1866,16 @@ reaches zero) and 0.017 behind on Korshunov (interval touches zero); against but
 and on Narwaria and level on Korshunov, where every score ties near 0.94-0.96. Note for zenmetrics: its `hdr_feeding`
 table still routes SSIMULACRA2 through the PU21 path that fast-ssim2 0.9.1 deprecates; the native path should replace
 it there.
+
+### Owner decision (2026-11-04): the mix on F3's recipe is adopted
+
+Owner, 2026-11-04: "let's adopt the mix and make sure it is fully documented so another person could recreate it
+from scratch" (after R10 and its amendments 1-6, R4, and the reference-metric and HDR comparisons above). `mixF3`,
+the TID2013 + MDID mix on F3's recipe without the hinge (seeds 0-2; bakes `pack_e059/refit/production-f16.bin`),
+replaces F3's control as the program's model. Marks accepted with it: G-STEER's broad-220-b8 case at every seed (8-px
+map rank 0.69 against the 0.70 bar on one text screenshot; the JPEG XL loop shows no byte cost), the near-tie texture
+aversion on CLIC 2021 (0.3-0.6 points overall, returned at moderate differences) and the 0.04 it gives back to F3 on
+CID:IQ's SGCK gamut mapping. Not adopted with it: p30L, the map term, the CLIC 2024 leg, any Haar-taught leg. AIC2026
+public_test stays sealed and is never folded into training (owner, 2026-11-04). Follow-ups: the from-scratch recipe
+in zensim-training (`recipes/MixF3.json`, `docs/RECIPE_MIXF3.md`, replayed in the release sandbox) and a zensim
+profile for it (pull request).
