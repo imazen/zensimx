@@ -53,10 +53,11 @@ def main():
                 contracts=contracts,addressability=addressability,G_DIAL=dial,
                 cid22_capacity=capacity[f'cid22/{name}'],hdr_capacity=capacity[f'hdr/{name}'],
                 fit_wall_seconds=fit['wall_seconds'],packed_sha256=fit['packed_sha256'])
-            conditions=dict(chroma=bool(row['chroma_pass']),steer=row['steering_successes']==135,
+            # Existing E33 gate owner: 135 cases, at least 128 successes.
+            conditions=dict(chroma=bool(row['chroma_pass']),steer=row['steering_successes']>=128,
                 C1_C6=all(contracts.values()),G_ADDR=all(v['shippable'] for v in addressability.values()),
                 development_strict_improvement=row['development_MAE']<development['pooled']['F_s0'])
-            eligibility[name]=dict(conditions=conditions,eligible=all(conditions.values()),
+            eligibility[name]=dict(conditions=conditions,steering_bar=128,eligible=all(conditions.values()),
                 disposition='requires owner cost decision before any repeat' if all(conditions.values()) else
                     'not eligible under registration; no seed repeats',
                 failed_or_unmeasured=[k for k,v in conditions.items() if not v])
