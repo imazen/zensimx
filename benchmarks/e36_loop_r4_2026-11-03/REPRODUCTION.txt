@@ -1,0 +1,7 @@
+none 702 encodes; 0 differ from experiment 3 step 4
+butteraugli 702 encodes; 0 differ from experiment 3 step 4
+B 702 encodes; 0 differ from experiment 3 step 4
+M7lintail 702 encodes; 0 differ from experiment 3 step 4
+F3lintail 702 encodes; 0 differ from experiment 3 step 4
+p30Llintail 702 encodes; 0 differ from experiment 3 step 4
+map300lintail 702 encodes; 0 differ from experiment 3 step 4

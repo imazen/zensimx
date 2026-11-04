@@ -1548,3 +1548,34 @@ done except its JPEG XL loop, which already ran (amendment 1): the mix passes ev
 no held-out human read contradicts it (CLIC 2021, CIQA and MMSPG neutral; AIC2026 out of fold level, codec
 consistency better), and its gains are the EVAL human sets it was chosen on. The choice between F3 and the mix is the
 owner's.
+
+### R4 loop result (2026-11-03, i270): the DVIFM-target map saves more bytes than its butteraugli-target twin
+
+`e36_loop_r4.sh` (zensimx 6ce4faa3; loop build `/var/tmp/byconstruction-bin/6ce4faa33c5e-loop-e36r4`): every arm
+encoded fresh on i270 by one build; the B/M7 placement rows reproduce the earlier calibration exactly; the seven
+shared arms (none, butteraugli, B, M7, F3, p30L, map 300) reproduce experiment 3 step 4's 702 bitstreams each, 0
+differ (`REPRODUCTION.txt`). 78 images; BD-rate (positive = fewer bytes at equal judged quality; 95% bootstrap over
+images); butteraugli judges, the others are reported. Tables: `benchmarks/e36_loop_r4_2026-11-03/`; encodes, judge
+tables and BD-rate tables: `/mnt/tower/output/zensim/e36-subset-test-2026-11-01/r4-jxl-i270/` (SHA256SUMS).
+
+| arm, against p30L | ssim2 | butteraugli | zensim | DVIFM | CVVDP |
+|---|---|---|---|---|---|
+| p30L + map 300, DVIFM target (R4) | +1.03 [+0.77, +1.30] | +1.18 [+0.90, +1.45] | +0.31 [+0.02, +0.62] | +1.21 [+0.48, +1.99] | +1.34 [+1.03, +1.66] |
+| p30L + map 300, butteraugli target (the twin) | +0.51 [+0.27, +0.72] | +0.86 [+0.51, +1.18] | +0.29 [-0.08, +0.64] | +0.49 [-0.64, +1.67] | +0.86 [+0.53, +1.22] |
+| F3 | -0.04 [-0.22, +0.16] | -0.30 [-0.51, -0.12] | -0.21 [-0.49, +0.04] | +0.09 [-0.70, +0.94] | -0.13 [-0.40, +0.14] |
+| butteraugli loop | +2.21 [+1.51, +3.03] | +4.55 [+3.88, +5.28] | +1.52 [+0.74, +2.32] | +2.60 [+1.36, +3.85] | +4.00 [+3.18, +4.84] |
+
+Against the twin, the DVIFM arm: ssim2 +0.49 [+0.22, +0.79], butteraugli +0.27 [-0.15, +0.68], zensim -0.04 [-0.48,
++0.43], DVIFM +0.34 [-0.34, +1.07], CVVDP +0.47 [+0.11, +0.86]. Against the butteraugli loop (ssim2 / butteraugli /
+CVVDP): the DVIFM arm -1.35 / -3.68 / -2.91, the twin -1.89 / -4.00 / -3.49, p30L -2.39 / -4.88 / -4.34, so the DVIFM
+arm closes a quarter of p30L's butteraugli gap and a third of its CVVDP gap (the twin a fifth of each). By class
+against p30L (ssim2 / butteraugli / CVVDP): photo (38) +0.81 / +0.99 / +1.01, illustration (22) +0.99 / +0.91 / +1.09;
+the twin +0.75 / +1.27 / +1.13 and +0.43 / +0.80 / +0.63.
+
+Reading (the registered rule): the arm passed its guards, and its out-of-fold interval against the twin contains
+zero, so it is reported as a map-term arm with the twin's pairwise cost, beside this loop result: its byte savings
+exceed the twin's on the two judges the map term never trained toward (SSIMULACRA2 and CVVDP, intervals above zero)
+and tie on butteraugli. The map term's question for the owner is sharper, not different: about 1% of JPEG XL bytes
+at equal judged quality (1.2% on the butteraugli judge) against a small, consistent loss of pairwise agreement
+across images (AIC2026 out of fold -0.0155 [-0.0245, -0.0071] global SROCC against p30L; the twin's CLIC 2021 read 1
+-0.0052). Nothing is adopted on this read.
