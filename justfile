@@ -4378,6 +4378,12 @@ r14-transform-fit arm:
 r14-trainer-build:
     python3 -B scripts/byconstruction/r14_transforms.py job --label selected-caller-trainer-build -- bash scripts/byconstruction/r14_trainer_build.sh
 
+r14-inspector-build:
+    python3 -B scripts/byconstruction/r14_transforms.py job --label transformed-inspector-build -- bash scripts/byconstruction/r14_inspector_build.sh
+
+r14-recover-pack:
+    python3 -B scripts/byconstruction/r14_pack_recover.py
+
 r14-transform-retry-continuation arm:
     python3 -B scripts/byconstruction/r14_transforms.py fit --arm {{arm}} --continuation-retry r2
 

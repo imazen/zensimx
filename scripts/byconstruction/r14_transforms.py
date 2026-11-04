@@ -63,19 +63,34 @@ def args_for(arm,dest,seed=0):
         'pipal,live-md,cid-iq,cid-oa,irccyn-ivc,colourlab-rating-variability-2022','--mos-share','36.035']
 
 
+def inspector():
+    pin=json.loads((O/'INSPECTOR_PINS.json').read_text())
+    binary=Path(pin['binary'])
+    if owner.sha(binary)!=pin['sha256']:raise ValueError('R14 inspection binary changed')
+    return binary
+
+
+def inspect_pack(arm,row):
+    cell=O/f'fits/{arm}-s0'
+    bake=Path(row['packed_model'])
+    if owner.sha(bake)!=row['packed_model_sha256']:raise ValueError('packed bake changed before inspection')
+    cert=json.loads(subprocess.check_output([str(O/'bin/bake_dial_refit'),'certify-monotone','--bake',str(bake)]))
+    if not cert['certified']:raise ValueError('R14 final certificate failed')
+    subprocess.run([str(inspector()),'--inspect',str(bake),str(cell/'HEAD.json')],check=True)
+    row.update(certificate=cert,capacity=owner.quick_capacity(cell/'HEAD.json'),
+        inspector_pins_sha256=owner.sha(O/'INSPECTOR_PINS.json'))
+    owner.write(cell/'PACK.json',row)
+
+
 def pack(arm,continuation_name='continuation'):
     from v2_production_pack import pack_production
+    inspector() # fail before packing when the serving-aware inspector is absent
     cell=O/f'fits/{arm}-s0';continuation=cell/continuation_name;dest=continuation/'pack_e059'
     (dest/'refit').mkdir(parents=True,exist_ok=False)
     row=pack_production(continuation/'ckpt/ckpt_epoch059.bin',dest,
         owner.R/'wide/main/real/cid22_fit.parquet',e33_output_stage=True,no_prune=True)
-    bake=Path(row['packed_model'])
-    cert=json.loads(subprocess.check_output([str(O/'bin/bake_dial_refit'),'certify-monotone','--bake',str(bake)]))
-    if not cert['certified']:raise ValueError('R14 final certificate failed')
-    inspect=O/'bin/prune_forward_bench'
-    subprocess.run([str(inspect),'--inspect',str(bake),str(cell/'HEAD.json')],check=True)
-    row.update(certificate=cert,capacity=owner.quick_capacity(cell/'HEAD.json'))
-    owner.write(cell/'PACK.json',row)
+    owner.write(cell/'PACK_STAGE.json',row)
+    inspect_pack(arm,row)
 
 
 def fit(arm,trainer_dir=None,continuation_retry=None):
@@ -261,7 +276,7 @@ def reads():
 
 def finalize():
     import r13_width_finalize as strip
-    owner.HEAD=O/'bin/prune_forward_bench'
+    owner.HEAD=inspector()
     strip.worker(registered_hidden=128)
     frozen=json.loads((O/'FROZEN_FITS.json').read_text())
     for row in frozen['models']:
