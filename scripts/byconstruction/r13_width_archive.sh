@@ -21,7 +21,9 @@ for p in sorted(root.rglob('*')):
         for block in iter(lambda:f.read(1024*1024),b''):h.update(block)
     rows.append((str(rel),h.hexdigest(),p.stat().st_size))
 (root/'SHA256SUMS').write_text(''.join(f'{digest}  {name}\n' for name,digest,size in rows))
-(root/'ARCHIVE_MANIFEST.json').write_text(json.dumps(dict(files=len(rows),bytes=sum(r[2] for r in rows)),indent=2)+'\n')
+pins=json.loads((root/'SOURCE_PINS.json').read_text())
+(root/'ARCHIVE_MANIFEST.json').write_text(json.dumps(dict(build_commit=pins['source_commit'],
+    files=len(rows),bytes=sum(r[2] for r in rows)),indent=2)+'\n')
 PY
 mkdir -p "$D"
 rsync -aLO --no-owner --no-group --exclude=/target/ --exclude=/archive.log --exclude=/archive-check.txt \
