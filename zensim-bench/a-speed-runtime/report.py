@@ -36,7 +36,7 @@ def summarize(root):
     fixture_rows = json.loads((root / "fixtures/pairs.json").read_text())
     pairs = {r["id"]: r for r in fixture_rows}
     assert len(pairs) == 80
-    rows, fits = [], []
+    rows, fits, rss_scores = [], [], {}
     for threads in (1, 16):
         points = {arm: [] for arm in ARMS}
         for size in SIZES:
@@ -81,6 +81,13 @@ def summarize(root):
                 row[arm] = {"p50_ms": quantile(pooled[arm], .5), "p95_ms": quantile(pooled[arm], .95)}
                 stem = root / f"results/{threads}t_{size}_rss-{arm}"
                 log = stem.with_suffix(".log").read_text()
+                score_rows = [m for line in log.splitlines()
+                              if (m := re.fullmatch(rf"(\d+_\d+)\t{arm}\t([-+0-9.eE]+)", line))]
+                assert len(score_rows) == len(seen), (stem, "RSS image coverage differs")
+                scores = {m[1]: m[2] for m in score_rows}
+                assert set(scores) == seen, (stem, "RSS image coverage differs")
+                assert all(math.isfinite(float(value)) for value in scores.values())
+                rss_scores[(threads, size, arm)] = scores
                 line = next(line for line in log.splitlines() if line.startswith("run-heavy: done"))
                 assert "rc=0" in line, line
                 time_text = stem.with_suffix(".time.txt").read_text()
@@ -96,7 +103,15 @@ def summarize(root):
         single = next(r for r in rows if r["threads"] == 1 and r["size"] == row["size"])
         for arm in ARMS:
             row[arm]["speedup_16t"] = single[arm]["p50_ms"] / next(r for r in rows if r["threads"] == 16 and r["size"] == row["size"])[arm]["p50_ms"]
-    return {"rows": rows, "fits": fits}
+    score_diagnostics = []
+    for size in SIZES:
+        for arm in ARMS:
+            one, sixteen = rss_scores[(1, size, arm)], rss_scores[(16, size, arm)]
+            mismatches = [{"id": key, "one_thread": one[key], "sixteen_threads": sixteen[key]}
+                          for key in one if one[key] != sixteen[key]]
+            score_diagnostics.append({"size": size, "arm": arm, "pairs": 20,
+                                      "printed_score_mismatches": mismatches})
+    return {"rows": rows, "fits": fits, "printed_score_thread_diagnostics": score_diagnostics}
 
 
 def render(root, result):

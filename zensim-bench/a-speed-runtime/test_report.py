@@ -36,7 +36,8 @@ class ReportAdmission(unittest.TestCase):
                 p.with_suffix(".log").write_text("invented admission fixture\n")
                 for arm in report.ARMS:
                     stem = self.root / f"results/{threads}t_{size}_rss-{arm}"
-                    stem.with_suffix(".log").write_text("run-heavy: done rc=0 1s | peak-RSS 0.01GiB | min-avail 20000MiB | peak-load 0.10\n")
+                    score_lines = "".join(f"{size}_{i}\t{arm}\t{i + 1}.00000000000000000\n" for i in range(20))
+                    stem.with_suffix(".log").write_text(score_lines + "run-heavy: done rc=0 1s | peak-RSS 0.01GiB | min-avail 20000MiB | peak-load 0.10\n")
                     stem.with_suffix(".time.txt").write_text("Maximum resident set size (kbytes): 10000\n")
         (self.root / "fixtures/pairs.json").write_text(json.dumps(fixtures))
         self.path = self.root / "results/1t_64_latency.json"
@@ -74,6 +75,12 @@ class ReportAdmission(unittest.TestCase):
         run["comparisons"][0]["samples"][0]["iterations"] = 2
         self.write(run)
         with self.assertRaises(AssertionError):
+            report.summarize(self.root)
+
+    def test_incomplete_rss_image_coverage_refuses(self):
+        path = self.root / "results/1t_64_rss-margarine.log"
+        path.write_text(path.read_text().split("\n", 1)[1])
+        with self.assertRaisesRegex(AssertionError, "RSS image coverage"):
             report.summarize(self.root)
 
     def test_insufficient_clean_pairs_refuse(self):
