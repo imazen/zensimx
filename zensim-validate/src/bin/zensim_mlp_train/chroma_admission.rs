@@ -87,7 +87,8 @@ pub(super) fn admit(
     }
     // Optional declared view-size filter: fitting views with a long edge of 64 px or less are dropped, because
     // SSIMULACRA2 is not valid there (benchmarks/ssim2_small_view_validity_2026-10-30.md). Absent = the full leg.
-    let filter = if d.get("view_filter_path").is_some() || d.get("drop_long_edge_at_most").is_some() {
+    let filter = if d.get("view_filter_path").is_some() || d.get("drop_long_edge_at_most").is_some()
+    {
         let f = read("view_filter_path", "view_filter_sha256")?;
         if f["schema"] != "chroma-view-size-filter-v1"
             || f["drop_long_edge_at_most"] != 64
@@ -110,8 +111,12 @@ pub(super) fn admit(
         };
         let counts = &f["per_role"][role][family];
         let (kept, dropped) = (
-            counts["kept"].as_u64().ok_or("filter kept count required")?,
-            counts["dropped"].as_u64().ok_or("filter dropped count required")?,
+            counts["kept"]
+                .as_u64()
+                .ok_or("filter kept count required")?,
+            counts["dropped"]
+                .as_u64()
+                .ok_or("filter dropped count required")?,
         );
         if kept + dropped != admitted {
             return Err("chroma view-size filter population differs".into());
@@ -193,7 +198,9 @@ pub(super) fn admit(
         return Err("chroma admitted source/ladder population differs".into());
     }
     // Registered scales (1, 1/2, 1/4, 1/8) are exact in f64, so scale 1 keeps the round-1 bits.
-    let nominal = d["nominal_weight"].as_f64().ok_or("chroma nominal weight required")?;
+    let nominal = d["nominal_weight"]
+        .as_f64()
+        .ok_or("chroma nominal weight required")?;
     let weight =
         nominal / (counts.values().map(|n| 1. - 1. / *n as f64).sum::<f64>() / counts.len() as f64);
     if record["train_weight"].as_f64() != Some(weight) {

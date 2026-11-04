@@ -56,10 +56,10 @@ use crate::adam_simd;
 // added to the RankNet per-prediction backprop direction. See module
 // docs for the exact formula and gradient derivation.
 mod e36_tv;
-pub mod map_term;
 mod loss_norm_in_norm;
 mod loss_pearson;
 mod loss_steer;
+pub mod map_term;
 mod smooth_hinge;
 mod steer_data;
 
@@ -2463,7 +2463,8 @@ pub enum PairSampling {
     /// Group weights only determine eligibility in this mode: relative draw
     /// shares follow each group's number of non-singleton strata. Use
     /// [`Self::Uniform`] for weighted group draws and singleton-band coverage.
-    Stratified,    /// The uniform draw's group sequence and rng consumption, with each
+    Stratified,
+    /// The uniform draw's group sequence and rng consumption, with each
     /// within-ref group walking its refs round-robin and each ref's rows on
     /// a seeded bijection, so every ref and row of a group is visited before
     /// any repeats. See [`sampling::RefWalk`]. CPU strategy trainer only.
@@ -3610,10 +3611,12 @@ pub fn train_mlp_strategy_pairs(
         .map(|(pos, &gi)| {
             let rb = groups[gi].ref_ids.and_then(RefBuckets::build);
             match hyperparams.pair_sampling {
-                PairSampling::Walk => rb.map(|rb| rb.with_walk(sampling::walk_seed(
-                    hyperparams.sample_seed.unwrap_or(hyperparams.seed),
-                    pos,
-                ))),
+                PairSampling::Walk => rb.map(|rb| {
+                    rb.with_walk(sampling::walk_seed(
+                        hyperparams.sample_seed.unwrap_or(hyperparams.seed),
+                        pos,
+                    ))
+                }),
                 _ => rb,
             }
         })

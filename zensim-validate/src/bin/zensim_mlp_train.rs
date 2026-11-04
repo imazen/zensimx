@@ -5517,17 +5517,19 @@ fn main() {
                 hyperparams.sample_seed.unwrap_or(hyperparams.seed),
             )
             .expect("tv pool reproduction receipt");
-            if let (Some(level_path), Some(level)) =
-                (&args.level_pool, tv_regularizer.as_ref().and_then(|t| t.level.as_ref()))
-            {
+            if let (Some(level_path), Some(level)) = (
+                &args.level_pool,
+                tv_regularizer.as_ref().and_then(|t| t.level.as_ref()),
+            ) {
                 record["level_pool"] =
                     tv_pool::level_receipt(level_path, args.level_ref.as_ref().unwrap(), level)
                         .expect("level pool reproduction receipt");
             }
         }
-        if let (Some(map_path), Some(map)) =
-            (&args.map_pool, tv_regularizer.as_ref().and_then(|t| t.map.as_ref()))
-        {
+        if let (Some(map_path), Some(map)) = (
+            &args.map_pool,
+            tv_regularizer.as_ref().and_then(|t| t.map.as_ref()),
+        ) {
             record["map_pool"] =
                 tv_pool::map_receipt(map_path, map).expect("map pool reproduction receipt");
         }
