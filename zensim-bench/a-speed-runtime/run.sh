@@ -8,10 +8,12 @@ export TMPDIR="$root/scratch"
 mkdir -p "$TMPDIR" "$root/results"
 printf '%s\n' "$$" > "$root/collector.pid"
 sha256sum "$binary" > "$root/benchmark.sha256"
-for threads in 1 16; do
-    for size in 64 256 1024 4096; do
+for threads in ${BENCH_THREADS:-1 16}; do
+    [[ $threads = 1 || $threads = 16 ]] || exit 2
+    for size in ${BENCH_SIZES:-64 256 1024 4096}; do
+        [[ " 64 256 1024 4096 " = *" $size "* ]] || exit 2
         cell="${threads}t_${size}"
-        for mode in latency rss-zensim_a rss-fast_ssim2 rss-margarine; do
+        for mode in ${BENCH_MODES:-latency rss-zensim_a rss-fast_ssim2 rss-margarine}; do
             stem="$root/results/${cell}_${mode}"
             test ! -e "$stem.log" || { echo "refusing to overwrite $stem.log" >&2; exit 2; }
             printf '%s %s %s queued collector=%s\n' "$(date -u +%FT%TZ)" "$cell" "$mode" "$$" > "$root/PROGRESS.txt"
@@ -30,9 +32,10 @@ for threads in 1 16; do
                 ps -eo pid,ppid,comm,pcpu,args --sort=-pcpu | sed -n "1,12p"
                 if [[ $mode = latency ]]; then
                     deadline=$((SECONDS+600))
-                    until awk "{exit !(\$1 < 2.0)}" /proc/loadavg; do
+                    until awk "{exit !(\$1 < 2.0)}" /proc/loadavg &&
+                        ! pgrep -x "cc1plus|cc1|rustc|cargo|cmake|ninja|make|zensim_mlp_trai" >/dev/null; do
                         (( SECONDS < deadline )) || { echo "quiet load gate refused"; exit 3; }
-                        echo "waiting for load1 < 2.0: $(cat /proc/loadavg)"
+                        echo "waiting for load1 < 2.0 and no compiler/trainer: $(cat /proc/loadavg)"
                         sleep 10
                     done
                 fi
@@ -47,5 +50,16 @@ for threads in 1 16; do
         done
     done
 done
-printf '%s complete\n' "$(date -u +%FT%TZ)" > "$root/PROGRESS.txt"
-touch "$root/COMPLETE"
+# A targeted retry is not a full matrix. Require every output before declaring
+# raw collection complete; the reporter separately checks scientific admission.
+complete=1
+for threads in 1 16; do
+    for size in 64 256 1024 4096; do
+        test -s "$root/results/${threads}t_${size}_latency.json" || complete=0
+        for arm in zensim_a fast_ssim2 margarine; do
+            test -s "$root/results/${threads}t_${size}_rss-${arm}.time.txt" || complete=0
+        done
+    done
+done
+printf '%s raw-collection-finished matrix-outputs-present=%s\n' "$(date -u +%FT%TZ)" "$complete" > "$root/PROGRESS.txt"
+if [[ $complete = 1 ]]; then touch "$root/COMPLETE"; fi

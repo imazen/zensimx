@@ -4130,3 +4130,7 @@ r12-linear-clippy:
 
 viz-design2-verify root out:
     python3 -B tools/zensim-viz/verify_design2.py {{quote(root)}} {{quote(out)}}
+
+a-speed-report-check:
+    python3 -B zensim-bench/a-speed-runtime/test_report.py
+    bash -n zensim-bench/a-speed-runtime/run.sh

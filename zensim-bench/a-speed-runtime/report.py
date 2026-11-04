@@ -40,15 +40,21 @@ def summarize(root):
         points = {arm: [] for arm in ARMS}
         for size in SIZES:
             path = root / f"results/{threads}t_{size}_latency.json"
+            latency_log = path.with_suffix(".log").read_text()
+            forbidden = re.findall(r'foreign pid=\d+ name="(cc1plus|cc1|rustc|cargo|cmake|ninja|zensim_mlp_trai)"', latency_log)
+            assert not forbidden, (path, "foreign build/training observed", forbidden)
             run = json.loads(path.read_text())
             assert not run["unreliable"], path
             assert len(run["comparisons"]) == 20, path
             pooled = {arm: [] for arm in ARMS}
             excluded = 0
             pixels = []
+            seen = set()
             for group in run["comparisons"]:
                 _, pixel_text, pair_id = group["group_name"].split("/")
                 pair = pairs[pair_id]
+                assert pair_id not in seen, (path, "duplicate image", pair_id)
+                seen.add(pair_id)
                 assert pair["size"] == size
                 pixel_count = pair["width"] * pair["height"]
                 assert int(pixel_text) == pixel_count
@@ -66,6 +72,7 @@ def summarize(root):
                     assert all(sorted(r["execution_order"]) == [0, 1, 2] for r in clean)
                     pooled[arm].extend(values)
                     points[arm].append((pixel_count, statistics.median(values)))
+            assert seen == {r["id"] for r in fixture_rows if r["size"] == size}
             row = {"host": "i270", "tier": "v3/AVX2", "threads": threads, "size": size,
                    "images": 20, "samples_per_arm": 640, "flagged_rounds": excluded,
                    "min_pixels": min(pixels), "max_pixels": max(pixels), "mean_pixels": statistics.mean(pixels)}
