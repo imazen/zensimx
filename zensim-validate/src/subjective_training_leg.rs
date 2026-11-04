@@ -151,21 +151,27 @@ fn r12_head_binding(c: &Value, args: &super::Args) -> Result<bool, String> {
     let Some(r) = c.get("r12_linear") else {
         return Ok(false);
     };
+    let two = r["arm"] == "L4";
     let masked = r["arm"] == "L2";
     let mask_ok = match (&args.monotone_feature_mask, masked) {
         (Some(path), true) => r["mask_sha256"] == hash(path)?,
         (None, false) => r["mask_sha256"].is_null(),
         _ => false,
     };
-    if r["registration"] != "9088eacf781c5b3cb70049f8e190a69d32474757d"
-        || !matches!(r["arm"].as_str(), Some("L1" | "L2" | "L3"))
+    if r["registration"]
+        != if two {
+            "339de6b8c24b49403745cacde495ded875a3e83a"
+        } else {
+            "9088eacf781c5b3cb70049f8e190a69d32474757d"
+        }
+        || !matches!(r["arm"].as_str(), Some("L1" | "L2" | "L3" | "L4"))
         || c["width"] != 1853
         || c["feature_ids"].as_array().is_none_or(|v| v.len() != 492)
-        || args.hidden != 1
+        || args.hidden != if two { 2 } else { 1 }
         || !args.monotone_cbc
         || !args.nonneg_distance
-        || args.nonneg_thresholds
-        || args.max_pairs != 0
+        || args.nonneg_thresholds != two
+        || args.max_pairs != if two { 1 } else { 0 }
         || args.monotone_ramps != 0
         || args.free_ramps != 0
         || args.monotone_gated_products
@@ -222,7 +228,11 @@ fn run_binding(
         || c["pairs_per_epoch"] != 50000
         || args.pairs_per_epoch != 50000
         || c["selected_epoch"] != 119
-        || (args.hidden != 128 && !r12_head_binding(c, args)?)
+        || (if c.get("r12_linear").is_some() {
+            !r12_head_binding(c, args)?
+        } else {
+            args.hidden != 128
+        })
         || args.max_features != width
         || c["init_seed"].as_u64() != args.init_seed
         || c["sample_seed"].as_u64() != args.sample_seed
@@ -1537,6 +1547,17 @@ mod tests {
         args.hidden = 1;
         c["r12_linear"]["arm"] = json!("L2");
         assert!(r12_head_binding(&c, &args).is_err());
+        c["r12_linear"] = json!({"registration":"339de6b8c24b49403745cacde495ded875a3e83a","arm":"L4","mask_sha256":null});
+        args.hidden = 2;
+        args.nonneg_thresholds = true;
+        args.max_pairs = 1;
+        assert!(r12_head_binding(&c, &args).unwrap());
+        args.max_pairs = 2;
+        assert!(r12_head_binding(&c, &args).is_err());
+        args.max_pairs = 0;
+        args.nonneg_thresholds = false;
+        args.hidden = 1;
+        c["r12_linear"] = json!({"registration":"9088eacf781c5b3cb70049f8e190a69d32474757d","arm":"L2","mask_sha256":null});
         let dir = std::env::temp_dir().join(format!("r12-mask-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let mask = dir.join("mask.tsv");

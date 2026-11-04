@@ -4624,6 +4624,48 @@ fn byc_certificate_gated_products() {
 /// is non-increasing along non-negative steps (up to f32 rounding of a pair's
 /// two terms).
 #[test]
+fn r12_two_piece_learns_single_nonpositive_offset() {
+    let rows: Vec<Vec<f64>> = (0..64)
+        .map(|i| vec![(i % 8) as f64 / 7., (i / 8) as f64 / 7.])
+        .collect();
+    let refs: Vec<&[f64]> = rows.iter().map(Vec::as_slice).collect();
+    let scores: Vec<f64> = rows.iter().map(|x| 100. - 40. * x[0].max(x[1])).collect();
+    let hp = MlpHyperparams {
+        nonneg_distance: true,
+        monotone_cbc: true,
+        nonneg_thresholds: true,
+        max_pairs: 1,
+        n_hidden: 2,
+        n_epochs: 4,
+        pairs_per_epoch: 256,
+        seed: 13,
+        early_stop_patience: 0,
+        ..Default::default()
+    };
+    let mut groups = [TrainingGroup {
+        name: "r12-invented".into(),
+        human_scores: &scores,
+        features: FeatureRows::Borrowed(&refs),
+        metric_sigmas: None,
+        train_weight: 1.,
+        validation_weight: 1.,
+        ref_ids: None,
+        loss_mode: GroupLossMode::Both,
+    }];
+    let bytes = train_mlp(&mut groups, 2, &hp, &mut Vec::new());
+    let model = zenpredict::Model::from_bytes(&bytes).unwrap();
+    assert_eq!(model.layer(0).out_dim, 2);
+    assert!(model.layer(0).biases.iter().all(|v| *v <= 0.));
+    assert!(model.layer(0).biases.contains(&0.));
+    assert_eq!(
+        certify_monotone_bake(&model, 100.).unwrap().free_amplitude,
+        0.
+    );
+    let mut p = zenpredict::Predictor::new(&model);
+    assert_eq!(p.predict(&[0., 0.]).unwrap()[0].to_bits(), 100f32.to_bits());
+}
+
+#[test]
 fn byc_max_pairs_train_certify_and_stay_monotone() {
     let rows: Vec<Vec<f64>> = (0..256)
         .map(|i| vec![(i % 16) as f64 / 15., (i / 16) as f64 / 15.])

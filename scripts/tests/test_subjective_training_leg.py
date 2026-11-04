@@ -74,6 +74,15 @@ class SubjectiveAdmission(unittest.TestCase):
         self.cell['r12_linear']['mask_sha256'] = 'c' * 64
         check()
 
+    def test_r12_l4_requires_one_pair_and_one_nonpositive_offset(self):
+        c=dict(width=1853,feature_ids=list(range(492)),r12_linear=dict(
+            registration="339de6b8c24b49403745cacde495ded875a3e83a",arm="L4",mask_sha256=None))
+        recipe=dict(hidden=2,mono_all=True,derived_inputs='fx2',max_pairs=1,thresholds=True)
+        self.assertTrue(leg.r12_head_binding(c,recipe))
+        for key,value in [('thresholds',False),('max_pairs',2),('hidden',128)]:
+            with self.subTest(key=key), self.assertRaises(ValueError):
+                leg.r12_head_binding(c,dict(recipe,**{key:value}))
+
     def test_valid_metadata_never_opens_target(self):
         with mock.patch.object(Path,"read_bytes",autospec=True,side_effect=self.read_guard):
             self.assertEqual(set(self.admit()),{"subjective_rank"})

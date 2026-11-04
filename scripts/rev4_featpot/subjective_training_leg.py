@@ -37,16 +37,20 @@ R12_REGISTRATION = "9088eacf781c5b3cb70049f8e190a69d32474757d"
 
 
 def r12_head_binding(cell, recipe):
-    """Only the preregistered H1 linear class; legacy H128 admission is unchanged."""
+    """Only the registered H1 linear or H2 max-pair class; legacy H128 is unchanged."""
     r = cell.get("r12_linear")
     if r is None:
         return False
-    if (r.get("registration") != R12_REGISTRATION or r.get("arm") not in ("L1", "L2", "L3")
+    two = r.get("arm") == "L4"
+    registration = "339de6b8c24b49403745cacde495ded875a3e83a" if two else R12_REGISTRATION
+    if (r.get("registration") != registration or r.get("arm") not in ("L1", "L2", "L3", "L4")
             or cell.get("width") != 1853 or len(cell.get("feature_ids", [])) != 492
-            or recipe.get("hidden") != 1 or not recipe.get("mono_all")
+            or recipe.get("hidden") != (2 if two else 1) or not recipe.get("mono_all")
             or recipe.get("derived_inputs") != "fx2"
-            or any(recipe.get(k) for k in ("thresholds", "max_pairs", "ramps", "free_ramps", "gated_products"))):
-        raise ValueError("R12 registered linear head binding differs")
+            or recipe.get("max_pairs", 0) != (1 if two else 0)
+            or bool(recipe.get("thresholds")) != two
+            or any(recipe.get(k) for k in ("ramps", "free_ramps", "gated_products"))):
+        raise ValueError("R12 registered head binding differs")
     if r["arm"] == "L2":
         if not isinstance(r.get("mask_sha256"), str) or len(r["mask_sha256"]) != 64:
             raise ValueError("R12 sparse mask pin required")
@@ -65,7 +69,7 @@ def command_binding(authority_path,pin,cell_id,init_seed,sample_seed,width,head,
             or (c["epochs"],c["pairs_per_epoch"],c["selected_epoch"])!=(120,50000,119)
             or (c["init_seed"],c["sample_seed"])!=(init_seed,sample_seed)
             or width!=expected_width or head!="N"
-            or ((recipe or {}).get("hidden",32)!=128 and not r12_head_binding(c, recipe or {}))):
+            or (not r12_head_binding(c, recipe or {}) if "r12_linear" in c else (recipe or {}).get("hidden",32)!=128)):
         raise ValueError("subjective registered cell/seed/full-budget/head binding differs")
 
 
