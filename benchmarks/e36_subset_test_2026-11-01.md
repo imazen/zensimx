@@ -2301,3 +2301,17 @@ G-CHROMA-L level qualification. No candidate is adopted. The six L0/L4 bakes
 were frozen in `007c4a00` before additional-arm scoring, with all three L4
 certificates showing one max pair and no free-ramp amplitude. A0 structural
 pruning removes exactly 95 units; proof is measured separately, never assumed.
+
+**R12 completed result (2026-11-04).** All fifteen registered fits/derivations
+and all original/additional-arm reads are complete. The
+[final six-arm report](r12_linear_head_2026-11-04.md) and
+[full read tables](r12_linear_reads_2026-11-04.md) retain the comparisons.
+L0 matches all registered score bits and all reported HDR metrics; adopted
+A0's pruned head takes 2.839829 µs versus its matched A0's 5.766177 µs.
+L4 E36 inversion share is 3.161444%, paired change −0.235202 percentage points
+(95% origin bootstrap −0.412274 to −0.049230). Its all-nine MOS normalized median
+error is 8.33836%, versus A's 8.02794%. Every fitted L1/L2/L3/L4 seed fails
+G-CHROMA-L level qualification, while passing G-STEER 135/135, C1–C6, identity
+and NEARID. No model is adopted. The sparse formula has 144 damage rows and
+288 available coefficients, with all weights and feature names committed.
+Extraction remains unchanged; reported speed is the head alone.

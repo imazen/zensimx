@@ -3156,3 +3156,18 @@ do not make the confirmation sets fresh. CLIC/CIQA/MMSPG and public_test stay cl
 L0/L4 hashes were subsequently frozen in `007c4a00` before their assessments.
 Their construction followed the separate addition and learned-offset amendment;
 L1/L2/L3 were not refitted after any assessment.
+
+### R12 L0/L4 actual reads completed (2026-11-04)
+
+After `007c4a00` froze all six bakes, L0 and L4 completed the same registered
+EVAL collections and compression/non-codec subsets, E36, G-CHROMA-L dev >64 px,
+G-STEER, C1–C6, identity, NEARID and all five cube-root:203 HDR views. All 36
+additional-arm stage receipts succeeded. These remain reused mix/HC1/R12
+assessments, not fresh confirmation. No read selected a checkpoint, mask,
+threshold, offset rule or new fit. L4 learned one non-positive second-piece
+bias under amendment `339de6b8`; there was no fixed-zero-offset comparison arm.
+L0 served-score bits match the corresponding A seed across all 12 feature
+fixtures and every registered pixel-gate score check. Optional L0r read those
+feature fixtures only to quantify score changes, without an additional fit or
+qualification arm. All L1/L2/L3 fits and original read results remain frozen.
+CLIC/CIQA/MMSPG were not reopened; AIC-2026 public_test remained sealed.

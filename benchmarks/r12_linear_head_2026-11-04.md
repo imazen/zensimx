@@ -1,7 +1,26 @@
 # R12: non-negative linear heads against adopted A (2026-11-04)
 
-The original nine fits and their registered assessments are complete. The separately
-registered L0/L4 addition is in progress. No candidate is selected or adopted here.
+Pruning A is the useful fast simplification: every registered served-score bit is
+preserved, and adopted A0's measured head drops from 5.766 to 2.840 µs. Dense L1
+and max-linear L4 improve E36 ordering, but raise average MOS error and fail the
+chroma-level gate. Sparse L2 makes the formula smaller and loses more E36 accuracy.
+All registered reads, fifteen fits/derivations, and head timing are complete. No
+candidate is selected or adopted here.
+
+| Arm | E36 inversion share (%) | All-nine MOS median error (%) | Head (µs/pair) | Chroma level |
+|---|---:|---:|---:|---|
+| A | 3.396647 | 8.02794 | 5.609705–5.810238 matched-batch means | reference A0 |
+| L0, structural pruning | 3.396647 | 8.02794 | 2.711389 | unchanged from corresponding A seeds |
+| L1, dense linear | 3.148249 | 8.35201 | 2.581856 | fails, 3/3 seeds |
+| L2, eight-family linear | 3.897773 | 8.58165 | 2.540460 | fails, 3/3 seeds |
+| L3, L1 continuation | 3.595252 | 8.26648 | 2.551408 | fails, 3/3 seeds |
+| L4, learned-offset max-linear | 3.161444 | 8.33836 | 2.523115 | fails, 3/3 seeds |
+
+Three-seed means. MOS error is the normalized median residual around each
+collection's assessment-only 4PL, averaged equally across nine collections.
+Head timings come from separate A-paired batches; the A range is across batch
+means, not an uncertainty interval. The complete read tables and native gate
+semantics below retain all qualifications.
 
 Registration: [E36 R12 record](e36_subset_test_2026-11-01.md#r12-registration-2026-11-04-before-any-fit-or-new-read-linear-formulas-over-as-inputs),
 commit `9088eacf`; exposure: [DATA_SPLITS R12](../docs/DATA_SPLITS.md#exposure-registration--2026-11-04-r12-linear-heads-against-the-adopted-mix-a).
@@ -14,6 +33,9 @@ L3 continues each L1 seed through the mix's AIC-2026 public_train ×256 recipe w
 rehearsal and fixed epoch 59. No public_test or confirmation-set read is authorized.
 No AIC-2026 result statistics are recorded here.
 
+The TRAIN root is `/var/tmp/byc-fchroma-20261029/r3/w100/root` (width 1,853).
+The 492 damage IDs are the pinned `cols_fx2.txt`, also retained under
+`references/`; adding their fx2 products gives the same 984 inputs as A.
 All base fits use the mix's exact admitted root, group targets, weights and sampling
 through `v2_confirm_fit.py` / `v2_lodo_mlp.py`: TID2013 + MDID MOS, BAPPS, SafeSyn,
 CID22 TRAIN teacher, coverage and chroma-teacher legs. Only the head architecture
@@ -28,8 +50,8 @@ then CID22 TRAIN calibration with E33 identity knot/tail factor 2.
 The historical dataset authority pins H128. R12 has an explicit H1 authorization
 in the Python/native admission owners (`b901766a`), with the registration identity
 and sparse-mask digest bound before optimization. All old population, seed, budget,
-continuation and data-role checks remain. Seven Python admission tests and twelve
-native admission tests pass, including unregistered-H1 and changed-mask refusals.
+continuation and data-role checks remain. The initial seven Python and twelve native admission tests pass, including
+unregistered-H1 and changed-mask refusals; closing L4 coverage is recorded below.
 
 ## Training-side feasibility decision
 
@@ -75,10 +97,9 @@ Execution through the shared heavy lock and `run-heavy --mem 24G`: six base fits
 continuations 344 s, peak-RSS 1.96 GiB, min available 36,502 MiB, peak load 2.41.
 These are execution receipts, not inference timing comparisons.
 
-## Original-arm assessments
+## Registered assessments
 
-[Measured read tables](r12_linear_reads_2026-11-04.md) report every original
-population beside A: all nine MOS collections, compression/non-codec subsets,
+[Measured read tables](r12_linear_reads_2026-11-04.md) report every population for A, L0, L1, L2, L3 and L4: all nine MOS collections, compression/non-codec subsets,
 E36, G-CHROMA-L, G-STEER, C1–C6, identity, NEARID and the five HDR views.
 Cells use the three seed means; the retained JSON has seed values and native
 whole-reference/family intervals. These are descriptive comparisons after freezing,
@@ -251,11 +272,76 @@ L4's E36 share is 3.161444%, a change of −0.235202 percentage points against A
 (95% origin bootstrap −0.412274 to −0.049230). Its all-nine normalized MOS median
 error is 8.33836%, compression error 7.44035%, and non-codec error 9.44045%, against
 A's 8.02794%, 7.02144% and 8.58352%. L0 matches A exactly on all these reads.
-L0 pixel assessment and bit proof are complete. L4 pixel and both added arms' HDR
-assessments remain in progress.
+All L0/L4 pixel and HDR assessments are complete. Every reported HDR metric for
+L0 equals its corresponding A seed. L4 passes G-STEER 135/135 for all seeds,
+C1–C6 on both grids, all 744 identity scores and NEARID N1/N2/N3.
 
 Full per-seed timing values, clean/all-round summaries, native model hashes and
 raw JSON hashes: [head timing receipt](r12_head_timing_2026-11-04.json).
 For adopted A0 specifically, the 33-unit L0 head takes 2.839829 µs against
 5.766177 µs for its matched A0 control. The headline L0 2.711389 µs is the
 three-seed mean, including the third seed's three-unit retained head.
+
+## Completed HDR interpretation and verdict
+
+The fitted arms give mixed HDR changes. L1/L4 improve mean within-ladder Spearman
+from A's 0.987108 to 0.987886/0.988012; L2 falls to 0.983462 and L3 to 0.985617.
+All four fitted arms have slightly lower mean within-reference UPIQ-all Spearman
+than A (0.962233 versus 0.961829/0.961991/0.961412/0.961907 for L1/L2/L3/L4),
+even though L1/L2/L4 have higher pooled UPIQ-all SROCC. L2's higher pooled teacher
+SROCC is also not a local-ranking gain: HDRTEACH inversions are 8/9/7 versus
+A's 1/1/1. L4 has 2/4/2. No HDR conclusion is independent HDR qualification;
+these are the registered report-only banks and teacher labels, with no HDR fit.
+The tables retain pooled PLCC, within-reference rank and inversion counts for
+all five views instead of selecting the favorable correlation.
+
+A linear formula buys explicit non-negative coefficients and a smaller head:
+L1 has 984 available terms; L2 has 288 over 144 named damage features and eight
+families. It gives up the max's ability to choose between two damage sums.
+In these frozen fits, L1 improves E36 ordering but raises all-nine MOS error and
+extended-XYB error; L2 loses E36 ordering and raises aggregate MOS error further,
+although its compression error is close to A. L3 recovers some MOS error but
+loses L1's E36 gain. L4 restores the two-piece mechanism with a learned offset,
+yet these training-side-selected fits still lose MOS/chroma accuracy against A.
+The measured factor-of-two head gain is largely also available by pruning A,
+with no score-bit change on the registered fixtures. Extraction stays unchanged,
+and the head measurement excludes the output stage/dial, so no full-runtime
+speedup is claimed. None of L1/L2/L3/L4 meets the complete label-free product
+gates because every seed fails G-CHROMA-L level. L0 preserves A's existing
+133/134/134 steering successes and all other measured behavior; its equality to
+A0 cannot satisfy a strict-improvement-versus-A0 level test. These are fitted
+solutions, not global expressivity bounds, and A/L3's continuation differs from
+the base L1/L2/L4 protocol. No EVAL result selects a new model or a refit.
+
+## Validation, exposure and retained artifacts
+
+Original-arm assessment has 48/48 successful final stage receipts, after the
+explicitly retained EVAL report repairs; the L0/L4 assessment has 36/36 with no
+scoring repair. The latter ran 1,925 s through the shared lock and run-heavy:
+peak-RSS 7.68 GiB, minimum available 35,911 MiB, peak load 8.71.
+The closing run passes scoped cargo fmt, eight Python admission tests, the
+script lint, and CI-exact workspace/all-target/all-feature clippy. The native
+learned-offset and hidden-pruning tests plus twelve native admission tests also
+pass. Existing gates and test expectations were not relaxed. Closing check
+receipt: 18 s, peak-RSS 0.12 GiB, minimum available 43,461 MiB, peak load 1.60.
+
+All later reads retain the mix/HC1/R12 exposure in DATA_SPLITS. CLIC 2021
+validation, CIQA and MMSPG JPEG XR were not reopened; public_test stayed sealed.
+L0r was only a fixture-score difference diagnostic, not an additional fitted arm.
+Current canonical read owners match revision `0ea98edb`; historical scratch
+readout/primary owners and their hashes are copied under `references/`.
+`ENVIRONMENT.json`, source/binary/model pins, complete logs, predictions,
+bootstrap results and all failed/invalid attempts are retained under the registered
+artifact root. No model binary or AIC-2026 result statistics are committed.
+
+The complete artifact archive is `/mnt/tower/output/zensim/r12-linear-20261104/`.
+Its rsync checksum dry run is empty; 26 additional SHA-256 checks verify all
+15 candidate bakes, nine reference files (including the three A bakes), and both
+immutable timing executables. `ARCHIVE_VERIFIED.json` retains those checks.
+The Cargo target cache is excluded; all as-run tools and generated experiment
+outputs are retained. Archive retry receipts preserve the initial NFS group
+ownership refusal and the verification wrapper's self-induced directory-mtime
+change. The final copy omits ownership and directory-time restoration while
+retaining file-content checksum verification; no scientific read changed.
+Final archive receipt: 6 s, peak-RSS 0.13 GiB, minimum available 43,341 MiB,
+peak load 1.51.
