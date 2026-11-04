@@ -2289,3 +2289,15 @@ Use the existing threshold-enabled max-pair owner, keep the first bias at
 zero and learn the second at <= 0. No additional arm, fit budget, selection
 read or evaluation population is introduced. No L4 model has been constructed,
 fitted or assessed before this amendment.
+
+**R12 original-arm read result and L0/L4 freeze (2026-11-04).**
+The [R12 report](r12_linear_head_2026-11-04.md) and
+[read tables](r12_linear_reads_2026-11-04.md) record completed original-arm reads.
+E36 inversion share: A 3.396647%, L1 3.148249%, L2 3.897773%, L3 3.595252%.
+Dense L1's paired change is −0.248398 percentage points (95% origin bootstrap
+−0.427255 to −0.060774); this is reused instrument evidence, not fresh confirmation.
+All original fitted seeds pass G-STEER, C1–C6, identity and NEARID; all fail
+G-CHROMA-L level qualification. No candidate is adopted. The six L0/L4 bakes
+were frozen in `007c4a00` before additional-arm scoring, with all three L4
+certificates showing one max pair and no free-ramp amplitude. A0 structural
+pruning removes exactly 95 units; proof is measured separately, never assumed.

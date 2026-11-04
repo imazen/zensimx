@@ -3137,3 +3137,22 @@ EVAL collections, confirmation sets and E36/HDR instruments retain all prior
 mix/HC1/R12 exposure; no confirmation set or public_test is reopened. No EVAL
 result chooses a fit, threshold, pruning mask or checkpoint. Record actual
 additional reads on completion; preserve the original L1–L3 assessments.
+
+### R12 original-arm actual reads (2026-11-04)
+
+After `aaa9b529` froze the nine L1/L2/L3 bakes, all registered original-arm reads
+completed: EVAL collections and compression/non-codec subsets; E36; G-CHROMA-L
+dev >64 px; G-STEER; C1–C6; identity; NEARID; cube-root:203 4Kdtb EVAL,
+consumer-EVAL ladders, HDRTEACH VAL, UPIQ development and UPIQ-all 380.
+Predictions completed in the first scoring batch. The three EVAL reports initially
+failed because the copied cache lacked `judge_pairs.tsv`; they were replayed
+successfully after copying the original key mapping. Both attempts remain retained.
+An earlier Path-to-JSON logging refusal occurred before predictor launch. No new
+population, fit, target, statistic, gate or checkpoint choice entered either repair.
+[Read tables](../benchmarks/r12_linear_reads_2026-11-04.md) preserve the report-only
+comparisons. These reads retain all previously declared mix/HC1/R12 exposure and
+do not make the confirmation sets fresh. CLIC/CIQA/MMSPG and public_test stay closed.
+
+L0/L4 hashes were subsequently frozen in `007c4a00` before their assessments.
+Their construction followed the separate addition and learned-offset amendment;
+L1/L2/L3 were not refitted after any assessment.
