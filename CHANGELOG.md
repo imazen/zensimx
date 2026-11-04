@@ -25,6 +25,10 @@
 
 ### Added
 
+- Unpublished paired speed instrument for frozen public A, fast-ssim2 0.9.1
+  and margarine's selected kernel, with imazen codec fixtures, individual-call
+  rounds, isolated RSS collection and pixel-count regression reporting.
+
 - Unpublished `tools/zensim-viz`: native revision-7 feature atlas, per-weight
   audit, served-score PDP/ICE, ablations and bake comparisons; private default-off
   map retention preserves pooled bits (`5fc15b28`, `48ca5fb5`, `8c0d8d9b`).

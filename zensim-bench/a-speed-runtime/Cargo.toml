@@ -1,0 +1,63 @@
+[package]
+name = "a-speed-runtime"
+version = "0.0.0"
+edition = "2024"
+publish = false
+build = "build.rs"
+
+[workspace]
+
+# Match margarine's selected command; its unchanged private modules are
+# included at the binary root, with their original feature relationships.
+[features]
+default = ["rayon", "avx512", "simd-malta", "row-malta"]
+rayon = []
+avx512 = ["archmage/avx512", "magetypes/avx512"]
+multirate = []
+bounded = ["multirate"]
+lattice = ["bounded"]
+planar = ["lattice"]
+stream-blur = ["planar"]
+row-psycho = ["stream-blur"]
+row-tiles = ["row-psycho"]
+full-malta = ["row-tiles"]
+row-malta = ["full-malta"]
+simd-malta = ["full-malta"]
+
+[dependencies]
+zensim = { git = "https://github.com/imazen/zensim", rev = "bebc6ea45d2b6adb6ab70affc3e289707ef74fb0", default-features = false, features = ["threads", "avx512"] }
+fast-ssim2 = { version = "=0.9.1", features = ["rayon"] }
+# Registered worker accounting keeps our own Rayon pool out of foreign-load
+# admission while retaining every unregistered process and the RAM/heat gates.
+zenbench = { git = "https://github.com/imazen/zenbench", rev = "82ff70a3f0c212cf88f53d6e9c3e02de13f32eec", default-features = false }
+butteraugli = { git = "https://github.com/imazen/butteraugli", rev = "13c49cbcab6e2b2bb65f60e3cb28344463bacbf7", features = ["internals"] }
+image = { version = "0.25.10", default-features = false, features = ["png", "jpeg", "bmp"] }
+archmage = "0.9.30"
+magetypes = "0.9.30"
+imgref = "1.12.3"
+rgb = "0.8.53"
+enough = "0.4.4"
+rayon = "1.12.0"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.151"
+bytemuck = "1.25.0"
+zenpng = { version = "=0.1.4", default-features = false }
+zenpixels-convert = "0.2.16"
+zenresize = { git = "https://github.com/imazen/zenresize", rev = "e3975fb9d6d6b7baa96038a0eb8e27febb37c012", default-features = false, features = ["std"] }
+zenjpeg = { git = "https://github.com/imazen/zenjpeg", rev = "4933461f2b6d760b7b112dc94397718fdadb5119", default-features = false }
+
+[[bin]]
+name = "a-speed-prepare"
+path = "prepare.rs"
+
+[[bench]]
+name = "a_speed_peers"
+path = "../benches/a_speed_peers.rs"
+harness = false
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+
+[lints.rust]
+unexpected_cfgs = "allow"

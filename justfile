@@ -4078,3 +4078,17 @@ a-family-cost-inputs corpus canonical out remote_root:
 
 a-family-cost stage study *args:
     bash scripts/bench/a_family_cost.sh {{quote(stage)}} {{quote(study)}} {{args}}
+
+# Public A against the pinned SSIMULACRA2 and selected margarine peers.
+# Run on the eligible measurement host, inside its shared run-heavy lock.
+a-speed-build:
+    cargo build --release --manifest-path zensim-bench/a-speed-runtime/Cargo.toml --bins --benches
+
+a-speed-prepare sources output:
+    zensim-bench/a-speed-runtime/target/release/a-speed-prepare {{quote(sources)}} {{quote(output)}}
+
+a-speed-collect root binary cpus:
+    env BENCH_CPUS={{quote(cpus)}} bash zensim-bench/a-speed-runtime/run.sh {{quote(root)}} {{quote(binary)}}
+
+a-speed-report root output:
+    python3 -B zensim-bench/a-speed-runtime/report.py {{quote(root)}} {{quote(output)}}
