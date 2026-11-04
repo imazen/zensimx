@@ -37,10 +37,26 @@ def main():
                fits=done,epochs=epochs,source_pins=str(root/'SOURCE_PINS.json'),
                owner_cost_cut=(root/'OWNER_COST_CUT.json').exists(),
                next_action='finish registered fits, freeze before assessment' if len(done)<owner.required_fits() else 'complete registered assessments')
+    queue_path=root/'QUEUED_W4_BUILD.json'
+    if queue_path.exists():
+        queue=json.loads(queue_path.read_text())
+        expected=queue['processes'][0]
+        build_tree=process_tree(expected['pid'])
+        build_live=[{k:p[k] for k in ('pid','state','start_ticks','cpu_ticks')} for p in build_tree]
+        identity=any(p['pid']==expected['pid'] and p['start_ticks']==expected['start_ticks'] for p in build_live)
+        build_lock=compute_lock(expected['pid'])
+        build_state=('running' if build_lock['held_by_worker_ancestor'] else 'waiting for shared lock') if identity else 'exited; verify build log'
+        if not identity and 'verified_rc' in queue:
+            build_state='complete' if queue['verified_rc']==0 else 'failed'
+        queue.update(checked=now,state=build_state,live=build_live if identity else [],lock=build_lock,
+                     native_pins_present=(root/'W4_SOURCE_PINS.json').exists())
+        queue_path.write_text(json.dumps(queue,indent=2)+'\n')
+        state['w4_build']=queue
     (root/'SUPERVISION.json').write_text(json.dumps(state,indent=2)+'\n')
     if sys.argv[1:] == ['--compact']:
         state = {k:state[k] for k in ('checked','stage','completed_fits','required_fits','epochs','lock')}
         state['trainer'] = [p for p in live if p['executable'] and p['executable'].endswith('zensim_mlp_train')]
+        if queue_path.exists():state['w4_build']={k:queue[k] for k in ('state','checked','native_pins_present')}
     print(json.dumps(state,indent=2))
 
 
