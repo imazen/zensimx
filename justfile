@@ -4108,6 +4108,12 @@ a-parallel-gate-test:
 a-parallel-gate-hdr-test:
     cargo test -p zensim --features custom-profiles --test native_hdr_color -- --test-threads=1
 
+# Whole-process hardware counters over the same tiny score pairs, before/after.
+# The caller supplies the shared compute lock and run-heavy resource scope.
+a-parallel-gate-profile root phase:
+    test {{quote(phase)}} = before || test {{quote(phase)}} = after
+    env A_SPEED_PARALLEL_GATE=1 RAYON_NUM_THREADS=16 perf stat -e cycles,instructions,context-switches,cpu-migrations,page-faults -o {{quote(root + "/" + phase + "/perf-small.txt")}} -- taskset -c 0-15 {{quote(root + "/" + phase + "/bin/a-speed-peers")}} {{quote(root + "/fixtures")}} 16 64 scores
+
 a-speed-prepare sources output:
     zensim-bench/a-speed-runtime/target/release/a-speed-prepare {{quote(sources)}} {{quote(output)}}
 
