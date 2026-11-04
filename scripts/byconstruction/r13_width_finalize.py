@@ -1,7 +1,7 @@
 """Freeze all R13 packed bakes and derive A's metadata-stripped shipping form.
 
 This completes the released recipe's last step without changing the packed
-assessment bakes. Native inspection proves every inference parameter equal.
+assessment bakes. Native inspections bind layers, scalers, derived inputs and dial.
 """
 import json
 from pathlib import Path
@@ -14,10 +14,23 @@ import r13_width as owner
 def worker():
     root=owner.O
     frozen=json.loads((root/'FROZEN_FITS.json').read_text())
+    control=owner.H/'tmp/e36test/r10/runs/mixF3-s0/pack_e059/refit/production-f16.bin'
+    control_head=root/'FROZEN_CONTROL_HEAD.json'
+    if control_head.exists():raise ValueError('preserve prior finalization control')
+    subprocess.run([str(owner.HEAD),'--inspect',str(control),str(control_head)],check=True)
+    declaration=json.loads(control_head.read_text())['derived_inputs']
+    frozen['control_sha256']=owner.sha(control)
     for row in frozen['models']:
         packed=Path(row['packed_model'])
         if owner.sha(packed)!=row['packed_sha256']:
             raise ValueError('frozen packed bake changed')
+        original=root/f"fits/{row['arm']}-s{row['seed']}/HEAD.json"
+        inspection=json.loads(original.read_text())
+        first,last=inspection['layers']
+        if (inspection['derived_inputs']!=declaration or first['in_dim']!=984
+                or first['out_dim']!=row['capacity']['hidden']
+                or last['in_dim']!=first['out_dim'] or last['out_dim']!=1):
+            raise ValueError('R13 input declaration or registered layer dimensions differ')
         no_repro=packed.with_name('without-repro.bin')
         shipped=packed.with_name('shipped.bin')
         for src,dest,key in ((packed,no_repro,'zentrain.repro'),
@@ -27,7 +40,6 @@ def worker():
                             '--out',str(dest),'--key',key],check=True)
         head=packed.with_name('shipped-inspection.json')
         subprocess.run([str(owner.HEAD),'--inspect',str(shipped),str(head)],check=True)
-        original=root/f"fits/{row['arm']}-s{row['seed']}/HEAD.json"
         if head.read_bytes()!=original.read_bytes():
             raise ValueError('stripping changed inference parameters')
         row.update(shipped_model=str(shipped),shipped_sha256=owner.sha(shipped),
