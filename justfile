@@ -4163,3 +4163,6 @@ r12-source-rows-check:
 
 r12-linear-tables output:
     python3 -B scripts/byconstruction/r12_linear_tables.py --root /var/tmp/byc-linear-20261104 --with-extra --out {{quote(output)}}
+
+r12-linear-head-receipt:
+    python3 -B scripts/byconstruction/r12_linear_head_summary.py --root /var/tmp/byc-linear-20261104 --receipt benchmarks/r12_head_timing_2026-11-04.json

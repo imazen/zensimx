@@ -253,3 +253,9 @@ error is 8.33836%, compression error 7.44035%, and non-codec error 9.44045%, aga
 A's 8.02794%, 7.02144% and 8.58352%. L0 matches A exactly on all these reads.
 L0 pixel assessment and bit proof are complete. L4 pixel and both added arms' HDR
 assessments remain in progress.
+
+Full per-seed timing values, clean/all-round summaries, native model hashes and
+raw JSON hashes: [head timing receipt](r12_head_timing_2026-11-04.json).
+For adopted A0 specifically, the 33-unit L0 head takes 2.839829 µs against
+5.766177 µs for its matched A0 control. The headline L0 2.711389 µs is the
+three-seed mean, including the third seed's three-unit retained head.

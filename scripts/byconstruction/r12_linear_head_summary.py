@@ -7,6 +7,7 @@ floating-point scorer.
 """
 import argparse
 import csv
+import hashlib
 import json
 from pathlib import Path
 from statistics import mean, median
@@ -80,14 +81,43 @@ def sparse_formula(root, destination):
                 writer.writerow(row)
 
 
+def receipt(root, destination):
+    pairs = {}
+    for sub in ('', 'extra'):
+        directory = root / sub
+        summary = json.loads((directory / 'heads/SUMMARY.json').read_text())
+        pins = json.loads((directory / 'reads/MODEL_PINS.json').read_text())
+        for name, row in summary.items():
+            raw = directory / f'heads/timing-{name}.json'
+            seed = name.rsplit('_s', 1)[1]
+            pairs[name] = dict(row, model_sha256=pins[name]['sha256'],
+                               baseline_sha256=pins[f'F_s{seed}']['sha256'],
+                               raw_json=str(raw), raw_json_sha256=hashlib.sha256(raw.read_bytes()).hexdigest())
+    if len(pairs) != 15:
+        raise ValueError('all fifteen frozen head timing pairs required')
+    result = dict(protocol=dict(owner='zenbench; Predictor::predict_transformed', rows=256,
+                               rounds_per_pair=30,
+                               summary='same gate-clean paired indices, no value-based trimming; descriptive means',
+                               units='ns per pair', includes='scaling and raw network forward',
+                               excludes='extraction, derived product generation and served dial'),
+                  pairs=pairs,
+                  original_binary=json.loads((root / 'heads/BINARY.json').read_text()),
+                  extra_binary=json.loads((root / 'extra/heads/BINARY.json').read_text()))
+    destination.write_text(json.dumps(result, indent=2) + '\n')
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument('--root', type=Path, required=True)
     ap.add_argument('--formula', type=Path)
+    ap.add_argument('--receipt', type=Path)
     a = ap.parse_args()
     timing(a.root)
     if a.formula:
         sparse_formula(a.root, a.formula)
+    if a.receipt:
+        timing(a.root / 'extra')
+        receipt(a.root, a.receipt)
 
 
 if __name__ == '__main__':
