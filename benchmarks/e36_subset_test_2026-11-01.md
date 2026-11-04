@@ -2181,3 +2181,7 @@ line: PreviewV0_1, PreviewV0_2, LegacyA, A; `codec_target()` returns A); (3) the
 Sonnet lane. Both public-crate changes go to imazen/zensim PR #2 through the `zensim-profile-a` Codex lane (phase 2 brief
 `~/tmp/zensim-profile-a-brief/PHASE2.md`): the HDR port follows zensimx `94095e06` and `41ea3ecf`, with A's HDR goldens
 derived from the research `BakeScorer::with_hdr_front_end` and a public continuity test.
+**Owner decisions (2026-11-04, ~14:30Z):** `LegacyA` (the v47 development model, never published) is dropped from
+the public crate together with the revision-1 372-feature MLP path only it used; the previews `PreviewV0_1`/`PreviewV0_2`
+(the 0.2.7 API) go behind a cargo feature `legacy-models`, off by default, scores unchanged. Public 0.3.0 default line:
+`A` only. Phase 3 brief `~/tmp/zensim-profile-a-brief/PHASE3.md`.
