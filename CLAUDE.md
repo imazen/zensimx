@@ -182,6 +182,12 @@ because cleanup tests or a historical training reproduction pass.
 
 ## Known Bugs
 
+- **zensim-viz viewport (2026-11-04, fixed):** compact header labels passed a
+  zero font size to selects, and an atlas hidden during resize retained stale
+  image dimensions when reopened. Selects now have explicit type sizing and
+  view switching recomputes image fit. `tools/zensim-viz/tests/design2.mjs`
+  checks readable controls and image bounds at both supported viewport sizes.
+
 - **2026-11-04: structural certification does not imply strict served floating-point monotonicity.**
   The archived revision-7 F seed-0 inspection found 1,663 strict adjacent
   increases across its 494 exported input/family curves (200 recorded CID22

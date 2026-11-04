@@ -1,5 +1,91 @@
 # zensim-viz report — 2026-11-04
 
+## Design 2 — completed and measured
+
+Both views now use the fixed 44px header, virtual family/signal/scale tree,
+central stage, reference pane and 56px filmstrip. Exactly one of Concerns,
+Weights, Dependence, Ranges and Attribution occupies the lens stage. The
+resizable gutters support drag and arrows; search, channel cells, pins, image
+modes, zoom, pan and reset have keyboard controls. All 984 stored inputs are
+reachable through the tree and its fragility toggle. Hover previews until a pin
+holds the selection; filmstrip clicks swap it, and Release pin resumes previews.
+
+Limits first: cursor terms cover the 4 local basic signal groups (SSIM,
+added edges, lost detail and MSE): 120 raw slots and their 120 fragility twins.
+The 3 global basic HF ratios have no local result. Other families say terms
+are not exported. Native HDR pixel maps and real human-response panels remain
+unmeasured/unsupported as described below.
+
+The reference join has **36/36 rendered equations**: 35 family/signal entries
+plus the fragility product. **22 entries have paper descriptions; 14 say
+“no paper text yet”** (13 individual v2 signals plus the product). Both broad
+families have paper descriptions. Bibliography author/year/title/URLs and
+section source anchors come from read-only zenpapers commit
+`8ac8a2b6d020282373977092627b34041693106b`. The current draft uses Typst and four
+split bibliography files, without the suggested fenced LaTeX blocks. Equations
+are explicitly code-derived, with source hashes; missing inspirations are not
+invented. KaTeX 0.19.1 loads once from cdnjs. Every reference entry reaches a
+stored row, and the browser visits all 984 virtual inputs (72 cells initially
+in the DOM).
+
+Native terms use plane-major little-endian f32, on exactly the map sampling
+grid. Revision 7 exports the direct error moment rather than reconstructed
+covariance. All **8,298,195 sampled SSIM formula replays** across the six pairs
+match the retained detector bits. Every pair retains 504 populated-slot and
+720 full-layout bit identities. All **2,088 detector PNGs** remain byte-identical
+to review 1; every prior feature field also matches. All four weight documents
+retain every original field, adding native per-input total |weight|. Six bank
+audits and all existing curves/strict flags are reused unchanged. No tolerance,
+severity threshold or frozen result was relaxed.
+
+The additional native test compares term results with decoded detector PNGs
+on all three odd-size fixtures and both tight/strided rows. Product ranges are
+checked separately: a fragility input shares the raw normalized PNG and scales
+its display range. An initial test applied that scaled range to the raw term;
+the corrected join keeps both checks exact.
+
+Browser acceptance passes at **1600×1000 and 1280×800, both themes and views**:
+8/8 captures report document dimensions equal to viewport dimensions. The
+1600×1000 stage is **1008×900**, above the required 880×700. Keyboard gutter
+resizing reaches the 388px left-panel cap with the default right panel while
+preserving the 55% stage minimum. Measured preloaded preview-to-canvas times
+are **4.6, 4.0, 4.6, 4.8, 4.4, 4.2 ms** when rounded to one decimal; the exact
+six measurements are in the receipt. Four cursor checks match native f32
+bytes, including zoom/pan, scale 1 at the lower-right boundary, and scale 3.
+Reference flags join stored layer/input IDs; the f20 check exposes all 33
+applicable native audit flags. Review-1 paging, zero/MAD distinction,
+minimap/zoom IDs, centered ICE, alpha and bank-scope checks also pass.
+
+Screenshot inspection caught and fixed selector text inheriting a zero font
+size and stale atlas image sizing after a hidden-pane resize. Both have browser
+regressions. Original capture attempts remain under sibling archive directories;
+the current eight images are in `design2-screenshots/`.
+
+Validation receipts: native tests `rc=0 14s | peak-RSS 0.44GiB | min-avail
+39882MiB | peak-load 2.10`; standalone strict clippy `rc=0 4s | peak-RSS
+0.64GiB | min-avail 39968MiB | peak-load 1.07`; metric-library strict clippy
+`rc=0 1s | peak-RSS 0.50GiB | min-avail 40168MiB | peak-load 1.07`.
+Web syntax, numeric formatting, network HTTP and verbatim design-asset checks
+pass. CI was inspected; no new Actions run was dispatched under repository
+policy, so this is local verification rather than a CI-green claim.
+
+Landed milestones: frame `bbb3d090519b`; all equations `950df2e647b6`;
+native terms `53f83a0a850c`; studio interactions `bda091b81227`; viewport fixes
+and capture source `eca9e4f88d48`. Full measurements, hashes and source identity
+are in [design2-evidence.json](design2-evidence.json).
+
+Open questions for the coordinator: **none block this implementation**. Paper
+follow-up remains the 13 missing v2 detector descriptions and the fragility
+product prose; the UI explicitly identifies each gap. The previous RGB8/HDR
+and teacher-versus-human limits remain unchanged.
+
+http://dev.lan:3310/
+
+http://dev.lan:3300/zensim/viz/2026-11-04/design2-screenshots/index.html
+
+http://dev.lan:3300/zensim/viz/2026-11-04/design2-screenshots/browser-review.json
+
+
 ## Coverage and limits
 
 Both requested visualizers are implemented and exercised with native data (2/2).

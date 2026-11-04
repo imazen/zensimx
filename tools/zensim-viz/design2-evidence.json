@@ -1,0 +1,369 @@
+{
+  "review": "DESIGN-2",
+  "output_root": "/mnt/v/output/zensim/viz/2026-11-04",
+  "source_commit": "eca9e4f88d48fec61b82dea8ffbab5cb0edcc66e",
+  "native_export_commit": "53f83a0a850c",
+  "paper_commit": "8ac8a2b6d020282373977092627b34041693106b",
+  "reference_sha256": "e80d59b41224acc017e35478cf41a1a72c7021ee0bce4af4bf9e1301690d258d",
+  "reference_counts": {
+    "entries": 36,
+    "family_signals": 35,
+    "rendered_equations": 36,
+    "paper_text": 22,
+    "no_paper_text": 14,
+    "sidebar_inputs": 984
+  },
+  "native_preservation": {
+    "pairs": [
+      {
+        "pair": "atlas-pair-01",
+        "pooled_bits": 504,
+        "layout_bits": 720,
+        "inputs": 984,
+        "unchanged_map_files": 348,
+        "basic_term_files": 12,
+        "native_formula_replay_samples": 1448916
+      },
+      {
+        "pair": "atlas-pair-02",
+        "pooled_bits": 504,
+        "layout_bits": 720,
+        "inputs": 984,
+        "unchanged_map_files": 348,
+        "basic_term_files": 12,
+        "native_formula_replay_samples": 1448916
+      },
+      {
+        "pair": "atlas-pair-03",
+        "pooled_bits": 504,
+        "layout_bits": 720,
+        "inputs": 984,
+        "unchanged_map_files": 348,
+        "basic_term_files": 12,
+        "native_formula_replay_samples": 1818624
+      },
+      {
+        "pair": "atlas-pair-04",
+        "pooled_bits": 504,
+        "layout_bits": 720,
+        "inputs": 984,
+        "unchanged_map_files": 348,
+        "basic_term_files": 12,
+        "native_formula_replay_samples": 1448916
+      },
+      {
+        "pair": "atlas-pair-05",
+        "pooled_bits": 504,
+        "layout_bits": 720,
+        "inputs": 984,
+        "unchanged_map_files": 348,
+        "basic_term_files": 12,
+        "native_formula_replay_samples": 683907
+      },
+      {
+        "pair": "atlas-pair-06",
+        "pooled_bits": 504,
+        "layout_bits": 720,
+        "inputs": 984,
+        "unchanged_map_files": 348,
+        "basic_term_files": 12,
+        "native_formula_replay_samples": 1448916
+      }
+    ],
+    "weights": {
+      "F0": {
+        "inputs": 984,
+        "original_fields_unchanged": true,
+        "weights_sha256": "068348508b57677a1ac00980eecd48a0bd1ed0d3825d99b5c38930c4a367be1d"
+      },
+      "F1": {
+        "inputs": 984,
+        "original_fields_unchanged": true,
+        "weights_sha256": "1a6e4a9e6a7147e4c0da571de1c5eff3fb775a51bdd5257af5dc5f1ee1d7b405"
+      },
+      "F2": {
+        "inputs": 984,
+        "original_fields_unchanged": true,
+        "weights_sha256": "6742b0bd872794de06112e2fb563c2cba509632bf6c7f8991f6d357546dc2600"
+      },
+      "E": {
+        "inputs": 820,
+        "original_fields_unchanged": true,
+        "weights_sha256": "cdf29ddcb1802bd5007a268bb89e158726aace5369ba177962a02c685d55f915"
+      }
+    },
+    "reused_native_evidence": {
+      "F0/cid22-fit/audit": "907b8f2a8cfac4699768a4c9c3a8ec25006dd3e045a7a2a4907d1bb5f42e408b",
+      "F0/cid22-fit/summary": "2e52cd5d460437b53aa71accf4ba8561375da51888dc84c16db0efeaa1d42908",
+      "F0/hdr-teacher/audit": "660e913bdeb72f0ab4052b4861aba54b378fdd913934b217ecbce096a027c74d",
+      "F0/hdr-teacher/summary": "57ac39690ab52b6ccba5ceaa90d0264ada2684835e56d4a4d3749501ab89238b",
+      "E/cid22-fit/audit": "431d595317808f99512916155cc2240352d8c2bafdc66a7bdbda8a7e2b659b0f",
+      "E/cid22-fit/summary": "75821acb971acffb78400ef1d9c4eb86b2299e89f0adbcdd0e854f0de5f7f1f3",
+      "E/hdr-teacher/audit": "d672f97f00219064b5cc2b8a914bbf61844c8fc2459f449f73bb667d2f0eeb1d",
+      "E/hdr-teacher/summary": "e9e8f12f305ec4d2ad52ff2cdf4e904ed5f2bda9009a89af81d069d0159efbb6",
+      "F1/cid22-fit/audit": "c7dc26dfa8f61c97a78c7529192e79769df472af9431f6e835289135c2823cf6",
+      "F1/cid22-fit/summary": "b9b5e214882f91abd6b5da5a550f38da2b019438997786f1fbc86ffdc91b765f",
+      "F2/cid22-fit/audit": "80982d005a0e88f5652e0e2b53578bfcac653198283e484c966658ed6ad47795",
+      "F2/cid22-fit/summary": "861c1edbfee4d8c666df0a3ab2c835188a6adfa3083a75e5aebc5acf4320c669"
+    },
+    "reference": {
+      "entries": 36,
+      "family_signals": 35,
+      "rendered_equations": 36,
+      "paper_text": 22,
+      "no_paper_text": 14,
+      "sidebar_inputs": 984
+    }
+  },
+  "browser": {
+    "review": "DESIGN-2",
+    "coverage": {
+      "entries": 36,
+      "family_signals": 35,
+      "rendered_equations": 36,
+      "paper_text": 22,
+      "no_paper_text": 14,
+      "sidebar_inputs": 984
+    },
+    "sidebar_ids": 984,
+    "virtual_rows_visited": 984,
+    "equations_rendered": 36,
+    "native_cursor_samples": [
+      {
+        "feature": "input20",
+        "index": 62042,
+        "result": "detail",
+        "value": 0.019433677196502686,
+        "readout": "\u03bcr 0.4192 \u00b7 \u03bcd 0.414 \u00b7 V 0.006698 \u00b7 E\u03b4\u00b2 0.0008047 \u2192 detail 0.01943 at (422, 242) \u00b7 s0, sampled native window"
+      },
+      {
+        "feature": "input20",
+        "index": 96318,
+        "result": "detail",
+        "value": 0.011922955513000488,
+        "readout": "\u03bcr 0.4163 \u00b7 \u03bcd 0.4171 \u00b7 V 0.001385 \u00b7 E\u03b4\u00b2 0.0004187 \u2192 detail 0.01192 at (500, 376) \u00b7 s0, sampled native window"
+      },
+      {
+        "feature": "input39",
+        "index": 208998,
+        "result": "d1",
+        "value": 0.0048339893110096455,
+        "readout": "\u03bcr 0.395 \u00b7 \u03bcd 0.3928 \u00b7 V 0.000004651 \u00b7 E\u03b4\u00b2 0.000008974 \u2192 d1 0.004834 at (1020, 816) \u00b7 s1, sampled native window"
+      },
+      {
+        "feature": "input117",
+        "index": 12575,
+        "result": "d1",
+        "value": 0.008600073866546154,
+        "readout": "\u03bcr 0.3914 \u00b7 \u03bcd 0.3949 \u00b7 V 0.000008733 \u00b7 E\u03b4\u00b2 0.00002009 \u2192 d1 0.0086 at (16, 792) \u00b7 s3, sampled native window"
+      }
+    ],
+    "reference_flag_count": 33,
+    "source_commit": "eca9e4f88d48fec61b82dea8ffbab5cb0edcc66e",
+    "resized_left_px": 388,
+    "virtualized_cells": 72,
+    "preloaded_hover_ms": [
+      4.599999904632568,
+      4,
+      4.599999904632568,
+      4.800000190734863,
+      4.400000095367432,
+      4.199999809265137
+    ],
+    "screenshots": [
+      {
+        "name": "atlas-dark-1600x1000.png",
+        "viewport": [
+          1600,
+          1000
+        ],
+        "document": [
+          1600,
+          1000
+        ],
+        "stage": {
+          "x": 266,
+          "y": 44,
+          "width": 1008,
+          "height": 900,
+          "top": 44,
+          "right": 1274,
+          "bottom": 944,
+          "left": 266
+        },
+        "exhibits": 1
+      },
+      {
+        "name": "atlas-light-1600x1000.png",
+        "viewport": [
+          1600,
+          1000
+        ],
+        "document": [
+          1600,
+          1000
+        ],
+        "stage": {
+          "x": 266,
+          "y": 44,
+          "width": 1008,
+          "height": 900,
+          "top": 44,
+          "right": 1274,
+          "bottom": 944,
+          "left": 266
+        },
+        "exhibits": 1
+      },
+      {
+        "name": "lens-dark-1600x1000.png",
+        "viewport": [
+          1600,
+          1000
+        ],
+        "document": [
+          1600,
+          1000
+        ],
+        "stage": {
+          "x": 266,
+          "y": 44,
+          "width": 1008,
+          "height": 900,
+          "top": 44,
+          "right": 1274,
+          "bottom": 944,
+          "left": 266
+        },
+        "exhibits": 1
+      },
+      {
+        "name": "lens-light-1600x1000.png",
+        "viewport": [
+          1600,
+          1000
+        ],
+        "document": [
+          1600,
+          1000
+        ],
+        "stage": {
+          "x": 266,
+          "y": 44,
+          "width": 1008,
+          "height": 900,
+          "top": 44,
+          "right": 1274,
+          "bottom": 944,
+          "left": 266
+        },
+        "exhibits": 1
+      },
+      {
+        "name": "atlas-dark-1280x800.png",
+        "viewport": [
+          1280,
+          800
+        ],
+        "document": [
+          1280,
+          800
+        ],
+        "stage": {
+          "x": 246,
+          "y": 44,
+          "width": 748,
+          "height": 700,
+          "top": 44,
+          "right": 994,
+          "bottom": 744,
+          "left": 246
+        },
+        "exhibits": 1
+      },
+      {
+        "name": "atlas-light-1280x800.png",
+        "viewport": [
+          1280,
+          800
+        ],
+        "document": [
+          1280,
+          800
+        ],
+        "stage": {
+          "x": 246,
+          "y": 44,
+          "width": 748,
+          "height": 700,
+          "top": 44,
+          "right": 994,
+          "bottom": 744,
+          "left": 246
+        },
+        "exhibits": 1
+      },
+      {
+        "name": "lens-dark-1280x800.png",
+        "viewport": [
+          1280,
+          800
+        ],
+        "document": [
+          1280,
+          800
+        ],
+        "stage": {
+          "x": 246,
+          "y": 44,
+          "width": 748,
+          "height": 700,
+          "top": 44,
+          "right": 994,
+          "bottom": 744,
+          "left": 246
+        },
+        "exhibits": 1
+      },
+      {
+        "name": "lens-light-1280x800.png",
+        "viewport": [
+          1280,
+          800
+        ],
+        "document": [
+          1280,
+          800
+        ],
+        "stage": {
+          "x": 246,
+          "y": 44,
+          "width": 748,
+          "height": 700,
+          "top": 44,
+          "right": 994,
+          "bottom": 744,
+          "left": 246
+        },
+        "exhibits": 1
+      }
+    ],
+    "uncaught_errors": []
+  },
+  "checks": {
+    "test-real": "run-heavy: done rc=0 14s | peak-RSS 0.44GiB | min-avail 39882MiB | peak-load 2.10",
+    "clippy": "run-heavy: done rc=0 4s | peak-RSS 0.64GiB | min-avail 39968MiB | peak-load 1.07",
+    "library-clippy": "run-heavy: done rc=0 1s | peak-RSS 0.50GiB | min-avail 40168MiB | peak-load 1.07"
+  },
+  "screenshots": {
+    "atlas-dark-1600x1000.png": "353b12d6bf04d491f1e78e7a8737367617647bc0802a872a3e80e765def4f3b7",
+    "atlas-light-1600x1000.png": "ce1866cf2b9c4abdba6af563600083a8c9a86e7f99bb5adbde2e7dcb62564973",
+    "lens-dark-1600x1000.png": "5899a1771ca3baae1b885377a624bc5ecb012f26eb21e84ca50f0667d4538f98",
+    "lens-light-1600x1000.png": "4b0b3102e056d7df77bfea6422cb05f71db307985bcd4bd31058b9e38a1db272",
+    "atlas-dark-1280x800.png": "3443fda001b9fca83990d36a8ed5e0e1b90a4970498363273c08e8b439c32076",
+    "atlas-light-1280x800.png": "f8048aa43a8ef4dc5aee73335026ac96d37441569659e4dc7fa96f36a3a93245",
+    "lens-dark-1280x800.png": "045acc558d9f707e4167d350dd92a310272811742838b20d362c55cc694e6d79",
+    "lens-light-1280x800.png": "0839899802763b0078b1ee8a08ac77e66c0502da16662bd91626e16ef43929af"
+  },
+  "native_binary_sha256": "b3cb4da87d806d71e8dd8c63942b0384c21754783ea46c8f71439876913e4e85"
+}

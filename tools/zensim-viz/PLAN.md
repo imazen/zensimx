@@ -146,3 +146,9 @@ document height equal to viewport, stage at least 55% width and 70% height at
 1600×1000, preloaded hover below 50ms, complete stored-ID/reference joins,
 and native term/parity checks. Record evidence and open questions in REPORT
 and chat; push each verified milestone to main.
+
+Design 2 completion: the fixed frame, all 36 code-derived equations, paper
+coverage labels, 984-row virtual join and native basic cursor terms are
+implemented. Eight viewport/theme/view captures and exact cursor, map, pooled
+bit, original-weight-field and review-1 regressions pass. Current coverage and
+source commits are recorded at the top of REPORT.md and in design2-evidence.json.

@@ -4,6 +4,25 @@ A native revision-7 feature atlas and MLP lens. Hover detector maps, inspect
 individual weights and follow their served-score effects. [REPORT.md](REPORT.md)
 records measured coverage, limitations and the completed design review.
 
+## Inspect
+
+The app uses one viewport: a virtual feature tree, the image or one lens exhibit,
+and a paper reference pane. Search with `/`, walk with arrows, and pin with
+Enter. Release the pin to resume hover previews. Wheel/drag zoom and pan the
+image; arrows on the focused stage pan, and double-click resets. Gutters also
+resize with arrows. Pins and the active legend stay in the bottom strip.
+
+Reference entries distinguish paper prose from revision-7 code-derived
+formulae. KaTeX 0.19.1 loads once from cdnjs. Build the read-only paper join with
+`just viz-reference "$output/audit/weights.json" "$output/reference.json"`.
+The paper commit, bibliography and code hashes travel with the result.
+
+Basic local SSIM, added-edge, lost-detail and MSE maps expose exact f32 terms
+at the cursor. Their binary planes share the map sampling grid. Global HF
+ratios and other families explicitly have no local term demo. The native
+revision-7 direct-error form uses an error moment instead of reconstructing
+covariance. RGB8 ingress and the other limits in REPORT still apply.
+
 ## Build and export
 
 From the repository root, set absolute paths for `bake`, `comparison_bake`,
@@ -81,14 +100,23 @@ just viz-format-test
 just viz-web-check
 VIZ_TEST_COMPLETE=1 just viz-browser
 just viz-review-browser
+just viz-design2-browser
 ```
 
 Real-bake tests require the frozen F0 bake/CID22 bank identified in
 `f-audit-census.json` and `VIZ_CERTIFIER`. Browser checks need `VIZ_PLAYWRIGHT`
-(installed module) and `VIZ_CHROMIUM` (executable). `VIZ_CAPTURE_DIR` saves fresh
-view/theme images. `VIZ_TEST_SCOPE=audit` checks only the audit portion.
+(installed module) and `VIZ_CHROMIUM` (executable). `VIZ_CAPTURE_DIR` saves eight fresh view/theme/viewport images and
+`browser-review.json`; existing files are refused. `VIZ_TEST_SCOPE=audit` checks only the audit portion.
 
 See the report for diagnostic definitions: zero MAD differs from an all-zero
 row; inactive units are bank-scoped; drift is descriptive; ablations overlap;
 weight indices do not align neurons across independent bakes. All strict
 score rises remain recorded, with the approved magnitude-based severity.
+
+`zensim-viz-export weights BAKE --out NEW_DIRECTORY` exports the same native
+weight document with per-input total |weight| and an identity receipt. Set
+`weights_directory` on a bake in the assembly config to use it; assembly verifies
+its bake against each bank audit. This does not replace the bank audit.
+`just viz-design2-verify OUTPUT_ROOT NEW_RECEIPT_JSON` compares complete Design 2
+bundles against the retained review-1 exports, including every prior feature
+field and map byte.
