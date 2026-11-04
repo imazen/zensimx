@@ -11,6 +11,15 @@
 
 - Add a separate TRAIN-only Rev7 UPIQ extraction admission while preserving the frozen Rev5 contract and original source membership. Native extraction tests and the 380-row computation pass; feature publication and HDR training qualification remain incomplete.
 
+### Fixed
+
+- Validate tracked-path guards in plain source exports using an explicit, strict
+  file-list manifest; preserve normal VCS discovery (`4a403308`).
+
+- Restore registry-test decoding of the existing `fx2_consumed_504` declaration,
+  retaining registered hashes and coverage checks (`e517c776`). Serving arithmetic
+  and the ignored legacy pool identity test remain unchanged.
+
 ### Dependency compatibility
 
 - Update training-core and Adam constructor calls to equivalent token-explicit aliases; strict workspace lint passes. No arithmetic or dependency-version change (`872adce9`).
@@ -26,6 +35,8 @@
 - Unpublished `zensim-validate`: explicit `MlpHyperparams` struct literals gain the owner-approved `init_from` and `constant_lr` fields (`None` and `false` preserve default behavior). Supported serving-crate APIs are unchanged.
 
 ### Added
+
+- Unpublished complete-feature fusion probes and native gate/timing receipts (`d6a537ee`, `32f6e69f`, `2190da00`). The [fusion study](benchmarks/a_extraction_fusion_2026-11-04.md) records the rejected moment ring and ongoing qualification; no fusion has landed.
 
 - Research R14 T2: native log-knee gradients, TRAIN-quantile projection, current-transform checkpoint scaling, and a release binding to the registered teacher-development comparison. Other transforms remain fixed; no T2 fit is released merely by building this support.
 
