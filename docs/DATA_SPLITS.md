@@ -3080,3 +3080,7 @@ amendment 6 result).
   (PU21 control + anchored cube root at 100/203/255/1000 cd/m²) × F seeds 0-2, F3 seeds 0-2 and E through
   `hdr_panel_upiq_all.py --upiq-bank` and `hdr_frontend_compare.py`; T2 TRAIN rows no candidate trained on; no fit, no
   selection; PU21 stands (benchmarks/e36_subset_test_2026-11-01.md, "HDR front-end experiment result").
+- 2026-11-04 (R11, codec-only continuations of the mix): EVAL collection labels read again, report-only, for `mixF3codec` and
+  `mixF3codecB` (seeds 0-2) and the ECodec and F3codec baselines through `dataset_eval.py score` + `readout.py` + `ceval.py`
+  (compression and non-codec rows); E36 selection-source inversion share via `e36_features.py inversions` + `primary.py`
+  (label-free consensus pairs). No fit, no selection (benchmarks/e36_subset_test_2026-11-01.md, R11).

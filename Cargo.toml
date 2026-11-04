@@ -11,7 +11,7 @@ members = ["zensim", "zensim-experimental", "zensim-validate", "zensim-regress",
 # `apidoc/` is the CI-free public-API snapshot runner: excluded so plain
 # `cargo test` and every CI job (incl. --all-features) never compile its
 # dependency tree or run rustdoc. Regenerate via `just api-doc`.
-exclude = ["zensim-bench", "zensim-picker-prep", "zensim-target", "apidoc"]
+exclude = ["zensim-bench", "zensim-picker-prep", "zensim-target", "zensim-ultrahdr-probe", "apidoc"]
 
 [profile.release]
 lto = "thin"
