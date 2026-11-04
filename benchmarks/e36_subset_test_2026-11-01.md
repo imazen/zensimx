@@ -2016,3 +2016,20 @@ ladders, a 0.4-point error rise on the held-out collections and Colourlab's non-
 itself (arm B) is worse than continuing its base (arm A) on every read. **Recommendation:** no codec variant of the mix
 ships now; F covers codec output better than any codec-only continuation on the ladders the product optimises. If the
 owner wants a codec profile regardless, arm A is the one, and it would still need the R6 label-free gates.
+
+### Owner decision (2026-11-04): PU21 is not the HDR front end; the HDR front-end rule is set aside
+
+After the Ultra HDR probe's addendum (two thirds of zensim's SDR-to-HDR gap on the camera files is the PU21 path's own
+severity on identical pixels, growing with the assumed luminance), the owner: "That's why I said to not use PU21. Ignore the
+gate on that until we sort this out - let's use a proper model that makes continuity better." Recorded consequences:
+
+- The reading rule of the "HDR front-end experiment" (PU21 stands unless an anchored arm is non-negative on both UPIQ
+  studies) is **set aside**. It compared zero-shot front-end swaps under PU21-trained weights, which is not the question.
+- **Continuity is the requirement**: an SDR image fed through the HDR path at its reference white must score as it does
+  through the SDR path, and HDR light above white must extend that scale, not a different one. The anchored cube root
+  (`HdrEncoding::LinearCubeRoot`, nits over the SDR white luminance, unclamped) has this by construction: at a unit of
+  1 cd/m² on light in [0, 1] it equals the SDR gamut-preserving path bit for bit (`linear_cube_root_front_end_is_the_sdr_cube_root_on_the_same_light`),
+  and the unit only sets which luminance is "white".
+- **Next: a model fit through that front end** rather than another zero-shot read; the registration follows below once
+  the HDR training path's inputs are re-extracted through it. The shipped profiles' PU21 HDR entry (`compute_hdr`) stays
+  as is until that model exists; its scores are a separate regime from the SDR scores and must be labelled so.
