@@ -4309,3 +4309,8 @@ r14-transform-checks:
 # TRAIN screening is serialized with other research jobs on the fitting host.
 r14-transform-screen:
     flock ~/tmp/heavy.lock ~/work/claudehints/scripts/run-heavy --mem 24G --jobs 8 -- python3 -B scripts/byconstruction/r14_transforms_screen.py
+
+r14-certificate-checks:
+    cargo test -p zensim-validate --lib mlp_train::transforms -- --test-threads=1
+    cargo test -p zensim-validate --lib mlp_train::warm_start -- --test-threads=1
+    cargo check -p zensim-validate --bin bake_dial_refit --bin zensim_mlp_train

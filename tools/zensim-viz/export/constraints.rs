@@ -46,7 +46,9 @@ pub(crate) fn inspect(model: &Model, inputs: &[Input], bake: &Path) -> Result<Co
     let scales = model.scaler_scale();
     let mut exempt = BTreeSet::new();
     let mut gates = Vec::new();
-    for p in inputs.iter().filter(|i| i.factor.is_some()) {
+    // A nonlinear input transform invalidates the linear gated-weight slope
+    // exemption. Mirror the canonical certificate; max-pair witnesses remain.
+    for p in inputs.iter().filter(|i| i.factor.is_some() && !model.has_nontrivial_feature_transforms()) {
         let Some(d) = inputs
             .iter()
             .find(|i| i.factor.is_none() && i.feature == p.feature)

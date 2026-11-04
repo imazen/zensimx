@@ -590,7 +590,7 @@ struct Args {
     #[arg(long, value_name = "TOKEN:IDX[:PARAMS]")]
     feature_transform: Vec<String>,
     /// Exact R14 registration; transform table is additionally bound by the subjective authority.
-    #[arg(long)]
+    #[arg(long, requires = "subjective_authority")]
     r14_transforms_registration: Option<String>,
 
     /// V0_20 input-shaping: auto-load per-feature transforms from a

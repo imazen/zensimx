@@ -1654,6 +1654,26 @@ fn cmd_certify_monotone(a: &CertifyMonotoneArgs) -> Result<bool, String> {
         }
         Err(e) => serde_json::json!({"certified": false, "reason": e, "bake": a.bake}),
     };
+    let mut line = line;
+    if verdict.is_ok()
+        && let Some(ts) = model.feature_transforms()
+    {
+        line["feature_transforms"] = serde_json::json!(
+            ts.iter()
+                .enumerate()
+                .map(|(i, &t)| {
+                    let params = model
+                        .feature_transform_params()
+                        .map_or(&[][..], |p| p[i].as_slice());
+                    serde_json::json!({"caller_input":i,"token":t.as_token(),"params":params,
+                "value_at_zero":t.apply_with_params(0.,params),
+                "derivative_at_zero":zensim_validate::mlp_train::transforms::slope_at_zero(t,params)
+                    .expect("certificate validates slopes"),
+                "finite_positive_one_sided_derivative":true,"domain":"[0,infinity)"})
+                })
+                .collect::<Vec<_>>()
+        );
+    }
     println!("{line}");
     Ok(verdict.is_err())
 }

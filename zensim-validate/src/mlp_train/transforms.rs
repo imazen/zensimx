@@ -111,3 +111,41 @@ mod admission_tests {
         );
     }
 }
+
+#[cfg(test)]
+mod certificate_tests {
+    use super::*;
+    #[test]
+    fn certificate_accepts_smooth_transforms_and_refuses_roots_and_signed_gate_shortcuts() {
+        let base = serde_json::json!({"schema_hash":1,"scaler_mean":[0.,0.],"scaler_scale":[1.,1.],
+            "metadata":[{"key":"zentrain.feature_transforms","type":"utf8","text":"soft_clip\nsoft_sign"},
+                {"key":"zentrain.feature_transform_params","type":"utf8","text":"0.5,0.5\n2"}],
+            "layers":[{"in_dim":2,"out_dim":1,"activation":"relu","dtype":"f32","weights":[1.,2.],"biases":[0.]},
+                {"in_dim":1,"out_dim":1,"activation":"identity","dtype":"f32","weights":[-1.],"biases":[100.]}]});
+        let bytes = zenpredict_bake::bake_from_json_str(&base.to_string()).unwrap();
+        let model = zenpredict::Model::from_bytes(&bytes).unwrap();
+        assert!(super::super::certify_monotone_bake(&model, 100.).is_ok());
+        let mut invalid = base.clone();
+        invalid["metadata"][0]["text"] = serde_json::json!("signed_sqrt\nsoft_sign");
+        invalid["metadata"][1]["text"] = serde_json::json!("\n2");
+        let bytes = zenpredict_bake::bake_from_json_str(&invalid.to_string()).unwrap();
+        assert!(
+            super::super::certify_monotone_bake(
+                &zenpredict::Model::from_bytes(&bytes).unwrap(),
+                100.
+            )
+            .is_err()
+        );
+        let mut gated = base;
+        gated["metadata"].as_array_mut().unwrap().push(serde_json::json!({"key":"zensim.derived_inputs","type":"utf8","text":"zensim-derived-inputs v1\nin 13\nproduct 13 422"}));
+        gated["layers"][0]["weights"] = serde_json::json!([1., -0.5]);
+        let bytes = zenpredict_bake::bake_from_json_str(&gated.to_string()).unwrap();
+        assert!(
+            super::super::certify_monotone_bake(
+                &zenpredict::Model::from_bytes(&bytes).unwrap(),
+                100.
+            )
+            .is_err()
+        );
+    }
+}

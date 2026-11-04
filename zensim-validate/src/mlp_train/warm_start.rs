@@ -235,6 +235,17 @@ impl InitialWeights {
             return Err("initial checkpoint model-input layout differs".into());
         }
         if model.feature_transforms().is_some() || hp.feature_transforms.is_some() {
+            if hp
+                .feature_transforms
+                .as_ref()
+                .is_some_and(|t| t.len() != n_features)
+                || hp
+                    .feature_transform_params
+                    .as_ref()
+                    .is_some_and(|p| p.len() != n_features)
+            {
+                return Err("initial checkpoint transform training width differs".into());
+            }
             if hp.r14_transforms_registration.as_deref() != Some(super::transforms::REGISTRATION) {
                 return Err("initial checkpoint transforms require R14 registration".into());
             }
@@ -534,6 +545,34 @@ mod tests {
         );
         assert_eq!(before, (loaded.w1, loaded.w2, loaded.b1, loaded.b2));
         assert!(max_pair_positions(&[0.0, 0.0], &[0.0, 0.0], &[-1.0, -2.0], 1).is_err());
+    }
+
+    #[test]
+    fn carries_transforms_only_when_registration_and_checkpoint_table_match() {
+        let (bytes, mut hp) = fixture();
+        let bytes = zenpredict_bake::append_metadata_utf8(
+            &bytes,
+            "zentrain.feature_transforms",
+            "soft_clip\nsoft_sign",
+        )
+        .unwrap();
+        let bytes = zenpredict_bake::append_metadata_utf8(
+            &bytes,
+            "zentrain.feature_transform_params",
+            "0.5,0.5\n2",
+        )
+        .unwrap();
+        hp.feature_transforms = Some(vec![
+            zenpredict::FeatureTransform::SoftClip,
+            zenpredict::FeatureTransform::SoftSign,
+        ]);
+        hp.feature_transform_params = Some(vec![vec![0.5, 0.5], vec![2.]]);
+        assert!(InitialWeights::load(&bytes, 2, &hp, None).is_err());
+        hp.r14_transforms_registration = Some(super::super::transforms::REGISTRATION.into());
+        let loaded = InitialWeights::load(&bytes, 2, &hp, None).unwrap();
+        assert_eq!(loaded.scaler_mean, vec![0., 0.]);
+        hp.feature_transform_params.as_mut().unwrap()[1][0] = 3.;
+        assert!(InitialWeights::load(&bytes, 2, &hp, None).is_err());
     }
 
     #[test]

@@ -1660,7 +1660,8 @@ pub struct MonotoneCertificate {
 /// Checks, from the baked bytes alone, the structure that makes a one-hidden-
 /// layer model monotone by construction (up to an explicit bounded budget):
 ///
-/// - ReLU hidden layer, identity scalar output, no feature transforms;
+/// - ReLU hidden layer, identity scalar output, with absent or R14 smooth,
+///   increasing, zero-preserving scalar input transforms;
 /// - `scaler_mean = 0`, `scaler_scale > 0` (standardization is increasing and
 ///   maps `0⃗` to `0⃗`);
 /// - every `b1 <= 0`, output bias `== pin`;
@@ -1705,11 +1706,11 @@ pub fn certify_monotone_bake(
     {
         return Err("needs ReLU hidden layer and identity scalar output".into());
     }
-    if model
-        .feature_transforms()
-        .is_some_and(|ts| ts.iter().any(|t| *t != FeatureTransform::Identity))
-    {
-        return Err("feature transforms present".into());
+    if let Some(ts) = model.feature_transforms() {
+        transforms::validate(ts, model.feature_transform_params())?;
+        if ts.len() != model.n_inputs() {
+            return Err("R14 transforms must preserve scalar caller arity".into());
+        }
     }
     if model.scaler_mean().iter().any(|&m| m != 0.0)
         || model
@@ -1737,7 +1738,15 @@ pub fn certify_monotone_bake(
     // is a `pjnd_fragility` slot, bounded in (0, 1] by construction. A unit is
     // monotone in a damage feature when its gain `a/s_d + b·f/s_p` is >= 0 for
     // every such f, i.e. `a >= 0` and `a/s_d + min(0, b)/s_p >= 0`.
-    let gates = derived_gates(model)?;
+    // The historical signed product exemption assumes a linear t(D*R).
+    // Nonlinear transforms invalidate that slope bound; require nonnegative
+    // ordinary columns and prove signed corrections only through max pairs.
+    let gates = if model.has_nontrivial_feature_transforms() {
+        derived_gates(model)?; // still validate the declaration
+        Vec::new()
+    } else {
+        derived_gates(model)?
+    };
     let scale = model.scaler_scale();
     let mut gated = vec![false; n_in];
     for &(_, p) in &gates {
