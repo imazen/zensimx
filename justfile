@@ -4347,6 +4347,9 @@ r14-transform-fit arm:
 r14-transform-status:
     python3 -B scripts/byconstruction/r14_transforms_status.py
 
+r14-native-noop:
+    python3 -B scripts/byconstruction/r14_transforms.py job --label native-noop -- python3 -B scripts/byconstruction/r14_transforms_noop.py
+
 r14-transform-capacity:
     python3 -B scripts/byconstruction/r14_transforms.py capacity
 
