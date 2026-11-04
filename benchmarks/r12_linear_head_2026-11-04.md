@@ -202,7 +202,11 @@ rows, such as UPIQ development inside UPIQ-all; they are not a distinct-image co
 The proof uses the native production BakeScorer with a bit-output option, not an
 algebraically reconstructed scorer or decimal tolerance. Dial fixtures retain their
 720 raw columns; EVAL/E36/chroma have 1,825, HDR transports 1,853. Every model uses
-the same 984 declared head inputs. Pixel-gate bit checks follow their ongoing reads.
+the same 984 declared head inputs. Pixel-gate bit checks also pass for all three seeds: each matches A on all 135
+G-STEER cases (both base and repair score-bit fields), all 744 identity scores,
+and all 768 serialized NEARID ladder scores spanning 648 distinct packet rows.
+The NEARID ladder count includes reused identity scores. Native model/tool pins
+and both feature/pixel proof results are retained in the same receipt.
 
 A0's optional two-unit L0r changes 842,021 of those fixture-row occurrences.
 The largest absolute served-score difference is 0.004247403886495249 points,
@@ -246,4 +250,5 @@ L4's E36 share is 3.161444%, a change of −0.235202 percentage points against A
 (95% origin bootstrap −0.412274 to −0.049230). Its all-nine normalized MOS median
 error is 8.33836%, compression error 7.44035%, and non-codec error 9.44045%, against
 A's 8.02794%, 7.02144% and 8.58352%. L0 matches A exactly on all these reads.
-Pixel and HDR assessments remain in progress.
+L0 pixel assessment and bit proof are complete. L4 pixel and both added arms' HDR
+assessments remain in progress.

@@ -216,5 +216,39 @@
     "sha256": "9cfa75115d953667869980252f27a6a91e4218e50df126618176efb10fb4a7db"
   },
   "rows_per_seed": 861516,
-  "comparisons": 2584548
+  "comparisons": 2584548,
+  "pixel_proof": {
+    "L0_s0": {
+      "steer_cases": 135,
+      "steer_base_and_repair_bits_equal": true,
+      "identity_score_bits": 744,
+      "nearid_rows": 648,
+      "nearid_ladder_score_bits": 768,
+      "all_equal": true
+    },
+    "L0_s1": {
+      "steer_cases": 135,
+      "steer_base_and_repair_bits_equal": true,
+      "identity_score_bits": 744,
+      "nearid_rows": 648,
+      "nearid_ladder_score_bits": 768,
+      "all_equal": true
+    },
+    "L0_s2": {
+      "steer_cases": 135,
+      "steer_base_and_repair_bits_equal": true,
+      "identity_score_bits": 744,
+      "nearid_rows": 648,
+      "nearid_ladder_score_bits": 768,
+      "all_equal": true
+    }
+  },
+  "pixel_tool_pins": {
+    "/var/tmp/byc-fchroma-20261029/r3/tools/predict_features_with_bake": "effaff7d37061df4a4456614dca46756b537302aea7cb2c22ebcad5f383f4f91",
+    "/var/tmp/byc-hdr-20261104/bin/bake_dial_refit": "ce9ff24b62b940877ddc94c1a794437c0a1b07075cbe6ddcf21ad404f116b942",
+    "/var/tmp/byc-hdr-20261104/bin/panel": "4a4319ed0b8ffdde4189e591e8f7cbefcd014365c53d5a6692478327e8a86c5d",
+    "/var/tmp/zensim-bin-10d087cd/byc_predict": "faebb8509dea79907a443931e3f9facf58fe14c99e82c04f9fa589617088364c",
+    "/var/tmp/byc-fx2-20261028/stage2/gate-tools-d02d2e07/steer_instrument": "b67a89de9880921a6880869333722e11ee82ee7e5690848704872330260be502",
+    "/home/lilith/tmp/e36test/nearid/bin/serve_custom_bake": "598477d32643f6ddecd1f1e932c1d94c76b3f3461b1048d466697d63ecf89899"
+  }
 }
