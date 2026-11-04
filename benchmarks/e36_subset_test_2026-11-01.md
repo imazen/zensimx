@@ -2234,3 +2234,14 @@ All fits/reads on dev, serialized through heavy.lock and run-heavy with 24G cap;
 Result: report every registered read beside A, full L2 coefficient formula, hashes, head-only
 timings and product-gate verdict in `benchmarks/r12_linear_head_2026-11-04.md`.
 Negative/incomplete outcomes are results, never adoption or permission to weaken a gate.
+
+
+**R12 development-unit correction (2026-11-04, before any L3 fit or EVAL read).**
+The registration's `100 * human_score` is an erroneous conversion: the teacher tables
+already store score points, and the canonical trainer uses `--target-scale 1`.
+The first R12 development check multiplied them again and is invalid (retained in
+`/var/tmp/byc-linear-20261104/dev-unit-error/`). Compare final packed scores directly
+with the stored `human_score` instead. The population, row weighting, three-seed mean
+and one-score-point allowance remain exactly as registered. A fresh corrected TRAIN
+development check must qualify L3; the invalid result does not authorize continuation.
+This corrects a unit mistake introduced by R12, with no EVAL-guided selection.
