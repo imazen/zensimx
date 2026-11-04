@@ -1393,3 +1393,57 @@ TensorFlow's `decode_jpeg(channels=3, fancy_upscaling=True, dct_method="INTEGER_
 
 Reading: a further evaluation of the dial candidates, as the owner asked ("we need to do more evals"); nothing is
 adopted on it.
+
+### R10 amendment 2 result (2026-11-03): the mix passes the remaining gates; read 3 is neutral
+
+`mixF3` seeds 0-2 (`e36_exp56/postR10b.sh`; outputs under `~/tmp/e36test/postR10b/`, `gates/mixF3_s*-vi/`,
+`nearid/out-mixf3s{1,2}/` and `clic21-confirm-3/` on dev):
+
+- **G-TRADE (a)**, 18,267 trade pairs over 64 px, 173 sources: `mixF3` 2.47% / 2.55% / 2.38% (mean 2.47%) against
+  F3's control 2.50% / 2.35% / 2.24% (mean 2.36%, the subset test's recorded value). +0.11 points against a bar of
+  +0.5: **pass**.
+- **Dial contract C1-C6:** PASS on both grids at every seed (standard C1 0.997 / 0.998 / 0.998, ladder C1 0.992 /
+  0.994 / 0.992; C3 0.768 / 0.741 / 0.724). **Identity:** 12 SIMD permutations, 62 sources identical at every tier,
+  every seed. **pass**.
+- **NEARID at seeds 1 and 2:** N1-N3 pass, 132 of 144 monotone ladders at both (seed 0: 132). **pass**.
+- **Confirmation read 3, CLIC 2021 validation** (4,812 questions, 315 references; `clic21-confirm-3/CONFIRM.json`):
+  F3's control 0.6445 / 0.6443 / 0.6398; `mixF3` 0.6417 / 0.6456 / 0.6444, seed-mean difference **+0.0010 [-0.0024,
+  +0.0044], neutral**; mix + p30L 0.6386 / 0.6382 / 0.6378, **-0.0047 [-0.0091, -0.0003], contradicted**.
+
+Reading: `mixF3` passes the amendment (every gate passes and read 3 does not contradict it). Its R10 G-STEER miss
+(133 / 134 / 134, broad-220-b8 at every seed) stands as recorded. Mix + p30L is contradicted on CLIC 2021, as the
+hinge arms were in read 1. CLIC 2021 validation has now been read three times; F3's control four.
+
+### R10 amendment 3 result (2026-11-03): CIQA cannot separate the candidates
+
+`e36_exp56/ciqa_confirm.sh`. Features: 13,713 pairs in 47 s wall (peak RSS 1.1 GiB) on dev. The read is ledgered in
+`confirm-1/LABEL_READS.json` under the private CIQA root; its outputs stay there.
+
+| model (seeds 0 / 1 / 2) | all 7,902 questions, 6,596 references | native test split, 1,573 questions, 267 references |
+|---|---|---|
+| F3 control | 0.6752 / 0.6753 / 0.6753 | 0.6821 / 0.6821 / 0.6821 |
+| p30L | 0.6752 / 0.6752 / 0.6752 | 0.6822 / 0.6823 / 0.6823 |
+| `mixF3` | 0.6752 / 0.6752 / 0.6753 | 0.6819 / 0.6818 / 0.6821 |
+| mix + p30L | 0.6753 / 0.6753 / 0.6753 | 0.6820 / 0.6822 / 0.6822 |
+
+Every model's whole-reference interval is about [0.671, 0.680] on all rows. Arms against F3's control (seed means):
+p30L -0.0000 [-0.0001, +0.0001], `mixF3` -0.0000 [-0.0002, +0.0002], mix + p30L +0.0001 [-0.0001, +0.0003]: all
+**neutral**, and the same on the test split.
+
+Why the read is flat (diagnostics on the same read; the quality settings and the ceiling are label-free or follow
+from the labels already read):
+
+- Every question compares two JPEG quality settings of one photograph (median gap 27 settings; 9.9% of questions
+  within 5). The rule "the higher setting wins" scores 0.6750. The ceiling, siding with every majority, is 0.6975.
+  Every candidate orders 99.4-99.5% of the questions as the setting does (40-51 exceptions of 7,902), and the
+  candidates differ from one another on 0.2-0.3% of the questions (F3's control against `mixF3` 24, against p30L 14,
+  against mix + p30L 24; the control's own seeds differ on 4-7), at gaps averaging 4 settings.
+- The majority prefers the lower setting on 1,211 questions (15.3%; median gap 14). On those no candidate agrees
+  better than 0.49-0.53. By the lower setting of the pair: at q 10-30 (3,195 questions) the setting rule scores 0.803
+  against a ceiling of 0.808; at q 71-90 (751) 0.508 against 0.579; at q 91-100 (73) 0.480 against 0.579. The room
+  a metric could use is in the near-transparent pairs, and no candidate uses it.
+
+Consequence: CIQA as published (one codec, within-reference pairs, soft labels) measures whether a metric orders JPEG
+settings, which every candidate does; it is not an instrument for choosing among them. It has now been read once;
+no further read is planned unless a candidate disagrees with the setting order. The owner's evaluation-only
+condition stands.
