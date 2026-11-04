@@ -183,7 +183,25 @@ pub(crate) fn weights_document(model: &Model, inputs: &[Input]) -> serde_json::V
         .chunks(first.out_dim)
         .map(|row| row.iter().map(|v| f64::from(v.abs())).sum())
         .collect();
-    serde_json::json!({"inputs":inputs,"row_order":row_order,"column_order":column_order,"per_input_columns":per_input_columns,"top_inputs_by_unit":top_inputs_by_unit,"nonzero_counts":nonzero_counts,"input_l1":input_l1,"scaler_mean":model.scaler_mean(),"scaler_scale":model.scaler_scale(),
+    let output = weights(model, 1);
+    let largest_output = output
+        .iter()
+        .map(|v| f64::from(v.abs()))
+        .fold(0.0f64, f64::max);
+    let residual_threshold = largest_output * 1e-3;
+    let mut capacity_counts =
+        std::collections::BTreeMap::from([("dead", 0usize), ("residual", 0), ("live", 0)]);
+    let capacity_units: Vec<_> = (0..first.out_dim).map(|j| {
+        let encoder_nonzero = (0..first.in_dim).filter(|&i| w[i*first.out_dim+j] != 0.0).count();
+        let status = if encoder_nonzero == 0 && first.biases[j] <= 0.0 { "dead" }
+            else if f64::from(output[j].abs()) < residual_threshold { "residual" } else { "live" };
+        *capacity_counts.get_mut(status).unwrap() += 1;
+        serde_json::json!({"unit":j,"status":status,"output_coefficient":output[j],"bias":first.biases[j],"encoder_nonzero":encoder_nonzero})
+    }).collect();
+    let capacity = serde_json::json!({"units":capacity_units,"counts":capacity_counts,
+        "largest_output_coefficient":largest_output,"residual_threshold":residual_threshold,
+        "rule":"dead: encoder column all zero and bias ≤ 0; residual: non-dead and |output coefficient| < 1e-3 × largest |output coefficient|; live: remaining units"});
+    serde_json::json!({"inputs":inputs,"row_order":row_order,"column_order":column_order,"per_input_columns":per_input_columns,"top_inputs_by_unit":top_inputs_by_unit,"nonzero_counts":nonzero_counts,"input_l1":input_l1,"capacity":capacity,"scaler_mean":model.scaler_mean(),"scaler_scale":model.scaler_scale(),
         "layers": (0..model.n_layers()).map(|i| { let l=model.layer(i); serde_json::json!({"layer":i,"in_dim":l.in_dim,"out_dim":l.out_dim,"activation":format!("{:?}",l.activation),"weights":weights(model,i),"biases":l.biases,"stats":crate::audit::weight_statistics(&weights(model,i),l.in_dim,l.out_dim)}) }).collect::<Vec<_>>()})
 }
 // Compose diagnostic layer views with the existing baker, then execute

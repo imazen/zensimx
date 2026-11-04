@@ -183,9 +183,12 @@ fn curves(
         centered_p75,
     })
 }
+pub(crate) fn pdp_percentiles() -> Vec<f64> {
+    (0..21).map(|i| 0.01 + 0.98 * i as f64 / 20.0).collect()
+}
 pub(crate) fn pdp(model: &Model, bank: &Bank, feature: usize) -> Result<Pdp> {
     let values: Vec<_> = bank.rows.iter().map(|r| r[feature]).collect();
-    let percentiles: Vec<_> = (0..21).map(|i| 0.01 + 0.98 * i as f64 / 20.0).collect();
+    let percentiles = pdp_percentiles();
     let x = percentiles.iter().map(|&p| quantile(&values, p)).collect();
     curves(model, bank, vec![feature], None, x, percentiles)
 }

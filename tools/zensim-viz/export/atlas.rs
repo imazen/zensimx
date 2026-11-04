@@ -90,6 +90,39 @@ pub(crate) fn run(
     }
     let records: Vec<serde_json::Value> =
         serde_json::from_slice(&std::fs::read(maps.join("maps.json"))?)?;
+    // Display quantiles describe the actual encoded, sampled map pixels.
+    // Cache by shared detector filename; use the same quantile owner as PDP.
+    let mut display_ranges = BTreeMap::new();
+    let records = records
+        .into_iter()
+        .map(|mut record| -> Result<_> {
+            if let Some(file) = record["map_file"].as_str() {
+                let range = if let Some(range) = display_ranges.get(file) {
+                    *range
+                } else {
+                    let image = pixels::decode(&maps.join(file))?;
+                    let lo = record["map_range"][0]
+                        .as_f64()
+                        .ok_or("missing map minimum")?;
+                    let hi = record["map_range"][1]
+                        .as_f64()
+                        .ok_or("missing map maximum")?;
+                    let values: Vec<_> = (0..image.height)
+                        .flat_map(|y| image.row(y))
+                        .map(|p| lo + f64::from(p[0]) / 255.0 * (hi - lo))
+                        .collect();
+                    let range = [
+                        crate::audit::quantile(&values, 0.02),
+                        crate::audit::quantile(&values, 0.98),
+                    ];
+                    display_ranges.insert(file.to_owned(), range);
+                    range
+                };
+                record["map_robust_range"] = serde_json::json!(range);
+            }
+            Ok(record)
+        })
+        .collect::<Result<Vec<_>>>()?;
     let map_by_id: BTreeMap<_, _> = records
         .into_iter()
         .map(|r| (r["id"].as_u64().unwrap() as usize, r))
@@ -136,6 +169,13 @@ pub(crate) fn run(
         .map(|p| (usize::from(p.id), p))
         .collect();
     let mut features = Vec::new();
+    let pdp_percentiles = crate::lens::pdp_percentiles();
+    let plot_range = |values: &[f64]| {
+        [
+            crate::audit::quantile(values, pdp_percentiles[0]),
+            crate::audit::quantile(values, *pdp_percentiles.last().unwrap()),
+        ]
+    };
     for input in inputs {
         let p = provenance
             .get(&input.feature)
@@ -195,6 +235,8 @@ pub(crate) fn run(
         };
         let mut bank_ranges = serde_json::Map::new();
         bank_ranges.insert(bank.sha256.clone(), serde_json::json!(extrema(&column)));
+        let mut bank_plot_ranges = serde_json::Map::new();
+        bank_plot_ranges.insert(bank.sha256.clone(), serde_json::json!(plot_range(&column)));
         let mut percentiles = serde_json::Map::new();
         percentiles.insert(bank.sha256.clone(), serde_json::json!(percentile));
         for other in percentile_banks {
@@ -210,6 +252,7 @@ pub(crate) fn run(
                 })
                 .collect();
             bank_ranges.insert(other.sha256.clone(), serde_json::json!(extrema(&values)));
+            bank_plot_ranges.insert(other.sha256.clone(), serde_json::json!(plot_range(&values)));
             let below = values.iter().filter(|&&v| v < value).count();
             let equal = values.iter().filter(|&&v| v == value).count();
             percentiles.insert(
@@ -219,6 +262,7 @@ pub(crate) fn run(
         }
         f["percentiles"] = serde_json::Value::Object(percentiles);
         f["bank_ranges"] = serde_json::Value::Object(bank_ranges);
+        f["bank_plot_ranges"] = serde_json::Value::Object(bank_plot_ranges);
 
         if let Some(file) = f["map_file"].as_str() {
             f["map_file"] = serde_json::json!(format!("maps/{file}"));
@@ -229,6 +273,14 @@ pub(crate) fn run(
             f["fragility_value"] = serde_json::json!(v);
             if let Some(range) = f["map_range"].as_array() {
                 f["map_range"] = serde_json::json!(
+                    range
+                        .iter()
+                        .map(|a| a.as_f64().unwrap() * f64::from(v))
+                        .collect::<Vec<_>>()
+                );
+            }
+            if let Some(range) = f["map_robust_range"].as_array() {
+                f["map_robust_range"] = serde_json::json!(
                     range
                         .iter()
                         .map(|a| a.as_f64().unwrap() * f64::from(v))

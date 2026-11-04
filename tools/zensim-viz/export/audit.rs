@@ -652,6 +652,11 @@ mod tests {
         assert_eq!(a.counts["dead-input"], 0);
         let weights = model::weights_document(&m, &inputs);
         assert_eq!(weights["nonzero_counts"][371], 33);
+        assert_eq!(
+            weights["capacity"]["counts"],
+            serde_json::json!({"live":2,"residual":31,"dead":95})
+        );
+        assert_eq!(weights["capacity"]["units"].as_array().unwrap().len(), 128);
         assert!(
             !a.flags
                 .iter()

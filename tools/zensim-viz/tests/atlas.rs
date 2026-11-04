@@ -120,6 +120,25 @@ fn retained_export_matches_plain_extraction_on_odd_sizes_and_strided_rows() {
 
             assert!(features.iter().any(|f| f["map_file"].is_string()));
             assert!(features.iter().all(|f| f["value"].is_number()));
+            for f in features {
+                let range = f["bank_plot_ranges"]
+                    .as_object()
+                    .expect("native bank p1–p99 required");
+                assert!(!range.is_empty());
+                for bounds in range.values() {
+                    assert!(bounds[0].as_f64().unwrap() <= bounds[1].as_f64().unwrap());
+                }
+                if f["map_file"].is_string() {
+                    let bounds = f["map_robust_range"]
+                        .as_array()
+                        .expect("native map p2–p98 required");
+                    let lo = f["map_range"][0].as_f64().unwrap();
+                    let hi = f["map_range"][1].as_f64().unwrap();
+                    assert!(lo <= bounds[0].as_f64().unwrap());
+                    assert!(bounds[0].as_f64().unwrap() <= bounds[1].as_f64().unwrap());
+                    assert!(bounds[1].as_f64().unwrap() <= hi);
+                }
+            }
             let map_records: Vec<serde_json::Value> =
                 serde_json::from_slice(&std::fs::read(out.join("maps/maps.json")).unwrap())
                     .unwrap();
