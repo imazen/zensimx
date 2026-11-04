@@ -2140,3 +2140,24 @@ through the cube-root front end at 203, and through PU21. **Cube root: |HDR − 
 mean |gap| 4.74 (mixHC1) and 4.51 (F), max 33.4 and 31.1** (the ±8-noise pair of one image), the HDR reading always lower.
 Identity pairs score 100 on every path. The property is the front end's, not the model's: F through the cube root is as
 continuous as mixHC1; what the HDR legs buy is calibration on HDR content, which the HDR panel reads measure.
+
+**HDR evidence panel read (2026-11-04, 11:28–12:00Z; `hdr_panel.py --banks`, `hdr_panel_upiq_all.py`; outputs
+`~/tmp/hc1-reads/hdr-panel-{cr203,pu21}/`, `hdr-upiq-cr203/`).** Every model read on both bank sets, the 2026-10-29
+PU21 banks and the cube-root:203 banks (pooled SROCC; ladder inversions in brackets):
+
+| population | F s0/s1/s2 on PU21 | F s0/s1/s2 on cube root | E PU21 → cube root | mixHC1 s0/s1/s2 on cube root |
+|---|---|---|---|---|
+| UPIQ 50 development rows | 0.835 / 0.842 / 0.841 | 0.943 / 0.941 / 0.939 | 0.839 → 0.943 | 0.924 / 0.923 / 0.926 |
+| HDRTEACH VAL (3,900; HDR-VDP-3 teacher) | 0.908 / 0.917 / 0.910 | 0.890 / 0.896 / 0.889 | 0.941 → 0.914 | 0.878 / 0.857 / 0.898 |
+| 4Kdtb EVAL (48, MOS) | 0.804 / 0.807 / 0.804 | 0.805 / 0.806 / 0.805 | 0.808 → 0.813 | 0.817 / 0.811 / 0.805 |
+| Ladders EVAL (3,245 rungs, natural SSIMULACRA2) | 0.774 / 0.771 / 0.773 [60/51/59] | 0.786 / 0.785 / 0.787 [50/51/49] | 0.757 → 0.776 [114 → 103] | 0.780 / 0.783 / 0.781 [108/105/108] |
+| UPIQ all 380 (mixHC1 trained on 330) | 0.783 / 0.786 / 0.785 (R10 am. 6) | 0.811 / 0.812 / 0.811 | 0.830 (cube root) | 0.820 / 0.820 / 0.823 |
+
+**Reading.** (1) The front end alone moves the mix: through the cube root, zero-shot, F gains +0.10 on UPIQ's human
+development rows and +0.013 on the ladders with fewer inversions, is level on 4Kdtb MOS, and loses 0.02 on HDRTEACH VAL,
+whose labels are the HDR-VDP-3 teacher; E moves the same way. (2) The HC1 retrain buys nothing held out: on the
+cube-root banks mixHC1 is below F on UPIQ's development rows (0.925 vs 0.942), level or below on HDRTEACH VAL with a
+wide seed spread, +0.01 on 4Kdtb's 48 rows, and doubles the ladder inversions (108 vs 50); its only lead is on the 330
+UPIQ rows it trained on. (3) Continuity is the front end's property (above). **Recommendation:** ship the cube-root
+front end at 203 cd/m² as the public HDR path for A (the mix); do not ship the HC1 retrain; PU21 stays research-only.
+The SDR no-regression reads of mixHC1 continue for the record.
