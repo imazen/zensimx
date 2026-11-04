@@ -28,7 +28,7 @@ def worker():
         inspection=json.loads(original.read_text())
         first,last=inspection['layers']
         if (inspection['derived_inputs']!=declaration or first['in_dim']!=984
-                or first['out_dim']!=row['capacity']['hidden']
+                or first['out_dim']!=int(row['arm'][1:])
                 or last['in_dim']!=first['out_dim'] or last['out_dim']!=1):
             raise ValueError('R13 input declaration or registered layer dimensions differ')
         no_repro=packed.with_name('without-repro.bin')
