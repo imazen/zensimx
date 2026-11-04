@@ -221,7 +221,13 @@ zenpixels = { version = ">=0.2.10, <0.4.0", default-features = false, optional =
 # zenjpeg is also patched in [patch.crates-io] for transitive consumers; this
 # direct optional dep adds the zencodec + decoder features for the JPEG path.
 zencodec = { version = ">=0.1.26, <0.3.0", optional = true }
-zenjpeg = { path = "../../zenjpeg/zenjpeg", optional = true }
+# Pinned to the last zenjpeg revision on the zencodec 0.2 *git* family (79676215), which is
+# what this lockfile resolves (zencodec 0.1.27 for our own use, 0.2.0 at 79676215 for zenjpeg).
+# The live sibling moved to crates.io version edges (`zencodec >=0.2.0, <0.3.0`, zenjpeg
+# d099267c, 2026-10-28) that this root cannot satisfy; the HDR extractor (`hdr944-extract`)
+# never uses zenjpeg, so the pin keeps the fleet-era dependency graph for it. Move this pin
+# together with the zencodec/zenpixels entries below when the 0.2 family is published.
+zenjpeg = { git = "https://github.com/imazen/zenjpeg", rev = "4933461f2b6d760b7b112dc94397718fdadb5119", optional = true }
 zenwebp = { path = "../../zenwebp", package = "zenwebp", optional = true, default-features = false }
 # --decode-list PNG writer (R1b): re-encode the decoded RGB8 so the PNG/JPEG-only
 # zensim feature extractors can read avif/jxl/webp corpus rows.
@@ -419,7 +425,7 @@ zencodec = { git = "https://github.com/imazen/zencodec", rev = "a81daf7605dc6307
 # `codec.rs` module) both finish rc=0, zero errors. Full record + proof logs:
 # benchmarks/d_inversions_2026-09-05.md §6 addendum.
 jxl-encoder = { git = "https://github.com/imazen/jxl-encoder", rev = "3cd8475b8a42e299b785319d30bb108b52e91239" }
-zenjpeg = { path = "../../zenjpeg/zenjpeg" }
+zenjpeg = { git = "https://github.com/imazen/zenjpeg", rev = "4933461f2b6d760b7b112dc94397718fdadb5119" }  # same pin as the direct dep above
 # use local sibling codecs so the whole graph resolves to one version (2026-07-18):
 # transitive crates.io zenavif/zenpixels were skewing against the local siblings.
 # Forcing local unifies them. (zencodec no longer needs a patch: every sibling
