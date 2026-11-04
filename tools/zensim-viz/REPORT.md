@@ -1,5 +1,88 @@
 # zensim-viz report — 2026-11-04
 
+## Design review 2 — 8/8 done and measured
+
+All eight decisions are implemented, verified and captured. Native metadata
+landed at `43fe65e9952e`; the UI at `ceeef101f79a`; guarded recipes at
+`581365b6bff8`; the final capture source is `ccafbc48abaa`.
+
+1. **Done — visible Atlas.** The photographic base is grey with a selected
+   map, except in Δ mode. Exact zeros stay transparent; positive pixels use
+   `slider × (0.25 + 0.75t)`. Native cached p2–p98 map-pixel bounds are the
+   default, with own and bank p1–p99 controls. Map-only is opaque. For the
+   pinned f20 building map, 129,423 pixels have alpha 67–255 before the 0.65
+   slider; 79,576 remain exactly transparent. Own upper bound is
+   0.35488855838775635; robust upper bound is 0.0904617893929575.
+   All four Atlas captures visibly show the map on the building.
+2. **Done — stage-filling Lens.** Dependence and range plot areas measure
+   568px in the 900px stage at 1600×1000, including after gutter resize.
+   The concern table is 631px tall and the weight matrix region 682px.
+   The per-weight audit remains expandable; ranked strips and full tables
+   remain accessible through the exhibit's internal scroll.
+3. **Done — model strip.** Native total |weight|, ablation rank, reading
+   units and flag count/severity appear in two lines directly below the
+   pooled value. The full model section remains. Cursor terms appear only
+   in Atlas; Lens shows input/unit facts. Missing bank evidence clears
+   stale model and capacity facts.
+4. **Done — sidebar footer.** The permanent sentence moved to the app-name
+   title and the Concerns footnote.
+5. **Done — compact bank selector.** Below 1400px the selected label reads
+   `CID22 TRAIN`; native option labels and titles retain the full bank name.
+6. **Done — carried details.** The tree has the five-step p0–p100 chip legend,
+   duplicate-input rows show signed native `r`, and the global-input glyph
+   has a visible label and title in the weight legend.
+7. **Done — capacity strip.** Every bake has 128 native-classified cells,
+   coefficient/bias tooltips and stored-ID click/keyboard selection. Dead
+   means an all-zero encoder column and bias ≤ 0. Of the remaining units,
+   residual means |output coefficient| < 1e-3 of the largest; the rest are live.
+8. **Done — preservation and acceptance.** The original Design 1/2 browser
+   gates pass alongside the new checks. All eight size/theme/view combinations,
+   Δ and the weight exhibit have document dimensions equal to the viewport.
+   There are no uncaught browser errors. Design assets remain verbatim.
+
+| Bake | Live | Residual | Dead |
+| --- | ---: | ---: | ---: |
+| F seed 0 | 2 | 31 | 95 |
+| F seed 1 | 2 | 31 | 95 |
+| F seed 2 | 2 | 1 | 125 |
+| E | 6 | 29 | 93 |
+
+The six final pair bundles retain **2,088 byte-identical detector PNGs** and
+all original feature fields. Each pair preserves 504 populated-slot and 720
+layout-bit identities; **8,298,195 native sampled formula replays** still match.
+All four weight documents preserve every original field. Six bank audits,
+existing curves and all measured flags are reused unchanged. No threshold or
+zero-tolerance check was relaxed. The new bank display bounds share the
+original dependence-grid expression, preserving even its floating-point
+endpoint representation.
+
+Native validation passed: 8 unit tests and the odd-size/strided Atlas test;
+standalone and metric-library strict clippy. Test resource receipt:
+`rc=0 30s | peak-RSS 0.82GiB | min-avail 39726MiB | peak-load 4.37`.
+Standalone clippy: `rc=0 1s | peak-RSS 0.23GiB | min-avail 40906MiB |
+peak-load 1.55`; metric-library clippy: `rc=0 1s | peak-RSS 0.07GiB |
+min-avail 42594MiB | peak-load 1.88`. Final guarded browser/capture receipt:
+`rc=0 13s | peak-RSS 0.31GiB | min-avail 42280MiB | peak-load 1.33`.
+Syntax, numeric formatting, network HTTP and design-copy checks pass.
+CI was inspected; no Actions run was dispatched under repository policy.
+These are local verification results, not a CI-green claim.
+
+The final capture directory is
+`/mnt/v/output/zensim/viz/2026-11-04/review2-screenshots/`: eight overview
+images, one Δ image, two capacity/weight images, a gallery and both acceptance
+receipts. Inspection caught an early Δ screenshot taken before image decode;
+the capture now awaits decode and verifies its native image URL. The earlier
+set remains in `review2-screenshots-before-delta-decode/`.
+Hashes and measurements are preserved in [review2-evidence.json](review2-evidence.json).
+Existing HDR-map, teacher/human and missing-paper-prose limits below remain.
+No review-2 item is open.
+
+http://dev.lan:3310/
+
+http://dev.lan:3300/zensim/viz/2026-11-04/review2-screenshots/index.html
+
+http://dev.lan:3300/zensim/viz/2026-11-04/review2-screenshots/browser-review.json
+
 ## Design 2 — completed and measured
 
 Both views now use the fixed 44px header, virtual family/signal/scale tree,

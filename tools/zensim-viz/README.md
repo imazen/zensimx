@@ -12,6 +12,21 @@ Enter. Release the pin to resume hover previews. Wheel/drag zoom and pan the
 image; arrows on the focused stage pan, and double-click resets. Gutters also
 resize with arrows. Pins and the active legend stay in the bottom strip.
 
+The photographic base becomes grey while a detector is shown; difference mode
+keeps its native difference image. Nonzero map pixels use the selected opacity
+times `0.25 + 0.75·t`; zero remains transparent. The bottom range control defaults
+to native p2–p98 of the sampled, encoded map pixels, cached per shared map.
+`own` uses the complete map range; `bank` uses the feature's whole-bank p1–p99.
+Map-only stays opaque. These are display ranges; stored detector maps, pooled
+values and flags remain unchanged.
+
+The reference's compact model strip keeps total |weight|, ablation rank, reading
+units and flag counts visible. Weights has a 128-cell capacity strip. Its native
+rule is: dead = all-zero encoder column and bias ≤ 0; residual = non-dead and
+|output coefficient| below 1e-3 times the largest; live = the rest. This differs
+from inactivity measured on one bank. Click a capacity cell or use arrows to
+select its stored unit; the coefficient and bias are in its tooltip.
+
 Reference entries distinguish paper prose from revision-7 code-derived
 formulae. KaTeX 0.19.1 loads once from cdnjs. Build the read-only paper join with
 `just viz-reference "$output/audit/weights.json" "$output/reference.json"`.
@@ -101,6 +116,7 @@ just viz-web-check
 VIZ_TEST_COMPLETE=1 just viz-browser
 just viz-review-browser
 just viz-design2-browser
+just viz-review2-browser
 ```
 
 Real-bake tests require the frozen F0 bake/CID22 bank identified in
@@ -120,3 +136,14 @@ its bake against each bank audit. This does not replace the bank audit.
 `just viz-design2-verify OUTPUT_ROOT NEW_RECEIPT_JSON` compares complete Design 2
 bundles against the retained review-1 exports, including every prior feature
 field and map byte.
+
+Review-2 captures use `viz-review2-browser`, which holds the shared heavy lock
+and runs through run-heavy. Set `VIZ_REVIEW_COMMIT` to the verified source SHA
+and `VIZ_CAPTURE_DIR` to a fresh directory: it saves
+both sizes/themes/views, a delta view, two capacity-strip views, and
+`browser-review.json`, `design2-gates.json` and an `index.html` gallery.
+Older bundles need a fresh native atlas export for the
+new map/bank ranges, and a fresh weights export for capacity metadata. Keep the
+previous bundle and compare through
+`just viz-review2-verify OUTPUT_ROOT NEW_RECEIPT_JSON review2-final-` for the
+published final bundle prefix; all prior fields and raw PNG bytes must agree.

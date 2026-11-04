@@ -182,6 +182,13 @@ because cleanup tests or a historical training reproduction pass.
 
 ## Known Bugs
 
+- **zensim-viz map visibility (2026-11-04 review 2, fixed):** alpha proportional to
+  the full own-range value left detector maps faint over photographs. The
+  decided treatment is a grey photographic base, a nonzero alpha floor, and
+  native cached p2–p98 display bounds, with own/bank alternatives. Keep zero
+  transparent, map-only opaque, and all raw maps/pooled bits unchanged. The
+  guarded review-2 browser checks own this regression.
+
 - **zensim-viz viewport (2026-11-04, fixed):** compact header labels passed a
   zero font size to selects, and an atlas hidden during resize retained stale
   image dimensions when reopened. Selects now have explicit type sizing and

@@ -152,3 +152,29 @@ coverage labels, 984-row virtual join and native basic cursor terms are
 implemented. Eight viewport/theme/view captures and exact cursor, map, pooled
 bit, original-weight-field and review-1 regressions pass. Current coverage and
 source commits are recorded at the top of REPORT.md and in design2-evidence.json.
+
+## Design review 2 — ordered implementation
+
+1. Make the overlay visible: grey photographic base, nonzero alpha floor,
+   cached native p2–p98 map range and a p2–p98 / own / bank range control.
+   Preserve raw PNGs, pooled bits, terms, bank data and all existing flags.
+2. Fit the active chart plot, concern table and weights region to the stage.
+3. Put a two-line model strip below the pooled value; atlas-only cursor demo.
+4. Move the sidebar footer to the app-name title and Concerns footnote.
+5. Show compact bank names below 1400px, preserving full option titles.
+6. Add the chip percentile legend, duplicate correlation readout and labelled
+   global-weight glyph.
+7. Export the audit-defined dead/residual/live unit classification natively,
+   then render a selectable 128-cell capacity strip for every bake.
+8. Re-run native and browser gates under the heavy lock/run-heavy, capture both
+   sizes/themes/views plus delta in a fresh directory, update REPORT and push.
+
+The range percentiles are display metadata computed by the existing native
+quantile owner, once per unique decoded map and once per feature/bank column.
+They never replace a detector value or change the extraction arithmetic.
+
+All eight review-2 decisions passed the guarded browser run at source
+`ccafbc48abaa`. The six final Atlas and four weight bundles preserve the
+prior fields/maps/bits. Eleven images and the acceptance receipts are in
+`review2-screenshots/`; REPORT.md and review2-evidence.json own the results.
+The capture explicitly waits for native difference-image decode.

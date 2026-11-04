@@ -1,0 +1,527 @@
+{
+  "review": "DESIGN-REVIEW-2",
+  "verified_utc": "2026-11-04T16:29:06.897843+00:00",
+  "native_commit": "43fe65e9952e",
+  "ui_commit": "ceeef101f79a",
+  "capture_source_commit": "ccafbc48abaad55b70c216d9330c65444287d41e",
+  "binary_sha256": "fc24e9cb3d90a1d192a6cc4d2bf20b1e104118fb6ba85b7fdffe291cb6befbc3",
+  "capture_directory": "/mnt/v/output/zensim/viz/2026-11-04/review2-screenshots",
+  "gallery": "http://dev.lan:3300/zensim/viz/2026-11-04/review2-screenshots/index.html",
+  "browser_receipt": {
+    "review": "DESIGN-REVIEW-2",
+    "source_commit": "ccafbc48abaad55b70c216d9330c65444287d41e",
+    "items": [
+      {
+        "item": 1,
+        "status": "done"
+      },
+      {
+        "item": 2,
+        "status": "done"
+      },
+      {
+        "item": 3,
+        "status": "done"
+      },
+      {
+        "item": 4,
+        "status": "done"
+      },
+      {
+        "item": 5,
+        "status": "done"
+      },
+      {
+        "item": 6,
+        "status": "done"
+      },
+      {
+        "item": 7,
+        "status": "done"
+      },
+      {
+        "item": 8,
+        "status": "done"
+      }
+    ],
+    "alpha": {
+      "positive": 129423,
+      "zero": 79576,
+      "min": 67,
+      "max": 255,
+      "slider": 0.65,
+      "composite_opacity": 0.65
+    },
+    "ranges": [
+      {
+        "mode": "own",
+        "legend": "00.3549Own map range \u00b7 pooled 0.05263 \u00b7 l4 \u00b7 pooling grid 1022\u00d7818"
+      },
+      {
+        "mode": "bank",
+        "legend": "0.0043240.03813Bank p1\u2013p99 feature values \u00b7 pooled 0.05263 \u00b7 l4 \u00b7 pooling grid 1022\u00d7818"
+      },
+      {
+        "mode": "robust",
+        "legend": "00.09046p2\u2013p98 map pixels \u00b7 pooled 0.05263 \u00b7 l4 \u00b7 pooling grid 1022\u00d7818"
+      }
+    ],
+    "plot": {
+      "plot": 568,
+      "stage": 900
+    },
+    "resized_plot": {
+      "plot": 568,
+      "stage": 900
+    },
+    "range_plot": {
+      "plot": 568,
+      "stage": 900
+    },
+    "concerns_height": 631,
+    "weights_height": 682,
+    "weights_geometry": {
+      "viewport": [
+        1600,
+        1000
+      ],
+      "document": [
+        1600,
+        1000
+      ]
+    },
+    "capacities": {
+      "F0": {
+        "dead": 95,
+        "live": 2,
+        "residual": 31
+      },
+      "F1": {
+        "dead": 95,
+        "live": 2,
+        "residual": 31
+      },
+      "F2": {
+        "dead": 125,
+        "live": 2,
+        "residual": 1
+      },
+      "E": {
+        "dead": 93,
+        "live": 6,
+        "residual": 29
+      }
+    },
+    "delta": {
+      "viewport": [
+        1600,
+        1000
+      ],
+      "document": [
+        1600,
+        1000
+      ]
+    },
+    "delta_image": "http://dev.lan:3310/data/review2-final-atlas-pair-01/difference.png",
+    "uncaught_errors": [],
+    "capture_directory": "/mnt/v/output/zensim/viz/2026-11-04/review2-screenshots",
+    "acceptance": {
+      "review": "DESIGN-REVIEW-2",
+      "coverage": {
+        "entries": 36,
+        "family_signals": 35,
+        "rendered_equations": 36,
+        "paper_text": 22,
+        "no_paper_text": 14,
+        "sidebar_inputs": 984
+      },
+      "sidebar_ids": 984,
+      "virtual_rows_visited": 984,
+      "equations_rendered": 36,
+      "native_cursor_samples": [
+        {
+          "feature": "input20",
+          "index": 62042,
+          "result": "detail",
+          "value": 0.019433677196502686,
+          "readout": "\u03bcr 0.4192 \u00b7 \u03bcd 0.414 \u00b7 V 0.006698 \u00b7 E\u03b4\u00b2 0.0008047 \u2192 detail 0.01943 at (422, 242) \u00b7 s0, sampled native window"
+        },
+        {
+          "feature": "input20",
+          "index": 96318,
+          "result": "detail",
+          "value": 0.011922955513000488,
+          "readout": "\u03bcr 0.4163 \u00b7 \u03bcd 0.4171 \u00b7 V 0.001385 \u00b7 E\u03b4\u00b2 0.0004187 \u2192 detail 0.01192 at (500, 376) \u00b7 s0, sampled native window"
+        },
+        {
+          "feature": "input39",
+          "index": 208998,
+          "result": "d1",
+          "value": 0.0048339893110096455,
+          "readout": "\u03bcr 0.395 \u00b7 \u03bcd 0.3928 \u00b7 V 0.000004651 \u00b7 E\u03b4\u00b2 0.000008974 \u2192 d1 0.004834 at (1020, 816) \u00b7 s1, sampled native window"
+        },
+        {
+          "feature": "input117",
+          "index": 12575,
+          "result": "d1",
+          "value": 0.008600073866546154,
+          "readout": "\u03bcr 0.3914 \u00b7 \u03bcd 0.3949 \u00b7 V 0.000008733 \u00b7 E\u03b4\u00b2 0.00002009 \u2192 d1 0.0086 at (16, 792) \u00b7 s3, sampled native window"
+        }
+      ],
+      "reference_flag_count": 33,
+      "source_commit": "ccafbc48abaad55b70c216d9330c65444287d41e",
+      "resized_left_px": 388,
+      "virtualized_cells": 72,
+      "preloaded_hover_ms": [
+        5.900000095367432,
+        7.599999904632568,
+        4.599999904632568,
+        5,
+        6.300000190734863,
+        5.600000381469727
+      ],
+      "screenshots": [
+        {
+          "name": "atlas-dark-1600x1000.png",
+          "viewport": [
+            1600,
+            1000
+          ],
+          "document": [
+            1600,
+            1000
+          ],
+          "stage": {
+            "x": 266,
+            "y": 44,
+            "width": 1008,
+            "height": 900,
+            "top": 44,
+            "right": 1274,
+            "bottom": 944,
+            "left": 266
+          },
+          "exhibits": 1
+        },
+        {
+          "name": "atlas-light-1600x1000.png",
+          "viewport": [
+            1600,
+            1000
+          ],
+          "document": [
+            1600,
+            1000
+          ],
+          "stage": {
+            "x": 266,
+            "y": 44,
+            "width": 1008,
+            "height": 900,
+            "top": 44,
+            "right": 1274,
+            "bottom": 944,
+            "left": 266
+          },
+          "exhibits": 1
+        },
+        {
+          "name": "lens-dark-1600x1000.png",
+          "viewport": [
+            1600,
+            1000
+          ],
+          "document": [
+            1600,
+            1000
+          ],
+          "stage": {
+            "x": 266,
+            "y": 44,
+            "width": 1008,
+            "height": 900,
+            "top": 44,
+            "right": 1274,
+            "bottom": 944,
+            "left": 266
+          },
+          "exhibits": 1
+        },
+        {
+          "name": "lens-light-1600x1000.png",
+          "viewport": [
+            1600,
+            1000
+          ],
+          "document": [
+            1600,
+            1000
+          ],
+          "stage": {
+            "x": 266,
+            "y": 44,
+            "width": 1008,
+            "height": 900,
+            "top": 44,
+            "right": 1274,
+            "bottom": 944,
+            "left": 266
+          },
+          "exhibits": 1
+        },
+        {
+          "name": "atlas-dark-1280x800.png",
+          "viewport": [
+            1280,
+            800
+          ],
+          "document": [
+            1280,
+            800
+          ],
+          "stage": {
+            "x": 246,
+            "y": 44,
+            "width": 748,
+            "height": 700,
+            "top": 44,
+            "right": 994,
+            "bottom": 744,
+            "left": 246
+          },
+          "exhibits": 1
+        },
+        {
+          "name": "atlas-light-1280x800.png",
+          "viewport": [
+            1280,
+            800
+          ],
+          "document": [
+            1280,
+            800
+          ],
+          "stage": {
+            "x": 246,
+            "y": 44,
+            "width": 748,
+            "height": 700,
+            "top": 44,
+            "right": 994,
+            "bottom": 744,
+            "left": 246
+          },
+          "exhibits": 1
+        },
+        {
+          "name": "lens-dark-1280x800.png",
+          "viewport": [
+            1280,
+            800
+          ],
+          "document": [
+            1280,
+            800
+          ],
+          "stage": {
+            "x": 246,
+            "y": 44,
+            "width": 748,
+            "height": 700,
+            "top": 44,
+            "right": 994,
+            "bottom": 744,
+            "left": 246
+          },
+          "exhibits": 1
+        },
+        {
+          "name": "lens-light-1280x800.png",
+          "viewport": [
+            1280,
+            800
+          ],
+          "document": [
+            1280,
+            800
+          ],
+          "stage": {
+            "x": 246,
+            "y": 44,
+            "width": 748,
+            "height": 700,
+            "top": 44,
+            "right": 994,
+            "bottom": 744,
+            "left": 246
+          },
+          "exhibits": 1
+        }
+      ],
+      "uncaught_errors": []
+    }
+  },
+  "preservation": {
+    "pairs": [
+      {
+        "pair": "atlas-pair-01",
+        "pooled_bits": 504,
+        "layout_bits": 720,
+        "inputs": 984,
+        "unchanged_map_files": 348,
+        "basic_term_files": 12,
+        "native_formula_replay_samples": 1448916
+      },
+      {
+        "pair": "atlas-pair-02",
+        "pooled_bits": 504,
+        "layout_bits": 720,
+        "inputs": 984,
+        "unchanged_map_files": 348,
+        "basic_term_files": 12,
+        "native_formula_replay_samples": 1448916
+      },
+      {
+        "pair": "atlas-pair-03",
+        "pooled_bits": 504,
+        "layout_bits": 720,
+        "inputs": 984,
+        "unchanged_map_files": 348,
+        "basic_term_files": 12,
+        "native_formula_replay_samples": 1818624
+      },
+      {
+        "pair": "atlas-pair-04",
+        "pooled_bits": 504,
+        "layout_bits": 720,
+        "inputs": 984,
+        "unchanged_map_files": 348,
+        "basic_term_files": 12,
+        "native_formula_replay_samples": 1448916
+      },
+      {
+        "pair": "atlas-pair-05",
+        "pooled_bits": 504,
+        "layout_bits": 720,
+        "inputs": 984,
+        "unchanged_map_files": 348,
+        "basic_term_files": 12,
+        "native_formula_replay_samples": 683907
+      },
+      {
+        "pair": "atlas-pair-06",
+        "pooled_bits": 504,
+        "layout_bits": 720,
+        "inputs": 984,
+        "unchanged_map_files": 348,
+        "basic_term_files": 12,
+        "native_formula_replay_samples": 1448916
+      }
+    ],
+    "weights": {
+      "F0": {
+        "inputs": 984,
+        "original_fields_unchanged": true,
+        "weights_sha256": "c18d673d8a2be9bb62a89a66a18162d49a86d4243eaa22c0356bfe7a7cb6cb21"
+      },
+      "F1": {
+        "inputs": 984,
+        "original_fields_unchanged": true,
+        "weights_sha256": "3344ed21e1eee0b6313650f886583ab97328c9c40746c802b2f7af60f2021cd0"
+      },
+      "F2": {
+        "inputs": 984,
+        "original_fields_unchanged": true,
+        "weights_sha256": "923138c64a9516460f592ba626d50e9ae473accbb011de1d381188f9e3c6df49"
+      },
+      "E": {
+        "inputs": 820,
+        "original_fields_unchanged": true,
+        "weights_sha256": "49571b659c2ce55298f21734cfa402a5b05c4e5b88a9480dc583d2f562517f3f"
+      }
+    },
+    "reused_native_evidence": {
+      "F0/cid22-fit/audit": "907b8f2a8cfac4699768a4c9c3a8ec25006dd3e045a7a2a4907d1bb5f42e408b",
+      "F0/cid22-fit/summary": "2e52cd5d460437b53aa71accf4ba8561375da51888dc84c16db0efeaa1d42908",
+      "F0/hdr-teacher/audit": "660e913bdeb72f0ab4052b4861aba54b378fdd913934b217ecbce096a027c74d",
+      "F0/hdr-teacher/summary": "57ac39690ab52b6ccba5ceaa90d0264ada2684835e56d4a4d3749501ab89238b",
+      "E/cid22-fit/audit": "431d595317808f99512916155cc2240352d8c2bafdc66a7bdbda8a7e2b659b0f",
+      "E/cid22-fit/summary": "75821acb971acffb78400ef1d9c4eb86b2299e89f0adbcdd0e854f0de5f7f1f3",
+      "E/hdr-teacher/audit": "d672f97f00219064b5cc2b8a914bbf61844c8fc2459f449f73bb667d2f0eeb1d",
+      "E/hdr-teacher/summary": "e9e8f12f305ec4d2ad52ff2cdf4e904ed5f2bda9009a89af81d069d0159efbb6",
+      "F1/cid22-fit/audit": "c7dc26dfa8f61c97a78c7529192e79769df472af9431f6e835289135c2823cf6",
+      "F1/cid22-fit/summary": "b9b5e214882f91abd6b5da5a550f38da2b019438997786f1fbc86ffdc91b765f",
+      "F2/cid22-fit/audit": "80982d005a0e88f5652e0e2b53578bfcac653198283e484c966658ed6ad47795",
+      "F2/cid22-fit/summary": "861c1edbfee4d8c666df0a3ab2c835188a6adfa3083a75e5aebc5acf4320c669"
+    },
+    "reference": {
+      "entries": 36,
+      "family_signals": 35,
+      "rendered_equations": 36,
+      "paper_text": 22,
+      "no_paper_text": 14,
+      "sidebar_inputs": 984
+    }
+  },
+  "capture_files": {
+    "atlas-dark-1280x800.png": "d621ff7965f003771832929fdbebec296b4d3774fb7ec5d1fcc58eac6401138d",
+    "atlas-dark-1600x1000.png": "94b0b0f2fdd77ff26d759631a7da8df7c7adc4e5cd71f4c464ada708265af720",
+    "atlas-delta-dark-1600x1000.png": "ca386b1c7baf21c29adea2be6099562ddd8bdfd6b6b8a97ff4fe2c63c52271bd",
+    "atlas-light-1280x800.png": "cf4c4b03030e062d12d6266609c3ab16d3016681e6b057b3a73803494e1c2d3b",
+    "atlas-light-1600x1000.png": "cd8295ab8881e8afc8be35ca1bf8fdd9f3a7c022323390b4b6bd2236039e2fce",
+    "browser-review.json": "e68d4bbd9859f9fe9fec2791c4fc3f37e768349f556b34da6d08437f0d71c8bb",
+    "design2-gates.json": "f373f56053c5fe78696fedc76d4a2aaf0b59328eb7b10f1788f6c6c3d0c6f57c",
+    "index.html": "ea432ed95d7770300d40514980892e2ea45f91ef9b8713f7498042fffaddf444",
+    "lens-dark-1280x800.png": "d1ced945bde7c3cf427264927a0b4dc4497715d87cda2a188d1f04d66362751f",
+    "lens-dark-1600x1000.png": "ab30a2d2ccd4cffc9eeb4fad521f24a10f2462ced376a1b732a9028bede7fd12",
+    "lens-light-1280x800.png": "76655c19eb0bf1fbb5c48a19382598e41f18afc01e4339c2fca53c33f17f7af5",
+    "lens-light-1600x1000.png": "8a74c436b91100612b9edb17986933f7b8f29e342cb7f69134e350227c41a9c1",
+    "lens-weights-dark-1600x1000.png": "c4989557531c060ef234151ee43f5481243cccb5a6847312de121e151310587e",
+    "lens-weights-light-1600x1000.png": "75e63acad206d17da4a306b4f9136757dda9dbc59662aba7f41d9ddb03370da5"
+  },
+  "source_sha256": {
+    "tools/zensim-viz/export/main.rs": "f4fe2d8948f5e281d213f37c372c0651b8f81c3a18f3fdbf73b7434a7f668ddb",
+    "tools/zensim-viz/export/model.rs": "78f099387f7133aebd6cac47c12836695c261daf2e295a6cf7c0b3a2695dd042",
+    "tools/zensim-viz/export/bank.rs": "3c1a7a1dff391300f77d39ce2d38373aba2ee62e5453bd04ea423af9f34fa8e4",
+    "tools/zensim-viz/export/audit.rs": "6b5e6eedce665c4707324b173365d10ad7b700c059cb0028e1f2235a3322b850",
+    "tools/zensim-viz/export/constraints.rs": "7c5d97a24ba733f60d0a2a91bedcf657c2bd39f4493765e2ea724ca46b63c224",
+    "tools/zensim-viz/export/lens.rs": "db94c8d8a084eae65568f61b65ccff5c75e3b3203c8dbec336e68d68257cf52d",
+    "tools/zensim-viz/export/pixels.rs": "dadf10e7d7576372bffed7843e655989aa565cffb4329559212d51f7f655a518",
+    "tools/zensim-viz/export/atlas.rs": "505278d306d5fd544d869b7c578402f52c84e7aee42189dff2ec8fff320d0018",
+    "tools/zensim-viz/export/compare.rs": "8abea064dc2662d01e543df6bb26b6c3aa9570edad1e38e703464116a1949132",
+    "tools/zensim-viz/export/provenance.rs": "a849c6b0f6ddfce92e2be8126292aefa5de4aa330698c1dedde179bc53cef14b",
+    "tools/zensim-viz/web/app.js": "35ad61aee8557c6575b29339cd326b78cba66194949a6b10258b00abe8398dc3",
+    "tools/zensim-viz/web/weight-view.js": "dd353e97cca827ba850cc26ffc0e61422efde09e679765a6739bbfa489375ee1",
+    "tools/zensim-viz/web/frame.js": "681f7102fe5ad396e095c40fc766e747a4061a3c307e9bbd229d639f1e812f1d",
+    "tools/zensim-viz/web/studio.js": "5a43839e6d825d00b83dcd85944b59a5b7b77951e04af202bb039b94b6b5b236",
+    "tools/zensim-viz/web/studio.css": "7804760559f0653e71896cad60bd0a3461d8c12889e8a5fe4ba9be5ae4d8c3c1",
+    "tools/zensim-viz/tests/review2.mjs": "ba0d7fe38346c81e01593969dfa4447be1f208ecf6239a4180dffa8e552cba48"
+  },
+  "checks": {
+    "build": {
+      "log": "/home/lilith/tmp/zensim-viz/build.log",
+      "sha256": "ee63b563df63d2873b9aea19a6030d3fea33bdd37cd4f7114c9408f4cb50d6dc",
+      "receipt": "run-heavy: done rc=0 14s | peak-RSS 0.84GiB | min-avail 40140MiB | peak-load 2.62"
+    },
+    "test-real": {
+      "log": "/home/lilith/tmp/zensim-viz/test-real.log",
+      "sha256": "ef120ee00c443de03bad428be8db6f6731543f56b15d6075aae37ccbc7593965",
+      "receipt": "run-heavy: done rc=0 30s | peak-RSS 0.82GiB | min-avail 39726MiB | peak-load 4.37"
+    },
+    "clippy": {
+      "log": "/home/lilith/tmp/zensim-viz/clippy.log",
+      "sha256": "595d82b184a65a31333aa8506b0ac8f8c08b15b3d4ae3d9f0a0da9ee54a4059e",
+      "receipt": "run-heavy: done rc=0 1s | peak-RSS 0.23GiB | min-avail 40906MiB | peak-load 1.55"
+    },
+    "library-clippy": {
+      "log": "/home/lilith/tmp/zensim-viz/library-clippy.log",
+      "sha256": "66f8b8f3a3ef44ab023f716aa02ae2b29dcf50a30423081851eeb95798f50826",
+      "receipt": "run-heavy: done rc=0 1s | peak-RSS 0.07GiB | min-avail 42594MiB | peak-load 1.88"
+    },
+    "review2-browser": {
+      "log": "/home/lilith/tmp/zensim-viz/review2-browser.log",
+      "sha256": "9b8ea48636d2b3af3502de814976e14050dc49f862189895a5c2b4284384d6a9",
+      "receipt": "run-heavy: done rc=0 13s | peak-RSS 0.31GiB | min-avail 42280MiB | peak-load 1.33"
+    }
+  }
+}
