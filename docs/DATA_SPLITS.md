@@ -3124,3 +3124,16 @@ CLIC 2021 validation, CIQA and MMSPG JPEG XR were already read in R10 and earlie
 registrations (CLIC also selected R7); R12 does not reopen them. Their prior exposure
 remains disclosed. E36 instruments have repeatedly informed this research program;
 no instrument result selects a new R12 fit. Record actual read completion below.
+
+### R12 coordinator addition — L0/L4, before construction and reads (2026-11-04)
+
+L0 derives each A seed by structural dead-unit pruning only, without data or
+label selection; L4 fits the registered TRAIN mix with a two-piece max-linear
+head at three seeds. The R12 record binds architecture, final-epoch rule and
+strict L0 score-bit checks before either arm is constructed/read. Their
+assessment populations and owners are exactly the existing R12 panel; L0r,
+if constructed, measures A0 residual-unit removal on those same fixtures only.
+EVAL collections, confirmation sets and E36/HDR instruments retain all prior
+mix/HC1/R12 exposure; no confirmation set or public_test is reopened. No EVAL
+result chooses a fit, threshold, pruning mask or checkpoint. Record actual
+additional reads on completion; preserve the original L1–L3 assessments.

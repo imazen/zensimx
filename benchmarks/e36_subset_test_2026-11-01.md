@@ -2245,3 +2245,36 @@ with the stored `human_score` instead. The population, row weighting, three-seed
 and one-score-point allowance remain exactly as registered. A fresh corrected TRAIN
 development check must qualify L3; the invalid result does not authorize continuation.
 This corrects a unit mistake introduced by R12, with no EVAL-guided selection.
+
+**R12 coordinator addition (2026-11-04, before any L0/L4 construction or read).**
+The coordinator requests two more arms, with all earlier R12 fits/results and
+registered reads retained unchanged:
+
+- **L0, structurally pruned A:** for each baseline seed, remove only hidden
+  units whose entire encoder column is exactly zero and whose bias is <= 0.
+  Preserve the remaining units' order, all input declarations/scalers, live
+  weights, output bias, output stage and dial spline. Seed 0 must remove the
+  audit's 95 dead units. This is data-free pruning, not selection or a fit.
+  Prove strict served-score bit identity against its corresponding A seed
+  across the registered feature fixtures and pixel gates, including identity
+  and NEARID; any differing bit fails the exact-pruning claim and is reported.
+  Report L0 beside A and L1–L3 on every registered read, plus head-only timing.
+  Optional **L0r** diagnostic: retain only A0's audited live max pair, removing
+  the 31 residual units too. Measure score differences on the same registered
+  fixtures; do not assume identity, select on the result, or silently promote
+  this approximate variant to L0. L0r is a fixture-difference diagnostic only.
+- **L4, fitted two-piece max-linear:** three seeds, same admitted mix root,
+  all 984 inputs, loss/targets/group weights/sampler and 120-epoch final-epoch
+  rule as L1/L2; no AIC continuation or EVAL selection. Raw score is
+  `100 - c * max(a dot x, b dot x)`, with `c >= 0`, `a >= 0`, `b >= 0`,
+  both affine offsets fixed at zero, and no residual units. Use the canonical
+  max-pair projection and trainer, with a narrowly bound R12 authorization
+  for H2/one pair/zero thresholds; any necessary admission/orchestration
+  extension preserves historical recipe contracts. The existing coupled
+  representation is `a dot x + ReLU((b-a) dot x)`; a signed stored correction
+  is allowed only when both complete pieces remain non-negative.
+  Pack/calibrate exactly as L1/L2. Every registered read is report-only and
+  reported beside A, L0 and L1–L3, including head-only forward time.
+
+Keep the original L1/L2/L3 choices frozen. L0 and L4 reuse already-exposed
+assessments, not fresh confirmation. Existing qualification thresholds remain.
