@@ -28,7 +28,7 @@ def worker():
         head=packed.with_name('shipped-inspection.json')
         subprocess.run([str(owner.HEAD),'--inspect',str(shipped),str(head)],check=True)
         original=root/f"fits/{row['arm']}-s{row['seed']}/HEAD.json"
-        if json.loads(head.read_text())!=json.loads(original.read_text()):
+        if head.read_bytes()!=original.read_bytes():
             raise ValueError('stripping changed inference parameters')
         row.update(shipped_model=str(shipped),shipped_sha256=owner.sha(shipped),
                    shipped_bytes=shipped.stat().st_size,
