@@ -2278,3 +2278,14 @@ registered reads retained unchanged:
 
 Keep the original L1/L2/L3 choices frozen. L0 and L4 reuse already-exposed
 assessments, not fresh confirmation. Existing qualification thresholds remain.
+
+**R12 L4 offset amendment (2026-11-04, before L4 construction).**
+Owner answer: L4 learns **one non-positive offset on the second piece**, so
+`raw = 100 - c * max(a dot x, b dot x - t)`, with `t >= 0`, `a >= 0`,
+`b >= 0`, `c >= 0`. This replaces the addition's "offsets fixed at zero";
+**one learned non-positive offset on the second piece; amended before L4
+construction**. A0's audited pair biases are 0 and −5.868288993835449.
+Use the existing threshold-enabled max-pair owner, keep the first bias at
+zero and learn the second at <= 0. No additional arm, fit budget, selection
+read or evaluation population is introduced. No L4 model has been constructed,
+fitted or assessed before this amendment.
