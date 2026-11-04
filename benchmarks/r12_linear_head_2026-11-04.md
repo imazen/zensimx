@@ -97,7 +97,8 @@ G-CHROMA-L level qualification; all pass its rank non-regression. Extended-XYB M
 rises from A0's 3.576321 points to seed means 4.029702 / 4.934336 / 3.946562 for
 L1 / L2 / L3. No original fitted arm meets the complete label-free product gates.
 
-HDR uses the registered cube-root:203 banks and historical native predictor. It is
+HDR uses the registered cube-root:203 banks and historical native predictor's raw
+network scores, before the served dial, exactly as the mix read. It is
 report-only and includes a teacher validation population. No HDR leg was fitted.
 The small 4Kdtb EVAL sample has one family, so its family bootstrap is undefined.
 Pooled ladder correlations are descriptive; within-ladder rank is the ladder read.

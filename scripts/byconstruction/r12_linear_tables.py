@@ -54,7 +54,7 @@ def main():
         rows = [(f"{c} (n={original['per']['F@0'][c]['n']})", [f'{scale * eval_mean(arm, c, metric):.5f}' for arm in arms]) for c in collections]
         if metric != 'p90':
             for title_row, cols in [('all nine, equal collection mean', collections),
-                                    ('eight without MDID (same training population)', [c for c in collections if c != 'mdid']),
+                                    ('eight collections excluding training-source MDID', [c for c in collections if c != 'mdid']),
                                     ('common three: IQA-ODI, NITS-IQA, VCL-FER', ['iqa-odi', 'nits-iqa', 'vcl-fer'])]:
                 rows.append((title_row, [f'{scale * mean(eval_mean(arm, c, metric) for c in cols):.5f}' for arm in arms]))
         table(title, labels, rows)

@@ -15,7 +15,7 @@ for p in Path('/proc').iterdir():
         exe=Path(cmd[0]).name
         if (exe in ('zensim_mlp_train','prune_forward_bench') or
                 (exe.startswith('python') and len(cmd)>2 and any(Path(c).name.startswith(('r12_linear_', 'r12_pruning_', 'hdr_panel')) for c in cmd[1:3]))):
-            processes.append(dict(pid=int(p.name),exe=exe,script=cmd[2] if exe.startswith('python') else None,
+            processes.append(dict(pid=int(p.name),exe=exe,script=next((c for c in cmd[1:] if Path(c).suffix=='.py'),None) if exe.startswith('python') else None,
                                   start_ticks=p.joinpath('stat').read_text().split(') ',1)[1].split()[19]))
     except (OSError, UnicodeError,IndexError): pass
 status=dict(checked=now,stage=(root/'reads/STAGE').read_text() if (root/'reads/STAGE').exists() else (root/'STAGE').read_text(),fit_and_head_stage=(root/'STAGE').read_text(),complete=(root/'PROGRESS').read_text().splitlines(),
