@@ -204,6 +204,12 @@ projection, zero-lower-bound refusal, transform/warm-start regressions and the
 release binding. The final combined sequence takes 74 seconds (peak RSS
 1.39 GiB, minimum available 26,157 MiB). The all-targets compile check also
 passes in 26 seconds (peak RSS 0.56 GiB, minimum available 26,460 MiB).
+The subsequent percentile-boundary regression verifies inward f32 rounding
+after log projection: a stored knee remains inside the exact TRAIN interval
+even when the percentile itself is not representable. Zero underflow still
+fails without an epsilon. All five knee tests and targeted clippy pass on ARM
+in 51 seconds (peak RSS 1.55 GiB, minimum available 25,925 MiB). A conditional
+native T2 trainer build has its own selection receipt; T1 trainer pins stay fixed.
 T2's scientific fit is still unreleased pending the registered T1 comparison.
 All serving/read binaries remain pinned to `912609aa`. Trainer successors
 are pinned separately, including each fit stage's native identity.

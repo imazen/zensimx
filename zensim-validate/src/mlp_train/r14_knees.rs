@@ -9,6 +9,7 @@ pub struct KneePlan {
     columns: Vec<usize>,
     lower: Vec<f64>,
     upper: Vec<f64>,
+    intervals: Vec<[f64; 2]>,
     groups: Vec<Vec<f32>>,
     train: Vec<bool>,
     fixed_intervals: Vec<usize>,
@@ -47,6 +48,7 @@ impl KneePlan {
         let mut columns = Vec::new();
         let mut lower = Vec::new();
         let mut upper = Vec::new();
+        let mut intervals = Vec::new();
         let mut fixed_intervals = Vec::new();
         let nf = transforms.len();
         let mut seen = vec![false; nf];
@@ -80,6 +82,7 @@ impl KneePlan {
             columns.push(c);
             lower.push(if lo > 0. { lo.ln() } else { f64::NEG_INFINITY });
             upper.push(hi.ln());
+            intervals.push([lo.max(0.), hi]);
         }
         if columns.is_empty() {
             return Err("T2 has no eligible soft-clip knees".into());
@@ -114,6 +117,7 @@ impl KneePlan {
             columns,
             lower,
             upper,
+            intervals,
             groups: raw,
             train,
             fixed_intervals,
@@ -247,10 +251,23 @@ impl KneeState {
                 "T2 nonfinite Adam state"
             );
             let proposal = self.log_knee[j].clamp(self.plan.lower[j], self.plan.upper[j]);
-            let k = proposal.exp() as f32;
+            let mut k = proposal.exp() as f32;
             assert!(
                 proposal.is_finite() && k.is_finite() && k > 0.,
                 "T2 invalid projected knee"
+            );
+            // Quantize inward at a nonrepresentable percentile boundary.
+            // Nearest-f32 rounding can otherwise put a valid log projection
+            // outside its TRAIN interval and make continuation reject it.
+            let [lo, hi] = self.plan.intervals[j];
+            if f64::from(k) < lo {
+                k = k.next_up();
+            } else if f64::from(k) > hi {
+                k = k.next_down();
+            }
+            assert!(
+                k.is_finite() && k > 0. && f64::from(k) >= lo && f64::from(k) <= hi,
+                "T2 TRAIN interval has no representable projected knee"
             );
             self.log_knee[j] = proposal;
             self.params[c][0] = k;
@@ -462,6 +479,25 @@ mod tests {
             }))
             .is_err()
         );
+    }
+
+    #[test]
+    fn projection_rounds_inward_at_nonrepresentable_percentile_boundaries() {
+        let mut lower = state(0.25);
+        let lo = f64::from(0.25_f32) + f64::from(0.25_f32.next_up() - 0.25) / 4.;
+        Arc::make_mut(&mut lower.plan).lower[0] = lo.ln();
+        Arc::make_mut(&mut lower.plan).intervals[0][0] = lo;
+        lower.step(0, 0, 1, &[1.; 4], &[1.; 4], &[1.; 4], 1000.);
+        assert_eq!(lower.params[0][0], 0.25_f32.next_up());
+        assert!(f64::from(lower.params[0][0]) >= lo);
+
+        let mut upper = state(0.25);
+        let hi = f64::from(0.75_f32) - f64::from(0.75 - 0.75_f32.next_down()) / 4.;
+        Arc::make_mut(&mut upper.plan).upper[0] = hi.ln();
+        Arc::make_mut(&mut upper.plan).intervals[0][1] = hi;
+        upper.step(0, 0, 1, &[1.; 4], &[-1.; 4], &[-1.; 4], 1000.);
+        assert_eq!(upper.params[0][0], 0.75_f32.next_down());
+        assert!(f64::from(upper.params[0][0]) <= hi);
     }
 
     #[test]

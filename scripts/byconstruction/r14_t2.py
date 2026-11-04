@@ -47,17 +47,19 @@ def fit():
     decision=release()
     print(json.dumps(decision),flush=True)
     if not decision['run']:return
-    selected=json.loads((O/'ACTIVE_TRAINER.json').read_text())
+    selected=json.loads((O/'T2_TRAINER.json').read_text())
     native_dir=Path(selected['trainer_dir'])
     native=json.loads((native_dir/'TRAINER_PINS.json').read_text())
-    if (owner.sha(native_dir/'TRAINER_PINS.json')!=selected['trainer_pins_sha256']
+    if (selected['schema']!='r14-t2-f32-bounds-v1'
+            or owner.sha(native_dir/'TRAINER_PINS.json')!=selected['trainer_pins_sha256']
             or owner.sha(native_dir/'zensim_mlp_train')!=native['trainer_sha256']
             or native['serving_pins_sha256']!=owner.sha(O/'SOURCE_PINS.json')):
         raise ValueError('T2 native trainer identity differs')
     fixed.validate_owners(json.loads((O/'SOURCE_PINS.json').read_text()),native)
     wrapper='scripts/rev4_featpot/r14_learn_knees_fit.py'
-    if owner.sha(X/wrapper)!=native['source_sha256'][wrapper]:
-        raise ValueError('T2 wrapper differs from native source freeze')
+    for source in (wrapper,'zensim-validate/src/mlp_train/r14_knees.rs'):
+        if owner.sha(X/source)!=native['source_sha256'][source]:
+            raise ValueError('T2 learner differs from native source freeze')
     cell=O/'fits/T2-s0'
     cell.mkdir(exist_ok=True)
     if (cell/'FIT.json').exists():raise ValueError('preserve completed T2 fit')
@@ -119,8 +121,13 @@ def freeze():
             raise ValueError('T2 changed a transform kind')
         if i in eligible:
             knee,soft=a['params']
-            lo,hi=f32(inputs[i]['p05']),f32(inputs[i]['p99'])
-            if knee!=soft or not (knee>0 and max(0.,lo)<=knee<=hi):
+            raw_lo,raw_hi=max(0.,inputs[i]['p05']),inputs[i]['p99']
+            lo,hi=f32(raw_lo),f32(raw_hi)
+            bits=lambda x:struct.unpack('<I',struct.pack('<f',x))[0]
+            number=lambda n:struct.unpack('<f',struct.pack('<I',n))[0]
+            if lo<raw_lo:lo=number(bits(lo)+1)
+            if hi>raw_hi:hi=number(bits(hi)-1)
+            if knee!=soft or not (knee>0 and raw_lo<=knee<=raw_hi):
                 raise ValueError('T2 knee outside registered positive TRAIN bounds')
             if knee!=original[0]:changed.append(i)
             if knee==lo:lower.append(i)
@@ -141,9 +148,13 @@ def freeze():
 
 def main():
     ap=argparse.ArgumentParser(description=__doc__)
-    ap.add_argument('command',choices=('fit','freeze','pack-worker'))
+    ap.add_argument('command',choices=('prepare','fit','freeze','pack-worker'))
     args=ap.parse_args()
-    if args.command=='fit':fit()
+    if args.command=='prepare':
+        decision=release()
+        if decision['run']:
+            owner.job('T2-trainer-build',['bash',X/'scripts/byconstruction/r14_trainer_build.sh','t2-bounds'])
+    elif args.command=='fit':fit()
     elif args.command=='freeze':freeze()
     else:fixed.pack('T2')
 
