@@ -3039,3 +3039,13 @@ without TensorFlow. The read, models and reading rule are in the zensimx record
   0.6750 against a majority ceiling of 0.6975, and the candidates order 99.5% of the questions identically, so the set
   cannot separate them (zensimx record, R10 amendment 3 result). No model was selected on it. Any later read must
   disclose this one.
+
+## Exposure registration — 2026-11-03: MMSPG JPEG XR confirmation read (R10 amendment 4)
+
+The zensimx record (R10 amendment 4) resolves "other library MOS sets in no training leg and not in EVAL" to one
+set and lists why every other candidate is excluded (reserved, shares a training source, already read, or not in the
+library's content). **MMSPG JPEG XR (`mmspg-jpeg-xr`), all 186 rated conditions, EVALUATION ONLY**, read once for
+E36's four dial candidates (F3 control, p30L, `mixF3`, mix + p30L; seeds 0-2) against F3's control. Prior exposure:
+the M2 trust screen (third-party metrics only, 2026-11-03). Pixels: the screen's zenbitmaps decodes. Six references:
+the read is descriptive. `scripts/byconstruction/e36_exp56/mos_confirm.py`: `keys` reads `item` and `ref` only;
+`confirm` ledgers `LABEL_READS.json` before parsing `score`.

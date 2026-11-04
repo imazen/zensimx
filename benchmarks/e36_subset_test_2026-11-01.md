@@ -1486,3 +1486,40 @@ of the twin's E36 gain (2.31% against 2.12%, p30L 2.38%) and improves the EVAL c
 arm with the same pairwise cost as the twin. As registered, the arm passed its guards, so its JPEG XL loop at seed 0
 runs next on i270, judged by butteraugli with CVVDP, SSIMULACRA2, zensim and DVIFM reported (`e36_loop_r4.sh`);
 the loop result is appended below when it lands. Nothing is adopted on this read.
+
+### R10 amendment 4 (2026-11-03, before the read): the library's other MOS sets, resolved to one
+
+Experiment 5 stage 3 registered "other library MOS sets in no training leg and not in EVAL" as the mix's confirmation.
+Resolved from the IQA catalogue (`zenpapers/datasets/iqa_catalog.tsv`, 681 rows, 103 full-reference image sets in
+the library) against F3's legs (safesyn, cid22, coverage, the human sources KADID, TID2013, KonFiG, CID22-A25, AIC-3,
+the dataset legs PIPAL, MDID, LIVE-MD, CID:IQ, CID:OA, IRCCyN-IVC, Colourlab, BAPPS, chroma teacher), EVAL's nine
+collections (CID:IQ, CID:OA, Colourlab, IQA-ODI, IRCCyN-IVC, LIVE-MD, MDID, NITS-IQA, VCL-FER) and `docs/DATA_SPLITS.md`:
+
+- Reserved or sealed, not touched: CSIQ, LIVE release 2, KonJND JPEG, MCL-JCI (Rev4 confirmation); CLIC 2022, CID22-B,
+  KADID TERMINAL, AIC2026 public_test; the threshold sets (JND-MID-MA, VLIC, Konstanz PJND).
+- Share a training source: NNCD-IQA, MIDD-CAP, MIDD-GAR, TID2008 (TID2013's photographs); mucped23 (17 CID22-A25
+  sources); IRCCyN/IVC Toyama and MICT Toyama (Kodak scenes that contain TID2013 and SafeSyn sources; DATA_SPLITS,
+  October 25); IDSQS-AIC and Konstanz feedback (AIC-3 sources); PC-IQA (9 of 15 references are IRCCyN-IVC sources, 6
+  are LIVE's); mabyduck's CLIC 2024 reproduction (CLIC 2024, R7's leg, and CLIC 2021's protocol family).
+- Already read: CLIC 2021 validation (three times); CIQA (amendment 3). Fidelity-LIC measures GAN-vs-non-GAN
+  preference that fidelity metrics miss (M2) and has protected sources.
+- Not in the library's content (catalogued only): A57, ESPL synthetic, IRCCyN/IVC LAR, JPEG AI subjective (EPFL),
+  MD-IVL, MDID2013, MP2020, SD-IVL, VDID2014, CAIP HEVC patches, EPFL nearly visually lossless. The owner's rule
+  (2026-10-25) forbids downloading datasets, so none is read.
+- Remaining compression-centric set with content, in no leg, not in EVAL, not reserved, no known source overlap:
+  **MMSPG JPEG XR** (186 rated conditions, 6 photographs, 13 raters; JPEG 4:2:0, JPEG 2000 4:2:0 and 4:4:4, JPEG XR
+  with and without overlap, 6 rates each). Prior exposure: the M2 trust screen scored it with third-party metrics
+  only (SSIMULACRA2 0.928, butteraugli 3-norm 0.892, CVVDP 0.911, DVIFM 0.3 0.928; reliability 0.978).
+  Non-compression sets with content (watermarking, DIBR, denoising, enhancement, super-resolution, tone mapping) are
+  outside this question and are not read here.
+
+**The read** (`e36_exp56/mos_confirm.py`, token `mmspg`): pixels are the M2 screen's zenbitmaps decodes of the
+library's BMPs (`decode_map.tsv`, content-addressed PNGs copied from i270 to `/mnt/v/zensim/e36-read4-mmspg/`);
+`keys` reads `item` and `ref` only; features with the frozen Rev7 extractor; `confirm` ledgers the read before parsing
+`score`. All 186 rows (the 6 reference rows included, as the screen scored them). Models: F3's control, p30L, `mixF3`,
+mix + p30L at seeds 0-2. Per model: SROCC with the canonical whole-reference interval, within-reference SROCC, error
+(median absolute residual around the 4PL fit over the 1-99% span, the EVAL readout's statistic). Arms against F3's
+control at the same seed: seed-mean SROCC and error differences, whole-reference bootstrap (10,000 draws, seed
+20261103). **Disclosure stated before the read:** six references cannot support a bootstrap interval; the read is
+descriptive, with the within-reference SROCC (which does not depend on cross-photograph level) the more informative
+number. Nothing is adopted on it.
