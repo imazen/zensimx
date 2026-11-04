@@ -3053,3 +3053,15 @@ the read is descriptive. `scripts/byconstruction/e36_exp56/mos_confirm.py`: `key
   F3's control, p30L, `mixF3` and mix + p30L at seeds 0-2. SROCC 0.917-0.922 for every model (within-reference
   0.924-0.931); every arm neutral against F3's control (zensimx record, R10 amendment 4 result). No model was selected
   on it. Any later read must disclose this one.
+
+## Exposure registration — 2026-11-03: reference metrics on the confirmation sets (R10 amendment 5)
+
+Registered in the zensimx record (R10 amendment 5) before the runs, at the owner's request for a comparison with
+SSIMULACRA2, butteraugli's 3-norm, FSIMc and the AIC-4 HaarXYB-SSIM-mask-deltaL1248 metric: the reference metrics
+(SSIMULACRA2, butteraugli 3-norm, FSIM and FSIMc, HaarPSI, the two published AIC-4 Haar configs; no zensim model) were
+scored on exactly the rows of the candidates' reads, and the `confirm` statistics were rerun over the metrics' judge
+files (`scripts/byconstruction/e36_exp56/refmetric_judges.py`). This is a further read of the labels of **CLIC 2021
+validation** (read 3's 4,812 questions), **MMSPG JPEG XR** (186 rows) and **CIQA** (7,902 questions) by metrics
+only, plus EVAL's ledgered rows; no model was selected on any of them and nothing was adopted (zensimx record, R10
+amendment 5 result: no metric matches the mix across the sets; the Haar configs are not teacher candidates). Any
+later read of these sets must disclose this one as well as the candidates' reads.
