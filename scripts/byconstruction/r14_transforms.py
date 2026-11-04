@@ -126,6 +126,20 @@ def reads():
             owner.job(f'read-{stage}-{name}',common+['--only',stage,'--include-model',name])
 
 
+def finalize():
+    import r13_width_finalize as strip
+    owner.HEAD=O/'bin/prune_forward_bench'
+    strip.worker(registered_hidden=128)
+    frozen=json.loads((O/'FROZEN_FITS.json').read_text())
+    for row in frozen['models']:
+        for key in ('zentrain.feature_transforms','zentrain.feature_transform_params'):
+            values=[subprocess.check_output([str(O/'bin/bake_dial_refit'),'read-meta',
+                '--in',str(row[k]),'--key',key]) for k in ('packed_model','shipped_model')]
+            if values[0]!=values[1]:raise ValueError('stripping changed transform metadata')
+        row['stripped_transform_metadata']='exactly equal to packed table and params'
+    owner.write(O/'FROZEN_FITS.json',frozen)
+
+
 def fit_progress(destination):
     pins=json.loads((O/'SOURCE_PINS.json').read_text())
     screen=json.loads((O/'screen/SUMMARY.json').read_text())
@@ -172,7 +186,7 @@ def fit_progress(destination):
 
 def main():
     ap=argparse.ArgumentParser(description=__doc__)
-    ap.add_argument('command',choices=('fit','pack','freeze','development','capacity','reads','fit-progress','job'))
+    ap.add_argument('command',choices=('fit','pack','freeze','development','capacity','reads','finalize','fit-progress','job'))
     ap.add_argument('--arm',choices=ARMS)
     ap.add_argument('--label')
     ap.add_argument('--out',type=Path)
@@ -189,6 +203,8 @@ def main():
         owner.job(a.label,argv[1:] if argv[:1]==['--'] else argv)
     elif a.command=='capacity':capacity()
     elif a.command=='reads':reads()
+    elif a.command=='finalize':
+        owner.job('metadata-strip',[sys.executable,'-B',__file__,'finalize-worker'])
     elif a.command=='fit-progress':
         if not a.out:ap.error('--out required')
         fit_progress(a.out)
@@ -197,4 +213,5 @@ def main():
 
 if __name__=='__main__':
     if sys.argv[1:]==['development-worker']:development()
+    elif sys.argv[1:]==['finalize-worker']:finalize()
     else:main()

@@ -11,7 +11,7 @@ import sys
 import r13_width as owner
 
 
-def worker():
+def worker(registered_hidden=None):
     root=owner.O
     frozen=json.loads((root/'FROZEN_FITS.json').read_text())
     control=owner.H/'tmp/e36test/r10/runs/mixF3-s0/pack_e059/refit/production-f16.bin'
@@ -27,8 +27,9 @@ def worker():
         original=root/f"fits/{row['arm']}-s{row['seed']}/HEAD.json"
         inspection=json.loads(original.read_text())
         first,last=inspection['layers']
+        expected_hidden=registered_hidden if registered_hidden is not None else int(row['arm'][1:])
         if (inspection['derived_inputs']!=declaration or first['in_dim']!=984
-                or first['out_dim']!=int(row['arm'][1:])
+                or first['out_dim']!=expected_hidden
                 or last['in_dim']!=first['out_dim'] or last['out_dim']!=1):
             raise ValueError('R13 input declaration or registered layer dimensions differ')
         no_repro=packed.with_name('without-repro.bin')
