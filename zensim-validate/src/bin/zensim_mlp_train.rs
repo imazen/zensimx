@@ -1428,6 +1428,19 @@ fn parse_pwrc_band_weights(s: &str) -> Result<Vec<f64>, String> {
     Ok(out)
 }
 
+fn compact_subset_wanted(args: &Args, want_gpu: bool) -> bool {
+    args.feature_transform.is_empty()
+        && args.auto_transforms.is_none()
+        // The checkpoint table is restored after loading. R14 continuations
+        // need dense rows for the transform pass; lazy products carry no table.
+        && !(args.init_from.is_some() && args.r14_transforms_registration.is_some())
+        && args.tv_pairs_file.is_none()
+        && !want_gpu
+        && !args.pool_head
+        && !args.hybrid_head
+        && !args.per_sample_alpha_head
+}
+
 struct LoadedGroup {
     name: String,
     train_w: f64,
@@ -3931,15 +3944,7 @@ fn main() {
     // feature transform / auto-transforms / TV pairs, no GPU lane, no pool /
     // hybrid / per-sample-α head. Everything else loads dense, as before.
     let compact_load: Option<(Vec<u32>, usize)> = match selected_ids.as_deref() {
-        Some(ids)
-            if args.feature_transform.is_empty()
-                && args.auto_transforms.is_none()
-                && args.tv_pairs_file.is_none()
-                && !want_gpu
-                && !args.pool_head
-                && !args.hybrid_head
-                && !args.per_sample_alpha_head =>
-        {
+        Some(ids) if compact_subset_wanted(&args, want_gpu) => {
             let load: Vec<usize> = match &derived {
                 Some((decl, _)) => decl.load_ids(),
                 None => ids.to_vec(),
@@ -4244,6 +4249,20 @@ fn main() {
             };
             // Validate param count matches variant expectation
             match transform {
+                zenpredict::FeatureTransform::YeoJohnson
+                | zenpredict::FeatureTransform::SoftSign
+                | zenpredict::FeatureTransform::SoftClip => {
+                    let expected = if transform == zenpredict::FeatureTransform::SoftClip {
+                        2
+                    } else {
+                        1
+                    };
+                    assert_eq!(
+                        parsed_params.len(),
+                        expected,
+                        "--feature-transform {token}:{idx}: wrong parameter count"
+                    );
+                }
                 zenpredict::FeatureTransform::ClipThenLog1p => {
                     if !parsed_params.is_empty() && parsed_params.len() != 1 {
                         eprintln!(
@@ -6371,6 +6390,20 @@ mod capability_preflight_tests {
         argv.extend_from_slice(extra);
         let matches = Args::command().try_get_matches_from(argv).unwrap();
         (Args::from_arg_matches(&matches).unwrap(), matches)
+    }
+
+    #[test]
+    fn r14_checkpoint_transform_restore_cannot_select_lazy_raw_rows() {
+        let (mut a, _) = args(&[]);
+        assert!(compact_subset_wanted(&a, false));
+        a.init_from = Some("checkpoint.bin".into());
+        assert!(compact_subset_wanted(&a, false)); // historical untransformed A
+        a.r14_transforms_registration = Some(mlp_train::transforms::REGISTRATION.into());
+        assert!(a.feature_transform.is_empty() && a.auto_transforms.is_none());
+        assert!(!compact_subset_wanted(&a, false)); // table is not parsed yet
+        a.init_from = None;
+        a.auto_transforms = Some("screen.tsv".into());
+        assert!(!compact_subset_wanted(&a, false));
     }
 
     #[test]

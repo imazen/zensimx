@@ -4333,6 +4333,11 @@ r14-certificate-checks:
     cargo test -p zensim-validate --lib mlp_train::warm_start -- --test-threads=1
     cargo check -p zensim-validate --bin bake_dial_refit --bin zensim_mlp_train
 
+r14-continuation-checks:
+    cargo fmt --check -p zensim-validate
+    cargo test -p zensim-validate --bin zensim_mlp_train capability_preflight_tests -- --test-threads=1
+    cargo clippy -p zensim-validate --bin zensim_mlp_train
+
 r14-transform-build:
     python3 -B scripts/byconstruction/r14_transforms.py job --label final-build -- bash scripts/byconstruction/r14_transforms_build.sh
 
