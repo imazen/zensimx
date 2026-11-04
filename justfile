@@ -4386,7 +4386,7 @@ r14-transform-t2:
     python3 -B scripts/byconstruction/r14_t2.py freeze
 
 r14-transform-status:
-    python3 -B scripts/byconstruction/r14_transforms_status.py
+    python3 -B scripts/byconstruction/r14_transforms_status.py --compact
 
 r14-transform-heads:
     python3 -B scripts/byconstruction/r14_heads.py

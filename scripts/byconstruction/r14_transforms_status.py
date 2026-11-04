@@ -11,6 +11,7 @@ from run_processes import process_tree, compute_lock
 
 
 def main():
+    if sys.argv[1:] not in ([],['--compact']):raise ValueError('expected --compact or no arguments')
     root=Path('/var/tmp/byc-transforms-20261104')
     now=datetime.now(timezone.utc).isoformat()
     lock=X/'.workongoing'
@@ -59,6 +60,8 @@ def main():
         source_pins_present=(root/'SOURCE_PINS.json').exists(),receipt=result,
         next_action='finish registered fits, then development feasibility and frozen reads')
     (root/'SUPERVISION.json').write_text(json.dumps(report,indent=2)+'\n')
+    if sys.argv[1:]==['--compact']:
+        report={k:report[k] for k in ('checked','stage','state','completed_fits','required_T1_fits','epochs','lock','holder_activity')}
     print(json.dumps(report,indent=2))
 
 
