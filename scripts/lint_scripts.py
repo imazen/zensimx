@@ -373,24 +373,11 @@ def check_windows_paths() -> list[str]:
     windows-11-arm CI, so this is not cosmetic -- it silently removed a
     required platform from coverage.
     """
-    import subprocess
-
-    try:
-        out = subprocess.run(
-            ["git", "-c", "core.quotepath=off", "ls-files", "-z"],
-            cwd=ROOT,
-            capture_output=True,
-            text=True,
-            timeout=60,
-        )
-    except (OSError, subprocess.SubprocessError):
-        return []  # not a git checkout (or git absent) -- nothing to assert
-    if out.returncode != 0:
+    files = _tracked_files()
+    if files is None:
         return []
     bad = []
-    for path in out.stdout.split("\0"):
-        if not path:
-            continue
+    for path in files:
         hits = sorted(set(path) & WINDOWS_FORBIDDEN)
         if hits:
             bad.append(
@@ -486,10 +473,25 @@ def _tracked_files() -> list[str] | None:
     ls-files` there fails outright (nonzero exit, no exception) and this
     falls back to `jj file list`, which every jj workspace of the same repo
     answers identically since they share the underlying operation log.
-    Returns None (checked nothing) only when neither VCS answers, e.g. a
-    plain source export with no `.git` and no `.jj`.
+    A plain source export can explicitly supply `LINT_TRACKED_FILES`, a
+    newline-separated snapshot of `jj file list`. Missing, repeated or
+    out-of-root paths fail rather than silently narrowing that snapshot.
+    Returns None (checked nothing) only when neither VCS nor a manifest exists.
     """
     import subprocess
+
+    manifest = os.environ.get("LINT_TRACKED_FILES")
+    if manifest is not None:
+        files = Path(manifest).read_text().splitlines()
+        if not files or len(files) != len(set(files)):
+            raise ValueError("tracked-file manifest must be nonempty and unique")
+        for name in files:
+            path = Path(name)
+            target = ROOT / path
+            if (path.is_absolute() or ".." in path.parts or not target.is_file()
+                    or not target.resolve().is_relative_to(ROOT.resolve())):
+                raise ValueError(f"invalid or missing tracked export path: {name!r}")
+        return files
 
     try:
         out = subprocess.run(

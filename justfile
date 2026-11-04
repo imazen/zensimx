@@ -1389,6 +1389,10 @@ demo-speed-accuracy *options:
 lint-scripts:
     python3 scripts/lint_scripts.py
 
+# `manifest` is a complete `jj file list` snapshot accompanying a source export.
+lint-scripts-export manifest:
+    LINT_TRACKED_FILES={{quote(manifest)}} python3 scripts/lint_scripts.py
+
 # Display the canonical detached-compute waiter's progress and terminal record.
 [positional-arguments]
 await-status heartbeat:
