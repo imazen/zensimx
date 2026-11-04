@@ -34,6 +34,9 @@ def main():
             if not (audit_dir / 'complete.json').is_file():
                 continue
             audit = read(audit_dir / 'audit.json')
+            if result.get('bake_sha256', audit['bake_sha256']) != audit['bake_sha256']:
+                raise RuntimeError('bank-scoped bake identities differ')
+            result['bake_sha256'] = audit['bake_sha256']
             target = {'audit': f"data/{sources['audit']}/audit.json", 'weights': f"data/{sources['audit']}/weights.json", 'lenses': {}, 'family_lenses': {}}
             lens_dir = root / sources['lens'] if sources.get('lens') else None
             if lens_dir and (lens_dir / 'complete.json').is_file():
@@ -47,9 +50,13 @@ def main():
                 target['monotonicity_flags'] = []
                 for curve_name in [*index['lenses'].values(), *index['family_lenses'].values()]:
                     curve = read(lens_dir / curve_name)['pdp']
+                    native_flags = {(f['ice_row'], f['point']): f for f in curve.get('rise_flags', [])}
                     for row, point, delta in curve['monotonicity_violations']:
                         feature = curve['feature']
-                        target['monotonicity_flags'].append(dict(kind='monotonicity', severity='critical', location=f"{curve['family'] or ('f' + str(feature))}, bank row {curve['row_indices'][row]}, grid {point}", feature=feature, layer=None, value=curve['ice'][row][point], statistic=delta, threshold=0, reason='Observed served score rises when damage increases; inspect the native curve.'))
+                        severity = native_flags.get((row, point), {}).get('severity')
+                        if severity is None:
+                            severity = 'note' if delta < 0.001 else 'warning' if delta < 0.05 else 'serious' if delta < 0.5 else 'critical'
+                        target['monotonicity_flags'].append(dict(kind='monotonicity', severity=severity, intervention=curve['family'] or ('f' + str(feature)), family_intervention=curve['family'], location=f"{curve['family'] or ('f' + str(feature))}, bank row {curve['row_indices'][row]}, grid {point}", feature=feature, layer=None, value=curve['ice'][row][point], statistic=delta, threshold=0, reason='Observed served score rises when damage increases; inspect the native curve.'))
             target['comparisons'] = {}
             for other, dirname in sources.get('comparisons', {}).items():
                 if (root / dirname / 'complete.json').is_file():

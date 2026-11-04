@@ -19,7 +19,7 @@ for lock in heavy:
     except FileNotFoundError:
         lock['args'] = 'process exited during observation'
 record = {'last_verified_utc': datetime.datetime.now(datetime.timezone.utc).isoformat(), 'heavy_lock_observation': heavy, 'runs': [], 'checks': {}}
-for folder in ['export-logs', 'hdr-export-logs']:
+for folder in ['export-logs', 'hdr-export-logs', 'curve-audit-logs', 'atlas-v2-logs', 'review1-logs']:
     path = output / folder / 'progress.json'
     if not path.exists():
         continue

@@ -4001,6 +4001,7 @@ viz-serve:
 
 viz-web-check:
     node --check tools/zensim-viz/web/app.js
+    node --check tools/zensim-viz/web/weight-view.js
     diff -qr /home/lilith/tmp/zensim-viz-brief/design tools/zensim-viz/web/design
 
 viz-lens bake bank out feature:
@@ -4041,7 +4042,7 @@ viz-browser-audit:
     VIZ_TEST_SCOPE=audit TMPDIR="$HOME/tmp/zensim-viz" node tools/zensim-viz/tests/browser.mjs
 
 viz-web-fmt:
-    node "$VIZ_PRETTIER" --write tools/zensim-viz/web/app.js tools/zensim-viz/web/app.css tools/zensim-viz/web/index.html tools/zensim-viz/web/format.mjs tools/zensim-viz/tests/browser.mjs tools/zensim-viz/tests/format.mjs
+    node "$VIZ_PRETTIER" --write tools/zensim-viz/web/app.js tools/zensim-viz/web/weight-view.js tools/zensim-viz/web/app.css tools/zensim-viz/web/index.html tools/zensim-viz/web/format.mjs tools/zensim-viz/tests/browser.mjs tools/zensim-viz/tests/review1.mjs tools/zensim-viz/tests/format.mjs
 
 # Caller supplies private file paths; every native job reacquires the shared lock.
 viz-bundle plan:
@@ -4055,3 +4056,12 @@ viz-assemble config:
 
 viz-library-check:
     set -o pipefail; TMPDIR="$HOME/tmp/zensim-viz" flock "$HOME/tmp/heavy.lock" "$HOME/work/claudehints/scripts/run-heavy" --mem 16G --jobs 8 -- cargo clippy -p zensim --lib --features viz-export -- -D warnings 2>&1 | tee "$HOME/tmp/zensim-viz/library-clippy.log"
+
+viz-bank bake bank out other:
+    set -o pipefail; ZENSIM_FORMULA_REV=7 TMPDIR="$HOME/tmp/zensim-viz" flock "$HOME/tmp/heavy.lock" "$HOME/work/claudehints/scripts/run-heavy" --mem 16G --jobs 8 -- tools/zensim-viz/target/release/zensim-viz-export mlp-bank {{quote(bake)}} --bank {{quote(bank)}} --other {{quote(other)}} --out {{quote(out)}} 2>&1 | tee "$HOME/tmp/zensim-viz/lens-bank.log"
+
+viz-ci-status:
+    gh run list -R imazen/zensimx --limit 5 --json databaseId,name,status,conclusion,headSha,event
+
+viz-review-browser:
+    TMPDIR="$HOME/tmp/zensim-viz" node tools/zensim-viz/tests/review1.mjs
