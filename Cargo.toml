@@ -52,8 +52,9 @@ imgref = "1.12"
 rgb = { version = "0.8", default-features = false, features = ["bytemuck"] }
 linear-srgb = { version = "0.6.7", default-features = false, features = ["std"] }
 codec-corpus = "1.0.3"
-# Retained paired rounds and the Linux heartbeat gate fix for all local benches.
-zenbench = { version = "0.1.9", git = "https://github.com/imazen/zenbench", rev = "53941021fd20158bb52af6654df003ca6ead9caa" }
+# Retained paired rounds and explicit worker ownership in resource admission.
+# Historical results retain their recorded zenbench revision.
+zenbench = { version = "0.1.10", git = "https://github.com/imazen/zenbench", rev = "82ff70a3f0c212cf88f53d6e9c3e02de13f32eec" }
 # Current upstream main, fetched 2026-09-13; pin the filter-study implementation.
 zenresize = { git = "https://github.com/imazen/zenresize", rev = "e3975fb9d6d6b7baa96038a0eb8e27febb37c012", default-features = false, features = ["std"] }
 zenpng = { version = ">=0.1.4, <0.3.0", default-features = false }
