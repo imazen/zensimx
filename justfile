@@ -4071,3 +4071,10 @@ viz-reference catalog out:
 
 viz-design2-browser:
     TMPDIR="$HOME/tmp/zensim-viz" node tools/zensim-viz/tests/design2.mjs
+
+# A low-effect family extraction-cost study; all compute runs on the quiet host.
+a-family-cost-inputs corpus canonical out remote_root:
+    python3 scripts/bench/a_family_cost_inputs.py --corpus {{quote(corpus)}} --canonical {{quote(canonical)}} --out {{quote(out)}} --remote-root {{quote(remote_root)}}
+
+a-family-cost stage study *args:
+    bash scripts/bench/a_family_cost.sh {{quote(stage)}} {{quote(study)}} {{args}}
