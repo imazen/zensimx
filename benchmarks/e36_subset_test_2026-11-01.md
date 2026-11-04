@@ -2416,17 +2416,25 @@ RNG streams are separate; encoder draws do not advance the pair sampler.
 These inherited semantics are unchanged (`mlp_train/mod.rs`, initialization
 section); R13 does not add an initialization intervention.
 
-**R13 owner cost cut (2026-11-04, relayed approximately 20:15Z, before any R13
-assessment read).** Finish W512 seed 0 and W16 seed 0 as registered; retain the
+**R13 owner cost cut and W4 addition (2026-11-04, relayed approximately 20:15Z
+and 20:30Z, before any R13 assessment read).** Finish W512 seed 0 and W16 seed 0 as registered; retain the
 completed W32/W256/W64 seed-0 fits. **Do not start seeds 1–2 at any width.**
-The final candidate inventory is exactly five seed-0 bakes, W16/W32/W64/W256/W512.
+The owner subsequently adds **W4 seed 0 after W16 seed 0**, replacing the cut
+seed repetitions: hidden width 4, exactly one coupled max pair (two units) plus
+two ordinary units under the same pairs=width/4 rule. It uses the entire A
+recipe, including the public_train ×256 continuation with original rehearsal.
+This directly tests one-pair training with the full recipe against wide-training
+collapse; R12 L4 had no continuation and could not answer that question. Bind W4
+to this amendment explicitly in the Python/native admission, without relaxing the
+original width authorization. No W4 fit or assessment precedes this registration.
+The final inventory is exactly six seed-0 bakes, W4/W16/W32/W64/W256/W512.
 Every omitted seed-1/seed-2 cell is **not run (owner cut on cost, 2026-11-04)**.
 A remains the frozen mix F seeds 0–2, without refitting. This is an owner-directed
 reduction of arms on execution cost, not a new read or an outcome-based selection.
 
 All training/packing/certification rules, fixed base epoch 119 and continuation
 epoch 59, proportional pairs=width/4, input banks and capacity definitions stay
-unchanged. Freeze the five final bakes in a fit commit before assessments. Run
+unchanged. Freeze the six final bakes in a fit commit before assessments. Run
 the same registered EVAL, E36, G-CHROMA-L, G-STEER, C1–C6, identity, NEARID and
 cube-root:203 HDR reads beside all three frozen A seeds, and A-paired head time
 for each seed-0 width. The E36 statistic remains the mean over each arm's

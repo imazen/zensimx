@@ -60,7 +60,7 @@ def main():
             if json.loads(receipt.read_text())['rc']!=0:
                 raise ValueError('preserve failed metadata finalization for investigation')
             frozen=json.loads((owner.O/'FROZEN_FITS.json').read_text())
-            if len(frozen['models'])!=15 or any(owner.sha(r['shipped_model'])!=r['shipped_sha256'] for r in frozen['models']):
+            if len(frozen['models'])!=owner.required_fits() or any(owner.sha(r['shipped_model'])!=r['shipped_sha256'] for r in frozen['models']):
                 raise ValueError('completed frozen shipping inventory differs')
             return
         owner.freeze()

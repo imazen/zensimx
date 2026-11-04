@@ -12,8 +12,10 @@ def main():
     a=ap.parse_args()
     rows=[]
     pending=[]
-    for seed in range(3):
-        for width in owner.ORDER:
+    omitted=[dict(name=f'W{width}-s{seed}',state='not run (owner cut on cost, 2026-11-04)')
+             for seed in range(3) if seed not in owner.registered_seeds() for width in owner.ORDER]
+    for seed in owner.registered_seeds():
+        for width in owner.registered_widths():
             name=f'W{width}-s{seed}'
             path=owner.O/'fits'/name/'FIT.json'
             if not path.exists():
@@ -37,9 +39,9 @@ def main():
     pins=json.loads((owner.O/'SOURCE_PINS.json').read_text())
     owner.write(a.out,dict(schema='r13-packed-fit-progress-v1',registration='25e772922fd5a40d576e12af47778ce81bed5e08',
           trainer_source_commit=pins['source_commit'],reporting_source_sha256=owner.sha(__file__),
-          complete_fits=len(rows),required_fits=15,models=rows,pending=pending,
+          complete_fits=len(rows),required_fits=owner.required_fits(),models=rows,pending=pending,omitted=omitted,
           artifacts=dict(host='dev',root=str(owner.O),source_pins_sha256=owner.sha(owner.O/'SOURCE_PINS.json')),
-          role='packed-fit identities/capacity only; all fifteen must freeze before R13 EVAL assessments'))
+          role='packed-fit identities/capacity only; every retained candidate must freeze before R13 EVAL assessments'))
 
 
 if __name__=='__main__':main()

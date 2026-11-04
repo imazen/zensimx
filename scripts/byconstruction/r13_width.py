@@ -27,6 +27,29 @@ BANKS = {
 }
 
 
+def registered_seeds():
+    cut = O / 'OWNER_COST_CUT.json'
+    if not cut.exists():
+        return (0, 1, 2)
+    decision = json.loads(cut.read_text())
+    expected_widths = [4,16,32,64,256,512] if decision.get('schema') == 'r13-owner-cost-cut-v2' else [16,32,64,256,512]
+    if (decision.get('schema') not in ('r13-owner-cost-cut-v1','r13-owner-cost-cut-v2') or decision.get('seeds') != [0]
+            or decision.get('not_run_seeds') != [1, 2]
+            or decision.get('widths') != expected_widths):
+        raise ValueError('unrecognized R13 owner cut')
+    return (0,)
+
+
+def registered_widths():
+    registered_seeds()  # validate the owner decision before applying its addition
+    cut=O/'OWNER_COST_CUT.json'
+    return ORDER+(4,) if cut.exists() and json.loads(cut.read_text()).get('additional_arm')=='W4-s0' else ORDER
+
+
+def required_fits():
+    return len(registered_widths()) * len(registered_seeds())
+
+
 def now():
     return datetime.now(timezone.utc).isoformat()
 
@@ -65,7 +88,7 @@ def job(label, argv):
     start = now()
     write(O / 'SUPERVISION.json', dict(stage=label, coordinator_pid=os.getpid(),
           started=start, state='waiting-for-shared-lock', completed_fits=len(list((O/'fits').glob('*/FIT.json'))),
-          required_fits=15, source=sha(Path(__file__)), next_action=argv))
+          required_fits=required_fits(), source=sha(Path(__file__)), next_action=argv))
     command = ['flock', str(H/'tmp/heavy.lock'), str(H/'work/claudehints/scripts/run-heavy'),
                '--mem', '24G', '--jobs', '8', '--', '/usr/bin/time', '-v',
                '-o', str(O/'logs'/f'{label}.time.txt'), *argv]
@@ -129,8 +152,8 @@ def pack(width, seed):
 
 
 def fits():
-    for seed in range(3):
-        for width in ORDER:
+    for seed in registered_seeds():
+        for width in registered_widths():
             name = f'W{width}-s{seed}'
             cell = O/'fits'/name
             cell.mkdir(parents=True, exist_ok=True)
@@ -158,14 +181,14 @@ def fits():
             row['stage_times'] = times
             write(cell/'FIT.json',row)
             print('PACKED '+json.dumps(dict(name=name,wall_seconds=row['wall_seconds'],capacity=row['capacity'])),flush=True)
-    write(O/'SUPERVISION.json',dict(stage='fits-complete',state='complete',completed_fits=15,required_fits=15,last_check=now()))
+    write(O/'SUPERVISION.json',dict(stage='fits-complete',state='complete',completed_fits=required_fits(),required_fits=required_fits(),last_check=now()))
 
 
 def freeze():
     models = {}
     rows = []
-    for seed in range(3):
-        for width in ORDER:
+    for seed in registered_seeds():
+        for width in registered_widths():
             cell = O/f'fits/W{width}-s{seed}'
             row = json.loads((cell/'FIT.json').read_text())
             bake = Path(row['packed_model'])
@@ -176,13 +199,14 @@ def freeze():
             rows.append(row)
             models[f'W{width}_s{seed}'] = str(bake)
     write(O/'MODELS.json', models)
-    write(O/'FROZEN_FITS.json',dict(models=rows,source=sha(__file__)))
+    cut = json.loads((O/'OWNER_COST_CUT.json').read_text()) if (O/'OWNER_COST_CUT.json').exists() else None
+    write(O/'FROZEN_FITS.json',dict(models=rows,source=sha(__file__),owner_cost_cut=cut))
 
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument('command',choices=('fits','pack','freeze','job'))
-    ap.add_argument('--width',type=int,choices=ORDER)
+    ap.add_argument('--width',type=int,choices=ORDER+(4,))
     ap.add_argument('--seed',type=int,choices=range(3))
     ap.add_argument('--label')
     a, argv = ap.parse_known_args()

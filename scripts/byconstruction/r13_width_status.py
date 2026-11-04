@@ -8,6 +8,7 @@ import sys
 X = Path(__file__).resolve().parents[2]
 sys.path.insert(0,str(X/'scripts/rev4_featpot'))
 from run_processes import process_tree, compute_lock
+import r13_width as owner
 
 
 def main():
@@ -30,9 +31,10 @@ def main():
         matches=re.findall(r'epoch=(\d+)',p.read_text())
         epochs[str(p.relative_to(root))]=int(matches[-1]) if matches else None
     state=dict(checked=now,stage=active.get('stage'),active_pid=active.get('pid'),live=live,
-               lock=compute_lock(active.get('pid',0)),completed_fits=len(done),required_fits=15,
+               lock=compute_lock(active.get('pid',0)),completed_fits=len(done),required_fits=owner.required_fits(),
                fits=done,epochs=epochs,source_pins=str(root/'SOURCE_PINS.json'),
-               next_action='finish registered fits, freeze before assessment' if len(done)<15 else 'complete registered assessments')
+               owner_cost_cut=(root/'OWNER_COST_CUT.json').exists(),
+               next_action='finish registered fits, freeze before assessment' if len(done)<owner.required_fits() else 'complete registered assessments')
     (root/'SUPERVISION.json').write_text(json.dumps(state,indent=2)+'\n')
     print(json.dumps(state,indent=2))
 

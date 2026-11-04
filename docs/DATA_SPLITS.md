@@ -3195,14 +3195,18 @@ are not reopened. Capacity/ablation reads use the existing audit's CID22 TRAIN
 oracle and HDR teacher TRAIN banks only, with no new human holdout labels.
 Record actual completed assessments separately after freezing and execution.
 
-### R13 owner cost cut — 2026-11-04, approximately 20:15Z, before the first read
+### R13 owner cost cut and W4 addition — 2026-11-04, before the first read
 
-The owner reduces the registered candidate inventory to W16/W32/W64/W256/W512
-at seed 0 only. Finish W512 s0 and W16 s0; retain the completed W32/W256/W64 s0
+The owner reduces the original candidate inventory to W16/W32/W64/W256/W512
+at seed 0 only (approximately 20:15Z relay), then adds W4 s0 after W16 s0
+(approximately 20:30Z relay): one coupled max pair plus two ordinary units,
+the full recipe including public_train ×256 continuation with rehearsal. Finish
+W512 s0 and W16 s0; retain the completed W32/W256/W64 s0
 bakes. Seeds 1–2 of every width are **not run (owner cut on cost, 2026-11-04)**.
 The frozen A baseline still contains mix F seeds 0–2. No R13 EVAL or gate result
 has been read to make this decision. This is a reduction of arms on cost, not a
 new read: every assessment population, prior mix/HC1/R12 exposure, source role,
 fixed-epoch selection rule, and sealed/public_test/confirmation restriction above
-remains unchanged. Freeze all five final candidate bakes before the unchanged
+remains unchanged. W4 replaces the omitted seed repetitions; it introduces no new
+read population or selection rule. Freeze all six final bakes before the unchanged
 registered reads. Candidate across-seed stability is unmeasured.
