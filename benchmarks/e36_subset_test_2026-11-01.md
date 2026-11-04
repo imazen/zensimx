@@ -1839,3 +1839,30 @@ luminance in): pooled SROCC 0.704 (GPU port 0.704; the published PU-SSIM bar is 
 the input, leave the pipeline alone" shell at about 0.61, which is exactly what the PU-rendering column above
 reproduces (0.610). So the fair SSIMULACRA2 number on UPIQ is 0.704 pooled, and the mix (0.783-0.786) is 0.08 above it
 there; per-study figures for the integrated path were not recorded.
+
+*Addendum (owner, 2026-11-04: "NO to pu21. Use actual hdr path for butter/ssim2 as currently implemented").* The
+PU-rendering rows above are withdrawn as the field comparison. The metrics' own HDR paths, as implemented today:
+butteraugli's linear entry on display-relative planes (`nits / peak` clamped to [0, 1], `intensity_target = peak`; the
+feeding zenmetrics-api's `HdrFeeding::LinearPlanes` uses) and SSIMULACRA2's native HDR path (fast-ssim2 0.9.1, which
+deprecates PU21 upstream: linear f32 BT.709 with a diffuse-white anchor of 1.0, so the samples are nits).
+`jnd-ladder-score --hdr-nits` (zenmetrics-private `1832b895`) scored the 380 UPIQ EXR pairs through both (28 s, peak
+RSS 8.4 GiB; `~/tmp/e36test/refmetrics/scores/upiq-exr.tsv`, comparison `hdr-amend6/candidates_vs_field_native.md`).
+The butteraugli columns reproduce the stored June panels exactly at both peaks, which verifies the feeding.
+
+| score | UPIQ pooled | Narwaria | Korshunov | within-reference |
+|---|---:|---:|---:|---:|
+| mix, seed 0 (seeds 1-2 within 0.008) | 0.783 | 0.884 | 0.945 | 0.954 |
+| F3, seed 0 | 0.775 | 0.883 | 0.945 | 0.955 |
+| SSIMULACRA2, native HDR path | 0.765 | 0.662 | 0.962 | 0.955 |
+| butteraugli 3-norm, linear path, peak 1,000 cd/m² (= stored panel) | 0.628 | 0.354 | 0.940 | 0.908 |
+| butteraugli 3-norm, linear path, peak 10,000 (= stored 10k panel) | 0.640 | 0.349 | 0.943 | 0.912 |
+| butteraugli max, linear path, peak 1,000 / 10,000 | 0.630 / 0.638 | 0.400 / 0.380 | 0.917 / 0.920 | 0.887 / 0.878 |
+
+Paired over the 30 references, mix (seed 0) minus the metric: SSIMULACRA2 native +0.016 pooled [-0.080, +0.163],
++0.199 Narwaria [-0.021, +0.548], -0.017 Korshunov [-0.038, +0.004]; butteraugli 3-norm (peak 1,000) +0.151 [+0.001,
++0.309], +0.492 [+0.169, +0.735], +0.004 [-0.014, +0.028]; F3 within 0.01 of the mix on every line. Reading: against
+SSIMULACRA2 on its own HDR path the candidates are level pooled, ahead on Narwaria (ten references; the interval
+reaches zero) and 0.017 behind on Korshunov (interval touches zero); against butteraugli they are clearly ahead pooled
+and on Narwaria and level on Korshunov, where every score ties near 0.94-0.96. Note for zenmetrics: its `hdr_feeding`
+table still routes SSIMULACRA2 through the PU21 path that fast-ssim2 0.9.1 deprecates; the native path should replace
+it there.

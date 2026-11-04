@@ -26,6 +26,10 @@ STORED = [("CVVDP 10k nits", "panel_cvvdp_gpu_10k"), ("CVVDP default", "panel_cv
           ("PU-FSIM", "panel_base_PU_FSIM")]
 PU_NEW = [("SSIMULACRA2 (PU)", "ssim2", 1), ("butteraugli p3 (PU)", "ba_p3", -1), ("butteraugli max (PU)", "ba_max", -1),
           ("FSIMc (PU)", "fsimc", 1), ("FSIM (PU)", "fsim_y", 1), ("HaarPSI (PU)", "haarpsi", 1)]
+# `jnd-ladder-score --hdr-nits` on the EXRs: the metrics' own HDR paths as implemented (no PU21).
+HDR_NEW = [("SSIMULACRA2 native HDR", "ssim2_native", 1), ("butteraugli p3 linear, peak 1000", "ba_p3_1000", -1),
+           ("butteraugli max linear, peak 1000", "ba_max_1000", -1), ("butteraugli p3 linear, peak 10000", "ba_p3_10000", -1),
+           ("butteraugli max linear, peak 10000", "ba_max_10000", -1)]
 
 
 def main():
@@ -33,6 +37,7 @@ def main():
     ap.add_argument("--upiq-dir", required=True)
     ap.add_argument("--models", required=True, help="comma-separated names; the first pair F3_sN,mix_sN per seed is compared")
     ap.add_argument("--pu-scores")
+    ap.add_argument("--hdr-scores", help="jnd-ladder-score --hdr-nits output on the EXR pairs (id = condition id)")
     ap.add_argument("--panel2-dir")
     ap.add_argument("--draws", type=int, default=2000)
     a = ap.parse_args()
@@ -49,10 +54,13 @@ def main():
         t = pd.read_csv(U + f + ".tsv", sep="\t")
         assert np.allclose(t.target.values[pos], y, atol=1e-6), n
         M[n] = t.predicted.values[pos]
-    if a.pu_scores:
-        rows = {r["id"]: r for r in csv.DictReader(open(a.pu_scores), delimiter="\t")}
-        for n, col, sign in PU_NEW:
-            M[n] = np.array([sign * float(rows[c][col]) for c in keys.condition_id])
+    for path, spec in ((a.pu_scores, PU_NEW), (a.hdr_scores, HDR_NEW)):
+        if not path:
+            continue
+        rows = {r["id"]: r for r in csv.DictReader(open(path), delimiter="\t")}
+        for n, col, sign in spec:
+            if col in next(iter(rows.values())):
+                M[n] = np.array([sign * float(rows[c][col]) for c in keys.condition_id])
     ds = keys.dataset.values
     ref = (keys.dataset + ":" + keys.content.astype(str)).values
 
@@ -84,7 +92,8 @@ def main():
                 m, lo, hi = paired(M[f"mix_s{s}"], M[f"F3_s{s}"], kind)
                 print(f"| {s} | {kind} | {m:+.3f} | [{lo:+.3f}, {hi:+.3f}] |")
     cand = [n for n in (f"F3_s{seeds[0]}", f"mix_s{seeds[0]}") if n in M] if seeds else []
-    field = [n for n in ("CVVDP 10k nits", "butteraugli p3 (stored)", "SSIMULACRA2 (PU)", "butteraugli p3 (PU)", "HDR-VDP-2", "FSIMc (PU)", "HaarPSI (PU)") if n in M]
+    field = [n for n in ("CVVDP 10k nits", "SSIMULACRA2 native HDR", "butteraugli p3 linear, peak 1000", "butteraugli p3 linear, peak 10000",
+                         "butteraugli p3 (stored)", "SSIMULACRA2 (PU)", "butteraugli p3 (PU)", "HDR-VDP-2", "FSIMc (PU)", "HaarPSI (PU)") if n in M]
     print(f"\nPaired bootstrap, candidate (seed {seeds[0] if seeds else '?'}) minus metric:\n\n| candidate | vs | pooled | Narwaria | Korshunov |\n|---|---|---|---|---|")
     for c in cand:
         for n in field:
