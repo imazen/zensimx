@@ -3981,3 +3981,77 @@ hdr-native-plan-check:
 
 upiq-rev7-library-metadata out build_commit:
     python3 scripts/rev4_featpot/upiq380.py relocate-rev7 --dest {{out}} --images /mnt/tower/input/iqa/datasets/upiq/content/upiq_dataset/images --parent-admission /mnt/v/output/zensim/upiq380-rev5-r2-2026-10-07/extraction-admission.json --library-inventory /mnt/tower/input/iqa/datasets/upiq/SHA256SUMS --build-commit {{build_commit}}
+
+# Revision-7 atlas and MLP inspection instrument (standalone Cargo root).
+viz-fmt:
+    cargo fmt --manifest-path tools/zensim-viz/Cargo.toml
+
+viz-build:
+    mkdir -p "$HOME/tmp/zensim-viz"
+    set -o pipefail; TMPDIR="$HOME/tmp/zensim-viz" flock "$HOME/tmp/heavy.lock" "$HOME/work/claudehints/scripts/run-heavy" --mem 16G --jobs 8 -- cargo build --manifest-path tools/zensim-viz/Cargo.toml --release 2>&1 | tee "$HOME/tmp/zensim-viz/build.log"
+
+viz-test:
+    set -o pipefail; TMPDIR="$HOME/tmp/zensim-viz" flock "$HOME/tmp/heavy.lock" "$HOME/work/claudehints/scripts/run-heavy" --mem 16G --jobs 8 -- cargo test --manifest-path tools/zensim-viz/Cargo.toml 2>&1 | tee "$HOME/tmp/zensim-viz/test.log"
+
+viz-audit bake bank out:
+    set -o pipefail; ZENSIM_FORMULA_REV=7 TMPDIR="$HOME/tmp/zensim-viz" flock "$HOME/tmp/heavy.lock" "$HOME/work/claudehints/scripts/run-heavy" --mem 16G --jobs 8 -- tools/zensim-viz/target/release/zensim-viz-export audit {{quote(bake)}} --bank {{quote(bank)}} --out {{quote(out)}} 2>&1 | tee "$HOME/tmp/zensim-viz/audit.log"
+
+viz-serve:
+    python3 -m http.server 3310 --bind 0.0.0.0 -d tools/zensim-viz/web
+
+viz-web-check:
+    node --check tools/zensim-viz/web/app.js
+    diff -qr /home/lilith/tmp/zensim-viz-brief/design tools/zensim-viz/web/design
+
+viz-lens bake bank out feature:
+    set -o pipefail; ZENSIM_FORMULA_REV=7 TMPDIR="$HOME/tmp/zensim-viz" flock "$HOME/tmp/heavy.lock" "$HOME/work/claudehints/scripts/run-heavy" --mem 16G --jobs 8 -- tools/zensim-viz/target/release/zensim-viz-export mlp-lens {{quote(bake)}} --bank {{quote(bank)}} --out {{quote(out)}} --feature {{quote(feature)}} 2>&1 | tee "$HOME/tmp/zensim-viz/lens.log"
+
+viz-browser:
+    TMPDIR="$HOME/tmp/zensim-viz" node tools/zensim-viz/tests/browser.mjs
+
+viz-atlas bake bank reference distorted out:
+    set -o pipefail; ZENSIM_FORMULA_REV=7 TMPDIR="$HOME/tmp/zensim-viz" flock "$HOME/tmp/heavy.lock" "$HOME/work/claudehints/scripts/run-heavy" --mem 16G --jobs 8 -- tools/zensim-viz/target/release/zensim-viz-export atlas {{quote(bake)}} --bank {{quote(bank)}} --reference {{quote(reference)}} --distorted {{quote(distorted)}} --out {{quote(out)}} 2>&1 | tee "$HOME/tmp/zensim-viz/atlas.log"
+
+viz-browser-empty:
+    VIZ_EMPTY_STATE=1 TMPDIR="$HOME/tmp/zensim-viz" node tools/zensim-viz/tests/browser.mjs
+
+viz-compare bake other bank out feature:
+    set -o pipefail; ZENSIM_FORMULA_REV=7 TMPDIR="$HOME/tmp/zensim-viz" flock "$HOME/tmp/heavy.lock" "$HOME/work/claudehints/scripts/run-heavy" --mem 16G --jobs 8 -- tools/zensim-viz/target/release/zensim-viz-export compare {{quote(bake)}} --other {{quote(other)}} --bank {{quote(bank)}} --out {{quote(out)}} --feature {{quote(feature)}} 2>&1 | tee "$HOME/tmp/zensim-viz/compare.log"
+
+viz-certify bake:
+    "$VIZ_CERTIFIER" certify-monotone --bake {{quote(bake)}}
+
+viz-metric-fmt:
+    cargo fmt -p zensim
+    rustfmt --edition 2024 zensim/src/feature_v2_viz.rs
+
+viz-http-check:
+    curl --noproxy '*' --fail --silent --show-error -o /dev/null -w '%{http_code}\n' http://dev.lan:3310/
+
+viz-format-test:
+    node tools/zensim-viz/tests/format.mjs
+
+viz-test-real:
+    set -o pipefail; TMPDIR="$HOME/tmp/zensim-viz" ZENSIM_FORMULA_REV=7 flock "$HOME/tmp/heavy.lock" "$HOME/work/claudehints/scripts/run-heavy" --mem 16G --jobs 8 -- cargo test --release --manifest-path tools/zensim-viz/Cargo.toml --features real-bake-tests 2>&1 | tee "$HOME/tmp/zensim-viz/test-real.log"
+
+viz-progress:
+    python3 tools/zensim-viz/progress.py
+
+viz-browser-audit:
+    VIZ_TEST_SCOPE=audit TMPDIR="$HOME/tmp/zensim-viz" node tools/zensim-viz/tests/browser.mjs
+
+viz-web-fmt:
+    node "$VIZ_PRETTIER" --write tools/zensim-viz/web/app.js tools/zensim-viz/web/app.css tools/zensim-viz/web/index.html tools/zensim-viz/web/format.mjs tools/zensim-viz/tests/browser.mjs tools/zensim-viz/tests/format.mjs
+
+# Caller supplies private file paths; every native job reacquires the shared lock.
+viz-bundle plan:
+    python3 -B tools/zensim-viz/bundle.py {{quote(plan)}}
+
+viz-clippy:
+    set -o pipefail; TMPDIR="$HOME/tmp/zensim-viz" flock "$HOME/tmp/heavy.lock" "$HOME/work/claudehints/scripts/run-heavy" --mem 16G --jobs 8 -- cargo clippy --release --manifest-path tools/zensim-viz/Cargo.toml --all-targets --features real-bake-tests -- -D warnings 2>&1 | tee "$HOME/tmp/zensim-viz/clippy.log"
+
+viz-assemble config:
+    python3 -B tools/zensim-viz/assemble.py {{quote(config)}}
+
+viz-library-check:
+    set -o pipefail; TMPDIR="$HOME/tmp/zensim-viz" flock "$HOME/tmp/heavy.lock" "$HOME/work/claudehints/scripts/run-heavy" --mem 16G --jobs 8 -- cargo clippy -p zensim --lib --features viz-export -- -D warnings 2>&1 | tee "$HOME/tmp/zensim-viz/library-clippy.log"
