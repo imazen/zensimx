@@ -1,7 +1,9 @@
 """Local R14 jobs reusing the R13 shared-lock/resource and fit receipt owner."""
 import argparse
+import ast
 from collections import Counter
 import csv
+import hashlib
 import json
 from pathlib import Path
 import subprocess
@@ -16,12 +18,44 @@ owner.O=O
 owner.SCRATCH=Path.home()/'tmp/zensim-transforms'
 owner.required_fits=lambda:3
 ARMS=('T1a','T1b','T1c')
+SPEC='sel:45acffa603e8@h32:H128:cv16:cf98:fx2:mono:thr:mp32'
+
+
+def validate_owners(pins,replacement):
+    for relative in ('r14_transforms_fit.py','v2_confirm_fit.py','v2_lodo_mlp.py',
+                     'v2_production_pack.py','subjective_training_leg.py',
+                     'v2_teacher.py','v2c_wide.py','v2_common.py'):
+        source=f'scripts/rev4_featpot/{relative}'
+        observed=owner.sha(X/source)
+        if observed==pins['source_sha256'][source]:continue
+        if relative!='v2_common.py' or replacement is None:
+            raise ValueError(f'fit owner changed since native freeze: {source}')
+        old=subprocess.check_output(['jj','file','show','-r',pins['source_commit'],source],cwd=X)
+        new=subprocess.check_output(['jj','file','show','-r',replacement['source_commit'],source],cwd=X)
+        if hashlib.sha256(new).hexdigest()!=observed:raise ValueError('owner differs from successor trainer source')
+        def outside_recipe(data):
+            tree=ast.parse(data)
+            tree.body=[n for n in tree.body if not isinstance(n,ast.FunctionDef) or n.name!='recipe_of']
+            return ast.dump(tree,include_attributes=False)
+        if outside_recipe(old)!=outside_recipe(new):raise ValueError('shared owner changed outside recipe parser')
+        def recipe(data):
+            namespace={'__name__':'r14_owner_compatibility','__file__':str(X/source)}
+            exec(compile(data,str(X/source),'exec'),namespace)
+            return namespace['recipe_of'](SPEC)
+        original,current=recipe(old),recipe(new)
+        if original!=current:raise ValueError('registered R14 recipe changed')
+        receipt=dict(source=source,original_sha256=pins['source_sha256'][source],successor_sha256=observed,
+            successor_commit=replacement['source_commit'],outside_recipe_ast='identical',
+            registered_spec=SPEC,recipe=current,role='metadata-only compatibility; no data or model selection')
+        out=O/f'owner-compat-v2-common-{observed[:12]}.json'
+        if out.exists() and json.loads(out.read_text())!=receipt:raise ValueError('preserve prior owner compatibility receipt')
+        owner.write(out,receipt)
 
 
 def args_for(arm,dest,seed=0):
     return [sys.executable,'-B',X/'scripts/rev4_featpot/r14_transforms_fit.py',
         '--r14-arm',arm,'--r14-table',O/f'screen/{arm}.tsv',
-        '--root',owner.R,'--spec','sel:45acffa603e8@h32:H128:cv16:cf98:fx2:mono:thr:mp32',
+        '--root',owner.R,'--spec',SPEC,
         '--columns',(owner.H/'tmp/hc1-profile/cols_fx2.txt').read_text().strip(),
         '--head','N','--seed-index',seed,'--strict-admission',
         '--data-role-decision',owner.R/'human_role_decision.json','--dest',dest,'--train-only',
@@ -56,12 +90,6 @@ def fit(arm,trainer_dir=None,continuation_retry=None):
             or set(proof['banks'])!=set(owner.BANKS)
             or any(any(b['differences'].values()) for b in proof['banks'].values())):
         raise ValueError('fit requires frozen screen, native trainer and complete exact A no-op proof')
-    for relative in ('r14_transforms_fit.py','v2_confirm_fit.py','v2_lodo_mlp.py',
-                     'v2_production_pack.py','subjective_training_leg.py',
-                     'v2_teacher.py','v2c_wide.py','v2_common.py'):
-        source=f'scripts/rev4_featpot/{relative}'
-        if owner.sha(X/source)!=pins['source_sha256'][source]:
-            raise ValueError(f'fit owner changed since native freeze: {source}')
     cell=O/f'fits/{arm}-s0';cell.mkdir(parents=True,exist_ok=True)
     if (cell/'FIT.json').exists():raise ValueError('fit already frozen; preserve it')
     native=dict(path=str(O/'bin/zensim_mlp_train'),sha256=pins['binary_sha256']['zensim_mlp_train'],source_commit=pins['source_commit'])
@@ -73,6 +101,7 @@ def fit(arm,trainer_dir=None,continuation_retry=None):
                 or owner.sha(trainer_dir/'TRAINER_PINS.json')!=selected['trainer_pins_sha256']):
             raise ValueError('active trainer selection differs')
     prefix=[]
+    replacement=None
     if trainer_dir:
         trainer_dir=trainer_dir.resolve()
         replacement=json.loads((trainer_dir/'TRAINER_PINS.json').read_text())
@@ -82,6 +111,7 @@ def fit(arm,trainer_dir=None,continuation_retry=None):
             raise ValueError('replacement trainer identity differs')
         native=dict(path=str(trainer_dir/'zensim_mlp_train'),sha256=replacement['trainer_sha256'],source_commit=replacement['source_commit'])
         prefix=['env',f'REV4_V2_BIN_DIR={trainer_dir}']
+    validate_owners(pins,replacement)
     labels={stage:f'{arm}-s0-{stage}' for stage in ('base','continuation','pack')}
     continuation_name='continuation'
     failed_attempts=[]
