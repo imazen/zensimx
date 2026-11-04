@@ -79,6 +79,16 @@ to R14; historical non-R14 argument admission is preserved.
 The untouched ARM strict-library-clippy baseline reports eight unused-item
 warnings as errors; this baseline receipt is retained without suppressing them.
 
+The final native binaries are pinned to `912609aa` (Rust 1.99.1), with all ten
+binary hashes in `SOURCE_PINS.json`. Trainer SHA256:
+`3c9b88b82ab9f1688a4ec9dc4ddd2b9321d9ca94275829973d8d77d20d483949`.
+The first native build compiled every binary but failed its final provenance
+assertion: this jj version prints a zero-file summary for an empty diff.
+The correction uses jj's `empty` predicate. Both attempts are preserved:
+332 seconds/peak RSS 2.24 GiB for the compile attempt (exit 1), then
+1 second/peak RSS 0.09 GiB for the successful cached rerun. Both used the
+shared resource lock and 24 GiB cap. No fit started before finalization.
+
 ## TRAIN screen
 
 Pre-read amendment `447fcc16` restricts the absolute variance <1e-10 guard
