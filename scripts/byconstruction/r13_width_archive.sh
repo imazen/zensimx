@@ -10,8 +10,8 @@ python3 -B - "$O" <<'PY'
 from pathlib import Path
 import hashlib,json,sys
 root=Path(sys.argv[1]); rows=[]
-excluded={'archive.log','archive-check.txt','ARCHIVE_VERIFIED.json','SHA256SUMS',
-          'ACTIVE_JOB.json','SUPERVISION.json','status-last.json','PROGRESS.jsonl'}
+excluded={'archive.log','archive-check.txt','ARCHIVE_VERIFIED.json','ARCHIVE_MANIFEST.json','SHA256SUMS',
+          'ACTIVE_JOB.json','SUPERVISION.json','status-last.json','PROGRESS.jsonl','QUEUED_W4_BUILD.json'}
 for p in sorted(root.rglob('*')):
     rel=p.relative_to(root)
     if rel.parts[0]=='target' or not p.is_file() or rel.name in excluded or rel.name.startswith('archive-'):
@@ -27,9 +27,11 @@ pins=json.loads((root/'SOURCE_PINS.json').read_text())
 PY
 mkdir -p "$D"
 rsync -aLO --no-owner --no-group --exclude=/target/ --exclude=/archive.log --exclude=/archive-check.txt \
-  --exclude=/ACTIVE_JOB.json --exclude=/SUPERVISION.json --exclude=/status-last.json --exclude=/PROGRESS.jsonl "$O/" "$D/"
+  --exclude=/ACTIVE_JOB.json --exclude=/SUPERVISION.json --exclude=/status-last.json --exclude=/PROGRESS.jsonl \
+  --exclude=/QUEUED_W4_BUILD.json "$O/" "$D/"
 rsync -ancLO --no-owner --no-group --itemize-changes --exclude=/target/ --exclude=/archive.log --exclude=/archive-check.txt \
-  --exclude=/ACTIVE_JOB.json --exclude=/SUPERVISION.json --exclude=/status-last.json --exclude=/PROGRESS.jsonl "$O/" "$D/" > "$O/archive-check.txt"
+  --exclude=/ACTIVE_JOB.json --exclude=/SUPERVISION.json --exclude=/status-last.json --exclude=/PROGRESS.jsonl \
+  --exclude=/QUEUED_W4_BUILD.json "$O/" "$D/" > "$O/archive-check.txt"
 if test -s "$O/archive-check.txt"; then cat "$O/archive-check.txt"; exit 1; fi
 python3 -B - "$O" "$D" <<'PY'
 from pathlib import Path
