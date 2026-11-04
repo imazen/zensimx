@@ -188,6 +188,17 @@ because cleanup tests or a historical training reproduction pass.
   view switching recomputes image fit. `tools/zensim-viz/tests/design2.mjs`
   checks readable controls and image bounds at both supported viewport sizes.
 
+- **2026-11-04 — R12 assessment command logging. Fixed before model scoring.**
+  The new orchestration passed `Path` objects to JSON logging, which refused
+  before the first predictor launch. Arguments now become strings at the
+  command boundary. The failed attempt and copied authorized EVAL cache are
+  retained under `/var/tmp/byc-linear-20261104/reads-command-log-error/`;
+  frozen bakes, registered populations, statistics and gates are unchanged.
+  A subsequent report pass also required the original `judge_pairs.tsv` key
+  mapping beside its copied EVAL cache. Prediction completed; only readout and
+  compression/non-codec reports are replayed after preserving their failed logs.
+
+
 - **2026-11-04: structural certification does not imply strict served floating-point monotonicity.**
   The archived revision-7 F seed-0 inspection found 1,663 strict adjacent
   increases across its 494 exported input/family curves (200 recorded CID22

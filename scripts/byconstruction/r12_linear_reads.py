@@ -54,6 +54,7 @@ def main():
     records = []
 
     def run(name, argv, extra=None):
+        argv = [str(v) for v in argv]
         receipt = out/f'{name}.receipt.json'
         if receipt.exists():
             raise ValueError(f'preserve prior stage, use --only for outstanding stages: {name}')
@@ -70,14 +71,15 @@ def main():
         return p.returncode == 0
 
     todo = a.only.split(',')
-    if 'eval' in todo:
-        ev = out/'eval'; ev.mkdir(exist_ok=False)
+    if 'eval' in todo or 'eval-reports' in todo:
+        ev = out/'eval'
+        ev.mkdir(exist_ok='eval-reports' in todo)
         parent = Path.home()/'tmp/e36test/eval'
-        for name in ('features.parquet','eval_rows.json','LABEL_READS.json'):
-            shutil.copy2(parent/name, ev/name)
+        for name in ('features.parquet','eval_rows.json','LABEL_READS.json','judge_pairs.tsv'):
+            if not (ev/name).exists(): shutil.copy2(parent/name, ev/name)
         args = [py,scripts/'dataset_eval.py','score','--out',ev,'--predict',fitbin]
         for n,p in all_models.items(): args += ['--model',f'{n}={p}']
-        if run('eval-score',args):
+        if 'eval-reports' in todo or run('eval-score',args):
             spec = ','.join(f'{n.rsplit("_s",1)[0]}@{n.rsplit("_s",1)[1]}={n}' for n in all_models)
             # Import owners from this checkout before the historical scratch readout
             # inserts its old checkout paths. The readout itself is preserved verbatim.

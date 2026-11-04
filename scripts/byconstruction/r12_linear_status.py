@@ -18,7 +18,10 @@ for p in Path('/proc').iterdir():
             processes.append(dict(pid=int(p.name),exe=exe,script=cmd[2] if exe.startswith('python') else None,
                                   start_ticks=p.joinpath('stat').read_text().split(') ',1)[1].split()[19]))
     except (OSError, UnicodeError,IndexError): pass
-status=dict(checked=now,stage=(root/'STAGE').read_text(),complete=(root/'PROGRESS').read_text().splitlines(),
-            live=processes,models={p.parent.parent.name: str(p) for p in (root/'fits').glob('*/refit/production-f16.bin')})
+status=dict(checked=now,stage=(root/'reads/STAGE').read_text() if (root/'reads/STAGE').exists() else (root/'STAGE').read_text(),fit_and_head_stage=(root/'STAGE').read_text(),complete=(root/'PROGRESS').read_text().splitlines(),
+            live=processes,models={p.relative_to(root/'fits').parts[0]: str(p) for p in (root/'fits').glob('**/refit/production-f16.bin')})
+status['extra_stage']=(root/'extra/STAGE').read_text() if (root/'extra/STAGE').exists() else 'queued build/tests'
+status['source_pins']=str(root/'SOURCE_PINS.json')
+status['completed_read_receipts']={p.stem:json.loads(p.read_text())['rc'] for p in (root/'reads').glob('*.receipt.json')}
 (root/'SUPERVISION.json').write_text(json.dumps(status,indent=2)+'\n')
 print(json.dumps(status,indent=2))
