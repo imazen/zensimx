@@ -26,11 +26,12 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('root', type=Path)
     parser.add_argument('out', type=Path)
+    parser.add_argument('--prefix', default='design2-')
     args = parser.parse_args()
     result = {'pairs': [], 'weights': {}, 'reused_native_evidence': {}}
     for number in range(1, 7):
         name = f'atlas-pair-{number:02}'
-        old, new = [args.root / (p + name) for p in ['review1-', 'design2-']]
+        old, new = [args.root / (p + name) for p in ['review1-', args.prefix]]
         assert (new / 'complete.json').is_file(), f'{new}: incomplete'
         a, b = read(old / 'meta.json'), read(new / 'meta.json')
         assert b['pooled_bit_identity'] is True
@@ -55,7 +56,7 @@ def main():
             samples += count
         result['pairs'].append(dict(pair=name, pooled_bits=b['pooled_bits_checked'], layout_bits=b['layout_bits_checked'], inputs=984, unchanged_map_files=len(files), basic_term_files=len(terms), native_formula_replay_samples=samples))
     for bake in ['F0', 'F1', 'F2', 'E']:
-        old, new = args.root / f'review1-audit-v2-{bake}', args.root / f'design2-weights-{bake}'
+        old, new = args.root / f'review1-audit-v2-{bake}', args.root / f'{args.prefix}weights-{bake}'
         assert (new / 'complete.json').is_file()
         a, b = read(old / 'weights.json'), read(new / 'weights.json')
         assert canonical(a) == canonical({k:b[k] for k in a}), f'changed original weights {bake}'

@@ -4044,7 +4044,7 @@ viz-browser-audit:
     VIZ_TEST_SCOPE=audit TMPDIR="$HOME/tmp/zensim-viz" node tools/zensim-viz/tests/browser.mjs
 
 viz-web-fmt:
-    node "$VIZ_PRETTIER" --write tools/zensim-viz/web/app.js tools/zensim-viz/web/weight-view.js tools/zensim-viz/web/app.css tools/zensim-viz/web/index.html tools/zensim-viz/web/format.mjs tools/zensim-viz/web/studio.js tools/zensim-viz/web/frame.js tools/zensim-viz/web/studio.css tools/zensim-viz/tests/design2.mjs tools/zensim-viz/tests/browser.mjs tools/zensim-viz/tests/review1.mjs tools/zensim-viz/tests/format.mjs
+    node "$VIZ_PRETTIER" --write tools/zensim-viz/web/app.js tools/zensim-viz/web/weight-view.js tools/zensim-viz/web/app.css tools/zensim-viz/web/index.html tools/zensim-viz/web/format.mjs tools/zensim-viz/web/studio.js tools/zensim-viz/web/frame.js tools/zensim-viz/web/studio.css tools/zensim-viz/tests/design2.mjs tools/zensim-viz/tests/browser.mjs tools/zensim-viz/tests/review1.mjs tools/zensim-viz/tests/review2.mjs tools/zensim-viz/tests/format.mjs
 
 # Caller supplies private file paths; every native job reacquires the shared lock.
 viz-bundle plan:
@@ -4166,3 +4166,12 @@ r12-linear-tables output:
 
 r12-linear-head-receipt:
     python3 -B scripts/byconstruction/r12_linear_head_summary.py --root /var/tmp/byc-linear-20261104 --receipt benchmarks/r12_head_timing_2026-11-04.json
+
+# All review-2 builds and captures serialize with training/evaluation.
+viz-review2-browser:
+    set -o pipefail; TMPDIR="$HOME/tmp/zensim-viz" flock "$HOME/tmp/heavy.lock" "$HOME/work/claudehints/scripts/run-heavy" --mem 8G --jobs 4 -- node tools/zensim-viz/tests/review2.mjs 2>&1 | tee "$HOME/tmp/zensim-viz/review2-browser.log"
+
+viz-review2-verify root out prefix="review2-":
+    python3 -B tools/zensim-viz/verify_design2.py {{quote(root)}} {{quote(out)}} --prefix {{quote(prefix)}}
+
+

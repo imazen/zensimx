@@ -19,7 +19,7 @@ for lock in heavy:
     except FileNotFoundError:
         lock['args'] = 'process exited during observation'
 record = {'last_verified_utc': datetime.datetime.now(datetime.timezone.utc).isoformat(), 'heavy_lock_observation': heavy, 'runs': [], 'checks': {}}
-for folder in ['export-logs', 'hdr-export-logs', 'curve-audit-logs', 'atlas-v2-logs', 'review1-logs', 'design2-logs']:
+for folder in ['export-logs', 'hdr-export-logs', 'curve-audit-logs', 'atlas-v2-logs', 'review1-logs', 'design2-logs', 'review2-logs', 'review2-final-logs']:
     path = output / folder / 'progress.json'
     if not path.exists():
         continue
@@ -39,7 +39,7 @@ for folder in ['export-logs', 'hdr-export-logs', 'curve-audit-logs', 'atlas-v2-l
     else:
         run['observed_stage'] = 'complete (return code and required artifacts verified)'
     record['runs'].append(run)
-for name in ['test-real', 'clippy', 'library-clippy']:
+for name in ['build', 'test-real', 'clippy', 'library-clippy', 'review2-browser']:
     path = scratch / f'{name}.log'
     if path.exists():
         text = re.sub(r'\x1b\[[0-9;]*m', '', path.read_text())
