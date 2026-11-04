@@ -51,6 +51,7 @@ fn main() -> Result<()> {
     let mut opts = BTreeMap::new();
     let mut percentile_paths = Vec::new();
     let allowed: &[&str] = match command.as_str() {
+        "curve-audit" => &["--out"],
         "audit" => &["--bank", "--out", "--max-rows", "--training-bank"],
         "mlp-bank" => &["--bank", "--out", "--max-rows", "--other"],
         "mlp-lens" => &["--bank", "--out", "--max-rows", "--feature", "--family"],
@@ -79,6 +80,11 @@ fn main() -> Result<()> {
         }
     }
     let out = PathBuf::from(opts.get("--out").ok_or("--out is required")?);
+    if command == "curve-audit" {
+        std::fs::create_dir_all(&out)?;
+        provenance::write(&out)?;
+        return lens::summarize(&bake_path, &out);
+    }
     if command == "atlas-pass" {
         let reference = PathBuf::from(opts.get("--reference").ok_or("--reference required")?);
         let distorted = PathBuf::from(opts.get("--distorted").ok_or("--distorted required")?);

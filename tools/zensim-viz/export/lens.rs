@@ -1,8 +1,8 @@
 use crate::{Result, audit::quantile, bank::Bank, model::Input};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use zenpredict::Model;
 
-#[derive(Serialize)]
+#[derive(Deserialize, Serialize)]
 pub(crate) struct Pdp {
     pub feature: usize,
     pub row_indices: Vec<usize>,
@@ -404,6 +404,64 @@ pub(crate) fn bulk(
         &out.join("index.json"),
         &serde_json::json!({"bake_sha256":bake_sha256,"bank_sha256":bank.sha256,"bank_rows":bank.total_rows,"observed_rows":bank.rows.len(),"ice_rows":bank.rows.len().min(200),"summary":"summary.json","lenses":files,"family_lenses":family_files,"completed":completed,"required":total,"monotonicity_flag_count":flags}),
     )?;
+    Ok(())
+}
+/// Recheck and summarize persisted native curve flags without resampling.
+pub(crate) fn summarize(directory: &std::path::Path, out: &std::path::Path) -> Result<()> {
+    let index_path = directory.join("index.json");
+    let index: serde_json::Value = serde_json::from_reader(std::fs::File::open(&index_path)?)?;
+    if index["completed"] != index["required"] {
+        return Err("curve export is incomplete".into());
+    }
+    let mut curves = Vec::new();
+    let mut flags = 0usize;
+    let mut comparisons = 0usize;
+    let mut maximum = 0.0f64;
+    let mut worst = serde_json::Value::Null;
+    for group in ["lenses", "family_lenses"] {
+        for (key, name) in index[group].as_object().ok_or("curve index missing")? {
+            let path = directory.join(name.as_str().ok_or("invalid curve path")?);
+            let document: serde_json::Value = serde_json::from_reader(std::fs::File::open(&path)?)?;
+            let p: Pdp = serde_json::from_value(document["pdp"].clone())?;
+            let mut actual = Vec::new();
+            let mut curve_max = 0.0f64;
+            for (row, ys) in p.ice.iter().enumerate() {
+                if ys.len() != p.x.len() {
+                    return Err("curve dimension mismatch".into());
+                }
+                for step in 1..ys.len() {
+                    comparisons += 1;
+                    if ys[step] > ys[step - 1] {
+                        let delta = ys[step] - ys[step - 1];
+                        actual.push((row, step, delta));
+                        curve_max = curve_max.max(delta);
+                        if delta > maximum {
+                            maximum = delta;
+                            worst = serde_json::json!({"curve":key,"family":p.family,"feature":p.feature,"bank_row":p.row_indices[row],"step":step,"x_before":p.x[step-1],"x_after":p.x[step],"score_before":ys[step-1],"score_after":ys[step],"rise":delta});
+                        }
+                    }
+                }
+            }
+            if actual != p.monotonicity_violations {
+                return Err(
+                    format!("{key}: recorded flags disagree with persisted native points").into(),
+                );
+            }
+            flags += actual.len();
+            curves.push(serde_json::json!({"key":key,"sha256":crate::hash(&path)?,"flags":actual.len(),"maximum_rise":curve_max}));
+        }
+    }
+    if index["monotonicity_flag_count"].as_u64() != Some(flags as u64) {
+        return Err("aggregate curve flag count differs".into());
+    }
+    crate::json(
+        &out.join("curve-audit.json"),
+        &serde_json::json!({"bake_sha256":index["bake_sha256"],"bank_sha256":index["bank_sha256"],"index_sha256":crate::hash(&index_path)?,"curves":curves,"curve_count":curves.len(),"adjacent_comparisons":comparisons,"strict_rises":flags,"maximum_rise":maximum,"worst":worst,"definition":"Every persisted native ICE adjacent pair; strict comparison, zero tolerance; family curves multiply observed damage jointly."}),
+    )?;
+    println!(
+        "{} curves; {comparisons} comparisons; {flags} strict rises; largest {maximum}",
+        curves.len()
+    );
     Ok(())
 }
 #[cfg(all(test, feature = "real-bake-tests"))]
