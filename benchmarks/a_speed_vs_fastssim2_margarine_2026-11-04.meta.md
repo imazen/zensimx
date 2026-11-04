@@ -72,7 +72,7 @@ rather than an old filename left in `target/release/deps`.
 Run on the eligible host. `source-provenance.json` binds every staged source
 to its original filename and SHA-256; `sources.json` fixes order. The artifact
 root below is the actual i270 run directory. The benchmark source is
-[`a_speed_peers.rs`](../zensim-bench/benches/a_speed_peers.rs); its separate
+[`instrument.rs`](../zensim-bench/benches/a_speed_peers/instrument.rs); its separate
 [`manifest`](../zensim-bench/a-speed-runtime/Cargo.toml) avoids unrelated
 research and sibling-codec dependencies.
 
@@ -128,3 +128,8 @@ with type-7 quantiles. A/peer ratios divide those observed p50 values; the
 16-thread speedup is p50 at one thread divided by p50 at sixteen. Negative
 OLS intercepts are permitted regression terms, not physical startup times.
 Changing content at the large size limits the interpretation of the fits.
+
+The running instrument was frozen from the initial flat bench-source path.
+The tracked source was subsequently moved byte-for-byte into a nested file
+to avoid parent-package auto-discovery; the matrix continues using the same
+archived executable. This path change alters no scoring or timing code.

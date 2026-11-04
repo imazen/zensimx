@@ -31,6 +31,7 @@ def fit(points):
 
 
 def summarize(root):
+    assert (root / "measurement-host.txt").read_text().strip() == "i270", "this report requires the recorded i270 measurement host"
     assert (root / "COMPLETE").exists(), "collector has not completed"
     fixture_rows = json.loads((root / "fixtures/pairs.json").read_text())
     pairs = {r["id"]: r for r in fixture_rows}

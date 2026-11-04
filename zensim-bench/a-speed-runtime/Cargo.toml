@@ -52,7 +52,7 @@ path = "prepare.rs"
 
 [[bench]]
 name = "a_speed_peers"
-path = "../benches/a_speed_peers.rs"
+path = "../benches/a_speed_peers/instrument.rs"
 harness = false
 
 [profile.release]

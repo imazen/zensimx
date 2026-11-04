@@ -21,6 +21,7 @@ class ReportAdmission(unittest.TestCase):
         (self.root / "fixtures").mkdir()
         (self.root / "results").mkdir()
         (self.root / "COMPLETE").touch()
+        (self.root / "measurement-host.txt").write_text("i270\n")
         fixtures = []
         for size in report.SIZES:
             fixtures.extend({"id": f"{size}_{i}", "size": size, "width": size, "height": size} for i in range(20))
@@ -54,6 +55,11 @@ class ReportAdmission(unittest.TestCase):
     def test_foreign_compiler_refuses_even_with_clean_round_flags(self):
         self.path.with_suffix(".log").write_text('[zenbench gate] foreign pid=123 name="rustc" cpu_pct=100\n')
         with self.assertRaisesRegex(AssertionError, "foreign build/training"):
+            report.summarize(self.root)
+
+    def test_host_mismatch_refuses(self):
+        (self.root / "measurement-host.txt").write_text("another-host\n")
+        with self.assertRaisesRegex(AssertionError, "measurement host"):
             report.summarize(self.root)
 
     def test_duplicate_image_refuses(self):

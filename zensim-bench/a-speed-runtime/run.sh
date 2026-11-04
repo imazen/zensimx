@@ -6,6 +6,12 @@ binary=$(realpath "${2:?benchmark binary}")
 cpus=${BENCH_CPUS:?set the same affinity for every arm and thread count}
 export TMPDIR="$root/scratch"
 mkdir -p "$TMPDIR" "$root/results"
+host=$(hostname)
+if [[ -f $root/measurement-host.txt ]]; then
+    [[ $(cat "$root/measurement-host.txt") = "$host" ]] || { echo "artifact host mismatch" >&2; exit 2; }
+else
+    printf '%s\n' "$host" > "$root/measurement-host.txt"
+fi
 printf '%s\n' "$$" > "$root/collector.pid"
 sha256sum "$binary" > "$root/benchmark.sha256"
 for threads in ${BENCH_THREADS:-1 16}; do
