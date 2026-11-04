@@ -1882,3 +1882,26 @@ profile for it (pull request).
 
 *Shipping (2026-11-04):* the zensim profile pull request is https://github.com/imazen/zensim/pull/2 (`ZensimProfile::F`, `zensim-f`, returned by
 `latest()`; stacked on `slim-0.3.0`; 40 of 40 tests and 3,927 of 3,927 production parity rows on i265).
+
+### HDR front-end experiment (2026-11-04, registered before any extraction): anchored cube-root against PU21 for F, F3 and E
+
+Owner, 2026-11-04: "let's figure out if we can do better than pu21. ssim2 did, and we do similar approaches, so let's
+give f a fair shake." fast-ssim2 0.9.1's native HDR path keeps the cube-root XYB opsin and scales it by an
+absolute-light anchor (UPIQ 0.765 pooled, against 0.704 for its deprecated PU21 path). zensim's HDR front end is PU21
+per channel divided by PU21(100 cd/m²), then the opponent axes (`color::linear_to_pu_xyb_planar_into`).
+
+**Arms (front ends), on the same decoded nits:** PU21 (the current path; the stored `upiq-r2-bank`), and the anchored
+cube-root front end, nits divided by a unit luminance and then the unclamped cube-root XYB
+(`color::linear_to_positive_xyb_planar_into_unclamped`, values above 1.0 retained), at units of 100 cd/m² (zensim's
+PU normalisation point), 203 (BT.2408 diffuse white), 255 (the libjxl and fast-ssim2 default for linear input) and
+1,000 (the HDR reference peak). Implementation: `HdrEncoding::LinearCubeRoot { unit_nits }` in the research crate,
+chosen in `upiq_pu_score`'s allowlisted extraction by `--front-end cube-root:<nits>`; the extraction manifest records
+the front end. **Models:** F (`mixF3`, seeds 0-2), F3 (seeds 0-2) and E (the 2026-10-30 read's bake), forwarded by
+`byc_predict` with their declarations on each bank; no fit, no selection. **Populations, in order:** UPIQ-380 (380
+pairs, 30 references, JOD; T2 TRAIN rows no candidate trained on, read again report-only as in amendment 6); then, only
+if the UPIQ read favours an anchored arm under the rule below, the 4Kdtb EVAL half, HDRTEACH VAL and the chroma ladders
+through the fleet extractor with the same front end (a later registration names that build). **Statistics:**
+amendment 6's: pooled and per-study SROCC, within-reference SROCC, and the paired bootstrap over the 30 references of
+each arm minus PU21 for the same model. **Reading rule:** an anchored front end counts as better only if, for F at
+every seed, its pooled and both per-study differences against PU21 are non-negative and the pooled interval lies above
+zero; otherwise PU21 stands. Nothing ships from this read; a front-end change is a revision-8 decision for the owner.
