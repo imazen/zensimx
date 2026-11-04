@@ -170,3 +170,24 @@ packer receives an explicit identity hidden-unit permutation so it retains live
 accumulation order. Bit identity is an experimental gate, not inferred from the
 algebra; fixture proof and the optional two-unit residual-removal diagnostic follow
 the frozen L0 bakes. No inference tolerance is authorized.
+
+### Frozen L0/L4 bakes, before assessment
+
+Full hashes, pruning masks, binary/source identities and native certificates:
+[addition fit receipt](r12_linear_extra_fits_2026-11-04.json). All three L4 bakes
+certify exactly one max pair and zero free-ramp amplitude. The three structural
+L0 bakes retain 33 / 33 / 3 units (remove 95 / 95 / 125); A0 retains units 95–127.
+
+| Arm | Seed | Packed SHA-256 | Bytes |
+|---|---:|---|---:|
+| L0 | 0 | `04ad99bbe5ae1ea84001904e384dc2f45ebb5f43378d53309bc80879310d1a14` | 31502 |
+| L0 | 1 | `0b4d5d070fc6590bd209c87ff8c1cdff9eb89f9bfb25fd292fc22f9c23ecf82e` | 30783 |
+| L0 | 2 | `0ab893be8a4117cc69f74cccce1f23ed992f6cedfa78462b5e5f208973c6b3b2` | 28270 |
+| L4 | 0 | `8df340b82701f96c31e8977e09a94e1fc6ba0effa4480363795a3e93e1f25a22` | 24546 |
+| L4 | 1 | `012ba24266eec0d64859e2c530c9893113e8125c48e6471c79ce37de0889611d` | 24580 |
+| L4 | 2 | `27c174d5071a17a5871ac51e73f298760169eeec5f98685133b405df256601fe` | 24497 |
+
+Construction/fitting receipt: 357 s, peak-RSS 2.03 GiB, minimum available 38,602 MiB,
+peak load 2.42. Models live at `extra/bakes/L0_s*.bin` and
+`extra/fits/L4-s*/refit/production-f16.bin` under the registered artifact root.
+The optional A0 two-unit L0r remains a score-change diagnostic, not a replacement arm.

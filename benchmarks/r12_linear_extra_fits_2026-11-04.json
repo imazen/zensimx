@@ -1,0 +1,229 @@
+{
+  "models": [
+    {
+      "arm": "L0",
+      "seed": 0,
+      "packed_sha256": "04ad99bbe5ae1ea84001904e384dc2f45ebb5f43378d53309bc80879310d1a14",
+      "packed_bytes": 31502,
+      "certificate": {
+        "bake": "/var/tmp/byc-linear-20261104/extra/bakes/L0_s0.bin",
+        "certified": true,
+        "free_amplitude": 0.0,
+        "free_ramps": 0,
+        "max_pairs": 1,
+        "monotone": true,
+        "ramps": 0
+      }
+    },
+    {
+      "arm": "L0",
+      "seed": 1,
+      "packed_sha256": "0b4d5d070fc6590bd209c87ff8c1cdff9eb89f9bfb25fd292fc22f9c23ecf82e",
+      "packed_bytes": 30783,
+      "certificate": {
+        "bake": "/var/tmp/byc-linear-20261104/extra/bakes/L0_s1.bin",
+        "certified": true,
+        "free_amplitude": 0.0,
+        "free_ramps": 0,
+        "max_pairs": 1,
+        "monotone": true,
+        "ramps": 0
+      }
+    },
+    {
+      "arm": "L0",
+      "seed": 2,
+      "packed_sha256": "0ab893be8a4117cc69f74cccce1f23ed992f6cedfa78462b5e5f208973c6b3b2",
+      "packed_bytes": 28270,
+      "certificate": {
+        "bake": "/var/tmp/byc-linear-20261104/extra/bakes/L0_s2.bin",
+        "certified": true,
+        "free_amplitude": 0.0,
+        "free_ramps": 0,
+        "max_pairs": 1,
+        "monotone": true,
+        "ramps": 0
+      }
+    },
+    {
+      "arm": "L4",
+      "seed": 0,
+      "packed_sha256": "8df340b82701f96c31e8977e09a94e1fc6ba0effa4480363795a3e93e1f25a22",
+      "packed_bytes": 24546,
+      "certificate": {
+        "bake": "/var/tmp/byc-linear-20261104/extra/fits/L4-s0/refit/production-f16.bin",
+        "certified": true,
+        "free_amplitude": 0.0,
+        "free_ramps": 0,
+        "max_pairs": 1,
+        "monotone": true,
+        "ramps": 0
+      }
+    },
+    {
+      "arm": "L4",
+      "seed": 1,
+      "packed_sha256": "012ba24266eec0d64859e2c530c9893113e8125c48e6471c79ce37de0889611d",
+      "packed_bytes": 24580,
+      "certificate": {
+        "bake": "/var/tmp/byc-linear-20261104/extra/fits/L4-s1/refit/production-f16.bin",
+        "certified": true,
+        "free_amplitude": 0.0,
+        "free_ramps": 0,
+        "max_pairs": 1,
+        "monotone": true,
+        "ramps": 0
+      }
+    },
+    {
+      "arm": "L4",
+      "seed": 2,
+      "packed_sha256": "27c174d5071a17a5871ac51e73f298760169eeec5f98685133b405df256601fe",
+      "packed_bytes": 24497,
+      "certificate": {
+        "bake": "/var/tmp/byc-linear-20261104/extra/fits/L4-s2/refit/production-f16.bin",
+        "certified": true,
+        "free_amplitude": 0.0,
+        "free_ramps": 0,
+        "max_pairs": 1,
+        "monotone": true,
+        "ramps": 0
+      }
+    }
+  ],
+  "source_pins": {
+    "registration": "d3ec4dab02202258f9697f1e220aa544307ef2e3",
+    "offset_amendment": "339de6b8c24b49403745cacde495ded875a3e83a",
+    "source": {
+      "scripts/rev4_featpot/r12_linear_fit.py": "8163e45700455ea3a1b3253ca4634d39eae4ad3a36c371fa6b61c9ac8fa4dbe6",
+      "scripts/rev4_featpot/subjective_training_leg.py": "56f0ea8869502a9befc786f8e054d1d8d916ac2cc951524e7eb157b6b4f169b4",
+      "scripts/rev4_featpot/v2_common.py": "98eb86b488f2e1a6ef386df68ec014870a8fd6ca212765af326e32b44700422e",
+      "zensim-validate/src/subjective_training_leg.rs": "7401d8988c9b90837dd5c84e30140230264d2f39bdd389a1e4b1e626c15b80d9",
+      "zensim-validate/src/mlp_train/mod.rs": "d777017c5e563127a17766487b36349cb832c95897ccde744be36a9811cd35b2",
+      "zensim-validate/src/bin/bake_dial_refit.rs": "a7bf8e8676e8addb665471f8cbcf926bca6e7ecbfdadda6888dc5657b933a2a5",
+      "zensim-validate/src/bin/predict_features_with_bake.rs": "9baa34b40f7366bb9905ab9d521327b6caa9579f2d786903586b6ee6a5e49d38"
+    },
+    "binaries": {
+      "/var/tmp/byc-linear-20261104/extra/bin/zensim_mlp_train": "5afda1e1d0b6ac368e1bb6d5e3383ab6cc83e0c99edcf7124906da27d02a6b03",
+      "/var/tmp/byc-linear-20261104/extra/bin/bake_dial_refit": "e6f5c0d8d2914e50ddc0606009081c80556435e0c71ba34fc51ab05b4b296464",
+      "/var/tmp/byc-linear-20261104/extra/bin/panel": "4a4319ed0b8ffdde4189e591e8f7cbefcd014365c53d5a6692478327e8a86c5d",
+      "/var/tmp/byc-linear-20261104/extra/bin/predict_features_with_bake": "9cfa75115d953667869980252f27a6a91e4218e50df126618176efb10fb4a7db",
+      "/var/tmp/byc-linear-20261104/extra/bin/byc_fsid": "7780604244c1a273e825a6f7cc5433136ed5fe1d5b6efe8c9ef093d345973155",
+      "/var/tmp/byc-linear-20261104/extra/bin/byc_predict": "faebb8509dea79907a443931e3f9facf58fe14c99e82c04f9fa589617088364c",
+      "/var/tmp/byc-linear-20261104/extra/bin/score_pair_with_bake": "83fcc3d6b6cf49044a3ac1224b7345465a5e5db3426c687b8ebefffa82bfe06b"
+    }
+  },
+  "pruning": {
+    "L0_s0": {
+      "bytes": 31502,
+      "kept": [
+        95,
+        96,
+        97,
+        98,
+        99,
+        100,
+        101,
+        102,
+        103,
+        104,
+        105,
+        106,
+        107,
+        108,
+        109,
+        110,
+        111,
+        112,
+        113,
+        114,
+        115,
+        116,
+        117,
+        118,
+        119,
+        120,
+        121,
+        122,
+        123,
+        124,
+        125,
+        126,
+        127
+      ],
+      "new_hidden": 33,
+      "old_hidden": 128,
+      "served_bit_identity": "requires registered fixture proof",
+      "structural_only": true
+    },
+    "L0_s1": {
+      "bytes": 30783,
+      "kept": [
+        95,
+        96,
+        97,
+        98,
+        99,
+        100,
+        101,
+        102,
+        103,
+        104,
+        105,
+        106,
+        107,
+        108,
+        109,
+        110,
+        111,
+        112,
+        113,
+        114,
+        115,
+        116,
+        117,
+        118,
+        119,
+        120,
+        121,
+        122,
+        123,
+        124,
+        125,
+        126,
+        127
+      ],
+      "new_hidden": 33,
+      "old_hidden": 128,
+      "served_bit_identity": "requires registered fixture proof",
+      "structural_only": true
+    },
+    "L0_s2": {
+      "bytes": 28270,
+      "kept": [
+        125,
+        126,
+        127
+      ],
+      "new_hidden": 3,
+      "old_hidden": 128,
+      "served_bit_identity": "requires registered fixture proof",
+      "structural_only": true
+    }
+  },
+  "L0r_diagnostic": {
+    "pruning": {
+      "bytes": 26102,
+      "kept": [
+        126,
+        127
+      ],
+      "new_hidden": 2,
+      "old_hidden": 128,
+      "served_bit_identity": "requires registered fixture proof",
+      "structural_only": false
+    },
+    "sha256": "34acf4d7ce106f6a0230757d598fcd9a201c80db917c5f9f36a080801a99c278"
+  },
+  "selection": "L4 final epoch 119 of 120, TRAIN-side only, no continuation; L0 structural only"
+}
