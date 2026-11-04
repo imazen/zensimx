@@ -33,6 +33,7 @@ def worker():
         row.update(shipped_model=str(shipped),shipped_sha256=owner.sha(shipped),
                    shipped_bytes=shipped.stat().st_size,
                    stripped_inference_inspection='exactly equal to packed native inspection')
+    frozen['finalizer_source_sha256']=owner.sha(__file__)
     owner.write(root/'FROZEN_FITS.json',frozen)
 
 
@@ -42,6 +43,14 @@ def main():
     elif sys.argv[1:]:
         raise ValueError('unexpected arguments')
     else:
+        receipt=owner.O/'logs/metadata-strip.receipt.json'
+        if receipt.exists():
+            if json.loads(receipt.read_text())['rc']!=0:
+                raise ValueError('preserve failed metadata finalization for investigation')
+            frozen=json.loads((owner.O/'FROZEN_FITS.json').read_text())
+            if len(frozen['models'])!=15 or any(owner.sha(r['shipped_model'])!=r['shipped_sha256'] for r in frozen['models']):
+                raise ValueError('completed frozen shipping inventory differs')
+            return
         owner.freeze()
         owner.job('metadata-strip',[sys.executable,'-B',__file__,'worker'])
 
