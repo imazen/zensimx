@@ -918,6 +918,12 @@ pub(crate) struct ScaleStats {
 pub struct ZensimResult {
     score: f64,
     raw_distance: f64,
+    /// The profile's linear weighted feature distance, kept when a bake
+    /// replaces `raw_distance` with its own output (`set_mlp_score`). The
+    /// `approx_*` power laws were fitted on this distance, so they read it
+    /// rather than `raw_distance`, which on a bake-scored profile (A, B, C,
+    /// D and their HDR variants) holds a calibrated score instead.
+    linear_distance: f64,
     features: Vec<f64>,
     profile: crate::profile::ZensimProfile,
     mean_offset: [f64; 3],
@@ -949,6 +955,7 @@ impl ZensimResult {
         Self {
             score,
             raw_distance,
+            linear_distance: raw_distance,
             features,
             profile,
             mean_offset,
@@ -963,6 +970,7 @@ impl ZensimResult {
     #[inline]
     pub(crate) fn mark_identical(mut self) -> Self {
         self.is_identical = true;
+        self.linear_distance = 0.0;
         self
     }
 
@@ -984,6 +992,7 @@ impl ZensimResult {
     /// Replace the raw distance and score with values from the MLP
     /// scoring path. Internal use only — called by
     /// [`apply_mlp_scoring`](crate::metric::apply_mlp_scoring).
+    /// `linear_distance` is left alone: the `approx_*` helpers need it.
     pub(crate) fn set_mlp_score(&mut self, raw_distance: f64, score: f64) {
         self.raw_distance = raw_distance;
         self.score = score;
@@ -1000,6 +1009,7 @@ impl ZensimResult {
         Self {
             score: f64::NAN,
             raw_distance: f64::NAN,
+            linear_distance: f64::NAN,
             features: vec![],
             // Placeholder tag on a NaN result — the canonical codec-target
             // profile (`B`); never the deprecated `A`.
@@ -1017,6 +1027,10 @@ impl ZensimResult {
 
     /// Raw weighted feature distance before nonlinear mapping. Lower = more similar.
     /// Not bounded to a fixed range; depends on image content and weights.
+    ///
+    /// On a bake-scored profile (A, B, C, D and their HDR variants) this is
+    /// the bake's raw output, which is a calibrated score rather than a
+    /// distance.
     pub fn raw_distance(&self) -> f64 {
         self.raw_distance
     }
@@ -1064,11 +1078,17 @@ impl ZensimResult {
     ///
     /// More accurate than `mapping::zensim_to_ssim2(score)` (MAE 4.9, r = 0.932)
     /// because it skips the intermediate score mapping.
+    ///
+    /// Read from the profile's linear preview-v0.2 distance, which a
+    /// bake-scored profile (A, B, C, D and their HDR variants) still computes
+    /// before its bake replaces `raw_distance`. On the SDR profiles it
+    /// matches `PreviewV0_2`'s to about 1e-7; on BHdr and CHdr it comes from
+    /// HDR features, which this fit never saw.
     pub fn approx_ssim2(&self) -> f64 {
-        if self.raw_distance <= 0.0 {
+        if self.linear_distance <= 0.0 {
             return 100.0;
         }
-        (100.0 - 19.0379 * self.raw_distance.det_powf(0.5979, active_pow_form())).max(-100.0)
+        (100.0 - 19.0379 * self.linear_distance.det_powf(0.5979, active_pow_form())).max(-100.0)
     }
 
     /// Approximate DSSIM value from the raw distance.
@@ -1079,11 +1099,17 @@ impl ZensimResult {
     /// Significantly more accurate than `mapping::zensim_to_dssim(score)`
     /// (MAE 0.00213, r = 0.719) because DSSIM's natural exponent (1.22)
     /// differs from the score mapping exponent (0.70).
+    ///
+    /// Read from the profile's linear preview-v0.2 distance, which a
+    /// bake-scored profile (A, B, C, D and their HDR variants) still computes
+    /// before its bake replaces `raw_distance`. On the SDR profiles it
+    /// matches `PreviewV0_2`'s to about 1e-7; on BHdr and CHdr it comes from
+    /// HDR features, which this fit never saw.
     pub fn approx_dssim(&self) -> f64 {
-        if self.raw_distance <= 0.0 {
+        if self.linear_distance <= 0.0 {
             return 0.0;
         }
-        0.000922 * self.raw_distance.det_powf(1.2244, active_pow_form())
+        0.000922 * self.linear_distance.det_powf(1.2244, active_pow_form())
     }
 
     /// Approximate butteraugli distance from the raw distance.
@@ -1093,11 +1119,17 @@ impl ZensimResult {
     ///
     /// Butteraugli's weak correlation with our features (r = 0.71) limits
     /// approximation accuracy regardless of mapping choice.
+    ///
+    /// Read from the profile's linear preview-v0.2 distance, which a
+    /// bake-scored profile (A, B, C, D and their HDR variants) still computes
+    /// before its bake replaces `raw_distance`. On the SDR profiles it
+    /// matches `PreviewV0_2`'s to about 1e-7; on BHdr and CHdr it comes from
+    /// HDR features, which this fit never saw.
     pub fn approx_butteraugli(&self) -> f64 {
-        if self.raw_distance <= 0.0 {
+        if self.linear_distance <= 0.0 {
             return 0.0;
         }
-        2.365353 * self.raw_distance.det_powf(0.6130, active_pow_form())
+        2.365353 * self.linear_distance.det_powf(0.6130, active_pow_form())
     }
 }
 
