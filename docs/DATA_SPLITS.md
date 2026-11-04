@@ -3171,3 +3171,26 @@ fixtures and every registered pixel-gate score check. Optional L0r read those
 feature fixtures only to quantify score changes, without an additional fit or
 qualification arm. All L1/L2/L3 fits and original read results remain frozen.
 CLIC/CIQA/MMSPG were not reopened; AIC-2026 public_test remained sealed.
+
+
+## Exposure registration — 2026-11-04: R13 proportional hidden widths against adopted A
+
+Registered in the E36 record before any R13 fit or new assessment. W16/32/64/256/512
+use A's admitted TRAIN root, 984 fx2 inputs, fixed final-epoch rules, seeds 0–2,
+and AIC-2026 public_train ×256 continuation with original rehearsal. Owner defines
+width proportionally: pairs=width/4, half paired units and half ordinary units.
+No EVAL selects any fit/width/epoch; no HDR leg is fitted; A is not refitted.
+AIC-2026 statistics remain local; public_test stays sealed.
+
+After all final bakes are frozen, report-only reads exactly R12's populations:
+EVAL collections and compression/non-codec subsets, E36 selection-source pairs,
+G-CHROMA-L dev >64px, G-STEER, C1–C6, identity, NEARID; cube-root:203 HDR views
+(UPIQ development and all 380 T2 rows, HDRTEACH VAL teacher labels, 4Kdtb EVAL
+MOS and consumer-EVAL ladders). These are already exposed to the adopted mix,
+HC1 and R12, including R12's L0/L4 additions. They are reused assessments,
+not untouched confirmation. E36 instruments repeatedly informed the program;
+R13's reads do not select any subsequent fit. CLIC 2021 validation, CIQA and
+MMSPG JPEG XR retain their R10/earlier exposure (CLIC also selected R7), and
+are not reopened. Capacity/ablation reads use the existing audit's CID22 TRAIN
+oracle and HDR teacher TRAIN banks only, with no new human holdout labels.
+Record actual completed assessments separately after freezing and execution.

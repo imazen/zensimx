@@ -2315,3 +2315,83 @@ G-CHROMA-L level qualification, while passing G-STEER 135/135, C1–C6, identity
 and NEARID. No model is adopted. The sparse formula has 144 damage rows and
 288 available coefficients, with all weights and feature names committed.
 Extraction remains unchanged; reported speed is the head alone.
+
+
+### R13 registration (2026-11-04, before any fit or new read): A at proportional hidden widths
+
+Owner requests the complete A recipe at W16, W32, W64, W256 and W512, three seed
+indices 0–2 each; frozen adopted A = W128, mixF3 seeds 0–2, is the control and is
+not refitted. **Definition of width, owner decision before fitting:** preserve A's
+allocation, `max_pairs = width / 4`: W16=4, W32=8, W64=16, W256=64, W512=128.
+Two units per pair means half the units are coupled max pairs and the remaining
+half retain A's ordinary threshold-unit role. W16 and W32 cannot retain A's
+32 pairs; this comparison is proportional by construction, not fixed-pair-count.
+
+Use the released `MixF3-s*.json` / `RECIPE_MIXF3.md` recipe and the existing
+`v2_confirm_fit.py`, trainer and production pack owners. TRAIN root:
+`/var/tmp/byc-fchroma-20261029/r3/w100/root`; the 492 damage columns pinned in
+`~/tmp/hc1-profile/cols_fx2.txt` plus their 492 fx2 fragility products = 984 inputs.
+Spec `sel:45acffa603e8@h32:H<width>:cv16:cf98:fx2:mono:thr:mp<width/4>`;
+`--human-sources tid2013 --exclude-datasets pipal,live-md,cid-iq,cid-oa,irccyn-ivc,colourlab-rating-variability-2022
+--mos-share 36.035`. All inherited legs, targets, group masses, sampling, loss,
+seed streams and epoch budgets remain A's. Only proportional hidden capacity
+changes. Extend Python/native admission with a separate authorization bound to
+this registration, exactly these widths/pair counts/984 inputs/seed indices;
+retain historical H128 and R12 authorization contracts.
+
+Each base fit runs 120 epochs and selects the fixed final epoch 119, preserving
+A's TRAIN-side selection rule. Then AIC-2026 public_train ×256 continuation with
+all original rehearsal, 60 epochs, lr 1e-5, constant schedule, population
+`mixed-aic256-xref`, fixed epoch 59. No AIC statistics enter committed files;
+public_test stays sealed. No HDR legs are added. Densify, f16 pack before dial
+calibration (protect final layer), CID22 TRAIN anchor, E33 identity knot/tail
+factor 2, and native `certify-monotone` use the canonical owners. Preserve all
+984 inputs, including exact-zero weights. No EVAL or gate result selects a
+width, fit, checkpoint, hyperparameter, threshold or stopping rule.
+Report the root's teacher-development error directly in stored score-point
+units, separately and row-pooled, following R12's corrected unit contract;
+this diagnostic does not change the fixed final-epoch selection.
+
+Execution order: W32 s0, W256 s0, W64 s0, W512 s0, W16 s0, then seed 1 and
+seed 2 in that same width order. Each fit has its base, continuation and pack;
+report the first packed fit's measured wall time and dead/residual/live counts
+in chat immediately, then continue without waiting. Use dev, one heavy job at
+a time under `flock ~/tmp/heavy.lock run-heavy --mem 24G`; acquire per job and
+release between jobs because another lane shares it. Scratch `~/tmp/zensim-width/`,
+large artifacts `/var/tmp/byc-width-20261104/`, mirror finished artifacts with
+checksums to `/mnt/tower/output/zensim/r13-width-20261104/`.
+
+Per packed fit, use the weight audit's native exporter on the same full CID22
+TRAIN oracle bank (12,163 rows, SHA256 `07e2f4b71fe0ccc67848f2896344e6d0b6a255b0e91a7da9062d471ea3e11100`)
+and HDR teacher TRAIN cube-root:203 bank (7,390 rows, SHA256
+`742fd8f314dcc5d1f812faa9924ac8b3fb048ba07dbc5f53a0b7f2b984857101`).
+Dead = exact-zero encoder column and nonpositive bias; among remaining units,
+residual = |output coefficient| < 1e-3 of the largest |output coefficient|,
+live = the rest. Report largest live max-pair share of mean absolute raw
+contribution, and damage-input counts carrying 50/90/99% of summed individual
+identity-ablation mean absolute served-score effects. Direct and product rows
+share one raw-damage intervention as in the audit. Do not treat non-additive
+ablation mass as an additive score decomposition.
+
+Freeze all 15 final packed hashes in a fit commit before report-only assessments.
+Reads exactly R12's set beside A: EVAL collections and compression/non-codec
+subsets; E36 selection-source inversion share with CONTROL=F; G-CHROMA-L dev
+views >64px; G-STEER; C1–C6 on standard and ladder grids; identity; NEARID;
+HDR evidence panel and UPIQ-all on cube-root:203 banks
+`/mnt/v/output/zensim/byc-hdr-20261104/banks-cube-root-203-aliases`.
+Baseline `~/tmp/e36test/r10/runs/mixF3-s*/pack_e059/refit/production-f16.bin`.
+Reuse the R12 native A-paired head instrument retained under
+`/var/tmp/byc-linear-20261104/extra/heads/`; head time includes scaling and
+network forward, excluding extraction, products and dial. This explicitly
+requested head measurement runs on dev as the brief directs. Keep paired
+round gates, raw rounds and tool hashes. Reused mix/HC1/R12 exposure is
+registered in DATA_SPLITS before any new assessment. No CLIC, CIQA, MMSPG,
+public_test or other sealed confirmation read is reopened.
+
+Result: `benchmarks/r13_hidden_width_2026-11-04.md`, full reads beside A and one
+width × seed table with development statistic, E36 share, all-nine MOS median
+error, chroma level, capacity counts, pair share, input concentration and head
+time; fit hashes, resource receipts and mirror evidence. Answer whether training
+width is load-bearing, collapse to one live pair is universal, and any width
+beats A on all label-free product gates. Negative results are results; missing
+reads are incomplete. No candidate adoption or release is authorized.
