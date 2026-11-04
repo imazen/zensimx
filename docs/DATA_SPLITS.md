@@ -3084,3 +3084,19 @@ amendment 6 result).
   `mixF3codecB` (seeds 0-2) and the ECodec and F3codec baselines through `dataset_eval.py score` + `readout.py` + `ceval.py`
   (compression and non-codec rows); E36 selection-source inversion share via `e36_features.py inversions` + `primary.py`
   (label-free consensus pairs). No fit, no selection (benchmarks/e36_subset_test_2026-11-01.md, R11).
+
+## Exposure registration — 2026-11-04: HC1 step 2, the mix with the HDR legs through the cube-root front end
+
+Registered before any fit (zensimx record, "HC1", "Step 2 registration"). **Trained on (new for the mix):** the four
+registered native-HDR TRAIN legs of HDR_P2P3_EXECUTION_2026-10-29.md, now from the `cube-root:203` banks: UPIQ-380's 330
+T2 fit rows (JOD), 4Kdtb TRAIN (Bike, 48 MOS rows), the consumer-TRAIN HDR chroma-ladder rungs (7,177; natural
+SSIMULACRA2, label-free) and HDRTEACH train agree rows (7,390; HDR-VDP-3 q_jod, a teacher). From this registration on,
+UPIQ-380's fit rows, 4Kdtb TRAIN and HDRTEACH train are **training data** for the HC1 models and no longer a held-out
+read for them; any UPIQ number for an HC1 model is on the 50 development rows only. **Selection reads (TRAIN-side only):**
+the dev-fold scale rule scores held-out TRAIN families of the same legs (`hdr_devfold_score.py`); EVAL, VAL and the 50
+UPIQ development rows never select. **Report reads, after the fits, each disclosed here:** UPIQ-380's 50 development
+rows (JOD) through the HDR evidence panel; HDRTEACH VAL (3,900 rows, HDR-VDP-3) through the `cube-root:203` VAL bank;
+the 4Kdtb EVAL half (Regatta, 48 MOS rows); the ladders' EVAL rungs (label-free); the SDR no-regression set exactly as
+the mix's own reads (the held-out EVAL MOS collections through `dataset_eval.py score` + `readout.py` + `ceval.py`,
+E36 inversion share, G-STEER, dial contract, all previously disclosed); the continuity check and the Ultra HDR probe
+(label-free). Nothing on public_test, CID22 validation, CLIC, CIQA or MMSPG is read for HC1 unless registered first.
