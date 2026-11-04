@@ -51,7 +51,10 @@ def main():
            '/var/tmp/byc-fx2-20261028/stage2/gate-tools-d02d2e07/steer_instrument',
            str(Path.home()/'tmp/e36test/nearid/bin/serve_custom_bake')]
     tool_pins={p:digest(p) for p in tools}
-    (out/'TOOL_PINS.json').write_text(json.dumps(tool_pins,indent=2)+'\n')
+    tool_pin_path=out/'TOOL_PINS.json'
+    if tool_pin_path.exists() and json.loads(tool_pin_path.read_text())!=tool_pins:
+        raise ValueError('assessment instruments differ from original stage pins')
+    tool_pin_path.write_text(json.dumps(tool_pins,indent=2)+'\n')
     records = []
 
     def run(name, argv, extra=None):
