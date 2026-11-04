@@ -191,3 +191,59 @@ Construction/fitting receipt: 357 s, peak-RSS 2.03 GiB, minimum available 38,602
 peak load 2.42. Models live at `extra/bakes/L0_s*.bin` and
 `extra/fits/L4-s*/refit/production-f16.bin` under the registered artifact root.
 The optional A0 two-unit L0r remains a score-change diagnostic, not a replacement arm.
+
+### L0 feature-bit proof and L0r diagnostic
+
+[Native proof receipt](r12_pruning_feature_proof_2026-11-04.json) binds the tool
+and unchanged frozen model hashes. All three L0 seeds match their corresponding A
+seed bit-for-bit on all 861,516 fixture-row occurrences per seed (2,584,548 exact
+f64 score comparisons) across 12 registered feature fixtures. Counts include reused
+rows, such as UPIQ development inside UPIQ-all; they are not a distinct-image count.
+The proof uses the native production BakeScorer with a bit-output option, not an
+algebraically reconstructed scorer or decimal tolerance. Dial fixtures retain their
+720 raw columns; EVAL/E36/chroma have 1,825, HDR transports 1,853. Every model uses
+the same 984 declared head inputs. Pixel-gate bit checks follow their ongoing reads.
+
+A0's optional two-unit L0r changes 842,021 of those fixture-row occurrences.
+The largest absolute served-score difference is 0.004247403886495249 points,
+on EVAL. Identity stays exact on the 38 cached identity feature rows. It is a
+measured approximation, not bit-identical pruning, and is not promoted to an arm.
+Per-fixture changed counts, mean absolute differences and maxima remain in the
+proof receipt. Feature proof execution: 129 s, peak-RSS 2.67 GiB, minimum available
+39,851 MiB, peak load 4.01.
+
+### Additional-arm head timing and offset parameters
+
+| Arm | A matched head (µs/pair) | Candidate head (µs/pair) | A / candidate |
+|---|---:|---:|---:|
+| L0 | 5.625950 | 2.711389 | 2.074932 |
+| L4 | 5.810238 | 2.523115 | 2.302803 |
+
+The same paired method gives 14/18/15 clean rounds for L0 and 14/17/22 for L4,
+out of 30 per seed. These batches are paired against A; differences between
+candidate arms measured in different batches are descriptive. The new immutable
+benchmark executable and its source/hash receipt are under `extra/heads/`.
+Batch receipt: 58 s, peak-RSS 0.18 GiB, minimum available 42,366 MiB, peak load 1.88.
+
+| L4 seed | Learned t (packed hidden bias magnitude) | Shared c | Effective c·t |
+|---|---:|---:|---:|
+| 0 | 0 | 0.3328985869884491 | 0 |
+| 1 | 0.0004863178764935583 | 0.306227445602417 | 0.00014892388106941407 |
+| 2 | 0.0022572835441678762 | 0.3161628544330597 | 0.0007136692085888893 |
+
+Both complete pieces remain non-negative; stored correction weights may have either
+sign. Hidden-unit reordering can place the zero-bias piece in either column, so
+inspection identifies the zero-bias non-negative piece before reconstructing b.
+No EVAL result changes these parameters or prompts a refit. All three L4 seeds
+fail G-CHROMA-L level qualification while passing rank non-regression; their
+extended-XYB MAEs are 3.849951 / 4.459601 / 3.809958 points. L0's comparison to A0
+also reports level failure: the level tool requires strict improvement, so L0_s0's
+identical score values and zero difference interval cannot pass that criterion.
+This is not a pruning-induced quality change. L0_s1/s2 retain their corresponding
+A-seed variation against the common A0 reference.
+
+L4's E36 share is 3.161444%, a change of −0.235202 percentage points against A
+(95% origin bootstrap −0.412274 to −0.049230). Its all-nine normalized MOS median
+error is 8.33836%, compression error 7.44035%, and non-codec error 9.44045%, against
+A's 8.02794%, 7.02144% and 8.58352%. L0 matches A exactly on all these reads.
+Pixel and HDR assessments remain in progress.
