@@ -169,3 +169,37 @@ file lists, binary and input hashes): `/mnt/v/output/zensim/ultrahdr-probe-2026-
 | 1520_nature_tulips-in-garden_notre-dame-versaill | 49.26 | 87.27 | 88.43 | +1.16 | 85.77 | 86.23 | +0.46 |
 | 1639_food_sashimi-on-plate_colorado_s25u_iso200- | 49.26 | 79.95 | 80.42 | +0.47 | 79.45 | 80.65 | +1.20 |
 | 1640_food_birthday-cake-table_colorado_ip16pro_i | 49.26 | 77.38 | 76.93 | -0.46 | 77.38 | 78.58 | +1.20 |
+
+## Addendum (2026-11-04): the SDR base fed through the HDR paths
+
+Owner: "What if you feed sdr in as hdr?" Two arms added to the probe (binary `4670313f…`; one worker, 822 s, peak RSS
+16.7 GiB): display boost 1.0, so the gain map contributes nothing and the base's own light goes through the HDR paths,
+once with SDR white at 203 cd/m² (BT.2408, ultrahdr-rs's convention) and once at 100 cd/m² (zensim's PU normalisation
+point). Full tables: `out2/summary.md` in the artifact folder. The decomposition, camera files, mean over the eight images:
+
+| reading (zensim F) | q35 | q75 | q94 | | reading (SSIMULACRA2) | q35 | q75 | q94 |
+|---|---:|---:|---:|---|---|---:|---:|---:|
+| SDR path | 57.7 | 72.9 | 88.1 | | SDR path | 58.3 | 73.6 | 88.0 |
+| SDR fed as HDR, white 100 cd/m² | 51.5 (-6.2) | 68.6 (-4.2) | 87.0 (-1.2) | | same | 69.7 (+11.4) | 81.0 (+7.4) | 91.2 (+3.2) |
+| SDR fed as HDR, white 203 cd/m² | 46.1 (-11.6) | 64.6 (-8.3) | 85.3 (-2.9) | | same | 61.2 (+3.0) | 75.6 (+1.9) | 88.9 (+0.9) |
+| gain map, 4× boost (812 cd/m²) | 41.6 (-16.1) | 60.8 (-12.0) | 83.2 (-4.9) | | same | 52.4 (-5.9) | 69.5 (-4.1) | 85.8 (-2.2) |
+| gain map, full boost (4.9×) | 40.9 (-16.8) | 60.3 (-12.6) | 82.8 (-5.3) | | same | 50.9 (-7.3) | 68.5 (-5.2) | 85.2 (-2.8) |
+
+Butteraugli 3-norm at q75: SDR path 1.17; SDR fed as HDR at 100 cd/m² 1.25, at 203 cd/m² 1.51; gain map 4× 1.78, full
+1.82 (its sRGB-u8 path assumes an 80 cd/m² display, so the linear path at 203 cd/m² is already 1.3× harsher on the same
+pixels). Census files (our encodes): zensim SDR fed as HDR at 203 cd/m² -1.8 at q75, at 100 cd/m² -0.1, gain map 4×
+-1.7; SSIMULACRA2 +1.1 / +4.5 / +1.1: the gain map adds nothing beyond the path there.
+
+**Reading.** Two thirds of zensim's SDR-to-HDR gap on the camera files is the HDR *path* itself, not the gain map: the
+same JPEG artifacts, scored as 203 cd/m² light through the PU21 front end, read 8 points lower than through the SDR path
+at q75 (4 points at 100 cd/m²), and the gain map's 4.9× boost takes a further 4. The severity grows with the assumed
+luminance, which is the PU21 front end's regime (SDR-trained weights on PU-coded light), not a property of the content.
+SSIMULACRA2's native path goes the other way: it is *more lenient* than its SDR path on identical pixels (+2 at 203 cd/m²,
++7 at 100 cd/m², its 255-nit anchor scaling the linear values down), so all of its HDR gap, and more, is the gain map.
+Butteraugli's linear path splits the gap about evenly between the path and the boost. Consequences: (1) zensim's SDR and
+HDR scores are not on one scale, and the assumed SDR white moves the HDR reading by 4 points at q75, so an HDR score
+needs its white and boost stated beside it; (2) comparing an Ultra HDR encode's HDR reading with an SDR encode's SDR
+reading charges the HDR encode about 8 points that have nothing to do with the gain map; (3) the gain map's own cost on
+the camera files is about 4 zensim points and 6 SSIMULACRA2 points at q75, which is the part a base-quality or gain-map
+quality knob can trade. Whether zensim's HDR regime *should* be this much harsher than its SDR regime is the HDR
+calibration question (a future HDR-trained profile), not something this probe can settle.
