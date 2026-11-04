@@ -1,0 +1,10 @@
+{
+  "root": "/absolute/output/root",
+  "note": "Local revision-7 inspection; diagnostic scope is recorded in each bundle.",
+  "banks": [{"id": "train", "label": "Admitted TRAIN bank", "sha256": "TABLE_SHA256"}],
+  "pairs": [{"id": "pair-01", "label": "Training pair", "directory": "pair-01"}],
+  "bakes": [{
+    "id": "primary", "label": "Primary bake",
+    "banks": {"train": {"audit": "audit", "lens": "lens", "comparisons": {"comparison": "compare"}}}
+  }]
+}

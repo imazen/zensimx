@@ -1,0 +1,11 @@
+{
+  "binary": "/absolute/path/to/zensim-viz-export",
+  "certifier": "/absolute/path/to/bake_dial_refit",
+  "log_directory": "/absolute/path/to/logs",
+  "jobs": [{
+    "id": "pair-01",
+    "args": ["atlas", "/absolute/bake", "--bank", "/absolute/table.parquet", "--reference", "/absolute/reference.png", "--distorted", "/absolute/distorted.jpg"],
+    "out": "/absolute/output/pair-01",
+    "required": ["meta.json", "control.json", "instrumented.json"]
+  }]
+}
