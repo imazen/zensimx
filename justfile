@@ -4094,6 +4094,18 @@ a-speed-build:
 a-parallel-gate-collect root binary threads sizes:
     env A_SPEED_PARALLEL_GATE=1 BENCH_CPUS=0-15 BENCH_THREADS={{quote(threads)}} BENCH_SIZES={{quote(sizes)}} BENCH_MODES='latency scores' bash zensim-bench/a-speed-runtime/run.sh {{quote(root)}} {{quote(binary)}}
 
+a-parallel-gate-build root:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    cd {{quote(root)}}
+    cargo build --release --manifest-path source/a-speed-runtime/Cargo.toml --bins --benches --message-format=json
+
+a-parallel-gate-check root phase:
+    python3 -B zensim-bench/a-speed-runtime/check_gate.py {{quote(root)}} {{quote(phase)}}
+
+a-parallel-gate-after root:
+    python3 -B zensim-bench/a-speed-runtime/after_gate.py {{quote(root)}}
+
 a-parallel-gate-report root output phase:
     python3 -B zensim-bench/a-speed-runtime/report.py {{quote(root)}} {{quote(output)}} --parallel-gate {{quote(phase)}}
 
@@ -4103,6 +4115,9 @@ a-parallel-gate-crossover root output:
 
 a-parallel-gate-progress host root *args:
     ssh {{quote(host)}} python3 -B {{quote(root + "/source/a-speed-runtime/progress.py")}} {{quote(root)}} {{args}}
+
+a-parallel-gate-host host:
+    ssh {{quote(host)}} 'hostname; uptime; free -h; df -h /home; lslocks -o PID,COMMAND,PATH | rg "(heavy|host)[.]lock" || true; ps -eo pid,ppid,etimes,pcpu,comm,args --sort=-pcpu | sed -n "1,8p"'
 
 a-parallel-gate-reference bake revision='7':
     env ZENSIM_FORMULA_REV={{quote(revision)}} ZENSIM_POW_FORM=libm cargo run --release -p zensim --features custom-profiles,training,classification --example split_parity_golden -- --public-a {{quote(bake)}} {{quote(bake)}}
@@ -4115,6 +4130,13 @@ a-parallel-gate-test:
 
 a-parallel-gate-hdr-test:
     cargo test -p zensim --features custom-profiles --test native_hdr_color -- --test-threads=1
+
+a-parallel-gate-thread-test:
+    env ZENSIM_FORMULA_REV=1 cargo test -p zensim --features training,custom-profiles --test research_engine_parity research_output_is_thread_invariant -- --exact --nocapture --test-threads=1
+    env ZENSIM_FORMULA_REV=4 cargo test -p zensim --features training,custom-profiles --test research_engine_parity research_output_is_thread_invariant -- --exact --nocapture --test-threads=1
+
+a-parallel-gate-bake-thread-test bake:
+    env ZENSIM_FORMULA_REV=7 cargo run --release -p zensim --features training,custom-profiles,classification --example a_parallel_gate_threads -- {{quote(bake)}}
 
 # Requires the outer shared lock and resource wrapper; keeps release controls.
 a-parallel-gate-reclaim root label:

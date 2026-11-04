@@ -73,7 +73,7 @@ def main():
         value.update({"last_check": datetime.datetime.now(datetime.UTC).isoformat(),
                       "launcher": process, "compute_lock": compute_lock(pid),
                       "compiler_pids": [p["pid"] for p in compilers],
-                      "stage": "baseline building" if compilers else "baseline awaiting heavy lock"})
+                      "stage": f"{root.name} building" if compilers else f"{root.name} awaiting heavy lock"})
         (root / "PROGRESS.json").write_text(json.dumps(value, indent=2) + "\n")
         with (root / "SUPERVISION.jsonl").open("a") as stream:
             stream.write(json.dumps(value) + "\n")
@@ -127,6 +127,8 @@ def main():
     (root / "LIVE_CHECK.json").write_text(json.dumps(value, indent=2) + "\n")
     checks = research_checks(task_root) if parallel_gate else None
     goldens = research_checks(task_root, "RESEARCH_GOLDEN") if parallel_gate else None
+    retry = research_checks(task_root, "RESEARCH_RETRY") if parallel_gate else None
+    public = research_checks(task_root, "PUBLIC") if parallel_gate else None
     if parallel_gate and task_root != root:
         task = json.loads((task_root / "PROGRESS.json").read_text())
         # Retire build-era process fields; their observations remain in the
@@ -142,6 +144,7 @@ def main():
                      "compute_lock": lock, "lock_holders": lock_holders,
                      "research_checks": checks,
                      "research_goldens": goldens,
+                     "research_retry": retry, "public_checks": public,
                      "admission": value["admission"]})
         (task_root / "PROGRESS.json").write_text(json.dumps(task, indent=2) + "\n")
     with (root / "SUPERVISION.jsonl").open("a") as stream:
@@ -160,6 +163,7 @@ def main():
         "lock_holder_pids": lock.get("holder_pids"),
         "research_checks": checks,
         "research_goldens": goldens,
+        "research_retry": retry, "public_checks": public,
     }))
 
 
