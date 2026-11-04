@@ -1,0 +1,77 @@
+{
+  "source_commit": "912609aaacd3663a10426006a8b6d84bad826f93",
+  "old_tool": {
+    "path": "/var/tmp/byc-linear-20261104/extra/bin/predict_features_with_bake",
+    "sha256": "9cfa75115d953667869980252f27a6a91e4218e50df126618176efb10fb4a7db"
+  },
+  "new_tool": {
+    "path": "/var/tmp/byc-transforms-20261104/bin/predict_features_with_bake",
+    "sha256": "3c2ade56835fd6826dec8987375dc8159574687d5ecf7599049ec21d705f98fe"
+  },
+  "models": {
+    "A0": {
+      "path": "/home/lilith/tmp/e36test/r10/runs/mixF3-s0/pack_e059/refit/production-f16.bin",
+      "sha256": "185f43f7e5e1327c34ad18f0b73b96b872663726a0fac6ff524430d0d8430088"
+    },
+    "A1": {
+      "path": "/home/lilith/tmp/e36test/r10/runs/mixF3-s1/pack_e059/refit/production-f16.bin",
+      "sha256": "c806f18393d88c76a783f6d9916a79abb7e7a3d4d51aed110634a74a337135d5"
+    },
+    "A2": {
+      "path": "/home/lilith/tmp/e36test/r10/runs/mixF3-s2/pack_e059/refit/production-f16.bin",
+      "sha256": "1ed0ffda1b3a525e7c2f54d6acc2ff64f0c87da8e57e4528fdd4bf6186e0a687"
+    }
+  },
+  "banks": {
+    "cid22": {
+      "path": "/var/tmp/byc-fchroma-20261029/r3/w100/root/wide/main/real/cid22_fit.parquet",
+      "sha256": "07e2f4b71fe0ccc67848f2896344e6d0b6a255b0e91a7da9062d471ea3e11100",
+      "rows": 12163,
+      "raw_columns": 1853,
+      "differences": {
+        "A0": 0,
+        "A1": 0,
+        "A2": 0
+      },
+      "score_bit_sha256": {
+        "A0": [
+          "e453139cd73a22a0bb5f1593d791b3de0bdf88e7c9937b5e316c88ffdeea645c",
+          "e453139cd73a22a0bb5f1593d791b3de0bdf88e7c9937b5e316c88ffdeea645c"
+        ],
+        "A1": [
+          "34cbcaab6b65e86f05b29bdeda80f0de250f62058ac9dac106711049c482d26a",
+          "34cbcaab6b65e86f05b29bdeda80f0de250f62058ac9dac106711049c482d26a"
+        ],
+        "A2": [
+          "56098f9af0c4492427740e05ade264e41af384502f0ed46160ca87b4b580c4bc",
+          "56098f9af0c4492427740e05ade264e41af384502f0ed46160ca87b4b580c4bc"
+        ]
+      }
+    },
+    "hdr": {
+      "path": "/mnt/v/output/zensim/byc-hdr-20261104/banks-cube-root-203/teacher-train-r1/features.parquet",
+      "sha256": "742fd8f314dcc5d1f812faa9924ac8b3fb048ba07dbc5f53a0b7f2b984857101",
+      "rows": 7390,
+      "raw_columns": 1825,
+      "differences": {
+        "A0": 0,
+        "A1": 0,
+        "A2": 0
+      },
+      "score_bit_sha256": {
+        "A0": [
+          "16365b53f22fa8c62f08ab5ef72e9a12b338a47d6f04c6e29a49e0faa343ecea",
+          "16365b53f22fa8c62f08ab5ef72e9a12b338a47d6f04c6e29a49e0faa343ecea"
+        ],
+        "A1": [
+          "ce5d18d10c7e70529d7701aca96f8b035b77d3e4c93e2010a5d21f04181c313a",
+          "ce5d18d10c7e70529d7701aca96f8b035b77d3e4c93e2010a5d21f04181c313a"
+        ],
+        "A2": [
+          "8d9b487fe16a62ebab7b643e4474837d288f555009f97b5ab85ac34141e8d391",
+          "8d9b487fe16a62ebab7b643e4474837d288f555009f97b5ab85ac34141e8d391"
+        ]
+      }
+    }
+  }
+}

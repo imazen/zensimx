@@ -89,6 +89,14 @@ The correction uses jj's `empty` predicate. Both attempts are preserved:
 1 second/peak RSS 0.09 GiB for the successful cached rerun. Both used the
 shared resource lock and 24 GiB cap. No fit started before finalization.
 
+The final native no-op proof also passes: all three frozen A seeds have zero
+served f64-bit differences between the old and rebuilt scorers on all 12,163
+CID22 TRAIN rows and 7,390 HDR teacher TRAIN rows. There are 58,659 paired
+comparisons in total, with identical score-stream SHA256s for each bank/seed.
+No targets were read. The run took 3 seconds (peak RSS 0.42 GiB, minimum
+available memory 40,365 MiB). [Native proof receipt](r14_noop_2026-11-04.json)
+retains both instrument identities, model/bank hashes and score-stream hashes.
+
 ## TRAIN screen
 
 Pre-read amendment `447fcc16` restricts the absolute variance <1e-10 guard
