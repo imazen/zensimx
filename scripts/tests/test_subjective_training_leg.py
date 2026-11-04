@@ -83,6 +83,28 @@ class SubjectiveAdmission(unittest.TestCase):
             with self.subTest(key=key), self.assertRaises(ValueError):
                 leg.r12_head_binding(c,dict(recipe,**{key:value}))
 
+    def test_r13_width_authorization_keeps_legacy_pin_and_pair_proportion(self):
+        self.authority['schema'] = 'subjective-training-authority-v2'
+        self.cell.update(width=1853, feature_ids=list(range(492)))
+        for width in (16, 32, 64, 256, 512):
+            recipe = dict(hidden=width, mono_all=True, thresholds=True,
+                          derived_inputs='fx2', max_pairs=width // 4)
+            self.cell.pop('r13_width', None)
+            with self.assertRaises(ValueError):
+                leg.command_binding(self.authority_path, self.save(), 'invented-cell',
+                                    1101, 101, 1853, 'N', recipe)
+            self.cell['r13_width'] = dict(registration=leg.R13_REGISTRATION,
+                                         hidden=width, max_pairs=width // 4)
+            leg.command_binding(self.authority_path, self.save(), 'invented-cell',
+                                1101, 101, 1853, 'N', recipe)
+            for key, value in [('hidden', 128), ('max_pairs', width // 4 + 1),
+                               ('thresholds', False), ('derived_inputs', 'fx1')]:
+                with self.subTest(width=width, key=key), self.assertRaises(ValueError):
+                    leg.r13_head_binding(self.cell, dict(recipe, **{key: value}))
+            self.cell['r13_width']['registration'] = 'unregistered'
+            with self.assertRaises(ValueError):
+                leg.r13_head_binding(self.cell, recipe)
+
     def test_valid_metadata_never_opens_target(self):
         with mock.patch.object(Path,"read_bytes",autospec=True,side_effect=self.read_guard):
             self.assertEqual(set(self.admit()),{"subjective_rank"})

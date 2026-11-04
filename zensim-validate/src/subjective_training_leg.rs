@@ -185,6 +185,36 @@ fn r12_head_binding(c: &Value, args: &super::Args) -> Result<bool, String> {
     Ok(true)
 }
 
+// R13 changes proportional hidden capacity, never the historical H128 contract.
+fn r13_head_binding(c: &Value, args: &super::Args) -> Result<bool, String> {
+    let Some(r) = c.get("r13_width") else {
+        return Ok(false);
+    };
+    if r["registration"] != "25e772922fd5a40d576e12af47778ce81bed5e08"
+        || !matches!(args.hidden, 16 | 32 | 64 | 256 | 512)
+        || r["hidden"].as_u64() != Some(args.hidden as u64)
+        || r["max_pairs"].as_u64() != Some((args.hidden / 4) as u64)
+        || args.max_pairs != args.hidden / 4
+        || c["width"] != 1853
+        || c["feature_ids"].as_array().is_none_or(|v| v.len() != 492)
+        || c["seed_index"].as_u64().is_none_or(|v| v > 2)
+        || !args.monotone_cbc
+        || !args.nonneg_distance
+        || !args.nonneg_thresholds
+        || args.monotone_ramps != 0
+        || args.free_ramps != 0
+        || args.monotone_gated_products
+        || args.n_hidden_layers != 1
+        || args.derived_inputs.is_none()
+        || args.monotone_strict
+        || args.monotone_feature_mask.is_some()
+        || c.get("r12_linear").is_some()
+    {
+        return Err("R13 registered proportional head binding differs".into());
+    }
+    Ok(true)
+}
+
 fn run_binding(
     c: &Value,
     args: &super::Args,
@@ -228,7 +258,9 @@ fn run_binding(
         || c["pairs_per_epoch"] != 50000
         || args.pairs_per_epoch != 50000
         || c["selected_epoch"] != 119
-        || (if c.get("r12_linear").is_some() {
+        || (if c.get("r13_width").is_some() {
+            !r13_head_binding(c, args)?
+        } else if c.get("r12_linear").is_some() {
             !r12_head_binding(c, args)?
         } else {
             args.hidden != 128
@@ -1569,6 +1601,48 @@ mod tests {
         std::fs::write(mask, b"changed").unwrap();
         assert!(r12_head_binding(&c, &args).is_err());
         std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn r13_width_requires_registration_and_proportional_pair_allocation() {
+        use clap::Parser;
+        let mut args = super::super::Args::parse_from([
+            "zensim_mlp_train",
+            "--group",
+            "g:x:1:0",
+            "--out",
+            "o.bin",
+            "--nonneg-distance",
+            "--monotone-cbc",
+            "--nonneg-thresholds",
+            "--derived-inputs",
+            "fx2.json",
+        ]);
+        for width in [16, 32, 64, 256, 512] {
+            args.hidden = width;
+            args.max_pairs = width / 4;
+            let mut c = json!({"width":1853,"feature_ids":vec![0;492],"seed_index":0,
+                "route":"full","epochs":120,"pairs_per_epoch":50000,"selected_epoch":119,
+                "init_seed":1101,"sample_seed":101});
+            assert!(!r13_head_binding(&c, &args).unwrap());
+            args.epochs = 120;
+            args.pairs_per_epoch = 50000;
+            args.max_features = 1853;
+            args.init_seed = Some(1101);
+            args.sample_seed = Some(101);
+            assert!(run_binding(&c, &args, 1853, false).is_err());
+            c["r13_width"] = json!({"registration":"25e772922fd5a40d576e12af47778ce81bed5e08",
+                "hidden":width,"max_pairs":width / 4});
+            assert!(run_binding(&c, &args, 1853, false).is_ok());
+            args.max_pairs += 1;
+            assert!(r13_head_binding(&c, &args).is_err());
+            args.max_pairs -= 1;
+            args.nonneg_thresholds = false;
+            assert!(r13_head_binding(&c, &args).is_err());
+            args.nonneg_thresholds = true;
+            c["r13_width"]["registration"] = json!("unregistered");
+            assert!(r13_head_binding(&c, &args).is_err());
+        }
     }
 
     #[test]

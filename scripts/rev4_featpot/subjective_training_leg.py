@@ -34,6 +34,27 @@ def document(path, expected=None):
 
 
 R12_REGISTRATION = "9088eacf781c5b3cb70049f8e190a69d32474757d"
+R13_REGISTRATION = "25e772922fd5a40d576e12af47778ce81bed5e08"
+
+
+def r13_head_binding(cell, recipe):
+    """R13 proportional capacity only; historical H128 authorities stay pinned."""
+    r = cell.get("r13_width")
+    if r is None:
+        return False
+    width = recipe.get("hidden")
+    if (r.get("registration") != R13_REGISTRATION
+            or width not in (16, 32, 64, 256, 512)
+            or r.get("hidden") != width or r.get("max_pairs") != width // 4
+            or recipe.get("max_pairs") != width // 4
+            or cell.get("width") != 1853 or len(cell.get("feature_ids", [])) != 492
+            or cell.get("seed_index") not in (0, 1, 2)
+            or not recipe.get("mono_all") or not recipe.get("thresholds")
+            or recipe.get("derived_inputs") != "fx2"
+            or any(recipe.get(k) for k in ("ramps", "free_ramps", "gated_products"))
+            or "r12_linear" in cell):
+        raise ValueError("R13 registered proportional head binding differs")
+    return True
 
 
 def r12_head_binding(cell, recipe):
@@ -69,7 +90,8 @@ def command_binding(authority_path,pin,cell_id,init_seed,sample_seed,width,head,
             or (c["epochs"],c["pairs_per_epoch"],c["selected_epoch"])!=(120,50000,119)
             or (c["init_seed"],c["sample_seed"])!=(init_seed,sample_seed)
             or width!=expected_width or head!="N"
-            or (not r12_head_binding(c, recipe or {}) if "r12_linear" in c else (recipe or {}).get("hidden",32)!=128)):
+            or (not r13_head_binding(c, recipe or {}) if "r13_width" in c else
+                not r12_head_binding(c, recipe or {}) if "r12_linear" in c else (recipe or {}).get("hidden",32)!=128)):
         raise ValueError("subjective registered cell/seed/full-budget/head binding differs")
 
 

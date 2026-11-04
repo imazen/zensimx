@@ -4192,6 +4192,26 @@ r12-linear-final-check:
 r12-linear-archive:
     flock ~/tmp/heavy.lock ~/work/claudehints/scripts/run-heavy --mem 24G --jobs 8 -- bash scripts/byconstruction/r12_linear_archive.sh
 
+# R13 takes the resource lock separately inside each base/continuation/pack job.
+r13-width-fits:
+    python3 -B scripts/byconstruction/r13_width.py fits
+
+r13-width-freeze:
+    python3 -B scripts/byconstruction/r13_width.py freeze
+
+r13-width-native-check:
+    flock ~/tmp/heavy.lock ~/work/claudehints/scripts/run-heavy --mem 24G --jobs 8 -- env TMPDIR="$HOME/tmp/zensim-width" CARGO_TARGET_DIR=/var/tmp/byc-width-20261104/target cargo test --release -p zensim-validate --bin zensim_mlp_train subjective_training_leg::tests
+
+r13-width-build:
+    flock ~/tmp/heavy.lock ~/work/claudehints/scripts/run-heavy --mem 24G --jobs 8 -- env TMPDIR="$HOME/tmp/zensim-width" CARGO_TARGET_DIR=/var/tmp/byc-width-20261104/target cargo build --release -p zensim-validate --bin zensim_mlp_train
+
+r13-width-clippy:
+    flock ~/tmp/heavy.lock ~/work/claudehints/scripts/run-heavy --mem 24G --jobs 8 -- env TMPDIR="$HOME/tmp/zensim-width" CARGO_TARGET_DIR=/var/tmp/byc-width-20261104/target just clippy
+
+r13-width-python-check:
+    env TMPDIR="$HOME/tmp/zensim-width" python3 -B -m unittest discover -s scripts/tests -p test_subjective_training_leg.py
+    env TMPDIR="$HOME/tmp/zensim-width" python3 -B -m unittest discover -s scripts/tests -p test_r13_width.py
+
 
 
 a-family-cost-report study out host:
