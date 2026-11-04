@@ -35,6 +35,7 @@ def document(path, expected=None):
 
 R12_REGISTRATION = "9088eacf781c5b3cb70049f8e190a69d32474757d"
 R13_REGISTRATION = "25e772922fd5a40d576e12af47778ce81bed5e08"
+R13_W4_REGISTRATION = "397d67be879339e7014d3b29c2a99d3fe51df6b2"
 
 
 def r13_head_binding(cell, recipe):
@@ -43,12 +44,14 @@ def r13_head_binding(cell, recipe):
     if r is None:
         return False
     width = recipe.get("hidden")
-    if (r.get("registration") != R13_REGISTRATION
-            or width not in (16, 32, 64, 256, 512)
+    registration = R13_W4_REGISTRATION if width == 4 else R13_REGISTRATION
+    if (r.get("registration") != registration
+            or width not in (4, 16, 32, 64, 256, 512)
             or r.get("hidden") != width or r.get("max_pairs") != width // 4
             or recipe.get("max_pairs") != width // 4
             or cell.get("width") != 1853 or len(cell.get("feature_ids", [])) != 492
             or cell.get("seed_index") not in (0, 1, 2)
+            or (width == 4 and cell.get("seed_index") != 0)
             or not recipe.get("mono_all") or not recipe.get("thresholds")
             or recipe.get("derived_inputs") != "fx2"
             or any(recipe.get(k) for k in ("ramps", "free_ramps", "gated_products"))

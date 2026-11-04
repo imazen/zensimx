@@ -190,14 +190,20 @@ fn r13_head_binding(c: &Value, args: &super::Args) -> Result<bool, String> {
     let Some(r) = c.get("r13_width") else {
         return Ok(false);
     };
-    if r["registration"] != "25e772922fd5a40d576e12af47778ce81bed5e08"
-        || !matches!(args.hidden, 16 | 32 | 64 | 256 | 512)
+    let registration = if args.hidden == 4 {
+        "397d67be879339e7014d3b29c2a99d3fe51df6b2"
+    } else {
+        "25e772922fd5a40d576e12af47778ce81bed5e08"
+    };
+    if r["registration"] != registration
+        || !matches!(args.hidden, 4 | 16 | 32 | 64 | 256 | 512)
         || r["hidden"].as_u64() != Some(args.hidden as u64)
         || r["max_pairs"].as_u64() != Some((args.hidden / 4) as u64)
         || args.max_pairs != args.hidden / 4
         || c["width"] != 1853
         || c["feature_ids"].as_array().is_none_or(|v| v.len() != 492)
         || c["seed_index"].as_u64().is_none_or(|v| v > 2)
+        || (args.hidden == 4 && c["seed_index"] != 0)
         || !args.monotone_cbc
         || !args.nonneg_distance
         || !args.nonneg_thresholds
@@ -1720,7 +1726,7 @@ mod tests {
             "--derived-inputs",
             "fx2.json",
         ]);
-        for width in [16, 32, 64, 256, 512] {
+        for width in [4, 16, 32, 64, 256, 512] {
             args.hidden = width;
             args.max_pairs = width / 4;
             let mut c = json!({"width":1853,"feature_ids":vec![0;492],"seed_index":0,
@@ -1733,9 +1739,19 @@ mod tests {
             args.init_seed = Some(1101);
             args.sample_seed = Some(101);
             assert!(run_binding(&c, &args, 1853, false).is_err());
-            c["r13_width"] = json!({"registration":"25e772922fd5a40d576e12af47778ce81bed5e08",
+            c["r13_width"] = json!({"registration":if width == 4 {
+                "397d67be879339e7014d3b29c2a99d3fe51df6b2"
+            } else {"25e772922fd5a40d576e12af47778ce81bed5e08"},
                 "hidden":width,"max_pairs":width / 4});
             assert!(run_binding(&c, &args, 1853, false).is_ok());
+            if width == 4 {
+                c["r13_width"]["registration"] = json!("25e772922fd5a40d576e12af47778ce81bed5e08");
+                assert!(r13_head_binding(&c, &args).is_err());
+                c["r13_width"]["registration"] = json!("397d67be879339e7014d3b29c2a99d3fe51df6b2");
+                c["seed_index"] = json!(1);
+                assert!(r13_head_binding(&c, &args).is_err());
+                c["seed_index"] = json!(0);
+            }
             args.max_pairs += 1;
             assert!(r13_head_binding(&c, &args).is_err());
             args.max_pairs -= 1;
