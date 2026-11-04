@@ -1,5 +1,5 @@
 //! Imazen PNG/JPEG ingress, adapted from zensim/examples/support/zen_io.rs.
-//! Explicit RGB8 research interpretation: U16 PNG samples round to U8;
+//! RGB8 research interpretation; higher-precision inputs are refused;
 //! opaque inputs only. No browser or third-party decoder enters this path.
 use crate::Result;
 use std::path::Path;
@@ -37,16 +37,7 @@ pub(crate) fn decode(path: &Path) -> Result<RgbImage> {
                 let row = slice.row(y as u32);
                 let samples = match desc.channel_type() {
                     ChannelType::U8 => row[..width * channels].to_vec(),
-                    ChannelType::U16 => row
-                        .as_chunks::<2>()
-                        .0
-                        .iter()
-                        .take(width * channels)
-                        .map(|v| {
-                            let n = u32::from(u16::from_ne_bytes(*v));
-                            ((n * 255 + 32767) / 65535) as u8
-                        })
-                        .collect(),
+                    ChannelType::U16 => return Err("16-bit PNG requires a native-precision atlas path; RGB8 ingress refuses downconversion".into()),
                     _ => return Err("unsupported PNG channel type".into()),
                 };
                 for x in 0..width {
