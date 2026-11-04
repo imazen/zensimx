@@ -1753,3 +1753,82 @@ pixelation; butteraugli is weak on optical aberrations and colour. Contrast and 
 distortions and NITS D4 defeat every score here, zensim included. With the compression rows (FSIMc 0.906, mix 0.895)
 this is the shape of the comparison: the metrics sit at or just above zensim on codec distortions and below it on
 everything else.
+
+### R10 amendment 6 (2026-11-04, before the run): HDR evidence panel for F3 and the mix
+
+Owner, 2026-11-04: "how does the mix do on hdr vs natural butter-3 and ssim2?" Neither candidate has an HDR read; E's
+is `benchmarks/hdr_e_vs_field_2026-10-30.md`. **Registered here:** F3 (seeds 0-2) and `mixF3` (seeds 0-2) through the
+HDR evidence panel exactly as E was read (`scripts/byconstruction/hdr_panel_upiq_all.py`, native revision-7 banks under
+`/var/tmp/byc-hdr-20261029/banks` on dev, PU21 front end, `byc_predict` with the fx2 declaration; no re-extraction, no
+fit, no selection): UPIQ-380 (380 HDR pairs, 30 references, JOD; T2 TRAIN rows that no E36 candidate ever trained on,
+so held out for them, and already read for E on 2026-10-30), its 50 development rows, HDRTEACH VAL (3,900 rows,
+HDR-VDP-3 Q_JOD: agreement with a model, not with people), the 4Kdtb EVAL half (48 rows, MOS) and the consumer-EVAL
+HDR chroma ladders (3,245 rungs, rank agreement with natural SSIMULACRA2, label-free). Reference metrics: the stored
+per-pair UPIQ panels (butteraugli 3-norm and max, CVVDP default and 10k nits, HDR-VDP-2, PU-PieAPP) as
+`hdr_e_vs_field.py` reads them, plus SSIMULACRA2, butteraugli, FSIMc and HaarPSI computed now with `jnd-ladder-score`
+on the stored PU-encoded 8-bit renderings of the same 380 pairs (`/mnt/v/output/zenmetrics/upiq-pu/png`, the June
+2026 inputs of the stored butteraugli panel; the metrics in their standard form on PU-encoded pixels, not on linear
+nits). Statistics: pooled and per-study SROCC (Narwaria, Korshunov), within-reference SROCC, paired bootstrap over
+the 30 references, candidate minus metric and mix minus F3. Report-only; nothing is adopted on this read.
+
+### R10 amendment 6 result (2026-11-04): HDR evidence panel for F3 and the mix
+
+Run as registered: `hdr_panel_upiq_all.py` and `hdr_panel.py` with the fx2 declaration and `byc_predict` (`10d087cd`)
+on the 2026-10-29 banks, compared by `e36_exp56/hdr_candidates_vs_field.py`; SSIMULACRA2, butteraugli, FSIMc and
+HaarPSI scored with `jnd-ladder-score` on the 380 pairs of 8-bit PU renderings stored with the 2026-06-09
+PU-integrated UPIQ study (`/mnt/v/output/zenmetrics/upiq-pu/png`, file names the md5 of each EXR path; 16 s under a
+24G cap, peak RSS 8.2 GiB). Tables: `~/tmp/e36test/hdr-amend6/candidates_vs_field.md` on dev. E's numbers are the
+2026-10-30 read.
+
+| score | UPIQ pooled | Narwaria | Korshunov | within-reference |
+|---|---:|---:|---:|---:|
+| mix, seeds 0 / 1 / 2 | 0.783 / 0.786 / 0.785 | 0.884 / 0.879 / 0.876 | 0.945 / 0.944 / 0.944 | 0.954 / 0.956 / 0.956 |
+| F3, seeds 0 / 1 / 2 | 0.775 / 0.775 / 0.773 | 0.883 / 0.882 / 0.883 | 0.945 / 0.945 / 0.945 | 0.955 / 0.954 / 0.955 |
+| E (2026-10-30) | 0.792 | 0.900 | 0.947 | 0.958 |
+| CVVDP 10k nits | 0.831 | 0.781 | 0.969 | 0.958 |
+| CVVDP default | 0.758 | 0.664 | 0.965 | 0.954 |
+| HDR-VDP-2 | 0.812 | 0.886 | 0.948 | 0.957 |
+| PU-PieAPP | 0.875 | 0.778 | 0.925 | 0.922 |
+| butteraugli 3-norm, stored HDR path (default / 10k nits) | 0.628 / 0.640 | 0.354 / 0.349 | 0.940 / 0.943 | 0.908 / 0.912 |
+| butteraugli max, stored | 0.630 | 0.400 | 0.917 | 0.887 |
+| PU-SSIM / PU-FSIM (stored) | 0.740 / 0.718 | 0.676 / 0.872 | 0.919 / 0.936 | 0.933 / 0.951 |
+| SSIMULACRA2 on the PU renderings | 0.610 | 0.707 | 0.820 | 0.931 |
+| butteraugli 3-norm / max on the PU renderings | 0.519 / 0.529 | 0.399 / 0.428 | 0.713 / 0.695 | 0.805 / 0.765 |
+| FSIMc / HaarPSI on the PU renderings | 0.599 / 0.628 | 0.752 / 0.797 | 0.853 / 0.879 | 0.938 / 0.945 |
+
+Paired bootstrap over the 30 references (2,000 draws). Mix minus F3 at the same seed: pooled +0.007 [-0.003, +0.023],
++0.011 [+0.002, +0.025], +0.011 [+0.002, +0.026]; Narwaria +0.001, -0.002, -0.006 (intervals about ±0.03);
+Korshunov -0.001 [-0.004, +0.002] at every seed. Mix (seed 0) minus metric, pooled / Narwaria / Korshunov: CVVDP 10k
+-0.047 [-0.098, +0.014] / +0.099 [-0.017, +0.265] / -0.024 [-0.044, -0.008]; HDR-VDP-2 -0.029 [-0.069, +0.006] /
+0.000 / -0.004; butteraugli 3-norm (stored) +0.151 [+0.001, +0.309] / +0.492 [+0.169, +0.735] / +0.004 [-0.014,
++0.028]; SSIMULACRA2 (PU renderings) +0.165 [+0.031, +0.287] / +0.158 [+0.001, +0.304] / +0.120 [+0.047, +0.194];
+FSIMc +0.176 / +0.118 / +0.088; HaarPSI +0.148 / +0.078 / +0.063 (F3 within 0.01 of the mix on every line).
+
+Other populations: HDRTEACH VAL (3,900 rows, target HDR-VDP-3 Q_JOD, agreement with a model): pooled F3 0.898 / 0.908
+/ 0.911, mix 0.907 / 0.917 / 0.910; within-reference 0.9999 against 1.0000; inversions 5-6 against 1 of 23,400; CVVDP
+0.821 / 0.9821 / 602. 4Kdtb EVAL half (48 rows, MOS): pooled F3 0.795-0.798, mix 0.804-0.807, within-source 0.81-0.82
+for both. Consumer-EVAL HDR chroma ladders (3,245 rungs, rank agreement with natural SSIMULACRA2): per-ladder mean F3
+0.972-0.977, mix 0.975-0.980, paired deltas within ±0.005 with intervals through zero. UPIQ development rows (50): F3
+0.824-0.831, mix 0.835-0.842.
+
+Caveats. (1) The reference metrics on the 8-bit PU renderings read well below the stored HDR-path butteraugli on
+Korshunov (0.713 against 0.940 for the 3-norm), so the PU-rendering numbers for SSIMULACRA2, FSIMc and HaarPSI are
+lower bounds of what an HDR-aware input would give them; "natural" SSIMULACRA2 on linear nits/100 (the HDR-A3 probe's
+convention) is not measured on UPIQ. (2) UPIQ's pooled SROCC mostly measures how the two studies' JOD scales line up;
+the per-study columns are the fairer read. (3) HDRTEACH is agreement with HDR-VDP-3, not with people.
+
+**Reading.** On HDR the mix is level with F3: UPIQ pooled +0.011 at two of three seeds with intervals just above zero,
+per-study differences within ±0.006, HDRTEACH one inversion against five or six, 4Kdtb +0.009, ladders level. Both
+candidates sit a little below E on UPIQ (pooled 0.775-0.786 against 0.792, Narwaria 0.88 against 0.90), level with
+HDR-VDP-2, below CVVDP at 10k nits on Korshunov by 0.024 (interval excludes zero) and above it on Narwaria by 0.10
+(interval touches zero), clearly above butteraugli's 3-norm on the stored HDR path (+0.15 pooled, +0.49 on Narwaria,
+level on Korshunov) and above SSIMULACRA2 on the PU renderings (+0.17 pooled, +0.12 on Korshunov, +0.16 on
+Narwaria). Nothing is adopted on this read.
+
+**AIC2026 leg share (owner question, 2026-11-04).** The trainer samples a pair with probability proportional to its
+group's `train_weight` (`zensim-train-core/src/lib.rs`), so a group's share of the draws is rows × weight over the
+total. In the continuation step (60 epochs × 50,000 draws, `train.log` of `mixF3-s0`) the AIC2026 public_train leg is
+3,920 pairs at ×256 = 48.3% of the draws (coverage 18.3%, chroma teacher 11.6%, BAPPS 10.7%, SafeSyn 6.9%, the human
+MOS legs 1.5% each, MDID 0.7%, CID22 0.6%), about 370 passes over each AIC pair; the 120-epoch base fit has no AIC
+leg, so over base fit plus continuation AIC2026 is 16.1% of all draws. At ×64 it would be 18.9% of the continuation's
+draws, at ×16 5.5%. The weight was never ablated (method review, experiment 1).

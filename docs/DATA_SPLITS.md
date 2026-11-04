@@ -3065,3 +3065,14 @@ validation** (read 3's 4,812 questions), **MMSPG JPEG XR** (186 rows) and **CIQA
 only, plus EVAL's ledgered rows; no model was selected on any of them and nothing was adopted (zensimx record, R10
 amendment 5 result: no metric matches the mix across the sets; the Haar configs are not teacher candidates). Any
 later read of these sets must disclose this one as well as the candidates' reads.
+
+## Exposure registration — 2026-11-04: HDR evidence panel for the E36 candidates (R10 amendment 6)
+
+Registered in the zensimx record (R10 amendment 6) before the run, at the owner's question about HDR. F3 and `mixF3`
+(seeds 0-2), which never trained on UPIQ, HDRTEACH, 4Kdtb or the HDR ladders, were read through the HDR evidence panel
+exactly as E was on 2026-10-30 (`hdr_panel_upiq_all.py`, `hdr_panel.py`; native revision-7 banks, no re-extraction, no
+fit): UPIQ-380's JOD labels (T2 TRAIN rows, held out for these candidates) and its 50 development rows, HDRTEACH VAL's
+HDR-VDP-3 labels, the 4Kdtb EVAL half's MOS (48 rows) and the label-free chroma ladders. Reference metrics beside them:
+the stored June 2026 UPIQ panels and SSIMULACRA2, butteraugli, FSIMc and HaarPSI scored on the stored 8-bit PU
+renderings of the same pairs. Report-only; no model was selected on it and nothing was adopted (zensimx record, R10
+amendment 6 result).
