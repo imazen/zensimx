@@ -1,0 +1,68 @@
+#!/usr/bin/env python3
+"""One-shot live evidence using the repository's canonical process/lock owner."""
+import datetime
+import hashlib
+import json
+from pathlib import Path
+import sys
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts/rev4_featpot"))
+from run_processes import compute_lock, process_snapshot, process_tree
+
+
+def main():
+    root = Path(sys.argv[1]).resolve()
+    identity = json.loads((root / "BINARY.json").read_text())
+    binary = root / "bin/a-speed-peers"
+    actual = hashlib.sha256(binary.read_bytes()).hexdigest()
+    assert actual == identity["binary_sha256"], "frozen benchmark binary changed"
+    collector_pid = int((root / "collector.pid").read_text())
+    collector = process_snapshot(collector_pid)
+    if collector and not any("run.sh" in arg for arg in collector["argv"]):
+        collector = None
+    processes = process_tree(collector_pid) if collector else []
+    workers = [p for p in processes if p["argv"] and p["argv"][0] == str(binary) and p["state"] not in ("Z", "X")]
+    for worker in workers:
+        assert Path(f'/proc/{worker["pid"]}/exe').resolve() == binary
+        worker["compute_lock"] = compute_lock(worker["pid"])
+    stage = (root / "PROGRESS.txt").read_text().strip()
+    tokens = stage.split()
+    log = root / "results" / f"{tokens[1]}_{tokens[2]}.log" if len(tokens) >= 3 else None
+    lines = log.read_text().splitlines() if log and log.exists() else []
+    completed_images = sum(" rounds × " in line for line in lines)
+    value = {
+        "checked_utc": datetime.datetime.now(datetime.UTC).isoformat(),
+        "host": (root / "measurement-host.txt").read_text().strip(),
+        "binary_sha256": actual,
+        "collector": collector,
+        "workers": workers,
+        "stage_record": stage,
+        "current_completed_image_groups": completed_images,
+        "current_gate_observations": sum("[zenbench gate] clean=" in line for line in lines),
+        "current_foreign_compiler_traces": sum("foreign pid=" in line and any(f'name="{name}"' in line for name in ("rustc", "cargo", "cc1plus", "cmake")) for line in lines),
+        "raw_latency_outputs_present": len(list((root / "results").glob("*t_*_latency.json"))),
+        "raw_rss_outputs_present": len(list((root / "results").glob("*t_*_rss-*.time.txt"))),
+        "required_latency_outputs": 8,
+        "required_rss_outputs": 24,
+        "raw_collection_complete_marker": (root / "COMPLETE").exists(),
+        "admission": "Final admission is owned by report.py; output presence is not qualification.",
+    }
+    (root / "LIVE_CHECK.json").write_text(json.dumps(value, indent=2) + "\n")
+    with (root / "SUPERVISION.jsonl").open("a") as stream:
+        stream.write(json.dumps(value) + "\n")
+    print(json.dumps({
+        "utc": value["checked_utc"], "host": value["host"],
+        "stage": stage, "images": completed_images,
+        "gate_observations": value["current_gate_observations"],
+        "compiler_traces": value["current_foreign_compiler_traces"],
+        "latency_outputs": value["raw_latency_outputs_present"],
+        "rss_outputs": value["raw_rss_outputs_present"],
+        "workers": [{"pid": p["pid"], "start_ticks": p["start_ticks"],
+                     "lock_holders": p["compute_lock"].get("holder_pids"),
+                     "owns_lock": p["compute_lock"]["held_by_worker_ancestor"]} for p in workers],
+        "binary_verified": True,
+    }))
+
+
+if __name__ == "__main__":
+    main()

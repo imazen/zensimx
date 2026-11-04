@@ -4134,3 +4134,6 @@ viz-design2-verify root out:
 a-speed-report-check:
     python3 -B zensim-bench/a-speed-runtime/test_report.py
     bash -n zensim-bench/a-speed-runtime/run.sh
+
+a-speed-progress host root:
+    ssh {{quote(host)}} python3 -B {{quote(root + "/harness/a-speed-runtime/progress.py")}} {{quote(root)}}
