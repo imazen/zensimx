@@ -4207,7 +4207,7 @@ r13-width-fits:
     python3 -B scripts/byconstruction/r13_width.py fits
 
 r13-width-freeze:
-    python3 -B scripts/byconstruction/r13_width.py freeze
+    python3 -B scripts/byconstruction/r13_width_finalize.py
 
 r13-width-native-check:
     flock ~/tmp/heavy.lock ~/work/claudehints/scripts/run-heavy --mem 24G --jobs 8 -- env TMPDIR="$HOME/tmp/zensim-width" CARGO_TARGET_DIR=/var/tmp/byc-width-20261104/target cargo test --release -p zensim-validate --bin zensim_mlp_train subjective_training_leg::tests

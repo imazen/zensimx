@@ -46,6 +46,10 @@ def main():
            'No EVAL result selects a width, checkpoint or setting. No AIC-2026 assessment statistics are committed.',
            'Packing is canonical densify → f16 with protected final layer → CID22 TRAIN dial, E33 identity/tail2,',
            'with all 984 inputs preserved and a native monotone certificate for each final bake.','',
+           'The recipe’s final strip removes `zentrain.repro` and `zentrain.sample_coverage` into `shipped.bin`.',
+           'Native inspections of all layers/scalers/derived declarations/dial splines are exactly equal before',
+           'and after stripping. Assessments use the original packed bytes. Fit wall excludes this separate',
+           'metadata-only finalization; its execution receipt appears below.','',
            '| Width | Seed | Base final dev geomean3 | TRAIN dev MAE | E36 inversions (%) | All-nine MOS error (%) | Chroma level | Dead / residual / live | Largest pair (%) | Inputs 50/90/99% | Head (µs) | Fit wall (s) |',
            '|---|---:|---:|---:|---:|---:|---|---|---:|---|---:|---:|']
     compact=[]
