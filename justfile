@@ -4410,3 +4410,39 @@ r14-serving-checks:
     cargo test -p zensim --features custom-profiles,training,classification --lib r14_transform_tests -- --test-threads=1
     cargo test -p zensim-validate --lib derived_inputs -- --test-threads=1
     cargo test --manifest-path tools/zensim-viz/Cargo.toml r14_tests -- --test-threads=1
+
+# Run only on i270 inside its shared flock/run-heavy wrapper.
+[positional-arguments]
+a-fusion-report stage root output:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    test "$(hostname)" = i270
+    if [[ $1 = progress ]]; then
+        exec python3 -B scripts/bench/a_extraction_fusion.py "$@"
+    fi
+    exec flock "$HOME/tmp/heavy.lock" "$HOME/work/claudehints/scripts/run-heavy" --mem 16G --jobs 8 -- python3 -B scripts/bench/a_extraction_fusion.py "$@"
+
+[positional-arguments]
+a-fusion-compare before after pairs bake size threads output:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    test "$(hostname)" = i270
+    case "$6" in 1) cpus=2 ;; 16) cpus=0-15 ;; *) echo 'choose 1 or 16 threads' >&2; exit 2 ;; esac
+    exec flock "$HOME/tmp/heavy.lock" "$HOME/work/claudehints/scripts/run-heavy" --mem 16G --jobs 16 -- env ZENSIM_FORMULA_REV=7 ZENBENCH_NO_CALIBRATE=1 RAYON_NUM_THREADS="$6" python3 -B scripts/bench/a_family_cost_admit.py "$7/admission.json" -- taskset -c "$cpus" "$1" fusion compare "$1" "$2" "$3" "$4" "$5" "$6" "$7"
+
+a-fusion-native stage study label:
+    bash scripts/bench/a_fusion_native.sh {{quote(stage)}} {{quote(study)}} {{quote(label)}}
+
+
+# Freeze EVAL RGB ingress once; old/new binaries read the same hash-bound bytes.
+a-fusion-freeze-eval binary table output:
+    test "$(hostname)" = i270
+    flock "$HOME/tmp/heavy.lock" "$HOME/work/claudehints/scripts/run-heavy" --mem 16G -- '{{binary}}' fusion prepare-eval '{{table}}' '{{output}}'
+
+# Optional six-pair detector-map proof, serialized on the measurement host.
+a-fusion-maps study label:
+    bash scripts/bench/a_fusion_maps.sh {{quote(study)}} {{quote(label)}}
+
+# One complete gate, pixel or timing phase under the shared native heavy lock.
+a-fusion-trial phase study label snapshot:
+    bash scripts/bench/a_fusion_trial.sh {{quote(phase)}} {{quote(study)}} {{quote(label)}} {{quote(snapshot)}}

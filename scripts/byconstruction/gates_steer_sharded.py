@@ -31,11 +31,13 @@ def main():
     ap.add_argument("--bin", required=True, type=Path)
     ap.add_argument("--formula-rev", default="7")
     ap.add_argument("--shards", type=int, default=9)
+    ap.add_argument("--packet", type=Path, default=STEER_JOB,
+                    help="explicit relocated copy of the same frozen engineering packet")
     a = ap.parse_args()
     dest = a.out / "steer135" / a.name
     dest.mkdir(parents=True, exist_ok=False)
     # The packet exactly as gates.py builds it.
-    job = json.loads(STEER_JOB.read_text())
+    job = json.loads(a.packet.read_text())
     digest = sha(a.model)
     for case in job["cases"]:
         case.update(model=str(a.model), model_sha256=digest)
