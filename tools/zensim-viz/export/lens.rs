@@ -14,6 +14,44 @@ pub(crate) struct Pdp {
     pub mean: Vec<f64>,
     pub ice: Vec<Vec<f64>>,
     pub monotonicity_violations: Vec<(usize, usize, f64)>,
+    #[serde(default)]
+    pub rise_flags: Vec<RiseFlag>,
+    #[serde(default)]
+    pub p25: Vec<f64>,
+    #[serde(default)]
+    pub p75: Vec<f64>,
+    #[serde(default)]
+    pub centered_ice: Vec<Vec<f64>>,
+    #[serde(default)]
+    pub centered_mean: Vec<f64>,
+    #[serde(default)]
+    pub centered_p25: Vec<f64>,
+    #[serde(default)]
+    pub centered_p75: Vec<f64>,
+}
+#[derive(Deserialize, Serialize)]
+pub(crate) struct RiseFlag {
+    pub ice_row: usize,
+    pub bank_row: usize,
+    pub point: usize,
+    pub delta: f64,
+    pub severity: String,
+}
+fn rise_severity(delta: f64) -> &'static str {
+    if delta < 0.001 {
+        "note"
+    } else if delta < 0.05 {
+        "warning"
+    } else if delta < 0.5 {
+        "serious"
+    } else {
+        "critical"
+    }
+}
+fn band(ice: &[Vec<f64>], p: f64) -> Vec<f64> {
+    (0..ice[0].len())
+        .map(|j| quantile(&ice.iter().map(|row| row[j]).collect::<Vec<_>>(), p))
+        .collect()
 }
 #[derive(Serialize)]
 pub(crate) struct Bin {
@@ -101,6 +139,27 @@ fn curves(
         .map(|j| ice.iter().map(|r| r[j]).sum::<f64>() / ice.len() as f64)
         .collect();
     let feature = features[0];
+    let p25 = band(&ice, 0.25);
+    let p75 = band(&ice, 0.75);
+    let centered_ice: Vec<Vec<f64>> = ice
+        .iter()
+        .map(|row| row.iter().map(|v| v - row[0]).collect())
+        .collect();
+    let centered_mean = (0..x.len())
+        .map(|j| centered_ice.iter().map(|r| r[j]).sum::<f64>() / centered_ice.len() as f64)
+        .collect();
+    let centered_p25 = band(&centered_ice, 0.25);
+    let centered_p75 = band(&centered_ice, 0.75);
+    let rise_flags = violations
+        .iter()
+        .map(|&(row, point, delta)| RiseFlag {
+            ice_row: row,
+            bank_row: bank.row_indices[selected[row]],
+            point,
+            delta,
+            severity: rise_severity(delta).into(),
+        })
+        .collect();
     Ok(Pdp {
         feature,
         row_indices: selected.iter().map(|&i| bank.row_indices[i]).collect(),
@@ -115,6 +174,13 @@ fn curves(
         mean,
         ice,
         monotonicity_violations: violations,
+        rise_flags,
+        p25,
+        p75,
+        centered_ice,
+        centered_mean,
+        centered_p25,
+        centered_p75,
     })
 }
 pub(crate) fn pdp(model: &Model, bank: &Bank, feature: usize) -> Result<Pdp> {
@@ -131,7 +197,7 @@ pub(crate) fn family_pdp(
 ) -> Result<Pdp> {
     let ids: std::collections::BTreeSet<_> = inputs
         .iter()
-        .filter(|i| i.family == family)
+        .filter(|i| i.matches_family(family))
         .map(|i| i.feature)
         .collect();
     if ids.is_empty() {
@@ -230,7 +296,7 @@ pub(crate) fn view(
     let separation_axis = if let Some(family) = family {
         let direct: Vec<_> = inputs
             .iter()
-            .filter(|i| i.family == family && i.factor.is_none())
+            .filter(|i| i.matches_family(family) && i.factor.is_none())
             .collect();
         if direct.is_empty() {
             return Err("family has no direct damage inputs".into());
@@ -287,7 +353,7 @@ pub(crate) fn run(
             return Err("identity ablation requires difference-form raw inputs".into());
         }
         groups
-            .entry(input.family.clone())
+            .entry(input.analysis_family.clone())
             .or_default()
             .insert(input.feature);
     }
@@ -333,7 +399,7 @@ pub(crate) fn run(
             model,
             bank,
             &scores,
-            format!("f{} · {}", input.feature, input.name),
+            format!("f{} · {}", input.feature, input.short_name),
             vec![input.feature],
         )?;
         record("input", &result)?;
@@ -366,8 +432,10 @@ pub(crate) fn bulk(
     object.remove("separation_axis");
     crate::json(&out.join("summary.json"), &summary)?;
     let ids: std::collections::BTreeSet<_> = probes.iter().map(|i| i.feature).collect();
-    let families: std::collections::BTreeSet<_> =
-        inputs.iter().map(|i| i.family.as_str()).collect();
+    let families: std::collections::BTreeSet<_> = inputs
+        .iter()
+        .flat_map(|i| [i.family.as_str(), i.analysis_family.as_str()])
+        .collect();
     let total = ids.len() + families.len();
     let mut files = serde_json::Map::new();
     let mut family_files = serde_json::Map::new();
@@ -407,11 +475,69 @@ pub(crate) fn bulk(
     Ok(())
 }
 /// Recheck and summarize persisted native curve flags without resampling.
-pub(crate) fn summarize(directory: &std::path::Path, out: &std::path::Path) -> Result<()> {
+pub(crate) fn summarize(
+    directory: &std::path::Path,
+    out: &std::path::Path,
+    baseline: Option<&std::path::Path>,
+) -> Result<()> {
     let index_path = directory.join("index.json");
     let index: serde_json::Value = serde_json::from_reader(std::fs::File::open(&index_path)?)?;
     if index["completed"] != index["required"] {
         return Err("curve export is incomplete".into());
+    }
+    let mut baseline_points_checked = 0usize;
+    let mut baseline_curves_checked = 0usize;
+    if let Some(baseline) = baseline {
+        let previous: serde_json::Value =
+            serde_json::from_reader(std::fs::File::open(baseline.join("index.json"))?)?;
+        if previous["bank_sha256"] != index["bank_sha256"]
+            || previous["bake_sha256"] != index["bake_sha256"]
+        {
+            return Err("baseline identities differ".into());
+        }
+        for group in ["lenses", "family_lenses"] {
+            for (key, name) in previous[group]
+                .as_object()
+                .ok_or("baseline index missing")?
+            {
+                let new_name = index[group][key]
+                    .as_str()
+                    .ok_or("a baseline curve was dropped")?;
+                let old: serde_json::Value = serde_json::from_reader(std::fs::File::open(
+                    baseline.join(name.as_str().ok_or("invalid baseline filename")?),
+                )?)?;
+                let new: serde_json::Value =
+                    serde_json::from_reader(std::fs::File::open(directory.join(new_name))?)?;
+                let old: Pdp = serde_json::from_value(old["pdp"].clone())?;
+                let new: Pdp = serde_json::from_value(new["pdp"].clone())?;
+                if old.row_indices != new.row_indices
+                    || old.monotonicity_violations != new.monotonicity_violations
+                    || old.ice.len() != new.ice.len()
+                {
+                    return Err(format!("{key}: original curve identity or flags changed").into());
+                }
+                for (a, b) in old
+                    .x
+                    .iter()
+                    .zip(&new.x)
+                    .chain(old.mean.iter().zip(&new.mean))
+                    .chain(old.ice.iter().flatten().zip(new.ice.iter().flatten()))
+                {
+                    if a.to_bits() != b.to_bits() {
+                        return Err(format!("{key}: original native point changed").into());
+                    }
+                    baseline_points_checked += 1;
+                }
+                if old.x.len() != new.x.len()
+                    || old.mean.len() != new.mean.len()
+                    || old.ice.iter().map(Vec::len).collect::<Vec<_>>()
+                        != new.ice.iter().map(Vec::len).collect::<Vec<_>>()
+                {
+                    return Err("baseline curve dimensions changed".into());
+                }
+                baseline_curves_checked += 1;
+            }
+        }
     }
     let mut curves = Vec::new();
     let mut flags = 0usize;
@@ -456,7 +582,7 @@ pub(crate) fn summarize(directory: &std::path::Path, out: &std::path::Path) -> R
     }
     crate::json(
         &out.join("curve-audit.json"),
-        &serde_json::json!({"bake_sha256":index["bake_sha256"],"bank_sha256":index["bank_sha256"],"index_sha256":crate::hash(&index_path)?,"curves":curves,"curve_count":curves.len(),"adjacent_comparisons":comparisons,"strict_rises":flags,"maximum_rise":maximum,"worst":worst,"definition":"Every persisted native ICE adjacent pair; strict comparison, zero tolerance; family curves multiply observed damage jointly."}),
+        &serde_json::json!({"bake_sha256":index["bake_sha256"],"bank_sha256":index["bank_sha256"],"index_sha256":crate::hash(&index_path)?,"curves":curves,"baseline_curves_checked":baseline_curves_checked,"baseline_points_checked":baseline_points_checked,"curve_count":curves.len(),"adjacent_comparisons":comparisons,"strict_rises":flags,"maximum_rise":maximum,"worst":worst,"definition":"Every persisted native ICE adjacent pair; strict comparison, zero tolerance; family curves multiply observed damage jointly."}),
     )?;
     println!(
         "{} curves; {comparisons} comparisons; {flags} strict rises; largest {maximum}",
@@ -491,6 +617,44 @@ mod tests {
                 );
             }
         }
+        for j in 0..p.x.len() {
+            let mut sorted: Vec<_> = p.ice.iter().map(|row| row[j]).collect();
+            sorted.sort_by(f64::total_cmp);
+            assert_eq!(
+                p.p25[j].to_bits(),
+                (sorted[49] + (sorted[50] - sorted[49]) * 0.75).to_bits()
+            );
+            assert_eq!(
+                p.p75[j].to_bits(),
+                (sorted[149] + (sorted[150] - sorted[149]) * 0.25).to_bits()
+            );
+            for (i, row) in p.ice.iter().enumerate() {
+                assert_eq!(p.centered_ice[i][j].to_bits(), (row[j] - row[0]).to_bits());
+            }
+        }
+        let fine = family_pdp(&m, &inputs, &bank, &inputs[0].analysis_family).unwrap();
+        assert!(
+            fine.features.len()
+                < inputs
+                    .iter()
+                    .filter(|i| i.family == inputs[0].family && i.factor.is_none())
+                    .count()
+        );
+        for (i, observed) in bank.rows.iter().enumerate() {
+            for (j, &multiplier) in fine.x.iter().enumerate() {
+                let mut changed = observed.clone();
+                for &id in &fine.features {
+                    changed[id] = observed[id] * multiplier;
+                }
+                assert_eq!(
+                    fine.ice[i][j].to_bits(),
+                    direct
+                        .score_features(&changed, 512, 512, None)
+                        .unwrap()
+                        .to_bits()
+                );
+            }
+        }
         let family = inputs[0].family.as_str();
         let family_curve = family_pdp(&m, &inputs, &bank, family).unwrap();
         for (i, observed) in bank.rows.iter().enumerate() {
@@ -508,5 +672,12 @@ mod tests {
                 );
             }
         }
+    }
+    #[test]
+    fn display_severity_keeps_strict_rises_with_magnitude_boundaries() {
+        assert_eq!(rise_severity(0.000999999), "note");
+        assert_eq!(rise_severity(0.001), "warning");
+        assert_eq!(rise_severity(0.05), "serious");
+        assert_eq!(rise_severity(0.5), "critical");
     }
 }

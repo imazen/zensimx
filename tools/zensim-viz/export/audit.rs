@@ -263,11 +263,23 @@ pub(crate) fn run(
                 .iter()
                 .map(|v| f64::from(v.abs()))
                 .fold(0.0, f64::max);
+            if l == 0 && maximum == 0.0 {
+                flag(
+                    &mut flags,
+                    "dead-input",
+                    "critical",
+                    Scope::input(i),
+                    0.0,
+                    Some(0.0),
+                    0.0,
+                    "all incoming-model-row outgoing weights are exactly zero",
+                );
+            }
             if maximum <= EPS {
                 flag(
                     &mut flags,
                     "dead_input",
-                    "warning",
+                    "critical",
                     Scope {
                         layer: Some(l),
                         from: Some(i),
@@ -343,7 +355,7 @@ pub(crate) fn run(
             flag(
                 &mut flags,
                 "constant_input",
-                "warning",
+                "critical",
                 Scope::input(i),
                 c[0],
                 Some(0.0),
@@ -364,7 +376,7 @@ pub(crate) fn run(
                 flag(
                     &mut flags,
                     "drift",
-                    "warning",
+                    "critical",
                     Scope::input(i),
                     outside as f64,
                     Some(outside as f64 / c.len() as f64),
@@ -387,7 +399,7 @@ pub(crate) fn run(
                 flag(
                     &mut flags,
                     "duplicate_input",
-                    "warning",
+                    "critical",
                     Scope::input(i),
                     corr,
                     Some(corr),
@@ -445,7 +457,7 @@ pub(crate) fn run(
             flag(
                 &mut flags,
                 "dead_hidden",
-                "warning",
+                "critical",
                 Scope {
                     layer: Some(0),
                     from: None,
@@ -463,7 +475,7 @@ pub(crate) fn run(
             flag(
                 &mut flags,
                 "saturated_hidden",
-                "warning",
+                "critical",
                 Scope {
                     layer: Some(0),
                     from: None,
@@ -478,6 +490,7 @@ pub(crate) fn run(
     }
     let mut counts = BTreeMap::new();
     for kind in [
+        "dead-input",
         "sign",
         "row_outlier",
         "column_outlier",
@@ -555,6 +568,48 @@ pub(crate) fn write_tsv(path: &Path, a: &Audit) -> Result<()> {
     }
     Ok(())
 }
+// Presentation severity may change; every original measured flag must survive.
+pub(crate) fn verify_prior(audit: &Audit, baseline: &Path, out: &Path) -> Result<()> {
+    let prior: serde_json::Value = serde_json::from_reader(std::fs::File::open(baseline)?)?;
+    if prior["bake_sha256"] != audit.bake_sha256 || prior["bank_sha256"] != audit.bank_sha256 {
+        return Err("audit baseline identity differs".into());
+    }
+    let key = |mut value: serde_json::Value| -> Result<String> {
+        value
+            .as_object_mut()
+            .ok_or("invalid flag")?
+            .remove("severity");
+        Ok(serde_json::to_string(&value)?)
+    };
+    let mut remaining = BTreeMap::<String, usize>::new();
+    for f in &audit.flags {
+        *remaining.entry(key(serde_json::to_value(f)?)?).or_default() += 1;
+    }
+    let flags = prior["flags"].as_array().ok_or("baseline flags missing")?;
+    for f in flags {
+        let k = key(f.clone())?;
+        let count = remaining
+            .get_mut(&k)
+            .ok_or("an original measured flag was dropped or changed")?;
+        if *count == 0 {
+            return Err("an original duplicate flag was dropped".into());
+        }
+        *count -= 1;
+    }
+    for (kind, count) in prior["counts"]
+        .as_object()
+        .ok_or("baseline counts missing")?
+    {
+        if kind != "dead-input" && count.as_u64() != audit.counts.get(kind).map(|&v| v as u64) {
+            return Err(format!("original {kind} count changed").into());
+        }
+    }
+    crate::json(
+        &out.join("flag-preservation.json"),
+        &serde_json::json!({"baseline_sha256":crate::hash(baseline)?,"original_flags":flags.len(),"matched_original_flags":flags.len(),"new_flags":audit.flags.len()-flags.len(),"all_original_numeric_fields_unchanged":true,"severity_presentation_allowed_to_change":true}),
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -594,6 +649,14 @@ mod tests {
         .unwrap();
         assert_eq!(a.counts["sign"], 0);
         assert_eq!(a.counts["scaler_sign"], 0);
+        assert_eq!(a.counts["dead-input"], 0);
+        let weights = model::weights_document(&m, &inputs);
+        assert_eq!(weights["nonzero_counts"][371], 33);
+        assert!(
+            !a.flags
+                .iter()
+                .any(|f| f.kind == "dead-input" && f.from == Some(371))
+        );
         let expected: serde_json::Value =
             serde_json::from_str(include_str!("../f-audit-census.json")).unwrap();
         assert_eq!(a.bake_sha256, expected["bake_sha256"].as_str().unwrap());

@@ -51,8 +51,14 @@ fn main() -> Result<()> {
     let mut opts = BTreeMap::new();
     let mut percentile_paths = Vec::new();
     let allowed: &[&str] = match command.as_str() {
-        "curve-audit" => &["--out"],
-        "audit" => &["--bank", "--out", "--max-rows", "--training-bank"],
+        "curve-audit" => &["--out", "--baseline"],
+        "audit" => &[
+            "--bank",
+            "--out",
+            "--max-rows",
+            "--training-bank",
+            "--baseline-audit",
+        ],
         "mlp-bank" => &["--bank", "--out", "--max-rows", "--other"],
         "mlp-lens" => &["--bank", "--out", "--max-rows", "--feature", "--family"],
         "compare" => &["--bank", "--out", "--max-rows", "--feature", "--other"],
@@ -83,7 +89,7 @@ fn main() -> Result<()> {
     if command == "curve-audit" {
         std::fs::create_dir_all(&out)?;
         provenance::write(&out)?;
-        return lens::summarize(&bake_path, &out);
+        return lens::summarize(&bake_path, &out, opts.get("--baseline").map(Path::new));
     }
     if command == "atlas-pass" {
         let reference = PathBuf::from(opts.get("--reference").ok_or("--reference required")?);
@@ -156,6 +162,9 @@ fn main() -> Result<()> {
                 hash(&bake_path)?,
                 &constraints,
             )?;
+            if let Some(path) = opts.get("--baseline-audit") {
+                audit::verify_prior(&audit, Path::new(path), &out)?;
+            }
             json(&out.join("audit.json"), &audit)?;
             audit::write_tsv(&out.join("audit.tsv"), &audit)?;
             json(

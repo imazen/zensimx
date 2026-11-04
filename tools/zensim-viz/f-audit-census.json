@@ -15,6 +15,7 @@
     "row_outlier": 32344,
     "saturated_hidden": 95,
     "scaler_sign": 0,
-    "sign": 0
+    "sign": 0,
+    "dead-input": 0
   }
 }

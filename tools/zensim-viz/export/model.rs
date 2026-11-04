@@ -9,12 +9,18 @@ pub(crate) struct Input {
     pub factor: Option<usize>,
     pub name: String,
     pub family: String,
+    pub signal: String,
+    pub analysis_family: String,
+    pub short_name: String,
     pub scale: u8,
     pub channel: String,
     pub pooling: String,
     pub form: String,
 }
 impl Input {
+    pub fn matches_family(&self, family: &str) -> bool {
+        self.family == family || self.analysis_family == family
+    }
     pub fn value(&self, row: &[f64]) -> f32 {
         let a = row[self.feature] as f32;
         self.factor.map_or(a, |b| a * row[b] as f32)
@@ -37,6 +43,9 @@ pub(crate) fn inputs(model: &Model) -> Result<Vec<Input>> {
             };
             Ok(Input {
                 family: String::new(),
+                signal: String::new(),
+                analysis_family: String::new(),
+                short_name: String::new(),
                 scale: 0,
                 channel: String::new(),
                 pooling: String::new(),
@@ -71,12 +80,45 @@ pub(crate) fn inputs(model: &Model) -> Result<Vec<Input>> {
             p.name.clone()
         };
         input.family = p.family.into();
+        input.signal = signal_name(&p.name, p.family);
+        input.analysis_family = format!("{} × {}", p.family, input.signal);
+        input.short_name = format!(
+            "{}_{}_s{}_{}{}",
+            p.family,
+            input.signal,
+            p.scale,
+            p.channel,
+            if input.factor.is_some() {
+                " × fragility"
+            } else {
+                ""
+            }
+        );
         input.scale = p.scale;
         input.channel = p.channel.into();
         input.pooling = p.statistic.into();
         input.form = p.form.into();
     }
     Ok(inputs)
+}
+// Registry names encode signal, pool, scale and channel. Pool variants share a
+// signal group; the registry's broad family remains unchanged in `family`.
+pub(crate) fn signal_name(name: &str, family: &str) -> String {
+    let prefix = name.rsplit_once("_s").map_or(name, |(a, _)| a);
+    let mut prefix = prefix;
+    for suffix in ["_mean", "_4th", "_2nd", "_max", "_l8"] {
+        if let Some(value) = prefix.strip_suffix(suffix) {
+            prefix = value;
+            break;
+        }
+    }
+    if prefix == "v2_ssim_var" || prefix == "v2_ssim_skew" {
+        prefix = "v2_ssim";
+    }
+    prefix
+        .strip_prefix(&format!("{family}_"))
+        .unwrap_or(prefix)
+        .into()
 }
 pub(crate) fn weights(model: &Model, layer: usize) -> Vec<f32> {
     let l = model.layer(layer);
@@ -91,7 +133,53 @@ pub(crate) fn weights(model: &Model, layer: usize) -> Vec<f32> {
     }
 }
 pub(crate) fn weights_document(model: &Model, inputs: &[Input]) -> serde_json::Value {
-    serde_json::json!({"inputs":inputs,"scaler_mean":model.scaler_mean(),"scaler_scale":model.scaler_scale(),
+    let first = model.layer(0);
+    let w = weights(model, 0);
+    let mut row_order: Vec<_> = (0..inputs.len()).collect();
+    row_order.sort_by_key(|&i| {
+        (
+            &inputs[i].family,
+            &inputs[i].signal,
+            inputs[i].feature,
+            inputs[i].factor,
+            i,
+        )
+    });
+    let energy: Vec<f64> = (0..first.out_dim)
+        .map(|j| {
+            (0..first.in_dim)
+                .map(|i| f64::from(w[i * first.out_dim + j].abs()))
+                .sum()
+        })
+        .collect();
+    let mut column_order: Vec<_> = (0..first.out_dim).collect();
+    column_order.sort_by(|&a, &b| energy[b].total_cmp(&energy[a]).then(a.cmp(&b)));
+    let per_input_columns: Vec<Vec<usize>> = w
+        .chunks(first.out_dim)
+        .map(|row| {
+            let mut order: Vec<_> = (0..row.len()).collect();
+            order.sort_by(|&a, &b| row[b].abs().total_cmp(&row[a].abs()).then(a.cmp(&b)));
+            order
+        })
+        .collect();
+    let top_inputs_by_unit: Vec<Vec<usize>> = (0..first.out_dim)
+        .map(|j| {
+            let mut order: Vec<_> = (0..first.in_dim).collect();
+            order.sort_by(|&a, &b| {
+                w[b * first.out_dim + j]
+                    .abs()
+                    .total_cmp(&w[a * first.out_dim + j].abs())
+                    .then(a.cmp(&b))
+            });
+            order.truncate(32);
+            order
+        })
+        .collect();
+    let nonzero_counts: Vec<_> = w
+        .chunks(first.out_dim)
+        .map(|row| row.iter().filter(|&&v| v != 0.0).count())
+        .collect();
+    serde_json::json!({"inputs":inputs,"row_order":row_order,"column_order":column_order,"per_input_columns":per_input_columns,"top_inputs_by_unit":top_inputs_by_unit,"nonzero_counts":nonzero_counts,"scaler_mean":model.scaler_mean(),"scaler_scale":model.scaler_scale(),
         "layers": (0..model.n_layers()).map(|i| { let l=model.layer(i); serde_json::json!({"layer":i,"in_dim":l.in_dim,"out_dim":l.out_dim,"activation":format!("{:?}",l.activation),"weights":weights(model,i),"biases":l.biases,"stats":crate::audit::weight_statistics(&weights(model,i),l.in_dim,l.out_dim)}) }).collect::<Vec<_>>()})
 }
 // Compose diagnostic layer views with the existing baker, then execute
