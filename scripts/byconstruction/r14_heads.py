@@ -15,9 +15,15 @@ BINARY_SHA='aa409c8e689323f7ed0f8ca4f07fa34565d673efa18e26806f98572677af3a33'
 
 def worker():
     import os
+    import platform
     import socket
     root=Path(sys.argv[2]).resolve()
     if socket.gethostname()!='i270':raise ValueError('R14 head timing is authorized on i270 only')
+    cpu_names=sorted({line.split(':',1)[1].strip() for line in Path('/proc/cpuinfo').read_text().splitlines()
+                      if line.startswith('model name')})
+    (root/'HOST.json').write_text(json.dumps(dict(host=socket.gethostname(),cpu_models=cpu_names,
+        kernel=platform.release(),machine=platform.machine(),affinity=sorted(os.sched_getaffinity(0)),
+        checked=time.time(),role='observed inside the acquired timing resource scope'),indent=2)+'\n')
     manifest=json.loads((root/'MANIFEST.json').read_text())
     os.environ.update(RAYON_NUM_THREADS='1',OMP_NUM_THREADS='1',ZENSIM_MAX_TIER='v3',TMPDIR=str(root/'scratch'))
     (root/'scratch').mkdir(exist_ok=True)
