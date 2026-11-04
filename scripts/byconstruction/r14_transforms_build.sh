@@ -32,7 +32,7 @@ sha=lambda p: hashlib.sha256(Path(p).read_bytes()).hexdigest()
 assert sha(head)=='aa409c8e689323f7ed0f8ca4f07fa34565d673efa18e26806f98572677af3a33'
 shutil.copy2(head,root/'bin/prune_forward_bench')
 source=subprocess.check_output(['jj','log','-r','@-','--no-graph','-T','commit_id'],text=True).strip()
-assert subprocess.check_output(['jj','diff','--stat'],text=True).strip()=='','final source must be clean'
+assert subprocess.check_output(['jj','log','-r','@','--no-graph','-T','empty'],text=True).strip()=='true','final source must be clean'
 files=[p for folder in ('scripts/byconstruction','scripts/rev4_featpot') for p in Path(folder).glob('*.py')]
 files+=[Path('Cargo.lock'),Path('Cargo.toml'),Path('tools/zensim-viz/Cargo.lock')]
 pins=dict(source_commit=source,source_sha256={str(p):sha(p) for p in files},
