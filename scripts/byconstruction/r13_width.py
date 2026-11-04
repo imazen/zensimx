@@ -71,6 +71,7 @@ def env():
                 RAYON_NUM_THREADS='1', OMP_NUM_THREADS='1', OPENBLAS_NUM_THREADS='1',
                 TMPDIR=str(SCRATCH), BYC_SCRATCH=str(SCRATCH),
                 REV4_V2_BIN_DIR=str(O / 'bin'), ZEN_PANEL_BIN=str(O / 'bin/panel'),
+                VIZ_CERTIFIER=str(O / 'bin/bake_dial_refit'),
                 REV4_V2_ROOT=str(R), BYC_ROOT=str(R),
                 BYC_CELLS='/var/tmp/byc-fchroma-20261029/r3/w100/cells',
                 PYTHONPATH=f'{X}/scripts/rev4_featpot:{X}/scripts/byconstruction:{X}/scripts')

@@ -16,6 +16,10 @@ with mock.patch.dict(sys.modules,{'r13_width':OWNER}):STATUS_SPEC.loader.exec_mo
 
 
 class Capacity(unittest.TestCase):
+    def test_audit_binds_the_frozen_native_certifier(self):
+        with mock.patch.dict('os.environ',{'VIZ_CERTIFIER':'/wrong/certifier'}):
+            self.assertEqual(OWNER.env()['VIZ_CERTIFIER'],str(OWNER.O/'bin/bake_dial_refit'))
+
     def test_w4_full_recipe_parses_only_with_its_exact_amendment(self):
         import v2_common as common
         spec='sel:45acffa603e8@h32:H4:cv16:cf98:fx2:mono:thr:mp1'

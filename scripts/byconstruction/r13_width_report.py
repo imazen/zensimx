@@ -63,6 +63,8 @@ def main():
            'W4’s first setup attempt rejected the `H4` recipe token before optimization; no checkpoint was written.',
            'The repair admits only the exact amendment-bound W4 specification and preserves the legacy default rejection.',
            'That 1.24 s setup attempt is retained under `failed-attempts/W4-s0-recipe-parser-v1/` and excluded from the successful fit’s wall total.','',
+           'The first capacity audit stopped because its explicit native certifier binding was absent.',
+           'Setting `VIZ_CERTIFIER` to the same frozen packing certifier repaired orchestration; the failed invocation and partial output remain under `failed-attempts/audit-certifier-env-v1/`.','',
            '| Width | Seed | Base final dev geomean3 | TRAIN dev MAE | E36 inversions (%) | All-nine MOS error (%) | Chroma level | Dead / residual / live | Largest pair (%) | Inputs 50/90/99% | Head (µs) | Fit wall (s) |',
            '|---|---:|---:|---:|---:|---:|---|---|---:|---|---:|---:|']
     compact=[]
