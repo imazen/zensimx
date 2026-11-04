@@ -114,9 +114,19 @@ def capacity():
     audit.capacity(exporter_sha256=pins['binary_sha256']['zensim-viz-export'])
 
 
+def reads():
+    common=[sys.executable,'-B',X/'scripts/byconstruction/r12_linear_reads.py',
+        '--models',O/'MODELS.json','--out',O/'reads','--bin-dir',O/'bin']
+    for stage in ('eval','e36','chroma','hdr'):
+        owner.job('read-'+stage,common+['--only',stage])
+    for name in json.loads((O/'MODELS.json').read_text()):
+        for stage in ('steer','dial','nearid'):
+            owner.job(f'read-{stage}-{name}',common+['--only',stage,'--include-model',name])
+
+
 def main():
     ap=argparse.ArgumentParser(description=__doc__)
-    ap.add_argument('command',choices=('fit','pack','freeze','development','capacity','job'))
+    ap.add_argument('command',choices=('fit','pack','freeze','development','capacity','reads','job'))
     ap.add_argument('--arm',choices=ARMS)
     ap.add_argument('--label')
     a,argv=ap.parse_known_args()
@@ -131,6 +141,7 @@ def main():
         if not a.label:ap.error('--label required')
         owner.job(a.label,argv[1:] if argv[:1]==['--'] else argv)
     elif a.command=='capacity':capacity()
+    elif a.command=='reads':reads()
     else:freeze()
 
 

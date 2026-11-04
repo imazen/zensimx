@@ -4339,6 +4339,15 @@ r14-transform-build:
 r14-transform-fit arm:
     python3 -B scripts/byconstruction/r14_transforms.py fit --arm {{arm}}
 
+r14-transform-status:
+    python3 -B scripts/byconstruction/r14_transforms_status.py
+
+r14-transform-capacity:
+    python3 -B scripts/byconstruction/r14_transforms.py capacity
+
+r14-transform-reads:
+    python3 -B scripts/byconstruction/r14_transforms.py reads
+
 r14-serving-checks:
     cargo test -p zensim --features custom-profiles,training,classification --lib r14_transform_tests -- --test-threads=1
     cargo test -p zensim-validate --lib derived_inputs -- --test-threads=1
