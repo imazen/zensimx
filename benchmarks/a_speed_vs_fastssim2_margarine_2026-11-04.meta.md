@@ -1,6 +1,6 @@
 # Public A peer speed comparison: identities and reproduction
 
-The measurement host is **i270**, Intel Core Ultra 7 270K Plus, Linux x86-64.
+The measurement host is **i270**, Intel Core Ultra 7 270K Plus, Ubuntu 26.04 LTS, Linux x86-64.
 Rust is `1.99.1` (`58cf8f9c3`, LLVM `23.1.1`); the kernel is `7.0.0-38-generic`.
 All metric arms use runtime v3/AVX2 dispatch. Every measurement uses the same
 CPU affinity, `0-15`: eight P cores and eight E cores, without SMT or a CCD
@@ -28,7 +28,8 @@ not establish performance on a homogeneous core set or on Zen 5.
   includes its original private `kernel.rs` and modules unchanged at the
   benchmark crate root and calls the exact `row_psycho::compute_geometry`
   entry used by its command. This avoids CLI, decode and process-start cost;
-  those costs are **not measured**. All 41 staged Rust source hashes match the
+  end-to-end CLI scoring/decode cost is **not measured**. A separate no-input
+  command-startup baseline is described below. All 41 staged Rust source hashes match the
   clean source tree; the hash inventory is retained with the artifacts.
 - [`zenbench`](https://github.com/imazen/zenbench/tree/82ff70a3f0c212cf88f53d6e9c3e02de13f32eec),
   package `0.1.10`, commit `82ff70a3f0c212cf88f53d6e9c3e02de13f32eec`.
@@ -59,6 +60,10 @@ not establish performance on a homogeneous core set or on Zen 5.
   canonical Git LFS hydration; each payload matches its original LFS OID.
   The twenty files and actual PNG SHA-256 values are listed in the report.
   No quarantined image copy is used.
+
+All fifty staged sources have verified PNG IHDR depth 8 and color type 2
+(RGB). The retained `SOURCE_HEADERS.json` records those checks. No alpha
+removal or precision conversion is needed for this SDR matrix.
 
 The complete resolved graph is in
 [`Cargo.lock`](../zensim-bench/a-speed-runtime/Cargo.lock). Runtime dispatch
@@ -139,3 +144,45 @@ instrument source SHA-256 is
 `909a10de480398a3902a2c18e44d75937d2ab9cf1ea4d32c25249ca01d5ba456`.
 The initial harness commit is `446f9e7b`; the archive retains Cargo’s full
 `compiler-artifact` record and build logs for that executable.
+
+## Final validation and separate command startup
+
+The contaminated tiny cell was preserved in `results-foreign-build-run02.bak`,
+then replaced in full under the owner's reserved quiet window on i270:
+
+```sh
+BENCH_CPUS=0-15 BENCH_THREADS=1 BENCH_SIZES=64 bash final-source/a-speed-runtime/run.sh "$PWD" "$PWD/bin/a-speed-peers"
+export CARGO_TARGET_DIR="$PWD/harness/a-speed-runtime/target"
+flock "$HOME/tmp/heavy.lock" "$HOME/work/claudehints/scripts/run-heavy" --mem 16G --jobs 8 -- cargo clippy --release --locked --manifest-path final-source/a-speed-runtime/Cargo.toml --bins --bench a_speed_peers -- -D warnings
+flock "$HOME/tmp/heavy.lock" "$HOME/work/claudehints/scripts/run-heavy" --mem 16G --jobs 8 -- cargo build --release --locked --manifest-path final-source/a-speed-runtime/Cargo.toml --bins --bench a_speed_peers
+cp "$CARGO_TARGET_DIR/release/a-speed-cli-startup" "$PWD/bin/a-speed-cli-startup"
+flock "$HOME/tmp/heavy.lock" "$HOME/work/claudehints/scripts/run-heavy" --mem 16G --jobs 8 -- bash final-source/a-speed-runtime/build_cli.sh "$PWD" "$PWD/final-source/a-speed-runtime"
+bash final-source/a-speed-runtime/startup.sh "$PWD" "$PWD/bin/a-speed-cli-startup"
+python3 -B final-source/a-speed-runtime/report.py "$PWD" "$PWD/REPORT.md" --command-startup
+```
+
+Final path-layout builds and strict clippy passed on i270. The scoring source
+remains byte-identical, and all eight latency cells and 24 isolated RSS
+processes use the original frozen executable. Rebuilt validation artifacts
+are preserved separately. All 41 margarine source hashes were rechecked
+after the original CLI build. Eight reporter admission checks pass; the
+production report validates all 80 fixture identities, paired clean samples,
+absence of compiler traces, and complete per-image RSS score output. All 240
+printed-score comparisons between thread counts match.
+
+`build_cli.sh` uses the unchanged original `margarine.rs` command, its original
+private modules, and the instrument's locked dependency graph and release
+settings. It adds no public library API. CLI SHA-256 is
+`c576c23242d81c71675743bba535d99a46811a5d012d42e4e4a80775d644aa12`;
+startup instrument SHA-256 is
+`9f82248de9ce62e60c36b80804ddfa541f387c5aaef326fd39b9af887898c76c`.
+The `margarine --help` baseline measures spawn, executable loading, argument
+handling and exit, with 100 ms warmup and 32 retained clean single-call
+zenbench rounds. It does not initialize a scoring pool or decode images;
+these values are not subtracted from the scoring matrix. Original encoded
+PNG/JPEG command smoke checks also pass at both thread settings; they are
+not end-to-end latency benchmarks or decoder-equivalence tests.
+
+The owner-reserved i270 window was released after all measurements and
+validation, before artifact copying. `FINAL_VALIDATION.json` records the
+frozen identity, completed matrix, clean process state and release.

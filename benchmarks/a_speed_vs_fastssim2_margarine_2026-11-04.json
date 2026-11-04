@@ -1,0 +1,424 @@
+{
+  "rows": [
+    {
+      "host": "i270",
+      "tier": "v3/AVX2",
+      "threads": 1,
+      "size": 64,
+      "images": 20,
+      "samples_per_arm": 640,
+      "flagged_rounds": 34,
+      "min_pixels": 4096,
+      "max_pixels": 4096,
+      "mean_pixels": 4096,
+      "zensim_a": {
+        "p50_ms": 0.750239,
+        "p95_ms": 1.2535978999999997,
+        "rss_kib": 7876,
+        "run_heavy": "run-heavy: done rc=0 0s | peak-RSS 0.01GiB | min-avail 25719MiB | peak-load 1.57",
+        "speedup_16t": 0.34893960802844953
+      },
+      "fast_ssim2": {
+        "p50_ms": 0.4000865,
+        "p95_ms": 0.6973732499999998,
+        "rss_kib": 4736,
+        "run_heavy": "run-heavy: done rc=0 0s | peak-RSS 0.01GiB | min-avail 25755MiB | peak-load 1.57",
+        "speedup_16t": 0.8471141355957683
+      },
+      "margarine": {
+        "p50_ms": 1.4753574999999999,
+        "p95_ms": 3.1743009499999997,
+        "rss_kib": 4752,
+        "run_heavy": "run-heavy: done rc=0 0s | peak-RSS 0.01GiB | min-avail 25774MiB | peak-load 1.57",
+        "speedup_16t": 0.8969452886521662
+      },
+      "a_over_fast": 1.8751919897322202,
+      "a_over_margarine": 0.5085133603211426
+    },
+    {
+      "host": "i270",
+      "tier": "v3/AVX2",
+      "threads": 1,
+      "size": 256,
+      "images": 20,
+      "samples_per_arm": 640,
+      "flagged_rounds": 89,
+      "min_pixels": 65536,
+      "max_pixels": 65536,
+      "mean_pixels": 65536,
+      "zensim_a": {
+        "p50_ms": 3.5327954999999998,
+        "p95_ms": 5.609673049999999,
+        "rss_kib": 14452,
+        "run_heavy": "run-heavy: done rc=0 0s | peak-RSS 0.01GiB | min-avail 25820MiB | peak-load 1.19",
+        "speedup_16t": 1.3328640560310683
+      },
+      "fast_ssim2": {
+        "p50_ms": 4.209048,
+        "p95_ms": 6.3752107,
+        "rss_kib": 11308,
+        "run_heavy": "run-heavy: done rc=0 0s | peak-RSS 0.01GiB | min-avail 25816MiB | peak-load 1.19",
+        "speedup_16t": 0.8854825746106283
+      },
+      "margarine": {
+        "p50_ms": 6.0523620000000005,
+        "p95_ms": 11.574095699999996,
+        "rss_kib": 11616,
+        "run_heavy": "run-heavy: done rc=0 0s | peak-RSS 0.01GiB | min-avail 25811MiB | peak-load 1.10",
+        "speedup_16t": 0.8277429380053245
+      },
+      "a_over_fast": 0.8393336212844329,
+      "a_over_margarine": 0.5837052542461934
+    },
+    {
+      "host": "i270",
+      "tier": "v3/AVX2",
+      "threads": 1,
+      "size": 1024,
+      "images": 20,
+      "samples_per_arm": 640,
+      "flagged_rounds": 56,
+      "min_pixels": 1048576,
+      "max_pixels": 1048576,
+      "mean_pixels": 1048576,
+      "zensim_a": {
+        "p50_ms": 33.4841015,
+        "p95_ms": 56.49652724999997,
+        "rss_kib": 32656,
+        "run_heavy": "run-heavy: done rc=0 0s | peak-RSS 0.03GiB | min-avail 25684MiB | peak-load 1.31",
+        "speedup_16t": 2.9876388645811107
+      },
+      "fast_ssim2": {
+        "p50_ms": 73.9088395,
+        "p95_ms": 84.50889,
+        "rss_kib": 122688,
+        "run_heavy": "run-heavy: done rc=0 2s | peak-RSS 0.12GiB | min-avail 25577MiB | peak-load 1.21",
+        "speedup_16t": 2.186605509980342
+      },
+      "margarine": {
+        "p50_ms": 56.236782000000005,
+        "p95_ms": 63.326532,
+        "rss_kib": 31408,
+        "run_heavy": "run-heavy: done rc=0 1s | peak-RSS 0.03GiB | min-avail 25662MiB | peak-load 1.21",
+        "speedup_16t": 1.161617638925589
+      },
+      "a_over_fast": 0.4530459648199455,
+      "a_over_margarine": 0.5954128296316813
+    },
+    {
+      "host": "i270",
+      "tier": "v3/AVX2",
+      "threads": 1,
+      "size": 4096,
+      "images": 20,
+      "samples_per_arm": 640,
+      "flagged_rounds": 2,
+      "min_pixels": 12000000,
+      "max_pixels": 12582912,
+      "mean_pixels": 12038784,
+      "zensim_a": {
+        "p50_ms": 350.935426,
+        "p95_ms": 376.85140449999994,
+        "rss_kib": 179276,
+        "run_heavy": "run-heavy: done rc=0 7s | peak-RSS 0.17GiB | min-avail 25463MiB | peak-load 1.11",
+        "speedup_16t": 3.330155922344675
+      },
+      "fast_ssim2": {
+        "p50_ms": 1373.945057,
+        "p95_ms": 1498.03342235,
+        "rss_kib": 1435000,
+        "run_heavy": "run-heavy: done rc=0 32s | peak-RSS 1.37GiB | min-avail 24569MiB | peak-load 1.16",
+        "speedup_16t": 3.8435494244021
+      },
+      "margarine": {
+        "p50_ms": 666.2212455,
+        "p95_ms": 747.9780834499999,
+        "rss_kib": 156628,
+        "run_heavy": "run-heavy: done rc=0 17s | peak-RSS 0.15GiB | min-avail 25593MiB | peak-load 1.11",
+        "speedup_16t": 1.210981864903387
+      },
+      "a_over_fast": 0.25542173190408735,
+      "a_over_margarine": 0.5267550807939523
+    },
+    {
+      "host": "i270",
+      "tier": "v3/AVX2",
+      "threads": 16,
+      "size": 64,
+      "images": 20,
+      "samples_per_arm": 640,
+      "flagged_rounds": 48,
+      "min_pixels": 4096,
+      "max_pixels": 4096,
+      "mean_pixels": 4096,
+      "zensim_a": {
+        "p50_ms": 2.150054,
+        "p95_ms": 3.4565485,
+        "rss_kib": 7572,
+        "run_heavy": "run-heavy: done rc=0 0s | peak-RSS 0.01GiB | min-avail 25870MiB | peak-load 0.91",
+        "speedup_16t": 0.34893960802844953
+      },
+      "fast_ssim2": {
+        "p50_ms": 0.47229350000000003,
+        "p95_ms": 1.72162595,
+        "rss_kib": 5020,
+        "run_heavy": "run-heavy: done rc=0 0s | peak-RSS 0.01GiB | min-avail 25853MiB | peak-load 0.91",
+        "speedup_16t": 0.8471141355957683
+      },
+      "margarine": {
+        "p50_ms": 1.644869,
+        "p95_ms": 2.6504579499999994,
+        "rss_kib": 6032,
+        "run_heavy": "run-heavy: done rc=0 0s | peak-RSS 0.01GiB | min-avail 25853MiB | peak-load 0.92",
+        "speedup_16t": 0.8969452886521662
+      },
+      "a_over_fast": 4.552368389571315,
+      "a_over_margarine": 1.3071278016668806
+    },
+    {
+      "host": "i270",
+      "tier": "v3/AVX2",
+      "threads": 16,
+      "size": 256,
+      "images": 20,
+      "samples_per_arm": 640,
+      "flagged_rounds": 18,
+      "min_pixels": 65536,
+      "max_pixels": 65536,
+      "mean_pixels": 65536,
+      "zensim_a": {
+        "p50_ms": 2.6505295,
+        "p95_ms": 5.66411645,
+        "rss_kib": 27704,
+        "run_heavy": "run-heavy: done rc=0 0s | peak-RSS 0.03GiB | min-avail 25869MiB | peak-load 0.83",
+        "speedup_16t": 1.3328640560310683
+      },
+      "fast_ssim2": {
+        "p50_ms": 4.7533945,
+        "p95_ms": 7.0599937,
+        "rss_kib": 11532,
+        "run_heavy": "run-heavy: done rc=0 0s | peak-RSS 0.01GiB | min-avail 25846MiB | peak-load 0.76",
+        "speedup_16t": 0.8854825746106283
+      },
+      "margarine": {
+        "p50_ms": 7.311886,
+        "p95_ms": 10.631840099999994,
+        "rss_kib": 13144,
+        "run_heavy": "run-heavy: done rc=0 0s | peak-RSS 0.01GiB | min-avail 25824MiB | peak-load 0.76",
+        "speedup_16t": 0.8277429380053245
+      },
+      "a_over_fast": 0.5576077264363394,
+      "a_over_margarine": 0.3624960099213801
+    },
+    {
+      "host": "i270",
+      "tier": "v3/AVX2",
+      "threads": 16,
+      "size": 1024,
+      "images": 20,
+      "samples_per_arm": 640,
+      "flagged_rounds": 39,
+      "min_pixels": 1048576,
+      "max_pixels": 1048576,
+      "mean_pixels": 1048576,
+      "zensim_a": {
+        "p50_ms": 11.2075465,
+        "p95_ms": 16.811890100000003,
+        "rss_kib": 159920,
+        "run_heavy": "run-heavy: done rc=0 0s | peak-RSS 0.15GiB | min-avail 25756MiB | peak-load 3.25",
+        "speedup_16t": 2.9876388645811107
+      },
+      "fast_ssim2": {
+        "p50_ms": 33.8007195,
+        "p95_ms": 42.69559519999999,
+        "rss_kib": 235020,
+        "run_heavy": "run-heavy: done rc=0 1s | peak-RSS 0.22GiB | min-avail 25742MiB | peak-load 3.07",
+        "speedup_16t": 2.186605509980342
+      },
+      "margarine": {
+        "p50_ms": 48.4124725,
+        "p95_ms": 55.039020799999996,
+        "rss_kib": 41204,
+        "run_heavy": "run-heavy: done rc=0 1s | peak-RSS 0.04GiB | min-avail 25588MiB | peak-load 3.07",
+        "speedup_16t": 1.161617638925589
+      },
+      "a_over_fast": 0.3315771576992614,
+      "a_over_margarine": 0.2315012210954522
+    },
+    {
+      "host": "i270",
+      "tier": "v3/AVX2",
+      "threads": 16,
+      "size": 4096,
+      "images": 20,
+      "samples_per_arm": 640,
+      "flagged_rounds": 0,
+      "min_pixels": 12000000,
+      "max_pixels": 12582912,
+      "mean_pixels": 12038784,
+      "zensim_a": {
+        "p50_ms": 105.3810795,
+        "p95_ms": 119.91617599999998,
+        "rss_kib": 598216,
+        "run_heavy": "run-heavy: done rc=0 3s | peak-RSS 0.57GiB | min-avail 24786MiB | peak-load 4.31",
+        "speedup_16t": 3.330155922344675
+      },
+      "fast_ssim2": {
+        "p50_ms": 357.46777399999996,
+        "p95_ms": 396.62825680000003,
+        "rss_kib": 2468936,
+        "run_heavy": "run-heavy: done rc=0 9s | peak-RSS 2.35GiB | min-avail 23652MiB | peak-load 5.25",
+        "speedup_16t": 3.8435494244021
+      },
+      "margarine": {
+        "p50_ms": 550.149647,
+        "p95_ms": 587.3843463,
+        "rss_kib": 167168,
+        "run_heavy": "run-heavy: done rc=0 12s | peak-RSS 0.16GiB | min-avail 24978MiB | peak-load 4.91",
+        "speedup_16t": 1.210981864903387
+      },
+      "a_over_fast": 0.2947988242990542,
+      "a_over_margarine": 0.19154984480068205
+    }
+  ],
+  "fits": [
+    {
+      "host": "i270",
+      "threads": 1,
+      "arm": "zensim_a",
+      "alpha_ms": 1.5961422461077603,
+      "beta_ms_per_MP": 29.03715534793735,
+      "r_squared": 0.999686834017557
+    },
+    {
+      "host": "i270",
+      "threads": 1,
+      "arm": "fast_ssim2",
+      "alpha_ms": -16.43187709325167,
+      "beta_ms_per_MP": 116.27186132461027,
+      "r_squared": 0.9985476697951565
+    },
+    {
+      "host": "i270",
+      "threads": 1,
+      "arm": "margarine",
+      "alpha_ms": 0.9728971157895501,
+      "beta_ms_per_MP": 55.54126183339184,
+      "r_squared": 0.9996919914671768
+    },
+    {
+      "host": "i270",
+      "threads": 16,
+      "arm": "zensim_a",
+      "alpha_ms": 2.035846322662209,
+      "beta_ms_per_MP": 8.673501056271157,
+      "r_squared": 0.9963739736026634
+    },
+    {
+      "host": "i270",
+      "threads": 16,
+      "arm": "fast_ssim2",
+      "alpha_ms": 2.042241074943888,
+      "beta_ms_per_MP": 29.721962763238317,
+      "r_squared": 0.9988209521926394
+    },
+    {
+      "host": "i270",
+      "threads": 16,
+      "arm": "margarine",
+      "alpha_ms": 2.155795392456639,
+      "beta_ms_per_MP": 45.321391766839525,
+      "r_squared": 0.9994815835951247
+    }
+  ],
+  "printed_score_thread_diagnostics": [
+    {
+      "size": 64,
+      "arm": "zensim_a",
+      "pairs": 20,
+      "printed_score_mismatches": []
+    },
+    {
+      "size": 64,
+      "arm": "fast_ssim2",
+      "pairs": 20,
+      "printed_score_mismatches": []
+    },
+    {
+      "size": 64,
+      "arm": "margarine",
+      "pairs": 20,
+      "printed_score_mismatches": []
+    },
+    {
+      "size": 256,
+      "arm": "zensim_a",
+      "pairs": 20,
+      "printed_score_mismatches": []
+    },
+    {
+      "size": 256,
+      "arm": "fast_ssim2",
+      "pairs": 20,
+      "printed_score_mismatches": []
+    },
+    {
+      "size": 256,
+      "arm": "margarine",
+      "pairs": 20,
+      "printed_score_mismatches": []
+    },
+    {
+      "size": 1024,
+      "arm": "zensim_a",
+      "pairs": 20,
+      "printed_score_mismatches": []
+    },
+    {
+      "size": 1024,
+      "arm": "fast_ssim2",
+      "pairs": 20,
+      "printed_score_mismatches": []
+    },
+    {
+      "size": 1024,
+      "arm": "margarine",
+      "pairs": 20,
+      "printed_score_mismatches": []
+    },
+    {
+      "size": 4096,
+      "arm": "zensim_a",
+      "pairs": 20,
+      "printed_score_mismatches": []
+    },
+    {
+      "size": 4096,
+      "arm": "fast_ssim2",
+      "pairs": 20,
+      "printed_score_mismatches": []
+    },
+    {
+      "size": 4096,
+      "arm": "margarine",
+      "pairs": 20,
+      "printed_score_mismatches": []
+    }
+  ],
+  "command_startup": [
+    {
+      "host": "i270",
+      "threads_environment": 1,
+      "calls": 32,
+      "p50_ms": 3.1595715,
+      "p95_ms": 3.32351305
+    },
+    {
+      "host": "i270",
+      "threads_environment": 16,
+      "calls": 32,
+      "p50_ms": 3.2053830000000003,
+      "p95_ms": 3.42815165
+    }
+  ]
+}

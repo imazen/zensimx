@@ -31,6 +31,9 @@
   and margarine's selected kernel, with imazen codec fixtures, individual-call
   rounds, isolated RSS collection and pixel-count regression reporting
   (`446f9e7b`, `a56dfbbd`).
+  The complete one/sixteen-thread i270 matrix, fits, source hashes and artifact
+  provenance are in the [measurement report](benchmarks/a_speed_vs_fastssim2_margarine_2026-11-04.md);
+  command-startup and evidence controls are recorded in `6f3c5c7a`.
 
 - Unpublished `tools/zensim-viz`: native revision-7 feature atlas, per-weight
   audit, served-score PDP/ICE, ablations and bake comparisons; private default-off
