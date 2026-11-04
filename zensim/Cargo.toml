@@ -468,3 +468,11 @@ required-features = ["training"]
 [[example]]
 name = "e34_pixels"
 required-features = ["custom-profiles", "feature-regime-v2"]
+
+[[example]]
+name = "split_parity_golden"
+required-features = ["custom-profiles", "training"]
+
+[[example]]
+name = "split_timing"
+required-features = ["custom-profiles"]

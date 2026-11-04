@@ -182,6 +182,13 @@ because cleanup tests or a historical training reproduction pass.
 
 ## Known Bugs
 
+- **2026-11-04 — split examples lacked feature requirements, fixed.** Cargo's
+  default example discovery compiled `split_parity_golden` and `split_timing`
+  without their custom-profile APIs; the golden also reads training exports.
+  Their manifest entries now declare those existing requirements. The complete
+  default-feature `cargo test -p zensim -- --test-threads=1` passes on i270,
+  including integration tests and doctests. No numerical assertions changed.
+
 - **2026-11-04 — ignored stable-pool tier identity fails on the unchanged baseline.**
   Explicit `ssim_form::tests::stable_moments_are_exact_across_simd_tiers`
   runs at revisions 1 and 7 differ in 41 pooled values natively and 40 under
@@ -199,7 +206,7 @@ because cleanup tests or a historical training reproduction pass.
 - **2026-11-04 — default-feature HDR steering test compile failure, fixed.** The
   `rev7_prepared_native_hdr_workers_match_canonical_features` integration test
   called `prepare_steering_hdr` without its `custom-profiles` feature gate.
-  test now matches the API's feature guard. The native HDR target passes with
+  The test now matches the API's feature guard. The native HDR target passes with
   default features and with `custom-profiles`, including the steering test.
   Every feature, score, identity and error-state assertion is unchanged.
 
