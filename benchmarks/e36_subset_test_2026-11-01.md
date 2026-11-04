@@ -1300,3 +1300,29 @@ acceptable for adoption is the owner's decision; nothing is adopted on this read
 `/mnt/tower/output/zensim/e36-subset-test-2026-11-01/r10-amend1-jxl-i270/` (SHA256SUMS), beside the experiment 3
 step 4 and experiment 5 amendment 6 runs (`exp3-step4-jxl-i270/`, `exp5-amend6-jxl-i270/`), mirrored from i270 the
 same day.
+
+### R4 registration (2026-11-03, before any run): DVIFM's painted map as the map-term target
+
+Owner, 2026-11-03, on decision 5: "I will take your reccomendation as I trust your experiment ideas to be worth
+testing" (option b1). **Hypothesis** (method review, experiment 4): butteraugli's block map is one metric's account of
+where distortion sits; a second spatial target may keep the map term's JPEG XL loop gains with less cost on the
+pairwise human sets (read 1: p30L + map 300 -0.0052 against p30L on CLIC 2021; the private out-of-fold check found a
+cost of the same sign). **Target:** dvifmish preset `ycbcr3-curve-ours-safesyn` (fitted on SafeSyn TRAIN with
+SSIMULACRA2 as the teacher; no human labels), its painted map summed on the map pool's 16 px grid by
+`examples/block_sums.rs` (dvifmish 263636ef, binary sha256 db64937e1eecff4d559c896ade04e4ddc151a745973e6730dbf80b06d4447e55)
+on the map pool's views minus the one view whose DVIFM map is all zero (`rav1e-160-100-df626527`), 1,966 views;
+`map_pool_subset.py --exclude-keys`, then `map_pool_retarget.py` (zensimx bf9e227b). On those views the preset's map
+has median per-view Spearman 0.54 with the absolute pixel difference (butteraugli's map 0.80) and 0.61 with
+butteraugli's map. **Arm** `p30L-map300dv`: each command is experiment 3's p30L + map 300 (amendment 4) at the same
+seed with only the map pool, destination and scratch directory changed (`e36_exp56/r4_make_cmds.py`); seeds 0-2, and
+the AIC2026 public_train folds at seed 0 (private). The twin's pool keeps the dropped view. The consensus arm of the
+draft is not run (option b1): its loop would have had CVVDP as its only independent judge. **Measures:** the
+amendment-2 set (primary, G-STEER, G-CHROMA-L, NEARID at seed 0, error against human ratings, EVAL compression rows),
+held-out map agreement against butteraugli's and DVIFM's block sums (`map_agreement.py`), the M1 panel against the
+twin, the private out-of-fold check against the twin, p30L and F3's control, and, if the arm passes the guards, the
+JPEG XL loop at seed 0 judged by butteraugli (SSIMULACRA2 taught the preset), with CVVDP, SSIMULACRA2, zensim and
+DVIFM reported. CLIC 2021 is not read. **Guards** (against the twin): compression-row SROCC seed mean falls by no more
+than 0.003, all-nine error rises by no more than 0.30 points, G-STEER passes amendment 2's guard, G-CHROMA-L and
+NEARID pass. **Reading:** an arm that passes the guards and whose out-of-fold interval against the twin lies above
+zero is reported as reducing the map term's pairwise cost; if its interval against p30L also contains zero, it is
+reported as a map-term arm without a measured pairwise cost, beside its loop result. Nothing is adopted on this read.

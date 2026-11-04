@@ -37,5 +37,7 @@ admission checks still run on every arm.
   E36's held-out ladders) and `inversion_by_gap.py` (inversion share by quality-setting gap).
 - R10 (the mix on F3's recipe): `r10_make_cmds.py` (in the runs' layout `r10/make_cmds.py`), `chainR10.sh`, `postR10.sh`;
   its JPEG XL loop (amendment 1): `../e36_loop_r10.sh`, `r10_chainLoop.sh` and `r10_loop_i270_run.sh`.
+- R4 (DVIFM's map as the map-term target): `r4_make_cmds.py` (`r4/make_cmds.py` in the runs' layout), `chainR4.sh`,
+  `postR4.sh`; the pools come from `../map_pool_subset.py` and `../map_pool_retarget.py`.
 
 Paths inside the scripts are the dev host's scratch layout (`~/tmp/e36test`) where the runs live.
