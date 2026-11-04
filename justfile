@@ -4398,6 +4398,12 @@ r14-transform-t2:
 r14-transform-status:
     python3 -B scripts/byconstruction/r14_transforms_status.py --compact
 
+r14-python-checks:
+    python3 -B -c 'import ast,pathlib; paths=list(pathlib.Path("scripts/byconstruction").glob("r14_*.py"))+list(pathlib.Path("scripts/rev4_featpot").glob("r14_*.py")); [ast.parse(p.read_text(),filename=str(p)) for p in paths]; print(f"Parsed {len(paths)} R14 Python owners")'
+    bash -n scripts/byconstruction/r14_inspector_build.sh scripts/byconstruction/r14_trainer_build.sh scripts/byconstruction/r14_transforms_build.sh
+    python3 -B scripts/byconstruction/r14_transforms.py --help
+    python3 -B scripts/byconstruction/r14_t2.py --help
+
 r14-transform-heads:
     python3 -B scripts/byconstruction/r14_heads.py
 
