@@ -121,3 +121,28 @@ four view/theme images and record the landed commit in REPORT and chat.
 Review completion: all ten decisions are implemented and checked against complete
 native bundles. Six audit and six curve preservation checks retain the original
 measurements; current dark/light screenshots and detailed coverage are in REPORT.md.
+
+## Design 2 — viewport, references, then cursor terms
+
+The coordinator's DESIGN-2.md supersedes page layout. First replace the frame
+with a 44px header, virtual feature tree, dominant stage, reference pane and
+56px filmstrip. Retain every native concern, curve, display identity and map.
+Only one lens exhibit is visible. Gutters and all controls support keyboards.
+
+Extract bibliography entries and family descriptions from a pinned, read-only
+zenpapers revision. Its current draft uses Typst and four split bibliography
+files, without fenced LaTeX blocks. Label code-derived revision-7 equations,
+and explicitly mark signals lacking paper descriptions. Join all 984 model
+inputs to reference entries; report coverage and source hashes.
+
+After the frame works, export basic-family term planes from retained native
+fold values, on the same sampled grid as maps. Preserve full f32 precision for
+the cursor demo; never infer terms from quantized PNGs. Compare all pooled
+bits against extraction without the hook, including odd sizes and row padding.
+Preserve existing exports and flags in fresh artifact directories.
+
+Acceptance: both views and themes at 1600×1000 and 1280×800 (eight captures),
+document height equal to viewport, stage at least 55% width and 70% height at
+1600×1000, preloaded hover below 50ms, complete stored-ID/reference joins,
+and native term/parity checks. Record evidence and open questions in REPORT
+and chat; push each verified milestone to main.
