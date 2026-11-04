@@ -8673,6 +8673,11 @@ fn foldapp_streaming_walk<S: ImageSource, D: ImageSource>(
     }
 }
 
+// Public A, i270 (Core Ultra 7 270K Plus, v3/AVX2), 2026-11-04, CPUs 0–15:
+// paired p50 crossovers were 160² at 16 threads and 192² at 4 threads. Use
+// the higher crossover. Paired instrument: imazen/zensimx f3e19a47.
+const PARALLEL_MIN_PIXELS: usize = 36_864;
+
 fn foldapp_streaming_walk_impl<S: ImageSource, D: ImageSource, const ALL_CHANNELS: bool>(
     source: &S,
     distorted: &D,
@@ -8690,6 +8695,8 @@ fn foldapp_streaming_walk_impl<S: ImageSource, D: ImageSource, const ALL_CHANNEL
         compute,
     } = extras;
     use crate::feature_v2_stream::StripPlaneProducer;
+    let (w0, h0) = (source.width(), source.height());
+    let parallel = parallel && w0 * h0 >= PARALLEL_MIN_PIXELS;
     // ITEM D: one derivation of WHAT this request computes. Every local
     // below reads from it instead of re-deriving from `toggles`.
     let mut compute = compute.unwrap_or_else(|| ComputeSet::from_toggles(toggles));
@@ -8809,7 +8816,6 @@ fn foldapp_streaming_walk_impl<S: ImageSource, D: ImageSource, const ALL_CHANNEL
         }
     });
     let n_scales = crate::NUM_SCALES;
-    let (w0, h0) = (source.width(), source.height());
 
     // Scale dims: floor-halving, matching both the producer and the
     // materialized walk's `downscale_2x_inplace` returns.

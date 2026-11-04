@@ -141,6 +141,9 @@ fn ordered_batches_match_serial_with_reused_strided_scratch() {
                     (257, 1025, false, ComputeSet::ALL_SCALES),
                     (511, 259, false, ComputeSet::ALL_SCALES),
                     (129, 513, true, ComputeSet::ALL_SCALES),
+                    (191, 193, false, ComputeSet::ALL_SCALES), // One pixel below the gate.
+                    (192, 192, false, ComputeSet::ALL_SCALES), // Exactly at the gate.
+                    (192, 193, false, ComputeSet::ALL_SCALES), // Above the gate.
                     (65, 129, false, ComputeSet::ALL_SCALES),
                     (257, 513, false, 0b0101),
                 ] {
@@ -213,7 +216,17 @@ fn ordered_batches_match_serial_with_reused_strided_scratch() {
                         })
                         .unwrap()
                         .into_features();
-                    if budget.is_none() {
+                    if w * h < PARALLEL_MIN_PIXELS {
+                        assert!(
+                            scratch.rev5_jobs.is_empty(),
+                            "small walks use the serial route"
+                        );
+                        assert_eq!(
+                            scratch.rev5_jobs.capacity(),
+                            0,
+                            "small walks retain no queue"
+                        );
+                    } else if budget.is_none() {
                         assert!(
                             !scratch.rev5_jobs.is_empty(),
                             "the default batch route must execute"
@@ -262,8 +275,8 @@ fn ordered_batches_match_serial_with_reused_strided_scratch() {
                         assert_eq!(
                             scratch.rev5_jobs.is_empty(),
                             // Literal, not the constant: the floor is the contract.
-                            budget / per_job < 3,
-                            "{w}x{h} budget {budget}: queue iff at least three jobs fit"
+                            w * h < PARALLEL_MIN_PIXELS || budget / per_job < 3,
+                            "{w}x{h} budget {budget}: queue above the pixel gate iff at least three jobs fit"
                         );
                     }
                     assert_eq!(expected.len(), actual.len());

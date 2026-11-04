@@ -476,3 +476,7 @@ required-features = ["custom-profiles", "training"]
 [[example]]
 name = "split_timing"
 required-features = ["custom-profiles"]
+
+[[example]]
+name = "a_parallel_gate_threads"
+required-features = ["custom-profiles", "training", "feature-regime-v2", "threads"]
