@@ -1945,3 +1945,18 @@ addendum), so under one convention zensim is far ahead on Narwaria and level on 
 revision-8 decision): keep PU21 (the default), or register a fit through the cube-root front end at 100 cd/m² (this read
 only swapped the front end under PU21-trained weights; a fit would say whether the Narwaria loss is the front end or the
 training), or a front end that is PU21-like below about 100 cd/m² and cube-root above (a design, not a measurement).
+
+### R11 (2026-11-04, registered before the run): a codec-only continuation of the mix (`mixF3codec`)
+
+Owner, 2026-11-04: "What about a codec-optimized mix variant? Did we try that already?" Not yet: R10 ran only the
+mix's general continuation (`mixF3`). **Arm:** the mix's base fit (`tid2013_mdid-s{0,1,2}`, the R3 step of the mix
+recipe) continued exactly as F3codec and ECodec were: the AIC-2026 public_train table alone, `--aic-weight 16.0
+--diagnostic-population aic-only --train-only`, 60 epochs at lr 1e-5, F3codec's trainer build and source
+(`fx2-full-codec-e29`), the checkpoint after epoch 29 packed with the codec pack program (no input pruning), seeds 0-2;
+runs under `~/tmp/e36test/r11/` on dev. **Reads (report-only; nothing ships from them):** the frozen held-out panel
+(`dataset_eval.py mix-eval`, the 11 EVAL collections and the 2AFC sets) beside ECodec, F3codec and the mix; the E36
+selection-source inversion share (`e36_exp56/primary.py`, the 40 selection sources, per stratum) beside the same three.
+The JPEG XL loop is not read here. **What would make it a candidate:** a codec-stratum inversion share no worse than
+F3codec's at every seed and held-out MOS no worse than ECodec's on the codec-heavy collections (LIVE-MD, VCL@FER,
+IRCCyN/IVC, NITS-IQA) within the intervals. Shipping would additionally need the R6 label-free gates (dial contract
+C1-C6, G-STEER, identity at the SIMD permutations) and an owner decision.
