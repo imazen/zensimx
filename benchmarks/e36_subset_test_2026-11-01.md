@@ -2185,3 +2185,52 @@ derived from the research `BakeScorer::with_hdr_front_end` and a public continui
 the public crate together with the revision-1 372-feature MLP path only it used; the previews `PreviewV0_1`/`PreviewV0_2`
 (the 0.2.7 API) go behind a cargo feature `legacy-models`, off by default, scores unchanged. Public 0.3.0 default line:
 `A` only. Phase 3 brief `~/tmp/zensim-profile-a-brief/PHASE3.md`.
+
+
+### R12 registration (2026-11-04, before any fit or new read): linear formulas over A's inputs
+
+Owner asks what linear weights buy and give up against the adopted mix (research F, public A).
+Training root: `/var/tmp/byc-fchroma-20261029/r3/w100/root`, the mix's admitted TRAIN legs,
+`--human-sources tid2013 --exclude-datasets pipal,live-md,cid-iq,cid-oa,irccyn-ivc,colourlab-rating-variability-2022
+--mos-share 36.035`. Same 492 damage IDs as `~/tmp/hc1-profile/cols_fx2.txt` and their 492 fx2
+fragility products. Reuse `v2_confirm_fit.py`, strict admission, the mix's loss/targets, masses,
+samplers, 120 epochs and final-epoch rule. The supported linear route is plain N, H1, mono,
+without thresholds/max pairs: scale-only inputs, W1 >= 0, b1 = 0, W2 <= 0, b2 = 100.
+Thus raw = 100 - sum(nonnegative coefficient * input); both direct and product damage
+coefficients are nonnegative. Three registered seed indices 0–2, because Adam initialization
+and pair sampling are random. No fit or selection uses EVAL.
+
+- **L1 dense:** all 984 inputs available.
+- **L2 sparse family formula:** retain only basic edge_det, v2 art_soft_peak, hf_mag_loss,
+  blockiness, hf_loss, ssim_dev4, basic edge_art and v2 iw_art, and their products. Keep the
+  same fx2 declaration; fix all other input weights to zero through the existing strict
+  feature mask. All nonzero coefficients with canonical feature names will be reported.
+- **L3 conditional:** L1 only, AIC-2026 public_train ×256 continuation with original rehearsal,
+  60 epochs, lr 1e-5, epoch 59, three seeds, only if L1's seed-mean absolute score error on
+  the root's teacher development groups is at most one score point above A's seed mean.
+  Score these frozen root development rows with final packed bytes and compare with
+  100 * human_score; pool teacher rows, disclose group-wise errors too. This is a
+  training-side feasibility check, not an EVAL decision. If it fails, omit L3 and report why.
+
+Packing: canonical `v2_production_pack.pack_production`, f16 before CID22 TRAIN dial
+calibration, E33 identity knot and tail factor 2, no automatic input pruning (preserve fx2
+positions); native monotone certificate. The fitted head is linear before the common
+output stage/dial spline. Record every departure from A's objective, if required.
+Freeze fits/hashes in a second commit before report-only reads.
+
+Reads: exactly the applicable HC1/mix owners in `~/tmp/hc1-profile/hc1-reads.sh`: held-out
+EVAL collections (`dataset_eval.py score`, `readout.py`, compression/non-codec `ceval.py`),
+E36 selection-source inversions and `primary.py` with CONTROL=F, G-CHROMA-L dev >64px,
+G-STEER, C1–C6, identity, NEARID, and HDR panel plus UPIQ-all on cube-root:203 banks
+`/mnt/v/output/zensim/byc-hdr-20261104/banks-cube-root-203-aliases`. Baselines F seeds 0–2
+at `~/tmp/e36test/r10/runs/mixF3-s*/pack_e059/refit/production-f16.bin`.
+No confirmation-set, public_test or other sealed read. Confirmation sets' prior exposure
+still binds; DATA_SPLITS ledger records it. No AIC-2026 statistics in committed files.
+Measure head-only forward time per pair against A, with extraction unchanged; L2's
+family-removal opportunity is separate and refers to the extraction-cost report if available.
+All fits/reads on dev, serialized through heavy.lock and run-heavy with 24G cap; scratch
+`~/tmp/zensim-linear`, large artifacts `/var/tmp/byc-linear-20261104`.
+
+Result: report every registered read beside A, full L2 coefficient formula, hashes, head-only
+timings and product-gate verdict in `benchmarks/r12_linear_head_2026-11-04.md`.
+Negative/incomplete outcomes are results, never adoption or permission to weaken a gate.

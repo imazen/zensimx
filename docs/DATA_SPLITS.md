@@ -3104,3 +3104,23 @@ E36 inversion share, G-STEER, dial contract, all previously disclosed); the cont
   seeds 0–2 and E (HDR panel on both bank sets, EVAL collections, E36 inversion share, G-CHROMA-L, G-STEER, dial contract,
   identity, NEARID). Nothing was selected on them; the retrain is not shipped; the mix F stays adopted
   (benchmarks/e36_subset_test_2026-11-01.md, "HC1", SDR no-regression reads).
+
+
+## Exposure registration — 2026-11-04: R12 linear heads against the adopted mix A
+
+Registered before any R12 fit/read in the E36 record. L1 and L2 use only the adopted
+mix's admitted TRAIN root and its existing development splits. The conditional L3 uses
+only D6-admitted AIC-2026 public_train with the original rehearsal, if the registered
+TRAIN-side development error condition passes. AIC-2026 numbers remain local;
+public_test is sealed and is never read. No HDR leg enters these fits.
+
+After fits are frozen, report-only reads: held-out EVAL MOS collections (including
+compression/non-codec rows), E36 selection-source consensus pairs, G-CHROMA-L dev,
+G-STEER, C1–C6, identity and NEARID; cube-root:203 HDR banks (UPIQ development and
+all 380 T2 rows, HDRTEACH VAL teacher labels, 4Kdtb EVAL MOS, consumer-EVAL ladders).
+These populations were already exposed to the mix and, on 2026-11-04, to HC1 (see
+preceding entries); they are reused assessments, not untouched confirmation evidence.
+CLIC 2021 validation, CIQA and MMSPG JPEG XR were already read in R10 and earlier
+registrations (CLIC also selected R7); R12 does not reopen them. Their prior exposure
+remains disclosed. E36 instruments have repeatedly informed this research program;
+no instrument result selects a new R12 fit. Record actual read completion below.
