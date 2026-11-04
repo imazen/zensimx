@@ -1,0 +1,140 @@
+// Preserve the evidence widgets while placing them in a single viewport.
+export function buildFrame() {
+  const retained = new Map(
+    [...document.querySelectorAll("[id]")].map((n) => [n.id, n]),
+  );
+  const $ = (id) => retained.get(id);
+  const node = (tag, cls, text) => {
+    const n = document.createElement(tag);
+    n.className = cls || "";
+    if (text) n.textContent = text;
+    return n;
+  };
+  const old = document.querySelector("header");
+  const header = node("header", "topbar");
+  header.append(
+    node("strong", "", "zensim-viz"),
+    $("bake").closest("label"),
+    $("pair").closest("label"),
+    $("bank").closest("label"),
+    old.querySelector("nav"),
+    $("theme"),
+  );
+  const subject = $("subject");
+  subject.hidden = true;
+  const workspace = node("div", "workspace");
+  workspace.id = "workspace";
+  const sidebar = node("aside", "feature-sidebar");
+  sidebar.setAttribute("aria-label", "Features");
+  sidebar.innerHTML =
+    '<div class="sidebar-title">FEATURES <span id="tree-count" class="ink-3"></span></div><label class="search-label"><input id="feature-search" type="search" placeholder="Search id, signal or family…" aria-label="Search features" /><kbd>/</kbd></label><label class="twin"><input id="fragility-twin" type="checkbox" /> Fragility twin</label>';
+  const matrix = $("matrix");
+  matrix.setAttribute("role", "tree");
+  matrix.setAttribute("aria-label", "Feature tree");
+  sidebar.append(matrix, $("status"));
+  const center = node("div", "center-stage");
+  center.id = "center-stage";
+  const atlas = $("atlas"),
+    lens = $("lens"),
+    stage = $("stage");
+  atlas.replaceChildren(stage);
+  atlas.className = "atlas-stage";
+  const concerns = document.querySelector(".concerns");
+  const concernFilters = node("div", "controls");
+  for (const id of ["severity", "kind", "sort", "compare"])
+    concernFilters.append($(id).closest("label"));
+  concerns.prepend(concernFilters);
+  concerns.dataset.exhibit = "Concerns";
+  concerns.append($("comparison-panel"));
+  const network = document.querySelector(".network");
+  network.dataset.exhibit = "Weights";
+  const figures = [...document.querySelectorAll(".diagnostics > figure")];
+  figures[0].dataset.exhibit = "Dependence";
+  figures[1].dataset.exhibit = "Ranges";
+  const attribution = node("section", "attribution-pane");
+  attribution.dataset.exhibit = "Attribution";
+  attribution.append(figures[2], figures[3]);
+  const tabs = node("nav", "exhibit-tabs seg");
+  tabs.setAttribute("aria-label", "Lens exhibit");
+  for (const name of [
+    "Concerns",
+    "Weights",
+    "Dependence",
+    "Ranges",
+    "Attribution",
+  ]) {
+    const b = node("button", "", name);
+    b.dataset.exhibitTab = name;
+    b.setAttribute("aria-pressed", String(name === "Dependence"));
+    tabs.append(b);
+  }
+  const exhibits = node("div", "exhibits diagnostics");
+  exhibits.append(concerns, network, figures[0], figures[1], attribution);
+  for (const e of exhibits.children)
+    e.hidden = e.dataset.exhibit !== "Dependence";
+  lens.replaceChildren(tabs, exhibits);
+  center.append(atlas, lens);
+  const reference = node("aside", "reference-panel");
+  reference.id = "reference-panel";
+  reference.setAttribute("aria-label", "Feature reference");
+  reference.innerHTML =
+    '<div class="sidebar-title">REFERENCE <button id="release-hold" hidden>Release pin</button></div><div id="reference-body"><p class="ink-2">Hover a feature to read its formula and background.</p></div><details class="reference-options"><summary>Display and model controls</summary></details>';
+  const options = reference.querySelector("details");
+  for (const id of ["input", "lens-family", "full-precision", "colour"])
+    options.append($(id).closest("label"));
+  const compatibility = node("div");
+  compatibility.hidden = true;
+  for (const id of [
+    "subject",
+    "filters",
+    "family-lane",
+    "family",
+    "atlas-table-toggle",
+    "atlas-table",
+    "family-maps",
+    "matrix-range",
+    "matrix-ramp",
+    "feature-detail",
+  ])
+    compatibility.append($(id));
+  const gutter = (side) => {
+    const g = node("div", "gutter");
+    g.dataset.side = side;
+    g.tabIndex = 0;
+    g.setAttribute("role", "separator");
+    g.setAttribute("aria-orientation", "vertical");
+    g.setAttribute("aria-label", `Resize ${side} panel`);
+    return g;
+  };
+  workspace.append(sidebar, gutter("left"), center, gutter("right"), reference);
+  const bottom = node("footer", "bottom-strip");
+  bottom.id = "bottom-strip";
+  const modes = $("image-mode");
+  modes.setAttribute("aria-label", "Stage image");
+  const only = node("button", "", "Map");
+  only.id = "map-mode-button";
+  modes.append(only);
+  const controls = node("div", "stage-controls");
+  for (const id of ["zoom", "alpha"]) controls.append($(id).closest("label"));
+  controls.append($("reset-pan"));
+  compatibility.append($("map-only").closest("label"), $("flip"));
+  bottom.append(
+    $("pins"),
+    $("map-legend"),
+    modes,
+    controls,
+    node(
+      "span",
+      "keyboard-hints",
+      "/ search · arrows move · Enter pin · wheel zoom",
+    ),
+  );
+  const tooltip = $("tooltip");
+  document.body.replaceChildren(
+    header,
+    workspace,
+    bottom,
+    compatibility,
+    tooltip,
+  );
+}

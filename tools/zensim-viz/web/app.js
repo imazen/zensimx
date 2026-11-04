@@ -1,5 +1,8 @@
 import { formatNumber } from "./format.mjs";
 import { WeightView } from "./weight-view.js";
+import { buildFrame } from "./frame.js";
+import { Studio } from "./studio.js";
+buildFrame();
 const $ = (id) => document.getElementById(id);
 const state = {
   fullPrecision: false,
@@ -195,6 +198,8 @@ function colour(t, div = false) {
 function view(v) {
   state.view = v;
   refreshSubject();
+  document.body.dataset.instrument = v;
+  studio.renderTree();
   if (state.manifest) status(state.manifest.note || "");
   $("atlas").hidden = v !== "atlas";
   $("lens").hidden = v !== "lens";
@@ -244,25 +249,7 @@ function segments(name, items) {
   return root;
 }
 function renderFilters() {
-  const features = state.pair?.features || [];
-  $("filters").replaceChildren(
-    ...["scale", "channel", "fragility", "pooling"].map((name) => {
-      const values =
-        name === "fragility"
-          ? ["damage", "fragility"]
-          : [
-              "all",
-              ...new Set(
-                features
-                  .map((f) => String(f[name]))
-                  .filter((v) => v !== "undefined"),
-              ),
-            ];
-      const block = el("label", name + " ");
-      block.append(segments(name, values));
-      return block;
-    }),
-  );
+  $("fragility-twin").checked = state.filters.fragility === "fragility";
 }
 function visible() {
   return (state.pair?.features || []).filter(
@@ -291,199 +278,7 @@ function percentile(f) {
   return p == null ? null : p > 1 ? p / 100 : p;
 }
 function renderMatrix() {
-  const fs = visible(),
-    root = $("matrix");
-  root.replaceChildren();
-  const hasGlobals = fs.some((f) => !f.map_file);
-  root.style.setProperty("--matrix-columns", 4);
-  const header = el("div", null, "matrix-row matrix-header");
-  [
-    "family × scale",
-    "X",
-    "Y",
-    "B",
-    ...(hasGlobals ? ["global / chroma"] : []),
-  ].forEach((s) => header.append(el("span", s, "ink-2")));
-  root.append(header);
-  const max = Math.max(
-      ...state.pair.features.map((f) => Math.abs(f.value)),
-      1e-30,
-    ),
-    signed = $("colour").value === "signed";
-  $("matrix-range").textContent = signed
-    ? `${fmt(-max)} … 0 … ${fmt(max)} where bank spans 0; one-sided cells retain percentiles`
-    : "p0 … p100";
-  $("matrix-ramp").style.background = signed
-    ? "linear-gradient(to right,var(--ramp-div-n3),var(--ramp-div-0),var(--ramp-div-p3))"
-    : "";
-  const groups = new Map();
-  const active = new Set(fs);
-  const positions = state.pair.features.filter(
-    (f) =>
-      (f.fragility ? "fragility" : "damage") === state.filters.fragility &&
-      (state.filters.scale === "all" ||
-        String(f.scale) === state.filters.scale) &&
-      (!$("family-lane").checked ||
-        (f.analysis_family || f.family) === $("family").value),
-  );
-  for (const f of positions) {
-    const key = `${f.analysis_family || f.family} · s${f.scale}`;
-    if (!groups.has(key)) groups.set(key, []);
-    groups.get(key).push(f);
-  }
-  for (const [label, items] of groups) {
-    if (!items.some((f) => active.has(f))) continue;
-    const row = el("div", null, "matrix-row");
-    row.append(el("span", label, "row-label"));
-    for (const channel of ["x", "y", "b", ...(hasGlobals ? ["s"] : [])]) {
-      const group = el("div", null, "channel");
-      const globals = items.filter((f) => !f.map_file && active.has(f));
-      const channelItems =
-        channel === "s"
-          ? globals.slice(0, 1)
-          : items.filter((f) => !!f.map_file && f.channel === channel);
-      for (const f of channelItems) {
-        const b = el("button", null, "cell" + (!f.map_file ? " hollow" : ""));
-        b.dataset.filtered = String(!active.has(f));
-        b.style.visibility = active.has(f) ? "visible" : "hidden";
-        b.tabIndex = active.has(f) ? 0 : -1;
-        b.dataset.feature = f.key ?? f.id;
-        if (channel === "s") {
-          b.classList.add("global-cell");
-          b.dataset.globalMembers = globals.map((g) => g.key).join(",");
-          b.textContent = globals.length > 1 ? String(globals.length) : "";
-          b.setAttribute(
-            "aria-label",
-            globals
-              .map((g) => `f${g.id} ${g.name}: ${full(g.value)}`)
-              .join("; "),
-          );
-        }
-        b.dataset.pinned = String(
-          state.pins.some((p) => p.key === f.key && p.id === f.id),
-        );
-        b.dataset.hover = String(f === state.feature);
-        const bankSha = state.manifest.banks.find(
-          (bank) => bank.id === $("bank").value,
-        )?.sha256;
-        const bankRange = f.bank_ranges?.[bankSha];
-        const signedFeature =
-          signed && bankRange?.[0] < 0 && bankRange?.[1] > 0;
-        b.dataset.diverging = String(!!signedFeature);
-        b.style.background = signedFeature
-          ? colour(0.5 + (0.5 * f.value) / max, true)
-          : percentile(f) == null
-            ? "transparent"
-            : colour(percentile(f));
-        b.setAttribute(
-          "aria-label",
-          `f${f.id} ${f.name}, value ${full(f.value)}, percentile ${full(percentile(f))}${f.map_file ? "" : `, no spatial map; ${globals.map((g) => `f${g.id} ${g.name} ${full(g.value)}`).join("; ")}`}`,
-        );
-        b.addEventListener("pointerenter", () => preview(f));
-        b.addEventListener("focus", () => preview(f));
-        tip(
-          b,
-          () =>
-            `${channel === "s" ? globals.map((g) => `${full(g.value)} · f${g.id} ${g.name}`).join("\n") : full(f.value) + " · pooled value"}\nf${f.id} ${f.name}\n${percentile(f) == null ? "Percentile unavailable" : `p${full(percentile(f) * 100)}`}\n${f.map_file ? f.map_role : f.map_status}`,
-        );
-        b.onclick = () => pin(f);
-        b.onkeydown = matrixKey;
-        b._feature = f;
-        group.append(b);
-      }
-      row.append(group);
-    }
-    root.append(row);
-  } // Preload the visible maps; pointer previews then use decoded bitmaps.
-  fs.filter((f) => f.map_file).forEach((f) =>
-    loadMap(f).catch((e) => status(e.message)),
-  );
-  $("atlas-table").replaceChildren(
-    table(
-      [
-        "ID",
-        "Name",
-        "Scale",
-        "Channel",
-        "Pooling",
-        "Value",
-        "Percentile",
-        "Map",
-      ],
-      fs.map((f) => [
-        `f${f.id}`,
-        f.name,
-        f.scale,
-        f.channel,
-        f.pooling,
-        full(f.value),
-        full(percentile(f)),
-        f.map_file || f.map_status || "global",
-      ]),
-      (i) => {
-        preview(fs[i]);
-        pin(fs[i]);
-      },
-    ),
-  );
-  if (!fs.includes(state.feature)) preview(fs[0]);
-  else renderFamilyLane().catch((e) => status(e.message));
-}
-$("matrix").addEventListener("pointermove", (e) => {
-  const cell = document.elementsFromPoint(e.clientX, e.clientY).find((node) => {
-    if (!node.classList?.contains("cell")) return false;
-    const r = node.getBoundingClientRect();
-    return (
-      e.clientX >= r.left &&
-      e.clientX <= r.right &&
-      e.clientY >= r.top &&
-      e.clientY <= r.bottom
-    );
-  });
-  if (cell && cell._feature !== state.feature) {
-    preview(cell._feature).catch((error) => status(error.message));
-    if (cell._tip)
-      tooltip(
-        { target: cell, clientX: e.clientX, clientY: e.clientY },
-        typeof cell._tip === "function" ? cell._tip() : cell._tip,
-      );
-  }
-});
-function matrixKey(e) {
-  if (e.key === "Enter") {
-    pin(e.currentTarget._feature);
-    return;
-  }
-  if (!e.key.startsWith("Arrow")) return;
-  e.preventDefault();
-  const cells = [
-      ...$("matrix").querySelectorAll(".cell:not([data-filtered=true])"),
-    ],
-    r = e.currentTarget.getBoundingClientRect(),
-    cx = r.x + r.width / 2,
-    cy = r.y + r.height / 2;
-  const dir = {
-    ArrowRight: [1, 0],
-    ArrowLeft: [-1, 0],
-    ArrowDown: [0, 1],
-    ArrowUp: [0, -1],
-  }[e.key];
-  const candidates = cells.filter((c) => {
-    const q = c.getBoundingClientRect();
-    return (
-      (q.x + r.width / 2 - cx) * dir[0] + (q.y + r.height / 2 - cy) * dir[1] > 1
-    );
-  });
-  candidates.sort((a, b) => {
-    const distance = (c) => {
-      const q = c.getBoundingClientRect(),
-        dx = q.x + r.width / 2 - cx,
-        dy = q.y + r.height / 2 - cy;
-      return Math.hypot(dx, dy) + Math.abs(dx * dir[1] - dy * dir[0]) * 4;
-    };
-    return distance(a) - distance(b);
-  });
-  candidates[0]?.focus();
+  studio.renderTree();
 }
 async function loadMap(f) {
   if (!f?.map_file) return null;
@@ -581,9 +376,11 @@ async function renderFamilyLane() {
 }
 let previewGeneration = 0;
 async function preview(f) {
+  const started = performance.now();
   const generation = ++previewGeneration;
   if (!f) return;
   state.feature = f;
+  studio.reference(f);
   renderFamilyLane().catch((e) => status(e.message));
   $("feature-detail").textContent =
     `f${f.id} ${f.name} · value ${fmt(f.value)} · ${percentile(f) == null ? "percentile unavailable" : `p${fmt(100 * percentile(f))} in ${$("bank").selectedOptions[0]?.textContent}`}`;
@@ -606,6 +403,7 @@ async function preview(f) {
   overlay.height = painted.height;
   overlay.getContext("2d").drawImage(painted, 0, 0);
   overlay.dataset.map = f.key ?? String(f.id);
+  overlay.dataset.latency = String(performance.now() - started);
   $("map-legend").replaceChildren(
     el("span", fmt(f.map_range[0])),
     el("span", null, "ramp"),
@@ -624,6 +422,9 @@ function pin(f) {
     if (state.pins.length === 4) state.pins.shift();
     state.pins.push(f);
   }
+  studio.hold = state.pins.includes(f) ? f : null;
+  preview(f);
+  studio.reference(f, true);
   renderPins();
   renderMatrix();
 }
@@ -650,6 +451,17 @@ async function renderPins() {
     remove.setAttribute("aria-label", `Unpin f${f.id}`);
     remove.onclick = () => pin(f);
     caption.append(remove);
+    c.tabIndex = 0;
+    c.setAttribute("role", "button");
+    c.setAttribute("aria-label", `Show pinned f${f.id}`);
+    c.onclick = () => {
+      studio.hold = f;
+      preview(f);
+      studio.reference(f, true);
+    };
+    c.onkeydown = (e) => {
+      if (e.key === "Enter" || e.key === " ") c.click();
+    };
     fig.append(
       c,
       caption,
@@ -737,6 +549,7 @@ async function selectPair() {
   pair._label = p.label;
   state.pair = pair;
   state.pins = [];
+  studio.hold = null;
   state.feature = null;
   options(
     $("family"),
@@ -1449,6 +1262,8 @@ const weightView = new WeightView({
   select: (input, unit) => {
     state.input = input;
     state.unit = unit;
+    studio.showUnit = true;
+    studio.reference(state.feature, true);
     $("input").value = input;
     renderWeights();
     loadLens().catch((e) => status(e.message));
@@ -1683,6 +1498,8 @@ async function loadLens() {
   renderRange();
   renderFamily();
   renderInputRanking();
+  studio.renderTree();
+  studio.reference(studio.hold || state.feature, true);
   document.querySelector(".diagnostics").classList.remove("loading");
 }
 let bakeGeneration = 0;
@@ -1815,7 +1632,10 @@ document.addEventListener("keydown", (e) => {
 });
 async function boot() {
   try {
-    state.manifest = await get("data/manifest.json");
+    [state.manifest, studio.references] = await Promise.all([
+      get("data/manifest.json"),
+      get("data/reference.json"),
+    ]);
     options(
       $("bank"),
       (state.manifest.banks || []).map((b) => [b.id, b.label]),
@@ -1833,6 +1653,7 @@ async function boot() {
       ...state.manifest.bakes.map((b) => [b.id, b.label]),
     ]);
     await Promise.all([selectPair(), selectBake()]);
+    studio.ready();
     status(state.manifest.note || "");
     if (!state.manifest.pairs.length && state.manifest.bakes.length)
       view("lens");
@@ -1849,4 +1670,20 @@ async function boot() {
     empty($("concern-table"), "Waiting for the Rust weight audit.");
   }
 }
+const studio = new Studio({
+  state,
+  $,
+  el,
+  fmt,
+  full,
+  percentile,
+  colour,
+  preview,
+  pin,
+  loadMap,
+  get,
+  renderWeights,
+  loadLens,
+  status,
+});
 boot();

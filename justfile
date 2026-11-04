@@ -4065,3 +4065,9 @@ viz-ci-status:
 
 viz-review-browser:
     TMPDIR="$HOME/tmp/zensim-viz" node tools/zensim-viz/tests/review1.mjs
+
+viz-reference catalog out:
+    python3 -B tools/zensim-viz/reference.py --paper "$HOME/work/zen/zenpapers" --catalog {{quote(catalog)}} --out {{quote(out)}}
+
+viz-design2-browser:
+    TMPDIR="$HOME/tmp/zensim-viz" node tools/zensim-viz/tests/design2.mjs
