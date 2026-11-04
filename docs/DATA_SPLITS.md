@@ -3210,3 +3210,30 @@ fixed-epoch selection rule, and sealed/public_test/confirmation restriction abov
 remains unchanged. W4 replaces the omitted seed repetitions; it introduces no new
 read population or selection rule. Freeze all six final bakes before the unchanged
 registered reads. Candidate across-seed stability is unmeasured.
+
+## 2026-11-04 — R14 smooth input transforms (registered before screening/reads)
+
+Registration: `5b5a013482db4944042883995ad6892f92244c69`, the R14 section of
+[the E36 experiment record](../benchmarks/e36_subset_test_2026-11-01.md).
+Transform statistics/MLE/greedy screening use only the base mix recipe's admitted
+TRAIN rows, after fx2 f32 products. Validation-only development groups do not
+enter those statistics. The screen target is the trainer's `human_score` in
+stored score-point units. Root transforms and dead-zone transforms are excluded;
+all allowed kinds have finite positive slopes at zero. T2 feasibility uses only
+teacher TRAIN-development rows, with frozen final packed bytes. No EVAL statistic
+selects transforms, checkpoints, fits, thresholds or continuation parameters.
+
+The planned frozen-candidate assessments reuse the mix R10, HC1, R12 and R13
+populations and their accumulated exposure: EVAL collection/full compression and
+non-codec panels, E36 selection-source inversions, G-CHROMA-L, G-STEER, C1–C6,
+G-ADDR, identity, NEARID, and the cube-root:203 HDR panel/UPIQ-all. These are
+repeated report-only reads, not independent confirmation. The UPIQ-all panel
+includes the previously disclosed development rows and is not a new holdout.
+No new R14 assessment has occurred at this entry. CLIC, CIQA and MMSPG confirmation
+sets are not reopened; public_test and all sealed sets stay untouched.
+
+Base fitting and the inherited public_train ×256 AIC-2026 continuation retain
+original TRAIN roles, native targets, rehearsal and admission. No AIC-2026 result
+statistics are committed. Seeds1–2 require the registered seed0 product/development
+conditions and the owner's subsequent cost decision. The public zensim repository
+and its A model remain outside this research change.
