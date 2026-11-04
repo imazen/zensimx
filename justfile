@@ -4234,7 +4234,7 @@ r13-width-report output:
     python3 -B scripts/byconstruction/r13_width_report.py --out {{quote(output)}}
 
 r13-width-archive:
-    python3 -B scripts/byconstruction/r13_width.py job --label archive -- bash scripts/byconstruction/r13_width_archive.sh
+    flock ~/tmp/heavy.lock ~/work/claudehints/scripts/run-heavy --mem 24G --jobs 8 -- bash scripts/byconstruction/r13_width_archive.sh
 
 
 
