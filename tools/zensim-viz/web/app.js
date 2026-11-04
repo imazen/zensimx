@@ -1,6 +1,7 @@
+import {formatNumber} from './format.mjs';
 const $ = id => document.getElementById(id);
 const state = {manifest:null,pair:null,feature:null,pins:[],maps:new Map(),bake:null,audit:null,weights:null,lens:null,compare:null,input:0,unit:0,filters:{scale:'all',channel:'all',fragility:'damage',pooling:'all'},view:'atlas',pan:[0,0]};
-const fmt = n => n==null?'unavailable':Number(n).toPrecision(4).replace(/\.?0+(e|$)/,'$1');
+const fmt = formatNumber;
 const full = n => n==null?'undefined':String(n);
 const el = (tag,text,cls) => {const e=document.createElement(tag);if(text!=null)e.textContent=text;if(cls)e.className=cls;return e;};
 const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
