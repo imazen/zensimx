@@ -7097,6 +7097,126 @@ pub(crate) mod tests {
         check(&r, "hlg-1000");
     }
 
+    /// The anchored cube-root arm (`HdrEncoding::LinearCubeRoot`, the HDR
+    /// front-end experiment of 2026-11-04) IS the SDR front end on the same
+    /// light. The SDR route's gamut-preserving branch (non-sRGB primaries,
+    /// `GamutMapping::Preserve`) runs the same gamut matrix and the same
+    /// unclamped cube-root converter the arm runs, so on identical linear f32
+    /// pixels every slot agrees bit for bit at a unit of 1 cd/m². (The SDR
+    /// route's clamped sRGB branch is another kernel of the same formula and
+    /// agrees only within floating-point precision; the first version of this
+    /// test compared against it and saw a 3% difference on a 1.9e-4 slot.)
+    /// The unit is exact: doubled light at a unit of 2 cd/m² is the same
+    /// measurement bit for bit. PU21 on the same light is a different front
+    /// end, and a non-positive or non-finite unit is refused.
+    #[test]
+    fn linear_cube_root_front_end_is_the_sdr_cube_root_on_the_same_light() {
+        use crate::source::{ColorPrimaries, GamutMapping};
+        /// Linear f32 RGBA in Display P3; `hdr` selects the HDR route.
+        struct P3Linear {
+            data: Vec<[f32; 4]>,
+            w: usize,
+            h: usize,
+            hdr: bool,
+        }
+        impl P3Linear {
+            fn new(rgb: &[[f32; 3]], w: usize, h: usize, hdr: bool) -> Self {
+                Self {
+                    data: rgb.iter().map(|p| [p[0], p[1], p[2], 1.0]).collect(),
+                    w,
+                    h,
+                    hdr,
+                }
+            }
+        }
+        impl crate::source::ImageSource for P3Linear {
+            fn width(&self) -> usize {
+                self.w
+            }
+            fn height(&self) -> usize {
+                self.h
+            }
+            fn pixel_format(&self) -> crate::source::PixelFormat {
+                crate::source::PixelFormat::LinearF32Rgba
+            }
+            fn row_bytes(&self, y: usize) -> &[u8] {
+                bytemuck::cast_slice(&self.data[y * self.w..(y + 1) * self.w])
+            }
+            fn alpha_mode(&self) -> crate::source::AlphaMode {
+                crate::source::AlphaMode::Opaque
+            }
+            fn color_primaries(&self) -> ColorPrimaries {
+                ColorPrimaries::DisplayP3
+            }
+            fn gamut_mapping(&self) -> GamutMapping {
+                GamutMapping::Preserve
+            }
+            fn is_hdr(&self) -> bool {
+                self.hdr
+            }
+        }
+        let (w, h) = (96usize, 64usize);
+        let src = nits_image(w, h, 0.01, 0.7, 11);
+        let dst = distort_nits(&src);
+        let z = crate::Zensim::new(crate::ZensimProfile::codec_target()).with_parallel(false);
+        let mut scratch = V2Scratch::new();
+        let cube = |rgb_s: &[[f32; 3]], rgb_d: &[[f32; 3]], unit_nits: f32, scratch: &mut V2Scratch| {
+            z.compute_folded720_append_features_hdr(
+                &P3Linear::new(rgb_s, w, h, true),
+                &P3Linear::new(rgb_d, w, h, true),
+                HdrEncoding::LinearCubeRoot { unit_nits },
+                V2NewFeatureToggles::default(),
+                scratch,
+            )
+        };
+        let arm = cube(&src, &dst, 1.0, &mut scratch).unwrap();
+        let sdr = z
+            .compute_folded720_append_features(
+                &P3Linear::new(&src, w, h, false),
+                &P3Linear::new(&dst, w, h, false),
+            )
+            .unwrap();
+        assert_eq!(arm.features().len(), sdr.features().len());
+        for (i, (a, b)) in arm.features().iter().zip(sdr.features()).enumerate() {
+            assert_eq!(
+                a.to_bits(),
+                b.to_bits(),
+                "slot {i}: cube-root HDR arm {a} vs SDR gamut-preserving path {b}"
+            );
+        }
+        // Exact unit: ×2 light at a unit of 2 cd/m² (both exact in binary
+        // floating point) is the same measurement bit for bit.
+        let twice = |rgb: &[[f32; 3]]| -> Vec<[f32; 3]> { rgb.iter().map(|p| p.map(|c| c * 2.0)).collect() };
+        let doubled = cube(&twice(&src), &twice(&dst), 2.0, &mut scratch).unwrap();
+        for (i, (a, b)) in arm.features().iter().zip(doubled.features()).enumerate() {
+            assert_eq!(a.to_bits(), b.to_bits(), "slot {i}: unit 1 {a} vs doubled light at unit 2 {b}");
+        }
+        // The PU21 front end on the same light is a different measurement.
+        let pu = z
+            .compute_folded720_append_features_hdr(
+                &P3Linear::new(&src, w, h, true),
+                &P3Linear::new(&dst, w, h, true),
+                HdrEncoding::Linear,
+                V2NewFeatureToggles::default(),
+                &mut scratch,
+            )
+            .unwrap();
+        assert!(
+            pu.features()
+                .iter()
+                .zip(arm.features())
+                .any(|(a, b)| a.to_bits() != b.to_bits()),
+            "PU21 and the anchored cube root must not coincide"
+        );
+        // A non-positive or non-finite unit is refused at the entry.
+        for unit in [0.0f32, -1.0, f32::NAN, f32::INFINITY] {
+            assert!(
+                cube(&src, &dst, unit, &mut scratch).is_err(),
+                "unit {unit} must be refused"
+            );
+        }
+    }
+
     /// BANDVIS δ-constant derivation (append2, 2026-07-27): measure the
     /// |∇| the span-2 central-difference kernel reports at one-code-step
     /// plateau edges, through the REAL front-ends, at all 4 walk scales.

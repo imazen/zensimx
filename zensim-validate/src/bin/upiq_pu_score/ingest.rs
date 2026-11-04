@@ -1,4 +1,8 @@
 //! Label-free, pinned UPIQ-380 extraction through the existing HDR owner.
+//!
+//! `--front-end pu21` (default) is the stored banks' producer; `--front-end
+//! cube-root:<nits>` is the anchored cube-root research arm (2026-11-04), and
+//! the result manifest records the choice as `hdr_front_end`.
 use std::collections::{BTreeSet, HashMap};
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -33,11 +37,18 @@ pub(super) fn requested(args: &[String]) -> bool {
 }
 
 fn extraction_option(args: &[String], key: &str) -> Result<String, String> {
+    optional_extraction_option(args, key)?.ok_or_else(|| format!("missing {key}"))
+}
+
+/// An extraction option that may be absent; present, it needs one unambiguous value.
+fn optional_extraction_option(args: &[String], key: &str) -> Result<Option<String>, String> {
     let mut positions = args
         .iter()
         .enumerate()
         .filter(|(_, arg)| is_option(arg, key));
-    let (i, option) = positions.next().ok_or_else(|| format!("missing {key}"))?;
+    let Some((i, option)) = positions.next() else {
+        return Ok(None);
+    };
     if positions.next().is_some() {
         return Err(format!("duplicate {key}"));
     }
@@ -47,8 +58,34 @@ fn extraction_option(args: &[String], key: &str) -> Result<String, String> {
         args.get(i + 1).map(String::as_str)
     };
     match value {
-        Some(value) if !value.is_empty() && !value.starts_with("--") => Ok(value.into()),
+        Some(value) if !value.is_empty() && !value.starts_with("--") => Ok(Some(value.into())),
         _ => Err(format!("missing value for {key}")),
+    }
+}
+
+/// The HDR front end of an extraction: `pu21` (the default and the stored
+/// banks' producer) or `cube-root:<unit nits>`, the research arm registered on
+/// 2026-11-04 (zensimx `benchmarks/e36_subset_test_2026-11-01.md`, "HDR
+/// front-end experiment"). Returns the encoding and the normalised label the
+/// manifest records.
+fn front_end(value: Option<&str>) -> Result<(zensim::feature_v2::HdrEncoding, String), String> {
+    match value {
+        None | Some("pu21") => Ok((zensim::feature_v2::HdrEncoding::Linear, "pu21".into())),
+        Some(spec) => {
+            let nits = spec
+                .strip_prefix("cube-root:")
+                .ok_or_else(|| format!("unknown --front-end {spec:?} (pu21 | cube-root:<nits>)"))?;
+            let unit_nits: f32 = nits
+                .parse()
+                .map_err(|_| format!("--front-end cube-root unit {nits:?} is not a number"))?;
+            if !unit_nits.is_finite() || unit_nits <= 0.0 {
+                return Err("--front-end cube-root unit must be finite and positive".into());
+            }
+            Ok((
+                zensim::feature_v2::HdrEncoding::LinearCubeRoot { unit_nits },
+                format!("cube-root:{unit_nits}"),
+            ))
+        }
     }
 }
 
@@ -175,6 +212,8 @@ pub(super) fn run(args: &[String]) -> Result<(), String> {
     let path = extraction_option(args, "--training-allowlist")?;
     let pin = extraction_option(args, "--allowlist-sha256")?;
     let out = extraction_option(args, "--out")?;
+    let (encoding, front_end_label) =
+        front_end(optional_extraction_option(args, "--front-end")?.as_deref())?;
     if Path::new(&out).exists() || Path::new(&format!("{out}.manifest.json")).exists() {
         return Err("fresh extraction output required".into());
     }
@@ -225,13 +264,8 @@ pub(super) fn run(args: &[String]) -> Result<(), String> {
         if (reference.w, reference.h) != (distorted.w, distorted.h) {
             return Err("reference/distorted dimensions differ".into());
         }
-        let result = zensim::research::extract_hdr(
-            &req,
-            reference,
-            &distorted,
-            zensim::feature_v2::HdrEncoding::Linear,
-        )
-        .map_err(|e| e.to_string())?;
+        let result = zensim::research::extract_hdr(&req, reference, &distorted, encoding)
+            .map_err(|e| e.to_string())?;
         let metadata = result.manifest_json();
         if result.values().len() != TRANSPORT_WIDTH {
             return Err("frozen UPIQ transport width changed".into());
@@ -261,6 +295,7 @@ pub(super) fn run(args: &[String]) -> Result<(), String> {
     }
     let metadata = serde_json::json!({"schema":"upiq380-extraction-result-v1", "rows":a.rows.len(),
         "formula_revision":a.formula_revision,"input_contract":a.input_contract,"requested_ids":a.requested_ids,
+        "hdr_front_end":front_end_label,
         "allowlist_sha256":pin,"build_commit":zensim::research::BUILD_COMMIT,
         "research":serde_json::from_str::<serde_json::Value>(&manifest.ok_or("empty extraction")?).map_err(|e| e.to_string())?,
         "files_read":reads,"reference_count":refs.len(),"decoder":"zenexr; native BT.709 f32 absolute nits; finite opaque samples"});
@@ -353,6 +388,31 @@ mod tests {
             "--subjective".into(),
             "synthetic.csv".into()
         ]));
+    }
+
+    #[test]
+    fn front_end_defaults_to_pu21_and_parses_anchored_cube_root() {
+        use zensim::feature_v2::HdrEncoding;
+        assert_eq!(front_end(None).unwrap(), (HdrEncoding::Linear, "pu21".to_string()));
+        assert_eq!(front_end(Some("pu21")).unwrap().1, "pu21");
+        assert_eq!(
+            front_end(Some("cube-root:203")).unwrap(),
+            (HdrEncoding::LinearCubeRoot { unit_nits: 203.0 }, "cube-root:203".to_string())
+        );
+        for bad in ["cube-root:0", "cube-root:-5", "cube-root:nan", "cube-root:", "pu", "cube-root"] {
+            assert!(front_end(Some(bad)).is_err(), "{bad}");
+        }
+        let args: Vec<String> = ["--front-end", "cube-root:100", "--out", "x"]
+            .iter()
+            .map(|s| (*s).to_string())
+            .collect();
+        assert_eq!(
+            optional_extraction_option(&args, "--front-end").unwrap().as_deref(),
+            Some("cube-root:100")
+        );
+        assert_eq!(optional_extraction_option(&args, "--allowlist-sha256").unwrap(), None);
+        let dup: Vec<String> = ["--front-end=a", "--front-end", "b"].iter().map(|s| (*s).to_string()).collect();
+        assert!(optional_extraction_option(&dup, "--front-end").is_err());
     }
 
     #[test]

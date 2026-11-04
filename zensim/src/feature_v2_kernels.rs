@@ -823,6 +823,21 @@ pub enum HdrEncoding {
         /// Ambient illuminance, lux (5.0 = reference environment).
         ambient_lux: f32,
     },
+    /// Research arm (registered 2026-11-04, zensimx
+    /// `benchmarks/e36_subset_test_2026-11-01.md`, "HDR front-end experiment"):
+    /// pixels are absolute linear light in cd/m² exactly as [`Self::Linear`],
+    /// but the walk feeds them through the **SDR cube-root XYB opsin** with
+    /// `unit_nits` mapped to 1.0 (`nits / unit_nits`, values above 1.0
+    /// retained: `color::linear_to_positive_xyb_planar_into_unclamped`)
+    /// instead of the PU21 front end. The anchored cube root is what
+    /// SSIMULACRA2's native HDR path does; `unit_nits = 255` is its libjxl
+    /// anchor, 100 is zensim's PU normalisation point, 203 BT.2408 diffuse
+    /// white. Only `LinearF32Rgba` input. No shipped profile uses this arm.
+    LinearCubeRoot {
+        /// Absolute luminance, cd/m², that maps to linear 1.0 before the
+        /// cube-root opsin. Finite and positive.
+        unit_nits: f32,
+    },
 }
 
 /// Which FORMULA REVISION an extraction computes — re-exported so

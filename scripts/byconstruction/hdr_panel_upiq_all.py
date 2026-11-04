@@ -33,11 +33,11 @@ def pearson(a, b):
     return float(np.corrcoef(a, b)[0, 1])
 
 
-def populations(width):
+def populations(width, bank, jod_csv):
     out = {}
-    keys = pq.read_table(BANKS / "upiq-r2-bank/keys.parquet").to_pylist()
-    feats = pq.read_table(BANKS / "upiq-r2-bank/features.parquet")
-    jod = {r[0]: float(r[1]) for r in csv.reader(open("/mnt/v/output/zenmetrics/upiq-pu/upiq_cid_jod.csv"))}
+    keys = pq.read_table(bank / "keys.parquet").to_pylist()
+    feats = pq.read_table(bank / "features.parquet")
+    jod = {r[0]: float(r[1]) for r in csv.reader(open(jod_csv))}
     idx, ref, y, fam = [], [], [], []
     for i, k in enumerate(keys):
         idx.append(i); ref.append(f"upiq:{k['dataset']}:{k['content']:02d}"); y.append(100.0 + 10.0 * jod[k["condition_id"]]); fam.append(ref[-1])
@@ -97,12 +97,16 @@ def main():
     ap.add_argument("--models", nargs="+", required=True, help="NAME=BAKE:TOKEN (fx1|fx2); the first is the baseline")
     ap.add_argument("--byc-predict", required=True)
     ap.add_argument("--width-root", default="/var/tmp/byc-mixes-20261025/Mlic/root")
+    ap.add_argument("--upiq-bank", type=Path, default=BANKS / "upiq-r2-bank",
+                    help="hdr-native-rev7-bank-v1 directory (default: the 2026-10-29 PU21 bank; the HDR front-end arms live in their own banks)")
+    ap.add_argument("--jod", default="/mnt/v/output/zenmetrics/upiq-pu/upiq_cid_jod.csv")
     ap.add_argument("--out", type=Path, required=True)
     a = ap.parse_args()
     from v2_common import derived_declaration
     width = json.loads((Path(a.width_root) / "wide/main/real/receipt.json").read_text())["width"]
     a.out.mkdir(parents=True, exist_ok=True)
-    pops = populations(width)
+    bank_manifest = json.loads((a.upiq_bank / "_MANIFEST.json").read_text())
+    pops = populations(width, a.upiq_bank, a.jod)
     models = {m.split("=")[0]: m.split("=")[1].rsplit(":", 1) for m in a.models}
     result, base = {}, a.models[0].split("=")[0]
     for pname, (feats, idx, ref, y, fam) in pops.items():
@@ -116,7 +120,10 @@ def main():
             preds[name] = np.array([float(l.split("\t")[1]) for l in pred.read_text().splitlines()[1:] if l])
         result[pname] = {n: dict(metrics(p, y, ref, fam), **({} if n == base else dict(delta_within_group_vs_base=family_bootstrap(preds, y, ref, fam, base, n))))
                          for n, p in preds.items()}
+    result["_bank"] = dict(path=str(a.upiq_bank), hdr_front_end=bank_manifest.get("hdr_front_end", "pu21"),
+                           build_commit=bank_manifest.get("build_commit"), features_parquet_sha256=bank_manifest.get("features_parquet_sha256"))
     (a.out / "panel.json").write_text(json.dumps(result, indent=1) + "\n")
+    result.pop("_bank")
     print(json.dumps({p: {n: (m["pooled_srocc"], m["within_group_spearman_mean"]) for n, m in v.items()} for p, v in result.items()}, indent=0))
 
 

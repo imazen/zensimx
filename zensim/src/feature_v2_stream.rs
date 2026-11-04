@@ -120,6 +120,8 @@ pub(crate) enum FrontEnd {
     /// the declared [`HdrEncoding`] → the UPIQ-validated PU-XYB front-end
     /// (`color::linear_to_pu_xyb_planar_into`: opsin mix → PU21
     /// banding_glare per channel ÷ PU21(100) → opponent axes, X×4).
+    /// [`HdrEncoding::LinearCubeRoot`] (research arm) swaps the PU-XYB step
+    /// for the SDR cube-root opsin on `nits / unit_nits`, unclamped.
     Hdr(HdrEncoding),
 }
 
@@ -1140,13 +1142,33 @@ impl<'a, S: ImageSource, D: ImageSource> StripPlaneProducer<'a, S, D> {
                                     self.revision,
                                 );
                             }
-                            crate::color::linear_to_pu_xyb_planar_into_at_revision(
-                                &self.hdr_row[..width],
-                                &mut p0[row_off..row_off + width],
-                                &mut p1[row_off..row_off + width],
-                                &mut p2[row_off..row_off + width],
-                                self.revision,
-                            );
+                            match encoding {
+                                // Research arm: the SDR cube-root opsin on
+                                // nits scaled so `unit_nits` is 1.0, values
+                                // above 1.0 retained (no display clamp).
+                                HdrEncoding::LinearCubeRoot { unit_nits } => {
+                                    let inv = 1.0 / unit_nits;
+                                    for px in &mut self.hdr_row[..width] {
+                                        for c in px.iter_mut() {
+                                            *c *= inv;
+                                        }
+                                    }
+                                    crate::color::linear_to_positive_xyb_planar_into_unclamped(
+                                        &self.hdr_row[..width],
+                                        &mut p0[row_off..row_off + width],
+                                        &mut p1[row_off..row_off + width],
+                                        &mut p2[row_off..row_off + width],
+                                        self.revision,
+                                    );
+                                }
+                                _ => crate::color::linear_to_pu_xyb_planar_into_at_revision(
+                                    &self.hdr_row[..width],
+                                    &mut p0[row_off..row_off + width],
+                                    &mut p1[row_off..row_off + width],
+                                    &mut p2[row_off..row_off + width],
+                                    self.revision,
+                                ),
+                            }
                         }
                     }
                 }
@@ -1518,7 +1540,7 @@ fn hdr_source_row_to_nits(
     }
     if !already_nits {
         match encoding {
-            HdrEncoding::Linear => {}
+            HdrEncoding::Linear | HdrEncoding::LinearCubeRoot { .. } => {}
             HdrEncoding::Pq { peak_nits } => {
                 crate::transfer::decode_pq_row_at_revision(&mut out[..width], peak_nits, revision)
             }

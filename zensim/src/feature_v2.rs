@@ -7987,6 +7987,7 @@ pub(crate) fn validate_hdr_pair(
     crate::metric::check_within_max_pixels(source.width(), source.height(), max_pixels)?;
     let valid_display = match encoding {
         HdrEncoding::Linear => true,
+        HdrEncoding::LinearCubeRoot { unit_nits } => unit_nits.is_finite() && unit_nits > 0.0,
         HdrEncoding::Pq { peak_nits } => peak_nits.is_finite() && peak_nits > 0.0,
         HdrEncoding::Hlg {
             peak_nits,
@@ -8003,7 +8004,9 @@ pub(crate) fn validate_hdr_pair(
     }
     let shape_ok = |fmt: crate::source::PixelFormat, alpha: crate::source::AlphaMode| {
         let fmt_ok = match encoding {
-            HdrEncoding::Linear => fmt == crate::source::PixelFormat::LinearF32Rgba,
+            HdrEncoding::Linear | HdrEncoding::LinearCubeRoot { .. } => {
+                fmt == crate::source::PixelFormat::LinearF32Rgba
+            }
             HdrEncoding::Pq { .. } | HdrEncoding::Hlg { .. } => {
                 fmt == crate::source::PixelFormat::LinearF32Rgba
                     || fmt == crate::source::PixelFormat::Srgb16Rgba
