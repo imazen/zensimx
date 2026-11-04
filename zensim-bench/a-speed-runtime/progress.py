@@ -12,6 +12,7 @@ from run_processes import compute_lock, process_snapshot, process_tree
 
 def main():
     root = Path(sys.argv[1]).resolve()
+    task_root = root
     if "--stage" in sys.argv[2:]:
         stage = sys.argv[sys.argv.index("--stage") + 1]
         assert stage in ("before", "after")
@@ -74,6 +75,16 @@ def main():
         "admission": "Final admission is owned by report.py; output presence is not qualification.",
     }
     (root / "LIVE_CHECK.json").write_text(json.dumps(value, indent=2) + "\n")
+    if parallel_gate and task_root != root:
+        task = json.loads((task_root / "PROGRESS.json").read_text())
+        task.update({"last_check": value["checked_utc"], "stage": f"{root.name}: {stage}",
+                     "source": str(task_root / "source/a-speed-runtime"),
+                     "binary_sha256": actual,
+                     "raw_timing_outputs": sum(len(list((task_root / phase / "results").glob("*t_*_latency.json"))) for phase in ("before", "after")),
+                     "required_timing_cells": 50,
+                     "verified_workers": workers, "collector": collector,
+                     "admission": value["admission"]})
+        (task_root / "PROGRESS.json").write_text(json.dumps(task, indent=2) + "\n")
     with (root / "SUPERVISION.jsonl").open("a") as stream:
         stream.write(json.dumps(value) + "\n")
     print(json.dumps({
