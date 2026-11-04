@@ -562,3 +562,12 @@ body[data-instrument="lens"] #image-mode,
 body[data-instrument="lens"] .stage-controls {
   display: none;
 }
+
+.topbar select {
+  font-size: 12px;
+}
+.exhibits.diagnostics > figure {
+  padding: 24px;
+  margin: 0;
+  border: 0;
+}

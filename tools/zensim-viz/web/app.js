@@ -203,6 +203,7 @@ function view(v) {
   if (state.manifest) status(state.manifest.note || "");
   $("atlas").hidden = v !== "atlas";
   $("lens").hidden = v !== "lens";
+  if (v === "atlas") studio.fitImage();
   if (v === "lens" && state.feature && state.weights)
     studio.choose(state.feature, true);
   else if (v === "atlas" && state.feature) {
@@ -399,6 +400,7 @@ async function preview(f) {
     $("overlay").dataset.map = f.key ?? String(f.id);
     $("map-legend").textContent =
       `${f.map_status || "Global statistic; no spatial map"} · pooled ${full(f.value)}`;
+    studio.updateLegend();
     return;
   }
   const painted = document.createElement("canvas");
@@ -419,6 +421,7 @@ async function preview(f) {
       `Own range · pooled ${fmt(f.value)} · ${f.pooling} · pooling grid ${(f.pooling_grid || []).join("×")}`,
     ),
   );
+  studio.updateLegend();
 }
 function pin(f) {
   if (!f) return;

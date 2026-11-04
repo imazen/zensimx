@@ -86,6 +86,7 @@ export class Studio {
         `${img.naturalHeight * ratio}px`,
       );
     };
+    this.fitImage = fit;
     this.$("pair-image").addEventListener("load", fit);
     new ResizeObserver(() => {
       fit();
