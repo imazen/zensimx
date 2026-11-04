@@ -12,6 +12,8 @@ import r13_width as owner
 
 
 def main():
+    if sys.argv[1:] not in ([], ['--compact']):
+        raise ValueError('expected no arguments or --compact')
     root=Path('/var/tmp/byc-width-20261104')
     now=datetime.now(timezone.utc).isoformat()
     lock=X/'.workongoing'
@@ -36,6 +38,9 @@ def main():
                owner_cost_cut=(root/'OWNER_COST_CUT.json').exists(),
                next_action='finish registered fits, freeze before assessment' if len(done)<owner.required_fits() else 'complete registered assessments')
     (root/'SUPERVISION.json').write_text(json.dumps(state,indent=2)+'\n')
+    if sys.argv[1:] == ['--compact']:
+        state = {k:state[k] for k in ('checked','stage','completed_fits','required_fits','epochs','lock')}
+        state['trainer'] = [p for p in live if p['executable'] and p['executable'].endswith('zensim_mlp_train')]
     print(json.dumps(state,indent=2))
 
 
