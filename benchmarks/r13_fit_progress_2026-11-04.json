@@ -1,0 +1,109 @@
+{
+  "schema": "r13-packed-fit-progress-v1",
+  "registration": "25e772922fd5a40d576e12af47778ce81bed5e08",
+  "trainer_source_commit": "ccdb5c7aa0d4b67d52f0e2874f325fbc84ddb11c",
+  "reporting_source_sha256": "36d00b9b84bdac205a79dc79d447aeac05a953de0191aabafa87260f6ba0f06a",
+  "complete_fits": 2,
+  "required_fits": 15,
+  "models": [
+    {
+      "name": "W32-s0",
+      "hidden": 32,
+      "initial_max_pairs": 8,
+      "seed": 0,
+      "packed_sha256": "beaf83829ee6899f5474a486c7580fc7773daada9bb2a8c36c0c7ef988de171f",
+      "packed_bytes": 34156,
+      "certified": true,
+      "certified_max_pairs": 1,
+      "capacity": {
+        "dead": 23,
+        "residual": 7,
+        "live": 2
+      },
+      "wall_seconds_excluding_lock_waits": 716.21,
+      "stage_times": [
+        {
+          "stage": "base",
+          "seconds": 471.51,
+          "elapsed": "7:51.51"
+        },
+        {
+          "stage": "continuation",
+          "seconds": 244.16,
+          "elapsed": "4:04.16"
+        },
+        {
+          "stage": "pack",
+          "seconds": 0.54,
+          "elapsed": "0:00.54"
+        }
+      ],
+      "resource_receipts": {
+        "base": "run-heavy: done rc=0 472s | peak-RSS 1.91GiB | min-avail 39073MiB | peak-load 3.10",
+        "continuation": "run-heavy: done rc=0 244s | peak-RSS 1.99GiB | min-avail 39486MiB | peak-load 2.02",
+        "pack": "run-heavy: done rc=0 1s | peak-RSS 0.28GiB | min-avail 42010MiB | peak-load 1.38"
+      },
+      "finished": "2026-11-04T18:10:27.472368+00:00"
+    },
+    {
+      "name": "W256-s0",
+      "hidden": 256,
+      "initial_max_pairs": 64,
+      "seed": 0,
+      "packed_sha256": "5097267b5d4d74369169c48d74c883010158dcffcb36cda0ca0f4ec35ca2c387",
+      "packed_bytes": 37040,
+      "certified": true,
+      "certified_max_pairs": 1,
+      "capacity": {
+        "dead": 191,
+        "residual": 63,
+        "live": 2
+      },
+      "wall_seconds_excluding_lock_waits": 4624.73,
+      "stage_times": [
+        {
+          "stage": "base",
+          "seconds": 3421.72,
+          "elapsed": "57:01.72"
+        },
+        {
+          "stage": "continuation",
+          "seconds": 1202.18,
+          "elapsed": "20:02.18"
+        },
+        {
+          "stage": "pack",
+          "seconds": 0.83,
+          "elapsed": "0:00.83"
+        }
+      ],
+      "resource_receipts": {
+        "base": "run-heavy: done rc=0 3422s | peak-RSS 1.96GiB | min-avail 38818MiB | peak-load 2.42",
+        "continuation": "run-heavy: done rc=0 1203s | peak-RSS 1.95GiB | min-avail 39172MiB | peak-load 2.28",
+        "pack": "run-heavy: done rc=0 1s | peak-RSS 0.28GiB | min-avail 41719MiB | peak-load 1.86"
+      },
+      "finished": "2026-11-04T19:27:36.600900+00:00"
+    }
+  ],
+  "pending": [
+    "W64-s0",
+    "W512-s0",
+    "W16-s0",
+    "W32-s1",
+    "W256-s1",
+    "W64-s1",
+    "W512-s1",
+    "W16-s1",
+    "W32-s2",
+    "W256-s2",
+    "W64-s2",
+    "W512-s2",
+    "W16-s2"
+  ],
+  "artifacts": {
+    "host": "dev",
+    "root": "/var/tmp/byc-width-20261104",
+    "source_pins_sha256": "72f4f8736d18ae73bef7cd0c7e76582621f088607894e536f4daa476a2fc42e3"
+  },
+  "role": "packed-fit identities/capacity only; all fifteen must freeze before R13 EVAL assessments"
+}

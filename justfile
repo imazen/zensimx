@@ -4246,6 +4246,9 @@ r13-width-tables output:
 r13-width-status:
     python3 -B scripts/byconstruction/r13_width_status.py
 
+r13-width-fit-progress:
+    python3 -B scripts/byconstruction/r13_width_fit_progress.py --out benchmarks/r13_fit_progress_2026-11-04.json
+
 r13-width-report output:
     python3 -B scripts/byconstruction/r13_width_report.py --out {{quote(output)}}
 
