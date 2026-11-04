@@ -1,0 +1,82 @@
+{
+  "registration": "5b5a013482db4944042883995ad6892f92244c69",
+  "trainer_source_commit": "912609aaacd3663a10426006a8b6d84bad826f93",
+  "trainer_sha256": "3c9b88b82ab9f1688a4ec9dc4ddd2b9321d9ca94275829973d8d77d20d483949",
+  "screen_summary_sha256": "27464bad49b68250b245a5ae6b672f8e370c41b9dbafadbd116442b6c844dbc4",
+  "models": [
+    {
+      "arm": "T1a",
+      "seed": 0,
+      "packed_sha256": "6a28893f896696fde6832782631e0af0582e9a317478fc5dc621198716935487",
+      "packed_bytes": 40076,
+      "wall_seconds_excluding_lock_waits": 2291.47,
+      "stage_times": [
+        {
+          "stage": "base",
+          "label": "T1a-s0-base",
+          "seconds": 1615.09
+        },
+        {
+          "stage": "continuation",
+          "label": "T1a-s0-continuation-r2",
+          "seconds": 675.52
+        },
+        {
+          "stage": "pack",
+          "label": "T1a-s0-pack-inspection-r2",
+          "seconds": 0.8600000000000001,
+          "retained_payload_label": "T1a-s0-pack",
+          "retained_payload_seconds": 0.81
+        }
+      ],
+      "capacity": {
+        "dead": 94,
+        "residual": 30,
+        "live": 4
+      },
+      "certified": true,
+      "certified_max_pairs": 2,
+      "token_counts": {
+        "yeo_johnson": 984
+      },
+      "resource_receipts": {
+        "base": "run-heavy: done rc=0 1615s | peak-RSS 15.52GiB | min-avail 27156MiB | peak-load 3.05",
+        "continuation": "run-heavy: done rc=0 676s | peak-RSS 12.50GiB | min-avail 27634MiB | peak-load 2.32",
+        "pack": "run-heavy: done rc=0 0s | peak-RSS 0.02GiB | min-avail 40848MiB | peak-load 2.61"
+      },
+      "native_stages": {
+        "base": {
+          "path": "/var/tmp/byc-transforms-20261104/bin/zensim_mlp_train",
+          "sha256": "3c9b88b82ab9f1688a4ec9dc4ddd2b9321d9ca94275829973d8d77d20d483949",
+          "source_commit": "912609aaacd3663a10426006a8b6d84bad826f93"
+        },
+        "continuation": {
+          "path": "/var/tmp/byc-transforms-20261104/repairs/selected-callers/bin/zensim_mlp_train",
+          "sha256": "002740271cb808b0709b1f9ff6da3b89ca1d25bd399a41b109fb59c9715a8d35",
+          "source_commit": "fc41da568eee0703dd28020834a04d47be3a3e51"
+        }
+      },
+      "failed_attempts": [
+        {
+          "label": "T1a-s0-continuation",
+          "optimizer_steps": 0,
+          "receipt_sha256": "3ab571f51e99f58000fdf1dd92753141e211d705806892d83cc50aa94fa98d89"
+        },
+        {
+          "label": "T1a-s0-pack",
+          "stage": "inspection after successful canonical packing",
+          "receipt_sha256": "201e1503e24130c7be6281bbd54b954ded8a4c46c6fcc8b575d43b77c38f66b9",
+          "included_in_successful_payload_wall": true
+        }
+      ],
+      "finished": "2026-11-04T23:30:46.439357+00:00"
+    }
+  ],
+  "pending": [
+    "T1b",
+    "T1c"
+  ],
+  "completed": 1,
+  "required_T1_fits": 3,
+  "role": "packed-fit identities only; no AIC-2026 quality statistics or EVAL selection"
+}

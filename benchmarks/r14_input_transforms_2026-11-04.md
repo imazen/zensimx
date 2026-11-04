@@ -1,6 +1,6 @@
 # R14: smooth per-input transforms for A
 
-**Incomplete: fits, development feasibility, product/EVAL/HDR reads, capacity
+**Incomplete: 1 of 3 T1 fits is complete; development feasibility, product/EVAL/HDR reads, capacity
 panels, head timing and archive verification are not yet measured.** No candidate
 is selected or adopted. No EVAL data has been read by R14.
 
@@ -216,8 +216,30 @@ are pinned separately, including each fit stage's native identity.
 
 ## Results
 
-Not measured yet. Complete every registered arm/read or report a verified blocker;
-no missing evidence counts as a pass. Frozen A is the control and is not refitted.
+T1a seed 0 completed its 120 base epochs and 60 continuation epochs. Its final
+40,076-byte packed bake is certified, SHA256
+`6a28893f896696fde6832782631e0af0582e9a317478fc5dc621198716935487`.
+Measured payload wall is 2,291.47 seconds: base 1,615.09; continuation 675.52;
+packing/inspection 0.86. Shared-lock waits and the failed pre-optimizer loader
+attempt are excluded. Structural capacity is 94 dead / 30 residual / 4 live
+hidden units; the final certificate retains two active max pairs.
+
+Base resource receipt: `run-heavy: done rc=0 1615s | peak-RSS 15.52GiB | min-avail 27156MiB | peak-load 3.05`.
+Continuation: `run-heavy: done rc=0 676s | peak-RSS 12.50GiB | min-avail 27634MiB | peak-load 2.32`.
+The first post-pack inspection failed because the frozen R12 executable's
+inspection branch called its older serving metadata validator. The canonical
+pack and certificate had already succeeded. Rebuilding the same inspector
+against transformed-derived serving support took 39 seconds (peak RSS
+1.64 GiB, minimum available 36,291 MiB). Recovery verifies the original command
+and recorded SHA256 and inspects those same packed bytes; no calibration or
+fit repeats. The R12 timing executable remains unchanged. Both failed attempts
+and stage-specific native identities are retained in the artifact root.
+[Fit receipt](r14_fit_progress_2026-11-04.json) contains the exact successful
+times, hashes, certified transform inventory and resource receipts.
+
+T1b and T1c, full-bank capacity contributions, development feasibility and all
+quality/product reads remain outstanding. No missing evidence counts as a pass.
+Frozen A is the control and is not refitted.
 
 The public crate (imazen/zensim) is untouched: 0.3.0 ships A without transforms;
 porting transform support to its derived path is a later follow-up.
