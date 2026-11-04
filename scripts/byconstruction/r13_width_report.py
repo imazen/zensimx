@@ -58,6 +58,8 @@ def main():
            'Native inspections of all layers/scalers/derived declarations/dial splines are exactly equal before',
            'and after stripping. Assessments use the original packed bytes. Fit wall excludes this separate',
            'metadata-only finalization; its execution receipt appears below.','',
+           'Fit wall totals sum the recorded GNU time payload elapsed fields and exclude queued waits.',
+           'The W512 base elapsed field is printed at whole-second resolution; its recorded sum is not a centisecond-precise whole-fit measurement.','',
            '| Width | Seed | Base final dev geomean3 | TRAIN dev MAE | E36 inversions (%) | All-nine MOS error (%) | Chroma level | Dead / residual / live | Largest pair (%) | Inputs 50/90/99% | Head (µs) | Fit wall (s) |',
            '|---|---:|---:|---:|---:|---:|---|---|---:|---|---:|---:|']
     compact=[]

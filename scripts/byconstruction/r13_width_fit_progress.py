@@ -47,6 +47,7 @@ def main():
     owner.write(a.out,dict(schema='r13-packed-fit-progress-v1',registration='25e772922fd5a40d576e12af47778ce81bed5e08',
           trainer_source_commit=pins['source_commit'],reporting_source_sha256=owner.sha(__file__),
           trainer_source_scope='original numerical source; W4 adds its separately registered admission overlay',
+          wall_time_method='sum of recorded GNU time payload elapsed fields; queued waits excluded; stage strings retain printed precision',
           complete_fits=len(rows),required_fits=owner.required_fits(),models=rows,pending=pending,omitted=omitted,
           artifacts=dict(host='dev',root=str(owner.O),source_pins_sha256=owner.sha(owner.O/'SOURCE_PINS.json')),
           role='packed-fit identities/capacity only; every retained candidate must freeze before R13 EVAL assessments'))

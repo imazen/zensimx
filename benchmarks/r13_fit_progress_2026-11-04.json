@@ -2,9 +2,10 @@
   "schema": "r13-packed-fit-progress-v1",
   "registration": "25e772922fd5a40d576e12af47778ce81bed5e08",
   "trainer_source_commit": "ccdb5c7aa0d4b67d52f0e2874f325fbc84ddb11c",
-  "reporting_source_sha256": "ca971326a886da6aa317d33e6c63a70d163954b83b4e031e1453400e0e8b3e1a",
+  "reporting_source_sha256": "486816c73509c148bee363fb4e4b8ce0f5c02197abc49b2a25f447118d532949",
   "trainer_source_scope": "original numerical source; W4 adds its separately registered admission overlay",
-  "complete_fits": 3,
+  "wall_time_method": "sum of recorded GNU time payload elapsed fields; queued waits excluded; stage strings retain printed precision",
+  "complete_fits": 4,
   "required_fits": 6,
   "models": [
     {
@@ -129,10 +130,50 @@
       "finished": "2026-11-04T19:48:25.535979+00:00",
       "native_trainer_sha256": "267a3492e14bd2c2988e49a056b9a1840b188aada796804974f635b733c670cf",
       "admission_registration": "25e772922fd5a40d576e12af47778ce81bed5e08"
+    },
+    {
+      "name": "W512-s0",
+      "hidden": 512,
+      "initial_max_pairs": 128,
+      "seed": 0,
+      "packed_sha256": "472256e7488b66dcd46b9387095f0901dc18c4edcd45606e7be53d63bdc89335",
+      "packed_bytes": 38790,
+      "certified": true,
+      "certified_max_pairs": 2,
+      "capacity": {
+        "dead": 508,
+        "residual": 0,
+        "live": 4
+      },
+      "wall_seconds_excluding_lock_waits": 8386.33,
+      "stage_times": [
+        {
+          "stage": "base",
+          "seconds": 6226.0,
+          "elapsed": "1:43:46"
+        },
+        {
+          "stage": "continuation",
+          "seconds": 2159.12,
+          "elapsed": "35:59.12"
+        },
+        {
+          "stage": "pack",
+          "seconds": 1.21,
+          "elapsed": "0:01.21"
+        }
+      ],
+      "resource_receipts": {
+        "base": "run-heavy: done rc=0 6227s | peak-RSS 2.01GiB | min-avail 38515MiB | peak-load 5.01",
+        "continuation": "run-heavy: done rc=0 2159s | peak-RSS 1.99GiB | min-avail 38653MiB | peak-load 4.32",
+        "pack": "run-heavy: done rc=0 1s | peak-RSS 0.29GiB | min-avail 41160MiB | peak-load 2.25"
+      },
+      "finished": "2026-11-04T22:18:40.792970+00:00",
+      "native_trainer_sha256": "267a3492e14bd2c2988e49a056b9a1840b188aada796804974f635b733c670cf",
+      "admission_registration": "25e772922fd5a40d576e12af47778ce81bed5e08"
     }
   ],
   "pending": [
-    "W512-s0",
     "W16-s0",
     "W4-s0"
   ],
