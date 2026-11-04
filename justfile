@@ -4097,6 +4097,10 @@ a-parallel-gate-collect root binary threads sizes:
 a-parallel-gate-report root output phase:
     python3 -B zensim-bench/a-speed-runtime/report.py {{quote(root)}} {{quote(output)}} --parallel-gate {{quote(phase)}}
 
+# Progress view of complete contiguous baseline cells; never admits the matrix.
+a-parallel-gate-crossover root output:
+    python3 -B zensim-bench/a-speed-runtime/report.py {{quote(root)}} {{quote(output)}} --crossover-prefix
+
 a-parallel-gate-progress host root *args:
     ssh {{quote(host)}} python3 -B {{quote(root + "/source/a-speed-runtime/progress.py")}} {{quote(root)}} {{args}}
 

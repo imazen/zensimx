@@ -148,6 +148,21 @@ class ParallelGateAdmission(unittest.TestCase):
         self.assertEqual(result["parallel_min_pixels"], 192**2)
         self.assertEqual(result["score_comparisons"], 1000)
 
+    def test_prefix_crossover_does_not_admit_an_incomplete_matrix(self):
+        (self.root / "before/results/16t_4096_latency.json").unlink()
+        result = report.crossover_prefix(self.root)
+        self.assertEqual(result["crossovers"], {"16": 160, "4": 192})
+        self.assertFalse(result["full_matrix_admitted"])
+        with self.assertRaises(FileNotFoundError):
+            report.parallel_gate(self.root, "before")
+
+    def test_prefix_cannot_jump_a_missing_earlier_score_cell(self):
+        (self.root / "before/results/4t_160_scores.log").unlink()
+        result = report.crossover_prefix(self.root)
+        self.assertIsNone(result["crossovers"]["4"])
+        self.assertIsNone(result["parallel_min_pixels"])
+        self.assertFalse(result["full_matrix_admitted"])
+
     def test_score_bit_movement_refuses(self):
         path = self.root / "after/results/4t_64_scores.log"
         path.write_text(path.read_text().replace("3ff0000000000000\t3ff0000000000000", "3ff0000000000000\t3ff0000000000001", 1))

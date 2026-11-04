@@ -233,12 +233,19 @@ def main():
     parser.add_argument("output", type=Path)
     parser.add_argument("--command-startup", action="store_true", help="require both separate command-startup runs")
     parser.add_argument("--parallel-gate", choices=("before", "after"), help="validate the A serial/parallel matrix")
+    parser.add_argument("--crossover-prefix", action="store_true", help="inspect admitted baseline prefixes; never qualifies the full matrix")
     parser.add_argument("--split-parity", nargs=3, type=Path, metavar=("REF7", "REF1", "PUBLIC"))
     args = parser.parse_args()
     if args.split_parity:
         result = split_parity(*args.split_parity, args.output)
         print(json.dumps(result))
         assert result["missing"] == result["extra"] == result["different"] == 0, "split parity diff is not empty"
+        return
+    if args.crossover_prefix:
+        result = crossover_prefix(args.root)
+        assert not args.output.exists(), "never overwrite a prefix receipt"
+        args.output.write_text(json.dumps(result, indent=2) + "\n")
+        print(json.dumps({key: result[key] for key in ("full_matrix_admitted", "crossovers", "parallel_min_pixels")}))
         return
     if args.parallel_gate:
         result = parallel_gate(args.root, args.parallel_gate)
@@ -303,6 +310,61 @@ def split_parity(reference7, reference1, public_path, output):
     return result
 
 
+def parallel_gate_cell(root, fixtures, pairs, stage, threads, size):
+    """Admit one whole cell; the matrix owner decides required coverage."""
+    run_root = root / stage
+    assert (run_root / "measurement-host.txt").read_text().strip() == "i270"
+    expected = {r["id"] for r in fixtures if r["size"] == size}
+    assert len(expected) == 20
+    path = run_root / f"results/{threads}t_{size}_latency.json"
+    log = path.with_suffix(".log").read_text()
+    assert "run-heavy: done rc=0" in log, (path, "runner failed")
+    assert not re.findall(r'foreign pid=\d+ name="(cc1plus|cc1|rustc|cargo|cmake|ninja|make|zensim_mlp_trai)"', log), (path, "foreign build/training")
+    run = json.loads(path.read_text())
+    assert not run["unreliable"]
+    assert len(run["comparisons"]) == 20
+    seen, pooled, excluded = set(), [[], []], 0
+    per_image = [[], []]
+    for group in run["comparisons"]:
+        label, pixels, pair_id = group["group_name"].split("/")
+        assert pair_id in expected and pair_id not in seen
+        seen.add(pair_id)
+        pair = pairs[pair_id]
+        assert int(label) == size and int(pixels) == pair["width"] * pair["height"]
+        assert [b["name"] for b in group["benchmarks"]] == ["serial", "parallel"]
+        samples = group["samples"]
+        assert all(s["iterations"] == 1 for s in samples)
+        clean = [s for s in samples if s["gate_clean"] is True][:32]
+        assert len(clean) == 32, (path, pair_id, "insufficient clean rounds")
+        excluded += sum(s["gate_clean"] is not True for s in samples)
+        for i in (0, 1):
+            values = [s["elapsed_ns"][i] / 1e6 for s in clean]
+            assert all(math.isfinite(v) and v > 0 for v in values)
+            assert all(sorted(s["execution_order"]) == [0, 1] for s in clean)
+            pooled[i].extend(values)
+            per_image[i].append((int(pixels), statistics.median(values)))
+    assert seen == expected
+    score_log = run_root / f"results/{threads}t_{size}_scores.log"
+    score_text = score_log.read_text()
+    assert "run-heavy: done rc=0" in score_text
+    scores = {}
+    for line in score_text.splitlines():
+        fields = line.split("\t")
+        if len(fields) == 5 and fields[0] in expected:
+            pair_id, serial, parallel, serial_bits, parallel_bits = fields
+            assert pair_id not in scores
+            assert serial == parallel and serial_bits == parallel_bits, (pair_id, "score moved")
+            scores[pair_id] = serial_bits
+    assert set(scores) == expected, (score_log, "incomplete scores")
+    row = {"stage": stage, "threads": threads, "size": size, "images": 20,
+           "samples_per_arm": 640, "excluded_rounds": excluded, "score_bits": scores,
+           "runner": next(line for line in log.splitlines() if line.startswith("run-heavy: done"))}
+    for i, arm in enumerate(("serial", "parallel")):
+        row[arm] = {"p50_ms": quantile(pooled[i], .5), "p95_ms": quantile(pooled[i], .95)}
+    row["speedup"] = row["serial"]["p50_ms"] / row["parallel"]["p50_ms"]
+    return row
+
+
 def parallel_gate(root, phase):
     """Retain one shared first-32-clean index set for the two arms."""
     fixtures = json.loads((root / "fixtures/pairs.json").read_text())
@@ -310,59 +372,9 @@ def parallel_gate(root, phase):
     assert len(pairs) == len(fixtures), "duplicate fixture IDs"
     rows = []
     for stage in (("before",) if phase == "before" else ("before", "after")):
-        run_root = root / stage
-        assert (run_root / "measurement-host.txt").read_text().strip() == "i270"
         for threads in (16, 4):
             for size in (*GATE_SIZES, 4096) if threads == 16 else GATE_SIZES:
-                expected = {r["id"] for r in fixtures if r["size"] == size}
-                assert len(expected) == 20
-                path = run_root / f"results/{threads}t_{size}_latency.json"
-                log = path.with_suffix(".log").read_text()
-                assert "run-heavy: done rc=0" in log, (path, "runner failed")
-                assert not re.findall(r'foreign pid=\d+ name="(cc1plus|cc1|rustc|cargo|cmake|ninja|make|zensim_mlp_trai)"', log), (path, "foreign build/training")
-                run = json.loads(path.read_text())
-                assert not run["unreliable"]
-                assert len(run["comparisons"]) == 20
-                seen, pooled, excluded = set(), [[], []], 0
-                per_image = [[], []]
-                for group in run["comparisons"]:
-                    label, pixels, pair_id = group["group_name"].split("/")
-                    assert pair_id in expected and pair_id not in seen
-                    seen.add(pair_id)
-                    pair = pairs[pair_id]
-                    assert int(label) == size and int(pixels) == pair["width"] * pair["height"]
-                    assert [b["name"] for b in group["benchmarks"]] == ["serial", "parallel"]
-                    samples = group["samples"]
-                    assert all(s["iterations"] == 1 for s in samples)
-                    clean = [s for s in samples if s["gate_clean"] is True][:32]
-                    assert len(clean) == 32, (path, pair_id, "insufficient clean rounds")
-                    excluded += sum(s["gate_clean"] is not True for s in samples)
-                    for i in (0, 1):
-                        values = [s["elapsed_ns"][i] / 1e6 for s in clean]
-                        assert all(math.isfinite(v) and v > 0 for v in values)
-                        assert all(sorted(s["execution_order"]) == [0, 1] for s in clean)
-                        pooled[i].extend(values)
-                        per_image[i].append((int(pixels), statistics.median(values)))
-                assert seen == expected
-                score_log = run_root / f"results/{threads}t_{size}_scores.log"
-                score_text = score_log.read_text()
-                assert "run-heavy: done rc=0" in score_text
-                scores = {}
-                for line in score_text.splitlines():
-                    fields = line.split("\t")
-                    if len(fields) == 5 and fields[0] in expected:
-                        pair_id, serial, parallel, serial_bits, parallel_bits = fields
-                        assert pair_id not in scores
-                        assert serial == parallel and serial_bits == parallel_bits, (pair_id, "score moved")
-                        scores[pair_id] = serial_bits
-                assert set(scores) == expected, (score_log, "incomplete scores")
-                row = {"stage": stage, "threads": threads, "size": size, "images": 20,
-                       "samples_per_arm": 640, "excluded_rounds": excluded, "score_bits": scores,
-                       "runner": next(line for line in log.splitlines() if line.startswith("run-heavy: done"))}
-                for i, arm in enumerate(("serial", "parallel")):
-                    row[arm] = {"p50_ms": quantile(pooled[i], .5), "p95_ms": quantile(pooled[i], .95)}
-                row["speedup"] = row["serial"]["p50_ms"] / row["parallel"]["p50_ms"]
-                rows.append(row)
+                rows.append(parallel_gate_cell(root, fixtures, pairs, stage, threads, size))
     before = {(r["threads"], r["size"]): r for r in rows if r["stage"] == "before"}
     for row in rows:
         assert row["score_bits"] == before[(row["threads"], row["size"])]["score_bits"], "before/after scores moved"
@@ -373,6 +385,31 @@ def parallel_gate(root, phase):
     gate_side = max(crossovers.values())
     return {"rows": rows, "crossovers": crossovers, "parallel_min_pixels": gate_side ** 2,
             "score_comparisons": len(rows) * 20, "score_differences": 0}
+
+
+def crossover_prefix(root):
+    """Inspect completed contiguous prefixes, separately from matrix admission."""
+    fixtures = json.loads((root / "fixtures/pairs.json").read_text())
+    pairs = {r["id"]: r for r in fixtures}
+    assert len(pairs) == len(fixtures), "duplicate fixture IDs"
+    rows = []
+    for threads in (16, 4):
+        for size in GATE_SIZES:
+            stem = root / f"before/results/{threads}t_{size}"
+            latency = Path(str(stem) + "_latency.json")
+            scores = Path(str(stem) + "_scores.log")
+            if not latency.exists() or not scores.exists() or "run-heavy: done rc=0" not in scores.read_text():
+                break  # An explicit progress view; the full matrix still refuses missing cells.
+            rows.append(parallel_gate_cell(root, fixtures, pairs, "before", threads, size))
+    index = {(r["threads"], r["size"]): r for r in rows}
+    for size in GATE_SIZES:
+        if (4, size) in index and (16, size) in index:
+            assert index[(4, size)]["score_bits"] == index[(16, size)]["score_bits"], "thread-count scores moved"
+    crossovers = {str(t): next((r["size"] for r in rows if r["threads"] == t and r["speedup"] > 1), None) for t in (16, 4)}
+    minimum = max(crossovers.values()) ** 2 if all(crossovers.values()) else None
+    return {"full_matrix_admitted": False, "rows": rows, "crossovers": crossovers,
+            "parallel_min_pixels": minimum,
+            "admission": "Crossover prefixes only; --parallel-gate owns complete matrix admission."}
 
 
 def render_parallel_gate(result):
