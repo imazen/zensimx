@@ -68,6 +68,12 @@ if (scope === "all") {
   assert.match(await page.locator("#feature-detail").textContent(), /value/);
 }
 if (scope === "all" && process.env.VIZ_TEST_COMPLETE === "1") {
+  assert.ok(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+    "open data tables must scroll inside their panel",
+  );
   await page.waitForLoadState("networkidle");
   const latency = await page.evaluate(async () => {
     const samples = [],
@@ -127,13 +133,14 @@ if (scope === "all" && process.env.VIZ_TEST_COMPLETE === "1") {
     assert.equal(existsSync(path), false, "preserve earlier captures");
     await page.screenshot({ path, fullPage: true });
   };
+  await page.locator("#colour").selectOption("percentile");
   await capture("atlas-dark");
   await page.locator("#theme").click();
   await capture("atlas-light");
   await page.locator("#theme").click();
   await page.getByRole("button", { name: "MLP lens", exact: true }).click();
   await page.waitForSelector("#pdp-chart .mean");
-  assert.equal(await page.locator("#pdp-chart .ice").count(), 200);
+  assert.equal(await page.locator("#pdp-chart .ice").count(), 40);
   await page.locator("#compare").selectOption("E");
   await page.waitForSelector("#pdp-chart .compare");
   assert.ok(await page.locator("#comparison-panel").isVisible());
@@ -151,15 +158,24 @@ if (scope === "all" && process.env.VIZ_TEST_COMPLETE === "1") {
     "native monotonicity counterexamples must be exposed",
   );
   await page.locator("#kind").selectOption("");
+  if (await page.locator("#pdp-table").isVisible())
+    await page.locator("[data-table=pdp-table]").click();
+  assert.ok(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+    "tables must stay within the viewport",
+  );
   await capture("mlp-lens-dark");
   await page.locator("#theme").click();
   await capture("mlp-lens-light");
   await page.locator("#theme").click();
   await page.locator("#bank").selectOption("hdr-teacher");
   await page.waitForFunction(() =>
-    document.querySelector("#audit-summary").textContent.includes("7390"),
+    document.querySelector("#audit-summary").textContent.includes("7,390"),
   );
-  await page.waitForFunction(() => !document.querySelector("#pdp-chart svg"));
+  await page.waitForSelector("#pdp-chart .mean");
+  assert.equal(await page.locator("#pdp-chart .ice").count(), 40);
   await page.locator("#bake").selectOption("F1");
   await page.waitForFunction(() =>
     document

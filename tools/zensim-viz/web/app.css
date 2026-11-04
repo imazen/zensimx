@@ -189,7 +189,6 @@ kbd {
   flex: 0 0 14px;
   cursor: crosshair;
 }
-.matrix-row .cell:hover,
 .matrix-row .cell:focus-visible,
 .matrix-row .cell[data-hover="true"] {
   outline: 2px solid var(--ink);
@@ -481,4 +480,121 @@ details summary {
 #weight-detail {
   white-space: pre-line;
   overflow-wrap: anywhere;
+}
+
+/* Review 1: native display orders, full pixel minimap and local detail. */
+.weight-views {
+  display: grid;
+  grid-template-columns: 144px minmax(0, 1fr);
+  gap: 12px;
+}
+#weight-wrap {
+  max-height: none;
+  overflow: hidden;
+  border: 0;
+}
+#weight-minimap-scroll {
+  max-height: 408px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  width: 144px;
+}
+#weight-matrix {
+  width: 128px;
+  height: auto;
+  max-width: none;
+}
+#weight-zoom {
+  width: 100%;
+  height: auto;
+  image-rendering: pixelated;
+}
+.weight-strip-scroll {
+  max-height: 280px;
+  overflow: auto;
+  margin: 12px 0 24px;
+}
+.weight-strip {
+  width: 100%;
+  min-width: 480px;
+  display: block;
+}
+.weight-strip text {
+  fill: var(--ink-2);
+  font-size: 12px;
+}
+.zero-line {
+  stroke: var(--ink-3);
+  stroke-width: 1;
+}
+.iqr-band {
+  fill: var(--series-1);
+  fill-opacity: 0.15;
+  stroke: none;
+}
+.band-key {
+  background: var(--series-1);
+  opacity: 0.15;
+  height: 12px;
+  border: 1px solid var(--series-1);
+}
+#pdp-legend {
+  justify-content: flex-start;
+}
+/* Review 1: preserve dense marks while making the hovered target forgiving. */
+.matrix-row {
+  grid-template-columns: minmax(180px, 1.4fr) repeat(
+      var(--matrix-columns, 4),
+      minmax(80px, 1fr)
+    );
+}
+#matrix {
+  max-height: calc(100vh - 390px);
+  min-height: 220px;
+  overflow: auto;
+}
+.matrix-row .cell {
+  position: relative;
+}
+.matrix-row .cell::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+}
+.matrix-row .cell[data-hover="true"]::after,
+.matrix-row .cell:focus-visible::after {
+  inset: -18px;
+}
+.matrix-row .cell[data-hover="true"],
+.matrix-row .cell:focus-visible {
+  z-index: 2;
+}
+.global-cell {
+  color: var(--ink-2);
+  font-size: 9px;
+}
+.empty-pins {
+  grid-column: 1 / -1;
+  min-height: 64px;
+  border: 1px dashed var(--border);
+  padding: 16px;
+  color: var(--ink-3);
+  font-size: 12px;
+}
+.whisker.human {
+  stroke: var(--series-2);
+}
+
+#family-chart {
+  max-height: 520px;
+  overflow: auto;
+}
+.weight-strip .hit {
+  fill: transparent;
+  cursor: pointer;
+}
+.weight-strip g:hover rect:not(.hit),
+.weight-strip g:focus-visible rect:not(.hit) {
+  stroke: var(--ink);
+  stroke-width: 1;
 }

@@ -99,7 +99,7 @@
           ><span>High</span><span id="matrix-range"></span>
         </div>
         <div id="matrix" role="grid" aria-label="Feature matrix"></div>
-        <div id="atlas-table" hidden></div>
+        <div class="scroll-table" id="atlas-table" hidden></div>
         <div id="family-maps" hidden></div>
       </section>
     </main>
@@ -147,11 +147,12 @@
         <h1 id="concern-title">Concerns</h1>
         <div id="audit-summary" class="ink-2"></div>
         <div id="concern-table" class="scroll-table"></div>
+        <div id="concern-pager"></div>
       </section>
       <details id="comparison-panel" hidden>
         <summary>Comparison audit and weight drift</summary>
         <div id="comparison-detail"></div>
-        <div id="comparison-table"></div>
+        <div class="scroll-table" id="comparison-table"></div>
       </details>
       <div class="lens-layout">
         <section class="network">
@@ -164,18 +165,42 @@
           ></svg>
           <h2>Weights · input × hidden</h2>
           <div id="weight-detail" class="mono"></div>
-          <div id="weight-wrap">
-            <canvas
-              id="weight-matrix"
-              tabindex="0"
-              aria-label="Weight matrix, arrow keys move selected weight"
-            ></canvas>
+          <label
+            >Columns
+            <select id="column-order">
+              <option value="energy">Total |weight|</option>
+              <option value="selected">Selected input |weight|</option>
+            </select></label
+          >
+          <div id="weight-wrap" class="weight-views">
+            <div>
+              <div class="ink-2">1:1 minimap</div>
+              <div id="weight-minimap-scroll">
+                <canvas
+                  id="weight-matrix"
+                  tabindex="0"
+                  aria-label="Weight minimap, arrow keys move selected weight"
+                ></canvas>
+              </div>
+            </div>
+            <div>
+              <div class="ink-2">Selected region · stored IDs</div>
+              <canvas
+                id="weight-zoom"
+                tabindex="0"
+                aria-label="Zoomed weight region, arrow keys move selected weight"
+              ></canvas>
+            </div>
           </div>
           <div id="weight-legend" class="legend"></div>
           <details>
             <summary>Selected input weights · table</summary>
-            <div id="weight-table"></div>
+            <div class="scroll-table" id="weight-table"></div>
           </details>
+          <h2>Top 32 inputs for this unit</h2>
+          <div class="weight-strip-scroll" id="unit-input-strip"></div>
+          <h2>Top 16 units for this input</h2>
+          <div class="weight-strip-scroll" id="input-unit-strip"></div>
           <h2>Hidden units</h2>
           <div id="hidden-units"></div>
         </section>
@@ -185,10 +210,14 @@
               Partial dependence <span id="pdp-title" class="mono"></span
               ><button data-table="pdp-table">Table view</button>
             </figcaption>
+            <label
+              ><input type="checkbox" id="center-ice" /> Centered ICE · subtract
+              each row’s first value</label
+            >
             <div id="pdp-legend" class="legend"></div>
             <div id="pdp-chart"></div>
             <div id="pdp-note" class="ink-2"></div>
-            <div id="pdp-table" hidden></div>
+            <div class="scroll-table" id="pdp-table" hidden></div>
           </figure>
           <figure>
             <figcaption>
@@ -196,7 +225,7 @@
               <button data-table="range-table">Table view</button>
             </figcaption>
             <div id="range-chart"></div>
-            <div id="range-table" hidden></div>
+            <div class="scroll-table" id="range-table" hidden></div>
           </figure>
           <figure>
             <figcaption>
@@ -205,7 +234,7 @@
             </figcaption>
             <div id="family-chart"></div>
             <p id="attribution-note" class="ink-2"></p>
-            <div id="family-table" hidden></div>
+            <div class="scroll-table" id="family-table" hidden></div>
           </figure>
           <figure>
             <figcaption>
@@ -216,7 +245,7 @@
               </button>
             </figcaption>
             <div id="input-ranking-chart"></div>
-            <div id="input-ranking-table" hidden></div>
+            <div class="scroll-table" id="input-ranking-table" hidden></div>
           </figure>
         </section>
       </div>

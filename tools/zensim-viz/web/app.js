@@ -1,4 +1,5 @@
 import { formatNumber } from "./format.mjs";
+import { WeightView } from "./weight-view.js";
 const $ = (id) => document.getElementById(id);
 const state = {
   fullPrecision: false,
@@ -23,6 +24,19 @@ const state = {
   view: "atlas",
   pan: [0, 0],
 };
+function refreshSubject() {
+  if (state.view === "atlas" && state.pair) {
+    const p = state.pair,
+      label =
+        state.manifest?.bakes.find((b) => b.bake_sha256 === p.bake_sha256)
+          ?.label || p.bake_sha256.slice(0, 12);
+    $("subject").textContent =
+      `${p._label || p.name} · ${p.width}×${p.height} · ${label}`;
+  } else if (state.view === "lens")
+    $("subject").textContent = state.bake
+      ? `${state.bake.label} · ${state.audit?.bake_sha256?.slice(0, 12) || ""}`
+      : "No exported bank evidence";
+}
 const fmt = formatNumber;
 const full = (n) => (n == null ? "undefined" : String(n));
 const el = (tag, text, cls) => {
@@ -81,6 +95,7 @@ function hideTooltip() {
   $("tooltip").hidden = true;
 }
 function tip(node, text) {
+  node._tip = text;
   node.addEventListener("pointermove", (e) =>
     tooltip(e, typeof text === "function" ? text() : text),
   );
@@ -127,6 +142,11 @@ function table(headers, rows, onSelect) {
 }
 $("full-precision").onchange = () => {
   state.fullPrecision = $("full-precision").checked;
+  document.querySelectorAll("td[data-raw-text]").forEach((cell) => {
+    cell.textContent = state.fullPrecision
+      ? cell.dataset.rawText
+      : cell.dataset.compactText;
+  });
   document
     .querySelectorAll("td[data-raw-number]")
     .forEach(
@@ -174,6 +194,8 @@ function colour(t, div = false) {
 }
 function view(v) {
   state.view = v;
+  refreshSubject();
+  if (state.manifest) status(state.manifest.note || "");
   $("atlas").hidden = v !== "atlas";
   $("lens").hidden = v !== "lens";
   document
@@ -254,7 +276,8 @@ function visible() {
               : "damage"
             : String(f[key])) === v,
       ) &&
-      (!$("family-lane").checked || $("family").value === f.family),
+      (!$("family-lane").checked ||
+        $("family").value === (f.analysis_family || f.family)),
   );
 }
 function percentile(f) {
@@ -271,10 +294,16 @@ function renderMatrix() {
   const fs = visible(),
     root = $("matrix");
   root.replaceChildren();
+  const hasGlobals = fs.some((f) => !f.map_file);
+  root.style.setProperty("--matrix-columns", 4);
   const header = el("div", null, "matrix-row matrix-header");
-  ["family × scale", "X", "Y", "B", "global / chroma"].forEach((s) =>
-    header.append(el("span", s, "ink-2")),
-  );
+  [
+    "family × scale",
+    "X",
+    "Y",
+    "B",
+    ...(hasGlobals ? ["global / chroma"] : []),
+  ].forEach((s) => header.append(el("span", s, "ink-2")));
   root.append(header);
   const max = Math.max(
       ...state.pair.features.map((f) => Math.abs(f.value)),
@@ -282,7 +311,7 @@ function renderMatrix() {
     ),
     signed = $("colour").value === "signed";
   $("matrix-range").textContent = signed
-    ? `${fmt(-max)} … 0 … ${fmt(max)}`
+    ? `${fmt(-max)} … 0 … ${fmt(max)} where bank spans 0; one-sided cells retain percentiles`
     : "p0 … p100";
   $("matrix-ramp").style.background = signed
     ? "linear-gradient(to right,var(--ramp-div-n3),var(--ramp-div-0),var(--ramp-div-p3))"
@@ -294,10 +323,11 @@ function renderMatrix() {
       (f.fragility ? "fragility" : "damage") === state.filters.fragility &&
       (state.filters.scale === "all" ||
         String(f.scale) === state.filters.scale) &&
-      (!$("family-lane").checked || f.family === $("family").value),
+      (!$("family-lane").checked ||
+        (f.analysis_family || f.family) === $("family").value),
   );
   for (const f of positions) {
-    const key = `${f.family} · s${f.scale}`;
+    const key = `${f.analysis_family || f.family} · s${f.scale}`;
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key).push(f);
   }
@@ -305,32 +335,57 @@ function renderMatrix() {
     if (!items.some((f) => active.has(f))) continue;
     const row = el("div", null, "matrix-row");
     row.append(el("span", label, "row-label"));
-    for (const channel of ["x", "y", "b", "s"]) {
+    for (const channel of ["x", "y", "b", ...(hasGlobals ? ["s"] : [])]) {
       const group = el("div", null, "channel");
-      for (const f of items.filter(
-        (f) =>
-          (["x", "y", "b"].includes(f.channel) ? f.channel : "s") === channel,
-      )) {
+      const globals = items.filter((f) => !f.map_file && active.has(f));
+      const channelItems =
+        channel === "s"
+          ? globals.slice(0, 1)
+          : items.filter((f) => !!f.map_file && f.channel === channel);
+      for (const f of channelItems) {
         const b = el("button", null, "cell" + (!f.map_file ? " hollow" : ""));
         b.dataset.filtered = String(!active.has(f));
         b.style.visibility = active.has(f) ? "visible" : "hidden";
         b.tabIndex = active.has(f) ? 0 : -1;
         b.dataset.feature = f.key ?? f.id;
+        if (channel === "s") {
+          b.classList.add("global-cell");
+          b.dataset.globalMembers = globals.map((g) => g.key).join(",");
+          b.textContent = globals.length > 1 ? String(globals.length) : "";
+          b.setAttribute(
+            "aria-label",
+            globals
+              .map((g) => `f${g.id} ${g.name}: ${full(g.value)}`)
+              .join("; "),
+          );
+        }
         b.dataset.pinned = String(
           state.pins.some((p) => p.key === f.key && p.id === f.id),
         );
         b.dataset.hover = String(f === state.feature);
-        b.style.background = signed
+        const bankSha = state.manifest.banks.find(
+          (bank) => bank.id === $("bank").value,
+        )?.sha256;
+        const bankRange = f.bank_ranges?.[bankSha];
+        const signedFeature =
+          signed && bankRange?.[0] < 0 && bankRange?.[1] > 0;
+        b.dataset.diverging = String(!!signedFeature);
+        b.style.background = signedFeature
           ? colour(0.5 + (0.5 * f.value) / max, true)
           : percentile(f) == null
             ? "transparent"
             : colour(percentile(f));
         b.setAttribute(
           "aria-label",
-          `f${f.id} ${f.name}, value ${full(f.value)}, percentile ${full(percentile(f))}${f.map_file ? "" : ", no spatial map"}`,
+          `f${f.id} ${f.name}, value ${full(f.value)}, percentile ${full(percentile(f))}${f.map_file ? "" : `, no spatial map; ${globals.map((g) => `f${g.id} ${g.name} ${full(g.value)}`).join("; ")}`}`,
         );
         b.addEventListener("pointerenter", () => preview(f));
         b.addEventListener("focus", () => preview(f));
+        tip(
+          b,
+          () =>
+            `${channel === "s" ? globals.map((g) => `${full(g.value)} · f${g.id} ${g.name}`).join("\n") : full(f.value) + " · pooled value"}\nf${f.id} ${f.name}\n${percentile(f) == null ? "Percentile unavailable" : `p${full(percentile(f) * 100)}`}\n${f.map_file ? f.map_role : f.map_status}`,
+        );
         b.onclick = () => pin(f);
         b.onkeydown = matrixKey;
         b._feature = f;
@@ -374,6 +429,26 @@ function renderMatrix() {
   if (!fs.includes(state.feature)) preview(fs[0]);
   else renderFamilyLane().catch((e) => status(e.message));
 }
+$("matrix").addEventListener("pointermove", (e) => {
+  const cell = document.elementsFromPoint(e.clientX, e.clientY).find((node) => {
+    if (!node.classList?.contains("cell")) return false;
+    const r = node.getBoundingClientRect();
+    return (
+      e.clientX >= r.left &&
+      e.clientX <= r.right &&
+      e.clientY >= r.top &&
+      e.clientY <= r.bottom
+    );
+  });
+  if (cell && cell._feature !== state.feature) {
+    preview(cell._feature).catch((error) => status(error.message));
+    if (cell._tip)
+      tooltip(
+        { target: cell, clientX: e.clientX, clientY: e.clientY },
+        typeof cell._tip === "function" ? cell._tip() : cell._tip,
+      );
+  }
+});
 function matrixKey(e) {
   if (e.key === "Enter") {
     pin(e.currentTarget._feature);
@@ -435,7 +510,7 @@ async function loadMap(f) {
   return state.maps.get(url);
 }
 let mapPalette;
-async function paint(canvas, f, range) {
+async function paint(canvas, f, range, alphaByValue = false) {
   const map = await loadMap(f);
   if (!map) {
     canvas.width = 1;
@@ -459,7 +534,9 @@ async function paint(canvas, f, range) {
     data.data[i] = rgb[0];
     data.data[i + 1] = rgb[1];
     data.data[i + 2] = rgb[2];
-    data.data[i + 3] = 255;
+    data.data[i + 3] = alphaByValue
+      ? Math.round(Math.max(0, Math.min(1, t)) * 255)
+      : 255;
   }
   ctx.putImageData(data, 0, 0);
 }
@@ -502,7 +579,9 @@ async function renderFamilyLane() {
     await paint(canvas, f, range);
   }
 }
+let previewGeneration = 0;
 async function preview(f) {
+  const generation = ++previewGeneration;
   if (!f) return;
   state.feature = f;
   renderFamilyLane().catch((e) => status(e.message));
@@ -520,8 +599,8 @@ async function preview(f) {
     return;
   }
   const painted = document.createElement("canvas");
-  await paint(painted, f);
-  if (state.feature !== f) return;
+  await paint(painted, f, undefined, !$("map-only").checked);
+  if (state.feature !== f || generation !== previewGeneration) return;
   const overlay = $("overlay");
   overlay.width = painted.width;
   overlay.height = painted.height;
@@ -531,7 +610,10 @@ async function preview(f) {
     el("span", fmt(f.map_range[0])),
     el("span", null, "ramp"),
     el("span", fmt(f.map_range[1])),
-    el("span", `Own range · pooled ${fmt(f.value)} · ${f.pooling}`),
+    el(
+      "span",
+      `Own range · pooled ${fmt(f.value)} · ${f.pooling} · pooling grid ${(f.pooling_grid || []).join("×")}`,
+    ),
   );
 }
 function pin(f) {
@@ -545,8 +627,11 @@ function pin(f) {
   renderPins();
   renderMatrix();
 }
+let pinsGeneration = 0;
 async function renderPins() {
-  const maps = state.pins.filter((f) => f.map_file),
+  const generation = ++pinsGeneration,
+    pins = [...state.pins];
+  const maps = pins.filter((f) => f.map_file),
     range = maps.length
       ? [
           Math.min(...maps.map((f) => f.map_range[0])),
@@ -554,7 +639,10 @@ async function renderPins() {
         ]
       : [0, 0];
   $("pins").replaceChildren();
-  for (const f of state.pins) {
+  if (!pins.length)
+    $("pins").append(el("div", "pin a feature: Enter", "empty-pins"));
+  for (const f of pins) {
+    if (generation !== pinsGeneration) return;
     const fig = el("figure"),
       c = el("canvas"),
       caption = el("figcaption", `f${f.id} · ${fmt(f.value)}`),
@@ -607,6 +695,7 @@ $("alpha").oninput = () =>
     $("alpha").value,
   );
 $("map-only").onchange = () => {
+  preview(state.feature).catch((e) => status(e.message));
   $("pair-image").style.visibility = $("map-only").checked
     ? "hidden"
     : "visible";
@@ -636,20 +725,26 @@ $("stage").onpointermove = (e) => {
 $("stage").onpointerup = () => (drag = null);
 for (const id of ["colour", "family-lane", "family"])
   $(id).onchange = renderMatrix;
+let pairGeneration = 0;
 async function selectPair() {
+  const generation = ++pairGeneration;
   const p = state.manifest.pairs.find((p) => p.id === $("pair").value);
   if (!p) return;
   const url = new URL(p.meta, location.href).href;
   const pair = await get(url);
+  if (generation !== pairGeneration) return;
   pair._url = url;
+  pair._label = p.label;
   state.pair = pair;
   state.pins = [];
   state.feature = null;
   options(
     $("family"),
-    [...new Set(pair.features.map((f) => f.family))].map((v) => [v, v]),
+    [...new Set(pair.features.map((f) => f.analysis_family || f.family))].map(
+      (v) => [v, v],
+    ),
   );
-  $("subject").textContent = `${p.label} · ${pair.width}×${pair.height}`;
+  refreshSubject();
   renderFilters();
   renderMatrix();
   showImage();
@@ -773,10 +868,7 @@ function renderPdp() {
   const d = state.lens,
     other = state.compare;
   if (!d) {
-    empty(
-      $("pdp-chart"),
-      "No curve exported for this input. Export mlp-lens for its raw feature id.",
-    );
+    empty($("pdp-chart"), "No curve exported for this input.");
     $("pdp-table").replaceChildren();
     $("pdp-legend").replaceChildren();
     $("pdp-note").textContent = "";
@@ -785,20 +877,44 @@ function renderPdp() {
   }
   const p = d.pdp,
     op = other?.pdp;
-  const all = [...p.ice.flat(), ...(op?.mean || [])];
+  $("center-ice").disabled = !p.centered_ice?.length;
+  if ($("center-ice").disabled) $("center-ice").checked = false;
+  const centered = $("center-ice").checked,
+    ice = centered ? p.centered_ice : p.ice,
+    mean = centered ? p.centered_mean : p.mean,
+    low = centered ? p.centered_p25 : p.p25,
+    high = centered ? p.centered_p75 : p.p75,
+    otherMean = op ? (centered ? op.centered_mean : op.mean) : null;
+  const values = [
+      ...mean,
+      ...(low || []),
+      ...(high || []),
+      ...(otherMean || []),
+    ],
+    tickIndices = [0],
+    span = p.x.at(-1) - p.x[0];
+  if (span > 0) {
+    for (const i of [5, 10, 15])
+      if (
+        ((p.x[i] - p.x[tickIndices.at(-1)]) / span) * 708 >= 90 &&
+        ((p.x.at(-1) - p.x[i]) / span) * 708 >= 90
+      )
+        tickIndices.push(i);
+    tickIndices.push(20);
+  }
   const c = chartFrame(
     Math.min(...p.x),
     Math.max(...p.x),
-    Math.min(...all),
-    Math.max(...all),
+    Math.min(...values),
+    Math.max(...values),
     p.axis_label || `f${p.feature} · feature units`,
-    "Served score",
+    centered ? "Δ served score from each row’s first value" : "Served score",
     p.percentiles.length
-      ? [0, 5, 10, 15, 20].map((i) => [p.x[i], fmt(p.x[i])])
+      ? tickIndices.map((i) => [p.x[i], fmt(p.x[i])])
       : undefined,
   );
   if (p.percentiles.length)
-    for (const i of [0, 5, 10, 15, 20])
+    for (const i of tickIndices)
       c.node.append(
         svg(
           "text",
@@ -806,98 +922,131 @@ function renderPdp() {
           `p${fmt(p.percentiles[i] * 100)}`,
         ),
       );
-  p.ice.forEach((row) =>
-    c.node.append(
-      svg("path", { d: linePath(p.x, row, c.x, c.y), class: "ice" }),
-    ),
+  const definitions = svg("defs"),
+    clip = svg("clipPath", { id: "pdp-plot-clip" });
+  clip.append(
+    svg("rect", {
+      x: c.L,
+      y: c.T,
+      width: c.W - c.L - c.R,
+      height: c.H - c.B - c.T,
+    }),
   );
-  c.node.append(
-    svg("path", { d: linePath(p.x, p.mean, c.x, c.y), class: "line mean" }),
-  );
-  if (op)
-    c.node.append(
+  definitions.append(clip);
+  c.node.append(definitions);
+  const plot = svg("g", { "clip-path": "url(#pdp-plot-clip)" });
+  if (low?.length)
+    plot.append(
       svg("path", {
-        d: linePath(op.x, op.mean, c.x, c.y),
+        d:
+          linePath(p.x, low, c.x, c.y) +
+          p.x
+            .toReversed()
+            .map((v, i) => `L${c.x(v)} ${c.y(high[high.length - 1 - i])}`)
+            .join(" ") +
+          "Z",
+        class: "iqr-band",
+      }),
+    );
+  const shown = Math.min(40, ice.length);
+  for (let k = 0; k < shown; k++) {
+    const row = Math.floor((k * (ice.length - 1)) / Math.max(1, shown - 1));
+    plot.append(
+      svg("path", {
+        d: linePath(p.x, ice[row], c.x, c.y),
+        class: "ice",
+        "data-bank-row": p.row_indices[row],
+      }),
+    );
+  }
+  plot.append(
+    svg("path", { d: linePath(p.x, mean, c.x, c.y), class: "line mean" }),
+  );
+  if (otherMean?.length)
+    plot.append(
+      svg("path", {
+        d: linePath(op.x, otherMean, c.x, c.y),
         class: "line compare",
       }),
     );
   c.node.append(
+    plot,
     svg(
       "text",
-      {
-        x: c.x(p.x.at(-1)) - 4,
-        y: c.y(p.mean.at(-1)) - 8,
-        "text-anchor": "end",
-      },
-      `${state.bake.label} ${fmt(p.mean.at(-1))}`,
+      { x: c.x(p.x.at(-1)) - 4, y: c.y(mean.at(-1)) - 8, "text-anchor": "end" },
+      `${state.bake.label} ${fmt(mean.at(-1))}`,
     ),
   );
-  if (op)
-    c.node.append(
-      svg(
-        "text",
-        { x: c.L + 4, y: c.T + 12 },
-        `${$("compare").selectedOptions[0].textContent} · dashed`,
-      ),
-    );
   addCrosshair(
     c,
     p.x,
     (i) =>
-      `${full(p.x[i])} · f${p.feature}${p.percentiles.length ? ` (p${fmt(p.percentiles[i] * 100)})` : ""}\n${full(p.mean[i])} · ${state.bake.label} mean\n${p.ice.length} observed ICE rows${op ? `\n${full(op.mean[i])} · ${$("compare").selectedOptions[0].textContent} mean` : ""}`,
+      `${full(p.x[i])} · f${p.feature}${p.percentiles.length ? ` (p${fmt(p.percentiles[i] * 100)})` : ""}\n${full(mean[i])} · ${state.bake.label} mean${low?.length ? `\n${full(low[i])} … ${full(high[i])} · interquartile range` : ""}\n${ice.length} recorded ICE rows · ${shown} drawn${otherMean?.length ? `\n${full(otherMean[i])} · ${$("compare").selectedOptions[0].textContent} mean` : ""}`,
   );
   $("pdp-chart").replaceChildren(c.node);
   $("pdp-title").textContent = p.family
     ? `${p.family} family`
     : `f${p.feature}`;
-  const legend = el("span"),
-    key = el("span", null, "key");
+  const legend = el("span");
   legend.append(
-    key,
-    document.createTextNode(state.bake.label + " mean · solid"),
+    el("span", null, "key"),
+    document.createTextNode(`${state.bake.label} mean · solid`),
   );
-  const ice = el("span", "ICE · 20% opacity");
-  $("pdp-legend").replaceChildren(legend, ice);
-  if (op) {
+  const band = el("span");
+  band.append(
+    el("span", null, "key band-key"),
+    document.createTextNode("Interquartile band · all 200 rows"),
+  );
+  $("pdp-legend").replaceChildren(
+    legend,
+    ...(low?.length ? [band] : []),
+    el("span", `${shown} of ${ice.length} ICE traces`),
+  );
+  if (otherMean?.length) {
     const label = el("span");
     label.append(
       el("span", null, "key compare"),
       document.createTextNode(
-        $("compare").selectedOptions[0].textContent + " mean · dashed",
+        `${$("compare").selectedOptions[0].textContent} mean · dashed`,
       ),
     );
     $("pdp-legend").append(label);
   }
   $("pdp-note").textContent =
-    `${p.ice.length} observed rows · ${p.family ? "0–2 × observed family damage" : "p1–p99"} · ${p.monotonicity_violations.length} strict floating-point monotonicity rises. Raw damage intervention recomputes its fragility products.`;
+    `${p.monotonicity_violations.length} strict floating-point rises in the original served scores · ${p.ice.length} recorded rows · ${p.family ? "0–2 × observed family damage" : "p1–p99"}${centered ? " · centered on each row’s first point" : ""}. Every native curve and flag remains in the numeric table/export.`;
   $("pdp-table").replaceChildren(
     table(
       [
         "Feature value",
         "Bank percentile",
-        `${state.bake.label} mean`,
-        ...(op ? ["Comparison mean"] : []),
-        ...p.ice.map(
-          (_, i) => `ICE row ${(p.row_indices || d.row_indices)[i]}`,
+        `${state.bake.label} ${centered ? "centered " : ""}mean`,
+        ...(otherMean?.length ? ["Comparison mean"] : []),
+        "p25",
+        "p75",
+        ...ice.map(
+          (_, i) => `${centered ? "Δ " : ""}ICE row ${p.row_indices[i]}`,
         ),
       ],
       p.x.map((v, i) => [
         full(v),
-        p.percentiles.length ? full(p.percentiles[i]) : "not a percentile axis",
-        full(p.mean[i]),
-        ...(op ? [full(op.mean[i])] : []),
-        ...p.ice.map((row) => full(row[i])),
+        p.percentiles.length ? full(p.percentiles[i]) : "multiplier",
+        full(mean[i]),
+        ...(otherMean?.length ? [full(otherMean[i])] : []),
+        full(low?.[i]),
+        full(high?.[i]),
+        ...ice.map((row) => full(row[i])),
       ]),
     ),
   );
 }
+$("center-ice").onchange = renderPdp;
 function rangePanel(bins, human = false) {
   const values = bins.flatMap((b) =>
       human ? b.human.slice(1) : [b.p10, b.p90],
     ),
     c = chartFrame(
       0,
-      9,
+      9.5,
       Math.min(...values),
       Math.max(...values),
       "Quantile bin · ties kept together",
@@ -908,7 +1057,7 @@ function rangePanel(bins, human = false) {
     const med = human ? b.human[0] : b.median,
       low = human ? b.human[1] : b.p10,
       high = human ? b.human[2] : b.p90,
-      x = c.x(b.bin),
+      x = c.x(b.bin + (human ? 0.5 : 0)),
       g = svg("g", { tabindex: 0 });
     g.append(
       svg("line", {
@@ -916,7 +1065,7 @@ function rangePanel(bins, human = false) {
         x2: x,
         y1: c.y(low),
         y2: c.y(high),
-        class: "whisker",
+        class: human ? "whisker human" : "whisker",
       }),
     );
     for (const v of [low, high])
@@ -926,7 +1075,7 @@ function rangePanel(bins, human = false) {
           x2: x + 6,
           y1: c.y(v),
           y2: c.y(v),
-          class: "whisker",
+          class: human ? "whisker human" : "whisker",
         }),
       );
     g.append(
@@ -1090,84 +1239,137 @@ function renderFamily() {
   );
 }
 let concernsPage = 1;
+function selectConcern(f) {
+  if (!state.weights) return;
+  if (f.feature != null)
+    state.input = Math.max(
+      0,
+      state.weights.inputs.findIndex((i) => i.feature === f.feature),
+    );
+  if (f.layer === 0) {
+    state.input = f.from ?? state.input;
+    state.unit = f.to ?? state.unit;
+  } else if (f.layer === 1) state.unit = f.from ?? state.unit;
+  $("input").value = state.input;
+  $("lens-family").value = f.family_intervention || "";
+  renderWeights();
+  loadLens().catch((e) => status(e.message));
+}
 function renderConcerns() {
   if (!state.audit) return;
-  const a = state.audit;
-  const allFlags = [...a.flags, ...(state.bake.monotonicity_flags || [])];
-  let flags = allFlags.filter(
+  const a = state.audit,
+    structural = new Set([
+      "sign",
+      "scaler_sign",
+      "certificate",
+      "dead-input",
+      "dead_input",
+      "constant_input",
+      "dead_hidden",
+      "saturated_hidden",
+      "duplicate_input",
+      "drift",
+    ]);
+  const allFlags = [...a.flags, ...(state.bake.monotonicity_flags || [])].map(
+    (f) => ({
+      ...f,
+      severity: structural.has(f.kind) ? "critical" : f.severity,
+    }),
+  );
+  const flags = allFlags.filter(
     (f) =>
       (!$("severity").value || f.severity === $("severity").value) &&
       (!$("kind").value || f.kind === $("kind").value),
   );
-  const priorities = { critical: 0, serious: 1, warning: 2, note: 3 };
-  flags.sort(
+  const groups = new Map(),
+    priorities = { critical: 0, serious: 1, warning: 2, note: 3 };
+  const magnitude = (f) => Math.abs(f.statistic ?? f.value);
+  for (const f of flags) {
+    const input =
+      f.intervention ??
+      (f.layer === 0 && f.from != null
+        ? `input ${f.from}`
+        : f.layer === 1 && f.from != null
+          ? `hidden ${f.from} → output`
+          : f.to != null
+            ? `hidden ${f.to}`
+            : "model");
+    const key = JSON.stringify([input, f.kind, f.reason]);
+    if (!groups.has(key))
+      groups.set(key, {
+        input,
+        kind: f.kind,
+        reason: f.reason,
+        severity: f.severity,
+        flags: [],
+        worst: f,
+      });
+    const group = groups.get(key);
+    group.flags.push(f);
+    if (priorities[f.severity] < priorities[group.severity])
+      group.severity = f.severity;
+    if (magnitude(f) > magnitude(group.worst)) group.worst = f;
+  }
+  const rows = [...groups.values()].sort(
     (a, b) =>
+      (a.kind === "dead-input" ? -1 : 0) - (b.kind === "dead-input" ? -1 : 0) ||
       priorities[a.severity] - priorities[b.severity] ||
-      Math.abs(b.statistic ?? b.value) - Math.abs(a.statistic ?? a.value),
+      magnitude(b.worst) - magnitude(a.worst),
   );
   if ($("sort").value === "magnitude")
-    flags = flags.toSorted(
-      (a, b) =>
-        Math.abs(b.statistic ?? b.value) - Math.abs(a.statistic ?? a.value),
-    );
+    rows.sort((a, b) => magnitude(b.worst) - magnitude(a.worst));
+  const pages = Math.max(1, Math.ceil(rows.length / 50));
+  concernsPage = Math.min(concernsPage, pages);
+  const selected = rows.slice((concernsPage - 1) * 50, concernsPage * 50);
   $("concern-title").textContent =
-    `Concerns (${flags.length} of ${allFlags.length})`;
+    `Concerns · ${rows.length.toLocaleString()} groups / ${flags.length.toLocaleString()} measured flags`;
   $("audit-summary").textContent =
-    `${a.weight_count.toLocaleString()} weights · ${a.sampled_rows} recorded rows of ${a.bank_rows.toLocaleString()} · bank ${a.bank_sha256.slice(0, 12)} · paired constraints ${a.constraints?.max_pairs?.length ?? "unavailable"}. MAD outliers are diagnostics.`;
-  const selected = flags.slice(0, concernsPage * 100);
+    `${a.weight_count.toLocaleString()} weights · ${a.sampled_rows.toLocaleString()} recorded rows of ${a.bank_rows.toLocaleString()} · bank ${a.bank_sha256.slice(0, 12)} · paired constraints ${a.constraints?.max_pairs?.length ?? "unavailable"}. MAD notes are diagnostic; grouped counts retain every measured flag.`;
   const t = table(
     [
       "Severity",
       "Kind",
-      "Location",
-      "Value",
-      "Statistic / threshold",
+      "Input / unit",
+      "Count",
+      "Worst magnitude",
+      "Worst witness",
       "Reason",
     ],
-    selected.map((f) => [
-      severity(f),
-      f.kind,
-      f.location,
-      fmt(f.value),
-      `${fmt(f.statistic)} / ${fmt(f.threshold)}`,
-      f.reason,
+    selected.map((g) => [
+      severity(g),
+      g.kind,
+      g.input,
+      g.flags.length,
+      full(magnitude(g.worst)),
+      g.worst.location,
+      g.reason,
     ]),
-    (i) => {
-      const f = selected[i];
-      if (f.feature != null)
-        state.input = Math.max(
-          0,
-          state.weights.inputs.findIndex((i) => i.feature === f.feature),
-        );
-      if (f.layer === 0) {
-        state.input = f.from ?? state.input;
-        state.unit = f.to ?? state.unit;
-      } else if (f.layer === 1) {
-        state.unit = f.from ?? state.unit;
-      }
-      if (f.layer !== 0)
-        status(
-          `Selected ${f.location}; this matrix shows layer 0. Full output weights are in the layer table.`,
-        );
-      $("input").value = state.input;
-      renderWeights();
-      loadLens().catch((e) => status(e.message));
-    },
+    (i) => selectConcern(selected[i].worst),
   );
-  $("concern-table").replaceChildren(t);
-  if (selected.length < flags.length) {
-    const more = el(
-      "button",
-      `Show next 100 · ${flags.length - selected.length} remaining`,
+  const pager = el("div", null, "controls"),
+    previous = el("button", "Previous 50"),
+    next = el("button", "Next 50"),
+    label = el(
+      "span",
+      `Page ${concernsPage} of ${pages} · ${rows.length} groups`,
+      "ink-2",
     );
-    more.onclick = () => {
-      concernsPage++;
-      renderConcerns();
-    };
-    $("concern-table").append(more);
-  }
+  previous.disabled = concernsPage === 1;
+  next.disabled = concernsPage === pages;
+  previous.onclick = () => {
+    concernsPage--;
+    renderConcerns();
+  };
+  next.onclick = () => {
+    concernsPage++;
+    renderConcerns();
+  };
+  pager.append(previous, label, next);
+  $("concern-table").replaceChildren(t);
+  $("concern-pager").replaceChildren(pager);
 }
 function renderArchitecture() {
+  refreshSubject();
   const m = state.weights,
     l = m.layers[0],
     node = $("architecture");
@@ -1211,11 +1413,18 @@ function weightStatisticsText(i, j) {
   const l = state.weights.layers[0],
     k = i * l.out_dim + j,
     stats = l.stats;
-  let text = stats
-    ? `Row z ${stats.row_z[k] == null ? "undefined (MAD=0)" : full(stats.row_z[k])} · column z ${stats.column_z[k] == null ? "undefined (MAD=0)" : full(stats.column_z[k])}
+  const nonzero =
+    state.weights.nonzero_counts?.[i] ??
+    l.weights.slice(i * l.out_dim, (i + 1) * l.out_dim).filter((v) => v !== 0)
+      .length;
+  if (nonzero === 0) return `all ${l.out_dim} weights are zero: dead input`;
+  let text =
+    `${nonzero} of ${l.out_dim} weights are nonzero. ` +
+    (stats
+      ? `Row z ${stats.row_z[k] == null ? "undefined (MAD=0)" : full(stats.row_z[k])} · column z ${stats.column_z[k] == null ? "undefined (MAD=0)" : full(stats.column_z[k])}
 Row median/MAD ${stats.rows[i].map(full).join(" / ")}
 Column median/MAD ${stats.columns[j].map(full).join(" / ")}`
-    : "Per-weight z statistics are not present in this bundle.";
+      : "Per-weight z statistics are not present in this bundle.");
   const pair = state.audit.constraints?.max_pairs?.find((p) => p.includes(j));
   if (pair)
     text += `
@@ -1224,161 +1433,32 @@ Coupled max pair h${pair[0]} / h${pair[1]}`;
     text += `\nOutgoing weight is exactly zero`;
   return text;
 }
-function renderWeights() {
-  if (!state.weights) return;
-  const l = state.weights.layers[0],
-    c = $("weight-matrix"),
-    ctx = c.getContext("2d"),
-    scale = 3;
-  c.width = l.out_dim * scale;
-  c.height = l.in_dim * scale;
-  const neutral = css("--ramp-div-0"),
-    dim = Number(css("--dim"));
-  const palette = Array.from({ length: 256 }, (_, i) => colour(i / 255, true));
-  const max = l.weights.reduce((m, v) => Math.max(m, Math.abs(v)), 0),
-    flagged = new Set(
-      state.audit.flags
-        .filter((f) => f.layer === 0 && f.from != null && f.to != null)
-        .map((f) => `${f.from},${f.to}`),
-    );
-  for (let i = 0; i < l.in_dim; i++)
-    for (let j = 0; j < l.out_dim; j++) {
-      ctx.globalAlpha =
-        ($("lens-family").value
-          ? state.weights.inputs[i].family === $("lens-family").value
-          : i === state.input) || j === state.unit
-          ? 1
-          : dim;
-      ctx.fillStyle =
-        l.weights[i * l.out_dim + j] === 0
-          ? neutral
-          : palette[
-              Math.max(
-                0,
-                Math.min(
-                  255,
-                  Math.round(
-                    (0.5 + (0.5 * l.weights[i * l.out_dim + j]) / (max || 1)) *
-                      255,
-                  ),
-                ),
-              )
-            ];
-      ctx.fillRect(j * scale, i * scale, scale, scale);
-    }
-  ctx.globalAlpha = 1;
-  ctx.fillStyle = css("--ink");
-  for (const key of flagged) {
-    const [i, j] = key.split(",").map(Number);
-    ctx.fillRect(j * scale, i * scale, 1, 1);
-  }
-  ctx.strokeStyle = css("--ink");
-  ctx.strokeRect(state.unit * scale, state.input * scale, scale, scale);
-  const value = l.weights[state.input * l.out_dim + state.unit];
-  const flags = state.audit.flags.filter(
-    (f) => f.layer === 0 && f.from === state.input && f.to === state.unit,
-  );
-  $("weight-detail").textContent =
-    `input ${state.input} ${state.weights.inputs[state.input]?.name} → h${state.unit}: ${full(value)}\n${weightStatisticsText(state.input, state.unit)}${flags.length ? " · ⚠ " + flags.map((f) => f.kind).join(", ") : ""}`;
-  $("weight-legend").replaceChildren(
-    el("span", fmt(-max)),
-    el("span", null, "ramp"),
-    el("span", fmt(max)),
-    el(
-      "span",
-      "⚠ flagged cells have ink markers; details in the concern table",
-    ),
-  );
-  $("weight-legend").querySelector(".ramp").style.background =
-    "linear-gradient(to right,var(--ramp-div-n3),var(--ramp-div-0),var(--ramp-div-p3))";
-  $("weight-table").replaceChildren(
-    table(
-      ["Hidden unit", "Weight", "Flags"],
-      Array.from({ length: l.out_dim }, (_, j) => [
-        j,
-        full(l.weights[state.input * l.out_dim + j]),
-        state.audit.flags
-          .filter((f) => f.layer === 0 && f.from === state.input && f.to === j)
-          .map((f) => f.kind)
-          .join(", "),
-      ]),
-      (j) => {
-        state.unit = j;
-        renderWeights();
-      },
-    ),
-  );
-  const wrap = $("weight-wrap"),
-    position = (state.input / l.in_dim) * c.clientHeight;
-  if (
-    position < wrap.scrollTop ||
-    position > wrap.scrollTop + wrap.clientHeight - 8
-  )
-    wrap.scrollTop = Math.max(0, position - wrap.clientHeight / 2);
-  renderArchitecture();
-}
-$("weight-matrix").onpointermove = (e) => {
-  if (!state.weights) return;
-  const r = e.currentTarget.getBoundingClientRect(),
-    l = state.weights.layers[0],
-    i = Math.min(
-      l.in_dim - 1,
-      Math.floor(((e.clientY - r.top) / r.height) * l.in_dim),
-    ),
-    j = Math.min(
-      l.out_dim - 1,
-      Math.floor(((e.clientX - r.left) / r.width) * l.out_dim),
-    );
-  tooltip(
-    e,
-    `${full(l.weights[i * l.out_dim + j])} · weight\ninput ${i} (${state.weights.inputs[i]?.name}) → hidden ${j}\n${weightStatisticsText(i, j)}\n${state.audit.flags
-      .filter((f) => f.layer === 0 && f.from === i && f.to === j)
-      .map((f) => `${f.severity} · ${f.kind}: ${f.reason}`)
-      .join("\n")}`,
-  );
-};
-$("weight-matrix").onpointerleave = hideTooltip;
-$("weight-matrix").onclick = (e) => {
-  const r = e.currentTarget.getBoundingClientRect(),
-    l = state.weights.layers[0];
-  state.input = Math.min(
-    l.in_dim - 1,
-    Math.floor(((e.clientY - r.top) / r.height) * l.in_dim),
-  );
-  state.unit = Math.min(
-    l.out_dim - 1,
-    Math.floor(((e.clientX - r.left) / r.width) * l.out_dim),
-  );
-  $("input").value = state.input;
-  renderWeights();
-  loadLens().catch((e) => status(e.message));
-};
-$("weight-matrix").onkeydown = (e) => {
-  if (!state.weights) return;
-  const l = state.weights.layers[0];
-  if (e.key.startsWith("Arrow")) {
-    e.preventDefault();
-    state.input = Math.max(
-      0,
-      Math.min(
-        l.in_dim - 1,
-        state.input +
-          (e.key === "ArrowDown" ? 1 : e.key === "ArrowUp" ? -1 : 0),
-      ),
-    );
-    state.unit = Math.max(
-      0,
-      Math.min(
-        l.out_dim - 1,
-        state.unit +
-          (e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0),
-      ),
-    );
-    $("input").value = state.input;
+const weightView = new WeightView({
+  state,
+  $,
+  css,
+  svg,
+  el,
+  table,
+  tip,
+  tooltip,
+  hideTooltip,
+  fmt,
+  full,
+  describe: weightStatisticsText,
+  select: (input, unit) => {
+    state.input = input;
+    state.unit = unit;
+    $("input").value = input;
     renderWeights();
     loadLens().catch((e) => status(e.message));
-  }
-};
+  },
+});
+function renderWeights() {
+  if (!state.weights) return;
+  weightView.render();
+  renderArchitecture();
+}
 function renderInputRanking() {
   const rows = state.lens?.input_attribution;
   if (!rows?.length) {
@@ -1392,7 +1472,7 @@ function renderInputRanking() {
   const shown = rows.slice(0, 20),
     max = Math.max(...shown.map((r) => r.mean_abs_delta), 1e-30),
     W = 800,
-    L = 100,
+    L = 280,
     R = 80,
     H = shown.length * 28 + 32,
     node = svg("svg", {
@@ -1407,11 +1487,7 @@ function renderInputRanking() {
       len = ((W - L - R) * r.mean_abs_delta) / max,
       g = svg("g", { tabindex: 0 });
     node.append(
-      svg(
-        "text",
-        { x: L - 12, y: y + 16, "text-anchor": "end" },
-        `f${r.features[0]}`,
-      ),
+      svg("text", { x: L - 12, y: y + 16, "text-anchor": "end" }, r.label),
     );
     g.append(
       svg("path", {
@@ -1609,7 +1685,13 @@ async function loadLens() {
   renderInputRanking();
   document.querySelector(".diagnostics").classList.remove("loading");
 }
+let bakeGeneration = 0;
 async function selectBake() {
+  const generation = ++bakeGeneration;
+  ++lensGeneration;
+  state.weights = null;
+  $("input").disabled = $("lens-family").disabled = true;
+  document.querySelector(".diagnostics").classList.add("loading");
   const bake = bankScopedBake(
     state.manifest?.bakes.find((b) => b.id === $("bake").value),
   );
@@ -1634,14 +1716,33 @@ async function selectBake() {
     $("weight-matrix")
       .getContext("2d")
       .clearRect(0, 0, $("weight-matrix").width, $("weight-matrix").height);
+    const zoom = $("weight-zoom");
+    zoom.getContext("2d").clearRect(0, 0, zoom.width, zoom.height);
+    for (const id of ["weight-table", "unit-input-strip", "input-unit-strip"])
+      empty($(id), "No evidence for this bake and bank.");
+    $("center-ice").disabled = true;
+    $("architecture").replaceChildren();
+    $("weight-detail").textContent = "No evidence for this bake and bank.";
+    $("weight-legend").replaceChildren();
+    $("comparison-panel").hidden = true;
+    renderInputRanking();
+    $("pdp-legend").replaceChildren();
+    $("pdp-note").textContent = "";
+    $("audit-summary").textContent = "No bank audit exported.";
+    $("concern-pager").replaceChildren();
+    document.querySelector(".diagnostics").classList.remove("loading");
     status("This bake has no exported evidence for the selected bank.");
     return;
   }
-  state.bake = bake;
-  [state.audit, state.weights] = await Promise.all([
+  const [audit, weights] = await Promise.all([
     get(bake.audit),
     get(bake.weights),
   ]);
+  if (generation !== bakeGeneration) return;
+  state.bake = bake;
+  state.audit = audit;
+  state.weights = weights;
+  $("input").disabled = $("lens-family").disabled = false;
   state.input = 0;
   state.unit = 0;
   options(
@@ -1650,10 +1751,14 @@ async function selectBake() {
   );
   options($("lens-family"), [
     ["", "Selected input"],
-    ...[...new Set(state.weights.inputs.map((i) => i.family))].map((f) => [
-      f,
-      f,
-    ]),
+    ...[
+      ...new Set(
+        state.weights.inputs.flatMap((i) => [
+          i.family,
+          i.analysis_family || i.family,
+        ]),
+      ),
+    ].map((f) => [f, f]),
   ]);
   options($("kind"), [
     ["", "All"],
