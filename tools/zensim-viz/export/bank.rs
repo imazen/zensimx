@@ -34,16 +34,17 @@ pub(crate) fn load(path: &Path, inputs: &[Input], max_rows: usize) -> Result<Ban
             "bank needs its producer manifest; refusing identity inference from width".into(),
         );
     }
-    let bank_sha256 = crate::hash(path)?;
-    let mut human_allowed = false;
-    let mut provenance = serde_json::Value::Null;
-    let mut producer_slots = None;
-    if manifest.exists() {
+    let bank_sha256;
+    let human_allowed;
+    let provenance;
+    let mut producer_slots;
+    {
         let text = std::fs::read_to_string(&manifest)?;
         if text.to_lowercase().contains("aic") {
             return Err("bank manifest mentions AIC; refusing before reading table".into());
         }
         let doc: serde_json::Value = serde_json::from_str(&text)?;
+        bank_sha256 = crate::hash(path)?;
         let revision = doc
             .get("formula_revision")
             .or_else(|| doc["research"].get("formula_revision"))
@@ -60,16 +61,23 @@ pub(crate) fn load(path: &Path, inputs: &[Input], max_rows: usize) -> Result<Ban
         let request = zensim::research::Request::for_set(&fsid)?;
         producer_slots = Some(request.want().clone());
         if let Some(measured) = doc["measured_ids"].as_array() {
-            producer_slots = Some(zensim::feature_set_id::SlotSet::from_slots(
-                measured.iter().map(|v| v.as_u64().unwrap() as usize),
-            ));
+            let ids: Vec<usize> = measured
+                .iter()
+                .map(|v| {
+                    v.as_u64()
+                        .and_then(|n| usize::try_from(n).ok())
+                        .filter(|&n| n < zensim::research::full_width())
+                        .ok_or("manifest measured_ids contains an invalid slot")
+                })
+                .collect::<std::result::Result<_, _>>()?;
+            producer_slots = Some(zensim::feature_set_id::SlotSet::from_slots(ids));
         }
         provenance = serde_json::json!({"manifest_sha256":crate::hash(&manifest)?,"feature_set_id":set,"formula_revision":revision,"hdr_front_end":doc["hdr_front_end"],"data_role":doc["data_role"]});
-        if let Some(expected) = doc["table_sha256"]
+        let expected = doc["table_sha256"]
             .as_str()
             .or_else(|| doc["features_parquet_sha256"].as_str())
-            && expected != bank_sha256
-        {
+            .ok_or("producer manifest has no table SHA-256")?;
+        if expected != bank_sha256 {
             return Err("bank bytes differ from manifest hash".into());
         }
         let role = doc["data_role"].as_str().unwrap_or("").to_lowercase();
@@ -170,5 +178,47 @@ fn number(a: &dyn Array, r: usize) -> Result<f64> {
         Ok(a.value(r))
     } else {
         Err(format!("expected float bank column, got {:?}", a.data_type()).into())
+    }
+}
+
+#[cfg(test)]
+mod admission_tests {
+    use super::*;
+    #[test]
+    fn prohibited_path_is_rejected_before_io() {
+        let error = load(Path::new("AIC-2026-must-never-be-opened.parquet"), &[], 200)
+            .err()
+            .expect("must refuse");
+        assert_eq!(
+            error.to_string(),
+            "AIC tables are outside visualizer read scope"
+        );
+    }
+    #[test]
+    fn prohibited_manifest_is_rejected_before_table_hashing() {
+        let scratch = std::env::var_os("TMPDIR")
+            .map(std::path::PathBuf::from)
+            .unwrap_or_else(|| {
+                std::path::PathBuf::from(std::env::var_os("HOME").expect("HOME required"))
+                    .join("tmp/zensim-viz")
+            });
+        let stamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let directory = scratch.join(format!("admission-{}-{stamp}", std::process::id()));
+        std::fs::create_dir_all(&directory).unwrap();
+        let table = directory.join("neutral.parquet");
+        // Deliberately no table exists: an attempted hash would fail differently.
+        std::fs::write(
+            table.with_extension("parquet.manifest.json"),
+            r#"{"source":"AIC-2026"}"#,
+        )
+        .unwrap();
+        let error = load(&table, &[], 200).err().expect("must refuse");
+        assert_eq!(
+            error.to_string(),
+            "bank manifest mentions AIC; refusing before reading table"
+        );
     }
 }
