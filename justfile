@@ -4357,7 +4357,7 @@ r14-transform-reads:
     python3 -B scripts/byconstruction/r14_transforms.py reads
 
 r14-transform-archive:
-    python3 -B scripts/byconstruction/r14_transforms.py job --label archive -- bash scripts/byconstruction/r13_width_archive.sh /var/tmp/byc-transforms-20261104 /mnt/tower/output/zensim/r14-transforms-20261104
+    flock ~/tmp/heavy.lock ~/work/claudehints/scripts/run-heavy --mem 24G --jobs 8 -- bash scripts/byconstruction/r13_width_archive.sh /var/tmp/byc-transforms-20261104 /mnt/tower/output/zensim/r14-transforms-20261104
 
 r14-serving-checks:
     cargo test -p zensim --features custom-profiles,training,classification --lib r14_transform_tests -- --test-threads=1
