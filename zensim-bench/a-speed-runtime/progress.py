@@ -135,7 +135,14 @@ def main():
         # supervision history and must not masquerade as current identities.
         for key in ("launcher", "compiler_pids", "verified_pid", "lock_holder_pid"):
             task.pop(key, None)
+        phases = task.get("phases", {})
+        phases[root.name] = {"checked_utc": value["checked_utc"],
+                             "stage": stage, "binary_sha256": actual,
+                             "collector": collector, "workers": workers,
+                             "compute_lock": lock,
+                             "raw_timing_outputs": value["raw_latency_outputs_present"]}
         task.update({"last_check": value["checked_utc"], "stage": f"{root.name}: {stage}",
+                     "phases": phases,
                      "source": str(task_root / "source/a-speed-runtime"),
                      "binary_sha256": actual,
                      "raw_timing_outputs": sum(len(list((task_root / phase / "results").glob("*t_*_latency.json"))) for phase in ("before", "after")),

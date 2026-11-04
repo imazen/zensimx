@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Start the after matrix only after complete baseline admission and build."""
+"""Start gated cells after both first crossovers; admit the full matrix last."""
 import datetime
 import json
 import os
@@ -8,14 +8,14 @@ import subprocess
 import sys
 import time
 
-from report import parallel_gate
+from report import crossover_prefix, parallel_gate
 
 
 def main():
     root = Path(sys.argv[1]).resolve()
     receipt = root / "AFTER_CONTROLLER.json"
     assert not receipt.exists(), receipt
-    state = {"launcher_pid": os.getpid(), "stage": "waiting for baseline and gated binary",
+    state = {"launcher_pid": os.getpid(), "stage": "waiting for crossovers and gated binary",
              "failure": None}
 
     def save():
@@ -24,15 +24,14 @@ def main():
 
     save()
     try:
-        while not ((root / "before/COMPLETE").exists() and (root / "after/BINARY.json").exists()):
+        while not (root / "after/BINARY.json").exists():
             time.sleep(10)
-        state["stage"] = "admitting baseline"
-        save()
-        baseline = parallel_gate(root, "before")
-        assert baseline["parallel_min_pixels"] == 36_864, baseline["crossovers"]
-        path = root / "SUMMARY.before.json"
-        assert not path.exists(), path
-        path.write_text(json.dumps(baseline, indent=2) + "\n")
+        # Larger cells cannot change the first win in an admitted contiguous
+        # prefix. Final admission still requires every before and after cell.
+        prefix = crossover_prefix(root)
+        assert prefix["parallel_min_pixels"] == 36_864, prefix["crossovers"]
+        state["crossover_prefix"] = {key: prefix[key] for key in (
+            "crossovers", "parallel_min_pixels", "full_matrix_admitted")}
         state["stage"] = "after matrix collecting"
         save()
         env = dict(os.environ, A_SPEED_PARALLEL_GATE="1", BENCH_CPUS="0-15", BENCH_MODES="latency scores")
@@ -45,6 +44,13 @@ def main():
                                env=env, stdout=log, stderr=log, check=True)
         state["stage"] = "admitting full matrix"
         save()
+        while not (root / "before/COMPLETE").exists():
+            time.sleep(10)
+        baseline = parallel_gate(root, "before")
+        assert baseline["parallel_min_pixels"] == 36_864, baseline["crossovers"]
+        path = root / "SUMMARY.before.json"
+        assert not path.exists(), path
+        path.write_text(json.dumps(baseline, indent=2) + "\n")
         result = parallel_gate(root, "after")
         path = root / "SUMMARY.after.json"
         assert not path.exists(), path
