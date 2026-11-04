@@ -1879,3 +1879,6 @@ CID:IQ's SGCK gamut mapping. Not adopted with it: p30L, the map term, the CLIC 2
 public_test stays sealed and is never folded into training (owner, 2026-11-04). Follow-ups: the from-scratch recipe
 in zensim-training (`recipes/MixF3.json`, `docs/RECIPE_MIXF3.md`, replayed in the release sandbox) and a zensim
 profile for it (pull request).
+
+*Shipping (2026-11-04):* the zensim profile pull request is https://github.com/imazen/zensim/pull/2 (`ZensimProfile::F`, `zensim-f`, returned by
+`latest()`; stacked on `slim-0.3.0`; 40 of 40 tests and 3,927 of 3,927 production parity rows on i265).
