@@ -25,6 +25,13 @@
 
 ### Added
 
+- Unpublished `tools/zensim-viz`: native revision-7 feature atlas, per-weight
+  audit, served-score PDP/ICE, ablations and bake comparisons; private default-off
+  map retention preserves pooled bits (`5fc15b28`, `48ca5fb5`, `8c0d8d9b`).
+- Apply the visualizer design review: grouped magnitude-based concerns,
+  native IQR/centered ICE, minimap and zoom, signed rankings and signal-family
+  atlas controls; retain all original points and flags (`25e8a80e`).
+
 - `zensim_mlp_train --pair-sampling walk`: the uniform draw's group sequence and random stream, with each within-reference group visiting its references round-robin and each reference's rows on a seeded bijection, so row and reference coverage stop depending on the seed (`0ee6c5ea`, E36 experiment 6). The coverage replay and `subset_sim` follow it.
 
 - Recorded `experiment5_scale` on dataset legs of a subjective authority: admission checks the manifest-derived weight times the scale, so `--mos-share` arms can rescale MOS legs (`0ee6c5ea`, E36 experiment 5).

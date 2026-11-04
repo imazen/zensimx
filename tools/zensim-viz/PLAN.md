@@ -82,3 +82,42 @@ show paired/gated witnesses, use the canonical certificate, and flag failures
 of the actual constraints rather than flag every negative encoder entry.
 The native certificate's source owner is
 `zensim-validate/src/mlp_train/mod.rs::certify_monotone_bake`.
+
+## Design review 1 — verified implementation
+
+Apply the coordinator's ten decisions from the supplied review after the verified
+atlas count replay (landed `fbf2feb7`). Preserve all measured native flags and
+zero-tolerance checks. New exports use fresh directories; old data is retained.
+
+1. Magnitude-based rise severity; structural concerns critical. Group flags with
+   count/worst witness; severity-first order; 50-row paging.
+2. Add exact all-zero incoming-row `dead-input` findings and truthful readouts.
+   Verified correction: F0 input 371 has 33 nonzero weights, not an all-zero row.
+   Its zero MAD must not be mistaken for deadness.
+3. Export native interquartile/centered-ICE statistics; render at most 40 ICE
+   traces while retaining every one of the 200 original curves and all flags.
+4. Native row/column orders, 1:1 minimap, selected-region zoom, named signed
+   top-32-input/top-16-unit strips. Preserve stored input/unit identities.
+5. Keep native human units in a separate aligned panel (Q2 confirmed); human
+   marks use the requested series-2 point/whisker encoding and half-bin offset.
+6. Derive signal groups from canonical registry names, use them for atlas rows
+   and ablation ranking, and label top inputs with short names beside IDs.
+   Retain the original broad-family curves as well as new signal-group curves.
+7. Value-dependent overlay alpha; opaque raw map-only mode; pooling grid in legend.
+8. Default percentile colors; divergent value colors only for bank ranges that
+   cross zero. Export bank min/max alongside the existing percentiles.
+9. Keep 14px cells/2px gaps, expand hover targets invisibly, move global-map
+   affordances into the global column without dropping their individual values.
+10. Keep a visible empty pin strip with the Enter affordance.
+
+Regression gates: every original raw/broad-family ICE point and flag remains
+bit-identical on the same bank; full F census retains its existing counts with
+an additive exact-zero finding; atlas parity still covers all 504 populated
+slots and all 720 layout positions. Exercise grouping, paging, centered view,
+minimap/zoom identity mapping, overlay/map-only alpha, signed gating, global
+cells, empty pins, both themes and bank scope in a real browser. Capture fresh
+four view/theme images and record the landed commit in REPORT and chat.
+
+Review completion: all ten decisions are implemented and checked against complete
+native bundles. Six audit and six curve preservation checks retain the original
+measurements; current dark/light screenshots and detailed coverage are in REPORT.md.

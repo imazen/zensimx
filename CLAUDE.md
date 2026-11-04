@@ -182,6 +182,18 @@ because cleanup tests or a historical training reproduction pass.
 
 ## Known Bugs
 
+- **2026-11-04: structural certification does not imply strict served floating-point monotonicity.**
+  The archived revision-7 F seed-0 inspection found 1,663 strict adjacent
+  increases across its 494 exported input/family curves (200 recorded CID22
+  TRAIN teacher rows, 21 points each). One f100 counterexample is row 0,
+  point 18: increase 0.0000073736699732762645. Curves call `BakeScorer`
+  directly; no tolerance or metric change was applied. Full native points,
+  source hashes and flags: `/mnt/v/output/zensim/viz/2026-11-04/lens-F0/`.
+  See `tools/zensim-viz/REPORT.md` for scope. This is a numerical inspection
+  finding, not a held-out quality verdict.
+  Design review 1 classifies rises below 0.001 served-score points as notes;
+  the strict checks and all recorded counterexamples remain unchanged.
+
 * **2026-10-28 — fx2 continuations lose steering cases.** Packed seed-0 general and codec models pass both C1–C6 contracts, all744 identity rows and monotone certification, but G-STEER is134/135 and133/135 against each fx1 counterpart's135/135. Failed cases general broad-10-b8 and codec city-384-20/girl-256-20 have zero engine feature disagreements. Preserve the fixed gate and keep both models unadopted; evidence is under `/var/tmp/byc-fx2-20261028/stage2/GATE_SCORECARD.json` and the by-construction record.
 
 * **2026-10-28 — C5 candidate extraction used the fx1 control read set.** The identity harness passed the fixed fx1 reference vector to every candidate, leaving additional fx2 inputs outside its extraction scope. Candidate identity scoring now uses each bake's declared request, checks every consumed value is finite and compares its consumed f32 bits across token permutations. The original fx1 reference checks and exact-100 score pin remain. Use the rebuilt identity binary for fx2; the frozen run03 binary remains the separate N1–N3 owner.
