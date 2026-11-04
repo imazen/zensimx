@@ -2161,3 +2161,16 @@ wide seed spread, +0.01 on 4Kdtb's 48 rows, and doubles the ladder inversions (1
 UPIQ rows it trained on. (3) Continuity is the front end's property (above). **Recommendation:** ship the cube-root
 front end at 203 cd/m² as the public HDR path for A (the mix); do not ship the HC1 retrain; PU21 stays research-only.
 The SDR no-regression reads of mixHC1 continue for the record.
+
+**SDR no-regression reads of mixHC1 (2026-11-04, 12:00–12:07Z; `~/tmp/hc1-reads/`, the mix's R10 commands).** EVAL
+held-out MOS sets: median error 8.16 / 8.28 / 8.31 % (seeds 2/0/1) against F's 8.27 / 8.39 / 8.40 %, common-3 SROCC
+0.853–0.855 against 0.848–0.850; compression rows (417): row-weighted SROCC 0.898 / 0.898 / 0.898 against 0.895 /
+0.894 / 0.894. **E36 selection-source inversion share: 5.01 % (4.90 / 5.00 / 5.13) against F's 3.40 % (3.39 / 3.36 /
+3.44), +1.61 pp [95 % CI +1.23, +2.02] — a regression on the program's primary statistic.** G-CHROMA-L: rank passes,
+**level fails** at every seed (ycc444 offset 4.0–4.3 vs F's 2.76, ycc420 6.0–6.3 vs 3.32, xyb-extended 4.9–5.3 vs 3.58).
+G-STEER 132 / 134 / 131 of 135 (F 133 / 134 / 134). Dial contract C1–C6 PASS on both grids; identity: 62 sources pass at
+every SIMD tier; NEARID N1–N3 pass (137 / 137 / 138 of 144 monotone ladders). **Verdict: the HC1 retrain is not
+shippable (E36 share +1.6 pp, G-CHROMA-L level fail, no held-out HDR gain); the cube-root front end is adopted on its
+own merits (continuity by construction; the mix gains +0.10 UPIQ dev / +0.013 ladders zero-shot). Nothing from these
+reads selects a model; the mix F stays the adopted model.** Bakes archived at `/var/tmp/byc-hdr-20261104/cont-s05/`
+(mirror to tower with the banks).

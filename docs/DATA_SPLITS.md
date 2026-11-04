@@ -3100,3 +3100,7 @@ the 4Kdtb EVAL half (Regatta, 48 MOS rows); the ladders' EVAL rungs (label-free)
 the mix's own reads (the held-out EVAL MOS collections through `dataset_eval.py score` + `readout.py` + `ceval.py`,
 E36 inversion share, G-STEER, dial contract, all previously disclosed); the continuity check and the Ultra HDR probe
 (label-free). Nothing on public_test, CID22 validation, CLIC, CIQA or MMSPG is read for HC1 unless registered first.
+- 2026-11-04 (HC1 reads done, 11:28–12:07Z): the report reads above were taken once for mixHC1 seeds 0–2, the mix F
+  seeds 0–2 and E (HDR panel on both bank sets, EVAL collections, E36 inversion share, G-CHROMA-L, G-STEER, dial contract,
+  identity, NEARID). Nothing was selected on them; the retrain is not shipped; the mix F stays adopted
+  (benchmarks/e36_subset_test_2026-11-01.md, "HC1", SDR no-regression reads).
