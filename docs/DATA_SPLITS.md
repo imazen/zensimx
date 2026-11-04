@@ -3012,3 +3012,24 @@ zensimx record `benchmarks/e36_subset_test_2026-11-01.md` (confirmation read 1 a
 - **Reads of the confirmation set so far:** read 1 (2026-11-03; F3 control, p30L and the two map-300 arms) and read 2
   (2026-11-03; R7's arms against their twins). Read 2 was R7's decision statistic, so it is a selection read for the
   arm it supported (F3 control + CLIC 2024). Each read's `LABEL_READS.json` lists the 4,812 validation questions only.
+
+## Exposure registration — 2026-11-03: CIQA confirmation read (R10 amendment 3)
+
+Owner, 2026-11-03: "Yes, zenjpeg has fast integer idct zenjpeg that can be bitexact with libjpeg-turbo; you can verify
+a few images match tensorflow": the pixels the owner-approved 2026-10-16 recreation hashed are now reproducible
+without TensorFlow. The read, models and reading rule are in the zensimx record
+`benchmarks/e36_subset_test_2026-11-01.md` (R10 amendment 3).
+
+- **CIQA (`ciqa-google`), all 7,902 published questions (6,329 native train, 1,573 native test), EVALUATION ONLY**,
+  read once as a confirmation set for E36's four dial candidates (F3 control, p30L, `mixF3`, mix + p30L, seeds 0-2)
+  against F3's control; the owner's 2026-10-16 condition stands (never training, tuning, distillation or an
+  admission gate). Pixels: the recreation's JPEGs decoded as TensorFlow's `INTEGER_FAST` pipeline decodes them,
+  rebuilt on zenjpeg's coefficient decoder with libjpeg-turbo's fast-integer reconstruction (zensim-training
+  `tools/ciqa-check/`) and kept only where each image reproduces its recorded SHA-256 (all 6,596 references and
+  13,713 stimuli do); private under `/mnt/v/zensim/ciqa-private/` on dev, mode 0700. Prior exposure: none (no label
+  column was ever loaded; the M2 trust screen did not score it). Keep the published split tags; the native test
+  split is reported beside the all-rows statistic. Disclose wherever it is read that the stimuli are a recreation
+  whose parity with the raters' files cannot be checked, and that every question orders two JPEG encodes of one AVA
+  photograph.
+- `scripts/byconstruction/e36_exp56/ciqa.py`: `keys` reads `ref`, `a`, `b` and `split` only; `confirm` ledgers
+  `LABEL_READS.json` before parsing `p_a`.

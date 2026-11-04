@@ -1349,3 +1349,47 @@ ran G-TRADE, the dial contract and identity at every seed. For `mixF3` seeds 0-2
 
 Reading: `mixF3` passes this amendment if every gate above passes and read 3 does not contradict it against F3's
 control. Its R10 G-STEER miss stands as recorded; nothing is adopted on this read.
+
+### R10 amendment 3 (2026-11-03, before the read): CIQA as a confirmation set for the dial candidates
+
+Owner, 2026-11-03: "Yes, zenjpeg has fast integer idct zenjpeg that can be bitexact with libjpeg-turbo; you can verify
+a few images match tensorflow." CIQA's stimuli are the 2026-10-16 private recreation (`docs/DATA_SPLITS.md` D4:
+TensorFlow 2.21.0's encoder, 13,713 JPEGs of 6,596 AVA references; evaluation only, never training, tuning,
+distillation or an admission gate). Its labels have never been read (D4; the M2 trust screen's "not read"): a
+full-reference score needs the pipeline's adjusted pixels, which the recreation recorded only as SHA-256s of
+TensorFlow's `decode_jpeg(channels=3, fancy_upscaling=True, dct_method="INTEGER_FAST")` output
+(`reference_rgb_sha256`, `adjusted_rgb_sha256`, H×W×3 uint8).
+
+- **Pixels (done before this entry, label-free):** zenjpeg main (`762fa712`) decodes with its jpegli-derived IDCT or
+  libjpeg's slow integer IDCT; neither reproduces TensorFlow's fast-integer decode (0 of 20 sampled references;
+  libjpeg-turbo's JDCT_IFAST through mozjpeg-sys, the oracle: 20 of 20). The decode was rebuilt on zenjpeg's
+  coefficient decoder (`Decoder::decode_coefficients`) with libjpeg-turbo's fast-integer reconstruction: the IFAST
+  multiplier table (jddctmgr.c), the x86-64 SSE2 IDCT kernel lane for lane (jidctfst-sse2.asm: 16-bit wrapping
+  arithmetic, `pmulhw` on pre-shifted operands, saturating output), fancy upsampling (jdsample.c h2v1, h2v2, h1v2)
+  and the 16-bit YCbCr tables (jdcolor.c). All 6,596 references and 13,713 stimuli reproduce their recorded hashes
+  (`ciqa-check`, zensim-training `tools/ciqa-check/`; mozjpeg-sys is its oracle, test code only). A first kernel
+  written from jidctfst.c's C path matched 20,279 of 20,309; the 30 misses are blocks where a 16-bit intermediate
+  overflows (the SIMD kernel saturates where the C path wraps through its range-limit table), and the SSE2-faithful
+  kernel matches all 30 with 0 bytes differing from the oracle. The PNGs are private:
+  `/mnt/v/zensim/ciqa-private/{references,stimuli}-zenjpeg-ifast/` on dev, mode 0700, never published or mirrored.
+- **Features (label-free):** `e36_exp56/ciqa.py keys` reads only pairs.tsv's `ref`, `a`, `b` and `split` and writes
+  the 13,713 distinct (reference, stimulus) pairs as assessment keys (token `ciqa`, `instrument.json` with
+  `labels_read: false`); `rev5_bank.py extract` with the frozen Rev7 extractor every E36 bank uses (build
+  `b77883be`, binary `ed495741…`, era `rev7_rowlanes`), into `/mnt/v/zensim/ciqa-private/e36-read/bank/ciqa/`.
+- **The read (registered here, before it happens; `e36_exp56/ciqa_confirm.sh`):** pairs.tsv's 7,902 questions
+  (6,329 native train, 1,573 native test; `p_a` = share of raters preferring `a`; the library already dropped 16
+  exact repeats), every row its own question, soft-label two-alternative agreement (clic.py's `pair_agreement`, a
+  tie counts one half). Models: F3's control, p30L, `mixF3` and mix + p30L at seeds 0-2 (the dial comparison's
+  candidates), each arm against F3's control at the same seed; whole-reference bootstrap (6,596 references, 10,000
+  draws, seed 20261103) of the seed-mean paired difference; all rows primary, the native test split reported beside
+  it. Reading rule as read 1: supported if the interval lies above zero, contradicted if below, otherwise neutral.
+  `ciqa.py confirm` ledgers the read in `LABEL_READS.json` before parsing `p_a`; outputs stay under the private root.
+- **Disclosures:** the stimuli are a recreation, not the raters' files, so parity with the originals is unknowable
+  (D4); raters compared two compressed versions of one photo, so each question is a within-reference JPEG ordering
+  at one codec; the raters' display decode is unknown and the recreation's decode is the one scored; every
+  reference is itself a JPEG; no zensim model, third-party metric or statistic has touched these labels before this
+  read; CIQA stays evaluation-only under the owner's 2026-10-16 condition, so nothing is fitted, tuned or selected
+  on it except by this reading rule.
+
+Reading: a further evaluation of the dial candidates, as the owner asked ("we need to do more evals"); nothing is
+adopted on it.
