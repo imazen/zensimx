@@ -87,6 +87,11 @@ fn retained_export_matches_plain_extraction_on_odd_sizes_and_strided_rows() {
                 serde_json::from_slice(&std::fs::read(out.join("instrumented.json")).unwrap())
                     .unwrap();
             assert_eq!(control["bits"], hooked["bits"]);
+            assert_eq!(meta["pooled_bits_checked"], control["emitted_slot_count"]);
+            assert_eq!(
+                meta["layout_bits_checked"],
+                control["bits"].as_array().unwrap().len()
+            );
             if let Some(ref bits) = tight_bits {
                 assert_eq!(
                     bits, &control["bits"],
