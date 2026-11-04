@@ -1,8 +1,11 @@
 """Local R14 jobs reusing the R13 shared-lock/resource and fit receipt owner."""
 import argparse
+from collections import Counter
+import csv
 import json
 from pathlib import Path
 import subprocess
+import struct
 import sys
 
 import r13_width as owner
@@ -95,7 +98,6 @@ def development():
     best=min(ARMS,key=lambda a:pooled[f'{a}_s0'])
     inputs=json.loads((O/'screen/INPUTS.json').read_text())
     with (O/f'screen/{best}.tsv').open() as f:
-        import csv
         table=list(csv.DictReader(f,delimiter='\t'))
     trainable=[i for i,r in enumerate(table) if r['best_transform']=='soft_clip'
         and inputs[i]['p99']>max(0.,inputs[i]['p05'])]
@@ -124,11 +126,56 @@ def reads():
             owner.job(f'read-{stage}-{name}',common+['--only',stage,'--include-model',name])
 
 
+def fit_progress(destination):
+    pins=json.loads((O/'SOURCE_PINS.json').read_text())
+    screen=json.loads((O/'screen/SUMMARY.json').read_text())
+    rows=[];pending=[]
+    for arm in ARMS:
+        cell=O/f'fits/{arm}-s0'
+        if not (cell/'FIT.json').exists():
+            pending.append(arm);continue
+        fit=json.loads((cell/'FIT.json').read_text())
+        if owner.sha(fit['packed_model'])!=fit['packed_model_sha256'] or not fit['certificate']['certified']:
+            raise ValueError('frozen fit identity/certificate differs')
+        transforms=fit['certificate']['feature_transforms']
+        tokens=dict(Counter(t['token'] for t in transforms))
+        if len(transforms)!=984 or tokens!=screen['token_counts'][arm]:
+            raise ValueError('packed transform table token inventory differs')
+        with (O/f'screen/{arm}.tsv').open() as f:
+            expected=list(csv.DictReader(f,delimiter='\t'))
+        f32=lambda values:b''.join(struct.pack('<f',float(v)) for v in values)
+        for i,(actual,wanted) in enumerate(zip(transforms,expected,strict=True)):
+            if (actual['caller_input']!=i or actual['token']!=wanted['best_transform']
+                    or f32(actual['params'])!=f32(v for v in wanted['params_csv'].split(',') if v)):
+                raise ValueError(f'packed transform parameters differ at caller input {i}')
+        if any(t['value_at_zero']!=0 or not t['finite_positive_one_sided_derivative']
+               or t['derivative_at_zero']<=0 for t in transforms):
+            raise ValueError('packed transform zero-slope contract differs')
+        resources={}
+        for stage in ('base','continuation','pack'):
+            lines=[v for v in (O/'logs'/f'{arm}-s0-{stage}.log').read_text().splitlines()
+                   if v.startswith('run-heavy: done')]
+            if len(lines)!=1:raise ValueError('unique complete resource receipt required')
+            resources[stage]=lines[0]
+        rows.append(dict(arm=arm,seed=0,packed_sha256=fit['packed_model_sha256'],
+            packed_bytes=Path(fit['packed_model']).stat().st_size,
+            wall_seconds_excluding_lock_waits=fit['wall_seconds'],stage_times=fit['stage_times'],
+            capacity={k:fit['capacity'][k] for k in ('dead','residual','live')},
+            certified=True,certified_max_pairs=fit['certificate']['max_pairs'],
+            token_counts=tokens,resource_receipts=resources,finished=fit['finished']))
+    owner.write(destination,dict(registration='5b5a013482db4944042883995ad6892f92244c69',
+        trainer_source_commit=pins['source_commit'],trainer_sha256=pins['binary_sha256']['zensim_mlp_train'],
+        screen_summary_sha256=owner.sha(O/'screen/SUMMARY.json'),models=rows,pending=pending,
+        completed=len(rows),required_T1_fits=3,
+        role='packed-fit identities only; no AIC-2026 quality statistics or EVAL selection'))
+
+
 def main():
     ap=argparse.ArgumentParser(description=__doc__)
-    ap.add_argument('command',choices=('fit','pack','freeze','development','capacity','reads','job'))
+    ap.add_argument('command',choices=('fit','pack','freeze','development','capacity','reads','fit-progress','job'))
     ap.add_argument('--arm',choices=ARMS)
     ap.add_argument('--label')
+    ap.add_argument('--out',type=Path)
     a,argv=ap.parse_known_args()
     if argv and a.command!='job':ap.error('unexpected arguments')
     for p in (O/'logs',owner.SCRATCH):p.mkdir(parents=True,exist_ok=True)
@@ -142,6 +189,9 @@ def main():
         owner.job(a.label,argv[1:] if argv[:1]==['--'] else argv)
     elif a.command=='capacity':capacity()
     elif a.command=='reads':reads()
+    elif a.command=='fit-progress':
+        if not a.out:ap.error('--out required')
+        fit_progress(a.out)
     else:freeze()
 
 
