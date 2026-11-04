@@ -4192,3 +4192,26 @@ r12-linear-final-check:
 r12-linear-archive:
     flock ~/tmp/heavy.lock ~/work/claudehints/scripts/run-heavy --mem 24G --jobs 8 -- bash scripts/byconstruction/r12_linear_archive.sh
 
+
+
+a-family-cost-report study out host:
+    python3 scripts/bench/a_family_cost_report.py {{quote(study)}} {{quote(out)}} --host {{quote(host)}}
+
+a-family-cost-perf study out host:
+    python3 scripts/bench/a_family_cost_perf.py {{quote(study)}} {{quote(out)}} --host {{quote(host)}}
+
+a-family-cost-progress study:
+    python3 scripts/bench/a_family_cost_progress.py {{quote(study)}}
+
+a-family-cost-select study view *args:
+    python3 scripts/bench/a_family_cost_select.py {{quote(study)}} {{quote(view)}} {{args}}
+
+a-family-cost-jpeg-check study out:
+    python3 scripts/bench/a_family_cost_jpeg_check.py {{quote(study)}} {{quote(out)}}
+
+a-family-cost-verify view summary out:
+    python3 scripts/bench/a_family_cost_verify.py {{quote(view)}} {{quote(summary)}} {{quote(out)}}
+
+a-family-cost-shared study:
+    python3 scripts/bench/a_family_cost_shared_run.py {{quote(study)}}
+
