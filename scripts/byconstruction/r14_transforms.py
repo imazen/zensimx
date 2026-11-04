@@ -259,9 +259,33 @@ def development_final():
 def capacity():
     import r13_width_analysis as audit
     pins=json.loads((O/'SOURCE_PINS.json').read_text())
+    if owner.sha(O/'bin/bake_dial_refit')!=pins['binary_sha256']['bake_dial_refit']:
+        raise ValueError('R14 canonical certifier changed')
+    frozen=json.loads((O/'FROZEN_FITS.json').read_text())
+    models=json.loads((O/'MODELS.json').read_text())
+    for row in frozen['models']:
+        name=f"{row['arm']}_s{row['seed']}"
+        if models[name]!=row['packed_model'] or owner.sha(models[name])!=row['packed_sha256']:
+            raise ValueError('capacity models differ from frozen fits')
     owner.EXPORT=O/'bin/zensim-viz-export'
     audit.O=O
     audit.capacity(exporter_sha256=pins['binary_sha256']['zensim-viz-export'])
+    measured=json.loads((O/'CAPACITY.json').read_text());proof={}
+    for bank in owner.BANKS:
+        for row in frozen['models']:
+            name=f"{row['arm']}_s{row['seed']}";key=f'{bank}/{name}'
+            path=O/f'capacity/{bank}/{name}/audit/audit.json'
+            data=json.loads(path.read_text());constraints=data['constraints']
+            if (constraints['certificate_binary_sha256']!=pins['binary_sha256']['bake_dial_refit']
+                    or not constraints['certificate']['certified']
+                    or any(measured[key][k]!=row['capacity'][k] for k in ('dead','residual','live'))
+                    or measured[key]['bake_sha256']!=row['packed_sha256']):
+                raise ValueError('capacity certificate, counts or model identity differs')
+            proof[key]=dict(audit_sha256=owner.sha(path),
+                certifier_sha256=constraints['certificate_binary_sha256'],
+                counts_equal_packed_inspection=True)
+    if len(measured)!=len(proof):raise ValueError('unexpected capacity cells')
+    owner.write(O/'CAPACITY_PROOF.json',proof)
 
 
 def reads():
