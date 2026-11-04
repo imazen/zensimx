@@ -20,6 +20,7 @@ def main():
     ap.add_argument('--with-extra', action='store_true')
     ap.add_argument('--arms', help='explicit frozen arm inventory, including F control')
     ap.add_argument('--title', default='R12 measured read tables')
+    ap.add_argument('--candidate-seeds', default='0,1,2', help='registered candidate seeds; F control remains 0,1,2')
     ap.add_argument('--out', type=Path, required=True)
     a = ap.parse_args()
     root = a.root
@@ -28,13 +29,17 @@ def main():
         arms = ['F', 'L0', 'L1', 'L2', 'L3', 'L4']
     if a.arms:
         arms = a.arms.split(',')
+    candidate_seeds=[int(s) for s in a.candidate_seeds.split(',')]
     def reads(arm):
         return root / ('extra/reads' if arm in ('L0', 'L4') else 'reads')
     def names(arm, sep='_s'):
-        return [f'{arm}{sep}{s}' for s in range(3)]
+        return [f'{arm}{sep}{s}' for s in (range(3) if arm=='F' else candidate_seeds)]
     lines = [f'# {a.title}', '',
              'A is the registered F baseline. Cells are seed means unless seed values are separated by `/`.',
              'No across-seed interval is implied. Per-seed whole-reference/family intervals remain in the native read JSON.', '']
+    if candidate_seeds!=[0,1,2]:
+        lines[2]=f'A is the registered F baseline, seeds 0–2. Candidate seeds: {a.candidate_seeds}; means use only those registered seeds.'
+        lines.insert(4,'Candidate seeds 1–2: not run (owner cut on cost, 2026-11-04). No candidate across-seed stability is measured.')
     def table(title, labels, rows):
         lines.extend([f'## {title}', '', '| Read | ' + ' | '.join(labels) + ' |',
                       '|---|' + '---:|' * len(labels)])
@@ -87,12 +92,13 @@ def main():
             values.append(f'{v:.6f}')
         rows.append((family, values))
     rows.append(('level pass / rank pass (seeds)', ['reference A0' if arm == 'F' else
-                 f"{sum(chroma[arm]['candidates'][n]['passes'] for n in names(arm))}/3 / {sum(chroma[arm]['candidates'][n]['rank_non_regression']['passes'] for n in names(arm))}/3" for arm in arms]))
+                 f"{sum(chroma[arm]['candidates'][n]['passes'] for n in names(arm))}/{len(names(arm))} / {sum(chroma[arm]['candidates'][n]['rank_non_regression']['passes'] for n in names(arm))}/{len(names(arm))}" for arm in arms]))
     table('G-CHROMA-L: dev views >64 px; MAE in score points against A0', labels, rows)
     gate_rows = {arm: [] for arm in arms}
     h = Path.home() / 'tmp/e36test'
     for arm in arms:
-        for s, name in enumerate(names(arm)):
+        for name in names(arm):
+            s=int(name.rsplit('_s',1)[1])
             gate = h / f'gates/mixF3_s{s}' if arm == 'F' else reads(arm) / f'gates/{name}'
             steer_name = f'mixF3_s{s}' if arm == 'F' else name
             steer = load(gate / f'steer135/{steer_name}/result.json')['rows']
@@ -116,9 +122,9 @@ def main():
                                        N1=near['N1']['pass'], N2=near['N2']['pass'],
                                        N3=near['N3']['monotone_ladders'], identity=identity_ok))
     rows = [('G-STEER successes /135', [' / '.join(str(v['steer']) for v in gate_rows[arm]) for arm in arms]),
-            ('C1–C6, both standard and ladder grids', [f"{sum(v['contracts'] for v in gate_rows[arm])}/3 pass" for arm in arms]),
-            ('Identity: 744 scores exactly 100; read sets invariant', [f"{sum(v['identity'] for v in gate_rows[arm])}/3 pass" for arm in arms]),
-            ('NEARID N1 / N2', [f"{sum(v['N1'] for v in gate_rows[arm])}/3 / {sum(v['N2'] for v in gate_rows[arm])}/3 pass" for arm in arms]),
+            ('C1–C6, both standard and ladder grids', [f"{sum(v['contracts'] for v in gate_rows[arm])}/{len(names(arm))} pass" for arm in arms]),
+            ('Identity: 744 scores exactly 100; read sets invariant', [f"{sum(v['identity'] for v in gate_rows[arm])}/{len(names(arm))} pass" for arm in arms]),
+            ('NEARID N1 / N2', [f"{sum(v['N1'] for v in gate_rows[arm])}/{len(names(arm))} / {sum(v['N2'] for v in gate_rows[arm])}/{len(names(arm))} pass" for arm in arms]),
             ('NEARID N3 monotone ladders /144 (bar 122)', [' / '.join(str(v['N3']) for v in gate_rows[arm]) for arm in arms])]
     table('Label-free pixel and dial checks', labels, rows)
     hdr = {arm: load(reads(arm) / 'hdr-panel/panel.json') for arm in arms}

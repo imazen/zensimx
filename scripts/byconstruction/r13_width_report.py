@@ -18,8 +18,7 @@ def main():
     ap.add_argument('--out',type=Path,required=True)
     a=ap.parse_args()
     fits=load(O/'FROZEN_FITS.json')['models']
-    if len(fits)!=15: raise ValueError('all fifteen frozen fits required')
-    models=load(O/'MODELS.json')
+    if len(fits)!=owner.required_fits(): raise ValueError('every retained frozen fit is required')
     cap=load(O/'CAPACITY.json')
     dev=load(O/'DEVELOPMENT.json')
     primary=load(O/'reads/PRIMARY.json')
@@ -30,10 +29,14 @@ def main():
         if load(p)['rc']!=0: raise ValueError(f'failed assessment: {p}')
     # Four shared scoring stages plus every model's steering/dial/NEARID.
     receipts=list((O/'reads').glob('*.receipt.json'))
-    if len(receipts)!=72: raise ValueError(f'incomplete assessment receipt inventory: {len(receipts)}/72')
+    expected_receipts=12+4*owner.required_fits()
+    if len(receipts)!=expected_receipts: raise ValueError(f'incomplete assessment receipt inventory: {len(receipts)}/{expected_receipts}')
     lines=['# R13: A at proportional hidden widths (2026-11-04)','',
            'Registration `25e77292`; admission/execution `ccdb5c7a`; native read-owner reuse `d6e429d3`.',
            'The control A is the frozen adopted W128 mixF3, seeds 0–2; no A refit.',
+           'Owner amendment `397d67be` cuts the original seed repetitions on cost and adds W4 seed 0 after W16.',
+           'Candidate seeds 1–2: **not run (owner cut on cost, 2026-11-04)**. W4 was registered only at seed 0.',
+           'Candidate across-seed stability is unmeasured. These are six seed-0 fits beside the three frozen A seeds.',
            'Owner defines width as pairs = width/4: half the units form max pairs, half retain A’s ordinary threshold role.',
            'W16 and W32 cannot keep 32 pairs, so this comparison is proportional by construction.','',
            'Width also changes the canonical Xavier scales and the number of initialization RNG draws:',
@@ -41,7 +44,7 @@ def main():
            'The output weights are drawn after the width-dependent encoder. Initialization and pair-sampling',
            'RNG streams are separate, so changing width does not consume pair-sampler draws. These are',
            'inherited trainer semantics, not an additional initialization intervention.','',
-           'All fifteen fits use A’s 984 inputs, admitted TRAIN mixture and weights, 120 base epochs (fixed epoch 119),',
+           'All retained fits use A’s 984 inputs, admitted TRAIN mixture and weights, 120 base epochs (fixed epoch 119),',
            'then public_train ×256 continuation with original rehearsal, 60 epochs at 1e-5 (fixed epoch 59).',
            'No EVAL result selects a width, checkpoint or setting. No AIC-2026 assessment statistics are committed.',
            'Packing is canonical densify → f16 with protected final layer → CID22 TRAIN dial, E33 identity/tail2,',
@@ -53,9 +56,9 @@ def main():
            '| Width | Seed | Base final dev geomean3 | TRAIN dev MAE | E36 inversions (%) | All-nine MOS error (%) | Chroma level | Dead / residual / live | Largest pair (%) | Inputs 50/90/99% | Head (µs) | Fit wall (s) |',
            '|---|---:|---:|---:|---:|---:|---|---|---:|---|---:|---:|']
     compact=[]
-    for width in (16,32,64,128,256,512):
+    for width in (4,16,32,64,128,256,512):
         arm='F' if width==128 else f'W{width}'
-        for seed in range(3):
+        for seed in (range(3) if width==128 else owner.registered_seeds()):
             name=f'{arm}_s{seed}'
             mos=100*mean(v['med'] for v in readout['per'][f'{arm}@{seed}'].values())
             share=100*primary[arm]['seeds'][name]
@@ -78,7 +81,7 @@ def main():
                 c=dict(dead=int(dead.sum()),residual=int(residual.sum()),live=int((~dead&~residual).sum()),
                        largest_pair_share=max(shares),concentration={str(p):int(np.searchsorted(mass,p*sum(effects))+1) for p in (.5,.9,.99)})
                 level='reference seed'
-                head='paired controls below'
+                head='paired A0 below' if seed==0 else 'not timed'
                 wall='not refitted'
             else:
                 c=cap[f'cid22/{name}']
@@ -100,10 +103,10 @@ def main():
               '|output coefficient| < 1e-3 of the largest. Largest pair share uses measured mean absolute raw contributions.',
               'Concentration counts damage slots out of 492, jointly intervening on their direct and product paths;',
               'single-slot effects overlap and do not form an additive score decomposition.','',
-              '| Width | Matched A head (µs), seeds 0/1/2 | Clean paired rounds /30, seeds 0/1/2 |',
+              '| Width | Matched A0 head (µs) | Clean paired rounds /30, candidate seed 0 |',
               '|---|---|---|']
-    for width in (16,32,64,256,512):
-        values=[timing[f'W{width}_s{s}'] for s in range(3)]
+    for width in (4,16,32,64,256,512):
+        values=[timing[f'W{width}_s{s}'] for s in owner.registered_seeds()]
         matched=' / '.join(format(v['baseline_ns']/1000,'.6f') for v in values)
         clean=' / '.join(str(v['clean']) for v in values)
         lines.append(f"| {width} | {matched} | {clean} |")

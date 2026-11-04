@@ -10,6 +10,15 @@ import os
 SEEDS = [int(x) for x in os.environ.get('SEEDS', '0,1,2').split(',')]  # SEEDS=0 for a seed-0 screen
 CONTROL = os.environ.get('CONTROL', 'control')  # the arm every other arm is compared with
 arms = {a: [f"{a.replace('-', '_')}_s{s}" for s in SEEDS] for a in (sys.argv[4].split(',') if len(sys.argv) > 4 else ['control', 'pool-1', 'pool-10'])}
+# R13's owner cut retains three frozen control seeds and one candidate seed.
+# Only inventory changes; the registered seed mean and source bootstrap below do not.
+if 'ARM_SEEDS' in os.environ:
+    inventory = json.loads(os.environ['ARM_SEEDS'])
+    if set(inventory) != set(arms) or any(not isinstance(v,list) or not v
+            or any(type(s) is not int or s < 0 for s in v) or len(v)!=len(set(v))
+            for v in inventory.values()):
+        raise ValueError('arm seed inventory must bind every arm to unique nonnegative seeds')
+    arms = {a:[f"{a.replace('-', '_')}_s{s}" for s in inventory[a]] for a in arms}
 cols = ['reference_sha256', 'split', 'scored'] + [f'{m}_inv' for v in arms.values() for m in v]
 p = pq.read_table(pairs, columns=cols).to_pandas()
 p = p[(p.split == 'selection') & p.scored]

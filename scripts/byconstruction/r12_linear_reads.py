@@ -100,8 +100,11 @@ def main():
             for n in all_models: args += ['--model',n]
             if run('e36-inversions',args):
                 arms = ','.join(dict.fromkeys(n.rsplit('_s',1)[0] for n in all_models))
-                run('primary',[py,Path.home()/'tmp/e36test/primary/primary.py',out/'inversions/pairs_scored.parquet',
-                               idx/'selection.jsonl',out/'PRIMARY.json',arms], {'CONTROL':'F'})
+                seed_inventory={arm:sorted(int(n.rsplit('_s',1)[1]) for n in all_models if n.rsplit('_s',1)[0]==arm)
+                                for arm in arms.split(',')}
+                run('primary',[py,scripts/'e36_exp56/primary.py',out/'inversions/pairs_scored.parquet',
+                               idx/'selection.jsonl',out/'PRIMARY.json',arms],
+                    {'CONTROL':'F','ARM_SEEDS':json.dumps(seed_inventory)})
     if 'chroma' in todo:
         args = [py,scripts/'chroma_ladder_gate.py','score','--bank','/var/tmp/byc-fchroma-20261029/c/merged-bank',
                 '--predict',pred,'--roles','dev','--out',out/'chroma','--drop-long-edge-at-most','64',
