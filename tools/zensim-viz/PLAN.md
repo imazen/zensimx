@@ -70,3 +70,15 @@ required columns, reject missing/nonfinite inputs, and preserve row identity.
 No training data, generated images, large JSON or bake bytes enter git.
 No metric arithmetic, public API, established expectation or frozen artifact
 is changed as a side effect of this tool.
+
+## Verified model correction (native certificate, 2026-11-04)
+
+The brief's unqualified nonnegative-encoder description is incomplete. The
+canonical `bake_dial_refit certify-monotone` certifies F with one live max pair
+and E with three; both have zero free ramps and zero free amplitude. In a max
+pair, `c*(ReLU(a*x)+ReLU((b-a)*x-t)) = c*max(a*x,b*x-t)` on nonnegative inputs.
+Negative entries in the second column can therefore be legal. The audit must
+show paired/gated witnesses, use the canonical certificate, and flag failures
+of the actual constraints rather than flag every negative encoder entry.
+The native certificate's source owner is
+`zensim-validate/src/mlp_train/mod.rs::certify_monotone_bake`.
