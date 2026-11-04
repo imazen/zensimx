@@ -380,6 +380,8 @@ def admit_datasets(a, cell_id, groups, selected_ids):
         if (d["loss"] == "hard-pair-preference" or votes) and any(n != 2 for n in counts.values()):
             raise ValueError("hard preference requires exactly two sides per comparison")
         weight = d["nominal_weight"]/(sum(1-1/counts[k] for k in sorted(counts))/len(counts))
+        if "experiment5_scale" in r:  # experiment 5 --mos-share: the recorded scale times the corrected weight
+            weight = weight * r["experiment5_scale"]
         if r["train_weight"] != weight:
             raise ValueError("dataset nominal-weight acceptance correction differs")
         admitted[r["name"]] = d
@@ -615,7 +617,7 @@ def read_train_panel(path):
 
 
 def dataset_groups(root, groups, selected, route, seed_index, init_seed, sample_seed, dest, exclude=(),
-                   derived_inputs="fx1"):
+                   derived_inputs="fx1", mos_share=None):
     """Attach the frozen derived root's dataset legs to the canonical fitter.
 
     `derived_inputs` is the run's pinned derived-input recipe token; the root's legs must have been admitted
@@ -668,6 +670,17 @@ def dataset_groups(root, groups, selected, route, seed_index, init_seed, sample_
                             manifest_sha256=sha(str(path)+".manifest.json"),
                             keys_path=str(path.with_suffix(".keys.parquet")), subjective=False))
     records += retained
+    if mos_share is not None:  # experiment 5: equal split of the total MOS weight, written into the authority itself
+        mos = [r for r in records if r["train_weight"] > 0 and (r["name"] == "human" or
+               (r["name"].startswith("subjective_rank_") and r["name"] != "subjective_rank_bapps"))]
+        if not mos:
+            raise ValueError("--mos-share with no MOS training group kept")
+        for r in mos:
+            if r["name"] == "human":
+                r["train_weight"] = mos_share / len(mos)
+            else:  # dataset legs: admission re-derives the weight from the pinned manifest times this scale
+                r["experiment5_scale"] = (mos_share / len(mos)) / r["train_weight"]
+                r["train_weight"] = r["train_weight"] * r["experiment5_scale"]
     expanded = [(r["name"],Path(r["path"]),r["train_weight"],r["val_weight"],r["mode"]) for r in records]
     cell_id = f"{route}-s{seed_index}"
     cell = dict(route="full" if route == "full" else "d1",seed_index=seed_index,epochs=120,pairs_per_epoch=50000,

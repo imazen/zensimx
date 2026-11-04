@@ -46,6 +46,12 @@ def main() -> None:
     os.environ.setdefault("ZEN_PANEL_BIN", str(PANEL))
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--exclude-datasets", default="", help="TRAIN-only dataset-group holdout, comma-separated collections")
+    # Experiment 5 (zensimx benchmarks/e36_subset_test_2026-11-01.md): MOS transfer arms. Defaults change nothing.
+    ap.add_argument("--human-sources", default=None, help="keep only these production sources of the human leg, or 'none'")
+    ap.add_argument("--drop-groups", default="", help="drop these training groups (e.g. cid22); validation groups stay")
+    ap.add_argument("--mos-share", type=float, default=None, help="split this total train weight equally over kept MOS groups")
+    ap.add_argument("--human-rows", type=Path, default=None,
+                    help="experiment 6: JSON {label, keep: [parent row indices]} pruning the human leg")
     from matched_codec import add_args as codec_args
     codec_args(ap)
     ap.add_argument("--spec", required=True)
@@ -84,7 +90,9 @@ def main() -> None:
         registered = (((60, diagnostic_protocol(args.diagnostic_population)[1]),) if args.diagnostic_population
                       else ((4, 8.0), (8, 16.0)))
         if (not args.init_from or not args.strict_admission or not args.train_only
-                or args.exclude_datasets or args.local_smoke_budget or args.research_extra_group
+                # E36 experiment 5 stage 3: a registered MOS mix may exclude dataset legs in the continuation.
+                or (args.exclude_datasets and args.mos_share is None and args.human_sources is None)
+                or args.local_smoke_budget or args.research_extra_group
                 or args.research_replay or args.aic_public_train is None or args.fine_tune_lr != 0.00001
                 or (args.diagnostic_population and args.pack_production)
                 or (args.fine_tune_epochs, args.aic_weight) not in registered):
@@ -168,8 +176,21 @@ def main() -> None:
         raise ValueError(f"{args.spec}: the confirm fitter implements the coverage leg only (no ko/ts recipe tokens)")
     hfit, hdev = checked(legs["human_all"]["fit"]), checked(legs["human_all"]["dev"])
     weights["human"] = acceptance_weight(NOMINAL_WEIGHT["human"] if human_w is None else human_w, refs_of(hfit))
+    if args.human_sources not in (None, "none"):
+        from human_subset import subset
+        hfit = subset(hfit, args.human_sources.split(","), dest / "human_subset")
+    if args.human_rows is not None:
+        from human_subset import subset
+        from v2_human_role import PRODUCTION_SOURCES
+        if args.human_sources is not None:
+            raise ValueError("--human-rows prunes the full human leg; it does not combine with --human-sources")
+        pr = json.loads(args.human_rows.read_text())
+        hfit = subset(hfit, list(PRODUCTION_SOURCES), dest / "human_subset", rows=pr["keep"], label=pr["label"])
     groups += [("human", hfit, weights["human"], 0, "withinref,rank"),
                ("human_development", hdev, 0, HUMAN_VAL_WEIGHT, "withinref,rank")]
+    if args.human_sources == "none":
+        groups = [g for g in groups if g[0] != "human"]
+        weights.pop("human")
     init_seed, sample_seed = confirm_seeds(args.seed_index)
     from matched_codec import attach as attach_codec
     groups, recipe = attach_codec(args, groups, V2, init_seed, sample_seed, recipe)
@@ -179,9 +200,18 @@ def main() -> None:
         groups, dataset_authority = dataset_groups(V2, groups, keep, "full", args.seed_index,
                                                    init_seed, sample_seed, dest,
                                                    exclude=tuple(filter(None, args.exclude_datasets.split(","))),
+                                                   mos_share=args.mos_share,
                                                    derived_inputs=recipe_of(args.spec).get("derived_inputs") or "fx1")
         if dataset_authority:
             weights.update({name:tw for name,_,tw,_,_ in groups if tw > 0})
+    drop = set(filter(None, args.drop_groups.split(",")))
+    if drop:
+        groups = [g for g in groups if g[0] not in drop]
+        weights = {k: v for k, v in weights.items() if k not in drop}
+    if args.human_sources is not None or drop or args.mos_share is not None:
+        print(json.dumps({"experiment5": dict(human_sources=args.human_sources, human_rows=str(args.human_rows), drop_groups=sorted(drop),
+                                             mos_share=args.mos_share,
+                                             train_groups={n: tw for n, _, tw, _, _ in groups if tw > 0})}))
     diagnostic = None
     if args.init_from is not None:
         if dataset_authority is None:
