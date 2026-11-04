@@ -5,6 +5,21 @@ export R14_TRAINER_KIND=${1:-selected-callers}
 case "$R14_TRAINER_KIND" in selected-callers|t2-bounds) ;; *) exit 2 ;; esac
 export CARGO_TARGET_DIR=/var/tmp/byc-transforms-20261104/target
 export TMPDIR="$HOME/tmp/zensim-transforms"
+python3 - <<'PY'
+from pathlib import Path
+import hashlib,json,os,subprocess
+root=Path('/var/tmp/byc-transforms-20261104')
+original=json.loads((root/'SOURCE_PINS.json').read_text())
+for name in ('Cargo.toml','Cargo.lock','tools/zensim-viz/Cargo.lock'):
+    assert hashlib.sha256(Path(name).read_bytes()).hexdigest()==original['source_sha256'][name],f'frozen dependency graph changed: {name}'
+assert subprocess.check_output(['rustc','--version'],text=True).strip()==original['rustc'],'frozen compiler changed'
+if os.environ['R14_TRAINER_KIND']=='t2-bounds':
+    selected=json.loads((root/'ACTIVE_TRAINER.json').read_text())
+    predecessor=json.loads((Path(selected['trainer_dir'])/'TRAINER_PINS.json').read_text())
+    changed=subprocess.check_output(['jj','diff','--from',predecessor['source_commit'],'--to','@-',
+        '--name-only','zensim-validate/src'],text=True).splitlines()
+    assert set(changed)=={'zensim-validate/src/mlp_train/r14_knees.rs'},f'unreviewed native trainer changes: {changed}'
+PY
 cargo build --release --locked -p zensim-validate --bin zensim_mlp_train
 python3 - <<'PY'
 from pathlib import Path
