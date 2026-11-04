@@ -4086,6 +4086,16 @@ a-family-cost stage study *args:
 a-speed-build:
     cargo build --release --manifest-path zensim-bench/a-speed-runtime/Cargo.toml --bins --benches
 
+# Public A's serial/parallel crossover; same paired instrument and admission.
+a-parallel-gate-collect root binary threads sizes:
+    env A_SPEED_PARALLEL_GATE=1 BENCH_CPUS=0-15 BENCH_THREADS={{quote(threads)}} BENCH_SIZES={{quote(sizes)}} BENCH_MODES='latency scores' bash zensim-bench/a-speed-runtime/run.sh {{quote(root)}} {{quote(binary)}}
+
+a-parallel-gate-report root output phase:
+    python3 -B zensim-bench/a-speed-runtime/report.py {{quote(root)}} {{quote(output)}} --parallel-gate {{quote(phase)}}
+
+a-parallel-gate-progress host root *args:
+    ssh {{quote(host)}} python3 -B {{quote(root + "/source/a-speed-runtime/progress.py")}} {{quote(root)}} {{args}}
+
 a-speed-prepare sources output:
     zensim-bench/a-speed-runtime/target/release/a-speed-prepare {{quote(sources)}} {{quote(output)}}
 

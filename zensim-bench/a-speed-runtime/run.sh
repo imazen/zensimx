@@ -15,9 +15,9 @@ fi
 printf '%s\n' "$$" > "$root/collector.pid"
 sha256sum "$binary" > "$root/benchmark.sha256"
 for threads in ${BENCH_THREADS:-1 16}; do
-    [[ $threads = 1 || $threads = 16 ]] || exit 2
+    [[ $threads = 1 || $threads = 16 || ( ${A_SPEED_PARALLEL_GATE:-} = 1 && $threads = 4 ) ]] || exit 2
     for size in ${BENCH_SIZES:-64 256 1024 4096}; do
-        [[ " 64 256 1024 4096 " = *" $size "* ]] || exit 2
+        [[ " 64 256 1024 4096 " = *" $size "* || ( ${A_SPEED_PARALLEL_GATE:-} = 1 && " 96 128 160 192 320 384 512 640 768 " = *" $size "* ) ]] || exit 2
         cell="${threads}t_${size}"
         for mode in ${BENCH_MODES:-latency rss-zensim_a rss-fast_ssim2 rss-margarine}; do
             stem="$root/results/${cell}_${mode}"
@@ -25,6 +25,8 @@ for threads in ${BENCH_THREADS:-1 16}; do
             printf '%s %s %s queued collector=%s\n' "$(date -u +%FT%TZ)" "$cell" "$mode" "$$" > "$root/PROGRESS.txt"
             if [[ $mode = latency ]]; then
                 args=(latency "$stem.json")
+            elif [[ $mode = scores && ${A_SPEED_PARALLEL_GATE:-} = 1 ]]; then
+                args=(scores)
             else
                 args=(rss "${mode#rss-}")
             fi
@@ -59,12 +61,25 @@ done
 # A targeted retry is not a full matrix. Require every output before declaring
 # raw collection complete; the reporter separately checks scientific admission.
 complete=1
-for threads in 1 16; do
-    for size in 64 256 1024 4096; do
+complete_threads='1 16'
+complete_sizes='64 256 1024 4096'
+if [[ ${A_SPEED_PARALLEL_GATE:-} = 1 ]]; then
+    complete_threads='16 4'
+    complete_sizes='64 96 128 160 192 256 320 384 512 640 768 1024 4096'
+fi
+for threads in $complete_threads; do
+    for size in $complete_sizes; do
+        if [[ ${A_SPEED_PARALLEL_GATE:-} = 1 && $threads = 4 && $size = 4096 ]]; then
+            continue # The declared large-image control is 16T only.
+        fi
         test -s "$root/results/${threads}t_${size}_latency.json" || complete=0
-        for arm in zensim_a fast_ssim2 margarine; do
-            test -s "$root/results/${threads}t_${size}_rss-${arm}.time.txt" || complete=0
-        done
+        if [[ ${A_SPEED_PARALLEL_GATE:-} = 1 ]]; then
+            test -s "$root/results/${threads}t_${size}_scores.log" || complete=0
+        else
+            for arm in zensim_a fast_ssim2 margarine; do
+                test -s "$root/results/${threads}t_${size}_rss-${arm}.time.txt" || complete=0
+            done
+        fi
     done
 done
 printf '%s raw-collection-finished matrix-outputs-present=%s\n' "$(date -u +%FT%TZ)" "$complete" > "$root/PROGRESS.txt"

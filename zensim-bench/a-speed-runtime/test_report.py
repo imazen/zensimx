@@ -2,7 +2,9 @@
 import copy
 import importlib.util
 import json
+import os
 from pathlib import Path
+import subprocess
 import tempfile
 import unittest
 
@@ -106,6 +108,100 @@ class ReportAdmission(unittest.TestCase):
         path.write_text(json.dumps(run))
         with self.assertRaises(AssertionError):
             report.command_startup(self.root)
+
+
+class ParallelGateAdmission(unittest.TestCase):
+    def setUp(self):
+        scratch = Path.home() / "tmp"
+        scratch.mkdir(exist_ok=True)
+        self.temp = tempfile.TemporaryDirectory(prefix="a-parallel-report-test-", dir=scratch)
+        self.addCleanup(self.temp.cleanup)
+        self.root = Path(self.temp.name)
+        (self.root / "fixtures").mkdir()
+        fixtures = [{"id": f"{size}_{i}", "size": size, "width": size, "height": size}
+                    for size in (*report.GATE_SIZES, 4096) for i in range(20)]
+        (self.root / "fixtures/pairs.json").write_text(json.dumps(fixtures))
+        for stage in ("before", "after"):
+            base = self.root / stage
+            (base / "results").mkdir(parents=True)
+            (base / "measurement-host.txt").write_text("i270\n")
+            for threads in (16, 4):
+                for size in (*report.GATE_SIZES, 4096) if threads == 16 else report.GATE_SIZES:
+                    # Invented control: the 4T crossover is deliberately higher.
+                    crossover = 192 if threads == 4 else 160
+                    groups = [{"group_name": f"{size}/{size*size}/{size}_{i}",
+                               "benchmarks": [{"name": a} for a in ("serial", "parallel")],
+                               "samples": [{"gate_clean": True, "iterations": 1,
+                                            "execution_order": [j % 2, 1 - j % 2],
+                                            "elapsed_ns": [1000000+j, (500000 if size >= crossover else 2000000)+j]}
+                                           for j in range(32)]} for i in range(20)]
+                    path = base / f"results/{threads}t_{size}_latency.json"
+                    path.write_text(json.dumps({"unreliable": False, "comparisons": groups}))
+                    runner = "run-heavy: done rc=0 1s | peak-RSS 0.01GiB | min-avail 20000MiB | peak-load 0.10\n"
+                    path.with_suffix(".log").write_text(runner)
+                    (base / f"results/{threads}t_{size}_scores.log").write_text(
+                        "".join(f"{size}_{i}\t1.00000000000000000\t1.00000000000000000\t3ff0000000000000\t3ff0000000000000\n" for i in range(20)) + runner)
+
+    def test_higher_pool_crossover_and_complete_scores(self):
+        result = report.parallel_gate(self.root, "after")
+        self.assertEqual(result["crossovers"], {"16": 160, "4": 192})
+        self.assertEqual(result["parallel_min_pixels"], 192**2)
+        self.assertEqual(result["score_comparisons"], 1000)
+
+    def test_score_bit_movement_refuses(self):
+        path = self.root / "after/results/4t_64_scores.log"
+        path.write_text(path.read_text().replace("3ff0000000000000\t3ff0000000000000", "3ff0000000000000\t3ff0000000000001", 1))
+        with self.assertRaisesRegex(AssertionError, "score moved"):
+            report.parallel_gate(self.root, "after")
+
+    def test_foreign_compiler_refuses(self):
+        path = self.root / "before/results/16t_64_latency.log"
+        with path.open("a") as stream:
+            stream.write('[zenbench gate] foreign pid=123 name="rustc" cpu_pct=100\n')
+        with self.assertRaisesRegex(AssertionError, "foreign build/training"):
+            report.parallel_gate(self.root, "before")
+
+    def test_shared_clean_round_coverage_refuses(self):
+        path = self.root / "before/results/16t_64_latency.json"
+        run = json.loads(path.read_text())
+        run["comparisons"][0]["samples"][0]["gate_clean"] = False
+        path.write_text(json.dumps(run))
+        with self.assertRaisesRegex(AssertionError, "insufficient clean rounds"):
+            report.parallel_gate(self.root, "before")
+
+
+class CollectorCompletion(unittest.TestCase):
+    def test_targeted_collection_cannot_complete_an_incomplete_matrix(self):
+        scratch = Path.home() / "tmp"
+        scratch.mkdir(exist_ok=True)
+        for gate in (False, True):
+            with self.subTest(parallel_gate=gate), tempfile.TemporaryDirectory(dir=scratch) as folder:
+                root = Path(folder)
+                results = root / "results"
+                results.mkdir()
+                threads = (16, 4) if gate else (1, 16)
+                sizes = (*report.GATE_SIZES, 4096) if gate else report.SIZES
+                for t in threads:
+                    for size in sizes:
+                        if gate and t == 4 and size == 4096:
+                            continue
+                        (results / f"{t}t_{size}_latency.json").write_text("invented completion fixture")
+                        arms = ("scores.log",) if gate else tuple(f"rss-{a}.time.txt" for a in report.ARMS)
+                        for arm in arms:
+                            (results / f"{t}t_{size}_{arm}").write_text("invented completion fixture")
+                missing = results / "16t_4096_latency.json"
+                missing.unlink()
+                env = dict(os.environ, BENCH_CPUS="0-15", BENCH_THREADS=" ", BENCH_SIZES=" ")
+                if gate:
+                    env["A_SPEED_PARALLEL_GATE"] = "1"
+                else:
+                    env.pop("A_SPEED_PARALLEL_GATE", None)
+                command = ["bash", str(Path(__file__).with_name("run.sh")), str(root), "/usr/bin/true"]
+                subprocess.run(command, env=env, check=True, capture_output=True)
+                self.assertFalse((root / "COMPLETE").exists())
+                missing.write_text("invented completion fixture")
+                subprocess.run(command, env=env, check=True, capture_output=True)
+                self.assertTrue((root / "COMPLETE").exists())
 
 
 if __name__ == "__main__":

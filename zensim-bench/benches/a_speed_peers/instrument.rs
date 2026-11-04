@@ -47,7 +47,7 @@ impl Pair {
     fn score(&self, arm: &str, scorer: Option<&zensim::Zensim>) -> f64 {
         let (w, h) = (self.record.width, self.record.height);
         match arm {
-            "zensim_a" => {
+            "zensim_a" | "serial" | "parallel" => {
                 let a = zensim::RgbSlice::new(bytemuck::cast_slice(&self.reference), w, h);
                 let b = zensim::RgbSlice::new(bytemuck::cast_slice(&self.distorted), w, h);
                 scorer.unwrap().compute(&a, &b).unwrap().score()
@@ -102,7 +102,8 @@ fn main() {
     let args: Vec<_> = std::env::args().collect();
     let root = Path::new(&args[1]);
     let threads: usize = args[2].parse().unwrap();
-    assert!(matches!(threads, 1 | 16));
+    let parallel_gate = std::env::var_os("A_SPEED_PARALLEL_GATE").is_some();
+    assert!(matches!(threads, 1 | 16) || (parallel_gate && threads == 4));
     assert_eq!(
         std::env::var("RAYON_NUM_THREADS").unwrap(),
         threads.to_string()
@@ -116,6 +117,24 @@ fn main() {
         selected.len() >= 20,
         "at least twenty images required for size {size}"
     );
+    if args[4] == "scores" {
+        assert!(parallel_gate);
+        for record in selected {
+            let pair = Pair::load(root, record);
+            let serial = zensim::Zensim::new(zensim::ZensimProfile::A).with_parallel(false);
+            let parallel = zensim::Zensim::new(zensim::ZensimProfile::A).with_parallel(true);
+            let a = pair.score("serial", Some(&serial));
+            let b = pair.score("parallel", Some(&parallel));
+            println!(
+                "{}\t{a:.17}\t{b:.17}\t{:016x}\t{:016x}",
+                pair.record.id,
+                a.to_bits(),
+                b.to_bits()
+            );
+            assert_eq!(a.to_bits(), b.to_bits(), "{}", pair.record.id);
+        }
+        return;
+    }
     if args[4] == "rss" {
         // One pair resident at a time, one arm per fresh process. Include all
         // twenty images so a content-dependent high-water mark is observable.
@@ -155,11 +174,21 @@ fn main() {
                     cfg.warmup_time = Duration::from_millis(100);
                     cfg.max_time = Duration::from_secs(600);
                     cfg.max_wall_time = Duration::from_secs(900);
-                    for arm in ["zensim_a", "fast_ssim2", "margarine"] {
+                    let arms: &[&str] = if parallel_gate {
+                        &["serial", "parallel"]
+                    } else {
+                        &["zensim_a", "fast_ssim2", "margarine"]
+                    };
+                    for &arm in arms {
                         let pair = pair.clone();
-                        let scorer = (arm == "zensim_a").then(|| {
-                            zensim::Zensim::new(zensim::ZensimProfile::A)
-                                .with_parallel(threads == 16)
+                        let scorer = matches!(arm, "zensim_a" | "serial" | "parallel").then(|| {
+                            zensim::Zensim::new(zensim::ZensimProfile::A).with_parallel(
+                                if parallel_gate {
+                                    arm == "parallel"
+                                } else {
+                                    threads == 16
+                                },
+                            )
                         });
                         group.bench(arm, move |b| {
                             b.iter(|| zenbench::black_box(pair.score(arm, scorer.as_ref())))

@@ -12,8 +12,31 @@ from run_processes import compute_lock, process_snapshot, process_tree
 
 def main():
     root = Path(sys.argv[1]).resolve()
+    if "--stage" in sys.argv[2:]:
+        stage = sys.argv[sys.argv.index("--stage") + 1]
+        assert stage in ("before", "after")
+        root /= stage
+    if "--build" in sys.argv[2:]:
+        pid = int((root / "build.pid").read_text())
+        process = process_snapshot(pid)
+        assert process and any("heavy.lock" in arg for arg in process["argv"]), "build launcher no longer matches its PID"
+        tree = process_tree(pid)
+        compilers = [p for p in tree if p["argv"] and Path(p["argv"][0]).name in ("cargo", "rustc")]
+        value = json.loads((root / "PROGRESS.json").read_text())
+        value.update({"last_check": datetime.datetime.now(datetime.UTC).isoformat(),
+                      "launcher": process, "compute_lock": compute_lock(pid),
+                      "compiler_pids": [p["pid"] for p in compilers],
+                      "stage": "baseline building" if compilers else "baseline awaiting heavy lock"})
+        (root / "PROGRESS.json").write_text(json.dumps(value, indent=2) + "\n")
+        with (root / "SUPERVISION.jsonl").open("a") as stream:
+            stream.write(json.dumps(value) + "\n")
+        print(json.dumps({"utc": value["last_check"], "stage": value["stage"],
+                          "launcher_pid": pid, "compiler_pids": value["compiler_pids"],
+                          "lock": value["compute_lock"],
+                          "completed_cells": value["completed_cells"]}))
+        return
     identity = json.loads((root / "BINARY.json").read_text())
-    binary = root / "bin/a-speed-peers"
+    binary = (root / "bin/a-speed-peers").resolve()
     actual = hashlib.sha256(binary.read_bytes()).hexdigest()
     assert actual == identity["binary_sha256"], "frozen benchmark binary changed"
     collector_pid = int((root / "collector.pid").read_text())
@@ -30,6 +53,7 @@ def main():
     log = root / "results" / f"{tokens[1]}_{tokens[2]}.log" if len(tokens) >= 3 else None
     lines = log.read_text().splitlines() if log and log.exists() else []
     completed_images = sum(" rounds × " in line for line in lines)
+    parallel_gate = "--parallel-gate" in sys.argv[2:]
     value = {
         "checked_utc": datetime.datetime.now(datetime.UTC).isoformat(),
         "host": (root / "measurement-host.txt").read_text().strip(),
@@ -42,8 +66,10 @@ def main():
         "current_foreign_compiler_traces": sum("foreign pid=" in line and any(f'name="{name}"' in line for name in ("rustc", "cargo", "cc1plus", "cmake")) for line in lines),
         "raw_latency_outputs_present": len(list((root / "results").glob("*t_*_latency.json"))),
         "raw_rss_outputs_present": len(list((root / "results").glob("*t_*_rss-*.time.txt"))),
-        "required_latency_outputs": 8,
-        "required_rss_outputs": 24,
+        "required_latency_outputs": 25 if parallel_gate else 8,
+        "required_rss_outputs": 0 if parallel_gate else 24,
+        "score_outputs_present": len(list((root / "results").glob("*t_*_scores.log"))),
+        "required_score_outputs": 25 if parallel_gate else 0,
         "raw_collection_complete_marker": (root / "COMPLETE").exists(),
         "admission": "Final admission is owned by report.py; output presence is not qualification.",
     }

@@ -15,7 +15,13 @@ fn main() -> Result<(), Box<dyn Error>> {
         "preserve existing fixture manifests"
     );
     let mut pairs = Vec::new();
-    let mut counts = [0usize; 4];
+    let sizes: Vec<usize> = std::env::var("A_SPEED_SIZES")
+        .unwrap_or_else(|_| "64,256,1024,4096".into())
+        .split(',')
+        .map(|n| n.parse().expect("positive integer fixture size"))
+        .collect();
+    assert!(!sizes.is_empty() && sizes.iter().all(|&n| n > 0));
+    let mut counts = vec![0usize; sizes.len()];
     for (index, source) in sources.iter().enumerate() {
         let bytes = std::fs::read(source)?;
         let decoded = zenpng::decode(&bytes, &zenpng::PngDecodeConfig::default(), &Unstoppable)?;
@@ -26,7 +32,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             .rows()
             .flat_map(|row| row.iter().flat_map(|p| [p.r, p.g, p.b]))
             .collect();
-        for (slot, n) in [64usize, 256, 1024, 4096].into_iter().enumerate() {
+        for (slot, &n) in sizes.iter().enumerate() {
             if counts[slot] >= 20
                 || (n < 4096 && (w < n || h < n))
                 || (n == 4096 && (!source.contains("png-v3/") || w.max(h) < 3840))
@@ -102,7 +108,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             eprintln!("prepared {id} from {source}");
         }
     }
-    assert_eq!(counts, [20, 20, 20, 20]);
+    assert_eq!(counts, vec![20; sizes.len()]);
     std::fs::write(root.join("pairs.json"), serde_json::to_vec_pretty(&pairs)?)?;
     Ok(())
 }

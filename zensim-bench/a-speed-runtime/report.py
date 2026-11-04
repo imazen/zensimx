@@ -231,7 +231,13 @@ def main():
     parser.add_argument("root", type=Path)
     parser.add_argument("output", type=Path)
     parser.add_argument("--command-startup", action="store_true", help="require both separate command-startup runs")
+    parser.add_argument("--parallel-gate", choices=("before", "after"), help="validate the A serial/parallel matrix")
     args = parser.parse_args()
+    if args.parallel_gate:
+        result = parallel_gate(args.root, args.parallel_gate)
+        args.output.write_text(render_parallel_gate(result))
+        (args.root / "SUMMARY.json").write_text(json.dumps(result, indent=2) + "\n")
+        return
     result = summarize(args.root)
     if args.command_startup:
         result["command_startup"] = command_startup(args.root)
@@ -239,6 +245,113 @@ def main():
     summary = args.root / "SUMMARY.json"
     summary.write_text(json.dumps(result, indent=2) + "\n")
     print(hashlib.sha256(summary.read_bytes()).hexdigest(), summary)
+
+
+GATE_SIZES = (64, 96, 128, 160, 192, 256, 320, 384, 512, 640, 768, 1024)
+
+
+def parallel_gate(root, phase):
+    """Retain one shared first-32-clean index set for the two arms."""
+    fixtures = json.loads((root / "fixtures/pairs.json").read_text())
+    pairs = {r["id"]: r for r in fixtures}
+    assert len(pairs) == len(fixtures), "duplicate fixture IDs"
+    rows = []
+    for stage in (("before",) if phase == "before" else ("before", "after")):
+        run_root = root / stage
+        assert (run_root / "measurement-host.txt").read_text().strip() == "i270"
+        for threads in (16, 4):
+            for size in (*GATE_SIZES, 4096) if threads == 16 else GATE_SIZES:
+                expected = {r["id"] for r in fixtures if r["size"] == size}
+                assert len(expected) == 20
+                path = run_root / f"results/{threads}t_{size}_latency.json"
+                log = path.with_suffix(".log").read_text()
+                assert "run-heavy: done rc=0" in log, (path, "runner failed")
+                assert not re.findall(r'foreign pid=\d+ name="(cc1plus|cc1|rustc|cargo|cmake|ninja|make|zensim_mlp_trai)"', log), (path, "foreign build/training")
+                run = json.loads(path.read_text())
+                assert not run["unreliable"]
+                assert len(run["comparisons"]) == 20
+                seen, pooled, excluded = set(), [[], []], 0
+                per_image = [[], []]
+                for group in run["comparisons"]:
+                    label, pixels, pair_id = group["group_name"].split("/")
+                    assert pair_id in expected and pair_id not in seen
+                    seen.add(pair_id)
+                    pair = pairs[pair_id]
+                    assert int(label) == size and int(pixels) == pair["width"] * pair["height"]
+                    assert [b["name"] for b in group["benchmarks"]] == ["serial", "parallel"]
+                    samples = group["samples"]
+                    assert all(s["iterations"] == 1 for s in samples)
+                    clean = [s for s in samples if s["gate_clean"] is True][:32]
+                    assert len(clean) == 32, (path, pair_id, "insufficient clean rounds")
+                    excluded += sum(s["gate_clean"] is not True for s in samples)
+                    for i in (0, 1):
+                        values = [s["elapsed_ns"][i] / 1e6 for s in clean]
+                        assert all(math.isfinite(v) and v > 0 for v in values)
+                        assert all(sorted(s["execution_order"]) == [0, 1] for s in clean)
+                        pooled[i].extend(values)
+                        per_image[i].append((int(pixels), statistics.median(values)))
+                assert seen == expected
+                score_log = run_root / f"results/{threads}t_{size}_scores.log"
+                score_text = score_log.read_text()
+                assert "run-heavy: done rc=0" in score_text
+                scores = {}
+                for line in score_text.splitlines():
+                    fields = line.split("\t")
+                    if len(fields) == 5 and fields[0] in expected:
+                        pair_id, serial, parallel, serial_bits, parallel_bits = fields
+                        assert pair_id not in scores
+                        assert serial == parallel and serial_bits == parallel_bits, (pair_id, "score moved")
+                        scores[pair_id] = serial_bits
+                assert set(scores) == expected, (score_log, "incomplete scores")
+                row = {"stage": stage, "threads": threads, "size": size, "images": 20,
+                       "samples_per_arm": 640, "excluded_rounds": excluded, "score_bits": scores,
+                       "runner": next(line for line in log.splitlines() if line.startswith("run-heavy: done"))}
+                for i, arm in enumerate(("serial", "parallel")):
+                    row[arm] = {"p50_ms": quantile(pooled[i], .5), "p95_ms": quantile(pooled[i], .95)}
+                row["speedup"] = row["serial"]["p50_ms"] / row["parallel"]["p50_ms"]
+                rows.append(row)
+    before = {(r["threads"], r["size"]): r for r in rows if r["stage"] == "before"}
+    for row in rows:
+        assert row["score_bits"] == before[(row["threads"], row["size"])]["score_bits"], "before/after scores moved"
+    for size in GATE_SIZES:
+        assert before[(4, size)]["score_bits"] == before[(16, size)]["score_bits"], "thread-count scores moved"
+    crossovers = {str(t): next((s for s in GATE_SIZES if before[(t, s)]["speedup"] > 1), None) for t in (16, 4)}
+    assert all(crossovers.values()), "no measured crossover"
+    gate_side = max(crossovers.values())
+    return {"rows": rows, "crossovers": crossovers, "parallel_min_pixels": gate_side ** 2,
+            "score_comparisons": len(rows) * 20, "score_differences": 0}
+
+
+def render_parallel_gate(result):
+    lines = ["# A parallel extraction gate — 2026-11-04", "",
+             "i270, Intel Core Ultra 7 270K Plus, v3/AVX2, CPUs 0–15. "
+             "Each cell pools 640 single-call timings per arm: 20 images, first 32 clean paired zenbench rounds, "
+             "100 ms warmup per arm/image. Type-7 p50/p95, milliseconds. No target-cpu=native.", "",
+             "Sizes through 512² use ten CID22 TRAIN + ten CLIC TRAIN sources; larger square cells use "
+             "twenty CLIC TRAIN sources because the CID22 fixtures are 512². Mitchell downscale, never enlarged; "
+             "zenjpeg q40 4:2:0 reconstruction. The 12 MP cell reuses the original twenty PNG-v3 fixtures.", "",
+             "| Size | 16T serial p50/p95 | 16T parallel p50/p95 | Serial/parallel | 4T serial p50/p95 | 4T parallel p50/p95 | Serial/parallel |",
+             "|---|---:|---:|---:|---:|---:|---:|"]
+    index = {(r["stage"], r["threads"], r["size"]): r for r in result["rows"]}
+    def timing(row, arm):
+        return f'{row[arm]["p50_ms"]:.4f}/{row[arm]["p95_ms"]:.4f}'
+    for size in GATE_SIZES:
+        a, b = (index[("before", t, size)] for t in (16, 4))
+        lines.append(f'| {size}² | {timing(a, "serial")} | {timing(a, "parallel")} | {a["speedup"]:.3f}× | {timing(b, "serial")} | {timing(b, "parallel")} | {b["speedup"]:.3f}× |')
+    has_after = ("after", 16, 64) in index
+    lines += ["", f'Crossover: 16T {result["crossovers"]["16"]}²; 4T {result["crossovers"]["4"]}². '
+              f'Gate: **{result["parallel_min_pixels"]:,} pixels**, the higher crossover.', "",
+              f'Printed and bitwise serial/parallel scores: **{result["score_differences"]} differences in {result["score_comparisons"]} comparisons**. '
+              + ('Before/after and pool-size score bits also match.' if has_after else 'Pool-size score bits also match; after measurements are pending.'), ""]
+    if has_after:
+        lines += ["| Threads | Size | Serial before/after p50 ms | Parallel before/after p50 ms | Parallel before/after p95 ms |", "|---:|---|---:|---:|---:|"]
+        for threads in (16, 4):
+            for size in (*GATE_SIZES, 4096) if threads == 16 else GATE_SIZES:
+                a, b = (index[(stage, threads, size)] for stage in ("before", "after"))
+                lines.append(f'| {threads} | {size_label(size)} | {a["serial"]["p50_ms"]:.4f}/{b["serial"]["p50_ms"]:.4f} | {a["parallel"]["p50_ms"]:.4f}/{b["parallel"]["p50_ms"]:.4f} | {a["parallel"]["p95_ms"]:.4f}/{b["parallel"]["p95_ms"]:.4f} |')
+    lines += ["", "Runner resource observations (whole-process peaks, not a separate memory comparison):", "", "```text"]
+    lines += [f'{r["stage"]} {r["threads"]}T {r["size"]}: {r["runner"]}' for r in result["rows"]]
+    return "\n".join(lines + ["```", ""])
 
 
 if __name__ == "__main__":
