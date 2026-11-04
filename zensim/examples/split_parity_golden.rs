@@ -17,6 +17,10 @@
 //! cargo run --release -p zensim --features custom-profiles,training,classification --example split_parity_golden -- \
 //!     <general.bin> <codec.bin> [<general-stripped.bin> <codec-stripped.bin>] > golden.tsv
 //! ```
+//! Prepend `--hdr-cube-root-203` when comparing the public crate's anchored
+//! cube-root HDR path. Without it, the historical PU21 reference is unchanged.
+//! `--public-a` also selects A's historical 156-weight projection for the
+//! linear helper surfaces; the default custom-profile projection has 228 weights.
 #![allow(deprecated)]
 
 include!("split_parity/hdr.rs");
@@ -42,10 +46,19 @@ fn bake3() -> &'static [u8] {
     BAKES.get().unwrap()[3]
 }
 
-fn rev7_profile(bytes: fn() -> &'static [u8], name: &'static str) -> ZensimProfile {
+fn rev7_profile(
+    bytes: fn() -> &'static [u8],
+    name: &'static str,
+    public_projection: bool,
+) -> ZensimProfile {
     // The same runtime shape as the shipped MLP profiles (`PROFILE_B` in profile.rs).
     let params: &'static ProfileParams = Box::leak(Box::new(
         ProfileParams::builder()
+            .weights(if public_projection {
+                &zensim::WEIGHTS[..156]
+            } else {
+                zensim::WEIGHTS
+            })
             .skip_score_mapping(true)
             .mlp(bytes)
             .extended_features(true)
@@ -76,10 +89,22 @@ fn f32s(v: &[f32]) -> u64 {
 }
 
 fn main() {
-    let args: Vec<String> = std::env::args().skip(1).collect();
+    let mut args: Vec<String> = std::env::args().skip(1).collect();
+    let mut hdr_cube_root = false;
+    let mut public_projection = false;
+    while args.first().is_some_and(|arg| arg.starts_with("--")) {
+        match args.remove(0).as_str() {
+            "--hdr-cube-root-203" => hdr_cube_root = true,
+            "--public-a" => {
+                public_projection = true;
+                hdr_cube_root = true;
+            }
+            option => panic!("unknown option {option}"),
+        }
+    }
     assert!(
         args.len() == 2 || args.len() == 4,
-        "usage: <general.bin> <codec.bin> [<general-stripped.bin> <codec-stripped.bin>]"
+        "usage: [--hdr-cube-root-203|--public-a] <general.bin> <codec.bin> [<general-stripped.bin> <codec-stripped.bin>]"
     );
     let bytes: Vec<&'static [u8]> = args
         .iter()
@@ -91,14 +116,20 @@ fn main() {
         ("PreviewV0_1", ZensimProfile::PreviewV0_1),
         ("PreviewV0_2", ZensimProfile::PreviewV0_2),
         ("A", ZensimProfile::A),
-        ("E", rev7_profile(bake0, "rev7-general")),
-        ("ECodec", rev7_profile(bake1, "rev7-codec")),
+        ("E", rev7_profile(bake0, "rev7-general", public_projection)),
+        (
+            "ECodec",
+            rev7_profile(bake1, "rev7-codec", public_projection),
+        ),
     ];
     if args.len() == 4 {
-        profiles.push(("E-stripped", rev7_profile(bake2, "rev7-general-stripped")));
+        profiles.push((
+            "E-stripped",
+            rev7_profile(bake2, "rev7-general-stripped", public_projection),
+        ));
         profiles.push((
             "ECodec-stripped",
-            rev7_profile(bake3, "rev7-codec-stripped"),
+            rev7_profile(bake3, "rev7-codec-stripped", public_projection),
         ));
     }
     let models: Vec<(&str, zenpredict::Model)> = [("E", 0usize), ("ECodec", 1)]
@@ -189,7 +220,7 @@ fn main() {
         }
     }
     extra_surfaces(&profiles[..5], &pairs, &line);
-    hdr_surfaces(&line);
+    hdr_surfaces(&line, hdr_cube_root);
 }
 
 /// HDR cases — the native HDR feature route (`Basic ∪ Peaks ∪ V2` at the
@@ -199,10 +230,10 @@ fn main() {
 /// Rows: `hdrfeat` — one `<caseid>:f<slot>` row per emitted slot (f64 bits)
 /// plus one `<caseid>:sum` row hashing the whole vector.
 #[cfg(feature = "feature-regime-v2")]
-fn hdr_surfaces(line: &impl Fn(&str, &str, &str, String)) {
+fn hdr_surfaces(line: &impl Fn(&str, &str, &str, String), cube_root: bool) {
     use zensim::feature_set_id::ComputeToken;
-    use zensim::feature_v2::HdrEncoding;
-    use zensim::research::{Request, extract_hdr, family_slots};
+    use zensim::feature_v2::{HdrEncoding, HdrFrontEnd};
+    use zensim::research::{Request, extract_hdr_with_front_end, family_slots};
     use zensim::source::{AlphaMode, ColorPrimaries, PixelFormat, StridedBytes};
 
     let slots = family_slots(ComputeToken::Basic)
@@ -248,7 +279,12 @@ fn hdr_surfaces(line: &impl Fn(&str, &str, &str, String)) {
         let dst = mk(true);
         let req = Request::for_slots(slots.clone(), HDR_FEATURE_WIDTH).with_parallel(c.parallel);
         let id = hdr_case_id(&c);
-        match extract_hdr(&req, &src, &dst, enc) {
+        let front_end = if cube_root {
+            HdrFrontEnd::CubeRoot { unit_nits: 203.0 }
+        } else {
+            HdrFrontEnd::Pu21
+        };
+        match extract_hdr_with_front_end(&req, &src, &dst, enc, front_end) {
             Ok(x) => {
                 let v = x.values();
                 line(

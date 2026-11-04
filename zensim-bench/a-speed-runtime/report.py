@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Summarize retained zenbench paired rounds; refuse incomplete evidence."""
 import argparse
+import difflib
 import hashlib
 import json
 import math
@@ -232,7 +233,13 @@ def main():
     parser.add_argument("output", type=Path)
     parser.add_argument("--command-startup", action="store_true", help="require both separate command-startup runs")
     parser.add_argument("--parallel-gate", choices=("before", "after"), help="validate the A serial/parallel matrix")
+    parser.add_argument("--split-parity", nargs=3, type=Path, metavar=("REF7", "REF1", "PUBLIC"))
     args = parser.parse_args()
+    if args.split_parity:
+        result = split_parity(*args.split_parity, args.output)
+        print(json.dumps(result))
+        assert result["missing"] == result["extra"] == result["different"] == 0, "split parity diff is not empty"
+        return
     if args.parallel_gate:
         result = parallel_gate(args.root, args.parallel_gate)
         args.output.write_text(render_parallel_gate(result))
@@ -248,6 +255,52 @@ def main():
 
 
 GATE_SIZES = (64, 96, 128, 160, 192, 256, 320, 384, 512, 640, 768, 1024)
+
+
+def split_parity(reference7, reference1, public_path, output):
+    """Compare the public contract with matching research revisions and params."""
+    def load(path):
+        rows = {}
+        for line in path.read_text().splitlines():
+            fields = line.split("\t", 3)
+            assert len(fields) == 4, (path, "malformed TSV row")
+            key = tuple(fields[:3])
+            assert key not in rows, (path, "duplicate parity row", key)
+            rows[key] = fields[3]
+        assert rows, (path, "empty parity output")
+        return rows
+
+    reference = {}
+    profiles = {"PreviewV0_1", "PreviewV0_2", "A", "E", "ECodec", "E-stripped", "ECodec-stripped"}
+    for key, value in load(reference1).items():
+        # The public crate removed the extended/masked/IW config knobs. All
+        # remaining preview and generic linear surfaces retain revision 1.
+        if key[0] != "hdrfeat" and (key[1] in {"PreviewV0_1", "PreviewV0_2"}
+                or key[1] not in profiles | {"extended", "extended_iw"}):
+            reference[key] = value
+    for key, value in load(reference7).items():
+        if key[0] == "hdrfeat":
+            reference[key] = value
+        elif key[1] == "E" and key[0] != "bake_scorer":
+            reference[(key[0], "A", key[2])] = value
+    public = load(public_path)
+    def render(rows):
+        return "".join("\t".join((*key, rows[key])) + "\n" for key in sorted(rows))
+    reference_text, public_text = render(reference), render(public)
+    Path(str(output) + ".reference.tsv").write_text(reference_text)
+    Path(str(output) + ".public.tsv").write_text(public_text)
+    diff = "".join(difflib.unified_diff(reference_text.splitlines(keepends=True), public_text.splitlines(keepends=True),
+                                       fromfile="research public contract", tofile="public crate"))
+    Path(str(output) + ".diff").write_text(diff)
+    common = reference.keys() & public.keys()
+    result = {"public_rows": len(public), "reference_rows": len(reference),
+              "missing": len(public.keys() - reference.keys()), "extra": len(reference.keys() - public.keys()),
+              "different": sum(reference[k] != public[k] for k in common),
+              "matched": sum(reference[k] == public[k] for k in common),
+              "public_sha256": hashlib.sha256(public_text.encode()).hexdigest(),
+              "reference_sha256": hashlib.sha256(reference_text.encode()).hexdigest()}
+    Path(str(output) + ".json").write_text(json.dumps(result, indent=2) + "\n")
+    return result
 
 
 def parallel_gate(root, phase):

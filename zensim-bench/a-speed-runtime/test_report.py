@@ -169,6 +169,28 @@ class ParallelGateAdmission(unittest.TestCase):
         with self.assertRaisesRegex(AssertionError, "insufficient clean rounds"):
             report.parallel_gate(self.root, "before")
 
+    def test_split_parity_selects_revisions_and_detects_one_bit(self):
+        r7, r1, public = (self.root / name for name in ("r7.tsv", "r1.tsv", "public.tsv"))
+        r7.write_text("compute\tE\tpair\t0000000000000001\n"
+                      "compute\tPreviewV0_1\tpair\twrong-revision\n"
+                      "hdrfeat\tLinear\tpair:sum\t0000000000000002\n"
+                      "bake_scorer\tE\tpair\tadditional-research-surface\n")
+        r1.write_text("compute\tPreviewV0_1\tpair\t0000000000000003\n"
+                      "config\tdefault\tpair\t0000000000000004\n"
+                      "config\textended\tpair\tremoved-public-knob\n")
+        public.write_text("compute\tA\tpair\t0000000000000001\n"
+                          "compute\tPreviewV0_1\tpair\t0000000000000003\n"
+                          "hdrfeat\tLinear\tpair:sum\t0000000000000002\n"
+                          "config\tdefault\tpair\t0000000000000004\n")
+        stem = self.root / "split"
+        result = report.split_parity(r7, r1, public, stem)
+        self.assertEqual((result["matched"], result["missing"], result["extra"], result["different"]), (4, 0, 0, 0))
+        self.assertEqual(Path(str(stem) + ".diff").read_text(), "")
+        public.write_text(public.read_text().replace("0000000000000001", "0000000000000000"))
+        result = report.split_parity(r7, r1, public, stem)
+        self.assertEqual(result["different"], 1)
+        self.assertNotEqual(Path(str(stem) + ".diff").read_text(), "")
+
 
 class CollectorCompletion(unittest.TestCase):
     def test_targeted_collection_cannot_complete_an_incomplete_matrix(self):

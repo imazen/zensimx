@@ -4096,6 +4096,12 @@ a-parallel-gate-report root output phase:
 a-parallel-gate-progress host root *args:
     ssh {{quote(host)}} python3 -B {{quote(root + "/source/a-speed-runtime/progress.py")}} {{quote(root)}} {{args}}
 
+a-parallel-gate-reference bake revision='7':
+    env ZENSIM_FORMULA_REV={{quote(revision)}} ZENSIM_POW_FORM=libm cargo run --release -p zensim --features custom-profiles,training,classification --example split_parity_golden -- --public-a {{quote(bake)}} {{quote(bake)}}
+
+a-parallel-gate-parity root reference7 reference1 public output:
+    python3 -B zensim-bench/a-speed-runtime/report.py {{quote(root)}} {{quote(output)}} --split-parity {{quote(reference7)}} {{quote(reference1)}} {{quote(public)}}
+
 a-speed-prepare sources output:
     zensim-bench/a-speed-runtime/target/release/a-speed-prepare {{quote(sources)}} {{quote(output)}}
 
