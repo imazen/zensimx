@@ -260,7 +260,13 @@ impl<'a> BakeScorer<'a> {
             if self.plan()?.compute.sampling.is_some() {
                 return Err(ZensimError::HdrInputRequiresPuPath);
             }
-            crate::feature_v2::validate_hdr_pair(source, source, encoding, Some(120_000_000))?;
+            crate::feature_v2::validate_hdr_pair(
+                source,
+                source,
+                encoding,
+                crate::feature_v2::HdrFrontEnd::Pu21,
+                Some(120_000_000),
+            )?;
             crate::PrecomputedReference::for_candidate(
                 source,
                 crate::metric::effective_parallel(self.parallel),
@@ -1382,7 +1388,13 @@ impl<'a> BakeScorer<'a> {
         }
         self.check_pixel_revision()?;
         if let Some(encoding) = encoding {
-            crate::feature_v2::validate_hdr_pair(source, distorted, encoding, Some(120_000_000))?;
+            crate::feature_v2::validate_hdr_pair(
+                source,
+                distorted,
+                encoding,
+                crate::feature_v2::HdrFrontEnd::Pu21,
+                Some(120_000_000),
+            )?;
         } else {
             validate_pair(source, distorted)?;
         }

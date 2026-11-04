@@ -7097,7 +7097,7 @@ pub(crate) mod tests {
         check(&r, "hlg-1000");
     }
 
-    /// The anchored cube-root arm (`HdrEncoding::LinearCubeRoot`, the HDR
+    /// The anchored cube-root front end (`HdrFrontEnd::CubeRoot`, the HDR
     /// front-end experiment of 2026-11-04) IS the SDR front end on the same
     /// light. The SDR route's gamut-preserving branch (non-sRGB primaries,
     /// `GamutMapping::Preserve`) runs the same gamut matrix and the same
@@ -7161,10 +7161,13 @@ pub(crate) mod tests {
         let z = crate::Zensim::new(crate::ZensimProfile::codec_target()).with_parallel(false);
         let mut scratch = V2Scratch::new();
         let cube = |rgb_s: &[[f32; 3]], rgb_d: &[[f32; 3]], unit_nits: f32, scratch: &mut V2Scratch| {
-            z.compute_folded720_append_features_hdr(
+            crate::feature_v2::compute_folded720_append_hdr_streaming_impl_with_front_end(
                 &P3Linear::new(rgb_s, w, h, true),
                 &P3Linear::new(rgb_d, w, h, true),
-                HdrEncoding::LinearCubeRoot { unit_nits },
+                HdrEncoding::Linear,
+                HdrFrontEnd::CubeRoot { unit_nits },
+                None,
+                false,
                 V2NewFeatureToggles::default(),
                 scratch,
             )

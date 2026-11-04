@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+- `HdrFrontEnd { Pu21, CubeRoot { unit_nits } }`: the declared-HDR walk's opsin step is a parameter orthogonal to
+  `HdrEncoding` (`research::extract_hdr_with_front_end`; `upiq_pu_score` and `hdr944_extract` take `--front-end`
+  and record `hdr_front_end`). The cube root is the SDR opsin on `nits / unit_nits`, unclamped, bit-exact with the
+  SDR gamut-preserving path at a unit of 1; the shipped entries keep `Pu21`. Owner decision 2026-11-04.
+
 - Add a separate TRAIN-only Rev7 UPIQ extraction admission while preserving the frozen Rev5 contract and original source membership. Native extraction tests and the 380-row computation pass; feature publication and HDR training qualification remain incomplete.
 
 ### Dependency compatibility

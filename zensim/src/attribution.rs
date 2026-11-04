@@ -6035,6 +6035,7 @@ impl Fused944Session {
                 source,
                 distorted,
                 encoding,
+                crate::feature_v2::HdrFrontEnd::Pu21,
                 Some(120_000_000),
                 parallel,
                 plan.toggles(),

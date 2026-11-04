@@ -28,7 +28,7 @@ use std::io::{BufWriter, Write as _};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use zensim::feature_v2::{HdrEncoding, V2NewFeatureToggles, V2Scratch};
+use zensim::feature_v2::{HdrEncoding, HdrFrontEnd, V2NewFeatureToggles, V2Scratch};
 use zensim::{Zensim, ZensimProfile};
 
 struct Pq16Image {
@@ -258,6 +258,7 @@ fn main() {
     let mut requested_ids: Option<Vec<u16>> = None;
     let mut absolute_pairs = false;
     let mut era_label = String::from("e26-native-hdr-rev5");
+    let mut front_end_label = String::from("pu21");
     let mut pq_png_distortions = false;
     let mut i = 1;
     while i < args.len() {
@@ -298,6 +299,13 @@ fn main() {
             "--absolute-pairs" => {
                 absolute_pairs = true;
                 i += 1;
+            }
+            // Research mode only: `pu21` (the shipped front end) or
+            // `cube-root:<unit nits>` (owner decision 2026-11-04); recorded in
+            // the manifest as `hdr_front_end`.
+            "--front-end" => {
+                front_end_label = args[i + 1].clone();
+                i += 2;
             }
             "--requested-ids" => {
                 assert!(requested_ids.is_none(), "duplicate requested ids");
@@ -399,6 +407,26 @@ fn main() {
     assert!(
         requested_ids.is_none() || (score_bakes.is_empty() && audit_composition.is_none()),
         "research extraction is a separate mode"
+    );
+    let front_end = match front_end_label.as_str() {
+        "pu21" => HdrFrontEnd::Pu21,
+        spec => {
+            let unit_nits: f32 = spec
+                .strip_prefix("cube-root:")
+                .expect("--front-end pu21|cube-root:<nits>")
+                .parse()
+                .expect("--front-end cube-root unit nits");
+            assert!(unit_nits.is_finite() && unit_nits > 0.0, "unit nits must be finite and positive");
+            HdrFrontEnd::CubeRoot { unit_nits }
+        }
+    };
+    front_end_label = match front_end {
+        HdrFrontEnd::Pu21 => "pu21".to_string(),
+        HdrFrontEnd::CubeRoot { unit_nits } => format!("cube-root:{unit_nits}"),
+    };
+    assert!(
+        front_end == HdrFrontEnd::Pu21 || requested_ids.is_some(),
+        "--front-end applies to research extraction only; the bake scorers serve the shipped PU21 path"
     );
     if requested_ids.is_some() {
         match zensim::feature_v2::active_formula_revision() {
@@ -538,7 +566,7 @@ fn main() {
                             return Ok(line);
                         }
                         if let Some(req) = &research_req {
-                            let result = zensim::research::extract_hdr(req, &source, &distorted, encoding)
+                            let result = zensim::research::extract_hdr_with_front_end(req, &source, &distorted, encoding, front_end)
                                 .map_err(|e| format!("research {}: {e:?}", c.dist_base))?;
                             let manifest = result.manifest_json();
                             let mut recorded = research_manifest.lock().unwrap();
@@ -634,6 +662,7 @@ fn main() {
     let manifest = serde_json::json!({
         "input_contract":input_contract,
         "era_label":era_label,
+        "hdr_front_end":front_end_label,
         "distortion_storage":if pq_png_distortions { "native PQ16 PNG with cICP" } else { "native PQ JXL with cICP" },
         "formula_revision":format!("{:?}",zensim::feature_v2::active_formula_revision()),
         "rows":cells.len(), "feature_count":if score_bakes.is_empty() { Some(if requested_ids.is_some() { research_width } else if composition.is_some() && zensim::feature_v2::active_formula_revision() == zensim::feature_v2::FormulaRevision::Rev5 { zensim::research::full_width() } else { 944 }) } else { None },

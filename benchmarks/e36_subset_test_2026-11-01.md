@@ -2033,3 +2033,39 @@ gate on that until we sort this out - let's use a proper model that makes contin
 - **Next: a model fit through that front end** rather than another zero-shot read; the registration follows below once
   the HDR training path's inputs are re-extracted through it. The shipped profiles' PU21 HDR entry (`compute_hdr`) stays
   as is until that model exists; its scores are a separate regime from the SDR scores and must be labelled so.
+
+### HC1 (2026-11-04, registered before any re-extraction or fit): the continuity front end and a model through it
+
+Follows the owner decision above. **Front end:** `HdrFrontEnd::CubeRoot { unit_nits }`, the SDR cube-root opsin on
+nits over the SDR white luminance, unclamped, now a parameter orthogonal to the transfer (`HdrEncoding::Pq`/`Hlg`/`Linear`
+decode to cd/m² as before, then the front end applies), so PQ-coded ladders and teacher frames take it too. **Unit:**
+203 cd/m² (BT.2408 reference white; the Ultra HDR decode convention, where an SDR base displayed in HDR is exactly 203
+cd/m² white, so the continuity property lands where the product meets HDR content) is the fitting arm; 100 cd/m² (the
+PU21 normalisation point, the zero-shot read's least-bad anchor) is extracted beside it as a reserve, not fit unless the
+owner asks. Step 1, extraction (label-free): the five 2026-10-29 plans (`fhdr-plans/{ladders-r1, teacher-train-r1,
+teacher-val-r1, 4kdtb-r1}` and UPIQ-380 through `upiq_pu_score`) re-extracted on i270 with
+`scripts/byconstruction/hdr_frontend_reextract.py` driving `hdr944_extract --front-end cube-root:<nits>` (one process
+per plan view, the fleet's shard layout, `hdr_native_bank.py` unchanged for assembly; the new plan directories carry
+the new producer pins and the front end in every cell). **Controls before any bank is used:** a `--front-end pu21`
+re-run of three views per plan must reproduce the stored 2026-10-29 bank rows bit for bit (the refactor is inert for
+PU21; the UPIQ PU21 control already reproduced its stored extraction byte for byte), and every cube-root bank's row
+count, keys and membership map must equal the PU21 bank's. Step 2 (registered separately once the banks exist): the
+mix's recipe with the four HDR legs through the cube-root banks (P3 on the mix: the fchroma fx2 root plus
+`hdr_upiq380`, `hdr_4kdtb_train`, `hdr_ladder_chroma`, `hdr_teacher_hdrvdp3`, masses and dev-fold scale rule as in
+`HDR_P2P3_EXECUTION_2026-10-29.md`), three seeds, the AIC ×256 continuation with rehearsal, epoch 59; reads: the HDR
+development rows (UPIQ's 50, HDRTEACH VAL, 4Kdtb EVAL, the ladders' EVAL rungs), the SDR no-regression set (held-out
+panel, E36 inversion share, G-STEER, dial contract), the continuity check (SDR images through `compute_hdr` at 203
+cd/m² must equal their SDR scores), and the Ultra HDR probe's SDR-as-HDR arm, whose gap must be zero at the unit.
+
+**Amendment (2026-11-04, owner, before any extraction ran):** the extraction stays on dev (the owner's call: dev's
+remit is zensim training and evaluation, and this extraction feeds the fit; the justfile's `hdr-native-build` guard
+against dev dates from the fleet era and is bypassed by running cargo directly), only the 203 cd/m² unit is extracted
+(the 100 cd/m² reserve arm is dropped), and a profiling and optimisation pass on the extractor precedes the run so that
+the wall time is spent once, on a measured binary (14,814 pairs: ladders 10,422 at 256², teacher train+val 10,304 at
+1200×1600 PQ16 PNG reference with JXL distortions, 4Kdtb 88 at 4K Radiance, all read from tower over NFS). The pass may
+change only how the work is scheduled, cached and read (the reference is decoded once per candidate today; process and
+thread counts; I/O staging), never a numeric operation or its order: its gate is the PU21 control above (three views
+per plan bit-identical to the stored banks) plus byte-identical cube-root outputs before and after on the same views;
+its record is `benchmarks/hc1_extractor_profile_2026-11-04.md`. Build note: the standalone bench root could not resolve
+the live zenjpeg sibling (crates.io version edges on the zencodec 0.2 family since zenjpeg d099267c), so zensim-bench
+pins zenjpeg at 4933461f, the revision its lockfile already resolved; `hdr944_extract` does not use zenjpeg.

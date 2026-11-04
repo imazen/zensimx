@@ -3263,6 +3263,7 @@ impl Zensim {
             source,
             distorted,
             crate::feature_v2::HdrEncoding::Linear,
+            crate::feature_v2::HdrFrontEnd::Pu21,
             self.max_pixels,
             self.parallel_now(),
             toggles,

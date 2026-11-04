@@ -967,14 +967,42 @@ pub fn extract_hdr(
     distorted: &impl ImageSource,
     encoding: crate::feature_v2::HdrEncoding,
 ) -> Result<Extraction, ResearchError> {
-    extract_impl(req, source, distorted, Some(encoding))
+    extract_hdr_with_front_end(
+        req,
+        source,
+        distorted,
+        encoding,
+        crate::feature_v2::HdrFrontEnd::Pu21,
+    )
+}
+
+/// [`extract_hdr`] with an explicit opsin front end
+/// ([`crate::feature_v2::HdrFrontEnd`]): `Pu21` is the shipped entry,
+/// `CubeRoot { unit_nits }` the continuity front end of the 2026-11-04 owner
+/// decision. The front end is not part of the research manifest (it says what
+/// slots a table carries, not how light entered them); the caller records it
+/// beside the table, as `upiq_pu_score` and `hdr944_extract` do.
+///
+/// # Errors
+/// As [`extract_hdr`], plus a non-positive or non-finite `unit_nits`.
+pub fn extract_hdr_with_front_end(
+    req: &Request,
+    source: &impl ImageSource,
+    distorted: &impl ImageSource,
+    encoding: crate::feature_v2::HdrEncoding,
+    front_end: crate::feature_v2::HdrFrontEnd,
+) -> Result<Extraction, ResearchError> {
+    extract_impl(req, source, distorted, Some((encoding, front_end)))
 }
 
 fn extract_impl(
     req: &Request,
     source: &impl ImageSource,
     distorted: &impl ImageSource,
-    hdr: Option<crate::feature_v2::HdrEncoding>,
+    hdr: Option<(
+        crate::feature_v2::HdrEncoding,
+        crate::feature_v2::HdrFrontEnd,
+    )>,
 ) -> Result<Extraction, ResearchError> {
     let ns = crate::NUM_SCALES;
     let plan = req.plan()?;
@@ -999,11 +1027,12 @@ fn extract_impl(
     let mut walk = if palette_only {
         Vec::new()
     } else {
-        let result = if let Some(encoding) = hdr {
+        let result = if let Some((encoding, front_end)) = hdr {
             crate::feature_v2::compute_folded720_hdr_streaming_extras(
                 source,
                 distorted,
                 encoding,
+                front_end,
                 Some(120_000_000),
                 req.parallel,
                 toggles,

@@ -68,9 +68,9 @@ fn optional_extraction_option(args: &[String], key: &str) -> Result<Option<Strin
 /// 2026-11-04 (zensimx `benchmarks/e36_subset_test_2026-11-01.md`, "HDR
 /// front-end experiment"). Returns the encoding and the normalised label the
 /// manifest records.
-fn front_end(value: Option<&str>) -> Result<(zensim::feature_v2::HdrEncoding, String), String> {
+fn front_end(value: Option<&str>) -> Result<(zensim::feature_v2::HdrFrontEnd, String), String> {
     match value {
-        None | Some("pu21") => Ok((zensim::feature_v2::HdrEncoding::Linear, "pu21".into())),
+        None | Some("pu21") => Ok((zensim::feature_v2::HdrFrontEnd::Pu21, "pu21".into())),
         Some(spec) => {
             let nits = spec
                 .strip_prefix("cube-root:")
@@ -82,7 +82,7 @@ fn front_end(value: Option<&str>) -> Result<(zensim::feature_v2::HdrEncoding, St
                 return Err("--front-end cube-root unit must be finite and positive".into());
             }
             Ok((
-                zensim::feature_v2::HdrEncoding::LinearCubeRoot { unit_nits },
+                zensim::feature_v2::HdrFrontEnd::CubeRoot { unit_nits },
                 format!("cube-root:{unit_nits}"),
             ))
         }
@@ -124,7 +124,11 @@ fn digest(bytes: &[u8]) -> String {
 
 fn validate(a: &Admission) -> Result<(), String> {
     let (schema, revision, ids) = if a.schema == "upiq380-extraction-admission-rev7-v1" {
-        ("upiq380-extraction-admission-rev7-v1", 7, (0..228).chain(372..720).collect())
+        (
+            "upiq380-extraction-admission-rev7-v1",
+            7,
+            (0..228).chain(372..720).collect(),
+        )
     } else {
         ("upiq380-extraction-admission-v1", 5, canonical_ids())
     };
@@ -212,7 +216,7 @@ pub(super) fn run(args: &[String]) -> Result<(), String> {
     let path = extraction_option(args, "--training-allowlist")?;
     let pin = extraction_option(args, "--allowlist-sha256")?;
     let out = extraction_option(args, "--out")?;
-    let (encoding, front_end_label) =
+    let (opsin, front_end_label) =
         front_end(optional_extraction_option(args, "--front-end")?.as_deref())?;
     if Path::new(&out).exists() || Path::new(&format!("{out}.manifest.json")).exists() {
         return Err("fresh extraction output required".into());
@@ -223,8 +227,11 @@ pub(super) fn run(args: &[String]) -> Result<(), String> {
     }
     let a: Admission = serde_json::from_slice(&bytes).map_err(|e| e.to_string())?;
     validate(&a)?; // Complete metadata admission precedes every pixel payload.
-    let revision = if a.formula_revision == 7 { zensim::feature_v2::FormulaRevision::Rev7 }
-        else { zensim::feature_v2::FormulaRevision::Rev5 };
+    let revision = if a.formula_revision == 7 {
+        zensim::feature_v2::FormulaRevision::Rev7
+    } else {
+        zensim::feature_v2::FormulaRevision::Rev5
+    };
     if zensim::feature_v2::active_formula_revision() != revision {
         return Err("UPIQ extraction process revision must match its explicit admission".into());
     }
@@ -232,7 +239,11 @@ pub(super) fn run(args: &[String]) -> Result<(), String> {
         zensim::feature_set_id::SlotSet::from_slots(a.requested_ids.iter().copied()),
         TRANSPORT_WIDTH,
     )
-    .with_era_label(if a.formula_revision == 7 { "rev7_rowlanes" } else { "e31-upiq380-native-hdr-rev5" })
+    .with_era_label(if a.formula_revision == 7 {
+        "rev7_rowlanes"
+    } else {
+        "e31-upiq380-native-hdr-rev5"
+    })
     .with_parallel(false);
     let mut refs = HashMap::new();
     let mut reads = vec![path.clone()];
@@ -264,8 +275,14 @@ pub(super) fn run(args: &[String]) -> Result<(), String> {
         if (reference.w, reference.h) != (distorted.w, distorted.h) {
             return Err("reference/distorted dimensions differ".into());
         }
-        let result = zensim::research::extract_hdr(&req, reference, &distorted, encoding)
-            .map_err(|e| e.to_string())?;
+        let result = zensim::research::extract_hdr_with_front_end(
+            &req,
+            reference,
+            &distorted,
+            zensim::feature_v2::HdrEncoding::Linear,
+            opsin,
+        )
+        .map_err(|e| e.to_string())?;
         let metadata = result.manifest_json();
         if result.values().len() != TRANSPORT_WIDTH {
             return Err("frozen UPIQ transport width changed".into());
@@ -290,7 +307,11 @@ pub(super) fn run(args: &[String]) -> Result<(), String> {
         }
         output.push('\n');
         if (i + 1) % 10 == 0 {
-            eprintln!("UPIQ-380 Rev{} extraction: {}/380", a.formula_revision, i + 1);
+            eprintln!(
+                "UPIQ-380 Rev{} extraction: {}/380",
+                a.formula_revision,
+                i + 1
+            );
         }
     }
     let metadata = serde_json::json!({"schema":"upiq380-extraction-result-v1", "rows":a.rows.len(),
@@ -392,14 +413,27 @@ mod tests {
 
     #[test]
     fn front_end_defaults_to_pu21_and_parses_anchored_cube_root() {
-        use zensim::feature_v2::HdrEncoding;
-        assert_eq!(front_end(None).unwrap(), (HdrEncoding::Linear, "pu21".to_string()));
+        use zensim::feature_v2::HdrFrontEnd;
+        assert_eq!(
+            front_end(None).unwrap(),
+            (HdrFrontEnd::Pu21, "pu21".to_string())
+        );
         assert_eq!(front_end(Some("pu21")).unwrap().1, "pu21");
         assert_eq!(
             front_end(Some("cube-root:203")).unwrap(),
-            (HdrEncoding::LinearCubeRoot { unit_nits: 203.0 }, "cube-root:203".to_string())
+            (
+                HdrFrontEnd::CubeRoot { unit_nits: 203.0 },
+                "cube-root:203".to_string()
+            )
         );
-        for bad in ["cube-root:0", "cube-root:-5", "cube-root:nan", "cube-root:", "pu", "cube-root"] {
+        for bad in [
+            "cube-root:0",
+            "cube-root:-5",
+            "cube-root:nan",
+            "cube-root:",
+            "pu",
+            "cube-root",
+        ] {
             assert!(front_end(Some(bad)).is_err(), "{bad}");
         }
         let args: Vec<String> = ["--front-end", "cube-root:100", "--out", "x"]
@@ -407,11 +441,19 @@ mod tests {
             .map(|s| (*s).to_string())
             .collect();
         assert_eq!(
-            optional_extraction_option(&args, "--front-end").unwrap().as_deref(),
+            optional_extraction_option(&args, "--front-end")
+                .unwrap()
+                .as_deref(),
             Some("cube-root:100")
         );
-        assert_eq!(optional_extraction_option(&args, "--allowlist-sha256").unwrap(), None);
-        let dup: Vec<String> = ["--front-end=a", "--front-end", "b"].iter().map(|s| (*s).to_string()).collect();
+        assert_eq!(
+            optional_extraction_option(&args, "--allowlist-sha256").unwrap(),
+            None
+        );
+        let dup: Vec<String> = ["--front-end=a", "--front-end", "b"]
+            .iter()
+            .map(|s| (*s).to_string())
+            .collect();
         assert!(optional_extraction_option(&dup, "--front-end").is_err());
     }
 

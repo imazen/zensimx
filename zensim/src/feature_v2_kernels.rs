@@ -823,17 +823,28 @@ pub enum HdrEncoding {
         /// Ambient illuminance, lux (5.0 = reference environment).
         ambient_lux: f32,
     },
-    /// Research arm (registered 2026-11-04, zensimx
-    /// `benchmarks/e36_subset_test_2026-11-01.md`, "HDR front-end experiment"):
-    /// pixels are absolute linear light in cd/m² exactly as [`Self::Linear`],
-    /// but the walk feeds them through the **SDR cube-root XYB opsin** with
-    /// `unit_nits` mapped to 1.0 (`nits / unit_nits`, values above 1.0
-    /// retained: `color::linear_to_positive_xyb_planar_into_unclamped`)
-    /// instead of the PU21 front end. The anchored cube root is what
-    /// SSIMULACRA2's native HDR path does; `unit_nits = 255` is its libjxl
-    /// anchor, 100 is zensim's PU normalisation point, 203 BT.2408 diffuse
-    /// white. Only `LinearF32Rgba` input. No shipped profile uses this arm.
-    LinearCubeRoot {
+}
+
+/// Which opsin front end the declared-HDR route feeds the walk with. Orthogonal
+/// to [`HdrEncoding`], which only says how pixel values become cd/m².
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum HdrFrontEnd {
+    /// The shipped front end (`color::linear_to_pu_xyb_planar_into`): opsin
+    /// mix → PU21 banding_glare per channel ÷ PU21(100 cd/m²) → opponent axes.
+    /// Its scores are a regime of their own, harsher than the SDR path on the
+    /// same pixels (zensimx `benchmarks/ultrahdr_same_base_sdr_vs_hdr_2026-11-04.md`).
+    Pu21,
+    /// The SDR cube-root XYB opsin on `nits / unit_nits`, unclamped (values
+    /// above 1.0 retained: `color::linear_to_positive_xyb_planar_into_unclamped`).
+    /// Continuous with the SDR path by construction: SDR light at `unit_nits`
+    /// white produces the SDR path's planes bit for bit
+    /// (`linear_cube_root_front_end_is_the_sdr_cube_root_on_the_same_light`),
+    /// and HDR light extends the same scale above 1.0. `unit_nits = 203` is
+    /// BT.2408 reference white (the Ultra HDR decode convention), 100 the PU21
+    /// normalisation point, 255 SSIMULACRA2's libjxl anchor. Owner decision
+    /// 2026-11-04: this, with a model fit through it, replaces PU21 (zensimx
+    /// `benchmarks/e36_subset_test_2026-11-01.md`, "Owner decision (2026-11-04)").
+    CubeRoot {
         /// Absolute luminance, cd/m², that maps to linear 1.0 before the
         /// cube-root opsin. Finite and positive.
         unit_nits: f32,

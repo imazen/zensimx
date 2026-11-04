@@ -7475,6 +7475,7 @@ pub(crate) fn compute_folded720_streaming_extras(
                 source,
                 distorted,
                 HdrEncoding::Linear,
+                HdrFrontEnd::Pu21,
                 max_pixels,
                 parallel,
                 toggles,
@@ -7917,6 +7918,7 @@ pub(crate) fn compute_folded720_hdr_streaming_impl(
         source,
         distorted,
         encoding,
+        HdrFrontEnd::Pu21,
         max_pixels,
         parallel,
         toggles,
@@ -7935,6 +7937,7 @@ pub(crate) fn compute_folded720_hdr_streaming_extras(
     source: &impl ImageSource,
     distorted: &impl ImageSource,
     encoding: HdrEncoding,
+    front_end: HdrFrontEnd,
     max_pixels: Option<usize>,
     parallel: bool,
     toggles: V2NewFeatureToggles,
@@ -7955,8 +7958,8 @@ pub(crate) fn compute_folded720_hdr_streaming_extras(
     // HDR walk computes Rev4 in a Rev4 process — `refuse_rev4_mix` keeps
     // the cross-boundary cases out.
     crate::ssim_form::refuse_rev4_mix(toggles.formula_revision)?;
-    validate_hdr_pair(source, distorted, encoding, max_pixels)?;
-    let front_end = crate::feature_v2_stream::FrontEnd::Hdr(encoding);
+    validate_hdr_pair(source, distorted, encoding, front_end, max_pixels)?;
+    let front_end = crate::feature_v2_stream::FrontEnd::Hdr(encoding, front_end);
     if source.width() < crate::metric::MIN_PYRAMID_DIM
         || source.height() < crate::metric::MIN_PYRAMID_DIM
     {
@@ -7981,13 +7984,18 @@ pub(crate) fn validate_hdr_pair(
     source: &impl ImageSource,
     distorted: &impl ImageSource,
     encoding: HdrEncoding,
+    front_end: HdrFrontEnd,
     max_pixels: Option<usize>,
 ) -> Result<(), ZensimError> {
     crate::metric::validate_pair_dims(source, distorted)?;
     crate::metric::check_within_max_pixels(source.width(), source.height(), max_pixels)?;
+    if let HdrFrontEnd::CubeRoot { unit_nits } = front_end
+        && !(unit_nits.is_finite() && unit_nits > 0.0)
+    {
+        return Err(ZensimError::HdrInputRequiresPuPath);
+    }
     let valid_display = match encoding {
         HdrEncoding::Linear => true,
-        HdrEncoding::LinearCubeRoot { unit_nits } => unit_nits.is_finite() && unit_nits > 0.0,
         HdrEncoding::Pq { peak_nits } => peak_nits.is_finite() && peak_nits > 0.0,
         HdrEncoding::Hlg {
             peak_nits,
@@ -8004,9 +8012,7 @@ pub(crate) fn validate_hdr_pair(
     }
     let shape_ok = |fmt: crate::source::PixelFormat, alpha: crate::source::AlphaMode| {
         let fmt_ok = match encoding {
-            HdrEncoding::Linear | HdrEncoding::LinearCubeRoot { .. } => {
-                fmt == crate::source::PixelFormat::LinearF32Rgba
-            }
+            HdrEncoding::Linear => fmt == crate::source::PixelFormat::LinearF32Rgba,
             HdrEncoding::Pq { .. } | HdrEncoding::Hlg { .. } => {
                 fmt == crate::source::PixelFormat::LinearF32Rgba
                     || fmt == crate::source::PixelFormat::Srgb16Rgba
@@ -8377,12 +8383,44 @@ pub(crate) fn compute_folded720_append_hdr_streaming_impl(
     encoding: HdrEncoding,
     max_pixels: Option<usize>,
     parallel: bool,
+    toggles: V2NewFeatureToggles,
+    scratch: &mut V2Scratch,
+) -> Result<ZensimV2Result, ZensimError> {
+    compute_folded720_append_hdr_streaming_impl_with_front_end(
+        source,
+        distorted,
+        encoding,
+        HdrFrontEnd::Pu21,
+        max_pixels,
+        parallel,
+        toggles,
+        scratch,
+    )
+}
+
+/// [`compute_folded720_append_hdr_streaming_impl`] with an explicit opsin
+/// front end (the research arms; the shipped entry is `Pu21`).
+pub(crate) fn compute_folded720_append_hdr_streaming_impl_with_front_end(
+    source: &impl ImageSource,
+    distorted: &impl ImageSource,
+    encoding: HdrEncoding,
+    front_end: HdrFrontEnd,
+    max_pixels: Option<usize>,
+    parallel: bool,
     mut toggles: V2NewFeatureToggles,
     scratch: &mut V2Scratch,
 ) -> Result<ZensimV2Result, ZensimError> {
     toggles.append_block = true;
-    compute_folded720_hdr_streaming_impl(
-        source, distorted, encoding, max_pixels, parallel, toggles, scratch, None,
+    compute_folded720_hdr_streaming_extras(
+        source,
+        distorted,
+        encoding,
+        front_end,
+        max_pixels,
+        parallel,
+        toggles,
+        scratch,
+        FoldWalkExtras::default(),
     )
 }
 
@@ -8689,7 +8727,7 @@ fn foldapp_streaming_walk_impl<S: ImageSource, D: ImageSource, const ALL_CHANNEL
                 hl_bins: false,
                 dst_activity: toggles.append2_dst_activity,
             },
-            FrontEnd::Hdr(_) => Append2Params {
+            FrontEnd::Hdr(..) => Append2Params {
                 bv_delta_lo: BV_DELTA_LO_PU,
                 bv_delta_hi: BV_DELTA_HI_PU,
                 hl_bins: true,
@@ -8739,7 +8777,7 @@ fn foldapp_streaming_walk_impl<S: ImageSource, D: ImageSource, const ALL_CHANNEL
         use crate::feature_v2_stream::FrontEnd;
         match front_end {
             FrontEnd::Sdr => CsfwParams::for_phi(CSFW_PHI_Y_SDR),
-            FrontEnd::Hdr(_) => CsfwParams::for_phi(CSFW_PHI_Y_PU),
+            FrontEnd::Hdr(..) => CsfwParams::for_phi(CSFW_PHI_Y_PU),
         }
     });
     let n_scales = crate::NUM_SCALES;
