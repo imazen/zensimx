@@ -207,9 +207,6 @@ pub(crate) fn weights_document(model: &Model, inputs: &[Input]) -> serde_json::V
 // Compose diagnostic layer views with the existing baker, then execute
 // them with Predictor. This preserves the one owner of inference arithmetic.
 pub(crate) fn layer_model(model: &Model, index: usize) -> Result<Model> {
-    if model.has_nontrivial_feature_transforms() {
-        return Err("layer inspection refuses nontrivial input transforms".into());
-    }
     let l = model.layer(index);
     if matches!(l.weights, WeightStorage::I8 { .. }) {
         return Err("layer inspection does not yet support i8 post-dot scaling".into());
@@ -230,7 +227,46 @@ pub(crate) fn layer_model(model: &Model, index: usize) -> Result<Model> {
         weights: &w,
         biases: l.biases,
     }];
-    let bytes = zenpredict_bake::BakeRequest::builder(model.schema_hash(), 0, mean, scale, &layers)
-        .bake()?;
+    let mut bytes =
+        zenpredict_bake::BakeRequest::builder(model.schema_hash(), 0, mean, scale, &layers)
+            .bake()?;
+    if index == 0 {
+        for key in [
+            "zentrain.feature_transforms",
+            "zentrain.feature_transform_params",
+        ] {
+            if let Ok(value) = model.metadata().get_utf8(key) {
+                bytes = zenpredict_bake::append_metadata_utf8(&bytes, key, value)?;
+            }
+        }
+    }
     Ok(Model::from_bytes(&bytes)?)
+}
+
+#[cfg(test)]
+mod r14_tests {
+    use super::*;
+    #[test]
+    fn transformed_hidden_layer_matches_complete_native_forward_bits() {
+        let recipe = serde_json::json!({"schema_hash":1,"scaler_mean":[0.,0.],"scaler_scale":[0.5,2.],
+            "metadata":[{"key":"zentrain.feature_transforms","type":"utf8","text":"soft_clip\nyeo_johnson"},
+                {"key":"zentrain.feature_transform_params","type":"utf8","text":"0.5,0.5\n-1"}],
+            "layers":[{"in_dim":2,"out_dim":2,"activation":"relu","dtype":"f32","weights":[1.,2.,3.,4.],"biases":[0.,-0.25]},
+                {"in_dim":2,"out_dim":1,"activation":"identity","dtype":"f32","weights":[-1.,-2.],"biases":[100.]}]});
+        let bytes = zenpredict_bake::bake_from_json_str(&recipe.to_string()).unwrap();
+        let model = Model::from_bytes(&bytes).unwrap();
+        let first = layer_model(&model, 0).unwrap();
+        let last = layer_model(&model, 1).unwrap();
+        let mut h = zenpredict::Predictor::new(&first);
+        let mut o = zenpredict::Predictor::new(&last);
+        let mut whole = zenpredict::Predictor::new(&model);
+        for i in 0..256 {
+            let input = [i as f32 / 29., (i % 17) as f32 / 11.];
+            let split = o.predict(h.predict_transformed(&input).unwrap()).unwrap()[0];
+            assert_eq!(
+                split.to_bits(),
+                whole.predict_transformed(&input).unwrap()[0].to_bits()
+            );
+        }
+    }
 }

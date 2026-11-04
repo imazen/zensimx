@@ -27,6 +27,8 @@
 
 ### Added
 
+- Research R14: smooth zero-preserving transforms on derived caller inputs, native finite-zero-slope certification and transform-aware layer inspection. The frozen A no-transform split golden remains byte-identical (`5b5a0134`, `51d9e36c`).
+
 - Research R13: preregistered proportional hidden widths with separate Python/native
   admission, preserving the inherited H128 and R12 contracts (`25e77292`, `ccdb5c7a`).
 

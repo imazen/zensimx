@@ -375,7 +375,10 @@ const V1_IW: (usize, usize) = (300, 372);
 ///
 /// `None` when the arities do not tile layer 0 — a malformed bake, which the
 /// caller must treat as "assume everything is read".
-fn caller_col_spans(model: &crate::mlp::Model, in_dim: usize) -> Option<Vec<(usize, usize)>> {
+pub(crate) fn caller_col_spans(
+    model: &crate::mlp::Model,
+    in_dim: usize,
+) -> Option<Vec<(usize, usize)>> {
     let Some(ts) = model.feature_transforms() else {
         // No transform table: caller line k IS column k.
         return (in_dim == model.n_inputs()).then(|| (0..in_dim).map(|i| (i, i + 1)).collect());

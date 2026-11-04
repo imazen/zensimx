@@ -48,7 +48,10 @@ pub(crate) fn inspect(model: &Model, inputs: &[Input], bake: &Path) -> Result<Co
     let mut gates = Vec::new();
     // A nonlinear input transform invalidates the linear gated-weight slope
     // exemption. Mirror the canonical certificate; max-pair witnesses remain.
-    for p in inputs.iter().filter(|i| i.factor.is_some() && !model.has_nontrivial_feature_transforms()) {
+    for p in inputs
+        .iter()
+        .filter(|i| i.factor.is_some() && !model.has_nontrivial_feature_transforms())
+    {
         let Some(d) = inputs
             .iter()
             .find(|i| i.factor.is_none() && i.feature == p.feature)

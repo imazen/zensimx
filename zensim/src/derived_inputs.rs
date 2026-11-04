@@ -201,8 +201,31 @@ pub(crate) fn from_model(model: &crate::mlp::Model) -> Result<Option<DerivedInpu
     if parsed.model_width() != model.caller_input_width() {
         return Err("derived inputs: entry count differs from the model input width");
     }
-    if model.feature_transforms().is_some() {
-        return Err("derived inputs: feature transforms are not supported");
+    if let Some(ts) = model.feature_transforms() {
+        use zenpredict::FeatureTransform::*;
+        let spans = crate::fold_engine::caller_col_spans(model, model.n_inputs())
+            .ok_or("derived inputs: transform arities do not tile layer zero")?;
+        if spans.len() != parsed.model_width() || spans.iter().any(|&(a, b)| b != a + 1) {
+            return Err("derived inputs: transforms must preserve scalar caller arity");
+        }
+        for (i, &t) in ts.iter().enumerate() {
+            let p = model
+                .feature_transform_params()
+                .map_or(&[][..], |p| p[i].as_slice());
+            let valid = p.iter().all(|v| v.is_finite())
+                && match t {
+                    Identity | Log1p | SignedLog1p => p.is_empty(),
+                    YeoJohnson => p.len() == 1,
+                    SoftClip => p.len() == 2 && p[0] > 0. && p[1] > 0.,
+                    SoftSign => p.len() == 1 && p[0] > 0.,
+                    _ => false,
+                };
+            if !valid || t.apply_with_params(0., p) != 0. {
+                return Err(
+                    "derived inputs: transform must be smooth, increasing and zero-preserving (R14)",
+                );
+            }
+        }
     }
     Ok(Some(parsed))
 }

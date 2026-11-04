@@ -421,9 +421,9 @@ pub(crate) fn run(
     let mut activations = Vec::new();
     for row in &bank.rows {
         let input: Vec<_> = inputs.iter().map(|i| i.value(row)).collect();
-        let h = hidden.predict(&input)?.to_vec();
+        let h = hidden.predict_transformed(&input)?.to_vec();
         let separate = output.predict(&h)?;
-        let direct = complete.predict(&input)?;
+        let direct = complete.predict_transformed(&input)?;
         if separate
             .iter()
             .zip(direct)

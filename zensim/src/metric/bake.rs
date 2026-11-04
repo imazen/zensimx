@@ -5282,3 +5282,160 @@ mod map_split_tests {
         }
     }
 }
+
+#[cfg(all(test, feature = "feature-regime-v2"))]
+mod r14_transform_tests {
+    use super::*;
+    #[cfg(feature = "custom-profiles")]
+    use crate::RgbSlice;
+
+    fn bake(tokens: &str, params: &str) -> crate::mlp::Model {
+        let recipe = serde_json::json!({"schema_hash":1,
+            "scaler_mean":[0.,0.,0.,0.],"scaler_scale":[1.,2.,0.5,4.],
+            "metadata":[
+                {"key":"zentrain.feature_ids","type":"utf8","text":"13 401 422"},
+                {"key":"zentrain.formula_revision","type":"utf8","text":(crate::ssim_form::active_revision() as u8+1).to_string()},
+                {"key":"zensim.derived_inputs","type":"utf8","text":"zensim-derived-inputs v1\nin 13\nin 401\nproduct 13 422\nproduct 401 422"},
+                {"key":"zentrain.feature_transforms","type":"utf8","text":tokens},
+                {"key":"zentrain.feature_transform_params","type":"utf8","text":params}],
+            "layers":[{"in_dim":4,"out_dim":1,"activation":"identity","dtype":"f32",
+                "weights":[-1.,-2.,-3.,-4.],"biases":[100.]}]});
+        let bytes = zenpredict_bake::bake_from_json_str(&recipe.to_string()).unwrap();
+        crate::mlp::Model::from_bytes(&bytes).unwrap()
+    }
+
+    #[test]
+    fn transformed_derived_inputs_and_forward_match_predictor_bits_on_256_rows() {
+        for (tokens, params) in [
+            (
+                "log1p\nsigned_log1p\nsoft_clip\nsoft_sign",
+                "\n\n0.25,0.25\n0.5",
+            ),
+            (
+                "yeo_johnson\nidentity\nyeo_johnson\nsoft_clip",
+                "-2\n\n0.5\n0.5,0.5",
+            ),
+        ] {
+            let model = bake(tokens, params);
+            let mut scorer = BakeScorer::new(&model).unwrap();
+            let mut reference = crate::mlp::Predictor::new(&model);
+            let mut explicit = crate::mlp::Predictor::new(&model);
+            for k in 0..256 {
+                let mut row = vec![0.; 720];
+                row[13] = k as f64 / 37.;
+                row[401] = (k % 39) as f64 / 31.;
+                row[422] = (k % 17) as f64 / 17.;
+                let (a, b, f) = (row[13] as f32, row[401] as f32, row[422] as f32);
+                let input = [a, b, a * f, b * f];
+                let served = scorer.score_features(&row, 96, 96, None).unwrap();
+                // Inspect the actual reusable caller buffer used by BakeScorer.
+                assert_eq!(
+                    scorer
+                        .inputs
+                        .iter()
+                        .map(|v| v.to_bits())
+                        .collect::<Vec<_>>(),
+                    input.map(f32::to_bits)
+                );
+                let transformed: Vec<_> = input
+                    .iter()
+                    .enumerate()
+                    .map(|(i, &v)| {
+                        model.feature_transforms().unwrap()[i]
+                            .apply_with_params(v, &model.feature_transform_params().unwrap()[i])
+                    })
+                    .collect();
+                let want = reference.predict_transformed(&input).unwrap()[0];
+                assert_eq!(
+                    explicit.predict(&transformed).unwrap()[0].to_bits(),
+                    want.to_bits()
+                );
+                assert_eq!(served.to_bits(), f64::from(want).to_bits(), "row {k}");
+            }
+        }
+    }
+
+    #[test]
+    fn transformed_product_gradient_follows_chain_rule_and_is_finite_at_zero() {
+        let model = bake(
+            "soft_clip\nsoft_clip\nsoft_clip\nsoft_clip",
+            "0.25,0.25\n0.25,0.25\n0.25,0.25\n0.25,0.25",
+        );
+        let mut scorer = BakeScorer::new(&model).unwrap();
+        let mut row = vec![0.; 720];
+        row[13] = 0.5;
+        row[401] = 0.125;
+        row[422] = 0.5;
+        let g = scorer
+            .score_features_fd_gradient(&row, 96, 96, None)
+            .unwrap();
+        assert_eq!(g[13], -3.5);
+        assert_eq!(g[401], -1.5);
+        assert_eq!(g[422], -3.125);
+        row[13] = 0.;
+        row[401] = 0.;
+        let g = scorer
+            .score_features_fd_gradient(&row, 96, 96, None)
+            .unwrap();
+        assert!(g.iter().all(|v| v.is_finite()));
+        assert_eq!(g[422], 0.);
+        assert_eq!(g[13], -4.);
+        assert_eq!(g[401], -1.5);
+    }
+
+    #[test]
+    fn disallowed_derived_transform_refuses_before_scoring() {
+        let model = bake("signed_sqrt\nidentity\nidentity\nidentity", "\n\n\n");
+        assert!(BakeScorer::new(&model).is_err());
+    }
+
+    #[cfg(feature = "custom-profiles")]
+    #[test]
+    fn runtime_attribution_uses_the_transformed_product_gradient() {
+        let model = bake(
+            "soft_clip\nsoft_sign\nsoft_clip\nlog1p",
+            "0.25,0.25\n0.5\n0.25,0.25\n",
+        );
+        let mut scorer = BakeScorer::new(&model).unwrap().with_parallel(false);
+        let (w, h) = (32, 32);
+        let src: Vec<[u8; 3]> = (0..w * h)
+            .map(|i| {
+                [
+                    (i % 251) as u8,
+                    ((i * 7) % 251) as u8,
+                    ((i * 13) % 251) as u8,
+                ]
+            })
+            .collect();
+        let dst: Vec<[u8; 3]> = src
+            .iter()
+            .enumerate()
+            .map(|(i, &p)| {
+                if i % 7 == 0 {
+                    [p[0].saturating_add(10), p[1], p[2]]
+                } else {
+                    p
+                }
+            })
+            .collect();
+        let reference = RgbSlice::new(&src, w, h);
+        let distorted = RgbSlice::new(&dst, w, h);
+        let observed = scorer
+            .prepare_steering(&reference, 8)
+            .unwrap()
+            .compute(&distorted, None)
+            .unwrap();
+        let g = scorer
+            .score_features_fd_gradient(observed.result().features(), w as u32, h as u32, None)
+            .unwrap();
+        assert_eq!(observed.sensitivities(), g.as_slice());
+        assert!(g.iter().all(|v| v.is_finite()));
+        assert!(
+            observed
+                .attribution()
+                .density()
+                .iter()
+                .all(|v| v.is_finite())
+        );
+    }
+}

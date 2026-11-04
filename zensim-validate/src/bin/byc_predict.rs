@@ -31,11 +31,14 @@ fn main() -> Result<(), String> {
     let bytes = std::fs::read(&bake).map_err(|e| format!("{bake:?}: {e}"))?;
     let model = zenpredict::Model::from_bytes(&bytes).map_err(|e| format!("parse bake: {e:?}"))?;
     let width = decl.direct.len() + decl.products.len();
-    if model.n_inputs() != width || model.feature_transforms().is_some() {
+    if model.n_inputs() != width || model.caller_input_width() != width {
         return Err(format!(
             "bake has {} inputs, the declaration builds {width}",
             model.n_inputs()
         ));
+    }
+    if let Some(ts) = model.feature_transforms() {
+        zensim_validate::mlp_train::transforms::validate(ts, model.feature_transform_params())?;
     }
     let g = zensim_validate::parquet_loader::load_parquet(&corpus, "predict", "human_score", 1.0)?;
     let mut predictor = zenpredict::Predictor::new(&model);
@@ -43,9 +46,12 @@ fn main() -> Result<(), String> {
     let mut s = String::from("row_idx\tpred\n");
     for (i, row) in g.feature_rows.iter().enumerate() {
         decl.compact_row(row, &mut x);
-        let p = predictor
-            .predict(&x)
-            .map_err(|e| format!("forward: {e:?}"))?;
+        let p = if model.has_nontrivial_feature_transforms() {
+            predictor.predict_transformed(&x)
+        } else {
+            predictor.predict(&x)
+        }
+        .map_err(|e| format!("forward: {e:?}"))?;
         s.push_str(&format!("{i}\t{:?}\n", p[0] as f64));
     }
     std::fs::write(&out, s).map_err(|e| format!("{out:?}: {e}"))?;
