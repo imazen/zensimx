@@ -12,6 +12,7 @@ import json
 import os
 from pathlib import Path
 import sys
+import subprocess
 
 import numpy as np
 import pyarrow.parquet as pq
@@ -39,6 +40,13 @@ def main():
     out.mkdir(parents=True,exist_ok=True)
     if (out/'SUMMARY.json').exists():
         raise ValueError('screen already frozen; do not overwrite')
+    producer=subprocess.check_output(['jj','log','-r','@-','--no-graph','-T','commit_id'],cwd=X,text=True).strip()
+    for relative in ('scripts/byconstruction/r14_transforms_screen.py',
+                     'scripts/v_next/v0_20_feature_transform_greedy_screen.py',
+                     'scripts/rev4_featpot/v2_teacher.py','scripts/rev4_featpot/v2c_wide.py',
+                     'scripts/rev4_featpot/v2_common.py'):
+        committed=subprocess.check_output(['jj','file','show','-r',producer,relative],cwd=X)
+        if committed!=(X/relative).read_bytes():raise ValueError(f'uncommitted screen owner: {relative}')
     spec=importlib.util.spec_from_file_location('greedy_screen',X/'scripts/v_next/v0_20_feature_transform_greedy_screen.py')
     screen=importlib.util.module_from_spec(spec);spec.loader.exec_module(screen)
     authority=json.loads((A/'dataset-authority.json').read_text())
@@ -111,7 +119,7 @@ def main():
     write(out/'INPUTS.json',records)
     lambdas=[r['yeo_johnson_lambda'] for r in records if r['yeo_johnson_lambda'] is not None]
     histogram,edges=np.histogram(lambdas,bins=[-2,-1.5,-1,-.5,0,.5,1,1.5,2])
-    summary=dict(registration='5b5a013482db4944042883995ad6892f92244c69',finished=datetime.now(timezone.utc).isoformat(),
+    summary=dict(build_commit=producer,registration='5b5a013482db4944042883995ad6892f92244c69',finished=datetime.now(timezone.utc).isoformat(),
         rows=n,inputs=984,target_column='human_score',target_scale=1,train_groups=pins,
         authority_sha256=sha(A/'dataset-authority.json'),declaration_sha256=sha(X/'scripts/rev4_featpot/color_noise_fx2_declaration.json'),
         source_sha256=sha(__file__),screen_owner_sha256=sha(X/'scripts/v_next/v0_20_feature_transform_greedy_screen.py'),
@@ -120,7 +128,13 @@ def main():
         token_counts={a:dict(Counter(r['best_transform'] for r in rows)) for a,rows in arms.items()},
         lambda_histogram=dict(edges=edges.tolist(),counts=histogram.tolist()),
         tables={a:dict(path=str(out/f'{a}.tsv'),sha256=sha(out/f'{a}.tsv')) for a in arms})
+    summary['pool_sha256']=sha(out/'TRAIN.f32')
+    summary['target_sha256']=sha(out/'human_score.f64')
     write(out/'SUMMARY.json',summary)
+    write(out/'_MANIFEST.json',dict(build_commit=producer,role='TRAIN-only R14 transform preprocessing; not a new fitting leg',
+        rows=n,caller_inputs=984,pool_dtype='f32-column-major',target_column='human_score',target_dtype='f64',
+        pool_sha256=summary['pool_sha256'],target_sha256=summary['target_sha256'],
+        summary_sha256=sha(out/'SUMMARY.json'),input_records_sha256=sha(out/'INPUTS.json')))
     print(json.dumps(summary),flush=True)
 
 
