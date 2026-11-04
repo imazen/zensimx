@@ -4409,6 +4409,7 @@ r14-transform-reads:
 
 r14-transform-tables:
     python3 -B scripts/byconstruction/r14_tables.py
+    python3 -B scripts/byconstruction/r14_summary.py
 
 r14-transform-archive:
     flock ~/tmp/heavy.lock ~/work/claudehints/scripts/run-heavy --mem 24G --jobs 8 -- bash scripts/byconstruction/r13_width_archive.sh /var/tmp/byc-transforms-20261104 /mnt/tower/output/zensim/r14-transforms-20261104
