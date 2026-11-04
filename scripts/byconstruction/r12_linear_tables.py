@@ -21,6 +21,8 @@ def main():
     ap.add_argument('--arms', help='explicit frozen arm inventory, including F control')
     ap.add_argument('--title', default='R12 measured read tables')
     ap.add_argument('--candidate-seeds', default='0,1,2', help='registered candidate seeds; F control remains 0,1,2')
+    ap.add_argument('--candidate-seed-note', default='Candidate seeds 1–2: not run (owner cut on cost, 2026-11-04). No candidate across-seed stability is measured.')
+    ap.add_argument('--addressability-details', action='store_true', help='include each measured contract and G-ADDR state')
     ap.add_argument('--out', type=Path, required=True)
     a = ap.parse_args()
     root = a.root
@@ -39,7 +41,7 @@ def main():
              'No across-seed interval is implied. Per-seed whole-reference/family intervals remain in the native read JSON.', '']
     if candidate_seeds!=[0,1,2]:
         lines[2]=f'A is the registered F baseline, seeds 0–2. Candidate seeds: {a.candidate_seeds}; means use only those registered seeds.'
-        lines.insert(4,'Candidate seeds 1–2: not run (owner cut on cost, 2026-11-04). No candidate across-seed stability is measured.')
+        lines.insert(4,a.candidate_seed_note)
     def table(title, labels, rows):
         lines.extend([f'## {title}', '', '| Read | ' + ' | '.join(labels) + ' |',
                       '|---|' + '---:|' * len(labels)])
@@ -103,12 +105,13 @@ def main():
             steer_name = f'mixF3_s{s}' if arm == 'F' else name
             steer = load(gate / f'steer135/{steer_name}/result.json')['rows']
             dial_root = h / f'gates/mixF3_s{s}-vi' if arm == 'F' else gate
-            contracts = []
+            contracts = []; addressability = {}
             for grid in ('standard', 'ladder'):
                 paths = list(dial_root.glob(f'verdict-s0-*/{grid}/fulleval.json'))
                 if len(paths) != 1:
                     raise ValueError(f'{name}: missing or ambiguous {grid} verdict')
-                checks = load(paths[0])['dial']['addressability']['checks']
+                addressability[grid] = load(paths[0])['dial']['addressability']
+                checks = addressability[grid]['checks']
                 cc = [c['state'] == 'pass' for c in checks if c['id'] in ('C1','C2','C3','C4','C5','C6')]
                 assert len(cc) == 6
                 contracts.append(all(cc))
@@ -120,13 +123,36 @@ def main():
                               and all(v['candidate_read_set_bits_equal_first_permutation']) for v in identity)
             gate_rows[arm].append(dict(steer=sum(v['pass'] for v in steer), contracts=all(contracts),
                                        N1=near['N1']['pass'], N2=near['N2']['pass'],
-                                       N3=near['N3']['monotone_ladders'], identity=identity_ok))
+                                       N3=near['N3']['monotone_ladders'], identity=identity_ok,
+                                       addressability=addressability))
     rows = [('G-STEER successes /135', [' / '.join(str(v['steer']) for v in gate_rows[arm]) for arm in arms]),
             ('C1–C6, both standard and ladder grids', [f"{sum(v['contracts'] for v in gate_rows[arm])}/{len(names(arm))} pass" for arm in arms]),
             ('Identity: 744 scores exactly 100; read sets invariant', [f"{sum(v['identity'] for v in gate_rows[arm])}/{len(names(arm))} pass" for arm in arms]),
             ('NEARID N1 / N2', [f"{sum(v['N1'] for v in gate_rows[arm])}/{len(names(arm))} / {sum(v['N2'] for v in gate_rows[arm])}/{len(names(arm))} pass" for arm in arms]),
             ('NEARID N3 monotone ladders /144 (bar 122)', [' / '.join(str(v['N3']) for v in gate_rows[arm]) for arm in arms])]
     table('Label-free pixel and dial checks', labels, rows)
+    if a.addressability_details:
+        for grid in ('standard','ladder'):
+            rows=[]
+            for check in ('A1','A2','A3','A4','A5','A6','A7r','A8r','C1','C2','C3','C4','C5','C6'):
+                values=[]
+                for arm in arms:
+                    entries=[]
+                    for row in gate_rows[arm]:
+                        c=next(c for c in row['addressability'][grid]['checks'] if c['id']==check)
+                        number='undefined' if c['measured'] is None else format(c['measured'],'.6f')
+                        entries.append(f"{number} ({c['state']})")
+                    values.append(' / '.join(entries))
+                rows.append((check,values))
+            rows.append(('G-ADDR regression state', [' / '.join(v['addressability'][grid]['regression'] for v in gate_rows[arm]) for arm in arms]))
+            rows.append(('G-DIAL p5 / p95 / mono; pass', [
+                ' ; '.join(f"{g['p5']:.6f} / {g['p95']:.6f} / {g['mono']:.6f}; "
+                    f"{g['p5']<=25 and g['p95']>=85 and g['mono']>=0.93}"
+                    for g in (v['addressability'][grid]['measured']['grid'] for v in gate_rows[arm]))
+                for arm in arms]))
+            table(f'{grid}: contract and addressability measurements (seed values)',labels,rows)
+        lines.extend(['A G-ADDR state of not measured is not a pass. Registered regression floors and mentor truth',
+                      'must be present for that owner to grade A1–A7r; R14 does not change those gates or inputs.', ''])
     hdr = {arm: load(reads(arm) / 'hdr-panel/panel.json') for arm in arms}
     for arm in arms:
         hdr[arm]['upiq_all'] = load(reads(arm) / 'hdr-upiq/panel.json')['upiq_all']
