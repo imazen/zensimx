@@ -2069,3 +2069,40 @@ per plan bit-identical to the stored banks) plus byte-identical cube-root output
 its record is `benchmarks/hc1_extractor_profile_2026-11-04.md`. Build note: the standalone bench root could not resolve
 the live zenjpeg sibling (crates.io version edges on the zencodec 0.2 family since zenjpeg d099267c), so zensim-bench
 pins zenjpeg at 4933461f, the revision its lockfile already resolved; `hdr944_extract` does not use zenjpeg.
+
+**Step 1 result (2026-11-04, dev; root `/mnt/v/output/zensim/byc-hdr-20261104/`, mirrored to
+`/mnt/tower/output/zensim/byc-hdr-20261104/`).** Build: zensimx main `94095e06`; `hdr944_extract` sha256
+`b61ae3f50e903f52…`, `upiq_pu_score` `ea4298a3ee3fca22…`. The profiling pass was dropped before it began: three baseline
+views (one process, one thread) took 0.8 s (ladders, 14 pairs at 256²), 4.0 s (teacher, 13 pairs at 1200×1600) and
+9.5 s (4Kdtb, 11 pairs at 4K), which projects the whole extraction at about five minutes, and the run took 437 s
+including its rebuild (4Kdtb 25 s, ladders 109 s, teacher-train 134 s, teacher-val 95 s at 28 processes, peak RSS
+12.55 GiB; UPIQ 2:02 for the PU21 arm on cold NFS, 0:28 for the cube-root arm). **Controls, all passed:** `--front-end
+pu21` on views 0,1,2 of each plan against the stored 2026-10-29 banks (`hdr_control_compare.py`: 4Kdtb 33 rows, ladders
+48, teacher-train 38, teacher-val 39, 0 mismatches; `control-<plan>.json`); the UPIQ PU21 arm byte-identical to the
+stored 2026-10-29 `features.tsv` (`668f726d…`); the UPIQ cube-root:203 arm byte-identical to the front-end experiment's
+arm built from `60223363` (`73209d64…`), so the `HdrFrontEnd` refactor changed no value on either front end. **Banks
+(`cube-root:203`, `build_commit 94095e06`, `hdr_front_end` in every manifest, `keys_sha256` equal to the PU21 banks'):**
+4Kdtb-r1 96 rows (features `9c9bd0d1…`), ladders-r1 10,422 (`992e442b…`), teacher-train-r1 7,390 (`742fd8f3…`),
+teacher-val-r1 3,900 (`ce52c268…`), UPIQ-380 (`upiq/arm-cube-root-203/bank`). The 100 cd/m² reserve was not extracted.
+
+**Step 2 registration (2026-11-04, before any fit, dev-fold score or checkpoint selection).** *Root:* the adopted mix's
+base root `/var/tmp/byc-fchroma-20261029/r3/w100/root` (frozen `14f53dac…`; the MixF3 recipe: `--human-sources tid2013
+--exclude-datasets pipal,live-md,cid-iq,cid-oa,irccyn-ivc,colourlab-rating-variability-2022 --mos-share 36.035`, spec
+`sel:45acffa603e8@h32:H128:cv16:cf98:fx2:mono:thr:mp32`, the 492 columns of the P3 study) plus the four HDR legs from the
+cube-root:203 banks through `hdr_root.py --front-end cube-root:203`, base masses as P3 (UPIQ 0.5, 4Kdtb 0.5, ladders 1.0,
+teacher 0.5) times the scale. The producer set (`subjective_training_leg.HDR_PRODUCERS`, mirrored in `hdr_admission.rs`)
+is keyed by front end and both admissions refuse a declaration and a bank of different front ends, so PU21 and cube-root
+legs cannot mix; the 2026-10-29 artefacts, which predate the field, mean `pu21`. *Scripts:* zensimx main, with the
+experiment-5 options ported byte for byte from the released `src-exp5` snapshot. *Trainer:* `zensim_mlp_train` built
+from main at the commit recorded in the study (NEWBIN). *Control first:* NEWBIN retrains the mix's seed-0 base fit on the
+parent root (no HDR legs); its `refit/last.bin` stripped of `zentrain.repro` must equal the recipe's `6ce7a42e37b72904…`;
+a failure is recorded and nothing is compared. *Scale:* TRAIN-side dev folds exactly as P3 (s ∈ {0.5, 1.0}, folds 0 and
+1, seed 0, `hdr_devfold_score.py`, larger statistic wins, tie to the smaller scale; EVAL, VAL and the 50 UPIQ development
+rows never select). *Then:* three full seeds at the chosen scale (120 epochs, `--train-only --pack-production
+--e33-output-stage`), the AIC ×256 continuation with rehearsal from each seed's `refit/last.bin` (60 epochs, lr 1e-5,
+`--aic-weight 256.0 --diagnostic-population mixed-aic256-xref`), pack `ckpt_epoch059` with the CID22 fit table anchor,
+strip. *Reads* as registered above; their label exposure is registered in `docs/DATA_SPLITS.md` before any read.
+*Wall:* about 30 min per fit (measured on the mix: base 120 epochs 30 min, continuation 60 epochs 25 min, one thread);
+control and the four dev fits run together, then the three seeds, then the three continuations: about 1.75 h on dev. No
+trainer profiling pass: the trainer's numerics are pinned by the control, and a faster build would have to reproduce the
+same bytes.

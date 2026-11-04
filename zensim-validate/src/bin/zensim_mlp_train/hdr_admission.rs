@@ -7,12 +7,36 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
 const FEATURES: &str = "basic+peaks+v2@w1825/rev7_rowlanes#36c3f3af";
-const HDR_NATIVE: &str = "63bed9a64ed265d2e8b8bad4aabaae5d952215afda935ec911a0c82d1c204aa7";
-const HDR_COMMIT: &str = "a86520ca68dc92f98abfd8a526d81f8abf112de6";
-const UPIQ_NATIVE: &str = "73d1374f1cbb2ca2f5166812d69ee49e22486174b56337263fa27d9689c79214";
-const UPIQ_COMMIT: &str = "d86b3b44383433e56ebc6161ee6c8db12639c5af";
 
-/// name, human, mode, loss, target transform, rows, producer commit, extractor sha
+/// Registered producer sets, keyed by the HDR front end the banks were extracted through (mirrors
+/// `HDR_PRODUCERS` in subjective_training_leg.py): front end, native (hdr944_extract) commit and
+/// extractor sha, UPIQ (upiq_pu_score) commit and extractor sha. `pu21` is the 2026-10-29 fleet
+/// extraction; banks and declarations from before the field exist carry no `hdr_front_end` and mean
+/// `pu21`. `cube-root:203` is HC1's dev re-extraction (e36_subset_test_2026-11-01.md, HC1).
+const PRODUCERS: [(&str, &str, &str, &str, &str); 2] = [
+    (
+        "pu21",
+        "a86520ca68dc92f98abfd8a526d81f8abf112de6",
+        "63bed9a64ed265d2e8b8bad4aabaae5d952215afda935ec911a0c82d1c204aa7",
+        "d86b3b44383433e56ebc6161ee6c8db12639c5af",
+        "73d1374f1cbb2ca2f5166812d69ee49e22486174b56337263fa27d9689c79214",
+    ),
+    (
+        "cube-root:203",
+        "94095e060047cbae3c257188f4f9e1b2a785ea54",
+        "b61ae3f50e903f522a1265ab9b5506b80fe0c254323aa9b8974a7fbb05890d1c",
+        "94095e060047cbae3c257188f4f9e1b2a785ea54",
+        "ea4298a3ee3fca22cc2b4c73c92301142818321287128ed93c43a14c6af934b3",
+    ),
+];
+
+/// (producer commit, extractor sha) of a registered front end for a UPIQ or native leg.
+fn producer(front_end: &str, upiq: bool) -> Option<(&'static str, &'static str)> {
+    let set = PRODUCERS.iter().find(|p| p.0 == front_end)?;
+    Some(if upiq { (set.3, set.4) } else { (set.1, set.2) })
+}
+
+/// name, human, mode, loss, target transform, rows, produced by upiq_pu_score (else hdr944_extract)
 type LegSpec = (
     &'static str,
     bool,
@@ -20,8 +44,7 @@ type LegSpec = (
     &'static str,
     &'static str,
     u64,
-    &'static str,
-    &'static str,
+    bool,
 );
 const LEGS: [LegSpec; 4] = [
     (
@@ -31,8 +54,7 @@ const LEGS: [LegSpec; 4] = [
         "within-source-rank",
         "score=100+10*human_JOD;no-clipping",
         330,
-        UPIQ_COMMIT,
-        UPIQ_NATIVE,
+        true,
     ),
     (
         "hdr_4kdtb_train",
@@ -41,8 +63,7 @@ const LEGS: [LegSpec; 4] = [
         "within-source-rank",
         "orient-native-quality;MOS-0-100",
         48,
-        HDR_COMMIT,
-        HDR_NATIVE,
+        false,
     ),
     (
         "hdr_ladder_chroma",
@@ -51,8 +72,7 @@ const LEGS: [LegSpec; 4] = [
         "within-source-rank-and-scale",
         "identity-ssimulacra2-unclipped",
         7177,
-        HDR_COMMIT,
-        HDR_NATIVE,
+        false,
     ),
     (
         "hdr_teacher_hdrvdp3",
@@ -61,8 +81,7 @@ const LEGS: [LegSpec; 4] = [
         "within-source-rank-and-scale",
         "score=10*q_jod;no-clipping",
         7390,
-        HDR_COMMIT,
-        HDR_NATIVE,
+        false,
     ),
 ];
 
@@ -93,8 +112,12 @@ pub(super) fn admit(
         .iter()
         .find(|l| record["name"] == l.0)
         .ok_or("unregistered HDR leg")?;
-    let (name, human, mode, loss, transform, rows, commit, extractor) = *leg;
-    let nominal = d["nominal_weight"].as_f64().filter(|w| w.is_finite() && *w > 0.);
+    let (name, human, mode, loss, transform, rows, upiq) = *leg;
+    let front_end = d["hdr_front_end"].as_str().unwrap_or("pu21");
+    let (commit, extractor) = producer(front_end, upiq).ok_or("unregistered HDR front end")?;
+    let nominal = d["nominal_weight"]
+        .as_f64()
+        .filter(|w| w.is_finite() && *w > 0.);
     let checks: [(&str, bool); 22] = [
         ("schema", d["schema"] != "hdr-native-leg-v1"),
         ("leg", d["leg"] != name),
@@ -116,15 +139,24 @@ pub(super) fn admit(
         ("record.teacher", record["teacher"] != !human),
         ("record.subjective", record["subjective"] != human),
         ("record.mode", record["mode"] != mode),
-        ("record.val_weight", record["val_weight"].as_f64() != Some(0.)),
+        (
+            "record.val_weight",
+            record["val_weight"].as_f64() != Some(0.),
+        ),
         ("record.rows", record["rows"] != d["rows"]),
     ];
     if let Some((which, _)) = checks.iter().find(|(_, failed)| *failed) {
-        return Err(format!("HDR leg role/loss/producer binding differs: {which} ({name})"));
+        return Err(format!(
+            "HDR leg role/loss/producer binding differs: {which} ({name})"
+        ));
     }
     let fold = match &d["dev_fold"] {
         Value::Null => None,
-        v => Some(v.as_u64().filter(|f| *f < 2).ok_or("HDR dev fold must be 0 or 1")? as u8),
+        v => Some(
+            v.as_u64()
+                .filter(|f| *f < 2)
+                .ok_or("HDR dev fold must be 0 or 1")? as u8,
+        ),
     };
     let expected_rows = fold.map_or(rows, |f| fold_rows(name)[f as usize]);
     if d["rows"] != expected_rows {
@@ -139,6 +171,7 @@ pub(super) fn admit(
     let bank = read("feature_bank_manifest_path", "feature_bank_manifest_sha256")?;
     if bank["schema"] != "hdr-native-rev7-bank-v1"
         || bank["build_commit"] != commit
+        || bank["hdr_front_end"].as_str().unwrap_or("pu21") != front_end
         || bank["research"]["feature_set_id"] != FEATURES
         || bank["labels_read"] != false
     {
@@ -161,7 +194,15 @@ pub(super) fn admit(
         };
         let fields: BTreeSet<&str> = object.keys().map(String::as_str).collect();
         if fields
-            != BTreeSet::from(["observation", "source", "family", "reference", "role", "tier", "row"])
+            != BTreeSet::from([
+                "observation",
+                "source",
+                "family",
+                "reference",
+                "role",
+                "tier",
+                "row",
+            ])
             || key["row"] != i
             || key["role"] != "fit"
             || key["tier"] != "T2"
@@ -194,7 +235,8 @@ mod tests {
     use serde_json::json;
 
     fn fixture() -> (Value, Value, Value, Value) {
-        let (name, _, mode, loss, transform, rows, commit, extractor) = LEGS[1];
+        let (name, _, mode, loss, transform, rows, upiq) = LEGS[1];
+        let (commit, extractor) = producer("pu21", upiq).unwrap();
         let keys: Vec<Value> = (0..rows)
             .map(|i| {
                 let s = format!("4kdtb:S{}", i / 12);
@@ -204,9 +246,12 @@ mod tests {
             .collect();
         let mut counts = BTreeMap::new();
         for k in &keys {
-            *counts.entry(k["source"].as_str().unwrap().to_owned()).or_insert(0usize) += 1;
+            *counts
+                .entry(k["source"].as_str().unwrap().to_owned())
+                .or_insert(0usize) += 1;
         }
-        let weight = 0.5 / (counts.values().map(|n| 1. - 1. / *n as f64).sum::<f64>() / counts.len() as f64);
+        let weight =
+            0.5 / (counts.values().map(|n| 1. - 1. / *n as f64).sum::<f64>() / counts.len() as f64);
         let d = json!({"schema": "hdr-native-leg-v1", "leg": name, "loss": loss, "nominal_weight": 0.5,
             "target_orientation": "quality", "target_transform": transform, "target_column": "human_score",
             "selection": "fixed-final-epoch", "formula_revision": 7, "tier": "v3", "feature_ids": [1, 2],
@@ -221,9 +266,19 @@ mod tests {
         (d, r, bank, Value::Array(keys))
     }
 
-    fn run(d: &Value, r: &Value, bank: &Value, keys: &Value, excluded: &BTreeSet<String>) -> Result<(), String> {
+    fn run(
+        d: &Value,
+        r: &Value,
+        bank: &Value,
+        keys: &Value,
+        excluded: &BTreeSet<String>,
+    ) -> Result<(), String> {
         admit(d, r, &json!([1, 2]), excluded, |p, _| {
-            Ok(if p == Path::new("bank") { bank.clone() } else { keys.clone() })
+            Ok(if p == Path::new("bank") {
+                bank.clone()
+            } else {
+                keys.clone()
+            })
         })
     }
 
@@ -256,5 +311,35 @@ mod tests {
         let mut bad = r.clone();
         bad["name"] = json!("hdr_other");
         assert!(run(&d, &bad, &bank, &keys, &none).is_err());
+    }
+
+    #[test]
+    fn cube_root_producer_set_admits_and_front_ends_never_mix() {
+        let (d, r, bank, keys) = fixture();
+        let none = BTreeSet::new();
+        let (commit, extractor) = producer("cube-root:203", false).unwrap();
+        assert_ne!(extractor, producer("pu21", false).unwrap().1);
+        let mut cube = d.clone();
+        cube["hdr_front_end"] = json!("cube-root:203");
+        cube["producer_commit"] = json!(commit);
+        cube["extractor_sha256"] = json!(extractor);
+        let mut cube_bank = bank.clone();
+        cube_bank["build_commit"] = json!(commit);
+        cube_bank["hdr_front_end"] = json!("cube-root:203");
+        run(&cube, &r, &cube_bank, &keys, &none).unwrap();
+        // a cube-root declaration over a 2026-10-29 bank (no field, meaning pu21) refuses
+        assert!(run(&cube, &r, &bank, &keys, &none).is_err());
+        // pu21 pins under the cube-root label refuse; an unregistered front end refuses
+        let mut bad = cube.clone();
+        bad["producer_commit"] = d["producer_commit"].clone();
+        bad["extractor_sha256"] = d["extractor_sha256"].clone();
+        assert!(run(&bad, &r, &cube_bank, &keys, &none).is_err());
+        let mut bad = cube.clone();
+        bad["hdr_front_end"] = json!("cube-root:100");
+        assert!(run(&bad, &r, &cube_bank, &keys, &none).is_err());
+        // a pu21 declaration over a cube-root bank refuses
+        assert!(run(&d, &r, &cube_bank, &keys, &none).is_err());
+        // the UPIQ leg takes the set's upiq_pu_score pins
+        assert_eq!(producer("cube-root:203", true).unwrap().0, commit);
     }
 }

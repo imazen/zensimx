@@ -221,17 +221,32 @@ def admit_chroma_teacher(record, declaration, selected_ids, excluded):
 
 
 HDR_FEATURES='basic+peaks+v2@w1825/rev7_rowlanes#36c3f3af'
-HDR_NATIVE='63bed9a64ed265d2e8b8bad4aabaae5d952215afda935ec911a0c82d1c204aa7'
-HDR_COMMIT='a86520ca68dc92f98abfd8a526d81f8abf112de6'
-HDR_UPIQ='73d1374f1cbb2ca2f5166812d69ee49e22486174b56337263fa27d9689c79214'
-HDR_UPIQ_COMMIT='d86b3b44383433e56ebc6161ee6c8db12639c5af'
-# name: (human, mode, loss, target_transform, rows, producer commit, extractor sha); mirrored in group_admission/hdr_admission.rs
-HDR_LEGS={
-    'hdr_upiq380':(True,'withinref,rank','within-source-rank','score=100+10*human_JOD;no-clipping',330,HDR_UPIQ_COMMIT,HDR_UPIQ),
-    'hdr_4kdtb_train':(True,'withinref,rank','within-source-rank','orient-native-quality;MOS-0-100',48,HDR_COMMIT,HDR_NATIVE),
-    'hdr_ladder_chroma':(False,'withinref,both','within-source-rank-and-scale','identity-ssimulacra2-unclipped',7177,HDR_COMMIT,HDR_NATIVE),
-    'hdr_teacher_hdrvdp3':(False,'withinref,both','within-source-rank-and-scale','score=10*q_jod;no-clipping',7390,HDR_COMMIT,HDR_NATIVE),
+# Registered producer sets, keyed by the HDR front end the banks were extracted through; mirrored in hdr_admission.rs.
+# front end: (native commit, native extractor sha, upiq commit, upiq extractor sha). 'pu21' is the 2026-10-29 fleet
+# extraction (HDR_P2P3_EXECUTION_2026-10-29.md); banks and declarations from before the field exist have no
+# hdr_front_end and mean 'pu21'. 'cube-root:203' is HC1's dev re-extraction (e36_subset_test_2026-11-01.md, HC1).
+HDR_PRODUCERS={
+    'pu21':('a86520ca68dc92f98abfd8a526d81f8abf112de6','63bed9a64ed265d2e8b8bad4aabaae5d952215afda935ec911a0c82d1c204aa7',
+            'd86b3b44383433e56ebc6161ee6c8db12639c5af','73d1374f1cbb2ca2f5166812d69ee49e22486174b56337263fa27d9689c79214'),
+    'cube-root:203':('94095e060047cbae3c257188f4f9e1b2a785ea54','b61ae3f50e903f522a1265ab9b5506b80fe0c254323aa9b8974a7fbb05890d1c',
+                     '94095e060047cbae3c257188f4f9e1b2a785ea54','ea4298a3ee3fca22cc2b4c73c92301142818321287128ed93c43a14c6af934b3'),
 }
+HDR_COMMIT,HDR_NATIVE,HDR_UPIQ_COMMIT,HDR_UPIQ=HDR_PRODUCERS['pu21']
+# name: (human, mode, loss, target_transform, rows, producer kind 'native'|'upiq'); mirrored in group_admission/hdr_admission.rs
+HDR_LEGS={
+    'hdr_upiq380':(True,'withinref,rank','within-source-rank','score=100+10*human_JOD;no-clipping',330,'upiq'),
+    'hdr_4kdtb_train':(True,'withinref,rank','within-source-rank','orient-native-quality;MOS-0-100',48,'native'),
+    'hdr_ladder_chroma':(False,'withinref,both','within-source-rank-and-scale','identity-ssimulacra2-unclipped',7177,'native'),
+    'hdr_teacher_hdrvdp3':(False,'withinref,both','within-source-rank-and-scale','score=10*q_jod;no-clipping',7390,'native'),
+}
+
+
+def hdr_producer(front_end, kind):
+    """(producer commit, extractor sha256) of a registered front end for a 'native' (hdr944_extract) or 'upiq' (upiq_pu_score) leg."""
+    if front_end not in HDR_PRODUCERS or kind not in ('native','upiq'):
+        raise ValueError('unregistered HDR front end or producer kind')
+    native_commit,native_sha,upiq_commit,upiq_sha=HDR_PRODUCERS[front_end]
+    return (upiq_commit,upiq_sha) if kind=='upiq' else (native_commit,native_sha)
 
 
 HDR_FOLD_ROWS={'hdr_upiq380':[150,180],'hdr_4kdtb_train':[0,48],'hdr_ladder_chroma':[2709,4468],'hdr_teacher_hdrvdp3':[4484,2906]}
@@ -247,7 +262,11 @@ def admit_hdr_leg(record, declaration, selected_ids, excluded):
     spec=HDR_LEGS.get(r.get('name'))
     if spec is None:
         raise ValueError('unregistered HDR leg')
-    human,mode,loss,transform,rows,commit,extractor=spec
+    human,mode,loss,transform,rows,kind=spec
+    front_end=d.get('hdr_front_end','pu21')
+    if front_end not in HDR_PRODUCERS:
+        raise ValueError('unregistered HDR front end')
+    commit,extractor=hdr_producer(front_end,kind)
     if (d.get('schema')!='hdr-native-leg-v1' or d.get('leg')!=r['name'] or d.get('loss')!=loss
             or d.get('target_transform')!=transform or d.get('target_column')!='human_score'
             or d.get('target_orientation')!='quality' or d.get('native_role')!='TRAIN'
@@ -264,6 +283,7 @@ def admit_hdr_leg(record, declaration, selected_ids, excluded):
         raise ValueError('HDR leg population (or dev fold) differs')
     bank=document(d['feature_bank_manifest_path'],d['feature_bank_manifest_sha256'])
     if (bank.get('schema')!='hdr-native-rev7-bank-v1' or bank.get('build_commit')!=commit
+            or bank.get('hdr_front_end','pu21')!=front_end
             or bank.get('research',{}).get('feature_set_id')!=HDR_FEATURES or bank.get('labels_read') is not False):
         raise ValueError('HDR native feature bank identity differs')
     keys=document(d['keys_path'],d['keys_sha256'])

@@ -16,11 +16,16 @@ def sha(b):
 
 
 class HdrLeg(unittest.TestCase):
-    def fixture(self, root):
+    def fixture(self, root, front_end=None):
+        """front_end None: a 2026-10-29 declaration and bank without the field (meaning pu21)."""
         name = 'hdr_4kdtb_train'
-        human, mode, loss, transform, rows, commit, extractor = leg.HDR_LEGS[name]
-        bank = json.dumps(dict(schema='hdr-native-rev7-bank-v1', build_commit=commit, labels_read=False,
-                               research=dict(feature_set_id=leg.HDR_FEATURES))).encode()
+        human, mode, loss, transform, rows, kind = leg.HDR_LEGS[name]
+        commit, extractor = leg.hdr_producer(front_end or 'pu21', kind)
+        bank_fields = dict(schema='hdr-native-rev7-bank-v1', build_commit=commit, labels_read=False,
+                           research=dict(feature_set_id=leg.HDR_FEATURES))
+        if front_end is not None:
+            bank_fields['hdr_front_end'] = front_end
+        bank = json.dumps(bank_fields).encode()
         (root / 'bank.json').write_bytes(bank)
         refs = ['4kdtb:S%d' % (i // 12) for i in range(rows)]
         keys = [dict(row=i, observation=f'o{i}', source=refs[i], reference=refs[i], family='hdr:' + refs[i], role='fit', tier='T2')
@@ -37,9 +42,34 @@ class HdrLeg(unittest.TestCase):
                     tier='v3', feature_ids=[1, 2], feature_set_id=leg.HDR_FEATURES, producer_commit=commit, extractor_sha256=extractor,
                     native_role='TRAIN', rows=rows, table_sha256='t', keys_sha256=sha(kb), keys_path=str(root / 'keys.json'),
                     feature_bank_manifest_path=str(root / 'bank.json'), feature_bank_manifest_sha256=sha(bank))
+        if front_end is not None:
+            decl['hdr_front_end'] = front_end
         rec = dict(name=name, teacher=not human, subjective=human, train_weight=weight, val_weight=0.0, mode=mode, table_sha256='t',
                    keys_sha256=sha(kb), rows=rows, source_counts=counts)
         return rec, decl
+
+    def test_cube_root_producer_set_admits_and_front_ends_never_mix(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            rec, decl = self.fixture(root, 'cube-root:203')
+            leg.admit_hdr_leg(rec, decl, [1, 2], set())
+            self.assertNotEqual(decl['extractor_sha256'], leg.HDR_NATIVE)
+            # the same declaration binding a 2026-10-29 (pu21) bank refuses: the bank manifest's front end differs
+            rec_pu, decl_pu = self.fixture(root / 'pu21', None) if (root / 'pu21').mkdir() is None else (None, None)
+            mixed = copy.deepcopy(decl)
+            mixed.update(feature_bank_manifest_path=decl_pu['feature_bank_manifest_path'],
+                         feature_bank_manifest_sha256=decl_pu['feature_bank_manifest_sha256'])
+            with self.assertRaises(ValueError):
+                leg.admit_hdr_leg(rec, mixed, [1, 2], set())
+            # pu21 pins under a cube-root label, and an unregistered front end, refuse
+            for label, mutate in {'pu21 pins': lambda d: d.update(producer_commit=leg.HDR_COMMIT, extractor_sha256=leg.HDR_NATIVE),
+                                  'unregistered front end': lambda d: d.update(hdr_front_end='cube-root:100')}.items():
+                d = copy.deepcopy(decl)
+                mutate(d)
+                with self.subTest(label), self.assertRaises(ValueError):
+                    leg.admit_hdr_leg(rec, d, [1, 2], set())
+            # the field-less 2026-10-29 form still admits as pu21
+            leg.admit_hdr_leg(rec_pu, decl_pu, [1, 2], set())
 
     def test_registered_leg_admits_and_each_deviation_refuses(self):
         with tempfile.TemporaryDirectory() as td:
