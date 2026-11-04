@@ -2406,3 +2406,12 @@ native monotone certificate passes. Exact structural counts: 23 dead, 7 residual
 Reported in chat immediately after packing; W256 seed 0 proceeds next.
 This is capacity/TRAIN execution evidence only, not accuracy or product qualification.
 All 15 final bakes must still be frozen before R13 report-only assessments.
+
+**R13 initialization semantics (source checked during fitting).** The canonical
+trainer uses Xavier scales `sqrt(2/(inputs+hidden))` and
+`sqrt(2/(hidden+outputs))`, and draws the output weights after the
+width-dependent encoder. Thus width changes initialization scales and draw
+counts as well as proportional capacity. Initialization and pair-sampling
+RNG streams are separate; encoder draws do not advance the pair sampler.
+These inherited semantics are unchanged (`mlp_train/mod.rs`, initialization
+section); R13 does not add an initialization intervention.
