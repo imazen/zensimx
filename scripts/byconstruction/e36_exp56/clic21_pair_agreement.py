@@ -7,6 +7,11 @@ same questions. Optionally writes a gallery of example questions (original, A, B
 /mnt/v/output for viewing at http://dev.lan:3300/.
 
     clic21_pair_agreement.py CONFIRM_DIR [--scores control_s0,mixF3_s0] [--bins 8] [--gallery OUT_DIR]
+                             [--paired control_s0:mixF3_s0,control_s1:mixF3_s1,...]
+
+--paired compares two scores on the questions near a tie (where the mix's curve zigzags): each score's own near-tie
+band (|difference| < 2.4), the union band, agreement with the raters, with PSNR and with SSIMULACRA2 there, and the
+questions the two scores order differently with a bootstrap interval over questions.
 """
 import argparse
 import csv
@@ -58,6 +63,7 @@ def main():
     ap.add_argument("--scores", default="control_s0,mixF3_s0")
     ap.add_argument("--bins", type=int, default=8)
     ap.add_argument("--gallery")
+    ap.add_argument("--paired", help="BASE:CHALLENGER pairs of score stems, comma separated")
     a = ap.parse_args()
     d = Path(a.confirm_dir)
     pairs, path, refpath, pred, judge = load_confirm(d)
@@ -101,8 +107,42 @@ def main():
                 js.append(f"{np.mean(np.where(dj > 0, t[sel], np.where(dj < 0, 1 - t[sel], 0.5))):.3f}")
             print(f"| {edges[i]:.1f}-{edges[i + 1]:.1f} | {sel.sum()} | {p:.3f} | {se:.3f} | "
                   f"{multi.sum()} / {agree[multi].mean():.3f} | {psnr_same[sel].mean():.2f} | " + " | ".join(js) + " |")
+    if a.paired:
+        paired(pairs, t, pred, J, pa, [tuple(x.split(":")) for x in a.paired.split(",")])
     if a.gallery:
         write_gallery(Path(a.gallery), pairs, path, refpath, pred, J, pa, t, n, a.scores.split(","))
+
+
+def paired(pairs, t, pred, J, pa, couples, band=2.4):
+    rng = np.random.default_rng(0)
+    dp = np.array([0.0 if x is None else (1.0 if x else -1.0) for x in pa])
+    ds2 = np.array([J["ssim2"][r["a"]] - J["ssim2"][r["b"]] for r in pairs])
+    hum = lambda d, sel: np.mean(np.where(d[sel] > 0, t[sel], np.where(d[sel] < 0, 1 - t[sel], 0.5)))  # noqa: E731
+    for base, chal in couples:
+        D = {}
+        for stem in (base, chal):
+            s = pred(stem)
+            D[stem] = np.array([s[r["a"]] - s[r["b"]] for r in pairs])
+        print(f"== {base} vs {chal}: mean difference {D[base].mean():+.2f} / {D[chal].mean():+.2f}, "
+              f"share positive {np.mean(D[base] > 0):.3f} / {np.mean(D[chal] > 0):.3f}, raters' share for a {t.mean():.3f}")
+        for stem in (base, chal):
+            own = np.abs(D[stem]) < band
+            print(f"   {stem}: own band |d|<{band} n={own.sum()} agreement {hum(D[stem], own):.3f} "
+                  f"(s.e. {np.sqrt(0.25 / own.sum()):.3f}), sign = PSNR {np.mean(np.sign(D[stem][own]) == dp[own]):.3f}, "
+                  f"sign = SSIMULACRA2 {np.mean(np.sign(D[stem][own]) == np.sign(ds2[own])):.3f}")
+        both = (np.abs(D[base]) < band) | (np.abs(D[chal]) < band)
+        for stem in (base, chal):
+            print(f"   union band n={both.sum()}: {stem} agreement {hum(D[stem], both):.3f}, sign = PSNR "
+                  f"{np.mean(np.sign(D[stem][both]) == dp[both]):.3f}, sign = SSIMULACRA2 {np.mean(np.sign(D[stem][both]) == np.sign(ds2[both])):.3f}")
+        dis = np.sign(D[base]) != np.sign(D[chal])
+        idx = np.where(dis)[0]
+        diffs = []
+        for _ in range(2000):
+            b = rng.choice(idx, len(idx))
+            diffs.append(hum(D[chal], b) - hum(D[base], b))
+        lo, hi = np.percentile(diffs, [2.5, 97.5])
+        print(f"   ordered differently: n={dis.sum()} ({dis.mean():.1%}); raters with {base} {hum(D[base], dis):.3f}, "
+              f"with {chal} {hum(D[chal], dis):.3f}, difference {hum(D[chal], dis) - hum(D[base], dis):+.3f} [{lo:+.3f}, {hi:+.3f}]")
 
 
 def write_gallery(out, pairs, path, refpath, pred, J, pa, t, n, stems):

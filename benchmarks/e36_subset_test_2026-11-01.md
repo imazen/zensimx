@@ -1666,19 +1666,26 @@ EVAL's eight (SROCC 0.810 vs 0.861) and on the compression rows (0.893 vs 0.895)
 on AIC2026, where its author fitted it (private evaluation; in-sample, and a Haar-taught leg could carry the sealed
 public_test into training). It is not a teacher candidate on this evidence; nothing is adopted.
 
-**Why the CLIC 2021 agreement curve zigzags** (owner question on the methodology doc's chart;
-`e36_exp56/clic21_pair_agreement.py`, `--gallery` output at `/mnt/v/output/zensim/clic21-dip-2026-11-03/`,
-http://dev.lan:3300/zensim/clic21-dip-2026-11-03/ on the LAN). Agreement with the raters by equal-count bin of the
-absolute F3 score difference: 0.482, 0.554, 0.635, 0.674, 0.719, 0.743, **0.643**, 0.705 (601-602 questions each,
-binomial s.e. 0.02). The dip at 20-27 points is in the questions, not the models: the same questions dip for F3 and
-the mix at every seed; on every question with a difference over 8 points SSIMULACRA2, butteraugli, FSIMc and
-HaarXYB-mask order the pair as zensim does, and the organisers' PSNR label does too in 100% of the two top bins; among
-the questions answered by two or more raters agreement is 0.80 at 12-20 points, 0.54 at 20-27 and 0.65 above 27. At
-the other end, where zensim is within 2.4 points of a tie, the raters side against PSNR in 75% of the answers and
-against the four reference metrics' consensus on 254 of the 357 questions where those agree; zensim's near-tie is the
-better answer there, and the mix leans a little toward the metrics' side (agreement 0.434-0.458 in that bin against
-F3's 0.482-0.486, three seeds each). Which content property makes those pairs special is not established (the crops
-are anonymised, so the methods are unknown; a sharper, noisier crop against a smoother one is the natural reading but
-was not verified by eye). The rated reference images in EVAL (CID:OA 7, Colourlab 3; both models score an image
-identical to its reference 100 by construction, the observers rated them 3.2-4.9 of 5) were drawn as coincident
-dots in the doc's scatter chart and looked like a ceiling only the mix hit; they are rings now.
+**Why the CLIC 2021 agreement curve zigzags** (owner question on the methodology doc's chart; corrected after the
+owner pointed out that F3's line does not zigzag; `e36_exp56/clic21_pair_agreement.py --paired`, gallery at
+`/mnt/v/output/zensim/clic21-dip-2026-11-03/`, http://dev.lan:3300/zensim/clic21-dip-2026-11-03/ on the LAN). The
+zigzag is the mix's own and sits at the tie: in its two bins nearest zero (median differences -1.2 and +1.7) the share
+preferring crop a is 0.521 then 0.436 at seed 0, while F3's bins there read 0.478 then 0.504 and stay monotone. It is
+not an a/b offset (every model's mean difference is +0.5 with 50.7% positive; the raters' share for a is 0.501). Where
+the mix's own difference is within 2.4 points, its ordering agrees with the raters 0.438 / 0.463 / 0.456 at seeds 0-2
+(n about 640, s.e. 0.020) against F3's 0.483 / 0.481 / 0.473 in its own band (n about 600): the band effect is
+seed-consistent, the up-then-down shape partly sampling noise (seeds 1 and 2 read 0.50 then 0.46). On the 680
+questions either model calls within 2.4 points, the mix's sign follows SSIMULACRA2's on 76% and PSNR's on 68% (F3:
+66% and 64%); those are the questions where the raters go against every reference metric (against PSNR in 75% of the
+answers, against the four metrics' consensus on 254 of the 357 questions where they agree). The questions the two
+models order differently are about 100 of 4,812 (2%), and which model the raters side with on them changes with the
+seed (F3 at seed 0, the mix at seeds 1 and 2), so sign flips are not the cause. Cost: 2-4.5 points of agreement on 13%
+of the questions, 0.3-0.6 points overall, returned at moderate differences (the bins at +5.5 and +9.4: 0.621 / 0.714
+against F3's 0.588 / 0.704), which is why the totals tie. A natural reading is that TID2013's noise and blur families
+make the mix treat added high-frequency texture as damage where CLIC's raters prefer the sharper crop; the crops are
+anonymised, so this was not verified. Separately, both lines drop at the largest positive differences (bins 10-11:
+0.66-0.68 after 0.74-0.76); that dip is in the questions, not the models: every reference metric and the organisers'
+PSNR order those pairs as zensim does, and among the questions answered by two or more raters agreement is 0.80 at
+12-20 points, 0.54 at 20-27 and 0.65 above 27. The rated reference images in EVAL (CID:OA 7, Colourlab 3; both models
+score an image identical to its reference 100 by construction, the observers rated them 3.2-4.9 of 5) were drawn as
+coincident dots in the doc's scatter chart and looked like a ceiling only the mix hit; they are rings now.
