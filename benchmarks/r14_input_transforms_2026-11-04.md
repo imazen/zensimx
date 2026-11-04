@@ -95,6 +95,16 @@ The target was the trainer's stored `human_score`, with scale 1.
 T1b's 28 identity inputs have zero TRAIN medians, which cannot define a positive
 knee. T1c keeps identity when no admitted candidate reaches lift 0.005.
 Its log1p and signed_log1p candidates were available but never selected.
+In particular, f12/f25/f51/f103 have zero pooled TRAIN medians but positive
+variances (respectively 0.07987541485675369, 0.02307203676416467,
+0.06759058838090709, 0.010680416719629264). They are not constant in this
+seven-group population, so T1a retains Yeo-Johnson and T1b uses identity.
+
+| Selected positive parameter | Count | Minimum | Median | Maximum |
+|---|---:|---:|---:|---:|
+| T1b soft-clip knee | 956 | 1.459379973312025e-6 | 0.011053490452468395 | 0.26553836464881897 |
+| T1c soft-clip knee | 327 | 5.6206893361832044e-8 | 0.018190236762166023 | 0.28836750984191895 |
+| T1c soft-sign scale | 588 | 1.459379973312025e-6 | 0.00710236607119441 | 0.5779024362564087 |
 
 The T1a lambda histogram, in bins with edges
 `[-2,-1.5,-1,-0.5,0,0.5,1,1.5,2]`, is
