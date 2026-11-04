@@ -397,11 +397,11 @@ def render_parallel_gate(result):
               f'Printed and bitwise serial/parallel scores: **{result["score_differences"]} differences in {result["score_comparisons"]} comparisons**. '
               + ('Before/after and pool-size score bits also match.' if has_after else 'Pool-size score bits also match; after measurements are pending.'), ""]
     if has_after:
-        lines += ["| Threads | Size | Serial before/after p50 ms | Parallel before/after p50 ms | Parallel before/after p95 ms |", "|---:|---|---:|---:|---:|"]
+        lines += ["| Threads | Size | Serial before/after p50 ms | Serial before/after p95 ms | Parallel before/after p50 ms | Parallel before/after p95 ms |", "|---:|---|---:|---:|---:|---:|"]
         for threads in (16, 4):
             for size in (*GATE_SIZES, 4096) if threads == 16 else GATE_SIZES:
                 a, b = (index[(stage, threads, size)] for stage in ("before", "after"))
-                lines.append(f'| {threads} | {size_label(size)} | {a["serial"]["p50_ms"]:.4f}/{b["serial"]["p50_ms"]:.4f} | {a["parallel"]["p50_ms"]:.4f}/{b["parallel"]["p50_ms"]:.4f} | {a["parallel"]["p95_ms"]:.4f}/{b["parallel"]["p95_ms"]:.4f} |')
+                lines.append(f'| {threads} | {size_label(size)} | {a["serial"]["p50_ms"]:.4f}/{b["serial"]["p50_ms"]:.4f} | {a["serial"]["p95_ms"]:.4f}/{b["serial"]["p95_ms"]:.4f} | {a["parallel"]["p50_ms"]:.4f}/{b["parallel"]["p50_ms"]:.4f} | {a["parallel"]["p95_ms"]:.4f}/{b["parallel"]["p95_ms"]:.4f} |')
     lines += ["", "Runner resource observations (whole-process peaks, not a separate memory comparison):", "", "```text"]
     lines += [f'{r["stage"]} {r["threads"]}T {r["size"]}: {r["runner"]}' for r in result["rows"]]
     return "\n".join(lines + ["```", ""])
