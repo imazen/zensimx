@@ -1579,3 +1579,26 @@ and tie on butteraugli. The map term's question for the owner is sharper, not di
 at equal judged quality (1.2% on the butteraugli judge) against a small, consistent loss of pairwise agreement
 across images (AIC2026 out of fold -0.0155 [-0.0245, -0.0071] global SROCC against p30L; the twin's CLIC 2021 read 1
 -0.0052). Nothing is adopted on this read.
+
+### R10 amendment 5 (2026-11-03, before the runs): reference metrics on the confirmation sets
+
+Owner, 2026-11-03: "Do we have comparative evals vs ssim2/butteraugli-3norm/fsimc/haarxyb-ssim-mask-deltaL1248 (we
+should consider the latter as a teacher, if it does as well as f3mix or better on other dataset evals)". The
+candidates' confirmation reads so far compared them with each other; SSIMULACRA2, butteraugli and CVVDP sit beside
+them on EVAL's compression rows (R2 amendment 1), CLIC 2021 and MMSPG (the M2 screen) and AIC2026 (private), FSIMc only
+on AIC2026 (zenmetrics' port, scores of 2026-10-20), and the AIC-4 Haar metrics only on AIC2026 and MCL-JCI
+(zenmetrics-private's `aic4` port of the AIC-4 framework at `ecec4e0`, the published `HaarXYB-SSIM-deltaL1248` and
+`HaarXYB-SSIM-mask-deltaL1248` configs; zenpapers `docs/jpeg-aic/metric-accuracy-and-jnd-mapping.md` §14).
+
+**Registered here:** score SSIMULACRA2 (fast-ssim2 0.9.0), butteraugli 3-norm (0.9.3), FSIMc and FSIM-Y (zenmetrics
+`fsim`), HaarPSI (zenmetrics `haarpsi`) and the two published AIC-4 Haar configs (JND output; `jnd-ladder-score`,
+weights `/mnt/v/zenmetrics-private/aic4/models/ecec4e0`) on exactly the rows the candidates were read on, and report
+them with the candidates' statistics: EVAL's nine collections (readout.py error and SROCC, ceval.py compression rows;
+selection data for the mix, not for the metrics), CLIC 2021 validation (4,812 questions; agreement), MMSPG JPEG XR
+(186 rows; SROCC, within-reference, error), CIQA (7,902 questions; agreement), and AIC2026 public_train (private:
+global and within-source SROCC, codec rank-bias and JND-unit spreads, `aic2026_codec_uniformity.py`).
+`e36_exp56/refmetric_judges.py` writes the scores as `judge_*.tsv` files beside the candidates' predictions, so the
+existing `confirm` scripts report them. Disclosures: these are further reads of CLIC 2021's, MMSPG's and CIQA's labels
+(by metrics, no zensim model); the AIC-4 Haar configs were fitted by their author on AIC data, so their AIC2026
+numbers are in-sample and a Haar-taught zensim leg would carry that fit (which may include the sealed public_test)
+into training. Nothing is adopted on these reads; the teacher question is decided afterwards, on the held-out sets.
