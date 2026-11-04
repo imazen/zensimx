@@ -4381,6 +4381,10 @@ r14-trainer-build:
 r14-transform-retry-continuation arm:
     python3 -B scripts/byconstruction/r14_transforms.py fit --arm {{arm}} --continuation-retry r2
 
+r14-transform-t2:
+    python3 -B scripts/byconstruction/r14_t2.py fit
+    python3 -B scripts/byconstruction/r14_t2.py freeze
+
 r14-transform-status:
     python3 -B scripts/byconstruction/r14_transforms_status.py
 

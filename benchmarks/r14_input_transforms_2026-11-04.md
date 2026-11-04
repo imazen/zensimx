@@ -86,6 +86,20 @@ parquet fixture checks both the allowed and refused cases. The ARM sequence
 passes in 69 seconds (peak RSS 1.18 GiB, minimum available 26,622 MiB).
 The completed base checkpoint and failed continuation remain immutable; the
 retry uses a separate directory and records native identities per stage.
+The repaired trainer is pinned to `fc41da56`, SHA256
+`002740271cb808b0709b1f9ff6da3b89ca1d25bd399a41b109fb59c9715a8d35`;
+its native build passed in 47 seconds (peak RSS 1.80 GiB, minimum available
+39,106 MiB). All serving/read binaries retain the original pin below.
+The shared recipe parser subsequently gained an unrelated registered width
+argument. The R14 controller verifies that the rest of that module's AST is
+identical and that both committed parser versions produce the identical
+registered H128 recipe. It preserves both hashes and the comparison receipt.
+
+The conditional T2 controller requires all three frozen T1 fits before applying
+the registered development rule. It uses the successor trainer above, preserves
+the initial winner's transform kinds, and checks final learned knees against
+the frozen TRAIN bounds. It records changed knees and bound hits. The release
+path is implemented; no T2 release decision or fit has occurred yet.
 
 The untouched ARM strict-library-clippy baseline reports eight unused-item
 warnings as errors; this baseline receipt is retained without suppressing them.
