@@ -1832,3 +1832,10 @@ total. In the continuation step (60 epochs × 50,000 draws, `train.log` of `mixF
 MOS legs 1.5% each, MDID 0.7%, CID22 0.6%), about 370 passes over each AIC pair; the 120-epoch base fit has no AIC
 leg, so over base fit plus continuation AIC2026 is 16.1% of all draws. At ×64 it would be 18.9% of the continuation's
 draws, at ×16 5.5%. The weight was never ablated (method review, experiment 1).
+
+*Addendum, SSIMULACRA2 on HDR done properly.* zenmetrics' `benchmarks/pu_integrated_upiq_2026-06-09.md` scored the
+same 380 UPIQ pairs with PU21 integrated into SSIMULACRA2's perceptual encoding (fast-ssim2 `hdr-pu`, absolute
+luminance in): pooled SROCC 0.704 (GPU port 0.704; the published PU-SSIM bar is 0.740), and it measured the "PU-encode
+the input, leave the pipeline alone" shell at about 0.61, which is exactly what the PU-rendering column above
+reproduces (0.610). So the fair SSIMULACRA2 number on UPIQ is 0.704 pooled, and the mix (0.783-0.786) is 0.08 above it
+there; per-study figures for the integrated path were not recorded.
