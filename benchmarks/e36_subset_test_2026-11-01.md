@@ -2482,8 +2482,12 @@ validation-only groups), with the trainer's stored `human_score` target in
 score-point units (`--target-scale 1`). No development rows enter transform
 statistics or the screen, including marginal MLE. Record exact groups, rows,
 source hashes, input order and any negative-valued input. Use signed variants
-or identity for unsupported negative domains. Near-constant variance<1e-10
-inputs stay identity, matching the existing MLE screen. Zero/nonpositive
+or identity for unsupported negative domains. T1a's near-constant variance<1e-10
+inputs stay identity, matching the existing marginal-MLE guard. This absolute
+variance guard does not disable T1b's scale-aware rule or T1c's other candidates:
+T1b uses every positive median; T1c retains the original Pearson std<1e-12
+safety guard. Where T1a stays identity, T1c has no fitted Yeo-Johnson candidate.
+Zero/nonpositive
 percentile knees or scales are invalid candidates and stay identity when no
 positive allowed candidate remains; never substitute an unregistered epsilon.
 
@@ -2503,8 +2507,12 @@ positive allowed candidate remains; never substitute an unregistered epsilon.
   on the identical rows (zero allowance). This is TRAIN-side feasibility,
   not EVAL selection; report groupwise and pooled errors. Learn log(knee)
   for soft_clip slots of that initialized arm, soft=knee, projected to each
-  input's positive TRAIN p05..p99 interval. Other chosen kinds stay fixed.
-  Empty/invalid learnable intervals are recorded and held fixed. If the best
+  input's TRAIN p05..p99 interval intersected with knee>0. A zero/nonpositive
+  p05 is a log-space lower bound of negative infinity, not an added epsilon;
+  finite log parameters keep the knee positive. Reject nonfinite or
+  nonrepresentable/nonpositive parameter updates rather than baking invalid
+  params. Other chosen kinds stay fixed. Empty/point/invalid intervals are
+  recorded and held fixed. If the best
   arm has no eligible soft_clip slots, report that no T2 parameter is available.
   No additional arm, initialization or parameter family is inferred from EVAL.
 - **Seeds1–2:** only after seed0 passes G-CHROMA-L,G-STEER,C1–C6,G-ADDR and

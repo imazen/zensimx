@@ -84,22 +84,25 @@ def main():
         if not np.isfinite(col).all():raise ValueError(f'nonfinite TRAIN input{k}')
         quantiles=np.percentile(col,[5,25,50,75,90,99]).astype(np.float32)
         p05,p25,p50,p75,p90,p99=map(float,quantiles)
-        constant=float(col.var())<1e-10
+        variance=float(col.var())
+        constant=bool(np.all(col==col[0]))
+        yj_identity=variance<1e-10  # existing marginal-MLE guard, T1a only
         negative=int(np.count_nonzero(col<0))
-        lmb=None if constant else float(np.float32(screen.fit_yj_lambda(col)))
-        t1a=('identity',[]) if constant else ('yeo_johnson',[lmb])
-        t1b=('identity',[]) if constant or p50<=0 else ('soft_clip',[p50,p50])
-        if constant:
+        lmb=None if yj_identity else float(np.float32(screen.fit_yj_lambda(col)))
+        t1a=('identity',[]) if yj_identity else ('yeo_johnson',[lmb])
+        t1b=('identity',[]) if p50<=0 else ('soft_clip',[p50,p50])
+        if constant or np.sqrt(variance)<1e-12:
             rec=dict(best_transform='identity',params_csv='',lift=0.)
         else:
-            allowed=tuple(t for t in screen.R14_VARIANTS if not (negative and t=='log1p'))
+            allowed=tuple(t for t in screen.R14_VARIANTS
+                if not (negative and t=='log1p') and not (lmb is None and t=='yeo_johnson'))
             rec,_=screen.screen_one_feature_all_transforms(k,col,labels,variants=allowed,yj_lambda=lmb)
         t1c=(rec['best_transform'],[float(np.float32(v)) for v in rec['params_csv'].split(',') if v]) if rec['lift']>=0.005 else ('identity',[])
         for a,(token,ps) in [('T1a',t1a),('T1b',t1b),('T1c',t1c)]:
             arms[a].append(dict(feat_idx=columns[k],best_transform=token,params_csv=','.join(map(str,ps)),lift=rec['lift'] if a=='T1c' else 1.))
         records.append(dict(caller_input=k,trainer_column=columns[k],kind='direct' if k<492 else 'product',
             feature=direct[k] if k<492 else products[k-492],negative_rows=negative,minimum=float(col.min()),
-            variance=float(col.var()),constant=constant,p05=p05,p25=p25,p50=p50,p75=p75,p90=p90,p99=p99,
+            variance=variance,constant=constant,near_constant_yj=yj_identity,p05=p05,p25=p25,p50=p50,p75=p75,p90=p90,p99=p99,
             yeo_johnson_lambda=lmb,T1c=rec))
         if k%16==0:print(json.dumps(dict(stage='screen',completed_inputs=k+1,total_inputs=984)),flush=True)
     for arm,rows in arms.items():
@@ -112,7 +115,8 @@ def main():
         rows=n,inputs=984,target_column='human_score',target_scale=1,train_groups=pins,
         authority_sha256=sha(A/'dataset-authority.json'),declaration_sha256=sha(X/'scripts/rev4_featpot/color_noise_fx2_declaration.json'),
         source_sha256=sha(__file__),screen_owner_sha256=sha(X/'scripts/v_next/v0_20_feature_transform_greedy_screen.py'),
-        constant_inputs=sum(r['constant'] for r in records),negative_inputs=[r['caller_input'] for r in records if r['negative_rows']],
+        constant_inputs=sum(r['constant'] for r in records),
+        near_constant_yj_inputs=sum(r['near_constant_yj'] for r in records),negative_inputs=[r['caller_input'] for r in records if r['negative_rows']],
         token_counts={a:dict(Counter(r['best_transform'] for r in rows)) for a,rows in arms.items()},
         lambda_histogram=dict(edges=edges.tolist(),counts=histogram.tolist()),
         tables={a:dict(path=str(out/f'{a}.tsv'),sha256=sha(out/f'{a}.tsv')) for a in arms})
