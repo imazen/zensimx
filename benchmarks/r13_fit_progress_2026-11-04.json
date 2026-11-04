@@ -2,9 +2,9 @@
   "schema": "r13-packed-fit-progress-v1",
   "registration": "25e772922fd5a40d576e12af47778ce81bed5e08",
   "trainer_source_commit": "ccdb5c7aa0d4b67d52f0e2874f325fbc84ddb11c",
-  "reporting_source_sha256": "36d00b9b84bdac205a79dc79d447aeac05a953de0191aabafa87260f6ba0f06a",
+  "reporting_source_sha256": "e1bec391911344b6e40c7406a8508a1e5b7ccce6745518bb1f13e96f4e4616fb",
   "complete_fits": 3,
-  "required_fits": 15,
+  "required_fits": 6,
   "models": [
     {
       "name": "W32-s0",
@@ -127,21 +127,54 @@
   "pending": [
     "W512-s0",
     "W16-s0",
-    "W32-s1",
-    "W256-s1",
-    "W64-s1",
-    "W512-s1",
-    "W16-s1",
-    "W32-s2",
-    "W256-s2",
-    "W64-s2",
-    "W512-s2",
-    "W16-s2"
+    "W4-s0"
+  ],
+  "omitted": [
+    {
+      "name": "W32-s1",
+      "state": "not run (owner cut on cost, 2026-11-04)"
+    },
+    {
+      "name": "W256-s1",
+      "state": "not run (owner cut on cost, 2026-11-04)"
+    },
+    {
+      "name": "W64-s1",
+      "state": "not run (owner cut on cost, 2026-11-04)"
+    },
+    {
+      "name": "W512-s1",
+      "state": "not run (owner cut on cost, 2026-11-04)"
+    },
+    {
+      "name": "W16-s1",
+      "state": "not run (owner cut on cost, 2026-11-04)"
+    },
+    {
+      "name": "W32-s2",
+      "state": "not run (owner cut on cost, 2026-11-04)"
+    },
+    {
+      "name": "W256-s2",
+      "state": "not run (owner cut on cost, 2026-11-04)"
+    },
+    {
+      "name": "W64-s2",
+      "state": "not run (owner cut on cost, 2026-11-04)"
+    },
+    {
+      "name": "W512-s2",
+      "state": "not run (owner cut on cost, 2026-11-04)"
+    },
+    {
+      "name": "W16-s2",
+      "state": "not run (owner cut on cost, 2026-11-04)"
+    }
   ],
   "artifacts": {
     "host": "dev",
     "root": "/var/tmp/byc-width-20261104",
     "source_pins_sha256": "72f4f8736d18ae73bef7cd0c7e76582621f088607894e536f4daa476a2fc42e3"
   },
-  "role": "packed-fit identities/capacity only; all fifteen must freeze before R13 EVAL assessments"
+  "role": "packed-fit identities/capacity only; every retained candidate must freeze before R13 EVAL assessments"
 }
