@@ -1447,3 +1447,42 @@ Consequence: CIQA as published (one codec, within-reference pairs, soft labels) 
 settings, which every candidate does; it is not an instrument for choosing among them. It has now been read once;
 no further read is planned unless a candidate disagrees with the setting order. The owner's evaluation-only
 condition stands.
+
+### R4 result (2026-11-03): the map term's pairwise cost does not come from butteraugli's map
+
+Arm `p30L-map300dv` (p30L + map 300 trained toward DVIFM's `ycbcr3-curve-ours-safesyn` block sums), seeds 0-2 and
+the seven AIC2026 folds at seed 0; twin `p30L-map300` (butteraugli's map); `~/tmp/e36test/postR4/` on dev.
+
+| measure (seeds 0 / 1 / 2) | p30L | twin: p30L + map 300 (butteraugli) | p30L + map 300 (DVIFM) |
+|---|---|---|---|
+| E36 misordering, 40 held-out sources (seed mean, vs control 3.36%) | 2.38% (-0.975) | 2.12% (-1.241 [-1.436, -1.057]) | 2.31% (-1.047 [-1.243, -0.874]) |
+| EVAL compression rows, row-weighted SROCC | 0.8956 / 0.8957 / 0.8935 | 0.8954 / 0.8942 / 0.8945 | 0.8982 / 0.8982 / 0.8976 |
+| EVAL compression rows, mean error | 6.82 / 6.85 / 7.27% | 6.88 / 6.90 / 6.87% | 6.58 / 6.63 / 6.67% |
+| error vs human, common three | 8.96 / 8.85 / 8.82% | 8.64 / 8.71 / 8.69% | 8.69 / 8.72 / 8.73% |
+| error vs human, all nine | 8.40 / 8.37 / 8.41% | 8.03 / 8.10 / 8.08% | 8.06 / 8.10 / 8.07% |
+| M1 panel against the twin (row-weighted SROCC) | | 0 | +0.0027 (descriptive) |
+| G-STEER, of 135 | 135 / 134 / 135 | | 135 / 134 / 135 |
+| G-CHROMA-L; NEARID (seed 0) | pass | pass | pass; N1-N3 pass |
+| held-out map agreement with DVIFM's block sums, 8 px, served median (239 views) | 0.536 | 0.570 / 0.568 / 0.571 | 0.575 / 0.573 / 0.574 |
+| the same with butteraugli's block sums | | (experiment 3) | 0.781 / 0.781 / 0.778 |
+
+(F3's control agrees with DVIFM's block sums at 0.512; at 16 px the pattern is the same: F3 0.614, p30L 0.618, twin
+0.654 / 0.654 / 0.650, DVIFM arm 0.648 / 0.649 / 0.650.)
+
+Guards against the twin: compression-row SROCC rises (+0.003 seed mean; guard: fall no more than 0.003); all-nine
+error +0.01 points (guard +0.30); G-STEER within amendment 2's guard; G-CHROMA-L and NEARID pass. **All pass.**
+
+**The registered question** (private out-of-fold check on AIC2026 public_train, zensim-training
+`evaluations/aic2026_oof_e36_candidates_2026-11-02.md`, section R4): the DVIFM arm's interval against the twin
+contains zero, and its intervals against p30L and against F3's control lie below zero, as the twin's do. So the arm
+is **not** reported as reducing the map term's pairwise cost: training the map toward DVIFM's account of where the
+damage sits costs the same pairwise agreement across images as training it toward butteraugli's. The two targets
+also pull the map the same way: the DVIFM arm agrees with DVIFM's block sums only 0.004 better than the twin does,
+and both gain about 0.04 over p30L.
+
+Reading: the hypothesis of the method review's experiment 4 (that the cost came from butteraugli's map in
+particular) is not supported; the cost belongs to steering the map at all, at this weight. The DVIFM arm keeps most
+of the twin's E36 gain (2.31% against 2.12%, p30L 2.38%) and improves the EVAL compression rows, so it is a map-term
+arm with the same pairwise cost as the twin. As registered, the arm passed its guards, so its JPEG XL loop at seed 0
+runs next on i270, judged by butteraugli with CVVDP, SSIMULACRA2, zensim and DVIFM reported (`e36_loop_r4.sh`);
+the loop result is appended below when it lands. Nothing is adopted on this read.
