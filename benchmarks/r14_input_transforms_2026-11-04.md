@@ -70,6 +70,39 @@ slots, matching the compact baseline loader and inference caller arithmetic.
 The untouched ARM strict-library-clippy baseline reports eight unused-item
 warnings as errors; this baseline receipt is retained without suppressing them.
 
+## TRAIN screen
+
+The registered screen completed on 627,732 rows from A's seven positive-weight
+TRAIN groups. It read no development or EVAL rows. All 984 caller inputs were
+nonnegative and nonconstant; none met the Yeo-Johnson near-constant guard.
+The target was the trainer's stored `human_score`, with scale 1.
+
+| Arm | Yeo-Johnson | Soft-clip | Soft-sign | Identity |
+|---|---:|---:|---:|---:|
+| T1a | 984 | 0 | 0 | 0 |
+| T1b | 0 | 956 | 0 | 28 |
+| T1c | 5 | 327 | 588 | 64 |
+
+T1b's 28 identity inputs have zero TRAIN medians, which cannot define a positive
+knee. T1c keeps identity when no admitted candidate reaches lift 0.005.
+Its log1p and signed_log1p candidates were available but never selected.
+
+The T1a lambda histogram, in bins with edges
+`[-2,-1.5,-1,-0.5,0,0.5,1,1.5,2]`, is
+`[976,3,3,2,0,0,0,0]`. This is the registered bounded MLE sweep, rather than
+an unconstrained search over all finite lambdas. There are 971 lambdas below
+−1.9999. The median lambda is −1.999995470046997; its maximum is
+−0.20050404965877533. The median of the inputs' TRAIN p50 values is
+0.01059551676735282 (direct inputs: 0.01506041269749403; products:
+0.006778999697417021). Every input's TRAIN p50 and
+lambda, and T1b/T1c's exact per-input parameters, are retained in the screen
+artifacts. No performance or accuracy result follows from these choices alone.
+
+The screen receipt is 183 seconds, run-heavy peak RSS 3.58 GiB, minimum
+available memory 39,930 MiB, exit 0. Producer commit `bfa87dd7` verifies the
+screen-owner source bytes before loading data. Artifact paths and SHA256s are
+recorded in [the pointer](r14_input_transforms_2026-11-04.pointer.md).
+
 ## Results
 
 Not measured yet. Complete every registered arm/read or report a verified blocker;
