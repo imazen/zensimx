@@ -2174,3 +2174,10 @@ shippable (E36 share +1.6 pp, G-CHROMA-L level fail, no held-out HDR gain); the 
 own merits (continuity by construction; the mix gains +0.10 UPIQ dev / +0.013 ladders zero-shot). Nothing from these
 reads selects a model; the mix F stays the adopted model.** Bakes archived at `/var/tmp/byc-hdr-20261104/cont-s05/`
 (mirror to tower with the banks).
+
+**Owner decisions (2026-11-04, 12:30Z, on the HC1 result):** (1) the public 0.3.0 HDR path is the cube-root front end at
+203 cd/m² for A (one queued breaking entry; PU21 stays research-only); (2) `E` and `ECodec` leave the public crate (public
+line: PreviewV0_1, PreviewV0_2, LegacyA, A; `codec_target()` returns A); (3) the obsolescence inventory resumes on a
+Sonnet lane. Both public-crate changes go to imazen/zensim PR #2 through the `zensim-profile-a` Codex lane (phase 2 brief
+`~/tmp/zensim-profile-a-brief/PHASE2.md`): the HDR port follows zensimx `94095e06` and `41ea3ecf`, with A's HDR goldens
+derived from the research `BakeScorer::with_hdr_front_end` and a public continuity test.
