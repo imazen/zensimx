@@ -47,14 +47,17 @@ def capacity():
             pair_masses.sort(key=lambda row:-row[1])
             s = json.loads((out/'bank/summary.json').read_text())
             effects = sorted((v['mean_abs_delta'] for v in s['input_attribution']),reverse=True)
-            if len(effects)!=492 or s['bank_sha256']!=digest or d['bank_sha256']!=digest:
+            if (len(effects)!=492 or s['bank_sha256']!=digest or d['bank_sha256']!=digest
+                    or d['sampled_rows']!=d['bank_rows'] or len(s['row_indices'])!=d['bank_rows']):
                 raise ValueError('incomplete or changed audit population')
             cumulative = np.cumsum(effects)
+            ablation_mass = sum(effects)
             all_rows[f'{bank}/{name}'] = dict(hidden=width,dead=int(dead.sum()),residual=int(residual.sum()),live=int(live.sum()),
                  live_pairs=len(pair_masses), largest_pair=pair_masses[0][0] if pair_masses else None,
                  largest_pair_share=pair_masses[0][1]/total if pair_masses and total else None,
-                 concentration={str(p):int(np.searchsorted(cumulative,p*sum(effects))+1) for p in (.5,.9,.99)},
-                 ablation_mass=sum(effects), rows=d['sampled_rows'] if 'sampled_rows' in d else len(s['scores']),
+                 concentration={str(p):int(np.searchsorted(cumulative,p*ablation_mass)+1) if ablation_mass>0 else None
+                                for p in (.5,.9,.99)},
+                 ablation_mass=ablation_mass, rows=d['sampled_rows'],
                  bank_sha256=digest,bake_sha256=owner.sha(bake))
             owner.write(O/'CAPACITY.json',all_rows)
             print(json.dumps({f'{bank}/{name}':all_rows[f'{bank}/{name}']}),flush=True)

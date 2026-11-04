@@ -97,8 +97,10 @@ def main():
                                     dev_mae=dev['pooled'][name],e36_percent=share,mos_error_percent=mos,
                                     chroma_level=chroma[name]['passes'],capacity=c,
                                     head_ns=timing[name]['candidate_ns'],fit_wall_seconds=fit['wall_seconds']))
-            concentration='/'.join(str(c['concentration'][str(p)]) for p in (.5,.9,.99))
-            lines.append(f"| {'A (128)' if width==128 else width} | {seed} | {dev['base_final_dev_geomean3'][name]:.6f} | {dev['pooled'][name]:.6f} | {share:.6f} | {mos:.5f} | {level} | {c['dead']}/{c['residual']}/{c['live']} | {100*c['largest_pair_share']:.8f} | {concentration} | {head} | {wall} |")
+            concentration='/'.join(str(c['concentration'][str(p)]) if c['concentration'][str(p)] is not None else 'undefined'
+                                   for p in (.5,.9,.99))
+            pair_share=f"{100*c['largest_pair_share']:.8f}" if c['largest_pair_share'] is not None else 'undefined'
+            lines.append(f"| {'A (128)' if width==128 else width} | {seed} | {dev['base_final_dev_geomean3'][name]:.6f} | {dev['pooled'][name]:.6f} | {share:.6f} | {mos:.5f} | {level} | {c['dead']}/{c['residual']}/{c['live']} | {pair_share} | {concentration} | {head} | {wall} |")
     lines += ['', 'Base development geomean3 is recorded at the fixed final epoch; it does not select a different epoch.',
               'TRAIN dev MAE pools SafeSyn and CID22 development rows in stored score-point units.',
               'All-nine error averages collection-wise median residual / target p1–p99 span after assessment-only 4PL.',
