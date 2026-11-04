@@ -4102,6 +4102,12 @@ a-parallel-gate-reference bake revision='7':
 a-parallel-gate-parity root reference7 reference1 public output:
     python3 -B zensim-bench/a-speed-runtime/report.py {{quote(root)}} {{quote(output)}} --split-parity {{quote(reference7)}} {{quote(reference1)}} {{quote(public)}}
 
+a-parallel-gate-test:
+    cargo test -p zensim -- --test-threads=1
+
+a-parallel-gate-hdr-test:
+    cargo test -p zensim --features custom-profiles --test native_hdr_color -- --test-threads=1
+
 a-speed-prepare sources output:
     zensim-bench/a-speed-runtime/target/release/a-speed-prepare {{quote(sources)}} {{quote(output)}}
 

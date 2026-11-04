@@ -1036,6 +1036,7 @@ fn rev7_native_hdr_strided_rows_match_packed_rows() {
 /// reproduce the supported entry's canonical features and the direct
 /// `compute_hdr` score, for native u16 and f32 inputs, sequential and parallel,
 /// at both map bins; identity scores 100 and a failed call leaves no state.
+#[cfg(feature = "custom-profiles")]
 #[test]
 fn rev7_prepared_native_hdr_workers_match_canonical_features() {
     use zensim::feature_v2::FormulaRevision;

@@ -182,6 +182,13 @@ because cleanup tests or a historical training reproduction pass.
 
 ## Known Bugs
 
+- **2026-11-04 — default-feature HDR steering test compile failure, fixed.** The
+  `rev7_prepared_native_hdr_workers_match_canonical_features` integration test
+  called `prepare_steering_hdr` without its `custom-profiles` feature gate.
+  test now matches the API's feature guard. The native HDR target passes with
+  default features and with `custom-profiles`, including the steering test.
+  Every feature, score, identity and error-state assertion is unchanged.
+
 - **zensim-viz map visibility (2026-11-04 review 2, fixed):** alpha proportional to
   the full own-range value left detector maps faint over photographs. The
   decided treatment is a grey photographic base, a nonzero alpha floor, and
