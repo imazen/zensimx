@@ -179,9 +179,10 @@ export class Studio {
         .map((f) => this.loadMap(f)),
     );
   }
-  choose(f) {
+  choose(f, force = false) {
     if (!f) return;
     this.showUnit = false;
+    if (this.hold && !force) return;
     if (f === this.state.feature && this.state.view !== "lens") return;
     this.preview(f).catch((e) => this.status(e.message));
     if (this.state.view === "lens" && this.state.weights) {
@@ -189,6 +190,12 @@ export class Studio {
         (i) => i.feature === f.id && Boolean(i.factor != null) === f.fragility,
       );
       if (input) {
+        if (
+          this.state.input === input.index &&
+          this.state.lens &&
+          !this.$("lens-family").value
+        )
+          return;
         this.state.input = input.index;
         this.$("input").value = input.index;
         this.$("lens-family").value = "";
@@ -208,7 +215,13 @@ export class Studio {
   }
   renderTree() {
     const fs = (this.state.pair?.features || []).filter(
-      (f) => f.fragility === (this.state.filters.fragility === "fragility"),
+      (f) =>
+        f.fragility === (this.state.filters.fragility === "fragility") &&
+        ["scale", "channel", "pooling"].every(
+          (k) =>
+            this.state.filters[k] === "all" ||
+            String(f[k]) === this.state.filters[k],
+        ),
     );
     const search = this.query,
       match = (f) =>
@@ -318,7 +331,23 @@ export class Studio {
             `f${f.id} ${f.name} ${ch} · ${this.fmt(f.value)} · p${this.fmt(100 * (this.percentile(f) || 0))}`,
           );
           const pixel = this.el("i", null, "pixel percentile-chip");
-          pixel.style.background = this.colour(this.percentile(f) || 0);
+          const bank = this.state.manifest.banks.find(
+              (b) => b.id === this.$("bank").value,
+            ),
+            range = f.bank_ranges?.[bank?.sha256];
+          const divergent =
+            this.$("colour").value === "signed" &&
+            range?.[0] < 0 &&
+            range?.[1] > 0;
+          b.dataset.diverging = String(Boolean(divergent));
+          pixel.style.background = divergent
+            ? this.colour(
+                (f.value / Math.max(Math.abs(range[0]), Math.abs(range[1])) +
+                  1) /
+                  2,
+                true,
+              )
+            : this.colour(this.percentile(f) || 0);
           b.append(pixel, this.el("span", ch));
           if (this.state.view === "lens") {
             const attrs = this.state.lens?.input_attribution || [],
@@ -448,7 +477,7 @@ export class Studio {
       this.el(
         "div",
         tex
-          ? "Equation verified against revision-7 code; paper provides prose."
+          ? "Code-derived equation · revision 7. Paper coverage is identified below."
           : "No equation available; see code below.",
         "formula-note",
       ),
@@ -459,6 +488,7 @@ export class Studio {
       this.el("h2", "Background and inspiration"),
       this.el("p", r.background),
     );
+    if (r.notation) root.append(this.el("p", r.notation, "formula-note"));
     if (!r.paper_text)
       root.append(this.el("p", "no paper text yet", "reference-missing"));
     if (f.fragility)
@@ -554,38 +584,114 @@ export class Studio {
         const unit = this.state.audit?.hidden_units.find(
           (u) => u.unit === this.state.unit || u.index === this.state.unit,
         );
-        root.append(
-          this.el(
-            "p",
-            unit
-              ? JSON.stringify(unit)
-              : `h${this.state.unit} · inspect its top inputs and outgoing weight in Weights.`,
-          ),
-        );
+        if (unit) {
+          root.append(
+            this.el(
+              "p",
+              `${this.fmt(unit.activation_rate * 100)}% positive · mean |activation| ${this.fmt(unit.mean_abs_activation)} · range ${this.fmt(unit.min)} … ${this.fmt(unit.max)} · outgoing weight ${this.fmt(w.layers[1].weights[this.state.unit])}.`,
+            ),
+          );
+          root.append(
+            this.el(
+              "p",
+              `Top inputs: ${unit.top_inputs
+                .slice(0, 8)
+                .map(
+                  ([idx]) =>
+                    `f${w.inputs[idx].feature} ${w.inputs[idx].short_name}`,
+                )
+                .join("; ")}.`,
+            ),
+          );
+        }
       }
       const flags = [
         ...(this.state.audit?.flags || []),
         ...(this.state.bake?.monotonicity_flags || []),
-      ].filter((flag) => flag.feature === f.id || flag.input === i.index);
+      ].filter(
+        (flag) =>
+          flag.feature === f.id ||
+          (flag.layer === 0 && flag.from === i.index) ||
+          (this.showUnit &&
+            ((flag.layer === 0 && flag.to === this.state.unit) ||
+              (flag.layer === 1 && flag.from === this.state.unit))),
+      );
+      root.dataset.flagCount = String(flags.length);
       const kinds = new Map();
       for (const flag of flags) {
         const key = `${flag.severity} ${flag.kind}`;
         kinds.set(key, (kinds.get(key) || 0) + 1);
       }
       for (const [key, count] of kinds) {
-        const chip = this.el("span", `● ${key} · ${count}`, "chip");
+        const icon =
+          key.startsWith("critical") || key.startsWith("serious")
+            ? "⚠"
+            : key.startsWith("note")
+              ? "○"
+              : "●";
+        const chip = this.el("span", `${icon} ${key} · ${count}`, "chip");
         chip.dataset.severity = key.split(" ")[0];
         root.append(chip);
       }
       if (!flags.length)
         root.append(this.el("p", "No measured flag on this feature.", "ink-3"));
     }
+    if (f.terms_file)
+      this.termPlanes(new URL(f.terms_file, this.state.pair._url).href).catch(
+        (e) => this.status(e.message),
+      );
+    const numbers = this.el("details");
+    numbers.append(this.el("summary", "Stored values · full precision"));
+    numbers.append(
+      this.table(
+        ["Field", "Value"],
+        [
+          ["Pooled slot", f.pooled_value],
+          ["Model input", f.model_input_value],
+          ["Bank percentile", this.percentile(f)],
+          ...(f.fragility
+            ? [
+                ["Fragility slot", f.fragility_slot],
+                ["Fragility value", f.fragility_value],
+              ]
+            : []),
+        ],
+      ),
+    );
+    root.append(numbers);
     this.updateLegend();
+  }
+  termPlanes(url) {
+    this.termCache ||= new Map();
+    if (!this.termCache.has(url))
+      this.termCache.set(
+        url,
+        (async () => {
+          const header = await this.get(url),
+            response = await fetch(new URL(header.data_file, url));
+          if (!response.ok)
+            throw Error(`Missing native terms: ${response.status}`);
+          const bytes = await response.arrayBuffer(),
+            count = header.width * header.height;
+          if (bytes.byteLength !== count * header.planes.length * 4)
+            throw Error("Native term plane length differs");
+          const view = new DataView(bytes),
+            planes = {};
+          header.planes.forEach((name, p) => {
+            const values = new Float32Array(count);
+            for (let i = 0; i < count; i++)
+              values[i] = view.getFloat32((p * count + i) * 4, true);
+            planes[name] = values;
+          });
+          return { ...header, planes };
+        })(),
+      );
+    return this.termCache.get(url);
   }
   updateLegend() {
     if (this.state.view === "lens")
       this.$("map-legend").textContent =
-        `${this.exhibit} · ${this.state.bake?.label || "No evidence"} · stored input ${this.state.input} · h${this.state.unit}`;
+        `${this.exhibit} · ${this.state.bake?.label || "No evidence"} · input ${this.state.input} · h${this.state.unit} · ${this.state.lens?.pdp?.ice?.length || 0} native curves · IQR p25–p75`;
   }
   async demoAt(e) {
     const f = this.hold || this.state.feature,
@@ -600,8 +706,14 @@ export class Studio {
       v = (e.clientY - rect.top) / rect.height;
     if (u < 0 || v < 0 || u >= 1 || v >= 1) return;
     const key = f.key,
-      terms = await this.get(new URL(f.terms_file, this.state.pair._url).href);
-    if ((this.hold || this.state.feature)?.key !== key) return;
+      terms = await this.termPlanes(
+        new URL(f.terms_file, this.state.pair._url).href,
+      );
+    if (
+      (this.hold || this.state.feature)?.key !== key ||
+      root !== this.$("formula-demo")
+    )
+      return;
     const x = Math.min(
         terms.width - 1,
         Math.floor((u * terms.native_grid[0]) / terms.step),

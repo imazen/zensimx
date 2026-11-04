@@ -558,3 +558,7 @@ header.topbar {
     gap: 8px;
   }
 }
+body[data-instrument="lens"] #image-mode,
+body[data-instrument="lens"] .stage-controls {
+  display: none;
+}

@@ -37,6 +37,11 @@ export function buildFrame() {
   const atlas = $("atlas"),
     lens = $("lens"),
     stage = $("stage");
+  stage.tabIndex = 0;
+  stage.setAttribute(
+    "aria-label",
+    "Image stage: arrows pan, wheel zooms, double click resets",
+  );
   atlas.replaceChildren(stage);
   atlas.className = "atlas-stage";
   const concerns = document.querySelector(".concerns");

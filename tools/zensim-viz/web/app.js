@@ -203,6 +203,12 @@ function view(v) {
   if (state.manifest) status(state.manifest.note || "");
   $("atlas").hidden = v !== "atlas";
   $("lens").hidden = v !== "lens";
+  if (v === "lens" && state.feature && state.weights)
+    studio.choose(state.feature, true);
+  else if (v === "atlas" && state.feature) {
+    studio.showUnit = false;
+    preview(state.feature);
+  }
   document
     .querySelectorAll("[data-view]")
     .forEach((b) =>
@@ -534,7 +540,20 @@ $("stage").onpointermove = (e) => {
     pan();
   }
 };
-$("stage").onpointerup = () => (drag = null);
+$("stage").onpointerup = $("stage").onpointercancel = () => (drag = null);
+$("stage").onkeydown = (e) => {
+  const delta = {
+    ArrowLeft: [-24, 0],
+    ArrowRight: [24, 0],
+    ArrowUp: [0, -24],
+    ArrowDown: [0, 24],
+  }[e.key];
+  if (delta) {
+    e.preventDefault();
+    state.pan = state.pan.map((v, i) => v + delta[i]);
+    pan();
+  }
+};
 for (const id of ["colour", "family-lane", "family"])
   $(id).onchange = renderMatrix;
 let pairGeneration = 0;
@@ -1054,6 +1073,8 @@ function renderFamily() {
 let concernsPage = 1;
 function selectConcern(f) {
   if (!state.weights) return;
+  studio.hold = null;
+  studio.showUnit = f.layer != null;
   if (f.feature != null)
     state.input = Math.max(
       0,
@@ -1263,7 +1284,14 @@ const weightView = new WeightView({
     state.input = input;
     state.unit = unit;
     studio.showUnit = true;
-    studio.reference(state.feature, true);
+    studio.hold = null;
+    const selected = state.weights.inputs[input];
+    const feature = state.pair?.features.find(
+      (f) =>
+        f.id === selected.feature && f.fragility === (selected.factor != null),
+    );
+    if (feature) preview(feature);
+    studio.reference(feature, true);
     $("input").value = input;
     renderWeights();
     loadLens().catch((e) => status(e.message));
@@ -1273,6 +1301,17 @@ function renderWeights() {
   if (!state.weights) return;
   weightView.render();
   renderArchitecture();
+  if (state.view === "lens") {
+    const i = state.weights.inputs[state.input];
+    const f = state.pair?.features.find(
+      (f) => f.id === i.feature && f.fragility === (i.factor != null),
+    );
+    if (f) {
+      state.feature = f;
+      studio.reference(f, true);
+    }
+  }
+  if (studio.showUnit) studio.reference(state.feature, true);
 }
 function renderInputRanking() {
   const rows = state.lens?.input_attribution;
@@ -1370,6 +1409,7 @@ function renderHidden() {
       );
       b.onclick = () => {
         state.unit = u.unit;
+        studio.showUnit = true;
         renderWeights();
       };
       return b;
@@ -1590,6 +1630,8 @@ async function selectBake() {
   renderWeights();
   renderHidden();
   await loadLens();
+  studio.renderTree();
+  studio.reference(studio.hold || state.feature, true);
 }
 $("bake").onchange = () => selectBake().catch((e) => status(e.message));
 $("lens-family").onchange = () => {
@@ -1599,6 +1641,14 @@ $("lens-family").onchange = () => {
 $("compare").onchange = () => loadLens().catch((e) => status(e.message));
 $("input").onchange = () => {
   state.input = Number($("input").value);
+  studio.showUnit = false;
+  studio.hold = null;
+  const selected = state.weights.inputs[state.input];
+  const feature = state.pair?.features.find(
+    (f) =>
+      f.id === selected.feature && f.fragility === (selected.factor != null),
+  );
+  if (feature) preview(feature);
   $("lens-family").value = "";
   renderWeights();
   loadLens().catch((e) => status(e.message));
@@ -1611,10 +1661,15 @@ for (const id of ["severity", "kind", "sort"])
 document.addEventListener("keydown", (e) => {
   if (["INPUT", "SELECT", "TEXTAREA"].includes(e.target.tagName)) return;
   if (state.view === "atlas") {
-    if (e.key === "f") $("flip").click();
+    if (e.key === "0") {
+      state.filters.scale = "all";
+      renderMatrix();
+    } else if (e.key === "f") $("flip").click();
     else if (e.key === "Backspace") {
       e.preventDefault();
-      state.pins.pop();
+      const removed = state.pins.pop();
+      if (studio.hold === removed) studio.hold = null;
+      studio.reference(state.feature, true);
       renderPins();
       renderMatrix();
     } else if (/[1-5]/.test(e.key) && e.key.length === 1) {
@@ -1674,6 +1729,7 @@ const studio = new Studio({
   state,
   $,
   el,
+  table,
   fmt,
   full,
   percentile,
