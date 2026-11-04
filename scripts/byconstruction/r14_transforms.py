@@ -106,9 +106,17 @@ def development():
     print(json.dumps(result),flush=True)
 
 
+def capacity():
+    import r13_width_analysis as audit
+    pins=json.loads((O/'SOURCE_PINS.json').read_text())
+    owner.EXPORT=O/'bin/zensim-viz-export'
+    audit.O=O
+    audit.capacity(exporter_sha256=pins['binary_sha256']['zensim-viz-export'])
+
+
 def main():
     ap=argparse.ArgumentParser(description=__doc__)
-    ap.add_argument('command',choices=('fit','pack','freeze','development','job'))
+    ap.add_argument('command',choices=('fit','pack','freeze','development','capacity','job'))
     ap.add_argument('--arm',choices=ARMS)
     ap.add_argument('--label')
     a,argv=ap.parse_known_args()
@@ -122,6 +130,7 @@ def main():
     elif a.command=='job':
         if not a.label:ap.error('--label required')
         owner.job(a.label,argv[1:] if argv[:1]==['--'] else argv)
+    elif a.command=='capacity':capacity()
     else:freeze()
 
 

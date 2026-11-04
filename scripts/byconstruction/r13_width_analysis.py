@@ -20,8 +20,8 @@ def models():
     return json.loads((O/'MODELS.json').read_text())
 
 
-def capacity():
-    if owner.sha(owner.EXPORT) != 'd9e1ca3e9624036f567c29dbc5cd79668a697fe4a63b4bb33c9cf30fdaed2f6f':
+def capacity(exporter_sha256='d9e1ca3e9624036f567c29dbc5cd79668a697fe4a63b4bb33c9cf30fdaed2f6f'):
+    if owner.sha(owner.EXPORT) != exporter_sha256:
         raise ValueError('native weight-audit exporter changed')
     all_rows = {}
     for bank, (path, digest) in owner.BANKS.items():
