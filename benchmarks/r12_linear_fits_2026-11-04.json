@@ -1,0 +1,212 @@
+{
+  "models": [
+    {
+      "arm": "L1",
+      "seed": 0,
+      "packed_sha256": "6a9312a478d727195e5cb25ab72c2f3e04ee0f8e8b6aeebbc9f0d0aaa843a2b9",
+      "packed_bytes": 21814,
+      "raw_sha256": "f12b090277622c8662002b1d401c3e372c1c15fe3df684d20b97266b9952f53e",
+      "certificate": {
+        "bake": "/var/tmp/byc-linear-20261104/fits/L1-s0/refit/production-f16.bin",
+        "certified": true,
+        "free_amplitude": 0.0,
+        "free_ramps": 0,
+        "max_pairs": 0,
+        "monotone": true,
+        "ramps": 0
+      },
+      "epochs": 120,
+      "selected_epoch": 119
+    },
+    {
+      "arm": "L1",
+      "seed": 1,
+      "packed_sha256": "985d2b234254f4a9c691cee9cc0cef6b4aec805b46ee966e297798eed649ce08",
+      "packed_bytes": 21881,
+      "raw_sha256": "9c510ff13a480632d518bc1cb302f38cc5f36cfb087d27339e61771bd8bfc185",
+      "certificate": {
+        "bake": "/var/tmp/byc-linear-20261104/fits/L1-s1/refit/production-f16.bin",
+        "certified": true,
+        "free_amplitude": 0.0,
+        "free_ramps": 0,
+        "max_pairs": 0,
+        "monotone": true,
+        "ramps": 0
+      },
+      "epochs": 120,
+      "selected_epoch": 119
+    },
+    {
+      "arm": "L1",
+      "seed": 2,
+      "packed_sha256": "2c54e0991eba3173c647ea285d7d031e2b54e7b27733ff1aebec14a35c29683e",
+      "packed_bytes": 21782,
+      "raw_sha256": "3686b6b26a6344141ba1dc61a7bafaa67f3ea681eae2993b5b8ecc2c67af91d7",
+      "certificate": {
+        "bake": "/var/tmp/byc-linear-20261104/fits/L1-s2/refit/production-f16.bin",
+        "certified": true,
+        "free_amplitude": 0.0,
+        "free_ramps": 0,
+        "max_pairs": 0,
+        "monotone": true,
+        "ramps": 0
+      },
+      "epochs": 120,
+      "selected_epoch": 119
+    },
+    {
+      "arm": "L2",
+      "seed": 0,
+      "packed_sha256": "51a3ff42cbf48ddadbddaafe0df9b730871798af8f73d24827a88abfa2096dd5",
+      "packed_bytes": 20930,
+      "raw_sha256": "1cacc8b3cea5396fa33dcc09199376a3ea83c16c3c9a917645bf493be71537bf",
+      "certificate": {
+        "bake": "/var/tmp/byc-linear-20261104/fits/L2-s0/refit/production-f16.bin",
+        "certified": true,
+        "free_amplitude": 0.0,
+        "free_ramps": 0,
+        "max_pairs": 0,
+        "monotone": true,
+        "ramps": 0
+      },
+      "epochs": 120,
+      "selected_epoch": 119
+    },
+    {
+      "arm": "L2",
+      "seed": 1,
+      "packed_sha256": "9d6a9bcb36a5aa844d4561303d580842680f09c170e0194a1508ec9b9b6c89bc",
+      "packed_bytes": 20933,
+      "raw_sha256": "0f7ab8866e8cd61c1774490627d90ae1e1fa87cf2fee2e0b61b6b967c0a7ffbf",
+      "certificate": {
+        "bake": "/var/tmp/byc-linear-20261104/fits/L2-s1/refit/production-f16.bin",
+        "certified": true,
+        "free_amplitude": 0.0,
+        "free_ramps": 0,
+        "max_pairs": 0,
+        "monotone": true,
+        "ramps": 0
+      },
+      "epochs": 120,
+      "selected_epoch": 119
+    },
+    {
+      "arm": "L2",
+      "seed": 2,
+      "packed_sha256": "012545710c8edfb074fb28f65b06d883091ca76b9e8eecf5d68bbdaa4fe9185d",
+      "packed_bytes": 20914,
+      "raw_sha256": "858632da00430c608987cfcbb0405ea3eed64fed2233e94f91d3c7e850eefdfc",
+      "certificate": {
+        "bake": "/var/tmp/byc-linear-20261104/fits/L2-s2/refit/production-f16.bin",
+        "certified": true,
+        "free_amplitude": 0.0,
+        "free_ramps": 0,
+        "max_pairs": 0,
+        "monotone": true,
+        "ramps": 0
+      },
+      "epochs": 120,
+      "selected_epoch": 119
+    },
+    {
+      "arm": "L3",
+      "seed": 0,
+      "packed_sha256": "7230b6046d6f9df6345e5904eb79af98cd8986de3df30f14d3a8a8e17578c0ac",
+      "packed_bytes": 23957,
+      "raw_sha256": "874fac3e2b32a47112f49e8f206cb246bdea9a2a6a031e186f1d3da9e28fa1a0",
+      "certificate": {
+        "bake": "/var/tmp/byc-linear-20261104/fits/L3-s0/pack_e059/refit/production-f16.bin",
+        "certified": true,
+        "free_amplitude": 0.0,
+        "free_ramps": 0,
+        "max_pairs": 0,
+        "monotone": true,
+        "ramps": 0
+      },
+      "epochs": 60,
+      "selected_epoch": 59
+    },
+    {
+      "arm": "L3",
+      "seed": 1,
+      "packed_sha256": "3984473bbbc46cbc6f283ed1f205365b6a761733f0df34629b5760f2cd8a7bf1",
+      "packed_bytes": 23668,
+      "raw_sha256": "2bebee7f49afba86f09141070792b3f7312f398cdd1f818970884b4738f114fb",
+      "certificate": {
+        "bake": "/var/tmp/byc-linear-20261104/fits/L3-s1/pack_e059/refit/production-f16.bin",
+        "certified": true,
+        "free_amplitude": 0.0,
+        "free_ramps": 0,
+        "max_pairs": 0,
+        "monotone": true,
+        "ramps": 0
+      },
+      "epochs": 60,
+      "selected_epoch": 59
+    },
+    {
+      "arm": "L3",
+      "seed": 2,
+      "packed_sha256": "62ec6a8ee8f04417a75bae8f4005afaf9baabdbc2791153ec477819132eddaf9",
+      "packed_bytes": 24023,
+      "raw_sha256": "004b994cab4594734cf4592e998c242268bec5dcb4ae8ac1add79b8df0662b4e",
+      "certificate": {
+        "bake": "/var/tmp/byc-linear-20261104/fits/L3-s2/pack_e059/refit/production-f16.bin",
+        "certified": true,
+        "free_amplitude": 0.0,
+        "free_ramps": 0,
+        "max_pairs": 0,
+        "monotone": true,
+        "ramps": 0
+      },
+      "epochs": 60,
+      "selected_epoch": 59
+    }
+  ],
+  "development": {
+    "groups": {
+      "safesyn": {
+        "n": 38757,
+        "target_min": -67.28177880554554,
+        "target_max": 99.05095780805053,
+        "mae": {
+          "F_s0": 3.393522721062465,
+          "F_s1": 3.398859370658721,
+          "F_s2": 3.5688931382985025,
+          "L1_s0": 2.956283750672329,
+          "L1_s1": 2.7126605521072835,
+          "L1_s2": 3.1634963431268317
+        }
+      },
+      "cid22": {
+        "n": 3785,
+        "target_min": 3.011507664959634,
+        "target_max": 93.67490583031818,
+        "mae": {
+          "F_s0": 1.5005719255618015,
+          "F_s1": 1.58666920445755,
+          "F_s2": 1.6013016747610926,
+          "L1_s0": 1.370632749973186,
+          "L1_s1": 1.31453995828533,
+          "L1_s2": 1.437120141494579
+        }
+      }
+    },
+    "pooled": {
+      "F_s0": 3.2251051863680456,
+      "F_s1": 3.2376271817848683,
+      "F_s2": 3.393834756241028,
+      "L1_s0": 2.815206955090404,
+      "L1_s1": 2.588268505480042,
+      "L1_s2": 3.009899099857167
+    },
+    "seed_means": {
+      "F": 3.28552237479798,
+      "L1": 2.8044581868092044
+    },
+    "delta_score_points": -0.4810641879887756,
+    "L3_run": true,
+    "rule": "L1 seed mean pooled teacher development absolute score error <= F + 1 point",
+    "role": "training-side development; no EVAL read"
+  }
+}

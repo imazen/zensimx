@@ -25,6 +25,8 @@
 
 ### Added
 
+- Research R12: registered dense and top-eight-family non-negative linear heads over the adopted mix inputs; explicit H1 admission preserves historical architecture and population guards (`b901766a`).
+
 - Unpublished paired speed instrument for frozen public A, fast-ssim2 0.9.1
   and margarine's selected kernel, with imazen codec fixtures, individual-call
   rounds, isolated RSS collection and pixel-count regression reporting.
