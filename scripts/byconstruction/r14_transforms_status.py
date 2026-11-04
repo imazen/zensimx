@@ -55,13 +55,24 @@ def main():
         holders.append(entry)
     state=('running' if lock_state['held_by_worker_ancestor'] else 'waiting-for-shared-lock') if live else 'exited; inspect receipt'
     if result:state='complete' if result['rc']==0 else 'failed'
+    release=json.loads((root/'T2_RELEASE.json').read_text()) if (root/'T2_RELEASE.json').exists() else None
+    models=json.loads((root/'MODELS.json').read_text()) if (root/'MODELS.json').exists() else None
+    read_receipts={p.stem.removesuffix('.receipt'):json.loads(p.read_text())['rc']
+                   for p in (root/'reads').glob('*.receipt.json')}
+    t2=dict(released=release['run'] if release else None,
+            complete=any(v['name']=='T2-s0' for v in completed))
     report=dict(checked=now,stage=active.get('stage'),state=state,live=live,lock=lock_state,holder_activity=holders,
-        completed_fits=len(completed),required_T1_fits=3,fits=completed,epochs=epochs,
+        completed_fits=sum(v['name'].startswith('T1') for v in completed),required_T1_fits=3,T2=t2,
+        fits=completed,epochs=epochs,
+        reads=dict(completed=sum(rc==0 for rc in read_receipts.values()),
+            failed=[n for n,rc in read_receipts.items() if rc],required=12+4*len(models) if models else None),
+        capacity=dict(completed=len(list((root/'capacity').glob('*/*/bank/summary.json'))),
+            required=2*len(models) if models else None),
         source_pins_present=(root/'SOURCE_PINS.json').exists(),receipt=result,
         next_action='finish registered fits, then development feasibility and frozen reads')
     (root/'SUPERVISION.json').write_text(json.dumps(report,indent=2)+'\n')
     if sys.argv[1:]==['--compact']:
-        report={k:report[k] for k in ('checked','stage','state','completed_fits','required_T1_fits','epochs','lock','holder_activity')}
+        report={k:report[k] for k in ('checked','stage','state','completed_fits','required_T1_fits','T2','reads','capacity','epochs','lock','holder_activity')}
     print(json.dumps(report,indent=2))
 
 
