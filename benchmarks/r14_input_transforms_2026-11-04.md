@@ -60,6 +60,13 @@ The exporter checks transformed split-layer execution against complete native
 forward bits on256 rows. Native authority tests reject a missing registration,
 changed screen table and changed A head.
 
+A native toy fit verifies post-transform scaler statistics exclude validation-only
+rows, preserves transform metadata and certifies the exact zero-input100 pin.
+The final transformed-training/native-CLI lint sequence passes in54s,
+run-heavy peak-RSS1.31GiB, minimum available26745MiB, with no warning in the
+new transform module. R14 identity slots narrow to f32 alongside nonidentity
+slots, matching the compact baseline loader and inference caller arithmetic.
+
 The untouched ARM strict-library-clippy baseline reports eight unused-item
 warnings as errors; this baseline receipt is retained without suppressing them.
 

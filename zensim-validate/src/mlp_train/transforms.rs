@@ -114,7 +114,6 @@ mod admission_tests {
 
 #[cfg(test)]
 mod certificate_tests {
-    use super::*;
     #[test]
     fn certificate_accepts_smooth_transforms_and_refuses_roots_and_signed_gate_shortcuts() {
         let base = serde_json::json!({"schema_hash":1,"scaler_mean":[0.,0.],"scaler_scale":[1.,1.],
@@ -146,6 +145,97 @@ mod certificate_tests {
                 100.
             )
             .is_err()
+        );
+    }
+}
+
+#[cfg(test)]
+mod training_tests {
+    use super::super::*;
+    use super::*;
+    #[test]
+    fn smooth_training_bakes_post_transform_train_only_scaling_and_zero_pin() {
+        let transforms = vec![FeatureTransform::SoftSign, FeatureTransform::SoftClip];
+        let params = vec![vec![1.], vec![1., 1.]];
+        let raw = [0_f32, 1., 3., 7.];
+        let rows: Vec<Vec<f64>> = raw
+            .iter()
+            .map(|&x| {
+                transforms
+                    .iter()
+                    .zip(&params)
+                    .map(|(t, p)| f64::from(t.apply_with_params(x, p)))
+                    .collect()
+            })
+            .collect();
+        let views: Vec<_> = rows.iter().map(Vec::as_slice).collect();
+        let validation: Vec<Vec<f64>> = [1000_f32, 2000.]
+            .iter()
+            .map(|&x| {
+                transforms
+                    .iter()
+                    .zip(&params)
+                    .map(|(t, p)| f64::from(t.apply_with_params(x, p)))
+                    .collect()
+            })
+            .collect();
+        let val_views: Vec<_> = validation.iter().map(Vec::as_slice).collect();
+        let scores = [100., 90., 80., 70.];
+        let val_scores = [50., 40.];
+        let mut groups = [
+            TrainingGroup {
+                name: "invented train".into(),
+                features: FeatureRows::Borrowed(&views),
+                human_scores: &scores,
+                metric_sigmas: None,
+                train_weight: 1.,
+                validation_weight: 1.,
+                ref_ids: None,
+                loss_mode: GroupLossMode::Both,
+            },
+            TrainingGroup {
+                name: "validation only".into(),
+                features: FeatureRows::Borrowed(&val_views),
+                human_scores: &val_scores,
+                metric_sigmas: None,
+                train_weight: 0.,
+                validation_weight: 1.,
+                ref_ids: None,
+                loss_mode: GroupLossMode::Both,
+            },
+        ];
+        let hp = MlpHyperparams {
+            n_hidden: 4,
+            max_pairs: 1,
+            nonneg_distance: true,
+            monotone_cbc: true,
+            nonneg_thresholds: true,
+            n_epochs: 2,
+            pairs_per_epoch: 32,
+            early_stop_patience: 0,
+            feature_transforms: Some(transforms),
+            feature_transform_params: Some(params),
+            r14_transforms_registration: Some(REGISTRATION.into()),
+            ..Default::default()
+        };
+        let bytes = train_mlp(&mut groups, 2, &hp, &mut Vec::new());
+        let model = zenpredict::Model::from_bytes(&bytes).unwrap();
+        assert!(certify_monotone_bake(&model, 100.).is_ok());
+        assert_eq!(model.scaler_mean(), &[0., 0.]);
+        for i in 0..2 {
+            let mean = rows.iter().map(|r| r[i]).sum::<f64>() / 4.;
+            let variance = rows.iter().map(|r| (r[i] - mean).powi(2)).sum::<f64>() / 4.;
+            assert!((f64::from(model.scaler_scale()[i]) - variance.sqrt()).abs() < 1e-6);
+        }
+        assert_eq!(model.feature_transforms(), hp.feature_transforms.as_deref());
+        assert_eq!(
+            model.feature_transform_params(),
+            hp.feature_transform_params.as_deref()
+        );
+        let mut predictor = zenpredict::Predictor::new(&model);
+        assert_eq!(
+            predictor.predict_transformed(&[0., 0.]).unwrap()[0].to_bits(),
+            100_f32.to_bits()
         );
     }
 }

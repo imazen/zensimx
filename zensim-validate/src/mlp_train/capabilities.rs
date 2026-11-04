@@ -235,17 +235,19 @@ pub fn validate_training_capabilities(
         );
     }
 
-    // E34 L inherits E33 E5: its linear/identity proof declares no transforms.
-    if hyperparams.nonneg_distance && hyperparams.monotone_cbc {
-        if let Some(ts) = &hyperparams.feature_transforms {
-            assert_eq!(
-                hyperparams.r14_transforms_registration.as_deref(),
-                Some(super::transforms::REGISTRATION),
-                "plain monotone N feature transforms require R14 registration"
-            );
-            super::transforms::validate(ts, hyperparams.feature_transform_params.as_deref())
-                .expect("plain monotone N requires smooth zero-preserving R14 transforms");
-        }
+    // Historical E34 L keeps its no-transform identity contract. R14 alone
+    // authorizes validated smooth, zero-preserving caller transforms.
+    if hyperparams.nonneg_distance
+        && hyperparams.monotone_cbc
+        && let Some(ts) = &hyperparams.feature_transforms
+    {
+        assert_eq!(
+            hyperparams.r14_transforms_registration.as_deref(),
+            Some(super::transforms::REGISTRATION),
+            "plain monotone N feature transforms require R14 registration"
+        );
+        super::transforms::validate(ts, hyperparams.feature_transform_params.as_deref())
+            .expect("plain monotone N requires smooth zero-preserving R14 transforms");
     }
 
     // The pool and hybrid heads implement NO absolute term — they read

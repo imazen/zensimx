@@ -4331,7 +4331,11 @@ fn main() {
             let nf = g.n_features;
             for row in g.feature_rows.chunks_mut(nf) {
                 for (i, t) in transforms.iter().enumerate() {
-                    if *t != zenpredict::FeatureTransform::Identity {
+                    // R14's caller row is f32 even for identity slots, matching
+                    // the compact baseline loader and runtime product pipeline.
+                    if *t != zenpredict::FeatureTransform::Identity
+                        || args.r14_transforms_registration.is_some()
+                    {
                         row[i] = t.apply_with_params(row[i] as f32, &params[i]) as f64;
                     }
                 }

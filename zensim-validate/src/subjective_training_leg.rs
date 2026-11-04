@@ -325,7 +325,8 @@ fn run_binding(
         || args.nonneg_pin != 100.
         || ((!args.feature_transform.is_empty() || args.auto_transforms.is_some())
             && !r14_transform_binding(c, args)?)
-        || (args.r14_transforms_registration.is_some() && !r14_transform_binding(c, args)?)
+        || ((c.get("r14_transforms").is_some() || args.r14_transforms_registration.is_some())
+            && !r14_transform_binding(c, args)?)
     {
         return Err("subjective registered cell/seed/full-budget/head binding differs".into());
     }
@@ -1653,6 +1654,55 @@ mod tests {
         std::fs::write(mask, b"changed").unwrap();
         assert!(r12_head_binding(&c, &args).is_err());
         std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn r14_authority_requires_its_flag_exact_table_and_unchanged_a_head() {
+        use clap::Parser;
+        let root = std::env::temp_dir().join(format!("r14-admission-{}", std::process::id()));
+        std::fs::create_dir_all(&root).unwrap();
+        let table = root.join("screen.tsv");
+        std::fs::write(
+            &table,
+            "feat_idx\tbest_transform\tparams_csv\tlift\n13\tsoft_clip\t0.5,0.5\t1\n",
+        )
+        .unwrap();
+        let mut args = super::super::Args::parse_from([
+            "trainer",
+            "--group",
+            "g:x:1:0",
+            "--out",
+            "o.bin",
+            "--nonneg-distance",
+            "--monotone-cbc",
+            "--nonneg-thresholds",
+            "--derived-inputs",
+            "fx2.json",
+        ]);
+        args.hidden = 128;
+        args.max_pairs = 32;
+        args.epochs = 120;
+        args.pairs_per_epoch = 50000;
+        args.max_features = 1853;
+        args.init_seed = Some(1101);
+        args.sample_seed = Some(101);
+        args.auto_transforms = Some(table.clone());
+        args.auto_transforms_min_lift = 0.005;
+        let c = json!({"width":1853,"feature_ids":vec![0;492],"seed_index":0,"route":"full",
+            "epochs":120,"pairs_per_epoch":50000,"selected_epoch":119,"init_seed":1101,"sample_seed":101,
+            "r14_transforms":{"registration":"5b5a013482db4944042883995ad6892f92244c69","arm":"T1b","table_sha256":hash(&table).unwrap()}});
+        assert!(run_binding(&c, &args, 1853, false).is_err());
+        args.r14_transforms_registration = Some("5b5a013482db4944042883995ad6892f92244c69".into());
+        assert!(run_binding(&c, &args, 1853, false).is_ok());
+        args.max_pairs = 31;
+        assert!(run_binding(&c, &args, 1853, false).is_err());
+        args.max_pairs = 32;
+        args.auto_transforms = None;
+        assert!(run_binding(&c, &args, 1853, false).is_err());
+        args.auto_transforms = Some(table.clone());
+        std::fs::write(&table, "changed table").unwrap();
+        assert!(run_binding(&c, &args, 1853, false).is_err());
+        std::fs::remove_dir_all(root).unwrap();
     }
 
     #[test]
