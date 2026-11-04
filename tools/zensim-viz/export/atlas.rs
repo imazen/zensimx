@@ -173,6 +173,9 @@ pub(crate) fn run(
             p.name.clone()
         });
         f["family"] = serde_json::json!(p.family);
+        f["signal"] = serde_json::json!(input.signal);
+        f["analysis_family"] = serde_json::json!(input.analysis_family);
+        f["short_name"] = serde_json::json!(input.short_name);
         f["scale"] = serde_json::json!(p.scale);
         f["channel"] = serde_json::json!(p.channel);
         f["pooling"] = serde_json::json!(p.statistic);
@@ -181,6 +184,14 @@ pub(crate) fn run(
         f["pooled_value"] = serde_json::json!(values[input.feature]);
         f["model_input_value"] = serde_json::json!(input.value(values));
         f["percentile"] = serde_json::json!(percentile);
+        let extrema = |values: &[f64]| {
+            [
+                values.iter().copied().fold(f64::INFINITY, f64::min),
+                values.iter().copied().fold(f64::NEG_INFINITY, f64::max),
+            ]
+        };
+        let mut bank_ranges = serde_json::Map::new();
+        bank_ranges.insert(bank.sha256.clone(), serde_json::json!(extrema(&column)));
         let mut percentiles = serde_json::Map::new();
         percentiles.insert(bank.sha256.clone(), serde_json::json!(percentile));
         for other in percentile_banks {
@@ -195,6 +206,7 @@ pub(crate) fn run(
                     }
                 })
                 .collect();
+            bank_ranges.insert(other.sha256.clone(), serde_json::json!(extrema(&values)));
             let below = values.iter().filter(|&&v| v < value).count();
             let equal = values.iter().filter(|&&v| v == value).count();
             percentiles.insert(
@@ -203,6 +215,7 @@ pub(crate) fn run(
             );
         }
         f["percentiles"] = serde_json::Value::Object(percentiles);
+        f["bank_ranges"] = serde_json::Value::Object(bank_ranges);
 
         if let Some(file) = f["map_file"].as_str() {
             f["map_file"] = serde_json::json!(format!("maps/{file}"));
