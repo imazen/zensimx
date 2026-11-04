@@ -146,18 +146,6 @@ impl InitialWeights {
         {
             return Err("initial checkpoint head, hidden size or activation differs".into());
         }
-        if model.feature_transforms().is_some()
-            || hp.feature_transforms.as_ref().is_some_and(|t| {
-                t.iter()
-                    .any(|&t| t != zenpredict::FeatureTransform::Identity)
-            })
-            || hp
-                .feature_transform_params
-                .as_ref()
-                .is_some_and(|p| p.iter().any(|p| !p.is_empty()))
-        {
-            return Err("initial checkpoint feature transforms are unsupported".into());
-        }
         let metadata = model.metadata();
         let declared_ids: Option<Vec<usize>> = zensim::declared_feature_ids(&model)
             .map(|ids| ids.into_iter().map(usize::from).collect());
@@ -245,6 +233,33 @@ impl InitialWeights {
         };
         if columns.len() != model.n_inputs() || columns.iter().any(|&c| c >= n_features) {
             return Err("initial checkpoint model-input layout differs".into());
+        }
+        if model.feature_transforms().is_some() || hp.feature_transforms.is_some() {
+            if hp.r14_transforms_registration.as_deref() != Some(super::transforms::REGISTRATION) {
+                return Err("initial checkpoint transforms require R14 registration".into());
+            }
+            if let Some(ts) = model.feature_transforms() {
+                super::transforms::validate(ts, model.feature_transform_params())?;
+            }
+            for (i, &c) in columns.iter().enumerate() {
+                let old = model
+                    .feature_transforms()
+                    .map_or(zenpredict::FeatureTransform::Identity, |t| t[i]);
+                let new = hp
+                    .feature_transforms
+                    .as_ref()
+                    .map_or(zenpredict::FeatureTransform::Identity, |t| t[c]);
+                let old_p = model
+                    .feature_transform_params()
+                    .map_or(&[][..], |p| p[i].as_slice());
+                let new_p = hp
+                    .feature_transform_params
+                    .as_ref()
+                    .map_or(&[][..], |p| p[c].as_slice());
+                if old != new || old_p != new_p {
+                    return Err(format!("initial checkpoint transform differs at input {i}"));
+                }
+            }
         }
         let weights = |layer: usize| -> Result<Vec<f64>, String> {
             match &model.layer(layer).weights {

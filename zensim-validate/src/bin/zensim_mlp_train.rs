@@ -589,6 +589,9 @@ struct Args {
     /// `benchmarks/v0_20_v0_21_design_2026-05-14.md`.
     #[arg(long, value_name = "TOKEN:IDX[:PARAMS]")]
     feature_transform: Vec<String>,
+    /// Exact R14 registration; transform table is additionally bound by the subjective authority.
+    #[arg(long)]
+    r14_transforms_registration: Option<String>,
 
     /// V0_20 input-shaping: auto-load per-feature transforms from a
     /// greedy-screen TSV (winning transform per feature with
@@ -2796,8 +2799,9 @@ fn preflight_cli_capabilities(args: &Args, matches: &clap::ArgMatches, want_gpu:
                 && !args.monotone_gated_products
                 && args.monotone_feature_mask.is_none()
                 && args.steer_pairs.is_none()
-                && args.feature_transform.is_empty()
-                && args.auto_transforms.is_none(),
+                && ((args.feature_transform.is_empty() && args.auto_transforms.is_none())
+                    || args.r14_transforms_registration.as_deref()
+                        == Some(mlp_train::transforms::REGISTRATION)),
             "--init-from/constant LR require the plain two-layer CPU head"
         );
         assert!(
@@ -2819,8 +2823,10 @@ fn preflight_cli_capabilities(args: &Args, matches: &clap::ArgMatches, want_gpu:
     }
     if args.nonneg_distance && args.monotone_cbc {
         assert!(
-            args.feature_transform.is_empty() && args.auto_transforms.is_none(),
-            "plain monotone N refuses feature transforms (E34 L identity contract)"
+            (args.feature_transform.is_empty() && args.auto_transforms.is_none())
+                || args.r14_transforms_registration.as_deref()
+                    == Some(mlp_train::transforms::REGISTRATION),
+            "plain monotone N transforms require R14 registration"
         );
     }
     if args.steer_pairs.is_some() {
@@ -3559,6 +3565,7 @@ fn main() {
         high_q_boost: args.high_q_boost,
         out_dtype,
         feature_transforms: None,
+        r14_transforms_registration: args.r14_transforms_registration.clone(),
         feature_transform_params: None,
         minibatch_size: args.minibatch_size.max(1),
         parallel_batch: args.parallel_batch,
@@ -3648,7 +3655,8 @@ fn main() {
                 });
             let refused = [
                 (selected_ids.as_deref() != Some(decl.direct.as_slice()), "--keep-features must list exactly the declared direct ids"),
-                (!args.feature_transform.is_empty() || args.auto_transforms.is_some(), "feature transforms"),
+                ((!args.feature_transform.is_empty() || args.auto_transforms.is_some())
+                    && args.r14_transforms_registration.as_deref() != Some(mlp_train::transforms::REGISTRATION), "unregistered feature transforms"),
                 (args.tv_pairs_file.is_some(), "--tv-pairs-file"),
                 (want_gpu, "the GPU runtime"),
                 (args.pool_head || args.hybrid_head || args.per_sample_alpha_head, "output heads"),
@@ -4100,6 +4108,42 @@ fn main() {
         std::process::exit(2);
     }
 
+    if let Some(path) = &args.init_from {
+        let bytes = std::fs::read(path).expect("initial checkpoint bytes");
+        let model = zenpredict::Model::from_bytes(&bytes).expect("initial checkpoint model");
+        if let Some(ts) = model.feature_transforms() {
+            assert_eq!(
+                args.r14_transforms_registration.as_deref(),
+                Some(mlp_train::transforms::REGISTRATION)
+            );
+            assert!(
+                args.feature_transform.is_empty() && args.auto_transforms.is_none(),
+                "continuation carries checkpoint transforms; do not rescreen or override them"
+            );
+            let columns: Vec<usize> = derived.as_ref().map_or_else(
+                || (0..n_features).collect(),
+                |(d, _)| d.kept_columns(args.max_features),
+            );
+            assert_eq!(columns.len(), ts.len());
+            for (i, &t) in ts.iter().enumerate() {
+                if t != zenpredict::FeatureTransform::Identity {
+                    let p = model
+                        .feature_transform_params()
+                        .map_or(&[][..], |p| p[i].as_slice());
+                    args.feature_transform.push(format!(
+                        "{}:{}:{}",
+                        t.as_token(),
+                        columns[i],
+                        p.iter()
+                            .map(ToString::to_string)
+                            .collect::<Vec<_>>()
+                            .join(",")
+                    ));
+                }
+            }
+        }
+    }
+
     // V0_20 input-shaping: parse `--feature-transform TOKEN:IDX[:PARAMS]`
     // repeating flags into a per-feature transform list. Default
     // is all-Identity. Apply transforms to feature_rows in-place so
@@ -4255,6 +4299,10 @@ fn main() {
             }
             transforms[idx] = transform;
             params[idx] = parsed_params;
+        }
+        if args.r14_transforms_registration.is_some() {
+            mlp_train::transforms::validate(&transforms, Some(&params))
+                .expect("R14 transform contract");
         }
         // Apply per-feature transforms in-place across every group's
         // feature_rows. The trainer's scaler sees the transformed

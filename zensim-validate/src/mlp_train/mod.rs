@@ -30,6 +30,7 @@
 mod capabilities;
 mod confidence_weights;
 mod contrast_precision;
+pub mod transforms;
 mod warm_start;
 pub use capabilities::validate_training_capabilities;
 
@@ -269,6 +270,8 @@ pub struct MlpHyperparams {
     /// the trainer receives). An all-`Identity` vector emits no
     /// metadata (consumers treat absence as all-identity).
     pub feature_transforms: Option<Vec<FeatureTransform>>,
+    /// Exact R14 registration authorization; absent preserves historical refusals.
+    pub r14_transforms_registration: Option<String>,
 
     /// V0_20 parameterized feature-transform params (added 2026-05-15).
     /// Parallel to `feature_transforms`; each inner `Vec<f32>` is the
@@ -1042,6 +1045,7 @@ impl Default for MlpHyperparams {
             high_q_boost: 1.0,
             out_dtype: WeightDtype::F32,
             feature_transforms: None,
+            r14_transforms_registration: None,
             feature_transform_params: None,
             minibatch_size: 1,
             parallel_batch: true,

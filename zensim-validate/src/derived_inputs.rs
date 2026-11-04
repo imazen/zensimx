@@ -307,8 +307,8 @@ impl Fx1Declaration {
                 self.products.len()
             ));
         }
-        if model.feature_transforms().is_some() {
-            return Err("fx1 compact: feature transforms are not supported".into());
+        if let Some(ts) = model.feature_transforms() {
+            crate::mlp_train::transforms::validate(ts, model.feature_transform_params())?;
         }
         if model
             .metadata()
@@ -374,6 +374,37 @@ impl Fx1Declaration {
             .iter()
             .map(|e| (e.key.to_string(), e.kind, e.value.to_vec()))
             .collect();
+        if let Some(ts) = model.feature_transforms() {
+            md.retain(|(k, _, _)| {
+                k != "zentrain.feature_transforms" && k != "zentrain.feature_transform_params"
+            });
+            md.push((
+                "zentrain.feature_transforms".into(),
+                zenpredict::MetadataType::Utf8,
+                rows.iter()
+                    .map(|&r| ts[r].as_token())
+                    .collect::<Vec<_>>()
+                    .join("\n")
+                    .into_bytes(),
+            ));
+            if let Some(ps) = model.feature_transform_params() {
+                md.push((
+                    "zentrain.feature_transform_params".into(),
+                    zenpredict::MetadataType::Utf8,
+                    rows.iter()
+                        .map(|&r| {
+                            ps[r]
+                                .iter()
+                                .map(ToString::to_string)
+                                .collect::<Vec<_>>()
+                                .join(",")
+                        })
+                        .collect::<Vec<_>>()
+                        .join("\n")
+                        .into_bytes(),
+                ));
+            }
+        }
         let read_set = self.read_set();
         md.push((
             zensim::ZENTRAIN_FEATURE_IDS_KEY.to_string(),
@@ -486,9 +517,12 @@ impl Fx1Declaration {
             for (j, &[a, b]) in self.products.iter().enumerate() {
                 ext[base + j] = product_f32(row[a] as f32, row[b] as f32);
             }
-            let want = predictor
-                .predict(&ext)
-                .map_err(|e| format!("fx1 gate: original forward: {e:?}"))?[0];
+            let want = if orig.has_nontrivial_feature_transforms() {
+                predictor.predict_transformed(&ext)
+            } else {
+                predictor.predict(&ext)
+            }
+            .map_err(|e| format!("fx1 gate: original forward: {e:?}"))?[0];
             let got = scorer
                 .score_features(&row, 0, 0, None)
                 .map_err(|e| format!("fx1 gate: compact forward: {e}"))?;

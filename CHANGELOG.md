@@ -19,6 +19,8 @@
 
 ### QUEUED BREAKING CHANGES
 
+- Unpublished `zensim-validate`: explicit `MlpHyperparams` literals gain `r14_transforms_registration`; `None` preserves the historical transform refusal. R14 requires its registered smooth, zero-preserving transform table.
+
 - Unpublished `zensim-validate`: explicit `TvRegularizer` struct literals gain `pool` and `level` (`false` and `None` keep the earlier behavior; `2857ca0c`, two integration tests updated in `0ee6c5ea`).
 
 - Unpublished `zensim-validate`: explicit `MlpHyperparams` struct literals gain the owner-approved `init_from` and `constant_lr` fields (`None` and `false` preserve default behavior). Supported serving-crate APIs are unchanged.

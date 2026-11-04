@@ -80,6 +80,26 @@ def r12_head_binding(cell, recipe):
     return True
 
 
+R14_REGISTRATION = "5b5a013482db4944042883995ad6892f92244c69"
+
+
+def r14_transform_binding(cell, recipe):
+    r = cell.get("r14_transforms")
+    if r is None:
+        return False
+    if (r.get("registration") != R14_REGISTRATION or r.get("arm") not in ("T1a","T1b","T1c","T2")
+            or len(r.get("table_sha256", "")) != 64
+            or cell.get("width") != 1853 or len(cell.get("feature_ids",[])) != 492
+            or cell.get("seed_index") not in (0,1,2)
+            or recipe.get("hidden") != 128 or recipe.get("max_pairs") != 32
+            or not recipe.get("mono_all") or not recipe.get("thresholds")
+            or recipe.get("derived_inputs") != "fx2"
+            or any(recipe.get(k) for k in ("ramps","free_ramps","gated_products"))
+            or "r12_linear" in cell or "r13_width" in cell):
+        raise ValueError("R14 registered transform/head binding differs")
+    return True
+
+
 def command_binding(authority_path,pin,cell_id,init_seed,sample_seed,width,head,recipe):
     authority = document(authority_path,pin)
     c = authority["cells"][cell_id]
@@ -90,7 +110,8 @@ def command_binding(authority_path,pin,cell_id,init_seed,sample_seed,width,head,
             or (c["epochs"],c["pairs_per_epoch"],c["selected_epoch"])!=(120,50000,119)
             or (c["init_seed"],c["sample_seed"])!=(init_seed,sample_seed)
             or width!=expected_width or head!="N"
-            or (not r13_head_binding(c, recipe or {}) if "r13_width" in c else
+            or (not r14_transform_binding(c, recipe or {}) if "r14_transforms" in c else
+                not r13_head_binding(c, recipe or {}) if "r13_width" in c else
                 not r12_head_binding(c, recipe or {}) if "r12_linear" in c else (recipe or {}).get("hidden",32)!=128)):
         raise ValueError("subjective registered cell/seed/full-budget/head binding differs")
 

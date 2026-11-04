@@ -215,6 +215,57 @@ fn r13_head_binding(c: &Value, args: &super::Args) -> Result<bool, String> {
     Ok(true)
 }
 
+// R14 keeps the exact A head; only its pinned input-transform table differs.
+fn r14_transform_binding(c: &Value, args: &super::Args) -> Result<bool, String> {
+    let Some(r) = c.get("r14_transforms") else {
+        if args.r14_transforms_registration.is_some() {
+            return Err("R14 transform authority required".into());
+        }
+        return Ok(false);
+    };
+    if r["registration"] != "5b5a013482db4944042883995ad6892f92244c69"
+        || args.r14_transforms_registration.as_deref()
+            != Some("5b5a013482db4944042883995ad6892f92244c69")
+        || !matches!(r["arm"].as_str(), Some("T1a" | "T1b" | "T1c" | "T2"))
+        || c["width"] != 1853
+        || c["feature_ids"].as_array().is_none_or(|v| v.len() != 492)
+        || c["seed_index"].as_u64().is_none_or(|v| v > 2)
+        || args.hidden != 128
+        || args.max_pairs != 32
+        || !args.monotone_cbc
+        || !args.nonneg_distance
+        || !args.nonneg_thresholds
+        || args.n_hidden_layers != 1
+        || args.derived_inputs.is_none()
+        || args.monotone_ramps != 0
+        || args.free_ramps != 0
+        || args.monotone_gated_products
+        || args.monotone_strict
+        || args.monotone_feature_mask.is_some()
+        || c.get("r12_linear").is_some()
+        || c.get("r13_width").is_some()
+        || !args.feature_transform.is_empty()
+    {
+        return Err("R14 registered transform/head binding differs".into());
+    }
+    if args.init_from.is_none() {
+        let table = args
+            .auto_transforms
+            .as_ref()
+            .ok_or("R14 pinned screen table required")?;
+        if r["table_sha256"] != hash(table)?
+            || args.auto_transforms_min_lift != 0.005
+            || args.auto_transforms_max_features != 0
+            || args.auto_transforms_max_feature_idx != 0
+        {
+            return Err("R14 screen table or admission options differ".into());
+        }
+    } else if args.auto_transforms.is_some() {
+        return Err("R14 continuation carries checkpoint transforms without rescreening".into());
+    }
+    Ok(true)
+}
+
 fn run_binding(
     c: &Value,
     args: &super::Args,
@@ -272,8 +323,9 @@ fn run_binding(
         || args.sample_seed.is_none()
         || !args.nonneg_distance
         || args.nonneg_pin != 100.
-        || !args.feature_transform.is_empty()
-        || args.auto_transforms.is_some()
+        || ((!args.feature_transform.is_empty() || args.auto_transforms.is_some())
+            && !r14_transform_binding(c, args)?)
+        || (args.r14_transforms_registration.is_some() && !r14_transform_binding(c, args)?)
     {
         return Err("subjective registered cell/seed/full-budget/head binding differs".into());
     }
