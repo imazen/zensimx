@@ -4215,3 +4215,7 @@ a-family-cost-verify view summary out:
 a-family-cost-shared study:
     python3 scripts/bench/a_family_cost_shared_run.py {{quote(study)}}
 
+# The caller supplies the measurement host's flock/run-heavy wrapper.
+a-family-cost-copy source destination:
+    rsync -a --no-owner --no-group --exclude scratch --exclude __pycache__ --exclude .workongoing --exclude control --rsync-path='nice -n19 ionice -c3 rsync' {{quote(source)}}/ {{quote(destination)}}/
+

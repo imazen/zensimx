@@ -77,7 +77,8 @@ def main():
             bootstrap = ([statistics.mean(rng.choices(deltas, k=len(deltas))) for _ in range(10000)]
                          if len(deltas) >= 2 else [])
             cells.append(dict(size=size, threads=threads, images=len(files),
-                              state="not collected on this host" if outside else "measured" if len(files) == 20 else "partial or not measured (contended)",
+                              state=("not collected on this host" if outside else "measured" if len(files) == 20
+                                     else "partial (contended)" if files else "not measured (contended)"),
                               retained_rounds=retained, excluded_rounds=excluded,
                               pixel_min=min(pairs[k]["width"] * pairs[k]["height"] for k in expected),
                               pixel_max=max(pairs[k]["width"] * pairs[k]["height"] for k in expected),
@@ -112,11 +113,13 @@ def main():
     print("\nFull minus reduced: mean of admitted within-image median differences; image-cluster bootstrap 95% CI.")
     for row in cells:
         if row["paired_median_saving_ms_ci95"] is None:
-            print(f'{row["size"]}/{row["threads"]}t: not measured (contended)')
+            print(f'{row["size"]}/{row["threads"]}t: {row["state"]}; CI unavailable')
             continue
         lo, hi = row["paired_median_saving_ms_ci95"]
         print(f'{row["size"]}/{row["threads"]}t: {row["paired_median_saving_ms_mean"]:.6f} ms [{lo:.6f}, {hi:.6f}]')
-    print(f'\nMissing image/thread records: {len(selection["missing"])}/160')
+    outside_count = sum(r["state"] == "not collected on this host" for r in selection["missing"])
+    print(f'\nNot measured (contended) on this host: {len(selection["missing"]) - outside_count}/160; '
+          f'not collected on this host: {outside_count}/160')
 
 
 if __name__ == "__main__":

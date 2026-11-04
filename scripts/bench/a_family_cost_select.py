@@ -30,6 +30,8 @@ def main():
             cell = f"{size}-{threads}t"
             states = [(attempt, *cell_status(attempt, size, threads, epoch)) for attempt in attempts]
             for pair in [r for r in pairs if r["size"] == size]:
+                native_attempts = sum((attempt / f"timing/{cell}/{pair['id']}.json").exists() for attempt in attempts)
+                assert native_attempts <= 3, "primary + at most two retries across both hosts"
                 candidates, reasons = [], []
                 attempted_rounds = flagged_rounds = 0
                 for attempt, valid_images, mode in states:
@@ -50,8 +52,10 @@ def main():
                         attempted_rounds += 32
                         clean = sum(s["gate_clean"] for s in group["samples"])
                         flagged_rounds += 32 - clean
-                        reason.update(timestamp=row["timestamp"], clean=clean, unreliable=row["unreliable"])
-                        if pair["id"] in valid_images and not row["unreliable"]:
+                        admitted = pair["id"] in valid_images and not row["unreliable"]
+                        reason.update(timestamp=row["timestamp"], clean=clean, unreliable=row["unreliable"],
+                                      image_admitted=admitted, qualifying_rounds=clean if admitted else 0)
+                        if admitted:
                             for index, sample in enumerate(group["samples"]):
                                 if sample["gate_clean"]:
                                     candidates.append((row["timestamp"], index, str(path), hashlib.sha256(data).hexdigest(), sample, valid_images[pair["id"]]["admission_mode"]))
@@ -60,6 +64,7 @@ def main():
                     reasons.append(reason)
                 candidates.sort(key=lambda r: (r[0], r[1], r[2]))
                 evidence = dict(cell=cell, case=pair["id"], clean_available=len(candidates),
+                                native_attempts_across_hosts=native_attempts,
                                 attempted_rounds=attempted_rounds, flagged_rounds=flagged_rounds, attempts=reasons)
                 if len(candidates) < 16:
                     outside = a.host == "i270" and size in ["64", "256"]

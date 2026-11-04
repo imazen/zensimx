@@ -25,6 +25,12 @@
 
 ### Added
 
+- Unpublished public-A extraction-cost instrument, bounded shared-host admission,
+  perf attribution and independent retained-round verification (`61d77a13`,
+  `c61394e6`, `915cbfcd`). The [cost report](benchmarks/a_family_extraction_cost_2026-11-04.md)
+  records 155/160 qualified image/thread pairs and five contended gaps. Removing
+  the 156 reads skips no extraction pass; feature arithmetic and model bytes are unchanged.
+
 - Research R12: registered dense and top-eight-family non-negative linear heads over the adopted mix inputs; explicit H1 admission preserves historical architecture and population guards (`b901766a`).
 
 - Unpublished paired speed instrument for frozen public A, fast-ssim2 0.9.1

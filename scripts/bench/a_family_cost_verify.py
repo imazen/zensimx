@@ -86,7 +86,8 @@ def main():
     receipt = dict(numpy=np.__version__, provisional=selection["provisional"],
                    images_verified=len(selection["chosen"]), source_files_verified=len(source_cache),
                    paired_rounds_verified=16 * len(selection["chosen"]),
-                   percentile_cells_verified=len(summary["cells"]), fits_verified=len(summary["fits"]),
+                   percentile_cells_verified=len(summary["cells"]), fit_rows_checked=len(summary["fits"]),
+                   numeric_fits_verified=sum(row["alpha_ms"] is not None for row in summary["fits"]),
                    identical_producer_manifests_verified=len(request_folders),
                    status="passed")
     args.out.write_text(json.dumps(receipt, indent=2) + "\n")
