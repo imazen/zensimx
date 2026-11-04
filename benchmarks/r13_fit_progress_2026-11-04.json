@@ -5,7 +5,7 @@
   "reporting_source_sha256": "486816c73509c148bee363fb4e4b8ce0f5c02197abc49b2a25f447118d532949",
   "trainer_source_scope": "original numerical source; W4 adds its separately registered admission overlay",
   "wall_time_method": "sum of recorded GNU time payload elapsed fields; queued waits excluded; stage strings retain printed precision",
-  "complete_fits": 4,
+  "complete_fits": 5,
   "required_fits": 6,
   "models": [
     {
@@ -171,10 +171,50 @@
       "finished": "2026-11-04T22:18:40.792970+00:00",
       "native_trainer_sha256": "267a3492e14bd2c2988e49a056b9a1840b188aada796804974f635b733c670cf",
       "admission_registration": "25e772922fd5a40d576e12af47778ce81bed5e08"
+    },
+    {
+      "name": "W16-s0",
+      "hidden": 16,
+      "initial_max_pairs": 4,
+      "seed": 0,
+      "packed_sha256": "472e51b0ff8f4f6a4828ef2a75e9250658c41bc5f7f0f427d7ea833b9cdbcf3c",
+      "packed_bytes": 34623,
+      "certified": true,
+      "certified_max_pairs": 1,
+      "capacity": {
+        "dead": 11,
+        "residual": 3,
+        "live": 2
+      },
+      "wall_seconds_excluding_lock_waits": 482.5,
+      "stage_times": [
+        {
+          "stage": "base",
+          "seconds": 301.83,
+          "elapsed": "5:01.83"
+        },
+        {
+          "stage": "continuation",
+          "seconds": 180.15,
+          "elapsed": "3:00.15"
+        },
+        {
+          "stage": "pack",
+          "seconds": 0.52,
+          "elapsed": "0:00.52"
+        }
+      ],
+      "resource_receipts": {
+        "base": "run-heavy: done rc=0 302s | peak-RSS 2.05GiB | min-avail 38630MiB | peak-load 2.07",
+        "continuation": "run-heavy: done rc=0 180s | peak-RSS 2.05GiB | min-avail 38708MiB | peak-load 1.90",
+        "pack": "run-heavy: done rc=0 1s | peak-RSS 0.28GiB | min-avail 40536MiB | peak-load 1.43"
+      },
+      "finished": "2026-11-04T22:26:49.214759+00:00",
+      "native_trainer_sha256": "267a3492e14bd2c2988e49a056b9a1840b188aada796804974f635b733c670cf",
+      "admission_registration": "25e772922fd5a40d576e12af47778ce81bed5e08"
     }
   ],
   "pending": [
-    "W16-s0",
     "W4-s0"
   ],
   "omitted": [
