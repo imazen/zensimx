@@ -2085,6 +2085,11 @@ arm built from `60223363` (`73209d64…`), so the `HdrFrontEnd` refactor changed
 4Kdtb-r1 96 rows (features `9c9bd0d1…`), ladders-r1 10,422 (`992e442b…`), teacher-train-r1 7,390 (`742fd8f3…`),
 teacher-val-r1 3,900 (`ce52c268…`), UPIQ-380 (`upiq/arm-cube-root-203/bank`). The 100 cd/m² reserve was not extracted.
 
+**Owner decisions (2026-11-04, after step 1):** the public release names the adopted model **A** (research F → public
+A; public profile letters restart with 0.3.0, so public names and research names are separate namespaces and the
+mapping is written in the public crate's `docs/PROFILES.md`); **no codec variant** ships (R11 stands); work on this
+record stops when the session's token budget reaches 36 percent used, with mechanical lanes on cheaper models.
+
 **Step 2 registration (2026-11-04, before any fit, dev-fold score or checkpoint selection).** *Root:* the adopted mix's
 base root `/var/tmp/byc-fchroma-20261029/r3/w100/root` (frozen `14f53dac…`; the MixF3 recipe: `--human-sources tid2013
 --exclude-datasets pipal,live-md,cid-iq,cid-oa,irccyn-ivc,colourlab-rating-variability-2022 --mos-share 36.035`, spec
@@ -2106,3 +2111,14 @@ strip. *Reads* as registered above; their label exposure is registered in `docs/
 control and the four dev fits run together, then the three seeds, then the three continuations: about 1.75 h on dev. No
 trainer profiling pass: the trainer's numerics are pinned by the control, and a faster build would have to reproduce the
 same bytes.
+
+**Step 2, phase A result (2026-11-04, 10:10–10:40Z on dev; `/var/tmp/byc-hdr-20261104/`).** Trainer NEWBIN
+`zensim_mlp_train` sha256 `57a8d54b…` built from zensimx `b4dde3b9` (the producer-set commit); support binaries the
+r10 `bin-map` set (`bin/BIN_SHA256SUMS`). **Control passed:** the mix's seed-0 base fit retrained on the parent root gave
+stripped `refit/last.bin` `6ce7a42e37b72904…`, the recipe's value, so main's trainer and scripts (with the experiment-5
+options ported) reproduce the adopted model byte for byte. Derived roots `roots/mix-cr203-{s05,s10}{,-f0,-f1}`
+(`hdr_root.py --front-end cube-root:203`, legs admitted by the Python and Rust admissions under the new producer set).
+**Dev-fold rule (`hdr_select.py`, `SELECTION_hc1.json`):** s05 statistic 0.9719 (ladders 0.9551, teacher 1.0000, UPIQ
+0.9606; 4Kdtb report-only, 0.9137 / 0.9006 at s05 / s10 fold 0), s10 0.9713 (0.9530 / 1.0000 / 0.9608): **scale 0.5
+chosen**, as P3 chose on the PU21 banks. Five single-thread fits took 28–31 min each in parallel (whole phase 1,878 s,
+peak RSS 1.97 GiB). Phase B (three seeds at s05, then the continuations, pack, strip) started 10:40:45Z.
