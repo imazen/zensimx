@@ -45,6 +45,22 @@ def pack(arm):
 
 
 def fit(arm):
+    pins=json.loads((O/'SOURCE_PINS.json').read_text())
+    screen=json.loads((O/'screen/SUMMARY.json').read_text())
+    proof=json.loads((O/'native-noop/PROOF.json').read_text())
+    if (owner.sha(O/'bin/zensim_mlp_train')!=pins['binary_sha256']['zensim_mlp_train']
+            or owner.sha(O/f'screen/{arm}.tsv')!=screen['tables'][arm]['sha256']
+            or proof['source_commit']!=pins['source_commit']
+            or proof['new_tool']['sha256']!=pins['binary_sha256']['predict_features_with_bake']
+            or set(proof['banks'])!=set(owner.BANKS)
+            or any(any(b['differences'].values()) for b in proof['banks'].values())):
+        raise ValueError('fit requires frozen screen, native trainer and complete exact A no-op proof')
+    for relative in ('r14_transforms_fit.py','v2_confirm_fit.py','v2_lodo_mlp.py',
+                     'v2_production_pack.py','subjective_training_leg.py',
+                     'v2_teacher.py','v2c_wide.py','v2_common.py'):
+        source=f'scripts/rev4_featpot/{relative}'
+        if owner.sha(X/source)!=pins['source_sha256'][source]:
+            raise ValueError(f'fit owner changed since native freeze: {source}')
     cell=O/f'fits/{arm}-s0';cell.mkdir(parents=True,exist_ok=True)
     if (cell/'FIT.json').exists():raise ValueError('fit already frozen; preserve it')
     owner.job(f'{arm}-s0-base',args_for(arm,cell/'base')+['--pack-production','--e33-output-stage'])
