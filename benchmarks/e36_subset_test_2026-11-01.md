@@ -2442,3 +2442,96 @@ registered seeds (candidate seed 0; A seeds 0–2), with the same source bootstr
 The report contains seed-0 candidate rows and explicitly marks all ten omitted
 cells; candidate across-seed stability is unmeasured. No R13 EVAL or gate result
 has been read or used for this cut, and no new selection rule is introduced.
+
+
+### R14 registration (2026-11-04, before screening, fitting or assessment): smooth per-input transforms
+
+Owner requests transforms on A's 984 caller inputs: 492 declared damage values
+and their 492 fx2 fragility products. Order is products → per-input transform →
+scale-only standardization → network → common output stage/dial. Thus t(D·R),
+not t(D)·R. Use existing ZNPR v3 metadata, without a format or dependency-pin change.
+Pinned zenpredict/zenpredict-bake f0903489300aea240ffae2e3f1359f8f2b9a0ba4
+contains Yeo-Johnson, soft_clip and soft_sign.
+
+**Requirements, corrected by the coordinator before registration:** R1 increasing
+on each input's domain; R2 t(0)=0; R3 C¹ on [0,∞), finite positive one-sided
+slope at zero and strictly positive derivative everywhere (no dead zones, flats
+or steps); R4 an existing token with finite, validated parameters. Allowed:
+identity, log1p, signed_log1p, yeo_johnson with one finite lambda, soft_clip with
+positive knee and soft, soft_sign with positive scale. Their analytic slopes at
+zero are respectively 1,1,1,1,1,1/scale; record these in the native certificate.
+Reject signed_pow (including the redundant p=1 token), signed_sqrt, signed_cbrt,
+clip_then_log1p, winsor variants/stacks, quantile_bins, sinusoidal, drop and log.
+The original root arms were inconsistent with finite runtime gradients at zero;
+no root-transform exception is authorized. Numerical plateaus are measured by
+the unchanged product gates, never excused by an analytic certificate.
+
+A is the frozen mixF3 control, never refitted. Same MixF3 seed-0 recipe as R13:
+W128,32 max pairs, 120 base epochs/fixed epoch119; same admitted TRAIN root
+`/var/tmp/byc-fchroma-20261029/r3/w100/root`, 492 damage columns from
+`~/tmp/hc1-profile/cols_fx2.txt`, TID2013 plus MDID mix, MOS share36.035 and
+exclusions pipal,live-md,cid-iq,cid-oa,irccyn-ivc,colourlab-rating-variability-2022.
+Then the original AIC-2026 public_train ×256 continuation with full rehearsal,
+60 epochs, constant lr1e-5/fixed epoch59. Inherit targets, group weights,
+samplers and seed streams; do not select on EVAL. Densify, f16 pack (protect
+last layer), preserve all984 inputs, CID22 TRAIN dial calibration, E33 identity
+knot/tail factor2, and certify-monotone through the existing owners.
+
+Screen the pooled base-recipe TRAIN rows only (positive training mass, zero
+validation-only groups), with the trainer's stored `human_score` target in
+score-point units (`--target-scale 1`). No development rows enter transform
+statistics or the screen, including marginal MLE. Record exact groups, rows,
+source hashes, input order and any negative-valued input. Use signed variants
+or identity for unsupported negative domains. Near-constant variance<1e-10
+inputs stay identity, matching the existing MLE screen. Zero/nonpositive
+percentile knees or scales are invalid candidates and stay identity when no
+positive allowed candidate remains; never substitute an unregistered epsilon.
+
+- **T1a:** label-free marginal Yeo-Johnson MLE on TRAIN, using the existing
+  screen's bounded [-2,2] golden-section search (tolerance1e-5). Record each
+  input's TRAIN p50 beside lambda, plus the lambda histogram: the unit shift
+  makes this transform nearly linear for small-scale inputs.
+- **T1b:** soft_clip per input with knee=TRAIN p50,soft=knee. This is an
+  identity core and smooth logarithmic tail, chosen without labels.
+- **T1c:** existing greedy Pearson screen, min lift0.005, revised allow-list:
+  soft_clip knee in TRAIN {p25,p50,p75,p90},soft=knee; soft_sign scale in
+  {p50,p75,p90}; T1a's fitted Yeo-Johnson lambda; log1p and signed_log1p.
+  Retain identity below lift; record every chosen token/parameter and counts.
+- **T2 conditional:** best T1 is lowest row-pooled teacher-development MAE
+  against the stored score-point `human_score`, using final packed bakes;
+  ties use T1a,T1b,T1c order. Run only if that MAE <= frozen A seed0's MAE
+  on the identical rows (zero allowance). This is TRAIN-side feasibility,
+  not EVAL selection; report groupwise and pooled errors. Learn log(knee)
+  for soft_clip slots of that initialized arm, soft=knee, projected to each
+  input's positive TRAIN p05..p99 interval. Other chosen kinds stay fixed.
+  Empty/invalid learnable intervals are recorded and held fixed. If the best
+  arm has no eligible soft_clip slots, report that no T2 parameter is available.
+  No additional arm, initialization or parameter family is inferred from EVAL.
+- **Seeds1–2:** only after seed0 passes G-CHROMA-L,G-STEER,C1–C6,G-ADDR and
+  strictly improves A's development MAE; report evidence in chat and obtain
+  the owner's cost decision before launching these seeds.
+
+Per fit report measured wall/resource receipts, model hashes, dead/residual/live
+units, largest live max-pair share and inputs carrying50/90/99% ablation mass,
+using R13's definitions/banks. Freeze final fitted bakes before assessment.
+Reads exactly R12/R13 beside frozen A seeds0–2 and available R13 seed0 arms:
+held-out EVAL collections/full compression/non-codec panels; E36 selection-source
+inversion share; G-CHROMA-L; G-STEER; C1–C6 standard/ladder grids; G-ADDR;
+identity; NEARID; HDR evidence and UPIQ-all on cube-root:203 alias banks.
+Reuse exposure is disclosed in DATA_SPLITS before assessment. No CLIC,CIQA,
+MMSPG,public_test or other sealed confirmation read is reopened. No AIC-2026
+statistics are committed. No read selects a fit, transform or threshold.
+
+Before fits: >=100 transformed-derived fixture rows must match zenpredict's
+expanded-vector input/output (exact bits or a justified stated tolerance), all
+A goldens/split_parity_golden must retain exact bits without transforms, and
+transformed gradients/certificates must pass. Report parity,no-op proof and
+T1c selection in chat after step3 lands; report wall time/capacity after the
+first fit and continue. Build/test loop on zen-arm-xl; final builds,fits,reads
+on dev under shared heavy.lock/run-heavy24G; head timing A-paired on i270 only
+under its heavy.lock/run-heavy16G (not measured if busy beyond one hour).
+Artifacts: `/var/tmp/byc-transforms-20261104/`, checksum mirror
+`/mnt/tower/output/zensim/r14-transforms-20261104/`. Report full comparisons,
+limits and verdict in `benchmarks/r14_input_transforms_2026-11-04.md`.
+The public crate (imazen/zensim) is untouched: 0.3.0 ships A without transforms;
+porting transform support to its derived path is a later follow-up.
