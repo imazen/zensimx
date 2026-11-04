@@ -133,3 +133,9 @@ The running instrument was frozen from the initial flat bench-source path.
 The tracked source was subsequently moved byte-for-byte into a nested file
 to avoid parent-package auto-discovery; the matrix continues using the same
 archived executable. This path change alters no scoring or timing code.
+
+Frozen matrix executable SHA-256: `489a3ceabf0b85abbf58129309d922129f99fa94309aae73fdcf77b6b2284c3b`. The unchanged
+instrument source SHA-256 is
+`909a10de480398a3902a2c18e44d75937d2ab9cf1ea4d32c25249ca01d5ba456`.
+The initial harness commit is `446f9e7b`; the archive retains Cargo’s full
+`compiler-artifact` record and build logs for that executable.
