@@ -4212,6 +4212,24 @@ r13-width-python-check:
     env TMPDIR="$HOME/tmp/zensim-width" python3 -B -m unittest discover -s scripts/tests -p test_subjective_training_leg.py
     env TMPDIR="$HOME/tmp/zensim-width" python3 -B -m unittest discover -s scripts/tests -p test_r13_width.py
 
+r13-width-capacity:
+    python3 -B scripts/byconstruction/r13_width_analysis.py capacity
+
+r13-width-development:
+    python3 -B scripts/byconstruction/r13_width_analysis.py development
+
+r13-width-heads:
+    python3 -B scripts/byconstruction/r13_width_analysis.py heads
+
+r13-width-reads:
+    python3 -B scripts/byconstruction/r13_width_reads.py
+
+r13-width-tables output:
+    python3 -B scripts/byconstruction/r12_linear_tables.py --root /var/tmp/byc-width-20261104 --arms F,W16,W32,W64,W256,W512 --title 'R13 measured read tables' --out {{quote(output)}}
+
+r13-width-status:
+    python3 -B scripts/byconstruction/r13_width_status.py
+
 
 
 a-family-cost-report study out host:

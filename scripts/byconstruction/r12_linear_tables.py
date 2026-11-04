@@ -18,17 +18,21 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument('--root', type=Path, required=True)
     ap.add_argument('--with-extra', action='store_true')
+    ap.add_argument('--arms', help='explicit frozen arm inventory, including F control')
+    ap.add_argument('--title', default='R12 measured read tables')
     ap.add_argument('--out', type=Path, required=True)
     a = ap.parse_args()
     root = a.root
     arms = ['F', 'L1', 'L2', 'L3']
     if a.with_extra:
         arms = ['F', 'L0', 'L1', 'L2', 'L3', 'L4']
+    if a.arms:
+        arms = a.arms.split(',')
     def reads(arm):
         return root / ('extra/reads' if arm in ('L0', 'L4') else 'reads')
     def names(arm, sep='_s'):
         return [f'{arm}{sep}{s}' for s in range(3)]
-    lines = ['# R12 measured read tables', '',
+    lines = [f'# {a.title}', '',
              'A is the registered F baseline. Cells are seed means unless seed values are separated by `/`.',
              'No across-seed interval is implied. Per-seed whole-reference/family intervals remain in the native read JSON.', '']
     def table(title, labels, rows):
@@ -77,7 +81,7 @@ def main():
         values = []
         for arm in arms:
             if arm == 'F':
-                v = chroma[arm]['candidates']['L1_s0']['per_family'][family]['mae_baseline']
+                v = next(iter(chroma[arm]['candidates'].values()))['per_family'][family]['mae_baseline']
             else:
                 v = mean(chroma[arm]['candidates'][n]['per_family'][family]['mae_candidate'] for n in names(arm))
             values.append(f'{v:.6f}')

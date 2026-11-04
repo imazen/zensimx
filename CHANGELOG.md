@@ -25,6 +25,9 @@
 
 ### Added
 
+- Research R13: preregistered proportional hidden widths with separate Python/native
+  admission, preserving the inherited H128 and R12 contracts (`25e77292`, `ccdb5c7a`).
+
 - Unpublished public-A extraction-cost instrument, bounded shared-host admission,
   perf attribution and independent retained-round verification (`61d77a13`,
   `c61394e6`, `915cbfcd`). The [cost report](benchmarks/a_family_extraction_cost_2026-11-04.md)

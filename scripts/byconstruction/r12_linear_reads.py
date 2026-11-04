@@ -20,6 +20,7 @@ def main():
     ap.add_argument('--out', type=Path, required=True)
     ap.add_argument('--models', type=Path, required=True)
     ap.add_argument('--only', default='eval,e36,chroma,steer,dial,nearid,hdr')
+    ap.add_argument('--include-model', help='run pixel gates only for this frozen model; retain full model pins')
     a = ap.parse_args()
     x = Path(__file__).resolve().parents[2]
     out = a.out.resolve()
@@ -114,6 +115,8 @@ def main():
     tools = '/var/tmp/byc-fx2-20261028/stage2/gate-tools-d02d2e07'
     instruments = '/var/tmp/byc-fx2-20261028/stage2/fx2-gate-instruments-run02'
     for n,p in models.items():
+        if a.include_model and n != a.include_model:
+            continue
         if 'steer' in todo:
             run(f'steer-{n}',[py,scripts/'gates_steer_sharded.py','--name',n,'--model',p,'--out',out/f'gates/{n}',
                               '--bin',tools+'/steer_instrument','--formula-rev','7','--shards','9'])
