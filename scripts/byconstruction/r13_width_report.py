@@ -41,6 +41,7 @@ def main():
            f"W4 uses numerical source `{native['numerical_source_commit']}` with the sole Rust overlay",
            f"`{native['sole_rust_overlay']}` for its amendment-bound admission. Its trainer SHA-256 is",
            f"`{native['native_sha256']}`; complete file/binary pins are in `W4_SOURCE_PINS.json`.",
+           f"Its admission/build source is `{native['admission_source_commit']}`.",
            'Owner defines width as pairs = width/4: half the units form max pairs, half retain A’s ordinary threshold role.',
            'W16 and W32 cannot keep 32 pairs, so this comparison is proportional by construction.','',
            'Width also changes the canonical Xavier scales and the number of initialization RNG draws:',
@@ -84,7 +85,7 @@ def main():
                 mass=np.cumsum(effects)
                 c=dict(dead=int(dead.sum()),residual=int(residual.sum()),live=int((~dead&~residual).sum()),
                        largest_pair_share=max(shares),concentration={str(p):int(np.searchsorted(mass,p*sum(effects))+1) for p in (.5,.9,.99)})
-                level='reference seed'
+                level='reference A0' if seed==0 else 'not rescored by this gate'
                 head='paired A0 below' if seed==0 else 'not timed'
                 wall='not refitted'
             else:
@@ -120,6 +121,18 @@ def main():
               '256 fixed positive logical rows, one call thread, default native dispatch, same clean-round indices.',
               'Includes scaling/network forward; excludes extraction, derived products and dial. These are paired',
               'descriptive means; no pooled confidence interval or full-image speed claim is implied.','',
+              '## Capacity on the HDR TRAIN feature bank','',
+              'These are label-free forward/ablation diagnostics on the registered TRAIN bank, separate from the HDR quality panel.',
+              'Structural counts use the same fixed weights as the CID22 table; contributions and interventions use this bank’s rows.','',
+              '| Width | Seed | Rows | Live max pairs | Largest pair (%) | Inputs 50/90/99% |',
+              '|---|---:|---:|---:|---:|---|']
+    for row in compact:
+        c=cap[f"hdr/W{row['width']}_s{row['seed']}"]
+        share=f"{100*c['largest_pair_share']:.8f}" if c['largest_pair_share'] is not None else 'undefined'
+        concentration='/'.join(str(c['concentration'][str(p)]) if c['concentration'][str(p)] is not None else 'undefined'
+                               for p in (.5,.9,.99))
+        lines.append(f"| {row['width']} | {row['seed']} | {c['rows']} | {c['live_pairs']} | {share} | {concentration} |")
+    lines += ['',
               'Full EVAL, E36, chroma, steering, C1–C6, identity, NEARID and five-view HDR tables:',
               '[R13 measured reads](r13_hidden_width_reads_2026-11-04.md). HDR uses the registered cube-root:203 banks,',
               'raw historical native scores before the dial, exactly as R12. HDR is report-only; no HDR leg was fitted.',
@@ -133,7 +146,7 @@ def main():
               '`/mnt/tower/output/zensim/r13-width-20261104/`; verification receipt `ARCHIVE_VERIFIED.json`.',
               'Every base/continuation/pack/audit/read job takes and releases the shared heavy lock individually.','',
               '## Per-job resource receipts','']
-    for path in sorted((O/'logs').glob('*.log')):
+    for path in sorted((O/'logs').glob('*.log'))+[O/'w4-build.log']:
         for line in path.read_text(errors='replace').splitlines():
             if line.startswith('run-heavy: done'):
                 lines.append(f"- `{path.name}`: {line}")
