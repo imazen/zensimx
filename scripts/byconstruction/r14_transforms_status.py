@@ -35,9 +35,26 @@ def main():
     receipt=root/'logs'/f"{active.get('stage')}.receipt.json"
     result=json.loads(receipt.read_text()) if receipt.exists() else None
     lock_state=compute_lock(active.get('pid',0))
+    holders=[]
+    for pid in lock_state.get('holder_pids',[]):
+        entry=dict(pid=pid,compute=[],fit_epochs={})
+        for p in process_tree(pid):
+            if not p['argv']:continue
+            executable=Path(p['argv'][0]).name
+            if executable in ('zensim_mlp_train','cargo','rustc'):
+                entry['compute'].append(dict(pid=p['pid'],executable=executable,
+                    state=p['state'],cpu_ticks=p['cpu_ticks']))
+            if '--dest' in p['argv']:
+                index=p['argv'].index('--dest')+1
+                if index<len(p['argv']):
+                    path=Path(p['argv'][index])/'train.log'
+                    if path.exists():
+                        values=re.findall(r'epoch=(\d+)',path.read_text())
+                        entry['fit_epochs'][str(path)]=int(values[-1]) if values else None
+        holders.append(entry)
     state=('running' if lock_state['held_by_worker_ancestor'] else 'waiting-for-shared-lock') if live else 'exited; inspect receipt'
     if result:state='complete' if result['rc']==0 else 'failed'
-    report=dict(checked=now,stage=active.get('stage'),state=state,live=live,lock=lock_state,
+    report=dict(checked=now,stage=active.get('stage'),state=state,live=live,lock=lock_state,holder_activity=holders,
         completed_fits=len(completed),required_T1_fits=3,fits=completed,epochs=epochs,
         source_pins_present=(root/'SOURCE_PINS.json').exists(),receipt=result,
         next_action='finish registered fits, then development feasibility and frozen reads')
