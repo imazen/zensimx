@@ -1,0 +1,83 @@
+{
+  "arm": "W32",
+  "seed": 0,
+  "hidden": 32,
+  "max_pairs": 8,
+  "registration": "25e772922fd5a40d576e12af47778ce81bed5e08",
+  "packed_sha256": "beaf83829ee6899f5474a486c7580fc7773daada9bb2a8c36c0c7ef988de171f",
+  "packed_bytes": 34156,
+  "capacity": {
+    "hidden": 32,
+    "dead": 23,
+    "residual": 7,
+    "live": 2,
+    "dead_units": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22
+    ],
+    "residual_units": [
+      23,
+      24,
+      25,
+      26,
+      27,
+      28,
+      29
+    ]
+  },
+  "wall_seconds_excluding_locks": 716.21,
+  "stage_times": [
+    {
+      "stage": "base",
+      "seconds": 471.51,
+      "elapsed": "7:51.51"
+    },
+    {
+      "stage": "continuation",
+      "seconds": 244.16,
+      "elapsed": "4:04.16"
+    },
+    {
+      "stage": "pack",
+      "seconds": 0.54,
+      "elapsed": "0:00.54"
+    }
+  ],
+  "certificate": {
+    "bake": "/var/tmp/byc-width-20261104/fits/W32-s0/continuation/pack_e059/refit/production-f16.bin",
+    "certified": true,
+    "free_amplitude": 0.0,
+    "free_ramps": 0,
+    "max_pairs": 1,
+    "monotone": true,
+    "ramps": 0
+  },
+  "resource_receipts": {
+    "base": "run-heavy: done rc=0 472s | peak-RSS 1.91GiB | min-avail 39073MiB | peak-load 3.10",
+    "continuation": "run-heavy: done rc=0 244s | peak-RSS 1.99GiB | min-avail 39486MiB | peak-load 2.02",
+    "pack": "run-heavy: done rc=0 1s | peak-RSS 0.28GiB | min-avail 42010MiB | peak-load 1.38"
+  },
+  "artifact_root": "/var/tmp/byc-width-20261104",
+  "role": "first of fifteen fits; no R13 EVAL assessment yet"
+}

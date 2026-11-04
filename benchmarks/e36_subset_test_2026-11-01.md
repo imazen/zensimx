@@ -2395,3 +2395,14 @@ time; fit hashes, resource receipts and mirror evidence. Answer whether training
 width is load-bearing, collapse to one live pair is universal, and any width
 beats A on all label-free product gates. Negative results are results; missing
 reads are incomplete. No candidate adoption or release is authorized.
+
+
+**R13 first packed fit (2026-11-04; remaining registered fits running).** W32
+seed 0, 8 max pairs: base 471.51 s, continuation 244.16 s, pack 0.54 s,
+total 716.21 s excluding lock waits. Packed bake `beaf83829ee6899f5474a486c7580fc7773daada9bb2a8c36c0c7ef988de171f`,
+native monotone certificate passes. Exact structural counts: 23 dead, 7 residual,
+2 live units. Resource receipts and complete first-fit identity:
+[`r13_first_fit_2026-11-04.json`](r13_first_fit_2026-11-04.json).
+Reported in chat immediately after packing; W256 seed 0 proceeds next.
+This is capacity/TRAIN execution evidence only, not accuracy or product qualification.
+All 15 final bakes must still be frozen before R13 report-only assessments.
