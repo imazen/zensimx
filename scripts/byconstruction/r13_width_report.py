@@ -25,6 +25,7 @@ def main():
     readout=load(O/'reads/readout.json')
     chroma=load(O/'reads/chroma/G_CHROMA_L.json')['candidates']
     timing=load(O/'heads/SUMMARY.json')
+    native=load(O/'W4_SOURCE_PINS.json')
     for p in (O/'reads').glob('*.receipt.json'):
         if load(p)['rc']!=0: raise ValueError(f'failed assessment: {p}')
     # Four shared scoring stages plus every model's steering/dial/NEARID.
@@ -37,6 +38,9 @@ def main():
            'Owner amendment `397d67be` cuts the original seed repetitions on cost and adds W4 seed 0 after W16.',
            'Candidate seeds 1–2: **not run (owner cut on cost, 2026-11-04)**. W4 was registered only at seed 0.',
            'Candidate across-seed stability is unmeasured. These are six seed-0 fits beside the three frozen A seeds.',
+           f"W4 uses numerical source `{native['numerical_source_commit']}` with the sole Rust overlay",
+           f"`{native['sole_rust_overlay']}` for its amendment-bound admission. Its trainer SHA-256 is",
+           f"`{native['native_sha256']}`; complete file/binary pins are in `W4_SOURCE_PINS.json`.",
            'Owner defines width as pairs = width/4: half the units form max pairs, half retain A’s ordinary threshold role.',
            'W16 and W32 cannot keep 32 pairs, so this comparison is proportional by construction.','',
            'Width also changes the canonical Xavier scales and the number of initialization RNG draws:',

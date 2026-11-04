@@ -10,6 +10,7 @@ def main():
     ap=argparse.ArgumentParser(description=__doc__)
     ap.add_argument('--out',type=Path,required=True)
     a=ap.parse_args()
+    pins=json.loads((owner.O/'SOURCE_PINS.json').read_text())
     rows=[]
     pending=[]
     omitted=[dict(name=f'W{width}-s{seed}',state='not run (owner cut on cost, 2026-11-04)')
@@ -36,9 +37,16 @@ def main():
                  capacity={k:d['capacity'][k] for k in ('dead','residual','live')},
                  wall_seconds_excluding_lock_waits=d['wall_seconds'],stage_times=d['stage_times'],
                  resource_receipts=resources,finished=d['finished']))
-    pins=json.loads((owner.O/'SOURCE_PINS.json').read_text())
+            if width==4:
+                native=json.loads((owner.O/'W4_SOURCE_PINS.json').read_text())
+                rows[-1]['native_trainer_sha256']=native['native_sha256']
+                rows[-1]['admission_registration']=native['registration']
+            else:
+                rows[-1]['native_trainer_sha256']=pins['bin_sha256'][str(owner.O/'bin/zensim_mlp_train')]
+                rows[-1]['admission_registration']='25e772922fd5a40d576e12af47778ce81bed5e08'
     owner.write(a.out,dict(schema='r13-packed-fit-progress-v1',registration='25e772922fd5a40d576e12af47778ce81bed5e08',
           trainer_source_commit=pins['source_commit'],reporting_source_sha256=owner.sha(__file__),
+          trainer_source_scope='original numerical source; W4 adds its separately registered admission overlay',
           complete_fits=len(rows),required_fits=owner.required_fits(),models=rows,pending=pending,omitted=omitted,
           artifacts=dict(host='dev',root=str(owner.O),source_pins_sha256=owner.sha(owner.O/'SOURCE_PINS.json')),
           role='packed-fit identities/capacity only; every retained candidate must freeze before R13 EVAL assessments'))
