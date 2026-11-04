@@ -179,7 +179,11 @@ pub(crate) fn weights_document(model: &Model, inputs: &[Input]) -> serde_json::V
         .chunks(first.out_dim)
         .map(|row| row.iter().filter(|&&v| v != 0.0).count())
         .collect();
-    serde_json::json!({"inputs":inputs,"row_order":row_order,"column_order":column_order,"per_input_columns":per_input_columns,"top_inputs_by_unit":top_inputs_by_unit,"nonzero_counts":nonzero_counts,"scaler_mean":model.scaler_mean(),"scaler_scale":model.scaler_scale(),
+    let input_l1: Vec<f64> = w
+        .chunks(first.out_dim)
+        .map(|row| row.iter().map(|v| f64::from(v.abs())).sum())
+        .collect();
+    serde_json::json!({"inputs":inputs,"row_order":row_order,"column_order":column_order,"per_input_columns":per_input_columns,"top_inputs_by_unit":top_inputs_by_unit,"nonzero_counts":nonzero_counts,"input_l1":input_l1,"scaler_mean":model.scaler_mean(),"scaler_scale":model.scaler_scale(),
         "layers": (0..model.n_layers()).map(|i| { let l=model.layer(i); serde_json::json!({"layer":i,"in_dim":l.in_dim,"out_dim":l.out_dim,"activation":format!("{:?}",l.activation),"weights":weights(model,i),"biases":l.biases,"stats":crate::audit::weight_statistics(&weights(model,i),l.in_dim,l.out_dim)}) }).collect::<Vec<_>>()})
 }
 // Compose diagnostic layer views with the existing baker, then execute

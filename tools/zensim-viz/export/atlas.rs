@@ -146,6 +146,9 @@ pub(crate) fn run(
             );
         }
         let mut f=map_by_id.get(&input.feature).cloned().unwrap_or_else(||serde_json::json!({"map_file":null,"map_status":"map unavailable for this declared input"}));
+        if let Some(file) = f["terms_file"].as_str() {
+            f["terms_file"] = serde_json::json!(format!("maps/{file}"));
+        }
         let value = if input.factor.is_none() {
             values[input.feature]
         } else {

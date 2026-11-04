@@ -57,6 +57,11 @@ pub(crate) fn viz_export_maps(
                 continue;
             }
             let n = w * h;
+            let basic_terms = if slots.iter_slots().any(|id| id < 156) && !ret.basic_sd.is_empty() {
+                Some(viz_export_basic_terms(ret, scale, ch, original, &out)?)
+            } else {
+                None
+            };
             // One source for each detector; features with different pooling share
             // the detector map. Numerators of weighted means retain their weight.
             let mut maps = vec![vec![0.0f32; n]; 29];
@@ -286,7 +291,7 @@ pub(crate) fn viz_export_maps(
                     cache.insert(key, value.clone());
                     value
                 };
-                records.push(serde_json::json!({"id":id,"map_file":file,"map_range":range,"map_width":mw,"map_height":mh,"native_grid":[(original.0>>scale).max(1).min(w),(original.1>>scale).max(1).min(h)],"pooling_grid":[w,h],"map_role":role}));
+                records.push(serde_json::json!({"id":id,"map_file":file,"map_range":range,"map_width":mw,"map_height":mh,"native_grid":[(original.0>>scale).max(1).min(w),(original.1>>scale).max(1).min(h)],"pooling_grid":[w,h],"map_role":role,"terms_file":if id < 156 { basic_terms.as_ref() } else { None }}));
             }
         }
     }
@@ -298,4 +303,117 @@ pub(crate) fn viz_export_maps(
         &records,
     )?;
     Ok(())
+}
+
+// Raw f32 terms are separate from quantized display maps. Sample coordinates,
+// crop and stride exactly match those maps; no metric accumulator is changed.
+fn viz_export_basic_terms(
+    ret: &FoldRetention,
+    scale: usize,
+    ch: usize,
+    original: (usize, usize),
+    out: &std::path::Path,
+) -> Result<String, Box<dyn std::error::Error>> {
+    use std::io::Write;
+    let (w, h) = ret.dims[scale];
+    let src = &ret.pyr_src[scale][ch];
+    let dst = &ret.pyr_dst[scale][ch];
+    let p = &ret.planes[scale][ch];
+    let logical = [
+        (original.0 >> scale).max(1).min(w),
+        (original.1 >> scale).max(1).min(h),
+    ];
+    let step = logical[0].max(logical[1]).div_ceil(512);
+    let mw = logical[0].div_ceil(step);
+    let mh = logical[1].div_ceil(step);
+    let names = [
+        "mu_r",
+        "mu_d",
+        "src",
+        "dst",
+        "square_moment",
+        "error_moment",
+        "variance_sum",
+        "error_variance",
+        "d1",
+        "edge",
+        "artifact",
+        "detail",
+        "mse",
+    ];
+    let mut planes: [Vec<f32>; 13] = core::array::from_fn(|_| Vec::with_capacity(mw * mh));
+    for yy in 0..mh {
+        for xx in 0..mw {
+            let i = yy * step * w + xx * step;
+            let m1 = p.mu1[i];
+            let m2 = p.mu2[i];
+            let delta = m1 - m2;
+            let variance = (-m2).mul_add(m2, (-m1).mul_add(m1, p.ssq[i])).max(0.0);
+            let error_variance = (p.s12[i] - delta * delta).max(0.0);
+            let d1 = ret.basic_sd[scale][ch][i];
+            let replay = crate::ssim_form::ssim_direct_raw_scalar(
+                crate::ssim_form::SsimLumaForm::Clamp,
+                m1,
+                m2,
+                p.ssq[i],
+                p.s12[i],
+            )
+            .max(0.0);
+            if replay.to_bits() != d1.to_bits() {
+                return Err(
+                    format!("basic formula replay differs at s{scale}/{ch}/({xx},{yy})").into(),
+                );
+            }
+            let edge = (1.0 + (dst[i] - m2).abs()) / (1.0 + (src[i] - m1).abs()) - 1.0;
+            let error = src[i] - dst[i];
+            let values = [
+                m1,
+                m2,
+                src[i],
+                dst[i],
+                p.ssq[i],
+                p.s12[i],
+                variance,
+                error_variance,
+                d1,
+                edge,
+                edge.max(0.0),
+                (-edge).max(0.0),
+                error * error,
+            ];
+            for (plane, value) in planes.iter_mut().zip(values) {
+                if !value.is_finite() {
+                    return Err("nonfinite basic formula term".into());
+                }
+                plane.push(value);
+            }
+        }
+    }
+    let file = format!("basic-terms-s{scale}-{ch}");
+    let mut binary = std::io::BufWriter::new(
+        std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(out.join(format!("{file}.f32le")))?,
+    );
+    for plane in &planes {
+        for value in plane {
+            binary.write_all(&value.to_le_bytes())?;
+        }
+    }
+    binary.flush()?;
+    let header = format!("{file}.json");
+    serde_json::to_writer(
+        std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(out.join(&header))?,
+        &serde_json::json!({"schema":"zensim-basic-terms-v1","layout":"plane-major-f32le",
+            "width":mw,"height":mh,"native_grid":logical,"pooling_grid":[w,h],"step":step,
+            "scale":scale,"channel":ch,"planes":names,"data_file":format!("{file}.f32le"),
+            "window":"same retained box window as extraction; reflected boundaries",
+            "formula":"revision-7 Clamp direct-error; f32 mul_add; nonnegative result",
+            "formula_replay_bits_checked":mw*mh,"formula_replay_bit_identity":true}),
+    )?;
+    Ok(header)
 }

@@ -51,6 +51,7 @@ fn main() -> Result<()> {
     let mut opts = BTreeMap::new();
     let mut percentile_paths = Vec::new();
     let allowed: &[&str] = match command.as_str() {
+        "weights" => &["--out"],
         "curve-audit" => &["--out", "--baseline"],
         "audit" => &[
             "--bank",
@@ -103,6 +104,20 @@ fn main() -> Result<()> {
                 .map(|v| v.parse())
                 .transpose()?
                 .unwrap_or(0),
+        );
+    }
+    if command == "weights" {
+        let model = zenpredict::Model::from_bytes(&std::fs::read(&bake_path)?)?;
+        let inputs = model::inputs(&model)?;
+        std::fs::create_dir_all(&out)?;
+        provenance::write(&out)?;
+        json(
+            &out.join("weights.json"),
+            &model::weights_document(&model, &inputs),
+        )?;
+        return json(
+            &out.join("identity.json"),
+            &serde_json::json!({"bake_sha256":hash(&bake_path)?}),
         );
     }
     if command != "audit" && std::env::var("ZENSIM_FORMULA_REV").as_deref() != Ok("7") {

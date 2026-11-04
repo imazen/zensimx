@@ -120,6 +120,9 @@ fn retained_export_matches_plain_extraction_on_odd_sizes_and_strided_rows() {
 
             assert!(features.iter().any(|f| f["map_file"].is_string()));
             assert!(features.iter().all(|f| f["value"].is_number()));
+            let map_records: Vec<serde_json::Value> =
+                serde_json::from_slice(&std::fs::read(out.join("maps/maps.json")).unwrap())
+                    .unwrap();
             for f in features.iter().filter(|f| f["map_file"].is_string()) {
                 let image = pixels::decode(&out.join(f["map_file"].as_str().unwrap())).unwrap();
                 assert!(image.width <= 512 && image.height <= 512);
@@ -130,6 +133,67 @@ fn retained_export_matches_plain_extraction_on_odd_sizes_and_strided_rows() {
                         .iter()
                         .all(|v| v.is_number())
                 );
+                if f["id"].as_u64().unwrap() < 156 {
+                    let header_path =
+                        out.join(f["terms_file"].as_str().expect("basic terms required"));
+                    let header: serde_json::Value =
+                        serde_json::from_slice(&std::fs::read(&header_path).unwrap()).unwrap();
+                    assert_eq!(header["formula_replay_bit_identity"], true);
+                    assert_eq!(
+                        header["formula_replay_bits_checked"].as_u64().unwrap() as usize,
+                        image.width * image.height
+                    );
+                    assert_eq!(header["native_grid"], f["native_grid"]);
+                    let bytes = std::fs::read(
+                        header_path
+                            .parent()
+                            .unwrap()
+                            .join(header["data_file"].as_str().unwrap()),
+                    )
+                    .unwrap();
+                    let names = header["planes"].as_array().unwrap();
+                    assert_eq!(bytes.len(), image.width * image.height * names.len() * 4);
+                    let local = f["id"].as_u64().unwrap() % 13;
+                    let result = match local {
+                        0..=2 => "d1",
+                        3..=5 => "artifact",
+                        6..=8 => "detail",
+                        9 => "mse",
+                        _ => unreachable!(),
+                    };
+                    let plane = names.iter().position(|name| name == result).unwrap();
+                    let n = image.width * image.height;
+                    // Product inputs share the raw detector's normalized PNG;
+                    // their display range is multiplied by reference fragility.
+                    // Terms describe the raw local formula, before that product.
+                    let raw = map_records.iter().find(|r| r["id"] == f["id"]).unwrap();
+                    let lo = raw["map_range"][0].as_f64().unwrap() as f32;
+                    let hi = raw["map_range"][1].as_f64().unwrap() as f32;
+                    if f["fragility"].as_bool().unwrap() {
+                        let fragility = f["fragility_value"].as_f64().unwrap();
+                        for k in 0..2 {
+                            assert_eq!(
+                                f["map_range"][k].as_f64().unwrap().to_bits(),
+                                (raw["map_range"][k].as_f64().unwrap() * fragility).to_bits()
+                            );
+                        }
+                    }
+                    for (i, pixel) in image.pixels.iter().enumerate() {
+                        let offset = (plane * n + i) * 4;
+                        let value =
+                            f32::from_le_bytes(bytes[offset..offset + 4].try_into().unwrap());
+                        let q = if hi == lo {
+                            0
+                        } else {
+                            ((value - lo) / (hi - lo) * 255.0).round() as u8
+                        };
+                        assert_eq!(
+                            *pixel, [q; 3],
+                            "basic map/term disagreement f{} at {i}: value={value:?}, range={lo:?}..{hi:?}, image={}x{}, header={header_path:?}",
+                            f["id"], image.width, image.height
+                        );
+                    }
+                }
             }
         }
     }

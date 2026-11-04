@@ -38,6 +38,13 @@ def main():
                 raise RuntimeError('bank-scoped bake identities differ')
             result['bake_sha256'] = audit['bake_sha256']
             target = {'audit': f"data/{sources['audit']}/audit.json", 'weights': f"data/{sources['audit']}/weights.json", 'lenses': {}, 'family_lenses': {}}
+            if bake.get('weights_directory'):
+                weight_dir = root / bake['weights_directory']
+                if not (weight_dir / 'complete.json').is_file():
+                    raise RuntimeError(f'{weight_dir}: weights incomplete')
+                if read(weight_dir / 'identity.json')['bake_sha256'] != audit['bake_sha256']:
+                    raise RuntimeError('display weights differ from audit bake')
+                target['weights'] = f"data/{bake['weights_directory']}/weights.json"
             lens_dir = root / sources['lens'] if sources.get('lens') else None
             if lens_dir and (lens_dir / 'complete.json').is_file():
                 index = read(lens_dir / 'index.json')
