@@ -232,8 +232,25 @@ def fit_yj_lambda(col: np.ndarray, lo: float | None = None, hi: float | None = N
     return (a + b) / 2.0
 
 
+def t_soft_clip(x: np.ndarray, params: list[float]) -> np.ndarray:
+    knee, soft = params
+    a = np.abs(x)
+    # Maximum avoids evaluating an invalid log in the unselected core.
+    tail = knee + soft * np.log1p(np.maximum(a-knee, 0.)/soft)
+    return np.where(a <= knee, x, np.sign(x)*tail)
+
+
+def t_soft_sign(x: np.ndarray, params: list[float]) -> np.ndarray:
+    return x/(params[0]+np.abs(x))
+
+
+R14_VARIANTS = ("identity", "log1p", "signed_log1p", "yeo_johnson", "soft_clip", "soft_sign")
+
+
 TRANSFORMS: dict[str, Callable[[np.ndarray, list[float]], np.ndarray]] = {
     "identity": t_identity,
+    "soft_clip": t_soft_clip,
+    "soft_sign": t_soft_sign,
     "log": t_log,
     "log1p": t_log1p,
     "signed_log1p": t_signed_log1p,
@@ -255,6 +272,10 @@ def sweep_for(name: str, col: np.ndarray) -> list[list[float]]:
     valid = col[np.isfinite(col)]
     if valid.size == 0:
         return [[]]
+    if name == "soft_clip":
+        return [[float(k), float(k)] for k in np.percentile(valid, [25,50,75,90]) if k > 0]
+    if name == "soft_sign":
+        return [[float(k)] for k in np.percentile(valid,[50,75,90]) if k > 0]
     if name == "clip_then_log1p":
         # ε = percentiles of the feature's positive distribution. We
         # want ε at the noise-floor — try p5..p75 spread to find where
@@ -431,6 +452,8 @@ def screen_one_feature(
     best_params: list[float] = []
     best_corr = baseline
     for token, fn in TRANSFORMS.items():
+        if token in ("soft_clip", "soft_sign"):
+            continue
         # Training-safety gates
         if token == "log" and feat_min <= 0.0:
             continue
@@ -463,6 +486,8 @@ def screen_one_feature_all_transforms(
     i: int,
     feat_col: np.ndarray,
     mos: np.ndarray,
+    variants: tuple[str, ...] | None = None,
+    yj_lambda: float | None = None,
 ) -> tuple[dict, dict[str, tuple[float, float, list[float]]]]:
     """Like `screen_one_feature` but ALSO returns per-transform results
     (token → (pearson, lift, params)) so the caller can attribute
@@ -481,7 +506,12 @@ def screen_one_feature_all_transforms(
     per_transform: dict[str, tuple[float, float, list[float]]] = {
         "identity": (baseline, 0.0, []),
     }
+    allowed = variants if variants is not None else tuple(t for t in TRANSFORMS if t not in ("soft_clip", "soft_sign"))
+    if any(t not in TRANSFORMS for t in allowed):
+        raise ValueError("unknown screen variant")
     for token, fn in TRANSFORMS.items():
+        if token not in allowed:
+            continue
         if token == "identity":
             continue
         if token == "log" and feat_min <= 0.0:
@@ -492,7 +522,8 @@ def screen_one_feature_all_transforms(
             continue
         best_corr_this = float("-inf")
         best_params_this: list[float] = []
-        for params in sweep_for(token, feat_col):
+        candidates = [[yj_lambda]] if token == "yeo_johnson" and yj_lambda is not None else sweep_for(token, feat_col)
+        for params in candidates:
             tx = fn(feat_col, params)
             corr, _ = safe_pearson(tx, mos)
             if math.isnan(corr):
@@ -513,7 +544,7 @@ def screen_one_feature_all_transforms(
     rec = {
         "feat_idx": i,
         "best_transform": best_token,
-        "params_csv": ",".join(f"{v:.6g}" for v in best_params) if best_params else "",
+        "params_csv": ",".join(format(v, ".9g" if variants is not None else ".6g") for v in best_params) if best_params else "",
         "baseline_pearson": baseline,
         "transformed_pearson": best_corr,
         "lift": best_lift,
@@ -597,7 +628,11 @@ def main() -> int:
             "the boundary."
         ),
     )
+    ap.add_argument("--variants", help="comma-separated transform token filter; historical defaults when absent")
     args = ap.parse_args()
+    variants = tuple(args.variants.split(",")) if args.variants else None
+    if variants and any(t not in TRANSFORMS for t in variants):
+        ap.error("unknown transform variant")
     if args.grid_min >= args.grid_max:
         print(
             f"ERROR: --grid-min ({args.grid_min}) must be < --grid-max ({args.grid_max})",
@@ -629,7 +664,7 @@ def main() -> int:
     per_transform_rows: list[tuple[int, str, float, float, str]] = []
     t0 = time.perf_counter()
     for i in range(n_features):
-        rec, per_tx = screen_one_feature_all_transforms(i, features[:, i], mos)
+        rec, per_tx = screen_one_feature_all_transforms(i, features[:, i], mos, variants=variants)
         rows.append(rec)
         for tok, (corr, lift, params) in per_tx.items():
             params_csv = ",".join(f"{v:.6g}" for v in params) if params else ""
