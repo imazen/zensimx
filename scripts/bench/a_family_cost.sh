@@ -43,8 +43,7 @@ case "$stage" in
     bench-worker)
         test "${A_COST_HEAVY_WORKER:-}" = 1
         threads=${3:?threads}; size=${4:?size}
-        export ZENBENCH_LAUNCHER_PIDS=$$
-        exec taskset -c "${A_COST_CPUS:?explicit affinity}" "$bin" bench "$study/pairs" "$study/production-f16.bin" "$study/inputs-A0.tsv" "$size" "$study/timing/${size}-${threads}t" "$threads"
+        exec python3 "$(dirname "$runner")/a_family_cost_admit.py" --images "$study/pairs/pairs.json" --size "$size" "$study/timing/${size}-${threads}t/admission.json" -- taskset -c "${A_COST_CPUS:?explicit affinity}" "$bin" bench "$study/pairs" "$study/production-f16.bin" "$study/inputs-A0.tsv" "$size" "$study/timing/${size}-${threads}t" "$threads"
         ;;
     profile)
         size=${3:?size}; repeats=${4:?repeats}
@@ -55,9 +54,16 @@ case "$stage" in
         test ! -e "$control"
         mkfifo "$control"
         export A_COST_PERF_CONTROL="$control"
-        heavy taskset -c "$cpus" perf record -e cycles:u -F 997 -g --call-graph fp --delay=-1 --control="fifo:$control" -o "$study/perf/$size/perf.data" -- "$bin" profile "$study/pairs" "$study/production-f16.bin" "$study/inputs-A0.tsv" "$size" "$study/perf/$size" 1 "$repeats" 2>&1 | tee "$study/logs/perf-${size}.log"
-        heavy perf report -i "$study/perf/$size/perf.data" --stdio --no-inline --no-children --percent-limit 0 -F overhead,symbol > "$study/perf/$size/self.txt" 2> "$study/perf/$size/self-receipt.log"
-        heavy perf report -i "$study/perf/$size/perf.data" --stdio --no-inline --children --percent-limit 0 -F overhead,overhead_children,symbol > "$study/perf/$size/children.txt" 2> "$study/perf/$size/children-receipt.log"
+        heavy python3 "$(dirname "$runner")/a_family_cost_admit.py" "$study/perf/$size/admission.json" -- taskset -c "$cpus" perf record -e cycles:u -F 997 -g --call-graph fp --delay=-1 --control="fifo:$control" -o "$study/perf/$size/perf.data" -- "$bin" profile "$study/pairs" "$study/production-f16.bin" "$study/inputs-A0.tsv" "$size" "$study/perf/$size" 1 "$repeats" 2>&1 | tee "$study/logs/perf-${size}.log"
+        if test -f "$study/perf/$size/perf.data"; then
+            bash "$runner" profile-report "$study" "$size"
+        fi
+        ;;
+    profile-report)
+        size=${3:?size}
+        heavy perf report -i "$study/perf/$size/perf.data" --stdio --no-inline --call-graph none --no-children --percent-limit 0 -F overhead,symbol > "$study/perf/$size/self.txt" 2> "$study/perf/$size/self-receipt.log"
+        heavy perf report -i "$study/perf/$size/perf.data" --stdio --no-inline --call-graph none --children --percent-limit 0 -F overhead,overhead_children,symbol > "$study/perf/$size/children.txt" 2> "$study/perf/$size/children-receipt.log"
+        heavy perf script -i "$study/perf/$size/perf.data" --no-inline -F period,ip,sym > "$study/perf/$size/samples.txt" 2> "$study/perf/$size/script-receipt.log"
         ;;
     timings)
         shift 2
