@@ -55,11 +55,15 @@ def main():
     lines = log.read_text().splitlines() if log and log.exists() else []
     completed_images = sum(" rounds × " in line for line in lines)
     parallel_gate = "--parallel-gate" in sys.argv[2:]
+    lock = compute_lock(collector_pid)
+    lock_holders = [process_snapshot(pid) for pid in lock.get("holder_pids", [])]
     value = {
         "checked_utc": datetime.datetime.now(datetime.UTC).isoformat(),
         "host": (root / "measurement-host.txt").read_text().strip(),
         "binary_sha256": actual,
         "collector": collector,
+        "compute_lock": lock,
+        "lock_holders": lock_holders,
         "workers": workers,
         "stage_record": stage,
         "current_completed_image_groups": completed_images,
@@ -83,6 +87,7 @@ def main():
                      "raw_timing_outputs": sum(len(list((task_root / phase / "results").glob("*t_*_latency.json"))) for phase in ("before", "after")),
                      "required_timing_cells": 50,
                      "verified_workers": workers, "collector": collector,
+                     "compute_lock": lock, "lock_holders": lock_holders,
                      "admission": value["admission"]})
         (task_root / "PROGRESS.json").write_text(json.dumps(task, indent=2) + "\n")
     with (root / "SUPERVISION.jsonl").open("a") as stream:
@@ -98,6 +103,7 @@ def main():
                      "lock_holders": p["compute_lock"].get("holder_pids"),
                      "owns_lock": p["compute_lock"]["held_by_worker_ancestor"]} for p in workers],
         "binary_verified": True,
+        "lock_holder_pids": lock.get("holder_pids"),
     }))
 
 
