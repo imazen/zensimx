@@ -81,6 +81,12 @@ warnings as errors; this baseline receipt is retained without suppressing them.
 
 ## TRAIN screen
 
+Pre-read amendment `447fcc16` restricts the absolute variance <1e-10 guard
+to T1a's marginal MLE. T1b keeps its positive-median rule, while T1c keeps the
+existing Pearson std <1e-12 guard and omits Yeo-Johnson where T1a has no fit.
+This correction landed before the first TRAIN payload read. In the actual
+pooled bank no input meets either near-constant guard.
+
 The registered screen completed on 627,732 rows from A's seven positive-weight
 TRAIN groups. It read no development or EVAL rows. All 984 caller inputs were
 nonnegative and nonconstant; none met the Yeo-Johnson near-constant guard.
