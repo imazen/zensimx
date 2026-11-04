@@ -2,8 +2,8 @@
 # Complete R13 evidence, excluding rebuildable Cargo output. Caller holds the resource lock.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
-O=/var/tmp/byc-width-20261104
-D=/mnt/tower/output/zensim/r13-width-20261104
+O=${1:-/var/tmp/byc-width-20261104}
+D=${2:-/mnt/tower/output/zensim/r13-width-20261104}
 df -h /var/tmp /mnt/tower
 ssh tower df -h /mnt/cache
 python3 -B - "$O" <<'PY'

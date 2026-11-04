@@ -4356,6 +4356,9 @@ r14-transform-capacity:
 r14-transform-reads:
     python3 -B scripts/byconstruction/r14_transforms.py reads
 
+r14-transform-archive:
+    python3 -B scripts/byconstruction/r14_transforms.py job --label archive -- bash scripts/byconstruction/r13_width_archive.sh /var/tmp/byc-transforms-20261104 /mnt/tower/output/zensim/r14-transforms-20261104
+
 r14-serving-checks:
     cargo test -p zensim --features custom-profiles,training,classification --lib r14_transform_tests -- --test-threads=1
     cargo test -p zensim-validate --lib derived_inputs -- --test-threads=1
