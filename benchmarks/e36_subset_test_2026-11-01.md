@@ -2415,3 +2415,22 @@ counts as well as proportional capacity. Initialization and pair-sampling
 RNG streams are separate; encoder draws do not advance the pair sampler.
 These inherited semantics are unchanged (`mlp_train/mod.rs`, initialization
 section); R13 does not add an initialization intervention.
+
+**R13 owner cost cut (2026-11-04, relayed approximately 20:15Z, before any R13
+assessment read).** Finish W512 seed 0 and W16 seed 0 as registered; retain the
+completed W32/W256/W64 seed-0 fits. **Do not start seeds 1–2 at any width.**
+The final candidate inventory is exactly five seed-0 bakes, W16/W32/W64/W256/W512.
+Every omitted seed-1/seed-2 cell is **not run (owner cut on cost, 2026-11-04)**.
+A remains the frozen mix F seeds 0–2, without refitting. This is an owner-directed
+reduction of arms on execution cost, not a new read or an outcome-based selection.
+
+All training/packing/certification rules, fixed base epoch 119 and continuation
+epoch 59, proportional pairs=width/4, input banks and capacity definitions stay
+unchanged. Freeze the five final bakes in a fit commit before assessments. Run
+the same registered EVAL, E36, G-CHROMA-L, G-STEER, C1–C6, identity, NEARID and
+cube-root:203 HDR reads beside all three frozen A seeds, and A-paired head time
+for each seed-0 width. The E36 statistic remains the mean over each arm's
+registered seeds (candidate seed 0; A seeds 0–2), with the same source bootstrap.
+The report contains seed-0 candidate rows and explicitly marks all ten omitted
+cells; candidate across-seed stability is unmeasured. No R13 EVAL or gate result
+has been read or used for this cut, and no new selection rule is introduced.
