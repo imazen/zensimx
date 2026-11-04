@@ -154,10 +154,9 @@ pub(crate) fn viz_export_maps(
                     maps[28][i] = lattice as f32;
                 }
             }
-            let mut cache: std::collections::BTreeMap<
-                (usize, i32),
-                (String, [f32; 2], usize, usize),
-            > = std::collections::BTreeMap::new();
+            type MapRecord = (String, [f32; 2], usize, usize);
+            let mut cache: std::collections::BTreeMap<(usize, i32), MapRecord> =
+                std::collections::BTreeMap::new();
             for id in slots.iter_slots() {
                 let Some(def) = crate::feature_defs::def_at(id, crate::NUM_SCALES) else {
                     continue;

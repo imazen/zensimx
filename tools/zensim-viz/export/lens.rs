@@ -433,5 +433,22 @@ mod tests {
                 );
             }
         }
+        let family = inputs[0].family.as_str();
+        let family_curve = family_pdp(&m, &inputs, &bank, family).unwrap();
+        for (i, observed) in bank.rows.iter().enumerate() {
+            for (j, &multiplier) in family_curve.x.iter().enumerate() {
+                let mut changed = observed.clone();
+                for &id in &family_curve.features {
+                    changed[id] = observed[id] * multiplier;
+                }
+                assert_eq!(
+                    family_curve.ice[i][j].to_bits(),
+                    direct
+                        .score_features(&changed, 512, 512, None)
+                        .unwrap()
+                        .to_bits()
+                );
+            }
+        }
     }
 }
