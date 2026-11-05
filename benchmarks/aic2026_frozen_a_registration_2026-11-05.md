@@ -33,3 +33,9 @@ separate assessment, outside the eight-population final-read record.
 
 Status at registration: label-file hash, header and key/source columns inspected;
 no `jnd` target parsed and no frozen-A assessment performed on this population.
+
+Completion: the single authorized assessment finished all1,848 pairs/14 sources
+after CLIC2022. Completed journal SHA256
+`2bb36a5e33610cb6fc4d378d5b445a19604881eb7fddfc1663b32c1a8236d67e`.
+The private evaluation record is `imazen/zensim-training/evaluations/frozen_a_aic2026_public_test_2026-11-05.md`;
+no numerical result is recorded here. No raw-label reopen or B recomputation.

@@ -3335,3 +3335,7 @@ The single authorized preference parse succeeded:57300 questions/57243 reference
 ### Frozen-A aic2026_public_test: individual pre-open exposure — 2026-11-05T13:07:17.337148+00:00
 
 Authorized frozen read of 1848 rows; before target parsing. LABEL_READS.json SHA256 `84cbd1c7c88ab7b1c2e2c383a62d3007dc19e2f2233209d5e72a7290a68692e8`; label specification `{"path": "/mnt/v/output/zensim/byconstruction-2026-10-22/aic2026train/folds_train/pairs_test.tsv", "sha256": "b0fb0c0fbb9fd05a6a28d4b485f8a793d0ad384c4ca7d61172ed1f49a917f63b", "target": "jnd"}`. Prediction/decode/binary pins retained in that receipt. Bootstrap10000 seed20261105; no tuning or selection. Status: authorized-before-read; any partial/failed read spends this population.
+
+### Frozen-A AIC-2026 public_test completion — 2026-11-05
+
+The one authorized frozen-A read completed all1,848 pairs/14 sources after CLIC2022. Completed journal SHA256 `2bb36a5e33610cb6fc4d378d5b445a19604881eb7fddfc1663b32c1a8236d67e`; target cache SHA256 `3fddd405b1fc863110d5b6389dd4d9b1156e0daa4f41658a1a67643412fb9afb`. Raw targets were parsed once using the registered October23 jnd column and declared quality orientation; no tuning, model selection or B recomputation. All evaluation numbers and the quoted historical B row are retained only under private imazen/zensim-training `evaluations/frozen_a_aic2026_public_test_2026-11-05.*` and chat. No addition to the public eight-population final-read document. Preliminary labels and the prior design/B/Tga exposures remain disclosed in the separate registration.
