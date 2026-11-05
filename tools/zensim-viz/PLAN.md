@@ -217,3 +217,13 @@ zensim-a. Prepare a dispatch-only Pages workflow diff for imazen/zensim; do not
 enable Pages, push that workflow there, or dispatch it. Push verified source to
 zensimx main. If an exact brief requirement is infeasible, stop with measured
 data and ask the owner.
+
+## Pages phase acceptance — 2026-11-05
+
+Complete against the owner Pages brief: 471,426 code bytes; one 1,608,550-byte
+IMIJ-set, one R2 PUT; A-only single-thread SIMD Wasm 1,645,879 bytes. Both
+200-row banks compute all curves through BakeScorer. Native pooled bits have
+zero mismatches; browser score/map and lens tolerances pass unchanged. Final
+dev Chromium passes 38 checks and 16 dark/light captures with public R2 ranges.
+REPORT.md records source identity, measurements, limitations and the exact
+local dispatch-only workflow diff. No Pages enablement or dispatch occurred.

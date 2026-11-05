@@ -2,10 +2,10 @@
 
 ## Public A explorer — 2026-11-05
 
-The A-only replacement is running on port 3310. Final source pin, one-object
-R2 publication, final captures and the exact Pages workflow diff are being
-completed. Pages has not been enabled, its workflow has not been installed in
-imazen/zensim, and no workflow has been dispatched.
+The A-only replacement is running on port 3310 with its public R2 archive.
+Source is pinned to `5d2c1a50cd2af9ea0111dae4e6169caf0e0c7b37`, verified on
+origin/main. Pages has not been enabled, its workflow has not been installed
+in imazen/zensim, and no workflow has been dispatched.
 
 The browser computes detector maps and all PDP/ICE through the Rust owners.
 Shipped A is exactly SHA-256
@@ -17,7 +17,7 @@ bytes and declared-input quantiles 82,656 bytes. The measured maximum sampled
 served-score change from f32 storage is 0.0 in both banks.
 
 The complete public data is one range-readable IMIJ-set with 14 internal
-entries; the current verified archive is 1,608,550 bytes. There are zero sample
+entries; the published archive is 1,608,550 bytes. There are zero sample
 image assets. The browser reader verifies footer identity, bounds and every
 payload SHA-256; the existing native Writer/Reader checks full byte roundtrip
 and native checksums. Public JSON contains registry equations and public
@@ -98,8 +98,37 @@ additions. It excludes prose, lockfiles, generated artifacts and the separate
 58,856-byte JPEG XL loop-convergence CLI, which is not in the Wasm dependency
 graph. All native preparation helpers and old numeric gates were preserved.
 The retired eight-file viewer runtime is preserved byte for byte with the
-review artifacts. Final exact code bytes, source commit, object receipt and
-capture directory follow after publication qualification.
+review artifacts. The final code census is **471,426 bytes**, including the
+IMIJ-set browser reader, below the exclusive 500,000-byte limit. No generated
+binary or data was added to git.
+
+Publication made exactly **one PUT: one object, 1,608,550 bytes**:
+`viz/5d2c1a50cd2af9ea0111dae4e6169caf0e0c7b37/bundle.imijset`.
+The bucket was empty immediately before publication and contains exactly that
+one object afterward. Archive SHA-256 is
+`c740f835162b7828d5c9d0cd760159cd8ba4140ccd79e9eeb3ce2692cffd96c3`.
+HEAD and full-object readback verified bytes and hash. Live CORS permits the
+3310 origin and exposes Content-Range. Final Chromium on dev passed all 38
+checks, all 984 feature joins, 15 HTTP 206 ranges, all 13 payload hashes and
+16 captures at 1600×1000 and 1280×800, in both themes. No browser errors.
+The final guarded browser run took 15 seconds: peak RSS 0.20 GiB, minimum
+available 45,808 MiB, peak load 1.44.
+
+Evidence root: `/mnt/v/output/zensim/viz/2026-11-05/`.
+Final captures: `screenshots-pages-final/`; publication receipt:
+`pages-r2-receipt.json`; exact source census: `pages-code-final.json`;
+artifact hashes: `pages-final-artifacts.json`. The exact dispatch-only workflow
+is `zensim-pages-workflow.diff` (3,041 bytes; resulting workflow 2,817 bytes),
+pinned to the same source commit. It is a local review artifact only.
+The prepared site, final archive, captures and qualification evidence are
+mirrored to the durable output archive. The port 3310 server stays running.
+
+The Pages brief is complete: browser computation, two compact observed banks,
+in-memory detector maps, A-only metadata, zero image assets, provenance scrub,
+decode labels, dispatch-only workflow preparation, single-object publication,
+source push and all local acceptance gates. The compiled source matches the
+qualified current-main fixture source exactly; later upstream changes were
+documentation only.
 
 ---
 
