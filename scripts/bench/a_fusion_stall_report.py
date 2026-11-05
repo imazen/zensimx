@@ -10,6 +10,7 @@ import re
 import socket
 
 from a_family_cost_perf import bucket
+from a_fusion_artifacts import parsed_path
 
 
 def sampled_events(path):
@@ -119,13 +120,13 @@ def main():
                 assert json.loads((cell / 'count-admission.json').read_text())['status'] == 'accepted'
                 confirmation = dict(direct_count_csv=(cell / 'count.csv').read_text(),
                     direct_count_admission_sha256=digest(cell / 'count-admission.json'))
-            if not (cell / 'samples.txt').read_text().strip():
+            if not parsed_path(cell, 'samples.txt').read_text().strip():
                 events[name] = dict(samples=0, attribution='not measured: no sampled events',
                                     receipt=receipt, **confirmation)
                 continue
-            summary = sampled_events(cell / 'samples.txt')
+            summary = sampled_events(parsed_path(cell, 'samples.txt'))
             summary['receipt'] = receipt
-            summary['samples_sha256'] = digest(cell / 'samples.txt')
+            summary['samples_sha256'] = digest(parsed_path(cell, 'samples.txt'))
             summary['original_capture'] = str(original)
             summary['selected_capture'] = str(cell)
             summary.update(confirmation)

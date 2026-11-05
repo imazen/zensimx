@@ -318,6 +318,207 @@ The corrected parser reused those unchanged captures. The sum of reported
 run-heavy durations for the main capture, follow-ups and reports is 796 seconds.
 These are full capture/report-driver memory receipts, not isolated scorer RSS.
 
+### AMD Phase-1 cycle attribution (owner-authorized second host)
+
+The dispatcher reports `archmage::tokens::generated::x86::X64V4xToken`.
+The one-thread profiles run on CPU 0 in CCD0 (96 MiB shared L3), with the same
+20 pairs per size and ten scoring loops inside each FIFO-controlled window.
+The baseline is export `ed7e67633198ad61d80cc096bfe2b7f216b6b528`: it adds
+host orchestration and dispatcher diagnostics, and preserves the Intel
+profile's extraction kernels. This profile predates the JPEG re-pin; paired
+timing arms will be rebuilt from the landed pin's parent as directed.
+These captures load the existing identical raw q40 pixels, outside the window.
+
+| Self cycles within extraction | i270 v3 256² | dev v4x 256² | i270 v3 1024² | dev v4x 1024² | i270 v3 large | dev v4x large |
+|---|---:|---:|---:|---:|---:|---:|
+| shared_blur_pyramid | 37.796% | 33.272% | 43.915% | 39.824% | 46.024% | 41.871% |
+| v2_dense | 24.123% | 23.357% | 20.799% | 23.168% | 19.070% | 24.148% |
+| basic_fused | 11.496% | 10.769% | 9.467% | 7.776% | 8.855% | 7.711% |
+| v2_gradient | 8.422% | 15.171% | 8.284% | 9.639% | 7.018% | 8.635% |
+| shared_color | 9.991% | 5.944% | 8.310% | 10.192% | 8.053% | 9.980% |
+| shared_memory | 3.549% | 5.453% | 3.843% | 2.738% | 3.904% | 2.239% |
+| retained_blockiness | 2.447% | 3.149% | 1.776% | 3.704% | 2.367% | 2.832% |
+| other_extraction | 2.175% | 2.884% | 3.607% | 2.957% | 4.709% | 2.585% |
+
+Receipts on dev are `$DEV_STUDY/phase1/256-cycles` and
+`$DEV_STUDY/phase1-v6/{1024,large}-cycles`, including `DISPATCH.json`,
+`SHA256SUMS`, `admission.json`, `perf.data`, `samples.txt` and `self.txt`.
+All three captures passed quiet and admission gates. Total/extraction sample
+counts are 285/277, 3,650/3,644 and 38,148/38,132. The 256² attribution has
+limited samples and should not be read with the precision of the large cell.
+Per-window run-heavy receipts are in the corresponding `phase1-*.log` files.
+The 256² capture reports `rc=0 1s | peak-RSS 0.03GiB | min-avail 42105MiB | peak-load 1.99`;
+1024² reports `rc=0 6s | peak-RSS 0.18GiB | min-avail 41107MiB | peak-load 0.84`.
+Large cycles report `rc=0 52s | peak-RSS 1.61GiB | min-avail 39564MiB | peak-load 1.64`.
+The required AMD counter and IBS attribution receipts completed; see the table below.
+Full metric groups multiplex counters; individual metric windows must pass
+at least 99% running time before their values qualify for the final table.
+Generic LLC-load events are unsupported here; the shared L3 PMU is measured
+separately and must not be represented as process-private generic LLC counts.
+IBS is captured on CPU 0 with `perf mem record -e mem-ldst -a -C 0 -W`;
+this perf/kernel combination refuses the load-only selector and user-only
+filter. Reports retain both operations; the attribution parser selects
+actual `OP LOAD` samples within the extraction call chain. Failed selector,
+filter and missing-weight attempts are preserved in `phase1/256-ibs` and
+`phase1-v{2,3,4}/256-ibs` receipts. Zero latency weights are counted separately, not assigned a latency.
+
+The FIFO duration control on dev is `counter-control-v1/RESULT.json`.
+`perf stat -e duration_time,task-clock,cycles --delay=-1 --control=fifo:...`
+wraps one second disabled before and after a small CPU workload. The tool
+reports 2,095,435,464 ns, while cycles are enabled for 50,979,076 ns.
+Thus the optional UMC bandwidth metrics divide gated counts by a duration
+that includes setup/teardown; their raw figures are diagnostic only and are
+excluded from scoring-window bandwidth claims. Other UMC clock/count ratios
+and the required pipeline/L3 metrics use hardware denominators.
+The native receipt is `rc=0 3s | peak-RSS 0.03GiB | min-avail 36154MiB | peak-load 1.80`.
+The [perf tool-PMU source](https://raw.githubusercontent.com/torvalds/linux/v7.0/tools/perf/util/tool_pmu.c)
+records duration from event open, matching this control. The [IBS documentation](https://linux.googlesource.com/linux/kernel/git/torvalds/linux/+/e34a79b96ab9d49ed8b605fee11099cf3efbb428/tools/perf/Documentation/perf-amd-ibs.txt)
+describes the PMU and its per-CPU profiling mode.
+
+A saved large IBS trace was parsed outside the heavy wrapper. The capture
+itself was locked; the error was postprocessing. All original 39 individual
+256² metric windows are conservatively excluded and rerun as
+`phase1-metrics-v2`, with original receipts retained. The manual exclusion
+receipt lists the three potentially overlapping original windows (remote
+DRAM L3 latency, UMC activation rate and UMC CAS command rate). The original
+full large memory-controller group is also retained only as diagnostic data.
+`AMD_SELECTION.json` binds the replacement metrics label explicitly; the
+report cannot silently select the excluded originals. No candidate timing
+pair was running. Remaining trace processing uses the shared lock and 24G
+wrapper.
+
+### Capture and parsing are separate (owner ruling, 2026-11-05)
+
+Profile and paired-timing commands preserve raw `perf.data`, counter CSV,
+worker/inner JSON, admission receipts and stdout/stderr before writing a
+`CAPTURE_COMPLETE.txt` marker. They do not run report parsers. The independent
+`just a-fusion-parse STUDY STAGE INPUT NEW_OUTPUT` command parses saved data
+under the host's heavy lock and memory cap. Each attempt has its own
+`parse.log`, input/parser hashes and `STATUS.json`; an append-only
+`PARSE_RUNS.jsonl` binds successful derived outputs. Failed attempts cannot
+replace a successful parse. The command has no scorer/benchmark launch path.
+Intel stall parsing, AMD attribution and timing summaries have parsing-only entry points through this owner.
+The progress record distinguishes captured timing cells from parsed summaries.
+
+A real saved 256² cycle capture on dev verifies recovery. Correct parse,
+intentional IBS-fields-on-cycle-data failure, and corrected parse return
+`0, 255, 0`. Both successful attempts have identical raw-input hashes and
+byte-identical sample/symbol reports, with **zero capture reruns**. Receipt:
+`$DEV_STUDY/PARSE_RECOVERY_RECEIPT.json`; attempt logs/statuses are under
+`phase1/256-cycles/parses/`. All attempts use the 24G wrapper; the first
+reports `rc=0 1s | peak-RSS 0.03GiB | min-avail 36320MiB | peak-load 2.32`.
+The intentional failure reports `rc=255 1s | peak-RSS 0.03GiB | min-avail 36283MiB | peak-load 2.66`;
+the successful retry reports `rc=0 0s | peak-RSS 0.03GiB | min-avail 36308MiB | peak-load 2.61`.
+These are parse/control receipts, not admitted performance measurements.
+
+### Completed required AMD metric and IBS receipts
+
+All 54 individual metric windows (PipelineL1, PipelineL2 and l3_cache at
+three sizes) pass admission and at least 99% counter-running time. The final
+report is `$DEV_STUDY/reports/phase1-required-v2/report.json`, bound to
+`AMD_SELECTION.json` and all admission/input hashes. Initial parsing failed
+on the undefined remote-DRAM latency when its sampled request count is zero.
+The corrected parser records **not measured: zero remote-DRAM requests**;
+no profile was rerun. Parser receipts retain both attempts.
+
+The following vendor-specific slot metrics are attribution, not directly
+interchangeable microarchitecture models or removable wall-clock time.
+
+| Metric | i270 v3 256² | dev v4x 256² | i270 v3 1024² | dev v4x 1024² | i270 v3 large | dev v4x large |
+|---|---:|---:|---:|---:|---:|---:|
+| backend_bound_by_cpu | 28.000% | 32.900% | 26.300% | 33.800% | 26.300% | 35.200% |
+| backend_bound_by_memory | 18.900% | 21.800% | 26.300% | 25.400% | 28.600% | 23.700% |
+| frontend_bound | 4.314% | 3.500% | 2.745% | 4.200% | 3.922% | 4.600% |
+
+AMD-specific metrics (separate windows, so components need not sum exactly):
+
+| Metric | 256² | 1024² | Large |
+|---|---:|---:|---:|
+| retiring | 39 %slots | 33.3 %slots | 34.8 %slots |
+| backend_bound | 54.3 %slots | 59.9 %slots | 58.1 %slots |
+| bad_speculation | 0.9 %ops | 1.8 %ops | 1.1 %ops |
+| smt_contention | 0.7 %slots | 1.6 %slots | 0.5 %slots |
+| l3_read_miss_latency | 74.6 ns | 70.8 ns | 73 ns |
+| l3_read_miss_latency_for_local_dram | 76.3 ns | 72.2 ns | 72.7 ns |
+| l3_misses | 893573 | 7.94189e+07 | 7.53498e+08 |
+| l3_cache_accesses | 1.02133e+08 | 2.64276e+09 | 3.15657e+10 |
+
+L3 metrics count shared CCD0/package PMUs, not process-private events. Generic
+LLC events are unsupported and remain **not measured**. Bad speculation is
+%ops on AMD; the Intel table elsewhere uses its slot denominator.
+IBS load sample counts within extraction are 1,349 / 15,440 / 165,958.
+Zero latency weights are not assigned a load latency. The tables below rank
+symbols by summed nonzero reported IBS cycle weights; these weights are not
+summed wall-clock stalls. Raw reports retain all sources and zero counts.
+
+**256, dev v4x, CPU 0**
+
+| Symbol | Load samples | L1 | L2 | L3 | RAM | Nonzero samples | Mean nonzero weight (cycles) |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| `zensim::simd_ops::__arcane_abs_diff_into_inner_v4` | 22 | 4 | 18 | 0 | 0 | 18 | 70.833 |
+| `__memmove_avx512_unaligned_erms` | 32 | 21 | 7 | 4 | 0 | 11 | 85.091 |
+| `zensim::blur::__arcane_box_blur_v_local11_wide_v4x` | 171 | 156 | 13 | 2 | 0 | 15 | 27.933 |
+| `<zensim::feature_v2_stream::RollingPlane>::append_rows` | 1 | 0 | 1 | 0 | 0 | 1 | 143.000 |
+| `zensim::blur::__arcane_box_blur_h_local11_wide_v4x` | 235 | 233 | 2 | 0 | 0 | 2 | 66.000 |
+| `zensim::feature_v2::__arcane_blockiness_row_l64_v4x` | 16 | 13 | 2 | 1 | 0 | 3 | 32.000 |
+
+**1024, dev v4x, CPU 0**
+
+| Symbol | Load samples | L1 | L2 | L3 | RAM | Nonzero samples | Mean nonzero weight (cycles) |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| `zensim::simd_ops::__arcane_abs_diff_into_inner_v4` | 410 | 35 | 357 | 18 | 0 | 375 | 116.501 |
+| `zensim::blur::__arcane_box_blur_v_local11_wide_v4x` | 3263 | 2582 | 371 | 310 | 0 | 681 | 43.508 |
+| `__memmove_avx512_unaligned_erms` | 359 | 75 | 225 | 59 | 0 | 284 | 86.792 |
+| `zensim::feature_v2::__arcane_blockiness_row_l64_v4x` | 354 | 184 | 93 | 77 | 0 | 170 | 35.459 |
+| `zensim::blur::__arcane_downscale_2x_into_inner_v4x` | 165 | 94 | 46 | 25 | 0 | 71 | 57.873 |
+| `zensim::feature_v2::__arcane_dense_block_kernel_canon64_vec_v4x::<zensim::featcanon::Lanes16F64, true>` | 3080 | 3030 | 46 | 4 | 0 | 50 | 20.520 |
+
+**large, dev v4x, CPU 0**
+
+| Symbol | Load samples | L1 | L2 | L3 | RAM | Nonzero samples | Mean nonzero weight (cycles) |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| `zensim::simd_ops::__arcane_abs_diff_into_inner_v4` | 4621 | 475 | 3741 | 402 | 3 | 4146 | 125.689 |
+| `zensim::blur::__arcane_box_blur_v_local11_wide_v4x` | 41596 | 33737 | 3715 | 4140 | 4 | 7859 | 43.191 |
+| `__memmove_avx512_unaligned_erms` | 3104 | 470 | 2209 | 360 | 65 | 2634 | 86.533 |
+| `zensim::feature_v2::__arcane_blockiness_row_l64_v4x` | 4332 | 1994 | 1355 | 983 | 0 | 2338 | 32.136 |
+| `zensim::blur::__arcane_downscale_2x_into_inner_v4x` | 1804 | 770 | 658 | 371 | 5 | 1034 | 60.218 |
+| `zensim::feature_v2::__arcane_dense_block_kernel_canon64_vec_v4x::<zensim::featcanon::Lanes16F64, true>` | 37374 | 36258 | 1100 | 16 | 0 | 1116 | 40.006 |
+
+The large IBS capture receipt is `rc=0 65s | peak-RSS 1.61GiB | min-avail 34547MiB | peak-load 1.75`.
+Final parsing is `rc=0 4s | peak-RSS 1.85GiB | min-avail 34926MiB | peak-load 1.53`.
+The first parse is retained with rc=1; its zero-request finding required only
+a parser correction. The owner then requested results urgently: individual
+UMC reruns beyond the explicit profile set were cancelled **before launch**
+with rc=76 after current cells finished. Their completed captures remain;
+unmeasured optional cells are not reported as successes. The stop decision
+is explicit in `STOP_OPTIONAL_PROFILES.json`. Required profile inputs,
+windows and gates are unchanged. No ring timing cell was interrupted.
+
+### Copy caller attribution from the Intel load-bound capture
+
+The saved `large-exe_activity.bound_on_loads/samples.txt` call chains split
+all 5,941 extraction `memmove` samples as follows. Counts are samples and
+period-weighted event estimates, **not cycles or summed wall-clock stalls**.
+The original `samples.txt`, its hash and the admission command remain in
+`$STUDY/phase1-deep-v1/large-exe_activity.bound_on_loads/`.
+
+| First caller below memmove | Samples | Period-weighted event estimate |
+|---|---:|---:|
+| StripPlaneProducer::next_strip | 3,439 | 6,878,010,317 |
+| StripPlaneProducer::produce::{closure#4} | 1,744 | 3,488,005,232 |
+| stream_phase_a | 745 | 1,490,002,235 |
+| gradient_block_kernel_at_revision | 6 | 12,000,018 |
+| dense_block_kernel_at_revision | 6 | 12,000,018 |
+| fused_vblur_features_ssim | 1 | 2,000,003 |
+
+Thus 5,183 samples have producer callers, 745 phase-A callers and 13 reduction
+consumer callers. This directs the copy hypothesis toward producer window
+movement, rather than assuming accumulator copies dominate. Inlining means
+the caller symbols alone do not distinguish every physical copy site.
+`RollingPlane::append_rows` compacts live rows with `copy_within`; the
+producer's ownership and retirement constraints must be preserved by any
+candidate. This attribution adds no new timing or sampling window.
+
 ## Pass table: one channel at one scale
 
 This table inventories materializations, not measured memory-controller bytes.
@@ -384,8 +585,9 @@ intermediate round trip; shared dense/basic loads and only provably identical
 expression intermediates; overlapping independent columns/channels/strips;
 removing dead initialization and avoidable accumulator copies; and working
 sets sized for the cache available to each active thread. These are
-hypotheses, not accepted optimizations. Copy callers need attribution before
-assuming the sampled `memmove` traffic consists of image-plane copies.
+hypotheses, not accepted optimizations. Saved call stacks attribute the large-image `memmove` load-bound samples
+primarily to producer frames (see the AMD/copy follow-up below). The inlined
+physical copy sites still need instruction-level separation.
 
 For an explicitly idealized extraction-only calculation, the measured large
 blur/pyramid cycle share is 46.024%. If that entire cost became zero and all

@@ -31,9 +31,8 @@ if [[ $mode = confirm-l3 || $mode = confirm-sparse ]]; then
             --delay=-1 --control="fifo:$cell/control-record" -o "$cell/perf.data" -- \
             "$old/binaries/a_family_cost" profile "$old/pairs" "$old/production-f16.bin" \
             "$old/inputs-A0.tsv" "$size" "$cell/record-window" 1 10 > "$cell/run.log" 2>&1
-        perf report -i "$cell/perf.data" --stdio --no-inline --call-graph none --no-children \
-            --percent-limit 0 -F overhead,period,sample,symbol > "$cell/self.txt"
-        perf script -i "$cell/perf.data" --no-inline -F period,ip,sym > "$cell/samples.txt"
+        printf '%s capture complete\n' "$(date -u +%FT%TZ)" > "$cell/CAPTURE_COMPLETE.txt"
+        # Decode this saved perf.data with a_fusion_parse.sh perf.
     }
     if [[ $mode = confirm-l3 ]]; then
         confirm 256 mem_load_retired.l3_miss 1 256-l3-period1
@@ -41,7 +40,7 @@ if [[ $mode = confirm-l3 || $mode = confirm-sparse ]]; then
         confirm 256 mem_load_retired.l2_miss 101 256-l2-period101
         confirm 1024 mem_load_retired.l3_miss 101 1024-l3-period101
     fi
-    python3 -B "$study/source/scripts/bench/a_fusion_stall_report.py" "$out" "$out/REPORT-$mode.json"
+    # Reports are a separate a_fusion_parse.sh intel-report invocation.
     exit
 fi
 [[ $mode = capture ]] || { echo "choose capture, confirm-l3 or confirm-sparse" >&2; exit 2; }
@@ -69,6 +68,7 @@ for size in 256 1024 large; do
             --control="fifo:$cell/control" -o "$cell/counters.csv" -- \
             "$old/binaries/a_family_cost" profile "$old/pairs" "$old/production-f16.bin" \
             "$old/inputs-A0.tsv" "$size" "$cell" 1 10 > "$cell/run.log" 2>&1
+        printf '%s capture complete\n' "$(date -u +%FT%TZ)" > "$cell/CAPTURE_COMPLETE.txt"
     done
     for event in "${events[@]}"; do
         name=${event%%:*}
@@ -83,9 +83,8 @@ for size in 256 1024 large; do
             --control="fifo:$cell/control" -o "$cell/perf.data" -- \
             "$old/binaries/a_family_cost" profile "$old/pairs" "$old/production-f16.bin" \
             "$old/inputs-A0.tsv" "$size" "$cell" 1 10 > "$cell/run.log" 2>&1
-        perf report -i "$cell/perf.data" --stdio --no-inline --call-graph none --no-children \
-            --percent-limit 0 -F overhead,period,sample,symbol > "$cell/self.txt"
-        perf script -i "$cell/perf.data" --no-inline -F period,ip,sym > "$cell/samples.txt"
+        printf '%s capture complete\n' "$(date -u +%FT%TZ)" > "$cell/CAPTURE_COMPLETE.txt"
+        # Decode this saved perf.data with a_fusion_parse.sh perf.
     done
 done
 printf '%s %s complete 24/24 cells\n' "$(date -u +%FT%TZ)" "$label" > "$out/COMPLETE.txt"

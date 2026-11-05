@@ -12,6 +12,7 @@ import subprocess
 import struct
 
 from a_family_cost_perf import summarize
+from a_fusion_artifacts import parsed_path
 
 
 def percentile(values, fraction):
@@ -90,6 +91,8 @@ def progress(root):
                 if json.loads(p.read_text())["status"] == "accepted"]
     cell_files = list(root.glob("**/inner.json"))
     cells = {str(p.parent.relative_to(root)): json.loads(p.read_text())["accepted"] for p in cell_files}
+    parsed_cells = {str(p.parent.relative_to(root)): str(parsed_path(p.parent, "summary.json"))
+                    for p in cell_files if parsed_path(p.parent, "summary.json").is_file()}
     identity = {str(p.relative_to(root)): sum(1 for _ in p.open())
                 for p in root.glob("*/identity.jsonl")}
     stages = {str(p.relative_to(root)): p.read_text().splitlines() for p in root.glob("*/stages.tsv")}
@@ -103,7 +106,7 @@ def progress(root):
                                         for p in root.glob("*RECEIPTS.tsv")},
                 processes=processes, heavy_lock=[row for row in locks if row.get("path") == lock],
                 phase1_captures_completed=len(captures), phase1_captures_required=9,
-                completed_image_timing_cells=cells,
+                completed_image_timing_cells=cells, parsed_image_timing_cells=parsed_cells,
                 identity_lines=identity, stage_outcomes=stages,
                 complete_failure_list_invariance=failure_invariance,
                 candidate_grid="20 images x 3 sizes x 2 thread counts x 32 clean paired rounds",

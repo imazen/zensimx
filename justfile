@@ -4493,3 +4493,27 @@ a-fusion-stall-confirm study label:
 # Add event-count samples where initial short windows had insufficient events.
 a-fusion-stall-sparse study label:
     bash scripts/bench/a_fusion_stalls.sh {{quote(study)}} {{quote(label)}} confirm-sparse
+
+# Short owner-authorized native batches; release the host lock between cells.
+a-fusion-host-cell stage study label arg1 arg2="":
+    bash scripts/bench/a_fusion_host_cell.sh {{quote(stage)}} {{quote(study)}} {{quote(label)}} {{quote(arg1)}} {{quote(arg2)}}
+
+# One profile cell, so training/evaluation can interleave between AMD windows.
+a-fusion-amd-profile study label size kind:
+    bash scripts/bench/a_fusion_amd_profile.sh {{quote(study)}} {{quote(label)}} {{quote(size)}} {{quote(kind)}}
+
+# Copy and hash-check the existing packet under dev's shared resource lock.
+a-fusion-setup-dev study archive:
+    bash scripts/bench/a_fusion_setup_dev.sh {{quote(study)}} {{quote(archive)}}
+
+# Strict AMD attribution from individual, non-multiplexed metric windows.
+fusion-amd-report study output:
+    flock "$HOME/tmp/heavy.lock" "$HOME/work/claudehints/scripts/run-heavy" --mem 24G --jobs 1 -- python3 -B scripts/bench/a_fusion_amd_report.py {{quote(study)}} {{quote(output)}}
+
+# Check tool-duration scope against a FIFO-controlled hardware counter.
+fusion-counter-control study output:
+    bash scripts/bench/a_fusion_counter_control.sh {{quote(study)}} {{quote(output)}}
+
+# Retry analysis in a new attempt directory; never rerun the capture.
+a-fusion-parse study stage input output:
+    bash scripts/bench/a_fusion_parse.sh {{quote(study)}} {{quote(stage)}} {{quote(input)}} {{quote(output)}}
