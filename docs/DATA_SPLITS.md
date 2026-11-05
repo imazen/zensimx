@@ -3255,3 +3255,13 @@ original TRAIN roles, native targets, rehearsal and admission. No AIC-2026 resul
 statistics are committed. Seeds1–2 require the registered seed0 product/development
 conditions and the owner's subsequent cost decision. The public zensim repository
 and its A model remain outside this research change.
+
+## Exposure registration — 2026-11-05: frozen shipped-A final assessment
+
+Owner authorized "score on the final sets"; coordinator corrected prior exposure claims before any read. Registration: `benchmarks/final_read_a_2026-11-05.md`, initial SHA256 `e10227b23566af3a17ba066d83841f8587d25785b74eea18c5c9c4f674b9d6dc`. Model SHA256 `d5e2a56db35c32620d9f9d9c19ba3bc78bd8fea2b8cd933cde8447428d85e62a`.
+
+Approved populations: CID22-B24, CSIQ866, LIVE release2/full779 and fixed clean10/267, KonJND JPEG TERMINAL100, KADID TERMINAL2000 (digits7/9), AIC-4 sample300 including SDR25/JPEG-AI50, MCL-JCI all rated conditions, CLIC2022 TERMINAL57243 questions. No training, tuning or model selection. No AIC-2026 public_test read.
+
+Prior zensim exposures remain: October4 R7/R7a read CID22-B/AIC-4/CSIQ/MCL-JCI/KonJND JPEG SELECT+TERMINAL (ledger lines1613–1617); October18 candidate reads CID22-B2100/CSIQ865/LIVE clean10 267 and KonJND SELECT404 (lines2761–2791). MCL-JCI/Konstanz PJND October24/25 and KADID TERMINAL October24–26 third-party studies remain disclosed (lines2867–2924). KADID TERMINAL has not previously been scored by a zensim model.
+
+KADID retains B (pinned research codec_target bake), delta>=-2SE, paired reference bootstrap10000 seed20261105, and Rev4 by_v2fy delta>=-0.005. Coordinator authorizes proceeding with B if by_v2fy cannot be located, with an explicit missing-comparator deviation. All reported statistics receive intervals; signed orientations are declared. Per-set LABEL_READS.json and ledger append precede the actual label parse; a failed or partial read is spent. Status at registration: no new label column parsed, no scoring performed.
