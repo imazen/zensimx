@@ -166,7 +166,8 @@ pub(crate) fn inspect(model: &Model, inputs: &[Input], constraints: &Constraints
     let ordinary=included.iter().filter(|j|!paired.contains(j)).map(|&j| -> Result<Value> {
         let mut input_order:Vec<_>=(0..l.in_dim).collect();
         input_order.sort_by(|&a,&b|w[b*l.out_dim+j].abs().total_cmp(&w[a*l.out_dim+j].abs()).then(a.cmp(&b)));
-        Ok(json!({"unit":j,"coefficient":c[j],"bias":l.biases[j],"status":capacity[j]["status"],"input_order":input_order,"slice":slice(model,inputs,&[j])?}))
+        let affine=l.biases[j]>=0.0 && (0..l.in_dim).all(|i|w[i*l.out_dim+j]>=0.0);
+        Ok(json!({"unit":j,"coefficient":c[j],"bias":l.biases[j],"status":capacity[j]["status"],"kind":if affine {"linear"} else {"hinge"},"input_order":input_order,"slice":slice(model,inputs,&[j])?}))
     }).collect::<Result<Vec<_>>>()?;
     let nonconstant = included
         .iter()
@@ -175,9 +176,30 @@ pub(crate) fn inspect(model: &Model, inputs: &[Input], constraints: &Constraints
     let zero_output_nondead: Vec<_> = (0..l.out_dim)
         .filter(|&j| c[j] == 0.0 && capacity[j]["status"] != "dead")
         .collect();
+    let affine_units: Vec<_> = ordinary
+        .iter()
+        .filter(|t| t["kind"] == "linear")
+        .map(|t| t["unit"].as_u64().unwrap() as usize)
+        .collect();
+    let linear_coefficients: Vec<f64> = (0..l.in_dim)
+        .map(|i| {
+            affine_units
+                .iter()
+                .map(|&j| f64::from(c[j]) * f64::from(w[i * l.out_dim + j]))
+                .sum()
+        })
+        .collect();
+    let linear_bias: f64 = affine_units
+        .iter()
+        .map(|&j| f64::from(c[j]) * f64::from(l.biases[j]))
+        .sum();
     let ordinary_nonconstant = included
         .iter()
-        .filter(|&&j| !paired.contains(&j) && (0..l.in_dim).any(|i| w[i * l.out_dim + j] != 0.0))
+        .filter(|&&j| {
+            !paired.contains(&j)
+                && !affine_units.contains(&j)
+                && (0..l.in_dim).any(|i| w[i * l.out_dim + j] != 0.0)
+        })
         .count();
     let certified_line_bound = (constraints.certificate["certified"] == true)
         .then_some(constraints.max_pairs.len() + ordinary_nonconstant + 1);
@@ -193,11 +215,13 @@ pub(crate) fn inspect(model: &Model, inputs: &[Input], constraints: &Constraints
         json!({"schema":"zensim-function-v1","output_bias":model.layer(1).biases[0],
         "certificate":constraints.certificate,"pairs":pairs,"ordinary_terms":ordinary,
         "included_units":included,"zero_output_nondead_units":zero_output_nondead,"capacity":document["capacity"],
+        "linear_background":{"units":affine_units,"coefficients":linear_coefficients,"bias":linear_bias,"proof":"Each listed unit has nonnegative encoder weights and nonnegative bias, hence ReLU(w·z+b)=w·z+b throughout the nonnegative standardized-input domain. Coefficients are summed in native f64 for an algebraic explanation; original f32 term execution is retained."},
+        "other_hinge_count":ordinary_nonconstant,
         "nonconstant_output_gates":nonconstant,"normalized_line_segments_upper_bound":nonconstant+1,
         "certified_line_segments_upper_bound":certified_line_bound,
         "binary_switches_upper_bound":switches,"global_affine_forms_upper_bound":affine_forms_bound,
-        "global_bound_scope":"Algebraic upper bound before output calibration on the certified domain: each max pair or remaining nonconstant ReLU chooses between two affine branches. Their sum has at most 2^K affine formulas for K switches; some choices may be unreachable or identical. This is not a measured region count or a statistical capacity/generalization guarantee.",
-        "certified_line_bound_scope":"On the certified nonnegative damage domain (declared fragility factors in [0,1]), each max of two affine planes adds at most one switch on a straight line in standardized inputs; each remaining nonconstant ReLU adds at most one. This bound excludes feature extraction, raw-to-product nonlinearities and output calibration. It does not count reachable regions or measure memorization.",
+        "global_bound_scope":"Algebraic upper bound before output calibration on the certified domain: always-active nonnegative ReLUs are affine background, with no switch. Each max pair or remaining nonconstant hinge chooses between two affine branches. Their sum has at most 2^K affine formulas for K switches; choices may be unreachable or identical. This is not a measured region count or a statistical capacity/generalization guarantee.",
+        "certified_line_bound_scope":"On the certified nonnegative damage domain (declared fragility factors in [0,1]), each max of two affine planes adds at most one switch on a straight line in standardized inputs; each remaining nonconstant hinge adds at most one. Always-active affine units add no switch. This bound excludes feature extraction, raw-to-product nonlinearities and output calibration. It does not count reachable regions or measure memorization.",
         "line_bound_scope":"Before the output head/calibration, along a straight line in standardized model inputs: each nonconstant affine preactivation crosses zero at most once. An upper bound, not a measured number of reachable pieces; raw fragility products and pixel descriptors are nonlinear.",
         "memorization":"Not established. Structural complexity and small coefficients do not prove absence of memorization or generalization. All nonzero residual terms are retained; no random-label fit, training/held-out gap, membership or duplicate-source experiment is performed here.",
         "algebra_scope":"Real-arithmetic explanation of stored coefficients, not a replacement scorer. Pair c·max(A,B) holds where the partner A is nonnegative; the native certificate proves this on nonnegative damage inputs with declared fragility factors in [0,1]. Reassociation need not preserve f32 bits. Curves use native activations and complete serving arithmetic.",
@@ -223,8 +247,16 @@ mod tests {
         assert_eq!(function["pairs"][0]["units"], json!([126, 127]));
         assert_eq!(function["ordinary_terms"].as_array().unwrap().len(), 31);
         assert_eq!(function["included_units"].as_array().unwrap().len(), 33);
-        assert_eq!(function["certified_line_segments_upper_bound"], 33);
-        assert_eq!(function["global_affine_forms_upper_bound"], "4294967296");
+        assert_eq!(
+            function["linear_background"]["units"]
+                .as_array()
+                .unwrap()
+                .len(),
+            31
+        );
+        assert_eq!(function["other_hinge_count"], 0);
+        assert_eq!(function["certified_line_segments_upper_bound"], 2);
+        assert_eq!(function["global_affine_forms_upper_bound"], "2");
         let w = model::weights(&model, 0);
         for row in function["pairs"][0]["coefficients"].as_array().unwrap() {
             let i = row["input"].as_u64().unwrap() as usize;
