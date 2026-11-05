@@ -289,6 +289,17 @@ def capacity():
 
 
 def reads():
+    if subprocess.check_output(['jj','log','-r','@','--no-graph','-T','empty'],cwd=X,text=True).strip()!='true':
+        raise ValueError('commit R14 read owners before freezing their source identities')
+    paths=[p for folder in ('scripts/byconstruction','scripts/rev4_featpot') for p in (X/folder).glob('*.py')]
+    paths+=[X/'justfile',owner.H/'tmp/e36test/exp5/readout.py']
+    source_pins=dict(source_commit=subprocess.check_output(['jj','log','-r','@-','--no-graph','-T','commit_id'],cwd=X,text=True).strip(),
+        sources={str(p.relative_to(X)) if p.is_relative_to(X) else str(p):owner.sha(p) for p in paths},
+        serving_pins_sha256=owner.sha(O/'SOURCE_PINS.json'),
+        frozen_fits_sha256=owner.sha(O/'FROZEN_FITS.json'))
+    path=O/'READ_SOURCE_PINS.json'
+    if path.exists() and json.loads(path.read_text())!=source_pins:raise ValueError('preserve frozen read-source cohort')
+    owner.write(path,source_pins)
     common=[sys.executable,'-B',X/'scripts/byconstruction/r12_linear_reads.py',
         '--models',O/'MODELS.json','--out',O/'reads','--bin-dir',O/'bin']
     for stage in ('eval','e36','chroma','hdr'):
