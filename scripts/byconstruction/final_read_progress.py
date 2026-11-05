@@ -9,6 +9,7 @@ from pathlib import Path
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('root', type=Path)
+    parser.add_argument('--brief', action='store_true')
     args = parser.parse_args()
     path = args.root / 'PROGRESS.json'
     value = json.loads(path.read_text())
@@ -47,7 +48,14 @@ def main():
     report = dict(stage=latest['stage'], completed=len(latest['completed_sets']),
         required=len(latest['required_sets']), failure=latest.get('failure'), **observation)
     (args.root / 'LIVE_OBSERVATION.json').write_text(json.dumps(report, indent=2) + '\n')
-    print(json.dumps(report, indent=2))
+    if args.brief:
+        print(f"{report['stage']}; {report['completed']}/{report['required']} populations complete")
+        print('live PIDs: ' + ', '.join(str(p['pid']) for p in observation['processes'].values() if p['live']))
+        for name, tail in observation['log_tails'].items():
+            if tail and not name.startswith('logs/'):
+                print(name + ': ' + tail.splitlines()[-1])
+    else:
+        print(json.dumps(report, indent=2))
 
 
 if __name__ == '__main__':

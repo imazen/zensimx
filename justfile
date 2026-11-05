@@ -4535,7 +4535,7 @@ viz-function-archive root destination:
 
 # Frozen-A assessment tools; caller supplies the disk-backed study root.
 final-read-progress root:
-    @python3 -B scripts/byconstruction/final_read_progress.py {{quote(root)}}
+    @python3 -B scripts/byconstruction/final_read_progress.py {{quote(root)}} --brief
 
 final-read-native-build root:
     env TMPDIR={{quote(root + "/scratch")}} CARGO_TARGET_DIR={{quote(root + "/target/decode")}} flock {{env_var('HOME')}}/tmp/heavy.lock {{env_var('HOME')}}/work/claudehints/scripts/run-heavy --mem 24G --jobs 8 -- cargo build --release --locked --manifest-path scripts/byconstruction/trust_decode/Cargo.toml
