@@ -4320,7 +4320,7 @@ r13-width-validate:
     flock ~/tmp/heavy.lock ~/work/claudehints/scripts/run-heavy --mem 24G --jobs 8 -- python3 -B scripts/byconstruction/r13_width_validate.py
 
 r13-width-archive:
-    flock ~/tmp/heavy.lock ~/work/claudehints/scripts/run-heavy --mem 24G --jobs 8 -- bash scripts/byconstruction/r13_width_archive.sh
+    python3 -B -c 'import sys; sys.path.insert(0,"scripts/byconstruction"); import r13_width as r; r.job("archive-final",["bash",r.X/"scripts/byconstruction/r13_width_archive.sh"])'
 
 
 

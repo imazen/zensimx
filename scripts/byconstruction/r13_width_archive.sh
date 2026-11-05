@@ -26,10 +26,10 @@ pins=json.loads((root/'SOURCE_PINS.json').read_text())
     files=len(rows),bytes=sum(r[2] for r in rows)),indent=2)+'\n')
 PY
 mkdir -p "$D"
-rsync -aLO --no-owner --no-group --exclude=/target/ --exclude=/archive.log --exclude=/archive-check.txt \
+rsync -aLO --no-owner --no-group --exclude=/target/ --exclude=/archive.log --exclude=/archive-check.txt --exclude='archive-*' \
   --exclude=/ACTIVE_JOB.json --exclude=/SUPERVISION.json --exclude=/status-last.json --exclude=/PROGRESS.jsonl \
   --exclude=/QUEUED_W4_BUILD.json "$O/" "$D/"
-rsync -ancLO --no-owner --no-group --itemize-changes --exclude=/target/ --exclude=/archive.log --exclude=/archive-check.txt \
+rsync -ancLO --no-owner --no-group --itemize-changes --exclude=/target/ --exclude=/archive.log --exclude=/archive-check.txt --exclude='archive-*' \
   --exclude=/ACTIVE_JOB.json --exclude=/SUPERVISION.json --exclude=/status-last.json --exclude=/PROGRESS.jsonl \
   --exclude=/QUEUED_W4_BUILD.json "$O/" "$D/" > "$O/archive-check.txt"
 if test -s "$O/archive-check.txt"; then cat "$O/archive-check.txt"; exit 1; fi
