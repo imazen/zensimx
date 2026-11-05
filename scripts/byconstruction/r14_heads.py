@@ -1,6 +1,7 @@
 """Run R12's frozen head instrument on i270 with the shared one-hour lock wait."""
 import json
 from pathlib import Path
+import shlex
 import subprocess
 import sys
 import time
@@ -46,9 +47,39 @@ def owner_hash(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
+def status():
+    import os
+    root=O/'heads'
+    active=json.loads((root/'ACTIVE.json').read_text())
+    sys.path.insert(0,str(fixed.X/'scripts/rev4_featpot'))
+    from run_processes import process_tree
+    live=any(p['pid']==active['pid'] and p['argv']==active['argv'] and p['state'] not in ('Z','X')
+             for p in process_tree(active['pid']))
+    probe='''import json,os,subprocess
+from pathlib import Path
+r=Path.home()/"tmp/zensim-r14-heads-20261104"
+d={name:json.loads((r/name).read_text()) if (r/name).exists() else None
+   for name in ("STAGE.json","COMPLETE.json","HOST.json")}
+p=subprocess.check_output(["lslocks","-J","-o","PID,COMMAND,PATH,BLOCKER"],text=True)
+d["locks"]=[v for v in json.loads(p)["locks"] if v.get("path","").endswith("/heavy.lock")]
+stage=d["STAGE.json"]
+d["worker_pid_exists"]=bool(stage and Path("/proc",str(stage["pid"])).exists())
+print(json.dumps(d))'''
+    remote=json.loads(subprocess.check_output(['ssh','i270','python3 -c '+shlex.quote(probe)],text=True))
+    execution=json.loads((root/'EXECUTION.json').read_text()) if (root/'EXECUTION.json').exists() else None
+    result=dict(checked=time.time(),local_coordinator_live=live,remote=remote,execution=execution,
+        started=active['started'],wait_limit_seconds=active['wait_limit_seconds'])
+    result['state']=execution['status'] if execution else ('timing/preflight' if remote['worker_pid_exists'] else
+        'waiting for shared lock' if live else 'exited; inspect execution/logs')
+    owner.write(root/'SUPERVISION.json',result)
+    print(json.dumps(result,indent=2))
+
+
 def main():
     if sys.argv[1:2]==['worker']:
         worker();return
+    if sys.argv[1:]==['status']:
+        status();return
     if sys.argv[1:]:raise ValueError('unexpected arguments')
     root=O/'heads'
     root.mkdir(exist_ok=False)

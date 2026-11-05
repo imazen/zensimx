@@ -64,12 +64,19 @@ def main():
                    for p in (root/'reads').glob('*.receipt.json')}
     t2=dict(released=release['run'] if release else None,
             complete=any(v['name']=='T2-s0' for v in completed))
+    capacity_completed=0
+    if models:
+        for bank in ('cid22','hdr'):
+            for name in models:
+                receipts=[root/'logs'/f'{kind}-{bank}-{name}.receipt.json' for kind in ('audit','ablation')]
+                if all(p.exists() and json.loads(p.read_text())['rc']==0 for p in receipts):
+                    capacity_completed+=1
     report=dict(checked=now,stage=active.get('stage'),state=state,live=live,lock=lock_state,holder_activity=holders,
         completed_fits=sum(v['name'].startswith('T1') for v in completed),required_T1_fits=3,T2=t2,
         fits=completed,epochs=epochs,
         reads=dict(completed=sum(rc==0 for rc in read_receipts.values()),
             failed=[n for n,rc in read_receipts.items() if rc],required=12+4*len(models) if models else None),
-        capacity=dict(completed=len(list((root/'capacity').glob('*/*/bank/summary.json'))),
+        capacity=dict(completed=capacity_completed,
             required=2*len(models) if models else None),
         source_pins_present=(root/'SOURCE_PINS.json').exists(),receipt=result,
         next_action='finish registered fits, then development feasibility and frozen reads')

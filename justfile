@@ -4411,6 +4411,9 @@ r14-python-checks:
 r14-transform-heads:
     python3 -B scripts/byconstruction/r14_heads.py
 
+r14-head-status:
+    python3 -B scripts/byconstruction/r14_heads.py status
+
 r14-native-noop:
     python3 -B scripts/byconstruction/r14_transforms.py job --label native-noop -- python3 -B scripts/byconstruction/r14_transforms_noop.py
 
