@@ -36,6 +36,7 @@ def main():
     if population == 'clic22' and action == 'stage':
         logs.append(args.root / 'stage/clic-2022-perceptual/rsync.log')
     logs.extend((args.root / 'inputs' / population).glob('*.log'))
+    logs.extend((args.root / 'scores' / population).glob('*.log'))
     logs.extend(sorted((args.root / 'banks/_work' / population).glob('chunk_*.log'))[-1:])
     observation['log_tails'] = {}
     for log in logs:
