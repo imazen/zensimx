@@ -103,6 +103,9 @@ path is implemented; no T2 release decision or fit has occurred yet.
 
 The untouched ARM strict-library-clippy baseline reports eight unused-item
 warnings as errors; this baseline receipt is retained without suppressing them.
+The Python execution-owner syntax, shell syntax and CLI setup checks also pass
+on ARM (`just r14-python-checks`, source `3e0c561c`, peak RSS 0.02 GiB).
+These checks load no scientific data; runtime fit/read receipts remain required.
 
 The final native binaries are pinned to `912609aa` (Rust 1.99.1), with all ten
 binary hashes in `SOURCE_PINS.json`. Trainer SHA256:
