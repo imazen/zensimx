@@ -1,8 +1,21 @@
 # R14: smooth per-input transforms for A
 
-**In progress: all 3 T1 fits, the T2 decision, 6 capacity cells, EVAL/HDR and
-head timing are complete; final product reads and archive verification remain.**
-No candidate is selected or adopted. EVAL is descriptive and never selects a fit.
+**All 3 required T1 fits, 6 capacity cells, 24 read stages and 3 i270 head pairs
+are complete. Final archive verification is pending.** Frozen A remains unchanged;
+no transformed model is adopted. T2 and seeds 1–2 are not run under the registered
+training-side conditions.
+
+Yeo-Johnson (T1a) buys selective improvements in chroma, exposed E36 ordering and
+compression median error, but worsens teacher development and the overall EVAL
+means while increasing the measured head cost. The stronger soft-clip and mixed
+arms do not improve the overall tradeoff. These are seed-0 results, without
+candidate across-seed stability evidence.
+
+[Full R14 read tables](r14_input_transform_reads_2026-11-04.md) include every EVAL
+collection, compression/noncodec split, product gate and HDR population beside
+all three A seeds. [Completed R13 comparisons](r14_r13_comparison_2026-11-04.md)
+include all six width arms' available EVAL/HDR/capacity reads and their completed
+product cells. [Artifact pointer](r14_input_transforms_2026-11-04.pointer.md).
 
 Registration `5b5a0134` in [the experiment record](e36_subset_test_2026-11-01.md)
 incorporates the coordinator's finite-gradient correction before screening.
@@ -52,6 +65,47 @@ development error and both EVAL means beside every A seed. Median-knee soft-clip
 and the mixed screen worsen all three summaries. Some individual collection/HDR
 statistics improve; the full read tables retain those results. EVAL does not
 select a candidate, release T2 or authorize repeats.
+
+## Product and HDR outcomes
+
+| Read | A seeds 0 / 1 / 2 | T1a | T1b | T1c |
+|---|---|---:|---:|---:|
+| Chroma level / rank | A0 reference | pass / pass | fail / pass | fail / pass |
+| Steering successes /135 (bar 128) | 133 / 134 / 134 | 134 | 127 | 128 |
+| C1–C6 on both grids | all pass | pass | pass | pass |
+| G-DIAL on both grids | all pass | pass | pass | pass |
+| Identity: all 744 exactly 100, read sets invariant | all pass | pass | pass | pass |
+| NEARID N1 / N2 | all pass | pass | pass | pass |
+| NEARID N3 monotone ladders /144 (bar 122) | 132 / 132 / 132 | 131 | 135 | 137 |
+| G-ADDR grading | not measured | not measured | not measured | not measured |
+
+The inherited standard/ladder grids are absent from the G-ADDR floor registry,
+and the resolvable-floor owner has no mentor per-cell truth for A7r. This affects
+A as well as the candidates. Numeric dial measurements are retained, but no
+G-ADDR pass is asserted and no gate/input is changed. The separate C1–C6 and
+G-DIAL outcomes above are measured passes. All three candidates miss strict
+teacher-development improvement; T1b/c also fail chroma, and T1b fails steering.
+No arm is eligible for seed repeats. `SEED_ELIGIBILITY.json` records each condition.
+
+T1a's compression equal-collection median error is 6.858%, against the three-seed
+A mean of 7.021%; its compression row-weighted SROCC is 0.89341 versus 0.89449.
+Its noncodec median error rises from 8.584% to 8.870%. These are descriptive
+assessment splits, not candidate-selection rules. T1b/c's extended-XYB chroma
+MAEs rise to 4.204848/4.566479 points versus A0's 3.576321; T1a is 3.462384.
+
+HDR is mixed and report-only. T1c raises UPIQ-all pooled SROCC to 0.825999
+against A's three-seed mean 0.811412, while within-reference Spearman falls
+to 0.956577 from 0.962233 and inversions rise to 131 versus A's 121/121/124.
+Its ladder inversions rise to 95 versus 50/51/49. T1a's UPIQ-all within-reference
+Spearman is 0.963536 with 120 inversions, but its ladder inversions are 54.
+The full tables preserve every panel result and the native JSON preserves
+whole-family intervals. The single-family 4Kdtb interval remains undefined.
+
+The completed R13 comparison uses identical A EVAL dictionaries and identical
+capacity-bank hashes/row counts. T1a's EVAL9 mean error is above W32/W64/W256/W512
+and below W4/W16. R13 W512 retains two live pairs, qualifying the earlier
+one-pair premise; T1a also retains two. Neither retained pair count nor a
+selection-source improvement establishes a held-out accuracy gain.
 
 ## Implementation and gates
 
@@ -344,10 +398,9 @@ are unchanged and the measured contributions are:
 
 All six cells passed the final bank/model identity, full-row coverage,
 packed structural-count and canonical native-certificate checks. These are
-label-free TRAIN diagnostics, separate from the forthcoming HDR quality panel.
+label-free TRAIN diagnostics, separate from the HDR quality panel.
 
-Frozen A is the control and is not refitted. Full read tables follow when the
-remaining pixel/dial jobs complete. No missing evidence counts as a pass.
+Frozen A is the control and is not refitted. The linked full read tables retain all completed pixel/dial jobs. No missing evidence counts as a pass.
 
 The public crate (imazen/zensim) is untouched: 0.3.0 ships A without transforms;
 porting transform support to its derived path is a later follow-up.
@@ -425,3 +478,19 @@ with its embedded commit ID. Its native compile inputs equal the published
 `ea0e8ea1` tree; only the report/receipt and two standalone analysis modules
 differ. [Final trainer receipt](r14_final_trainer_2026-11-04.json) owns both
 identities, source hashes, capsule hash and the resource receipt.
+
+## Interpretation
+
+These fixed transforms do not buy an overall accuracy/cost improvement over A
+in this registered seed-0 test. Yeo-Johnson is the strongest tested family: it
+passes chroma, steering, identity, NEARID and the measured dial contracts, and
+improves exposed E36 ordering plus compression median error. Its teacher-dev
+MAE and overall EVAL error are worse beside every A seed, its G-ADDR evidence is
+ungraded, and its descriptive head mean is 19.56 µs versus paired A0's 11.49 µs.
+The stronger soft-clip and mixed screen worsen the aggregate errors and fail
+chroma; T1b also misses the steering bar. Some individual EVAL/HDR improvements
+remain visible in the full tables. T2 would add supervised adaptation of
+soft-clip knees jointly with the network, within frozen TRAIN percentile bounds;
+no T2 accuracy is measured because its preregistered development rule fails
+and the winning T1a table has no eligible soft-clip slots. No repeat or adoption
+is selected from EVAL.
