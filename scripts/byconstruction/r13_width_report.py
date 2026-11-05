@@ -33,7 +33,13 @@ def main():
     expected_receipts=12+4*owner.required_fits()
     if len(receipts)!=expected_receipts: raise ValueError(f'incomplete assessment receipt inventory: {len(receipts)}/{expected_receipts}')
     lines=['# R13: A at proportional hidden widths (2026-11-04)','',
+           'Training width affects the learned solution in these seed-0 runs. Full-recipe W4 does not recover',
+           'A’s MOS error or E36 ordering. W16/W32/W64/W256 retain one live max pair; W4 has none detected and W512',
+           'retains two substantial pairs. W4/W16/W512 improve steering to 135/135, but every width fails',
+           'chroma-level, so no width improves across the registered product-gate set. No model is adopted.','',
            'Registration `25e77292`; admission/execution `ccdb5c7a`; native read-owner reuse `d6e429d3`.',
+           'All six bakes were frozen in `7669afbe` before assessment; capacity orchestration repair `f6941f24`.',
+           'Fits completed on November 4 UTC; the EVAL and product assessments ran on November 5 UTC.',
            'The control A is the frozen adopted W128 mixF3, seeds 0–2; no A refit.',
            'Owner amendment `397d67be` cuts the original seed repetitions on cost and adds W4 seed 0 after W16.',
            'Candidate seeds 1–2: **not run (owner cut on cost, 2026-11-04)**. W4 was registered only at seed 0.',
@@ -98,7 +104,7 @@ def main():
             else:
                 c=cap[f'cid22/{name}']
                 level='pass' if chroma[name]['passes'] else 'fail'
-                head=f"{timing[name]['candidate_ns']/1000:.6f}"
+                head=f"{timing[name]['candidate_ns']/1000:.3f}"
                 fit=next(r for r in fits if r['arm']==arm and r['seed']==seed)
                 wall=f"{fit['wall_seconds']:.2f}"
                 compact.append(dict(width=width,seed=seed,dev=dev['base_final_dev_geomean3'][name],
@@ -121,13 +127,14 @@ def main():
               '|---|---|---|']
     for width in (4,16,32,64,256,512):
         values=[timing[f'W{width}_s{s}'] for s in owner.registered_seeds()]
-        matched=' / '.join(format(v['baseline_ns']/1000,'.6f') for v in values)
+        matched=' / '.join(format(v['baseline_ns']/1000,'.3f') for v in values)
         clean=' / '.join(str(v['clean']) for v in values)
         lines.append(f"| {width} | {matched} | {clean} |")
     lines += ['', 'Native head owner: R12’s pinned `Predictor::predict_transformed` paired zenbench instrument,',
               '256 fixed positive logical rows, one call thread, default native dispatch, same clean-round indices.',
               'Includes scaling/network forward; excludes extraction, derived products and dial. These are paired',
-              'descriptive means; no pooled confidence interval or full-image speed claim is implied.','',
+              'descriptive means; no pooled confidence interval or full-image speed claim is implied.',
+              'W4 has only four clean rounds and W16 nine; their similar means do not establish a speed difference.','',
               '## Capacity on the HDR TRAIN feature bank','',
               'These are label-free forward/ablation diagnostics on the registered TRAIN bank, separate from the HDR quality panel.',
               'Structural counts use the same fixed weights as the CID22 table; contributions and interventions use this bank’s rows.','',
@@ -144,6 +151,68 @@ def main():
               '[R13 measured reads](r13_hidden_width_reads_2026-11-04.md). HDR uses the registered cube-root:203 banks,',
               'raw historical native scores before the dial, exactly as R12. HDR is report-only; no HDR leg was fitted.',
               'These are reused mix/HC1/R12 assessments, not untouched confirmation. CLIC/CIQA/MMSPG and public_test stay closed.','',
+              'The three A EVAL records, E36 control/population and five-view HDR point records exactly match',
+              'stored R12 outputs; A0’s five chroma anchor MAEs also match. `reads/CONTROL_REUSE_CHECK.json`',
+              'records this check. Additional verdict/identity executable hashes match the preserved October-28',
+              'tool manifest (`GATE_TOOL_PINS.json`); no executable or read input changed.','',
+              '`FINAL_VALIDATION.json` verifies the six bakes, twelve capacity cells, six native timing pairs',
+              'and all 36 read receipts. Every steering packet retains the same 135 cases as A; identity has',
+              '744 rows per model and NEARID 648 rows / 24 references / 144 ladders. `read-source/` and',
+              '`read-tools/` preserve the pinned reader sources and executable bytes; `READ_TOOL_ARCHIVE.json`',
+              'maps their original locations to archived copies.','',
+              '## Chroma level changes against A0','',
+              'Score-point MAE change and 95% ladder bootstrap interval, from the native registered read.',
+              'Each width has at least one family with a strictly positive interval. All six pass the separate rank check.','',
+              '| Family | W4 | W16 | W32 | W64 | W256 | W512 |',
+              '|---|---:|---:|---:|---:|---:|---:|']
+    for family in ('ycc444','ycc420','xyb-capped','xyb-extended','band-ac'):
+        values=[]
+        for width in (4,16,32,64,256,512):
+            c=chroma[f'W{width}_s0']['per_family'][family]
+            values.append(f"{c['mean_diff']:+.6f} [{c['ci95'][0]:+.6f}, {c['ci95'][1]:+.6f}]")
+        lines.append('| '+family+' | '+' | '.join(values)+' |')
+    lines += ['', '## Individual dial contracts','',
+              'Each cell is the measured value and native state. A lists seeds 0/1/2; candidates list seed 0.',
+              'C1 is monotonicity; C2 flat/clamp share; C3 negative-score share; C4 deepest negative score;',
+              'C5 identity-band violations; C6 cells above identity. C1–C6 pass on both grids.',
+              'This does not grade G-ADDR: its floor registry/mentor-truth inputs remain absent, as in R12.']
+    for grid in ('standard','ladder'):
+        lines += ['', f'### {grid}', '', '| Contract | A | W4 | W16 | W32 | W64 | W256 | W512 |',
+                  '|---|---:|---:|---:|---:|---:|---:|---:|']
+        for contract in ('C1','C2','C3','C4','C5','C6'):
+            values=[]
+            for arm in ('F','W4','W16','W32','W64','W256','W512'):
+                entries=[]
+                for seed in (range(3) if arm=='F' else (0,)):
+                    root=(owner.H/f'tmp/e36test/gates/mixF3_s{seed}-vi' if arm=='F' else O/f'reads/gates/{arm}_s{seed}')
+                    paths=list(root.glob(f'verdict-s0-*/{grid}/fulleval.json'))
+                    if len(paths)!=1:raise ValueError('ambiguous or missing contract grid')
+                    checks=load(paths[0])['dial']['addressability']['checks']
+                    c,=[c for c in checks if c['id']==contract]
+                    entries.append(f"{c['measured']:.6f} ({c['state']})")
+                values.append(' / '.join(entries))
+            lines.append('| '+contract+' | '+' | '.join(values)+' |')
+    lines += ['', '## Interpretation', '',
+              'Training width is load-bearing for the fitted solution and measured outcomes here, although candidate',
+              'across-seed stability is unmeasured. With the full continuation, W4 still has 8.25425% all-nine MOS',
+              'error versus A’s 7.94419/8.09039/8.04925%, and its E36 change against A’s seed mean is',
+              '+0.236079 percentage points [0.061760, 0.420477]. W16 also worsens both; W32 worsens MOS',
+              'while its E36 interval includes zero. W64 and W256 sit within A’s MOS seed range and their E36',
+              'intervals include zero; this does not establish W128 as necessary or optimal. W512 retains two',
+              'pairs with 53.263/46.737% of CID22 contribution (53.694/46.306% on HDR TRAIN), yet its E36',
+              'inversion share worsens. Collapse to one pair is therefore not universal. The packed W4 has',
+              'one live unit and one residual unit, with no coupled max pair detected; this is not an assertion',
+              'of exact global linearity. W4/W16/W512 beat A’s steering counts at 135/135 versus 133/134/134,',
+              'but all widths fail chroma-level; W4’s extended-XYB MAE rises by 0.380209 points',
+              '[0.249061, 0.502837]. All pass the registered dial/identity/NEARID bars, while W4 and W512',
+              'each lose one monotone NEARID ladder (131 versus A’s 132). No width gives an across-gate win.',
+              'Width includes the proportional pair allocation and inherited Xavier/RNG semantics above;',
+              'the experiment does not isolate those mechanisms.','',
+              'HDR gains are mixed: W4 improves 4Kdtb within-reference inversions to 43 versus A’s 45/44/45,',
+              'but has 53 ladder inversions versus 50/51/49 and 125 UPIQ-all inversions versus 121/121/124.',
+              'Its teacher-VAL pooled SROCC improves to 0.899412 versus A’s 0.891399 seed mean, while its',
+              'teacher within-reference ordering loses one pair. These report-only results do not establish',
+              'a consistent HDR gain or authorize an HDR fit.','',
               '## Frozen final bakes','', '| Width | Seed | Packed SHA-256 | Bytes |','|---|---:|---|---:|']
     for row in fits:
         lines.append(f"| {row['arm']} | {row['seed']} | `{row['packed_sha256']}` | {row['packed_bytes']} |")
@@ -157,7 +226,7 @@ def main():
         for line in path.read_text(errors='replace').splitlines():
             if line.startswith('run-heavy: done'):
                 lines.append(f"- `{path.relative_to(O)}`: {line}")
-    lines += ['', '## Verdict', '', 'Measured interpretation is written after reviewing every table; no model is adopted by this report.', '']
+    lines += ['']
     a.out.write_text('\n'.join(lines))
     owner.write(O/'REPORT_ROWS.json',compact)
 

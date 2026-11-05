@@ -4316,6 +4316,9 @@ r13-width-fit-progress:
 r13-width-report output:
     python3 -B scripts/byconstruction/r13_width_report.py --out {{quote(output)}}
 
+r13-width-validate:
+    flock ~/tmp/heavy.lock ~/work/claudehints/scripts/run-heavy --mem 24G --jobs 8 -- python3 -B scripts/byconstruction/r13_width_validate.py
+
 r13-width-archive:
     flock ~/tmp/heavy.lock ~/work/claudehints/scripts/run-heavy --mem 24G --jobs 8 -- bash scripts/byconstruction/r13_width_archive.sh
 
