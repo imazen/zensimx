@@ -33,7 +33,7 @@
 ### Dependency compatibility
 
 - Converge the research root and six standalone tool graphs on immutable sibling
-  revisions; eliminate external checkout paths and enforce resolved source identity.
+  revisions; eliminate external checkout paths and enforce resolved source identity (`91f29ad0`).
   Qualification and retained sibling limitations: [cohort receipt](benchmarks/sibling_final_2026-11-05.pointer.md).
 
 - Prepare one shared pixel/codec graph for sibling consumers; E34 uses equivalent

@@ -36,6 +36,8 @@ unchanged; formerly local benchmark statistics use `8d6bb1e`.
 resolved roots, including source identity, one shared core/pixel source,
 selected codec revisions and no external local-package paths. Missing locks
 or mismatched sources fail. The explicit public-F runtime is separately pinned.
+The final tool/source/script scope passes after unused-patch removal:
+`rc=0 29s | peak-RSS 0.17GiB | min-avail 8264MiB | peak-load 3.59`.
 The three already-ignored standalone lockfiles are archived with the evidence.
 
 ## Owner-visible sibling limitations
@@ -68,9 +70,27 @@ passes across five targets and eight doctests pass (eight existing ignored
 doctests). CI-exact clippy and the 1,576-script lint pass. Combined scope:
 `rc=0 992s | peak-RSS 3.21GiB | min-avail 4459MiB | peak-load 6.39`.
 
-Final root tests, source-stamped binaries and the fresh 4,678-pair replay are
-required before this cohort may land. No final-oracle success is claimed here
-until the receipts below are filled from the completed run.
+Built source: `91f29ad04000f63e7d3d3f7f8e4ccf98171247df`, preserved with
+the resolved locks and complete source archive. Release build:
+`rc=0 157s | peak-RSS 1.34GiB | min-avail 7179MiB | peak-load 4.05`.
+Binary SHA-256: `a_family_cost`
+`d34e71a1cd72189485fc126f372063b2d10a3ffbdf5cf9eacb68c1c09bab34ad`;
+`split_parity_golden`
+`155b7a934aed027f2466be59c8dfec61a843f1e4984198d285fa59b84a51dc3c`.
+
+Fresh frozen replay on i270 (`oracle-final-run01`) passes: 4,678/4,678
+predictions exactly equal the frozen table, zero differences. Source file and
+decoded-pixel hashes, all 504 consumed feature values, full-feature hashes and
+score bits are unchanged. The complete capture is byte-identical, SHA-256
+`aa1810c58b3615b57cb32fc21978111cbc6776566af791de8d1f1d3e8cd9deef`.
+The complete split golden is byte-identical: 145,327 lines, 18,586,466 bytes,
+SHA-256 `93c94bee1e518f3e105ebcc75f7a4e06a9367bc626f418a5fc7fdee6346b8627`.
+Combined native replay, split, frozen-prediction and strict pixel/feature checks:
+`rc=0 234s | peak-RSS 0.52GiB | min-avail 24425MiB | peak-load 7.44`.
+All eight input/model hashes and both binary hashes pass again after the run.
+The first orchestration launch omitted two unchanged just imports and exited
+before reading any pairs; that log is retained. The completed retry changed
+no scientific inputs or gates. Post-build changes contain receipts only.
 
 Evidence, checked on dev: `/mnt/v/output/zensim-siblings-20261105/zensimx-final/`.
 Mirror: `/mnt/tower/output/zensim-siblings-20261105/zensimx-final/`.
