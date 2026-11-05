@@ -14,7 +14,7 @@ publish = false
 
 [features]
 # Quiet-box measurement extension; no serving code or benchmark defaults change.
-shipgates = ["dep:zenpng", "zenpng/_dev", "dep:enough", "dep:zenpixels", "dep:zenpixels-convert", "dep:serde_json", "dep:sha2"]
+shipgates = ["dep:zenpng", "zenpng/_dev", "dep:enough", "dep:zenpixels", "dep:zenpixels-convert", "dep:serde_json", "dep:sha2", "dep:zenbitmaps"]
 speedq = ["dep:serde_json", "dep:sha2"]
 costcmp = ["speedq", "ssim2-rayon", "dep:fast-ssim2-main"]
 training = ["zensim/training"]

@@ -71,7 +71,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
     let (width, height) = (rect.width as u32, rect.height as u32);
     let mut rgb = vec![0u8; width as usize * height as usize * 3];
-    let options = ConvertOptions::forbid_lossy().with_alpha_policy(AlphaPolicy::DiscardIfOpaque);
+    let options = ConvertOptions::retain_channels().with_alpha_policy(AlphaPolicy::DiscardIfOpaque);
     let mut converter = RowConverter::new_explicit(
         PixelDescriptor::RGBA8_SRGB,
         PixelDescriptor::RGB8_SRGB,

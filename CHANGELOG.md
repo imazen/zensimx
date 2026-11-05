@@ -13,6 +13,8 @@
 
 ### Fixed
 
+- `shipgates_prepare_source` uses `ConvertOptions::retain_channels()`, the same preset under its surviving name, because zenpixels `fde59b96` removes `forbid_lossy()`. Its `shipgates` feature now enables the `zenbitmaps` dependency the example has read BMP files through since `b476d7cc`.
+
 - Retain final-read artifacts on durable storage and add the approved lossless temporary-PNG effort (`26ab7625`); require exact serial/parallel peer-output parity before bounded parallel scoring (`20a6e08a`).
 
 - Extend the existing verified mirror with explicit evaluation snapshots, preserving stimulus files and materializing file aliases while retaining feature/training image restrictions (`a39de789`).
