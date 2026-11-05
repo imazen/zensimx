@@ -374,3 +374,13 @@ All305 stimuli independently verified and all610 feature RGB checks passed. Froz
 - stats: `run-heavy: done rc=0 23s | peak-RSS 0.18GiB | min-avail 33342MiB | peak-load 3.69`
 
 Target cache `06ec295c3af79c12e86625b053572e928f8aab4b9a99bb2e242ddac3badf10fc`; completed journal `d2885fc4ffe3403c482c7ffc438a7c242f783e745456e7aff1e81b3d29ce6611`.
+
+## Durable study location and approved temporary-PNG effort — before MCL labels
+
+Owner instruction: do not keep needed artifacts in temporary storage. The full study was atomically moved onto durable root-volume storage at `/var/lib/zensim-final-read-a-20261105`; `/var/tmp/final-read-a-20261105` is only a compatibility symlink for immutable earlier receipts. Reusable source is committed in this repository. The frozen extractor is now also retained under the durable study's `bin/`, SHA unchanged (`ed495741…`). The final tower mirror remains `/mnt/tower/output/zensim/final-read-a-2026-11-05/`.
+
+Coordinator approved switching only temporary lossless PNG output compression from zenpng0.1.4 Balanced effort13 to Fastest effort1. JPEG decode remains zenjpeg `762fa712`; pixel conversion, models, populations and statistics are unchanged. New decoder SHA256 `1813afa0c45b469021775dfd9933735ce1c10ae0db35b27112e2c0b9da4a9e39`; old decoder SHA256 `47dc7d599febbee982e83545528494abc119b7f2de0f41999e111047097a213b` retained outside Cargo output. The earlier MCL decode was interrupted only after preserving580 completed records and every completed PNG; all artifacts retained. Existing pixel-hash-named PNGs are reused; remaining files use lossless Fastest compression. No MCL subject chain or target parsed.
+
+Independent Pillow readback of the same1920×1080 BMP and JPEG through both encodings matches RGB bytes exactly; input file SHAs, geometry and RGB hashes match the previous tool. All previous580 records will be checked against the resumed map, followed by the full independent readback. Native decoder tests2/2 and strict standalone clippy pass. Build receipt `rc=0 0s | peak-RSS0.18GiB | min-avail33167MiB | peak-load0.54`; test/clippy receipt `rc=0 0s | peak-RSS0.16GiB | min-avail33064MiB | peak-load0.61`; real-input lossless control `rc=0 0s | peak-RSS0.04GiB | min-avail33056MiB | peak-load0.56`. No runtime benchmark or speedup estimate is claimed.
+
+Durable location receipt SHA256 `41268403b87a5d343b37d736fdd1839d199c1cbeee348d20a8e7588592359f95`; Fastest parity receipt SHA256 `7959965b55652fae06ef867ca5ad75bf42b68114c84fa8327d90fc8164c24ef4`; relocated MODELS.json SHA256 `f566d1412d617a1535c0e58ded4b2bfdb9a99f1bab0b7170b94bb808d4ee366c`. Current model paths point to durable storage; original artifact SHAs are unchanged.

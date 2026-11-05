@@ -202,7 +202,7 @@ def decode(a):
     out = a.root/'inputs'/a.set
     with (out/'decode-map.tsv').open('x') as f:
         subprocess.run([str(a.root/'bin/trust-decode'), str(out/'decode-list.txt'),
-                        str(a.root/'pixels'/a.set), '--preserve-rgb8-png'], stdout=f, check=True)
+                        str(a.root/'pixels'/a.set), '--preserve-rgb8-png', '--fast-png'], stdout=f, check=True)
     verify_pixels(a)
 
 
@@ -542,7 +542,7 @@ def stats(a):
 
 
 def main():
-    global CURRENT
+    global CURRENT, EXTRACTOR
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('action',choices=['stage','keys','decode','verify_pixels','bank','predict','peers','comparators','ledger','read','stats'])
     parser.add_argument('set',choices=SETS)
@@ -550,6 +550,7 @@ def main():
     args=parser.parse_args()
     assert args.root.is_absolute()
     CURRENT=args
+    EXTRACTOR=args.root/'bin/extract_features_372col'
     progress(args,'running')
     try:
         globals()[args.action](args)

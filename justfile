@@ -4554,3 +4554,6 @@ final-read-control root:
 
 final-read-stats population root:
     env TMPDIR={{quote(root + "/scratch")}} PYTHONDONTWRITEBYTECODE=1 flock {{env_var('HOME')}}/tmp/heavy.lock {{env_var('HOME')}}/work/claudehints/scripts/run-heavy --mem 24G --jobs 8 -- python3 -B scripts/byconstruction/final_read_a.py stats {{quote(population)}} {{quote(root)}}
+
+final-read-native-check root:
+    env TMPDIR={{quote(root + "/scratch")}} CARGO_TARGET_DIR={{quote(root + "/target/decode")}} flock {{env_var('HOME')}}/tmp/heavy.lock {{env_var('HOME')}}/work/claudehints/scripts/run-heavy --mem 24G --jobs 8 -- bash -c 'cargo test --release --locked --manifest-path scripts/byconstruction/trust_decode/Cargo.toml && cargo clippy --release --locked --manifest-path scripts/byconstruction/trust_decode/Cargo.toml -- -D warnings'

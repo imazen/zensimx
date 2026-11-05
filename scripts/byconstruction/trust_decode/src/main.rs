@@ -109,9 +109,18 @@ fn webp_rgb8(bytes: &[u8]) -> Result<(u32, u32, Vec<u8>), String> {
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
-    if args.len() != 3 && !(args.len() == 4 && args[3] == "--preserve-rgb8-png") {
-        eprintln!("usage: trust_decode LIST OUT_DIR [--preserve-rgb8-png] > MAP.tsv");
+    if args.len() < 3
+        || args[3..]
+            .iter()
+            .any(|a| !matches!(a.as_str(), "--preserve-rgb8-png" | "--fast-png"))
+    {
+        eprintln!("usage: trust_decode LIST OUT_DIR [--preserve-rgb8-png] [--fast-png] > MAP.tsv");
         std::process::exit(2);
+    }
+    let preserve_png = args[3..].iter().any(|a| a == "--preserve-rgb8-png");
+    let mut png_config = zenpng::EncodeConfig::default();
+    if args[3..].iter().any(|a| a == "--fast-png") {
+        png_config.compression = zenpng::Compression::Fastest;
     }
     let out_dir = Path::new(&args[2]);
     std::fs::create_dir_all(out_dir).expect("create OUT_DIR");
@@ -129,7 +138,7 @@ fn main() {
         }
         let bytes = std::fs::read(&input).unwrap_or_else(|e| panic!("{input}: {e}"));
         let mut original_png = false;
-        let (w, h, px) = if args.len() == 4 && bytes.starts_with(b"\x89PNG") {
+        let (w, h, px) = if preserve_png && bytes.starts_with(b"\x89PNG") {
             let pb = decode(&bytes).unwrap_or_else(|e| panic!("{input}: {e}"));
             original_png = pb.descriptor().layout_compatible(PixelDescriptor::RGB8)
                 || pb
@@ -178,7 +187,7 @@ fn main() {
             let png = zenpng::encode_rgb8(
                 img,
                 None,
-                &zenpng::EncodeConfig::default(),
+                &png_config,
                 &enough::Unstoppable,
                 &enough::Unstoppable,
             )
