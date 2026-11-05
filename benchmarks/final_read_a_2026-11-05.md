@@ -126,3 +126,31 @@ The October4 pin's exact label files govern any difference from library label ta
 ### MCL library path approved — 2026-11-05, before chain reads
 
 Coordinator explicitly approves using the library files in place: chains under `/mnt/tower/input/iqa/datasets/mcl-jci/labels/JND_samples/`, pixels under `content/MCL-JCI/`. All50 raw chain files are hash-pinned without parsing them; aggregate `MCL_RAW_SHA256.json` SHA256 `9f49d76445161e46e61978ced5ca03482ac65d37505373b2ca57ba8d83b2b948`, retained in study `pins/`. The registered5000-row construction and full50/clean40 populations remain unchanged. No subject chain opened for label parsing or target construction yet.
+
+## Final instrument pin — before the first label parse
+
+Public/research parity passed the repository's documented split-parity normalizer: 135,625 records matched, zero missing, extra or different. Both canonical outputs SHA256 `3ab036b8559e819a54feb5795ea6d498a3b2a09aaa34c41312bebc0365a98eb1`. The normalizer maps research E to public A and compares Rev1 preview/configuration records and Rev7 A/HDR records. Research uses `ZENSIM_POW_FORM=libm`; the public default supplies the matching arithmetic. The unnormalized outputs include research-only records and therefore differ in shape. Official comparison receipt: `run-heavy: done rc=0 238s | peak-RSS 0.32GiB | min-avail 38135MiB | peak-load 4.16`.
+
+Frozen binaries:
+
+| Instrument | SHA256 |
+|---|---|
+| bake_dial_refit | `4174bb026a64abb15e402adb16a33f905da0864edcd538f026f3a1a8db733429` |
+| jnd-ladder-score | `7a1cf243895b958891ee83efe2c32828634da0e209305004dbfac3caeb2e8346` |
+| panel | `54901b0cda291117a108aa4f0c3f2b481d26dce62f9c1c6e68ec208a3820533c` |
+| serve_custom_bake | `3eefd0d45b8888bbc3464d3529179f75a937fe7747097d1ad4c335f62c3fe94b` |
+| split_parity_check | `2609d89b6b07305e15f9997d561cb285ef00867de62e3227f8175feed3078c9b` |
+| split_parity_golden | `47d0709139552e47941faad740e28a4c08c06154011b86f00787768a69bfbd9f` |
+| trust-decode | `47dc7d599febbee982e83545528494abc119b7f2de0f41999e111047097a213b` |
+
+Extractor SHA256 `ed4957417339779dd8ed25fe59a6166326ba9db86d5c1530b1e1c788c9d614d8`, source `b77883be18db5933a9db4b9e2670a2ba88a9729b`, serial Rev7 `basic+peaks+v2@w1825/rev7_rowlanes#36c3f3af`. Raw f64 CSVs are retained beside each bank. Predictor source is the registered research revision; the signed statistical tool is commit `a6c23628`, native serving comparator `cc6169df`, decoder including opaque RGBA support `332371bd`. All48 panel tests, strict workspace clippy and script lint passed; synthetic signed controls exercised all10,000 reference draws without real labels.
+
+KADID research B is `codec_target()` at the registered source, formula5, bake SHA256 `89cb4861e2651ff8d4a98bb879feed83a0f9eb3f22b83e644e42eb2291d74b2e`. The coordinator explicitly approves by_v2fy seed0, epoch119 (`epoch_rule:last`), formula4, bake SHA256 `d34f53111fa8baff4fc6003947768facfedc123e5bb1fd97aef99302297bd6d5`, original `full_s0/refit/last.bin` under the historical confirmation recipe. Both comparators will execute natively on the same decoded pixels. Model manifest SHA256 `088a81c1685ecd99a57ec8f85b41f7ca74d606a1a229a9bf22fc18dfb1b6bc46`. KADID label file `/mnt/v/dataset/kadid10k/dmos.csv` SHA256 `573e2ed98fdaa2a5aed7b50ad716906e125e1001ed0e97c8e93e79d7b997ba99`. Its `dmos` field is quality MOS; all2,000 original TERMINAL rows govern over the older1,952-row feature bank.
+
+Targets and score orientations: CID's pinned `human_score` is MCOS/100, restored to MCOS by multiplying100 for collection-scale RMSE (construction: `scripts/canonical_corpus/build_fr_corpus_pairs.py`). CSIQ is already1−DMOS; LIVE is already1−dmos_new/100; AIC4 `human_score` is distortion q_jnd; KonJND is its pinned PJND threshold; MCL is the registered distortion count. A/SSIM2/B/by_v2fy are quality, and butteraugli quality is explicitly −p3. Signed statistics preserve that relationship. CLIC uses every question's majority, with half credit for tied majority or prediction. Intervals use10,000 whole-reference PCG64 draws seed20261105, percentile95% with linear/type7 endpoints; paired KADID draws are shared.
+
+Coordinator staging amendment supersedes in-place content reads for LIVE, MCL and CLIC: one sequential rsync from each library content folder to `/var/tmp/final-read-a-20261105/stage/<id>/content`, every file verified against its dataset SHA256SUMS before decoding. No large data under home or the local dataset volume. Every scorer consumes the native normalized PNGs; independent Pillow readback verifies geometry and every RGB SHA. No third-party pixels enter feature extraction or scoring.
+
+CID22-B label-free completion: 2,100 pairs,24 references,2,124 stimuli. Keys SHA256 `b699066295048de539ba988f86c5435b327a33cce612acb334374f43d1b1415e`; decode-map SHA256 `bf77ceb8e9080102726ae0fa837bb504eda4ed3d5e7734d5a3d16ff32f56ecfa`. All4,200 feature RGB checks and all2,124 independent stimulus readbacks passed. Zero pixel-identical pairs; the cached prediction CLI's lack of identity evidence does not affect this population. Later populations are guarded before label parsing.
+
+Receipts: native decode `rc=0 71s | peak-RSS 0.06GiB | min-avail38427MiB | peak-load1.07`; feature extraction `rc=0 37s | peak-RSS0.28GiB | min-avail38316MiB | peak-load0.88`; A prediction `rc=0 1s | peak-RSS0.19GiB | min-avail38397MiB | peak-load0.47`; peers `rc=0 76s | peak-RSS0.13GiB | min-avail38019MiB | peak-load1.75`; independent readback `rc=0 10s | peak-RSS0.07GiB | min-avail31080MiB | peak-load1.03`. The initial opaque-alpha decoder refusal and peer scorer's missing model-directory environment failure occurred before label reads; their logs and intermediate artifacts are retained.

@@ -13,6 +13,8 @@
 
 ### Fixed
 
+- Preserve opaque RGBA pixels in native assessment decoding (`332371bd`); add native serial candidate serving (`cc6169df`), signed reference-bootstrap panels (`a6c23628`) and opt-in retention of exact feature CSVs (`bab8bd9e`).
+
 - Skip parallel streaming extraction below 36,864 pixels after existing small-image
   padding; scores are unchanged (`bfabf0d5`). The [gate study](benchmarks/a_parallel_gate_2026-11-04.md)
   records both pool-size crossovers and 49/50 admitted before/after cells.

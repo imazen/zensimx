@@ -4532,3 +4532,25 @@ viz-function-archive root destination:
     mkdir -p {{quote(destination)}}
     set -o pipefail; TMPDIR="$HOME/tmp/zensim-viz" flock "$HOME/tmp/heavy.lock" "$HOME/work/claudehints/scripts/run-heavy" --mem 2G --jobs 1 -- rsync -rlt --ignore-existing {{quote(root)}}/function-affine-* {{quote(root)}}/function-screenshots {{quote(root)}}/function-preservation.json tools/zensim-viz/function-evidence.json tools/zensim-viz/REPORT.md {{quote(destination)}}/ 2>&1 | tee "$HOME/tmp/zensim-viz/function-archive.log"
 
+
+# Frozen-A assessment tools; caller supplies the disk-backed study root.
+final-read-native-build root:
+    env TMPDIR={{quote(root + "/scratch")}} CARGO_TARGET_DIR={{quote(root + "/target/decode")}} flock {{env_var('HOME')}}/tmp/heavy.lock {{env_var('HOME')}}/work/claudehints/scripts/run-heavy --mem 24G --jobs 8 -- cargo build --release --locked --manifest-path scripts/byconstruction/trust_decode/Cargo.toml
+
+final-read-panel-build root:
+    env TMPDIR={{quote(root + "/scratch")}} CARGO_TARGET_DIR={{quote(root + "/target/assessment")}} flock {{env_var('HOME')}}/tmp/heavy.lock {{env_var('HOME')}}/work/claudehints/scripts/run-heavy --mem 24G --jobs 8 -- cargo build --release --locked -p zensim-validate --bin panel
+
+final-read-native-serving-build root:
+    env TMPDIR={{quote(root + "/scratch")}} CARGO_TARGET_DIR={{quote(root + "/target/assessment")}} flock {{env_var('HOME')}}/tmp/heavy.lock {{env_var('HOME')}}/work/claudehints/scripts/run-heavy --mem 24G --jobs 8 -- cargo build --release --locked -p zensim --features training,custom-profiles,classification --example serve_custom_bake
+
+final-read-step action population root:
+    env TMPDIR={{quote(root + "/scratch")}} PYTHONDONTWRITEBYTECODE=1 flock {{env_var('HOME')}}/tmp/heavy.lock {{env_var('HOME')}}/work/claudehints/scripts/run-heavy --mem 24G --jobs 1 -- python3 -B scripts/byconstruction/final_read_a.py {{quote(action)}} {{quote(population)}} {{quote(root)}}
+
+final-read-panel-test root:
+    env TMPDIR={{quote(root + "/scratch")}} CARGO_TARGET_DIR={{quote(root + "/target/assessment")}} flock {{env_var('HOME')}}/tmp/heavy.lock {{env_var('HOME')}}/work/claudehints/scripts/run-heavy --mem 24G --jobs 8 -- cargo test --release --locked -p zensim-validate --bin panel tests::signed_reference_resamples_preserve_negative_direction_and_ties -- --exact --test-threads=1
+
+final-read-control root:
+    env TMPDIR={{quote(root + "/scratch")}} PYTHONDONTWRITEBYTECODE=1 flock {{env_var('HOME')}}/tmp/heavy.lock {{env_var('HOME')}}/work/claudehints/scripts/run-heavy --mem 24G --jobs 8 -- python3 -B scripts/tests/test_final_read_a.py --panel-control {{quote(root)}}
+
+final-read-stats population root:
+    env TMPDIR={{quote(root + "/scratch")}} PYTHONDONTWRITEBYTECODE=1 flock {{env_var('HOME')}}/tmp/heavy.lock {{env_var('HOME')}}/work/claudehints/scripts/run-heavy --mem 24G --jobs 8 -- python3 -B scripts/byconstruction/final_read_a.py stats {{quote(population)}} {{quote(root)}}
