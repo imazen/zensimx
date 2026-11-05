@@ -3289,3 +3289,7 @@ CID22-B frozen-A read completed: all2,100 rows,24 references, no dropped targets
 Authorized frozen read of 866 rows; before target parsing. LABEL_READS.json SHA256 `e5e760f339697454ef384817511120bca59ed5caa8fb80c73365331e27dc2bd3`; label specification `{"path": "/mnt/v/dataset/csiq/csiq_pairs.tsv", "sha256": "78b1dac5f74e6f02198f9011eb12f655c358c567d6007497aeac9aa7e5f5a288", "target": "human_score"}`. Prediction/decode/binary pins retained in that receipt. Bootstrap10000 seed20261105; no tuning or selection. Status: authorized-before-read; any partial/failed read spends this population.
 
 CSIQ frozen-A read complete:866 rows /30 references; target cache `ef0a1ea87d0672bb4b4f1b3bd8368fcd728c3bae4c9502e4ddffdbb5d09efa0c`, completed journal `8fb4c1747e32a65ba8c6e471669659ad2793a142d2d153cd46ba97cd3a36707a`. Full signed panels and10,000-draw intervals in `benchmarks/final_read_a_2026-11-05.md`; spent, no model selection or tuning.
+
+### Frozen-A live: individual pre-open exposure — 2026-11-05T07:31:57.912021+00:00
+
+Authorized frozen read of 779 rows; before target parsing. LABEL_READS.json SHA256 `5c64bcca75eb0ef70071b1760be76f203af3239666800256fb438e0906a1a7a0`; label specification `{"path": "/mnt/v/datasets/LIVE/live_r2_pairs.tsv", "sha256": "49fcd7d23c9e35b147b52e3361103dbbf6a81aa8ae9d7b16f4763c7e7051fe5d", "target": "human_score"}`. Prediction/decode/binary pins retained in that receipt. Bootstrap10000 seed20261105; no tuning or selection. Status: authorized-before-read; any partial/failed read spends this population.
