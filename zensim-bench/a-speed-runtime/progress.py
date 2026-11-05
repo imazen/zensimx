@@ -176,6 +176,8 @@ def main():
                      "lock_holders": p["compute_lock"].get("holder_pids"),
                      "owns_lock": p["compute_lock"]["held_by_worker_ancestor"]} for p in workers],
         "binary_verified": True,
+        "collector_alive": collector is not None,
+        "collection_complete_marker": value["raw_collection_complete_marker"],
         "lock_holder_pids": lock.get("holder_pids"),
         "research_checks": checks,
         "research_goldens": goldens,
