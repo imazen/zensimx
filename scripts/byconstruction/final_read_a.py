@@ -62,7 +62,7 @@ def progress(a, state, child=None, error=None):
         binary=a.root/'bin'/file
         if binary.is_file():value[field]=sha(binary)
     value['next_action']={
-        'stage':'keys','keys':'decode','decode':'bank','verify_pixels':'ledger after predictions and peers','bank':'predict','predict':'peers',
+        'stage':'keys','keys':'decode','decode':'bank','verify_pixels':'ledger after predictions and peers','bank':'identity','identity':'predict','predict':'peers',
         'peers':'comparators then ledger' if a.set=='kadid_terminal' else 'ledger',
         'comparators':'ledger','ledger':'commit/push/verify exposure, then read','read':'stats',
         'stats':'publish results and continue in registered population order',
@@ -278,6 +278,48 @@ def bank(a):
         for c, field in [('ref_path','reference_pixels_sha256'),('dist_path','distorted_pixels_sha256')]:
             assert decoded[row[c]]['rgb8_sha256'] == audit[field], (row['pair_key'],field,'decode parity')
     print(json.dumps(dict(set=a.set,rows=len(rows),decode_hashes_verified=2*len(rows))),flush=True)
+
+
+def identity(a):
+    """Validate every identical-pixel row through the two frozen Rust surfaces."""
+    bank=a.root/'banks'/a.set
+    flags=pq.read_table(bank/'keys.parquet',columns=['pixels_identical'])['pixels_identical'].to_pylist()
+    indices=[i for i,flag in enumerate(flags) if flag]
+    if not indices:
+        print(json.dumps(dict(rows=0,native_parity_required=False,labels_parsed=False)),flush=True)
+        return
+    out=a.root/'controls'/(a.set+'-identity');out.mkdir(parents=True,exist_ok=False)
+    model=a.root/'models/A.bin'
+    assert sha(model)==sha(a.root/'source-public/zensim/weights/rev7_mix_h128_2026-11-03.bin')
+    tab=pq.read_table(bank/'features.parquet').take(pa.array(indices)).drop(['row_id'])
+    tab=tab.rename_columns(['ref_basename' if c=='pair_key' else c for c in tab.column_names])
+    tab=tab.append_column('human_score',pa.array([0.0]*len(indices)))
+    corpus=out/'features.parquet';pq.write_table(tab,corpus,compression='zstd')
+    del tab
+    pairs=pq.read_table(a.root/'inputs'/a.set/'keys.parquet').take(pa.array(indices)).to_pylist()
+    with (out/'pairs.tsv').open('x') as f:
+        writer=csv.writer(f,delimiter='\t');writer.writerow(['ref_path','dist_path'])
+        writer.writerows((r['ref_path'],r['dist_path']) for r in pairs)
+    env={**os.environ,'ZENSIM_FORMULA_REV':'7'}
+    command([a.root/'bin/bake_dial_refit','predict','--bake',model,'--corpus',corpus,
+             '--score-units','--out',out/'cached.tsv'],out/'cached.log',env=env)
+    command([a.root/'bin/serve_custom_bake','--native-pairs',out/'pairs.tsv',model],
+            out/'native.tsv',stderr=out/'native.log',env=env)
+    with (out/'cached.tsv').open() as f:cached=list(csv.DictReader(f,delimiter='\t'))
+    with (out/'native.tsv').open() as f:native=list(csv.DictReader(f,delimiter='\t'))
+    assert len(cached)==len(native)==len(indices)
+    assert [int(r['row_idx']) for r in cached]==list(range(len(indices)))
+    c=[float(r['pred']) for r in cached];n=[float(list(r.values())[-1]) for r in native]
+    proof=dict(rows=len(indices),all_cached_equal_native=c==n,
+               all_scores_exactly_100=all(v==100.0 for v in c+n),labels_parsed=False,
+               bank_keys_sha256=sha(bank/'keys.parquet'),feature_bank_sha256=sha(bank/'features.parquet'),
+               model_sha256=sha(model),predictor_sha256=sha(a.root/'bin/bake_dial_refit'),
+               native_scorer_sha256=sha(a.root/'bin/serve_custom_bake'),
+               cached_tsv_sha256=sha(out/'cached.tsv'),native_tsv_sha256=sha(out/'native.tsv'))
+    receipt=a.root/'inputs'/a.set/'CACHED_IDENTITY_PARITY.json'
+    assert not receipt.exists(),'preserve existing identity parity receipts'
+    write(receipt,proof);print(json.dumps(proof),flush=True)
+    assert proof['all_cached_equal_native'] and proof['all_scores_exactly_100'], 'identity parity failed before labels'
 
 
 def predict(a):
@@ -606,7 +648,7 @@ def require_private_aic_context(root):
 def main():
     global CURRENT, EXTRACTOR
     parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('action',choices=['stage','keys','decode','verify_pixels','bank','predict','peers','comparators','ledger','read','stats'])
+    parser.add_argument('action',choices=['stage','keys','decode','verify_pixels','bank','identity','predict','peers','comparators','ledger','read','stats'])
     parser.add_argument('set',choices=SETS+(AIC_PRIVATE,))
     parser.add_argument('root',type=Path)
     args=parser.parse_args()
