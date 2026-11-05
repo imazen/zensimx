@@ -4527,3 +4527,8 @@ a-fusion-idle-intel study:
 viz-function-browser:
     set -o pipefail; TMPDIR="$HOME/tmp/zensim-viz" flock "$HOME/tmp/heavy.lock" "$HOME/work/claudehints/scripts/run-heavy" --mem 8G --jobs 4 -- node tools/zensim-viz/tests/function.mjs 2>&1 | tee "$HOME/tmp/zensim-viz/function-browser.log"
 
+# Archive data without requiring ownership changes on a shared destination.
+viz-function-archive root destination:
+    mkdir -p {{quote(destination)}}
+    set -o pipefail; TMPDIR="$HOME/tmp/zensim-viz" flock "$HOME/tmp/heavy.lock" "$HOME/work/claudehints/scripts/run-heavy" --mem 2G --jobs 1 -- rsync -rlt --ignore-existing {{quote(root)}}/function-affine-* {{quote(root)}}/function-screenshots {{quote(root)}}/function-preservation.json tools/zensim-viz/function-evidence.json tools/zensim-viz/REPORT.md {{quote(destination)}}/ 2>&1 | tee "$HOME/tmp/zensim-viz/function-archive.log"
+

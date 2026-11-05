@@ -181,3 +181,8 @@ refuses unsupported heads or preprocessing. It reads model bytes without a bank.
 feature/function checks under the shared heavy lock. The same capture/source
 variables save the retained views plus all four function exhibits and affine
 background examples; `function-index.html` links the complete gallery.
+
+`just viz-function-archive OUTPUT_ROOT DESTINATION` copies the current
+`function-affine-*` bundles, captures and receipts under the heavy lock.
+It preserves existing destination files and avoids changing shared-storage
+ownership. Verify the copied bytes against the recorded SHA-256 receipts.
