@@ -384,6 +384,7 @@ def read_feature_csv(csv_path, expected_row_ids, width):
 
 def cmd_extract(a) -> int:
     s = a.set
+    retain_csv = getattr(a, "retain_feature_csv", False)
     assessment = getattr(a, "instrument_manifest", None)
     spec = None
     key_path = OLD_BANK / s / "keys.parquet"
@@ -488,9 +489,12 @@ def cmd_extract(a) -> int:
                         raise ValueError("canonical steering decoded pixel parity failed")
             audit_records.extend(audits)
         csv_bytes = csvp.stat().st_size
-        csvp.unlink()
+        if not retain_csv:
+            csvp.unlink()
         chunk_meta.append({"chunk": ci, "rows": hi - lo, "pairs_tsv_sha256": tsv_hashes[-1], "extract_wall_s": round(t_ext, 2),
-                           "csv_bytes_deleted": csv_bytes, "extractor_manifest": man, **({"audit_path":str(audit_path),"audit_sha256":sha256_file(audit_path)} if spec else {})})
+                           "csv_bytes_deleted": 0 if retain_csv else csv_bytes,
+                           **({"csv_path":str(csvp),"csv_sha256":sha256_file(csvp),"csv_bytes_retained":csv_bytes} if retain_csv else {}),
+                           "extractor_manifest": man, **({"audit_path":str(audit_path),"audit_sha256":sha256_file(audit_path)} if spec else {})})
         log(f"{s} chunk {ci} rows {lo}-{hi} extract {t_ext:.1f}s")
     writer.close()
     if len(fsids) != 1:
@@ -894,6 +898,7 @@ def main() -> int:
     ap.add_argument("--limit", type=int, default=0)
     ap.add_argument("--tier", default="native")
     ap.add_argument("--threads", type=int, default=8)
+    ap.add_argument("--retain-feature-csv", action="store_true", help="retain and hash each exact f64 feature CSV beside its assembled Parquet")
     a = ap.parse_args()
     if a.cmd == "extract":
         if not (a.bin and a.build_commit and a.era):
