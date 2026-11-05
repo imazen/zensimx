@@ -165,7 +165,7 @@ def keys(a):
         columns = ['ref_img', 'dist_img'] if a.set == 'kadid_terminal' else ['ref_path', 'dist_path']
         bref = set()
         if a.set == 'cid22_b':
-            bank = Path('/var/tmp/rev4-featbank/bank/cid22_b/keys.parquet')
+            bank = a.root/'pins/CID22_B_APPROVED_POPULATION_KEYS.parquet'
             bref = {Path(x).stem for x in pq.read_table(bank, columns=['ref_path'])['ref_path'].to_pylist()}
             assert len(bref) == 24
             spec['population_keys_sha256'] = sha(bank)
