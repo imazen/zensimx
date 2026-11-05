@@ -192,6 +192,21 @@ because cleanup tests or a historical training reproduction pass.
 
 ## Known Bugs
 
+### Crossover cache executable preservation (2026-11-04)
+
+The initial crossover cache helper scanned release executables only in `target`
+while also removing `target-tests`. It missed the gated public split checker.
+Its original TSV and frozen source survived; both timing executables were
+already outside Cargo output and remained intact. The checker was rebuilt from
+the unchanged source and reproduced the full original TSV byte-for-byte. It is
+now frozen outside Cargo output with its hash and compiler identity.
+
+`zensim-bench/a-speed-runtime/reclaim_cargo.py` now scans release roots and
+examples in every existing named cache. Regression controls cover the second
+cache and a single remaining cache, alongside live-mapping and non-Cargo
+refusals. The actual checker rebuild and subsequent preservation/cleanup pass.
+
+
 * **2026-11-04 — R13 native audit lacked its certifier binding. FIXED.** The exporter correctly refused the first capacity audit because `VIZ_CERTIFIER` was unset. R13 now binds the same frozen `bake_dial_refit` used for packing. The failed invocation and any partial audit output are retained separately; all bakes and audit definitions remain unchanged.
 
 * **2026-11-04 — R13 W4 recipe token rejected before optimization. FIXED.** The native/Python admission accepted the amendment-bound width-4 head, but the canonical recipe parser still rejected `H4`. The parser now accepts only the exact R13 W4 specification with its explicit amendment token; the historical default H4 rejection remains unchanged. The regression checks the complete recipe, absent/wrong authority and wrong pair allocation. The failed setup wrote no checkpoint and is retained with its resource receipt.

@@ -26,7 +26,9 @@ def main():
     label = args.label
     assert label and Path(label).name == label and label not in (".", "..")
     assert compute_lock(os.getpid())["held_by_worker_ancestor"], "take the shared compute lock"
-    targets = [root / name for name in ("target", "target-tests")]
+    targets = [root / name for name in ("target", "target-tests")
+               if (root / name).exists() or (root / name).is_symlink()]
+    assert targets, "no Cargo caches to reclaim"
     for target in targets:
         assert target.is_dir() and target.resolve() == target, target
         assert (target / "CACHEDIR.TAG").read_text().startswith(
@@ -46,8 +48,9 @@ def main():
     assert not preserved.exists(), "never overwrite a previous preservation receipt"
     preserved.mkdir(parents=True)
     copies = []
-    candidates = [*(targets[0] / "release").glob("*"),
-                  *(targets[0] / "release/examples").glob("*")]
+    candidates = [source for target in targets
+                  for directory in ("release", "release/examples")
+                  for source in (target / directory).glob("*")]
     for source in candidates:
         if not source.is_file():
             continue

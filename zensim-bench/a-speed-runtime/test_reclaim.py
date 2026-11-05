@@ -65,6 +65,24 @@ class CacheReclaim(unittest.TestCase):
         self.assertFalse((self.root / "target").exists())
         self.assertFalse((self.root / "target-tests").exists())
 
+    def test_second_target_release_control_survives(self):
+        source = self.root / "target-tests/release/examples/checker"
+        source.parent.mkdir(parents=True)
+        source.write_bytes(b"\x7fELFsecond target control")
+        self.run_reclaim()
+        destination = self.root / "preserved-cargo/control/target-tests/release/examples/checker"
+        self.assertEqual(destination.read_bytes(), b"\x7fELFsecond target control")
+
+    def test_one_remaining_target_is_supported(self):
+        (self.root / "target/CACHEDIR.TAG").unlink()
+        (self.root / "target").rmdir()
+        source = self.root / "target-tests/release/checker"
+        source.parent.mkdir(parents=True)
+        source.write_bytes(b"\x7fELFremaining target control")
+        self.run_reclaim()
+        destination = self.root / "preserved-cargo/control/target-tests/release/checker"
+        self.assertEqual(destination.read_bytes(), b"\x7fELFremaining target control")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -4109,6 +4109,10 @@ a-parallel-gate-after root:
 a-parallel-gate-fixture-oracle root:
     python3 -B zensim-bench/a-speed-runtime/oracle_fixtures.py {{quote(root)}}
 
+# Run under the shared compute lock, run-heavy and the original CPU affinity.
+a-parallel-gate-rebuild-checker root:
+    python3 -B zensim-bench/a-speed-runtime/rebuild_public_checker.py {{quote(root)}}
+
 a-parallel-gate-report root output phase:
     python3 -B zensim-bench/a-speed-runtime/report.py {{quote(root)}} {{quote(output)}} --parallel-gate {{quote(phase)}}
 
