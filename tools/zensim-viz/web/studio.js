@@ -497,14 +497,13 @@ export class Studio {
       "div",
       `|w| ${w.input_l1 ? this.fmt(w.input_l1[input.index]) : "unavailable"} · ablation ${rank < 0 ? "loading" : `${rank + 1} of ${rows.length}`}`,
     );
-    const second = this.el(
-      "div",
-      `read by ${
-        readers
-          .slice(0, 2)
-          .map((j) => `h${j}`)
-          .join(" ") || "none"
-      }${readers.length > 2 ? ` +${readers.length - 2}` : ""} · `,
+    const second = this.el("div", "read by ");
+    for (const j of readers.slice(0, 2))
+      second.append(this.unitLink(j), document.createTextNode(" "));
+    second.append(
+      document.createTextNode(
+        `${readers.length ? "" : "none"}${readers.length > 2 ? `+${readers.length - 2}` : ""} · `,
+      ),
     );
     const chip = this.el(
       "span",
@@ -660,21 +659,14 @@ export class Studio {
             : `Ablation rank ${rank + 1} of ${attrs.length} · mean |score change| ${this.fmt(attrs[rank].mean_abs_delta)}. Raw-feature intervention also changes its fragility twin.`,
         ),
       );
-      root.append(
-        this.el(
-          "p",
-          `Strongest readers: ${
-            (w.per_input_columns[i.index] || [])
-              .filter(
-                (j) =>
-                  w.layers[0].weights[i.index * w.layers[0].out_dim + j] !== 0,
-              )
-              .slice(0, 8)
-              .map((j) => `h${j}`)
-              .join(", ") || "none"
-          }.`,
-        ),
-      );
+      const readers = this.el("p", "Strongest readers: ");
+      for (const j of (w.per_input_columns[i.index] || [])
+        .filter(
+          (j) => w.layers[0].weights[i.index * w.layers[0].out_dim + j] !== 0,
+        )
+        .slice(0, 8))
+        readers.append(this.unitLink(j), document.createTextNode(" "));
+      root.append(readers);
       if (this.showUnit) {
         const unit = this.state.audit?.hidden_units.find(
           (u) => u.unit === this.state.unit || u.index === this.state.unit,
@@ -686,18 +678,10 @@ export class Studio {
               `${this.fmt(unit.activation_rate * 100)}% positive · mean |activation| ${this.fmt(unit.mean_abs_activation)} · range ${this.fmt(unit.min)} … ${this.fmt(unit.max)} · outgoing weight ${this.fmt(w.layers[1].weights[this.state.unit])}.`,
             ),
           );
-          root.append(
-            this.el(
-              "p",
-              `Top inputs: ${unit.top_inputs
-                .slice(0, 8)
-                .map(
-                  ([idx]) =>
-                    `f${w.inputs[idx].feature} ${w.inputs[idx].short_name}`,
-                )
-                .join("; ")}.`,
-            ),
-          );
+          const inputs = this.el("p", "Top inputs: ");
+          for (const [idx] of unit.top_inputs.slice(0, 8))
+            inputs.append(this.featureLink(idx), document.createTextNode("; "));
+          root.append(inputs);
         }
       }
       const flags = [
@@ -784,6 +768,11 @@ export class Studio {
     return this.termCache.get(url);
   }
   updateLegend() {
+    if (this.state.view === "lens" && this.exhibit === "Function") {
+      this.$("map-legend").textContent =
+        `Function · ${this.state.bake?.label || "No evidence"} · ${this.state.function?.pairs.length ?? 0} certified pairs · all nonzero residual terms retained · native basis slices`;
+      return;
+    }
     if (this.state.view === "lens")
       this.$("map-legend").textContent =
         `${this.exhibit} · ${this.state.bake?.label || "No evidence"} · input ${this.state.input} · h${this.state.unit} · ${this.state.lens?.pdp?.ice?.length || 0} native curves · IQR p25–p75`;

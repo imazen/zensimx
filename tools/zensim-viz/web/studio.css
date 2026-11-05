@@ -814,3 +814,108 @@ body[data-instrument="lens"] #range-mode {
 #weights-primary .capacity-strip {
   margin: 0;
 }
+.feature-link,
+.unit-link {
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+.model-strip a {
+  color: inherit;
+}
+.weights-controls {
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}
+#selected-feature-link {
+  font-size: 11px;
+  min-width: 0;
+}
+.function-pane {
+  overflow: auto;
+  padding: 20px 24px;
+}
+.function-pane h2 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 500;
+}
+.function-pane p {
+  margin: 6px 0;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.function-equation {
+  font-size: 14px;
+  overflow-x: auto;
+}
+.function-equation .katex-display {
+  margin: 8px 0;
+}
+.function-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 12px 0 8px;
+}
+.function-controls label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.function-controls select {
+  max-width: 330px;
+}
+.function-pane .term-formula {
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+.function-chart {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+.function-chart text {
+  fill: var(--ink-2);
+  font-size: 12px;
+}
+.function-chart .grid {
+  stroke: var(--border);
+  stroke-width: 1;
+}
+.function-switch {
+  stroke: var(--ink-3);
+  stroke-width: 1;
+  stroke-dasharray: 2 4;
+}
+.function-pane .function-footnote {
+  font-size: 10px;
+  color: var(--ink-2);
+}
+.function-pane > details {
+  margin: 12px 0;
+}
+.function-pane input[type="search"] {
+  width: 100%;
+  margin: 12px 0;
+}
+.function-coefficient-table {
+  max-height: 360px;
+  overflow: auto;
+}
+.function-pane details table {
+  width: 100%;
+}
+.function-pane .legend {
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 11px;
+}
+svg a {
+  cursor: pointer;
+}
+svg a text {
+  text-decoration: underline;
+}

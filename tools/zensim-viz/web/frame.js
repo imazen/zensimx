@@ -88,6 +88,9 @@ export function buildFrame() {
   weightAudit.append(weightSummary, $("weight-detail"));
   const weightControls = node("div", "weights-controls");
   weightControls.append(pathDetails, $("column-order").closest("label"));
+  const featureLink = node("span");
+  featureLink.id = "selected-feature-link";
+  weightControls.append(featureLink);
   const weightPrimary = node("div", "weights-primary");
   weightPrimary.id = "weights-primary";
   network.querySelector("h2").remove();
@@ -106,10 +109,14 @@ export function buildFrame() {
   attribution.dataset.exhibit = "Attribution";
   attribution.append(figures[2], figures[3]);
   const tabs = node("nav", "exhibit-tabs seg");
+  const functionPane = node("section", "function-pane");
+  functionPane.id = "function-exhibit";
+  functionPane.dataset.exhibit = "Function";
   tabs.setAttribute("aria-label", "Lens exhibit");
   for (const name of [
     "Concerns",
     "Weights",
+    "Function",
     "Dependence",
     "Ranges",
     "Attribution",
@@ -120,7 +127,14 @@ export function buildFrame() {
     tabs.append(b);
   }
   const exhibits = node("div", "exhibits diagnostics");
-  exhibits.append(concerns, network, figures[0], figures[1], attribution);
+  exhibits.append(
+    concerns,
+    network,
+    functionPane,
+    figures[0],
+    figures[1],
+    attribution,
+  );
   for (const e of exhibits.children)
     e.hidden = e.dataset.exhibit !== "Dependence";
   lens.replaceChildren(tabs, exhibits);

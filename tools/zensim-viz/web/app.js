@@ -2,6 +2,7 @@ import { formatNumber } from "./format.mjs";
 import { WeightView } from "./weight-view.js";
 import { buildFrame } from "./frame.js";
 import { Studio } from "./studio.js";
+import { FunctionView } from "./function-view.js";
 buildFrame();
 const $ = (id) => document.getElementById(id);
 const state = {
@@ -15,6 +16,7 @@ const state = {
   bake: null,
   audit: null,
   weights: null,
+  function: null,
   lens: null,
   compare: null,
   input: 0,
@@ -1155,6 +1157,69 @@ function correlationCell(value) {
   cell.title = `Pearson r ${full(value)}`;
   return cell;
 }
+function explainedFeature(input) {
+  const i = state.weights?.inputs[input];
+  return (
+    i &&
+    state.pair?.features.find(
+      (f) => f.id === i.feature && f.fragility === (i.factor != null),
+    )
+  );
+}
+function explainInput(input) {
+  const feature = explainedFeature(input);
+  if (!feature)
+    return status(
+      "No explained feature in this pair's catalog for that stored input.",
+    );
+  studio.hold = null;
+  studio.choose(feature, true);
+  studio.reference(feature, true);
+  $("reference-panel").scrollTop = 0;
+  history.replaceState(null, "", featureHref(feature.key));
+}
+function featureHref(key) {
+  return `#bake=${state.bake?.id || $("bake").value}&bank=${$("bank").value}&feature=${key}`;
+}
+function featureLink(input, label) {
+  const source = state.weights?.inputs[input],
+    feature = explainedFeature(input);
+  if (!source || !feature)
+    return el("span", label || "Feature explanation unavailable");
+  const link = el(
+    "a",
+    label || `f${source.feature} · ${source.short_name || source.name}`,
+    "feature-link",
+  );
+  link.href = featureHref(feature.key);
+  link.dataset.explainInput = input;
+  link.dataset.featureKey = feature.key;
+  link.title = `Explain ${source.name} · input ${input} · formula, detection, background and citations`;
+  link.onclick = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    explainInput(input);
+  };
+  return link;
+}
+function featureLinks(items) {
+  const root = el("span");
+  for (const [i, weight] of items)
+    root.append(featureLink(i), document.createTextNode(`: ${full(weight)}; `));
+  return root;
+}
+function unitLink(unit) {
+  const link = el("a", `h${unit}`, "unit-link");
+  link.href = `#bake=${state.bake?.id || $("bake").value}&bank=${$("bank").value}&unit=${unit}`;
+  link.title = `Inspect h${unit}'s pair or individual hinge function`;
+  link.onclick = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    view("lens");
+    functionView.chooseUnit(unit);
+  };
+  return link;
+}
 function renderConcerns() {
   if (!state.audit) return;
   const a = state.audit,
@@ -1238,7 +1303,21 @@ function renderConcerns() {
     selected.map((g) => [
       severity(g),
       g.kind,
-      g.input,
+      (() => {
+        const f = g.worst;
+        const input =
+          f.layer === 0 && f.from != null
+            ? f.from
+            : state.weights.inputs.findIndex(
+                (i) => i.feature === f.feature && i.factor == null,
+              );
+        return input >= 0
+          ? featureLink(
+              input,
+              `${g.input} · ${state.weights.inputs[input].short_name}`,
+            )
+          : g.input;
+      })(),
       g.flags.length,
       g.kind === "duplicate_input"
         ? correlationCell(g.worst.value)
@@ -1337,6 +1416,8 @@ Coupled max pair h${pair[0]} / h${pair[1]}`;
 }
 const weightView = new WeightView({
   state,
+  featureLink,
+  explainInput,
   $,
   css,
   svg,
@@ -1368,6 +1449,7 @@ const weightView = new WeightView({
 function renderWeights() {
   if (!state.weights) return;
   weightView.render();
+  $("selected-feature-link").replaceChildren(featureLink(state.input));
   renderArchitecture();
   if (state.view === "lens") {
     const i = state.weights.inputs[state.input];
@@ -1408,9 +1490,21 @@ function renderInputRanking() {
       y = i * 28,
       len = ((W - L - R) * r.mean_abs_delta) / max,
       g = svg("g", { tabindex: 0 });
-    node.append(
+    const inputIndex = state.weights.inputs.findIndex(
+      (i) => i.feature === r.features[0] && i.factor == null,
+    );
+    const name = svg("a", {
+      href: featureHref(explainedFeature(inputIndex)?.key),
+      "data-explain-input": inputIndex,
+    });
+    name.append(
       svg("text", { x: L - 12, y: y + 16, "text-anchor": "end" }, r.label),
     );
+    name.onclick = (e) => {
+      e.preventDefault();
+      explainInput(inputIndex);
+    };
+    node.append(name);
     g.append(
       svg("path", {
         d: `M${L} ${y} H${L + Math.max(0, len - 4)} Q${L + len} ${y} ${L + len} ${y + 4} V${y + 20} Q${L + len} ${y + 24} ${L + Math.max(0, len - 4)} ${y + 24} H${L} Z`,
@@ -1435,11 +1529,7 @@ Median Δ ${full(r.median_delta)} · p10 ${full(r.p10)} · p90 ${full(r.p90)}`,
         (i) => i.feature === r.features[0] && i.factor == null,
       );
       if (input) {
-        state.input = input.index;
-        $("input").value = input.index;
-        $("lens-family").value = "";
-        renderWeights();
-        loadLens().catch((e) => status(e.message));
+        explainInput(input.index);
       }
     };
     g.onkeydown = (e) => {
@@ -1458,7 +1548,12 @@ Median Δ ${full(r.median_delta)} · p10 ${full(r.p10)} · p90 ${full(r.p90)}`,
     table(
       ["Input", "Mean |Δscore|", "Median Δ", "p10", "p90"],
       rows.map((r) => [
-        r.label,
+        featureLink(
+          state.weights.inputs.findIndex(
+            (i) => i.feature === r.features[0] && i.factor == null,
+          ),
+          r.label,
+        ),
         full(r.mean_abs_delta),
         full(r.median_delta),
         full(r.p10),
@@ -1473,7 +1568,7 @@ function renderHidden() {
       const b = el("button", String(u.unit));
       tip(
         b,
-        `h${u.unit}\n${fmt(100 * u.activation_rate)}% positive\nMean |activation| ${full(u.mean_abs_activation)}\nRange ${full(u.min)} … ${full(u.max)}\nTop inputs: ${u.top_inputs.map(([i, v]) => `${i}: ${full(v)}`).join(", ")}`,
+        `h${u.unit}\n${fmt(100 * u.activation_rate)}% positive\nMean |activation| ${full(u.mean_abs_activation)}\nRange ${full(u.min)} … ${full(u.max)}\nTop inputs: ${u.top_inputs.map(([i, v]) => `${state.weights.inputs[i].short_name} (input ${i}): ${full(v)}`).join(", ")}`,
       );
       b.onclick = () => {
         state.unit = u.unit;
@@ -1504,7 +1599,7 @@ function renderHidden() {
         full(u.min),
         full(u.max),
         full(state.weights.layers[1]?.weights[u.unit]),
-        u.top_inputs.map(([i, w]) => `${i}: ${full(w)}`).join(", "),
+        featureLinks(u.top_inputs),
       ]),
       (j) => {
         state.unit = j;
@@ -1518,6 +1613,7 @@ function renderLens() {
   renderConcerns();
   renderWeights();
   renderHidden();
+  functionView.render();
   renderPdp();
   renderRange();
   renderFamily();
@@ -1615,6 +1711,8 @@ async function selectBake() {
   const generation = ++bakeGeneration;
   ++lensGeneration;
   state.weights = null;
+  state.function = null;
+  $("function-exhibit").textContent = "Loading native function explanation…";
   state.lens = state.compare = null;
   $("capacity-strip").textContent = "Loading native unit classification…";
   $("capacity-strip").dataset.bake = "";
@@ -1655,6 +1753,8 @@ async function selectBake() {
     $("capacity-strip").textContent = "No evidence for this bake and bank.";
     studio.reference(studio.hold || state.feature, true);
     $("weight-legend").replaceChildren();
+    $("selected-feature-link").replaceChildren();
+    $("function-exhibit").textContent = "No evidence for this bake and bank.";
     $("comparison-panel").hidden = true;
     renderInputRanking();
     $("pdp-legend").replaceChildren();
@@ -1665,14 +1765,18 @@ async function selectBake() {
     status("This bake has no exported evidence for the selected bank.");
     return;
   }
-  const [audit, weights] = await Promise.all([
+  const [audit, weights, functionDocument] = await Promise.all([
     get(bake.audit),
     get(bake.weights),
+    bake.function ? get(bake.function) : Promise.resolve(null),
   ]);
   if (generation !== bakeGeneration) return;
   state.bake = bake;
   state.audit = audit;
   state.weights = weights;
+  state.function = functionDocument;
+  functionView.selection = null;
+  functionView.render();
   $("input").disabled = $("lens-family").disabled = false;
   state.input = 0;
   state.unit = 0;
@@ -1784,6 +1888,7 @@ async function boot() {
     await Promise.all([selectPair(), selectBake()]);
     studio.ready();
     status(state.manifest.note || "");
+    await openLinkedExplanation();
     if (!state.manifest.pairs.length && state.manifest.bakes.length)
       view("lens");
     if (!state.manifest.pairs.length)
@@ -1799,6 +1904,54 @@ async function boot() {
     empty($("concern-table"), "Waiting for the Rust weight audit.");
   }
 }
+async function openLinkedExplanation() {
+  const params = new URLSearchParams(location.hash.slice(1));
+  const bake = params.get("bake"),
+    bank = params.get("bank");
+  if (
+    (bake && bake !== $("bake").value) ||
+    (bank && bank !== $("bank").value)
+  ) {
+    if (bake && state.manifest.bakes.some((b) => b.id === bake))
+      $("bake").value = bake;
+    if (bank && state.manifest.banks.some((b) => b.id === bank))
+      $("bank").value = bank;
+    await selectBake();
+    studio.compactBanks();
+  }
+  if (params.has("feature") && state.weights) {
+    const f = state.pair?.features.find((f) => f.key === params.get("feature"));
+    const input =
+      f &&
+      state.weights.inputs.find(
+        (i) => i.feature === f.id && (i.factor != null) === f.fragility,
+      );
+    if (input) {
+      view("lens");
+      explainInput(input.index);
+    }
+  } else if (params.has("unit") && state.function) {
+    view("lens");
+    functionView.chooseUnit(Number(params.get("unit")));
+  }
+}
+window.addEventListener("hashchange", () =>
+  openLinkedExplanation().catch((e) => status(e.message)),
+);
+const functionView = new FunctionView({
+  state,
+  $,
+  el,
+  svg,
+  fmt,
+  full,
+  table,
+  featureLink,
+  unitLink,
+  tooltip,
+  hideTooltip,
+  renderWeights,
+});
 const studio = new Studio({
   state,
   $,
@@ -1806,6 +1959,8 @@ const studio = new Studio({
   table,
   fmt,
   full,
+  featureLink,
+  unitLink,
   percentile,
   colour,
   preview,

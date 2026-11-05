@@ -332,11 +332,20 @@ export class WeightView {
         length = (Math.abs(v) / max) * R,
         y = k * 26,
         g = svg("g", { tabindex: 0 });
+      const mark =
+        type === "input"
+          ? svg("a", {
+              href: this.featureLink(id).getAttribute("href"),
+              "data-explain-input": id,
+              tabindex: -1,
+            })
+          : g;
+      if (mark !== g) g.append(mark);
       const name =
         type === "input"
           ? `in ${id} · ${m.inputs[id].short_name || m.inputs[id].name}`
           : `hidden ${id}`;
-      g.append(
+      mark.append(
         svg("text", { x: 0, y: y + 15 }, name),
         svg("rect", {
           x: v < 0 ? C - length : C,
@@ -350,13 +359,19 @@ export class WeightView {
         svg("rect", { x: 0, y, width: W, height: 26, class: "hit" }),
       );
       tip(g, `${full(v)} · signed weight\n${name}`);
-      g.onclick = () =>
+      g.onclick = (e) => {
+        e?.preventDefault();
         this.select(
           type === "input" ? id : state.input,
           type === "unit" ? id : state.unit,
         );
+        if (type === "input") this.explainInput(id);
+      };
       g.onkeydown = (e) => {
-        if (e.key === "Enter") g.onclick();
+        if (e.key === "Enter") {
+          e.preventDefault();
+          g.onclick(e);
+        }
       };
       node.append(g);
     });
