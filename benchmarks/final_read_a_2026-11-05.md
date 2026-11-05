@@ -80,3 +80,25 @@ crate's existing decode path (zenbitmaps/zenpng); JPEG stimuli through zenjpeg m
 - Registration is committed before any label column is parsed. Scorer/extractor binary hashes, label-file hashes and parity receipts will be appended in a committed pre-read pin before any label parse.
 - At registration: no labels parsed or sets scored by this assessment. Each actual read requires its own pre-open LABEL_READS.json and exposure append.
 - Coordinator amendments: preserve both KADID comparators/limits; if by_v2fy cannot be located, proceed with B and disclose the missing comparator. October 4/18 prior zensim exposures replace the earlier unread/first-zensim claims; approved populations unchanged.
+
+## Label-free preflight — 2026-11-05, coordinator clarification required
+
+Registration landed at `f3e5dc3dc3759356cb632568c005ec5a64248951`. No label values have been parsed and no set has been scored; no read has been spent by this assessment.
+
+- CLIC library `pairs.tsv`: 57,300 physical rows, 57,300 distinct canonical `(reference, unordered candidate pair)` questions, 57,243 distinct reference crops. The registered 57,243 question count is therefore a reference-crop count; population correction awaits coordinator direction.
+- Frozen KonJND JPEG TERMINAL keys: 100 pairs, 100 reference groups. A within-reference SROCC and its interval are undefined with one observation per reference; reporting it as undefined awaits coordinator direction.
+- MCL-JCI library `labels.tsv`: 243 threshold rows, 50 references, all 243 rows have `item == ref`. Its README describes JND locations on the JPEG-QF axis, rather than a per-distorted-image quality target. The historical instrument is 5,000 pairs (`benchmarks/mcl-jci.pointer.md`), with `jnd_dist` targets anchored at QF100. Its recorded `/var/tmp/datasets/mcl-jci/mcljci_labels.csv` is absent; expected SHA256 `36f17dd8bac2d085f718e388fd5db307d887338c9c2b296349bb2ef20f184802`. No substitute target or mapping has been invented.
+
+Research parity generator built from the pinned source, SHA256 `47d0709139552e47941faad740e28a4c08c06154011b86f00787768a69bfbd9f`. Build passed: `run-heavy: done rc=0 61s | peak-RSS 1.32GiB | min-avail 36513MiB | peak-load 5.69`. Public generator build and actual parity comparison remain pending; this is not a parity pass.
+
+Raw-file hashes below were computed without parsing label values:
+
+| Library table | SHA256 |
+|---|---|
+| cid22/labels.tsv | `128a7b1a9a2a7846f02f9253bebe062c8a26b91c39dcd0a711853cfee39a4b9c` |
+| csiq/labels.tsv | `495ffe5f9982766c06c024f09512f4339f32f6dac57b0e0d74b083d251eeec49` |
+| live-iqa/labels.tsv | `6673c707bc9a5be7de9185c3abfe793a8424777988428034dfb1dff7b452574f` |
+| konjnd-1k/labels.tsv | `9c27f7153c7efbae29ef67eb7a2b9e2ea59f7e612c35c73a61d5eab2e6633fd9` |
+| jpeg-aic4-sample/labels.tsv | `a64cabbdf47bc77c3692267e30c7db55ea6197114697e33c3dbb81c887bbf498` |
+| mcl-jci/labels.tsv | `6dd9668c421eda6546359e6311214965d7f43bc36a2281bb7656556432a55e4a` |
+| clic-2022-perceptual/pairs.tsv | `03300f61963c2fc96e5daf3cad3a0e8a43438637959875b904d7a944db295db1` |
