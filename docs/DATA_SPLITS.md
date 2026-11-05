@@ -3269,3 +3269,9 @@ KADID retains B (pinned research codec_target bake), delta>=-2SE, paired referen
 ### Frozen-A final assessment — pre-read instrument amendment, 2026-11-05
 
 Coordinator authorizes all57,300 CLIC2022 questions over57,243 reference crops, retaining every question. KonJND TERMINAL100 pairs/100 references has undefined within-reference SROCC/interval; pooled signed SROCC and reference bootstrap remain required. MCL-JCI is held pending the historical5000-row jnd_dist target or coordinator-supplied construction rule; no target construction or MCL read authorized meanwhile. Public parity and other populations proceed in registration order; individual ledger entries still precede labels. No labels parsed by this lane at this amendment.
+
+### Frozen-A final assessment — MCL construction and original label authority, 2026-11-05
+
+Coordinator supplies MCL rule before label reads:50 sources xQF1..100=5000 BMP/JPEG pairs; distortion target is mean over30 subject chains of count(points QF>=q), QF100 anchor0. Report full50 and clean40, excluding1/3/6/7/9/17/28/31/45/50. Record raw chain SHAs and new table SHA; lost36f17dd8 target byte identity cannot be verified. Named raw tree has0 chain/source files; use of library50 chain/source files is pending coordinator path approval. No chains opened or target constructed.
+
+The exact October4-pinned CID22/AIC4/KonJND/CSIQ label files govern differences from library tables; LIVE stays live_r2_pairs.tsv. Governing paths/hashes are in final_read_a_2026-11-05.md. Current approved CID22-B population remains24refs/2100pairs, distinct from the historical23-reference clean allowlist. No label value parsed by this lane at this amendment.

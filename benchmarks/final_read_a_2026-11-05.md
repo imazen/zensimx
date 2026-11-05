@@ -106,3 +106,19 @@ Raw-file hashes below were computed without parsing label values:
 ## Coordinator instrument decisions — 2026-11-05, before reads
 
 CLIC uses every one of the 57,300 questions across 57,243 reference crops. KonJND JPEG TERMINAL reports pooled signed SROCC with reference bootstrap; within-reference SROCC and its interval are undefined (100 pairs / 100 references). MCL-JCI is on hold until the coordinator supplies the historical 5,000-row `jnd_dist` table or its documented construction rule; this lane must not construct a target. Public parity and all other populations proceed in registration order, each label read after its ledger entry. The earlier preflight notes above retain their historical pending status; these decisions resolve CLIC and KonJND only.
+
+## Coordinator target and label-file amendment — 2026-11-05, before reads
+
+The historical MCL target and builder are lost. Before opening any subject chain, register the supplied construction: for each of 50 sources, pair the pristine BMP with every QF-q JPEG, q=1..100 (5,000 rows). `jnd_dist(source,q)` is the mean across its 30 subject chains of the number of chain points with QF >= q; the QF100 anchor has target0 by definition. This target is distortion-oriented. Report all50 sources and the R7a clean40 subset excluding source numbers1,3,6,7,9,17,28,31,45,50. Record every raw subject-chain SHA and the constructed target table SHA. Byte identity with the lost target table cannot be verified. Construction reference: zenpapers `scripts/jnd_ladder_agreement.py` and `benchmarks/mcl-jci.pointer.md`.
+
+The coordinator named `/var/tmp/datasets/mcl-jci/extracted/MCL-JCI/`; pre-read inspection found0 chain files and0 source-image files there. The in-place library contains50 chain files under `labels/JND_samples/` and50 BMP files under `content/MCL-JCI/source_images/`. A path-substitution question is pending; no chain has been opened, no MCL target constructed and no MCL read performed. Other populations continue.
+
+The October4 pin's exact label files govern any difference from library label tables. This changes label-file authority, not the approved population: CID22-B remains24 references/2100 pairs; the historical October4 pin itself had a23-reference clean allowlist, while the current approved24-reference B bank also includes `3316926_opo25u`. KonJND uses only the100 TERMINAL pairs and preserves the pinned SRC0437 JPEG058 path. LIVE remains its fixed external pair list. Hash checks on all original files below passed before reading labels.
+
+| Population | Governing label file | SHA256 |
+|---|---|---|
+| cid22_b | `/mnt/v/dataset/cid22/CID22_validation_set/cid22val_pairs_ab.tsv` | `3ce0f7438ea02277102217f504a1a680541e2a599be068f83fc49bb8fb1dfa8b` |
+| aic4 | `/mnt/v/output/zensim/v2-backfill-2026-07-20/aic4_pairs.tsv` | `955a9601e94c0877a00c822dbbbd17ad4ae11544dd6d550b9ed79d1ad9d983ff` |
+| konjnd_jpeg_terminal | `/mnt/v/output/zensim/v2-backfill-2026-07-20/konjnd_jpeg_val_pairs.tsv` | `70148a39c90d97d35899a171204d3996034cf0019fbe0c496ac51ae4c4d40856` |
+| csiq | `/mnt/v/dataset/csiq/csiq_pairs.tsv` | `78b1dac5f74e6f02198f9011eb12f655c358c567d6007497aeac9aa7e5f5a288` |
+| LIVE | `/mnt/v/datasets/LIVE/live_r2_pairs.tsv` | `49fcd7d23c9e35b147b52e3361103dbbf6a81aa8ae9d7b16f4763c7e7051fe5d` |
