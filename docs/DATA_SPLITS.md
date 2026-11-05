@@ -3211,6 +3211,24 @@ remains unchanged. W4 replaces the omitted seed repetitions; it introduces no ne
 read population or selection rule. Freeze all six final bakes before the unchanged
 registered reads. Candidate across-seed stability is unmeasured.
 
+### R13 completed exposure — 2026-11-05 UTC
+
+All six amended seed-0 bakes were frozen in `7669afbe` before the new assessment
+calls. EVAL (all nine collections, separately excluding training-source MDID),
+E36, G-CHROMA-L, G-STEER, C1–C6 on both grids, 744 identity probes per bake,
+NEARID and all five cube-root:203 HDR views completed under the registered
+owners. Label-free capacity used the full CID22 TRAIN and HDR teacher TRAIN
+banks; development reads used existing TRAIN-development groups. No new
+assessment population, fit, checkpoint selection or gate threshold was added.
+The frozen A controls reproduce the stored R12 EVAL/E36/HDR point records and
+A0 chroma anchor. These are reused assessments, not untouched confirmation.
+No CLIC/CIQA/MMSPG or public_test read occurred, and no AIC-2026 assessment
+statistics are published. The original ten seed-1/seed-2 cells are **not run
+(owner cut on cost, 2026-11-04)**; W4 was registered only at seed 0. All widths
+fail chroma-level despite steering gains in W4/W16/W512; no model is adopted.
+Results: `85231eb9`, [width report](../benchmarks/r13_hidden_width_2026-11-04.md)
+and [complete read tables](../benchmarks/r13_hidden_width_reads_2026-11-04.md).
+
 ## 2026-11-04 — R14 smooth input transforms (registered before screening/reads)
 
 Registration: `5b5a013482db4944042883995ad6892f92244c69`, the R14 section of

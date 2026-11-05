@@ -2405,7 +2405,8 @@ native monotone certificate passes. Exact structural counts: 23 dead, 7 residual
 [`r13_first_fit_2026-11-04.json`](r13_first_fit_2026-11-04.json).
 Reported in chat immediately after packing; W256 seed 0 proceeds next.
 This is capacity/TRAIN execution evidence only, not accuracy or product qualification.
-All 15 final bakes must still be frozen before R13 report-only assessments.
+At that point the original plan required 15 frozen bakes; the owner's amendment
+below replaces that inventory with six before the report-only assessments.
 
 **R13 initialization semantics (source checked during fitting).** The canonical
 trainer uses Xavier scales `sqrt(2/(inputs+hidden))` and
@@ -2459,6 +2460,26 @@ W4's legacy-parser setup failure preceded optimization; its explicit,
 amendment-scoped parser repair preserves the old default rejection. The failed
 setup is retained separately and does not select or shorten a fit. No R13 EVAL
 or product-gate result has been read at this fit freeze.
+
+**R13 completed result (2026-11-05 UTC).** The six retained seed-0 bakes received
+all registered reads, beside frozen A seeds 0–2, without another fit or setting
+change. Full-recipe W4 does not recover A: all-nine MOS error 8.25425% versus
+A's 7.94419/8.09039/8.04925%, E36 3.632725% versus A's 3.396647% seed mean.
+W64/W256 sit within A's MOS seed range and their E36 difference intervals
+include zero. One-pair collapse is not universal: W4 has no detected coupled
+max pair, W16/W32/W64/W256 retain one, and W512 retains two carrying
+53.263/46.737% of CID22 contribution. W4/W16/W512 reach 135/135 steering
+successes versus A's 133/134/134; all widths pass C1–C6, identity and NEARID,
+but every width fails chroma-level. No model is adopted. Candidate across-seed
+stability is unmeasured; the original ten seed-1/seed-2 cells remain **not run
+(owner cut on cost, 2026-11-04)**; W4 was registered only at seed 0.
+[Full width report](r13_hidden_width_2026-11-04.md),
+[all read tables](r13_hidden_width_reads_2026-11-04.md), results commit
+`85231eb9`. A's EVAL, E36 and HDR control point records exactly reproduce R12;
+the A0 chroma anchor reproduces R12 as well. Full artifact coverage is verified
+by `FINAL_VALIDATION.json` (six bakes, twelve capacity cells, six native timing
+pairs, 36 read receipts), with the [artifact pointer](r13_hidden_width_2026-11-04.pointer.md)
+owning mirror verification.
 
 
 ### R14 registration (2026-11-04, before screening, fitting or assessment): smooth per-input transforms
