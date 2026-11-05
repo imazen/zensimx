@@ -2,18 +2,18 @@
 
 
 Owner extension, 2026-11-05: dev is authorized for this study under its shared
-heavy lock, below training/evaluation priority. Its requested native tier is
-v4x; dispatcher confirmation and measurements are pending. One-thread dev
+heavy lock, below training/evaluation priority. Its dispatcher confirms native
+tier `v4x`; the profile and both full-width ring matrices are complete. One-thread dev
 cells use CPU 0, and sixteen-thread cells use CPUs 0–7,16–23 (CCD0, 96 MiB L3,
 verified through sysfs). All dev builds/measurements use a 24G run-heavy cap
 and `~/tmp/zensim-fusion-dev/`; no output goes under `/mnt/v`.
 
-The moment-ring and full-width activity-ring rejections below describe
-**i270 / v3 only**. Their dev cells are **not measured**, so cross-host
-decisions remain open. A candidate must pass the four required p50 comparisons
+The moment ring and full-width activity ring are **rejected on both
+i270 / v3 and dev / v4x**. The 128-column panel and remaining tiny rows
+are the final scoped work. A candidate must pass the four required p50 comparisons
 on each host. A split result goes to the owner and is neither landed nor
-discarded. After the deeper Intel attribution, the two existing rings get
-their dev tables before further candidates are timed on both hosts. Short
+discarded. The deeper Intel and required AMD attribution are complete.
+Further phases require an explicit owner go after the panel/tiny transition. Short
 dev batches release the lock between cells and during quiet-gate refusals.
 
 Status: investigation in progress. No fusion from this study is qualified or landed.
@@ -26,7 +26,8 @@ This is the brief's public-A control, distinct from the deprecated research
 
 Phase-1 profile parent: `ccdb5c7a`. The original builds, tests and measurements ran on i270,
 Core Ultra 7 270K Plus, native v3. One-thread measurements use P core 2;
-16-thread measurements use CPUs 0–15. AVX-512 speed is **not measured on Zen 5**.
+16-thread measurements use CPUs 0–15. Later AMD tables measure native `v4x`
+on Zen 5; Intel does not execute that tier natively.
 Every i270 job acquires the host's shared heavy lock and runs through
 `run-heavy --mem 16G`; other lanes use the same lock.
 
@@ -908,7 +909,9 @@ peak-load 9.19`. Its pixel and timing cells remain outstanding.
 Band interleaving and the first shared-leaf prototype pass strict native
 release clippy/build. A vector-accumulator refinement of the shared-leaf
 prototype still needs compilation and full qualification. No speed claim is
-made for those builds. Panel and era qualification is outstanding.
+made for those builds. The panel's original code and full pixel gates passed;
+its paired timing remains in progress. Further exact and era trials remain
+unmeasured under the owner's scope stop.
 
 ### Full-width activity-ring rejection
 
@@ -965,8 +968,8 @@ study root, label `activity-panel` and `activity-panel-stage` as arguments,
 inside one shared-lock/run-heavy scope. The immutable export is
 `ac7cafa5c16ac85ddbd569668ecf4c1d9d53ce9e`; its source and binary hash
 manifests are in `activity-panel/`. Full-vector pixel replay subsequently passed (receipt below);
-speed is not measured yet. Both full-width rings remain outside main's
-served path.
+speed was unmeasured at that gate receipt. Current panel timings are recorded
+below. Both full-width rings remain outside main's served path.
 
 
 ### Owner-directed zenjpeg-main probe (2026-11-05)
