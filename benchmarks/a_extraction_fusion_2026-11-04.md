@@ -9,14 +9,16 @@ verified through sysfs). All dev builds/measurements use a 24G run-heavy cap
 and `~/tmp/zensim-fusion-dev/`; no output goes under `/mnt/v`.
 
 The moment ring and full-width activity ring are **rejected on both
-i270 / v3 and dev / v4x**. The 128-column panel and remaining tiny rows
-are the final scoped work. A candidate must pass the four required p50 comparisons
+i270 / v3 and dev / v4x**. The 128-column panel is **rejected on AMD;
+Intel timing not measured**. All scoped AMD cells are complete.
+A candidate must pass the four required p50 comparisons
 on each host. A split result goes to the owner and is neither landed nor
 discarded. The deeper Intel and required AMD attribution are complete.
 Further phases require an explicit owner go after the panel/tiny transition. Short
 dev batches release the lock between cells and during quiet-gate refusals.
 
-Status: investigation in progress. No fusion from this study is qualified or landed.
+Status: closed under the final owner scope. No fusion from this study is qualified or landed.
+Further phases and missing Intel timings require a new owner go.
 The experiments use the frozen F seed-0 bake served through `BakeScorer`, SHA-256
 `185f43f7e5e1327c34ad18f0b73b96b872663726a0fac6ff524430d0d8430088`.
 This is the brief's public-A control, distinct from the deprecated research
@@ -839,7 +841,8 @@ any landing also checks the rebased source.
 
 ### Detector-map export
 
-The optional standalone visualizer regeneration is not yet run. Its
+The optional standalone visualizer regeneration was skipped: its separate
+Arrow/Parquet build graph was outside the final panel/tiny scope. Its
 `atlas-pass` command can export maps without a bank audit or certifier.
 The six original decoded PNG pairs and 2,088 detector PNGs are prepared for
 this proof, including seven pixels of row padding. The source exporter
@@ -910,7 +913,8 @@ Band interleaving and the first shared-leaf prototype pass strict native
 release clippy/build. A vector-accumulator refinement of the shared-leaf
 prototype still needs compilation and full qualification. No speed claim is
 made for those builds. The panel's original code and full pixel gates passed;
-its paired timing remains in progress. Further exact and era trials remain
+its completed AMD timing and unmeasured Intel cells are recorded below.
+Further exact and era trials remain
 unmeasured under the owner's scope stop.
 
 ### Full-width activity-ring rejection
@@ -1153,18 +1157,22 @@ The 64×64 extension reuses the same immutable common-parent binaries, bake,
 fixtures, 100 ms warmup and 32-clean-round policy. Only the shell driver’s
 size admission is extended. Logging and parsing remain separate.
 
-| Candidate / requested threads | AMD p50 ms before → after | AMD p95 ms before → after | Intel v3 |
-|---|---:|---:|---|
-| moment-pinned / 1 | 0.20927000 → 0.20729000 | 0.22539800 → 0.22421275 | not measured |
-| moment-pinned / 16 | 0.20868950 → 0.20672450 | 0.22149325 → 0.22017225 | not measured |
-| activity-pinned / 1 | 0.21367450 → 0.21727200 | 0.22921648 → 0.23371500 | not measured |
-| activity-pinned / 16 | not measured | not measured | not measured |
+| Candidate / requested threads | Intel v3 p50 ms before → after | Intel v3 p95 ms before → after | AMD v4x p50 ms before → after | AMD v4x p95 ms before → after |
+|---|---:|---:|---:|---:|
+| moment-pinned / 1 | 0.21441475 → 0.23384425 | 0.25677985 → 0.32928665 | 0.20927000 → 0.20729000 | 0.22539800 → 0.22421275 |
+| moment-pinned / 16 | not measured | not measured | 0.20868950 → 0.20672450 | 0.22149325 → 0.22017225 |
+| activity-pinned / 1 | not measured | not measured | 0.21367450 → 0.21727200 | 0.22921648 → 0.23371500 |
+| activity-pinned / 16 | not measured | not measured | 0.20706500 → 0.21186975 | 0.21550273 → 0.22640575 |
 
 The first AMD activity/64/16 attempt had only 31 clean rounds and failed
 qualification; its complete capture is preserved as
-`activity-pinned/timing/64-16t.invalid-31-clean`. A separately labeled retry
-uses the unchanged threshold. The moment ring has the lowest observed tiny
-p50 so far but fails larger-image acceptance; baseline serial remains the
+`activity-pinned/timing/64-16t.invalid-31-clean`. Its first retry also failed
+admission and is preserved as `64-16t.invalid-retry1`. The second retry passed
+and was parsed independently at 2026-11-05T04:14:19Z. Every reported tiny row
+has 32 clean paired rounds, twenty pairs and 100 ms warmup per arm.
+No threshold changed and no parser failure caused a benchmark rerun.
+The moment ring has the lowest observed AMD tiny p50 but fails larger-image
+acceptance and regresses on Intel; baseline serial remains the
 qualified implementation. Cross-run differences near one percent do not
 establish a significant tiny-image winner.
 
@@ -1175,13 +1183,13 @@ control and moment binaries: baseline p50/p95 **0.21441475 / 0.25677985 ms**;
 moment **0.23384425 / 0.32928665 ms**. Its successful independent timing parse
 is `$STUDY/moment-pinned/timing/64-1t/parses/table-v1/summary.json`, observed
 through SSH after `TINY_TIMING_PROGRESS.txt` recorded completion at
-2026-11-05T03:52:38Z. Other Intel tiny cells are not yet verified. Together
+2026-11-05T03:52:38Z. The other three Intel tiny cells remain **not measured**. Together
 with the AMD results, this supports retaining baseline serial for tiny
 inputs; it does not qualify a new implementation.
 
 The AMD activity/64/16 retry also failed the unchanged clean-round floor.
 Its first attempt remains in `64-16t.invalid-31-clean`; the second attempt
-and full log remain in `64-16t` and
+and full log remain in `64-16t.invalid-retry1` and
 `activity-pinned-64-16t.retry1.log`. No percentile is reported for either
 failed capture. This is an admission failure, not a parser failure.
 
@@ -1189,8 +1197,8 @@ The isolated 128-column activity export is
 `404ccc3e6a33e5752636fe24154cb23ff940d81a`, with the same decoder-pin parent
 as both timing controls. Its AMD normal release/clippy build passed:
 `rc=0 63s | peak-RSS 1.34GiB | min-avail 34088MiB | peak-load 2.46`.
-Fresh-parent native qualification and both-host timing remain incomplete;
-the earlier full native pixel/code proof above retains its original source.
+The completed AMD timing and native source-equivalence receipt are below;
+the earlier full native pixel/code proof retains its original source.
 At 2026-11-05T03:55Z, new Intel SSH logins began failing with the literal
 `System is going down` / `pam_nologin` message. Pending native jobs and
 any interrupted captures require inspection after access returns. No native
@@ -1207,9 +1215,125 @@ Their isolated jj prototypes and source patches are preserved; no timing or
 qualification claim is made for those unmeasured phases. This owner scope
 change supersedes the original brief’s remaining Phase-2/Phase-3 execution.
 
-The Intel shutdown initiator is unknown. Intel is treated as unavailable,
-rather than as a condition to bypass. When access returns, inspect completion
-artifacts and binary/input identities, retain completed admitted cells, mark
-interrupted cells invalid and rerun only those cells. The AMD panel continues
-under its normal shared lock. Fresh Intel panel qualification is pending;
-AMD timing alone cannot produce a both-host acceptance verdict.
+The coordinator subsequently identified the 04:00Z interruption as an automatic
+kernel-update reboot. Boot completed at 04:00:41Z. The saved-output audit found
+one completed Intel tiny cell and no active fusion timing directory interrupted
+by the reboot: the other cells and panel build were queued, not started.
+Authorized fleet evaluation restarted at boot (32 scoring containers, 27
+zenfleet workers observed; load1 10.48). Evaluation outranks this benchmark.
+The final owner ruling stopped all Intel timing waits and directed completion
+of AMD only. The verified Intel waiting process group was terminated; no
+scoring workload was altered. No interrupted or unadmitted capture is reported
+as a measurement.
+
+### Final 128-column panel result
+
+**Rejected on AMD; Intel timing not measured.** The two required AMD serial
+comparisons lose. All six AMD cells admitted 32 clean paired rounds. Both
+arms use decoder-pin parent `e113f0f367b45ba871a23036d63f2853526a5681`;
+prototype export `404ccc3e6a33e5752636fe24154cb23ff940d81a`.
+The missing Intel cells do not support a both-host win or a split-host verdict.
+
+| Size / threads | Intel v3 | AMD v4x p50 ms before → after | AMD p50 change | AMD p95 ms before → after |
+|---|---|---:|---:|---:|
+| 256 / 1 | not measured | 1.47247125 → 1.44611875 | -1.790% | 1.56692978 → 1.55262002 |
+| 256 / 16 | not measured | 0.46612650 → 0.46271650 | -0.732% | 0.50947297 → 0.51171252 |
+| 1024 / 1 | not measured | 17.55748700 → 18.03456625 | +2.717% | 18.72801353 → 19.04908182 |
+| 1024 / 16 | not measured | 3.25755850 → 3.24640875 | -0.342% | 3.50917500 → 3.48854055 |
+| large / 1 | not measured | 195.90722850 → 200.54963725 | +2.370% | 209.21488605 → 214.59788250 |
+| large / 16 | not measured | 84.73152375 → 84.28110250 | -0.532% | 87.31406293 → 87.76153580 |
+
+AMD worker receipts: seconds / peak-RSS GiB / min-avail MiB / peak-load;
+all exits zero. Whole-worker RSS includes the twenty preloaded pairs.
+
+| Size / threads | Before receipt | After receipt | Before / after max RSS KiB |
+|---|---|---|---|
+| 256 / 1 | 11 / 0.02 / 35674 / 1.80 | 11 / 0.02 / 35676 / 1.80 | 23904 / 23820 |
+| 256 / 16 | 12 / 0.04 / 35599 / 1.77 | 12 / 0.05 / 35606 / 1.77 | 47168 / 47360 |
+| 1024 / 1 | 53 / 0.14 / 35278 / 3.63 | 53 / 0.14 / 35262 / 3.63 | 151692 / 151624 |
+| 1024 / 16 | 14 / 0.27 / 35142 / 4.25 | 13 / 0.27 / 35147 / 4.25 | 280720 / 282036 |
+| large / 1 | 285 / 1.44 / 32501 / 5.06 | 280 / 1.43 / 32533 / 5.06 | 1510304 / 1502920 |
+| large / 16 | 128 / 1.87 / 31907 / 12.49 | 125 / 1.87 / 31898 / 12.77 | 1961848 / 1961568 |
+
+
+The largest AMD panel peak changes from 1,961,848 to 1,961,568 KiB
+(−280 KiB), with smaller cells mixed. This is not a meaningful or consistent
+process-RSS reduction. No accepted fusion lowers the shipped peak.
+
+**Intel build-only receipt.** The normal release/clippy build completed
+before the final stop instruction: `rc=0` for both Cargo commands, 78 seconds
+for the encompassing build/audit command, peak-RSS 1.34 GiB, min-avail
+22480 MiB, peak-load 15.75. The encompassing command returned `rc=1` because
+its source audit encountered two old, unused source files; its compiler and
+link steps succeeded and the frozen executables were retained. The independent
+audit then passed without rebuilding: `rc=0 0s | peak-RSS 0.02GiB |
+min-avail 25342MiB | peak-load 5.94`. It proves all 69 shared `zensim/src`
+file hashes identical to the completed panel gates and verifies that the
+old extra `blur_fusion.rs` and `fused_basic_fusion.rs` are referenced by no
+other source in the old archive. The gate receipts retain their original
+source, commands, complete legacy-failure-list diff and immutable 0.8.4 RGB
+inputs; the decoder pin's separate crate/JPEG/clippy/split/EVAL gates passed.
+No new code/tier/pixel gate execution is claimed for the rebuilt timing ELF.
+Receipt: `$STUDY/activity-panel-pinned/GATE_SOURCE_COMPATIBILITY.json`.
+The native timing-worker SHA-256 is
+`2135e2f8f943053ce398fad527972be1ea8bc3666f4b35c5df61bb8063b48d68`.
+**All six Intel panel performance cells remain not measured.**
+
+The three missing Intel tiny cells are moment/64/16 and activity/64/{1,16}.
+They and the six panel cells have a manual, hash-checked recipe, installed
+with its drivers under the retained study directory. Run only after a new
+owner go and an idle host:
+
+```sh
+ssh i270 'bash ~/tmp/zensim-fusion/tools/final/a_fusion_idle_intel.sh ~/tmp/zensim-fusion'
+```
+
+The tracked equivalent is `just a-fusion-idle-intel STUDY` on i270.
+It checks the frozen pair-manifest, bake and executable hashes, acquires the
+shared lock per cell, enforces the original quiet/admission policy, preserves
+failed captures, skips already completed captures and reparses in fresh
+directories. Parsing never launches a benchmark. The binaries are retained
+outside Cargo output, so this recipe does not rebuild after target cleanup.
+
+### Closed-study outcome
+
+No exact fusion landed: the moment and full-width activity rings fail on
+both measured hosts; the 128-column panel fails on AMD with Intel unmeasured.
+There is no measured cumulative extraction speedup to ship. Peak worker RSS
+is mixed and the small decreases above do not qualify a memory improvement.
+For this frozen A bake at 64×64, retain baseline serial; all measured thread
+settings route to the serial walk below 192². Prepared-reference and separately
+forced execution variants were not compared.
+
+The remaining exact prototypes and three era prototypes are preserved but
+unmeasured under the owner's explicit scope stop. No era speed/drift result,
+retraining decision or 2% stopping-bound claim is inferred. Optional detector
+PNG regeneration was skipped. Further phases need explicit owner approval.
+The public metric crate remains unchanged; its future 0.3.1 porting gate is
+the public split checker against the research split golden.
+
+The final recipe passed `bash -n`, ShellCheck, `just --list` and the repository
+script census: `rc=0 16s | peak-RSS 0.03GiB | min-avail 35939MiB |
+peak-load 1.81`. Captures and parsing remain separate, including the verified
+failure→retry parser control recorded above.
+
+### Final artifacts and cleanup
+
+Final matrix captures, rejected admission attempts, normal binaries and their
+source/hash receipts, AMD profiles and metric captures, derived reports,
+preserved prototype patches, the completed Intel tiny capture and final
+Intel metadata are mirrored at
+`/mnt/tower/output/zensim/fusion-final-2026-11-05/` (checked on dev).
+`ARCHIVE_VERIFY.json` records three randomly selected source/archive SHA-256
+equalities. The earlier full Intel gate/profile captures remain in their
+original retained study paths named above. No frozen pixel packet is deleted.
+
+The delivered parser bundle reproduced the saved Intel tiny summary byte for
+byte without launching a benchmark: `rc=0 1s | peak-RSS 0.03GiB |
+min-avail 35928MiB | peak-load 1.69`.
+Both study Cargo targets were removed after checking for active executables
+and verifying all twelve named reference executables on each host.
+Dev's Cargo example outputs and zenbench reports were moved outside target
+and mirrored before deletion. All timing/gate inputs and frozen binaries
+needed by the manual recipe remain outside Cargo output. The owner-directed
+study stops here; no further phase is queued.

@@ -4517,3 +4517,7 @@ fusion-counter-control study output:
 # Retry analysis in a new attempt directory; never rerun the capture.
 a-fusion-parse study stage input output:
     bash scripts/bench/a_fusion_parse.sh {{quote(study)}} {{quote(stage)}} {{quote(input)}} {{quote(output)}}
+
+# Manual owner-requested recipe for the nine unmeasured Intel cells; never auto-start.
+a-fusion-idle-intel study:
+    bash scripts/bench/a_fusion_idle_intel.sh {{quote(study)}}
