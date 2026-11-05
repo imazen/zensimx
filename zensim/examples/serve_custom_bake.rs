@@ -62,6 +62,9 @@
 
 use zensim::{BakeScorer, RgbSlice};
 
+#[path = "support/zen_io.rs"]
+mod zen_io;
+
 #[cfg(feature = "feature-regime-v2")]
 #[path = "serve_custom_bake/prodqual.rs"]
 mod prodqual;
@@ -246,7 +249,15 @@ fn census(args: &[String]) {
 /// works once its paths resolve on this host) with each bake through `BakeScorer::compute`. Prints
 /// one TSV row per pair: `ref_path dist_path <score per bake>`; a refusal is a hard error. `--shard
 /// i/n` keeps rows with `index % n == i` so several processes can split one table.
-fn pairs(args: &[String]) {
+fn pairs(args: &[String], native: bool) {
+    let decode = |path: &str| {
+        if native {
+            let (pixels, w, h) = zen_io::decode_rgb8(std::path::Path::new(path));
+            (pixels, w as u32, h as u32)
+        } else {
+            load_rgb(path)
+        }
+    };
     let table = args
         .first()
         .expect("--pairs <pairs.tsv> [--shard i/n] <bake>...");
@@ -277,7 +288,14 @@ fn pairs(args: &[String]) {
     let mut scorers: Vec<BakeScorer> = models
         .iter()
         .zip(rest)
-        .map(|(m, p)| BakeScorer::new(m).unwrap_or_else(|e| panic!("bake {p}: {e}")))
+        .map(|(m, p)| {
+            let scorer = BakeScorer::new(m).unwrap_or_else(|e| panic!("bake {p}: {e}"));
+            if native {
+                scorer.with_parallel(false)
+            } else {
+                scorer
+            }
+        })
         .collect();
     let text = std::fs::read_to_string(table).unwrap_or_else(|e| panic!("read {table}: {e}"));
     let mut lines = text.lines();
@@ -302,11 +320,11 @@ fn pairs(args: &[String]) {
         let f: Vec<&str> = line.split('\t').collect();
         let (rp, dp) = (f[rc], f[dc]);
         if cached.as_ref().is_none_or(|c| c.0 != rp) {
-            let (r, w, h) = load_rgb(rp);
+            let (r, w, h) = decode(rp);
             cached = Some((rp.to_string(), r, w, h));
         }
         let (_, r, w, h) = cached.as_ref().expect("reference loaded");
-        let (d, dw, dh) = load_rgb(dp);
+        let (d, dw, dh) = decode(dp);
         assert_eq!(
             (*w, *h),
             (dw, dh),
@@ -317,7 +335,13 @@ fn pairs(args: &[String]) {
         let scores: Vec<String> = scorers
             .iter_mut()
             .map(|z| match z.compute(&rs, &ds, None) {
-                Ok(res) => format!("{:.9}", res.score()),
+                Ok(res) => {
+                    if native {
+                        format!("{:.17e}", res.score())
+                    } else {
+                        format!("{:.9}", res.score())
+                    }
+                }
                 Err(e) => panic!("REFUSED {rp} {dp}: {e:?}"),
             })
             .collect();
@@ -408,8 +432,11 @@ fn main() {
         census(&args[1..]);
         return;
     }
-    if args.first().map(String::as_str) == Some("--pairs") {
-        pairs(&args[1..]);
+    if matches!(
+        args.first().map(String::as_str),
+        Some("--pairs" | "--native-pairs")
+    ) {
+        pairs(&args[1..], args[0] == "--native-pairs");
         return;
     }
     let mut a = args.into_iter();

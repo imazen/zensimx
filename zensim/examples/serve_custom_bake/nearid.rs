@@ -1,7 +1,6 @@
 //! Label-free near-identity measurements through the existing serving owners.
 //! One process per model/revision. Input admission is pinned before pixel access.
-#[path = "../support/zen_io.rs"]
-mod zen_io;
+use super::zen_io;
 
 use serde::Deserialize;
 use serde_json::json;
