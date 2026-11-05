@@ -481,5 +481,19 @@ after worker:
 The same ranked activity-fusion candidate now has a 128-column row-ring
 prototype in qualification. It preserves the H/V trees, intermediate f32
 rounding and final scalar tails, with the absolute-deviation row's mirrored
-halo prepared before the H tree. Neither its gates nor its speed are claimed
-passed yet. Both full-width rings remain outside main's served path.
+halo prepared before the H tree. Its native code gates pass: all 913 baseline
+case/status pairs are preserved among 917 cases, Rev4/5/7 vector gates pass
+all sixteen emulated permutations, and the split golden is byte-identical.
+The ignored test's four before/after comparisons retain exactly the original
+41 native / 40 SDE differing values, including both bit patterns and component
+names at Rev1 and Rev7. Receipts: `activity-panel/TEST_COVERAGE.json`,
+`activity-panel/stable-diff/receipt.json`, `activity-panel/logs/sde-rev{4,5,7}.log`
+and `activity-panel/trial-split.log`. Native build plus code gates:
+`rc=0 689s | peak-RSS 2.22GiB | min-avail 20419MiB | peak-load 8.00`.
+The commands were `a_fusion_trial_v5.sh build` followed by `gates`, with
+study root, label `activity-panel` and `activity-panel-stage` as arguments,
+inside one shared-lock/run-heavy scope. The immutable export is
+`ac7cafa5c16ac85ddbd569668ecf4c1d9d53ce9e`; its source and binary hash
+manifests are in `activity-panel/`. Full-vector pixel replay is queued, and
+speed is not measured yet. Both full-width rings remain outside main's
+served path.
