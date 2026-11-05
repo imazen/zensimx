@@ -1,6 +1,6 @@
 # R14: smooth per-input transforms for A
 
-**Incomplete: 2 of 3 T1 fits are complete; development feasibility, product/EVAL/HDR reads, capacity
+**Incomplete: all 3 T1 fits are complete; development feasibility, conditional T2, product/EVAL/HDR reads, capacity
 panels, head timing and archive verification are not yet measured.** No candidate
 is selected or adopted. No EVAL data has been read by R14.
 
@@ -251,7 +251,18 @@ Continuation: `run-heavy: done rc=0 615s | peak-RSS 12.50GiB | min-avail 27612Mi
 These payload sums exclude shared-lock waits; training-wall comparisons also
 carry T1a's distinct base-loader version, so they are not inference-speed claims.
 
-T1c, full-bank capacity contributions, development feasibility and all
+T1c seed 0 is packed and certified with the frozen mixed transform table.
+Its 47,108-byte packed bake has SHA256
+`de187fbabbdb1a1e999fed21c19f4589281e3e6184893c4ba559921922b71d98`.
+Payload wall totals 2,045.30 seconds: base 1,446.13; continuation 598.38;
+pack 0.79. Structural capacity is 123 dead / 0 residual / 5 live units,
+with one certified max pair. Both scientific stages use `fc41da56`.
+Base resource receipt: `run-heavy: done rc=0 1447s | peak-RSS 12.50GiB | min-avail 27525MiB | peak-load 2.16`.
+Continuation: `run-heavy: done rc=0 599s | peak-RSS 12.50GiB | min-avail 27275MiB | peak-load 2.83`.
+All three final T1 model hashes are frozen before development feasibility or
+any EVAL read. T1a has two certified max pairs; T1b and T1c each have one.
+
+Full-bank capacity contributions, development feasibility, conditional T2 and all
 quality/product reads remain outstanding. No missing evidence counts as a pass.
 Frozen A is the control and is not refitted.
 

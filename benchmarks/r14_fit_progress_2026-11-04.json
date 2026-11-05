@@ -124,12 +124,66 @@
       },
       "failed_attempts": [],
       "finished": "2026-11-05T00:04:17.703711+00:00"
+    },
+    {
+      "arm": "T1c",
+      "seed": 0,
+      "packed_sha256": "de187fbabbdb1a1e999fed21c19f4589281e3e6184893c4ba559921922b71d98",
+      "packed_bytes": 47108,
+      "wall_seconds_excluding_lock_waits": 2045.3000000000002,
+      "stage_times": [
+        {
+          "stage": "base",
+          "label": "T1c-s0-base",
+          "seconds": 1446.13
+        },
+        {
+          "stage": "continuation",
+          "label": "T1c-s0-continuation",
+          "seconds": 598.38
+        },
+        {
+          "stage": "pack",
+          "label": "T1c-s0-pack",
+          "seconds": 0.79
+        }
+      ],
+      "capacity": {
+        "dead": 123,
+        "residual": 0,
+        "live": 5
+      },
+      "certified": true,
+      "certified_max_pairs": 1,
+      "token_counts": {
+        "soft_clip": 327,
+        "identity": 64,
+        "yeo_johnson": 5,
+        "soft_sign": 588
+      },
+      "resource_receipts": {
+        "base": "run-heavy: done rc=0 1447s | peak-RSS 12.50GiB | min-avail 27525MiB | peak-load 2.16",
+        "continuation": "run-heavy: done rc=0 599s | peak-RSS 12.50GiB | min-avail 27275MiB | peak-load 2.83",
+        "pack": "run-heavy: done rc=0 1s | peak-RSS 0.28GiB | min-avail 40741MiB | peak-load 1.79"
+      },
+      "native_stages": {
+        "base": {
+          "path": "/var/tmp/byc-transforms-20261104/repairs/selected-callers/bin/zensim_mlp_train",
+          "sha256": "002740271cb808b0709b1f9ff6da3b89ca1d25bd399a41b109fb59c9715a8d35",
+          "source_commit": "fc41da568eee0703dd28020834a04d47be3a3e51"
+        },
+        "continuation": {
+          "path": "/var/tmp/byc-transforms-20261104/repairs/selected-callers/bin/zensim_mlp_train",
+          "sha256": "002740271cb808b0709b1f9ff6da3b89ca1d25bd399a41b109fb59c9715a8d35",
+          "source_commit": "fc41da568eee0703dd28020834a04d47be3a3e51"
+        }
+      },
+      "failed_attempts": [],
+      "finished": "2026-11-05T00:40:33.374432+00:00"
     }
   ],
-  "pending": [
-    "T1c"
-  ],
-  "completed": 2,
+  "pending": [],
+  "completed": 3,
   "required_T1_fits": 3,
   "role": "packed-fit identities only; no AIC-2026 quality statistics or EVAL selection"
 }
