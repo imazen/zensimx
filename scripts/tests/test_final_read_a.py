@@ -2,6 +2,7 @@
 import importlib.util
 import json
 import os
+import sys
 from pathlib import Path
 import tempfile
 import unittest
@@ -74,6 +75,21 @@ class FinalReadControls(unittest.TestCase):
         receipt=json.loads((out/'LABEL_READS.json').read_text())
         self.assertEqual(receipt['rebuilt_table_sha256'],owner.sha(out/'rebuilt_jnd_dist.tsv'))
         self.assertEqual(receipt['lost_table_byte_identity'],'cannot be verified')
+
+    def test_private_followup_preserves_historical_negative_jnd_target(self):
+        p=self.root/'labels.tsv';p.write_text('jnd\n1.25\n2.5\n')
+        rows=[dict(pair_key=f'p{i}',origin=f'source{i}',source_row=i) for i in range(2)]
+        a,out=self.prepare(owner.AIC_PRIVATE,dict(rows=rows),
+            dict(path=str(p),sha256=owner.sha(p),target='jnd'))
+        with patch.dict(owner.EXPECTED,**{owner.AIC_PRIVATE:2}):owner.read(a)
+        self.assertEqual([r['target'] for r in json.loads((out/'eval_rows.json').read_text())],[-1.25,-2.5])
+
+    def test_private_followup_refuses_public_output_before_progress_or_target_open(self):
+        argv=['final_read_a.py','stats',owner.AIC_PRIVATE,str(self.root)]
+        with patch.object(sys,'argv',argv),patch.object(owner,'progress') as progress:
+            with self.assertRaises(PermissionError):owner.main()
+            progress.assert_not_called()
+        self.assertFalse((self.root/'PROGRESS.json').exists())
 
 
 def panel_control(root):

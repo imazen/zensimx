@@ -26,9 +26,11 @@ LIB = Path('/mnt/tower/input/iqa/datasets')
 EXTRACTOR = Path('/var/tmp/byconstruction-bin/b77883be18db-rev7/extract_features_372col')
 EXTRACTOR_SHA = 'ed4957417339779dd8ed25fe59a6166326ba9db86d5c1530b1e1c788c9d614d8'
 SETS = ('cid22_b', 'csiq', 'live', 'konjnd_terminal', 'kadid_terminal', 'aic4', 'mcljci', 'clic22')
+AIC_PRIVATE = 'aic2026_public_test'
+PRIVATE_EVALUATIONS = Path.home()/'work/zen/zensim-training/evaluations'
 DATASETS = dict(live='live-iqa', mcljci='mcl-jci', clic22='clic-2022-perceptual')
 EXPECTED = dict(cid22_b=2100, csiq=866, live=779, konjnd_terminal=100,
-                kadid_terminal=2000, aic4=300, mcljci=5000, clic22=57300)
+                kadid_terminal=2000, aic4=300, mcljci=5000, clic22=57300, aic2026_public_test=1848)
 CURRENT = None
 
 
@@ -46,14 +48,15 @@ def progress(a, state, child=None, error=None):
     value=json.loads(p.read_text()) if p.exists() else {}
     for old in ('held_population','verified_process_observation','labels_parsed','sets_scored'):
         value.pop(old,None)
+    active_sets=(AIC_PRIVATE,) if a.set==AIC_PRIVATE else SETS
     reads={}
-    for name in SETS:
+    for name in active_sets:
         receipt=a.root/'scores'/name/'LABEL_READS.json'
         if receipt.exists():reads[name]=json.loads(receipt.read_text())['state']
     value.update(stage=f'{a.set}:{a.action}:{state}',last_check=datetime.now(timezone.utc).isoformat(),
         controller_pid=os.getpid() if state=='running' else None,child_pid=child,
-        label_reads=reads,completed_sets=[name for name in SETS if (a.root/'scores'/name/'RESULTS.json').exists()],
-        required_sets=list(SETS),failure=error)
+        label_reads=reads,completed_sets=[name for name in active_sets if (a.root/'scores'/name/'RESULTS.json').exists()],
+        required_sets=list(active_sets),failure=error)
     value['extractor_sha256']=EXTRACTOR_SHA
     for file,field in [('bake_dial_refit','predictor_sha256'),('trust-decode','decoder_sha256')]:
         binary=a.root/'bin'/file
@@ -64,6 +67,8 @@ def progress(a, state, child=None, error=None):
         'comparators':'ledger','ledger':'commit/push/verify exposure, then read','read':'stats',
         'stats':'publish results and continue in registered population order',
     }[a.action] if state=='complete' else f'supervise {a.set}:{a.action}'
+    if a.set==AIC_PRIVATE and a.action=='stats' and state=='complete':
+        value['next_action']='report only in private zensim-training/evaluations and chat; no public numbers'
     write(p,value)
 
 
@@ -99,14 +104,17 @@ def label_spec(name):
         return dict(path=spec['path'], sha256=spec['sha256'], target='human_score')
     paths = dict(live='/mnt/v/datasets/LIVE/live_r2_pairs.tsv',
                  kadid_terminal='/mnt/v/dataset/kadid10k/dmos.csv',
-                 clic22=str(LIB/'clic-2022-perceptual/pairs.tsv'))
+                 clic22=str(LIB/'clic-2022-perceptual/pairs.tsv'),
+                 aic2026_public_test='/mnt/v/output/zensim/byconstruction-2026-10-22/aic2026train/folds_train/pairs_test.tsv')
     digests = dict(live='49fcd7d23c9e35b147b52e3361103dbbf6a81aa8ae9d7b16f4763c7e7051fe5d',
                    kadid_terminal='573e2ed98fdaa2a5aed7b50ad716906e125e1001ed0e97c8e93e79d7b997ba99',
-                   clic22='03300f61963c2fc96e5daf3cad3a0e8a43438637959875b904d7a944db295db1')
+                   clic22='03300f61963c2fc96e5daf3cad3a0e8a43438637959875b904d7a944db295db1',
+                   aic2026_public_test='b0fb0c0fbb9fd05a6a28d4b485f8a793d0ad384c4ca7d61172ed1f49a917f63b')
     path = paths[name]
     assert sha(path) == digests[name], 'registered label-file SHA changed before keys'
     target = dict(live='human_score', kadid_terminal='dmos',
-                  clic22='primary majority(n_a,n_b), ties=0.5; supplementary (n_a+0.5*n_tie)/(n_a+n_b+n_tie)')[name]
+                  clic22='primary majority(n_a,n_b), ties=0.5; supplementary (n_a+0.5*n_tie)/(n_a+n_b+n_tie)',
+                  aic2026_public_test='jnd')[name]
     return dict(path=path, sha256=digests[name], target=target)
 
 
@@ -156,6 +164,12 @@ def keys(a):
                 add(r, d, len(rows), source=s, q=q)
         spec = dict(path=str(LIB/'mcl-jci/labels/JND_samples'), raw_pin_sha256=sha(a.root/'pins/MCL_RAW_SHA256.json'),
                     target='registered mean subject-chain JND count')
+    elif a.set == AIC_PRIVATE:
+        spec=label_spec(a.set)
+        for i,(key,group,r,d) in key_rows(spec['path'],['key','group','ref_path','dist_path']):
+            add(r,d,i,historical_key=key)
+            rows[-1]['origin']=group
+        assert len({r['origin'] for r in rows})==14
     elif a.set == 'clic22':
         spec = label_spec(a.set)
         seen = {}
@@ -251,7 +265,8 @@ def bank(a):
         keys=dict(path=str(kp),sha256=sha(kp)), extractor=dict(path=str(EXTRACTOR),sha256=EXTRACTOR_SHA),
         immutable_roots=[str(out),str(a.root/'pixels'/a.set)],
         instrument=dict(name=a.set,source=source['label_spec'],selection='registered label-free population'),
-        exposure_freeze=dict(state='features-only',labels_read=False,scope='final_read_a_2026-11-05.md'))
+        exposure_freeze=dict(state='features-only',labels_read=False,
+            scope='aic2026_frozen_a_registration_2026-11-05.md' if a.set==AIC_PRIVATE else 'final_read_a_2026-11-05.md'))
     write(out/'instrument.json',instrument)
     command(['python3','-B',REPO/'scripts/rev4_featpot/rev5_bank.py','extract',a.set,
              '--bin',EXTRACTOR,'--build-commit','b77883be18db5933a9db4b9e2670a2ba88a9729b',
@@ -375,7 +390,8 @@ def ledger(a):
     path=out/'LABEL_READS.json'
     assert not path.exists(), 'a registered or spent read already exists; coordinator required'
     pin=dict(set=a.set,state='authorized-before-read',utc=datetime.now(timezone.utc).isoformat(),
-        registration='benchmarks/final_read_a_2026-11-05.md',label_spec=source['label_spec'],
+        registration=('benchmarks/aic2026_frozen_a_registration_2026-11-05.md' if a.set==AIC_PRIVATE
+                      else 'benchmarks/final_read_a_2026-11-05.md'),label_spec=source['label_spec'],
         rows=len(source['questions'] or source['rows']),
         key_sha256=sha(a.root/'inputs'/a.set/'KEYS.json'),
         decode_map_sha256=sha(a.root/'inputs'/a.set/'decode-map.tsv'),
@@ -451,6 +467,7 @@ def read(a):
                     if i not in bysource:continue
                     row=bysource[i];y=float(r[spec['target']])
                     if a.set=='cid22_b':y*=100
+                    if a.set==AIC_PRIVATE:y=-y  # Exact October 23 quality target: -pairs_test.tsv.jnd.
                     item=dict(a=row['pair_key'],group=row['origin'],target=y,source_row=i)
                     if a.set=='kadid_terminal':item['distortion']=Path(row['original_dist']).stem.split('_')[1]
                     if a.set=='aic4':item['codec']=Path(row['original_dist']).stem.rsplit('_',1)[0].split('_',2)[-1]
@@ -578,14 +595,25 @@ def stats(a):
     write(out/'RESULTS.json',full)
 
 
+def require_private_aic_context(root):
+    if not root.is_relative_to(PRIVATE_EVALUATIONS):
+        raise PermissionError('AIC evaluation outputs belong only under private zensim-training/evaluations')
+    completed=json.loads((root/'pins/CLIC_COMPLETED.json').read_text())
+    assert completed['rows']==57300 and completed['references']==57243
+    assert completed['state']=='complete', 'CLIC must finish before the separate AIC assessment'
+
+
 def main():
     global CURRENT, EXTRACTOR
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('action',choices=['stage','keys','decode','verify_pixels','bank','predict','peers','comparators','ledger','read','stats'])
-    parser.add_argument('set',choices=SETS)
+    parser.add_argument('set',choices=SETS+(AIC_PRIVATE,))
     parser.add_argument('root',type=Path)
     args=parser.parse_args()
     assert args.root.is_absolute()
+    if args.set==AIC_PRIVATE:
+        require_private_aic_context(args.root)
+        assert args.action!='comparators', 'B is quoted from its stored row, never recomputed'
     CURRENT=args
     EXTRACTOR=args.root/'bin/extract_features_372col'
     progress(args,'running')
