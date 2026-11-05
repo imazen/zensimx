@@ -353,8 +353,18 @@ fn parse_args() -> Result<Args, String> {
     if scatter && (input.is_none() || !json || per_group || emit_rescaled) {
         return Err("--scatter requires --input --json without other modes".into());
     }
-    if signed_quality && (input.is_none() || !json || scatter || per_group || emit_rescaled) {
-        return Err("--signed-quality requires --input --json without other modes".into());
+    if signed_quality
+        && (scatter
+            || per_group
+            || emit_rescaled
+            || raw_errors
+            || (batch.is_some() && stats_srocc_only)
+            || (batch.is_none() && (input.is_none() || !json)))
+    {
+        return Err(
+            "--signed-quality requires --input --json or --batch --stats full, without other modes"
+                .into(),
+        );
     }
     Ok(Args {
         signed_quality,
@@ -861,6 +871,13 @@ struct BatchRow {
 fn signed_quality_correlations(predicted: &[f64], target: &[f64]) -> serde_json::Value {
     let mapped = panel::rescale_logistic(predicted, target);
     let mapping_direction = panel::spearman(predicted, &mapped).signum();
+    let rmse = (mapped
+        .iter()
+        .zip(target)
+        .map(|(a, b)| (a - b).powi(2))
+        .sum::<f64>()
+        / target.len() as f64)
+        .sqrt();
     serde_json::json!({
         "schema": "panel-signed-quality-v1",
         "orientation": "quality",
@@ -870,8 +887,46 @@ fn signed_quality_correlations(predicted: &[f64], target: &[f64]) -> serde_json:
         "krocc": panel::kendall_tau(predicted, target),
         "plcc": panel::pearson(&mapped, target) * mapping_direction,
         "plcc_raw": panel::pearson(predicted, target),
+        "rmse": rmse,
         "plcc_form": "four-parameter logistic; increasing predicted-quality mapping",
     })
+}
+
+/// Signed point statistics and whole-reference resamples share the same owner.
+fn run_signed_batch(input: &BatchInput) -> String {
+    use rayon::prelude::*;
+    input
+        .jobs
+        .par_iter()
+        .map(|(label, job)| {
+            let (x, y) = match job {
+                BatchJob::Explicit { x, y } => (x.clone(), y.clone()),
+                BatchJob::Indexed {
+                    x_base,
+                    y_base,
+                    idx,
+                } => {
+                    let (x, y) = (&input.bases[*x_base], &input.bases[*y_base]);
+                    match idx {
+                        Some(indices) => (
+                            indices.iter().map(|&i| x[i]).collect(),
+                            indices.iter().map(|&i| y[i]).collect(),
+                        ),
+                        None => (x.clone(), y.clone()),
+                    }
+                }
+            };
+            assert_eq!(x.len(), y.len(), "aligned signed batch vectors");
+            assert!(
+                x.len() >= 3 && x.iter().chain(&y).all(|v| v.is_finite()),
+                "finite signed batch vectors"
+            );
+            let mut result = signed_quality_correlations(&x, &y);
+            result["label"] = serde_json::json!(label);
+            format!("{result}\n")
+        })
+        .collect::<Vec<_>>()
+        .join("")
 }
 
 // Shared by the existing mapped-MAE and explicit raw-error output. Keeping
@@ -1329,7 +1384,9 @@ fn main() -> ExitCode {
                 return ExitCode::from(2);
             }
         };
-        if args.raw_errors {
+        if args.signed_quality {
+            print!("{}", run_signed_batch(&input));
+        } else if args.raw_errors {
             print!(
                 "{}",
                 run_batch_with_raw(&input, args.stats_srocc_only, true)
@@ -1958,5 +2015,29 @@ mod tests {
             legacy.lines().nth(1).unwrap(),
             "requesting raw error preserves every legacy statistic"
         );
+    }
+
+    #[test]
+    fn signed_reference_resamples_preserve_negative_direction_and_ties() {
+        let input = parse_batch(concat!(
+            "#def\tx\t1,2,3,4,5,6\n",
+            "#def\ty\t6,5,4,3,2,1\n",
+            "full\t@x:@y\t*\n",
+            "resampled\t@x:@y\t0,0,2,2,4,4\n",
+        ))
+        .unwrap();
+        let rows: Vec<serde_json::Value> = run_signed_batch(&input)
+            .lines()
+            .map(|line| serde_json::from_str(line).unwrap())
+            .collect();
+        assert_eq!(rows.len(), 2);
+        for row in rows {
+            assert_eq!(row["n"], 6);
+            for key in ["srocc_signed", "krocc", "plcc"] {
+                assert!(row[key].as_f64().unwrap() < -0.99, "{key}: {row}");
+            }
+            assert!(row["rmse"].as_f64().unwrap().is_finite());
+            assert_eq!(row["n_dropped"], 0);
+        }
     }
 }
