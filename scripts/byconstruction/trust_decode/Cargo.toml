@@ -10,10 +10,20 @@ description = "Dataset trust screen: BMP/PNM (zenbitmaps) and WebP (zenwebp) inp
 [dependencies]
 zenbitmaps = { version = "0.1.5", default-features = false, features = ["std", "bmp", "zencodec"] }
 zencodec = "0.1.26"
-zenpixels = { version = ">=0.2.10, <0.4.0", default-features = false }
+zenpixels = { version = "=0.2.16", default-features = false }
+zenpixels-convert = { git = "https://github.com/imazen/zenpixels", rev = "789d69dbc314e748676b7f2f19542c17473ba40b", default-features = false }
 zenpng = { version = "0.1.4", default-features = false }
+zenjpeg = { git = "https://github.com/imazen/zenjpeg", rev = "762fa7128c2124b42cfa6e23b30024a688f5b7a3", default-features = false }
 zenwebp = { version = "0.4.6", default-features = false, features = ["std"] }
 enough = "0.4"
 imgref = "1.12"
 rgb = { version = "0.8", default-features = false, features = ["bytemuck"] }
 sha2 = "0.10"
+
+# Retain the bitmap/PNG 0.2 pixel API alongside JPEG's pinned 0.3 API.
+[patch.crates-io]
+zenpixels = { git = "https://github.com/imazen/zenpixels", rev = "789d69dbc314e748676b7f2f19542c17473ba40b" }
+zenpixels-v3 = { package = "zenpixels", git = "https://github.com/imazen/zenpixels", rev = "f23ac7535be1144a22d0dc6b71f866a08b151f34" }
+zencodec = { git = "https://github.com/imazen/zencodec", rev = "61fb96f1c8c89d4c8d2210eed8679372d66f8aa7" }
+zenmeta = { git = "https://github.com/imazen/zencodec", rev = "61fb96f1c8c89d4c8d2210eed8679372d66f8aa7" }
+ultrahdr-core = { git = "https://github.com/imazen/ultrahdr", rev = "7e9d296c9e037e626234c9f0e8673d48278f83f0" }
