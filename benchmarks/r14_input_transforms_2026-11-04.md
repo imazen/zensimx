@@ -1,8 +1,8 @@
 # R14: smooth per-input transforms for A
 
-**Incomplete: all 3 T1 fits, the T2 release decision and all 6 capacity cells are complete;
-product/EVAL/HDR reads, head timing and archive verification remain.** No candidate
-is selected or adopted. No EVAL data has been read by R14.
+**In progress: all 3 T1 fits, the T2 decision, 6 capacity cells, EVAL/HDR and
+head timing are complete; final product reads and archive verification remain.**
+No candidate is selected or adopted. EVAL is descriptive and never selects a fit.
 
 Registration `5b5a0134` in [the experiment record](e36_subset_test_2026-11-01.md)
 incorporates the coordinator's finite-gradient correction before screening.
@@ -314,9 +314,44 @@ All six cells passed the final bank/model identity, full-row coverage,
 packed structural-count and canonical native-certificate checks. These are
 label-free TRAIN diagnostics, separate from the forthcoming HDR quality panel.
 
-All
-quality/product reads remain outstanding. No missing evidence counts as a pass.
-Frozen A is the control and is not refitted.
+Frozen A is the control and is not refitted. Full read tables follow when the
+remaining pixel/dial jobs complete. No missing evidence counts as a pass.
 
 The public crate (imazen/zensim) is untouched: 0.3.0 ships A without transforms;
 porting transform support to its derived path is a later follow-up.
+
+## Head timing on i270
+
+The exact frozen R12 head executable, SHA256
+`aa409c8e689323f7ed0f8ca4f07fa34565d673efa18e26806f98572677af3a33`,
+ran each final packed candidate against A0 on i270, observed as Intel Core
+Ultra 7 270K Plus. It uses one thread, `ZENSIM_MAX_TIER=v3`, the default
+process affinity, and the same 256 deterministic positive caller rows per pair.
+This measures transforms, scaling and network forward; it excludes extraction,
+derived-product formation and the served dial. It is not full-image throughput.
+
+| Candidate | Paired A0 mean (µs/image pair) | Candidate mean (µs/image pair) | Gate-clean / retained rounds |
+|---|---:|---:|---:|
+| T1a | 11.486382 | 19.557497 | 198 / 200 |
+| T1b | 11.809412 | 18.689147 | 180 / 200 |
+| T1c | 9.905098 | 15.115407 | 170 / 200 |
+
+Each cell uses the same gate-clean round indices for its A/candidate pair.
+All retained rounds, paired indices, all-round means and hashes are in the
+[head receipt](r14_head_timing_2026-11-04.json). No value-based trimming,
+round truncation or timing-based candidate selection was performed. A0 differs
+between pairs, so the table retains each contemporaneous control.
+
+The native zenbench sampler checks convergence from 30 rounds, then every 10,
+with a 200-round cap. All three runs reached the cap, with native
+`unreliable=false`; precision convergence is not established by these
+cap-ending runs. These are descriptive means with that limit. R12's historical
+summary requires exactly 30 rounds because its historical runs stopped there.
+That consumer remains unchanged; R14's separate summary validates the frozen
+instrument's actual adaptive population and preserves all 200 samples. The
+first R14 controller exited after successful native timing when it borrowed
+R12's 30-round assumption; the retained native execution was exit 0 and was
+not rerun. An earlier staging attempt failed before any measurement because
+remote rsync was absent; its receipt is retained and SCP was used.
+
+Resource receipt: `run-heavy: done rc=0 139s | peak-RSS 0.03GiB | min-avail 25179MiB | peak-load 1.61`.
