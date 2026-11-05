@@ -65,6 +65,17 @@ fn rgb8(pb: &PixelBuffer) -> Result<Vec<u8>, String> {
                 out.extend_from_slice(&[v, v, v]);
             }
         }
+    } else if desc.layout_compatible(PixelDescriptor::RGBA8)
+        || desc.layout_compatible(PixelDescriptor::RGBA8_SRGB)
+    {
+        for row in 0..h {
+            for pixel in data[row * stride..row * stride + w * 4].as_chunks::<4>().0 {
+                if pixel[3] != 255 {
+                    return Err("non-opaque alpha is not admitted".into());
+                }
+                out.extend_from_slice(&pixel[..3]);
+            }
+        }
     } else {
         // The feature extractor's canonical row converter owns narrowing.
         // Preserve this tool's refusal of alpha and unsupported channel layouts.
@@ -123,7 +134,11 @@ fn main() {
             original_png = pb.descriptor().layout_compatible(PixelDescriptor::RGB8)
                 || pb
                     .descriptor()
-                    .layout_compatible(PixelDescriptor::RGB8_SRGB);
+                    .layout_compatible(PixelDescriptor::RGB8_SRGB)
+                || pb.descriptor().layout_compatible(PixelDescriptor::RGBA8)
+                || pb
+                    .descriptor()
+                    .layout_compatible(PixelDescriptor::RGBA8_SRGB);
             (
                 pb.width(),
                 pb.height(),
@@ -200,5 +215,18 @@ mod tests {
         let mut buffer = PixelBuffer::new(3, 1, PixelDescriptor::RGB16_SRGB);
         buffer.as_slice_mut().row_mut(0)[..bytes.len()].copy_from_slice(&bytes);
         assert_eq!(rgb8(&buffer).unwrap(), [0, 0, 1, 1, 1, 1, 1, 255, 255]);
+    }
+
+    #[test]
+    fn opaque_rgba_preserves_rgb_and_nonopaque_alpha_is_refused() {
+        let mut buffer = PixelBuffer::new(2, 2, PixelDescriptor::RGBA8_SRGB);
+        buffer.as_slice_mut().row_mut(0)[..8].copy_from_slice(&[1, 2, 3, 255, 4, 5, 6, 255]);
+        buffer.as_slice_mut().row_mut(1)[..8].copy_from_slice(&[7, 8, 9, 255, 10, 11, 12, 255]);
+        assert_eq!(
+            rgb8(&buffer).unwrap(),
+            [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+        );
+        buffer.as_slice_mut().row_mut(1)[7] = 254;
+        assert!(rgb8(&buffer).is_err());
     }
 }
