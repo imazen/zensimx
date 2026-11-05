@@ -1,0 +1,67 @@
+name: A visualizer Pages
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+env:
+  VIZ_SOURCE: '@SOURCE_COMMIT@'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      TMPDIR: ${{ runner.temp }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          repository: imazen/zensimx
+          ref: ${{ env.VIZ_SOURCE }}
+          path: research
+      - uses: actions/configure-pages@v6
+        with:
+          enablement: false
+      - name: Pinned Rust and SIMD Wasm target
+        run: rustup toolchain install 1.99.1 --profile minimal --target wasm32-unknown-unknown
+      - name: Read the shipped A bake from the immutable range archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          base=$(python3 -c "import sys; sys.path.insert(0,'research/tools/zensim-viz'); from pages_build import DATA_BASE; print(DATA_BASE)")
+          python3 research/tools/zensim-viz/pages_build.py pull-a --source "$VIZ_SOURCE" --url "$base/viz/$VIZ_SOURCE/bundle.imijset" --out "$RUNNER_TEMP/A.bin"
+      - name: Single-thread browser computation
+        shell: bash
+        env:
+          ZENSIM_WORKBENCH_LABEL: zensim A revision 7 browser
+        run: |
+          set -euo pipefail
+          export ZENSIM_WORKBENCH_BAKES="A=$RUNNER_TEMP/A.bin"
+          export CARGO_TARGET_DIR="$RUNNER_TEMP/target"
+          export RUSTFLAGS="-C target-feature=+simd128 -C strip=symbols --remap-path-prefix=$HOME=deps --remap-path-prefix=$GITHUB_WORKSPACE/research=zensimx --remap-path-prefix=$RUNNER_TEMP=target"
+          cargo +1.99.1 build --release --locked --manifest-path research/zensim-workbench/Cargo.toml --features pages-viz --target wasm32-unknown-unknown --lib
+          curl -fL --retry 3 https://github.com/wasm-bindgen/wasm-bindgen/releases/download/0.2.129/wasm-bindgen-0.2.129-x86_64-unknown-linux-musl.tar.gz -o "$RUNNER_TEMP/bindgen.tar.gz"
+          echo "82d12bb940e2d4e72e0d5605387fc1b8ca179044e012b620f0ce4e7440e8320e  $RUNNER_TEMP/bindgen.tar.gz" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/bindgen.tar.gz" -C "$RUNNER_TEMP"
+          "$RUNNER_TEMP/wasm-bindgen-0.2.129-x86_64-unknown-linux-musl/wasm-bindgen" --target web --out-dir site/pkg "$CARGO_TARGET_DIR/wasm32-unknown-unknown/release/zensim_workbench.wasm"
+          python3 research/tools/zensim-viz/pages_build.py site --source "$VIZ_SOURCE" --out site
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: site
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy reviewed artifact
+        id: deployment
+        uses: actions/deploy-pages@v5
