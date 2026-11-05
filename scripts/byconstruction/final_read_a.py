@@ -85,7 +85,7 @@ def command(argv, log, stderr=None, env=None):
 def key_rows(path, columns):
     """mos_confirm.keys discipline: select key strings only, never a target."""
     with open(path, newline='') as f:
-        reader = csv.reader(f, delimiter='\t')
+        reader = csv.reader(f, delimiter=',' if Path(path).suffix == '.csv' else '\t')
         header = next(reader)
         indices = [header.index(c) for c in columns]
         for i, row in enumerate(reader):

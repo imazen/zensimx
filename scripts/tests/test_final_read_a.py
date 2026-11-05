@@ -32,6 +32,10 @@ class FinalReadControls(unittest.TestCase):
         p=self.root/'keys.tsv';p.write_text('ref\titem\tscore\nr\td\tNOT_A_NUMBER\n')
         self.assertEqual(list(owner.key_rows(p,['ref','item'])),[(0,['r','d'])])
 
+    def test_comma_delimited_key_projection_never_converts_poison_target(self):
+        p=self.root/'dmos.csv';p.write_text('ref_img,dist_img,dmos\nr.png,d.png,NOT_A_NUMBER\n')
+        self.assertEqual(list(owner.key_rows(p,['ref_img','dist_img'])),[(0,['r.png','d.png'])])
+
     def test_failed_parse_spends_read_and_prevents_second_open(self):
         p=self.root/'labels.tsv';p.write_text('human_score\ninvalid\n')
         a,out=self.prepare('csiq',dict(rows=[dict(pair_key='p',origin='r',source_row=0)]),
