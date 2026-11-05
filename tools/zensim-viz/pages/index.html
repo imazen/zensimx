@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <meta charset="utf-8" /><meta
+    name="viewport"
+    content="width=device-width,initial-scale=1"
+  /><title>zensim · A explorer</title>
+  <link rel="stylesheet" href="design/tokens.css" /><link
+    rel="stylesheet"
+    href="style.css"
+  />
+  <link
+    rel="stylesheet"
+    href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.19.1/katex.min.css"
+  />
+  <script
+    defer
+    src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.19.1/katex.min.js"
+    crossorigin="anonymous"
+  ></script>
+  <header>
+    <strong>zensim <span class="muted">/ A explorer</span></strong>
+    <nav id="tabs" aria-label="Exhibit">
+      <button data-view="atlas" aria-pressed="true">Detector atlas</button
+      ><button data-view="lens">PDP / ICE</button
+      ><button data-view="function">Function</button
+      ><button data-view="weights">Weight audit</button>
+    </nav>
+    <select id="bank" aria-label="Reference population">
+      <option value="sdr">SDR TRAIN</option>
+      <option value="hdr">HDR TRAIN</option></select
+    ><button id="theme">Light</button>
+  </header>
+  <main>
+    <aside id="features">
+      <input
+        id="search"
+        type="search"
+        placeholder="Find family, signal, scale…"
+        aria-label="Search features"
+      />
+      <div id="feature-count"></div>
+      <div id="tree" role="tree" tabindex="0">
+        <div id="spacer"></div>
+        <div id="rows"></div>
+      </div>
+    </aside>
+    <section id="stage">
+      <div id="stage-title"></div>
+      <div id="exhibit">
+        <div id="empty">
+          Choose two image files to inspect a local pair, or explore A’s learned
+          function and TRAIN-bank responses.
+        </div>
+        <canvas id="chart" aria-label="Selected exhibit"></canvas>
+        <div id="table"></div>
+      </div>
+      <output id="status" aria-live="polite">Loading browser model…</output>
+    </section>
+    <aside id="reference">
+      <h2 id="feature-title">A</h2>
+      <div id="formula"></div>
+      <div id="feature-detail"></div>
+      <div id="standing"></div>
+      <div id="concerns"></div>
+    </aside>
+  </main>
+  <footer>
+    <div class="controls">
+      <label
+        >Reference
+        <input id="reference-file" type="file" accept="image/*" /></label
+      ><label
+        >Distorted
+        <input id="distorted-file" type="file" accept="image/*" /></label
+      ><button id="synthetic">Synthetic demo</button><span id="score"></span>
+    </div>
+    <div class="controls">
+      <label data-atlas
+        >Range
+        <select id="range">
+          <option value="percentile">Map p2–p98</option>
+          <option value="own">Map min–max</option>
+          <option value="bank">Bank p1–p99</option>
+        </select></label
+      ><label data-atlas
+        >Alpha floor
+        <input
+          id="alpha"
+          type="range"
+          min="0.1"
+          max="1"
+          step="0.05"
+          value="0.25" /></label
+      ><label data-atlas><input id="map-only" type="checkbox" /> Map only</label
+      ><button id="pin">Pin feature</button><span id="pins"></span
+      ><span class="legend">Low ▰▰▰ High</span
+      ><label id="center-label"
+        ><input id="centered" type="checkbox" /> Center ICE at p0</label
+      >
+    </div>
+    <div class="controls">
+      <label id="lens-label" hidden
+        >Lens
+        <select id="lens-mode">
+          <option value="input">Raw-feature PDP / ICE</option>
+          <option value="signal">Signal strength</option>
+          <option value="family">Family strength</option>
+          <option value="diagnostics">Ablation / separation</option>
+          <option value="quantiles">Population quantiles</option>
+          <option value="table">Curve table</option>
+        </select></label
+      ><label id="function-label" hidden
+        >Slice
+        <select id="function-mode">
+          <option value="pair">Weighted branches / hinge</option>
+          <option value="network">Complete network</option>
+          <option value="served">Complete served score</option>
+        </select></label
+      ><label id="unit-label" hidden
+        >Hidden unit
+        <select id="unit"></select></label
+      ><button id="download" hidden>Download computed curve</button
+      ><span id="capacity" aria-label="Native hidden-unit capacity"></span>
+    </div>
+    <div class="muted">
+      Images stay local · Browser decode (not zenjpeg), sRGB8 · HDR bank
+      features only · <span id="identity"></span>
+    </div>
+  </footer>
+  <script type="module" src="app.js"></script>
+</html>
