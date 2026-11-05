@@ -355,3 +355,24 @@ not rerun. An earlier staging attempt failed before any measurement because
 remote rsync was absent; its receipt is retained and SCP was used.
 
 Resource receipt: `run-heavy: done rc=0 139s | peak-RSS 0.03GiB | min-avail 25179MiB | peak-load 1.61`.
+
+## Packed and stripped artifacts
+
+| Arm | Packed bytes | Stripped bytes | Stripped SHA256 |
+|---|---:|---:|---|
+| T1a | 40,076 | 28,905 | `ea208e75ff725b3f820ad9eb01dd3c37a56e8056ab3caf598115953c62e3288c` |
+| T1b | 58,269 | 47,120 | `046f3893cb17d2f6f74723d8a99d9b8eba4786e2f38d8c0a071753b24f77e1d4` |
+| T1c | 47,108 | 36,160 | `b7d19edb5c72f39a6d3dc6d5c211259615f1342eeb6f315fb8b402734a179623` |
+
+Stripping preserves the native layer/scaler/derived/dial inspection exactly.
+Both `zentrain.feature_transforms` and `zentrain.feature_transform_params` are
+byte-identical before and after stripping; they remain serving metadata.
+`FROZEN_FITS.json` retains both paths, sizes, hashes and equality receipts.
+Quality and timing reads use the frozen packed bytes, without recalibration.
+
+The final ARM Python-owner check parses all 13 R14 modules and passes the
+existing shell/CLI checks in 1 second (run-heavy peak RSS 0.03 GiB, minimum
+available 27,178 MiB). Its retained parity executable has SHA256
+`2756292de94009ef3683add19f1884959f47d15b88946b83054db1b11e080492`.
+The copy was verified against the ARM source binary before removing this
+experiment's inactive Cargo target; the golden streams and full logs remain.
