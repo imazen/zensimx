@@ -6464,7 +6464,7 @@ mod capability_preflight_tests {
             }),
         };
         let mut dense = c.into_dense_for_transforms().unwrap();
-        for (i, row) in dense.chunks_exact_mut(4).enumerate() {
+        for (i, row) in dense.as_chunks_mut::<4>().0.iter_mut().enumerate() {
             assert_eq!(row[0], f64::from(raw[2 * i]));
             assert_eq!(row[3], f64::from(raw[2 * i] * raw[2 * i + 1]));
             row[0] = f64::from(
