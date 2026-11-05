@@ -42,9 +42,12 @@ def main():
         for p in process_tree(pid):
             if not p['argv']:continue
             executable=Path(p['argv'][0]).name
-            if executable in ('zensim_mlp_train','cargo','rustc'):
+            if executable not in ('flock','bash','sleep','time','systemd-run','tee') and p['state'] not in ('Z','X'):
                 entry['compute'].append(dict(pid=p['pid'],executable=executable,
                     state=p['state'],cpu_ticks=p['cpu_ticks']))
+                if '--out' in p['argv']:
+                    index=p['argv'].index('--out')+1
+                    if index<len(p['argv']):entry['compute'][-1]['output']=p['argv'][index]
             if '--dest' in p['argv']:
                 index=p['argv'].index('--dest')+1
                 if index<len(p['argv']):
