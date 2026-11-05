@@ -1,6 +1,6 @@
 # R14: smooth per-input transforms for A
 
-**Incomplete: 1 of 3 T1 fits is complete; development feasibility, product/EVAL/HDR reads, capacity
+**Incomplete: 2 of 3 T1 fits are complete; development feasibility, product/EVAL/HDR reads, capacity
 panels, head timing and archive verification are not yet measured.** No candidate
 is selected or adopted. No EVAL data has been read by R14.
 
@@ -237,7 +237,18 @@ and stage-specific native identities are retained in the artifact root.
 [Fit receipt](r14_fit_progress_2026-11-04.json) contains the exact successful
 times, hashes, certified transform inventory and resource receipts.
 
-T1b and T1c, full-bank capacity contributions, development feasibility and all
+T1b seed 0 is also packed and certified, with its 956 soft-clip and 28 identity
+inputs exactly matching the frozen table. Its 58,269-byte packed bake has SHA256
+`7a02cd54ba692f5995477657d9ec5ec125602678e1f397dcde9af46a53c75065`.
+Payload wall totals 1,941.22 seconds: base 1,326.00; continuation 614.39;
+pack 0.83. Structural capacity is 116 dead / 5 residual / 7 live units.
+Both scientific stages use the selected-caller trainer `fc41da56`.
+Base resource receipt: `run-heavy: done rc=0 1326s | peak-RSS 12.50GiB | min-avail 27598MiB | peak-load 4.26`.
+Continuation: `run-heavy: done rc=0 615s | peak-RSS 12.50GiB | min-avail 27612MiB | peak-load 2.39`.
+These payload sums exclude shared-lock waits; training-wall comparisons also
+carry T1a's distinct base-loader version, so they are not inference-speed claims.
+
+T1c, full-bank capacity contributions, development feasibility and all
 quality/product reads remain outstanding. No missing evidence counts as a pass.
 Frozen A is the control and is not refitted.
 
