@@ -48,13 +48,14 @@ class FinalReadControls(unittest.TestCase):
                 opened.assert_not_called()
 
     def test_every_clic_question_including_tied_majority_is_retained(self):
-        p=self.root/'pairs.tsv';p.write_text('n_a\tn_b\n3\t1\n1\t1\n1\t3\n')
-        questions=[dict(source_row=i,ref=f'r{i}',a='a',b='b') for i in range(3)]
+        p=self.root/'pairs.tsv';p.write_text('n_a\tn_b\tn_tie\n3\t1\t0\n1\t1\t2\n1\t3\t0\n0\t0\t2\n')
+        questions=[dict(source_row=i,ref=f'r{i}',a='a',b='b') for i in range(4)]
         a,out=self.prepare('clic22',dict(rows=[],questions=questions),dict(path=str(p),sha256=owner.sha(p)))
-        with patch.dict(owner.EXPECTED,clic22=3):owner.read(a)
+        with patch.dict(owner.EXPECTED,clic22=4):owner.read(a)
         rows=json.loads((out/'eval_rows.json').read_text())
-        self.assertEqual([r['target'] for r in rows],[1.0,.5,0.0])
-        self.assertEqual([r['source_row'] for r in rows],[0,1,2])
+        self.assertEqual([r['target'] for r in rows],[1.0,.5,0.0,.5])
+        self.assertEqual([r['soft_target'] for r in rows],[.75,.5,.25,.5])
+        self.assertEqual([r['source_row'] for r in rows],[0,1,2,3])
 
     def test_mcl_mean_subject_counts_and_q100_anchor(self):
         pins=self.root/'pins';pins.mkdir()

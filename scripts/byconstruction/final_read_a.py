@@ -106,7 +106,7 @@ def label_spec(name):
     path = paths[name]
     assert sha(path) == digests[name], 'registered label-file SHA changed before keys'
     target = dict(live='human_score', kadid_terminal='dmos',
-                  clic22='majority(n_a,n_b), tied majority=0.5')[name]
+                  clic22='primary majority(n_a,n_b), ties=0.5; supplementary (n_a+0.5*n_tie)/(n_a+n_b+n_tie)')[name]
     return dict(path=path, sha256=digests[name], target=target)
 
 
@@ -390,6 +390,10 @@ def ledger(a):
     models=json.loads((a.root/'pins/MODELS.json').read_text())
     for spec in models.values():assert sha(spec['path'])==spec['sha256']
     pin['models']=models
+    if a.set=='clic22':
+        pin['agreements']=dict(primary='majority(n_a,n_b), ties=0.5',
+            supplementary='(n_a+0.5*n_tie)/(n_a+n_b+n_tie)',
+            label_columns=['n_a','n_b','n_tie'],one_parse_retains_both_targets=True)
     with path.open('x') as f:
         json.dump(pin,f,indent=2);f.write('\n');f.flush();os.fsync(f.fileno())
     with (REPO/'docs/DATA_SPLITS.md').open('a') as f:
@@ -433,11 +437,12 @@ def read(a):
             bysource={r['source_row']:r for r in source['questions']}
             with open(spec['path'],newline='') as f:
                 for i,r in enumerate(csv.DictReader(f,delimiter='\t')):
-                    q=bysource[i];na,nb=float(r['n_a']),float(r['n_b'])
-                    assert na+nb>0
+                    q=bysource[i];na,nb,nt=(float(r[c]) for c in ('n_a','n_b','n_tie'))
+                    assert np.isfinite([na,nb,nt]).all() and min(na,nb,nt)>=0 and na+nb+nt>0
                     pair=lambda d:a.set+':'+hashlib.sha256((q['ref']+'\t'+d).encode()).hexdigest()
                     targets.append(dict(a=pair(q['a']),b=pair(q['b']),group=q['ref'],
-                        target=1.0 if na>nb else 0.0 if na<nb else 0.5,source_row=i))
+                        target=1.0 if na>nb else 0.0 if na<nb else 0.5,
+                        soft_target=(na+0.5*nt)/(na+nb+nt),source_row=i))
         else:
             assert sha(spec['path'])==spec['sha256']
             bysource={r['source_row']:r for r in rows}
@@ -543,10 +548,18 @@ def stats(a):
         sys.path.insert(0,str(REPO/'scripts/byconstruction'))
         from dataset_eval import pair_agreement
         os.environ['ZEN_PANEL_BIN']=str(a.root/'bin/panel')
-        result=dict(rows=len(rows),references=len({r['group'] for r in rows}),models={})
+        result=dict(rows=len(rows),references=len({r['group'] for r in rows}),models={},
+                    primary='majority choice; tied majority or prediction gets half credit',
+                    bootstrap_draws=10000,seed=20261105,
+                    supplementary_soft_vote=dict(target='(n_a+0.5*n_tie)/(n_a+n_b+n_tie)',models={}))
+        soft_rows=[{**r,'target':r['soft_target']} for r in rows]
         for m,s in values.items():
             value,lo,hi,n=pair_agreement(rows,s,resamples=10000,seed=20261105)
+            assert n==len(rows), 'all registered CLIC questions must be retained'
             result['models'][m]=dict(agreement=value,lo=lo,hi=hi,questions=n)
+            value,lo,hi,n=pair_agreement(soft_rows,s,resamples=10000,seed=20261105)
+            assert n==len(rows), 'all CLIC questions must remain in the soft-vote supplement'
+            result['supplementary_soft_vote']['models'][m]=dict(agreement=value,lo=lo,hi=hi,questions=n)
         write(out/'RESULTS.json',result);print(json.dumps(result),flush=True);return
     full=mos_stats(a,rows,values,'all')
     if a.set=='live':
