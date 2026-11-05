@@ -130,7 +130,7 @@ fn ssim2_sdr(a: &[u8], b: &[u8], w: usize, h: usize) -> R<f64> {
 /// SSIMULACRA2's native HDR path: linear f32 in cd/m² with a 1 cd/m² diffuse white (the buffer's unit is one nit).
 fn ssim2_hdr(a: &[f32], b: &[f32], w: usize, h: usize) -> R<f64> {
     let d = fast_ssim2::PixelDescriptor::RGBF32_LINEAR;
-    let white = zenpixels::DiffuseWhite::new(1.0);
+    let white = zenpixels::hdr::DiffuseWhite::new(1.0);
     let sa = fast_ssim2::PixelSlice::new(bytemuck::cast_slice(a), w as u32, h as u32, w * 12, d)
         .map_err(s)?
         .with_diffuse_white(white);
