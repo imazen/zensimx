@@ -831,6 +831,91 @@ zenbench's round-robin rayon-thread-pool interleaving over a fixed defect in
 the walk's own code — diagnosed, not silently patched with an unverified
 fix).
 
+## SEED SPREAD IS NOT SUBSET COVERAGE — and `--seed` used to fuse two streams (2026-09-04)
+
+Full record: [`benchmarks/subset_quality_study_2026-09-04.md`](benchmarks/subset_quality_study_2026-09-04.md).
+Registry: [`benchmarks/good_subsets_registry.json`](benchmarks/good_subsets_registry.json).
+
+**The trainer runs TWO independent `SplitMix64` streams**, and always has:
+init from `SplitMix64::new(seed)`, sampling from
+`sampling::sample_stream_seed(seed)` (`seed*0x9E3779B97F4A7C15 + 0xDEADBEEFCAFEBABE`;
+the per-sample-α entry point adds `0x0123456789ABCDEF` instead). The split is
+deliberate — it exists so a 228-vs-372 A/B sees the same pair draws even though
+init consumes a different number of normals. **The CLI did not expose it until
+2026-09-04, so every bake trained before then confounds "different subset" with
+"different init" and NO board bake can separate them.** `--init-seed` /
+`--sample-seed` now override each stream; omitting both is byte-identical.
+
+**A drawn training subset is reconstructible from a bake's `zentrain.repro`
+alone.** The drawn multiset is a pure function of `(seed, [train_w], [rows],
+epochs, pairs_per_epoch, boosts, within_ref)` — not of the feature matrix, the
+architecture, or the loss — and `repro.inputs[].rows` IS the `n` the sampler
+draws modulo. `subset_sim --fulleval <x>.fulleval.json --seeds N` replays it
+through the SAME owner the trainer uses, reading only the target + ref columns
+(`parquet_loader::load_scores_and_refs`), no features. Faithfulness is provable,
+not asserted: `ZENSIM_SAMPLE_DIGEST=1` makes a real run print the same
+sample-sequence hash, verified equal on the uniform, within-ref and q-boost
+paths.
+
+**`mlp_train::sampling` is THE owner of the pair-draw step** (four training loops
++ the replay). Its RNG consumption is a WIRE CONTRACT: 1 value for the group,
+then 2 (uniform / per-row-CDF) or 3 (within-ref), with an early return after the
+group value when the group has <2 rows. Changing it re-rolls every model ever
+trained — an era break, which is why `simulate_digest_is_pinned` says so in its
+own failure message.
+
+**MEASURED, and it kills a tempting research direction: subset coverage does NOT
+explain seed-to-seed spread.** At production settings (120 x 50,000 draws over
+~700k rows = ~17 hits/row) coverage is SATURATED: over 66 seed-sibling arms the
+between-seed *relative* spread of pooled row coverage is 1.37e-4 (median), of
+reference coverage 1.31e-5, of row-multiplicity entropy 3.85e-6 — 12 of 29
+descriptors never exceed 1 % on any arm — while the targets move 28x to 940x
+more (within-image CID22 3.9e-3, KonJND 1.3e-1). **Do not tune the pair sampler
+hoping to cut seed variance at these settings.** The untried levers that act on
+the trajectory rather than the multiset are `--ema-decay` (its own doc claims
+"seed-variance reduction"; NO board bake sets it) and seed averaging.
+
+**METHOD LESSON — carry a pure-luck control descriptor.** The study's strongest
+correlate of within-image CID22 across the whole board was its CONTROL: the rate
+at which the RNG drew the same row index twice (rho +0.3707, n=119), which
+carries no information about the training data at all, and whose own permutation
+null called it significant at p=0.002. Real coverage descriptors topped out at
+0.3380. Mechanism, MEASURED: the 202 board cells hold only **132 distinct subsets over 51
+seeds**, and 88 cells share a subset with another cell — one subset is the
+training subset of 22 different cells. Arms sharing a group structure and a seed
+draw the IDENTICAL pairs in the identical order, so a seed-pure descriptor takes
+one value across all of them and permuting *within* arm leaves the cross-arm
+dependence intact — the null is under-dispersed and every p-value is optimistic. **A within-arm-rank correlation pooled over arms
+that share seeds needs a control that cannot matter; without one, |rho| ~ 0.3 at
+"p<0.01" is not evidence.**
+
+**Seeds are not transferably good.** Ranking seeds within arm and testing
+per-seed mean-rank consistency (2,000 permutations, 31 arms): p = 0.205 / 0.035 /
+0.446 / 0.587 on CID22-per-ref / CID22 / KonJND / AIC-3 — one nominal hit out of
+four, with orderings that disagree across targets (seed 4006 is 2nd best on CID22
+and 3rd worst on AIC-3). A "lucky seed" is arm-specific. Best-in-arm seeds are
+also NOT better covered (max mean z 0.467, with the pure-luck control third at
+0.428).
+
+**A WHOLE KNOB FAMILY was silently discarded off the per-sample-α path.**
+`--ema-decay`, `--hard-pair-frac`, `--dro-eta`, `--listwise-weight` are read ONLY
+inside `train_mlp_per_sample_alpha_head`; on the standard path (all 312 board
+bakes) they were accepted and thrown away, producing a bake byte-identical to a
+run that never set them. `train_mlp_strategy` already guards `--monotonicity-reg`
+/ `--mse-weight` / `--triplet-weight` against exactly this; these four were never
+added. They now **fail loud** (2026-09-04). NOT wired through — an EMA/DRO/
+listwise step in the other three loops is a real optimizer change. **So the
+obvious seed-variance lever is currently UNAVAILABLE on the standard path**: if
+you want EMA there, wiring it is the work. No board bake sets any of the four.
+
+**`--stratified-bands` was a SILENT NO-OP on the default path until 2026-09-04.**
+`strat_bands` was built in one of four training loops; the other three —
+including the standard path all 312 board bakes trained through — passed an empty
+table, so the flag was accepted and discarded (bands 0 vs 8: same digest
+`127b831bed8a3873`). Fixed, default byte-identical, failing-first test. No board
+bake sets it, so nothing published is affected. **Whether stratified sampling
+HELPS is unmeasured** — it is merely reachable now.
+
 ## LATENCY + TOKEN DISCIPLINE — idle waiting is re-charged, not cached (2026-08-04)
 
 **MEASURED, `benchmarks/rnd_cycle_audit_2026-08-04.md`.** Over the 2026-08-03/04
@@ -1330,13 +1415,28 @@ current bar. Re-pin record: gate doc **§14**.
   `--bake`), `--gaddr-json` (the G-ADDR block alone at full f64, stamped with which scorer it
   describes — peer-safe where `--full-json`/`--fulleval` are refused), `--gaddr-reference`.
   Re-grade an existing bake with `scripts/dialgate_arms.sh score <label> <bake.bin> [regime]`.
+- **BOARD COVERAGE (2026-09-04, gate doc §15):** all **97** fair-board cells are graded under
+  both pin sets and 96 carry the verdict; the board draws a **NOT SHIPPABLE** badge off a
+  MEASURED contract FAIL (**47** cells; C3+C4 dominate at 39 each — dials that never go below
+  zero on an all-negative probe — then C2 at 23). The **only** contract-clean cell is
+  `v47_strict_QAT_native` (6/6). A probe is scored only when its column count equals the
+  bake's caller width, so the 372 probes reach 3 cells; two **944** negative-tail probes were
+  cut in-era by `scripts/cut_gaddr_negtail_probe.py` (the committed owner of that cut; its
+  control reproduces the stored 372 probe EXACTLY) and are deliberately **NOT registered** —
+  no reference has been measured on them, so A7–A9 stay NOT MEASURED there while the
+  absolute-bar C3/C4 read normally. Graft with `promote_fulleval.py --graft-gaddr`.
 
 **Facts that are now measured and must not be re-derived:**
 
-- **The identity feature vector is the ZERO vector, for every image** (38/38 dial-grid refs,
-  byte-identical), so the identity dial is a SCALAR property of a bake, `dial(0⃗)`:
-  **v47-QAT 97.6893, shipped B 96.2412, ADD156 96.1157.** The `[97.5, 100]` identity band is
-  a **v47-era** property; both shipped LINEAR dials miss it.
+- **The identity feature vector is the ZERO vector, for every image — AT 372 ONLY** (38/38
+  dial-grid refs, byte-identical), so at that width the identity dial is a SCALAR property of
+  a bake, `dial(0⃗)`: **v47-QAT 97.6893, shipped B 96.2412, ADD156 96.1157.** The
+  `[97.5, 100]` identity band is a **v47-era** property; both shipped LINEAR dials miss it.
+  **⚠ It does NOT extend to 944 (MEASURED 2026-09-04, gate doc §15.3):** extracting the same
+  38 `ref == dist` pairs through `sdr944_extract` gives **190 of 944 slots non-zero**, varying
+  per image (row-to-row spread 0.594). A 944 identity read is an extractor-era-dependent
+  measurement, not an algebraic constant — so C5/C6 need a real in-era 38-pair extraction per
+  944 era, and none exists yet (94 of 97 fair board cells read NOT MEASURED on those rows).
 - **Shipped B ranks 266 of 4,424 dial-grid cells (6.01 %) ABOVE a perfect copy** in RAW
   space. Consequence, proved in §10.3: **C2 ⊻ C6** — pin identity at 100 and those cells cap
   (tied 0.0567 > 0.05); leave it below and they out-score identity. **No monotone output
@@ -1927,6 +2027,22 @@ rescores the stored feature tables in ~11 s and gate-checks the recorded
 numbers (Korshunov 0.9346, Narwaria 0.7688, AVT pooled 0.7742, …);
 `--scorer bake:<final.bin>` is the Phase-4 final-bake mode; as-run
 provenance copies live in `scripts/external_reads/asrun/`. See its README.
+
+### Replay a training run's pair sampler / describe a drawn subset
+**`subset_sim` binary** at
+`/home/lilith/work/zen/zensim/zensim-validate/src/bin/subset_sim.rs`.
+Build with `cargo build --release -p zensim-validate --bin subset_sim`.
+
+```sh
+subset_sim --fulleval <bake>.fulleval.json --seeds 4004,4005 --out cov.json
+subset_sim --group a:x.parquet:1.0:1.0 --seeds 42 --epochs 3 \
+           --pairs-per-epoch 2000 --expect-digest <hex>
+```
+Reconstructs which training pairs a run drew, from its embedded repro block,
+with NO feature columns read and no model built. Routes through
+`mlp_train::sampling::draw_pair` — the same owner the four training loops use —
+so it is a replay, not a re-implementation. `--expect-digest` checks it against
+a real run's `ZENSIM_SAMPLE_DIGEST=1` output.
 
 ### IQA statistical panel on arbitrary (predicted, target) pairs
 **`panel` binary** at

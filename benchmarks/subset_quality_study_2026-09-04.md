@@ -214,10 +214,29 @@ within-ref / high-q-boost):
 Reproduce: `scripts/subset_study/byte_identity_gate.sh` (binary paths via
 `OLD_TRAIN`/`NEW_TRAIN`, so it cannot fossilise onto a cleaned-up worktree).
 
+Two further proofs at **production scale**, from the Phase-3 pilot rather than a
+fixture (8 train groups, 465,587 rows, 120 × 50,000 = 6,000,000 draws):
+
+- **The replay reproduces a real production run's draw sequence exactly.**
+  `subset_sim --fulleval FC_C0_s4004.fulleval.json --seeds 4004` returns digest
+  `647a088f42232bab`, matching what the live training run printed under
+  `ZENSIM_SAMPLE_DIGEST=1`.
+- **Cross-build reproduction.** The pilot's origin cell
+  (`--init-seed 4004 --sample-seed 4004`) is **byte-identical** — repro block
+  stripped, sha `a29b610fa16e251d…` — to the shipped `C0_s4004.bin`, which was
+  built by a *different binary, at a different commit, in a different worktree*
+  (`c993f45f`, the wave-r4 tree). That simultaneously shows the split seeds
+  collapse to the old `--seed` behaviour, that none of this lane's trainer
+  changes moved the production recipe, and that the fastclass recipe is
+  reproducible from its embedded repro alone.
+
 Population actually reconstructed: **202 (arm, seed) cells across 66 seed-sibling
-arms**, from 312 board fullevals carrying a usable repro. 17 of the 83 candidate
-arms did not replay (their recorded corpus paths no longer resolve) and are
-simply absent, not silently substituted.
+arms**, from 312 board fullevals carrying a usable repro. The 17 remaining
+candidate arms all failed for **one** reason — every one of them trained on
+`ext_safesyn_full.parquet`, which no longer exists on disk — so they are absent,
+not silently substituted with a different corpus. That is a real limitation of
+the replay approach and worth stating: it reconstructs a subset from the recipe,
+so it inherits the recipe's dependency on the corpus files still being there.
 
 ## Phase 2 — H1: whole-run coverage is saturated
 
@@ -265,12 +284,17 @@ calls it "significant" at p = 0.002. `D10_samerow_rate` vs KonJND likewise:
 ρ = −0.3007, p = 0.010. The control also "replicates across ≥2 group structures".
 
 So the machinery manufactures |ρ| ≈ 0.3 with p < 0.01 for a descriptor that
-cannot matter. The mechanism is repeated measures: **seeds recur across arms**
-(seed 4004 appears in 18 of them), a seed-pure descriptor takes the same value
-in every arm it appears in, and permuting *within* arm does not destroy the
-resulting cross-arm dependence — so the null is under-dispersed and every
-p-value in that table is optimistic. **The correct reading is that no descriptor
-clears its own control.** The pre-registered falsifier fires:
+cannot matter. The mechanism is repeated measures, and the registry measures it
+exactly: the 202 cells contain only **132 distinct subsets over 51 distinct
+seeds**, and **88 cells share their subset with at least one other cell** — one
+subset (`bb1ac16f…`) is the training subset of **22 different cells**, another
+of 19, another of 13. Arms that share a group structure and a seed draw *the
+identical pairs in the identical order*, so a seed-pure descriptor takes one
+value across all of them, and permuting *within* arm leaves that cross-arm
+dependence intact. The pooled tests report n = 94–132 while the effective
+independent count is far smaller; the null is under-dispersed and every p-value
+in that table is optimistic. **The correct reading is that no descriptor clears
+its own control.** The pre-registered falsifier fires:
 
 > *no descriptor predicts held-out score across ≥2 model classes with |ρ| > 0.3
 > and consistent sign* — and by the stronger, control-based standard, no
@@ -307,3 +331,96 @@ and 3rd worst on AIC-3; 4003 is near-worst on CID22 and best on AIC-3). **There
 is no transferable "good seed."** Consequence for the deliverable: a registry of
 good seeds cannot be an oracle, and the registry says so in its own schema
 header.
+
+## Phase 3(c) — the stratified sampler already existed, and was unreachable
+
+The brief asked for `--pair-sampling stratified` if the concurrent ownerfix lane
+had not landed it. It did not need building: **`--stratified-bands N` has existed
+since STRATEGY-2026-07-02** — quantile bands per group, row A drawn band-uniform
+then row-uniform inside the band. Per the one-owner rule, a second stratified
+sampler was not written.
+
+It was, however, **a silent no-op on the path every model actually trains
+through.** `strat_bands` was built in exactly one of the four training loops
+(`train_mlp_per_sample_alpha_head`); the other three, including
+`train_mlp_strategy`'s standard path that all 312 board bakes used, passed an
+empty band table. MEASURED on the default path before the fix:
+`--stratified-bands 0` and `--stratified-bands 8` produced the **same
+sample-sequence digest, `127b831bed8a3873`** — the flag was accepted and
+discarded. Fixed (`fix(train): --stratified-bands was a SILENT NO-OP…`), with a
+failing-first test and the default proved byte-identical; after the fix the two
+digests are `127b831bed8a3873` vs `3ea736b63181a351`.
+
+Worth stating plainly, because it is the kind of defect this study was well
+placed to find: **a knob that accepts a value and discards it is worse than a
+missing knob**, because a sweep over it returns a clean table of identical
+results that reads as a finding. No board bake sets it, so nothing published is
+affected.
+
+**Not claimed:** that stratified sampling helps. It is now reachable and
+testable; whether it improves anything is unmeasured, and this study's own result
+is a reason for caution rather than optimism.
+
+**The same defect family, four more members.** `--ema-decay`, `--hard-pair-frac`,
+`--dro-eta` and `--listwise-weight` are all read only inside
+`train_mlp_per_sample_alpha_head`. `train_mlp_strategy` already guards three
+sibling flags against exactly this (`--monotonicity-reg`, `--mse-weight`,
+`--triplet-weight`, whose comments record that the earlier versions "were dead
+code that could never fire" and were "found by a should_panic test that did not
+panic") — these four were simply never added to the list. They now fail loud.
+
+## Phase 3(a) — the registry
+
+`benchmarks/good_subsets_registry.json` (append-only, schema header, 28.6 KB):
+one row per (arm, seed) cell — 202 cells over 66 arms — carrying the
+**sample-sequence digest** that identifies the drawn subset, the sample seed and
+init seed as separate fields, a `seeds_were_fused` flag recording that every
+current row predates `--init-seed`/`--sample-seed` (so its single `--seed` drove
+both streams and the two effects are not separable for that row), and the
+held-out scores.
+
+The 29 coverage descriptors are deliberately **not** duplicated into it: they are
+a deterministic function of the subset, so
+`subset_sim --fulleval <bake>.fulleval.json --seeds <sample_seed>` regenerates
+them exactly and the digest proves the right subset was regenerated. The computed
+tables live in block storage behind
+`benchmarks/subset_study_data_2026-09-04.pointer.md`.
+
+The schema header states the null in its own `finding` field, so a future session
+cannot pick a seed out of this file by its coverage numbers without reading that
+it must not.
+
+## Phase 3(b) — the prescription: there isn't one, and that is the result
+
+The pre-registration committed to skipping coverage-targeted steering if the
+falsifier fired. It fired. **No target coverage spec is issued**, because the
+evidence says a coverage spec would be steering on noise:
+
+1. whole-run coverage is saturated — 12 of 29 descriptors never move more than
+   1 % between seeds, while the targets move 28–940× more;
+2. a pure-luck control out-correlates every real descriptor;
+3. the best seeds are not better covered (max mean z 0.467, control third at
+   0.428);
+4. good seeds do not transfer across arms.
+
+What a practitioner should take from this: **do not tune the pair sampler hoping
+to reduce seed variance at production settings.** With ~17 draws per row, which
+rows a seed draws is effectively fixed; what differs between seeds is the *order*
+they arrive in and the weights they start from.
+
+The obvious remaining lever was `--ema-decay`, whose own CLI doc advertises
+"seed-variance reduction". **It is not available on this recipe**: like
+`--hard-pair-frac`, `--dro-eta` and `--listwise-weight`, it is read only inside
+`train_mlp_per_sample_alpha_head`, so on the standard path — the one all 312
+board bakes train through — it was accepted and discarded, silently. This lane
+did not wire it (an EMA/DRO/listwise step through three more training loops is a
+real change to the optimizer and the bake path, not a drive-by); it added the
+**fail-loud guard** the file already applies to `--monotonicity-reg`,
+`--mse-weight` and `--triplet-weight`, so the flag now stops the run instead of
+producing a table that reads "EMA does not help" when EMA never ran. No board
+bake sets any of the four, so nothing published is affected.
+
+That leaves **seed averaging**, which the ensemble rows already do, as the only
+variance lever currently reachable on this path — and wiring EMA into the
+standard loop as the concrete next piece of work, now that its absence is
+explicit rather than silent.

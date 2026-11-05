@@ -620,6 +620,107 @@ def graft_dial_zones(board: Path, verdict: Path, dry_run: bool = False) -> bool:
                               f"graft dial.zones ({v.get('name')})")
 
 
+def _ulps_apart(a: float, b: float) -> int:
+    """Distance in representable f64 steps. 0 == bit-identical."""
+    import struct
+    if a == b:
+        return 0
+    ia, ib = (struct.unpack("<q", struct.pack("<d", x))[0] for x in (a, b))
+    if (ia < 0) != (ib < 0):
+        return 1 << 62
+    return abs(ia - ib)
+
+
+# MEASURED 2026-09-04 (G-ADDR board-coverage lane): `bake_verdict --full-json`
+# and `bake_verdict --gaddr-json` serialise the SAME pooled percentile from the
+# SAME sorted vector in the SAME process and can disagree by ONE ULP, because
+# there are TWO linear-interpolation implementations —
+# `bake_verdict::percentile` uses `lo*(1-frac) + hi*frac` and
+# `dial_addressability::pct` uses `lo + frac*(hi-lo)`. Every stored board cell
+# carries the first form. Until that duplication is resolved at its owner (a
+# 1-ULP change to `pct` would move the committed G-ADDR registry bars, so it is
+# the gate owner's call, not this graft's), the same-grid identity check allows
+# a few ULP on the interpolated fields ONLY. A read taken on a DIFFERENT grid
+# differs by orders of magnitude more, so the gate still bites.
+GADDR_DIAL_ULP_SLACK = 4
+
+
+def graft_gaddr(board: Path, gaddr: Path, dry_run: bool = False) -> bool:
+    """Copy the G-ADDR dial-addressability verdict (`dial.addressability`, plus
+    the `dial.min` / `dial.max` pooled ends it grades) from a same-bake
+    `bake_verdict --gaddr-json` output into a board fulleval.
+
+    The gate is the `graft_dial_zones` gate, for the same reason: a sha match
+    alone does not prove the G-ADDR read was taken on the SAME dial grid, and an
+    addressability verdict cut from a different grid would silently disagree
+    with the `mono_pct` / `p5` / `p95` printed beside it. So every pre-existing
+    scalar of the board's `dial` block must be BYTE-IDENTICAL to the values the
+    G-ADDR run measured on its own grid. Same bake + same pooled dial numbers =
+    same grid, same regime, same code path.
+
+    A `--gaddr-json` file carries the verdict at full f64 under `checks` /
+    `measured` / `headline`, plus a `scorer` stamp saying which bake it
+    describes. Nothing is recomputed here: the block is copied verbatim, and
+    provenance (path + sha256 + the reference pin set it was graded against)
+    lands in `dial_gaddr_source`. Only `dial` and `dial_gaddr_source` may
+    change, and inside `dial` only `addressability` / `min` / `max`."""
+    bdoc = _load_board(board)
+    g_bytes = gaddr.read_bytes()
+    g = json.loads(g_bytes)
+    if not isinstance(g.get("checks"), list):
+        raise SystemExit(f"graft-gaddr: {gaddr} carries no G-ADDR `checks` list")
+    scorer = g.get("scorer") or {}
+    if scorer.get("kind") != "bake":
+        raise SystemExit(f"graft-gaddr: {gaddr} was not scored from a bake "
+                         f"(scorer.kind={scorer.get('kind')!r}); refusing")
+    bake_path = Path(scorer.get("label") or "")
+    if not bake_path.is_file():
+        raise SystemExit(f"graft-gaddr: scorer bake {bake_path} is not on disk; refusing")
+    sha = hashlib.sha256(bake_path.read_bytes()).hexdigest()
+    if bdoc.get("bake_sha256") != sha:
+        raise SystemExit(f"graft-gaddr: bake_sha256 mismatch — {board.name} "
+                         f"({bdoc.get('bake_sha256')}) is not the bake {gaddr.name} scored "
+                         f"({sha}); refusing")
+    bd = bdoc.get("dial") or {}
+    meas = (g.get("measured") or {}).get("grid") or {}
+    ulps: list = []
+    for k, gk in (("mono_pct", "mono"), ("tied_pct", "tied"), ("p5", "p5"), ("p95", "p95"),
+                  ("reach", "reach"), ("dynamic_range", "dynamic_range")):
+        if k not in bd or gk not in meas:
+            continue
+        bv, gv = bd.get(k), meas.get(gk)
+        if _num_eq(bv, gv):
+            continue
+        slack = (isinstance(bv, (int, float)) and isinstance(gv, (int, float))
+                 and _ulps_apart(float(bv), float(gv)) <= GADDR_DIAL_ULP_SLACK)
+        if not slack:
+            raise SystemExit(f"graft-gaddr: {board.name}: dial.{k} differs between the board "
+                             f"({bv}) and the G-ADDR read ({gv}) — the read "
+                             f"was NOT taken on the board's dial grid; refusing")
+        ulps.append((k, bv, gv, _ulps_apart(float(bv), float(gv))))
+    blk = {k: g[k] for k in ("headline", "regression", "contract", "shippable", "checks",
+                             "grid_label", "grid_sha256", "active_reference",
+                             "incumbent_reference", "reference", "measured",
+                             "n_pass", "n_fail", "n_not_measured") if k in g}
+    if _jc(bd.get("addressability")) == _jc(blk):
+        print(f"graft-gaddr: {board.name} already carries this addressability block — unchanged")
+        return False
+    doc = copy.deepcopy(bdoc)
+    d = doc.setdefault("dial", {})
+    d["addressability"] = blk
+    for k, gk in (("min", "min"), ("max", "max")):
+        if gk in meas:
+            d[k] = meas[gk]
+    src = {"path": str(gaddr), "sha256": hashlib.sha256(g_bytes).hexdigest(),
+           "reference": g.get("reference") or g.get("active_reference")}
+    if ulps:
+        src["dial_scalar_ulp_slack"] = [
+            {"field": k, "board": b, "gaddr": v, "ulps": u} for k, b, v, u in ulps]
+    doc["dial_gaddr_source"] = src
+    return _write_board_gated(board, bdoc, doc, {"dial", "dial_gaddr_source"}, dry_run,
+                              f"graft dial.addressability ({g.get('headline')})")
+
+
 def set_block_profile(board: Path, bbp_bin: str, dry_run: bool = False) -> bool:
     """Compute the static feature-block usage fingerprint from the fulleval's
     own bake bytes (`bake_block_profile --json`, sha-gated against
@@ -688,6 +789,101 @@ def graft_corruption_head(board: Path, verdict: Path, dry_run: bool = False) -> 
     return True
 
 
+def self_test_graft_gaddr() -> int:
+    """Exercise `graft_gaddr` on synthetic fixtures. Four behaviours, all
+    load-bearing: the happy path leaves every other key byte-identical; a bake
+    whose bytes hash to something else is REFUSED; a read whose dial scalars
+    disagree beyond the ULP slack (i.e. a different grid) is REFUSED; and a
+    1-ULP disagreement is allowed but RECORDED, never silent."""
+    import os, struct, tempfile
+    fails = []
+
+    def board(bake_path, sha, dial):
+        return {"name": "T", "bake": str(bake_path), "bake_sha256": sha,
+                "dial": dict(dial), "rank": {"cid22": {"srocc_signed": 0.5}},
+                "model": {"n_inputs": 372}}
+
+    def gaddr(bake_path, grid, checks=None):
+        return {"scorer": {"kind": "bake", "label": str(bake_path)},
+                "headline": "H", "regression": "FAIL", "contract": "PASS",
+                "shippable": False, "n_pass": 1, "n_fail": 1, "n_not_measured": 0,
+                "reference": "peer_ssim2", "active_reference": "peer_ssim2",
+                "grid_label": "G", "grid_sha256": "abc",
+                "checks": checks or [{"id": "C1", "tier": "contract", "state": "pass",
+                                      "measured": 1.0, "bar": 0.93, "cmp": "\u2265",
+                                      "incumbent": None, "note": "", "what": "mono"}],
+                "measured": {"grid": dict(grid)}}
+
+    def run(tmp, bdict, gdict):
+        b = tmp / "cell.fulleval.json"; g = tmp / "g.json"
+        b.write_text(json.dumps(bdict)); g.write_text(json.dumps(gdict))
+        before = json.loads(b.read_text())
+        try:
+            graft_gaddr(b, g)
+            return True, json.loads(b.read_text()), before
+        except SystemExit as e:
+            return False, str(e), before
+
+    # ~/tmp, never /tmp — the scratch ban (a mid-session wipe of /tmp has cost
+    # this project a whole measurement harness before).
+    scratch = Path(os.environ.get("ZEN_TMP", str(Path.home() / "tmp")))
+    scratch.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(dir=str(scratch)) as td:
+        tmp = Path(td)
+        bake = tmp / "b.bin"; bake.write_bytes(b"znpr-fixture-bytes")
+        sha = hashlib.sha256(bake.read_bytes()).hexdigest()
+        dial = {"mono_pct": 0.99, "tied_pct": 0.0, "p5": 12.5, "p95": 98.5,
+                "reach": 90.0, "dynamic_range": 86.0}
+        grid = {"mono": 0.99, "tied": 0.0, "p5": 12.5, "p95": 98.5, "reach": 90.0,
+                "dynamic_range": 86.0, "min": 3.0, "max": 93.0}
+
+        ok, after, before = run(tmp, board(bake, sha, dial), gaddr(bake, grid))
+        if not ok:
+            fails.append(f"happy path refused: {after}")
+        else:
+            if (after.get("dial") or {}).get("addressability", {}).get("headline") != "H":
+                fails.append("happy path did not graft the block")
+            if after["dial"].get("min") != 3.0 or after["dial"].get("max") != 93.0:
+                fails.append("happy path did not carry dial.min/max")
+            for k in set(before) | set(after):
+                if k in ("dial", "dial_gaddr_source"):
+                    continue
+                if _jc(before.get(k)) != _jc(after.get(k)):
+                    fails.append(f"happy path changed unrelated key {k}")
+            for k in before["dial"]:
+                if not _num_eq(before["dial"][k], after["dial"][k]):
+                    fails.append(f"happy path changed pre-existing dial.{k}")
+
+        ok, msg, _ = run(tmp, board(bake, "0" * 64, dial), gaddr(bake, grid))
+        if ok or "bake_sha256 mismatch" not in str(msg):
+            fails.append(f"sha mismatch was not refused: {msg}")
+
+        wrong = dict(grid, mono=0.80)
+        ok, msg, _ = run(tmp, board(bake, sha, dial), gaddr(bake, wrong))
+        if ok or "dial.mono_pct differs" not in str(msg):
+            fails.append(f"different-grid read was not refused: {msg}")
+
+        one_ulp = struct.unpack("<d", struct.pack("<q", struct.unpack(
+            "<q", struct.pack("<d", 12.5))[0] + 1))[0]
+        ok, after, _ = run(tmp, board(bake, sha, dial), gaddr(bake, dict(grid, p5=one_ulp)))
+        if not ok:
+            fails.append(f"1-ULP p5 was refused: {after}")
+        else:
+            rec = (after.get("dial_gaddr_source") or {}).get("dial_scalar_ulp_slack")
+            if not rec or rec[0]["field"] != "p5" or rec[0]["ulps"] != 1:
+                fails.append(f"1-ULP slack was not recorded: {rec}")
+
+        ok, msg, _ = run(tmp, board(bake, sha, dial),
+                         gaddr(bake, dict(grid, p5=12.5 + 1e-6)))
+        if ok or "dial.p5 differs" not in str(msg):
+            fails.append(f"1e-6 p5 drift (>> 4 ULP) was not refused: {msg}")
+
+    for f in fails:
+        print("FAIL:", f)
+    print(f"self-test graft_gaddr: {'FAIL' if fails else 'PASS'} ({len(fails)} failure(s))")
+    return 1 if fails else 0
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -735,6 +931,12 @@ def main(argv=None) -> int:
                     help="with --graft-into + --verdict: copy dial.zones (the ladder-inversion "
                          "split) from a same-bake verdict whose pooled dial numbers are "
                          "byte-identical (that identity is what proves the same dial grid)")
+    ap.add_argument("--graft-gaddr", default=None, type=Path, metavar="GADDR_JSON",
+                    help="with --graft-into: copy the G-ADDR dial-addressability verdict "
+                         "(dial.addressability + dial.min/max) from a same-bake "
+                         "`bake_verdict --gaddr-json` output. Sha-gated on the scorer bake's "
+                         "bytes, and every pre-existing dial scalar must match the read's own "
+                         "grid measure (that identity is what proves the same dial grid)")
     ap.add_argument("--set-block-profile", default=None, type=Path, metavar="BOARD_JSON",
                     help="BLOCK-PROFILE mode: compute the static feature-block fingerprint from "
                          "the fulleval's bake bytes (bake_block_profile --json, sha-gated) and "
@@ -742,9 +944,14 @@ def main(argv=None) -> int:
     ap.add_argument("--bbp-bin", default=None,
                     help="bake_block_profile binary (default: $BBP_BIN or "
                          "target/release/bake_block_profile next to this repo)")
+    ap.add_argument("--self-test-graft-gaddr", action="store_true",
+                    help="run graft_gaddr's fixture self-test and exit (no files touched)")
     ap.add_argument("--out-dir", default=DEFAULT_OUT, type=Path)
     ap.add_argument("--dry-run", action="store_true")
     a = ap.parse_args(argv)
+
+    if a.self_test_graft_gaddr:
+        return self_test_graft_gaddr()
 
     if a.mark_dominated is not None:
         if a.verdict or a.name or a.members or a.members_file:
@@ -772,6 +979,18 @@ def main(argv=None) -> int:
         bbp = a.bbp_bin or os.environ.get("BBP_BIN") or str(
             Path(__file__).resolve().parent.parent / "target/release/bake_block_profile")
         set_block_profile(a.set_block_profile, bbp, a.dry_run)
+        return 0
+
+    if a.graft_gaddr is not None:
+        if a.verdict or a.name or a.members or a.members_file:
+            ap.error("--graft-gaddr takes only --graft-into/--dry-run")
+        if a.graft_into is None:
+            ap.error("--graft-gaddr requires --graft-into <board.fulleval.json>")
+        if not a.graft_into.exists():
+            raise SystemExit(f"graft-gaddr: board file not found: {a.graft_into}")
+        if not a.graft_gaddr.exists():
+            raise SystemExit(f"graft-gaddr: gaddr json not found: {a.graft_gaddr}")
+        graft_gaddr(a.graft_into, a.graft_gaddr, a.dry_run)
         return 0
 
     if a.verdict is None or not a.verdict.exists():

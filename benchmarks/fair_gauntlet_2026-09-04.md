@@ -245,12 +245,17 @@ The re-pin reproduces the registry's own headline on the board. Shipped **B** no
 is −55.35 against B's +3.13). Board-wide over the six measurable axes, the modal cell is
 **3 pass / 3 fail** (278 of 433).
 
-The board still does **not** badge NOT-SHIPPABLE on a CONTRACT failure, because **no cell
-has a CONTRACT-tier measurement**: C3–C6 need the negative-tail and identity probes,
-which were never run for these verdicts, and C1/C2 alone are not the tier. Marking a
-cell NOT-SHIPPABLE off two of six contract rows would be a measured claim we do not have.
-(`~/tmp/gaddr_repin_READY.md` never existed; nothing was assumed from it — the landed
-registry was read instead.)
+~~The board still does **not** badge NOT-SHIPPABLE on a CONTRACT failure, because **no cell
+has a CONTRACT-tier measurement**~~ — **SUPERSEDED 2026-09-04, same day, by the
+board-coverage lane (gate doc §15).** All 97 fair cells were then graded through the owner
+under both pin sets; 96 carry the verdict as a grafted `dial.addressability` block, the
+G-ADDR column reads `pass/15`, and **47 cells fail a contract row and now badge NOT
+SHIPPABLE** (46 of them on the fair board — `ebothg_m504`'s read was refused by the
+same-grid gate). C5/C6 remain NOT MEASURED on 94 cells because no in-era 944 identity probe
+exists and the 372 one cannot be widened (measured: the 944 identity vector is not the zero
+vector). An INCOMPLETE contract still badges nothing — unmeasured is never a fail.
+(`~/tmp/gaddr_repin_READY.md` did not exist at this pass; nothing was assumed from it — the
+landed registry was read instead.)
 
 ---
 

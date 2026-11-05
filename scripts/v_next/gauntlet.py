@@ -1168,15 +1168,49 @@ def load_fulleval(fulleval_dir, best_per_day=None):
         # a verdict carries one (the gate landed 2026-09-04; no board cell has it yet).
         addr = (o.get("dial") or {}).get("addressability")
         gcells, gpass, gfail = [], 0, 0
-        if gaddr and gaddr.get("grid"):
+        gmeta = None
+        if isinstance(addr, dict) and isinstance(addr.get("checks"), list):
+            # The cell CARRIES the owner's own G-ADDR verdict (grafted by
+            # `promote_fulleval.py --graft-gaddr`, sha-gated + same-grid gated).
+            # Render THAT — all 15 rows, both tiers — instead of the six the board
+            # can re-derive from stored dial scalars. Nothing is recomputed here:
+            # every state/bar/measured value is copied out of the block.
+            _cmp = {"\u2265": "ge", "\u2264": "le", ">": "gt", "<": "lt"}
+            for c in addr["checks"]:
+                st = c.get("state")
+                mv, bar, inc = c.get("measured"), c.get("bar"), c.get("incumbent")
+                gpass += (st == "pass")
+                gfail += (st == "fail")
+                gcells.append([c.get("id"), c.get("what"),
+                               None if mv is None else round(float(mv), 5),
+                               None if bar is None else round(float(bar), 5),
+                               _cmp.get(c.get("cmp"), c.get("cmp")),
+                               True if st == "pass" else (False if st == "fail" else None),
+                               None if inc is None else round(float(inc), 5),
+                               c.get("tier"), st, (c.get("note") or "")[:220]])
+            cfail = [c.get("id") for c in addr["checks"]
+                     if c.get("tier") == "contract" and c.get("state") == "fail"]
+            cnm = [c.get("id") for c in addr["checks"]
+                   if c.get("tier") == "contract" and c.get("state") == "not_measured"]
+            gmeta = {"src": "emitted", "total": len(addr["checks"]),
+                     "headline": addr.get("headline"), "contract": addr.get("contract"),
+                     "regression": addr.get("regression"),
+                     "shippable": bool(addr.get("shippable")),
+                     "nm": addr.get("n_not_measured"),
+                     "ref": addr.get("reference") or addr.get("active_reference"),
+                     "grid": addr.get("grid_label"),
+                     "cfail": cfail, "cnm": cnm}
+        elif gaddr and gaddr.get("grid"):
             _grid = gaddr["grid"]
             _fx = gaddr["fixed_bars"]
             for aid, dial_key, bar_key, cmp_, what in GADDR_AXES:
                 mv = (o.get("dial") or {}).get(dial_key)
                 bar = _grid.get(bar_key) if aid.startswith("A") else _fx.get(
                     {"mono": "mono_min", "tied": "tied_max"}[bar_key])
+                _tier = "regression" if aid.startswith("A") else "contract"
                 if mv is None or bar is None:
-                    gcells.append([aid, what, None, bar, cmp_, None, None])
+                    gcells.append([aid, what, None, bar, cmp_, None, None,
+                                   _tier, "not_measured", ""])
                     continue
                 ok = (mv >= bar) if cmp_ == "ge" else (mv <= bar)
                 gpass += ok
@@ -1186,7 +1220,7 @@ def load_fulleval(fulleval_dir, best_per_day=None):
                     iv = gaddr["gridIncumbent"].get(bar_key)
                     inc = None if iv is None else round(float(iv), 5)
                 gcells.append([aid, what, round(float(mv), 5), round(float(bar), 5), cmp_,
-                               bool(ok), inc])
+                               bool(ok), inc, _tier, "pass" if ok else "fail", ""])
         blocks = None
         bp = o.get("block_profile")
         if isinstance(bp, dict):
@@ -1263,8 +1297,9 @@ def load_fulleval(fulleval_dir, best_per_day=None):
             "repro": o.get("repro"),
             "annotations": matched_ann,
             "fair": fair,
-            "gaddr": {"cells": gcells, "pass": gpass, "fail": gfail,
-                      "emitted": addr} if gcells else None,
+            "gaddr": dict({"cells": gcells, "pass": gpass, "fail": gfail,
+                           "emitted": bool(gmeta)}, **(gmeta or {"src": "derived",
+                                                                 "total": 6})) if gcells else None,
             "dominated_by": o.get("dominated_by") or [],
             "blocks": blocks,
             "scatter": scatter_out, "is_stub": bool(o.get("_stub")),
@@ -1676,13 +1711,38 @@ const gaddrTitle=b=>{if(!b.gaddr)return 'G-ADDR: NOT MEASURED (no registry / no 
   L.push('REGRESSION bars = the ACTIVE reference "'+ar+'" on the same instrument'
     +(ar==='peer_ssim2'?' — the reference METRIC, re-pinned by user decision 2026-09-04 ("ssim2 seems a better mentor"). A candidate must address AT LEAST the range ssim2 addresses.':''));
   if(GADDR&&GADDR.gridIncumbent)L.push('the shipped-B column is CONTEXT, never a bar — the registry labels it BIASED (A1/A3/A6 sit ABOVE the reference metric\u2019s own values on this grid).');
-  (b.gaddr.cells||[]).forEach(c=>L.push('  '+c[0]+' '+c[1]+': '+(c[2]==null?'NOT MEASURED':f3(c[2]))
-      +'  bar('+ar+') '+(c[4]==='ge'?'≥':'≤')+' '+f3(c[3])
+  const EM=b.gaddr.src==='emitted';
+  if(EM){L.push('this cell carries the OWNER’s own G-ADDR verdict (bake_verdict --gaddr-json, grafted '
+    +'sha-gated + same-grid gated) — all '+b.gaddr.total+' rows below are copied from it, none re-derived.');
+    L.push('VERDICT: '+(b.gaddr.headline||'?'));
+    L.push('  regression: '+(b.gaddr.regression||'?')+'   contract: '+(b.gaddr.contract||'?'));
+    if(b.gaddr.grid)L.push('  instrument: '+b.gaddr.grid);}
+  let tier='';
+  (b.gaddr.cells||[]).forEach(c=>{
+    const t=c[7]||(c[0].charAt(0)==='A'?'regression':'contract');
+    if(t!==tier){tier=t;L.push(' '+tier.toUpperCase()+' tier');}
+    L.push('  '+c[0]+' '+c[1]+': '+(c[2]==null?'NOT MEASURED':f3(c[2]))
+      +(c[3]==null?'':('  bar('+(t==='contract'?'absolute':ar)+') '
+        +(c[4]==='ge'?'≥':c[4]==='le'?'≤':c[4]==='gt'?'>':'<')+' '+f3(c[3])))
       +(c[6]==null?'':('   [shipped B '+f3(c[6])+']'))
-      +'  '+(c[5]==null?'—':(c[5]?'PASS':'FAIL'))));
-  L.push('NOT MEASURED here: '+(DATA.gaddrNotMeasured||''));
-  if(b.gaddr.emitted)L.push('this cell CARRIES an emitted dial.addressability block — see the Model card');
+      +'  '+(c[5]==null?'— NOT MEASURED':(c[5]?'PASS':'FAIL'))
+      +((c[5]==null&&c[9])?('  ('+c[9]+')'):''));});
+  if(EM){if((b.gaddr.cfail||[]).length)L.push('NOT SHIPPABLE — CONTRACT rows FAILED: '+b.gaddr.cfail.join(', ')
+      +'  (user rule 2026-09-04: any model that limits dial range cannot ship)');
+    if((b.gaddr.cnm||[]).length)L.push('contract rows NOT MEASURED (no in-era probe): '+b.gaddr.cnm.join(', ')
+      +'  — an unmeasured row is never a pass, so this cell is not certified shippable either.');}
+  else L.push('NOT MEASURED here: '+(DATA.gaddrNotMeasured||''));
   return L.join('\n');};
+// NOT-SHIPPABLE badge: drawn ONLY off a measured CONTRACT-tier FAIL in the owner's
+// own emitted verdict. An INCOMPLETE contract (a row nobody could measure) never
+// draws it — unmeasured is not a fail.
+const notShip=b=>!!(b.gaddr&&b.gaddr.src==='emitted'&&(b.gaddr.cfail||[]).length);
+const shipBadge=b=>notShip(b)?el('span',{style:'font-size:9px;font-weight:700;letter-spacing:.03em;'
+  +'padding:0 4px;margin-left:5px;border-radius:7px;vertical-align:1px;white-space:nowrap;'
+  +'background:color-mix(in srgb, var(--critical) 30%, var(--surface-1));border:1px solid var(--critical)',
+  title:'NOT SHIPPABLE — the G-ADDR CONTRACT tier FAILS on '+(b.gaddr.cfail||[]).join(', ')
+    +'. '+(b.gaddr.headline||'')+'  USER RULE 2026-09-04: "floor and ceiling dial addressability is '
+    +'crucial — any model that limits dial range cannot ship."',text:'NOT SHIPPABLE'}):null;
 const KNOBFAIL=b=>!!(b.knob_end_fail&&b.knob_end_fail.length);
 const CURATED_ALL=DATA.bakes.filter(b=>b.curated&&!DOM(b)).map(b=>b.name);
 // default compare set excludes knob-end failers (dial cannot reach/span the
@@ -1762,6 +1822,7 @@ function nameInto(node,b,suffix){
     title:'\u{1F31F} '+b.star}));
   const bd=ensBadge(b);if(bd)node.append(bd);
   const dd=domBadge(b);if(dd)node.append(dd);
+  const nb=shipBadge(b);if(nb)node.append(nb);
   return node;
 }
 
@@ -2092,12 +2153,12 @@ if(LT){COLS.push(
   ['loop2','2shot ±2',false,b=>{const c=ltCell(b,'k2_emit_best');return c?c.within2:null;}],
   ['loop3','3shot ±2',false,b=>{const c=ltCell(b,'k3_emit_best');return c?c.within2:null;}],
   ['loop3err','3shot med|err|',false,b=>{const c=ltCell(b,'k3_emit_best');return c!=null&&c.med_abs_err!=null?c.med_abs_err:null;}]);}
-function fmtCell(key,v){
+function fmtCell(key,v,b){
   if(key==='name'||key==='regime'||key==='fair')return v;
   if(key==='k')return v==null?'—':(v===1?'1 ⚠':String(v));
   if(key==='cspread')return v==null?'—':f3(v);
   if(key&&key.charAt(0)==='w'&&key.length===2)return v==null?'—':v;
-  if(key==='gaddr')return v==null?'—':v+'/'+6;
+  if(key==='gaddr')return v==null?'—':v+'/'+((b&&b.gaddr&&b.gaddr.total)||6);
   if(key==='trained')return v==null?'—':v;
   if(key==='gates')return v;
   if(key==='cid22_bwd')return v==null?'—':pct(v);
@@ -2192,7 +2253,7 @@ function renderTable(){
     if(DOM(b))tr.style.opacity=Math.min(tr.style.opacity||1,.35);
     COLS.forEach(c=>{
       const v=c[3](b);
-      const td=el('td',{class:(c[0]==='name'||c[0]==='regime')?'lbl':'',text:fmtCell(c[0],v)});
+      const td=el('td',{class:(c[0]==='name'||c[0]==='regime')?'lbl':'',text:fmtCell(c[0],v,b)});
       if(c[0]==='name'){td.textContent='';nameInto(td,b,b.is_stub?' ✳':'');}
       if(c[0]==='gates'){td.setAttribute('title',gateTitle(b));td.style.cursor='help';
         td.style.fontFamily='ui-monospace,monospace';td.style.letterSpacing='1px';}
