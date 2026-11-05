@@ -263,7 +263,16 @@ def predict(a):
     out = a.root/'scores'/a.set
     out.mkdir(parents=True,exist_ok=True)
     evidence=pq.read_table(a.root/'banks'/a.set/'keys.parquet',columns=['pixels_identical'])
-    assert not any(evidence['pixels_identical'].to_pylist()), 'cached predict lacks pixel-identity evidence; coordinator required'
+    count=sum(evidence['pixels_identical'].to_pylist())
+    if count:
+        proof=json.loads((a.root/'inputs'/a.set/'CACHED_IDENTITY_PARITY.json').read_text())
+        assert proof['rows']==count and proof['all_cached_equal_native'] and proof['all_scores_exactly_100']
+        for field,path in [('bank_keys_sha256',a.root/'banks'/a.set/'keys.parquet'),
+                           ('feature_bank_sha256',a.root/'banks'/a.set/'features.parquet'),
+                           ('model_sha256',a.root/'models/A.bin'),
+                           ('predictor_sha256',a.root/'bin/bake_dial_refit'),
+                           ('native_scorer_sha256',a.root/'bin/serve_custom_bake')]:
+            assert proof[field]==sha(path), 'identity parity proof does not bind this instrument'
     tab = pq.read_table(a.root/'banks'/a.set/'features.parquet').drop(['row_id'])
     tab = tab.rename_columns(['ref_basename' if c=='pair_key' else c for c in tab.column_names])
     tab = tab.append_column('human_score',pa.array([0.0]*tab.num_rows))

@@ -229,3 +229,11 @@ All200 stimuli independently verified and all200 feature RGB comparisons passed.
 - stats: `run-heavy: done rc=0 8s | peak-RSS 0.13GiB | min-avail 31308MiB | peak-load 3.37`
 
 Target cache `ca83376cfab13f34285d5326589b9ad54b211449bf7ef510977547f5b4c6a6c3`; result `614576af02fe66d5b2de476dec8d5e0d7c8a9ce56f622bf5fc1ce02b7ecf0776`; completed journal `a3e2cc761c67dc55ca6dc5bdc7683c62f7d2a512741619e8c88bb8ca5a6806f4`.
+
+### KADID pre-label identity-surface check
+
+All2,000 original TERMINAL pairs /16 references retained. All2,016 stimuli independently decoded; all4,000 feature RGB checks passed. Keys SHA256 `5cf3d221f3905f041caab2fed07a4462b62a5e3bf668cf242941dcf23096d5a6`; decode-map SHA256 `4b5e0abd37ac2d43727480a9cbbb743db4a844d349728bc7c6232379425b776a`. There are64 byte-identical pairs. The cached predictor does not pass an identity flag, so all64 were checked before labels against the native pixel surface:64/64 cached/native scores exactly100.0, zero differences. Frozen A, predictor and native scorer unchanged. This verifies the registered cached path on every identity row without overriding any prediction or dropping any pair. The pre-read orchestration guard now requires a bank/model/binary-bound exact parity receipt whenever identity rows occur.
+
+Cached64-score TSV SHA256 `408071c6659cc576a746a9b765ad3430010d38bb17611c50d00fa7cbd2e136bd`; native64-score TSV SHA256 `57249289e4acc401cbbbcf252904bfd4d8e02ee50f5505ec2f96d0ec2facae9c`. Receipts: cached `rc=0 0s | peak-RSS0.06GiB | min-avail31454MiB | peak-load1.00`; native `rc=0 1s | peak-RSS0.02GiB | min-avail31394MiB | peak-load1.00`. The preliminary single-row Snappy control was refused by the frozen loader, retained as failed; its Zstd replacement and all64-row controls passed. No human target was parsed in any control.
+
+KADID preparation receipts: keys `rc=0 0s | peak-RSS0.07GiB | min-avail31349MiB | peak-load3.10`; decode/readback `rc=0 11s | peak-RSS0.07GiB | min-avail31293MiB | peak-load2.93`; bank `rc=0 31s | peak-RSS0.28GiB | min-avail30483MiB | peak-load2.71`. KonJND's completed label parse receipt was `rc=0 1s | peak-RSS0.06GiB | min-avail31367MiB | peak-load2.43`.
