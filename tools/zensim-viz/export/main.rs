@@ -8,6 +8,7 @@ mod constraints;
 mod function;
 mod lens;
 mod model;
+mod pages;
 mod pixels;
 mod provenance;
 
@@ -53,6 +54,7 @@ fn main() -> Result<()> {
     let mut percentile_paths = Vec::new();
     let allowed: &[&str] = match command.as_str() {
         "weights" | "function" => &["--out"],
+        "pages-bank" => &["--bank", "--out", "--max-rows"],
         "curve-audit" => &["--out", "--baseline"],
         "audit" => &[
             "--bank",
@@ -139,7 +141,7 @@ fn main() -> Result<()> {
         .unwrap_or(
             if matches!(
                 command.as_str(),
-                "audit" | "atlas" | "mlp-bank" | "mlp-lens"
+                "audit" | "atlas" | "mlp-bank" | "mlp-lens" | "pages-bank"
             ) {
                 usize::MAX
             } else {
@@ -175,6 +177,7 @@ fn main() -> Result<()> {
     std::fs::create_dir_all(&out)?;
     provenance::write(&out)?;
     match command.as_str() {
+        "pages-bank" => pages::bank(&model, &inputs, &bank, &out)?,
         "audit" => {
             let constraints = constraints::inspect(&model, &inputs, &bake_path)?;
             let audit = audit::run(

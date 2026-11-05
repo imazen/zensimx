@@ -7,6 +7,7 @@ pub(crate) fn write(out: &Path) -> Result<()> {
         ("provenance", include_str!("provenance.rs")),
         ("audit", include_str!("audit.rs")),
         ("bank", include_str!("bank.rs")),
+        ("pages", include_str!("pages.rs")),
         ("constraints", include_str!("constraints.rs")),
         ("function", include_str!("function.rs")),
         ("model", include_str!("model.rs")),

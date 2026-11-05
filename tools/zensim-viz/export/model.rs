@@ -202,7 +202,7 @@ pub(crate) fn weights_document(model: &Model, inputs: &[Input]) -> serde_json::V
         "largest_output_coefficient":largest_output,"residual_threshold":residual_threshold,
         "rule":"dead: encoder column all zero and bias ≤ 0; residual: non-dead and |output coefficient| < 1e-3 × largest |output coefficient|; live: remaining units"});
     serde_json::json!({"inputs":inputs,"row_order":row_order,"column_order":column_order,"per_input_columns":per_input_columns,"top_inputs_by_unit":top_inputs_by_unit,"nonzero_counts":nonzero_counts,"input_l1":input_l1,"capacity":capacity,"scaler_mean":model.scaler_mean(),"scaler_scale":model.scaler_scale(),
-        "layers": (0..model.n_layers()).map(|i| { let l=model.layer(i); serde_json::json!({"layer":i,"in_dim":l.in_dim,"out_dim":l.out_dim,"activation":format!("{:?}",l.activation),"weights":weights(model,i),"biases":l.biases,"stats":crate::audit::weight_statistics(&weights(model,i),l.in_dim,l.out_dim)}) }).collect::<Vec<_>>()})
+        "layers": (0..model.n_layers()).map(|i| { let l=model.layer(i); serde_json::json!({"layer":i,"in_dim":l.in_dim,"out_dim":l.out_dim,"activation":format!("{:?}",l.activation),"weights":weights(model,i),"biases":l.biases,"abs_max":weights(model,i).iter().map(|v|v.abs()).fold(0.0f32,f32::max),"stats":crate::audit::weight_statistics(&weights(model,i),l.in_dim,l.out_dim)}) }).collect::<Vec<_>>()})
 }
 // Compose diagnostic layer views with the existing baker, then execute
 // them with Predictor. This preserves the one owner of inference arithmetic.
