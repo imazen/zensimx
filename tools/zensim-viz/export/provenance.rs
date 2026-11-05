@@ -8,6 +8,7 @@ pub(crate) fn write(out: &Path) -> Result<()> {
         ("audit", include_str!("audit.rs")),
         ("bank", include_str!("bank.rs")),
         ("constraints", include_str!("constraints.rs")),
+        ("function", include_str!("function.rs")),
         ("model", include_str!("model.rs")),
         ("lens", include_str!("lens.rs")),
         ("compare", include_str!("compare.rs")),
