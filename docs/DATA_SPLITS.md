@@ -3293,3 +3293,9 @@ CSIQ frozen-A read complete:866 rows /30 references; target cache `ef0a1ea87d067
 ### Frozen-A live: individual pre-open exposure — 2026-11-05T07:31:57.912021+00:00
 
 Authorized frozen read of 779 rows; before target parsing. LABEL_READS.json SHA256 `5c64bcca75eb0ef70071b1760be76f203af3239666800256fb438e0906a1a7a0`; label specification `{"path": "/mnt/v/datasets/LIVE/live_r2_pairs.tsv", "sha256": "49fcd7d23c9e35b147b52e3361103dbbf6a81aa8ae9d7b16f4763c7e7051fe5d", "target": "human_score"}`. Prediction/decode/binary pins retained in that receipt. Bootstrap10000 seed20261105; no tuning or selection. Status: authorized-before-read; any partial/failed read spends this population.
+
+### Frozen-A konjnd_terminal: individual pre-open exposure — 2026-11-05T07:34:30.690117+00:00
+
+Authorized frozen read of 100 rows; before target parsing. LABEL_READS.json SHA256 `c7f8ad2a2ac2c538eec3156e924f3b1078e2d80cbbaf1353681bfcc06c02b4cf`; label specification `{"path": "/mnt/v/output/zensim/v2-backfill-2026-07-20/konjnd_jpeg_val_pairs.tsv", "sha256": "70148a39c90d97d35899a171204d3996034cf0019fbe0c496ac51ae4c4d40856", "target": "human_score"}`. Prediction/decode/binary pins retained in that receipt. Bootstrap10000 seed20261105; no tuning or selection. Status: authorized-before-read; any partial/failed read spends this population.
+
+LIVE frozen-A read completed:779 /29refs; fixed clean10=267 /10refs. Target cache `340d4c9f276179b1ea5ce74d80f5889694180e13d367cab5e6ff2e609c43cd10`; completed journal `65eb0b35f147ebfbb7c392d176be595c40a8051acc8a00e1edeaf97134d2ada3`. Both panels and10,000-draw intervals in `benchmarks/final_read_a_2026-11-05.md`. Spent; no training or selection.

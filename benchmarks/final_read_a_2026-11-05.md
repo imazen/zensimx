@@ -178,3 +178,31 @@ Read receipt: `rc=0 0s | peak-RSS0.07GiB | min-avail31355MiB | peak-load0.75`. S
 | butteraugli3_quality | 0.814449907 [0.797829260, 0.830706233] | 0.635796157 [0.620981491, 0.651910146] | 0.808457237 [0.795328985, 0.822168439] | 0.154513019 [0.145254183, 0.163196645] | 0.815148643 [0.798092187, 0.831281077] |
 
 All896 decoded stimuli independently verified,1,732 feature RGB checks passed,zero identical pairs. Receipts: keys `rc=0 0s | peak-RSS0.07GiB | min-avail31356MiB | peak-load6.43`; decode/readback `rc=0 7s | peak-RSS0.07GiB | min-avail31344MiB | peak-load5.91`; features `rc=0 16s | peak-RSS0.21GiB | min-avail31124MiB | peak-load5.52`; A prediction `rc=0 1s | peak-RSS0.17GiB | min-avail31419MiB | peak-load3.22`; peers `rc=0 32s | peak-RSS0.13GiB | min-avail31124MiB | peak-load3.22`; read `rc=0 0s | peak-RSS0.07GiB | min-avail31501MiB | peak-load1.72`; statistics `run-heavy: done rc=0 94s | peak-RSS 0.35GiB | min-avail 30848MiB | peak-load 7.34`. Pre-open commit `c37ad1e3561361088dc388f4c0447cef0b796128` verified remotely before parse. Target cache SHA256 `ef0a1ea87d0672bb4b4f1b3bd8368fcd728c3bae4c9502e4ddffdbb5d09efa0c`; result SHA256 `e4cf91e3e972a024f528d56614eca627a8b0b2e0601dea7a50c9ca4e650dbc07`; completed journal SHA256 `8fb4c1747e32a65ba8c6e471669659ad2793a142d2d153cd46ba97cd3a36707a`.
+
+## LIVE release2 — frozen-A read spent, full and fixed clean10
+
+Quality1−dmos_new/100; butteraugli quality=−p3. All intervals95% whole-reference percentile,10,000 valid draws, seed20261105. Prior exposure at DATA_SPLITS lines2761–2791 includes October18 clean10. LIVE19 Kodak references contain TID2013 training content; fixed clean10 excludes them per the October3 audit.
+
+### all: 779 pairs /29 references
+
+| Metric | Signed SROCC | KROCC | PLCC4PL | RMSE | Within-reference SROCC |
+|---|---|---|---|---|---|
+| A | 0.967369417 [0.961121429, 0.972128864] | 0.840643847 [0.828768091, 0.852753627] | 0.966337129 [0.961342200, 0.971113515] | 0.070294207 [0.065279943, 0.075160488] | 0.965753259 [0.959953828, 0.970693398] |
+| SSIMULACRA2 | 0.959925801 [0.949924550, 0.967667174] | 0.829245353 [0.813585678, 0.843694491] | 0.954484868 [0.946026068, 0.961766968] | 0.081490884 [0.074692866, 0.088431477] | 0.956554273 [0.946893059, 0.964607821] |
+| butteraugli3_quality | 0.916378056 [0.899526499, 0.931583005] | 0.754247622 [0.730527016, 0.778688485] | 0.908102453 [0.891745565, 0.923425759] | 0.114410998 [0.104747730, 0.123731020] | 0.916418915 [0.897548271, 0.932379095] |
+
+RESULTS.json SHA256 `16e60bd182430a65111b48025aa8b8eb3975693ab5d12eae774b8938976ea954`.
+
+### clean10: 267 pairs /10 references
+
+| Metric | Signed SROCC | KROCC | PLCC4PL | RMSE | Within-reference SROCC |
+|---|---|---|---|---|---|
+| A | 0.966511023 [0.960109572, 0.972365728] | 0.840273186 [0.832851828, 0.858804726] | 0.966413098 [0.961852258, 0.973010408] | 0.070229439 [0.062332842, 0.074687031] | 0.967286021 [0.958513579, 0.974320467] |
+| SSIMULACRA2 | 0.960528006 [0.944989557, 0.970799008] | 0.834471595 [0.817053304, 0.855720577] | 0.957617506 [0.943237948, 0.969154883] | 0.078714370 [0.066430848, 0.090158154] | 0.953676979 [0.934651520, 0.968049588] |
+| butteraugli3_quality | 0.910527257 [0.894009505, 0.924940264] | 0.747898335 [0.728049214, 0.775646538] | 0.907636635 [0.892209265, 0.924049681] | 0.114708222 [0.103741393, 0.122959783] | 0.908387086 [0.890141813, 0.924478728] |
+
+RESULTS.json SHA256 `be96c8c8e2a95596cb0be65bfe33201a0dca3ec2176d51193a24c0ff59755a06`.
+
+Staging:1,020 files /1,083,889,744 bytes, every file verified; dataset SHA256SUMS SHA256 `5c46005ca25c5e35e24ed4c844759d82565bd32311b72baef19116051fb3f09d`. All808 source stimuli /792 distinct RGB buffers independently verified; all1,558 feature RGB hashes matched; no identical pairs. Governing LIVE label SHA256 `49fcd7d23c9e35b147b52e3361103dbbf6a81aa8ae9d7b16f4763c7e7051fe5d`; library SHA256 `6673c707bc9a5be7de9185c3abfe793a8424777988428034dfb1dff7b452574f` differs bytewise.
+
+Receipts: staging `rc=0 43s | peak-RSS0.07GiB | min-avail31281MiB | peak-load7.34`; keys `rc=0 0s | peak-RSS0.06GiB | min-avail31420MiB | peak-load3.54`; decode/readback `rc=0 161s | peak-RSS0.07GiB | min-avail31257MiB | peak-load3.34`; bank `rc=0 18s | peak-RSS0.22GiB | min-avail31075MiB | peak-load1.72`; prediction `rc=0 0s | peak-RSS0.17GiB | min-avail31321MiB | peak-load1.66`; peers `rc=0 78s | peak-RSS0.17GiB | min-avail30935MiB | peak-load2.13`; read `rc=0 0s | peak-RSS0.07GiB | min-avail31404MiB | peak-load1.59`; statistics `run-heavy: done rc=0 102s | peak-RSS 0.35GiB | min-avail 30976MiB | peak-load 7.39`. Pre-open commit `6cf232ec519f` verified remotely before parse. Target cache `340d4c9f276179b1ea5ce74d80f5889694180e13d367cab5e6ff2e609c43cd10`; completed journal `65eb0b35f147ebfbb7c392d176be595c40a8051acc8a00e1edeaf97134d2ada3`.
