@@ -55,12 +55,30 @@ async function shot(name) {
     ],
   }));
   assert.deepEqual(geometry.document, geometry.viewport);
+  const plot = await page
+    .locator(".function-chart")
+    .evaluate((n) => ({
+      bottom: n.getBoundingClientRect().bottom,
+      paneBottom: document
+        .querySelector("#function-exhibit")
+        .getBoundingClientRect().bottom,
+      plotHeight:
+        (Number(n.dataset.plotHeight) * n.getBoundingClientRect().height) /
+        n.viewBox.baseVal.height,
+      stageHeight: document.querySelector("#center-stage").clientHeight,
+    }));
+  assert.ok(plot.bottom <= plot.paneBottom, JSON.stringify(plot));
+  if (geometry.viewport[0] === 1600)
+    assert.ok(
+      plot.plotHeight * 100 >= plot.stageHeight * 60,
+      JSON.stringify(plot),
+    );
   if (directory) {
     const path = `${directory}/${name}`;
     assert.equal(existsSync(path), false);
     await page.screenshot({ path });
   }
-  captures.push({ name, ...geometry });
+  captures.push({ name, ...geometry, plot });
 }
 for (const bake of ["F0", "F1", "F2", "E"]) {
   await page.locator("#bake").selectOption(bake);
@@ -92,6 +110,8 @@ for (const bake of ["F0", "F1", "F2", "E"]) {
     pairs: doc.pairs.length,
     retained_other_terms: doc.ordinary_terms.length,
     zero_output_nondead: doc.zero_output_nondead_units.length,
+    linear_background: doc.linear_background.units.length,
+    other_hinges: doc.other_hinge_count,
     line_bound: doc.certified_line_segments_upper_bound,
     global_affine_bound: doc.global_affine_forms_upper_bound,
     units: doc.included_units,
@@ -217,6 +237,17 @@ for (const bake of ["F0", "F1", "F2", "E"]) {
       /retained exactly/,
     );
     await page.locator("#function-coefficients > summary").click();
+    if (doc.linear_background.units.length) {
+      await page.locator("#function-background > summary").click();
+      await page.waitForSelector("#function-background tbody tr");
+      assert.deepEqual(
+        await page
+          .locator("#function-background tbody tr")
+          .evaluateAll((rows) => rows.map((r) => r.cells[1].dataset.rawNumber)),
+        doc.linear_background.coefficients.map(String),
+      );
+      await page.locator("#function-background > summary").click();
+    }
     await page.waitForSelector(".function-coefficient-table tbody tr");
     assert.equal(
       await page.locator(".function-coefficient-table tbody tr").count(),

@@ -842,23 +842,41 @@ body[data-instrument="lens"] #range-mode {
   font-weight: 500;
 }
 .function-pane p {
-  margin: 6px 0;
+  margin: 4px 0;
   font-size: 12px;
-  line-height: 1.5;
+  line-height: 1.35;
 }
 .function-equation {
   font-size: 14px;
   overflow-x: auto;
 }
 .function-equation .katex-display {
-  margin: 8px 0;
+  margin: 4px 0;
+}
+.function-heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.function-heading h2 {
+  flex: none;
+  font-size: 13px;
+}
+.function-heading .function-equation {
+  flex: 1;
+  min-width: 0;
+}
+.function-summary .memorization-note {
+  font-size: 11px;
+  padding: 4px 0;
 }
 .function-controls {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 12px;
-  margin: 12px 0 8px;
+  margin: 4px 0;
 }
 .function-controls label {
   display: flex;
@@ -909,6 +927,7 @@ body[data-instrument="lens"] #range-mode {
   width: 100%;
 }
 .function-pane .legend {
+  padding: 4px 0;
   flex-wrap: wrap;
   gap: 12px;
   font-size: 11px;

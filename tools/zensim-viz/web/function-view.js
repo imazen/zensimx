@@ -35,6 +35,7 @@ export class FunctionView {
     )
       return;
     root.replaceChildren();
+    root.scrollTop = 0;
     if (!d) {
       root.append(
         el(
@@ -47,24 +48,24 @@ export class FunctionView {
     }
     root.dataset.bake = state.bake.id;
     const summary = el("div", null, "function-summary");
-    summary.append(
-      el("h2", `${state.bake.label} · the approximating function`),
-    );
+    const heading = el("div", null, "function-heading");
+    heading.append(el("h2", `${state.bake.label} · Function`));
+    summary.append(heading);
     const equation = el("div", null, "function-equation");
-    const tex = `p(z)\\approx ${full(d.output_bias)}${d.pairs.map((p) => `${p.coefficient < 0 ? "-" : "+"}${fmt(Math.abs(p.coefficient))}\\max(A_{${p.index + 1}},B_{${p.index + 1}})`).join("")}${d.ordinary_terms.length ? "+R(z)" : ""}`;
+    const tex = `p(z)\\approx ${full(d.output_bias)}${d.pairs.map((p) => `${p.coefficient < 0 ? "-" : "+"}${fmt(Math.abs(p.coefficient))}\\max(A_{${p.index + 1}},B_{${p.index + 1}})`).join("")}${d.linear_background?.units.length ? "+L(z)" : ""}${d.other_hinge_count ? "+R(z)" : ""}`;
     equation.title =
-      "Displayed output coefficients are rounded; exact stored coefficients are below. R(z) contains every remaining nonzero weighted ReLU, without a magnitude cutoff.";
+      "Displayed output coefficients are rounded. L(z) is the complete affine background; R(z), if present, retains every remaining nonzero hinge. Exact coefficients are below.";
     if (window.katex)
       window.katex.render(tex, equation, {
         throwOnError: false,
         displayMode: true,
       });
     else equation.textContent = tex;
+    heading.append(equation);
     summary.append(
-      equation,
       el(
         "p",
-        `${d.pairs.length} certified max ${d.pairs.length === 1 ? "pair" : "pairs"} · ${d.ordinary_terms.length} other nonzero terms retained · ${d.capacity.counts.dead} structurally dead · ${d.zero_output_nondead_units?.length ?? "unexported"} other units with exactly zero output weight`,
+        `${d.pairs.length} certified max ${d.pairs.length === 1 ? "pair" : "pairs"} · ${d.linear_background?.units.length ?? "unexported"} linear background terms · ${d.other_hinge_count ?? "unexported"} other hinges · ${d.capacity.counts.dead} dead · ${d.zero_output_nondead_units?.length ?? "unexported"} other zero-output units`,
       ),
     );
     const capacity = el(
@@ -73,10 +74,13 @@ export class FunctionView {
       "ink-2",
     );
     capacity.title = d.certified_line_bound_scope;
-    summary.append(capacity);
     const memo = el("details", null, "memorization-note");
     memo.append(
-      el("summary", "Memorization: not established by this inspection"),
+      el(
+        "summary",
+        `Before calibration: ≤${d.global_affine_forms_upper_bound} affine forms · ≤${d.certified_line_segments_upper_bound} pieces/line · Memorization: not established`,
+      ),
+      capacity,
       el("p", d.memorization),
       el("p", d.line_bound_scope),
       el("p", d.certified_line_bound_scope),
@@ -103,7 +107,7 @@ export class FunctionView {
     for (const u of d.ordinary_terms) {
       const o = el(
         "option",
-        `h${u.unit} · ${u.status} · c ${fmt(u.coefficient)}`,
+        `h${u.unit} · ${u.kind || "term"} · ${u.status} · c ${fmt(u.coefficient)}`,
       );
       o.value = `unit:${u.unit}`;
       select.append(o);
@@ -148,23 +152,20 @@ export class FunctionView {
     const formula = el("p", null, "term-formula");
     formula.textContent =
       kind === "pair"
-        ? `${full(term.coefficient)} × [ReLU(A) + ReLU(B − A)] = ${full(term.coefficient)} × max(A, B), where A = w${term.units[0]}·z and B = (w${term.units[0]} + w${term.units[1]})·z ${term.bias < 0 ? "−" : "+"} ${full(Math.abs(term.bias))}.`
-        : `${full(term.coefficient)} × ReLU(w${term.unit}·z ${term.bias < 0 ? "−" : "+"} ${full(Math.abs(term.bias))}) · ${term.status}, retained exactly.`;
+        ? `c=${full(term.coefficient)}; A=w${term.units[0]}·z; B=A+w${term.units[1]}·z ${term.bias < 0 ? "−" : "+"} ${full(Math.abs(term.bias))}; term=c max(A,B).`
+        : `${full(term.coefficient)} × ${term.kind === "linear" ? "(" : "ReLU("}w${term.unit}·z ${term.bias < 0 ? "−" : "+"} ${full(Math.abs(term.bias))}) · ${term.kind || "hinge"} / ${term.status}, retained exactly.`;
     formula.title = d.algebra_scope;
     if (kind === "pair" && term.coefficient < 0)
-      formula.append(
-        document.createTextNode(
-          " Since c < 0, this is min(cA, cB), the lower envelope in the plot.",
-        ),
-      );
+      formula.append(document.createTextNode(" c<0 ⇒ min(cA,cB)."));
     root.append(formula);
     for (const unit of kind === "pair" ? term.units : [term.unit])
       formula.append(document.createTextNode(" "), this.unitLink(unit));
-    const axis = el("p", "Basis slice along ", "function-axis");
+    const axis = el("p", "Basis: ", "function-axis");
+    axis.title = term.slice.definition;
     axis.append(
       featureLink(term.slice.input),
       document.createTextNode(
-        ` · switch at ${fmt(term.slice.threshold)} raw feature units · all other raw slots, including fragility, are zero.`,
+        ` · ${term.kind === "linear" ? "boundary" : "switch"} ${fmt(term.slice.threshold)} raw units · other inputs/fragility=0 · not an observed image.`,
       ),
     );
     root.append(axis);
@@ -229,6 +230,30 @@ export class FunctionView {
       if (coefficients.open && !wrap.childNodes.length) render();
     };
     root.append(coefficients);
+    if (d.linear_background?.units.length) {
+      const background = el("details");
+      background.id = "function-background";
+      background.append(
+        el(
+          "summary",
+          `L(z): all ${d.linear_background.units.length} affine terms and linked coefficients`,
+        ),
+        el("p", d.linear_background.proof),
+      );
+      background.ontoggle = () => {
+        if (background.open && !background.querySelector("table"))
+          background.append(
+            table(
+              ["Explained feature", "L coefficient on z"],
+              d.linear_background.coefficients.map((v, i) => [
+                featureLink(i),
+                full(v),
+              ]),
+            ),
+          );
+      };
+      root.append(background);
+    }
     const preprocessing = el("details");
     preprocessing.append(
       el("summary", "Preprocessing, all terms and output calibration"),
@@ -286,7 +311,6 @@ export class FunctionView {
     const { svg, fmt, full } = this,
       points = term.slice.points,
       W = Math.max(420, this.$("center-stage").clientWidth - 48),
-      H = Math.max(320, this.$("center-stage").clientHeight - 280),
       L = 76,
       R = 24,
       T = 24,
@@ -299,7 +323,16 @@ export class FunctionView {
               ["branch_b", "c × B", "--series-3", true],
               ["term_sum", "Native c × max(A, B)", "--series-1", false],
             ]
-          : [["term_sum", "Native hinge contribution", "--series-1", false]]
+          : [
+              [
+                "term_sum",
+                term.kind === "linear"
+                  ? "Native linear contribution"
+                  : "Native hinge contribution",
+                "--series-1",
+                false,
+              ],
+            ]
         : [
             [
               this.mode,
@@ -310,6 +343,24 @@ export class FunctionView {
               false,
             ],
           ];
+    const legend = this.el("div", null, "legend");
+    for (const [, label, color, dashed] of series) {
+      const text = this.el("span", `${dashed ? "┄" : "━"} ${label}`);
+      text.style.color = `var(${color})`;
+      legend.append(text);
+    }
+    root.append(legend);
+    const available =
+      root.getBoundingClientRect().bottom -
+      legend.getBoundingClientRect().bottom -
+      20;
+    const H = Math.max(
+      200,
+      Math.min(
+        Math.max(320, this.$("center-stage").clientHeight - 280),
+        available,
+      ),
+    );
     const values = points.flatMap((p) => series.map(([key]) => p[key])),
       lo = Math.min(...values),
       hi = Math.max(...values),
@@ -324,6 +375,7 @@ export class FunctionView {
       "aria-label": `Native ${this.mode} basis slice`,
     });
     chart.dataset.points = points.length;
+    chart.dataset.plotHeight = H - T - B;
     chart.dataset.nativeReplay = term.slice.native_layer_replay_bit_identity;
     chart.onpointermove = (e) => {
       const rect = chart.getBoundingClientRect(),
@@ -381,12 +433,11 @@ export class FunctionView {
       svg(
         "text",
         { x: X(term.slice.threshold) + 6, y: T + 12 },
-        "hinge switch",
+        term.kind === "linear" ? "domain boundary" : "hinge switch",
       ),
       svg("text", { x: L, y: H - 4 }, "Raw feature units · native basis slice"),
     );
-    const legend = this.el("div", null, "legend");
-    for (const [key, label, color, dashed] of series) {
+    for (const [key, , color, dashed] of series) {
       chart.append(
         svg("path", {
           d: points
@@ -398,11 +449,8 @@ export class FunctionView {
           "stroke-dasharray": dashed ? "5 4" : "none",
         }),
       );
-      const text = this.el("span", `${dashed ? "┄" : "━"} ${label}`);
-      text.style.color = `var(${color})`;
-      legend.append(text);
     }
-    root.append(legend, chart);
+    root.append(chart);
     const numeric = this.el("details");
     numeric.id = "function-values";
     numeric.append(
