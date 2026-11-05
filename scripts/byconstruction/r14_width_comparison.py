@@ -25,6 +25,7 @@ def main():
     ours, widths = load(O/'reads/readout.json'), load(W/'reads/readout.json')
     primary = {root: load(root/'reads/PRIMARY.json') for root in (O, W)}
     pins = {root: load(root/'reads/MODEL_PINS.json') for root in (O, W)}
+    capacity = {root: load(root/'CAPACITY.json') for root in (O, W)}
     for seed in range(3):
         if ours['per'][f'F@{seed}'] != widths['per'][f'F@{seed}']:
             raise ValueError('R13/R14 complete A control dictionaries differ')
@@ -45,6 +46,16 @@ def main():
             EVAL9_percent=100*mean(v['med'] for v in per.values()),
             EVAL8_percent=100*mean(v['med'] for k,v in per.items() if k!='mdid'),
             per_collection_median_percent={k:100*v['med'] for k,v in per.items()})
+        row['capacity'] = {}
+        for bank in ('cid22','hdr'):
+            key = f'{bank}/{name}'
+            if key in capacity[root]:
+                values = capacity[root][key]
+                reference = capacity[O][f'{bank}/T1a_s0']
+                if (values['bake_sha256'] != pin['sha256'] or values['rows'] != reference['rows']
+                        or values['bank_sha256'] != reference['bank_sha256']):
+                    raise ValueError('width/transform capacity bank or packed identity differs')
+                row['capacity'][bank] = values
         chroma = root/'reads/chroma/G_CHROMA_L.json'
         row['chroma'] = 'reference A0' if arm=='F' else (
             'pass' if load(chroma)['candidates'][name]['passes'] else 'fail') if chroma.exists() else None
@@ -96,6 +107,17 @@ def main():
         '| Collection | '+' | '.join(r['label'] for r in rows)+' |', '|---|'+'---:|'*len(rows)])
     for collection in sorted(rows[0]['per_collection_median_percent']):
         lines.append('| '+collection+' | '+' | '.join(f"{r['per_collection_median_percent'][collection]:.5f}" for r in rows)+' |')
+    lines.extend(['', '## Capacity on the identical complete TRAIN banks', '',
+        '| Model | Bank | Dead / residual / live | Live pairs | Largest pair share (%) | Inputs at 50/90/99% mass |',
+        '|---|---|---|---:|---:|---|'])
+    for row in rows:
+        for bank,v in row['capacity'].items():
+            share='undefined' if v['largest_pair_share'] is None else f"{100*v['largest_pair_share']:.6f}"
+            concentration=' / '.join(str(v['concentration'][k]) for k in ('0.5','0.9','0.99'))
+            lines.append(f"| {row['label']} | {bank} | {v['dead']} / {v['residual']} / {v['live']} | "
+                f"{v['live_pairs']} | {share} | {concentration} |")
+    lines.extend(['', 'The completed R13 W512 fit retains two live pairs (four live units); the earlier',
+        'one-pair description is not universal. A0 capacity is documented in the A weight audit.', ''])
     lines.extend(['', '## HDR: pooled SROCC / within-reference SROCC / inversions', '',
         '| Population | '+' | '.join(r['label'] for r in rows)+' |', '|---|'+'---:|'*len(rows)])
     for pop in ('4kdtb_eval','ladder_eval','hdrteach_val','upiq_dev','upiq_all'):
