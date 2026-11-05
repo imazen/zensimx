@@ -31,23 +31,18 @@ impl Vf32 for f32 {
     }
 }
 
-pub(crate) fn viz_export_maps(
+pub(crate) fn viz_visit_maps(
     ret: &FoldRetention,
     slots: &crate::feature_set_id::SlotSet,
     original: (usize, usize),
+    mut emit: impl FnMut(crate::research::DetectorMap) -> Result<(), Box<dyn std::error::Error>>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    use std::io::Write;
     if ret.revision != FormulaRevision::Rev7 {
         return Err("atlas requires revision 7".into());
     }
     if active_ring_form() != RingForm::Raw {
-        return Err("atlas currently requires the registered raw ringing form".into());
+        return Err("atlas requires the registered raw ringing form".into());
     }
-    let out = std::path::PathBuf::from(
-        std::env::var_os("ZENSIM_VIZ_MAP_DIR").ok_or("map directory unset")?,
-    );
-    std::fs::create_dir_all(&out)?;
-    let mut records = Vec::new();
     for (scale, &(w, h)) in ret.dims.iter().enumerate() {
         for ch in 0..3 {
             let src = &ret.pyr_src[scale][ch];
@@ -56,12 +51,14 @@ pub(crate) fn viz_export_maps(
             if src.is_empty() || dst.is_empty() || p.mu1.is_empty() {
                 continue;
             }
+            if !slots.iter_slots().any(|id| {
+                crate::feature_defs::def_at(id, crate::NUM_SCALES).is_some_and(|d| {
+                    usize::from(d.scale) == scale && d.channel.as_str() == ["x", "y", "b"][ch]
+                })
+            }) {
+                continue;
+            }
             let n = w * h;
-            let basic_terms = if slots.iter_slots().any(|id| id < 156) && !ret.basic_sd.is_empty() {
-                Some(viz_export_basic_terms(ret, scale, ch, original, &out)?)
-            } else {
-                None
-            };
             // One source for each detector; features with different pooling share
             // the detector map. Numerators of weighted means retain their weight.
             let mut maps = vec![vec![0.0f32; n]; 29];
@@ -159,9 +156,6 @@ pub(crate) fn viz_export_maps(
                     maps[28][i] = lattice as f32;
                 }
             }
-            type MapRecord = (String, [f32; 2], usize, usize);
-            let mut cache: std::collections::BTreeMap<(usize, i32), MapRecord> =
-                std::collections::BTreeMap::new();
             for id in slots.iter_slots() {
                 let Some(def) = crate::feature_defs::def_at(id, crate::NUM_SCALES) else {
                     continue;
@@ -218,7 +212,16 @@ pub(crate) fn viz_export_maps(
                     (None, "map export not implemented for this family")
                 };
                 let Some(index) = map_index else {
-                    records.push(serde_json::json!({"id":id,"map_file":null,"map_status":role}));
+                    emit(crate::research::DetectorMap {
+                        id,
+                        width: 0,
+                        height: 0,
+                        pooling_grid: [w, h],
+                        range: [0.0, 0.0],
+                        role: role.into(),
+                        file_name: String::new(),
+                        values: Vec::new(),
+                    })?;
                     continue;
                 };
                 let variant = if id < 156 {
@@ -236,65 +239,119 @@ pub(crate) fn viz_export_maps(
                 } else {
                     0
                 };
-                let key = (index, variant);
-                let (file, range, mw, mh) = if let Some(value) = cache.get(&key) {
-                    value.clone()
+                let values: Vec<f32> = if index == 27 {
+                    src.iter()
+                        .zip(dst)
+                        .map(|(a, b)| (a - b) * (a - b))
+                        .collect()
                 } else {
-                    let values: Vec<f32> = if index == 27 {
-                        src.iter()
-                            .zip(dst)
-                            .map(|(a, b)| (a - b) * (a - b))
-                            .collect()
-                    } else {
-                        maps[index]
-                            .iter()
-                            .map(|&v| match variant {
-                                1 => v.max(0.0),
-                                2 => (-v).max(0.0),
-                                _ => v,
-                            })
-                            .collect()
-                    };
-                    let lo = values.iter().copied().fold(f32::INFINITY, f32::min);
-                    let hi = values.iter().copied().fold(f32::NEG_INFINITY, f32::max);
-                    let logical_w = (original.0 >> scale).max(1).min(w);
-                    let logical_h = (original.1 >> scale).max(1).min(h);
-                    let factor = logical_w.max(logical_h).div_ceil(512);
-                    let mw = logical_w.div_ceil(factor);
-                    let mh = logical_h.div_ceil(factor);
-                    let mut rgb = Vec::with_capacity(mw * mh);
-                    for yy in 0..mh {
-                        for xx in 0..mw {
-                            let v = values[(yy * factor).min(h - 1) * w + (xx * factor).min(w - 1)];
-                            let q = if hi == lo {
-                                0
-                            } else {
-                                ((v - lo) / (hi - lo) * 255.0).round() as u8
-                            };
-                            rgb.push(rgb::Rgb::new(q, q, q));
-                        }
-                    }
-                    let file = format!("s{scale}-{ch}-{index}-{variant}.png");
-                    let bytes = zenpng::encode_rgb8(
-                        imgref::ImgRef::new(&rgb, mw, mh),
-                        None,
-                        &zenpng::EncodeConfig::default(),
-                        &enough::Unstoppable,
-                        &enough::Unstoppable,
-                    )?;
-                    std::fs::OpenOptions::new()
-                        .write(true)
-                        .create_new(true)
-                        .open(out.join(&file))?
-                        .write_all(&bytes)?;
-                    let value = (file, [lo, hi], mw, mh);
-                    cache.insert(key, value.clone());
-                    value
+                    maps[index]
+                        .iter()
+                        .map(|&v| match variant {
+                            1 => v.max(0.0),
+                            2 => (-v).max(0.0),
+                            _ => v,
+                        })
+                        .collect()
                 };
-                records.push(serde_json::json!({"id":id,"map_file":file,"map_range":range,"map_width":mw,"map_height":mh,"native_grid":[(original.0>>scale).max(1).min(w),(original.1>>scale).max(1).min(h)],"pooling_grid":[w,h],"map_role":role,"terms_file":if id < 156 { basic_terms.as_ref() } else { None }}));
+                let lo = values.iter().copied().fold(f32::INFINITY, f32::min);
+                let hi = values.iter().copied().fold(f32::NEG_INFINITY, f32::max);
+                let logical_w = (original.0 >> scale).max(1).min(w);
+                let logical_h = (original.1 >> scale).max(1).min(h);
+                let factor = logical_w.max(logical_h).div_ceil(512);
+                let mw = logical_w.div_ceil(factor);
+                let mh = logical_h.div_ceil(factor);
+                let mut sampled = Vec::with_capacity(mw * mh);
+                for yy in 0..mh {
+                    for xx in 0..mw {
+                        sampled
+                            .push(values[(yy * factor).min(h - 1) * w + (xx * factor).min(w - 1)]);
+                    }
+                }
+                emit(crate::research::DetectorMap {
+                    id,
+                    width: mw,
+                    height: mh,
+                    pooling_grid: [w, h],
+                    range: [lo, hi],
+                    role: role.into(),
+                    file_name: format!("s{scale}-{ch}-{index}-{variant}.png"),
+                    values: sampled,
+                })?;
             }
         }
     }
+    Ok(())
+}
+
+#[cfg(feature = "viz-export")]
+pub(crate) fn viz_export_maps(
+    ret: &FoldRetention,
+    slots: &crate::feature_set_id::SlotSet,
+    original: (usize, usize),
+) -> Result<(), Box<dyn std::error::Error>> {
+    use std::io::Write;
+    let out = std::path::PathBuf::from(
+        std::env::var_os("ZENSIM_VIZ_MAP_DIR").ok_or("map directory unset")?,
+    );
+    std::fs::create_dir_all(&out)?;
+    let mut records = Vec::new();
+    let mut files = std::collections::BTreeSet::new();
+    let mut terms = std::collections::BTreeMap::new();
+    viz_visit_maps(ret, slots, original, |map| {
+        let id = map.id;
+        if map.values.is_empty() {
+            records.push(serde_json::json!({"id":id,"map_file":null,"map_status":map.role}));
+            return Ok(());
+        }
+        let def = crate::feature_defs::def_at(id, crate::NUM_SCALES).ok_or("missing definition")?;
+        let scale = usize::from(def.scale);
+        let ch = ["x", "y", "b"]
+            .iter()
+            .position(|&c| c == def.channel.as_str())
+            .ok_or("channel")?;
+        if id < 156 && !terms.contains_key(&(scale, ch)) {
+            terms.insert(
+                (scale, ch),
+                viz_export_basic_terms(ret, scale, ch, original, &out)?,
+            );
+        }
+        let file = map.file_name.clone();
+        if !files.contains(&file) {
+            let [lo, hi] = map.range;
+            let rgb: Vec<_> = map
+                .values
+                .iter()
+                .map(|&v| {
+                    let q = if hi == lo {
+                        0
+                    } else {
+                        ((v - lo) / (hi - lo) * 255.0).round() as u8
+                    };
+                    rgb::Rgb::new(q, q, q)
+                })
+                .collect();
+            let bytes = zenpng::encode_rgb8(
+                imgref::ImgRef::new(&rgb, map.width, map.height),
+                None,
+                &zenpng::EncodeConfig::default(),
+                &enough::Unstoppable,
+                &enough::Unstoppable,
+            )?;
+            std::fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(out.join(&file))?
+                .write_all(&bytes)?;
+            files.insert(file.clone());
+        }
+        records.push(serde_json::json!({"id":id,"map_file":file,"map_range":map.range,
+            "map_width":map.width,"map_height":map.height,
+            "native_grid":[(original.0>>scale).max(1).min(map.pooling_grid[0]),(original.1>>scale).max(1).min(map.pooling_grid[1])],
+            "pooling_grid":map.pooling_grid,"map_role":map.role,
+            "terms_file":if id < 156 { terms.get(&(scale,ch)) } else { None }}));
+        Ok(())
+    })?;
     serde_json::to_writer(
         std::fs::OpenOptions::new()
             .write(true)
@@ -307,6 +364,7 @@ pub(crate) fn viz_export_maps(
 
 // Raw f32 terms are separate from quantized display maps. Sample coordinates,
 // crop and stride exactly match those maps; no metric accumulator is changed.
+#[cfg(feature = "viz-export")]
 fn viz_export_basic_terms(
     ret: &FoldRetention,
     scale: usize,
@@ -316,9 +374,6 @@ fn viz_export_basic_terms(
 ) -> Result<String, Box<dyn std::error::Error>> {
     use std::io::Write;
     let (w, h) = ret.dims[scale];
-    let src = &ret.pyr_src[scale][ch];
-    let dst = &ret.pyr_dst[scale][ch];
-    let p = &ret.planes[scale][ch];
     let logical = [
         (original.0 >> scale).max(1).min(w),
         (original.1 >> scale).max(1).min(h),
@@ -345,42 +400,7 @@ fn viz_export_basic_terms(
     for yy in 0..mh {
         for xx in 0..mw {
             let i = yy * step * w + xx * step;
-            let m1 = p.mu1[i];
-            let m2 = p.mu2[i];
-            let delta = m1 - m2;
-            let variance = (-m2).mul_add(m2, (-m1).mul_add(m1, p.ssq[i])).max(0.0);
-            let error_variance = (p.s12[i] - delta * delta).max(0.0);
-            let d1 = ret.basic_sd[scale][ch][i];
-            let replay = crate::ssim_form::ssim_direct_raw_scalar(
-                crate::ssim_form::SsimLumaForm::Clamp,
-                m1,
-                m2,
-                p.ssq[i],
-                p.s12[i],
-            )
-            .max(0.0);
-            if replay.to_bits() != d1.to_bits() {
-                return Err(
-                    format!("basic formula replay differs at s{scale}/{ch}/({xx},{yy})").into(),
-                );
-            }
-            let edge = (1.0 + (dst[i] - m2).abs()) / (1.0 + (src[i] - m1).abs()) - 1.0;
-            let error = src[i] - dst[i];
-            let values = [
-                m1,
-                m2,
-                src[i],
-                dst[i],
-                p.ssq[i],
-                p.s12[i],
-                variance,
-                error_variance,
-                d1,
-                edge,
-                edge.max(0.0),
-                (-edge).max(0.0),
-                error * error,
-            ];
+            let values = viz_basic_cell(ret, scale, ch, i)?;
             for (plane, value) in planes.iter_mut().zip(values) {
                 if !value.is_finite() {
                     return Err("nonfinite basic formula term".into());
@@ -416,4 +436,53 @@ fn viz_export_basic_terms(
             "formula_replay_bits_checked":mw*mh,"formula_replay_bit_identity":true}),
     )?;
     Ok(header)
+}
+
+pub(crate) fn viz_basic_cell(
+    ret: &FoldRetention,
+    scale: usize,
+    ch: usize,
+    i: usize,
+) -> Result<[f32; 13], Box<dyn std::error::Error>> {
+    let p = &ret.planes[scale][ch];
+    let src = &ret.pyr_src[scale][ch];
+    let dst = &ret.pyr_dst[scale][ch];
+    let m1 = p.mu1[i];
+    let m2 = p.mu2[i];
+    let delta = m1 - m2;
+    let variance = (-m2).mul_add(m2, (-m1).mul_add(m1, p.ssq[i])).max(0.0);
+    let error_variance = (p.s12[i] - delta * delta).max(0.0);
+    let d1 = ret.basic_sd[scale][ch][i];
+    let replay = crate::ssim_form::ssim_direct_raw_scalar(
+        crate::ssim_form::SsimLumaForm::Clamp,
+        m1,
+        m2,
+        p.ssq[i],
+        p.s12[i],
+    )
+    .max(0.0);
+    if replay.to_bits() != d1.to_bits() {
+        return Err(format!("basic formula replay differs at s{scale}/{ch}/cell {i}").into());
+    }
+    let edge = (1.0 + (dst[i] - m2).abs()) / (1.0 + (src[i] - m1).abs()) - 1.0;
+    let error = src[i] - dst[i];
+    let values = [
+        m1,
+        m2,
+        src[i],
+        dst[i],
+        p.ssq[i],
+        p.s12[i],
+        variance,
+        error_variance,
+        d1,
+        edge,
+        edge.max(0.0),
+        (-edge).max(0.0),
+        error * error,
+    ];
+    if values.iter().any(|v| !v.is_finite()) {
+        return Err("nonfinite basic formula term".into());
+    }
+    Ok(values)
 }

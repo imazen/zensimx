@@ -58,7 +58,8 @@ all-features = true
 
 [features]
 # Export-only retained term maps; absent from default and product builds.
-viz-export = ["feature-regime-v2", "custom-profiles", "training", "dep:serde_json", "dep:zenpng"]
+viz-memory = ["feature-regime-v2", "custom-profiles", "training", "dep:serde_json"]
+viz-export = ["viz-memory", "dep:zenpng"]
 default = ["avx512", "imgref", "threads", "deprecated-profiles", "candidate-profiles", "feature-regime-v2"]
 avx512 = ["archmage/avx512", "magetypes/avx512"]
 ## Diagnostic ONLY: accumulate `Σ activity` during extraction so `ScaleStats::

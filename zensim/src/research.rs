@@ -1001,15 +1001,30 @@ fn extract_impl(
         crate::feature_v2::HdrFrontEnd,
     )>,
 ) -> Result<Extraction, ResearchError> {
+    extract_planned(req, source, distorted, hdr, None, None)
+}
+
+fn extract_planned(
+    req: &Request,
+    source: &impl ImageSource,
+    distorted: &impl ImageSource,
+    hdr: Option<(
+        crate::feature_v2::HdrEncoding,
+        crate::feature_v2::HdrFrontEnd,
+    )>,
+    explicit_plan: Option<Plan>,
+    #[allow(unused_variables)] retained: Option<&mut Option<crate::feature_v2::FoldRetention>>,
+) -> Result<Extraction, ResearchError> {
     let ns = crate::NUM_SCALES;
-    let plan = req.plan()?;
+    let plan = explicit_plan.map_or_else(|| req.plan(), Ok)?;
     check_revision(req, &plan.emit)?;
 
     let mut scratch = crate::feature_v2::V2Scratch::new();
     let toggles = plan.toggles();
-    #[cfg(feature = "viz-export")]
-    let mut viz_retention =
-        std::env::var_os("ZENSIM_VIZ_MAP_DIR").map(|_| crate::feature_v2::FoldRetention::new());
+    #[cfg(feature = "viz-memory")]
+    let mut viz_retention = (retained.is_some()
+        || std::env::var_os("ZENSIM_VIZ_MAP_DIR").is_some())
+    .then(crate::feature_v2::FoldRetention::new);
 
     #[cfg(feature = "training")]
     let extras = crate::feature_v2::FoldWalkExtras {
@@ -1021,7 +1036,7 @@ fn extract_impl(
         compute: Some(plan.compute),
         ..Default::default()
     };
-    #[cfg(feature = "viz-export")]
+    #[cfg(feature = "viz-memory")]
     let extras = crate::feature_v2::FoldWalkExtras {
         retention: viz_retention.as_mut(),
         ..extras
@@ -1061,13 +1076,18 @@ fn extract_impl(
     };
 
     #[cfg(feature = "viz-export")]
-    if let Some(retention) = viz_retention.as_ref() {
+    if let Some(retention) = viz_retention.as_ref().filter(|_| retained.is_none()) {
         crate::feature_v2::viz_export_maps(
             retention,
             &plan.emit,
             (source.width(), source.height()),
         )
         .map_err(|e| ResearchError::Plan(format!("map export: {e}")))?;
+    }
+
+    #[cfg(feature = "viz-memory")]
+    if let Some(destination) = retained {
+        *destination = viz_retention;
     }
 
     // GATHER into the declared LAYOUT. The walk emits at its own identity
@@ -1851,3 +1871,6 @@ mod tests {
         assert_eq!(seen.len(), full_width());
     }
 }
+
+#[cfg(feature = "viz-memory")]
+include!("research_viz.rs");
