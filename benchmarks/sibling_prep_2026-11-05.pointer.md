@@ -47,8 +47,24 @@ the nonzero status is a missing parser module after both native gates completed.
 Parse-only retry (system Python with existing pyarrow, complete imports):
 `rc=0 1s | peak-RSS 0.52GiB | min-avail 24710MiB | peak-load 5.07`.
 Input and model hashes pass again after replay. No scoring or split computation
-was repeated to repair parsing. Runtime/shared-pixel tests remain required
-before landing.
+was repeated to repair parsing. Runtime/shared-pixel tests and final strict
+workspace clippy subsequently passed.
 Initial orchestration failures and a 210-row capture with unavailable corpus
 access are retained; none count as a passing oracle. The original fixtures,
 source image bytes, released binaries and study cache are unchanged.
+
+Final runtime qualification: 898 tests pass across 43 library/integration
+targets (25 existing ignores), plus 10 passing doctests (three existing ignores).
+The five revision-vector tests also passed in the explicit serial focused run.
+The final combined vector/runtime/doc/clippy scope completed with
+`rc=0 386s | peak-RSS 1.05GiB | min-avail 7440MiB | peak-load 3.51`.
+Three test-only child receipt readers now accept libtest's serial banner and
+require exactly one vector; every numerical assertion and threshold is retained.
+
+The built source above is retained as an archive with its stamped binaries.
+Rebasing over incoming final-read documentation/Python/just changes does not
+change its manifests, resolved lock, metadata example or production Rust.
+`rebase-runtime-proof.json` records byte comparisons; the only additional Rust
+changes are the three test-only receipt parsers. No released study input or
+reference binary was replaced. The CI workflow is manual; these are local
+CI-exact lint and runtime results, not a claim of a new remote CI run.

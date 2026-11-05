@@ -33,7 +33,7 @@
 ### Dependency compatibility
 
 - Prepare one shared pixel/codec graph for sibling consumers; E34 uses equivalent
-  zenmeta EXIF entry points (`c7875d8d`). Runtime/model pins remain unchanged;
+  zenmeta EXIF entry points (archived build `c7875d8d`). Runtime/model pins remain unchanged;
   qualification: `benchmarks/sibling_prep_2026-11-05.pointer.md`.
 
 - Update training-core and Adam constructor calls to equivalent token-explicit aliases; strict workspace lint passes. No arithmetic or dependency-version change (`872adce9`).
