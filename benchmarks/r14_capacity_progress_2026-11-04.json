@@ -1,5 +1,5 @@
 {
-  "completed_cells": 3,
+  "completed_cells": 6,
   "required_cells": 6,
   "cells": {
     "cid22/T1a_s0": {
@@ -64,6 +64,101 @@
       "rows": 12163,
       "bank_sha256": "07e2f4b71fe0ccc67848f2896344e6d0b6a255b0e91a7da9062d471ea3e11100",
       "bake_sha256": "de187fbabbdb1a1e999fed21c19f4589281e3e6184893c4ba559921922b71d98"
+    },
+    "hdr/T1a_s0": {
+      "hidden": 128,
+      "dead": 94,
+      "residual": 30,
+      "live": 4,
+      "live_pairs": 2,
+      "largest_pair": [
+        124,
+        126
+      ],
+      "largest_pair_share": 0.6968019531363031,
+      "concentration": {
+        "0.5": 12,
+        "0.9": 78,
+        "0.99": 163
+      },
+      "ablation_mass": 26.1907904021448,
+      "rows": 7390,
+      "bank_sha256": "742fd8f314dcc5d1f812faa9924ac8b3fb048ba07dbc5f53a0b7f2b984857101",
+      "bake_sha256": "6a28893f896696fde6832782631e0af0582e9a317478fc5dc621198716935487"
+    },
+    "hdr/T1b_s0": {
+      "hidden": 128,
+      "dead": 116,
+      "residual": 5,
+      "live": 7,
+      "live_pairs": 1,
+      "largest_pair": [
+        126,
+        127
+      ],
+      "largest_pair_share": 0.995868973507877,
+      "concentration": {
+        "0.5": 19,
+        "0.9": 111,
+        "0.99": 243
+      },
+      "ablation_mass": 28.423694141395277,
+      "rows": 7390,
+      "bank_sha256": "742fd8f314dcc5d1f812faa9924ac8b3fb048ba07dbc5f53a0b7f2b984857101",
+      "bake_sha256": "7a02cd54ba692f5995477657d9ec5ec125602678e1f397dcde9af46a53c75065"
+    },
+    "hdr/T1c_s0": {
+      "hidden": 128,
+      "dead": 123,
+      "residual": 0,
+      "live": 5,
+      "live_pairs": 1,
+      "largest_pair": [
+        126,
+        127
+      ],
+      "largest_pair_share": 0.980782539879493,
+      "concentration": {
+        "0.5": 20,
+        "0.9": 123,
+        "0.99": 242
+      },
+      "ablation_mass": 28.701109811407598,
+      "rows": 7390,
+      "bank_sha256": "742fd8f314dcc5d1f812faa9924ac8b3fb048ba07dbc5f53a0b7f2b984857101",
+      "bake_sha256": "de187fbabbdb1a1e999fed21c19f4589281e3e6184893c4ba559921922b71d98"
+    }
+  },
+  "proof": {
+    "cid22/T1a_s0": {
+      "audit_sha256": "9b3a67a901b644e7c7b1d9c90092a807d95c5d87da45f8742a7ef24b9879f0ed",
+      "certifier_sha256": "99d4822706ab0b229fec5c843e81cf4cc560683cfb8f3573fb72c1f6d3022ec5",
+      "counts_equal_packed_inspection": true
+    },
+    "cid22/T1b_s0": {
+      "audit_sha256": "c6407f48acfd8b477ed7f7ce06efcc7ff1fd1615f770175af8beca07092f6f42",
+      "certifier_sha256": "99d4822706ab0b229fec5c843e81cf4cc560683cfb8f3573fb72c1f6d3022ec5",
+      "counts_equal_packed_inspection": true
+    },
+    "cid22/T1c_s0": {
+      "audit_sha256": "2106622f970bd36bdad4b510b141aebc189774115b8a0ac9244ca865f0f831c8",
+      "certifier_sha256": "99d4822706ab0b229fec5c843e81cf4cc560683cfb8f3573fb72c1f6d3022ec5",
+      "counts_equal_packed_inspection": true
+    },
+    "hdr/T1a_s0": {
+      "audit_sha256": "745bd824de998d12ad1242c75ee29a2dcf494c64c09a2e01b92cc283ee7186d4",
+      "certifier_sha256": "99d4822706ab0b229fec5c843e81cf4cc560683cfb8f3573fb72c1f6d3022ec5",
+      "counts_equal_packed_inspection": true
+    },
+    "hdr/T1b_s0": {
+      "audit_sha256": "8e76ceda676bb0e8ea9bf73c90a022508dc2513ffe978ec5c50abc277e57de90",
+      "certifier_sha256": "99d4822706ab0b229fec5c843e81cf4cc560683cfb8f3573fb72c1f6d3022ec5",
+      "counts_equal_packed_inspection": true
+    },
+    "hdr/T1c_s0": {
+      "audit_sha256": "de4fb132fcd05c99b48169d0ff98af8c14ce6bad2871c3a6fc9181397237735e",
+      "certifier_sha256": "99d4822706ab0b229fec5c843e81cf4cc560683cfb8f3573fb72c1f6d3022ec5",
+      "counts_equal_packed_inspection": true
     }
   },
   "role": "full TRAIN-bank forward and joint-slot ablation; no quality labels"

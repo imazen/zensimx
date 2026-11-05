@@ -1,7 +1,7 @@
 # R14: smooth per-input transforms for A
 
-**Incomplete: all 3 T1 fits, the T2 release decision and CID22 capacity cells are complete;
-product/EVAL/HDR reads, HDR capacity, head timing and archive verification remain.** No candidate
+**Incomplete: all 3 T1 fits, the T2 release decision and all 6 capacity cells are complete;
+product/EVAL/HDR reads, head timing and archive verification remain.** No candidate
 is selected or adopted. No EVAL data has been read by R14.
 
 Registration `5b5a0134` in [the experiment record](e36_subset_test_2026-11-01.md)
@@ -301,7 +301,20 @@ all units. Each ablation jointly zeros a damage slot's direct and product
 callers; effects overlap and are not an additive score decomposition.
 [Capacity receipt](r14_capacity_progress_2026-11-04.json).
 
-The three HDR TRAIN capacity cells and all
+On all 7,390 rows of the frozen HDR TRAIN feature bank, the structural counts
+are unchanged and the measured contributions are:
+
+| Arm | Live max pairs | Largest pair share (%) | Inputs at 50/90/99% ablation mass |
+|---|---:|---:|---|
+| T1a | 2 | 69.680195 | 12 / 78 / 163 |
+| T1b | 1 | 99.586897 | 19 / 111 / 243 |
+| T1c | 1 | 98.078254 | 20 / 123 / 242 |
+
+All six cells passed the final bank/model identity, full-row coverage,
+packed structural-count and canonical native-certificate checks. These are
+label-free TRAIN diagnostics, separate from the forthcoming HDR quality panel.
+
+All
 quality/product reads remain outstanding. No missing evidence counts as a pass.
 Frozen A is the control and is not refitted.
 
