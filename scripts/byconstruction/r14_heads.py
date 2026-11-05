@@ -83,7 +83,7 @@ def main():
     worker_source=worker_source.replace('owner=fixed.owner\nO=fixed.O','')
     (root/'worker.py').write_text(worker_source)
     subprocess.run(['ssh','i270',f'test ! -e {REMOTE} && mkdir -p {REMOTE}'],check=True)
-    subprocess.run(['rsync','-a',str(root)+'/',f'i270:{REMOTE}/'],check=True)
+    subprocess.run(['scp','-p',*[str(p) for p in root.iterdir() if p.is_file()],f'i270:{REMOTE}/'],check=True)
     command=f'flock -w 3600 -E 75 ~/tmp/heavy.lock ~/work/claudehints/scripts/run-heavy --mem 16G --jobs 8 -- python3 ~/{REMOTE}/worker.py worker ~/{REMOTE}'
     started=time.time()
     with (root/'remote.log').open('x') as log:
@@ -91,7 +91,7 @@ def main():
         owner.write(root/'ACTIVE.json',dict(pid=p.pid,argv=['ssh','i270',command],started=started,
             wait_limit_seconds=3600,host='i270'))
         rc=p.wait()
-    subprocess.run(['rsync','-a',f'i270:{REMOTE}/',str(root)+'/'],check=True)
+    subprocess.run(['scp','-p','-r',f'i270:{REMOTE}/*',str(root)+'/'],check=True)
     owner.write(root/'EXECUTION.json',dict(rc=rc,started=started,finished=time.time(),
         status='not measured: shared lock busy for one hour' if rc==75 else 'complete' if rc==0 else 'failed; inspect retained logs'))
     if rc==75:return
