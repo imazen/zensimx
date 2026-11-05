@@ -384,3 +384,78 @@ Coordinator approved switching only temporary lossless PNG output compression fr
 Independent Pillow readback of the same1920×1080 BMP and JPEG through both encodings matches RGB bytes exactly; input file SHAs, geometry and RGB hashes match the previous tool. All previous580 records will be checked against the resumed map, followed by the full independent readback. Native decoder tests2/2 and strict standalone clippy pass. Build receipt `rc=0 0s | peak-RSS0.18GiB | min-avail33167MiB | peak-load0.54`; test/clippy receipt `rc=0 0s | peak-RSS0.16GiB | min-avail33064MiB | peak-load0.61`; real-input lossless control `rc=0 0s | peak-RSS0.04GiB | min-avail33056MiB | peak-load0.56`. No runtime benchmark or speedup estimate is claimed.
 
 Durable location receipt SHA256 `41268403b87a5d343b37d736fdd1839d199c1cbeee348d20a8e7588592359f95`; Fastest parity receipt SHA256 `7959965b55652fae06ef867ca5ad75bf42b68114c84fa8327d90fc8164c24ef4`; relocated MODELS.json SHA256 `f566d1412d617a1535c0e58ded4b2bfdb9a99f1bab0b7170b94bb808d4ee366c`. Current model paths point to durable storage; original artifact SHAs are unchanged.
+
+## MCL-JCI final pre-open pin — no subject-chain target parsed
+
+All5,000 pairs /50 sources and5,050 decoded stimuli retained; all10,000 feature RGB hashes and all5,050 independent readbacks passed. All580 records from before the approved lossless PNG effort change match exactly after durable-prefix remapping. Feature extraction remained serial, one process. Reference metrics use the existing R10 frozen binary at8 outer threads under24GiB: all64 uniformly spaced label-free control pairs match1-thread emitted SSIM2/BA scores exactly, as do all600 preserved serial-prefix rows against the full5,000-row output. No metric or statistical arithmetic changed.
+
+Receipts: staged5,202 files /1,716,532,646 bytes, every file verified, dataset SHA256SUMS `2edb91675c9155937553e11ff138125d13cea873d0bdb569ae273de8355686ad`; stage `rc=0 86s | peak-RSS0.07GiB | min-avail32585MiB | peak-load4.03`. Resumed decode/readback `rc=0 347s | peak-RSS0.10GiB | min-avail32555MiB | peak-load2.00`; feature bank `rc=0 621s | peak-RSS0.45GiB | min-avail46002MiB | peak-load2.88`; A prediction `rc=0 0s | peak-RSS0.25GiB | min-avail46566MiB | peak-load2.47`; peers including controls `rc=0 320s | peak-RSS6.49GiB | min-avail38702MiB | peak-load9.44`. Interrupted serial/decode artifacts are retained; no label read occurred in those attempts.
+
+Canonical keys SHA256 `4b3dbf770bd0eaf00ef49d560f175565de08d3470dead9c7189e83f71402033b`.
+
+Decode map SHA256 `31ff9311b398632e79459011b19c5a5b080668b53bf46abc11b1f05a9d39161b`.
+
+Prefix parity SHA256 `789c8a6a4409794dd34962475aea8510274dd39ab77fbc24b4ad49c957d95aee`.
+
+Thread parity SHA256 `8dea93ef6d6c7597532ff5e563d6060ae903155ab14a68dd7f1b526b3c063dac`.
+
+Serial-prefix parity SHA256 `a338cccfcf0c06abd7ebbd14c7767dfe48e648616df2a58319d53d00a41b1d61`.
+
+Pre-open journal SHA256 `afdfc753c574988a3e3122df000a3f27e7a24ef81ac63b2703d37b5e5d3e5a59`.
+
+Raw-chain pins (raw bytes hashed, target values not parsed):
+
+| File | SHA256 |
+|---|---|
+| JND_image_01.txt | `ecef89e08312c6cfba21d53503688092d34347bf15d3c968267f56b6143bbb97` |
+| JND_image_02.txt | `0ea2c68fa3e4c08010ec02657fea23d55ff16f7dfb81a9af214c5167bfeeca2e` |
+| JND_image_03.txt | `38b685ccb1498b587b2bf67987e47f27b0d1299ac1e6c3337af822588d329775` |
+| JND_image_04.txt | `6d5d43344062a139892f425729cba93a49e59f343678977dfa7e830b68d0f937` |
+| JND_image_05.txt | `d7f01fca3ebe911409db3956fa833ae980a8054a1a20ea7f9409f8441057101b` |
+| JND_image_06.txt | `229ee1a4c7de09d62d949a7c04434d8aa9b2787444e39875457c83fb395c2def` |
+| JND_image_07.txt | `ee07a8e75bf98347fbc8c0ec34a14b8ae4dcd2d02c8ac9bc93abfe46d9021cd4` |
+| JND_image_08.txt | `d98a25438feb7c7a2d223bf6751cec9c81691138ed130745264cfc5e83055b94` |
+| JND_image_09.txt | `db45ee865876a854cd6d1b732598bf432e0931e9d0d4bd8d534b1a6f8bd3564d` |
+| JND_image_10.txt | `15ca5d3336a8eb105a81fb6dbff627f4edce3edf58a9183b03a4ea97f909f1eb` |
+| JND_image_11.txt | `7b1d6300d52fd49bab2db2dd78cd760e4620d47d398d7a59e4face770979c9ee` |
+| JND_image_12.txt | `1ce985134044f35168a48439f999438150e53a9b0ccce43a781a7b4c322992fe` |
+| JND_image_13.txt | `35d425cc0b92c2888668d77eb514a4b78449ab097b18501ead4b0c0eac2bd766` |
+| JND_image_14.txt | `4e9dae3bea4329b2003917c5ff96bed6ec4e6ee207cf15dff7eaa8b740aca218` |
+| JND_image_15.txt | `52f80c4e34d9dfd2ec0e3dbfefef3abbd6cd39bdeb9fc3f5041b5084e95661c2` |
+| JND_image_16.txt | `683a8515c6f6fe68068c51d706c478ba1cbd6171e21db14a6ec10922df005267` |
+| JND_image_17.txt | `465602ba34f762ccda38e6303204c30eb665075ce09c3b6cf9a6f58ac2c4ecba` |
+| JND_image_18.txt | `ab73baf4a1370fe2d85daca1ddc2c8c6d7d401abd33a16f866aaff740cd2a075` |
+| JND_image_19.txt | `da9e6df2d781e9ee3f40d656d2b139eaca284be7eedba2980405f7f025e8e2c9` |
+| JND_image_20.txt | `b8432ca1517b1e108b4ea0ea76477c8b53ab348b65d009301896b4e3405a8b94` |
+| JND_image_21.txt | `46a212d8e3b1165e712fbe9aeaff7f829262cb6f2ea3190f277a703237e8a963` |
+| JND_image_22.txt | `f9658ed8fd09ea1de18afd0afeecdf2c7d85f4cb63f6d78f73e33a5903b28008` |
+| JND_image_23.txt | `caf447fa35d909c0e7682649be4177ecd0cacfda36d8e2a201d6fba5863e674b` |
+| JND_image_24.txt | `42f3f6eb9aef7a02b892ec6250071890170f5ce0c6ad2af33f14f1bb5fab9253` |
+| JND_image_25.txt | `c72b4fd9818f579ee2160e38ac0f753f8c4768bf9bac0aac12d79cbbc89e819e` |
+| JND_image_26.txt | `c89fbcc28e4122099a166b7f168621cb1d3ad4320f147f9f07b942abeea90023` |
+| JND_image_27.txt | `bff3b848169ce109926a8c98711f59aff5dd5abd87dd76be78af58bef82720c8` |
+| JND_image_28.txt | `b3b651881217ab99618c3430c2ef39aa5ac78889a6ba65d3e8a4bfd6d82c6076` |
+| JND_image_29.txt | `01268faf2cc6113d0401d5c72d487f0992456caef624d5edcbc03ff23bc8ef8a` |
+| JND_image_30.txt | `f4c7e60cd798484bcb50266063ef55f909a1e81df55ad7b927cf4e4690688883` |
+| JND_image_31.txt | `30adda37b7060c84c06367f31c1199d9006d5c74949c64ba676232bdda147379` |
+| JND_image_32.txt | `2e2b16d0e3655e04ef360638231d76285eed4bb2a4de3d3ed9281638a4764633` |
+| JND_image_33.txt | `770936e7df193b2c2fa9927dbe489f6e5170b3f4116651b724d234b0ffb60057` |
+| JND_image_34.txt | `fde2663c9af90980e7e9b80d88b1eb1a65f38be1a10eec93c21e7d611574c633` |
+| JND_image_35.txt | `eaf5f79c0b843b15298aa21f8acf30dd3fe4f1ef1ad7dfc0bb182cf539e01cca` |
+| JND_image_36.txt | `0c313f45221becab8176c7b570871978e00dc20d3cf7801e3ba7ee909ff3fc94` |
+| JND_image_37.txt | `d9eb279614c00555b60fc29c6d9dbd6503bfabf75e1073ae192c2c13b17b6e2f` |
+| JND_image_38.txt | `aa62177a62e014ffac220d7bceb913147c792edf9389d95d4ae50b934ba854c9` |
+| JND_image_39.txt | `f474ce5535266562582ab36655b6cef17e5d0b8564d2e7ff9f2653e34c3d89c4` |
+| JND_image_40.txt | `d1f40cbbe6ed33669b023a34dfeaa723ba83fc7b027aec203bc2648568aa60dd` |
+| JND_image_41.txt | `e412f999cc4ab92003a7356faf535f5915cad7c247725a00e2f0c9e761dee854` |
+| JND_image_42.txt | `d45250ec06a6f7bf45907c4fd35c50110978d617b5762298a92005a097019a17` |
+| JND_image_43.txt | `2f47c91ae1f1b2e6bb60a729e35d60c85c02a25a70bee28094e2222b0b3f8a6e` |
+| JND_image_44.txt | `5e7796bb775a269fa2f1fef8341ea979acdc71b9cf3d93ba41eba3b4f230b7af` |
+| JND_image_45.txt | `32a8d73acce001445e197735c38d78250e0d84fe100fa67311d51e7d3ee24818` |
+| JND_image_46.txt | `98c0173d1aca015e9fd782b214d544000f3e052ff43ff5a76bd586b5815b6add` |
+| JND_image_47.txt | `c03b71ef93c0402420629eaabcbcf46334149a56e95ba1d3c575d911d8cd942e` |
+| JND_image_48.txt | `2f0eb20bb9a76091da27ad3ae74064a57e55736fda82b5af8f79ed8822c278df` |
+| JND_image_49.txt | `1fb2457557486137e4235857cc9f106b0fc2a8ecdd88101938edade986d00685` |
+| JND_image_50.txt | `747b392eecea1787a306e73e0961cff575677851e77147634738222c0961341d` |
+
+The registered construction is mean count of chain points QF≥q across30 subjects, q1..100, with q100 target0 by definition. Full50 and fixed clean40 are reported. Excluded clean40 sources:1,3,6,7,9,17,28,31,45,50. The lost original CSV SHA256 `36f17dd8bac2d085f718e388fd5db307d887338c9c2b296349bb2ef20f184802` cannot be byte-verified against the reconstruction. No labels, weights or subset membership were selected on these scores.
