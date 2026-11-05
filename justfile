@@ -4414,6 +4414,9 @@ r14-transform-heads:
 r14-head-status:
     python3 -B scripts/byconstruction/r14_heads.py status
 
+r14-head-summary:
+    python3 -B scripts/byconstruction/r14_head_summary.py
+
 r14-native-noop:
     python3 -B scripts/byconstruction/r14_transforms.py job --label native-noop -- python3 -B scripts/byconstruction/r14_transforms_noop.py
 
@@ -4426,6 +4429,7 @@ r14-transform-reads:
 r14-transform-tables:
     python3 -B scripts/byconstruction/r14_tables.py
     python3 -B scripts/byconstruction/r14_summary.py
+    python3 -B scripts/byconstruction/r14_width_comparison.py
 
 r14-transform-archive:
     flock ~/tmp/heavy.lock ~/work/claudehints/scripts/run-heavy --mem 24G --jobs 8 -- bash scripts/byconstruction/r13_width_archive.sh /var/tmp/byc-transforms-20261104 /mnt/tower/output/zensim/r14-transforms-20261104

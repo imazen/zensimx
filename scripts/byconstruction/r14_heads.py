@@ -127,8 +127,8 @@ def main():
         status='not measured: shared lock busy for one hour' if rc==75 else 'complete' if rc==0 else 'failed; inspect retained logs'))
     if rc==75:return
     if rc:raise subprocess.CalledProcessError(rc,['ssh','i270',command])
-    import r12_linear_head_summary
-    r12_linear_head_summary.timing(O)
+    import r14_head_summary
+    r14_head_summary.timing(O)
 
 
 if __name__=='__main__':main()

@@ -88,7 +88,13 @@ def main():
             raise ValueError('source artifact changed during comparison')
     receipt = dict(role='descriptive frozen-model comparison, no fit or selection', rows=rows,
         artifact_sha256=sources, source_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest())
-    (O/'R13_COMPARISON.json').write_text(json.dumps(receipt,indent=2)+'\n')
+    path = O/'R13_COMPARISON.json'
+    payload = json.dumps(receipt,indent=2)+'\n'
+    if path.exists() and path.read_text()!=payload:
+        number=1
+        while path.with_name(f'R13_COMPARISON.bak{number}.json').exists():number+=1
+        path.rename(path.with_name(f'R13_COMPARISON.bak{number}.json'))
+    path.write_text(payload)
     lines=['# R14 beside completed R13 seed-zero reads', '',
         'All rows use seed 0. A0 is the frozen F control. The three A EVAL dictionaries are identical',
         'between the R13 and R14 reads. Missing width-lane artifacts are not measured here; no job',
