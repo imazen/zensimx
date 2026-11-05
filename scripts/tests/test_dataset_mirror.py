@@ -68,8 +68,13 @@ class MirrorKinds(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             payloads = {f"artifact-{i}.txt": f"retained artifact {i}\n".encode() for i in range(3)}
+            if kind == "evaluation":
+                payloads["stimulus.png"] = b"opaque stimulus bytes; the mirror never decodes them"
             for name, data in payloads.items():
                 (root / name).write_bytes(data)
+            if kind == "evaluation":
+                (root / "file-alias.txt").symlink_to(root / "artifact-0.txt")
+                payloads["file-alias.txt"] = payloads["artifact-0.txt"]
             image = "sha256:" + "a" * 64
             commands, transfers = [], []
 
@@ -107,7 +112,7 @@ class MirrorKinds(unittest.TestCase):
             receipt = json.loads((root / "MIRROR_VERIFIED.json").read_text())
             self.assertEqual(receipt["schema"], f"dataset-{kind}-mirror-v1")
             self.assertEqual(receipt["checksum_container_image_id"], image)
-            self.assertEqual(receipt["artifact_files_verified_before_receipt"], 3)
+            self.assertEqual(receipt["artifact_files_verified_before_receipt"], len(payloads))
             self.assertEqual(len(receipt["random_readbacks"]), 3)
             if kind == "features":
                 self.assertIs(receipt["response_tables_opened"], False)
@@ -121,6 +126,8 @@ class MirrorKinds(unittest.TestCase):
                 self.assertEqual(set(archive.getnames()), {*payloads, "SHA256SUMS"})
                 for name, data in payloads.items():
                     self.assertEqual(archive.extractfile(name).read(), data)
+                    if kind == "evaluation":
+                        self.assertTrue(archive.getmember(name).isfile())
             with tarfile.open(fileobj=io.BytesIO(transfers[1].flushed_bytes)) as archive:
                 self.assertEqual(set(archive.getnames()), {"MIRROR_VERIFIED.json", "SHA256SUMS"})
                 self.assertEqual(json.load(archive.extractfile("MIRROR_VERIFIED.json")), receipt)
@@ -137,6 +144,32 @@ class MirrorKinds(unittest.TestCase):
 
     def test_training(self):
         self.check_kind("training")
+
+    def test_evaluation_keeps_stimuli_and_materializes_file_links(self):
+        self.check_kind("evaluation")
+
+    def test_evaluation_refuses_directory_and_broken_links(self):
+        for broken in (False, True):
+            with self.subTest(broken=broken), tempfile.TemporaryDirectory() as directory:
+                root=Path(directory);(root/"directory").mkdir()
+                (root/"alias").symlink_to(root/("absent" if broken else "directory"))
+                argv=["dataset_mirror.py","--root",str(root),"--host","fixture",
+                      "--destination","/array/artifacts","--capacity-path","/array",
+                      "--artifact-kind","evaluation"]
+                with patch.object(sys,"argv",argv), patch.object(mirror.subprocess,"run"), \
+                        patch.object(mirror.subprocess,"check_output",return_value="sha256:"+"a"*64):
+                    with self.assertRaises(AssertionError):mirror.main()
+                self.assertFalse((root/"SHA256SUMS").exists())
+
+    def test_feature_and_training_still_refuse_images(self):
+        for kind in ("features", "training"):
+            with self.subTest(kind=kind), tempfile.TemporaryDirectory() as directory:
+                root=Path(directory);(root/"stimulus.png").write_bytes(b"opaque")
+                argv=["dataset_mirror.py","--root",str(root),"--nfs",
+                      "--destination",str(root.parent/(root.name+"-mirror")),"--artifact-kind",kind]
+                with patch.object(sys,"argv",argv):
+                    with self.assertRaises(AssertionError):mirror.main()
+                self.assertFalse((root/"MIRROR_VERIFIED.json").exists())
 
 
 if __name__ == "__main__":

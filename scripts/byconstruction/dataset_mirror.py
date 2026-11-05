@@ -4,7 +4,10 @@
 Run under the shared heavy lock and resource wrapper. The caller supplies the
 physical array destination and capacity-check mount paths, or a mounted
 destination for copying and verification on the client. Existing mirrors
-are preserved. No dataset source is modified.
+are preserved. No dataset source is modified. Explicit evaluation snapshots may
+include opaque stimulus files; feature/training modes retain their image refusal.
+The remote evaluation transport materializes file symlinks and refuses directory
+or broken symlinks.
 """
 
 import argparse
@@ -43,7 +46,7 @@ def main():
     ap.add_argument("--cold-readback", action="store_true", help="with --nfs on Linux: fsync copies and request page-cache eviction for readback")
     ap.add_argument("--destination", required=True)
     ap.add_argument("--capacity-path", nargs="+")
-    ap.add_argument("--artifact-kind", choices=("features", "training"), default="features")
+    ap.add_argument("--artifact-kind", choices=("features", "training", "evaluation"), default="features")
     ap.add_argument(
         "--image",
         default="iqa-organize:5",
@@ -68,7 +71,8 @@ def main():
     assert not args.root.resolve().is_relative_to(destination.resolve())
     files = sorted(p for p in args.root.rglob("*") if p.is_file())
     assert not any(p.is_symlink() for p in args.root.rglob("*"))
-    assert not any(p.suffix.lower() in {".png", ".jpg", ".bmp", ".tif", ".imijset"} for p in files)
+    if args.artifact_kind != "evaluation":
+        assert not any(p.suffix.lower() in {".png", ".jpg", ".bmp", ".tif", ".imijset"} for p in files)
     total = sum(p.stat().st_size for p in files)
     assert shutil.disk_usage(destination.parent).free > total
     digests = {p.relative_to(args.root).as_posix(): sha(p) for p in files}
@@ -141,12 +145,23 @@ def remote_main(args, receipt_path, sums):
     ).strip()
     assert image_id.startswith("sha256:")
     files = sorted(p for p in args.root.rglob("*") if p.is_file())
-    assert not any(
-        p.suffix.lower() in {".png", ".jpg", ".bmp", ".tif", ".imijset"} for p in files
-    )
-    digests = {p.relative_to(args.root).as_posix(): sha(p) for p in files}
+    if args.artifact_kind == "evaluation":
+        assert not any(p.is_symlink() and not p.is_file() for p in args.root.rglob("*")), (
+            "evaluation snapshots refuse directory or broken symlinks"
+        )
+    else:
+        assert not any(
+            p.suffix.lower() in {".png", ".jpg", ".bmp", ".tif", ".imijset"} for p in files
+        )
+    digests = {}
+    for index, path in enumerate(files, 1):
+        digests[path.relative_to(args.root).as_posix()] = sha(path)
+        if index % 1000 == 0:
+            print(f"checksum inventory {index}/{len(files)}", flush=True)
     sums.write_text("".join(f"{digest}  {name}\n" for name, digest in digests.items()))
     destination = args.destination.rstrip("/")
+    if args.artifact_kind == "evaluation":
+        subprocess.run(["ssh", args.host, "test ! -e " + shlex.quote(destination)], check=True)
     container = [
         "docker",
         "run",
@@ -178,13 +193,15 @@ def remote_main(args, receipt_path, sums):
             ["ssh", args.host, shlex.join(command)], stdin=subprocess.PIPE
         ) as proc:
             assert proc.stdin is not None
-            with tarfile.open(fileobj=proc.stdin, mode="w|") as archive:
-                for path in paths:
+            with tarfile.open(fileobj=proc.stdin, mode="w|", dereference=args.artifact_kind == "evaluation") as archive:
+                for index, path in enumerate(paths, 1):
                     archive.add(
                         path,
                         arcname=path.relative_to(args.root).as_posix(),
                         recursive=False,
                     )
+                    if index % 1000 == 0:
+                        print(f"mirroring {index}/{len(paths)}", flush=True)
             proc.stdin.close()
             if proc.wait():
                 raise RuntimeError("containerized array copy failed")
@@ -209,7 +226,7 @@ def remote_main(args, receipt_path, sums):
         assert result.split()[0] == digests[name], name
         readbacks.append({"relative_path": name, "sha256": digests[name]})
     receipt = {
-        "schema": "dataset-features-mirror-v1" if args.artifact_kind == "features" else "dataset-training-mirror-v1",
+        "schema": f"dataset-{args.artifact_kind}-mirror-v1",
         "verified_at": datetime.now(timezone.utc).isoformat(),
         "destination": args.host + ":" + destination,
         "artifact_files_verified_before_receipt": len(files),

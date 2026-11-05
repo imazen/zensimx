@@ -4557,3 +4557,9 @@ final-read-stats population root:
 
 final-read-native-check root:
     env TMPDIR={{quote(root + "/scratch")}} CARGO_TARGET_DIR={{quote(root + "/target/decode")}} flock {{env_var('HOME')}}/tmp/heavy.lock {{env_var('HOME')}}/work/claudehints/scripts/run-heavy --mem 24G --jobs 8 -- bash -c 'cargo test --release --locked --manifest-path scripts/byconstruction/trust_decode/Cargo.toml && cargo clippy --release --locked --manifest-path scripts/byconstruction/trust_decode/Cargo.toml -- -D warnings'
+
+final-read-mirror-check root:
+    env TMPDIR={{quote(root + "/scratch")}} PYTHONDONTWRITEBYTECODE=1 python3 -B scripts/tests/test_dataset_mirror.py
+
+final-read-mirror root host destination capacity_mount image:
+    env TMPDIR={{quote(root + "/scratch")}} PYTHONDONTWRITEBYTECODE=1 flock {{env_var('HOME')}}/tmp/heavy.lock {{env_var('HOME')}}/work/claudehints/scripts/run-heavy --mem 24G --jobs 1 -- python3 -B scripts/byconstruction/dataset_mirror.py --root {{quote(root)}} --host {{quote(host)}} --destination {{quote(destination)}} --capacity-path {{quote(capacity_mount)}} /mnt/cache --artifact-kind evaluation --image {{quote(image)}}
