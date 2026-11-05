@@ -33,13 +33,12 @@ def main():
             with log.open('rb') as stream:
                 stream.seek(max(0, log.stat().st_size - 1000))
                 observation['log_tails'][str(log.relative_to(args.root))] = stream.read().decode(errors='replace')
-    # Stage owners also update this file: merge their latest state before writing.
+    # Keep observations separate: the stage owner may update PROGRESS concurrently.
     latest = json.loads(path.read_text())
-    latest['verified_process_observation'] = observation
-    latest['last_check'] = observation['utc']
-    path.write_text(json.dumps(latest, indent=2) + '\n')
-    print(json.dumps(dict(stage=latest['stage'], completed=len(latest['completed_sets']),
-        required=len(latest['required_sets']), failure=latest.get('failure'), **observation), indent=2))
+    report = dict(stage=latest['stage'], completed=len(latest['completed_sets']),
+        required=len(latest['required_sets']), failure=latest.get('failure'), **observation)
+    (args.root / 'LIVE_OBSERVATION.json').write_text(json.dumps(report, indent=2) + '\n')
+    print(json.dumps(report, indent=2))
 
 
 if __name__ == '__main__':
