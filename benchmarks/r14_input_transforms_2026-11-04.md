@@ -99,7 +99,8 @@ The conditional T2 controller requires all three frozen T1 fits before applying
 the registered development rule. It uses the successor trainer above, preserves
 the initial winner's transform kinds, and checks final learned knees against
 the frozen TRAIN bounds. It records changed knees and bound hits. The release
-path is implemented; no T2 release decision or fit has occurred yet.
+path is implemented; the measured release decision below does not authorize a
+T2 fit.
 
 The untouched ARM strict-library-clippy baseline reports eight unused-item
 warnings as errors; this baseline receipt is retained without suppressing them.
