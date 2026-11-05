@@ -153,7 +153,7 @@ PY
         if [[ $stage = measure-cell ]]; then
             size_values=("${4:?size}")
             thread_values=("${5:?threads}")
-            [[ ${size_values[0]} =~ ^(256|1024|large)$ && ${thread_values[0]} =~ ^(1|16)$ ]]
+            [[ ${size_values[0]} =~ ^(64|256|1024|large)$ && ${thread_values[0]} =~ ^(1|16)$ ]]
         fi
         export A_FUSION_WORKER_MEM="$memory"
         for threads in "${thread_values[@]}"; do

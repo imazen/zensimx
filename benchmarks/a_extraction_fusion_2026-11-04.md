@@ -1061,3 +1061,106 @@ A parser failure could retry this saved capture without re-extraction.
 The fusion cache's decoder remains published 0.8.4, with identical cached
 pixels read by both arms. New timing binaries are rebuilt from the landed
 pin as a common parent; no timing from an older parent is restamped.
+
+### Both-host ring decisions after the decoder pin
+
+The AMD trials use runtime tier `v4x`, CPU 0 at one thread and CPUs
+0–7,16–23 at sixteen threads. Both arms have common parent
+`e113f0f367b45ba871a23036d63f2853526a5681` (the landed decoder pin).
+Moment source: `a14602ecbdc9c8e0590afd9091fd7069a5bfab84`; activity source:
+`6f81f7cd5ff03b2e2b8d90e1b5b3c95d906f1361`. The Intel `v3` columns below
+are the archived original trials above, with their original parents; they are
+not relabeled as fresh decoder-pin measurements. Every completed row admitted
+32 clean paired rounds over the same twenty image pairs. Values are medians
+of per-image percentiles. Negative change means lower time.
+
+**moment-pinned: rejected on both hosts.** Both required serial comparisons lose
+on AMD; three of four required comparisons lose on Intel. Neither implementation
+is on main’s served path.
+
+| Size / threads | Intel p50 ms before → after | Intel change | AMD p50 ms before → after | AMD change | AMD p95 ms before → after |
+|---|---:|---:|---:|---:|---:|
+| 256 / 1 | 1.85892825 → 2.12824150 | +14.488% | 1.36843300 → 1.48936375 | +8.837% | 1.48054900 → 1.51440500 |
+| 256 / 16 | 0.82401500 → 0.82001725 | -0.485% | 0.47260650 → 0.46006650 | -2.653% | 0.51329103 → 0.50865128 |
+| 1024 / 1 | 27.57252625 → 32.22658000 | +16.879% | 17.35054225 → 17.63931600 | +1.664% | 17.90635790 → 18.38557965 |
+| 1024 / 16 | 7.37269875 → 7.13245075 | -3.259% | 3.24366875 → 3.21630900 | -0.843% | 3.46746853 → 3.43027000 |
+| large / 1 | 330.70461350 → 367.94362375 | +11.261% | 192.81927775 → 195.90065825 | +1.598% | 201.85725400 → 206.48650122 |
+| large / 16 | 98.23215850 → 105.64631775 | +7.548% | 85.24699775 → 84.80628850 | -0.517% | 88.30518705 → 87.71689880 |
+
+AMD worker receipts: seconds / peak-RSS GiB / min-avail MiB / peak-load;
+all exit zero. Each cell retains raw zenbench rounds, admission census, worker
+records, stderr and time-v output separately from `parses/table-v1/summary.json`.
+
+| Size / threads | Before receipt | After receipt | Before / after max RSS KiB |
+|---|---|---|---|
+| 256 / 1 | 14 / 0.02 / 35932 / 1.93 | 14 / 0.02 / 35931 / 1.93 | 24168 / 25732 |
+| 256 / 16 | 13 / 0.05 / 35815 / 1.73 | 13 / 0.05 / 35809 / 1.73 | 47372 / 50380 |
+| 1024 / 1 | 32 / 0.14 / 35654 / 1.85 | 31 / 0.15 / 35651 / 1.85 | 151428 / 153432 |
+| 1024 / 16 | 15 / 0.27 / 35404 / 2.56 | 14 / 0.27 / 35392 / 2.56 | 281128 / 283392 |
+| large / 1 | 279 / 1.44 / 32741 / 2.18 | 274 / 1.43 / 32719 / 2.18 | 1510896 / 1497944 |
+| large / 16 | 129 / 1.88 / 32012 / 12.20 | 126 / 1.88 / 32031 / 12.20 | 1971528 / 1970020 |
+
+AMD artifact root: `$DEV_STUDY/moment-pinned/timing/`.
+
+**activity-pinned: rejected on both hosts.** Both required serial comparisons lose
+on AMD; three of four required comparisons lose on Intel. Neither implementation
+is on main’s served path.
+
+| Size / threads | Intel p50 ms before → after | Intel change | AMD p50 ms before → after | AMD change | AMD p95 ms before → after |
+|---|---:|---:|---:|---:|---:|
+| 256 / 1 | 1.86131400 → 1.89195225 | +1.646% | 1.47299600 → 1.45299175 | -1.358% | 1.57228002 → 1.56112048 |
+| 256 / 16 | 0.89408800 → 0.86748650 | -2.975% | 0.45980200 → 0.46185450 | +0.446% | 0.50975650 → 0.50773828 |
+| 1024 / 1 | 27.27656625 → 27.59267175 | +1.159% | 17.46675075 → 17.96454950 | +2.850% | 18.74490750 → 19.11961832 |
+| 1024 / 16 | 7.32353200 → 7.18946225 | -1.831% | 3.24765350 → 3.25081150 | +0.097% | 3.59556553 → 3.60853207 |
+| large / 1 | 327.72765975 → 330.00507950 | +0.695% | 195.35689275 → 200.40438625 | +2.584% | 207.53349805 → 213.15288287 |
+| large / 16 | 99.44721675 → 99.52491775 | +0.078% | 84.89728200 → 84.65263300 | -0.288% | 87.88423977 → 88.01827140 |
+
+AMD worker receipts: seconds / peak-RSS GiB / min-avail MiB / peak-load;
+all exit zero. Each cell retains raw zenbench rounds, admission census, worker
+records, stderr and time-v output separately from `parses/table-v1/summary.json`.
+
+| Size / threads | Before receipt | After receipt | Before / after max RSS KiB |
+|---|---|---|---|
+| 256 / 1 | 28 / 0.02 / 35809 / 2.27 | 28 / 0.02 / 35802 / 2.27 | 23548 / 24148 |
+| 256 / 16 | 15 / 0.05 / 35801 / 1.72 | 14 / 0.05 / 35783 / 1.69 | 49276 / 49296 |
+| 1024 / 1 | 35 / 0.14 / 35454 / 2.06 | 34 / 0.14 / 35479 / 2.06 | 151496 / 151600 |
+| 1024 / 16 | 19 / 0.27 / 35298 / 2.54 | 18 / 0.27 / 35281 / 2.54 | 281232 / 280352 |
+| large / 1 | 283 / 1.44 / 32606 / 1.99 | 278 / 1.43 / 32719 / 1.99 | 1511208 / 1502420 |
+| large / 16 | 139 / 1.88 / 32019 / 10.84 | 136 / 1.86 / 31927 / 10.84 | 1971028 / 1953560 |
+
+AMD artifact root: `$DEV_STUDY/activity-pinned/timing/`.
+
+### Small-image mode and RSS scope
+
+The timing entry calls `BakeScorer::compute` with `.with_parallel(false)`
+at one thread and `.with_parallel(true)` at sixteen. This exercises the serial
+streaming fold and bounded parallel fold; it does not select separately named
+LowMem and Mt APIs. `feature_v2.rs::PARALLEL_MIN_PIXELS` is 36,864 (192²),
+so both thread settings execute the serial walk for the verified 64×64 fixtures.
+The sixteen-thread tiny rows are parallel-requested, not forced MT extraction.
+
+Whole-worker max RSS includes all twenty preloaded RGB pairs and scratch.
+The moment ring lowers the large AMD peaks by 12,952 KiB (one thread) and
+1,508 KiB (sixteen), while smaller cases increase. The activity ring lowers
+the large peaks by 8,788 and 17,468 KiB, with smaller cases mixed. These
+receipts do not demonstrate a consistent process-memory reduction and do not
+isolate per-score scratch. No accepted fusion has lowered the shipped peak.
+
+The 64×64 extension reuses the same immutable common-parent binaries, bake,
+fixtures, 100 ms warmup and 32-clean-round policy. Only the shell driver’s
+size admission is extended. Logging and parsing remain separate.
+
+| Candidate / requested threads | AMD p50 ms before → after | AMD p95 ms before → after | Intel v3 |
+|---|---:|---:|---|
+| moment-pinned / 1 | 0.20927000 → 0.20729000 | 0.22539800 → 0.22421275 | not measured |
+| moment-pinned / 16 | 0.20868950 → 0.20672450 | 0.22149325 → 0.22017225 | not measured |
+| activity-pinned / 1 | 0.21367450 → 0.21727200 | 0.22921648 → 0.23371500 | not measured |
+| activity-pinned / 16 | not measured | not measured | not measured |
+
+The first AMD activity/64/16 attempt had only 31 clean rounds and failed
+qualification; its complete capture is preserved as
+`activity-pinned/timing/64-16t.invalid-31-clean`. A separately labeled retry
+uses the unchanged threshold. The moment ring has the lowest observed tiny
+p50 so far but fails larger-image acceptance; baseline serial remains the
+qualified implementation. Cross-run differences near one percent do not
+establish a significant tiny-image winner.

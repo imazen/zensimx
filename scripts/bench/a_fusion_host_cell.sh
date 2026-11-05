@@ -26,7 +26,7 @@ fi
 export A_FUSION_LOCK_HELD=1
 export TMPDIR="$study/scratch"
 mkdir -p "$TMPDIR"
-native="$study/source/scripts/bench/a_fusion_native.sh"
+native=${A_FUSION_NATIVE_DRIVER:-$study/source/scripts/bench/a_fusion_native.sh}
 if [[ $stage = build ]]; then
     snapshot=${4:?source snapshot}
     mkdir -p "$study/source"
