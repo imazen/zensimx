@@ -1,0 +1,43 @@
+{
+  "archive": {
+    "checked": "2026-11-05T01:55:39.126279+00:00",
+    "source": "/var/tmp/byc-transforms-20261104",
+    "destination": "/mnt/tower/output/zensim/r14-transforms-20261104",
+    "full_rsync_checksum_comparison": "empty",
+    "random_sha256_readbacks": [
+      {
+        "path": "capacity/hdr/T1a_s0/bank/curve-f121.json",
+        "sha256": "b2af10c19092de36085685571c417b399871cf337779e17991e171d385e4baed"
+      },
+      {
+        "path": "capacity/hdr/T1b_s0/bank/curve-f681.json",
+        "sha256": "c0ab33860789c170bb645f86d7254a49eecc5e39a8b4a456a6e5db10db8d20ac"
+      },
+      {
+        "path": "capacity/hdr/T1c_s0/bank/curve-f546.json",
+        "sha256": "de5e1f2b1916901382054f8ae9d312617715b305c434d34d008167ad52fa3424"
+      }
+    ],
+    "manifest_sha256": "fc9d64f898a950f69ed09dc81578f18af8faa07ae0fd98bb8dc0c502337eb95d"
+  },
+  "inventory": {
+    "build_commit": "912609aaacd3663a10426006a8b6d84bad826f93",
+    "files": 4688,
+    "bytes": 4390978136
+  },
+  "mirrored_record_sha256": {
+    "benchmarks/r14_input_transforms_2026-11-04.md": "2335bb8fa67c83f8c1acb993ae78c9ba928798999a30dc2d3da0fdf10b2b5f59",
+    "benchmarks/r14_input_transforms_2026-11-04.pointer.md": "b65d01d830bf098ccf422b49e5e5d9de64918b6702e095d26ae0490e74b0156e",
+    "benchmarks/r14_input_transform_reads_2026-11-04.md": "cc14e362342ab6da2f01413b2a82ebcb72773e92735b47894acbeffaf984ec4f",
+    "benchmarks/r14_r13_comparison_2026-11-04.md": "be4ca1aa1202464ee1b9845e3274d01b01c6e9c3a1ef4131248d389470e30367"
+  },
+  "resources": {
+    "archive-first.log": [
+      "run-heavy: done rc=0 94s | peak-RSS 0.04GiB | min-avail 41886MiB | peak-load 6.10"
+    ],
+    "archive.log": [
+      "run-heavy: done rc=0 7s | peak-RSS 0.04GiB | min-avail 41080MiB | peak-load 3.29"
+    ]
+  },
+  "role": "final canonical mirror verified from dev; no scientific input or threshold changed"
+}
