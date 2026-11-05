@@ -1,0 +1,30 @@
+[package]
+name = "zensim-viz-pack"
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "MIT OR Apache-2.0"
+
+[workspace]
+
+[dependencies]
+# Native asset preparation only; the browser and Pages Wasm build do not depend on this crate.
+imij-set = { git = "https://github.com/imazen/zqi", rev = "d43b4dada29ccf1a4681d3a1367acc25b55676b4" }
+imij = { git = "https://github.com/imazen/zqi", rev = "d43b4dada29ccf1a4681d3a1367acc25b55676b4", default-features = false, features = ["std"] }
+sha2 = "0.11.0"
+serde_json = "1.0.145"
+
+[[bin]]
+name = "zensim-viz-pack"
+path = "main.rs"
+
+[profile.release]
+lto = "thin"
+
+[patch.crates-io]
+# Exact common animation timing; coordinated with zenpng's native-color APIs.
+zencodec = { git = "https://github.com/imazen/zencodec", rev = "5ed2daded81407e7206fd8de6e8f1d93a5447b5b" }
+zenpixels = { git = "https://github.com/imazen/zenpixels", rev = "789d69dbc314e748676b7f2f19542c17473ba40b" }
+# zencodec takes how-far 0.1.0 from crates.io; IMIJ pins the same release by
+# git. One source keeps a single SharedPulse/Stop type across the boundary.
+how-far = { git = "https://github.com/imazen/how-far", rev = "571bf1a2fc92e5b99c3777f8ff81bafab7666a75" }
