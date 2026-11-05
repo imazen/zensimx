@@ -1,5 +1,21 @@
 # Public A extraction fusion — 2026-11-04
 
+
+Owner extension, 2026-11-05: dev is authorized for this study under its shared
+heavy lock, below training/evaluation priority. Its requested native tier is
+v4x; dispatcher confirmation and measurements are pending. One-thread dev
+cells use CPU 0, and sixteen-thread cells use CPUs 0–7,16–23 (CCD0, 96 MiB L3,
+verified through sysfs). All dev builds/measurements use a 24G run-heavy cap
+and `~/tmp/zensim-fusion-dev/`; no output goes under `/mnt/v`.
+
+The moment-ring and full-width activity-ring rejections below describe
+**i270 / v3 only**. Their dev cells are **not measured**, so cross-host
+decisions remain open. A candidate must pass the four required p50 comparisons
+on each host. A split result goes to the owner and is neither landed nor
+discarded. After the deeper Intel attribution, the two existing rings get
+their dev tables before further candidates are timed on both hosts. Short
+dev batches release the lock between cells and during quiet-gate refusals.
+
 Status: investigation in progress. No fusion from this study is qualified or landed.
 The experiments use the frozen F seed-0 bake served through `BakeScorer`, SHA-256
 `185f43f7e5e1327c34ad18f0b73b96b872663726a0fac6ff524430d0d8430088`.
@@ -8,10 +24,10 @@ This is the brief's public-A control, distinct from the deprecated research
 
 ## Inputs and execution
 
-Phase-1 profile parent: `ccdb5c7a`. All builds, tests and measurements run on i270,
+Phase-1 profile parent: `ccdb5c7a`. The original builds, tests and measurements ran on i270,
 Core Ultra 7 270K Plus, native v3. One-thread measurements use P core 2;
 16-thread measurements use CPUs 0–15. AVX-512 speed is **not measured on Zen 5**.
-Every native job acquires the host's shared heavy lock and runs through
+Every i270 job acquires the host's shared heavy lock and runs through
 `run-heavy --mem 16G`; other lanes use the same lock.
 
 Reuse the extraction-cost study's twenty zenjpeg-q40 pairs per size, with
@@ -69,6 +85,238 @@ Topdown's slot and cycle percentages have different denominators.
 Topdown capture receipt: `run-heavy: done rc=0 97s | peak-RSS 1.61GiB |
 min-avail 23694MiB | peak-load 1.77`. This is whole-driver RSS, including
 all twenty input pairs, not isolated scorer memory.
+
+
+### Deeper Intel stall attribution (owner addition A)
+
+i270 / v3, P core 2: the original twenty pairs and ten repeats per size,
+with FIFO enable/disable around the same 200 serving calls. Twelve counter
+windows and twelve event windows have accepted admission receipts; every
+active core counter has at least 99% running time (the observed rows are
+100%). Inactive atom-PMU rows are excluded. Metric percentages have their
+own definitions and denominators; they are not additive. In particular,
+outstanding-request metrics must not be read as measured DRAM bytes.
+
+| Metric | 256² | 1024² | Large |
+|---|---:|---:|---:|
+| `tma_core_bound` | 28.0% | 26.3% | 26.3% |
+| `tma_memory_bound` | 18.9% | 26.3% | 28.6% |
+| `tma_l1_bound` | 8.3% | 9.3% | 7.1% |
+| `tma_l2_bound` | 0.7% | 0.8% | 0.7% |
+| `tma_l3_bound` | 0.9% | 4.4% | 4.4% |
+| `tma_dram_bound` | 0.0% | 0.2% | 6.9% |
+| `tma_store_bound` | 9.0% | 12.6% | 12.7% |
+| `tma_mem_latency` | 4.4% | 20.3% | 16.9% |
+| `tma_mem_bandwidth` | 3.4% | 32.0% | 60.7% |
+| `tma_ports_utilization` | 18.0% | 19.6% | 17.4% |
+| `tma_divider` | 23.8% | 22.6% | 22.4% |
+| `tma_heavy_operations` | 5.5% | 5.1% | 4.3% |
+| `tma_light_operations` | 42.5% | 38.8% | 36.5% |
+| Frontend / slots | 4.314% | 2.745% | 3.922% |
+| Bad speculation / slots | 0.784% | 0.784% | 0.392% |
+
+The following cycle tables retain the original cycle-sample windows.
+The event tables sum the **recorded event sampling periods**, not sampled
+CPU cycles; they are event-count estimates. The `n` column is the actual
+number of samples for that executing symbol under the extraction call chain.
+All symbols, including sampled allocator/kernel frames, remain in the raw
+report. The tables show five leading symbols where five were observed.
+
+**256: original cycles**
+
+| Executing symbol | Sampled cycle weight | Self % of extraction |
+|---|---:|---:|
+| `zensim::feature_v2::__arcane_dense_block_kernel_canon64_vec_v3::<zensim::featcanon::Lanes16F64, true>` | 481,387,344 | 23.850% |
+| `zensim::blur::__arcane_fused_blur_h_local11_v3` | 345,728,225 | 17.129% |
+| `zensim::blur::__arcane_box_blur_v_local11_v3` | 296,469,917 | 14.689% |
+| `zensim::color::__arcane_srgb_xyb_canon_vec_v3` | 201,652,927 | 9.991% |
+| `zensim::fused::__arcane_fused_vblur_ssim_canon64_vec_v3::<zensim::featcanon::Lanes16F64>` | 196,749,814 | 9.748% |
+
+**256: `mem_load_retired.l1_miss`**
+
+| Executing symbol | Event-count estimate | n |
+|---|---:|---:|
+| `zensim::feature_v2::__arcane_dense_block_kernel_canon64_vec_v3::<zensim::featcanon::Lanes16F64, true>` | 6,200,093 | 31 |
+| `__memmove_avx_unaligned_erms` | 3,800,057 | 19 |
+| `zensim::blur::__arcane_downscale_2x_into_inner_v3` | 3,400,051 | 17 |
+| `zensim::fused::__arcane_fused_vblur_ssim_canon64_vec_v3::<zensim::featcanon::Lanes16F64>` | 2,400,036 | 12 |
+| `zensim::simd_ops::__arcane_abs_diff_into_inner_v3` | 2,200,033 | 11 |
+Extraction samples: 118; estimated extraction event count: 23,600,354.
+
+**256: `mem_load_retired.l2_miss`**
+
+| Executing symbol | Event-count estimate | n |
+|---|---:|---:|
+| `__memmove_avx_unaligned_erms` | 227,048 | 2,248 |
+| `<zensim::feature_v2::V1BasicSums>::merge` | 33,229 | 329 |
+| `zensim::feature_v2::__arcane_dense_block_kernel_canon64_vec_v3::<zensim::featcanon::Lanes16F64, true>` | 14,342 | 142 |
+| `<zensim::feature_v2::V1BasicSums>::finalize_into` | 7,878 | 78 |
+| `zensim::simd_ops::__arcane_abs_diff_into_inner_v3` | 5,050 | 50 |
+Extraction samples: 3,806; estimated extraction event count: 384,406.
+
+**256: `mem_load_retired.l3_miss`**
+
+| Executing symbol | Event-count estimate | n |
+|---|---:|---:|
+| `zensim::color::__arcane_srgb_xyb_canon_vec_v3` | 11 | 11 |
+| `cfree@GLIBC_2.2.5` | 5 | 5 |
+| `kfree` | 4 | 4 |
+| `<zensim::feature_v2::V1BasicSums>::finalize_into` | 2 | 2 |
+| `__run_timers` | 1 | 1 |
+Extraction samples: 23; estimated extraction event count: 23.
+
+**256: `exe_activity.bound_on_loads`**
+
+| Executing symbol | Event-count estimate | n |
+|---|---:|---:|
+| `zensim::blur::__arcane_fused_blur_h_local11_v3` | 72,000,108 | 36 |
+| `zensim::blur::__arcane_box_blur_v_local11_v3` | 66,000,099 | 33 |
+| `zensim::feature_v2::__arcane_dense_block_kernel_canon64_vec_v3::<zensim::featcanon::Lanes16F64, true>` | 22,000,033 | 11 |
+| `__memmove_avx_unaligned_erms` | 16,000,024 | 8 |
+| `zensim::simd_ops::__arcane_abs_diff_into_inner_v3` | 6,000,009 | 3 |
+Extraction samples: 105; estimated extraction event count: 210,000,315.
+
+**1024: original cycles**
+
+| Executing symbol | Sampled cycle weight | Self % of extraction |
+|---|---:|---:|
+| `zensim::blur::__arcane_box_blur_v_local11_v3` | 6,519,678,584 | 21.768% |
+| `zensim::feature_v2::__arcane_dense_block_kernel_canon64_vec_v3::<zensim::featcanon::Lanes16F64, true>` | 6,141,762,260 | 20.506% |
+| `zensim::blur::__arcane_fused_blur_h_local11_v3` | 5,075,996,721 | 16.947% |
+| `zensim::fused::__arcane_fused_vblur_ssim_canon64_vec_v3::<zensim::featcanon::Lanes16F64>` | 2,605,267,531 | 8.698% |
+| `zensim::color::__arcane_srgb_xyb_canon_vec_v3` | 2,477,946,149 | 8.273% |
+
+**1024: `mem_load_retired.l1_miss`**
+
+| Executing symbol | Event-count estimate | n |
+|---|---:|---:|
+| `zensim::blur::__arcane_box_blur_v_local11_v3` | 70,601,059 | 353 |
+| `zensim::simd_ops::__arcane_abs_diff_into_inner_v3` | 68,001,020 | 340 |
+| `zensim::blur::__arcane_downscale_2x_into_inner_v3` | 42,200,633 | 211 |
+| `zensim::feature_v2::__arcane_dense_block_kernel_canon64_vec_v3::<zensim::featcanon::Lanes16F64, true>` | 41,600,624 | 208 |
+| `zensim::fused::__arcane_fused_vblur_ssim_canon64_vec_v3::<zensim::featcanon::Lanes16F64>` | 32,800,492 | 164 |
+Extraction samples: 1,526; estimated extraction event count: 305,204,578.
+
+**1024: `mem_load_retired.l2_miss`**
+
+| Executing symbol | Event-count estimate | n |
+|---|---:|---:|
+| `zensim::simd_ops::__arcane_abs_diff_into_inner_v3` | 13,802,898 | 138 |
+| `zensim::blur::__arcane_box_blur_v_local11_v3` | 6,001,260 | 60 |
+| `zensim::blur::__arcane_downscale_2x_into_inner_v3` | 2,200,462 | 22 |
+| `__memmove_avx_unaligned_erms` | 2,000,420 | 20 |
+| `zensim::feature_v2::__arcane_dense_block_kernel_canon64_vec_v3::<zensim::featcanon::Lanes16F64, true>` | 300,063 | 3 |
+Extraction samples: 270; estimated extraction event count: 27,005,670.
+
+**1024: `mem_load_retired.l3_miss`**
+
+| Executing symbol | Event-count estimate | n |
+|---|---:|---:|
+| `__memmove_avx_unaligned_erms` | 50,197 | 497 |
+| `zensim::simd_ops::__arcane_abs_diff_into_inner_v3` | 8,888 | 88 |
+| `<zensim::feature_v2::V1BasicSums>::merge` | 5,555 | 55 |
+| `zensim::color::__arcane_srgb_xyb_canon_vec_v3` | 4,141 | 41 |
+| `core::ptr::drop_glue::<zensim::feature_v2::StreamChannelAccums>` | 2,323 | 23 |
+Extraction samples: 833; estimated extraction event count: 84,133.
+
+**1024: `exe_activity.bound_on_loads`**
+
+| Executing symbol | Event-count estimate | n |
+|---|---:|---:|
+| `zensim::blur::__arcane_box_blur_v_local11_v3` | 1,860,002,790 | 930 |
+| `zensim::blur::__arcane_fused_blur_h_local11_v3` | 822,001,233 | 411 |
+| `__memmove_avx_unaligned_erms` | 802,001,203 | 401 |
+| `zensim::simd_ops::__arcane_abs_diff_into_inner_v3` | 616,000,924 | 308 |
+| `zensim::feature_v2::__arcane_dense_block_kernel_canon64_vec_v3::<zensim::featcanon::Lanes16F64, true>` | 118,000,177 | 59 |
+Extraction samples: 2,267; estimated extraction event count: 4,534,006,801.
+
+**large: original cycles**
+
+| Executing symbol | Sampled cycle weight | Self % of extraction |
+|---|---:|---:|
+| `zensim::blur::__arcane_box_blur_v_local11_v3` | 84,043,350,530 | 23.470% |
+| `zensim::feature_v2::__arcane_dense_block_kernel_canon64_vec_v3::<zensim::featcanon::Lanes16F64, true>` | 67,984,468,917 | 18.986% |
+| `zensim::blur::__arcane_fused_blur_h_local11_v3` | 54,982,429,599 | 15.355% |
+| `zensim::fused::__arcane_fused_vblur_ssim_canon64_vec_v3::<zensim::featcanon::Lanes16F64>` | 30,527,515,566 | 8.525% |
+| `zensim::color::__arcane_srgb_xyb_canon_vec_v3` | 28,820,472,548 | 8.048% |
+
+**large: `mem_load_retired.l1_miss`**
+
+| Executing symbol | Event-count estimate | n |
+|---|---:|---:|
+| `zensim::blur::__arcane_box_blur_v_local11_v3` | 943,614,154 | 4,718 |
+| `zensim::simd_ops::__arcane_abs_diff_into_inner_v3` | 924,813,872 | 4,624 |
+| `zensim::blur::__arcane_downscale_2x_into_inner_v3` | 595,208,928 | 2,976 |
+| `zensim::fused::__arcane_fused_vblur_ssim_canon64_vec_v3::<zensim::featcanon::Lanes16F64>` | 517,207,758 | 2,586 |
+| `zensim::feature_v2::__arcane_dense_block_kernel_canon64_vec_v3::<zensim::featcanon::Lanes16F64, true>` | 490,607,359 | 2,453 |
+Extraction samples: 20,565; estimated extraction event count: 4,113,061,695.
+
+**large: `mem_load_retired.l2_miss`**
+
+| Executing symbol | Event-count estimate | n |
+|---|---:|---:|
+| `zensim::blur::__arcane_box_blur_v_local11_v3` | 126,426,544 | 1,264 |
+| `zensim::simd_ops::__arcane_abs_diff_into_inner_v3` | 46,509,765 | 465 |
+| `zensim::blur::__arcane_downscale_2x_into_inner_v3` | 45,409,534 | 454 |
+| `zensim::feature_v2::__arcane_blockiness_row_l64_v3` | 42,909,009 | 429 |
+| `zensim::feature_v2::__arcane_dense_block_kernel_canon64_vec_v3::<zensim::featcanon::Lanes16F64, true>` | 2,200,462 | 22 |
+Extraction samples: 2,908; estimated extraction event count: 290,861,068.
+
+**large: `mem_load_retired.l3_miss`**
+
+| Executing symbol | Event-count estimate | n |
+|---|---:|---:|
+| `zensim::blur::__arcane_box_blur_v_local11_v3` | 14,806,216 | 296 |
+| `zensim::blur::__arcane_downscale_2x_into_inner_v3` | 5,952,499 | 119 |
+| `zensim::simd_ops::__arcane_abs_diff_into_inner_v3` | 5,252,205 | 105 |
+| `__memmove_avx_unaligned_erms` | 1,100,462 | 22 |
+| `<zensim::feature_v2::V1BasicSums>::merge` | 950,399 | 19 |
+Extraction samples: 629; estimated extraction event count: 31,463,209.
+
+**large: `exe_activity.bound_on_loads`**
+
+| Executing symbol | Event-count estimate | n |
+|---|---:|---:|
+| `zensim::blur::__arcane_box_blur_v_local11_v3` | 29,742,044,613 | 14,871 |
+| `__memmove_avx_unaligned_erms` | 11,882,017,823 | 5,941 |
+| `zensim::simd_ops::__arcane_abs_diff_into_inner_v3` | 10,698,016,047 | 5,349 |
+| `zensim::blur::__arcane_fused_blur_h_local11_v3` | 8,032,012,048 | 4,016 |
+| `zensim::blur::__arcane_downscale_2x_into_inner_v3` | 6,036,009,054 | 3,018 |
+Extraction samples: 36,671; estimated extraction event count: 73,342,110,013.
+
+The initial 256² L3 recording had no samples. A separate period-1
+capture supplies its table above; its companion direct counter measured
+240 retired L3 misses over 200 scored images. The initial 256² L2 and
+1024² L3 windows had only 3 and 1 extraction samples. Separate period-101
+recordings now provide 3,806 and 833 extraction samples. Their companion
+direct counters measure 391,858 and 84,030 retired misses over 200 scored
+images. The independent counter and sampling windows are both retained;
+sampled-period estimates are not rescaled to force agreement between them.
+The original sparse recordings remain unchanged.
+
+The large-image V blur leads all three sampled cache-miss levels and the
+load-bound event. Abs-diff, pyramid downsampling and copies are also visible.
+This supports targeting those materializations while retaining the mixed
+core/memory finding: divider activity remains 22.4% at large size. It does
+not establish a speedup for any proposed fusion.
+
+Receipts: `$STUDY/phase1-deep-v1/` contains every `admission.json`,
+`counters.csv`, `perf.data`, `samples.txt`, command and event selector.
+`REPORT-confirm-sparse.json` retains the final full symbol lists; `REPORT.json`
+retains the initial report. Capture command:
+`a_fusion_stalls.sh $STUDY phase1-deep-v1`; follow-ups use `confirm-l3`
+and `confirm-sparse`, each in its own shared-lock/run-heavy scope.
+Main capture: `rc=0 773s | peak-RSS 1.61GiB | min-avail 23543MiB | peak-load 2.15`.
+The first report parser treated an event-name comma as a field separator;
+it was corrected to read the fixed fields from the right, retaining the
+strict running-time check. No counter window was repeated for that repair.
+The corrected report run: `rc=0 1s | peak-RSS 0.13GiB | min-avail 25702MiB | peak-load 1.47`.
+Sparse follow-up: `rc=0 20s | peak-RSS 0.18GiB | min-avail 25447MiB | peak-load 1.32`.
+The period-1 follow-up completed its counter/recording but its first parser
+failed on the comma issue: `rc=1 2s | peak-RSS 0.05GiB | min-avail 25666MiB | peak-load 1.12`.
+The corrected parser reused those unchanged captures. The sum of reported
+run-heavy durations for the main capture, follow-ups and reports is 796 seconds.
+These are full capture/report-driver memory receipts, not isolated scorer RSS.
 
 ## Pass table: one channel at one scale
 

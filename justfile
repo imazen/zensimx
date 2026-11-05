@@ -4470,3 +4470,19 @@ a-fusion-maps study label:
 # One complete gate, pixel or timing phase under the shared native heavy lock.
 a-fusion-trial phase study label snapshot:
     bash scripts/bench/a_fusion_trial.sh {{quote(phase)}} {{quote(study)}} {{quote(label)}} {{quote(snapshot)}}
+
+# Owner-directed precise miss and deeper Topdown attribution on the Intel host.
+a-fusion-stalls study label:
+    bash scripts/bench/a_fusion_stalls.sh {{quote(study)}} {{quote(label)}}
+
+# Analyze admitted Intel captures, preserving raw event-count units.
+a-fusion-stall-report capture output:
+    flock "$HOME/tmp/heavy.lock" "$HOME/work/claudehints/scripts/run-heavy" --mem 16G --jobs 2 -- python3 -B scripts/bench/a_fusion_stall_report.py {{quote(capture)}} {{quote(output)}}
+
+# Resolve a zero-sample 256-square L3 capture without changing its original data.
+a-fusion-stall-confirm study label:
+    bash scripts/bench/a_fusion_stalls.sh {{quote(study)}} {{quote(label)}} confirm-l3
+
+# Add event-count samples where initial short windows had insufficient events.
+a-fusion-stall-sparse study label:
+    bash scripts/bench/a_fusion_stalls.sh {{quote(study)}} {{quote(label)}} confirm-sparse
