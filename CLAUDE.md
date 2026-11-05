@@ -192,6 +192,20 @@ because cleanup tests or a historical training reproduction pass.
 
 ## Known Bugs
 
+### Ignored stable-moments tier test fails on the legacy pool reducers (2026-11-05)
+
+OPEN, unchanged by owner direction. On unchanged source the explicitly ignored
+`ssim_form::tests::stable_moments_are_exact_across_simd_tiers` fails at formula
+revisions 1 and 7: 41 pooled values differ across SIMD tiers natively and 40 under
+SDE, all in `stable_pool_cases` (the legacy weighted reducers). The stable per-pixel
+component agrees, and the served Rev4/5/7 feature-vector gates pass all sixteen SDE
+permutations. The owner directed that the test, its assertions, its ignore marker and
+the legacy arithmetic stay as they are. Any extraction fusion must rerun the ignored
+test on both arms and compare the complete differing-value lists
+(`scripts/bench/a_fusion_stable.py`); a new difference blocks qualification. Record:
+`benchmarks/a_extraction_fusion_2026-11-04.md`, "Baseline finding: explicitly ignored
+legacy pool identity".
+
 ### Crossover archive inventory (2026-11-04)
 
 The initial artifact inventory excluded every directory named `target`, including
