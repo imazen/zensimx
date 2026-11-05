@@ -1497,7 +1497,7 @@ dependencies = [
  "libc",
  "option-ext",
  "redox_users",
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -1677,7 +1677,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -2834,9 +2834,9 @@ checksum = "373f5eceeeab7925e0c1098212f2fbc4d416adec9d35051a6ab251e824c1854a"
 
 [[package]]
 name = "lz4_flex"
-version = "0.13.1"
+version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7ef0d4ed8669f8f8826eb00dc878084aa8f253506c4fd5e8f58f5bce72ddb97e"
+checksum = "ecbdfe44b1bd960b68170b417450a628c43f7cf56bb3c5317e61cb230ee7f226"
 
 [[package]]
 name = "magetypes"
@@ -3545,7 +3545,7 @@ dependencies = [
  "once_cell",
  "socket2",
  "tracing",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -3881,15 +3881,15 @@ dependencies = [
 
 [[package]]
 name = "rustix"
-version = "1.1.4"
+version = "1.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b6fe4565b9518b83ef4f91bb47ce29620ca828bd32cb7e408f0062e9930ba190"
+checksum = "e5e76742e5294153d4dde1207dbec5bdd81eef6fabdc0d2118babadabfd858aa"
 dependencies = [
  "bitflags",
  "errno",
  "libc",
  "linux-raw-sys",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -4332,7 +4332,7 @@ dependencies = [
  "getrandom 0.4.3",
  "once_cell",
  "rustix",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -4351,7 +4351,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "230a1b821ccbd75b185820a1f1ff7b14d21da1e442e22c0863ea5f08771a8874"
 dependencies = [
  "rustix",
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -4693,16 +4693,16 @@ checksum = "b6f5e870be6c3b371b77fe0ee0bafb859fa4964b4404c27de1d380043c4dda20"
 [[package]]
 name = "ultrahdr-core"
 version = "0.6.0"
-source = "git+https://github.com/imazen/ultrahdr?rev=7e9d296c9e037e626234c9f0e8673d48278f83f0#7e9d296c9e037e626234c9f0e8673d48278f83f0"
+source = "git+https://github.com/imazen/ultrahdr?rev=85cc309c07526341e6fa8b7e4d6130aaf64c8fea#85cc309c07526341e6fa8b7e4d6130aaf64c8fea"
 dependencies = [
  "bytemuck",
  "enough",
  "linear-srgb",
  "thiserror",
  "whereat",
- "zencodec 0.2.0",
+ "zencodec",
  "zenmeta",
- "zenpixels 0.3.1",
+ "zenpixels",
 ]
 
 [[package]]
@@ -5167,7 +5167,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -5590,20 +5590,8 @@ dependencies = [
 
 [[package]]
 name = "zencodec"
-version = "0.1.26"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "be4b0d4108a8f062c85090bf8d0e6dd00fea976ffacc0e4f3cb6b03284a75531"
-dependencies = [
- "almost-enough",
- "enough",
- "whereat",
- "zenpixels 0.2.16",
-]
-
-[[package]]
-name = "zencodec"
 version = "0.2.0"
-source = "git+https://github.com/imazen/zencodec?rev=61fb96f1c8c89d4c8d2210eed8679372d66f8aa7#61fb96f1c8c89d4c8d2210eed8679372d66f8aa7"
+source = "git+https://github.com/imazen/zencodec?rev=1816b4d082234c04c3805411b437b8396040f522#1816b4d082234c04c3805411b437b8396040f522"
 dependencies = [
  "almost-enough",
  "enough",
@@ -5611,7 +5599,7 @@ dependencies = [
  "libm",
  "spin 0.12.3",
  "whereat",
- "zenpixels 0.3.1",
+ "zenpixels",
 ]
 
 [[package]]
@@ -5623,25 +5611,13 @@ dependencies = [
  "exr",
  "thiserror",
  "whereat",
- "zenpixels 0.2.16",
+ "zenpixels",
 ]
 
 [[package]]
 name = "zenflate"
-version = "0.3.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8409543ad469f954834da58409f0d9c463156f01cfaf8a8a03fe277c73b1e0f5"
-dependencies = [
- "archmage",
- "enough",
- "libm",
-]
-
-[[package]]
-name = "zenflate"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a6a6d1257350f0e4dbe68918130e9e32629dc6a0bdcf645825e54e4252396e01"
+version = "0.4.1"
+source = "git+https://github.com/imazen/zenflate?rev=a0ea03637a2cc9a193e343018ae2cfb1a6c31edd#a0ea03637a2cc9a193e343018ae2cfb1a6c31edd"
 dependencies = [
  "archmage",
  "enough",
@@ -5668,19 +5644,19 @@ dependencies = [
  "tinyvec",
  "ultrahdr-core",
  "whereat",
- "zencodec 0.2.0",
+ "zencodec",
  "zenmeta",
- "zenpixels 0.3.1",
+ "zenpixels",
  "zenyuv",
 ]
 
 [[package]]
 name = "zenmeta"
 version = "0.1.0"
-source = "git+https://github.com/imazen/zencodec?rev=61fb96f1c8c89d4c8d2210eed8679372d66f8aa7#61fb96f1c8c89d4c8d2210eed8679372d66f8aa7"
+source = "git+https://github.com/imazen/zencodec?rev=1816b4d082234c04c3805411b437b8396040f522#1816b4d082234c04c3805411b437b8396040f522"
 dependencies = [
- "zencodec 0.2.0",
- "zenpixels 0.3.1",
+ "zencodec",
+ "zenpixels",
 ]
 
 [[package]]
@@ -5693,20 +5669,8 @@ dependencies = [
 
 [[package]]
 name = "zenpixels"
-version = "0.2.16"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5851fd39b312749a3c367a0cd3522bd95d43276cfa613e9c18df748447cef3a8"
-dependencies = [
- "bytemuck",
- "imgref",
- "rgb",
- "whereat",
-]
-
-[[package]]
-name = "zenpixels"
 version = "0.3.1"
-source = "git+https://github.com/imazen/zenpixels?rev=f23ac7535be1144a22d0dc6b71f866a08b151f34#f23ac7535be1144a22d0dc6b71f866a08b151f34"
+source = "git+https://github.com/imazen/zenpixels?rev=fa836abf72afe9826e866dc25712b7c800323962#fa836abf72afe9826e866dc25712b7c800323962"
 dependencies = [
  "bytemuck",
  "imgref",
@@ -5716,44 +5680,45 @@ dependencies = [
 
 [[package]]
 name = "zenpixels-convert"
-version = "0.2.16"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cf516a64a98f08fa2aa19e86f1389e49894f750441044d65369687cf88a1b8dd"
+version = "0.3.1"
+source = "git+https://github.com/imazen/zenpixels?rev=fa836abf72afe9826e866dc25712b7c800323962#fa836abf72afe9826e866dc25712b7c800323962"
 dependencies = [
  "archmage",
  "bytemuck",
  "garb",
  "libm",
  "linear-srgb",
- "lz4_flex 0.13.1",
+ "lz4_flex 0.14.0",
  "magetypes",
  "once_cell",
  "paste",
  "rgb",
  "whereat",
- "zenpixels 0.2.16",
+ "zenpixels",
 ]
 
 [[package]]
 name = "zenpng"
-version = "0.1.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "34ef0ff0cfac28ce74a9241dbe8ba3abe60f385819d55675c4daced1ac8ac4bd"
+version = "0.2.0"
+source = "git+https://github.com/imazen/zenpng?rev=02a7f0df5f72dd79b0afa58d66ced7cdd8395e31#02a7f0df5f72dd79b0afa58d66ced7cdd8395e31"
 dependencies = [
  "almost-enough",
  "archmage",
  "bytemuck",
  "enough",
+ "garb",
  "imgref",
  "linear-srgb",
+ "magetypes",
  "memchr",
  "rgb",
+ "rustix",
  "safe_unaligned_simd",
  "thiserror",
  "whereat",
- "zencodec 0.1.26",
- "zenflate 0.3.6",
- "zenpixels 0.2.16",
+ "zencodec",
+ "zenflate",
+ "zenpixels",
  "zenpixels-convert",
 ]
 
@@ -5794,7 +5759,7 @@ dependencies = [
  "safe_unaligned_simd",
  "whereat",
  "zenblend",
- "zenpixels 0.2.16",
+ "zenpixels",
 ]
 
 [[package]]
@@ -5818,9 +5783,10 @@ dependencies = [
  "sha2 0.11.0",
  "thiserror",
  "zenbench",
- "zencodec 0.1.26",
+ "zencodec",
  "zenjpeg",
- "zenpixels 0.2.16",
+ "zenmeta",
+ "zenpixels",
  "zenpixels-convert",
  "zenpng",
  "zenpredict",
@@ -5857,7 +5823,7 @@ dependencies = [
  "thiserror",
  "zenbench",
  "zenblend",
- "zenpixels 0.2.16",
+ "zenpixels",
  "zenpng",
  "zenresize",
  "zensim",
@@ -5913,9 +5879,9 @@ dependencies = [
  "toml",
  "zenbench",
  "zenexr",
- "zenflate 0.4.0",
+ "zenflate",
  "zenmetrics-stats",
- "zenpixels 0.2.16",
+ "zenpixels",
  "zenpixels-convert",
  "zenpng",
  "zenpredict",

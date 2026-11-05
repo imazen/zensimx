@@ -31,12 +31,14 @@ fn source_orientation(bytes: &[u8]) -> Option<zenpixels::Orientation> {
     }
     // Distinguish valid absence from an invalid orientation tag through the
     // structured native parser/filter, without a second TIFF scanner.
-    let orientation_only = parsed
-        .filtered(&zencodec::ExifPolicy::ORIENTATION_ONLY)
-        .to_bytes();
-    let without_tags = parsed
-        .filtered(&zencodec::ExifPolicy::DISCARD_ALL)
-        .to_bytes();
+    let orientation_only = zenmeta::exif::serialize(&zenmeta::exif::filter(
+        &parsed,
+        &zencodec::ExifPolicy::ORIENTATION_ONLY,
+    ));
+    let without_tags = zenmeta::exif::serialize(&zenmeta::exif::filter(
+        &parsed,
+        &zencodec::ExifPolicy::DISCARD_ALL,
+    ));
     (orientation_only == without_tags).then_some(zenpixels::Orientation::Identity)
 }
 
@@ -345,11 +347,17 @@ mod tests {
     #[test]
     fn native_exif_absence_identity_rotation_and_malformed() {
         let mut exif = zencodec::Exif::new(zencodec::exif::TextEncoding::Ascii);
-        assert!(source_orientation_is_identity(&exif.to_bytes()));
+        assert!(source_orientation_is_identity(&zenmeta::exif::serialize(
+            &exif
+        )));
         exif.set_orientation(zenpixels::Orientation::Rotate90);
-        assert!(!source_orientation_is_identity(&exif.to_bytes()));
+        assert!(!source_orientation_is_identity(&zenmeta::exif::serialize(
+            &exif
+        )));
         exif.set_orientation(zenpixels::Orientation::Identity);
-        assert!(source_orientation_is_identity(&exif.to_bytes()));
+        assert!(source_orientation_is_identity(&zenmeta::exif::serialize(
+            &exif
+        )));
         assert!(!source_orientation_is_identity(b"malformed"));
     }
 }

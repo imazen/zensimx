@@ -4569,3 +4569,36 @@ final-read-mirror-check root:
 
 final-read-mirror root host destination capacity_mount image:
     env TMPDIR={{quote(root + "/scratch")}} PYTHONDONTWRITEBYTECODE=1 flock {{env_var('HOME')}}/tmp/heavy.lock {{env_var('HOME')}}/work/claudehints/scripts/run-heavy --mem 24G --jobs 1 -- python3 -B scripts/byconstruction/dataset_mirror.py --root {{quote(root)}} --host {{quote(host)}} --destination {{quote(destination)}} --capacity-path {{quote(capacity_mount)}} /mnt/cache --artifact-kind evaluation --image {{quote(image)}}
+
+# Preparatory shared pixel graph; frozen runtime and model inputs stay pinned.
+sibling-prep-check:
+    cargo update -p zenflate
+    cargo metadata --format-version 1 > /dev/null
+    cargo clippy --workspace --all-targets --all-features --exclude zensim-wasm-tests -- -D warnings
+
+sibling-prep-regress-check:
+    cargo test -p zensim-regress --locked --lib --tests
+    cargo test -p zensim-regress --locked --doc
+
+# Source identity is stamped separately after the resolved lock is snapshotted.
+sibling-prep-build commit:
+    ZENSIM_BUILD_COMMIT={{quote(commit)}} RUSTFLAGS='-C force-frame-pointers=yes' cargo build --release --locked -p zensim --example a_family_cost --example split_parity_golden --features training,custom-profiles,classification
+
+# Shared metadata entry points delegate to the same retained EXIF implementation.
+sibling-prep-metadata-check:
+    cargo test -p zensim --locked --example e34_pixels --features training,custom-profiles,classification
+
+# Complete frozen source replay; input tables and source images are read in place.
+sibling-prep-eval binary pairs bake capture:
+    ZENSIM_FORMULA_REV=7 RAYON_NUM_THREADS=1 {{quote(binary)}} fusion pairs {{quote(pairs)}} {{quote(bake)}} {{quote(capture)}}
+
+sibling-prep-split binary general codec golden baseline:
+    ZENSIM_FORMULA_REV=7 {{quote(binary)}} {{quote(general)}} {{quote(codec)}} > {{quote(golden)}}
+    cmp {{quote(baseline)}} {{quote(golden)}}
+
+sibling-prep-frozen-compare root report:
+    python3 -B scripts/bench/a_extraction_fusion.py eval-baseline {{quote(root)}} {{quote(report)}}
+
+# Existing strict source-capture comparison also checks decoded pixel hashes.
+sibling-prep-pixel-compare root report:
+    python3 -B scripts/bench/a_extraction_fusion.py eval-bits {{quote(root)}} {{quote(report)}}
