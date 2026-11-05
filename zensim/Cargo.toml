@@ -203,7 +203,7 @@ thiserror = { workspace = true }
 linear-srgb = { workspace = true }
 imgref = { workspace = true, optional = true }
 rgb = { workspace = true, optional = true }
-zenpixels = { version = ">=0.2.11, <0.4.0", default-features = false, features = ["std"], optional = true }
+zenpixels = { version = ">=0.3.1, <0.4.0", default-features = false, features = ["std"], optional = true }
 # Runtime for the `PreviewV0_3` MLP scorer. zenpredict is MIT/Apache-2.0
 # (matching zensim), so the runtime dep is unconditional in 0.3.0+.
 # Prior comments claiming AGPL referred to a license plan that was
@@ -258,8 +258,8 @@ zenmeta = { version = "0.1.0", default-features = false }
 # dependency behind the default-on `imgref` feature; listing it here too keeps
 # the examples building under any feature combination.
 rgb = { workspace = true }
-# RGB era checked against the frozen extractor; Cargo.lock records 762fa7128c21.
-zenjpeg = { git = "https://github.com/imazen/zenjpeg", rev = "762fa7128c2124b42cfa6e23b30024a688f5b7a3", default-features = false }
+# Decoder revision advances with the sibling cohort; frozen pixels require replay.
+zenjpeg = { git = "https://github.com/imazen/zenjpeg", rev = "4b0f1bfa35444d982ce2a26e04bac19293487790", default-features = false }
 # Pins the shipped Profile C weight bytes (profile_c_tests::weight_sha256_pinned).
 # Same version zensim-validate already uses in this workspace.
 sha2 = "0.11.0"

@@ -81,8 +81,8 @@ enough = { version = "0.4.2", default-features = false, features = ["std"] }
 # zenpredict 0.2.0 publish → `cargo package -p zensim` gate → zensim
 # 0.3.0 publish → zensim-regress. zenpredict-bake is consumed only by
 # the unpublished zensim-validate, so it stays a bare git pin.
-zenpredict      = { version = "0.2.0", git = "https://github.com/imazen/zenanalyze", rev = "f0903489300aea240ffae2e3f1359f8f2b9a0ba4" }
-zenpredict-bake = { git = "https://github.com/imazen/zenanalyze", rev = "f0903489300aea240ffae2e3f1359f8f2b9a0ba4" }
+zenpredict      = { version = "0.2.0", git = "https://github.com/imazen/zenanalyze", rev = "38dc80f73887dafae6bf5ebfe9a03be5ef78ebe0" }
+zenpredict-bake = { git = "https://github.com/imazen/zenanalyze", rev = "38dc80f73887dafae6bf5ebfe9a03be5ef78ebe0" }
 
 # zenstats — canonical IQA-stats home extracted on 2026-05-26 from the
 # pre-existing `zensim-validate/src/panel.rs`. Lives in the zenmetrics
@@ -113,7 +113,7 @@ zenstats = { package = "zenmetrics-stats", git = "https://github.com/imazen/zenm
 zenpixels = { git = "https://github.com/imazen/zenpixels", rev = "fa836abf72afe9826e866dc25712b7c800323962" }
 zencodec = { git = "https://github.com/imazen/zencodec", rev = "1816b4d082234c04c3805411b437b8396040f522" }
 zenmeta = { git = "https://github.com/imazen/zencodec", rev = "1816b4d082234c04c3805411b437b8396040f522" }
-ultrahdr-core = { git = "https://github.com/imazen/ultrahdr", rev = "85cc309c07526341e6fa8b7e4d6130aaf64c8fea" }
+ultrahdr-core = { git = "https://github.com/imazen/ultrahdr", rev = "8a30cadfd08721749050215b924ca0a58a42e277" }
 
 zenpixels-convert = { git = "https://github.com/imazen/zenpixels", rev = "fa836abf72afe9826e866dc25712b7c800323962" }
 zenpng = { git = "https://github.com/imazen/zenpng", rev = "02a7f0df5f72dd79b0afa58d66ced7cdd8395e31" }
