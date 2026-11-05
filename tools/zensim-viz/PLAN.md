@@ -200,3 +200,20 @@ replay; the background proof gives two pre-calibration affine forms for every F
 seed and at most eight for E. The full link/curve/viewport browser suite passes;
 25 images are captured at source 3e875e25ff78, including complete fitted axes.
 REPORT.md and function-evidence.json own the final results and limits.
+
+## Owner Pages phase — 2026-11-05
+
+Keep the review server on :3310 until the browser replacement passes. Resolve the
+shipped A bytes (SHA d5e2a56db35c32620d9f9d9c19ba3bc78bd8fea2b8cd933cde8447428d85e62a),
+then add an in-memory detector observer without changing pooled arithmetic.
+Extend the single-thread SIMD workbench with native bake inference for PDP/ICE
+from two binary 200-row samples and quantile grids. Preserve native bit checks
+and score 1e-6 / map 1e-4 parity. Build an A-only public page with registry
+formulas, browser decode labeling and no private prose or paths.
+
+Measure code (<500,000 bytes), data (<=10,000,000 bytes), Wasm and browser pair/map
+times. Generated artifacts stay outside git. Upload only viz/<source-commit>/ in
+zensim-a. Prepare a dispatch-only Pages workflow diff for imazen/zensim; do not
+enable Pages, push that workflow there, or dispatch it. Push verified source to
+zensimx main. If an exact brief requirement is infeasible, stop with measured
+data and ask the owner.

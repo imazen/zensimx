@@ -1,4 +1,107 @@
-# zensim-viz report — 2026-11-04
+# zensim-viz report
+
+## Public A explorer — 2026-11-05
+
+The A-only replacement is running on port 3310. Final source pin, one-object
+R2 publication, final captures and the exact Pages workflow diff are being
+completed. Pages has not been enabled, its workflow has not been installed in
+imazen/zensim, and no workflow has been dispatched.
+
+The browser computes detector maps and all PDP/ICE through the Rust owners.
+Shipped A is exactly SHA-256
+`d5e2a56db35c32620d9f9d9c19ba3bc78bd8fea2b8cd933cde8447428d85e62a`,
+24,504 bytes. It has 984 declared inputs and 126,080 weights. The compact
+samples contain 200 observed rows per bank: SDR population 12,163 and HDR
+population 7,390. Each bank's sample is 403,200 bytes, raw quantiles 42,336
+bytes and declared-input quantiles 82,656 bytes. The measured maximum sampled
+served-score change from f32 storage is 0.0 in both banks.
+
+The complete public data is one range-readable IMIJ-set with 14 internal
+entries; the current verified archive is 1,608,550 bytes. There are zero sample
+image assets. The browser reader verifies footer identity, bounds and every
+payload SHA-256; the existing native Writer/Reader checks full byte roundtrip
+and native checksums. Public JSON contains registry equations and public
+bibliographic links, with no paper prose, private paper links or local paths.
+
+The single-thread SIMD Wasm is 1,645,879 bytes; generated JavaScript glue is
+23,303 bytes. The module contains the exact A bake and no built-in B bake.
+The native and Wasm detector paths retain the old file exporter and share its
+map owner. Five dimension/stride/identity cases compare all 720 pooled f64
+positions with an independent control: zero changed bits. Four cases cover
+all 504 consumed raw slots (444 spatial, 60 global), and the 1024×768 case
+covers eight representative slots. The browser checks 2,024 raw entries,
+every spatial value and map sum, and 180 basic cursor witnesses.
+
+Dev Chromium: score maximum delta 0; cell maximum scaled delta
+1.1102230246251565e-16; map-sum maximum scaled delta
+1.5406422314976243e-15. The unchanged limits are 1e-6 for scores and 1e-4
+for values/sums, relative to max(1, native magnitude). Both banks' curves,
+centered bands, rise witnesses, family curves and diagnostics pass 200,598
+numeric comparisons; maximum scaled delta 2.22006761361609e-16.
+There are also 162 independent direct BakeScorer spot checks.
+
+| Dev browser probe | Pair extraction, ms | Spatial maps | Median map, ms | Maximum map, ms |
+| --- | ---: | ---: | ---: | ---: |
+| 16×19, padded rows | 19.8 | 444 | 0.0 | 1.3 |
+| 65×67, padded rows | 4.9 | 444 | 0.1 | 0.6 |
+| 96×80 | 5.0 | 444 | 0.1 | 2.2 |
+| 97×81, identity, padded rows | 4.6 | 444 | 0.1 | 0.5 |
+| 1024×768, padded rows | 256.2 | 7 | 33.3 | 39.0 |
+
+These are one-pass browser API timings, including extraction/retention or map
+serialization and parsing, without image-file decoding. The first case
+includes first-use costs; values of 0.0 are below the browser timer's 0.1 ms
+resolution, not zero work. Empty global entries are excluded from map timing
+summaries. The guarded dev batch recorded peak RSS 1.39 GiB, minimum available
+43,614 MiB and peak load 2.19. Its scientific gates passed; its page smoke then
+rejected an older bank-source fingerprint. Fresh matching exports passed the
+complete browser checks; the strict fingerprint check was retained.
+
+All 34,927 native audit flags, thresholds and counts exactly match the frozen
+census. In particular, 32,344 zero-MAD row findings retain null statistics,
+which the UI displays as undefined. The 10 native tests and separate file-map
+parity test pass without ignored tests. Exporter and workbench strict clippy
+pass. The normal workbench mode also passes its score and eight-loop-map
+regression after the Pages-only Wasm export split. The current-main guarded
+qualification on r5900xt took 314 seconds with peak RSS 1.53 GiB, minimum
+available 45,250 MiB and peak load 5.33. The six existing Wasm-only unused-item
+warnings remain; no warning or numerical expectation was disabled.
+
+A's canonical certificate has one max pair, no free ramps and no free
+amplitude. The function retains all 31 nonzero affine-background units and
+both pair units. On the certified nonnegative standardized-input domain,
+there are at most two affine head forms before the 21-knot output
+calibration. This does not bound the pixel-to-score function to two affine
+forms. Memorization presence or absence is not measured or established.
+
+All 984 inputs join to 35 registry signal equations/descriptions, plus the
+fragility-product equation and its native reference-gradient factor. The
+reference export preserves all 36 formulas and 36 bibliographic links from
+the previous bundle. Output-layer indexes link to hidden units, not input
+features. Matrix ordering comes from the native exporter; stored identities
+and 14 px cells are preserved. The supplied design directory is unchanged.
+
+Compared with the review build, the page has one bake, code-generated/local
+pairs, on-demand maps and on-demand 200-row curves. It omits cross-bake
+comparisons, bundled photographs, private paper prose, the difference-image
+exhibit, image zoom/pan, resizable gutters, matrix minimap and complete-bank
+ablation rankings. Ablation/separation now use the labelled 200-row sample;
+full-population quantile grids and full SDR audit findings are retained.
+Tree chips show native population p50 values. The ordinary workbench keeps
+its attribution/loop APIs; those unused exports are absent from the public
+Pages module. No native HDR image decoding or empirical memorization test is
+claimed.
+
+The source census includes native preparation, all historical visualizer
+tests, the workbench API/glue, both observer modules and shared integration
+additions. It excludes prose, lockfiles, generated artifacts and the separate
+58,856-byte JPEG XL loop-convergence CLI, which is not in the Wasm dependency
+graph. All native preparation helpers and old numeric gates were preserved.
+The retired eight-file viewer runtime is preserved byte for byte with the
+review artifacts. Final exact code bytes, source commit, object receipt and
+capture directory follow after publication qualification.
+
+---
 
 ## Explained MLP function — owner follow-up completed
 
