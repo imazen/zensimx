@@ -1,0 +1,39 @@
+{
+  "schema": "sibling-dependency-cohort-v1",
+  "revisions": {
+    "zencodec": "1816b4d082234c04c3805411b437b8396040f522",
+    "zenpixels": "fa836abf72afe9826e866dc25712b7c800323962",
+    "zenjpeg": "4b0f1bfa35444d982ce2a26e04bac19293487790",
+    "zenpng": "02a7f0df5f72dd79b0afa58d66ced7cdd8395e31",
+    "zenwebp": "256c056441aeeb5e8cb275d5d5140508f1f54e4f",
+    "zenavif": "bf7fdadc95c357571bbd4a245194880912602fd7",
+    "ultrahdr": "8a30cadfd08721749050215b924ca0a58a42e277",
+    "zenanalyze": "38dc80f73887dafae6bf5ebfe9a03be5ef78ebe0",
+    "zenflate": "a0ea03637a2cc9a193e343018ae2cfb1a6c31edd",
+    "zenresize": "e3975fb9d6d6b7baa96038a0eb8e27febb37c012",
+    "zenjxl": "13998d071d77108638aebe7a1c12b4a022ce18dd",
+    "jxl-encoder": "7b354ee6b014d334591b1797bd1a3dede4e96331",
+    "zenjxl-decoder": "b04af24cd154fbefc4081e9072391738b1d7d552",
+    "butteraugli": "554a42f832ceffe7a70303d43f3cddcd5a8cd275",
+    "dvifmish": "6fbec37798cd6b96848f42ae74416ec864376854",
+    "zenmetrics": "8d6bb1e8791f0563125ec7c119ad09c8732e3c08",
+    "zenbitmaps": "ffc7841320f11c21c576d9c26bda65083d22e076"
+  },
+  "public_zensim_F": "473a4cfbef356e3528d37f63042263993144f121",
+  "manifests": [
+    "Cargo.toml",
+    "zensim/Cargo.toml",
+    "zensim-validate/Cargo.toml",
+    "zensim-target/Cargo.toml",
+    "zensim-picker-prep/Cargo.toml",
+    "zensim-ultrahdr-probe/Cargo.toml",
+    "zensim-bench/Cargo.toml",
+    "tools/zensim-viz/Cargo.toml",
+    "tools/shipgates-target/Cargo.toml"
+  ],
+  "forbidden_external_paths": true,
+  "oracle_pairs": 4678,
+  "oracle_policy": "bit-identical frozen predictions, decoded pixels,504 consumed values and full split golden; no model/kernel/threshold changes",
+  "public_zensim_F_zenpredict": "f0903489300aea240ffae2e3f1359f8f2b9a0ba4",
+  "public_zensim_F_reason": "Preserve the explicit public F model and its runtime in the UltraHDR probe; other research roots use the selected analyzer runtime."
+}

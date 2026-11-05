@@ -32,6 +32,10 @@
 
 ### Dependency compatibility
 
+- Converge the research root and six standalone tool graphs on immutable sibling
+  revisions; eliminate external checkout paths and enforce resolved source identity.
+  Qualification and retained sibling limitations: [cohort receipt](benchmarks/sibling_final_2026-11-05.pointer.md).
+
 - Prepare one shared pixel/codec graph for sibling consumers; E34 uses equivalent
   zenmeta EXIF entry points (archived build `c7875d8d`). Runtime/model pins remain unchanged;
   qualification: `benchmarks/sibling_prep_2026-11-05.pointer.md`.

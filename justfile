@@ -4660,3 +4660,21 @@ viz-pages-site source out archive_url:
 # Resume after verified native exports; replays the lens oracle, Wasm and browser gates.
 viz-pages-finish root bake bindgen:
     flock "$HOME/tmp/heavy.lock" "$HOME/work/claudehints/scripts/run-heavy" --mem 16G --jobs 6 -- bash tools/zensim-viz/finish_pages.sh {{quote(root)}} {{quote(bake)}} {{quote(bindgen)}}
+
+# Caller supplies run-heavy/flock, TMPDIR and a task-owned CARGO_TARGET_DIR.
+sibling-final-root-check:
+    just clippy
+    just lint-scripts
+
+# Compile requested tools; the existing explicit flag excludes C++ benchmark
+# oracle arms. No benchmark or historical encoder gate is executed.
+sibling-tools-check:
+    cargo check --manifest-path zensim-target/Cargo.toml --all-targets --all-features
+    cargo check --manifest-path zensim-picker-prep/Cargo.toml --all-targets
+    cargo check --manifest-path zensim-ultrahdr-probe/Cargo.toml --all-targets
+    ZENSIM_BENCH_SKIP_CPP_FFI=1 cargo check --manifest-path zensim-bench/Cargo.toml --all-targets --features training,zen-decode,zen-decode-tests,dvifm-judge,gmsd-arm,m3-fixtures
+    cargo check --manifest-path tools/zensim-viz/Cargo.toml --all-targets --features real-bake-tests
+    cargo check --manifest-path tools/shipgates-target/Cargo.toml --all-targets
+
+sibling-source-check out:
+    python3 scripts/check_sibling_sources.py --out {{quote(out)}}
