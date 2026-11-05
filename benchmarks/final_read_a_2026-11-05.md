@@ -206,3 +206,26 @@ RESULTS.json SHA256 `be96c8c8e2a95596cb0be65bfe33201a0dca3ec2176d51193a24c0ff597
 Staging:1,020 files /1,083,889,744 bytes, every file verified; dataset SHA256SUMS SHA256 `5c46005ca25c5e35e24ed4c844759d82565bd32311b72baef19116051fb3f09d`. All808 source stimuli /792 distinct RGB buffers independently verified; all1,558 feature RGB hashes matched; no identical pairs. Governing LIVE label SHA256 `49fcd7d23c9e35b147b52e3361103dbbf6a81aa8ae9d7b16f4763c7e7051fe5d`; library SHA256 `6673c707bc9a5be7de9185c3abfe793a8424777988428034dfb1dff7b452574f` differs bytewise.
 
 Receipts: staging `rc=0 43s | peak-RSS0.07GiB | min-avail31281MiB | peak-load7.34`; keys `rc=0 0s | peak-RSS0.06GiB | min-avail31420MiB | peak-load3.54`; decode/readback `rc=0 161s | peak-RSS0.07GiB | min-avail31257MiB | peak-load3.34`; bank `rc=0 18s | peak-RSS0.22GiB | min-avail31075MiB | peak-load1.72`; prediction `rc=0 0s | peak-RSS0.17GiB | min-avail31321MiB | peak-load1.66`; peers `rc=0 78s | peak-RSS0.17GiB | min-avail30935MiB | peak-load2.13`; read `rc=0 0s | peak-RSS0.07GiB | min-avail31404MiB | peak-load1.59`; statistics `run-heavy: done rc=0 102s | peak-RSS 0.35GiB | min-avail 30976MiB | peak-load 7.39`. Pre-open commit `6cf232ec519f` verified remotely before parse. Target cache `340d4c9f276179b1ea5ce74d80f5889694180e13d367cab5e6ff2e609c43cd10`; completed journal `65eb0b35f147ebfbb7c392d176be595c40a8051acc8a00e1edeaf97134d2ada3`.
+
+## KonJND JPEG TERMINAL — frozen-A read spent
+
+100 pairs /100 references, pooled signed statistics versus pinned raw PJND threshold. Signs retained, butteraugli quality=−p3. Within-reference SROCC and its interval undefined: one pair per reference. 10,000 valid draws for every pooled statistic, seed20261105,95% whole-reference percentile intervals. Prior zensim exposure: DATA_SPLITS lines1613–1617.
+
+| Metric | Signed SROCC | KROCC | PLCC4PL | RMSE (PJND) | Within-reference SROCC |
+|---|---|---|---|---|---|
+| A | -0.368034324 [-0.533382696, -0.180963615] | -0.257073586 [-0.383895537, -0.124410400] | -0.394729406 [-0.608187606, -0.264247975] | 7.477532075 [6.081121784, 8.377865945] | undefined |
+| SSIMULACRA2 | -0.400978113 [-0.567517238, -0.208665174] | -0.283346830 [-0.408301261, -0.148547697] | -0.449908665 [-0.612844212, -0.319472454] | 7.268189518 [5.975707621, 8.058430663] | undefined |
+| butteraugli3_quality | 0.052950089 [-0.162600740, 0.260998445] | 0.022635410 [-0.123201474, 0.163489972] | 0.405172900 [0.245605173, 0.626847834] | 7.440442665 [5.797174062, 8.452195856] | undefined |
+
+All200 stimuli independently verified and all200 feature RGB comparisons passed. The pinned target file SHA256 `70148a39c90d97d35899a171204d3996034cf0019fbe0c496ac51ae4c4d40856` governs over byte-different library table SHA256 `9c27f7153c7efbae29ef67eb7a2b9e2ea59f7e612c35c73a61d5eab2e6633fd9`; pinned SRC0437 JPEG058 retained. Pre-open journal was committed and verified on origin/main in `87200234d546` before parse.
+
+- keys: `run-heavy: done rc=0 1s | peak-RSS 0.06GiB | min-avail 31253MiB | peak-load 6.96`
+- decode: `run-heavy: done rc=0 16s | peak-RSS 0.07GiB | min-avail 31258MiB | peak-load 6.96`
+- bank: `run-heavy: done rc=0 2s | peak-RSS 0.17GiB | min-avail 31185MiB | peak-load 5.71`
+- predict: `run-heavy: done rc=0 0s | peak-RSS 0.14GiB | min-avail 31320MiB | peak-load 5.33`
+- peers: `run-heavy: done rc=0 8s | peak-RSS 0.12GiB | min-avail 31167MiB | peak-load 5.33`
+- ledger: `run-heavy: done rc=0 0s | peak-RSS 0.06GiB | min-avail 31286MiB | peak-load 4.67`
+- read: `run-heavy: done rc=0 1s | peak-RSS 0.06GiB | min-avail 31367MiB | peak-load 2.43`
+- stats: `run-heavy: done rc=0 8s | peak-RSS 0.13GiB | min-avail 31308MiB | peak-load 3.37`
+
+Target cache `ca83376cfab13f34285d5326589b9ad54b211449bf7ef510977547f5b4c6a6c3`; result `614576af02fe66d5b2de476dec8d5e0d7c8a9ce56f622bf5fc1ce02b7ecf0776`; completed journal `a3e2cc761c67dc55ca6dc5bdc7683c62f7d2a512741619e8c88bb8ca5a6806f4`.
