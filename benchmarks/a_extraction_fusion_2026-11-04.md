@@ -1164,3 +1164,31 @@ uses the unchanged threshold. The moment ring has the lowest observed tiny
 p50 so far but fails larger-image acceptance; baseline serial remains the
 qualified implementation. Cross-run differences near one percent do not
 establish a significant tiny-image winner.
+
+### Subsequent tiny receipt and current qualification limit
+
+The first completed Intel `v3` 64×64 / one-thread cell uses the fresh pinned
+control and moment binaries: baseline p50/p95 **0.21441475 / 0.25677985 ms**;
+moment **0.23384425 / 0.32928665 ms**. Its successful independent timing parse
+is `$STUDY/moment-pinned/timing/64-1t/parses/table-v1/summary.json`, observed
+through SSH after `TINY_TIMING_PROGRESS.txt` recorded completion at
+2026-11-05T03:52:38Z. Other Intel tiny cells are not yet verified. Together
+with the AMD results, this supports retaining baseline serial for tiny
+inputs; it does not qualify a new implementation.
+
+The AMD activity/64/16 retry also failed the unchanged clean-round floor.
+Its first attempt remains in `64-16t.invalid-31-clean`; the second attempt
+and full log remain in `64-16t` and
+`activity-pinned-64-16t.retry1.log`. No percentile is reported for either
+failed capture. This is an admission failure, not a parser failure.
+
+The isolated 128-column activity export is
+`404ccc3e6a33e5752636fe24154cb23ff940d81a`, with the same decoder-pin parent
+as both timing controls. Its AMD normal release/clippy build passed:
+`rc=0 63s | peak-RSS 1.34GiB | min-avail 34088MiB | peak-load 2.46`.
+Fresh-parent native qualification and both-host timing remain incomplete;
+the earlier full native pixel/code proof above retains its original source.
+At 2026-11-05T03:55Z, new Intel SSH logins began failing with the literal
+`System is going down` / `pam_nologin` message. Pending native jobs and
+any interrupted captures require inspection after access returns. No native
+build, gate or timing completion is inferred from a waiting supervisor.
