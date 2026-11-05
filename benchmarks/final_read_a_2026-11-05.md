@@ -475,3 +475,29 @@ No additional target column was parsed. Reference filenames identify the approve
 CID22 library adds24 reference/self rows on these references; the governing2,100 distorted pairs are all present. KonJND library entries pair each source with itself (threshold records), while the governing file pairs the source with the coded threshold JPEG. The pinned100 coded pairs, including SRC0437 JPEG058, govern. CSIQ, LIVE and AIC4 projected pixel-key populations match completely; their original target conventions and scales govern. MCL library243 threshold records remain distinct from the coordinator-approved5,000-row reconstruction.
 
 Key-comparison receipt SHA256 `8bb3467fc4f7d456703c8bd07d3afd4a606d5c8530ebddc5c15abe4dbc877f51`.
+
+## MCL-JCI results — full50 and fixed R7a clean40, read spent
+
+Distortion-oriented mean JND counts; quality scores retain their negative correlations; butteraugli quality=−p3. Every cell has10,000 valid whole-reference draws, seed20261105,95% percentile intervals. Within-reference SROCC defined for every source in each panel. Prior R7/R7a exposure: DATA_SPLITS lines1601–1617; later third-party label studies lines2867–2899. Full50 includes KonFiG training-source overlaps; clean40 excludes1,3,6,7,9,17,28,31,45,50, fixed before this read.
+
+### all: 5000 pairs /50 sources
+
+| Metric | Signed SROCC | KROCC | PLCC4PL | RMSE (JND count) | Within-reference SROCC |
+|---|---|---|---|---|---|
+| A | -0.896932387 [-0.914725059, -0.878509286] | -0.756792691 [-0.784911078, -0.730030419] | -0.927140774 [-0.953719618, -0.902912019] | 0.594454193 [0.451273061, 0.712595707] | -0.933867048 [-0.944413949, -0.923026856] |
+| SSIMULACRA2 | -0.884864711 [-0.906228055, -0.862671564] | -0.739921139 [-0.773287783, -0.710009652] | -0.916680294 [-0.949120950, -0.887649519] | 0.633969112 [0.472066047, 0.769775762] | -0.933821645 [-0.944384537, -0.923009973] |
+| butteraugli3_quality | -0.850526852 [-0.885806843, -0.814714611] | -0.697018155 [-0.742589342, -0.655656259] | -0.896875551 [-0.932629994, -0.861288320] | 0.701648558 [0.542900212, 0.841639468] | -0.933647916 [-0.944281491, -0.922797792] |
+
+RESULTS.json SHA256 `92c24cd8c5327043790c4a71f6de33e1f0ed46aac93c24ecdee57eec18409c6b`.
+
+### R7a_clean40: 4000 pairs /40 sources
+
+| Metric | Signed SROCC | KROCC | PLCC4PL | RMSE (JND count) | Within-reference SROCC |
+|---|---|---|---|---|---|
+| A | -0.904456237 [-0.921112372, -0.886363586] | -0.768631575 [-0.795093528, -0.741298705] | -0.929185931 [-0.959368633, -0.901898714] | 0.587412021 [0.417331234, 0.720339628] | -0.931893492 [-0.943422400, -0.920078666] |
+| SSIMULACRA2 | -0.890712810 [-0.912269204, -0.867320796] | -0.749285011 [-0.784230052, -0.717230935] | -0.916786016 [-0.955874442, -0.882832455] | 0.634718251 [0.433415739, 0.788568999] | -0.931839621 [-0.943325555, -0.920044075] |
+| butteraugli3_quality | -0.855604715 [-0.892608889, -0.815794403] | -0.702685420 [-0.752000445, -0.656116781] | -0.896019620 [-0.938157495, -0.854432631] | 0.705656142 [0.518376013, 0.867636989] | -0.931655515 [-0.943247060, -0.919788154] |
+
+RESULTS.json SHA256 `a249f97b2ce7ac201ce8a5a73510c891bc42f659f4e1f3e3db155720e3b43782`.
+
+Pre-open commit `fd75539f6b4e` was verified remotely before the single subject-chain parse. Reconstructed table SHA256 `8d9568e9b897b82106843b88fa59c59c14f9f11ea080e084a827cf63db17be1e`; target cache `371e5af9d441270929859fa8f2d7c9c9b144910e852107c3b287fa34170a7b34`; completed journal `76eae51230975beb02c97232a8515836ab73d9f4091fad883f35d6803f7b8769`. The QF100 target0 is an anchor definition, not pixel identity with the pristine BMP. Byte identity with the lost historical table cannot be verified. Read receipt `rc=0 1s | peak-RSS0.07GiB | min-avail46261MiB | peak-load1.72`; full50+clean40 statistics `run-heavy: done rc=0 871s | peak-RSS 1.95GiB | min-avail 43817MiB | peak-load 9.00`. No second raw-chain parse, tuning or model selection.
