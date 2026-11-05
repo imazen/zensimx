@@ -45,6 +45,13 @@ def main():
                 if read(weight_dir / 'identity.json')['bake_sha256'] != audit['bake_sha256']:
                     raise RuntimeError('display weights differ from audit bake')
                 target['weights'] = f"data/{bake['weights_directory']}/weights.json"
+            if bake.get('function_directory'):
+                function_dir = root / bake['function_directory']
+                if not (function_dir / 'complete.json').is_file():
+                    raise RuntimeError(f'{function_dir}: function incomplete')
+                if read(function_dir / 'function.json')['bake_sha256'] != audit['bake_sha256']:
+                    raise RuntimeError('function explanation differs from audit bake')
+                target['function'] = f"data/{bake['function_directory']}/function.json"
             lens_dir = root / sources['lens'] if sources.get('lens') else None
             if lens_dir and (lens_dir / 'complete.json').is_file():
                 index = read(lens_dir / 'index.json')

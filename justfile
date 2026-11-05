@@ -4006,6 +4006,7 @@ viz-serve:
 viz-web-check:
     node --check tools/zensim-viz/web/app.js
     node --check tools/zensim-viz/web/weight-view.js
+    node --check tools/zensim-viz/web/function-view.js
     node --check tools/zensim-viz/web/studio.js
     node --check tools/zensim-viz/web/frame.js
     diff -qr /home/lilith/tmp/zensim-viz-brief/design tools/zensim-viz/web/design
@@ -4048,7 +4049,7 @@ viz-browser-audit:
     VIZ_TEST_SCOPE=audit TMPDIR="$HOME/tmp/zensim-viz" node tools/zensim-viz/tests/browser.mjs
 
 viz-web-fmt:
-    node "$VIZ_PRETTIER" --write tools/zensim-viz/web/app.js tools/zensim-viz/web/weight-view.js tools/zensim-viz/web/app.css tools/zensim-viz/web/index.html tools/zensim-viz/web/format.mjs tools/zensim-viz/web/studio.js tools/zensim-viz/web/frame.js tools/zensim-viz/web/studio.css tools/zensim-viz/tests/design2.mjs tools/zensim-viz/tests/browser.mjs tools/zensim-viz/tests/review1.mjs tools/zensim-viz/tests/review2.mjs tools/zensim-viz/tests/format.mjs
+    node "$VIZ_PRETTIER" --write tools/zensim-viz/web/app.js tools/zensim-viz/web/weight-view.js tools/zensim-viz/web/function-view.js tools/zensim-viz/web/app.css tools/zensim-viz/web/index.html tools/zensim-viz/web/format.mjs tools/zensim-viz/web/studio.js tools/zensim-viz/web/frame.js tools/zensim-viz/web/studio.css tools/zensim-viz/tests/design2.mjs tools/zensim-viz/tests/browser.mjs tools/zensim-viz/tests/review1.mjs tools/zensim-viz/tests/review2.mjs tools/zensim-viz/tests/function.mjs tools/zensim-viz/tests/format.mjs
 
 # Caller supplies private file paths; every native job reacquires the shared lock.
 viz-bundle plan:
@@ -4521,3 +4522,8 @@ a-fusion-parse study stage input output:
 # Manual owner-requested recipe for the nine unmeasured Intel cells; never auto-start.
 a-fusion-idle-intel study:
     bash scripts/bench/a_fusion_idle_intel.sh {{quote(study)}}
+
+# Exact native function terms and named feature navigation; retains review-2 gates.
+viz-function-browser:
+    set -o pipefail; TMPDIR="$HOME/tmp/zensim-viz" flock "$HOME/tmp/heavy.lock" "$HOME/work/claudehints/scripts/run-heavy" --mem 8G --jobs 4 -- node tools/zensim-viz/tests/function.mjs 2>&1 | tee "$HOME/tmp/zensim-viz/function-browser.log"
+
