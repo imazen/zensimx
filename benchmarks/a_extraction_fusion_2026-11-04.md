@@ -1192,3 +1192,21 @@ At 2026-11-05T03:55Z, new Intel SSH logins began failing with the literal
 `System is going down` / `pam_nologin` message. Pending native jobs and
 any interrupted captures require inspection after access returns. No native
 build, gate or timing completion is inferred from a waiting supervisor.
+
+### Owner scope at the panel/tiny transition (2026-11-05)
+
+The coordinator directed this study to finish the 128-column activity panel’s
+both-host verdict and tiny-image rows, then finalize, push, verify and stop.
+Further de-serialization work and other phases now require an explicit owner
+go. The waiting queue for band interleaving, shared leaves, scratch removal,
+geometry and the three era builds was terminated before launching any of them.
+Their isolated jj prototypes and source patches are preserved; no timing or
+qualification claim is made for those unmeasured phases. This owner scope
+change supersedes the original brief’s remaining Phase-2/Phase-3 execution.
+
+The Intel shutdown initiator is unknown. Intel is treated as unavailable,
+rather than as a condition to bypass. When access returns, inspect completion
+artifacts and binary/input identities, retain completed admitted cells, mark
+interrupted cells invalid and rerun only those cells. The AMD panel continues
+under its normal shared lock. Fresh Intel panel qualification is pending;
+AMD timing alone cannot produce a both-host acceptance verdict.
