@@ -1,0 +1,39 @@
+{
+  "schema": "r13-archive-v1",
+  "host": "dev",
+  "results_commit": "85231eb91f33",
+  "inventory": {
+    "build_commit": "ccdb5c7aa0d4b67d52f0e2874f325fbc84ddb11c",
+    "files": 14425,
+    "bytes": 2818361257
+  },
+  "verification": {
+    "checked": "2026-11-05T02:13:38.022014+00:00",
+    "source": "/var/tmp/byc-width-20261104",
+    "destination": "/mnt/tower/output/zensim/r13-width-20261104",
+    "full_rsync_checksum_comparison": "empty",
+    "random_sha256_readbacks": [
+      {
+        "path": "w4-source/scripts/byconstruction/r12_linear_fits.sh",
+        "sha256": "06f0986bc43996ffa597334ed226418cfe0779c0e6a0f19cc9584a56d6913bc2"
+      },
+      {
+        "path": "w4-source/benchmarks/konfig/konfig_probe_w11family_2026-08-05.tsv",
+        "sha256": "55a5869b969356de317dae7580e57a443aca3ce216195f2b346adea475b42d07"
+      },
+      {
+        "path": "capacity/hdr/W16_s0/bank/curve-f444.json",
+        "sha256": "fb7bcccbab5f87da3cecc0daa689c953daeec77188bc201918ec454007456ddc"
+      }
+    ],
+    "manifest_sha256": "6cb73cd092869d1a6dc838aefe93c639043bec632e767924b9f654fc25076c6d"
+  },
+  "archive_job_rc": 0,
+  "archive_resource_receipt": "run-heavy: done rc=0 147s | peak-RSS 0.11GiB | min-avail 34941MiB | peak-load 2.67",
+  "supplemental_archive_execution_sha256": {
+    "logs/archive-final.log": "e3065bad498cedcea9548c7f92cb3882d2b93dc015ec4213bafd6751db8321e8",
+    "logs/archive-final.time.txt": "57c4666c881eb6e15a99d4e6ecf44f2ba58f02de27ec633febd1afc225f9ab61",
+    "logs/archive-final.receipt.json": "698c814d3026eedba982a23317bc8cf783744582bd3af7f5f854c396a0d09f82"
+  },
+  "exclusions": "rebuildable target, live supervision/progress and streaming archive-job files; final archive execution files copied separately after completion and hash-verified"
+}
