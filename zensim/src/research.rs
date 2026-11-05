@@ -1,6 +1,3 @@
-// Copyright (c) Imazen LLC.
-// Licensed under AGPL-3.0-or-later OR the Imazen commercial license.
-
 //! **The RESEARCH engine** — one named, complete entry that computes every
 //! registered signal at any registered revision, with per-feature provenance.
 //!

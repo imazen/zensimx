@@ -1,6 +1,3 @@
-// Copyright (c) Imazen LLC.
-// Licensed under AGPL-3.0-or-later OR the Imazen commercial license.
-
 //! **THE servability census** — the roster of profiles this build ships, and
 //! the gates that every one of them serves its own bake.
 //!

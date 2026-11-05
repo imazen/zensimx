@@ -1,6 +1,3 @@
-// Copyright (c) Imazen LLC.
-// Licensed under AGPL-3.0-or-later OR the Imazen commercial license.
-
 //! Derived model inputs declared in bake metadata (E33 `fx1`).
 //!
 //! A bake normally feeds its declared feature ids (`zentrain.feature_ids`)

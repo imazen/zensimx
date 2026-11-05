@@ -1,6 +1,3 @@
-// Copyright (c) Imazen LLC.
-// Licensed under AGPL-3.0-or-later OR the Imazen commercial license.
-
 //! **Layer 2 — the LAYOUT**, a declared mapping from feature ids to positions
 //! in an emitted vector.
 //!

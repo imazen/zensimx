@@ -1,5 +1,3 @@
-// Copyright (c) Imazen LLC.
-// Licensed under AGPL-3.0-or-later OR the Imazen commercial license.
 //! **Diagnostic-only** per-phase timing for the streaming fold walk.
 //!
 //! The fold-MT lane's first instruction is "profile the parallel walk, don't

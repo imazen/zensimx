@@ -1,6 +1,3 @@
-// Copyright (c) Imazen LLC.
-// Licensed under AGPL-3.0-or-later OR the Imazen commercial license.
-
 //! **THE one owner of the SCORE path's arithmetic.**
 //!
 //! Five pieces of float math turn a bake's forward-pass output into a shipped
