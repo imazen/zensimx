@@ -537,3 +537,17 @@ All1303 pixel-identical pairs pass exact cached/native A identity parity: every 
 CLIC full A prediction and both peers completed114,593 pairs with finite, exact key coverage. A prediction receipt `rc=0 9s | peak-RSS2.49GiB | min-avail41622MiB | peak-load1.10`; peer controls/full run `run-heavy: done rc=0 1800s | peak-RSS 1.39GiB | min-avail 43269MiB | peak-load 10.74`. All64 serial/eight-thread control outputs match exactly; control-input SHA256 `726c09925de4d1026c715dfe99e20ddfaa084383c67a3484e4a17cc284db31e5`.
 
 Before preference parsing: LABEL_READS.json SHA256 `12870a64b07ecfe981964523c579d132ba75f2078d8e6f24380488bc79648e0d`, state authorized-before-read,57300 questions. It names majority primary and soft-vote supplement, retained in one parse. Label-file SHA256 `03300f61963c2fc96e5daf3cad3a0e8a43438637959875b904d7a944db295db1`; A TSV `919ae11d723eaf34cae8b86dbf9f630c641ce18ed48ad61432ac369a881b728f`; peer TSV `ca8bf2920b8ff9f8a0a2da2cb48f83118d33d13f1b45028ed08d0cb809384ce1`. The individual DATA_SPLITS exposure entry is appended before the first target open. Commit/push/remote verification must precede the read.
+
+## CLIC 2022 result — original eight-population assessment complete
+
+All57,300 questions over57,243 reference crops are retained. Majority agreement is the registered primary; historical soft-vote agreement is the approved supplement. Every one of the57,300 cached targets is identical between these definitions on this population, so both panels and intervals coincide. Prediction ties and tied majorities receive half credit. Butteraugli quality=−p3. Intervals:10,000 whole-reference draws,seed20261105,95% percentile/type7. CLIC2022 shares the protocol of the earlier CLIC2021 confirmation read; no model fitting, tuning or selection on this result.
+
+| Metric | Majority primary,95% CI | Soft-vote supplement,95% CI |
+|---|---|---|
+| A | 0.7466317627 [0.743005742, 0.750179025] | 0.7466317627 [0.743005742, 0.750179025] |
+| SSIMULACRA2 | 0.7362303665 [0.732503727, 0.739862514] | 0.7362303665 [0.732503727, 0.739862514] |
+| butteraugli3_quality | 0.6883420593 [0.684479431, 0.692035122] | 0.6883420593 [0.684479431, 0.692035122] |
+
+Pre-open commit `56f963adee3c` was verified on origin/main before the one preference parse. Target-cache SHA256 `bcd469334afb822be344b05ebe006d6aa362ce4569e81b90ca4f237b864993f5`; completed LABEL_READS.json SHA256 `2d2d4d57f55ccdab4ddfa808a797556cc11c5f20c454210b49350967a558ca68`; RESULTS.json SHA256 `1890f926ad629b82f604d8ab7e66d2262b5a490d0325ec681abb85bd5a2be5aa`. Read receipt `rc=0 1s | peak-RSS0.32GiB | min-avail46472MiB | peak-load1.02`; statistics `run-heavy: done rc=0 14s | peak-RSS 0.46GiB | min-avail 46022MiB | peak-load 2.23`. Statistics used the cache without another raw-label open.
+
+All8 original populations are complete, including registered subsets and KADID per-type/scatter diagnostics. KADID failed both original comparator limits; no thresholds or weights changed. The durable folder is being finalized for the coordinator's mirror and move; archive verification is not yet claimed.

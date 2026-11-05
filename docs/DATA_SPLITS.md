@@ -3327,3 +3327,7 @@ Authorization only, before target parsing; execute after CLIC2022 completes. Reg
 ### Frozen-A clic22: individual pre-open exposure — 2026-11-05T12:36:07.843029+00:00
 
 Authorized frozen read of 57300 rows; before target parsing. LABEL_READS.json SHA256 `12870a64b07ecfe981964523c579d132ba75f2078d8e6f24380488bc79648e0d`; label specification `{"path": "/mnt/tower/input/iqa/datasets/clic-2022-perceptual/pairs.tsv", "sha256": "03300f61963c2fc96e5daf3cad3a0e8a43438637959875b904d7a944db295db1", "target": "majority(n_a,n_b), tied majority=0.5"}`. Prediction/decode/binary pins retained in that receipt. Bootstrap10000 seed20261105; no tuning or selection. Status: authorized-before-read; any partial/failed read spends this population.
+
+### Frozen-A CLIC2022 completion — 2026-11-05
+
+The single authorized preference parse succeeded:57300 questions/57243 reference crops, every question retained. Majority-primary and supplementary soft-vote targets were retained together; they match on all57300 questions. Both panels use10000 whole-reference draws,seed20261105. Completed journal SHA256 `2d2d4d57f55ccdab4ddfa808a797556cc11c5f20c454210b49350967a558ca68`; target cache `bcd469334afb822be344b05ebe006d6aa362ce4569e81b90ca4f237b864993f5`; result `1890f926ad629b82f604d8ab7e66d2262b5a490d0325ec681abb85bd5a2be5aa`. Original eight-population assessment complete; KADID failed both fixed rules. No fitting/tuning/selection; no second raw-label open. Full public result: `benchmarks/final_read_a_2026-11-05.md`.
