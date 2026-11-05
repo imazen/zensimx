@@ -122,3 +122,7 @@ The October4 pin's exact label files govern any difference from library label ta
 | konjnd_jpeg_terminal | `/mnt/v/output/zensim/v2-backfill-2026-07-20/konjnd_jpeg_val_pairs.tsv` | `70148a39c90d97d35899a171204d3996034cf0019fbe0c496ac51ae4c4d40856` |
 | csiq | `/mnt/v/dataset/csiq/csiq_pairs.tsv` | `78b1dac5f74e6f02198f9011eb12f655c358c567d6007497aeac9aa7e5f5a288` |
 | LIVE | `/mnt/v/datasets/LIVE/live_r2_pairs.tsv` | `49fcd7d23c9e35b147b52e3361103dbbf6a81aa8ae9d7b16f4763c7e7051fe5d` |
+
+### MCL library path approved — 2026-11-05, before chain reads
+
+Coordinator explicitly approves using the library files in place: chains under `/mnt/tower/input/iqa/datasets/mcl-jci/labels/JND_samples/`, pixels under `content/MCL-JCI/`. All50 raw chain files are hash-pinned without parsing them; aggregate `MCL_RAW_SHA256.json` SHA256 `9f49d76445161e46e61978ced5ca03482ac65d37505373b2ca57ba8d83b2b948`, retained in study `pins/`. The registered5000-row construction and full50/clean40 populations remain unchanged. No subject chain opened for label parsing or target construction yet.
