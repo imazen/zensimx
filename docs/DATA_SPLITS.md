@@ -3305,3 +3305,9 @@ KonJND TERMINAL frozen-A read complete:100 pairs /100 references; target cache `
 ### Frozen-A kadid_terminal: individual pre-open exposure — 2026-11-05T07:51:12.256337+00:00
 
 Authorized frozen read of 2000 rows; before target parsing. LABEL_READS.json SHA256 `25a1a93419ba76ab90507a47ab9a1349441830feb97a0bc790e82a2ad58fd691`; label specification `{"path": "/mnt/v/dataset/kadid10k/dmos.csv", "sha256": "573e2ed98fdaa2a5aed7b50ad716906e125e1001ed0e97c8e93e79d7b997ba99", "target": "dmos"}`. Prediction/decode/binary pins retained in that receipt. Bootstrap10000 seed20261105; no tuning or selection. Status: authorized-before-read; any partial/failed read spends this population.
+
+### Frozen-A aic4: individual pre-open exposure — 2026-11-05T07:57:47.126062+00:00
+
+Authorized frozen read of 300 rows; before target parsing. LABEL_READS.json SHA256 `97e947cf9d986798d3c98bb1ce629a7f8adbd7114ba36cad2c9b2a6febcdf5dd`; label specification `{"path": "/mnt/v/output/zensim/v2-backfill-2026-07-20/aic4_pairs.tsv", "sha256": "955a9601e94c0877a00c822dbbbd17ad4ae11544dd6d550b9ed79d1ad9d983ff", "target": "human_score"}`. Prediction/decode/binary pins retained in that receipt. Bootstrap10000 seed20261105; no tuning or selection. Status: authorized-before-read; any partial/failed read spends this population.
+
+KADID TERMINAL frozen-A read spent:all2,000 /16refs. Both registered confirmation rules FAILED (A−B=−0.0487800754485; −2SE=−0.00818113844439; A−by_v2fy=−0.0404887483923; limit−0.005). Full5-model panels,25 per-type intervals and native scatter in `benchmarks/final_read_a_2026-11-05.md`. Target cache `d22ae1e1cd492864c264b6830671d9219c0271e0099518452c157e1460267a5c`; completed journal `ff4d4858c6aef4043fe69f82ab3a63ae82443243eb9562a2ea66fc3cdd4ec724`. No model or limit changed.
