@@ -6,9 +6,9 @@ publish = false
 
 
 # Standalone workspace root (NOT a member of the zensim root workspace).
-# This crate is internal sibling-required tooling: it path-deps crates that
-# only exist in the full ~/work/zen dev layout. Excluding it from the root
-# workspace keeps `cargo metadata` green on bare checkouts (imazen/zensimx#43).
+# Standalone research tooling: external siblings use immutable git revisions.
+# In-repository metric crates remain local. Keeping a separate workspace
+# avoids pulling codec graphs into ordinary library builds (imazen/zensimx#43).
 # Build with `cargo <cmd> --manifest-path zensim-bench/Cargo.toml` or from this dir.
 [workspace]
 
@@ -127,13 +127,13 @@ sha2 = { version = "0.11", optional = true }
 zenblend = { version = "0.1.3", optional = true }
 # zenmetrics gmsd crate: GMSD + GMS map for `e5a_render_score` (E5A render
 # lane), the `gmsd-arm` speed bench and the `gmsbank_peer_gmsd` C8 peer scorer.
-# Path dep mirrors the zenstats entry. TOML allows one `gmsd` key per table, so
+# Git revision matches zenstats. TOML allows one `gmsd` key per table, so
 # all three share this entry. Default features stay off: without `std`, gmsd's
 # final sqrt is its no_std Newton form, and that build produced the stored C8
 # peer columns (`/var/tmp/gmsbank/peer_gmsd/`, scorer sha256 2ed8f676…).
 # `e5a-render` and `gmsd-arm` enable `gmsd/std` themselves. Enabling either of
 # them in the same build as `gmsbank-peer` switches the peer scorer to std sqrt.
-gmsd = { path = "../../zenmetrics/crates/gmsd", default-features = false, optional = true }
+gmsd = { git = "https://github.com/imazen/zenmetrics", rev = "8d6bb1e8791f0563125ec7c119ad09c8732e3c08", default-features = false, optional = true }
 png = { version = "0.18.1", optional = true }
 # zensim-bench is internal tooling (not published).
 # `deprecated-profiles` keeps `ZensimProfile::A` available for `zwe_zenbench`,
@@ -163,7 +163,7 @@ zensim = { path = "../zensim", default-features = false, features = ["threads", 
 # Dedup-K (2026-05-26): profile_compat_report example routes
 # spearman/pearson/kendall_tau through canonical zenstats.
 zensim027 = { package = "zensim", version = "=0.2.7", optional = true, default-features = false, features = ["avx512", "threads", "training"] }
-zenstats = { package = "zenmetrics-stats", path = "../../zenmetrics/crates/zenmetrics-stats", default-features = false, features = ["parallel"] }
+zenstats = { package = "zenmetrics-stats", git = "https://github.com/imazen/zenmetrics", rev = "8d6bb1e8791f0563125ec7c119ad09c8732e3c08", default-features = false, features = ["parallel"] }
 criterion = { version = "0.8", default-features = false, features = ["cargo_bench_support"] }
 ssimulacra2 = "0.5"
 fast-ssim2 = { version = "=0.8.2", features = ["imgref"] }
@@ -188,11 +188,11 @@ archmage = { version = ">=0.9.28, <=0.9.31-beta.1", features = ["std", "testable
 # runtime that scores them (`caller_input_width` — i.e. dead-column
 # pruning — does not exist in the older pin, so a pruned bake could not
 # be forwarded at all).
-zenpredict = { git = "https://github.com/imazen/zenanalyze", rev = "f0903489300aea240ffae2e3f1359f8f2b9a0ba4" }
+zenpredict = { git = "https://github.com/imazen/zenanalyze", rev = "38dc80f73887dafae6bf5ebfe9a03be5ef78ebe0" }
 # Match the root metadata-splicing owner used by bake_stamp_revision.
-zenpredict-bake = { git = "https://github.com/imazen/zenanalyze", rev = "f0903489300aea240ffae2e3f1359f8f2b9a0ba4" }
+zenpredict-bake = { git = "https://github.com/imazen/zenanalyze", rev = "38dc80f73887dafae6bf5ebfe9a03be5ef78ebe0" }
 csv = "1"
-dvifmish = { path = "../../../dvifmish", optional = true }
+dvifmish = { git = "https://github.com/imazen/dvifmish", rev = "6fbec37798cd6b96848f42ae74416ec864376854", optional = true }
 image = "0.25"
 rayon = "1.10"
 
@@ -210,39 +210,39 @@ rayon = "1.10"
 # minimal while delivering the same 4-codec coverage.
 parquet = { version = "58.3.0", default-features = false, features = ["arrow", "zstd"], optional = true }
 arrow = { version = "58.3.0", default-features = false, optional = true }
-# Direct codec path-deps for V11-DECODER-FIX (AVIF + JXL decode).
-# Mirror the path policy used by zensim-target. AGPL-3.0-only OR
+# Direct codec revisions for the AVIF + JXL decode path.
+# Mirror the immutable Git policy used by zensim-target. AGPL-3.0-only OR
 # Imazen commercial — zensim-bench is internal-only and not published.
-zenavif = { path = "../../zenavif",          optional = true, default-features = false }
-zenjxl  = { git = "https://github.com/imazen/zenjxl", rev = "561849318d6839f478fa7cbc73d67e6d489d4860",           optional = true, default-features = false, features = ["decode"] }
-zenpixels = { version = ">=0.2.10, <0.4.0", default-features = false, optional = true }
+zenavif = { git = "https://github.com/imazen/zenavif", rev = "bf7fdadc95c357571bbd4a245194880912602fd7",          optional = true, default-features = false }
+zenjxl  = { git = "https://github.com/imazen/zenjxl", rev = "13998d071d77108638aebe7a1c12b4a022ce18dd",           optional = true, default-features = false, features = ["decode"] }
+zenpixels = { version = ">=0.3.1, <0.4.0", default-features = false, optional = true }
 
 # `verify_bitstream_decode` decode path (zencodec unified API).
 # zenjpeg is also patched in [patch.crates-io] for transitive consumers; this
 # direct optional dep adds the zencodec + decoder features for the JPEG path.
-zencodec = { version = ">=0.1.26, <0.3.0", optional = true }
+zencodec = { version = ">=0.2.0, <0.3.0", optional = true }
 # Pinned to the last zenjpeg revision on the zencodec 0.2 *git* family (79676215), which is
 # what this lockfile resolves (zencodec 0.1.27 for our own use, 0.2.0 at 79676215 for zenjpeg).
 # The live sibling moved to crates.io version edges (`zencodec >=0.2.0, <0.3.0`, zenjpeg
 # d099267c, 2026-10-28) that this root cannot satisfy; the HDR extractor (`hdr944-extract`)
 # never uses zenjpeg, so the pin keeps the fleet-era dependency graph for it. Move this pin
 # together with the zencodec/zenpixels entries below when the 0.2 family is published.
-zenjpeg = { git = "https://github.com/imazen/zenjpeg", rev = "4933461f2b6d760b7b112dc94397718fdadb5119", optional = true }
-zenwebp = { path = "../../zenwebp", package = "zenwebp", optional = true, default-features = false }
+zenjpeg = { git = "https://github.com/imazen/zenjpeg", rev = "4b0f1bfa35444d982ce2a26e04bac19293487790", optional = true }
+zenwebp = { git = "https://github.com/imazen/zenwebp", rev = "256c056441aeeb5e8cb275d5d5140508f1f54e4f", package = "zenwebp", optional = true, default-features = false }
 # --decode-list PNG writer (R1b): re-encode the decoded RGB8 so the PNG/JPEG-only
 # zensim feature extractors can read avif/jxl/webp corpus rows.
 zenpng = { version = ">=0.1.4, <0.3.0", optional = true, default-features = false }
 # The canonical pixel-format converter (u16->u8 `v>>8`, gray broadcast, alpha
 # drop, channel reorder). Same crate zenmetrics' decode.rs funnels through, so
 # a bitstream decoded by --decode-list matches what the fleet extractor saw.
-zenpixels-convert = { version = ">=0.2.16, <0.4.0", optional = true }
+zenpixels-convert = { version = ">=0.3.1, <0.4.0", optional = true }
 enough = { version = "0.4", optional = true }
 # BMP / PNM / farbfeld through the imazen bitmap codec. Load-bearing, not a
 # nicety: TID2013 ships `.BMP` (zensim/CLAUDE.md) and the PIPAL extraction runs
 # `extract_features_372col` on BMP, so a decode owner without it would turn two
 # real corpora into loud aborts. `zencodec` gives the same trait path the other
 # five formats use.
-zenbitmaps = { version = "0.1.5", optional = true, default-features = false, features = ["std", "bmp", "zencodec"] }
+zenbitmaps = { git = "https://github.com/imazen/zenbitmaps", rev = "ffc7841320f11c21c576d9c26bda65083d22e076", optional = true, default-features = false, features = ["std", "bmp", "zencodec"] }
 # `m3_fixture_gen` (the M3/M3a coherence-fixture generator): the imazen owners
 # for the size axis (Mitchell downscale) that replaced the ImageMagick shell-out
 # in `scripts/run_full_eval.sh` on 2026-09-02, per the IMAZEN-ONLY rule.
@@ -407,50 +407,33 @@ features = ["std", "hdr"]
 optional = true
 
 [patch.crates-io]
+zenresize = { git = "https://github.com/imazen/zenresize", rev = "e3975fb9d6d6b7baa96038a0eb8e27febb37c012" }
 # Share the zenpixels-0.3-compatible PNG adapter with the native HDR graph.
-zenpng = { git = "https://github.com/imazen/zenpng", rev = "e04f734ac699a0657a0dc8821ba5dca0eaaae429" }
+zenpng = { git = "https://github.com/imazen/zenpng", rev = "02a7f0df5f72dd79b0afa58d66ced7cdd8395e31" }
 # Match the native PNG adapter's coordinated exact-animation timing contract.
-zencodec = { git = "https://github.com/imazen/zencodec", rev = "a81daf7605dc63074d4a39757e7b4399057d4a8f" }
-# NOTE 2026-09-05: this plain path patch was briefly WRONG and is right again.
-# `~/work/zen/jxl-encoder` bumped 0.3.2 -> 0.4.0 on 2026-08-29 (`4363a3d5`) while
-# the `~/work/zen/zenjxl` checkout still required `^0.3.2` — which was never
-# published — so every fresh resolve of this standalone workspace failed and only
-# checkouts carrying a warm pre-bump (gitignored) `Cargo.lock` still built. The
-# sibling checkout has since advanced to `06a8a94` (zenjxl's own `5e9b8793`,
-# 2026-08-30), which requires `^0.4.0` and matches the local crate again. If this
-# line ever fails to resolve, check the two siblings' versions against each other
-# BEFORE touching anything here.
-#
-# Re-verified independently 2026-09-05 (a second, later lane hit the same
-# already-fixed symptom without noticing this comment, because the git-rev
-# stopgap this replaced was gone by then but a stale local `~/work/zen/zenjxl`
-# checkout — 8 commits behind — made it LOOK unresolved again): from an empty
-# target dir, `cargo update` resolves clean (329 packages); `cargo build -p
-# zensim-bench --features training,zen-decode,verify-jxl` and the same with
-# `,zenjxl/encode` added (pulls in jxl-encoder itself + zenjxl's encode-gated
-# `codec.rs` module) both finish rc=0, zero errors. Full record + proof logs:
-# benchmarks/d_inversions_2026-09-05.md §6 addendum.
-jxl-encoder = { git = "https://github.com/imazen/jxl-encoder", rev = "3cd8475b8a42e299b785319d30bb108b52e91239" }
-zenjpeg = { git = "https://github.com/imazen/zenjpeg", rev = "4933461f2b6d760b7b112dc94397718fdadb5119" }  # same pin as the direct dep above
-# use local sibling codecs so the whole graph resolves to one version (2026-07-18):
-# transitive crates.io zenavif/zenpixels were skewing against the local siblings.
-# Forcing local unifies them. (zencodec no longer needs a patch: every sibling
-# requires the published 0.1.26 taxonomy release — rollout 2026-08-27.)
-zenavif = { path = "../../zenavif" }
-zenjxl = { git = "https://github.com/imazen/zenjxl", rev = "561849318d6839f478fa7cbc73d67e6d489d4860" }
+zencodec = { git = "https://github.com/imazen/zencodec", rev = "1816b4d082234c04c3805411b437b8396040f522" }
+# JXL encoder and decoder pins match the selected zenjxl manifest.
+jxl-encoder = { git = "https://github.com/imazen/jxl-encoder", rev = "7b354ee6b014d334591b1797bd1a3dede4e96331" }
+zenjpeg = { git = "https://github.com/imazen/zenjpeg", rev = "4b0f1bfa35444d982ce2a26e04bac19293487790" }
+# All codec adapters share the selected core and pixel source identities.
+zenavif = { git = "https://github.com/imazen/zenavif", rev = "bf7fdadc95c357571bbd4a245194880912602fd7" }
+zenjxl = { git = "https://github.com/imazen/zenjxl", rev = "13998d071d77108638aebe7a1c12b4a022ce18dd" }
 # zenjxl@HEAD consumes the UNPUBLISHED zenjxl-decoder error-taxonomy API
 # (jxl::api::ErrorClass) — patch the local sibling in (SOTA-944 hdr944
 # amendment; the "patch it in and KEEP WORKING" rule).
-zenjxl-decoder = { git = "https://github.com/imazen/zenjxl-decoder", rev = "ce1a28b41b71b66b19240dce0d1b6f0579c8064d" }
-zenpixels = { git = "https://github.com/imazen/zenpixels", rev = "789d69dbc314e748676b7f2f19542c17473ba40b" }
-# The unpublished local 0.2.17 narrows u16 to u8 correctly rounded (`round(v / 257)`); registry 0.2.16 does not, and
-# moved 4.5% of the safesyn AVIF samples by one level against the stored training root (2026-10-24; see the
-# "AVIF decode drift" record in benchmarks/byconstruction_2026-10-22.md). Drop when 0.2.17 is published.
-zenpixels-convert = { git = "https://github.com/imazen/zenpixels", rev = "789d69dbc314e748676b7f2f19542c17473ba40b" }
+zenjxl-decoder = { git = "https://github.com/imazen/zenjxl-decoder", rev = "b04af24cd154fbefc4081e9072391738b1d7d552" }
+zenpixels = { git = "https://github.com/imazen/zenpixels", rev = "fa836abf72afe9826e866dc25712b7c800323962" }
+# Current converter pin requires the frozen source replay; historical decode
+# drift measurements remain tied to their original revisions.
+zenpixels-convert = { git = "https://github.com/imazen/zenpixels", rev = "fa836abf72afe9826e866dc25712b7c800323962" }
 # zenjpeg@0.9.0 requires unpublished zenanalyze 0.2.x — dev-only local patch (2026-08-30).
-zenanalyze = { path = "../../zenanalyze" }
 
-# Mirror the root workspace build profiles (this is its own workspace root).
+zenmeta = { git = "https://github.com/imazen/zencodec", rev = "1816b4d082234c04c3805411b437b8396040f522" }
+ultrahdr-core = { git = "https://github.com/imazen/ultrahdr", rev = "8a30cadfd08721749050215b924ca0a58a42e277" }
+zenflate = { git = "https://github.com/imazen/zenflate", rev = "a0ea03637a2cc9a193e343018ae2cfb1a6c31edd" }
+zenavif-serialize = { git = "https://github.com/imazen/zenavif", rev = "bf7fdadc95c357571bbd4a245194880912602fd7" }
+butteraugli = { git = "https://github.com/imazen/butteraugli", rev = "554a42f832ceffe7a70303d43f3cddcd5a8cd275" }
+
 [profile.release]
 lto = "thin"
 codegen-units = 1
