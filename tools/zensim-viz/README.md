@@ -27,6 +27,28 @@ rule is: dead = all-zero encoder column and bias ≤ 0; residual = non-dead and
 from inactivity measured on one bank. Click a capacity cell or use arrows to
 select its stored unit; the coefficient and bias are in its tooltip.
 
+MLP input names in concerns, ablations, incoming-weight strips and coefficient
+tables link to the feature's formula, detector explanation and paper citations.
+Reading-unit links open its paired or individual function. Copied links restore
+the bake, bank and raw/fragility identity.
+
+The **Function** exhibit shows the stored head as weighted max pairs plus an
+explicit linear background and any remaining hinges. Select a pair or unit,
+hover its native samples, or switch between its contribution, the complete
+network and the complete served score. All coefficients and input scales remain
+available in linked tables, including the summed linear-background coefficients.
+The 65-point curves are mathematical raw-feature basis slices with all other
+raw slots/fragility zero; they are not observed images or partial dependence.
+Output calibration is shown separately with its native knots.
+
+On the certified nonnegative standardized-input domain, all three F seeds have
+one max pair, with at most two affine forms before calibration. E has three
+pairs, giving at most eight forms. Always-active nonnegative residual units
+contribute to the linear background: F0 has 31, F2 one. F1's 31 otherwise nondead
+residual units and E's 29 have exactly zero output weights. These are structural
+bounds, not a measured number of occupied regions or a proof about memorization.
+No empirical memorization or generalization experiment is performed here.
+
 Reference entries distinguish paper prose from revision-7 code-derived
 formulae. KaTeX 0.19.1 loads once from cdnjs. Build the read-only paper join with
 `just viz-reference "$output/audit/weights.json" "$output/reference.json"`.
@@ -147,3 +169,15 @@ new map/bank ranges, and a fresh weights export for capacity metadata. Keep the
 previous bundle and compare through
 `just viz-review2-verify OUTPUT_ROOT NEW_RECEIPT_JSON review2-final-` for the
 published final bundle prefix; all prior fields and raw PNG bytes must agree.
+
+Function exports use `zensim-viz-export function BAKE --out NEW_DIRECTORY`,
+with `VIZ_CERTIFIER` set. Add a function job to the existing bundle plan and set
+`function_directory` on each bake in the assembly config; assembly checks its
+bake identity against the audit. The current export supports certified,
+untransformed, scale-only, single-hidden-ReLU/scalar-output bakes and explicitly
+refuses unsupported heads or preprocessing. It reads model bytes without a bank.
+
+`just viz-function-browser` runs the retained review-2 gates and the linked
+feature/function checks under the shared heavy lock. The same capture/source
+variables save the retained views plus all four function exhibits and affine
+background examples; `function-index.html` links the complete gallery.

@@ -192,6 +192,15 @@ because cleanup tests or a historical training reproduction pass.
 
 ## Known Bugs
 
+- **zensim-viz function explanations (2026-11-04, fixed):** MLP input references
+  now link to the explained raw/fragility feature; copied links retain bake and
+  bank. Native function inspection groups certified max pairs and retains all
+  nonzero terms. A nonnegative encoder column with nonnegative bias is affine
+  on nonnegative inputs: its residual contribution belongs in the linear
+  background and adds no interior switch. Exact-zero output weights and
+  structurally dead units remain distinct. Head-only algebraic bounds do not
+  establish memorization absence. Function plots must fit including their axes.
+
 ### Ignored stable-moments tier test fails on the legacy pool reducers (2026-11-05)
 
 OPEN, unchanged by owner direction. On unchanged source the explicitly ignored

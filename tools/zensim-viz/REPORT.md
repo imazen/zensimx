@@ -1,5 +1,102 @@
 # zensim-viz report — 2026-11-04
 
+## Explained MLP function — owner follow-up completed
+
+MLP feature references now open the rendered formula, detector description,
+background and citations. Concerns, ablations, selected weights, incoming-weight
+strips, hidden-unit input tables and coefficient tables use named links.
+Reading-unit links open its max pair or individual term. Copied feature/unit URLs
+restore bake and bank, preserving the raw/fragility join and stored neuron IDs.
+The copied E h126 URL is checked against its actual pair `[124,126]`.
+
+The new Function exhibit exposes the algebra behind the stored head:
+
+`p(z) = 100 + L(z) + Σ c_k max(A_k(z), B_k(z))`.
+
+Here `d_i` is a declared raw feature or damage × fragility product, and
+`z_i = d_i / scale_i` for these zero-mean, positive-scale bakes. Each pair uses
+`A = w_u·z`, `B = (w_u+w_v)·z+b_v` and the equal stored output coefficient.
+The coefficient, bias, full planes, input scales and the complete background
+`L(z)` have native exports and linked tables. Display equations round their
+coefficients and use an approximation sign; the exact stored values remain
+available. This is real-arithmetic interpretation, not a replacement scorer
+or a promise that reassociated arithmetic preserves f32 bits.
+
+The native domain check proves F0's 31 small residual units and F2's one are
+always active on nonnegative standardized inputs: all their encoder weights
+and biases are nonnegative. They form an affine background without extra
+switches. F1's 31 otherwise nondead residual units and E's 29 have exactly zero
+output weights. No nonzero term was removed because it was small.
+
+| Bake | Max pairs | Nonzero linear background units | Other nonzero hinges | Other nondead zero-output units | Affine forms ≤ | Pieces per line ≤ |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| F seed 0 | 1 | 31 | 0 | 0 | 2 | 2 |
+| F seed 1 | 1 | 0 | 0 | 31 | 2 | 2 |
+| F seed 2 | 1 | 1 | 0 | 0 | 2 | 2 |
+| E | 3 | 0 | 0 | 29 | 8 | 4 |
+
+These bounds apply **before output calibration, on the certified nonnegative
+model-input domain**. Each max pair chooses between two affine branches;
+a linear background adds no branch. Three pairs therefore yield at most eight
+combinations and at most four pieces along a straight line. Choices can be
+unreachable or identical; this is not a measured region count. Raw feature
+extraction and fragility products are nonlinear, and all four bakes have a
+21-knot output calibration spline. The bounds do not describe the complete
+pixel-to-score function as a piecewise affine map.
+
+**Memorization presence or absence is not established.** Learned coefficients
+can overfit despite a small number of pieces. No random-label fit, training /
+held-out gap, membership or duplicate-source experiment was run. This follow-up
+reads model bytes and existing admitted inspection bundles, without a training
+fit or an AIC table read. The UI states that distinction beside the capacity
+bounds and retains every original per-weight finding.
+
+Each pair and remaining nonzero unit has a 65-point native basis slice. The
+hidden-layer/output-layer replay must match the complete Predictor's f32 bits
+at every sample. Complete served-score curves call BakeScorer at 512×512 with
+no codec hint. These slices set other raw slots and fragility to zero and are
+labelled as mathematical examples, not observed images or PDP. Network and
+served-score modes keep the output calibration visible.
+
+All retained Design 1/2/review-2 browser checks pass. New checks visit every
+pair's full coefficient table and native curve values, the complete affine
+background, raw/product links, and copied feature/unit URLs. All 14 Function
+captures have document dimensions equal to the viewport. The entire chart and
+x-axis fit the pane; at 1600×1000 its plot area measures 544px in a 900px stage.
+There are no uncaught browser errors. The gallery has 25 PNGs: 14 Function views
+and 11 retained atlas/lens/Δ/weights views. F0/E have both themes and sizes;
+F1/F2 have both themes at 1600×1000; two additional dark views inspect the
+linear residual terms.
+Earlier plot/bound captures remain in `function-screenshots-before-affine-fit/`.
+
+The preservation recheck matches all 2,088 detector PNGs, original feature fields,
+pooled/layout bits and original weight fields. Existing audits, flags and curves
+are reused unchanged. No established expectation, threshold or numeric guard
+was relaxed. Native validation passes the frozen F audit, direct serving-curve
+comparisons, layer replay, affine-background proof and odd/strided Atlas checks.
+Strict clippy passes for the tool and metric library, and script hygiene lint
+passes. Resource receipts:
+
+- Native tests: `rc=0 30s | peak-RSS 0.82GiB | min-avail 36672MiB | peak-load 3.13`.
+- Tool clippy: `rc=0 0s | peak-RSS 0.23GiB | min-avail 37743MiB | peak-load 2.47`.
+- Library clippy: `rc=0 5s | peak-RSS 0.66GiB | min-avail 35201MiB | peak-load 2.77`.
+- Browser/captures: `rc=0 24s | peak-RSS 0.34GiB | min-avail 36318MiB | peak-load 1.70`.
+- Script lint: `rc=0 17s | peak-RSS 0.04GiB | min-avail 37995MiB | peak-load 0.77`.
+
+CI was inspected without dispatching a workflow under repository policy.
+Native milestone `3782f794b638`, navigation/UI `998762b89783`, affine proof
+`594565a0aba9`; final capture source `3e875e25ff78`. Hashes, model identities,
+structural bounds and receipts are in [function-evidence.json](function-evidence.json).
+The final capture directory is
+`/mnt/v/output/zensim/viz/2026-11-04/function-screenshots/`.
+Existing unsupported HDR maps, missing paper prose and teacher/human limits below
+remain explicit. The function exporter currently refuses transformed or auxiliary
+heads outside its declared supported shape.
+
+http://dev.lan:3310/#bake=F0&bank=cid22-fit&unit=127
+
+http://dev.lan:3300/zensim/viz/2026-11-04/function-screenshots/function-index.html
+
 ## Design review 2 — 8/8 done and measured
 
 All eight decisions are implemented, verified and captured. Native metadata

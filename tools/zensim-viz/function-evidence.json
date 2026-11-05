@@ -1,0 +1,772 @@
+{
+  "verified_utc": "2026-11-05T04:40:47.944751+00:00",
+  "native_commit": "3782f794b638",
+  "affine_proof_commit": "594565a0aba9",
+  "navigation_commit": "998762b89783",
+  "capture_source_commit": "3e875e25ff78380af8a536aa87d0c43add0f0b54",
+  "capture_directory": "/mnt/v/output/zensim/viz/2026-11-04/function-screenshots",
+  "gallery": "http://dev.lan:3300/zensim/viz/2026-11-04/function-screenshots/function-index.html",
+  "function_browser": {
+    "source_commit": "3e875e25ff78380af8a536aa87d0c43add0f0b54",
+    "feature_links": [
+      "selected weight",
+      "concern",
+      "ablation",
+      "raw and fragility coefficient tables",
+      "copied feature URL",
+      "copied unit URL"
+    ],
+    "cases": {
+      "F0": {
+        "pairs": 1,
+        "retained_other_terms": 31,
+        "zero_output_nondead": 0,
+        "linear_background": 31,
+        "other_hinges": 0,
+        "line_bound": 2,
+        "global_affine_bound": "2",
+        "units": [
+          95,
+          96,
+          97,
+          98,
+          99,
+          100,
+          101,
+          102,
+          103,
+          104,
+          105,
+          106,
+          107,
+          108,
+          109,
+          110,
+          111,
+          112,
+          113,
+          114,
+          115,
+          116,
+          117,
+          118,
+          119,
+          120,
+          121,
+          122,
+          123,
+          124,
+          125,
+          126,
+          127
+        ]
+      },
+      "F1": {
+        "pairs": 1,
+        "retained_other_terms": 0,
+        "zero_output_nondead": 31,
+        "linear_background": 0,
+        "other_hinges": 0,
+        "line_bound": 2,
+        "global_affine_bound": "2",
+        "units": [
+          126,
+          127
+        ]
+      },
+      "F2": {
+        "pairs": 1,
+        "retained_other_terms": 1,
+        "zero_output_nondead": 0,
+        "linear_background": 1,
+        "other_hinges": 0,
+        "line_bound": 2,
+        "global_affine_bound": "2",
+        "units": [
+          125,
+          126,
+          127
+        ]
+      },
+      "E": {
+        "pairs": 3,
+        "retained_other_terms": 0,
+        "zero_output_nondead": 29,
+        "linear_background": 0,
+        "other_hinges": 0,
+        "line_bound": 4,
+        "global_affine_bound": "8",
+        "units": [
+          122,
+          123,
+          124,
+          125,
+          126,
+          127
+        ]
+      }
+    },
+    "captures": [
+      {
+        "name": "function-F0-dark-1600x1000.png",
+        "viewport": [
+          1600,
+          1000
+        ],
+        "document": [
+          1600,
+          1000
+        ],
+        "plot": {
+          "bottom": 905.3125,
+          "paneBottom": 944,
+          "plotHeight": 544,
+          "stageHeight": 900
+        }
+      },
+      {
+        "name": "function-F0-light-1600x1000.png",
+        "viewport": [
+          1600,
+          1000
+        ],
+        "document": [
+          1600,
+          1000
+        ],
+        "plot": {
+          "bottom": 905.3125,
+          "paneBottom": 944,
+          "plotHeight": 544,
+          "stageHeight": 900
+        }
+      },
+      {
+        "name": "function-F0-dark-1280x800.png",
+        "viewport": [
+          1280,
+          800
+        ],
+        "document": [
+          1280,
+          800
+        ],
+        "plot": {
+          "bottom": 720.15625,
+          "paneBottom": 744,
+          "plotHeight": 344,
+          "stageHeight": 700
+        }
+      },
+      {
+        "name": "function-F0-light-1280x800.png",
+        "viewport": [
+          1280,
+          800
+        ],
+        "document": [
+          1280,
+          800
+        ],
+        "plot": {
+          "bottom": 720.15625,
+          "paneBottom": 744,
+          "plotHeight": 344,
+          "stageHeight": 700
+        }
+      },
+      {
+        "name": "function-F0-residual-dark-1600x1000.png",
+        "viewport": [
+          1600,
+          1000
+        ],
+        "document": [
+          1600,
+          1000
+        ],
+        "plot": {
+          "bottom": 905.3125,
+          "paneBottom": 944,
+          "plotHeight": 544,
+          "stageHeight": 900
+        }
+      },
+      {
+        "name": "function-F1-dark-1600x1000.png",
+        "viewport": [
+          1600,
+          1000
+        ],
+        "document": [
+          1600,
+          1000
+        ],
+        "plot": {
+          "bottom": 905.3125,
+          "paneBottom": 944,
+          "plotHeight": 544,
+          "stageHeight": 900
+        }
+      },
+      {
+        "name": "function-F1-light-1600x1000.png",
+        "viewport": [
+          1600,
+          1000
+        ],
+        "document": [
+          1600,
+          1000
+        ],
+        "plot": {
+          "bottom": 905.3125,
+          "paneBottom": 944,
+          "plotHeight": 544,
+          "stageHeight": 900
+        }
+      },
+      {
+        "name": "function-F2-dark-1600x1000.png",
+        "viewport": [
+          1600,
+          1000
+        ],
+        "document": [
+          1600,
+          1000
+        ],
+        "plot": {
+          "bottom": 905.3125,
+          "paneBottom": 944,
+          "plotHeight": 544,
+          "stageHeight": 900
+        }
+      },
+      {
+        "name": "function-F2-light-1600x1000.png",
+        "viewport": [
+          1600,
+          1000
+        ],
+        "document": [
+          1600,
+          1000
+        ],
+        "plot": {
+          "bottom": 905.3125,
+          "paneBottom": 944,
+          "plotHeight": 544,
+          "stageHeight": 900
+        }
+      },
+      {
+        "name": "function-F2-residual-dark-1600x1000.png",
+        "viewport": [
+          1600,
+          1000
+        ],
+        "document": [
+          1600,
+          1000
+        ],
+        "plot": {
+          "bottom": 905.3125,
+          "paneBottom": 944,
+          "plotHeight": 544,
+          "stageHeight": 900
+        }
+      },
+      {
+        "name": "function-E-dark-1600x1000.png",
+        "viewport": [
+          1600,
+          1000
+        ],
+        "document": [
+          1600,
+          1000
+        ],
+        "plot": {
+          "bottom": 905.3125,
+          "paneBottom": 944,
+          "plotHeight": 544,
+          "stageHeight": 900
+        }
+      },
+      {
+        "name": "function-E-light-1600x1000.png",
+        "viewport": [
+          1600,
+          1000
+        ],
+        "document": [
+          1600,
+          1000
+        ],
+        "plot": {
+          "bottom": 905.3125,
+          "paneBottom": 944,
+          "plotHeight": 544,
+          "stageHeight": 900
+        }
+      },
+      {
+        "name": "function-E-dark-1280x800.png",
+        "viewport": [
+          1280,
+          800
+        ],
+        "document": [
+          1280,
+          800
+        ],
+        "plot": {
+          "bottom": 720.15625,
+          "paneBottom": 744,
+          "plotHeight": 344,
+          "stageHeight": 700
+        }
+      },
+      {
+        "name": "function-E-light-1280x800.png",
+        "viewport": [
+          1280,
+          800
+        ],
+        "document": [
+          1280,
+          800
+        ],
+        "plot": {
+          "bottom": 720.15625,
+          "paneBottom": 744,
+          "plotHeight": 344,
+          "stageHeight": 700
+        }
+      }
+    ],
+    "uncaught_errors": []
+  },
+  "retained_browser": {
+    "sha256": "a353cb5956657e1da963d1aaa1be339be829ff2f07d5021bd06ad0c841621abb",
+    "source_commit": "3e875e25ff78380af8a536aa87d0c43add0f0b54",
+    "url": "http://dev.lan:3300/zensim/viz/2026-11-04/function-screenshots/browser-review.json",
+    "uncaught_errors": []
+  },
+  "native": {
+    "F0": {
+      "bake_sha256": "185f43f7e5e1327c34ad18f0b73b96b872663726a0fac6ff524430d0d8430088",
+      "function_sha256": "bd75e6efb02b800365b850cadf571578d65ec26da10cb408715e92eb7b93f790",
+      "binary_sha256": "f4ce9311a2fb7af49ad8f48084b8bfc8020fe853d2f13e264a723667eba8732d",
+      "provenance": {
+        "binary_sha256": "f4ce9311a2fb7af49ad8f48084b8bfc8020fe853d2f13e264a723667eba8732d",
+        "command": [
+          "/mnt/v/output/zensim/viz/2026-11-04/function-affine-logs/native/zensim-viz-export-f4ce9311a2fb7af49ad8f48084b8bfc8020fe853d2f13e264a723667eba8732d",
+          "function",
+          "/home/lilith/tmp/e36test/r10/runs/mixF3-s0/pack_e059/refit/production-f16.bin",
+          "--out",
+          "/mnt/v/output/zensim/viz/2026-11-04/function-affine-F0"
+        ],
+        "compiled_cargo_lock_sha256": "4396d874a23680d2ad74f5f166dc6e74393655bf1ad69bae88924f7e07ba2e33",
+        "compiled_inspection_source_sha256": "6b47f865dba139b13be01fbb1d969e23e60828d5e50861727faa9126b62f4060",
+        "compiled_metric_source_sha256": "b4b2ab7c594a7eb5fe603a79977350dea97326c36e738feb057a6809885eae3c",
+        "data_scope": "no AIC tables admitted; explicit bank path and SHA256 in each result",
+        "formula_revision_environment": "7",
+        "source_hash_scope": "compiled exporter modules, manifest, research entry and private map exporter; dependency revisions are pinned by Cargo.lock"
+      },
+      "pairs": [
+        [
+          126,
+          127
+        ]
+      ],
+      "linear_units": [
+        95,
+        96,
+        97,
+        98,
+        99,
+        100,
+        101,
+        102,
+        103,
+        104,
+        105,
+        106,
+        107,
+        108,
+        109,
+        110,
+        111,
+        112,
+        113,
+        114,
+        115,
+        116,
+        117,
+        118,
+        119,
+        120,
+        121,
+        122,
+        123,
+        124,
+        125
+      ],
+      "other_hinge_count": 0,
+      "zero_output_nondead_units": [],
+      "global_affine_forms_upper_bound": "2",
+      "certified_line_segments_upper_bound": 2,
+      "prior_basis_coefficients_and_samples_unchanged": true
+    },
+    "F1": {
+      "bake_sha256": "c806f18393d88c76a783f6d9916a79abb7e7a3d4d51aed110634a74a337135d5",
+      "function_sha256": "8ae98f189c4fbc56e04d4ac7af0298c298a5274f816e02651581d2ebbbaf1203",
+      "binary_sha256": "f4ce9311a2fb7af49ad8f48084b8bfc8020fe853d2f13e264a723667eba8732d",
+      "provenance": {
+        "binary_sha256": "f4ce9311a2fb7af49ad8f48084b8bfc8020fe853d2f13e264a723667eba8732d",
+        "command": [
+          "/mnt/v/output/zensim/viz/2026-11-04/function-affine-logs/native/zensim-viz-export-f4ce9311a2fb7af49ad8f48084b8bfc8020fe853d2f13e264a723667eba8732d",
+          "function",
+          "/home/lilith/tmp/e36test/r10/runs/mixF3-s1/pack_e059/refit/production-f16.bin",
+          "--out",
+          "/mnt/v/output/zensim/viz/2026-11-04/function-affine-F1"
+        ],
+        "compiled_cargo_lock_sha256": "4396d874a23680d2ad74f5f166dc6e74393655bf1ad69bae88924f7e07ba2e33",
+        "compiled_inspection_source_sha256": "6b47f865dba139b13be01fbb1d969e23e60828d5e50861727faa9126b62f4060",
+        "compiled_metric_source_sha256": "b4b2ab7c594a7eb5fe603a79977350dea97326c36e738feb057a6809885eae3c",
+        "data_scope": "no AIC tables admitted; explicit bank path and SHA256 in each result",
+        "formula_revision_environment": "7",
+        "source_hash_scope": "compiled exporter modules, manifest, research entry and private map exporter; dependency revisions are pinned by Cargo.lock"
+      },
+      "pairs": [
+        [
+          126,
+          127
+        ]
+      ],
+      "linear_units": [],
+      "other_hinge_count": 0,
+      "zero_output_nondead_units": [
+        95,
+        96,
+        97,
+        98,
+        99,
+        100,
+        101,
+        102,
+        103,
+        104,
+        105,
+        106,
+        107,
+        108,
+        109,
+        110,
+        111,
+        112,
+        113,
+        114,
+        115,
+        116,
+        117,
+        118,
+        119,
+        120,
+        121,
+        122,
+        123,
+        124,
+        125
+      ],
+      "global_affine_forms_upper_bound": "2",
+      "certified_line_segments_upper_bound": 2,
+      "prior_basis_coefficients_and_samples_unchanged": true
+    },
+    "F2": {
+      "bake_sha256": "1ed0ffda1b3a525e7c2f54d6acc2ff64f0c87da8e57e4528fdd4bf6186e0a687",
+      "function_sha256": "99a940e5f578217c198f1b68d729524f5d5085cb530759d3fdc67986ade89cbb",
+      "binary_sha256": "f4ce9311a2fb7af49ad8f48084b8bfc8020fe853d2f13e264a723667eba8732d",
+      "provenance": {
+        "binary_sha256": "f4ce9311a2fb7af49ad8f48084b8bfc8020fe853d2f13e264a723667eba8732d",
+        "command": [
+          "/mnt/v/output/zensim/viz/2026-11-04/function-affine-logs/native/zensim-viz-export-f4ce9311a2fb7af49ad8f48084b8bfc8020fe853d2f13e264a723667eba8732d",
+          "function",
+          "/home/lilith/tmp/e36test/r10/runs/mixF3-s2/pack_e059/refit/production-f16.bin",
+          "--out",
+          "/mnt/v/output/zensim/viz/2026-11-04/function-affine-F2"
+        ],
+        "compiled_cargo_lock_sha256": "4396d874a23680d2ad74f5f166dc6e74393655bf1ad69bae88924f7e07ba2e33",
+        "compiled_inspection_source_sha256": "6b47f865dba139b13be01fbb1d969e23e60828d5e50861727faa9126b62f4060",
+        "compiled_metric_source_sha256": "b4b2ab7c594a7eb5fe603a79977350dea97326c36e738feb057a6809885eae3c",
+        "data_scope": "no AIC tables admitted; explicit bank path and SHA256 in each result",
+        "formula_revision_environment": "7",
+        "source_hash_scope": "compiled exporter modules, manifest, research entry and private map exporter; dependency revisions are pinned by Cargo.lock"
+      },
+      "pairs": [
+        [
+          126,
+          127
+        ]
+      ],
+      "linear_units": [
+        125
+      ],
+      "other_hinge_count": 0,
+      "zero_output_nondead_units": [],
+      "global_affine_forms_upper_bound": "2",
+      "certified_line_segments_upper_bound": 2,
+      "prior_basis_coefficients_and_samples_unchanged": true
+    },
+    "E": {
+      "bake_sha256": "7642eff4c965d9b7b838747042253ec31efe7389ea832280b49deb802b916006",
+      "function_sha256": "a260de3008f6ef6874244c950d78f305e1cb6af7fea944c3b7d9a93d184e9428",
+      "binary_sha256": "f4ce9311a2fb7af49ad8f48084b8bfc8020fe853d2f13e264a723667eba8732d",
+      "provenance": {
+        "binary_sha256": "f4ce9311a2fb7af49ad8f48084b8bfc8020fe853d2f13e264a723667eba8732d",
+        "command": [
+          "/mnt/v/output/zensim/viz/2026-11-04/function-affine-logs/native/zensim-viz-export-f4ce9311a2fb7af49ad8f48084b8bfc8020fe853d2f13e264a723667eba8732d",
+          "function",
+          "/mnt/v/output/zensim/mlic-aic-fulldata-xrefaic256e59-20261027-run01/full/XrefAIC256/full_s0/pack_e059/refit/production-f16.bin",
+          "--out",
+          "/mnt/v/output/zensim/viz/2026-11-04/function-affine-E"
+        ],
+        "compiled_cargo_lock_sha256": "4396d874a23680d2ad74f5f166dc6e74393655bf1ad69bae88924f7e07ba2e33",
+        "compiled_inspection_source_sha256": "6b47f865dba139b13be01fbb1d969e23e60828d5e50861727faa9126b62f4060",
+        "compiled_metric_source_sha256": "b4b2ab7c594a7eb5fe603a79977350dea97326c36e738feb057a6809885eae3c",
+        "data_scope": "no AIC tables admitted; explicit bank path and SHA256 in each result",
+        "formula_revision_environment": "7",
+        "source_hash_scope": "compiled exporter modules, manifest, research entry and private map exporter; dependency revisions are pinned by Cargo.lock"
+      },
+      "pairs": [
+        [
+          122,
+          123
+        ],
+        [
+          124,
+          126
+        ],
+        [
+          125,
+          127
+        ]
+      ],
+      "linear_units": [],
+      "other_hinge_count": 0,
+      "zero_output_nondead_units": [
+        93,
+        94,
+        95,
+        96,
+        97,
+        98,
+        99,
+        100,
+        101,
+        102,
+        103,
+        104,
+        105,
+        106,
+        107,
+        108,
+        109,
+        110,
+        111,
+        112,
+        113,
+        114,
+        115,
+        116,
+        117,
+        118,
+        119,
+        120,
+        121
+      ],
+      "global_affine_forms_upper_bound": "8",
+      "certified_line_segments_upper_bound": 4,
+      "prior_basis_coefficients_and_samples_unchanged": true
+    }
+  },
+  "preservation": {
+    "pairs": [
+      {
+        "pair": "atlas-pair-01",
+        "pooled_bits": 504,
+        "layout_bits": 720,
+        "inputs": 984,
+        "unchanged_map_files": 348,
+        "basic_term_files": 12,
+        "native_formula_replay_samples": 1448916
+      },
+      {
+        "pair": "atlas-pair-02",
+        "pooled_bits": 504,
+        "layout_bits": 720,
+        "inputs": 984,
+        "unchanged_map_files": 348,
+        "basic_term_files": 12,
+        "native_formula_replay_samples": 1448916
+      },
+      {
+        "pair": "atlas-pair-03",
+        "pooled_bits": 504,
+        "layout_bits": 720,
+        "inputs": 984,
+        "unchanged_map_files": 348,
+        "basic_term_files": 12,
+        "native_formula_replay_samples": 1818624
+      },
+      {
+        "pair": "atlas-pair-04",
+        "pooled_bits": 504,
+        "layout_bits": 720,
+        "inputs": 984,
+        "unchanged_map_files": 348,
+        "basic_term_files": 12,
+        "native_formula_replay_samples": 1448916
+      },
+      {
+        "pair": "atlas-pair-05",
+        "pooled_bits": 504,
+        "layout_bits": 720,
+        "inputs": 984,
+        "unchanged_map_files": 348,
+        "basic_term_files": 12,
+        "native_formula_replay_samples": 683907
+      },
+      {
+        "pair": "atlas-pair-06",
+        "pooled_bits": 504,
+        "layout_bits": 720,
+        "inputs": 984,
+        "unchanged_map_files": 348,
+        "basic_term_files": 12,
+        "native_formula_replay_samples": 1448916
+      }
+    ],
+    "weights": {
+      "F0": {
+        "inputs": 984,
+        "original_fields_unchanged": true,
+        "weights_sha256": "c18d673d8a2be9bb62a89a66a18162d49a86d4243eaa22c0356bfe7a7cb6cb21"
+      },
+      "F1": {
+        "inputs": 984,
+        "original_fields_unchanged": true,
+        "weights_sha256": "3344ed21e1eee0b6313650f886583ab97328c9c40746c802b2f7af60f2021cd0"
+      },
+      "F2": {
+        "inputs": 984,
+        "original_fields_unchanged": true,
+        "weights_sha256": "923138c64a9516460f592ba626d50e9ae473accbb011de1d381188f9e3c6df49"
+      },
+      "E": {
+        "inputs": 820,
+        "original_fields_unchanged": true,
+        "weights_sha256": "49571b659c2ce55298f21734cfa402a5b05c4e5b88a9480dc583d2f562517f3f"
+      }
+    },
+    "reused_native_evidence": {
+      "F0/cid22-fit/audit": "907b8f2a8cfac4699768a4c9c3a8ec25006dd3e045a7a2a4907d1bb5f42e408b",
+      "F0/cid22-fit/summary": "2e52cd5d460437b53aa71accf4ba8561375da51888dc84c16db0efeaa1d42908",
+      "F0/hdr-teacher/audit": "660e913bdeb72f0ab4052b4861aba54b378fdd913934b217ecbce096a027c74d",
+      "F0/hdr-teacher/summary": "57ac39690ab52b6ccba5ceaa90d0264ada2684835e56d4a4d3749501ab89238b",
+      "E/cid22-fit/audit": "431d595317808f99512916155cc2240352d8c2bafdc66a7bdbda8a7e2b659b0f",
+      "E/cid22-fit/summary": "75821acb971acffb78400ef1d9c4eb86b2299e89f0adbcdd0e854f0de5f7f1f3",
+      "E/hdr-teacher/audit": "d672f97f00219064b5cc2b8a914bbf61844c8fc2459f449f73bb667d2f0eeb1d",
+      "E/hdr-teacher/summary": "e9e8f12f305ec4d2ad52ff2cdf4e904ed5f2bda9009a89af81d069d0159efbb6",
+      "F1/cid22-fit/audit": "c7dc26dfa8f61c97a78c7529192e79769df472af9431f6e835289135c2823cf6",
+      "F1/cid22-fit/summary": "b9b5e214882f91abd6b5da5a550f38da2b019438997786f1fbc86ffdc91b765f",
+      "F2/cid22-fit/audit": "80982d005a0e88f5652e0e2b53578bfcac653198283e484c966658ed6ad47795",
+      "F2/cid22-fit/summary": "861c1edbfee4d8c666df0a3ab2c835188a6adfa3083a75e5aebc5acf4320c669"
+    },
+    "reference": {
+      "entries": 36,
+      "family_signals": 35,
+      "rendered_equations": 36,
+      "paper_text": 22,
+      "no_paper_text": 14,
+      "sidebar_inputs": 984
+    }
+  },
+  "checks": {
+    "build": {
+      "log": "/home/lilith/tmp/zensim-viz/build.log",
+      "sha256": "417e451e17456de90d4c9d5b046047e8bb711d6fb479fa35b8522d6ce022bbef",
+      "receipt": "run-heavy: done rc=0 14s | peak-RSS 0.83GiB | min-avail 36782MiB | peak-load 1.79"
+    },
+    "test-real": {
+      "log": "/home/lilith/tmp/zensim-viz/test-real.log",
+      "sha256": "dafa37ec1ac4dd16ae4437644845d758f48f9acd6c3d80f78a1c52977fa0e4d5",
+      "receipt": "run-heavy: done rc=0 30s | peak-RSS 0.82GiB | min-avail 36672MiB | peak-load 3.13"
+    },
+    "clippy": {
+      "log": "/home/lilith/tmp/zensim-viz/clippy.log",
+      "sha256": "b89fc52b06b5f32f6aceb9e5a1f79351c54cc56b03efb1194a4c04b5d17031bb",
+      "receipt": "run-heavy: done rc=0 0s | peak-RSS 0.23GiB | min-avail 37743MiB | peak-load 2.47"
+    },
+    "library-clippy": {
+      "log": "/home/lilith/tmp/zensim-viz/library-clippy.log",
+      "sha256": "a3a23f0f11505531745327c17f0b9cd9b3148ed82a075bb7e384f12c562131ec",
+      "receipt": "run-heavy: done rc=0 5s | peak-RSS 0.66GiB | min-avail 35201MiB | peak-load 2.77"
+    },
+    "function-browser": {
+      "log": "/home/lilith/tmp/zensim-viz/function-browser.log",
+      "sha256": "89163b065ff8dff10f12a4e9972dd88d6867bde75f644a94490537d9f5477b3a",
+      "receipt": "run-heavy: done rc=0 24s | peak-RSS 0.34GiB | min-avail 36318MiB | peak-load 1.70"
+    },
+    "script-lint": {
+      "log": "/home/lilith/tmp/zensim-viz/function-scripts-lint.log",
+      "sha256": "2c8fd47104e5d78c75b8cfe87421cdcd469eda058d53960da6ae53ed39b90029",
+      "receipt": "run-heavy: done rc=0 17s | peak-RSS 0.04GiB | min-avail 37995MiB | peak-load 0.77"
+    }
+  },
+  "capture_hashes": {
+    "atlas-dark-1280x800.png": "41e3171908d04b676fa799665b55033c4cfc4972ce6090a8ec19e16629fb08ae",
+    "atlas-dark-1600x1000.png": "85d492dd9c7df21abacf54a9bc4afb3df1cc978088f99de6294e59f87396a0a5",
+    "atlas-delta-dark-1600x1000.png": "29fd2b21f427192da06822b258e096edb0fc03402b9001f23d581be948d2dd51",
+    "atlas-light-1280x800.png": "257fb2b6048f7f79b162b477d0ca2c864cd1ac04d01e79a40ac1e4f71249bbb0",
+    "atlas-light-1600x1000.png": "43cf24c236f33981293c691d2f348b523bc8a764c61c20a80f70ab12bed34fa2",
+    "browser-review.json": "a353cb5956657e1da963d1aaa1be339be829ff2f07d5021bd06ad0c841621abb",
+    "design2-gates.json": "96945a8a8f7b125d2232ee5f731a035b71fa3a7485756f069346668c7a569454",
+    "function-E-dark-1280x800.png": "794bd98190c78d646df6d3e12c90b30b8a2c6cb92a8342f6dd7e5d0cdfab5f8e",
+    "function-E-dark-1600x1000.png": "f78734394e8b13ed5efa5486d138938cb6180332b7c52ef82e5a46d267f0c41e",
+    "function-E-light-1280x800.png": "1026226a2f66b7ef770968e03732bdf4d67147246ce95853b5648dd9e6d2056d",
+    "function-E-light-1600x1000.png": "55c6577dc14e0e3248a0f8d9b2202a61ab84ca8b787a121cc522482d929b0db8",
+    "function-F0-dark-1280x800.png": "1b58ebd20f769731cc8d73e69e1924d88076715c12b3d08b785c629846b8d47b",
+    "function-F0-dark-1600x1000.png": "b275545690f36d506be0f30cbdd6d34dda684b3e000db7e259d1b73855597a55",
+    "function-F0-light-1280x800.png": "ddfc09e535f43ab44d81e636709d6402942cfb26acaf981ed47bb4870ff88e6c",
+    "function-F0-light-1600x1000.png": "d5ac98f42481ef56a2a20ec5b201a57bf290c5f1ce558aee4a01c65c3dac372e",
+    "function-F0-residual-dark-1600x1000.png": "801490643662ae20f0490faf8023178587ec5fe92712c6f18b7fda93042bb38c",
+    "function-F1-dark-1600x1000.png": "1c8a5813d962734837df7e82dc87b1b55f9136640b365a15f60accddc8e76752",
+    "function-F1-light-1600x1000.png": "b8edaaf3481cecdd418fe9132d5747c5e9f8fdff74c5f1b7bdf82d9484ca173d",
+    "function-F2-dark-1600x1000.png": "b8caa195521878a423fca88a73d92c385b25f8c5cc71375b38ec1a34fb346ab5",
+    "function-F2-light-1600x1000.png": "8a15e9f4089bd89dcaaa344ff4ab011eee366180a8f574cf76012a982c75d6e0",
+    "function-F2-residual-dark-1600x1000.png": "a13b5e2b8578b90f89ea2e4de8209fe42206ff02ae4e875585e1642563ac6740",
+    "function-index.html": "52407fa94f84833acec9d00981b13b46457261f5c1c646650c9476c3916251b7",
+    "function-review.json": "eaab1d7c35a6b537a2019cbb27b0cf42c0ed051c99e901778d975cd5381a612e",
+    "index.html": "4cd3219505f08c9aa7542f7ddba7324e94314c657e376048490e2191954c3659",
+    "lens-dark-1280x800.png": "7944894d5c3c5e1fc594f6101f212b066ec8c4e27a4e990d6f9be587b894116f",
+    "lens-dark-1600x1000.png": "0e3a752b090699b20b8fc479824a3243ccdf6892898c09874ad716c482172be8",
+    "lens-light-1280x800.png": "a017398acaa1b671a9eb464b2cfe15ed38a33d5eb5e97bbb2960f9ecb1d2770b",
+    "lens-light-1600x1000.png": "c12df6655a428f3632332263710388d35edf97babe286482ed9c0357bf5718fc",
+    "lens-weights-dark-1600x1000.png": "15ddca71a326b6bcaf86c52282b41475c70d2c15fa586752227c7643e5fe63b6",
+    "lens-weights-light-1600x1000.png": "2fcc1fb3e2b07375c0571021ba5b61986be8181c98dc81125fb6cec2164682b8"
+  },
+  "source_hashes": {
+    "tools/zensim-viz/export/function.rs": "f801f4d5adab8b28cdc0607f736ae8dd9fa0c3b17d99ea5763818532d288aad8",
+    "tools/zensim-viz/export/main.rs": "7af818f74179f4144cebd980ba53b28ab147eafb7d15a21243d317da43358b20",
+    "tools/zensim-viz/export/provenance.rs": "2a414a2fb651772df03e4d2a912af30f0665ee6a7042a28b72e0823a7a916c4e",
+    "tools/zensim-viz/web/app.js": "2e9c9db983ae3cbd67f33d6becd88baca12db9b3a1ec633e7991b99a06c0571d",
+    "tools/zensim-viz/web/function-view.js": "ad704a14b6c2f5259ec4dbd3c1c890aeb0ecc763ce3efe8f606a041643f62e34",
+    "tools/zensim-viz/web/weight-view.js": "969bb0a281b92a48c997bea1d85f5afebebb09003ee93f769b4bcb61772f2424",
+    "tools/zensim-viz/web/studio.js": "460e62900e9fe7a6a982d04d847e9872c90fe576048d0a26c3fcf04f6d908968",
+    "tools/zensim-viz/web/studio.css": "65e267dfa7ea36082c752f1f611bcd6eb3a39b764117d05ab6cd391f3a5165db",
+    "tools/zensim-viz/tests/function.mjs": "11936670fb49ef1009cb6748b3417ccdbc0b5c04d2f497ecb53575eb6047d6a4"
+  }
+}

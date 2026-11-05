@@ -178,3 +178,25 @@ All eight review-2 decisions passed the guarded browser run at source
 prior fields/maps/bits. Eleven images and the acceptance receipts are in
 `review2-screenshots/`; REPORT.md and review2-evidence.json own the results.
 The capture explicitly waits for native difference-image decode.
+
+## Explained MLP function — owner follow-up
+
+1. Make every MLP input reference a named link to the feature formula, detector
+   explanation and paper citations, retaining stored IDs and fragility identity.
+2. Export the native certificate's max pairs, complete coefficient planes and
+   all remaining nonzero output terms. Plot native hidden activations and full
+   network/served scores on explicitly labelled basis slices; keep residuals.
+3. Add a Function exhibit with pair selection, linked coefficient tables,
+   preprocessing/output calibration and bounded structural capacity facts.
+   Memorization status remains untested; few dominant pairs alone cannot prove
+   absence, and nonlinear input features are outside a head-only region bound.
+4. Preserve every existing numeric gate; run native and browser verification
+   under the heavy lock, capture fresh dark/light views, report and push main.
+
+Visual inspection follow-up: fit the entire Function plot and x axis inside its pane. Check residual units for the sufficient affine-active condition (nonnegative encoder column and nonnegative bias); retain their coefficients as a linear background and count only genuine remaining switches in certified-domain bounds. Earlier exports/captures stay retained.
+
+Completed: all four function exports and every pair/remaining term pass native
+replay; the background proof gives two pre-calibration affine forms for every F
+seed and at most eight for E. The full link/curve/viewport browser suite passes;
+25 images are captured at source 3e875e25ff78, including complete fitted axes.
+REPORT.md and function-evidence.json own the final results and limits.

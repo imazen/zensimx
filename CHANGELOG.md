@@ -40,6 +40,10 @@
 
 ### Added
 
+- zensim-viz links MLP inputs to explained features and exposes certified max
+  pairs, native basis curves, linear backgrounds and scoped capacity bounds
+  (`998762b8`, `594565a0`, `3e875e25`).
+
 - Unpublished complete-feature fusion probes and native gate/timing receipts (`d6a537ee`, `32f6e69f`, `2190da00`). The [fusion study](benchmarks/a_extraction_fusion_2026-11-04.md) records the rejected moment ring and ongoing qualification; no fusion has landed.
 
 - Research R14 T2: native log-knee gradients, TRAIN-quantile projection, current-transform checkpoint scaling, and a release binding to the registered teacher-development comparison. Other transforms remain fixed; no T2 fit is released merely by building this support.
