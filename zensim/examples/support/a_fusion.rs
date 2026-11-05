@@ -11,6 +11,19 @@ use std::time::Instant;
 
 const BAKE_SHA: &str = "185f43f7e5e1327c34ad18f0b73b96b872663726a0fac6ff524430d0d8430088";
 
+// Report the token selected by the same incant ordering as the metric kernels.
+#[archmage::magetypes(v4x, v4, v3, neon, wasm128, scalar)]
+fn fusion_dispatch_token(token: Token) -> &'static str {
+    std::any::type_name_of_val(&token)
+}
+
+fn selected_token() -> &'static str {
+    archmage::incant!(
+        fusion_dispatch_token(),
+        [v4x, v4, v3, neon, wasm128, scalar]
+    )
+}
+
 fn full_feature_hash(features: &[f64]) -> String {
     hash(
         &features
@@ -47,7 +60,7 @@ fn worker(args: &[String]) {
         records.push(json!({"pair":p,"score":result.score(),"score_bits":result.score().to_bits(),
             "consumed_bits":ids.iter().map(|&i| result.features()[usize::from(i)].to_bits()).collect::<Vec<_>>()}));
     }
-    let ready = json!({"pid":std::process::id(),"threads":threads,"bake_sha256":BAKE_SHA,
+    let ready = json!({"pid":std::process::id(),"threads":threads,"bake_sha256":BAKE_SHA,"selected_token":selected_token(),
         "build_commit":option_env!("ZENSIM_BUILD_COMMIT"),"consumed_ids":ids,"records":records});
     let listener = UnixListener::bind(std::env::var_os("A_FUSION_SOCKET").unwrap()).unwrap();
     println!("{ready}");
@@ -93,10 +106,12 @@ impl Launcher {
             .unwrap();
         let wrapper = PathBuf::from(std::env::var_os("HOME").unwrap())
             .join("work/claudehints/scripts/run-heavy");
+        let memory = std::env::var("A_FUSION_WORKER_MEM").unwrap_or_else(|_| "16G".into());
+        assert!(matches!(memory.as_str(), "16G" | "24G"));
         let mut child = Command::new(wrapper)
             .args([
                 "--mem",
-                "16G",
+                &memory,
                 "--jobs",
                 "16",
                 "--",
@@ -553,11 +568,19 @@ fn identity(args: &[String]) {
 
 pub(super) fn run(args: &[String]) {
     match args[0].as_str() {
+        "dispatch" => {
+            assert_eq!(args.len(), 1);
+            println!(
+                "{}",
+                json!({"selected_token": selected_token(),
+                "avx512_build": cfg!(feature = "avx512")})
+            );
+        }
         "worker" => worker(&args[1..]),
         "compare" => compare(&args[1..]),
         "pairs" => pairs(&args[1..]),
         "identity" => identity(&args[1..]),
         "prepare-eval" => prepare_eval(&args[1..]),
-        _ => panic!("fusion worker|compare|pairs|identity|prepare-eval"),
+        _ => panic!("fusion dispatch|worker|compare|pairs|identity|prepare-eval"),
     }
 }

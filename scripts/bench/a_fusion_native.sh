@@ -1,11 +1,20 @@
 #!/usr/bin/env bash
 # Native build/test/measurement owner; the shared lock is reacquired per job.
 set -euo pipefail
-[[ $(hostname) = i270 ]] || { echo 'fusion native work requires i270' >&2; exit 2; }
+host=$(hostname)
+case "$host" in i270) memory=16G ;; dev) memory=24G ;; *) echo 'fusion native work requires an authorized host' >&2; exit 2 ;; esac
 export PATH="$HOME/.cargo/bin:$HOME/.local/share/mise/shims:$PATH"
 stage=${1:?build|crate|stable|test|tiers|instrument|split|identity|identity-full|identity-era|nearid|steer|measure|eval}
 study=${2:?absolute study root}
 label=${3:?immutable output label}
+if [[ $stage = measure-cell && ${A_FUSION_HOST_LOCK_HELD:-0} != 1 ]]; then
+    echo 'measure-cell requires a_fusion_host_cell.sh and its quiet gate' >&2
+    exit 2
+fi
+if [[ $host = dev && $stage != build && $stage != measure-cell ]]; then
+    echo 'dev supports short build and measure-cell batches; qualification remains on i270' >&2
+    exit 2
+fi
 export TMPDIR="$study/scratch" CARGO_TARGET_DIR="$study/target"
 export CARGO_PROFILE_RELEASE_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_INCREMENTAL=0
 export RUSTFLAGS='-C force-frame-pointers=yes'
@@ -16,9 +25,9 @@ out="$study/$label"
 mkdir -p "$TMPDIR" "$out/logs"
 cd "$study/source"
 jobs=8
-[[ $stage != measure ]] || jobs=16
-if [[ $stage != measure && ${A_FUSION_LOCK_HELD:-0} != 1 ]]; then
-    exec flock "$HOME/tmp/heavy.lock" "$HOME/work/claudehints/scripts/run-heavy" --mem 16G --jobs "$jobs" -- \
+[[ $stage != measure && $stage != measure-cell ]] || jobs=16
+if [[ $stage != measure && $stage != measure-cell && ${A_FUSION_LOCK_HELD:-0} != 1 ]]; then
+    exec flock "$HOME/tmp/heavy.lock" "$HOME/work/claudehints/scripts/run-heavy" --mem "$memory" --jobs "$jobs" -- \
         env A_FUSION_LOCK_HELD=1 bash "$0" "$@"
 fi
 trap 'status=$?; printf "%s %s %s pid=%s rc=%s\n" "$(date -u +%FT%TZ)" "$label" "$stage" "$$" "$status" >> "$out/stages.tsv"' EXIT
@@ -27,10 +36,10 @@ heavy() {
     if [[ ${A_FUSION_LOCK_HELD:-0} = 1 ]]; then
         "$@"
     else
-        flock "$HOME/tmp/heavy.lock" "$HOME/work/claudehints/scripts/run-heavy" --mem 16G --jobs "$jobs" -- "$@"
+        flock "$HOME/tmp/heavy.lock" "$HOME/work/claudehints/scripts/run-heavy" --mem "$memory" --jobs "$jobs" -- "$@"
     fi
 }
-bake="$HOME/tmp/zensim-cost/production-f16.bin"
+bake=${A_FUSION_BAKE:-$HOME/tmp/zensim-cost/production-f16.bin}
 sha=185f43f7e5e1327c34ad18f0b73b96b872663726a0fac6ff524430d0d8430088
 case "$stage" in
     build)
@@ -138,19 +147,32 @@ PY
             --out "$out/pixel" --bin "$out/steer_instrument" --formula-rev 7 --shards 8 \
             --packet "$study/fixtures/steer.json" 2>&1 | tee "$out/logs/steer.log"
         ;;
-    measure)
-        for threads in 1 16; do
-            if [[ $threads = 1 ]]; then cpus=2; else cpus=0-15; fi
-            for size in 256 1024 large; do
+    measure|measure-cell)
+        thread_values=(1 16)
+        size_values=(256 1024 large)
+        if [[ $stage = measure-cell ]]; then
+            size_values=("${4:?size}")
+            thread_values=("${5:?threads}")
+            [[ ${size_values[0]} =~ ^(256|1024|large)$ && ${thread_values[0]} =~ ^(1|16)$ ]]
+        fi
+        export A_FUSION_WORKER_MEM="$memory"
+        for threads in "${thread_values[@]}"; do
+            if [[ $host = dev ]]; then
+                if [[ $threads = 1 ]]; then cpus=0; else cpus=0-7,16-23; fi
+            else
+                if [[ $threads = 1 ]]; then cpus=2; else cpus=0-15; fi
+            fi
+            for size in "${size_values[@]}"; do
                 cell="$out/timing/${size}-${threads}t"
                 test ! -e "$cell"
                 heavy env ZENSIM_FORMULA_REV=7 ZENBENCH_NO_CALIBRATE=1 RAYON_NUM_THREADS="$threads" \
                     python3 -B scripts/bench/a_family_cost_admit.py "$cell/admission.json" -- \
-                    taskset -c "$cpus" "$study/before3/a_family_cost" fusion compare \
-                    "$study/${A_FUSION_BEFORE_LABEL:-before3}/a_family_cost" "$out/a_family_cost" "$HOME/tmp/zensim-cost/pairs" \
+                    taskset -c "$cpus" "$study/${A_FUSION_CONTROLLER_LABEL:-before3}/a_family_cost" fusion compare \
+                    "$study/${A_FUSION_BEFORE_LABEL:-before3}/a_family_cost" "$out/a_family_cost" "${A_FUSION_PAIRS:-$HOME/tmp/zensim-cost/pairs}" \
                     "$bake" "$size" "$threads" "$cell" 2>&1 | tee "$out/logs/measure-${size}-${threads}t.log"
-                heavy python3 -B scripts/bench/a_extraction_fusion.py timing "$cell" "$cell/summary.json" \
-                    2>&1 | tee "$out/logs/summary-${size}-${threads}t.log"
+                printf '%s %s %s %s capture complete\n' "$(date -u +%FT%TZ)" "$label" "$size" "$threads" > "$cell/CAPTURE_COMPLETE.txt"
+                # a_fusion_parse.sh timing replays analysis from inner/workers JSON.
+                # A parser failure cannot restart this measurement.
             done
         done
         ;;

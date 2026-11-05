@@ -10,7 +10,7 @@ import subprocess
 import sys
 import threading
 
-NAMES = {"rustc", "cargo", "aws", "perf"}
+NAMES = {"rustc", "cargo", "aws", "perf", "zensim_mlp_trai"}
 
 
 def now():
@@ -33,8 +33,9 @@ def census(owner):
     for proc in Path("/proc").glob("[0-9]*"):
         try:
             name = (proc / "comm").read_text().strip()
-            if name in NAMES and not descendant(int(proc.name), owner):
-                result.append(dict(pid=int(proc.name), name=name))
+            executable = Path((proc / "cmdline").read_bytes().split(b"\0")[0].decode()).name
+            if (name in NAMES or executable == "zensim_mlp_train") and not descendant(int(proc.name), owner):
+                result.append(dict(pid=int(proc.name), name=name, executable=executable))
         except (FileNotFoundError, ProcessLookupError, PermissionError):
             continue
     return result
