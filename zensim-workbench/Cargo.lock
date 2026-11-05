@@ -444,6 +444,7 @@ dependencies = [
  "libm",
  "linear-srgb",
  "magetypes",
+ "serde_json",
  "thiserror",
  "zenpredict",
  "zenresize",
