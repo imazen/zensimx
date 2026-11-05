@@ -363,8 +363,8 @@ Errors use the stored teacher `human_score` points, with target scale 1.
 Lower is better. T1a wins among T1 arms but misses the registered <=A0
 zero-allowance feasibility rule; it also has no eligible soft-clip parameters.
 **T2 is not run.** All T1 arms miss the strict development improvement required
-for seeds 1–2, so no repeat is eligible regardless of the outstanding product
-reads. No EVAL value informed either decision.
+for seeds 1–2, so no repeat is eligible regardless of the product
+outcomes. No EVAL value informed either decision.
 [Development and release receipt](r14_development_2026-11-04.json).
 The comparison job passes in 5 seconds (run-heavy peak RSS 0.97 GiB,
 minimum available 39,810 MiB).
