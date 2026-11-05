@@ -154,3 +154,15 @@ Coordinator staging amendment supersedes in-place content reads for LIVE, MCL an
 CID22-B label-free completion: 2,100 pairs,24 references,2,124 stimuli. Keys SHA256 `b699066295048de539ba988f86c5435b327a33cce612acb334374f43d1b1415e`; decode-map SHA256 `bf77ceb8e9080102726ae0fa837bb504eda4ed3d5e7734d5a3d16ff32f56ecfa`. All4,200 feature RGB checks and all2,124 independent stimulus readbacks passed. Zero pixel-identical pairs; the cached prediction CLI's lack of identity evidence does not affect this population. Later populations are guarded before label parsing.
 
 Receipts: native decode `rc=0 71s | peak-RSS 0.06GiB | min-avail38427MiB | peak-load1.07`; feature extraction `rc=0 37s | peak-RSS0.28GiB | min-avail38316MiB | peak-load0.88`; A prediction `rc=0 1s | peak-RSS0.19GiB | min-avail38397MiB | peak-load0.47`; peers `rc=0 76s | peak-RSS0.13GiB | min-avail38019MiB | peak-load1.75`; independent readback `rc=0 10s | peak-RSS0.07GiB | min-avail31080MiB | peak-load1.03`. The initial opaque-alpha decoder refusal and peer scorer's missing model-directory environment failure occurred before label reads; their logs and intermediate artifacts are retained.
+
+## CID22-B result — frozen-A assessment, read spent
+
+2,100 pairs /24 references; quality MCOS, butteraugli quality=−p3. 95% whole-reference percentile intervals,10,000 valid draws for every cell, seed20261105. Within-reference mean defined on all24 references. Prior exposures: DATA_SPLITS lines1613–1617,2761–2791. CID22-B is the second half of the reference set whose first half trained A.
+
+| Metric | Signed SROCC | KROCC | PLCC4PL | RMSE (MCOS) | Within-reference SROCC |
+|---|---|---|---|---|---|
+| A | 0.908926706 [0.876866846, 0.939159319] | 0.734654357 [0.689769001, 0.783003589] | 0.913389974 [0.883148694, 0.941129940] | 5.452548481 [4.532380746, 6.245206491] | 0.959433709 [0.950752289, 0.967297550] |
+| SSIMULACRA2 | 0.913094224 [0.883263150, 0.940670082] | 0.739625436 [0.695978572, 0.785353720] | 0.917160646 [0.889563468, 0.941858485] | 5.337787846 [4.507927732, 6.113361596] | 0.958154147 [0.946529619, 0.967491009] |
+| butteraugli3_quality | 0.781058047 [0.698243342, 0.861063845] | 0.598548287 [0.528366873, 0.676012534] | 0.776074628 [0.709731641, 0.855133028] | 8.446872954 [6.859664576, 9.519745951] | 0.903902685 [0.864125963, 0.935446761] |
+
+Read receipt: `rc=0 0s | peak-RSS0.07GiB | min-avail31355MiB | peak-load0.75`. Statistics: `run-heavy: done rc=0 81s | peak-RSS 0.89GiB | min-avail 30410MiB | peak-load 6.43`. Pre-open exposure commit `a02598e15b37443faf91f8c50ae8b300eedca6cb` was verified on origin/main before parsing. Target-cache SHA256 `a8b0caa3a1a9f238a3cab88580097874332fee0ec4dcfcabbdc7e483295fcc3f`; RESULTS.json SHA256 `5003d8fe0f20187569ec7fbada9144917feca955935766d09679eee7cdf64c5b`; completed LABEL_READS.json SHA256 `7b72c7050e58c81d9cf4f61d33eeef0e4ae7dd1bbcbb0838ac0e22b4c77d4c2f`. No model selected or changed.
