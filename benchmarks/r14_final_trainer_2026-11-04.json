@@ -1,0 +1,34 @@
+{
+  "registration": "5b5a013482db4944042883995ad6892f92244c69",
+  "source_commit": "58451fce12cbf93a849a1c12def76335eab35acb",
+  "trainer_sha256": "49a0a692863bb89b2fb6d3275711543ba15ffef33ebca7589bfda02005d5796e",
+  "serving_pins_sha256": "2b13fe8dac154a450257e4e7bff30be722fcc82a01c6cda85acd75eaeb7bc387",
+  "purpose": "R14 trainer successor: t2-bounds",
+  "source_sha256": {
+    "zensim-validate/src/bin/zensim_mlp_train.rs": "6d1f532912fb8cbbdb22365c9ce6ebb1220fa928979421dd4d9d1edddecf84ba",
+    "zensim-validate/src/mlp_train/mod.rs": "beccb5571d108a04054d9336e6a814c5846a36843f79a9ffb349e316ba27d4b4",
+    "zensim-validate/src/mlp_train/r14_knees.rs": "2a7e47888ee1c09d7329695bfc2035cd2002c86ca8c18986fe98420df02f9646",
+    "scripts/rev4_featpot/r14_transforms_fit.py": "36ef0f95e1d0605604195b79ef8a330853b90bfea0dec03531799617fa896db8",
+    "scripts/rev4_featpot/r14_learn_knees_fit.py": "ef9df878ce7ad601cc073131713223d31113273024c691885f4eee154b5d1f76"
+  },
+  "source_capsule": {
+    "build_source_commit": "58451fce12cbf93a849a1c12def76335eab35acb",
+    "canonical_published_native_source": "ea0e8ea1e52e699292f06a9b27a53da71399a48f",
+    "changed_paths_since_published_native_source": [
+      "benchmarks/r14_head_timing_2026-11-04.json",
+      "benchmarks/r14_input_transforms_2026-11-04.md",
+      "scripts/byconstruction/r14_head_summary.py",
+      "scripts/byconstruction/r14_width_comparison.py"
+    ],
+    "compile_inputs_unchanged": "only experiment report/receipt and the two new standalone analysis modules differ",
+    "archive": "native-final-58451fce12cb.tar",
+    "bytes": 109096960,
+    "sha256": "26def6c35b27a1aee2f6a9b8fa44b1bee7ec8c715ee6dd86b757534822dac3c2",
+    "embedded_tar_commit": "58451fce12cbf93a849a1c12def76335eab35acb",
+    "purpose": "preserve exact pre-rebase build tree; later jj rebases may rewrite commit ids"
+  },
+  "resource": [
+    "run-heavy: done rc=0 34s | peak-RSS 1.77GiB | min-avail 40354MiB | peak-load 1.66"
+  ],
+  "scientific_T2_fit_released": false
+}

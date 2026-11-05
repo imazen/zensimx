@@ -408,3 +408,20 @@ available 27,178 MiB). Its retained parity executable has SHA256
 `2756292de94009ef3683add19f1884959f47d15b88946b83054db1b11e080492`.
 The copy was verified against the ARM source binary before removing this
 experiment's inactive Cargo target; the golden streams and full logs remain.
+
+## Final native trainer verification
+
+The final native trainer, including inward f32 knee-bound projection, builds
+on dev under the shared lock. SHA256:
+`49a0a692863bb89b2fb6d3275711543ba15ffef33ebca7589bfda02005d5796e`.
+It has a separate selection receipt and leaves all fitted-model, serving-binary
+and T1 trainer pins unchanged. T2 release remains false; this is a build check,
+not a scientific T2 fit.
+
+Resource receipt: `run-heavy: done rc=0 34s | peak-RSS 1.77GiB | min-avail 40354MiB | peak-load 1.66`.
+The lock-inclusive wall time was 1,081.96 seconds; it is not compile time.
+The exact pre-rebase build tree `58451fce12cb` is preserved as a git archive
+with its embedded commit ID. Its native compile inputs equal the published
+`ea0e8ea1` tree; only the report/receipt and two standalone analysis modules
+differ. [Final trainer receipt](r14_final_trainer_2026-11-04.json) owns both
+identities, source hashes, capsule hash and the resource receipt.
