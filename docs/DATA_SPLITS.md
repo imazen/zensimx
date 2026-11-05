@@ -3301,3 +3301,7 @@ Authorized frozen read of 100 rows; before target parsing. LABEL_READS.json SHA2
 LIVE frozen-A read completed:779 /29refs; fixed clean10=267 /10refs. Target cache `340d4c9f276179b1ea5ce74d80f5889694180e13d367cab5e6ff2e609c43cd10`; completed journal `65eb0b35f147ebfbb7c392d176be595c40a8051acc8a00e1edeaf97134d2ada3`. Both panels and10,000-draw intervals in `benchmarks/final_read_a_2026-11-05.md`. Spent; no training or selection.
 
 KonJND TERMINAL frozen-A read complete:100 pairs /100 references; target cache `ca83376cfab13f34285d5326589b9ad54b211449bf7ef510977547f5b4c6a6c3`; completed journal `a3e2cc761c67dc55ca6dc5bdc7683c62f7d2a512741619e8c88bb8ca5a6806f4`. Pooled signed10,000-draw panel in `benchmarks/final_read_a_2026-11-05.md`; within-reference SROCC undefined as registered. Spent, no fitting or selection.
+
+### Frozen-A kadid_terminal: individual pre-open exposure — 2026-11-05T07:51:12.256337+00:00
+
+Authorized frozen read of 2000 rows; before target parsing. LABEL_READS.json SHA256 `25a1a93419ba76ab90507a47ab9a1349441830feb97a0bc790e82a2ad58fd691`; label specification `{"path": "/mnt/v/dataset/kadid10k/dmos.csv", "sha256": "573e2ed98fdaa2a5aed7b50ad716906e125e1001ed0e97c8e93e79d7b997ba99", "target": "dmos"}`. Prediction/decode/binary pins retained in that receipt. Bootstrap10000 seed20261105; no tuning or selection. Status: authorized-before-read; any partial/failed read spends this population.
