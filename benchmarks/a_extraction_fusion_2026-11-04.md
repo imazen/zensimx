@@ -964,6 +964,100 @@ The commands were `a_fusion_trial_v5.sh build` followed by `gates`, with
 study root, label `activity-panel` and `activity-panel-stage` as arguments,
 inside one shared-lock/run-heavy scope. The immutable export is
 `ac7cafa5c16ac85ddbd569668ecf4c1d9d53ce9e`; its source and binary hash
-manifests are in `activity-panel/`. Full-vector pixel replay is queued, and
+manifests are in `activity-panel/`. Full-vector pixel replay subsequently passed (receipt below);
 speed is not measured yet. Both full-width rings remain outside main's
 served path.
+
+
+### Owner-directed zenjpeg-main probe (2026-11-05)
+
+The owner directed a two-file RGB-hash probe of zenjpeg main before the next
+timing pair. The resolved head is `762fa7128c2124b42cfa6e23b30024a688f5b7a3`
+(version 0.9.0). The standalone probe uses `branch = "main"`,
+`default-features = false`, and no retired `decoder` feature. Its Cargo.lock
+records that exact git revision. Both files are 800×800 and match the frozen
+RGB hashes exactly:
+
+| File | Main RGB SHA-256 | Frozen RGB match |
+|---|---|---|
+| `060.jpg` | `6816d8b4fc46c604b8f2d2d516a53988ce6ffc2c692fa176779f22ff0c989ffe` | Yes |
+| `060_01_01.jpg` | `c5cfa8511171491822c9b7c3fc457439ac1dda89ef9b507a01c908c2b38064c6` | Yes |
+
+Receipt: `$STUDY/zenjpeg-main-probe/RESULTS.json`, its `Cargo.lock`,
+`SHA256SUMS` and `zenjpeg-main-probe-v2.log`.
+`rc=0 12s | peak-RSS 0.71GiB | min-avail 24840MiB | peak-load 1.97`.
+The first source-copy attempt failed before execution because native rsync
+is unavailable; it was replaced by scp. No decoder was chosen using score
+error.
+
+The preserved extractor's manifest is `zensim-bench/Cargo.toml`: its saved
+`zensim-bench.Cargo.lock` names that root package and local zenjpeg 0.9.0,
+and metric commit `b77883be18db` declares the `extract_features_372col`
+example there with a local zenjpeg path. The owner explicitly excludes that
+manifest's current frozen-tool pin from this re-pin. These pins remain:
+
+| Excluded manifest | Existing zenjpeg source |
+|---|---|
+| `tools/shipgates-target/Cargo.toml` | git `4196fa93d422bc367d1e3ddadbaddfe672b9cdfc` |
+| `zensim-bench/Cargo.toml` | git `4933461f2b6d760b7b112dc94397718fdadb5119` (dependency and patch) |
+| `zensim-ultrahdr-probe/Cargo.toml` | git `4196fa93d422bc367d1e3ddadbaddfe672b9cdfc` |
+| `zensim-picker-prep/Cargo.toml` | local `../../zenjpeg/zenjpeg` (dependency and patch) |
+
+They are listed for the owner's separate call. The root dev-dependency,
+visualizer dependency and both lockfiles now pin main revision
+`762fa7128c2124b42cfa6e23b30024a688f5b7a3`, with default features off.
+All 4,678 source-file EVAL predictions reproduce the frozen predictions
+bit-for-bit: **zero differences**. This reproduces the frozen prediction
+table from the tree; it is not a claim of re-extracting every historical
+feature column. The existing fusion cache remains decoded once by published
+zenjpeg 0.8.4; both fusion arms read those identical cached pixels, so its
+bit gate is unaffected.
+
+The 128-column activity variant's full-vector pixel qualification completed
+before the decoder probe. All 720 returned feature values and score bits
+match across 4,678 EVAL pairs, 744 identity cells, 648 NEARID rows, 135 steering
+bases and 55,380 repairs; all 768 ladder scores also match. Receipts are
+`activity-panel/{pixel-bits,pixel-features,eval-bits}.json`.
+`rc=0 680s | peak-RSS 0.52GiB | min-avail 24129MiB | peak-load 6.56`.
+Its timing job and all other unstarted fusion jobs were cancelled while
+verified waiting on the shared lock, before they had children or owned the
+lock (`CANCEL_FOR_ZENJPEG_MAIN.json`). No additional timing pair ran.
+
+### Decoder re-pin gate receipt
+
+The final native gate export is `2e9c9f4aff40` (source/binary hashes and
+source archive are preserved under `$STUDY/decoder-final/`). Commands:
+`cargo clippy --workspace --all-targets --all-features --exclude zensim-wasm-tests -- -D warnings`;
+`a_fusion_native.sh build`, `crate` and `split` with the native study/label;
+explicit `cargo test --release --locked -p zensim --features training,custom-profiles,classification --test rev4_featbank_parity -- --nocapture --test-threads=1`;
+then `a_family_cost fusion pairs fixtures/eval-pairs.tsv production-f16.bin source-eval.jsonl`.
+All run on i270 under its shared lock and 16G wrapper.
+
+| Gate | Result |
+|---|---|
+| CI-exact clippy | Pass |
+| Crate tests and doctests | All 913 baseline cases/statuses preserved; 917 cases recorded |
+| Explicit rev4_featbank_parity | Pass, existing ignored corpus gate unchanged |
+| split_parity_golden | Byte-identical to the preserved baseline |
+| Script lint | Pass |
+| Root lock / visualizer lock | Recorded zenjpeg main revision, default features off |
+| Source EVAL capture | 4,678 pairs |
+| Frozen EVAL prediction comparison | 4,678/4,678 bit-identical; zero differences |
+
+The root lock preserves existing zenexr/zenresize consumers on zenpixels
+0.2.16, within their declared version ranges. JPEG's new dependency graph
+uses the separately patched 0.3.1 crate. `cargo metadata --locked --all-features`
+accepts those edges, and CI-exact clippy verifies both descriptor contracts.
+No conversion or reduction arithmetic was changed. The pre-existing constant
+chunk-size clippy warning in an R14 test was corrected mechanically in its
+own preceding commit; its fixture values/assertions are unchanged.
+
+Capture/code-gate receipt: `rc=0 718s | peak-RSS 3.24GiB | min-avail 18975MiB | peak-load 9.21`.
+The replay comparison is an independent parse-only command:
+`a_fusion_parse.sh STUDY eval-baseline decoder-final/source-replay decoder-final/source-replay-parse-v1`.
+Its result is `rows=4678, equal=true, differences=[]`;
+`rc=0 1s | peak-RSS 0.42GiB | min-avail 25683MiB | peak-load 0.76`.
+A parser failure could retry this saved capture without re-extraction.
+The fusion cache's decoder remains published 0.8.4, with identical cached
+pixels read by both arms. New timing binaries are rebuilt from the landed
+pin as a common parent; no timing from an older parent is restamped.

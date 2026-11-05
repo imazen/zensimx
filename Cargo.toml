@@ -58,7 +58,9 @@ zenbench = { version = "0.1.10", git = "https://github.com/imazen/zenbench", rev
 # Current upstream main, fetched 2026-09-13; pin the filter-study implementation.
 zenresize = { git = "https://github.com/imazen/zenresize", rev = "e3975fb9d6d6b7baa96038a0eb8e27febb37c012", default-features = false, features = ["std"] }
 zenpng = { version = ">=0.1.4, <0.3.0", default-features = false }
-zenpixels = { version = ">=0.2.10, <0.4.0", default-features = false }
+# Existing PNG and conversion APIs use 0.2 descriptors. JPEG 0.9 uses
+# the separately patched 0.3 crate without changing those consumers.
+zenpixels = { version = "=0.2.16", default-features = false }
 zenblend = "0.1.3"
 enough = { version = "0.4.2", default-features = false, features = ["std"] }
 # zenpredict / zenpredict-bake live in sibling `zenanalyze` (not on crates.io).
@@ -106,3 +108,10 @@ zenpredict-bake = { git = "https://github.com/imazen/zenanalyze", rev = "f090348
 # percentiles to Hyndman–Fan type 7, the crate's one percentile rule.
 # E34 P7: directional bootstrap probability and public Student helpers (PR 82).
 zenstats = { package = "zenmetrics-stats", git = "https://github.com/imazen/zenmetrics", rev = "48665c8fb1bb3de5c99d792ae4ed4f3f1e854629", default-features = false, features = ["parallel"] }
+
+# Git-only codec contracts from zenjpeg main; dependency patches do not propagate.
+[patch.crates-io]
+zenpixels = { git = "https://github.com/imazen/zenpixels", rev = "f23ac7535be1144a22d0dc6b71f866a08b151f34" }
+zencodec = { git = "https://github.com/imazen/zencodec", rev = "61fb96f1c8c89d4c8d2210eed8679372d66f8aa7" }
+zenmeta = { git = "https://github.com/imazen/zencodec", rev = "61fb96f1c8c89d4c8d2210eed8679372d66f8aa7" }
+ultrahdr-core = { git = "https://github.com/imazen/ultrahdr", rev = "7e9d296c9e037e626234c9f0e8673d48278f83f0" }

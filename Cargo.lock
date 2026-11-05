@@ -1092,7 +1092,7 @@ dependencies = [
  "serde",
  "serde_bytes",
  "serde_json",
- "spin",
+ "spin 0.10.1",
  "toml",
  "tynm",
  "wasm-bindgen-futures",
@@ -1276,7 +1276,7 @@ dependencies = [
  "md5",
  "serde",
  "serde_json",
- "spin",
+ "spin 0.10.1",
  "thiserror",
  "toml",
  "wasm-bindgen-futures",
@@ -1296,7 +1296,7 @@ dependencies = [
  "num-traits",
  "paste",
  "serde",
- "spin",
+ "spin 0.10.1",
  "variadics_please",
 ]
 
@@ -1612,9 +1612,9 @@ dependencies = [
 
 [[package]]
 name = "enough"
-version = "0.4.4"
+version = "0.4.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f8e1bd41ecce82c300d0c84fa35b080fa6db50a5398b18f1abf0357bb067549e"
+checksum = "877362cb7b70d1c617f0cd3c67708bd58d894a86af5104018e2c10ebaee3c02f"
 
 [[package]]
 name = "entities"
@@ -2175,6 +2175,15 @@ name = "hexf-parse"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dfa686283ad6dd069f105e5ab091b04c62850d3e4cf5d67debad1933f55023df"
+
+[[package]]
+name = "how-far"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "090dfeab9752b8574ff7b6fcfc96af46f4e4fc5b2cd0a3462e6d419b076eb7d1"
+dependencies = [
+ "enough",
+]
 
 [[package]]
 name = "http"
@@ -4176,6 +4185,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "spin"
+version = "0.12.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0134f9043ed38b087ac4f7d4af44c79e2c9e5094421fe3164f435ce585953b10"
+
+[[package]]
 name = "spirv"
 version = "0.4.0+sdk-1.4.341.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4677,15 +4692,17 @@ checksum = "b6f5e870be6c3b371b77fe0ee0bafb859fa4964b4404c27de1d380043c4dda20"
 
 [[package]]
 name = "ultrahdr-core"
-version = "0.4.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "964a038e0f75524ef9bd01ee6bda6d2457a3b6c1ca8df22478b9bb94b3547669"
+version = "0.6.0"
+source = "git+https://github.com/imazen/ultrahdr?rev=7e9d296c9e037e626234c9f0e8673d48278f83f0#7e9d296c9e037e626234c9f0e8673d48278f83f0"
 dependencies = [
  "bytemuck",
  "enough",
- "half",
+ "linear-srgb",
  "thiserror",
- "wide",
+ "whereat",
+ "zencodec 0.2.0",
+ "zenmeta",
+ "zenpixels 0.3.1",
 ]
 
 [[package]]
@@ -5525,15 +5542,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "yuv"
-version = "0.8.16"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5d85a782d94ee43f078bcfd6fa82d4e6a5b2d1cfbbad168e4df5a9f7b39ef48c"
-dependencies = [
- "num-traits",
-]
-
-[[package]]
 name = "yuvxyb"
 version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5589,7 +5597,21 @@ dependencies = [
  "almost-enough",
  "enough",
  "whereat",
- "zenpixels",
+ "zenpixels 0.2.16",
+]
+
+[[package]]
+name = "zencodec"
+version = "0.2.0"
+source = "git+https://github.com/imazen/zencodec?rev=61fb96f1c8c89d4c8d2210eed8679372d66f8aa7#61fb96f1c8c89d4c8d2210eed8679372d66f8aa7"
+dependencies = [
+ "almost-enough",
+ "enough",
+ "how-far",
+ "libm",
+ "spin 0.12.3",
+ "whereat",
+ "zenpixels 0.3.1",
 ]
 
 [[package]]
@@ -5601,7 +5623,7 @@ dependencies = [
  "exr",
  "thiserror",
  "whereat",
- "zenpixels",
+ "zenpixels 0.2.16",
 ]
 
 [[package]]
@@ -5627,27 +5649,38 @@ dependencies = [
 
 [[package]]
 name = "zenjpeg"
-version = "0.8.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4fc00260b76e859d71f31ceab888e6691508569e69ed6eeed3a42ef9791cfd7f"
+version = "0.9.0"
+source = "git+https://github.com/imazen/zenjpeg?rev=762fa7128c2124b42cfa6e23b30024a688f5b7a3#762fa7128c2124b42cfa6e23b30024a688f5b7a3"
 dependencies = [
  "aligned-vec",
  "archmage",
  "bytemuck",
  "enough",
+ "garb",
+ "how-far",
  "imgref",
  "linear-srgb",
  "magetypes",
+ "memchr",
  "rgb",
  "safe_unaligned_simd",
  "thiserror",
  "tinyvec",
  "ultrahdr-core",
  "whereat",
- "wide",
- "yuv",
- "zencodec",
- "zenpixels",
+ "zencodec 0.2.0",
+ "zenmeta",
+ "zenpixels 0.3.1",
+ "zenyuv",
+]
+
+[[package]]
+name = "zenmeta"
+version = "0.1.0"
+source = "git+https://github.com/imazen/zencodec?rev=61fb96f1c8c89d4c8d2210eed8679372d66f8aa7#61fb96f1c8c89d4c8d2210eed8679372d66f8aa7"
+dependencies = [
+ "zencodec 0.2.0",
+ "zenpixels 0.3.1",
 ]
 
 [[package]]
@@ -5663,6 +5696,17 @@ name = "zenpixels"
 version = "0.2.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5851fd39b312749a3c367a0cd3522bd95d43276cfa613e9c18df748447cef3a8"
+dependencies = [
+ "bytemuck",
+ "imgref",
+ "rgb",
+ "whereat",
+]
+
+[[package]]
+name = "zenpixels"
+version = "0.3.1"
+source = "git+https://github.com/imazen/zenpixels?rev=f23ac7535be1144a22d0dc6b71f866a08b151f34#f23ac7535be1144a22d0dc6b71f866a08b151f34"
 dependencies = [
  "bytemuck",
  "imgref",
@@ -5687,7 +5731,7 @@ dependencies = [
  "paste",
  "rgb",
  "whereat",
- "zenpixels",
+ "zenpixels 0.2.16",
 ]
 
 [[package]]
@@ -5707,9 +5751,9 @@ dependencies = [
  "safe_unaligned_simd",
  "thiserror",
  "whereat",
- "zencodec",
+ "zencodec 0.1.26",
  "zenflate 0.3.6",
- "zenpixels",
+ "zenpixels 0.2.16",
  "zenpixels-convert",
 ]
 
@@ -5750,7 +5794,7 @@ dependencies = [
  "safe_unaligned_simd",
  "whereat",
  "zenblend",
- "zenpixels",
+ "zenpixels 0.2.16",
 ]
 
 [[package]]
@@ -5774,9 +5818,9 @@ dependencies = [
  "sha2 0.11.0",
  "thiserror",
  "zenbench",
- "zencodec",
+ "zencodec 0.1.26",
  "zenjpeg",
- "zenpixels",
+ "zenpixels 0.2.16",
  "zenpixels-convert",
  "zenpng",
  "zenpredict",
@@ -5813,7 +5857,7 @@ dependencies = [
  "thiserror",
  "zenbench",
  "zenblend",
- "zenpixels",
+ "zenpixels 0.2.16",
  "zenpng",
  "zenresize",
  "zensim",
@@ -5871,7 +5915,7 @@ dependencies = [
  "zenexr",
  "zenflate 0.4.0",
  "zenmetrics-stats",
- "zenpixels",
+ "zenpixels 0.2.16",
  "zenpixels-convert",
  "zenpng",
  "zenpredict",
@@ -5889,6 +5933,19 @@ version = "0.0.0"
 dependencies = [
  "zensim",
  "zensim-regress",
+]
+
+[[package]]
+name = "zenyuv"
+version = "0.1.3"
+source = "git+https://github.com/imazen/zenjpeg?rev=762fa7128c2124b42cfa6e23b30024a688f5b7a3#762fa7128c2124b42cfa6e23b30024a688f5b7a3"
+dependencies = [
+ "archmage",
+ "imgref",
+ "libm",
+ "linear-srgb",
+ "magetypes",
+ "safe_unaligned_simd",
 ]
 
 [[package]]

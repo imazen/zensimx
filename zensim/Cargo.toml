@@ -256,7 +256,8 @@ zencodec = { version = "0.1.26", default-features = false }
 # dependency behind the default-on `imgref` feature; listing it here too keeps
 # the examples building under any feature combination.
 rgb = { workspace = true }
-zenjpeg = { version = "0.8.4", default-features = false, features = ["decoder"] }
+# RGB era checked against the frozen extractor; Cargo.lock records 762fa7128c21.
+zenjpeg = { git = "https://github.com/imazen/zenjpeg", rev = "762fa7128c2124b42cfa6e23b30024a688f5b7a3", default-features = false }
 # Pins the shipped Profile C weight bytes (profile_c_tests::weight_sha256_pinned).
 # Same version zensim-validate already uses in this workspace.
 sha2 = "0.11.0"
