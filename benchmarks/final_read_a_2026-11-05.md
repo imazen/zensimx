@@ -459,3 +459,19 @@ Raw-chain pins (raw bytes hashed, target values not parsed):
 | JND_image_50.txt | `747b392eecea1787a306e73e0961cff575677851e77147634738222c0961341d` |
 
 The registered construction is mean count of chain points QF≥q across30 subjects, q1..100, with q100 target0 by definition. Full50 and fixed clean40 are reported. Excluded clean40 sources:1,3,6,7,9,17,28,31,45,50. The lost original CSV SHA256 `36f17dd8bac2d085f718e388fd5db307d887338c9c2b296349bb2ef20f184802` cannot be byte-verified against the reconstruction. No labels, weights or subset membership were selected on these scores.
+
+## Governing versus library files: key-only comparison
+
+No additional target column was parsed. Reference filenames identify the approved references; candidate keys retain the codec parent for CID22/LIVE to avoid basename aliases, and use the collision-free filenames for the other sets. Every governing row has a unique projected pair key. All files differ bytewise in schema/path representation; numeric library targets were not compared or substituted.
+
+| Set | Library total rows | Library rows on approved refs | Governing rows | Common pixel keys | Governing only | Library only |
+|---|---:|---:|---:|---:|---:|---:|
+| cid22_b | 4341 | 2124 | 2100 | 2100 | 0 | 24 |
+| csiq | 866 | 866 | 866 | 866 | 0 | 0 |
+| live | 779 | 779 | 779 | 779 | 0 | 0 |
+| konjnd_terminal | 1008 | 100 | 100 | 0 | 100 | 100 |
+| aic4 | 300 | 300 | 300 | 300 | 0 | 0 |
+
+CID22 library adds24 reference/self rows on these references; the governing2,100 distorted pairs are all present. KonJND library entries pair each source with itself (threshold records), while the governing file pairs the source with the coded threshold JPEG. The pinned100 coded pairs, including SRC0437 JPEG058, govern. CSIQ, LIVE and AIC4 projected pixel-key populations match completely; their original target conventions and scales govern. MCL library243 threshold records remain distinct from the coordinator-approved5,000-row reconstruction.
+
+Key-comparison receipt SHA256 `8bb3467fc4f7d456703c8bd07d3afd4a606d5c8530ebddc5c15abe4dbc877f51`.
