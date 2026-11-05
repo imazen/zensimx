@@ -21,7 +21,39 @@ teacher-development feasibility rule passes. Seeds1–2 require the separate
 owner cost decision after seed0 passes its product/development conditions.
 The full registration owns all constants, populations, objectives and reads.
 
-## Implementation and gates so far
+## Frozen-model accuracy
+
+| Model | Teacher dev MAE | E36 inversions (%) | EVAL9 error (%) | EVAL8 excluding MDID (%) |
+|---|---:|---:|---:|---:|
+| A0 | 3.225105 | 3.386235 | 7.94419 | 8.17742 |
+| A1 | 3.237627 | 3.362575 | 8.09039 | 8.31690 |
+| A2 | 3.393835 | 3.441131 | 8.04925 | 8.27506 |
+| T1a seed 0 | 3.510737 | 3.227577 | 8.20518 | 8.45104 |
+| T1b seed 0 | 4.404213 | 3.869474 | 8.46816 | 8.76595 |
+| T1c seed 0 | 4.941278 | 5.353987 | 8.40385 | 8.71204 |
+
+Lower is better in every numeric column. EVAL error is the equal-collection mean
+of median residuals after the assessment-only logistic fit, normalized by each
+collection's target 1–99% span. MDID is a training source, so EVAL8 also removes
+that collection. The models and transform tables were frozen before these reads.
+
+E36 compares 646,677 already-exposed selection pairs from 40 origins; it is not
+held-out confirmation. Its source-bootstrap changes against the three-seed A
+mean, with 10,000 draws, are:
+
+| Arm | Inversion change (percentage points) | 95% source-bootstrap interval |
+|---|---:|---|
+| T1a | -0.169069 | [-0.324519, -0.025491] |
+| T1b | +0.472827 | [+0.272937, +0.678314] |
+| T1c | +1.957340 | [+1.718568, +2.225726] |
+
+Yeo-Johnson improves the E36 selection-source ordering but worsens the teacher
+development error and both EVAL means beside every A seed. Median-knee soft-clip
+and the mixed screen worsen all three summaries. Some individual collection/HDR
+statistics improve; the full read tables retain those results. EVAL does not
+select a candidate, release T2 or authorize repeats.
+
+## Implementation and gates
 
 - `726278fc`: extend the existing screen with an explicit variant filter and
   positive-percentile soft_clip/soft_sign candidates; historical default
