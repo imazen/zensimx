@@ -4000,15 +4000,13 @@ viz-test:
 viz-audit bake bank out:
     set -o pipefail; ZENSIM_FORMULA_REV=7 TMPDIR="$HOME/tmp/zensim-viz" flock "$HOME/tmp/heavy.lock" "$HOME/work/claudehints/scripts/run-heavy" --mem 16G --jobs 8 -- tools/zensim-viz/target/release/zensim-viz-export audit {{quote(bake)}} --bank {{quote(bank)}} --out {{quote(out)}} 2>&1 | tee "$HOME/tmp/zensim-viz/audit.log"
 
-viz-serve:
-    python3 -m http.server 3310 --bind 0.0.0.0 -d tools/zensim-viz/web
+viz-serve directory:
+    python3 tools/zensim-viz/serve_pages.py {{quote(directory)}} --port 3310
 
 viz-web-check:
-    node --check tools/zensim-viz/web/app.js
-    node --check tools/zensim-viz/web/weight-view.js
-    node --check tools/zensim-viz/web/function-view.js
-    node --check tools/zensim-viz/web/studio.js
-    node --check tools/zensim-viz/web/frame.js
+    node --check tools/zensim-viz/pages/app.js
+    node --check tools/zensim-viz/pages/archive.js
+    node --check tools/zensim-viz/pages/worker.js
     diff -qr /home/lilith/tmp/zensim-viz-brief/design tools/zensim-viz/web/design
 
 viz-lens bake bank out feature:
@@ -4049,7 +4047,7 @@ viz-browser-audit:
     VIZ_TEST_SCOPE=audit TMPDIR="$HOME/tmp/zensim-viz" node tools/zensim-viz/tests/browser.mjs
 
 viz-web-fmt:
-    node "$VIZ_PRETTIER" --write tools/zensim-viz/web/app.js tools/zensim-viz/web/weight-view.js tools/zensim-viz/web/function-view.js tools/zensim-viz/web/app.css tools/zensim-viz/web/index.html tools/zensim-viz/web/format.mjs tools/zensim-viz/web/studio.js tools/zensim-viz/web/frame.js tools/zensim-viz/web/studio.css tools/zensim-viz/tests/design2.mjs tools/zensim-viz/tests/browser.mjs tools/zensim-viz/tests/review1.mjs tools/zensim-viz/tests/review2.mjs tools/zensim-viz/tests/function.mjs tools/zensim-viz/tests/format.mjs
+    node "$VIZ_PRETTIER" --write tools/zensim-viz/pages/app.js tools/zensim-viz/pages/archive.js tools/zensim-viz/pages/worker.js tools/zensim-viz/pages/style.css tools/zensim-viz/pages/index.html tools/zensim-viz/tests/pages-parity.mjs tools/zensim-viz/tests/pages-lens.mjs tools/zensim-viz/tests/pages-smoke.mjs
 
 # Caller supplies private file paths; every native job reacquires the shared lock.
 viz-bundle plan:
@@ -4616,3 +4614,49 @@ sibling-prep-steer-check:
 # Existing revision-vector oracles also retain their receipts in serial libtest.
 sibling-prep-vector-check:
     RUST_TEST_THREADS=1 cargo test -p zensim --locked --test featcanon_rev7_parity --test featcanon_tier_parity --features training,custom-profiles,classification,zenpixels -- --nocapture
+
+viz-pages-check bake target:
+    flock "$HOME/tmp/heavy.lock" "$HOME/work/claudehints/scripts/run-heavy" --mem 16G --jobs 6 -- env TMPDIR="$HOME/tmp/zensim-viz" ZENSIM_WORKBENCH_BAKES="A={{bake}}" CARGO_TARGET_DIR={{quote(target)}} cargo check --release --manifest-path zensim-workbench/Cargo.toml --features pages-viz
+
+# Keep browser/native builds behind the shared evaluation lock; never store binaries in git.
+viz-pages-module bake target out wasm_bindgen:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    export TMPDIR="$HOME/tmp/zensim-viz" ZENSIM_WORKBENCH_BAKES="A={{bake}}" ZENSIM_WORKBENCH_LABEL="zensim A revision 7 browser" CARGO_TARGET_DIR={{quote(target)}}
+    flock "$HOME/tmp/heavy.lock" "$HOME/work/claudehints/scripts/run-heavy" --mem 16G --jobs 6 -- env RUSTFLAGS="-C target-feature=+simd128 -C strip=symbols --remap-path-prefix=$HOME=deps --remap-path-prefix=$PWD=zensimx --remap-path-prefix=$CARGO_TARGET_DIR=target" cargo build --release --locked --manifest-path zensim-workbench/Cargo.toml --features pages-viz --target wasm32-unknown-unknown --lib
+    {{quote(wasm_bindgen)}} --target web --out-dir {{quote(out)}}/pkg "$CARGO_TARGET_DIR/wasm32-unknown-unknown/release/zensim_workbench.wasm"
+
+viz-pages-native bake target out:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    unset ZENSIM_VIZ_MAP_DIR
+    export TMPDIR="$HOME/tmp/zensim-viz" ZENSIM_FORMULA_REV=7 ZENSIM_WORKBENCH_BAKES="A={{bake}}" CARGO_TARGET_DIR={{quote(target)}}
+    flock "$HOME/tmp/heavy.lock" "$HOME/work/claudehints/scripts/run-heavy" --mem 16G --jobs 6 -- cargo run --release --locked --manifest-path zensim-workbench/Cargo.toml --features pages-viz --example viz_parity -- {{quote(bake)}} {{quote(out)}}
+
+viz-pages-export mode bake bank out certifier:
+    flock "$HOME/tmp/heavy.lock" "$HOME/work/claudehints/scripts/run-heavy" --mem 16G --jobs 6 -- env TMPDIR="$HOME/tmp/zensim-viz" ZENSIM_FORMULA_REV=7 VIZ_CERTIFIER={{quote(certifier)}} cargo run --release --manifest-path tools/zensim-viz/Cargo.toml -- {{quote(mode)}} {{quote(bake)}} --bank {{quote(bank)}} --out {{quote(out)}}
+
+viz-pages-inventory:
+    python3 tools/zensim-viz/r2_pages.py inventory
+
+viz-pages-packer target:
+    flock "$HOME/tmp/heavy.lock" "$HOME/work/claudehints/scripts/run-heavy" --mem 16G --jobs 6 -- env TMPDIR="$HOME/tmp/zensim-viz" CARGO_TARGET_DIR={{quote(target)}} cargo build --release --manifest-path tools/zensim-viz/pack/Cargo.toml
+
+viz-pages-parity site native out:
+    flock "$HOME/tmp/heavy.lock" "$HOME/work/claudehints/scripts/run-heavy" --mem 8G --jobs 1 -- env TMPDIR="$HOME/tmp/zensim-viz" node tools/zensim-viz/tests/pages-parity.mjs {{quote(site)}} {{quote(native)}} {{quote(out)}}
+
+viz-pages-qualify root bake certifier bindgen:
+    flock "$HOME/tmp/heavy.lock" "$HOME/work/claudehints/scripts/run-heavy" --mem 16G --jobs 6 -- bash tools/zensim-viz/qualify_pages.sh {{quote(root)}} {{quote(bake)}} {{quote(certifier)}} {{quote(bindgen)}}
+
+viz-pages-lens-check site native out:
+    flock "$HOME/tmp/heavy.lock" "$HOME/work/claudehints/scripts/run-heavy" --mem 8G --jobs 1 -- env TMPDIR="$HOME/tmp/zensim-viz" node tools/zensim-viz/tests/pages-lens.mjs {{quote(site)}} {{quote(native)}} {{quote(out)}}
+
+viz-pages-smoke site out:
+    flock "$HOME/tmp/heavy.lock" "$HOME/work/claudehints/scripts/run-heavy" --mem 8G --jobs 1 -- env TMPDIR="$HOME/tmp/zensim-viz" node tools/zensim-viz/tests/pages-smoke.mjs {{quote(site)}} {{quote(out)}}
+
+viz-pages-site source out archive_url:
+    python3 -B tools/zensim-viz/pages_build.py site --source {{quote(source)}} --out {{quote(out)}} --archive-url {{quote(archive_url)}}
+
+# Resume after verified native exports; replays the lens oracle, Wasm and browser gates.
+viz-pages-finish root bake bindgen:
+    flock "$HOME/tmp/heavy.lock" "$HOME/work/claudehints/scripts/run-heavy" --mem 16G --jobs 6 -- bash tools/zensim-viz/finish_pages.sh {{quote(root)}} {{quote(bake)}} {{quote(bindgen)}}
