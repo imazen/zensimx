@@ -14,13 +14,12 @@ def main():
     value = json.loads(path.read_text())
     observation = {'utc': datetime.now(timezone.utc).isoformat(), 'processes': {}}
     pids = {field: value.get(field) for field in ('controller_pid', 'child_pid')}
-    controller = pids['controller_pid']
-    if controller:
+    for parent in tuple(pid for pid in pids.values() if pid):
         try:
-            children = (Path('/proc') / str(controller) / 'task' / str(controller) / 'children').read_text()
+            children = (Path('/proc') / str(parent) / 'task' / str(parent) / 'children').read_text()
             for child in children.split():
                 if int(child) not in pids.values():
-                    pids[f'controller_child_{child}'] = int(child)
+                    pids[f'child_of_{parent}_{child}'] = int(child)
         except FileNotFoundError:
             pass
     for field, pid in pids.items():
@@ -36,6 +35,7 @@ def main():
     if population == 'clic22' and action == 'stage':
         logs.append(args.root / 'stage/clic-2022-perceptual/rsync.log')
     logs.extend((args.root / 'inputs' / population).glob('*.log'))
+    logs.extend(sorted((args.root / 'banks/_work' / population).glob('chunk_*.log'))[-1:])
     observation['log_tails'] = {}
     for log in logs:
         if log.is_file():
