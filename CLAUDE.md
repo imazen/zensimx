@@ -192,6 +192,15 @@ because cleanup tests or a historical training reproduction pass.
 
 ## Known Bugs
 
+### Crossover archive inventory (2026-11-04)
+
+The initial artifact inventory excluded every directory named `target`, including
+preserved reference executables, and silently omitted directory symlinks. Two
+controls reproduced those omissions before the final archive was inventoried.
+The inventory now excludes only root Cargo caches and VCS metadata, includes
+preserved nested controls, and refuses remaining directory symlinks. Fixture
+aliases are materialized as verified hard links before freezing the inventory.
+
 ### Crossover cache executable preservation (2026-11-04)
 
 The initial crossover cache helper scanned release executables only in `target`

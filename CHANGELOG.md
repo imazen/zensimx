@@ -13,6 +13,10 @@
 
 ### Fixed
 
+- Skip parallel streaming extraction below 36,864 pixels after existing small-image
+  padding; scores are unchanged (`bfabf0d5`). The [gate study](benchmarks/a_parallel_gate_2026-11-04.md)
+  records both pool-size crossovers and 49/50 admitted before/after cells.
+
 - Validate tracked-path guards in plain source exports using an explicit, strict
   file-list manifest; preserve normal VCS discovery (`4a403308`).
 

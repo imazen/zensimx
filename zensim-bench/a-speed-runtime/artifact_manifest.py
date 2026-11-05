@@ -10,7 +10,12 @@ manifest = root / "SHA256SUMS"
 assert not manifest.exists(), "preserve the existing frozen inventory"
 rows, total = [], 0
 for directory, dirs, files in os.walk(root):
-    dirs[:] = sorted(d for d in dirs if d not in {"target", ".git", ".jj"})
+    directory = Path(directory)
+    dirs[:] = sorted(d for d in dirs if d not in {".git", ".jj"}
+                     and not (directory == root and d in {"target", "target-tests"}))
+    for name in dirs:
+        path = directory / name
+        assert not path.is_symlink(), (path, "archive symlinks require an explicit policy")
     for name in sorted(files):
         if name == ".workongoing":
             continue

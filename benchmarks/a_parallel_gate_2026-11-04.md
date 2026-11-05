@@ -5,8 +5,14 @@ The cutoff is 36,864 pixels (192²): the higher of the measured 16-thread
 first-p50-win rule. The four-thread 192² p95 is worse than serial; this
 single-host measurement does not establish a universal optimum.
 
-The baseline matrix is admitted: 25/25 cells and 500/500 matching score pairs.
-The gated matrix is still being collected; this is an interim report.
+The final admitted scope is **49/50 cells: 25 baseline and 24 gated square cells**.
+All **980/980** printed and bitwise serial/parallel score pairs match, including
+before/after and pool-size identity. The gated 12 MP cell is **not measured**.
+i270 auto-rebooted at 04:00 UTC on November 5 for a kernel update. Its scoring
+containers restarted and kept load1 above the unchanged 2.0 admission gate.
+The coordinator directed finalization at 49 cells because that evaluation work
+outranks this benchmark. The interrupted timing and subsequent zero-sample
+preflight attempt are retained and excluded.
 
 ## Before measurements
 
@@ -27,7 +33,7 @@ The gated matrix is still being collected; this is an interim report.
 
 Crossover: 16T 160²; 4T 192². Gate: **36,864 pixels**, the higher crossover.
 
-Printed and bitwise serial/parallel scores: **0 differences in 500 comparisons**. Pool-size score bits also match; after measurements are pending.
+Printed and bitwise serial/parallel scores: **0 differences in 980 comparisons across 49 admitted cells**. Before/after and pool-size score bits match. Full 50-cell admission remains unmet because the gated 12 MP cell is not measured.
 
 
 The 12 MP 16T control has serial p50/p95 **345.6629/377.2978 ms** and
@@ -37,16 +43,45 @@ The grid is non-monotone: 384²/16T and 320²/4T favor serial at p50.
 The floor follows the requested first-win rule; it does not establish a
 parallel win at every larger size.
 
-## First gated control (1 of 25 cells illustrated)
+## Before and after measurements
 
-| 64², 16 threads | Before p50/p95 ms | After p50/p95 ms |
-|---|---:|---:|
-| serial | 0.8557/2.3167 | 0.6994/1.1352 |
-| parallel | 1.8539/3.2500 | 0.6952/1.1632 |
+All values are p50/p95 milliseconds. “Not measured” excludes the interrupted
+12 MP attempt; it is not an estimated or retained partial timing.
 
-All 20 printed score pairs match. The serial control is also faster in the
-second run; this cross-build change includes host-state variation. Full gated
-matrix admission and the remaining before/after tables are pending.
+| Threads | Size | Serial before p50/p95 | Serial after p50/p95 | Parallel before p50/p95 | Parallel after p50/p95 |
+|---:|---|---:|---:|---:|---:|
+| 16 | 64² | 0.8557/2.3167 | 0.6994/1.1352 | 1.8539/3.2500 | 0.6952/1.1632 |
+| 16 | 96² | 1.2052/3.2460 | 1.0569/1.6686 | 2.1173/3.9598 | 1.0374/1.6888 |
+| 16 | 128² | 1.6517/3.9895 | 1.4224/2.4099 | 2.4762/4.6111 | 1.4026/2.3571 |
+| 16 | 160² | 2.2436/3.8718 | 2.0243/3.2377 | 2.0572/3.5337 | 1.9848/3.2994 |
+| 16 | 192² | 2.7681/4.6096 | 2.8424/4.8720 | 2.2065/3.7183 | 2.5222/4.1158 |
+| 16 | 256² | 3.7594/6.2500 | 3.9837/6.4142 | 3.2760/5.5246 | 3.4488/5.5073 |
+| 16 | 320² | 4.8037/8.0167 | 5.1060/8.4200 | 4.3556/6.9398 | 4.5173/6.8046 |
+| 16 | 384² | 5.8448/10.4137 | 5.8369/10.8461 | 5.9112/7.8958 | 5.0290/7.5533 |
+| 16 | 512² | 9.1680/17.1411 | 9.0803/16.7956 | 7.0153/9.2289 | 7.0908/9.5125 |
+| 16 | 640² | 12.8102/24.4834 | 12.8759/24.6735 | 9.5784/11.7520 | 8.4830/11.4869 |
+| 16 | 768² | 17.7190/34.2597 | 17.7083/34.6424 | 10.7617/13.5585 | 10.3978/13.4176 |
+| 16 | 1024² | 30.6286/56.8208 | 30.6894/58.1914 | 14.1228/16.8510 | 15.3225/18.2562 |
+| 16 | 12 MP class | 345.6629/377.2978 | not measured | 117.5212/127.2016 | not measured |
+| 4 | 64² | 0.8320/1.3340 | 0.7350/1.2775 | 1.9478/3.4166 | 0.7403/1.2116 |
+| 4 | 96² | 1.1505/1.8595 | 1.0010/1.5843 | 2.3405/4.3923 | 0.9902/1.5999 |
+| 4 | 128² | 1.5668/2.6164 | 1.4483/2.4873 | 2.5073/4.8919 | 1.4384/2.4403 |
+| 4 | 160² | 2.0775/3.2753 | 1.8802/2.9094 | 2.1982/3.5091 | 1.8714/2.7569 |
+| 4 | 192² | 2.5022/4.1735 | 2.3906/3.9968 | 2.4563/4.6534 | 2.2864/3.9369 |
+| 4 | 256² | 3.8813/6.0495 | 3.1701/5.4045 | 3.3901/5.3817 | 3.6688/6.4396 |
+| 4 | 320² | 4.7080/7.4568 | 5.4240/8.1702 | 4.8147/8.2816 | 4.2833/6.9735 |
+| 4 | 384² | 6.4504/10.3288 | 5.9831/10.1935 | 5.7808/7.8488 | 5.2697/8.9040 |
+| 4 | 512² | 9.5644/17.7277 | 9.1918/16.6293 | 6.8959/10.3159 | 6.8557/9.8216 |
+| 4 | 640² | 13.6186/24.7416 | 12.0455/23.4537 | 9.6019/13.1801 | 9.6718/13.2484 |
+| 4 | 768² | 17.0443/33.3215 | 17.6336/33.9739 | 12.9097/17.2089 | 11.9060/17.6283 |
+| 4 | 1024² | 30.3912/32.8359 | 30.3065/57.1494 | 19.6642/25.0426 | 18.8150/24.2259 |
+
+The 1024²/16T parallel p50 is **8.5% higher** in the gated run.
+The serial control and parallel timings vary across runs; the measurements do
+not establish that every large-image latency is unchanged. The gate retains
+the parallel branch above its cutoff, and all admitted scores remain identical.
+No additional 1024² repeat was run: recovery was limited to the interrupted cell.
+The 12 MP four-thread control was outside the declared study and was not measured.
 
 ## Method and identities
 
@@ -69,8 +104,8 @@ The frozen baseline executable is SHA-256
 the gated executable is
 `d03774877de2e095768d5ddf98673246588dfe5fdecbf782611ddb9ff7fa3dc6`.
 The binary receipts, source snapshots and raw files retain the compiler,
-fixtures, rounds and resource logs. Final inventory and mirror verification
-are pending.
+fixtures, rounds and resource logs. The [artifact pointer](a_parallel_gate_2026-11-04.pointer.md)
+records the frozen inventory and verified copies.
 
 Each process compares `A.with_parallel(false)` with `A.with_parallel(true)`
 using interleaved paired zenbench rounds. Warmup is 100 ms per arm and image;
@@ -141,6 +176,28 @@ with that discarded executable is not claimed. The corrected helper preserves
 release roots/examples in each existing named cache before removing it; both
 new regression controls and the actual rebuild/preservation run pass.
 
+Before the final inventory, two further controls found that the manifest tool
+excluded preserved directories named `target` and silently omitted directory
+symlinks. It now includes preserved nested controls, excludes only root Cargo
+caches and VCS metadata, and refuses directory links. All five fixture aliases
+were materialized as verified hard links, preserving the original bytes. All
+23 admission, preservation and inventory controls pass. No raw measurement
+was rerun for this archival correction.
+
+## Hardware-counter observation
+
+For the same 20-pair 64²/16T score-check command, `perf stat` recorded
+1,644 context switches before the gate and 49 after, with 108 and 13 CPU
+migrations respectively. These are whole-process observations, including
+startup and both scoring arms. Core/atom PMU counters were multiplexed, so
+no cycle comparison or kernel-time percentage is inferred. Both raw captures
+are retained. Resource receipts:
+
+```text
+before: run-heavy: done rc=0 0s | peak-RSS 0.02GiB | min-avail 25555MiB | peak-load 1.58
+after: run-heavy: done rc=0 0s | peak-RSS 0.02GiB | min-avail 25727MiB | peak-load 1.55
+```
+
 ## Commands
 
 All heavy payloads run on i270 under the shared `flock` and `run-heavy`
@@ -183,8 +240,9 @@ any timing pair started; its empty attempt and receipt are preserved.
 The after controller validates both complete, contiguous crossover prefixes
 before starting gated cells. Larger sizes cannot change the first win in those
 prefixes. The two collectors serialize all heavy work through the same lock;
-full final admission still requires every before and after cell. Only the shared
-first 32 clean rounds enter either report.
+the original full-matrix admission still requires every before and after cell.
+That gate was not relaxed: this report explicitly finalizes 49 admitted cells
+and records the missing cell. Only the shared first 32 clean rounds enter the tables.
 
 Research check payloads, from `research-after/`, run under the same locked
 16 GiB/eight-job wrapper and `taskset -c 0-15`:
@@ -212,9 +270,36 @@ python3 -B ../source/a-speed-runtime/check_gate.py .. public
 ```
 
 Raw timing, score, reference, validation and hardware-counter logs are retained
-with their source/binary identities. Final inventory and archive-mirror verification remain pending.
+with their source/binary identities. The artifact pointer records archive verification.
 
-## Baseline resource observations
+## Re-run only the missing 12 MP cell
+
+Run this single command only when i270 is idle. It uses the frozen binary and
+fixtures, checks the recorded binary hash, takes the existing shared lock and
+keeps the original load and clean-round gates. It writes to a fresh sibling
+directory and does not overwrite the finalized 49-cell capture. This recipe
+was syntax-checked; it has not been executed because evaluation owns the host.
+
+```sh
+ssh i270 'set -eu
+  r="$HOME/tmp/zensim-pargate"
+  out="$HOME/tmp/zensim-pargate-idle-12mp-$(date -u +%Y%m%dT%H%M%SZ)"
+  sha256sum -c "$r/after/benchmark.sha256"
+  mkdir "$out"
+  ln -s "$r/fixtures" "$out/fixtures"
+  cp "$r/after/BINARY.json" "$out/BINARY.json"
+  A_SPEED_PARALLEL_GATE=1 BENCH_CPUS=0-15 BENCH_THREADS=16 \
+    BENCH_SIZES=4096 BENCH_MODES="latency scores" \
+    bash "$r/source/a-speed-runtime/run.sh" "$out" "$r/after/bin/a-speed-peers"
+'
+```
+
+The instrument’s legacy size tag `4096` selects the existing 12 MP fixtures;
+it does not create a 4096² corpus. A single-cell retry is intentionally not a
+complete matrix. Its latency JSON, score log and resource log remain available
+for independent admission without rerunning the measurement.
+
+## Resource observations
 
 Runner resource observations (whole-process peaks, not a separate memory comparison):
 
@@ -244,4 +329,28 @@ before 4T 512: run-heavy: done rc=0 289s | peak-RSS 0.10GiB | min-avail 25214MiB
 before 4T 640: run-heavy: done rc=0 287s | peak-RSS 0.13GiB | min-avail 25190MiB | peak-load 1.93
 before 4T 768: run-heavy: done rc=0 287s | peak-RSS 0.16GiB | min-avail 25141MiB | peak-load 1.62
 before 4T 1024: run-heavy: done rc=0 284s | peak-RSS 0.23GiB | min-avail 25110MiB | peak-load 1.94
+after 16T 64: run-heavy: done rc=0 289s | peak-RSS 0.03GiB | min-avail 25264MiB | peak-load 1.84
+after 16T 96: run-heavy: done rc=0 288s | peak-RSS 0.03GiB | min-avail 25303MiB | peak-load 1.92
+after 16T 128: run-heavy: done rc=0 289s | peak-RSS 0.04GiB | min-avail 25258MiB | peak-load 2.04
+after 16T 160: run-heavy: done rc=0 290s | peak-RSS 0.04GiB | min-avail 25228MiB | peak-load 1.73
+after 16T 192: run-heavy: done rc=0 291s | peak-RSS 0.06GiB | min-avail 25190MiB | peak-load 1.72
+after 16T 256: run-heavy: done rc=0 289s | peak-RSS 0.07GiB | min-avail 25225MiB | peak-load 2.08
+after 16T 320: run-heavy: done rc=0 289s | peak-RSS 0.08GiB | min-avail 25230MiB | peak-load 2.48
+after 16T 384: run-heavy: done rc=0 289s | peak-RSS 0.10GiB | min-avail 25152MiB | peak-load 1.84
+after 16T 512: run-heavy: done rc=0 289s | peak-RSS 0.13GiB | min-avail 25133MiB | peak-load 2.09
+after 16T 640: run-heavy: done rc=0 288s | peak-RSS 0.18GiB | min-avail 25099MiB | peak-load 3.16
+after 16T 768: run-heavy: done rc=0 287s | peak-RSS 0.23GiB | min-avail 25037MiB | peak-load 3.24
+after 16T 1024: run-heavy: done rc=0 285s | peak-RSS 0.32GiB | min-avail 24958MiB | peak-load 3.38
+after 4T 64: run-heavy: done rc=0 289s | peak-RSS 0.03GiB | min-avail 25239MiB | peak-load 1.84
+after 4T 96: run-heavy: done rc=0 288s | peak-RSS 0.04GiB | min-avail 25134MiB | peak-load 1.89
+after 4T 128: run-heavy: done rc=0 290s | peak-RSS 0.04GiB | min-avail 24867MiB | peak-load 1.96
+after 4T 160: run-heavy: done rc=0 288s | peak-RSS 0.04GiB | min-avail 25199MiB | peak-load 1.47
+after 4T 192: run-heavy: done rc=0 290s | peak-RSS 0.05GiB | min-avail 25211MiB | peak-load 1.81
+after 4T 256: run-heavy: done rc=0 288s | peak-RSS 0.06GiB | min-avail 25222MiB | peak-load 2.02
+after 4T 320: run-heavy: done rc=0 290s | peak-RSS 0.06GiB | min-avail 25186MiB | peak-load 2.34
+after 4T 384: run-heavy: done rc=0 289s | peak-RSS 0.07GiB | min-avail 25213MiB | peak-load 1.68
+after 4T 512: run-heavy: done rc=0 291s | peak-RSS 0.10GiB | min-avail 25168MiB | peak-load 1.65
+after 4T 640: run-heavy: done rc=0 287s | peak-RSS 0.13GiB | min-avail 25127MiB | peak-load 1.72
+after 4T 768: run-heavy: done rc=0 286s | peak-RSS 0.16GiB | min-avail 25091MiB | peak-load 2.18
+after 4T 1024: run-heavy: done rc=0 285s | peak-RSS 0.24GiB | min-avail 25041MiB | peak-load 2.35
 ```
