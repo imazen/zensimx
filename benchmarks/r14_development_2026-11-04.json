@@ -1,0 +1,48 @@
+{
+  "development": {
+    "groups": {
+      "safesyn": {
+        "rows": 38757,
+        "table_sha256": "6c0af6142a1e0d86de734e73a966502e78b68610e694b88e4584b1fb4c881643",
+        "mae": {
+          "T1a_s0": 3.705735696749654,
+          "T1b_s0": 4.679955989083233,
+          "T1c_s0": 5.267465651470391,
+          "F_s0": 3.393522721062465
+        }
+      },
+      "cid22": {
+        "rows": 3785,
+        "table_sha256": "b85e6c41941bc220c99b788b6b22b763faf0ce0f46edf7db330406204906535a",
+        "mae": {
+          "T1a_s0": 1.5140197429198008,
+          "T1b_s0": 1.580704427971763,
+          "T1c_s0": 1.6012317373382299,
+          "F_s0": 1.5005719255618015
+        }
+      }
+    },
+    "pooled": {
+      "T1a_s0": 3.5107367572252786,
+      "T1b_s0": 4.404212790390014,
+      "T1c_s0": 4.9412775229153105,
+      "F_s0": 3.2251051863680456
+    },
+    "best_arm": "T1a",
+    "T2_feasible": false,
+    "trainable_soft_clip_inputs": [],
+    "rule": "best T1 pooled teacher-development MAE <= A0; zero allowance",
+    "units": "stored human_score points, target scale1",
+    "role": "TRAIN development only; no EVAL selection"
+  },
+  "T2_release": {
+    "registration": "5b5a013482db4944042883995ad6892f92244c69",
+    "run": false,
+    "best_arm": "T1a",
+    "trainable_soft_clip_inputs": [],
+    "reason": "best T1 misses zero-allowance development feasibility",
+    "development_sha256": "bc7cadb766dfd88d86bf99cb663627b4e45093db815b8c2c73e5ab474cd0ac42",
+    "frozen_T1_sha256": "fd998d85d9732aa359ebbe39152c58bb65f546f17aaf128cf2841a1988e95966",
+    "source_sha256": "f93ea7a2ebc9d25cc2afaa56fe3cc5d3e9f2f4abc4063367805e2728923dc9fa"
+  }
+}

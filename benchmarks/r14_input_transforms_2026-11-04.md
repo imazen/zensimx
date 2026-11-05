@@ -1,6 +1,6 @@
 # R14: smooth per-input transforms for A
 
-**Incomplete: all 3 T1 fits are complete; development feasibility, conditional T2, product/EVAL/HDR reads, capacity
+**Incomplete: all 3 T1 fits and the T2 release decision are complete; product/EVAL/HDR reads, capacity
 panels, head timing and archive verification are not yet measured.** No candidate
 is selected or adopted. No EVAL data has been read by R14.
 
@@ -213,7 +213,8 @@ even when the percentile itself is not representable. Zero underflow still
 fails without an epsilon. All five knee tests and targeted clippy pass on ARM
 in 51 seconds (peak RSS 1.55 GiB, minimum available 25,925 MiB). A conditional
 native T2 trainer build has its own selection receipt; T1 trainer pins stay fixed.
-T2's scientific fit is still unreleased pending the registered T1 comparison.
+T2's scientific fit was not released: the registered T1 development comparison
+below fails feasibility, and its winning Yeo-Johnson table has no soft-clip slots.
 All serving/read binaries remain pinned to `912609aa`. Trainer successors
 are pinned separately, including each fit stage's native identity.
 
@@ -262,7 +263,26 @@ Continuation: `run-heavy: done rc=0 599s | peak-RSS 12.50GiB | min-avail 27275Mi
 All three final T1 model hashes are frozen before development feasibility or
 any EVAL read. T1a has two certified max pairs; T1b and T1c each have one.
 
-Full-bank capacity contributions, development feasibility, conditional T2 and all
+### Registered development comparison
+
+| Final bake, seed 0 | SafeSyn MAE (38,757 rows) | CID22 MAE (3,785 rows) | Pooled MAE |
+|---|---:|---:|---:|
+| A0 | 3.393523 | 1.500572 | 3.225105 |
+| T1a | 3.705736 | 1.514020 | 3.510737 |
+| T1b | 4.679956 | 1.580704 | 4.404213 |
+| T1c | 5.267466 | 1.601232 | 4.941278 |
+
+Errors use the stored teacher `human_score` points, with target scale 1.
+Lower is better. T1a wins among T1 arms but misses the registered <=A0
+zero-allowance feasibility rule; it also has no eligible soft-clip parameters.
+**T2 is not run.** All T1 arms miss the strict development improvement required
+for seeds 1–2, so no repeat is eligible regardless of the outstanding product
+reads. No EVAL value informed either decision.
+[Development and release receipt](r14_development_2026-11-04.json).
+The comparison job passes in 5 seconds (run-heavy peak RSS 0.97 GiB,
+minimum available 39,810 MiB).
+
+Full-bank capacity contributions and all
 quality/product reads remain outstanding. No missing evidence counts as a pass.
 Frozen A is the control and is not refitted.
 
