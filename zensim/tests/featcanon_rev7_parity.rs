@@ -188,10 +188,18 @@ fn rev7_moves_slots_by_rounding_only() {
                 "rev{rev} child failed:\n{}",
                 String::from_utf8_lossy(&out.stderr)
             );
-            let line = stdout
+            // Serial libtest can prefix the first uncaptured receipt with its banner.
+            let marker = format!("{TAG} ");
+            let mut vectors = stdout
                 .lines()
-                .find_map(|l| l.strip_prefix(TAG))
+                .filter_map(|line| line.split_once(&marker).map(|(_, vector)| vector));
+            let line = vectors
+                .next()
                 .unwrap_or_else(|| panic!("rev{rev} child did not emit its vector:\n{stdout}"));
+            assert!(
+                vectors.next().is_none(),
+                "rev{rev} child emitted multiple vectors:\n{stdout}"
+            );
             line.split_whitespace()
                 .map(|t| f64::from_bits(u64::from_str_radix(t, 16).expect("hex bits")))
                 .collect()

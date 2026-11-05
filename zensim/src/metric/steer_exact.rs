@@ -138,11 +138,20 @@ mod tests {
                 String::from_utf8_lossy(&output.stderr)
             );
             let stdout = String::from_utf8(output.stdout).unwrap();
-            let receipt = stdout
-                .lines()
-                .find_map(|l| l.strip_prefix("STEER_SMOOTH_BITS "))
-                .unwrap()
+            // Serial libtest writes its test banner before uncaptured stdout.
+            // The receipt can therefore share that line rather than start it.
+            let mut bit_receipts = stdout.lines().filter_map(|line| {
+                line.split_once("STEER_SMOOTH_BITS ")
+                    .map(|(_, receipt)| receipt)
+            });
+            let receipt = bit_receipts
+                .next()
+                .unwrap_or_else(|| panic!("child omitted its steering receipt:\n{stdout}"))
                 .to_string();
+            assert!(
+                bit_receipts.next().is_none(),
+                "child printed multiple steering receipts:\n{stdout}"
+            );
             receipts.push(receipt);
             println!("STEER_SMOOTH_NATIVE tier={tier} rectangles=91 stride=true identity=true");
         }

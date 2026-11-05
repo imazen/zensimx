@@ -993,3 +993,19 @@ E34's four deprecated EXIF calls now use the shared zenmeta entry points, which
 forward to the same retained filter/serializer; both existing metadata tests pass.
 Gate evidence: `benchmarks/sibling_prep_2026-11-05.pointer.md`. Frozen replay and
 split qualification are required before advancing a consuming dev-tool pin.
+
+
+## Known Bugs — serial steering receipt parsing (2026-11-05, fixed)
+
+With RUST_TEST_THREADS=1, libtest prefixes the child's first uncaptured line
+with `test <name> ... `. The smooth steering parent required its receipt at
+column zero and panicked after the child had passed. The retained child
+capture confirms the inline banner plus STEER_SMOOTH_BITS. The parser now
+finds the marker after that banner and requires exactly one receipt. Native,
+v3 and scalar receipt equality, all 91 rectangles, strided/identity and every
+existing numeric assertion are unchanged. No test is skipped or ignored.
+
+The same banner assumption also affected the Rev3/4 and Rev5/6/7 child-vector
+readers. They now require exactly one tagged vector anywhere on the banner
+line; vector width, revision movement, finiteness and rounding bounds remain
+unchanged. Both integration oracles run explicitly before the complete suite.

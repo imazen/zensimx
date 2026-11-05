@@ -4608,3 +4608,11 @@ sibling-prep-pixel-compare root report:
 sibling-prep-metric-check:
     RUST_TEST_THREADS=1 cargo test -p zensim --locked --lib --tests --features training,custom-profiles,classification,zenpixels
     cargo test -p zensim --locked --doc --features training,custom-profiles,classification,zenpixels
+
+# The existing three-tier oracle must also work with serial libtest formatting.
+sibling-prep-steer-check:
+    RUST_TEST_THREADS=1 cargo test -p zensim --locked --lib --features training,custom-profiles,classification,zenpixels metric::bake::steer_exact::tests::steer_smooth_native_tier_stride_parity -- --exact --nocapture
+
+# Existing revision-vector oracles also retain their receipts in serial libtest.
+sibling-prep-vector-check:
+    RUST_TEST_THREADS=1 cargo test -p zensim --locked --test featcanon_rev7_parity --test featcanon_tier_parity --features training,custom-profiles,classification,zenpixels -- --nocapture
