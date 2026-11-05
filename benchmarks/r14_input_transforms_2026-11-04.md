@@ -1,7 +1,7 @@
 # R14: smooth per-input transforms for A
 
-**Incomplete: all 3 T1 fits and the T2 release decision are complete; product/EVAL/HDR reads, capacity
-panels, head timing and archive verification are not yet measured.** No candidate
+**Incomplete: all 3 T1 fits, the T2 release decision and CID22 capacity cells are complete;
+product/EVAL/HDR reads, HDR capacity, head timing and archive verification remain.** No candidate
 is selected or adopted. No EVAL data has been read by R14.
 
 Registration `5b5a0134` in [the experiment record](e36_subset_test_2026-11-01.md)
@@ -283,7 +283,25 @@ reads. No EVAL value informed either decision.
 The comparison job passes in 5 seconds (run-heavy peak RSS 0.97 GiB,
 minimum available 39,810 MiB).
 
-Full-bank capacity contributions and all
+### Capacity on the complete CID22 TRAIN bank
+
+All 12,163 rows and all 492 joint damage-slot interventions are included.
+
+| Arm | Dead / residual / live | Live max pairs | Largest pair share (%) | Inputs at 50/90/99% ablation mass |
+|---|---|---:|---:|---|
+| T1a | 94 / 30 / 4 | 2 | 68.947980 | 12 / 88 / 176 |
+| T1b | 116 / 5 / 7 | 1 | 98.990304 | 19 / 134 / 266 |
+| T1c | 123 / 0 / 5 | 1 | 97.482152 | 27 / 133 / 246 |
+
+The native audit and ablation owners use the same R13 definitions: exact-zero
+encoder columns with nonpositive biases are dead; residual excludes dead and
+has absolute output weight below 1e-3 of the largest. Pair share sums measured
+absolute raw hidden contributions, `abs(w2)*mean(abs(activation))`, against
+all units. Each ablation jointly zeros a damage slot's direct and product
+callers; effects overlap and are not an additive score decomposition.
+[Capacity receipt](r14_capacity_progress_2026-11-04.json).
+
+The three HDR TRAIN capacity cells and all
 quality/product reads remain outstanding. No missing evidence counts as a pass.
 Frozen A is the control and is not refitted.
 

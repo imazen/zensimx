@@ -1,0 +1,70 @@
+{
+  "completed_cells": 3,
+  "required_cells": 6,
+  "cells": {
+    "cid22/T1a_s0": {
+      "hidden": 128,
+      "dead": 94,
+      "residual": 30,
+      "live": 4,
+      "live_pairs": 2,
+      "largest_pair": [
+        124,
+        126
+      ],
+      "largest_pair_share": 0.6894798034924934,
+      "concentration": {
+        "0.5": 12,
+        "0.9": 88,
+        "0.99": 176
+      },
+      "ablation_mass": 30.95827400542328,
+      "rows": 12163,
+      "bank_sha256": "07e2f4b71fe0ccc67848f2896344e6d0b6a255b0e91a7da9062d471ea3e11100",
+      "bake_sha256": "6a28893f896696fde6832782631e0af0582e9a317478fc5dc621198716935487"
+    },
+    "cid22/T1b_s0": {
+      "hidden": 128,
+      "dead": 116,
+      "residual": 5,
+      "live": 7,
+      "live_pairs": 1,
+      "largest_pair": [
+        126,
+        127
+      ],
+      "largest_pair_share": 0.989903035409487,
+      "concentration": {
+        "0.5": 19,
+        "0.9": 134,
+        "0.99": 266
+      },
+      "ablation_mass": 33.4310979153794,
+      "rows": 12163,
+      "bank_sha256": "07e2f4b71fe0ccc67848f2896344e6d0b6a255b0e91a7da9062d471ea3e11100",
+      "bake_sha256": "7a02cd54ba692f5995477657d9ec5ec125602678e1f397dcde9af46a53c75065"
+    },
+    "cid22/T1c_s0": {
+      "hidden": 128,
+      "dead": 123,
+      "residual": 0,
+      "live": 5,
+      "live_pairs": 1,
+      "largest_pair": [
+        126,
+        127
+      ],
+      "largest_pair_share": 0.9748215196860804,
+      "concentration": {
+        "0.5": 27,
+        "0.9": 133,
+        "0.99": 246
+      },
+      "ablation_mass": 37.30475712077008,
+      "rows": 12163,
+      "bank_sha256": "07e2f4b71fe0ccc67848f2896344e6d0b6a255b0e91a7da9062d471ea3e11100",
+      "bake_sha256": "de187fbabbdb1a1e999fed21c19f4589281e3e6184893c4ba559921922b71d98"
+    }
+  },
+  "role": "full TRAIN-bank forward and joint-slot ablation; no quality labels"
+}
