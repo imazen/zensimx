@@ -3331,3 +3331,7 @@ Authorized frozen read of 57300 rows; before target parsing. LABEL_READS.json SH
 ### Frozen-A CLIC2022 completion — 2026-11-05
 
 The single authorized preference parse succeeded:57300 questions/57243 reference crops, every question retained. Majority-primary and supplementary soft-vote targets were retained together; they match on all57300 questions. Both panels use10000 whole-reference draws,seed20261105. Completed journal SHA256 `2d2d4d57f55ccdab4ddfa808a797556cc11c5f20c454210b49350967a558ca68`; target cache `bcd469334afb822be344b05ebe006d6aa362ce4569e81b90ca4f237b864993f5`; result `1890f926ad629b82f604d8ab7e66d2262b5a490d0325ec681abb85bd5a2be5aa`. Original eight-population assessment complete; KADID failed both fixed rules. No fitting/tuning/selection; no second raw-label open. Full public result: `benchmarks/final_read_a_2026-11-05.md`.
+
+### Frozen-A aic2026_public_test: individual pre-open exposure — 2026-11-05T13:07:17.337148+00:00
+
+Authorized frozen read of 1848 rows; before target parsing. LABEL_READS.json SHA256 `84cbd1c7c88ab7b1c2e2c383a62d3007dc19e2f2233209d5e72a7290a68692e8`; label specification `{"path": "/mnt/v/output/zensim/byconstruction-2026-10-22/aic2026train/folds_train/pairs_test.tsv", "sha256": "b0fb0c0fbb9fd05a6a28d4b485f8a793d0ad384c4ca7d61172ed1f49a917f63b", "target": "jnd"}`. Prediction/decode/binary pins retained in that receipt. Bootstrap10000 seed20261105; no tuning or selection. Status: authorized-before-read; any partial/failed read spends this population.
