@@ -13,6 +13,10 @@
 
 ### Fixed
 
+- Retain final-read artifacts on durable storage and add the approved lossless temporary-PNG effort (`26ab7625`); require exact serial/parallel peer-output parity before bounded parallel scoring (`20a6e08a`).
+
+- Extend the existing verified mirror with explicit evaluation snapshots, preserving stimulus files and materializing file aliases while retaining feature/training image restrictions (`a39de789`).
+
 - Preserve opaque RGBA pixels in native assessment decoding (`332371bd`); add native serial candidate serving (`cc6169df`), signed reference-bootstrap panels (`a6c23628`) and opt-in retention of exact feature CSVs (`bab8bd9e`).
 
 - Skip parallel streaming extraction below 36,864 pixels after existing small-image
