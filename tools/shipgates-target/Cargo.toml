@@ -9,10 +9,10 @@ publish = false
 [dependencies]
 zensim-target = { path = "../../zensim-target", default-features = false, features = ["native-probe"] }
 zensim = { path = "../../zensim", features = ["custom-profiles", "imgref"] }
-zenpredict = { git = "https://github.com/imazen/zenanalyze", rev = "f0903489300aea240ffae2e3f1359f8f2b9a0ba4" }
-zenjpeg = { git = "https://github.com/imazen/zenjpeg", rev = "4196fa93d422bc367d1e3ddadbaddfe672b9cdfc", default-features = false, features = ["recompress-expert"] }
-zenwebp = { git = "https://github.com/imazen/zenwebp", rev = "160acc6588ebb57c4982c30ebb1c303e4fa7cabc", default-features = false, features = ["std"] }
-zenavif = { git = "https://github.com/imazen/zenavif", rev = "5712b80af91f17804d09b5eef0d888435594cd65", default-features = false }
+zenpredict = { git = "https://github.com/imazen/zenanalyze", rev = "38dc80f73887dafae6bf5ebfe9a03be5ef78ebe0" }
+zenjpeg = { git = "https://github.com/imazen/zenjpeg", rev = "4b0f1bfa35444d982ce2a26e04bac19293487790", default-features = false, features = ["recompress-expert"] }
+zenwebp = { git = "https://github.com/imazen/zenwebp", rev = "256c056441aeeb5e8cb275d5d5140508f1f54e4f", default-features = false, features = ["std"] }
+zenavif = { git = "https://github.com/imazen/zenavif", rev = "bf7fdadc95c357571bbd4a245194880912602fd7", default-features = false }
 bytemuck = "1.25.2"
 anyhow = "1.0.104"
 serde = { version = "1.0.229", features = ["derive"] }
@@ -21,11 +21,14 @@ sha2 = "0.10.9"
 image = { version = "0.25.10", default-features = false, features = ["png"] }
 enough = "0.4.5"
 almost-enough = "0.4.5"
-zenpixels = { version = ">=0.2.10, <0.4.0", default-features = false }
+zenpixels = { version = ">=0.3.1, <0.4.0", default-features = false }
 
 [patch.crates-io]
-zenanalyze = { git = "https://github.com/imazen/zenanalyze", rev = "f0903489300aea240ffae2e3f1359f8f2b9a0ba4" }
-zencodec = { git = "https://github.com/imazen/zencodec", rev = "7cc3d3ec6b41103ee8398c30b1582ebdbb6df914" }
+zencodec = { git = "https://github.com/imazen/zencodec", rev = "1816b4d082234c04c3805411b437b8396040f522" }
+zenpixels = { git = "https://github.com/imazen/zenpixels", rev = "fa836abf72afe9826e866dc25712b7c800323962" }
+zenpixels-convert = { git = "https://github.com/imazen/zenpixels", rev = "fa836abf72afe9826e866dc25712b7c800323962" }
+zenmeta = { git = "https://github.com/imazen/zencodec", rev = "1816b4d082234c04c3805411b437b8396040f522" }
+ultrahdr-core = { git = "https://github.com/imazen/ultrahdr", rev = "8a30cadfd08721749050215b924ca0a58a42e277" }
 
 [profile.release]
 lto = "thin"

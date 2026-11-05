@@ -16,21 +16,21 @@ real-bake-tests = []
 
 [dependencies]
 zensim = { path = "../../zensim", features = ["custom-profiles", "feature-regime-v2", "training", "viz-export"] }
-zenpredict = { version = "0.2.0", git = "https://github.com/imazen/zenanalyze", rev = "f0903489300aea240ffae2e3f1359f8f2b9a0ba4" }
-zenpredict-bake = { git = "https://github.com/imazen/zenanalyze", rev = "f0903489300aea240ffae2e3f1359f8f2b9a0ba4" }
+zenpredict = { version = "0.2.0", git = "https://github.com/imazen/zenanalyze", rev = "38dc80f73887dafae6bf5ebfe9a03be5ef78ebe0" }
+zenpredict-bake = { git = "https://github.com/imazen/zenanalyze", rev = "38dc80f73887dafae6bf5ebfe9a03be5ef78ebe0" }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = { version = "1.0.145", features = ["float_roundtrip"] }
 sha2 = "0.11.0"
 parquet = { version = "59.1.0", default-features = false, features = ["arrow", "zstd"] }
 arrow = { version = "59.1.0", default-features = false }
-zenpng = { version = "=0.1.4", default-features = false }
-zenpixels = { version = "=0.2.16", default-features = false }
+zenpng = { version = ">=0.2.0, <0.3.0", default-features = false }
+zenpixels = { version = ">=0.3.1, <0.4.0", default-features = false }
 enough = "0.4.2"
 rgb = "0.8.52"
 imgref = "1.12.0"
 bytemuck = "1.25.0"
-# RGB era checked against the frozen extractor; Cargo.lock records 762fa7128c21.
-zenjpeg = { git = "https://github.com/imazen/zenjpeg", rev = "762fa7128c2124b42cfa6e23b30024a688f5b7a3", default-features = false }
+# Decoder revision advances with the sibling cohort; frozen pixels require replay.
+zenjpeg = { git = "https://github.com/imazen/zenjpeg", rev = "4b0f1bfa35444d982ce2a26e04bac19293487790", default-features = false }
 
 zenstats = { package = "zenmetrics-stats", git = "https://github.com/imazen/zenmetrics", rev = "48665c8fb1bb3de5c99d792ae4ed4f3f1e854629", default-features = false }
 
@@ -42,7 +42,11 @@ sha2 = "0.11.0"
 
 # Git-only codec contracts from zenjpeg main; dependency patches do not propagate.
 [patch.crates-io]
-zenpixels = { git = "https://github.com/imazen/zenpixels", rev = "f23ac7535be1144a22d0dc6b71f866a08b151f34" }
-zencodec = { git = "https://github.com/imazen/zencodec", rev = "61fb96f1c8c89d4c8d2210eed8679372d66f8aa7" }
-zenmeta = { git = "https://github.com/imazen/zencodec", rev = "61fb96f1c8c89d4c8d2210eed8679372d66f8aa7" }
-ultrahdr-core = { git = "https://github.com/imazen/ultrahdr", rev = "7e9d296c9e037e626234c9f0e8673d48278f83f0" }
+zenpixels = { git = "https://github.com/imazen/zenpixels", rev = "fa836abf72afe9826e866dc25712b7c800323962" }
+zencodec = { git = "https://github.com/imazen/zencodec", rev = "1816b4d082234c04c3805411b437b8396040f522" }
+zenmeta = { git = "https://github.com/imazen/zencodec", rev = "1816b4d082234c04c3805411b437b8396040f522" }
+ultrahdr-core = { git = "https://github.com/imazen/ultrahdr", rev = "8a30cadfd08721749050215b924ca0a58a42e277" }
+zenpixels-convert = { git = "https://github.com/imazen/zenpixels", rev = "fa836abf72afe9826e866dc25712b7c800323962" }
+zenpng = { git = "https://github.com/imazen/zenpng", rev = "02a7f0df5f72dd79b0afa58d66ced7cdd8395e31" }
+zenflate = { git = "https://github.com/imazen/zenflate", rev = "a0ea03637a2cc9a193e343018ae2cfb1a6c31edd" }
+
