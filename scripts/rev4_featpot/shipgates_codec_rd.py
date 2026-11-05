@@ -17,8 +17,8 @@ from shipgates import sha, write
 
 
 def require_supported_gate_adapter(codec):
-    if codec == "avif":
-        raise ValueError("Required AVIF gates use zenav1-svt (svt-rs) only. This dispatcher wraps the Zenravif-only CQ driver; implement and validate an SVT map/target adapter before new AVIF gate cells. Completed legacy cells remain diagnostics.")
+    if codec == "avif" and os.environ.get("AVIF_ZENSIM_BACKEND") not in ("svt", "zenav1-svt"):
+        raise ValueError("AVIF gate cells require the zenav1-svt (svt-rs) backend: set AVIF_ZENSIM_BACKEND=svt so the CQ driver selects the Zenav1Svt lane (external sb-q-scale map seam implemented and validated 2026-10-17; the Zenravif lane remains release-gated diagnostics).")
 
 
 def store(root, kind, path):
@@ -26,13 +26,17 @@ def store(root, kind, path):
     directory = root / "artifacts" / kind
     directory.mkdir(parents=True, exist_ok=True)
     dest = directory / (digest + path.suffix)
-    if dest.exists():
-        assert sha(dest) == digest, "CAS artifact changed"
-    else:
-        with dest.open("xb") as out, path.open("rb") as source:
+    if not dest.exists():
+        tmp = dest.parent / (digest + path.suffix + f".tmp-{os.getpid()}")
+        with tmp.open("xb") as out, path.open("rb") as source:
             while block := source.read(1024 * 1024):
                 out.write(block)
-    assert sha(dest) == digest
+        try:
+            os.link(tmp, dest)
+        except FileExistsError:
+            pass
+        tmp.unlink(missing_ok=True)
+    assert sha(dest) == digest, "CAS artifact changed"
     return dict(path=str(dest), sha256=digest, bytes=dest.stat().st_size,
                 original=str(path))
 
@@ -58,6 +62,7 @@ def cell(args):
     if args.codec == "avif":
         command = [str(args.binary), "--out-dir", str(probe)]
         env.update(AVIF_RD_ARTIFACT_ROOT=str(args.output / "native-artifacts"),
+                   AVIF_ZENSIM_BACKEND=os.environ.get("AVIF_ZENSIM_BACKEND", "svt"),
                    AVIF_ZENSIM_SPEED="6", AVIF_ZENSIM_SAVE_AVIF="1",
                    AVIF_ZENSIM_EMIT_BEST="1", AVIF_ZENSIM_H3_RULE="zerosum",
                    AVIF_ZENSIM_H3_GAIN="10" if args.mode == "active" else "0",
@@ -272,8 +277,8 @@ def matrix():
         map_arms=["scalar", "neutral", "active", "butteraugli"],
         neutral_rule="candidate-neutral byte-identical to matching candidate-scalar",
         seed_quality=125 if args.codec == "avif" else 50,
-        codec_settings="speed6,444,8bit,zerosum,gain10,factor1.15,emit-best,threads1" if args.codec == "avif"
-            else "JPEG444,two corrections" if args.codec == "jpeg" else "method6,segments4,three passes",
+        codec_settings=("speed6,420,8bit,zerosum,gain10,factor1.15,emit-best,threads1,backend=zenav1-svt,sb-q-scale"
+            if args.codec == "avif" else "JPEG444,two corrections" if args.codec == "jpeg" else "method6,segments4,three passes"),
         scalar_controller="same candidate for active/neutral/scalar/butteraugli peer; no model on dense global frontier",
         cas_root=str(args.output), smoke_only=args.smoke_only, label_free=True)
     if args.resume and (args.output / "DESIGN.json").is_file():
@@ -296,11 +301,19 @@ def matrix():
     else:
         write(runner_pin, runner_sums)
     count = 0
+    expected_per_source = len(qualities) + len(models) * len(targets) * 4
     for source_id in source_ids:
         source_dir = args.output / f"source-{source_id:02d}"
-        source_dir.mkdir(exist_ok=True)
         phases = [("global", None, None)] + [
             (model + f"-t{target}", model, target) for model in models for target in targets]
+        if args.resume and (source_dir / "COMPLETE.json").is_file():
+            done = json.loads((source_dir / "COMPLETE.json").read_text())
+            assert done["cells"] == expected_per_source, (
+                f"source-{source_id:02d} COMPLETE.json cells {done['cells']} != expected {expected_per_source}")
+            count += done["cells"]
+            print(f"{args.codec} source{source_id:02d}: resume-complete ({done['cells']} cells)", flush=True)
+            continue
+        source_dir.mkdir(exist_ok=True)
         source_count = 0
         def run_phase(label, model, target):
             dest = source_dir / label
@@ -348,8 +361,9 @@ def matrix():
             for label, _, _ in phases:
                 out.write((source_dir / label / "cells.jsonl").read_text())
         write(source_dir / "COMPLETE.json", dict(cells=source_count))
-    write(args.output / "COMPLETE.json", dict(cells=count, sources=len(source_ids), smoke_only=args.smoke_only,
-        qualification="encoder-only; independent judges and intervention controls required"))
+    if not (args.output / "COMPLETE.json").exists():
+        write(args.output / "COMPLETE.json", dict(cells=count, sources=len(source_ids), smoke_only=args.smoke_only,
+            qualification="encoder-only; independent judges and intervention controls required"))
 
 
 def main():

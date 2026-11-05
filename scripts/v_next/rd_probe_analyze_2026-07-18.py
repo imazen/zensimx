@@ -1287,6 +1287,100 @@ def shipgates_r6_prime_gates(models, summaries, delta_intervals, neutral_metrics
     return gates
 
 
+
+def shipgates_savings_core(cases, sources, arms, models, native_codec,
+        requested, columns, lookup, cvvdp_lookup, reference_pixels,
+        baseline_arms, output_dir, panel):
+    """The registered equal-judged-quality savings engine — one owner for the
+    panel and the AVIF-SVT hook diagnostic. Builds per-source frontiers, mean
+    log byte ratios vs the declared baselines, then the canonical
+    source-cluster bootstrap intervals via the panel binary."""
+    import json, math, statistics as st, subprocess
+    from collections import defaultdict
+    analysis_metrics = sorted(requested) + (["cvvdp"] if cvvdp_lookup is not None else [])
+    group, cohorts = defaultdict(list), {}
+    for case in cases:
+        for metric in analysis_metrics:
+            value = (cvvdp_lookup[case["case"]]["cvvdp_jod"] if metric == "cvvdp"
+                     else columns[metric][1]*lookup[case["case"]][columns[metric][0]])
+            group[(case["source"],metric,case["arm"])].append((value,case["bytes"]))
+    observations, series = [], defaultdict(list)
+    family_ids = {f:i for i,f in enumerate(sorted({r["source_family"] for r in sources.values()}))}
+    ids = {s:family_ids[r["source_family"]] for s,r in sources.items()}
+    pixel_families = {}
+    for name,pixel_hash in reference_pixels.items():
+        family = sources[name]["source_family"]
+        assert pixel_families.setdefault(pixel_hash,family) == family, "exact reference pixels occur across declared families"
+    for source, record in sorted(sources.items()):
+        for metric in analysis_metrics:
+            curves = {a:rd_frontier(group[(source,metric,a)]) for a in arms}
+            assert all(curves.values())
+            low = max(c[0][0] for c in curves.values())
+            high = min(c[-1][0] for c in curves.values())
+            qualities = [q for q,_ in curves["none"] if low <= q <= high]
+            assert qualities, f"no common measured quality support: {source}/{metric}"
+            sizes = {a:[interp_bytes(curves[a],q) for q in qualities] for a in arms}
+            assert all(v is not None and v > 0 for values in sizes.values() for v in values)
+            for arm in arms:
+                for baseline in baseline_arms:
+                    logs = [math.log(size/base) for size,base in zip(sizes[arm],sizes[baseline])]
+                    value = st.mean(logs)
+                    if arm == baseline:
+                        assert value == 0.
+                    observations.append(dict(source=source,source_family=record["source_family"],
+                        content_class=record["content_class"],metric=metric,arm=arm,baseline=baseline,
+                        common_quality_points=len(qualities),baseline_frontier_points=len(curves["none"]),
+                        quality_min=low,quality_max=high,mean_log_ratio=value,ratio=math.exp(value)))
+                    for cohort in ["all",record["content_class"]]:
+                        name=f"{baseline}/{metric}/{arm}/{cohort}"
+                        series[name].append((ids[source],value))
+                        cohorts[name] = dict(baseline=baseline,metric=metric,arm=arm,content_class=cohort)
+    # R6' paired deltas: candidate-vs-none saving minus butteraugli-vs-none
+    # saving on the same neutral judge, per source. Raw (non-log) series; the
+    # lower bootstrap bound carries the noninferiority rule.
+    neutral_metrics = {"ssim2"} | ({"cvvdp"} if cvvdp_lookup is not None else set())
+    obs = {(o["source"],o["metric"],o["arm"],o["baseline"]): o["mean_log_ratio"]
+           for o in observations}
+    r6_delta = {}
+    for source, record in sorted(sources.items()):
+        for metric in sorted(neutral_metrics):
+            for model in models:
+                delta = (math.exp(obs[(source,metric,model+"-butteraugli","none")]) if native_codec
+                         else math.exp(obs[(source,metric,"butteraugli","none")])) \
+                        - math.exp(obs[(source,metric,model,"none")])
+                for cohort in ["all",record["content_class"]]:
+                    name=f"r6delta-vs-none/{metric}/{model}/{cohort}"
+                    r6_delta.setdefault(name,[]).append((ids[source],delta))
+    output_dir.mkdir(parents=True,exist_ok=False)
+    # Delta series carry one-sided R6' bounds: level 0.90 makes the bootstrap
+    # `lo` the fifth percentile — the one-sided 95% lower bound the frozen
+    # rule names; savings series keep the registered two-sided 0.95.
+    all_series = sorted([dict(name=name,reference=[i for i,_ in data],
+        values=[v for _,v in data],exp=(name not in r6_delta),
+        level=0.90 if name in r6_delta else 0.95)
+        for name,data in [*series.items(),*r6_delta.items()]],key=lambda s:s["name"])
+    job = dict(schema="engineering-source-series-v1",series=all_series)
+    (output_dir / "SOURCE_SERIES.json").write_text(json.dumps(job,indent=2,allow_nan=False)+"\n")
+    command=[str(panel),"e34","source-series","--input",str(output_dir / "SOURCE_SERIES.json"),
+             "--output",str(output_dir / "SOURCE_INTERVALS.json")]
+    subprocess.run(command,check=True)
+    intervals=json.loads((output_dir / "SOURCE_INTERVALS.json").read_text())
+    summaries=[]
+    delta_intervals={}
+    for row in intervals["series"]:
+        iv=row["interval"]
+        if row["name"].startswith("r6delta-vs-none/"):
+            _,metric,model,cohort = row["name"].split("/")
+            delta_intervals[(metric,model,cohort)] = dict(
+                estimate=iv["estimate"],lo=iv["lo"],hi=iv["hi"],
+                sources=row["sources"],seed=row["seed"],
+                level=row.get("level"),bound="one-sided 95% lower (fifth percentile)")
+            continue
+        summaries.append(dict(**cohorts[row["name"]],sources=row["sources"],ratio=iv["estimate"],
+            saving=1-iv["estimate"],saving_ci95=[1-iv["hi"],1-iv["lo"]],seed=row["seed"]))
+    return summaries, delta_intervals, observations, analysis_metrics, neutral_metrics
+
+
 def shipgates_rd_main():
     """Matched engineering curves; bootstrap stays in the Rust stats owner."""
     import argparse, hashlib, json, subprocess
@@ -1360,7 +1454,9 @@ def shipgates_rd_main():
             revision_path = Path(annotation["revision"])
             assert digest(revision_path) == annotation["revision_sha256"]
             revision = json.loads(revision_path.read_text())
-            assert revision["revised_manifest_sha256"] == digest(args.sources)
+            assert revision["revised_manifest_sha256"] in (digest(args.sources),
+                manifest.get("subset_of", {}).get("manifest_sha256")), \
+                "class revision pins a different source manifest"
             assert revision["coordinator_approval"] == "Approve correction and add 3 photos"
             assert dict(name=r["source"],sha256=r["source_sha256"],
                         **{"from":annotation["original_content_class"],"to":r["content_class"]}) in revision["changes"]
@@ -1437,87 +1533,14 @@ def shipgates_rd_main():
             assert (row["arm"],row["quality_index"],row["source"],row["decoded_png_sha256"]) == \
                    (case["arm"],case["quality_index"],case["source"],case["decoded_png_sha256"])
             assert math.isfinite(row["cvvdp_jod"])
-    analysis_metrics = sorted(requested) + (["cvvdp"] if cvvdp_lookup is not None else [])
-    group, cohorts = defaultdict(list), {}
-    for case in cases:
-        for metric in analysis_metrics:
-            value = (cvvdp_lookup[case["case"]]["cvvdp_jod"] if metric == "cvvdp"
-                     else columns[metric][1]*lookup[case["case"]][columns[metric][0]])
-            group[(case["source"],metric,case["arm"])].append((value,case["bytes"]))
-    observations, series = [], defaultdict(list)
-    family_ids = {f:i for i,f in enumerate(sorted({r["source_family"] for r in sources.values()}))}
-    ids = {s:family_ids[r["source_family"]] for s,r in sources.items()}
-    pixel_families = {}
-    for name,pixel_hash in reference_pixels.items():
-        family = sources[name]["source_family"]
-        assert pixel_families.setdefault(pixel_hash,family) == family, "exact reference pixels occur across declared families"
-    for source, record in sorted(sources.items()):
-        for metric in analysis_metrics:
-            curves = {a:rd_frontier(group[(source,metric,a)]) for a in arms}
-            assert all(curves.values())
-            low = max(c[0][0] for c in curves.values())
-            high = min(c[-1][0] for c in curves.values())
-            qualities = [q for q,_ in curves["none"] if low <= q <= high]
-            assert qualities, f"no common measured quality support: {source}/{metric}"
-            sizes = {a:[interp_bytes(curves[a],q) for q in qualities] for a in arms}
-            assert all(v is not None and v > 0 for values in sizes.values() for v in values)
-            for arm in arms:
-                for baseline in (["none"]+[a for m in models for a in [m+"-scalar",m+"-butteraugli"]] if native_codec else ["none","butteraugli"]):
-                    logs = [math.log(size/base) for size,base in zip(sizes[arm],sizes[baseline])]
-                    value = st.mean(logs)
-                    if arm == baseline:
-                        assert value == 0.
-                    observations.append(dict(source=source,source_family=record["source_family"],
-                        content_class=record["content_class"],metric=metric,arm=arm,baseline=baseline,
-                        common_quality_points=len(qualities),baseline_frontier_points=len(curves["none"]),
-                        quality_min=low,quality_max=high,mean_log_ratio=value,ratio=math.exp(value)))
-                    for cohort in ["all",record["content_class"]]:
-                        name=f"{baseline}/{metric}/{arm}/{cohort}"
-                        series[name].append((ids[source],value))
-                        cohorts[name] = dict(baseline=baseline,metric=metric,arm=arm,content_class=cohort)
-    # R6' paired deltas: candidate-vs-none saving minus butteraugli-vs-none
-    # saving on the same neutral judge, per source. Raw (non-log) series; the
-    # lower bootstrap bound carries the noninferiority rule.
-    neutral_metrics = {"ssim2"} | ({"cvvdp"} if cvvdp_lookup is not None else set())
-    obs = {(o["source"],o["metric"],o["arm"],o["baseline"]): o["mean_log_ratio"]
-           for o in observations}
-    r6_delta = {}
-    for source, record in sorted(sources.items()):
-        for metric in sorted(neutral_metrics):
-            for model in models:
-                delta = (math.exp(obs[(source,metric,model+"-butteraugli","none")]) if native_codec
-                         else math.exp(obs[(source,metric,"butteraugli","none")])) \
-                        - math.exp(obs[(source,metric,model,"none")])
-                for cohort in ["all",record["content_class"]]:
-                    name=f"r6delta-vs-none/{metric}/{model}/{cohort}"
-                    r6_delta.setdefault(name,[]).append((ids[source],delta))
-    args.output.mkdir(parents=True,exist_ok=False)
-    # Delta series carry one-sided R6' bounds: level 0.90 makes the bootstrap
-    # `lo` the fifth percentile — the one-sided 95% lower bound the frozen
-    # rule names; savings series keep the registered two-sided 0.95.
-    all_series = sorted([dict(name=name,reference=[i for i,_ in data],
-        values=[v for _,v in data],exp=(name not in r6_delta),
-        level=0.90 if name in r6_delta else 0.95)
-        for name,data in [*series.items(),*r6_delta.items()]],key=lambda s:s["name"])
-    job = dict(schema="engineering-source-series-v1",series=all_series)
-    (args.output / "SOURCE_SERIES.json").write_text(json.dumps(job,indent=2,allow_nan=False)+"\n")
-    command=[str(args.panel),"e34","source-series","--input",str(args.output / "SOURCE_SERIES.json"),
-             "--output",str(args.output / "SOURCE_INTERVALS.json")]
-    subprocess.run(command,check=True)
-    intervals=json.loads((args.output / "SOURCE_INTERVALS.json").read_text())
-    summaries=[]
-    delta_intervals={}
-    for row in intervals["series"]:
-        iv=row["interval"]
-        if row["name"].startswith("r6delta-vs-none/"):
-            _,metric,model,cohort = row["name"].split("/")
-            delta_intervals[(metric,model,cohort)] = dict(
-                estimate=iv["estimate"],lo=iv["lo"],hi=iv["hi"],
-                sources=row["sources"],seed=row["seed"],
-                level=row.get("level"),bound="one-sided 95% lower (fifth percentile)")
-            continue
-        summaries.append(dict(**cohorts[row["name"]],sources=row["sources"],ratio=iv["estimate"],
-            saving=1-iv["estimate"],saving_ci95=[1-iv["hi"],1-iv["lo"]],seed=row["seed"]))
+    (summaries, delta_intervals, observations,
+     analysis_metrics, neutral_metrics) = shipgates_savings_core(
+        cases,sources,arms,models,native_codec,requested,columns,lookup,
+        cvvdp_lookup,reference_pixels,
+        (["none"]+[a for m in models for a in [m+"-scalar",m+"-butteraugli"]]
+         if native_codec else ["none","butteraugli"]),
+        args.output,args.panel)
+
     classes = sorted({r["content_class"] for r in sources.values()})
     packet_summaries=[r for r in summaries if r["metric"] in columns]
     numeric_gates = shipgates_numeric_gates(models,packet_summaries,classes,requested==set(columns),native_codec)
@@ -1542,9 +1565,88 @@ def shipgates_rd_main():
     print(json.dumps({k:v for k,v in result.items() if k not in ["per_source","summary"]},indent=2))
 
 
+
+
+def shipgates_diag_main():
+    """AVIF-SVT steering-hook diagnostic (coordinator 2026-10-18): the same
+    equal-quality savings engine as the registered panel, on the diagnostic
+    matrix. No admission/receipt binding — diagnostic evidence only, no
+    verdict and no gate."""
+    import argparse, hashlib, json
+    from pathlib import Path
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--shipgates-diag", type=Path, required=True)
+    ap.add_argument("--judge-dir", type=Path, required=True)
+    ap.add_argument("--cvvdp-dir", type=Path)
+    ap.add_argument("--panel", type=Path, required=True)
+    ap.add_argument("--output", type=Path, required=True)
+    ap.add_argument("--metrics", default="ssim2,butter")
+    args = ap.parse_args()
+    root = args.shipgates_diag
+    def digest(path):
+        with path.open("rb") as stream:
+            return hashlib.file_digest(stream,"sha256").hexdigest()
+    design = json.loads((root/"DESIGN.json").read_text())
+    assert design["schema"]=="shipgates-codec-diag-v1"
+    arms = list(design["arms"])
+    cases, by_name = [], {}
+    for i in range(len(design["sources"])):
+        part = root/f"source-{i:02d}"
+        rows = [json.loads(l) for l in (part/"cells.jsonl").read_text().splitlines()]
+        assert len(rows)==json.loads((part/"COMPLETE.json").read_text())["cells"]
+        for r in rows:
+            by_name.setdefault(r["source"],r)
+        cases.extend(rows)
+    sources = {n:dict(name=n,source_family=r["source_family"],
+        content_class=r["content_class"],sha256=r["source_sha256"],
+        path=r["reference"]) for n,r in by_name.items()}
+    by_case = {}
+    for r in cases:
+        assert r["case"] not in by_case
+        by_case[r["case"]] = r
+        assert digest(Path(r["encoded"]))==r["encoded_sha256"]
+        assert digest(Path(r["decoded"]))==r["decoded_png_sha256"]
+        assert digest(Path(r["reference"]))==r["reference_png_sha256"]
+    requested = set(args.metrics.split(","))
+    columns = {"ssim2":("ssim2",1),"butter":("butteraugli_pnorm3",-1),"zensim":("fixed_zensim",1)}
+    judges=[json.loads(l) for l in (args.judge_dir/"judges.jsonl").read_text().splitlines()]
+    assert json.loads((args.judge_dir/"COMPLETE.json").read_text())["pairs"]==len(judges)==len(cases)
+    lookup, reference_pixels = {}, {}
+    for row in judges:
+        cid=row["input"]["case_id"]; case=by_case[cid]
+        assert (row["ref_path"],row["dist_path"])==(case["reference"],case["decoded"])
+        for metric in requested:
+            assert math.isfinite(row[columns[metric][0]])
+        reference_pixels[case["source"]]=row["reference_pixels_sha256"]
+        lookup[cid]=row
+    assert set(lookup)==set(by_case)
+    cvvdp_lookup=None
+    if args.cvvdp_dir is not None:
+        cvvdp_lookup={}
+        for p in sorted(args.cvvdp_dir.glob("source-*-cvvdp.jsonl")):
+            for line in p.read_text().splitlines():
+                row=json.loads(line); cvvdp_lookup[row["case"]]=row
+        assert set(cvvdp_lookup)==set(by_case), "cvvdp coverage differs"
+        for row in cvvdp_lookup.values():
+            assert math.isfinite(row["cvvdp_jod"])
+    (summaries, delta_intervals, observations,
+     _, _) = shipgates_savings_core(
+        cases,sources,arms,[],True,requested,columns,lookup,cvvdp_lookup,
+        reference_pixels,["none"],args.output,args.panel)
+    result=dict(schema="shipgates-rd-diag-v1",
+        scope="AVIF-SVT steering-hook diagnostic; changes no registered verdict or gate",
+        binary_sha256=design["binary_sha256"],sources=len(sources),
+        cases=len(cases),arms=arms,per_source=observations,summary=summaries)
+    (args.output/"DIAG_RESULT.json").write_text(json.dumps(result,indent=1,allow_nan=False)+"\n")
+    for s in summaries:
+        print(f'{s["baseline"]}/{s["metric"]}/{s["arm"]}/{s["content_class"]}: '
+              f'saving {100*s["saving"]:.2f}% CI [{100*s["saving_ci95"][0]:.2f},{100*s["saving_ci95"][1]:.2f}]')
+
 def main():
     if "--shipgates-rd" in sys.argv:
         return shipgates_rd_main()
+    if "--shipgates-diag" in sys.argv:
+        return shipgates_diag_main()
     if "--model-preferences" in sys.argv:
         return model_preferences_main()
     if "--interventions" in sys.argv:
