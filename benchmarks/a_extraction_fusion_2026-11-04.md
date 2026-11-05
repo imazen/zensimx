@@ -376,6 +376,26 @@ one and sixteen threads, with all required bit gates unchanged. The remaining
 exact candidates need measurement before the 2% stopping rule can be invoked.
 No such stopping claim has been made.
 
+### De-serialization hypotheses and the headroom model
+
+The owner asked how to break serial work and reduce memory latency. The
+next hypotheses are producer-to-consumer V-blur tiles that remove a real
+intermediate round trip; shared dense/basic loads and only provably identical
+expression intermediates; overlapping independent columns/channels/strips;
+removing dead initialization and avoidable accumulator copies; and working
+sets sized for the cache available to each active thread. These are
+hypotheses, not accepted optimizations. Copy callers need attribution before
+assuming the sampled `memmove` traffic consists of image-plane copies.
+
+For an explicitly idealized extraction-only calculation, the measured large
+blur/pyramid cycle share is 46.024%. If that entire cost became zero and all
+remaining cost stayed fixed, `1 / (1 - 0.46024) = 1.85` times throughput.
+This Amdahl calculation is not a measured speedup or a forecast. Fusion
+retains blur arithmetic, and cache interactions can change the remaining
+cost. Memory-bound slot fractions and divider-active cycles cannot be
+substituted for removable wall time. No exact fusion has yet met the
+acceptance rule; the first two rings still need their dev comparisons.
+
 ## Correctness and comparison receipts
 
 The paired harness extends `a_family_cost` and follows SPEEDQ:
