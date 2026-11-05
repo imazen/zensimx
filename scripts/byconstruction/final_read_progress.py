@@ -13,8 +13,17 @@ def main():
     path = args.root / 'PROGRESS.json'
     value = json.loads(path.read_text())
     observation = {'utc': datetime.now(timezone.utc).isoformat(), 'processes': {}}
-    for field in ('controller_pid', 'child_pid'):
-        pid = value.get(field)
+    pids = {field: value.get(field) for field in ('controller_pid', 'child_pid')}
+    controller = pids['controller_pid']
+    if controller:
+        try:
+            children = (Path('/proc') / str(controller) / 'task' / str(controller) / 'children').read_text()
+            for child in children.split():
+                if int(child) not in pids.values():
+                    pids[f'controller_child_{child}'] = int(child)
+        except FileNotFoundError:
+            pass
+    for field, pid in pids.items():
         if pid:
             try:
                 command = (Path('/proc') / str(pid) / 'cmdline').read_bytes()
