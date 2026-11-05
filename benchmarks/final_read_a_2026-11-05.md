@@ -1,4 +1,4 @@
-# Final confirmatory read of the shipped model A (zensim 0.3.0) on the sealed sets — registration, 2026-11-05
+# Final registered frozen-A assessment (zensim 0.3.0) — 2026-11-05
 
 Owner, 2026-11-05 (verbatim): "score on the final sets". Nothing in this read selects, tunes or
 changes any model; failure or success is final and is reported as measured. Written before any label is opened by this assessment; historical exposures are disclosed below. To be committed to the zensimx record (`benchmarks/final_read_a_2026-11-05.md`)
@@ -28,7 +28,7 @@ and appended to `docs/DATA_SPLITS.md` exposure ledger before the lane reads a la
 | KonJND JPEG TERMINAL | the registered TERMINAL split only | PJND (threshold) | library `konjnd-1k` JPEG, decoded by zenjpeg main `762fa712` | pooled signed SROCC vs PJND with reference bootstrap; within-reference SROCC and interval undefined (100 pairs / 100 references), as approved by coordinator. Prior zensim read: October 4 R7/R7a, SELECT and TERMINAL labels; `docs/DATA_SPLITS.md:1613–1617`. |
 | KADID TERMINAL | 2,000 pairs | MOS | local `kadid10k` | the 2026-10-07 registration exactly: signed SROCC, KROCC, PLCC, within-reference SROCC, per-distortion-type SROCC, `zenstats::scatter` geometry; comparators the shipped research profile B (`codec_target()` of the research crate at the pinned commit, bake SHA recorded) and the Rev4 research by_v2fy bake (resolved from `benchmarks/release_gate_map_2026-10-07.md` / `releasegate5_admission_2026-10-07.md`, SHA recorded); confirmation rule: A's signed SROCC not worse than B's by more than 2 SE (paired bootstrap over references, 10,000 draws, seed fixed in the pin) and not worse than by_v2fy's by more than 0.005; failing either is a failed confirmation, recorded as such. If the by_v2fy bake cannot be located, the read still happens, the B rule is applied, and the missing comparator is recorded as a deviation, never silently dropped No prior zensim model scored this population; third-party-metric/reliability reads October 24–26 are disclosed at `docs/DATA_SPLITS.md:2892–2924`. |
 | AIC-4 sample | 300 pairs / 5 references; SDR25 = its 50-row JPEG-AI subset, reported as a subset, not independently | `q_jnd` (distortion-oriented; reported signed, sign disclosed) | library `jpeg-aic4-sample` | signed SROCC, within-reference SROCC Prior zensim read: October 4 R7/R7a; `docs/DATA_SPLITS.md:1613–1617`. Prior JND-unit study: `docs/DATA_SPLITS.md:2886–2889`. SDR25 inherits this exposure as its subset. |
-| MCL-JCI | all rated conditions | JND-based quality | library `mcl-jci` | signed SROCC, within-reference SROCC. Prior exposure, disclosed: zenpapers read every subject's JND chain and 243 library score rows on 2026-10-24/25 for JND-unit and observer studies with third-party metrics only, without a preregistration (ledger, "Exposure ledger — 2026-10-24/25"); no zensim model was scored, fitted or selected on them. D3 made its images training sources (KonFiG-IQA crops ten of them); its ratings never trained any zensim model Prior zensim read: October 4 R7/R7a, including the 40-source subset excluding KonFiG crops; `docs/DATA_SPLITS.md:1601–1617`. Additional October 24/25 exposure: `docs/DATA_SPLITS.md:2867–2899`. |
+| MCL-JCI | 5,000 rows /50 sources; also registered clean40 subset | mean subject-chain JND count (distortion) | library `mcl-jci` | signed SROCC, within-reference SROCC. Prior exposure, disclosed: zenpapers read every subject's JND chain and 243 library score rows on 2026-10-24/25 for JND-unit and observer studies with third-party metrics only, without a preregistration (ledger, "Exposure ledger — 2026-10-24/25"); no zensim model was scored, fitted or selected on them. D3 made its images training sources (KonFiG-IQA crops ten of them); its ratings never trained any zensim model Prior zensim read: October 4 R7/R7a, including the 40-source subset excluding KonFiG crops; `docs/DATA_SPLITS.md:1601–1617`. Additional October 24/25 exposure: `docs/DATA_SPLITS.md:2867–2899`. |
 | CLIC 2022 perceptual (TERMINAL) | 57,300 2AFC questions / 57,243 reference crops; every question retained | human preference | library `clic-2022-perceptual` | agreement with the majority choice, as the CLIC 2021 read |
 
 Excluded and why: AIC-2026 `public_test` (its one read is spent, 2026-10-23; AIC-2026 numbers never
@@ -337,3 +337,40 @@ Scatter receipt SHAs:
 - butteraugli3_quality: `eff87a25f6f92c8b9cefaa006766364260f3b5c2f3e271c0c029f1ea97fd97b1`
 
 Statistics receipt: `run-heavy: done rc=0 256s | peak-RSS 1.23GiB | min-avail 32055MiB | peak-load 9.18`. Read: `rc=0 0s | peak-RSS0.07GiB | min-avail33542MiB | peak-load0.85`. Pre-open commit `85a08787d7d3` was verified remotely before parse. Target cache `d22ae1e1cd492864c264b6830671d9219c0271e0099518452c157e1460267a5c`; result `51fb82ce177212804149072488ba604954f4264d516455bcc9f5d99dd627cf43`; completed journal `ff4d4858c6aef4043fe69f82ab3a63ae82443243eb9562a2ea66fc3cdd4ec724`. All earlier failed serving/control artifacts preserved; no second raw-label open.
+
+## AIC4 and SDR25 — frozen-A read spent
+
+Distortion-oriented q_jnd; quality metric signs retained; butteraugli quality=−p3. SDR25 is the50-row JPEG-AI subset of AIC4, not independent. Prior zensim read: DATA_SPLITS lines1613–1617; later JND study lines2886–2889. 95% whole-reference percentile intervals,10,000 valid draws per statistic, seed20261105. Only5 reference groups; intervals are descriptive with limited source coverage.
+
+### all: 300 pairs /5 references
+
+| Metric | Signed SROCC | KROCC | PLCC4PL | RMSE (q_jnd) | Within-reference SROCC |
+|---|---|---|---|---|---|
+| A | -0.921776464 [-0.961732777, -0.892515873] | -0.755897436 [-0.830807065, -0.710320125] | -0.910638304 [-0.959857060, -0.891894102] | 0.386207256 [0.245807099, 0.448532622] | -0.939560989 [-0.967924423, -0.904706863] |
+| SSIMULACRA2 | -0.912548806 [-0.959555734, -0.877435814] | -0.745507246 [-0.835328402, -0.693583725] | -0.899948565 [-0.958510363, -0.873821943] | 0.407509811 [0.240421312, 0.487357708] | -0.940727980 [-0.969958322, -0.908385663] |
+| butteraugli3_quality | -0.896924188 [-0.965041346, -0.839286818] | -0.726376812 [-0.845220506, -0.653610552] | -0.883370624 [-0.955630164, -0.841214621] | 0.438053705 [0.252501529, 0.490460035] | -0.937171437 [-0.963200889, -0.895248680] |
+
+Result SHA256 `6e8304cc63f71a14cbc1d4e0c022955f9557c9e2e0548450b2778dbd40693dc1`.
+
+### SDR25: 50 pairs /5 references
+
+| Metric | Signed SROCC | KROCC | PLCC4PL | RMSE (q_jnd) | Within-reference SROCC |
+|---|---|---|---|---|---|
+| A | -0.855078031 [-0.991147462, -0.739966354] | -0.732244898 [-0.949367089, -0.611618257] | -0.894268530 [-0.989661933, -0.835314319] | 0.331906627 [0.095107431, 0.406639013] | -1.000000000 [-1.000000000, -1.000000000] |
+| SSIMULACRA2 | -0.841344538 [-0.989891697, -0.706615348] | -0.702857143 [-0.931330472, -0.581742739] | -0.882005799 [-0.982791365, -0.814631236] | 0.349489255 [0.125999723, 0.428981303] | -1.000000000 [-1.000000000, -1.000000000] |
+| butteraugli3_quality | -0.841632653 [-0.991705669, -0.708303249] | -0.712653061 [-0.951931330, -0.594770404] | -0.887265545 [-0.986331112, -0.817885716] | 0.342088014 [0.108171851, 0.414872472] | -1.000000000 [-1.000000000, -1.000000000] |
+
+Result SHA256 `bc6564cfd50b307bd2fd2c578351b4e7a4d765ea18c067cddc49feeb28de1ade`.
+
+All305 stimuli independently verified and all610 feature RGB checks passed. Frozen pinned target file SHA256 `955a9601e94c0877a00c822dbbbd17ad4ae11544dd6d550b9ed79d1ad9d983ff` differs bytewise from library SHA256 `a64cabbdf47bc77c3692267e30c7db55ea6197114697e33c3dbb81c887bbf498`; pinned file governs. Pre-open journal `97e947cf9d986798d3c98bb1ce629a7f8adbd7114ba36cad2c9b2a6febcdf5dd` verified remotely in `11527604aa32` before parse.
+
+- keys: `run-heavy: done rc=0 1s | peak-RSS 0.06GiB | min-avail 33498MiB | peak-load 8.39`
+- decode: `run-heavy: done rc=0 4s | peak-RSS 0.07GiB | min-avail 33471MiB | peak-load 4.85`
+- bank: `run-heavy: done rc=0 11s | peak-RSS 0.19GiB | min-avail 33383MiB | peak-load 4.54`
+- predict: `run-heavy: done rc=0 0s | peak-RSS 0.15GiB | min-avail 33549MiB | peak-load 3.83`
+- peers: `run-heavy: done rc=0 49s | peak-RSS 0.19GiB | min-avail 33224MiB | peak-load 3.83`
+- ledger: `run-heavy: done rc=0 1s | peak-RSS 0.06GiB | min-avail 33461MiB | peak-load 2.39`
+- read: `run-heavy: done rc=0 0s | peak-RSS 0.06GiB | min-avail 33590MiB | peak-load 1.75`
+- stats: `run-heavy: done rc=0 23s | peak-RSS 0.18GiB | min-avail 33342MiB | peak-load 3.69`
+
+Target cache `06ec295c3af79c12e86625b053572e928f8aab4b9a99bb2e242ddac3badf10fc`; completed journal `d2885fc4ffe3403c482c7ffc438a7c242f783e745456e7aff1e81b3d29ce6611`.
