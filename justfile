@@ -4552,6 +4552,9 @@ final-read-step action population root:
 final-read-panel-test root:
     env TMPDIR={{quote(root + "/scratch")}} CARGO_TARGET_DIR={{quote(root + "/target/assessment")}} flock {{env_var('HOME')}}/tmp/heavy.lock {{env_var('HOME')}}/work/claudehints/scripts/run-heavy --mem 24G --jobs 8 -- cargo test --release --locked -p zensim-validate --bin panel tests::signed_reference_resamples_preserve_negative_direction_and_ties -- --exact --test-threads=1
 
+final-read-unit root:
+    env TMPDIR={{quote(root + "/scratch")}} PYTHONDONTWRITEBYTECODE=1 flock {{env_var('HOME')}}/tmp/heavy.lock {{env_var('HOME')}}/work/claudehints/scripts/run-heavy --mem 24G --jobs 1 -- python3 -B scripts/tests/test_final_read_a.py
+
 final-read-control root:
     env TMPDIR={{quote(root + "/scratch")}} PYTHONDONTWRITEBYTECODE=1 flock {{env_var('HOME')}}/tmp/heavy.lock {{env_var('HOME')}}/work/claudehints/scripts/run-heavy --mem 24G --jobs 8 -- python3 -B scripts/tests/test_final_read_a.py --panel-control {{quote(root)}}
 
