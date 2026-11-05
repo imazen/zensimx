@@ -32,6 +32,10 @@
 
 ### Dependency compatibility
 
+- Prepare one shared pixel/codec graph for sibling consumers; E34 uses equivalent
+  zenmeta EXIF entry points (`c7875d8d`). Runtime/model pins remain unchanged;
+  qualification: `benchmarks/sibling_prep_2026-11-05.pointer.md`.
+
 - Update training-core and Adam constructor calls to equivalent token-explicit aliases; strict workspace lint passes. No arithmetic or dependency-version change (`872adce9`).
 
 - Admit the current SIMD beta and use equivalent token-explicit constructor aliases throughout the metric kernels (`639d5292`). Formatting, strict library lint and 450 library tests pass; ten existing ignored tests are unchanged. No metric coefficients, arithmetic or expected values changed.

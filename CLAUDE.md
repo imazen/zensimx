@@ -980,3 +980,16 @@ That removed protected experiment artifacts, including the epoch-zero control.
 New executions retain the directory; final-epoch selection and model bytes are
 unchanged. Frozen source snapshots retain their as-run behavior and must not
 be modified. Old completed runs cannot supply the deleted checkpoints.
+
+## Known Bugs — sibling pixel hold and metadata ingress (2026-11-05)
+
+The exact workspace zenpixels 0.2.16 hold is incompatible with current PNG's
+0.3.1 PixelBuffer in zensim-regress. JPEG's existing dev-tool pin reproduced two
+E0308 errors when its PNG patch advanced. The approved preparatory convergence
+uses one 0.3.1 source and one 0.2 codec family. PNG's unpublished strip API also
+requires its existing zenflate git pin at the consuming root; dependency patch
+tables do not propagate. Update the resolved lock when introducing that pin.
+E34's four deprecated EXIF calls now use the shared zenmeta entry points, which
+forward to the same retained filter/serializer; both existing metadata tests pass.
+Gate evidence: `benchmarks/sibling_prep_2026-11-05.pointer.md`. Frozen replay and
+split qualification are required before advancing a consuming dev-tool pin.

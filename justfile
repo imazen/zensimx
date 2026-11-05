@@ -4598,7 +4598,13 @@ sibling-prep-split binary general codec golden baseline:
 
 sibling-prep-frozen-compare root report:
     python3 -B scripts/bench/a_extraction_fusion.py eval-baseline {{quote(root)}} {{quote(report)}}
+    python3 -c 'import json,sys; row=json.load(open(sys.argv[1])); assert row["rows"] == 4678 and row["equal"] and not row["differences"], (row["rows"],row["equal"],len(row["differences"]))' {{quote(report)}}
 
 # Existing strict source-capture comparison also checks decoded pixel hashes.
 sibling-prep-pixel-compare root report:
     python3 -B scripts/bench/a_extraction_fusion.py eval-bits {{quote(root)}} {{quote(report)}}
+
+# Runtime and optional shared-pixel ingress behavior after the graph update.
+sibling-prep-metric-check:
+    RUST_TEST_THREADS=1 cargo test -p zensim --locked --lib --tests --features training,custom-profiles,classification,zenpixels
+    cargo test -p zensim --locked --doc --features training,custom-profiles,classification,zenpixels
