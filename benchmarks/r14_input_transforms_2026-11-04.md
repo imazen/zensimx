@@ -1,7 +1,8 @@
 # R14: smooth per-input transforms for A
 
 **All 3 required T1 fits, 6 capacity cells, 24 read stages and 3 i270 head pairs
-are complete. Final archive verification is pending.** Frozen A remains unchanged;
+are complete. The tower mirror passes full checksum comparison and three random
+SHA256 readbacks.** Frozen A remains unchanged;
 no transformed model is adopted. T2 and seeds 1–2 are not run under the registered
 training-side conditions.
 
@@ -494,3 +495,28 @@ soft-clip knees jointly with the network, within frozen TRAIN percentile bounds;
 no T2 accuracy is measured because its preregistered development rule fails
 and the winning T1a table has no eligible soft-clip slots. No repeat or adoption
 is selected from EVAL.
+
+## Archive and completion
+
+All scientific stages are complete: 3/3 required T1 fits, the registered T2
+no-run decision, 6/6 full-bank capacity cells, 24/24 read stages, 3/3 paired
+head timings, final native builds and the no-transform proofs. Neither T2
+nor additional seeds was released. No model, target, scientific gate or
+existing test expectation was relaxed.
+
+The canonical mirror is `/mnt/tower/output/zensim/r14-transforms-20261104/`,
+checked from dev. It retains packed/stripped models, checkpoints, frozen
+TRAIN screen, all reads and capacity curves, raw timing pairs, ARM goldens
+and logs, failed orchestration attempts, native/source identities and the
+exact final-trainer source capsule. Rebuildable Cargo output is excluded.
+`SHA256SUMS` and `ARCHIVE_VERIFIED.json` own the complete inventory and final
+verification timestamp; the full rsync checksum comparison is empty and
+three random SHA256 readbacks pass. The first complete mirror took
+94 seconds (run-heavy peak RSS 0.04 GiB, minimum available 41,886 MiB).
+A final mirror also incorporates this report and the last R13 comparison
+snapshot; its resource receipt is retained in `archive.log`.
+
+The experiment's ARM Cargo target has been removed after preserving the
+parity executable and its verified hash. The dedicated jj workspace is
+removed after the report and verification receipt land on main. No source
+or artifact belonging to another lane is changed or removed.
