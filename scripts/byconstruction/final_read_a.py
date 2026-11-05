@@ -100,8 +100,14 @@ def label_spec(name):
     paths = dict(live='/mnt/v/datasets/LIVE/live_r2_pairs.tsv',
                  kadid_terminal='/mnt/v/dataset/kadid10k/dmos.csv',
                  clic22=str(LIB/'clic-2022-perceptual/pairs.tsv'))
+    digests = dict(live='49fcd7d23c9e35b147b52e3361103dbbf6a81aa8ae9d7b16f4763c7e7051fe5d',
+                   kadid_terminal='573e2ed98fdaa2a5aed7b50ad716906e125e1001ed0e97c8e93e79d7b997ba99',
+                   clic22='03300f61963c2fc96e5daf3cad3a0e8a43438637959875b904d7a944db295db1')
     path = paths[name]
-    return dict(path=path, sha256=sha(path), target='dmos' if name == 'kadid_terminal' else 'human_score')
+    assert sha(path) == digests[name], 'registered label-file SHA changed before keys'
+    target = dict(live='human_score', kadid_terminal='dmos',
+                  clic22='majority(n_a,n_b), tied majority=0.5')[name]
+    return dict(path=path, sha256=digests[name], target=target)
 
 
 def stage(a):
