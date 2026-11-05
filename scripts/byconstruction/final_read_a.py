@@ -289,8 +289,26 @@ def peers(a):
     with pairs.open('w') as f:
         writer=csv.writer(f,delimiter='\t');writer.writerow(['id','ref','dist'])
         writer.writerows((r['pair_key'],r['ref_path'],r['dist_path']) for r in keys)
-    command([a.root/'bin/jnd-ladder-score','--configs','','--threads','1',pairs,out/'peers.tsv'],out/'peers.log',
-            env={**os.environ,'AIC4_MODEL_DIR':'/mnt/v/zenmetrics-private/aic4/models/ecec4e0'})
+    threads=min(8,int(os.environ.get('RAYON_NUM_THREADS','1')))
+    assert threads>=1
+    env={**os.environ,'AIC4_MODEL_DIR':'/mnt/v/zenmetrics-private/aic4/models/ecec4e0'}
+    if threads>1:
+        control=out/'peer-thread-parity';control.mkdir(exist_ok=False)
+        selected=np.linspace(0,len(keys)-1,min(64,len(keys)),dtype=int)
+        probe=control/'pairs.tsv'
+        with probe.open('x') as f:
+            w=csv.writer(f,delimiter='\t');w.writerow(['id','ref','dist'])
+            w.writerows((keys[i]['pair_key'],keys[i]['ref_path'],keys[i]['dist_path']) for i in selected)
+        scores_by_thread={}
+        for n in (1,threads):
+            dest=control/f'scores-{n}.tsv'
+            command([a.root/'bin/jnd-ladder-score','--configs','','--threads',str(n),probe,dest],control/f'run-{n}.log',env=env)
+            with dest.open() as f:
+                scores_by_thread[n]={r['id']:(r['ssim2'],r['ba_p3']) for r in csv.DictReader(f,delimiter='\t')}
+        assert scores_by_thread[1]==scores_by_thread[threads] and len(scores_by_thread[1])==len(selected), 'peer thread parity failed before labels'
+        write(control/'PARITY.json',dict(rows=len(selected),threads=[1,threads],all_registered_metric_outputs_exact=True,
+              input_sha256=sha(probe),binary_sha256=sha(a.root/'bin/jnd-ladder-score'),labels_parsed=False))
+    command([a.root/'bin/jnd-ladder-score','--configs','','--threads',str(threads),pairs,out/'peers.tsv'],out/'peers.log',env=env)
 
 
 def comparators(a):

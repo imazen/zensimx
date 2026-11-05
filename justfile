@@ -4544,7 +4544,7 @@ final-read-native-serving-build root:
     env TMPDIR={{quote(root + "/scratch")}} CARGO_TARGET_DIR={{quote(root + "/target/assessment")}} flock {{env_var('HOME')}}/tmp/heavy.lock {{env_var('HOME')}}/work/claudehints/scripts/run-heavy --mem 24G --jobs 8 -- cargo build --release --locked -p zensim --features training,custom-profiles,classification --example serve_custom_bake
 
 final-read-step action population root:
-    env TMPDIR={{quote(root + "/scratch")}} PYTHONDONTWRITEBYTECODE=1 flock {{env_var('HOME')}}/tmp/heavy.lock {{env_var('HOME')}}/work/claudehints/scripts/run-heavy --mem 24G --jobs 1 -- python3 -B scripts/byconstruction/final_read_a.py {{quote(action)}} {{quote(population)}} {{quote(root)}}
+    env TMPDIR={{quote(root + "/scratch")}} PYTHONDONTWRITEBYTECODE=1 flock {{env_var('HOME')}}/tmp/heavy.lock {{env_var('HOME')}}/work/claudehints/scripts/run-heavy --mem 24G --jobs {{if action == "peers" { "8" } else { "1" }}} -- python3 -B scripts/byconstruction/final_read_a.py {{quote(action)}} {{quote(population)}} {{quote(root)}}
 
 final-read-panel-test root:
     env TMPDIR={{quote(root + "/scratch")}} CARGO_TARGET_DIR={{quote(root + "/target/assessment")}} flock {{env_var('HOME')}}/tmp/heavy.lock {{env_var('HOME')}}/work/claudehints/scripts/run-heavy --mem 24G --jobs 8 -- cargo test --release --locked -p zensim-validate --bin panel tests::signed_reference_resamples_preserve_negative_direction_and_ties -- --exact --test-threads=1
