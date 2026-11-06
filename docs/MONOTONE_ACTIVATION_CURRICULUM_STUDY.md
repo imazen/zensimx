@@ -1,5 +1,9 @@
 # Identity, activations and distortion-order study — 2026-11-06
 
+The [paper-derived architecture queue](MONOTONE_ARCHITECTURE_EXPERIMENTS.md)
+continues this study with mixed caps, activation switches, splines and
+Lipschitz residuals, followed by separately controlled training experiments.
+
 Zensimx is the experiment platform. This study does not modify serving profiles,
 feature extraction, the running shared-depth comparison, or its frozen inputs.
 The owner requested exploration of identity-preserving monotone activations,

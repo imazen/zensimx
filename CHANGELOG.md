@@ -4,6 +4,9 @@
 
 ### Research
 
+- Register the paper-derived nonconvex monotone architecture and training queue
+  in `docs/MONOTONE_ARCHITECTURE_EXPERIMENTS.md`; serving models are unchanged.
+
 - Register and implement source-grouped random-forest, Extra Trees and histogram-boosting tuning over cached features, matched peer panels and native finalist arithmetic checks (`7b57f9cb`).
 
 - Complete 189 tree/peer-stack fits and matched constraint controls; record stronger KADID/TID development ranking, CID22-A trade-offs, source-bootstrap intervals and exact native vector parity in `benchmarks/tree_study_2026-11-06.md`. No serving profile changes.
