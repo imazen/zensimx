@@ -210,6 +210,18 @@ registered family IDs and include cross-family pairs. This is a training-order
 choice, not a claim that taxonomy order represents distortion severity.
 Native assertions compare full sorted multisets and the consolidation digest.
 
+Checkpoint-retention replay, registered before replay fitting: rerun the random,
+easy-first, hard-first, family-block and teacher-warm schedules at the same
+120 x 5,000 budget and all three seed pairs (15 replay cells), retaining every
+epoch checkpoint. Use the same frozen training binary as T1--T7. Final model
+bytes, after removing run/coverage provenance, must exactly reproduce each
+original fit before interpreting intermediate results. Evaluate epochs
+0, 29, 59, 89 and 119 on TRAIN populations and distortion families only.
+This measures within-training changes and the shared final-quarter consolidation;
+it does not add intermediate development reads or choose a checkpoint. Report
+all five schedules, including the unchanged random control. Loss of earlier
+family fit is a diagnostic of interference, not proof of a bad local minimum.
+
 T5 reweights family-pair or source/family-pair cells within each population:
 0.2 + 0.8*N/(K*n_cell). Its mean over proposed valid pair events is one and
 its floor is 0.2. It changes the objective, not the event stream. Realized

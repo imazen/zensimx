@@ -4783,6 +4783,9 @@ monotone-artifact-mirror root destination:
 monotone-leaky-training baseline_plan binaries metadata output:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 6G --jobs 2 -- python3 -B scripts/rev4_featpot/activation_curriculum.py training --baseline-plan {{quote(baseline_plan)}} --binary-dir {{quote(binaries)}} --metadata {{quote(metadata)}} --output {{quote(output)}} --workers 2 --leaky-switches
 
+monotone-stage-replay baseline_plan binaries metadata output:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 8G --jobs 3 -- python3 -B scripts/rev4_featpot/activation_curriculum.py training --baseline-plan {{quote(baseline_plan)}} --binary-dir {{quote(binaries)}} --metadata {{quote(metadata)}} --output {{quote(output)}} --workers 3 --stage-replay
+
 monotone-capacity root binary output:
     python3 -B scripts/rev4_featpot/activation_curriculum.py capacity --root {{quote(root)}} --binary {{quote(binary)}} --output {{quote(output)}}
 

@@ -180,12 +180,12 @@ def audit(out):
     print(json.dumps(result,indent=2))
 
 
-def native(plan_path, output, workers, *, architecture=False, binary_dir=None, metadata=None, long=False, prepare_only=False, training=False, replay_control=False, leaky=False):
+def native(plan_path, output, workers, *, architecture=False, binary_dir=None, metadata=None, long=False, prepare_only=False, training=False, replay_control=False, leaky=False, stage_replay=False):
     import numpy as np
     import pyarrow as pa
     import pyarrow.parquet as pq
-    if leaky and replay_control:
-        raise ValueError('leaky arms and neutral replay are separate registered runs')
+    if sum((leaky,replay_control,stage_replay))>1:
+        raise ValueError('leaky arms, neutral replay and stage replay are separate registered runs')
     if not 1 <= workers <= (12 if architecture and long else 6 if architecture else 3):
         raise ValueError('pilot concurrency exceeds the registered aggregate memory budget')
     base = json.loads(plan_path.read_text())
@@ -240,6 +240,7 @@ def native(plan_path, output, workers, *, architecture=False, binary_dir=None, m
     owner.EPOCHS,owner.PAIRS_PER_EPOCH,owner.LOG_EVERY = epochs,draws,1
     training_options = LEAKY_ARMS if leaky else TRAINING_ARMS
     arms = (('control',) if replay_control else tuple(training_options)) if training else tuple(ARCHITECTURE_ARMS) if architecture else ARMS
+    if stage_replay:arms=('control','easy_first','hard_first','family_blocks','teacher_warm')
     seeds = ARCHITECTURE_SEEDS if architecture else SEEDS
     groups = []
     for g in prepared['groups']:
@@ -284,6 +285,7 @@ def native(plan_path, output, workers, *, architecture=False, binary_dir=None, m
                 'selection':'fixed final epoch; no development selection',
                 'binary_sha256':{name:sha(selected_bin/name) for name in ('zensim_mlp_train','bake_dial_refit','panel')},
                 'architecture':architecture,'training':training,'training_options':training_options if training else None,
+                'stage_replay':stage_replay,'checkpoint_interval':1 if stage_replay else epochs-1,
                 'family_taxonomy':{n:sorted(set(v)) for n,v in families.items()},'per_training_child_memory_cap':'2G' if architecture else None}
     write(output/'PLAN.json',run_plan)
     if prepare_only:
@@ -314,7 +316,7 @@ def native(plan_path, output, workers, *, architecture=False, binary_dir=None, m
         if training:
             cmd += ['--l2',str(training_options[arm].get('l2',1e-5)),'--no-sample-coverage']
         (dest/'ckpt').mkdir()
-        cmd += ['--dump-checkpoints-every',str(epochs-1),'--dump-checkpoints-dir',str(dest/'ckpt')]
+        cmd += ['--dump-checkpoints-every',str(1 if stage_replay else epochs-1),'--dump-checkpoints-dir',str(dest/'ckpt')]
         env = os.environ.copy()
         for key in ('ZENSIM_MONOTONE_RESEARCH_MANIFEST','ZENSIM_MONOTONE_RESEARCH_SHA256'):
             env.pop(key,None)
@@ -689,6 +691,7 @@ def main():
     p.add_argument('--workers',type=int,default=6)
     p.add_argument('--replay-control',action='store_true')
     p.add_argument('--leaky-switches',action='store_true')
+    p.add_argument('--stage-replay',action='store_true')
     p=sub.add_parser('compare-neutral')
     for name in ('reference','candidate','binary','output'): p.add_argument('--'+name,type=Path,required=True)
     p=sub.add_parser('families')
@@ -727,7 +730,7 @@ def main():
         replay_controls(args.frozen,args.binary_dir,args.output)
     elif args.action == 'training':
         native(args.baseline_plan,args.output,args.workers,architecture=True,training=True,
-               binary_dir=args.binary_dir,metadata=args.metadata,replay_control=args.replay_control,leaky=args.leaky_switches)
+               binary_dir=args.binary_dir,metadata=args.metadata,replay_control=args.replay_control,leaky=args.leaky_switches,stage_replay=args.stage_replay)
     elif args.action == 'architectures':
         native(args.baseline_plan,args.output,args.workers,architecture=True,
                binary_dir=args.binary_dir,metadata=args.metadata,long=args.long,prepare_only=args.prepare_only)
