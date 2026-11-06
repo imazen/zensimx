@@ -1,5 +1,12 @@
 # zensim — current working rules
 
+## Known Bugs — rank-only training driver (resolved 2026-11-06)
+
+The shared `v2_lodo_mlp.train_command` always supplied `--mse-weight 1`,
+which the native capability guard rejects when every group is rank-only.
+Recipes may now explicitly set `mse_weight: 0`; the default stays 1 and
+the native guard remains unchanged. This does not add absolute supervision.
+
 ## Known Bugs — R14 checkpoint transform preprocessing (2026-11-04)
 
 Checkpoint transforms are restored after row loading. R14 now loads the
