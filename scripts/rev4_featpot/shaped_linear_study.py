@@ -346,6 +346,8 @@ def run_tasks(root,tasks,stage,workers):
     if matrix.exists():
         if json.loads(matrix.read_text())!=tasks:raise ValueError('registered matrix changed: '+stage)
     else:write(matrix,tasks)
+    source=Path(__file__).read_bytes();source_path=root/f'{stage}-DRIVER.py'
+    if not source_path.exists():source_path.write_bytes(source)
     status=dict(stage=stage,coordinator_pid=os.getpid(),required=sum(len(t['lambdas']) for t in tasks),completed=0,failures=[],last_check=datetime.now(timezone.utc).isoformat())
     write(root/'PROGRESS.json',status)
     with ProcessPoolExecutor(max_workers=workers) as pool:
@@ -447,7 +449,7 @@ def influence(root,workers):
                 mass[s]=float(np.sum(w[mask]*(pred[fit][mask]-target[mask])**2))
             chosen=sorted(components,key=lambda s:(-mass[s],s))[:2];names.update(chosen)
             selected.append(dict(family=family,population=p,selected=chosen,residual_mass=mass))
-        for i,s in enumerate(sorted(names)):tasks.append(task(f's5-influence-{family}-{i}',family,fit[d['component'][fit]!=s],dev,omitted_component=s))
+        for i,s in enumerate(sorted(names)):tasks.append(task(f's5-influence-{family}-{i}',family,fit[d['component'][fit]!=s],dev,(result['lambda_'],),omitted_component=s))
     write(root/'S5-INFLUENCE-SELECTION.json',selected);run_tasks(root,tasks,'S5_influence',workers)
 
 

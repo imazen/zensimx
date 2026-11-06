@@ -4850,3 +4850,6 @@ shaped-linear-controller-tests:
 
 shaped-linear-compare root model="all":
     python3 -B scripts/rev4_featpot/shaped_linear_compare.py --root {{root}} --model {{model}}
+
+shaped-linear-report stage root:
+    python3 -B scripts/rev4_featpot/shaped_linear_report.py {{stage}} --root {{root}}

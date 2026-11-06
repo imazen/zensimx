@@ -232,3 +232,9 @@ The neural comparator retains human rank-only and teacher rank/MSE objectives;
 its data match the linear study but its objective differs. It selects epoch 119
 regardless of development logs. Seeds are the registered two seed values for
 initialization, with sampling seed equal to initialization plus 100,000,000.
+
+Source-influence refits retain the selected full-FIT model's lambda. This holds
+regularization fixed when removing a source; the source learning and permutation
+controls retain their separately registered lambda=1e-4. Every new executable
+stage preserves its driver bytes alongside the matrix. The original S1–S5
+controller is retained by its frozen hash.
