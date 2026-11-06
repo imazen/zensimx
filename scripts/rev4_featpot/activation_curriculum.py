@@ -535,13 +535,19 @@ def capacity(root, binary, output):
         model=p.parent/f"ckpt/ckpt_epoch{plan['epochs']-1:03d}.bin"
         if sha(model)!=data['bake_sha256']: raise ValueError('capacity model drift')
         info=json.loads(subprocess.check_output([str(binary),'inspect','--in',str(model)],text=True))
-        command=json.loads(p.with_name('RUN.json').read_text())['command']
+        parameter_owner=p.parent
+        if data.get('fitting_steps_in_this_evaluation')==0:
+            parameter_owner=Path(data['original_fit'])
+            original_bake=parameter_owner/f"ckpt/ckpt_epoch{plan['epochs']-1:03d}.bin"
+            if sha(original_bake)!=data['original_fit_bake_sha256'] or sha(parameter_owner.parent.parent/'PLAN.json')!=plan['original_plan_sha256']:
+                raise ValueError('capacity original-fit provenance drift')
+        command=json.loads((parameter_owner/'RUN.json').read_text())['command']
         mp=int(command[command.index('--max-pairs')+1])
         ramps=int(command[command.index('--monotone-ramps')+1]) if '--monotone-ramps' in command else 0
         nf,nh=info['layers'][0]['in_dim'],info['layers'][0]['out_dim']
         first=nf*(nh-ramps)+nh-mp
-        if p.with_name('HEAD.json').exists():
-            head=json.loads(p.with_name('HEAD.json').read_text());ni=nh-mp;count=first
+        if (parameter_owner/'HEAD.json').exists():
+            head=json.loads((parameter_owner/'HEAD.json').read_text());ni=nh-mp;count=first
             for width in head['widths']:
                 family=head['family']
                 count+=ni*width
@@ -557,6 +563,7 @@ def capacity(root, binary, output):
             count=first+nh-mp-ramps
         else:raise ValueError('unsupported capacity parameterization')
         info['independent_trainable_coefficients']=count
+        info['parameterization_run_sha256']=sha(parameter_owner/'RUN.json')
         info['trainable_count_scope']='nominal coefficients after exact ties, frozen biases and unused cap thresholds; excludes scaler/fixed routing; boundary-zero weights remain trainable'
         results[str(p.parent.relative_to(root))]=info
     write(output,dict(inspector_sha256=sha(binary),cells=results))
