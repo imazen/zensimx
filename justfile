@@ -4794,3 +4794,9 @@ monotone-study-summary root breakdowns output *extra:
 
 monotone-source-bootstrap root summary binary output *extra:
     TMPDIR="$HOME/tmp" RAYON_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 "$HOME/work/claudehints/scripts/run-heavy" --mem 2G --jobs 1 -- python3 -B scripts/rev4_featpot/monotone_summary.py --root {{quote(root)}} --bootstrap-summary {{quote(summary)}} --binary {{quote(binary)}} --output {{quote(output)}} {{extra}}
+
+monotone-study-plot summary bootstrap output title *extra:
+    TMPDIR="$HOME/tmp" OPENBLAS_NUM_THREADS=1 "$HOME/work/claudehints/scripts/run-heavy" --mem 2G --jobs 1 -- python3 -B scripts/rev4_featpot/monotone_plot.py --summary {{quote(summary)}} --bootstrap {{quote(bootstrap)}} --output {{quote(output)}} --title {{quote(title)}} {{extra}}
+
+monotone-figure-mirror root destination:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 2G --jobs 1 -- python3 -B scripts/byconstruction/dataset_mirror.py --root {{quote(root)}} --nfs --cold-readback --destination {{quote(destination)}} --artifact-kind evaluation
