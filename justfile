@@ -4717,11 +4717,22 @@ monotone-architecture-check:
     cargo test --locked -p zensim-validate --lib shared_depth -- --test-threads=1
     cargo clippy --locked -p zensim-validate --lib --bin zensim_mlp_train -- -D warnings
 
+monotone-training-check:
+    cargo test --locked -p zensim-validate --lib training_research -- --test-threads=1
+    cargo test --locked -p zensim-validate --lib monotone_research -- --test-threads=1
+    cargo clippy --locked -p zensim-validate --lib --bin zensim_mlp_train -- -D warnings
+
 monotone-architecture-screen baseline_plan binaries metadata output:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 14G --jobs 6 -- python3 -B scripts/rev4_featpot/activation_curriculum.py architectures --baseline-plan {{quote(baseline_plan)}} --binary-dir {{quote(binaries)}} --metadata {{quote(metadata)}} --output {{quote(output)}} --workers 6
 
 monotone-architecture-long baseline_plan binaries metadata output:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 26G --jobs 12 -- python3 -B scripts/rev4_featpot/activation_curriculum.py architectures --baseline-plan {{quote(baseline_plan)}} --binary-dir {{quote(binaries)}} --metadata {{quote(metadata)}} --output {{quote(output)}} --workers 12 --long
+
+monotone-training-run baseline_plan binaries metadata output:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 14G --jobs 6 -- python3 -B scripts/rev4_featpot/activation_curriculum.py training --baseline-plan {{quote(baseline_plan)}} --binary-dir {{quote(binaries)}} --metadata {{quote(metadata)}} --output {{quote(output)}} --workers 6
+
+monotone-training-replay baseline_plan binaries metadata output:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 8G --jobs 3 -- python3 -B scripts/rev4_featpot/activation_curriculum.py training --baseline-plan {{quote(baseline_plan)}} --binary-dir {{quote(binaries)}} --metadata {{quote(metadata)}} --output {{quote(output)}} --workers 3 --replay-control
 
 monotone-architecture-replay frozen binaries output:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 3G --jobs 1 -- python3 -B scripts/rev4_featpot/activation_curriculum.py replay --frozen {{quote(frozen)}} --binary-dir {{quote(binaries)}} --output {{quote(output)}}

@@ -66,6 +66,7 @@ mod monotone_research;
 mod shared_depth;
 mod smooth_hinge;
 mod steer_data;
+mod training_research;
 
 mod goals;
 
@@ -3632,6 +3633,19 @@ pub fn train_mlp_strategy_pairs(
 
     let mut depth =
         shared_depth_on.then(|| shared_depth::Head::new(hyperparams, shared_smooth, &mut init_rng));
+    let training_study = depth
+        .as_ref()
+        .and_then(|head| head.research.as_ref())
+        .and_then(|net| net.training())
+        .cloned();
+    if let Some(research) = depth
+        .as_ref()
+        .and_then(|head| head.research.as_ref())
+        .filter(|net| net.training().is_some())
+    {
+        research.init_first(&mut w1, &mut b1);
+        project_plain(&mut w1, &mut w2, &mut b1, &mut b2, nonneg, hyperparams);
+    }
     if let Some(head) = &depth {
         log_line(
             &format!(
@@ -4009,12 +4023,39 @@ pub fn train_mlp_strategy_pairs(
     }
     let mut la_next: Option<Lookahead<'_>> = None;
 
+    let training_events = training_study.as_ref().map(|study| {
+        assert!(
+            !pooled_on
+                && pair_plan.is_none()
+                && pair_lists.iter().all(Option::is_none)
+                && matched_plans.iter().all(Option::is_none)
+        );
+        training_research::Events::new(
+            study,
+            hyperparams,
+            groups,
+            &train_indices,
+            &sampling::PairDrawCtx {
+                cdf: &cdf,
+                row_counts: &row_counts,
+                per_row_cdfs: &per_row_cdfs,
+                ref_buckets: &ref_buckets,
+                strat_bands: &strat_bands,
+                plan: None,
+                draw_index: 0,
+            },
+            &mut rng,
+        )
+    });
+
     for epoch in 0..hyperparams.n_epochs {
         // Global draw index, the coordinate `--pair-sampling stratified`'s
         // schedule is a function of. Unused (and unread) by the uniform
         // draw, which is why adding it changes nothing for a default run.
         let draw_index_base = (epoch as u64).wrapping_mul(hyperparams.pairs_per_epoch as u64);
-        let lr = if hyperparams.constant_lr {
+        let lr = if let Some(study) = &training_study {
+            study.lr(epoch, hyperparams)
+        } else if hyperparams.constant_lr {
             hyperparams.initial_lr
         } else {
             hyperparams.initial_lr
@@ -4040,20 +4081,25 @@ pub fn train_mlp_strategy_pairs(
             // was already drawn at exactly this stream position — the
             // stash replays it (and may carry the pre-accumulated h_pre).
             let la = la_next.take();
-            let drawn = match la.as_ref() {
-                Some(l) => l.drawn,
-                None => sampling::draw_pair(
-                    &sampling::PairDrawCtx {
-                        cdf: &cdf,
-                        row_counts: &row_counts,
-                        per_row_cdfs: &per_row_cdfs,
-                        ref_buckets: &ref_buckets,
-                        strat_bands: &strat_bands,
-                        plan: pair_plan.as_ref(),
-                        draw_index: draw_index_base + pair_i as u64,
-                    },
-                    &mut rng,
-                ),
+            let drawn = if let Some(events) = &training_events {
+                assert!(la.is_none());
+                events.draws[epoch * hyperparams.pairs_per_epoch + pair_i]
+            } else {
+                match la.as_ref() {
+                    Some(l) => l.drawn,
+                    None => sampling::draw_pair(
+                        &sampling::PairDrawCtx {
+                            cdf: &cdf,
+                            row_counts: &row_counts,
+                            per_row_cdfs: &per_row_cdfs,
+                            ref_buckets: &ref_buckets,
+                            strat_bands: &strat_bands,
+                            plan: pair_plan.as_ref(),
+                            draw_index: draw_index_base + pair_i as u64,
+                        },
+                        &mut rng,
+                    ),
+                }
             };
             let drawn = if pooled_on {
                 sampling::pool_draw(
@@ -4220,9 +4266,7 @@ pub fn train_mlp_strategy_pairs(
                 (xa, xb, ya, hpa, ha, yb, hpb, hb)
             };
 
-            let deep_forward = depth
-                .as_ref()
-                .map(|head| (head.forward(&ha), head.forward(&hb)));
+            let deep_forward = depth.as_mut().map(|head| head.training_pair(&ha, &hb));
             let (ya, yb) = deep_forward.as_ref().map_or((ya, yb), |(a, b)| (a.0, b.0));
 
             let mos_a = g.human_scores[ia];
@@ -4266,6 +4310,10 @@ pub fn train_mlp_strategy_pairs(
             if want_rank && let Some(plan) = &confidence {
                 pair_weight *= plan.weight(g_idx, ia, ib);
             }
+            let study_weight = training_events
+                .as_ref()
+                .map_or(1., |events| events.weight(drawn));
+            pair_weight *= study_weight;
             // RankNet term. Zeroed for `GroupLossMode::Mse` groups and for
             // tied / sub-threshold pairs of a `Both` group.
             let (dl_dya_rn, dl_dyb_rn) = if want_rank {
@@ -4313,8 +4361,11 @@ pub fn train_mlp_strategy_pairs(
             // ~0.1 is the balanced setting for `Both`.
             let (dl_dya_mse, dl_dyb_mse) = if want_mse {
                 let (ra, rb) = (ya - mos_a, yb - mos_b);
-                total_loss += hyperparams.mse_weight * (ra * ra + rb * rb) / 2.0;
-                (hyperparams.mse_weight * ra, hyperparams.mse_weight * rb)
+                total_loss += hyperparams.mse_weight * study_weight * (ra * ra + rb * rb) / 2.0;
+                (
+                    hyperparams.mse_weight * study_weight * ra,
+                    hyperparams.mse_weight * study_weight * rb,
+                )
             } else {
                 (0.0, 0.0)
             };
@@ -4377,6 +4428,9 @@ pub fn train_mlp_strategy_pairs(
                     }
                     adam.step(&mut w1, &mut b1, &mut w2, &mut b2, lr);
                     apply_post_adam_penalties(&mut w1, n_hidden, lr);
+                }
+                if let Some(study) = &training_study {
+                    training_research::decay(&mut w1, lr, study.adamw);
                 }
                 head.step(hyperparams, lr);
                 project_plain(&mut w1, &mut w2, &mut b1, &mut b2, nonneg, hyperparams);

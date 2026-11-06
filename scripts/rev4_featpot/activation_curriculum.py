@@ -34,6 +34,20 @@ ARCHITECTURE_ARMS = {
     'single_ramps': None,
 }
 
+TRAINING_ARMS = {
+    'control': {},
+    'init_half': {'init_scale': .5}, 'init_double': {'init_scale': 2.},
+    'bias_zero': {'bias_scale': 0.}, 'bias_double': {'bias_scale': 2.},
+    'l2_none': {'l2': 0.}, 'l2_high': {'l2': 1e-4},
+    'adamw_low': {'l2': 0., 'adamw': 1e-5}, 'adamw_high': {'l2': 0., 'adamw': 1e-4},
+    'dropout_05': {'dropout': .05}, 'dropout_15': {'dropout': .15},
+    'easy_first': {'order': 'easy'}, 'hard_first': {'order': 'hard'},
+    'family_blocks': {'order': 'family'}, 'teacher_warm': {'order': 'teacher_warm'},
+    'family_balance': {'balance': 'family'}, 'source_family_balance': {'balance': 'source_family'},
+    'teacher_zero': {'teacher_mass': 0.}, 'teacher_half': {'teacher_mass': .5}, 'teacher_double': {'teacher_mass': 2.},
+    'lr_constant': {'schedule': 'constant'}, 'lr_consolidate': {'schedule': 'consolidate'},
+}
+
 
 def sha(path):
     with Path(path).open('rb') as stream:
@@ -165,7 +179,7 @@ def audit(out):
     print(json.dumps(result,indent=2))
 
 
-def native(plan_path, output, workers, *, architecture=False, binary_dir=None, metadata=None, long=False, prepare_only=False):
+def native(plan_path, output, workers, *, architecture=False, binary_dir=None, metadata=None, long=False, prepare_only=False, training=False, replay_control=False):
     import numpy as np
     import pyarrow as pa
     import pyarrow.parquet as pq
@@ -184,6 +198,7 @@ def native(plan_path, output, workers, *, architecture=False, binary_dir=None, m
     if {g['name'] for g in prepared['groups']} != expected:
         raise ValueError('pilot requires exactly the admitted four human populations and CID22 teacher')
     source_audit = None
+    families = {}
     if architecture:
         if binary_dir is None or metadata is None:
             raise ValueError('architecture fits require explicit frozen binaries and source metadata')
@@ -191,7 +206,7 @@ def native(plan_path, output, workers, *, architecture=False, binary_dir=None, m
         receipt = json.loads(metadata.with_name('PEERS.json').read_text())
         if sha(metadata) != receipt['metadata_sha256']:
             raise ValueError('source metadata drift')
-        source = pq.read_table(metadata, columns=['pair_key','ref_pixels_sha256','development']).to_pydict()
+        source = pq.read_table(metadata, columns=['pair_key','ref_pixels_sha256','development','codec']).to_pydict()
         offset, by_role = 0, {'fit':set(), 'dev':set()}
         for g in prepared['groups']:
             keys = pq.read_table(Path(g['path']).with_suffix('.keys.parquet'), columns=['pair_key'])['pair_key'].to_pylist()
@@ -199,6 +214,10 @@ def native(plan_path, output, workers, *, architecture=False, binary_dir=None, m
             if source['pair_key'][offset:end] != keys or any(v != (g['split']=='dev') for v in source['development'][offset:end]):
                 raise ValueError('source metadata order/role mismatch: '+g['name'])
             by_role[g['split']].update(source['ref_pixels_sha256'][offset:end])
+            labels=source['codec'][offset:end]
+            if any(not isinstance(v,str) or not v for v in labels):
+                raise ValueError('missing family label: '+g['name'])
+            families[g['name']]=labels
             offset=end
         if offset != len(source['pair_key']) or by_role['fit'] & by_role['dev']:
             raise ValueError('decoded reference overlap or unmatched source rows')
@@ -212,9 +231,9 @@ def native(plan_path, output, workers, *, architecture=False, binary_dir=None, m
                       RAYON_NUM_THREADS='1',OMP_NUM_THREADS='1',OPENBLAS_NUM_THREADS='1')
     from v2_common import acceptance_weight, derived_declaration
     import v2_lodo_mlp as owner
-    epochs, draws = (120,50000) if long else (12,5000)
+    epochs, draws = (120,5000) if training and not replay_control else (120,50000) if long else (12,5000)
     owner.EPOCHS,owner.PAIRS_PER_EPOCH,owner.LOG_EVERY = epochs,draws,1
-    arms = tuple(ARCHITECTURE_ARMS) if architecture else ARMS
+    arms = (('control',) if replay_control else tuple(TRAINING_ARMS)) if training else tuple(ARCHITECTURE_ARMS) if architecture else ARMS
     seeds = ARCHITECTURE_SEEDS if architecture else SEEDS
     groups = []
     for g in prepared['groups']:
@@ -258,7 +277,8 @@ def native(plan_path, output, workers, *, architecture=False, binary_dir=None, m
                 'arms':arms,'seed_pairs':seeds,'workers':workers,'source_audit':source_audit,
                 'selection':'fixed final epoch; no development selection',
                 'binary_sha256':{name:sha(selected_bin/name) for name in ('zensim_mlp_train','bake_dial_refit','panel')},
-                'architecture':architecture,'per_training_child_memory_cap':'2G' if architecture else None}
+                'architecture':architecture,'training':training,'training_options':TRAINING_ARMS if training else None,
+                'family_taxonomy':{n:sorted(set(v)) for n,v in families.items()},'per_training_child_memory_cap':'2G' if architecture else None}
     write(output/'PLAN.json',run_plan)
     if prepare_only:
         print(json.dumps({'stage':'preparation verified; zero optimizer steps','source_audit':source_audit}),flush=True)
@@ -269,7 +289,7 @@ def native(plan_path, output, workers, *, architecture=False, binary_dir=None, m
         dest.mkdir(parents=True)
         keep = dest/'keep.txt'
         keep.write_text('\n'.join(map(str,declaration['direct']))+'\n')
-        selected = [(n,p,w*({'teacher_half':0.5,'teacher_double':2.}.get(arm,1.) if n=='cid22' else 1.),v,m)
+        selected = [(n,p,w*({'teacher_half':0.5,'teacher_double':2.}.get(arm,1.) if n=='cid22' and not training else 1.),v,m)
                     for n,p,w,v,m in groups]
         recipe = {**base['recipe'],'shared_hidden_activation':'relu','mse_weight':1}
         if arm == 'shared_smooth':
@@ -283,20 +303,29 @@ def native(plan_path, output, workers, *, architecture=False, binary_dir=None, m
             cmd[cmd.index('--pair-sampling')+1] = 'walk'
         if arm == 'lr_low':
             cmd += ['--lr','0.0003']
-        if arm == 'l2_high':
+        if arm == 'l2_high' and not training:
             cmd += ['--l2','0.0001']
+        if training:
+            cmd += ['--l2',str(TRAINING_ARMS[arm].get('l2',1e-5))]
         (dest/'ckpt').mkdir()
         cmd += ['--dump-checkpoints-every',str(epochs-1),'--dump-checkpoints-dir',str(dest/'ckpt')]
         env = os.environ.copy()
         for key in ('ZENSIM_MONOTONE_RESEARCH_MANIFEST','ZENSIM_MONOTONE_RESEARCH_SHA256'):
             env.pop(key,None)
         manifest = None
-        if architecture and ARCHITECTURE_ARMS[arm] is not None:
-            family,widths=ARCHITECTURE_ARMS[arm]
+        if architecture and (training or ARCHITECTURE_ARMS[arm] is not None):
+            family,widths=('switch',[64]) if training else ARCHITECTURE_ARMS[arm]
             manifest=dest/'HEAD.json'
-            write(manifest,dict(schema='monotone-head-v1',family=family,widths=widths,
+            head_config=dict(schema='monotone-head-v1',family=family,widths=widths,
                 init_seed=seeds[index][0],sample_seed=seeds[index][1],epochs=epochs,
-                pairs_per_epoch=draws,first_width=recipe['hidden'],max_pairs=recipe['max_pairs']))
+                pairs_per_epoch=draws,first_width=recipe['hidden'],max_pairs=recipe['max_pairs'])
+            if training:
+                opts={k:v for k,v in TRAINING_ARMS[arm].items() if k!='l2'}
+                head_config['training']=dict(schema='monotone-training-v1',init_scale=1.,bias_scale=1.,
+                    dropout=0.,dropout_seed=9000001+index*100000,adamw=0.,schedule='cosine',order='random',
+                    teacher_mass=1.,balance='none',groups=[dict(name=n,families=[sorted(set(families[n])).index(v) for v in families[n]]) for n,_,w,_,_ in groups if w>0])
+                head_config['training'].update(opts)
+            write(manifest,head_config)
             env.update(ZENSIM_MONOTONE_RESEARCH_MANIFEST=str(manifest),ZENSIM_MONOTONE_RESEARCH_SHA256=sha(manifest))
         launch = ([str(Path.home()/'work/claudehints/scripts/run-heavy'),'--mem','2G','--jobs','1','--']+cmd) if architecture else cmd
         with (dest/'train.log').open('w') as log:
@@ -326,6 +355,12 @@ def native(plan_path, output, workers, *, architecture=False, binary_dir=None, m
                 (dest/f'{n}.{mode}.log').write_text(proc.stdout+'\n'+proc.stderr)
                 proc.check_returncode()
                 panels[n][mode] = json.loads(proc.stdout)
+            if training:
+                family_table=dest/f'{n}.families.parquet'
+                pq.write_table(pa.table({'predicted':prediction,'target':targets['human_score'],'band':families[n]}),family_table,compression='zstd')
+                proc=subprocess.run([str(selected_bin/'panel'),'--input',str(family_table),'--json','--per-group'],text=True,capture_output=True,check=True)
+                panels[n]['families']=json.loads(proc.stdout)
+                (dest/f'{n}.families.log').write_text(proc.stdout+'\n'+proc.stderr)
             q = panels[n]['signed-quality']
             if q['n'] != len(prediction) or q['n_dropped'] != 0 or panels[n]['scatter']['status'] != 'MEASURED':
                 raise ValueError('incomplete panel coverage')
@@ -415,6 +450,13 @@ def main():
     p.add_argument('--workers',type=int,default=6)
     p.add_argument('--long',action='store_true')
     p.add_argument('--prepare-only',action='store_true')
+    p=sub.add_parser('training')
+    p.add_argument('--baseline-plan',type=Path,required=True)
+    p.add_argument('--output',type=Path,required=True)
+    p.add_argument('--binary-dir',type=Path,required=True)
+    p.add_argument('--metadata',type=Path,required=True)
+    p.add_argument('--workers',type=int,default=6)
+    p.add_argument('--replay-control',action='store_true')
     p=sub.add_parser('replay')
     p.add_argument('--frozen',type=Path,required=True)
     p.add_argument('--binary-dir',type=Path,required=True)
@@ -426,6 +468,9 @@ def main():
         audit(args.output)
     elif args.action == 'replay':
         replay_controls(args.frozen,args.binary_dir,args.output)
+    elif args.action == 'training':
+        native(args.baseline_plan,args.output,args.workers,architecture=True,training=True,
+               binary_dir=args.binary_dir,metadata=args.metadata,replay_control=args.replay_control)
     elif args.action == 'architectures':
         native(args.baseline_plan,args.output,args.workers,architecture=True,
                binary_dir=args.binary_dir,metadata=args.metadata,long=args.long,prepare_only=args.prepare_only)

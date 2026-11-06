@@ -114,6 +114,19 @@ impl Head {
         )
     }
 
+    pub(super) fn training_pair(
+        &mut self,
+        a: &[f64],
+        b: &[f64],
+    ) -> ((f64, Vec<f64>, Vec<f64>), (f64, Vec<f64>, Vec<f64>)) {
+        if let Some(research) = &mut self.research {
+            research.begin_pair();
+            (research.training_forward(a), research.training_forward(b))
+        } else {
+            (self.forward(a), self.forward(b))
+        }
+    }
+
     // Return dL/d(first activation), before either layer's weights are updated.
     pub(super) fn backward(
         &mut self,

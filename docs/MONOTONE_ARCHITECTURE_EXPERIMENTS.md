@@ -165,3 +165,55 @@ A0--A6 are implemented and screened; none is dropped from the full comparison.
 All final native feature probes pass. The long runner now permits twelve
 single-threaded children (2 GiB each, 26 GiB outer cap) after resource inspection;
 this concurrency-only amendment changes no seed, draw or checkpoint choice.
+
+## Controlled training matrix, registered before fitting
+
+T1--T7 use the shared switch [128,64] as a fixed experimental platform, not
+an architecture chosen by development ranking. There are 22 arms and three
+independent seed pairs (66 cells), each at 120 epochs x 5,000 pair draws,
+fixed epoch 119. This crosses both 50-epoch restarts but has one tenth the
+draw budget of the architecture-long comparison. Do not compare the two as
+matched fits. The three-cell 12 x 5,000 neutral replay must match the earlier
+switch screen before these arms run.
+
+The neutral arm has initialization/bias multipliers 1, coupled L2 1e-5,
+no dropout, cosine restarts, original group mass and random order. Change
+one factor at a time: initialization {.5,2}; bias spread {0,2}; L2 {0,1e-4};
+AdamW {1e-5,1e-4} with coupled L2 zero; dropout {.05,.15}; easy-first,
+hard-first, family blocks, teacher warm-up; family and source/family loss
+balancing; teacher proposal mass {0,.5,2}; fixed LR and fixed LR followed by
+0.1x LR during the final quarter. Dropout seeds are 9000001 + 100000*seed_index,
+separate from initialization and sampling. No settings or checkpoints are
+selected from development. Adaptive follow-up tuning requires TRAIN folds.
+
+The native sampler materializes the exact event stream once, including skips.
+Order arms permute only its first 75%; every fifth prefix event retains its
+original position as replay, and the final 25% stays exactly unchanged.
+Human-pair margin percentile within each population defines difficulty;
+teacher pairs retain a neutral difficulty. Family blocks use lexicographically
+registered family IDs and include cross-family pairs. This is a training-order
+choice, not a claim that taxonomy order represents distortion severity.
+Native assertions compare full sorted multisets and the consolidation digest.
+
+T5 reweights family-pair or source/family-pair cells within each population:
+0.2 + 0.8*N/(K*n_cell). Its mean over proposed valid pair events is one and
+its floor is 0.2. It changes the objective, not the event stream. Realized
+counts and weight extrema are recorded. Source-only balancing is already in
+the baseline within-reference sampler. Same-row and rank-tie skips remain
+visible; proposed mass is not claimed to equal accepted gradient mass.
+
+T6 changes only the proposal CDF. Even zero teacher proposal mass retains the
+same training-feature scaler membership, so removing teacher labels is not
+confounded with a different scaler. Teacher warm-up and its joint control
+have identical cumulative event counts, with the replay/consolidation rules
+above. Last-hidden dropout uses one mask for both rank-pair members and the
+anchored response; inference always uses the unmasked network. No individual
+first-layer max-pair member is dropped. AdamW decays every trainable weight
+matrix and output amplitude after Adam, excluding thresholds/biases; coupled
+L2 is explicitly zero in those arms. Native identity/projection gates remain.
+
+The control implementation passes 167 trainer checks (one pre-existing ignore)
+and 65 CLI checks. Native exhaustive last-hidden mask probes check zero identity,
+coordinate order, input gradients and unmasked inference; zero dropout consumes
+no RNG draws. Actual-data neutral replay is the next admission gate, not implied
+by those unit checks. No quality claim follows from compilation or toy targets.

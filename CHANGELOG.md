@@ -4,6 +4,9 @@
 
 ### Research
 
+- Add opt-in, hash-bound native monotone training controls for hidden dropout,
+  initialization, AdamW, exact-event curricula, family weighting and teacher/LR schedules.
+
 - Implement private native mixed-cap, activation-switch, positive-slope spline
   and Lipschitz residual research heads, exported through existing dense/ReLU
   ZNPR operators. Add matched architecture trials and source-key admission.

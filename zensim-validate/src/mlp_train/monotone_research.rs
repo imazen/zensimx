@@ -42,6 +42,8 @@ struct Config {
     pairs_per_epoch: usize,
     first_width: usize,
     max_pairs: usize,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    training: Option<super::training_research::Config>,
 }
 
 struct Block {
@@ -282,6 +284,7 @@ mod tests {
             sample_seed: 101,
             epochs: 12,
             pairs_per_epoch: 5000,
+            training: None,
         }
     }
 
@@ -478,6 +481,48 @@ mod tests {
     }
 
     #[test]
+    fn dropout_uses_one_mask_for_pair_anchor_and_analytic_gradient() {
+        for family in [
+            Family::Caps,
+            Family::Switch,
+            Family::Spline,
+            Family::Lipschitz,
+        ] {
+            let mut net = Network::new(config(family, false), 100., &mut SplitMix64::new(87));
+            let width = net.output.len();
+            for bits in 0..(1 << width) {
+                net.mask = Some(
+                    (0..width)
+                        .map(|i| if bits & (1 << i) == 0 { 0. } else { 2. })
+                        .collect(),
+                );
+                assert_eq!(net.training_forward(&[0., 0., 0.]).0, 100.);
+                let x = [0.7, 0.4, 1.1];
+                let cache = net.training_forward(&x);
+                let gradient = net.backward(&x, &cache, 1.);
+                for i in 0..x.len() {
+                    let mut plus = x;
+                    plus[i] += 1e-6;
+                    let mut minus = x;
+                    minus[i] -= 1e-6;
+                    let numerical =
+                        (net.training_forward(&plus).0 - net.training_forward(&minus).0) / 2e-6;
+                    assert!(
+                        (numerical - gradient[i]).abs() < 2e-7,
+                        "{family:?} mask={bits}"
+                    );
+                    assert!(net.training_forward(&plus).0 <= cache.0 + 1e-12);
+                }
+                let eval = net.forward(&x).0;
+                let saved = net.mask.take();
+                assert_eq!(eval, net.forward(&x).0);
+                net.mask = saved;
+                net.adam.gw1.fill(0.);
+            }
+        }
+    }
+
+    #[test]
     fn native_fits_reduce_error_on_nonconvex_monotone_targets() {
         for family in [
             Family::Caps,
@@ -525,6 +570,8 @@ pub(super) struct Network {
     output: Vec<f64>,
     adam: AdamState,
     pin: f64,
+    dropout_rng: SplitMix64,
+    mask: Option<Vec<f64>>,
 }
 
 impl Network {
@@ -557,6 +604,9 @@ impl Network {
         assert_eq!(config.sample_seed, hp.sample_seed.unwrap_or(hp.seed));
         assert_eq!(config.epochs, hp.n_epochs);
         assert_eq!(config.pairs_per_epoch, hp.pairs_per_epoch);
+        if let Some(study) = &config.training {
+            study.validate(hp);
+        }
         Some(Self::new(config, hp.nonneg_pin, rng))
     }
 
@@ -568,20 +618,68 @@ impl Network {
         let mut ni = config.first_width - config.max_pairs;
         let mut blocks = Vec::new();
         for &width in &config.widths {
-            let block = Block::new(config.family, ni, width, rng);
+            let mut block = Block::new(config.family, ni, width, rng);
+            if let Some(study) = &config.training {
+                for w in &mut block.w {
+                    *w *= study.init_scale;
+                }
+                for b in &mut block.b {
+                    *b *= study.bias_scale;
+                }
+                block.project();
+            }
             ni = block.output_width();
             blocks.push(block);
         }
         let output = (0..ni)
             .map(|_| rng.next_normal().abs() * (0.1 / ni as f64).sqrt())
             .collect();
+        let dropout_rng = SplitMix64::new(config.training.as_ref().map_or(0, |c| c.dropout_seed));
         Self {
             config,
+            dropout_rng,
+            mask: None,
             blocks,
             output,
             adam: AdamState::new(ni, 0, 0, 0),
             pin,
         }
+    }
+
+    pub(super) fn training(&self) -> Option<&super::training_research::Config> {
+        self.config.training.as_ref()
+    }
+
+    pub(super) fn init_first(&self, weights: &mut [f64], bias: &mut [f64]) {
+        if let Some(study) = self.training() {
+            for w in weights {
+                *w *= study.init_scale;
+            }
+            for b in bias {
+                *b *= study.bias_scale;
+            }
+        }
+    }
+
+    pub(super) fn begin_pair(&mut self) {
+        self.mask = super::training_research::dropout_mask(
+            self.config.training.as_ref().map_or(0., |c| c.dropout),
+            self.output.len(),
+            &mut self.dropout_rng,
+        );
+    }
+
+    pub(super) fn training_forward(&self, first: &[f64]) -> (f64, Vec<f64>, Vec<f64>) {
+        let mut cache = self.forward(first);
+        if let Some(mask) = &self.mask {
+            let last = &cache.2[cache.2.len() - self.output.len()..];
+            cache.0 = last
+                .iter()
+                .zip(&self.output)
+                .zip(mask)
+                .fold(self.pin, |y, ((h, a), m)| y - h * a * m);
+        }
+        cache
     }
 
     fn basis(&self, first: &[f64]) -> Vec<f64> {
@@ -615,8 +713,10 @@ impl Network {
     ) -> Vec<f64> {
         let last = &cache.2[cache.2.len() - self.output.len()..];
         let mut gradient = self.output.iter().map(|a| -dy * a).collect::<Vec<_>>();
-        for (g, h) in self.adam.gw1.iter_mut().zip(last) {
-            *g -= dy * h;
+        for (j, (g, h)) in self.adam.gw1.iter_mut().zip(last).enumerate() {
+            let m = self.mask.as_ref().map_or(1., |mask| mask[j]);
+            *g -= dy * h * m;
+            gradient[j] *= m;
         }
         let mut end = cache.2.len() - self.output.len();
         for block in self.blocks.iter_mut().rev() {
@@ -644,6 +744,16 @@ impl Network {
         }
         self.adam
             .step(&mut self.output, &mut [], &mut [], &mut [], lr);
+        if let Some(study) = &self.config.training {
+            super::training_research::decay(&mut self.output, lr, study.adamw);
+            for block in &mut self.blocks {
+                super::training_research::decay(&mut block.w, lr, study.adamw);
+                if matches!(block.kind, Family::Spline | Family::Lipschitz) {
+                    super::training_research::decay(&mut block.extra, lr, study.adamw);
+                }
+                block.project();
+            }
+        }
         self.output.iter_mut().for_each(|w| *w = w.max(0.));
         assert!(self.output.iter().all(|w| w.is_finite()));
     }
