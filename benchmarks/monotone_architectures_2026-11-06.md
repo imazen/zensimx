@@ -65,3 +65,29 @@ These are resource observations, not aggregate process-tree memory or speed benc
 Artifacts observed on dev: `/mnt/v/output/zensim/monotone-architectures-20261106/`.
 Mirror verification is pending; the existing source data closure has its own
 verified mirror in the earlier tree and activation studies.
+
+## Native capacity census
+
+Native inspection of seed-0 final screen bakes reports stored coefficients
+(including frozen routing/expanded weights) and actual compressed bake bytes:
+
+| Arm | Stored coefficients | Bake bytes | Expanded dense layers |
+|---|---:|---:|---:|
+| shared_relu | 134401 | 148431 | 3 |
+| shared_smooth | 134401 | 126398 | 3 |
+| shared_caps | 159201 | 216299 | 5 |
+| shared_switch | 159201 | 216087 | 5 |
+| shared_switch_deep | 165409 | 238627 | 7 |
+| shared_spline | 200417 | 194100 | 5 |
+| shared_lipschitz | 196355 | 226017 | 6 |
+| single_ramps | 126209 | 247118 | 2 |
+
+These are not independent trainable-parameter counts or runtime benchmarks.
+Frozen routing makes the expanded representations larger; compression and
+zero coefficients make byte size differ from dense coefficient count. Exact
+layer dimensions and coefficient sign/zero counts are in `CAPACITY.json`.
+
+Input closure now contains 71 indexed files / 69 unique SHA-256 blobs,
+including the admitted prepared tables, sidecars, source-key metadata, baseline
+plan and its dependencies. Index SHA-256:
+`30a907d2c514d3dc57b2cdad5c3131c878eb3763be128f593f4c69201dfbd981`.

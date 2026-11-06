@@ -456,6 +456,35 @@ def compare_neutral(reference, candidate, binary, output):
     print(json.dumps(result),flush=True)
 
 
+def input_closure(root, plan_path, metadata):
+    import shutil
+    plan=json.loads(plan_path.read_text())
+    pin=json.loads((root/'screen/PLAN.json').read_text())
+    if sha(plan_path)!=pin['base_plan_sha256']: raise ValueError('baseline plan drift')
+    prepared_path=Path(plan['output'])/'PREPARED.json'
+    if sha(prepared_path)!=pin['prepared_sha256']: raise ValueError('prepared receipt drift')
+    prepared=json.loads(prepared_path.read_text())
+    wanted={p:v['sha256'] for p,v in plan['inputs'].items()}
+    wanted.update({str(plan_path):sha(plan_path),str(prepared_path):sha(prepared_path),
+                   str(metadata):pin['source_audit']['metadata_sha256'],str(metadata.with_name('PEERS.json')):pin['source_audit']['receipt_sha256']})
+    for g in prepared['groups']:
+        p=Path(g['path'])
+        wanted.update({str(p):g['sha256'],str(p)+'.manifest.json':g['manifest_sha256'],
+                       str(p.with_suffix('.keys.parquet')):g['keys_sha256']})
+    role=Path(plan['output'])/'root/human_role_decision.json'
+    wanted[str(role)]=sha(role)
+    dest=root/'input-closure';dest.mkdir(exist_ok=False)
+    records=[]
+    for path,expected in sorted(wanted.items()):
+        if sha(path)!=expected: raise ValueError('input closure drift: '+path)
+        target=dest/expected
+        if not target.exists(): shutil.copyfile(path,target)
+        if sha(target)!=expected: raise ValueError('closure copy mismatch')
+        records.append(dict(source=path,sha256=expected,bytes=target.stat().st_size,blob=expected))
+    write(dest/'INDEX.json',records)
+    print(json.dumps(dict(files=len(records),unique_blobs=len(set(wanted.values())),index_sha256=sha(dest/'INDEX.json'))))
+
+
 def qualify_receipts(root, binary, output, watch=False):
     """Preserve historical bakes; remove invalid legacy reconstruction from final copies."""
     import time
@@ -542,6 +571,8 @@ def main():
     p.add_argument('--replay-control',action='store_true')
     p=sub.add_parser('compare-neutral')
     for name in ('reference','candidate','binary','output'): p.add_argument('--'+name,type=Path,required=True)
+    p=sub.add_parser('closure')
+    for name in ('root','baseline-plan','metadata'): p.add_argument('--'+name,type=Path,required=True)
     p=sub.add_parser('qualify-receipts')
     for name in ('root','binary','output'): p.add_argument('--'+name,type=Path,required=True)
     p.add_argument('--watch',action='store_true')
@@ -556,6 +587,8 @@ def main():
         if args.output.exists():
             raise ValueError('preserve existing audit before rerunning')
         audit(args.output)
+    elif args.action == 'closure':
+        input_closure(args.root,args.baseline_plan,args.metadata)
     elif args.action == 'qualify-receipts':
         qualify_receipts(args.root,args.binary,args.output,args.watch)
     elif args.action == 'progress':

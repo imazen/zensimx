@@ -231,3 +231,22 @@ This corrects provenance only: no refit, model coefficient or score changes.
 The receipt describes scheduled events including skips, not accepted-gradient
 mass or full row coverage. The neutral replay's unchanged legacy receipt was
 valid because its CDF and event order were unchanged.
+
+## T8: leaky activation switches, prompted by TRAIN diagnostics
+
+The first neutral seed's epoch-119 diagnostic sample has 57/64 last-hidden
+units with no nonzero activation in that sample. This is not proof of global
+inactivity or a local minimum. Test a positive branch-slope floor in the same
+activation-switch construction: slopes .05 and .1, with the existing zero-slope
+switch as control. Keep the 120 x 5,000 budget, three seed pairs, masses, losses,
+scaler and fixed final checkpoint unchanged. Register these six additional
+cells before fitting; do not select a slope on development.
+
+For alpha in [0,1], use
+h(x)=alpha*sum_i(abs(W_i)*x_i)+(1-alpha)*(ReLU(W+ x+b)-ReLU(W- x+b)).
+This is zero at identity and coordinate-monotone for x>=0. Its slope in a
+coordinate is at least alpha*abs(W_i), so a nonzero input connection retains
+a gradient when both ReLU branches are inactive. Signed weight zero remains
+a kink. The nonzero bias branches can still express nonconvex monotone shapes.
+Export with existing ReLU units plus an explicit nonnegative linear residual;
+no new serving operator is needed. The zero-alpha default must replay exactly.

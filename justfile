@@ -4773,3 +4773,9 @@ monotone-neutral-compare reference candidate binary output:
 
 monotone-receipt-qualification root binary output:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/activation_curriculum.py qualify-receipts --root {{quote(root)}} --binary {{quote(binary)}} --output {{quote(output)}} --watch
+
+monotone-input-closure root baseline_plan metadata:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/activation_curriculum.py closure --root {{quote(root)}} --baseline-plan {{quote(baseline_plan)}} --metadata {{quote(metadata)}}
+
+monotone-artifact-mirror root destination:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 2G --jobs 1 -- python3 -B scripts/byconstruction/dataset_mirror.py --root {{quote(root)}} --nfs --cold-readback --destination {{quote(destination)}} --artifact-kind training
