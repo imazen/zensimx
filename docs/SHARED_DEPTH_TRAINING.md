@@ -54,3 +54,8 @@ The follow-up [activation and curriculum study](MONOTONE_ACTIVATION_CURRICULUM_S
 separates analytic identity/monotonicity checks, native optimization pilots and
 full-budget candidate trials. It includes anchored activations, dropout, curvature,
 matched-exposure order controls, replay and dataset/family mass accounting.
+
+The [tree regression study](TREE_REGRESSION_STUDY.md) trials random forests,
+Extra Trees, gradient boosting, monotonic controls and peer-assisted stacks on
+the same admitted human rows. It separates predictive quality from pixel-model
+qualification and compares completed neural assessments on identical rows.

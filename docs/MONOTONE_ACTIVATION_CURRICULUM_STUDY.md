@@ -192,3 +192,10 @@ present. Family curricula therefore require a versioned join to canonical
 metadata using those keys, with complete coverage and no row movement across
 source splits. The executed pilot tests population mass and coverage walking;
 it does not pretend dataset names are distortion labels.
+
+The subsequent [tree study](TREE_REGRESSION_STUDY.md) implements this join for
+the same admitted rows: canonical bank pair keys supply distortion codes,
+severity knobs and decoded reference hashes. Its metadata artifact retains
+complete row order and checks reference separation across the inner folds and
+development. This supplies metadata for a future neural curriculum; it does
+not turn the earlier coverage-walk pilot into a family-order experiment.
