@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- Add an opt-in constrained shared second hidden layer to the plain trainer,
+  with ReLU or SmoothHinge in layer 2. Existing single-layer models and serving
+  APIs remain unchanged; registration `083480f2`.
+
 - research: `BakeScorer::with_hdr_front_end` (HC1): `compute_hdr` through `HdrFrontEnd::CubeRoot { unit_nits }` for models fitted through the cube-root banks; default `Pu21` unchanged; HDR steering and attribution refuse other front ends. New `hdr_continuity` bench example and `hdr_panel.py --banks`.
 
 - `HdrFrontEnd { Pu21, CubeRoot { unit_nits } }`: the declared-HDR walk's opsin step is a parameter orthogonal to

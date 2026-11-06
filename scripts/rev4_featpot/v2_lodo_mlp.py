@@ -157,6 +157,11 @@ def train_command(groups: list, init_seed: int, sample_seed: int, width: int, ke
             "--pair-sampling", "uniform", "--max-features", str(width), "--keep-features", str(keep_file),
             "--mse-weight", str(recipe.get("mse_weight", 1)), "--early-stop-patience", "0", "--val-policy", "mean",
             "--val-aggregate", "geomean3", "--out-dtype", "f32", "--log-every", str(LOG_EVERY), "--no-auto-eval"]
+    if "shared_hidden_activation" in recipe:
+        activation = recipe["shared_hidden_activation"]
+        if head != "N" or not recipe.get("mono_all") or not recipe.get("thresholds") or activation not in ("relu", "smooth-hinge"):
+            raise ValueError("shared depth requires constrained plain N and relu or smooth-hinge")
+        cmd += ["--n-hidden-layers", "2", "--shared-hidden-activation", activation]
     if not strict_admission:
         cmd += ["--historical-replay", REPLAY]
     cmd += ["--out", str(out)]

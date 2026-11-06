@@ -330,6 +330,20 @@ class Builders(unittest.TestCase):
 
 
 class TrainRecipe(unittest.TestCase):
+    def test_shared_hidden_activation_preserves_the_recipe_except_depth(self):
+        import v2_lodo_mlp as lodo
+        recipe = {"hidden": 128, "mono_all": True, "thresholds": True, "max_pairs": 32}
+        args = ([], 1, 2, 3, Path("k"), "N", Path("o"))
+        base = lodo.train_command(*args, recipe)
+        for activation in ("relu", "smooth-hinge"):
+            cmd = lodo.train_command(*args, {**recipe, "shared_hidden_activation": activation})
+            index = cmd.index("--n-hidden-layers")
+            self.assertEqual(cmd[index:index+4], ["--n-hidden-layers", "2", "--shared-hidden-activation", activation])
+            self.assertEqual(cmd[:index] + cmd[index+4:], base)
+        for bad in ({"shared_hidden_activation": "relu"}, {**recipe, "shared_hidden_activation": "tanh"}):
+            with self.assertRaises(ValueError):
+                lodo.train_command(*args, bad)
+
     def test_train_command_is_the_v2_recipe(self):
         import v2_lodo_mlp as lodo
         cmd = lodo.train_command([("safesyn", Path("/t/s.parquet"), 1.5, 0, "withinref,both"),

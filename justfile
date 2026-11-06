@@ -4684,3 +4684,18 @@ pixel-example-check:
     cargo check --locked -p zensim --example e34_pixels --features custom-profiles,feature-regime-v2
     cargo generate-lockfile --manifest-path zensim-bench/Cargo.toml
     cargo check --locked --manifest-path zensim-bench/Cargo.toml --example verify_bitstream_decode --example m3_fixture_gen --example gmsbank_decode_dump --features zen-decode,m3-fixtures,verify-decode
+
+# Constrained shared-depth checks; caller holds the resource wrapper/lock.
+shared-depth-check:
+    cargo clippy --locked -p zensim-validate --lib --bin zensim_mlp_train -- -D warnings
+    cargo test --locked -p zensim-validate --lib shared_depth -- --test-threads=1
+
+shared-depth-regressions:
+    cargo test --locked -p zensim-validate --lib mlp_train:: -- --test-threads=1
+    cargo test --locked -p zensim-validate --bin zensim_mlp_train -- --test-threads=1
+
+shared-depth-build:
+    cargo build --release --locked -p zensim-validate --bin zensim_mlp_train
+
+shared-depth-driver-tests:
+    python3 -B -m unittest discover -s scripts/tests -p test_v2c.py

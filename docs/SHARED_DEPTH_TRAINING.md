@@ -30,3 +30,22 @@ training/runtime agreement for both activations, unchanged single-layer
 regressions, and native feature-subset/densification parity. Match the registered
 human-plus-single-teacher trial's rows, seeds and final-epoch schedule. These
 are development comparisons, not new final-test reads or model adoption.
+
+## Validation scope
+
+The first focused checks pass for both activations: all weight/bias gradients
+against central finite differences, fused versus unfused first-layer Adam,
+projection after optimizer updates, exact f32 identity, sampled nonnegative-input
+monotonicity and f64-training/f32-bake agreement. The latter permits f32 rounding
+(8 epsilon times max(1, magnitude)); it is not a bit-exact f64/f32 claim.
+Only f32 research bakes are admitted on the new path.
+
+The existing trainer regression pass has 160 passing library tests, with its
+one existing ignored test unchanged, and 65 passing CLI tests including the new
+CLI admission fixture. Full workspace all-target/all-feature Clippy passed.
+The script suite has 70 passing tests and two errors in historical part-B arm
+pin loading; both errors reproduce on the unchanged `083480f2` test source.
+No arm pin or expectation was altered. The new depth argv fixture passes and
+verifies that stripping just the four depth tokens restores the old command.
+Native executable smoke, unchanged-baseline replay, and the scientific fits
+remain required before reporting a depth result.

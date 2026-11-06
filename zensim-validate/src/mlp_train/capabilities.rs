@@ -8,6 +8,10 @@ pub fn validate_training_capabilities(
     has_absolute_group: bool,
     triplet_rows: usize,
 ) -> MlpHyperparams {
+    let shared_depth = super::shared_depth::enabled(hyperparams);
+    if shared_depth {
+        super::shared_depth::validate(hyperparams);
+    }
     if hyperparams.init_from.is_some() || hyperparams.constant_lr {
         assert!(
             hyperparams.n_hidden_layers == 1
@@ -24,7 +28,7 @@ pub fn validate_training_capabilities(
             "checkpoint initialization and constant LR require the plain two-layer CPU path"
         );
     }
-    if hyperparams.smooth_hinge {
+    if hyperparams.smooth_hinge && !shared_depth {
         assert!(
             hyperparams.nonneg_distance
                 && hyperparams.n_hidden_layers == 1
@@ -41,13 +45,13 @@ pub fn validate_training_capabilities(
     if hyperparams.nonneg_thresholds {
         assert!(
             hyperparams.nonneg_distance
-                && hyperparams.n_hidden_layers == 1
-                && !hyperparams.smooth_hinge
+                && (hyperparams.n_hidden_layers == 1 || shared_depth)
+                && (!hyperparams.smooth_hinge || shared_depth)
                 && hyperparams.steer_pairs.is_none()
                 && !hyperparams.pool_head
                 && !hyperparams.hybrid_head
                 && !hyperparams.per_sample_alpha_head,
-            "--nonneg-thresholds requires plain one-layer N without smooth hinge, heads or the K penalty"
+            "--nonneg-thresholds requires plain one-layer N or constrained shared depth, without auxiliary heads or the K penalty"
         );
     }
     if hyperparams.max_pairs > 0 {
@@ -176,10 +180,9 @@ pub fn validate_training_capabilities(
              claimed and not held. Drop --nonneg-distance or drop the head flag."
         );
         assert!(
-            hyperparams.n_hidden_layers <= 1,
-            "--nonneg-distance is implemented on the 1-hidden-layer plain path only \
-             (--n-hidden-layers {} was requested). Depth >= 2 routes through the \
-             alpha-head owner, which this flag refuses.",
+            hyperparams.n_hidden_layers <= 1 || shared_depth,
+            "--nonneg-distance requires one plain hidden layer or constrained shared depth 2 \
+             (--n-hidden-layers {} was requested). Other depth combinations are unsupported.",
             hyperparams.n_hidden_layers
         );
         assert!(
@@ -374,7 +377,10 @@ pub fn validate_training_capabilities(
     // skip connection on any other head got a 1-layer, skip-less net and a bake
     // byte-identical to one that never asked.
     for (name, on) in [
-        ("--n-hidden-layers >= 2", hyperparams.n_hidden_layers >= 2),
+        (
+            "--n-hidden-layers >= 2",
+            hyperparams.n_hidden_layers >= 2 && !shared_depth,
+        ),
         ("--skip-connection", hyperparams.skip_connection),
     ] {
         if on && !hyperparams.per_sample_alpha_head {

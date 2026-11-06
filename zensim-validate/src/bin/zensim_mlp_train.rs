@@ -944,15 +944,18 @@ struct Args {
     /// -supervision question respectively.
     ///
     /// Plain path only; refused with `--skip-connection`, with any head flag,
-    /// and with `--n-hidden-layers >= 2`. Note `g` is CONVEX in the
-    /// standardized features at one hidden layer.
+    /// and with unsupported depth combinations. Two shared hidden layers
+    /// require `--monotone-cbc --nonneg-thresholds`; see
+    /// `--shared-hidden-activation`. Note `g` is CONVEX in the standardized
+    /// features at one hidden layer.
     #[arg(long, default_value_t = false)]
     nonneg_distance: bool,
 
     /// Under `--nonneg-distance`, project hidden biases to `<= 0` instead of
     /// freezing them at 0 (`raw(0⃗) = pin` stays exact). With `--monotone-cbc`
     /// this gives a monotone, identity-pinned, convex piecewise-linear model
-    /// that is not restricted to linear. Plain one-layer N only.
+    /// that is not restricted to linear. Also supports constrained shared
+    /// depth 2 with `--monotone-cbc`.
     #[arg(long, requires = "nonneg_distance", conflicts_with_all = ["steer_pairs", "smooth_hinge", "pool_head", "hybrid_head", "per_sample_alpha_head", "skip_connection"])]
     nonneg_thresholds: bool,
 
@@ -988,6 +991,11 @@ struct Args {
     /// STEER S: fixed tau1/8 C1 convex hinge; plain N only.
     #[arg(long, requires = "nonneg_distance", conflicts_with_all = ["steer_pairs", "pool_head", "hybrid_head", "per_sample_alpha_head", "skip_connection"])]
     smooth_hinge: bool,
+
+    /// Activation of the second shared layer only. Requires constrained plain
+    /// --n-hidden-layers 2. First-layer max pairs retain ReLU.
+    #[arg(long, value_parser = ["relu", "smooth-hinge"], requires_all = ["nonneg_distance", "nonneg_thresholds", "monotone_cbc"], conflicts_with = "smooth_hinge")]
+    shared_hidden_activation: Option<String>,
 
     /// E34 K: label-free base/repair feature pairs (registered Rev5/v3 Parquet).
     #[arg(long)]
@@ -2798,6 +2806,19 @@ fn apply_manifest_to_args(
 /// CLI-only capabilities (data sources and the GPU adapter). Shared head/loss
 /// checks live in mlp_train::validate_training_capabilities.
 fn preflight_cli_capabilities(args: &Args, matches: &clap::ArgMatches, want_gpu: bool) {
+    let shared_depth = args.n_hidden_layers == 2
+        && args.nonneg_distance
+        && args.nonneg_thresholds
+        && args.monotone_cbc
+        && !args.per_sample_alpha_head
+        && !args.pool_head
+        && !args.hybrid_head
+        && !want_gpu;
+    assert!(
+        args.shared_hidden_activation.is_none() || shared_depth,
+        "--shared-hidden-activation requires constrained plain CPU depth 2"
+    );
+
     if args.init_from.is_some() || args.lr_schedule == "constant" {
         assert!(
             !want_gpu
@@ -2864,7 +2885,8 @@ fn preflight_cli_capabilities(args: &Args, matches: &clap::ArgMatches, want_gpu:
     // `benchmarks/fastclass_distill_wave_2026-09-04.md` §7.6/§7.7) — fail
     // loud rather than shipping a bake whose spec claims a subset it
     // never trained.
-    if args.keep_features.is_some()
+    if !shared_depth
+        && args.keep_features.is_some()
         && let Some(name) = keep_features_unsupported_flag(
             args.pool_head,
             args.hybrid_head,
@@ -3537,7 +3559,8 @@ fn main() {
     let mut hyperparams = MlpHyperparams {
         init_from: args.init_from.clone(),
         constant_lr: args.lr_schedule == "constant",
-        smooth_hinge: args.smooth_hinge,
+        smooth_hinge: args.smooth_hinge
+            || args.shared_hidden_activation.as_deref() == Some("smooth-hinge"),
         steer_pairs: args.steer_pairs.clone(),
         steer_lambda: args.steer_lambda,
         steer_derived_inputs: args.derived_inputs.clone(),
@@ -5604,6 +5627,7 @@ fn main() {
             "epochs": args.epochs,
             "pairs_per_epoch": args.pairs_per_epoch,
             "n_hidden_layers": args.n_hidden_layers,
+            "shared_hidden_activation": args.shared_hidden_activation,
             "pair_sampling": args.pair_sampling,
             "target_column": args.target_column,
             "target_scale": args.target_scale,
@@ -6551,6 +6575,43 @@ mod capability_preflight_tests {
             .is_err()
         );
         std::fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn shared_depth_cli_admits_only_the_constrained_cpu_route() {
+        for activation in ["relu", "smooth-hinge"] {
+            let (a, m) = args(&[
+                "--nonneg-distance",
+                "--nonneg-thresholds",
+                "--monotone-cbc",
+                "--n-hidden-layers",
+                "2",
+                "--keep-features",
+                "0,1",
+                "--shared-hidden-activation",
+                activation,
+            ]);
+            preflight_cli_capabilities(&a, &m, false);
+            assert!(
+                std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                    preflight_cli_capabilities(&a, &m, true)
+                }))
+                .is_err()
+            );
+        }
+        let (a, m) = args(&[
+            "--nonneg-distance",
+            "--nonneg-thresholds",
+            "--monotone-cbc",
+            "--shared-hidden-activation",
+            "relu",
+        ]);
+        assert!(
+            std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| preflight_cli_capabilities(
+                &a, &m, false
+            )))
+            .is_err()
+        );
     }
 
     #[test]

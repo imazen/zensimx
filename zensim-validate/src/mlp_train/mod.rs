@@ -62,6 +62,7 @@ mod loss_norm_in_norm;
 mod loss_pearson;
 mod loss_steer;
 pub mod map_term;
+mod shared_depth;
 mod smooth_hinge;
 mod steer_data;
 
@@ -78,7 +79,7 @@ pub struct MlpHyperparams {
     pub init_from: Option<std::path::PathBuf>,
     /// Keep `initial_lr` fixed on the plain CPU path; false preserves the 50-epoch cosine schedule.
     pub constant_lr: bool,
-    /// Fixed tau1/8 C1 activation, admitted only on the plain N path.
+    /// Fixed tau1/8 C1 activation on plain N; constrained shared depth applies it only to layer 2.
     pub smooth_hinge: bool,
     /// E34 K label-free repair table; absent leaves the training stream unchanged.
     pub steer_pairs: Option<std::path::PathBuf>,
@@ -3180,7 +3181,30 @@ pub fn train_mlp_strategy_pairs(
         groups.iter().any(|g| g.loss_mode.has_mse()),
         triplets.map_or(0, |t| t.responses.len()),
     );
-    let hyperparams = &effective;
+    let shared_depth_on = shared_depth::enabled(&effective);
+    let shared_smooth = effective.smooth_hinge;
+    let first_layer_hp;
+    let hyperparams = if shared_depth_on {
+        assert!(
+            tv.is_none()
+                && anchor.is_none()
+                && equiv.is_none()
+                && pjnd_anchor.is_none()
+                && konjnd_agg.is_none()
+                && triplets.is_none()
+                && rank_pairs.is_empty(),
+            "shared depth supports rank/MSE groups without auxiliary pools"
+        );
+        // SmoothHinge, when selected, belongs only to the new second layer.
+        // First-layer ReLU is part of the max-pair construction.
+        first_layer_hp = MlpHyperparams {
+            smooth_hinge: false,
+            ..effective.clone()
+        };
+        &first_layer_hp
+    } else {
+        &effective
+    };
 
     let confidence = confidence_weights::Plan::from_env(
         groups,
@@ -3604,6 +3628,23 @@ pub fn train_mlp_strategy_pairs(
         );
     }
 
+    let mut depth =
+        shared_depth_on.then(|| shared_depth::Head::new(hyperparams, shared_smooth, &mut init_rng));
+    if let Some(head) = &depth {
+        log_line(
+            &format!(
+                "MLP shared depth: arch=[{n_features} -> {n_hidden} ReLU -> {} {} -> 1], tied max pairs={}",
+                head.width,
+                if head.smooth {
+                    "SmoothHinge(tau=1/8)"
+                } else {
+                    "ReLU"
+                },
+                hyperparams.max_pairs
+            ),
+            log,
+        );
+    }
     let mut adam = AdamState::new(w1.len(), b1.len(), w2.len(), b2.len());
 
     // 4. Training loop.
@@ -3845,6 +3886,7 @@ pub fn train_mlp_strategy_pairs(
         && tv_pool_ready;
     let pooled_on = !hyperparams.pooled_legs.is_empty();
     let lookahead_ok = fuse_w1
+        && depth.is_none()
         && !hyperparams.monotone_cbc
         && !hyperparams.nonneg_thresholds
         && !parallel
@@ -4176,6 +4218,11 @@ pub fn train_mlp_strategy_pairs(
                 (xa, xb, ya, hpa, ha, yb, hpb, hb)
             };
 
+            let deep_forward = depth
+                .as_ref()
+                .map(|head| (head.forward(&ha), head.forward(&hb)));
+            let (ya, yb) = deep_forward.as_ref().map_or((ya, yb), |(a, b)| (a.0, b.0));
+
             let mos_a = g.human_scores[ia];
             let mos_b = g.human_scores[ib];
             // `rank_target_sign` reconciles the rank term with the absolute
@@ -4278,7 +4325,61 @@ pub fn train_mlp_strategy_pairs(
 
             let e36_scheduled = e36_pool.as_ref().is_some_and(|p| p.scheduled(n_steps));
 
-            if fuse_w1 && !e36_scheduled {
+            if let Some(head) = depth.as_mut() {
+                let (fa, fb) = deep_forward.as_ref().expect("shared-depth forward");
+                let ga = head.backward(&ha, fa, dl_dya);
+                let gb = head.backward(&hb, fb, dl_dyb);
+                if fuse_w1 {
+                    shared_depth::first_grad_head(&ha_pre, &ha, &ga, &mut dh_a, &mut adam);
+                    shared_depth::first_grad_head(&hb_pre, &hb, &gb, &mut dh_b, &mut adam);
+                    let fmult = l2_feature_mult();
+                    let coarse_on = coarse_decay_rate() > 0.;
+                    let tau = if coarse_on {
+                        None
+                    } else {
+                        group_l1_step_tau(lr, group_l1_lambda())
+                    };
+                    adam.step_w1_fused(
+                        &mut w1,
+                        &mut b1,
+                        &mut w2,
+                        &mut b2,
+                        lr,
+                        xa,
+                        &dh_a,
+                        xb,
+                        &dh_b,
+                        hyperparams.l2_lambda,
+                        fmult.as_ref().map(|v| v.as_slice()),
+                        n_hidden,
+                        active_rows.as_deref(),
+                        tau,
+                        nonneg,
+                        None,
+                    );
+                    if coarse_on {
+                        apply_post_adam_penalties(&mut w1, n_hidden, lr);
+                    }
+                } else {
+                    shared_depth::first_backward(xa, &ha_pre, &ha, &ga, &mut adam);
+                    shared_depth::first_backward(xb, &hb_pre, &hb, &gb, &mut adam);
+                    if hyperparams.l2_lambda > 0. {
+                        let fmult = l2_feature_mult();
+                        add_l2_grad_layer1(
+                            &mut adam.gw1,
+                            &w1,
+                            hyperparams.l2_lambda,
+                            n_hidden,
+                            fmult.as_ref().map(|v| v.as_slice()),
+                        );
+                    }
+                    adam.step(&mut w1, &mut b1, &mut w2, &mut b2, lr);
+                    apply_post_adam_penalties(&mut w1, n_hidden, lr);
+                }
+                head.step(hyperparams, lr);
+                project_plain(&mut w1, &mut w2, &mut b1, &mut b2, nonneg, hyperparams);
+                steps_since_adam = 0;
+            } else if fuse_w1 && !e36_scheduled {
                 // Fused pair update: the two gw1 row sweeps, the L2 term,
                 // and the w1 Adam step run as one pass. The `dl_dh_pre`
                 // vectors and the gw2/gb1/gb2 accumulations come from
@@ -4763,18 +4864,22 @@ pub fn train_mlp_strategy_pairs(
                     if skipped[gi] {
                         return crate::panel::LightPanel::default();
                     }
-                    let preds = std_features.predict_with_knees(
-                        knees.as_ref(),
-                        gi,
-                        g.features.len(),
-                        &w1,
-                        &b1,
-                        &w2,
-                        &b2,
-                        n_hidden,
-                        hyperparams.leaky_alpha,
-                        hyperparams.smooth_hinge,
-                    );
+                    let preds = if let Some(head) = &depth {
+                        head.predict(&std_features, gi, g.features.len(), &w1, &b1, &w2, &b2)
+                    } else {
+                        std_features.predict_with_knees(
+                            knees.as_ref(),
+                            gi,
+                            g.features.len(),
+                            &w1,
+                            &b1,
+                            &w2,
+                            &b2,
+                            n_hidden,
+                            hyperparams.leaky_alpha,
+                            hyperparams.smooth_hinge,
+                        )
+                    };
                     let neg_preds: Vec<f64> = preds.iter().map(|&p| -p).collect();
                     crate::panel::compute_light_panel_subsampled(&neg_preds, g.human_scores)
                 })
@@ -4838,7 +4943,8 @@ pub fn train_mlp_strategy_pairs(
             if hyperparams.dump_checkpoints_every > 0
                 && epoch % hyperparams.dump_checkpoints_every == 0
             {
-                let ckpt_bytes = r14_knees::checkpoint(
+                let ckpt_bytes = shared_depth::checkpoint(
+                    depth.as_ref(),
                     knees.as_ref(),
                     &scaler_mean,
                     &scaler_scale,
@@ -4864,7 +4970,8 @@ pub fn train_mlp_strategy_pairs(
             if val_score > best_val_score {
                 best_val_score = val_score;
                 stale_epochs = 0;
-                best_bake = Some(r14_knees::checkpoint(
+                best_bake = Some(shared_depth::checkpoint(
+                    depth.as_ref(),
                     knees.as_ref(),
                     &scaler_mean,
                     &scaler_scale,
@@ -4907,7 +5014,8 @@ pub fn train_mlp_strategy_pairs(
         println!("ZENSIM_SAMPLE_DIGEST {}", d.hex());
     }
     best_bake.unwrap_or_else(|| {
-        r14_knees::checkpoint(
+        shared_depth::checkpoint(
+            depth.as_ref(),
             knees.as_ref(),
             &scaler_mean,
             &scaler_scale,
@@ -7348,13 +7456,49 @@ pub fn bake_two_layer_znpr_v3(
     // activation is the trained one.
     hidden_activation: Activation,
 ) -> Vec<u8> {
+    bake_plain_znpr_v3(
+        scaler_mean,
+        scaler_scale,
+        w1,
+        b1,
+        w2,
+        b2,
+        n_inputs,
+        n_hidden,
+        n_outputs,
+        dtype,
+        feature_transforms,
+        feature_transform_params,
+        hidden_activation,
+        None,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn bake_plain_znpr_v3(
+    scaler_mean: &[f64],
+    scaler_scale: &[f64],
+    w1: &[f64],
+    b1: &[f64],
+    w2: &[f64],
+    b2: &[f64],
+    n_inputs: usize,
+    n_hidden: usize,
+    n_outputs: usize,
+    dtype: WeightDtype,
+    feature_transforms: Option<&[FeatureTransform]>,
+    feature_transform_params: Option<&[Vec<f32>]>,
+    hidden_activation: Activation,
+    depth: Option<&shared_depth::Head>,
+) -> Vec<u8> {
+    let (w2, b2) = depth.map_or((w2, b2), |h| (h.mid.as_slice(), h.bias.as_slice()));
     let scaler_mean_f32: Vec<f32> = scaler_mean.iter().map(|&v| v as f32).collect();
     let scaler_scale_f32: Vec<f32> = scaler_scale.iter().map(|&v| v as f32).collect();
     let w1_f32: Vec<f32> = w1.iter().map(|&v| v as f32).collect();
     let b1_f32: Vec<f32> = b1.iter().map(|&v| v as f32).collect();
     let w2_f32: Vec<f32> = w2.iter().map(|&v| v as f32).collect();
     let b2_f32: Vec<f32> = b2.iter().map(|&v| v as f32).collect();
-    let layers = [
+    let mut layers = vec![
         BakeLayer {
             in_dim: n_inputs,
             out_dim: n_hidden,
@@ -7365,13 +7509,33 @@ pub fn bake_two_layer_znpr_v3(
         },
         BakeLayer {
             in_dim: n_hidden,
-            out_dim: n_outputs,
-            activation: Activation::Identity,
+            out_dim: depth.map_or(n_outputs, |h| h.width),
+            activation: depth.map_or(Activation::Identity, |h| {
+                if h.smooth {
+                    Activation::SmoothHinge
+                } else {
+                    Activation::Relu
+                }
+            }),
             dtype,
             weights: &w2_f32,
             biases: &b2_f32,
         },
     ];
+    let output_f32;
+    let pin_f32;
+    if let Some(head) = depth {
+        output_f32 = head.output.iter().map(|v| *v as f32).collect::<Vec<_>>();
+        pin_f32 = head.pin.iter().map(|v| *v as f32).collect::<Vec<_>>();
+        layers.push(BakeLayer {
+            in_dim: head.width,
+            out_dim: 1,
+            activation: Activation::Identity,
+            dtype,
+            weights: &output_f32,
+            biases: &pin_f32,
+        });
+    }
     // Feature-transforms metadata (V0_20 input-shaping research). Bakers
     // omit the key entirely when every feature is `Identity` per the
     // zenpredict convention — consumers treat absence as all-identity.
