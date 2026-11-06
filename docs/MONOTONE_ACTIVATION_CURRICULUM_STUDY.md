@@ -182,3 +182,13 @@ monotone function class; monotonicity need not imply convexity.
 anchor the SiLU/GELU/leaky controls; the integrated-Gaussian derivative follows
 by differentiating the formula above. These are hypotheses to test on admitted
 zensim data, not external evidence that an arm improves zensim.
+
+## Verified category-join limitation
+
+The pilot's five fit tables contain features, `ref_basename` and `human_score`
+only. Their sidecar keys contain `pair_key`, `source_row_id`, `ref_basename`
+and `member_set`. No explicit distortion-family, codec or severity column is
+present. Family curricula therefore require a versioned join to canonical
+metadata using those keys, with complete coverage and no row movement across
+source splits. The executed pilot tests population mass and coverage walking;
+it does not pretend dataset names are distortion labels.

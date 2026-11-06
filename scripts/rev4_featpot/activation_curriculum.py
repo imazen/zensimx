@@ -65,6 +65,15 @@ def activation(name, x, tau=0.125):
     if name == 'linear_tanh':
         t = math.tanh(x/tau)
         return x+tau*t, 2-t*t
+    if name == 'spline_reference':
+        # Continuous, positive-slope reference with both signs of curvature.
+        if x < -1:
+            return -2+0.2*(x+1), 0.2
+        if x < 0:
+            return 2*x, 2.
+        if x < 1:
+            return 0.5*x, 0.5
+        return 0.5+1.5*(x-1), 1.5
     if name == 'silu_negative_control':
         s = 1/(1+math.exp(-x)) if x >= 0 else math.exp(x)/(1+math.exp(x))
         return x*s, s+x*s*(1-s)
@@ -81,7 +90,7 @@ def anchored(name, z, bias):
 
 def audit(out):
     names = ('relu', 'smooth_hinge', 'leaky', 'softplus', 'gaussian',
-             'rational', 'linear_tanh', 'silu_negative_control', 'gelu_negative_control')
+             'rational', 'linear_tanh', 'spline_reference', 'silu_negative_control', 'gelu_negative_control')
     records = {}
     for name in names:
         rng = random.Random(20261106)
@@ -90,7 +99,7 @@ def audit(out):
             z, b = rng.uniform(0.01, 8), rng.uniform(-8, 8)
             # Nondifferentiable reference points are deliberately excluded from finite differences.
             eps = 1e-6
-            if min(abs(b), abs(b+z), abs(b-0.125), abs(b+z-0.125)) < 10*eps:
+            if min(abs(x-knot) for x in (b,b+z) for knot in (-1.,0.,0.125,1.)) < 10*eps:
                 continue
             dz = (anchored(name, z+eps, b)-anchored(name, z-eps, b))/(2*eps)
             db = (anchored(name, z, b+eps)-anchored(name, z, b-eps))/(2*eps)
@@ -109,6 +118,8 @@ def audit(out):
                          'max_gradient_error_z': max(errors_z), 'max_gradient_error_bias': max(errors_b)}
         if not identity or max(errors_z+errors_b) > 1e-7:
             raise ValueError(f'analytic reference gradient/identity failure: {name}')
+        if not name.endswith('negative_control') and (drops or records[name]['minimum_derivative'] < 0):
+            raise ValueError(f'positive control lost monotonicity: {name}')
         if name.endswith('negative_control') and not drops:
             raise ValueError(f'negative control failed to detect nonmonotonicity: {name}')
     # A certified max construction: ReLU(u-v)+ReLU(v)=max(u,v), u,v>=0.
