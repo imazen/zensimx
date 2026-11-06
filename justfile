@@ -4820,3 +4820,10 @@ monotone-spline-export-check:
 
 monotone-export-audit original baseline_plan binaries repair_binary output:
     TMPDIR="$HOME/tmp" OPENBLAS_NUM_THREADS=1 "$HOME/work/claudehints/scripts/run-heavy" --mem 3G --jobs 1 -- python3 -B scripts/rev4_featpot/monotone_export_audit.py --original {{quote(original)}} --baseline-plan {{quote(baseline_plan)}} --binary-dir {{quote(binaries)}} --repair-binary {{quote(repair_binary)}} --output {{quote(output)}}
+
+monotone-study-regressions:
+    cargo test --locked -p zensim-validate --lib mlp_train -- --test-threads=1
+    cargo test --locked -p zensim-validate --bin zensim_mlp_train -- --test-threads=1
+    cargo test --locked -p zensim-validate --bin bake_dial_refit -- --test-threads=1
+    just activation-curriculum-tests
+    just lint-scripts
