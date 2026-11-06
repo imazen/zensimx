@@ -8,6 +8,9 @@ additional human populations, alter frozen runs or select a production model.
 The initial screening registration was expanded before any scientific fit;
 the executed protocol is described here.
 
+Completed measurements, paired comparisons and archive evidence are in
+[the study results](../benchmarks/tree_study_2026-11-06.md).
+
 The executed search has 38 configurations and three source folds (114 fits),
 followed by three full-FIT seeds for the best configuration within each of five
 families (15 fits): 129 fits. RF searches leaf size 2/16, sqrt/.33 feature

@@ -1,0 +1,300 @@
+{
+  "kadid": {
+    "references": 10,
+    "draws": 2000,
+    "seed": 20261106,
+    "status": "conditional on already-exposed development sources; no multiplicity correction",
+    "comparisons": {
+      "rf_minus_mlp_shared_relu_ssim2": {
+        "point": 0.030812675111757115,
+        "low": 0.016188402825504628,
+        "high": 0.045100235993796915
+      },
+      "extra_minus_mlp_shared_relu_ssim2": {
+        "point": 0.031499859821945586,
+        "low": 0.015239336781100751,
+        "high": 0.04773493434429018
+      },
+      "hgb_minus_mlp_shared_relu_ssim2": {
+        "point": 0.044389101577106405,
+        "low": 0.03336302656915263,
+        "high": 0.05446442869977546
+      },
+      "rf_features_and_peers_minus_mlp_shared_relu_ssim2": {
+        "point": 0.03089670356822105,
+        "low": 0.019784576227329927,
+        "high": 0.04354830414013746
+      },
+      "extra_features_and_peers_minus_mlp_shared_relu_ssim2": {
+        "point": 0.041770170088280434,
+        "low": 0.028643609489284055,
+        "high": 0.055365439415769394
+      },
+      "hgb_features_and_peers_minus_mlp_shared_relu_ssim2": {
+        "point": 0.022019794359849243,
+        "low": 0.009174582266682094,
+        "high": 0.03563839853849869
+      },
+      "rf_minus_mlp_four_human": {
+        "point": 0.02370793685478889,
+        "low": 0.006519305664178299,
+        "high": 0.0391211920404934
+      },
+      "extra_minus_mlp_four_human": {
+        "point": 0.024395121564977362,
+        "low": 0.005256737214059917,
+        "high": 0.04105091274981187
+      },
+      "hgb_minus_mlp_four_human": {
+        "point": 0.03728436332013818,
+        "low": 0.02754857376355859,
+        "high": 0.04818863965110188
+      },
+      "rf_features_and_peers_minus_mlp_four_human": {
+        "point": 0.023791965311252827,
+        "low": 0.011452087834285241,
+        "high": 0.03716130674944819
+      },
+      "extra_features_and_peers_minus_mlp_four_human": {
+        "point": 0.03466543183131221,
+        "low": 0.019790939424494,
+        "high": 0.0485944311248702
+      },
+      "hgb_features_and_peers_minus_mlp_four_human": {
+        "point": 0.014915056102881019,
+        "low": 0.005164093709446663,
+        "high": 0.02784248634877771
+      },
+      "rf_minus_ssim2": {
+        "point": 0.13157689455575028,
+        "low": 0.11169642381910716,
+        "high": 0.15301095302982218
+      },
+      "extra_minus_ssim2": {
+        "point": 0.13226407926593875,
+        "low": 0.11153826079351564,
+        "high": 0.15626239646982545
+      },
+      "hgb_minus_ssim2": {
+        "point": 0.14515332102109957,
+        "low": 0.12174110391711566,
+        "high": 0.164494961010671
+      },
+      "rf_features_and_peers_minus_ssim2": {
+        "point": 0.13166092301221421,
+        "low": 0.11041820769276714,
+        "high": 0.15476776782750482
+      },
+      "extra_features_and_peers_minus_ssim2": {
+        "point": 0.1425343895322736,
+        "low": 0.12119284346033173,
+        "high": 0.1667609749684127
+      },
+      "hgb_features_and_peers_minus_ssim2": {
+        "point": 0.1227840138038424,
+        "low": 0.0965559871512952,
+        "high": 0.14932947391280613
+      }
+    }
+  },
+  "tid2013": {
+    "references": 3,
+    "draws": 2000,
+    "seed": 20261106,
+    "status": "conditional on already-exposed development sources; no multiplicity correction",
+    "comparisons": {
+      "rf_minus_mlp_shared_relu_ssim2": {
+        "point": 0.017869759721544587,
+        "low": -0.005611627460206048,
+        "high": 0.045167899461202476
+      },
+      "extra_minus_mlp_shared_relu_ssim2": {
+        "point": 0.021712671785330095,
+        "low": -0.006462400187774442,
+        "high": 0.04681043167040888
+      },
+      "hgb_minus_mlp_shared_relu_ssim2": {
+        "point": 0.00787628503268012,
+        "low": -0.005003278804644906,
+        "high": 0.047574400139807294
+      },
+      "rf_features_and_peers_minus_mlp_shared_relu_ssim2": {
+        "point": 0.029836131605059046,
+        "low": -0.0003750345084790885,
+        "high": 0.05223460780313727
+      },
+      "extra_features_and_peers_minus_mlp_shared_relu_ssim2": {
+        "point": 0.032670796878801145,
+        "low": 0.012011521896567401,
+        "high": 0.0545786019706096
+      },
+      "hgb_features_and_peers_minus_mlp_shared_relu_ssim2": {
+        "point": 0.028202617481700387,
+        "low": 0.008031989056594524,
+        "high": 0.039121403325863
+      },
+      "rf_minus_mlp_four_human": {
+        "point": 0.020053822889313455,
+        "low": 0.0016147319115072944,
+        "high": 0.0443448970646233
+      },
+      "extra_minus_mlp_four_human": {
+        "point": 0.023896734953098964,
+        "low": 0.0007639591839389004,
+        "high": 0.045987429273829705
+      },
+      "hgb_minus_mlp_four_human": {
+        "point": 0.010060348200448987,
+        "low": -0.006914231913790925,
+        "high": 0.04675139774322812
+      },
+      "rf_features_and_peers_minus_mlp_four_human": {
+        "point": 0.032020194772827915,
+        "low": 0.006851324863234254,
+        "high": 0.05141160540655809
+      },
+      "extra_features_and_peers_minus_mlp_four_human": {
+        "point": 0.03485486004657001,
+        "low": 0.019237881268280743,
+        "high": 0.05375559957403042
+      },
+      "hgb_features_and_peers_minus_mlp_four_human": {
+        "point": 0.030386680649469255,
+        "low": 0.015258348428307866,
+        "high": 0.04104264069600494
+      },
+      "rf_minus_ssim2": {
+        "point": 0.054636173376176544,
+        "low": 0.01374793599397961,
+        "high": 0.0901204987173927
+      },
+      "extra_minus_ssim2": {
+        "point": 0.05847908543996205,
+        "low": 0.01891165936428718,
+        "high": 0.0917630309265991
+      },
+      "hgb_minus_ssim2": {
+        "point": 0.04464269868731208,
+        "low": 0.0023405175195611028,
+        "high": 0.09252699939599751
+      },
+      "rf_features_and_peers_minus_ssim2": {
+        "point": 0.066602545259691,
+        "low": 0.03459382126093069,
+        "high": 0.09718720705932749
+      },
+      "extra_features_and_peers_minus_ssim2": {
+        "point": 0.0694372105334331,
+        "low": 0.034322960182999296,
+        "high": 0.09953120122679981
+      },
+      "hgb_features_and_peers_minus_ssim2": {
+        "point": 0.06496903113633234,
+        "low": 0.033253406182962575,
+        "high": 0.08342188427434971
+      }
+    }
+  },
+  "konfig": {
+    "status": "not estimable from one development reference",
+    "references": 1
+  },
+  "cid22_a25": {
+    "references": 7,
+    "draws": 2000,
+    "seed": 20261106,
+    "status": "conditional on already-exposed development sources; no multiplicity correction",
+    "comparisons": {
+      "rf_minus_mlp_shared_relu_ssim2": {
+        "point": -0.01619467039424527,
+        "low": -0.05022034996985932,
+        "high": 0.01698030438265674
+      },
+      "extra_minus_mlp_shared_relu_ssim2": {
+        "point": -0.009255250913408397,
+        "low": -0.039955022194341314,
+        "high": 0.020875683984952948
+      },
+      "hgb_minus_mlp_shared_relu_ssim2": {
+        "point": -0.018621934299721365,
+        "low": -0.04796307728675728,
+        "high": 0.006665834348823727
+      },
+      "rf_features_and_peers_minus_mlp_shared_relu_ssim2": {
+        "point": -0.06583575324958968,
+        "low": -0.09670124511624,
+        "high": -0.022451448281070735
+      },
+      "extra_features_and_peers_minus_mlp_shared_relu_ssim2": {
+        "point": -0.08732409125392238,
+        "low": -0.1464765180486793,
+        "high": -0.028677893123292053
+      },
+      "hgb_features_and_peers_minus_mlp_shared_relu_ssim2": {
+        "point": -0.026229427662059157,
+        "low": -0.06050735455503642,
+        "high": 0.004872117542142673
+      },
+      "rf_minus_mlp_four_human": {
+        "point": 0.004912953018227917,
+        "low": -0.0682452007137129,
+        "high": 0.0718711855336482
+      },
+      "extra_minus_mlp_four_human": {
+        "point": 0.01185237249906479,
+        "low": -0.05982903647710913,
+        "high": 0.07694329066454975
+      },
+      "hgb_minus_mlp_four_human": {
+        "point": 0.002485689112751821,
+        "low": -0.0651547918732999,
+        "high": 0.06240839991794252
+      },
+      "rf_features_and_peers_minus_mlp_four_human": {
+        "point": -0.04472812983711649,
+        "low": -0.11312826683118327,
+        "high": 0.031211544849056944
+      },
+      "extra_features_and_peers_minus_mlp_four_human": {
+        "point": -0.06621646784144919,
+        "low": -0.16110839471096727,
+        "high": 0.016465548806622748
+      },
+      "hgb_features_and_peers_minus_mlp_four_human": {
+        "point": -0.005121804249585971,
+        "low": -0.0719758515302895,
+        "high": 0.05877382126339782
+      },
+      "rf_minus_ssim2": {
+        "point": -0.009314066837629587,
+        "low": -0.03403357116886563,
+        "high": 0.022557767060936852
+      },
+      "extra_minus_ssim2": {
+        "point": -0.002374647356792714,
+        "low": -0.02739435464284084,
+        "high": 0.02774373158960585
+      },
+      "hgb_minus_ssim2": {
+        "point": -0.011741330743105682,
+        "low": -0.04052739127019368,
+        "high": 0.022579398982028764
+      },
+      "rf_features_and_peers_minus_ssim2": {
+        "point": -0.058955149692973996,
+        "low": -0.09077670284714494,
+        "high": -0.011407988035808525
+      },
+      "extra_features_and_peers_minus_ssim2": {
+        "point": -0.08044348769730669,
+        "low": -0.13683876101801085,
+        "high": -0.012953208644494724
+      },
+      "hgb_features_and_peers_minus_ssim2": {
+        "point": -0.019348824105443474,
+        "low": -0.06569371588590034,
+        "high": 0.01287122041020361
+      }
+    }
+  }
+}
