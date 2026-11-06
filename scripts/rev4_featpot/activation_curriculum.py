@@ -169,7 +169,7 @@ def native(plan_path, output, workers, *, architecture=False, binary_dir=None, m
     import numpy as np
     import pyarrow as pa
     import pyarrow.parquet as pq
-    if not 1 <= workers <= (6 if architecture else 3):
+    if not 1 <= workers <= (12 if architecture and long else 6 if architecture else 3):
         raise ValueError('pilot concurrency exceeds the registered aggregate memory budget')
     base = json.loads(plan_path.read_text())
     for path,pin in base['inputs'].items():
@@ -366,6 +366,38 @@ def native(plan_path, output, workers, *, architecture=False, binary_dir=None, m
         raise RuntimeError(f'{len(failures)} pilot cells failed; preserved in SUMMARY.json')
 
 
+def replay_controls(frozen, binaries, output):
+    """Replay all three frozen native compatibility cells; only paths/provenance differ."""
+    original=json.loads((frozen/'RESULT.json').read_text())
+    output.mkdir(parents=True,exist_ok=False)
+    results={}
+    for arm in ('new-single','deep-relu','deep-smooth'):
+        dest=output/arm
+        (dest/'ckpt').mkdir(parents=True)
+        cmd=json.loads((frozen/arm/'command.json').read_text())
+        cmd[0]=str(binaries/'zensim_mlp_train')
+        cmd[cmd.index('--out')+1]=str(dest/'best.bin')
+        cmd[cmd.index('--dump-checkpoints-dir')+1]=str(dest/'ckpt')
+        env=os.environ.copy()
+        env.update(RAYON_NUM_THREADS='1',OMP_NUM_THREADS='1',OPENBLAS_NUM_THREADS='1',TMPDIR=str(Path.home()/'tmp'))
+        for key in ('ZENSIM_MONOTONE_RESEARCH_MANIFEST','ZENSIM_MONOTONE_RESEARCH_SHA256'):
+            env.pop(key,None)
+        write(dest/'COMMAND.json',cmd)
+        with (dest/'train.log').open('w') as log:
+            subprocess.run(cmd,stdout=log,stderr=subprocess.STDOUT,env=env,check=True)
+        stripped=dest/'without-repro.bin'
+        with (dest/'strip.log').open('w') as log:
+            subprocess.run([str(binaries/'bake_dial_refit'),'strip','--in',str(dest/'ckpt/ckpt_epoch001.bin'),
+                '--out',str(stripped),'--key','zentrain.repro'],stdout=log,stderr=subprocess.STDOUT,check=True)
+        actual=sha(stripped)
+        expected=original['results'][arm]['without_repro_sha256']
+        results[arm]=dict(expected=expected,actual=actual,match=actual==expected)
+        write(output/'REPLAY.json',results)
+        if actual!=expected:
+            raise ValueError('baseline replay changed: '+arm)
+    print(json.dumps(results),flush=True)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest='action',required=True)
@@ -383,11 +415,17 @@ def main():
     p.add_argument('--workers',type=int,default=6)
     p.add_argument('--long',action='store_true')
     p.add_argument('--prepare-only',action='store_true')
+    p=sub.add_parser('replay')
+    p.add_argument('--frozen',type=Path,required=True)
+    p.add_argument('--binary-dir',type=Path,required=True)
+    p.add_argument('--output',type=Path,required=True)
     args = parser.parse_args()
     if args.action == 'audit':
         if args.output.exists():
             raise ValueError('preserve existing audit before rerunning')
         audit(args.output)
+    elif args.action == 'replay':
+        replay_controls(args.frozen,args.binary_dir,args.output)
     elif args.action == 'architectures':
         native(args.baseline_plan,args.output,args.workers,architecture=True,
                binary_dir=args.binary_dir,metadata=args.metadata,long=args.long,prepare_only=args.prepare_only)

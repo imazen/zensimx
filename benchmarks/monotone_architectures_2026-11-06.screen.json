@@ -1,0 +1,423 @@
+{
+  "scope": "12x5000 fixed epoch 11, three seed pairs, exposed development",
+  "summary_sha256": "832d45877e1d56e4a9d041de51a8f367e0a85d64f5eeebbacc08224980b04bc7",
+  "metrics": {
+    "shared_smooth": {
+      "human_kadid_development": {
+        "pooled_srocc": {
+          "mean": 0.8955917261772703,
+          "min": 0.8929806999815795,
+          "max": 0.89827159684094
+        },
+        "within_reference_srocc": {
+          "mean": 0.9015008052,
+          "min": 0.8993884929,
+          "max": 0.9041884417
+        }
+      },
+      "human_tid2013_development": {
+        "pooled_srocc": {
+          "mean": 0.9010768864806351,
+          "min": 0.8981021297736507,
+          "max": 0.9042053665289927
+        },
+        "within_reference_srocc": {
+          "mean": 0.9052142882,
+          "min": 0.9026268424,
+          "max": 0.9075706171
+        }
+      },
+      "human_konfig_development": {
+        "pooled_srocc": {
+          "mean": 0.9386453376531335,
+          "min": 0.9248152272957376,
+          "max": 0.9559380378657487
+        },
+        "within_reference_srocc": {
+          "mean": 0.9386453376666667,
+          "min": 0.9248152273,
+          "max": 0.9559380379
+        }
+      },
+      "human_cid22_a25_development": {
+        "pooled_srocc": {
+          "mean": 0.9033365451568657,
+          "min": 0.9016100624825423,
+          "max": 0.9056758630191711
+        },
+        "within_reference_srocc": {
+          "mean": 0.9659837058666667,
+          "min": 0.9648953026,
+          "max": 0.9671294185
+        }
+      }
+    },
+    "shared_relu": {
+      "human_kadid_development": {
+        "pooled_srocc": {
+          "mean": 0.8954971257178191,
+          "min": 0.8920305677447222,
+          "max": 0.898473855831879
+        },
+        "within_reference_srocc": {
+          "mean": 0.9014688570333333,
+          "min": 0.8983054819,
+          "max": 0.9047585751
+        }
+      },
+      "human_tid2013_development": {
+        "pooled_srocc": {
+          "mean": 0.9017255595430049,
+          "min": 0.9009611009967956,
+          "max": 0.9032061219424319
+        },
+        "within_reference_srocc": {
+          "mean": 0.9056336959,
+          "min": 0.9048701146,
+          "max": 0.9067314121
+        }
+      },
+      "human_konfig_development": {
+        "pooled_srocc": {
+          "mean": 0.9385373426479026,
+          "min": 0.9281360737065911,
+          "max": 0.9511390098207958
+        },
+        "within_reference_srocc": {
+          "mean": 0.9385373426333333,
+          "min": 0.9281360737,
+          "max": 0.9511390098
+        }
+      },
+      "human_cid22_a25_development": {
+        "pooled_srocc": {
+          "mean": 0.9030197431747187,
+          "min": 0.9008356875440232,
+          "max": 0.9060214651815134
+        },
+        "within_reference_srocc": {
+          "mean": 0.9655415011666667,
+          "min": 0.9644138942,
+          "max": 0.9667063516
+        }
+      }
+    },
+    "shared_caps": {
+      "human_kadid_development": {
+        "pooled_srocc": {
+          "mean": 0.8879529001783407,
+          "min": 0.8858323708408717,
+          "max": 0.8908454748865838
+        },
+        "within_reference_srocc": {
+          "mean": 0.8945676010333333,
+          "min": 0.892639144,
+          "max": 0.8972276717
+        }
+      },
+      "human_tid2013_development": {
+        "pooled_srocc": {
+          "mean": 0.8950040428789554,
+          "min": 0.8934319152098205,
+          "max": 0.8963819372910459
+        },
+        "within_reference_srocc": {
+          "mean": 0.8981445043999999,
+          "min": 0.8970915435,
+          "max": 0.8992954699
+        }
+      },
+      "human_konfig_development": {
+        "pooled_srocc": {
+          "mean": 0.920947656170902,
+          "min": 0.9143262124126759,
+          "max": 0.9334008302116027
+        },
+        "within_reference_srocc": {
+          "mean": 0.9209476561666666,
+          "min": 0.9143262124,
+          "max": 0.9334008302
+        }
+      },
+      "human_cid22_a25_development": {
+        "pooled_srocc": {
+          "mean": 0.902738939247166,
+          "min": 0.9006463200643557,
+          "max": 0.9050698610364389
+        },
+        "within_reference_srocc": {
+          "mean": 0.964602912,
+          "min": 0.9638824427,
+          "max": 0.9655151825
+        }
+      }
+    },
+    "shared_switch": {
+      "human_kadid_development": {
+        "pooled_srocc": {
+          "mean": 0.8916620887320194,
+          "min": 0.8874965434302773,
+          "max": 0.8942338379721441
+        },
+        "within_reference_srocc": {
+          "mean": 0.898481244,
+          "min": 0.8940608997,
+          "max": 0.9008171234
+        }
+      },
+      "human_tid2013_development": {
+        "pooled_srocc": {
+          "mean": 0.8985288342187225,
+          "min": 0.8972582374986168,
+          "max": 0.9005998554313323
+        },
+        "within_reference_srocc": {
+          "mean": 0.9016846048666667,
+          "min": 0.9002157058,
+          "max": 0.9037924549
+        }
+      },
+      "human_konfig_development": {
+        "pooled_srocc": {
+          "mean": 0.9313556748000406,
+          "min": 0.9228308190746178,
+          "max": 0.9455300192366103
+        },
+        "within_reference_srocc": {
+          "mean": 0.9313556748,
+          "min": 0.9228308191,
+          "max": 0.9455300192
+        }
+      },
+      "human_cid22_a25_development": {
+        "pooled_srocc": {
+          "mean": 0.9028161449156301,
+          "min": 0.9000326339816921,
+          "max": 0.9054993110553217
+        },
+        "within_reference_srocc": {
+          "mean": 0.9651709949333334,
+          "min": 0.9644759275,
+          "max": 0.9661719258
+        }
+      }
+    },
+    "shared_switch_deep": {
+      "human_kadid_development": {
+        "pooled_srocc": {
+          "mean": 0.8908815285328241,
+          "min": 0.887357238888139,
+          "max": 0.8940567749861886
+        },
+        "within_reference_srocc": {
+          "mean": 0.8974034407666667,
+          "min": 0.893977898,
+          "max": 0.9003150829
+        }
+      },
+      "human_tid2013_development": {
+        "pooled_srocc": {
+          "mean": 0.8981684031383363,
+          "min": 0.8964728595462195,
+          "max": 0.9005562590458954
+        },
+        "within_reference_srocc": {
+          "mean": 0.9012397283333333,
+          "min": 0.8999124336,
+          "max": 0.9035979906
+        }
+      },
+      "human_konfig_development": {
+        "pooled_srocc": {
+          "mean": 0.9297559987850562,
+          "min": 0.9168775944112585,
+          "max": 0.948607876885694
+        },
+        "within_reference_srocc": {
+          "mean": 0.9297559988,
+          "min": 0.9168775944,
+          "max": 0.9486078769
+        }
+      },
+      "human_cid22_a25_development": {
+        "pooled_srocc": {
+          "mean": 0.9025386490582173,
+          "min": 0.8997240457380029,
+          "max": 0.9052169008469922
+        },
+        "within_reference_srocc": {
+          "mean": 0.9650370835000001,
+          "min": 0.9642411731,
+          "max": 0.9661089348
+        }
+      }
+    },
+    "shared_spline": {
+      "human_kadid_development": {
+        "pooled_srocc": {
+          "mean": 0.8899833519778835,
+          "min": 0.8852088145954796,
+          "max": 0.8932369446054572
+        },
+        "within_reference_srocc": {
+          "mean": 0.896696343,
+          "min": 0.8923295201,
+          "max": 0.8998716464
+        }
+      },
+      "human_tid2013_development": {
+        "pooled_srocc": {
+          "mean": 0.8967201200685396,
+          "min": 0.8937680832084396,
+          "max": 0.8994471875768476
+        },
+        "within_reference_srocc": {
+          "mean": 0.8997712116666666,
+          "min": 0.8967199817,
+          "max": 0.9021487636
+        }
+      },
+      "human_konfig_development": {
+        "pooled_srocc": {
+          "mean": 0.9234180419155614,
+          "min": 0.9094664371772806,
+          "max": 0.942735648476258
+        },
+        "within_reference_srocc": {
+          "mean": 0.9234180419333333,
+          "min": 0.9094664372,
+          "max": 0.9427356485
+        }
+      },
+      "human_cid22_a25_development": {
+        "pooled_srocc": {
+          "mean": 0.9024224237907792,
+          "min": 0.9004703932476193,
+          "max": 0.9047690350360704
+        },
+        "within_reference_srocc": {
+          "mean": 0.9650021117666666,
+          "min": 0.9644372932,
+          "max": 0.9660670907
+        }
+      }
+    },
+    "shared_lipschitz": {
+      "human_kadid_development": {
+        "pooled_srocc": {
+          "mean": 0.8909879112886416,
+          "min": 0.885586497257088,
+          "max": 0.8940489103372342
+        },
+        "within_reference_srocc": {
+          "mean": 0.8968521692,
+          "min": 0.8914822726,
+          "max": 0.8999360103
+        }
+      },
+      "human_tid2013_development": {
+        "pooled_srocc": {
+          "mean": 0.8956356974899797,
+          "min": 0.8931648069722031,
+          "max": 0.8975385918356442
+        },
+        "within_reference_srocc": {
+          "mean": 0.8988494475666666,
+          "min": 0.8963160122,
+          "max": 0.9014345856
+        }
+      },
+      "human_konfig_development": {
+        "pooled_srocc": {
+          "mean": 0.9230873072120415,
+          "min": 0.9126455401437683,
+          "max": 0.9385035942087678
+        },
+        "within_reference_srocc": {
+          "mean": 0.9230873072,
+          "min": 0.9126455401,
+          "max": 0.9385035942
+        }
+      },
+      "human_cid22_a25_development": {
+        "pooled_srocc": {
+          "mean": 0.9024638137392237,
+          "min": 0.8996270958398843,
+          "max": 0.905434478090137
+        },
+        "within_reference_srocc": {
+          "mean": 0.9654386488,
+          "min": 0.9643270303,
+          "max": 0.9669581433
+        }
+      }
+    },
+    "single_ramps": {
+      "human_kadid_development": {
+        "pooled_srocc": {
+          "mean": 0.8883788619807369,
+          "min": 0.8849250199911561,
+          "max": 0.8950194832099397
+        },
+        "within_reference_srocc": {
+          "mean": 0.8943534910000001,
+          "min": 0.8902576783,
+          "max": 0.9009194197
+        }
+      },
+      "human_tid2013_development": {
+        "pooled_srocc": {
+          "mean": 0.8942115488990433,
+          "min": 0.8898510958702834,
+          "max": 0.9021752410407752
+        },
+        "within_reference_srocc": {
+          "mean": 0.8972563089,
+          "min": 0.8925968972,
+          "max": 0.9058621023
+        }
+      },
+      "human_konfig_development": {
+        "pooled_srocc": {
+          "mean": 0.9187202591880126,
+          "min": 0.897337248152273,
+          "max": 0.9601903411967196
+        },
+        "within_reference_srocc": {
+          "mean": 0.9187202592,
+          "min": 0.8973372482,
+          "max": 0.9601903412
+        }
+      },
+      "human_cid22_a25_development": {
+        "pooled_srocc": {
+          "mean": 0.9039661811735115,
+          "min": 0.9029642874162301,
+          "max": 0.9056539828702137
+        },
+        "within_reference_srocc": {
+          "mean": 0.9652614748666667,
+          "min": 0.964389118,
+          "max": 0.9661253556
+        }
+      }
+    }
+  },
+  "replay": {
+    "new-single": {
+      "expected": "1fd8c7c2d44f0d088ca42abc337dc256624b9b3edd0ed90f3cf32952025863bb",
+      "actual": "1fd8c7c2d44f0d088ca42abc337dc256624b9b3edd0ed90f3cf32952025863bb",
+      "match": true
+    },
+    "deep-relu": {
+      "expected": "e86f91cb9e60a3d97ac395dca3110920ed3725006a92c6c09b275f2ccbe53daf",
+      "actual": "e86f91cb9e60a3d97ac395dca3110920ed3725006a92c6c09b275f2ccbe53daf",
+      "match": true
+    },
+    "deep-smooth": {
+      "expected": "7f668102ab3dce5dc724d44c528fa9c49f77307bd0e1251258e3994f315e3eec",
+      "actual": "7f668102ab3dce5dc724d44c528fa9c49f77307bd0e1251258e3994f315e3eec",
+      "match": true
+    }
+  }
+}

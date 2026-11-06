@@ -156,3 +156,12 @@ do not establish image-domain or near-lossless qualification.
 The short screen and long comparison have separate output directories and
 fixed final checkpoints. Neither is complete merely because native code and
 the preparation check pass. T1--T7 remain separately controlled experiments.
+
+## First measured stage
+
+The [short-screen record](../benchmarks/monotone_architectures_2026-11-06.md)
+contains 24/24 completed fits and unchanged byte replay for all three controls.
+A0--A6 are implemented and screened; none is dropped from the full comparison.
+All final native feature probes pass. The long runner now permits twelve
+single-threaded children (2 GiB each, 26 GiB outer cap) after resource inspection;
+this concurrency-only amendment changes no seed, draw or checkpoint choice.
