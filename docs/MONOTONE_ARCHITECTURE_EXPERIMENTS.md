@@ -222,6 +222,9 @@ Additional snapshot panels score TRAIN only; the native trainer repeats its
 original development logs, and no checkpoint is selected. Report
 all five schedules, including the unchanged random control. Loss of earlier
 family fit is a diagnostic of interference, not proof of a bad local minimum.
+`monotone-stage-plot` requires all 15 exact replays before plotting all five
+TRAIN-population trajectories; its receipt retains every family change from
+epoch 89 to 119 and all seed values, without selecting a schedule.
 
 T5 reweights family-pair or source/family-pair cells within each population:
 0.2 + 0.8*N/(K*n_cell). Its mean over proposed valid pair events is one and
