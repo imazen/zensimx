@@ -3339,3 +3339,26 @@ Authorized frozen read of 1848 rows; before target parsing. LABEL_READS.json SHA
 ### Frozen-A AIC-2026 public_test completion — 2026-11-05
 
 The one authorized frozen-A read completed all1,848 pairs/14 sources after CLIC2022. Completed journal SHA256 `2bb36a5e33610cb6fc4d378d5b445a19604881eb7fddfc1663b32c1a8236d67e`; target cache SHA256 `3fddd405b1fc863110d5b6389dd4d9b1156e0daa4f41658a1a67643412fb9afb`. Raw targets were parsed once using the registered October23 jnd column and declared quality orientation; no tuning, model selection or B recomputation. All evaluation numbers and the quoted historical B row are retained only under private imazen/zensim-training `evaluations/frozen_a_aic2026_public_test_2026-11-05.*` and chat. No addition to the public eight-population final-read document. Preliminary labels and the prior design/B/Tga exposures remain disclosed in the separate registration.
+
+## Exposure ledger — 2026-11-06: KonFiG Part A/B reference alias
+
+A label-free join of the frozen mixed human tables to their pinned revision-7
+bank keys found 24 fitting rows named `src50_partb` sharing the development
+reference `src50_parta`. Both bind decoded-reference pixel SHA-256
+`e866467940509aef18bd05fe82b4d29fbfae524cb7b4925d10087ffc68be1783`.
+The affected parent table hashes are fit
+`5d6f53f17f518fb2f5113ef35783dfbc89d5d62b9eddc520f5726d195fe01084`
+and development
+`a8d3409136573154cd9d30070d630ba90ed8683df4c35e397a4bab6375689786`.
+
+The historical reference-name hash split treated the Part A/B names separately.
+Consequently its KonFiG development reading is not source-independent. This
+entry does not rewrite those frozen tables, change previous results or authorize
+any new held-out read. Future derivatives must group original-source aliases
+before splitting or remove fitting aliases of development references.
+
+The owner's new F-condition recipe uses only the approved Part A reconstructed
+human labels; Part B contributes no rows. Its exact-reference alias guard runs
+before fitting. Repeated pristine anchors were verified as identical decoded RGB
+pixels; the existing feature tables omit those identity rows. The private
+training repository owns the new recipe, label joins and run receipts.

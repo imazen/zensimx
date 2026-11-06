@@ -1,5 +1,14 @@
 # zensim — current working rules
 
+## Known Bugs — historical KonFiG development reference alias (2026-11-06)
+
+The frozen mixed human tables place 24 `src50_partb` rows in fitting and
+`src50_parta` in development; their reference-pixel hashes are identical.
+That development result is not source-independent. Preserve the historical
+tables and results, but group future split/admission by original source,
+including Part A/B aliases. Evidence and affected table hashes are recorded
+in `docs/DATA_SPLITS.md` under the November 6 KonFiG entry.
+
 ## Known Bugs — rank-only training driver (resolved 2026-11-06)
 
 The shared `v2_lodo_mlp.train_command` always supplied `--mse-weight 1`,
