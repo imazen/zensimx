@@ -4732,3 +4732,9 @@ tree-study-summary root output neural_single neural_shared:
 
 tree-study-constraint-controls run output:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 6G --jobs 6 -- python3 -B scripts/rev4_featpot/tree_study_report.py --constraint-controls --run {{quote(run)}} --output {{quote(output)}}
+
+tree-study-closure root baseline_plan:
+    TMPDIR="$HOME/tmp" python3 -B scripts/rev4_featpot/tree_study_report.py --closure --run {{quote(root)}} --output {{quote(root)}} --baseline-plan {{quote(baseline_plan)}}
+
+tree-study-mirror root destination:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 2G --jobs 1 -- just dataset-artifacts-mirror-nfs {{quote(root)}} {{quote(destination)}} training true

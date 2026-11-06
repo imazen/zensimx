@@ -369,7 +369,8 @@ def closure(root, base_path):
     sources.mkdir(exist_ok=False)
     repo = Path(__file__).resolve().parents[2]
     records = [('7b57f9cbc259', 'scripts/rev4_featpot/tree_study.py'),
-               ('8c39499e5916', 'scripts/rev4_featpot/tree_study_report.py')]
+               ('8c39499e5916', 'scripts/rev4_featpot/tree_study_report.py'),
+               ('2de60dca6c2b', 'scripts/rev4_featpot/tree_study_report.py')]
     for commit, file in records:
         target = sources / (commit + '-' + Path(file).name)
         target.write_bytes(subprocess.check_output(['git', 'show', commit + ':' + file], cwd=repo))
@@ -383,6 +384,9 @@ def closure(root, base_path):
     peer_plan = json.loads((root / 'peer-search/PLAN.json').read_text())
     if sha(sources / '8c39499e5916-tree_study_report.py') != peer_plan['script_sha256']:
         raise ValueError('peer-search source identity mismatch')
+    controls_plan = json.loads((root / 'constraint-controls/PLAN.json').read_text())
+    if sha(sources / '2de60dca6c2b-tree_study_report.py') != controls_plan['controller_sha256']:
+        raise ValueError('constraint-control source identity mismatch')
     import importlib.metadata
     write(sources / 'PACKAGES.json', {name: importlib.metadata.version(name)
           for name in ['scikit-learn', 'numpy', 'scipy', 'pyarrow', 'pandas', 'joblib', 'threadpoolctl']})
