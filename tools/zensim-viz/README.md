@@ -11,9 +11,10 @@ feature bank, not a browser HDR pixel path.
 
 [PAGES.md](PAGES.md) describes the compact banks, single IMIJ-set, scientific
 gates and dispatch-only deployment boundary. [REPORT.md](REPORT.md) records
-measured bytes, parity, browser times and captures. The coordinator installs
-the prepared workflow in imazen/zensim after owner review; this tool does not
-enable Pages or dispatch it.
+measured bytes, parity, browser times and captures. The page is live at
+https://imazen.github.io/zensim/, deployed by the hand-run `pages.yml` in
+imazen/zensim from pinned source `5d2c1a50`. It passed the 38 browser checks
+of `tests/pages-smoke.mjs` on the live URL on 2026-11-06.
 
 Serve a prepared directory with `just viz-serve /absolute/prepared/site`.
 Source lives in `pages/`; generated Wasm, bakes, data and screenshots stay

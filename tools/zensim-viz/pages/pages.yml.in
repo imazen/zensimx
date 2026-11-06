@@ -18,9 +18,9 @@ env:
 jobs:
   build:
     runs-on: ubuntu-latest
-    env:
-      TMPDIR: ${{ runner.temp }}
     steps:
+      - name: Keep scratch on the runner's temp disk
+        run: echo "TMPDIR=$RUNNER_TEMP" >> "$GITHUB_ENV"
       - uses: actions/checkout@v7
         with:
           repository: imazen/zensimx

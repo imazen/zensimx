@@ -91,7 +91,7 @@ def site(a):
 
 def pull_a(a):
     def get(start,length):
-        request=urllib.request.Request(a.url,headers={'Range':f'bytes={start}-{start+length-1}'})
+        request=urllib.request.Request(a.url,headers={'Range':f'bytes={start}-{start+length-1}','User-Agent':'zensim-pages-build'}) # R2's public domain refuses Python's default agent
         with urllib.request.urlopen(request) as response:
             if response.status!=206:raise ValueError('archive server must support Range')
             data=response.read()
