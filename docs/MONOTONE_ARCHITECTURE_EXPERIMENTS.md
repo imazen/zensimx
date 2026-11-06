@@ -256,6 +256,11 @@ The receipt describes scheduled events including skips, not accepted-gradient
 mass or full row coverage. The neutral replay's unchanged legacy receipt was
 valid because its CDF and event order were unchanged.
 
+For the newer leaky-capable binary, verify both the explicit omission flag
+and the native omission log before appending the event receipt directly.
+The three neutral bakes recover their original bytes exactly after stripping
+only that appended receipt. Preserve historical raw bakes in both cases.
+
 ## T8: leaky activation switches, prompted by TRAIN diagnostics
 
 The first neutral seed's epoch-119 diagnostic sample has 57/64 last-hidden

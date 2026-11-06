@@ -141,3 +141,15 @@ The leaky-capable trainer's neutral configuration reproduces all three earlier
 switch fits exactly after removing run metadata and the old coverage entry.
 The nonzero .05/.1 slope trials use the same 120 x 5,000 budget as T1--T7;
 the six runs are separate from the ten-times-larger architecture comparison.
+
+The completed 2,000-draw source-cluster bootstrap conditions on all three
+fixed short fits. Against shared ReLU, one switch block has KADID mean signed
+rank delta -0.003835, percentile interval [-0.005505, -0.001949]; CID22 human
+delta -0.000204, interval [-0.004031, 0.003818]. SmoothHinge intervals overlap
+zero on all three populations with multiple sources. ReLU self-comparisons
+are exactly zero in every replicate. These are exposed-development diagnostics
+without multiplicity correction, not a reason to drop long-budget arms.
+There are 10 KADID, three TID and seven CID22 development sources; no
+new-source interval is estimable for the single KonFiG development source.
+The bootstrap input report adds exact prediction-table pins while replaying
+every earlier measured summary value unchanged (`screen-report-v2`).

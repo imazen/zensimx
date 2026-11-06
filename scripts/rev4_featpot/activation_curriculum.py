@@ -599,20 +599,28 @@ def qualify_receipts(root, binary, output, watch=False):
             events=[json.loads(line.split(' ',1)[1]) for line in p.with_name('train.log').read_text().splitlines() if line.startswith('TRAINING_EVENTS ')]
             if len(events)!=1 or events[0]['events']!=plan['epochs']*plan['pairs_per_epoch']:
                 raise ValueError('missing exact full-budget event receipt')
+            command=json.loads(p.with_name('RUN.json').read_text())['command']
+            omitted='--no-sample-coverage' in command
+            if omitted and '[coverage] zentrain.sample_coverage SKIPPED (--no-sample-coverage)' not in p.with_name('train.log').read_text():
+                raise ValueError('coverage omission lacks native log receipt')
             dest=output/relative;dest.mkdir(parents=True)
             receipt=dict(scope='full scheduled draw stream, including skips; not accepted-gradient or row-coverage statistics',
                 raw_bake_sha256=sha(source),head_manifest_sha256=sha(p.with_name('HEAD.json')),
                 training_log_sha256=sha(p.with_name('train.log')),events=events[0],
-                correction='legacy uniform reconstruction removed; actual native event receipt retained')
+                correction='legacy entry not emitted; actual native event receipt appended' if omitted else
+                    'legacy uniform reconstruction removed; actual native event receipt retained')
             write(dest/'EVENTS.json',receipt)
             def call(name,args):
                 with (dest/(name+'.log')).open('w') as log:
                     subprocess.run([str(binary),*args],stdout=log,stderr=subprocess.STDOUT,check=True)
-            call('remove-legacy',['strip','--in',str(source),'--out',str(dest/'without-legacy.bin'),'--key','zentrain.sample_coverage'])
-            call('append-actual',['append-meta','--in',str(dest/'without-legacy.bin'),'--out',str(dest/'final.bin'),
+            base=source
+            if not omitted:
+                base=dest/'without-legacy.bin'
+                call('remove-legacy',['strip','--in',str(source),'--out',str(base),'--key','zentrain.sample_coverage'])
+            call('append-actual',['append-meta','--in',str(base),'--out',str(dest/'final.bin'),
                  '--key','zentrain.training_events','--value-file',str(dest/'EVENTS.json')])
             call('verify-sections',['strip','--in',str(dest/'final.bin'),'--out',str(dest/'roundtrip.bin'),'--key','zentrain.training_events'])
-            if sha(dest/'roundtrip.bin')!=sha(dest/'without-legacy.bin'):
+            if sha(dest/'roundtrip.bin')!=sha(base):
                 raise ValueError('receipt correction changed retained model sections')
             records[str(relative)]={'raw_sha256':sha(source),'qualified_sha256':sha(dest/'final.bin'),
                 'retained_sections_identical':True,'events_sha256':sha(dest/'EVENTS.json')}
