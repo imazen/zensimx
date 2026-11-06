@@ -46,3 +46,7 @@ Commands: `just activation-curriculum-tests`; `just activation-curriculum-audit 
 Native wrapper: `run-heavy: done rc=0 179s | peak-RSS 0.26GiB | min-avail 42515MiB | peak-load 3.85`. Three fit workers ran concurrently in an 8 GiB hard scope with one thread per child. This is a resource observation, not a benchmark or aggregate process-tree memory claim.
 
 Local artifacts checked on dev: `/mnt/v/output/zensim/activation-curriculum-20261106/`. Mirror verification is recorded below after preservation.
+
+Mirror: `/mnt/tower/output/zensim/activation-curriculum-20261106/`; 641 files, 128,106,604 bytes, all remotely read and SHA-256 verified. Includes the admitted prepared tables, key/manifest sidecars, role decision, three pinned binaries, source snapshots, native model/prediction/panel outputs and logs. Manifest SHA-256: `e938ae8e6c7326ac416b13a8f251d17776f9a13541f9b44cf5933509af9105bc`.
+
+The first rsync attempt copied correct bytes but returned code 23 because network storage refused ownership metadata. The attempt log is preserved. Retrying content/timestamps without ownership changes succeeded; every file passed verification.

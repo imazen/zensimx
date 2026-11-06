@@ -4710,3 +4710,7 @@ activation-curriculum-pilot baseline_plan output:
 
 activation-curriculum-tests:
     python3 -B -m unittest discover -s scripts/tests -p test_activation_curriculum.py -v
+
+# Content mirror only: network storage need not accept local ownership metadata.
+activation-curriculum-mirror source destination:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 2G --jobs 1 -- rsync -rt {{quote(source)}}/ {{quote(destination)}}/
