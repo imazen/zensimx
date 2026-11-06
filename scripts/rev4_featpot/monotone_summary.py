@@ -157,6 +157,10 @@ def summarize(root, breakdowns, output, control_root=None):
                 prediction_table_sha256=detail['prediction_table_sha256'],
                 probes=result['feature_probes'])
     if len(cells)!=complete['required'] or set(cells)!=set(index['cells']):raise ValueError('cell coverage mismatch')
+    gate_failures=[cell for cell,value in cells.items() if value['probes']['identity']!=100.
+        or value['probes']['violations_over_1e_5'] or value['probes']['ceiling_violations']]
+    if sorted(gate_failures)!=sorted(complete.get('feature_gate_failures',[])):
+        raise ValueError('feature gate failure ledger mismatch')
     event_checks={}
     if plan.get('training',False):
         control_root=control_root or root
@@ -202,12 +206,15 @@ def summarize(root, breakdowns, output, control_root=None):
         breakdown_index_sha256=sha(breakdowns/'INDEX.json'),completed=len(cells),required=complete['required'],
         selection='none; fixed final checkpoints, every registered arm',
         interpretation='seed ranges are descriptive, not confidence intervals; development is already exposed',
+        feature_gate_failures=gate_failures,evaluation_scope=complete.get('scope','native fitting comparison'),
         arms=aggregates,cells=cells,events=events,event_checks=event_checks,diagnostics=diagnostics))
     with (output/'metrics.csv').open('w') as f:
         writer=csv.DictWriter(f,fieldnames=list(rows[0]));writer.writeheader();writer.writerows(rows)
     populations=['human_kadid_development','human_tid2013_development','human_konfig_development','human_cid22_a25_development']
     text=['# Fixed-final development comparison','',f"Completed {len(cells)}/{complete['required']} cells; {plan['epochs']} epochs x {plan['pairs_per_epoch']} draws.",
         '','Three-seed means; ranges and all fitting panels are in SUMMARY.json. No model selection.']
+    text+=['',f"Feature gates: {len(cells)-len(gate_failures)}/{len(cells)} pass. Failed candidates remain visible for diagnosis: "+(', '.join(gate_failures) or 'none')+'.']
+    if complete.get('scope'):text+=['',complete['scope']+'.']
     for metric in ('pooled_srocc','source_mean_srocc','family_min_srocc','geo_tail_p99','raw_tail_p99'):
         text+=['',f'## {metric}','','| Arm | KADID | TID2013 | KonFiG F | CID22 human |','|---|---:|---:|---:|---:|']
         for arm in plan['arms']:
