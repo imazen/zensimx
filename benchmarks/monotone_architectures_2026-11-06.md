@@ -2,11 +2,17 @@
 
 ## Completed coverage
 
-24/24 short fits; eight registered architectures and three independent seed pairs.
-All train for 12 epochs x 5,000 draws and use fixed final epoch 11. These are
-short development results, not full-budget selection or a shipping qualification.
-The registered 120 x 50,000 comparison remains separate. T1--T7 are complete, reported below.
-T8's six leaky-switch fits are complete, reported below.
+129/129 registered native fitting runs reached their fixed final epoch:
+24 short architecture fits, 24 long architecture fits, 66 training controls,
+six leaky-switch fits and nine isolated-order fits. **123/129 original final
+bakes pass the feature gate; six long spline/ramp exports fail.** All failures
+are preserved. Six separate spline re-exports pass, without additional fitting.
+
+All 15 checkpoint-retention replays reproduce final model bytes and logged
+trajectories, retaining 1,800 checkpoints. Neutral compatibility replays also
+pass. This is a completed development experiment matrix, not a shipping
+qualification. Exact smooth-activation operators and ramp-export repair remain
+explicitly unimplemented; see the experiment queue's verified runtime limits.
 
 ## Short-screen results
 
@@ -323,3 +329,81 @@ distortion order, and keep random mixing as the control.
 
 Artifacts: `isolated-order-report/`, `isolated-order-bootstrap/`,
 `isolated-order-breakdowns/`, `isolated-order-qualified/`.
+
+## Full-budget architecture outcomes and numerical repair
+
+24/24 original fitting runs reached epoch 119 at 120 x 50,000 draws.
+18/24 original final bakes pass the unchanged feature gate; all three spline
+and all three single-ramp bakes fail it. The native driver exits nonzero and
+preserves those failures. Separate export evaluation retains every failed
+candidate, adds three spline re-exports, and performs zero optimizer steps.
+
+| Architecture | Feature gate | KADID | TID2013 | KonFiG F | CID22 human |
+|---|---|---:|---:|---:|---:|
+| shared_relu | PASS 3/3 | 0.897470 | 0.905377 | 0.948689 | 0.904456 |
+| shared_smooth | PASS 3/3 | 0.896479 | 0.902115 | 0.948176 | 0.904561 |
+| shared_caps | PASS 3/3 | 0.897168 | 0.899309 | 0.954372 | 0.903166 |
+| shared_switch | PASS 3/3 | 0.896213 | 0.899685 | 0.956249 | 0.903207 |
+| shared_switch_deep | PASS 3/3 | 0.897202 | 0.900033 | 0.960238 | 0.901846 |
+| shared_spline | FAIL 3/3 | 0.898087 | 0.898855 | 0.953535 | 0.902947 |
+| shared_lipschitz | PASS 3/3 | 0.897299 | 0.898477 | 0.956249 | 0.902463 |
+| single_ramps | FAIL 3/3 | 0.893920 | 0.885626 | 0.958422 | 0.902418 |
+| shared_spline_repaired | PASS 3/3 | 0.898087 | 0.898855 | 0.953535 | 0.902947 |
+
+No new architecture improves all four means over shared ReLU. The deeper
+switch reaches the highest KonFiG mean, but that panel contains one source
+and its TID2013/CID22-human means are lower. The repaired spline raises KADID
+mean slightly, with lower TID2013/CID22-human means. Source intervals retain
+the uncertainty: the repaired-spline KADID difference is 0.000617 with interval
+[-0.003577, 0.004785]. The one-block switch TID2013 difference is -0.005692
+with interval [-0.009924, -0.002598]. No CID22-human architecture interval
+excludes zero. These are conditional development diagnostics, not selection.
+
+Capacity limitation: every long shared-ReLU, SmoothHinge and spline fit ends
+with exactly one nonzero final output amplitude out of 64. Switch has
+2/3/2 nonzero amplitudes; deep switch has 2/8/2 out of 32. These counts are
+stored model coefficients, not sampled activity or proof that only one input
+feature matters. They show that nominal width was not retained as distinct
+final paths. The comparison cannot conclude that nonconvex capacity is useless;
+future optimization work must explicitly track and preserve useful paths.
+
+Original spline coordinate increases reach 0.00002288818359375; original ramp
+increases reach the same maximum. All retain exact identity score 100. The
+spline repair replaces signed unbounded-hinge cancellation with positive
+bounded segments and keeps the first two layers/final head/scaler. Hidden-unit
+connectivity is recovered from the serialized graph. All six short/long
+re-exports pass the unchanged gate, with no negative reconstructed slope
+requiring clipping. Their four development pooled SROCC values are unchanged.
+
+Largest prepared-row score changes per long seed: 0.00022125244139914457,
+0.000370025634765625 and 0.000152587890625. These are numerical export changes,
+not bit-identical models. The short maxima are 0.00005340576171875,
+0.00006866455078125 and 0.0000457763671875. TRAIN rank differences can be
+nonzero because rounding changes ties. Historical checkpoints remain unchanged.
+
+The repaired spline has 496097 stored coefficients in seven dense layers, versus
+200417 in five for the old export. Both correspond to 132640 nominal
+trainable coefficients in the original fitting parameterization. Dense expansion
+is not a compute match, and no runtime speed claim is made.
+
+The ramp export remains a measured native-gate failure; it is not silently
+repaired or accepted. Strict floating-point monotonicity is not established
+by the real-arithmetic construction or these finite feature probes. Pixel-domain,
+near-lossless and cross-target shipping qualification remain outside this trial.
+
+Artifacts: `long/SUMMARY.json` retains the six failures. `long-export-audit/`
+contains original/repaired bakes, native panels and per-row change receipts;
+`long-export-report/`, `long-export-bootstrap/` and `long-export-breakdowns/`
+contain every candidate, including failed ones. `LONG_CAPACITY.json` pins the
+native inspection and original fitting parameterization.
+Long report SHA-256: `c639f38231bb58559e5bf0a8baf26eafeaf4414aacc8b874ba5a3ee445b5ea41`.
+Bootstrap SHA-256: `588b9823f293fb357c2c90bea50d7a5cf62768288e03b056891fa4cab283c627`.
+
+Long wrapper: `run-heavy: done rc=1 6367s | peak-RSS 0.67GiB | min-avail 36928MiB | peak-load 23.86`.
+The nonzero exit records feature-gate failures after completed fits; it is not
+an interrupted optimizer or an all-pass result. The resource line does not
+measure aggregate process-tree memory or benchmark speed.
+
+Final native checks: 169 trainer tests passed with one pre-existing ignore;
+65 trainer-CLI tests and 38 bake-tool tests passed. The analytic construction
+checks and script lint pass. CI is manual and was not dispatched.

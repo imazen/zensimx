@@ -4,6 +4,10 @@
 
 ### Research
 
+- Complete 129 registered native fits, retaining six long-export gate failures;
+  verify six numerical spline re-exports and all 15 exact trajectory replays.
+  Record source uncertainty, supervision-timing effects and final-path collapse.
+
 - Replace private research-spline export cancellation with positive bounded
   segments; retain historical failed models and register separate no-fit
   checkpoint repair evaluation.

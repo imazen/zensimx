@@ -1,13 +1,15 @@
 # zensim — current working rules
 
-## Known Bugs — research spline float32 export (2026-11-06)
+## Known Bugs — research spline and ramp float32 exports (2026-11-06)
 
-The long monotone-study spline candidates s0 and s2 exceeded the frozen 1e-5
-coordinate gate, with maxima 1.1444091796875e-5 and 2.288818359375e-5.
-Their signed slope-difference export can cancel large hinge values. Preserve
-historical failed candidates. A4r registers positive bounded-segment exports,
-unchanged gates and full prepared-row comparison; this is not a serving-profile
-change. See docs/MONOTONE_ARCHITECTURE_EXPERIMENTS.md.
+All three long spline and all three long single-ramp candidates exceed the
+frozen 1e-5 coordinate gate; maxima reach 2.288818359375e-5. Historical failures
+remain preserved. Positive bounded-segment spline export now passes the native
+regression and all six short/long checkpoint repairs, with unchanged development
+SROCC and recorded float32 prediction changes. The ramp baseline remains a
+measured failure and is not accepted or silently repaired. Neither the failed
+nor repaired candidate changes a serving profile. See
+`docs/MONOTONE_ARCHITECTURE_EXPERIMENTS.md` and the linked result record.
 
 ## Known Bugs — monotone report seed coverage (resolved 2026-11-06)
 

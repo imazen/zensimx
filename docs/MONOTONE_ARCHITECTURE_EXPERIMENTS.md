@@ -378,3 +378,21 @@ numerical qualification; a piecewise-linear approximation must be a separately
 named experiment. The native architecture matrix does not claim to complete
 that earlier smooth-activation proposal. Ordinary unconstrained SiLU/GELU remain
 nonmonotone negative controls, not safe replacements for a monotone hidden layer.
+
+## Execution outcome
+
+A0--A6: all 24 short and 24 long fits completed. Six original long exports
+fail the unchanged feature gate (three splines, three ramps). A4r: all six
+spline re-exports pass with zero fitting steps; historical failures remain.
+T1--T7: 66/66 fits. T8: 6/6 fits. T9: 9/9 fits. Checkpoint retention: 15/15
+exact replays and 1,800 retained checkpoints. Every comparison retains all
+registered candidates, signed source/family panels and fixed-final results.
+See the result record for source uncertainty and exact provenance.
+
+The next capacity question is now concrete: long ReLU, SmoothHinge and spline
+fits each retain only one nonzero final output amplitude. A future registered
+TRAIN-fold comparison should separate output initialization/projection,
+regularization and leaky gradient floors at the long budget, track effective
+paths, and preserve this matrix as its baseline. Do not infer an architecture's
+representational limit from a fit that collapses its final paths. This is a
+follow-up hypothesis, not an unreported fit or a development-selected setting.
