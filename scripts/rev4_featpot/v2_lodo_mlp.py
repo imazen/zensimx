@@ -155,7 +155,7 @@ def train_command(groups: list, init_seed: int, sample_seed: int, width: int, ke
             "--epochs", str(EPOCHS), "--pairs-per-epoch", str(PAIRS_PER_EPOCH),
             "--init-seed", str(init_seed), "--sample-seed", str(sample_seed),
             "--pair-sampling", "uniform", "--max-features", str(width), "--keep-features", str(keep_file),
-            "--mse-weight", "1", "--early-stop-patience", "0", "--val-policy", "mean",
+            "--mse-weight", str(recipe.get("mse_weight", 1)), "--early-stop-patience", "0", "--val-policy", "mean",
             "--val-aggregate", "geomean3", "--out-dtype", "f32", "--log-every", str(LOG_EVERY), "--no-auto-eval"]
     if not strict_admission:
         cmd += ["--historical-replay", REPLAY]
