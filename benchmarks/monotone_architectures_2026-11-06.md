@@ -70,8 +70,8 @@ Replay wrapper: `run-heavy: done rc=0 10s | peak-RSS 0.16GiB | min-avail 45171Mi
 These are resource observations, not aggregate process-tree memory or speed benchmarks.
 
 Artifacts observed on dev: `/mnt/v/output/zensim/monotone-architectures-20261106/`.
-The completed stage-1 snapshot has a verified mirror, detailed below. The
-ongoing full-budget/training runs require a separate final closure.
+The stage-1 snapshot and the complete final study both have verified mirrors,
+detailed below. The final closure preserves failed scientific gates explicitly.
 
 ## Native capacity census
 
@@ -113,7 +113,7 @@ Completed stage-1 closure is mirrored at
 2,330 artifact files, 426,717,327 bytes, every SHA-256 verified by cold client
 readback. Receipt SHA-256:
 `fcd150cbe25627073b8a3153498956c1aa8359005b75edcb22b5e777d7832397`.
-This snapshot excludes the ongoing full-budget/training runs.
+This historical snapshot excludes the later full-budget/training runs.
 
 ## Signed source and distortion breakdowns
 
@@ -407,3 +407,36 @@ measure aggregate process-tree memory or benchmark speed.
 Final native checks: 169 trainer tests passed with one pre-existing ignore;
 65 trainer-CLI tests and 38 bake-tool tests passed. The analytic construction
 checks and script lint pass. CI is manual and was not dispatched.
+
+## Final artifact closure
+
+`CLOSURE.json` independently checks all 129 final fits, the six original failed
+gates, all 81 corrected event-receipt models, 15 exact replays with 1,800 retained
+checkpoints, six spline re-exports and the five 2,000-draw source-bootstrap
+reports. SHA-256:
+`ccf6e9d14c94ec1c5f9070786783e231b75aebfa6308fd306e379f12062322bb`.
+`FINAL_STATUS.json` distinguishes zero-fit preflight and export evaluations
+from optimizer runs; the generic training-process monitor does not classify
+those evaluation-only directories. No recorded training wrapper remains live.
+
+The final study mirror at
+`/mnt/tower/output/zensim/monotone-architectures-20261106/` contains 19,561
+artifact files totaling 1,862,518,430 bytes, plus its verification receipt.
+Every artifact SHA-256 passed cold client readback. Receipt SHA-256:
+`6187779a9ae463253ed8bc94a3b0750e5e9a3fecb938fe10c5024fd940eb50fc`.
+The final analysis/closure source archive pins commit `d19f489748ba`; historical
+fitting binaries and source archives remain separately pinned. Original failures,
+the refused first repair attempt and successful successor are all retained.
+
+Figures are stored separately at
+`/mnt/v/output/zensim/monotone-figures-20261106/`, mirrored under the same name
+in `/mnt/tower/output/zensim/`: 32 artifact files, 7,204,366 bytes, every SHA-256
+verified. Figure mirror receipt SHA-256:
+`f6354c725e321755f0f948e3ecfb032d160970a0ec31246b5412a20ce1e31fab`.
+`FIGURES-final.json` pins the six current plots; older plots remain historical.
+The architecture, training and trajectory SVG gallery URLs returned HTTP 200.
+
+Full-study mirror wrapper:
+`run-heavy: done rc=0 177s | peak-RSS 0.06GiB | min-avail 42911MiB | peak-load 10.34`.
+This is a resource observation, not a storage benchmark. The completed check
+also reports 1,587 runnable scripts; no scientific threshold was relaxed.

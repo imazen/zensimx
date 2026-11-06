@@ -389,6 +389,13 @@ exact replays and 1,800 retained checkpoints. Every comparison retains all
 registered candidates, signed source/family panels and fixed-final results.
 See the result record for source uncertainty and exact provenance.
 
+The final `CLOSURE.json` verifies this coverage and preserves the six original
+failed gates. All 19,561 study artifacts and 32 figure artifacts have verified
+storage mirrors, including cold client SHA-256 readback. Source/binary pins,
+all retained checkpoints, native panels and failed attempts are preserved;
+the [result record](../benchmarks/monotone_architectures_2026-11-06.md#final-artifact-closure)
+contains the closure and mirror receipt hashes. No research candidate is promoted.
+
 The next capacity question is now concrete: long ReLU, SmoothHinge and spline
 fits each retain only one nonzero final output amplitude. A future registered
 TRAIN-fold comparison should separate output initialization/projection,
