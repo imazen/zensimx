@@ -229,6 +229,8 @@ def native(plan_path, output, workers, *, architecture=False, binary_dir=None, m
                         'decoded_reference_overlap':0}
     selected_bin = Path(binary_dir or base['binary_dir'])
     output.mkdir(parents=True,exist_ok=False)
+    driver_source=Path(__file__).read_bytes()
+    (output/'DRIVER.py').write_bytes(driver_source)
     os.environ.update(REV4_V2_ROOT=base['root'],REV4_V2_BIN_DIR=str(selected_bin),
                       ZEN_PANEL_BIN=str(selected_bin/'panel'),
                       RAYON_NUM_THREADS='1',OMP_NUM_THREADS='1',OPENBLAS_NUM_THREADS='1')
@@ -277,7 +279,7 @@ def native(plan_path, output, workers, *, architecture=False, binary_dir=None, m
               note='raw nonnegative coordinates; derived products recomputed by native prediction'))
     run_plan = {'scope':'fixed-budget architecture development comparison' if architecture else 'short optimization diagnostic, not full-budget model selection',
                 'base_plan_sha256':sha(plan_path),'prepared_sha256':sha(prepared_path),
-                'script_sha256':sha(__file__),'epochs':epochs,'pairs_per_epoch':draws,
+                'script_sha256':hashlib.sha256(driver_source).hexdigest(),'epochs':epochs,'pairs_per_epoch':draws,
                 'arms':arms,'seed_pairs':seeds,'workers':workers,'source_audit':source_audit,
                 'selection':'fixed final epoch; no development selection',
                 'binary_sha256':{name:sha(selected_bin/name) for name in ('zensim_mlp_train','bake_dial_refit','panel')},

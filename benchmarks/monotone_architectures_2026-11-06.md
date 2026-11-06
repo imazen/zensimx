@@ -153,3 +153,9 @@ There are 10 KADID, three TID and seven CID22 development sources; no
 new-source interval is estimable for the single KonFiG development source.
 The bootstrap input report adds exact prediction-table pins while replaying
 every earlier measured summary value unchanged (`screen-report-v2`).
+
+`source/DRIVERS.json` resolves all eight registered stages to preserved driver
+bytes matching their original SHA-256 pins. Future launches copy those bytes
+into their own run directory before writing the plan. The signed/diagnostic
+summary also passes a real three-cell neutral replay with complete epoch and
+event receipts. The final script scan covers 1,582 runnable scripts.

@@ -201,6 +201,19 @@ def summarize(root, breakdowns, output, control_root=None):
         text+=['',f'## {metric}','','| Arm | KADID | TID2013 | KonFiG F | CID22 human |','|---|---:|---:|---:|---:|']
         for arm in plan['arms']:
             text.append('| '+arm+' | '+' | '.join(f"{aggregates[arm][p][metric]['mean']:.6f}" for p in populations)+' |')
+    if diagnostics:
+        text+=['','## Final TRAIN response diagnostics','',
+            'Three-seed means. Activity is sampled before applying dropout. Zero output weights are counted separately.',
+            '','| Arm | Inactive sampled units / 64 | Zero output weights / 64 | Zero first-layer response fraction | Mean squared gradient norm |',
+            '|---|---:|---:|---:|---:|']
+        for arm in plan['arms']:
+            ds=[diagnostics[f'{arm}/s{i}']['final'] for i in range(len(plan['seed_pairs']))]
+            if any(d['last_units']!=64 or not d['first_activation_values'] for d in ds):
+                raise ValueError('unsupported diagnostic width or absent responses')
+            values=[mean(d['last_never_active_in_sample'] for d in ds),mean(d['output_zero_weights'] for d in ds),
+                mean(d['first_zero_activations']/d['first_activation_values'] for d in ds),
+                mean(d['mean_squared_first_activation_gradient'] for d in ds)]
+            text.append('| '+arm+' | '+' | '.join(f'{v:.6f}' for v in values)+' |')
     (output/'REPORT.md').write_text('\n'.join(text)+'\n')
     print(json.dumps(dict(completed=len(cells),summary_sha256=sha(output/'SUMMARY.json'),event_checks=len(event_checks))))
 
