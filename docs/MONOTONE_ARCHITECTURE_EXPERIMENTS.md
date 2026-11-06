@@ -280,6 +280,12 @@ a kink. The nonzero bias branches can still express nonconvex monotone shapes.
 Export with existing ReLU units plus an explicit nonnegative linear residual;
 no new serving operator is needed. The zero-alpha default must replay exactly.
 
+T8 completion: 6/6 fixed-budget fits, unchanged event streams against their
+neutral seeds, zero inactive sampled last-hidden units in every leaky fit,
+and mixed development-quality changes. The [result record](../benchmarks/monotone_architectures_2026-11-06.md)
+retains per-population means and the remaining zero output weights. This is
+evidence about optimization behavior, not a universal quality win.
+
 Leaky-switch native gates pass at slopes .05 and .1: nonzero derivatives with
 both ReLU branches inactive, finite-difference weight/bias gradients, exact
 native zero identity, coordinate-order probes and training/bake agreement.

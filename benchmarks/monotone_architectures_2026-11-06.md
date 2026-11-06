@@ -6,6 +6,7 @@
 All train for 12 epochs x 5,000 draws and use fixed final epoch 11. These are
 short development results, not full-budget selection or a shipping qualification.
 The registered 120 x 50,000 comparison remains separate. T1--T7 remain open.
+T8's six leaky-switch fits are complete, reported below.
 
 ## Short-screen results
 
@@ -159,3 +160,34 @@ bytes matching their original SHA-256 pins. Future launches copy those bytes
 into their own run directory before writing the plan. The signed/diagnostic
 summary also passes a real three-cell neutral replay with complete epoch and
 event receipts. The final script scan covers 1,582 runnable scripts.
+
+## T8 completed: leaky activation switches
+
+Six of six fits completed at 120 x 5,000 draws, fixed final epoch 119. Their
+exact native event streams, per-population counts and consolidation tails
+match the corresponding neutral control seeds. All six feature probes pass;
+all six final event-receipt copies preserve model sections byte-for-byte.
+
+Three-seed mean signed development SROCC:
+
+| Switch slope | KADID | TID2013 | KonFiG F | CID22 human |
+|---|---:|---:|---:|---:|
+| 0 (control) | 0.893218 | 0.898381 | 0.951834 | 0.902551 |
+| 0.05 | 0.894719 | 0.899908 | 0.947940 | 0.902880 |
+| 0.10 | 0.894807 | 0.901067 | 0.948642 | 0.902302 |
+
+Every leaky fit has all 64 last-hidden units nonzero in the final response
+sample, versus 53--57 inactive units in the neutral controls. That is not
+64 effective learned directions: slope .05 has zero output amplitudes
+[0,0,34] across seeds, and slope .10 has [0,0,35]. The slope floor addresses
+the sampled activation inactivity, but neither slope wins all populations.
+KADID/TID improve in the mean; the one-source KonFiG result declines, and
+CID22 changes are small and mixed. Source-bootstrap intervals will accompany
+the complete control-matrix report; no slope is selected from development.
+
+Native summary SHA-256:
+`53db2b7907dac4c6932614eaed19289102e79fea530b0576856b3534ede9d497`.
+Artifacts: `leaky-report`, `leaky-breakdowns`, `leaky-qualified`.
+Wrapper: `run-heavy: done rc=0 1415s | peak-RSS 0.39GiB | min-avail 39102MiB | peak-load 22.39`.
+This is a resource observation under concurrent training, not a speed benchmark
+or an aggregate process-tree memory measurement.
