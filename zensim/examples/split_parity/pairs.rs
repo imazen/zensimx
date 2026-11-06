@@ -144,7 +144,8 @@ fn distort(kind: &str, src: &[u8], w: usize, h: usize, seed: u64) -> Vec<u8> {
         // a few isolated single-pixel changes (near-identity)
         _ => {
             for _ in 0..3 {
-                let i = (rng.next() as usize) % out.len();
+                // Reduce in u64 so 32-bit targets pick the same pixels as 64-bit ones.
+                let i = (rng.next() % out.len() as u64) as usize;
                 out[i] = out[i].wrapping_add(1);
             }
         }
