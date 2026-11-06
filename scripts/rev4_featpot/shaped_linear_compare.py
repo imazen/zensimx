@@ -8,6 +8,8 @@ import os
 from pathlib import Path
 import shutil
 import sys
+for _key in ('OMP_NUM_THREADS','OPENBLAS_NUM_THREADS','MKL_NUM_THREADS','RAYON_NUM_THREADS'):
+    os.environ[_key]='1'
 import numpy as np
 import pyarrow as pa
 import pyarrow.parquet as pq

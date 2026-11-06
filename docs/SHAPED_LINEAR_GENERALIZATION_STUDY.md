@@ -238,3 +238,13 @@ regularization fixed when removing a source; the source learning and permutation
 controls retain their separately registered lambda=1e-4. Every new executable
 stage preserves its driver bytes alongside the matrix. The original S1–S5
 controller is retained by its frozen hash.
+
+Execution resource correction: the original linear entry point imported NumPy
+before the study set its environment. Replaying that import sequence under the
+original `run-heavy --jobs 4` measured a four-thread NumPy BLAS pool, while SciPy
+and OpenMP reported one thread. Thus four Gram workers could use sixteen BLAS
+threads; native fitting children remained explicitly limited to one thread.
+This stayed within the host budget but differed from the intended one BLAS
+thread per worker. Future entry points set limits before importing NumPy. The
+original driver, actual assembled Grams and all numerical certificates remain
+preserved; scientific fits are not relabeled as one-thread runs.

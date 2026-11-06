@@ -9,6 +9,8 @@ import os
 from pathlib import Path
 import shutil
 import subprocess
+for _key in ('OMP_NUM_THREADS','OPENBLAS_NUM_THREADS','MKL_NUM_THREADS','RAYON_NUM_THREADS'):
+    os.environ[_key]='1'
 import numpy as np
 import pyarrow as pa
 import pyarrow.parquet as pq
@@ -93,6 +95,15 @@ def bootstrap(root):
             by[p]=dict(point=float(points[k,pi].mean()-points[baseline,pi].mean()),low=float(np.quantile(delta,.025)),high=float(np.quantile(delta,.975)))
         agg=samples[k,humans].mean(axis=(0,1));control=samples[baseline,humans].mean(axis=(0,1));delta=agg-control
         intervals[name]=dict(populations=by,equal_human_composite=dict(point=float(points[k,humans].mean()),low=float(np.quantile(agg,.025)),high=float(np.quantile(agg,.975)),difference_from_positive_products=float(points[k,humans].mean()-points[baseline,humans].mean()),difference_low=float(np.quantile(delta,.025)),difference_high=float(np.quantile(delta,.975))))
+    # Mean seed performance, not averaged predictions, is the matched comparator.
+    for kind in ('extra','neural'):
+        selected=[k for k,name in enumerate(names) if name.startswith(kind+'-s')]
+        sm=samples[selected].mean(axis=0);pt=points[selected].mean(axis=0);by={}
+        for pi,p in enumerate(pops):
+            delta=sm[pi].mean(axis=0)-samples[baseline,pi].mean(axis=0)
+            by[p]=dict(point=float(pt[pi].mean()-points[baseline,pi].mean()),low=float(np.quantile(delta,.025)),high=float(np.quantile(delta,.975)))
+        agg=sm[humans].mean(axis=(0,1));delta=agg-samples[baseline,humans].mean(axis=(0,1))
+        intervals[kind+'-mean-seeds']=dict(populations=by,equal_human_composite=dict(point=float(pt[humans].mean()),low=float(np.quantile(agg,.025)),high=float(np.quantile(agg,.975)),difference_from_positive_products=float(pt[humans].mean()-points[baseline,humans].mean()),difference_low=float(np.quantile(delta,.025)),difference_high=float(np.quantile(delta,.975))))
     write(out/'SOURCE_BOOTSTRAP.json',dict(draws=draws,seed=20261106,names=names,populations=pops,baseline=names[baseline],intervals=intervals,predictions_sha256=pins,scope='paired whole-source resampling within each population and outer fold; average fold metrics; conditional on these fits and exposed sources, no multiplicity correction'))
 
 
@@ -161,7 +172,7 @@ def reduce(root):
             values.append(float(np.mean(selected)))
         axes[1].plot(fractions,values,'o-',label=family.replace('positive_','+ '),color=color)
     axes[1].set_xlabel('Fraction of training source components');axes[1].set_ylabel('Unseen-source composite');axes[1].set_title('Sources added; outer sources stay fixed');axes[1].legend()
-    fig.savefig(out/'study.png',dpi=160);fig.savefig(out/'study.svg');plt.close(fig)
+    fig.savefig(out/'study.svg');fig.savefig(out/'study.pdf');plt.close(fig)
     print(json.dumps(dict(stage='report',quadratic_fits=len(records),comparators=len(comparators),max_kkt=summary['maximum_kkt'],max_gap=summary['maximum_gap'])),flush=True)
 
 
@@ -179,8 +190,98 @@ def archive(root):
     write(root/'CLOSURE.json',dict(source_revision=subprocess.check_output(['git','rev-parse','HEAD'],cwd=REPO,text=True).strip(),report_sha256=sha(root/'report/SUMMARY.json'),bootstrap_sha256=sha(root/'bootstrap/SOURCE_BOOTSTRAP.json'),numeric_gate_sha256=sha(root/'checks/NUMERIC_GATE.json'),reproduction_inventory_sha256=sha(dest/'INDEX.json'),final_test_accessed=False,serving_promoted=False,finished=datetime.now(timezone.utc).isoformat()))
 
 
+def linear_details(root):
+    from shaped_linear_study import permuted,term_matrix
+    plan,d=load(root);out=root/'linear-details';out.mkdir(exist_ok=True)
+    n=len(d['y']);fit=np.flatnonzero(~d['dev']);objective=[];calibration=[]
+    for complete in sorted((root/'fits').glob('*/COMPLETE.json')):
+        task=json.loads((complete.parent/'TASK.json').read_text());ids=np.asarray(task['train'])
+        y=permuted(d['y'],d,ids,task['permutation'],task['seed']) if task.get('permutation') else d['y']
+        w,target,maps=weights_and_targets(y[ids],d['pop'][ids],d['component'][ids],'range',1.)
+        if task.get('pairs'):
+            pair=np.load(complete.parent/'pairs.npz');left=pair['left'];right=pair['right'];weight=pair['weight']
+            all_target=np.full(n,np.nan);all_target[ids]=target
+            truth=all_target[left]-all_target[right]
+        else:weight=w;truth=target
+        for cell in json.loads(complete.read_text())['results']:
+            path=Path(cell['path']);r=json.loads((path/'RESULT.json').read_text());pred=np.load(path/'predictions.npz')
+            values={}
+            for kind in ('optimum','native'):
+                q=pred[kind][:n]/100
+                residual=q[left]-q[right]-truth if task.get('pairs') else q[ids]-truth
+                values[kind]=float(np.dot(weight,residual*residual)/weight.sum()/2)
+            cert=r['certificate'];error=abs(values['optimum']-cert['weighted_half_mse'])
+            if error>1e-8:raise ValueError('independent row-space objective disagrees with Gram certificate')
+            objective.append(dict(task=task['id'],lambda_=cell['lambda_'],independent_half_mse=values['optimum'],native_half_mse=values['native'],gram_rowspace_absolute_error=error,f32_half_mse_difference=values['native']-values['optimum'],regularized_objective_lower_bound=cert['regularized_objective']-cert['objective_gap_upper_bound']))
+            if r['calibration']['status']!='not_requested':
+                row=dict(task=task['id'],status=r['calibration'])
+                if (path/'calibrated.npz').exists():
+                    raw=pred['native'][:n];mapped=np.load(path/'calibrated.npz')['native'][:n]
+                    order=np.argsort(raw,kind='stable');diff=np.diff(mapped[order]);minimum=float(diff.min())
+                    if minimum < -1e-5:raise ValueError('calibration reversed raw projection order')
+                    row.update(raw_distinct=int(len(np.unique(raw))),mapped_distinct=int(len(np.unique(mapped))),minimum_sorted_increment=minimum)
+                calibration.append(row)
+    duplicates=json.loads((root/'audit/DUPLICATES.json').read_text())['exact_feature_groups']
+    weights,targets,maps=weights_and_targets(d['y'][fit],d['pop'][fit],d['component'][fit],'range',1.)
+    local={v:i for i,v in enumerate(fit)};collision=0.;clusters=[]
+    meta=pq.read_table(META,columns=['pair_key','ref_pixels_sha256','dist_pixels_sha256']).to_pydict()
+    for group in duplicates:
+        ids=[local[i] for i in group['ids'] if i in local]
+        if len(ids)<2:continue
+        yy=targets[ids];ww=weights[ids];best=float(np.average(yy,weights=ww));loss=float(np.dot(ww,(yy-best)**2)/weights.sum()/2);collision+=loss
+        original=group['ids'];clusters.append(dict(rows=original,mapped_targets=yy.tolist(),optimal_common_prediction=best,half_mse_floor=loss,pair_keys=[meta['pair_key'][i] for i in original],distorted_pixel_hashes=[meta['dist_pixels_sha256'][i] for i in original]))
+    stability=[]
+    for family in POSITIVE:
+        for outer in range(3):
+            base=root/'fits'/f's3-source-{family}-o{outer}-full';bs=json.loads((base/'SPEC.json').read_text());bp=np.load(base/'lambda-0.0001/predictions.npz')
+            train=np.array(json.loads((base/'TASK.json').read_text())['train']);test=np.array(json.loads((base/'TASK.json').read_text())['test'])
+            grid=np.quantile(term_matrix(d['raw'][train],bs['terms']),[0,.25,.5,.75,1.],axis=0)
+            def slopes(spec,coef):
+                sc=np.array(spec['scales']);norm=np.array(spec['basis_scales'])
+                if not spec['knots']:return np.broadcast_to(coef/sc/norm,grid.shape)
+                k=np.array(spec['knots'])*sc[:,None];bin=(grid>k[:,0]).astype(int)+(grid>k[:,1]).astype(int)
+                grad=coef.reshape(-1,3)/sc[:,None]/norm.reshape(-1,3)
+                return np.take_along_axis(np.broadcast_to(grad,(len(grid),*grad.shape)),bin[:,:,None],axis=2)[:,:,0]
+            reference=slopes(bs,bp['coefficients']).ravel();norm=float(np.linalg.norm(reference))
+            for prefix in ('s3-source','s3-rows'):
+                for path in sorted((root/'fits').glob(f'{prefix}-{family}-o{outer}-*')):
+                    spec=json.loads((path/'SPEC.json').read_text());pred=np.load(path/'lambda-0.0001/predictions.npz');v=slopes(spec,pred['coefficients']).ravel();denom=float(np.linalg.norm(v)*norm)
+                    stability.append(dict(task=path.name,baseline=base.name,diagnostic='continuous basis slopes at five TRAIN-only raw-term quantiles; not pixel gradients',slope_cosine=float(np.dot(v,reference)/denom) if denom else None,relative_slope_l2_change=float(np.linalg.norm(v-reference)/norm) if norm else None,outer_mean_absolute_score_change=float(np.mean(np.abs(pred['native'][test]-bp['native'][test]))),nonzero_coefficients=int(np.sum(pred['coefficients']!=0))))
+    os.environ['ZEN_PANEL_BIN']=str(root/'bin/panel')
+    transfer=[]
+    for task in json.loads((root/'S5_family.json').read_text()):
+        family=task['family'];outer=int(task['id'].split('-o')[1].split('-')[0]);excluded=task['excluded']
+        codecs={'avif':['aom','cld_avif','vis_avif'],'jpeg':['mozjpeg'],'jxl':['libjxl'],'webp':['cld_webp']}.get(excluded,[excluded])
+        ids=np.array(task['test']);path=root/'fits'/task['id']/'lambda-0.0001';baseline=root/'fits'/f's3-source-{family}-o{outer}-full'/'lambda-0.0001'
+        pred=np.load(path/'predictions.npz')['native'][:n];control=np.load(baseline/'predictions.npz')['native'][:n]
+        jobs=[]
+        for pop in sorted(set(d['pop'][ids])):
+            selected=ids[(d['pop'][ids]==pop)&np.isin(d['family'][ids],codecs)]
+            if not len(selected):continue
+            for label,q in [('excluded',selected),('retained',ids[(d['pop'][ids]==pop)&~np.isin(d['family'][ids],codecs)])]:
+                if len(q)<2:raise ValueError('undefined transfer panel population')
+                jobs.extend([(pop+'|'+label+'|refit','refit','y',q),(pop+'|'+label+'|control','control','y',q)])
+        panels=panel_batch_indexed(dict(refit=pred,control=control,y=d['y']),jobs,stats='srocc')
+        transfer.append(dict(task=task['id'],family=family,outer=outer,excluded=excluded,panels=panels))
+    write(out/'TRANSFER.json',clean(transfer))
+    amplitudes=[]
+    for task in json.loads((root/'S4_linear.json').read_text()):
+        path=root/'fits'/task['id']/'lambda-0.0001';pred=np.load(path/'predictions.npz')['native'][:n];ids=np.array(task['test']);train=np.array(task['train'])
+        y=permuted(d['y'],d,train,task['permutation'],task['seed']);_,_,maps=weights_and_targets(y[train],d['pop'][train],d['component'][train],'range',1.)
+        for pop in sorted(set(d['pop'][ids])):
+            q=ids[d['pop'][ids]==pop];lo,hi=maps[pop]['values'][0],maps[pop]['values'][-1]
+            value=scatter(pred[q],100*(d['y'][q]-lo)/(hi-lo))
+            if value['status']!='MEASURED':raise ValueError('negative-control scatter incomplete')
+            amplitudes.append(dict(task=task['id'],population=pop,raw=value['raw'],geometry=value['geo']))
+    write(out/'PERMUTATION_SCATTER.json',clean(amplitudes))
+    write(out/'OBJECTIVES.json',dict(fits=len(objective),maximum_rowspace_gram_difference=max(v['gram_rowspace_absolute_error'] for v in objective),maximum_absolute_f32_loss_change=max(abs(v['f32_half_mse_difference']) for v in objective),fits_detail=objective))
+    write(out/'COLLISION_FLOOR.json',dict(full_fit_weighted_half_mse_floor=collision,clusters=clusters,scope='unregularized mapped-label squared-loss lower bound for any deterministic function of these 576 features on this frozen FIT population; only the exact collisions contribute; not a tight bound or SROCC ceiling'))
+    write(out/'CALIBRATION.json',calibration);write(out/'STABILITY.json',stability)
+    print(json.dumps(dict(stage='linear-details',fits=len(objective),calibrations=len(calibration),stability_cells=len(stability),collision_half_mse_floor=collision)),flush=True)
+
+
 def main():
-    p=argparse.ArgumentParser(description=__doc__);p.add_argument('stage',choices=['audit','bootstrap','report','archive']);p.add_argument('--root',type=Path,required=True);a=p.parse_args();{'audit':audit,'bootstrap':bootstrap,'report':reduce,'archive':archive}[a.stage](a.root)
+    p=argparse.ArgumentParser(description=__doc__);p.add_argument('stage',choices=['audit','linear-details','bootstrap','report','archive']);p.add_argument('--root',type=Path,required=True);a=p.parse_args();{'audit':audit,'linear-details':linear_details,'bootstrap':bootstrap,'report':reduce,'archive':archive}[a.stage](a.root)
 
 
 if __name__=='__main__':main()

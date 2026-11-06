@@ -15,6 +15,11 @@ import sys
 import tempfile
 from pathlib import Path
 
+# The shaped-study dispatch must set BLAS limits before NumPy initializes.
+if len(sys.argv) > 1 and sys.argv[1] == "shaped-study":
+    for _key in ('OMP_NUM_THREADS', 'OPENBLAS_NUM_THREADS', 'MKL_NUM_THREADS', 'RAYON_NUM_THREADS'):
+        os.environ[_key] = '1'
+
 import numpy as np
 import pandas as pd
 import pyarrow as pa
