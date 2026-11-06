@@ -443,15 +443,16 @@ def replay_controls(frozen, binaries, output):
     print(json.dumps(results),flush=True)
 
 
-def compare_neutral(reference, candidate, binary, output):
+def compare_neutral(reference, candidate, binary, output, epoch=11, strip_research=True):
     output.mkdir(parents=True,exist_ok=False)
     result=[]
     for index in range(3):
         hashes=[]
         for label,root in [('reference',reference),('candidate',candidate)]:
-            original=root/f's{index}'/'ckpt/ckpt_epoch011.bin'
+            original=root/f's{index}'/f'ckpt/ckpt_epoch{epoch:03d}.bin'
             current=original
             for step,key in enumerate(('zentrain.repro','zentrain.monotone_research','zentrain.sample_coverage')):
+                if key=='zentrain.monotone_research' and not strip_research:continue
                 if key=='zentrain.sample_coverage' and '--no-sample-coverage' in json.loads((root/f's{index}'/'RUN.json').read_text())['command']:
                     continue
                 destination=output/f'{label}-{index}-{step}.bin'

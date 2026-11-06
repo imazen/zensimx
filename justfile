@@ -4786,6 +4786,9 @@ monotone-leaky-training baseline_plan binaries metadata output:
 monotone-stage-replay baseline_plan binaries metadata output:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 8G --jobs 3 -- python3 -B scripts/rev4_featpot/activation_curriculum.py training --baseline-plan {{quote(baseline_plan)}} --binary-dir {{quote(binaries)}} --metadata {{quote(metadata)}} --output {{quote(output)}} --workers 3 --stage-replay
 
+monotone-stage-panels original replays baseline_plan binaries audit_binary metadata output:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 2G --jobs 1 -- python3 -B scripts/rev4_featpot/monotone_stages.py --original {{quote(original)}} --replays {{quote(replays)}} --baseline-plan {{quote(baseline_plan)}} --binary-dir {{quote(binaries)}} --audit-binary {{quote(audit_binary)}} --metadata {{quote(metadata)}} --output {{quote(output)}} --watch
+
 monotone-capacity root binary output:
     python3 -B scripts/rev4_featpot/activation_curriculum.py capacity --root {{quote(root)}} --binary {{quote(binary)}} --output {{quote(output)}}
 

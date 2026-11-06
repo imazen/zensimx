@@ -217,8 +217,9 @@ epoch checkpoint. Use the same frozen training binary as T1--T7. Final model
 bytes, after removing run/coverage provenance, must exactly reproduce each
 original fit before interpreting intermediate results. Evaluate epochs
 0, 29, 59, 89 and 119 on TRAIN populations and distortion families only.
-This measures within-training changes and the shared final-quarter consolidation;
-it does not add intermediate development reads or choose a checkpoint. Report
+This measures within-training changes and the shared final-quarter consolidation.
+Additional snapshot panels score TRAIN only; the native trainer repeats its
+original development logs, and no checkpoint is selected. Report
 all five schedules, including the unchanged random control. Loss of earlier
 family fit is a diagnostic of interference, not proof of a bad local minimum.
 
