@@ -5,7 +5,7 @@
 24/24 short fits; eight registered architectures and three independent seed pairs.
 All train for 12 epochs x 5,000 draws and use fixed final epoch 11. These are
 short development results, not full-budget selection or a shipping qualification.
-The registered 120 x 50,000 comparison remains separate. T1--T7 remain open.
+The registered 120 x 50,000 comparison remains separate. T1--T7 are complete, reported below.
 T8's six leaky-switch fits are complete, reported below.
 
 ## Short-screen results
@@ -191,3 +191,78 @@ Artifacts: `leaky-report`, `leaky-breakdowns`, `leaky-qualified`.
 Wrapper: `run-heavy: done rc=0 1415s | peak-RSS 0.39GiB | min-avail 39102MiB | peak-load 22.39`.
 This is a resource observation under concurrent training, not a speed benchmark
 or an aggregate process-tree memory measurement.
+
+## Completed T1–T7 training comparison
+
+66/66 fits completed: 22 arms, three fixed seed pairs, 120 x 5,000 draws,
+fixed epoch 119. These use one tenth of the architecture-long draw budget.
+Every final feature gate passes; all 66 event-receipt corrections preserve
+the model bytes after stripping only the appended event metadata.
+
+| Arm | KADID | TID2013 | KonFiG F | CID22 human |
+|---|---:|---:|---:|---:|
+| control | 0.893218 | 0.898381 | 0.951834 | 0.902551 |
+| init_half | 0.891374 | 0.894913 | 0.938639 | 0.902657 |
+| init_double | 0.894931 | 0.900592 | 0.950424 | 0.902199 |
+| bias_zero | 0.894584 | 0.899273 | 0.949438 | 0.902552 |
+| bias_double | 0.893532 | 0.898764 | 0.951915 | 0.902681 |
+| l2_none | 0.893993 | 0.899227 | 0.952880 | 0.902344 |
+| l2_high | 0.892877 | 0.898875 | 0.947771 | 0.902500 |
+| adamw_low | 0.894291 | 0.899028 | 0.953535 | 0.902309 |
+| adamw_high | 0.894089 | 0.899069 | 0.952651 | 0.902175 |
+| dropout_05 | 0.893661 | 0.899281 | 0.948041 | 0.902535 |
+| dropout_15 | 0.893891 | 0.898605 | 0.948054 | 0.901080 |
+| easy_first | 0.886864 | 0.895136 | 0.920691 | 0.896742 |
+| hard_first | 0.889352 | 0.897248 | 0.947312 | 0.896746 |
+| family_blocks | 0.888910 | 0.895415 | 0.925882 | 0.903807 |
+| teacher_warm | 0.888465 | 0.893521 | 0.956093 | 0.895672 |
+| family_balance | 0.894652 | 0.898715 | 0.951193 | 0.902579 |
+| source_family_balance | 0.893734 | 0.899362 | 0.947582 | 0.902848 |
+| teacher_zero | 0.901648 | 0.916268 | 0.964497 | 0.889162 |
+| teacher_half | 0.897289 | 0.898045 | 0.954183 | 0.902284 |
+| teacher_double | 0.892959 | 0.902252 | 0.949114 | 0.901923 |
+| lr_constant | 0.892937 | 0.898388 | 0.953690 | 0.902534 |
+| lr_consolidate | 0.895487 | 0.897665 | 0.955796 | 0.901477 |
+
+No arm improves all four means. Removing teacher labels gives the largest
+TID2013 change, with a CID22-human trade-off. This arm keeps the same scaler
+membership, including teacher-feature rows; it isolates supervision removal
+and is not a strict human-data-only preprocessing recipe. Halving teacher mass
+raises KADID mean while leaving a small CID22-human decrease.
+
+Dropout .05 and .15 give mixed changes and no four-population advantage.
+Decoupled AdamW improves KADID/TID/KonFiG means at its low setting, with a small
+CID22-human decrease. Greater initialization scale and zero initial bias
+also merit separate TRAIN-fold follow-up; these development results do not
+authorize selecting or combining settings.
+
+Global easy/hard, family-block and teacher-warm schedules mostly lose quality
+at this fixed budget. Their matched event multisets and final-quarter tails
+are verified; T9 separately isolates within-population order from timing.
+
+Paired source-bootstrap examples (2,000 draws, same three fits; no multiplicity
+correction):
+- teacher_zero, human_tid2013_development: delta 0.017887, 95% interval [0.009890, 0.026557].
+- teacher_half, human_kadid_development: delta 0.004071, 95% interval [0.001916, 0.006314].
+- family_balance, human_kadid_development: delta 0.001434, 95% interval [0.000577, 0.002372].
+- family_blocks, human_kadid_development: delta -0.004307, 95% interval [-0.006914, -0.001990].
+
+No training-control CID22-human interval excludes zero. TID2013 has only
+three development sources and KonFiG has one; no KonFiG source interval is
+estimable. Leaky-switch intervals also cross zero on all three multi-source
+populations. Seed ranges are descriptive, not confidence intervals.
+
+Native event audits confirm zero teacher pair events in all three zero-mass
+fits, and identical original, ordered and tail digests for loss-only controls.
+Source/family balancing changes the number of weighting cells, not proposed
+pair counts; the report compares group/pair counts separately from that
+taxonomy count. The first report attempt refused the mismatched taxonomy
+comparison before producing a summary, and its numerical inputs were preserved.
+
+Artifacts: `training-report/SUMMARY.json`, `training-bootstrap/SOURCE_BOOTSTRAP.json`,
+`training-breakdowns/INDEX.json`, and `training-qualified/` under the study root.
+Training summary SHA-256: `67d4c551b6b46afb6de093cdc4c207f78213e09550e21c0e45a0000a2d5a5b13`.
+Bootstrap SHA-256: `9f899e339e3d4d2f168c9b1a89e9fc95c8c3f60ee95bc56d942aea55c810adfa`.
+
+Training wrapper: `run-heavy: done rc=0 4485s | peak-RSS 0.55GiB | min-avail 36820MiB | peak-load 23.86`.
+This is a resource observation, not aggregate process-tree memory or a speed benchmark.

@@ -361,3 +361,7 @@ nonzero graph edges and knot biases, retaining the original final-unit order.
 Explicit identity permutations keep the preserved first two layers and final
 head coefficients unchanged on re-emission. A serialized two-unit regression
 covers the composer's hidden-unit reordering, in addition to cancellation.
+
+T1--T7 completion: all 66 fixed-final fits and corrected event receipts are
+complete. The result record includes all arms, source intervals and diagnostic
+limits. T9 and the retained-checkpoint study remain separate measurements.
