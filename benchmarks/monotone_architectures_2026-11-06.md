@@ -224,7 +224,10 @@ the model bytes after stripping only the appended event metadata.
 | lr_constant | 0.892937 | 0.898388 | 0.953690 | 0.902534 |
 | lr_consolidate | 0.895487 | 0.897665 | 0.955796 | 0.901477 |
 
-No arm improves all four means. Removing teacher labels gives the largest
+Doubling initial bias spread raises all four means by 0.000081–0.000383;
+three of its four panels do not establish a source-level improvement (KonFiG
+has no estimable interval). This is a small descriptive gain, not a selected
+setting. Removing teacher labels gives the largest
 TID2013 change, with a CID22-human trade-off. This arm keeps the same scaler
 membership, including teacher-feature rows; it isolates supervision removal
 and is not a strict human-data-only preprocessing recipe. Halving teacher mass
