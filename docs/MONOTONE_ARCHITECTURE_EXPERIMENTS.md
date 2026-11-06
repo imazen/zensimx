@@ -349,8 +349,15 @@ numerical export, not recovery of the original float64 weights or a byte replay.
 The trainer's future exports use its original nonnegative slopes directly.
 
 Each bounded segment uses width-ReLU(width-ReLU(z-knot)), followed by a
-positive weighted sum. Keep original first layers, hinge inputs, final head,
+positive weighted sum. Keep original first two layers, equivalent hinge inputs, final head,
 scaler and metadata, and add a repair receipt. Re-evaluate every prepared panel
 and the unchanged feature gate; report original failures and repaired outcomes
 separately. Inspect prediction differences on every prepared row. The six exports
 must not replace historical raw checkpoints or turn their failed gates into passes.
+
+The first repair attempt refused the real bake's hidden-unit permutation;
+its refusal and outputs remain preserved. Connectivity recovery now follows
+nonzero graph edges and knot biases, retaining the original final-unit order.
+Explicit identity permutations keep the preserved first two layers and final
+head coefficients unchanged on re-emission. A serialized two-unit regression
+covers the composer's hidden-unit reordering, in addition to cancellation.

@@ -2834,30 +2834,50 @@ fn stable_research_spline(
     {
         return Err("not the registered spline hinge/combine layout".into());
     }
+    let mut canonical_hinges = OwnedLayer {
+        in_dim: hinges.in_dim,
+        out_dim: n,
+        activation: Activation::Relu,
+        dtype: WeightDtype::F32,
+        weights: vec![0.; hinges.in_dim * n],
+        biases: vec![0.; n],
+    };
     let mut slopes = Vec::with_capacity(n);
     let mut clipped = 0;
     let mut largest_clip = 0f64;
     let mut largest_cast_error = 0f64;
     for j in 0..no {
+        // bake() permutes hidden units for compression. Recover connectivity
+        // from nonzero coefficients, not from the pre-bake unit numbering.
+        let terms = (0..n)
+            .filter(|&c| combine.weights[c * no + j] != 0.)
+            .collect::<Vec<_>>();
+        let mut coefficients = [0f64; 6];
+        if let Some(&first) = terms.first() {
+            for &column in &terms {
+                let k = knots
+                    .iter()
+                    .position(|&knot| hinges.biases[column] == -knot as f32)
+                    .ok_or("spline knot drift")?;
+                for i in 0..hinges.in_dim {
+                    let w = hinges.weights[i * n + column];
+                    if w < 0. || w.to_bits() != hinges.weights[i * n + first].to_bits() {
+                        return Err("spline preactivation weights drift".into());
+                    }
+                }
+                coefficients[k] += f64::from(combine.weights[column * no + j]);
+            }
+            for k in 0..knots.len() {
+                for i in 0..hinges.in_dim {
+                    canonical_hinges.weights[i * n + j * knots.len() + k] =
+                        hinges.weights[i * n + first];
+                }
+            }
+        }
         let mut slope = 0f64;
         let mut magnitude = 0f64;
-        for (k, &knot) in knots.iter().enumerate() {
-            let column = j * knots.len() + k;
-            if hinges.biases[column] != -knot as f32 {
-                return Err("spline knot drift".into());
-            }
-            for i in 0..hinges.in_dim {
-                let w = hinges.weights[i * n + column];
-                if w < 0. || w.to_bits() != hinges.weights[i * n + j * knots.len()].to_bits() {
-                    return Err("spline preactivation weights drift".into());
-                }
-            }
-            for out in 0..no {
-                if out != j && combine.weights[column * no + out] != 0. {
-                    return Err("unexpected spline cross-unit coefficient".into());
-                }
-            }
-            let coefficient = f64::from(combine.weights[column * no + j]);
+        for (k, &coefficient) in coefficients.iter().enumerate() {
+            canonical_hinges.biases[j * knots.len() + k] = -knots[k] as f32;
             slope += coefficient;
             magnitude += coefficient.abs();
             if slope < -8. * f64::from(f32::EPSILON) * magnitude {
@@ -2873,7 +2893,9 @@ fn stable_research_spline(
         }
     }
     let tail = layers.pop().unwrap();
-    layers.pop(); // Replace signed slope differences; retain the original hinges.
+    layers.pop(); // Replace signed slope differences.
+    layers.pop(); // Restore spline connectivity after hidden-unit permutations.
+    layers.push(canonical_hinges);
     layers.extend(
         spline_segments::bounded(no, &knots, &slopes).map(|l| OwnedLayer {
             in_dim: l.ni,
@@ -2919,12 +2941,18 @@ fn cmd_repair_research_spline(a: &RepairResearchSplineArgs) -> Result<(), String
         kind: MetadataType::Utf8,
         value: serde_json::to_vec(&receipt).map_err(|e| e.to_string())?,
     });
-    let output = bake_layers(
+    let identities = layers[..layers.len() - 1]
+        .iter()
+        .map(|l| (0..l.out_dim as u32).collect::<Vec<_>>())
+        .collect::<Vec<_>>();
+    let permutations = identities.iter().map(Vec::as_slice).collect::<Vec<_>>();
+    let output = bake_layers_hu(
         model.scaler_mean(),
         model.scaler_scale(),
         &layers,
         &metadata,
         model.schema_hash(),
+        Some(&permutations),
     );
     receipt["output_sha256"] = sha256_hex(&output).into();
     std::fs::write(&a.out, output).map_err(|e| e.to_string())?;
@@ -6138,6 +6166,37 @@ mod tests {
             observed_old_increase,
             "negative control must expose cancellation"
         );
+        // Recover connectivity after the serializer permutes hidden units.
+        let mut multi = original.clone();
+        multi[2].out_dim = 12;
+        multi[2].weights = [vec![2.; 6], vec![1.; 6]].concat();
+        multi[2].biases = [multi[2].biases.clone(), multi[2].biases.clone()].concat();
+        multi[3].in_dim = 12;
+        multi[3].out_dim = 2;
+        multi[3].weights = vec![0.; 24];
+        multi[3].biases = vec![0.; 2];
+        multi[3].weights[0] = 0.3;
+        multi[3].weights[2] = -0.3;
+        multi[3].weights[13] = 0.1;
+        multi[3].weights[15] = -0.1;
+        multi[4].in_dim = 2;
+        multi[4].weights = vec![-2., -1.];
+        let packed = bake_layers(&[0.], &[1.], &multi, &[], 0);
+        let model = Model::from_bytes(&packed).unwrap();
+        let parsed = owned_layers(&model).unwrap();
+        let (recovered, _) = stable_research_spline(parsed.clone()).unwrap();
+        for (a, b) in parsed[..2].iter().zip(&recovered[..2]) {
+            assert_eq!(a.weights, b.weights);
+            assert_eq!(a.biases, b.biases);
+        }
+        assert_eq!(parsed[4].weights, recovered[6].weights);
+        let rebaked = bake_layers(&[0.], &[1.], &recovered, &[], 0);
+        let recovered_model = Model::from_bytes(&rebaked).unwrap();
+        let mut predict = zenpredict::Predictor::new(&recovered_model);
+        for x in [0f32, 0.01, 0.1, 0.125, 1., 1000., 1_000_000.] {
+            let expected = 100f32 - 2. * 0.3 * (2. * x).min(0.125) - 0.1 * x.min(0.125);
+            assert!((predict.predict(&[x]).unwrap()[0] - expected).abs() < 1e-5);
+        }
         let mut invalid = original;
         invalid[3].weights[1] = -1.;
         assert!(
