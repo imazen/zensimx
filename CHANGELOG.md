@@ -4,6 +4,10 @@
 
 ### Research
 
+- Implement private native mixed-cap, activation-switch, positive-slope spline
+  and Lipschitz residual research heads, exported through existing dense/ReLU
+  ZNPR operators. Add matched architecture trials and source-key admission.
+
 - Register the paper-derived nonconvex monotone architecture and training queue
   in `docs/MONOTONE_ARCHITECTURE_EXPERIMENTS.md`; serving models are unchanged.
 

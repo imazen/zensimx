@@ -42,6 +42,7 @@ pub(super) fn validate(hp: &MlpHyperparams) {
 }
 
 pub(super) struct Head {
+    pub(super) research: Option<super::monotone_research::Network>,
     pub(super) mid: Vec<f64>,
     pub(super) bias: Vec<f64>,
     pub(super) output: Vec<f64>,
@@ -61,6 +62,7 @@ impl Head {
             .map(|_| rng.next_normal() * (2. / (width + 1) as f64).sqrt())
             .collect::<Vec<_>>();
         let mut head = Self {
+            research: super::monotone_research::Network::from_env(hp, smooth, rng),
             adam: AdamState::new(mid.len(), width, width, 1),
             mid,
             bias: vec![0.; width],
@@ -96,6 +98,9 @@ impl Head {
     }
 
     pub(super) fn forward(&self, first: &[f64]) -> (f64, Vec<f64>, Vec<f64>) {
+        if let Some(research) = &self.research {
+            return research.forward(first);
+        }
         smooth_hinge::forward(
             first,
             &self.mid,
@@ -116,6 +121,9 @@ impl Head {
         cache: &(f64, Vec<f64>, Vec<f64>),
         dy: f64,
     ) -> Vec<f64> {
+        if let Some(research) = &mut self.research {
+            return research.backward(first, cache, dy);
+        }
         let mut pre_gradient = vec![0.; self.width];
         smooth_hinge::backprop_grad_head(
             &cache.1,
@@ -141,6 +149,10 @@ impl Head {
     }
 
     pub(super) fn step(&mut self, hp: &MlpHyperparams, lr: f64) {
+        if let Some(research) = &mut self.research {
+            research.step(lr, hp.l2_lambda);
+            return;
+        }
         if hp.l2_lambda > 0. {
             for (g, w) in self.adam.gw1.iter_mut().zip(&self.mid) {
                 *g += hp.l2_lambda * w;

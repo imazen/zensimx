@@ -62,6 +62,7 @@ mod loss_norm_in_norm;
 mod loss_pearson;
 mod loss_steer;
 pub mod map_term;
+mod monotone_research;
 mod shared_depth;
 mod smooth_hinge;
 mod steer_data;
@@ -3182,6 +3183,7 @@ pub fn train_mlp_strategy_pairs(
         triplets.map_or(0, |t| t.responses.len()),
     );
     let shared_depth_on = shared_depth::enabled(&effective);
+    monotone_research::check_admission(&effective);
     let shared_smooth = effective.smooth_hinge;
     let first_layer_hp;
     let hyperparams = if shared_depth_on {
@@ -7491,6 +7493,11 @@ fn bake_plain_znpr_v3(
     hidden_activation: Activation,
     depth: Option<&shared_depth::Head>,
 ) -> Vec<u8> {
+    if let Some(research) = depth.and_then(|head| head.research.as_ref()) {
+        assert!(feature_transforms.is_none() && feature_transform_params.is_none());
+        assert_eq!(dtype, WeightDtype::F32);
+        return research.bake(scaler_mean, scaler_scale, w1, b1, n_inputs, n_hidden);
+    }
     let (w2, b2) = depth.map_or((w2, b2), |h| (h.mid.as_slice(), h.bias.as_slice()));
     let scaler_mean_f32: Vec<f32> = scaler_mean.iter().map(|&v| v as f32).collect();
     let scaler_scale_f32: Vec<f32> = scaler_scale.iter().map(|&v| v as f32).collect();

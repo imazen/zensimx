@@ -127,3 +127,32 @@ The durable result record must identify completed/required cells, failed
 gates, exact source/binary/model identities and remaining experiments. A plan,
 scalar reference, short pilot and full-budget fit are distinct deliverables.
 Update this queue and its linked evidence as each stage actually completes.
+
+## Native implementation and preflight, November 6
+
+The private `mlp_train::monotone_research` owner now implements A1--A5, using
+the existing Adam update, first-layer gradients, ZNPR baker and Predictor.
+A1 alternates ordinary hinges and bounded ramps. A4 has six fixed knots and
+learned nonnegative segment slopes; its knot positions are a registered
+initial configuration, not an optimized choice. A5 uses an anchored signed
+ReLU subnetwork with row-l1 bounds and a monotone linear residual. It is a
+specific residual model, not a claimed universal Lipschitz approximator.
+
+The manifest and independent SHA-256 bind family, widths, seeds, budget and
+first-layer max pairs. No manifest leaves baseline arithmetic and RNG draws
+unchanged. The `monotone-architecture-check` recipe covers analytic gradients,
+nonconvex monotone counterexamples, exact native f32 identity, coordinate
+probes and training/bake agreement. Four native construction checks and the
+four existing shared-depth checks pass. Full trainer regressions pass with
+the existing ignore unchanged; no prior numeric expectation was changed.
+
+A source-key preflight covers all 24,852 prepared rows, 232 fitting sources
+and 21 development sources, with zero decoded-reference overlap. No fit was
+performed by that preflight. The architecture driver registers eight arms
+times three independent seed pairs, reports fitting and development panels,
+and checks the final native bake on fixed feature-space probes. Those probes
+do not establish image-domain or near-lossless qualification.
+
+The short screen and long comparison have separate output directories and
+fixed final checkpoints. Neither is complete merely because native code and
+the preparation check pass. T1--T7 remain separately controlled experiments.

@@ -22,6 +22,17 @@ import sys
 
 ARMS = ('control', 'walk', 'lr_low', 'l2_high', 'teacher_half', 'teacher_double')
 SEEDS = ((1101, 101), (1107, 101), (1101, 200000101))
+ARCHITECTURE_SEEDS = ((1101, 101), (1107, 200000101), (1129, 400000101))
+ARCHITECTURE_ARMS = {
+    'shared_relu': None,
+    'shared_smooth': None,
+    'shared_caps': ('caps', [64]),
+    'shared_switch': ('switch', [64]),
+    'shared_switch_deep': ('switch', [64, 32]),
+    'shared_spline': ('spline', [64]),
+    'shared_lipschitz': ('lipschitz', [64]),
+    'single_ramps': None,
+}
 
 
 def sha(path):
@@ -154,11 +165,12 @@ def audit(out):
     print(json.dumps(result,indent=2))
 
 
-def native(plan_path, output, workers):
+def native(plan_path, output, workers, *, architecture=False, binary_dir=None, metadata=None, long=False, prepare_only=False):
+    import numpy as np
     import pyarrow as pa
     import pyarrow.parquet as pq
-    if not 1 <= workers <= 3:
-        raise ValueError('pilot concurrency must be 1..3 under the registered aggregate memory cap')
+    if not 1 <= workers <= (6 if architecture else 3):
+        raise ValueError('pilot concurrency exceeds the registered aggregate memory budget')
     base = json.loads(plan_path.read_text())
     for path,pin in base['inputs'].items():
         if sha(path) != pin['sha256']:
@@ -171,13 +183,39 @@ def native(plan_path, output, workers):
                 'human_kadid_development','human_tid2013_development','human_konfig_development','human_cid22_a25_development'}
     if {g['name'] for g in prepared['groups']} != expected:
         raise ValueError('pilot requires exactly the admitted four human populations and CID22 teacher')
+    source_audit = None
+    if architecture:
+        if binary_dir is None or metadata is None:
+            raise ValueError('architecture fits require explicit frozen binaries and source metadata')
+        # Reuse the existing verified keyed join; read no additional peer labels.
+        receipt = json.loads(metadata.with_name('PEERS.json').read_text())
+        if sha(metadata) != receipt['metadata_sha256']:
+            raise ValueError('source metadata drift')
+        source = pq.read_table(metadata, columns=['pair_key','ref_pixels_sha256','development']).to_pydict()
+        offset, by_role = 0, {'fit':set(), 'dev':set()}
+        for g in prepared['groups']:
+            keys = pq.read_table(Path(g['path']).with_suffix('.keys.parquet'), columns=['pair_key'])['pair_key'].to_pylist()
+            end = offset+len(keys)
+            if source['pair_key'][offset:end] != keys or any(v != (g['split']=='dev') for v in source['development'][offset:end]):
+                raise ValueError('source metadata order/role mismatch: '+g['name'])
+            by_role[g['split']].update(source['ref_pixels_sha256'][offset:end])
+            offset=end
+        if offset != len(source['pair_key']) or by_role['fit'] & by_role['dev']:
+            raise ValueError('decoded reference overlap or unmatched source rows')
+        source_audit = {'metadata_sha256':sha(metadata), 'receipt_sha256':sha(metadata.with_name('PEERS.json')),
+                        'rows':offset, 'fit_sources':len(by_role['fit']), 'development_sources':len(by_role['dev']),
+                        'decoded_reference_overlap':0}
+    selected_bin = Path(binary_dir or base['binary_dir'])
     output.mkdir(parents=True,exist_ok=False)
-    os.environ.update(REV4_V2_ROOT=base['root'],REV4_V2_BIN_DIR=base['binary_dir'],
-                      ZEN_PANEL_BIN=str(Path(base['binary_dir'])/'panel'),
+    os.environ.update(REV4_V2_ROOT=base['root'],REV4_V2_BIN_DIR=str(selected_bin),
+                      ZEN_PANEL_BIN=str(selected_bin/'panel'),
                       RAYON_NUM_THREADS='1',OMP_NUM_THREADS='1',OPENBLAS_NUM_THREADS='1')
     from v2_common import acceptance_weight, derived_declaration
     import v2_lodo_mlp as owner
-    owner.EPOCHS,owner.PAIRS_PER_EPOCH,owner.LOG_EVERY = 12,5000,1
+    epochs, draws = (120,50000) if long else (12,5000)
+    owner.EPOCHS,owner.PAIRS_PER_EPOCH,owner.LOG_EVERY = epochs,draws,1
+    arms = tuple(ARCHITECTURE_ARMS) if architecture else ARMS
+    seeds = ARCHITECTURE_SEEDS if architecture else SEEDS
     groups = []
     for g in prepared['groups']:
         p = Path(g['path'])
@@ -189,12 +227,42 @@ def native(plan_path, output, workers):
         groups.append((g['name'],p,acceptance_weight(1.,refs) if g['split']=='fit' else 0.,
                        1. if g['split']=='dev' else 0.,'withinref,both' if g['name']=='cid22' else 'withinref,rank'))
     _,_,declaration = derived_declaration('fx2')
-    run_plan = {'scope':'short optimization diagnostic, not full-budget model selection',
+    probe = None
+    if architecture:
+        required=sorted(set(declaration['direct']) | {v for pair in declaration['products'] for v in pair})
+        # Feature-space diagnostics, not generated images or admitted training data.
+        fit_table=next(p for _,p,w,_,_ in groups if w>0)
+        fit=pq.read_table(fit_table,columns=[f'f{i}' for i in required])
+        median=np.array([np.median(fit[f'f{i}'].to_numpy()) for i in required],dtype=np.float32)
+        if not np.isfinite(median).all() or (median<0).any():
+            raise ValueError('nonnegative feature probe assumption failed')
+        median=np.maximum(median,np.float32(1e-6))
+        random=np.random.default_rng(20261106)
+        small=(random.uniform(.01,2,(128,len(required)))*median).astype(np.float32)
+        larger=small.copy()
+        columns=random.integers(len(required),size=128)
+        larger[np.arange(128),columns]+=median[columns]*np.float32(.25)
+        ray=median[None,:]*np.array([0,1e-8,1e-6,1e-4,.01,.1,1],dtype=np.float32)[:,None]
+        values=np.concatenate([small,larger,ray])
+        fields={f'f{i}':pa.array(values[:,required.index(i)] if i in required else np.zeros(len(values),dtype=np.float32)) for i in range(1853)}
+        fields.update(human_score=pa.array(np.zeros(len(values))),ref_basename=pa.array(['feature_probe']*len(values)))
+        probe=output/'feature-probes.parquet'
+        pq.write_table(pa.table(fields),probe,compression='zstd')
+        write(Path(str(probe)+'.manifest.json'),dict(formula_revision=7,scope='feature-space diagnostic only',rows=len(values)))
+        write(output/'PROBES.json',dict(table_sha256=sha(probe),fit_table_sha256=sha(fit_table),
+              seed=20261106,pairs=128,ray_scales=[0,1e-8,1e-6,1e-4,.01,.1,1],required_raw_ids=required,
+              note='raw nonnegative coordinates; derived products recomputed by native prediction'))
+    run_plan = {'scope':'fixed-budget architecture development comparison' if architecture else 'short optimization diagnostic, not full-budget model selection',
                 'base_plan_sha256':sha(plan_path),'prepared_sha256':sha(prepared_path),
-                'script_sha256':sha(__file__),'epochs':12,'pairs_per_epoch':5000,
-                'arms':ARMS,'seed_pairs':SEEDS,'workers':workers,
-                'binary_sha256':sha(Path(base['binary_dir'])/'zensim_mlp_train')}
+                'script_sha256':sha(__file__),'epochs':epochs,'pairs_per_epoch':draws,
+                'arms':arms,'seed_pairs':seeds,'workers':workers,'source_audit':source_audit,
+                'selection':'fixed final epoch; no development selection',
+                'binary_sha256':{name:sha(selected_bin/name) for name in ('zensim_mlp_train','bake_dial_refit','panel')},
+                'architecture':architecture,'per_training_child_memory_cap':'2G' if architecture else None}
     write(output/'PLAN.json',run_plan)
+    if prepare_only:
+        print(json.dumps({'stage':'preparation verified; zero optimizer steps','source_audit':source_audit}),flush=True)
+        return
 
     def cell(arm, index):
         dest = output/arm/f's{index}'
@@ -204,7 +272,12 @@ def native(plan_path, output, workers):
         selected = [(n,p,w*({'teacher_half':0.5,'teacher_double':2.}.get(arm,1.) if n=='cid22' else 1.),v,m)
                     for n,p,w,v,m in groups]
         recipe = {**base['recipe'],'shared_hidden_activation':'relu','mse_weight':1}
-        cmd = owner.train_command(selected,*SEEDS[index],1853,keep,'N',dest/'best.bin',recipe,
+        if arm == 'shared_smooth':
+            recipe['shared_hidden_activation']='smooth-hinge'
+        if arm == 'single_ramps':
+            recipe.pop('shared_hidden_activation')
+            recipe['ramps']=16
+        cmd = owner.train_command(selected,*seeds[index],1853,keep,'N',dest/'best.bin',recipe,
                                   strict_admission=True,data_role_decision=Path(base['output'])/'root/human_role_decision.json')
         if arm == 'walk':
             cmd[cmd.index('--pair-sampling')+1] = 'walk'
@@ -213,16 +286,33 @@ def native(plan_path, output, workers):
         if arm == 'l2_high':
             cmd += ['--l2','0.0001']
         (dest/'ckpt').mkdir()
-        cmd += ['--dump-checkpoints-every','11','--dump-checkpoints-dir',str(dest/'ckpt')]
-        write(dest/'RUN.json',{'command':cmd,'arm':arm,'seed_index':index,'stage':'training'})
-        owner.run(cmd,dest/'train.log')
+        cmd += ['--dump-checkpoints-every',str(epochs-1),'--dump-checkpoints-dir',str(dest/'ckpt')]
+        env = os.environ.copy()
+        for key in ('ZENSIM_MONOTONE_RESEARCH_MANIFEST','ZENSIM_MONOTONE_RESEARCH_SHA256'):
+            env.pop(key,None)
+        manifest = None
+        if architecture and ARCHITECTURE_ARMS[arm] is not None:
+            family,widths=ARCHITECTURE_ARMS[arm]
+            manifest=dest/'HEAD.json'
+            write(manifest,dict(schema='monotone-head-v1',family=family,widths=widths,
+                init_seed=seeds[index][0],sample_seed=seeds[index][1],epochs=epochs,
+                pairs_per_epoch=draws,first_width=recipe['hidden'],max_pairs=recipe['max_pairs']))
+            env.update(ZENSIM_MONOTONE_RESEARCH_MANIFEST=str(manifest),ZENSIM_MONOTONE_RESEARCH_SHA256=sha(manifest))
+        launch = ([str(Path.home()/'work/claudehints/scripts/run-heavy'),'--mem','2G','--jobs','1','--']+cmd) if architecture else cmd
+        with (dest/'train.log').open('w') as log:
+            proc=subprocess.Popen(launch,stdout=log,stderr=subprocess.STDOUT,env=env)
+            write(dest/'RUN.json',{'command':cmd,'launch':launch,'arm':arm,'seed_index':index,'stage':'training',
+                'pid':proc.pid,'head_manifest_sha256':sha(manifest) if manifest else None})
+            rc=proc.wait()
+        if rc:
+            raise RuntimeError(f'native training rc={rc}: {dest}/train.log')
         curve = owner.read_curve(dest/'train.log')
-        if set(curve) != set(range(12)):
+        if set(curve) != set(range(epochs)):
             raise ValueError('incomplete native training curve')
-        bake = dest/'ckpt/ckpt_epoch011.bin'
+        bake = dest/f'ckpt/ckpt_epoch{epochs-1:03d}.bin'
         panels = {}
         for n,p,_,v,_ in groups:
-            if not v:
+            if not v and not architecture:
                 continue
             prediction = owner.predict(bake,p,dest/f'{n}.tsv')
             targets = pq.read_table(p,columns=['human_score','ref_basename'])
@@ -231,7 +321,7 @@ def native(plan_path, output, workers):
                                     'band':targets['ref_basename']}),table,compression='zstd')
             panels[n] = {}
             for mode in ('signed-quality','per-group','scatter'):
-                command = [str(Path(base['binary_dir'])/'panel'),'--input',str(table),'--json','--'+mode]
+                command = [str(selected_bin/'panel'),'--input',str(table),'--json','--'+mode]
                 proc = subprocess.run(command,text=True,capture_output=True)
                 (dest/f'{n}.{mode}.log').write_text(proc.stdout+'\n'+proc.stderr)
                 proc.check_returncode()
@@ -239,25 +329,38 @@ def native(plan_path, output, workers):
             q = panels[n]['signed-quality']
             if q['n'] != len(prediction) or q['n_dropped'] != 0 or panels[n]['scatter']['status'] != 'MEASURED':
                 raise ValueError('incomplete panel coverage')
-        result = {'arm':arm,'seed_index':index,'init_seed':SEEDS[index][0],'sample_seed':SEEDS[index][1],
+        probes=None
+        if probe is not None:
+            prediction=owner.predict(bake,probe,dest/'feature-probes.tsv')
+            delta=prediction[128:256]-prediction[:128]
+            probes=dict(identity=float(prediction[256]),near_identity_ray=prediction[256:].tolist(),
+                        coordinate_pairs=128,positive_deltas=int(np.sum(delta>0)),
+                        violations_over_1e_5=int(np.sum(delta>1e-5)),max_increase=float(max(0.,delta.max())),
+                        ceiling_violations=int(np.sum(prediction>100.)))
+            write(dest/'PROBES.json',probes)
+            if probes['identity']!=100. or probes['violations_over_1e_5'] or probes['ceiling_violations']:
+                raise ValueError(f'native feature gate failed: {dest}/PROBES.json')
+        result = {'arm':arm,'seed_index':index,'init_seed':seeds[index][0],'sample_seed':seeds[index][1],
                   'bake_sha256':sha(bake),'plan_sha256':sha(output/'PLAN.json'),'panels':panels}
+        if probes is not None:
+            result['feature_probes']=probes
         write(dest/'RESULT.json',result)
         return {'arm':arm,'seed_index':index,'result_sha256':sha(dest/'RESULT.json'),
                 'metrics':{n:{'pooled_srocc':p['signed-quality']['srocc_signed'],
                               'within_reference_srocc':p['per-group']['per_group']['mean']} for n,p in panels.items()}}
     results, failures = [], []
     with ThreadPoolExecutor(max_workers=workers) as pool:
-        tasks = {pool.submit(cell,arm,i):(arm,i) for arm in ARMS for i in range(len(SEEDS))}
+        tasks = {pool.submit(cell,arm,i):(arm,i) for arm in arms for i in range(len(seeds))}
         for task in as_completed(tasks):
             arm,i = tasks[task]
             try:
                 results.append(task.result())
             except Exception as error:
                 failures.append({'arm':arm,'seed_index':i,'error':repr(error)})
-            record = {'checked_utc':datetime.now(timezone.utc).isoformat(),'required':18,
+            record = {'checked_utc':datetime.now(timezone.utc).isoformat(),'required':len(tasks),
                       'complete':len(results),'results':results,'failures':failures}
             write(output/'PROGRESS.json',record)
-            print(json.dumps({'complete':len(results),'required':18,'failures':failures}),flush=True)
+            print(json.dumps({'complete':len(results),'required':len(tasks),'failures':failures}),flush=True)
     write(output/'SUMMARY.json',record)
     if failures:
         raise RuntimeError(f'{len(failures)} pilot cells failed; preserved in SUMMARY.json')
@@ -272,11 +375,22 @@ def main():
     p.add_argument('--baseline-plan',type=Path,required=True)
     p.add_argument('--output',type=Path,required=True)
     p.add_argument('--workers',type=int,default=3)
+    p = sub.add_parser('architectures')
+    p.add_argument('--baseline-plan',type=Path,required=True)
+    p.add_argument('--output',type=Path,required=True)
+    p.add_argument('--binary-dir',type=Path,required=True)
+    p.add_argument('--metadata',type=Path,required=True)
+    p.add_argument('--workers',type=int,default=6)
+    p.add_argument('--long',action='store_true')
+    p.add_argument('--prepare-only',action='store_true')
     args = parser.parse_args()
     if args.action == 'audit':
         if args.output.exists():
             raise ValueError('preserve existing audit before rerunning')
         audit(args.output)
+    elif args.action == 'architectures':
+        native(args.baseline_plan,args.output,args.workers,architecture=True,
+               binary_dir=args.binary_dir,metadata=args.metadata,long=args.long,prepare_only=args.prepare_only)
     else:
         native(args.baseline_plan,args.output,args.workers)
 
