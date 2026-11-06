@@ -15,7 +15,7 @@ import numpy as np
 import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
-from tree_study import load_data, panels, sha, write, estimator, weights_and_targets, native_gate, SEEDS, canonical_ref
+from tree_study import load_data, panels, sha, write, estimator, weights_and_targets, native_gate, SEEDS, canonical_ref, cell
 
 
 def unique_index(frame):
@@ -204,7 +204,7 @@ def summarize(root, output, neural_summaries):
     populations = ['kadid', 'tid2013', 'konfig', 'cid22_a25']
     ids = {p: np.flatnonzero(data['dev'] & (data['pop'] == p)) for p in populations}
     metrics, vectors, pins, selections, diagnostics = {}, {}, {}, {}, {}
-    for study in ('search', 'peer-search'):
+    for study in ('search', 'peer-search', 'constraint-controls'):
         path = root / study / 'SUMMARY.json'
         summary = json.loads(path.read_text())
         if summary['completed'] != summary['required'] or summary['failures']:
@@ -215,7 +215,8 @@ def summarize(root, output, neural_summaries):
             cells = sorted([r for r in summary['results'] if r['config']['id'] == winner['id'] and r['fold'] == -1], key=lambda r: r['seed'])
             if len(cells) != 3:
                 raise ValueError('missing final seed')
-            name = winner['family'] if study == 'search' else winner['family'] + '_' + winner['features']
+            name = (winner['family'] if study == 'search' else winner['family'] + '_constraint_control'
+                    if study == 'constraint-controls' else winner['family'] + '_' + winner['features'])
             metrics[name] = {p: {k: dict(mean=float(np.mean([r['native_development'][p][k] for r in cells])),
                     minimum=float(min(r['native_development'][p][k] for r in cells)),
                     maximum=float(max(r['native_development'][p][k] for r in cells))) for k in ('pooled', 'within')} for p in populations}
@@ -385,9 +386,44 @@ def closure(root, base_path):
     import importlib.metadata
     write(sources / 'PACKAGES.json', {name: importlib.metadata.version(name)
           for name in ['scikit-learn', 'numpy', 'scipy', 'pyarrow', 'pandas', 'joblib', 'threadpoolctl']})
+    completed = 0
+    for study in ('search', 'peer-search', 'constraint-controls'):
+        receipt = json.loads((root / study / 'SUMMARY.json').read_text())
+        if receipt['completed'] != receipt['required'] or receipt['failures']:
+            raise ValueError('unclosed scientific fits')
+        completed += receipt['completed']
     write(root / 'CLOSURE.json', dict(input_files=len(index), input_index_sha256=sha(dest / 'INDEX.json'),
-        source_files={p.name: sha(p) for p in sorted(sources.iterdir())}, scientific_fits=183,
+        source_files={p.name: sha(p) for p in sorted(sources.iterdir())}, scientific_fits=completed,
         artifact_mirror_owner='scripts/byconstruction/dataset_mirror.py', complete=True))
+
+
+def constraint_controls(run, output):
+    """Fixed full-fit unconstrained twins; reuse the exact registered cell owner."""
+    output.mkdir(parents=True, exist_ok=False)
+    shutil.copytree(run / 'data', output / 'data')
+    source = json.loads((run / 'PLAN.json').read_text())
+    configs = [dict(family='rf', features='direct', mapping='cdf', teacher_mass=1.,
+                    params=dict(min_samples_leaf=8, max_features=.33), id='rf_control'),
+               dict(family='hgb', features='direct', mapping='cdf', teacher_mass=1.,
+                    params=dict(max_leaf_nodes=31, min_samples_leaf=20), id='hgb_control')]
+    write(output / 'PLAN.json', {**source, 'schema': 'tree-matched-constraint-controls-v1',
+        'configurations': configs, 'source_plan_sha256': sha(run / 'PLAN.json'),
+        'controller_sha256': sha(__file__), 'selection': 'fixed matched twins, no tuning'})
+    results, failures = [], []
+    with ProcessPoolExecutor(max_workers=6) as pool:
+        tasks = {pool.submit(cell, output, c, -1, s): (c['id'], s) for c in configs for s in SEEDS}
+        for future in as_completed(tasks):
+            try:
+                results.append(future.result())
+            except Exception as error:
+                failures.append(dict(cell=tasks[future], error=repr(error)))
+            write(output / 'PROGRESS.json', dict(complete=len(results), required=6, failures=failures,
+                pid=os.getpid(), checked_utc=datetime.now(timezone.utc).isoformat()))
+            print(json.dumps(dict(complete=len(results), required=6, failures=failures)), flush=True)
+    write(output / 'SUMMARY.json', dict(completed=len(results), required=6, failures=failures,
+        results=results, winners=configs, selection={}))
+    if failures:
+        raise RuntimeError('matched constraint controls failed')
 
 
 def main():
@@ -398,9 +434,12 @@ def main():
     p.add_argument('--peer-search', type=Path, help='run the registered peer-assisted search with this joined metadata')
     p.add_argument('--summarize', action='store_true')
     p.add_argument('--closure', action='store_true')
+    p.add_argument('--constraint-controls', action='store_true')
     p.add_argument('--neural-summary', type=Path, action='append', default=[])
     args = p.parse_args()
-    if args.closure:
+    if args.constraint_controls:
+        constraint_controls(args.run, args.output)
+    elif args.closure:
         if args.baseline_plan is None:
             p.error('--baseline-plan is required for closure')
         closure(args.run, args.baseline_plan)

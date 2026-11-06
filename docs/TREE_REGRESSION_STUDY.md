@@ -185,3 +185,14 @@ canonical Rust batch-panel owner for every signed correlation. One-source
 KonFiG cannot estimate uncertainty over new sources. These conditional
 intervals do not make the previously exposed development sets independent or
 correct for many comparisons; they diagnose the strength of apparent gains.
+
+## Matched monotonicity controls
+
+The tuned unconstrained winners may use different features/targets from the
+constrained controls. Their difference cannot isolate the cost of monotonicity.
+Six fixed additional full-data fits therefore remove only `monotonic_cst` from
+the RF and HGB direct-input/CDF controls, using the same three seeds, weights
+and all other settings. These controls were registered after unconstrained
+finalist results, before inspecting completed monotone finalist results. They
+do not alter the original source-fold selection. Total scientific fits across
+the three studies: 129 + 54 + 6 = 189.
