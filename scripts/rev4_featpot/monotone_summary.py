@@ -153,7 +153,7 @@ def summarize(root, breakdowns, output, control_root=None):
                     raise ValueError('incomplete diagnostic epochs: '+cell)
                 diagnostics[cell]=dict(first=diag[0],final=diag[-1],
                     note='sampled training responses; no claim of global inactivity or a local minimum')
-        cells[cell]=dict(result_sha256=sha(result_path),bake_sha256=sha(bake),metrics=metrics,
+            cells[cell]=dict(result_sha256=sha(result_path),bake_sha256=sha(bake),metrics=metrics,
                 prediction_table_sha256=detail['prediction_table_sha256'],
                 probes=result['feature_probes'])
     if len(cells)!=complete['required'] or set(cells)!=set(index['cells']):raise ValueError('cell coverage mismatch')

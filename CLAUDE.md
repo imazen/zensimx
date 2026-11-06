@@ -1,5 +1,12 @@
 # zensim — current working rules
 
+## Known Bugs — monotone report seed coverage (resolved 2026-11-06)
+
+Adding prediction-table pins briefly moved the summary cell assignment outside
+the seed loop. The full-cell assertion refused the report before writing it.
+Restoring the loop scope reproduces all 24 earlier cells and every measured
+value exactly; only prediction hashes are added. Training artifacts are unchanged.
+
 ## Known Bugs — monotone study coverage receipt (2026-11-06)
 
 The legacy `zentrain.sample_coverage` simulator does not replay the private
