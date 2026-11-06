@@ -269,3 +269,28 @@ Bootstrap SHA-256: `9f899e339e3d4d2f168c9b1a89e9fc95c8c3f60ee95bc56d942aea55c810
 
 Training wrapper: `run-heavy: done rc=0 4485s | peak-RSS 0.55GiB | min-avail 36820MiB | peak-load 23.86`.
 This is a resource observation, not aggregate process-tree memory or a speed benchmark.
+
+## Exact checkpoint replay and TRAIN trajectories
+
+15/15 replays match their original final model bytes, every logged epoch
+trajectory and the native event receipt. All 1,800 epoch checkpoints are
+retained. Additional panels use TRAIN rows only at epochs 0, 29, 59, 89 and
+119; no checkpoint is selected. The five schedules all complete.
+
+| Schedule | KADID 89 → 119 | TID2013 89 → 119 | KonFiG F 89 → 119 | CID22 human 89 → 119 |
+|---|---:|---:|---:|---:|
+| control | 0.893265 → 0.890360 | 0.876921 → 0.879592 | 0.896252 → 0.890867 | 0.863766 → 0.862510 |
+| easy_first | 0.891260 → 0.886080 | 0.856675 → 0.863597 | 0.847755 → 0.878312 | 0.861396 → 0.865853 |
+| hard_first | 0.891964 → 0.888793 | 0.874288 → 0.871542 | 0.897689 → 0.890107 | 0.866735 → 0.867554 |
+| family_blocks | 0.865683 → 0.886789 | 0.859949 → 0.870757 | 0.865680 → 0.871572 | 0.863605 → 0.863889 |
+| teacher_warm | 0.896362 → 0.887819 | 0.870231 → 0.871092 | 0.903440 → 0.889171 | 0.868345 → 0.868516 |
+
+The shared random tail can recover fit lost earlier in a schedule, but does
+not erase every difference. For example, easy-first KonFiG rises during the
+last quarter, while remaining below the random control. Family-block KADID
+recovers strongly over the same tail. These observed training changes are
+consistent with interference and recovery, not proof of a local minimum.
+
+All TRAIN family changes and per-seed population values are retained in the
+plot receipt; native panels are in `stages/*/STAGES.json` and `PANELS.parquet`.
+Stage summary SHA-256: `ef155a4b5406cf14888c7d46112d0dbaac5a31ee012ff6a74e7b15fdec354027`.

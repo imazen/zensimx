@@ -364,4 +364,5 @@ covers the composer's hidden-unit reordering, in addition to cancellation.
 
 T1--T7 completion: all 66 fixed-final fits and corrected event receipts are
 complete. The result record includes all arms, source intervals and diagnostic
-limits. T9 and the retained-checkpoint study remain separate measurements.
+limits. T9 remains a separate measurement. The retained-checkpoint study is complete:
+15/15 exact replays, 1,800 checkpoints and all five TRAIN trajectory panels.

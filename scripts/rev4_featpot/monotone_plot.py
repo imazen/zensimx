@@ -28,6 +28,7 @@ def main():
     from matplotlib.ticker import FormatStrFormatter, MaxNLocator
     plt.rcParams.update({'svg.fonttype':'none','font.size':9})
     names=list(summary['arms']);baseline=bootstrap['baseline']
+    failed={cell.split('/')[0] for cell in summary.get('feature_gate_failures',[])}
     populations=[('human_kadid_development','KADID'),('human_tid2013_development','TID2013'),
                  ('human_konfig_development','KonFiG F'),('human_cid22_a25_development','CID22 human')]
     fig,axes=plt.subplots(1,4,sharey=True,figsize=(15,max(4.5,.33*len(names)+2)))
@@ -47,10 +48,11 @@ def main():
         ax.xaxis.set_major_locator(MaxNLocator(4))
         ax.grid(axis='x',alpha=.2)
         ax.spines[['top','right']].set_visible(False)
-    axes[0].set_yticks(range(len(names)),[name.replace('_',' ') for name in names]);axes[0].invert_yaxis()
+    axes[0].set_yticks(range(len(names)),[name.replace('_',' ')+(' [gate failed]' if name in failed else '') for name in names]);axes[0].invert_yaxis()
     fig.suptitle(args.title+' — versus '+baseline.replace('_',' '),fontsize=13)
     fig.text(.02,.025,'Dots: mean of three fixed-final fits. Bars: 95% paired source-bootstrap intervals (2,000 draws).\n'
-        'Conditional on exposed development sources; no multiplicity correction. KonFiG has one source, so no interval. Axis scales differ.',fontsize=8)
+        'Conditional on exposed development sources; no multiplicity correction. KonFiG has one source, so no interval. Axis scales differ.'
+        + (' Failed-gate candidates are diagnostic only.' if failed else ''),fontsize=8)
     fig.tight_layout(rect=(0,.08,1,.94))
     for suffix in ('svg','png'):fig.savefig(args.output/('comparison.'+suffix),dpi=160)
     plt.close(fig)
