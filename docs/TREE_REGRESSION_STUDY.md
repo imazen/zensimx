@@ -184,3 +184,19 @@ credited to a feature-only zensim model. Compare peer-only versus combined
 inputs to measure the added predictive value of the cached features. Native
 opaque-vector parity covers all final fitting and development rows. No
 pixel-serving, identity, runtime-cost or monotonicity qualification is implied.
+
+## Paired assessment
+
+Completed 120-epoch neural comparators are reused only after receipt/model
+hashes, fitting-table admission and development target/reference order match.
+The summary reports each finalist's mean and range across its three seeds.
+This is not equal-compute or equal-objective training; it compares attained
+quality on identical rows. Grouped panels use actual cached distortion codes.
+
+For the first predeclared seed of each unconstrained tree/combined-input stack,
+use 2,000 paired source-cluster bootstrap draws against SSIMULACRA2, the
+human-only one-hidden-layer MLP and shared-ReLU human+teacher MLP. Reuse the
+canonical Rust batch-panel owner for every signed correlation. One-source
+KonFiG cannot estimate uncertainty over new sources. These conditional
+intervals do not make the previously exposed development sets independent or
+correct for many comparisons; they diagnose the strength of apparent gains.

@@ -8,11 +8,12 @@ import os
 from pathlib import Path
 import json
 import pickle
+import sys
 import numpy as np
 import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
-from tree_study import load_data, panels, sha, write, estimator, weights_and_targets, native_gate, SEEDS
+from tree_study import load_data, panels, sha, write, estimator, weights_and_targets, native_gate, SEEDS, canonical_ref
 
 
 def unique_index(frame):
@@ -192,14 +193,159 @@ def peer_search(run, metadata_path, output):
         selection=scores, results=results, failures=failures))
 
 
+def summarize(root, output, neural_summaries):
+    """Reduce completed studies without fitting or selecting another model."""
+    output.mkdir(parents=True, exist_ok=False)
+    original = json.loads((root / 'search/PLAN.json').read_text())
+    data = load_data(root / 'search/data')
+    metadata_ = pq.read_table(root / 'peers/metadata.parquet').to_pandas()
+    populations = ['kadid', 'tid2013', 'konfig', 'cid22_a25']
+    ids = {p: np.flatnonzero(data['dev'] & (data['pop'] == p)) for p in populations}
+    metrics, vectors, pins, selections, diagnostics = {}, {}, {}, {}, {}
+    for study in ('search', 'peer-search'):
+        path = root / study / 'SUMMARY.json'
+        summary = json.loads(path.read_text())
+        if summary['completed'] != summary['required'] or summary['failures']:
+            raise ValueError('incomplete study: ' + study)
+        pins[str(path)] = sha(path)
+        selections[study] = summary['selection']
+        for winner in summary['winners']:
+            cells = sorted([r for r in summary['results'] if r['config']['id'] == winner['id'] and r['fold'] == -1], key=lambda r: r['seed'])
+            if len(cells) != 3:
+                raise ValueError('missing final seed')
+            name = winner['family'] if study == 'search' else winner['family'] + '_' + winner['features']
+            metrics[name] = {p: {k: dict(mean=float(np.mean([r['native_development'][p][k] for r in cells])),
+                    minimum=float(min(r['native_development'][p][k] for r in cells)),
+                    maximum=float(max(r['native_development'][p][k] for r in cells))) for k in ('pooled', 'within')} for p in populations}
+            diagnostics[name] = dict(config=winner, native_rows=[r['native']['rows'] for r in cells],
+                max_export_rounding=max(r['maximum_sklearn_export_rounding_difference'] for r in cells),
+                probes=[r.get('feature_probes') for r in cells])
+            first = root / study / 'cells' / cells[0]['name'] / 'native_development'
+            vectors[name] = {}
+            for p in populations:
+                table_path = first / (p + '.parquet')
+                t = pq.read_table(table_path)
+                if not np.array_equal(t['target'].to_numpy(), data['y'][ids[p]]) or t['band'].to_pylist() != data['refs'][ids[p]].tolist():
+                    raise ValueError('tree panel rows do not match admitted development')
+                vectors[name][p] = t['predicted'].to_numpy()
+                pins[str(table_path)] = sha(table_path)
+    peer = json.loads((root / 'peers/PEERS.json').read_text())
+    for name in ('ssim2', 'butter3', 'gmsd_quality', 'gmsm'):
+        metrics[name] = {p: {k: dict(mean=v, minimum=v, maximum=v) for k, v in peer['metrics'][name]['development'][p].items()} for p in populations}
+        vectors[name] = {p: metadata_[name].to_numpy()[ids[p]] for p in populations}
+    # Reuse completed native neural assessments only after checking their bytes and row identity.
+    for path in neural_summaries:
+        doc = json.loads(path.read_text())
+        if doc['missing_cells']:
+            raise ValueError('incomplete neural comparator')
+        pins[str(path)] = sha(path)
+        for arm in sorted({c['arm'] for c in doc['cells']}):
+            cells = sorted([c for c in doc['cells'] if c['arm'] == arm], key=lambda c: c['seed'])
+            if len(cells) != 3:
+                raise ValueError('neural seed count')
+            name = 'mlp_' + arm
+            scores = []
+            for index, cell_ in enumerate(cells):
+                result_path = Path(cell_['result_path'])
+                if sha(result_path) != cell_['result_sha256']:
+                    raise ValueError('neural receipt changed')
+                record = json.loads(result_path.read_text())
+                admitted_hashes = {pin for file, pin in original['inputs'].items()
+                                   if file.endswith('.parquet') and not file.endswith('.keys.parquet')}
+                if any(r['table_sha256'] not in admitted_hashes for r in record['selection']['strict_table_admission']):
+                    raise ValueError('neural comparator used different input tables')
+                bake = Path(record['bake'])
+                if sha(bake) != cell_['bake_sha256']:
+                    raise ValueError('neural bake changed')
+                pins[str(result_path)], pins[str(bake)] = sha(result_path), sha(bake)
+                values = {}
+                for p in populations:
+                    table_path = Path(record['assessment_directory']) / ('human_' + p + '_development.panel.parquet')
+                    t = pq.read_table(table_path)
+                    if not np.array_equal(t['target'].to_numpy(), data['y'][ids[p]]) or [canonical_ref(r) for r in t['band'].to_pylist()] != data['refs'][ids[p]].tolist():
+                        raise ValueError('neural assessment rows differ')
+                    pins[str(table_path)] = sha(table_path)
+                    values[p] = dict(pooled=record['panels']['human_' + p + '_development']['signed-quality']['srocc_signed'],
+                        within=record['panels']['human_' + p + '_development']['per-group']['per_group']['mean'])
+                    if index == 0:
+                        vectors.setdefault(name, {})[p] = t['predicted'].to_numpy()
+                scores.append(values)
+            metrics[name] = {p: {k: dict(mean=float(np.mean([v[p][k] for v in scores])),
+                minimum=float(min(v[p][k] for v in scores)), maximum=float(max(v[p][k] for v in scores))) for k in ('pooled', 'within')} for p in populations}
+    write(output / 'COMPARISON.json', dict(metrics=metrics, diagnostics=diagnostics, selections=selections,
+        sources=pins, development_rows={p: len(ids[p]) for p in populations},
+        development_sources={p: len(set(data['refs'][ids[p]])) for p in populations},
+        seed_statistic='mean and range across three fitted seeds, not a confidence interval',
+        paired_analysis_seed='first predeclared seed in each model family; not a seed average'))
+    np.savez_compressed(output / 'comparison_vectors.npz', **{n + '__' + p: x for n, ps in vectors.items() for p, x in ps.items()})
+    # Canonical group diagnostics by actual distortion labels, independent of dataset names.
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+    os.environ['ZEN_PANEL_BIN'] = original['panel_bin']
+    from lib.zen_stats import panel_batch, panel_batch_indexed
+    jobs = []
+    for name, ps in vectors.items():
+        for pop, pred in ps.items():
+            labels = metadata_.iloc[ids[pop]].codec.to_numpy()
+            for label in sorted(set(labels)):
+                keep = labels == label
+                jobs.append((name + '__' + pop + '__' + label, pred[keep], data['y'][ids[pop]][keep]))
+    rows = panel_batch(jobs, stats='srocc')
+    if any(r['n_dropped'] for r in rows):
+        raise ValueError('distortion panel dropped rows')
+    pq.write_table(pa.Table.from_pylist(rows), output / 'distortion_panels.parquet', compression='zstd')
+    # Paired source bootstrap: native signed SROCC; never resample variants independently.
+    chosen = ['rf', 'extra', 'hgb', 'rf_features_and_peers', 'extra_features_and_peers',
+              'hgb_features_and_peers', 'mlp_shared_relu_ssim2', 'mlp_four_human', 'ssim2']
+    intervals = {}
+    for pop in populations:
+        references = data['refs'][ids[pop]]
+        groups = [np.flatnonzero(references == r) for r in sorted(set(references))]
+        if len(groups) < 2:
+            intervals[pop] = dict(status='not estimable from one development reference', references=1)
+            continue
+        bases = {'human': data['y'][ids[pop]]}
+        bases.update({name: vectors[name][pop] for name in chosen})
+        jobs = [(name + '_point', name, 'human', None) for name in chosen]
+        rng = np.random.default_rng(20261106)
+        for b in range(2000):
+            indices = np.concatenate([groups[i] for i in rng.integers(len(groups), size=len(groups))])
+            jobs.extend((name + '_' + str(b), name, 'human', indices) for name in chosen)
+        sampled = panel_batch_indexed(bases, jobs, stats='srocc')
+        if any(r['n_dropped'] for r in sampled):
+            raise ValueError('bootstrap dropped rows')
+        pq.write_table(pa.Table.from_pylist(sampled), output / (pop + '.bootstrap.parquet'), compression='zstd')
+        by = {r['label']: r['srocc_signed'] for r in sampled}
+        if not np.isfinite(list(by.values())).all():
+            raise ValueError('nonfinite source bootstrap')
+        comparisons = {}
+        for baseline in ('mlp_shared_relu_ssim2', 'mlp_four_human', 'ssim2'):
+            for name in chosen[:6]:
+                delta = np.array([by[name + '_' + str(b)] - by[baseline + '_' + str(b)] for b in range(2000)])
+                comparisons[name + '_minus_' + baseline] = dict(point=by[name + '_point'] - by[baseline + '_point'],
+                    low=float(np.quantile(delta, .025)), high=float(np.quantile(delta, .975)))
+        intervals[pop] = dict(references=len(groups), draws=2000, seed=20261106,
+            status='conditional on already-exposed development sources; no multiplicity correction', comparisons=comparisons)
+    write(output / 'SOURCE_BOOTSTRAP.json', intervals)
+    lines = ['# Tree study comparison', '', 'Development SROCC, mean across three seeds; peers are fixed.', '',
+             '| Model | KADID | TID2013 | KonFiG F | CID22-A |', '|---|---:|---:|---:|---:|']
+    for name, m in metrics.items():
+        lines.append('| ' + name + ' | ' + ' | '.join(f"{m[p]['pooled']['mean']:.6f}" for p in populations) + ' |')
+    (output / 'TABLE.md').write_text('\n'.join(lines) + '\n')
+    print('\n'.join(lines), flush=True)
+
+
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--baseline-plan', type=Path)
     p.add_argument('--run', type=Path, required=True)
     p.add_argument('--output', type=Path, required=True)
     p.add_argument('--peer-search', type=Path, help='run the registered peer-assisted search with this joined metadata')
+    p.add_argument('--summarize', action='store_true')
+    p.add_argument('--neural-summary', type=Path, action='append', default=[])
     args = p.parse_args()
-    if args.peer_search:
+    if args.summarize:
+        summarize(args.run, args.output, args.neural_summary)
+    elif args.peer_search:
         peer_search(args.run, args.peer_search, args.output)
     else:
         if args.baseline_plan is None:

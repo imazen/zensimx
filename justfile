@@ -4726,3 +4726,6 @@ tree-study-peers baseline_plan run output:
 
 tree-study-peer-search run metadata output:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 8G --jobs 8 -- python3 -B scripts/rev4_featpot/tree_study_report.py --run {{quote(run)}} --peer-search {{quote(metadata)}} --output {{quote(output)}}
+
+tree-study-summary root output neural_single neural_shared:
+    TMPDIR="$HOME/tmp" OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 "$HOME/work/claudehints/scripts/run-heavy" --mem 4G --jobs 1 -- python3 -B scripts/rev4_featpot/tree_study_report.py --summarize --run {{quote(root)}} --output {{quote(output)}} --neural-summary {{quote(neural_single)}} --neural-summary {{quote(neural_shared)}}
