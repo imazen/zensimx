@@ -4779,3 +4779,9 @@ monotone-input-closure root baseline_plan metadata:
 
 monotone-artifact-mirror root destination:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 2G --jobs 1 -- python3 -B scripts/byconstruction/dataset_mirror.py --root {{quote(root)}} --nfs --cold-readback --destination {{quote(destination)}} --artifact-kind training
+
+monotone-leaky-training baseline_plan binaries metadata output:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 6G --jobs 2 -- python3 -B scripts/rev4_featpot/activation_curriculum.py training --baseline-plan {{quote(baseline_plan)}} --binary-dir {{quote(binaries)}} --metadata {{quote(metadata)}} --output {{quote(output)}} --workers 2 --leaky-switches
+
+monotone-capacity root binary output:
+    python3 -B scripts/rev4_featpot/activation_curriculum.py capacity --root {{quote(root)}} --binary {{quote(binary)}} --output {{quote(output)}}

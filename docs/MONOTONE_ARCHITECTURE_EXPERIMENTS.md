@@ -250,3 +250,12 @@ a gradient when both ReLU branches are inactive. Signed weight zero remains
 a kink. The nonzero bias branches can still express nonconvex monotone shapes.
 Export with existing ReLU units plus an explicit nonnegative linear residual;
 no new serving operator is needed. The zero-alpha default must replay exactly.
+
+Leaky-switch native gates pass at slopes .05 and .1: nonzero derivatives with
+both ReLU branches inactive, finite-difference weight/bias gradients, exact
+native zero identity, coordinate-order probes and training/bake agreement.
+The zero-slope default remains a separate actual-data replay gate. Native
+inspection and tie accounting give 132,320 independent trainable coefficients
+for shared ReLU, SmoothHinge and the one-block switch, before boundary sparsity;
+the ramp control has 110,384 and the two-block switch 134,368. Expanded bake
+sizes are reported separately. These counts do not measure execution cost.

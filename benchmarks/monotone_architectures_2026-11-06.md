@@ -91,3 +91,19 @@ Input closure now contains 71 indexed files / 69 unique SHA-256 blobs,
 including the admitted prepared tables, sidecars, source-key metadata, baseline
 plan and its dependencies. Index SHA-256:
 `30a907d2c514d3dc57b2cdad5c3131c878eb3763be128f593f4c69201dfbd981`.
+
+Nominal independent trainable coefficient counts, computed from all three
+seeds' actual native layer dimensions and enforced parameter ties:
+shared ReLU / SmoothHinge / switch 132,320; caps 132,352; spline 132,640;
+Lipschitz residual 132,321; two-block switch 134,368; single ramps 110,384.
+Scaler constants, fixed routing, frozen max-pair biases and unused cap
+thresholds are excluded. Zero weights at a constraint boundary remain trainable
+parameters in this count; it is not a measure of effective learned capacity.
+`PARAMETERS.json` preserves the calculation inputs and all model dimensions.
+
+Completed stage-1 closure is mirrored at
+`/mnt/tower/output/zensim/monotone-architectures-20261106-stage1/`:
+2,330 artifact files, 426,717,327 bytes, every SHA-256 verified by cold client
+readback. Receipt SHA-256:
+`fcd150cbe25627073b8a3153498956c1aa8359005b75edcb22b5e777d7832397`.
+This snapshot excludes the ongoing full-budget/training runs.

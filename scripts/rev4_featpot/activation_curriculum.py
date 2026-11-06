@@ -34,6 +34,7 @@ ARCHITECTURE_ARMS = {
     'single_ramps': None,
 }
 
+LEAKY_ARMS = {'switch_leaky_05': {'negative_slope': .05}, 'switch_leaky_10': {'negative_slope': .1}}
 TRAINING_ARMS = {
     'control': {},
     'init_half': {'init_scale': .5}, 'init_double': {'init_scale': 2.},
@@ -179,10 +180,12 @@ def audit(out):
     print(json.dumps(result,indent=2))
 
 
-def native(plan_path, output, workers, *, architecture=False, binary_dir=None, metadata=None, long=False, prepare_only=False, training=False, replay_control=False):
+def native(plan_path, output, workers, *, architecture=False, binary_dir=None, metadata=None, long=False, prepare_only=False, training=False, replay_control=False, leaky=False):
     import numpy as np
     import pyarrow as pa
     import pyarrow.parquet as pq
+    if leaky and replay_control:
+        raise ValueError('leaky arms and neutral replay are separate registered runs')
     if not 1 <= workers <= (12 if architecture and long else 6 if architecture else 3):
         raise ValueError('pilot concurrency exceeds the registered aggregate memory budget')
     base = json.loads(plan_path.read_text())
@@ -233,7 +236,8 @@ def native(plan_path, output, workers, *, architecture=False, binary_dir=None, m
     import v2_lodo_mlp as owner
     epochs, draws = (120,5000) if training and not replay_control else (120,50000) if long else (12,5000)
     owner.EPOCHS,owner.PAIRS_PER_EPOCH,owner.LOG_EVERY = epochs,draws,1
-    arms = (('control',) if replay_control else tuple(TRAINING_ARMS)) if training else tuple(ARCHITECTURE_ARMS) if architecture else ARMS
+    training_options = LEAKY_ARMS if leaky else TRAINING_ARMS
+    arms = (('control',) if replay_control else tuple(training_options)) if training else tuple(ARCHITECTURE_ARMS) if architecture else ARMS
     seeds = ARCHITECTURE_SEEDS if architecture else SEEDS
     groups = []
     for g in prepared['groups']:
@@ -277,7 +281,7 @@ def native(plan_path, output, workers, *, architecture=False, binary_dir=None, m
                 'arms':arms,'seed_pairs':seeds,'workers':workers,'source_audit':source_audit,
                 'selection':'fixed final epoch; no development selection',
                 'binary_sha256':{name:sha(selected_bin/name) for name in ('zensim_mlp_train','bake_dial_refit','panel')},
-                'architecture':architecture,'training':training,'training_options':TRAINING_ARMS if training else None,
+                'architecture':architecture,'training':training,'training_options':training_options if training else None,
                 'family_taxonomy':{n:sorted(set(v)) for n,v in families.items()},'per_training_child_memory_cap':'2G' if architecture else None}
     write(output/'PLAN.json',run_plan)
     if prepare_only:
@@ -306,7 +310,7 @@ def native(plan_path, output, workers, *, architecture=False, binary_dir=None, m
         if arm == 'l2_high' and not training:
             cmd += ['--l2','0.0001']
         if training:
-            cmd += ['--l2',str(TRAINING_ARMS[arm].get('l2',1e-5)),'--no-sample-coverage']
+            cmd += ['--l2',str(training_options[arm].get('l2',1e-5)),'--no-sample-coverage']
         (dest/'ckpt').mkdir()
         cmd += ['--dump-checkpoints-every',str(epochs-1),'--dump-checkpoints-dir',str(dest/'ckpt')]
         env = os.environ.copy()
@@ -320,7 +324,9 @@ def native(plan_path, output, workers, *, architecture=False, binary_dir=None, m
                 init_seed=seeds[index][0],sample_seed=seeds[index][1],epochs=epochs,
                 pairs_per_epoch=draws,first_width=recipe['hidden'],max_pairs=recipe['max_pairs'])
             if training:
-                opts={k:v for k,v in TRAINING_ARMS[arm].items() if k!='l2'}
+                opts={k:v for k,v in training_options[arm].items() if k not in ('l2','negative_slope')}
+                if 'negative_slope' in training_options[arm]:
+                    head_config['negative_slope']=training_options[arm]['negative_slope']
                 head_config['training']=dict(schema='monotone-training-v1',init_scale=1.,bias_scale=1.,
                     dropout=0.,dropout_seed=9000001+index*100000,adamw=0.,schedule='cosine',order='random',
                     teacher_mass=1.,balance='none',groups=[dict(name=n,families=[sorted(set(families[n])).index(v) for v in families[n]]) for n,_,w,_,_ in groups if w>0])
@@ -456,6 +462,41 @@ def compare_neutral(reference, candidate, binary, output):
     print(json.dumps(result),flush=True)
 
 
+def capacity(root, binary, output):
+    results={}
+    for p in sorted(root.glob('*/s*/RESULT.json')):
+        data=json.loads(p.read_text());plan=json.loads((root/'PLAN.json').read_text())
+        model=p.parent/f"ckpt/ckpt_epoch{plan['epochs']-1:03d}.bin"
+        if sha(model)!=data['bake_sha256']: raise ValueError('capacity model drift')
+        info=json.loads(subprocess.check_output([str(binary),'inspect','--in',str(model)],text=True))
+        command=json.loads(p.with_name('RUN.json').read_text())['command']
+        mp=int(command[command.index('--max-pairs')+1])
+        ramps=int(command[command.index('--monotone-ramps')+1]) if '--monotone-ramps' in command else 0
+        nf,nh=info['layers'][0]['in_dim'],info['layers'][0]['out_dim']
+        first=nf*(nh-ramps)+nh-mp
+        if p.with_name('HEAD.json').exists():
+            head=json.loads(p.with_name('HEAD.json').read_text());ni=nh-mp;count=first
+            for width in head['widths']:
+                family=head['family']
+                count+=ni*width
+                if family in ('switch','caps','lipschitz'): count+=width
+                if family=='caps':count+=width//2
+                if family=='spline':count+=width*6
+                if family=='lipschitz':count+=width
+                ni=1 if family=='lipschitz' else width
+            count+=ni
+        elif len(info['layers'])==3:
+            width=info['layers'][1]['out_dim'];count=first+(nh-mp)*width+2*width
+        elif len(info['layers'])==2:
+            count=first+nh-mp-ramps
+        else:raise ValueError('unsupported capacity parameterization')
+        info['independent_trainable_coefficients']=count
+        info['trainable_count_scope']='nominal coefficients after exact ties, frozen biases and unused cap thresholds; excludes scaler/fixed routing; boundary-zero weights remain trainable'
+        results[str(p.parent.relative_to(root))]=info
+    write(output,dict(inspector_sha256=sha(binary),cells=results))
+    print(json.dumps({name:v['independent_trainable_coefficients'] for name,v in results.items()}))
+
+
 def input_closure(root, plan_path, metadata):
     import shutil
     plan=json.loads(plan_path.read_text())
@@ -569,8 +610,11 @@ def main():
     p.add_argument('--metadata',type=Path,required=True)
     p.add_argument('--workers',type=int,default=6)
     p.add_argument('--replay-control',action='store_true')
+    p.add_argument('--leaky-switches',action='store_true')
     p=sub.add_parser('compare-neutral')
     for name in ('reference','candidate','binary','output'): p.add_argument('--'+name,type=Path,required=True)
+    p=sub.add_parser('capacity')
+    for name in ('root','binary','output'): p.add_argument('--'+name,type=Path,required=True)
     p=sub.add_parser('closure')
     for name in ('root','baseline-plan','metadata'): p.add_argument('--'+name,type=Path,required=True)
     p=sub.add_parser('qualify-receipts')
@@ -587,6 +631,8 @@ def main():
         if args.output.exists():
             raise ValueError('preserve existing audit before rerunning')
         audit(args.output)
+    elif args.action == 'capacity':
+        capacity(args.root,args.binary,args.output)
     elif args.action == 'closure':
         input_closure(args.root,args.baseline_plan,args.metadata)
     elif args.action == 'qualify-receipts':
@@ -599,7 +645,7 @@ def main():
         replay_controls(args.frozen,args.binary_dir,args.output)
     elif args.action == 'training':
         native(args.baseline_plan,args.output,args.workers,architecture=True,training=True,
-               binary_dir=args.binary_dir,metadata=args.metadata,replay_control=args.replay_control)
+               binary_dir=args.binary_dir,metadata=args.metadata,replay_control=args.replay_control,leaky=args.leaky_switches)
     elif args.action == 'architectures':
         native(args.baseline_plan,args.output,args.workers,architecture=True,
                binary_dir=args.binary_dir,metadata=args.metadata,long=args.long,prepare_only=args.prepare_only)

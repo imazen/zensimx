@@ -33,6 +33,8 @@ enum Family {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct Config {
+    #[serde(default, skip_serializing_if = "is_zero")]
+    negative_slope: f64,
     schema: String,
     family: Family,
     widths: Vec<usize>,
@@ -46,7 +48,12 @@ struct Config {
     training: Option<super::training_research::Config>,
 }
 
+fn is_zero(value: &f64) -> bool {
+    *value == 0.
+}
+
 struct Block {
+    negative_slope: f64,
     kind: Family,
     ni: usize,
     no: usize,
@@ -85,6 +92,7 @@ impl Block {
             Family::Switch => Vec::new(),
         };
         let mut result = Self {
+            negative_slope: 0.,
             kind,
             ni,
             no,
@@ -154,7 +162,17 @@ impl Block {
                 }
                 Family::Switch => {
                     let (p, n) = self.switch_pre(x, j);
-                    p.max(0.) - n.max(0.)
+                    let hinge = p.max(0.) - n.max(0.);
+                    if self.negative_slope == 0. {
+                        hinge
+                    } else {
+                        self.negative_slope
+                            * x.iter()
+                                .enumerate()
+                                .map(|(i, x)| x * self.w[i * self.no + j].abs())
+                                .sum::<f64>()
+                            + (1. - self.negative_slope) * hinge
+                    }
                 }
                 Family::Spline => self.spline(self.pre(x, j), j).0,
                 Family::Lipschitz => unreachable!(),
@@ -183,8 +201,12 @@ impl Block {
             let g = gradient[j];
             if self.kind == Family::Switch {
                 let (p, n) = self.switch_pre(x, j);
-                let sp = f64::from(p > 0.);
-                let sn = f64::from(n > 0.);
+                let mut sp = f64::from(p > 0.);
+                let mut sn = f64::from(n > 0.);
+                if self.negative_slope > 0. {
+                    sp = self.negative_slope + (1. - self.negative_slope) * sp;
+                    sn = self.negative_slope + (1. - self.negative_slope) * sn;
+                }
                 self.adam.gb1[j] += g * (sp - sn);
                 for i in 0..self.ni {
                     let k = i * self.no + j;
@@ -276,6 +298,7 @@ mod tests {
     fn config(family: Family, deep: bool) -> Config {
         Config {
             schema: "monotone-head-v1".into(),
+            negative_slope: 0.,
             family,
             widths: if deep { vec![4, 3] } else { vec![4] },
             first_width: 3,
@@ -523,6 +546,71 @@ mod tests {
     }
 
     #[test]
+    fn leaky_switch_keeps_gradients_anchor_and_native_order() {
+        for alpha in [0.05, 0.1] {
+            let mut cfg = config(Family::Switch, false);
+            cfg.negative_slope = alpha;
+            cfg.first_width = 2;
+            cfg.max_pairs = 0;
+            let mut net = Network::new(cfg, 100., &mut SplitMix64::new(92));
+            let block = &mut net.blocks[0];
+            block.b.fill(-10.); // Both ReLU branches inactive; leaky path still differentiates.
+            let x = [0.7, 0.3];
+            let gradient = vec![1.; block.no];
+            let dx = block.backward(&x, &gradient);
+            assert!(dx.iter().all(|d| *d > 0.));
+            for i in 0..block.w.len() {
+                let old = block.w[i];
+                let eps = 1e-6;
+                block.w[i] = old + eps;
+                let plus = block.forward(&x).iter().sum::<f64>();
+                block.w[i] = old - eps;
+                let minus = block.forward(&x).iter().sum::<f64>();
+                block.w[i] = old;
+                assert!(((plus - minus) / (2. * eps) - block.adam.gw1[i]).abs() < 1e-7);
+            }
+            // Positive and negative shared biases exercise both anchor branches.
+            block.b = [-0.4, 0.7, -0.8, 1.2].to_vec();
+            block.adam.gb1.fill(0.);
+            block.backward(&x, &gradient);
+            for i in 0..block.b.len() {
+                let old = block.b[i];
+                let eps = 1e-6;
+                block.b[i] = old + eps;
+                let plus = block.forward(&x).iter().sum::<f64>();
+                block.b[i] = old - eps;
+                let minus = block.forward(&x).iter().sum::<f64>();
+                block.b[i] = old;
+                assert!(((plus - minus) / (2. * eps) - block.adam.gb1[i]).abs() < 1e-7);
+            }
+            let bytes = net.bake(&[0.; 2], &[1.; 2], &[1., 0., 0., 1.], &[0.; 2], 2, 2);
+            let model = zenpredict::Model::from_bytes(&bytes).unwrap();
+            let mut predict = zenpredict::Predictor::new(&model);
+            assert_eq!(
+                predict.predict(&[0., 0.]).unwrap()[0].to_bits(),
+                100f32.to_bits()
+            );
+            for a in [0., 1e-8, 1e-5, 0.1, 1., 10., 1024.] {
+                for b in [0., 1e-8, 1e-5, 0.1, 1., 10., 1024.] {
+                    let x = [a as f32, b as f32];
+                    let y = predict.predict(&x).unwrap()[0];
+                    let expected = net.forward(&[f64::from(x[0]), f64::from(x[1])]).0;
+                    assert!(
+                        (f64::from(y) - expected).abs()
+                            < 16. * f64::from(f32::EPSILON) * (100. + (100. - expected).abs())
+                    );
+                    assert!(y.is_finite() && y <= 100.);
+                    for i in 0..2 {
+                        let mut larger = x;
+                        larger[i] += 0.01;
+                        assert!(predict.predict(&larger).unwrap()[0] <= y + 1e-5);
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
     fn native_fits_reduce_error_on_nonconvex_monotone_targets() {
         for family in [
             Family::Caps,
@@ -624,6 +712,8 @@ impl Network {
 
     fn new(config: Config, pin: f64, rng: &mut SplitMix64) -> Self {
         assert!(config.max_pairs * 2 <= config.first_width);
+        assert!((0.0..=1.0).contains(&config.negative_slope));
+        assert!(config.negative_slope == 0. || config.family == Family::Switch);
         assert!((1..=2).contains(&config.widths.len()));
         assert!(config.widths.iter().all(|w| (1..=256).contains(w)));
         assert!(config.family == Family::Switch || config.widths.len() == 1);
@@ -631,6 +721,7 @@ impl Network {
         let mut blocks = Vec::new();
         for &width in &config.widths {
             let mut block = Block::new(config.family, ni, width, rng);
+            block.negative_slope = config.negative_slope;
             if let Some(study) = &config.training {
                 for w in &mut block.w {
                     *w *= study.init_scale;
@@ -928,13 +1019,27 @@ impl Block {
             layers.extend([hinges, combine]);
             return;
         }
-        let pass = if self.kind == Family::Lipschitz {
+        let leaky_switch = self.kind == Family::Switch && self.negative_slope > 0.;
+        let pass = if self.kind == Family::Lipschitz || leaky_switch {
             self.ni
         } else {
             0
         };
         let mut hinges = Dense::zero(self.ni, 2 * self.no + pass, Activation::Relu);
-        let mut combine = Dense::zero(2 * self.no + pass, self.no + pass, Activation::Identity);
+        let mut combine = Dense::zero(
+            2 * self.no + pass,
+            if leaky_switch {
+                self.no
+            } else {
+                self.no + pass
+            },
+            Activation::Identity,
+        );
+        let branch_weight = if leaky_switch {
+            1. - self.negative_slope
+        } else {
+            1.
+        };
         for j in 0..self.no {
             let b = self.b[j];
             hinges.b[2 * j] = b as f32;
@@ -943,9 +1048,9 @@ impl Block {
             } else {
                 b as f32
             };
-            combine.set(2 * j, j, 1.);
+            combine.set(2 * j, j, branch_weight);
             if self.kind != Family::Caps || j % 2 == 1 {
-                combine.set(2 * j + 1, j, -1.);
+                combine.set(2 * j + 1, j, -branch_weight);
             }
             for i in 0..self.ni {
                 let w = self.w[i * self.no + j];
@@ -971,7 +1076,17 @@ impl Block {
         }
         for i in 0..pass {
             hinges.set(i, 2 * self.no + i, 1.);
-            combine.set(2 * self.no + i, self.no + i, 1.);
+            if leaky_switch {
+                for j in 0..self.no {
+                    combine.set(
+                        2 * self.no + i,
+                        j,
+                        self.negative_slope * self.w[i * self.no + j].abs(),
+                    );
+                }
+            } else {
+                combine.set(2 * self.no + i, self.no + i, 1.);
+            }
         }
         layers.extend([hinges, combine]);
         if self.kind == Family::Lipschitz {
