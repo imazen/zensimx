@@ -1,6 +1,38 @@
 # Forest and boosting study — 2026-11-06
 
 The owner requested actual random-forest trials and new techniques in zensimx.
+**Pre-fit amendment:** the owner clarified that predictive quality from cached
+features, peer scores and human judgments is the priority, with a fair tuning
+effort. No scientific fit had started when this amendment was made. The search
+below supersedes the initial 40-fit screening table later in this document.
+
+The executed search has 38 configurations and three source folds (114 fits),
+followed by three full-FIT seeds for the best configuration within each of five
+families (15 fits): 129 fits. RF searches leaf size 2/16, sqrt/.33 feature
+subsampling and three input sets; Extra Trees searches leaf size 2/16 across
+those input sets; HGB searches 15/63 leaves across them. The sets are fx2 direct
+492, all 576 explicitly measured raw columns (f0..227 and f372..719), and fx2's
+984 direct/product inputs. Products use f32 multiplication of cached values.
+Only the direct set is assigned all-decreasing constraints. Other inputs may
+contain reference context; an all-zero vector is not a pixel-identity claim.
+
+For each unconstrained family, four further raw-feature configurations compare
+CDF/range label mapping and teacher mass 0/.25/1, with leaf size 8 and .33 feature
+sampling (RF/Extra) or 31 leaves (HGB). These are targeted ablations, not a full
+factorial. Range mapping uses only fitting-partition minimum and maximum.
+Forests have 128 trees and at most 2048 leaves; HGB has 200 stages, learning
+rate .05 and L2=1. Constrained RF and HGB controls use direct inputs, CDF targets
+and teacher mass 1. All settings are in `tree_study.candidates()` before fits.
+
+The within-family selection objective equally averages the four human
+populations and three folds, with equal pooled and within-reference signed
+SROCC. Teacher accuracy is reported but does not select the model. Missing
+panels fail selection. All finalist settings are frozen before development is
+scored. No single cross-population pooled correlation is optimized. Native
+packing is a finalist arithmetic check, not a prerequisite for a search fit.
+The original registration below explains the control choices; its 40-fit grid,
+two-fold schedule and fixed-finalist rule are superseded by this amendment.
+
 This study compares six tree configurations plus two human-only ablations.
 It uses the admitted four-human-population/CID22-SSIMULACRA2 preparation from
 the [activation study](MONOTONE_ACTIVATION_CURRICULUM_STUDY.md). It does not

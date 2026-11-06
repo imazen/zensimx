@@ -4714,3 +4714,9 @@ activation-curriculum-tests:
 # Content mirror only: network storage need not accept local ownership metadata.
 activation-curriculum-mirror source destination:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 2G --jobs 1 -- rsync -rt {{quote(source)}}/ {{quote(destination)}}/
+
+tree-study-tests parity_bin:
+    TMPDIR="$HOME/tmp" TREE_PARITY_BIN={{quote(parity_bin)}} python3 -B -m unittest discover -s scripts/tests -p test_tree_study.py -v
+
+tree-study baseline_plan parity_bin output:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 12G --jobs 4 -- python3 -B scripts/rev4_featpot/tree_study.py --baseline-plan {{quote(baseline_plan)}} --parity-bin {{quote(parity_bin)}} --output {{quote(output)}} --workers 4
