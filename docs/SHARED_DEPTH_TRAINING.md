@@ -49,3 +49,8 @@ No arm pin or expectation was altered. The new depth argv fixture passes and
 verifies that stripping just the four depth tokens restores the old command.
 Native executable smoke, unchanged-baseline replay, and the scientific fits
 remain required before reporting a depth result.
+
+The follow-up [activation and curriculum study](MONOTONE_ACTIVATION_CURRICULUM_STUDY.md)
+separates analytic identity/monotonicity checks, native optimization pilots and
+full-budget candidate trials. It includes anchored activations, dropout, curvature,
+matched-exposure order controls, replay and dataset/family mass accounting.
