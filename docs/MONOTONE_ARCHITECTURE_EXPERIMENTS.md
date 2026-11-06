@@ -364,5 +364,17 @@ covers the composer's hidden-unit reordering, in addition to cancellation.
 
 T1--T7 completion: all 66 fixed-final fits and corrected event receipts are
 complete. The result record includes all arms, source intervals and diagnostic
-limits. T9 remains a separate measurement. The retained-checkpoint study is complete:
+limits. T9 is complete: 9/9 fits with verified fixed population and teacher slots. The retained-checkpoint study is complete:
 15/15 exact replays, 1,800 checkpoints and all five TRAIN trajectory panels.
+
+## Remaining exact smooth-activation work
+
+Softplus, integrated Gaussian, rational and linear+tanh remain scalar-reference
+proposals, not native-trained candidates. The pinned runtime at zenanalyze
+`38dc80f73887dafae6bf5ebfe9a03be5ef78ebe0`, `zenpredict/src/model.rs`, supports
+only Identity, ReLU, fixed LeakyReLU and SmoothHinge activation wire codes.
+The exact smooth families require runtime/bake operators and their cross-target
+numerical qualification; a piecewise-linear approximation must be a separately
+named experiment. The native architecture matrix does not claim to complete
+that earlier smooth-activation proposal. Ordinary unconstrained SiLU/GELU remain
+nonmonotone negative controls, not safe replacements for a monotone hidden layer.

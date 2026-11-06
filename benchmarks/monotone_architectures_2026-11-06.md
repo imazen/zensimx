@@ -294,3 +294,32 @@ consistent with interference and recovery, not proof of a local minimum.
 All TRAIN family changes and per-seed population values are retained in the
 plot receipt; native panels are in `stages/*/STAGES.json` and `PANELS.parquet`.
 Stage summary SHA-256: `ef155a4b5406cf14888c7d46112d0dbaac5a31ee012ff6a74e7b15fdec354027`.
+
+## T9: ordering with population and teacher positions fixed
+
+9/9 fits and corrected receipts complete. Every native 600,000-event stream
+preserves population slots, teacher events, skips, replay slots and the final
+quarter. The prefix assertion checks all 450,000 positions; eligible human
+pair order changes. All nine final feature gates pass.
+
+| Order | KADID | TID2013 | KonFiG F | CID22 human |
+|---|---:|---:|---:|---:|
+| within_population_easy | 0.893390 | 0.897728 | 0.951875 | 0.902868 |
+| within_population_hard | 0.892008 | 0.900268 | 0.954642 | 0.902801 |
+| within_population_family | 0.892191 | 0.899777 | 0.948972 | 0.902784 |
+
+The large CID22-human losses from global easy/hard sorting disappear when
+supervision positions stay fixed: isolated easy/hard reach 0.902868/0.902801,
+versus global 0.896742/0.896746 and random control 0.902551. This supports
+population timing as a contributor to the global-schedule loss; it does not
+establish that isolated curricula generally beat random mixing.
+
+Within-population hard-first improves TID2013 by 0.001888 with a conditional
+source interval [0.001579, 0.002434], but reduces KADID by 0.001209 with interval
+[-0.002285, -0.000375]. Easy-first reduces TID2013 by 0.000653 with interval
+[-0.000888, -0.000359]. All three CID22-human intervals cross zero. No arm
+improves all four means. Preserve interleaved population exposure when testing
+distortion order, and keep random mixing as the control.
+
+Artifacts: `isolated-order-report/`, `isolated-order-bootstrap/`,
+`isolated-order-breakdowns/`, `isolated-order-qualified/`.
