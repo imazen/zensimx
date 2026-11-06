@@ -4830,3 +4830,13 @@ monotone-study-regressions:
 
 monotone-study-close root figures:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 2G --jobs 1 -- python3 -B scripts/rev4_featpot/monotone_close.py --root {{quote(root)}} --figures {{quote(figures)}}
+
+shaped-linear-native-tests:
+    cargo test --locked -p zensim-validate --bin bake_dial_refit linear_study -- --test-threads=1
+
+shaped-linear-native-check:
+    cargo test --locked -p zensim-validate --bin bake_dial_refit -- --test-threads=1
+    cargo clippy --locked -p zensim-validate --bin bake_dial_refit -- -D warnings
+
+shaped-linear-native-build:
+    cargo build --locked --release -p zensim-validate --bin bake_dial_refit

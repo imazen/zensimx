@@ -207,3 +207,13 @@ Method references: [convex least squares](https://www.cvxpy.org/examples/basic/l
 [grouped validation](https://scikit-learn.org/stable/modules/cross_validation.html#cross-validation-iterators-for-grouped-data),
 [random-label capacity](https://arxiv.org/abs/1611.03530),
 [selection overfitting](https://www.jmlr.org/papers/v11/cawley10a.html).
+
+## Implementation status
+
+The private `bake_dial_refit linear-study` adapter reuses the Rust Gram owner's
+Cholesky solver, with active-set nonnegative fitting and independent KKT/gap
+recomputation. The canonical baker and Predictor evaluate the f32 projection;
+the existing native identity-pinned spline owner performs optional calibration.
+Small correlated/singular/zero-column and active-bound fixtures pass. All 41
+bake-tool tests and scoped clippy pass. No scientific fit has run at this point;
+the independent Python numeric reference and input/fold admission remain gates.

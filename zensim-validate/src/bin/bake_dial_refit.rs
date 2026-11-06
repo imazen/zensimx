@@ -87,6 +87,8 @@ use clap::{Args, Parser, Subcommand};
 use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
 use zenpredict::{Activation, MetadataType, Model, WeightDtype, WeightStorage, f16_bits_to_f32};
 use zenpredict_bake::{BakeLayer, BakeMetadataEntry, BakeRequest, bake};
+#[path = "bake_dial_refit/linear_study.rs"]
+mod linear_study;
 #[path = "../spline_segments.rs"]
 mod spline_segments;
 use zensim_validate::block_profile;
@@ -172,6 +174,8 @@ enum Cmd {
     ReadMeta(ReadMetaArgs),
     /// Read model dimensions and stored coefficient counts without changing it.
     Inspect(InspectArgs),
+    /// Certified fixed-basis quadratic fit for the registered opaque-vector study.
+    LinearStudy(linear_study::Args),
     /// Re-export a private monotone-research spline using positive bounded segments.
     /// No fitting; preserves the original file and records any slope rounding repair.
     RepairResearchSpline(RepairResearchSplineArgs),
@@ -6072,6 +6076,7 @@ fn main() -> ExitCode {
         Cmd::AppendMeta(a) => cmd_append_meta(a).map(|_| false),
         Cmd::ReadMeta(a) => cmd_read_meta(a).map(|_| false),
         Cmd::Inspect(a) => cmd_inspect(a).map(|_| false),
+        Cmd::LinearStudy(a) => linear_study::run(a).map(|_| false),
         Cmd::RepairResearchSpline(a) => cmd_repair_research_spline(a).map(|_| false),
         Cmd::Interpolate(a) => cmd_interpolate(a).map(|_| false),
         Cmd::FitLasso(a) => cmd_fit_lasso(a).map(|_| false),
