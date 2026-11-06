@@ -12,6 +12,9 @@ pub(super) enum Order {
     Hard,
     Family,
     TeacherWarm,
+    WithinPopulationEasy,
+    WithinPopulationHard,
+    WithinPopulationFamily,
 }
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
@@ -171,6 +174,62 @@ fn permute(
     // Every fifth prefix event stays on a random replay stream; the final 25%
     // is untouched. Reinsert replay after each four curriculum events.
     let original = draws[..prefix].to_vec();
+    if matches!(
+        order,
+        Order::WithinPopulationEasy | Order::WithinPopulationHard | Order::WithinPopulationFamily
+    ) {
+        let mut slots = BTreeMap::<usize, Vec<usize>>::new();
+        for (i, &draw) in original.iter().enumerate() {
+            if i % 5 == 4 {
+                continue;
+            }
+            if let sampling::Draw::Pair { train_pos, .. } = draw
+                && !teacher[train_pos]
+            {
+                slots.entry(train_pos).or_default().push(i);
+            }
+        }
+        for positions in slots.values() {
+            let mut indices = positions.clone();
+            indices.sort_by(|&a, &b| match order {
+                Order::WithinPopulationEasy => difficulty[b].total_cmp(&difficulty[a]),
+                Order::WithinPopulationHard => difficulty[a].total_cmp(&difficulty[b]),
+                Order::WithinPopulationFamily => {
+                    let family = |i: usize| match original[i] {
+                        sampling::Draw::Pair { train_pos, ia, ib } => (
+                            families[train_pos][ia].min(families[train_pos][ib]),
+                            families[train_pos][ia].max(families[train_pos][ib]),
+                        ),
+                        _ => unreachable!(),
+                    };
+                    family(a).cmp(&family(b))
+                }
+                _ => unreachable!(),
+            });
+            for (&destination, &source) in positions.iter().zip(&indices) {
+                draws[destination] = original[source];
+            }
+        }
+        // Check the actual realized stream, not just a small schedule fixture.
+        for (i, &old) in original.iter().enumerate() {
+            match old {
+                sampling::Draw::Pair { train_pos, .. } if !teacher[train_pos] && i % 5 != 4 => {
+                    assert!(
+                        matches!(draws[i], sampling::Draw::Pair {train_pos: g, ..} if g == train_pos)
+                    );
+                }
+                _ => assert_eq!(draws[i], old, "protected order slot changed"),
+            }
+        }
+        println!(
+            "TRAINING_ORDER_ISOLATION {}",
+            serde_json::json!({"population_slots_equal":true,"teacher_events_fixed":true,
+                "skips_fixed":true,"prefix_replay_fixed":true,
+                "checked_prefix_events":prefix,"eligible_human_events":slots.values().map(Vec::len).sum::<usize>(),
+                "changed_events":original.iter().zip(&draws[..prefix]).filter(|(a,b)|a!=b).count()})
+        );
+        return;
+    }
     let mut indices = (0..prefix).filter(|i| i % 5 != 4).collect::<Vec<_>>();
     indices.sort_by(|&a, &b| match order {
         Order::Easy => difficulty[b].total_cmp(&difficulty[a]),
@@ -198,7 +257,10 @@ fn permute(
             };
             is_teacher(b).cmp(&is_teacher(a))
         }
-        Order::Random => unreachable!(),
+        Order::Random
+        | Order::WithinPopulationEasy
+        | Order::WithinPopulationHard
+        | Order::WithinPopulationFamily => unreachable!(),
     });
     let mut curriculum = indices.into_iter();
     for i in 0..prefix {
@@ -351,6 +413,85 @@ impl Events {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn within_population_orders_keep_teacher_skips_and_every_population_slot() {
+        let events = (0..600)
+            .map(|i| {
+                if i % 31 == 0 {
+                    sampling::Draw::GroupTooSmall
+                } else if i % 17 == 0 {
+                    sampling::Draw::SameRow {
+                        train_pos: i % 3,
+                        row: i,
+                    }
+                } else {
+                    sampling::Draw::Pair {
+                        train_pos: i % 3,
+                        ia: i,
+                        ib: i + 1,
+                    }
+                }
+            })
+            .collect::<Vec<_>>();
+        let difficulty = (0..600)
+            .map(|i| ((i * 137) % 601) as f64)
+            .collect::<Vec<_>>();
+        let families = vec![(0..601).map(|i| (i * 13 % 23) as u32).collect::<Vec<_>>(); 3];
+        for order in [
+            Order::WithinPopulationEasy,
+            Order::WithinPopulationHard,
+            Order::WithinPopulationFamily,
+        ] {
+            let mut changed = events.clone();
+            permute(
+                &mut changed,
+                order,
+                &difficulty,
+                &families,
+                &[false, false, true],
+            );
+            let mut old_codes = events.iter().map(|&d| code(d)).collect::<Vec<_>>();
+            let mut new_codes = changed.iter().map(|&d| code(d)).collect::<Vec<_>>();
+            old_codes.sort();
+            new_codes.sort();
+            assert_eq!(old_codes, new_codes);
+            assert_eq!(events[450..], changed[450..]);
+            let mut by_population = [Vec::new(), Vec::new()];
+            for (i, &old) in events[..450].iter().enumerate() {
+                match old {
+                    sampling::Draw::Pair { train_pos, .. } if train_pos < 2 && i % 5 != 4 => {
+                        let sampling::Draw::Pair {
+                            train_pos: g,
+                            ia,
+                            ib,
+                        } = changed[i]
+                        else {
+                            panic!("pair slot lost")
+                        };
+                        assert_eq!(train_pos, g);
+                        by_population[g].push((
+                            difficulty[ia],
+                            families[g][ia].min(families[g][ib]),
+                            families[g][ia].max(families[g][ib]),
+                        ));
+                    }
+                    _ => assert_eq!(old, changed[i]),
+                }
+            }
+            for g in 0..2 {
+                assert!(events.iter().zip(&changed).any(
+                    |(&a, &b)| matches!(a,sampling::Draw::Pair {train_pos,..} if train_pos==g)
+                        && a != b
+                ));
+                assert!(by_population[g].windows(2).all(|p| match order {
+                    Order::WithinPopulationEasy => p[0].0 >= p[1].0,
+                    Order::WithinPopulationHard => p[0].0 <= p[1].0,
+                    Order::WithinPopulationFamily => (p[0].1, p[0].2) <= (p[1].1, p[1].2),
+                    _ => unreachable!(),
+                }));
+            }
+        }
+    }
     #[test]
     fn curricula_preserve_multiset_tail_and_replay() {
         let events = (0..100)

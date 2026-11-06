@@ -180,6 +180,16 @@ def summarize(root, breakdowns, output, control_root=None):
                 raise ValueError('random-event order drift: '+cell)
             if options.get('teacher_mass')==0 and any(m['pair_events'] for m in event['mass'] if m['group']=='cid22'):
                 raise ValueError('zero-mass teacher still sampled: '+cell)
+            if options.get('order','').startswith('within_population_'):
+                isolated=records((root/cell/'train.log').read_text(),'TRAINING_ORDER_ISOLATION ')
+                if len(isolated)!=1:raise ValueError('isolated-order receipt missing/duplicated: '+cell)
+                proof=isolated[0]
+                if not all(proof[k] for k in ('population_slots_equal','teacher_events_fixed','skips_fixed','prefix_replay_fixed')):
+                    raise ValueError('population timing changed: '+cell)
+                if proof['checked_prefix_events']!=event['events']*3//4 or not 0<proof['changed_events']<=proof['eligible_human_events']:
+                    raise ValueError('isolated order absent/incomplete: '+cell)
+                if checks['ordered_matches_control']:raise ValueError('isolated order did not change the stream: '+cell)
+                checks['order_isolation']=proof
             event_checks[cell]=checks
     aggregates={}
     for arm in plan['arms']:

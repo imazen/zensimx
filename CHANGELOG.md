@@ -4,6 +4,10 @@
 
 ### Research
 
+- Register and implement within-population ordering controls that preserve every
+  teacher, skipped and replay event position, separating distortion order from
+  supervision timing.
+
 - Add certified leaky activation switches and signed source/family summaries
   for the monotone study; retain three-seed neutral byte replay and explicit
   fixed-final reporting (`4a34f974`).

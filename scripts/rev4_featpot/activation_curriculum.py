@@ -35,6 +35,11 @@ ARCHITECTURE_ARMS = {
 }
 
 LEAKY_ARMS = {'switch_leaky_05': {'negative_slope': .05}, 'switch_leaky_10': {'negative_slope': .1}}
+ISOLATED_ORDER_ARMS = {
+    'within_population_easy': {'order': 'within_population_easy'},
+    'within_population_hard': {'order': 'within_population_hard'},
+    'within_population_family': {'order': 'within_population_family'},
+}
 TRAINING_ARMS = {
     'control': {},
     'init_half': {'init_scale': .5}, 'init_double': {'init_scale': 2.},
@@ -180,12 +185,12 @@ def audit(out):
     print(json.dumps(result,indent=2))
 
 
-def native(plan_path, output, workers, *, architecture=False, binary_dir=None, metadata=None, long=False, prepare_only=False, training=False, replay_control=False, leaky=False, stage_replay=False):
+def native(plan_path, output, workers, *, architecture=False, binary_dir=None, metadata=None, long=False, prepare_only=False, training=False, replay_control=False, leaky=False, stage_replay=False, isolated_orders=False):
     import numpy as np
     import pyarrow as pa
     import pyarrow.parquet as pq
-    if sum((leaky,replay_control,stage_replay))>1:
-        raise ValueError('leaky arms, neutral replay and stage replay are separate registered runs')
+    if sum((leaky,replay_control,stage_replay,isolated_orders))>1:
+        raise ValueError('leaky arms, neutral replay, stage replay and isolated orders are separate registered runs')
     if not 1 <= workers <= (12 if architecture and long else 6 if architecture else 3):
         raise ValueError('pilot concurrency exceeds the registered aggregate memory budget')
     base = json.loads(plan_path.read_text())
@@ -238,7 +243,7 @@ def native(plan_path, output, workers, *, architecture=False, binary_dir=None, m
     import v2_lodo_mlp as owner
     epochs, draws = (120,5000) if training and not replay_control else (120,50000) if long else (12,5000)
     owner.EPOCHS,owner.PAIRS_PER_EPOCH,owner.LOG_EVERY = epochs,draws,1
-    training_options = LEAKY_ARMS if leaky else TRAINING_ARMS
+    training_options = ISOLATED_ORDER_ARMS if isolated_orders else LEAKY_ARMS if leaky else TRAINING_ARMS
     arms = (('control',) if replay_control else tuple(training_options)) if training else tuple(ARCHITECTURE_ARMS) if architecture else ARMS
     if stage_replay:arms=('control','easy_first','hard_first','family_blocks','teacher_warm')
     seeds = ARCHITECTURE_SEEDS if architecture else SEEDS
@@ -693,6 +698,7 @@ def main():
     p.add_argument('--replay-control',action='store_true')
     p.add_argument('--leaky-switches',action='store_true')
     p.add_argument('--stage-replay',action='store_true')
+    p.add_argument('--isolated-orders',action='store_true')
     p=sub.add_parser('compare-neutral')
     for name in ('reference','candidate','binary','output'): p.add_argument('--'+name,type=Path,required=True)
     p=sub.add_parser('families')
@@ -731,7 +737,7 @@ def main():
         replay_controls(args.frozen,args.binary_dir,args.output)
     elif args.action == 'training':
         native(args.baseline_plan,args.output,args.workers,architecture=True,training=True,
-               binary_dir=args.binary_dir,metadata=args.metadata,replay_control=args.replay_control,leaky=args.leaky_switches,stage_replay=args.stage_replay)
+               binary_dir=args.binary_dir,metadata=args.metadata,replay_control=args.replay_control,leaky=args.leaky_switches,stage_replay=args.stage_replay,isolated_orders=args.isolated_orders)
     elif args.action == 'architectures':
         native(args.baseline_plan,args.output,args.workers,architecture=True,
                binary_dir=args.binary_dir,metadata=args.metadata,long=args.long,prepare_only=args.prepare_only)

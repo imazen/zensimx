@@ -307,3 +307,25 @@ inspection and tie accounting give 132,320 independent trainable coefficients
 for shared ReLU, SmoothHinge and the one-block switch, before boundary sparsity;
 the ramp control has 110,384 and the two-block switch 134,368. Expanded bake
 sizes are reported separately. These counts do not measure execution cost.
+
+## T9: isolate order from population timing, registered before fitting
+
+Code inspection identifies two additional interventions in the original order
+arms: easy/hard sorting places the teacher's neutral difficulty near the middle,
+and family sorting groups populations before sorting their family pairs.
+Those trials measure joint schedules. They do not isolate within-population order.
+
+Add easy, hard and family ordering within each human population's existing slots:
+three arms times the same three seeds, 120 x 5,000 draws, fixed epoch 119,
+shared switch [128,64], and all neutral training settings. Only valid human
+pairs in the first 75%, excluding every fifth replay slot, may move. Preserve
+every population slot, teacher event, skipped event, replay slot and the entire
+final quarter. Native assertions check the realized 600,000-event stream;
+unit tests independently check sorting, preservation and actual changes.
+This registration follows the code finding, not a selected development winner.
+
+A three-seed neutral 12 x 5,000 byte replay gates the new binary before these
+nine fits. Report all three arms against the existing neutral control, including
+source intervals and family panels; no additional checkpoint or hyperparameter
+selection. Together with the earlier global schedules, these controls distinguish
+within-population order from the timing of supervision populations.
