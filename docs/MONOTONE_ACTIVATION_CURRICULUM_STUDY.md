@@ -3,6 +3,9 @@
 The [paper-derived architecture queue](MONOTONE_ARCHITECTURE_EXPERIMENTS.md)
 continues this study with mixed caps, activation switches, splines and
 Lipschitz residuals, followed by separately controlled training experiments.
+That protocol owns the executed native follow-up and supersedes the earlier
+development-based candidate-selection suggestion below: tuning uses source-
+grouped TRAIN folds; exposed development is reporting only.
 
 Zensimx is the experiment platform. This study does not modify serving profiles,
 feature extraction, the running shared-depth comparison, or its frozen inputs.
@@ -201,5 +204,5 @@ The subsequent [tree study](TREE_REGRESSION_STUDY.md) implements this join for
 the same admitted rows: canonical bank pair keys supply distortion codes,
 severity knobs and decoded reference hashes. Its metadata artifact retains
 complete row order and checks reference separation across the inner folds and
-development. This supplies metadata for a future neural curriculum; it does
+development. The paper-derived neural curriculum now uses this join; it does
 not turn the earlier coverage-walk pilot into a family-order experiment.

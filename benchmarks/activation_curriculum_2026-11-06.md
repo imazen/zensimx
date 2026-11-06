@@ -2,7 +2,12 @@
 
 ## Scope and missing work
 
-New analytic activations have **not** been fitted or baked in Rust. Family curricula and dropout training are not implemented by this study. General anchoring needs the native forward/backward and bake/runtime work specified in the [protocol](../docs/MONOTONE_ACTIVATION_CURRICULUM_STUDY.md); family schedules additionally need a complete distortion metadata join.
+This is the historical scalar-probe/short-pilot phase. Its [paper-derived
+follow-up](monotone_architectures_2026-11-06.md) implements native mixed caps,
+activation switches, positive-slope splines, Lipschitz residuals, leaky switches,
+hidden dropout and real family curricula. General softplus/Gaussian/rational/
+linear+tanh native operators remain unimplemented; their evidence here is scalar
+feasibility only. The follow-up uses the tree study's verified distortion join.
 
 Completed: 18/18 short native optimization fits; all four development populations per fit have signed-quality, within-reference and scatter panels, zero dropped rows, and measured scatter. Eight scalar positive controls and two negative controls have independent numerical probes. This is development evidence, not qualification or independent final-test accuracy.
 
@@ -35,7 +40,7 @@ Matched observations at this short horizon:
 
 The [scalar audit](activation_curriculum_2026-11-06.analytic.json) checks ReLU, SmoothHinge, anchored leaky/softplus/Gaussian/rational/linear+tanh and a positive-slope nonconvex spline. Each has 8,193 grid points, no decreasing f32-rounded values, identity checks and finite-difference gradients in input and bias. Ordinary SiLU and GELU produce the expected decreases despite having an identity anchor. This uses f64 scalar formulas rounded to f32; it is **not** native f32 implementation qualification.
 
-Five focused construction tests cover the missing-anchor-gradient failure, an exhaustive last-hidden dropout mask expectation/identity/order check, nonconvex monotonicity, extreme scalar inputs, and the SiLU/GELU negative controls. The first-layer independent-mask counterexample decreases from 1 to 0 as one feature increases; tied masks retain the certified response. Four synthetic pair schedules retain identical event multisets and a common 25% tail. No real distortion curriculum was executed.
+Five focused construction tests cover the missing-anchor-gradient failure, an exhaustive last-hidden dropout mask expectation/identity/order check, nonconvex monotonicity, extreme scalar inputs, and the SiLU/GELU negative controls. The first-layer independent-mask counterexample decreases from 1 to 0 as one feature increases; tied masks retain the certified response. Four synthetic pair schedules retain identical event multisets and a common 25% tail. No real distortion curriculum was executed in this pilot; those native experiments belong to the linked follow-up.
 
 ## Reproduction and resources
 
