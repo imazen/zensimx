@@ -1,0 +1,125 @@
+{
+  "scope": "independent numerical feasibility; not Rust/f32 runtime qualification or a fit",
+  "code_sha256": "93a9e825e64926575417b8639702d657f19d0c6ecedd973fc0149bc19aa501b2",
+  "activations": {
+    "relu": {
+      "grid_points": 8193,
+      "minimum_derivative": 0.0,
+      "f32_rounded_grid_decreases": 0,
+      "largest_decrease": 0.0,
+      "identity_all_bias_probes": true,
+      "max_gradient_error_z": 1.0279563866788521e-09,
+      "max_gradient_error_bias": 8.881784197001252e-10
+    },
+    "smooth_hinge": {
+      "grid_points": 8193,
+      "minimum_derivative": 0.0,
+      "f32_rounded_grid_decreases": 0,
+      "largest_decrease": 0.0,
+      "identity_all_bias_probes": true,
+      "max_gradient_error_z": 1.0279563866788521e-09,
+      "max_gradient_error_bias": 8.881784197001252e-10
+    },
+    "leaky": {
+      "grid_points": 8193,
+      "minimum_derivative": 0.1,
+      "f32_rounded_grid_decreases": 0,
+      "largest_decrease": 0.0,
+      "identity_all_bias_probes": true,
+      "max_gradient_error_z": 1.0279563866788521e-09,
+      "max_gradient_error_bias": 8.881784197001252e-10
+    },
+    "softplus": {
+      "grid_points": 8193,
+      "minimum_derivative": 6.616261056709485e-112,
+      "f32_rounded_grid_decreases": 0,
+      "largest_decrease": 0.0,
+      "identity_all_bias_probes": true,
+      "max_gradient_error_z": 1.0279563866788521e-09,
+      "max_gradient_error_bias": 1.3639702700629641e-09
+    },
+    "gaussian": {
+      "grid_points": 8193,
+      "minimum_derivative": 0.0,
+      "f32_rounded_grid_decreases": 0,
+      "largest_decrease": 0.0,
+      "identity_all_bias_probes": true,
+      "max_gradient_error_z": 1.0279563866788521e-09,
+      "max_gradient_error_bias": 8.881784197001252e-10
+    },
+    "rational": {
+      "grid_points": 8193,
+      "minimum_derivative": 0.0,
+      "f32_rounded_grid_decreases": 0,
+      "largest_decrease": 0.0,
+      "identity_all_bias_probes": true,
+      "max_gradient_error_z": 1.9453680888403824e-09,
+      "max_gradient_error_bias": 2.0061268202198335e-09
+    },
+    "linear_tanh": {
+      "grid_points": 8193,
+      "minimum_derivative": 1.0,
+      "f32_rounded_grid_decreases": 0,
+      "largest_decrease": 0.0,
+      "identity_all_bias_probes": true,
+      "max_gradient_error_z": 1.0279563866788521e-09,
+      "max_gradient_error_bias": 1.7763568394002505e-09
+    },
+    "spline_reference": {
+      "grid_points": 8193,
+      "minimum_derivative": 0.2,
+      "f32_rounded_grid_decreases": 0,
+      "largest_decrease": 0.0,
+      "identity_all_bias_probes": true,
+      "max_gradient_error_z": 3.3182914194185287e-09,
+      "max_gradient_error_bias": 3.552713678800501e-09
+    },
+    "silu_negative_control": {
+      "grid_points": 8193,
+      "minimum_derivative": -0.09983928139183755,
+      "f32_rounded_grid_decreases": 3932,
+      "largest_decrease": 0.0007799863815307617,
+      "identity_all_bias_probes": true,
+      "max_gradient_error_z": 2.585275771238571e-09,
+      "max_gradient_error_bias": 2.793951514590276e-09
+    },
+    "gelu_negative_control": {
+      "grid_points": 8193,
+      "minimum_derivative": -0.12890414044830545,
+      "f32_rounded_grid_decreases": 1725,
+      "largest_decrease": 0.0010070353746414185,
+      "identity_all_bias_probes": true,
+      "max_gradient_error_z": 1.0279563866788521e-09,
+      "max_gradient_error_bias": 1.3171099766395855e-09
+    }
+  },
+  "dropout_counterexample": {
+    "independent_mask": [
+      1.0,
+      0.5,
+      0.0
+    ],
+    "tied_mask": [
+      1.0,
+      1.0,
+      1.0
+    ]
+  },
+  "schedule_probe": {
+    "events": 280,
+    "schedules": [
+      "random",
+      "easy_first",
+      "hard_first",
+      "family_blocks"
+    ],
+    "identical_multisets": true,
+    "shared_consolidation_events": 70,
+    "minimum_replay_proposal_mass": 0.028571428571428574
+  },
+  "limitations": [
+    "f32-rounded scalar values are not native f32 activation evaluation",
+    "schedule fixtures are not dataset category assignments",
+    "custom activations require native trainer and bake/runtime implementation"
+  ]
+}

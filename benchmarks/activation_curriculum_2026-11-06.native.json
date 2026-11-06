@@ -1,0 +1,422 @@
+{
+  "checked_utc": "2026-11-06T17:44:12.901230+00:00",
+  "required": 18,
+  "complete": 18,
+  "results": [
+    {
+      "arm": "control",
+      "seed_index": 2,
+      "result_sha256": "9951fcf37aa673437f55a29ce771c82c8e26e4f177e8033326fa94b827180ac3",
+      "metrics": {
+        "human_kadid_development": {
+          "pooled_srocc": 0.8925747492923339,
+          "within_reference_srocc": 0.8995327935
+        },
+        "human_tid2013_development": {
+          "pooled_srocc": 0.9009286930642585,
+          "within_reference_srocc": 0.9044580396
+        },
+        "human_konfig_development": {
+          "pooled_srocc": 0.9436671053963754,
+          "within_reference_srocc": 0.9436671054
+        },
+        "human_cid22_a25_development": {
+          "pooled_srocc": 0.9027156091042101,
+          "within_reference_srocc": 0.9660226139
+        }
+      }
+    },
+    {
+      "arm": "control",
+      "seed_index": 1,
+      "result_sha256": "e18108e6b5b6752e597f9c2b5503e8d3bfda4d32ec16f3027e605fdd3cd24b0a",
+      "metrics": {
+        "human_kadid_development": {
+          "pooled_srocc": 0.8964111602772405,
+          "within_reference_srocc": 0.9022059726
+        },
+        "human_tid2013_development": {
+          "pooled_srocc": 0.8998740206248265,
+          "within_reference_srocc": 0.9049441941
+        },
+        "human_konfig_development": {
+          "pooled_srocc": 0.9319631467044649,
+          "within_reference_srocc": 0.9319631467
+        },
+        "human_cid22_a25_development": {
+          "pooled_srocc": 0.901483496239942,
+          "within_reference_srocc": 0.9658004422
+        }
+      }
+    },
+    {
+      "arm": "control",
+      "seed_index": 0,
+      "result_sha256": "a78b53aaa2c508a0bf7ea1cc577822372a6bbe0e2104aebe2b217da174c577a4",
+      "metrics": {
+        "human_kadid_development": {
+          "pooled_srocc": 0.8959869535768562,
+          "within_reference_srocc": 0.9013425141
+        },
+        "human_tid2013_development": {
+          "pooled_srocc": 0.9009611009967956,
+          "within_reference_srocc": 0.905299561
+        },
+        "human_konfig_development": {
+          "pooled_srocc": 0.9281360737065911,
+          "within_reference_srocc": 0.9281360737
+        },
+        "human_cid22_a25_development": {
+          "pooled_srocc": 0.9008356875440232,
+          "within_reference_srocc": 0.9644138942
+        }
+      }
+    },
+    {
+      "arm": "walk",
+      "seed_index": 0,
+      "result_sha256": "eb8a0df1956e97714877467014a650d569b48661850c595e1fd37023fbdef2e0",
+      "metrics": {
+        "human_kadid_development": {
+          "pooled_srocc": 0.889743055678888,
+          "within_reference_srocc": 0.8964619832
+        },
+        "human_tid2013_development": {
+          "pooled_srocc": 0.9042452334301297,
+          "within_reference_srocc": 0.9072094699
+        },
+        "human_konfig_development": {
+          "pooled_srocc": 0.9474739293307685,
+          "within_reference_srocc": 0.9474739293
+        },
+        "human_cid22_a25_development": {
+          "pooled_srocc": 0.9022856759284731,
+          "within_reference_srocc": 0.9666924499
+        }
+      }
+    },
+    {
+      "arm": "walk",
+      "seed_index": 2,
+      "result_sha256": "48f2f6c4ff0148382e9e8bbe5856ef5f8100428af95da80b7514676ea74ea452",
+      "metrics": {
+        "human_kadid_development": {
+          "pooled_srocc": 0.8943123930122815,
+          "within_reference_srocc": 0.9040159268
+        },
+        "human_tid2013_development": {
+          "pooled_srocc": 0.8973534036497178,
+          "within_reference_srocc": 0.9027344841
+        },
+        "human_konfig_development": {
+          "pooled_srocc": 0.9364584387972056,
+          "within_reference_srocc": 0.9364584388
+        },
+        "human_cid22_a25_development": {
+          "pooled_srocc": 0.90077192253849,
+          "within_reference_srocc": 0.9669594425
+        }
+      }
+    },
+    {
+      "arm": "walk",
+      "seed_index": 1,
+      "result_sha256": "ab287ae93a2e0b706e5b0f379d7609a0cb7e21ddf790fa7818a7fccb543fc7a2",
+      "metrics": {
+        "human_kadid_development": {
+          "pooled_srocc": 0.8896488390811429,
+          "within_reference_srocc": 0.8956693066
+        },
+        "human_tid2013_development": {
+          "pooled_srocc": 0.9008691499183669,
+          "within_reference_srocc": 0.9044348894
+        },
+        "human_konfig_development": {
+          "pooled_srocc": 0.9362356990989167,
+          "within_reference_srocc": 0.9362356991
+        },
+        "human_cid22_a25_development": {
+          "pooled_srocc": 0.9010661323985787,
+          "within_reference_srocc": 0.9655041398
+        }
+      }
+    },
+    {
+      "arm": "lr_low",
+      "seed_index": 1,
+      "result_sha256": "754469f9ee126aea15d164f6f2ed31285cf273d7ecc82974872ae1617a788c4d",
+      "metrics": {
+        "human_kadid_development": {
+          "pooled_srocc": 0.8961607040620893,
+          "within_reference_srocc": 0.9020738575
+        },
+        "human_tid2013_development": {
+          "pooled_srocc": 0.9005309242732374,
+          "within_reference_srocc": 0.9049210374
+        },
+        "human_konfig_development": {
+          "pooled_srocc": 0.9373696466538423,
+          "within_reference_srocc": 0.9373696467
+        },
+        "human_cid22_a25_development": {
+          "pooled_srocc": 0.9018381890832201,
+          "within_reference_srocc": 0.9651829855
+        }
+      }
+    },
+    {
+      "arm": "lr_low",
+      "seed_index": 0,
+      "result_sha256": "eb97c4a9b539275b7974328971f55c4838337986b8d76f563291bb746861a8db",
+      "metrics": {
+        "human_kadid_development": {
+          "pooled_srocc": 0.8956768621876569,
+          "within_reference_srocc": 0.901629393
+        },
+        "human_tid2013_development": {
+          "pooled_srocc": 0.9013892200738434,
+          "within_reference_srocc": 0.905601663
+        },
+        "human_konfig_development": {
+          "pooled_srocc": 0.9355269818770882,
+          "within_reference_srocc": 0.9355269819
+        },
+        "human_cid22_a25_development": {
+          "pooled_srocc": 0.9022428155521546,
+          "within_reference_srocc": 0.9655642468
+        }
+      }
+    },
+    {
+      "arm": "lr_low",
+      "seed_index": 2,
+      "result_sha256": "b57e8c5ecbbd536a3506e0c676336fa1b6efb6de55425c4e971ae54820b14572",
+      "metrics": {
+        "human_kadid_development": {
+          "pooled_srocc": 0.892224159364139,
+          "within_reference_srocc": 0.8992133402
+        },
+        "human_tid2013_development": {
+          "pooled_srocc": 0.9005478998569474,
+          "within_reference_srocc": 0.9051120413
+        },
+        "human_konfig_development": {
+          "pooled_srocc": 0.9377746279234586,
+          "within_reference_srocc": 0.9377746279
+        },
+        "human_cid22_a25_development": {
+          "pooled_srocc": 0.9034574242972568,
+          "within_reference_srocc": 0.9662572584
+        }
+      }
+    },
+    {
+      "arm": "l2_high",
+      "seed_index": 0,
+      "result_sha256": "2c96e6e29a34c973775515948c3cec51552b34990a5aa104ba702063ad8557ed",
+      "metrics": {
+        "human_kadid_development": {
+          "pooled_srocc": 0.8955035249182604,
+          "within_reference_srocc": 0.9007218871
+        },
+        "human_tid2013_development": {
+          "pooled_srocc": 0.9005053322947657,
+          "within_reference_srocc": 0.9045471627
+        },
+        "human_konfig_development": {
+          "pooled_srocc": 0.9351422496709527,
+          "within_reference_srocc": 0.9351422497
+        },
+        "human_cid22_a25_development": {
+          "pooled_srocc": 0.9012519834257351,
+          "within_reference_srocc": 0.9650925398
+        }
+      }
+    },
+    {
+      "arm": "l2_high",
+      "seed_index": 1,
+      "result_sha256": "2c93e27293e5ca7fcf03d99b07493557e22ae1b52549266b014978b2bd148c30",
+      "metrics": {
+        "human_kadid_development": {
+          "pooled_srocc": 0.8980566433175804,
+          "within_reference_srocc": 0.9037544405
+        },
+        "human_tid2013_development": {
+          "pooled_srocc": 0.8994149082472174,
+          "within_reference_srocc": 0.9042647309
+        },
+        "human_konfig_development": {
+          "pooled_srocc": 0.9309911916573859,
+          "within_reference_srocc": 0.9309911917
+        },
+        "human_cid22_a25_development": {
+          "pooled_srocc": 0.9014244458855533,
+          "within_reference_srocc": 0.964763378
+        }
+      }
+    },
+    {
+      "arm": "l2_high",
+      "seed_index": 2,
+      "result_sha256": "1137ee0f4347efb481990b0af4c14d238618a19f80fcc7f9b5e43b66a0eca51a",
+      "metrics": {
+        "human_kadid_development": {
+          "pooled_srocc": 0.8922565019708856,
+          "within_reference_srocc": 0.898724527
+        },
+        "human_tid2013_development": {
+          "pooled_srocc": 0.9014261291081217,
+          "within_reference_srocc": 0.906226731
+        },
+        "human_konfig_development": {
+          "pooled_srocc": 0.9350815024805103,
+          "within_reference_srocc": 0.9350815025
+        },
+        "human_cid22_a25_development": {
+          "pooled_srocc": 0.9030767357531936,
+          "within_reference_srocc": 0.966052636
+        }
+      }
+    },
+    {
+      "arm": "teacher_half",
+      "seed_index": 1,
+      "result_sha256": "6694d8e839b9dc5277fb7630700a0bc341180de598cb1b947809da24e1aaac0c",
+      "metrics": {
+        "human_kadid_development": {
+          "pooled_srocc": 0.8924935320583645,
+          "within_reference_srocc": 0.8967160605
+        },
+        "human_tid2013_development": {
+          "pooled_srocc": 0.8997948012341802,
+          "within_reference_srocc": 0.9037114292
+        },
+        "human_konfig_development": {
+          "pooled_srocc": 0.926070669231548,
+          "within_reference_srocc": 0.9260706692
+        },
+        "human_cid22_a25_development": {
+          "pooled_srocc": 0.8998015118844308,
+          "within_reference_srocc": 0.9641208971
+        }
+      }
+    },
+    {
+      "arm": "teacher_half",
+      "seed_index": 0,
+      "result_sha256": "582126f39c2067a4f6e87633245f3ba3ad751cf055aafb602b4c29e8f1dff83e",
+      "metrics": {
+        "human_kadid_development": {
+          "pooled_srocc": 0.8904525608182795,
+          "within_reference_srocc": 0.8940564854
+        },
+        "human_tid2013_development": {
+          "pooled_srocc": 0.9002836208832816,
+          "within_reference_srocc": 0.9039163139
+        },
+        "human_konfig_development": {
+          "pooled_srocc": 0.9234990381694846,
+          "within_reference_srocc": 0.9234990382
+        },
+        "human_cid22_a25_development": {
+          "pooled_srocc": 0.8993000136607668,
+          "within_reference_srocc": 0.9637992545
+        }
+      }
+    },
+    {
+      "arm": "teacher_half",
+      "seed_index": 2,
+      "result_sha256": "6a0a37e9bedface77f5c717bf1132f0ce0c6ffb9e6d15f4d4a769d9627d65f08",
+      "metrics": {
+        "human_kadid_development": {
+          "pooled_srocc": 0.894246986364582,
+          "within_reference_srocc": 0.9000064371
+        },
+        "human_tid2013_development": {
+          "pooled_srocc": 0.8987752373883302,
+          "within_reference_srocc": 0.9037797179
+        },
+        "human_konfig_development": {
+          "pooled_srocc": 0.951341500455604,
+          "within_reference_srocc": 0.9513415005
+        },
+        "human_cid22_a25_development": {
+          "pooled_srocc": 0.8988050534339936,
+          "within_reference_srocc": 0.9650439569
+        }
+      }
+    },
+    {
+      "arm": "teacher_double",
+      "seed_index": 0,
+      "result_sha256": "9984b4916892a4ea9214bfeaba7053eb3a3c5c40c6dea7a4c664054a5e0d8155",
+      "metrics": {
+        "human_kadid_development": {
+          "pooled_srocc": 0.8959356911040205,
+          "within_reference_srocc": 0.9033767246
+        },
+        "human_tid2013_development": {
+          "pooled_srocc": 0.8996268458377776,
+          "within_reference_srocc": 0.9039892456
+        },
+        "human_konfig_development": {
+          "pooled_srocc": 0.9306064594512504,
+          "within_reference_srocc": 0.9306064595
+        },
+        "human_cid22_a25_development": {
+          "pooled_srocc": 0.9012893099179446,
+          "within_reference_srocc": 0.9654112669
+        }
+      }
+    },
+    {
+      "arm": "teacher_double",
+      "seed_index": 1,
+      "result_sha256": "1117fb21491aff048be1584010f29e9cee3e263680451a8593c57fc7b36b08cb",
+      "metrics": {
+        "human_kadid_development": {
+          "pooled_srocc": 0.8931204380616445,
+          "within_reference_srocc": 0.9009826829
+        },
+        "human_tid2013_development": {
+          "pooled_srocc": 0.8980092784748737,
+          "within_reference_srocc": 0.9024485803
+        },
+        "human_konfig_development": {
+          "pooled_srocc": 0.928480307785765,
+          "within_reference_srocc": 0.9284803078
+        },
+        "human_cid22_a25_development": {
+          "pooled_srocc": 0.9028524381785834,
+          "within_reference_srocc": 0.9670652204
+        }
+      }
+    },
+    {
+      "arm": "teacher_double",
+      "seed_index": 2,
+      "result_sha256": "5a4d39049d1da4f7e8990f64d85877d267d605facf17f8ba5f6b064b788413a6",
+      "metrics": {
+        "human_kadid_development": {
+          "pooled_srocc": 0.8900429961839719,
+          "within_reference_srocc": 0.8971774012
+        },
+        "human_tid2013_development": {
+          "pooled_srocc": 0.899600996653492,
+          "within_reference_srocc": 0.9048458344
+        },
+        "human_konfig_development": {
+          "pooled_srocc": 0.934899260909183,
+          "within_reference_srocc": 0.9348992609
+        },
+        "human_cid22_a25_development": {
+          "pooled_srocc": 0.9031064562888608,
+          "within_reference_srocc": 0.9665646964
+        }
+      }
+    }
+  ],
+  "failures": []
+}

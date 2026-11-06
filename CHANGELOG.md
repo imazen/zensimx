@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Research
+
+- Register constrained activation/dropout and distortion-order experiments; add independent numerical probes and a matched native optimization pilot (`cb502a81`).
+
 - Add an opt-in constrained shared second hidden layer to the plain trainer,
   with ReLU or SmoothHinge in layer 2. Existing single-layer models and serving
   APIs remain unchanged; registration `083480f2`.
