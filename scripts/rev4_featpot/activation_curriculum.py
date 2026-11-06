@@ -462,6 +462,62 @@ def compare_neutral(reference, candidate, binary, output):
     print(json.dumps(result),flush=True)
 
 
+def family_panels(root, prepared_path, metadata, binary, output):
+    import numpy as np
+    import pyarrow.parquet as pq
+    os.environ.update(ZEN_PANEL_BIN=str(binary),TMPDIR=str(Path.home()/'tmp'))
+    sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
+    from lib.zen_stats import panel_batch_indexed
+    plan=json.loads((root/'PLAN.json').read_text())
+    complete=json.loads((root/'SUMMARY.json').read_text())
+    if complete['complete']!=complete['required'] or complete['failures']:
+        raise ValueError('signed breakdowns require a completed, successful study')
+    if sha(prepared_path)!=plan['prepared_sha256'] or sha(metadata)!=plan['source_audit']['metadata_sha256']:
+        raise ValueError('family metadata/preparation drift')
+    prepared=json.loads(prepared_path.read_text())
+    meta=pq.read_table(metadata,columns=['pair_key','codec','ref_pixels_sha256']).to_pydict()
+    offset=0;groups={}
+    for group in prepared['groups']:
+        keys_path=Path(group['path']).with_suffix('.keys.parquet')
+        if sha(keys_path)!=group['keys_sha256']:raise ValueError('family key drift')
+        keys=pq.read_table(keys_path,columns=['pair_key'])['pair_key'].to_pylist();end=offset+len(keys)
+        if meta['pair_key'][offset:end]!=keys:raise ValueError('family key order drift')
+        groups[group['name']]={k:np.array(meta[k][offset:end]) for k in ('codec','ref_pixels_sha256')};offset=end
+    if offset!=len(meta['pair_key']):raise ValueError('unconsumed metadata')
+    output.mkdir(parents=True,exist_ok=False)
+    records={}
+    for path in sorted(root.glob('*/s*/RESULT.json')):
+        result=json.loads(path.read_text());dest=output/path.parent.relative_to(root);dest.mkdir(parents=True)
+        panels={};sources={};source_families={};table_hashes={}
+        for name,labels in groups.items():
+            table=path.parent/(name+'.panel.parquet')
+            data=pq.read_table(table).to_pydict();pred=np.array(data['predicted']);target=np.array(data['target'])
+            if len(pred)!=len(labels['codec']):raise ValueError('family prediction length')
+            jobs=[];descriptions={}
+            for scope in ('family','source','source_family'):
+                keys=(list(labels['codec']) if scope=='family' else list(labels['ref_pixels_sha256'])
+                      if scope=='source' else list(zip(labels['codec'],labels['ref_pixels_sha256'])))
+                buckets={}
+                for i,key in enumerate(keys):buckets.setdefault(key,[]).append(i)
+                for key,ids in sorted(buckets.items()):
+                    label=str(len(jobs));jobs.append((label,'p','t',ids));descriptions[label]=(scope,key)
+            rows=panel_batch_indexed({'p':pred,'t':target},jobs,stats='srocc')
+            if any(r['n_dropped'] for r in rows):raise ValueError('family panel dropped rows')
+            grouped={'family':[],'source':[],'source_family':[]}
+            for row in rows:
+                scope,key=descriptions[row['label']]
+                grouped[scope].append(dict(label=key,n=row['n'],srocc_signed=row['srocc_signed'] if np.isfinite(row['srocc_signed']) else None,
+                    status='measured' if np.isfinite(row['srocc_signed']) else 'undefined correlation'))
+            panels[name]=grouped['family'];sources[name]=grouped['source'];source_families[name]=grouped['source_family']
+            table_hashes[name]=sha(table)
+        write(dest/'FAMILIES.json',dict(schema='signed-source-family-v1',source_result_sha256=sha(path),panel_binary_sha256=sha(binary),
+            prediction_table_sha256=table_hashes,panels=panels,sources=sources,source_families=source_families))
+        records[str(path.parent.relative_to(root))]=sha(dest/'FAMILIES.json')
+    if len(records)!=complete['required']:raise ValueError('signed breakdown cell count mismatch')
+    write(output/'INDEX.json',dict(plan_sha256=sha(root/'PLAN.json'),metadata_sha256=sha(metadata),cells=records))
+    print(json.dumps(dict(family_cells=len(records),index_sha256=sha(output/'INDEX.json'))))
+
+
 def capacity(root, binary, output):
     results={}
     for p in sorted(root.glob('*/s*/RESULT.json')):
@@ -613,6 +669,8 @@ def main():
     p.add_argument('--leaky-switches',action='store_true')
     p=sub.add_parser('compare-neutral')
     for name in ('reference','candidate','binary','output'): p.add_argument('--'+name,type=Path,required=True)
+    p=sub.add_parser('families')
+    for name in ('root','prepared','metadata','binary','output'):p.add_argument('--'+name,type=Path,required=True)
     p=sub.add_parser('capacity')
     for name in ('root','binary','output'): p.add_argument('--'+name,type=Path,required=True)
     p=sub.add_parser('closure')
@@ -631,6 +689,8 @@ def main():
         if args.output.exists():
             raise ValueError('preserve existing audit before rerunning')
         audit(args.output)
+    elif args.action == 'families':
+        family_panels(args.root,args.prepared,args.metadata,args.binary,args.output)
     elif args.action == 'capacity':
         capacity(args.root,args.binary,args.output)
     elif args.action == 'closure':

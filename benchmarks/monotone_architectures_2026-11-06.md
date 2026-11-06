@@ -63,8 +63,8 @@ Replay wrapper: `run-heavy: done rc=0 10s | peak-RSS 0.16GiB | min-avail 45171Mi
 These are resource observations, not aggregate process-tree memory or speed benchmarks.
 
 Artifacts observed on dev: `/mnt/v/output/zensim/monotone-architectures-20261106/`.
-Mirror verification is pending; the existing source data closure has its own
-verified mirror in the earlier tree and activation studies.
+The completed stage-1 snapshot has a verified mirror, detailed below. The
+ongoing full-budget/training runs require a separate final closure.
 
 ## Native capacity census
 
@@ -107,3 +107,34 @@ Completed stage-1 closure is mirrored at
 readback. Receipt SHA-256:
 `fcd150cbe25627073b8a3153498956c1aa8359005b75edcb22b5e777d7832397`.
 This snapshot excludes the ongoing full-budget/training runs.
+
+## Signed source and distortion breakdowns
+
+The 24 short fits now have canonical native signed ranks for every source,
+distortion family and source/family combination. The older `--per-group`
+panel returns absolute correlation; it is retained as historical output but
+is not the authority for signed subgroup claims. No model or checkpoint was
+selected from these breakdowns. All subgroup correlations are defined in this
+screen; subsequent studies must report undefined cells explicitly.
+
+All 24 short models reverse the pooled ordering of TID2013 `tid_15` in
+development (15 rows, three sources). The three-seed mean is -0.347619 for
+shared ReLU, -0.328571 for one switch block and -0.292857 for two blocks.
+The existing taxonomy names this local block-wise distortion. The small
+panel and already-exposed development set do not support selecting a fix;
+they show why a pooled population rank near 0.90 is insufficient evidence.
+Family weighting was registered before this breakdown was computed.
+
+`screen-breakdowns/INDEX.json` SHA-256:
+`e3d7d9876243e3f77765c2515a89419bd0bd22f033e3da6efbb6d9815e4730a5`.
+`screen-report/SUMMARY.json` SHA-256:
+`0be671b541b4b0221248dcdee4a058fe527dbd4243ef46bf5bf21e2ded128417`.
+The report retains all nine fitting/development populations, seed ranges,
+signed subgroup means/minima, calibrated/raw correlations and native scatter
+tails. Seed ranges are descriptive, not confidence intervals. Reproduce with
+`just monotone-family-panels` followed by `just monotone-study-summary`.
+
+The leaky-capable trainer's neutral configuration reproduces all three earlier
+switch fits exactly after removing run metadata and the old coverage entry.
+The nonzero .05/.1 slope trials use the same 120 x 5,000 budget as T1--T7;
+the six runs are separate from the ten-times-larger architecture comparison.

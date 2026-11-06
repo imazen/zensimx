@@ -4,6 +4,10 @@
 
 ### Research
 
+- Add certified leaky activation switches and signed source/family summaries
+  for the monotone study; retain three-seed neutral byte replay and explicit
+  fixed-final reporting (`4a34f974`).
+
 - Add opt-in, hash-bound native monotone training controls for hidden dropout,
   initialization, AdamW, exact-event curricula, family weighting and teacher/LR schedules.
 
