@@ -4847,3 +4847,6 @@ shaped-linear-study stage root:
 
 shaped-linear-controller-tests:
     TMPDIR="$HOME/tmp" python3 -B -m unittest discover -s scripts/tests -p test_shaped_linear_study.py -v
+
+shaped-linear-compare root model="all":
+    python3 -B scripts/rev4_featpot/shaped_linear_compare.py --root {{root}} --model {{model}}

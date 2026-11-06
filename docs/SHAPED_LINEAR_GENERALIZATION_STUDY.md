@@ -217,3 +217,18 @@ the existing native identity-pinned spline owner performs optional calibration.
 Small correlated/singular/zero-column and active-bound fixtures pass. All 41
 bake-tool tests and scoped clippy pass. No scientific fit has run at this point;
 the independent Python numeric reference and input/fold admission remain gates.
+
+The eight independent NumPy/SciPy numeric systems pass, as do three controller
+leakage/grouping tests and signed/raw native panel checks. Preparation retains
+232 FIT and 21 development source components with no cross-role overlap. The
+155 S1 fits completed and passed their numerical certificates. Their results
+remain preliminary while the registered negative controls execute.
+
+Comparator preparation reuses strict D1/revision/key admission. Each derived
+training table records its original parent, ordered subset and label permutation;
+the original tables remain immutable. An actual population-permutation admission
+passed for all nine groups, changing 15,066 training labels and zero outer labels.
+The neural comparator retains human rank-only and teacher rank/MSE objectives;
+its data match the linear study but its objective differs. It selects epoch 119
+regardless of development logs. Seeds are the registered two seed values for
+initialization, with sampling seed equal to initialization plus 100,000,000.
