@@ -637,7 +637,19 @@ def progress(root):
         cells.append(dict(cell=str(p.parent.relative_to(root)),pid=run['pid'],verified_wrapper_alive=alive,
             final_result=p.with_name('RESULT.json').exists(),last_epoch=int(epochs[-1]) if epochs else None,
             wrapper_exit=re.findall(r'run-heavy: done rc=(\d+)',log)))
-    report=dict(checked_utc=datetime.now(timezone.utc).isoformat(),cells=cells)
+    stages={}
+    for p in sorted(root.glob('*/PLAN.json')):
+        plan=json.loads(p.read_text())
+        if 'arms' not in plan or 'seed_pairs' not in plan:continue
+        name=p.parent.name;selected=[c for c in cells if c['cell'].startswith(name+'/')]
+        required=len(plan['arms'])*len(plan['seed_pairs'])
+        progress_path=p.with_name('PROGRESS.json')
+        progress=json.loads(progress_path.read_text()) if progress_path.exists() else {}
+        stages[name]=dict(required=required,complete=sum(c['final_result'] for c in selected),
+            running=sum(c['verified_wrapper_alive'] for c in selected),not_started=required-len(selected),
+            stopped_without_result=[c['cell'] for c in selected if not c['verified_wrapper_alive'] and not c['final_result']],
+            recorded_failures=progress.get('failures',[]),plan_sha256=sha(p),binary_sha256=plan['binary_sha256'])
+    report=dict(checked_utc=datetime.now(timezone.utc).isoformat(),stages=stages,cells=cells)
     write(root/'SUPERVISION.json',report)
     print(json.dumps(report),flush=True)
 

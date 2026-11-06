@@ -43,6 +43,12 @@ is a bibliography, not the authority for its malformed displayed equations.
 - Architecture comparisons keep group masses, losses, examples, scaler and
   pair budget fixed. Compare at matched width and report actual trainable
   parameters and expanded bake dimensions; width is not a compute match.
+- The native scaler divides by TRAIN-feature standard deviations but does
+  not subtract feature means (`scaler_mean=0` on the constrained path).
+  This is scale-only standardization, not centered StandardScaler. It keeps
+  the identity vector at zero and every increasing coordinate transform
+  increasing. Development rows never fit the scales. Teacher-mass ablations
+  retain exactly the same scale-fitting rows.
 - Diagnostic seeds: independent pairs (1101,101), (1107,200000101),
   (1129,400000101). First screen: 12 epochs x 5,000 draws, final epoch 11.
   Long comparison: 120 x 50,000, fixed final epoch 119. Short fits cannot be
@@ -219,6 +225,13 @@ no RNG draws. Three-seed actual-data neutral replay matches the earlier switch
 screen byte-for-byte after removing run-specific metadata. The diagnostic and
 leaky-capable trainer versions independently repeat this admission check.
 No quality claim follows from compilation or toy targets.
+
+Diagnostics sample one response per 256 backward calls. The stored field
+`mean_squared_first_activation_gradient` is the mean squared L2 norm of the
+first-layer activation gradient (sum across coordinates, then mean across
+sampled responses), not a per-coordinate mean. Per-unit activity and zero
+output amplitudes are separate measurements. Neither establishes that a unit
+is inactive on every possible input.
 
 ## Coverage-receipt correction
 

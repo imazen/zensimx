@@ -123,6 +123,9 @@ shared ReLU, -0.328571 for one switch block and -0.292857 for two blocks.
 The existing taxonomy names this local block-wise distortion. The small
 panel and already-exposed development set do not support selecting a fix;
 they show why a pooled population rank near 0.90 is insufficient evidence.
+Within-source results are mixed: ReLU seed 0 gives 0.7, -0.7 and 0.7 on the
+three five-row sources. Thus the negative pooled rank does not mean every
+source reverses, and cross-source calibration is a separate concern.
 Family weighting was registered before this breakdown was computed.
 
 `screen-breakdowns/INDEX.json` SHA-256:
