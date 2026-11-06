@@ -433,6 +433,45 @@ def replay_controls(frozen, binaries, output):
     print(json.dumps(results),flush=True)
 
 
+def compare_neutral(reference, candidate, binary, output):
+    output.mkdir(parents=True,exist_ok=False)
+    result=[]
+    for index in range(3):
+        hashes=[]
+        for label,root in [('reference',reference),('candidate',candidate)]:
+            original=root/f's{index}'/'ckpt/ckpt_epoch011.bin'
+            current=original
+            for step,key in enumerate(('zentrain.repro','zentrain.monotone_research')):
+                destination=output/f'{label}-{index}-{step}.bin'
+                with (output/f'{label}-{index}-{step}.log').open('w') as log:
+                    subprocess.run([str(binary),'strip','--in',str(current),'--out',str(destination),'--key',key],stdout=log,stderr=subprocess.STDOUT,check=True)
+                current=destination
+            hashes.append(sha(current))
+        result.append(dict(seed_index=index,reference=hashes[0],candidate=hashes[1],match=hashes[0]==hashes[1]))
+    write(output/'COMPARISON.json',result)
+    if not all(r['match'] for r in result):
+        raise ValueError('neutral control changes native weights/scaler or retained metadata')
+    print(json.dumps(result),flush=True)
+
+
+def progress(root):
+    import re
+    cells=[]
+    for p in sorted(root.glob('*/**/RUN.json')):
+        run=json.loads(p.read_text())
+        log=p.with_name('train.log').read_text()
+        epochs=re.findall(r'epoch\s+(\d+)\s*\|',log)
+        proc=Path('/proc')/str(run['pid'])/'cmdline'
+        command=proc.read_bytes().replace(b'\x00',b' ').decode(errors='replace') if proc.exists() else ''
+        alive='run-heavy' in command and str(p.parent) in command
+        cells.append(dict(cell=str(p.parent.relative_to(root)),pid=run['pid'],verified_wrapper_alive=alive,
+            final_result=p.with_name('RESULT.json').exists(),last_epoch=int(epochs[-1]) if epochs else None,
+            wrapper_exit=re.findall(r'run-heavy: done rc=(\d+)',log)))
+    report=dict(checked_utc=datetime.now(timezone.utc).isoformat(),cells=cells)
+    write(root/'SUPERVISION.json',report)
+    print(json.dumps(report),flush=True)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest='action',required=True)
@@ -457,6 +496,10 @@ def main():
     p.add_argument('--metadata',type=Path,required=True)
     p.add_argument('--workers',type=int,default=6)
     p.add_argument('--replay-control',action='store_true')
+    p=sub.add_parser('compare-neutral')
+    for name in ('reference','candidate','binary','output'): p.add_argument('--'+name,type=Path,required=True)
+    p=sub.add_parser('progress')
+    p.add_argument('--root',type=Path,required=True)
     p=sub.add_parser('replay')
     p.add_argument('--frozen',type=Path,required=True)
     p.add_argument('--binary-dir',type=Path,required=True)
@@ -466,6 +509,10 @@ def main():
         if args.output.exists():
             raise ValueError('preserve existing audit before rerunning')
         audit(args.output)
+    elif args.action == 'progress':
+        progress(args.root)
+    elif args.action == 'compare-neutral':
+        compare_neutral(args.reference,args.candidate,args.binary,args.output)
     elif args.action == 'replay':
         replay_controls(args.frozen,args.binary_dir,args.output)
     elif args.action == 'training':

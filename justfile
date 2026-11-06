@@ -4764,3 +4764,9 @@ tree-study-closure root baseline_plan:
 
 tree-study-mirror root destination:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 2G --jobs 1 -- just dataset-artifacts-mirror-nfs {{quote(root)}} {{quote(destination)}} training true
+
+monotone-trial-progress root:
+    python3 -B scripts/rev4_featpot/activation_curriculum.py progress --root {{quote(root)}}
+
+monotone-neutral-compare reference candidate binary output:
+    python3 -B scripts/rev4_featpot/activation_curriculum.py compare-neutral --reference {{quote(reference)}} --candidate {{quote(candidate)}} --binary {{quote(binary)}} --output {{quote(output)}}

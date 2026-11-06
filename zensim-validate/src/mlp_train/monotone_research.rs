@@ -564,6 +564,17 @@ mod tests {
     }
 }
 
+#[derive(Default)]
+struct Diagnostics {
+    backwards: u64,
+    samples: u64,
+    first_zeros: u64,
+    first_values: u64,
+    last_active: Vec<u64>,
+    first_gradient_squared: f64,
+    max_hidden: f64,
+}
+
 pub(super) struct Network {
     config: Config,
     blocks: Vec<Block>,
@@ -572,6 +583,7 @@ pub(super) struct Network {
     pin: f64,
     dropout_rng: SplitMix64,
     mask: Option<Vec<f64>>,
+    diagnostics: Diagnostics,
 }
 
 impl Network {
@@ -639,6 +651,7 @@ impl Network {
             config,
             dropout_rng,
             mask: None,
+            diagnostics: Diagnostics::default(),
             blocks,
             output,
             adam: AdamState::new(ni, 0, 0, 0),
@@ -732,6 +745,21 @@ impl Network {
             result[2 * i + 1] = gradient[i];
         }
         result[2 * pairs..].copy_from_slice(&gradient[pairs..]);
+        if self.config.training.is_some() {
+            let stats = &mut self.diagnostics;
+            stats.backwards += 1;
+            if stats.backwards.is_multiple_of(256) {
+                stats.samples += 1;
+                stats.first_values += first.len() as u64;
+                stats.first_zeros += first.iter().filter(|&&x| x == 0.).count() as u64;
+                stats.last_active.resize(last.len(), 0);
+                for (count, &h) in stats.last_active.iter_mut().zip(last) {
+                    *count += u64::from(h != 0.);
+                }
+                stats.first_gradient_squared += result.iter().map(|v| v * v).sum::<f64>();
+                stats.max_hidden = last.iter().fold(stats.max_hidden, |m, h| m.max(h.abs()));
+            }
+        }
         result
     }
 
@@ -756,6 +784,27 @@ impl Network {
         }
         self.output.iter_mut().for_each(|w| *w = w.max(0.));
         assert!(self.output.iter().all(|w| w.is_finite()));
+    }
+
+    pub(super) fn report_diagnostics(&mut self, epoch: usize) {
+        if self.config.training.is_none() {
+            return;
+        }
+        let stats = std::mem::take(&mut self.diagnostics);
+        println!(
+            "TRAINING_DIAGNOSTICS {}",
+            serde_json::json!({
+                "epoch": epoch, "backwards": stats.backwards, "sample_stride": 256,
+                "sampled_responses": stats.samples, "first_zero_activations": stats.first_zeros,
+                "first_activation_values": stats.first_values,
+                "last_never_active_in_sample": stats.last_active.iter().filter(|&&n|n==0).count(),
+                "last_units": self.output.len(), "last_unit_active_counts": stats.last_active,
+                "max_last_activation_in_sample": stats.max_hidden,
+                "mean_squared_first_activation_gradient": if stats.samples>0 {Some(stats.first_gradient_squared/stats.samples as f64)} else {None},
+                "output_zero_weights": self.output.iter().filter(|&&w|w==0.).count(),
+                "note": "training-response sample, not proof of globally dead units or a timing profile"
+            })
+        );
     }
 
     pub(super) fn bake(

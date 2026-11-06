@@ -168,6 +168,8 @@ enum Cmd {
     /// studies can report checkpoint sampler receipts
     /// (`zentrain.sample_coverage`) from the native metadata owner.
     ReadMeta(ReadMetaArgs),
+    /// Read model dimensions and stored coefficient counts without changing it.
+    Inspect(InspectArgs),
     /// Weight-space interpolation of two bakes of one architecture: every
     /// weight and bias becomes (1 - alpha)*a + alpha*b (f64, rounded to f32;
     /// alpha 0 and 1 copy their end exactly). Refuses unless shapes,
@@ -2787,6 +2789,30 @@ struct ReadMetaArgs {
     /// Metadata key to print.
     #[arg(long)]
     key: String,
+}
+
+#[derive(Args)]
+struct InspectArgs {
+    #[arg(long = "in")]
+    input: PathBuf,
+}
+fn cmd_inspect(a: &InspectArgs) -> Result<(), String> {
+    let bytes = std::fs::read(&a.input).map_err(|e| e.to_string())?;
+    let model = Model::from_bytes(&bytes).map_err(|e| e.to_string())?;
+    let layers = verbatim_layers(&model)?;
+    let rows=layers.iter().enumerate().map(|(i,l)|serde_json::json!({
+        "index":i,"in_dim":l.in_dim,"out_dim":l.out_dim,"activation":format!("{:?}",l.activation),
+        "dtype":format!("{:?}",l.dtype),"stored_weights":l.weights.len(),"stored_biases":l.biases.len(),
+        "zero_weights":l.weights.iter().filter(|&&x|x==0.).count(),
+        "negative_weights":l.weights.iter().filter(|&&x|x<0.).count()
+    })).collect::<Vec<_>>();
+    println!(
+        "{}",
+        serde_json::json!({"bytes":bytes.len(),"inputs":model.n_inputs(),"layers":rows,
+        "stored_coefficients":layers.iter().map(|l|l.weights.len()+l.biases.len()).sum::<usize>(),
+        "note":"stored coefficients include frozen routing and tied/expanded weights; not independent trainable parameters"})
+    );
+    Ok(())
 }
 
 fn read_meta(bytes: &[u8], key: &str) -> Result<String, String> {
@@ -5882,6 +5908,7 @@ fn main() -> ExitCode {
         Cmd::PruneHidden(a) => cmd_prune_hidden(a).map(|_| false),
         Cmd::AppendMeta(a) => cmd_append_meta(a).map(|_| false),
         Cmd::ReadMeta(a) => cmd_read_meta(a).map(|_| false),
+        Cmd::Inspect(a) => cmd_inspect(a).map(|_| false),
         Cmd::Interpolate(a) => cmd_interpolate(a).map(|_| false),
         Cmd::FitLasso(a) => cmd_fit_lasso(a).map(|_| false),
         Cmd::Gram(a) => cmd_gram(a).map(|_| false),

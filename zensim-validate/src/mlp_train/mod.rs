@@ -4879,6 +4879,9 @@ pub fn train_mlp_strategy_pairs(
                 log,
             );
         }
+        if let Some(research) = depth.as_mut().and_then(|head| head.research.as_mut()) {
+            research.report_diagnostics(epoch);
+        }
         let avg_loss = if n_steps > 0 {
             total_loss / n_steps as f64
         } else {
