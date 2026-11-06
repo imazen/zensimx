@@ -134,6 +134,15 @@ gates, exact source/binary/model identities and remaining experiments. A plan,
 scalar reference, short pilot and full-budget fit are distinct deliverables.
 Update this queue and its linked evidence as each stage actually completes.
 
+For uncertainty reporting, reuse paired reference-cluster bootstrap through
+the canonical Rust panel: 2,000 source draws, seed 20261106, every registered
+arm versus its matched control. Each replicate computes the mean signed-rank
+difference across the three fixed fits; it does not ensemble their predictions
+or treat image variants as independent sources. Report percentile 95% intervals
+as conditional on these fits and exposed development references, without
+multiplicity correction. KonFiG's one-source development panel cannot estimate
+new-source uncertainty. These are descriptive diagnostics, not selection gates.
+
 ## Native implementation and preflight, November 6
 
 The private `mlp_train::monotone_research` owner now implements A1--A5, using

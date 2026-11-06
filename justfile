@@ -4791,3 +4791,6 @@ monotone-family-panels root prepared metadata binary output:
 
 monotone-study-summary root breakdowns output *extra:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/monotone_summary.py --root {{quote(root)}} --breakdowns {{quote(breakdowns)}} --output {{quote(output)}} {{extra}}
+
+monotone-source-bootstrap root summary binary output *extra:
+    TMPDIR="$HOME/tmp" RAYON_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 "$HOME/work/claudehints/scripts/run-heavy" --mem 2G --jobs 1 -- python3 -B scripts/rev4_featpot/monotone_summary.py --root {{quote(root)}} --bootstrap-summary {{quote(summary)}} --binary {{quote(binary)}} --output {{quote(output)}} {{extra}}
