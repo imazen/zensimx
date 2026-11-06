@@ -4723,3 +4723,6 @@ tree-study baseline_plan parity_bin output:
 
 tree-study-peers baseline_plan run output:
     TMPDIR="$HOME/tmp" OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 python3 -B scripts/rev4_featpot/tree_study_report.py --baseline-plan {{quote(baseline_plan)}} --run {{quote(run)}} --output {{quote(output)}}
+
+tree-study-peer-search run metadata output:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 8G --jobs 8 -- python3 -B scripts/rev4_featpot/tree_study_report.py --run {{quote(run)}} --peer-search {{quote(metadata)}} --output {{quote(output)}}

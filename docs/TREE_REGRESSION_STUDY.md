@@ -160,3 +160,27 @@ inputs to the initial 129-fit search. SSIMULACRA2 on the separate CID22 training
 images is the only synthetic supervision in that search. Other peers are
 zero-shot comparators. Detailed distortion/severity metadata is saved for
 subgroup diagnosis; dataset identity is not substituted for distortion type.
+
+## Peer-assisted extension, registered before its fits
+
+The owner's cached-feature/peer-score clarification also warrants a separate
+human-only stacking comparison. Twelve settings compare RF, Extra Trees and
+HGB using either the four peer scores alone or 576 raw features plus those
+scores. RF/Extra search minimum leaf 2/16, 128 trees, 2048-leaf cap; feature
+fraction is 1 for four peers and .33 for 580 combined inputs. HGB searches
+15/63 leaves, 200 stages, minimum leaf 20, learning rate .05, L2=1. The same
+within-FIT CDF mapping, equal reference/population weighting and source folds
+apply. No teacher or human development label fits these models.
+
+Three folds per setting give 36 fits; the best setting per family/input set
+then receives three full-FIT seeds (18 fits): 54 total. Selection uses the same
+composite and never development. The metadata join and initial study inputs
+are immutable. This experiment was registered after peer baseline panels and
+48 initial tree fold cells were available, before initial tree development
+results. It does not claim a newly untouched final test.
+
+These stacks require the peer metrics at inference; their quality cannot be
+credited to a feature-only zensim model. Compare peer-only versus combined
+inputs to measure the added predictive value of the cached features. Native
+opaque-vector parity covers all final fitting and development rows. No
+pixel-serving, identity, runtime-cost or monotonicity qualification is implied.

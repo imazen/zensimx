@@ -2,13 +2,17 @@
 """Exact-key peer/source joins and canonical panels for the registered tree study."""
 from __future__ import annotations
 import argparse
+from concurrent.futures import ProcessPoolExecutor, as_completed
+from datetime import datetime, timezone
+import os
 from pathlib import Path
 import json
+import pickle
 import numpy as np
 import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
-from tree_study import load_data, panels, sha, write
+from tree_study import load_data, panels, sha, write, estimator, weights_and_targets, native_gate, SEEDS
 
 
 def unique_index(frame):
@@ -102,13 +106,105 @@ def metadata(base_path, run, output):
     print(json.dumps(summaries, indent=2))
 
 
+def peer_cell(run, metadata_path, output, config, fold, seed):
+    data = load_data(run / 'data')
+    original = json.loads((run / 'PLAN.json').read_text())
+    meta = pq.read_table(metadata_path, columns=['ssim2', 'butter3', 'gmsd_quality', 'gmsm'])
+    peers = np.column_stack([meta[n].to_numpy() for n in meta.column_names]).astype(np.float32)
+    x = peers if config['features'] == 'peers' else np.column_stack([data['raw'], peers])
+    human = data['pop'] != 'cid22_ssim2'
+    fit = human & ~data['dev']
+    if fold >= 0:
+        fit &= data['fold'] != fold
+    test = human & ((~data['dev'] & (data['fold'] == fold)) if fold >= 0 else data['dev'])
+    fit_ids, test_ids = np.flatnonzero(fit), np.flatnonzero(test)
+    if not np.isfinite(x[human]).all():
+        raise ValueError('missing peer input on admitted human row')
+    name = f"{config['id']}-fold{fold}-seed{seed}"
+    dest = output / 'cells' / name
+    dest.mkdir(parents=True, exist_ok=False)
+    w, target, maps = weights_and_targets(data['y'][fit_ids], data['pop'][fit_ids], data['refs'][fit_ids], 'cdf', 0.)
+    model = estimator(config, seed, x.shape[1])
+    write(dest / 'FIT.json', dict(config=config, fold=fold, seed=seed, parameters=model.get_params(),
+        maps=maps, fit_rows=len(fit_ids), test_rows=len(test_ids), plan_sha256=sha(output / 'PLAN.json')))
+    model.fit(x[fit_ids], target, sample_weight=w)
+    with (dest / 'model.pickle').open('wb') as f:
+        pickle.dump(model, f, protocol=5)
+    predicted = model.predict(x[test_ids])
+    result = dict(name=name, config=config, fold=fold, seed=seed,
+        metrics=panels(dest / 'held', predicted, test_ids, data, original['panel_bin']))
+    if fold < 0:
+        ids = np.concatenate([fit_ids, test_ids])
+        native, receipt = native_gate(model, x[ids], dest / 'raw', original['parity_bin'], config)
+        delta = float(np.max(np.abs(native - model.predict(x[ids]))))
+        if delta > 1e-12:
+            raise ValueError('peer forest export rounding bound')
+        result.update(native=receipt, maximum_sklearn_export_rounding_difference=delta,
+            in_sample=panels(dest / 'in_sample', native[:len(fit_ids)], fit_ids, data, original['panel_bin']),
+            native_development=panels(dest / 'native_development', native[len(fit_ids):], test_ids, data, original['panel_bin']))
+    write(dest / 'RESULT.json', result)
+    return result
+
+
+def peer_search(run, metadata_path, output):
+    output.mkdir(parents=True, exist_ok=False)
+    configs = []
+    for family in ('rf', 'extra', 'hgb'):
+        for features in ('peers', 'features_and_peers'):
+            for complexity in (0, 1):
+                params = (dict(max_leaf_nodes=(15, 63)[complexity], min_samples_leaf=20) if family == 'hgb'
+                          else dict(min_samples_leaf=(2, 16)[complexity], max_features=1. if features == 'peers' else .33))
+                configs.append(dict(id=f'{family}-{features}-{complexity}', family=family,
+                    features=features, params=params, mapping='cdf', teacher_mass=0.))
+    write(output / 'PLAN.json', dict(schema='tree-peer-assisted-v1', configs=configs, folds=3,
+        seeds=SEEDS, source_plan_sha256=sha(run / 'PLAN.json'), metadata_sha256=sha(metadata_path),
+        script_sha256=sha(__file__), tree_owner_sha256=sha(Path(__file__).with_name('tree_study.py')),
+        synthetic_labels_used=False, peer_inputs=['ssim2', 'butter3', 'gmsd_quality', 'gmsm'],
+        selection='same equal-population pooled/within composite; best per family and input set',
+        development_for_selection=False, required=54))
+    results, failures = [], []
+    def batch(tasks, stage):
+        with ProcessPoolExecutor(max_workers=8) as pool:
+            futures = {pool.submit(peer_cell, run, metadata_path, output, c, f, s): (c['id'], f, s) for c, f, s in tasks}
+            for future in as_completed(futures):
+                try:
+                    results.append(future.result())
+                except Exception as error:
+                    failures.append(dict(cell=futures[future], error=repr(error)))
+                write(output / 'PROGRESS.json', dict(stage=stage, complete=len(results), failures=failures,
+                    pid=os.getpid(), checked_utc=datetime.now(timezone.utc).isoformat()))
+                print(json.dumps(dict(stage=stage, complete=len(results), failures=failures)), flush=True)
+        if failures:
+            raise RuntimeError('peer-assisted failures preserved in progress record')
+    batch([(c, f, SEEDS[0]) for c in configs for f in range(3)], 'peer_source_folds')
+    scores = {}
+    for c in configs:
+        cells = [r for r in results if r['config']['id'] == c['id']]
+        values = [(m['pooled'] + m['within']) / 2 for r in cells for m in r['metrics'].values()]
+        if len(cells) != 3 or len(values) != 12 or not np.isfinite(values).all():
+            raise ValueError('incomplete peer selection composite')
+        scores[c['id']] = float(np.mean(values))
+    winners = [max([c for c in configs if c['family'] == family and c['features'] == feature], key=lambda c: scores[c['id']])
+               for family in ('rf', 'extra', 'hgb') for feature in ('peers', 'features_and_peers')]
+    write(output / 'SELECTION.json', dict(scores=scores, winners=winners, uses_development=False))
+    batch([(c, -1, s) for c in winners for s in SEEDS], 'peer_frozen_finalists')
+    write(output / 'SUMMARY.json', dict(required=54, completed=len(results), winners=winners,
+        selection=scores, results=results, failures=failures))
+
+
 def main():
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument('--baseline-plan', type=Path, required=True)
+    p.add_argument('--baseline-plan', type=Path)
     p.add_argument('--run', type=Path, required=True)
     p.add_argument('--output', type=Path, required=True)
+    p.add_argument('--peer-search', type=Path, help='run the registered peer-assisted search with this joined metadata')
     args = p.parse_args()
-    metadata(args.baseline_plan, args.run, args.output)
+    if args.peer_search:
+        peer_search(args.run, args.peer_search, args.output)
+    else:
+        if args.baseline_plan is None:
+            p.error('--baseline-plan is required for a metadata join')
+        metadata(args.baseline_plan, args.run, args.output)
 
 
 if __name__ == '__main__':
