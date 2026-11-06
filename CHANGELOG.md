@@ -13,6 +13,8 @@
 
 ### Fixed
 
+- Add a compilation-only recipe for the four pinned pixel examples; document why newer associated helper names require a paired dependency update in [the compatibility record](docs/PIXEL_EXAMPLE_COMPATIBILITY.md).
+
 - `shipgates_prepare_source` uses `ConvertOptions::retain_channels()`, the same preset under its surviving name, because zenpixels `fde59b96` removes `forbid_lossy()`. Its `shipgates` feature now enables the `zenbitmaps` dependency the example has read BMP files through since `b476d7cc`.
 
 - Retain final-read artifacts on durable storage and add the approved lossless temporary-PNG effort (`26ab7625`); require exact serial/parallel peer-output parity before bounded parallel scoring (`20a6e08a`).

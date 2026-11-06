@@ -4678,3 +4678,9 @@ sibling-tools-check:
 
 sibling-source-check out:
     python3 scripts/check_sibling_sources.py --out {{quote(out)}}
+
+# Compile pixel consumers without running extraction, training or evaluation.
+pixel-example-check:
+    cargo check --locked -p zensim --example e34_pixels --features custom-profiles,feature-regime-v2
+    cargo generate-lockfile --manifest-path zensim-bench/Cargo.toml
+    cargo check --locked --manifest-path zensim-bench/Cargo.toml --example verify_bitstream_decode --example m3_fixture_gen --example gmsbank_decode_dump --features zen-decode,m3-fixtures,verify-decode
