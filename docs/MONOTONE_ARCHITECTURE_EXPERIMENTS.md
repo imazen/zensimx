@@ -217,3 +217,17 @@ and 65 CLI checks. Native exhaustive last-hidden mask probes check zero identity
 coordinate order, input gradients and unmasked inference; zero dropout consumes
 no RNG draws. Actual-data neutral replay is the next admission gate, not implied
 by those unit checks. No quality claim follows from compilation or toy targets.
+
+## Coverage-receipt correction
+
+The CLI's older `zentrain.sample_coverage` reconstructs uniform sampler draws;
+it does not know this study's permutation or teacher-CDF override. New study
+commands explicitly use `--no-sample-coverage`, enforced by CLI admission.
+The already-running frozen binary still emits the legacy entry. Preserve its
+raw checkpoints, but remove that entry from final-model copies and append the
+actual native `TRAINING_EVENTS` record as `zentrain.training_events`. Removing
+the appended record must recover the pre-append canonical bake byte-for-byte.
+This corrects provenance only: no refit, model coefficient or score changes.
+The receipt describes scheduled events including skips, not accepted-gradient
+mass or full row coverage. The neutral replay's unchanged legacy receipt was
+valid because its CDF and event order were unchanged.

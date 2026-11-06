@@ -1,5 +1,16 @@
 # zensim — current working rules
 
+## Known Bugs — monotone study coverage receipt (2026-11-06)
+
+The legacy `zentrain.sample_coverage` simulator does not replay the private
+monotone training curriculum or teacher-CDF override. The CLI now requires
+`--no-sample-coverage` when that training manifest is present. Actual scheduled
+events come from the native `TRAINING_EVENTS` receipt. Earlier raw research
+checkpoints are preserved; use copies with that legacy entry removed and the
+actual event receipt attached, with retained-section byte equality verified.
+Details: `docs/MONOTONE_ARCHITECTURE_EXPERIMENTS.md`. Do not interpret the old
+entry as observed coverage for reordered/reweighted fits.
+
 ## Known Bugs — historical KonFiG development reference alias (2026-11-06)
 
 The frozen mixed human tables place 24 `src50_partb` rows in fitting and

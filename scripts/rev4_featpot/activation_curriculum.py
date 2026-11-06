@@ -306,7 +306,7 @@ def native(plan_path, output, workers, *, architecture=False, binary_dir=None, m
         if arm == 'l2_high' and not training:
             cmd += ['--l2','0.0001']
         if training:
-            cmd += ['--l2',str(TRAINING_ARMS[arm].get('l2',1e-5))]
+            cmd += ['--l2',str(TRAINING_ARMS[arm].get('l2',1e-5)),'--no-sample-coverage']
         (dest/'ckpt').mkdir()
         cmd += ['--dump-checkpoints-every',str(epochs-1),'--dump-checkpoints-dir',str(dest/'ckpt')]
         env = os.environ.copy()
@@ -441,7 +441,9 @@ def compare_neutral(reference, candidate, binary, output):
         for label,root in [('reference',reference),('candidate',candidate)]:
             original=root/f's{index}'/'ckpt/ckpt_epoch011.bin'
             current=original
-            for step,key in enumerate(('zentrain.repro','zentrain.monotone_research')):
+            for step,key in enumerate(('zentrain.repro','zentrain.monotone_research','zentrain.sample_coverage')):
+                if key=='zentrain.sample_coverage' and '--no-sample-coverage' in json.loads((root/f's{index}'/'RUN.json').read_text())['command']:
+                    continue
                 destination=output/f'{label}-{index}-{step}.bin'
                 with (output/f'{label}-{index}-{step}.log').open('w') as log:
                     subprocess.run([str(binary),'strip','--in',str(current),'--out',str(destination),'--key',key],stdout=log,stderr=subprocess.STDOUT,check=True)
@@ -452,6 +454,48 @@ def compare_neutral(reference, candidate, binary, output):
     if not all(r['match'] for r in result):
         raise ValueError('neutral control changes native weights/scaler or retained metadata')
     print(json.dumps(result),flush=True)
+
+
+def qualify_receipts(root, binary, output, watch=False):
+    """Preserve historical bakes; remove invalid legacy reconstruction from final copies."""
+    import time
+    output.mkdir(parents=True,exist_ok=False)
+    plan=json.loads((root/'PLAN.json').read_text())
+    required=len(plan['arms'])*len(plan['seed_pairs'])
+    records={}
+    while True:
+        for p in sorted(root.glob('*/s*/RESULT.json')):
+            relative=p.parent.relative_to(root)
+            if str(relative) in records: continue
+            result=json.loads(p.read_text())
+            source=p.parent/f"ckpt/ckpt_epoch{plan['epochs']-1:03d}.bin"
+            if sha(source)!=result['bake_sha256']: raise ValueError('changed source checkpoint')
+            events=[json.loads(line.split(' ',1)[1]) for line in p.with_name('train.log').read_text().splitlines() if line.startswith('TRAINING_EVENTS ')]
+            if len(events)!=1 or events[0]['events']!=plan['epochs']*plan['pairs_per_epoch']:
+                raise ValueError('missing exact full-budget event receipt')
+            dest=output/relative;dest.mkdir(parents=True)
+            receipt=dict(scope='full scheduled draw stream, including skips; not accepted-gradient or row-coverage statistics',
+                raw_bake_sha256=sha(source),head_manifest_sha256=sha(p.with_name('HEAD.json')),
+                training_log_sha256=sha(p.with_name('train.log')),events=events[0],
+                correction='legacy uniform reconstruction removed; actual native event receipt retained')
+            write(dest/'EVENTS.json',receipt)
+            def call(name,args):
+                with (dest/(name+'.log')).open('w') as log:
+                    subprocess.run([str(binary),*args],stdout=log,stderr=subprocess.STDOUT,check=True)
+            call('remove-legacy',['strip','--in',str(source),'--out',str(dest/'without-legacy.bin'),'--key','zentrain.sample_coverage'])
+            call('append-actual',['append-meta','--in',str(dest/'without-legacy.bin'),'--out',str(dest/'final.bin'),
+                 '--key','zentrain.training_events','--value-file',str(dest/'EVENTS.json')])
+            call('verify-sections',['strip','--in',str(dest/'final.bin'),'--out',str(dest/'roundtrip.bin'),'--key','zentrain.training_events'])
+            if sha(dest/'roundtrip.bin')!=sha(dest/'without-legacy.bin'):
+                raise ValueError('receipt correction changed retained model sections')
+            records[str(relative)]={'raw_sha256':sha(source),'qualified_sha256':sha(dest/'final.bin'),
+                'retained_sections_identical':True,'events_sha256':sha(dest/'EVENTS.json')}
+            write(output/'QUALIFICATION.json',dict(required=required,complete=len(records),cells=records))
+            print(json.dumps(dict(qualified=len(records),required=required,cell=str(relative))),flush=True)
+        if len(records)==required or not watch: break
+        if (root/'SUMMARY.json').exists():
+            raise ValueError('run terminated without every required result; preserve qualification record')
+        time.sleep(5)
 
 
 def progress(root):
@@ -498,6 +542,9 @@ def main():
     p.add_argument('--replay-control',action='store_true')
     p=sub.add_parser('compare-neutral')
     for name in ('reference','candidate','binary','output'): p.add_argument('--'+name,type=Path,required=True)
+    p=sub.add_parser('qualify-receipts')
+    for name in ('root','binary','output'): p.add_argument('--'+name,type=Path,required=True)
+    p.add_argument('--watch',action='store_true')
     p=sub.add_parser('progress')
     p.add_argument('--root',type=Path,required=True)
     p=sub.add_parser('replay')
@@ -509,6 +556,8 @@ def main():
         if args.output.exists():
             raise ValueError('preserve existing audit before rerunning')
         audit(args.output)
+    elif args.action == 'qualify-receipts':
+        qualify_receipts(args.root,args.binary,args.output,args.watch)
     elif args.action == 'progress':
         progress(args.root)
     elif args.action == 'compare-neutral':

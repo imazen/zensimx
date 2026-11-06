@@ -4770,3 +4770,6 @@ monotone-trial-progress root:
 
 monotone-neutral-compare reference candidate binary output:
     python3 -B scripts/rev4_featpot/activation_curriculum.py compare-neutral --reference {{quote(reference)}} --candidate {{quote(candidate)}} --binary {{quote(binary)}} --output {{quote(output)}}
+
+monotone-receipt-qualification root binary output:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/activation_curriculum.py qualify-receipts --root {{quote(root)}} --binary {{quote(binary)}} --output {{quote(output)}} --watch

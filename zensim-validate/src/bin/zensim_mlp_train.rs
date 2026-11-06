@@ -3674,6 +3674,18 @@ fn main() {
         args.rank_pair_list.is_empty() || args.no_sample_coverage,
         "pair-list replay requires --no-sample-coverage; actual digest remains available"
     );
+    if let Some(path) = std::env::var_os("ZENSIM_MONOTONE_RESEARCH_MANIFEST") {
+        let bytes = std::fs::read(path).expect("research manifest for coverage admission");
+        let manifest: serde_json::Value =
+            serde_json::from_slice(&bytes).expect("research manifest JSON");
+        assert!(
+            manifest
+                .get("training")
+                .is_none_or(serde_json::Value::is_null)
+                || args.no_sample_coverage,
+            "monotone training controls require --no-sample-coverage; use the native TRAINING_EVENTS receipt, not uniform-sampler reconstruction"
+        );
+    }
     let selected_ids = args.keep_features.as_deref().map(|spec| {
         parse_keep_features(spec, args.max_features).unwrap_or_else(|e| {
             eprintln!("--keep-features: {e}");
