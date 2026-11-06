@@ -8,6 +8,8 @@ import os
 from pathlib import Path
 import json
 import pickle
+import shutil
+import subprocess
 import sys
 import numpy as np
 import pandas as pd
@@ -334,6 +336,60 @@ def summarize(root, output, neural_summaries):
     print('\n'.join(lines), flush=True)
 
 
+def closure(root, base_path):
+    """Save exact consumed files and source before the existing mirror owner runs."""
+    base = json.loads(base_path.read_text())
+    original = json.loads((root / 'search/PLAN.json').read_text())
+    peer = json.loads((root / 'peers/PEERS.json').read_text())
+    comparison = json.loads((root / 'analysis/COMPARISON.json').read_text())
+    dest = root / 'input-closure'
+    dest.mkdir(exist_ok=False)
+    inputs = {**original['inputs'], **peer['inputs'], **comparison['sources']}
+    inputs[str(base_path)] = sha(base_path)
+    prepared = Path(base['output']) / 'PREPARED.json'
+    inputs[str(prepared)] = original['prepared_sha256']
+    for key, pin in original['binary_sha256'].items():
+        inputs[original[key]] = pin
+    role = Path(base['output']) / 'root/human_role_decision.json'
+    inputs[str(role)] = sha(role)
+    index = []
+    for file, pin in sorted(inputs.items()):
+        path = Path(file)
+        if sha(path) != pin:
+            raise ValueError('closure input drift: ' + file)
+        blob = dest / pin
+        if not blob.exists():
+            shutil.copyfile(path, blob)
+        if sha(blob) != pin:
+            raise ValueError('closure copy mismatch')
+        index.append(dict(source=file, sha256=pin, bytes=blob.stat().st_size, blob=blob.name))
+    write(dest / 'INDEX.json', index)
+    sources = root / 'source'
+    sources.mkdir(exist_ok=False)
+    repo = Path(__file__).resolve().parents[2]
+    records = [('7b57f9cbc259', 'scripts/rev4_featpot/tree_study.py'),
+               ('8c39499e5916', 'scripts/rev4_featpot/tree_study_report.py')]
+    for commit, file in records:
+        target = sources / (commit + '-' + Path(file).name)
+        target.write_bytes(subprocess.check_output(['git', 'show', commit + ':' + file], cwd=repo))
+    for file in ['scripts/rev4_featpot/activation_curriculum.py', 'scripts/rev4_featpot/tree_study_report.py',
+                 'scripts/v_next/train_corruption_head.py', 'scripts/lib/zen_stats.py',
+                 'scripts/byconstruction/dataset_mirror.py', 'scripts/tests/test_tree_study.py',
+                 'scripts/rev4_featpot/color_noise_fx2_declaration.json', 'docs/TREE_REGRESSION_STUDY.md']:
+        shutil.copyfile(repo / file, sources / Path(file).name)
+    if sha(sources / '7b57f9cbc259-tree_study.py') != original['script_sha256']:
+        raise ValueError('search source identity mismatch')
+    peer_plan = json.loads((root / 'peer-search/PLAN.json').read_text())
+    if sha(sources / '8c39499e5916-tree_study_report.py') != peer_plan['script_sha256']:
+        raise ValueError('peer-search source identity mismatch')
+    import importlib.metadata
+    write(sources / 'PACKAGES.json', {name: importlib.metadata.version(name)
+          for name in ['scikit-learn', 'numpy', 'scipy', 'pyarrow', 'pandas', 'joblib', 'threadpoolctl']})
+    write(root / 'CLOSURE.json', dict(input_files=len(index), input_index_sha256=sha(dest / 'INDEX.json'),
+        source_files={p.name: sha(p) for p in sorted(sources.iterdir())}, scientific_fits=183,
+        artifact_mirror_owner='scripts/byconstruction/dataset_mirror.py', complete=True))
+
+
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--baseline-plan', type=Path)
@@ -341,9 +397,14 @@ def main():
     p.add_argument('--output', type=Path, required=True)
     p.add_argument('--peer-search', type=Path, help='run the registered peer-assisted search with this joined metadata')
     p.add_argument('--summarize', action='store_true')
+    p.add_argument('--closure', action='store_true')
     p.add_argument('--neural-summary', type=Path, action='append', default=[])
     args = p.parse_args()
-    if args.summarize:
+    if args.closure:
+        if args.baseline_plan is None:
+            p.error('--baseline-plan is required for closure')
+        closure(args.run, args.baseline_plan)
+    elif args.summarize:
         summarize(args.run, args.output, args.neural_summary)
     elif args.peer_search:
         peer_search(args.run, args.peer_search, args.output)
