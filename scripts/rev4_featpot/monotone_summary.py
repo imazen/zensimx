@@ -172,7 +172,8 @@ def summarize(root, breakdowns, output, control_root=None):
             checks=dict(teacher_mass_changed=changed_mass,
                 original_matches_control=event['original_digest']==control['original_digest'],
                 tail_matches_control=event['tail_digest']==control['tail_digest'],
-                mass_counts_match_control=event['mass']==control['mass'],
+                mass_counts_match_control=[(m['group'],m['pair_events']) for m in event['mass']]
+                    ==[(m['group'],m['pair_events']) for m in control['mass']],
                 ordered_matches_control=event['ordered_digest']==control['ordered_digest'])
             if not changed_mass and not all(checks[k] for k in ('original_matches_control','tail_matches_control','mass_counts_match_control')):
                 raise ValueError('matched exposure/tail failure: '+cell)

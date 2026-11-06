@@ -332,3 +332,25 @@ nine fits. Report all three arms against the existing neutral control, including
 source intervals and family panels; no additional checkpoint or hyperparameter
 selection. Together with the earlier global schedules, these controls distinguish
 within-population order from the timing of supervision populations.
+
+## A4r: numerical export repair, registered before repaired evaluation
+
+The original long spline export failed the existing coordinate gate in seeds
+0 and 2 (maximum increases 0.000011444091796875 and 0.00002288818359375).
+Preserve those failures and their frozen binaries. The exporter used signed
+slope differences times unbounded hinges, which can cancel in float32.
+
+Evaluate a positive bounded-segment export for all three short and all three
+long spline checkpoints, without optimizer steps or label-based tuning.
+Recover segment slopes by summing stored float32 slope differences in float64;
+record rounding-negative slopes, clamp only negatives within a declared rounding
+bound, and cast the recovered nonnegative slopes to float32. This is a new
+numerical export, not recovery of the original float64 weights or a byte replay.
+The trainer's future exports use its original nonnegative slopes directly.
+
+Each bounded segment uses width-ReLU(width-ReLU(z-knot)), followed by a
+positive weighted sum. Keep original first layers, hinge inputs, final head,
+scaler and metadata, and add a repair receipt. Re-evaluate every prepared panel
+and the unchanged feature gate; report original failures and repaired outcomes
+separately. Inspect prediction differences on every prepared row. The six exports
+must not replace historical raw checkpoints or turn their failed gates into passes.

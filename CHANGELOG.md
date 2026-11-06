@@ -4,6 +4,10 @@
 
 ### Research
 
+- Replace private research-spline export cancellation with positive bounded
+  segments; retain historical failed models and register separate no-fit
+  checkpoint repair evaluation.
+
 - Register and implement within-population ordering controls that preserve every
   teacher, skipped and replay event position, separating distortion order from
   supervision timing.

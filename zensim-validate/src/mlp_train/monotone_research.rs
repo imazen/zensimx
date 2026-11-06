@@ -4,6 +4,8 @@ use super::{AdamState, MlpHyperparams, SplitMix64};
 use serde::{Deserialize, Serialize};
 use zenpredict::{Activation, WeightDtype};
 use zenpredict_bake::{BakeLayer, BakeMetadataEntry, BakeRequest, bake};
+#[path = "../spline_segments.rs"]
+mod spline_segments;
 
 const KNOTS: [f64; 6] = [0., 0.125, 0.5, 1., 2., 4.];
 // A small strict margin protects the real-arithmetic bound when packing f32.
@@ -1002,21 +1004,26 @@ impl Block {
         if self.kind == Family::Spline {
             let n = self.no * KNOTS.len();
             let mut hinges = Dense::zero(self.ni, n, Activation::Relu);
-            let mut combine = Dense::zero(n, self.no, Activation::Identity);
             for j in 0..self.no {
-                let mut previous = 0.;
                 for (k, &knot) in KNOTS.iter().enumerate() {
                     let column = j * KNOTS.len() + k;
                     hinges.b[column] = -knot as f32;
                     for i in 0..self.ni {
                         hinges.set(i, column, self.w[i * self.no + j]);
                     }
-                    let slope = self.extra[column];
-                    combine.set(column, j, slope - previous);
-                    previous = slope;
                 }
             }
-            layers.extend([hinges, combine]);
+            layers.push(hinges);
+            let slopes = self.extra.iter().map(|s| *s as f32).collect::<Vec<_>>();
+            layers.extend(
+                spline_segments::bounded(self.no, &KNOTS, &slopes).map(|l| Dense {
+                    ni: l.ni,
+                    no: l.no,
+                    act: l.activation,
+                    w: l.weights,
+                    b: l.biases,
+                }),
+            );
             return;
         }
         let leaky_switch = self.kind == Family::Switch && self.negative_slope > 0.;

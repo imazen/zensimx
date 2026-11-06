@@ -87,6 +87,8 @@ use clap::{Args, Parser, Subcommand};
 use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
 use zenpredict::{Activation, MetadataType, Model, WeightDtype, WeightStorage, f16_bits_to_f32};
 use zenpredict_bake::{BakeLayer, BakeMetadataEntry, BakeRequest, bake};
+#[path = "../spline_segments.rs"]
+mod spline_segments;
 use zensim_validate::block_profile;
 use zensim_validate::output_calibration_spline as spline;
 use zensim_validate::panel::{outlier_ratio, rescale_logistic, spearman, z_rmse};
@@ -170,6 +172,9 @@ enum Cmd {
     ReadMeta(ReadMetaArgs),
     /// Read model dimensions and stored coefficient counts without changing it.
     Inspect(InspectArgs),
+    /// Re-export a private monotone-research spline using positive bounded segments.
+    /// No fitting; preserves the original file and records any slope rounding repair.
+    RepairResearchSpline(RepairResearchSplineArgs),
     /// Weight-space interpolation of two bakes of one architecture: every
     /// weight and bias becomes (1 - alpha)*a + alpha*b (f64, rounded to f32;
     /// alpha 0 and 1 copy their end exactly). Refuses unless shapes,
@@ -2795,6 +2800,136 @@ struct ReadMetaArgs {
 struct InspectArgs {
     #[arg(long = "in")]
     input: PathBuf,
+}
+
+#[derive(Args)]
+struct RepairResearchSplineArgs {
+    #[arg(long = "in")]
+    input: PathBuf,
+    #[arg(long)]
+    out: PathBuf,
+}
+
+fn stable_research_spline(
+    mut layers: Vec<OwnedLayer>,
+) -> Result<(Vec<OwnedLayer>, serde_json::Value), String> {
+    let knots = [0., 0.125, 0.5, 1., 2., 4.];
+    if layers.len() != 5
+        || layers.iter().any(|l| {
+            l.dtype != WeightDtype::F32 || l.weights.iter().chain(&l.biases).any(|v| !v.is_finite())
+        })
+    {
+        return Err("repair requires five finite f32 research layers".into());
+    }
+    let hinges = &layers[2];
+    let combine = &layers[3];
+    let no = combine.out_dim;
+    let n = no * knots.len();
+    if no == 0
+        || hinges.out_dim != n
+        || combine.in_dim != n
+        || hinges.activation != Activation::Relu
+        || combine.activation != Activation::Identity
+        || combine.biases.iter().any(|v| *v != 0.)
+    {
+        return Err("not the registered spline hinge/combine layout".into());
+    }
+    let mut slopes = Vec::with_capacity(n);
+    let mut clipped = 0;
+    let mut largest_clip = 0f64;
+    let mut largest_cast_error = 0f64;
+    for j in 0..no {
+        let mut slope = 0f64;
+        let mut magnitude = 0f64;
+        for (k, &knot) in knots.iter().enumerate() {
+            let column = j * knots.len() + k;
+            if hinges.biases[column] != -knot as f32 {
+                return Err("spline knot drift".into());
+            }
+            for i in 0..hinges.in_dim {
+                let w = hinges.weights[i * n + column];
+                if w < 0. || w.to_bits() != hinges.weights[i * n + j * knots.len()].to_bits() {
+                    return Err("spline preactivation weights drift".into());
+                }
+            }
+            for out in 0..no {
+                if out != j && combine.weights[column * no + out] != 0. {
+                    return Err("unexpected spline cross-unit coefficient".into());
+                }
+            }
+            let coefficient = f64::from(combine.weights[column * no + j]);
+            slope += coefficient;
+            magnitude += coefficient.abs();
+            if slope < -8. * f64::from(f32::EPSILON) * magnitude {
+                return Err("negative cumulative slope exceeds rounding bound".into());
+            }
+            if slope < 0. {
+                clipped += 1;
+                largest_clip = largest_clip.max(-slope);
+            }
+            let rounded = slope.max(0.) as f32;
+            largest_cast_error = largest_cast_error.max((f64::from(rounded) - slope.max(0.)).abs());
+            slopes.push(rounded);
+        }
+    }
+    let tail = layers.pop().unwrap();
+    layers.pop(); // Replace signed slope differences; retain the original hinges.
+    layers.extend(
+        spline_segments::bounded(no, &knots, &slopes).map(|l| OwnedLayer {
+            in_dim: l.ni,
+            out_dim: l.no,
+            activation: l.activation,
+            dtype: WeightDtype::F32,
+            weights: l.weights,
+            biases: l.biases,
+        }),
+    );
+    layers.push(tail);
+    Ok((
+        layers,
+        serde_json::json!({"schema":"positive-spline-export-repair-v1",
+        "slopes":slopes.len(),"negative_reconstructed_slopes":clipped,
+        "largest_negative_slope_clipped":largest_clip,"largest_nonnegative_slope_cast_error":largest_cast_error,
+        "method":"cumulative f64 sum of stored f32 slope differences; clamp rounding-negative slopes to zero; cast f32; positive bounded segments",
+        "fitting_steps":0,"note":"a new numerical export, not byte-equivalent or recovery of original f64 parameters"}),
+    ))
+}
+
+fn cmd_repair_research_spline(a: &RepairResearchSplineArgs) -> Result<(), String> {
+    if a.out.exists() {
+        return Err("preserve existing output".into());
+    }
+    let bytes = std::fs::read(&a.input).map_err(|e| e.to_string())?;
+    let model = Model::from_bytes(&bytes).map_err(|e| e.to_string())?;
+    let config: serde_json::Value =
+        serde_json::from_str(&read_meta(&bytes, "zentrain.monotone_research")?)
+            .map_err(|e| e.to_string())?;
+    if config["schema"] != "monotone-head-v1"
+        || config["family"] != "spline"
+        || model.scaler_mean().iter().any(|m| *m != 0.)
+    {
+        return Err("only the scale-only monotone research spline is admitted".into());
+    }
+    let (layers, mut receipt) =
+        stable_research_spline(owned_layers(&model).map_err(|e| e.to_string())?)?;
+    receipt["input_sha256"] = sha256_hex(&bytes).into();
+    let mut metadata = clone_metadata(&model);
+    metadata.push(OwnedMeta {
+        key: "zentrain.spline_export_repair".into(),
+        kind: MetadataType::Utf8,
+        value: serde_json::to_vec(&receipt).map_err(|e| e.to_string())?,
+    });
+    let output = bake_layers(
+        model.scaler_mean(),
+        model.scaler_scale(),
+        &layers,
+        &metadata,
+        model.schema_hash(),
+    );
+    receipt["output_sha256"] = sha256_hex(&output).into();
+    std::fs::write(&a.out, output).map_err(|e| e.to_string())?;
+    println!("{receipt}");
+    Ok(())
 }
 fn cmd_inspect(a: &InspectArgs) -> Result<(), String> {
     let bytes = std::fs::read(&a.input).map_err(|e| e.to_string())?;
@@ -5909,6 +6044,7 @@ fn main() -> ExitCode {
         Cmd::AppendMeta(a) => cmd_append_meta(a).map(|_| false),
         Cmd::ReadMeta(a) => cmd_read_meta(a).map(|_| false),
         Cmd::Inspect(a) => cmd_inspect(a).map(|_| false),
+        Cmd::RepairResearchSpline(a) => cmd_repair_research_spline(a).map(|_| false),
         Cmd::Interpolate(a) => cmd_interpolate(a).map(|_| false),
         Cmd::FitLasso(a) => cmd_fit_lasso(a).map(|_| false),
         Cmd::Gram(a) => cmd_gram(a).map(|_| false),
@@ -5935,6 +6071,82 @@ fn main() -> ExitCode {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn research_spline_repair_removes_saturated_hinge_cancellation() {
+        let layer = |ni, no, activation, weights, biases| OwnedLayer {
+            in_dim: ni,
+            out_dim: no,
+            activation,
+            dtype: WeightDtype::F32,
+            weights,
+            biases,
+        };
+        let original = vec![
+            layer(1, 1, Activation::Relu, vec![1.], vec![0.]),
+            layer(1, 1, Activation::Identity, vec![1.], vec![0.]),
+            layer(
+                1,
+                6,
+                Activation::Relu,
+                vec![1.; 6],
+                vec![0., -0.125, -0.5, -1., -2., -4.],
+            ),
+            layer(
+                6,
+                1,
+                Activation::Identity,
+                vec![0.1, -0.1, 0., 0., 0., 0.],
+                vec![0.],
+            ),
+            layer(1, 1, Activation::Identity, vec![-1.], vec![100.]),
+        ];
+        let (fixed, receipt) = stable_research_spline(original.clone()).unwrap();
+        assert_eq!(receipt["fitting_steps"], 0);
+        assert_eq!(receipt["negative_reconstructed_slopes"], 0);
+        for (a, b) in original[..3].iter().zip(&fixed[..3]) {
+            assert_eq!(a.weights, b.weights);
+            assert_eq!(a.biases, b.biases);
+        }
+        assert_eq!(original[4].weights, fixed[6].weights);
+        assert_eq!(original[4].biases, fixed[6].biases);
+        let old_bytes = bake_layers(&[0.], &[1.], &original, &[], 0);
+        let new_bytes = bake_layers(&[0.], &[1.], &fixed, &[], 0);
+        let old = Model::from_bytes(&old_bytes).unwrap();
+        let new = Model::from_bytes(&new_bytes).unwrap();
+        let mut old_pred = zenpredict::Predictor::new(&old);
+        let mut new_pred = zenpredict::Predictor::new(&new);
+        assert_eq!(
+            new_pred.predict(&[0.]).unwrap()[0].to_bits(),
+            100f32.to_bits()
+        );
+        let mut prior_old = f32::INFINITY;
+        let mut prior_new = f32::INFINITY;
+        let mut observed_old_increase = false;
+        let mut x = 1_000_000f32;
+        for _ in 0..4096 {
+            let a = old_pred.predict(&[x]).unwrap()[0];
+            let b = new_pred.predict(&[x]).unwrap()[0];
+            observed_old_increase |= a > prior_old;
+            assert!(b <= prior_new, "positive segment export increased at {x}");
+            assert_eq!(b.to_bits(), (100f32 - 0.1f32 * 0.125).to_bits());
+            prior_old = a;
+            prior_new = b;
+            x = x.next_up();
+        }
+        assert!(
+            observed_old_increase,
+            "negative control must expose cancellation"
+        );
+        let mut invalid = original;
+        invalid[3].weights[1] = -1.;
+        assert!(
+            stable_research_spline(invalid)
+                .err()
+                .unwrap()
+                .contains("negative cumulative slope")
+        );
+    }
 
     /// A one-output, one-hidden-layer bake (inputs from the scaler, hidden units
     /// from `w2`) with one structural entry and one run-provenance entry, like a

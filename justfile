@@ -4812,3 +4812,8 @@ monotone-study-plot summary bootstrap output title *extra:
 
 monotone-figure-mirror root destination:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 2G --jobs 1 -- python3 -B scripts/byconstruction/dataset_mirror.py --root {{quote(root)}} --nfs --cold-readback --destination {{quote(destination)}} --artifact-kind evaluation
+
+monotone-spline-export-check:
+    cargo test --locked -p zensim-validate --bin bake_dial_refit research_spline_repair -- --test-threads=1
+    cargo test --locked -p zensim-validate --lib monotone_research -- --test-threads=1
+    cargo clippy --locked -p zensim-validate --lib --bin bake_dial_refit -- -D warnings
