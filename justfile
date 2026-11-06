@@ -4827,3 +4827,6 @@ monotone-study-regressions:
     cargo test --locked -p zensim-validate --bin bake_dial_refit -- --test-threads=1
     just activation-curriculum-tests
     just lint-scripts
+
+monotone-study-close root figures:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 2G --jobs 1 -- python3 -B scripts/rev4_featpot/monotone_close.py --root {{quote(root)}} --figures {{quote(figures)}}
