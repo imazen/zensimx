@@ -4707,3 +4707,6 @@ activation-curriculum-audit output:
 # Short Rust fits reuse strict admission, native baking/prediction and panels.
 activation-curriculum-pilot baseline_plan output:
     TMPDIR="$HOME/tmp" RAYON_NUM_THREADS=1 OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 "$HOME/work/claudehints/scripts/run-heavy" --mem 8G --jobs 3 -- python3 -B scripts/rev4_featpot/activation_curriculum.py native --baseline-plan {{quote(baseline_plan)}} --output {{quote(output)}} --workers 3
+
+activation-curriculum-tests:
+    python3 -B -m unittest discover -s scripts/tests -p test_activation_curriculum.py -v
