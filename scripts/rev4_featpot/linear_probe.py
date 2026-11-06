@@ -22,11 +22,6 @@ import pyarrow.parquet as pq
 
 from data import FEATURES, load
 
-tmpdir = Path("/var/tmp/rev4-featpot/tmp")
-tmpdir.mkdir(parents=True, exist_ok=True)
-os.environ["TMPDIR"] = str(tmpdir)
-tempfile.tempdir = str(tmpdir)
-
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from lib.zen_stats import panel_batch  # noqa: E402
 
@@ -210,4 +205,12 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    if len(sys.argv) > 1 and sys.argv[1] == "shaped-study":
+        from shaped_linear_study import main as shaped_main
+        shaped_main(sys.argv[2:])
+    else:
+        tmpdir = Path.home() / "tmp/rev4-featpot"
+        tmpdir.mkdir(parents=True, exist_ok=True)
+        os.environ["TMPDIR"] = str(tmpdir)
+        tempfile.tempdir = str(tmpdir)
+        main()

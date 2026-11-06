@@ -192,7 +192,7 @@ _BATCH_FULL_COLS = ("n", "n_dropped", "srocc", "srocc_signed", "plcc",
 _BATCH_SROCC_COLS = ("n", "n_dropped", "srocc", "srocc_signed")
 
 
-def _run_batch(text: str, stats: str, timeout: float) -> list[dict]:
+def _run_batch(text: str, stats: str, timeout: float, raw_errors: bool = False) -> list[dict]:
     if stats not in ("full", "srocc"):
         raise ValueError(f"stats must be 'full' or 'srocc', got {stats!r}")
     bin_path = _find_panel_bin()
@@ -201,7 +201,7 @@ def _run_batch(text: str, stats: str, timeout: float) -> list[dict]:
         f.write(text)
     try:
         out = subprocess.run(
-            [bin_path, "--batch", tmp, "--stats", stats],
+            [bin_path, "--batch", tmp, "--stats", stats] + (["--raw-errors"] if raw_errors else []),
             pass_fds=_panel_pass_fds(),
             capture_output=True, text=True, timeout=timeout, check=True,
         )
@@ -212,6 +212,8 @@ def _run_batch(text: str, stats: str, timeout: float) -> list[dict]:
     lines = out.stdout.splitlines()
     header = lines[0].split("\t")
     want = ("label",) + (_BATCH_SROCC_COLS if stats == "srocc" else _BATCH_FULL_COLS)
+    if raw_errors:
+        want += ("mae_raw",)
     if tuple(header) != want:
         raise RuntimeError(f"unexpected batch header {header!r}")
     rows = []
@@ -230,7 +232,7 @@ def _fmt_vec(v) -> str:
     return ",".join(repr(float(x)) for x in v)
 
 
-def panel_batch(jobs, stats: str = "full", timeout: float = 1800.0) -> list[dict]:
+def panel_batch(jobs, stats: str = "full", timeout: float = 1800.0, *, raw_errors: bool = False) -> list[dict]:
     """N explicit (x, y) pairs -> N stat rows, one `panel` process.
 
     Args:
@@ -250,7 +252,7 @@ def panel_batch(jobs, stats: str = "full", timeout: float = 1800.0) -> list[dict
         if len(x) != len(y):
             raise ValueError(f"job {label!r}: x ({len(x)}) != y ({len(y)})")
         parts.append(f"{label}\t{_fmt_vec(x)}\t{_fmt_vec(y)}\n")
-    return _run_batch("".join(parts), stats, timeout)
+    return _run_batch("".join(parts), stats, timeout, raw_errors)
 
 
 def render_indexed_jobs(jobs, base_names) -> str:
@@ -271,7 +273,8 @@ def render_indexed_jobs(jobs, base_names) -> str:
 
 
 def panel_batch_indexed(bases: dict, jobs, stats: str = "full",
-                        timeout: float = 1800.0, rendered_jobs: Optional[str] = None) -> list[dict]:
+                        timeout: float = 1800.0, rendered_jobs: Optional[str] = None,
+                        *, raw_errors: bool = False) -> list[dict]:
     """N index-set resamples over shared base vectors -> N stat rows.
 
     The paired-bootstrap shape: declare each base vector ONCE, then each
@@ -290,7 +293,7 @@ def panel_batch_indexed(bases: dict, jobs, stats: str = "full",
             raise ValueError(f"base name {name!r} must not contain tab/colon/@")
         parts.append(f"#def {name}\t{_fmt_vec(v)}\n")
     parts.append(render_indexed_jobs(jobs, bases) if rendered_jobs is None else rendered_jobs)
-    return _run_batch("".join(parts), stats, timeout)
+    return _run_batch("".join(parts), stats, timeout, raw_errors)
 
 
 # Convenience single-stat accessors for drop-in replacement of the

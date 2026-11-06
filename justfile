@@ -4839,4 +4839,11 @@ shaped-linear-native-check:
     cargo clippy --locked -p zensim-validate --bin bake_dial_refit -- -D warnings
 
 shaped-linear-native-build:
-    cargo build --locked --release -p zensim-validate --bin bake_dial_refit
+    cargo build --locked --release -p zensim-validate --bin bake_dial_refit --bin corrhead_parity
+
+# Source-separated shaped-linear research; run through run-heavy.
+shaped-linear-study stage root:
+    python3 scripts/rev4_featpot/linear_probe.py shaped-study {{stage}} --root {{root}}
+
+shaped-linear-controller-tests:
+    TMPDIR="$HOME/tmp" python3 -B -m unittest discover -s scripts/tests -p test_shaped_linear_study.py -v

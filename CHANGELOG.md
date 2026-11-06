@@ -4,6 +4,10 @@
 
 ### Research
 
+- Register source-separated shaped-linear fitting bounds and memorization controls;
+  add a private Rust quadratic fitter with numerical optimality certificates
+  and canonical f32 prediction (`29e350a6`).
+
 - Complete 129 registered native fits, retaining six long-export gate failures;
   verify six numerical spline re-exports and all 15 exact trajectory replays.
   Record source uncertainty, supervision-timing effects and final-path collapse.
