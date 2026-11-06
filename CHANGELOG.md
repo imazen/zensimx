@@ -4,6 +4,8 @@
 
 ### Research
 
+- Register and implement source-grouped random-forest, Extra Trees and histogram-boosting tuning over cached features, matched peer panels and native finalist arithmetic checks (`7b57f9cb`).
+
 - Register constrained activation/dropout and distortion-order experiments; add independent numerical probes and a matched native optimization pilot (`cb502a81`).
 
 - Add an opt-in constrained shared second hidden layer to the plain trainer,

@@ -141,3 +141,22 @@ Primary references: [Breiman's Random Forests paper](https://www.stat.berkeley.e
 and [histogram boosting API](https://scikit-learn.org/stable/modules/generated/sklearn.ensemble.HistGradientBoostingRegressor.html).
 Installed implementation at registration: scikit-learn 1.9.0; version-specific
 bootstrap behavior was checked against its local source.
+
+## Matched peer and source audit
+
+`tree_study_report.py` joins only the admitted preparation's pair keys. The
+frozen revision-7 bank keys provide decoded reference/distorted pixel hashes,
+distortion labels and severity knobs. The decoded reference audit checks both
+FIT/development and all inner folds across population boundaries, not merely
+matching names within a dataset. Historical GMSD/GMSM rows must match both pixel
+hashes and their successful digest-check flag. SSIMULACRA2 and butteraugli
+3-norm use the October 28 E21 cache, exact pair keys and exact image paths.
+Duplicate keys with different scores fail the join. Missing admitted human
+rows fail the comparison. Peer tables' human labels are never imported.
+
+The four peer baselines receive the same signed/within-reference/scatter panels
+as the trees, for fitting and development separately. Their scores are not
+inputs to the initial 129-fit search. SSIMULACRA2 on the separate CID22 training
+images is the only synthetic supervision in that search. Other peers are
+zero-shot comparators. Detailed distortion/severity metadata is saved for
+subgroup diagnosis; dataset identity is not substituted for distortion type.
