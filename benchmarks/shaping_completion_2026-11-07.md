@@ -639,3 +639,37 @@ SSD allocation. `VARIANT_INPUT_AUDIT.json`, `VARIANT_INPUT_PROGRESS.json`, froze
 memberships, preparation receipts and per-file hashes are retained. Two tests
 cover corruption of feature bits/keys/null masks/labels and independent replay
 of both registered permutation schemes and seeds.
+
+## Additional registered analytic waves at 06:34 UTC
+
+The untouched `inner-2-0` analytic wave is assigned to i265 and `inner-2-1` to
+i270. Each contains 36 registered Softplus/monotone-SiLU/ordinary-SiLU cells,
+with four concurrent trainers per wave. Both use the existing qualified frozen
+training capsule and binary set, unchanged 240 x 50,000 exposure, settings,
+seeds and training-complement rows. Each trainer has a one-thread, 1 GiB cap;
+each new controller has a 6 GiB, four-worker cap. These are admission caps,
+not measured peak memory claims.
+
+All 20 transferred inputs per partition passed exact checksum verification:
+23,190,369 bytes for inner-2-0 and 24,109,088 for inner-2-1. The second transfer
+uses the committed installer, which rejects unexpected paths, symlinks,
+existing files and checksum mismatches before scientific execution. Its test
+verifies exact installation, overwrite refusal and wrong-hash refusal.
+
+At 06:34:48 UTC, live process checks found 18 dev, 20 i270 and 16 i265 fits,
+with no unexpectedly stopped attempts. All eight newly admitted native wrappers
+were verified live; the four i265 fits had logged epochs 2, 5, 1 and 2. The four
+i270 fits were initializing. Free SSD bytes were 57,352,433,664,
+60,921,602,048 and 219,094,581,248 respectively. No global compute lock was added.
+
+Both input/admission archives passed all-file destination readback:
+`worker-i265-analytic-inner-2-0-inputs` (nine files, 23,245,851 bytes) and
+`worker-i270-analytic-inner-2-1-inputs` (ten files, 24,171,364 bytes).
+These archives qualify inputs and placement; completed scientific fit outputs
+will be collected and archived separately.
+
+The refreshed progress audit records 133/816 primary inner final reports and
+7/72 fresh-control final reports. Thirty-seven primary cells have neural
+convergence receipts, 34 retain investigation triggers, and four retain original
+diagnostic-gate failures. No outer-selection or convergence-completion claim
+follows from these process/report counts.
