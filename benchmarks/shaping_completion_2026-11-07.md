@@ -1112,3 +1112,19 @@ The waiting worker import subsequently completed and its automatic wave archive
 verified. Exact removal inventory and restoration root are recorded in
 `RECLAIMED_LINEAR_PARITY.json` under the completion-study artifact root. This
 retention did not lower the 30 GiB reserve or any pending-write allowance.
+
+## Doubled-exposure native dispatch
+
+`shaping_extension_dispatch.py` waits for the extension registration, reproduces
+all paired rescue decisions and the exact registered extension matrix, and queues
+native fits through the existing extension owner. It preserves continuous 480-epoch
+fits, pretrained 240+240 phases and the registered fresh controls. Each fold uses
+two slots; concurrent copies of that fold's dispatcher are refused. Existing fits
+require matching plan, build, registration, cell, exposure and final model hashes.
+Failed or ambiguous attempts are preserved for explicit reconciliation.
+
+Four tests exercise refusal before registration, terminal identity/exposure/model
+checks, preservation of failures, an empty verified matrix, and a nonempty queue
+with continuous/pretrained/fresh-control exposures and a measured two-child
+maximum. These are orchestration checks, not scientific fits. Extension evaluation
+and outer admission still require the existing complete diagnostic gates.

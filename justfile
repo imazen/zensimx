@@ -5050,6 +5050,12 @@ shaping-completion-register-extension study outer:
 shaping-completion-extension-fit study binary_dir neutral cell:
     TMPDIR="$HOME/tmp" python3 -B scripts/rev4_featpot/shaping_extension_execution.py --study {{quote(study)}} --binary-dir {{quote(binary_dir)}} --neutral-qualification {{quote(neutral)}} --cell {{quote(cell)}}
 
+shaping-completion-dispatch-extensions study binary_dir neutral outer *args:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 4G --jobs 2 -- python3 -B scripts/rev4_featpot/shaping_extension_dispatch.py --study {{quote(study)}} --binary-dir {{quote(binary_dir)}} --neutral-qualification {{quote(neutral)}} --outer {{outer}} --workers 2 {{args}}
+
+shaping-completion-extension-dispatch-check:
+    python3 -B -m unittest discover -s scripts/tests -p test_shaping_extension_dispatch.py
+
 shaping-completion-progress study *args:
     TMPDIR="$HOME/tmp" python3 -B scripts/rev4_featpot/shaping_progress.py --study {{quote(study)}} {{args}}
 
