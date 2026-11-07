@@ -1033,3 +1033,28 @@ synthetic queue that launches each registered cell once with at most two childre
 The queue test verifies orchestration, not native training quality. Tree/additive
 outer controls retain their separate existing execution owner. Scientific outer
 fits remain unexecuted until the full evidence admission becomes available.
+
+## Completed ReLU consolidation-rescue optimizer traces
+
+Both seed-0 `consolidate_lr` ReLU rescues on outer fold 0 have complete
+240-epoch native diagnostic traces. The summary command verifies their final
+model/report/convergence provenance through the supplemental ReLU representation
+before reading the training log. It rejects missing/duplicate epochs, inconsistent
+activity counts and nonfinite evidence rather than reporting a complete trace.
+
+| Inner partition | Epochs with at most one nonzero output | First such epoch | Total output projection hits | Final mean squared first-activation gradient |
+|---|---:|---:|---:|---:|
+| inner-0-0 | 226 / 240 | 14 | 855,406 | 1.443929485482317 |
+| inner-0-1 | 225 / 240 | 14 | 836,323 | 1.520907514992422 |
+
+At epoch 239 both fits have one nonzero output coefficient and one active
+last-layer unit among 386 sampled training responses. First-layer activation
+zeros are respectively 43,100 and 44,931 of 49,408 sampled values. These
+first-activation gradients are not first-weight gradients. Sampled inactivity
+is not proof of globally dead units, and a single surviving output does not
+establish a linear function or a feature-information ceiling. Consolidation
+has not prevented collapse in these two fits; the other paired seeds and rescue
+choices remain required before comparing remedies. The original native-gate
+failure for `ddc7932564aefab339d1` remains preserved independently of its
+supplemental evaluation. Summaries and exact input hashes are under
+`relu-rescue-optimizer-diagnosis` in the completion-study artifact roots.

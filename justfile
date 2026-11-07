@@ -5062,6 +5062,12 @@ shaping-completion-dispatch-outer study binary_dir neutral outer *args:
 shaping-completion-outer-dispatch-check:
     python3 -B -m unittest discover -s scripts/tests -p test_shaping_outer_dispatch.py
 
+shaping-completion-optimizer-summary study run output *args:
+    python3 -B scripts/rev4_featpot/shaping_optimizer_summary.py --study {{quote(study)}} --run {{quote(run)}} --output {{quote(output)}} {{args}}
+
+shaping-completion-optimizer-summary-check:
+    python3 -B -m unittest discover -s scripts/tests -p test_shaping_optimizer_summary.py
+
 shaping-completion-watch-all-evaluation study binary_dir rescue_binary_dir:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 2G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_supervision.py --study {{quote(study)}} --binary-dir {{quote(binary_dir)}} --rescue-binary-dir {{quote(rescue_binary_dir)}} --watch
 
