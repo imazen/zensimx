@@ -51,6 +51,14 @@ their loaded modules do not update with the checkout, but future lazy imports do
 Verify process liveness as well as status files; restart affected evaluators only
 after checking active children and preserving any incomplete outputs.
 
+The Softplus supplemental evaluator had the same import failure after its last
+successful status at 17:55 UTC. Its old process was verified absent during the
+20:18 audit; the failed log and completed conversion were preserved. A new
+evaluator on current committed source reused that conversion and caught up from
+57 to 67 complete supplemental panels, without retraining. The progress owner now
+accepts explicit supervisor-status roles and verifies recorded local PIDs against
+their program, study and mode. Status age alone never establishes process death.
+
 ## Known Bugs — analytic-head native order failure (November 7, 2026)
 
 Softplus cell `6e988eec6f23b804ff31` (inner-2-1, seed 2, setting 0)

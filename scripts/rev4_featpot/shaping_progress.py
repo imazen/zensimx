@@ -16,7 +16,53 @@ def report_marker(path,cell,plan):
     return True
 
 
-def audit(root,workers):
+SUPERVISOR_SCRIPTS={
+    'inner_evaluation':'shaping_supervision.py','later_evaluation':'shaping_supervision.py',
+    'relu_evaluation':'shaping_reexport_supervision.py','softplus_evaluation':'shaping_reexport_supervision.py',
+    'primary_archive':'shaping_archive_supervision.py','supplemental_archive':'shaping_archive_supervision.py',
+    'later_neural_archive':'shaping_archive_supervision.py','later_control_archive':'shaping_archive_supervision.py',
+    'failed_original_archive':'shaping_archive_supervision.py','bootstrap':'shaping_bootstrap.py',
+}
+ARCHIVE_FLAGS={'primary_archive':None,'supplemental_archive':'--supplemental',
+    'later_neural_archive':'--later-neural','later_control_archive':'--later-controls',
+    'failed_original_archive':'--failed-original'}
+
+
+def supervisor_observation(root,role,path,proc=Path('/proc'),now=None):
+    """Observe the recorded process only; never restart or infer death from age."""
+    if role not in SUPERVISOR_SCRIPTS:raise ValueError('unknown supervisor role')
+    row=dict(status_file=str(path),expected_script=SUPERVISOR_SCRIPTS[role],verified_live=False)
+    if not path.exists():return dict(row,process_state='status_missing')
+    status=json.loads(path.read_text());pid=status['pid']
+    if type(pid) is not int or pid<=0:raise ValueError('positive supervisor PID required')
+    now=now or datetime.now(timezone.utc)
+    age=(now-datetime.fromisoformat(status['checked_utc'])).total_seconds()
+    row.update(pid=pid,status_sha256=sha(path),reported_stage=status['stage'],
+               checked_utc=now.isoformat(),status_age_seconds=age,status_fresh=0<=age<=120)
+    try:command=(proc/str(pid)/'cmdline').read_bytes().decode().split('\0')[:-1]
+    except FileNotFoundError:return dict(row,process_state='recorded_process_missing')
+    except PermissionError:return dict(row,verified_live=None,process_state='observation_unavailable')
+    def argument(flag,default=None):
+        if flag not in command:return default
+        if command.count(flag)!=1 or command.index(flag)+1>=len(command):return None
+        return command[command.index(flag)+1]
+    script=next((v for v in command[1:] if not v.startswith('-')),'')
+    matches=(bool(command) and Path(command[0]).name.startswith('python')
+             and '-c' not in command and '-m' not in command
+             and Path(script).name==SUPERVISOR_SCRIPTS[role]
+             and argument('--study')==str(root) and '--watch' in command)
+    if role in ('inner_evaluation','later_evaluation'):
+        matches=matches and ('--later-only' in command)==(role=='later_evaluation')
+    if role in ('relu_evaluation','softplus_evaluation'):
+        matches=matches and argument('--family','relu')==role.split('_',1)[0]
+    if role in ARCHIVE_FLAGS:
+        flags=[flag for flag in ARCHIVE_FLAGS.values() if flag is not None and flag in command]
+        matches=matches and flags==([] if ARCHIVE_FLAGS[role] is None else [ARCHIVE_FLAGS[role]])
+    return dict(row,verified_live=bool(matches),
+                process_state='verified_live' if matches else 'recorded_process_identity_differs')
+
+
+def audit(root,workers,supervisors=None):
     _,cells,_=load_registration(root);plan_pin=sha(root/'PLAN.json')
     required={c['id'] for c in cells if c['stage'] not in ('rescue','resource_pilot')}
     for path in root.glob('RESCUE_TRIGGER_OUTER_*.json'):
@@ -92,19 +138,32 @@ def audit(root,workers):
         observed[host]=dict(status_sha256=sha(path),checked_utc=status['checked_utc'],age_seconds=age,
             fresh=0<=age<=120,observed_live=status['live'],unexpectedly_stopped=status['unexpectedly_stopped'],
             ssd_free_bytes=status['ssd_free_bytes'])
+    supervising={role:supervisor_observation(root,role,path,now=now)
+                 for role,path in (supervisors or {}).items()}
     return dict(checked_utc=now.isoformat(),plan_sha256=plan_pin,required_cells=len(required),
                 counts=counts,workers=observed,cells=rows,overall_experiments_complete=False,
+                supervisors=supervising,
+                all_requested_supervisor_processes_verified_live=all(v['verified_live'] is True for v in supervising.values()) if supervising else None,
                 interpretation='Fit, final-report, convergence and archive counts are distinct. Inner reports do not complete outer/variant comparisons. Cell-level archive receipts and manifest identity checked here; central batch archives are not counted. File readback occurred during archival.')
 
 
 if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__);p.add_argument('--study',type=Path,required=True)
-    p.add_argument('--worker-status',action='append',default=[]);a=p.parse_args()
+    p.add_argument('--worker-status',action='append',default=[])
+    p.add_argument('--supervisor-status',action='append',default=[],metavar='ROLE=PATH',
+                   help='verify a recorded local PID without restarting it; roles: '+', '.join(SUPERVISOR_SCRIPTS))
+    a=p.parse_args()
     workers={}
     for item in a.worker_status:
         host,path=item.split('=',1)
         if host in workers:p.error('duplicate host')
         workers[host]=Path(path)
-    result=audit(a.study,workers)
+    supervisors={}
+    for item in a.supervisor_status:
+        role,path=item.split('=',1)
+        if role not in SUPERVISOR_SCRIPTS:p.error('unknown supervisor role: '+role)
+        if role in supervisors:p.error('duplicate supervisor role')
+        supervisors[role]=Path(path)
+    result=audit(a.study,workers,supervisors)
     temporary=a.study/'PROGRESS_AUDIT.json.writing';temporary.write_bytes(encoded(result));temporary.replace(a.study/'PROGRESS_AUDIT.json')
     print(json.dumps({k:v for k,v in result.items() if k!='cells'}),flush=True)

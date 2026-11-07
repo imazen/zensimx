@@ -3,11 +3,62 @@ from pathlib import Path
 import sys,tempfile,unittest
 from unittest.mock import patch
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'rev4_featpot'))
-from shaping_progress import audit,report_marker
+from shaping_progress import audit,report_marker,supervisor_observation
 from shaping_completion import encoded,sha
 
 
 class ProgressTests(unittest.TestCase):
+    def supervisor_fixture(self,d,command):
+        root=Path(d);status=root/'status.json';proc=root/'proc';process=proc/'42'
+        process.mkdir(parents=True)
+        status.write_bytes(encoded(dict(pid=42,checked_utc='2020-01-01T00:00:00+00:00',stage='watching')))
+        (process/'cmdline').write_bytes(('\0'.join(command)+ '\0').encode())
+        return root,status,proc
+
+    def test_watching_record_with_missing_process_is_not_live(self):
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as d:
+            root,status,proc=self.supervisor_fixture(d,['python3','shaping_supervision.py','--study',d,'--watch'])
+            (proc/'42/cmdline').unlink()
+            row=supervisor_observation(root,'inner_evaluation',status,proc)
+            self.assertFalse(row['verified_live']);self.assertEqual(row['process_state'],'recorded_process_missing')
+            self.assertEqual(json.loads(status.read_text())['stage'],'watching')
+
+    def test_live_process_with_stale_status_is_not_inferred_dead(self):
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as d:
+            root,status,proc=self.supervisor_fixture(d,['python3','-B','shaping_supervision.py','--study',d,'--watch'])
+            row=supervisor_observation(root,'inner_evaluation',status,proc)
+            self.assertTrue(row['verified_live']);self.assertFalse(row['status_fresh'])
+
+    def test_reused_pid_wrong_program_study_or_family_is_not_live(self):
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as d:
+            root,status,proc=self.supervisor_fixture(d,[])
+            for command in [
+                ['python3','other.py','shaping_reexport_supervision.py','--study',d,'--family','softplus','--watch'],
+                ['python3','shaping_reexport_supervision.py','--study',d+'/other','--family','softplus','--watch'],
+                ['python3','shaping_reexport_supervision.py','--study',d,'--family','relu','--watch'],
+            ]:
+                with self.subTest(command=command):
+                    (proc/'42/cmdline').write_bytes(('\0'.join(command)+'\0').encode())
+                    row=supervisor_observation(root,'softplus_evaluation',status,proc)
+                    self.assertFalse(row['verified_live']);self.assertEqual(row['process_state'],'recorded_process_identity_differs')
+
+    def test_archive_role_requires_its_actual_mode(self):
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as d:
+            root,status,proc=self.supervisor_fixture(d,['python3','shaping_archive_supervision.py','--study',d,'--supplemental','--watch'])
+            self.assertTrue(supervisor_observation(root,'supplemental_archive',status,proc)['verified_live'])
+            self.assertFalse(supervisor_observation(root,'primary_archive',status,proc)['verified_live'])
+
+    def test_unreadable_process_is_an_unknown_observation(self):
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as d:
+            root,status,proc=self.supervisor_fixture(d,[])
+            original=Path.read_bytes
+            def read(path):
+                if path==proc/'42/cmdline':raise PermissionError('test observation unavailable')
+                return original(path)
+            with patch.object(Path,'read_bytes',read):
+                row=supervisor_observation(root,'inner_evaluation',status,proc)
+            self.assertIsNone(row['verified_live']);self.assertEqual(row['process_state'],'observation_unavailable')
+
     def test_successful_process_without_report_is_not_evaluated(self):
         with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as d:
             root=Path(d);(root/'PLAN.json').write_text('{}')
