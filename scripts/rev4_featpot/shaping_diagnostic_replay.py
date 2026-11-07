@@ -9,7 +9,28 @@ from shaping_completion import encoded,sha
 from shaping_execution import load_registration
 
 
+def canonical_pairs(binary_dir,pairs,output):
+    """Require every requested checkpoint, including transient states, to match."""
+    rows=[]
+    for epoch,old,new in pairs:
+        pins=[]
+        for label,path in [('original',old),('diagnostic',new)]:
+            dest=output/(f'epoch-{epoch:03}-'+label+'-canonical.bin')
+            subprocess.run([str(binary_dir/'bake_dial_refit'),'strip','--in',str(path),'--out',str(dest),'--key','zentrain.repro'],check=True)
+            pins.append(sha(dest))
+        rows.append(dict(epoch=epoch,canonical_sha256=pins,match=pins[0]==pins[1]))
+    return rows
+
+
 def replay(args):
+    from shaping_storage import reservation
+    plan=json.loads((args.study/'PLAN.json').read_text())
+    if args.output.exists():raise ValueError('preserve existing replay')
+    with reservation(args.study,args.output,plan['minimum_ssd_free_bytes']):
+        return admitted_replay(args)
+
+
+def admitted_replay(args):
     plan,cells,_=load_registration(args.study)
     original=json.loads((args.run/'RUN.json').read_text())
     result=json.loads((args.run/'RESULT.json').read_text())
@@ -29,6 +50,9 @@ def replay(args):
     old=args.run/'checkpoints'/f"ckpt_epoch{epochs-1:03}.bin"
     if sha(old)!=result['bake_sha256']:raise ValueError('original checkpoint drift')
     if args.output.exists():raise ValueError('preserve existing replay')
+    if getattr(args,'all_checkpoints',False):
+        if not all((args.run/'checkpoints'/f'ckpt_epoch{epoch:03}.bin').is_file() for epoch in range(epochs)):
+            raise ValueError('all-checkpoint replay requires complete original checkpoint sequence')
     args.output.mkdir(parents=True);(args.output/'checkpoints').mkdir()
     cmd=original['command'].copy();start=next(i for i,v in enumerate(cmd) if Path(v).name=='zensim_mlp_train')
     cmd[start]=str(args.binary_dir/'zensim_mlp_train')
@@ -61,12 +85,18 @@ def replay(args):
         if line.startswith('TRAINING_DIAGNOSTICS '):traces.append(json.loads(line.split(' ',1)[1]))
     if [r['epoch'] for r in traces]!=list(range(epochs)):raise ValueError('incomplete diagnostic trace')
     (args.output/'DIAGNOSTICS.json').write_bytes(encoded(traces))
-    (args.output/'RESULT.json').write_bytes(encoded(dict(**receipt,canonical_sha256=canonical,match=canonical[0]==canonical[1],epochs=len(traces))))
-    if canonical[0]!=canonical[1]:raise ValueError('diagnostics changed canonical model; do not attribute traces to original')
+    checkpoint_matches=[]
+    if getattr(args,'all_checkpoints',False):
+        pairs=[(epoch,args.run/'checkpoints'/f'ckpt_epoch{epoch:03}.bin',args.output/'checkpoints'/f'ckpt_epoch{epoch:03}.bin') for epoch in range(epochs)]
+        checkpoint_matches=canonical_pairs(args.binary_dir,pairs,args.output)
+    matched=canonical[0]==canonical[1] and all(r['match'] for r in checkpoint_matches)
+    (args.output/'RESULT.json').write_bytes(encoded(dict(**receipt,canonical_sha256=canonical,match=matched,epochs=len(traces),checkpoint_matches=checkpoint_matches)))
+    if not matched:raise ValueError('diagnostics changed canonical model; do not attribute traces to original')
 
 
 if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__)
     for name in ('study','binary-dir','run','output'):p.add_argument('--'+name,type=Path,required=True)
+    p.add_argument('--all-checkpoints',action='store_true',help='require canonical parity at every scheduled checkpoint, not only final')
     p.add_argument('--resource-pilot',action='store_true',help='qualification only, excluded from scientific selection')
     replay(p.parse_args())

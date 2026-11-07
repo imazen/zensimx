@@ -5284,3 +5284,9 @@ shaping-completion-regularization-curves study binaries family outer inner outpu
 # All scheduled checkpoint structures; no new predictions or checkpoint selection.
 shaping-completion-structure-trace run binary_dir output:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_convergence.py --run {{quote(run)}} --binary-dir {{quote(binary_dir)}} --structure-trace {{quote(output)}}
+
+shaping-completion-diagnostic-replay-all study binary_dir run output:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_diagnostic_replay.py --study {{quote(study)}} --binary-dir {{quote(binary_dir)}} --run {{quote(run)}} --output {{quote(output)}} --all-checkpoints
+
+shaping-completion-diagnostic-replay-check:
+    TMPDIR="$HOME/tmp" python3 -B -m unittest discover -s scripts/tests -p test_shaping_diagnostic_replay.py

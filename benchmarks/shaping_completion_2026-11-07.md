@@ -1655,3 +1655,20 @@ The structure diagnosis bundle has a cold-readback verified durable copy under
 It contains the complete checkpoint trace, parent structure observation,
 pretraining provenance, resource log and measured summary. The original failed
 fit archive remains separate and unchanged.
+
+### Qualification requirement for the zero-output optimizer replay
+
+Before replaying the frozen product-shape failure, require canonical equality at
+all 120 saved epochs, not just the final all-zero network. Equality of a collapsed
+final network cannot validate the transient optimizer trace. The existing replay
+owner now offers `--all-checkpoints`, retaining every stripped original/replay
+comparison and refusing any mismatch. A fixture deliberately matches the final
+checkpoint while changing an earlier one and verifies the earlier mismatch is
+retained. A separate test verifies storage reservation precedes launch.
+
+Diagnostic replays now use the same pending-write reservation owner as scientific
+fits, preserving the 30 GiB reserve, auxiliary allowance and one-job allowance.
+This does not change scientific fits, selection, training parameters or inputs.
+The proposed replay uses the already qualified optimizer binary and the failed
+fit's exact original command, seeds and frozen shape manifest, with diagnostics
+activated. It is excluded from model selection. Its result is not yet available.
