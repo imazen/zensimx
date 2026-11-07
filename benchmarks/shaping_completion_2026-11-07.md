@@ -3327,3 +3327,23 @@ the registered policy. Existing guards and tests remain intact. Test log:
 peak RSS 0.07 GiB, minimum available memory 33,892 MiB and peak load 27.39.
 Scientific inputs and selection gates are unchanged; live reclamation follows
 the committed implementation and a separate candidate dry run.
+
+The live dry run qualified 16 completed single-phase rescues and excluded the
+two with original failed gates. Apply selected exactly the same 3,712
+intermediate checkpoints (441,451,436 logical bytes), rechecked the native
+rescue qualification and reread every selected durable checksum before removal.
+Post-removal inspection verified all 608 protected checkpoint checksums,
+including every checkpoint from both excluded runs, and all 16 phase-aware
+local retention notes. No training or prediction was replayed. Free-space
+observations were 72,595,025,920 bytes before and 73,041,502,208 afterward;
+concurrent writes prevent interpreting that difference as isolated allocation.
+Run-heavy reports 41 seconds, peak RSS 0.12 GiB, minimum available memory
+33,585 MiB and peak load 28.42.
+
+The live layout was `fit:240`. The pretrained `pretraining:120` + `fit:120`
+layout has fixture coverage, but no completed live pretrained rescue was
+available for this pass. All raw checkpoints remain in their original verified
+archives. Plans, receipt, before/after preservation checks, source, tests,
+phase-aware notes and native archive pins passed cold readback in
+`rescue-checkpoint-retention-2215-evidence`: 60 files, 6,077,990 bytes;
+receipt `ac23d3f72a2b8d4d84f40cb8897f30fe98f23b8640d1a88aff02c6a2eef0ad2b`.

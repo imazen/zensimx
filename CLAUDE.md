@@ -14,8 +14,9 @@ The companion checkpoint-retention owner supports explicit `--rescue` for
 qualified completed rescue phases. It rechecks the native rescue archive gate
 and phase/exposure inventory, binds each path to its durable manifest, rereads
 all selected checksums and checks active users before removal. Initial,
-prefix, diagnostic (including epoch 219) and final checkpoints stay local in
-each phase. Failed originals remain excluded. Both phase layouts and refusal
+prefix, diagnostic and final checkpoints stay local in each phase; 240-epoch
+phases also retain the registered epoch-219 diagnostic. Failed originals remain
+excluded. Both phase layouts and refusal
 cases are covered by the retention/archive checks; live use is recorded in
 the shaping completion benchmark.
 
