@@ -495,8 +495,14 @@ mod tests {
                 .collect::<Vec<_>>();
             let actual = f64::from(p.predict(&[raw]).unwrap()[0]);
             let expected = net.forward(&first).0;
+            // Match the established network export gate: f32 accumulation near
+            // a score of 100 is bounded by the pin and damage terms, not by a
+            // fixed absolute epsilon smaller than two representable score steps.
+            let tolerance = 16.
+                * f64::from(f32::EPSILON)
+                * (net.pin.abs() + (net.pin - expected).abs()).max(1.);
             assert!(
-                (actual - expected).abs() < 1e-5,
+                (actual - expected).abs() <= tolerance,
                 "raw={raw} actual={actual} expected={expected}"
             );
         }
