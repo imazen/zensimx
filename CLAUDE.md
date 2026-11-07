@@ -1,5 +1,15 @@
 # zensim — current working rules
 
+## Known Bugs — native rescue archive coverage (resolved November 7, 2026)
+
+The primary native archiver excluded rescue-stage runs; supplemental panels and
+re-exports had their own coverage, but 13 complete native rescue runs lacked
+cell archive receipts. The shared archive owner now has an explicit rescue mode
+with phase/exposure, resolution, model-hash and existing candidate checks.
+Failed original evidence remains with its separate owner. All 13 native runs
+were copied and checksum-verified; no local checkpoints were removed. The
+process-aware progress audit includes this additional archive watcher.
+
 ## Known Bugs — interrupted joint-shaping supervision (November 7, 2026)
 
 A historical inner-0-0 joint-shaping controller and two fits stopped while its

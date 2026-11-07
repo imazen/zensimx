@@ -3015,3 +3015,93 @@ Three original fresh-control order failures on inner-2-1 remain preserved:
 `1c1fb3a1803998068d78` (0.00001239776611328125). Each uniform max-pair final
 report has identity 100, finite outputs and maximum damage increase zero;
 convergence reports and original-cell archives exist. No tolerance was loosened.
+
+## November 7, matched pretraining-boundary and final shape parameters
+
+The reader now supports a registered diagnostic checkpoint after a complete
+parent fit qualifies. It binds the cell, plan, epoch, model hash and diagnostic
+report marker before reading native metadata. Nine reader tests pass, including
+modified-report and unregistered-epoch refusals. This adds no fit or prediction
+replay and does not change checkpoint selection.
+
+Setting-0 comparison covers all six partitions and three paired seeds: 18
+product identity-joint and 18 separate identity-joint parents. All begin with
+984 potentially nonzero stored shape paths. The actual pretraining boundary is
+epoch 119 (120 epochs); continuous joint fitting ends at epoch 239 (240 epochs).
+
+| Family and checkpoint | Nonzero parameter paths, min / median / max | Nonzero stored output coefficients, min / median / max |
+|---|---|---|
+| Product, epoch 119 | 97 / 405 / 932 | 24 / 41 / 47 |
+| Product, epoch 239 | 91 / 350.5 / 924 | 24 / 40.5 / 48 |
+| Separate, epoch 119 | 92 / 198 / 461 | 31 / 39 / 48 |
+| Separate, epoch 239 | 83 / 160 / 510 | 30 / 39 / 49 |
+
+None of these parents has one stored output coefficient at either checkpoint.
+Zero-path counts increase in 15/18 product fits and 16/18 separate fits; the
+remaining fits recover paths. Separate reference-gate zero counts have median
+445.5/492 at the prefix and 451/492 at the final checkpoint. These are exact
+zeros in stored f32 coefficients. Product gates are unused and excluded from
+that count. A nonzero path is not an independent dimension or proof of utility,
+and stored coefficients are not optimizer state or effective neuron counts.
+This locates substantial first-stage sparsity without attributing later
+fresh-head collapse to a specific cause.
+
+The frozen binary's input-shaping row owner at `1e1df57a` divides shaped raw
+values by the existing raw-input scale-only denominator. It does not recompute
+post-shaping variance. This is the retained protocol, not a newly introduced
+normalization choice. Identical paired knot domains were verified across both
+checkpoints. No outer response was read.
+
+| Archive directory | Files | Bytes | Receipt SHA-256 |
+|---|---:|---:|---|
+| native-product-prefix119-six-partitions-setting0-2048 | 20 | 6,281,156 | `c087b2ecddb50004d058fae943d3fdf24e277e8d0df702b34ac48aa287182010` |
+| native-separate-prefix119-six-partitions-setting0-2048 | 20 | 6,129,941 | `b4313b347141f39fff3ea503243ecd13768794cd9111e64ff4decd1908858067` |
+| shape-prefix-final-diagnostics-2048 | 7 | 1,663,105 | `756a6ebcf8c6c03095a1790a36965e6453f70ce5afe1c7f7708235962431ceec` |
+
+All were checksum-verified by durable readback. Prefix reader wrappers report
+`done rc=0 2s | peak-RSS 0.08GiB | min-avail 26458MiB | peak-load 32.24`
+(product) and `done rc=0 3s | peak-RSS 0.08GiB | min-avail 26446MiB | peak-load
+32.24` (separate).
+
+## November 7, further worker admission and native rescue archive coverage
+
+Two freed i270 slots admitted four never-started inner-1-0 setting-0/seed-2
+pretrained cells with two workers. A subsequently freed slot admitted two
+setting-1/seed-0 separate-pretrained cells with one worker. The preflight counts
+actual native processes and bounds each existing pool by its unfinished frozen
+cohort, retaining the full declared ceiling when matching status is ambiguous.
+It excludes status-only observer processes. The final admission observed 19
+native trainers and an effective existing ceiling of 19; one new worker restored
+the 20-trainer budget. All three new native processes were verified and advancing;
+three further registered cells remain queued in those batches. Immutable inputs
+were checked by the existing installer. No completed or interrupted fit was replayed.
+
+Before admission, verified duplicate retention removed ten transport bundles
+(483,307,520 bytes) and 1,856 intermediate checkpoints from ten completed fits
+(456,607,404 bytes), preserving required epochs and all durable copies. Admission
+evidence is `i270-additional-pretrained-admission-2058` (27 files, 820,840 bytes),
+receipt SHA-256 `ae1779386f048e4ed70dac859484cfe1253d68744aa56f72118d768a6960bcde`.
+Input capsule archives are `i270-pretrained10-seed2-inputs-2052` (three files,
+25,914,842 bytes; receipt `10fbe1fff5c62eca4eb01e5c4f7db91300d2aff1e85e06bc4ccc956abf69af69`)
+and `i270-pretrained10-separate1-inputs-2055` (three files, 23,906,615 bytes;
+receipt `08c3af3d4a27c77244fcae90807aa058f110746ef07a0267d86914e705040b0e`).
+All receipts were verified by durable readback.
+
+The native primary archiver excluded rescue-stage runs, leaving 13 complete
+rescues without native cell receipts even though supplemental outputs had
+coverage. The shared archive owner now has `--rescue`: it verifies the registered
+resolution, exposure, each completed phase, model/manifest hashes and existing
+candidate provenance. It waits for active writers and excludes failed evidence,
+which remains owned by the separate failure archiver. Three rescue-archive, nine
+process-progress and four existing failure-archive tests pass.
+
+All 13 native runs were copied and readback-verified: 5,941 files and
+486,050,059 bytes. No local checkpoints were removed. The watcher is PID 3450830,
+unit `zensim-rescue-native-archives-20261107-2108`, with a 1 GiB cap and one job.
+Coverage evidence is `rescue-native-archive-coverage-2108` (21 files, 24,822 bytes),
+receipt SHA-256 `bce76dd50d1fea8de9b0bfac88461fd61ab26c3c532a6992d0534863c89a378e`.
+The progress registry now includes this eleventh evaluator/archive/bootstrap
+role. All eleven were verified live in the 21:11 audit. That audit found
+529/816 inner fits trained, all 72/72 fresh controls trained/evaluated/archived,
+and all 18/18 completed rescues archived out of 720 required. Outer, full-FIT
+and memorization comparisons remain unexecuted; this is not study completion.
