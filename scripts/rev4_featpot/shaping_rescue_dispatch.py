@@ -25,6 +25,30 @@ def base_ready(root,cells,family,outer):
     return True
 
 
+def completed_runs(root,selected,build_pin):
+    """Resume only terminal successful fits with the original selected inputs."""
+    completed=set();pins={}
+    for cell in selected:
+        directory=root/'runs'/cell['id']
+        if not directory.exists():continue
+        attempts=list(directory.glob('attempt-*'))
+        if len(attempts)!=1:raise ValueError('rescue attempts require explicit reconciliation')
+        run=attempts[0];identity=json.loads((run/'RUN.json').read_text())
+        result=json.loads((run/'RESULT.json').read_text())
+        expected=dict(cell=cell,plan_sha256=sha(root/'PLAN.json'),build_sha256=build_pin,
+            resolution=resolve(root,cell['id']),process_role='rescue_controller',
+            epochs=120 if '_pretrained_' in cell['family'] else 240,
+            pairs_per_epoch=50000,training_exposure_pair_draws=12000000,fit_directory='fit')
+        if any(identity.get(k)!=v or result.get(k)!=v for k,v in expected.items()):
+            raise ValueError('resumed rescue identity or exposure differs')
+        if result['stage']!='trained' or result['exit_code']!=0:raise ValueError('failed rescue cannot be resumed as complete')
+        checkpoint=run/'fit/checkpoints'/f"ckpt_epoch{expected['epochs']-1:03}.bin"
+        if sha(checkpoint)!=result['bake_sha256']:raise ValueError('resumed rescue checkpoint drift')
+        for name in ('RUN.json','RESULT.json'):pins[str(run/name)]=sha(run/name)
+        pins[str(checkpoint)]=sha(checkpoint);completed.add(cell['id'])
+    return completed,pins
+
+
 def dispatch(args):
     if not 1<=args.workers<=4:raise ValueError('explicit one-to-four worker budget required')
     _,cells,_=load_registration(args.study)
@@ -34,15 +58,24 @@ def dispatch(args):
     if len(selected)!=240:raise ValueError('complete registered rescue wave required')
     if set(json.loads(trigger.read_text())['required_rescue_cells'])!={c['id'] for c in selected}:
         raise ValueError('trigger coverage differs')
-    if any((args.study/'runs'/c['id']).exists() for c in selected):
+    resume=getattr(args,'resume_completed',False)
+    completed,pins=completed_runs(args.study,selected,sha(args.binary_dir/'BUILD.json')) if resume else (set(),{})
+    if not resume and any((args.study/'runs'/c['id']).exists() for c in selected):
         raise ValueError('existing rescue attempts require explicit reconciliation')
     directory=args.study/'dispatch/rescue'/f'outer-{args.outer}'
+    if resume:
+        previous=json.loads((directory/'STATUS.json').read_text())
+        if Path(f"/proc/{previous['pid']}").exists():raise ValueError('previous rescue dispatcher still live')
+        if any(Path(f'/proc/{pid}').exists() for pid in previous['active'].values()):
+            raise ValueError('previous rescue children still live')
+        directory=directory/('resume-'+datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%fZ'))
     directory.mkdir(parents=True,exist_ok=False)
     identity=dict(pid=os.getpid(),driver_sha256=sha(__file__),plan_sha256=sha(args.study/'PLAN.json'),
                   build_sha256=sha(args.binary_dir/'BUILD.json'),trigger_sha256=sha(trigger),
                   workers=args.workers,required_cells=[c['id'] for c in selected])
+    if resume:identity.update(resumed_completed=sorted(completed),resume_evidence_sha256=pins)
     (directory/'RUN.json').write_bytes(encoded(identity))
-    active={};completed=set();ready=set();failure=None
+    active={};ready=set();failure=None
     selected.sort(key=lambda c:(NEURAL.index(c['family']),c['rescue'],c['seed'],c['partition']))
     while len(completed)<len(selected):
         for cell_id,(process,log) in list(active.items()):
@@ -90,4 +123,5 @@ if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__)
     for key in ('study','binary-dir','neutral-qualification'):p.add_argument('--'+key,type=Path,required=True)
     p.add_argument('--outer',type=int,choices=range(3),required=True);p.add_argument('--workers',type=int,default=2)
+    p.add_argument('--resume-completed',action='store_true')
     dispatch(p.parse_args())

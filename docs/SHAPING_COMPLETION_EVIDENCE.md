@@ -562,3 +562,15 @@ rescue and selection-watch regression suites pass. At amendment qualification,
 only ReLU outer-fold 0 had complete base evidence; no new product base selection
 or rescue was claimed. Existing live dispatchers retain their loaded code and
 require reconciliation before consuming amended receipts.
+
+
+## Rescue dispatcher upgrade without repeating fits
+
+`shaping-completion-dispatch-rescues ... --resume-completed` permits a new
+supervisor after the previous dispatcher and its recorded children have exited.
+It requires every existing attempt to be terminal and successful, reproduces its
+base selection, checks the original build, plan, exposure and final checkpoint,
+and preserves the old dispatcher directory. Its new run receipt pins all reused
+RUN, RESULT and final-model files. Missing results, failures and model drift are
+refused rather than silently retried. This supports loading the approved
+eligibility amendment without repeating completed rescue fits.
