@@ -81,6 +81,23 @@ eviction. Manifest SHA-256:
 `01f1ce9634b8164f6d1821061ca1b7990ade5fbb33585e987a64153f01e0df5f`.
 Archive suffix: `shaping-completion-20261107/linear-inner-archive`.
 
+### Fresh durable verification of both inner control archives
+
+On November 7 at 12:35 UTC, all 24 shaped-additive and 72 tree inner fits
+were confirmed covered by their central batch archives. Current RUN, RESULT,
+REPORT and COMPLETE hashes match the batch manifests for every control.
+The per-cell archive count in the progress audit excludes these batch archives;
+that omission is not evidence that the 96 controls lack durable copies.
+
+Fresh cold destination readback passed all 246 linear-archive manifest entries
+(610413374 bytes) and all 585 tree-archive entries (3251256867 bytes), including
+the original mirror receipts. The tree manifest is
+`2e7685d7746262d40a42a242358a1084f39c4d839e9944c3b5a72c71acb0213f`;
+the linear manifest remains the hash above. Local copies are explicitly partial;
+this verification establishes complete durable copies, not complete local ones.
+Verification receipts, resource logs and coverage are retained in
+`inner-control-batch-reverification` under the completion-study roots.
+
 ## Convergence evaluation implementation
 
 The evaluator accepts only completed registered fits and final-epoch selection.
