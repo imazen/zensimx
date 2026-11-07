@@ -4884,3 +4884,9 @@ shaping-completion-resource-pilot study binary_dir:
 # One measured CPU thread per independent seed; controller allows concurrent lanes.
 shaping-completion-inner-relu study binary_dir partition:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 18G --jobs 12 -- python3 -B scripts/rev4_featpot/shaping_execution.py --study {{quote(study)}} --binary-dir {{quote(binary_dir)}} --inner-relu --partition {{quote(partition)}} --workers 12
+
+shaping-completion-status study:
+    python3 -B scripts/rev4_featpot/shaping_execution.py --study {{quote(study)}} --status
+
+shaping-completion-inner-analytic study binary_dir partition family:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 8G --jobs 4 -- python3 -B scripts/rev4_featpot/shaping_execution.py --study {{quote(study)}} --binary-dir {{quote(binary_dir)}} --inner-family --partition {{quote(partition)}} --family {{quote(family)}} --workers 4

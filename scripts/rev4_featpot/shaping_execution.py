@@ -79,6 +79,8 @@ def run_native(root,binary_dir,cell,record,attempt,epochs,mem):
     # The caller establishes these shared module settings before concurrency.
     if owner.EPOCHS!=epochs:raise ValueError('command builder epoch budget drift')
     recipe={**json.loads(BASE.read_text())['recipe'],'shared_hidden_activation':'relu','mse_weight':1}
+    analytic_family=cell['family'] in ('softplus','silu_monotone','silu_diagnostic')
+    if cell['family']=='silu_diagnostic':recipe['max_pairs']=0
     declaration=json.loads((REPO/'scripts/rev4_featpot/color_noise_fx2_declaration.json').read_text())
     keep=dest/'keep.txt';keep.write_text('\n'.join(map(str,declaration['direct']))+'\n')
     groups=[(n,Path(p),tw,vw,m) for n,p,tw,vw,m in record['groups']]
@@ -94,6 +96,17 @@ def run_native(root,binary_dir,cell,record,attempt,epochs,mem):
     for key in ('ZENSIM_MONOTONE_RESEARCH_MANIFEST','ZENSIM_MONOTONE_RESEARCH_SHA256',
                 'ZENSIM_INPUT_SHAPING_MANIFEST','ZENSIM_INPUT_SHAPING_SHA256'):
         env.pop(key,None)
+    if analytic_family:
+        tau,learn,bias=((.25,False,0.),(1.,False,0.),(1.,True,.25),(4.,True,1.))[cell['setting']]
+        if cell['family']=='softplus' and cell['setting']==3:bias=-1.
+        manifest=dict(schema='monotone-head-v1',family=cell['family'],widths=[64],
+                      init_seed=SEEDS[cell['seed']][0],sample_seed=SEEDS[cell['seed']][1],
+                      epochs=epochs,pairs_per_epoch=50000,first_width=128,max_pairs=recipe['max_pairs'],
+                      analytic=dict(temperature=tau,learn_temperature=learn,bias=bias))
+        if cell['family']=='silu_diagnostic':manifest['unrestricted_first']=True
+        path=dest/'HEAD.json';path.write_bytes(encoded(manifest))
+        env['ZENSIM_MONOTONE_RESEARCH_MANIFEST']=str(path)
+        env['ZENSIM_MONOTONE_RESEARCH_SHA256']=sha(path)
     command=[str(HEAVY),'--mem',mem,'--jobs','1','--',*map(str,argv)]
     with (dest/'train.log').open('w') as log:
         process=subprocess.Popen(command,stdout=log,stderr=subprocess.STDOUT,env=env)
@@ -125,7 +138,7 @@ def execute(args):
     if args.resource_pilot:
         selected=[c for c in cells if c['stage']=='resource_pilot'];epochs=1;workers=1;mem='4G'
     else:
-        selected=[c for c in cells if c['stage']=='inner' and c['family']=='relu' and c['partition']==args.partition]
+        selected=[c for c in cells if c['stage']=='inner' and c['family']==args.family and c['partition']==args.partition]
         epochs=240;workers=args.workers;mem='1G'
         if not selected or not 1<=workers<=16:raise ValueError('invalid partition or worker count')
     # Native pilot measured 606443 total artifact bytes, including two bakes.
@@ -142,7 +155,7 @@ def execute(args):
     owner.EPOCHS=epochs;owner.PAIRS_PER_EPOCH=50000;owner.LOG_EVERY=1
     status=dict(required=len(selected),trained=0,failed=[],scientific_reports_completed=0,
                 controller_pid=os.getpid(),stage='running',cells=[c['id'] for c in selected])
-    status_path=args.study/f"{('pilot' if args.resource_pilot else args.partition)}-STATUS.json"
+    status_path=args.study/f"{('pilot' if args.resource_pilot else args.partition+'-'+args.family)}-STATUS.json"
     status_path.write_bytes(encoded(status))
     with ThreadPoolExecutor(max_workers=workers) as pool:
         pending={pool.submit(run_native,args.study,args.binary_dir,c,records[c['partition']],args.attempt,epochs,mem):c for c in selected}
@@ -154,17 +167,48 @@ def execute(args):
     if status['failed']:raise RuntimeError('failed attempts preserved; see '+str(status_path))
 
 
+def live_status(root):
+    import re
+    rows=[]
+    for path in sorted(root.glob('runs/*/attempt-*/RUN.json')):
+        run=json.loads(path.read_text());pid=run['pid']
+        try:
+            command=Path(f'/proc/{pid}/cmdline').read_bytes().replace(b'\0',b' ').decode()
+            live=str(path.parent) in command and 'run-heavy' in command
+        except FileNotFoundError:live=False
+        text=(path.parent/'train.log').read_text()
+        epochs=re.findall(r'epoch\s+(\d+)\s+\|',text)
+        result=path.parent/'RESULT.json'
+        terminal=json.loads(result.read_text())['stage'] if result.exists() else None
+        rows.append(dict(cell=run['cell']['id'],stage=run['cell']['stage'],pid=pid,
+                         verified_live=live,terminal=terminal,last_epoch=int(epochs[-1]) if epochs else None,
+                         required_epochs=run.get('epochs',run['cell'].get('epochs')),run=str(path.parent)))
+    out=dict(checked_utc=datetime.now(timezone.utc).isoformat(),runs=rows,
+             ssd_free_bytes=shutil.disk_usage(root).free,
+             live=sum(r['verified_live'] for r in rows),
+             unexpectedly_stopped=[r['cell'] for r in rows if not r['verified_live'] and r['terminal'] is None])
+    temporary=root/'LIVE_STATUS.json.writing';temporary.write_bytes(encoded(out));temporary.replace(root/'LIVE_STATUS.json')
+    print(json.dumps(out),flush=True)
+
+
 def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('--study',type=Path,required=True)
-    p.add_argument('--binary-dir',type=Path,required=True)
+    p.add_argument('--binary-dir',type=Path)
     mode=p.add_mutually_exclusive_group(required=True)
     mode.add_argument('--resource-pilot',action='store_true')
     mode.add_argument('--inner-relu',action='store_true')
+    mode.add_argument('--inner-family',action='store_true')
+    p.add_argument('--family',choices=['relu','softplus','silu_monotone','silu_diagnostic'],default='relu')
+    mode.add_argument('--status',action='store_true')
     p.add_argument('--partition',default='inner-0-0')
     p.add_argument('--workers',type=int,default=12)
     p.add_argument('--attempt',type=int,default=1)
-    execute(p.parse_args())
+    args=p.parse_args()
+    if args.status:live_status(args.study)
+    else:
+        if args.binary_dir is None:p.error('--binary-dir is required for execution')
+        execute(args)
 
 
 if __name__=='__main__':main()
