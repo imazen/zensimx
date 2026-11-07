@@ -142,7 +142,7 @@ compaction emits the research declaration and runs its bit-exact served-forward
 gate. `BakeScorer` refuses an intermediate shaping checkpoint lacking native
 compaction; the trainer CLI requires `--derived-inputs` when shaping is enabled.
 
-At `3ca48ae7`, `just input-shaping-check` passed: 14 runtime derived-input tests,
+At `2c68977e` (identical tested tree before a description-only history rewrite), `just input-shaping-check` passed: 14 runtime derived-input tests,
 one runtime analytic sensitivity test, 396 trainer library tests with two existing
 ignores unchanged, 65 trainer CLI tests, and strict clippy for both owners.
 Tests exercise independent parameter central differences, frozen versus joint
