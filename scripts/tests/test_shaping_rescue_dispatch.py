@@ -3,7 +3,7 @@ import sys,tempfile,unittest,json
 from unittest.mock import patch
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'rev4_featpot'))
 from shaping_completion import matrix,sha
-from shaping_rescue_dispatch import base_ready,completed_runs,resource_controls,dispatch,worker_slot
+from shaping_rescue_dispatch import base_ready,completed_runs,resource_controls,dispatch,worker_slot,reserve_worker,release_worker,bind_worker
 from types import SimpleNamespace
 
 
@@ -60,7 +60,7 @@ class DispatchTests(unittest.TestCase):
                     if not drain.exists():return None
                     self.returncode=0;(study/'runs'/self.cell/'attempt-001/RESULT.json').write_text('{"stage":"trained","exit_code":0}')
                     return 0
-            with patch('shaping_rescue_dispatch.worker_slot',return_value={'can_start':True}),patch('shaping_rescue_dispatch.NEURAL',['relu']),patch('shaping_rescue_dispatch.load_registration',return_value=({},cells,{})),patch('shaping_rescue_dispatch.base_ready',return_value=True),patch('shaping_rescue_dispatch.select'),patch('shaping_rescue_dispatch.selected_base'),patch('shaping_rescue_dispatch.resolve'),patch('shaping_rescue_dispatch.subprocess.Popen',Child),patch('shaping_rescue_dispatch.time.sleep',side_effect=lambda _:drain.touch()):
+            with patch('shaping_rescue_dispatch.reserve_worker',return_value={'can_start':True}),patch('shaping_rescue_dispatch.bind_worker'),patch('shaping_rescue_dispatch.release_worker'),patch('shaping_rescue_dispatch.NEURAL',['relu']),patch('shaping_rescue_dispatch.load_registration',return_value=({},cells,{})),patch('shaping_rescue_dispatch.base_ready',return_value=True),patch('shaping_rescue_dispatch.select'),patch('shaping_rescue_dispatch.selected_base'),patch('shaping_rescue_dispatch.resolve'),patch('shaping_rescue_dispatch.subprocess.Popen',Child),patch('shaping_rescue_dispatch.time.sleep',side_effect=lambda _:drain.touch()):
                 dispatch(args)
             status=json.loads((study/'dispatch/rescue/outer-0/STATUS.json').read_text())
             self.assertEqual(len(launched),2);self.assertEqual(len(status['completed']),2)
@@ -79,6 +79,46 @@ class DispatchTests(unittest.TestCase):
             self.assertFalse(worker_slot(active,proc,8)['can_start'])
             (proc/'meminfo').write_text('MemAvailable: 5242880 kB\n')
             self.assertFalse(worker_slot({},proc,32)['can_start'])
+
+
+    def test_optional_capacity_preserves_default_and_rejects_scientific_fields(self):
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as d:
+            budget=Path(d)/'budget';budget.write_text('{"workers":8}')
+            args=SimpleNamespace(workers=2,worker_budget_file=budget,drain_file=None)
+            with self.assertRaises(ValueError):resource_controls(args)
+            args.worker_capacity=8;self.assertEqual(resource_controls(args)[0],8)
+            budget.write_text('{"workers":8,"epochs":480}')
+            with self.assertRaises(ValueError):resource_controls(args)
+
+    def test_shared_claims_bound_concurrent_starts_and_preserve_unknown_owners(self):
+        from concurrent.futures import ThreadPoolExecutor
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as d:
+            root=Path(d);proc=root/'proc';proc.mkdir();(proc/'meminfo').write_text('MemAvailable: 83886080 kB\n')
+            with ThreadPoolExecutor(max_workers=8) as pool:
+                results=list(pool.map(lambda i:reserve_worker(root,str(i),proc,8),range(8)))
+            self.assertEqual(sum(r['can_start'] for r in results),4)
+            path=root/'cpu-admission/CLAIMS.json';claims=json.loads(path.read_text());self.assertEqual(len(claims),4)
+            cell=next(iter(claims));bind_worker(root,cell,123);self.assertEqual(json.loads(path.read_text())[cell]['child_pid'],123)
+            release_worker(root,cell);self.assertTrue(reserve_worker(root,'replacement',proc,8)['can_start'])
+            claims=json.loads(path.read_text());cell=next(iter(claims));claims[cell]['owner']='unknown';path.write_text(json.dumps(claims))
+            with self.assertRaises(ValueError):release_worker(root,cell)
+            self.assertFalse(reserve_worker(root,'ninth',proc,8)['can_start'])
+            self.assertEqual(json.loads(path.read_text())[cell]['owner'],'unknown')
+
+
+    def test_separate_processes_share_one_pending_start_budget(self):
+        import subprocess
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as d:
+            root=Path(d);proc=root/'proc';proc.mkdir();(proc/'meminfo').write_text('MemAvailable: 83886080 kB\n')
+            code="import sys,json;from pathlib import Path;sys.path.insert(0,sys.argv[1]);from shaping_rescue_dispatch import reserve_worker;print(json.dumps(reserve_worker(Path(sys.argv[2]),sys.argv[3],Path(sys.argv[2])/'proc',8)))"
+            processes=[subprocess.Popen([sys.executable,'-B','-c',code,str(Path(__file__).resolve().parents[1]/'rev4_featpot'),str(root),str(i)],stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True) for i in range(8)]
+            results=[]
+            for process in processes:
+                stdout,stderr=process.communicate(timeout=30);self.assertEqual(process.returncode,0,stderr);results.append(json.loads(stdout))
+            self.assertEqual(sum(r['can_start'] for r in results),4)
+            claims=json.loads((root/'cpu-admission/CLAIMS.json').read_text());self.assertEqual(len(claims),4)
+            self.assertEqual(len({r['owner'] for r in claims.values()}),4)
+            self.assertFalse(reserve_worker(root,'after-owners-exit',proc,8)['can_start'])
 
 
     def test_all_paired_reports_and_diagnostics_are_required(self):

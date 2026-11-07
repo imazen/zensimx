@@ -859,7 +859,7 @@ cost invocations must use a preserved binary path rather than that Cargo target.
 ## Rescue queue resource controls
 
 Rescue dispatch accepts an optional worker-budget JSON containing only
-`workers`, bounded by the existing one-to-four limit. Changing it affects new
+`workers`, bounded by a declared capacity (four by default). Changing it affects new
 admissions; active fits finish unchanged. The current value and file hash are
 recorded in queue status. The coordinator still verifies aggregate host CPU, RAM
 and disk headroom before raising that budget. A separate drain flag file stops
@@ -867,14 +867,25 @@ new admissions while active children finish; an empty drained queue reports
 `drained`, preserving its incomplete required-cell list rather than claiming
 scientific completion. Resume continues to verify original completed-fit evidence.
 
-Five dispatch tests pass, including an isolated process simulation that launches
+Eight dispatch tests pass, including an isolated process simulation that launches
 two children, requests draining, retains their completion and leaves 238 cells
 unstarted. No native training is invoked by that simulation. Resource files
 cannot change epochs, targets, settings or any other scientific input.
 
 Before each new child, rescue dispatch checks observed native trainer demand
-plus its own children not yet visible as native trainers against `nproc-4`, and
-requires 6 GiB available RAM (the existing 4 GiB headroom plus one child's 2 GiB
-cap). Queue status records that observation. Active fits remain unchanged when
+plus shared starting-child claims against the allowed CPU count minus four.
+It requires 6 GiB available RAM, plus 2 GiB for every claimed child not yet
+visible as a native trainer. Queue status records that observation. Active fits remain unchanged when
 headroom is unavailable; the dispatcher waits without a global compute lock.
 The admission test covers pending children, saturated CPUs and insufficient RAM.
+
+
+An explicit `--worker-capacity` opts a queue into a larger pool; the default
+capacity remains four. Expanded capacity cannot exceed the host CPU budget.
+All upgraded rescue dispatchers share short locked admission transactions and
+claim starting children before launching them, so simultaneous dispatchers
+cannot independently consume the same observed slots. Native training never
+holds this lock. Claim ownership and child PIDs are recorded; normal completion
+releases claims, while unexpected owner death requires explicit reconciliation.
+Eight separate process contenders admitted exactly four pending children under
+a four-slot fixture budget. No native training was run in that test.

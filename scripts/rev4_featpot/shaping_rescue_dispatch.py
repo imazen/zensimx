@@ -1,6 +1,7 @@
 """Release registered rescue fits only after complete paired base selection."""
 from __future__ import annotations
-import argparse,json,os,subprocess,time
+import argparse,json,os,subprocess,time,fcntl,uuid
+from contextlib import contextmanager
 from datetime import datetime,timezone
 from pathlib import Path
 from types import SimpleNamespace
@@ -56,13 +57,14 @@ def resource_controls(args):
         content=path.read_bytes();record=json.loads(content)
         if set(record)!={'workers'}:raise ValueError('worker budget contains non-resource fields')
         workers=record['workers'];pin=__import__('hashlib').sha256(content).hexdigest()
-    if type(workers) is not int or not 1<=workers<=4:raise ValueError('explicit one-to-four worker budget required')
+    capacity=getattr(args,'worker_capacity',4)
+    if type(workers) is not int or not 1<=workers<=capacity:raise ValueError('worker budget exceeds declared capacity')
     drain=getattr(args,'drain_file',None)
     return workers,drain is not None and drain.exists(),pin
 
 
 def worker_slot(active_cells,proc=Path('/proc'),cpu_count=None):
-    cpu_count=os.cpu_count() if cpu_count is None else cpu_count
+    cpu_count=len(os.sched_getaffinity(0)) if cpu_count is None else cpu_count
     native=0;own=0
     for path in proc.glob('[0-9]*/comm'):
         try:
@@ -73,14 +75,56 @@ def worker_slot(active_cells,proc=Path('/proc'),cpu_count=None):
         except (FileNotFoundError,ProcessLookupError):continue
     pending=max(0,len(active_cells)-own)
     available=int(next(line.split()[1] for line in (proc/'meminfo').read_text().splitlines() if line.startswith('MemAvailable:')))*1024
-    budget=max(1,(cpu_count or 1)-4);minimum=6*1024**3
+    budget=max(1,(cpu_count or 1)-4);minimum=(6+2*pending)*1024**3
     return dict(can_start=native+pending<budget and available>=minimum,native_threads=native,
                 pending_dispatcher_threads=pending,cpu_budget=budget,available_memory_bytes=available,
                 minimum_available_memory_bytes=minimum)
 
 
+OWNER_TOKEN=f'{os.getpid()}:{uuid.uuid4().hex}'
+
+
+@contextmanager
+def worker_claims(root):
+    directory=root/'cpu-admission';directory.mkdir(exist_ok=True)
+    with (directory/'transaction.lock').open('a') as lock:
+        fcntl.flock(lock,fcntl.LOCK_EX)
+        path=directory/'CLAIMS.json';claims=json.loads(path.read_text()) if path.exists() else {}
+        yield claims
+        path.write_bytes(encoded(claims))
+
+
+def reserve_worker(root,cell,proc=Path('/proc'),cpu_count=None):
+    # The lock spans this short admission transaction, never training.
+    # Unexpected dead-owner claims remain reserved for explicit reconciliation.
+    with worker_claims(root) as claims:
+        observation=worker_slot(claims,proc,cpu_count)
+        observation['shared_claims']=len(claims)
+        if cell in claims:
+            observation.update(can_start=False,reason='cell already claimed')
+        if observation['can_start']:
+            claims[cell]=dict(owner=OWNER_TOKEN,dispatcher_pid=os.getpid(),child_pid=None,
+                admitted_utc=datetime.now(timezone.utc).isoformat())
+        return observation
+
+
+def bind_worker(root,cell,pid):
+    with worker_claims(root) as claims:
+        if claims[cell]['owner']!=OWNER_TOKEN:raise ValueError('worker claim owner differs')
+        claims[cell]['child_pid']=pid
+
+
+def release_worker(root,cell):
+    with worker_claims(root) as claims:
+        if claims[cell]['owner']!=OWNER_TOKEN:raise ValueError('worker claim owner differs')
+        del claims[cell]
+
+
 def dispatch(args):
-    if not 1<=args.workers<=4:raise ValueError('explicit one-to-four worker budget required')
+    capacity=getattr(args,'worker_capacity',4)
+    host_budget=max(1,len(os.sched_getaffinity(0))-4)
+    if type(capacity) is not int or not 1<=capacity<=max(4,host_budget):raise ValueError('worker capacity exceeds host budget')
+    if not 1<=args.workers<=capacity:raise ValueError('workers exceed declared capacity')
     _,cells,_=load_registration(args.study)
     trigger=args.study/f'RESCUE_TRIGGER_OUTER_{args.outer}.json'
     if not trigger.exists():raise ValueError('registered rescue trigger required')
@@ -102,7 +146,7 @@ def dispatch(args):
     directory.mkdir(parents=True,exist_ok=False)
     identity=dict(pid=os.getpid(),driver_sha256=sha(__file__),plan_sha256=sha(args.study/'PLAN.json'),
                   build_sha256=sha(args.binary_dir/'BUILD.json'),trigger_sha256=sha(trigger),
-                  workers=args.workers,required_cells=[c['id'] for c in selected],
+                  workers=args.workers,worker_capacity=capacity,required_cells=[c['id'] for c in selected],
                   worker_budget_file=str(args.worker_budget_file) if getattr(args,'worker_budget_file',None) else None,
                   drain_file=str(args.drain_file) if getattr(args,'drain_file',None) else None)
     if resume:identity.update(resumed_completed=sorted(completed),resume_evidence_sha256=pins)
@@ -114,6 +158,7 @@ def dispatch(args):
             if process.poll() is None:continue
             log.close();del active[cell_id]
             try:
+                release_worker(args.study,cell_id)
                 if process.returncode:raise RuntimeError('rescue child failed: '+cell_id)
                 result=json.loads((args.study/'runs'/cell_id/'attempt-001/RESULT.json').read_text())
                 if result['stage']!='trained' or result['exit_code']!=0:raise ValueError('rescue child lacks successful result')
@@ -137,13 +182,22 @@ def dispatch(args):
                     if len(active)>=worker_limit:break
                     if cell['family'] not in ready or cell['id'] in active or cell['id'] in completed:continue
                     if (args.study/'runs'/cell['id']).exists():raise ValueError('unexpected existing rescue attempt')
-                    admission=worker_slot(active)
+                    admission=reserve_worker(args.study,cell['id'])
                     if not admission['can_start']:break
                     command=['python3','-B',str(REPO/'scripts/rev4_featpot/shaping_rescue_execution.py'),
                         '--study',str(args.study),'--binary-dir',str(args.binary_dir),
                         '--neutral-qualification',str(args.neutral_qualification),'--cell',cell['id']]
-                    log=(directory/(cell['id']+'.log')).open('x')
-                    active[cell['id']]=(subprocess.Popen(command,stdout=log,stderr=subprocess.STDOUT,cwd=REPO),log)
+                    log=None;process=None
+                    try:
+                        log=(directory/(cell['id']+'.log')).open('x')
+                        process=subprocess.Popen(command,stdout=log,stderr=subprocess.STDOUT,cwd=REPO)
+                        active[cell['id']]=(process,log)
+                        bind_worker(args.study,cell['id'],process.pid)
+                    except BaseException:
+                        if process is None:
+                            if log is not None:log.close()
+                            release_worker(args.study,cell['id'])
+                        raise
         except Exception as error:failure=str(error)
         status=dict(**identity,checked_utc=datetime.now(timezone.utc).isoformat(),ready_families=sorted(ready),
                     waiting_families=sorted(set(NEURAL)-ready),completed=sorted(completed),
@@ -160,6 +214,7 @@ if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__)
     for key in ('study','binary-dir','neutral-qualification'):p.add_argument('--'+key,type=Path,required=True)
     p.add_argument('--outer',type=int,choices=range(3),required=True);p.add_argument('--workers',type=int,default=2)
+    p.add_argument('--worker-capacity',type=int,default=4)
     p.add_argument('--worker-budget-file',type=Path);p.add_argument('--drain-file',type=Path)
     p.add_argument('--resume-completed',action='store_true')
     dispatch(p.parse_args())
