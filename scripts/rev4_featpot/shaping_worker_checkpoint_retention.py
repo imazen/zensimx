@@ -67,13 +67,36 @@ def remove_remote(payload):
     return record
 
 
-def make_plan(study,archive,host,remote_receipt):
+def prior_cells(study,host,receipts):
+    excluded=set();pins=[]
+    for path in receipts:
+        record=json.loads(path.read_text())
+        if record['stage']!='worker_duplicates_removed' or record['host']!=host:raise ValueError('completed matching retention receipt required')
+        payload=record['payload'];result=record['result']
+        if payload['study']!=str(study) or payload['plan_sha256']!=sha(study/'PLAN.json'):
+            raise ValueError('prior retention scope differs')
+        if result['stage']!='duplicates_removed' or any(result.get(k)!=v for k,v in payload.items()):
+            raise ValueError('prior worker receipt differs')
+        removed={};expected_bytes=0
+        for row in payload['cells']:
+            if row['cell'] in removed:raise ValueError('duplicate prior cell')
+            files=selected(row['files'],row['epochs'],row['keep'])
+            removed[row['cell']]=len(files);expected_bytes+=sum(f['bytes'] for f in files.values())
+        if result['removed_files']!=sum(removed.values()) or result['removed_bytes']!=expected_bytes:
+            raise ValueError('prior removal totals differ')
+        excluded.update(removed)
+        pins.append(dict(path=str(path),sha256=sha(path),cells=sorted(removed)))
+    return excluded,pins
+
+
+def make_plan(study,archive,host,remote_receipt,excluded=()):
     from shaping_checkpoint_retention import retained_epochs
     rows=[]
     for collection in sorted(study.glob('runs/*/attempt-001/WORKER_COLLECTION.json')):
         c=json.loads(collection.read_text())
         if c['source_host']!=host:continue
         run=collection.parent;cell=run.parent.name
+        if cell in excluded:continue
         bundle=archive/f'{host}-{cell}-attempt-001'/f'{cell}-attempt-001.tar'
         verified=Path(str(bundle)+'.verified.json')
         if not verified.exists():continue
@@ -101,10 +124,13 @@ def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('--host',choices=['i265','i270','r3800x'],required=True)
     for key in ['study','archive','output']:p.add_argument('--'+key,type=Path,required=True)
+    p.add_argument('--prior-receipt',type=Path,action='append',default=[])
     p.add_argument('--apply',action='store_true');a=p.parse_args()
     if a.output.exists():raise ValueError('preserve existing output')
-    payload=make_plan(a.study,a.archive,a.host,a.study.parent/('WORKER_'+a.output.name))
-    record=dict(stage='durable_readback_verified',host=a.host,payload=payload,driver_sha256=sha(__file__))
+    excluded,prior=prior_cells(a.study,a.host,a.prior_receipt)
+    payload=make_plan(a.study,a.archive,a.host,a.study.parent/('WORKER_'+a.output.name),excluded)
+    record=dict(stage='durable_readback_verified',host=a.host,payload=payload,driver_sha256=sha(__file__),prior_receipts=prior)
+    if any(sha(row['path'])!=row['sha256'] for row in prior):raise ValueError('prior receipt changed')
     with a.output.open('x') as stream:json.dump(record,stream,indent=2)
     if a.apply:
         command='TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- '+shlex.join(['python3','-c',Path(__file__).read_text(),'--remote'])

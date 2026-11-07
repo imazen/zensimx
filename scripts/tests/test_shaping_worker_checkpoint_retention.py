@@ -2,7 +2,7 @@ import json,sys,tempfile,unittest
 from pathlib import Path
 from unittest.mock import patch
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'rev4_featpot'))
-from shaping_worker_checkpoint_retention import remove_remote,selected,sha,no_users
+from shaping_worker_checkpoint_retention import remove_remote,selected,sha,no_users,prior_cells
 from shaping_checkpoint_retention import retained_epochs
 
 
@@ -39,6 +39,22 @@ class WorkerRetentionTests(unittest.TestCase):
                 if mode=='duplicate':payload['cells']*=2
                 with self.assertRaises(ValueError):remove_remote(payload)
                 self.assertEqual(len(list((run/'checkpoints').glob('*.bin'))),120)
+
+    def test_prior_receipts_require_completed_matching_removal_evidence(self):
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as temp,patch('shaping_worker_checkpoint_retention.no_users'):
+            payload,run=self.fixture(Path(temp));result=remove_remote(payload)
+            p=Path(temp)/'coordinator.json';record=dict(stage='worker_duplicates_removed',host='i270',payload=payload,result=result)
+            p.write_text(json.dumps(record));cells,pins=prior_cells(Path(payload['study']),'i270',[p])
+            self.assertEqual(cells,{'a'*20});self.assertEqual(pins[0]['sha256'],sha(p))
+            for mode in ['host','stage','totals','scope']:
+                bad=json.loads(json.dumps(record))
+                if mode=='host':bad['host']='i265'
+                if mode=='stage':bad['stage']='durable_readback_verified'
+                if mode=='totals':bad['result']['removed_files']+=1
+                if mode=='scope':bad['payload']['plan_sha256']='wrong'
+                p.write_text(json.dumps(bad))
+                with self.assertRaises(ValueError):prior_cells(Path(payload['study']),'i270',[p])
+
 
     def test_inventory_and_required_epochs(self):
         with self.assertRaisesRegex(ValueError,'inventory'):selected({},120,[0,119])

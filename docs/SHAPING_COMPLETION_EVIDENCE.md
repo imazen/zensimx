@@ -816,3 +816,13 @@ and RESULT civil-clock intervals exclude prior shared preparation and include
 fit/export/evaluation; they are labeled accordingly. Per-model peak RSS and
 training-only timing were not measured. This accounting neither infers those
 quantities nor serves as isolated benchmarking evidence. No fit is replayed.
+
+
+Worker checkpoint retention accepts explicit prior completed receipts for
+incremental passes. Each prior receipt must match the host, study and frozen
+plan, include the worker's completed removal result, and reconcile exact file
+and byte totals. Its hash and excluded cell IDs are recorded in the new receipt.
+Only those previously completed cells are excluded; newly imported cells retain
+full durable bundle readback, metadata/checkpoint verification and both open-file
+checks. Missing new checkpoints still cause refusal. Five retention regressions
+pass, including wrong-host, wrong-plan, incomplete and inconsistent prior receipts.
