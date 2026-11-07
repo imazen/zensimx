@@ -712,6 +712,9 @@ struct Diagnostics {
     last_active: Vec<u64>,
     first_gradient_squared: f64,
     max_hidden: f64,
+    output_projection_hits: u64,
+    output_gradient_squared: f64,
+    optimizer_steps: u64,
 }
 
 pub(super) struct Network {
@@ -928,6 +931,11 @@ impl Network {
         for (g, w) in self.adam.gw1.iter_mut().zip(&self.output) {
             *g += l2 * w;
         }
+        if self.config.training.is_some() {
+            self.diagnostics.optimizer_steps += 1;
+            self.diagnostics.output_gradient_squared +=
+                self.adam.gw1.iter().map(|g| g * g).sum::<f64>();
+        }
         self.adam
             .step(&mut self.output, &mut [], &mut [], &mut [], lr);
         if let Some(study) = &self.config.training {
@@ -941,6 +949,10 @@ impl Network {
             }
         }
         if self.config.family != Family::SiluDiagnostic {
+            if self.config.training.is_some() {
+                self.diagnostics.output_projection_hits +=
+                    self.output.iter().filter(|&&w| w < 0.).count() as u64;
+            }
             self.output.iter_mut().for_each(|w| *w = w.max(0.));
         }
         assert!(self.output.iter().all(|w| w.is_finite()));
@@ -962,6 +974,11 @@ impl Network {
                 "max_last_activation_in_sample": stats.max_hidden,
                 "mean_squared_first_activation_gradient": if stats.samples>0 {Some(stats.first_gradient_squared/stats.samples as f64)} else {None},
                 "output_zero_weights": self.output.iter().filter(|&&w|w==0.).count(),
+                "output_amplitudes": self.output,
+                "output_projection_hits": stats.output_projection_hits,
+                "optimizer_steps": stats.optimizer_steps,
+                "mean_squared_regularized_output_gradient": if stats.optimizer_steps>0 {Some(stats.output_gradient_squared/stats.optimizer_steps as f64)} else {None},
+                "analytic_temperatures": self.blocks.iter().filter(|b| b.is_analytic()).map(|b| b.extra[0].exp()).collect::<Vec<_>>(),
                 "note": "training-response sample, not proof of globally dead units or a timing profile"
             })
         );
