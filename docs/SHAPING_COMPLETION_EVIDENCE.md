@@ -867,7 +867,14 @@ new admissions while active children finish; an empty drained queue reports
 `drained`, preserving its incomplete required-cell list rather than claiming
 scientific completion. Resume continues to verify original completed-fit evidence.
 
-Four dispatch tests pass, including an isolated process simulation that launches
+Five dispatch tests pass, including an isolated process simulation that launches
 two children, requests draining, retains their completion and leaves 238 cells
 unstarted. No native training is invoked by that simulation. Resource files
 cannot change epochs, targets, settings or any other scientific input.
+
+Before each new child, rescue dispatch checks observed native trainer demand
+plus its own children not yet visible as native trainers against `nproc-4`, and
+requires 6 GiB available RAM (the existing 4 GiB headroom plus one child's 2 GiB
+cap). Queue status records that observation. Active fits remain unchanged when
+headroom is unavailable; the dispatcher waits without a global compute lock.
+The admission test covers pending children, saturated CPUs and insufficient RAM.

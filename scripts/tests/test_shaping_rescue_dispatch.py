@@ -3,7 +3,7 @@ import sys,tempfile,unittest,json
 from unittest.mock import patch
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'rev4_featpot'))
 from shaping_completion import matrix,sha
-from shaping_rescue_dispatch import base_ready,completed_runs,resource_controls,dispatch
+from shaping_rescue_dispatch import base_ready,completed_runs,resource_controls,dispatch,worker_slot
 from types import SimpleNamespace
 
 
@@ -60,12 +60,25 @@ class DispatchTests(unittest.TestCase):
                     if not drain.exists():return None
                     self.returncode=0;(study/'runs'/self.cell/'attempt-001/RESULT.json').write_text('{"stage":"trained","exit_code":0}')
                     return 0
-            with patch('shaping_rescue_dispatch.NEURAL',['relu']),patch('shaping_rescue_dispatch.load_registration',return_value=({},cells,{})),patch('shaping_rescue_dispatch.base_ready',return_value=True),patch('shaping_rescue_dispatch.select'),patch('shaping_rescue_dispatch.selected_base'),patch('shaping_rescue_dispatch.resolve'),patch('shaping_rescue_dispatch.subprocess.Popen',Child),patch('shaping_rescue_dispatch.time.sleep',side_effect=lambda _:drain.touch()):
+            with patch('shaping_rescue_dispatch.worker_slot',return_value={'can_start':True}),patch('shaping_rescue_dispatch.NEURAL',['relu']),patch('shaping_rescue_dispatch.load_registration',return_value=({},cells,{})),patch('shaping_rescue_dispatch.base_ready',return_value=True),patch('shaping_rescue_dispatch.select'),patch('shaping_rescue_dispatch.selected_base'),patch('shaping_rescue_dispatch.resolve'),patch('shaping_rescue_dispatch.subprocess.Popen',Child),patch('shaping_rescue_dispatch.time.sleep',side_effect=lambda _:drain.touch()):
                 dispatch(args)
             status=json.loads((study/'dispatch/rescue/outer-0/STATUS.json').read_text())
             self.assertEqual(len(launched),2);self.assertEqual(len(status['completed']),2)
             self.assertEqual(status['stage'],'drained');self.assertEqual(len(status['required_cells']),240)
             self.assertFalse(status['active']);self.assertIsNone(status['failure'])
+
+
+    def test_admission_counts_pending_children_and_respects_headroom(self):
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as d:
+            proc=Path(d);(proc/'meminfo').write_text('MemAvailable: 8388608 kB\n')
+            def native(pid,command):
+                p=proc/str(pid);p.mkdir();(p/'comm').write_text('zensim_mlp_trai\n');(p/'cmdline').write_text(command)
+            native(1,'trainer --out cell-a');active={'cell-a':None,'cell-b':None}
+            a=worker_slot(active,proc,8);self.assertTrue(a['can_start']);self.assertEqual(a['pending_dispatcher_threads'],1)
+            native(2,'other');native(3,'other')
+            self.assertFalse(worker_slot(active,proc,8)['can_start'])
+            (proc/'meminfo').write_text('MemAvailable: 5242880 kB\n')
+            self.assertFalse(worker_slot({},proc,32)['can_start'])
 
 
     def test_all_paired_reports_and_diagnostics_are_required(self):

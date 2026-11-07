@@ -61,6 +61,24 @@ def resource_controls(args):
     return workers,drain is not None and drain.exists(),pin
 
 
+def worker_slot(active_cells,proc=Path('/proc'),cpu_count=None):
+    cpu_count=os.cpu_count() if cpu_count is None else cpu_count
+    native=0;own=0
+    for path in proc.glob('[0-9]*/comm'):
+        try:
+            if path.read_text().strip()!='zensim_mlp_trai':continue
+            native+=1
+            command=(path.parent/'cmdline').read_bytes().replace(b'\0',b' ').decode()
+            if any(cell in command for cell in active_cells):own+=1
+        except (FileNotFoundError,ProcessLookupError):continue
+    pending=max(0,len(active_cells)-own)
+    available=int(next(line.split()[1] for line in (proc/'meminfo').read_text().splitlines() if line.startswith('MemAvailable:')))*1024
+    budget=max(1,(cpu_count or 1)-4);minimum=6*1024**3
+    return dict(can_start=native+pending<budget and available>=minimum,native_threads=native,
+                pending_dispatcher_threads=pending,cpu_budget=budget,available_memory_bytes=available,
+                minimum_available_memory_bytes=minimum)
+
+
 def dispatch(args):
     if not 1<=args.workers<=4:raise ValueError('explicit one-to-four worker budget required')
     _,cells,_=load_registration(args.study)
@@ -89,7 +107,7 @@ def dispatch(args):
                   drain_file=str(args.drain_file) if getattr(args,'drain_file',None) else None)
     if resume:identity.update(resumed_completed=sorted(completed),resume_evidence_sha256=pins)
     (directory/'RUN.json').write_bytes(encoded(identity))
-    active={};ready=set();failure=None;worker_limit=args.workers;draining=False;budget_pin=None
+    active={};ready=set();failure=None;worker_limit=args.workers;draining=False;budget_pin=None;admission=None
     selected.sort(key=lambda c:(NEURAL.index(c['family']),c['rescue'],c['seed'],c['partition']))
     while len(completed)<len(selected):
         for cell_id,(process,log) in list(active.items()):
@@ -119,6 +137,8 @@ def dispatch(args):
                     if len(active)>=worker_limit:break
                     if cell['family'] not in ready or cell['id'] in active or cell['id'] in completed:continue
                     if (args.study/'runs'/cell['id']).exists():raise ValueError('unexpected existing rescue attempt')
+                    admission=worker_slot(active)
+                    if not admission['can_start']:break
                     command=['python3','-B',str(REPO/'scripts/rev4_featpot/shaping_rescue_execution.py'),
                         '--study',str(args.study),'--binary-dir',str(args.binary_dir),
                         '--neutral-qualification',str(args.neutral_qualification),'--cell',cell['id']]
@@ -128,7 +148,7 @@ def dispatch(args):
         status=dict(**identity,checked_utc=datetime.now(timezone.utc).isoformat(),ready_families=sorted(ready),
                     waiting_families=sorted(set(NEURAL)-ready),completed=sorted(completed),
                     active={key:value[0].pid for key,value in active.items()},failure=failure,
-                    worker_limit=worker_limit,worker_budget_sha256=budget_pin,drain_requested=draining,
+                    worker_limit=worker_limit,worker_budget_sha256=budget_pin,drain_requested=draining,resource_admission=admission,
                     stage='failed' if failure and not active else 'drained' if draining and not active else 'training_finished' if len(completed)==len(selected) else 'supervising')
         (directory/'STATUS.json').write_bytes(encoded(status))
         if failure and not active:raise RuntimeError(failure)
