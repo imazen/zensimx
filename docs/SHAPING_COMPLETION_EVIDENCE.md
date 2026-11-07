@@ -234,3 +234,14 @@ objective are mandatory; teacher and validation groups are refused. Every comman
 manifest, PID, result and canonical model hash is retained. This is an explicitly
 non-selection implementation check. The existing neutral-prefix replay remains
 available unchanged for mixed-data backward-compatibility checks.
+
+## Reproducible conditional rescue registration
+
+`shaping-completion-register-rescue-trigger` rechecks a completed registered neural
+inner fit, its plan, final checkpoint, full loss history and diagnostic-report
+hashes. It recomputes the unchanged convergence rule before materializing that
+outer fold's already registered 240-cell rescue wave. Existing trigger receipts
+are never overwritten. A regression covers a second-fold trigger, all 240 cells,
+JSON epoch-key normalization, overwrite refusal and report corruption. The
+outer-fold-1 imported SiLU fit reproduced its improving-loss trigger; base
+selection still gates every rescue fit.

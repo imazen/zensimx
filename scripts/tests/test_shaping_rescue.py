@@ -1,12 +1,41 @@
 from pathlib import Path
 import sys,unittest,json,tempfile
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'rev4_featpot'))
-from shaping_rescue import controls,selected_base,rewrite_command
+from shaping_rescue import controls,selected_base,rewrite_command,register_trigger
+from unittest.mock import patch
+from shaping_convergence import diagnostics
+from shaping_evaluation import diagnostic_epochs
 from shaping_completion import matrix,encoded,sha
 from shaping_selection import HUMANS,aggregate
 from shaping_rescue_selection import aggregate as aggregate_rescues
 
 class RescueTests(unittest.TestCase):
+    def test_rescue_trigger_replays_diagnostics_and_preserves_existing(self):
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as directory:
+            root=Path(directory);(root/'PLAN.json').write_text('{}');cells=matrix()
+            cell=next(c for c in cells if c['stage']=='inner' and c['partition']=='inner-1-0' and c['family']=='silu_diagnostic')
+            run=root/'runs'/cell['id']/'attempt-001';(run/'checkpoints').mkdir(parents=True)
+            final=run/'checkpoints/ckpt_epoch239.bin';final.write_bytes(b'native fixture')
+            (run/'RUN.json').write_bytes(encoded(dict(cell=cell,plan_sha256=sha(root/'PLAN.json'),epochs=240)))
+            (run/'RESULT.json').write_bytes(encoded(dict(cell=cell,stage='trained',exit_code=0,bake_sha256=sha(final))))
+            losses=[1.]*220+[.8]*20
+            (run/'train.log').write_text(''.join(f'epoch {i} | loss={v} |\n' for i,v in enumerate(losses)))
+            epochs=diagnostic_epochs(240);scores={e:.8 for e in epochs};active={e:64 for e in epochs};pins={}
+            for epoch in epochs:
+                path=run/'curve_evaluation'/f'epoch-{epoch:03}'/'REPORT.json';path.parent.mkdir(parents=True)
+                path.write_bytes(encoded(dict(cell=cell,outer_results_read=False,checkpoint_epoch=epoch,
+                    inner_validation=dict(selection_score=.8),active_output_coefficients=64)))
+                pins[str(path)]=sha(path);path.with_name('DIAGNOSTIC_COMPLETE.json').write_bytes(encoded(dict(report_sha256=sha(path))))
+            convergence=diagnostics(losses,scores,active)
+            convergence.update(cell=cell,outer_results_read=False,training_log_sha256=sha(run/'train.log'),report_sha256=pins)
+            (run/'CONVERGENCE.json').write_bytes(encoded(convergence))
+            with patch('shaping_rescue.load_registration',return_value=({},cells,{})):
+                result=register_trigger(root,run)
+                self.assertEqual(result['outer'],1);self.assertEqual(len(result['required_rescue_cells']),240)
+                with self.assertRaises(FileExistsError):register_trigger(root,run)
+                Path(next(iter(pins))).write_text('{}')
+                with self.assertRaisesRegex(ValueError,'report drift'):register_trigger(root,run)
+
     def test_human_only_controls_require_explicit_teacher_exclusion(self):
         groups=[dict(name='human_kadid',families=[0,1])]
         with self.assertRaisesRegex(ValueError,'one teacher'):controls('constant_lr',True,groups=groups)

@@ -113,3 +113,62 @@ def admitted_families(root,record):
         taxonomy=sorted(set(labels));codes={name:i for i,name in enumerate(taxonomy)}
         groups.append(dict(name=name,families=[codes[label] for label in labels]))
     return groups
+
+
+def register_trigger(root,run):
+    """Materialize an already registered conditional wave from pinned diagnostics."""
+    import re
+    from shaping_convergence import diagnostics
+    from shaping_evaluation import diagnostic_epochs
+    from shaping_completion import encoded
+    _,cells,_=load_registration(root)
+    identity=json.loads((run/'RUN.json').read_text());cell=identity['cell']
+    if cell not in cells or cell['stage']!='inner' or cell['family'] not in NEURAL:
+        raise ValueError('registered primary neural inner fit required')
+    if run.resolve().parent.parent!= (root/'runs').resolve() or run.parent.name!=cell['id']:
+        raise ValueError('trigger run location differs')
+    if identity['plan_sha256']!=sha(root/'PLAN.json'):raise ValueError('trigger plan drift')
+    path=run/'CONVERGENCE.json';convergence=json.loads(path.read_text())
+    if convergence['cell']!=cell or convergence['outer_results_read'] or not convergence['investigation_required']:
+        raise ValueError('unexposed investigation trigger required')
+    result=json.loads((run/'RESULT.json').read_text())
+    if result['cell']!=cell or result['stage']!='trained' or result['exit_code']!=0:
+        raise ValueError('successful terminal trigger fit required')
+    fit=run/identity.get('fit_directory','.')
+    log=fit/'train.log'
+    if sha(log)!=convergence['training_log_sha256']:raise ValueError('trigger training log drift')
+    if sha(fit/'checkpoints'/f"ckpt_epoch{identity['epochs']-1:03}.bin")!=result['bake_sha256']:
+        raise ValueError('trigger final checkpoint drift')
+    losses={int(k):float(v) for k,v in re.findall(r'epoch\s+(\d+)\s+\|[^\n]*?loss=([^ |]+)',log.read_text())}
+    if sorted(losses)!=list(range(identity['epochs'])):raise ValueError('trigger exposure differs')
+    scores={};active={}
+    for name,pin in convergence['report_sha256'].items():
+        report_path=Path(name)
+        if sha(report_path)!=pin:raise ValueError('trigger report drift')
+        marker=json.loads(report_path.with_name('DIAGNOSTIC_COMPLETE.json').read_text())
+        row=json.loads(report_path.read_text())
+        if marker['report_sha256']!=pin or row['cell']!=cell or row['outer_results_read']:
+            raise ValueError('trigger diagnostic identity differs')
+        epoch=row['checkpoint_epoch'];scores[epoch]=row['inner_validation']['selection_score']
+        active[epoch]=row['active_output_coefficients']
+    if sorted(scores)!=list(diagnostic_epochs(identity['epochs'])):raise ValueError('trigger curve coverage differs')
+    actual=diagnostics([losses[i] for i in sorted(losses)],scores,active)
+    # JSON stringifies epoch-map keys; compare via canonical JSON representation.
+    if any(json.loads(encoded(actual[k]))!=convergence[k] for k in actual):
+        raise ValueError('trigger diagnostics cannot be reproduced')
+    outer=int(cell['partition'].split('-')[1])
+    required=[c['id'] for c in cells if c['stage']=='rescue' and c['partition'].startswith(f'inner-{outer}-')]
+    if len(required)!=240:raise ValueError('complete equal-opportunity rescue matrix required')
+    record=dict(outer=outer,trigger_cell=cell,convergence_sha256=sha(path),reasons=actual['reasons'],
+        required_rescue_cells=required,status='required_after_complete_base_selection',outer_results_read=False,
+        plan_sha256=sha(root/'PLAN.json'),driver_sha256=sha(__file__))
+    destination=root/f'RESCUE_TRIGGER_OUTER_{outer}.json'
+    with destination.open('xb') as stream:stream.write(encoded(record))
+    return record
+
+
+if __name__=='__main__':
+    import argparse
+    parser=argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--study',type=Path,required=True);parser.add_argument('--trigger-run',type=Path,required=True)
+    args=parser.parse_args();print(json.dumps(register_trigger(args.study,args.trigger_run)),flush=True)
