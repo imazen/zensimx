@@ -47,11 +47,13 @@ def existing_trial(root,cell,plan_pin,build_pin):
             if (attempt/'RUN.json').exists():raise ValueError('contradictory pre-training failure')
             continue
         run=json.loads((attempt/'RUN.json').read_text())
-        if run['cell']!=cell or run['plan_sha256']!=plan_pin or run['build_sha256']!=build_pin or run['epochs']!=120:
+        expected=dict(cell=cell,plan_sha256=plan_pin,build_sha256=build_pin,epochs=120,pairs_per_epoch=50000)
+        if any(run.get(k)!=v for k,v in expected.items()):
             raise ValueError('existing pretrained identity differs')
         result=attempt/'RESULT.json'
         if result.exists():
             value=json.loads(result.read_text())
+            if any(value.get(k)!=v for k,v in expected.items()):raise ValueError('existing pretrained result identity differs')
             if value['stage']!='trained' or value['exit_code']!=0:raise ValueError('existing training failed')
             if sha(attempt/'checkpoints/ckpt_epoch119.bin')!=value['bake_sha256']:raise ValueError('existing checkpoint drift')
             trials.append(('trained',None))

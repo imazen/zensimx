@@ -8,6 +8,18 @@ from shaping_completion import sha
 
 
 class PretrainedDispatchTests(unittest.TestCase):
+    def test_adopted_fit_requires_full_pair_budget_and_matching_result_identity(self):
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as d:
+            root=Path(d);cell=dict(id='child',stage='inner',family='product_pretrained_frozen');run=root/'runs/child/attempt-001';(run/'checkpoints').mkdir(parents=True)
+            final=run/'checkpoints/ckpt_epoch119.bin';final.write_bytes(b'fixture')
+            record=dict(cell=cell,plan_sha256='plan',build_sha256='build',epochs=120,pairs_per_epoch=50000,stage='trained',exit_code=0,bake_sha256=sha(final))
+            for name in ['RUN.json','RESULT.json']:(run/name).write_text(json.dumps(record))
+            self.assertEqual(module.existing_trial(root,cell,'plan','build'),('trained',None))
+            for name,change in [('RUN.json',dict(pairs_per_epoch=1000)),('RESULT.json',dict(pairs_per_epoch=1000)),('RESULT.json',dict(cell={**cell,'id':'other'}))]:
+                for path in ['RUN.json','RESULT.json']:(run/path).write_text(json.dumps(record))
+                (run/name).write_text(json.dumps({**record,**change}))
+                with self.assertRaisesRegex(ValueError,'identity differs'):module.existing_trial(root,cell,'plan','build')
+
     def test_cli_ownership_does_not_precreate_initial_audit_directory(self):
         with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as d:
             root=Path(d)

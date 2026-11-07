@@ -821,7 +821,7 @@ required-work wait. It validates assignment identity and reports the pinned
 placement instead of launching that cell on the coordinator. Completed imports
 still pass the existing native checkpoint gate. A foreign-placement control
 keeps both cells required while only the eligible local child runs; parent-wait
-and failed-parent refusals remain. Ten placement tests and six pretrained
+and failed-parent refusals remain. Ten placement tests and seven pretrained
 queue tests pass. Remote orchestration resolves its resource wrapper under the
 worker's own HOME rather than assuming the coordinator's filesystem username.
 
@@ -951,3 +951,9 @@ claims and native command lines, so a legacy child still loading inputs cannot
 be mistaken for an idle CPU slot. Terminal run records and released storage
 reservations remove that demand; stale reservations still require reconciliation.
 The additional regression covers this admission boundary without training.
+
+Adoption of existing pretrained trials also requires the registered 50000 draws
+per epoch in both RUN and RESULT, alongside matching cell/plan/build identity,
+120 epochs and the final checkpoint hash. A changed pair budget or result cell
+refuses adoption. The four-partition preflight passed for all 31 locally completed
+fits and one locally running fit; other-host placements remain required waits.
