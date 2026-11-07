@@ -2,6 +2,8 @@ import importlib.util
 from pathlib import Path
 import sys
 import unittest
+import tempfile,json
+from unittest.mock import patch
 import numpy as np
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'rev4_featpot'))
@@ -9,6 +11,25 @@ import shaping_inputs as shaping
 
 
 class ShapeInitializationTests(unittest.TestCase):
+    def test_cached_shapes_bind_raw_inputs_and_declaration(self):
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as d:
+            root=Path(d);raw=root/'data/raw.npy';raw.parent.mkdir()
+            np.save(raw,np.array([[.2,.8],[.8,.2]],np.float32))
+            declaration=root/'scripts/rev4_featpot/color_noise_fx2_declaration.json'
+            declaration.parent.mkdir(parents=True)
+            declaration.write_text(json.dumps(dict(direct=[13],products=[[13,422]])))
+            (root/'PLAN.json').write_bytes(b'{}')
+            plan=dict(input_pins={str(raw):shaping.sha(raw)})
+            with patch('shaped_linear_study.OLD',root),patch('tree_study.RAW_IDS',[13,422]), \
+                 patch('shaping_completion.REPO',root),patch('shaping_completion.DECLARATION_SHA256',shaping.sha(declaration)):
+                first=shaping.prepare(root,'variant-test',dict(train=[0,1]),plan,False)
+                self.assertEqual(first,shaping.prepare(root,'variant-test',dict(train=[0,1]),plan,False))
+                with self.assertRaisesRegex(ValueError,'scientific identity'):
+                    shaping.prepare(root,'variant-test',dict(train=[0,1]),dict(input_pins={str(raw):'changed'}),False)
+                declaration.write_bytes(b'changed')
+                with self.assertRaisesRegex(ValueError,'declaration drift'):
+                    shaping.prepare(root,'variant-test',dict(train=[0,1]),plan,False)
+
     def test_held_out_values_cannot_move_training_knots(self):
         raw=np.array([[.2,.8],[.8,.2],[100.,.9]],np.float32)
         declaration={'direct':[13],'products':[[13,422]]}

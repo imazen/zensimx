@@ -185,3 +185,12 @@ teacher exclusion, and verifies exact coverage against the registered matrix.
 Tests exercise changed keys, validity masks, signed-zero feature bits, labels,
 and replay of both permutation seeds. This audit fits no model and does not
 use outer responses.
+
+`just shaping-completion-prepare-variant-shapes` applies the existing raw-domain
+q50/q90 initializer independently to each registered TRAIN membership, for both
+product and separate damage/fragility shaping. Label permutations may share only
+these label-independent initializations; they do not share supervised pretraining.
+Human-only initialization excludes teacher rows. Preparation requires the completed
+input audit, checks exact membership coverage, and binds raw/declaration/plan hashes
+when reusing cached configurations. Native training must still refit scales on its
+admitted groups and learn shapes separately where the registered family requires it.

@@ -42,19 +42,23 @@ def initial_config(raw,raw_ids,train,declaration,base,separate):
 def prepare(root,partition,membership,plan,separate):
     from tree_study import RAW_IDS
     from shaped_linear_study import OLD
-    from shaping_completion import REPO
+    from shaping_completion import DECLARATION_SHA256,REPO
     kind='separate' if separate else 'product'
     dest=root/'shapes'/partition/kind
     selected_sha=hashlib.sha256(encoded(membership['train'])).hexdigest()
+    raw_path=OLD/'data/raw.npy'
+    declaration_path=REPO/'scripts/rev4_featpot/color_noise_fx2_declaration.json'
+    if sha(declaration_path)!=DECLARATION_SHA256:raise ValueError('frozen shaping declaration drift')
     if dest.exists():
         receipt=json.loads((dest/'RECEIPT.json').read_text())
         if receipt['training_indices_sha256']!=selected_sha or sha(dest/'INITIAL.json')!=receipt['manifest_sha256']:
             raise ValueError('shaping initialization cache drift')
+        if (receipt['plan_sha256']!=sha(root/'PLAN.json') or receipt['kind']!=kind
+            or receipt['raw_sha256']!=plan['input_pins'][str(raw_path)]
+            or receipt['declaration_sha256']!=DECLARATION_SHA256):raise ValueError('shaping cache scientific identity differs')
         return dest/'INITIAL.json'
-    raw_path=OLD/'data/raw.npy'
     if sha(raw_path)!=plan['input_pins'][str(raw_path)]:raise ValueError('raw feature drift')
     raw=np.load(raw_path,mmap_mode='r',allow_pickle=False)
-    declaration_path=REPO/'scripts/rev4_featpot/color_noise_fx2_declaration.json'
     declaration=json.loads(declaration_path.read_text())
     config=initial_config(raw,RAW_IDS,membership['train'],declaration,1853,separate)
     dest.mkdir(parents=True)
