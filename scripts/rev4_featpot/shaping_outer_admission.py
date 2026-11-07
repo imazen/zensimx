@@ -49,6 +49,14 @@ def build(root,outer):
         decision=dict(family=family,outer=outer,setting=setting,optimizer_choice='base',
                       inner_score=actual['setting_scores'][setting],outer_results_read=False)
         if family in NEURAL:
+            # All base settings support the equal-search decision; some also
+            # supply a fresh template/pretraining parent at another family's
+            # selected setting. Pin every primary source, not only the winner.
+            primary={}
+            for c in cells:
+                if c['id'] in actual['reported_cells']:
+                    primary[c['id']]=verified_candidate(root,c,representation)
+                    evidence.update(primary[c['id']][2])
             if triggered:
                 record,path=verify_decision(root,family,outer,cells)
                 evidence[str(path)]=sha(path);evidence.update(record['evidence_sha256'])
@@ -61,7 +69,7 @@ def build(root,outer):
                 record=dict(family=family,outer=outer,base_setting=setting,selected_choice='base',outer_results_read=False)
             convergence={}
             for cell in required:
-                _,diagnostic,pins=verified_candidate(root,cell,representation);evidence.update(pins)
+                _,diagnostic,pins=(primary[cell['id']] if cell['id'] in primary else verified_candidate(root,cell,representation));evidence.update(pins)
                 if not triggered and diagnostic['investigation_required']:
                     raise ValueError('investigation requires registered equal-opportunity rescues')
                 if cell['id'] in selected:convergence[cell['id']]=diagnostic

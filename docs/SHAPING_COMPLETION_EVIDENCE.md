@@ -273,3 +273,16 @@ absent completed ReLU rescue selection; no outer response view was prepared.
 Tests exercise full synthetic evidence composition, altered admission refusal,
 incomplete pairing, missing rescue triggers, and conditional-control progress
 accounting. Actual outer scientific admission remains pending the ongoing trials.
+
+Outer neural execution reuses the qualified native phase runner. Preparation is
+separate from fitting and requires a reproduced outer admission; shared TRAIN
+views and both shape initializations are hashed before seeds run. Commands replace
+only admitted training groups and phase lengths while preserving selected optimizer
+arguments and paired seeds. Pretrained models relearn shapes on the outer training
+complement and then fit a fresh head; inner learned shapes are not transferred.
+Fresh controls resolve only exact admitted tuples. All source command templates,
+including a different family's pretraining parent, are pinned by checking every
+base candidate in outer admission. Unit checks cover changed TRAIN membership,
+fixed settings/seeds, all phase lengths, exact fresh-control identity and
+unadmitted-fold refusal. This does not claim an executed outer fit: live admission
+remains closed until the registered inner rescue/extension evidence is complete.

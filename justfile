@@ -5086,3 +5086,12 @@ shaping-completion-outer-admission study outer *args:
 
 shaping-completion-outer-admission-check:
     python3 -B -m unittest scripts/tests/test_shaping_outer_admission.py
+
+shaping-completion-outer-execution-check:
+    python3 -B -m unittest scripts/tests/test_shaping_outer_execution.py
+
+shaping-completion-prepare-outer study outer:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 2G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_outer_execution.py --study {{quote(study)}} --outer {{outer}} --prepare
+
+shaping-completion-fit-outer-neural study outer binary_dir qualification cell:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 6G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_outer_execution.py --study {{quote(study)}} --outer {{outer}} --binary-dir {{quote(binary_dir)}} --neutral-qualification {{quote(qualification)}} --cell {{quote(cell)}}
