@@ -146,9 +146,9 @@ checksum = "c3d036a3c4ab069c7b410a2ce876bd74808d2d0888a82667669f8e783a898bf1"
 
 [[package]]
 name = "archmage"
-version = "0.9.30"
+version = "0.9.31"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "15785ee3576fbd41276a25f063b1e6b5bf323af9b4924632e25a8de6a3065f06"
+checksum = "67dcf4e0bcce8da7704d177f604cf43299777de9d0f052ffe8822ab188de2820"
 dependencies = [
  "archmage-macros",
  "safe_unaligned_simd",
@@ -157,9 +157,9 @@ dependencies = [
 
 [[package]]
 name = "archmage-macros"
-version = "0.9.30"
+version = "0.9.31"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ce7707714970d5cf476caccbae2d282000c6c14ca5aada878e722a10d8e1c153"
+checksum = "8ec18ef9ee506a934ab4f46f204f1d1d83528283d5400df800688748268b82bc"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2834,12 +2834,11 @@ checksum = "ecbdfe44b1bd960b68170b417450a628c43f7cf56bb3c5317e61cb230ee7f226"
 
 [[package]]
 name = "magetypes"
-version = "0.9.30"
+version = "0.9.31"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5726fd3335b1d2814036c420a5c8d105abcc0e0b43eebb477e48f8c725fc8fb2"
+checksum = "f509b5e651143f19077f1d3874e87d1f8ed617f7c257f60e38d58f27563e0f98"
 dependencies = [
  "archmage",
- "libm",
  "rustversion",
 ]
 
@@ -4687,7 +4686,7 @@ checksum = "b6f5e870be6c3b371b77fe0ee0bafb859fa4964b4404c27de1d380043c4dda20"
 [[package]]
 name = "ultrahdr-core"
 version = "0.6.0"
-source = "git+https://github.com/imazen/ultrahdr?rev=8a30cadfd08721749050215b924ca0a58a42e277#8a30cadfd08721749050215b924ca0a58a42e277"
+source = "git+https://github.com/imazen/ultrahdr?rev=1742595b5efd3c51720189e00f6a17fa8cf39bb0#1742595b5efd3c51720189e00f6a17fa8cf39bb0"
 dependencies = [
  "bytemuck",
  "enough",
@@ -5620,7 +5619,7 @@ dependencies = [
 [[package]]
 name = "zenjpeg"
 version = "0.9.0"
-source = "git+https://github.com/imazen/zenjpeg?rev=4b0f1bfa35444d982ce2a26e04bac19293487790#4b0f1bfa35444d982ce2a26e04bac19293487790"
+source = "git+https://github.com/imazen/zenjpeg?rev=33ef549f0ba8daf1ab2bdce6bf75363807d87636#33ef549f0ba8daf1ab2bdce6bf75363807d87636"
 dependencies = [
  "aligned-vec",
  "archmage",
@@ -5694,7 +5693,7 @@ dependencies = [
 [[package]]
 name = "zenpng"
 version = "0.2.0"
-source = "git+https://github.com/imazen/zenpng?rev=02a7f0df5f72dd79b0afa58d66ced7cdd8395e31#02a7f0df5f72dd79b0afa58d66ced7cdd8395e31"
+source = "git+https://github.com/imazen/zenpng?rev=381abd7fc9c753f14d0bd28b4cdd6d36bb1687cf#381abd7fc9c753f14d0bd28b4cdd6d36bb1687cf"
 dependencies = [
  "almost-enough",
  "archmage",
@@ -5898,7 +5897,7 @@ dependencies = [
 [[package]]
 name = "zenyuv"
 version = "0.1.3"
-source = "git+https://github.com/imazen/zenjpeg?rev=4b0f1bfa35444d982ce2a26e04bac19293487790#4b0f1bfa35444d982ce2a26e04bac19293487790"
+source = "git+https://github.com/imazen/zenjpeg?rev=33ef549f0ba8daf1ab2bdce6bf75363807d87636#33ef549f0ba8daf1ab2bdce6bf75363807d87636"
 dependencies = [
  "archmage",
  "imgref",
