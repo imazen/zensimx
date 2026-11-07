@@ -383,3 +383,25 @@ actual. Explicit absent-population calibration handling matches neural reports.
 The original estimator, native quadratic solve, certificate and native prediction
 gates are unchanged. Four control-orchestration tests and ten evaluator tests
 pass. Actual variant controls remain unexecuted until inner admission is complete.
+
+### Worker collection and filesystem accounting (2026-11-07)
+
+The repeatable terminal-wave collector imported 3 fits from one worker and 10
+from the other, preserving a fixed observed cell list, per-cell logs, complete
+checkpoint inventories and durable bundle readback receipts. The wave records
+are `collection-i265-wave-0750/WAVE.json` and
+`collection-i270-wave-0750/WAVE.json` under the completion output root.
+
+One import waited for the unchanged storage reservation gate, then completed.
+A compiler-cache cleanup removed only inactive Cargo incremental intermediates
+(open-file checks passed twice); all final binaries were retained. **That cleanup
+was on the root filesystem, not the experiment SSD, and reclaimed no space on
+the experiment SSD.** The cleanup receipt is not credited to the SSD budget.
+The reclaim command now refuses cross-filesystem use before deleting anything.
+At 07:53 UTC, `df -B1 /mnt/v /home/lilith` reported 54,473,691,136 bytes available
+on the shared experiment SSD; `/srv/zen-research` resolved to a separate ext4
+root volume. Re-resolve with `findmnt -T` before future space interventions.
+
+The variant-path qualification archive contains 12 files / 93,279 bytes, all
+SHA-256 verified by destination readback. It preserves implementation sources,
+test output and push verification; it is not scientific variant-fit evidence.
