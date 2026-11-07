@@ -32,7 +32,13 @@ def base_decision(root,family,outer,cells):
 
 
 def build(root,outer):
-    _,cells,_=load_registration(root);decisions={};evidence={};neural={};representations={}
+    _,cells,_=load_registration(root);decisions={};evidence={};neural={};representations={};evaluators={}
+    def check_evaluator(family,row):
+        identity=dict(representation='research-relu-max-pairs-v1' if 'reexport_receipt' in row else 'original',
+                      evaluation_build_sha256=row.get('evaluation_build_sha256'))
+        if identity['representation']!=representations[family]:raise ValueError('candidate representation differs from selection')
+        if family in evaluators and evaluators[family]!=identity:raise ValueError('mixed candidate evaluation runtimes')
+        evaluators[family]=identity
     trigger=root/f'RESCUE_TRIGGER_OUTER_{outer}.json'
     triggered=trigger.exists()
     if triggered:
@@ -56,7 +62,7 @@ def build(root,outer):
             for c in cells:
                 if c['id'] in actual['reported_cells']:
                     primary[c['id']]=verified_candidate(root,c,representation)
-                    evidence.update(primary[c['id']][2])
+                    evidence.update(primary[c['id']][2]);check_evaluator(family,primary[c['id']][0])
             if triggered:
                 record,path=verify_decision(root,family,outer,cells)
                 evidence[str(path)]=sha(path);evidence.update(record['evidence_sha256'])
@@ -69,7 +75,8 @@ def build(root,outer):
                 record=dict(family=family,outer=outer,base_setting=setting,selected_choice='base',outer_results_read=False)
             convergence={}
             for cell in required:
-                _,diagnostic,pins=(primary[cell['id']] if cell['id'] in primary else verified_candidate(root,cell,representation));evidence.update(pins)
+                row,diagnostic,pins=(primary[cell['id']] if cell['id'] in primary else verified_candidate(root,cell,representation));evidence.update(pins)
+                check_evaluator(family,row)
                 if not triggered and diagnostic['investigation_required']:
                     raise ValueError('investigation requires registered equal-opportunity rescues')
                 if cell['id'] in selected:convergence[cell['id']]=diagnostic
@@ -89,6 +96,7 @@ def build(root,outer):
         evidence[str(path)]=sha(path)
         for cell in extension['cells']:
             row,diagnostic,pins=verified_candidate(root,cell,representations[cell['family']]);evidence.update(pins)
+            check_evaluator(cell['family'],row)
             run_path=next(Path(p) for p in pins if Path(p).name=='RUN.json')
             run=json.loads(run_path.read_text())
             if run['resolution']['registration_sha256']!=sha(path) or run['resolution']['cell']!=cell:
@@ -104,7 +112,7 @@ def build(root,outer):
         qualifications[family]=dict(status='inconclusive_after_registered_optimization' if reasons else 'registered_triggers_absent',
                                     reasons=reasons,not_a_global_convergence_proof=True)
     resolved.update(outer_evaluation_admitted=True,status='admitted_with_explicit_convergence_classifications',
-                    qualifications=qualifications,plan_sha256=sha(root/'PLAN.json'),policy_sha256=sha(POLICY),
+                    qualifications=qualifications,evaluation_representations=evaluators,plan_sha256=sha(root/'PLAN.json'),policy_sha256=sha(POLICY),
                     decision_sha256=evidence,driver_sha256=sha(__file__))
     return resolved
 

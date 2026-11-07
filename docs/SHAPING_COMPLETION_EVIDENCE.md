@@ -286,3 +286,9 @@ base candidate in outer admission. Unit checks cover changed TRAIN membership,
 fixed settings/seeds, all phase lengths, exact fresh-control identity and
 unadmitted-fold refusal. This does not claim an executed outer fit: live admission
 remains closed until the registered inner rescue/extension evidence is complete.
+
+Outer admission also binds one evaluation representation and runtime per neural
+family across every base, rescue and extension candidate. Mixed repaired-ReLU
+runtimes are refused; the selected identity is carried into the admission record
+for outer scoring. Native outer controllers have explicit live-process matching
+in the existing progress owner, rather than being mistaken for stopped wrappers.
