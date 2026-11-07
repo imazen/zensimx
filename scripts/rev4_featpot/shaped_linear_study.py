@@ -243,21 +243,24 @@ def numeric_gate(root):
 
 
 def mapped_labels(y,pop,maps):
-    out=np.empty(len(y))
+    out=np.full(len(y),np.nan)
     for p,m in maps.items():
         ids=np.flatnonzero(pop==p);lo,hi=m['values'][0],m['values'][-1]
         out[ids]=(y[ids]-lo)/(hi-lo)
     return out
 
 
-def metrics(pred,y,ids,d,maps):
+def metrics(pred,y,ids,d,maps,*,allow_absent_maps=False):
+    absent=set(d['pop'][ids])-set(maps)
+    if absent and not allow_absent_maps:raise ValueError('missing training-only score maps: '+str(sorted(absent)))
     jobs=[];summary={};mapped=mapped_labels(y,d['pop'],maps)*100
     unmapped=pred.copy()
     for p,m in maps.items():
         sel=d['pop']==p;lo,hi=m['values'][0],m['values'][-1];unmapped[sel]=lo+pred[sel]/100*(hi-lo)
     for p in sorted(set(d['pop'][ids])):
         q=ids[d['pop'][ids]==p]
-        jobs.extend([(p+'|pooled','pred','y',q),(p+'|mapped','pred','mapped',q),(p+'|unmapped','unmapped','y',q)])
+        jobs.append((p+'|pooled','pred','y',q))
+        if p in maps:jobs.extend([(p+'|mapped','pred','mapped',q),(p+'|unmapped','unmapped','y',q)])
         for s in sorted(set(d['component'][q])):jobs.append((p+'|source|'+s,'pred','y',q[d['component'][q]==s]))
         for f in sorted(set(d['family'][q])):jobs.append((p+'|family|'+f,'pred','y',q[d['family'][q]==f]))
     rows=panel_batch_indexed(dict(pred=pred,y=y,mapped=mapped,unmapped=unmapped),jobs,stats='srocc',raw_errors=True)
@@ -271,7 +274,8 @@ def metrics(pred,y,ids,d,maps):
         source=[v['srocc_signed'] for v in rows if v['label'].startswith(p+'|source|')]
         valid=[v for v in source if np.isfinite(v)]
         pooled=next(v for v in rows if v['label']==p+'|pooled')['srocc_signed']
-        summary[p]=dict(pooled=pooled,within=float(np.mean(valid)) if valid else None,defined_sources=len(valid),sources=len(source),rows=int(np.sum(d['pop'][ids]==p)),mapped_mae=next(v for v in rows if v['label']==p+'|mapped')['mae_raw'],unmapped_mae=next(v for v in rows if v['label']==p+'|unmapped')['mae_raw'])
+        summary[p]=dict(pooled=pooled,within=float(np.mean(valid)) if valid else None,defined_sources=len(valid),sources=len(source),rows=int(np.sum(d['pop'][ids]==p)),mapped_mae=next(v for v in rows if v['label']==p+'|mapped')['mae_raw'] if p in maps else None,unmapped_mae=next(v for v in rows if v['label']==p+'|unmapped')['mae_raw'] if p in maps else None)
+        if p not in maps:summary[p]['calibration_status']='unavailable: population absent from training'
     human=[(v['pooled']+v['within'])/2 for p,v in summary.items() if p!='cid22_ssim2' and v['within'] is not None and np.isfinite(v['pooled'])]
     return clean(dict(summary=summary,selection_score=float(np.mean(human)) if len(human)==4 else None,panels=rows))
 

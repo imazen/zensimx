@@ -4954,3 +4954,6 @@ shaping-completion-variants-check:
 
 shaping-completion-register-variants study:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_variants.py --study {{quote(study)}}
+
+shaping-completion-absent-maps-check:
+    python3 -B -m unittest discover -s scripts/tests -p test_shaping_absent_maps.py
