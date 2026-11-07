@@ -924,3 +924,15 @@ pass, including unchanged TRAIN membership and preserved empty registered test
 membership. Final neural training-only diagnostics accept the descriptive report
 but never use development scores; the four convergence tests cover that scope
 alongside the unchanged inner loss rule. Scientific final fits remain gated.
+
+### Worker transport retention
+
+A completed worker import can leave both original fit files and a redundant
+transport tar on the worker SSD. The transport-retention tool first requires the
+matching durable transfer receipt, producer sidecar and successful local import,
+then cold-rereads the durable tar. On the worker it verifies the tar and sidecar
+again, checks open files twice and rechecks file identity before removal. It
+removes only selected transport tar files; original fit directories and sidecars
+remain. Corrupt durable/worker bytes and open transports refuse removal in tests.
+This addresses storage admission without reducing the registered reserve or
+trainer write allowances.

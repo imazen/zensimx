@@ -5162,3 +5162,9 @@ shaping-completion-full-fit-refit-native study cell binaries qualification:
 
 shaping-completion-full-fit-refit-control study binaries mode:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 6G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_controls.py --study {{quote(study)}} --partition full-fit --binary-dir {{quote(binaries)}} --full-fit-refit --{{mode}}
+
+shaping-completion-worker-bundle-retention-check:
+    python3 -B -m unittest discover -s scripts/tests -p test_shaping_worker_bundle_retention.py
+
+shaping-completion-worker-bundle-retention host study archive output *args:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_worker_bundle_retention.py --host {{quote(host)}} --study {{quote(study)}} --archive {{quote(archive)}} --output {{quote(output)}} {{args}}
