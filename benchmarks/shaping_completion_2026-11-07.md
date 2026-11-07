@@ -93,3 +93,15 @@ that is epochs 119 and 219, not mismatched learning-rate phases 199 and 239.
 The native four-decimal loss log has a 0.00005 rounding bound; a one-percent
 threshold interval crossing zero triggers investigation. The guard tests pass;
 actual completed-fit curve evaluation remains to be exercised.
+
+## Remaining optimizer-diagnostic qualification
+
+Source inspection found that `monotone_research::report_diagnostics` and its
+accumulators require `config.training`. The initial analytic scientific
+manifests omit that object, so these runs do not log the implemented gradient,
+hidden-activity and projection diagnostics. Saved native checkpoints support
+coefficient inspection, but do not reconstruct historical projection counts.
+Preserve these fits and qualify a diagnostic replay before using those traces.
+Plain shared-ReLU initialization and consolidation rescue controls also require
+native implementation; the existing training-research configuration is attached
+to a research head and must not substitute a different head for that control.
