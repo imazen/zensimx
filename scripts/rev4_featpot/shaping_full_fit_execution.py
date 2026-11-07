@@ -3,7 +3,7 @@ from __future__ import annotations
 import argparse,json,os,subprocess
 from datetime import datetime,timezone
 from pathlib import Path
-from shaping_completion import NEURAL,encoded,sha
+from shaping_completion import NEURAL,ROLES,encoded,sha
 from shaping_execution import load_registration,prepare_partition
 from shaping_full_fit_admission import resolve as resolve_admission
 from shaping_inputs import prepare as prepare_shapes
@@ -27,20 +27,56 @@ def search_cell(root,identifier):
     return plan,cells,partitions,admission,path,cell,family,schedule
 
 
+def refit_cell(root,identifier):
+    plan,cells,partitions=load_registration(root);admission,path=resolve_admission(root)
+    matches=[c for c in admission['final_cells'] if c['id']==identifier]
+    if len(matches)!=1 or matches[0] not in cells:raise ValueError('registered full-FIT final cell required')
+    cell=matches[0]
+    if cell['stage']!='full_fit' or cell['partition']!='full-fit':raise ValueError('full-FIT refit scope differs')
+    from shaping_full_fit_selection import resolve as resolve_setting
+    selections={};pins={}
+    # Fix every role before any final refit can expose development results.
+    for role in ROLES:
+        decision,selection_path=resolve_setting(root,role)
+        if (decision['admission_sha256']!=sha(path) or decision['selection_scope']!='full_fit_only'
+            or decision['development_results_read'] or decision['resolved_family']!=admission['finalist_roles'][role]):
+            raise ValueError('full-FIT setting decision scope differs')
+        selections[role]=decision;pins[str(selection_path)]=sha(selection_path)
+    family=admission['finalist_roles'][cell['family']]
+    schedule=dict(admission['schedules'][family],setting=selections[cell['family']]['selected_setting'])
+    if schedule['setting'] not in range(4):raise ValueError('unregistered final setting')
+    membership=partitions['full-fit']
+    if membership['test'] or set(membership['train'])&set(membership['descriptive_development']):
+        raise ValueError('development entered full-FIT training')
+    admission=dict(admission,full_fit_selection_sha256=pins)
+    return plan,cells,partitions,admission,path,cell,family,schedule
+
+
+def fit_cell(root,identifier):
+    _,cells,_=load_registration(root)
+    matches=[c for c in cells if c['id']==identifier]
+    if len(matches)!=1:raise ValueError('one registered full-FIT cell required')
+    return (refit_cell if matches[0]['stage']=='full_fit' else search_cell)(root,identifier)
+
+
+def fit_scope(cell):
+    return 'full_fit_refit' if cell['stage']=='full_fit' else 'full_fit_only'
+
+
 def prepare(root,identifier):
-    plan,_,partitions,_,path,cell,_,_=search_cell(root,identifier)
+    plan,_,partitions,_,path,cell,_,_=fit_cell(root,identifier)
     partition=cell['partition'];dest=root/'full_fit/inputs'/partition
     if dest.exists():return prepared(root,identifier)
     with reservation(root,dest,plan['minimum_ssd_free_bytes']):
         # Reproduce admission again after a possible storage wait.
-        search_cell(root,identifier)
+        fit_cell(root,identifier)
         record=prepare_partition(root,partition,partitions[partition],plan)
         shapes=[prepare_shapes(root,partition,partitions[partition],plan,separate) for separate in (False,True)]
         pins={str(root/'comparators'/partition/'GROUPS.json'):sha(root/'comparators'/partition/'GROUPS.json'),**record['file_sha256']}
         for shape in shapes:
             pins[str(shape)]=sha(shape);pins[str(shape.with_name('RECEIPT.json'))]=sha(shape.with_name('RECEIPT.json'))
         receipt=dict(partition=partition,admission_sha256=sha(path),plan_sha256=sha(root/'PLAN.json'),
-                     file_sha256=pins,selection_scope='full_fit_only',development_results_read=False,
+                     file_sha256=pins,selection_scope=fit_scope(cell),development_results_read=False,
                      models_fitted=0,driver_sha256=sha(__file__))
         dest.mkdir(parents=True,exist_ok=False)
         (dest/'PREPARED.json').write_bytes(encoded(receipt))
@@ -48,10 +84,10 @@ def prepare(root,identifier):
 
 
 def prepared(root,identifier):
-    _,_,partitions,_,path,cell,_,_=search_cell(root,identifier)
+    _,_,partitions,_,path,cell,_,_=fit_cell(root,identifier)
     receipt=json.loads((root/'full_fit/inputs'/cell['partition']/'PREPARED.json').read_text())
     if (receipt['partition']!=cell['partition'] or receipt['admission_sha256']!=sha(path)
-        or receipt['plan_sha256']!=sha(root/'PLAN.json') or receipt['selection_scope']!='full_fit_only'
+        or receipt['plan_sha256']!=sha(root/'PLAN.json') or receipt['selection_scope']!=fit_scope(cell)
         or receipt['development_results_read']):raise ValueError('full-FIT input scope or admission differs')
     for name,pin in receipt['file_sha256'].items():
         if sha(name)!=pin:raise ValueError('full-FIT TRAIN input drift')
@@ -64,11 +100,11 @@ def prepared(root,identifier):
 
 
 def execute(args):
-    plan,cells,_,admission,path,cell,family,schedule=search_cell(args.study,args.cell)
+    plan,cells,_,admission,path,cell,family,schedule=fit_cell(args.study,args.cell)
     if family not in NEURAL:raise ValueError('native full-FIT runner requires a neural finalist')
     inputs=prepared(args.study,args.cell)
     build_path=args.binary_dir/'BUILD.json';build=json.loads(build_path.read_text())
-    pins={str(path):sha(path),str(build_path):sha(build_path),**inputs['file_sha256']}
+    pins={str(path):sha(path),str(build_path):sha(build_path),**inputs['file_sha256'],**admission.get('full_fit_selection_sha256',{})}
     for name,pin in build['binary_sha256'].items():
         if sha(args.binary_dir/name)!=pin:raise ValueError('full-FIT native binary drift')
         pins[str(args.binary_dir/name)]=pin
@@ -82,13 +118,13 @@ def execute(args):
     # Commands encode the fixed four settings and paired seeds. Reuse only their
     # configuration; scales, weights and supervised shaping start afresh below.
     template=dict(cell,family=family,partition='inner-0-0')
-    source,original=primary_source(args.study,cells,template,cell['setting'])
+    source,original=primary_source(args.study,cells,template,schedule['setting'])
     if admission['evidence_sha256'].get(str(source/'RUN.json'))!=sha(source/'RUN.json'):raise ValueError('unadmitted full-FIT command template')
     builder=lambda original,binaries,dest,epochs:command(original,binaries,dest,epochs,group_record['groups'])
     dest=args.study/'runs'/cell['id']/f'attempt-{args.attempt:03}'
     if args.attempt<1 or dest.exists():raise ValueError('preserve full-FIT attempts')
     with reservation(args.study,dest,plan['minimum_ssd_free_bytes']):
-        if search_cell(args.study,args.cell)[3]!=admission or prepared(args.study,args.cell)!=inputs:raise ValueError('full-FIT admission changed while waiting')
+        if fit_cell(args.study,args.cell)[3]!=admission or prepared(args.study,args.cell)!=inputs:raise ValueError('full-FIT admission changed while waiting')
         for name,pin in pins.items():
             if sha(name)!=pin:raise ValueError('full-FIT input changed while waiting')
         dest.mkdir(parents=True)
@@ -96,7 +132,7 @@ def execute(args):
                  plan_sha256=sha(args.study/'PLAN.json'),build_sha256=sha(build_path),file_sha256=pins,
                  driver_sha256=sha(__file__),pid=os.getpid(),process_role='full_fit_controller',stage='running',
                  fit_directory='fit',epochs=schedule['phase_epochs'][-1],pairs_per_epoch=50000,
-                 training_exposure_pair_draws=schedule['total_pair_draws'],selection_scope='full_fit_only',
+                 training_exposure_pair_draws=schedule['total_pair_draws'],selection_scope=fit_scope(cell),
                  development_results_read=False,outer_results_read=False)
         (dest/'RUN.json').write_bytes(encoded(run));phases=[];shaping=None
         try:
@@ -107,7 +143,7 @@ def execute(args):
             choice=schedule['optimizer_choice']
             if '_pretrained_' in family:
                 parent_family=family.split('_pretrained_')[0]+'_joint_identity'
-                parent,parent_run=primary_source(args.study,cells,template,cell['setting'],parent_family)
+                parent,parent_run=primary_source(args.study,cells,template,schedule['setting'],parent_family)
                 if admission['evidence_sha256'].get(str(parent/'RUN.json'))!=sha(parent/'RUN.json'):raise ValueError('unadmitted full-FIT pretraining template')
                 epochs=schedule['phase_epochs'][0]
                 phases.append(phase(args.study,args.binary_dir,parent,parent_run,dest/'pretraining',epochs,choice,groups,shaping,

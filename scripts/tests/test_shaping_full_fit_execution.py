@@ -75,3 +75,44 @@ class FullFitExecutionTests(unittest.TestCase):
             self.assertFalse((root/'runs').exists())
 
 if __name__=='__main__':unittest.main()
+
+class FinalRefitTests(unittest.TestCase):
+    def test_all_roles_must_be_fixed_before_refit_admission(self):
+        from shaping_completion import matrix,ROLES
+        from shaping_full_fit_execution import refit_cell,fit_scope
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as directory:
+            root=Path(directory);cells=matrix();cell=next(c for c in cells if c['stage']=='full_fit' and c['family']=='relu')
+            admission=dict(final_cells=[c for c in cells if c['stage']=='full_fit'],
+                finalist_roles={r:r for r in ROLES},schedules={'relu':dict(phase_epochs=[480],optimizer_choice='constant_lr',total_pair_draws=24000000)})
+            path=root/'admission';path.write_text('{}');decisions={}
+            for role in ROLES:
+                p=root/(role+'.json');p.write_text('{}')
+                decisions[role]=(dict(admission_sha256=sha(path),selection_scope='full_fit_only',development_results_read=False,resolved_family=role,selected_setting=2),p)
+            partitions={'full-fit':dict(train=[1,2,3],test=[],descriptive_development=[4,5])}
+            with patch('shaping_full_fit_execution.load_registration',return_value=({},cells,partitions)),patch('shaping_full_fit_execution.resolve_admission',return_value=(admission,path)),patch('shaping_full_fit_selection.resolve',side_effect=lambda _,r:decisions[r]):
+                resolved=refit_cell(root,cell['id'])
+                self.assertEqual(resolved[-1]['setting'],2);self.assertEqual(resolved[-1]['phase_epochs'],[480])
+                self.assertEqual(len(resolved[3]['full_fit_selection_sha256']),len(ROLES))
+                self.assertEqual(fit_scope(cell),'full_fit_refit')
+                decisions['extra_trees'][0]['development_results_read']=True
+                with self.assertRaisesRegex(ValueError,'scope'):refit_cell(root,cell['id'])
+                decisions['extra_trees'][0]['development_results_read']=False
+                partitions['full-fit']['train'].append(4)
+                with self.assertRaisesRegex(ValueError,'development entered'):refit_cell(root,cell['id'])
+
+    def test_full_fit_preparation_does_not_pass_development_to_trainer(self):
+        from shaping_execution import prepare_partition
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as directory:
+            root=Path(directory);membership=dict(train=[1,2],test=[],descriptive_development=[9])
+            def prepare(root,cell,data,plan):
+                self.assertIsNone(cell['outer']);self.assertEqual(cell['train'],[1,2]);self.assertEqual(cell['test'],[])
+                self.assertNotIn('descriptive_development',cell)
+                dest=root/'comparators/full-fit';dest.mkdir(parents=True)
+                decision=dest/'decision.json';decision.write_text('{}');(dest/'ADMISSION.json').write_text('{}')
+                receipt=dest/'admission/wide/main/real/receipt.json';receipt.parent.mkdir(parents=True);receipt.write_text('{}')
+                table=dest/'fit.parquet';table.write_bytes(b'fit');table.with_suffix('.keys.parquet').write_bytes(b'keys');Path(str(table)+'.manifest.json').write_text('{}')
+                return [('human',table,1.,0.,'withinref,rank'),('dev',Path('/unopened'),0.,1.,'withinref,rank')],decision,None
+            with patch('shaped_linear_compare.prepare_neural',side_effect=prepare),patch('numpy.load',return_value=[0,1,2]):
+                record=prepare_partition(root,'full-fit',membership,{})
+                self.assertEqual([g[0] for g in record['groups']],['human'])
+                self.assertFalse(record['exposed_development_passed_to_trainer'])

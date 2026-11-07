@@ -895,3 +895,14 @@ incomplete evidence creates no selection receipt. Receipts are exclusive and
 recomputed before downstream use. Three provenance tests pass, alongside the
 existing full-FIT human-only scoring/tie tests. No real setting decision exists
 until the registered scientific search has completed.
+
+### Final all-FIT neural refits
+
+The shared full-FIT native runner now resolves final cells only after every role's
+setting decision reproduces. It retains the selected setting, fixed optimizer and
+exposure, starts new weights and supervised shapes, and pins all setting receipts.
+All-FIT preparation records no outer fold and passes only registered FIT rows to
+the trainer; exposed development remains outside its groups. Five preparation,
+search and final-admission tests pass, including refusal when another role used
+development or when a development row enters training. Final scientific refits
+remain pending their selection gates; this implementation is not a measured fit.

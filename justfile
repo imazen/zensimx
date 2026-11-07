@@ -5153,3 +5153,9 @@ shaping-completion-full-fit-selection-check:
 
 shaping-completion-full-fit-select study role *args:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_full_fit_selection.py --study {{quote(study)}} --role {{quote(role)}} {{args}}
+
+shaping-completion-full-fit-refit-prepare study cell:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 2G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_full_fit_execution.py --study {{quote(study)}} --cell {{quote(cell)}} --prepare
+
+shaping-completion-full-fit-refit-native study cell binaries qualification:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 3G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_full_fit_execution.py --study {{quote(study)}} --cell {{quote(cell)}} --binary-dir {{quote(binaries)}} --neutral-qualification {{quote(qualification)}}

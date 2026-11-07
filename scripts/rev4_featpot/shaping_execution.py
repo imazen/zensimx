@@ -48,7 +48,7 @@ def prepare_partition(root, partition, membership, plan):
     if dest.exists():raise ValueError(f'incomplete partition preserved: {dest}')
     data={'y':np.load(OLD/'data/y.npy',mmap_mode='r')}
     cell=dict(id=partition,train=membership['train'],test=membership['test'],mode='true',seed=0,
-              outer=int(partition.split('-')[1]))
+              outer=None if partition=='full-fit' else int(partition.split('-')[1]))
     groups,decision,_=prepare_neural(root,cell,data,plan)
     # Exposed development is never passed to this study's trainer. Selection
     # uses the externally evaluated inner rows and fixed final checkpoints.
