@@ -882,3 +882,16 @@ Tests change validation scores without changing the diagnosis and reject duplica
 loss epochs. Existing inner convergence tests retain their original outcomes.
 This supplies a limited, honest classification; it does not establish convergence
 or count unexecuted scientific cells as complete.
+
+### Verified full-FIT setting decisions
+
+The setting-selection receipt owner now requires complete original fold/seed
+coverage and reproduces the equal-human composite decision. It binds admission,
+run/result/report identities, final scheduled neural checkpoint, repaired runtime
+when required, and each control's native model/parity evidence. Neural training-only
+classifications must reproduce from the phase logs and final model evidence.
+Changes to a model, report scope or convergence conclusion invalidate admission;
+incomplete evidence creates no selection receipt. Receipts are exclusive and
+recomputed before downstream use. Three provenance tests pass, alongside the
+existing full-FIT human-only scoring/tie tests. No real setting decision exists
+until the registered scientific search has completed.

@@ -5147,3 +5147,9 @@ shaping-completion-full-fit-control study partition binaries mode:
 
 shaping-completion-training-only-convergence run report:
     python3 -B scripts/rev4_featpot/shaping_convergence.py --run {{quote(run)}} --training-only --final-report {{quote(report)}}
+
+shaping-completion-full-fit-selection-check:
+    python3 -B -m unittest discover -s scripts/tests -p test_shaping_full_fit_selection.py
+
+shaping-completion-full-fit-select study role *args:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_full_fit_selection.py --study {{quote(study)}} --role {{quote(role)}} {{args}}
