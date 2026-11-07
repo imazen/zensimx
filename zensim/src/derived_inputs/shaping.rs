@@ -99,3 +99,66 @@ impl ReferenceGate {
         ((1. - t) * lo + t * hi, 2. * (hi - lo))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn identity_and_piecewise_slopes_cover_knots_and_extremes() {
+        let identity = DamageShape::parse(&["0.3", "1.7", "1", "1", "1"]).unwrap();
+        for x in [-0.0_f32, 0., f32::MIN_POSITIVE, 0.3, 1.7, 1e10, f32::MAX] {
+            assert_eq!(identity.eval(x).to_bits(), x.to_bits());
+        }
+        let shape = DamageShape::parse(&["0.25", "1", "2", "0.5", "3"]).unwrap();
+        let mut last = 0.;
+        for i in 0..1000 {
+            let x = i as f32 / 100.;
+            let y = shape.eval(x);
+            assert!(y >= last);
+            last = y;
+            let (reference, _) = shape.value_slope(f64::from(x));
+            assert!(
+                (f64::from(y) - reference).abs()
+                    <= 4. * f64::from(f32::EPSILON) * reference.max(1.)
+            );
+        }
+        for x in [0.1, 0.5, 2.0] {
+            let (_, slope) = shape.value_slope(x);
+            let delta = (shape.value_slope(x + 1e-6).0 - shape.value_slope(x - 1e-6).0) / 2e-6;
+            assert!((delta - slope).abs() < 1e-8);
+        }
+    }
+    #[test]
+    fn reference_gate_nonnegative_does_not_claim_monotonicity() {
+        let gate = ReferenceGate::parse(&["1", "0.2", "2"]).unwrap();
+        assert!(gate.eval(0.25) < gate.eval(0.));
+        assert!(gate.eval(0.75) > gate.eval(0.5));
+        for i in -20..121 {
+            assert!(gate.eval(i as f32 / 100.) >= 0.);
+        }
+        for x in [0.1, 0.7] {
+            let (_, slope) = gate.value_slope(x);
+            let numeric = (gate.value_slope(x + 1e-6).0 - gate.value_slope(x - 1e-6).0) / 2e-6;
+            assert!((numeric - slope).abs() < 1e-8);
+        }
+        let identity = ReferenceGate::parse(&["0", "0.5", "1"]).unwrap();
+        for i in 0..100 {
+            let x = i as f32 / 100.;
+            assert_eq!(identity.eval(x), x);
+        }
+    }
+    #[test]
+    fn invalid_parameters_are_refused() {
+        for parameters in [
+            ["0", "1", "1", "1", "1"],
+            ["1", "1", "1", "1", "1"],
+            ["1", "2", "-1", "1", "1"],
+            ["1", "2", "NaN", "1", "1"],
+            ["1", "inf", "1", "1", "1"],
+        ] {
+            assert!(DamageShape::parse(&parameters).is_err());
+        }
+        assert!(ReferenceGate::parse(&["1", "-0.1", "1"]).is_err());
+        assert!(ReferenceGate::parse(&["1", "NaN", "1"]).is_err());
+    }
+}

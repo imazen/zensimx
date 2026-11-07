@@ -288,6 +288,27 @@ mod tests {
     }
 
     #[test]
+    fn native_shaping_distinguishes_product_and_separate_forms() {
+        let text = "zensim-derived-inputs research-shaping-v1\nshape 13 0.25 1 2 0.5 3\nshape-product 13 422 0.25 1 2 0.5 3\nseparate 13 422 0.25 1 2 0.5 3 0 0.5 1\nin 401\nin 480";
+        let d = parse(text).unwrap();
+        let mut out = Vec::new();
+        d.fill_f32(&[0.5, 0., 0.5, 0.7], &mut out);
+        assert_eq!(out[..3], [0.625, 0.5, 0.3125]);
+        for fragility in [0., 0.25, 0.5, 1.] {
+            d.fill_f32(&[0., 0., fragility, 0.7], &mut out);
+            assert_eq!(out[..3], [0., 0., 0.]);
+        }
+        let old = text.replace("research-shaping-v1", "v1");
+        assert!(parse(&old).is_err());
+        let bad = text.replace("separate 13 422", "separate 13 480");
+        assert!(parse(&bad).is_err());
+        let reads = d
+            .read_slots(&[13, 401, 422, 480], &[false, false, true, false, false])
+            .unwrap();
+        assert_eq!(reads.iter_slots().collect::<Vec<_>>(), vec![13, 422]);
+    }
+
+    #[test]
     fn products_pair_same_cell_difference_with_reference_only() {
         let d = parse(
             "zensim-derived-inputs v1\nin 13\nin 401\nproduct 13 422\nproduct 401 422\nin 480\n",
