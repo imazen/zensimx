@@ -6,6 +6,7 @@ from shaping_completion import encoded,sha
 from shaping_execution import load_registration
 from shaping_rescue_selection import verified_candidate
 from shaping_pretraining import structural_terms
+from shaping_evaluation import evaluation_epoch
 
 
 def response(term,x,f):
@@ -65,30 +66,69 @@ def selected_cells(cells,family,outer,settings,inner_fold=None,partitions=None):
     return sorted(selected,key=lambda c:(c['family'],c['partition'],c['setting'],c['seed']))
 
 
+def parameter_activity(config):
+    """Count stored f32 zero paths, not predictive utility or input rank."""
+    counts=dict(terms=len(config['terms']),zero_damage_terms=0,zero_reference_gates=0,
+                zero_parameter_paths=0,interaction_terms=0)
+    for term in config['terms']:
+        zero=lambda values:all(struct.unpack('<f',struct.pack('<f',v))[0]==0 for v in values)
+        damage_zero=zero(term['slopes']);gate_zero=term['separate'] and zero(term['gate'])
+        counts['zero_damage_terms']+=damage_zero;counts['zero_reference_gates']+=gate_zero
+        counts['zero_parameter_paths']+=damage_zero or gate_zero
+        counts['interaction_terms']+=term['reference'] is not None
+    counts['nonzero_parameter_paths']=counts['terms']-counts['zero_parameter_paths']
+    return counts
+
+
+def checkpoint_config(binary_dir,run,cell,epochs,requested,final_report,pins):
+    epoch=evaluation_epoch(epochs,requested)
+    model=run/'checkpoints'/f'ckpt_epoch{epoch:03}.bin'
+    row=final_report
+    if requested is not None:
+        directory=run/'curve_evaluation'/f'epoch-{epoch:03}'
+        marker=directory/'DIAGNOSTIC_COMPLETE.json';path=directory/'REPORT.json'
+        row=json.loads(path.read_text())
+        if json.loads(marker.read_text())['report_sha256']!=sha(path):raise ValueError('shape diagnostic report drift')
+        for p in (marker,path):pins[str(p)]=sha(p)
+    if (row['cell']!=cell or row['plan_sha256']!=final_report['plan_sha256']
+            or row['checkpoint_epoch']!=epoch or row['outer_results_read']
+            or row['checkpoint_sha256']!=sha(model)):
+        raise ValueError('shape checkpoint/report identity differs')
+    pins[str(model)]=sha(model)
+    config=json.loads(subprocess.check_output([str(binary_dir/'bake_dial_refit'),'read-meta',
+        '--in',str(model),'--key','zentrain.input_shaping'],text=True))
+    return config,epoch,row['active_output_coefficients']
+
+
 def report(args):
     _,cells,_=load_registration(args.study)
     settings=getattr(args,'settings',None) or [args.setting]
     selected=selected_cells(cells,args.family,args.outer,settings,getattr(args,'inner_fold',None),getattr(args,'partitions',None))
-    args.output.mkdir(parents=True,exist_ok=False);configs=[];pins={};fits=[]
+    args.output.mkdir(parents=True,exist_ok=False);configs=[];pins={};fits=[];activity=[]
     build=json.loads((args.binary_dir/'BUILD.json').read_text())
     if sha(args.binary_dir/'bake_dial_refit')!=build['binary_sha256']['bake_dial_refit']:raise ValueError('native metadata reader drift')
     for cell in selected:
-        _,_,evidence=verified_candidate(args.study,cell);pins.update(evidence)
+        final_report,_,evidence=verified_candidate(args.study,cell);pins.update(evidence)
         run=next(Path(p).parent for p in evidence if Path(p).name=='RUN.json')
         identity=json.loads((run/'RUN.json').read_text())
         if identity['build_sha256']!=sha(args.binary_dir/'BUILD.json'):raise ValueError('native training build differs')
-        model=run/'checkpoints'/f"ckpt_epoch{identity['epochs']-1:03}.bin"
-        config=json.loads(subprocess.check_output([str(args.binary_dir/'bake_dial_refit'),'read-meta','--in',str(model),'--key','zentrain.input_shaping'],text=True))
+        config,epoch,output_active=checkpoint_config(args.binary_dir,run,cell,identity['epochs'],
+            getattr(args,'checkpoint',None),final_report,pins)
         initial=json.loads((run/'SHAPING.json').read_text())
         if structural_terms(config)!=structural_terms(initial):raise ValueError('native shape structure differs from TRAIN initialization')
-        pins[str(model)]=sha(model);pins[str(run/'SHAPING.json')]=sha(run/'SHAPING.json')
+        pins[str(run/'SHAPING.json')]=sha(run/'SHAPING.json')
         if args.family=='direct_joint_both':config['terms']=[t for t in config['terms'] if t['reference'] is None]
+        activity.append(dict(cell=cell['id'],checkpoint_epoch=epoch,
+                             active_output_coefficients=output_active,**parameter_activity(config)))
         (args.output/(cell['id']+'.json')).write_bytes(encoded(config));configs.append(config);fits.append(cell)
     rows=compare(configs)
     result=dict(scope='Descriptive paired inner fit comparison; no quality selection, outer scores or transferable-utility claim.',
         method='Real-valued piecewise-linear response at native quantized parameters; maximum normalized spread on union-of-knot vertices. Separate responses use the damage/reference rectangle. Not a bit-exact runtime score comparison.',
         domain='Zero through largest TRAIN second damage knot; separate reference gates use [0,1]. No claim beyond this domain.',
         downstream_weights_included=False,zero_terms_are_not_useful_stability=True,fits=fits,input_sha256=pins,
+        requested_checkpoint=getattr(args,'checkpoint',None),coefficient_activity=activity,
+        checkpoint_scope='registered final' if getattr(args,'checkpoint',None) is None else 'registered diagnostic; excluded from checkpoint selection',
+        coefficient_activity_scope='Stored f32 zero paths only; not measured input rank, optimizer state or predictive utility.',
         plan_sha256=sha(args.study/'PLAN.json'),driver_sha256=sha(__file__),terms=rows,
         active_in_all=sum(r['active_fits']==len(selected) for r in rows),zero_in_all=sum(r['active_fits']==0 for r in rows),total_terms=len(rows))
     (args.output/'CURVE_STABILITY.json').write_bytes(encoded(result))
@@ -103,6 +143,7 @@ if __name__=='__main__':
     scope.add_argument('--outer',type=int,choices=range(3))
     scope.add_argument('--partitions',nargs='+',choices=[f'inner-{o}-{i}' for o in range(3) for i in range(2)])
     p.add_argument('--inner-fold',type=int,choices=(0,1))
+    p.add_argument('--checkpoint',type=int,help='registered diagnostic epoch; requires a completed and qualified parent fit')
     choices=p.add_mutually_exclusive_group(required=True)
     choices.add_argument('--setting',type=int,choices=range(4))
     choices.add_argument('--settings',type=int,choices=range(4),nargs='+')

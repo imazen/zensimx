@@ -1,7 +1,9 @@
-import copy,sys,unittest
+import copy,json,sys,tempfile,unittest
 from pathlib import Path
+from unittest.mock import patch
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'rev4_featpot'))
-from shaping_curve_stability import compare
+from shaping_curve_stability import compare,parameter_activity,checkpoint_config
+from shaping_completion import encoded,sha
 
 
 class CurveStabilityTests(unittest.TestCase):
@@ -24,6 +26,44 @@ class CurveStabilityTests(unittest.TestCase):
         r=compare([a,a])[0];self.assertEqual(r['active_fits'],0);self.assertIsNone(r['strength_ratio'])
         a['terms'][0]['slopes'][0]=-1.
         with self.assertRaises(ValueError):compare([a])
+
+    def test_zero_paths_use_wire_precision_and_ignore_unused_product_gate(self):
+        product=self.config();product['terms'][0]['gate']=[0.,0.,0.]
+        self.assertEqual(parameter_activity(product)['nonzero_parameter_paths'],1)
+        separate=self.config(True);separate['terms'][0]['gate']=[0.,0.,0.]
+        separate['terms'][0]['slopes']=[1e-50,0.,0.]
+        row=parameter_activity(separate)
+        self.assertEqual(row['zero_damage_terms'],1);self.assertEqual(row['zero_reference_gates'],1)
+        self.assertEqual(row['zero_parameter_paths'],1);self.assertEqual(row['nonzero_parameter_paths'],0)
+
+    def test_diagnostic_checkpoint_is_bound_to_its_report_and_model(self):
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as d:
+            root=Path(d);run=root/'run';(run/'checkpoints').mkdir(parents=True)
+            prefix=run/'checkpoints/ckpt_epoch119.bin';prefix.write_bytes(b'prefix')
+            final=run/'checkpoints/ckpt_epoch239.bin';final.write_bytes(b'final')
+            cell={'id':'cell'};final_report=dict(cell=cell,plan_sha256='plan',checkpoint_epoch=239,
+                checkpoint_sha256=sha(final),outer_results_read=False,active_output_coefficients=1)
+            row=dict(final_report,checkpoint_epoch=119,checkpoint_sha256=sha(prefix),active_output_coefficients=3)
+            folder=run/'curve_evaluation/epoch-119';folder.mkdir(parents=True)
+            report=folder/'REPORT.json';report.write_bytes(encoded(row))
+            marker=folder/'DIAGNOSTIC_COMPLETE.json';marker.write_bytes(encoded(dict(report_sha256=sha(report))))
+            pins={}
+            with patch('shaping_curve_stability.subprocess.check_output',return_value=json.dumps(self.config())) as read:
+                config,epoch,active=checkpoint_config(root,run,cell,240,119,final_report,pins)
+            self.assertEqual((epoch,active),(119,3));self.assertIn(str(prefix),pins);self.assertIn(str(report),pins)
+            self.assertNotIn(str(final),pins);self.assertEqual(read.call_args.args[0][3],str(prefix))
+            self.assertEqual(config,self.config())
+            report.write_text('{}')
+            with patch('shaping_curve_stability.subprocess.check_output') as read:
+                with self.assertRaisesRegex(ValueError,'diagnostic report drift'):
+                    checkpoint_config(root,run,cell,240,119,final_report,{})
+                read.assert_not_called()
+
+    def test_unregistered_checkpoint_is_refused_before_metadata_read(self):
+        with patch('shaping_curve_stability.subprocess.check_output') as read:
+            with self.assertRaisesRegex(ValueError,'unregistered diagnostic checkpoint'):
+                checkpoint_config(Path('/unused'),Path('/unused'),{},240,1,{}, {})
+            read.assert_not_called()
 
 
 if __name__=='__main__':unittest.main()
