@@ -1687,3 +1687,32 @@ ineligible when any paired human score is undefined, retaining all failed fits,
 and choose the rescue base among fully defined settings. The existing finite
 four-setting requirement remains in force. No individual seed has been dropped,
 undefined score imputed, or rescue selection changed.
+
+### Paired pretrained-product collapse and a separate analytic order failure
+
+Fresh unshaped control `d3b2f4deeaa0ab19d572`, frozen product
+`7acaa2df5782f9d05f08`, and jointly updated pretrained product
+`e2818d1db67981205488` share inner-0-0, setting 1, seed 0, native build,
+feature-list hash, fresh-head seeds 1001101/1000101 and 120 fresh-head epochs.
+After replacing only output/checkpoint/feature-list paths, their command arrays
+are identical. The two shaped fits start from identical pretrained shape terms;
+only their frozen/trainable flag differs. The unshaped control retains one output
+coefficient with inner human composite 0.9211705296939692. Both pretrained
+variants end with zero output coefficients and undefined composites.
+This isolates a failure associated with introducing this pretrained bank in this
+matched setting, but does not establish the optimizer mechanism or an architecture
+ranking. The comparison and input pins have a verified durable archive under
+`zero-output-paired-control-diagnosis`.
+
+The second undefined fit was archived separately: 233 artifact files,
+16,880,273 bytes. Softplus `6e988eec6f23b804ff31` independently fails the unchanged
+final order probe with one increase of 0.00001239776611328125 (limit 0.00001),
+finite outputs and exact identity 100. Its failed final and epoch-239 gates remain
+failed; 454 artifact files, 59,319,043 bytes have a cold-readback verified archive
+under `failed-softplus-6e988eec6f23b804ff31`. No tolerance was changed.
+
+An early prefix comparison against the running optimizer replay was refused:
+intermediate bakes lack final reproducibility metadata until the native trainer
+finishes. The incomplete comparison is preserved in
+`zero-output-prefix-qualification`; it does not qualify the provisional trace.
+The registered full all-checkpoint comparison still runs after trainer completion.

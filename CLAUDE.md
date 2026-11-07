@@ -1,5 +1,14 @@
 # zensim — current working rules
 
+## Known Bugs — analytic-head native order failure (November 7, 2026)
+
+Softplus cell `6e988eec6f23b804ff31` (inner-2-1, seed 2, setting 0)
+fails the unchanged final-checkpoint damage-order probe: one score increase of
+0.00001239776611328125 exceeds 0.00001. Identity remains exactly 100 and outputs
+are finite. The final and epoch-239 failures are preserved and archived; this
+fit is not qualified. Its export uses first-layer max pairs and an expanded
+anchored Softplus construction. The numerical cause has not been established.
+
 ## Known Bugs — undefined convergence panel isolation (November 7, 2026)
 
 A frozen pretrained product-shape fit produced undefined human rank panels and
