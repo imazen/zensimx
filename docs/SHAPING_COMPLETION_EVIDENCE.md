@@ -799,3 +799,20 @@ evidence prevents a complete-coverage claim; no timing is imputed. The first
 batch produced 332 reports with zero refusals. Nonneural controls remain outside
 this reader's scope. Pending fits and all scientific eligibility gates remain
 separate from resource coverage.
+
+
+## Saved control resource accounting
+
+`shaping-control-resources` reads complete inner control batches and pins their
+logs, RUN and RESULT records to the frozen plan. It requires exact registered
+cell coverage, matching process IDs, a successful resource receipt and complete
+start/completion pairs. Partial, overlapping, failed and duplicate evidence is
+refused. It qualified against all twelve saved inner control batches, covering
+96 fitted controls; two parser regressions pass.
+
+The wrapper's time and RSS cover shared input preparation, fitting, native
+export, parity checks and evaluation. Batch cost remains whole. Individual RUN
+and RESULT civil-clock intervals exclude prior shared preparation and include
+fit/export/evaluation; they are labeled accordingly. Per-model peak RSS and
+training-only timing were not measured. This accounting neither infers those
+quantities nor serves as isolated benchmarking evidence. No fit is replayed.

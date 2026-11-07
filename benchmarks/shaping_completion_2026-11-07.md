@@ -2244,3 +2244,16 @@ peak-load 32.67`. The three parser regressions passed. Evidence lives in
 `training-resource-batch-1545` under the study output root. This is resource
 coverage for available completed fits; the scientific experiment matrix remains
 incomplete. Nonneural control costs are outside this reader's scope.
+
+
+## Saved inner control resource accounting
+
+The control reader qualified all twelve completed inner partition/family
+batches, covering 72 tree fits and 24 shaped-additive fits. It verified exact
+registered coverage, RUN/RESULT identity and PID agreement with the saved logs.
+Two parser tests pass. The qualification wrapper reported
+`rc=0 1s | peak-RSS 0.03GiB | min-avail 22137MiB | peak-load 31.75`.
+The reports preserve whole-batch time/RSS including shared preparation, export
+and evaluation, plus labeled per-fit civil-clock intervals. Per-fit peak RSS
+and training-only timing are unmeasured. No training was replayed. Evidence:
+`control-resources-1547.json` under the completion study output root.
