@@ -3268,3 +3268,38 @@ native cell archive receipts, plus the 96 controls' central archives. All 72
 fresh controls and 18 completed rescues remain archived. All eleven registered
 supervisors were verified live, with fresh worker observations and no
 unexpected stops. Outer and memorization evidence remains incomplete.
+
+### Verified storage reclamation after the queue handoffs
+
+i270 had no new imported transport bundles eligible for deletion; that command
+refused before removing anything. Its checkpoint-retention pass also found
+zero new candidates. The later capacity check observed 20 native trainers:
+an already queued fit had filled the free slot, so no additional placement was
+made. CPU and per-fit storage admission limits were preserved.
+
+The inactive analytic build's Cargo `target/debug/incremental` directory held
+7,470 compiler files with 5,430,693,888 allocated bytes. No build, executable,
+descriptor or mapping used the target/cache in the root process inspection
+(244 processes). Only recognized compiler outputs were present; all sibling
+artifacts and reference binaries were retained. The initial filename check
+refused a ThinLTO cache filename. A subsequent global open-file check refused
+because of unrelated stale NFS mounts; the successful check inspected root
+`/proc` descriptors, mappings and executables without querying those mounts.
+Both refusals preceded deletion. Removing only this inactive incremental cache
+changed observed free space from 56,727,646,208 to 62,111,985,664 bytes;
+concurrent study writes mean this difference is not an isolated allocation
+measurement. Run-heavy reports 1 second, peak RSS 0.02 GiB, minimum available
+memory 23,667 MiB and peak load 19.30. Evidence passed cold readback in
+`i270-storage-2159-evidence`: 6 files, 14,746 bytes,
+receipt `51b26042b07f048437094610b1f249cc3d37c7d1b35620fdea5deea53aed4612`.
+
+On the coordinator SSD, the existing retention owner reread durable and local
+SHA-256 for 9,744 intermediate checkpoints from 50 completed qualified fits,
+checked for active users, then removed only those archived local duplicates.
+It retained the required initial, prefix, diagnostic and final epochs; no
+failed or active run was reclaimed. Removed logical bytes total 2,618,666,944;
+observed free space changed from 70,024,376,320 to 72,656,154,624 bytes.
+Run-heavy reports 96 seconds, peak RSS 0.11 GiB, minimum available memory
+32,946 MiB and peak load 32.43. Retention evidence passed cold readback in
+`checkpoint-retention-2201-evidence`: 2 files, 6,056,639 bytes,
+receipt `fec7e5c90cda1beb1216ceb074adb10ac0ece6dc6c38b38f3e3eaebbf52dda80`.
