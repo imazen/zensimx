@@ -1828,6 +1828,15 @@ peak RSS 0.09 GiB, minimum available memory 34940 MiB, peak load 26.68.
 These are replay resource observations, not inference benchmark measurements.
 The replay remains excluded from scientific model selection.
 
+The next diagnostic comparison is the exactly matched unshaped fresh-head
+control `d3b2f4deeaa0ab19d572`: same partition, setting, seed pair and 120-epoch
+head exposure as the collapsed frozen-product fit. The replay owner admits
+registered fresh ReLU controls with that unchanged exposure, still excludes
+outer/full-data runs, and requires all-checkpoint parity before attributing new
+weight traces. Its archived intermediate checkpoints are restored with hashes
+before replay. This is a diagnostic replay, not another tuning opportunity;
+no comparison result is claimed until replay qualification completes.
+
 ## Supplemental analytic re-export qualification scope
 
 Before evaluating repaired Softplus quality panels, extend the existing native

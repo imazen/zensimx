@@ -4,9 +4,22 @@ from contextlib import contextmanager
 from types import SimpleNamespace
 from unittest.mock import patch
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'rev4_featpot'))
-from shaping_diagnostic_replay import canonical_pairs,replay,first_weight_traces
+from shaping_diagnostic_replay import canonical_pairs,replay,first_weight_traces,diagnostic_fit_scope
 
 class ReplayTests(unittest.TestCase):
+    def test_fresh_control_admission_preserves_scope_and_exposure(self):
+        cell=dict(stage='fresh_control_inner',family='relu',id='control')
+        original=dict(cell=cell);result=dict(cell=cell,stage='trained')
+        diagnostic_fit_scope(original,result,120)
+        with self.assertRaisesRegex(ValueError,'120-epoch'):diagnostic_fit_scope(original,result,240)
+        for stage in ('outer','full_fit','full_fit_selection'):
+            with self.assertRaisesRegex(ValueError,'inner fit'):
+                diagnostic_fit_scope(dict(cell=dict(cell,stage=stage)),result,120)
+        with self.assertRaisesRegex(ValueError,'result identity'):
+            diagnostic_fit_scope(original,dict(result,cell=dict(cell,id='other')),120)
+        with self.assertRaisesRegex(ValueError,'120-epoch'):
+            diagnostic_fit_scope(dict(cell=dict(cell,family='softplus')),result,120)
+
     def test_weight_trace_requires_exact_epoch_coverage(self):
         lines=['FIRST_WEIGHT_DIAGNOSTICS '+json.dumps({'epoch':i}) for i in range(3)]
         self.assertEqual(len(first_weight_traces('noise\n'+'\n'.join(lines),3)),3)

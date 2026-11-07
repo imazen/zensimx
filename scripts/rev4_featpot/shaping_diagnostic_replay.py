@@ -29,6 +29,15 @@ def first_weight_traces(log,epochs):
     return rows
 
 
+def diagnostic_fit_scope(original,result,epochs):
+    cell=original['cell']
+    if cell['stage'] not in ('inner','fresh_control_inner') or result['stage']!='trained':
+        raise ValueError('completed registered inner fit required')
+    if cell['stage']=='fresh_control_inner' and (cell['family']!='relu' or epochs!=120):
+        raise ValueError('registered 120-epoch fresh ReLU control required')
+    if result['cell']!=cell:raise ValueError('diagnostic original result identity differs')
+
+
 def replay(args):
     from shaping_storage import reservation
     plan=json.loads((args.study/'PLAN.json').read_text())
@@ -48,7 +57,7 @@ def admitted_replay(args):
     if pilot:
         if original['cell']['stage']!='resource_pilot' or epochs!=1 or result['stage']!='complete':
             raise ValueError('only completed one-epoch resource pilot is a qualification replay')
-    elif original['cell']['stage']!='inner' or result['stage']!='trained':raise ValueError('completed registered inner fit required')
+    else:diagnostic_fit_scope(original,result,epochs)
     if result['exit_code']!=0:raise ValueError('failed fit cannot qualify a replay')
     if original['plan_sha256']!=sha(args.study/'PLAN.json'):raise ValueError('original plan drift')
     build=json.loads((args.binary_dir/'BUILD.json').read_text())
