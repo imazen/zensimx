@@ -5221,3 +5221,6 @@ shaping-completion-bootstrap-plan study output:
 
 shaping-completion-bootstrap-plan-check:
     TMPDIR="$HOME/tmp" python3 -B -m unittest discover -s scripts/tests -p test_shaping_bootstrap_plan.py
+
+shaping-completion-bootstrap-stats-check panel:
+    TMPDIR="$HOME/tmp" ZEN_PANEL_BIN={{quote(panel)}} "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B -m unittest discover -s scripts/tests -p test_shaping_bootstrap_stats.py

@@ -1213,3 +1213,21 @@ Artifacts are in `source-bootstrap-plan` under the completion-study root.
 These are registered sampling inputs, not completed confidence intervals;
 consuming admitted outer predictions and computing the native rank panels
 remain required work.
+
+### Native bootstrap rank calculation
+
+`shaping_bootstrap_stats.py` computes pooled and mean-within-component signed
+Spearman samples using the existing Rust panel, with every model evaluated on
+identical whole-component draws. It retains model/seed samples separately and
+does not average predictions. Source rows must partition the input exactly;
+nonfinite data, invalid draws, native response identity changes and dropped rows
+are errors. Index jobs are processed in batches of 32 replicates.
+
+Four checks passed against the frozen study panel. The numerical check covers
+36 replicates across the batch boundary, tied ranks, repeated sources, identical
+candidate pairing and reversed-score polarity, compared with SciPy Spearman to
+nine decimal places. The resource wrapper reported `done rc=0 1s | peak-RSS
+0.09GiB | min-avail 31882MiB | peak-load 22.53`. This is evaluator qualification
+on an artificial fixture, not scientific uncertainty or an inference benchmark.
+The admitted outer-evidence loader and final interval reduction remain to be
+connected before scientific use. Evidence: `bootstrap-stats-qualification`.
