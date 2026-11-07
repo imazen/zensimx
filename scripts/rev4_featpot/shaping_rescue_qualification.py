@@ -65,7 +65,82 @@ def qualify(args):
     print(json.dumps(dict(match=True,epochs=args.epochs,canonical_sha256=hashes[0])),flush=True)
 
 
+def human_command(command,groups,binary_dir,output):
+    """Retain optimizer/feature arguments while replacing admitted TRAIN groups."""
+    if len(groups)!=4 or {g[0] for g in groups}!={'human_kadid','human_tid2013','human_konfig','human_cid22_a25'}:
+        raise ValueError('exact four human populations required')
+    if any(weight<=0 or validation!=0 or mode!='withinref,rank' for _,_,weight,validation,mode in groups):
+        raise ValueError('human-only qualification requires TRAIN-only ranking')
+    cmd=[];i=0
+    while i<len(command):
+        if command[i]=='--group':i+=2;continue
+        cmd.append(command[i]);i+=1
+    index=next(i for i,v in enumerate(cmd) if Path(v).name=='zensim_mlp_train')
+    cmd[index]=str(binary_dir/'zensim_mlp_train')
+    for flag,value in [('--mem','2G'),('--epochs',1),('--mse-weight',0),('--out',output/'best.bin'),('--dump-checkpoints-dir',output/'checkpoints')]:
+        if cmd.count(flag)!=1:raise ValueError('missing or duplicated command flag: '+flag)
+        cmd[cmd.index(flag)+1]=str(value)
+    for name,path,weight,validation,mode in groups:
+        cmd.extend(['--group',f'{name}:{path}:{weight}:{validation}:{mode}'])
+    return cmd
+
+
+def qualify_human(args):
+    import pyarrow.parquet as pq
+    from shaping_variant_inputs import load_variant,verify_prepared
+    _,cell,identifier,view=load_variant(args.study,args.human_only_cell)
+    if cell['stage']!='human_only' or view['teacher_training_rows']!=0:
+        raise ValueError('registered human-only membership required')
+    path=args.study/'comparators'/f'variant-{identifier[:20]}-true-0'/'GROUPS.json'
+    record=verify_prepared(path,args.study,identifier,view,cell)
+    original=json.loads((args.run/'RUN.json').read_text())
+    head=json.loads((args.run/'HEAD.json').read_text())
+    if head['family'] not in ('softplus','silu_monotone','silu_diagnostic'):
+        raise ValueError('analytic head required')
+    build=json.loads((args.binary_dir/'BUILD.json').read_text())
+    for name,pin in build['binary_sha256'].items():
+        if sha(args.binary_dir/name)!=pin:raise ValueError('qualification binary drift')
+    groups=[dict(name=n,families=[0]*pq.read_metadata(p).num_rows) for n,p,_,_,_ in record['groups']]
+    neutral=controls('init_half',True,groups=groups,human_only=True)
+    neutral.update(init_scale=1.,bias_scale=1.)
+    args.output.mkdir(parents=True,exist_ok=False)
+    receipt=dict(schema='human-only-native-neutral-qualification-v1',family=head['family'],
+        source_run=str(args.run),source_run_sha256=sha(args.run/'RUN.json'),
+        groups=str(path),groups_sha256=sha(path),membership_cell=cell,
+        teacher_rows=0,training_rows=view['training_rows'],epochs=1,pairs_per_epoch=50000,
+        scientific_selection=False,outer_results_read=False,build_sha256=sha(args.binary_dir/'BUILD.json'),
+        driver_sha256=sha(__file__),arms={})
+    for label,training in [('streaming',None),('human_only_controls',neutral)]:
+        out=args.output/label;out.mkdir();(out/'checkpoints').mkdir()
+        manifest=dict(head,epochs=1);manifest.pop('training',None)
+        if training is not None:manifest['training']=training
+        mp=out/'HEAD.json';mp.write_bytes(encoded(manifest))
+        cmd=human_command(original['command'],record['groups'],args.binary_dir,out)
+        env=os.environ.copy()
+        for key in list(env):
+            if key.startswith(('ZENSIM_MONOTONE_RESEARCH_','ZENSIM_INPUT_SHAPING_','ZENSIM_PLAIN_OPTIMIZER_')):env.pop(key)
+        env.update(ZENSIM_MONOTONE_RESEARCH_MANIFEST=str(mp),ZENSIM_MONOTONE_RESEARCH_SHA256=sha(mp),TMPDIR=str(Path.home()/'tmp'))
+        with (out/'train.log').open('w') as log:
+            process=subprocess.Popen(cmd,stdout=log,stderr=subprocess.STDOUT,env=env)
+            receipt['arms'][label]=dict(command=cmd,pid=process.pid,manifest_sha256=sha(mp))
+            (args.output/'RUN.json').write_bytes(encoded(receipt));rc=process.wait()
+        receipt['arms'][label]['exit_code']=rc
+        (args.output/'PROGRESS.json').write_bytes(encoded(receipt))
+        if rc:raise RuntimeError('human-only native qualification failed; preserve logs')
+        model=out/'checkpoints/ckpt_epoch000.bin'
+        for i,key in enumerate(('zentrain.repro','zentrain.monotone_research')):
+            dest=out/f'canonical-{i}.bin'
+            subprocess.run([str(args.binary_dir/'bake_dial_refit'),'strip','--in',str(model),'--out',str(dest),'--key',key],check=True)
+            model=dest
+        receipt['arms'][label]['canonical_sha256']=sha(model)
+    receipt['match']=len({v['canonical_sha256'] for v in receipt['arms'].values()})==1
+    (args.output/'RESULT.json').write_bytes(encoded(receipt))
+    if not receipt['match']:raise ValueError('human-only neutral controls changed weights/scales')
+    print(json.dumps(dict(family=head['family'],match=True,teacher_rows=0,training_rows=view['training_rows'])),flush=True)
+
+
 if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__)
     for name in ('study','run','binary-dir','output'):p.add_argument('--'+name,type=Path,required=True)
-    p.add_argument('--epochs',type=int,default=1);qualify(p.parse_args())
+    p.add_argument('--epochs',type=int,default=1);p.add_argument('--human-only-cell')
+    args=p.parse_args();(qualify_human if args.human_only_cell else qualify)(args)
