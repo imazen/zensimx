@@ -440,7 +440,7 @@ execution/evaluation integration remains unfinished.
 Native extension execution is implemented through the same qualified phase owner.
 It reconstructs the registered initialization and optimizer choice, applies exact
 fresh-seed offsets, independently retrains extended pretraining, and validates
-embedded shape layout. Nine combined extension/rescue controls passed; issued
+embedded shape layout. Eight combined extension/rescue controls passed; issued
 commands preserve groups, objective, learning rate and paired seeds. The 480-epoch
 phase has an explicit 4 GiB native cap because analytic events are materialized;
 actual extended-fit resource use is not yet measured. Existing rescue phase
