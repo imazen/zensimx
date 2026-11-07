@@ -599,3 +599,18 @@ The instrument also implements randomized interleaved zenbench samples for the
 three pairs, first 32 clean paired rounds from at most 64, raw failed-run
 preservation and postflight parity. This timing path has not yet been measured
 on an eligible isolated host. Qualification elapsed times are not latency claims.
+
+## Eligibility replay at outer admission
+
+Outer admission now replays each base receipt under its pinned eligibility
+policy. Previously this later gate still invoked the original all-finite
+aggregator, which would reject an otherwise valid amended selection. Excluded
+undefined inner fits retain fully verified final-model and diagnostic-failure
+provenance; they are not admitted as converged candidates or eligible winners.
+They still require the registered equal-opportunity rescue wave. Selected base,
+rescue and extension fits retain their ordinary qualification gates.
+
+The two preserved product-collapse fits reproduce under explicit failure
+retention, while ordinary candidate admission still refuses both. Four outer
+admission and seven rescue regressions pass, including policy-drift refusal and
+preserving all 24 paired reports while excluding an undefined setting.

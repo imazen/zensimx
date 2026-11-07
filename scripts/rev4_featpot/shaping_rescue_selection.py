@@ -32,7 +32,7 @@ def aggregate(cells,reports,family,outer,setting):
                 required_reports=30,reported_cells=sorted(reports),outer_results_read=False)
 
 
-def verified_candidate(root,cell,representation='original'):
+def verified_candidate(root,cell,representation='original',*,allow_undefined_failure=False):
     """Shared final-checkpoint and diagnostic provenance gate for neural fits."""
     if representation not in ('original','research-relu-max-pairs-v1'):
         raise ValueError('unknown candidate representation')
@@ -58,7 +58,19 @@ def verified_candidate(root,cell,representation='original'):
     if sha(original)!=result['bake_sha256']:raise ValueError('candidate source model drift')
     if result['plan_sha256']!=run['plan_sha256'] or result['epochs']!=run['epochs']:
         raise ValueError('candidate terminal provenance differs')
-    cpath=marker.parent.parent/'CONVERGENCE.json';c=json.loads(cpath.read_text())
+    cpath=marker.parent.parent/'CONVERGENCE.json'
+    if allow_undefined_failure and not cpath.exists():
+        if repaired or cell['stage']!='inner':raise ValueError('undefined failure retention requires original inner fit')
+        if row['cell']!=cell or row['outer_results_read'] or row['checkpoint_sha256']!=sha(original):
+            raise ValueError('excluded candidate identity, exposure or model differs')
+        from shaping_selection import verify_undefined_failure
+        failure_path=marker.parent.parent/'CONVERGENCE_FAILURE.json'
+        verify_undefined_failure(failure_path,cell,row)
+        failure=json.loads(failure_path.read_text());pins.update(failure['evidence_sha256'])
+        for p in (path,marker,failure_path,run_dir/'RUN.json',run_dir/'RESULT.json',original,
+                  run_dir/run.get('fit_directory','.')/'train.log'):pins[str(p)]=sha(p)
+        return row,failure,pins
+    c=json.loads(cpath.read_text())
     if c['cell']!=cell or c['outer_results_read']:raise ValueError('candidate convergence identity differs')
     if sha(run_dir/run.get('fit_directory','.')/'train.log')!=c['training_log_sha256']:
         raise ValueError('candidate training log drift')

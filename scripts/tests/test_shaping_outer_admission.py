@@ -3,7 +3,7 @@ from pathlib import Path
 from unittest.mock import patch
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'rev4_featpot'))
 from shaping_completion import FAMILIES,NEURAL,matrix,encoded,sha
-from shaping_outer_admission import build,register,resolve
+from shaping_outer_admission import build,register,resolve,base_decision
 
 class OuterAdmissionTests(unittest.TestCase):
     def base(self,root,family,outer,cells):
@@ -12,6 +12,28 @@ class OuterAdmissionTests(unittest.TestCase):
 
     def candidate(self,root,cell,representation):
         return {},dict(cell=cell,investigation_required=False,reasons=[],outer_results_read=False),{}
+
+    def test_base_replays_approved_eligibility_and_rejects_policy_drift(self):
+        from shaping_selection import aggregate,HUMANS,INELIGIBILITY_POLICY
+        from shaping_completion import REPO
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as directory:
+            root=Path(directory);(root/'PLAN.json').write_text('{}');dest=root/'selection/outer-0';dest.mkdir(parents=True)
+            cells=matrix();reports={};pins={}
+            for c in cells:
+                if c['stage']!='inner' or c['family']!='extra_trees' or not c['partition'].startswith('inner-0-'):continue
+                value=.9 if c['setting']==0 else .8
+                row=dict(cell=c,outer_results_read=False,inner_validation=dict(summary={p:dict(pooled=value,within=value) for p in HUMANS},selection_score=value))
+                if c['setting']==0 and c['seed']==0:row['inner_validation']['summary']['kadid']['pooled']=None
+                reports[c['id']]=row;p=root/c['id']/'REPORT.json';p.parent.mkdir();p.write_bytes(encoded(row));pins[str(p)]=sha(p)
+            record=aggregate(cells,reports,'extra_trees',0,INELIGIBILITY_POLICY)
+            record.update(plan_sha256=sha(root/'PLAN.json'),evidence_sha256=pins,
+                          selection_policy_sha256=sha(REPO/'docs/SHAPING_UNDEFINED_SETTING_POLICY.md'))
+            path=dest/'extra_trees-base.json';path.write_bytes(encoded(record))
+            actual,_,evidence=base_decision(root,'extra_trees',0,cells)
+            self.assertEqual(actual['selected_setting'],1);self.assertEqual(len(actual['reported_cells']),24)
+            self.assertIn(str(REPO/'docs/SHAPING_UNDEFINED_SETTING_POLICY.md'),evidence)
+            record['selection_policy_sha256']='changed';path.write_bytes(encoded(record))
+            with self.assertRaisesRegex(ValueError,'policy drift'):base_decision(root,'extra_trees',0,cells)
 
     def test_complete_evidence_admits_without_opening_outer_and_preserves_receipt(self):
         with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as directory:

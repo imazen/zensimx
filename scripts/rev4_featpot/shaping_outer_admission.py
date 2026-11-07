@@ -25,7 +25,12 @@ def base_decision(root,family,outer,cells):
         pins[name]=pin
         if p.name=='REPORT.json':
             report=json.loads(p.read_text());reports[report['cell']['id']]=report
-    actual=aggregate(cells,reports,family,outer)
+    actual=aggregate(cells,reports,family,outer,record.get('selection_policy'))
+    if record.get('selection_policy'):
+        policy=REPO/'docs/SHAPING_UNDEFINED_SETTING_POLICY.md'
+        if record['selection_policy_sha256']!=sha(policy):raise ValueError('base eligibility policy drift')
+        if actual['ineligible_settings']!=record['ineligible_settings']:raise ValueError('base eligibility reasons differ')
+        pins[str(policy)]=sha(policy)
     for key in ('family','outer','selected_setting','required_reports','reported_cells','setting_scores'):
         if json.loads(encoded(actual[key]))!=record[key]:raise ValueError('base decision cannot be reproduced: '+key)
     return actual,record,pins
@@ -59,8 +64,14 @@ def build(root,outer):
             # supply a fresh template/pretraining parent at another family's
             # selected setting. Pin every primary source, not only the winner.
             primary={}
+            excluded={cid for entry in actual.get('ineligible_settings',{}).values() for cid in entry['undefined_cells']}
+            if excluded and not triggered:raise ValueError('excluded undefined fits require equal-opportunity rescues')
             for c in cells:
                 if c['id'] in actual['reported_cells']:
+                    if c['id'] in excluded:
+                        row,_,failed_pins=verified_candidate(root,c,representation,allow_undefined_failure=True)
+                        evidence.update(failed_pins);check_evaluator(family,row)
+                        continue
                     primary[c['id']]=verified_candidate(root,c,representation)
                     evidence.update(primary[c['id']][2]);check_evaluator(family,primary[c['id']][0])
             if triggered:
