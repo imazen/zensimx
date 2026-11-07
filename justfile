@@ -4857,3 +4857,9 @@ shaped-linear-report stage root:
 # Verify both existing archive copies without modifying the frozen trees.
 study-archive-verify root destination receipt:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/byconstruction/dataset_mirror.py --root {{quote(root)}} --nfs --cold-readback --destination {{quote(destination)}} --verify-only --verification-output {{quote(receipt)}}
+
+# Exact native analytic research heads, shared-depth replay and trainer regressions.
+analytic-head-check:
+    cargo test --locked -p zensim-validate --lib -- --test-threads=1
+    cargo test --locked -p zensim-validate --bin zensim_mlp_train -- --test-threads=1
+    cargo clippy --locked -p zensim-validate --lib --bin zensim_mlp_train -- -D warnings
