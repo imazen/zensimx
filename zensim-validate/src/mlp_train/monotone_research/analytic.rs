@@ -102,6 +102,32 @@ mod tests {
     use zenpredict_bake::BakeRequest;
 
     #[test]
+    fn finite_extremes_and_signed_softplus_anchors() {
+        for soft in [false, true] {
+            for x in [-f64::MAX, -1000., -1e-12, -0., 0., 1e-12, 1000., f64::MAX] {
+                let (value, derivative) = unit(x, soft);
+                assert!(value.is_finite() && derivative.is_finite());
+            }
+        }
+        for bias in [-100., -1., 0., 1., 100.] {
+            let mut block = Block::new(Family::Softplus, 1, 1, &mut SplitMix64::new(123));
+            block.b[0] = bias;
+            block.extra[0] = 0.13_f64.ln();
+            block.w[0] = 1.;
+            let (value, _, db, dt) = block.analytic_response(bias, bias);
+            assert_eq!(value, 0.);
+            assert_eq!(db, 0.);
+            assert_eq!(dt, 0.);
+            let mut previous = 0.;
+            for x in [0., 1e-12, 1e-6, 0.1, 1., 100., 1e6] {
+                let value = block.forward(&[x])[0];
+                assert!(value.is_finite() && value >= previous);
+                previous = value;
+            }
+        }
+    }
+
+    #[test]
     fn all_parameter_gradients_include_both_anchor_terms() {
         for family in [
             Family::Softplus,
