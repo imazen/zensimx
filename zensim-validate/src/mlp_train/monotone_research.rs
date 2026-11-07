@@ -493,8 +493,11 @@ mod tests {
             let first = (0..3)
                 .map(|i| (first_w[i] * f64::from(raw) + first_b[i]).max(0.))
                 .collect::<Vec<_>>();
+            let actual = f64::from(p.predict(&[raw]).unwrap()[0]);
+            let expected = net.forward(&first).0;
             assert!(
-                (f64::from(p.predict(&[raw]).unwrap()[0]) - net.forward(&first).0).abs() < 1e-5
+                (actual - expected).abs() < 1e-5,
+                "raw={raw} actual={actual} expected={expected}"
             );
         }
     }
