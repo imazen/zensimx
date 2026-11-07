@@ -3230,3 +3230,41 @@ The gate binds the observed wrapper SHA-256 and host. Actual study handoffs
 have not yet been performed at this qualification point; active fits remain
 under their original owners. All 25 dispatch and placement checks pass, including
 natural completion during handoff and rejection of a changed final checksum.
+
+Both study handoffs subsequently passed. Old queue writers 1490343 and 161555
+were replaced by 3872674 (inner-0-0, `resume-004-placement`) and 3876269
+(inner-0-1, `resume-001-placement`). Both replacements run the frozen committed
+source export at `3499d1aab04a`, with a 2 GiB controller cap and a four-worker
+ceiling; shared CPU/RAM admission still controls actual fit launches. All six
+adopted fits retained their original native-wrapper and child-controller
+identities. Post-handoff inspection found 3–5 newly written checkpoints in
+each, proving continued fitting without replay. The first queue's four
+interrupted-parent children remain required dependency waits.
+
+Two service setup attempts refused before any queue or scientific fit mutation:
+the first lacked `just` on its unit PATH, and the second source capsule lacked
+the two imported justfiles. Explicit PATH and the complete source export were
+verified before the successful launch. Both refusals and the original source
+capsule are retained. Handoff evidence, qualifications, tests, status snapshots
+and source exports passed cold readback in
+`pretrained-controller-handoff-2148-evidence`: 20 files, 32,569,398 bytes,
+receipt `17c8570b4259932dff87366eea8957053d8b52e3a1e7e2e91d98a9d15fa01ecd`.
+
+The placement-aware second owner now recognizes two never-started product
+pretrained cells assigned to i265: inner-0-1 setting-2/seed-1 frozen and joint.
+One worker filled the available slot, restoring the host's 16-native budget.
+Frozen cell `dc1f1372726f8da24d3a` was verified at native PID 4152504 with its
+first checkpoint; joint cell `1689456acb8c31826c46` remains queued. Both retain
+the original plan/build/exposure and remain in the local owner's required
+matrix. No fit was replayed. Cold-readback archives:
+
+- `i265-pretrained01-product21-2151-inputs`: 3 files, 24,858,937 bytes;
+  receipt `cb938aa1431321c198ac2729aa480dac674a7c6cb7edc0a1eb0de261f90b06bc`.
+- `i265-pretrained01-product21-2151-evidence`: 8 files, 19,606 bytes;
+  receipt `d629f22ddef7d2e9b8707c6c08ebcca00a0c8a080a7bf23ce24c9e296cdbbd8a`.
+
+The 21:51:47 UTC process-aware audit found 550/816 inner fits trained and 453
+native cell archive receipts, plus the 96 controls' central archives. All 72
+fresh controls and 18 completed rescues remain archived. All eleven registered
+supervisors were verified live, with fresh worker observations and no
+unexpected stops. Outer and memorization evidence remains incomplete.
