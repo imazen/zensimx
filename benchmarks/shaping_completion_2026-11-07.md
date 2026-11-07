@@ -1388,3 +1388,20 @@ The queue keeps the current fit owner, selected settings, SSD reservation and
 native evaluation gates. Watcher tests use mocked fits and do not count as
 scientific control fits. Qualification wrapper: `run-heavy: done rc=0 1s |
 peak-RSS 0.07GiB | min-avail 32251MiB | peak-load 25.42`.
+
+## Checkpoint retention at 10:22 UTC
+
+Seventeen newly archived primary fits supplied 3,944 eligible intermediate
+checkpoint duplicates totaling 768,849,168 logical bytes. Each local file and
+its durable copy passed SHA-256 verification, including destination reread
+after cache eviction. Two open-file checks and final inode/size/mtime checks
+preceded removal. Required diagnostic epochs, final models and failed attempts
+remain local; durable checkpoints are preserved. Free bytes measured directly
+before/after removal were 59,260,928,000 and 60,018,589,696 while other jobs wrote
+outputs. This remains below the then-current 60,129,542,144-byte admission
+requirement for an additional pending fit; the reserve was not lowered.
+
+Wrapper: `run-heavy: done rc=0 30s | peak-RSS 0.10GiB | min-avail 32132MiB |
+peak-load 24.59`. The plan, removal receipt and log passed complete destination
+readback in `checkpoint-retention-1022-qualification`: three artifact files,
+4,977,414 bytes. These storage operations do not add scientific fit coverage.
