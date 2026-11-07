@@ -2356,3 +2356,20 @@ min-avail 22983MiB | peak-load 30.77`.
 Cold readback verified `checkpoint-retention-1619-evidence`: 4 artifacts,
 5127468 bytes, receipt
 `e974aa29d06516f8385500cd3fdadc826def675111c7288a5b2d42a22adc8368`.
+
+
+## Second newly ready inner-2-1 pretrained pair
+
+A second completed matching parent released two previously unstarted registered
+pretrained fits. Both native prefix extractions passed before assigning the
+pair locally with two workers. Admission observed 26 existing trainers,
+25,652,330,496 available memory bytes and 77,756,665,856 free disk bytes against
+65,498,251,264 required, including reserve and pending writes. The two new
+trainers bring aggregate training demand to the host's 28-thread budget.
+Both native PIDs were verified live. The controller retains a 2 GiB cap and
+children retain 1 GiB caps. Frozen scientific inputs and training exposure
+remain unchanged; no pretraining or completed fit was replayed.
+
+Cold readback verified `local-pretrained21-admission-evidence`: 9 artifacts,
+619384 bytes, receipt
+`eb17adf8211b14febbc4e3479fdf692a8429343fdfe56bfd8ca73d75524f3228`.
