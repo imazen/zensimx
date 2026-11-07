@@ -2813,3 +2813,45 @@ count bind aliases as additional storage. No experiment was replayed and no
 artifact was removed. The broader duplicate read-only scan was stopped after
 88 seconds; its partial log is not used for totals. Completed scan wrapper:
 `done rc=0 84s | peak-RSS 0.81GiB | min-avail 24863MiB | peak-load 35.12`.
+
+## November 7, remaining pretrained queue coverage and i270 admission
+
+Four automatic queues on `27e98ca936c7` now supervise all 192 pretrained cells
+in inner-1-0, inner-1-1, inner-2-0 and inner-2-1. Each has a four-worker ceiling,
+a 2 GiB controller cap and shared CPU/RAM admission. Already completed fits are
+reused; externally assigned cells remain explicit requirements. The first
+inner-1-0 children are running. Their launch evidence was cold-readback verified:
+17 files, 51,381 bytes, receipt SHA-256
+`a3164de89e96031f3937d6c047216660106609420c74f8ed6d72cf29c4b2dbc7`.
+
+Four additional never-started inner-1-0 pretrained cells were assigned to i270
+and launched on its previously qualified source `ce9229d0362d`. The admission
+observed 16 existing native trainers, six Python batch owners with a combined
+16-worker ceiling, 25,560,879,104 bytes available RAM and 58,018,291,712 free
+disk bytes against the unchanged 56,908,316,672-byte requirement. All four
+new native PIDs were subsequently verified, bringing the worker to 20 trainers.
+The 30-file input capsule was checked on installation; 19 identical files were
+reused. No completed or interrupted scientific fit was replayed.
+
+The first transport attempt found rsync absent and copied no inputs; scp plus
+the existing checksum installer succeeded. The first admission preflight counted
+wrapper argv as separate batch owners and refused before creating any attempt.
+Counting the actual Python batch owners corrected this orchestration check;
+CPU, memory and disk thresholds were preserved. Both refusal logs remain.
+
+Before admission, durable readback and open-user checks permitted removal of
+17 duplicate worker transport bundles (850,636,800 bytes) and 2,784 intermediate
+checkpoints from 16 completed fits (770,975,169 bytes). Prefix, final and required
+diagnostic checkpoints remain. These removals do not include active or failed
+fits. The input capsule archive contains three files totaling 25,095,641 bytes,
+receipt SHA-256 `d29e27380884309c93f87f26d8a83fb3788a6af6e609aba6840b3c7bc2d5239b`.
+Admission and retention evidence contains 22 files totaling 1,182,198 bytes,
+receipt SHA-256 `80a36abebe2406c8952e948d6ea2c887c88c3e738babbbcbf2088abf6244854a`.
+Both are under the completion artifact root and its durable mirror as
+`i270-pretrained10-inputs-1948` and `i270-pretrained10-admission-evidence-1948`.
+
+The 19:44 UTC evidence audit found 491/816 inner fits, 69/72 fresh inner controls
+and 14/720 rescue fits trained. Outer, full-fit and memorization stages remain
+unexecuted and are not counted as complete. This snapshot checks final report,
+diagnostic and archive evidence separately; training success alone is not
+scientific qualification.
