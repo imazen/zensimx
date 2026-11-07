@@ -342,7 +342,15 @@ mod tests {
             epochs: 12,
             pairs_per_epoch: 5000,
             training: None,
-            analytic: None,
+            analytic: matches!(
+                family,
+                Family::Softplus | Family::SiluMonotone | Family::SiluDiagnostic
+            )
+            .then_some(analytic::Config {
+                temperature: 0.73,
+                learn_temperature: true,
+                bias: 0.37,
+            }),
         }
     }
 
@@ -353,6 +361,9 @@ mod tests {
             Family::Switch,
             Family::Spline,
             Family::Lipschitz,
+            Family::Softplus,
+            Family::SiluMonotone,
+            Family::SiluDiagnostic,
         ] {
             let mut net = Network::new(
                 config(family, family == Family::Switch),
@@ -483,6 +494,8 @@ mod tests {
             Family::Switch,
             Family::Spline,
             Family::Lipschitz,
+            Family::Softplus,
+            Family::SiluMonotone,
         ] {
             let mut net = Network::new(
                 config(kind, kind == Family::Switch),
@@ -546,6 +559,8 @@ mod tests {
             Family::Switch,
             Family::Spline,
             Family::Lipschitz,
+            Family::Softplus,
+            Family::SiluMonotone,
         ] {
             let mut net = Network::new(config(family, false), 100., &mut SplitMix64::new(87));
             let width = net.output.len();
