@@ -41,6 +41,7 @@ def validate(root, assignment, cells):
 def pack(study,assignment_path,cell_id,attempt,bundle):
     from shaping_storage import reservation
     minimum=json.loads((study/'PLAN.json').read_text())['minimum_ssd_free_bytes']
+    bundle.parent.mkdir(parents=True,exist_ok=True)
     if study.stat().st_dev!=bundle.parent.stat().st_dev:
         raise ValueError('worker packaging must use the reserved study filesystem')
     # Terminal artifacts have a finite measured payload, unlike future trainer

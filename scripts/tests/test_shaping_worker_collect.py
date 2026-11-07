@@ -34,7 +34,8 @@ class CollectionTests(unittest.TestCase):
             assignment=study/'assignment.json'
             assignment.write_bytes(encoded(dict(host='worker',cells=['cell'],
                 plan_sha256=sha(study/'PLAN.json'),build_sha256='build')))
-            before=inventory(root);bundle=study/'bundle.tar'
+            before=inventory(root);bundle=study/'new-transport'/'nested'/'bundle.tar'
+            self.assertFalse(bundle.parent.exists())
             with patch('shaping_execution.load_registration',return_value=({},[cell],{})), \
                  patch('shaping_worker_collect.socket.gethostname',return_value='worker'), \
                  patch('shaping_worker_collect.DECLARATION_SHA256',pin):

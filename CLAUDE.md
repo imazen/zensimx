@@ -1,5 +1,15 @@
 # zensim — current working rules
 
+## Known Bugs — first worker bundle directory (resolved November 7, 2026)
+
+The worker packer checked the destination parent's filesystem before creating
+that parent. A worker's first collected result therefore failed with a missing
+`worker-bundles` directory. The packer now creates the parent before checking
+that packaging uses the reserved study filesystem. The portable-rescue transfer
+regression covers a previously absent nested parent; checkpoint inventory,
+storage reservation, archive hashes and source preservation checks remain.
+Training was unaffected; the failed collection wave is preserved.
+
 ## Known Bugs — live research supervisor import drift (November 7, 2026)
 
 The inner shaping evaluator stopped when a lazy import loaded updated
