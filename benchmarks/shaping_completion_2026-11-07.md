@@ -296,3 +296,26 @@ accumulating their separate terms in the middle layer nevertheless reverses
 the ordering. This localizes the observed reversal to rounded dense evaluation
 of the tied-pair representation. It is not a repaired or passing model.
 The scalar diagnostic wrapper measured 1 second and peak RSS 0.15 GiB.
+
+## Full unchanged-fit SiLU diagnostic replay
+
+The ordinary SiLU inner-0-0 setting-0 seed-0 replay completed all 240 epochs.
+After removing only `zentrain.repro`, both final models have canonical SHA256
+`499e335ce89b363d879b2404833db985847ac36f368d9058cb88ef5d9dd279fd`.
+The diagnostic traces therefore correspond to the original fit; this replay is
+not an additional selection candidate.
+
+At epoch 239 all 64 output coefficients remain nonzero, with zero output
+projection hits. All 64 final hidden units are active on at least one of the
+386 sampled training responses. The sampled first-layer values include
+47,683 exact zeros among 49,408 values. Their squared gradient norm averaged
+per sampled response is 0.05944560457827638, and the regularized output-gradient
+statistic is 1458.6049832207204. These observations do not establish globally
+dead units or convergence, and do not explain the separate constrained
+Softplus collapse; that unchanged-fit replay remains in progress.
+
+Native wrapper: `run-heavy: done rc=0 2986s | peak-RSS 0.09GiB | min-avail 37941MiB | peak-load 23.43`.
+All trace epochs, checkpoints, commands and original/replay model identities are
+preserved in archive suffix `diagnostic-184c4027e954a4c3eafc`.
+Destination readback passed manifest SHA256
+`684b38f5997461f9c76dbf3b052167b8c6340a5c712ceb235a27c0ff30e0c2ca`.
