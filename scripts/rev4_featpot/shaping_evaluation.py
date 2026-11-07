@@ -101,16 +101,22 @@ def make_probes(root,partition,train,plan):
 
 def admitted_epoch(run,result,cells):
     cell=run['cell']
-    if cell not in cells or cell['stage'] not in ('inner','fresh_control_inner','rescue'):raise ValueError('only registered inner cells are admitted')
+    if cell not in cells or cell['stage'] not in ('inner','fresh_control_inner','rescue','exposure_extension'):raise ValueError('only registered inner cells are admitted')
     if result['stage']!='trained' or result['exit_code']!=0:raise ValueError('training is not complete')
     epochs=120 if 'pretrained' in cell['family'] or cell['stage']=='fresh_control_inner' else 240
+    if cell['stage']=='exposure_extension':epochs=cell['phase_epochs'][-1]
     if run['epochs']!=epochs:raise ValueError('incorrect scheduled checkpoint budget')
     return epochs
 
 
+def diagnostic_epochs(epochs):
+    if epochs not in (120,240,480):raise ValueError('unregistered phase duration')
+    return tuple(e for e in (49,99,119,149,199,219,239,299,349,399,429,449,459,479) if e<epochs)
+
+
 def evaluation_epoch(epochs,checkpoint):
     if checkpoint is None:return epochs-1
-    allowed=(49,99,119,149,199,219,239)
+    allowed=diagnostic_epochs(epochs)
     if checkpoint not in allowed or checkpoint>=epochs:
         raise ValueError('unregistered diagnostic checkpoint')
     return checkpoint
@@ -132,15 +138,23 @@ def reexport_bake(receipt_path,original,run,build_path):
 def evaluate(args):
     plan,cells,partitions=load_registration(args.study)
     run=json.loads((args.run/'RUN.json').read_text());result=json.loads((args.run/'RESULT.json').read_text())
+    if run['cell']['stage']=='exposure_extension':
+        from shaping_extension import resolve as resolve_extension
+        resolution=resolve_extension(args.study,run['cell']['id'])
+        if run['resolution']!=resolution:raise ValueError('extension registration/selection drift')
+        cells=[*cells,resolution['cell']]
     if sha(args.study/'PLAN.json')!=run['plan_sha256']:raise ValueError('run registration drift')
     cell=run['cell']
     epochs=admitted_epoch(run,result,cells)
-    if cell['stage']=='rescue':
-        from shaping_rescue import resolve
-        if run['resolution']!=resolve(args.study,cell['id']):raise ValueError('rescue selection/trigger drift')
-        if run['training_exposure_pair_draws']!=12000000 or run['fit_directory']!='fit':raise ValueError('rescue exposure/layout differs')
+    if cell['stage'] in ('rescue','exposure_extension'):
+        if cell['stage']=='rescue':
+            from shaping_rescue import resolve
+            if run['resolution']!=resolve(args.study,cell['id']):raise ValueError('rescue selection/trigger drift')
+        exposure=cell['total_pair_draws'] if cell['stage']=='exposure_extension' else 12000000
+        if run['training_exposure_pair_draws']!=exposure or run['fit_directory']!='fit':raise ValueError('rescue/extension exposure/layout differs')
         phases=result['phases']
         expected=[120,120] if '_pretrained_' in cell['family'] else [240]
+        if cell['stage']=='exposure_extension':expected=cell['phase_epochs']
         if [p['epochs'] for p in phases]!=expected or any(p['exit_code']!=0 or p['stage']!='trained' for p in phases):
             raise ValueError('incomplete registered rescue phases')
         phase_names=['pretraining','fit'] if len(phases)==2 else ['fit']

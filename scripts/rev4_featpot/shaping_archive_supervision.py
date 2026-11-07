@@ -15,6 +15,7 @@ def eligible(directory,cells,plan_pin):
     if not all((run/name).is_file() for name in ('RUN.json','RESULT.json','CONVERGENCE.json','evaluation/COMPLETE.json')):return False
     identity=json.loads((run/'RUN.json').read_text());result=json.loads((run/'RESULT.json').read_text())
     cell=identity['cell']
+    if cell['stage'] not in ('inner','fresh_control_inner'):return False
     if cell not in cells or cell['id']!=directory.name:raise ValueError('archive cell identity differs')
     if cell['stage'] not in ('inner','fresh_control_inner') or result['stage']!='trained':return False
     if identity['plan_sha256']!=plan_pin or result['cell']!=cell or result['exit_code']!=0:raise ValueError('archive fit differs')

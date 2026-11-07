@@ -11,6 +11,9 @@ from shaping_probe_trace import unique_signed_pairs
 def reexport(args):
     _,cells,_=load_registration(args.study)
     run=json.loads((args.run/'RUN.json').read_text())
+    if run['cell']['stage']=='exposure_extension':
+        from shaping_extension import resolve
+        cells=[*cells,resolve(args.study,run['cell']['id'])['cell']]
     result=json.loads((args.run/'RESULT.json').read_text())
     epochs=admitted_epoch(run,result,cells)
     epoch=evaluation_epoch(epochs,args.checkpoint)

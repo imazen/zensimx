@@ -8,7 +8,7 @@ from pathlib import Path
 import time
 from types import SimpleNamespace
 from shaping_completion import encoded,sha
-from shaping_evaluation import evaluate,NativeFeatureGateError
+from shaping_evaluation import evaluate,NativeFeatureGateError,diagnostic_epochs
 from shaping_convergence import report
 from shaping_execution import load_registration
 
@@ -27,12 +27,17 @@ def sweep(args):
     completed=0
     for result_path in sorted((args.study/'runs').glob('*/attempt-*/RESULT.json')):
         result=json.loads(result_path.read_text());cell=result['cell'];run=result_path.parent
+        if cell['stage']=='exposure_extension':
+            from shaping_extension import resolve
+            registered=resolve(args.study,cell['id'])['cell']
+            if cell!=registered:raise ValueError('extension cell differs')
+            if cell not in cells:cells.append(cell)
         if cell not in cells:raise ValueError('unregistered training result')
-        if cell['stage'] not in ('inner','fresh_control_inner','rescue') or result['stage']!='trained':continue
+        if cell['stage'] not in ('inner','fresh_control_inner','rescue','exposure_extension') or result['stage']!='trained':continue
         values=dict(study=args.study,binary_dir=args.binary_dir,run=run)
         print(json.dumps(dict(cell=cell['id'],stage='evaluating',utc=datetime.now(timezone.utc).isoformat())),flush=True)
         failures=[]
-        for epoch in (None,49,99,119,149,199,219,239):
+        for epoch in (None,*diagnostic_epochs(result['epochs'])):
             if epoch is not None and epoch>=result['epochs']:continue
             dest=run/'evaluation' if epoch is None else run/'curve_evaluation'/f'epoch-{epoch:03}'
             marker='COMPLETE.json' if epoch is None else 'DIAGNOSTIC_COMPLETE.json'

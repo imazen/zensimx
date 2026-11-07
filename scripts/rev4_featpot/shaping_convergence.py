@@ -6,6 +6,7 @@ from pathlib import Path
 import re
 import numpy as np
 from shaping_completion import encoded,sha
+from shaping_evaluation import diagnostic_epochs
 
 
 def diagnostics(losses,scores,active):
@@ -36,7 +37,7 @@ def diagnostics(losses,scores,active):
 
 def report(run,reexport_root=None):
     identity=json.loads((run/'RUN.json').read_text())
-    if identity['cell']['stage'] not in ('inner','fresh_control_inner','rescue'):raise ValueError('only inner diagnostics admitted')
+    if identity['cell']['stage'] not in ('inner','fresh_control_inner','rescue','exposure_extension'):raise ValueError('only inner diagnostics admitted')
     result=json.loads((run/'RESULT.json').read_text())
     if result['stage']!='trained':raise ValueError('fit incomplete')
     fit_root=run/identity.get('fit_directory','.')
@@ -66,7 +67,7 @@ def report(run,reexport_root=None):
             builds.add(row['evaluation_build_sha256'])
             if r['evaluation_build_sha256']!=row['evaluation_build_sha256']:raise ValueError('re-export evaluator differs')
         epoch=row['checkpoint_epoch'];scores[epoch]=row['inner_validation']['selection_score'];active[epoch]=row['active_output_coefficients'];pins[str(path)]=sha(path)
-    expected=[e for e in (49,99,119,149,199,219,239) if e<identity['epochs']]
+    expected=list(diagnostic_epochs(identity['epochs']))
     if sorted(scores)!=expected:raise ValueError('incomplete registered checkpoint panels')
     if reexport_root is not None and len(builds)!=1:raise ValueError('mixed re-export evaluators')
     out=diagnostics([losses[i] for i in sorted(losses)],scores,active)

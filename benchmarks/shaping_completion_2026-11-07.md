@@ -448,3 +448,13 @@ budgets and commands are unchanged. Evaluation/supervision integration and the
 first scientifically admitted extension run remain required before qualification.
 The new extension diagnostic schedule includes epochs 429 and 479 to compare
 its final checkpoint at the same restart-cycle position; no affected fit exists.
+
+Extension evaluation now re-resolves the frozen registration and selected evidence,
+checks every completed phase and manifest, and uses the unchanged native feature
+gates. The diagnostic schedule compares epochs 429/479 at the same restart-cycle
+position for a 480-epoch phase. Original 120/240-epoch schedules are unchanged.
+Targeted evaluation, convergence, supervision, extension and rescue checks passed.
+Original and supplemental supervisors recognize registered extension cells; the
+currently live supervisors retain their previously loaded code and must be
+restarted deliberately before extensions enter their queues. No extension fit
+or extension native resource measurement has yet been made.

@@ -241,6 +241,7 @@ def live_status(root):
             command=Path(f'/proc/{pid}/cmdline').read_bytes().replace(b'\0',b' ').decode()
             if run.get('process_role')=='control_worker':live=str(root) in command and 'shaping_controls.py' in command
             elif run.get('process_role')=='rescue_controller':live=str(root) in command and 'shaping_rescue_execution.py' in command and run['cell']['id'] in command
+            elif run.get('process_role')=='extension_controller':live=str(root) in command and 'shaping_extension_execution.py' in command and run['cell']['id'] in command
             else:live=str(path.parent) in command and 'run-heavy' in command
         except FileNotFoundError:live=False
         log=path.parent/run.get('fit_directory','.')/'train.log'

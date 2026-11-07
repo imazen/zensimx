@@ -14,6 +14,20 @@ def selections():
 
 
 class ExtensionTests(unittest.TestCase):
+    def test_extended_diagnostics_compare_the_final_cycle_without_changing_old_schedules(self):
+        from shaping_evaluation import diagnostic_epochs,evaluation_epoch,admitted_epoch
+        from shaping_convergence import diagnostics
+        self.assertEqual(diagnostic_epochs(120),(49,99,119))
+        self.assertEqual(diagnostic_epochs(240),(49,99,119,149,199,219,239))
+        scores={e:.8 for e in diagnostic_epochs(480)};scores[479]=.804
+        d=diagnostics([1.]*480,scores,{e:64 for e in scores})
+        self.assertEqual(d['same_cycle_epochs'],[429,479]);self.assertTrue(d['investigation_required'])
+        with self.assertRaises(ValueError):evaluation_epoch(240,429)
+        cell=dict(stage='exposure_extension',family='relu',phase_epochs=[480])
+        run=dict(cell=cell,epochs=480);result=dict(stage='trained',exit_code=0)
+        self.assertEqual(admitted_epoch(run,result,[cell]),480)
+        with self.assertRaises(ValueError):admitted_epoch(dict(run,epochs=240),result,[cell])
+
     def test_native_command_changes_only_registered_exposure_and_fresh_seeds(self):
         from shaping_extension_execution import command,fresh_command,optimizer
         original=dict(command=['run-heavy','--mem','1G','--jobs','1','--','/old/zensim_mlp_train',
