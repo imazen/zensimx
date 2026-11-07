@@ -1,5 +1,16 @@
 # zensim — current working rules
 
+## Known Bugs — interrupted joint-shaping supervision (November 7, 2026)
+
+A historical inner-0-0 joint-shaping controller and two fits stopped while its
+status still said running. The scope-end observation does not establish the
+cause. The attempts retained 19 and 219 checkpoints of 240; both partial runs
+are archived and explicitly marked interrupted. Never infer trainer liveness
+from a controller status alone: inspect every unfinished RUN and its process.
+Nine never-started cells are recovered through the shared dispatch owner's
+explicit inner-subset mode, with CPU/RAM claims and unchanged per-fit storage
+admission. Partial restarts await owner clarification of the no-replay rule.
+
 ## Known Bugs — first worker bundle directory (resolved November 7, 2026)
 
 The worker packer checked the destination parent's filesystem before creating

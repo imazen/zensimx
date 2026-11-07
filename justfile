@@ -5477,7 +5477,7 @@ shaping-inner-dispatch-check:
     TMPDIR="$HOME/tmp" python3 -B -m unittest discover -s scripts/tests -p test_shaping_inner_dispatch.py
 
 shaping-inner-dispatch study binary_dir output *args:
-    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 2G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_inner_dispatch.py --study {{quote(study)}} --binary-dir {{quote(binary_dir)}} --output {{quote(output)}} {{args}}
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 2G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_rescue_dispatch.py --inner-subset --study {{quote(study)}} --binary-dir {{quote(binary_dir)}} --output {{quote(output)}} {{args}}
 
 # Describe every registered setting within one completed paired inner partition.
 shaping-completion-curve-all-settings study binaries family outer inner output:

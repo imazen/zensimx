@@ -2554,10 +2554,55 @@ of the no-replay instruction. Existing native warm start restores model weights,
 not exact optimizer and sampling state, so it cannot be claimed as a faithful
 continuation. No partial or completed fit was restarted.
 
-`shaping_inner_dispatch.py` accepts explicit registered inner cells only and
+The shared dispatch owner, `shaping_rescue_dispatch.py --inner-subset`, accepts
+explicit registered inner cells only and
 refuses every existing attempt. It uses the same shared CPU/RAM admission as
 rescue dispatch, with the existing per-fit SSD reservation and native execution
 owner. Successful children must preserve registered cell, plan, binary, epoch
 and pair-budget identity and the final-checkpoint checksum. Drain requests and
 invalid resource controls let live children finish before the controller exits.
 Four queue tests and nine shared-admission tests pass without native training.
+
+
+## Resource-aware recovery admissions and resource-report refresh
+
+The nine never-started inner-0-0 joint cells are queued with four workers,
+through a user service retaining a durable log. At 17:51:42 UTC all four
+child controllers and native trainers were verified live, each with its first
+checkpoint. Admission retained the registered 240 epochs and 50000 pair draws
+per epoch. No completed or partial fit was restarted. The implementation now
+extends the existing shared dispatch owner; the first launch used the same
+logic from `eb89044aa4aa`, and that already-loaded queue remains running.
+
+A separate one-worker local wave released two previously unstarted separate
+pretrained fits in inner-2-0, setting 0, seed 2. Its frozen prefix extraction
+and immutable admission evidence are preserved.
+
+Six newly eligible inner-1-1 pretrained cells were assigned to i265 and queued
+with two workers. All six native prefix extractions and the checksummed input
+installation passed. The admission observed 14 existing trainers,
+24403636224 available RAM bytes and 282753417216 free disk bytes; it required
+52613349376 free bytes, including the reserve and pending writes. Both new
+native trainers were verified live. The worker retains frozen source
+`ce9229d0362d`, a 2 GiB controller cap and 1 GiB child caps.
+
+The saved-resource reader now reports 409 completed neural cells, with zero
+refused completed fits and 1368 registered neural cells still pending. These
+reports read saved logs and checkpoints without training. This replaces the
+earlier 332-report snapshot; it does not establish completion of outer or
+memorization comparisons.
+
+Local retention reread every selected durable checkpoint and checked hashes,
+open users and file identities before removing 9280 intermediate duplicates
+across 54 completed archived cells, totaling 2587143879 logical bytes. Required
+checkpoints and partial attempts remain. Filesystem free space measured
+73897594880 before and 76497235968 bytes after removal. The resource wrapper
+reported: `run-heavy: done rc=0 88s | peak-RSS 0.11GiB | min-avail 27385MiB | peak-load 32.19`.
+
+Cold readback verified these evidence archives:
+
+- `joint00-recovery-admission-evidence`: 15 artifacts, 31604 bytes; receipt `76c9b7c7918b8c3123ed4b14eaa2a3e7856e5a4d05fb138b1b025a000dbac5ab`.
+- `local-pretrained20-admission-evidence`: 11 artifacts, 617977 bytes; receipt `5ad0ea2b6586510e47f45768c0f16b6d2ab89c0b84d4a2d8b370f5a264d478a4`.
+- `i265-pretrained11c-inputs`: 3 artifacts, 27411067 bytes; receipt `12aa2f7f9d9df734f0ec04d5c88fd54473878432ea2c31dc94500902f1e830ff`.
+- `i265-pretrained11c-admission-evidence`: 22 artifacts, 1877835 bytes; receipt `b659b467f4fcbda32e259d0a8807a14d8191acfae6dce9f97f0ab5a8bc3d0fa2`.
+- `training-resource-batch-1755`: 410 artifacts, 3033145 bytes; receipt `0c167d82879af2ec842f7d706052c1fe58be2da38fabf0442254318ce2f2c6e5`.
