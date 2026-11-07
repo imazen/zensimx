@@ -1,4 +1,5 @@
 import json,sys,tempfile,unittest
+from contextlib import nullcontext
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -8,6 +9,26 @@ from shaping_controls import selected_cells,run
 
 
 class OuterControlTests(unittest.TestCase):
+    def test_variant_control_receives_reduced_membership_and_selected_setting(self):
+        cell=next(c for c in matrix() if c['stage']=='human_only' and c['family']=='extra_trees')
+        membership=dict(train=[1,3],test=[9])
+        variant=dict(cell=cell,resolved_family='extra_trees',schedule={'setting':2},
+                     admission_sha256='pinned',groups_path='/prepared/variant-human/GROUPS.json')
+        args=SimpleNamespace(study=Path('/unused'),partition=cell['partition'],tree=True,cell=cell['id'],attempt=1)
+        with patch('shaping_controls.load_registration',return_value=({'minimum_ssd_free_bytes':30*1024**3},matrix(),{})),\
+             patch('shaping_variant_execution.resolve',return_value=variant),\
+             patch('shaping_variant_inputs.load_variant',return_value=({},cell,'view',membership)),\
+             patch('shaping_storage.reservation',return_value=nullcontext()) as reserve,\
+             patch('shaping_controls.fit') as fit:
+            run(args)
+            supplied=fit.call_args.args
+            self.assertEqual(supplied[2],{cell['partition']:membership})
+            self.assertEqual(supplied[4],[cell]);self.assertEqual(supplied[5]['selected_setting'],2)
+            self.assertIn('variant-human',str(reserve.call_args.args[1]))
+            fit.reset_mock();args.tree=False
+            with self.assertRaisesRegex(ValueError,'family or partition'):run(args)
+            fit.assert_not_called()
+
     def test_outer_controls_use_inner_selected_setting_and_original_paired_cells(self):
         cells=matrix()
         with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as directory:

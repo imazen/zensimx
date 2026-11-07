@@ -371,3 +371,15 @@ Ten evaluator tests and three variant-executor tests pass, including exact
 training-only target replacement, unchanged outer labels, altered qualification
 receipts, and mismatched variant resolutions. No actual variant scoring run has
 yet been admitted. Full scientific fit/evaluation remains outstanding.
+
+### Generalization nonneural controls (2026-11-07)
+
+The existing tree/quadratic control runner now accepts an exact registered
+variant cell, resolves its inner-selected finalist setting, and uses that
+variant's training membership and audited targets. Knots, weights, maps and
+quadratic sufficient statistics are refitted from variant TRAIN rows. Variant
+cache paths distinguish subset and permutation views; outer targets remain
+actual. Explicit absent-population calibration handling matches neural reports.
+The original estimator, native quadratic solve, certificate and native prediction
+gates are unchanged. Four control-orchestration tests and ten evaluator tests
+pass. Actual variant controls remain unexecuted until inner admission is complete.

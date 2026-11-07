@@ -42,14 +42,26 @@ def selected_cells(root,partition,family,cells):
 def run(args):
     plan,cells,partitions=load_registration(args.study)
     family='extra_trees' if args.tree else 'shaped_additive'
-    chosen,outer=selected_cells(args.study,args.partition,family,cells)
+    variant=None
+    if getattr(args,'cell',None):
+        from shaping_variant_execution import resolve as resolve_variant
+        from shaping_variant_inputs import load_variant
+        variant=resolve_variant(args.study,args.cell)
+        if variant['resolved_family']!=family or variant['cell']['partition']!=args.partition:
+            raise ValueError('variant control family or partition differs')
+        _,_,_,membership=load_variant(args.study,args.cell)
+        partitions={**partitions,args.partition:membership};chosen=[variant['cell']]
+        outer=dict(admission_sha256=variant['admission_sha256'],selected_setting=variant['schedule']['setting'],variant=variant)
+    else:chosen,outer=selected_cells(args.study,args.partition,family,cells)
     if not chosen:raise ValueError('no registered cells')
     if outer is None:return fit(args,plan,partitions,family,chosen,outer)
     from shaping_storage import reservation
-    dest=args.study/'control_inputs'/args.partition/f'{family}-attempt-{args.attempt:03}'
+    key=Path(variant['groups_path']).parent.name if variant else args.partition
+    dest=args.study/'control_inputs'/key/f'{family}-attempt-{args.attempt:03}'
     with reservation(args.study,dest,plan['minimum_ssd_free_bytes']):
         # Admission may have waited for space; revalidate before reading labels.
-        if selected_cells(args.study,args.partition,family,cells)!=(chosen,outer):
+        current=resolve_variant(args.study,args.cell) if variant else selected_cells(args.study,args.partition,family,cells)
+        if current!=(variant if variant else (chosen,outer)):
             raise ValueError('outer control admission changed while waiting')
         return fit(args,plan,partitions,family,chosen,outer)
 
@@ -71,9 +83,18 @@ def fit(args,plan,partitions,family,chosen,outer):
     d={k:np.load(OLD/'data'/f'{k}.npy',mmap_mode='r')[wanted] for k in ('y','pop')}
     original=Path(plan['original_plan']).parent
     d.update({k:np.load(original/'data'/f'{k}.npy',mmap_mode='r')[wanted] for k in ('component','family')})
+    variant=outer.get('variant') if outer else None
+    if variant:
+        from shaped_linear_study import PREP
+        from shaping_evaluation import training_targets
+        record=json.loads(Path(variant['groups_path']).read_text())
+        groups={g[0]:g[1] for g in record['groups']};selected=set(membership['train']);offset=0
+        for group in json.loads(PREP.read_text())['groups']:
+            ids=[v for v in range(offset,offset+group['rows']) if v in selected];offset+=group['rows']
+            if ids:training_targets(d['y'],pos,ids,groups[group['name']])
     weight,target,maps=weights_and_targets(d['y'][tr],d['pop'][tr],d['component'][tr],'range',1.)
     declaration=json.loads((REPO/'scripts/rev4_featpot/color_noise_fx2_declaration.json').read_text())
-    cache=args.study/'control_inputs'/args.partition
+    cache=args.study/'control_inputs'/(Path(variant['groups_path']).parent.name if variant else args.partition)
     cache.mkdir(parents=True,exist_ok=True)
     linear=None
     if not args.tree:
@@ -135,11 +156,15 @@ def fit(args,plan,partitions,family,chosen,outer):
             if not np.isfinite(pred).all():raise ValueError('nonfinite control predictions')
             evaluation=dest/'evaluation';evaluation.mkdir()
             report=dict(cell=cell,qualification=qualification,maps=maps,
-                        train=metrics(pred,d['y'],tr,d,maps),inner_validation=metrics(pred,d['y'],te,d,maps),
+                        train=metrics(pred,d['y'],tr,d,maps,allow_absent_maps=bool(variant)),
+                        inner_validation=metrics(pred,d['y'],te,d,maps,allow_absent_maps=bool(variant)),
                         outer_results_read=False,plan_sha256=sha(args.study/'PLAN.json'))
             if outer is not None:
                 report['outer_test']=report.pop('inner_validation')
                 report.update(outer,outer_results_read=True,selection='outer test; excluded from all selection')
+            if variant:
+                report.update(training_target_policy='registered permutation' if cell['stage']=='shuffle' else 'actual targets',
+                              outer_target_policy='actual targets',resolved_family=family)
             np.savez_compressed(evaluation/'predictions.npz',original_indices=wanted,native=pred)
             write(evaluation/'REPORT.json',report)
             write(evaluation/'COMPLETE.json',dict(cell=cell['id'],report_sha256=sha(evaluation/'REPORT.json')))
@@ -156,6 +181,7 @@ def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('--study',type=Path,required=True);p.add_argument('--binary-dir',type=Path,required=True)
     p.add_argument('--partition',required=True);p.add_argument('--attempt',type=int,default=1)
+    p.add_argument('--cell',help='registered generalization control cell; retains inner-selected settings')
     mode=p.add_mutually_exclusive_group(required=True);mode.add_argument('--tree',action='store_true');mode.add_argument('--linear',action='store_true')
     run(p.parse_args())
 
