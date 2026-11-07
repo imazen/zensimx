@@ -47,6 +47,10 @@ class ProgressTests(unittest.TestCase):
             root,status,proc=self.supervisor_fixture(d,['python3','shaping_archive_supervision.py','--study',d,'--supplemental','--watch'])
             self.assertTrue(supervisor_observation(root,'supplemental_archive',status,proc)['verified_live'])
             self.assertFalse(supervisor_observation(root,'primary_archive',status,proc)['verified_live'])
+            self.assertFalse(supervisor_observation(root,'rescue_archive',status,proc)['verified_live'])
+            command=['python3','shaping_archive_supervision.py','--study',d,'--rescue','--watch']
+            (proc/'42/cmdline').write_bytes(('\0'.join(command)+'\0').encode())
+            self.assertTrue(supervisor_observation(root,'rescue_archive',status,proc)['verified_live'])
 
     def test_unreadable_process_is_an_unknown_observation(self):
         with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as d:

@@ -22,10 +22,11 @@ SUPERVISOR_SCRIPTS={
     'primary_archive':'shaping_archive_supervision.py','supplemental_archive':'shaping_archive_supervision.py',
     'later_neural_archive':'shaping_archive_supervision.py','later_control_archive':'shaping_archive_supervision.py',
     'failed_original_archive':'shaping_archive_supervision.py','bootstrap':'shaping_bootstrap.py',
+    'rescue_archive':'shaping_archive_supervision.py',
 }
 ARCHIVE_FLAGS={'primary_archive':None,'supplemental_archive':'--supplemental',
     'later_neural_archive':'--later-neural','later_control_archive':'--later-controls',
-    'failed_original_archive':'--failed-original'}
+    'failed_original_archive':'--failed-original','rescue_archive':'--rescue'}
 
 
 def supervisor_observation(root,role,path,proc=Path('/proc'),now=None):

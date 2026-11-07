@@ -1,4 +1,4 @@
-"""Archive immutable completed inner cells; never reclaim or copy active attempts."""
+"""Archive immutable completed study cells; never reclaim or copy active attempts."""
 from __future__ import annotations
 import argparse,json,os,subprocess,time
 from datetime import datetime,timezone
@@ -32,17 +32,55 @@ def eligible(directory,cells,plan_pin):
     return True
 
 
+def rescue_eligible(study,directory,cells):
+    """Preserve complete native rescue runs; failed evidence has its own owner."""
+    attempts=list(directory.glob('attempt-*'))
+    if len(attempts)!=1:return False
+    run=attempts[0]
+    if not all((run/n).is_file() for n in ('RUN.json','RESULT.json','CONVERGENCE.json','evaluation/COMPLETE.json')):return False
+    identity=json.loads((run/'RUN.json').read_text());result=json.loads((run/'RESULT.json').read_text());cell=identity['cell']
+    if cell['stage']!='rescue' or result['stage']!='trained':return False
+    if any((run/n).exists() for n in ('EVALUATION_FAILURES.json','CONVERGENCE_FAILURE.json')):return False
+    if cell not in cells or cell['id']!=directory.name:raise ValueError('rescue archive registration differs')
+    expected=dict(cell=cell,plan_sha256=sha(study/'PLAN.json'),build_sha256=identity['build_sha256'],
+                  epochs=120 if '_pretrained_' in cell['family'] else 240,pairs_per_epoch=50000,
+                  training_exposure_pair_draws=12000000,fit_directory='fit',process_role='rescue_controller')
+    if any(row.get(k)!=v for row in (identity,result) for k,v in expected.items()) or result['exit_code']!=0:
+        raise ValueError('rescue archive identity or exposure differs')
+    process=Path('/proc')/str(identity['pid'])/'cmdline'
+    if process.exists():
+        command=process.read_bytes().decode()
+        if 'shaping_rescue_execution.py' in command and cell['id'] in command:return False
+    from shaping_rescue import resolve
+    from shaping_rescue_selection import verified_candidate
+    if identity['resolution']!=resolve(study,cell['id']) or result['resolution']!=identity['resolution']:
+        raise ValueError('rescue archive resolution differs')
+    epochs=[120,120] if '_pretrained_' in cell['family'] else [240]
+    if [p['epochs'] for p in result['phases']]!=epochs:raise ValueError('rescue archive phase exposure differs')
+    for name,phase in zip(['pretraining','fit'] if len(epochs)==2 else ['fit'],result['phases']):
+        directory=run/name
+        if phase['stage']!='trained' or phase['exit_code']!=0 or phase['pairs_per_epoch']!=50000 or json.loads((directory/'RESULT.json').read_text())!=phase:
+            raise ValueError('rescue archive phase incomplete')
+        if sha(directory/'checkpoints'/f"ckpt_epoch{phase['epochs']-1:03}.bin")!=phase['bake_sha256']:
+            raise ValueError('rescue archive phase model drift')
+        for path,pin in phase['manifest_sha256'].items():
+            if sha(path)!=pin:raise ValueError('rescue archive phase manifest drift')
+    verified_candidate(study,cell)
+    return True
+
+
 def sweep(args):
     _,cells,_=load_registration(args.study);completed=0
     logs=args.study/'archive_supervision';logs.mkdir(exist_ok=True)
     for directory in sorted((args.study/'runs').iterdir()):
         if not directory.is_dir():continue
         if (directory/'MIRROR_VERIFIED.json').exists():continue
-        if not eligible(directory,cells,sha(args.study/'PLAN.json')):continue
-        dest=args.destination/('inner-'+directory.name)
+        rescue=getattr(args,'rescue',False)
+        if not (rescue_eligible(args.study,directory,cells) if rescue else eligible(directory,cells,sha(args.study/'PLAN.json'))):continue
+        dest=args.destination/(('rescue-native-' if rescue else 'inner-')+directory.name)
         if dest.exists() or (directory/'SHA256SUMS').exists():
             raise ValueError('unfinished archive requires explicit reconciliation: '+str(directory))
-        log=logs/(directory.name+'.log')
+        log=logs/(('rescue-native-' if rescue else '')+directory.name+'.log')
         command=['python3','-B',str(REPO/'scripts/byconstruction/dataset_mirror.py'),
                  '--root',str(directory),'--nfs','--cold-readback','--destination',str(dest)]
         print(json.dumps(dict(cell=directory.name,stage='archiving',destination=str(dest))),flush=True)
@@ -296,6 +334,7 @@ def main():
     modes.add_argument('--later-neural',action='store_true')
     modes.add_argument('--later-controls',action='store_true')
     modes.add_argument('--failed-original',action='store_true')
+    modes.add_argument('--rescue',action='store_true')
     p.add_argument('--watch',action='store_true');args=p.parse_args()
     while True:
         completed=failed_sweep(args) if args.failed_original else later_sweep(args) if args.later_neural or args.later_controls else supplemental_sweep(args) if args.supplemental else sweep(args)
@@ -303,6 +342,7 @@ def main():
                     newly_archived=completed,stage='watching' if args.watch else 'sweep_finished',driver_sha256=DRIVER_SHA256)
         status_name='LATER_CONTROL_ARCHIVE_STATUS.json' if args.later_controls else 'LATER_NEURAL_ARCHIVE_STATUS.json' if args.later_neural else 'SUPPLEMENTAL_ARCHIVE_STATUS.json' if args.supplemental else 'ARCHIVE_SUPERVISOR_STATUS.json'
         if args.failed_original:status_name='FAILED_ORIGINAL_ARCHIVE_STATUS.json'
+        if args.rescue:status_name='RESCUE_NATIVE_ARCHIVE_STATUS.json'
         (args.study/status_name).write_bytes(encoded(status));print(json.dumps(status),flush=True)
         if not args.watch:return
         time.sleep(30)
