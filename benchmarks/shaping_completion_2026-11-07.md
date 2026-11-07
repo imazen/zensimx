@@ -595,8 +595,9 @@ Preparation reached its SSD admission boundary after four views. To preserve
 pending trainer writes and the 30 GiB reserve, 72 duplicate `model.parity.npz`
 files were removed only from local `tree-inner-archive/runs` after verifying each
 against the archive manifest, a fresh NAS readback, and the retained original in
-`study/runs`. No process held those transport copies. Exactly 2,637,786,497 bytes
-were reclaimed; original study arrays, all models and reports remain on SSD.
+`study/runs`. No process held those transport copies. The removed files totaled 2,637,786,497 logical bytes; this did not produce
+corresponding free SSD space. Shared filesystem blocks are a possible cause,
+not verified. Original study arrays, all models and reports remain on SSD.
 The local archive is explicitly marked partial with restoration paths and hashes.
 Receipt: `RECLAIMED_TREE_TRANSPORT.json` under the completion-study root.
 
