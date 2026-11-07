@@ -9,7 +9,7 @@ fn values<const N: usize>(text: &[&str]) -> Result<[f32; N], &'static str> {
     if text.len() != N {
         return Err("shape: wrong parameter count");
     }
-    let mut out = [0.; N];
+    let mut out = [0.0_f32; N];
     for (out, text) in out.iter_mut().zip(text) {
         *out = text.parse().map_err(|_| "shape: invalid parameter")?;
         if !out.is_finite() || *out < 0. {
@@ -31,6 +31,9 @@ impl DamageShape {
         self.0.map(f32::from_bits)
     }
     pub(crate) fn eval(self, x: f32) -> f32 {
+        if x.is_nan() {
+            return x;
+        }
         let [a, b, s0, s1, s2] = self.parameters();
         let x = if x < 0. { 0. } else { x };
         // Preserve exact identity initialization on the nonnegative domain.
