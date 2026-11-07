@@ -2,9 +2,9 @@
 from __future__ import annotations
 import json
 from pathlib import Path
-from shaping_completion import NEURAL,RESCUES,sha
+from shaping_completion import NEURAL,RESCUES,REPO,sha
 from shaping_execution import load_registration
-from shaping_selection import aggregate
+from shaping_selection import aggregate,verify_undefined_failure
 
 
 def selected_base(root,family,outer,cells):
@@ -18,12 +18,23 @@ def selected_base(root,family,outer,cells):
         if sha(evidence)!=pin:raise ValueError('selection evidence drift')
         if evidence.name=='REPORT.json':
             report=json.loads(evidence.read_text());reports[report['cell']['id']]=report
-    actual=aggregate(cells,reports,family,outer)
+    actual=aggregate(cells,reports,family,outer,record.get('selection_policy'))
     if any(record[k]!=actual[k] for k in ('selected_setting','reported_cells','required_reports')):
         raise ValueError('base selection cannot be reproduced')
+    if record.get('selection_policy'):
+        if record['selection_policy_sha256']!=sha(REPO/'docs/SHAPING_UNDEFINED_SETTING_POLICY.md'):
+            raise ValueError('undefined setting policy drift')
+        for key in ('setting_scores','ineligible_settings'):
+            if record[key]!=json.loads(json.dumps(actual[key])):raise ValueError('setting eligibility cannot be reproduced')
     for cell_id in actual['reported_cells']:
         candidates=[Path(p) for p in record['evidence_sha256'] if Path(p).name=='CONVERGENCE.json'
                     and json.loads(Path(p).read_text())['cell']['id']==cell_id]
+        if not candidates and record.get('selection_policy'):
+            failures=[Path(p) for p in record['evidence_sha256'] if Path(p).name=='CONVERGENCE_FAILURE.json'
+                      and json.loads(Path(p).read_text())['cell']['id']==cell_id]
+            if len(failures)!=1:raise ValueError('missing paired convergence failure evidence')
+            verify_undefined_failure(failures[0],reports[cell_id]['cell'],reports[cell_id])
+            continue
         if len(candidates)!=1:raise ValueError('missing paired convergence evidence')
         convergence=json.loads(candidates[0].read_text())
         if convergence['outer_results_read']:raise ValueError('outer-exposed convergence')

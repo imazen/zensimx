@@ -545,3 +545,20 @@ complete paired rounds, clean-round selection and reliability. Actual benchmark
 execution, full-FIT workload registration, extraction measurements and cost
 analysis remain outstanding. Neither vector qualification nor the existence of
 this harness completes those requirements.
+
+
+## Whole-setting eligibility amendment (November 7, 2026)
+
+The owner approved excluding an entire base setting when any paired human panel
+is undefined. [The amendment](SHAPING_UNDEFINED_SETTING_POLICY.md) retains all
+paired reports and failure evidence, leaves undefined scores null, and preserves
+the original rule for old receipts. Selection replays eligibility and pins the
+policy. All-undefined settings cannot produce a winner. This changes base tuning
+eligibility only; collapsed fits remain failed convergence investigations.
+
+The two preserved product-collapse diagnostic failures (`7acaa2df5782f9d05f08`
+and `e2818d1db67981205488`) reproduce under the failure verifier. Selection,
+rescue and selection-watch regression suites pass. At amendment qualification,
+only ReLU outer-fold 0 had complete base evidence; no new product base selection
+or rescue was claimed. Existing live dispatchers retain their loaded code and
+require reconciliation before consuming amended receipts.

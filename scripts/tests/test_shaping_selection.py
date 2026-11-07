@@ -3,7 +3,7 @@ from pathlib import Path
 import sys
 import unittest
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'rev4_featpot'))
-from shaping_selection import HUMANS,aggregate,human_score,choose
+from shaping_selection import HUMANS,aggregate,human_score,choose,INELIGIBILITY_POLICY
 from shaping_completion import matrix
 
 
@@ -42,6 +42,27 @@ class SelectionTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'mixed evaluation'):aggregate(cells,reports,'softplus',0)
         first['evaluation_build_sha256']='runtime';del first['reexport_receipt']
         with self.assertRaisesRegex(ValueError,'mixed evaluation'):aggregate(cells,reports,'softplus',0)
+
+    def test_undefined_fit_excludes_entire_setting_without_dropping_pairs(self):
+        cells=matrix();reports={}
+        for c in cells:
+            if c['stage']=='inner' and c['family']=='extra_trees' and c['partition'].startswith('inner-0-'):
+                score=.9 if c['setting']==0 else .8
+                reports[c['id']]={'cell':c,'outer_results_read':False,'inner_validation':{'summary':{p:{'pooled':score,'within':score} for p in HUMANS},'selection_score':score}}
+        first=next(r for r in reports.values() if r['cell']['setting']==0)
+        first['inner_validation']['summary']['kadid']['pooled']=None
+        with self.assertRaisesRegex(ValueError,'undefined human'):aggregate(cells,reports,'extra_trees',0)
+        result=aggregate(cells,reports,'extra_trees',0,INELIGIBILITY_POLICY)
+        self.assertEqual(result['selected_setting'],1)
+        self.assertIsNone(result['setting_scores'][0])
+        self.assertEqual(result['required_reports'],24)
+        self.assertEqual(len(result['reported_cells']),24)
+        self.assertEqual(result['ineligible_settings']['0']['undefined_cells'],[first['cell']['id']])
+        first['outer_results_read']=True
+        with self.assertRaisesRegex(ValueError,'outer-exposed'):aggregate(cells,reports,'extra_trees',0,INELIGIBILITY_POLICY)
+        first['outer_results_read']=False
+        for r in reports.values():r['inner_validation']['summary']['kadid']['pooled']=None
+        with self.assertRaisesRegex(ValueError,'no fully defined'):aggregate(cells,reports,'extra_trees',0,INELIGIBILITY_POLICY)
 
     def test_registered_tie_rule(self):
         self.assertEqual(choose({0:.8,1:.8+5e-13,2:.7,3:.6}),0)

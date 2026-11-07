@@ -19,7 +19,9 @@ def base_ready(root,cells,family,outer):
         directory=root/('reexport_max_pairs' if repaired else 'runs')/cell['id']
         markers=list(directory.glob('attempt-*/final/COMPLETE.json' if repaired else 'attempt-*/evaluation/COMPLETE.json'))
         if len(markers)>1:raise ValueError('ambiguous base report')
-        if not markers or not (markers[0].parent.parent/'CONVERGENCE.json').exists():return False
+        if not markers:return False
+        parent=markers[0].parent.parent
+        if not (parent/'CONVERGENCE.json').exists() and not (parent/'CONVERGENCE_FAILURE.json').exists():return False
     return True
 
 
