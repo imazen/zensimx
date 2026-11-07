@@ -1842,3 +1842,11 @@ checkpoints uniformly, including future completions. Its default remains ReLU,
 and separate status records prevent the two supervisors from overwriting each
 other. Family isolation is tested. This starts uniform evidence collection,
 not selection admission; original reports and native failures remain unchanged.
+
+The first-weight observer build source is durably preserved in
+`first-weight-build-source`: source snapshot `1eb2f09d74dd60f6e480bfdd6e9d032085389b9f`
+plus the corrected `shared_depth.rs` and reconstruction instructions. Complete
+cold destination checksum readback verified 3 files and 111338813 bytes. The
+remote training-module, shared-depth, root manifest and lockfile hashes match
+the landed implementation. Binary-build and neutral-replay qualification remain
+separate pending gates.
