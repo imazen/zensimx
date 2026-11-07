@@ -5214,3 +5214,10 @@ shaping-completion-watch-later study primary optimizer human repaired inspector:
 # Reclaim historical Python model duplicates only after complete durable readback.
 shaping-completion-reclaim-tree-models:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_reclaim_tree_models.py
+
+# Metadata-only paired source draws; no predictions or targets are read.
+shaping-completion-bootstrap-plan study output:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_bootstrap_plan.py --study {{quote(study)}} --output {{quote(output)}}
+
+shaping-completion-bootstrap-plan-check:
+    TMPDIR="$HOME/tmp" python3 -B -m unittest discover -s scripts/tests -p test_shaping_bootstrap_plan.py

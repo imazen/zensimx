@@ -1186,3 +1186,30 @@ changed from 56,618,467,328 to 59,285,913,600 bytes. The resource wrapper report
 The operation did not change the 30 GiB reserve or pending-write allowances.
 The exact receipt, source, log and completed-result checks are preserved under
 `tree-model-retention-qualification` in the completion-study artifact root.
+
+## Paired source-bootstrap draw registration
+
+Before opening completion-study outer predictions, `shaping_bootstrap_plan.py`
+registered 2,000 population-stratified source-component draws per outer fold,
+using one NumPy PCG64 stream seeded 20261107. Every candidate/control and model
+seed will use the same draw arrays. The stream advances across strata rather
+than restarting, so equally sized populations/folds do not receive artificially
+identical samples. Each draw preserves all rows and duplicate multiplicity of a
+sampled component. This is conditional uncertainty over observed sources and
+fitted models, not training-seed or population-distribution uncertainty.
+
+The metadata audit found no component spanning populations and no source overlap
+between outer folds. Component counts by fold are: CID22-human 6/6/6,
+CID22-SSIM2 47/46/46, KADID 18/19/18, KonFiG 2/2/2, and TID2013 4/5/5.
+KonFiG's two components per fold sharply limit the source variation represented
+by its bootstrap. No labels, predictions, or quality-selection results were read.
+
+Four tests cover complete-component multiplicity, cross-population component
+rejection, exclusion of unselected rows, and reproducible sampling with an
+advancing stream. All 15 generated arrays passed shape/range checks; the
+407,965-byte `draws.npz` has SHA-256
+`6f83b42a08e946b4acd5d324402ca044f565913a056d3e0ba186dfab9fb4f1e0`.
+Artifacts are in `source-bootstrap-plan` under the completion-study root.
+These are registered sampling inputs, not completed confidence intervals;
+consuming admitted outer predictions and computing the native rank panels
+remain required work.
