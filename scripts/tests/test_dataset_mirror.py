@@ -26,6 +26,21 @@ class RetainedPipe(io.BytesIO):
 
 
 class MirrorKinds(unittest.TestCase):
+    def test_small_archive_reads_every_artifact_and_refuses_empty_inventory(self):
+        with self.assertRaises(ValueError):mirror.readback_names({})
+        for count in (1,2):
+            with self.subTest(count=count), tempfile.TemporaryDirectory() as d:
+                parent=Path(d);root=parent/'source';root.mkdir();destination=parent/'mirror'
+                for i in range(count):(root/f'artifact-{i}.txt').write_text(f'evidence {i}')
+                argv=['dataset_mirror.py','--root',str(root),'--nfs','--destination',str(destination)]
+                with patch.object(sys,'argv',argv),contextlib.redirect_stdout(io.StringIO()):mirror.main()
+                receipt=json.loads((root/'MIRROR_VERIFIED.json').read_text())
+                self.assertEqual(receipt['artifact_files_verified_before_receipt'],count)
+                self.assertEqual({x['relative_path'] for x in receipt['random_readbacks']},
+                                 {f'artifact-{i}.txt' for i in range(count)})
+                for line in (destination/'SHA256SUMS').read_text().splitlines():
+                    digest,name=line.split('  ',1);self.assertEqual(mirror.sha(destination/name),digest)
+
     def test_existing_archive_verification_preserves_inputs_and_detects_corruption(self):
         with tempfile.TemporaryDirectory() as directory:
             parent = Path(directory)

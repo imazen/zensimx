@@ -29,6 +29,12 @@ def sha(path):
         return hashlib.file_digest(stream, "sha256").hexdigest()
 
 
+def readback_names(digests):
+    if not digests:
+        raise ValueError("an archive must contain at least one artifact")
+    return random.SystemRandom().sample(list(digests), min(3, len(digests)))
+
+
 def cold_sha(path):
     """Request Linux page-cache eviction before and after a client readback."""
     with path.open("rb") as stream:
@@ -133,7 +139,7 @@ def main():
     for name, digest in digests.items():
         assert readback_sha(destination / name) == digest, name
     readbacks = []
-    for name in random.SystemRandom().sample(list(digests), 3):
+    for name in readback_names(digests):
         assert readback_sha(destination / name) == digests[name], name
         readbacks.append({"relative_path": name, "sha256": digests[name]})
     receipt = {
@@ -259,7 +265,7 @@ def remote_main(args, receipt_path, sums):
     verify = shlex.join([*checksum_command, "-c", "SHA256SUMS"])
     subprocess.run(["ssh", args.host, verify], check=True)
     readbacks = []
-    for name in random.SystemRandom().sample(list(digests), 3):
+    for name in readback_names(digests):
         result = subprocess.check_output(
             ["ssh", args.host, shlex.join([*checksum_command, name])],
             text=True,

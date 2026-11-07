@@ -1091,3 +1091,12 @@ before training. The prefix validator now compares exact packed f32 knot bits;
 structural fields remain exact, and adjacent-float changes are rejected.
 The failed child attempt is retained. Both frozen and joint product-shape
 extractions from the completed registered parent passed all 984 term checks.
+
+## Known Bugs — small archive sampling (2026-11-07, fixed)
+
+The archive mirror completed full readback of a two-file admission bundle, then
+failed when requesting three distinct supplemental samples. It now reads every
+artifact when fewer than three exist and refuses empty inventories. Full SHA-256
+verification of all files is unchanged. The failed destination remains preserved;
+a retry uses a new destination. One-file, two-file, existing three-file, and
+corruption-refusal checks pass.
