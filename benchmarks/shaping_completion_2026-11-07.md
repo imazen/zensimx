@@ -2855,3 +2855,47 @@ and 14/720 rescue fits trained. Outer, full-fit and memorization stages remain
 unexecuted and are not counted as complete. This snapshot checks final report,
 diagnostic and archive evidence separately; training success alone is not
 scientific qualification.
+
+## November 7, five-partition descriptive shaper panel
+
+Completed setting-0 evidence now covers 30 fits: both direct joint-shaping
+families, three paired seeds and five partitions (all except inner-1-0, which
+still lacks two qualified fits). Among 492 direct terms, only features 603 and
+690 are active in all 30 fits; neither has a consistent response across fits.
+Their normalized maximum response spreads are 0.9642562028839521 and
+0.9658494342387896, with response-strength ratios 22140.828457586227 and
+22143.80469444119. Feature 412 is active in 29/30, feature 403 in 28/30 and
+feature 506 in 21/30. No term is zero in every fit.
+
+This expands the earlier 24-fit panel without training or prediction replay.
+It is descriptive at one registered setting, excludes downstream weights and
+does not test held-out quality or transferable feature utility. Optimization
+investigations and the remaining registered settings still matter. Native
+quantized parameters define real-valued piecewise-linear response comparisons,
+not bit-exact runtime scoring. The response domain remains zero through the
+largest TRAIN second knot. Evidence is in
+`native-direct-five-partitions-setting0-1955`, cold-readback verified as 34 files,
+5,043,053 bytes, receipt SHA-256
+`388d0610402293f8e19f5a40c724aa053324a9ee587d34336dc01d1761515ffb`.
+Wrapper: `done rc=0 1s | peak-RSS 0.04GiB | min-avail 25810MiB | peak-load 31.83`.
+
+The saved-log training-resource audit now reports 481 completed neural fits,
+1,296 pending neural cells and zero refused completed runs. Its archive has
+482 files, 3,626,308 bytes, receipt SHA-256
+`0018b5bc541c292f1627a1b3edcc069f4b628ad119488c08c6f58ba440ee8c96`.
+These are observed completed-fit resources, not final scientific comparisons
+or finalist inference costs. Reused prefix-only memory and wrapper time remain
+unmeasured; full-parent measurements are never prorated. The existing batch
+recipe now applies a 1 GiB, one-job run-heavy cap; `just --show` validates the
+recipe without rerunning fits or the resource audit.
+
+Local retention cold-reread all 10,672 selected archived checkpoint copies and
+confirmed no open users before removal. It reclaimed 3,088,320,872 logical bytes
+from 62 completed fits, with filesystem free space changing from 70,624,235,520
+to 73,727,336,448 bytes. Required local epochs and complete durable archives
+remain. Receipt/log and downstream supervision evidence are in
+`checkpoint-retention-1955-evidence` (three files, 6,549,668 bytes), archive receipt
+SHA-256 `8a7cbb5b0530880e7549d92a6010ddf9070df3398393c6073451fa4d64bb7eb1`.
+Wrapper: `done rc=0 102s | peak-RSS 0.11GiB | min-avail 25310MiB | peak-load 31.93`.
+All 18 downstream watchers and all three worker collectors were verified live;
+these observations do not qualify their pending scientific stages.
