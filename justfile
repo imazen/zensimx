@@ -4877,3 +4877,10 @@ shaping-completion-register original output:
 
 shaping-completion-registration-check:
     python3 -B -m unittest discover -s scripts/tests -p test_shaping_completion.py
+
+shaping-completion-resource-pilot study binary_dir:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 6G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_execution.py --study {{quote(study)}} --binary-dir {{quote(binary_dir)}} --resource-pilot
+
+# One measured CPU thread per independent seed; controller allows concurrent lanes.
+shaping-completion-inner-relu study binary_dir partition:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 18G --jobs 12 -- python3 -B scripts/rev4_featpot/shaping_execution.py --study {{quote(study)}} --binary-dir {{quote(binary_dir)}} --inner-relu --partition {{quote(partition)}} --workers 12
