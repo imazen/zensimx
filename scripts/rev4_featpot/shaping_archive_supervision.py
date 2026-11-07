@@ -241,6 +241,53 @@ def later_sweep(args):
     return completed
 
 
+def failed_eligible(study,directory,cells):
+    """Preservation eligibility is not scientific qualification."""
+    from shaping_evaluation import diagnostic_epochs
+    attempts=list(directory.glob('attempt-*'))
+    if len(attempts)!=1:return False
+    run=attempts[0]
+    failures=[p for n in ('EVALUATION_FAILURES.json','CONVERGENCE_FAILURE.json') if (p:=run/n).exists()]
+    if not failures:return False
+    identity=json.loads((run/'RUN.json').read_text());result=json.loads((run/'RESULT.json').read_text());cell=identity['cell']
+    if cell not in cells or cell['id']!=directory.name or cell['stage'] not in ('inner','fresh_control_inner','rescue'):raise ValueError('failure archive registration differs')
+    if result['stage']!='trained' or result['exit_code']!=0:return False
+    if result['cell']!=cell or identity['plan_sha256']!=sha(study/'PLAN.json'):raise ValueError('failure archive fit differs')
+    proc=Path('/proc')/str(result['pid'])/'cmdline'
+    if proc.exists() and str(run).encode() in proc.read_bytes():raise ValueError('failure archive trainer still live')
+    if sha(run/'checkpoints'/f"ckpt_epoch{result['epochs']-1:03}.bin")!=result['bake_sha256']:raise ValueError('failure archive final model drift')
+    for path in failures:
+        record=json.loads(path.read_text())
+        if record['cell']!=cell or record['scientifically_complete'] is not False or record['outer_results_read'] is not False:raise ValueError('failure archive classification differs')
+        for name,pin in record.get('evidence_sha256',{}).items():
+            if sha(name)!=pin:raise ValueError('failure evidence drift')
+        for failure in record.get('failures',[]):
+            if sha(failure['gate'])!=failure['gate_sha256']:raise ValueError('failed gate drift')
+    for epoch in (None,*diagnostic_epochs(result['epochs'])):
+        panel=run/'evaluation' if epoch is None else run/'curve_evaluation'/f'epoch-{epoch:03}'
+        if (panel/'FAILED_GATE.json').exists():continue
+        marker=panel/('COMPLETE.json' if epoch is None else 'DIAGNOSTIC_COMPLETE.json')
+        if not marker.exists():return False
+        if json.loads(marker.read_text())['report_sha256']!=sha(panel/'REPORT.json'):raise ValueError('failure archive report drift')
+    return True
+
+
+def failed_sweep(args):
+    _,cells,_=load_registration(args.study);completed=0
+    logs=args.study/'archive_supervision';logs.mkdir(exist_ok=True)
+    for directory in sorted((args.study/'runs').iterdir()):
+        if (directory/'MIRROR_VERIFIED.json').exists() or not failed_eligible(args.study,directory,cells):continue
+        dest=args.destination/('failed-original-'+directory.name)
+        if dest.exists() or (directory/'SHA256SUMS').exists():raise ValueError('unfinished failure archive needs reconciliation')
+        command=['python3','-B',str(REPO/'scripts/byconstruction/dataset_mirror.py'),'--root',str(directory),'--nfs','--cold-readback','--destination',str(dest)]
+        print(json.dumps(dict(cell=directory.name,stage='archiving_failed_evidence',scientifically_complete=False)),flush=True)
+        with (logs/('failed-original-'+directory.name+'.log')).open('x') as stream:subprocess.run(command,stdout=stream,stderr=subprocess.STDOUT,check=True)
+        receipt=json.loads((directory/'MIRROR_VERIFIED.json').read_text())
+        if not receipt['all_artifact_sha256_verified'] or receipt['destination']!=str(dest) or sha(directory/'SHA256SUMS')!=sha(dest/'SHA256SUMS'):raise ValueError('failure archive readback incomplete')
+        completed+=1
+    return completed
+
+
 def main():
     p=argparse.ArgumentParser(description=__doc__)
     for key in ('study','destination'):p.add_argument('--'+key,type=Path,required=True)
@@ -248,12 +295,14 @@ def main():
     modes.add_argument('--supplemental',action='store_true')
     modes.add_argument('--later-neural',action='store_true')
     modes.add_argument('--later-controls',action='store_true')
+    modes.add_argument('--failed-original',action='store_true')
     p.add_argument('--watch',action='store_true');args=p.parse_args()
     while True:
-        completed=later_sweep(args) if args.later_neural or args.later_controls else supplemental_sweep(args) if args.supplemental else sweep(args)
+        completed=failed_sweep(args) if args.failed_original else later_sweep(args) if args.later_neural or args.later_controls else supplemental_sweep(args) if args.supplemental else sweep(args)
         status=dict(pid=os.getpid(),checked_utc=datetime.now(timezone.utc).isoformat(),
                     newly_archived=completed,stage='watching' if args.watch else 'sweep_finished',driver_sha256=DRIVER_SHA256)
         status_name='LATER_CONTROL_ARCHIVE_STATUS.json' if args.later_controls else 'LATER_NEURAL_ARCHIVE_STATUS.json' if args.later_neural else 'SUPPLEMENTAL_ARCHIVE_STATUS.json' if args.supplemental else 'ARCHIVE_SUPERVISOR_STATUS.json'
+        if args.failed_original:status_name='FAILED_ORIGINAL_ARCHIVE_STATUS.json'
         (args.study/status_name).write_bytes(encoded(status));print(json.dumps(status),flush=True)
         if not args.watch:return
         time.sleep(30)

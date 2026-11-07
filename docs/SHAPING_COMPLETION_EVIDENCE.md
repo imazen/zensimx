@@ -743,3 +743,15 @@ Synthetic evidence tests exercise variable iteration counts, reordered arms,
 whole-round exclusion, receipt tampering, incomplete pairs and qualification-only
 refusal. Actual finalist timings remain required.
 
+
+
+## Preserving completed failed evaluations
+
+The `shaping-completion-failed-archives` command mirrors completed original
+inner/fresh/rescue evidence with recorded numerical-gate or undefined-convergence
+failures. It verifies registration, the terminal model, failure evidence hashes,
+and every final/diagnostic panel's completion or failed-gate marker before
+archiving. Live trainers, partial panels and ambiguous attempts are refused or
+left pending. Destination manifests and every artifact receive cold checksum
+readback through the existing mirror owner. Failed scientific status remains
+unchanged; an archive receipt is not convergence or model admission.

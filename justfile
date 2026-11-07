@@ -5045,6 +5045,12 @@ shaping-completion-worker-install-test:
 shaping-completion-watch-archives study destination:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_archive_supervision.py --study {{quote(study)}} --destination {{quote(destination)}} --watch
 
+shaping-completion-failed-archives study destination *args:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_archive_supervision.py --study {{quote(study)}} --destination {{quote(destination)}} --failed-original {{args}}
+
+shaping-completion-failed-archives-check:
+    TMPDIR="$HOME/tmp" python3 -B -m unittest discover -s scripts/tests -p test_shaping_failed_archive.py
+
 shaping-completion-extension-check:
     TMPDIR="$HOME/tmp" python3 -B -m unittest scripts/tests/test_shaping_extension.py
 
