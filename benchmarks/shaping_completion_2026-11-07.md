@@ -319,3 +319,39 @@ All trace epochs, checkpoints, commands and original/replay model identities are
 preserved in archive suffix `diagnostic-184c4027e954a4c3eafc`.
 Destination readback passed manifest SHA256
 `684b38f5997461f9c76dbf3b052167b8c6340a5c712ceb235a27c0ff30e0c2ca`.
+
+## First completed jointly learned shaping pair
+
+On inner-0-0, setting 0 and paired seed 0, the completed product-shaping fit
+has human composite 0.9245500073515289 with 44 nonzero output coefficients;
+the separate damage/fragility fit has 0.9201898276009219 with 40. Both pass
+all scheduled native panels and unchanged feature gates. Both trigger the
+registered loss-improvement investigation. These single-fold, single-setting,
+single-seed observations are not an architecture comparison or evidence of
+convergence. Paired tuning and rescue resolution remain required.
+
+The complete parent fits and their epoch-119 prefixes are immutable before
+pretrained children start. Frozen and joint product-shaping children started
+in attempt 2 after exact-f32 knot validation repaired the serialization check;
+the attempt-1 failures ran no optimizer steps and are preserved. The separate
+shape children use the same completed-parent requirement.
+
+The first uniform repaired-ReLU wave has 104 passing final/checkpoint panels
+across 12 base fits and two fresh controls. Original failed gates remain intact.
+Its archive includes the separately pinned model representations, reports,
+convergence records and the refusal to select on incomplete inner-fold coverage.
+
+Storage admission held a child while pending-write reservations would have
+threatened the 30 GiB reserve. All 60 historical tree parity-input NPZ files
+were rehashed locally and at the existing durable mirror, checked against
+active input pins and live file descriptors/maps, then removed only locally.
+Measured reclaimed bytes: 2,713,454,008. Models, reports, predictions,
+specifications and active input arrays remain local. The historical local tree
+archive is now explicitly marked partial; its durable archive is intact.
+Wrapper: `run-heavy: done rc=0 28s | peak-RSS 0.02GiB | min-avail 40134MiB | peak-load 22.19`.
+
+Verified product shaping archive manifest SHA256: `20b9c31bdb5cf03765f16857e6b6fae31bed698e4c22897a0bb6fd4a191d7e30`.
+
+Verified separate shaping archive manifest SHA256: `4565ad00600c15a0d836d8887816e2dae9c311b2da4cd958adeea7bbe0224252`.
+
+Verified uniform ReLU re-export archive manifest SHA256: `89a47c3bb2acf8ae09b7a0526a5b419ffa6d742244fab4f9e5b621dfccbd2290`.
