@@ -2125,4 +2125,33 @@ twice. Failed verification removes nothing; successful removal keeps an exact
 per-file receipt. This applies only to completed, imported worker fits and does
 not restart training. Three unit tests cover retained epochs, corruption,
 metadata drift, busy files, pinned inputs, duplicate paths and extra attempts.
-Actual worker reclamation remains to be qualified separately.
+The completed worker qualification is recorded below.
+
+
+## Worker reclamation and fresh-control admission at 15:02 UTC
+
+The first worker cleanup refused before deletion because the global open-file
+scan encountered unrelated stale NFS mounts and nonexistent portal exclusions.
+The corrected implementation checks exact checkpoint filenames in bounded
+argument batches, still refusing warnings or busy files. All four regression
+tests pass. Both failed and successful operation logs are preserved.
+
+On i270, complete durable bundles for 74 imported fits were reread and verified.
+The worker then verified metadata, local checkpoint hashes and open-file state,
+and removed 17,168 intermediate copies totaling 4,029,621,240 bytes. Final and
+diagnostic epochs remain; complete histories remain in the archived bundles.
+Free space changed from 52,775,612,416 to 56,827,318,272 bytes during concurrent
+training. The worker wrapper reports `rc=0 21s | peak-RSS 0.06GiB |
+min-avail 24352MiB | peak-load 16.89`; the coordinator reports `rc=0 87s |
+peak-RSS 0.09GiB | min-avail 30800MiB | peak-load 32.27`.
+
+The six evidence artifacts (9,862,780 bytes) passed durable readback in
+`i270-checkpoint-retention-1500-evidence`, receipt SHA-256
+`92080712f065b258bc0d1ba036c171379286c00540b5c30df3fb85a3a59590da`.
+The newly assigned inner-1-1 fresh ReLU controls contain 12 previously unstarted
+registered cells. Three workers were admitted with 56,729,882,624 free bytes
+against 55,834,574,848 reserved bytes (30 GiB reserve, 3 GiB auxiliary allowance,
+19 one-GiB pending-fit allowances). Their controller and first three children
+were verified live. No completed fit was replayed. The 24,090,132-byte input
+capsule and install receipt passed durable readback in `i270-fresh11-inputs`,
+receipt SHA-256 `465b5debbaad42daea9b73bbd4d45aa80adc810fb795be01cad47ea79aeca80a`.
