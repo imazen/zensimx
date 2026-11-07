@@ -7,9 +7,31 @@ from shaping_convergence import diagnostics
 from shaping_evaluation import diagnostic_epochs
 from shaping_completion import matrix,encoded,sha
 from shaping_selection import HUMANS,aggregate
-from shaping_rescue_selection import aggregate as aggregate_rescues
+from shaping_rescue_selection import aggregate as aggregate_rescues,verified_candidate
 
 class RescueTests(unittest.TestCase):
+    def test_verified_candidate_refuses_model_log_and_exposure_drift(self):
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as directory:
+            root=Path(directory);(root/'PLAN.json').write_text('{}')
+            cell=dict(id='cell',stage='inner',family='silu_diagnostic')
+            run=root/'runs/cell/attempt-001';(run/'evaluation').mkdir(parents=True);(run/'checkpoints').mkdir()
+            checkpoint=run/'checkpoints/ckpt_epoch239.bin';checkpoint.write_bytes(b'frozen native model')
+            log=run/'train.log';log.write_text('frozen training log')
+            identity=dict(cell=cell,plan_sha256=sha(root/'PLAN.json'),epochs=240)
+            (run/'RUN.json').write_bytes(encoded(identity));(run/'RESULT.json').write_bytes(encoded(dict(identity,stage='trained',exit_code=0,bake_sha256=sha(checkpoint))))
+            report=dict(identity,checkpoint_epoch=239,checkpoint_sha256=sha(checkpoint),outer_results_read=False)
+            path=run/'evaluation/REPORT.json';path.write_bytes(encoded(report))
+            marker=run/'evaluation/COMPLETE.json';marker.write_bytes(encoded(dict(report_sha256=sha(path))))
+            (run/'CONVERGENCE.json').write_bytes(encoded(dict(cell=cell,outer_results_read=False,training_log_sha256=sha(log),report_sha256={})))
+            actual,_,pins=verified_candidate(root,cell);self.assertEqual(actual,report);self.assertEqual(len(pins),4)
+            log.write_text('changed log')
+            with self.assertRaisesRegex(ValueError,'training log drift'):verified_candidate(root,cell)
+            log.write_text('frozen training log');checkpoint.write_bytes(b'changed model')
+            with self.assertRaisesRegex(ValueError,'source model drift'):verified_candidate(root,cell)
+            checkpoint.write_bytes(b'frozen native model');report['outer_results_read']=True
+            path.write_bytes(encoded(report));marker.write_bytes(encoded(dict(report_sha256=sha(path))))
+            with self.assertRaisesRegex(ValueError,'identity or exposure'):verified_candidate(root,cell)
+
     def test_rescue_trigger_replays_diagnostics_and_preserves_existing(self):
         with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as directory:
             root=Path(directory);(root/'PLAN.json').write_text('{}');cells=matrix()

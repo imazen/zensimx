@@ -245,3 +245,11 @@ are never overwritten. A regression covers a second-fold trigger, all 240 cells,
 JSON epoch-key normalization, overwrite refusal and report corruption. The
 outer-fold-1 imported SiLU fit reproduced its improving-loss trigger; base
 selection still gates every rescue fit.
+
+The rescue selector now exposes its existing final-checkpoint provenance reader
+for reuse by outer admission. It preserves report, source-model, re-export and
+curve checks and additionally verifies terminal plan/exposure consistency and the
+pinned training log. A regression refuses changed model bytes, changed loss logs
+and outer-exposed reports. Actual completed Softplus, monotone SiLU, ordinary
+SiLU and repaired-ReLU candidates pass the shared reader. This check does not
+select an outer model or open outer responses.

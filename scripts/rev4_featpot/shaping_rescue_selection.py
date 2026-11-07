@@ -32,50 +32,66 @@ def aggregate(cells,reports,family,outer,setting):
                 required_reports=30,reported_cells=sorted(reports),outer_results_read=False)
 
 
+def verified_candidate(root,cell,representation='original'):
+    """Shared final-checkpoint and diagnostic provenance gate for neural fits."""
+    if representation not in ('original','research-relu-max-pairs-v1'):
+        raise ValueError('unknown candidate representation')
+    repaired=representation=='research-relu-max-pairs-v1'
+    if repaired and cell['family']!='relu':raise ValueError('ReLU-only repaired representation')
+    pins={}
+    directory=root/('reexport_max_pairs' if repaired else 'runs')/cell['id']
+    markers=list(directory.glob('attempt-*/final/COMPLETE.json' if repaired else 'attempt-*/evaluation/COMPLETE.json'))
+    if len(markers)!=1:raise ValueError('one completed candidate required for '+cell['id'])
+    marker=markers[0];path=marker.parent/'REPORT.json'
+    if json.loads(marker.read_text())['report_sha256']!=sha(path):raise ValueError('candidate report drift')
+    row=json.loads(path.read_text())
+    if row['plan_sha256']!=sha(root/'PLAN.json'):raise ValueError('candidate plan drift')
+    run_dir=root/'runs'/cell['id']/marker.parent.parent.name
+    run=json.loads((run_dir/'RUN.json').read_text());result=json.loads((run_dir/'RESULT.json').read_text())
+    if run['cell']!=cell or result['cell']!=cell or run['plan_sha256']!=sha(root/'PLAN.json'):
+        raise ValueError('candidate training identity differs')
+    if cell['stage']=='rescue' and run['selection_policy_sha256']!=sha(REPO/'docs/SHAPING_RESCUE_SELECTION.md'):
+        raise ValueError('rescue selection policy drift')
+    if result['stage']!='trained' or result['exit_code']!=0 or row['checkpoint_epoch']!=run['epochs']-1:
+        raise ValueError('candidate is not a completed final checkpoint')
+    original=run_dir/run.get('fit_directory','.')/'checkpoints'/f"ckpt_epoch{run['epochs']-1:03}.bin"
+    if sha(original)!=result['bake_sha256']:raise ValueError('candidate source model drift')
+    if result['plan_sha256']!=run['plan_sha256'] or result['epochs']!=run['epochs']:
+        raise ValueError('candidate terminal provenance differs')
+    cpath=marker.parent.parent/'CONVERGENCE.json';c=json.loads(cpath.read_text())
+    if c['cell']!=cell or c['outer_results_read']:raise ValueError('candidate convergence identity differs')
+    if sha(run_dir/run.get('fit_directory','.')/'train.log')!=c['training_log_sha256']:
+        raise ValueError('candidate training log drift')
+    for name,pin in c['report_sha256'].items():
+        if sha(name)!=pin:raise ValueError('candidate curve drift')
+    if repaired:
+        receipt_path=Path(row['reexport_receipt'])
+        if sha(receipt_path)!=row['reexport_receipt_sha256']:raise ValueError('candidate re-export receipt drift')
+        receipt=json.loads(receipt_path.read_text())
+        if receipt['original_sha256']!=sha(original) or receipt['training_build_sha256']!=run['build_sha256']:
+            raise ValueError('candidate re-export source drift')
+        if c['representation']!=representation or c['evaluation_build_sha256']!=row['evaluation_build_sha256']:
+            raise ValueError('candidate diagnostic representation differs')
+        for name,pin in receipt['file_sha256'].items():
+            if sha(name)!=pin:raise ValueError('candidate re-export artifact drift')
+        pins[str(receipt_path)]=sha(receipt_path)
+    elif row['checkpoint_sha256']!=sha(original):raise ValueError('candidate report model differs')
+    pins.update({str(p):sha(p) for p in (path,cpath,run_dir/'RUN.json',run_dir/'RESULT.json')})
+    if row['cell']!=cell or row['outer_results_read']:
+        raise ValueError('candidate report identity or exposure differs')
+    return row,c,pins
+
+
 def select(args):
     _,cells,_=load_registration(args.study)
     setting,base_path,base_pin=selected_base(args.study,args.family,args.outer,cells)
     base=json.loads(Path(base_path).read_text());representation=base.get('representation','original')
-    repaired=representation=='research-relu-max-pairs-v1'
     expected=[c for c in cells if c['family']==args.family and c['partition'] in (f'inner-{args.outer}-0',f'inner-{args.outer}-1')
               and (c['stage']=='rescue' or (c['stage']=='inner' and c['setting']==setting))]
     reports={};pins={base_path:base_pin};convergence={}
     for cell in expected:
-        directory=args.study/('reexport_max_pairs' if repaired else 'runs')/cell['id']
-        markers=list(directory.glob('attempt-*/final/COMPLETE.json' if repaired else 'attempt-*/evaluation/COMPLETE.json'))
-        if len(markers)!=1:raise ValueError('one completed candidate required for '+cell['id'])
-        marker=markers[0];path=marker.parent/'REPORT.json'
-        if json.loads(marker.read_text())['report_sha256']!=sha(path):raise ValueError('candidate report drift')
-        row=json.loads(path.read_text())
-        if row['plan_sha256']!=sha(args.study/'PLAN.json'):raise ValueError('candidate plan drift')
-        run_dir=args.study/'runs'/cell['id']/marker.parent.parent.name
-        run=json.loads((run_dir/'RUN.json').read_text());result=json.loads((run_dir/'RESULT.json').read_text())
-        if run['cell']!=cell or result['cell']!=cell or run['plan_sha256']!=sha(args.study/'PLAN.json'):
-            raise ValueError('candidate training identity differs')
-        if cell['stage']=='rescue' and run['selection_policy_sha256']!=sha(REPO/'docs/SHAPING_RESCUE_SELECTION.md'):
-            raise ValueError('rescue selection policy drift')
-        if result['stage']!='trained' or result['exit_code']!=0 or row['checkpoint_epoch']!=run['epochs']-1:
-            raise ValueError('candidate is not a completed final checkpoint')
-        original=run_dir/run.get('fit_directory','.')/'checkpoints'/f"ckpt_epoch{run['epochs']-1:03}.bin"
-        if sha(original)!=result['bake_sha256']:raise ValueError('candidate source model drift')
-        cpath=marker.parent.parent/'CONVERGENCE.json';c=json.loads(cpath.read_text())
-        if c['cell']!=cell or c['outer_results_read']:raise ValueError('candidate convergence identity differs')
-        for name,pin in c['report_sha256'].items():
-            if sha(name)!=pin:raise ValueError('candidate curve drift')
-        if repaired:
-            receipt_path=Path(row['reexport_receipt'])
-            if sha(receipt_path)!=row['reexport_receipt_sha256']:raise ValueError('candidate re-export receipt drift')
-            receipt=json.loads(receipt_path.read_text())
-            if receipt['original_sha256']!=sha(original) or receipt['training_build_sha256']!=run['build_sha256']:
-                raise ValueError('candidate re-export source drift')
-            if c['representation']!=representation or c['evaluation_build_sha256']!=row['evaluation_build_sha256']:
-                raise ValueError('candidate diagnostic representation differs')
-            for name,pin in receipt['file_sha256'].items():
-                if sha(name)!=pin:raise ValueError('candidate re-export artifact drift')
-            pins[str(receipt_path)]=sha(receipt_path)
-        elif row['checkpoint_sha256']!=sha(original):raise ValueError('candidate report model differs')
-        reports[cell['id']]=row;convergence[cell['id']]=c
-        pins.update({str(p):sha(p) for p in (path,cpath,run_dir/'RUN.json',run_dir/'RESULT.json')})
+        row,c,evidence=verified_candidate(args.study,cell,representation)
+        reports[cell['id']]=row;convergence[cell['id']]=c;pins.update(evidence)
     decision=aggregate(cells,reports,args.family,args.outer,setting)
     winner=decision['selected_choice']
     selected=[c for c in expected if ('base' if c['stage']=='inner' else c['rescue'])==winner]
