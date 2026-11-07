@@ -5078,6 +5078,13 @@ shaping-completion-extension-dispatch-check:
 shaping-completion-progress study *args:
     TMPDIR="$HOME/tmp" python3 -B scripts/rev4_featpot/shaping_progress.py --study {{quote(study)}} {{args}}
 
+# Read saved reports only; --watch refreshes the local statistics page.
+shaping-completion-stats study dashboard *args:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 2G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_progress.py --study {{quote(study)}} --dashboard {{quote(dashboard)}} {{args}}
+
+shaping-completion-stats-check:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B -m unittest scripts.tests.test_shaping_dashboard scripts.tests.test_shaping_progress
+
 shaping-completion-progress-check:
     TMPDIR="$HOME/tmp" python3 -B -m unittest discover -s scripts/tests -p test_shaping_progress.py
 

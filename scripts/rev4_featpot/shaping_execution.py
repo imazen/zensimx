@@ -232,7 +232,7 @@ def registered_subset(selected,requested):
     return [c for c in selected if c['id'] in requested]
 
 
-def live_status(root):
+def live_status(root,*,persist=True,emit=True):
     import re
     rows=[]
     for path in sorted(root.glob('runs/*/attempt-*/RUN.json')):
@@ -260,8 +260,10 @@ def live_status(root):
              ssd_free_bytes=shutil.disk_usage(root).free,
              live=sum(r['verified_live'] for r in rows),
              unexpectedly_stopped=[r['cell'] for r in rows if not r['verified_live'] and r['terminal'] is None])
-    temporary=root/'LIVE_STATUS.json.writing';temporary.write_bytes(encoded(out));temporary.replace(root/'LIVE_STATUS.json')
-    print(json.dumps(out),flush=True)
+    if persist:
+        temporary=root/'LIVE_STATUS.json.writing';temporary.write_bytes(encoded(out));temporary.replace(root/'LIVE_STATUS.json')
+    if emit:print(json.dumps(out),flush=True)
+    return out
 
 
 def main():

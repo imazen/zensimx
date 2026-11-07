@@ -1,10 +1,181 @@
 """Count registered evidence stages without treating process exit as scientific completion."""
 from __future__ import annotations
-import argparse,json
+import argparse,json,math,statistics,os,time,hashlib,fcntl
+from functools import lru_cache
 from datetime import datetime,timezone
 from pathlib import Path
 from shaping_completion import NEURAL,encoded,sha
 from shaping_execution import load_registration
+
+
+LABELS={
+    'relu':'ReLU · unshaped','softplus':'Anchored Softplus',
+    'silu_monotone':'Monotone SiLU','silu_diagnostic':'Ordinary SiLU · diagnostic',
+    'product_joint_identity':'Product shaping · joint from identity',
+    'product_pretrained_frozen':'Product shaping · pretrained, frozen',
+    'product_pretrained_joint':'Product shaping · pretrained, joint',
+    'separate_joint_identity':'Separate damage/fragility · joint from identity',
+    'separate_pretrained_frozen':'Separate shaping · pretrained, frozen',
+    'separate_pretrained_joint':'Separate shaping · pretrained, joint',
+    'shaped_additive':'Shaped additive · linear solve','extra_trees':'Extra Trees',
+}
+
+
+def finite(value):
+    return type(value) in (int,float) and math.isfinite(value)
+
+
+def panel_values(panel):
+    from shaping_selection import HUMANS,human_score,UndefinedHumanPanel
+    try:human=human_score(dict(outer_results_read=False,inner_validation=panel))
+    except UndefinedHumanPanel:human=None
+    data={}
+    for name in (*HUMANS,'cid22_ssim2'):
+        summary=panel['summary'][name]
+        pooled=summary['pooled'];within=summary['within']
+        data[name]=dict(pooled=pooled if finite(pooled) else None,within=within if finite(within) else None,
+            mean=(pooled+within)/2 if finite(pooled) and finite(within) else None,
+            rows=summary['rows'],sources=summary['sources'])
+    return dict(human=human,datasets=data)
+
+
+@lru_cache(maxsize=8192)
+def saved_panel(path,pin,mtime,size):
+    raw=Path(path).read_bytes()
+    if hashlib.sha256(raw).hexdigest()!=pin:raise ValueError('dashboard report drift: '+path)
+    row=json.loads(raw)
+    if row['outer_results_read']:raise ValueError('dashboard inner panel has outer exposure')
+    return dict(cell=row['cell'],plan_sha256=row['plan_sha256'],
+        epoch=row.get('checkpoint_epoch'),train=panel_values(row['train']),
+        validation=panel_values(row['inner_validation']),
+        active=row.get('active_output_coefficients'),gate=row.get('feature_gate'),
+        structure=row.get('structure'),representation='max-pairs re-export' if 'reexport_receipt' in row else 'original')
+
+
+def read_saved_panel(path,pin,cell,plan_pin):
+    stat=path.stat();value=saved_panel(str(path),pin,stat.st_mtime_ns,stat.st_size)
+    if value['cell']!=cell or value['plan_sha256']!=plan_pin:raise ValueError('dashboard panel identity differs')
+    return value
+
+
+def average(values,expected):
+    good=[v for v in values if finite(v)]
+    complete=len(values)==expected and len(good)==expected
+    return dict(mean=statistics.fmean(good) if complete else None,
+        sd=statistics.stdev(good) if complete and expected>1 else None,
+        finite=len(good),required=expected)
+
+
+def paired_delta(rows,baseline):
+    left={r['cell']['seed']:r for r in rows};right={r['cell']['seed']:r for r in baseline}
+    if None in left or set(left)!=set(right) or not left:return None
+    values=[]
+    for seed in left:
+        a=left[seed].get('panel');b=right[seed].get('panel')
+        if not a or not b or not finite(a['validation']['human']) or not finite(b['validation']['human']):return None
+        values.append(a['validation']['human']-b['validation']['human'])
+    return average(values,len(values))
+
+
+def comparison_rows(records):
+    groups={}
+    for record in records:
+        c=record['cell'];key=(c['stage'],c['partition'],c['setting'],c.get('rescue'),c['family'])
+        groups.setdefault(key,[]).append(record)
+    undefined=set()
+    for r in records:
+        c=r['cell']
+        if c['stage']=='inner' and r.get('panel') and r['panel']['validation']['human'] is None:
+            undefined.add((c['family'],c['partition'].split('-')[1],c['setting']))
+    result=[]
+    for (stage,partition,setting,rescue,family),items in groups.items():
+        n=len(items);panels=[r['panel'] for r in items if r.get('panel')]
+        row=dict(stage=stage,partition=partition,setting=setting,rescue=rescue,family=family,
+            label=LABELS.get(family,family),required=n,reported=len(panels),
+            trained=sum(r['trained'] for r in items),live=sum(r['state']=='running' for r in items),
+            human=average([p['validation']['human'] for p in panels],n),
+            train=average([p['train']['human'] for p in panels],n),
+            ineligible=(family,partition.split('-')[1],setting) in undefined if stage=='inner' else False,
+            original_failures=sum(r['original_failed_gate'] for r in items),
+            investigations=sum(r['investigation'] for r in items),datasets={},
+            active_coefficients=statistics.median([p['active'] for p in panels if p['active'] is not None]) if any(p['active'] is not None for p in panels) else None,
+            cells=[r['cell']['id'] for r in items])
+        for dataset in ('kadid','tid2013','konfig','cid22_a25','cid22_ssim2'):
+            row['datasets'][dataset]={metric:average([p['validation']['datasets'][dataset][metric] for p in panels],n)
+                                     for metric in ('pooled','within','mean')}
+        baseline=groups.get(('inner',partition,setting,None,'relu'),[])
+        row['delta']=paired_delta(items,baseline) if stage=='inner' and not row['ineligible'] else None
+        result.append(row)
+    return result
+
+
+def dashboard_data(root,result,workers):
+    from shaping_completion import FAMILIES,MAX_PAIR_FAMILIES
+    from shaping_execution import live_status
+    plan,cells,_=load_registration(root);plan_pin=result['plan_sha256']
+    local=live_status(root,persist=False,emit=False)
+    observations={r['cell']:dict(**r,host='dev',fresh=True) for r in local['runs']}
+    fleet=[dict(host='dev',live=local['live'],ssd_free_bytes=local['ssd_free_bytes'],fresh=True,checked_utc=local['checked_utc'])]
+    for host,path in workers.items():
+        status=json.loads(path.read_text());health=result['workers'][host]
+        fleet.append(dict(host=host,live=status['live'],ssd_free_bytes=status['ssd_free_bytes'],
+                          fresh=health['fresh'],checked_utc=status['checked_utc']))
+        for row in status['runs']:
+            if row['verified_live']:observations[row['cell']]=dict(**row,host=host,fresh=health['fresh'])
+    audited={r['cell']:r for r in result['cells']};records=[]
+    for cell in cells:
+        if cell['stage'] not in ('inner','fresh_control_inner','rescue') or not audited[cell['id']]['required']:continue
+        directory=root/'runs'/cell['id'];a=audited[cell['id']]
+        trained=any(v['fit_success'] for v in a['attempts']);seen=observations.get(cell['id'],{})
+        state='trained' if trained else 'running' if seen.get('verified_live') and seen.get('fresh') else 'last observed running' if seen.get('verified_live') else seen.get('terminal') or 'pending'
+        record=dict(cell=cell,trained=trained,state=state,host=seen.get('host'),
+            last_epoch=seen.get('last_epoch'),required_epochs=seen.get('required_epochs'),
+            original_failed_gate=any(v['original_failed_gates'] for v in a['attempts']),
+            investigation=any(v['convergence_failure'] or any(d['investigation_required'] for d in v['diagnostics'].values()) for v in a['attempts']),
+            diagnostics_ready=cell['family'] not in NEURAL or any(v['convergence_failure'] or v['diagnostics'] for v in a['attempts']),
+            archive=a['archive_receipt_verified'],panel=None,curve=[],reasons=[])
+        repaired=cell['family'] in MAX_PAIR_FAMILIES
+        base=root/'reexport_max_pairs'/cell['id'] if repaired else directory
+        markers=list(base.glob('attempt-*/final/COMPLETE.json' if repaired else 'attempt-*/evaluation/COMPLETE.json'))
+        if len(markers)>1:raise ValueError('ambiguous dashboard final: '+cell['id'])
+        if markers:
+            marker=markers[0];path=marker.parent/'REPORT.json';pin=json.loads(marker.read_text())['report_sha256']
+            record['panel']=read_saved_panel(path,pin,cell,plan_pin)
+            run=directory/marker.parent.parent.name
+            identity=json.loads((run/'RUN.json').read_text())
+            if cell['family'] in NEURAL and record['panel']['epoch']!=identity['epochs']-1:
+                raise ValueError('dashboard requires registered final checkpoint')
+            for name in ('CONVERGENCE.json','CONVERGENCE_FAILURE.json'):
+                conv=marker.parent.parent/name
+                if not conv.exists():continue
+                content=json.loads(conv.read_text())
+                if content['cell']!=cell or content['outer_results_read']:raise ValueError('dashboard diagnostic identity differs')
+                record['reasons']=content.get('reasons',[])
+                pins=content.get('report_sha256',content.get('evidence_sha256',{}))
+                points={}
+                for name,pin in pins.items():
+                    path=Path(name)
+                    if path.name!='REPORT.json':continue
+                    if not path.resolve().is_relative_to(root.resolve()):raise ValueError('dashboard diagnostic outside study')
+                    p=read_saved_panel(path,pin,cell,plan_pin)
+                    if p['epoch'] is not None:points[p['epoch']]=dict(epoch=p['epoch'],train=p['train']['human'],validation=p['validation']['human'],active=p['active'])
+                record['curve']=[points[k] for k in sorted(points)]
+                break
+        records.append(record)
+    comparisons=comparison_rows(records)
+    primary=[r for r in comparisons if r['stage']=='inner' and r['setting']==0]
+    coverage={p:sum(r['reported']/r['required'] for r in primary if r['partition']==p) for p in {r['partition'] for r in primary}}
+    default=min(coverage,key=lambda p:(-coverage[p],p))
+    return dict(schema='zensim-shaping-stats-v1',generated_utc=result['checked_utc'],plan_sha256=plan_pin,
+        counts=result['counts'],required_cells=result['required_cells'],fleet=fleet,
+        supervisors=result['supervisors'],all_supervisors_live=result['all_requested_supervisor_processes_verified_live'],
+        comparisons=comparisons,records=records,default_partition=default,
+        neural_settings=plan['neural_settings'],families=list(FAMILIES),
+        methodology=dict(human='Equal mean of pooled and within-source SROCC on each of four human datasets. Teacher excluded.',
+            uncertainty='Mean and sample SD across all registered paired seeds; not source-bootstrap confidence intervals.',
+            exposure='Primary neural fits: 240 epochs; pretrained shapes: 120-epoch prefix plus 120-epoch fresh head. Fresh controls: 120 epochs. 50,000 pairs per epoch.',
+            scope='Source-disjoint inner validation. Outer and memorization comparisons remain pending until their registered gates pass.',
+            completeness='An incomplete or undefined seed group has no aggregate score. A single undefined paired human fit makes its entire outer-group setting ineligible.'))
 
 
 def report_marker(path,cell,plan):
@@ -23,6 +194,7 @@ SUPERVISOR_SCRIPTS={
     'later_neural_archive':'shaping_archive_supervision.py','later_control_archive':'shaping_archive_supervision.py',
     'failed_original_archive':'shaping_archive_supervision.py','bootstrap':'shaping_bootstrap.py',
     'rescue_archive':'shaping_archive_supervision.py',
+    'statistics_dashboard':'shaping_progress.py',
 }
 ARCHIVE_FLAGS={'primary_archive':None,'supplemental_archive':'--supplemental',
     'later_neural_archive':'--later-neural','later_control_archive':'--later-controls',
@@ -148,12 +320,32 @@ def audit(root,workers,supervisors=None):
                 interpretation='Fit, final-report, convergence and archive counts are distinct. Inner reports do not complete outer/variant comparisons. Cell-level archive receipts and manifest identity checked here; central batch archives are not counted. File readback occurred during archival.')
 
 
-if __name__=='__main__':
+def atomic_json(path,value):
+    temporary=path.with_name(path.name+f'.{os.getpid()}.writing')
+    temporary.write_text(json.dumps(value,allow_nan=False,separators=(',',':'))+'\n')
+    temporary.replace(path)
+
+
+def dashboard_claim(directory):
+    directory.mkdir(parents=True,exist_ok=True)
+    stream=(directory/'.publisher.lock').open('a')
+    try:fcntl.flock(stream,fcntl.LOCK_EX|fcntl.LOCK_NB)
+    except BlockingIOError:
+        stream.close();raise ValueError('another statistics publisher owns this output')
+    return stream
+
+
+def main():
     p=argparse.ArgumentParser(description=__doc__);p.add_argument('--study',type=Path,required=True)
     p.add_argument('--worker-status',action='append',default=[])
     p.add_argument('--supervisor-status',action='append',default=[],metavar='ROLE=PATH',
                    help='verify a recorded local PID without restarting it; roles: '+', '.join(SUPERVISOR_SCRIPTS))
+    p.add_argument('--dashboard',type=Path,help='publish a local HTML/JSON view of saved inner-study results only')
+    p.add_argument('--watch',action='store_true',help='refresh the requested view without fitting or scoring')
+    p.add_argument('--poll-seconds',type=int,default=60)
     a=p.parse_args()
+    if a.poll_seconds<10:p.error('poll-seconds must be at least 10')
+    if a.watch and not a.dashboard:p.error('watch requires dashboard output')
     workers={}
     for item in a.worker_status:
         host,path=item.split('=',1)
@@ -165,6 +357,30 @@ if __name__=='__main__':
         if role not in SUPERVISOR_SCRIPTS:p.error('unknown supervisor role: '+role)
         if role in supervisors:p.error('duplicate supervisor role')
         supervisors[role]=Path(path)
-    result=audit(a.study,workers,supervisors)
-    temporary=a.study/'PROGRESS_AUDIT.json.writing';temporary.write_bytes(encoded(result));temporary.replace(a.study/'PROGRESS_AUDIT.json')
-    print(json.dumps({k:v for k,v in result.items() if k!='cells'}),flush=True)
+    if a.dashboard:
+        dashboard_lock=dashboard_claim(a.dashboard)
+        template=Path(__file__).with_name('shaping_dashboard.html').read_text()
+        temp=a.dashboard/f'index.html.{os.getpid()}.writing';temp.write_text(template);temp.replace(a.dashboard/'index.html')
+        if a.watch:atomic_json(a.dashboard/'publisher-status.json',dict(pid=os.getpid(),stage='starting',
+            checked_utc=datetime.now(timezone.utc).isoformat(),error=None))
+    while True:
+        try:
+            result=audit(a.study,workers,supervisors)
+            if a.dashboard:
+                data=dashboard_data(a.study,result,workers)
+                atomic_json(a.dashboard/'stats.json',data)
+                atomic_json(a.dashboard/'publisher-status.json',dict(pid=os.getpid(),stage='watching' if a.watch else 'snapshot',
+                    checked_utc=datetime.now(timezone.utc).isoformat(),last_success_utc=result['checked_utc'],error=None))
+            atomic_json(a.study/'PROGRESS_AUDIT.json',result)
+            print(json.dumps({k:v for k,v in result.items() if k!='cells'}),flush=True)
+        except Exception as error:
+            if not a.dashboard or not a.watch:raise
+            atomic_json(a.dashboard/'publisher-status.json',dict(pid=os.getpid(),stage='observation_failed',
+                checked_utc=datetime.now(timezone.utc).isoformat(),error=str(error)))
+            print(json.dumps(dict(stage='observation_failed',error=str(error))),flush=True)
+        if not a.watch:break
+        time.sleep(a.poll_seconds)
+    if a.dashboard:dashboard_lock.close()
+
+
+if __name__=='__main__':main()

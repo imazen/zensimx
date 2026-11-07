@@ -3347,3 +3347,37 @@ archives. Plans, receipt, before/after preservation checks, source, tests,
 phase-aware notes and native archive pins passed cold readback in
 `rescue-checkpoint-retention-2215-evidence`: 60 files, 6,077,990 bytes;
 receipt `ac23d3f72a2b8d4d84f40cb8897f30fe98f23b8640d1a88aff02c6a2eef0ad2b`.
+
+### Live approach statistics page
+
+The progress owner now renders the saved study reports through
+`just shaping-completion-stats STUDY OUTPUT [--watch]`. It does not fit models
+or invoke a scorer. The local page includes all 12 primary approaches, fresh
+controls and all 40 family/rescue combinations per partition, with separate
+dataset SROCC, teacher agreement, paired-seed deltas, seed SD, diagnostic flags,
+per-fit saved learning curves, stage coverage and observed worker state.
+Default coverage is chosen by report completeness, not observed quality.
+Comparisons require every registered seed; deterministic additive controls
+retain their one-fit scope. Undefined values remain undefined, and the
+whole-setting ineligibility rule spans both inner partitions. Original failures
+remain visible alongside the registered uniform re-export representation.
+
+The human composite reuses the registered equal-human pooled/within definition;
+teacher agreement is separate. Seed SD is not a source-bootstrap interval.
+Outer/generalization counts remain separate from inner-quality tables, and
+older development cohorts are not mixed into this study. The existing live-run
+observer has an explicit no-write/no-stdout mode for this view. Publisher output
+has its own ownership lock; it does not serialize compute. Update failures keep
+the last verified snapshot and expose an error/stale indication.
+
+The first inner-0-0/setting-0 snapshot contains all three seeds for Extra Trees
+(0.9246210738402638, SD 0.0006674843746903608), identity-initialized joint product
+shaping (0.9244361839997651, SD 0.0012224344390329887) and ReLU
+(0.922301774564238, SD 0.0022218486738891734). These are descriptive matched
+inner-validation means, not selected architecture or outer results.
+
+The page is under the completion artifact root as `stats/index.html` and
+`stats/stats.json`. Initial browser checks passed all 12 rows, paired seed
+details, saved curves, undefined-setting display, fresh controls, 40 rescue
+choices, metric switching, a 390-pixel viewport without document overflow and
+absence of JavaScript errors. Browser log: `stats/qa/browser-check.log`.
