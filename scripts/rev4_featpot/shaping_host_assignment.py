@@ -22,14 +22,17 @@ def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('--study',type=Path,required=True);p.add_argument('--binary-dir',type=Path,required=True)
     p.add_argument('--partition',required=True);p.add_argument('--host',required=True)
+    p.add_argument('--family',choices=('joint_shapes','analytic'),default='joint_shapes')
     args=p.parse_args();_,cells,_=load_registration(args.study)
+    families=(('product_joint_identity','separate_joint_identity') if args.family=='joint_shapes'
+              else ('softplus','silu_monotone','silu_diagnostic'))
     selected=[c for c in cells if c['stage']=='inner' and c['partition']==args.partition
-              and c['family'] in ('product_joint_identity','separate_joint_identity')]
-    if len(selected)!=24:raise ValueError('complete registered joint-shaping wave required')
+              and c['family'] in families]
+    if len(selected)!=12*len(families):raise ValueError('complete registered family wave required')
     if any((args.study/'runs'/c['id']).exists() for c in selected):raise ValueError('existing attempts cannot be reassigned')
     build_pin=sha(args.binary_dir/'BUILD.json');check(args.study,selected,build_pin,args.host)
     directory=args.study/'worker_assignments';directory.mkdir(exist_ok=True)
-    out=directory/(args.partition+'-joint-shapes.json')
+    out=directory/(args.partition+'-'+args.family.replace('_','-')+'.json')
     record=dict(host=args.host,cells=[c['id'] for c in selected],plan_sha256=sha(args.study/'PLAN.json'),
                 build_sha256=build_pin,partition=args.partition,scientific_inputs_unchanged=True)
     with out.open('xb') as stream:stream.write(encoded(record))
