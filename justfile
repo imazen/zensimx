@@ -5348,3 +5348,9 @@ shaping-completion-bootstrap-matched study draws binaries comparison output:
 
 shaping-completion-register-matched-bootstrap study output:
     TMPDIR="$HOME/tmp" python3 -B scripts/rev4_featpot/shaping_bootstrap_plan.py --study {{quote(study)}} --output {{quote(output)}} --matched
+
+shaping-completion-bootstrap-watch-check:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B -m unittest discover -s scripts/tests -p test_shaping_bootstrap_watch.py
+
+shaping-completion-watch-bootstraps study draws binaries registry output destination:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 2G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_bootstrap.py --study {{quote(study)}} --draws {{quote(draws)}} --binary-dir {{quote(binaries)}} --matched-registry {{quote(registry)}} --output {{quote(output)}} --archive-destination {{quote(destination)}} --watch

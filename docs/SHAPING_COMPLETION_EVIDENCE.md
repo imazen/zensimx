@@ -446,3 +446,19 @@ and the block device reported nonrotating storage. Qualification artifacts and
 the 24-file partition capsule have separate durable mirror receipts under
 `worker-r3800x/` in the completion output root. The additional idle r3500 worker
 was not used: its observed 9,712,185,344 bytes free cannot meet the 30 GiB reserve.
+## Source-bootstrap execution supervision
+
+`just shaping-completion-watch-bootstraps` supervises the registered primary
+outer comparison and all 88 matched comparisons with one computation at a time.
+It checks metadata for all three outer admissions and complete paired terminal
+fits/reports before launching the existing runner in a fresh process. The runner
+repeats full provenance and scientific admission before reading predictions;
+readiness is not qualification. No partial fold/seed intervals are emitted.
+
+Completed summaries and sample arrays are hash-checked, then archived through
+the existing cold-readback mirror. A failed computation retains its directory,
+log and failure receipt and is not automatically retried; independent registered
+comparisons continue. An interrupted or ambiguous output requires explicit
+reconciliation. Status distinguishes completed, archived, failed and waiting
+comparisons. This operational support does not establish any scientific
+bootstrap result before the required fits exist.

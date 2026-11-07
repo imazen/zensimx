@@ -1,6 +1,7 @@
 """Primary outer source-bootstrap runner; admission precedes every score read."""
 from __future__ import annotations
-import argparse,json,os
+import argparse,json,os,subprocess,sys,time
+from datetime import datetime,timezone
 from pathlib import Path
 import numpy as np
 from shaping_completion import FAMILIES,encoded,seeds,sha
@@ -158,8 +159,120 @@ def run(args):
             raise
 
 
+def ready_cells(study,cells,admissions):
+    """Metadata-only readiness; the runner repeats full scientific admission."""
+    from shaping_completion import NEURAL
+    from shaping_evaluation import VARIANT_STAGES
+    for cell in cells:
+        outer=int(cell['partition'].split('-')[1]);admission=admissions[outer]
+        family=admission['finalist_roles'][cell['family']] if cell['stage'] in VARIANT_STAGES else cell['family']
+        attempts=list((study/'runs'/cell['id']).glob('attempt-*'))
+        complete=[]
+        for attempt in attempts:
+            result=attempt/'RESULT.json'
+            if not result.exists():return False
+            record=json.loads(result.read_text())
+            if record['exit_code']!=0:continue
+            if record['cell']!=cell or record['stage']!=('trained' if family in NEURAL else 'complete'):
+                raise ValueError('bootstrap readiness terminal identity differs')
+            representation=admission.get('evaluation_representations',{}).get(family,{'representation':'original'})
+            panel=study/'reexport_max_pairs'/cell['id']/attempt.name/'final' if representation['representation']!='original' else attempt/'evaluation'
+            if not (panel/'COMPLETE.json').exists():return False
+            complete.append(attempt)
+        if len(complete)>1:raise ValueError('ambiguous completed bootstrap cell')
+        if not complete:return False
+    return True
+
+
+def complete_output(output):
+    if not (output/'COMPLETE.json').exists():return False
+    marker=json.loads((output/'COMPLETE.json').read_text());summary=json.loads((output/'SUMMARY.json').read_text())
+    if marker['summary_sha256']!=sha(output/'SUMMARY.json') or summary['samples_sha256']!=sha(output/'samples.npz'):
+        raise ValueError('completed bootstrap output drift')
+    return True
+
+
+def archive_output(output,destination,logs):
+    from shaping_completion import REPO
+    receipt=output/'MIRROR_VERIFIED.json'
+    if not receipt.exists():
+        if destination.exists() or (output/'SHA256SUMS').exists():raise ValueError('unfinished bootstrap archive needs reconciliation')
+        command=[sys.executable,'-B',str(REPO/'scripts/byconstruction/dataset_mirror.py'),'--root',str(output),
+                 '--nfs','--cold-readback','--destination',str(destination)]
+        with (logs/('archive-'+output.name+'.log')).open('x') as stream:
+            subprocess.run(command,stdout=stream,stderr=subprocess.STDOUT,check=True)
+    record=json.loads(receipt.read_text())
+    if not record['all_artifact_sha256_verified'] or record['destination']!=str(destination) or sha(output/'SHA256SUMS')!=sha(destination/'SHA256SUMS'):
+        raise ValueError('bootstrap archive readback incomplete')
+
+
+def watch_sweep(args):
+    from shaping_execution import load_registration
+    from shaping_bootstrap_plan import load_comparison
+    from shaping_outer_admission import resolve
+    from shaping_outer_evidence import matched_cells
+    _,cells,_=load_registration(args.study)
+    registry=args.matched_registry/'MATCHED_REGISTRATION.json'
+    entries=json.loads(registry.read_text())['comparisons']
+    # This validates all 88 entries and the policy before admitting any job.
+    if not entries:raise ValueError('empty matched bootstrap registry')
+    load_comparison(args.study,args.matched_registry/entries[0]['file'])
+    jobs=[('primary',None,None)]+[(Path(row['file']).stem,args.matched_registry/row['file'],row['spec']) for row in entries]
+    if len(jobs)!=89:raise ValueError('complete primary plus matched bootstrap queue required')
+    args.output.mkdir(parents=True,exist_ok=True)
+    failures=args.output/'failures';failures.mkdir(exist_ok=True)
+    logs=args.output/'logs';logs.mkdir(exist_ok=True)
+    status=dict(pid=os.getpid(),checked_utc=datetime.now(timezone.utc).isoformat(),required=89,completed=[],archived=[],failed=[],waiting=[],driver_sha256=sha(__file__))
+    admissions=None
+    for name,comparison,spec in jobs:
+        output=args.output/name;failure=failures/(name+'.json')
+        if complete_output(output):
+            status['completed'].append(name)
+            archive_output(output,args.archive_destination/name,logs);status['archived'].append(name)
+            continue
+        if failure.exists():status['failed'].append(name);continue
+        if output.exists():raise ValueError('incomplete bootstrap output requires explicit reconciliation: '+str(output))
+        if not all((args.study/'selection'/f'outer-{o}'/'OUTER_ADMISSION.json').exists() for o in range(3)):
+            status['waiting'].append(name);continue
+        if admissions is None:admissions={o:resolve(args.study,o)[0] for o in range(3)}
+        if spec is None:wanted=primary_cells(cells)
+        else:
+            pairs,_=matched_cells(cells,admissions,**spec)
+            wanted=list({c['id']:c for pair in pairs for c in (pair['candidate'],pair['control'])}.values())
+        if not ready_cells(args.study,wanted,admissions):status['waiting'].append(name);continue
+        command=[sys.executable,'-B',str(Path(__file__).resolve()),'--study',str(args.study),'--draws',str(args.draws),
+                 '--binary-dir',str(args.binary_dir),'--output',str(output)]
+        if comparison is not None:command.extend(['--comparison',str(comparison)])
+        launch=dict(name=name,pid=os.getpid(),command=command,started_utc=datetime.now(timezone.utc).isoformat(),stage='computing')
+        (args.output/'ACTIVE.json').write_bytes(encoded(launch));print(json.dumps(launch),flush=True)
+        with (logs/(name+'.log')).open('x') as stream:
+            child=subprocess.run(command,stdout=stream,stderr=subprocess.STDOUT)
+        if child.returncode or not complete_output(output):
+            failure.write_bytes(encoded(dict(**launch,exit_code=child.returncode,complete=False,log=str(logs/(name+'.log')))))
+            status['failed'].append(name)
+        else:
+            status['completed'].append(name)
+            archive_output(output,args.archive_destination/name,logs);status['archived'].append(name)
+        (args.output/'ACTIVE.json').write_bytes(encoded(dict(**launch,finished_utc=datetime.now(timezone.utc).isoformat(),exit_code=child.returncode)))
+    status.update(checked_utc=datetime.now(timezone.utc).isoformat(),stage='complete' if len(status['completed'])==89 else 'waiting_or_failed')
+    (args.output/'STATUS.json').write_bytes(encoded(status));print(json.dumps(status),flush=True)
+    return status
+
+
 if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__)
     for key in ('study','draws','binary-dir','output'):p.add_argument('--'+key,type=Path,required=True)
     p.add_argument('--comparison',type=Path,help='JSON role/condition or fresh_family; full matched provenance required')
-    run(p.parse_args())
+    p.add_argument('--watch',action='store_true')
+    p.add_argument('--matched-registry',type=Path)
+    p.add_argument('--archive-destination',type=Path)
+    args=p.parse_args()
+    if args.watch:
+        if args.comparison is not None or args.matched_registry is None or args.archive_destination is None:p.error('watch requires matched registry and archive destination, and excludes individual comparison')
+        while True:
+            status=watch_sweep(args)
+            if status['stage']=='complete':break
+            time.sleep(30)
+    else:
+        if args.matched_registry is not None or args.archive_destination is not None:p.error('matched registry and archive destination require watch')
+        run(args)
