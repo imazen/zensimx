@@ -5380,3 +5380,18 @@ shaping-cost-native-clippy:
 
 shaping-cost-check binary workload output:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 2G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_cost_check.py --binary {{quote(binary)}} --workload {{quote(workload)}} --output {{quote(output)}}
+
+shaping-extraction-fixture source output:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_extract_fixture.py --source {{quote(source)}} --output {{quote(output)}}
+
+shaping-extraction-build:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 2G --jobs 1 -- cargo build --locked --release -p zensim-validate --example shaping_extract_cost
+
+shaping-extraction-clippy:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 2G --jobs 1 -- cargo clippy --locked --release -p zensim-validate --example shaping_extract_cost -- -D warnings
+
+shaping-extraction-qualify binary workload output jobs:
+    TMPDIR="$HOME/tmp" ZENSIM_FORMULA_REV=7 "$HOME/work/claudehints/scripts/run-heavy" --mem 4G --jobs {{jobs}} -- {{quote(binary)}} qualify {{quote(workload)}} {{quote(output)}}
+
+shaping-extraction-fixture-check:
+    python3 -B -m unittest discover -s scripts/tests -p test_shaping_extract_fixture.py

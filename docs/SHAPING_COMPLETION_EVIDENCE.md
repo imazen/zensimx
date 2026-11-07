@@ -574,3 +574,28 @@ and preserves the old dispatcher directory. Its new run receipt pins all reused
 RUN, RESULT and final-model files. Missing results, failures and model drift are
 refused rather than silently retried. This supports loading the approved
 eligibility amendment without repeating completed rescue fits.
+
+## Native extraction-cost instrument qualification
+
+`shaping_extract_cost` measures the revision-7 `research::extract` API for the
+explicit raw-feature read set, including that API's planning and result metadata.
+It excludes decoding and model scoring. Its deterministic integer pixels reuse
+the `featacc_extract_ab` pattern; independent Python generation freezes byte
+hashes before native extraction. Three fixed salt pairs cover each of 256²,
+1024² and 4096² at one and four threads. The fixture is for instrument
+qualification; finalist timing still requires the full-FIT model admission.
+
+All six workload cases (eighteen image pairs) pass exact packed/strided parity,
+postflight repetition and one/four-thread parity. Native pixel hashes match the
+frozen Python hashes, and extraction manifests report Rev7. Wrong pixel hashes
+and formula revision are refused. A scalar-integer test independently checks the
+chunked Python generator across its chunk boundary. Release compilation and
+strict clippy pass. The 4096² qualification wrapper reports peak RSS 0.46 GiB
+(single thread) and 0.52 GiB (four threads); these are process peaks for the
+qualification workload, not isolated production-call allocation measurements.
+
+Evidence: `/mnt/v/output/zensim/shaping-completion-20261107/extraction-cost-qualification-evidence`.
+The instrument also implements randomized interleaved zenbench samples for the
+three pairs, first 32 clean paired rounds from at most 64, raw failed-run
+preservation and postflight parity. This timing path has not yet been measured
+on an eligible isolated host. Qualification elapsed times are not latency claims.
