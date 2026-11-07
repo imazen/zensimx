@@ -1884,3 +1884,18 @@ open-file checks. Registered diagnostic/final checkpoints and failed runs remain
 local. The plan, receipt and execution log passed durable archive verification
 in `checkpoint-retention-1142-evidence`. Replay admission remained pending after
 this pass; pending-write allowances and the 30 GiB reserve are unchanged.
+
+## Replay storage admission restored
+
+The first incremental-cache cleanup was on the separate root filesystem and
+did not release study-SSD space. A second pass targeted inactive Cargo compiler
+intermediates on the verified study filesystem: 2786 files, 3051351244 logical
+bytes. Before/after filesystem free space measured 56891715584 and 59452190720
+bytes. Both process checks found no target-directory users; only `.rlib`,
+`.rmeta`, `.o` and `.bc` files were removed. Executable binaries and generated
+experiment data were retained. The cleanup plan and receipts passed durable
+readback in `compiler-cache-reclamation-1145`.
+
+The first-weight replay then passed the unchanged admission gate and started
+its registered 120-epoch training. Full checkpoint parity and complete new
+weight diagnostics are still pending; launch is not qualification.
