@@ -27,6 +27,8 @@ def compare(configs):
                 raise ValueError('invalid native shape or gate')
         # serde's shortest f32 decimals parse as f64 in Python; recover exact wire values.
         terms=[dict(t,**{k:[struct.unpack('<f',struct.pack('<f',v))[0] for v in t[k]] for k in ('knots','slopes','gate')}) for t in terms]
+        # Domain and normalization belong to this panel: adding fits can extend
+        # the knot union, so spread/strength are not monotone across panels.
         grid=sorted({0.,*(v for t in terms for v in t['knots'])})
         references=[0.,.5,1.] if terms[0]['separate'] else [1.]
         curves=[[response(t,x,f) for x in grid for f in references] for t in terms]

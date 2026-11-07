@@ -2899,3 +2899,68 @@ SHA-256 `8a7cbb5b0530880e7549d92a6010ddf9070df3398393c6073451fa4d64bb7eb1`.
 Wrapper: `done rc=0 102s | peak-RSS 0.11GiB | min-avail 25310MiB | peak-load 31.93`.
 All 18 downstream watchers and all three worker collectors were verified live;
 these observations do not qualify their pending scientific stages.
+
+## November 7, complete six-partition setting-0 shaper diagnostics
+
+All six source partitions now have complete setting-0 paired evidence for both
+identity-joint families. The shared-direct panel covers 36 fits, three seeds
+per family/partition, and 492 terms. Only features 603 and 690 are active in
+every fit. Their normalized maximum response spreads are 0.9836573441018949 and
+0.9844186278883621, with response-strength ratios 18541.300412297616 and
+18543.57604772536. Features 403, 412 and 506 are active in 34/36, 35/36 and
+27/36 fits. No direct term is zero throughout this panel.
+
+The family-specific panels also include all 492 interaction terms, giving
+984 terms in each of 18 paired fits across all six partitions:
+
+| Family | Terms active in every fit | Interaction terms active in every fit | Terms zero in every fit |
+|---|---:|---:|---:|
+| Product identity-joint | 9/984 | 2/492 | 0/984 |
+| Separate identity-joint | 2/984 | 0/492 | 287/984 |
+
+Within the product family, direct feature 585 is the most repeatable term among
+those active in all 18 fits by this descriptive spread measure: normalized
+maximum spread 0.22237143005903245 and strength ratio 6.77567352046665. This is
+a candidate for further investigation, not established predictive benefit or
+a shaper shared across architectures. The two interaction terms active in
+every product fit have spreads 0.950396343143931 (damage 59/reference 509) and
+0.998040623807351 (damage 603/reference 596).
+
+All 287 terms zero in every separate-family fit are interaction terms. Exact
+stored-coefficient inspection found 205 terms whose three reference-gate
+coefficients are zero in every fit, and 248 whose three damage slopes are zero
+in every fit; these categories overlap. This establishes parameter states, not
+a causal explanation or evidence that their underlying features are useless.
+Optimization rescues and predictive comparisons remain required.
+
+Each panel uses zero through its largest TRAIN second knot, with normalization
+on that panel's domain. For features 603/690, the endpoint is now
+0.0012192976428195834, versus 0.001052213367074728 in the five-partition panel.
+Consequently spread and strength ratios are not monotone as panels expand;
+their numerical changes alone are not improved or worsened consistency. A
+comment clarifies this in the reader; identical Python ASTs verify no behavior
+changed. All panels exclude downstream weights, use native quantized parameters
+in real-valued responses, cover one of four registered settings and consume no
+outer/holdout response. No training or predictions were replayed.
+
+Cold-readback archives under the completion artifact root and its durable mirror:
+
+| Directory | Files | Bytes | Archive receipt SHA-256 |
+|---|---:|---:|---|
+| native-direct-six-partitions-setting0-2005 | 40 | 6,054,654 | `4ea2c5fb881c1db6537147db95d319afd38e5b974045f2cdc1ee124372d97e0d` |
+| native-product-six-partitions-setting0-2008 | 21 | 6,271,106 | `a995f6ce0abfc66b8a812c99d212eb4723bbf2d6d971aa4308081810da07ed64` |
+| native-separate-six-partitions-setting0-2008 | 22 | 6,146,438 | `34defff28ebe8e39b3b1b8e65200b961e1e8fcf7e58f5f046e9f2a8d3e2c2158` |
+
+The direct panel wrapper reports `done rc=0 2s | peak-RSS 0.04GiB | min-avail
+26757MiB | peak-load 31.40`; the two family-specific wrapper receipts are in
+their archived `ANALYSIS.log` files. These diagnostics do not complete the
+remaining tuning, rescue, outer, full-FIT or memorization comparisons.
+
+Additional host checks admitted no work: r5900xt still has 11G free on local
+storage and its large fit-cell directory contains cached training inputs, not
+completed fit outputs with established archive receipts. Those inputs were
+preserved. Tower has 14,227 MiB available; after its required 12,288 MiB
+headroom, the remaining 1,939 MiB does not fit the current 2,048 MiB controller
+cap. Its cache has 504G available. No host installation or compute launch was
+performed there. The bootstrap supervisor was verified live with 89 required
+jobs waiting and no failures.
