@@ -1716,3 +1716,31 @@ intermediate bakes lack final reproducibility metadata until the native trainer
 finishes. The incomplete comparison is preserved in
 `zero-output-prefix-qualification`; it does not qualify the provisional trace.
 The registered full all-checkpoint comparison still runs after trainer completion.
+
+### Softplus order failure: scalar reproduction and direct-max diagnostic
+
+The native inspector rebuilt from zenanalyze `8bf61bc9` reads the analytic
+activation; the older inspector refused activation byte 4. The independent
+scalar float32/FMA trace exactly reproduces both failing native scores for pair
+35: -11.888920783996582 → -11.888908386230469. Float64 dense algebra from the
+stored float32 coefficients instead decreases by 0.000004769070841348366.
+For tied first-layer units 125/127, the float64 activation sum increases by
+0.000010011641109031189 while the float32 sum decreases by 0.00000762939453125.
+The trace extends the existing owner with the native stable Softplus construction;
+its native-bit equality guard remains mandatory. Two boundary/refusal tests pass.
+
+The exported nonzero signed pairs are 123/124, 122/126 and 125/127. Assuming the
+training-time adjacent-pair layout was correctly refused by the native tied-weight
+validator; export ordering must be read from the model. With the actual pairs,
+the existing native research direct-max operator yields zero violations across
+all 128 registered order probes, maximum increase zero, finite outputs and exact
+identity 100. Pair 35 becomes a tie at -11.889023780822754. No refitting occurred.
+This establishes a working diagnostic repair for this failure, not complete
+qualification or permission to mix representations in model selection.
+
+The first diagnostic wrapper also counted identity as an extra probe, although
+it is already the first of the nine ray rows. Correcting that new wrapper to the
+existing 265-row layout leaves the original study gates unchanged. All failed
+attempts are retained separately. The successful trace and probe-only repair
+are archived as `softplus-order-probe-diagnosis-r2` and
+`softplus-maxpair-diagnostic-r3`, with cold destination checksum readback.

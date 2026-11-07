@@ -7,7 +7,11 @@ fails the unchanged final-checkpoint damage-order probe: one score increase of
 0.00001239776611328125 exceeds 0.00001. Identity remains exactly 100 and outputs
 are finite. The final and epoch-239 failures are preserved and archived; this
 fit is not qualified. Its export uses first-layer max pairs and an expanded
-anchored Softplus construction. The numerical cause has not been established.
+anchored Softplus construction. A scalar float32 trace reproduces the native
+failure bit for bit and identifies a tied first-layer max-pair sum reversing
+direction after rounding. The existing direct-max re-export passes all 128
+registered order probes with exact identity. This is diagnostic evidence only;
+the original failure remains, and uniform repaired qualification is unfinished.
 
 ## Known Bugs — undefined convergence panel isolation (November 7, 2026)
 
