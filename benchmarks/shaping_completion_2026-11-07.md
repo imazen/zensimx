@@ -150,3 +150,47 @@ controller cap, after the verified Gram reclamation restored storage headroom.
 
 The storage reclamation receipt itself has a verified durable mirror:
 `ed94eb9b0ff4748a0d90675ac16c7de21b37d32a25a1017cda6796746a8b2a9f`.
+
+## All tree inner cells evaluated
+
+All 72 registered tree inner cells passed the exact native export gate and
+human/teacher panels. Settings selected from complete inner evidence are
+(leaf=8, features=0.33) for outer folds 0 and 1, and (leaf=8, features=1.0)
+for outer fold 2. Their mean inner human composites are 0.917060008,
+0.889150989 and 0.905468636. Outer results remain closed.
+The six controller run-heavy receipts report 324, 291, 264, 323, 253 and
+365 seconds, each with measured peak RSS 0.39 GiB. These are training/evaluation
+measurements, not inference benchmarks.
+
+## First complete neural fit: ordinary SiLU diagnostic
+
+Cell `184c4027e954a4c3eafc`, inner-0-0, setting 0, seed 0, completed all 240
+scheduled epochs. Native final export and finite-output probes passed.
+Its final-epoch human composite is 0.912114887; this single tuning cell is not
+a family comparison or outer generalization result. The final checkpoint remains
+the selection candidate even though earlier diagnostic checkpoints score higher.
+
+| Population | Inner pooled signed SROCC | Inner within-source signed SROCC |
+|---|---:|---:|
+| kadid | 0.880458712 | 0.904324169 |
+| tid2013 | 0.880485119 | 0.909956034 |
+| konfig | 0.930216490 | 0.903411967 |
+| cid22_a25 | 0.924434432 | 0.963632174 |
+
+Teacher agreement, excluded from that human composite: pooled 0.985546444,
+within-source 0.990438656. The ordinary diagnostic makes no identity/order
+claim; its probes recorded identity 103.413970947 and 59 damage-direction
+increases. All seven inspected checkpoints retained 64 nonzero output
+coefficients. The final twenty mean logged losses were 0.160995, compared
+with 0.223560 in the preceding twenty. That exceeds the registered loss
+improvement trigger even accounting for log rounding. Same-cycle inner
+composite change (119 to 219) was -0.000426859.
+
+The outer-0 rescue condition is therefore active: all 240 registered rescue
+cells for that fold are required after complete base selection. No family is
+rejected from this fit. A separate full diagnostic replay is running; its
+traces require canonical model equality before attribution to the original.
+The completed original and all checkpoint panels are archived with manifest
+`db7c1b9fbdcd09b81a8876e31e48bf5ec331147d8f5522fc9eb130b7589a93bc`.
+Native fit wrapper: `run-heavy: done rc=0 2840s | peak-RSS 0.09GiB |
+min-avail 41595MiB | peak-load 22.27`.
