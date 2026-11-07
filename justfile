@@ -5153,6 +5153,10 @@ shaping-completion-curve-stability-partitions study binaries family setting outp
 shaping-completion-curve-checkpoint-partitions study binaries family setting epoch output +partitions:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_curve_stability.py --study {{quote(study)}} --binary-dir {{quote(binaries)}} --family {{quote(family)}} --setting {{setting}} --checkpoint {{epoch}} --output {{quote(output)}} --partitions {{partitions}}
 
+# Matched registered L2 settings across explicit source partitions; descriptive only.
+shaping-completion-curve-regularization-partitions study binaries family output +partitions:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_curve_stability.py --study {{quote(study)}} --binary-dir {{quote(binaries)}} --family {{quote(family)}} --settings 0 1 --output {{quote(output)}} --partitions {{partitions}}
+
 shaping-completion-watch-all-evaluation study binary_dir rescue_binary_dir:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 2G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_supervision.py --study {{quote(study)}} --binary-dir {{quote(binary_dir)}} --rescue-binary-dir {{quote(rescue_binary_dir)}} --watch
 
