@@ -318,3 +318,19 @@ The 07:35 UTC progress audit records 153/816 original inner final reports and
 fresh cells; the audit does not count older central batch archives. Fresh live
 process checks found 17/16/20 fits on the three active workers and no unexpected
 stops. Outer, generalization and full-fit experiments remain incomplete.
+
+### Outer nonneural control refits (2026-11-07)
+
+The existing control runner now resolves the same complete inner admission before
+opening outer responses. It retains the original registered outer cells (three
+paired tree seeds and one deterministic shaped-additive solve) and uses each
+family's inner-selected setting. Tree configuration, quadratic solver, native
+export/parity gates, TRAIN-only maps and TRAIN-only shape fitting reuse their
+existing owners. Outer reports are explicitly excluded from selection. A shared
+storage reservation covers each outer control invocation, with admission checked
+again after any wait for space. Existing inner searches retain all four settings.
+
+Three focused tests pass: exact selected-setting/seed coverage, refusal before
+fit or response reads when admission is missing, and unchanged inner search
+coverage. These checks qualify orchestration only; no actual outer control fit
+has yet been admitted or measured.

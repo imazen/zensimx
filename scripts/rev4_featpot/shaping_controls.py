@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Registered inner controls, using the existing quadratic and tree fit owners."""
+"""Registered inner and admitted outer controls using existing fit owners."""
 from __future__ import annotations
 import argparse
 from datetime import datetime,timezone
@@ -22,15 +22,42 @@ DRIVER_SHA256=sha(__file__)
 def write(path,value):path.write_bytes(encoded(value))
 
 
+def selected_cells(root,partition,family,cells):
+    if partition.startswith('inner-'):
+        return [c for c in cells if c['stage']=='inner' and c['family']==family and c['partition']==partition],None
+    if partition not in ('outer-0','outer-1','outer-2'):raise ValueError('unregistered control partition')
+    from shaping_outer_admission import resolve
+    admission,path=resolve(root,int(partition.split('-')[1]))
+    if not admission['outer_evaluation_admitted']:raise ValueError('outer controls are not admitted')
+    schedule=admission['schedules'][family]
+    if schedule['phase_epochs'] or schedule['optimizer_choice']!='base' or schedule['setting'] not in range(4):
+        raise ValueError('nonneural control schedule differs')
+    chosen=[c for c in cells if c['stage']=='outer' and c['family']==family and c['partition']==partition]
+    expected={0,1,2} if family=='extra_trees' else {None}
+    if len(chosen)!=len(expected) or {c['seed'] for c in chosen}!=expected:
+        raise ValueError('outer control seed coverage differs')
+    return chosen,dict(admission_sha256=sha(path),selected_setting=schedule['setting'])
+
+
 def run(args):
+    plan,cells,partitions=load_registration(args.study)
+    family='extra_trees' if args.tree else 'shaped_additive'
+    chosen,outer=selected_cells(args.study,args.partition,family,cells)
+    if not chosen:raise ValueError('no registered cells')
+    if outer is None:return fit(args,plan,partitions,family,chosen,outer)
+    from shaping_storage import reservation
+    dest=args.study/'control_inputs'/args.partition/f'{family}-attempt-{args.attempt:03}'
+    with reservation(args.study,dest,plan['minimum_ssd_free_bytes']):
+        # Admission may have waited for space; revalidate before reading labels.
+        if selected_cells(args.study,args.partition,family,cells)!=(chosen,outer):
+            raise ValueError('outer control admission changed while waiting')
+        return fit(args,plan,partitions,family,chosen,outer)
+
+
+def fit(args,plan,partitions,family,chosen,outer):
     from shaped_linear_study import OLD,metrics,weights_and_targets,fit_spec,apply_basis,HEAVY
     from tree_study import RAW_IDS,estimator,native_gate
-    plan,cells,partitions=load_registration(args.study)
-    if not args.partition.startswith('inner-'):raise ValueError('outer selection gate not yet admitted')
     membership=partitions[args.partition]
-    family='extra_trees' if args.tree else 'shaped_additive'
-    chosen=[c for c in cells if c['stage']=='inner' and c['family']==family and c['partition']==args.partition]
-    if not chosen:raise ValueError('no registered cells')
     build=json.loads((args.binary_dir/'BUILD.json').read_text())
     for name,pin in build['binary_sha256'].items():
         if sha(args.binary_dir/name)!=pin:raise ValueError('binary drift')
@@ -67,16 +94,18 @@ def run(args):
               gram_sha256=sha(linear/'gram.npz'),basis_sha256=hashlib.sha256(basis.tobytes()).hexdigest(),maps=maps))
         del b,bw,gram,rhs
     for cell in chosen:
+        setting=outer['selected_setting'] if outer is not None else cell['setting']
         dest=args.study/'runs'/cell['id']/f'attempt-{args.attempt:03}'
         if dest.exists():raise ValueError('control attempt exists: '+str(dest))
         dest.mkdir(parents=True)
         running=dict(cell=cell,pid=os.getpid(),process_role='control_worker',stage='running',
                      started_utc=datetime.now(timezone.utc).isoformat(),driver_sha256=DRIVER_SHA256,
                      plan_sha256=sha(args.study/'PLAN.json'),build_sha256=sha(args.binary_dir/'BUILD.json'))
+        if outer is not None:running.update(outer)
         write(dest/'RUN.json',running);print(json.dumps({'cell':cell['id'],'pid':os.getpid(),'stage':'running'}),flush=True)
         try:
             if args.tree:
-                leaf,fraction=((2,.33),(8,.33),(16,.33),(8,1.))[cell['setting']]
+                leaf,fraction=((2,.33),(8,.33),(16,.33),(8,1.))[setting]
                 config=dict(family='extra',features='raw',params=dict(min_samples_leaf=leaf,max_features=fraction))
                 model=estimator(config,SEEDS[cell['seed']][0],raw.shape[1])
                 model.fit(raw[tr],target,sample_weight=weight)
@@ -85,7 +114,7 @@ def run(args):
                 pred=prediction*100
                 qualification=dict(native_tree_gate=gate,config=config,objective='reference-balanced mapped-target MSE')
             else:
-                lam=(1e-7,1e-6,1e-4,1e-2)[cell['setting']]
+                lam=(1e-7,1e-6,1e-4,1e-2)[setting]
                 output=dest/'native';cmd=[str(HEAVY),'--mem','4G','--jobs','1','--',str(args.binary_dir/'bake_dial_refit'),
                      'linear-study','--inputs',str(linear/'inputs.npz'),'--gram',str(linear/'gram.npz'),
                      '--spec',str(linear/'SPEC.json'),'--lambda',str(lam),'--out',str(output),'--positive']
@@ -108,11 +137,16 @@ def run(args):
             report=dict(cell=cell,qualification=qualification,maps=maps,
                         train=metrics(pred,d['y'],tr,d,maps),inner_validation=metrics(pred,d['y'],te,d,maps),
                         outer_results_read=False,plan_sha256=sha(args.study/'PLAN.json'))
+            if outer is not None:
+                report['outer_test']=report.pop('inner_validation')
+                report.update(outer,outer_results_read=True,selection='outer test; excluded from all selection')
             np.savez_compressed(evaluation/'predictions.npz',original_indices=wanted,native=pred)
             write(evaluation/'REPORT.json',report)
             write(evaluation/'COMPLETE.json',dict(cell=cell['id'],report_sha256=sha(evaluation/'REPORT.json')))
             write(dest/'RESULT.json',{**running,'stage':'complete','exit_code':0,'finished_utc':datetime.now(timezone.utc).isoformat()})
-            print(json.dumps({'cell':cell['id'],'stage':'complete','inner_selection_score':report['inner_validation']['selection_score']}),flush=True)
+            role='outer_test' if outer is not None else 'inner_validation'
+            key='outer_test_score' if outer is not None else 'inner_selection_score'
+            print(json.dumps({'cell':cell['id'],'stage':'complete',key:report[role]['selection_score']}),flush=True)
         except Exception as error:
             write(dest/'RESULT.json',{**running,'stage':'failed','exit_code':1,'error':str(error),'finished_utc':datetime.now(timezone.utc).isoformat()})
             raise

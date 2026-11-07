@@ -5094,6 +5094,9 @@ shaping-completion-outer-admission-check:
 shaping-completion-outer-execution-check:
     python3 -B -m unittest scripts/tests/test_shaping_outer_execution.py
 
+shaping-completion-outer-controls-check:
+    python3 -B -m unittest scripts/tests/test_shaping_outer_controls.py
+
 shaping-completion-prepare-outer study outer:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 2G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_outer_execution.py --study {{quote(study)}} --outer {{outer}} --prepare
 
