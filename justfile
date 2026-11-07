@@ -5006,3 +5006,6 @@ shaping-completion-worker-collect action study assignment bundle *args:
 
 shaping-completion-worker-collect-test:
     TMPDIR="$HOME/tmp" python3 -B -m unittest scripts/tests/test_shaping_worker_collect.py
+
+shaping-completion-watch-reexport study binary_dir inspector:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 2G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_reexport_supervision.py --study {{quote(study)}} --binary-dir {{quote(binary_dir)}} --inspector {{quote(inspector)}} --watch

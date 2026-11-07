@@ -403,3 +403,10 @@ failed imports stay in a separate staging directory. The original host and comma
 remain in RUN.json. Three local controls passed: byte-exact readback and corruption
 refusal, traversal/symlink refusal, and terminal/checkpoint coverage admission.
 This validates transfer mechanics, not a scientific fit or a completed remote wave.
+
+A supplemental evaluation watcher now applies the same separately pinned native
+max-pair representation to newly completed ReLU inner fits and fresh controls.
+It uses all scheduled checkpoints, preserves original failed reports, and refuses
+selection completion for any supplemental gate failure. Two orchestration controls
+passed, including isolation of a failed supplemental checkpoint while the next cell
+finishes. The watcher does not select settings or consume outer scores.

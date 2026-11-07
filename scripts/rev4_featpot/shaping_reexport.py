@@ -8,12 +8,7 @@ from shaping_execution import load_registration
 from shaping_probe_trace import unique_signed_pairs
 
 
-def main():
-    p=argparse.ArgumentParser(description=__doc__)
-    for name in ('study','run','binary-dir','inspector'):
-        p.add_argument('--'+name,type=Path,required=True)
-    p.add_argument('--checkpoint',type=int)
-    args=p.parse_args()
+def reexport(args):
     _,cells,_=load_registration(args.study)
     run=json.loads((args.run/'RUN.json').read_text())
     result=json.loads((args.run/'RESULT.json').read_text())
@@ -47,4 +42,9 @@ def main():
     evaluate(args)
 
 
-if __name__=='__main__':main()
+if __name__=='__main__':
+    p=argparse.ArgumentParser(description=__doc__)
+    for name in ('study','run','binary-dir','inspector'):
+        p.add_argument('--'+name,type=Path,required=True)
+    p.add_argument('--checkpoint',type=int)
+    reexport(p.parse_args())
