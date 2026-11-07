@@ -4976,6 +4976,12 @@ shaping-completion-prepare-variant study cell:
 shaping-completion-prepare-all-variants study:
     TMPDIR="$HOME/tmp" OPENBLAS_NUM_THREADS=1 "$HOME/work/claudehints/scripts/run-heavy" --mem 2G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_variant_inputs.py --study {{quote(study)}} --all
 
+shaping-completion-variant-audit-test:
+    TMPDIR="$HOME/tmp" OPENBLAS_NUM_THREADS=1 python3 -B -m unittest scripts/tests/test_shaping_variant_audit.py
+
+shaping-completion-audit-variant-inputs study output:
+    TMPDIR="$HOME/tmp" OPENBLAS_NUM_THREADS=1 "$HOME/work/claudehints/scripts/run-heavy" --mem 2G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_variant_audit.py --study {{quote(study)}} --output {{quote(output)}}
+
 shaping-completion-reclaim-tree-transport *args:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_reclaim_tree_transport.py {{args}}
 

@@ -176,3 +176,12 @@ part of the preparation identity. Each preparation reserves SSD space and checks
 the frozen inputs. Reuse verifies membership, metadata and every pinned file.
 It neither chooses finalists nor reads outer responses, and fits no model.
 `VARIANT_INPUT_PROGRESS.json` records preparation separately from scientific fits.
+
+`just shaping-completion-audit-variant-inputs` independently checks every
+prepared table against its registered original TRAIN rows, including numerical
+feature bits, null masks and row keys. It reconstructs both label permutation
+schemes without calling the preparation permutation function, checks human-only
+teacher exclusion, and verifies exact coverage against the registered matrix.
+Tests exercise changed keys, validity masks, signed-zero feature bits, labels,
+and replay of both permutation seeds. This audit fits no model and does not
+use outer responses.
