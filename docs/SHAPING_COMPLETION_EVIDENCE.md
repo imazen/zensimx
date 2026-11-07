@@ -405,3 +405,17 @@ root volume. Re-resolve with `findmnt -T` before future space interventions.
 The variant-path qualification archive contains 12 files / 93,279 bytes, all
 SHA-256 verified by destination readback. It preserves implementation sources,
 test output and push verification; it is not scientific variant-fit evidence.
+
+### Full-FIT decision policy (2026-11-07)
+
+The pre-fit full-FIT policy now resolves global finalist families from the mean
+of the three inner-selected family scores, fixes an optimizer using only choices
+with complete inner evidence across all three folds, and carries forward the
+longest registered family exposure. The original 192 selection cells and 16 final
+fits remain unchanged. Selection reports are scoped to full-FIT tuning and cannot
+feed back into the earlier nested comparison. Development remains descriptive.
+
+Three pure-planner tests pass: complete pairing, family/setting tie order,
+optimizer evidence intersection, registered exposure, teacher exclusion and
+refusal of development-exposed or mis-scoped selection reports. This is a tested
+planning policy, not a registered full-FIT admission or a completed fit.
