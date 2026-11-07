@@ -138,7 +138,9 @@ def execute(args):
     if args.resource_pilot:
         selected=[c for c in cells if c['stage']=='resource_pilot'];epochs=1;workers=1;mem='4G'
     else:
-        selected=[c for c in cells if c['stage']=='inner' and c['family']==args.family and c['partition']==args.partition]
+        families=('softplus','silu_monotone','silu_diagnostic') if args.family=='analytic' else (args.family,)
+        selected=[c for c in cells if c['stage']=='inner' and c['family'] in families and c['partition']==args.partition]
+        selected.sort(key=lambda c:(c['setting'],c['seed'],families.index(c['family'])))
         epochs=240;workers=args.workers;mem='1G'
         if not selected or not 1<=workers<=16:raise ValueError('invalid partition or worker count')
     # Native pilot measured 606443 total artifact bytes, including two bakes.
@@ -199,7 +201,7 @@ def main():
     mode.add_argument('--resource-pilot',action='store_true')
     mode.add_argument('--inner-relu',action='store_true')
     mode.add_argument('--inner-family',action='store_true')
-    p.add_argument('--family',choices=['relu','softplus','silu_monotone','silu_diagnostic'],default='relu')
+    p.add_argument('--family',choices=['relu','softplus','silu_monotone','silu_diagnostic','analytic'],default='relu')
     mode.add_argument('--status',action='store_true')
     p.add_argument('--partition',default='inner-0-0')
     p.add_argument('--workers',type=int,default=12)
