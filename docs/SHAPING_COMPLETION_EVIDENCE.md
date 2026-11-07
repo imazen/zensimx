@@ -89,3 +89,10 @@ any child attempt is created; the existing extraction owner then validates its
 complete identity, exposure, binary and prefix hashes. Subset controllers have
 separate status filenames. This allows frozen and joint fresh-head trials to
 start while other independent parent settings are still training.
+
+The pretrained dispatcher supervises two child fits at a time and records its
+PID, required IDs, child PIDs and terminal status under `study/dispatch/pretrained/`.
+It checks matching-parent terminal artifacts before release, preserves existing
+child attempts, and waits for already started children if a child or parent
+fails. Per-job storage reservations still govern admission. This is dependency
+scheduling, not an exclusive compute lock; independent controllers keep running.
