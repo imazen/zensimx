@@ -5227,3 +5227,6 @@ shaping-completion-bootstrap-stats-check panel:
 
 shaping-completion-prediction-evidence-check:
     TMPDIR="$HOME/tmp" python3 -B -m unittest discover -s scripts/tests -p test_shaping_prediction_evidence.py
+
+shaping-completion-outer-evidence-check:
+    TMPDIR="$HOME/tmp" python3 -B -m unittest discover -s scripts/tests -p test_shaping_outer_evidence.py

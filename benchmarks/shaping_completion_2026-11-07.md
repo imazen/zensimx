@@ -1246,3 +1246,22 @@ shape and finite coverage. Its caller must revalidate the full outer admission
 before reading responses; this helper alone is not the complete study loader.
 Five new evidence checks, 15 existing evaluation checks and six outer-control
 checks pass. Qualification is preserved in `prediction-evidence-qualification`.
+
+### Complete primary outer-evidence loader
+
+`shaping_outer_evidence.collect` revalidates all three complete inner-admission
+records, then requires exactly the registered 102 primary outer cells (all 12
+families, three folds, and their declared seeds). Every cell must have one
+successful terminal attempt and a completed evaluation before any prediction
+table opens. It verifies plan/admission identity, selected schedule or control
+setting, original model hashes, repaired-ReLU model/build provenance, bound
+prediction hashes and complete ordered row membership. Convergence classifications
+remain attached; collection does not reselect models using outer results.
+
+Four tests cover matrix completeness, admission-before-read ordering, missing
+fit refusal, and a complete synthetic 102-cell artifact matrix including repaired
+ReLU representations. Mutating a completed prediction table is rejected. On the
+live study, the missing outer-0 admission produced the expected refusal with zero
+prediction-reader calls. This validates admission behavior, not scientific outer
+completion. The final bootstrap runner and interval reduction remain pending.
+Evidence is in `outer-evidence-qualification` under the completion-study root.
