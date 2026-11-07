@@ -427,6 +427,43 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "feature-regime-v2")]
+    fn shaped_bake_roundtrip_identity_and_chain_rule() {
+        let declaration = "zensim-derived-inputs research-shaping-v1\nshape 13 0.25 1 2 0.5 3\nin 401\nshape-product 13 422 0.25 1 2 0.5 3\nseparate 13 422 0.25 1 2 0.5 3 0 0.5 1\n";
+        let bytes = derived_bake(Some(declaration));
+        let model = zenpredict::Model::from_bytes(&bytes).unwrap();
+        let mut scorer = crate::BakeScorer::new(&model).unwrap();
+        let mut row = vec![0.0; 720];
+        row[422] = 0.4;
+        assert_eq!(scorer.score_features(&row, 96, 96, None).unwrap(), 100.0);
+        row[13] = 0.5;
+        row[401] = 0.125;
+        let mut predictor = zenpredict::Predictor::new(&model);
+        let expected = predictor.predict(&[0.625, 0.125, 0.4, 0.25]).unwrap()[0];
+        assert_eq!(
+            scorer.score_features(&row, 96, 96, None).unwrap(),
+            f64::from(expected)
+        );
+        let gradient = scorer
+            .score_features_fd_gradient(&row, 96, 96, None)
+            .unwrap();
+        // Analytical chain rule through the three distinct input operations,
+        // including the model's unequal input scales and reference factor.
+        assert!((gradient[13] - (-0.5 - 6.0 * 2.0 * 0.4 - 0.5 * 0.4)).abs() < 1e-12);
+        assert!((gradient[422] - (-6.0 * 2.0 * 0.5 - 0.625)).abs() < 1e-12);
+        for id in [13, 401, 422] {
+            let mut plus = row.clone();
+            let mut minus = row.clone();
+            plus[id] += 0.001;
+            minus[id] -= 0.001;
+            let numerical = (scorer.score_features(&plus, 96, 96, None).unwrap()
+                - scorer.score_features(&minus, 96, 96, None).unwrap())
+                / 0.002;
+            assert!((numerical - gradient[id]).abs() < 0.01);
+        }
+    }
+
+    #[test]
     fn a_runtime_without_the_declaration_refuses_the_bake() {
         // What an older runtime sees: three declared ids, four inputs.
         let bytes = derived_bake(None);

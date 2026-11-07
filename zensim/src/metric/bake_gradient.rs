@@ -495,6 +495,15 @@ fn primary(
                         if v >= 0. { v } else { v * 0.01 },
                         if v >= 0. { 1. } else { 0.01 },
                     ),
+                    Activation::Softplus | Activation::Silu => {
+                        let e = (-v.abs()).exp();
+                        let sigmoid = if v >= 0. { 1. / (1. + e) } else { e / (1. + e) };
+                        if matches!(layer.activation, Activation::Softplus) {
+                            t.unary(x, v.max(0.) + e.ln_1p(), sigmoid)
+                        } else {
+                            t.unary(x, v * sigmoid, sigmoid + v * sigmoid * (1. - sigmoid))
+                        }
+                    }
                     _ => return Err(error("unknown network activation in exact sensitivity")),
                 });
             }
@@ -694,6 +703,39 @@ fn spline_slope(x: f64, s: &OutputCalibrationSpline) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn analytic_activation_sensitivity_matches_served_central_difference() {
+        for activation in ["softplus", "silu"] {
+            let spec = serde_json::json!({"schema_hash":1,"scaler_mean":[0.],"scaler_scale":[1.],
+                "metadata":[{"key":"zentrain.feature_ids","type":"utf8","text":"13"}],
+                "layers":[{"in_dim":1,"out_dim":1,"activation":activation,"dtype":"f32","weights":[1.],"biases":[-3.]},
+                {"in_dim":1,"out_dim":1,"activation":"identity","dtype":"f32","weights":[-1.],"biases":[50.]}]});
+            let bytes = zenpredict_bake::bake_from_json_str(&spec.to_string()).unwrap();
+            let model = crate::mlp::Model::from_bytes(&bytes).unwrap();
+            let mut scorer = BakeScorer::new(&model).unwrap();
+            for value in [0.5, 2., 3., 4., 10.] {
+                let mut row = vec![0.; 372];
+                row[13] = value;
+                let g = scorer
+                    .score_features_fd_gradient(&row, 96, 96, None)
+                    .unwrap()[13];
+                let v = value - 3.;
+                let sigmoid = 1. / (1. + (-v).exp());
+                let expected = if activation == "softplus" {
+                    -sigmoid
+                } else {
+                    -(sigmoid + v * sigmoid * (1. - sigmoid))
+                };
+                assert!((g - expected).abs() < 1e-12);
+                row[13] = value + 0.002;
+                let plus = scorer.score_features(&row, 96, 96, None).unwrap();
+                row[13] = value - 0.002;
+                let minus = scorer.score_features(&row, 96, 96, None).unwrap();
+                assert!((g - (plus - minus) / 0.004).abs() < 0.002);
+            }
+        }
+    }
+
     #[test]
     fn f32_f16_i8_storage_and_dispatch_have_exact_derivatives() {
         if !crate::ssim_form::run_in_own_process(
