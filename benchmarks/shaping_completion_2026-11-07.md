@@ -1837,6 +1837,23 @@ weight traces. Its archived intermediate checkpoints are restored with hashes
 before replay. This is a diagnostic replay, not another tuning opportunity;
 no comparison result is claimed until replay qualification completes.
 
+The matched replay was initially held by the unchanged storage gate, then
+admitted after inactive compiler-intermediate reclamation. Its first weight
+trace has been emitted; complete checkpoint neutrality remains unverified.
+Restoration preserved and verified all 120 original checkpoints, including
+116 restored files totaling 9149742 bytes. Keep that sequence until replay ends.
+
+The subsequent storage wave removed 5916 local checkpoint duplicates from 27
+completed cells, totaling 1706658047 logical bytes, after cold SHA-256 readback
+of every durable counterpart and two open-file checks. It excludes the matched
+replay originals. Available SSD bytes measured immediately before/after removal
+were 62171017216 and 63885348864. The wrapper reports rc=0, 87 seconds,
+peak RSS 0.10 GiB, minimum available memory 35811 MiB and peak load 24.48.
+The plan, removal receipt and log are preserved in
+`checkpoint-retention-1226-evidence`; separate compiler-cache receipts are in
+`compiler-cache-reclamation-1227`. No scientific thresholds or storage
+allowances changed.
+
 ## Supplemental analytic re-export qualification scope
 
 Before evaluating repaired Softplus quality panels, extend the existing native
