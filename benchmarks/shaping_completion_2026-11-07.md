@@ -2692,3 +2692,37 @@ prediction replay, outer evaluation or final-holdout read was performed.
 Cold readback verified `native-direct-four-partitions-setting0-1815`:
 30 artifacts, 4660563 bytes; receipt
 `08df0cbd82bcdf750bcdc9791743170505f23c30065fea9468999b9250115a83`.
+
+
+## Resource-only recovery expansion and placement split
+
+The recovery queue's resource ceiling increased from four to nine workers.
+Shared admission limited actual starts: the observed host budget was 28
+native trainers, with no unstarted CPU reservations left uncounted. Two
+additional registered fits started first; a third started when a slot freed.
+The original four active children retained their identities and continued.
+
+Spare i265 capacity then admitted the final two never-started recovery cells.
+The original queue acknowledged drain before placement changed. Its seven
+active local fits continued; the two remaining cells had no attempt directory
+or shared CPU claim. The assignment owner preserved the original nine-cell
+record byte for byte and split it into disjoint seven-cell dev and two-cell
+i265 records. The registered cell union, plan, binaries, data and settings
+remain unchanged. All nine recovery cells were verified live across the two
+hosts; no partial or completed fit moved or replayed.
+
+The recipient admission observed ten native trainers, no pending reservations,
+25140035584 available RAM bytes and 282468159488 free disk bytes. It required
+52613349376 free bytes, including the 30 GiB reserve and pending writes.
+The worker uses frozen source `ce9229d0362d`, a 2 GiB controller cap and
+1 GiB native-child caps. Checksummed input installation passed; both new
+native PIDs were verified live. The local queue intentionally retains its
+original nine-cell requirement and drains after its seven local children;
+global completion still requires the two imported remote results.
+
+Three relocation tests, four queue tests and nine shared-admission tests pass.
+These tests do not train scientific models. Cold readback verified:
+
+- `joint00-recovery-budget-expansion-1815-evidence`: 6 artifacts, 9516 bytes; receipt `57d84f78c83a1cea51f262630df9a989d77becd4fe5b28d9d0edb5f913f7faa2`.
+- `joint00-unstarted-relocation-1820-evidence`: 14 artifacts, 21253 bytes; receipt `a5923bc50878b12617bb2a52e9199aaf7d640507d8ff2ea01e57774d53d2e332`.
+- `i265-joint00-relocated-inputs`: 3 artifacts, 24223753 bytes; receipt `fa8d7abdfffbe2079dc8055c64fe95ae1f6d259ab4036181b9f191cf53a72153`.
