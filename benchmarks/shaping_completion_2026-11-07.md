@@ -747,3 +747,69 @@ destination checksum readback under the same NAS-relative path.
 Wrapper: `run-heavy: done rc=0 1s | peak-RSS 0.20GiB | min-avail 40617MiB | peak-load 19.76`
 for the first calculation; the v2 receipt adds original feature-ID mapping. This
 is resource accounting during concurrent training, not an inference benchmark.
+
+## Explicit human-only native controls and replay qualification
+
+The analytic optimizer-control configuration previously required exactly one
+teacher population. Human-only supervision now has an explicit opt-in flag that
+requires zero teachers, neutral teacher mass and a non-teacher-warm curriculum.
+The default retains the original one-teacher requirement and omits the new flag
+from legacy serialization. Human-only commands require exactly the four human
+TRAIN ranking groups and set MSE weight to zero; feature and optimizer settings
+remain unchanged. This implements a necessary capability, not a selected model.
+
+Native source `709392a65a28b1565d299569c430c9bf3218a435` passed all four training
+research tests, all twelve monotone research tests, and release-profile Clippy
+with warnings denied. The release trainer and packer were built and their remote
+hashes verified after transfer. `human-only-bin/BUILD.json` has SHA-256
+`ce8199538b28165f69f6f9b2ea23a1e5609a27a31e8d427b65a67b7de642dd3d`;
+unchanged panel/parity tools retain their separately recorded source provenance.
+
+All three analytic families passed two independent one-epoch checks, each using
+50,000 pair draws. First, neutral mixed-data controls reproduced the original
+frozen prefix's canonical model bytes exactly. Second, human-only neutral controls
+reproduced native streaming bytes exactly on the registered outer-0 training
+complement: 7,060 human rows, zero teacher rows. Canonical comparison strips only
+reproduction and research-configuration metadata, retaining weights and scales.
+No outer labels or selection metrics were read. These short checks establish
+replay behavior; they are not full-budget scientific fits or new convergence data.
+
+| Family | Human-only canonical SHA-256 |
+|---|---|
+| softplus | `223ca465a6553e124f820b4cca37ef286b4d0c35e65a902bbf0996890fe45794` |
+| silu_monotone | `49f04cdfd02667c68256b456626f88f7b7f003e118e6f7164a7c2673e1ae45e2` |
+| silu_diagnostic | `68dce17d885b20965dba4e739500cb5fca4496f7384aebdadfca1afe5bf87fb2` |
+
+Resource-wrapper observations, during concurrent training:
+
+- native-tests-r3: `run-heavy: done rc=0 555s | peak-RSS 1.69GiB | min-avail 22848MiB | peak-load 21.85`.
+- monotone-tests: `run-heavy: done rc=0 0s | peak-RSS 0.09GiB | min-avail 24424MiB | peak-load 20.96`.
+- clippy: `run-heavy: done rc=0 107s | peak-RSS 0.65GiB | min-avail 23834MiB | peak-load 21.39`.
+- build: `run-heavy: done rc=0 303s | peak-RSS 1.69GiB | min-avail 22824MiB | peak-load 22.61`.
+- softplus: `run-heavy: done rc=0 54s | peak-RSS 0.10GiB | min-avail 39174MiB | peak-load 20.88`.
+- silu_monotone: `run-heavy: done rc=0 54s | peak-RSS 0.10GiB | min-avail 39104MiB | peak-load 20.88`.
+- silu_diagnostic: `run-heavy: done rc=0 37s | peak-RSS 0.10GiB | min-avail 39352MiB | peak-load 20.30`.
+- legacy-softplus: `run-heavy: done rc=0 41s | peak-RSS 0.09GiB | min-avail 37587MiB | peak-load 20.89`.
+- legacy-silu_monotone: `run-heavy: done rc=0 26s | peak-RSS 0.09GiB | min-avail 39371MiB | peak-load 20.87`.
+- legacy-silu_diagnostic: `run-heavy: done rc=0 20s | peak-RSS 0.09GiB | min-avail 39352MiB | peak-load 20.59`.
+
+The source capsule, failed preparation logs, native test/build logs, all six
+qualification arms and results remain under `human-only-native-qualification/`.
+No failed attempt was overwritten. Native scientific human-only refits remain
+gated on inner-only finalist selection.
+
+The qualification archive passed destination readback for all 102 artifacts
+(135,606,307 bytes) at 07:11:51 UTC. The binary archive independently passed all
+five artifact hashes (32,854,017 bytes) at 07:11:07 UTC. Both include their source
+and binary identities; neither receipt claims completion of the 48 registered
+scientific human-only fits.
+
+Seven further worker fits were collected with complete checkpoint inventories:
+three 240-epoch analytic fits and four 120-epoch fresh ReLU controls. Each durable
+bundle passed full checksum readback and assignment checks before per-member
+verification and atomic local import. Failed transport/preparation logs remain
+preserved. At 07:11 UTC the progress audit counted 147/816 primary inner final
+reports and 12/72 fresh-control reports; 51 primary and 12 fresh-control neural
+convergence receipts were present. Of those, 48 primary and four fresh controls
+retained investigation triggers. These counts are execution progress, not
+convergence qualification or a family ranking.

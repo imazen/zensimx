@@ -224,3 +224,13 @@ It validates terminal exposure and checkpoints first, pins the payload inventory
 and refuses a changed inventory after storage admission before creating the tar.
 The normal post-pack input recheck and producer pin remain mandatory. Unknown
 future trainer writes still reserve one GiB; no reserve floor changes.
+
+## Human-only analytic optimizer qualification
+
+`shaping-completion-human-qualify` validates a registered human-only membership
+and its admitted input hashes, then compares native streaming with neutral
+optimizer controls for one epoch. The four human populations and rank-only
+objective are mandatory; teacher and validation groups are refused. Every command,
+manifest, PID, result and canonical model hash is retained. This is an explicitly
+non-selection implementation check. The existing neutral-prefix replay remains
+available unchanged for mixed-data backward-compatibility checks.
