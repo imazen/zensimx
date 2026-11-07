@@ -1075,3 +1075,20 @@ terminal-only admission, stale observations, already imported runs, stopped-job
 reconciliation, no transfer on an empty cycle, no archival/retry after collection
 failure and the unknown-state timeout receipt. Scientific gates and model
 selection are unchanged.
+
+## Paired rescue-selection and extension admission supervision
+
+`shaping_selection_watch.py` advances triggered folds only through the existing
+selection and admission owners. It waits for all 24 rescue candidates per family,
+then invokes the full paired base/rescue provenance gate. All ten neural decisions
+must verify before extension registration. Existing registrations are reproduced,
+including empty matrices and pinned decision hashes. Required extension reports
+and diagnostics must exist before the complete outer-admission gate runs.
+
+Presence checks schedule validation; they never stand in for provenance or
+scientific completion. Errors preserve existing artifacts and stop the watcher.
+Tests verify that missing diagnostics and ambiguous candidates are refused,
+incomplete rescue waves cannot select or admit, and apparent completion markers
+still lead to the full provenance gate. This watcher does not execute extension
+fits; their native execution owner remains separate. The three triggered folds
+still require their unfinished paired experiments.

@@ -5097,6 +5097,12 @@ shaping-completion-watch-worker host source status_source study destination outp
 shaping-completion-worker-watch-check:
     python3 -B -m unittest discover -s scripts/tests -p test_shaping_worker_watch.py
 
+shaping-completion-watch-selection study outer:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_selection_watch.py --study {{quote(study)}} --outer {{outer}} --watch
+
+shaping-completion-selection-watch-check:
+    python3 -B -m unittest discover -s scripts/tests -p test_shaping_selection_watch.py
+
 shaping-completion-reclaim-incremental:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_reclaim_incremental.py
 
