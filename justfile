@@ -5075,6 +5075,18 @@ shaping-cost-memory binary workload output:
 shaping-cost-memory-check:
     TMPDIR="$HOME/tmp" python3 -B -m unittest discover -s scripts/tests -p test_shaping_cost_memory.py
 
+shaping-model-inventory-build:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 2G --jobs 1 -- cargo build --locked --release -p zensim-validate --example shaping_model_inventory
+
+shaping-model-inventory-clippy:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 2G --jobs 1 -- cargo clippy --locked --release -p zensim-validate --example shaping_model_inventory -- -D warnings
+
+shaping-model-inventory binary workload output:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- {{quote(binary)}} {{quote(workload)}} {{quote(output)}}
+
+shaping-model-inventory-check binary inspector workload tree_log output:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_inventory_check.py --binary {{quote(binary)}} --inspector {{quote(inspector)}} --workload {{quote(workload)}} --tree-log {{quote(tree_log)}} --output {{quote(output)}}
+
 shaping-completion-dispatch-rescues study binary_dir neutral outer *args:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 6G --jobs 2 -- python3 -B scripts/rev4_featpot/shaping_rescue_dispatch.py --study {{quote(study)}} --binary-dir {{quote(binary_dir)}} --neutral-qualification {{quote(neutral)}} --outer {{outer}} --workers 2 {{args}}
 

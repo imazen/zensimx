@@ -642,6 +642,28 @@ inode and modification time for reuse, plus mismatch refusal. Shared-base
 installation cannot use this option.
 # Cost report replay
 
+`shaping_model_inventory` reads the exact models named by a hash-bound cost
+workload through the native model owners. It records tree/node counts and the
+expanded f32 layer coefficients, biases and nonzero weights. It deliberately
+leaves independent trainable-parameter counts unset; stored weights include
+fixed routing and expanded or tied coefficients. The inventory qualification
+compares every bake layer with `bake_dial_refit inspect`, and tree counts with
+the original native tree-parity log. A changed model hash must refuse inventory.
+
+Training-parameter accounting must follow the training owner, not sum exported
+matrix dimensions. In `mlp_train/shared_depth.rs`, each max pair ties two rows
+of the intermediate matrix; `mlp_train/mod.rs` fixes that pair's first threshold
+at zero. The analytic owner in `mlp_train/monotone_research.rs` uses an explicit
+pair-sum basis and a reduced-width trainable matrix. Its ordinary SiLU diagnostic
+also trains the output intercept; the identity-preserving heads keep that value
+fixed. Temperature counts only when `analytic.learn_temperature` is enabled.
+`mlp_train/input_shaping.rs` fixes knot locations, trains three damage slopes per
+trainable term, and uses three additional gate values for a separate reference
+gate. Gate slots on product/direct terms do not affect their response. Frozen
+shape phases must therefore be distinguished from jointly trained phases.
+These source observations define the remaining accounting work; they are not
+a completed parameter-count report or evidence of effective learned capacity.
+
 `just shaping-cost-memory BINARY WORKLOAD NEW_OUTPUT` runs each model in a fresh
 native qualification process under GNU `time -v`. The recorded maximum RSS includes
 the runtime, loading, forty feature rows and exact pre/postflight scoring. It is
