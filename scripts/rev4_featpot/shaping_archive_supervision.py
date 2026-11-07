@@ -176,12 +176,55 @@ def later_neural_bundles(study,directory,cells):
     return bundles
 
 
+def later_control_bundles(study,directory,cells):
+    """Reproduce control admission and hash native artifacts without scoring."""
+    from shaping_controls import selected_cells,full_fit_cells,final_refit_cells
+    from shaping_evaluation import VARIANT_STAGES
+    attempts=list(directory.glob('attempt-*'))
+    if len(attempts)!=1:return []
+    run=attempts[0]
+    if not all((run/n).is_file() for n in ('RUN.json','RESULT.json','evaluation/COMPLETE.json')):return []
+    identity=json.loads((run/'RUN.json').read_text());result=json.loads((run/'RESULT.json').read_text())
+    cell=identity['cell'];family=cell['family'];stage=cell['stage']
+    if family not in ('extra_trees','shaped_additive') or stage not in ('outer','full_fit_selection','full_fit',*VARIANT_STAGES) or result['stage']!='complete':return []
+    if stage in VARIANT_STAGES:
+        from shaping_variant_execution import resolve
+        from shaping_variant_inputs import load_variant
+        variant=resolve(study,cell['id']);load_variant(study,cell['id'])
+        if variant['resolved_family']!=family:raise ValueError('control archive resolved family differs')
+        chosen=[variant['cell']]
+        context=dict(admission_sha256=variant['admission_sha256'],selected_setting=variant['schedule']['setting'],variant=variant)
+    else:
+        resolver=final_refit_cells if stage=='full_fit' else full_fit_cells if stage=='full_fit_selection' else selected_cells
+        chosen,context=resolver(study,cell['partition'],family,cells)
+    plan_pin=sha(study/'PLAN.json')
+    if cell not in chosen or directory.name!=cell['id']:raise ValueError('control archive cell differs')
+    for record in (identity,result):
+        if record['cell']!=cell or record['plan_sha256']!=plan_pin or any(record.get(k)!=v for k,v in context.items()):
+            raise ValueError('control archive admission differs')
+    if result['exit_code']!=0 or result['build_sha256']!=identity['build_sha256']:raise ValueError('control archive terminal identity differs')
+    panel=run/'evaluation';marker=json.loads((panel/'COMPLETE.json').read_text());report=json.loads((panel/'REPORT.json').read_text())
+    if marker['cell']!=cell['id'] or marker['report_sha256']!=sha(panel/'REPORT.json'):raise ValueError('control archive report drift')
+    if (report['cell']!=cell or report['plan_sha256']!=plan_pin or report['admission_sha256']!=context['admission_sha256']
+        or report['outer_results_read'] is not True):raise ValueError('control archive report identity differs')
+    role='exposed_development' if context.get('descriptive') else 'full_fit_validation' if context.get('full_fit') else 'outer_test'
+    if {k for k in ('outer_test','full_fit_validation','exposed_development','inner_validation') if k in report}!={role}:
+        raise ValueError('control archive response role differs')
+    if sha(panel/'predictions.npz')!=report['predictions_sha256']:raise ValueError('control archive prediction drift')
+    qualification=report['qualification']
+    model=run/('model.opaque-vector.zcth' if family=='extra_trees' else 'native/model.bin')
+    pin=qualification['native_tree_gate']['model_sha256'] if family=='extra_trees' else qualification['model_sha256']
+    if sha(model)!=pin:raise ValueError('control archive native model drift')
+    return [('control',directory)]
+
+
 def later_sweep(args):
     _,cells,_=load_registration(args.study);completed=0
     logs=args.study/'archive_supervision';logs.mkdir(exist_ok=True)
     for directory in sorted((args.study/'runs').iterdir()):
         if not directory.is_dir():continue
-        for kind,source in later_neural_bundles(args.study,directory,cells):
+        inspect=later_control_bundles if getattr(args,'later_controls',False) else later_neural_bundles
+        for kind,source in inspect(args.study,directory,cells):
             if (source/'MIRROR_VERIFIED.json').exists():continue
             dest=args.destination/(f'later-{kind}-'+directory.name)
             if dest.exists() or (source/'SHA256SUMS').exists():raise ValueError('unfinished later archive needs reconciliation')
@@ -201,12 +244,14 @@ def main():
     modes=p.add_mutually_exclusive_group()
     modes.add_argument('--supplemental',action='store_true')
     modes.add_argument('--later-neural',action='store_true')
+    modes.add_argument('--later-controls',action='store_true')
     p.add_argument('--watch',action='store_true');args=p.parse_args()
     while True:
-        completed=later_sweep(args) if args.later_neural else supplemental_sweep(args) if args.supplemental else sweep(args)
+        completed=later_sweep(args) if args.later_neural or args.later_controls else supplemental_sweep(args) if args.supplemental else sweep(args)
         status=dict(pid=os.getpid(),checked_utc=datetime.now(timezone.utc).isoformat(),
                     newly_archived=completed,stage='watching' if args.watch else 'sweep_finished',driver_sha256=sha(__file__))
-        (args.study/('LATER_NEURAL_ARCHIVE_STATUS.json' if args.later_neural else 'SUPPLEMENTAL_ARCHIVE_STATUS.json' if args.supplemental else 'ARCHIVE_SUPERVISOR_STATUS.json')).write_bytes(encoded(status));print(json.dumps(status),flush=True)
+        status_name='LATER_CONTROL_ARCHIVE_STATUS.json' if args.later_controls else 'LATER_NEURAL_ARCHIVE_STATUS.json' if args.later_neural else 'SUPPLEMENTAL_ARCHIVE_STATUS.json' if args.supplemental else 'ARCHIVE_SUPERVISOR_STATUS.json'
+        (args.study/status_name).write_bytes(encoded(status));print(json.dumps(status),flush=True)
         if not args.watch:return
         time.sleep(30)
 

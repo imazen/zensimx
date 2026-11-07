@@ -132,5 +132,13 @@ result, and checks the final report's response role, prediction hash and origina
 or repaired model provenance. Full-data runs also require reproducible training
 diagnostics. It archives run directories plus separate repaired panels and bakes;
 it does not read prediction arrays, select models, or reclaim local files.
-Failed or ambiguous attempts require explicit reconciliation. Automatic later
-tree/additive-control archive coverage remains separate work.
+Failed or ambiguous attempts require explicit reconciliation.
+
+The `--later-controls` mode covers tree and shaped-additive outer, variant,
+full-data search and final-refit runs. It reproduces the existing control or
+variant admission, verifies the report's response role, and checks prediction
+and native-model hashes before cold readback of the complete run directory.
+It shares the archive transport with the neural mode, while preserving the
+controls' distinct terminal-result and qualification formats. Both modes wait
+for actual completed runs; implemented archive support is not evidence that
+the scientific comparisons have finished.
