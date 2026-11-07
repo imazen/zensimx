@@ -54,5 +54,13 @@ class TrainingOnlyTests(unittest.TestCase):
             changed=training_report(run,report)
             self.assertEqual(changed['observed_training_triggers'],result['observed_training_triggers'])
             self.assertEqual(changed['phase_loss_windows'],result['phase_loss_windows'])
+            cell['stage']='full_fit';identity['selection_scope']='full_fit_refit'
+            write(run/'RUN.json',identity);write(run/'RESULT.json',dict(cell=cell,stage='trained',exit_code=0,phases=phases))
+            row.update(selection_scope='descriptive_only',development_results_read=True)
+            row['exposed_development']=row.pop('full_fit_validation')
+            write(report,row);write(report.parent/'COMPLETE.json',{'report_sha256':sha(report)})
+            final=training_report(run,report)
+            self.assertEqual(final['selection_scope'],'full_fit_refit');self.assertFalse(final['development_results_used'])
+            self.assertEqual(final['phase_loss_windows'],result['phase_loss_windows'])
             with (run/'fit/train.log').open('a') as stream:stream.write('epoch 119 | loss=.98\n')
             with self.assertRaisesRegex(ValueError,'coverage'):training_report(run,report)

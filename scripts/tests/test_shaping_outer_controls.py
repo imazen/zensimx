@@ -81,3 +81,25 @@ class FullFitControlTests(unittest.TestCase):
                         run(args);self.assertEqual(fit.call_args.args[4],chosen)
                     admission['selection_cells'].remove(chosen[0])
                     with self.assertRaisesRegex(ValueError,'coverage'):full_fit_cells(root,'outer-1',family,cells)
+
+class FinalControlTests(unittest.TestCase):
+    def test_final_controls_use_verified_settings_and_keep_dev_out_of_training(self):
+        from shaping_controls import final_refit_cells,control_cache_key
+        cells=matrix()
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as directory:
+            root=Path(directory);path=root/'admission';path.write_text('{}')
+            partition=dict(train=[1,2],test=[],descriptive_development=[3])
+            for family in ['extra_trees','shaped_additive']:
+                cell=next(c for c in cells if c['stage']=='full_fit' and c['family']==family)
+                resolved=({},cells,{'full-fit':partition},{'full_fit_selection_sha256':{'selection':'pin'}},path,cell,family,dict(setting=3,optimizer_choice='base',phase_epochs=[]))
+                with patch('shaping_full_fit_execution.refit_cell',return_value=resolved):
+                    chosen,context=final_refit_cells(root,'full-fit',family,cells)
+                    self.assertEqual(context['selected_setting'],3);self.assertTrue(context['descriptive'])
+                    self.assertTrue(control_cache_key('full-fit',context).startswith('full-fit-refit-'))
+                    args=SimpleNamespace(study=root,partition='full-fit',tree=family=='extra_trees',full_fit_refit=True,attempt=1)
+                    with patch('shaping_controls.load_registration',return_value=({'minimum_ssd_free_bytes':0},cells,{'full-fit':partition})),patch('shaping_storage.reservation',return_value=nullcontext()),patch('shaping_controls.fit') as fit:
+                        run(args)
+                        membership=fit.call_args.args[2]['full-fit']
+                        self.assertEqual(membership['train'],[1,2]);self.assertEqual(membership['test'],[3])
+                        self.assertEqual(partition['test'],[])
+                        self.assertEqual(fit.call_args.args[5]['selected_setting'],3)

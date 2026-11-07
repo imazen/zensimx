@@ -915,3 +915,12 @@ view is bound to the full-FIT admission and all setting receipts. Development
 checkpoint diagnostics are refused. Fifteen evaluation tests pass, including
 wrong membership/population refusal and final schedule checks. No untouched final
 holdout is referenced by this path; no real development score is claimed yet.
+
+Final tree/additive refits now resolve all role decisions through the same final
+admission gate, use their selected settings and paired seeds, and retain separate
+final-refit caches. Their FIT-only objectives and calibration are unchanged;
+development appears only in descriptive evaluation. Six control-admission tests
+pass, including unchanged TRAIN membership and preserved empty registered test
+membership. Final neural training-only diagnostics accept the descriptive report
+but never use development scores; the four convergence tests cover that scope
+alongside the unchanged inner loss rule. Scientific final fits remain gated.

@@ -91,12 +91,14 @@ def report(run,reexport_root=None):
 def training_report(run,final_report):
     identity=json.loads((run/'RUN.json').read_text());result=json.loads((run/'RESULT.json').read_text())
     cell=identity['cell']
-    if cell['stage']!='full_fit_selection' or identity['selection_scope']!='full_fit_only' or identity['development_results_read']:
+    final_refit=cell['stage']=='full_fit'
+    expected_scope='full_fit_refit' if final_refit else 'full_fit_only'
+    if cell['stage'] not in ('full_fit_selection','full_fit') or identity['selection_scope']!=expected_scope or identity['development_results_read']:
         raise ValueError('training-only full-FIT selection diagnostics required')
     if result['cell']!=cell or result['stage']!='trained' or result['exit_code']!=0:
         raise ValueError('full-FIT training incomplete')
     final=json.loads(final_report.read_text())
-    if (final['cell']!=cell or final['selection_scope']!='full_fit_only' or final['development_results_read']
+    if (final['cell']!=cell or final['selection_scope']!=('descriptive_only' if final_refit else 'full_fit_only') or final['development_results_read']!=final_refit
         or final['checkpoint_epoch']!=identity['epochs']-1 or final['plan_sha256']!=identity['plan_sha256']):
         raise ValueError('full-FIT final report identity differs')
     marker=final_report.parent/'COMPLETE.json'
@@ -123,7 +125,7 @@ def training_report(run,final_report):
         active_output_coefficients_at_final=active,observed_training_triggers=reasons,
         conclusion='inconclusive_training_only',validation_scores_used=False,
         same_cycle_human_trend='not measured; validation checkpoint diagnosis prohibited',
-        selection_scope='full_fit_only',development_results_used=False,
+        selection_scope=expected_scope,development_results_used=False,
         evidence_sha256={**pins,**{str(p):sha(p) for p in (run/'RUN.json',run/'RESULT.json',final_report,marker)}},
         driver_sha256=sha(__file__))
     return record
