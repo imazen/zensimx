@@ -4942,3 +4942,6 @@ shaping-completion-selection-check:
 
 shaping-completion-select-base study family outer:
     python3 -B scripts/rev4_featpot/shaping_selection.py --study {{quote(study)}} --family {{quote(family)}} --outer {{outer}}
+
+shaping-completion-reclaim-old-grams:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_reclaim_grams.py

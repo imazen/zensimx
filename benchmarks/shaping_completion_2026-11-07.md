@@ -105,3 +105,16 @@ Preserve these fits and qualify a diagnostic replay before using those traces.
 Plain shared-ReLU initialization and consolidation rescue controls also require
 native implementation; the existing training-research configuration is attached
 to a research head and must not substitute a different head for that control.
+
+## Local Gram reclamation, November 7 UTC
+
+Under the completion goal's storage authorization, all 264 historical
+`fits/*/gram.npz` files were reread locally and from the durable mirror against
+manifest `642428868aada79b69ee4358b14e01a279b7c068e6dd1f0bdea2e478de7b8882`.
+Open-file, memory-map and active-study-pin checks found no users. Only those
+local copies were removed, reclaiming 7,177,361,457 bytes. Reports, models,
+predictions, fit specifications and active inputs remain local. The original
+manifest now describes the complete durable archive; the local tree is partial.
+`LOCAL_ARCHIVE_STATUS.json` in the historical root gives the restoration root,
+and `shaping-completion-20261107/RECLAIMED_OLD_GRAMS.json` lists every removed
+relative path, hash and byte count. The durable archive was not changed.
