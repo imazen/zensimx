@@ -4,9 +4,16 @@ from contextlib import contextmanager
 from types import SimpleNamespace
 from unittest.mock import patch
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'rev4_featpot'))
-from shaping_diagnostic_replay import canonical_pairs,replay
+from shaping_diagnostic_replay import canonical_pairs,replay,first_weight_traces
 
 class ReplayTests(unittest.TestCase):
+    def test_weight_trace_requires_exact_epoch_coverage(self):
+        lines=['FIRST_WEIGHT_DIAGNOSTICS '+json.dumps({'epoch':i}) for i in range(3)]
+        self.assertEqual(len(first_weight_traces('noise\n'+'\n'.join(lines),3)),3)
+        for invalid in (lines[:2],lines+[lines[-1]],list(reversed(lines)),[]):
+            with self.assertRaisesRegex(ValueError,'incomplete first-weight'):
+                first_weight_traces('\n'.join(invalid),3)
+
     def test_transient_drift_detected_even_when_final_matches(self):
         with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as d:
             root=Path(d);pairs=[]

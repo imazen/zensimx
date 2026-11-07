@@ -22,6 +22,13 @@ def canonical_pairs(binary_dir,pairs,output):
     return rows
 
 
+def first_weight_traces(log,epochs):
+    rows=[json.loads(line.split(" ",1)[1]) for line in log.splitlines() if line.startswith("FIRST_WEIGHT_DIAGNOSTICS ")]
+    if [r["epoch"] for r in rows]!=list(range(epochs)):
+        raise ValueError("incomplete first-weight diagnostic trace")
+    return rows
+
+
 def replay(args):
     from shaping_storage import reservation
     plan=json.loads((args.study/'PLAN.json').read_text())
@@ -85,6 +92,9 @@ def admitted_replay(args):
         if line.startswith('TRAINING_DIAGNOSTICS '):traces.append(json.loads(line.split(' ',1)[1]))
     if [r['epoch'] for r in traces]!=list(range(epochs)):raise ValueError('incomplete diagnostic trace')
     (args.output/'DIAGNOSTICS.json').write_bytes(encoded(traces))
+    if getattr(args,'require_weight_diagnostics',False):
+        weight_traces=first_weight_traces((args.output/'train.log').read_text(),epochs)
+        (args.output/'FIRST_WEIGHT_DIAGNOSTICS.json').write_bytes(encoded(weight_traces))
     checkpoint_matches=[]
     if getattr(args,'all_checkpoints',False):
         pairs=[(epoch,args.run/'checkpoints'/f'ckpt_epoch{epoch:03}.bin',args.output/'checkpoints'/f'ckpt_epoch{epoch:03}.bin') for epoch in range(epochs)]
@@ -98,5 +108,6 @@ if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__)
     for name in ('study','binary-dir','run','output'):p.add_argument('--'+name,type=Path,required=True)
     p.add_argument('--all-checkpoints',action='store_true',help='require canonical parity at every scheduled checkpoint, not only final')
+    p.add_argument('--require-weight-diagnostics',action='store_true',help='require every epoch of sampled first-layer weight diagnostics')
     p.add_argument('--resource-pilot',action='store_true',help='qualification only, excluded from scientific selection')
     replay(p.parse_args())

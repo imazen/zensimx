@@ -5301,3 +5301,7 @@ shaping-completion-probe-trace-check:
 # Diagnostic probe-only re-export; does not admit or score a study candidate.
 shaping-completion-repair-probe original probes binaries inspector output:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_probe_trace.py --repair-probes --original {{quote(original)}} --probes {{quote(probes)}} --binary-dir {{quote(binaries)}} --inspector {{quote(inspector)}} --output {{quote(output)}}
+
+# Qualify the sampled first-weight observer against every original checkpoint.
+shaping-completion-weight-replay study binary_dir run output:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_diagnostic_replay.py --study {{quote(study)}} --binary-dir {{quote(binary_dir)}} --run {{quote(run)}} --output {{quote(output)}} --all-checkpoints --require-weight-diagnostics

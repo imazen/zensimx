@@ -1764,3 +1764,13 @@ attempt remain preserved. The corrected native source is snapshot `1eb2f09d`
 with the recorded `shared_depth.rs` correction hash. This is implementation
 evidence; a full canonical-neutral replay is still required before attributing
 new weight-gradient traces to an original scientific fit.
+
+## First-weight replay coverage gate
+
+The diagnostic replay owner now has an explicit first-weight trace requirement.
+It refuses missing, duplicated or reordered epochs before qualifying a replay,
+and preserves the sampled weight traces separately from activation diagnostics.
+The dedicated recipe also requires canonical parity at every scheduled checkpoint.
+Three replay tests pass, including transient model drift despite matching final
+models and exact weight-trace epoch coverage. Native replay qualification remains
+pending; these tests do not establish observer neutrality on scientific fits.
