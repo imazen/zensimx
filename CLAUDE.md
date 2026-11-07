@@ -1,5 +1,17 @@
 # zensim — current working rules
 
+## Known Bugs — live research supervisor import drift (November 7, 2026)
+
+The inner shaping evaluator stopped when a lazy import loaded updated
+`shaping_selection` into a process whose older `shaping_completion` module lacked
+`MAX_PAIR_FAMILIES`. Its v7 log is preserved in the verified
+`inner-evaluator-import-recovery` archive. A new v8 evaluator on committed source
+resumed final and diagnostic reports without changing gates or prior results.
+When changing shared research modules, account for long-lived Python processes:
+their loaded modules do not update with the checkout, but future lazy imports do.
+Verify process liveness as well as status files; restart affected evaluators only
+after checking active children and preserving any incomplete outputs.
+
 ## Known Bugs — analytic-head native order failure (November 7, 2026)
 
 Softplus cell `6e988eec6f23b804ff31` (inner-2-1, seed 2, setting 0)
