@@ -5474,7 +5474,7 @@ shaping-cost-finalists-check:
 
 # Read observed training costs from completed native fits without replaying training.
 shaping-training-resources-batch study output:
-    TMPDIR="$HOME/tmp" python3 -B scripts/rev4_featpot/shaping_training_resources.py --batch-study "{{study}}" --output "{{output}}"
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_training_resources.py --batch-study "{{study}}" --output "{{output}}"
 
 shaping-control-resources study output logs:
     TMPDIR="$HOME/tmp" python3 -B scripts/rev4_featpot/shaping_control_resources.py --study "{{study}}" --output "{{output}}" {{logs}}
