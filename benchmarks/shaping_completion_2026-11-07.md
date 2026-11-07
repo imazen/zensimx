@@ -2534,3 +2534,30 @@ Cold readback verified `i265-pretrained11b-inputs`: 3 artifacts,
 Cold readback verified `i265-pretrained20c-inputs`: 3 artifacts,
 23753015 bytes, receipt
 `d1f99bc39af0f34569852b8e1030135cfb290ee622dfdb2c64dad9e878cc0568`.
+
+
+## Interrupted joint-shaping wave and unstarted-cell recovery
+
+The inner-0-0 joint-shaping controller and two native fits were absent on
+2026-11-07 after their scopes ended at 17:18:37 UTC. The product fit retained
+19 of 240 scheduled checkpoints, and the separate fit retained 219 of 240.
+The cause is unconfirmed. Neither has a final checkpoint; both are explicitly
+recorded as interrupted with an unknown exit code, rather than successful.
+Their partial files and original controller status remain preserved. Cold
+readback verified 252 artifacts, 334457522 bytes, under
+`interrupted-joint-00-evidence`, receipt
+`d6fa13e6a927ce474d7a5a247af0d508e511337470f40ab98f9ec7a5c8a87271`.
+
+The wave contains 13 successful fits, two interrupted fits and nine cells that
+never started. Restarting the two partial fits awaits the owner's clarification
+of the no-replay instruction. Existing native warm start restores model weights,
+not exact optimizer and sampling state, so it cannot be claimed as a faithful
+continuation. No partial or completed fit was restarted.
+
+`shaping_inner_dispatch.py` accepts explicit registered inner cells only and
+refuses every existing attempt. It uses the same shared CPU/RAM admission as
+rescue dispatch, with the existing per-fit SSD reservation and native execution
+owner. Successful children must preserve registered cell, plan, binary, epoch
+and pair-budget identity and the final-checkpoint checksum. Drain requests and
+invalid resource controls let live children finish before the controller exits.
+Four queue tests and nine shared-admission tests pass without native training.

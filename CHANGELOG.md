@@ -68,6 +68,10 @@
 
 ### Fixed
 
+- Add resource-aware recovery of explicitly selected, never-started inner
+  experiment cells; refuse existing attempts and retain active children while
+  draining, without changing native training inputs or exposure.
+
 - Add a compilation-only recipe for the four pinned pixel examples; document why newer associated helper names require a paired dependency update in [the compatibility record](docs/PIXEL_EXAMPLE_COMPATIBILITY.md).
 
 - `shipgates_prepare_source` uses `ConvertOptions::retain_channels()`, the same preset under its surviving name, because zenpixels `fde59b96` removes `forbid_lossy()`. Its `shipgates` feature now enables the `zenbitmaps` dependency the example has read BMP files through since `b476d7cc`.
