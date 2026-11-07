@@ -1798,3 +1798,15 @@ The replay was archived with cold destination readback: 368 artifact files,
 `291b783df9dbfd1eca594214a7675e4bc6d2c4bc5a1df999e834309352d62add`.
 Artifact suffix: `zero-output-optimizer-replay` beneath the completion-study
 local and durable roots. The replay remains excluded from model selection.
+
+## Supplemental analytic re-export qualification scope
+
+Before evaluating repaired Softplus quality panels, extend the existing native
+re-export owner with explicit inner-only diagnostic admission for Softplus.
+The native operator still admits only valid first-layer ReLU pairs with tied
+following coefficients; the later anchored Softplus layer remains unchanged.
+Evaluate the failed cell's final checkpoint and every registered convergence
+checkpoint. Retain original failures and use the existing feature-order, identity,
+parity and panel gates. The selection owner still refuses non-ReLU re-exports;
+these supplemental panels cannot select a Softplus setting or admit outer data.
+The default exporter and running ReLU supervisor retain their previous scope.

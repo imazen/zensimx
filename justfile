@@ -5305,3 +5305,9 @@ shaping-completion-repair-probe original probes binaries inspector output:
 # Qualify the sampled first-weight observer against every original checkpoint.
 shaping-completion-weight-replay study binary_dir run output:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_diagnostic_replay.py --study {{quote(study)}} --binary-dir {{quote(binary_dir)}} --run {{quote(run)}} --output {{quote(output)}} --all-checkpoints --require-weight-diagnostics
+
+shaping-completion-analytic-reexport study run binaries inspector *args:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 2G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_reexport.py --study {{quote(study)}} --run {{quote(run)}} --binary-dir {{quote(binaries)}} --inspector {{quote(inspector)}} --analytic-diagnostic {{args}}
+
+shaping-completion-reexport-check:
+    TMPDIR="$HOME/tmp" python3 -B -m unittest discover -s scripts/tests -p test_shaping_reexport.py

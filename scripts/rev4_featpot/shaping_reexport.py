@@ -8,6 +8,12 @@ from shaping_execution import load_registration
 from shaping_probe_trace import unique_signed_pairs
 
 
+def admit_family(family,analytic_diagnostic=False):
+    if family=='relu':return
+    if family=='softplus' and analytic_diagnostic:return
+    raise ValueError('non-ReLU re-export requires explicit Softplus diagnostic admission')
+
+
 def reexport(args):
     _,cells,_=load_registration(args.study)
     run=json.loads((args.run/'RUN.json').read_text())
@@ -18,7 +24,9 @@ def reexport(args):
     outer=outer_context(args.study,run,cells,args.checkpoint)
     epochs=admitted_epoch(run,result,cells,outer)
     epoch=evaluation_epoch(epochs,args.checkpoint)
-    if run['cell']['family']!='relu':raise ValueError('this exporter qualifies first-layer ReLU pairs only')
+    admit_family(run['cell']['family'],getattr(args,'analytic_diagnostic',False))
+    if run['cell']['family']!='relu' and outer is not None:
+        raise ValueError('analytic re-export is inner diagnostic only')
     if sha(args.study/'PLAN.json')!=run['plan_sha256']:raise ValueError('registration drift')
     build_path=args.binary_dir/'BUILD.json'
     for name,pin in json.loads(build_path.read_text())['binary_sha256'].items():
@@ -51,4 +59,5 @@ if __name__=='__main__':
     for name in ('study','run','binary-dir','inspector'):
         p.add_argument('--'+name,type=Path,required=True)
     p.add_argument('--checkpoint',type=int)
+    p.add_argument('--analytic-diagnostic',action='store_true',help='allow supplemental Softplus panels; selection remains unsupported')
     reexport(p.parse_args())
