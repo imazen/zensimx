@@ -216,3 +216,20 @@ All generated table, key, manifest and admission hashes were rechecked.
 `study/VARIANT_ADMISSION_QUALIFICATION.json` preserves the per-group evidence.
 Two population-admission tests and two absent-map tests pass. These are input
 qualification results, not completed variant fits or generalization results.
+
+The variant registry and admission evidence archive verified all five artifact
+files (7,580,046 bytes). Manifest SHA-256:
+`bfd4ad5273825f11406cc0e0b8427a2a0c651d088e7417bc0892882feb109753`.
+Suffix: `shaping-completion-20261107/variant-registration-archive`.
+
+New neural controllers reserve pending checkpoint space before every fit, in
+a short admission transaction. The allowance is one GiB per unresolved attempt
+plus three GiB for auxiliary output above the frozen 30-GiB reserve; these are
+conservative admission budgets, not measured output forecasts. Below the
+budget, admission waits for archival/reclamation without holding a compute
+lock. Reservations deduplicate running attempts and are released on normal
+exit or exception. Unexpected controller death retains its reservation for
+inspection. Three tests cover unresolved attempts, overlapping reservations,
+exception release, and waiting until sufficient space exists. Previously
+started controllers retain their loaded implementation and require continued
+manual headroom supervision; they have not silently adopted this change.

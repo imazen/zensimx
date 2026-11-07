@@ -71,6 +71,14 @@ def admit(args):
 
 
 def run_native(root,binary_dir,cell,record,attempt,epochs,mem):
+    from shaping_storage import reservation
+    minimum=json.loads((root/'PLAN.json').read_text())['minimum_ssd_free_bytes']
+    dest=root/'runs'/cell['id']/f'attempt-{attempt:03}'
+    with reservation(root,dest,minimum):
+        return _run_native(root,binary_dir,cell,record,attempt,epochs,mem)
+
+
+def _run_native(root,binary_dir,cell,record,attempt,epochs,mem):
     if attempt<1:raise ValueError('attempt must be positive')
     dest=root/'runs'/cell['id']/f'attempt-{attempt:03}'
     if dest.exists():raise ValueError('destination exists; inspect its actual process/artifacts')
