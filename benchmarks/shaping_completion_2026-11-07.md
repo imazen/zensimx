@@ -2477,3 +2477,30 @@ Cold readback verified `i265-pretrained20b-admission-evidence`: 19 artifacts,
 Cold readback verified `i265-pretrained20b-inputs`: 3 artifacts,
 24767960 bytes, receipt
 `5e44c1e035ffde8128fe7c5897a0125d384ec7494795ec78869ba01429a38cd0`.
+
+
+## Shared admission for optional expanded rescue pools
+
+Source `db8f1a97260f` retains the default four-worker capacity and adds an
+explicit larger-capacity option bounded by the host CPU budget. Upgraded
+queues reserve starting children through a shared short admission transaction;
+the transaction lock is never held during native training. CPU admission
+counts observed native processes plus shared claims not yet visible as native
+trainers. RAM admission retains 6 GiB headroom plus 2 GiB for each such pending
+child. Normal completion releases claims; unexpected owner loss requires
+explicit reconciliation rather than silently freeing a slot.
+
+Eight tests pass, including eight separate processes contending for a
+four-slot fixture budget: exactly four were admitted. Tests also retain
+unknown-owner claims, enforce default capacity and reject scientific fields
+in resource controls. These tests execute no native training.
+
+Only the idle outer-2 watcher was replaced, after verifying no active fits or
+process children. It is live with declared capacity 16, an initial two-worker
+limit and an 8 GiB controller cap. This prepares later scaling; it does not
+claim sixteen scientific fits are active. Fold-0 and fold-1 active fits were
+not interrupted, and no completed fit or pretraining was replayed.
+
+Cold readback verified `rescue-shared-pool-evidence`: 15 artifacts,
+63623 bytes, receipt
+`3f802c4f8e51240ce33b6ec7c510b54ae5b49c7ca0b4059be368ca5260adf6dd`.
