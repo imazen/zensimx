@@ -1899,3 +1899,14 @@ readback in `compiler-cache-reclamation-1145`.
 The first-weight replay then passed the unchanged admission gate and started
 its registered 120-epoch training. Full checkpoint parity and complete new
 weight diagnostics are still pending; launch is not qualification.
+
+## Analytic runtime comparison qualification
+
+Before admitting supplemental Softplus results to selection, the existing
+re-export owner now supports a separate full TRAIN/inner prediction comparison.
+It pins the original training runtime and repaired runtime, reproduces stored
+original predictions, requires bit-identical float32 unmarked-model outputs
+across runtimes, and measures repaired-model score differences on every
+population. It refuses missing, reordered or nonfinite prediction records and
+checks all input hashes again after scoring. This diagnostic writes separate
+artifacts and never changes study reports or chooses settings.

@@ -54,10 +54,83 @@ def reexport(args):
     evaluate(args)
 
 
+def prediction_values(path):
+    import numpy as np
+    import pandas as pd
+    frame=pd.read_csv(path,sep='\t')
+    if frame.columns.tolist()!=['row_idx','pred'] or not np.array_equal(frame.row_idx.to_numpy(),np.arange(len(frame))):
+        raise ValueError('comparison prediction row order differs')
+    values=frame.pred.to_numpy(dtype=np.float64)
+    if not len(values) or not np.isfinite(values).all():raise ValueError('comparison predictions empty or nonfinite')
+    return values
+
+
+def compare_runtime(args,output):
+    """Compare both runtimes and representations without changing study reports."""
+    import numpy as np
+    import v2_common
+    import v2_lodo_mlp as owner
+    from shaping_evaluation import prepare_validation,reexport_bake
+    if output.exists():raise ValueError('preserve existing runtime comparison')
+    plan,cells,partitions=load_registration(args.study)
+    run=json.loads((args.run/'RUN.json').read_text());result=json.loads((args.run/'RESULT.json').read_text());cell=run['cell']
+    if cell['stage']!='inner' or cell not in cells:raise ValueError('registered inner comparison required')
+    if run['plan_sha256']!=sha(args.study/'PLAN.json'):raise ValueError('comparison plan drift')
+    epochs=admitted_epoch(run,result,cells,None);epoch=evaluation_epoch(epochs,args.checkpoint)
+    original=args.run/run.get('fit_directory','.')/'checkpoints'/f'ckpt_epoch{epoch:03}.bin'
+    name='final' if args.checkpoint is None else f'epoch-{epoch:03}'
+    receipt=args.study/'reexports'/cell['id']/args.run.name/name/'RECEIPT.json'
+    build=args.binary_dir/'BUILD.json'
+    for key,pin in json.loads(build.read_text())['binary_sha256'].items():
+        if sha(args.binary_dir/key)!=pin:raise ValueError('comparison binary drift')
+    repaired=reexport_bake(receipt,original,run,build)
+    original_build=args.original_binary_dir/'BUILD.json'
+    if sha(original_build)!=run['build_sha256']:raise ValueError('original runtime differs from training')
+    for key,pin in json.loads(original_build.read_text())['binary_sha256'].items():
+        if sha(args.original_binary_dir/key)!=pin:raise ValueError('original runtime binary drift')
+    training_path=args.study/'comparators'/cell['partition']/'GROUPS.json'
+    training=json.loads(training_path.read_text())
+    validation=prepare_validation(args.study,cell['partition'],partitions[cell['partition']])
+    tables=[(g[0],'train',Path(g[1])) for g in training['groups']]+[(g['name'],'validation',Path(g['path'])) for g in validation['groups']]
+    baseline=args.run/('evaluation' if args.checkpoint is None else 'curve_evaluation/'+name)
+    pins={str(p):sha(p) for p in [args.run/'RUN.json',args.run/'RESULT.json',receipt,build,original_build,training_path,original,repaired]}
+    # Refuse missing original evidence before any scoring.
+    for group,split,table in tables:
+        path=baseline/(group+'-'+split+'.tsv');prediction_values(path)
+        pins[str(path)]=sha(path);pins[str(table)]=sha(table)
+    output.mkdir(parents=True);owner.FITBIN=v2_common.FITBIN=args.binary_dir/'bake_dial_refit';rows=[]
+    for group,split,table in tables:
+        directory=output/(group+'-'+split);directory.mkdir()
+        stored=prediction_values(baseline/(group+'-'+split+'.tsv'))
+        owner.FITBIN=v2_common.FITBIN=args.original_binary_dir/'bake_dial_refit'
+        old=owner.predict(original,table,directory/'original-runtime.tsv')
+        if not np.array_equal(stored.astype(np.float32).view(np.uint32),old.astype(np.float32).view(np.uint32)):
+            raise ValueError('original runtime no longer reproduces stored predictions')
+        owner.FITBIN=v2_common.FITBIN=args.binary_dir/'bake_dial_refit'
+        unmarked=owner.predict(original,table,directory/'unmarked.tsv')
+        changed=owner.predict(repaired,table,directory/'repaired.tsv')
+        if len(old)!=len(unmarked) or len(old)!=len(changed):raise ValueError('comparison row coverage differs')
+        exact=np.array_equal(old.astype(np.float32).view(np.uint32),unmarked.astype(np.float32).view(np.uint32))
+        delta=np.abs(changed-old)
+        rows.append(dict(group=group,split=split,rows=len(old),unmarked_exact=bool(exact),max_abs_delta=float(delta.max()),mean_abs_delta=float(delta.mean())))
+    for path,pin in pins.items():
+        if sha(path)!=pin:raise ValueError('comparison evidence changed during scoring')
+    record=dict(cell=cell,checkpoint_epoch=epoch,comparisons=rows,all_unmarked_exact=all(r['unmarked_exact'] for r in rows),evidence_sha256=pins,driver_sha256=sha(__file__),outer_results_read=False,selection_candidate=False)
+    (output/'RESULT.json').write_bytes(encoded(record))
+    if not record['all_unmarked_exact']:raise ValueError('unmarked runtime predictions changed')
+    print(json.dumps(record),flush=True)
+
+
 if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__)
     for name in ('study','run','binary-dir','inspector'):
         p.add_argument('--'+name,type=Path,required=True)
     p.add_argument('--checkpoint',type=int)
     p.add_argument('--analytic-diagnostic',action='store_true',help='allow supplemental Softplus panels; selection remains unsupported')
-    reexport(p.parse_args())
+    p.add_argument('--compare-runtime',type=Path)
+    p.add_argument('--original-binary-dir',type=Path)
+    args=p.parse_args()
+    if args.compare_runtime:
+        if args.original_binary_dir is None:p.error('runtime comparison requires original-binary-dir')
+        compare_runtime(args,args.compare_runtime)
+    else:reexport(args)
