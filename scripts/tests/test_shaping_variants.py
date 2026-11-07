@@ -1,12 +1,31 @@
 import sys
 from pathlib import Path
 import unittest
+import tempfile
 import numpy as np
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'rev4_featpot'))
 from shaping_variants import membership
+from shaping_variant_inputs import verify_prepared
+from shaping_completion import encoded,sha
 
 
 class VariantTests(unittest.TestCase):
+    def test_prepared_reuse_rejects_membership_and_input_drift(self):
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as d:
+            root=Path(d);manifest=root/'VARIANT_MEMBERSHIPS.json';manifest.write_bytes(b'{}')
+            source=root/'table';source.write_bytes(b'original')
+            view=dict(train=[0,1],test=[2]);cell=dict(stage='human_only')
+            admission=root/'ADMISSION.json';admission.write_bytes(encoded(dict(cell=view)))
+            path=root/'GROUPS.json'
+            receipt=dict(view_identifier='id',permutation='true',permutation_seed=0,
+                         view_sha256=sha(manifest),exposed_development_passed_to_trainer=False,
+                         outer_results_read=False,file_sha256={str(source):sha(source),str(admission):sha(admission)})
+            path.write_bytes(encoded(receipt));verify_prepared(path,root,'id',view,cell)
+            with self.assertRaisesRegex(ValueError,'membership differs'):
+                verify_prepared(path,root,'id',dict(train=[0,2],test=[1]),cell)
+            source.write_bytes(b'changed')
+            with self.assertRaisesRegex(ValueError,'input drift'):verify_prepared(path,root,'id',view,cell)
+
     def setUp(self):
         self.component=np.repeat(np.array(['a','b','c','d','held']),8)
         self.pop=np.array(['human']*16+['cid22_ssim2']*16+['human']*8)

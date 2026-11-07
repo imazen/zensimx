@@ -166,3 +166,13 @@ Packaging also reserves one GiB on the worker study filesystem before writing.
 Its payload admission leaves 16 MiB for transport metadata and permits at most
 1,000 files; this is a conservative allowance, not a memory or timing claim.
 The collector retains its independent SSD reservation and atomic publication.
+
+## Registered generalization input preparation
+
+`just shaping-completion-prepare-all-variants` prepares the already registered
+source/row subsets, human-only views and both training-label permutation schemes.
+Views are shared across model roles and seeds; permutation type and seed remain
+part of the preparation identity. Each preparation reserves SSD space and checks
+the frozen inputs. Reuse verifies membership, metadata and every pinned file.
+It neither chooses finalists nor reads outer responses, and fits no model.
+`VARIANT_INPUT_PROGRESS.json` records preparation separately from scientific fits.
