@@ -4,6 +4,9 @@
 
 ### Research
 
+- Extend saved-shaper consistency analysis to complete paired source-partition
+  grids; report remaining coverage and separate response variation from utility.
+
 - Add opt-in sampled first-layer weight-gradient diagnostics using separate
   scratch state, reporting data and coupled-L2 pair-gradient norms. Native
   tests pass; scientific trace use still requires a canonical-neutral replay.

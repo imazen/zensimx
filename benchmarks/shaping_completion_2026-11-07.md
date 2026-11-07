@@ -2663,3 +2663,32 @@ models and inner-2-1 has three of six; both remain missing from this interim
 analysis. It describes response consistency over the declared TRAIN-derived
 domain, excluding downstream weights, without claiming feature utility or
 source-independent quality gains. The original scientific matrix is unchanged.
+
+The measured 24-model balanced panel has 492 direct terms: three are nonzero
+in every fit, and three are zero in every fit. f403 is nonzero in 22/24 fits;
+f506 is nonzero in 16/24. Terms nonzero in every fit are:
+
+| Feature | Active fits | Maximum normalized response spread | Response-strength ratio |
+|---|---:|---:|---:|
+| f412 | 24/24 | 1.0 | 1757.4696777466531 |
+| f603 | 24/24 | 0.9642562028839521 | 22140.828457586227 |
+| f690 | 24/24 | 0.9658494342387896 | 22143.80469444119 |
+
+Deduplicating this panel against the earlier 24-model, four-setting inner-0-1
+panel verifies six identical overlapping model configurations and 42 unique
+fits. This union has unbalanced setting coverage and is descriptive only.
+Only f603 and f690 are nonzero in all 42; their normalized spreads are
+0.965019994677981 and 0.9666167243813757, and strength ratios are
+22140.828457586227 and 22143.80469444119.
+
+This does not establish a reusable, consistently shaped per-feature set.
+Nonzero activity does not establish utility. The responses exclude downstream
+weights, which can compensate for shaper scale, and the sampled source folds
+overlap in their training data. These measurements neither reject the full
+models nor establish held-out quality gains. The remaining two partitions
+and the registered generalization comparisons are incomplete. No training,
+prediction replay, outer evaluation or final-holdout read was performed.
+
+Cold readback verified `native-direct-four-partitions-setting0-1815`:
+30 artifacts, 4660563 bytes; receipt
+`08df0cbd82bcdf750bcdc9791743170505f23c30065fea9468999b9250115a83`.
