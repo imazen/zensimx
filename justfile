@@ -5074,6 +5074,12 @@ shaping-completion-optimizer-summary study run output *args:
 shaping-completion-optimizer-summary-check:
     python3 -B -m unittest discover -s scripts/tests -p test_shaping_optimizer_summary.py
 
+shaping-completion-curve-stability study binaries family outer setting output:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_curve_stability.py --study {{quote(study)}} --binary-dir {{quote(binaries)}} --family {{quote(family)}} --outer {{outer}} --setting {{setting}} --output {{quote(output)}}
+
+shaping-completion-curve-stability-check:
+    python3 -B -m unittest discover -s scripts/tests -p test_shaping_curve_stability.py
+
 shaping-completion-watch-all-evaluation study binary_dir rescue_binary_dir:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 2G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_supervision.py --study {{quote(study)}} --binary-dir {{quote(binary_dir)}} --rescue-binary-dir {{quote(rescue_binary_dir)}} --watch
 
