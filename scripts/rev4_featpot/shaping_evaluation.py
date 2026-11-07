@@ -358,7 +358,8 @@ def evaluate(args):
                       evaluation_build_sha256=sha(args.binary_dir/'BUILD.json'),
                       representation='research-relu-max-pairs-v1',
                       selection=report['selection'] if outer is not None else 'supplemental re-export; requires uniform representation qualification before selection')
-    np.savez_compressed(dest/'predictions.npz',original_indices=wanted,native=pred)
+    from shaping_prediction_evidence import save as save_predictions
+    save_predictions(dest,report,wanted,pred)
     (dest/'REPORT.json').write_bytes(encoded(report))
     (dest/('COMPLETE.json' if checkpoint is None else 'DIAGNOSTIC_COMPLETE.json')).write_bytes(encoded(dict(cell=cell['id'],report_sha256=sha(dest/'REPORT.json'))))
     role='exposed_development' if outer and outer.get('descriptive') else 'full_fit_validation' if outer and outer.get('full_fit') else 'outer_test' if outer is not None else 'inner_validation'

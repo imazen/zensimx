@@ -1231,3 +1231,18 @@ nine decimal places. The resource wrapper reported `done rc=0 1s | peak-RSS
 on an artificial fixture, not scientific uncertainty or an inference benchmark.
 The admitted outer-evidence loader and final interval reduction remain to be
 connected before scientific use. Evidence: `bootstrap-stats-qualification`.
+
+### Prediction-table binding for outer uncertainty
+
+New neural and control evaluations bind `predictions.npz` into `REPORT.json`
+with `predictions_sha256` before the completion marker is written. This adds
+provenance without changing predictions, ranks, gates or selection. Earlier
+reports remain preserved; an unbound table cannot enter the new uncertainty
+reader merely because its report has a completion marker.
+
+`shaping_prediction_evidence.py` verifies report/marker identity, exact admitted
+outer role, plan/admission hashes, prediction digest, ordered row membership,
+shape and finite coverage. Its caller must revalidate the full outer admission
+before reading responses; this helper alone is not the complete study loader.
+Five new evidence checks, 15 existing evaluation checks and six outer-control
+checks pass. Qualification is preserved in `prediction-evidence-qualification`.

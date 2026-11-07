@@ -211,7 +211,8 @@ def fit(args,plan,partitions,family,chosen,outer):
             if variant:
                 report.update(training_target_policy='registered permutation' if cell['stage']=='shuffle' else 'actual targets',
                               outer_target_policy='actual targets',resolved_family=family)
-            np.savez_compressed(evaluation/'predictions.npz',original_indices=wanted,native=pred)
+            from shaping_prediction_evidence import save as save_predictions
+            save_predictions(evaluation,report,wanted,pred)
             write(evaluation/'REPORT.json',report)
             write(evaluation/'COMPLETE.json',dict(cell=cell['id'],report_sha256=sha(evaluation/'REPORT.json')))
             write(dest/'RESULT.json',{**running,'stage':'complete','exit_code':0,'finished_utc':datetime.now(timezone.utc).isoformat()})
