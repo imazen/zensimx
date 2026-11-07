@@ -974,3 +974,32 @@ to the later evaluator and must not stop an inner watcher merely because they
 are registered by an outer-admission receipt instead of the base matrix. A
 regression test verifies both inner watchers leave that result to its owner;
 existing inner failure and later final-only behavior remain tested.
+
+## Third-fold rescue admission and continued execution (08:59 UTC)
+
+Registered inner cell `bf9567983d426a188f00` (ordinary SiLU diagnostic,
+inner-2-1, setting 0, seed 0) completed 240 epochs. Its final 20-epoch
+mean logged loss was 0.16346, versus 0.22818 in the preceding window.
+The registered rounding-aware loss test requires investigation; all seven
+diagnostic checkpoints retain 64 active output coefficients. This is evidence
+of continuing optimization, not output-coefficient collapse or a quality win.
+
+The trigger registrar reproduced the diagnostics from pinned reports and the
+complete training log, verified the terminal bake, and wrote
+`RESCUE_TRIGGER_OUTER_2.json`. Its convergence receipt SHA-256 is
+`43a5c7fd1caf027521b1dbd01f75a8434f5472dc0e6282e119afc023a0fb4183`.
+All three outer folds now require their pre-registered 240-cell rescue waves:
+720 rescue fits in total. The third dispatcher waits for complete paired base
+selection; registration is not execution or convergence. No outer results were
+read to make this decision.
+
+The inner-0-1 pretrained dispatcher now has two verified live native fits,
+released from completed matching parent fits. A second checkpoint-retention
+pass reread and removed 5,220 local duplicates from 25 completed archived cells,
+preserving diagnostic, final and epoch-119 prefix checkpoints. Removed logical
+bytes: 1,399,134,243. Observed filesystem free bytes before/after were
+56,591,933,440 / 57,996,812,288; concurrent jobs were still writing. Wrapper:
+`run-heavy: done rc=0 39s | peak-RSS 0.10GiB | min-avail 33559MiB | peak-load 20.63`.
+The four-file retention evidence archive (6,239,399 bytes) passed full destination
+SHA-256 readback under `checkpoint-retention-0858-qualification` in the study's
+local and durable roots. The full scientific matrix remains incomplete.
