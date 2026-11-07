@@ -94,3 +94,28 @@ SHA-256. Wrapper: `run-heavy: done rc=0 38s | peak-RSS 1.63GiB | min-avail 25068
 The complete success/failure logs and isolated-process fixture are mirrored
 under `shaping-completion-20261107/unrestricted-qualification/`; verified
 inventory SHA-256: `5fc593ba04273859f4f6877429bfe1e3084e639af3b2650e2fd8d3cb1e4d1c81`.
+
+## Native input-shaping runtime
+
+The private `zensim-derived-inputs research-shaping-v1` declaration distinguishes
+`shape d k0 k1 s0 s1 s2`, `shape-product d f k0 k1 s0 s1 s2`, and
+`separate d f k0 k1 s0 s1 s2 h0 hhalf h1`. Older runtimes reject its header.
+Damage shapes integrate three nonnegative slopes over intervals delimited by
+positive increasing knots. They preserve zero damage and are monotone on the
+nonnegative damage domain. Unit slopes use an exact identity fast path.
+Separate gates interpolate nonnegative heights at 0, 0.5 and 1, with constant
+extrapolation outside this interval. Nonnegative gates do not imply monotonicity
+in fragility; no such claim is made here. Negative damage is clamped to zero.
+The exact mathematical sensitivity uses the right-hand slope at internal knots
+and zero slope at the clamped domain boundary.
+
+At `29895a8b`, the targeted runtime gate passed all 14 derived-input tests,
+including a baked-model round trip, the identity score, the distinct product
+operations and their full chain rule against served central differences.
+A separate analytic-activation sensitivity test passed for Softplus and SiLU
+on both sides of zero. Strict runtime library clippy passed. These gates do
+not qualify the still-pending learned-shaper training/export integration.
+
+Wrapper for the shaped round trip: `run-heavy: done rc=0 29s | peak-RSS 2.60GiB | min-avail 24610MiB | peak-load 1.61`.
+Wrapper for analytic sensitivity: `run-heavy: done rc=0 24s | peak-RSS 2.60GiB | min-avail 24522MiB | peak-load 1.95`.
+Wrapper for strict runtime clippy: `run-heavy: done rc=0 7s | peak-RSS 0.60GiB | min-avail 26441MiB | peak-load 1.92`.
