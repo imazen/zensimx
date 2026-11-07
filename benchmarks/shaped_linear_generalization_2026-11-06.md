@@ -11,8 +11,7 @@ passed for the applicable constrained models. Twenty calibration attempts gave
 18 measured curves and two explicit anchor refusals. The 2,000-draw paired
 source bootstrap, exact-feature/nearest-source audits, all family exclusions
 and all source-influence refits are complete. Artifacts are retained under
-`/mnt/v/output/zensim/shaped-linear-generalization-20261106/`; cold mirror
-verification is the final storage step.
+`/mnt/v/output/zensim/shaped-linear-generalization-20261106/`; every artifact has a verified cold-readback storage mirror.
 
 ## Data and comparison
 
@@ -140,7 +139,7 @@ selected S1 lambda. Matched row-budget controls retain all sources, and all
 60 curve fits include basis-slope stability diagnostics on common training-only
 raw-feature quantiles.
 
-Reference-context-only models are constant within each source, so their
+The 12-input fx2 reference-context-only models are constant within each source, so their
 within-source correlations are explicitly undefined. Their pooled outer
 correlations range from -0.167101 to 0.152083 across human populations/folds.
 This does not prove that another model ignores context shortcuts.
@@ -181,3 +180,23 @@ four Gram workers could therefore use sixteen threads. Native fitting children
 were limited to one thread. The original driver and actual Grams remain intact.
 Subsequent entry points set limits before NumPy import; the corrected audit
 reports one thread. This is recorded rather than retroactively relabeling runs.
+
+## Verified retention
+
+The archive contains 4,403 artifacts before its mirror receipt, totaling
+10,391,487,000 bytes. Every file passed fsync plus client cold-readback SHA-256
+verification in the mirror at
+`/mnt/tower/output/zensim/shaped-linear-generalization-20261106/`.
+Receipt SHA-256:
+`4a797ece6ebe382be7460e6c8cabe16554547377cca743a597d12db17f17f846`.
+The checksum inventory SHA-256 is
+`642428868aada79b69ee4358b14e01a279b7c068e6dd1f0bdea2e478de7b8882`.
+
+The retained closure pins report SHA-256
+`5288a8f09262168f7f9df6506a1c81b62fdb57a7c7e9a20153233e87486d3397`
+and source-bootstrap SHA-256
+`82901d7992c2be4cc0a1f923bbb73d4eb404a58492a69a7d2cb3ffaf9647157d`.
+Reproduction sources were captured at `c48eecca08c1`; this later pointer update
+does not modify the closed experiment tree. All original input and model hashes
+were rechecked before archive creation. Scientific fits did not access a final
+holdout or promote a serving profile. CI is manual; the recorded checks are local.

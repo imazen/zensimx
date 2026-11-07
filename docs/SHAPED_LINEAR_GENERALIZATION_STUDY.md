@@ -221,6 +221,8 @@ scoped clippy and controller leakage/grouping tests pass. Source bootstrap uses
 Findings and limits: [result record](../benchmarks/shaped_linear_generalization_2026-11-06.md).
 The experiment artifacts retain exact matrices, Grams, native model bytes,
 per-row predictions, signed panels, uncertainty samples and live-process audits.
+All 4,403 artifacts passed cold-readback SHA-256 verification in the archive
+mirror; the result record binds its receipt and inventories.
 No final holdout or serving qualification was included.
 
 Comparator preparation reused strict D1/revision/key admission. Each derived
