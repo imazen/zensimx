@@ -1,11 +1,33 @@
 """Independent f64 algebra diagnostic of stored dense weights, not a scorer."""
 from __future__ import annotations
-import argparse,csv,json,os
+import argparse,csv,json,os,ctypes
 from pathlib import Path
 for k in ('OPENBLAS_NUM_THREADS','OMP_NUM_THREADS','MKL_NUM_THREADS'):os.environ[k]='1'
 import numpy as np
 import pyarrow.parquet as pq
 from shaping_completion import encoded,sha
+
+
+def f32_layers(raw,model):
+    # libc fmaf supplies one correctly rounded float32 fused multiply-add.
+    # This is an independent scalar reference; equality is checked against native.
+    fmaf=ctypes.CDLL('libm.so.6').fmaf
+    fmaf.argtypes=[ctypes.c_float]*3;fmaf.restype=ctypes.c_float
+    scale=np.array(model['scaler_scale'],np.float32);scale=np.where(scale==0,np.float32(1),scale)
+    x=(raw.astype(np.float32)-np.array(model['scaler_mean'],np.float32))/scale
+    outputs=[]
+    for layer in model['layers']:
+        w=np.array(layer['weights'],np.float32).reshape(layer['in_dim'],layer['out_dim'])
+        out=np.tile(np.array(layer['biases'],np.float32),(len(x),1))
+        for row in range(len(x)):
+            for i in range(layer['in_dim']):
+                value=float(x[row,i])
+                if value==0:continue
+                for j in range(layer['out_dim']):out[row,j]=fmaf(value,float(w[i,j]),float(out[row,j]))
+        if layer['activation']=='relu':out=np.maximum(out,np.float32(0))
+        elif layer['activation']!='identity':raise ValueError('unsupported scalar activation')
+        outputs.append(out);x=out
+    return outputs
 
 
 def trace(model_path,probes,predictions,out):
@@ -35,9 +57,23 @@ def trace(model_path,probes,predictions,out):
     cases=[]
     for index in failures:
         i=int(index);j=i+128;changed=np.flatnonzero(raw[j]!=raw[i])
+        f32=f32_layers(raw[[i,j]],model)
+        if not np.array_equal(f32[-1][:,0].view(np.uint32),native[[i,j]].astype(np.float32).view(np.uint32)):
+            raise ValueError('scalar fused reference does not reproduce native failing scores')
+        first=np.array(model['layers'][0]['weights']).reshape(model['layers'][0]['in_dim'],-1)
+        middle=np.array(model['layers'][1]['weights'],np.float32).reshape(model['layers'][1]['in_dim'],-1)
+        tied={}
+        for unit,weights in enumerate(middle):tied.setdefault(weights.tobytes(),[]).append(unit)
+        group_changes=[]
+        for units in tied.values():
+            if len(units)>1 and (first[:,units]<0).any():
+                group_changes.append(dict(units=units,f64_change=float(layers[0][j,units].sum()-layers[0][i,units].sum()),
+                    f32_activation_sum_change=float(f32[0][1,units].astype(np.float64).sum()-f32[0][0,units].astype(np.float64).sum())))
         cases.append(dict(pair=i,native_low=float(native[i]),native_high=float(native[j]),native_increase=float(native[j]-native[i]),
             f64_low=float(x[i,0]),f64_high=float(x[j,0]),f64_increase=float(x[j,0]-x[i,0]),
-            changed_derived_inputs=changed.tolist(),layer_minimum_activation_changes=[float((v[j]-v[i]).min()) for v in layers],
+            changed_derived_inputs=changed.tolist(),scalar_fused_native_bits_equal=True,
+            f32_layer_minimum_changes=[float((v[1].astype(np.float64)-v[0]).min()) for v in f32],
+            tied_signed_first_layer_groups=group_changes,layer_minimum_activation_changes=[float((v[j]-v[i]).min()) for v in layers],
             layer_maximum_activation_changes=[float((v[j]-v[i]).max()) for v in layers]))
     result=dict(pins={str(p):sha(p) for p in (model_path,probes,predictions)},cases=cases,
                 scope='independent f64 dense algebra from stored f32 coefficients; not native replay or qualification',

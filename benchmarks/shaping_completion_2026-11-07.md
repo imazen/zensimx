@@ -286,3 +286,13 @@ investigation direction, not a proven native root cause or a qualified repair.
 The native gate remains failed. The trace uses the existing native model
 inspector and a separately labelled f64 algebra reference; it is not a
 replacement scoring implementation.
+
+The follow-up scalar reference uses libc `fmaf`, the stored f32 scaler and
+the predictor's bias-first SAXPY order. It reproduces both failing native
+scores bit for bit. The second layer contains an activation decrease of
+0.00048828125, while its f64 counterpart has no decrease. Tied signed
+first-layer groups have nondecreasing summed f32 activations in this pair;
+accumulating their separate terms in the middle layer nevertheless reverses
+the ordering. This localizes the observed reversal to rounded dense evaluation
+of the tied-pair representation. It is not a repaired or passing model.
+The scalar diagnostic wrapper measured 1 second and peak RSS 0.15 GiB.
