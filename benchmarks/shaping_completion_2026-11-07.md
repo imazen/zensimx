@@ -2318,3 +2318,26 @@ alone does not establish stable magnitude. No quality benefit is inferred.
 Evidence: `native-direct-allsettings-inner01-1556`. The wrapper reported
 `rc=0 1s | peak-RSS 0.04GiB | min-avail 22664MiB | peak-load 29.35`.
 This reads stored parameters, not new training or predictions.
+
+
+## Newly ready pretrained inner-2-1 pair
+
+One newly completed matching joint-shaping parent released two previously
+unstarted registered inner-2-1 pretrained fits. They were assigned to i265
+with one worker, preserving its aggregate 16-thread budget. Both native prefix
+extractions and checksummed input installation passed before admission. The
+controller and first native trainer were verified live. Worker source remains
+`ce9229d0362d`; no completed fit or pretraining prefix was replayed.
+
+Admission observed 15 existing trainers, 24,569,634,816 available memory bytes,
+and 284,626,165,760 free disk bytes against 52,613,349,376 required. The controller
+has a 2 GiB cap; the child retains a 1 GiB cap. Placement, commands and parent
+provenance are retained in `pretrained21-admission-evidence`.
+
+Cold readback verified `pretrained21-admission-evidence`: 15 artifacts,
+609304 bytes, receipt
+`e5dbdb38794c71896f6b036f7116dae467d67143b790642200d94f9331cad3fb`.
+
+Cold readback verified `i265-pretrained21-inputs`: 3 artifacts,
+25094457 bytes, receipt
+`1b0a321d3e959cf5ab14dd152256a252d697edd3fff71fb9f876ff622823980a`.
