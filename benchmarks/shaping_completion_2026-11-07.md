@@ -1569,3 +1569,21 @@ All three `regularization-curves-o0-i1-*` directories passed complete destinatio
 checksum readback: 30 artifact files, 6,665,737 bytes. They retain every compared
 native shaping configuration, fit/input hashes and analysis logs. Outer
 predictions and exposed development results were not used.
+
+## Checkpoint retention and fresh-control admission at 10:44 UTC
+
+Sixteen newly archived fits supplied 3,480 intermediate checkpoint duplicates,
+789,651,408 logical bytes. The existing retention owner reread and SHA-256
+verified every durable copy, checked local hashes and file identities, and
+performed two open-file checks before removal. Required diagnostic epochs,
+final models and failed attempts remain local. Free bytes measured immediately
+before/after removal were 59,193,442,304 and 59,987,755,008 with concurrent writes.
+Wrapper: `run-heavy: done rc=0 29s | peak-RSS 0.10GiB | min-avail 32088MiB |
+peak-load 25.52`. The three-file plan/receipt/log archive passed full checksum
+readback: 4,368,988 bytes in `checkpoint-retention-1042-qualification`.
+
+Fresh control `de1b752f8826a840b5e7` was independently admitted at 10:40 UTC,
+before this retention pass. Its live process and epoch-8 checkpoint of the
+registered 120-epoch fit were verified at 10:44 UTC. The other queued seed
+still awaited pending-write headroom. This run must not be attributed to the
+later reclamation, and its partial checkpoints do not complete the fit.
