@@ -8,7 +8,7 @@ import unittest
 from unittest.mock import patch
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'rev4_featpot'))
-from shaping_worker_collect import unpack,inventory,validate,pack
+from shaping_worker_collect import unpack,inventory,validate,pack,collect
 from shaping_completion import encoded,sha
 from shaping_rescue_execution import portable_command
 
@@ -21,20 +21,33 @@ class CollectionTests(unittest.TestCase):
             pin=sha(declaration)
             command=['trainer','--derived-inputs',str(declaration)]
             cell=dict(id='cell',family='relu',stage='inner')
-            run=dict(cell=cell,command=command)
-            (root/'RUN.json').write_bytes(encoded(run))
             (study/'PLAN.json').write_bytes(encoded(dict(minimum_ssd_free_bytes=0)))
+            run=dict(cell=cell,command=command,execution_host='worker',
+                     plan_sha256=sha(study/'PLAN.json'),build_sha256='build',
+                     epochs=240,pairs_per_epoch=50000)
+            (root/'RUN.json').write_bytes(encoded(run))
+            checkpoints=root/'checkpoints';checkpoints.mkdir()
+            for epoch in range(240):
+                (checkpoints/f'ckpt_epoch{epoch:03}.bin').write_bytes(bytes([epoch]))
+            (root/'RESULT.json').write_bytes(encoded(dict(run,stage='trained',exit_code=0,
+                bake_sha256=sha(checkpoints/'ckpt_epoch239.bin'))))
             assignment=study/'assignment.json'
-            assignment.write_bytes(encoded(dict(host='worker',cells=['cell'],plan_sha256=sha(study/'PLAN.json'))))
+            assignment.write_bytes(encoded(dict(host='worker',cells=['cell'],
+                plan_sha256=sha(study/'PLAN.json'),build_sha256='build')))
             before=inventory(root);bundle=study/'bundle.tar'
             with patch('shaping_execution.load_registration',return_value=({},[cell],{})), \
-                 patch('shaping_worker_collect.validate',return_value=run), \
                  patch('shaping_worker_collect.socket.gethostname',return_value='worker'), \
                  patch('shaping_worker_collect.DECLARATION_SHA256',pin):
                 receipt=pack(study,assignment,'cell','attempt-001',bundle)
             self.assertEqual(inventory(root),before)
-            out=study/'imported';unpack(bundle,out,receipt['bundle_sha256'])
-            (out/'WORKER_COLLECTION.json').write_bytes(encoded(receipt))
+            collector=study/'collector';collector.mkdir();(collector/'runs').mkdir()
+            (collector/'PLAN.json').write_bytes((study/'PLAN.json').read_bytes())
+            with patch('shaping_execution.load_registration',return_value=(dict(minimum_ssd_free_bytes=0),[cell],{})):
+                out=Path(collect(collector,assignment,bundle,receipt['bundle_sha256']))
+                self.assertFalse((collector/'worker_collection'/receipt['bundle_sha256']).exists())
+                with self.assertRaises(FileExistsError):
+                    collect(collector,assignment,bundle,receipt['bundle_sha256'])
+            self.assertEqual((out/'RUN.json').read_bytes(),(root/'RUN.json').read_bytes())
             declaration.unlink() # Original worker path is absent on the collector.
             with patch('shaping_rescue_execution.DECLARATION_SHA256',pin):
                 relocated=portable_command(command,out)

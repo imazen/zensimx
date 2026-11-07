@@ -551,3 +551,34 @@ admission archive is verified at `worker-i265-fresh-inner-0-1-admission-r2`,
 manifest SHA-256 `2551487803fd285de940c0c3037733550cbe8a0ab210c1a90a6bb8a8ecfcdae2`. The first destination remains
 preserved after the two-file supplemental-sampling bug; full artifact hashing
 was unchanged by the repair.
+
+## Collection readiness and observed progress at 06:17 UTC
+
+Collection tooling at `581c43d5` reserves worker packaging space and preserves
+an exact copy of the frozen derived-input declaration. A separate source capsule
+was installed on i270 and i265; both copies matched SHA-256
+`ffd9c67f61b650958df61299d6106bdce6227879f28f8b2b5d5adf77d7f6c793`.
+The running training capsules were not changed. Its two-file, 4,209,048-byte
+archive at `collection-tools-581c43d5` under the completion-study mirror passed
+full SHA-256 readback. No remote scientific fit had been imported at this check.
+
+The collection integration fixture now passes the real terminal-receipt and
+240-checkpoint coverage validator, packaging, reserved import and atomic
+publication. It also proves refusal to overwrite an existing cell and detects
+declaration drift after relocation. This is transport qualification, not native
+model or scientific qualification.
+
+The 06:17:16 UTC progress audit records 132/816 primary inner cells with final
+reports and 6/72 fresh inner controls with final reports. Of the primary cells,
+36 have neural convergence receipts, 34 trigger investigation and four retain
+original diagnostic-gate failures. These counts do not imply scientific closure.
+The cell-level archive receipts cover 32 primary and six fresh cells; control-wave
+archives are separately recorded above. Source/row curves, shuffles, human-only,
+outer and full-FIT stages remain unexecuted.
+
+Live process inspection confirms 19 local, 16 i270 and 12 i265 fits, with no
+unexpectedly stopped attempts. Free SSD bytes were 57,131,855,872,
+61,988,958,208 and 219,861,602,304 respectively. The original evaluator,
+supplemental evaluator, archive supervisor and rescue dispatcher were verified
+against their live process command lines. Rescue admission still awaits complete
+paired base-family evidence; no rescue fit was reported as running.
