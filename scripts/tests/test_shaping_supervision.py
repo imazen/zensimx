@@ -8,6 +8,18 @@ from shaping_evaluation import NativeFeatureGateError
 from shaping_completion import encoded
 
 class SupervisionTests(unittest.TestCase):
+    def test_rescue_uses_explicit_optimizer_binary_set(self):
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as d:
+            root=Path(d);cell=dict(id='rescue',stage='rescue',family='softplus')
+            run=root/'runs/rescue/attempt-001';run.mkdir(parents=True)
+            (run/'RESULT.json').write_bytes(encoded(dict(cell=cell,stage='trained',epochs=240)))
+            args=SimpleNamespace(study=root,binary_dir=root/'primary',rescue_binary_dir=root/'optimizer')
+            with patch('shaping_supervision.load_registration',return_value=({},[cell],{})),patch('shaping_supervision.evaluate') as evaluate,patch('shaping_supervision.report'):
+                self.assertEqual(sweep(args),1)
+                self.assertTrue(all(c.args[0].binary_dir==root/'optimizer' for c in evaluate.call_args_list))
+                args.rescue_binary_dir=None
+                with self.assertRaisesRegex(ValueError,'explicit pinned'):sweep(args)
+
     def test_supplemental_watch_keeps_original_failure_and_isolates_new_failure(self):
         from shaping_reexport_supervision import sweep as supplemental
         with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as d:

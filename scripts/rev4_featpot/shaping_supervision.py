@@ -34,7 +34,11 @@ def sweep(args):
             if cell not in cells:cells.append(cell)
         if cell not in cells:raise ValueError('unregistered training result')
         if cell['stage'] not in ('inner','fresh_control_inner','rescue','exposure_extension') or result['stage']!='trained':continue
-        values=dict(study=args.study,binary_dir=args.binary_dir,run=run)
+        binaries=args.binary_dir
+        if cell['stage'] in ('rescue','exposure_extension'):
+            binaries=getattr(args,'rescue_binary_dir',None)
+            if binaries is None:raise ValueError('rescue/extension evaluation requires its explicit pinned binary directory')
+        values=dict(study=args.study,binary_dir=binaries,run=run)
         print(json.dumps(dict(cell=cell['id'],stage='evaluating',utc=datetime.now(timezone.utc).isoformat())),flush=True)
         failures=[]
         for epoch in (None,*diagnostic_epochs(result['epochs'])):
@@ -64,6 +68,7 @@ def sweep(args):
 def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('--study',type=Path,required=True);p.add_argument('--binary-dir',type=Path,required=True)
+    p.add_argument('--rescue-binary-dir',type=Path)
     p.add_argument('--watch',action='store_true');args=p.parse_args()
     while True:
         n=sweep(args)
