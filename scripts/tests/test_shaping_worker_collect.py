@@ -8,7 +8,7 @@ import unittest
 from unittest.mock import patch
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'rev4_featpot'))
-from shaping_worker_collect import unpack,inventory,validate,pack,collect
+from shaping_worker_collect import unpack,inventory,validate,pack,collect,verify_transfer
 from shaping_completion import encoded,sha
 from shaping_rescue_execution import portable_command
 
@@ -58,6 +58,20 @@ class CollectionTests(unittest.TestCase):
                 (out/'COLLECTION_DERIVED_INPUTS.json').write_bytes(b'changed')
                 with self.assertRaisesRegex(ValueError,'declaration drift'):
                     portable_command(command,out)
+
+    def test_transfer_readback_and_changed_bytes(self):
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as d:
+            root=Path(d);bundle=root/'bundle.tar';bundle.write_bytes(b'known producer bytes')
+            assignment=root/'assignment.json';assignment.write_bytes(encoded(dict(cells=['cell'])))
+            pin=sha(bundle)
+            Path(str(bundle)+'.json').write_bytes(encoded(dict(bundle_sha256=pin,
+                assignment_sha256=sha(assignment),cell=dict(id='cell'))))
+            receipt=verify_transfer(bundle,pin,assignment)
+            self.assertEqual(receipt['bundle_sha256'],pin)
+            self.assertEqual(receipt['bundle_bytes'],len(b'known producer bytes'))
+            with self.assertRaises(FileExistsError):verify_transfer(bundle,pin,assignment)
+            bundle.write_bytes(b'changed transfer bytes')
+            with self.assertRaisesRegex(ValueError,'checksum'):verify_transfer(bundle,pin,assignment)
 
     def test_readback_and_corruption(self):
         with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as d:

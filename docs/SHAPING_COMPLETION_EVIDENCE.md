@@ -210,3 +210,11 @@ when an overlapping reservation asks for less. The 30 GiB minimum and 3 GiB
 auxiliary reserve remain unchanged. The first real 240-checkpoint worker import
 passed provenance and per-file hashes, then native evaluation and convergence
 diagnosis; its ongoing improvement remains an investigation trigger.
+
+Worker transport has explicit fetch and durable-readback commands. Fetch creates
+a new destination and uses SCP without preserving remote ownership. Readback
+checks the producer's bundle pin and assignment, requests cache eviction, rereads
+the complete bundle, and writes a non-overwriting verification receipt. Collection
+still validates every member and scientific provenance independently. Actual NAS
+group-preservation refusal and missing remote rsync are retained in transport logs;
+six additional fits subsequently passed durable readback and atomic collection.

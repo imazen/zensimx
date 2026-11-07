@@ -148,9 +148,31 @@ def collect(study,assignment_path,bundle,pin):
     return str(target/attempt)
 
 
+def verify_transfer(bundle, pin, assignment_path):
+    """Reread durable transport bytes before allowing collection."""
+    sidecar=Path(str(bundle)+'.json')
+    receipt=json.loads(sidecar.read_text())
+    assignment=json.loads(assignment_path.read_text())
+    if receipt['bundle_sha256']!=pin:raise ValueError('producer pin differs')
+    if receipt['assignment_sha256']!=sha(assignment_path):raise ValueError('assignment drift')
+    if receipt['cell']['id'] not in assignment['cells']:raise ValueError('unassigned transfer')
+    for path in (bundle,sidecar):
+        with path.open('rb') as stream:
+            os.fsync(stream.fileno())
+            os.posix_fadvise(stream.fileno(),0,0,os.POSIX_FADV_DONTNEED)
+    if sha(bundle)!=pin:raise ValueError('durable bundle checksum differs')
+    from datetime import datetime,timezone
+    result=dict(bundle=str(bundle),bundle_sha256=pin,bundle_bytes=bundle.stat().st_size,
+                producer_receipt_sha256=sha(sidecar),assignment_sha256=sha(assignment_path),
+                verified_utc=datetime.now(timezone.utc).isoformat(),
+                readback='fsync, POSIX_FADV_DONTNEED and complete client SHA-256')
+    with Path(str(bundle)+'.verified.json').open('xb') as stream:stream.write(encoded(result))
+    return result
+
+
 def main():
     p=argparse.ArgumentParser(description=__doc__)
-    p.add_argument('action',choices=('pack','collect'))
+    p.add_argument('action',choices=('pack','collect','verify-transfer'))
     for name in ('study','assignment','bundle'):p.add_argument('--'+name,type=Path,required=True)
     p.add_argument('--cell');p.add_argument('--attempt',default='attempt-001');p.add_argument('--sha256')
     a=p.parse_args()
@@ -159,7 +181,8 @@ def main():
         result=pack(a.study,a.assignment,a.cell,a.attempt,a.bundle)
     else:
         if not a.sha256:p.error('--sha256 is required')
-        result=collect(a.study,a.assignment,a.bundle,a.sha256)
+        result=(verify_transfer(a.bundle,a.sha256,a.assignment) if a.action=='verify-transfer'
+                else collect(a.study,a.assignment,a.bundle,a.sha256))
     print(json.dumps(result),flush=True)
 
 
