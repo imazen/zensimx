@@ -1587,3 +1587,19 @@ before this retention pass. Its live process and epoch-8 checkpoint of the
 registered 120-epoch fit were verified at 10:44 UTC. The other queued seed
 still awaited pending-write headroom. This run must not be attributed to the
 later reclamation, and its partial checkpoints do not complete the fit.
+
+### Undefined frozen-shape fit and evaluator recovery
+
+At 10:49 UTC the original inner evaluator process was absent. Its retained v6
+log ends in a null-score subtraction in `shaping_convergence.diagnostics`.
+Cell `7acaa2df5782f9d05f08` is product-pretrained-frozen, inner-0-0, seed 0,
+setting 1. Its checkpoint panels report undefined human composites and zero
+active output coefficients. This is an optimization failure requiring
+investigation, not evidence that the shaping architecture is ineffective.
+
+The reporter now explicitly refuses null/nonfinite same-cycle scores. The
+supervisor records an immutable hashed convergence failure and evaluates peers;
+it does not emit a convergence receipt for the failed fit. All existing
+thresholds and scientific admission rules remain unchanged. Five convergence
+and eight supervision tests pass, including undefined endpoints, repeated
+failure preservation, and continuation to an independent cell.

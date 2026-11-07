@@ -8,6 +8,27 @@ from shaping_evaluation import NativeFeatureGateError
 from shaping_completion import encoded
 
 class SupervisionTests(unittest.TestCase):
+    def test_undefined_convergence_preserves_failure_and_evaluates_peer(self):
+        from shaping_convergence import UndefinedInnerComposite
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as d:
+            root=Path(d);cells=[dict(id=str(i),stage='inner',family='product_pretrained_frozen') for i in range(2)]
+            for cell in cells:
+                run=root/'runs'/cell['id']/'attempt-001';run.mkdir(parents=True)
+                (run/'RUN.json').write_bytes(encoded(dict(cell=cell)))
+                (run/'RESULT.json').write_bytes(encoded(dict(cell=cell,stage='trained',epochs=120)))
+            def diagnose(run):
+                if run.parent.name=='0':raise UndefinedInnerComposite('undefined inner composite')
+            with patch('shaping_supervision.load_registration',return_value=({},cells,{})),patch('shaping_supervision.evaluate'),patch('shaping_supervision.report',side_effect=diagnose) as report:
+                args=SimpleNamespace(study=root,binary_dir=root/'bin')
+                self.assertEqual(sweep(args),1)
+                failure=root/'runs/0/attempt-001/CONVERGENCE_FAILURE.json'
+                before=failure.stat().st_mtime_ns
+                self.assertEqual(sweep(args),1)
+                self.assertEqual(failure.stat().st_mtime_ns,before)
+                self.assertEqual(report.call_count,4)
+                self.assertFalse(json.loads(failure.read_text())['scientifically_complete'])
+                self.assertFalse((failure.parent/'CONVERGENCE.json').exists())
+
     def test_rescue_uses_explicit_optimizer_binary_set(self):
         with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as d:
             root=Path(d);cell=dict(id='rescue',stage='rescue',family='softplus')

@@ -1,5 +1,15 @@
 # zensim — current working rules
 
+## Known Bugs — undefined convergence panel isolation (November 7, 2026)
+
+A frozen pretrained product-shape fit produced undefined human rank panels and
+zero active output coefficients. The convergence reporter attempted to subtract
+null scores, stopping the inner evaluation supervisor. Undefined comparisons
+now raise a specific refusal; the supervisor preserves a hashed
+`CONVERGENCE_FAILURE.json` and continues independent cells. No convergence
+receipt or selection qualification is granted, and undefined ranks stay undefined.
+The original failed supervisor log and training artifacts remain preserved.
+
 ## Known Bugs — bootstrap undefined source ranks (resolved November 7, 2026)
 
 The newly added bootstrap helper initially accepted the native panel's numeric

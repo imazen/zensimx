@@ -9,7 +9,7 @@ import time
 from types import SimpleNamespace
 from shaping_completion import encoded,sha
 from shaping_evaluation import evaluate,NativeFeatureGateError,diagnostic_epochs
-from shaping_convergence import report
+from shaping_convergence import report,UndefinedInnerComposite
 from shaping_execution import load_registration
 
 
@@ -70,7 +70,14 @@ def sweep(args):
             preserve_failure(run/'EVALUATION_FAILURES.json',dict(cell=cell,failures=failures,
                 scientifically_complete=False,requires_investigation=True,outer_results_read=False))
             continue
-        if not (run/'CONVERGENCE.json').exists():report(run)
+        if not (run/'CONVERGENCE.json').exists():
+            try:report(run)
+            except UndefinedInnerComposite as error:
+                evidence=[run/'RUN.json',run/'RESULT.json',*sorted((run/'curve_evaluation').glob('epoch-*/REPORT.json'))]
+                preserve_failure(run/'CONVERGENCE_FAILURE.json',dict(cell=cell,reason=str(error),
+                    scientifically_complete=False,requires_investigation=True,outer_results_read=False,
+                    evidence_sha256={str(p):sha(p) for p in evidence}))
+                continue
         completed+=1
     return completed
 

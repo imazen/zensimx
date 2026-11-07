@@ -9,6 +9,10 @@ from shaping_completion import encoded,sha
 from shaping_evaluation import diagnostic_epochs
 
 
+class UndefinedInnerComposite(ValueError):
+    """A measured undefined rank panel cannot establish convergence."""
+
+
 def loss_window(losses):
     if len(losses)<40 or not np.isfinite(losses).all():
         raise ValueError('requires at least forty finite scheduled losses')
@@ -28,8 +32,10 @@ def diagnostics(losses,scores,active):
     pairs=[(a,b) for a in sorted(scores) for b in sorted(scores) if a<b and a%50==b%50]
     if not pairs:raise ValueError('no same-cycle checkpoint comparison')
     a,b=max(pairs,key=lambda pair:(pair[1],pair[0]))
+    if any(scores[k] is None or not np.isfinite(scores[k]) for k in (a,b)):
+        raise UndefinedInnerComposite(f'undefined inner composite at same-cycle epochs {a}, {b}')
     improvement=scores[b]-scores[a]
-    if not np.isfinite(improvement):raise ValueError('undefined inner composite')
+    if not np.isfinite(improvement):raise UndefinedInnerComposite('undefined inner composite')
     collapse=any(v==1 for v in active.values())
     reasons=[]
     if upper>0:reasons.append('loss_improvement_over_one_percent_or_rounding_boundary')

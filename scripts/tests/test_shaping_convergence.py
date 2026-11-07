@@ -2,7 +2,7 @@ import sys
 from pathlib import Path
 import unittest
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'rev4_featpot'))
-from shaping_convergence import diagnostics
+from shaping_convergence import diagnostics,UndefinedInnerComposite
 
 
 class ConvergenceTests(unittest.TestCase):
@@ -18,6 +18,12 @@ class ConvergenceTests(unittest.TestCase):
         self.assertEqual(result['reasons'],['one_output_coefficient'])
         self.assertTrue(diagnostics([1.]*20+[.99]*20,scores,{k:3 for k in scores})['investigation_required'])
         self.assertFalse(diagnostics([1.]*40,scores,{k:3 for k in scores})['investigation_required'])
+
+    def test_undefined_same_cycle_scores_remain_refused(self):
+        for missing in (None,float('nan'),float('inf')):
+            for scores in ({49:missing,99:.8},{49:.8,99:missing}):
+                with self.assertRaises(UndefinedInnerComposite):
+                    diagnostics([1.]*40,scores,{49:0,99:0})
 
     def test_missing_and_nonfinite_losses_refused(self):
         for losses in ([1.]*39,[float('nan')]*40):
