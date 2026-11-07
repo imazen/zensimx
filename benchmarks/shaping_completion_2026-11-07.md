@@ -2232,3 +2232,15 @@ Cold readback verified `pretrained20-admission-evidence`: 26 artifacts,
 `0149b120fcad376b455c3822ea5fd8eb93addb1b8455c843d07b98c0d850d74f`.
 The input capsule archive verified three artifacts, 26,992,412 bytes, receipt
 `b016ffc9fedbc145db4b43e5e360bb60f7e3509e157943cc7c29226eb13eb949`.
+
+
+## Saved resource coverage at 15:44 UTC
+
+The batch reader inspected completed neural fits and wrote 332 per-fit resource
+reports with zero refused completed fits; 1,445 concrete neural cells were still
+pending. It neither loaded final holdout responses nor replayed training.
+The resource wrapper reported `rc=0 11s | peak-RSS 0.04GiB | min-avail 20552MiB |
+peak-load 32.67`. The three parser regressions passed. Evidence lives in
+`training-resource-batch-1545` under the study output root. This is resource
+coverage for available completed fits; the scientific experiment matrix remains
+incomplete. Nonneural control costs are outside this reader's scope.

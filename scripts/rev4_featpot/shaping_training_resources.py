@@ -95,11 +95,50 @@ def qualify(study,output):
     return dict(models=len(rows),training_replayed=False)
 
 
+def batch(study,output):
+    """Read all completed registered neural fits; retain every refusal explicitly."""
+    from shaping_execution import load_registration
+    from shaping_completion import NEURAL
+    if output.exists():raise ValueError('preserve batch resource evidence')
+    output.mkdir(parents=True);_,cells,_=load_registration(study)
+    rows=[];pending=[];refused=[]
+    for cell in cells:
+        # Later role-based cells resolve their concrete family in RUN.json.
+        results=sorted((study/'runs'/cell['id']).glob('attempt-*/RESULT.json'))
+        completed=[]
+        for path in results:
+            result=json.loads(path.read_text())
+            identity=json.loads((path.parent/'RUN.json').read_text())
+            family=identity.get('resolved_family',cell['family'])
+            if family in NEURAL and result.get('stage')=='trained' and result.get('exit_code')==0:
+                completed.append(path.parent)
+        if not completed:
+            if cell['family'] in NEURAL:pending.append(cell['id'])
+            continue
+        if len(completed)!=1:
+            refused.append(dict(cell=cell['id'],error='ambiguous completed attempts',attempts=list(map(str,completed))))
+            continue
+        try:
+            record=report(completed[0],output/(cell['id']+'.json'))
+            rows.append(dict(cell=cell,report_sha256=sha(output/(cell['id']+'.json')),
+                             directly_executed_phase_wrapper_seconds=record['directly_executed_phase_wrapper_seconds'],
+                             reused_pretraining=record['reused_pretraining'] is not None))
+        except (ValueError,KeyError,FileNotFoundError) as error:
+            refused.append(dict(cell=cell['id'],error=str(error),run=str(completed[0])))
+    summary=dict(plan_sha256=sha(study/'PLAN.json'),driver_sha256=sha(__file__),
+                 rows=rows,pending_neural_cells=pending,refused_completed_runs=refused,
+                 completed_fit_resource_coverage_complete=not refused,all_experiments_complete=False,
+                 training_replayed=False,scope='Completed neural fits only; pending cells and nonneural controls are not measured here.')
+    (output/'SUMMARY.json').write_bytes(encoded(summary))
+    return dict(reported=len(rows),pending_neural=len(pending),refused_completed=len(refused),training_replayed=False)
+
+
 if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__)
-    mode=p.add_mutually_exclusive_group(required=True);mode.add_argument('--run',type=Path);mode.add_argument('--qualify-study',type=Path)
+    mode=p.add_mutually_exclusive_group(required=True);mode.add_argument('--run',type=Path);mode.add_argument('--qualify-study',type=Path);mode.add_argument('--batch-study',type=Path)
     p.add_argument('--output',type=Path,required=True);a=p.parse_args()
-    if a.qualify_study:print(json.dumps(qualify(a.qualify_study,a.output)))
+    if a.batch_study:print(json.dumps(batch(a.batch_study,a.output)))
+    elif a.qualify_study:print(json.dumps(qualify(a.qualify_study,a.output)))
     else:
         r=report(a.run,a.output)
         print(json.dumps(dict(cell=r['cell'],phases=len(r['phases']),reused_pretraining=r['reused_pretraining'] is not None,training_replayed=False)))

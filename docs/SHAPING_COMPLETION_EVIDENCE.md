@@ -790,3 +790,12 @@ rescue in `training-resource-qualification-v3` under the study output root. It
 completed without replaying training. Earlier qualification attempts are retained.
 This qualifies the evidence reader; scientific finalist resource comparisons
 remain outstanding.
+
+
+`shaping-training-resources-batch` reads every uniquely completed registered
+neural fit available at invocation. It preserves separate per-run reports,
+explicit refusals and pending cells. A completed fit with unreadable or ambiguous
+evidence prevents a complete-coverage claim; no timing is imputed. The first
+batch produced 332 reports with zero refusals. Nonneural controls remain outside
+this reader's scope. Pending fits and all scientific eligibility gates remain
+separate from resource coverage.

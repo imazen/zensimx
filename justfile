@@ -5462,3 +5462,7 @@ shaping-cost-finalists study binary_dir output:
 shaping-cost-finalists-check:
     python3 -B -m unittest discover -s scripts/tests -p test_shaping_cost_finalists.py
     python3 -B -m unittest discover -s scripts/tests -p test_shaping_full_fit_selection.py
+
+# Read observed training costs from completed native fits without replaying training.
+shaping-training-resources-batch study output:
+    TMPDIR="$HOME/tmp" python3 -B scripts/rev4_featpot/shaping_training_resources.py --batch-study "{{study}}" --output "{{output}}"
