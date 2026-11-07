@@ -5109,6 +5109,12 @@ shaping-completion-variant-execution-check:
 shaping-completion-full-fit-plan-check:
     TMPDIR="$HOME/tmp" python3 -B -m unittest scripts/tests/test_shaping_full_fit_plan.py
 
+shaping-completion-full-fit-admission-check:
+    TMPDIR="$HOME/tmp" python3 -B -m unittest scripts/tests/test_shaping_full_fit_admission.py
+
+shaping-completion-full-fit-admission study *args:
+    TMPDIR="$HOME/tmp" python3 -B scripts/rev4_featpot/shaping_full_fit_admission.py --study {{quote(study)}} {{args}}
+
 shaping-completion-variant-fit study binary_dir neutral human_qualification cell:
     TMPDIR="$HOME/tmp" python3 -B scripts/rev4_featpot/shaping_variant_execution.py --study {{quote(study)}} --binary-dir {{quote(binary_dir)}} --neutral-qualification {{quote(neutral)}} --human-qualification {{quote(human_qualification)}} --cell {{quote(cell)}}
 

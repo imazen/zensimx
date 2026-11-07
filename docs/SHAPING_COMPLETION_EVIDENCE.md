@@ -419,3 +419,30 @@ Three pure-planner tests pass: complete pairing, family/setting tie order,
 optimizer evidence intersection, registered exposure, teacher exclusion and
 refusal of development-exposed or mis-scoped selection reports. This is a tested
 planning policy, not a registered full-FIT admission or a completed fit.
+
+### Full-FIT admission and additional qualified worker (2026-11-07)
+
+The full-FIT admission builder revalidates all three complete outer admissions,
+then binds their inner-only base/rescue scores and fixed schedules into the
+new full-FIT plan. It requires uniform evaluation representations across folds,
+exclusive receipt creation and exact reconstruction. Two admission tests and
+three planner tests pass. On the live study it refuses the absent outer-0
+admission; no full-FIT plan or model has been created.
+
+An additional eligible worker, r3800x, verified the same 87 shared input files
+(409,044,047 bytes), frozen source capsule and native build used by the existing
+workers. Its single-layer, deep-ReLU and deep-smooth compatibility replays match
+all three frozen canonical hashes exactly. The wrapper recorded
+`run-heavy: done rc=0 12s | peak-RSS 0.16GiB | min-avail 13497MiB | peak-load 0.21`.
+This is compatibility/resource evidence, not an inference benchmark. The initial
+bootstrap invocation failed before mutation/training because PYTHONPATH was
+missing; both logs remain preserved.
+
+The registered inner-1-0 joint-shaping wave now has 24 cells assigned to that
+worker, with eight concurrent native fits, one thread/1 GiB per fit and a 10 GiB
+controller scope. At 08:04 UTC, process inspection verified eight live runs and
+no unexpected stops; the data filesystem had 807,989,166,080 bytes available
+and the block device reported nonrotating storage. Qualification artifacts and
+the 24-file partition capsule have separate durable mirror receipts under
+`worker-r3800x/` in the completion output root. The additional idle r3500 worker
+was not used: its observed 9,712,185,344 bytes free cannot meet the 30 GiB reserve.
