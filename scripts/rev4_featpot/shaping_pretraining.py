@@ -16,7 +16,7 @@ def matching_parent(child, cells):
     return found[0]
 
 
-def extract(root,binary_dir,child,cells,destination):
+def completed_parent(root,child,cells):
     parent=matching_parent(child,cells)
     candidates=[]
     for path in (root/'runs'/parent['id']).glob('attempt-*/RESULT.json'):
@@ -24,6 +24,11 @@ def extract(root,binary_dir,child,cells,destination):
         if result['stage']=='trained' and result['exit_code']==0:candidates.append((path.parent,result))
     if len(candidates)!=1:raise ValueError('requires one completed matching parent; never reuse mutable checkpoints')
     source,result=candidates[0]
+    return parent,source,result
+
+
+def extract(root,binary_dir,child,cells,destination):
+    parent,source,result=completed_parent(root,child,cells)
     run=json.loads((source/'RUN.json').read_text())
     if run['cell']!=parent or run['epochs']!=240 or run['pairs_per_epoch']!=50000:
         raise ValueError('parent exposure or registered identity differs')

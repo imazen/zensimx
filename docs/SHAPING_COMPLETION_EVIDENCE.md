@@ -78,3 +78,14 @@ This verifies retention of the earlier experiments, not completion of the new
 activation/shaping comparisons. Their scientific fitting started subsequently;
 see [the execution record](../benchmarks/shaping_completion_2026-11-07.md) for
 completed controls and current qualification limits.
+
+### Dependency-aware pretrained dispatch
+
+The execution owner accepts explicit registered cell IDs within its selected
+stage, partition and family. This changes dispatch order only, not the matrix,
+training budget or completion requirement. Duplicate and out-of-scope IDs are
+refused. Pretrained children require a terminal successful matching parent before
+any child attempt is created; the existing extraction owner then validates its
+complete identity, exposure, binary and prefix hashes. Subset controllers have
+separate status filenames. This allows frozen and joint fresh-head trials to
+start while other independent parent settings are still training.

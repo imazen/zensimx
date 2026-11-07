@@ -168,13 +168,22 @@ def execute(args):
     else:
         if args.family=='analytic':families=('softplus','silu_monotone','silu_diagnostic')
         elif args.family=='joint_shapes':families=('product_joint_identity','separate_joint_identity')
+        elif args.family=='pretrained_shapes':families=('product_pretrained_frozen','product_pretrained_joint','separate_pretrained_frozen','separate_pretrained_joint')
         else:families=(args.family,)
         stage='fresh_control_inner' if args.fresh_control_inner else 'inner'
         selected=[c for c in cells if c['stage']==stage and c['family'] in families and c['partition']==args.partition]
+        requested=getattr(args,'cell',None)
+        if requested:
+            selected=registered_subset(selected,requested)
         selected.sort(key=lambda c:(c['setting'],c['seed'],families.index(c['family'])))
         epochs=120 if stage=='fresh_control_inner' or all('_pretrained_' in c['family'] for c in selected) else 240
         workers=args.workers;mem='1G'
         if not selected or not 1<=workers<=16:raise ValueError('invalid partition or worker count')
+        # A dispatcher may release individual children as their matching parents
+        # finish. Never create a failed attempt merely because a parent is live.
+        if any('_pretrained_' in c['family'] for c in selected):
+            from shaping_pretraining import completed_parent
+            for c in selected:completed_parent(args.study,c,cells)
     # Native pilot measured 606443 total artifact bytes, including two bakes.
     # Reserve a deliberately conservative fixed 1 GiB per admitted long run;
     # this is an admission allowance, not an extrapolated measured size.
@@ -194,6 +203,9 @@ def execute(args):
     status=dict(required=len(selected),trained=0,failed=[],scientific_reports_completed=0,
                 controller_pid=os.getpid(),stage='running',cells=[c['id'] for c in selected])
     status_path=args.study/f"{('pilot' if args.resource_pilot else args.partition+'-'+args.family+('-fresh' if args.fresh_control_inner else ''))}-STATUS.json"
+    if getattr(args,'cell',None):
+        suffix=__import__('hashlib').sha256(encoded(sorted(args.cell))).hexdigest()[:16]
+        status_path=status_path.with_name(status_path.stem+'-'+suffix+status_path.suffix)
     status_path.write_bytes(encoded(status))
     with ThreadPoolExecutor(max_workers=workers) as pool:
         pending={pool.submit(run_native,args.study,args.binary_dir,c,records[c['partition']],args.attempt,epochs,mem):c for c in selected}
@@ -203,6 +215,12 @@ def execute(args):
             status['checked_utc']=datetime.now(timezone.utc).isoformat();status_path.write_bytes(encoded(status))
     status['stage']='failed' if status['failed'] else 'training_finished';status_path.write_bytes(encoded(status))
     if status['failed']:raise RuntimeError('failed attempts preserved; see '+str(status_path))
+
+
+def registered_subset(selected,requested):
+    if len(set(requested))!=len(requested):raise ValueError('duplicate requested cell')
+    if not set(requested)<=set(c['id'] for c in selected):raise ValueError('cell outside registered stage/family/partition')
+    return [c for c in selected if c['id'] in requested]
 
 
 def live_status(root):
@@ -240,7 +258,8 @@ def main():
     mode.add_argument('--inner-relu',action='store_true')
     mode.add_argument('--inner-family',action='store_true')
     mode.add_argument('--fresh-control-inner',action='store_true')
-    p.add_argument('--family',choices=['relu','softplus','silu_monotone','silu_diagnostic','analytic','product_joint_identity','separate_joint_identity','joint_shapes','product_pretrained_frozen','product_pretrained_joint','separate_pretrained_frozen','separate_pretrained_joint'],default='relu')
+    p.add_argument('--family',choices=['relu','softplus','silu_monotone','silu_diagnostic','analytic','product_joint_identity','separate_joint_identity','joint_shapes','pretrained_shapes','product_pretrained_frozen','product_pretrained_joint','separate_pretrained_frozen','separate_pretrained_joint'],default='relu')
+    p.add_argument('--cell',action='append',help='dispatch only these registered IDs; does not change study requirements')
     mode.add_argument('--status',action='store_true')
     p.add_argument('--partition',default='inner-0-0')
     p.add_argument('--workers',type=int,default=12)
