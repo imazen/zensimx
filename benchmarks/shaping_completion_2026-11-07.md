@@ -53,3 +53,30 @@ are under the corresponding local/NAS `shaping-completion-20261107` roots.
 The complete study, shaped-family execution, convergence investigations,
 source-fold reports, learning curves, shuffles, human-only trials and finalist
 inference measurements remain required.
+
+## Completed shaped-additive inner tuning
+
+All 24 registered quadratic inner cells completed: four regularization choices
+across six source-disjoint inner partitions. Every cell passed the unchanged
+native KKT/gap certificate, independent basis and f64 prediction checks, and
+f32 identity/damage probes. No outer results were read.
+
+| Outer fold | Selected lambda | Mean inner human composite |
+|---|---:|---:|
+| 0 | 0.01 | 0.870036250 |
+| 1 | 0.01 | 0.850801756 |
+| 2 | 1e-06 | 0.869986132 |
+
+Each partition ran its four solves sequentially under a four-GiB controller
+and separate four-GiB native solve cap, with one thread per process. The six
+controller run-heavy receipts report 15, 13, 13, 15, 14 and 13 seconds,
+respectively; measured peak RSS was 1.02 or 1.03 GiB per controller. These are
+training measurements, not runtime benchmark claims. Full logs and native
+certificates are retained with the artifacts.
+
+The completed quadratic wave archive contains 245 artifact files totaling
+610,412,250 bytes. All destination artifact hashes passed client readback
+after fsync and POSIX_FADV_DONTNEED; this does not claim physical NAS cache
+eviction. Manifest SHA-256:
+`01f1ce9634b8164f6d1821061ca1b7990ade5fbb33585e987a64153f01e0df5f`.
+Archive suffix: `shaping-completion-20261107/linear-inner-archive`.
