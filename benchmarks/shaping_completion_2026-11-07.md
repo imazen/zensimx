@@ -1282,3 +1282,13 @@ missing families/axes or nonfinite samples. The wrapper reported `done rc=0 1s |
 peak-RSS 0.07GiB | min-avail 32384MiB | peak-load 23.96`. This is synthetic-array
 qualification, not completed scientific intervals. Evidence is in
 `bootstrap-reduce-qualification`; the end-to-end runner remains to be connected.
+
+The bootstrap rank helper now explicitly rejects constant predictions, constant
+targets and singleton source groups before calling the native panel. This matches
+the existing study metric's undefined-correlation classification and prevents
+numeric zero conventions from becoming measured source ranks. All five helper
+checks pass, including the independent tied-rank oracle and 36-replicate batch
+boundary. No scientific bootstrap used the earlier helper. Updated qualification
+is archived separately in `bootstrap-undefined-qualification`; earlier evidence
+is preserved. A refusal requires reporting undefined uncertainty, not dropping
+sources or silently weakening the comparison.

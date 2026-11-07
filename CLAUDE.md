@@ -1,5 +1,14 @@
 # zensim — current working rules
 
+## Known Bugs — bootstrap undefined source ranks (resolved November 7, 2026)
+
+The newly added bootstrap helper initially accepted the native panel's numeric
+zero for a constant source. The existing study metrics classify constant or
+singleton sources as undefined. The helper now refuses complete paired intervals
+for these inputs before invoking the panel, with a regression for constant
+predictions, constant targets and singleton groups. No scientific bootstrap had
+been computed with the earlier helper.
+
 ## Known Bugs — research ReLU diagnostic monotonicity (November 7, 2026)
 
 Completion-study cell `6df732ab294270460360` epoch 119 fails its unchanged

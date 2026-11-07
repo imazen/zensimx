@@ -26,6 +26,11 @@ def paired_stratum(predictions,target,groups,draws,*,panel=panel_batch_indexed):
     members=np.concatenate(groups)
     if len(members)!=len(target) or not np.array_equal(np.sort(members),np.arange(len(target))):
         raise ValueError('components must partition every row exactly once')
+    # The study's metrics owner marks these correlations undefined; the native
+    # panel's numeric zero convention must not become a measured bootstrap rank.
+    for group in groups:
+        if len(group)<2 or np.ptp(target[group])==0 or (np.ptp(predictions[:,group],axis=1)==0).any():
+            raise ValueError('undefined within-component rank; cannot compute complete paired intervals')
     if draws.ndim!=2 or not len(draws) or draws.shape[1]!=len(groups) or draws.dtype.kind not in 'iu':
         raise ValueError('integer component draws with registered stratum width required')
     if draws.min()<0 or draws.max()>=len(groups):raise ValueError('component draw outside stratum')

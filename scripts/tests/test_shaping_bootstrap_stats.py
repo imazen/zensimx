@@ -47,5 +47,14 @@ class BootstrapStatsTests(unittest.TestCase):
                 return [dict(label=('wrong' if failure=='identity' else j[0]),n_dropped=int(failure=='drop'),srocc_signed=float('nan') if failure=='undefined' else 1.) for j in jobs]
             with self.assertRaises(ValueError):paired_stratum(pred,y,groups,draws,panel=corrupt)
 
+    def test_constant_and_singleton_components_are_not_numeric_zero_ranks(self):
+        for kind in ('prediction','target','singleton'):
+            pred,y,groups,draws=self.fixture()
+            if kind=='prediction':pred[0,groups[0]]=7.
+            elif kind=='target':y[groups[0]]=7.
+            else:groups=[np.array([0]),np.arange(1,8),np.arange(8,12)]
+            with self.assertRaisesRegex(ValueError,'undefined within-component'):
+                paired_stratum(pred,y,groups,draws,panel=lambda *args,**kwargs:self.fail('undefined input reached native panel'))
+
 
 if __name__=='__main__':unittest.main()
