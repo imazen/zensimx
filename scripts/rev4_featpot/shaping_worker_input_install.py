@@ -9,12 +9,24 @@ def sha(path):
 
 
 def install(study,partition,assignment,bundle,manifest,bundle_pin,manifest_pin,receipt):
+    if len(PurePosixPath(partition).parts)!=1 or partition in ('.','..'):raise ValueError('invalid partition')
+    if assignment.parent!=study/'worker_assignments':raise ValueError('assignment outside study')
+    allowed=lambda path:(path.is_relative_to(study/'comparators'/partition) or path.is_relative_to(study/'shapes'/partition) or path==assignment)
+    return install_checked(bundle,manifest,bundle_pin,manifest_pin,receipt,allowed)
+
+
+def install_shared(bundle,manifest,bundle_pin,manifest_pin,receipt):
+    roots=(Path('/mnt/v/output/zensim'),Path('/srv/zen-research/human-ssim2-depth-20261106'),
+           Path('/srv/zen-research/human-ssim2-trial-20261106'))
+    return install_checked(bundle,manifest,bundle_pin,manifest_pin,receipt,
+                           lambda path:any(path.is_relative_to(root) for root in roots))
+
+
+def install_checked(bundle,manifest,bundle_pin,manifest_pin,receipt,allowed):
     if receipt.exists():raise ValueError('preserve existing installation receipt')
     if sha(bundle)!=bundle_pin or sha(manifest)!=manifest_pin:raise ValueError('capsule checksum differs')
     rows=json.loads(manifest.read_text());expected={r['path'].lstrip('/'):r for r in rows}
     if len(expected)!=len(rows):raise ValueError('duplicate manifest path')
-    if len(PurePosixPath(partition).parts)!=1 or partition in ('.','..'):raise ValueError('invalid partition')
-    if assignment.parent!=study/'worker_assignments':raise ValueError('assignment outside study')
     with tarfile.open(bundle) as archive:
         members=archive.getmembers()
         if len(members)!=len(expected) or {m.name for m in members}!=set(expected):raise ValueError('capsule inventory differs')
@@ -22,7 +34,7 @@ def install(study,partition,assignment,bundle,manifest,bundle_pin,manifest_pin,r
             row=expected[member.name];path=Path(row['path']);parts=PurePosixPath(member.name)
             if not path.is_absolute() or '..' in parts.parts or parts.as_posix()!=member.name:
                 raise ValueError('unsafe input path')
-            if not (path.is_relative_to(study/'comparators'/partition) or path.is_relative_to(study/'shapes'/partition) or path==assignment):
+            if not allowed(path):
                 raise ValueError('input outside assigned partition')
             if not member.isfile() or member.size!=row['bytes']:raise ValueError('nonregular or wrong-sized input')
             if path.exists() or path.is_symlink():raise ValueError('existing input preserved')
@@ -32,6 +44,7 @@ def install(study,partition,assignment,bundle,manifest,bundle_pin,manifest_pin,r
             with archive.extractfile(member) as src,path.open('xb') as dst:
                 shutil.copyfileobj(src,dst,1024*1024);dst.flush();os.fsync(dst.fileno())
             if sha(path)!=row['sha256']:raise ValueError('installed input checksum differs')
+            os.chmod(path,member.mode&0o777)
     result=dict(files=len(rows),bytes=sum(r['bytes'] for r in rows),archive_sha256=bundle_pin,
                 manifest_sha256=manifest_pin,all_inputs_verified=True,scientific_inputs_unchanged=True,
                 driver_sha256=sha(__file__))
@@ -42,6 +55,12 @@ def install(study,partition,assignment,bundle,manifest,bundle_pin,manifest_pin,r
 
 if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__)
-    for name in ('study','assignment','bundle','manifest','receipt'):p.add_argument('--'+name,type=Path,required=True)
-    for name in ('partition','bundle-pin','manifest-pin'):p.add_argument('--'+name,required=True)
-    a=p.parse_args();install(a.study,a.partition,a.assignment,a.bundle,a.manifest,a.bundle_pin,a.manifest_pin,a.receipt)
+    for name in ('study','assignment'):p.add_argument('--'+name,type=Path)
+    for name in ('bundle','manifest','receipt'):p.add_argument('--'+name,type=Path,required=True)
+    p.add_argument('--partition');p.add_argument('--shared',action='store_true')
+    for name in ('bundle-pin','manifest-pin'):p.add_argument('--'+name,required=True)
+    a=p.parse_args()
+    if a.shared:install_shared(a.bundle,a.manifest,a.bundle_pin,a.manifest_pin,a.receipt)
+    else:
+        if not (a.study and a.partition and a.assignment):p.error('partition install requires study, partition and assignment')
+        install(a.study,a.partition,a.assignment,a.bundle,a.manifest,a.bundle_pin,a.manifest_pin,a.receipt)
