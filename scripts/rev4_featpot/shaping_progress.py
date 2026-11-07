@@ -30,6 +30,12 @@ def audit(root,workers):
         for cell in extension['cells']:
             if resolve(root,cell['id'])['cell']!=cell:raise ValueError('extension drift')
             cells.append(cell);required.add(cell['id'])
+    for path in (root/'selection').glob('outer-*/OUTER_ADMISSION.json'):
+        from shaping_outer_admission import resolve as resolve_outer
+        outer=int(path.parent.name.rsplit('-',1)[1]);admission,_=resolve_outer(root,outer)
+        for cell in admission['additional_cells']:
+            if cell['id'] in {c['id'] for c in cells}:raise ValueError('conditional outer cell identity collision')
+            cells.append(cell);required.add(cell['id'])
     rows=[]
     for cell in cells:
         directory=root/'runs'/cell['id'];attempts=[]

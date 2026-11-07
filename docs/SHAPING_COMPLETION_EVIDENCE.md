@@ -263,3 +263,13 @@ while all original cells remain. Tests cover exact-match reuse, different settin
 different optimizer choices, doubled phase lengths, paired seeds, deterministic
 IDs and inner-only tie handling. The pure planner explicitly does not admit outer
 evaluation without the separate complete evidence gate.
+
+The outer-admission implementation requires all twelve reproduced base decisions,
+all triggered paired rescues, and every required doubled-exposure diagnostic,
+including matched fresh controls. It reuses the shared neural candidate reader
+and preserves unresolved convergence classifications. It writes no admission
+receipt when evidence is missing. The live outer-0 attempt correctly refused the
+absent completed ReLU rescue selection; no outer response view was prepared.
+Tests exercise full synthetic evidence composition, altered admission refusal,
+incomplete pairing, missing rescue triggers, and conditional-control progress
+accounting. Actual outer scientific admission remains pending the ongoing trials.

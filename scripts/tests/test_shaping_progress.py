@@ -21,6 +21,18 @@ class ProgressTests(unittest.TestCase):
             self.assertEqual(c['original_final_report_cells'],0);self.assertEqual(c['neural_diagnostic_receipt_cells'],0)
             self.assertFalse(result['overall_experiments_complete']);self.assertFalse(result['workers']['worker']['fresh'])
 
+    def test_admitted_matched_outer_controls_are_required_without_claiming_fits(self):
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as d:
+            root=Path(d);(root/'PLAN.json').write_text('{}')
+            p=root/'selection/outer-0/OUTER_ADMISSION.json';p.parent.mkdir(parents=True);p.write_text('{}')
+            cell=dict(id='extra',stage='fresh_control_outer_matched',family='relu')
+            with patch('shaping_progress.load_registration',return_value=({},[],{})), \
+                 patch('shaping_outer_admission.resolve',return_value=(dict(additional_cells=[cell]),p)):
+                result=audit(root,{})
+            c=result['counts']['fresh_control_outer_matched']
+            self.assertEqual(c['required'],1);self.assertEqual(c['successful_fit_cells'],0)
+            self.assertEqual(result['required_cells'],1);self.assertFalse(result['overall_experiments_complete'])
+
     def test_modified_report_cannot_count_as_passed(self):
         with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as d:
             root=Path(d);cell=dict(id='cell');report=root/'REPORT.json';marker=root/'COMPLETE.json'

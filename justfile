@@ -5080,3 +5080,9 @@ shaping-completion-register-rescue-trigger study run:
 
 shaping-completion-outer-plan-check:
     python3 -B -m unittest scripts/tests/test_shaping_outer_plan.py
+
+shaping-completion-outer-admission study outer *args:
+    python3 -B scripts/rev4_featpot/shaping_outer_admission.py --study {{quote(study)}} --outer {{outer}} {{args}}
+
+shaping-completion-outer-admission-check:
+    python3 -B -m unittest scripts/tests/test_shaping_outer_admission.py
