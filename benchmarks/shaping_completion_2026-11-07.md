@@ -1013,3 +1013,23 @@ without opening it for writing; differing evidence stops the sweep and preserves
 the original. The native gates and failure classifications are unchanged.
 The regression check verifies unchanged inode/mtime on repeated observation and
 preservation of original bytes on conflicting evidence.
+
+## Bounded outer neural dispatch
+
+`shaping_outer_dispatch.py` waits for `OUTER_ADMISSION.json`, then reproduces
+that admission with the existing complete inner/rescue/extension evidence gate.
+It prepares TRAIN inputs through the existing owner and queues all 30 paired
+outer neural cells plus the exact admitted fresh controls. Each native child
+retains the selected schedule, optimizer, seed, qualification and disk admission.
+The command uses two concurrent children; a per-fold queue ownership lock prevents
+duplicate dispatchers without serializing other folds or training workloads.
+
+Existing fits are resumed only with matching plan/build/admission, cell and
+schedule identities; completed fits also require the final model hash. Failed,
+ambiguous or stale attempts require explicit reconciliation and are not overwritten.
+Five dispatcher tests cover exact pairing, changed model/admission refusal,
+failed/ambiguous attempt preservation, no launch before admission, and a complete
+synthetic queue that launches each registered cell once with at most two children.
+The queue test verifies orchestration, not native training quality. Tree/additive
+outer controls retain their separate existing execution owner. Scientific outer
+fits remain unexecuted until the full evidence admission becomes available.
