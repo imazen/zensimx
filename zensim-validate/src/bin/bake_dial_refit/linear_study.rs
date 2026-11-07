@@ -1,6 +1,6 @@
 //! Private study adapter: existing Gram Cholesky, ZNPR baker/Predictor and dial owners.
 use super::*;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use sha2::{Digest, Sha256};
 use zensim_validate::gram_lasso::{StandardizedGram, ridge_solve};
 use zensim_validate::npz::{Npz, NpzF64Entry, write_npz_f64};
@@ -21,73 +21,9 @@ pub(super) struct Args {
     positive: bool,
 }
 
-#[derive(Deserialize)]
-struct Spec {
-    schema: String,
-    terms: Vec<(usize, Option<usize>)>,
-    scales: Vec<f32>,
-    /// Empty for linear; otherwise two strictly positive knots per term.
-    knots: Vec<[f32; 2]>,
-    basis_scales: Vec<f32>,
-    #[serde(default)]
-    calibration_ids: Vec<usize>,
-    #[serde(default)]
-    calibration_targets: Vec<f64>,
-}
-
-impl Spec {
-    fn width(&self) -> usize {
-        self.terms.len() * if self.knots.is_empty() { 1 } else { 3 }
-    }
-
-    fn validate(&self, input_width: usize) -> Result<(), String> {
-        if self.schema != "shaped-linear-basis-v1"
-            || self.terms.is_empty()
-            || self.terms.len() != self.scales.len()
-            || self.basis_scales.len() != self.width()
-            || self
-                .terms
-                .iter()
-                .any(|&(a, b)| a >= input_width || b.is_some_and(|v| v >= input_width))
-            || self
-                .scales
-                .iter()
-                .chain(&self.basis_scales)
-                .any(|v| !v.is_finite() || *v <= 0.)
-            || (!self.knots.is_empty()
-                && (self.knots.len() != self.terms.len()
-                    || self
-                        .knots
-                        .iter()
-                        .any(|k| !k[1].is_finite() || !(0. < k[0] && k[0] < k[1]))))
-        {
-            return Err("invalid registered basis".into());
-        }
-        Ok(())
-    }
-
-    fn apply(&self, raw: &[f32], out: &mut [f32]) -> Result<(), String> {
-        for (j, &(a, b)) in self.terms.iter().enumerate() {
-            let value = b.map_or(raw[a], |b| raw[a] * raw[b]);
-            let x = value / self.scales[j];
-            if self.knots.is_empty() {
-                out[j] = x / self.basis_scales[j];
-            } else {
-                if x < 0. {
-                    return Err("negative damage input in monotone segment basis".into());
-                }
-                let [a, b] = self.knots[j];
-                out[3 * j] = x.min(a) / self.basis_scales[3 * j];
-                out[3 * j + 1] = (x - a).max(0.).min(b - a) / self.basis_scales[3 * j + 1];
-                out[3 * j + 2] = (x - b).max(0.) / self.basis_scales[3 * j + 2];
-            }
-        }
-        if out.iter().any(|v| !v.is_finite()) {
-            return Err("nonfinite shaped feature".into());
-        }
-        Ok(())
-    }
-}
+#[path = "linear_basis.rs"]
+mod linear_basis;
+use linear_basis::Spec;
 
 fn system(g: Vec<f64>, c: Vec<f64>) -> StandardizedGram {
     let n = c.len();

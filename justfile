@@ -5358,3 +5358,25 @@ shaping-completion-bootstrap-watch-check:
 
 shaping-completion-watch-bootstraps study draws binaries registry output destination:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 2G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_bootstrap.py --study {{quote(study)}} --draws {{quote(draws)}} --binary-dir {{quote(binaries)}} --matched-registry {{quote(registry)}} --output {{quote(output)}} --archive-destination {{quote(destination)}} --watch
+
+# Native cost instrument: tests/builds run on an eligible non-dev host.
+shaping-cost-native-test:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 2G --jobs 1 -- cargo test --locked --release -p zensim-validate --example shaping_cost
+
+shaping-cost-native-build:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 2G --jobs 1 -- cargo build --locked --release -p zensim-validate --example shaping_cost
+
+shaping-cost-fixture study output binaries:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 2G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_cost_fixture.py --study {{quote(study)}} --output {{quote(output)}} --binary-dir {{quote(binaries)}}
+
+shaping-cost-qualify binary workload output:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 2G --jobs 1 -- {{quote(binary)}} qualify {{quote(workload)}} {{quote(output)}}
+
+shaping-cost-fixture-test:
+    TMPDIR="$HOME/tmp" python3 -B -m unittest discover -s scripts/tests -p test_shaping_cost_fixture.py -v
+
+shaping-cost-native-clippy:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 2G --jobs 1 -- cargo clippy --locked --release -p zensim-validate --example shaping_cost -- -D warnings
+
+shaping-cost-check binary workload output:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 2G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_cost_check.py --binary {{quote(binary)}} --workload {{quote(workload)}} --output {{quote(output)}}

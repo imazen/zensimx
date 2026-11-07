@@ -505,3 +505,43 @@ omission experiment. `corrhead_forward` uses a fixed 372-wide row and probabilit
 scoring. Neither directly measures the registered shaping finalists. The new
 protocol retains those historical instruments and requires a qualified native
 harness for this study. No latency, RSS or pixel-serving result is claimed yet.
+
+
+## Native vector-cost instrument qualification
+
+`shaping_cost` now exercises the study's three native scoring routes: neural
+`BakeScorer::score_features`, the shaped-additive basis followed by `Predictor`,
+and tree raw-vector gathering followed by `100 * decision_function`. The additive
+basis moved unchanged into a private module shared with the fitting owner. The
+three existing linear-study tests and strict clippy for the fitting binary pass.
+Two instrument input-contract tests and two fixture/archive tests also pass.
+
+The fixed qualification uses setting 0, seed 0 (or the deterministic additive
+fit), inner-0-0 models for ReLU, Softplus, both SiLU variants, joint product and
+separate shaping, shaped-additive, and extra-trees. Forty TRAIN-only rows cover
+eight rows from each of the five admitted populations. All 320 reference scores
+match bit-for-bit before and after qualification. Altering one reference bit or
+one model hash is refused. This is instrumentation evidence, not finalist
+selection or timing. The fixture reproduces the evaluator's existing dense-input
+conversion byte-for-byte, without introducing an optimization.
+
+An initial implementation incorrectly applied pixel-serving admission to the
+opaque additive model. Separate per-model checks localized the refusal to that
+control; the other seven routes matched exactly. Reusing the registered basis
+owner resolves the mismatch without changing the control model, coefficients,
+inputs, expected scores, or scientific gates. Initial failed build and
+qualification attempts remain preserved with the successful evidence.
+
+The qualified executable SHA-256 is
+`543e9fcbf5670d473956471cb44339d5d49e1d147ebbec2d8c79a711c0eef394`.
+Qualification's resource-wrapper line reports `rc=0 0s | peak-RSS 0.04GiB |
+min-avail 38548MiB | peak-load 25.81`; this is the qualification invocation,
+not a measured inference latency or per-model RSS. Binary, source reconstruction,
+fixture and logs live in the `inference-cost-*` bundles under the completion-study
+artifact root and its durable mirror.
+
+The instrument preserves raw zenbench records before checking arm coverage,
+complete paired rounds, clean-round selection and reliability. Actual benchmark
+execution, full-FIT workload registration, extraction measurements and cost
+analysis remain outstanding. Neither vector qualification nor the existence of
+this harness completes those requirements.

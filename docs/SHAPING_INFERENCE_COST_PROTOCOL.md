@@ -31,13 +31,21 @@ training-table values and the original feature-ID mapping. Pin the chosen indice
 source tables, declaration, exported rows and reference predictions. No outer,
 development or final-holdout row is needed for this workload.
 
-The native ZNPR arm uses `BakeScorer::score_features`, including declared input
+The neural ZNPR arm uses `BakeScorer::score_features`, including declared input
 gathering, learned shaping, scaling and final score transformation. The tree arm
 gathers the same raw feature IDs into the opaque vector layout, invokes
 `CorruptionHead::decision_function`, and multiplies by 100, matching
 `shaping_controls.py`. The tree control is trained on raw features, not damage
 products. Include the tree gather in its timed region. Do not time its logistic
 probability or corruption-gating score: neither is this study's regressor output.
+
+The shaped-additive control uses its registered `zentrain.research_basis`
+transform and native `Predictor`, exactly as the fitting owner does. Include raw
+feature gathering and basis construction in its timed region. Share that basis
+implementation with the fitting owner rather than duplicating it. It is an
+opaque-vector model, not a pixel-serving ZNPR profile. Preserve any existing
+dense-input conversion used by the evaluator and reproduce its output bytes;
+do not introduce a new pruning or conversion policy for the benchmark.
 
 Use the same ordered rows for every model. Validate outputs against each model's
 qualified native predictions before timing, then repeat the comparison after
