@@ -208,23 +208,22 @@ Method references: [convex least squares](https://www.cvxpy.org/examples/basic/l
 [random-label capacity](https://arxiv.org/abs/1611.03530),
 [selection overfitting](https://www.jmlr.org/papers/v11/cawley10a.html).
 
-## Implementation status
+## Completed execution
 
-The private `bake_dial_refit linear-study` adapter reuses the Rust Gram owner's
-Cholesky solver, with active-set nonnegative fitting and independent KKT/gap
-recomputation. The canonical baker and Predictor evaluate the f32 projection;
-the existing native identity-pinned spline owner performs optional calibration.
-Small correlated/singular/zero-column and active-bound fixtures pass. All 41
-bake-tool tests and scoped clippy pass. No scientific fit has run at this point;
-the independent Python numeric reference and input/fold admission remain gates.
+All 390 registered fits completed: 354 certified quadratic fits and 36 matched
+comparators. All 60 source/row learning controls, 60 linear permutations,
+48 family exclusions, three context controls and 20 source-influence refits
+are included. Twenty anchored calibration attempts yielded 18 curves and two
+retained refusals. The independent eight-system oracle, 41 bake-tool tests,
+scoped clippy and controller leakage/grouping tests pass. Source bootstrap uses
+2,000 draws per population/fold over all real-label model families.
 
-The eight independent NumPy/SciPy numeric systems pass, as do three controller
-leakage/grouping tests and signed/raw native panel checks. Preparation retains
-232 FIT and 21 development source components with no cross-role overlap. The
-155 S1 fits completed and passed their numerical certificates. Their results
-remain preliminary while the registered negative controls execute.
+Findings and limits: [result record](../benchmarks/shaped_linear_generalization_2026-11-06.md).
+The experiment artifacts retain exact matrices, Grams, native model bytes,
+per-row predictions, signed panels, uncertainty samples and live-process audits.
+No final holdout or serving qualification was included.
 
-Comparator preparation reuses strict D1/revision/key admission. Each derived
+Comparator preparation reused strict D1/revision/key admission. Each derived
 training table records its original parent, ordered subset and label permutation;
 the original tables remain immutable. An actual population-permutation admission
 passed for all nine groups, changing 15,066 training labels and zero outer labels.

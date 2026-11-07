@@ -5,11 +5,14 @@ Source implementation starts at `29e350a6` (native solve), `21bea651` (matrix),
 `5e037122` (comparators) and `4fe1e464` (evidence reduction). Resource-startup
 correction and row-space audits: `dd117206`.
 
-This record is being completed while the fixed-budget neural controls run.
-All 354 quadratic fits and 18 Extra Trees controls have finished. Their original
-matrices, inputs, native binaries, predictions and failure logs are retained in
-`/mnt/v/output/zensim/shaped-linear-generalization-20261106/`. The pending neural
-controls, source bootstrap and final mirror are not yet claimed complete.
+All 390 registered fits are complete: 354 quadratic fits, 18 Extra Trees
+controls and 18 shared-ReLU controls. All numerical and native feature gates
+passed for the applicable constrained models. Twenty calibration attempts gave
+18 measured curves and two explicit anchor refusals. The 2,000-draw paired
+source bootstrap, exact-feature/nearest-source audits, all family exclusions
+and all source-influence refits are complete. Artifacts are retained under
+`/mnt/v/output/zensim/shaped-linear-generalization-20261106/`; cold mirror
+verification is the final storage step.
 
 ## Data and comparison
 
@@ -38,6 +41,26 @@ no new comparator hyperparameter search uses these outer scores.
 | Positive shaped direct inputs | 0.889582 | 0.863715 |
 | Positive shaped direct/products | 0.896138 | 0.865817 |
 | Extra Trees, mean of two seeds | 0.987419 | 0.911052 |
+| Shared [128,64] ReLU, mean of two seeds | 0.899916 | 0.885679 |
+
+Paired source-resampling differences (conditional 95% intervals):
+
+- Extra Trees minus shared ReLU: +0.025373 [+0.014977, +0.034836].
+- Extra Trees minus free products: +0.029753 [+0.019871, +0.036296].
+- Shared ReLU minus free products: +0.004379 [-0.007818, +0.014321].
+- Shaped positive products minus positive products: +0.006581 [-0.007387, +0.018944].
+
+These intervals resample whole sources within each population and outer fold,
+then average fold metrics. They are conditional on these fits and exposed
+sources, without a multiple-testing correction. The free projection is
+competitive with this shared-ReLU control; the aggregate shaping gain is
+uncertain. CID22-A25's shaping difference is +0.036831 [+0.007275, +0.057536].
+
+The fixed-lambda pair-difference control raises positive-products outer ranking
+from 0.859198 to 0.867900. Its training composite is 0.883353. Free products under
+this objective reach training 0.938588 and outer 0.870948. These are separately
+registered least-squares pair objectives, not RankNet, and their lambda remains
+1e-4. Objective choice matters alongside model capacity.
 
 Shaping is not a uniform improvement. Positive shaped products raise the CID22-A25
 composite from 0.845914 to 0.882745, while KADID, TID2013 and KonFiG decline
@@ -97,6 +120,8 @@ negative control deliberately retains family-level structure.
 | Positive shaped products, population shuffle | 0.023175 | 0.698357 |
 | Extra Trees, population shuffle | 0.943560 | 0.205364 |
 | Extra Trees, conditional shuffle | 0.924708 | 0.497598 |
+| Shared ReLU, population shuffle | 0.006077 | 0.599914 |
+| Shared ReLU, conditional shuffle | 0.100525 | 0.659089 |
 
 Trees can fit much of the shuffled-label structure; this demonstrates capacity,
 not proof that their real-label result is memorization. Positive models fit
@@ -109,7 +134,7 @@ that monotonicity prevents memorization.
 
 Source learning curves improve with added sources. Positive-products outer
 composites are 0.840412, 0.849916, 0.853779 and 0.859198 at 25%, 50%, 75% and
-100% of training sources; shaped products give 0.851041, 0.855571, 0.860677 and
+100% of training sources (nominal fractions, rounded up within population); shaped products give 0.851041, 0.855571, 0.860677 and
 0.866127. The 100% rows use fixed lambda=1e-4, rather than the separately
 selected S1 lambda. Matched row-budget controls retain all sources, and all
 60 curve fits include basis-slope stability diagnostics on common training-only
@@ -123,7 +148,17 @@ This does not prove that another model ignores context shortcuts.
 All 48 family exclusions and 20 source-influence refits finished. Exclusions
 match human and teacher codec families. The influence refits hold the selected
 full-FIT lambda fixed; family exclusions use their registered lambda=1e-4.
-Held-family and retained-family panels remain separate. Full source hashes,
+Held-family and retained-family panels remain separate. Removing AVIF lowers
+unseen-source AVIF SROCC on CID22-A25 by 0.023577 for positive products and
+0.046050 for shaped products; teacher changes are -0.039779 and -0.056378.
+Removing KADID-20 lowers its held-family correlation by 0.010563 and 0.019259.
+These are descriptive three-fold means, not uncertainty-adjusted claims.
+
+The selected-source removals move individual development predictions by up to
+15.619113 score points for shaped products; one removal moves its development
+predictions by 1.310266 points on average. These are sensitivity diagnostics,
+with target maps/basis parameters refitted on the retained training rows.
+Full source hashes,
 selected residual-mass sources and coefficient/prediction changes are retained.
 
 ## Calibration and verification

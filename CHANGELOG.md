@@ -4,6 +4,10 @@
 
 ### Research
 
+- Complete 390 shaped-linear, tree and neural fitting/generalization controls,
+  with numerical optimization bounds, source bootstrap, permutation capacity,
+  distortion transfer and retained identity-calibration refusals.
+
 - Register source-separated shaped-linear fitting bounds and memorization controls;
   add a private Rust quadratic fitter with numerical optimality certificates
   and canonical f32 prediction (`29e350a6`).

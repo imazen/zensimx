@@ -152,9 +152,19 @@ def reduce(root):
         path=root/'fits'/t['id']/f"lambda-{t['lambdas'][0]:g}";base=selected_path(root,t['family'],None)
         pred=np.load(path/'predictions.npz')['native'][:len(d['y'])];control=np.load(base/'predictions.npz')['native'][:len(d['y'])]
         influence.append(dict(task=t['id'],omitted_component=t['omitted_component'],baseline_selected_lambda=json.loads((base/'RESULT.json').read_text())['certificate']['lambda'],refit_lambda=t['lambdas'][0],development_mean_absolute_score_change=float(np.mean(np.abs(pred[d['dev']]-control[d['dev']]))),development_max_absolute_score_change=float(np.max(np.abs(pred[d['dev']]-control[d['dev']])))))
+    boot=json.loads((root/'bootstrap/SOURCE_BOOTSTRAP.json').read_text());draws=np.load(root/'bootstrap/samples.npz')
+    names=boot['names'];human=[i for i,p in enumerate(boot['populations']) if p!='cid22_ssim2']
+    group_ids={name:[names.index(name)] for name in FAMILIES}
+    group_ids.update({kind:[i for i,name in enumerate(names) if name.startswith(kind+'-s')] for kind in ('extra','neural')})
+    paired={}
+    for a,b in [('extra','neural'),('extra','free_products'),('neural','free_products'),('positive_shaped_products','positive_products')]:
+        aa=draws['composite'][group_ids[a]].mean(axis=0)[human].mean(axis=(0,1));bb=draws['composite'][group_ids[b]].mean(axis=0)[human].mean(axis=(0,1));delta=aa-bb
+        point=float(draws['point'][group_ids[a]].mean(axis=0)[human].mean()-draws['point'][group_ids[b]].mean(axis=0)[human].mean())
+        paired[a+' minus '+b]=dict(point=point,low=float(np.quantile(delta,.025)),high=float(np.quantile(delta,.975)))
+    write(out/'PAIRED_COMPARISONS.json',paired)
     summary=dict(registered_quadratic_fits=expected,quadratic_fits=len(records),comparator_fits=len(comparators),calibrations=Counter(v['calibration']['status'] for v in records.values() if v['calibration']['status']!='not_requested'),
         maximum_kkt=max(c['kkt_infinity'] for c in certificates),maximum_gap=max(c['objective_gap_upper_bound'] for c in certificates),maximum_scientific_f32_difference=max(v['maximum_f32_scientific_difference'] for v in records.values()),
-        main=main,convex_bounds=bounds,influence=influence,comparators=comparators,all_reports_sha256={k:sha(root/k/'REPORT.json') for k in records},limitations=['regularized squared-loss bounds only; no universal SROCC or feature-information ceiling','opaque-vector qualification; no pixel/runtime promotion','source bootstrap conditional on these fits and exposed populations','neural and quadratic objectives and compute budgets differ'])
+        main=main,paired_comparisons=paired,convex_bounds=bounds,influence=influence,comparators=comparators,all_reports_sha256={k:sha(root/k/'REPORT.json') for k in records},limitations=['regularized squared-loss bounds only; no universal SROCC or feature-information ceiling','opaque-vector qualification; no pixel/runtime promotion','source bootstrap conditional on these fits and exposed populations','neural and quadratic objectives and compute budgets differ'])
     write(out/'SUMMARY.json',clean(summary))
     import matplotlib
     matplotlib.use('Agg')
@@ -177,12 +187,31 @@ def reduce(root):
 
 
 def archive(root):
-    plan=json.loads((root/'PLAN.json').read_text());dest=root/'reproduction';dest.mkdir(exist_ok=False)
+    plan=json.loads((root/'PLAN.json').read_text())
+    for path,pin in {**plan['inputs'],**plan['data_sha256'],**plan['binary_sha256']}.items():
+        if sha(path)!=pin:raise ValueError('archive input drift: '+path)
+    status=json.loads((root/'PROGRESS_AUDIT.json').read_text())
+    if status['quadratic_complete']!=354 or status['comparators_complete']!=36:raise ValueError('archive requires every registered fit')
+    for report in (root/'fits').glob('*/lambda*/REPORT.json'):
+        if sha(report.parent/'model.bin')!=json.loads(report.read_text())['bake_sha256']:raise ValueError('quadratic model drift')
+    for report in (root/'comparators').glob('*/REPORT.json'):
+        r=json.loads(report.read_text());v=r['provenance']
+        model=report.parent/('ckpt/ckpt_epoch119.bin' if r['cell']['model']=='neural' else 'model.opaque-vector.zcth')
+        expected=v['bake_sha256'] if r['cell']['model']=='neural' else v['native_gate']['model_sha256']
+        if sha(model)!=expected:raise ValueError('comparator model drift')
+    import platform,scipy,sklearn,pyarrow,matplotlib
+    write(root/'ENVIRONMENT.json',dict(python=platform.python_version(),numpy=np.__version__,scipy=scipy.__version__,sklearn=sklearn.__version__,pyarrow=pyarrow.__version__,matplotlib=matplotlib.__version__,rustc=subprocess.check_output(['rustc','--version','--verbose'],text=True),cargo=subprocess.check_output(['cargo','--version'],text=True)))
+    dest=root/'reproduction';dest.mkdir(exist_ok=False)
     inventory={}
     sources=[Path(p) for p in plan['inputs']]+[META.with_name('PEERS.json'),OLD/'PLAN.json',REPO/'Cargo.toml',REPO/'Cargo.lock',REPO/'docs/SHAPED_LINEAR_GENERALIZATION_STUDY.md',REPO/'scripts/rev4_featpot/linear_probe.py',REPO/'scripts/rev4_featpot/shaped_linear_study.py',REPO/'scripts/rev4_featpot/shaped_linear_compare.py',REPO/'scripts/rev4_featpot/shaped_linear_report.py',REPO/'scripts/lib/zen_stats.py',REPO/'zensim-validate/src/bin/bake_dial_refit/linear_study.rs',REPO/'scripts/byconstruction/dataset_mirror.py']
+    sources += [REPO/'scripts/rev4_featpot'/name for name in ('activation_curriculum.py','tree_study.py','v2_common.py','v2_lodo_mlp.py','v2_teacher.py','v2_human_role.py','v2c_wide.py','color_noise_fx2_declaration.json')]
+    sources += [REPO/'scripts/tests/test_shaped_linear_study.py',REPO/'benchmarks/shaped_linear_generalization_2026-11-06.md']
     for i,path in enumerate(dict.fromkeys(sources)):
         copied=dest/f'{i:03d}-{path.name}';shutil.copy2(path,copied);inventory[str(path)]=dict(artifact=str(copied.relative_to(root)),sha256=sha(copied))
-    for name in ('shaped-linear-prepare.log','shaped-linear-prepare-r2.log','shaped-linear-oracle.log','shaped-linear-s1.log','shaped-linear-diagnostics.log','shaped-linear-comparators.log','shaped-linear-influence.log','shaped-linear-native-check.log','shaped-linear-native-build-r2.log','shaped-linear-native-build-r3.log'):
+    failed=root.with_name(root.name+'-prepare-failed-1')
+    if not failed.is_dir():raise FileNotFoundError(failed)
+    shutil.copytree(failed,dest/'failed-preparation-1')
+    for name in ('shaped-linear-audit.log','shaped-linear-details.log','shaped-linear-details-r2.log','shaped-linear-label-structure.log','shaped-linear-bootstrap.log','shaped-linear-report.log','shaped-linear-thread-audit.log','shaped-linear-thread-fixed.log','shaped-linear-comparator-admission.log','shaped-linear-native-tests.log','shaped-linear-native-tests-r2.log','shaped-linear-native-tests-r3.log','shaped-linear-prepare.log','shaped-linear-prepare-r2.log','shaped-linear-oracle.log','shaped-linear-s1.log','shaped-linear-diagnostics.log','shaped-linear-comparators.log','shaped-linear-influence.log','shaped-linear-native-check.log','shaped-linear-native-build-r2.log','shaped-linear-native-build-r3.log'):
         path=Path.home()/'tmp'/name
         if not path.exists():raise FileNotFoundError(path)
         shutil.copy2(path,dest/name)
