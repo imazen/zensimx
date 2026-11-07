@@ -5012,3 +5012,6 @@ shaping-completion-watch-reexport study binary_dir inspector:
 
 shaping-completion-worker-inputs study assignment output:
     TMPDIR="$HOME/tmp" OPENBLAS_NUM_THREADS=1 "$HOME/work/claudehints/scripts/run-heavy" --mem 2G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_worker_inputs.py --study {{quote(study)}} --assignment {{quote(assignment)}} --output {{quote(output)}}
+
+shaping-completion-watch-archives study destination:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_archive_supervision.py --study {{quote(study)}} --destination {{quote(destination)}} --watch
