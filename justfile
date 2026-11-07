@@ -4924,8 +4924,8 @@ shaping-completion-inner-linear study binary_dir partition:
 shaping-completion-pretraining-check:
     python3 -B -m unittest discover -s scripts/tests -p test_shaping_pretraining.py
 
-shaping-completion-pretrained-dispatch study binary_dir partition:
-    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 4G --jobs 2 -- python3 -B scripts/rev4_featpot/shaping_pretrained_dispatch.py --study {{quote(study)}} --binary-dir {{quote(binary_dir)}} --partition {{quote(partition)}} --workers 2
+shaping-completion-pretrained-dispatch study binary_dir partition workers='2' memory='4G':
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem {{quote(memory)}} --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_pretrained_dispatch.py --study {{quote(study)}} --binary-dir {{quote(binary_dir)}} --partition {{quote(partition)}} --workers {{quote(workers)}}
 
 shaping-pretrained-dispatch-check:
     TMPDIR="$HOME/tmp" python3 -B -m unittest discover -s scripts/tests -p test_shaping_pretrained_dispatch.py

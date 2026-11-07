@@ -2757,3 +2757,40 @@ interrupted-parent dependencies. Both partial parent attempts remain untouched.
 
 Cold readback verified `i270-retention-1830-evidence`: 7 artifacts,
 1509074 bytes; receipt `70dfbc76ad1c9a24ecdc9ea3b367b73c9810ded2d032895728a05f3abbb74387`.
+
+
+## Eight queued inner-1-0 joint fits handed to spare capacity
+
+The r3800x legacy queue had eight live native fits and sixteen cells that had
+not started. Its frozen execution and placement sources matched commit
+`39beed49e651`; AST checks verified the host guard precedes attempt creation
+and matches the current guard. All eight occupied executor slots were verified
+as live children of the original controller before the placement transaction.
+
+The handoff preserved the original 24-cell assignment and split it into sixteen
+r3800x cells and eight i265 cells. It used a bounded stop of the Python queue
+writer only, with PID-start verification and guaranteed resumption. Existing
+native children continued. Collection was stopped only at an observed idle
+boundary and resumed after checksum-verified placement files agreed on both
+hosts. The local resource wrapper reported
+`run-heavy: done rc=0 8s | peak-RSS 0.03GiB | min-avail 28404MiB | peak-load 29.54`.
+
+The frozen source host guard was exercised read-only against all eight moved
+cells: each refused with `cell assigned to another worker`, and no source
+attempt directory was created. The legacy batch retains its original 24-cell
+requirement and will record those future placement refusals; they must remain
+visible. Global scientific completion requires all 24 actual native results,
+not a successful status from that old batch. No native fit was restarted.
+
+Immutable input installation on i265 passed. Its admission observed nine native
+trainers, no pending reservations, 25680367616 available RAM bytes and
+281576394752 free disk bytes; it required 52613349376 free bytes. Seven new
+native PIDs were verified, bringing the observed target total to sixteen, with
+the eighth moved cell queued. The controller has a 2 GiB cap and each native
+child a 1 GiB cap. Training uses frozen source `ce9229d0362d` and the unchanged
+study binary, data, 240 epochs and 50000 pair draws per epoch.
+
+Cold readback verified:
+
+- `legacy-joint10-handoff-admission-evidence`: 27 artifacts, 94050 bytes; receipt `8bc28ed1db26ab61b5e76d716abec910dd2832701f9b0f8a309bcfafb639f82f`.
+- `i265-joint10-handoff-inputs`: 3 artifacts, 24008696 bytes; receipt `35edfa8496f675e37ad83449f602d886e2603f3478a009a08e8fd13987c60b87`.
