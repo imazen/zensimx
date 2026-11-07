@@ -642,6 +642,15 @@ inode and modification time for reuse, plus mismatch refusal. Shared-base
 installation cannot use this option.
 # Cost report replay
 
+`just shaping-cost-memory BINARY WORKLOAD NEW_OUTPUT` runs each model in a fresh
+native qualification process under GNU `time -v`. The recorded maximum RSS includes
+the runtime, loading, forty feature rows and exact pre/postflight scoring. It is
+neither isolated model heap use nor steady-state allocation. The outer resource
+wrapper's peak RSS is also retained, with its different process scope. Model bytes,
+source hashes, command and native qualification receipts accompany each result.
+This instrument can qualify on fixed inner models; a final scientific report must
+use the admitted full-FIT workload and its provenance separately.
+
 `just shaping-cost-report DIRECTORY WORKLOAD OUTPUT` checks the native cost
 instrument's raw zenbench batches against its completion receipt. It requires
 the first 32 clean paired rounds, exact pre/postflight qualification, matching

@@ -5069,6 +5069,12 @@ shaping-cost-report directory workload output:
 shaping-cost-report-check:
     TMPDIR="$HOME/tmp" python3 -B -m unittest discover -s scripts/tests -p test_shaping_cost_report.py
 
+shaping-cost-memory binary workload output:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 2G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_cost_memory.py --binary {{quote(binary)}} --workload {{quote(workload)}} --output {{quote(output)}}
+
+shaping-cost-memory-check:
+    TMPDIR="$HOME/tmp" python3 -B -m unittest discover -s scripts/tests -p test_shaping_cost_memory.py
+
 shaping-completion-dispatch-rescues study binary_dir neutral outer *args:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 6G --jobs 2 -- python3 -B scripts/rev4_featpot/shaping_rescue_dispatch.py --study {{quote(study)}} --binary-dir {{quote(binary_dir)}} --neutral-qualification {{quote(neutral)}} --outer {{outer}} --workers 2 {{args}}
 
