@@ -26,6 +26,9 @@ class SelectionTests(unittest.TestCase):
         self.assertEqual(result['required_reports'],24);self.assertEqual(result['selected_setting'],0)
         missing=copy.deepcopy(reports);missing.pop(next(iter(missing)))
         with self.assertRaises(ValueError):aggregate(cells,missing,'extra_trees',0)
+        mixed=copy.deepcopy(reports)
+        next(iter(mixed.values())).update(reexport_receipt='receipt',evaluation_build_sha256='other')
+        with self.assertRaises(ValueError):aggregate(cells,mixed,'extra_trees',0)
         next(iter(reports.values()))['outer_results_read']=True
         with self.assertRaises(ValueError):aggregate(cells,reports,'extra_trees',0)
 

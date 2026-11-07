@@ -67,3 +67,19 @@ The first epoch-119 replay completed all population panels and unchanged gates;
 its human inner composite was 0.9126419709659228. This diagnostic checkpoint is
 not a selected candidate. Resource wrapper: 3 seconds, peak RSS 0.23 GiB,
 minimum available 39878 MiB, peak load 20.96.
+
+The first uniform replay wave covers every completed ReLU base fit on inner-0-0
+(12 settings/seeds) and both completed fresh-head controls: 104 final/checkpoint
+reports, all passing the unchanged native gates. All 14 have separately stored
+convergence receipts. Each full-exposure base fit triggers the registered loss
+investigation; five also encounter one surviving output coefficient. Two have
+same-cycle human improvement above 0.002. Neither completed fresh-head control
+triggers these criteria. These are within-fold diagnostics, not a family ranking.
+
+Repaired convergence binds every original checkpoint, repair receipt, model and
+evaluator hash. Inner selection can explicitly use this representation for ReLU,
+but requires the same representation and evaluator across all paired settings,
+seeds and folds, and agreement between final and diagnostic reports. The actual
+outer-0 selection attempt correctly refuses because the other inner fold is
+incomplete; no selection receipt was emitted. Original failed reports remain
+untouched. The rescue protocol and unchanged numerical gates still apply.

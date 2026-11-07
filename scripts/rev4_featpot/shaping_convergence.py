@@ -34,7 +34,7 @@ def diagnostics(losses,scores,active):
                 conclusion='investigate' if reasons else 'registered triggers absent; not a proof of global convergence')
 
 
-def report(run):
+def report(run,reexport_root=None):
     identity=json.loads((run/'RUN.json').read_text())
     if identity['cell']['stage'] not in ('inner','fresh_control_inner'):raise ValueError('only inner diagnostics admitted')
     result=json.loads((run/'RESULT.json').read_text())
@@ -42,22 +42,43 @@ def report(run):
     lines=re.findall(r'epoch\s+(\d+)\s+\|[^\n]*?loss=([^ |]+)',(run/'train.log').read_text())
     losses={int(k):float(v) for k,v in lines}
     if sorted(losses)!=list(range(identity['epochs'])):raise ValueError('missing or extra scheduled loss epochs')
-    scores={};active={};pins={}
-    for path in sorted((run/'curve_evaluation').glob('epoch-*/REPORT.json')):
+    scores={};active={};pins={};builds=set()
+    if reexport_root is not None and identity['cell']['family']!='relu':
+        raise ValueError('max-pair supplemental convergence requires ReLU')
+    curve_root=reexport_root if reexport_root is not None else run/'curve_evaluation'
+    for path in sorted(curve_root.glob('epoch-*/REPORT.json')):
         marker=path.parent/'DIAGNOSTIC_COMPLETE.json'
         if json.loads(marker.read_text())['report_sha256']!=sha(path):raise ValueError('diagnostic report drift')
         row=json.loads(path.read_text())
         if row['cell']!=identity['cell'] or row['outer_results_read']:raise ValueError('diagnostic identity differs')
+        if reexport_root is not None:
+            receipt=Path(row['reexport_receipt'])
+            if sha(receipt)!=row['reexport_receipt_sha256']:raise ValueError('re-export receipt drift')
+            r=json.loads(receipt.read_text())
+            original=run/'checkpoints'/f"ckpt_epoch{row['checkpoint_epoch']:03}.bin"
+            if r['original_sha256']!=sha(original) or r['training_build_sha256']!=identity['build_sha256']:
+                raise ValueError('re-export training identity drift')
+            if r['representation']!='research-relu-max-pairs-v1':raise ValueError('representation differs')
+            for name,pin in r['file_sha256'].items():
+                if sha(name)!=pin:raise ValueError('re-export artifact drift')
+            if row['checkpoint_sha256']!=sha(r['bake']):raise ValueError('re-export bake drift')
+            builds.add(row['evaluation_build_sha256'])
+            if r['evaluation_build_sha256']!=row['evaluation_build_sha256']:raise ValueError('re-export evaluator differs')
         epoch=row['checkpoint_epoch'];scores[epoch]=row['inner_validation']['selection_score'];active[epoch]=row['active_output_coefficients'];pins[str(path)]=sha(path)
     expected=[e for e in (49,99,119,149,199,219,239) if e<identity['epochs']]
     if sorted(scores)!=expected:raise ValueError('incomplete registered checkpoint panels')
+    if reexport_root is not None and len(builds)!=1:raise ValueError('mixed re-export evaluators')
     out=diagnostics([losses[i] for i in sorted(losses)],scores,active)
     out.update(cell=identity['cell'],report_sha256=pins,training_log_sha256=sha(run/'train.log'),outer_results_read=False)
-    path=run/'CONVERGENCE.json'
+    if reexport_root is not None:
+        out.update(representation='research-relu-max-pairs-v1',evaluation_build_sha256=next(iter(builds)),
+                   original_training_run=str(run))
+    path=(reexport_root if reexport_root is not None else run)/'CONVERGENCE.json'
     if path.exists():raise ValueError('preserve existing convergence receipt')
     path.write_bytes(encoded(out));print(json.dumps(out),flush=True)
 
 
 if __name__=='__main__':
     parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('--run',type=Path,required=True)
-    report(parser.parse_args().run)
+    parser.add_argument('--reexport-root',type=Path)
+    args=parser.parse_args();report(args.run,args.reexport_root)

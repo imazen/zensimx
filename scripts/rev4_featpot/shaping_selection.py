@@ -37,6 +37,9 @@ def aggregate(cells,reports,family,outer):
     required={(setting,f'inner-{outer}-{fold}',seed) for setting in range(4) for fold in range(2) for seed in seeds}
     if coverage!=required or len(expected)!=len(required):raise ValueError('registered tuning coverage differs')
     if set(reports)!={c['id'] for c in expected}:raise ValueError('missing or extra paired reports')
+    representations={(('research-relu-max-pairs-v1',r['evaluation_build_sha256'])
+                      if 'reexport_receipt' in r else ('original',None)) for r in reports.values()}
+    if len(representations)!=1:raise ValueError('mixed evaluation representations or repaired runtimes')
     scores={setting:[] for setting in range(4)}
     for cell in expected:
         report=reports[cell['id']]
@@ -51,11 +54,14 @@ def aggregate(cells,reports,family,outer):
 
 def select(args):
     _,cells,_=load_registration(args.study)
+    repaired=getattr(args,'reexport_max_pairs',False)
+    if repaired and args.family!='relu':raise ValueError('max-pair selection requires ReLU')
     expected=[c for c in cells if c['stage']=='inner' and c['family']==args.family
               and c['partition'] in (f'inner-{args.outer}-0',f'inner-{args.outer}-1')]
     reports={};pins={};convergence={}
     for cell in expected:
-        candidates=list((args.study/'runs'/cell['id']).glob('attempt-*/evaluation/COMPLETE.json'))
+        candidates=list((args.study/('reexport_max_pairs' if repaired else 'runs')/cell['id']).glob(
+            'attempt-*/final/COMPLETE.json' if repaired else 'attempt-*/evaluation/COMPLETE.json'))
         if len(candidates)!=1:raise ValueError('one complete report required for '+cell['id'])
         marker=candidates[0];path=marker.parent/'REPORT.json';receipt=json.loads(marker.read_text())
         if receipt['report_sha256']!=sha(path):raise ValueError('report drift')
@@ -66,12 +72,25 @@ def select(args):
             cpath=marker.parent.parent/'CONVERGENCE.json'
             c=json.loads(cpath.read_text())
             if c['cell']!=cell or c['outer_results_read']:raise ValueError('convergence evidence differs')
+            if repaired:
+                if c['representation']!='research-relu-max-pairs-v1' or c['evaluation_build_sha256']!=row['evaluation_build_sha256']:
+                    raise ValueError('final and diagnostic representations differ')
+                receipt_path=Path(row['reexport_receipt'])
+                if sha(receipt_path)!=row['reexport_receipt_sha256']:raise ValueError('final re-export receipt drift')
+                receipt=json.loads(receipt_path.read_text())
+                for name,pin in receipt['file_sha256'].items():
+                    if sha(name)!=pin:raise ValueError('final re-export artifact drift')
+                original=Path(c['original_training_run'])
+                result=json.loads((original/'RESULT.json').read_text())
+                if receipt['original_sha256']!=result['bake_sha256'] or row['checkpoint_epoch']!=result['epochs']-1:
+                    raise ValueError('re-export did not use final scheduled checkpoint')
             for report_path,pin in c['report_sha256'].items():
                 if sha(report_path)!=pin:raise ValueError('convergence input drift')
             convergence[cell['id']]=c['investigation_required'];pins[str(cpath)]=sha(cpath)
     result=aggregate(cells,reports,args.family,args.outer)
     result.update(plan_sha256=sha(args.study/'PLAN.json'),evidence_sha256=pins,
                   investigation_triggered=any(convergence.values()),convergence=convergence,driver_sha256=sha(__file__))
+    result['representation']='research-relu-max-pairs-v1' if repaired else 'original'
     dest=args.study/'selection'/f'outer-{args.outer}';dest.mkdir(parents=True,exist_ok=True)
     path=dest/(args.family+'-base.json')
     if path.exists():raise ValueError('preserve existing selection receipt')
@@ -82,4 +101,5 @@ if __name__=='__main__':
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--study',type=Path,required=True);parser.add_argument('--family',choices=FAMILIES,required=True)
     parser.add_argument('--outer',type=int,choices=range(3),required=True)
+    parser.add_argument('--reexport-max-pairs',action='store_true')
     select(parser.parse_args())
