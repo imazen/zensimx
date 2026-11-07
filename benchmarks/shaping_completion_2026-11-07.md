@@ -250,3 +250,13 @@ owner materializes the event stream, unlike independent diagnostics; its actual
 registered-exposure resource use and neutral replay must be qualified before
 scientific rescue launch. Pretrained rescue execution and nonmatching-schedule
 pretraining remain implementation work.
+
+The actual analytic neutral-control qualification reproduced epoch zero of the
+completed ordinary-SiLU fit exactly after removing only repro and declared
+research-configuration metadata. Native weights, scaler and retained metadata
+hash: `74edb955ecaca2022eb93d0b75df7455011351988416ae5d98f576d82881491b`.
+It used the same admitted rows and 50,000 draws with random order, unit teacher
+mass, no dropout and no balancing. Uniform family codes are a neutral-control
+fixture only. Native wrapper: `run-heavy: done rc=0 20s | peak-RSS 0.09GiB`.
+The enclosing wrapper measured 21 seconds and 0.09 GiB. This one-epoch result
+does not establish memory use at 240 epochs or full-run equivalence.

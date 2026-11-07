@@ -4969,3 +4969,6 @@ shaping-completion-storage-check:
 
 shaping-completion-rescue-check:
     python3 -B -m unittest discover -s scripts/tests -p test_shaping_rescue.py
+
+shaping-completion-rescue-qualify study run binaries output epochs="1":
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_rescue_qualification.py --study {{quote(study)}} --run {{quote(run)}} --binary-dir {{quote(binaries)}} --output {{quote(output)}} --epochs {{epochs}}
