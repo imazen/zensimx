@@ -2452,3 +2452,28 @@ No native training or completed fit was replayed.
 Cold readback verified `rescue-resource-controls-evidence-1650`: 10 artifacts,
 38035 bytes, receipt
 `0bb570925450025080b196b47ae330f0d079daa3a65dfaf839353dfc2209e524`.
+
+
+## Four additional ready inner-2-0 pretrained fits
+
+Four previously unstarted registered descendants from two newly completed
+parents were assigned to i265 with four workers. The existing analytic
+inner-1-1 and ReLU inner-2-0 waves had each completed their full 36/12 fits,
+respectively, with no reported native training failure. All four native
+prefix extractions and checksummed input installation passed before admission.
+Both controller and all four native PIDs were verified live.
+
+Admission observed nine existing trainers, 25,545,216,000 available memory bytes,
+and 284,350,447,616 free disk bytes against 52,613,349,376 required. The
+controller has a 2 GiB cap and each child a 1 GiB cap. The admission guard
+allows at most twelve existing trainers for this four-worker placement and
+requires 12 GiB available RAM. Worker source remains `ce9229d0362d`.
+No completed fit or pretraining was replayed.
+
+Cold readback verified `i265-pretrained20b-admission-evidence`: 19 artifacts,
+1217036 bytes, receipt
+`1c6c71d85672f9af8e1f7c630517b8e20aa52207675ed297f086e6a20c8df727`.
+
+Cold readback verified `i265-pretrained20b-inputs`: 3 artifacts,
+24767960 bytes, receipt
+`5e44c1e035ffde8128fe7c5897a0125d384ec7494795ec78869ba01429a38cd0`.
