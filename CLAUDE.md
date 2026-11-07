@@ -1,5 +1,13 @@
 # zensim — current working rules
 
+## Known Bugs — stable SIMD lint audit (November 7, 2026)
+
+An isolated dependency-only descendant of `ad123a8e` resolves stable
+archmage/magetypes 0.9.31 and passes workspace checking. Strict library
+Clippy reports 341 deprecated `mul_add` calls. Numerical source, model
+inputs and existing assertions remain unchanged; no scientific qualification
+is implied by that compile check. See `docs/stable-dependencies-2026-11-07.md`.
+
 ## Known Bugs — first worker bundle directory (resolved November 7, 2026)
 
 The worker packer checked the destination parent's filesystem before creating
