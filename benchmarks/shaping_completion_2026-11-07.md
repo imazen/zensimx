@@ -233,3 +233,20 @@ inspection. Three tests cover unresolved attempts, overlapping reservations,
 exception release, and waiting until sufficient space exists. Previously
 started controllers retain their loaded implementation and require continued
 manual headroom supervision; they have not silently adopted this change.
+
+## Rescue admission implementation
+
+Rescue setting resolution now rechecks the frozen matrix, triggering convergence
+receipt, complete paired inner reports, report hashes, and each selected family's
+convergence evidence before resolving `base_selected`. It recomputes the human
+selection rather than trusting the saved winning index. Two tests exercise
+complete coverage, missing reports, modified evidence and optimizer settings.
+No rescue fit has started.
+
+Analytic rescue controls use the existing training-research owner, which requires
+exact admitted row-family groups and one teacher. Empty groups are rejected by
+the Python builder; native code independently checks names and row counts. This
+owner materializes the event stream, unlike independent diagnostics; its actual
+registered-exposure resource use and neutral replay must be qualified before
+scientific rescue launch. Pretrained rescue execution and nonmatching-schedule
+pretraining remain implementation work.

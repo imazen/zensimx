@@ -4966,3 +4966,6 @@ shaping-completion-prepare-variant study cell:
 
 shaping-completion-storage-check:
     python3 -B -m unittest discover -s scripts/tests -p test_shaping_storage.py
+
+shaping-completion-rescue-check:
+    python3 -B -m unittest discover -s scripts/tests -p test_shaping_rescue.py
