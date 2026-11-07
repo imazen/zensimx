@@ -827,3 +827,13 @@ Tests verify retained epochs, successful duplicate removal, late archive
 corruption with no deletion, busy files, and source changes during verification.
 This changes local storage placement, not the save-every-epoch record or
 scientific checkpoint-selection policy.
+
+The first retention batch removed 17,864 local duplicate checkpoints from 88
+completed cells after rereading all 4,444,420,965 logical bytes from their durable
+copies. The local receipt and post-removal check confirm every removed path is
+absent, every durable counterpart exists, and every required retained epoch is
+present. Free bytes measured immediately before/after were 52,574,863,360 and
+57,033,805,824; concurrent workloads mean that delta is not an isolated allocation
+measurement. `run-heavy`: 229 seconds, peak RSS 0.11 GiB, minimum available RAM
+30,277 MiB, peak load 18.71. Evidence lives in the completion artifact root's
+`checkpoint-retention-qualification/`, including the full per-file receipt.
