@@ -353,3 +353,21 @@ These establish orchestration behavior, not completed generalization fits.
 Actual variant fitting remains gated by unfinished inner comparisons. The new
 human-capable native build has begun its separate full-240-epoch neutral replay;
 its previously completed one-epoch checks alone do not qualify that schedule.
+
+### Generalization target-aware evaluation (2026-11-07)
+
+The native evaluator now resolves registered variant runs through their complete
+inner admission and exact saved input/shape resolution. It uses the audited
+variant TRAIN tables for training targets and freshly fitted target maps. This
+preserves permuted targets for shuffled-label training metrics while leaving
+actual outer targets unchanged. Absent training populations retain rank panels
+and explicitly unavailable calibration errors; no outer-fitted map is created.
+Feature probes use each variant's own training rows, with their membership hash
+checked before cache reuse. The resolved analytic family controls whether
+identity/monotonicity is claimed, so `best_analytic` cannot accidentally impose
+that claim on ordinary SiLU. Outer checkpoints remain unavailable for selection.
+
+Ten evaluator tests and three variant-executor tests pass, including exact
+training-only target replacement, unchanged outer labels, altered qualification
+receipts, and mismatched variant resolutions. No actual variant scoring run has
+yet been admitted. Full scientific fit/evaluation remains outstanding.

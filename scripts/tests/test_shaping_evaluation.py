@@ -5,11 +5,42 @@ import json
 import tempfile
 from unittest.mock import patch
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'rev4_featpot'))
-from shaping_evaluation import admitted_epoch, evaluation_epoch, reexport_bake, prepare_validation, outer_context
+from shaping_evaluation import admitted_epoch, evaluation_epoch, reexport_bake, prepare_validation, outer_context, training_targets
 from shaping_completion import sha
 
 
 class EvaluationAdmissionTests(unittest.TestCase):
+    def test_shuffled_training_targets_leave_actual_outer_targets_intact(self):
+        import numpy as np
+        import pyarrow as pa
+        import pyarrow.parquet as pq
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as directory:
+            path=Path(directory)/'train.parquet'
+            pq.write_table(pa.table({'human_score':[30.,10.,20.]}),path)
+            labels=np.array([10.,91.,20.,92.,30.]);positions={100:0,101:1,102:2,103:3,104:4}
+            training_targets(labels,positions,[100,102,104],path)
+            np.testing.assert_array_equal(labels,[30.,91.,10.,92.,20.])
+            with self.assertRaisesRegex(ValueError,'coverage'):training_targets(labels,positions,[100],path)
+
+    def test_variant_outer_context_revalidates_resolution_and_qualification(self):
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as directory:
+            root=Path(directory);gate=root/'admission';gate.write_text('{}')
+            qualification=root/'qualification';qualification.write_text('{}')
+            cell=dict(id='v',stage='shuffle',partition='outer-1',family='best_analytic')
+            resolution=dict(schedule={'phase_epochs':[480]},resolved_family='silu_diagnostic')
+            run=dict(cell=cell,resolution=resolution,qualification_sha256={str(qualification):sha(qualification)},epochs=480)
+            membership=dict(train=[1],test=[2])
+            with patch('shaping_outer_admission.resolve',return_value=({'additional_cells':[]},gate)),\
+                 patch('shaping_variant_execution.resolve',return_value=resolution),\
+                 patch('shaping_variant_inputs.load_variant',return_value=({},cell,'id',membership)):
+                context=outer_context(root,run,[cell]);self.assertEqual(context['membership'],membership)
+                self.assertEqual(context['variant']['resolved_family'],'silu_diagnostic')
+                self.assertEqual(admitted_epoch(run,dict(stage='trained',exit_code=0),[cell],context),480)
+                with self.assertRaisesRegex(ValueError,'resolution drift'):outer_context(root,dict(run,resolution={}),[cell])
+                with self.assertRaisesRegex(ValueError,'cannot diagnose'):outer_context(root,run,[cell],479)
+                qualification.write_text('{"changed":true}')
+                with self.assertRaisesRegex(ValueError,'qualification drift'):outer_context(root,run,[cell])
+
     def test_cached_outer_view_cannot_bypass_live_admission(self):
         with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as directory:
             root=Path(directory);dest=root/'evaluation_views/outer-0';dest.mkdir(parents=True)

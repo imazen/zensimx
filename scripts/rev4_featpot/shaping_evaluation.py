@@ -18,6 +18,7 @@ from shaping_execution import load_registration
 
 
 DRIVER_SHA256=sha(__file__)
+VARIANT_STAGES=('source_curve','row_curve','shuffle','human_only')
 
 class NativeFeatureGateError(ValueError):
     """Measured feature-contract failure; never a qualified candidate."""
@@ -101,6 +102,7 @@ def make_probes(root,partition,train,plan):
     data=probe_values(values,RAW_IDS,declaration)
     position={int(v):i for i,v in enumerate(RAW_IDS)}
     path=root/'evaluation_views'/partition/'probes.parquet'
+    path.parent.mkdir(parents=True,exist_ok=True)
     fields={f'f{i}':pa.array(data[:,position[i]] if i in position else np.zeros(len(data),np.float32)) for i in range(1853)}
     fields.update(human_score=pa.array(np.zeros(len(data))),ref_basename=pa.array(['probe']*len(data)))
     if path.exists():raise ValueError('probe view already exists without a receipt')
@@ -112,7 +114,7 @@ def make_probes(root,partition,train,plan):
 
 
 def outer_context(root,run,cells,checkpoint=None):
-    if run['cell']['stage'] not in ('outer','fresh_control_outer','fresh_control_outer_matched'):return None
+    if run['cell']['stage'] not in ('outer','fresh_control_outer','fresh_control_outer_matched',*VARIANT_STAGES):return None
     if checkpoint is not None:raise ValueError('outer responses cannot diagnose checkpoints')
     from shaping_outer_admission import resolve
     from shaping_outer_execution import resolve_cell,prepared
@@ -120,6 +122,16 @@ def outer_context(root,run,cells,checkpoint=None):
     if partition not in ('outer-0','outer-1','outer-2'):raise ValueError('unregistered outer partition')
     outer=int(partition.split('-')[1]);admission,path=resolve(root,outer)
     if run['cell'] not in [*cells,*admission['additional_cells']]:raise ValueError('unregistered outer cell')
+    if run['cell']['stage'] in VARIANT_STAGES:
+        from shaping_variant_execution import resolve as resolve_variant
+        from shaping_variant_inputs import load_variant
+        resolution=resolve_variant(root,run['cell']['id'])
+        if run['resolution']!=resolution:raise ValueError('variant fit resolution drift')
+        for name,pin in run['qualification_sha256'].items():
+            if sha(name)!=pin:raise ValueError('variant native qualification drift')
+        _,_,_,membership=load_variant(root,run['cell']['id'])
+        return dict(admission=admission,schedule=resolution['schedule'],admission_sha256=sha(path),
+                    variant=resolution,membership=membership)
     schedule=resolve_cell(run['cell'],admission)
     if run['admission_sha256']!=sha(path) or run['schedule']!=schedule:raise ValueError('outer run admission drift')
     prepared(root,outer,path)
@@ -129,7 +141,7 @@ def outer_context(root,run,cells,checkpoint=None):
 def admitted_epoch(run,result,cells,outer=None):
     cell=run['cell']
     if outer is not None:
-        if cell['stage'] not in ('outer','fresh_control_outer','fresh_control_outer_matched'):
+        if cell['stage'] not in ('outer','fresh_control_outer','fresh_control_outer_matched',*VARIANT_STAGES):
             raise ValueError('outer context on an inner run')
         epochs=outer['schedule']['phase_epochs'][-1]
         if result['stage']!='trained' or result['exit_code']!=0 or run['epochs']!=epochs:
@@ -141,6 +153,13 @@ def admitted_epoch(run,result,cells,outer=None):
     if cell['stage']=='exposure_extension':epochs=cell['phase_epochs'][-1]
     if run['epochs']!=epochs:raise ValueError('incorrect scheduled checkpoint budget')
     return epochs
+
+
+def training_targets(labels,positions,ids,table_path):
+    """Use exactly the audited trainer targets; leave every outer target intact."""
+    values=pq.read_table(table_path,columns=['human_score'])['human_score'].to_numpy()
+    if len(values)!=len(ids) or not np.isfinite(values).all():raise ValueError('variant training target coverage differs')
+    labels[[positions[v] for v in ids]]=values
 
 
 def diagnostic_epochs(epochs):
@@ -181,6 +200,8 @@ def evaluate(args):
     cell=run['cell']
     checkpoint=getattr(args,'checkpoint',None)
     outer=outer_context(args.study,run,cells,checkpoint)
+    variant=outer.get('variant') if outer is not None else None
+    family=variant['resolved_family'] if variant else cell['family']
     epochs=admitted_epoch(run,result,cells,outer)
     if cell['stage'] in ('rescue','exposure_extension') or outer is not None:
         if cell['stage']=='rescue':
@@ -212,7 +233,7 @@ def evaluate(args):
     build=json.loads((args.binary_dir/'BUILD.json').read_text())
     reexport=getattr(args,'reexport_receipt',None)
     if outer is not None:
-        identity=outer['admission']['evaluation_representations'][cell['family']]
+        identity=outer['admission']['evaluation_representations'][family]
         representation='research-relu-max-pairs-v1' if reexport is not None else 'original'
         if representation!=identity['representation']:raise ValueError('outer evaluation representation differs from inner selection')
         if representation!='original' and sha(args.binary_dir/'BUILD.json')!=identity['evaluation_build_sha256']:
@@ -228,9 +249,10 @@ def evaluate(args):
     import v2_lodo_mlp as owner
     from shaped_linear_study import OLD,PREP,metrics,weights_and_targets
     owner.FITBIN=v2_common.FITBIN=args.binary_dir/'bake_dial_refit'
-    membership=partitions[cell['partition']]
+    membership=outer['membership'] if variant else partitions[cell['partition']]
     validation=prepare_validation(args.study,cell['partition'],membership)
-    training=json.loads((args.study/'comparators'/cell['partition']/'GROUPS.json').read_text())
+    training_path=Path(variant['groups_path']) if variant else args.study/'comparators'/cell['partition']/'GROUPS.json'
+    training=json.loads(training_path.read_text())
     dest=args.run/'evaluation' if checkpoint is None else args.run/'curve_evaluation'/f'epoch-{epoch:03}'
     if reexport is not None:
         dest=args.study/'reexport_max_pairs'/cell['id']/args.run.name/('final' if checkpoint is None else f'epoch-{epoch:03}')
@@ -258,16 +280,24 @@ def evaluate(args):
         if sha(path)!=plan['input_pins'][str(path)]:raise ValueError('evaluation array drift')
     d={k:np.load(OLD/'data'/f'{k}.npy',mmap_mode='r')[wanted] for k in ('pop','y')}
     d.update({k:np.load(original/'data'/f'{k}.npy',mmap_mode='r')[wanted] for k in ('component','family')})
+    if variant:
+        offset=0
+        for g in json.loads(PREP.read_text())['groups']:
+            ids=[v for v in range(offset,offset+g['rows']) if v in selected];offset+=g['rows']
+            if ids:training_targets(d['y'],positions,ids,train_groups[g['name']])
     train=np.array([positions[v] for v in membership['train']]);test=np.array([positions[v] for v in membership['test']])
     _,_,maps=weights_and_targets(d['y'][train],d['pop'][train],d['component'][train],'range',1.)
-    probe_receipt=args.study/'evaluation_views'/cell['partition']/'PROBES.json'
-    probes=json.loads(probe_receipt.read_text()) if probe_receipt.exists() else make_probes(args.study,cell['partition'],membership['train'],plan)
+    probe_partition='variant-'+variant['view_identifier'][:20] if variant else cell['partition']
+    probe_receipt=args.study/'evaluation_views'/probe_partition/'PROBES.json'
+    probes=json.loads(probe_receipt.read_text()) if probe_receipt.exists() else make_probes(args.study,probe_partition,membership['train'],plan)
+    if probes['training_indices_sha256']!=__import__('hashlib').sha256(encoded(membership['train'])).hexdigest():
+        raise ValueError('feature probe training membership drift')
     if sha(probes['path'])!=probes['sha256']:raise ValueError('probe drift')
     p=owner.predict(bake,Path(probes['path']),dest/'probes.tsv')
     delta=p[128:256]-p[:128]
     gate=dict(finite=bool(np.isfinite(p).all()),identity=float(p[256]),
               damage_increase_violations=int(np.sum(delta>1e-5)),maximum_damage_increase=float(max(0,delta.max())),
-              identity_and_order_claim=cell['family']!='silu_diagnostic')
+              identity_and_order_claim=family!='silu_diagnostic')
     if not gate['finite'] or (gate['identity_and_order_claim'] and (gate['identity']!=100. or gate['damage_increase_violations'])):
         (dest/'FAILED_GATE.json').write_bytes(encoded(gate));raise NativeFeatureGateError('native feature qualification failed')
     structure=json.loads(subprocess.check_output([str(args.binary_dir/'bake_dial_refit'),'inspect','--in',str(bake)],text=True))
@@ -275,13 +305,18 @@ def evaluate(args):
     active=output['stored_weights']-output['zero_weights']
     report=dict(cell=cell,checkpoint_epoch=epoch,checkpoint_sha256=sha(bake),maps=maps,feature_gate=gate,
                 structure=structure,active_output_coefficients=active,one_output_coefficient=active==1,
-                train=metrics(pred,d['y'],train,d,maps),inner_validation=metrics(pred,d['y'],test,d,maps),
+                train=metrics(pred,d['y'],train,d,maps,allow_absent_maps=bool(variant)),
+                inner_validation=metrics(pred,d['y'],test,d,maps,allow_absent_maps=bool(variant)),
                 selection='registered final epoch only' if checkpoint is None else 'diagnostic checkpoint; not a selection candidate',outer_results_read=False,
                 driver_sha256=DRIVER_SHA256,plan_sha256=sha(args.study/'PLAN.json'))
     if outer is not None:
         report['outer_test']=report.pop('inner_validation')
         report.update(outer_results_read=True,admission_sha256=outer['admission_sha256'],
                       selection='outer test; excluded from all selection')
+    if variant:
+        report.update(resolved_family=family,view_identifier=variant['view_identifier'],
+                      training_target_policy='registered permutation' if cell['stage']=='shuffle' else 'actual targets',
+                      outer_target_policy='actual targets',training_groups_sha256=sha(training_path))
     if reexport is not None:
         report.update(reexport_receipt=str(reexport),reexport_receipt_sha256=sha(reexport),
                       evaluation_build_sha256=sha(args.binary_dir/'BUILD.json'),
