@@ -22,6 +22,14 @@ class InstallTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError,'existing input'):
                 install(*args,root/'second.json')
             self.assertEqual(target.read_bytes(),data)
+            before=target.stat()
+            result=install(*args,root/'reused.json',reuse_identical=True)
+            self.assertEqual(result['reused_identical_files'],[str(target)])
+            self.assertEqual((target.stat().st_ino,target.stat().st_mtime_ns),(before.st_ino,before.st_mtime_ns))
+            target.write_bytes(b'changed inputs')
+            with self.assertRaisesRegex(ValueError,'existing input differs'):
+                install(*args,root/'changed.json',reuse_identical=True)
+            self.assertEqual(target.read_bytes(),b'changed inputs')
             with self.assertRaisesRegex(ValueError,'checksum'):
                 install(*args[:5],'wrong',args[6],root/'wrong.json')
 

@@ -630,3 +630,13 @@ This prepares the final model workload; it does not use the earlier eight-model
 instrument fixture as a finalist measurement. Eight targeted regressions pass.
 Actual final models are not yet available, so end-to-end preparation, native
 qualification of all sixteen models, fresh-process RSS and latency remain open.
+
+## Reusing immutable partition inputs on a worker
+
+The partition installer now has explicit `--reuse-identical` admission for waves
+sharing an already installed TRAIN partition. Default installation still refuses
+all existing files. The opt-in checks size and SHA-256, refuses symlinks and
+mismatches, never overwrites existing data, and records the reused paths. A final
+readback covers both installed and reused files. The regression checks unchanged
+inode and modification time for reuse, plus mismatch refusal. Shared-base
+installation cannot use this option.
