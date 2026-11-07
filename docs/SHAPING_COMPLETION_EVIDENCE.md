@@ -807,6 +807,15 @@ legacy source-guard refusal, occupied-slot/parent checks, preservation of active
 children and writer resumption after both successful and refused handoffs.
 
 
+The coordinator also verifies an idle collector has no active subprocess before
+pausing collection for the registry transaction. Incoming source, kept and moved
+placement files are checksummed before any local registry mutation. Collection
+resumes after both registries agree. An uncertain remote outcome leaves the
+collector visibly quiescent for reconciliation; it never infers a trainer died
+or starts a replacement fit. Nine placement tests cover these transaction and
+uncertain-outcome cases in addition to the queue and source guards.
+
+
 ## Saved training resource accounting
 
 `shaping-training-resources` reads registered completed native runs without

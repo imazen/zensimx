@@ -1,6 +1,6 @@
 """Content-bound cell placement; never an exclusive compute lock."""
 from __future__ import annotations
-import argparse,json,socket,fcntl,os,signal,time,ast,inspect
+import argparse,json,socket,fcntl,os,signal,time,ast,inspect,subprocess,shlex
 from contextlib import contextmanager
 from datetime import datetime,timezone
 from pathlib import Path
@@ -164,6 +164,91 @@ def relocate_legacy_joint(root,assignment,requested,host,legacy_status,driver,gu
             if process_identity(proc,pid)[1]!=start:raise ValueError('legacy PID identity changed; refusing signal')
             os.kill(pid,signal.SIGCONT)
             (control_output/'RESUMED.json').write_bytes(encoded(dict(pid=pid,start_ticks=start,resumed_utc=datetime.now(timezone.utc).isoformat())))
+
+
+def mirror_placement(root,assignment,source_record,files):
+    """Verify every incoming placement before changing the coordinator registry."""
+    from shaping_execution import load_registration
+    _,cells,_=load_registration(root)
+    old=json.loads(assignment.read_text());record=source_record
+    if record['original_assignment']!=str(assignment) or record['original_sha256']!=sha(assignment):
+        raise ValueError('coordinator/source original placement differs')
+    backup=Path(record['backup']);kept=Path(record['kept_assignment']);moved=Path(record['moved_assignment'])
+    if any(p.parent!=assignment.parent or p.exists() for p in (backup,kept,moved)):
+        raise ValueError('placement mirror destinations must be absent in the assignment directory')
+    expected={backup:record['original_sha256'],kept:record['kept_sha256'],moved:record['moved_sha256']}
+    for destination,pin in expected.items():
+        if sha(files/destination.name)!=pin:raise ValueError('incoming placement checksum differs')
+    a=json.loads((files/kept.name).read_text());b=json.loads((files/moved.name).read_text())
+    if (a!=record['kept'] or b!=record['moved'] or set(a['cells'])&set(b['cells'])
+            or set(a['cells'])|set(b['cells'])!=set(old['cells'])
+            or any(row[k]!=old[k] for row in (a,b) for k in ('plan_sha256','build_sha256','partition'))
+            or a['host']!=old['host']):raise ValueError('incoming placement split differs')
+    assignment.rename(backup)
+    for path in (kept,moved):
+        with path.open('xb') as stream:stream.write((files/path.name).read_bytes())
+    for row in (a,b):check(root,[c for c in cells if c['id'] in row['cells']],old['build_sha256'],row['host'])
+    return dict(backup=str(backup),kept=str(kept),moved=str(moved))
+
+
+def coordinate_remote_legacy(root,assignment,requested,target,source_host,remote_tool,
+        legacy_status,driver,guard,driver_pin,guard_pin,collector_status,output,*,proc=Path('/proc')):
+    """Keep collection quiescent until source and coordinator placement agree."""
+    original_pin=sha(assignment);old=json.loads(assignment.read_text())
+    if old['host']!=source_host:raise ValueError('source host differs from assignment')
+    status=json.loads(collector_status.read_text());pid=status['pid']
+    command=(proc/str(pid)/'cmdline').read_bytes().decode()
+    state,start=process_identity(proc,pid)
+    children=proc/str(pid)/'task'/str(pid)/'children'
+    age=(datetime.now(timezone.utc)-datetime.fromisoformat(status['checked_utc'])).total_seconds()
+    if (state in ('T','Z','X') or status['stage']!='watching' or not 0<=age<=120
+            or 'shaping_worker_watch.py' not in command or source_host not in command
+            or children.read_text().strip()):raise ValueError('fresh idle collector required')
+    output.mkdir(parents=True,exist_ok=False);(output/'ORIGINAL_COLLECTOR.json').write_bytes(encoded(status))
+    receipt=output/'SOURCE_RELOCATION.json';control=output/'source-control'
+    remote_source=driver.parent
+    loader='import sys,runpy;root,path=sys.argv[1:3];sys.path.insert(0,root);sys.argv=[path,*sys.argv[3:]];runpy.run_path(path,run_name="__main__")'
+    command=['/home/lilith/work/claudehints/scripts/run-heavy','--mem','1G','--jobs','1','--',
+        'python3','-B','-c',loader,str(remote_source),str(remote_tool),'--study',str(root),
+        '--binary-dir',str(root.parent/'study-bin'),'--partition',old['partition'],'--host',target,
+        '--family','joint_shapes','--relocate-from',str(assignment),'--legacy-status',str(legacy_status),
+        '--legacy-driver',str(driver),'--legacy-guard',str(guard),'--legacy-driver-pin',driver_pin,
+        '--legacy-guard-pin',guard_pin,'--relocation-receipt',str(receipt),'--control-output',str(control)]
+    for cell in requested:command+=['--cell',cell]
+    (output/'COMMAND.json').write_bytes(encoded(dict(command=command,source_host=source_host,collector_pid=pid,collector_start_ticks=start)))
+    paused=False;remote_started=False;safe_to_resume=False
+    try:
+        os.kill(pid,signal.SIGSTOP);paused=True;deadline=time.monotonic()+5
+        while process_identity(proc,pid)[0]!='T':
+            if time.monotonic()>=deadline:raise ValueError('collector did not stop')
+            time.sleep(.02)
+        if children.read_text().strip():raise ValueError('collector acquired an active child before maintenance')
+        subprocess.run(['ssh',source_host,shlex.join(['mkdir',str(output)])],check=True,capture_output=True,text=True,timeout=30)
+        remote_started=True
+        result=subprocess.run(['ssh',source_host,'TMPDIR=/home/lilith/tmp '+shlex.join(command)],capture_output=True,text=True,timeout=60)
+        (output/'REMOTE.log').write_text(result.stdout+result.stderr)
+        if result.returncode:raise RuntimeError('source relocation refused; preserve remote log')
+        record=json.loads(result.stdout)
+        if record['original_sha256']!=original_pin or set(record['moved']['cells'])!=set(requested):
+            raise ValueError('remote relocation identity differs')
+        files=output/'SOURCE_FILES';files.mkdir()
+        names=[str(receipt),record['backup'],record['kept_assignment'],record['moved_assignment'],
+               str(control/'CONTROL_STATUS.json'),str(control/'RESUMED.json')]
+        subprocess.run(['scp',*[source_host+':'+name for name in names],str(files)+'/'],check=True,capture_output=True,text=True,timeout=30)
+        if json.loads((files/receipt.name).read_text())!=record:raise ValueError('remote receipt differs')
+        mirrored=mirror_placement(root,assignment,record,files);safe_to_resume=True
+        receipt.write_bytes(encoded(record))
+        (output/'LOCAL_APPLIED.json').write_bytes(encoded(dict(stage='placement_mirrored',checked_utc=datetime.now(timezone.utc).isoformat(),paths=mirrored,source_receipt_sha256=sha(receipt))))
+        return record
+    except BaseException as error:
+        (output/'FAILURE.json').write_bytes(encoded(dict(error=str(error),remote_started=remote_started,
+            collector_left_stopped=paused and remote_started and not safe_to_resume,pid=pid,start_ticks=start)))
+        raise
+    finally:
+        if paused and (safe_to_resume or not remote_started):
+            if process_identity(proc,pid)[1]!=start:raise ValueError('collector PID identity changed; refusing signal')
+            os.kill(pid,signal.SIGCONT)
+            (output/'COLLECTOR_RESUMED.json').write_bytes(encoded(dict(pid=pid,start_ticks=start,checked_utc=datetime.now(timezone.utc).isoformat())))
 
 
 def main():

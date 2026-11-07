@@ -8,6 +8,41 @@ from shaping_completion import sha
 
 
 class PlacementRelocationTests(unittest.TestCase):
+    def test_incoming_placement_checksums_are_verified_before_coordinator_mutation(self):
+        for corrupt in [False,True]:
+            with self.subTest(corrupt=corrupt),tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as d:
+                base=Path(d);source=base/'source';target=base/'target';source.mkdir();target.mkdir()
+                cells,assignment,queue,proc,status=self.fixture(source)
+                with patch('shaping_execution.load_registration',return_value=({},cells,{})),patch.object(module.socket,'gethostname',return_value='dev'):
+                    record=module.relocate_joint_subset(source,assignment,['1'],'i265',queue,source/'receipt',proc=proc)
+                _,target_assignment,_,_,_=self.fixture(target);original=target_assignment.read_bytes();files=base/'files';files.mkdir()
+                for key in ['backup','kept_assignment','moved_assignment']:
+                    src=Path(record[key]);(files/src.name).write_bytes(src.read_bytes());record[key]=str(target_assignment.parent/src.name)
+                record['original_assignment']=str(target_assignment)
+                if corrupt:(files/Path(record['moved_assignment']).name).write_text('{}')
+                with patch('shaping_execution.load_registration',return_value=({},cells,{})):
+                    if corrupt:
+                        with self.assertRaisesRegex(ValueError,'checksum differs'):module.mirror_placement(target,target_assignment,record,files)
+                        self.assertEqual(target_assignment.read_bytes(),original)
+                    else:
+                        module.mirror_placement(target,target_assignment,record,files)
+                        module.check(target,[cells[1]],'build','i265');module.check(target,[cells[0]],'build','dev')
+
+    def test_collection_resumes_before_remote_action_but_stays_quiescent_after_uncertainty(self):
+        import subprocess
+        for uncertain in [False,True]:
+            with self.subTest(uncertain=uncertain),tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as d:
+                root=Path(d);cells,assignment,proc,driver,guard,legacy,kill,calls=self.legacy_fixture(root)
+                (proc/'99/cmdline').write_text('python shaping_worker_watch.py --host dev')
+                children=proc/'99/task/99';children.mkdir(parents=True);(children/'children').write_text('')
+                collector=root/'COLLECTOR.json';collector.write_text(json.dumps(dict(pid=99,stage='watching',checked_utc=datetime.now(timezone.utc).isoformat())))
+                effects=[subprocess.CompletedProcess([],0),subprocess.TimeoutExpired('ssh',60)] if uncertain else [OSError('connect refused')]
+                with patch.object(module.os,'kill',side_effect=kill),patch.object(module.subprocess,'run',side_effect=effects):
+                    with self.assertRaises((OSError,subprocess.TimeoutExpired)):
+                        module.coordinate_remote_legacy(root,assignment,['1'],'i265','dev',root/'tool',legacy,driver,guard,sha(driver),sha(guard),collector,root/'control',proc=proc)
+                self.assertEqual(calls,[signal.SIGSTOP] if uncertain else [signal.SIGSTOP,signal.SIGCONT])
+                failure=json.loads((root/'control/FAILURE.json').read_text());self.assertEqual(failure['collector_left_stopped'],uncertain)
+
     def legacy_fixture(self,root):
         cells,assignment,queue,proc,status=self.fixture(root)
         driver=root/'shaping_execution.py';driver.write_text((Path(__file__).resolve().parents[1]/'rev4_featpot/shaping_execution.py').read_text())
