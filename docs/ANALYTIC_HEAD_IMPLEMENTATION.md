@@ -45,3 +45,23 @@ capacity collapse. Ordinary diagnostic outputs are not projected nonnegative.
 No scientific fitting has started. Frozen protocol, fair tuning, baseline replay,
 input/fragility shaping, convergence experiments and generalization evaluations
 remain required by the completion goal.
+
+## Measured implementation qualification
+
+At source `6bb5bd47`, `just analytic-head-check` passed on i270: 386 library
+tests passed with two existing ignores unchanged, all 65 trainer CLI tests
+passed, and strict library/trainer clippy passed. The library run includes the
+new full-network analytic parameter gradients, post-update export/order gates,
+dropout-anchor checks and finite-extreme probes. This does not replace the
+required actual-data baseline replay or fair scientific fits.
+
+Wrapper: `run-heavy: done rc=0 77s | peak-RSS 1.63GiB | min-avail 25459MiB | peak-load 3.53`.
+This is qualification resource evidence, not an inference timing benchmark.
+Logs, including the preserved dependency-resolution and incomplete-cache
+failures, live in `/mnt/v/output/zensim/shaping-completion-20261107/trainer-qualification/`.
+The isolated Cargo source cache repaired the missing dependency source files
+without changing the dependency version or any test expectation.
+
+The qualification directory is mirrored under the matching NAS output path.
+Cold client readback verified every artifact; inventory SHA-256 is
+`282d47327d9f8730b825401e2896d428b1504e9c0a672fa65f39947f87045800`.

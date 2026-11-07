@@ -4,6 +4,11 @@
 
 ### Research
 
+- Add private anchored Softplus and nonnegative-domain SiLU training heads,
+  ordinary SiLU diagnostic head, analytic temperature gradients, native export
+  gates and output-collapse diagnostics (`7252ba03`, `0c9f8224`). Scientific
+  comparisons remain unrun; runtime operators are reviewed separately.
+
 - Complete 390 shaped-linear, tree and neural fitting/generalization controls,
   with numerical optimization bounds, source bootstrap, permutation capacity,
   distortion transfer and retained identity-calibration refusals.
