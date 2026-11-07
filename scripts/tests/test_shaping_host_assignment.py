@@ -1,4 +1,4 @@
-import json,sys,tempfile,unittest
+import json,sys,tempfile,unittest,signal
 from datetime import datetime,timezone
 from pathlib import Path
 from unittest.mock import patch
@@ -8,6 +8,56 @@ from shaping_completion import sha
 
 
 class PlacementRelocationTests(unittest.TestCase):
+    def legacy_fixture(self,root):
+        cells,assignment,queue,proc,status=self.fixture(root)
+        driver=root/'shaping_execution.py';driver.write_text((Path(__file__).resolve().parents[1]/'rev4_featpot/shaping_execution.py').read_text())
+        guard=root/'shaping_host_assignment.py';guard.write_text(Path(module.__file__).read_text())
+        (proc/'99/cmdline').write_text('python shaping_execution.py --study '+str(root)+' --workers 1')
+        def state(value):(proc/'99/stat').write_text('99 (python3) '+value+' '+'0 '*18+'12345\n')
+        state('S');calls=[]
+        def kill(pid,sig):
+            self.assertEqual(pid,99);calls.append(sig);state('T' if sig==signal.SIGSTOP else 'S')
+        run=root/'runs/0/attempt-001';run.mkdir(parents=True)
+        record=dict(cell=cells[0],pid=101,driver_sha256=sha(driver),plan_sha256=sha(root/'PLAN.json'),build_sha256='build',epochs=240,pairs_per_epoch=50000)
+        (run/'RUN.json').write_text(json.dumps(record));(proc/'101').mkdir();(proc/'101/cmdline').write_text('run-heavy '+str(run))
+        (proc/'101/stat').write_text('101 (bash) S 99 '+'0 '*17+'333\n')
+        legacy=root/'LEGACY_STATUS.json';legacy.write_text(json.dumps(dict(controller_pid=99,cells=['0','1','2'],stage='running')))
+        return cells,assignment,proc,driver,guard,legacy,kill,calls
+
+    def test_legacy_handoff_stops_only_writer_and_always_resumes_it(self):
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as d:
+            root=Path(d);cells,assignment,proc,driver,guard,legacy,kill,calls=self.legacy_fixture(root)
+            with patch('shaping_execution.load_registration',return_value=({},cells,{})),patch.object(module.socket,'gethostname',return_value='dev'),patch.object(module.os,'kill',side_effect=kill):
+                record=module.relocate_legacy_joint(root,assignment,['1'],'i265',legacy,driver,guard,sha(driver),sha(guard),root/'receipt',root/'control',proc=proc)
+            self.assertEqual(calls,[signal.SIGSTOP,signal.SIGCONT]);self.assertEqual(record['kept']['cells'],['0','2']);self.assertEqual(record['active_children_preserved'],{'0':101})
+            self.assertTrue((root/'control/RESUMED.json').exists());self.assertFalse((root/'runs/1').exists())
+
+    def test_legacy_failure_resumes_writer_without_moving_started_cells(self):
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as d:
+            root=Path(d);cells,assignment,proc,driver,guard,legacy,kill,calls=self.legacy_fixture(root);original=assignment.read_bytes()
+            (root/'runs/1/attempt-001').mkdir(parents=True)
+            with patch('shaping_execution.load_registration',return_value=({},cells,{})),patch.object(module.socket,'gethostname',return_value='dev'),patch.object(module.os,'kill',side_effect=kill):
+                with self.assertRaisesRegex(ValueError,'started or reserved'):
+                    module.relocate_legacy_joint(root,assignment,['1'],'i265',legacy,driver,guard,sha(driver),sha(guard),root/'receipt',root/'control',proc=proc)
+            self.assertEqual(calls,[signal.SIGSTOP,signal.SIGCONT]);self.assertEqual(assignment.read_bytes(),original);self.assertFalse((root/'receipt').exists())
+
+    def test_legacy_guard_must_precede_attempt_creation_and_match_host_behavior(self):
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as d:
+            root=Path(d);cells,assignment,proc,driver,guard,legacy,kill,calls=self.legacy_fixture(root)
+            driver.write_text(driver.read_text().replace("    check(root,[cell],sha(binary_dir/'BUILD.json'))","    pass",1))
+            with self.assertRaisesRegex(ValueError,'guard must precede'):module.verify_legacy_guard(driver,guard,sha(driver),sha(guard))
+            self.assertFalse(calls)
+
+    def test_legacy_handoff_requires_every_executor_slot_owned_and_live(self):
+        for fault in ['unrecorded_slot','foreign_child']:
+            with self.subTest(fault=fault),tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as d:
+                root=Path(d);cells,assignment,proc,driver,guard,legacy,kill,calls=self.legacy_fixture(root);original=assignment.read_bytes()
+                if fault=='unrecorded_slot':(proc/'99/cmdline').write_text('python shaping_execution.py --study '+str(root)+' --workers 2')
+                else:(proc/'101/stat').write_text('101 (bash) S 100 '+'0 '*17+'333\n')
+                with patch('shaping_execution.load_registration',return_value=({},cells,{})),patch.object(module.socket,'gethostname',return_value='dev'),patch.object(module.os,'kill',side_effect=kill):
+                    with self.assertRaises(ValueError):module.relocate_legacy_joint(root,assignment,['1'],'i265',legacy,driver,guard,sha(driver),sha(guard),root/'receipt',root/'control',proc=proc)
+                self.assertEqual(calls,[signal.SIGSTOP,signal.SIGCONT]);self.assertEqual(assignment.read_bytes(),original)
+
     def fixture(self,root):
         (root/'PLAN.json').write_text('{}');directory=root/'worker_assignments';directory.mkdir()
         cells=[dict(id=str(i),stage='inner',family='product_joint_identity',partition='inner-0-0',setting=0,seed=i) for i in range(3)]

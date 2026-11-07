@@ -786,6 +786,27 @@ Three placement tests cover preserved active cells, started/reserved/active-cell
 refusals, and undrained/stale/mismatched queue refusals before mutations.
 
 
+## Legacy queue placement handoff
+
+A legacy fixed-worker queue may lack a drain control. Its placement handoff
+uses a separately recorded, bounded SIGSTOP of the Python queue writer only;
+training children continue. The source files must match pinned checksums,
+the native execution function must call the host guard before attempt creation,
+and the frozen host-check function must match the current guard. Every worker
+slot must be occupied by a verified live child owned by that exact controller.
+This rules out an unrecorded queued task already passing its old host guard.
+Started or reserved selected cells remain forbidden. PID start identity is
+checked before SIGCONT, including on refused handoffs.
+
+The old batch retains its original requirement. Reassigned future tasks must
+refuse at the unchanged host guard; those old queue refusals are preserved,
+not treated as native fit failures or hidden as successful batch completion.
+Global scientific completion still requires every cell's verified native result
+and evaluation from its assigned host. Seven placement tests pass, including
+legacy source-guard refusal, occupied-slot/parent checks, preservation of active
+children and writer resumption after both successful and refused handoffs.
+
+
 ## Saved training resource accounting
 
 `shaping-training-resources` reads registered completed native runs without

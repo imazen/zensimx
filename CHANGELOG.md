@@ -71,6 +71,9 @@
 
 ### Fixed
 
+- Add verified placement handoff for queued legacy joint-shaping cells while
+  preserving active native fits and original batch refusals.
+
 - Permit relocation of explicitly unstarted joint-shaping cells after verified
   queue drain, preserving original placement and active fits.
 

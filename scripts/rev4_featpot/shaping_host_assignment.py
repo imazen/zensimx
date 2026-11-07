@@ -1,9 +1,37 @@
 """Content-bound cell placement; never an exclusive compute lock."""
 from __future__ import annotations
-import argparse,json,socket
+import argparse,json,socket,fcntl,os,signal,time,ast,inspect
+from contextlib import contextmanager
 from datetime import datetime,timezone
 from pathlib import Path
 from shaping_completion import encoded,sha
+
+
+@contextmanager
+def placement_claims(root):
+    # Read the shared admission owner's claims under its transaction lock.
+    # This also works beside older immutable worker source exports.
+    directory=root/'cpu-admission';directory.mkdir(exist_ok=True)
+    with (directory/'transaction.lock').open('a') as lock:
+        fcntl.flock(lock,fcntl.LOCK_EX)
+        path=directory/'CLAIMS.json'
+        yield json.loads(path.read_text()) if path.exists() else {}
+
+
+def process_identity(proc,pid):
+    fields=(proc/str(pid)/'stat').read_text().rsplit(')',1)[1].split()
+    return fields[0],fields[19]
+
+
+def verify_legacy_guard(driver,guard,driver_pin,guard_pin):
+    if sha(driver)!=driver_pin or sha(guard)!=guard_pin:raise ValueError('legacy source checksum differs')
+    nodes={n.name:n for n in ast.parse(driver.read_text()).body if isinstance(n,ast.FunctionDef)}
+    expected=ast.parse("def f():\n from shaping_host_assignment import check\n check(root,[cell],sha(binary_dir/'BUILD.json'))").body[0].body
+    if ast.dump(ast.Module(body=nodes['_run_native'].body[:2],type_ignores=[]))!=ast.dump(ast.Module(body=expected,type_ignores=[])):
+        raise ValueError('legacy host guard must precede attempt creation')
+    nodes={n.name:n for n in ast.parse(guard.read_text()).body if isinstance(n,ast.FunctionDef)}
+    current=ast.parse(inspect.getsource(check)).body[0]
+    if ast.dump(nodes['check'])!=ast.dump(current):raise ValueError('legacy host-check behavior differs')
 
 
 def check(root,cells,build_pin,host=None):
@@ -21,11 +49,10 @@ def check(root,cells,build_pin,host=None):
 def relocate_joint_subset(root,assignment,requested,host,queue_status,receipt,*,proc=Path('/proc')):
     """Split placement only after the old queue has stopped new admissions."""
     from shaping_execution import load_registration
-    from shaping_rescue_dispatch import worker_claims
     _,cells,_=load_registration(root)
     if assignment.parent!=root/'worker_assignments':raise ValueError('assignment outside study')
     if receipt.exists():raise ValueError('preserve existing relocation receipt')
-    with worker_claims(root) as claims:
+    with placement_claims(root) as claims:
         old=json.loads(assignment.read_text());old_pin=sha(assignment);selected=set(requested)
         if (not selected or len(selected)!=len(requested) or not selected<set(old['cells'])
                 or host==old['host'] or old['host']!=socket.gethostname()):
@@ -38,6 +65,10 @@ def relocate_joint_subset(root,assignment,requested,host,queue_status,receipt,*,
         q=json.loads(queue_status.read_text())
         age=(datetime.now(timezone.utc)-datetime.fromisoformat(q['checked_utc'])).total_seconds()
         command=(proc/str(q['pid'])/'cmdline').read_bytes().decode()
+        if q.get('control_mechanism')=='verified_legacy_sigstop':
+            if process_identity(proc,q['pid'])[0]!='T':raise ValueError('legacy controller is not admission-stopped')
+            verify_legacy_guard(Path(q['legacy_driver']),Path(q['legacy_guard']),q['legacy_driver_sha256'],q['legacy_guard_sha256'])
+        elif q.get('control_mechanism') is not None:raise ValueError('unknown admission-stop mechanism')
         if (not 0<=age<=30 or not q.get('draining') or not Path(q['drain_file']).exists()
                 or str(root) not in command or 'shaping_' not in command
                 or set(q['required_cells'])!=set(old['cells']) or selected&set(q['active'])
@@ -73,6 +104,68 @@ def relocate_joint_subset(root,assignment,requested,host,queue_status,receipt,*,
         return record
 
 
+def relocate_legacy_joint(root,assignment,requested,host,legacy_status,driver,guard,
+                          driver_pin,guard_pin,receipt,control_output,*,proc=Path('/proc')):
+    """Pause only a verified legacy queue writer during a placement transaction."""
+    verify_legacy_guard(driver,guard,driver_pin,guard_pin)
+    old=json.loads(assignment.read_text());status=json.loads(legacy_status.read_text());pid=status['controller_pid']
+    command=(proc/str(pid)/'cmdline').read_bytes().decode()
+    argv=command.split('\0') if '\0' in command else command.split()
+    if '--workers' not in argv:raise ValueError('legacy worker budget must be explicit')
+    workers=int(argv[argv.index('--workers')+1])
+    if (str(root) not in command or 'shaping_execution.py' not in command
+            or set(status['cells'])!=set(old['cells']) or status['stage']!='running'):
+        raise ValueError('matching live legacy controller required')
+    state,start=process_identity(proc,pid)
+    if state in ('T','Z','X'):raise ValueError('legacy controller already stopped or terminal')
+    control_output.mkdir(parents=True,exist_ok=False)
+    (control_output/'ORIGINAL_STATUS.json').write_bytes(encoded(status))
+    paused=False
+    try:
+        os.kill(pid,signal.SIGSTOP);paused=True
+        deadline=time.monotonic()+5
+        while process_identity(proc,pid)[0]!='T':
+            if time.monotonic()>=deadline:raise ValueError('legacy controller did not stop admissions')
+            time.sleep(.02)
+        active={};pins={}
+        for cell in old['cells']:
+            for path in (root/'runs'/cell).glob('attempt-*/RUN.json'):
+                run=json.loads(path.read_text())
+                if (run['cell']['id']!=cell or run['driver_sha256']!=driver_pin or run['plan_sha256']!=old['plan_sha256']
+                        or run['build_sha256']!=old['build_sha256'] or run['epochs']!=240
+                        or run['pairs_per_epoch']!=50000):raise ValueError('legacy run identity differs')
+                pins[str(path)]=sha(path)
+                if path.with_name('RESULT.json').exists():continue
+                child=(proc/str(run['pid'])/'cmdline').read_bytes().decode()
+                if str(path.parent) not in child or 'run-heavy' not in child:
+                    raise ValueError('legacy active child is not verified live')
+                child_fields=(proc/str(run['pid'])/'stat').read_text().rsplit(')',1)[1].split()
+                if int(child_fields[1])!=pid:raise ValueError('legacy active child has another controller')
+                active[cell]=run['pid']
+        # Every executor slot must be blocked on its own existing live child.
+        # Otherwise an unrecorded task could already have passed the old guard.
+        if len(active)!=workers:raise ValueError('all legacy worker slots must have verified live children')
+        intent=control_output/'ADMISSION_STOP.json'
+        intent.write_bytes(encoded(dict(pid=pid,start_ticks=start,mechanism='SIGSTOP of queue writer only',active_children_preserved=active)))
+        snapshot=dict(pid=pid,checked_utc=datetime.now(timezone.utc).isoformat(),draining=True,
+            drain_file=str(intent),active=active,required_cells=old['cells'],plan_sha256=old['plan_sha256'],
+            build_sha256=old['build_sha256'],control_mechanism='verified_legacy_sigstop',
+            legacy_driver=str(driver),legacy_guard=str(guard),legacy_driver_sha256=driver_pin,
+            legacy_guard_sha256=guard_pin,run_identity_sha256=pins)
+        path=control_output/'CONTROL_STATUS.json';path.write_bytes(encoded(snapshot))
+        result=relocate_joint_subset(root,assignment,requested,host,path,receipt,proc=proc)
+        result.update(legacy_controller_pid=pid,legacy_start_ticks=start,
+            control_status=str(path),old_queue_keeps_original_requirement=True,
+            expected_old_queue_refusal='reassigned cells must fail the frozen host guard before attempt creation')
+        receipt.write_bytes(encoded(result))
+        return result
+    finally:
+        if paused:
+            if process_identity(proc,pid)[1]!=start:raise ValueError('legacy PID identity changed; refusing signal')
+            os.kill(pid,signal.SIGCONT)
+            (control_output/'RESUMED.json').write_bytes(encoded(dict(pid=pid,start_ticks=start,resumed_utc=datetime.now(timezone.utc).isoformat())))
+
+
 def main():
     from shaping_execution import load_registration
     p=argparse.ArgumentParser(description=__doc__)
@@ -83,18 +176,30 @@ def main():
     p.add_argument('--stage',choices=('inner','fresh_control_inner'),default='inner')
     p.add_argument('--relocate-from',type=Path)
     p.add_argument('--queue-status',type=Path);p.add_argument('--relocation-receipt',type=Path)
+    p.add_argument('--legacy-status',type=Path);p.add_argument('--legacy-driver',type=Path)
+    p.add_argument('--legacy-guard',type=Path);p.add_argument('--legacy-driver-pin');p.add_argument('--legacy-guard-pin')
+    p.add_argument('--control-output',type=Path)
     args=p.parse_args();_,cells,_=load_registration(args.study)
     if args.relocate_from:
-        if not (args.cell and args.queue_status and args.relocation_receipt):
-            p.error('relocation requires cell, queue-status and relocation-receipt')
+        if not (args.cell and args.relocation_receipt and (args.queue_status or args.legacy_status)):
+            p.error('relocation requires cell, relocation-receipt and queue-status or legacy-status')
         old=json.loads(args.relocate_from.read_text())
         if (args.family!='joint_shapes' or args.stage!='inner' or old['partition']!=args.partition
                 or old['build_sha256']!=sha(args.binary_dir/'BUILD.json')):
             raise ValueError('relocation must preserve the original joint partition and binary')
-        record=relocate_joint_subset(args.study,args.relocate_from,args.cell,args.host,
-                                    args.queue_status,args.relocation_receipt)
+        if args.legacy_status:
+            if args.queue_status or not all((args.legacy_driver,args.legacy_guard,args.legacy_driver_pin,args.legacy_guard_pin,args.control_output)):
+                p.error('legacy relocation requires source guards and control-output without queue-status')
+            record=relocate_legacy_joint(args.study,args.relocate_from,args.cell,args.host,args.legacy_status,
+                args.legacy_driver,args.legacy_guard,args.legacy_driver_pin,args.legacy_guard_pin,
+                args.relocation_receipt,args.control_output)
+        else:
+            record=relocate_joint_subset(args.study,args.relocate_from,args.cell,args.host,
+                                        args.queue_status,args.relocation_receipt)
         print(json.dumps(record),flush=True);return
-    if args.queue_status or args.relocation_receipt:p.error('relocation evidence requires relocate-from')
+    if any((args.queue_status,args.relocation_receipt,args.legacy_status,args.legacy_driver,
+            args.legacy_guard,args.legacy_driver_pin,args.legacy_guard_pin,args.control_output)):
+        p.error('relocation evidence requires relocate-from')
     if args.stage=='fresh_control_inner' and args.family!='relu':raise ValueError('fresh control must be ReLU')
     families={'joint_shapes':('product_joint_identity','separate_joint_identity'),
               'analytic':('softplus','silu_monotone','silu_diagnostic'),'relu':('relu',),
