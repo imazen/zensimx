@@ -114,6 +114,19 @@ def make_probes(root,partition,train,plan):
 
 
 def outer_context(root,run,cells,checkpoint=None):
+    if run['cell']['stage']=='full_fit_selection':
+        if checkpoint is not None:raise ValueError('full-FIT validation cannot diagnose checkpoints')
+        from shaping_full_fit_execution import search_cell,prepared
+        _,_,_,admission,path,cell,family,schedule=search_cell(root,run['cell']['id'])
+        if (cell not in cells or run['cell']!=cell or run['resolved_family']!=family
+            or run['schedule']!=schedule or run['admission_sha256']!=sha(path)
+            or run['selection_scope']!='full_fit_only' or run['development_results_read']):
+            raise ValueError('full-FIT run scope or admission drift')
+        prepared(root,cell['id'])
+        for name,pin in run['file_sha256'].items():
+            if sha(name)!=pin:raise ValueError('full-FIT run input drift')
+        return dict(admission=admission,schedule=schedule,admission_sha256=sha(path),
+                    full_fit=True,resolved_family=family)
     if run['cell']['stage'] not in ('outer','fresh_control_outer','fresh_control_outer_matched',*VARIANT_STAGES):return None
     if checkpoint is not None:raise ValueError('outer responses cannot diagnose checkpoints')
     from shaping_outer_admission import resolve
@@ -141,7 +154,7 @@ def outer_context(root,run,cells,checkpoint=None):
 def admitted_epoch(run,result,cells,outer=None):
     cell=run['cell']
     if outer is not None:
-        if cell['stage'] not in ('outer','fresh_control_outer','fresh_control_outer_matched',*VARIANT_STAGES):
+        if cell['stage'] not in ('outer','fresh_control_outer','fresh_control_outer_matched','full_fit_selection',*VARIANT_STAGES):
             raise ValueError('outer context on an inner run')
         epochs=outer['schedule']['phase_epochs'][-1]
         if result['stage']!='trained' or result['exit_code']!=0 or run['epochs']!=epochs:
@@ -188,6 +201,17 @@ def reexport_bake(receipt_path,original,run,build_path):
     return bake
 
 
+def apply_report_scope(report,context,family):
+    if context is None:return
+    full_fit=context.get('full_fit',False)
+    role='full_fit_validation' if full_fit else 'outer_test'
+    report[role]=report.pop('inner_validation')
+    report.update(outer_results_read=True,admission_sha256=context['admission_sha256'],
+                  selection='full-FIT tuning only; excluded from nested-study selection' if full_fit else 'outer test; excluded from all selection')
+    if full_fit:
+        report.update(selection_scope='full_fit_only',resolved_family=family,development_results_read=False)
+
+
 def evaluate(args):
     plan,cells,partitions=load_registration(args.study)
     run=json.loads((args.run/'RUN.json').read_text());result=json.loads((args.run/'RESULT.json').read_text())
@@ -201,7 +225,7 @@ def evaluate(args):
     checkpoint=getattr(args,'checkpoint',None)
     outer=outer_context(args.study,run,cells,checkpoint)
     variant=outer.get('variant') if outer is not None else None
-    family=variant['resolved_family'] if variant else cell['family']
+    family=(outer['resolved_family'] if outer and outer.get('full_fit') else variant['resolved_family'] if variant else cell['family'])
     epochs=admitted_epoch(run,result,cells,outer)
     if cell['stage'] in ('rescue','exposure_extension') or outer is not None:
         if cell['stage']=='rescue':
@@ -309,10 +333,7 @@ def evaluate(args):
                 inner_validation=metrics(pred,d['y'],test,d,maps,allow_absent_maps=bool(variant)),
                 selection='registered final epoch only' if checkpoint is None else 'diagnostic checkpoint; not a selection candidate',outer_results_read=False,
                 driver_sha256=DRIVER_SHA256,plan_sha256=sha(args.study/'PLAN.json'))
-    if outer is not None:
-        report['outer_test']=report.pop('inner_validation')
-        report.update(outer_results_read=True,admission_sha256=outer['admission_sha256'],
-                      selection='outer test; excluded from all selection')
+    apply_report_scope(report,outer,family)
     if variant:
         report.update(resolved_family=family,view_identifier=variant['view_identifier'],
                       training_target_policy='registered permutation' if cell['stage']=='shuffle' else 'actual targets',
@@ -320,12 +341,13 @@ def evaluate(args):
     if reexport is not None:
         report.update(reexport_receipt=str(reexport),reexport_receipt_sha256=sha(reexport),
                       evaluation_build_sha256=sha(args.binary_dir/'BUILD.json'),
-                      selection='outer test; excluded from all selection' if outer is not None else 'supplemental re-export; requires uniform representation qualification before selection')
+                      representation='research-relu-max-pairs-v1',
+                      selection=report['selection'] if outer is not None else 'supplemental re-export; requires uniform representation qualification before selection')
     np.savez_compressed(dest/'predictions.npz',original_indices=wanted,native=pred)
     (dest/'REPORT.json').write_bytes(encoded(report))
     (dest/('COMPLETE.json' if checkpoint is None else 'DIAGNOSTIC_COMPLETE.json')).write_bytes(encoded(dict(cell=cell['id'],report_sha256=sha(dest/'REPORT.json'))))
-    role='outer_test' if outer is not None else 'inner_validation'
-    score_key='outer_test_score' if outer is not None else 'inner_selection_score'
+    role='full_fit_validation' if outer and outer.get('full_fit') else 'outer_test' if outer is not None else 'inner_validation'
+    score_key='full_fit_selection_score' if role=='full_fit_validation' else 'outer_test_score' if outer is not None else 'inner_selection_score'
     print(json.dumps({'cell':cell['id'],score_key:report[role]['selection_score']}),flush=True)
 
 

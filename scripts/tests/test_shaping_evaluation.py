@@ -129,3 +129,34 @@ class EvaluationAdmissionTests(unittest.TestCase):
 
 
 if __name__=='__main__':unittest.main()
+
+class FullFitScopeTests(unittest.TestCase):
+    def test_full_fit_scores_cannot_reenter_inner_selection(self):
+        from shaping_evaluation import apply_report_scope
+        from shaping_selection import human_score
+        report=dict(inner_validation={'selection_score':.8},outer_results_read=False)
+        apply_report_scope(report,dict(full_fit=True,admission_sha256='pin'),'silu_diagnostic')
+        self.assertNotIn('inner_validation',report);self.assertNotIn('outer_test',report)
+        self.assertEqual(report['full_fit_validation']['selection_score'],.8)
+        self.assertEqual(report['selection_scope'],'full_fit_only')
+        self.assertEqual(report['resolved_family'],'silu_diagnostic')
+        self.assertFalse(report['development_results_read'])
+        with self.assertRaisesRegex(ValueError,'outer-exposed'):human_score(report)
+
+    def test_full_fit_context_reproduces_schedule_and_rejects_diagnostics(self):
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as directory:
+            root=Path(directory);gate=root/'admission';gate.write_text('{}')
+            source=root/'source';source.write_text('{}')
+            cell=dict(id='f',stage='full_fit_selection',partition='outer-0',family='best_analytic')
+            schedule=dict(phase_epochs=[480],setting=3,total_pair_draws=24000000)
+            run=dict(cell=cell,resolved_family='silu_diagnostic',schedule=schedule,epochs=480,
+                admission_sha256=sha(gate),selection_scope='full_fit_only',development_results_read=False,
+                file_sha256={str(source):sha(source)})
+            resolved=({},[cell],{}, {},gate,cell,'silu_diagnostic',schedule)
+            with patch('shaping_full_fit_execution.search_cell',return_value=resolved),patch('shaping_full_fit_execution.prepared'):
+                context=outer_context(root,run,[cell]);self.assertTrue(context['full_fit'])
+                self.assertEqual(admitted_epoch(run,dict(stage='trained',exit_code=0),[cell],context),480)
+                with self.assertRaisesRegex(ValueError,'cannot diagnose'):outer_context(root,run,[cell],479)
+                with self.assertRaisesRegex(ValueError,'scope'):outer_context(root,dict(run,development_results_read=True),[cell])
+                source.write_text('changed')
+                with self.assertRaisesRegex(ValueError,'input drift'):outer_context(root,run,[cell])

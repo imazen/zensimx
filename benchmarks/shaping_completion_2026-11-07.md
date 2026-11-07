@@ -852,3 +852,13 @@ using final-refit cells as selection cells are rejected in orchestration tests.
 These tests are not scientific fits. Full-FIT evaluation, nonneural execution,
 selection receipts and final refit execution remain to be connected; no full-FIT
 scientific result is claimed by this implementation.
+
+Full-FIT native search evaluation now uses the same native prediction, TRAIN-only
+calibration, feature probes and final-checkpoint checks as the existing evaluator.
+Its globally admitted family controls the identity/monotonicity claim and its
+uniform representation must match inner admission. The report field is
+`full_fit_validation`, scoped `full_fit_only`; it records exposure of these
+previously outer FIT rows and cannot pass the inner selector's exposure gate.
+Validation checkpoint diagnostics are refused, preserving final-epoch-only
+selection. Twelve evaluation tests pass, including full-FIT admission and scope
+isolation; this is implementation evidence, not completed full-FIT fitting.
