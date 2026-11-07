@@ -33,6 +33,8 @@
 //! [`Form::ReferenceOnly`]: crate::feature_defs::Form::ReferenceOnly
 
 use crate::feature_set_id::SlotSet;
+pub(crate) mod shaping;
+use shaping::{DamageShape, ReferenceGate};
 
 /// The metadata key. Its value is utf8 text in the format above.
 pub(crate) const DERIVED_INPUTS_KEY: &str = "zensim.derived_inputs";
@@ -43,6 +45,9 @@ const HEADER: &str = "zensim-derived-inputs v1";
 pub(crate) enum DerivedInput {
     Direct(u32),
     Product(u32, u32),
+    Shaped(u32, DamageShape),
+    ShapedProduct(u32, u32, DamageShape),
+    Separate(u32, u32, DamageShape, ReferenceGate),
 }
 
 /// A validated derived-input declaration.
@@ -70,16 +75,32 @@ impl DerivedInputs {
                 .map_err(|_| "derived inputs: id is not a declared feature id")
         };
         let mut lines = text.lines().map(str::trim).filter(|l| !l.is_empty());
-        if lines.next() != Some(HEADER) {
-            return Err("derived inputs: unknown header");
-        }
+        let research = match lines.next() {
+            Some(HEADER) => false,
+            Some("zensim-derived-inputs research-shaping-v1") => true,
+            _ => return Err("derived inputs: unknown header"),
+        };
         let mut inputs = Vec::new();
         let mut used = vec![false; ids.len()];
         for line in lines {
             let toks: Vec<&str> = line.split_ascii_whitespace().collect();
             let entry = match toks.as_slice() {
                 ["in", a] => DerivedInput::Direct(pos_of(a)?),
-                ["product", a, b] => {
+                ["shape", a, params @ ..] if research => {
+                    let pa = pos_of(a)?;
+                    let da = def_at(ids[pa as usize], n_scales)
+                        .ok_or("derived inputs: id outside the registry")?;
+                    if da.signal.form != Form::Difference {
+                        return Err("shape: direct input must be Difference");
+                    }
+                    DerivedInput::Shaped(pa, DamageShape::parse(params)?)
+                }
+                [
+                    op @ ("product" | "shape-product" | "separate"),
+                    a,
+                    b,
+                    params @ ..,
+                ] => {
                     let (pa, pb) = (pos_of(a)?, pos_of(b)?);
                     let da = def_at(ids[pa as usize], n_scales)
                         .ok_or("derived inputs: id outside the registry")?;
@@ -96,13 +117,27 @@ impl DerivedInputs {
                     if da.scale != db.scale || da.channel != db.channel {
                         return Err("derived inputs: product factors must share scale and channel");
                     }
-                    DerivedInput::Product(pa, pb)
+                    match *op {
+                        "product" if params.is_empty() => DerivedInput::Product(pa, pb),
+                        "shape-product" if research => {
+                            DerivedInput::ShapedProduct(pa, pb, DamageShape::parse(params)?)
+                        }
+                        "separate" if research && params.len() == 8 => DerivedInput::Separate(
+                            pa,
+                            pb,
+                            DamageShape::parse(&params[..5])?,
+                            ReferenceGate::parse(&params[5..])?,
+                        ),
+                        _ => return Err("derived inputs: unknown entry"),
+                    }
                 }
                 _ => return Err("derived inputs: unknown entry"),
             };
             match entry {
-                DerivedInput::Direct(p) => used[p as usize] = true,
-                DerivedInput::Product(a, b) => {
+                DerivedInput::Direct(p) | DerivedInput::Shaped(p, _) => used[p as usize] = true,
+                DerivedInput::Product(a, b)
+                | DerivedInput::ShapedProduct(a, b, _)
+                | DerivedInput::Separate(a, b, _, _) => {
                     used[a as usize] = true;
                     used[b as usize] = true;
                 }
@@ -155,8 +190,12 @@ impl DerivedInputs {
                 continue;
             }
             match *entry {
-                DerivedInput::Direct(p) => ids.push(declared[p as usize]),
-                DerivedInput::Product(a, b) => {
+                DerivedInput::Direct(p) | DerivedInput::Shaped(p, _) => {
+                    ids.push(declared[p as usize])
+                }
+                DerivedInput::Product(a, b)
+                | DerivedInput::ShapedProduct(a, b, _)
+                | DerivedInput::Separate(a, b, _, _) => {
                     ids.push(declared[a as usize]);
                     ids.push(declared[b as usize]);
                 }
@@ -175,6 +214,13 @@ impl DerivedInputs {
         out.clear();
         out.extend(self.inputs.iter().map(|e| match *e {
             DerivedInput::Direct(p) => gathered[p as usize] as f32,
+            DerivedInput::Shaped(p, shape) => shape.eval(gathered[p as usize] as f32),
+            DerivedInput::ShapedProduct(a, b, shape) => {
+                shape.eval(gathered[a as usize] as f32 * gathered[b as usize] as f32)
+            }
+            DerivedInput::Separate(a, b, shape, gate) => {
+                shape.eval(gathered[a as usize] as f32) * gate.eval(gathered[b as usize] as f32)
+            }
             DerivedInput::Product(a, b) => {
                 gathered[a as usize] as f32 * gathered[b as usize] as f32
             }

@@ -275,6 +275,25 @@ fn scaled_inputs(
             .iter()
             .map(|e| match *e {
                 crate::derived_inputs::DerivedInput::Direct(a) => gathered[a as usize],
+                crate::derived_inputs::DerivedInput::Shaped(a, shape) => {
+                    let node = gathered[a as usize];
+                    let (value, slope) = shape.value_slope(t.value(node));
+                    t.unary(node, value, slope)
+                }
+                crate::derived_inputs::DerivedInput::ShapedProduct(a, b, shape) => {
+                    let node = t.product(gathered[a as usize], gathered[b as usize]);
+                    let (value, slope) = shape.value_slope(t.value(node));
+                    t.unary(node, value, slope)
+                }
+                crate::derived_inputs::DerivedInput::Separate(a, b, shape, gate) => {
+                    let a = gathered[a as usize];
+                    let b = gathered[b as usize];
+                    let (value, slope) = shape.value_slope(t.value(a));
+                    let a = t.unary(a, value, slope);
+                    let (value, slope) = gate.value_slope(t.value(b));
+                    let b = t.unary(b, value, slope);
+                    t.product(a, b)
+                }
                 crate::derived_inputs::DerivedInput::Product(a, b) => {
                     t.product(gathered[a as usize], gathered[b as usize])
                 }
