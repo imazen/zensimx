@@ -10,6 +10,9 @@ from a controller status alone: inspect every unfinished RUN and its process.
 Nine never-started cells are recovered through the shared dispatch owner's
 explicit inner-subset mode, with CPU/RAM claims and unchanged per-fit storage
 admission. Partial restarts await owner clarification of the no-replay rule.
+The pretrained dispatch owner now records these exact interrupted dependencies
+as waiting and continues independent children; failed or drifted parents still
+refuse. New dispatchers share CPU/RAM admission with rescue and inner recovery.
 
 ## Known Bugs — first worker bundle directory (resolved November 7, 2026)
 

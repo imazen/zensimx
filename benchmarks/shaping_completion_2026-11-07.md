@@ -2610,3 +2610,26 @@ Cold readback verified these evidence archives:
 Cold readback also verified `checkpoint-retention-1755-evidence`: 3 artifacts, 5697252 bytes; receipt `981d80e95f65772e36c22985dfe5ed8d1fc9845bc10429eae3c9ac21446ad2dc`.
 
 Cold readback also verified `interrupted-joint-00-resolution-evidence`: 4 artifacts, 16639 bytes; receipt `d668534cfa3d96310dac0a43f9273daba26c1e1194256ff068c5d9e6cd27fd98`.
+
+
+## Interrupted-parent pretraining dependency handling
+
+Recording the two preserved interruptions exposed a downstream orchestration
+refusal: the older inner-0-0 pretraining dispatcher treated every parent result
+without a successful fit as a fatal error. Its last active child continues; it
+was not interrupted. That queue stopped admitting new children.
+
+The existing pretrained dispatch owner now reports preserved interrupted
+parents as explicit dependency waits and continues independent registered
+children. Each interrupted parent must retain its registered identity, 240-epoch
+budget, 50000 draws per epoch and preservation/approval-pending metadata. Normal
+failed parents, identity drift and ambiguous completed prefixes still refuse.
+Partial prefixes are never used. Shared CPU/RAM claims now cover new pretrained
+starts; per-fit native execution and SSD reservations are unchanged. A per-fold
+dispatcher ownership lock prevents duplicate new queue writers without holding
+a global compute lock. Existing completed trials retain their checkpoint gate.
+
+Four pretrained-dispatch tests, four inner-subset tests and nine shared-rescue
+admission tests pass. The dependency test retains the blocked child as required
+while an independent child finishes; failed, drifted and ambiguous-parent
+controls refuse. These checks perform no native training.

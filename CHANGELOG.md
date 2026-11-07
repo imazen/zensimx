@@ -68,6 +68,9 @@
 
 ### Fixed
 
+- Keep preserved interrupted parents visible as pretraining dependency waits,
+  allowing independent registered children to continue under shared admission.
+
 - Add resource-aware recovery of explicitly selected, never-started inner
   experiment cells; refuse existing attempts and retain active children while
   draining, without changing native training inputs or exposure.
