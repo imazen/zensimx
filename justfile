@@ -5212,6 +5212,12 @@ shaping-completion-checkpoint-retention-check:
 shaping-completion-checkpoint-retention study output *args:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_checkpoint_retention.py --study {{quote(study)}} --output {{quote(output)}} {{args}}
 
+shaping-completion-worker-checkpoint-retention host study archive output *args:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_worker_checkpoint_retention.py --host {{quote(host)}} --study {{quote(study)}} --archive {{quote(archive)}} --output {{quote(output)}} {{args}}
+
+shaping-completion-worker-checkpoint-retention-check:
+    TMPDIR="$HOME/tmp" python3 -B -m unittest discover -s scripts/tests -p test_shaping_worker_checkpoint_retention.py
+
 shaping-completion-full-fit-native-check:
     python3 -B -m unittest discover -s scripts/tests -p test_shaping_full_fit_execution.py
 

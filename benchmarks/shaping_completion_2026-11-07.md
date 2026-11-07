@@ -2113,3 +2113,16 @@ The plan, per-file removal receipt and full log are preserved in
 and the corresponding durable archive. All three artifacts (19,075,705 bytes)
 passed destination checksum readback; the archive receipt SHA-256 is
 `673bb0d0762cea75a027e0840fd5471e6778868b449521f12473ea0b6faadc64`.
+
+
+## Worker checkpoint retention implementation
+
+The worker retention command verifies imported RUN/RESULT identities against
+complete durable transport bundles, rereads each bundle SHA-256, and verifies
+worker checkpoint hashes before removal. It preserves final and diagnostic
+checkpoints, rejects pinned inputs and multiple attempts, and checks open files
+twice. Failed verification removes nothing; successful removal keeps an exact
+per-file receipt. This applies only to completed, imported worker fits and does
+not restart training. Three unit tests cover retained epochs, corruption,
+metadata drift, busy files, pinned inputs, duplicate paths and extra attempts.
+Actual worker reclamation remains to be qualified separately.
