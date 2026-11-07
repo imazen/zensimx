@@ -1532,3 +1532,40 @@ establish source generalization or downstream utility. Existing exact-f32
 curve normalization, domain boundaries and treatment of zero terms are retained.
 Five tests pass, including exact paired coverage and refusal of missing seeds
 or duplicate settings. The original single-setting/two-partition mode remains.
+
+## Measured response stability across regularization settings
+
+The registered inner-0-1 contrast completed for both architectures, all three
+seeds and both L2 settings. Product shaping has 35/984 terms active in all six
+fits and 702 zero throughout; separate shaping has 39/984 active throughout
+and 721 zero throughout. Across both families, 14/492 direct terms remain
+active in all twelve fits; 289 are zero throughout.
+
+The five smallest normalized spreads among those fourteen direct terms are:
+
+| Direct feature | Maximum normalized response spread | Maximum/minimum response strength |
+|---|---:|---:|
+| f506 | 0.0009952661275045216 | 4.648842792356843 |
+| f587 | 0.05075509235122355 | 1.7646469859154306 |
+| f98 | 0.0638835321321295 | 3.0533278791481813 |
+| f500 | 0.06871856240492602 | 4.545224377112383 |
+| f428 | 0.1040924590395571 | 3.1234335160221436 |
+
+f403 remains active in all twelve, with spread 0.25057572542573014 and
+strength ratio 3.6570070057787825. Within product shaping alone, f597, f506,
+f23, f589 and f19 have spreads from 0.00021089314417922704 through
+0.0012399178272332753 across the six matched regularization fits.
+
+This is stronger evidence of same-partition repeatability than of transfer
+between source partitions. In the earlier setting-0/two-partition comparison,
+f506, f587 and f98 were active in only six of twelve fits, and f500 in seven.
+f428 was active in all twelve but its spread was 0.9311656651542348, versus
+0.1040924590395571 in the new same-partition contrast. f403 remains active
+throughout both comparisons. The comparisons share six fits and therefore
+must not be described as 24 independent trainings. No downstream-weight or
+quality-utility claim follows from normalized input-curve stability.
+
+All three `regularization-curves-o0-i1-*` directories passed complete destination
+checksum readback: 30 artifact files, 6,665,737 bytes. They retain every compared
+native shaping configuration, fit/input hashes and analysis logs. Outer
+predictions and exposed development results were not used.
