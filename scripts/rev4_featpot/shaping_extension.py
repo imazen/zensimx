@@ -85,6 +85,27 @@ def register(root,outer):
     (out/'REGISTRATION.json').write_bytes(encoded(result));print(json.dumps(result),flush=True)
 
 
+def resolve(root,cell_id):
+    _,cells,_=load_registration(root)
+    found=[]
+    for path in (root/'extensions').glob('outer-*/REGISTRATION.json'):
+        record=json.loads(path.read_text())
+        if not any(c['id']==cell_id for c in record['cells']):continue
+        if record['plan_sha256']!=sha(root/'PLAN.json') or record['policy_sha256']!=sha(REPO/'docs/SHAPING_EXPOSURE_EXTENSION.md'):
+            raise ValueError('extension registration drift')
+        decisions={}
+        for family in NEURAL:
+            decision,source=verify_decision(root,family,record['outer'],cells)
+            if record['decision_sha256'].get(str(source))!=sha(source):raise ValueError('extension selection drift')
+            decisions[family]=decision
+        expected=matrix(decisions,record['outer'])
+        if any(record[k]!=v for k,v in expected.items()):raise ValueError('extension cannot be reproduced')
+        found.append((next(c for c in record['cells'] if c['id']==cell_id),path))
+    if len(found)!=1:raise ValueError('one registered extension cell required')
+    cell,path=found[0]
+    return dict(cell=cell,registration=str(path),registration_sha256=sha(path),outer_results_read=False)
+
+
 if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__);p.add_argument('--study',type=Path,required=True)
     p.add_argument('--outer',type=int,choices=range(3),required=True);a=p.parse_args();register(a.study,a.outer)

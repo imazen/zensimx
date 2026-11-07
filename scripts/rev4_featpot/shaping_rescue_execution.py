@@ -31,7 +31,7 @@ def primary_source(root,cells,cell,setting,family=None):
     return source,run
 
 
-def phase(root,binaries,source,original,dest,epochs,rescue,groups,shaping=None):
+def phase(root,binaries,source,original,dest,epochs,rescue,groups,shaping=None,*,optimizer=None,command_builder=rewrite_command):
     source_bake=source/'checkpoints'/f"ckpt_epoch{original['epochs']-1:03}.bin"
     def metadata(key):
         return subprocess.check_output([str(binaries/'bake_dial_refit'),'read-meta','--in',str(source_bake),'--key',key],text=True).strip()
@@ -42,7 +42,7 @@ def phase(root,binaries,source,original,dest,epochs,rescue,groups,shaping=None):
         if metadata('zentrain.input_shaping_initial_sha256')!=sha(source/'SHAPING.json'):
             raise ValueError('primary shaping manifest drift')
     dest.mkdir(parents=True,exist_ok=False);(dest/'checkpoints').mkdir()
-    command=rewrite_command(original['command'],binaries,dest,epochs)
+    command=command_builder(original['command'],binaries,dest,epochs)
     env=os.environ.copy()
     for key in list(env):
         if key.startswith(('ZENSIM_MONOTONE_RESEARCH_','ZENSIM_INPUT_SHAPING_','ZENSIM_PLAIN_OPTIMIZER_')):env.pop(key)
@@ -51,12 +51,12 @@ def phase(root,binaries,source,original,dest,epochs,rescue,groups,shaping=None):
     files={}
     if (source/'HEAD.json').exists():
         head=json.loads((source/'HEAD.json').read_text());head['epochs']=epochs
-        head['training']=controls(rescue,True,groups=groups)
+        head['training']=optimizer if optimizer is not None else controls(rescue,True,groups=groups)
         manifest=dest/'HEAD.json';manifest.write_bytes(encoded(head))
         env['ZENSIM_MONOTONE_RESEARCH_MANIFEST']=str(manifest);env['ZENSIM_MONOTONE_RESEARCH_SHA256']=sha(manifest)
         files[str(manifest)]=sha(manifest)
     else:
-        manifest=dest/'OPTIMIZER.json';manifest.write_bytes(encoded(controls(rescue)))
+        manifest=dest/'OPTIMIZER.json';manifest.write_bytes(encoded(optimizer if optimizer is not None else controls(rescue)))
         env['ZENSIM_PLAIN_OPTIMIZER_MANIFEST']=str(manifest);env['ZENSIM_PLAIN_OPTIMIZER_SHA256']=sha(manifest)
         files[str(manifest)]=sha(manifest)
     if shaping is None and (source/'SHAPING.json').exists():shaping=json.loads((source/'SHAPING.json').read_text())

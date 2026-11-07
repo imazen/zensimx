@@ -5021,3 +5021,6 @@ shaping-completion-extension-check:
 
 shaping-completion-register-extension study outer:
     python3 -B scripts/rev4_featpot/shaping_extension.py --study {{quote(study)}} --outer {{outer}}
+
+shaping-completion-extension-fit study binary_dir neutral cell:
+    TMPDIR="$HOME/tmp" python3 -B scripts/rev4_featpot/shaping_extension_execution.py --study {{quote(study)}} --binary-dir {{quote(binary_dir)}} --neutral-qualification {{quote(neutral)}} --cell {{quote(cell)}}

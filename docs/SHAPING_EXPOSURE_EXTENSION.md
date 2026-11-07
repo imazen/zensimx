@@ -35,7 +35,7 @@ Deduplicate controls only for exactly identical settings and choices. This
 
 Evaluate the final scheduled checkpoint. Retain all checkpoints and report
 training loss, human/teacher panels and capacity diagnostics at the original
-scheduled epochs plus 299,349,399,449,459,479 when the phase is long enough.
+scheduled epochs plus 299,349,399,429,449,459,479 when the phase is long enough.
 The existing final-forty-loss and last same-cycle criteria apply unchanged.
 Continued improvement or unresolved collapse is reported as inconclusive, never
 as proof that an architecture has reached its limit. Registration and fitting

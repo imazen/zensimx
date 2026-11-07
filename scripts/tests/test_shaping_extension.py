@@ -14,6 +14,25 @@ def selections():
 
 
 class ExtensionTests(unittest.TestCase):
+    def test_native_command_changes_only_registered_exposure_and_fresh_seeds(self):
+        from shaping_extension_execution import command,fresh_command,optimizer
+        original=dict(command=['run-heavy','--mem','1G','--jobs','1','--','/old/zensim_mlp_train',
+                               '--epochs','240','--out','old.bin','--dump-checkpoints-dir','old-checkpoints',
+                               '--init-seed','1107','--sample-seed','200000101','--lr','0.001','--group','unchanged'])
+        frozen=copy.deepcopy(original);fresh=fresh_command(original,1)
+        self.assertEqual(original,frozen)
+        self.assertEqual(fresh['command'][fresh['command'].index('--init-seed')+1],'1001107')
+        self.assertEqual(fresh['command'][fresh['command'].index('--sample-seed')+1],'201000101')
+        result=command(original['command'],Path('/binaries'),Path('/output'),480)
+        self.assertEqual(result[result.index('--epochs')+1],'480');self.assertEqual(result[result.index('--mem')+1],'4G')
+        for flag in ('--jobs','--init-seed','--sample-seed','--lr','--group'):
+            self.assertEqual(result[result.index(flag)+1],original['command'][original['command'].index(flag)+1])
+        with self.assertRaises(ValueError):command(original['command'],Path('/bin'),Path('/out'),481)
+        with self.assertRaises(ValueError):fresh_command(original,0)
+        control=optimizer('base',True,[dict(name='cid22',families=[0])])
+        self.assertEqual((control['init_scale'],control['bias_scale'],control['schedule']),(1.,1.,'cosine'))
+        self.assertEqual((control['teacher_mass'],control['dropout'],control['balance']),(1.,0.,'none'))
+
     def test_plateau_collapse_is_not_mislabeled_as_continuing_improvement(self):
         d=selections();d['softplus']['selected_convergence']['0-0']['reasons']=['one_output_coefficient']
         self.assertEqual(matrix(d,0)['cells'],[])
