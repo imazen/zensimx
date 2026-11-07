@@ -26,6 +26,31 @@ class RetainedPipe(io.BytesIO):
 
 
 class MirrorKinds(unittest.TestCase):
+    def test_existing_archive_verification_preserves_inputs_and_detects_corruption(self):
+        with tempfile.TemporaryDirectory() as directory:
+            parent = Path(directory)
+            root, destination = parent / "source", parent / "mirror"
+            for base in (root, destination):
+                base.mkdir()
+                (base / "artifact.txt").write_bytes(b"retained evidence")
+                (base / "SHA256SUMS").write_text(
+                    mirror.sha(base / "artifact.txt") + "  artifact.txt\n")
+            before = {p: p.read_bytes() for base in (root, destination) for p in base.iterdir()}
+            receipt = parent / "verified.json"
+            with contextlib.redirect_stdout(io.StringIO()):
+                mirror.verify_existing(root, destination, receipt)
+            self.assertTrue(json.loads(receipt.read_text())["both_copies_verified"])
+            self.assertEqual(before, {p: p.read_bytes() for p in before})
+            with self.assertRaises(AssertionError):
+                mirror.verify_existing(root, destination, receipt)
+            with self.assertRaises(AssertionError):
+                mirror.verify_existing(root, destination, root / "new.json")
+            (destination / "artifact.txt").write_bytes(b"damaged evidence")
+            failed = parent / "failed.json"
+            with self.assertRaises(AssertionError):
+                mirror.verify_existing(root, destination, failed)
+            self.assertFalse(failed.exists())
+
     def test_mounted_transport_and_corruption_refusal(self):
         for corrupt in (False, True):
             with self.subTest(corrupt=corrupt), tempfile.TemporaryDirectory() as directory:

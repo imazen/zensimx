@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Checksum and mirror completed feature or training artifacts without deletion.
 
-Run under the shared heavy lock and resource wrapper. The caller supplies the
+Run under the resource wrapper with an explicit CPU/RAM budget. The caller supplies the
 physical array destination and capacity-check mount paths, or a mounted
 destination for copying and verification on the client. Existing mirrors
 are preserved. No dataset source is modified. Explicit evaluation snapshots may
@@ -38,6 +38,41 @@ def cold_sha(path):
         return digest
 
 
+def verify_existing(root, destination, output, cold=False):
+    """Re-read both immutable copies without altering either archive."""
+    assert root.is_dir() and destination.is_dir()
+    assert not output.exists(), "preserve prior verification receipts"
+    assert not output.resolve().is_relative_to(root.resolve())
+    assert not output.resolve().is_relative_to(destination.resolve())
+    manifest = root / "SHA256SUMS"
+    pin = sha(manifest)
+    assert sha(destination / manifest.name) == pin, "mirror manifest differs"
+    digest = cold_sha if cold else sha
+    count = total = 0
+    for line in manifest.read_text().splitlines():
+        expected, name = line.split("  ", 1)
+        relative = Path(name)
+        assert not relative.is_absolute() and ".." not in relative.parts
+        assert len(expected) == 64 and all(c in "0123456789abcdef" for c in expected)
+        for base in (root, destination):
+            path = base / relative
+            assert path.is_file() and not path.is_symlink(), str(path)
+            assert digest(path) == expected, str(path)
+        count += 1
+        total += (root / relative).stat().st_size
+        if count % 1000 == 0:
+            print(json.dumps({"verified_files": count, "root": str(root)}), flush=True)
+    assert count and sha(manifest) == pin and sha(destination / manifest.name) == pin
+    result = dict(schema="existing-artifact-verification-v1",
+                  checked_utc=datetime.now(timezone.utc).isoformat(),
+                  root=str(root), destination=str(destination), files=count,
+                  bytes_per_copy=total, manifest_sha256=pin,
+                  both_copies_verified=True, cold_readback=cold)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(json.dumps(result, indent=2) + "\n")
+    print(json.dumps(result), flush=True)
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--root", type=Path, required=True)
@@ -47,6 +82,8 @@ def main():
     ap.add_argument("--destination", required=True)
     ap.add_argument("--capacity-path", nargs="+")
     ap.add_argument("--artifact-kind", choices=("features", "training", "evaluation"), default="features")
+    ap.add_argument("--verify-only", action="store_true", help="re-read existing local and mounted mirror manifests without copying")
+    ap.add_argument("--verification-output", type=Path, help="new receipt outside both immutable archive roots")
     ap.add_argument(
         "--image",
         default="iqa-organize:5",
@@ -58,6 +95,10 @@ def main():
     else:
         assert args.host and args.capacity_path and not args.cold_readback
     assert args.root.is_dir() and args.destination.startswith("/")
+    if args.verify_only:
+        assert args.nfs and args.verification_output is not None
+        return verify_existing(args.root, Path(args.destination), args.verification_output, args.cold_readback)
+    assert args.verification_output is None
     receipt_path = args.root / "MIRROR_VERIFIED.json"
     sums = args.root / "SHA256SUMS"
     assert not receipt_path.exists() and not sums.exists(), (

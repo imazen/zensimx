@@ -4853,3 +4853,7 @@ shaped-linear-compare root model="all":
 
 shaped-linear-report stage root:
     python3 -B scripts/rev4_featpot/shaped_linear_report.py {{stage}} --root {{root}}
+
+# Verify both existing archive copies without modifying the frozen trees.
+study-archive-verify root destination receipt:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/byconstruction/dataset_mirror.py --root {{quote(root)}} --nfs --cold-readback --destination {{quote(destination)}} --verify-only --verification-output {{quote(receipt)}}
