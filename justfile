@@ -5090,6 +5090,15 @@ shaping-model-inventory-check binary inspector workload tree_log output:
 shaping-live-profile pid output:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_live_profile.py --pid {{pid}} --output {{quote(output)}}
 
+shaping-parameter-count run inspector output:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_parameter_count.py --run {{quote(run)}} --inspector {{quote(inspector)}} --output {{quote(output)}}
+
+shaping-parameter-count-check:
+    TMPDIR="$HOME/tmp" python3 -B -m unittest discover -s scripts/tests -p test_shaping_parameter_count.py
+
+shaping-parameter-count-qualify study inspector output:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_parameter_count.py --qualify-study {{quote(study)}} --inspector {{quote(inspector)}} --output {{quote(output)}}
+
 shaping-completion-dispatch-rescues study binary_dir neutral outer *args:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 6G --jobs 2 -- python3 -B scripts/rev4_featpot/shaping_rescue_dispatch.py --study {{quote(study)}} --binary-dir {{quote(binary_dir)}} --neutral-qualification {{quote(neutral)}} --outer {{outer}} --workers 2 {{args}}
 

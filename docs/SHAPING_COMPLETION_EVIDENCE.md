@@ -686,8 +686,32 @@ fixed. Temperature counts only when `analytic.learn_temperature` is enabled.
 trainable term, and uses three additional gate values for a separate reference
 gate. Gate slots on product/direct terms do not affect their response. Frozen
 shape phases must therefore be distinguished from jointly trained phases.
-These source observations define the remaining accounting work; they are not
-a completed parameter-count report or evidence of effective learned capacity.
+`just shaping-parameter-count RUN INSPECTOR OUTPUT` now binds this accounting to
+the registered run, its original final checkpoint, native structure and embedded
+head/shape manifests. The report counts the final training phase, excludes fixed
+masked input rows, and retains source hashes. It does not assert scientific
+eligibility or effective learned capacity. Global shape-column IDs are distinct
+from compact exported input positions. The qualified reader handles both original
+and preserved successful replacement attempts; it never starts training.
+
+The ten fixed inner-0-0, setting-0, seed-0 specimens passed inspection in
+`parameter-count-qualification-v3`. Their final-phase counts are:
+
+| Family | Adjustable scalar entries | Frozen response-shape values |
+| --- | ---: | ---: |
+| ReLU, Softplus, monotone SiLU | 132,320 each | 0 |
+| Ordinary SiLU diagnostic | 134,401 | 0 |
+| Product shaping, joint identity or pretrained joint | 135,272 each | 0 |
+| Separate shaping, joint identity or pretrained joint | 136,748 each | 0 |
+| Product shaping, pretrained frozen | 132,320 | 2,952 |
+| Separate shaping, pretrained frozen | 132,320 | 4,428 |
+
+The inspected analytic manifests fix temperature; a learned-temperature block
+adds one adjustable scalar. Frozen shapes still required their recorded pretraining
+phase: their zero final-phase shape updates do not imply free training. These are
+instrument specimens, not selected finalists. Final models still require their own
+reports. Tests verify explicit symbolic max-pair ties, diagnostic intercepts,
+temperature policy, frozen/unused shape fields and sparse logical column IDs.
 
 `just shaping-cost-memory BINARY WORKLOAD NEW_OUTPUT` runs each model in a fresh
 native qualification process under GNU `time -v`. The recorded maximum RSS includes
