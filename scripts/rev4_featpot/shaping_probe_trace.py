@@ -30,7 +30,25 @@ def f32_layers(raw,model):
     return outputs
 
 
+def unique_signed_pairs(model):
+    """Conservative proposal only; the native parser owns admission."""
+    first,next_layer=model['layers'][:2]
+    w=np.array(first['weights'],np.float64).reshape(first['in_dim'],first['out_dim'])
+    bias=np.array(first['biases']);middle=np.array(next_layer['weights'],np.float32).reshape(next_layer['in_dim'],next_layer['out_dim'])
+    signed=np.any(w<0,axis=0);used=set();pairs=[]
+    for v in np.flatnonzero(signed):
+        candidates=[u for u in range(len(bias)) if u not in used and u!=v and not signed[u]
+                    and bias[u]==0 and bias[v]<=0
+                    and np.array_equal(middle[u].view(np.uint32),middle[v].view(np.uint32))
+                    and np.all(w[:,u]+w[:,v]>=0)]
+        if len(candidates)!=1:raise ValueError('ambiguous or unsupported signed pair')
+        u=candidates[0];pairs.append([u,int(v)]);used.update((u,int(v)))
+    if not pairs:raise ValueError('no signed pairs to repair')
+    return pairs
+
+
 def trace(model_path,probes,predictions,out):
+    if out.exists():raise ValueError('preserve existing trace')
     model=json.loads(model_path.read_text());meta={x['key']:x.get('value_text') for x in model['metadata']}
     rows=list(csv.DictReader(predictions.open(),delimiter='\t'));native=np.array([float(r['pred']) for r in rows])
     failures=np.flatnonzero(native[128:256]-native[:128]>1e-5)
@@ -83,5 +101,13 @@ def trace(model_path,probes,predictions,out):
 
 if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__)
-    for k in ('model','probes','predictions','output'):p.add_argument('--'+k,type=Path,required=True)
-    a=p.parse_args();trace(a.model,a.probes,a.predictions,a.output)
+    p.add_argument('--model',type=Path,required=True);p.add_argument('--output',type=Path,required=True)
+    p.add_argument('--probes',type=Path);p.add_argument('--predictions',type=Path)
+    p.add_argument('--declare-pairs',action='store_true');a=p.parse_args()
+    if a.declare_pairs:
+        pairs=unique_signed_pairs(json.loads(a.model.read_text()))
+        with a.output.open('x') as out:out.write('relu-max-pairs-v1\n'+''.join(f'{u} {v}\n' for u,v in pairs))
+        print(json.dumps(dict(pairs=pairs,model_sha256=sha(a.model),declaration_sha256=sha(a.output))))
+    else:
+        if a.probes is None or a.predictions is None:p.error('trace requires probes and predictions')
+        trace(a.model,a.probes,a.predictions,a.output)

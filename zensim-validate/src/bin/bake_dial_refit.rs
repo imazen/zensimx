@@ -179,6 +179,8 @@ enum Cmd {
     /// Re-export a private monotone-research spline using positive bounded segments.
     /// No fitting; preserves the original file and records any slope rounding repair.
     RepairResearchSpline(RepairResearchSplineArgs),
+    /// Re-export declared research max pairs with stable native evaluation.
+    RepairResearchMaxPairs(RepairResearchMaxPairsArgs),
     /// Weight-space interpolation of two bakes of one architecture: every
     /// weight and bias becomes (1 - alpha)*a + alpha*b (f64, rounded to f32;
     /// alpha 0 and 1 copy their end exactly). Refuses unless shapes,
@@ -2812,6 +2814,91 @@ struct RepairResearchSplineArgs {
     input: PathBuf,
     #[arg(long)]
     out: PathBuf,
+}
+
+#[derive(Args)]
+struct RepairResearchMaxPairsArgs {
+    #[arg(long = "in")]
+    input: PathBuf,
+    #[arg(long)]
+    out: PathBuf,
+    /// Validated native pair declaration, using stored first-layer indices.
+    #[arg(long)]
+    pairs: PathBuf,
+}
+
+fn cmd_repair_research_max_pairs(a: &RepairResearchMaxPairsArgs) -> Result<(), String> {
+    if a.out.exists() {
+        return Err("preserve existing output".into());
+    }
+    let bytes = std::fs::read(&a.input).map_err(|e| e.to_string())?;
+    let model = Model::from_bytes(&bytes).map_err(|e| e.to_string())?;
+    if model.n_layers() < 2
+        || model.layer(0).activation != Activation::Relu
+        || !model.feature_bounds().is_empty()
+        || model.has_output_specs()
+        || !model.discrete_sets().is_empty()
+        || !model.sparse_overrides().is_empty()
+        || model
+            .metadata()
+            .get("zenpredict.research_max_pairs")
+            .is_some()
+    {
+        return Err(
+            "requires unmarked research ReLU graph without optional decision sections".into(),
+        );
+    }
+    read_meta(&bytes, "zentrain.repro")?;
+    let mut layers = owned_layers(&model).map_err(|e| e.to_string())?;
+    if layers.iter().any(|l| l.dtype != WeightDtype::F32) {
+        return Err("f32 research layers required".into());
+    }
+    layers[0].activation = Activation::ResearchReluMaxPairs;
+    let declaration = std::fs::read_to_string(&a.pairs).map_err(|e| e.to_string())?;
+    let mut metadata = clone_metadata(&model);
+    metadata.push(OwnedMeta {
+        key: "zenpredict.research_max_pairs".into(),
+        kind: MetadataType::Utf8,
+        value: declaration.into_bytes(),
+    });
+    let identities = layers[..layers.len() - 1]
+        .iter()
+        .map(|l| (0..l.out_dim as u32).collect::<Vec<_>>())
+        .collect::<Vec<_>>();
+    let permutations = identities.iter().map(Vec::as_slice).collect::<Vec<_>>();
+    let output = bake_layers_hu(
+        model.scaler_mean(),
+        model.scaler_scale(),
+        &layers,
+        &metadata,
+        model.schema_hash(),
+        Some(&permutations),
+    );
+    // Parse before writing: native constraints, domain declarations and layout
+    // must pass. Keep stored coefficient/scaler bits independent of rounding.
+    let repaired = Model::from_bytes(&output).map_err(|e| e.to_string())?;
+    let actual = owned_layers(&repaired).map_err(|e| e.to_string())?;
+    let bits = |xs: &[f32]| xs.iter().map(|v| v.to_bits()).collect::<Vec<_>>();
+    if bits(model.scaler_mean()) != bits(repaired.scaler_mean())
+        || bits(model.scaler_scale()) != bits(repaired.scaler_scale())
+        || actual.len() != layers.len()
+        || actual.iter().zip(&layers).any(|(x, y)| {
+            x.in_dim != y.in_dim
+                || x.out_dim != y.out_dim
+                || x.activation != y.activation
+                || bits(&x.weights) != bits(&y.weights)
+                || bits(&x.biases) != bits(&y.biases)
+        })
+    {
+        return Err("repair changed stored weights, biases, scaler or layout".into());
+    }
+    std::fs::write(&a.out, &output).map_err(|e| e.to_string())?;
+    println!(
+        "{}",
+        serde_json::json!({"input_sha256":sha256_hex(&bytes),"output_sha256":sha256_hex(&output),
+        "weights_biases_scaler_unchanged":true,"rounded_scores_may_change":true,"original_preserved":true})
+    );
+    Ok(())
 }
 
 fn stable_research_spline(
@@ -6078,6 +6165,7 @@ fn main() -> ExitCode {
         Cmd::Inspect(a) => cmd_inspect(a).map(|_| false),
         Cmd::LinearStudy(a) => linear_study::run(a).map(|_| false),
         Cmd::RepairResearchSpline(a) => cmd_repair_research_spline(a).map(|_| false),
+        Cmd::RepairResearchMaxPairs(a) => cmd_repair_research_max_pairs(a).map(|_| false),
         Cmd::Interpolate(a) => cmd_interpolate(a).map(|_| false),
         Cmd::FitLasso(a) => cmd_fit_lasso(a).map(|_| false),
         Cmd::Gram(a) => cmd_gram(a).map(|_| false),

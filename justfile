@@ -4978,3 +4978,6 @@ shaping-completion-supervision-check:
 
 shaping-completion-probe-trace model probes predictions output:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_probe_trace.py --model {{quote(model)}} --probes {{quote(probes)}} --predictions {{quote(predictions)}} --output {{quote(output)}}
+
+shaping-completion-declare-max-pairs model output:
+    python3 -B scripts/rev4_featpot/shaping_probe_trace.py --declare-pairs --model {{quote(model)}} --output {{quote(output)}}

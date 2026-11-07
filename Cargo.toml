@@ -62,13 +62,13 @@ zenpng = { version = ">=0.1.4, <0.3.0", default-features = false }
 zenpixels = { version = ">=0.3.1, <0.4.0", default-features = false }
 zenblend = "0.1.3"
 enough = { version = "0.4.2", default-features = false, features = ["std"] }
-# Native research runtime and baker from zenanalyze PR 93. The source pin
+# Native research runtime and baker from zenanalyze PRs 93 and 94. The source pin
 # includes exact Softplus/SiLU operators needed by the shaping study; this is
 # an unreleased research dependency, not a serving-model promotion.
 # Keep the runtime and baker on one revision. Existing frozen bakes and their
 # qualification remain separate from the new experimental activation graphs.
-zenpredict      = { version = "0.2.0", git = "https://github.com/imazen/zenanalyze", rev = "1f3767a56c104e8ff2aa936dd900ef278d172ea3" }
-zenpredict-bake = { git = "https://github.com/imazen/zenanalyze", rev = "1f3767a56c104e8ff2aa936dd900ef278d172ea3" }
+zenpredict      = { version = "0.2.0", git = "https://github.com/imazen/zenanalyze", rev = "8bf61bc96ab05a7a88d2fa93c00cf0613eb24ae3" }
+zenpredict-bake = { git = "https://github.com/imazen/zenanalyze", rev = "8bf61bc96ab05a7a88d2fa93c00cf0613eb24ae3" }
 
 # zenstats — canonical IQA-stats home extracted on 2026-05-26 from the
 # pre-existing `zensim-validate/src/panel.rs`. Lives in the zenmetrics
