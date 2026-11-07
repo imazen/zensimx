@@ -5126,3 +5126,9 @@ shaping-completion-prepare-outer study outer:
 
 shaping-completion-fit-outer-neural study outer binary_dir qualification cell:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 6G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_outer_execution.py --study {{quote(study)}} --outer {{outer}} --binary-dir {{quote(binary_dir)}} --neutral-qualification {{quote(qualification)}} --cell {{quote(cell)}}
+
+shaping-completion-checkpoint-retention-check:
+    python3 -B -m unittest discover -s scripts/tests -p test_shaping_checkpoint_retention.py
+
+shaping-completion-checkpoint-retention study output *args:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_checkpoint_retention.py --study {{quote(study)}} --output {{quote(output)}} {{args}}

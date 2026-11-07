@@ -813,3 +813,17 @@ reports and 12/72 fresh-control reports; 51 primary and 12 fresh-control neural
 convergence receipts were present. Of those, 48 primary and four fresh controls
 retained investigation triggers. These counts are execution progress, not
 convergence qualification or a family ranking.
+
+### Archived checkpoint retention
+
+The checkpoint-retention command keeps epoch zero, epoch 119, the scheduled
+final epoch, and every registered diagnostic epoch locally. Other checkpoints
+are eligible only in completed, convergence-recorded, fully mirrored cells.
+Before removal it rereads each local and durable SHA-256, checks open descriptors
+and mappings twice, and verifies local file identities again. A durable receipt
+records each removed path and its archive counterpart; per-cell notes identify
+the partial local copy. Failed runs and registered input pins are excluded.
+Tests verify retained epochs, successful duplicate removal, late archive
+corruption with no deletion, busy files, and source changes during verification.
+This changes local storage placement, not the save-every-epoch record or
+scientific checkpoint-selection policy.
