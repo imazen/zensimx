@@ -5141,3 +5141,6 @@ shaping-completion-full-fit-search-prepare study cell:
 
 shaping-completion-full-fit-search-native study cell binaries qualification:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 3G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_full_fit_execution.py --study {{quote(study)}} --cell {{quote(cell)}} --binary-dir {{quote(binaries)}} --neutral-qualification {{quote(qualification)}}
+
+shaping-completion-full-fit-control study partition binaries mode:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 6G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_controls.py --study {{quote(study)}} --partition {{quote(partition)}} --binary-dir {{quote(binaries)}} --full-fit-selection --{{mode}}

@@ -61,3 +61,23 @@ class OuterControlTests(unittest.TestCase):
 
 
 if __name__=='__main__':unittest.main()
+
+class FullFitControlTests(unittest.TestCase):
+    def test_full_fit_controls_retain_all_settings_and_isolate_caches(self):
+        from shaping_controls import full_fit_cells,control_cache_key
+        cells=matrix()
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as directory:
+            root=Path(directory);path=root/'admission';path.write_text('{}')
+            for family,count in [('extra_trees',12),('shaped_additive',4)]:
+                admission=dict(selection_cells=[c for c in cells if c['stage']=='full_fit_selection'],
+                    finalist_roles={family:family},schedules={family:dict(optimizer_choice='base',phase_epochs=[])})
+                with patch('shaping_full_fit_admission.resolve',return_value=(admission,path)):
+                    chosen,context=full_fit_cells(root,'outer-1',family,cells)
+                    self.assertEqual(len(chosen),count);self.assertEqual({c['setting'] for c in chosen},{0,1,2,3})
+                    self.assertEqual(context['selection_scope'],'full_fit_only')
+                    self.assertNotEqual(control_cache_key('outer-1',context),control_cache_key('outer-1',{}))
+                    args=SimpleNamespace(study=root,partition='outer-1',tree=family=='extra_trees',full_fit_selection=True,attempt=1)
+                    with patch('shaping_controls.load_registration',return_value=({'minimum_ssd_free_bytes':0},cells,{})),patch('shaping_storage.reservation',return_value=nullcontext()),patch('shaping_controls.fit') as fit:
+                        run(args);self.assertEqual(fit.call_args.args[4],chosen)
+                    admission['selection_cells'].remove(chosen[0])
+                    with self.assertRaisesRegex(ValueError,'coverage'):full_fit_cells(root,'outer-1',family,cells)

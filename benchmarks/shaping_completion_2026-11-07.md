@@ -862,3 +862,11 @@ previously outer FIT rows and cannot pass the inner selector's exposure gate.
 Validation checkpoint diagnostics are refused, preserving final-epoch-only
 selection. Twelve evaluation tests pass, including full-FIT admission and scope
 isolation; this is implementation evidence, not completed full-FIT fitting.
+
+The existing tree and shaped-additive control owner now also accepts the admitted
+full-FIT search. It retains all four settings, all three tree seeds and the one
+deterministic quadratic solve per setting. Dedicated full-FIT cache paths avoid
+reusing or overwriting outer-control Gram matrices. The existing TRAIN-only
+basis/map fitting, native export checks and objectives remain unchanged. Reports
+use the same full-FIT-only scope as the neural search. Five control-admission
+checks pass; no control fits are claimed by those orchestration tests.

@@ -14,7 +14,7 @@ os.environ['TMPDIR']=str(Path.home()/'tmp')
 import numpy as np
 from shaping_completion import REPO,SEEDS,encoded,sha
 from shaping_execution import load_registration
-from shaping_evaluation import probe_values
+from shaping_evaluation import probe_values,apply_report_scope
 
 
 DRIVER_SHA256=sha(__file__)
@@ -39,11 +39,39 @@ def selected_cells(root,partition,family,cells):
     return chosen,dict(admission_sha256=sha(path),selected_setting=schedule['setting'])
 
 
+def full_fit_cells(root,partition,family,cells):
+    from shaping_full_fit_admission import resolve
+    admission,path=resolve(root)
+    if partition not in ('outer-0','outer-1','outer-2') or family not in ('extra_trees','shaped_additive'):
+        raise ValueError('registered full-FIT control partition/family required')
+    if admission['finalist_roles'][family]!=family:raise ValueError('full-FIT control role differs')
+    chosen=[c for c in admission['selection_cells'] if c['family']==family and c['partition']==partition]
+    seeds=(0,1,2) if family=='extra_trees' else (None,)
+    expected={(setting,seed) for setting in range(4) for seed in seeds}
+    if (len(chosen)!=len(expected) or {(c['setting'],c['seed']) for c in chosen}!=expected
+        or any(c not in cells or c['stage']!='full_fit_selection' for c in chosen)):
+        raise ValueError('full-FIT control search coverage differs')
+    schedule=admission['schedules'][family]
+    if schedule['optimizer_choice']!='base' or schedule['phase_epochs']:raise ValueError('full-FIT control schedule differs')
+    return chosen,dict(full_fit=True,admission_sha256=sha(path),selection_scope='full_fit_only',
+                       development_results_read=False,resolved_family=family)
+
+
+def control_cache_key(partition,context):
+    variant=context.get('variant') if context else None
+    if variant:return Path(variant['groups_path']).parent.name
+    return ('full-fit-selection-' if context and context.get('full_fit') else '')+partition
+
+
 def run(args):
     plan,cells,partitions=load_registration(args.study)
     family='extra_trees' if args.tree else 'shaped_additive'
     variant=None
-    if getattr(args,'cell',None):
+    full_fit=getattr(args,'full_fit_selection',False)
+    if full_fit:
+        if getattr(args,'cell',None):raise ValueError('full-FIT search and variant cell are mutually exclusive')
+        chosen,outer=full_fit_cells(args.study,args.partition,family,cells)
+    elif getattr(args,'cell',None):
         from shaping_variant_execution import resolve as resolve_variant
         from shaping_variant_inputs import load_variant
         variant=resolve_variant(args.study,args.cell)
@@ -56,11 +84,11 @@ def run(args):
     if not chosen:raise ValueError('no registered cells')
     if outer is None:return fit(args,plan,partitions,family,chosen,outer)
     from shaping_storage import reservation
-    key=Path(variant['groups_path']).parent.name if variant else args.partition
+    key=control_cache_key(args.partition,outer)
     dest=args.study/'control_inputs'/key/f'{family}-attempt-{args.attempt:03}'
     with reservation(args.study,dest,plan['minimum_ssd_free_bytes']):
         # Admission may have waited for space; revalidate before reading labels.
-        current=resolve_variant(args.study,args.cell) if variant else selected_cells(args.study,args.partition,family,cells)
+        current=resolve_variant(args.study,args.cell) if variant else (full_fit_cells if full_fit else selected_cells)(args.study,args.partition,family,cells)
         if current!=(variant if variant else (chosen,outer)):
             raise ValueError('outer control admission changed while waiting')
         return fit(args,plan,partitions,family,chosen,outer)
@@ -94,7 +122,7 @@ def fit(args,plan,partitions,family,chosen,outer):
             if ids:training_targets(d['y'],pos,ids,groups[group['name']])
     weight,target,maps=weights_and_targets(d['y'][tr],d['pop'][tr],d['component'][tr],'range',1.)
     declaration=json.loads((REPO/'scripts/rev4_featpot/color_noise_fx2_declaration.json').read_text())
-    cache=args.study/'control_inputs'/(Path(variant['groups_path']).parent.name if variant else args.partition)
+    cache=args.study/'control_inputs'/control_cache_key(args.partition,outer)
     cache.mkdir(parents=True,exist_ok=True)
     linear=None
     if not args.tree:
@@ -115,7 +143,7 @@ def fit(args,plan,partitions,family,chosen,outer):
               gram_sha256=sha(linear/'gram.npz'),basis_sha256=hashlib.sha256(basis.tobytes()).hexdigest(),maps=maps))
         del b,bw,gram,rhs
     for cell in chosen:
-        setting=outer['selected_setting'] if outer is not None else cell['setting']
+        setting=outer['selected_setting'] if outer is not None and not outer.get('full_fit') else cell['setting']
         dest=args.study/'runs'/cell['id']/f'attempt-{args.attempt:03}'
         if dest.exists():raise ValueError('control attempt exists: '+str(dest))
         dest.mkdir(parents=True)
@@ -160,8 +188,8 @@ def fit(args,plan,partitions,family,chosen,outer):
                         inner_validation=metrics(pred,d['y'],te,d,maps,allow_absent_maps=bool(variant)),
                         outer_results_read=False,plan_sha256=sha(args.study/'PLAN.json'))
             if outer is not None:
-                report['outer_test']=report.pop('inner_validation')
-                report.update(outer,outer_results_read=True,selection='outer test; excluded from all selection')
+                report.update(outer)
+                apply_report_scope(report,outer,family)
             if variant:
                 report.update(training_target_policy='registered permutation' if cell['stage']=='shuffle' else 'actual targets',
                               outer_target_policy='actual targets',resolved_family=family)
@@ -169,8 +197,8 @@ def fit(args,plan,partitions,family,chosen,outer):
             write(evaluation/'REPORT.json',report)
             write(evaluation/'COMPLETE.json',dict(cell=cell['id'],report_sha256=sha(evaluation/'REPORT.json')))
             write(dest/'RESULT.json',{**running,'stage':'complete','exit_code':0,'finished_utc':datetime.now(timezone.utc).isoformat()})
-            role='outer_test' if outer is not None else 'inner_validation'
-            key='outer_test_score' if outer is not None else 'inner_selection_score'
+            role='full_fit_validation' if outer and outer.get('full_fit') else 'outer_test' if outer is not None else 'inner_validation'
+            key='full_fit_selection_score' if role=='full_fit_validation' else 'outer_test_score' if outer is not None else 'inner_selection_score'
             print(json.dumps({'cell':cell['id'],'stage':'complete',key:report[role]['selection_score']}),flush=True)
         except Exception as error:
             write(dest/'RESULT.json',{**running,'stage':'failed','exit_code':1,'error':str(error),'finished_utc':datetime.now(timezone.utc).isoformat()})
@@ -182,6 +210,7 @@ def main():
     p.add_argument('--study',type=Path,required=True);p.add_argument('--binary-dir',type=Path,required=True)
     p.add_argument('--partition',required=True);p.add_argument('--attempt',type=int,default=1)
     p.add_argument('--cell',help='registered generalization control cell; retains inner-selected settings')
+    p.add_argument('--full-fit-selection',action='store_true',help='registered four-setting full-FIT control search')
     mode=p.add_mutually_exclusive_group(required=True);mode.add_argument('--tree',action='store_true');mode.add_argument('--linear',action='store_true')
     run(p.parse_args())
 
