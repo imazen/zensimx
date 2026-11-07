@@ -2205,3 +2205,30 @@ Both input capsules and install receipts also passed durable readback:
 `df616616e8a1878df8d673ab454b0682292074a9e2e1835a05cf4d0a472e29f0`;
 `i270-pretrained11-inputs` (30,453,269 bytes), receipt
 `6115b8627fda894179251dbdfdee9d2e9fdc0e3ac305741cc803afbe125d4ca2`.
+
+
+## Saved training resource reader and additional ready pretrained fits
+
+Source `37efb4dade1c` adds saved-run resource accounting. Eleven saved runs
+qualified across ten neural families and a completed rescue. Three parser
+regressions pass. No scientific fit was replayed. The qualification wrapper
+reported `rc=0 2s | peak-RSS 0.04GiB | min-avail 32439MiB | peak-load 29.80`.
+Full-parent wrapper cost and the observed native epoch-119 timestamp remain
+separate from child cost; prefix-only wrapper time/RSS were not measured.
+The reader evidence archive verified 25 artifacts, 181,928 bytes, receipt
+`eae7921f5888cbb7ef52e306d21ab5aa5a71552416585f80c3bbe81c4a540b47`.
+
+Eight previously unstarted inner-2-0 pretrained cells had four completed matching
+parents. Their original prefixes passed native extraction qualification on i265
+and were admitted with six workers using source `ce9229d0362d`. At admission,
+nine existing trainers were present, available RAM was 25,439,903,744 bytes and
+free disk was 285,267,173,376 bytes against a 52,613,349,376-byte requirement.
+The controller retains a 2 GiB cap and each native child a 1 GiB cap. All six
+native child PIDs were verified live; these observations do not measure speedup.
+The assigned eight fits preserve the frozen matrix, seeds, exposure and gates.
+
+Cold readback verified `pretrained20-admission-evidence`: 26 artifacts,
+2,461,951 bytes, receipt
+`0149b120fcad376b455c3822ea5fd8eb93addb1b8455c843d07b98c0d850d74f`.
+The input capsule archive verified three artifacts, 26,992,412 bytes, receipt
+`b016ffc9fedbc145db4b43e5e360bb60f7e3509e157943cc7c29226eb13eb949`.
