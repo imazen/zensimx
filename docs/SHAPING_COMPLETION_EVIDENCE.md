@@ -487,3 +487,21 @@ loaded implementation; their historical status hashes alone do not prove which
 source they loaded. Use their launch records and frozen source provenance. No
 training, evaluation, selection or archive-content gate changes, and active jobs
 are not restarted for this reporting correction.
+
+
+## Inference-cost preparation
+
+[The inference-cost protocol](SHAPING_INFERENCE_COST_PROTOCOL.md) fixes the
+remaining measurement scope before timing: every one of the sixteen registered
+full-FIT cells, shared FIT-only feature rows, qualified native scoring, separate
+image extraction, paired zenbench rounds and fresh-process RSS. The matrix owner
+confirms three seeds for each neural finalist role and extra-trees, and one
+shaped-additive model. Source inspection of `shaping_controls.py::fit` confirms
+that the tree uses raw features and `100 * decision_function`, not its logistic
+probability or corruption-gating score.
+
+The existing `a_family_cost` example is pinned to a different model and feature
+omission experiment. `corrhead_forward` uses a fixed 372-wide row and probability
+scoring. Neither directly measures the registered shaping finalists. The new
+protocol retains those historical instruments and requires a qualified native
+harness for this study. No latency, RSS or pixel-serving result is claimed yet.
