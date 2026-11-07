@@ -8,7 +8,7 @@ from shaping_completion import encoded,sha
 from shaping_execution import load_registration
 from shaping_reexport import reexport
 from shaping_evaluation import evaluate,NativeFeatureGateError,diagnostic_epochs
-from shaping_supervision import complete_marker
+from shaping_supervision import complete_marker,preserve_failure
 from shaping_convergence import report
 
 
@@ -45,7 +45,7 @@ def sweep(args):
                     if not failure.exists():raise
             if failure.exists():failures.append(dict(path=str(failure),sha256=sha(failure)))
         if failures:
-            (root/'EVALUATION_FAILURES.json').write_bytes(encoded(dict(cell=cell,failures=failures,scientifically_complete=False)))
+            preserve_failure(root/'EVALUATION_FAILURES.json',dict(cell=cell,failures=failures,scientifically_complete=False))
             continue
         if not (root/'CONVERGENCE.json').exists():report(run,root)
         completed+=1

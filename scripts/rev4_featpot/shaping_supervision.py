@@ -22,6 +22,16 @@ def complete_marker(path,marker):
     return True
 
 
+def preserve_failure(path, record):
+    """Completed failure evidence is immutable, including during archive reads."""
+    payload=encoded(record)
+    if path.exists():
+        if path.read_bytes()!=payload:
+            raise ValueError('existing failure evidence differs: '+str(path))
+        return
+    with path.open('xb') as stream:stream.write(payload)
+
+
 def sweep(args):
     _,cells,_=load_registration(args.study)
     completed=0
@@ -57,8 +67,8 @@ def sweep(args):
         if failures:
             # Failed checkpoints remain failed. No convergence/selection completion
             # receipt is emitted, but independent cells can still be evaluated.
-            (run/'EVALUATION_FAILURES.json').write_bytes(encoded(dict(cell=cell,failures=failures,
-                scientifically_complete=False,requires_investigation=True,outer_results_read=False)))
+            preserve_failure(run/'EVALUATION_FAILURES.json',dict(cell=cell,failures=failures,
+                scientifically_complete=False,requires_investigation=True,outer_results_read=False))
             continue
         if not (run/'CONVERGENCE.json').exists():report(run)
         completed+=1
@@ -106,7 +116,7 @@ def later_sweep(args):
             except NativeFeatureGateError:
                 if not failure.exists():raise
         if failure.exists():
-            (dest.parent/'LATER_EVALUATION_FAILURE.json').write_bytes(encoded(dict(cell=cell,gate=str(failure),gate_sha256=sha(failure),scientifically_complete=False)))
+            preserve_failure(dest.parent/'LATER_EVALUATION_FAILURE.json',dict(cell=cell,gate=str(failure),gate_sha256=sha(failure),scientifically_complete=False))
             continue
         if cell['stage'] in ('full_fit_selection','full_fit'):
             diagnostic=run_dir/'TRAIN_CONVERGENCE.json'

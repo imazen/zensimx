@@ -115,3 +115,15 @@ class StageIsolationTests(unittest.TestCase):
                 self.assertEqual(sweep(args),0);evaluate.assert_not_called()
             with patch('shaping_reexport_supervision.load_registration',return_value=({},[],{})),patch('shaping_reexport_supervision.reexport') as export:
                 self.assertEqual(supplemental(args),0);export.assert_not_called()
+
+class FailureEvidenceTests(unittest.TestCase):
+    def test_repeat_observation_does_not_reopen_and_conflict_preserves_original(self):
+        from shaping_supervision import preserve_failure
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as directory:
+            path=Path(directory)/'FAILURE.json';record={'scientifically_complete':False,'gate':'original'}
+            preserve_failure(path,record);original=path.read_bytes();before=path.stat()
+            preserve_failure(path,record);after=path.stat()
+            self.assertEqual((before.st_ino,before.st_mtime_ns),(after.st_ino,after.st_mtime_ns))
+            with self.assertRaisesRegex(ValueError,'existing failure evidence differs'):
+                preserve_failure(path,dict(record,gate='changed'))
+            self.assertEqual(path.read_bytes(),original)

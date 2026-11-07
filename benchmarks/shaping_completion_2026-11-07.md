@@ -1003,3 +1003,13 @@ bytes: 1,399,134,243. Observed filesystem free bytes before/after were
 The four-file retention evidence archive (6,239,399 bytes) passed full destination
 SHA-256 readback under `checkpoint-retention-0858-qualification` in the study's
 local and durable roots. The full scientific matrix remains incomplete.
+
+## Immutable terminal failure receipts
+
+Repeated evaluator sweeps previously rewrote identical failure receipts, leaving
+an unnecessary truncation window during archival. The original, supplemental
+and later-stage supervisors now preserve an existing byte-identical receipt
+without opening it for writing; differing evidence stops the sweep and preserves
+the original. The native gates and failure classifications are unchanged.
+The regression check verifies unchanged inode/mtime on repeated observation and
+preservation of original bytes on conflicting evidence.
