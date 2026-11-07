@@ -5028,6 +5028,9 @@ shaping-completion-worker-inputs study assignment output:
 shaping-completion-assign-worker study binary_dir partition host family stage="inner":
     python3 -B scripts/rev4_featpot/shaping_host_assignment.py --study {{quote(study)}} --binary-dir {{quote(binary_dir)}} --partition {{quote(partition)}} --host {{quote(host)}} --family {{quote(family)}} --stage {{quote(stage)}}
 
+shaping-completion-worker-install-test:
+    TMPDIR="$HOME/tmp" python3 -B -m unittest scripts/tests/test_shaping_worker_input_install.py
+
 shaping-completion-watch-archives study destination:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_archive_supervision.py --study {{quote(study)}} --destination {{quote(destination)}} --watch
 
