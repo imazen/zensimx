@@ -1168,3 +1168,21 @@ first-activation gradients, not first-weight gradients. The latter must not be
 reported as measured from these traces. Source inspection confirms this distinction
 in `shared_depth.rs` and `monotone_research.rs`; native first-weight diagnostics
 remain required by the frozen protocol.
+
+## Historical tree model retention (09:41 UTC)
+
+The historical tree archive manifest
+`c98912ff5e927496899a5f6d4bd5aaa8a60f4b331d5b1fa483966ce1ac35ecad`
+identifies 189 Python model pickles: 129 search, 54 peer-search and six constraint
+controls. All 189 completed result records match that manifest. Each model passed
+local SHA-256 and cold destination SHA-256 verification, two process/open-file
+checks and final inode/size/mtime checks before its local duplicate was removed.
+No active completion-study input pins one of these models. Durable models, local
+native exports, reports, predictions and input arrays remain available.
+
+The receipt records 2,667,085,403 logical bytes removed; filesystem free space
+changed from 56,618,467,328 to 59,285,913,600 bytes. The resource wrapper reported
+`done rc=0 38s | peak-RSS 0.09GiB | min-avail 33034MiB | peak-load 21.26`.
+The operation did not change the 30 GiB reserve or pending-write allowances.
+The exact receipt, source, log and completed-result checks are preserved under
+`tree-model-retention-qualification` in the completion-study artifact root.

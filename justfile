@@ -5210,3 +5210,7 @@ shaping-completion-worker-bundle-retention host study archive output *args:
 
 shaping-completion-watch-later study primary optimizer human repaired inspector:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 2G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_supervision.py --study {{quote(study)}} --binary-dir {{quote(primary)}} --rescue-binary-dir {{quote(optimizer)}} --candidate-binary-dir {{quote(human)}} --repair-binary-dir {{quote(repaired)}} --repair-inspector {{quote(inspector)}} --later-only --watch
+
+# Reclaim historical Python model duplicates only after complete durable readback.
+shaping-completion-reclaim-tree-models:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_reclaim_tree_models.py
