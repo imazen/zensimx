@@ -9,6 +9,13 @@ from shaping_completion import sha
 
 
 class EvaluationAdmissionTests(unittest.TestCase):
+    def test_rescue_fresh_phase_retains_its_registered_budget(self):
+        result={'stage':'trained','exit_code':0}
+        for family,epochs in [('relu',240),('product_pretrained_frozen',120),('separate_pretrained_joint',120)]:
+            cell=dict(id=family,stage='rescue',family=family)
+            self.assertEqual(admitted_epoch(dict(cell=cell,epochs=epochs),result,[cell]),epochs)
+            with self.assertRaises(ValueError):admitted_epoch(dict(cell=cell,epochs=epochs+1),result,[cell])
+
     def test_reexport_is_bound_to_original_runtime_and_artifacts(self):
         with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as directory:
             root=Path(directory)

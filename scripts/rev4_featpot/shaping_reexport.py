@@ -24,7 +24,7 @@ def main():
     build_path=args.binary_dir/'BUILD.json'
     for name,pin in json.loads(build_path.read_text())['binary_sha256'].items():
         if sha(args.binary_dir/name)!=pin:raise ValueError('binary drift')
-    original=args.run/'checkpoints'/f'ckpt_epoch{epoch:03}.bin'
+    original=args.run/run.get('fit_directory','.')/'checkpoints'/f'ckpt_epoch{epoch:03}.bin'
     dest=args.study/'reexports'/run['cell']['id']/args.run.name/('final' if args.checkpoint is None else f'epoch-{epoch:03}')
     if dest.exists():raise ValueError('preserve existing re-export')
     dest.mkdir(parents=True)

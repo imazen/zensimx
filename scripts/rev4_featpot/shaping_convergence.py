@@ -36,10 +36,11 @@ def diagnostics(losses,scores,active):
 
 def report(run,reexport_root=None):
     identity=json.loads((run/'RUN.json').read_text())
-    if identity['cell']['stage'] not in ('inner','fresh_control_inner'):raise ValueError('only inner diagnostics admitted')
+    if identity['cell']['stage'] not in ('inner','fresh_control_inner','rescue'):raise ValueError('only inner diagnostics admitted')
     result=json.loads((run/'RESULT.json').read_text())
     if result['stage']!='trained':raise ValueError('fit incomplete')
-    lines=re.findall(r'epoch\s+(\d+)\s+\|[^\n]*?loss=([^ |]+)',(run/'train.log').read_text())
+    fit_root=run/identity.get('fit_directory','.')
+    lines=re.findall(r'epoch\s+(\d+)\s+\|[^\n]*?loss=([^ |]+)',(fit_root/'train.log').read_text())
     losses={int(k):float(v) for k,v in lines}
     if sorted(losses)!=list(range(identity['epochs'])):raise ValueError('missing or extra scheduled loss epochs')
     scores={};active={};pins={};builds=set()
@@ -55,7 +56,7 @@ def report(run,reexport_root=None):
             receipt=Path(row['reexport_receipt'])
             if sha(receipt)!=row['reexport_receipt_sha256']:raise ValueError('re-export receipt drift')
             r=json.loads(receipt.read_text())
-            original=run/'checkpoints'/f"ckpt_epoch{row['checkpoint_epoch']:03}.bin"
+            original=fit_root/'checkpoints'/f"ckpt_epoch{row['checkpoint_epoch']:03}.bin"
             if r['original_sha256']!=sha(original) or r['training_build_sha256']!=identity['build_sha256']:
                 raise ValueError('re-export training identity drift')
             if r['representation']!='research-relu-max-pairs-v1':raise ValueError('representation differs')
@@ -69,7 +70,7 @@ def report(run,reexport_root=None):
     if sorted(scores)!=expected:raise ValueError('incomplete registered checkpoint panels')
     if reexport_root is not None and len(builds)!=1:raise ValueError('mixed re-export evaluators')
     out=diagnostics([losses[i] for i in sorted(losses)],scores,active)
-    out.update(cell=identity['cell'],report_sha256=pins,training_log_sha256=sha(run/'train.log'),outer_results_read=False)
+    out.update(cell=identity['cell'],report_sha256=pins,training_log_sha256=sha(fit_root/'train.log'),outer_results_read=False)
     if reexport_root is not None:
         out.update(representation='research-relu-max-pairs-v1',evaluation_build_sha256=next(iter(builds)),
                    original_training_run=str(run))

@@ -101,7 +101,7 @@ def make_probes(root,partition,train,plan):
 
 def admitted_epoch(run,result,cells):
     cell=run['cell']
-    if cell not in cells or cell['stage'] not in ('inner','fresh_control_inner'):raise ValueError('only registered inner cells are admitted')
+    if cell not in cells or cell['stage'] not in ('inner','fresh_control_inner','rescue'):raise ValueError('only registered inner cells are admitted')
     if result['stage']!='trained' or result['exit_code']!=0:raise ValueError('training is not complete')
     epochs=120 if 'pretrained' in cell['family'] or cell['stage']=='fresh_control_inner' else 240
     if run['epochs']!=epochs:raise ValueError('incorrect scheduled checkpoint budget')
@@ -135,11 +135,29 @@ def evaluate(args):
     if sha(args.study/'PLAN.json')!=run['plan_sha256']:raise ValueError('run registration drift')
     cell=run['cell']
     epochs=admitted_epoch(run,result,cells)
-    final=args.run/'checkpoints'/f'ckpt_epoch{epochs-1:03}.bin'
+    if cell['stage']=='rescue':
+        from shaping_rescue import resolve
+        if run['resolution']!=resolve(args.study,cell['id']):raise ValueError('rescue selection/trigger drift')
+        if run['training_exposure_pair_draws']!=12000000 or run['fit_directory']!='fit':raise ValueError('rescue exposure/layout differs')
+        phases=result['phases']
+        expected=[120,120] if '_pretrained_' in cell['family'] else [240]
+        if [p['epochs'] for p in phases]!=expected or any(p['exit_code']!=0 or p['stage']!='trained' for p in phases):
+            raise ValueError('incomplete registered rescue phases')
+        phase_names=['pretraining','fit'] if len(phases)==2 else ['fit']
+        for name,phase in zip(phase_names,phases):
+            directory=args.run/name
+            if json.loads((directory/'RESULT.json').read_text())!=phase:raise ValueError('rescue phase receipt drift')
+            if phase['pairs_per_epoch']!=50000:raise ValueError('rescue phase exposure differs')
+            if sha(directory/'checkpoints'/f"ckpt_epoch{phase['epochs']-1:03}.bin")!=phase['bake_sha256']:
+                raise ValueError('rescue phase model drift')
+            for path,pin in phase['manifest_sha256'].items():
+                if sha(path)!=pin:raise ValueError('rescue phase manifest drift')
+    fit_root=args.run/run.get('fit_directory','.')
+    final=fit_root/'checkpoints'/f'ckpt_epoch{epochs-1:03}.bin'
     if sha(final)!=result['bake_sha256']:raise ValueError('final checkpoint drift')
     checkpoint=getattr(args,'checkpoint',None)
     epoch=evaluation_epoch(epochs,checkpoint)
-    bake=args.run/'checkpoints'/f'ckpt_epoch{epoch:03}.bin'
+    bake=fit_root/'checkpoints'/f'ckpt_epoch{epoch:03}.bin'
     build=json.loads((args.binary_dir/'BUILD.json').read_text())
     reexport=getattr(args,'reexport_receipt',None)
     if reexport is None:

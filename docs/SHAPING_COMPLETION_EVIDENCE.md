@@ -129,3 +129,11 @@ The command/control tests and actual primary-config admission pass. Scientific
 rescue fits have not started: complete base selection and full analytic neutral
 qualification are still required. Rescue evaluation/selection integration remains
 implementation work; this entry does not claim those comparisons are complete.
+
+Rescue evaluator integration now uses the same TRAIN/inner panels and unchanged
+feature gates as base fits. It re-resolves the selection/trigger, requires every
+registered phase to finish, and rehashes phase receipts, manifests and final
+models. Convergence reads the actual fresh-head phase log for pretrained fits;
+pretraining remains separately charged and preserved. Repaired ReLU reports use
+the actual nested fit checkpoints. Admission/epoch, convergence and supervisor
+regressions pass. No rescue result is claimed before an eligible native fit runs.
