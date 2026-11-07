@@ -5072,6 +5072,15 @@ shaping-completion-extension-dispatch-check:
 shaping-completion-progress study *args:
     TMPDIR="$HOME/tmp" python3 -B scripts/rev4_featpot/shaping_progress.py --study {{quote(study)}} {{args}}
 
+shaping-training-resources run output:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_training_resources.py --run {{quote(run)}} --output {{quote(output)}}
+
+shaping-training-resources-check:
+    TMPDIR="$HOME/tmp" python3 -B -m unittest discover -s scripts/tests -p test_shaping_training_resources.py
+
+shaping-training-resources-qualify study output:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_training_resources.py --qualify-study {{quote(study)}} --output {{quote(output)}}
+
 shaping-cost-report directory workload output:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_cost_report.py --directory {{quote(directory)}} --workload {{quote(workload)}} --output {{quote(output)}}
 

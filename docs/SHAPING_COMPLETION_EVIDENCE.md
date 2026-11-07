@@ -769,3 +769,24 @@ explicit, and refuses other checkpoint epochs or paths. Native prefix extraction
 still verifies its original plan/build, exposure, initial-shape hash and f32
 structure before training; parent pretraining is reused, never recomputed.
 Two parent-transport regressions and the existing installer regression pass.
+
+
+## Saved training resource accounting
+
+`shaping-training-resources` reads registered completed native runs without
+training again. Reports pin input evidence and retain the run-heavy receipt and
+cumulative native epoch times. These describe concurrent training, not isolated
+benchmarks or cross-host speed comparisons. Wrapper rounding remains explicit.
+
+Reused pretraining retains its full parent receipt and observed epoch-119 native
+time separately. Prefix-only wrapper elapsed time and peak RSS are unmeasured;
+parent cost is neither prorated nor silently treated as free. Directly executed
+phases remain separate from shared parent work. Exact duplicate epoch-progress
+blocks are recorded without double-counting; conflicting blocks, incomplete
+epoch coverage and multiple resource receipts are refused.
+
+Qualification read eleven saved runs spanning ten neural families and a completed
+rescue in `training-resource-qualification-v3` under the study output root. It
+completed without replaying training. Earlier qualification attempts are retained.
+This qualifies the evidence reader; scientific finalist resource comparisons
+remain outstanding.

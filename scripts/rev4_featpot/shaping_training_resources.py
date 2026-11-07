@@ -1,0 +1,105 @@
+"""Report observed native training resources without reruns or prorated prefixes."""
+import argparse,json,math,re
+from pathlib import Path
+from shaping_completion import encoded,sha
+
+
+def parse_log(text,epochs):
+    matches=list(re.finditer(r'^[ \t]*epoch\s+(\d+)\s+\|[^\n]*\| t=([0-9.]+)s[ \t]*$',text,re.M))
+    if epochs<=0 or not matches or len(matches)%epochs:raise ValueError('complete ordered epoch timing coverage required')
+    blocks=len(matches)//epochs
+    first=[m.group(0) for m in matches[:epochs]]
+    if any([m.group(0) for m in matches[i:i+epochs]]!=first for i in range(0,len(matches),epochs)):
+        raise ValueError('nonidentical repeated epoch log blocks')
+    rows=[m.groups() for m in matches[:epochs]]
+    if [int(e) for e,_ in rows]!=list(range(epochs)):
+        raise ValueError('complete ordered epoch timing coverage required')
+    times=[float(t) for _,t in rows]
+    if any(not math.isfinite(t) or t<0 for t in times) or times!=sorted(times):raise ValueError('invalid cumulative training time')
+    receipts=re.findall(r'^run-heavy: done rc=(\d+) (\d+)s \| peak-RSS ([0-9.]+)GiB \| min-avail (\d+)MiB \| peak-load ([0-9.]+)\s*$',text,re.M)
+    if len(receipts)!=1 or receipts[0][0]!='0':raise ValueError('one successful resource receipt required')
+    rc,elapsed,rss,available,load=receipts[0]
+    if any(not math.isfinite(float(v)) for v in (elapsed,rss,available,load)):raise ValueError('nonfinite resource receipt')
+    return dict(wrapper_elapsed_seconds=int(elapsed),wrapper_peak_rss_gib_reported=float(rss),
+                wrapper_min_available_mib=int(available),wrapper_peak_load=float(load),
+                wrapper_receipt_line='run-heavy: done rc='+rc+' '+elapsed+'s | peak-RSS '+rss+'GiB | min-avail '+available+'MiB | peak-load '+load,
+                native_elapsed_seconds_by_epoch=times,identical_epoch_log_blocks=blocks,
+                precision='Wrapper seconds are integer-reported; RSS/load retain wrapper rounding; native elapsed is reported to 0.1 seconds.')
+
+
+def phase_record(directory,epochs,pins):
+    result_path=directory/'RESULT.json';log=directory/'train.log'
+    result=json.loads(result_path.read_text())
+    if result['stage']!='trained' or result['exit_code']!=0 or result['epochs']!=epochs:raise ValueError('completed matching phase required')
+    model=directory/'checkpoints'/f'ckpt_epoch{epochs-1:03}.bin'
+    if sha(model)!=result['bake_sha256']:raise ValueError('final phase model drift')
+    for p in (directory/'RUN.json',result_path,log,model):pins[str(p)]=sha(p)
+    return dict(directory=str(directory),epochs=epochs,pair_draws=epochs*result['pairs_per_epoch'],
+                execution_host=result.get('execution_host'),resources=parse_log(log.read_text(),epochs))
+
+
+def report(run,output):
+    if output.exists():raise ValueError('preserve resource report')
+    identity=json.loads((run/'RUN.json').read_text());result=json.loads((run/'RESULT.json').read_text())
+    from shaping_execution import load_registration
+    study=run.parents[2];_,cells,_=load_registration(study)
+    if identity['cell'] not in cells or identity['plan_sha256']!=sha(study/'PLAN.json'):raise ValueError('registered resource scope required')
+    if result['cell']!=identity['cell'] or result['stage']!='trained' or result['exit_code']!=0:raise ValueError('completed matching run required')
+    pins={str(p):sha(p) for p in (run/'RUN.json',run/'RESULT.json',study/'PLAN.json')}
+    phases=[]
+    if result.get('phases'):
+        if len(result['phases']) not in (1,2):raise ValueError('unsupported phase count')
+        names=['pretraining','fit'] if len(result['phases'])==2 else ['fit']
+        for name,phase in zip(names,result['phases']):
+            if json.loads((run/name/'RESULT.json').read_text())!=phase:raise ValueError('phase result identity differs')
+            phases.append(phase_record(run/name,phase['epochs'],pins))
+    else:phases.append(phase_record(run/identity.get('fit_directory','.'),result['epochs'],pins))
+    reused=None;provenance=run/'SHAPING.provenance.json'
+    if provenance.exists():
+        receipt=json.loads(provenance.read_text());parent=Path(receipt['source_run'])
+        if sha(parent/'RESULT.json')!=receipt['parent_result_sha256'] or sha(parent/'checkpoints/ckpt_epoch119.bin')!=receipt['prefix_sha256'] or sha(run/'SHAPING.json')!=receipt['manifest_sha256']:
+            raise ValueError('reused prefix evidence drift')
+        parent_identity=json.loads((parent/'RUN.json').read_text())
+        if parent_identity['cell']!=receipt['parent_cell'] or parent_identity['plan_sha256']!=identity['plan_sha256']:raise ValueError('reused parent identity differs')
+        parent_cost=phase_record(parent,parent_identity['epochs'],pins)
+        if receipt['pretraining_epochs']!=120 or receipt['pretraining_pair_draws']!=6000000:raise ValueError('reused prefix exposure differs')
+        for p in (provenance,run/'SHAPING.json',parent/'checkpoints/ckpt_epoch119.bin'):pins[str(p)]=sha(p)
+        reused=dict(provenance=str(provenance),parent=parent_cost,
+                    prefix_native_elapsed_seconds=parent_cost['resources']['native_elapsed_seconds_by_epoch'][119],
+                    prefix_peak_rss_gib=None,prefix_wrapper_elapsed_seconds=None,
+                    interpretation='Observed cumulative trainer time at epoch 119, before that checkpoint dump. Full-parent wrapper time/RSS cover 240 epochs and are not prorated or added to child cost. Prefix-only wrapper time and peak RSS were not measured.')
+    for path,pin in pins.items():
+        if sha(path)!=pin:raise ValueError('resource evidence changed')
+    record=dict(cell=identity['cell'],execution_host=identity.get('execution_host'),phases=phases,reused_pretraining=reused,
+                directly_executed_phase_wrapper_seconds=sum(p['resources']['wrapper_elapsed_seconds'] for p in phases),
+                scientific_eligibility_asserted=False,training_replayed=False,source_pins=pins,driver_sha256=sha(__file__),
+                interpretation='Observed concurrent-run resource accounting, not an isolated benchmark or cross-host speed comparison. Shared parent work remains explicit and is not treated as free.')
+    output.write_bytes(encoded(record));return record
+
+
+def qualify(study,output):
+    from shaping_execution import load_registration
+    from shaping_completion import NEURAL
+    if output.exists():raise ValueError('preserve qualification')
+    output.mkdir(parents=True);_,cells,_=load_registration(study);chosen=[]
+    for family in NEURAL:
+        chosen.append((family,next(c for c in cells if c['stage']=='inner' and c['partition']=='inner-0-0' and c['family']==family and c['setting']==0 and c['seed']==0)))
+    chosen.append(('rescue',next(c for c in cells if c['stage']=='rescue' and c['family']=='relu' and c['partition']=='inner-0-0' and c['seed']==0 and c['rescue']=='consolidate_lr')))
+    rows=[]
+    for name,cell in chosen:
+        attempts=[p.parent for p in (study/'runs'/cell['id']).glob('attempt-*/RESULT.json') if json.loads(p.read_text()).get('stage')=='trained']
+        if len(attempts)!=1:raise ValueError('one completed qualification attempt required')
+        record=report(attempts[0],output/(name+'.json'))
+        rows.append(dict(name=name,cell=cell,wrapper_seconds=record['directly_executed_phase_wrapper_seconds'],reused_prefix=record['reused_pretraining'] is not None))
+    (output/'SUMMARY.json').write_bytes(encoded(dict(rows=rows,complete=True,training_replayed=False)))
+    return dict(models=len(rows),training_replayed=False)
+
+
+if __name__=='__main__':
+    p=argparse.ArgumentParser(description=__doc__)
+    mode=p.add_mutually_exclusive_group(required=True);mode.add_argument('--run',type=Path);mode.add_argument('--qualify-study',type=Path)
+    p.add_argument('--output',type=Path,required=True);a=p.parse_args()
+    if a.qualify_study:print(json.dumps(qualify(a.qualify_study,a.output)))
+    else:
+        r=report(a.run,a.output)
+        print(json.dumps(dict(cell=r['cell'],phases=len(r['phases']),reused_pretraining=r['reused_pretraining'] is not None,training_replayed=False)))
