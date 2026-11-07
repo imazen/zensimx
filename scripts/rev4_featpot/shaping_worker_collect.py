@@ -43,6 +43,7 @@ def pack(study,assignment_path,cell_id,attempt,bundle):
     _,cells,_=load_registration(study)
     assignment=json.loads(assignment_path.read_text())
     if assignment['host']!=socket.gethostname():raise ValueError('pack must run on assigned host')
+    if assignment['plan_sha256']!=sha(study/'PLAN.json'):raise ValueError('assignment plan drift')
     if cell_id not in assignment['cells'] or not attempt.startswith('attempt-') or not attempt[8:].isdigit():
         raise ValueError('invalid cell or attempt')
     root=study/'runs'/cell_id/attempt
