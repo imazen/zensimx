@@ -425,3 +425,14 @@ readback under `worker-i270-analytic-inner-1-0-inputs`; manifest SHA-256:
 not isolated speed benchmarks. A separate archive supervisor now handles fully
 evaluated single-attempt inner cells; it preserves local artifacts and refuses
 active, failed, or unreconciled multiple-attempt cells.
+
+The doubled-exposure registration policy now fixes the trigger and pairing before
+any affected fits: selected continuing-improvement families plus selected ReLU,
+both inner folds and all three seeds. Continuous models receive 480 epochs;
+pretrained models receive 240+240 with independent pretraining and fresh heads.
+Matched 240-epoch fresh unshaped controls are deduplicated only by identical
+settings and optimizer choice. Collapse alone remains a separate unresolved
+diagnostic. Three registration controls passed, covering pairing, exposure,
+deduplication and incomplete selection refusal. No extension is registered or
+fitted until the complete base/rescue decisions exist; the native extension
+execution/evaluation integration remains unfinished.

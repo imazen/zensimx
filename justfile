@@ -5015,3 +5015,9 @@ shaping-completion-worker-inputs study assignment output:
 
 shaping-completion-watch-archives study destination:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_archive_supervision.py --study {{quote(study)}} --destination {{quote(destination)}} --watch
+
+shaping-completion-extension-check:
+    TMPDIR="$HOME/tmp" python3 -B -m unittest scripts/tests/test_shaping_extension.py
+
+shaping-completion-register-extension study outer:
+    python3 -B scripts/rev4_featpot/shaping_extension.py --study {{quote(study)}} --outer {{outer}}
