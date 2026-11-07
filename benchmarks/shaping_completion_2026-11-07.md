@@ -275,3 +275,14 @@ as investigation requirements, emits no convergence/selection completion for
 the affected cell, and continues other checkpoints and independent fits. A
 control test verifies that failure remains visible and cannot count as
 completion. No feature threshold or scientific expectation was relaxed.
+
+For the seed-2 failing pair (probe 29), native predictions move from
+-70.53814697265625 to -70.53813171386719. An independent f64 evaluation of
+the stored f32 layers gives -70.53811054625083 and -70.53811059123643, a
+decrease of 4.498559746934916e-8. Derived inputs 152 and 644 change. The
+first layer has opposing activation changes; the f64 second layer has no
+decreasing activations. This supports numerical cancellation as the current
+investigation direction, not a proven native root cause or a qualified repair.
+The native gate remains failed. The trace uses the existing native model
+inspector and a separately labelled f64 algebra reference; it is not a
+replacement scoring implementation.

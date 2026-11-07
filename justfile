@@ -4975,3 +4975,6 @@ shaping-completion-rescue-qualify study run binaries output epochs="1":
 
 shaping-completion-supervision-check:
     python3 -B -m unittest discover -s scripts/tests -p test_shaping_supervision.py
+
+shaping-completion-probe-trace model probes predictions output:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_probe_trace.py --model {{quote(model)}} --probes {{quote(probes)}} --predictions {{quote(predictions)}} --output {{quote(output)}}
