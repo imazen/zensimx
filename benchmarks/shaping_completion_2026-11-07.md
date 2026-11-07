@@ -2057,3 +2057,36 @@ requires the complete comparison registry, unchanged analysis policy, source
 draw settings and all specification hashes. Five registration tests and six
 native runner tests pass, including refusal when another registered comparison
 specification changes. No scientific outer bootstrap has executed yet.
+
+
+## Qualified matched unshaped first-weight replay
+
+The matched fresh unshaped ReLU control `d3b2f4deeaa0ab19d572` completed the
+120-epoch first-weight observer replay. All 120 canonical checkpoints match the
+original training run; the final canonical hash is
+`a3ee84cc6140485e9b339c413ef6a4d01c6f5fd74055ac51ea73da2bc7586cc8`.
+Its restored original checkpoints remained available throughout qualification.
+
+The sampled first-layer data pair-gradient squared norm is positive in all
+120 epochs: minimum 259.6048862165868, maximum 3335.051155762056. Values at
+epochs 0, 1, 2 and 119 are respectively 1072.1407198492502,
+798.7777045375468, 376.92650152863183 and 529.2501790020109. At epoch 119,
+the data-plus-coupled-L2 norm is 529.2501693345246; the model retains one
+nonzero output coefficient (63 of 64 are zero).
+
+The separately qualified frozen-product replay has a positive sampled data
+pair-gradient norm only at epoch 0 (60.93524851312713), followed by 119 zero
+values, and ends with all 64 output coefficients zero. This contrast establishes
+that the matched unshaped control retains sampled first-layer gradient signal
+under the same registered fresh-training seed and exposure. It does not isolate
+L2, Adam or projection as the cause of collapse, prove that one surviving output
+uses the nominal hidden capacity, or demonstrate generalization. The different
+input transforms also prevent interpreting the gradient-norm magnitudes as a
+common quality scale. These are sampled pair-gradient squared norms, not means
+per parameter; they exclude Adam moments, projection and decoupled decay.
+
+The training wrapper reports `rc=0 3233s | peak-RSS 0.09GiB | min-avail 35530MiB |
+peak-load 31.04`. This supervised diagnostic run is not a runtime benchmark.
+The complete `unshaped-first-weight-replay` archive passed durable checksum
+readback: 369 files, 28,370,021 bytes, retaining both checkpoint sequences,
+canonical comparisons, traces, source/binary identity and full logs.
