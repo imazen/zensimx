@@ -2341,3 +2341,18 @@ Cold readback verified `pretrained21-admission-evidence`: 15 artifacts,
 Cold readback verified `i265-pretrained21-inputs`: 3 artifacts,
 25094457 bytes, receipt
 `1b0a321d3e959cf5ab14dd152256a252d697edd3fff71fb9f876ff622823980a`.
+
+
+## Completed local checkpoint retention at 16:20 UTC
+
+The existing retention owner verified archive identity, local and durable
+checkpoint hashes, required retained epochs and both open-file inspections.
+It removed 8,236 intermediate copies from 42 completed runs, totaling
+1,610,531,022 logical bytes. Final and diagnostic epochs remain. Free space
+was 76,345,839,616 bytes before and 77,966,934,016 afterward. No fit or
+pretraining was replayed. Wrapper: `rc=0 66s | peak-RSS 0.10GiB |
+min-avail 22983MiB | peak-load 30.77`.
+
+Cold readback verified `checkpoint-retention-1619-evidence`: 4 artifacts,
+5127468 bytes, receipt
+`e974aa29d06516f8385500cd3fdadc826def675111c7288a5b2d42a22adc8368`.
