@@ -640,3 +640,26 @@ mismatches, never overwrites existing data, and records the reused paths. A fina
 readback covers both installed and reused files. The regression checks unchanged
 inode and modification time for reuse, plus mismatch refusal. Shared-base
 installation cannot use this option.
+# Cost report replay
+
+`just shaping-cost-report DIRECTORY WORKLOAD OUTPUT` checks the native cost
+instrument's raw zenbench batches against its completion receipt. It requires
+the first 32 clean paired rounds, exact pre/postflight qualification, matching
+workload/model hashes, and a reliable result. It remaps each batch's arm order
+and divides compensated batch durations by that round's actual iteration count.
+
+The report preserves the normalized observations, medians and conditional 95%
+percentile-bootstrap intervals (10,000 shared round draws, seed 20261107).
+Vector comparisons report every pair's median within-round time ratio. Shared
+draws retain pairing; these intervals concern timing repeatability, assuming
+stationary independent rounds, and do not represent training-seed or source-image
+uncertainty. They are not adjusted for multiple comparisons. Extraction reports
+each of the three image pairs separately. Neither path claims end-to-end latency.
+The per-row vector number is the forty-row batch's arithmetic mean per row,
+not a measurement of individual-call latency.
+
+This reporting definition is recorded before scientific cost measurements.
+Synthetic evidence tests exercise variable iteration counts, reordered arms,
+whole-round exclusion, receipt tampering, incomplete pairs and qualification-only
+refusal. Actual finalist timings remain required.
+

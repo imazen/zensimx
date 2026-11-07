@@ -5063,6 +5063,12 @@ shaping-completion-extension-dispatch-check:
 shaping-completion-progress study *args:
     TMPDIR="$HOME/tmp" python3 -B scripts/rev4_featpot/shaping_progress.py --study {{quote(study)}} {{args}}
 
+shaping-cost-report directory workload output:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_cost_report.py --directory {{quote(directory)}} --workload {{quote(workload)}} --output {{quote(output)}}
+
+shaping-cost-report-check:
+    TMPDIR="$HOME/tmp" python3 -B -m unittest discover -s scripts/tests -p test_shaping_cost_report.py
+
 shaping-completion-dispatch-rescues study binary_dir neutral outer *args:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 6G --jobs 2 -- python3 -B scripts/rev4_featpot/shaping_rescue_dispatch.py --study {{quote(study)}} --binary-dir {{quote(binary_dir)}} --neutral-qualification {{quote(neutral)}} --outer {{outer}} --workers 2 {{args}}
 
