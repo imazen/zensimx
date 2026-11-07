@@ -4858,6 +4858,10 @@ shaped-linear-report stage root:
 study-archive-verify root destination receipt:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/byconstruction/dataset_mirror.py --root {{quote(root)}} --nfs --cold-readback --destination {{quote(destination)}} --verify-only --verification-output {{quote(receipt)}}
 
+# Explicitly verifies every durable artifact when the local copy was reclaimed.
+study-archive-verify-destination root destination receipt:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/byconstruction/dataset_mirror.py --root {{quote(root)}} --nfs --cold-readback --destination {{quote(destination)}} --verify-only --destination-only --verification-output {{quote(receipt)}}
+
 # Exact native analytic research heads, shared-depth replay and trainer regressions.
 analytic-head-check:
     cargo test --locked -p zensim-validate --lib -- --test-threads=1

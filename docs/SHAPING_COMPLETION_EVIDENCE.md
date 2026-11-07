@@ -462,3 +462,11 @@ comparisons continue. An interrupted or ambiguous output requires explicit
 reconciliation. Status distinguishes completed, archived, failed and waiting
 comparisons. This operational support does not establish any scientific
 bootstrap result before the required fits exist.
+
+For batch archives whose local duplicates have already been reclaimed,
+`just study-archive-verify-destination` rereads every durable artifact against
+the retained local manifest and matching destination manifest. Its receipt
+explicitly states `both_copies_verified: false` and
+`verification_scope: destination artifacts only`; it never treats missing local
+files as verified. The default `study-archive-verify` still requires both full
+copies. Missing or corrupted durable files refuse either mode.

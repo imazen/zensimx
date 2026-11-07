@@ -26,6 +26,25 @@ class RetainedPipe(io.BytesIO):
 
 
 class MirrorKinds(unittest.TestCase):
+    def test_explicit_destination_verification_with_reclaimed_local_artifacts(self):
+        with tempfile.TemporaryDirectory() as directory:
+            parent=Path(directory);root=parent/'source';destination=parent/'mirror'
+            root.mkdir();destination.mkdir()
+            artifact=destination/'artifact.bin';artifact.write_bytes(b'preserved evidence')
+            manifest=mirror.sha(artifact)+'  artifact.bin\n'
+            for base in (root,destination):(base/'SHA256SUMS').write_text(manifest)
+            with self.assertRaises(AssertionError):mirror.verify_existing(root,destination,parent/'both.json')
+            output=parent/'destination.json'
+            with contextlib.redirect_stdout(io.StringIO()):mirror.verify_existing(root,destination,output,destination_only=True)
+            record=json.loads(output.read_text());self.assertFalse(record['both_copies_verified'])
+            self.assertTrue(record['destination_verified']);self.assertTrue(record['local_manifest_verified'])
+            self.assertEqual(record['files'],1);self.assertFalse((root/'artifact.bin').exists())
+            artifact.write_bytes(b'corrupt')
+            with self.assertRaises(AssertionError):mirror.verify_existing(root,destination,parent/'bad.json',destination_only=True)
+            self.assertFalse((parent/'bad.json').exists())
+            artifact.unlink()
+            with self.assertRaises(AssertionError):mirror.verify_existing(root,destination,parent/'missing.json',destination_only=True)
+
     def test_small_archive_reads_every_artifact_and_refuses_empty_inventory(self):
         with self.assertRaises(ValueError):mirror.readback_names({})
         for count in (1,2):
