@@ -522,3 +522,32 @@ required matrix currently contains 2,119 cells including 240 triggered rescues.
 Outer, curve, shuffle, human-only and full-FIT stages remain unexecuted. Central
 control-wave archives are already verified but are deliberately separate from
 the auditor's cell-level archive-receipt count.
+
+The matching product-pretrained-joint cell (`070101f07a58f717d498`,
+inner-0-0 / setting 0 / seed 0) now passes all scheduled native evaluations.
+Its human composite is 0.9022832465164315, against 0.8959433619066952 frozen
+and 0.9202173469027812 fresh unshaped. Both pretrained variants retain 13
+nonzero output coefficients and have no registered convergence trigger in
+this cell. These are one-fold, one-setting, one-seed observations; no family
+is selected or rejected from them. Joint fresh-stage wrapper: 3519 s, peak RSS
+0.09 GiB, minimum available 37118 MiB, peak load 25.58, excluding its shared
+pretraining cost. Both the successful retry and retained zero-step admission
+failure are archived under `inner-070101f07a58f717d498`; manifest SHA-256
+`bfbc50e3bd93d39eb4cf4be08d64cf4da56170de7e4912f171639a21102d84f5`.
+
+The outer-0 rescue dispatcher now waits for all 24 paired base reports and
+diagnostics per family, reproduces the inner selection, and rechecks the
+registered trigger before admitting a child. Two native slots have a 6 GiB
+parent cap; per-phase native caps remain explicit. No rescue fit is admitted
+yet. The original evaluator was retired while sleeping between completed
+sweeps with no child processes. Its replacement explicitly distinguishes
+primary and optimizer-enabled binary sets and preserves all existing reports.
+Targeted dispatch/evaluator checks passed.
+
+Four registered fresh-control inner-0-1 fits now run on the second qualified
+worker, sharing its already verified partition. Its twelve-cell queue uses
+four workers, a 6 GiB parent cap, and 1 GiB/one-thread per native fit. The
+admission archive is verified at `worker-i265-fresh-inner-0-1-admission-r2`,
+manifest SHA-256 `2551487803fd285de940c0c3037733550cbe8a0ab210c1a90a6bb8a8ecfcdae2`. The first destination remains
+preserved after the two-file supplemental-sampling bug; full artifact hashing
+was unchanged by the repair.
