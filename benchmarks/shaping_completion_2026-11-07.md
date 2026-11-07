@@ -2504,3 +2504,33 @@ not interrupted, and no completed fit or pretraining was replayed.
 Cold readback verified `rescue-shared-pool-evidence`: 15 artifacts,
 63623 bytes, receipt
 `3f802c4f8e51240ce33b6ec7c510b54ae5b49c7ca0b4059be368ca5260adf6dd`.
+
+
+## Two further paired pretrained waves on i265
+
+Two newly completed parents released four unstarted registered fits: a product
+pair in inner-1-1 and a separate-shaping pair in inner-2-0. Both two-worker
+waves passed native prefix extraction and checksummed immutable input
+installation. All four native PIDs and both controllers were verified live.
+Raw admission observations are retained in the evidence snapshot.
+
+The first admission observed twelve existing trainers, 24,995,106,816 available
+RAM bytes and 283,612,766,208 free disk bytes. The second observed fourteen
+existing trainers, 24,720,584,704 available RAM bytes and 283,610,284,032 free
+disk bytes. Each required 52,613,349,376 free bytes, including reserve and
+pending writes. Together the new waves fill the 16-thread training budget.
+Each controller has a 2 GiB cap and each child a 1 GiB cap; the admission
+guard requires 12 GiB available RAM. Worker source is `ce9229d0362d`.
+No completed fit or pretraining was replayed.
+
+Cold readback verified `pretrained-ready-1715-evidence`: 28 artifacts,
+1275647 bytes, receipt
+`7419cf3ab50ec576ffb2196cd263cb2b6ccff68422bf33e6de73b64ef6da9680`.
+
+Cold readback verified `i265-pretrained11b-inputs`: 3 artifacts,
+25176377 bytes, receipt
+`cdc3548758e01006f760eb77f6a2a4f60af676286c055136db88e9dbc9c5efc2`.
+
+Cold readback verified `i265-pretrained20c-inputs`: 3 artifacts,
+23753015 bytes, receipt
+`d1f99bc39af0f34569852b8e1030135cfb290ee622dfdb2c64dad9e878cc0568`.
