@@ -582,3 +582,23 @@ unexpectedly stopped attempts. Free SSD bytes were 57,131,855,872,
 supplemental evaluator, archive supervisor and rescue dispatcher were verified
 against their live process command lines. Rescue admission still awaits complete
 paired base-family evidence; no rescue fit was reported as running.
+
+## Generalization input preparation and transport-copy reclamation
+
+The registered input-preparation driver now shares views across model roles and
+seeds while retaining permutation type and seed in each view identity. Four
+membership/reuse tests pass, and both pre-existing prepared views passed actual
+membership and input-hash verification. Scientific fitting and finalist selection
+remain separate gates.
+
+Preparation reached its SSD admission boundary after four views. To preserve
+pending trainer writes and the 30 GiB reserve, 72 duplicate `model.parity.npz`
+files were removed only from local `tree-inner-archive/runs` after verifying each
+against the archive manifest, a fresh NAS readback, and the retained original in
+`study/runs`. No process held those transport copies. Exactly 2,637,786,497 bytes
+were reclaimed; original study arrays, all models and reports remain on SSD.
+The local archive is explicitly marked partial with restoration paths and hashes.
+Receipt: `RECLAIMED_TREE_TRANSPORT.json` under the completion-study root.
+
+Reclamation wrapper: `run-heavy: done rc=0 33s | peak-RSS 0.02GiB | min-avail 40440MiB | peak-load 20.10`.
+This is a resource observation, not a storage performance benchmark.
