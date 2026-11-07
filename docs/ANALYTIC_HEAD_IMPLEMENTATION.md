@@ -68,3 +68,29 @@ without changing the dependency version or any test expectation.
 The qualification directory is mirrored under the matching NAS output path.
 Cold client readback verified every artifact; inventory SHA-256 is
 `282d47327d9f8730b825401e2896d428b1504e9c0a672fa65f39947f87045800`.
+
+## Compatibility replay and unrestricted mode
+
+The release binaries from `6bb5bd47` reproduce all three frozen native control
+bakes byte-for-byte after removing only `zentrain.repro`: single-layer, shared
+ReLU and shared SmoothHinge. The commands, original expected hashes and replay
+outputs are retained under `shaping-completion-20261107/baseline-replay/`, with
+a verified NAS mirror. This replay predates the unrestricted-mode extension.
+
+The unrestricted-mode extension is covered by an isolated-process test invoking
+the actual CPU trainer with its hash-bound manifest and synthetic data. It
+checks retained negative first-layer weights, unchanged scale-only preprocessing
+and non-pinned identity output. Separate tests cover learned output bias, signed
+head paths and export parity. Its initial fixed 1e-5 export tolerance measured
+a 1.4603684121539118e-05 residual near score 100; this new test now uses the same
+f32 pin/damage rounding bound as the existing network export gate. No established
+expectation changed. These checks remain implementation evidence, not a
+human-data fitting or generalization result.
+
+At compiled source `d93fe729`, the full qualification passes: 388 library tests
+(two existing ignores unchanged), 65 CLI tests and strict clippy. The tested
+Cargo manifests and implementation files match the coordinating checkout by
+SHA-256. Wrapper: `run-heavy: done rc=0 38s | peak-RSS 1.63GiB | min-avail 25068MiB | peak-load 3.33`.
+The complete success/failure logs and isolated-process fixture are mirrored
+under `shaping-completion-20261107/unrestricted-qualification/`; verified
+inventory SHA-256: `5fc593ba04273859f4f6877429bfe1e3084e639af3b2650e2fd8d3cb1e4d1c81`.
