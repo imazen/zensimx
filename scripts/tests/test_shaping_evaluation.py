@@ -153,10 +153,46 @@ class FullFitScopeTests(unittest.TestCase):
                 admission_sha256=sha(gate),selection_scope='full_fit_only',development_results_read=False,
                 file_sha256={str(source):sha(source)})
             resolved=({},[cell],{}, {},gate,cell,'silu_diagnostic',schedule)
-            with patch('shaping_full_fit_execution.search_cell',return_value=resolved),patch('shaping_full_fit_execution.prepared'):
+            with patch('shaping_full_fit_execution.fit_cell',return_value=resolved),patch('shaping_full_fit_execution.prepared'):
                 context=outer_context(root,run,[cell]);self.assertTrue(context['full_fit'])
                 self.assertEqual(admitted_epoch(run,dict(stage='trained',exit_code=0),[cell],context),480)
                 with self.assertRaisesRegex(ValueError,'cannot diagnose'):outer_context(root,run,[cell],479)
                 with self.assertRaisesRegex(ValueError,'scope'):outer_context(root,dict(run,development_results_read=True),[cell])
                 source.write_text('changed')
                 with self.assertRaisesRegex(ValueError,'input drift'):outer_context(root,run,[cell])
+
+class DescriptiveDevelopmentTests(unittest.TestCase):
+    def test_development_scope_cannot_select_full_fit_settings(self):
+        from shaping_evaluation import apply_report_scope
+        from shaping_full_fit_plan import select
+        from shaping_completion import matrix
+        cell=next(c for c in matrix() if c['stage']=='full_fit')
+        report=dict(cell=cell,inner_validation={'selection_score':.9})
+        apply_report_scope(report,dict(full_fit=True,descriptive=True,admission_sha256='pin'),'relu')
+        self.assertEqual(report['selection_scope'],'descriptive_only');self.assertTrue(report['development_results_read'])
+        self.assertIn('exposed_development',report);self.assertNotIn('full_fit_validation',report)
+        with self.assertRaises(ValueError):select(matrix(),{cell['id']:report},'relu','relu')
+
+    def test_only_registered_development_rows_and_dev_populations_can_be_read(self):
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as directory:
+            root=Path(directory);prep=root/'PREP.json';prep.write_text(json.dumps({'groups':[{'rows':2,'split':'fit'}]}))
+            registered=dict(train=[1],test=[],descriptive_development=[0])
+            with patch('shaping_evaluation.validation_admission',return_value='gate'),patch('shaping_evaluation.load_registration',return_value=({},[],{'full-fit':registered})),patch('shaped_linear_study.PREP',prep):
+                with self.assertRaisesRegex(ValueError,'membership'):prepare_validation(root,'full-fit',dict(train=[1],test=[2]))
+                self.assertFalse((root/'evaluation_views').exists())
+                with self.assertRaisesRegex(ValueError,'population split'):prepare_validation(root,'full-fit',dict(train=[1],test=[0]))
+
+    def test_final_context_uses_descriptive_membership_and_frozen_schedule(self):
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as directory:
+            root=Path(directory);gate=root/'admission';gate.write_text('{}')
+            cell=dict(id='final',stage='full_fit',family='relu',partition='full-fit')
+            schedule=dict(phase_epochs=[480],setting=2,total_pair_draws=24000000)
+            partitions={'full-fit':dict(train=[1,2],test=[],descriptive_development=[3])}
+            resolved=({},[cell],partitions,{},gate,cell,'relu',schedule)
+            run=dict(cell=cell,resolved_family='relu',schedule=schedule,admission_sha256=sha(gate),selection_scope='full_fit_refit',development_results_read=False,file_sha256={},epochs=480)
+            with patch('shaping_full_fit_execution.fit_cell',return_value=resolved),patch('shaping_full_fit_execution.prepared'):
+                context=outer_context(root,run,[cell]);self.assertTrue(context['descriptive'])
+                self.assertEqual(context['membership']['train'],[1,2]);self.assertEqual(context['membership']['test'],[3])
+                self.assertEqual(partitions['full-fit']['test'],[])
+                self.assertEqual(admitted_epoch(run,dict(stage='trained',exit_code=0),[cell],context),480)
+                with self.assertRaisesRegex(ValueError,'cannot diagnose'):outer_context(root,run,[cell],479)

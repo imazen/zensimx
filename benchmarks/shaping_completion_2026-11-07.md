@@ -906,3 +906,12 @@ the trainer; exposed development remains outside its groups. Five preparation,
 search and final-admission tests pass, including refusal when another role used
 development or when a development row enters training. Final scientific refits
 remain pending their selection gates; this implementation is not a measured fit.
+
+Final neural evaluation now admits exactly the registered exposed-development
+membership after all full-FIT settings are fixed. Native scoring still fits maps
+on FIT rows only. Reports use `exposed_development` and `descriptive_only`, record
+that development was read, and cannot enter either earlier selector. The cached
+view is bound to the full-FIT admission and all setting receipts. Development
+checkpoint diagnostics are refused. Fifteen evaluation tests pass, including
+wrong membership/population refusal and final schedule checks. No untouched final
+holdout is referenced by this path; no real development score is claimed yet.

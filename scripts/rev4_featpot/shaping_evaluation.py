@@ -26,6 +26,12 @@ class NativeFeatureGateError(ValueError):
 
 def validation_admission(root,partition):
     if partition.startswith('inner-'):return None
+    if partition=='full-fit':
+        from shaping_full_fit_execution import refit_cell
+        _,cells,_=load_registration(root)
+        cell=next(c for c in cells if c['stage']=='full_fit')
+        _,_,_,admission,path,_,_,_=refit_cell(root,cell['id'])
+        return __import__('hashlib').sha256(encoded(dict(admission_sha256=sha(path),selection_sha256=admission['full_fit_selection_sha256']))).hexdigest()
     if partition not in ('outer-0','outer-1','outer-2'):
         raise ValueError('unregistered evaluation partition')
     from shaping_outer_admission import resolve
@@ -36,6 +42,10 @@ def validation_admission(root,partition):
 def prepare_validation(root,partition,membership):
     # Gate before reading even an existing cached outer view.
     admission=validation_admission(root,partition)
+    if partition=='full-fit':
+        _,_,partitions=load_registration(root);registered=partitions['full-fit']
+        if membership['train']!=registered['train'] or membership['test']!=registered['descriptive_development']:
+            raise ValueError('descriptive development membership differs')
     from shaped_linear_study import PREP
     from v2_teacher import row_keys_sha,selection_sha
     dest=root/'evaluation_views'/partition
@@ -53,7 +63,8 @@ def prepare_validation(root,partition,membership):
         ids=np.arange(offset,offset+g['rows']);offset+=g['rows']
         local=np.array([i for i,v in enumerate(ids) if int(v) in selected],dtype=np.int64)
         if not len(local):continue
-        if g['split']!='fit':raise ValueError('development entered inner validation')
+        expected_split='dev' if partition=='full-fit' else 'fit'
+        if g['split']!=expected_split:raise ValueError('population split differs from admitted evaluation role')
         source=Path(g['path']);keys=source.with_suffix('.keys.parquet');manifest=Path(str(source)+'.manifest.json')
         for path,key in ((source,'sha256'),(keys,'keys_sha256'),(manifest,'manifest_sha256')):
             if sha(path)!=g[key]:raise ValueError('original view drift')
@@ -65,7 +76,7 @@ def prepare_validation(root,partition,membership):
         meta.update(table_sha256=sha(out),keys_sha256=sha(keyout),rows_in=g['rows'],rows_kept=len(local),
                     source_table_sha256=g['sha256'],source_manifest_sha256=g['manifest_sha256'],
                     row_keys_sha256=row_keys_sha(selected_keys),row_selection_sha256=selection_sha(local),
-                    shaping_evaluation=dict(partition=partition,role='outer_test' if admission else 'inner_validation',indices=ids[local].tolist(),
+                    shaping_evaluation=dict(partition=partition,role='exposed_development' if partition=='full-fit' else 'outer_test' if admission else 'inner_validation',indices=ids[local].tolist(),
                                             original_table_sha256=g['sha256'],plan_sha256=sha(root/'PLAN.json')))
         mout=Path(str(out)+'.manifest.json');mout.write_bytes(encoded(meta))
         groups.append(dict(name=g['name'],path=str(out),indices=ids[local].tolist(),
@@ -114,19 +125,22 @@ def make_probes(root,partition,train,plan):
 
 
 def outer_context(root,run,cells,checkpoint=None):
-    if run['cell']['stage']=='full_fit_selection':
+    if run['cell']['stage'] in ('full_fit_selection','full_fit'):
         if checkpoint is not None:raise ValueError('full-FIT validation cannot diagnose checkpoints')
-        from shaping_full_fit_execution import search_cell,prepared
-        _,_,_,admission,path,cell,family,schedule=search_cell(root,run['cell']['id'])
+        from shaping_full_fit_execution import fit_cell,fit_scope,prepared
+        _,_,partitions,admission,path,cell,family,schedule=fit_cell(root,run['cell']['id'])
         if (cell not in cells or run['cell']!=cell or run['resolved_family']!=family
             or run['schedule']!=schedule or run['admission_sha256']!=sha(path)
-            or run['selection_scope']!='full_fit_only' or run['development_results_read']):
+            or run['selection_scope']!=fit_scope(cell) or run['development_results_read']):
             raise ValueError('full-FIT run scope or admission drift')
         prepared(root,cell['id'])
         for name,pin in run['file_sha256'].items():
             if sha(name)!=pin:raise ValueError('full-FIT run input drift')
-        return dict(admission=admission,schedule=schedule,admission_sha256=sha(path),
-                    full_fit=True,resolved_family=family)
+        context=dict(admission=admission,schedule=schedule,admission_sha256=sha(path),
+                     full_fit=True,resolved_family=family,descriptive=cell['stage']=='full_fit')
+        if context['descriptive']:
+            member=partitions['full-fit'];context['membership']=dict(member,test=member['descriptive_development'])
+        return context
     if run['cell']['stage'] not in ('outer','fresh_control_outer','fresh_control_outer_matched',*VARIANT_STAGES):return None
     if checkpoint is not None:raise ValueError('outer responses cannot diagnose checkpoints')
     from shaping_outer_admission import resolve
@@ -154,7 +168,7 @@ def outer_context(root,run,cells,checkpoint=None):
 def admitted_epoch(run,result,cells,outer=None):
     cell=run['cell']
     if outer is not None:
-        if cell['stage'] not in ('outer','fresh_control_outer','fresh_control_outer_matched','full_fit_selection',*VARIANT_STAGES):
+        if cell['stage'] not in ('outer','fresh_control_outer','fresh_control_outer_matched','full_fit_selection','full_fit',*VARIANT_STAGES):
             raise ValueError('outer context on an inner run')
         epochs=outer['schedule']['phase_epochs'][-1]
         if result['stage']!='trained' or result['exit_code']!=0 or run['epochs']!=epochs:
@@ -204,12 +218,13 @@ def reexport_bake(receipt_path,original,run,build_path):
 def apply_report_scope(report,context,family):
     if context is None:return
     full_fit=context.get('full_fit',False)
-    role='full_fit_validation' if full_fit else 'outer_test'
+    descriptive=context.get('descriptive',False)
+    role='exposed_development' if descriptive else 'full_fit_validation' if full_fit else 'outer_test'
     report[role]=report.pop('inner_validation')
     report.update(outer_results_read=True,admission_sha256=context['admission_sha256'],
-                  selection='full-FIT tuning only; excluded from nested-study selection' if full_fit else 'outer test; excluded from all selection')
+                  selection='exposed development; descriptive only; excluded from all selection' if descriptive else 'full-FIT tuning only; excluded from nested-study selection' if full_fit else 'outer test; excluded from all selection')
     if full_fit:
-        report.update(selection_scope='full_fit_only',resolved_family=family,development_results_read=False)
+        report.update(selection_scope='descriptive_only' if descriptive else 'full_fit_only',resolved_family=family,development_results_read=descriptive)
 
 
 def evaluate(args):
@@ -273,7 +288,7 @@ def evaluate(args):
     import v2_lodo_mlp as owner
     from shaped_linear_study import OLD,PREP,metrics,weights_and_targets
     owner.FITBIN=v2_common.FITBIN=args.binary_dir/'bake_dial_refit'
-    membership=outer['membership'] if variant else partitions[cell['partition']]
+    membership=outer['membership'] if outer and 'membership' in outer else partitions[cell['partition']]
     validation=prepare_validation(args.study,cell['partition'],membership)
     training_path=Path(variant['groups_path']) if variant else args.study/'comparators'/cell['partition']/'GROUPS.json'
     training=json.loads(training_path.read_text())
@@ -346,8 +361,8 @@ def evaluate(args):
     np.savez_compressed(dest/'predictions.npz',original_indices=wanted,native=pred)
     (dest/'REPORT.json').write_bytes(encoded(report))
     (dest/('COMPLETE.json' if checkpoint is None else 'DIAGNOSTIC_COMPLETE.json')).write_bytes(encoded(dict(cell=cell['id'],report_sha256=sha(dest/'REPORT.json'))))
-    role='full_fit_validation' if outer and outer.get('full_fit') else 'outer_test' if outer is not None else 'inner_validation'
-    score_key='full_fit_selection_score' if role=='full_fit_validation' else 'outer_test_score' if outer is not None else 'inner_selection_score'
+    role='exposed_development' if outer and outer.get('descriptive') else 'full_fit_validation' if outer and outer.get('full_fit') else 'outer_test' if outer is not None else 'inner_validation'
+    score_key='exposed_development_score' if role=='exposed_development' else 'full_fit_selection_score' if role=='full_fit_validation' else 'outer_test_score' if outer is not None else 'inner_selection_score'
     print(json.dumps({'cell':cell['id'],score_key:report[role]['selection_score']}),flush=True)
 
 
