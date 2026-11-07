@@ -35,8 +35,8 @@ zensim-regress = { version = "0.4.0", path = "zensim-regress", default-features 
 # rsqrt_path_precision_vs_scalar fails at max_rel 1.67e-5 (measured A/B,
 # 2026-08-05 — the same movement is the prime suspect for the CI v1-golden
 # flip, benchmarks/v1_golden_env_triage_2026-08-05.md). Do not lower.
-archmage = { version = ">=0.9.28, <=0.9.31-beta.1", features = ["macros", "avx512"] }
-magetypes = { version = ">=0.9.30, <=0.9.31-beta.1", features = ["avx512"] }
+archmage = { version = ">=0.9.28, <0.10.0", features = ["macros", "avx512"] }
+magetypes = { version = ">=0.9.30, <0.10.0", features = ["avx512"] }
 # The pure-Rust port of musl's libm (rust-lang/libm). NOT a new edge into the
 # dependency closure -- `cargo tree -p zensim -e normal -i libm` already shows
 # it arriving twice (num-traits <- linear-srgb, and zenpredict). Made explicit
@@ -99,9 +99,9 @@ zenstats = { package = "zenmetrics-stats", git = "https://github.com/imazen/zenm
 zenpixels = { git = "https://github.com/imazen/zenpixels", rev = "fa836abf72afe9826e866dc25712b7c800323962" }
 zencodec = { git = "https://github.com/imazen/zencodec", rev = "1816b4d082234c04c3805411b437b8396040f522" }
 zenmeta = { git = "https://github.com/imazen/zencodec", rev = "1816b4d082234c04c3805411b437b8396040f522" }
-ultrahdr-core = { git = "https://github.com/imazen/ultrahdr", rev = "8a30cadfd08721749050215b924ca0a58a42e277" }
+ultrahdr-core = { git = "https://github.com/imazen/ultrahdr", rev = "1742595b5efd3c51720189e00f6a17fa8cf39bb0" }
 
 zenpixels-convert = { git = "https://github.com/imazen/zenpixels", rev = "fa836abf72afe9826e866dc25712b7c800323962" }
-zenpng = { git = "https://github.com/imazen/zenpng", rev = "02a7f0df5f72dd79b0afa58d66ced7cdd8395e31" }
+zenpng = { git = "https://github.com/imazen/zenpng", rev = "381abd7fc9c753f14d0bd28b4cdd6d36bb1687cf" }
 # Current PNG strip compression uses the same tested source as the siblings.
 zenflate = { git = "https://github.com/imazen/zenflate", rev = "a0ea03637a2cc9a193e343018ae2cfb1a6c31edd" }

@@ -16,8 +16,8 @@ real-bake-tests = []
 
 [dependencies]
 zensim = { path = "../../zensim", features = ["custom-profiles", "feature-regime-v2", "training", "viz-export"] }
-zenpredict = { version = "0.2.0", git = "https://github.com/imazen/zenanalyze", rev = "38dc80f73887dafae6bf5ebfe9a03be5ef78ebe0" }
-zenpredict-bake = { git = "https://github.com/imazen/zenanalyze", rev = "38dc80f73887dafae6bf5ebfe9a03be5ef78ebe0" }
+zenpredict = { version = "0.2.0", git = "https://github.com/imazen/zenanalyze", rev = "9f57f1be05e49f91d7a13f5a4bc1227b56fe76f2" }
+zenpredict-bake = { git = "https://github.com/imazen/zenanalyze", rev = "9f57f1be05e49f91d7a13f5a4bc1227b56fe76f2" }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = { version = "1.0.145", features = ["float_roundtrip"] }
 sha2 = "0.11.0"
@@ -30,7 +30,7 @@ rgb = "0.8.52"
 imgref = "1.12.0"
 bytemuck = "1.25.0"
 # Decoder revision advances with the sibling cohort; frozen pixels require replay.
-zenjpeg = { git = "https://github.com/imazen/zenjpeg", rev = "4b0f1bfa35444d982ce2a26e04bac19293487790", default-features = false }
+zenjpeg = { git = "https://github.com/imazen/zenjpeg", rev = "33ef549f0ba8daf1ab2bdce6bf75363807d87636", default-features = false }
 
 zenstats = { package = "zenmetrics-stats", git = "https://github.com/imazen/zenmetrics", rev = "48665c8fb1bb3de5c99d792ae4ed4f3f1e854629", default-features = false }
 
@@ -45,8 +45,8 @@ sha2 = "0.11.0"
 zenpixels = { git = "https://github.com/imazen/zenpixels", rev = "fa836abf72afe9826e866dc25712b7c800323962" }
 zencodec = { git = "https://github.com/imazen/zencodec", rev = "1816b4d082234c04c3805411b437b8396040f522" }
 zenmeta = { git = "https://github.com/imazen/zencodec", rev = "1816b4d082234c04c3805411b437b8396040f522" }
-ultrahdr-core = { git = "https://github.com/imazen/ultrahdr", rev = "8a30cadfd08721749050215b924ca0a58a42e277" }
+ultrahdr-core = { git = "https://github.com/imazen/ultrahdr", rev = "1742595b5efd3c51720189e00f6a17fa8cf39bb0" }
 zenpixels-convert = { git = "https://github.com/imazen/zenpixels", rev = "fa836abf72afe9826e866dc25712b7c800323962" }
-zenpng = { git = "https://github.com/imazen/zenpng", rev = "02a7f0df5f72dd79b0afa58d66ced7cdd8395e31" }
+zenpng = { git = "https://github.com/imazen/zenpng", rev = "381abd7fc9c753f14d0bd28b4cdd6d36bb1687cf" }
 zenflate = { git = "https://github.com/imazen/zenflate", rev = "a0ea03637a2cc9a193e343018ae2cfb1a6c31edd" }
 

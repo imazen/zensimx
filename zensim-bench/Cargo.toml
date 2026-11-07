@@ -182,15 +182,15 @@ zenbench = { git = "https://github.com/imazen/zenbench", rev = "82ff70a3f0c212cf
 # `testable_dispatch` lets benches/tier_isolation.rs disable the baseline SIMD
 # token (NEON on aarch64) so the scalar arm is real rather than a second
 # measurement of the SIMD path.
-archmage = { version = ">=0.9.28, <=0.9.31-beta.1", features = ["std", "testable_dispatch"] }
+archmage = { version = ">=0.9.28, <0.10.0", features = ["std", "testable_dispatch"] }
 # Bumped 2026-09-01 to the rev the zensim workspace root pins, so the
 # amended-W4 speed arms forward the SHIPPED bakes through the SAME
 # runtime that scores them (`caller_input_width` — i.e. dead-column
 # pruning — does not exist in the older pin, so a pruned bake could not
 # be forwarded at all).
-zenpredict = { git = "https://github.com/imazen/zenanalyze", rev = "38dc80f73887dafae6bf5ebfe9a03be5ef78ebe0" }
+zenpredict = { git = "https://github.com/imazen/zenanalyze", rev = "9f57f1be05e49f91d7a13f5a4bc1227b56fe76f2" }
 # Match the root metadata-splicing owner used by bake_stamp_revision.
-zenpredict-bake = { git = "https://github.com/imazen/zenanalyze", rev = "38dc80f73887dafae6bf5ebfe9a03be5ef78ebe0" }
+zenpredict-bake = { git = "https://github.com/imazen/zenanalyze", rev = "9f57f1be05e49f91d7a13f5a4bc1227b56fe76f2" }
 csv = "1"
 dvifmish = { git = "https://github.com/imazen/dvifmish", rev = "6fbec37798cd6b96848f42ae74416ec864376854", optional = true }
 image = "0.25"
@@ -227,7 +227,7 @@ zencodec = { version = ">=0.2.0, <0.3.0", optional = true }
 # d099267c, 2026-10-28) that this root cannot satisfy; the HDR extractor (`hdr944-extract`)
 # never uses zenjpeg, so the pin keeps the fleet-era dependency graph for it. Move this pin
 # together with the zencodec/zenpixels entries below when the 0.2 family is published.
-zenjpeg = { git = "https://github.com/imazen/zenjpeg", rev = "4b0f1bfa35444d982ce2a26e04bac19293487790", optional = true }
+zenjpeg = { git = "https://github.com/imazen/zenjpeg", rev = "33ef549f0ba8daf1ab2bdce6bf75363807d87636", optional = true }
 zenwebp = { git = "https://github.com/imazen/zenwebp", rev = "256c056441aeeb5e8cb275d5d5140508f1f54e4f", package = "zenwebp", optional = true, default-features = false }
 # --decode-list PNG writer (R1b): re-encode the decoded RGB8 so the PNG/JPEG-only
 # zensim feature extractors can read avif/jxl/webp corpus rows.
@@ -409,12 +409,12 @@ optional = true
 [patch.crates-io]
 zenresize = { git = "https://github.com/imazen/zenresize", rev = "e3975fb9d6d6b7baa96038a0eb8e27febb37c012" }
 # Share the zenpixels-0.3-compatible PNG adapter with the native HDR graph.
-zenpng = { git = "https://github.com/imazen/zenpng", rev = "02a7f0df5f72dd79b0afa58d66ced7cdd8395e31" }
+zenpng = { git = "https://github.com/imazen/zenpng", rev = "381abd7fc9c753f14d0bd28b4cdd6d36bb1687cf" }
 # Match the native PNG adapter's coordinated exact-animation timing contract.
 zencodec = { git = "https://github.com/imazen/zencodec", rev = "1816b4d082234c04c3805411b437b8396040f522" }
 # JXL encoder and decoder pins match the selected zenjxl manifest.
 jxl-encoder = { git = "https://github.com/imazen/jxl-encoder", rev = "7b354ee6b014d334591b1797bd1a3dede4e96331" }
-zenjpeg = { git = "https://github.com/imazen/zenjpeg", rev = "4b0f1bfa35444d982ce2a26e04bac19293487790" }
+zenjpeg = { git = "https://github.com/imazen/zenjpeg", rev = "33ef549f0ba8daf1ab2bdce6bf75363807d87636" }
 # All codec adapters share the selected core and pixel source identities.
 zenavif = { git = "https://github.com/imazen/zenavif", rev = "bf7fdadc95c357571bbd4a245194880912602fd7" }
 zenjxl = { git = "https://github.com/imazen/zenjxl", rev = "13998d071d77108638aebe7a1c12b4a022ce18dd" }
@@ -429,7 +429,7 @@ zenpixels-convert = { git = "https://github.com/imazen/zenpixels", rev = "fa836a
 # zenjpeg@0.9.0 requires unpublished zenanalyze 0.2.x — dev-only local patch (2026-08-30).
 
 zenmeta = { git = "https://github.com/imazen/zencodec", rev = "1816b4d082234c04c3805411b437b8396040f522" }
-ultrahdr-core = { git = "https://github.com/imazen/ultrahdr", rev = "8a30cadfd08721749050215b924ca0a58a42e277" }
+ultrahdr-core = { git = "https://github.com/imazen/ultrahdr", rev = "1742595b5efd3c51720189e00f6a17fa8cf39bb0" }
 zenflate = { git = "https://github.com/imazen/zenflate", rev = "a0ea03637a2cc9a193e343018ae2cfb1a6c31edd" }
 zenavif-serialize = { git = "https://github.com/imazen/zenavif", rev = "bf7fdadc95c357571bbd4a245194880912602fd7" }
 butteraugli = { git = "https://github.com/imazen/butteraugli", rev = "554a42f832ceffe7a70303d43f3cddcd5a8cd275" }

@@ -14,10 +14,10 @@ license = "AGPL-3.0-only OR LicenseRef-Imazen-Commercial"
 # Preserve the public F spelling and its model, before the later F-to-A rename.
 zensim = { git = "https://github.com/imazen/zensim", rev = "473a4cfbef356e3528d37f63042263993144f121" }
 # Ultra HDR container, gain-map decode and application; the sibling's zenjpeg pin decodes the JPEGs.
-ultrahdr-rs = { git = "https://github.com/imazen/ultrahdr", rev = "8a30cadfd08721749050215b924ca0a58a42e277" }
-ultrahdr-core = { git = "https://github.com/imazen/ultrahdr", rev = "8a30cadfd08721749050215b924ca0a58a42e277" }
+ultrahdr-rs = { git = "https://github.com/imazen/ultrahdr", rev = "1742595b5efd3c51720189e00f6a17fa8cf39bb0" }
+ultrahdr-core = { git = "https://github.com/imazen/ultrahdr", rev = "1742595b5efd3c51720189e00f6a17fa8cf39bb0" }
 # The base re-encoder, the same zenjpeg revision ultrahdr-rs bundles (one copy in the graph).
-zenjpeg = { git = "https://github.com/imazen/zenjpeg", rev = "4b0f1bfa35444d982ce2a26e04bac19293487790" }
+zenjpeg = { git = "https://github.com/imazen/zenjpeg", rev = "33ef549f0ba8daf1ab2bdce6bf75363807d87636" }
 # Reference metrics on their own paths: SSIMULACRA2's native HDR anchor and butteraugli's linear path.
 fast-ssim2 = { version = "0.9.1", features = ["imgref"] }
 butteraugli = { version = "0.9.3", features = ["avx512"] }
@@ -29,7 +29,7 @@ bytemuck = { version = "1", features = ["derive"] }
 # The ultrahdr workspace's pins, replicated so one zenpixels serves ultrahdr, fast-ssim2 and this crate.
 zenpixels = { git = "https://github.com/imazen/zenpixels", rev = "fa836abf72afe9826e866dc25712b7c800323962" }
 zenpixels-convert = { git = "https://github.com/imazen/zenpixels", rev = "fa836abf72afe9826e866dc25712b7c800323962" }
-ultrahdr-core = { git = "https://github.com/imazen/ultrahdr", rev = "8a30cadfd08721749050215b924ca0a58a42e277" }
+ultrahdr-core = { git = "https://github.com/imazen/ultrahdr", rev = "1742595b5efd3c51720189e00f6a17fa8cf39bb0" }
 zencodec = { git = "https://github.com/imazen/zencodec", rev = "1816b4d082234c04c3805411b437b8396040f522" }
 # zenjpeg wants zenanalyze ^0.2 (git-only until it publishes); the ultrahdr workspace carries the same entry.
 zenmeta = { git = "https://github.com/imazen/zencodec", rev = "1816b4d082234c04c3805411b437b8396040f522" }

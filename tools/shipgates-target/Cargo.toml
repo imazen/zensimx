@@ -9,8 +9,8 @@ publish = false
 [dependencies]
 zensim-target = { path = "../../zensim-target", default-features = false, features = ["native-probe"] }
 zensim = { path = "../../zensim", features = ["custom-profiles", "imgref"] }
-zenpredict = { git = "https://github.com/imazen/zenanalyze", rev = "38dc80f73887dafae6bf5ebfe9a03be5ef78ebe0" }
-zenjpeg = { git = "https://github.com/imazen/zenjpeg", rev = "4b0f1bfa35444d982ce2a26e04bac19293487790", default-features = false, features = ["recompress-expert"] }
+zenpredict = { git = "https://github.com/imazen/zenanalyze", rev = "9f57f1be05e49f91d7a13f5a4bc1227b56fe76f2" }
+zenjpeg = { git = "https://github.com/imazen/zenjpeg", rev = "33ef549f0ba8daf1ab2bdce6bf75363807d87636", default-features = false, features = ["recompress-expert"] }
 zenwebp = { git = "https://github.com/imazen/zenwebp", rev = "256c056441aeeb5e8cb275d5d5140508f1f54e4f", default-features = false, features = ["std"] }
 zenavif = { git = "https://github.com/imazen/zenavif", rev = "bf7fdadc95c357571bbd4a245194880912602fd7", default-features = false }
 bytemuck = "1.25.2"
@@ -28,7 +28,7 @@ zencodec = { git = "https://github.com/imazen/zencodec", rev = "1816b4d082234c04
 zenpixels = { git = "https://github.com/imazen/zenpixels", rev = "fa836abf72afe9826e866dc25712b7c800323962" }
 zenpixels-convert = { git = "https://github.com/imazen/zenpixels", rev = "fa836abf72afe9826e866dc25712b7c800323962" }
 zenmeta = { git = "https://github.com/imazen/zencodec", rev = "1816b4d082234c04c3805411b437b8396040f522" }
-ultrahdr-core = { git = "https://github.com/imazen/ultrahdr", rev = "8a30cadfd08721749050215b924ca0a58a42e277" }
+ultrahdr-core = { git = "https://github.com/imazen/ultrahdr", rev = "1742595b5efd3c51720189e00f6a17fa8cf39bb0" }
 
 [profile.release]
 lto = "thin"

@@ -28,7 +28,7 @@ zenjxl  = ["dep:zenjxl", "dep:zencodec"]
 zenpng  = ["dep:zenpng"]
 
 [dependencies]
-zenpredict = { version = "0.2.0", git = "https://github.com/imazen/zenanalyze", rev = "38dc80f73887dafae6bf5ebfe9a03be5ef78ebe0", optional = true }
+zenpredict = { version = "0.2.0", git = "https://github.com/imazen/zenanalyze", rev = "9f57f1be05e49f91d7a13f5a4bc1227b56fe76f2", optional = true }
 serde_json = { version = "1", optional = true }
 sha2 = { version = "0.10", optional = true }
 serde = { version = "1", features = ["derive"] }
@@ -49,18 +49,18 @@ zenpixels = { version = ">=0.3.1, <0.4.0", default-features = false }
 
 # Codec dependencies use the qualified sibling revisions.
 # All AGPL-3.0-only OR Imazen commercial.
-zenjpeg = { git = "https://github.com/imazen/zenjpeg", rev = "4b0f1bfa35444d982ce2a26e04bac19293487790", optional = true, default-features = false }
+zenjpeg = { git = "https://github.com/imazen/zenjpeg", rev = "33ef549f0ba8daf1ab2bdce6bf75363807d87636", optional = true, default-features = false }
 zenwebp = { git = "https://github.com/imazen/zenwebp", rev = "256c056441aeeb5e8cb275d5d5140508f1f54e4f",          optional = true, default-features = false, features = ["std"] }
 zenavif = { git = "https://github.com/imazen/zenavif", rev = "bf7fdadc95c357571bbd4a245194880912602fd7",          optional = true, default-features = false, features = ["encode"] }
 zenjxl  = { git = "https://github.com/imazen/zenjxl", rev = "13998d071d77108638aebe7a1c12b4a022ce18dd",           optional = true, default-features = false, features = ["encode", "decode", "zencodec"] }
-zenpng  = { git = "https://github.com/imazen/zenpng", rev = "02a7f0df5f72dd79b0afa58d66ced7cdd8395e31",           optional = true, default-features = false }
+zenpng  = { git = "https://github.com/imazen/zenpng", rev = "381abd7fc9c753f14d0bd28b4cdd6d36bb1687cf",           optional = true, default-features = false }
 # zencodec traits are needed for the JXL encode path's `EncodeJob` / `Encoder`
 # / `EncoderConfig` trait bounds (zenjxl exposes the encoder via these traits
 # when the `zencodec` feature is enabled).
 zencodec = { version = ">=0.2.0, <0.3.0", optional = true }
 
 [dev-dependencies]
-zenpredict = { version = "0.2.0", git = "https://github.com/imazen/zenanalyze", rev = "38dc80f73887dafae6bf5ebfe9a03be5ef78ebe0" }
+zenpredict = { version = "0.2.0", git = "https://github.com/imazen/zenanalyze", rev = "9f57f1be05e49f91d7a13f5a4bc1227b56fe76f2" }
 fast-ssim2 = { version = "0.8.2", default-features = false, features = ["imgref"] }
 serde_json = "1"
 sha2 = "0.10"
@@ -78,7 +78,7 @@ path = "src/bin/zensim_target.rs"
 [patch.crates-io]
 zenavif-serialize = { git = "https://github.com/imazen/zenavif", rev = "bf7fdadc95c357571bbd4a245194880912602fd7" }
 jxl-encoder = { git = "https://github.com/imazen/jxl-encoder", rev = "7b354ee6b014d334591b1797bd1a3dede4e96331" }
-zenjpeg = { git = "https://github.com/imazen/zenjpeg", rev = "4b0f1bfa35444d982ce2a26e04bac19293487790" }
+zenjpeg = { git = "https://github.com/imazen/zenjpeg", rev = "33ef549f0ba8daf1ab2bdce6bf75363807d87636" }
 # zenjxl@HEAD requires the UNPUBLISHED zenjxl-decoder 0.4.0 (crates.io max is
 # 0.3.x) — patch the local sibling in, same as zensim-bench does.
 zenjxl-decoder = { git = "https://github.com/imazen/zenjxl-decoder", rev = "b04af24cd154fbefc4081e9072391738b1d7d552" }
@@ -88,8 +88,8 @@ zenpixels = { git = "https://github.com/imazen/zenpixels", rev = "fa836abf72afe9
 zenpixels-convert = { git = "https://github.com/imazen/zenpixels", rev = "fa836abf72afe9826e866dc25712b7c800323962" }
 zencodec = { git = "https://github.com/imazen/zencodec", rev = "1816b4d082234c04c3805411b437b8396040f522" }
 zenmeta = { git = "https://github.com/imazen/zencodec", rev = "1816b4d082234c04c3805411b437b8396040f522" }
-ultrahdr-core = { git = "https://github.com/imazen/ultrahdr", rev = "8a30cadfd08721749050215b924ca0a58a42e277" }
-zenpng = { git = "https://github.com/imazen/zenpng", rev = "02a7f0df5f72dd79b0afa58d66ced7cdd8395e31" }
+ultrahdr-core = { git = "https://github.com/imazen/ultrahdr", rev = "1742595b5efd3c51720189e00f6a17fa8cf39bb0" }
+zenpng = { git = "https://github.com/imazen/zenpng", rev = "381abd7fc9c753f14d0bd28b4cdd6d36bb1687cf" }
 zenflate = { git = "https://github.com/imazen/zenflate", rev = "a0ea03637a2cc9a193e343018ae2cfb1a6c31edd" }
 butteraugli = { git = "https://github.com/imazen/butteraugli", rev = "554a42f832ceffe7a70303d43f3cddcd5a8cd275" }
 

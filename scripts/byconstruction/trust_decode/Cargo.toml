@@ -23,7 +23,7 @@ sha2 = "0.10"
 # Retain the bitmap/PNG 0.2 pixel API alongside JPEG's pinned 0.3 API.
 [patch.crates-io]
 zenpixels = { git = "https://github.com/imazen/zenpixels", rev = "789d69dbc314e748676b7f2f19542c17473ba40b" }
-zenpixels-v3 = { package = "zenpixels", git = "https://github.com/imazen/zenpixels", rev = "f23ac7535be1144a22d0dc6b71f866a08b151f34" }
+zenpixels-v3 = { package = "zenpixels", git = "https://github.com/imazen/zenpixels", rev = "18afc75f1fd40c7feafeef6deae4df8e97e5e1b9" }
 zencodec = { git = "https://github.com/imazen/zencodec", rev = "61fb96f1c8c89d4c8d2210eed8679372d66f8aa7" }
 zenmeta = { git = "https://github.com/imazen/zencodec", rev = "61fb96f1c8c89d4c8d2210eed8679372d66f8aa7" }
-ultrahdr-core = { git = "https://github.com/imazen/ultrahdr", rev = "7e9d296c9e037e626234c9f0e8673d48278f83f0" }
+ultrahdr-core = { git = "https://github.com/imazen/ultrahdr", rev = "ade3c857f5541aaff3828e0c7fad073bfe109fd9" }
