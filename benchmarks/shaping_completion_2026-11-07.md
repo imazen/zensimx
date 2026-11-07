@@ -616,3 +616,26 @@ hashes in `RECLAIMED_COMPLETED_TREE_PARITY.json`. The earlier transport removal
 and this second pass are separately preserved.
 
 Second-pass wrapper: `run-heavy: done rc=0 28s | peak-RSS 0.02GiB | min-avail 40351MiB | peak-load 20.68`.
+
+## All registered generalization input views qualified
+
+All 42 distinct prepared views supporting the 672 registered source-curve,
+row-curve, shuffled-label and human-only cells are complete. Independent audit
+checks every prepared TRAIN row, unchanged numeric feature bits and keys,
+registered population/conditional label permutations, and exact matrix coverage.
+All 42 pass. The three strict human-only outer-training views contain 7,060,
+6,837 and 6,947 rows, each with zero teacher rows. This is input qualification;
+none of the 672 model cells is claimed fitted or evaluated by this audit.
+
+Preparation wrapper: `run-heavy: done rc=0 358s | peak-RSS 0.52GiB | min-avail 40346MiB | peak-load 21.31`.
+Audit wrapper: `run-heavy: done rc=0 35s | peak-RSS 0.72GiB | min-avail 40308MiB | peak-load 20.35`.
+These are resource observations during concurrent training, not speed benchmarks.
+
+The `variant-input-archive` mirror under the completion-study archive contains
+790 artifact files totaling 1,261,291,003 logical bytes; all artifact checksums
+passed destination readback at 06:28:20 UTC. Its local staging snapshot uses
+hardlinks to the immutable admitted inputs; its logical size is not additional
+SSD allocation. `VARIANT_INPUT_AUDIT.json`, `VARIANT_INPUT_PROGRESS.json`, frozen
+memberships, preparation receipts and per-file hashes are retained. Two tests
+cover corruption of feature bits/keys/null masks/labels and independent replay
+of both registered permutation schemes and seeds.
