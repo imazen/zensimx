@@ -3,7 +3,7 @@ from __future__ import annotations
 import argparse,json,os,subprocess
 from datetime import datetime,timezone
 from pathlib import Path
-from shaping_completion import encoded,sha
+from shaping_completion import REPO,encoded,sha
 from shaping_execution import load_registration
 from shaping_pretraining import structural_terms
 from shaping_rescue import resolve,controls,rewrite_command,admitted_families
@@ -101,6 +101,7 @@ def execute(args):
         dest.mkdir(parents=True)
         run=dict(cell=cell,plan_sha256=sha(args.study/'PLAN.json'),build_sha256=sha(args.binary_dir/'BUILD.json'),
                  resolution=resolution,pid=os.getpid(),process_role='rescue_controller',stage='running',
+                 selection_policy_sha256=sha(REPO/'docs/SHAPING_RESCUE_SELECTION.md'),
                  driver_sha256=sha(__file__),epochs=120 if '_pretrained_' in cell['family'] else 240,
                  pairs_per_epoch=50000,training_exposure_pair_draws=12000000,fit_directory='fit')
         (dest/'RUN.json').write_bytes(encoded(run));phases=[];shaping=None

@@ -4,8 +4,28 @@ sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'rev4_featpot'))
 from shaping_rescue import controls,selected_base,rewrite_command
 from shaping_completion import matrix,encoded,sha
 from shaping_selection import HUMANS,aggregate
+from shaping_rescue_selection import aggregate as aggregate_rescues
 
 class RescueTests(unittest.TestCase):
+    def test_rescue_selection_requires_all_thirty_paired_reports(self):
+        cells=matrix();reports={}
+        for cell in cells:
+            if cell['family']!='relu' or cell['partition'] not in ('inner-0-0','inner-0-1'):continue
+            if not (cell['stage']=='rescue' or (cell['stage']=='inner' and cell['setting']==2)):continue
+            score=.81 if cell.get('rescue')=='constant_lr' else .8
+            reports[cell['id']]=dict(cell=cell,outer_results_read=False,inner_validation=dict(
+                summary={p:dict(pooled=score,within=score) for p in HUMANS},selection_score=score))
+        result=aggregate_rescues(cells,reports,'relu',0,2)
+        self.assertEqual(result['required_reports'],30);self.assertEqual(result['selected_choice'],'constant_lr')
+        missing=reports.copy();missing.pop(next(iter(missing)))
+        with self.assertRaises(ValueError):aggregate_rescues(cells,missing,'relu',0,2)
+        for report in reports.values():
+            score=.8+5e-13 if report['cell'].get('rescue')=='init_half' else .8
+            report['inner_validation']=dict(summary={p:dict(pooled=score,within=score) for p in HUMANS},selection_score=score)
+        self.assertEqual(aggregate_rescues(cells,reports,'relu',0,2)['selected_choice'],'base')
+        next(iter(reports.values())).update(reexport_receipt='different',evaluation_build_sha256='runtime')
+        with self.assertRaises(ValueError):aggregate_rescues(cells,reports,'relu',0,2)
+
     def test_phase_command_preserves_seed_objective_and_inputs(self):
         command=['run-heavy','--mem','1G','--jobs','1','--','/old/zensim_mlp_train',
                  '--epochs','240','--out','old.bin','--dump-checkpoints-dir','old-checkpoints',

@@ -4982,6 +4982,9 @@ shaping-completion-rescue-check:
 shaping-completion-rescue-fit study binaries qualification cell:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 3G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_rescue_execution.py --study {{quote(study)}} --binary-dir {{quote(binaries)}} --neutral-qualification {{quote(qualification)}} --cell {{quote(cell)}}
 
+shaping-completion-rescue-select study family outer:
+    python3 -B scripts/rev4_featpot/shaping_rescue_selection.py --study {{quote(study)}} --family {{quote(family)}} --outer {{outer}}
+
 shaping-completion-rescue-qualify study run binaries output epochs="1":
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_rescue_qualification.py --study {{quote(study)}} --run {{quote(run)}} --binary-dir {{quote(binaries)}} --output {{quote(output)}} --epochs {{epochs}}
 
