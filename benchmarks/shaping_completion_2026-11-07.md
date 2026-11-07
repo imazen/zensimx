@@ -1405,3 +1405,28 @@ Wrapper: `run-heavy: done rc=0 30s | peak-RSS 0.10GiB | min-avail 32132MiB |
 peak-load 24.59`. The plan, removal receipt and log passed complete destination
 readback in `checkpoint-retention-1022-qualification`: three artifact files,
 4,977,414 bytes. These storage operations do not add scientific fit coverage.
+
+## Native generalization queue admission
+
+The existing bounded outer dispatcher now has an explicit neural-variant mode.
+It requires the exact registered 168 neural cells per outer fold: source curves,
+row curves, shuffled labels and human-only trials for ReLU and the three
+inner-selected neural finalist roles. This covers 504 registered cells across
+three folds; the 168 nonneural variant cells require their control launch path.
+No outer scores enter finalist choice. The dispatcher verifies prepared variant
+views through the existing variant resolver and calls the existing native
+variant trainer, preserving TRAIN-only preprocessing, absence declarations,
+neutral-replay qualifications and SSD reservation.
+
+The qualification exercises all 168 cells in a simulated two-slot queue,
+requires each cell exactly once through the variant owner, checks admission
+refusal before variant resolution/launch, checks exact matrix coverage, and
+rejects altered checkpoints or failed attempts on resume. Existing outer queue
+checks also pass. These tests use simulated child fits and are not scientific
+experiments. Wrapper: `run-heavy: done rc=0 1s | peak-RSS 0.04GiB |
+min-avail 30167MiB | peak-load 28.08`.
+
+`just shaping-completion-dispatch-variants STUDY BINARY_DIR NEUTRAL HUMAN OUTER`
+waits for complete outer admission with one worker and a 3 GiB scope per fold.
+The resource bounds are independent of other queues; no global training lock
+is introduced. Native child commands retain their own one-thread resource cap.
