@@ -1058,3 +1058,20 @@ choices remain required before comparing remedies. The original native-gate
 failure for `ddc7932564aefab339d1` remains preserved independently of its
 supplemental evaluation. Summaries and exact input hashes are under
 `relu-rescue-optimizer-diagnosis` in the completion-study artifact roots.
+
+## Automatic terminal worker collection
+
+`shaping_worker_watch.py` refreshes each worker's process-backed status and
+passes freshly observed, completed and unimported fits to the existing terminal
+wave collector. That owner preserves producer checksums, rereads durable transfer
+bytes and validates the local import. Each completed wave's records also pass the
+full archive readback owner. The watcher uses one ownership lock per worker;
+manual collection must not overlap that worker's watcher.
+
+A failed collection stops for explicit reconciliation, preserving partial output.
+An SSH timeout or command failure records unknown remote training state and retries
+observation; it neither restarts nor marks remote training failed. Tests cover
+terminal-only admission, stale observations, already imported runs, stopped-job
+reconciliation, no transfer on an empty cycle, no archival/retry after collection
+failure and the unknown-state timeout receipt. Scientific gates and model
+selection are unchanged.

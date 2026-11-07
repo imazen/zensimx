@@ -5091,6 +5091,12 @@ shaping-completion-pack-worker host source study assignment cell bundle:
 shaping-completion-collect-terminal-worker host source study status destination output:
     TMPDIR="$HOME/tmp" python3 -B scripts/rev4_featpot/shaping_worker_collection_wave.py --host {{quote(host)}} --source {{quote(source)}} --study {{quote(study)}} --status {{quote(status)}} --destination {{quote(destination)}} --output {{quote(output)}}
 
+shaping-completion-watch-worker host source status_source study destination output:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_worker_watch.py --host {{quote(host)}} --source {{quote(source)}} --status-source {{quote(status_source)}} --study {{quote(study)}} --destination {{quote(destination)}} --output {{quote(output)}} --watch
+
+shaping-completion-worker-watch-check:
+    python3 -B -m unittest discover -s scripts/tests -p test_shaping_worker_watch.py
+
 shaping-completion-reclaim-incremental:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_reclaim_incremental.py
 
