@@ -2,7 +2,7 @@
 from __future__ import annotations
 import argparse,json,subprocess
 from pathlib import Path
-from shaping_completion import encoded,sha
+from shaping_completion import MAX_PAIR_FAMILIES,encoded,sha
 from shaping_evaluation import admitted_epoch,evaluation_epoch,evaluate,outer_context
 from shaping_execution import load_registration
 from shaping_probe_trace import unique_signed_pairs
@@ -12,6 +12,13 @@ def admit_family(family,analytic_diagnostic=False):
     if family=='relu':return
     if family=='softplus' and analytic_diagnostic:return
     raise ValueError('non-ReLU re-export requires explicit Softplus diagnostic admission')
+
+
+def admit_representation(family,outer=None,analytic_diagnostic=False):
+    if outer is None:
+        admit_family(family,analytic_diagnostic)
+    elif family not in MAX_PAIR_FAMILIES or outer['admission']['evaluation_representations'][family]['representation']!='research-relu-max-pairs-v1':
+        raise ValueError('later max-pair representation was not admitted by inner selection')
 
 
 def reexport(args):
@@ -24,9 +31,8 @@ def reexport(args):
     outer=outer_context(args.study,run,cells,args.checkpoint)
     epochs=admitted_epoch(run,result,cells,outer)
     epoch=evaluation_epoch(epochs,args.checkpoint)
-    admit_family(run['cell']['family'],getattr(args,'analytic_diagnostic',False))
-    if run['cell']['family']!='relu' and outer is not None:
-        raise ValueError('analytic re-export is inner diagnostic only')
+    family=run['cell']['family'] if outer is None else outer.get('resolved_family',outer.get('variant',{}).get('resolved_family',run['cell']['family']))
+    admit_representation(family,outer,getattr(args,'analytic_diagnostic',False))
     if sha(args.study/'PLAN.json')!=run['plan_sha256']:raise ValueError('registration drift')
     build_path=args.binary_dir/'BUILD.json'
     for name,pin in json.loads(build_path.read_text())['binary_sha256'].items():

@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 """Register the completion study without fitting models or opening final holdouts."""
 from __future__ import annotations
+
+# Qualified first-layer direct-max representation; later activations remain unchanged.
+MAX_PAIR_FAMILIES=('relu','softplus')
+
 import argparse
 from collections import Counter
 from datetime import datetime, timezone

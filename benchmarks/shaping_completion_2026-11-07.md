@@ -1917,3 +1917,15 @@ exactly. Maximum repaired-model score change is 0.0002899169921875. The separate
 `softplus-runtime-comparison` archive passed full destination readback:
 81 files, 4183261 bytes. No outer responses
 were consumed, and selection admission remains unchanged.
+
+## Uniform Softplus representation admission implementation
+
+The existing repaired-representation selection and rescue gates now admit
+Softplus alongside ReLU. Every paired report still requires one representation
+and evaluation binary set; final/diagnostic agreement, full seed/fold/setting
+coverage and all finite human scores remain mandatory. Later-stage re-export
+resolves the actual fitted family and requires its verified inner representation
+admission. Explicit inner diagnostic scope is unchanged. The three re-export,
+seven selection, eight rescue and nine supervision tests pass, including mixed
+runtime/representation refusal and later-stage admission rejection. Actual
+paired coverage and rescue completion are still required before outer fitting.

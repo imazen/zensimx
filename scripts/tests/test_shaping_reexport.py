@@ -20,3 +20,11 @@ class ReexportAdmissionTests(unittest.TestCase):
             for text in ('row_idx\tpred\n1\t1.5\n0\t2.0\n','row_idx\tpred\n0\tnan\n','row_idx\tpred\n'):
                 p.write_text(text)
                 with self.assertRaises(ValueError):prediction_values(p)
+
+    def test_later_softplus_requires_inner_representation_admission(self):
+        from shaping_reexport import admit_representation
+        context={'admission':{'evaluation_representations':{'softplus':{'representation':'original'}}}}
+        with self.assertRaises(ValueError):admit_representation('softplus',context,True)
+        context['admission']['evaluation_representations']['softplus']['representation']='research-relu-max-pairs-v1'
+        admit_representation('softplus',context)
+        with self.assertRaises(ValueError):admit_representation('silu_monotone',context,True)

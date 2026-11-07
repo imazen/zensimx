@@ -32,6 +32,17 @@ class SelectionTests(unittest.TestCase):
         next(iter(reports.values()))['outer_results_read']=True
         with self.assertRaises(ValueError):aggregate(cells,reports,'extra_trees',0)
 
+    def test_softplus_requires_uniform_repaired_paired_reports(self):
+        cells=matrix();reports={}
+        for c in cells:
+            if c['stage']=='inner' and c['family']=='softplus' and c['partition'].startswith('inner-0-'):
+                reports[c['id']]={'cell':c,'outer_results_read':False,'reexport_receipt':'receipt','evaluation_build_sha256':'runtime','inner_validation':{'summary':{p:{'pooled':.8,'within':.8} for p in HUMANS},'selection_score':.8}}
+        self.assertEqual(aggregate(cells,reports,'softplus',0)['required_reports'],24)
+        first=next(iter(reports.values()));first['evaluation_build_sha256']='different'
+        with self.assertRaisesRegex(ValueError,'mixed evaluation'):aggregate(cells,reports,'softplus',0)
+        first['evaluation_build_sha256']='runtime';del first['reexport_receipt']
+        with self.assertRaisesRegex(ValueError,'mixed evaluation'):aggregate(cells,reports,'softplus',0)
+
     def test_registered_tie_rule(self):
         self.assertEqual(choose({0:.8,1:.8+5e-13,2:.7,3:.6}),0)
         self.assertEqual(choose({0:.8,1:.8+2e-12,2:.7,3:.6}),1)

@@ -4,7 +4,7 @@ import argparse,fcntl,json,os,time
 from datetime import datetime,timezone
 from pathlib import Path
 from types import SimpleNamespace
-from shaping_completion import FAMILIES,NEURAL,encoded,sha
+from shaping_completion import MAX_PAIR_FAMILIES,FAMILIES,NEURAL,encoded,sha
 from shaping_execution import load_registration
 from shaping_rescue_selection import select as select_rescue
 from shaping_extension import register as register_extension,verify_decision
@@ -14,7 +14,7 @@ from shaping_outer_admission import register as register_outer,resolve as resolv
 def ready(root,cell,representation):
     repaired=representation=='research-relu-max-pairs-v1'
     if representation not in ('original','research-relu-max-pairs-v1'):raise ValueError('unknown selection representation')
-    if repaired and cell['family']!='relu':raise ValueError('ReLU representation applied to another family')
+    if repaired and cell['family'] not in MAX_PAIR_FAMILIES:raise ValueError('unqualified max-pair family')
     directory=root/('reexport_max_pairs' if repaired else 'runs')/cell['id']
     markers=list(directory.glob('attempt-*/final/COMPLETE.json' if repaired else 'attempt-*/evaluation/COMPLETE.json'))
     if len(markers)>1:raise ValueError('ambiguous completed candidate')
@@ -46,7 +46,7 @@ def sweep(root,outer):
     registration=json.loads(path.read_text())
     # Reproduce even an empty extension matrix, which has no cell to resolve.
     from shaping_extension import matrix
-    from shaping_completion import REPO
+    from shaping_completion import MAX_PAIR_FAMILIES,REPO
     expected=matrix(decisions,outer)
     if any(registration[k]!=v for k,v in expected.items()) or registration['plan_sha256']!=sha(root/'PLAN.json') or registration['policy_sha256']!=sha(REPO/'docs/SHAPING_EXPOSURE_EXTENSION.md'):
         raise ValueError('extension registration cannot be reproduced')

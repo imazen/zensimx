@@ -100,4 +100,21 @@ bit for bit. The repaired model's maximum absolute difference is
 0.0002899169921875 across these tables. This is a rounding comparison, not an
 improvement claim. The separate `softplus-runtime-comparison` archive passed
 complete destination checksum verification. Selection support and consistent
-later-stage representation admission remain unfinished.
+later-stage representation admission are implemented below; complete paired
+scientific coverage remains unfinished.
+
+## Uniform Softplus selection and later-stage admission
+
+Following the numerical compatibility qualification above, use the direct-max
+first-layer representation for the entire Softplus family, as for ReLU. This
+is not an option searched per setting, seed or checkpoint. Base selection must
+have every paired final panel and diagnostic receipt in this representation
+with one pinned evaluator. Rescue comparisons, triggered extensions, outer
+refits, learning curves and full-data fits inherit that representation through
+the existing admission chain. No original failed gate is converted to a pass.
+
+The ordinary SiLU diagnostic and monotone SiLU family are not admitted by this
+qualification. All source boundaries, fitting budgets, human-only selection
+composites, finite-score requirements, convergence triggers and native probe
+thresholds remain unchanged. The native repair still validates each model's
+first-layer structural requirements; family membership alone cannot qualify it.
