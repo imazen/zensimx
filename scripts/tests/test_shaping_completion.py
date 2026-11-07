@@ -11,6 +11,19 @@ spec.loader.exec_module(study)
 
 
 class RegistrationTests(unittest.TestCase):
+    def test_worker_assignment_prevents_duplicate_host_execution(self):
+        sys.path.insert(0,str(path.parent))
+        from shaping_host_assignment import check
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as directory:
+            root=Path(directory);(root/'PLAN.json').write_text('{}')
+            d=root/'worker_assignments';d.mkdir()
+            row=dict(host='worker-a',cells=['assigned'],plan_sha256=study.sha(root/'PLAN.json'),build_sha256='build')
+            (d/'wave.json').write_text(json.dumps(row))
+            check(root,[dict(id='assigned')],'build','worker-a')
+            check(root,[dict(id='unassigned')],'build','worker-b')
+            with self.assertRaises(ValueError):check(root,[dict(id='assigned')],'build','worker-b')
+            with self.assertRaises(ValueError):check(root,[dict(id='assigned')],'different','worker-a')
+
     def test_portable_protocol_requires_identical_registered_bytes(self):
         sys.path.insert(0,str(path.parent))
         from shaping_execution import load_registration

@@ -144,3 +144,9 @@ changed copied document is rejected. This permits a source snapshot on another
 eligible host without changing the scientific plan or relying on that host's
 checkout paths. It does not waive input/binary qualification or admit a worker
 before native parity checks.
+
+Distributed cells receive an explicit assignment binding their IDs, plan and
+binary-set hashes to a worker hostname. Execution checks assignment before
+creating an attempt; a different host or binary set is refused. Assignment
+cannot move already started attempts. This preserves paired scientific inputs
+while allowing independent workers; it is not a global compute lock.

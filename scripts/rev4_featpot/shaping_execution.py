@@ -83,6 +83,8 @@ def run_native(root,binary_dir,cell,record,attempt,epochs,mem):
 
 
 def _run_native(root,binary_dir,cell,record,attempt,epochs,mem):
+    from shaping_host_assignment import check
+    check(root,[cell],sha(binary_dir/'BUILD.json'))
     if attempt<1:raise ValueError('attempt must be positive')
     dest=root/'runs'/cell['id']/f'attempt-{attempt:03}'
     if dest.exists():raise ValueError('destination exists; inspect its actual process/artifacts')
@@ -143,6 +145,7 @@ def _run_native(root,binary_dir,cell,record,attempt,epochs,mem):
     with (dest/'train.log').open('w') as log:
         process=subprocess.Popen(command,stdout=log,stderr=subprocess.STDOUT,env=env)
         running=dict(cell=cell,command=command,pid=process.pid,started_utc=datetime.now(timezone.utc).isoformat(),
+                     execution_host=__import__('socket').gethostname(),
                      plan_sha256=sha(root/'PLAN.json'),build_sha256=sha(binary_dir/'BUILD.json'),
                      driver_sha256=DRIVER_SHA256,stage='running',epochs=epochs,pairs_per_epoch=50000,
                      scientific_selection=cell['stage']!='resource_pilot')
@@ -189,6 +192,8 @@ def execute(args):
             from shaping_pretraining import completed_parent
             for c in selected:completed_parent(args.study,c,cells)
     # Native pilot measured 606443 total artifact bytes, including two bakes.
+    from shaping_host_assignment import check
+    check(args.study,selected,sha(args.binary_dir/'BUILD.json'))
     # Reserve a deliberately conservative fixed 1 GiB per admitted long run;
     # this is an admission allowance, not an extrapolated measured size.
     if shutil.disk_usage(args.study).free < plan['minimum_ssd_free_bytes']+(workers+2)*1024**3:
