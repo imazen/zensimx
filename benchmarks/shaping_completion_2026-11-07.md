@@ -355,3 +355,17 @@ Verified product shaping archive manifest SHA256: `20b9c31bdb5cf03765f16857e6b6f
 Verified separate shaping archive manifest SHA256: `4565ad00600c15a0d836d8887816e2dae9c311b2da4cd958adeea7bbe0224252`.
 
 Verified uniform ReLU re-export archive manifest SHA256: `89a47c3bb2acf8ae09b7a0526a5b419ffa6d742244fab4f9e5b621dfccbd2290`.
+
+## Full analytic neutral-control qualification
+
+The neutral analytic training-control route replayed all 240 epochs and
+12,000,000 registered pair draws of the completed ordinary-SiLU fit. Original
+and replay canonical models match SHA256 `1b8b5a46a19501c142ab5941a40de485add3425a926e55ca67e959567ec59672` after
+removing only the declared repro/config metadata. The full streamed-event path
+therefore qualifies beyond the earlier one-epoch prefix; the scientific fit
+itself is unchanged and this replay does not become a selection candidate.
+
+Native wrapper: `run-heavy: done rc=0 3186s | peak-RSS 1.27GiB | min-avail 37988MiB | peak-load 25.58`.
+This measured peak is why rescue analytic phases receive a 2 GiB native cap.
+The completed replay and checkpoints passed destination readback against manifest
+SHA256 `3ccbcf768644d28c6c70ba5e778a6edc246695553b80ecba9b0b1421be89791d`.
