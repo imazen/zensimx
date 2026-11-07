@@ -4999,3 +4999,10 @@ shaping-completion-declare-max-pairs model output:
 
 shaping-completion-reexport study run binaries inspector epoch:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 2G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_reexport.py --study {{quote(study)}} --run {{quote(run)}} --binary-dir {{quote(binaries)}} --inspector {{quote(inspector)}} --checkpoint {{quote(epoch)}}
+
+# The caller copies the terminal bundle and sidecar; collection rehashes every file.
+shaping-completion-worker-collect action study assignment bundle *args:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_worker_collect.py {{quote(action)}} --study {{quote(study)}} --assignment {{quote(assignment)}} --bundle {{quote(bundle)}} {{args}}
+
+shaping-completion-worker-collect-test:
+    TMPDIR="$HOME/tmp" python3 -B -m unittest scripts/tests/test_shaping_worker_collect.py

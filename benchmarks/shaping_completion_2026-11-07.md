@@ -394,3 +394,12 @@ Worker qualification archive suffix: `worker-i270-qualification`; manifest
 SHA256 `ef92f329e39f0830d2ca5c600425953ee9eb86c3be6ba895255524788bb52e5e`.
 It preserves copied input bindings, source snapshot, failed/successful replay
 commands and results. Active training outputs are not represented as archived.
+
+Completed-worker collection now has a dedicated transfer owner. It packages only
+successful terminal fits from the assigned host, binds the complete checkpoint
+inventory and source/build/plan identities, and rehashes every received file before
+publishing an attempt to the evaluator. Existing cell directories are refused;
+failed imports stay in a separate staging directory. The original host and command
+remain in RUN.json. Three local controls passed: byte-exact readback and corruption
+refusal, traversal/symlink refusal, and terminal/checkpoint coverage admission.
+This validates transfer mechanics, not a scientific fit or a completed remote wave.
