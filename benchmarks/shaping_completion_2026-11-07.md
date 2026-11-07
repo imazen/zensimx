@@ -2373,3 +2373,24 @@ remain unchanged; no pretraining or completed fit was replayed.
 Cold readback verified `local-pretrained21-admission-evidence`: 9 artifacts,
 619384 bytes, receipt
 `eb17adf8211b14febbc4e3479fdf692a8429343fdfe56bfd8ca73d75524f3228`.
+
+
+## i270 retention at 16:28 UTC
+
+Durable bundle cold readback and exact open-file checks qualified removal of
+17 imported transport duplicates totaling 766,894,080 bytes. Original fit
+directories remain. Free disk was 55,865,823,232 bytes before and
+56,632,745,984 after. Coordinator wrapper: `rc=0 13s | peak-RSS 0.02GiB |
+min-avail 24853MiB | peak-load 31.01`. Worker inventory and removal receipts
+reported peak RSS 0.02 GiB, elapsed 0/1 seconds respectively.
+
+The incremental checkpoint pass excluded prior retained cells and verified
+seven newly imported fits. It removed 1,160 intermediate copies totaling
+331,391,733 bytes, preserving required final/diagnostic epochs. Free disk was
+56,607,264,768 bytes before and 56,930,967,552 after. Coordinator wrapper:
+`rc=0 10s | peak-RSS 0.07GiB | min-avail 25647MiB | peak-load 31.09`.
+No training or completed fit was replayed.
+
+Cold readback verified `i270-retention-1628-evidence`: 6 artifacts,
+505001 bytes, receipt
+`35a0369593c37e9f977e0d95b4dc597a224c84afd0cb55b537d5f307c97538e1`.
