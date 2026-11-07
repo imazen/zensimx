@@ -2726,3 +2726,34 @@ These tests do not train scientific models. Cold readback verified:
 - `joint00-recovery-budget-expansion-1815-evidence`: 6 artifacts, 9516 bytes; receipt `57d84f78c83a1cea51f262630df9a989d77becd4fe5b28d9d0edb5f913f7faa2`.
 - `joint00-unstarted-relocation-1820-evidence`: 14 artifacts, 21253 bytes; receipt `a5923bc50878b12617bb2a52e9199aaf7d640507d8ff2ea01e57774d53d2e332`.
 - `i265-joint00-relocated-inputs`: 3 artifacts, 24223753 bytes; receipt `fa8d7abdfffbe2079dc8055c64fe95ae1f6d259ab4036181b9f191cf53a72153`.
+
+
+## Incremental i270 retention and queued admission
+
+Verified durable imports released 22 additional transport bundles totaling
+989163520 bytes and 3712 intermediate checkpoints from 22 completed fits
+totaling 893390467 bytes. Prior receipts excluded the already removed cells;
+required epochs, originals needed for analysis, active fits and failed runs
+remain. All selected durable bundles were reread and matched to imports;
+checkpoint and transport removal retain exact-file identity and open-user
+checks. No scientific work was replayed.
+
+Transport cleanup observed free space changing from 55913259008 to
+56902471680 bytes. Checkpoint cleanup observed 56870973440 before and
+57769140224 bytes after removal. A subsequent process check found 20 native
+trainers and 57600331776 free bytes; the queued native fit was admitted while
+active output writes continued. The 30 GiB floor remains unchanged.
+
+The transport controller reported `run-heavy: done rc=0 15s | peak-RSS 0.02GiB | min-avail 28197MiB | peak-load 30.93`; its worker removal reported
+`run-heavy: done rc=0 1s | peak-RSS 0.02GiB | min-avail 23690MiB | peak-load 19.29`.
+The checkpoint controller reported `run-heavy: done rc=0 19s | peak-RSS 0.07GiB | min-avail 27996MiB | peak-load 30.83`; its worker reported
+`run-heavy: done rc=0 6s | peak-RSS 0.03GiB | min-avail 23675MiB | peak-load 19.39`.
+
+All 18 downstream watchers were verified against live processes and fresh
+status records, retaining their scientific prerequisite waits. The recovered
+pretraining watcher subsequently observed its preserved external child finish
+and now records 26 completed children, 18 normal parent waits and four
+interrupted-parent dependencies. Both partial parent attempts remain untouched.
+
+Cold readback verified `i270-retention-1830-evidence`: 7 artifacts,
+1509074 bytes; receipt `70dfbc76ad1c9a24ecdc9ea3b367b73c9810ded2d032895728a05f3abbb74387`.
