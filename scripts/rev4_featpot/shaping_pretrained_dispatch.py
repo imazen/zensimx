@@ -144,8 +144,9 @@ def main():
     p.add_argument('--workers',type=int,default=2)
     p.add_argument('--resume-name',help='new audit directory when resuming an existing dispatch')
     args=p.parse_args()
-    directory=args.study/'dispatch'/'pretrained'/args.partition;directory.mkdir(parents=True,exist_ok=True)
-    with (directory/'admission.lock').open('a') as lock:
+    # Queue-writer ownership only; independent fits still run concurrently.
+    directory=args.study/'dispatch'/'pretrained'/'locks';directory.mkdir(parents=True,exist_ok=True)
+    with (directory/(args.partition+'.lock')).open('a') as lock:
         fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
         dispatch(args)
 

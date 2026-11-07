@@ -2629,7 +2629,10 @@ starts; per-fit native execution and SSD reservations are unchanged. A per-fold
 dispatcher ownership lock prevents duplicate new queue writers without holding
 a global compute lock. Existing completed trials retain their checkpoint gate.
 
-Four pretrained-dispatch tests, four inner-subset tests and nine shared-rescue
+Five pretrained-dispatch tests, four inner-subset tests and nine shared-rescue
 admission tests pass. The dependency test retains the blocked child as required
 while an independent child finishes; failed, drifted and ambiguous-parent
 controls refuse. These checks perform no native training.
+
+The CLI ownership check also verifies that acquiring the dispatcher lock does
+not precreate the initial audit directory; the lock is stored separately.

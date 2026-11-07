@@ -8,6 +8,17 @@ from shaping_completion import sha
 
 
 class PretrainedDispatchTests(unittest.TestCase):
+    def test_cli_ownership_does_not_precreate_initial_audit_directory(self):
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as d:
+            root=Path(d)
+            def dispatch(args):
+                self.assertFalse((root/'dispatch/pretrained/inner-0-0').exists())
+                self.assertTrue((root/'dispatch/pretrained/locks/inner-0-0.lock').exists())
+            argv=['dispatch','--study',str(root),'--binary-dir',str(root/'bin'),'--partition','inner-0-0']
+            with patch.object(sys,'argv',argv),patch.object(module,'dispatch',side_effect=dispatch) as owner:
+                module.main()
+            owner.assert_called_once()
+
     def fixture(self,root):
         (root/'PLAN.json').write_text('{}')
         parent=dict(id='parent',stage='inner',family='product_joint_identity',partition='inner-0-0',setting=0,seed=0)

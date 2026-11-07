@@ -13,6 +13,9 @@ admission. Partial restarts await owner clarification of the no-replay rule.
 The pretrained dispatch owner now records these exact interrupted dependencies
 as waiting and continues independent children; failed or drifted parents still
 refuse. New dispatchers share CPU/RAM admission with rescue and inner recovery.
+The ownership lock lives separately from audit directories; the CLI regression
+check preserves first-launch directory creation. No scientific fit was launched
+with the intermediate lock-directory placement.
 
 ## Known Bugs — first worker bundle directory (resolved November 7, 2026)
 
