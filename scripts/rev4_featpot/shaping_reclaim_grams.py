@@ -14,7 +14,8 @@ def digest(path,cold=False):
         return hashlib.file_digest(f,'sha256').hexdigest()
 
 
-def no_users(paths):
+def no_users(paths,process_root=None):
+    process_root=ROOT/'fits' if process_root is None else process_root
     ancestors=set();pid=os.getpid()
     while pid>1:
         ancestors.add(str(pid))
@@ -24,7 +25,7 @@ def no_users(paths):
         if not proc.name.isdigit() or proc.name in ancestors:continue
         try:
             cmd=(proc/'cmdline').read_bytes().replace(b'\0',b' ').decode(errors='replace')
-            if str(ROOT/'fits') in cmd:raise ValueError('old fit process is active: '+proc.name)
+            if str(process_root) in cmd:raise ValueError('old fit process is active: '+proc.name)
             for fd in (proc/'fd').iterdir():
                 try:target=os.readlink(fd)
                 except OSError:continue
