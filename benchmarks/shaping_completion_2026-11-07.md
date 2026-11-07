@@ -1648,3 +1648,10 @@ convergence owner. It requires the complete scheduled checkpoint sequence and
 pinned native reader, rechecks input hashes after inspection, preserves existing
 outputs, and never computes scores or selects checkpoints. The real 120-epoch
 trace and six convergence/structure checks passed.
+
+The structure diagnosis bundle has a cold-readback verified durable copy under
+`zero-output-structure-diagnosis`: five artifact files, 183,630 bytes, manifest
+`adf6b54c16635374e51d683def060ca88e02170658471ae4f59e9319e989714a`.
+It contains the complete checkpoint trace, parent structure observation,
+pretraining provenance, resource log and measured summary. The original failed
+fit archive remains separate and unchanged.
