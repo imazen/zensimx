@@ -74,3 +74,55 @@ class FullFitSelectionTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError,'cannot reproduce'):candidate(root,cell,'softplus',admission,path)
 
 if __name__=='__main__':unittest.main()
+
+class FullFitSelectionWatchTests(unittest.TestCase):
+    def test_readiness_requires_diagnostics_and_preserves_failed_gate(self):
+        from shaping_full_fit_selection import readiness
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as directory:
+            root=Path(directory);cell=next(c for c in matrix() if c['stage']=='full_fit_selection' and c['family']=='relu')
+            admission=dict(selection_cells=[cell],finalist_roles={'relu':'relu'},evaluation_representations={'relu':{'representation':'research-relu-max-pairs-v1'}})
+            self.assertEqual(readiness(root,admission),([],[cell['id']]))
+            evaluation=root/'reexport_max_pairs'/cell['id']/'attempt-001/final';evaluation.mkdir(parents=True)
+            (evaluation/'COMPLETE.json').write_text('{}');(evaluation/'REPORT.json').write_text('not read by readiness')
+            self.assertEqual(readiness(root,admission),([],[cell['id']]))
+            diagnostic=root/'runs'/cell['id']/'attempt-001/TRAIN_CONVERGENCE.json';diagnostic.parent.mkdir(parents=True);diagnostic.write_text('{}')
+            self.assertEqual(readiness(root,admission),([cell['id']],[]))
+            failure=evaluation/'FAILED_GATE.json';failure.write_text('preserve failed evidence')
+            with self.assertRaisesRegex(ValueError,'gate failed'):readiness(root,admission)
+            self.assertEqual(failure.read_text(),'preserve failed evidence')
+
+    def test_no_selection_reads_before_admission(self):
+        from shaping_full_fit_selection import watch
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as directory:
+            root=Path(directory)
+            with patch('shaping_full_fit_selection.time.sleep',side_effect=RuntimeError('observation ended')),\
+                 patch('shaping_full_fit_selection.resolve_admission') as admission,patch('shaping_full_fit_selection.build') as build:
+                with self.assertRaisesRegex(RuntimeError,'observation ended'):watch(root)
+                admission.assert_not_called();build.assert_not_called()
+
+    def test_all_roles_preflight_before_register_and_failed_preflight_writes_none(self):
+        from shaping_full_fit_selection import watch
+        from shaping_completion import ROLES
+        for fail in (False,True):
+            with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as directory:
+                root=Path(directory);path=root/'full_fit/PLAN.json';path.parent.mkdir();path.write_text('{}');events=[]
+                def build(study,role):
+                    events.append(('build',role))
+                    if fail and role==ROLES[-1]:raise ValueError('candidate qualification failed')
+                    return {}
+                def register(study,role):
+                    self.assertEqual([v for k,v in events if k=='build'],list(ROLES))
+                    events.append(('register',role));p=root/'full_fit/selection'/(role+'.json');p.parent.mkdir(exist_ok=True);p.write_text('{}')
+                def resolve(study,role):return {},root/'full_fit/selection'/(role+'.json')
+                with patch('shaping_full_fit_selection.resolve_admission',return_value=({},path)),\
+                     patch('shaping_full_fit_selection.readiness',return_value=(['complete'],[])),\
+                     patch('shaping_full_fit_selection.build',side_effect=build),\
+                     patch('shaping_full_fit_selection.register',side_effect=register),\
+                     patch('shaping_full_fit_selection.resolve',side_effect=resolve):
+                    if fail:
+                        with self.assertRaisesRegex(ValueError,'qualification failed'):watch(root)
+                        self.assertFalse((root/'full_fit/selection').exists())
+                    else:
+                        watch(root);self.assertEqual([v for k,v in events if k=='register'],list(ROLES))
+                        status=json.loads((root/'dispatch/full-fit-selection/STATUS.json').read_text())
+                        self.assertEqual(status['stage'],'all_role_settings_verified');self.assertEqual(len(status['selection_sha256']),6)

@@ -1,6 +1,7 @@
 """Reproduce full-FIT setting decisions from complete pinned search evidence."""
 from __future__ import annotations
-import argparse,json
+import argparse,fcntl,json,os,time
+from datetime import datetime,timezone
 from pathlib import Path
 from shaping_completion import NEURAL,ROLES,encoded,sha
 from shaping_execution import load_registration
@@ -104,7 +105,69 @@ def resolve(root,role):
     return saved,path
 
 
+def readiness(root,admission):
+    """Inspect completion metadata only; candidate() later verifies all evidence."""
+    ready=[];missing=[]
+    for cell in admission['selection_cells']:
+        family=admission['finalist_roles'][cell['family']]
+        repaired=family in NEURAL and admission['evaluation_representations'][family]['representation']=='research-relu-max-pairs-v1'
+        directory=root/('reexport_max_pairs' if repaired else 'runs')/cell['id']
+        markers=list(directory.glob('attempt-*/final/COMPLETE.json' if repaired else 'attempt-*/evaluation/COMPLETE.json'))
+        if len(markers)>1:raise ValueError('ambiguous full-FIT completed candidates')
+        if markers:
+            attempt=markers[0].parent.parent.name
+            if (markers[0].parent/'FAILED_GATE.json').exists():raise ValueError('full-FIT evaluation gate failed')
+            if family not in NEURAL or (root/'runs'/cell['id']/attempt/'TRAIN_CONVERGENCE.json').exists():
+                ready.append(cell['id']);continue
+        else:
+            for result in (root/'runs'/cell['id']).glob('attempt-*/RESULT.json'):
+                row=json.loads(result.read_text())
+                if row.get('exit_code')!=0 or row.get('stage')=='failed':raise ValueError('full-FIT search fit failed: '+cell['id'])
+            if list(directory.glob('attempt-*/final/FAILED_GATE.json' if repaired else 'attempt-*/evaluation/FAILED_GATE.json')):
+                raise ValueError('full-FIT evaluation gate failed: '+cell['id'])
+        missing.append(cell['id'])
+    return ready,missing
+
+
+def watch(root):
+    directory=root/'dispatch/full-fit-selection';directory.mkdir(parents=True,exist_ok=True)
+    with (directory/'OWNER.lock').open('a') as owner:
+        fcntl.flock(owner,fcntl.LOCK_EX|fcntl.LOCK_NB)
+        output=directory/'STATUS.json'
+        if output.exists():raise ValueError('existing full-FIT selection queue requires reconciliation')
+        status=dict(pid=os.getpid(),driver_sha256=sha(__file__),development_results_read=False)
+        def save(stage,**extra):
+            status.update(stage=stage,checked_utc=datetime.now(timezone.utc).isoformat(),**extra);output.write_bytes(encoded(status))
+        try:
+            while not (root/'full_fit/PLAN.json').exists():
+                save('waiting_for_full_fit_admission');time.sleep(30)
+            admission,path=resolve_admission(root);pin=sha(path)
+            while True:
+                if sha(path)!=pin:raise ValueError('full-FIT admission changed during selection wait')
+                ready,missing=readiness(root,admission)
+                save('waiting_for_search_evaluation',ready_cells=ready,missing_cells=missing,admission_sha256=pin)
+                if not missing:break
+                time.sleep(30)
+            # Validate every role before writing any new setting choice.
+            for role in ROLES:build(root,role)
+            for role in ROLES:
+                path=root/'full_fit/selection'/(role+'.json')
+                if not path.exists():register(root,role)
+                resolve(root,role)
+            pins={}
+            for role in ROLES:
+                _,path=resolve(root,role);pins[str(path)]=sha(path)
+            save('all_role_settings_verified',selection_sha256=pins)
+        except Exception as error:
+            save('failed',error=str(error));raise
+
+
 if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__);p.add_argument('--study',type=Path,required=True)
-    p.add_argument('--role',choices=ROLES,required=True);p.add_argument('--register',action='store_true');a=p.parse_args()
-    print(json.dumps((register if a.register else build)(a.study,a.role)),flush=True)
+    p.add_argument('--role',choices=ROLES);p.add_argument('--register',action='store_true');p.add_argument('--watch',action='store_true');a=p.parse_args()
+    if a.watch:
+        if a.role or a.register:p.error('watch owns all roles and registration')
+        watch(a.study)
+    else:
+        if not a.role:p.error('role required')
+        print(json.dumps((register if a.register else build)(a.study,a.role)),flush=True)

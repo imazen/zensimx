@@ -1480,3 +1480,22 @@ any scientific run; its failing log is preserved. After correction, the full
 missing admissions, missing shared preparation, exact coverage and draining
 children after failure. All 18 full-FIT tests pass. Wrapper: `run-heavy: done
 rc=0 3s | peak-RSS 0.19GiB | min-avail 32108MiB | peak-load 24.22`.
+
+## Full-FIT setting-selection supervision
+
+The existing full-FIT selection owner now waits for the admitted search plan,
+then for every registered candidate's completed evaluation and every neural
+candidate's training-only convergence receipt. Readiness checks inspect metadata
+only; the existing candidate verifier checks actual report/model/diagnostic
+hashes and scope before any setting choice is written. It validates all six
+roles before registering new choices, then reproduces all six decisions and
+records their hashes. Failed fits, failed native gates and ambiguous completed
+candidates stop the watcher with preserved evidence. An existing watcher record
+requires explicit reconciliation.
+
+The new checks exercise missing admission before selection reads, delayed neural
+diagnostics, repaired-evaluation routing, failed-gate preservation and refusal to
+write partial choices when the last role fails qualification. All 21 full-FIT
+tests pass. Wrapper: `run-heavy: done rc=0 2s | peak-RSS 0.19GiB |
+min-avail 32150MiB | peak-load 22.87`. These are orchestration qualifications,
+not completed search experiments or newly selected settings.
