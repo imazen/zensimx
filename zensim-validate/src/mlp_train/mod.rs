@@ -3185,6 +3185,7 @@ pub fn train_mlp_strategy_pairs(
     );
     let shared_depth_on = shared_depth::enabled(&effective);
     monotone_research::check_admission(&effective);
+    let unrestricted_first = monotone_research::unrestricted_first();
     let shared_smooth = effective.smooth_hinge;
     let first_layer_hp;
     let hyperparams = if shared_depth_on {
@@ -3235,6 +3236,7 @@ pub fn train_mlp_strategy_pairs(
                          b2: &mut [f64],
                          pin: Option<f64>,
                          hp: &MlpHyperparams| {
+        if unrestricted_first { return; }
         match max_pair_positions.as_deref() {
             Some(pairs) => project_plain_indexed(w1, w2, b1, b2, pin, hp, Some(pairs)),
             None => project_plain(w1, w2, b1, b2, pin, hp),
@@ -3347,6 +3349,10 @@ pub fn train_mlp_strategy_pairs(
         eprintln!("{msg}");
         log.push(msg.to_string());
     };
+
+    if unrestricted_first {
+        log_line("RESEARCH_DIAGNOSTIC: unrestricted first-layer weights/biases; no pair ties; scale-only transform retained; no identity/monotonicity guarantee", log);
+    }
 
     // Say the output convention out loud: a bake trained under DISTANCE and a
     // bake trained under SCORE are not interchangeable, and which one a run got

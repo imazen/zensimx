@@ -24,6 +24,20 @@ pub(super) fn check_admission(hp: &MlpHyperparams) {
     }
 }
 
+/// Opt-in diagnostic removes first-layer projection while keeping the same
+/// scale-only feature transform. Admission flags still select the shared owner.
+pub(super) fn unrestricted_first() -> bool {
+    let Some(path) = std::env::var_os("ZENSIM_MONOTONE_RESEARCH_MANIFEST") else { return false; };
+    let expected = std::env::var("ZENSIM_MONOTONE_RESEARCH_SHA256").expect("manifest hash");
+    assert_eq!(crate::train_manifest::sha256_file(std::path::Path::new(&path)).unwrap(), expected);
+    let c: Config = serde_json::from_slice(&std::fs::read(path).unwrap()).expect("research config");
+    if c.unrestricted_first {
+        assert_eq!(c.family, Family::SiluDiagnostic);
+        assert_eq!(c.max_pairs, 0, "unrestricted diagnostic cannot retain max-pair ties");
+    }
+    c.unrestricted_first
+}
+
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
 enum Family {
@@ -39,6 +53,8 @@ enum Family {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct Config {
+    #[serde(default, skip_serializing_if = "is_false")]
+    unrestricted_first: bool,
     #[serde(default, skip_serializing_if = "is_zero")]
     negative_slope: f64,
     schema: String,
@@ -55,6 +71,8 @@ struct Config {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     analytic: Option<analytic::Config>,
 }
+
+fn is_false(value: &bool) -> bool { !value }
 
 fn is_zero(value: &f64) -> bool {
     *value == 0.
@@ -331,6 +349,7 @@ mod tests {
 
     fn config(family: Family, deep: bool) -> Config {
         Config {
+            unrestricted_first: false,
             schema: "monotone-head-v1".into(),
             negative_slope: 0.,
             family,
@@ -766,6 +785,7 @@ impl Network {
 
     fn new(config: Config, pin: f64, rng: &mut SplitMix64) -> Self {
         assert!(config.max_pairs * 2 <= config.first_width);
+        assert!(!config.unrestricted_first || (config.family == Family::SiluDiagnostic && config.max_pairs == 0));
         assert!((0.0..=1.0).contains(&config.negative_slope));
         assert!(config.negative_slope == 0. || config.family == Family::Switch);
         assert!((1..=2).contains(&config.widths.len()));
@@ -808,6 +828,7 @@ impl Network {
             .map(|_| rng.next_normal().abs() * (0.1 / ni as f64).sqrt())
             .collect();
         let dropout_rng = SplitMix64::new(config.training.as_ref().map_or(0, |c| c.dropout_seed));
+        let diagnostic = config.family == Family::SiluDiagnostic;
         Self {
             config,
             dropout_rng,
@@ -815,7 +836,7 @@ impl Network {
             diagnostics: Diagnostics::default(),
             blocks,
             output,
-            adam: AdamState::new(ni, 0, 0, 0),
+            adam: AdamState::new(ni, usize::from(diagnostic), 0, 0),
             pin,
         }
     }
@@ -846,7 +867,8 @@ impl Network {
     pub(super) fn training_forward(&self, first: &[f64]) -> (f64, Vec<f64>, Vec<f64>) {
         let mut cache = self.forward(first);
         if let Some(mask) = &self.mask {
-            let last = &cache.2[cache.2.len() - self.output.len()..];
+            if self.config.family == Family::SiluDiagnostic { self.adam.gb1[0] += dy; }
+        let last = &cache.2[cache.2.len() - self.output.len()..];
             cache.0 = last
                 .iter()
                 .zip(&self.output)
@@ -936,8 +958,10 @@ impl Network {
             self.diagnostics.output_gradient_squared +=
                 self.adam.gw1.iter().map(|g| g * g).sum::<f64>();
         }
-        self.adam
-            .step(&mut self.output, &mut [], &mut [], &mut [], lr);
+        let bias = if self.config.family == Family::SiluDiagnostic {
+            std::slice::from_mut(&mut self.pin)
+        } else { &mut [] };
+        self.adam.step(&mut self.output, bias, &mut [], &mut [], lr);
         if let Some(study) = &self.config.training {
             super::training_research::decay(&mut self.output, lr, study.adamw);
             for block in &mut self.blocks {
