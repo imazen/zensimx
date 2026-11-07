@@ -1,12 +1,30 @@
 import sys
 from pathlib import Path
 import unittest
+import json,tempfile
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'rev4_featpot'))
 from shaping_pretraining import matching_parent,structural_terms
 from shaping_execution import registered_subset
+from shaping_pretrained_dispatch import existing_trial
+from shaping_completion import sha
 
 
 class PrefixTests(unittest.TestCase):
+    def test_resumed_dispatch_checks_completed_model_identity(self):
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as directory:
+            root=Path(directory);cell=dict(id='child',family='product_pretrained_joint')
+            self.assertIsNone(existing_trial(root,cell,'plan','build'))
+            failed=root/'runs/child/attempt-001';failed.mkdir(parents=True)
+            (failed/'ORCHESTRATION_FAILURE.json').write_text('{}')
+            attempt=root/'runs/child/attempt-002';(attempt/'checkpoints').mkdir(parents=True)
+            (attempt/'RUN.json').write_text(json.dumps(dict(cell=cell,plan_sha256='plan',build_sha256='build',epochs=120)))
+            bake=attempt/'checkpoints/ckpt_epoch119.bin';bake.write_bytes(b'model')
+            (attempt/'RESULT.json').write_text(json.dumps(dict(stage='trained',exit_code=0,bake_sha256=sha(bake))))
+            self.assertEqual(existing_trial(root,cell,'plan','build'),('trained',None))
+            with self.assertRaises(ValueError):existing_trial(root,cell,'other-plan','build')
+            bake.write_bytes(b'changed')
+            with self.assertRaises(ValueError):existing_trial(root,cell,'plan','build')
+
     def test_native_knot_decimal_roundtrip_is_bit_exact(self):
         a={'terms':[dict(column=0,knots=[0.03746293485164642,0.17839227616786957],slopes=[1,1,1])]}
         b={'terms':[dict(column=0,knots=[0.037462935,0.17839228],slopes=[0,0,0])]}

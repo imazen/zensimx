@@ -102,3 +102,9 @@ different Python-f64 values. Exact f32-bit comparison now matches the native
 contract; the regression rejects an adjacent f32 knot. Both frozen and jointly
 fine-tuned manifests extract all 984 terms from the completed product parent.
 The failed pre-training attempt is preserved; no optimizer steps were run.
+
+Resumed pretrained dispatch uses a new audit directory. It reconciles completed
+children by their plan, build, cell, exposure and final checkpoint hash, and
+counts already running native children against the same worker limit after
+checking their live command lines. It never silently relaunches a missing or
+failed process. Pre-training failure receipts remain alongside repaired attempts.
