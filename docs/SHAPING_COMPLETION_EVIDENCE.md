@@ -963,3 +963,6 @@ reserved or already placed cells. Pretraining rechecks placement after obtaining
 its claim, releasing it without training if another host acquired the cell in
 the intervening snapshot. This keeps required-work waits explicit and closes
 the placement/admission race without changing any scientific budget or gate.
+
+Pretrained children inherit the coordinator's resolved Python executable;
+the native trainer and registered scientific inputs remain pinned separately.

@@ -90,6 +90,7 @@ class PretrainedDispatchTests(unittest.TestCase):
                 with self.assertRaises(Observed):module.dispatch(args)
             status=json.loads((root/'dispatch/pretrained/inner-0-0/test/STATUS.json').read_text())
             self.assertEqual(len(launched),1);self.assertEqual(launched[0][-3:],['1','--workers','1'])
+            self.assertEqual(launched[0][0],sys.executable)
             self.assertEqual(status['completed'],['1']);self.assertEqual(released,['0','1'] if placement_race else ['1']);self.assertFalse(status['active'])
             self.assertEqual(len(status['required_cells']),2)
             self.assertEqual(set(status['interrupted_parent_dependencies']),set() if foreign else {'0'})

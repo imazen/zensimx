@@ -124,7 +124,7 @@ def dispatch(args):
                 release_worker(args.study,cell['id']);failure=str(error);break
             if placement and placement['host']!=__import__('socket').gethostname():
                 release_worker(args.study,cell['id']);placed[cell['id']]=placement;continue
-            cmd=['python3','-B','scripts/rev4_featpot/shaping_execution.py','--study',str(args.study),
+            cmd=[os.sys.executable,'-B','scripts/rev4_featpot/shaping_execution.py','--study',str(args.study),
                  '--binary-dir',str(args.binary_dir),'--partition',args.partition,'--inner-family',
                  '--family',cell['family'],'--cell',cell['id'],'--workers','1']
             log=None;process=None
