@@ -1,6 +1,6 @@
 """Descriptive learned input responses across a complete paired inner setting."""
 from __future__ import annotations
-import argparse,json,math,subprocess
+import argparse,json,math,subprocess,struct
 from pathlib import Path
 from shaping_completion import encoded,sha
 from shaping_execution import load_registration
@@ -25,6 +25,8 @@ def compare(configs):
         for t in terms:
             if any(not math.isfinite(v) or v<0 for v in t['knots']+t['slopes']+t['gate']) or not 0<t['knots'][0]<t['knots'][1]:
                 raise ValueError('invalid native shape or gate')
+        # serde's shortest f32 decimals parse as f64 in Python; recover exact wire values.
+        terms=[dict(t,**{k:[struct.unpack('<f',struct.pack('<f',v))[0] for v in t[k]] for k in ('knots','slopes','gate')}) for t in terms]
         grid=sorted({0.,*(v for t in terms for v in t['knots'])})
         references=[0.,.5,1.] if terms[0]['separate'] else [1.]
         curves=[[response(t,x,f) for x in grid for f in references] for t in terms]
@@ -42,14 +44,15 @@ def compare(configs):
 
 def report(args):
     _,cells,_=load_registration(args.study)
-    selected=[c for c in cells if c['stage']=='inner' and c['family']==args.family and c['setting']==args.setting and
+    families=['product_joint_identity','separate_joint_identity'] if args.family=='direct_joint_both' else [args.family]
+    selected=[c for c in cells if c['stage']=='inner' and c['family'] in families and c['setting']==args.setting and
               c['partition'] in (f'inner-{args.outer}-0',f'inner-{args.outer}-1')]
-    if len(selected)!=6 or {(c['partition'],c['seed']) for c in selected}!={(f'inner-{args.outer}-{fold}',seed) for fold in range(2) for seed in range(3)}:
-        raise ValueError('complete six-fit paired setting required')
+    if len(selected)!=6*len(families) or {(c['family'],c['partition'],c['seed']) for c in selected}!={(family,f'inner-{args.outer}-{fold}',seed) for family in families for fold in range(2) for seed in range(3)}:
+        raise ValueError('complete paired setting required')
     args.output.mkdir(parents=True,exist_ok=False);configs=[];pins={};fits=[]
     build=json.loads((args.binary_dir/'BUILD.json').read_text())
     if sha(args.binary_dir/'bake_dial_refit')!=build['binary_sha256']['bake_dial_refit']:raise ValueError('native metadata reader drift')
-    for cell in sorted(selected,key=lambda c:(c['partition'],c['seed'])):
+    for cell in sorted(selected,key=lambda c:(c['family'],c['partition'],c['seed'])):
         _,_,evidence=verified_candidate(args.study,cell);pins.update(evidence)
         run=next(Path(p).parent for p in evidence if Path(p).name=='RUN.json')
         identity=json.loads((run/'RUN.json').read_text())
@@ -59,6 +62,7 @@ def report(args):
         initial=json.loads((run/'SHAPING.json').read_text())
         if structural_terms(config)!=structural_terms(initial):raise ValueError('native shape structure differs from TRAIN initialization')
         pins[str(model)]=sha(model);pins[str(run/'SHAPING.json')]=sha(run/'SHAPING.json')
+        if args.family=='direct_joint_both':config['terms']=[t for t in config['terms'] if t['reference'] is None]
         (args.output/(cell['id']+'.json')).write_bytes(encoded(config));configs.append(config);fits.append(cell)
     rows=compare(configs)
     result=dict(scope='Descriptive one-setting inner fit comparison; no quality selection, outer scores or transferable-utility claim.',
@@ -66,7 +70,7 @@ def report(args):
         domain='Zero through largest TRAIN second damage knot; separate reference gates use [0,1]. No claim beyond this domain.',
         downstream_weights_included=False,zero_terms_are_not_useful_stability=True,fits=fits,input_sha256=pins,
         plan_sha256=sha(args.study/'PLAN.json'),driver_sha256=sha(__file__),terms=rows,
-        active_in_all=sum(r['active_fits']==6 for r in rows),zero_in_all=sum(r['active_fits']==0 for r in rows),total_terms=len(rows))
+        active_in_all=sum(r['active_fits']==len(selected) for r in rows),zero_in_all=sum(r['active_fits']==0 for r in rows),total_terms=len(rows))
     (args.output/'CURVE_STABILITY.json').write_bytes(encoded(result))
     print(json.dumps({k:result[k] for k in ('active_in_all','zero_in_all','total_terms')}),flush=True)
 
@@ -74,6 +78,6 @@ def report(args):
 if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__)
     for key in ('study','binary-dir','output'):p.add_argument('--'+key,type=Path,required=True)
-    p.add_argument('--family',choices=['product_joint_identity','separate_joint_identity'],required=True)
+    p.add_argument('--family',choices=['product_joint_identity','separate_joint_identity','direct_joint_both'],required=True)
     p.add_argument('--outer',type=int,choices=range(3),required=True);p.add_argument('--setting',type=int,choices=range(4),required=True)
     report(p.parse_args())

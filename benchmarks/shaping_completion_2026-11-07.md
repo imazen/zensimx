@@ -1128,3 +1128,43 @@ checks, preservation of failures, an empty verified matrix, and a nonempty queue
 with continuous/pretrained/fresh-control exposures and a measured two-child
 maximum. These are orchestration checks, not scientific fits. Extension evaluation
 and outer admission still require the existing complete diagnostic gates.
+
+## Native input-response reproducibility, outer-0 inner partitions, setting 0
+
+This descriptive comparison uses all three paired seeds on both inner partitions
+for each identity-initialized joint-shaping family. It reads final native shaping
+metadata only after completed candidate provenance verifies. Neither outer
+responses nor quality rankings select these fits. Exact f32 parameter values are
+recovered from the metadata decimals before evaluating real-valued curves.
+
+Among 984 terms, product shaping has 14 active in all six fits and 438 zero in
+all six. Separate shaping has 12 active throughout and 613 zero throughout.
+The five smallest normalized response spreads among always-active product terms
+are f19 (0.034083065198891704), f597 (0.04340139520968023), f59×f509
+(0.05733979197287997), f586 (0.06337348810652772), and f403
+(0.0972438711225124). For separate shaping, f403 has the smallest such spread,
+0.0859823010854921. This is descriptive ordering, not a registered quality selection.
+
+Across both architectures' twelve fits, five of 492 direct terms remain active.
+Only f403 has a normalized spread below 0.8: 0.16523522064482415, with response
+strength varying by 3.98478155991701. The other four spreads range from
+0.8517161053827695 to 1.0. This supports a limited repeatability observation;
+it does not establish a reusable shaper bank or improved generalization.
+Downstream weights are excluded, so a nonzero input response is not proof of
+usefulness to the fitted network. Zero terms are never counted as useful stability.
+
+The comparison domain ends at the largest TRAIN-fitted second knot. Separate
+terms compare the full damage/reference response rectangle at the union of shape
+knots and gate vertices (reference 0, 0.5, 1), rather than ignoring gate variation.
+No extrapolation or bit-exact runtime-score claim is made. Per-term slope/gate
+ranges, source hashes and full manifests are in the three
+`native-*-stability-o0-s0-v2` artifact directories. Initial decimal-f64 summaries
+are retained separately; v2 uses exact native f32 parameters. Four tests cover
+curve/strength normalization, wire-equivalent decimal spellings, separate gates,
+and exclusion of zero/invalid terms.
+
+Diagnostic coverage remains incomplete: existing optimizer traces record
+first-activation gradients, not first-weight gradients. The latter must not be
+reported as measured from these traces. Source inspection confirms this distinction
+in `shared_depth.rs` and `monotone_research.rs`; native first-weight diagnostics
+remain required by the frozen protocol.

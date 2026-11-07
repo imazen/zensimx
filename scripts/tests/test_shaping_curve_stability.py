@@ -10,6 +10,11 @@ class CurveStabilityTests(unittest.TestCase):
     def test_linear_shape_is_knot_and_strength_invariant(self):
         a=self.config();b=copy.deepcopy(a);b['terms'][0].update(knots=[2.,3.],slopes=[2.,2.,2.])
         r=compare([a,b])[0];self.assertEqual(r['normalized_response_max_spread'],0.);self.assertEqual(r['strength_ratio'],2.)
+    def test_equivalent_f32_spellings_have_identical_curves(self):
+        a=self.config();b=copy.deepcopy(a);b['terms'][0]['slopes'][0]=1.00000001
+        original=copy.deepcopy(b)
+        self.assertEqual(compare([a,b])[0]['normalized_response_max_spread'],0.)
+        self.assertEqual(b,original)
     def test_separate_gate_difference_is_not_hidden_by_damage_normalization(self):
         a=self.config(True);b=copy.deepcopy(a);b['terms'][0]['gate']=[1.,1.,0.]
         r=compare([a,b])[0];self.assertEqual(r['normalized_response_max_spread'],1.)
