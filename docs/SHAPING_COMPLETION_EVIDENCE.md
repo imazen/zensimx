@@ -867,7 +867,7 @@ new admissions while active children finish; an empty drained queue reports
 `drained`, preserving its incomplete required-cell list rather than claiming
 scientific completion. Resume continues to verify original completed-fit evidence.
 
-Eight dispatch tests pass, including an isolated process simulation that launches
+Nine dispatch tests pass, including an isolated process simulation that launches
 two children, requests draining, retains their completion and leaves 238 cells
 unstarted. No native training is invoked by that simulation. Resource files
 cannot change epochs, targets, settings or any other scientific input.
@@ -889,3 +889,10 @@ holds this lock. Claim ownership and child PIDs are recorded; normal completion
 releases claims, while unexpected owner death requires explicit reconciliation.
 Eight separate process contenders admitted exactly four pending children under
 a four-slot fixture budget. No native training was run in that test.
+
+The shared guard also includes existing unfinished scientific runs and their
+startup storage reservations. Their cells are deduplicated against shared
+claims and native command lines, so a legacy child still loading inputs cannot
+be mistaken for an idle CPU slot. Terminal run records and released storage
+reservations remove that demand; stale reservations still require reconciliation.
+The additional regression covers this admission boundary without training.

@@ -94,12 +94,29 @@ def worker_claims(root):
         path.write_bytes(encoded(claims))
 
 
+def pending_scientific_cells(root):
+    import re
+    cells={p.parent.parent.name for p in root.glob('runs/*/attempt-*/RUN.json')
+           if not p.with_name('RESULT.json').exists()}
+    directory=root/'storage-admission'
+    if directory.exists():
+        with (directory/'transaction.lock').open('a') as lock:
+            fcntl.flock(lock,fcntl.LOCK_EX)
+            ledger=directory/'RESERVATIONS.json'
+            for path in json.loads(ledger.read_text()) if ledger.exists() else {}:
+                match=re.search(r'/runs/([a-f0-9]{20})/attempt-',path)
+                if match:cells.add(match[1])
+    return cells
+
+
 def reserve_worker(root,cell,proc=Path('/proc'),cpu_count=None):
     # The lock spans this short admission transaction, never training.
     # Unexpected dead-owner claims remain reserved for explicit reconciliation.
     with worker_claims(root) as claims:
-        observation=worker_slot(claims,proc,cpu_count)
+        legacy=pending_scientific_cells(root)
+        observation=worker_slot(set(claims)|legacy,proc,cpu_count)
         observation['shared_claims']=len(claims)
+        observation['existing_scientific_reservations']=len(legacy)
         if cell in claims:
             observation.update(can_start=False,reason='cell already claimed')
         if observation['can_start']:

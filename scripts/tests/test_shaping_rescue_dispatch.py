@@ -121,6 +121,17 @@ class DispatchTests(unittest.TestCase):
             self.assertFalse(reserve_worker(root,'after-owners-exit',proc,8)['can_start'])
 
 
+    def test_legacy_startup_reservations_share_the_cpu_budget(self):
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as d:
+            root=Path(d);proc=root/'proc';proc.mkdir();(proc/'meminfo').write_text('MemAvailable: 83886080 kB\n')
+            run=root/'runs'/('a'*20)/'attempt-001';run.mkdir(parents=True);(run/'RUN.json').write_text('{}')
+            storage=root/'storage-admission';storage.mkdir();(storage/'RESERVATIONS.json').write_text(json.dumps({str(run):{}}))
+            for i in range(3):self.assertTrue(reserve_worker(root,str(i),proc,8)['can_start'])
+            denied=reserve_worker(root,'fourth',proc,8);self.assertFalse(denied['can_start']);self.assertEqual(denied['existing_scientific_reservations'],1)
+            (run/'RESULT.json').write_text('{}');(storage/'RESERVATIONS.json').write_text('{}')
+            self.assertTrue(reserve_worker(root,'fourth',proc,8)['can_start'])
+
+
     def test_all_paired_reports_and_diagnostics_are_required(self):
         cells=matrix()
         with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as d:
