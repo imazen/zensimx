@@ -96,6 +96,14 @@ def run_native(root,binary_dir,cell,record,attempt,epochs,mem):
     for key in ('ZENSIM_MONOTONE_RESEARCH_MANIFEST','ZENSIM_MONOTONE_RESEARCH_SHA256',
                 'ZENSIM_INPUT_SHAPING_MANIFEST','ZENSIM_INPUT_SHAPING_SHA256'):
         env.pop(key,None)
+    if cell['family'] in ('product_joint_identity','separate_joint_identity'):
+        kind='separate' if cell['family'].startswith('separate') else 'product'
+        initial=root/'shapes'/cell['partition']/kind/'INITIAL.json'
+        receipt=json.loads((initial.parent/'RECEIPT.json').read_text())
+        if sha(initial)!=receipt['manifest_sha256']:raise ValueError('initial shape drift')
+        path=dest/'SHAPING.json';shutil.copy2(initial,path)
+        env['ZENSIM_INPUT_SHAPING_MANIFEST']=str(path)
+        env['ZENSIM_INPUT_SHAPING_SHA256']=sha(path)
     if analytic_family:
         tau,learn,bias=((.25,False,0.),(1.,False,0.),(1.,True,.25),(4.,True,1.))[cell['setting']]
         if cell['family']=='softplus' and cell['setting']==3:bias=-1.
@@ -138,7 +146,9 @@ def execute(args):
     if args.resource_pilot:
         selected=[c for c in cells if c['stage']=='resource_pilot'];epochs=1;workers=1;mem='4G'
     else:
-        families=('softplus','silu_monotone','silu_diagnostic') if args.family=='analytic' else (args.family,)
+        if args.family=='analytic':families=('softplus','silu_monotone','silu_diagnostic')
+        elif args.family=='joint_shapes':families=('product_joint_identity','separate_joint_identity')
+        else:families=(args.family,)
         selected=[c for c in cells if c['stage']=='inner' and c['family'] in families and c['partition']==args.partition]
         selected.sort(key=lambda c:(c['setting'],c['seed'],families.index(c['family'])))
         epochs=240;workers=args.workers;mem='1G'
@@ -149,6 +159,10 @@ def execute(args):
     if shutil.disk_usage(args.study).free < plan['minimum_ssd_free_bytes']+(workers+2)*1024**3:
         raise ValueError('SSD reserve does not admit this wave')
     records={p:prepare_partition(args.study,p,partitions[p],plan) for p in {c['partition'] for c in selected}}
+    if not args.resource_pilot and any(c['family'].endswith('joint_identity') for c in selected):
+        from shaping_inputs import prepare
+        for partition in {c['partition'] for c in selected}:
+            for separate in (False,True):prepare(args.study,partition,partitions[partition],plan,separate)
     os.environ['REV4_V2_BIN_DIR']=str(args.binary_dir)
     import v2_common
     import v2_lodo_mlp as owner
@@ -201,7 +215,7 @@ def main():
     mode.add_argument('--resource-pilot',action='store_true')
     mode.add_argument('--inner-relu',action='store_true')
     mode.add_argument('--inner-family',action='store_true')
-    p.add_argument('--family',choices=['relu','softplus','silu_monotone','silu_diagnostic','analytic'],default='relu')
+    p.add_argument('--family',choices=['relu','softplus','silu_monotone','silu_diagnostic','analytic','product_joint_identity','separate_joint_identity','joint_shapes'],default='relu')
     mode.add_argument('--status',action='store_true')
     p.add_argument('--partition',default='inner-0-0')
     p.add_argument('--workers',type=int,default=12)

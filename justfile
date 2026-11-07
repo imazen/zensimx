@@ -4890,3 +4890,12 @@ shaping-completion-status study:
 
 shaping-completion-inner-analytic study binary_dir partition family:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 8G --jobs 4 -- python3 -B scripts/rev4_featpot/shaping_execution.py --study {{quote(study)}} --binary-dir {{quote(binary_dir)}} --inner-family --partition {{quote(partition)}} --family {{quote(family)}} --workers 4
+
+shaping-completion-inputs study partition:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 2G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_inputs.py --study {{quote(study)}} --partition {{quote(partition)}}
+
+shaping-completion-inputs-check:
+    python3 -B -m unittest discover -s scripts/tests -p test_shaping_inputs.py
+
+shaping-completion-inner-shapes study binary_dir partition:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 4G --jobs 2 -- python3 -B scripts/rev4_featpot/shaping_execution.py --study {{quote(study)}} --binary-dir {{quote(binary_dir)}} --inner-family --partition {{quote(partition)}} --family joint_shapes --workers 2
