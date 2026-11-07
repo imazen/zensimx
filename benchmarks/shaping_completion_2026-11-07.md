@@ -2428,3 +2428,27 @@ Cold readback verified `i270-pretrained21b-admission-evidence`: 19 artifacts,
 Cold readback verified `i270-pretrained21b-inputs`: 3 artifacts,
 25104697 bytes, receipt
 `df1f337c0869fa3c307c7efa7ae9f71b5bd8f35f153d8885a75d50ea5ceddf64`.
+
+
+## Rescue resource-control qualification and idle queue upgrade
+
+Source `f7e0ea10f51d` adds worker-budget and drain controls while retaining the
+existing one-to-four bound. Five tests pass. An isolated child-process
+simulation proves a drained queue retains two completed children and leaves
+238 registered cells unstarted; no native training occurs in that test.
+Admission counts observed native trainers plus this dispatcher's starting
+children, and requires CPU headroom and 6 GiB available RAM before new launches.
+Budget files cannot change scientific fields.
+
+Outer fold 1 was already running two rescue fits when checked, so its idle-only
+replacement guard refused before any signal or mutation. Active fold-0 and
+fold-1 controllers remain unchanged. Only the idle fold-2 dispatcher was
+replaced, with a verified empty process-child list and no fit interruption.
+The new dispatcher is live, supervising its original 240 required cells at a
+two-worker limit, with resource-file hash and drain state recorded. The mutable
+control directory remains separate from the immutable evidence snapshot.
+No native training or completed fit was replayed.
+
+Cold readback verified `rescue-resource-controls-evidence-1650`: 10 artifacts,
+38035 bytes, receipt
+`0bb570925450025080b196b47ae330f0d079daa3a65dfaf839353dfc2209e524`.
