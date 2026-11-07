@@ -1499,3 +1499,22 @@ write partial choices when the last role fails qualification. All 21 full-FIT
 tests pass. Wrapper: `run-heavy: done rc=0 2s | peak-RSS 0.19GiB |
 min-avail 32150MiB | peak-load 22.87`. These are orchestration qualifications,
 not completed search experiments or newly selected settings.
+
+## Final full-FIT refit queue
+
+The same execution queue now supports the registered 16 final refits after
+all six setting decisions exist and reproduce. It pins those decisions and
+rechecks cross-role scope through the existing final-fit resolver before any
+final input preparation. The exact matrix contains 12 native fits and two
+control groups covering four fits. Two jobs may run concurrently; each final
+fit still passes its own admission and SSD reservation. Final control routing
+uses `--full-fit-refit`, preserving descriptive development evaluation and
+excluding those results from setting selection.
+
+The simulated final queue covers all 16 cells exactly once, verifies two-slot
+admission and checks that a missing sixth role prevents both preparation and
+launch. Earlier search, failure-draining, selection and native execution checks
+remain green: 23 full-FIT tests pass. Wrapper: `run-heavy: done rc=0 2s |
+peak-RSS 0.19GiB | min-avail 32204MiB | peak-load 23.48`. These qualification
+fits are simulated, not scientific results. The queue's terminal stage explicitly
+requires reports; it does not certify inference costs, archives or study completion.

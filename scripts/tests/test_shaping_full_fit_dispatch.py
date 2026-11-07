@@ -105,3 +105,66 @@ class FullFitDispatchTests(unittest.TestCase):
                  patch('shaping_full_fit_execution.time.sleep',side_effect=RuntimeError('waiting for shared inputs')):
                 with self.assertRaisesRegex(RuntimeError,'shared inputs'):watch_search(args)
                 prepare.assert_not_called();launch.assert_not_called()
+
+    def test_final_refits_require_all_settings_before_preparation(self):
+        from shaping_completion import ROLES
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as directory:
+            root=Path(directory);cells,a,path,args=self.fixture(root);args.watch_refit=True
+            a['final_cells']=[c for c in cells if c['stage']=='full_fit']
+            for outer in range(3):
+                p=root/'selection'/f'outer-{outer}'/'OUTER_ADMISSION.json';p.parent.mkdir(parents=True);p.write_text('{}')
+            for role in ROLES[:-1]:
+                p=root/'full_fit/selection'/(role+'.json');p.parent.mkdir(exist_ok=True);p.write_text('{}')
+            with patch('shaping_full_fit_execution.resolve_admission',return_value=(a,path)),\
+                 patch('shaping_full_fit_execution.load_registration',return_value=({},cells,{})),\
+                 patch('shaping_full_fit_execution.prepare') as prepare,\
+                 patch('shaping_full_fit_execution.refit_cell') as refit,\
+                 patch('shaping_full_fit_execution.subprocess.Popen') as launch,\
+                 patch('shaping_full_fit_execution.time.sleep',side_effect=RuntimeError('missing last role')):
+                with self.assertRaisesRegex(RuntimeError,'missing last role'):watch_search(args)
+                prepare.assert_not_called();refit.assert_not_called();launch.assert_not_called()
+
+    def test_final_queue_has_all16_refits_and_preserves_descriptive_scope(self):
+        from shaping_completion import ROLES
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as directory:
+            root=Path(directory);cells,a,path,args=self.fixture(root);args.watch_refit=True
+            a['final_cells']=[c for c in cells if c['stage']=='full_fit']
+            for outer in range(3):
+                p=root/'selection'/f'outer-{outer}'/'OUTER_ADMISSION.json';p.parent.mkdir(parents=True);p.write_text('{}')
+            for role in ROLES:
+                p=root/'full_fit/selection'/(role+'.json');p.parent.mkdir(exist_ok=True);p.write_text('{}')
+            jobs=search_jobs(cells,a,True);self.assertEqual(len(jobs),14);self.assertEqual(sum(map(len,jobs)),16)
+            groups={j[0]['id']:j for j in jobs};started=[];live=0;peak=0;verified=[]
+            def setting(study,role):
+                verified.append(role);return {},root/'full_fit/selection'/(role+'.json')
+            class Process:
+                def __init__(child,cmd,**kwargs):
+                    nonlocal live,peak
+                    self.assertEqual(verified,list(ROLES))
+                    if '--cell' in cmd:group=groups[cmd[cmd.index('--cell')+1]]
+                    else:
+                        self.assertIn('--full-fit-refit',cmd);self.assertNotIn('--full-fit-selection',cmd)
+                        family='extra_trees' if '--tree' in cmd else 'shaped_additive'
+                        group=next(j for j in jobs if j[0]['family']==family)
+                    child.group=group;started.extend(c['id'] for c in group);child.pid=1000+len(started);child.returncode=None
+                    live+=1;peak=max(peak,live)
+                def poll(child):
+                    nonlocal live
+                    if child.returncode is not None:return child.returncode
+                    for c in child.group:
+                        self.assertEqual(c['partition'],'full-fit');r=root/'runs'/c['id']/'attempt-001';r.mkdir(parents=True)
+                        identity=dict(cell=c,admission_sha256=sha(path),plan_sha256=sha(root/'PLAN.json'),
+                            build_sha256=sha(args.binary_dir/'BUILD.json'),selection_scope='full_fit_refit',development_results_read=False)
+                        (r/'RUN.json').write_bytes(encoded(identity));(r/'RESULT.json').write_bytes(encoded(dict(identity,
+                            stage='trained' if a['finalist_roles'][c['family']] in NEURAL else 'complete',exit_code=0)))
+                    live-=1;child.returncode=0;return 0
+            with patch('shaping_full_fit_execution.resolve_admission',return_value=(a,path)),\
+                 patch('shaping_full_fit_execution.load_registration',return_value=({},cells,{})),\
+                 patch('shaping_full_fit_selection.resolve',side_effect=setting),\
+                 patch('shaping_full_fit_execution.refit_cell') as refit,\
+                 patch('shaping_full_fit_execution.prepare') as prepare,\
+                 patch('shaping_full_fit_execution.subprocess.Popen',side_effect=Process),patch('shaping_full_fit_execution.time.sleep'):
+                watch_search(args);refit.assert_called_once();prepare.assert_called_once()
+            self.assertEqual(peak,2);self.assertEqual(live,0);self.assertEqual(len(started),16);self.assertEqual(len(set(started)),16)
+            status=json.loads((root/'dispatch/full-fit-refit/STATUS.json').read_text())
+            self.assertEqual(status['stage'],'refit_fits_finished_reports_required')
