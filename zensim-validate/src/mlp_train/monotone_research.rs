@@ -4,6 +4,7 @@ use super::{AdamState, MlpHyperparams, SplitMix64};
 use serde::{Deserialize, Serialize};
 use zenpredict::{Activation, WeightDtype};
 use zenpredict_bake::{BakeLayer, BakeMetadataEntry, BakeRequest, bake};
+mod analytic;
 #[path = "../spline_segments.rs"]
 mod spline_segments;
 
@@ -30,6 +31,9 @@ enum Family {
     Switch,
     Spline,
     Lipschitz,
+    Softplus,
+    SiluMonotone,
+    SiluDiagnostic,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -48,6 +52,8 @@ struct Config {
     max_pairs: usize,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     training: Option<super::training_research::Config>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    analytic: Option<analytic::Config>,
 }
 
 fn is_zero(value: &f64) -> bool {
@@ -55,6 +61,7 @@ fn is_zero(value: &f64) -> bool {
 }
 
 struct Block {
+    learn_temperature: bool,
     negative_slope: f64,
     kind: Family,
     ni: usize,
@@ -71,7 +78,10 @@ impl Block {
         let w = (0..ni * no)
             .map(|_| {
                 let value = rng.next_normal() * scale;
-                if matches!(kind, Family::Caps | Family::Spline) {
+                if matches!(
+                    kind,
+                    Family::Caps | Family::Spline | Family::Softplus | Family::SiluMonotone
+                ) {
                     value.abs()
                 } else {
                     value
@@ -82,7 +92,8 @@ impl Block {
             .map(|_| match kind {
                 Family::Caps => -rng.next_f64_unit(),
                 Family::Switch | Family::Lipschitz => 2. * rng.next_f64_unit() - 1.,
-                Family::Spline => 0.,
+                Family::Spline | Family::SiluMonotone => 0.,
+                Family::Softplus | Family::SiluDiagnostic => 2. * rng.next_f64_unit() - 1.,
             })
             .collect();
         let extra = match kind {
@@ -92,8 +103,10 @@ impl Block {
                 .collect(),
             Family::Lipschitz => (0..no).map(|_| rng.next_normal() * scale).collect(),
             Family::Switch => Vec::new(),
+            Family::Softplus | Family::SiluMonotone | Family::SiluDiagnostic => vec![0.],
         };
         let mut result = Self {
+            learn_temperature: false,
             negative_slope: 0.,
             kind,
             ni,
@@ -177,6 +190,9 @@ impl Block {
                     }
                 }
                 Family::Spline => self.spline(self.pre(x, j), j).0,
+                Family::Softplus | Family::SiluMonotone | Family::SiluDiagnostic => {
+                    self.analytic_response(self.pre(x, j), self.b[j]).0
+                }
                 Family::Lipschitz => unreachable!(),
             })
             .collect()
@@ -226,7 +242,14 @@ impl Block {
                 continue;
             }
             let z = self.pre(x, j);
-            let dz = if self.kind == Family::Caps {
+            let dz = if self.is_analytic() {
+                let (_, dz, db, dt) = self.analytic_response(z, self.b[j]);
+                self.adam.gb1[j] += g * db;
+                if self.learn_temperature {
+                    self.adam.gw2[0] += g * dt;
+                }
+                g * dz
+            } else if self.kind == Family::Caps {
                 let top = f64::from(j % 2 == 1 && z > self.extra[j]);
                 self.adam.gw2[j] += g * top;
                 self.adam.gb1[j] += g * (f64::from(z > 0.) - top);
@@ -266,6 +289,15 @@ impl Block {
                 self.extra
                     .iter_mut()
                     .for_each(|v| *v = v.clamp(-NORM_LIMIT, NORM_LIMIT));
+            }
+            Family::Softplus | Family::SiluMonotone | Family::SiluDiagnostic => {
+                if self.kind != Family::SiluDiagnostic {
+                    self.w.iter_mut().for_each(|w| *w = w.max(0.));
+                }
+                if self.kind == Family::SiluMonotone {
+                    self.b.iter_mut().for_each(|b| *b = b.max(0.));
+                }
+                self.extra[0] = self.extra[0].clamp(-6., 6.);
             }
             Family::Switch => {}
         }
@@ -310,6 +342,7 @@ mod tests {
             epochs: 12,
             pairs_per_epoch: 5000,
             training: None,
+            analytic: None,
         }
     }
 
@@ -408,6 +441,7 @@ mod tests {
             block.extra.fill(1.);
             let j = if kind == Family::Lipschitz { 0 } else { 1 };
             match kind {
+                Family::Softplus | Family::SiluMonotone | Family::SiluDiagnostic => unreachable!(),
                 Family::Caps => {}
                 Family::Switch => {
                     block.w.fill(-1.);
@@ -719,11 +753,27 @@ impl Network {
         assert!((1..=2).contains(&config.widths.len()));
         assert!(config.widths.iter().all(|w| (1..=256).contains(w)));
         assert!(config.family == Family::Switch || config.widths.len() == 1);
+        assert_eq!(
+            config.analytic.is_some(),
+            matches!(
+                config.family,
+                Family::Softplus | Family::SiluMonotone | Family::SiluDiagnostic
+            )
+        );
+        if let Some(a) = &config.analytic {
+            a.validate(config.family);
+        }
         let mut ni = config.first_width - config.max_pairs;
         let mut blocks = Vec::new();
         for &width in &config.widths {
             let mut block = Block::new(config.family, ni, width, rng);
             block.negative_slope = config.negative_slope;
+            if let Some(a) = &config.analytic {
+                block.extra[0] = a.temperature.ln();
+                block.learn_temperature = a.learn_temperature;
+                block.b.fill(a.bias);
+                block.project();
+            }
             if let Some(study) = &config.training {
                 for w in &mut block.w {
                     *w *= study.init_scale;
@@ -875,7 +925,9 @@ impl Network {
                 block.project();
             }
         }
-        self.output.iter_mut().for_each(|w| *w = w.max(0.));
+        if self.config.family != Family::SiluDiagnostic {
+            self.output.iter_mut().for_each(|w| *w = w.max(0.));
+        }
         assert!(self.output.iter().all(|w| w.is_finite()));
     }
 
@@ -1001,6 +1053,10 @@ impl Dense {
 
 impl Block {
     fn expand(&self, layers: &mut Vec<Dense>) {
+        if self.is_analytic() {
+            self.expand_analytic(layers);
+            return;
+        }
         if self.kind == Family::Spline {
             let n = self.no * KNOTS.len();
             let mut hinges = Dense::zero(self.ni, n, Activation::Relu);

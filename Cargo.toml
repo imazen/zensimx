@@ -81,8 +81,8 @@ enough = { version = "0.4.2", default-features = false, features = ["std"] }
 # zenpredict 0.2.0 publish → `cargo package -p zensim` gate → zensim
 # 0.3.0 publish → zensim-regress. zenpredict-bake is consumed only by
 # the unpublished zensim-validate, so it stays a bare git pin.
-zenpredict      = { version = "0.2.0", git = "https://github.com/imazen/zenanalyze", rev = "38dc80f73887dafae6bf5ebfe9a03be5ef78ebe0" }
-zenpredict-bake = { git = "https://github.com/imazen/zenanalyze", rev = "38dc80f73887dafae6bf5ebfe9a03be5ef78ebe0" }
+zenpredict      = { version = "0.2.0", git = "https://github.com/imazen/zenanalyze", rev = "1f3767a56c104e8ff2aa936dd900ef278d172ea3" }
+zenpredict-bake = { git = "https://github.com/imazen/zenanalyze", rev = "1f3767a56c104e8ff2aa936dd900ef278d172ea3" }
 
 # zenstats — canonical IQA-stats home extracted on 2026-05-26 from the
 # pre-existing `zensim-validate/src/panel.rs`. Lives in the zenmetrics
