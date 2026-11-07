@@ -83,3 +83,21 @@ seeds and folds, and agreement between final and diagnostic reports. The actual
 outer-0 selection attempt correctly refuses because the other inner fold is
 incomplete; no selection receipt was emitted. Original failed reports remain
 untouched. The rescue protocol and unchanged numerical gates still apply.
+
+## Softplus first-layer repair qualification
+
+The same first-layer max-pair rounding reversal was reproduced for Softplus
+cell `6e988eec6f23b804ff31`. The repair changes only the marked first-layer
+representation; the later anchored Softplus construction and all parameter bits
+remain preserved by the existing native admission/export owner. The final and
+all seven diagnostic checkpoints pass unchanged probe gates. Full supplemental
+evaluation is now collected uniformly for every completed Softplus inner fit.
+
+For this cell's final checkpoint, all five TRAIN and five inner-validation
+populations reproduce stored original predictions with the original runtime.
+The new runtime with the unmarked model reproduces those float32 predictions
+bit for bit. The repaired model's maximum absolute difference is
+0.0002899169921875 across these tables. This is a rounding comparison, not an
+improvement claim. The separate `softplus-runtime-comparison` archive passed
+complete destination checksum verification. Selection support and consistent
+later-stage representation admission remain unfinished.

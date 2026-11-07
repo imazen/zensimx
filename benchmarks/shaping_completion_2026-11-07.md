@@ -1910,3 +1910,10 @@ across runtimes, and measures repaired-model score differences on every
 population. It refuses missing, reordered or nonfinite prediction records and
 checks all input hashes again after scoring. This diagnostic writes separate
 artifacts and never changes study reports or chooses settings.
+
+Softplus runtime comparison completed on ten TRAIN/inner population tables.
+Original-runtime replay and unmarked cross-runtime float32 predictions match
+exactly. Maximum repaired-model score change is 0.0002899169921875. The separate
+`softplus-runtime-comparison` archive passed full destination readback:
+81 files, 4183261 bytes. No outer responses
+were consumed, and selection admission remains unchanged.
