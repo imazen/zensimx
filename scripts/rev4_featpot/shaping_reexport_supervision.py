@@ -12,6 +12,9 @@ from shaping_supervision import complete_marker,preserve_failure
 from shaping_convergence import report
 
 
+# Preserve the loaded driver identity across later source edits.
+DRIVER_SHA256=sha(__file__)
+
 def sweep(args):
     family=getattr(args,'family','relu')
     if family not in ('relu','softplus'):raise ValueError('unsupported supplemental family')
@@ -65,7 +68,7 @@ def main():
         count=sweep(args)
         status=dict(pid=os.getpid(),checked_utc=datetime.now(timezone.utc).isoformat(),
                     completed_supplemental_cells=count,stage='watching' if args.watch else 'sweep_finished',
-                    driver_sha256=sha(__file__))
+                    driver_sha256=DRIVER_SHA256)
         (args.study/('REEXPORT_EVALUATOR_STATUS.json' if args.family=='relu' else 'SOFTPLUS_REEXPORT_EVALUATOR_STATUS.json')).write_bytes(encoded(status))
         print(json.dumps(status),flush=True)
         if not args.watch:return

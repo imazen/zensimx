@@ -470,3 +470,20 @@ explicitly states `both_copies_verified: false` and
 `verification_scope: destination artifacts only`; it never treats missing local
 files as verified. The default `study-archive-verify` still requires both full
 copies. Missing or corrupted durable files refuse either mode.
+
+
+## Supervisor source identity
+
+Selection, archive and supplemental-evaluation supervisors capture their driver
+SHA-256 when imported. Status writes retain that loaded-source identity after a
+later checkout edit, matching the inner evaluator. Hashing the current pathname
+on every sweep could incorrectly attribute a live older process to newer code.
+The regression exercises all three status writers after replacing their source
+path and verifies that the loaded hash survives. The selection and three archive
+regression suites also pass (eleven checks).
+
+This change applies to newly started processes. Existing supervisors retain their
+loaded implementation; their historical status hashes alone do not prove which
+source they loaded. Use their launch records and frozen source provenance. No
+training, evaluation, selection or archive-content gate changes, and active jobs
+are not restarted for this reporting correction.

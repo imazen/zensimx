@@ -7,6 +7,9 @@ from shaping_completion import REPO,encoded,sha
 from shaping_execution import load_registration
 
 
+# Preserve the loaded driver identity across later source edits.
+DRIVER_SHA256=sha(__file__)
+
 def eligible(directory,cells,plan_pin):
     attempts=list(directory.glob('attempt-*'))
     # Multiple attempts need explicit reconciliation of all retained failures.
@@ -249,7 +252,7 @@ def main():
     while True:
         completed=later_sweep(args) if args.later_neural or args.later_controls else supplemental_sweep(args) if args.supplemental else sweep(args)
         status=dict(pid=os.getpid(),checked_utc=datetime.now(timezone.utc).isoformat(),
-                    newly_archived=completed,stage='watching' if args.watch else 'sweep_finished',driver_sha256=sha(__file__))
+                    newly_archived=completed,stage='watching' if args.watch else 'sweep_finished',driver_sha256=DRIVER_SHA256)
         status_name='LATER_CONTROL_ARCHIVE_STATUS.json' if args.later_controls else 'LATER_NEURAL_ARCHIVE_STATUS.json' if args.later_neural else 'SUPPLEMENTAL_ARCHIVE_STATUS.json' if args.supplemental else 'ARCHIVE_SUPERVISOR_STATUS.json'
         (args.study/status_name).write_bytes(encoded(status));print(json.dumps(status),flush=True)
         if not args.watch:return

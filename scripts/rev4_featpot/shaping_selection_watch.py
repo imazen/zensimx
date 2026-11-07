@@ -11,6 +11,9 @@ from shaping_extension import register as register_extension,verify_decision
 from shaping_outer_admission import register as register_outer,resolve as resolve_outer
 
 
+# Preserve the loaded driver identity across later source edits.
+DRIVER_SHA256=sha(__file__)
+
 def ready(root,cell,representation):
     repaired=representation=='research-relu-max-pairs-v1'
     if representation not in ('original','research-relu-max-pairs-v1'):raise ValueError('unknown selection representation')
@@ -69,7 +72,7 @@ def watch(args):
     with (directory/f'outer-{args.outer}.lock').open('a') as lock:
         fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
         while True:
-            identity=dict(pid=os.getpid(),outer=args.outer,driver_sha256=sha(__file__),checked_utc=datetime.now(timezone.utc).isoformat())
+            identity=dict(pid=os.getpid(),outer=args.outer,driver_sha256=DRIVER_SHA256,checked_utc=datetime.now(timezone.utc).isoformat())
             try:result=sweep(args.study,args.outer)
             except Exception as error:
                 (directory/f'outer-{args.outer}-STATUS.json').write_bytes(encoded(dict(identity,stage='failed_preserved_for_reconciliation',error=str(error))))
