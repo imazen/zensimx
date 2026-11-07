@@ -614,3 +614,19 @@ The two preserved product-collapse fits reproduce under explicit failure
 retention, while ordinary candidate admission still refuses both. Four outer
 admission and seven rescue regressions pass, including policy-drift refusal and
 preserving all 24 paired reports while excluding an undefined setting.
+
+## Full-FIT cost workload admission
+
+`shaping-cost-finalists` requires the registered sixteen final cells, with all
+three paired seeds for five roles and the single deterministic additive model.
+It re-resolves all full-FIT selections, verifies final native model and
+convergence evidence, and distinguishes descriptive final reports from tuning
+reports. It freezes forty TRAIN rows before reading predictions, requires their
+hash-bound native predictions, and reproduces the evaluator's existing dense
+representation before writing a benchmark workload. Missing or duplicate roles,
+seeds, changed selections and incorrect final-report scope are refused.
+
+This prepares the final model workload; it does not use the earlier eight-model
+instrument fixture as a finalist measurement. Eight targeted regressions pass.
+Actual final models are not yet available, so end-to-end preparation, native
+qualification of all sixteen models, fresh-process RSS and latency remain open.

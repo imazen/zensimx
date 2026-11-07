@@ -5395,3 +5395,10 @@ shaping-extraction-qualify binary workload output jobs:
 
 shaping-extraction-fixture-check:
     python3 -B -m unittest discover -s scripts/tests -p test_shaping_extract_fixture.py
+
+shaping-cost-finalists study binary_dir output:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 2G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_cost_finalists.py --study {{quote(study)}} --binary-dir {{quote(binary_dir)}} --output {{quote(output)}}
+
+shaping-cost-finalists-check:
+    python3 -B -m unittest discover -s scripts/tests -p test_shaping_cost_finalists.py
+    python3 -B -m unittest discover -s scripts/tests -p test_shaping_full_fit_selection.py

@@ -11,6 +11,14 @@ from shaping_convergence import training_report
 
 
 def candidate(root,cell,family,admission,admission_path):
+    final=cell['stage']=='full_fit'
+    if cell['stage'] not in ('full_fit_selection','full_fit'):raise ValueError('full-FIT candidate stage differs')
+    final_schedule=None
+    if final:
+        from shaping_full_fit_execution import refit_cell
+        _,_,_,verified,path,registered,resolved,final_schedule=refit_cell(root,cell['id'])
+        if registered!=cell or resolved!=family or verified!=admission or path!=admission_path:
+            raise ValueError('final model admission differs')
     repaired=family in NEURAL and admission['evaluation_representations'][family]['representation']=='research-relu-max-pairs-v1'
     directory=root/('reexport_max_pairs' if repaired else 'runs')/cell['id']
     markers=list(directory.glob('attempt-*/final/COMPLETE.json' if repaired else 'attempt-*/evaluation/COMPLETE.json'))
@@ -21,8 +29,10 @@ def candidate(root,cell,family,admission,admission_path):
     run_path=run_dir/'RUN.json';result_path=run_dir/'RESULT.json'
     run=json.loads(run_path.read_text());result=json.loads(result_path.read_text());plan_pin=sha(root/'PLAN.json')
     for record in (run,result,row):
+        scope=('descriptive_only' if record is row else 'full_fit_refit') if final else 'full_fit_only'
+        development=final and record is row
         if (record['cell']!=cell or record['plan_sha256']!=plan_pin or record['resolved_family']!=family
-            or record['selection_scope']!='full_fit_only' or record['development_results_read']):
+            or record['selection_scope']!=scope or record['development_results_read']!=development):
             raise ValueError('full-FIT candidate scope differs')
     if run['admission_sha256']!=sha(admission_path) or result['admission_sha256']!=sha(admission_path) or row['admission_sha256']!=sha(admission_path):
         raise ValueError('full-FIT candidate admission differs')
@@ -32,8 +42,16 @@ def candidate(root,cell,family,admission,admission_path):
         if sha(path)!=expected:raise ValueError('full-FIT evidence drift: '+str(path))
         pins[str(path)]=expected
     classification=None
+    if final:
+        for name,expected in admission['full_fit_selection_sha256'].items():
+            pin(Path(name),expected)
+            if family in NEURAL:
+                if run['file_sha256'].get(name)!=expected:raise ValueError('final fit selection provenance differs')
+            elif run['selection_sha256'].get(name)!=expected:raise ValueError('final control selection provenance differs')
+        if 'exposed_development' not in row or 'full_fit_validation' in row:
+            raise ValueError('final descriptive report scope differs')
     if family in NEURAL:
-        schedule=dict(admission['schedules'][family],setting=cell['setting'])
+        schedule=final_schedule if final else dict(admission['schedules'][family],setting=cell['setting'])
         if run['schedule']!=schedule or result['schedule']!=schedule or result['stage']!='trained':raise ValueError('full-FIT candidate schedule differs')
         if run['epochs']!=schedule['phase_epochs'][-1] or row['checkpoint_epoch']!=run['epochs']-1 or run['training_exposure_pair_draws']!=schedule['total_pair_draws']:
             raise ValueError('full-FIT final exposure differs')

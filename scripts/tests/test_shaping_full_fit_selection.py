@@ -22,6 +22,31 @@ class FullFitSelectionTests(unittest.TestCase):
             report=directory/'evaluation/REPORT.json';write(report,row);write(report.parent/'COMPLETE.json',dict(report_sha256=sha(report)))
         return cells,admission,path,chosen
 
+    def test_final_candidate_revalidates_selection_and_descriptive_scope(self):
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as directory:
+            root=Path(directory);cells,admission,path,_=self.fixture(root)
+            cell=next(c for c in cells if c['stage']=='full_fit' and c['family']=='shaped_additive')
+            selected=root/'selected.json';selected.write_text('{}')
+            admission=dict(admission,full_fit_selection_sha256={str(selected):sha(selected)})
+            run_dir=root/'runs'/cell['id']/'attempt-001';(run_dir/'native').mkdir(parents=True)
+            model=run_dir/'native/model.bin';model.write_bytes(b'final')
+            run=dict(cell=cell,plan_sha256=sha(root/'PLAN.json'),resolved_family='shaped_additive',
+                selection_scope='full_fit_refit',development_results_read=False,admission_sha256=sha(path),
+                selection_sha256=admission['full_fit_selection_sha256'])
+            (run_dir/'RUN.json').write_bytes(encoded(run));(run_dir/'RESULT.json').write_bytes(encoded(dict(run,stage='complete',exit_code=0)))
+            row=dict(run,selection_scope='descriptive_only',development_results_read=True,exposed_development={},
+                qualification=dict(model_sha256=sha(model),identity=100,damage_increase_violations=0))
+            report=run_dir/'evaluation/REPORT.json';report.parent.mkdir();report.write_bytes(encoded(row))
+            marker=report.parent/'COMPLETE.json';marker.write_bytes(encoded(dict(report_sha256=sha(report))))
+            resolved=({},cells,{},admission,path,cell,'shaped_additive',{'setting':1})
+            with patch('shaping_full_fit_execution.refit_cell',return_value=resolved):
+                actual,_,pins=candidate(root,cell,'shaped_additive',admission,path)
+                self.assertEqual(actual['selection_scope'],'descriptive_only');self.assertIn(str(selected),pins)
+                selected.write_text('changed')
+                with self.assertRaisesRegex(ValueError,'evidence drift'):candidate(root,cell,'shaped_additive',admission,path)
+                selected.write_text('{}');row['selection_scope']='full_fit_only';report.write_bytes(encoded(row));marker.write_bytes(encoded(dict(report_sha256=sha(report))))
+                with self.assertRaisesRegex(ValueError,'scope'):candidate(root,cell,'shaped_additive',admission,path)
+
     def test_verified_search_reproduces_and_model_drift_invalidates_decision(self):
         with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as directory:
             root=Path(directory);cells,admission,path,chosen=self.fixture(root)
