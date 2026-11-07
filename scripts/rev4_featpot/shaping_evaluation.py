@@ -6,6 +6,7 @@ import json
 import os
 from pathlib import Path
 import shutil
+import subprocess
 for key in ('OMP_NUM_THREADS','OPENBLAS_NUM_THREADS','MKL_NUM_THREADS','RAYON_NUM_THREADS'):
     os.environ[key]='1'
 os.environ['TMPDIR']=str(Path.home()/'tmp')
@@ -101,14 +102,25 @@ def admitted_epoch(run,result,cells):
     return epochs
 
 
+def evaluation_epoch(epochs,checkpoint):
+    if checkpoint is None:return epochs-1
+    allowed=(49,99,119,149,199,219,239)
+    if checkpoint not in allowed or checkpoint>=epochs:
+        raise ValueError('unregistered diagnostic checkpoint')
+    return checkpoint
+
+
 def evaluate(args):
     plan,cells,partitions=load_registration(args.study)
     run=json.loads((args.run/'RUN.json').read_text());result=json.loads((args.run/'RESULT.json').read_text())
     if sha(args.study/'PLAN.json')!=run['plan_sha256']:raise ValueError('run registration drift')
     cell=run['cell']
     epochs=admitted_epoch(run,result,cells)
-    bake=args.run/'checkpoints'/f'ckpt_epoch{epochs-1:03}.bin'
-    if sha(bake)!=result['bake_sha256']:raise ValueError('final checkpoint drift')
+    final=args.run/'checkpoints'/f'ckpt_epoch{epochs-1:03}.bin'
+    if sha(final)!=result['bake_sha256']:raise ValueError('final checkpoint drift')
+    checkpoint=getattr(args,'checkpoint',None)
+    epoch=evaluation_epoch(epochs,checkpoint)
+    bake=args.run/'checkpoints'/f'ckpt_epoch{epoch:03}.bin'
     build=json.loads((args.binary_dir/'BUILD.json').read_text())
     if sha(args.binary_dir/'BUILD.json')!=run['build_sha256']:raise ValueError('evaluator binary set differs')
     for name,pin in build['binary_sha256'].items():
@@ -121,9 +133,9 @@ def evaluate(args):
     membership=partitions[cell['partition']]
     validation=prepare_validation(args.study,cell['partition'],membership)
     training=json.loads((args.study/'comparators'/cell['partition']/'GROUPS.json').read_text())
-    dest=args.run/'evaluation'
+    dest=args.run/'evaluation' if checkpoint is None else args.run/'curve_evaluation'/f'epoch-{epoch:03}'
     if dest.exists():raise ValueError('evaluation exists; preserve and inspect it')
-    dest.mkdir()
+    dest.mkdir(parents=True)
     wanted=np.array(sorted(set(membership['train'])|set(membership['test'])),dtype=np.int64)
     positions={int(v):i for i,v in enumerate(wanted)}
     pred=np.full(len(wanted),np.nan)
@@ -158,13 +170,17 @@ def evaluate(args):
               identity_and_order_claim=cell['family']!='silu_diagnostic')
     if not gate['finite'] or (gate['identity_and_order_claim'] and (gate['identity']!=100. or gate['damage_increase_violations'])):
         (dest/'FAILED_GATE.json').write_bytes(encoded(gate));raise ValueError('native feature qualification failed')
-    report=dict(cell=cell,checkpoint_sha256=sha(bake),maps=maps,feature_gate=gate,
+    structure=json.loads(subprocess.check_output([str(args.binary_dir/'bake_dial_refit'),'inspect','--in',str(bake)],text=True))
+    output=structure['layers'][-1]
+    active=output['stored_weights']-output['zero_weights']
+    report=dict(cell=cell,checkpoint_epoch=epoch,checkpoint_sha256=sha(bake),maps=maps,feature_gate=gate,
+                structure=structure,active_output_coefficients=active,one_output_coefficient=active==1,
                 train=metrics(pred,d['y'],train,d,maps),inner_validation=metrics(pred,d['y'],test,d,maps),
-                selection='registered final epoch only',outer_results_read=False,
+                selection='registered final epoch only' if checkpoint is None else 'diagnostic checkpoint; not a selection candidate',outer_results_read=False,
                 driver_sha256=sha(__file__),plan_sha256=sha(args.study/'PLAN.json'))
     np.savez_compressed(dest/'predictions.npz',original_indices=wanted,native=pred)
     (dest/'REPORT.json').write_bytes(encoded(report))
-    (dest/'COMPLETE.json').write_bytes(encoded(dict(cell=cell['id'],report_sha256=sha(dest/'REPORT.json'))))
+    (dest/('COMPLETE.json' if checkpoint is None else 'DIAGNOSTIC_COMPLETE.json')).write_bytes(encoded(dict(cell=cell['id'],report_sha256=sha(dest/'REPORT.json'))))
     print(json.dumps({'cell':cell['id'],'inner_selection_score':report['inner_validation']['selection_score']}),flush=True)
 
 
@@ -172,6 +188,7 @@ def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('--study',type=Path,required=True);p.add_argument('--binary-dir',type=Path,required=True)
     p.add_argument('--run',type=Path,required=True)
+    p.add_argument('--checkpoint',type=int,help='registered diagnostic epoch; requires completed training')
     evaluate(p.parse_args())
 
 

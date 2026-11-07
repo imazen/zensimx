@@ -2,10 +2,17 @@ import sys
 from pathlib import Path
 import unittest
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'rev4_featpot'))
-from shaping_evaluation import admitted_epoch
+from shaping_evaluation import admitted_epoch, evaluation_epoch
 
 
 class EvaluationAdmissionTests(unittest.TestCase):
+    def test_diagnostics_do_not_change_final_selection(self):
+        self.assertEqual(evaluation_epoch(240,None),239)
+        self.assertEqual(evaluation_epoch(120,None),119)
+        self.assertEqual(evaluation_epoch(240,49),49)
+        for budget,epoch in [(120,149),(240,0),(240,238),(240,240)]:
+            with self.assertRaises(ValueError):evaluation_epoch(budget,epoch)
+
     def test_final_scheduled_epoch_is_required(self):
         cell={'id':'x','stage':'inner','family':'relu'}
         result={'stage':'trained','exit_code':0}

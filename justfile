@@ -4915,3 +4915,12 @@ shaping-completion-inner-linear study binary_dir partition:
 
 shaping-completion-pretraining-check:
     python3 -B -m unittest discover -s scripts/tests -p test_shaping_pretraining.py
+
+shaping-completion-convergence-check:
+    python3 -B -m unittest discover -s scripts/tests -p test_shaping_convergence.py
+
+shaping-completion-evaluate-checkpoint study binary_dir run epoch:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 2G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_evaluation.py --study {{quote(study)}} --binary-dir {{quote(binary_dir)}} --run {{quote(run)}} --checkpoint {{epoch}}
+
+shaping-completion-convergence run:
+    python3 -B scripts/rev4_featpot/shaping_convergence.py --run {{quote(run)}}
