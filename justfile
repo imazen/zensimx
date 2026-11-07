@@ -4924,3 +4924,6 @@ shaping-completion-evaluate-checkpoint study binary_dir run epoch:
 
 shaping-completion-convergence run:
     python3 -B scripts/rev4_featpot/shaping_convergence.py --run {{quote(run)}}
+
+shaping-completion-watch-evaluation study binary_dir:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 2G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_supervision.py --study {{quote(study)}} --binary-dir {{quote(binary_dir)}} --watch
