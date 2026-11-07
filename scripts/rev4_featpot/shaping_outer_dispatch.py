@@ -51,21 +51,22 @@ def existing(root,cell,admission,admission_pin,build_pin):
     return 'running'
 
 
-def variant_cells(cells,admission):
+def variant_cells(cells,admission,controls=False):
     if not admission['outer_evaluation_admitted']:raise ValueError('variants are not admitted')
     stages=('source_curve','row_curve','shuffle','human_only')
     partition=f"outer-{admission['outer']}"
-    roles=('relu','best_analytic','best_product','best_separate')
+    roles=('extra_trees','shaped_additive') if controls else ('relu','best_analytic','best_product','best_separate')
     chosen=[c for c in cells if c['stage'] in stages and c['partition']==partition and c['family'] in roles]
     expected=[c for c in matrix() if c['stage'] in stages and c['partition']==partition and c['family'] in roles]
     if sorted(chosen,key=lambda c:c['id'])!=sorted(expected,key=lambda c:c['id']):
-        raise ValueError('complete registered neural variant matrix required')
-    if any(admission['finalist_roles'][role] not in NEURAL for role in roles):
-        raise ValueError('neural variant role resolved to nonneural family')
-    return sorted(chosen,key=lambda c:(c['seed'],c['stage'],c['family'],c['id']))
+        raise ValueError('complete registered variant matrix required')
+    allowed=('extra_trees','shaped_additive') if controls else NEURAL
+    if any(admission['finalist_roles'][role] not in allowed for role in roles):
+        raise ValueError('variant role resolved to wrong neural/nonneural family')
+    return sorted(chosen,key=lambda c:(-1 if c['seed'] is None else c['seed'],c['stage'],c['family'],c['id']))
 
 
-def existing_variant(root,cell,admission,admission_pin,build_pin):
+def existing_variant(root,cell,admission,admission_pin,build_pin,controls=False):
     directory=root/'runs'/cell['id']
     if not directory.exists():return None
     attempts=list(directory.glob('attempt-*'))
@@ -74,20 +75,34 @@ def existing_variant(root,cell,admission,admission_pin,build_pin):
     resolution=resolve_variant(root,cell['id'])
     if resolution['admission_sha256']!=admission_pin:raise ValueError('variant admission differs')
     run=attempts[0];identity=json.loads((run/'RUN.json').read_text())
-    expected=dict(cell=cell,resolution=resolution,build_sha256=build_pin,
-        plan_sha256=sha(root/'PLAN.json'),epochs=resolution['schedule']['phase_epochs'][-1],
-        process_role='variant_controller')
+    expected=dict(cell=cell,build_sha256=build_pin,plan_sha256=sha(root/'PLAN.json'))
+    if controls:
+        expected.update(variant=resolution,admission_sha256=admission_pin,
+            selected_setting=resolution['schedule']['setting'],process_role='control_worker')
+    else:
+        expected.update(resolution=resolution,epochs=resolution['schedule']['phase_epochs'][-1],
+            process_role='variant_controller')
     if any(identity.get(k)!=v for k,v in expected.items()):raise ValueError('existing variant identity differs')
     result=run/'RESULT.json'
     if result.exists():
         record=json.loads(result.read_text())
-        if any(record.get(k)!=v for k,v in expected.items()) or record['stage']!='trained' or record['exit_code']!=0:
+        if any(record.get(k)!=v for k,v in expected.items()) or record['stage']!=('complete' if controls else 'trained') or record['exit_code']!=0:
             raise ValueError('existing variant fit failed or differs')
+        if controls:
+            evaluation=run/'evaluation';report=json.loads((evaluation/'REPORT.json').read_text())
+            marker=json.loads((evaluation/'COMPLETE.json').read_text())
+            if (marker!={'cell':cell['id'],'report_sha256':sha(evaluation/'REPORT.json')}
+                or any(report.get(k)!=expected[k] for k in ('cell','plan_sha256','variant','admission_sha256','selected_setting'))
+                or report.get('predictions_sha256')!=sha(evaluation/'predictions.npz')
+                or report.get('outer_results_read') is not True or 'outer_test' not in report):
+                raise ValueError('variant control completed evidence differs')
+            return 'trained'
         checkpoint=run/'fit/checkpoints'/f"ckpt_epoch{identity['epochs']-1:03}.bin"
         if sha(checkpoint)!=record['bake_sha256']:raise ValueError('existing variant checkpoint drift')
         return 'trained'
     arguments=[v.decode() for v in Path(f"/proc/{identity['pid']}/cmdline").read_bytes().split(b'\0') if v]
-    if not any(Path(v).name=='shaping_variant_execution.py' for v in arguments):raise ValueError('variant controller identity missing')
+    driver='shaping_controls.py' if controls else 'shaping_variant_execution.py'
+    if not any(Path(v).name==driver for v in arguments):raise ValueError('variant controller identity missing')
     for flag,value in [('--study',str(root)),('--cell',cell['id'])]:
         if arguments.count(flag)!=1 or arguments[arguments.index(flag)+1]!=value:
             raise ValueError('variant controller command differs')
@@ -97,9 +112,10 @@ def existing_variant(root,cell,admission,admission_pin,build_pin):
 def dispatch(args):
     if not 1<=args.workers<=4:raise ValueError('explicit one-to-four worker budget required')
     if not args.session.replace('-','').isalnum():raise ValueError('invalid dispatch session')
-    variants=getattr(args,'variants',False)
-    if variants and not getattr(args,'human_qualification',None):raise ValueError('variant human qualification required')
-    directory=args.study/'dispatch'/('variants-neural' if variants else 'outer')/f'outer-{args.outer}';directory.mkdir(parents=True,exist_ok=True)
+    controls=getattr(args,'variant_controls',False)
+    variants=getattr(args,'variants',False) or controls
+    if variants and not controls and not getattr(args,'human_qualification',None):raise ValueError('variant human qualification required')
+    directory=args.study/'dispatch'/('variants-controls' if controls else 'variants-neural' if variants else 'outer')/f'outer-{args.outer}';directory.mkdir(parents=True,exist_ok=True)
     # Ownership of this one queue, never a global training/compute lock.
     with (directory/'OWNER.lock').open('a') as owner:
         fcntl.flock(owner,fcntl.LOCK_EX|fcntl.LOCK_NB)
@@ -113,7 +129,7 @@ def dispatch(args):
             if not args.watch_admission:raise ValueError('outer evidence admission is not yet complete')
             save('waiting_for_verified_outer_admission');time.sleep(30)
         admission,path=resolve(args.study,args.outer)
-        _,cells,_=load_registration(args.study);selected=(variant_cells if variants else selected_cells)(cells,admission)
+        _,cells,_=load_registration(args.study);selected=variant_cells(cells,admission,controls) if variants else selected_cells(cells,admission)
         pins=dict(admission_sha256=sha(path),build_sha256=sha(args.binary_dir/'BUILD.json'),
                   plan_sha256=sha(args.study/'PLAN.json'),required_cells=selected)
         (dest/'RUN.json').write_bytes(encoded(dict(status,**pins)))
@@ -132,7 +148,8 @@ def dispatch(args):
             try:
                 for cell in selected:
                     if cell['id'] in active or cell['id'] in completed:continue
-                    state=(existing_variant if variants else existing)(args.study,cell,admission,pins['admission_sha256'],pins['build_sha256'])
+                    state=(existing_variant(args.study,cell,admission,pins['admission_sha256'],pins['build_sha256'],controls) if variants
+                           else existing(args.study,cell,admission,pins['admission_sha256'],pins['build_sha256']))
                     if state=='trained':completed.add(cell['id'])
                     elif state=='running':external.add(cell['id'])
             except (ValueError,OSError,KeyError) as error:failure=str(error)
@@ -144,10 +161,14 @@ def dispatch(args):
                 command=['python3','-B','scripts/rev4_featpot/shaping_outer_execution.py','--study',str(args.study),
                          '--outer',str(args.outer),'--binary-dir',str(args.binary_dir),
                          '--neutral-qualification',str(args.neutral_qualification),'--cell',cell['id']]
-                if variants:
+                if variants and not controls:
                     command=['python3','-B','scripts/rev4_featpot/shaping_variant_execution.py','--study',str(args.study),
                         '--binary-dir',str(args.binary_dir),'--neutral-qualification',str(args.neutral_qualification),
                         '--human-qualification',str(args.human_qualification),'--cell',cell['id']]
+                if controls:
+                    command=['python3','-B','scripts/rev4_featpot/shaping_controls.py','--study',str(args.study),
+                        '--binary-dir',str(args.binary_dir),'--partition',cell['partition'],'--cell',cell['id'],
+                        '--tree' if cell['family']=='extra_trees' else '--linear']
                 log=(dest/(cell['id']+'.log')).open('x')
                 active[cell['id']]=(subprocess.Popen(command,cwd=REPO,stdout=log,stderr=subprocess.STDOUT),log)
             save('failed' if failure and not active else 'training_finished' if len(completed)==len(selected) else 'supervising',
@@ -162,5 +183,6 @@ if __name__=='__main__':
     for key in ('study','binary-dir','neutral-qualification'):p.add_argument('--'+key,type=Path,required=True)
     p.add_argument('--outer',type=int,choices=range(3),required=True)
     p.add_argument('--workers',type=int,required=True);p.add_argument('--session',default='initial')
-    p.add_argument('--variants',action='store_true');p.add_argument('--human-qualification',type=Path)
+    mode=p.add_mutually_exclusive_group();mode.add_argument('--variants',action='store_true')
+    mode.add_argument('--variant-controls',action='store_true');p.add_argument('--human-qualification',type=Path)
     p.add_argument('--watch-admission',action='store_true');dispatch(p.parse_args())

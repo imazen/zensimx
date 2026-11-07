@@ -5255,3 +5255,11 @@ shaping-completion-watch-outer-controls study binary_dir mode:
 # Complete neural variant queue for one admitted outer fold, bounded independently.
 shaping-completion-dispatch-variants study binary_dir neutral human outer:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 3G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_outer_dispatch.py --study {{quote(study)}} --binary-dir {{quote(binary_dir)}} --neutral-qualification {{quote(neutral)}} --human-qualification {{quote(human)}} --outer {{outer}} --workers 1 --variants --watch-admission
+
+# One 8 GiB control scope across folds; native variant queues remain independent.
+shaping-completion-dispatch-variant-controls study binary_dir:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    for outer in 0 1 2; do
+        TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 8G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_outer_dispatch.py --study {{quote(study)}} --binary-dir {{quote(binary_dir)}} --neutral-qualification {{quote(binary_dir)}} --outer "$outer" --workers 1 --variant-controls --watch-admission
+    done

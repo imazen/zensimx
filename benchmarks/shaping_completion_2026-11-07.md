@@ -1430,3 +1430,27 @@ min-avail 30167MiB | peak-load 28.08`.
 waits for complete outer admission with one worker and a 3 GiB scope per fold.
 The resource bounds are independent of other queues; no global training lock
 is introduced. Native child commands retain their own one-thread resource cap.
+
+## Nonneural generalization queue admission
+
+The same dispatcher now routes the remaining 168 registered control variants
+through the existing additive/tree fit owners: 56 per outer fold, including
+14 additive and 42 tree cells. The actual variant registration has 42 additive
+cells with 42 distinct preprocessing cache keys, so their independent basis
+preparations do not collide. The three tree seeds share only immutable view
+inputs and retain independent fit directories.
+
+A complete simulated 56-cell queue exercises both trainer modes, exact coverage,
+two-worker admission and completed evidence verification. Changing a completed
+prediction table without its bound report is rejected. Neural and original
+outer queue regressions also pass. The tests do not perform scientific fits.
+Wrapper: `run-heavy: done rc=0 1s | peak-RSS 0.04GiB | min-avail 32278MiB |
+peak-load 25.29`.
+
+`just shaping-completion-dispatch-variant-controls STUDY BINARY_DIR` processes
+all three folds with one control fit at a time in an 8 GiB, one-thread scope.
+Each fold waits for verified outer admission and each trainer retains its SSD
+reservation. This bounded control queue can run alongside independent neural
+queues; it is not a global training lock. Together, both dispatch modes cover
+all 672 registered generalization cells. Execution and scientific evaluation
+remain required; launch coverage is not experiment completion.

@@ -178,3 +178,58 @@ class VariantDispatchTests(OuterDispatchTests):
             self.assertEqual(set(started),set(chosen))
             status=json.loads((root/'dispatch/variants-neural/outer-0/first/STATUS.json').read_text())
             self.assertEqual(status['stage'],'training_finished')
+
+class ControlVariantDispatchTests(unittest.TestCase):
+    def fixture(self,root):
+        cells=matrix();decisions={f:dict(family=f,outer=0,outer_results_read=False,setting=0,optimizer_choice='base',inner_score=.8) for f in FAMILIES}
+        admission=plan(decisions,[],0,cells);admission['outer_evaluation_admitted']=True
+        (root/'PLAN.json').write_text('{}');binary=root/'bin';binary.mkdir();(binary/'BUILD.json').write_text('{}')
+        path=root/'selection/outer-0/OUTER_ADMISSION.json';path.parent.mkdir(parents=True);path.write_bytes(encoded(admission))
+        return cells,admission,binary,path
+
+    def test_full_control_queue_and_bound_evidence(self):
+        from shaping_outer_dispatch import variant_cells,existing_variant
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as directory:
+            root=Path(directory);cells,admission,binary,path=self.fixture(root)
+            selected=variant_cells(cells,admission,True);self.assertEqual(len(selected),56)
+            self.assertEqual(sum(c['family']=='shaped_additive' for c in selected),14)
+            with self.assertRaisesRegex(ValueError,'complete registered'):
+                variant_cells([c for c in cells if c!=selected[0]],admission,True)
+            byid={c['id']:c for c in selected};started=[];live=0;peak=0
+            def resolution(study,cell_id):
+                return dict(cell=byid[cell_id],resolved_family=byid[cell_id]['family'],admission_sha256=sha(path),schedule=dict(setting=2,phase_epochs=[]))
+            class Process:
+                def __init__(process,command,**kwargs):
+                    nonlocal live,peak
+                    self.assertIn('scripts/rev4_featpot/shaping_controls.py',command)
+                    process.cell=byid[command[command.index('--cell')+1]]
+                    self.assertIn('--tree' if process.cell['family']=='extra_trees' else '--linear',command)
+                    started.append(process.cell['id']);process.pid=1000+len(started);process.returncode=None
+                    live+=1;peak=max(peak,live)
+                def poll(process):
+                    nonlocal live
+                    if process.returncode is not None:return process.returncode
+                    cell=process.cell;run=root/'runs'/cell['id']/'attempt-001';evaluation=run/'evaluation';evaluation.mkdir(parents=True)
+                    identity=dict(cell=cell,variant=resolution(root,cell['id']),build_sha256=sha(binary/'BUILD.json'),
+                        plan_sha256=sha(root/'PLAN.json'),process_role='control_worker',selected_setting=2,admission_sha256=sha(path))
+                    (run/'RUN.json').write_bytes(encoded(identity));(run/'RESULT.json').write_bytes(encoded(dict(identity,stage='complete',exit_code=0)))
+                    (evaluation/'predictions.npz').write_bytes(b'bound predictions fixture')
+                    report=dict(identity,outer_results_read=True,outer_test={},predictions_sha256=sha(evaluation/'predictions.npz'))
+                    (evaluation/'REPORT.json').write_bytes(encoded(report));(evaluation/'COMPLETE.json').write_bytes(encoded(dict(cell=cell['id'],report_sha256=sha(evaluation/'REPORT.json'))))
+                    live-=1;process.returncode=0;return 0
+            args=SimpleNamespace(study=root,outer=0,workers=2,session='first',watch_admission=False,
+                binary_dir=binary,neutral_qualification=root/'unused',variant_controls=True)
+            with patch('shaping_outer_dispatch.resolve',return_value=(admission,path)),\
+                 patch('shaping_outer_dispatch.load_registration',return_value=({},cells,{})),\
+                 patch('shaping_variant_execution.resolve',side_effect=resolution),\
+                 patch('shaping_outer_dispatch.prepare') as prepare,\
+                 patch('shaping_outer_dispatch.subprocess.Popen',side_effect=Process),patch('shaping_outer_dispatch.time.sleep'):
+                dispatch(args);prepare.assert_not_called()
+                cell=selected[0];evaluation=root/'runs'/cell['id']/'attempt-001/evaluation'
+                (evaluation/'predictions.npz').write_bytes(b'altered predictions')
+                with self.assertRaisesRegex(ValueError,'completed evidence differs'):
+                    existing_variant(root,cell,admission,sha(path),sha(binary/'BUILD.json'),True)
+            self.assertEqual(peak,2);self.assertEqual(live,0);self.assertEqual(len(started),56)
+            self.assertEqual(set(started),set(byid))
+            status=json.loads((root/'dispatch/variants-controls/outer-0/first/STATUS.json').read_text())
+            self.assertEqual(status['stage'],'training_finished')
