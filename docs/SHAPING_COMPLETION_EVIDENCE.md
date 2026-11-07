@@ -96,3 +96,9 @@ It checks matching-parent terminal artifacts before release, preserves existing
 child attempts, and waits for already started children if a child or parent
 fails. Per-job storage reservations still govern admission. This is dependency
 scheduling, not an exclusive compute lock; independent controllers keep running.
+
+Actual first-parent prefix extraction exposed equivalent f32 knot decimals with
+different Python-f64 values. Exact f32-bit comparison now matches the native
+contract; the regression rejects an adjacent f32 knot. Both frozen and jointly
+fine-tuned manifests extract all 984 terms from the completed product parent.
+The failed pre-training attempt is preserved; no optimizer steps were run.

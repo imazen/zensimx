@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 import subprocess
+import math,struct
 from shaping_completion import encoded, sha
 
 
@@ -27,6 +28,19 @@ def completed_parent(root,child,cells):
     return parent,source,result
 
 
+def structural_terms(config):
+    # Native manifests deserialize knots as f32 and serde prints their shortest
+    # round-tripping decimals. Compare those exact native bits, not Python f64
+    # interpretations of two equivalent JSON spellings. No tolerance is used.
+    output=[]
+    for term in config['terms']:
+        row={k:v for k,v in term.items() if k not in ('slopes','gate','knots')}
+        if not all(math.isfinite(v) for v in term['knots']):raise ValueError('nonfinite knot')
+        row['knot_bits']=[struct.pack('<f',v).hex() for v in term['knots']]
+        output.append(row)
+    return output
+
+
 def extract(root,binary_dir,child,cells,destination):
     parent,source,result=completed_parent(root,child,cells)
     run=json.loads((source/'RUN.json').read_text())
@@ -45,8 +59,7 @@ def extract(root,binary_dir,child,cells,destination):
     if config['schema']!='zensim-input-shaping-v1' or not config['trainable']:
         raise ValueError('prefix is not jointly learned shaping')
     initial=json.loads((source/'SHAPING.json').read_text())
-    structural=lambda c:[{k:v for k,v in t.items() if k not in ('slopes','gate')} for t in c['terms']]
-    if structural(config)!=structural(initial):raise ValueError('prefix shape layout or knots differ')
+    if structural_terms(config)!=structural_terms(initial):raise ValueError('prefix shape layout or knots differ')
     config['trainable']=child['family'].endswith('_joint')
     destination.write_bytes(encoded(config))
     receipt=dict(parent_cell=parent,source_run=str(source),prefix_sha256=sha(prefix),

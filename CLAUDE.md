@@ -1081,3 +1081,13 @@ The same banner assumption also affected the Rev3/4 and Rev5/6/7 child-vector
 readers. They now require exactly one tagged vector anywhere on the banner
 line; vector width, revision movement, finiteness and rounding bounds remain
 unchanged. Both integration oracles run explicitly before the complete suite.
+
+## Known Bugs — pretrained shape knot serialization (2026-11-07, fixed)
+
+The native f32 manifest exporter prints shortest round-tripping decimals, while
+initial Python manifests retain the exact f32 value as a longer f64 decimal.
+Comparing these Python floats directly rejected the first pretrained child
+before training. The prefix validator now compares exact packed f32 knot bits;
+structural fields remain exact, and adjacent-float changes are rejected.
+The failed child attempt is retained. Both frozen and joint product-shape
+extractions from the completed registered parent passed all 984 term checks.

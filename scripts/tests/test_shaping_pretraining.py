@@ -2,11 +2,20 @@ import sys
 from pathlib import Path
 import unittest
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'rev4_featpot'))
-from shaping_pretraining import matching_parent
+from shaping_pretraining import matching_parent,structural_terms
 from shaping_execution import registered_subset
 
 
 class PrefixTests(unittest.TestCase):
+    def test_native_knot_decimal_roundtrip_is_bit_exact(self):
+        a={'terms':[dict(column=0,knots=[0.03746293485164642,0.17839227616786957],slopes=[1,1,1])]}
+        b={'terms':[dict(column=0,knots=[0.037462935,0.17839228],slopes=[0,0,0])]}
+        self.assertEqual(structural_terms(a),structural_terms(b))
+        b['terms'][0]['knots'][0]=0.03746293857693672
+        self.assertNotEqual(structural_terms(a),structural_terms(b))
+        b['terms'][0]['knots'][0]=float('nan')
+        with self.assertRaises(ValueError):structural_terms(b)
+
     def test_dispatch_subset_cannot_add_or_duplicate_registered_cells(self):
         cells=[dict(id='a'),dict(id='b'),dict(id='c')]
         self.assertEqual(registered_subset(cells,['c','a']),[cells[0],cells[2]])
