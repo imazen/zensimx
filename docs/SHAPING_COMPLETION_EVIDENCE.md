@@ -108,3 +108,24 @@ children by their plan, build, cell, exposure and final checkpoint hash, and
 counts already running native children against the same worker limit after
 checking their live command lines. It never silently relaunches a missing or
 failed process. Pre-training failure receipts remain alongside repaired attempts.
+
+### Rescue execution admission
+
+The rescue execution owner resolves the registered cell from a complete paired
+inner selection and its convergence trigger. It retains the primary command's
+seeds, groups, objective and regularization, binding source model/config hashes.
+Analytic controls require a full 240-epoch neutral-control replay with identical
+canonical weights before scientific fitting. Actual admitted family rows were
+joined by frozen row key without reading target columns: KADID 2178 rows/25
+families, TID2013 600/24, KonFiG 168/7, CID22-human 518/8 and teacher 4028/8
+for inner-0-0. Random ordering and no family balancing remain unchanged.
+
+Pretrained rescues use an independent 120-epoch identity-shape phase followed by
+120 epochs with fresh head seeds, applying the registered control to both phases.
+This preserves total exposure and the phase-local final-quarter schedule boundary;
+it cannot borrow a mismatched 240-epoch consolidation prefix. Learned knots retain
+exact native f32 structural checks. Failures preserve phase and controller receipts.
+The command/control tests and actual primary-config admission pass. Scientific
+rescue fits have not started: complete base selection and full analytic neutral
+qualification are still required. Rescue evaluation/selection integration remains
+implementation work; this entry does not claim those comparisons are complete.

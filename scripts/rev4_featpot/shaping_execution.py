@@ -230,9 +230,11 @@ def live_status(root):
         run=json.loads(path.read_text());pid=run['pid']
         try:
             command=Path(f'/proc/{pid}/cmdline').read_bytes().replace(b'\0',b' ').decode()
-            live=(str(root) in command and 'shaping_controls.py' in command) if run.get('process_role')=='control_worker' else (str(path.parent) in command and 'run-heavy' in command)
+            if run.get('process_role')=='control_worker':live=str(root) in command and 'shaping_controls.py' in command
+            elif run.get('process_role')=='rescue_controller':live=str(root) in command and 'shaping_rescue_execution.py' in command and run['cell']['id'] in command
+            else:live=str(path.parent) in command and 'run-heavy' in command
         except FileNotFoundError:live=False
-        log=path.parent/'train.log'
+        log=path.parent/run.get('fit_directory','.')/'train.log'
         text=log.read_text() if log.exists() else ''
         epochs=re.findall(r'epoch\s+(\d+)\s+\|',text)
         result=path.parent/'RESULT.json'

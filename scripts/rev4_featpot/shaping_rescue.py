@@ -69,3 +69,45 @@ def controls(rescue,analytic=False,*,groups=None):
     return dict(schema='monotone-training-v1',init_scale=scale,bias_scale=scale,
                 dropout=0.,dropout_seed=0,adamw=0.,schedule=schedule,order='random',
                 teacher_mass=1.,balance='none',groups=groups)
+
+
+def rewrite_command(command,binary_dir,output,epochs):
+    """Retain every scientific argument except the explicitly budgeted phase length."""
+    if epochs not in (120,240):raise ValueError('unregistered rescue phase exposure')
+    cmd=list(command)
+    positions=[i for i,v in enumerate(cmd) if Path(v).name=='zensim_mlp_train']
+    if len(positions)!=1:raise ValueError('one native trainer required')
+    cmd[positions[0]]=str(binary_dir/'zensim_mlp_train')
+    for flag,value in [('--mem','2G'),('--epochs',epochs),('--out',output/'best.bin'),
+                       ('--dump-checkpoints-dir',output/'checkpoints')]:
+        if cmd.count(flag)!=1:raise ValueError('missing or duplicate native argument: '+flag)
+        cmd[cmd.index(flag)+1]=str(value)
+    return cmd
+
+
+def admitted_families(root,record):
+    """Join only admitted TRAIN row keys to frozen distortion-family metadata."""
+    import pyarrow.parquet as pq
+    plan,_,_=load_registration(root)
+    metadata=Path('/mnt/v/output/zensim/tree-study-20261106/peers/metadata.parquet')
+    if sha(metadata)!=plan['input_pins'][str(metadata)]:raise ValueError('family metadata drift')
+    for name,pin in record['file_sha256'].items():
+        if sha(name)!=pin:raise ValueError('admitted table drift')
+    rows=pq.read_table(metadata,columns=['pair_key','codec','development']).to_pylist()
+    lookup={}
+    for row in rows:
+        value=(row['codec'],row['development'])
+        if row['pair_key'] in lookup and lookup[row['pair_key']]!=value:raise ValueError('ambiguous family key')
+        lookup[row['pair_key']]=value
+    groups=[]
+    for name,path,weight,validation,mode in record['groups']:
+        if weight<=0 or validation!=0:raise ValueError('rescue controls require TRAIN-only groups')
+        keys=pq.read_table(Path(path).with_suffix('.keys.parquet'),columns=['pair_key'])['pair_key'].to_pylist()
+        labels=[]
+        for key in keys:
+            family,development=lookup[key]
+            if development or not isinstance(family,str) or not family:raise ValueError('invalid training family')
+            labels.append(family)
+        taxonomy=sorted(set(labels));codes={name:i for i,name in enumerate(taxonomy)}
+        groups.append(dict(name=name,families=[codes[label] for label in labels]))
+    return groups

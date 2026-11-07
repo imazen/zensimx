@@ -1,11 +1,25 @@
 from pathlib import Path
 import sys,unittest,json,tempfile
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'rev4_featpot'))
-from shaping_rescue import controls,selected_base
+from shaping_rescue import controls,selected_base,rewrite_command
 from shaping_completion import matrix,encoded,sha
 from shaping_selection import HUMANS,aggregate
 
 class RescueTests(unittest.TestCase):
+    def test_phase_command_preserves_seed_objective_and_inputs(self):
+        command=['run-heavy','--mem','1G','--jobs','1','--','/old/zensim_mlp_train',
+                 '--epochs','240','--out','old.bin','--dump-checkpoints-dir','old-checkpoints',
+                 '--init-seed','1101','--sample-seed','101','--l2','0.00001','--group','frozen:1:0:rank']
+        got=rewrite_command(command,Path('/native'),Path('/outputs/phase'),120)
+        for flag in ('--jobs','--init-seed','--sample-seed','--l2','--group'):
+            self.assertEqual(got[got.index(flag)+1],command[command.index(flag)+1])
+        self.assertEqual(got[got.index('--epochs')+1],'120')
+        self.assertIn('/native/zensim_mlp_train',got)
+        self.assertEqual(command[command.index('--epochs')+1],'240')
+        for bad in (command+['--epochs','120'],command+['/another/zensim_mlp_train']):
+            with self.assertRaises(ValueError):rewrite_command(bad,Path('/native'),Path('/output'),120)
+        with self.assertRaises(ValueError):rewrite_command(command,Path('/native'),Path('/output'),119)
+
     def test_selection_rechecks_full_pairing_and_report_hashes(self):
         with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as d:
             root=Path(d);(root/'PLAN.json').write_text('{}');cells=matrix();reports={};pins={}
