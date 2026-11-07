@@ -293,8 +293,26 @@ def label_structure(root):
     print(json.dumps(dict(stage='label-structure',permutations=len(records))),flush=True)
 
 
+def progress(root):
+    import re
+    quadratic=sum(json.loads(p.read_text())['fits'] for p in (root/'fits').glob('*/COMPLETE.json'))
+    cells=[]
+    for cell in json.loads((root/'S4-comparison.json').read_text()):
+        path=root/'comparators'/cell['id'];done=(path/'COMPLETE.json').exists();record=dict(id=cell['id'],complete=done)
+        if (path/'RUN.json').exists():
+            run=json.loads((path/'RUN.json').read_text());pid=run['pid'];cmd=Path(f'/proc/{pid}/cmdline')
+            record.update(recorded_pid=pid,live_process_matches=cmd.exists() and str(path).encode() in cmd.read_bytes())
+            epochs=re.findall(r'epoch\s+(\d+)\s+\|',(path/'train.log').read_text())
+            record['last_artifact_epoch']=int(epochs[-1]) if epochs else None
+            if not done and not record['live_process_matches']:raise ValueError('unfinished native cell has no matching live process: '+cell['id'])
+        cells.append(record)
+    result=dict(checked=datetime.now(timezone.utc).isoformat(),quadratic_complete=quadratic,quadratic_required=354,comparators_complete=sum(v['complete'] for v in cells),comparators_required=36,cells=cells)
+    write(root/'PROGRESS_AUDIT.json',result)
+    print(json.dumps({k:v for k,v in result.items() if k!='cells'}),flush=True)
+
+
 def main():
-    p=argparse.ArgumentParser(description=__doc__);p.add_argument('stage',choices=['audit','linear-details','label-structure','bootstrap','report','archive']);p.add_argument('--root',type=Path,required=True);a=p.parse_args();{'audit':audit,'linear-details':linear_details,'label-structure':label_structure,'bootstrap':bootstrap,'report':reduce,'archive':archive}[a.stage](a.root)
+    p=argparse.ArgumentParser(description=__doc__);p.add_argument('stage',choices=['audit','linear-details','label-structure','bootstrap','report','progress','archive']);p.add_argument('--root',type=Path,required=True);a=p.parse_args();{'audit':audit,'linear-details':linear_details,'label-structure':label_structure,'bootstrap':bootstrap,'report':reduce,'progress':progress,'archive':archive}[a.stage](a.root)
 
 
 if __name__=='__main__':main()
