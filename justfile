@@ -4936,3 +4936,9 @@ shaping-completion-archive root destination:
 
 shaping-completion-diagnostic-pilot study binary_dir run output:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_diagnostic_replay.py --study {{quote(study)}} --binary-dir {{quote(binary_dir)}} --run {{quote(run)}} --output {{quote(output)}} --resource-pilot
+
+shaping-completion-selection-check:
+    python3 -B -m unittest discover -s scripts/tests -p test_shaping_selection.py
+
+shaping-completion-select-base study family outer:
+    python3 -B scripts/rev4_featpot/shaping_selection.py --study {{quote(study)}} --family {{quote(family)}} --outer {{outer}}
