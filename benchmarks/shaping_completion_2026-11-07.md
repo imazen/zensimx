@@ -1955,3 +1955,14 @@ fits, model corruption, phase-exposure drift and absent outer admission.
 Six native runner tests pass, including complete matched summary/artifact
 production; wrapper peak RSS was 0.21 GiB. These are implementation tests, not
 completed scientific comparisons. Actual outer/variant fitting remains required.
+
+## Complete matched-comparison registration
+
+The bootstrap plan owner derives 88 fixed comparisons from the registered
+matrix: 84 variant/full-data comparisons (six finalist roles, six source
+fraction/order conditions, three row fractions, four shuffle conditions and
+one human-only condition) plus four pretrained/fresh comparisons. Every run
+requires the complete comparison registry, unchanged analysis policy, source
+draw settings and all specification hashes. Five registration tests and six
+native runner tests pass, including refusal when another registered comparison
+specification changes. No scientific outer bootstrap has executed yet.

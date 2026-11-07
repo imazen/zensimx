@@ -5330,3 +5330,6 @@ shaping-completion-bootstrap-matched-native-check panel:
 
 shaping-completion-bootstrap-matched study draws binaries comparison output:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 2G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_bootstrap.py --study {{quote(study)}} --draws {{quote(draws)}} --binary-dir {{quote(binaries)}} --comparison {{quote(comparison)}} --output {{quote(output)}}
+
+shaping-completion-register-matched-bootstrap study output:
+    TMPDIR="$HOME/tmp" python3 -B scripts/rev4_featpot/shaping_bootstrap_plan.py --study {{quote(study)}} --output {{quote(output)}} --matched

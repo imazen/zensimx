@@ -97,12 +97,12 @@ def run(args):
     if comparison is None:
         plan,partitions,outputs,pins,qualifications=collect(args.study)
     else:
-        spec=json.loads(comparison.read_text())
-        if set(spec) not in ({'role','condition'},{'fresh_family'}):raise ValueError('exact matched comparison specification required')
+        from shaping_bootstrap_plan import load_comparison
+        spec,comparison_pins=load_comparison(args.study,comparison)
         plan,partitions,arms,pins,qualifications,seed_ids=collect_matched(args.study,**spec)
         outputs=[row for rows in arms.values() for row in rows]
         policy=Path(__file__).resolve().parents[2]/'docs/SHAPING_MATCHED_UNCERTAINTY.md'
-        pins.update({str(comparison):sha(comparison),str(policy):sha(policy)})
+        pins.update(comparison_pins)
     if args.output.parent.stat().st_dev!=args.study.stat().st_dev:
         raise ValueError('active bootstrap output must share the study SSD')
     for name in ('shaping_bootstrap.py','shaping_bootstrap_plan.py','shaping_bootstrap_stats.py',

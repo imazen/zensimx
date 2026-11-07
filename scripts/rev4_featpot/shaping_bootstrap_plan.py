@@ -3,7 +3,7 @@ from __future__ import annotations
 import argparse,json
 from pathlib import Path
 import numpy as np
-from shaping_completion import encoded,sha
+from shaping_completion import NEURAL,REPO,encoded,sha
 from shaping_execution import load_registration
 
 SEED=20261107
@@ -73,8 +73,57 @@ def register(study,output):
     return record
 
 
+def matched_specs(cells):
+    fields={'source_curve':('stage','fraction','order_seed'),'row_curve':('stage','fraction','order_seed'),
+            'shuffle':('stage','permutation','permutation_seed'),'human_only':('stage',)}
+    specs={}
+    for cell in cells:
+        if cell['stage'] in fields:
+            spec=dict(role=cell['family'],condition={k:cell[k] for k in fields[cell['stage']]})
+            specs[encoded(spec)]=spec
+    for family in NEURAL:
+        if '_pretrained_' in family:
+            spec=dict(fresh_family=family);specs[encoded(spec)]=spec
+    if len(specs)!=88:raise ValueError('complete 88-comparison matched analysis required')
+    return [specs[k] for k in sorted(specs)]
+
+
+def register_matched(study,output):
+    _,cells,_=load_registration(study);specs=matched_specs(cells)
+    output.mkdir(parents=True,exist_ok=False);entries=[]
+    for i,spec in enumerate(specs):
+        path=output/f'comparison-{i:03}.json';path.write_bytes(encoded(spec))
+        entries.append(dict(file=path.name,spec=spec,sha256=sha(path)))
+    policy=REPO/'docs/SHAPING_MATCHED_UNCERTAINTY.md'
+    record=dict(schema='shaping-matched-bootstrap-plan-v1',plan_sha256=sha(study/'PLAN.json'),
+                policy_sha256=sha(policy),comparisons=entries,scores_read=False,outer_results_read=False,
+                seed=SEED,replicates=REPLICATES,driver_sha256=sha(__file__))
+    (output/'MATCHED_REGISTRATION.json').write_bytes(encoded(record));return record
+
+
+def load_comparison(study,path):
+    _,cells,_=load_registration(study)
+    registration=path.parent/'MATCHED_REGISTRATION.json';record=json.loads(registration.read_text())
+    policy=REPO/'docs/SHAPING_MATCHED_UNCERTAINTY.md'
+    if (record['plan_sha256']!=sha(study/'PLAN.json') or record['policy_sha256']!=sha(policy)
+        or record['scores_read'] or record['outer_results_read'] or record['seed']!=SEED or record['replicates']!=REPLICATES):
+        raise ValueError('matched analysis registration drift')
+    entries=record['comparisons']
+    if [r['spec'] for r in entries]!=matched_specs(cells):raise ValueError('matched comparison coverage differs')
+    pins={str(registration):sha(registration),str(policy):sha(policy)};selected=[]
+    for i,row in enumerate(entries):
+        if row['file']!=f'comparison-{i:03}.json':raise ValueError('matched comparison file identity differs')
+        source=path.parent/row['file']
+        if sha(source)!=row['sha256'] or json.loads(source.read_text())!=row['spec']:raise ValueError('matched comparison specification drift')
+        pins[str(source)]=sha(source)
+        if source==path:selected.append(row['spec'])
+    if len(selected)!=1:raise ValueError('comparison not in complete registration')
+    return selected[0],pins
+
+
 if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('--study',type=Path,required=True);p.add_argument('--output',type=Path,required=True)
-    a=p.parse_args();record=register(a.study,a.output)
-    print(json.dumps(dict(strata=len(record['strata']),replicates=record['replicates'],scores_read=False)),flush=True)
+    p.add_argument('--matched',action='store_true')
+    a=p.parse_args();record=(register_matched if a.matched else register)(a.study,a.output)
+    print(json.dumps(dict(comparisons=len(record.get('comparisons',[])),strata=len(record.get('strata',[])),replicates=record['replicates'],scores_read=False)),flush=True)

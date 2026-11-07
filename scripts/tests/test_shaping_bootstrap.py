@@ -74,7 +74,7 @@ class BootstrapRunnerTests(unittest.TestCase):
     def test_matched_runner_requires_admission_before_loading_arrays(self):
         with tempfile.TemporaryDirectory(dir=os.environ['TMPDIR']) as d:
             spec=Path(d)/'comparison.json';spec.write_bytes(encoded({'fresh_family':'product_pretrained_frozen'}))
-            with patch('shaping_bootstrap.collect_matched',side_effect=ValueError('matched not admitted')),patch('shaping_bootstrap.np.load') as load:
+            with patch('shaping_bootstrap_plan.load_comparison',return_value=({'fresh_family':'product_pretrained_frozen'},{})),patch('shaping_bootstrap.collect_matched',side_effect=ValueError('matched not admitted')),patch('shaping_bootstrap.np.load') as load:
                 with self.assertRaisesRegex(ValueError,'not admitted'):run(SimpleNamespace(study=Path(d),comparison=spec))
                 load.assert_not_called()
 
@@ -102,9 +102,12 @@ class BootstrapRunnerTests(unittest.TestCase):
             # Exercise the same pinned runner for a separate matched comparison.
             arms={'candidate':[r for r in outputs if r['cell']['family']=='softplus'],
                   'control':[r for r in outputs if r['cell']['family']=='relu']}
-            args.comparison=root/'comparison.json';args.comparison.write_bytes(encoded(dict(role='best_analytic',condition={'stage':'human_only'})))
+            from shaping_bootstrap_plan import register_matched
+            with patch('shaping_bootstrap_plan.load_registration',return_value=(plan,matrix(),partitions)):
+                registered=register_matched(study,root/'comparisons')
+            args.comparison=root/'comparisons'/next(r['file'] for r in registered['comparisons'] if r['spec']==dict(role='best_analytic',condition={'stage':'human_only'}))
             args.output=root/'matched-result'
-            with patch('shaping_bootstrap.collect_matched',return_value=(plan,partitions,arms,{str(study/'PLAN.json'):sha(study/'PLAN.json')},{},(0,1,2))),patch('shaped_linear_study.OLD',old):
+            with patch('shaping_bootstrap_plan.load_registration',return_value=(plan,matrix(),partitions)),patch('shaping_bootstrap.collect_matched',return_value=(plan,partitions,arms,{str(study/'PLAN.json'):sha(study/'PLAN.json')},{},(0,1,2))),patch('shaped_linear_study.OLD',old):
                 run(args)
             matched=json.loads((args.output/'SUMMARY.json').read_text())
             self.assertEqual(matched['comparison'],json.loads(args.comparison.read_text()))

@@ -29,3 +29,22 @@ class SourceBootstrapTests(unittest.TestCase):
 
 
 if __name__=='__main__':unittest.main()
+
+
+class MatchedRegistrationTests(unittest.TestCase):
+    def test_complete_registration_and_specification_drift_refused(self):
+        import json,tempfile
+        from unittest.mock import patch
+        from shaping_completion import matrix
+        from shaping_bootstrap_plan import matched_specs,register_matched,load_comparison
+        self.assertEqual(len(matched_specs(matrix())),88)
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as d:
+            root=Path(d);study=root/'study';study.mkdir();(study/'PLAN.json').write_text('{}')
+            with patch('shaping_bootstrap_plan.load_registration',return_value=({},matrix(),{})):
+                record=register_matched(study,root/'comparisons')
+                path=root/'comparisons'/record['comparisons'][0]['file']
+                spec,pins=load_comparison(study,path)
+                self.assertEqual(spec,record['comparisons'][0]['spec']);self.assertIn(str(path),pins)
+                other=root/'comparisons'/record['comparisons'][-1]['file'];other.write_text('{}')
+                with self.assertRaisesRegex(ValueError,'specification drift'):load_comparison(study,path)
+                with self.assertRaises(FileExistsError):register_matched(study,root/'comparisons')
