@@ -16,9 +16,12 @@ existing initialization draws and numerical paths.
   preactivations stay in SiLU's nonnegative, increasing domain.
 - `silu_diagnostic`: ordinary unanchored SiLU, signed intermediate weights and
   unrestricted output amplitudes. It has no identity or monotonicity claim.
-  **The first layer still uses the constrained shared-depth owner.** This is a
-  diagnostic head, not a fully unconstrained MLP. A fully unrestricted control
-  remains separate implementation work; do not relabel this one.
+  By default the first layer still uses the constrained shared-depth owner.
+  `unrestricted_first: true`, admitted only with this family and `max_pairs: 0`,
+  disables first-layer weight/bias projection and pair ties. That explicit mode
+  is the fully unrestricted diagnostic. Both diagnostic modes learn the output
+  bias and retain the same scale-only feature transformation as the controls.
+  The manifest and training log distinguish them; neither claims monotonicity.
 
 For the anchored families the response is
 `tau * (f((b + W*x)/tau) - f(b/tau))`. Bias derivatives subtract both branch

@@ -468,6 +468,93 @@ mod tests {
     }
 
     #[test]
+    fn unrestricted_manifest_reaches_the_real_cpu_trainer() {
+        const CHILD: &str = "ZENSIM_ANALYTIC_DIAGNOSTIC_TEST_CHILD";
+        if std::env::var_os(CHILD).is_none() {
+            let root = std::env::temp_dir().join(format!(
+                "zensim-analytic-diagnostic-{}-{}",
+                std::process::id(),
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap()
+                    .as_nanos()
+            ));
+            std::fs::create_dir(&root).unwrap();
+            let path = root.join("manifest.json");
+            let mut c = config(Family::SiluDiagnostic, false);
+            c.unrestricted_first = true;
+            c.max_pairs = 0;
+            c.first_width = 4;
+            c.init_seed = 111;
+            c.sample_seed = 222;
+            c.epochs = 3;
+            c.pairs_per_epoch = 50;
+            std::fs::write(&path, serde_json::to_vec(&c).unwrap()).unwrap();
+            let hash = crate::train_manifest::sha256_file(&path).unwrap();
+            let output = std::process::Command::new(std::env::current_exe().unwrap())
+                .args(["--exact", "mlp_train::monotone_research::tests::unrestricted_manifest_reaches_the_real_cpu_trainer", "--nocapture"])
+                .env(CHILD, "1").env("ZENSIM_MONOTONE_RESEARCH_MANIFEST", path)
+                .env("ZENSIM_MONOTONE_RESEARCH_SHA256", hash).output().unwrap();
+            std::fs::write(root.join("stdout.log"), &output.stdout).unwrap();
+            std::fs::write(root.join("stderr.log"), &output.stderr).unwrap();
+            assert!(
+                output.status.success(),
+                "child failed: {}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+        } else {
+            use crate::mlp_train::{FeatureRows, GroupLossMode, TrainingGroup};
+            let x = (0..32)
+                .map(|i| vec![(i % 8) as f64 / 8., (i / 8) as f64 / 4.])
+                .collect::<Vec<_>>();
+            let y = x
+                .iter()
+                .map(|v| 40. + 20. * v[0] - 10. * v[1])
+                .collect::<Vec<_>>();
+            let refs = x.iter().map(Vec::as_slice).collect::<Vec<_>>();
+            let hp = MlpHyperparams {
+                n_hidden_layers: 2,
+                n_hidden: 4,
+                nonneg_distance: true,
+                monotone_cbc: true,
+                nonneg_thresholds: true,
+                max_pairs: 0,
+                init_seed: Some(111),
+                sample_seed: Some(222),
+                n_epochs: 3,
+                pairs_per_epoch: 50,
+                log_every: 1,
+                mse_weight: 0.1,
+                ..Default::default()
+            };
+            let group = TrainingGroup {
+                name: "unrestricted_fixture".into(),
+                features: FeatureRows::Borrowed(&refs),
+                human_scores: &y,
+                metric_sigmas: None,
+                train_weight: 1.,
+                validation_weight: 1.,
+                ref_ids: None,
+                loss_mode: GroupLossMode::Both,
+            };
+            let mut log = Vec::new();
+            let bytes = crate::mlp_train::train_mlp(&mut [group], 2, &hp, &mut log);
+            assert!(log.iter().any(|s| s.contains("RESEARCH_DIAGNOSTIC")));
+            let model = zenpredict::Model::from_bytes(&bytes).unwrap();
+            assert!(model.scaler_mean().iter().all(|m| *m == 0.));
+            let zenpredict::WeightStorage::F32(weights) = model.layer(0).weights else {
+                panic!("f32 expected");
+            };
+            assert!(
+                weights.iter().any(|w| *w < 0.),
+                "first-layer sign projection remained active"
+            );
+            let mut predictor = zenpredict::Predictor::new(&model);
+            assert_ne!(predictor.predict(&[0., 0.]).unwrap()[0], 100.);
+        }
+    }
+
+    #[test]
     fn diagnostic_updates_free_output_bias_and_retains_signed_paths() {
         let mut c = config(Family::SiluDiagnostic, false);
         c.unrestricted_first = true;
