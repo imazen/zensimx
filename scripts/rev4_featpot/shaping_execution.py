@@ -190,12 +190,14 @@ def live_status(root):
         run=json.loads(path.read_text());pid=run['pid']
         try:
             command=Path(f'/proc/{pid}/cmdline').read_bytes().replace(b'\0',b' ').decode()
-            live=str(path.parent) in command and 'run-heavy' in command
+            live=(str(root) in command and 'shaping_controls.py' in command) if run.get('process_role')=='control_worker' else (str(path.parent) in command and 'run-heavy' in command)
         except FileNotFoundError:live=False
-        text=(path.parent/'train.log').read_text()
+        log=path.parent/'train.log'
+        text=log.read_text() if log.exists() else ''
         epochs=re.findall(r'epoch\s+(\d+)\s+\|',text)
         result=path.parent/'RESULT.json'
         terminal=json.loads(result.read_text())['stage'] if result.exists() else None
+        if terminal is not None:live=False
         rows.append(dict(cell=run['cell']['id'],stage=run['cell']['stage'],pid=pid,
                          verified_live=live,terminal=terminal,last_epoch=int(epochs[-1]) if epochs else None,
                          required_epochs=run.get('epochs',run['cell'].get('epochs')),run=str(path.parent)))

@@ -56,15 +56,8 @@ def prepare_validation(root,partition,membership):
     (dest/'RECEIPT.json').write_bytes(encoded(receipt));return receipt
 
 
-def make_probes(root,partition,train,plan):
-    from shaped_linear_study import OLD
-    from tree_study import RAW_IDS
-    raw_path=OLD/'data/raw.npy'
-    if sha(raw_path)!=plan['input_pins'][str(raw_path)]:raise ValueError('probe input drift')
-    raw=np.load(raw_path,mmap_mode='r')
-    values=np.array(raw[np.asarray(train)],dtype=np.float32)
-    position={int(v):i for i,v in enumerate(RAW_IDS)}
-    declaration=json.loads((REPO/'scripts/rev4_featpot/color_noise_fx2_declaration.json').read_text())
+def probe_values(values,raw_ids,declaration):
+    position={int(v):i for i,v in enumerate(raw_ids)}
     damage=np.array([position[i] for i in declaration['direct']])
     rng=np.random.default_rng(20261107)
     low=values[rng.integers(len(values),size=128)].copy();high=low.copy()
@@ -75,6 +68,19 @@ def make_probes(root,partition,train,plan):
     factors=np.array([0,1e-8,1e-6,1e-4,.01,.1,1,10,1e4],np.float32)
     ray[:,damage]*=factors[:,None]
     data=np.concatenate((low,high,ray))
+    return data
+
+
+def make_probes(root,partition,train,plan):
+    from shaped_linear_study import OLD
+    from tree_study import RAW_IDS
+    raw_path=OLD/'data/raw.npy'
+    if sha(raw_path)!=plan['input_pins'][str(raw_path)]:raise ValueError('probe input drift')
+    raw=np.load(raw_path,mmap_mode='r')
+    values=np.array(raw[np.asarray(train)],dtype=np.float32)
+    declaration=json.loads((REPO/'scripts/rev4_featpot/color_noise_fx2_declaration.json').read_text())
+    data=probe_values(values,RAW_IDS,declaration)
+    position={int(v):i for i,v in enumerate(RAW_IDS)}
     path=root/'evaluation_views'/partition/'probes.parquet'
     fields={f'f{i}':pa.array(data[:,position[i]] if i in position else np.zeros(len(data),np.float32)) for i in range(1853)}
     fields.update(human_score=pa.array(np.zeros(len(data))),ref_basename=pa.array(['probe']*len(data)))
