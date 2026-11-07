@@ -4957,3 +4957,9 @@ shaping-completion-register-variants study:
 
 shaping-completion-absent-maps-check:
     python3 -B -m unittest discover -s scripts/tests -p test_shaping_absent_maps.py
+
+shaping-completion-population-admission-check:
+    python3 -B -m unittest discover -s scripts/tests -p test_shaping_population_admission.py
+
+shaping-completion-prepare-variant study cell:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 2G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_variant_inputs.py --study {{quote(study)}} --cell {{quote(cell)}}

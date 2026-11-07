@@ -80,7 +80,7 @@ def run_native(root,binary_dir,cell,record,attempt,epochs,mem):
     import v2_lodo_mlp as owner
     # The caller establishes these shared module settings before concurrency.
     if owner.EPOCHS!=epochs:raise ValueError('command builder epoch budget drift')
-    recipe={**json.loads(BASE.read_text())['recipe'],'shared_hidden_activation':'relu','mse_weight':1}
+    recipe={**json.loads(BASE.read_text())['recipe'],'shared_hidden_activation':'relu','mse_weight':record.get('mse_weight',1)}
     analytic_family=cell['family'] in ('softplus','silu_monotone','silu_diagnostic')
     if cell['family']=='silu_diagnostic':recipe['max_pairs']=0
     declaration=json.loads((REPO/'scripts/rev4_featpot/color_noise_fx2_declaration.json').read_text())

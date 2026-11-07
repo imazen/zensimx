@@ -198,3 +198,21 @@ min-avail 41595MiB | peak-load 22.27`.
 The complete tree inner wave and its three selection receipts are mirrored
 and reread: 584 artifact files, 3,251,255,749 bytes, all hashes matched.
 Archive manifest: `2e7685d7746262d40a42a242358a1084f39c4d839e9944c3b5a72c71acb0213f`.
+
+## Registered subset admission
+
+The supplementary membership policy was frozen before variant fitting. Its
+registry covers 672 cells using 33 distinct row memberships. Two quarter-source
+samples lack one human training population; preserve those hash-selected
+samples and report unavailable calibration errors explicitly. Rank evaluation
+on the fixed test populations remains available. The default evaluator still
+refuses undeclared missing training maps.
+
+Actual preparation and strict table admission passed for an outer-0 human-only
+view and the outer-1 quarter-source view lacking TID2013. The former contains
+all four human populations and no teacher group; its rank-only recipe uses
+MSE weight zero. The latter contains three human groups and the teacher.
+All generated table, key, manifest and admission hashes were rechecked.
+`study/VARIANT_ADMISSION_QUALIFICATION.json` preserves the per-group evidence.
+Two population-admission tests and two absent-map tests pass. These are input
+qualification results, not completed variant fits or generalization results.

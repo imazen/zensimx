@@ -17,12 +17,20 @@ from shaped_linear_study import (load,sha,write,digest,clean,command,HEAVY,BASE,
                                 permuted,weights_and_targets,metrics,RAW_IDS)
 
 
-def prepare_neural(root,cell,d,plan):
+def include_population(name,count,declared):
+    if count==0 and name not in declared:raise ValueError('empty comparator population')
+    if count>0 and name in declared:raise ValueError('declared absent population contains training rows')
+    return count>0
+
+
+def prepare_neural(root,cell,d,plan,*,absent_fit_groups=()):
     from v2_teacher import row_keys_sha,selection_sha
     from v2_common import acceptance_weight
     dest=root/'comparators'/cell['id'];admission=dest/'admission';tables=admission/'wide/main/real'
     tables.mkdir(parents=True,exist_ok=True)
     original=json.loads(PREP.read_text());base=json.loads(BASE.read_text())
+    if set(absent_fit_groups)-{g['name'] for g in original['groups'] if g['split']=='fit'}:
+        raise ValueError('unknown declared absent training population')
     decision=Path(base['output'])/'root/human_role_decision.json'
     shutil.copy2(decision,admission/'human_role_decision.json')
     train=np.asarray(cell['train']);y=permuted(d['y'],d,train,cell['mode'],cell['seed']) if cell['mode']!='true' else np.array(d['y'])
@@ -34,7 +42,7 @@ def prepare_neural(root,cell,d,plan):
         if g['split']=='dev':
             groups.append((g['name'],source,0.,1.,'withinref,rank'));continue
         selected=np.flatnonzero(np.isin(global_ids,train));ids=global_ids[selected]
-        if not len(ids):raise ValueError('empty comparator population')
+        if not include_population(g['name'],len(ids),absent_fit_groups):continue
         source_keys=source.with_suffix('.keys.parquet');manifest=Path(str(source)+'.manifest.json')
         for p,k in ((source,'sha256'),(source_keys,'keys_sha256'),(manifest,'manifest_sha256')):
             if sha(p)!=g[k]:raise ValueError('comparator original input drift')
@@ -55,6 +63,7 @@ def prepare_neural(root,cell,d,plan):
         refs=keys['ref_basename'].to_pylist()
         groups.append((g['name'],out,acceptance_weight(1.,refs),0.,'withinref,both' if g['name']=='cid22' else 'withinref,rank'))
         records.append(dict(name=g['name'],path=str(out),table_sha256=sha(out),manifest_sha256=sha(str(out)+'.manifest.json'),keys_sha256=sha(kp),rows=len(ids)))
+    if absent_fit_groups:receipt['explicit_absent_fit_groups']=sorted(absent_fit_groups)
     write(tables/'receipt.json',receipt)
     write(dest/'ADMISSION.json',dict(cell=cell,groups=records,receipt_sha256=sha(tables/'receipt.json'),decision_sha256=sha(admission/'human_role_decision.json'),originals_unchanged=True))
     return groups,admission/'human_role_decision.json',y

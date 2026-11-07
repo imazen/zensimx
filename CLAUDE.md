@@ -1,5 +1,14 @@
 # zensim — current working rules
 
+## Known Bugs — absent training calibration maps (resolved November 7, 2026)
+
+The generalization evaluator used an uninitialized array for populations absent
+from training maps. It now initializes unavailable entries to NaN and refuses
+missing maps by default. Explicit registered absent-population evaluation emits
+rank panels and unavailable calibration errors; it never learns a map from test
+labels. Complete-map behavior and existing scientific thresholds are unchanged.
+
+
 ## Known Bugs — manifest comment edit (resolved November 7, 2026)
 
 A research dependency comment edit exposed a commented path-dependency example,
