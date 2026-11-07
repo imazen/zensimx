@@ -1317,3 +1317,35 @@ The live runner refused the missing outer-0 admission with zero array-load calls
 No scientific intervals have been computed. This runner covers primary outer
 comparisons; fresh-head controls and generalization variants still need their
 separate matched comparisons. Evidence: `bootstrap-runner-qualification`.
+
+## Third completed ReLU consolidation rescue
+
+Cell `1039887855a540dae1ee` is `inner-0-1`, seed index 1, under
+`consolidate_lr`. Its complete 240-epoch native trace has at most one output
+coefficient at 206 epochs, first at epoch 31. The final checkpoint has one
+nonzero output coefficient and one sampled active last-hidden unit among 64,
+using 386 sampled responses. It records 45,945 zero first activations among
+49,408 sampled values and 929,999 output-projection hits over training.
+The final squared-gradient summaries are 0.7688965147802748 for the first
+activation gradient and 1445658.1106648236 for the regularized output gradient.
+These are not first-weight gradients or proof of globally dead units.
+
+The final evaluation still triggers both continuing same-cycle improvement and
+one-output-coefficient investigation. Native original evaluation passed; the
+uniform repaired-ReLU representation is also preserved. The fit, repaired
+reports and re-export artifacts passed destination SHA-256 verification:
+714 files, 54,234,876 bytes across three archives. The diagnostic summary and
+pinned final/convergence reports are separately archived under
+`relu-rescue-seed1-diagnosis`.
+
+A log-hash-verified comparison of all three completed consolidation rescues
+(`ddc7932564aefab339d1`, `e07b843ce1d5b313c0a9`, `1039887855a540dae1ee`) finds
+exactly one output coefficient at every recorded epoch from 180 through 239,
+all 60 checkpoints in each fit. Collapse first appeared before the schedule's
+epoch-180 learning-rate change in all three fits. Thus this late consolidation
+has not revived the collapsed outputs in these observations. This is evidence
+across two seeds and two inner partitions, not a complete paired rescue result
+or a rejection of the architecture. Other initialization/schedule trials remain
+required. The late-phase measurements and input log hashes are preserved in
+`relu-consolidation-late-phase` in both artifact roots. A single surviving output
+coefficient still combines a nonlinear hidden network; it is not a feature ceiling.
