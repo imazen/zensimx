@@ -2636,3 +2636,13 @@ controls refuse. These checks perform no native training.
 
 The CLI ownership check also verifies that acquiring the dispatcher lock does
 not precreate the initial audit directory; the lock is stored separately.
+
+The corrected inner-0-0 dispatcher was verified live with 25 completed children,
+one externally supervised live child, 18 waiting for the nine recovering
+parents, and four explicit interrupted-parent dependencies. The prior queue's
+fatal dependency state was verified before starting this observer; it admits
+no more work, and its last active child is preserved. The new owner uses a
+four-worker ceiling and shared CPU/RAM admission, without restarting existing
+fits. Cold readback verified `pretrained00-interrupted-parent-recovery`: 
+8 artifacts, 35334 bytes; receipt
+`cbda186981820d5ca968d1f4db6e331f9d615bc5639977b7c3ead09a44609406`.
