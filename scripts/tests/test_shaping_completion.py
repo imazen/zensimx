@@ -2,6 +2,7 @@
 import importlib.util
 from pathlib import Path
 import unittest
+import json,sys,tempfile
 
 path = Path(__file__).resolve().parents[1]/'rev4_featpot/shaping_completion.py'
 spec = importlib.util.spec_from_file_location('shaping_completion', path)
@@ -10,6 +11,20 @@ spec.loader.exec_module(study)
 
 
 class RegistrationTests(unittest.TestCase):
+    def test_portable_protocol_requires_identical_registered_bytes(self):
+        sys.path.insert(0,str(path.parent))
+        from shaping_execution import load_registration
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as directory:
+            root=Path(directory)
+            (root/'MATRIX.json').write_text('[]');(root/'PARTITIONS.json').write_text('{}')
+            protocol=root/'PROTOCOL.md';protocol.write_text('frozen scientific protocol\n')
+            plan=dict(protocol=str(root/'unavailable-host-path.md'),protocol_sha256=study.sha(protocol),
+                      matrix_sha256=study.sha(root/'MATRIX.json'),partition_sha256=study.sha(root/'PARTITIONS.json'))
+            (root/'PLAN.json').write_text(json.dumps(plan))
+            self.assertEqual(load_registration(root),(plan,[],{}))
+            protocol.write_text('changed scientific protocol\n')
+            with self.assertRaisesRegex(ValueError,'protocol drift'):load_registration(root)
+
     def test_alias_component_and_development_leak_refuse(self):
         for component, train, test, dev in [
             (['a','a','b'],[0],[1],[2]),

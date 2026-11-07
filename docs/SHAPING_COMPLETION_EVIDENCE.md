@@ -137,3 +137,10 @@ models. Convergence reads the actual fresh-head phase log for pretrained fits;
 pretraining remains separately charged and preserved. Repaired ReLU reports use
 the actual nested fit checkpoints. Admission/epoch, convergence and supervisor
 regressions pass. No rescue result is claimed before an eligible native fit runs.
+
+Portable worker admission can read an exact frozen `PROTOCOL.md` beside the
+registered `PLAN.json`. The original protocol SHA256 remains mandatory; a
+changed copied document is rejected. This permits a source snapshot on another
+eligible host without changing the scientific plan or relying on that host's
+checkout paths. It does not waive input/binary qualification or admit a worker
+before native parity checks.

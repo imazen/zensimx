@@ -23,7 +23,11 @@ def load_registration(root):
     plan=json.loads((root/'PLAN.json').read_text())
     for name,pin in [('MATRIX.json','matrix_sha256'),('PARTITIONS.json','partition_sha256')]:
         if sha(root/name)!=plan[pin]:raise ValueError(f'registration drift: {name}')
-    if sha(plan['protocol'])!=plan['protocol_sha256']:raise ValueError('protocol drift')
+    # A worker capsule may carry the exact frozen document beside PLAN.json.
+    # Its registered content hash, never a host-specific path, owns admission.
+    protocol=root/'PROTOCOL.md'
+    if not protocol.exists():protocol=Path(plan['protocol'])
+    if sha(protocol)!=plan['protocol_sha256']:raise ValueError('protocol drift')
     return plan,json.loads((root/'MATRIX.json').read_text()),json.loads((root/'PARTITIONS.json').read_text())
 
 
