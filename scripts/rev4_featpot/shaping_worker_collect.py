@@ -39,6 +39,15 @@ def validate(root, assignment, cells):
 
 
 def pack(study,assignment_path,cell_id,attempt,bundle):
+    from shaping_storage import reservation
+    minimum=json.loads((study/'PLAN.json').read_text())['minimum_ssd_free_bytes']
+    if study.stat().st_dev!=bundle.parent.stat().st_dev:
+        raise ValueError('worker packaging must use the reserved study filesystem')
+    with reservation(study,bundle,minimum):
+        return pack_reserved(study,assignment_path,cell_id,attempt,bundle)
+
+
+def pack_reserved(study,assignment_path,cell_id,attempt,bundle):
     from shaping_execution import load_registration
     _,cells,_=load_registration(study)
     assignment=json.loads(assignment_path.read_text())
@@ -59,7 +68,10 @@ def pack(study,assignment_path,cell_id,attempt,bundle):
     portable='COLLECTION_DERIVED_INPUTS.json'
     if portable in files:raise ValueError('reserved collection filename already present')
     files[portable]=dict(bytes=declaration.stat().st_size,sha256=sha(declaration))
-    if sum(r['bytes'] for r in files.values())>1024**3:raise ValueError('bundle exceeds one-job storage allowance')
+    # Leave room for tar headers, padding and the JSON receipt within the same
+    # one-GiB reservation. These are admission limits, not measured file sizes.
+    if len(files)>1000 or sum(r['bytes'] for r in files.values())>1024**3-16*1024**2:
+        raise ValueError('bundle exceeds one-job storage allowance')
     receipt=dict(cell=run['cell'],attempt=attempt,assignment_sha256=sha(assignment_path),files=files,
                  pack_driver_sha256=sha(__file__),original_declaration_path=str(declaration))
     with tarfile.open(bundle,'x') as archive:

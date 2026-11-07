@@ -23,7 +23,7 @@ class CollectionTests(unittest.TestCase):
             cell=dict(id='cell',family='relu',stage='inner')
             run=dict(cell=cell,command=command)
             (root/'RUN.json').write_bytes(encoded(run))
-            (study/'PLAN.json').write_bytes(b'{}')
+            (study/'PLAN.json').write_bytes(encoded(dict(minimum_ssd_free_bytes=0)))
             assignment=study/'assignment.json'
             assignment.write_bytes(encoded(dict(host='worker',cells=['cell'],plan_sha256=sha(study/'PLAN.json'))))
             before=inventory(root);bundle=study/'bundle.tar'

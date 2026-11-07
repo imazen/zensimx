@@ -161,3 +161,8 @@ Original commands remain evidence. Tests cover pack/unpack, an absent original
 worker path, successful relocation and rejection of changed declaration bytes
 or mismatched paths. This qualifies transport behavior, not a scientific fit;
 remote fit collection still requires terminal receipts and every checkpoint.
+
+Packaging also reserves one GiB on the worker study filesystem before writing.
+Its payload admission leaves 16 MiB for transport metadata and permits at most
+1,000 files; this is a conservative allowance, not a memory or timing claim.
+The collector retains its independent SSD reservation and atomic publication.
