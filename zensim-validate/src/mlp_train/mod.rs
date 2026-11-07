@@ -1378,6 +1378,43 @@ fn nonneg_project(w2: &mut [f64], b1: &mut [f64], b2: &mut [f64], pin: Option<f6
     nonneg_project_w2b2(w2, b2, pin);
 }
 
+mod gate_projection;
+#[cfg(test)]
+use gate_projection::{GATE_MARGIN, GATE_MIN_DIRECT};
+use gate_projection::{MaxPairRows, project_gate};
+
+fn project_max_pair_rows(
+    rows: &MaxPairRows,
+    active_rows: Option<&[(u32, u32)]>,
+    w1: &mut [f64],
+    w2: &mut [f64],
+    b1: &mut [f64],
+    b2: &mut [f64],
+    pin: Option<f64>,
+    hp: &MlpHyperparams,
+) {
+    // Read each tied output mean before the sign projection, exactly as the
+    // general projection does. The validated pair layout is disjoint.
+    for &[u, v] in rows.pairs() {
+        let c = (0.5 * (w2[u] + w2[v])).min(0.0);
+        w2[u] = c;
+        w2[v] = c;
+    }
+    if hp.nonneg_thresholds && pin.is_some() {
+        nonneg_project_thresholds(b1);
+        nonneg_project_w2b2(w2, b2, pin);
+    } else {
+        nonneg_project(w2, b1, b2, pin);
+    }
+    rows.project_active_rows(w1, active_rows);
+    for &[u, v] in rows.pairs() {
+        b1[u] = 0.0;
+        if b1[v] > 0.0 {
+            b1[v] = 0.0;
+        }
+    }
+}
+
 fn project_plain(
     w1: &mut [f64],
     w2: &mut [f64],
@@ -1553,43 +1590,6 @@ fn project_plain_indexed(
         w2[u] = c;
         w2[v] = c;
     }
-}
-
-/// Smallest direct weight that may carry a negative product weight: the f16
-/// normal range, so packing cannot flush `a` to zero while `b < 0` survives.
-const GATE_MIN_DIRECT: f64 = 1.0 / 8192.0;
-/// Relative margin kept inside the gate cone so f16 packing (relative error
-/// <= 2^-11 per weight) cannot move a boundary pair outside it.
-const GATE_MARGIN: f64 = 1.0 / 256.0;
-
-/// Projects one unit's `(a, b)` (direct, product weights) onto the gate cone
-/// `{a >= 0, s_p·a + s_d·b >= GATE_MARGIN·s_p·a}`: the closer of the two edge
-/// rays when outside, then the f16 safety rules above.
-fn project_gate(a: f64, b: f64, sd: f64, sp: f64) -> (f64, f64) {
-    let (mut a, mut b) = if a >= 0.0 && sp * a + sd * b >= 0.0 {
-        (a, b)
-    } else {
-        let n = (sd * sd + sp * sp).sqrt();
-        let (ux, uy) = (sd / n, -sp / n);
-        let t1 = b.max(0.0);
-        let t2 = (a * ux + b * uy).max(0.0);
-        let d1 = a * a + (b - t1) * (b - t1);
-        let d2 = (a - t2 * ux).powi(2) + (b - t2 * uy).powi(2);
-        if d1 <= d2 {
-            (0.0, t1)
-        } else {
-            (t2 * ux, t2 * uy)
-        }
-    };
-    if b < 0.0 {
-        if a < GATE_MIN_DIRECT {
-            b = 0.0;
-        } else {
-            b = b.max(-a * (sp / sd) * (1.0 - GATE_MARGIN));
-        }
-    }
-    a = a.max(0.0);
-    (a, b)
 }
 
 /// Scales the free ramps' output weights so `Σ |v|·(b_p - b_q) <= budget`.
@@ -3234,6 +3234,22 @@ pub fn train_mlp_strategy_pairs(
     });
 
     let max_pair_positions = initial.as_ref().map(|init| init.max_pair_positions.clone());
+    let max_pair_rows = (hyperparams.monotone_cbc
+        && hyperparams.monotone_product_pairs.is_empty()
+        && hyperparams.monotone_feature_pin.is_none()
+        && hyperparams.monotone_ramps == 0
+        && hyperparams.free_ramps == 0
+        && hyperparams.max_pairs > 0)
+        .then(|| {
+            MaxPairRows::new(
+                hyperparams.n_hidden,
+                max_pair_positions.clone().unwrap_or_else(|| {
+                    (0..hyperparams.max_pairs)
+                        .map(|i| [2 * i, 2 * i + 1])
+                        .collect()
+                }),
+            )
+        });
     let project_plain = |w1: &mut [f64],
                          w2: &mut [f64],
                          b1: &mut [f64],
@@ -3241,6 +3257,10 @@ pub fn train_mlp_strategy_pairs(
                          pin: Option<f64>,
                          hp: &MlpHyperparams| {
         if unrestricted_first {
+            return;
+        }
+        if let Some(rows) = &max_pair_rows {
+            project_max_pair_rows(rows, None, w1, w2, b1, b2, pin, hp);
             return;
         }
         match max_pair_positions.as_deref() {
@@ -3892,6 +3912,25 @@ pub fn train_mlp_strategy_pairs(
         None
     };
 
+    // Reuse exactly Adam's skipped-row contract only immediately after a
+    // fused update. The ordinary projection closure still walks all rows.
+    let project_after_fused = |w1: &mut [f64],
+                               w2: &mut [f64],
+                               b1: &mut [f64],
+                               b2: &mut [f64],
+                               pin: Option<f64>,
+                               hp: &MlpHyperparams| {
+        if unrestricted_first {
+            return;
+        }
+        match max_pair_rows.as_ref() {
+            Some(rows) => {
+                project_max_pair_rows(rows, active_rows.as_deref(), w1, w2, b1, b2, pin, hp)
+            }
+            None => project_plain(w1, w2, b1, b2, pin, hp),
+        }
+    };
+
     // Norm-in-Norm hybrid loss gate (Li et al. 2020). When opted in via
     // `norm_in_norm_weight > 0.0`, the auxiliary loss is computed on
     // each mini-batch's 2K predictions. Batch statistics are unstable
@@ -4504,7 +4543,13 @@ pub fn train_mlp_strategy_pairs(
                     training_research::decay(&mut w1, lr, study.adamw);
                 }
                 head.step(hyperparams, lr);
-                project_plain(&mut w1, &mut w2, &mut b1, &mut b2, nonneg, hyperparams);
+                if training_study.is_none() {
+                    project_after_fused(&mut w1, &mut w2, &mut b1, &mut b2, nonneg, hyperparams);
+                } else {
+                    // Experimental decoupled decay follows Adam and can change
+                    // signed zeros; retain its original complete projection.
+                    project_plain(&mut w1, &mut w2, &mut b1, &mut b2, nonneg, hyperparams);
+                }
                 steps_since_adam = 0;
             } else if fuse_w1 && !e36_scheduled {
                 // Fused pair update: the two gw1 row sweeps, the L2 term,
@@ -4640,7 +4685,7 @@ pub fn train_mlp_strategy_pairs(
                     // look-ahead accumulators from final b1).
                     nonneg_project_w2b2(&mut w2, &mut b2, nonneg);
                 } else {
-                    project_plain(&mut w1, &mut w2, &mut b1, &mut b2, nonneg, hyperparams);
+                    project_after_fused(&mut w1, &mut w2, &mut b1, &mut b2, nonneg, hyperparams);
                 }
                 steps_since_adam = 0;
             } else {

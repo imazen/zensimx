@@ -115,3 +115,8 @@ harness = false
 name = "gl_step_timing"
 path = "benches/gl_step_timing.rs"
 harness = false
+
+[[bench]]
+name = "projection_rows"
+path = "benches/projection_rows.rs"
+harness = false

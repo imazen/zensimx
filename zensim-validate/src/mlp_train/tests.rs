@@ -5097,3 +5097,170 @@ fn steer_hinge_unsupported_modes_refuse() {
         );
     }
 }
+
+#[test]
+fn planned_max_pair_projection_matches_original_full_state() {
+    for hidden in [4, 64, 128] {
+        for thresholds in [false, true] {
+            for pin in [None, Some(100.0)] {
+                for indexed in [false, true] {
+                    let count = hidden / 4;
+                    let positions: Vec<_> = (0..count)
+                        .map(|i| {
+                            if indexed {
+                                [hidden - 1 - 2 * i, hidden - 2 - 2 * i]
+                            } else {
+                                [2 * i, 2 * i + 1]
+                            }
+                        })
+                        .collect();
+                    let hp = MlpHyperparams {
+                        n_hidden: hidden,
+                        max_pairs: count,
+                        monotone_cbc: true,
+                        nonneg_thresholds: thresholds,
+                        ..MlpHyperparams::default()
+                    };
+                    let rows = MaxPairRows::new(hidden, positions.clone());
+                    let values = [
+                        0.0,
+                        -0.0,
+                        0.00001,
+                        -0.00001,
+                        0.125,
+                        -0.125,
+                        1.0,
+                        -1.0,
+                        f64::MIN_POSITIVE,
+                        -f64::MIN_POSITIVE,
+                    ];
+                    let mut state = (
+                        (0..17 * hidden)
+                            .map(|i| values[i % values.len()])
+                            .collect::<Vec<_>>(),
+                        (0..hidden)
+                            .map(|i| values[(i + 3) % values.len()])
+                            .collect::<Vec<_>>(),
+                        (0..hidden)
+                            .map(|i| values[(i + 6) % values.len()])
+                            .collect::<Vec<_>>(),
+                        vec![2.0],
+                    );
+                    let mut expected = state.clone();
+                    for _ in 0..3 {
+                        project_plain_indexed(
+                            &mut expected.0,
+                            &mut expected.1,
+                            &mut expected.2,
+                            &mut expected.3,
+                            pin,
+                            &hp,
+                            Some(&positions),
+                        );
+                        project_max_pair_rows(
+                            &rows,
+                            None,
+                            &mut state.0,
+                            &mut state.1,
+                            &mut state.2,
+                            &mut state.3,
+                            pin,
+                            &hp,
+                        );
+                        for (a, b) in [&expected.0, &expected.1, &expected.2, &expected.3]
+                            .into_iter()
+                            .zip([&state.0, &state.1, &state.2, &state.3])
+                        {
+                            assert_eq!(
+                                a.iter().map(|x| x.to_bits()).collect::<Vec<_>>(),
+                                b.iter().map(|x| x.to_bits()).collect::<Vec<_>>()
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn planned_active_max_pair_projection_matches_original_full_state() {
+    for indexed in [false, true] {
+        for thresholds in [false, true] {
+            let hidden = 128;
+            let hp = MlpHyperparams {
+                n_hidden: hidden,
+                max_pairs: 32,
+                monotone_cbc: true,
+                nonneg_thresholds: thresholds,
+                ..MlpHyperparams::default()
+            };
+            let pos: Vec<_> = (0..32)
+                .map(|i| {
+                    if indexed {
+                        [127 - 2 * i, 126 - 2 * i]
+                    } else {
+                        [2 * i, 2 * i + 1]
+                    }
+                })
+                .collect();
+            let rows = MaxPairRows::new(hidden, pos.clone());
+            let ranges = [
+                (0, 156),
+                (372, 393),
+                (394, 422),
+                (423, 451),
+                (452, 480),
+                (481, 509),
+                (510, 538),
+                (539, 567),
+                (568, 596),
+                (597, 625),
+                (626, 654),
+                (655, 683),
+                (684, 712),
+                (713, 720),
+                (1853, 2345),
+            ];
+            let mut w1 = vec![0.0; 2345 * hidden];
+            for &(a, b) in &ranges {
+                for (i, x) in w1[a as usize * hidden..b as usize * hidden]
+                    .iter_mut()
+                    .enumerate()
+                {
+                    *x = (i as f64 % 19.0 - 9.0) * 0.001;
+                }
+            }
+            let mut state = (w1, vec![-0.5; hidden], vec![-0.1; hidden], vec![0.0]);
+            let mut expected = state.clone();
+            project_plain_indexed(
+                &mut expected.0,
+                &mut expected.1,
+                &mut expected.2,
+                &mut expected.3,
+                Some(100.0),
+                &hp,
+                Some(&pos),
+            );
+            project_max_pair_rows(
+                &rows,
+                Some(&ranges),
+                &mut state.0,
+                &mut state.1,
+                &mut state.2,
+                &mut state.3,
+                Some(100.0),
+                &hp,
+            );
+            for (a, b) in [&expected.0, &expected.1, &expected.2, &expected.3]
+                .into_iter()
+                .zip([&state.0, &state.1, &state.2, &state.3])
+            {
+                assert_eq!(
+                    a.iter().map(|x| x.to_bits()).collect::<Vec<_>>(),
+                    b.iter().map(|x| x.to_bits()).collect::<Vec<_>>()
+                );
+            }
+        }
+    }
+}

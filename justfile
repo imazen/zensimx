@@ -5521,3 +5521,31 @@ shaping-inner-dispatch study binary_dir output *args:
 # Describe every registered setting within one completed paired inner partition.
 shaping-completion-curve-all-settings study binaries family outer inner output:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_curve_stability.py --study {{quote(study)}} --binary-dir {{quote(binaries)}} --family {{quote(family)}} --outer {{outer}} --inner-fold {{inner}} --settings 0 1 2 3 --output {{quote(output)}}
+
+# Compile the private row kernel's boundary/parity tests without the full trainer graph.
+shaping-projection-check output:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    mkdir -p {{quote(output)}}
+    printf '#[path = "%s/zensim-validate/src/mlp_train/gate_projection.rs"] mod gate_projection;\n' "$PWD" | TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- rustc --edition 2024 --test - -o {{quote(output + "/gate-projection-tests")}}
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- {{quote(output + "/gate-projection-tests")}}
+
+# Reuse an identified warm dependency build; run the resulting zenbench only on an eligible host.
+shaping-projection-bench-binary deps zenbench output:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 2G --jobs 1 -- rustc --edition 2024 -C opt-level=3 zensim-validate/benches/projection_rows.rs -L dependency={{quote(deps)}} --extern zenbench={{quote(zenbench)}} -o {{quote(output)}}
+
+shaping-projection-trainer-check:
+    cargo test --locked -p zensim-validate --lib -- --test-threads=1
+    cargo clippy --locked -p zensim-validate --lib --bench projection_rows -- -D warnings
+
+# The caller chooses an eligible benchmark host; zenbench owns admission and serialization.
+shaping-projection-bench-run binary result:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    case "$(hostname -s)" in dev|r7900x) echo 'choose an eligible benchmark host' >&2; exit 2;; esac
+    test ! -e {{quote(result)}}
+    TMPDIR="$HOME/tmp" ZENBENCH_NO_CALIBRATE=1 ZENBENCH_RESULT_PATH={{quote(result)}} "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- {{quote(binary)}}
+
+# Sample existing process branches; no training is started or restarted.
+shaping-cpu-accounting:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B benchmarks/cpu_branch_accounting_2026-11-07.py

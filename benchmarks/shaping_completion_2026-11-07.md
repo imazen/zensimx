@@ -3381,3 +3381,68 @@ The page is under the completion artifact root as `stats/index.html` and
 details, saved curves, undefined-setting display, fresh controls, 40 rescue
 choices, metric switching, a 390-pixel viewport without document overflow and
 absence of JavaScript errors. Browser log: `stats/qa/browser-check.log`.
+
+### Trainer projection optimization and checking cost (23:25 UTC)
+
+A ten-second external `perf stat task-clock` sample of existing processes on
+four training hosts counted 649.30018 CPU-seconds in 65 native trainers.
+Dedicated evaluation, archive/transport and reporting processes accounted for
+10.25165 CPU-seconds, 1.55% of the 660.98375 successfully counted CPU-seconds.
+The remaining 1.43192 counted CPU-seconds were orchestration. Two orchestration
+samples failed; this is not complete pipeline or historical accounting.
+Trainer-internal statistics and checks remain in the native-training bucket.
+Coordinator effort spent checking is not measured by these CPU counters.
+
+The saved ReLU-rescue profile attributed 37.23% of sampled self cycles to fused
+AVX-512 Adam and 35.56% to `project_plain_indexed`. The statistics-panel routines
+accounted for 6.74% in that one profile. These are sampled attribution, not
+isolated benchmark timings or an accounting of all models.
+
+The first row-walk prototype removed capture scratch and used an indexed clamp
+for unpaired units. Its 1853-row proxy improved contiguous-layout timing but
+regressed permuted-layout timing. It is not the adopted implementation.
+The final implementation retains the dense capture/clamp path for permuted
+pairs and reuses Adam's active-row ranges immediately after fused pair updates.
+Other updates and initialization still project every row. Experimental shared-
+depth decoupled decay retains the complete projection to preserve signed zeros.
+The gate formula, safety margin, optimizer and scientific settings are unchanged.
+
+The native rescue log establishes 2345 input rows, with 492 kept base columns
+and 492 kept derived products: 984 active rows in 15 ranges. The final kernel
+fixture uses those observed dimensions and ranges, 128 hidden units and 32 max
+pairs. Interleaved zenbench on r5900xt measured the following means in microseconds;
+restoring identical input weights is included in both arms:
+
+| Layout / input | Original | Planned active rows | Paired change, 95% CI |
+| --- | ---: | ---: | --- |
+| Contiguous / initial | 345.19 | 243.83 | -30.79% to -29.59% |
+| Contiguous / near feasible | 306.10 | 208.17 | -33.76% to -30.21% |
+| Permuted / initial | 355.28 | 282.06 | -21.25% to -20.47% |
+| Permuted / near feasible | 309.64 | 242.80 | -22.32% to -21.01% |
+
+The final fixed-array-chunk source completed 30 paired rounds per case and
+saved raw timing, iteration, order and gate vectors. Each case has 23 clean and
+seven flagged rounds; zenbench reports `unreliable=false`. Means above use all
+30 rounds; paired intervals use zenbench's default outlier handling, retaining
+25/30/26/24 pairs. These descriptive results do not assert an all-clean retained-
+round gate or a final scientific cost result. The earlier active-row iteration,
+including its text-only result, is also preserved. The resource wrapper reported
+45 s, peak RSS 0.10 GiB, minimum available RAM 48506 MiB and peak load 0.72. No end-to-end trainer speedup or Zen 5 speedup has
+been measured. No running scientific fit was replaced or replayed.
+
+The final-source trainer library passed 408 tests with its two existing ignored
+tests unchanged; clippy passed for the library and new benchmark. Its resource
+wrapper reported 124 s, peak RSS 1.53 GiB, minimum available RAM 23127 MiB and
+peak load 15.17. Exact row/state comparisons cover contiguous and permuted layouts,
+active ranges, gate boundaries, signed zeros, subnormals, infinities and NaNs;
+existing training, native export, identity and monotonicity tests also passed.
+Reproduction owners are `shaping-projection-check`, `shaping-projection-trainer-check`,
+`shaping-projection-bench-binary`, and `shaping-projection-bench-run` in the justfile.
+The benchmark runner now explicitly saves raw zenbench JSON for future measurements.
+A preliminary `--help` invocation unexpectedly started the macro-based benchmark;
+it was stopped by its verified PID and retained as incomplete, without using its
+results. Source-copy failure evidence is also retained separately.
+
+Supporting evidence: `/mnt/v/output/zensim/shaping-completion-20261107/projection-performance-evidence/`.
+
+The exact CPU observer source is preserved in `cpu_branch_accounting_2026-11-07.py`; `just shaping-cpu-accounting` invokes it under the resource wrapper. It has not been rerun for this report.

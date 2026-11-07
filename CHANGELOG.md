@@ -4,6 +4,10 @@
 
 ### Research
 
+- Reduce native max-pair projection passes and reuse fused Adam's active input
+  rows, preserving exact constraint arithmetic; retain the dense permuted-pair
+  clamp after measured regression in the first prototype.
+
 - Extend saved-shaper consistency analysis to complete paired source-partition
   grids; report remaining coverage and separate response variation from utility.
 
