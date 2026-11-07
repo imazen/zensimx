@@ -361,7 +361,7 @@ Verified uniform ReLU re-export archive manifest SHA256: `89a47c3bb2acf8ae09b7a0
 The neutral analytic training-control route replayed all 240 epochs and
 12,000,000 registered pair draws of the completed ordinary-SiLU fit. Original
 and replay canonical models match SHA256 `1b8b5a46a19501c142ab5941a40de485add3425a926e55ca67e959567ec59672` after
-removing only the declared repro/config metadata. The full streamed-event path
+removing only the declared repro/config metadata. The full precomputed event sequence
 therefore qualifies beyond the earlier one-epoch prefix; the scientific fit
 itself is unchanged and this replay does not become a selection candidate.
 
