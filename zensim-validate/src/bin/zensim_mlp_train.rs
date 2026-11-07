@@ -3686,6 +3686,14 @@ fn main() {
             "monotone training controls require --no-sample-coverage; use the native TRAINING_EVENTS receipt, not uniform-sampler reconstruction"
         );
     }
+    if std::env::var_os("ZENSIM_INPUT_SHAPING_MANIFEST").is_some()
+        || std::env::var_os("ZENSIM_INPUT_SHAPING_SHA256").is_some()
+    {
+        assert!(
+            args.derived_inputs.is_some(),
+            "input shaping requires native --derived-inputs export"
+        );
+    }
     let selected_ids = args.keep_features.as_deref().map(|spec| {
         parse_keep_features(spec, args.max_features).unwrap_or_else(|e| {
             eprintln!("--keep-features: {e}");

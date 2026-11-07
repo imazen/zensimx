@@ -30,6 +30,7 @@
 mod capabilities;
 mod confidence_weights;
 mod contrast_precision;
+pub(crate) mod input_shaping;
 pub mod r14_knees;
 pub mod transforms;
 mod warm_start;
@@ -3185,6 +3186,7 @@ pub fn train_mlp_strategy_pairs(
     );
     let shared_depth_on = shared_depth::enabled(&effective);
     monotone_research::check_admission(&effective);
+    input_shaping::check_admission(&effective);
     let unrestricted_first = monotone_research::unrestricted_first();
     let shared_smooth = effective.smooth_hinge;
     let first_layer_hp;
@@ -3475,6 +3477,7 @@ pub fn train_mlp_strategy_pairs(
     //    Group g's standardized features live in std_features[g], shape
     //    (n_pairs[g] × n_features).
     let std_features = StdFeatures::build(groups, n_features, &scaler_mean, &scaler_scale);
+    let mut input_shapes = input_shaping::State::load(hyperparams, &std_features);
     let mut knees = r14_knees::KneeState::new(
         hyperparams,
         &scaler_mean,
@@ -3847,12 +3850,12 @@ pub fn train_mlp_strategy_pairs(
     // allocated once instead of per-pair like the old in-kernel vecs.
     let fuse_w1 =
         k == 1 && n_hidden > 0 && n_hidden.is_multiple_of(4) && w1.len().is_multiple_of(n_hidden);
-    let mut dh_a = if fuse_w1 {
+    let mut dh_a = if fuse_w1 || input_shapes.is_some() {
         vec![0.0f64; n_hidden]
     } else {
         Vec::new()
     };
-    let mut dh_b = if fuse_w1 {
+    let mut dh_b = if fuse_w1 || input_shapes.is_some() {
         vec![0.0f64; n_hidden]
     } else {
         Vec::new()
@@ -4265,8 +4268,14 @@ pub fn train_mlp_strategy_pairs(
                 let (ra, rb) = la_rows.as_ref().unwrap();
                 (ra.as_ref(), rb.as_ref(), ya, hpa, ha, yb, hpb, hb)
             } else {
-                let xa = std_features.row_with_knees(knees.as_ref(), g_idx, ia, &mut scratch_a);
-                let xb = std_features.row_with_knees(knees.as_ref(), g_idx, ib, &mut scratch_b);
+                let xa = match &input_shapes {
+                    Some(s) => s.row(&std_features, g_idx, ia, &mut scratch_a),
+                    None => std_features.row_with_knees(knees.as_ref(), g_idx, ia, &mut scratch_a),
+                };
+                let xb = match &input_shapes {
+                    Some(s) => s.row(&std_features, g_idx, ib, &mut scratch_b),
+                    None => std_features.row_with_knees(knees.as_ref(), g_idx, ib, &mut scratch_b),
+                };
                 let (ya, hpa, ha, yb, hpb, hb) = smooth_hinge::forward_pair(
                     xa,
                     xb,
@@ -4398,6 +4407,15 @@ pub fn train_mlp_strategy_pairs(
                 let (fa, fb) = deep_forward.as_ref().expect("shared-depth forward");
                 let ga = head.backward(&ha, fa, dl_dya);
                 let gb = head.backward(&hb, fb, dl_dyb);
+                if let Some(shapes) = &mut input_shapes {
+                    for ((out, g), p) in dh_a.iter_mut().zip(&ga).zip(&ha_pre) {
+                        *out = if *p > 0. { *g } else { 0. };
+                    }
+                    for ((out, g), p) in dh_b.iter_mut().zip(&gb).zip(&hb_pre) {
+                        *out = if *p > 0. { *g } else { 0. };
+                    }
+                    shapes.step(&std_features, g_idx, ia, ib, &w1, &dh_a, &dh_b, lr);
+                }
                 if fuse_w1 {
                     shared_depth::first_grad_head(&ha_pre, &ha, &ga, &mut dh_a, &mut adam);
                     shared_depth::first_grad_head(&hb_pre, &hb, &gb, &mut dh_b, &mut adam);
@@ -4940,7 +4958,16 @@ pub fn train_mlp_strategy_pairs(
                         return crate::panel::LightPanel::default();
                     }
                     let preds = if let Some(head) = &depth {
-                        head.predict(&std_features, gi, g.features.len(), &w1, &b1, &w2, &b2)
+                        head.predict(
+                            &std_features,
+                            input_shapes.as_ref(),
+                            gi,
+                            g.features.len(),
+                            &w1,
+                            &b1,
+                            &w2,
+                            &b2,
+                        )
                     } else {
                         std_features.predict_with_knees(
                             knees.as_ref(),
@@ -5021,6 +5048,7 @@ pub fn train_mlp_strategy_pairs(
                 let ckpt_bytes = shared_depth::checkpoint(
                     depth.as_ref(),
                     knees.as_ref(),
+                    input_shapes.as_ref(),
                     &scaler_mean,
                     &scaler_scale,
                     &w1,
@@ -5048,6 +5076,7 @@ pub fn train_mlp_strategy_pairs(
                 best_bake = Some(shared_depth::checkpoint(
                     depth.as_ref(),
                     knees.as_ref(),
+                    input_shapes.as_ref(),
                     &scaler_mean,
                     &scaler_scale,
                     &w1,
@@ -5092,6 +5121,7 @@ pub fn train_mlp_strategy_pairs(
         shared_depth::checkpoint(
             depth.as_ref(),
             knees.as_ref(),
+            input_shapes.as_ref(),
             &scaler_mean,
             &scaler_scale,
             &w1,
@@ -7814,6 +7844,7 @@ pub(crate) struct LazyStd {
     /// (`CompactRows::kept.len()`, narrower than `kept` under a lazy
     /// derived extension).
     stored_width: usize,
+    stored_ids: Vec<u32>,
     /// Expanded logical column ids (`CompactRows::expanded_kept()`).
     kept: Vec<u32>,
     /// How each expanded column is produced from the stored row, parallel
@@ -7850,6 +7881,7 @@ impl LazyStd {
             .collect();
         Self {
             stored_width: c.kept.len(),
+            stored_ids: c.kept.clone(),
             kept,
             sources,
             mean: scaler_mean[..n_features].to_vec(),

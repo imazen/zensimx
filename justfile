@@ -4863,3 +4863,10 @@ analytic-head-check:
     cargo test --locked -p zensim-validate --lib -- --test-threads=1
     cargo test --locked -p zensim-validate --bin zensim_mlp_train -- --test-threads=1
     cargo clippy --locked -p zensim-validate --lib --bin zensim_mlp_train -- -D warnings
+
+# Native input-shaping runtime and full trainer regression gates.
+input-shaping-check:
+    cargo test --locked -p zensim --features training,feature-regime-v2 --lib derived_inputs -- --test-threads=1
+    cargo test --locked -p zensim --features training,feature-regime-v2 --lib analytic_activation_sensitivity -- --test-threads=1
+    just analytic-head-check
+    cargo clippy --locked -p zensim --features training,feature-regime-v2 --lib -- -D warnings

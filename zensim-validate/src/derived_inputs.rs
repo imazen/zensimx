@@ -318,6 +318,40 @@ impl Fx1Declaration {
         {
             return Err("fx1 compact: bake already declares its inputs".into());
         }
+        let shapes = model
+            .metadata()
+            .get_utf8(crate::mlp_train::input_shaping::KEY)
+            .ok()
+            .map(|text| {
+                serde_json::from_str::<crate::mlp_train::input_shaping::Config>(text)
+                    .map_err(|e| format!("fx1 shaping metadata: {e}"))
+            })
+            .transpose()?;
+        let mut declaration = self.metadata_text();
+        if let Some(shapes) = &shapes {
+            shapes.validate();
+            if self.reads_research_ids() {
+                return Err("shaping requires native feature ids".into());
+            }
+            let mut lines: Vec<String> = declaration.lines().map(str::to_owned).collect();
+            lines[0] = "zensim-derived-inputs research-shaping-v1".into();
+            let columns = self.kept_columns(base);
+            for t in &shapes.terms {
+                let pos = columns
+                    .iter()
+                    .position(|c| *c == t.column)
+                    .ok_or("shaped column not kept")?;
+                let expected = match t.reference {
+                    None => format!("in {}", t.damage),
+                    Some(f) => format!("product {} {f}", t.damage),
+                };
+                if lines[pos + 1] != expected {
+                    return Err("shaping term differs from declared input".into());
+                }
+                lines[pos + 1] = t.declaration();
+            }
+            declaration = lines.join("\n") + "\n";
+        }
         let rows = self.kept_columns(base);
         let mut layers: Vec<OwnedLayer> = Vec::new();
         for (li, l) in model.layers().enumerate() {
@@ -419,7 +453,7 @@ impl Fx1Declaration {
         md.push((
             DERIVED_INPUTS_KEY.to_string(),
             zenpredict::MetadataType::Utf8,
-            self.metadata_text().into_bytes(),
+            declaration.into_bytes(),
         ));
         let bl: Vec<BakeLayer<'_>> = layers
             .iter()
@@ -481,6 +515,15 @@ impl Fx1Declaration {
         let mut scorer = zensim::BakeScorer::new(&dense)
             .map_err(|e| format!("fx1 gate: zensim refuses the compact bake: {e}"))?;
         let mut predictor = zenpredict::Predictor::new(&orig);
+        let shapes = orig
+            .metadata()
+            .get_utf8(crate::mlp_train::input_shaping::KEY)
+            .ok()
+            .map(|text| {
+                serde_json::from_str::<crate::mlp_train::input_shaping::Config>(text)
+                    .map_err(|e| format!("fx1 gate shaping: {e}"))
+            })
+            .transpose()?;
         let read_set = self.read_set();
         let walk = read_set.last().copied().unwrap_or(0) + 1;
         let width = base + self.products.len();
@@ -516,6 +559,14 @@ impl Fx1Declaration {
             }
             for (j, &[a, b]) in self.products.iter().enumerate() {
                 ext[base + j] = product_f32(row[a] as f32, row[b] as f32);
+            }
+            if let Some(shapes) = &shapes {
+                for t in &shapes.terms {
+                    ext[t.column] = t.value(
+                        row[t.damage as usize] as f32,
+                        t.reference.map_or(1., |f| row[f as usize] as f32),
+                    );
+                }
             }
             let want = if orig.has_nontrivial_feature_transforms() {
                 predictor.predict_transformed(&ext)

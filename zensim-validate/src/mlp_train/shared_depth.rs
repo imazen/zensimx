@@ -187,6 +187,7 @@ impl Head {
     pub(super) fn predict(
         &self,
         features: &StdFeatures,
+        shapes: Option<&super::input_shaping::State>,
         gi: usize,
         rows: usize,
         w1: &[f64],
@@ -197,7 +198,10 @@ impl Head {
         let mut scratch = Vec::new();
         (0..rows)
             .map(|row| {
-                let x = features.row(gi, row, &mut scratch);
+                let x = match shapes {
+                    Some(s) => s.row(features, gi, row, &mut scratch),
+                    None => features.row(gi, row, &mut scratch),
+                };
                 let (_, _, h) = super::forward(
                     x,
                     w1,
@@ -246,6 +250,7 @@ pub(super) fn first_backward(
 pub(super) fn checkpoint(
     depth: Option<&Head>,
     knees: Option<&super::r14_knees::KneeState>,
+    shapes: Option<&super::input_shaping::State>,
     mean: &[f64],
     scale: &[f64],
     w1: &[f64],
@@ -266,9 +271,13 @@ pub(super) fn checkpoint(
         );
     }
     assert!(knees.is_none());
-    super::bake_plain_znpr_v3(
+    let bytes = super::bake_plain_znpr_v3(
         mean, scale, w1, b1, w2, b2, nf, nh, no, dtype, transforms, params, activation, depth,
-    )
+    );
+    match shapes {
+        Some(s) => s.stamp(&bytes),
+        None => bytes,
+    }
 }
 
 pub(super) fn first_grad_head(
@@ -415,6 +424,7 @@ mod tests {
                 }
                 let bytes = checkpoint(
                     Some(&head),
+                    None,
                     None,
                     &[0.; 2],
                     &[1.; 2],

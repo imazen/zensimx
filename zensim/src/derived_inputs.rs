@@ -233,6 +233,9 @@ impl DerivedInputs {
 pub(crate) fn from_model(model: &crate::mlp::Model) -> Result<Option<DerivedInputs>, &'static str> {
     let metadata = model.metadata();
     if metadata.get(DERIVED_INPUTS_KEY).is_none() {
+        if metadata.get("zentrain.input_shaping").is_some() {
+            return Err("input shaping checkpoint requires native derived-input compaction");
+        }
         return Ok(None);
     }
     let text = metadata
