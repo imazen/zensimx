@@ -123,5 +123,14 @@ The supplemental archive supervisor covers base, fresh-head, rescue and
 registered exposure-extension checkpoint panels and repaired bakes. Extensions
 must reproduce their registration through the existing selection resolver before
 any copy. Every final and scheduled diagnostic report, source checkpoint and
-conversion artifact remains hash-checked before cold archive readback. This does
-not yet provide automatic archive coverage for outer or full-data stages.
+conversion artifact remains hash-checked before cold archive readback.
+
+The separate `--later-neural` archive mode covers final-only neural outer,
+fresh-head, learning-curve, shuffled-label, human-only and full-data runs. It
+reproduces their existing admissions, verifies every phase's final model and
+result, and checks the final report's response role, prediction hash and original
+or repaired model provenance. Full-data runs also require reproducible training
+diagnostics. It archives run directories plus separate repaired panels and bakes;
+it does not read prediction arrays, select models, or reclaim local files.
+Failed or ambiguous attempts require explicit reconciliation. Automatic later
+tree/additive-control archive coverage remains separate work.

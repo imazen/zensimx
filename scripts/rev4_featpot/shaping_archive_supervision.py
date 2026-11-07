@@ -109,16 +109,104 @@ def supplemental_sweep(args):
     return completed
 
 
+def later_neural_bundles(study,directory,cells):
+    """Resolve completed final-only evidence without opening prediction arrays."""
+    from shaping_evaluation import outer_context,admitted_epoch
+    from shaping_supervision import LATER_STAGES
+    from shaping_convergence import training_report
+    attempts=list(directory.glob('attempt-*'))
+    if len(attempts)!=1:return []
+    run=attempts[0]
+    if not all((run/n).is_file() for n in ('RUN.json','RESULT.json')):return []
+    identity=json.loads((run/'RUN.json').read_text());result=json.loads((run/'RESULT.json').read_text())
+    cell=identity['cell']
+    if cell['stage'] not in LATER_STAGES or result['stage']!='trained':return []
+    plan_pin=sha(study/'PLAN.json')
+    if cell['id']!=directory.name or result['cell']!=cell or identity['plan_sha256']!=plan_pin or result['plan_sha256']!=plan_pin:
+        raise ValueError('later archive training identity differs')
+    context=outer_context(study,identity,cells)
+    if context is None:raise ValueError('later archive lacks admission')
+    epochs=admitted_epoch(identity,result,cells,context)
+    family=context.get('resolved_family',context.get('variant',{}).get('resolved_family',cell['family']))
+    representation=context['admission']['evaluation_representations'][family]
+    repaired=representation['representation']=='research-relu-max-pairs-v1'
+    if representation['representation'] not in ('original','research-relu-max-pairs-v1'):
+        raise ValueError('unknown later archive representation')
+    panel=study/'reexport_max_pairs'/cell['id']/run.name/'final' if repaired else run/'evaluation'
+    if not (panel/'COMPLETE.json').exists() or (panel/'FAILED_GATE.json').exists():return []
+    marker=json.loads((panel/'COMPLETE.json').read_text());report=json.loads((panel/'REPORT.json').read_text())
+    if marker['cell']!=cell['id'] or marker['report_sha256']!=sha(panel/'REPORT.json'):
+        raise ValueError('later archive report drift')
+    if (report['cell']!=cell or report['plan_sha256']!=plan_pin or report['admission_sha256']!=context['admission_sha256']
+        or report['checkpoint_epoch']!=epochs-1 or report['outer_results_read'] is not True):
+        raise ValueError('later archive report scope differs')
+    expected_role='exposed_development' if context.get('descriptive') else 'full_fit_validation' if context.get('full_fit') else 'outer_test'
+    if {k for k in ('outer_test','full_fit_validation','exposed_development','inner_validation') if k in report}!={expected_role}:
+        raise ValueError('later archive response role differs')
+    if sha(panel/'predictions.npz')!=report['predictions_sha256']:raise ValueError('later archive prediction drift')
+    phases=result['phases'];expected=context['schedule']['phase_epochs']
+    if [p['epochs'] for p in phases]!=expected or len(expected) not in (1,2):raise ValueError('later archive phase exposure differs')
+    for name,phase in zip(['pretraining','fit'] if len(expected)==2 else ['fit'],phases):
+        phase_root=run/name
+        if phase['stage']!='trained' or phase['exit_code']!=0 or json.loads((phase_root/'RESULT.json').read_text())!=phase:
+            raise ValueError('later archive phase incomplete')
+        if sha(phase_root/'checkpoints'/f"ckpt_epoch{phase['epochs']-1:03}.bin")!=phase['bake_sha256']:
+            raise ValueError('later archive phase model drift')
+    if phases[-1]['bake_sha256']!=result['bake_sha256']:raise ValueError('later archive final model differs')
+    if repaired:
+        receipt_path=Path(report['reexport_receipt']);receipt=json.loads(receipt_path.read_text())
+        if (sha(receipt_path)!=report['reexport_receipt_sha256'] or receipt['original_sha256']!=result['bake_sha256']
+            or receipt['training_build_sha256']!=identity['build_sha256'] or receipt['representation']!=representation['representation']
+            or receipt['evaluation_build_sha256']!=representation['evaluation_build_sha256']
+            or report['evaluation_build_sha256']!=representation['evaluation_build_sha256']):
+            raise ValueError('later archive conversion identity differs')
+        if receipt['bake'] not in receipt['file_sha256']:raise ValueError('later archive unpinned bake')
+        for name,pin in receipt['file_sha256'].items():
+            if sha(name)!=pin:raise ValueError('later archive conversion artifact drift')
+        if sha(receipt['bake'])!=report['checkpoint_sha256']:raise ValueError('later archive scored bake differs')
+    elif report['checkpoint_sha256']!=result['bake_sha256']:raise ValueError('later archive scored model differs')
+    if cell['stage'] in ('full_fit_selection','full_fit'):
+        diagnostic=run/'TRAIN_CONVERGENCE.json'
+        if not diagnostic.exists():return []
+        saved=json.loads(diagnostic.read_text());actual=training_report(run,panel/'REPORT.json')
+        if {k:v for k,v in saved.items() if k!='driver_sha256'}!={k:v for k,v in actual.items() if k!='driver_sha256'}:
+            raise ValueError('later archive training diagnostic drift')
+    bundles=[('run',directory)]
+    if repaired:bundles.extend([('panels',panel.parent.parent),('bakes',study/'reexports'/cell['id'])])
+    return bundles
+
+
+def later_sweep(args):
+    _,cells,_=load_registration(args.study);completed=0
+    logs=args.study/'archive_supervision';logs.mkdir(exist_ok=True)
+    for directory in sorted((args.study/'runs').iterdir()):
+        if not directory.is_dir():continue
+        for kind,source in later_neural_bundles(args.study,directory,cells):
+            if (source/'MIRROR_VERIFIED.json').exists():continue
+            dest=args.destination/(f'later-{kind}-'+directory.name)
+            if dest.exists() or (source/'SHA256SUMS').exists():raise ValueError('unfinished later archive needs reconciliation')
+            command=['python3','-B',str(REPO/'scripts/byconstruction/dataset_mirror.py'),'--root',str(source),'--nfs','--cold-readback','--destination',str(dest)]
+            with (logs/(f'later-{kind}-'+directory.name+'.log')).open('x') as stream:
+                subprocess.run(command,stdout=stream,stderr=subprocess.STDOUT,check=True)
+            receipt=json.loads((source/'MIRROR_VERIFIED.json').read_text())
+            if not receipt['all_artifact_sha256_verified'] or receipt['destination']!=str(dest) or sha(source/'SHA256SUMS')!=sha(dest/'SHA256SUMS'):
+                raise ValueError('later archive readback incomplete')
+            completed+=1
+    return completed
+
+
 def main():
     p=argparse.ArgumentParser(description=__doc__)
     for key in ('study','destination'):p.add_argument('--'+key,type=Path,required=True)
-    p.add_argument('--supplemental',action='store_true')
+    modes=p.add_mutually_exclusive_group()
+    modes.add_argument('--supplemental',action='store_true')
+    modes.add_argument('--later-neural',action='store_true')
     p.add_argument('--watch',action='store_true');args=p.parse_args()
     while True:
-        completed=supplemental_sweep(args) if args.supplemental else sweep(args)
+        completed=later_sweep(args) if args.later_neural else supplemental_sweep(args) if args.supplemental else sweep(args)
         status=dict(pid=os.getpid(),checked_utc=datetime.now(timezone.utc).isoformat(),
                     newly_archived=completed,stage='watching' if args.watch else 'sweep_finished',driver_sha256=sha(__file__))
-        (args.study/('SUPPLEMENTAL_ARCHIVE_STATUS.json' if args.supplemental else 'ARCHIVE_SUPERVISOR_STATUS.json')).write_bytes(encoded(status));print(json.dumps(status),flush=True)
+        (args.study/('LATER_NEURAL_ARCHIVE_STATUS.json' if args.later_neural else 'SUPPLEMENTAL_ARCHIVE_STATUS.json' if args.supplemental else 'ARCHIVE_SUPERVISOR_STATUS.json')).write_bytes(encoded(status));print(json.dumps(status),flush=True)
         if not args.watch:return
         time.sleep(30)
 
