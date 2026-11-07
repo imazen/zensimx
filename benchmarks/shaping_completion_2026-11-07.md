@@ -458,3 +458,35 @@ Original and supplemental supervisors recognize registered extension cells; the
 currently live supervisors retain their previously loaded code and must be
 restarted deliberately before extensions enter their queues. No extension fit
 or extension native resource measurement has yet been made.
+
+The unchanged-fit Softplus diagnostic replay completed all 240 epochs and matches
+the original final model after stripping only `zentrain.repro`: canonical SHA-256
+`eb3b1260fb65d4a29b86f4f66f52ee6322ebd25cf4ecc45fc99b5eb1d3aece40`.
+The trace reaches one nonzero output coefficient at epoch 69 and retains exactly
+one through epoch 239. It records 13,557,450 negative-output-weight projection
+hits over the run, with the last hit in epoch 69. These are counts of weights
+clipped after optimizer steps, not counts of distinct units or examples.
+
+At epoch 239, 63 of 64 final hidden units are inactive in the 386 sampled training
+responses; the remaining unit is active in all 386. The sampled first-activation
+gradient squared-norm mean is 0.09522677921903464; the regularized output-gradient
+squared-norm mean per optimizer step is 12363.682204193905. Neither statistic
+establishes global deadness or causation. This is reproducible optimization
+collapse evidence, not proof of an architectural/feature capacity ceiling or a
+linear whole network. The registered initialization/schedule rescue comparisons
+remain required. Native wrapper: 4751 s, peak RSS 0.09 GiB, minimum available
+37225 MiB, peak load 25.58; this concurrent run is not an isolated benchmark.
+
+The older standalone inspector rejected Softplus activation byte 0x4. Its failed
+empty output is preserved with an error record. The pinned native bake inspector
+successfully read the final model; no training or gate changed to accommodate
+the older reader.
+
+A second qualified worker now runs eight analytic inner-1-1 fits. Its 87 shared
+files (409,044,047 bytes) and 20 partition files (24,040,656 bytes) passed hash
+verification. All three canonical baseline replays matched; wrapper receipt:
+9 s, peak RSS 0.16 GiB, minimum available 24684 MiB, peak load 1.32.
+The first bootstrap attempt rejected a mistyped expected hash before fitting;
+its log remains preserved. The corrected hash and original baseline directory
+were verified before admission. Source snapshot and native binaries remain the
+same frozen versions used by the other worker.
