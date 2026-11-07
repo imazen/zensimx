@@ -18,6 +18,11 @@ def prepare(study,assignment_path,output):
     receipt=study/'comparators'/partition/'GROUPS.json'
     files={receipt,assignment_path,*map(Path,record['file_sha256'])}
     files.update(p for p in receipt.parent.rglob('*') if p.is_file())
+    if any('_pretrained_' in c['family'] for c in selected):
+        from shaping_host_assignment import parent_inputs
+        parents=parent_inputs(study,cells,selected,assignment['build_sha256'])
+        if parents!=assignment.get('parent_inputs'):raise ValueError('assigned parent inputs drift')
+        files.update(Path(row['path']) for row in parents)
     shapes=study/'shapes'/partition
     if any(c['family'].endswith('joint_identity') for c in selected):
         from shaping_inputs import prepare as prepare_shapes

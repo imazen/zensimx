@@ -5036,8 +5036,11 @@ shaping-completion-watch-reexport study binary_dir inspector:
 shaping-completion-worker-inputs study assignment output:
     TMPDIR="$HOME/tmp" OPENBLAS_NUM_THREADS=1 "$HOME/work/claudehints/scripts/run-heavy" --mem 2G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_worker_inputs.py --study {{quote(study)}} --assignment {{quote(assignment)}} --output {{quote(output)}}
 
-shaping-completion-assign-worker study binary_dir partition host family stage="inner":
-    python3 -B scripts/rev4_featpot/shaping_host_assignment.py --study {{quote(study)}} --binary-dir {{quote(binary_dir)}} --partition {{quote(partition)}} --host {{quote(host)}} --family {{quote(family)}} --stage {{quote(stage)}}
+shaping-completion-assign-worker study binary_dir partition host family stage="inner" *args:
+    python3 -B scripts/rev4_featpot/shaping_host_assignment.py --study {{quote(study)}} --binary-dir {{quote(binary_dir)}} --partition {{quote(partition)}} --host {{quote(host)}} --family {{quote(family)}} --stage {{quote(stage)}} {{args}}
+
+shaping-completion-parent-transport-check:
+    TMPDIR="$HOME/tmp" python3 -B -m unittest discover -s scripts/tests -p test_shaping_parent_transport.py
 
 shaping-completion-worker-install-test:
     TMPDIR="$HOME/tmp" python3 -B -m unittest scripts/tests/test_shaping_worker_input_install.py

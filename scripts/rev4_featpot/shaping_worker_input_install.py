@@ -1,6 +1,6 @@
 """Install one checksummed partition capsule without overwriting worker inputs."""
 from __future__ import annotations
-import argparse,hashlib,json,os,shutil,tarfile
+import argparse,hashlib,json,os,re,shutil,tarfile
 from pathlib import Path,PurePosixPath
 
 
@@ -11,8 +11,29 @@ def sha(path):
 def install(study,partition,assignment,bundle,manifest,bundle_pin,manifest_pin,receipt,*,reuse_identical=False):
     if len(PurePosixPath(partition).parts)!=1 or partition in ('.','..'):raise ValueError('invalid partition')
     if assignment.parent!=study/'worker_assignments':raise ValueError('assignment outside study')
-    allowed=lambda path:(path.is_relative_to(study/'comparators'/partition) or path.is_relative_to(study/'shapes'/partition) or path==assignment)
+    parents=parent_allowlist(study,assignment,bundle,manifest,bundle_pin,manifest_pin)
+    allowed=lambda path:(path.is_relative_to(study/'comparators'/partition) or path.is_relative_to(study/'shapes'/partition) or path==assignment or str(path) in parents)
     return install_checked(bundle,manifest,bundle_pin,manifest_pin,receipt,allowed,reuse_identical=reuse_identical)
+
+
+def parent_allowlist(study,assignment,bundle,manifest,bundle_pin,manifest_pin):
+    if sha(bundle)!=bundle_pin or sha(manifest)!=manifest_pin:raise ValueError('capsule checksum differs')
+    rows=json.loads(manifest.read_text());paths={r['path']:r for r in rows}
+    if str(assignment) not in paths:return set()
+    with tarfile.open(bundle) as archive:
+        member=archive.getmember(str(assignment).lstrip('/'))
+        if not member.isfile():raise ValueError('assignment is not regular')
+        data=archive.extractfile(member).read()
+    if hashlib.sha256(data).hexdigest()!=paths[str(assignment)]['sha256']:raise ValueError('assignment checksum differs')
+    record=json.loads(data);parents=record.get('parent_inputs',[]);allowed=set()
+    for row in parents:
+        path=Path(row['path'])
+        if not path.is_relative_to(study/'runs'):raise ValueError('parent outside study runs')
+        relative=path.relative_to(study/'runs').as_posix()
+        if not re.fullmatch(r'[a-f0-9]{20}/attempt-[0-9]{3}/(?:RUN\.json|RESULT\.json|SHAPING\.json|checkpoints/ckpt_epoch(?:119|239)\.bin)',relative):raise ValueError('unapproved parent artifact')
+        if paths.get(str(path))!=row or str(path) in allowed:raise ValueError('parent manifest differs')
+        allowed.add(str(path))
+    return allowed
 
 
 def install_shared(bundle,manifest,bundle_pin,manifest_pin,receipt):

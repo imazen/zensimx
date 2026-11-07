@@ -755,3 +755,17 @@ archiving. Live trainers, partial panels and ambiguous attempts are refused or
 left pending. Destination manifests and every artifact receive cold checksum
 readback through the existing mirror owner. Failed scientific status remains
 unchanged; an archive receipt is not convergence or model admission.
+
+
+## Pretrained worker input transport
+
+Worker assignments now support explicit registered cell subsets and pretrained
+families. Subsets change placement only; the registered matrix remains unchanged.
+Pretrained assignments pin each completed matching parent's RUN, RESULT, initial
+SHAPING manifest and epochs 119/239. Packaging revalidates those pins. The
+standalone installer permits only the exact parent files declared by the
+checksummed assignment, preserves existing files unless identical reuse is
+explicit, and refuses other checkpoint epochs or paths. Native prefix extraction
+still verifies its original plan/build, exposure, initial-shape hash and f32
+structure before training; parent pretraining is reused, never recomputed.
+Two parent-transport regressions and the existing installer regression pass.
