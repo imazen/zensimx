@@ -4,10 +4,14 @@
 
 ### Research
 
+- Add opt-in sampled first-layer weight-gradient diagnostics using separate
+  scratch state, reporting data and coupled-L2 pair-gradient norms. Native
+  tests pass; scientific trace use still requires a canonical-neutral replay.
+
 - Add private anchored Softplus and nonnegative-domain SiLU training heads,
   ordinary SiLU diagnostic head, analytic temperature gradients, native export
   gates and output-collapse diagnostics (`7252ba03`, `0c9f8224`). Scientific
-  comparisons remain unrun; runtime operators are reviewed separately.
+  comparisons are ongoing; runtime operators are reviewed separately.
 
 - Complete 390 shaped-linear, tree and neural fitting/generalization controls,
   with numerical optimization bounds, source bootstrap, permutation capacity,

@@ -4432,6 +4432,18 @@ pub fn train_mlp_strategy_pairs(
                 let (fa, fb) = deep_forward.as_ref().expect("shared-depth forward");
                 let ga = head.backward(&ha, fa, dl_dya);
                 let gb = head.backward(&hb, fb, dl_dyb);
+                head.observe_first_weights(
+                    xa,
+                    &ha_pre,
+                    &ha,
+                    &ga,
+                    xb,
+                    &hb_pre,
+                    &hb,
+                    &gb,
+                    &w1,
+                    hyperparams.l2_lambda,
+                );
                 if let Some(shapes) = &mut input_shapes {
                     for ((out, g), p) in dh_a.iter_mut().zip(&ga).zip(&ha_pre) {
                         *out = if *p > 0. { *g } else { 0. };

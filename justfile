@@ -5290,3 +5290,14 @@ shaping-completion-diagnostic-replay-all study binary_dir run output:
 
 shaping-completion-diagnostic-replay-check:
     TMPDIR="$HOME/tmp" python3 -B -m unittest discover -s scripts/tests -p test_shaping_diagnostic_replay.py
+
+# Run on an eligible build host under run-heavy with an explicit target directory.
+shaping-completion-weight-observer-native-check:
+    cargo test --locked --release -p zensim-validate --lib -- --test-threads=1
+
+shaping-completion-probe-trace-check:
+    TMPDIR="$HOME/tmp" python3 -B -m unittest discover -s scripts/tests -p test_shaping_probe_trace.py
+
+# Diagnostic probe-only re-export; does not admit or score a study candidate.
+shaping-completion-repair-probe original probes binaries inspector output:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_probe_trace.py --repair-probes --original {{quote(original)}} --probes {{quote(probes)}} --binary-dir {{quote(binaries)}} --inspector {{quote(inspector)}} --output {{quote(output)}}

@@ -52,6 +52,7 @@ pub(super) struct Head {
     adam: AdamState,
     diagnostics_enabled: bool,
     diagnostics: super::monotone_research::Diagnostics,
+    weight_diagnostics: WeightDiagnostics,
 }
 
 impl Head {
@@ -67,6 +68,7 @@ impl Head {
             research: super::monotone_research::Network::from_env(hp, smooth, rng),
             diagnostics_enabled: super::optimizer_controls::diagnostics_enabled(),
             diagnostics: Default::default(),
+            weight_diagnostics: Default::default(),
             adam: AdamState::new(mid.len(), width, width, 1),
             mid,
             bias: vec![0.; width],
@@ -212,7 +214,29 @@ impl Head {
         self.project(hp);
     }
 
+    pub(super) fn observe_first_weights(
+        &mut self,
+        xa: &[f64],
+        pa: &[f64],
+        ha: &[f64],
+        ga: &[f64],
+        xb: &[f64],
+        pb: &[f64],
+        hb: &[f64],
+        gb: &[f64],
+        weights: &[f64],
+        l2: f64,
+    ) {
+        if self.diagnostics_enabled {
+            self.weight_diagnostics
+                .observe(xa, pa, ha, ga, xb, pb, hb, gb, weights, l2);
+        }
+    }
+
     pub(super) fn report_diagnostics(&mut self, epoch: usize) {
+        if self.diagnostics_enabled {
+            self.weight_diagnostics.report(epoch);
+        }
         if let Some(research) = &mut self.research {
             research.report_diagnostics(epoch);
             return;
@@ -268,6 +292,72 @@ impl Head {
                 self.forward(&h).0
             })
             .collect()
+    }
+}
+
+// Observation-only storage: never share the optimizer's gradients or moments.
+#[derive(Default)]
+struct WeightDiagnostics {
+    scratch: Option<AdamState>,
+    pairs: u64,
+    samples: u64,
+    data_squared: f64,
+    regularized_squared: f64,
+}
+
+impl WeightDiagnostics {
+    fn observe(
+        &mut self,
+        xa: &[f64],
+        pa: &[f64],
+        ha: &[f64],
+        ga: &[f64],
+        xb: &[f64],
+        pb: &[f64],
+        hb: &[f64],
+        gb: &[f64],
+        weights: &[f64],
+        l2: f64,
+    ) {
+        self.pairs += 1;
+        if !self.pairs.is_multiple_of(128) {
+            return;
+        }
+        let adam = self
+            .scratch
+            .get_or_insert_with(|| AdamState::new(weights.len(), ha.len(), ha.len(), 1));
+        assert_eq!(adam.gw1.len(), weights.len());
+        adam.gw1.fill(0.);
+        adam.gb1.fill(0.);
+        first_backward(xa, pa, ha, ga, adam);
+        first_backward(xb, pb, hb, gb, adam);
+        self.data_squared += adam.gw1.iter().map(|g| g * g).sum::<f64>();
+        let multipliers = super::l2_feature_mult();
+        super::add_l2_grad_layer1(
+            &mut adam.gw1,
+            weights,
+            l2,
+            ha.len(),
+            multipliers.as_ref().map(|v| v.as_slice()),
+        );
+        self.regularized_squared += adam.gw1.iter().map(|g| g * g).sum::<f64>();
+        self.samples += 1;
+    }
+
+    fn report(&mut self, epoch: usize) {
+        println!(
+            "FIRST_WEIGHT_DIAGNOSTICS {}",
+            serde_json::json!({
+                "epoch":epoch,"pair_sample_stride":128,"pairs":self.pairs,"sampled_pairs":self.samples,
+                "mean_squared_data_pair_gradient_norm":if self.samples>0 {Some(self.data_squared/self.samples as f64)} else {None},
+                "mean_squared_regularized_pair_gradient_norm":if self.samples>0 {Some(self.regularized_squared/self.samples as f64)} else {None},
+                "note":"First-layer weight pair-gradient squared norms, not per-parameter means. Canonical unfused backward plus coupled L2; excludes Adam moments, projection and decoupled decay."
+            })
+        );
+        self.pairs = 0;
+        self.samples = 0;
+        self.data_squared = 0.;
+        self.regularized_squared = 0.;
     }
 }
 
@@ -552,6 +642,74 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn first_weight_observer_matches_finite_difference_and_coupled_l2() {
+        let xa = [0.2, 0.7];
+        let xb = [0.8, 0.3];
+        let weights = [0.4, -0.2, 0.3, 0.5];
+        let bias = [-0.1, -0.15];
+        let ga = [0.7, -0.4];
+        let gb = [-0.2, 0.6];
+        let activation = |x: &[f64], w: &[f64]| {
+            let pre: Vec<f64> = (0..2)
+                .map(|j| bias[j] + x[0] * w[j] + x[1] * w[2 + j])
+                .collect();
+            let h: Vec<f64> = pre.iter().map(|v| v.max(0.)).collect();
+            (pre, h)
+        };
+        let objective = |w: &[f64]| {
+            let (_, ha) = activation(&xa, w);
+            let (_, hb) = activation(&xb, w);
+            ha.iter().zip(ga).map(|(h, g)| h * g).sum::<f64>()
+                + hb.iter().zip(gb).map(|(h, g)| h * g).sum::<f64>()
+        };
+        let (pa, ha) = activation(&xa, &weights);
+        let (pb, hb) = activation(&xb, &weights);
+        let mut observer = WeightDiagnostics::default();
+        observer.observe(&xa, &pa, &ha, &ga, &xb, &pb, &hb, &gb, &weights, 0.);
+        assert!(observer.scratch.is_none());
+        observer.pairs = 127;
+        observer.observe(&xa, &pa, &ha, &ga, &xb, &pb, &hb, &gb, &weights, 0.);
+        let gradient = observer.scratch.as_ref().unwrap().gw1.clone();
+        for i in 0..weights.len() {
+            let mut plus = weights;
+            let mut minus = weights;
+            plus[i] += 1e-6;
+            minus[i] -= 1e-6;
+            let numerical = (objective(&plus) - objective(&minus)) / 2e-6;
+            assert!((gradient[i] - numerical).abs() < 1e-9);
+        }
+        let mut regularized = gradient.clone();
+        let mult = super::super::l2_feature_mult();
+        super::super::add_l2_grad_layer1(
+            &mut regularized,
+            &weights,
+            0.01,
+            2,
+            mult.as_ref().map(|v| v.as_slice()),
+        );
+        observer.pairs = 127;
+        observer.observe(&xa, &pa, &ha, &ga, &xb, &pb, &hb, &gb, &weights, 0.01);
+        assert_eq!(observer.scratch.as_ref().unwrap().gw1, regularized);
+        assert_eq!(observer.samples, 2);
+        let expected = gradient.iter().map(|g| g * g).sum::<f64>();
+        assert_eq!(observer.data_squared, 2. * expected);
+        assert_eq!(
+            observer.regularized_squared,
+            expected + regularized.iter().map(|g| g * g).sum::<f64>()
+        );
+        assert_eq!(observer.scratch.as_ref().unwrap().t, 0);
+        assert!(
+            observer
+                .scratch
+                .as_ref()
+                .unwrap()
+                .mw1
+                .iter()
+                .all(|&v| v == 0.)
+        );
     }
 
     #[test]

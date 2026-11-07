@@ -1744,3 +1744,23 @@ existing 265-row layout leaves the original study gates unchanged. All failed
 attempts are retained separately. The successful trace and probe-only repair
 are archived as `softplus-order-probe-diagnosis-r2` and
 `softplus-maxpair-diagnostic-r3`, with cold destination checksum readback.
+
+### First-layer weight-gradient observer: native implementation checks
+
+The optional `ZENSIM_OPTIMIZER_DIAGNOSTICS` path now samples first-layer weight
+pair gradients every 128 optimizer pairs, before input-shape and weight updates.
+It uses the existing canonical backward and coupled-L2 functions in separate,
+lazily allocated scratch state. It never shares the training optimizer's gradients
+or moments. `FIRST_WEIGHT_DIAGNOSTICS` reports mean squared pair-gradient norms
+before and after coupled L2, not means per coefficient; it excludes Adam moments,
+projection and decoupled decay. Existing activation-gradient records retain their
+schema and meaning.
+
+The finite-difference test checks the sampled data gradient and the existing L2
+owner checks the regularized result. The complete native library suite passed
+402 tests (two existing ignored), the CLI suite passed 65, and strict release
+clippy passed. The initial cached-dependency failure and subsequent type-error
+attempt remain preserved. The corrected native source is snapshot `1eb2f09d`
+with the recorded `shared_depth.rs` correction hash. This is implementation
+evidence; a full canonical-neutral replay is still required before attributing
+new weight-gradient traces to an original scientific fit.
