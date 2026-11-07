@@ -56,7 +56,7 @@ codec-corpus = "1.0.3"
 # Historical results retain their recorded zenbench revision.
 zenbench = { version = "0.1.10", git = "https://github.com/imazen/zenbench", rev = "82ff70a3f0c212cf88f53d6e9c3e02de13f32eec" }
 # Current upstream main, fetched 2026-09-13; pin the filter-study implementation.
-zenresize = { git = "https://github.com/imazen/zenresize", rev = "4ad64b3c0a29469e68ddfdda3798de20c60c3421", default-features = false, features = ["std"] }
+zenresize = { git = "https://github.com/imazen/zenresize", rev = "5c5fe0d53b8264a162bc1eba08d2cd4ea2094f4b", default-features = false, features = ["std"] }
 zenpng = { version = ">=0.1.4, <0.3.0", default-features = false }
 # Shared PNG/JPEG buffers use the converged 0.3 pixel representation.
 zenpixels = { version = ">=0.3.1, <0.4.0", default-features = false }
@@ -81,8 +81,8 @@ enough = { version = "0.4.2", default-features = false, features = ["std"] }
 # zenpredict 0.2.0 publish → `cargo package -p zensim` gate → zensim
 # 0.3.0 publish → zensim-regress. zenpredict-bake is consumed only by
 # the unpublished zensim-validate, so it stays a bare git pin.
-zenpredict      = { version = "0.2.0", git = "https://github.com/imazen/zenanalyze", rev = "87f69b14993ad3f984ead143e1a6f65669314fa8" }
-zenpredict-bake = { git = "https://github.com/imazen/zenanalyze", rev = "87f69b14993ad3f984ead143e1a6f65669314fa8" }
+zenpredict      = { version = "0.2.0", git = "https://github.com/imazen/zenanalyze", rev = "0e2c2d8f6cd8f0b00188984b0d2bf696be81c4c0" }
+zenpredict-bake = { git = "https://github.com/imazen/zenanalyze", rev = "0e2c2d8f6cd8f0b00188984b0d2bf696be81c4c0" }
 
 # zenstats — canonical IQA-stats home extracted on 2026-05-26 from the
 # pre-existing `zensim-validate/src/panel.rs`. Lives in the zenmetrics
