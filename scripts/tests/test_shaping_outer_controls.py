@@ -103,3 +103,58 @@ class FinalControlTests(unittest.TestCase):
                         self.assertEqual(membership['train'],[1,2]);self.assertEqual(membership['test'],[3])
                         self.assertEqual(partition['test'],[])
                         self.assertEqual(fit.call_args.args[5]['selected_setting'],3)
+
+class OuterControlWatchTests(unittest.TestCase):
+    def fixture(self,root):
+        binary=root/'bin';binary.mkdir();(binary/'BUILD.json').write_text('{}')
+        (root/'PLAN.json').write_text('{}')
+        args=SimpleNamespace(study=root,binary_dir=binary,partition='outer-0',attempt=1,
+            tree=True,cell=None,full_fit_selection=False,full_fit_refit=False)
+        admission=root/'selection/outer-0/OUTER_ADMISSION.json'
+        admission.parent.mkdir(parents=True)
+        chosen=[c for c in matrix() if c['stage']=='outer' and c['partition']=='outer-0' and c['family']=='extra_trees']
+        return args,admission,chosen
+
+    def test_waits_without_reading_responses_then_runs_exact_queue_once(self):
+        from shaping_controls import watch_outer
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as directory:
+            root=Path(directory);args,admission,chosen=self.fixture(root)
+            def admit(seconds):
+                self.assertEqual(seconds,30);fit.assert_not_called();load.assert_not_called()
+                admission.write_text('{}')
+            with patch('shaping_controls.time.sleep',side_effect=admit),patch('shaping_controls.run') as fit,\
+                 patch('shaping_controls.load_registration',return_value=({},matrix(),{})) as load,\
+                 patch('shaping_controls.selected_cells',return_value=(chosen,dict(admission_sha256='gate',selected_setting=2))):
+                watch_outer(args);fit.assert_called_once_with(args)
+                with self.assertRaisesRegex(ValueError,'reconciliation'):watch_outer(args)
+                self.assertEqual(fit.call_count,1)
+            status=json.loads((root/'dispatch/outer-controls/outer-0/extra_trees/STATUS.json').read_text())
+            self.assertEqual(status['stage'],'complete');self.assertEqual(status['required_cells'],chosen)
+
+    def test_changed_input_or_invalid_admission_never_launches(self):
+        from shaping_controls import watch_outer
+        for drift in (True,False):
+            with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as directory:
+                root=Path(directory);args,admission,chosen=self.fixture(root)
+                def admit(_):
+                    admission.write_text('{}')
+                    if drift:(root/'PLAN.json').write_text('{"changed":true}')
+                with patch('shaping_controls.time.sleep',side_effect=admit),patch('shaping_controls.run') as fit,\
+                     patch('shaping_controls.load_registration',return_value=({},matrix(),{})),\
+                     patch('shaping_controls.selected_cells',side_effect=ValueError('incomplete scientific evidence')):
+                    with self.assertRaisesRegex(ValueError,'changed|incomplete'):watch_outer(args)
+                    fit.assert_not_called()
+                status=json.loads((root/'dispatch/outer-controls/outer-0/extra_trees/STATUS.json').read_text())
+                self.assertEqual(status['stage'],'failed')
+
+    def test_existing_attempt_is_preserved_before_training(self):
+        from shaping_controls import watch_outer
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as directory:
+            root=Path(directory);args,admission,chosen=self.fixture(root);admission.write_text('{}')
+            prior=root/'runs'/chosen[0]['id'];prior.mkdir(parents=True)
+            (prior/'evidence').write_text('preserve')
+            with patch('shaping_controls.run') as fit,patch('shaping_controls.load_registration',return_value=({},matrix(),{})),\
+                 patch('shaping_controls.selected_cells',return_value=(chosen,{})):
+                with self.assertRaisesRegex(ValueError,'attempts require reconciliation'):watch_outer(args)
+                fit.assert_not_called()
+            self.assertEqual((prior/'evidence').read_text(),'preserve')

@@ -1377,3 +1377,14 @@ The independently stored summary and archive receipts are in
 had 225/816 completed inner fits, 24/72 fresh inner controls and 4/720
 rescues; outer, learning-curve, shuffled-label and human-only studies remained
 unexecuted. These counts are progress evidence, not completion.
+
+## Automatic admission for outer additive and tree controls
+
+The existing control trainer now supports waiting for complete outer admission.
+Nine control tests pass, including deferred admission without response reads,
+changed-input and invalid-admission refusal, preservation of existing attempts,
+original paired seed coverage and the existing variant/full-FIT routing checks.
+The queue keeps the current fit owner, selected settings, SSD reservation and
+native evaluation gates. Watcher tests use mocked fits and do not count as
+scientific control fits. Qualification wrapper: `run-heavy: done rc=0 1s |
+peak-RSS 0.07GiB | min-avail 32251MiB | peak-load 25.42`.

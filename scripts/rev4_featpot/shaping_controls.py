@@ -2,6 +2,8 @@
 """Registered inner and admitted outer controls using existing fit owners."""
 from __future__ import annotations
 import argparse
+import fcntl
+import time
 from datetime import datetime,timezone
 import hashlib
 import json
@@ -224,15 +226,53 @@ def fit(args,plan,partitions,family,chosen,outer):
             raise
 
 
+def watch_outer(args):
+    """Wait without opening response tables; own only this control-family queue."""
+    if (args.partition not in ('outer-0','outer-1','outer-2') or args.attempt!=1
+        or args.cell or args.full_fit_selection or args.full_fit_refit):
+        raise ValueError('watcher requires a fresh primary outer control queue')
+    family='extra_trees' if args.tree else 'shaped_additive'
+    directory=args.study/'dispatch/outer-controls'/args.partition/family
+    directory.mkdir(parents=True,exist_ok=True)
+    with (directory/'OWNER.lock').open('a') as owner:
+        fcntl.flock(owner,fcntl.LOCK_EX|fcntl.LOCK_NB)
+        # A stopped or completed queue needs explicit reconciliation, never replay.
+        status_path=directory/'STATUS.json'
+        if status_path.exists():raise ValueError('existing control queue requires reconciliation')
+        pins={str(p):sha(p) for p in (args.study/'PLAN.json',args.binary_dir/'BUILD.json',Path(__file__))}
+        status=dict(pid=os.getpid(),family=family,partition=args.partition,input_sha256=pins)
+        def save(stage,**extra):
+            status.update(stage=stage,checked_utc=datetime.now(timezone.utc).isoformat(),**extra)
+            write(status_path,status)
+        try:
+            admission=args.study/'selection'/args.partition/'OUTER_ADMISSION.json'
+            while not admission.exists():
+                save('waiting_for_verified_outer_admission');time.sleep(30)
+            if any(sha(path)!=pin for path,pin in pins.items()):
+                raise ValueError('control watcher inputs changed while waiting')
+            _,cells,_=load_registration(args.study)
+            chosen,context=selected_cells(args.study,args.partition,family,cells)
+            if any((args.study/'runs'/cell['id']).exists() for cell in chosen):
+                raise ValueError('existing control attempts require reconciliation')
+            save('admitted',required_cells=chosen,**context)
+            # run() resolves admission again and reserves pending SSD writes.
+            run(args)
+            save('complete')
+        except Exception as error:
+            save('failed',error=str(error));raise
+
+
 def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('--study',type=Path,required=True);p.add_argument('--binary-dir',type=Path,required=True)
+    p.add_argument('--watch-outer-admission',action='store_true')
     p.add_argument('--partition',required=True);p.add_argument('--attempt',type=int,default=1)
     p.add_argument('--cell',help='registered generalization control cell; retains inner-selected settings')
     p.add_argument('--full-fit-refit',action='store_true',help='final all-FIT control with descriptive development evaluation')
     p.add_argument('--full-fit-selection',action='store_true',help='registered four-setting full-FIT control search')
     mode=p.add_mutually_exclusive_group(required=True);mode.add_argument('--tree',action='store_true');mode.add_argument('--linear',action='store_true')
-    run(p.parse_args())
+    args=p.parse_args()
+    (watch_outer if args.watch_outer_admission else run)(args)
 
 
 if __name__=='__main__':main()

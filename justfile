@@ -5239,3 +5239,15 @@ shaping-completion-bootstrap study draws binary_dir output:
 
 shaping-completion-bootstrap-check panel:
     TMPDIR="$HOME/tmp" ZEN_PANEL_BIN={{quote(panel)}} "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B -m unittest discover -s scripts/tests -p test_shaping_bootstrap.py
+
+# One nonneural family per queue; existing control trainer owns fitting and gates.
+shaping-completion-watch-outer-control study binary_dir partition mode:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 6G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_controls.py --study {{quote(study)}} --binary-dir {{quote(binary_dir)}} --partition {{quote(partition)}} --{{mode}} --watch-outer-admission
+
+# Two independent family queues may run together; each bounds RAM across folds.
+shaping-completion-watch-outer-controls study binary_dir mode:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    for outer in 0 1 2; do
+        just shaping-completion-watch-outer-control {{quote(study)}} {{quote(binary_dir)}} "outer-$outer" {{quote(mode)}}
+    done

@@ -43,3 +43,15 @@ or improving curves must remain explicitly inconclusive. Outer measurement may
 report such candidates with that limitation; it cannot turn them into converged
 negative results. Unexecuted diagnostics, missing numerical gates, incomplete
 pairing or altered provenance block outer admission. No final holdout is opened.
+
+The nonneural controls can wait on admission with
+`just shaping-completion-watch-outer-controls STUDY BINARY_DIR tree` and the
+corresponding `linear` command. Each family processes the three outer folds
+sequentially; the two families can run concurrently within the host RAM budget.
+Each fitting process has a 6 GiB memory cap and one compute thread. Waiting does
+not open response tables. The watcher verifies the full existing outer admission,
+selected settings and seed coverage, then calls the existing control trainer,
+which rechecks admission after SSD reservation. Queue ownership is per family and
+fold; it does not serialize unrelated training. Existing queue records or cell
+attempts require explicit reconciliation rather than automatic retries. Plan,
+build manifest or driver changes during the wait also stop the queue.
