@@ -4,7 +4,7 @@ import argparse,json,os
 from pathlib import Path
 import numpy as np
 from shaping_completion import FAMILIES,encoded,seeds,sha
-from shaping_outer_evidence import collect,primary_cells
+from shaping_outer_evidence import collect,collect_matched,primary_cells
 from shaping_bootstrap_plan import SEED,REPLICATES,population_groups,component_draws
 from shaping_bootstrap_stats import paired_stratum
 from shaping_bootstrap_reduce import POPULATIONS,reduce
@@ -93,7 +93,16 @@ def compute_matched(arms,registration,draws,labels,seed_ids,progress=lambda *arg
 
 
 def run(args):
-    plan,partitions,outputs,pins,qualifications=collect(args.study)
+    comparison=getattr(args,'comparison',None);spec=None
+    if comparison is None:
+        plan,partitions,outputs,pins,qualifications=collect(args.study)
+    else:
+        spec=json.loads(comparison.read_text())
+        if set(spec) not in ({'role','condition'},{'fresh_family'}):raise ValueError('exact matched comparison specification required')
+        plan,partitions,arms,pins,qualifications,seed_ids=collect_matched(args.study,**spec)
+        outputs=[row for rows in arms.values() for row in rows]
+        policy=Path(__file__).resolve().parents[2]/'docs/SHAPING_MATCHED_UNCERTAINTY.md'
+        pins.update({str(comparison):sha(comparison),str(policy):sha(policy)})
     if args.output.parent.stat().st_dev!=args.study.stat().st_dev:
         raise ValueError('active bootstrap output must share the study SSD')
     for name in ('shaping_bootstrap.py','shaping_bootstrap_plan.py','shaping_bootstrap_stats.py',
@@ -129,7 +138,10 @@ def run(args):
             np.savez_compressed(args.output/(stratum['array']+'.npz'),**result)
             print(json.dumps(dict(completed_stratum=stratum['array'],replicates=REPLICATES)),flush=True)
         try:
-            samples,points,summary=compute(outputs,registration,draws,data['y'],progress)
+            if comparison is None:
+                samples,points,summary=compute(outputs,registration,draws,data['y'],progress)
+            else:
+                samples,points,summary=compute_matched(arms,registration,draws,data['y'],seed_ids,progress)
             for name,pin in pins.items():
                 if sha(name)!=pin:raise ValueError('bootstrap input changed during computation')
             arrays={**{f+'__samples':v for f,v in samples.items()},**{f+'__points':v for f,v in points.items()}}
@@ -137,7 +149,8 @@ def run(args):
             summary.update(input_sha256=pins,convergence_qualifications=qualifications,
                 outer_population_reports={r['cell']['id']:r['report']['outer_test'] for r in outputs},
                 samples_sha256=sha(args.output/'samples.npz'),driver_sha256=sha(__file__),numpy_version=np.__version__,
-                outer_results_read=True,final_holdout_read=False,scientific_scope='102 primary outer cells only; variants and fresh controls require separate comparisons')
+                outer_results_read=True,final_holdout_read=False,scientific_scope='102 primary outer cells only; variants and fresh controls require separate comparisons' if comparison is None else 'one fully paired registered matched outer comparison')
+            if comparison is not None:summary['comparison']=spec
             (args.output/'SUMMARY.json').write_bytes(encoded(summary))
             (args.output/'COMPLETE.json').write_bytes(encoded(dict(summary_sha256=sha(args.output/'SUMMARY.json'))))
         except Exception as error:
@@ -148,4 +161,5 @@ def run(args):
 if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__)
     for key in ('study','draws','binary-dir','output'):p.add_argument('--'+key,type=Path,required=True)
+    p.add_argument('--comparison',type=Path,help='JSON role/condition or fresh_family; full matched provenance required')
     run(p.parse_args())

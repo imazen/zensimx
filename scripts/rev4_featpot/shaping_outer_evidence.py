@@ -114,3 +114,97 @@ def matched_cells(cells,admissions,*,role=None,condition=None,fresh_family=None)
                 candidate=one([c for c in cells if c['family']==role and c['partition']==partition and c['seed']==seed and all(c.get(k)==v for k,v in condition.items())])
                 pairs.append(dict(candidate=candidate,control=base,resolved_family=family))
     return pairs,seed_ids
+
+
+def collect_matched(study,*,role=None,condition=None,fresh_family=None):
+    """Validate every matched arm before opening any prediction array."""
+    from shaping_evaluation import outer_context,VARIANT_STAGES
+    from shaping_variant_execution import resolve as resolve_variant
+    from shaping_variant_inputs import load_variant
+    plan,cells,partitions=load_registration(study);plan_pin=sha(study/'PLAN.json')
+    admitted={o:resolve(study,o) for o in range(3)}
+    admissions={o:a for o,(a,_) in admitted.items()}
+    pairs,seed_ids=matched_cells(cells,admissions,role=role,condition=condition,fresh_family=fresh_family)
+    wanted={c['id']:c for pair in pairs for c in (pair['candidate'],pair['control'])}
+    pins={str(study/'PLAN.json'):plan_pin};pending=[]
+    for o,(_,path) in admitted.items():pins[str(path)]=sha(path)
+    for cell in wanted.values():
+        outer=int(cell['partition'].split('-')[1]);admission,path=admitted[outer];admission_pin=sha(path)
+        family=admission['finalist_roles'][cell['family']] if cell['stage'] in VARIANT_STAGES else cell['family']
+        complete=[]
+        for run_dir in sorted((study/'runs'/cell['id']).glob('attempt-*')):
+            if not (run_dir/'RESULT.json').is_file():raise ValueError('unfinished matched attempt')
+            result=json.loads((run_dir/'RESULT.json').read_text())
+            if result['exit_code']!=0:continue
+            run=json.loads((run_dir/'RUN.json').read_text())
+            for value in (run,result):
+                if value['cell']!=cell or value['plan_sha256']!=plan_pin:raise ValueError('matched run identity differs')
+            if result['stage']!=('trained' if family in NEURAL else 'complete'):raise ValueError('matched terminal stage differs')
+            if family in NEURAL:
+                context=outer_context(study,run,cells)
+                if context is None or context['admission_sha256']!=admission_pin:raise ValueError('matched neural admission differs')
+                membership=context.get('membership',partitions[cell['partition']]);schedule=context['schedule']
+                if (run['epochs']!=schedule['phase_epochs'][-1] or run['training_exposure_pair_draws']!=schedule['total_pair_draws']
+                    or [p['epochs'] for p in result['phases']]!=schedule['phase_epochs']
+                    or any(p['stage']!='trained' or p['exit_code']!=0 for p in result['phases'])):
+                    raise ValueError('matched phase exposure or completion differs')
+                model=run_dir/run['fit_directory']/'checkpoints'/f"ckpt_epoch{run['epochs']-1:03}.bin"
+                if sha(model)!=result['bake_sha256']:raise ValueError('matched final model drift')
+                pins[str(model)]=sha(model)
+            elif cell['stage'] in VARIANT_STAGES:
+                resolution=resolve_variant(study,cell['id'])
+                if run['variant']!=resolution or run['admission_sha256']!=admission_pin or run['selected_setting']!=resolution['schedule']['setting']:
+                    raise ValueError('matched control variant resolution differs')
+                _,_,_,membership=load_variant(study,cell['id'])
+            else:
+                if run['admission_sha256']!=admission_pin or run['selected_setting']!=admission['schedules'][family]['setting']:
+                    raise ValueError('matched control admission differs')
+                membership=partitions[cell['partition']]
+            if membership['test']!=partitions[cell['partition']]['test']:raise ValueError('matched outer test membership differs')
+            representation=admission.get('evaluation_representations',{}).get(family,{'representation':'original'})
+            evaluation=(study/'reexport_max_pairs'/cell['id']/run_dir.name/'final' if representation['representation']!='original' else run_dir/'evaluation')
+            if not (evaluation/'COMPLETE.json').is_file():raise ValueError('matched evaluation incomplete')
+            complete.append((run_dir,evaluation,result,representation,membership,family))
+        if len(complete)!=1:raise ValueError('exactly one completed matched attempt required')
+        pending.append((cell,admission_pin,*complete[0]))
+    # Validate every report, model and prediction hash before the first array read.
+    for cell,admission_pin,run_dir,evaluation,result,representation,membership,family in pending:
+        path=evaluation/'REPORT.json';marker=evaluation/'COMPLETE.json';row=json.loads(path.read_text());done=json.loads(marker.read_text())
+        if done['cell']!=cell['id'] or done['report_sha256']!=sha(path):raise ValueError('matched completion marker differs')
+        if (row['cell']!=cell or row['plan_sha256']!=plan_pin or row.get('admission_sha256')!=admission_pin
+            or row.get('outer_results_read') is not True or 'outer_test' not in row
+            or 'exposed_development' in row or 'full_fit_validation' in row):raise ValueError('matched report scope differs')
+        if sha(evaluation/'predictions.npz')!=row['predictions_sha256']:raise ValueError('matched prediction artifact drift')
+        if family in NEURAL:
+            if row['checkpoint_epoch']!=result['epochs']-1:raise ValueError('matched report is not scheduled final checkpoint')
+            if representation['representation']=='original':
+                if row['checkpoint_sha256']!=result['bake_sha256']:raise ValueError('matched report model differs')
+            else:
+                receipt_path=Path(row['reexport_receipt']);receipt=json.loads(receipt_path.read_text())
+                if (sha(receipt_path)!=row['reexport_receipt_sha256'] or receipt['original_sha256']!=result['bake_sha256']
+                    or receipt['evaluation_build_sha256']!=representation['evaluation_build_sha256']
+                    or row['evaluation_build_sha256']!=representation['evaluation_build_sha256']
+                    or receipt['training_build_sha256']!=result['build_sha256']
+                    or receipt['representation']!=representation['representation']):raise ValueError('matched repaired identity differs')
+                if receipt['bake'] not in receipt['file_sha256']:raise ValueError('matched repaired bake unpinned')
+                for name,pin in receipt['file_sha256'].items():
+                    if sha(name)!=pin:raise ValueError('matched repaired artifact drift')
+                    pins[name]=pin
+                if sha(receipt['bake'])!=row['checkpoint_sha256']:raise ValueError('matched repaired report model differs')
+                pins[str(receipt_path)]=sha(receipt_path)
+        else:
+            model=run_dir/('model.opaque-vector.zcth' if family=='extra_trees' else 'native/model.bin')
+            qualification=row['qualification'];pin=qualification['native_tree_gate']['model_sha256'] if family=='extra_trees' else qualification['model_sha256']
+            if sha(model)!=pin:raise ValueError('matched native control model drift')
+            pins[str(model)]=pin
+        pins.update({str(p):sha(p) for p in (run_dir/'RUN.json',run_dir/'RESULT.json',path,marker,evaluation/'predictions.npz')})
+    outputs={}
+    for cell,admission_pin,run_dir,evaluation,result,representation,membership,family in pending:
+        indices=sorted(set(membership['train'])|set(membership['test']))
+        row,values,evidence=read(evaluation,cell,plan_pin,admission_pin,indices);pins.update(evidence)
+        outputs[cell['id']]=dict(cell=cell,report=row,indices=indices,predictions=values)
+    for name,pin in pins.items():
+        if sha(name)!=pin:raise ValueError('matched evidence changed during collection')
+    arms={key:[outputs[pair[key]['id']] for pair in pairs] for key in ('candidate','control')}
+    qualification={str(o):a['qualifications'] for o,a in admissions.items()}
+    return plan,partitions,arms,pins,qualification,seed_ids

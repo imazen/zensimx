@@ -71,6 +71,13 @@ class BootstrapRunnerTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError,'not admitted'):run(SimpleNamespace(study=Path('not-admitted')))
             load.assert_not_called()
 
+    def test_matched_runner_requires_admission_before_loading_arrays(self):
+        with tempfile.TemporaryDirectory(dir=os.environ['TMPDIR']) as d:
+            spec=Path(d)/'comparison.json';spec.write_bytes(encoded({'fresh_family':'product_pretrained_frozen'}))
+            with patch('shaping_bootstrap.collect_matched',side_effect=ValueError('matched not admitted')),patch('shaping_bootstrap.np.load') as load:
+                with self.assertRaisesRegex(ValueError,'not admitted'):run(SimpleNamespace(study=Path(d),comparison=spec))
+                load.assert_not_called()
+
     def test_runner_writes_pinned_summary_after_complete_native_calculation(self):
         outputs,registration,draws,labels,partitions,pops,components=self.fixture()
         with tempfile.TemporaryDirectory(dir=os.environ['TMPDIR']) as directory:
@@ -92,6 +99,19 @@ class BootstrapRunnerTests(unittest.TestCase):
             self.assertEqual(summary['samples_sha256'],sha(args.output/'samples.npz'))
             self.assertEqual(len(summary['outer_population_reports']),102)
             self.assertFalse(summary['teacher_in_human_headline']);self.assertFalse(summary['final_holdout_read'])
+            # Exercise the same pinned runner for a separate matched comparison.
+            arms={'candidate':[r for r in outputs if r['cell']['family']=='softplus'],
+                  'control':[r for r in outputs if r['cell']['family']=='relu']}
+            args.comparison=root/'comparison.json';args.comparison.write_bytes(encoded(dict(role='best_analytic',condition={'stage':'human_only'})))
+            args.output=root/'matched-result'
+            with patch('shaping_bootstrap.collect_matched',return_value=(plan,partitions,arms,{str(study/'PLAN.json'):sha(study/'PLAN.json')},{},(0,1,2))),patch('shaped_linear_study.OLD',old):
+                run(args)
+            matched=json.loads((args.output/'SUMMARY.json').read_text())
+            self.assertEqual(matched['comparison'],json.loads(args.comparison.read_text()))
+            self.assertEqual(matched['seed_ids'],[0,1,2]);self.assertEqual(len(matched['outer_population_reports']),18)
+            self.assertIn(str(args.comparison),matched['input_sha256'])
+            self.assertFalse(matched['teacher_in_human_headline'])
+
 
 
 if __name__=='__main__':unittest.main()

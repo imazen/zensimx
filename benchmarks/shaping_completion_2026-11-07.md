@@ -1941,3 +1941,17 @@ candidate-minus-control intervals. Six reducer tests pass; the native runner
 suite, including the matched comparison and missing-seed refusal, also passes.
 This validates computation only. Variant/fresh-control provenance collection
 and actual registered scientific bootstrap executions remain unfinished.
+
+## Matched uncertainty provenance and runner
+
+The existing outer-evidence owner now collects variant/full-data and
+pretrained/fresh pairs. All three outer admissions, every terminal fit, exact
+phase exposure, native model hashes, report scope, repaired representation and
+prediction hashes are validated before any prediction array is opened. The
+bootstrap runner accepts an explicit comparison JSON and pins its analysis
+policy alongside the original source draws. Nine evidence tests pass, including
+complete deterministic and neural-pair fixtures and pre-read refusal of missing
+fits, model corruption, phase-exposure drift and absent outer admission.
+Six native runner tests pass, including complete matched summary/artifact
+production; wrapper peak RSS was 0.21 GiB. These are implementation tests, not
+completed scientific comparisons. Actual outer/variant fitting remains required.

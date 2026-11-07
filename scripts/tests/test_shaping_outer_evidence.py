@@ -103,3 +103,81 @@ class MatchedCellTests(unittest.TestCase):
         for admission in admissions.values():
             next(v for v in admission['fresh_controls'] if 'product_pretrained_frozen' in v['paired_families'])['epochs']=240
         with self.assertRaisesRegex(ValueError,'exposure differs'):matched_cells(cells,admissions,fresh_family='product_pretrained_frozen')
+
+
+class MatchedCollectorTests(unittest.TestCase):
+    def test_complete_control_pair_and_pre_read_corruption_refusal(self):
+        from shaping_outer_evidence import matched_cells,collect_matched
+        from shaping_prediction_evidence import read as real_read
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as directory:
+            root=Path(directory);cells=matrix();(root/'PLAN.json').write_text('{}');plan_pin=sha(root/'PLAN.json')
+            admissions=MatchedCellTests().admissions(cells);gates={};partitions={};resolutions={}
+            for outer in range(3):
+                admissions[outer]['qualifications']={};gate=root/f'admission-{outer}.json';gate.write_bytes(encoded(admissions[outer]));gates[outer]=(admissions[outer],gate)
+                partitions[f'outer-{outer}']=dict(train=[0],test=[1,2])
+            pairs,seed_ids=matched_cells(cells,admissions,role='shaped_additive',condition=dict(stage='human_only'))
+            for pair in pairs:
+                for cell in (pair['candidate'],pair['control']):
+                    run=root/'runs'/cell['id']/'attempt-001';run.mkdir(parents=True)
+                    outer=int(cell['partition'][-1]);gate=gates[outer][1]
+                    record=dict(cell=cell,plan_sha256=plan_pin,admission_sha256=sha(gate),selected_setting=0)
+                    if cell['stage']=='human_only':
+                        resolution=dict(cell=cell,resolved_family='shaped_additive',schedule={'setting':0},admission_sha256=sha(gate))
+                        record['variant']=resolution;resolutions[cell['id']]=resolution
+                    (run/'RUN.json').write_bytes(encoded(record));(run/'RESULT.json').write_bytes(encoded(dict(record,stage='complete',exit_code=0)))
+                    model=run/'native/model.bin';model.parent.mkdir();model.write_bytes(b'qualified-native-model')
+                    report=dict(cell=cell,plan_sha256=plan_pin,admission_sha256=sha(gate),outer_results_read=True,outer_test={},qualification={'model_sha256':sha(model)})
+                    evaluation=run/'evaluation';evaluation.mkdir();save(evaluation,report,np.arange(3),np.array([90.,80.,70.]))
+                    (evaluation/'REPORT.json').write_bytes(encoded(report));(evaluation/'COMPLETE.json').write_bytes(encoded(dict(cell=cell['id'],report_sha256=sha(evaluation/'REPORT.json'))))
+            kwargs=dict(role='shaped_additive',condition={'stage':'human_only'})
+            with patch('shaping_outer_evidence.load_registration',return_value=({},cells,partitions)),patch('shaping_outer_evidence.resolve',side_effect=lambda root,fold:gates[fold]),patch('shaping_variant_execution.resolve',side_effect=lambda root,cell:resolutions[cell]),patch('shaping_variant_inputs.load_variant',return_value=({},None,None,dict(train=[0],test=[1,2]))),patch('shaping_outer_evidence.read',wraps=real_read) as reader:
+                _,_,arms,pins,_,ids=collect_matched(root,**kwargs)
+                self.assertEqual(ids,(None,));self.assertEqual(len(arms['candidate']),3);self.assertEqual(reader.call_count,6)
+                reader.reset_mock();model.write_bytes(b'corrupt')
+                with self.assertRaisesRegex(ValueError,'model drift'):collect_matched(root,**kwargs)
+                reader.assert_not_called();model.write_bytes(b'qualified-native-model')
+                (run/'RESULT.json').unlink()
+                with self.assertRaisesRegex(ValueError,'unfinished'):collect_matched(root,**kwargs)
+                reader.assert_not_called()
+
+    def test_all_admissions_precede_matched_response_reads(self):
+        from shaping_outer_evidence import collect_matched
+        with patch('shaping_outer_evidence.load_registration',return_value=({},matrix(),{})),patch('shaping_outer_evidence.sha',return_value='plan'),patch('shaping_outer_evidence.read') as reader:
+            def admission(root,fold):
+                if fold==2:raise ValueError('third fold not admitted')
+                return {},Path('gate')
+            with patch('shaping_outer_evidence.resolve',side_effect=admission):
+                with self.assertRaisesRegex(ValueError,'third fold'):collect_matched(Path('unopened'),fresh_family='product_pretrained_frozen')
+                reader.assert_not_called()
+
+    def test_neural_fresh_pair_requires_exact_phase_exposure_before_reads(self):
+        from shaping_outer_evidence import matched_cells,collect_matched
+        from shaping_prediction_evidence import read as real_read
+        from shaping_outer_execution import resolve_cell
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as directory:
+            root=Path(directory);cells=matrix();(root/'PLAN.json').write_text('{}');plan_pin=sha(root/'PLAN.json')
+            admissions=MatchedCellTests().admissions(cells);gates={};partitions={};contexts={}
+            for outer in range(3):
+                admissions[outer]['qualifications']={};gate=root/f'admission-{outer}.json';gate.write_bytes(encoded(admissions[outer]));gates[outer]=(admissions[outer],gate)
+                partitions[f'outer-{outer}']=dict(train=[0],test=[1,2])
+            pairs,_=matched_cells(cells,admissions,fresh_family='product_pretrained_frozen')
+            for pair in pairs:
+                for cell in (pair['candidate'],pair['control']):
+                    run=root/'runs'/cell['id']/'attempt-001';run.mkdir(parents=True)
+                    outer=int(cell['partition'][-1]);admission,gate=gates[outer];schedule=resolve_cell(cell,admission)
+                    contexts[cell['id']]=dict(admission=admission,admission_sha256=sha(gate),schedule=schedule)
+                    record=dict(cell=cell,plan_sha256=plan_pin,admission_sha256=sha(gate),schedule=schedule,
+                                epochs=schedule['phase_epochs'][-1],training_exposure_pair_draws=schedule['total_pair_draws'],fit_directory='fit')
+                    (run/'RUN.json').write_bytes(encoded(record))
+                    model=run/'fit/checkpoints'/f"ckpt_epoch{record['epochs']-1:03}.bin";model.parent.mkdir(parents=True);model.write_bytes(b'neural-model')
+                    result=dict(record,stage='trained',exit_code=0,bake_sha256=sha(model),phases=[dict(epochs=e,stage='trained',exit_code=0) for e in schedule['phase_epochs']])
+                    (run/'RESULT.json').write_bytes(encoded(result))
+                    report=dict(cell=cell,plan_sha256=plan_pin,admission_sha256=sha(gate),outer_results_read=True,outer_test={},checkpoint_epoch=record['epochs']-1,checkpoint_sha256=sha(model))
+                    evaluation=run/'evaluation';evaluation.mkdir();save(evaluation,report,np.arange(3),np.array([90.,80.,70.]))
+                    (evaluation/'REPORT.json').write_bytes(encoded(report));(evaluation/'COMPLETE.json').write_bytes(encoded(dict(cell=cell['id'],report_sha256=sha(evaluation/'REPORT.json'))))
+            with patch('shaping_outer_evidence.load_registration',return_value=({},cells,partitions)),patch('shaping_outer_evidence.resolve',side_effect=lambda root,fold:gates[fold]),patch('shaping_evaluation.outer_context',side_effect=lambda root,record,cells:contexts[record['cell']['id']]),patch('shaping_outer_evidence.read',wraps=real_read) as reader:
+                _,_,arms,_,_,ids=collect_matched(root,fresh_family='product_pretrained_frozen')
+                self.assertEqual(ids,(0,1,2));self.assertEqual(len(arms['candidate']),9);self.assertEqual(reader.call_count,18)
+                reader.reset_mock();result['phases'][0]['epochs']-=1;(run/'RESULT.json').write_bytes(encoded(result))
+                with self.assertRaisesRegex(ValueError,'phase exposure'):collect_matched(root,fresh_family='product_pretrained_frozen')
+                reader.assert_not_called()
