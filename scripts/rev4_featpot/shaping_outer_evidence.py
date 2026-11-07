@@ -2,7 +2,7 @@
 from __future__ import annotations
 import json
 from pathlib import Path
-from shaping_completion import FAMILIES,NEURAL,seeds,sha
+from shaping_completion import FAMILIES,NEURAL,ROLES,seeds,sha
 from shaping_execution import load_registration
 from shaping_outer_admission import resolve
 from shaping_prediction_evidence import read
@@ -77,3 +77,40 @@ def collect(study):
                 pins[str(receipt_path)]=sha(receipt_path)
         outputs.append(dict(cell=cell,report=report,indices=expected,predictions=values))
     return plan,partitions,outputs,pins,qualifications
+
+
+def matched_cells(cells,admissions,*,role=None,condition=None,fresh_family=None):
+    """Resolve complete pairs from inner decisions and frozen matrix metadata."""
+    if set(admissions)!={0,1,2}:raise ValueError('all three outer admissions required')
+    if fresh_family is not None:
+        if role is not None or condition is not None or fresh_family not in NEURAL or '_pretrained_' not in fresh_family:
+            raise ValueError('one registered pretrained-family comparison required')
+        seed_ids=(0,1,2)
+    else:
+        if role not in ROLES or not isinstance(condition,dict):raise ValueError('registered variant role and condition required')
+        keys={'source_curve':{'stage','fraction','order_seed'},'row_curve':{'stage','fraction','order_seed'},
+              'shuffle':{'stage','permutation','permutation_seed'},'human_only':{'stage'}}
+        if condition.get('stage') not in keys or set(condition)!=keys[condition['stage']]:
+            raise ValueError('exact registered variant condition required')
+        seed_ids=tuple(seeds(role))
+    def one(matches):
+        if len(matches)!=1:raise ValueError('exactly one registered cell per paired arm required')
+        return matches[0]
+    pairs=[]
+    for outer in range(3):
+        admission=admissions[outer]
+        if not admission['outer_evaluation_admitted']:raise ValueError('matched outer comparison not admitted')
+        family=fresh_family or admission['finalist_roles'][role];partition=f'outer-{outer}'
+        for seed in seed_ids:
+            base=one([c for c in cells if c['stage']=='outer' and c['family']==family and c['partition']==partition and c['seed']==seed])
+            if fresh_family is not None:
+                control=one([v for v in admission['fresh_controls'] if fresh_family in v['paired_families'] and v['cell']['seed']==seed])
+                schedule=admission['schedules'][family]
+                if (control['setting'],control['optimizer_choice'],control['epochs'])!=(schedule['setting'],schedule['optimizer_choice'],schedule['phase_epochs'][-1]):
+                    raise ValueError('fresh control setting, optimizer or exposure differs')
+                if control['cell']['partition']!=partition or control['cell']['family']!='relu':raise ValueError('fresh control fold or family differs')
+                pairs.append(dict(candidate=base,control=control['cell'],resolved_family=family))
+            else:
+                candidate=one([c for c in cells if c['family']==role and c['partition']==partition and c['seed']==seed and all(c.get(k)==v for k,v in condition.items())])
+                pairs.append(dict(candidate=candidate,control=base,resolved_family=family))
+    return pairs,seed_ids

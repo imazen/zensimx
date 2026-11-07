@@ -73,3 +73,33 @@ class OuterEvidenceTests(unittest.TestCase):
 
 
 if __name__=='__main__':unittest.main()
+
+
+class MatchedCellTests(unittest.TestCase):
+    def admissions(self,cells):
+        from shaping_outer_plan import plan
+        values={}
+        for outer in range(3):
+            decisions={f:dict(family=f,outer=outer,outer_results_read=False,setting=0,optimizer_choice='base',inner_score=.8) for f in FAMILIES}
+            values[outer]=plan(decisions,[],outer,cells);values[outer]['outer_evaluation_admitted']=True
+        return values
+
+    def test_variant_pairs_use_inner_finalist_and_all_seeds(self):
+        from shaping_outer_evidence import matched_cells
+        cells=matrix();admissions=self.admissions(cells)
+        pairs,seeds_=matched_cells(cells,admissions,role='best_analytic',condition=dict(stage='source_curve',fraction=.25,order_seed=20261107))
+        self.assertEqual(len(pairs),9);self.assertEqual(seeds_,(0,1,2))
+        self.assertTrue(all(p['control']['family']=='softplus' for p in pairs))
+        missing=[c for c in cells if c!=pairs[-1]['candidate']]
+        with self.assertRaisesRegex(ValueError,'exactly one'):matched_cells(missing,admissions,role='best_analytic',condition=dict(stage='source_curve',fraction=.25,order_seed=20261107))
+        pairs,seeds_=matched_cells(cells,admissions,role='shaped_additive',condition=dict(stage='human_only'))
+        self.assertEqual(len(pairs),3);self.assertEqual(seeds_,(None,))
+
+    def test_pretrained_controls_match_actual_exposure_and_settings(self):
+        from shaping_outer_evidence import matched_cells
+        cells=matrix();admissions=self.admissions(cells)
+        pairs,seeds_=matched_cells(cells,admissions,fresh_family='product_pretrained_frozen')
+        self.assertEqual(len(pairs),9)
+        for admission in admissions.values():
+            next(v for v in admission['fresh_controls'] if 'product_pretrained_frozen' in v['paired_families'])['epochs']=240
+        with self.assertRaisesRegex(ValueError,'exposure differs'):matched_cells(cells,admissions,fresh_family='product_pretrained_frozen')
