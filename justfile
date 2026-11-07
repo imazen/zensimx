@@ -5076,6 +5076,9 @@ shaping-completion-fetch-worker host remote_bundle destination:
 shaping-completion-pack-worker host source study assignment cell bundle:
     ssh {{quote(host)}} 'TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B {{source}}/scripts/rev4_featpot/shaping_worker_collect.py pack --study {{study}} --assignment {{assignment}} --cell {{cell}} --bundle {{bundle}}'
 
+shaping-completion-collect-terminal-worker host source study status destination output:
+    TMPDIR="$HOME/tmp" python3 -B scripts/rev4_featpot/shaping_worker_collection_wave.py --host {{quote(host)}} --source {{quote(source)}} --study {{quote(study)}} --status {{quote(status)}} --destination {{quote(destination)}} --output {{quote(output)}}
+
 shaping-completion-human-qualify study run binaries output cell:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 3G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_rescue_qualification.py --study {{quote(study)}} --run {{quote(run)}} --binary-dir {{quote(binaries)}} --output {{quote(output)}} --human-only-cell {{quote(cell)}}
 
