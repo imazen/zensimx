@@ -410,3 +410,18 @@ It uses all scheduled checkpoints, preserves original failed reports, and refuse
 selection completion for any supplemental gate failure. Two orchestration controls
 passed, including isolation of a failed supplemental checkpoint while the next cell
 finishes. The watcher does not select settings or consume outer scores.
+
+Additional registered analytic execution (inner-1-0) now runs on the qualified
+worker with eight independent one-thread trainers, alongside its eight shaping
+trainers. The assignment binds all 36 existing analytic cells; the immutable
+training snapshot and binary set are unchanged. Twenty partition files totaling
+23,335,757 bytes passed full remote hash verification before fitting. Native
+epoch-zero checkpoints were observed. No new score or selection conclusion follows.
+
+The partition bundle and admission evidence were archived with full destination
+readback under `worker-i270-analytic-inner-1-0-inputs`; manifest SHA-256:
+`432c3b60b03ded57c26e0984d862db437ace467ee61a545cf2ac8bdeccc47440`. Preparation used 3 s / peak RSS 0.42 GiB; packaging used
+3 s / peak RSS 0.20 GiB, as reported by run-heavy. These are resource receipts,
+not isolated speed benchmarks. A separate archive supervisor now handles fully
+evaluated single-attempt inner cells; it preserves local artifacts and refuses
+active, failed, or unreconciled multiple-attempt cells.
