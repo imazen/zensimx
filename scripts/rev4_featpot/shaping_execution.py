@@ -243,6 +243,7 @@ def live_status(root):
             elif run.get('process_role')=='rescue_controller':live=str(root) in command and 'shaping_rescue_execution.py' in command and run['cell']['id'] in command
             elif run.get('process_role')=='extension_controller':live=str(root) in command and 'shaping_extension_execution.py' in command and run['cell']['id'] in command
             elif run.get('process_role')=='outer_controller':live=str(root) in command and 'shaping_outer_execution.py' in command and run['cell']['id'] in command
+            elif run.get('process_role')=='full_fit_controller':live=str(root) in command and 'shaping_full_fit_execution.py' in command and run['cell']['id'] in command
             elif run.get('process_role')=='variant_controller':live=str(root) in command and 'shaping_variant_execution.py' in command and run['cell']['id'] in command
             else:live=str(path.parent) in command and 'run-heavy' in command
         except FileNotFoundError:live=False

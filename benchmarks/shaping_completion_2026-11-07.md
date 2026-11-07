@@ -837,3 +837,18 @@ present. Free bytes measured immediately before/after were 52,574,863,360 and
 measurement. `run-heavy`: 229 seconds, peak RSS 0.11 GiB, minimum available RAM
 30,277 MiB, peak load 18.71. Evidence lives in the completion artifact root's
 `checkpoint-retention-qualification/`, including the full per-file receipt.
+
+### Native full-FIT setting-search runner
+
+The native search runner resolves each of the registered selection cells through
+the complete three-fold inner-evidence admission. It retains the fixed family,
+optimizer and exposure, uses that cell's original setting and paired seed, and
+refits preprocessing on the registered training complement. Pretrained models
+learn new shapes there before starting a fresh head. It shares the existing
+native phase and objective owners with outer refits. Inputs, command templates,
+qualification, binaries and final checkpoints are pinned; reports are scoped
+`full_fit_only`. Source membership drift, admission drift, duplicate attempts and
+using final-refit cells as selection cells are rejected in orchestration tests.
+These tests are not scientific fits. Full-FIT evaluation, nonneural execution,
+selection receipts and final refit execution remain to be connected; no full-FIT
+scientific result is claimed by this implementation.

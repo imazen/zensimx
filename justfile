@@ -5132,3 +5132,12 @@ shaping-completion-checkpoint-retention-check:
 
 shaping-completion-checkpoint-retention study output *args:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_checkpoint_retention.py --study {{quote(study)}} --output {{quote(output)}} {{args}}
+
+shaping-completion-full-fit-native-check:
+    python3 -B -m unittest discover -s scripts/tests -p test_shaping_full_fit_execution.py
+
+shaping-completion-full-fit-search-prepare study cell:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 2G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_full_fit_execution.py --study {{quote(study)}} --cell {{quote(cell)}} --prepare
+
+shaping-completion-full-fit-search-native study cell binaries qualification:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 3G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_full_fit_execution.py --study {{quote(study)}} --cell {{quote(cell)}} --binary-dir {{quote(binaries)}} --neutral-qualification {{quote(qualification)}}
