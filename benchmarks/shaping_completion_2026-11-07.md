@@ -1876,3 +1876,11 @@ The full 120-epoch replay controller was launched with required per-epoch weight
 traces and all-checkpoint canonical matching. Storage admission initially held
 it because pending-job allowances exceeded available SSD space. No training
 started through that hold, and no reserve or allowance was weakened.
+
+The 11:42 checkpoint-retention pass removed 2204 local duplicate checkpoints
+from 11 completed fits, totaling 435056860 logical bytes. Every removed file
+passed local hashing, cold durable readback, unchanged-file checks and two
+open-file checks. Registered diagnostic/final checkpoints and failed runs remain
+local. The plan, receipt and execution log passed durable archive verification
+in `checkpoint-retention-1142-evidence`. Replay admission remained pending after
+this pass; pending-write allowances and the 30 GiB reserve are unchanged.
