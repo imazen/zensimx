@@ -1,9 +1,9 @@
 """Native full-FIT setting search, isolated from earlier nested-study decisions."""
 from __future__ import annotations
-import argparse,json,os,subprocess
+import argparse,fcntl,json,os,subprocess,time
 from datetime import datetime,timezone
 from pathlib import Path
-from shaping_completion import NEURAL,ROLES,encoded,sha
+from shaping_completion import NEURAL,ROLES,REPO,encoded,sha,matrix
 from shaping_execution import load_registration,prepare_partition
 from shaping_full_fit_admission import resolve as resolve_admission
 from shaping_inputs import prepare as prepare_shapes
@@ -161,12 +161,113 @@ def execute(args):
                 'finished_utc':datetime.now(timezone.utc).isoformat()}));raise
 
 
+def search_jobs(cells,admission):
+    selected=admission['selection_cells']
+    expected=[c for c in matrix() if c['stage']=='full_fit_selection']
+    if (sorted(selected,key=lambda c:c['id'])!=sorted(expected,key=lambda c:c['id'])
+        or any(c not in cells for c in selected)):
+        raise ValueError('complete registered full-FIT search matrix required')
+    jobs=[]
+    for partition in ('outer-0','outer-1','outer-2'):
+        for role in ROLES:
+            chosen=[c for c in selected if c['partition']==partition and c['family']==role]
+            family=admission['finalist_roles'][role]
+            if family in NEURAL:jobs.extend([[c] for c in chosen])
+            elif family in ('extra_trees','shaped_additive') and family==role:jobs.append(chosen)
+            else:raise ValueError('full-FIT role resolved to unsupported family')
+    return jobs
+
+
+def watch_search(args):
+    """Launch each complete search group once; failed attempts require reconciliation."""
+    directory=args.study/'dispatch/full-fit-search';directory.mkdir(parents=True,exist_ok=True)
+    with (directory/'OWNER.lock').open('a') as owner:
+        fcntl.flock(owner,fcntl.LOCK_EX|fcntl.LOCK_NB)
+        status_path=directory/'STATUS.json'
+        if status_path.exists():raise ValueError('existing full-FIT queue requires reconciliation')
+        status=dict(pid=os.getpid(),driver_sha256=sha(__file__),workers=2)
+        def save(stage,**extra):
+            status.update(stage=stage,checked_utc=datetime.now(timezone.utc).isoformat(),**extra)
+            status_path.write_bytes(encoded(status))
+        active={}
+        try:
+            while not all((args.study/'selection'/f'outer-{outer}'/'OUTER_ADMISSION.json').exists() for outer in range(3)):
+                save('waiting_for_three_verified_outer_admissions');time.sleep(30)
+            from shaping_full_fit_admission import register
+            if not (args.study/'full_fit/PLAN.json').exists():register(args.study)
+            admission,path=resolve_admission(args.study)
+            _,cells,_=load_registration(args.study);jobs=search_jobs(cells,admission)
+            pins={str(p):sha(p) for p in (path,args.study/'PLAN.json',args.binary_dir/'BUILD.json')}
+            if any((args.study/'runs'/c['id']).exists() for group in jobs for c in group):
+                raise ValueError('existing full-FIT attempts require reconciliation')
+            # Outer dispatch owns creation of the shared partition inputs. Wait
+            # for its receipt rather than racing its writes; prepare() revalidates.
+            while not all((args.study/'outer_inputs'/f'outer-{outer}'/'PREPARED.json').exists() for outer in range(3)):
+                save('waiting_for_shared_outer_inputs',input_sha256=pins);time.sleep(30)
+            save('preparing_search_inputs',input_sha256=pins,required_cells=sum(map(len,jobs)))
+            for partition in ('outer-0','outer-1','outer-2'):
+                representative=next(c for group in jobs for c in group if c['partition']==partition and admission['finalist_roles'][c['family']] in NEURAL)
+                prepare(args.study,representative['id'])
+            active={};completed=[];next_job=0;failure=None
+            while active or next_job<len(jobs):
+                for key,(child,log,group) in list(active.items()):
+                    if child.poll() is None:continue
+                    log.close();del active[key]
+                    if child.returncode:failure='full-FIT search child failed: '+key
+                    else:
+                        for cell in group:
+                            run=args.study/'runs'/cell['id']/'attempt-001'
+                            identity=json.loads((run/'RUN.json').read_text());result=json.loads((run/'RESULT.json').read_text())
+                            for record in (identity,result):
+                                if (record['cell']!=cell or record['admission_sha256']!=pins[str(path)]
+                                    or record['plan_sha256']!=pins[str(args.study/'PLAN.json')]
+                                    or record['build_sha256']!=pins[str(args.binary_dir/'BUILD.json')]
+                                    or record['selection_scope']!='full_fit_only' or record['development_results_read']):
+                                    raise ValueError('full-FIT child evidence scope differs')
+                            family=admission['finalist_roles'][cell['family']]
+                            if result['exit_code']!=0 or result['stage']!=('trained' if family in NEURAL else 'complete'):
+                                raise ValueError('incomplete full-FIT search child')
+                            completed.append(cell['id'])
+                while not failure and len(active)<2 and next_job<len(jobs):
+                    if any(sha(p)!=pin for p,pin in pins.items()):raise ValueError('full-FIT search input drift')
+                    group=jobs[next_job];cell=group[0];family=admission['finalist_roles'][cell['family']]
+                    if family in NEURAL:
+                        cmd=['python3','-B','scripts/rev4_featpot/shaping_full_fit_execution.py','--study',str(args.study),
+                            '--binary-dir',str(args.binary_dir),'--neutral-qualification',str(args.neutral_qualification),'--cell',cell['id']]
+                    else:
+                        cmd=['python3','-B','scripts/rev4_featpot/shaping_controls.py','--study',str(args.study),
+                            '--binary-dir',str(args.binary_dir),'--partition',cell['partition'],'--full-fit-selection',
+                            '--tree' if family=='extra_trees' else '--linear']
+                    log=(directory/(cell['id']+'.log')).open('x')
+                    active[cell['id']]=(subprocess.Popen(cmd,cwd=REPO,stdout=log,stderr=subprocess.STDOUT),log,group);next_job+=1
+                save('failed' if failure and not active else 'supervising_search',completed=completed,
+                     active={k:v[0].pid for k,v in active.items()},failure=failure)
+                if failure and not active:raise RuntimeError(failure)
+                if active:time.sleep(30)
+            if len(completed)!=192 or len(set(completed))!=192:raise ValueError('full-FIT search coverage incomplete')
+            save('search_fits_finished_reports_required')
+        except Exception as error:
+            # Preserve already admitted children; stop new launches and drain them.
+            while active:
+                save('draining_after_failure',error=str(error),active={k:v[0].pid for k,v in active.items()})
+                for key,(child,log,_) in list(active.items()):
+                    if child.poll() is not None:log.close();del active[key]
+                if active:time.sleep(30)
+            save('failed',error=str(error),active={});raise
+
+
 if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__);p.add_argument('--study',type=Path,required=True)
-    p.add_argument('--cell',required=True);p.add_argument('--prepare',action='store_true')
+    p.add_argument('--cell');p.add_argument('--prepare',action='store_true');p.add_argument('--watch-search',action='store_true')
     p.add_argument('--binary-dir',type=Path);p.add_argument('--neutral-qualification',type=Path)
     p.add_argument('--attempt',type=int,default=1);a=p.parse_args()
-    if a.prepare:print(json.dumps(prepare(a.study,a.cell)),flush=True)
+    if a.watch_search:
+        if a.cell or a.prepare or not (a.binary_dir and a.neutral_qualification):p.error('search watcher requires binaries and qualification without a cell')
+        watch_search(a)
+    elif a.prepare:
+        if not a.cell:p.error('prepare requires cell')
+        print(json.dumps(prepare(a.study,a.cell)),flush=True)
     else:
+        if not a.cell:p.error('fit requires cell')
         if not (a.binary_dir and a.neutral_qualification):p.error('fit requires binaries and neutral qualification')
         execute(a)

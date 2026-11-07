@@ -5263,3 +5263,10 @@ shaping-completion-dispatch-variant-controls study binary_dir:
     for outer in 0 1 2; do
         TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 8G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_outer_dispatch.py --study {{quote(study)}} --binary-dir {{quote(binary_dir)}} --neutral-qualification {{quote(binary_dir)}} --outer "$outer" --workers 1 --variant-controls --watch-admission
     done
+
+shaping-completion-full-fit-dispatch-check:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B -m unittest discover -s scripts/tests -p 'test_shaping_full_fit*.py'
+
+# Two search jobs; each native phase retains its own cap. Controls stay grouped.
+shaping-completion-watch-full-fit-search study binary_dir neutral:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 14G --jobs 2 -- python3 -B scripts/rev4_featpot/shaping_full_fit_execution.py --study {{quote(study)}} --binary-dir {{quote(binary_dir)}} --neutral-qualification {{quote(neutral)}} --watch-search

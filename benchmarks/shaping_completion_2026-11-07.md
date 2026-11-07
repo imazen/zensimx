@@ -1454,3 +1454,29 @@ reservation. This bounded control queue can run alongside independent neural
 queues; it is not a global training lock. Together, both dispatch modes cover
 all 672 registered generalization cells. Execution and scientific evaluation
 remain required; launch coverage is not experiment completion.
+
+## Full-FIT search launch automation
+
+The existing full-FIT execution owner now offers `--watch-search`. It waits for
+all three complete outer admissions, registers or reproduces the global search
+plan, and requires exactly the registered 192 setting-search cells. Native
+fits remain independent jobs; additive and tree settings are grouped by role
+and partition so the additive input cache is prepared only once per search.
+There are 150 child jobs: 144 native fits and six control groups covering 48
+fits. At most two jobs run concurrently in the queue. Existing attempts or a
+previous queue require explicit reconciliation; failed children stop new
+launches while already admitted children finish and retain their evidence.
+
+Outer dispatch owns creation of shared partition inputs. This queue waits for
+its preparation receipts before revalidating and reusing those inputs, avoiding
+concurrent creation by two owners. Neither admission nor preparation reads
+exposed development responses. Completion of the queue means search fit receipts
+are available; final evaluation, setting selection and 16 final refits remain
+separate requirements.
+
+The first synthetic queue execution found a child-record tuple mismatch before
+any scientific run; its failing log is preserved. After correction, the full
+192-cell simulated queue executes each cell once with two slots. Checks cover
+missing admissions, missing shared preparation, exact coverage and draining
+children after failure. All 18 full-FIT tests pass. Wrapper: `run-heavy: done
+rc=0 3s | peak-RSS 0.19GiB | min-avail 32108MiB | peak-load 24.22`.
