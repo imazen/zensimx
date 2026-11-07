@@ -2643,6 +2643,23 @@ parents, and four explicit interrupted-parent dependencies. The prior queue's
 fatal dependency state was verified before starting this observer; it admits
 no more work, and its last active child is preserved. The new owner uses a
 four-worker ceiling and shared CPU/RAM admission, without restarting existing
-fits. Cold readback verified `pretrained00-interrupted-parent-recovery`: 
+fits. Cold readback verified `pretrained00-interrupted-parent-recovery`:
 8 artifacts, 35334 bytes; receipt
 `cbda186981820d5ca968d1f4db6e331f9d615bc5639977b7c3ead09a44609406`.
+
+
+## Broader paired shape-response analysis
+
+The descriptive native curve reader accepts explicit registered inner partitions
+while requiring every architecture, setting and seed in their Cartesian grid.
+Six tests pass, including missing-cell, duplicate-partition and mixed-selector
+refusals. No quality-based cell filtering or new fitting is introduced.
+
+The next saved-model analysis uses setting 0, both joint-shaping architectures
+and all three seeds across inner-0-0, inner-0-1, inner-1-1 and inner-2-0: 24
+verified final models. These are all four partitions with a complete qualified
+setting-0 grid at the eligibility check. Inner-1-0 has zero of six qualified
+models and inner-2-1 has three of six; both remain missing from this interim
+analysis. It describes response consistency over the declared TRAIN-derived
+domain, excluding downstream weights, without claiming feature utility or
+source-independent quality gains. The original scientific matrix is unchanged.

@@ -29,6 +29,22 @@ class CurveStabilityTests(unittest.TestCase):
 if __name__=='__main__':unittest.main()
 
 class PairedSettingTests(unittest.TestCase):
+    def test_explicit_partitions_preserve_each_seed_architecture_and_setting(self):
+        from shaping_completion import matrix
+        from shaping_curve_stability import selected_cells
+        cells=matrix();partitions=['inner-0-0','inner-0-1','inner-1-1','inner-2-0']
+        chosen=selected_cells(cells,'direct_joint_both',None,[0],partitions=partitions)
+        self.assertEqual(len(chosen),24)
+        self.assertEqual({c['partition'] for c in chosen},set(partitions))
+        for partition in partitions:
+            self.assertEqual({(c['family'],c['seed']) for c in chosen if c['partition']==partition},
+                             {(f,s) for f in ['product_joint_identity','separate_joint_identity'] for s in range(3)})
+        with self.assertRaisesRegex(ValueError,'complete paired'):
+            selected_cells([c for c in cells if c!=chosen[0]],'direct_joint_both',None,[0],partitions=partitions)
+        for outer,fold,parts in [(0,None,partitions),(None,0,partitions),(None,None,partitions+partitions[:1]),(None,None,['outer-0'])]:
+            with self.assertRaisesRegex(ValueError,'distinct registered partitions'):
+                selected_cells(cells,'direct_joint_both',outer,[0],fold,parts)
+
     def test_two_settings_three_seeds_per_architecture_without_other_fold(self):
         from shaping_completion import matrix
         from shaping_curve_stability import selected_cells

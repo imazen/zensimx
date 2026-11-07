@@ -42,13 +42,21 @@ def compare(configs):
     return rows
 
 
-def selected_cells(cells,family,outer,settings,inner_fold=None):
+def selected_cells(cells,family,outer,settings,inner_fold=None,partitions=None):
     families=['product_joint_identity','separate_joint_identity'] if family=='direct_joint_both' else [family]
-    if (outer not in range(3) or not settings or len(set(settings))!=len(settings)
+    if (not settings or len(set(settings))!=len(settings)
         or any(v not in range(4) for v in settings) or inner_fold not in (None,0,1)):
         raise ValueError('registered distinct settings and inner folds required')
-    folds=(0,1) if inner_fold is None else (inner_fold,)
-    expected={(f,f'inner-{outer}-{fold}',seed,setting) for f in families for fold in folds for seed in range(3) for setting in settings}
+    if partitions is None:
+        if outer not in range(3):raise ValueError('registered outer fold required')
+        folds=(0,1) if inner_fold is None else (inner_fold,)
+        partitions=[f'inner-{outer}-{fold}' for fold in folds]
+    else:
+        allowed={f'inner-{o}-{i}' for o in range(3) for i in range(2)}
+        if (outer is not None or inner_fold is not None or not partitions or
+                len(partitions)!=len(set(partitions)) or not set(partitions)<=allowed):
+            raise ValueError('distinct registered partitions without fold selectors required')
+    expected={(f,partition,seed,setting) for f in families for partition in partitions for seed in range(3) for setting in settings}
     selected=[c for c in cells if c['stage']=='inner' and (c['family'],c['partition'],c['seed'],c['setting']) in expected]
     if len(selected)!=len(expected) or {(c['family'],c['partition'],c['seed'],c['setting']) for c in selected}!=expected:
         raise ValueError('complete paired settings required')
@@ -58,7 +66,7 @@ def selected_cells(cells,family,outer,settings,inner_fold=None):
 def report(args):
     _,cells,_=load_registration(args.study)
     settings=getattr(args,'settings',None) or [args.setting]
-    selected=selected_cells(cells,args.family,args.outer,settings,getattr(args,'inner_fold',None))
+    selected=selected_cells(cells,args.family,args.outer,settings,getattr(args,'inner_fold',None),getattr(args,'partitions',None))
     args.output.mkdir(parents=True,exist_ok=False);configs=[];pins={};fits=[]
     build=json.loads((args.binary_dir/'BUILD.json').read_text())
     if sha(args.binary_dir/'bake_dial_refit')!=build['binary_sha256']['bake_dial_refit']:raise ValueError('native metadata reader drift')
@@ -89,7 +97,10 @@ if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__)
     for key in ('study','binary-dir','output'):p.add_argument('--'+key,type=Path,required=True)
     p.add_argument('--family',choices=['product_joint_identity','separate_joint_identity','direct_joint_both'],required=True)
-    p.add_argument('--outer',type=int,choices=range(3),required=True);p.add_argument('--inner-fold',type=int,choices=(0,1))
+    scope=p.add_mutually_exclusive_group(required=True)
+    scope.add_argument('--outer',type=int,choices=range(3))
+    scope.add_argument('--partitions',nargs='+',choices=[f'inner-{o}-{i}' for o in range(3) for i in range(2)])
+    p.add_argument('--inner-fold',type=int,choices=(0,1))
     choices=p.add_mutually_exclusive_group(required=True)
     choices.add_argument('--setting',type=int,choices=range(4))
     choices.add_argument('--settings',type=int,choices=range(4),nargs='+')
