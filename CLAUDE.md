@@ -10,6 +10,15 @@ Failed original evidence remains with its separate owner. All 13 native runs
 were copied and checksum-verified; no local checkpoints were removed. The
 process-aware progress audit includes this additional archive watcher.
 
+The companion checkpoint-retention owner supports explicit `--rescue` for
+qualified completed rescue phases. It rechecks the native rescue archive gate
+and phase/exposure inventory, binds each path to its durable manifest, rereads
+all selected checksums and checks active users before removal. Initial,
+prefix, diagnostic (including epoch 219) and final checkpoints stay local in
+each phase. Failed originals remain excluded. Both phase layouts and refusal
+cases are covered by the retention/archive checks; live use is recorded in
+the shaping completion benchmark.
+
 ## Known Bugs — interrupted joint-shaping supervision (November 7, 2026)
 
 A historical inner-0-0 joint-shaping controller and two fits stopped while its

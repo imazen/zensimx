@@ -3303,3 +3303,27 @@ Run-heavy reports 96 seconds, peak RSS 0.11 GiB, minimum available memory
 32,946 MiB and peak load 32.43. Retention evidence passed cold readback in
 `checkpoint-retention-2201-evidence`: 2 files, 6,056,639 bytes,
 receipt `fec7e5c90cda1beb1216ceb074adb10ac0ece6dc6c38b38f3e3eaebbf52dda80`.
+
+### Native rescue checkpoint-retention qualification
+
+The existing retention owner now supports explicit `--rescue`, preserving its
+default primary-only scope. It requires the existing complete native rescue
+archive gate, full per-phase checkpoint inventories, registered 240-epoch fit
+or 120+120 pretrained layout and 50,000 pairs per epoch. Apply rechecks those
+gates and binds each selected local path, phase and SHA-256 to the durable
+manifest before the existing full readback and active-user checks. Partial,
+failed or unqualified runs remain excluded. Each phase retains initial,
+prefix, diagnostic and final checkpoints; the registered epoch-219 diagnostic
+in 240-epoch fits remains preserved. The loaded source hash is captured at
+import so a later source edit cannot mislabel a running retention receipt.
+
+All 19 retention/archive/worker-retention checks pass, including both phase
+layouts, corruption in the second phase, incomplete phase inventories,
+changed exposure, non-rescue runs and an identical-byte copy outside the
+verified archive. The new test's initial expected file count omitted epoch
+219; only that newly introduced expectation was corrected after checking
+the registered policy. Existing guards and tests remain intact. Test log:
+`rescue-checkpoint-retention-final-tests-2211.log`; run-heavy reports 2 seconds,
+peak RSS 0.07 GiB, minimum available memory 33,892 MiB and peak load 27.39.
+Scientific inputs and selection gates are unchanged; live reclamation follows
+the committed implementation and a separate candidate dry run.
