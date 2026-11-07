@@ -25,3 +25,34 @@ class ConvergenceTests(unittest.TestCase):
 
 
 if __name__=='__main__':unittest.main()
+
+class TrainingOnlyTests(unittest.TestCase):
+    def test_complete_phase_logs_preserve_unknown_human_trend(self):
+        import tempfile,json
+        from shaping_completion import encoded,sha
+        from shaping_convergence import training_report
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as directory:
+            run=Path(directory)
+            def write(p,d):p.parent.mkdir(parents=True,exist_ok=True);p.write_bytes(encoded(d))
+            cell=dict(id='full-fit-search',stage='full_fit_selection')
+            identity=dict(cell=cell,selection_scope='full_fit_only',development_results_read=False,
+                          epochs=120,plan_sha256='plan',schedule={'phase_epochs':[120,120]})
+            phases=[]
+            for name in ['pretraining','fit']:
+                p=run/name/'checkpoints/ckpt_epoch119.bin';p.parent.mkdir(parents=True);p.write_bytes(name.encode())
+                log=run/name/'train.log';log.write_text(''.join(f'epoch {i} | loss={1. if i<100 else .98}\n' for i in range(120)))
+                phase=dict(epochs=120,stage='trained',exit_code=0,bake_sha256=sha(p));write(run/name/'RESULT.json',phase);phases.append(phase)
+            write(run/'RUN.json',identity);write(run/'RESULT.json',dict(cell=cell,stage='trained',exit_code=0,phases=phases))
+            report=run/'evaluation/REPORT.json'
+            row=dict(cell=cell,selection_scope='full_fit_only',development_results_read=False,checkpoint_epoch=119,
+                     plan_sha256='plan',active_output_coefficients=1,full_fit_validation={'selection_score':-999})
+            write(report,row);write(report.parent/'COMPLETE.json',{'report_sha256':sha(report)})
+            result=training_report(run,report)
+            self.assertEqual(result['conclusion'],'inconclusive_training_only');self.assertFalse(result['validation_scores_used'])
+            self.assertEqual(len(result['observed_training_triggers']),3)
+            row['full_fit_validation']['selection_score']=999;write(report,row);write(report.parent/'COMPLETE.json',{'report_sha256':sha(report)})
+            changed=training_report(run,report)
+            self.assertEqual(changed['observed_training_triggers'],result['observed_training_triggers'])
+            self.assertEqual(changed['phase_loss_windows'],result['phase_loss_windows'])
+            with (run/'fit/train.log').open('a') as stream:stream.write('epoch 119 | loss=.98\n')
+            with self.assertRaisesRegex(ValueError,'coverage'):training_report(run,report)

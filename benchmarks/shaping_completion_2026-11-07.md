@@ -870,3 +870,15 @@ reusing or overwriting outer-control Gram matrices. The existing TRAIN-only
 basis/map fitting, native export checks and objectives remain unchanged. Reports
 use the same full-FIT-only scope as the neural search. Five control-admission
 checks pass; no control fits are claimed by those orchestration tests.
+
+### Full-FIT training-only convergence evidence
+
+Full-FIT search diagnostics reuse the registered 20-versus-20-epoch loss rule,
+including the native log's rounding interval, and record final output activity.
+Every scheduled epoch in each phase and its final model must be present. The
+result is explicitly `inconclusive_training_only`: validation checkpoint trends
+are not measured, and validation/development values cannot decide extra fitting.
+Tests change validation scores without changing the diagnosis and reject duplicate
+loss epochs. Existing inner convergence tests retain their original outcomes.
+This supplies a limited, honest classification; it does not establish convergence
+or count unexecuted scientific cells as complete.

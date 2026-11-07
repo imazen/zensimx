@@ -5144,3 +5144,6 @@ shaping-completion-full-fit-search-native study cell binaries qualification:
 
 shaping-completion-full-fit-control study partition binaries mode:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 6G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_controls.py --study {{quote(study)}} --partition {{quote(partition)}} --binary-dir {{quote(binaries)}} --full-fit-selection --{{mode}}
+
+shaping-completion-training-only-convergence run report:
+    python3 -B scripts/rev4_featpot/shaping_convergence.py --run {{quote(run)}} --training-only --final-report {{quote(report)}}
