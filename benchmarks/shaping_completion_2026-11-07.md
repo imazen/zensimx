@@ -1810,3 +1810,28 @@ checkpoint. Retain original failures and use the existing feature-order, identit
 parity and panel gates. The selection owner still refuses non-ReLU re-exports;
 these supplemental panels cannot select a Softplus setting or admit outer data.
 The default exporter and running ReLU supervisor retain their previous scope.
+
+## Softplus supplemental panels and convergence
+
+Cell `6e988eec6f23b804ff31` now has full supplemental re-export panels for
+the scheduled final checkpoint and epochs 49, 99, 119, 149, 199, 219 and 239.
+All eight evaluations pass the unchanged finite, exact-identity and damage-order
+gates with zero probe violations. Final inner human composite is
+0.9052339145577766, with two active output coefficients. This is one cell's
+inner diagnostic, not a family comparison or a source-generalization result.
+
+The same-cycle composite change from epoch 119 to 219 is
+0.001105667166776958. Late mean training loss changes from 1.466835 to
+1.36391; the existing loss-improvement trigger requires investigation. No
+convergence threshold changed, no original failure was removed, and the
+selection owner still refuses supplemental Softplus representations.
+
+Cold destination SHA-256 verification passed for both bundles:
+- `softplus-reexport-panels-6e988eec6f23b804ff31`: 209 files, 8283740 bytes;
+  manifest `1874573b94c221bd2da9946f8c427a027dcfa12925b72300126ebff8c5d9f93d`.
+- `softplus-reexport-bakes-6e988eec6f23b804ff31`: 48 files, 24980391 bytes;
+  manifest `80e7e5c12c3bacc9426ca4d93c164c948450dd720230f44f67c30c44a76f6537`.
+
+The explicit analytic admission test, fifteen evaluation tests and six
+convergence tests pass. Full paired uniform-representation qualification remains
+unexecuted; these supplemental results do not admit outer evaluation.
