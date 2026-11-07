@@ -3152,3 +3152,56 @@ and `i265-pretrained21-separate2-2133-evidence` (8 files, 256,336 bytes;
 receipt `06af2b3c87fe483211ce89364e7597e8a035fab185b9121ed7376f4330eb6ba0`).
 The evidence includes the unchanged placement, installation, launch preflight,
 native identity and complete downstream supervision snapshot.
+
+### Balanced source and regularization shaper panel at 21:34 UTC
+
+Completion coverage, before reading response outcomes, admitted all four source
+partitions with complete paired setting-0/1 fits in both shaping architectures:
+inner-0-0, inner-0-1, inner-1-1 and inner-2-0. Three paired seeds give 24 fits per
+architecture and 48 direct-response fits across both. These settings share
+learning rate 0.001 and compare L2 0 with 0.00001. This panel does not replace
+the six-partition setting-0 panel or the one-partition four-setting panel.
+`SCOPE.json` freezes its coverage and limitations before parameter inspection.
+
+The existing native checkpoint metadata reader and response comparison ran
+through `just shaping-completion-curve-regularization-partitions`; there was no
+training, prediction replay, outcome selection or outer/holdout read. The direct,
+product and separate commands passed in 3, 2 and 2 seconds. Their run-heavy
+receipts report peak RSS 0.09 GiB each, minimum available memory 28,950, 28,961
+and 28,922 MiB, and peak load 31.94, 31.94 and 32.11, respectively.
+
+| Response panel | Fits | Terms | Active in every fit | Zero in every fit |
+| --- | ---: | ---: | ---: | ---: |
+| Direct terms, both architectures | 48 | 492 | 1 | 2 |
+| Product architecture | 24 | 984 | 7 | 160 |
+| Separate architecture | 24 | 984 | 4 | 100 |
+
+Only direct f603 is active in all 48 fits. Its normalized response maximum
+spread is 0.9999873040295244 and strength ratio 272803.7853507836, so activity
+alone does not establish a consistent shape. In the product architecture,
+f585 remains active in all 24 fits with normalized spread 0.2216993967333184,
+but strength ratio 1822.3853694597599. Direct f403 is also active in all 24:
+spread 0.3169592291924623 and strength ratio 4.709017286147603. These distinguish
+curve similarity from response magnitude; neither includes downstream weights.
+
+The separate architecture's damage-59/reference-509 interaction is active in
+all 24 fits, with normalized spread 0.1730251889011942 and strength ratio
+8.976947034777496. It is a narrower lead: the earlier six-partition setting-0
+panel has no interaction active throughout. Product shaping has two
+interactions active in all 24 fits; separate shaping has one. Zero in every fit
+describes 77 product interactions and 97 separate interactions in this panel,
+not a feature-uselessness or causal regularization conclusion. Domains and
+normalization are panel-specific; spreads and ratios from different panels
+are not a controlled before/after comparison. No universal shaper set or
+transferable predictive utility has been established.
+
+All metadata, source/report pins, scopes and logs passed durable cold readback:
+
+- `native-direct_joint_both-four-partitions-settings01-2134`: 51 files,
+  7,841,914 bytes; receipt `3b3150b03ce0e33e661dd802dd0b367bc0ff95b5c5bed7eee687e5a281473968`.
+- `native-product_joint_identity-four-partitions-settings01-2134`: 27 files,
+  7,978,660 bytes; receipt `9bde02f1f84bc4b16462716117a733c8b310a99b6aad39d5366902ae547c5e90`.
+- `native-separate_joint_identity-four-partitions-settings01-2134`: 27 files,
+  8,103,187 bytes; receipt `d92d75fc3c658b191a67eb07e7ff66ccef0a40fdac4b51c8fea47775679c5560`.
+- `shape-regularization-four-partitions-2134-summary`: 2 files, 20,959 bytes;
+  receipt `b036c5dce13fd259c7a71b729e7baf58ba001556fbce1b6fed956064306440d2`.
