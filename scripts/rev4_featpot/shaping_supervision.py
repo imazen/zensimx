@@ -26,7 +26,7 @@ def sweep(args):
     for result_path in sorted((args.study/'runs').glob('*/attempt-*/RESULT.json')):
         result=json.loads(result_path.read_text());cell=result['cell'];run=result_path.parent
         if cell not in cells:raise ValueError('unregistered training result')
-        if cell['stage']!='inner' or result['stage']!='trained':continue
+        if cell['stage'] not in ('inner','fresh_control_inner') or result['stage']!='trained':continue
         values=dict(study=args.study,binary_dir=args.binary_dir,run=run)
         print(json.dumps(dict(cell=cell['id'],stage='evaluating',utc=datetime.now(timezone.utc).isoformat())),flush=True)
         if not complete_marker(run/'evaluation','COMPLETE.json'):evaluate(SimpleNamespace(**values,checkpoint=None))

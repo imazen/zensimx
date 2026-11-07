@@ -159,9 +159,10 @@ def execute(args):
         if args.family=='analytic':families=('softplus','silu_monotone','silu_diagnostic')
         elif args.family=='joint_shapes':families=('product_joint_identity','separate_joint_identity')
         else:families=(args.family,)
-        selected=[c for c in cells if c['stage']=='inner' and c['family'] in families and c['partition']==args.partition]
+        stage='fresh_control_inner' if args.fresh_control_inner else 'inner'
+        selected=[c for c in cells if c['stage']==stage and c['family'] in families and c['partition']==args.partition]
         selected.sort(key=lambda c:(c['setting'],c['seed'],families.index(c['family'])))
-        epochs=120 if all('_pretrained_' in c['family'] for c in selected) else 240
+        epochs=120 if stage=='fresh_control_inner' or all('_pretrained_' in c['family'] for c in selected) else 240
         workers=args.workers;mem='1G'
         if not selected or not 1<=workers<=16:raise ValueError('invalid partition or worker count')
     # Native pilot measured 606443 total artifact bytes, including two bakes.
@@ -182,7 +183,7 @@ def execute(args):
     owner.EPOCHS=epochs;owner.PAIRS_PER_EPOCH=50000;owner.LOG_EVERY=1
     status=dict(required=len(selected),trained=0,failed=[],scientific_reports_completed=0,
                 controller_pid=os.getpid(),stage='running',cells=[c['id'] for c in selected])
-    status_path=args.study/f"{('pilot' if args.resource_pilot else args.partition+'-'+args.family)}-STATUS.json"
+    status_path=args.study/f"{('pilot' if args.resource_pilot else args.partition+'-'+args.family+('-fresh' if args.fresh_control_inner else ''))}-STATUS.json"
     status_path.write_bytes(encoded(status))
     with ThreadPoolExecutor(max_workers=workers) as pool:
         pending={pool.submit(run_native,args.study,args.binary_dir,c,records[c['partition']],args.attempt,epochs,mem):c for c in selected}
@@ -228,6 +229,7 @@ def main():
     mode.add_argument('--resource-pilot',action='store_true')
     mode.add_argument('--inner-relu',action='store_true')
     mode.add_argument('--inner-family',action='store_true')
+    mode.add_argument('--fresh-control-inner',action='store_true')
     p.add_argument('--family',choices=['relu','softplus','silu_monotone','silu_diagnostic','analytic','product_joint_identity','separate_joint_identity','joint_shapes','product_pretrained_frozen','product_pretrained_joint','separate_pretrained_frozen','separate_pretrained_joint'],default='relu')
     mode.add_argument('--status',action='store_true')
     p.add_argument('--partition',default='inner-0-0')

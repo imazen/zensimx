@@ -4945,3 +4945,6 @@ shaping-completion-select-base study family outer:
 
 shaping-completion-reclaim-old-grams:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_reclaim_grams.py
+
+shaping-completion-inner-fresh study binary_dir partition:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 2G --jobs 2 -- python3 -B scripts/rev4_featpot/shaping_execution.py --study {{quote(study)}} --binary-dir {{quote(binary_dir)}} --fresh-control-inner --partition {{quote(partition)}} --workers 2

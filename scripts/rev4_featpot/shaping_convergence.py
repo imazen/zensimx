@@ -36,7 +36,7 @@ def diagnostics(losses,scores,active):
 
 def report(run):
     identity=json.loads((run/'RUN.json').read_text())
-    if identity['cell']['stage']!='inner':raise ValueError('only inner diagnostics admitted')
+    if identity['cell']['stage'] not in ('inner','fresh_control_inner'):raise ValueError('only inner diagnostics admitted')
     result=json.loads((run/'RESULT.json').read_text())
     if result['stage']!='trained':raise ValueError('fit incomplete')
     lines=re.findall(r'epoch\s+(\d+)\s+\|[^\n]*?loss=([^ |]+)',(run/'train.log').read_text())

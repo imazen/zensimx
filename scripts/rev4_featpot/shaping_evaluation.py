@@ -95,9 +95,9 @@ def make_probes(root,partition,train,plan):
 
 def admitted_epoch(run,result,cells):
     cell=run['cell']
-    if cell not in cells or cell['stage']!='inner':raise ValueError('only registered inner cells are admitted')
+    if cell not in cells or cell['stage'] not in ('inner','fresh_control_inner'):raise ValueError('only registered inner cells are admitted')
     if result['stage']!='trained' or result['exit_code']!=0:raise ValueError('training is not complete')
-    epochs=120 if 'pretrained' in cell['family'] else 240
+    epochs=120 if 'pretrained' in cell['family'] or cell['stage']=='fresh_control_inner' else 240
     if run['epochs']!=epochs:raise ValueError('incorrect scheduled checkpoint budget')
     return epochs
 

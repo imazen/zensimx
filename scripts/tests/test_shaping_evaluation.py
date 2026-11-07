@@ -13,6 +13,12 @@ class EvaluationAdmissionTests(unittest.TestCase):
         for budget,epoch in [(120,149),(240,0),(240,238),(240,240)]:
             with self.assertRaises(ValueError):evaluation_epoch(budget,epoch)
 
+    def test_fresh_control_keeps_its_separate_half_exposure(self):
+        cell={'id':'fresh','stage':'fresh_control_inner','family':'relu'}
+        result={'stage':'trained','exit_code':0}
+        self.assertEqual(admitted_epoch({'cell':cell,'epochs':120},result,[cell]),120)
+        with self.assertRaises(ValueError):admitted_epoch({'cell':cell,'epochs':240},result,[cell])
+
     def test_final_scheduled_epoch_is_required(self):
         cell={'id':'x','stage':'inner','family':'relu'}
         result={'stage':'trained','exit_code':0}
