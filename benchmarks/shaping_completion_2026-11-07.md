@@ -936,3 +936,21 @@ removes only selected transport tar files; original fit directories and sidecars
 remain. Corrupt durable/worker bytes and open transports refuse removal in tests.
 This addresses storage admission without reducing the registered reserve or
 trainer write allowances.
+
+Worker transport retention on i270 verified and removed 16 duplicate tar files,
+1,004,451,840 logical bytes, with every original fit directory retained. Free
+bytes before/after were 56,372,252,672 and 57,376,747,520. The first attempt refused
+before deletion because lsof was absent; after installing it, the second attempt
+repeated durable readback and worker checks. `run-heavy` reported 14 seconds and
+0.02 GiB peak RSS for the coordinator; worker removal reported 1 second and
+0.02 GiB peak RSS. The pending packaging job could then retain its original
+reserve policy.
+
+A separate later-stage mode in the existing evaluation supervisor now handles
+admitted outer, variant and full-FIT native fits. It evaluates only final epochs,
+resolves the actual family and binary identity, and uses the admitted repaired
+ReLU representation when required. Inner evaluation remains in its existing
+supervisor. Full-FIT evaluations receive reproducible training-only diagnostics;
+failed gates remain explicit. Supervisor tests cover stage isolation, final-only
+scoring and continuing independent cells after a native gate failure. Other
+later-stage convergence analysis and aggregate comparisons remain required.

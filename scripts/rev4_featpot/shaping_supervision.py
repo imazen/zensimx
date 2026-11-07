@@ -65,16 +65,75 @@ def sweep(args):
     return completed
 
 
+LATER_STAGES=('outer','fresh_control_outer','fresh_control_outer_matched','source_curve','row_curve','shuffle','human_only','full_fit_selection','full_fit')
+
+
+def later_sweep(args):
+    from shaping_evaluation import outer_context
+    from shaping_reexport import reexport
+    from shaping_convergence import training_report,save_training_report
+    _,cells,_=load_registration(args.study);completed=0
+    for path in sorted((args.study/'runs').glob('*/attempt-*/RESULT.json')):
+        result=json.loads(path.read_text());cell=result['cell'];run_dir=path.parent
+        if cell['stage'] not in LATER_STAGES or result['stage']!='trained':continue
+        run=json.loads((run_dir/'RUN.json').read_text())
+        if run['cell']!=cell:raise ValueError('later-stage run/result identity differs')
+        context=outer_context(args.study,run,cells)
+        if context is None:raise ValueError('later-stage evaluation lacks admission')
+        family=context.get('resolved_family',context.get('variant',{}).get('resolved_family',cell['family']))
+        identity=context['admission']['evaluation_representations'][family]
+        repaired=identity['representation']=='research-relu-max-pairs-v1'
+        values=dict(study=args.study,run=run_dir,checkpoint=None)
+        if repaired:
+            binaries=getattr(args,'repair_binary_dir',None);inspector=getattr(args,'repair_inspector',None)
+            if binaries is None or inspector is None:raise ValueError('later ReLU requires explicit repaired runtime and inspector')
+            dest=args.study/'reexport_max_pairs'/cell['id']/run_dir.name/'final'
+            existing=args.study/'reexports'/cell['id']/run_dir.name/'final/RECEIPT.json'
+            values.update(binary_dir=binaries,inspector=inspector)
+        else:
+            candidates=[args.binary_dir,getattr(args,'rescue_binary_dir',None),*getattr(args,'candidate_binary_dir',[])]
+            matches={p for p in candidates if p is not None and sha(p/'BUILD.json')==run['build_sha256']}
+            if len(matches)!=1:raise ValueError('one explicit matching later-stage binary directory required')
+            values['binary_dir']=next(iter(matches));dest=run_dir/'evaluation'
+        failure=dest/'FAILED_GATE.json'
+        if not failure.exists() and not complete_marker(dest,'COMPLETE.json'):
+            print(json.dumps(dict(cell=cell['id'],stage='later_final_evaluation',checkpoint=None)),flush=True)
+            try:
+                if repaired and not existing.exists():reexport(SimpleNamespace(**values))
+                else:
+                    if repaired:values['reexport_receipt']=existing
+                    evaluate(SimpleNamespace(**values))
+            except NativeFeatureGateError:
+                if not failure.exists():raise
+        if failure.exists():
+            (dest.parent/'LATER_EVALUATION_FAILURE.json').write_bytes(encoded(dict(cell=cell,gate=str(failure),gate_sha256=sha(failure),scientifically_complete=False)))
+            continue
+        if cell['stage'] in ('full_fit_selection','full_fit'):
+            diagnostic=run_dir/'TRAIN_CONVERGENCE.json'
+            if not diagnostic.exists():save_training_report(run_dir,dest/'REPORT.json')
+            else:
+                saved=json.loads(diagnostic.read_text());actual=training_report(run_dir,dest/'REPORT.json')
+                if {k:v for k,v in saved.items() if k!='driver_sha256'}!={k:v for k,v in actual.items() if k!='driver_sha256'}:
+                    raise ValueError('later-stage training diagnostic drift')
+        completed+=1
+    return completed
+
+
 def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('--study',type=Path,required=True);p.add_argument('--binary-dir',type=Path,required=True)
     p.add_argument('--rescue-binary-dir',type=Path)
+    p.add_argument('--later-only',action='store_true')
+    p.add_argument('--candidate-binary-dir',type=Path,action='append',default=[])
+    p.add_argument('--repair-binary-dir',type=Path);p.add_argument('--repair-inspector',type=Path)
     p.add_argument('--watch',action='store_true');args=p.parse_args()
     while True:
-        n=sweep(args)
+        n=(later_sweep if args.later_only else sweep)(args)
         status=dict(pid=os.getpid(),checked_utc=datetime.now(timezone.utc).isoformat(),evaluated_inner_neural=n,
                     stage='watching' if args.watch else 'sweep_finished',driver_sha256=DRIVER_SHA256)
-        (args.study/'EVALUATOR_STATUS.json').write_bytes(encoded(status));print(json.dumps(status),flush=True)
+        if args.later_only:
+            status['evaluated_later_neural']=status.pop('evaluated_inner_neural')
+        (args.study/('LATER_EVALUATOR_STATUS.json' if args.later_only else 'EVALUATOR_STATUS.json')).write_bytes(encoded(status));print(json.dumps(status),flush=True)
         if not args.watch:return
         time.sleep(30)
 

@@ -5168,3 +5168,6 @@ shaping-completion-worker-bundle-retention-check:
 
 shaping-completion-worker-bundle-retention host study archive output *args:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_worker_bundle_retention.py --host {{quote(host)}} --study {{quote(study)}} --archive {{quote(archive)}} --output {{quote(output)}} {{args}}
+
+shaping-completion-watch-later study primary optimizer human repaired inspector:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 2G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_supervision.py --study {{quote(study)}} --binary-dir {{quote(primary)}} --rescue-binary-dir {{quote(optimizer)}} --candidate-binary-dir {{quote(human)}} --repair-binary-dir {{quote(repaired)}} --repair-inspector {{quote(inspector)}} --later-only --watch

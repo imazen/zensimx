@@ -65,3 +65,40 @@ class SupervisionTests(unittest.TestCase):
             self.assertEqual(failure['failures'][0]['checkpoint'],119)
 
 if __name__=='__main__':unittest.main()
+
+class LaterSupervisionTests(unittest.TestCase):
+    def test_later_stage_scores_only_final_epoch_and_records_training_diagnostics(self):
+        from shaping_supervision import later_sweep
+        from shaping_completion import sha
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as directory:
+            root=Path(directory);binary=root/'bin';binary.mkdir();(binary/'BUILD.json').write_text('{}')
+            cells=[dict(id='later',stage='full_fit_selection',family='best_analytic'),dict(id='inner',stage='inner',family='softplus')]
+            for cell in cells:
+                run=root/'runs'/cell['id']/'attempt-001';run.mkdir(parents=True)
+                (run/'RUN.json').write_bytes(encoded(dict(cell=cell,build_sha256=sha(binary/'BUILD.json'))))
+                (run/'RESULT.json').write_bytes(encoded(dict(cell=cell,stage='trained',epochs=480)))
+            context=dict(full_fit=True,resolved_family='softplus',admission={'evaluation_representations':{'softplus':{'representation':'original'}}})
+            args=SimpleNamespace(study=root,binary_dir=binary)
+            with patch('shaping_supervision.load_registration',return_value=({},cells,{})),patch('shaping_evaluation.outer_context',return_value=context),patch('shaping_supervision.evaluate') as evaluate,patch('shaping_convergence.save_training_report') as diagnose:
+                self.assertEqual(later_sweep(args),1)
+                evaluate.assert_called_once();self.assertIsNone(evaluate.call_args.args[0].checkpoint)
+                self.assertEqual(evaluate.call_args.args[0].run.parent.name,'later')
+                diagnose.assert_called_once()
+
+    def test_later_gate_failure_is_preserved_and_does_not_stop_peer(self):
+        from shaping_supervision import later_sweep
+        from shaping_completion import sha
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as directory:
+            root=Path(directory);binary=root/'bin';binary.mkdir();(binary/'BUILD.json').write_text('{}')
+            cells=[dict(id=str(i),stage='outer',family='softplus') for i in range(2)]
+            for cell in cells:
+                run=root/'runs'/cell['id']/'attempt-001';run.mkdir(parents=True)
+                (run/'RUN.json').write_bytes(encoded(dict(cell=cell,build_sha256=sha(binary/'BUILD.json'))))
+                (run/'RESULT.json').write_bytes(encoded(dict(cell=cell,stage='trained',epochs=240)))
+            context=dict(admission={'evaluation_representations':{'softplus':{'representation':'original'}}})
+            def evaluate(args):
+                if args.run.parent.name=='0':
+                    dest=args.run/'evaluation';dest.mkdir();(dest/'FAILED_GATE.json').write_text('{}');raise NativeFeatureGateError('gate')
+            with patch('shaping_supervision.load_registration',return_value=({},cells,{})),patch('shaping_evaluation.outer_context',return_value=context),patch('shaping_supervision.evaluate',side_effect=evaluate):
+                self.assertEqual(later_sweep(SimpleNamespace(study=root,binary_dir=binary)),1)
+                self.assertTrue((root/'runs/0/attempt-001/LATER_EVALUATION_FAILURE.json').exists())
