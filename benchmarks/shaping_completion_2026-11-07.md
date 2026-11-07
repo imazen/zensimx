@@ -490,3 +490,22 @@ The first bootstrap attempt rejected a mistyped expected hash before fitting;
 its log remains preserved. The corrected hash and original baseline directory
 were verified before admission. Source snapshot and native binaries remain the
 same frozen versions used by the other worker.
+
+First completed product-pretrained-frozen cell (`1605f99e85bbbe3cd6e0`,
+inner-0-0 / setting 0 / seed 0) passes final and scheduled native gates.
+Its human composite is 0.8959433619066952 versus 0.9202173469027812
+for the matched fresh unshaped head; both head fits use 120 epochs and the
+same offset seeds. The frozen model additionally uses the registered 120-epoch
+supervised shape prefix. Its final head has 13 nonzero output coefficients,
+and the registered convergence triggers are absent. This is one paired
+observation, not a family ranking or proof of global convergence. The continuous
+240-epoch joint-product parent scores 0.9245500073515289 and still triggers
+loss-improvement investigation; it is not the matched fresh-head control.
+
+The failed pre-training attempt was reconciled against its actual inventory:
+keep file, empty checkpoint directory, failure receipt, no training RUN/log.
+Both it and the completed retry are retained in the verified archive
+`inner-1605f99e85bbbe3cd6e0`, manifest SHA-256
+`b92a4cfd00b0dfd07efbf545ec4f3d9351277acd821e77d84165b3b9472d4638`. The fresh head resource receipt is
+2956 s / peak RSS 0.09 GiB / minimum available 36977 MiB / peak load 25.58;
+this excludes the shared pretraining cost and is not an isolated benchmark.
