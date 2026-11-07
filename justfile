@@ -5549,3 +5549,7 @@ shaping-projection-bench-run binary result:
 # Sample existing process branches; no training is started or restarted.
 shaping-cpu-accounting:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B benchmarks/cpu_branch_accounting_2026-11-07.py
+
+# Read-only storage inventory. Run with root visibility when evaluating active Cargo users.
+shaping-temp-storage output:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_temp_storage.py --output {{quote(output)}}
