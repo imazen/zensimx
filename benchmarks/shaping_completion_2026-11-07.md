@@ -1850,3 +1850,14 @@ cold destination checksum readback verified 3 files and 111338813 bytes. The
 remote training-module, shared-depth, root manifest and lockfile hashes match
 the landed implementation. Binary-build and neutral-replay qualification remain
 separate pending gates.
+
+## Supplemental archive supervision
+
+The existing archive owner now has a separate supplemental mode. Before
+mirroring panels and native re-export evidence, it requires complete registered
+diagnostic checkpoint coverage, final and diagnostic completion markers, source
+checkpoint hashes, repaired-bake and artifact hashes, and a consistent evaluator
+identity. It preserves incomplete or failed evaluations without archiving them
+as complete and does not reclaim local data. A negative-control test refuses
+missing checkpoint coverage and corrupted repair artifacts before any copy;
+complete inputs mirror both bundles and are not recopied on the next sweep.

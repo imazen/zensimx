@@ -1,0 +1,45 @@
+from pathlib import Path
+import json,sys,tempfile,unittest
+from types import SimpleNamespace
+from unittest.mock import patch
+sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'rev4_featpot'))
+from shaping_completion import encoded,sha
+from shaping_archive_supervision import supplemental_sweep
+
+class SupplementalArchiveTests(unittest.TestCase):
+    def test_complete_pins_required_before_mirroring(self):
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as d:
+            study=Path(d)/'study';study.mkdir();(study/'PLAN.json').write_text('{}')
+            cell=dict(id='cell',family='softplus',stage='inner')
+            run=study/'runs/cell/attempt-001';root=study/'reexport_max_pairs/cell/attempt-001'
+            def write(path,data):path.parent.mkdir(parents=True,exist_ok=True);path.write_bytes(encoded(data))
+            write(run/'RUN.json',dict(cell=cell,plan_sha256=sha(study/'PLAN.json'),build_sha256='train'))
+            write(run/'RESULT.json',dict(cell=cell,stage='trained',exit_code=0,epochs=120))
+            pins={}
+            for name,epoch in [('final',119),('epoch-049',49),('epoch-099',99),('epoch-119',119)]:
+                original=run/'checkpoints'/f'ckpt_epoch{epoch:03}.bin';original.parent.mkdir(exist_ok=True);original.write_bytes(b'original')
+                bake=study/'reexports/cell/attempt-001'/name/'bake.bin';bake.parent.mkdir(parents=True);bake.write_bytes(b'repaired')
+                receipt=bake.parent/'RECEIPT.json'
+                write(receipt,dict(original_sha256=sha(original),training_build_sha256='train',evaluation_build_sha256='eval',file_sha256={str(bake):sha(bake)},bake=str(bake)))
+                report=root/name/'REPORT.json'
+                write(report,dict(cell=cell,checkpoint_epoch=epoch,outer_results_read=False,reexport_receipt=str(receipt),reexport_receipt_sha256=sha(receipt),evaluation_build_sha256='eval',checkpoint_sha256=sha(bake)))
+                write(report.parent/('COMPLETE.json' if name=='final' else 'DIAGNOSTIC_COMPLETE.json'),dict(report_sha256=sha(report)))
+                if name!='final':pins[str(report)]=sha(report)
+            c=dict(cell=cell,outer_results_read=False,original_training_run=str(run),report_sha256=pins,evaluation_build_sha256='eval')
+            write(root/'CONVERGENCE.json',c)
+            args=SimpleNamespace(study=study,destination=Path(d)/'archive')
+            def mirror(command,**kwargs):
+                source=Path(command[command.index('--root')+1]);dest=Path(command[command.index('--destination')+1]);dest.mkdir(parents=True)
+                (source/'SHA256SUMS').write_text('fixture manifest');(dest/'SHA256SUMS').write_text('fixture manifest')
+                write(source/'MIRROR_VERIFIED.json',dict(all_artifact_sha256_verified=True))
+            with patch('shaping_archive_supervision.load_registration',return_value=({},[cell],{})),patch('shaping_archive_supervision.subprocess.run',side_effect=mirror) as native:
+                saved=dict(pins);pins.pop(next(iter(pins)));write(root/'CONVERGENCE.json',c)
+                with self.assertRaisesRegex(ValueError,'incomplete'):supplemental_sweep(args)
+                native.assert_not_called()
+                pins.update(saved);write(root/'CONVERGENCE.json',c)
+                bake.write_bytes(b'drift')
+                with self.assertRaisesRegex(ValueError,'artifact drift'):supplemental_sweep(args)
+                native.assert_not_called();bake.write_bytes(b'repaired')
+                self.assertEqual(supplemental_sweep(args),2)
+                self.assertEqual(supplemental_sweep(args),0)
+                self.assertEqual(native.call_count,2)
