@@ -2606,3 +2606,7 @@ Cold readback verified these evidence archives:
 - `i265-pretrained11c-inputs`: 3 artifacts, 27411067 bytes; receipt `12aa2f7f9d9df734f0ec04d5c88fd54473878432ea2c31dc94500902f1e830ff`.
 - `i265-pretrained11c-admission-evidence`: 22 artifacts, 1877835 bytes; receipt `b659b467f4fcbda32e259d0a8807a14d8191acfae6dce9f97f0ab5a8bc3d0fa2`.
 - `training-resource-batch-1755`: 410 artifacts, 3033145 bytes; receipt `0c167d82879af2ec842f7d706052c1fe58be2da38fabf0442254318ce2f2c6e5`.
+
+Cold readback also verified `checkpoint-retention-1755-evidence`: 3 artifacts, 5697252 bytes; receipt `981d80e95f65772e36c22985dfe5ed8d1fc9845bc10429eae3c9ac21446ad2dc`.
+
+Cold readback also verified `interrupted-joint-00-resolution-evidence`: 4 artifacts, 16639 bytes; receipt `d668534cfa3d96310dac0a43f9273daba26c1e1194256ff068c5d9e6cd27fd98`.
