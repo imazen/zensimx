@@ -1,6 +1,6 @@
 """Release registered pretrained trials only after matching parents finish."""
 from __future__ import annotations
-import argparse,json,os,subprocess,time,fcntl
+import argparse,json,os,subprocess,time,fcntl,signal,socket
 from datetime import datetime,timezone
 from pathlib import Path
 from shaping_completion import encoded,sha
@@ -11,6 +11,110 @@ from shaping_host_assignment import assigned_placement
 
 
 DRIVER_SHA256=sha(__file__)
+
+
+def handoff_controller(args,proc=Path('/proc')):
+    """Replace only a verified occupied queue writer; retain every fit process."""
+    from shaping_host_assignment import process_identity
+    qualification=json.loads(args.handoff_qualification.read_text())
+    wrapper=Path.home()/'work/claudehints/scripts/run-heavy'
+    if (qualification.get('schema')!='shaping-controller-scope-survival-v1'
+            or qualification.get('host')!=socket.gethostname()
+            or qualification.get('child_completed_after_parent_signal') is not True
+            or qualification.get('parent_only_signals')!=[int(v) for v in (signal.SIGSTOP,signal.SIGTERM,signal.SIGCONT)]
+            or qualification.get('run_heavy_sha256')!=sha(wrapper)):
+        raise ValueError('matching controller scope-survival qualification required')
+    if (not args.resume_name or not args.resume_name.replace('-','').isalnum()
+            or not 1<=args.workers<=4 or args.handoff_receipt.exists()
+            or (args.study/'dispatch/pretrained'/args.partition/args.resume_name).exists()):
+        raise ValueError('new valid resume name, worker budget and handoff receipt required')
+    original=json.loads(args.handoff_status.read_text());pid=original['pid']
+    command=(proc/str(pid)/'cmdline').read_bytes().decode().split('\0')[:-1]
+    def argument(argv,flag):
+        if argv.count(flag)!=1 or argv.index(flag)+1>=len(argv):raise ValueError('unique queue argument required: '+flag)
+        return argv[argv.index(flag)+1]
+    if (Path(command[0]).name.startswith('python') is False or '-c' in command or '-m' in command
+            or not any(Path(v).name=='shaping_pretrained_dispatch.py' for v in command[1:])
+            or argument(command,'--study')!=str(args.study)
+            or argument(command,'--binary-dir')!=str(args.binary_dir)
+            or argument(command,'--partition')!=args.partition):
+        raise ValueError('matching pretrained queue process required')
+    _,cells,_=load_registration(args.study)
+    expected={c['id'] for c in cells if c['stage']=='inner' and c['partition']==args.partition and '_pretrained_' in c['family']}
+    if (set(original['required_cells'])!=expected or original['stage']!='supervising' or original['failure'] is not None
+            or original['plan_sha256']!=sha(args.study/'PLAN.json')
+            or original['build_sha256']!=sha(args.binary_dir/'BUILD.json')
+            or original.get('externally_supervised')):raise ValueError('matching occupied queue evidence required')
+    workers=int(argument(command,'--workers'))
+    state,start=process_identity(proc,pid)
+    if state in ('T','Z','X'):raise ValueError('queue already stopped or terminal')
+    paused=False;terminated=False;record=None
+    try:
+        os.kill(pid,signal.SIGSTOP);paused=True;deadline=time.monotonic()+5
+        while process_identity(proc,pid)[0]!='T':
+            if time.monotonic()>deadline:raise ValueError('queue did not stop admissions')
+            time.sleep(.02)
+        current=json.loads(args.handoff_status.read_text());active=current['active']
+        children=set(map(int,(proc/str(pid)/'task'/str(pid)/'children').read_text().split()))
+        if (current['pid']!=pid or current['required_cells']!=original['required_cells']
+                or current['failure'] is not None or len(active)!=workers
+                or set(active.values())!=children):raise ValueError('all queue slots must have recorded live fit controllers')
+        retained={};pins={}
+        for cell_id,child_pid in active.items():
+            argv=(proc/str(child_pid)/'cmdline').read_bytes().decode().split('\0')[:-1]
+            if (not Path(argv[0]).name.startswith('python') or '-c' in argv or '-m' in argv
+                    or not any(Path(v).name=='shaping_execution.py' for v in argv[1:])
+                    or argument(argv,'--study')!=str(args.study) or argument(argv,'--cell')!=cell_id
+                    or argument(argv,'--partition')!=args.partition):raise ValueError('recorded fit controller differs')
+            runs=[p for p in (args.study/'runs'/cell_id).glob('attempt-*/RUN.json') if not p.with_name('RESULT.json').exists()]
+            if len(runs)!=1:raise ValueError('one active native attempt required')
+            path=runs[0];identity=json.loads(path.read_text());wrapper_pid=identity['pid']
+            expected_cell=next(c for c in cells if c['id']==cell_id)
+            if any(identity.get(k)!=v for k,v in dict(cell=expected_cell,plan_sha256=original['plan_sha256'],
+                    build_sha256=original['build_sha256'],epochs=120,pairs_per_epoch=50000).items()):
+                raise ValueError('active pretrained scientific identity differs')
+            native_command=(proc/str(wrapper_pid)/'cmdline').read_bytes().decode()
+            if str(path.parent) not in native_command or 'run-heavy' not in native_command:
+                raise ValueError('active native wrapper is not verified live')
+            retained[cell_id]=dict(controller_pid=child_pid,controller_start_ticks=process_identity(proc,child_pid)[1],
+                wrapper_pid=wrapper_pid,wrapper_start_ticks=process_identity(proc,wrapper_pid)[1])
+            pins[str(path)]=sha(path)
+        record=dict(stage='verified_before_controller_signal',checked_utc=datetime.now(timezone.utc).isoformat(),
+            previous_pid=pid,previous_start_ticks=start,previous_command=command,previous_status=current,
+            qualification_sha256=sha(args.handoff_qualification),retained_active_fits=retained,
+            input_sha256=pins,driver_sha256=DRIVER_SHA256,training_replayed=False)
+        with args.handoff_receipt.open('xb') as stream:stream.write(encoded(record))
+        if process_identity(proc,pid)!=('T',start):raise ValueError('queue identity changed while stopped')
+        # Signal exactly the queue writer; never its scope, process group or fits.
+        os.kill(pid,signal.SIGTERM)
+        try:os.kill(pid,signal.SIGCONT)
+        except ProcessLookupError:pass
+        paused=False
+        deadline=time.monotonic()+5
+        while (proc/str(pid)/'stat').exists() and process_identity(proc,pid)[0] not in ('Z','X'):
+            if time.monotonic()>deadline:raise ValueError('old queue did not exit; replacement refused')
+            time.sleep(.02)
+        terminated=True
+        for cell_id,fit in retained.items():
+            vanished=False
+            for label in ('controller','wrapper'):
+                try:state,ticks=process_identity(proc,fit[label+'_pid'])
+                except FileNotFoundError:vanished=True;continue
+                if ticks!=fit[label+'_start_ticks'] or state in ('Z','X'):vanished=True
+            if vanished:
+                # A completed fit may exit naturally during the signal/readback.
+                cell=next(c for c in cells if c['id']==cell_id)
+                if existing_trial(args.study,cell,original['plan_sha256'],original['build_sha256'])!=('trained',None):
+                    raise ValueError('active fit did not survive controller-only handoff')
+                fit['completed_during_handoff']=True
+        record.update(stage='controller_exited_fits_preserved',verified_utc=datetime.now(timezone.utc).isoformat())
+        args.handoff_receipt.write_bytes(encoded(record))
+        return record
+    finally:
+        if paused and not terminated:
+            try:same=process_identity(proc,pid)[1]==start
+            except FileNotFoundError:same=False
+            if same:os.kill(pid,signal.SIGCONT)
 
 
 def parent_state(root,child,cells,build_pin):
@@ -158,7 +262,14 @@ def main():
     p.add_argument('--partition',required=True)
     p.add_argument('--workers',type=int,default=2)
     p.add_argument('--resume-name',help='new audit directory when resuming an existing dispatch')
+    p.add_argument('--handoff-status',type=Path,help='replace this verified occupied old queue writer only')
+    p.add_argument('--handoff-receipt',type=Path)
+    p.add_argument('--handoff-qualification',type=Path)
     args=p.parse_args()
+    if any((args.handoff_status,args.handoff_receipt,args.handoff_qualification)):
+        if not all((args.handoff_status,args.handoff_receipt,args.handoff_qualification,args.resume_name)):
+            p.error('handoff requires status, receipt, scope qualification and resume-name')
+        handoff_controller(args)
     # Queue-writer ownership only; independent fits still run concurrently.
     directory=args.study/'dispatch'/'pretrained'/'locks';directory.mkdir(parents=True,exist_ok=True)
     with (directory/(args.partition+'.lock')).open('a') as lock:

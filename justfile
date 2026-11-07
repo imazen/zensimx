@@ -5081,6 +5081,13 @@ shaping-completion-progress study *args:
 shaping-completion-progress-check:
     TMPDIR="$HOME/tmp" python3 -B -m unittest discover -s scripts/tests -p test_shaping_progress.py
 
+# Observe real run-heavy scope survival before a queue-only controller replacement.
+shaping-pretrained-handoff-scope-check output:
+    TMPDIR="$HOME/tmp" SHAPING_HANDOFF_QUALIFICATION={{quote(output)}} python3 -B -m unittest scripts.tests.test_shaping_pretrained_dispatch.HandoffScopeQualification.verify_scope_child_survival
+
+shaping-completion-pretrained-handoff study binaries partition workers resume old_status receipt qualification:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 2G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_pretrained_dispatch.py --study {{quote(study)}} --binary-dir {{quote(binaries)}} --partition {{quote(partition)}} --workers {{workers}} --resume-name {{quote(resume)}} --handoff-status {{quote(old_status)}} --handoff-receipt {{quote(receipt)}} --handoff-qualification {{quote(qualification)}}
+
 shaping-training-resources run output:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_training_resources.py --run {{quote(run)}} --output {{quote(output)}}
 

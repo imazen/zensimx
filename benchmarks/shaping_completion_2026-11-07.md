@@ -3205,3 +3205,28 @@ All metadata, source/report pins, scopes and logs passed durable cold readback:
   8,103,187 bytes; receipt `d92d75fc3c658b191a67eb07e7ff66ccef0a40fdac4b51c8fea47775679c5560`.
 - `shape-regularization-four-partitions-2134-summary`: 2 files, 20,959 bytes;
   receipt `b036c5dce13fd259c7a71b729e7baf58ba001556fbce1b6fed956064306440d2`.
+
+### Pretrained queue-only handoff qualification
+
+The two older pretrained queue writers do not recognize foreign placements.
+The existing dispatch owner now admits an explicit controller-only handoff,
+requiring matching plan/build/partition, a new audit directory, exact recorded
+occupied worker slots, live child-controller and native-wrapper identities,
+unchanged pair exposure, and a matching resource-wrapper scope qualification.
+It briefly stops admissions, records all retained fits and source pins, then
+signals only the queue writer and verifies the retained processes. A fit that
+finishes naturally during that interval must instead pass the existing final
+checkpoint and result-identity gate. No scope, process group or fit is signaled.
+The replacement adopts existing native attempts through the existing owner.
+Unrecorded children or changed evidence refuse while resuming the old writer.
+
+The real scope qualification stops, terminates and continues only a test parent
+inside run-heavy and requires its child to finish normally afterward. It passed
+in 3.751 seconds;
+the expected parent-only termination returned 143, peak RSS 0.01 GiB, minimum
+available memory 33,134 MiB and peak load 29.61. The receipt is
+`PRETRAINED_CONTROLLER_SCOPE_QUALIFICATION_2146.json` under the completion root.
+The gate binds the observed wrapper SHA-256 and host. Actual study handoffs
+have not yet been performed at this qualification point; active fits remain
+under their original owners. All 25 dispatch and placement checks pass, including
+natural completion during handoff and rejection of a changed final checksum.
