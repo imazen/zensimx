@@ -4870,3 +4870,10 @@ input-shaping-check:
     cargo test --locked -p zensim --features training,feature-regime-v2 --lib analytic_activation_sensitivity -- --test-threads=1
     just analytic-head-check
     cargo clippy --locked -p zensim --features training,feature-regime-v2 --lib -- -D warnings
+
+# Freeze source memberships and candidate cells before completion-study fits.
+shaping-completion-register original output:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 2G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_completion.py --original {{quote(original)}} --output {{quote(output)}}
+
+shaping-completion-registration-check:
+    python3 -B -m unittest discover -s scripts/tests -p test_shaping_completion.py
