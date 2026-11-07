@@ -143,12 +143,55 @@ def save_training_report(run,final_report):
     print(json.dumps(record),flush=True)
 
 
+def structure_trace(run,binary_dir,output):
+    """Inspect every scheduled bake without scoring or selecting checkpoints."""
+    import subprocess
+    identity=json.loads((run/'RUN.json').read_text());result=json.loads((run/'RESULT.json').read_text())
+    if result['stage']!='trained' or result['exit_code']!=0 or result['cell']!=identity['cell']:
+        raise ValueError('completed matching fit required')
+    build=binary_dir/'BUILD.json';reader=binary_dir/'bake_dial_refit'
+    if sha(build)!=identity['build_sha256'] or sha(reader)!=json.loads(build.read_text())['binary_sha256']['bake_dial_refit']:
+        raise ValueError('native checkpoint reader identity differs')
+    fit=run/identity.get('fit_directory','.')
+    checkpoints=[fit/'checkpoints'/f'ckpt_epoch{epoch:03}.bin' for epoch in range(identity['epochs'])]
+    if not all(p.is_file() for p in checkpoints):raise ValueError('complete scheduled checkpoint sequence required')
+    if output.exists():raise ValueError('preserve previous structure trace')
+    pins={str(p):sha(p) for p in [run/'RUN.json',run/'RESULT.json',build,reader,*checkpoints]}
+    rows=[]
+    for epoch,path in enumerate(checkpoints):
+        structure=json.loads(subprocess.check_output([str(reader),'inspect','--in',str(path)],text=True))
+        layers=structure['layers']
+        if not layers:raise ValueError('native checkpoint contains no layers')
+        active=[layer['stored_weights']-layer['zero_weights'] for layer in layers]
+        if any(v<0 for v in active):raise ValueError('invalid native weight counts')
+        rows.append(dict(epoch=epoch,active_stored_weights_by_layer=active,structure=structure))
+    shape_path=run/'SHAPING.json';shapes=None
+    if shape_path.exists():
+        pins[str(shape_path)]=sha(shape_path);config=json.loads(shape_path.read_text())
+        shapes=dict(trainable=config['trainable'],terms=len(config['terms']),
+                    terms_with_positive_slope=sum(any(v>0 for v in t['slopes']) for t in config['terms']))
+    for name,pin in pins.items():
+        if sha(name)!=pin:raise ValueError('checkpoint evidence changed during inspection')
+    record=dict(cell=identity['cell'],epochs=identity['epochs'],checkpoints=rows,input_shapes=shapes,
+        evidence_sha256=pins,driver_sha256=sha(__file__),outer_results_read=False,
+        scores_computed=False,checkpoint_selection=False,
+        interpretation='Stored coefficients only; no claim about per-row activation, gradients, or independent parameter count.')
+    output.parent.mkdir(parents=True,exist_ok=True)
+    with output.open('xb') as stream:stream.write(encoded(record))
+    print(json.dumps(dict(epochs=len(rows),first_zero_output_epoch=next((r['epoch'] for r in rows if r['active_stored_weights_by_layer'][-1]==0),None),input_shapes=shapes)),flush=True)
+    return record
+
+
 if __name__=='__main__':
     parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('--run',type=Path,required=True)
     parser.add_argument('--reexport-root',type=Path)
     parser.add_argument('--training-only',action='store_true');parser.add_argument('--final-report',type=Path)
+    parser.add_argument('--structure-trace',type=Path);parser.add_argument('--binary-dir',type=Path)
     args=parser.parse_args()
-    if args.training_only:
+    if args.structure_trace:
+        if args.training_only or args.final_report or args.reexport_root or not args.binary_dir:parser.error('structure trace requires only run and binary-dir')
+        structure_trace(args.run,args.binary_dir,args.structure_trace)
+    elif args.training_only:
         if not args.final_report or args.reexport_root:parser.error('training-only requires final-report and no reexport-root')
         save_training_report(args.run,args.final_report)
     else:report(args.run,args.reexport_root)

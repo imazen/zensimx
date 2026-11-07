@@ -5280,3 +5280,7 @@ shaping-completion-watch-full-fit-refit study binary_dir neutral:
 # Fixed matched regularization contrast: lr .001, L2 0 versus 1e-5, all three seeds.
 shaping-completion-regularization-curves study binaries family outer inner output:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_curve_stability.py --study {{quote(study)}} --binary-dir {{quote(binaries)}} --family {{quote(family)}} --outer {{outer}} --inner-fold {{inner}} --settings 0 1 --output {{quote(output)}}
+
+# All scheduled checkpoint structures; no new predictions or checkpoint selection.
+shaping-completion-structure-trace run binary_dir output:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_convergence.py --run {{quote(run)}} --binary-dir {{quote(binary_dir)}} --structure-trace {{quote(output)}}

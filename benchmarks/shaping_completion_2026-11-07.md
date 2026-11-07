@@ -1621,3 +1621,30 @@ A trained fit and an archived failure remain distinct from scientific completion
 Undefined final scores also prevent this family's existing paired base selection;
 its registered rescue admission still needs resolution without imputing ranks or
 dropping paired cells. The independent families continue.
+
+### Native checkpoint trace of the zero-output frozen-shape fit
+
+The native reader inspected all 120 scheduled checkpoints of
+`7acaa2df5782f9d05f08`, with the original build and every input hash pinned.
+At epoch 0, the three layers retain 64, 0, and 4 nonzero stored weights.
+At epoch 1, all three counts become zero and remain zero through epoch 119.
+The second hidden layer therefore already blocks the learned signal at the first
+saved checkpoint; the subsequent disappearance of output weights is not the
+first observed failure. These are stored-weight counts, not activation or
+independent-parameter counts. The native training log independently reports zero
+rank correlations from its first epoch; the later evaluator did not create this
+collapse.
+
+The frozen input manifest retains positive slopes in 101 of 984 terms, so an
+entirely zero shaper bank does not explain it. The parent pretraining checkpoint
+at epoch 119 retains 600, 16, and 2 nonzero stored weights in its three exported
+layers. Its exported shaping representation includes routing coefficients;
+these counts do not prove equivalence of hidden capacity to the fresh frozen head.
+No causal claim about learning rate, regularization or gradients follows from
+these structural observations alone. An optimizer trace remains necessary.
+
+`just shaping-completion-structure-trace` adds this analysis to the existing
+convergence owner. It requires the complete scheduled checkpoint sequence and
+pinned native reader, rechecks input hashes after inspection, preserves existing
+outputs, and never computes scores or selects checkpoints. The real 120-epoch
+trace and six convergence/structure checks passed.

@@ -70,3 +70,34 @@ class TrainingOnlyTests(unittest.TestCase):
             self.assertEqual(final['phase_loss_windows'],result['phase_loss_windows'])
             with (run/'fit/train.log').open('a') as stream:stream.write('epoch 119 | loss=.98\n')
             with self.assertRaisesRegex(ValueError,'coverage'):training_report(run,report)
+
+
+class StructureTraceTests(unittest.TestCase):
+    def test_all_epochs_required_and_native_reader_pinned(self):
+        import json,tempfile
+        from unittest.mock import patch
+        from shaping_convergence import structure_trace
+        from shaping_completion import encoded,sha
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as directory:
+            root=Path(directory);run=root/'run';binary=root/'bin';run.mkdir();binary.mkdir()
+            reader=binary/'bake_dial_refit';reader.write_text('fixture native reader')
+            build=binary/'BUILD.json';build.write_bytes(encoded({'binary_sha256':{'bake_dial_refit':sha(reader)}}))
+            cell={'id':'fixture','stage':'inner'}
+            (run/'RUN.json').write_bytes(encoded(dict(cell=cell,epochs=2,build_sha256=sha(build))))
+            (run/'RESULT.json').write_bytes(encoded(dict(cell=cell,stage='trained',exit_code=0)))
+            checkpoints=run/'checkpoints';checkpoints.mkdir()
+            (checkpoints/'ckpt_epoch000.bin').write_bytes(b'first')
+            output=root/'trace.json'
+            with patch('subprocess.check_output') as native:
+                with self.assertRaisesRegex(ValueError,'complete scheduled'):structure_trace(run,binary,output)
+                native.assert_not_called()
+            (checkpoints/'ckpt_epoch001.bin').write_bytes(b'second')
+            layers=[{'stored_weights':64,'zero_weights':60}]
+            with patch('subprocess.check_output',return_value=json.dumps({'layers':layers})) as native:
+                record=structure_trace(run,binary,output)
+                self.assertEqual(native.call_count,2)
+                self.assertEqual([r['epoch'] for r in record['checkpoints']],[0,1])
+                self.assertFalse(record['scores_computed']);self.assertFalse(record['checkpoint_selection'])
+                with self.assertRaisesRegex(ValueError,'preserve previous'):structure_trace(run,binary,output)
+            reader.write_text('changed')
+            with self.assertRaisesRegex(ValueError,'reader identity'):structure_trace(run,binary,root/'other.json')
