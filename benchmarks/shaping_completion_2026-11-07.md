@@ -2090,3 +2090,26 @@ peak-load 31.04`. This supervised diagnostic run is not a runtime benchmark.
 The complete `unshaped-first-weight-replay` archive passed durable checksum
 readback: 369 files, 28,370,021 bytes, retaining both checkpoint sequences,
 canonical comparisons, traces, source/binary identity and full logs.
+
+
+## Verified checkpoint retention at 14:54 UTC
+
+The existing retention owner removed 15,196 local intermediate checkpoint
+copies from 70 completed runs, totaling 3,601,657,508 logical bytes. Every
+removed file matched its local SHA-256 and a fresh durable readback; open-file
+checks ran before verification and again before removal. Final checkpoints,
+registered diagnostic epochs, epoch 119 and pinned inputs remain local.
+Complete checkpoint histories remain in their durable archives. No training
+was replayed or restarted.
+
+Filesystem free space was 75,917,742,080 bytes before removal and
+79,537,983,488 bytes afterward, while other jobs continued writing. These
+filesystem observations are not an isolated allocation measurement.
+The wrapper reported `rc=0 126s | peak-RSS 0.12GiB | min-avail 30462MiB |
+peak-load 32.07`.
+
+The plan, per-file removal receipt and full log are preserved in
+`/mnt/v/output/zensim/shaping-completion-20261107/checkpoint-retention-1455-evidence`
+and the corresponding durable archive. All three artifacts (19,075,705 bytes)
+passed destination checksum readback; the archive receipt SHA-256 is
+`673bb0d0762cea75a027e0840fd5471e6778868b449521f12473ea0b6faadc64`.
