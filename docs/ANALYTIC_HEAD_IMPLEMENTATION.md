@@ -189,3 +189,9 @@ Qualification of compiled source `4aa5d643`: 400 library tests passed, two
 existing ignores unchanged; 65 CLI tests and strict clippy passed. Local and
 remote implementation hashes match. Wrapper: `run-heavy: done rc=0 42s |
 peak-RSS 1.63GiB | min-avail 25588MiB | peak-load 2.26`.
+
+The optimizer qualification archive retains both full qualification logs and
+the four actual-trainer replay outputs/logs: 17 artifact files, 100,735 bytes.
+All destination hashes passed client readback after fsync/cache-eviction requests.
+Manifest: `6462a170aaca96a7a1926ed7fcf536a8c1b2b422fd66e947a20fca1315347984`.
+Archive suffix: `shaping-completion-20261107/optimizer-qualification`.
