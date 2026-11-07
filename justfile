@@ -5276,3 +5276,7 @@ shaping-completion-watch-full-fit-selection study:
 
 shaping-completion-watch-full-fit-refit study binary_dir neutral:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 14G --jobs 2 -- python3 -B scripts/rev4_featpot/shaping_full_fit_execution.py --study {{quote(study)}} --binary-dir {{quote(binary_dir)}} --neutral-qualification {{quote(neutral)}} --watch-refit
+
+# Fixed matched regularization contrast: lr .001, L2 0 versus 1e-5, all three seeds.
+shaping-completion-regularization-curves study binaries family outer inner output:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_curve_stability.py --study {{quote(study)}} --binary-dir {{quote(binaries)}} --family {{quote(family)}} --outer {{outer}} --inner-fold {{inner}} --settings 0 1 --output {{quote(output)}}

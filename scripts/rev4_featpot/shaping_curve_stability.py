@@ -42,17 +42,27 @@ def compare(configs):
     return rows
 
 
+def selected_cells(cells,family,outer,settings,inner_fold=None):
+    families=['product_joint_identity','separate_joint_identity'] if family=='direct_joint_both' else [family]
+    if (outer not in range(3) or not settings or len(set(settings))!=len(settings)
+        or any(v not in range(4) for v in settings) or inner_fold not in (None,0,1)):
+        raise ValueError('registered distinct settings and inner folds required')
+    folds=(0,1) if inner_fold is None else (inner_fold,)
+    expected={(f,f'inner-{outer}-{fold}',seed,setting) for f in families for fold in folds for seed in range(3) for setting in settings}
+    selected=[c for c in cells if c['stage']=='inner' and (c['family'],c['partition'],c['seed'],c['setting']) in expected]
+    if len(selected)!=len(expected) or {(c['family'],c['partition'],c['seed'],c['setting']) for c in selected}!=expected:
+        raise ValueError('complete paired settings required')
+    return sorted(selected,key=lambda c:(c['family'],c['partition'],c['setting'],c['seed']))
+
+
 def report(args):
     _,cells,_=load_registration(args.study)
-    families=['product_joint_identity','separate_joint_identity'] if args.family=='direct_joint_both' else [args.family]
-    selected=[c for c in cells if c['stage']=='inner' and c['family'] in families and c['setting']==args.setting and
-              c['partition'] in (f'inner-{args.outer}-0',f'inner-{args.outer}-1')]
-    if len(selected)!=6*len(families) or {(c['family'],c['partition'],c['seed']) for c in selected}!={(family,f'inner-{args.outer}-{fold}',seed) for family in families for fold in range(2) for seed in range(3)}:
-        raise ValueError('complete paired setting required')
+    settings=getattr(args,'settings',None) or [args.setting]
+    selected=selected_cells(cells,args.family,args.outer,settings,getattr(args,'inner_fold',None))
     args.output.mkdir(parents=True,exist_ok=False);configs=[];pins={};fits=[]
     build=json.loads((args.binary_dir/'BUILD.json').read_text())
     if sha(args.binary_dir/'bake_dial_refit')!=build['binary_sha256']['bake_dial_refit']:raise ValueError('native metadata reader drift')
-    for cell in sorted(selected,key=lambda c:(c['family'],c['partition'],c['seed'])):
+    for cell in selected:
         _,_,evidence=verified_candidate(args.study,cell);pins.update(evidence)
         run=next(Path(p).parent for p in evidence if Path(p).name=='RUN.json')
         identity=json.loads((run/'RUN.json').read_text())
@@ -65,7 +75,7 @@ def report(args):
         if args.family=='direct_joint_both':config['terms']=[t for t in config['terms'] if t['reference'] is None]
         (args.output/(cell['id']+'.json')).write_bytes(encoded(config));configs.append(config);fits.append(cell)
     rows=compare(configs)
-    result=dict(scope='Descriptive one-setting inner fit comparison; no quality selection, outer scores or transferable-utility claim.',
+    result=dict(scope='Descriptive paired inner fit comparison; no quality selection, outer scores or transferable-utility claim.',
         method='Real-valued piecewise-linear response at native quantized parameters; maximum normalized spread on union-of-knot vertices. Separate responses use the damage/reference rectangle. Not a bit-exact runtime score comparison.',
         domain='Zero through largest TRAIN second damage knot; separate reference gates use [0,1]. No claim beyond this domain.',
         downstream_weights_included=False,zero_terms_are_not_useful_stability=True,fits=fits,input_sha256=pins,
@@ -79,5 +89,8 @@ if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__)
     for key in ('study','binary-dir','output'):p.add_argument('--'+key,type=Path,required=True)
     p.add_argument('--family',choices=['product_joint_identity','separate_joint_identity','direct_joint_both'],required=True)
-    p.add_argument('--outer',type=int,choices=range(3),required=True);p.add_argument('--setting',type=int,choices=range(4),required=True)
+    p.add_argument('--outer',type=int,choices=range(3),required=True);p.add_argument('--inner-fold',type=int,choices=(0,1))
+    choices=p.add_mutually_exclusive_group(required=True)
+    choices.add_argument('--setting',type=int,choices=range(4))
+    choices.add_argument('--settings',type=int,choices=range(4),nargs='+')
     report(p.parse_args())

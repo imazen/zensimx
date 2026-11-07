@@ -27,3 +27,18 @@ class CurveStabilityTests(unittest.TestCase):
 
 
 if __name__=='__main__':unittest.main()
+
+class PairedSettingTests(unittest.TestCase):
+    def test_two_settings_three_seeds_per_architecture_without_other_fold(self):
+        from shaping_completion import matrix
+        from shaping_curve_stability import selected_cells
+        cells=matrix();chosen=selected_cells(cells,'direct_joint_both',0,[0,1],1)
+        self.assertEqual(len(chosen),12)
+        self.assertEqual({c['partition'] for c in chosen},{'inner-0-1'})
+        self.assertEqual({c['setting'] for c in chosen},{0,1})
+        with self.assertRaisesRegex(ValueError,'complete paired'):
+            selected_cells([c for c in cells if c!=chosen[0]],'direct_joint_both',0,[0,1],1)
+        with self.assertRaisesRegex(ValueError,'distinct settings'):
+            selected_cells(cells,'direct_joint_both',0,[0,0],1)
+        old=selected_cells(cells,'product_joint_identity',0,[0])
+        self.assertEqual(len(old),6);self.assertEqual({c['partition'] for c in old},{'inner-0-0','inner-0-1'})

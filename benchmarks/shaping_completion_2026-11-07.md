@@ -1518,3 +1518,17 @@ remain green: 23 full-FIT tests pass. Wrapper: `run-heavy: done rc=0 2s |
 peak-RSS 0.19GiB | min-avail 32204MiB | peak-load 23.48`. These qualification
 fits are simulated, not scientific results. The queue's terminal stage explicitly
 requires reports; it does not certify inference costs, archives or study completion.
+
+## Registered descriptive regularization contrast for input responses
+
+Before inspecting new curves, extend the existing metadata comparison to the
+complete paired setting-0/setting-1 fits on inner partition `inner-0-1`.
+Both settings use learning rate 0.001; L2 is respectively zero and 1e-5.
+Compare all three registered seeds for each identity-initialized product and
+separate family, plus their direct-term intersection across both families.
+This is a fixed twelve-fit metadata comparison, not a quality-based selection.
+It tests sensitivity to regularization on one training partition; it cannot
+establish source generalization or downstream utility. Existing exact-f32
+curve normalization, domain boundaries and treatment of zero terms are retained.
+Five tests pass, including exact paired coverage and refusal of missing seeds
+or duplicate settings. The original single-setting/two-partition mode remains.
