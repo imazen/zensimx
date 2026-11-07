@@ -369,3 +369,28 @@ Native wrapper: `run-heavy: done rc=0 3186s | peak-RSS 1.27GiB | min-avail 37988
 This measured peak is why rescue analytic phases receive a 2 GiB native cap.
 The completed replay and checkpoints passed destination readback against manifest
 SHA256 `3ccbcf768644d28c6c70ba5e778a6edc246695553b80ecba9b0b1421be89791d`.
+
+## Additional qualified shaping worker
+
+A frozen source snapshot at `39beed49e651` and the existing study binaries
+were copied to i270. Every copied input was SHA256-verified. The first native
+replay refused missing recipe provenance before training; the preserved retry
+included the original receipt and human-role decision. All three native
+compatibility models then matched their canonical hashes exactly. Only the
+declaration's filesystem path changed, with identical declaration bytes.
+
+Replay wrapper: `run-heavy: done rc=0 9s | peak-RSS 0.16GiB | min-avail 26872MiB | peak-load 0.27`.
+This is compatibility/resource evidence, not an isolated runtime benchmark.
+
+The worker runs the 24 registered inner-0-1 jointly learned product/separate
+shaping cells, eight native single-thread fits concurrently, with a 12 GiB
+aggregate cap and 1 GiB per-trainer cap. Explicit assignment prevents another
+host from fitting those same IDs. Source memberships, training-only knots,
+seeds, settings, exposure and final-checkpoint rules are unchanged. At the first
+live check all eight trainers had advanced to epoch 2 or 3, with no unexpected
+stops. Scientific results await completed training and the same native panels.
+
+Worker qualification archive suffix: `worker-i270-qualification`; manifest
+SHA256 `ef92f329e39f0830d2ca5c600425953ee9eb86c3be6ba895255524788bb52e5e`.
+It preserves copied input bindings, source snapshot, failed/successful replay
+commands and results. Active training outputs are not represented as archived.
