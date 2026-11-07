@@ -2394,3 +2394,37 @@ No training or completed fit was replayed.
 Cold readback verified `i270-retention-1628-evidence`: 6 artifacts,
 505001 bytes, receipt
 `35a0369593c37e9f977e0d95b4dc597a224c84afd0cb55b537d5f307c97538e1`.
+
+
+## Reference preservation, compiler-cache reclamation and new i270 pair
+
+Seven cost/inventory reference executables (20,757,904 bytes) were copied with
+source paths and hashes, then cold-read verified in durable storage before
+removing inactive Cargo output. No cargo/rustc process was present; both exact
+open-file inspections passed and file identities were rechecked. The first
+check refused before deletion on an additional Cargo future-incompatibility
+report; that refusal remains. The corrected check admits this compiler report.
+The removed output contained 3,827 files totaling 1,171,748,382 logical bytes.
+Free disk was 56,606,826,496 bytes before and 57,760,239,616 after. Wrapper:
+`rc=0 5s | peak-RSS 0.02GiB | min-avail 23891MiB | peak-load 19.32`.
+
+This enabled one additional i270 worker for two previously unstarted registered
+inner-2-1 pretrained fits. Both native prefix extractions passed and immutable
+input installation verified checksums. Admission observed 19 existing trainers,
+25,033,318,400 available RAM bytes and 57,673,064,448 free disk bytes against
+56,908,316,672 required. The new single-thread trainer fills the host's
+20-thread training budget. The controller has a 2 GiB cap, the child a 1 GiB cap.
+Both controller and first native trainer were verified live. Worker source
+remains `ce9229d0362d`; no training or completed pretraining was replayed.
+
+Cold readback verified `i270-preserved-cost-binaries-1633`: 8 artifacts,
+20760609 bytes, receipt
+`d063cc8c87560ade70d07f6055f8a2475eecd85e3a3f44900bc1603dab05abe8`.
+
+Cold readback verified `i270-pretrained21b-admission-evidence`: 19 artifacts,
+646339 bytes, receipt
+`fe8096327641094144ed34b90a04d0a3420bb44eb38900e13135fd2fc4ef5fa1`.
+
+Cold readback verified `i270-pretrained21b-inputs`: 3 artifacts,
+25104697 bytes, receipt
+`df1f337c0869fa3c307c7efa7ae9f71b5bd8f35f153d8885a75d50ea5ceddf64`.

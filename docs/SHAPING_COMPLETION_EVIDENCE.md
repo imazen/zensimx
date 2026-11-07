@@ -846,3 +846,11 @@ spread 0.0009952661275045216 in the new 24 fits, but is zero in six of the
 earlier twelve fits, all from the other inner partition. This does not support
 a source-independent f506 response. Downstream weights and quality utility
 remain outside this instrument. No model is selected or training replayed.
+
+
+Cost and inventory reference executables survive the inactive Cargo-cache
+reclamation in `i270-preserved-cost-binaries-1633`. Its manifest pins all seven
+preserved executables, including historical variants. Worker copies remain in
+`preserved-binaries-1633/release/examples` beside the removed target directory;
+the durable archive received cold checksum readback before deletion. Future
+cost invocations must use a preserved binary path rather than that Cargo target.
