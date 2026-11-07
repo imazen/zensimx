@@ -5,7 +5,7 @@ from unittest.mock import patch
 import numpy as np
 from scipy.stats import spearmanr
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'rev4_featpot'))
-from shaping_bootstrap import compute,verify_draws,run
+from shaping_bootstrap import compute,compute_matched,verify_draws,run
 from shaping_bootstrap_plan import population_groups,component_draws,SEED,REPLICATES
 from shaping_bootstrap_reduce import POPULATIONS
 from shaping_outer_evidence import primary_cells
@@ -33,6 +33,18 @@ class BootstrapRunnerTests(unittest.TestCase):
             point=dict(pooled=float(spearmanr(pred,y).statistic),within=float(np.mean([spearmanr(pred[:3],y[:3]).statistic,spearmanr(pred[3:],y[3:]).statistic])))
             outputs.append(dict(cell=cell,indices=partitions[cell['partition']]['test'],predictions=np.tile(pred,5),report=dict(outer_test=dict(summary={p:point for p in POPULATIONS}))))
         return outputs,registration,draws,np.array(labels),partitions,np.array(populations),np.array(components)
+
+    def test_native_matched_comparison_keeps_pairing_and_rejects_missing_seed(self):
+        outputs,registration,draws,labels,*_=self.fixture()
+        arms={'candidate':[r for r in outputs if r['cell']['family']=='softplus'],
+              'control':[r for r in outputs if r['cell']['family']=='relu']}
+        samples,points,summary=compute_matched(arms,registration,draws,labels,(0,1,2))
+        self.assertEqual(samples['candidate'].shape,(3,3,5,2,REPLICATES))
+        point=summary['scopes']['mean_outer']['equal_human_composite']
+        self.assertLess(point['difference_from_control'],0)
+        self.assertFalse(summary['teacher_in_human_headline'])
+        arms['candidate'].pop()
+        with self.assertRaisesRegex(ValueError,'coverage'):compute_matched(arms,registration,draws,labels,(0,1,2))
 
     def test_complete_native_primary_computation(self):
         if not Path(os.environ['ZEN_PANEL_BIN']).is_file():raise ValueError('native panel binary missing')

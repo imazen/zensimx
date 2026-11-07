@@ -1929,3 +1929,15 @@ admission. Explicit inner diagnostic scope is unchanged. The three re-export,
 seven selection, eight rescue and nine supervision tests pass, including mixed
 runtime/representation refusal and later-stage admission rejection. Actual
 paired coverage and rescue completion are still required before outer fitting.
+
+## Matched uncertainty computation validation
+
+The source-bootstrap owner now computes paired candidate/control arrays with
+all three outer folds and the exact registered seed set. It reuses the existing
+native rank-panel and whole-source draw implementation, verifies each point
+estimate against its completed report, and retains separate model-seed axes.
+The matched reducer keeps teacher agreement separate and reports paired
+candidate-minus-control intervals. Six reducer tests pass; the native runner
+suite, including the matched comparison and missing-seed refusal, also passes.
+This validates computation only. Variant/fresh-control provenance collection
+and actual registered scientific bootstrap executions remain unfinished.

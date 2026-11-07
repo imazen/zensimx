@@ -58,6 +58,40 @@ def compute(outputs,registration,draws,labels,progress=lambda *args:None):
     return samples,points,reduce(samples,points)
 
 
+
+def compute_matched(arms,registration,draws,labels,seed_ids,progress=lambda *args:None):
+    """Matched outer arms; caller must verify source/model/admission evidence."""
+    from shaping_bootstrap_reduce import reduce_matched
+    seed_ids=tuple(seed_ids)
+    if set(arms)!={'candidate','control'} or seed_ids not in ((0,1,2),(None,)):
+        raise ValueError('complete registered matched arms and seeds required')
+    expected={(f'outer-{fold}',seed) for fold in range(3) for seed in seed_ids}
+    for rows in arms.values():
+        coverage=[(r['cell']['partition'],r['cell']['seed']) for r in rows]
+        if set(coverage)!=expected or len(coverage)!=len(expected):raise ValueError('incomplete or duplicate matched fold/seed coverage')
+    samples={k:np.full((3,len(seed_ids),5,2,REPLICATES),np.nan) for k in arms}
+    points={k:np.full((3,len(seed_ids),5,2),np.nan) for k in arms}
+    for stratum in registration['strata']:
+        outer=stratum['outer'];population=stratum['population'];pi=POPULATIONS.index(population)
+        selected=[(key,row) for key,rows in arms.items() for row in rows if row['cell']['partition']==f'outer-{outer}']
+        rows=[i for group in stratum['groups'].values() for i in group];positions={row:i for i,row in enumerate(rows)}
+        groups=[np.array([positions[i] for i in group]) for group in stratum['groups'].values()]
+        predictions=[]
+        for _,row in selected:
+            lookup={original:i for i,original in enumerate(row['indices'])}
+            if len(lookup)!=len(row['indices']) or not set(rows)<=set(lookup):raise ValueError('matched outer source rows differ')
+            predictions.append(row['predictions'][[lookup[i] for i in rows]])
+        result=paired_stratum(predictions,labels[rows],groups,draws[stratum['array']])
+        for k,(key,row) in enumerate(selected):
+            si=seed_ids.index(row['cell']['seed']);summary=row['report']['outer_test']['summary'][population]
+            point=np.array([summary['pooled'],summary['within']],dtype=float)
+            if not np.isfinite(point).all() or not np.allclose(result['point'][k],point,rtol=0,atol=1e-9):
+                raise ValueError('matched bootstrap point differs from completed report')
+            samples[key][outer,si,pi]=np.stack((result['pooled'][k],result['within'][k]));points[key][outer,si,pi]=result['point'][k]
+        progress(stratum,result)
+    return samples,points,reduce_matched(samples,points,seed_ids)
+
+
 def run(args):
     plan,partitions,outputs,pins,qualifications=collect(args.study)
     if args.output.parent.stat().st_dev!=args.study.stat().st_dev:
