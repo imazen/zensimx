@@ -1603,3 +1603,21 @@ it does not emit a convergence receipt for the failed fit. All existing
 thresholds and scientific admission rules remain unchanged. Five convergence
 and eight supervision tests pass, including undefined endpoints, repeated
 failure preservation, and continuation to an independent cell.
+
+The restarted supervisor completed a sweep at 10:51:27 UTC and verified its
+live PID. The failed fit's final epoch 119 and diagnostic epochs 49, 99, 119 all
+have zero active output coefficients and undefined human composites. Its complete
+retained attempt was archived with cold destination SHA-256 readback:
+233 artifact files, 11,619,827 bytes, manifest
+`f4b9950e8ad2f3f7cbe178834f2542cb1533a130b3368757b566298177a280fb`.
+The archive is `failed-frozen-product-7acaa2df5782f9d05f08` under the study's
+existing durable root. No local artifact was removed.
+
+The progress audit now separately counts convergence failures and verifies their
+input hashes. Four audit tests pass, including tampered failure evidence refusal.
+The observed audit has 248/816 primary fits, 247 final reports, 150 diagnostic
+receipts, one convergence failure, and five original native-gate failures.
+A trained fit and an archived failure remain distinct from scientific completion.
+Undefined final scores also prevent this family's existing paired base selection;
+its registered rescue admission still needs resolution without imputing ranks or
+dropping paired cells. The independent families continue.

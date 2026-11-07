@@ -21,6 +21,22 @@ class ProgressTests(unittest.TestCase):
             self.assertEqual(c['original_final_report_cells'],0);self.assertEqual(c['neural_diagnostic_receipt_cells'],0)
             self.assertFalse(result['overall_experiments_complete']);self.assertFalse(result['workers']['worker']['fresh'])
 
+    def test_convergence_failure_is_counted_separately_and_pins_verified(self):
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as d:
+            root=Path(d);(root/'PLAN.json').write_text('{}')
+            cell=dict(id='cell',stage='inner',family='softplus')
+            run=root/'runs/cell/attempt-001';run.mkdir(parents=True)
+            result=run/'RESULT.json'
+            result.write_bytes(encoded(dict(cell=cell,plan_sha256=sha(root/'PLAN.json'),exit_code=0,stage='trained')))
+            failure=dict(cell=cell,outer_results_read=False,scientifically_complete=False,requires_investigation=True,evidence_sha256={str(result):sha(result)})
+            path=run/'CONVERGENCE_FAILURE.json';path.write_bytes(encoded(failure))
+            with patch('shaping_progress.load_registration',return_value=({},[cell],{})):
+                counts=audit(root,{})['counts']['inner']
+                self.assertEqual(counts['cells_with_convergence_failure'],1)
+                self.assertEqual(counts['neural_diagnostic_receipt_cells'],0)
+                failure['evidence_sha256'][str(result)]='bad';path.write_bytes(encoded(failure))
+                with self.assertRaisesRegex(ValueError,'failure evidence drift'):audit(root,{})
+
     def test_admitted_matched_outer_controls_are_required_without_claiming_fits(self):
         with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as d:
             root=Path(d);(root/'PLAN.json').write_text('{}')

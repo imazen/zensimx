@@ -55,9 +55,18 @@ def audit(root,workers):
                 for name,pin in c['report_sha256'].items():
                     if sha(name)!=pin:raise ValueError('diagnostic report drift')
                 diagnostics[label]=dict(investigation_required=c['investigation_required'],reasons=c['reasons'])
+            failure_path=run/'CONVERGENCE_FAILURE.json'
+            convergence_failure=False
+            if failure_path.exists():
+                failure=json.loads(failure_path.read_text())
+                if failure['cell']!=cell or failure['outer_results_read'] or failure['scientifically_complete'] or not failure['requires_investigation']:
+                    raise ValueError('convergence failure identity differs')
+                for name,pin in failure['evidence_sha256'].items():
+                    if sha(name)!=pin:raise ValueError('convergence failure evidence drift')
+                convergence_failure=True
             attempts.append(dict(attempt=run.name,fit_success=result['exit_code']==0 and result['stage'] in ('trained','complete'),
                                  original_final_report=original,supplemental_final_report=supplemental,
-                                 original_failed_gates=(run/'EVALUATION_FAILURES.json').exists(),diagnostics=diagnostics))
+                                 original_failed_gates=(run/'EVALUATION_FAILURES.json').exists(),convergence_failure=convergence_failure,diagnostics=diagnostics))
         archive=False
         if (directory/'MIRROR_VERIFIED.json').exists():
             receipt=json.loads((directory/'MIRROR_VERIFIED.json').read_text());destination=Path(receipt['destination'])
@@ -75,6 +84,7 @@ def audit(root,workers):
             neural_diagnostic_receipt_cells=sum(r['family'] in NEURAL and any(a['diagnostics'] for a in r['attempts']) for r in selected),
             cells_with_investigation_trigger=sum(any(d['investigation_required'] for a in r['attempts'] for d in a['diagnostics'].values()) for r in selected),
             cells_with_original_failed_gates=sum(any(a['original_failed_gates'] for a in r['attempts']) for r in selected),
+            cells_with_convergence_failure=sum(any(a['convergence_failure'] for a in r['attempts']) for r in selected),
             archive_receipt_cells=sum(r['archive_receipt_verified'] for r in selected))
     observed={};now=datetime.now(timezone.utc)
     for host,path in workers.items():
