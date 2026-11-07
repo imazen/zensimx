@@ -5106,6 +5106,9 @@ shaping-completion-selection-watch-check:
 shaping-completion-reclaim-incremental:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_reclaim_incremental.py
 
+shaping-completion-reclaim-linear-parity:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_reclaim_linear_parity.py
+
 shaping-completion-human-qualify study run binaries output cell:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 3G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_rescue_qualification.py --study {{quote(study)}} --run {{quote(run)}} --binary-dir {{quote(binaries)}} --output {{quote(output)}} --human-only-cell {{quote(cell)}}
 

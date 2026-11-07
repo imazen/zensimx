@@ -1092,3 +1092,23 @@ incomplete rescue waves cannot select or admit, and apparent completion markers
 still lead to the full provenance gate. This watcher does not execute extension
 fits; their native execution owner remains separate. The three triggered folds
 still require their unfinished paired experiments.
+
+## Historical comparator parity retention (09:20 UTC)
+
+A completed worker import waited at storage admission while pending writes were
+reserved. Eighteen historical shaped-linear Extra Trees comparator parity inputs
+were eligible archived duplicates: exactly three folds × three label modes ×
+two seeds, each containing only `test_X.npy`, `test_raw.npy` and `test_p.npy`.
+The fixed historical manifest hash matched both copies; all 18 local and durable
+files passed SHA-256 reread, with POSIX_FADV_DONTNEED on the durable copy. Two
+lsof inspections and a final inode/size/mtime check preceded removal. None was
+pinned by the active study. Models, standalone predictions, specifications and
+active input arrays were retained; the prior Gram-retention receipt was preserved.
+
+Removed logical bytes: 1,088,053,114. Observed free bytes before/after were
+56,265,535,488 / 57,353,674,752 while other jobs continued writing. Wrapper:
+`run-heavy: done rc=0 20s | peak-RSS 0.10GiB | min-avail 33315MiB | peak-load 21.45`.
+The waiting worker import subsequently completed and its automatic wave archive
+verified. Exact removal inventory and restoration root are recorded in
+`RECLAIMED_LINEAR_PARITY.json` under the completion-study artifact root. This
+retention did not lower the 30 GiB reserve or any pending-write allowance.
