@@ -912,9 +912,6 @@ impl Network {
     pub(super) fn training_forward(&self, first: &[f64]) -> (f64, Vec<f64>, Vec<f64>) {
         let mut cache = self.forward(first);
         if let Some(mask) = &self.mask {
-            if self.config.family == Family::SiluDiagnostic {
-                self.adam.gb1[0] += dy;
-            }
             let last = &cache.2[cache.2.len() - self.output.len()..];
             cache.0 = last
                 .iter()
@@ -954,6 +951,9 @@ impl Network {
         cache: &(f64, Vec<f64>, Vec<f64>),
         dy: f64,
     ) -> Vec<f64> {
+        if self.config.family == Family::SiluDiagnostic {
+            self.adam.gb1[0] += dy;
+        }
         let last = &cache.2[cache.2.len() - self.output.len()..];
         let mut gradient = self.output.iter().map(|a| -dy * a).collect::<Vec<_>>();
         for (j, (g, h)) in self.adam.gw1.iter_mut().zip(last).enumerate() {
