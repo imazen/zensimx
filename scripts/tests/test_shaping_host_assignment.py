@@ -8,6 +8,22 @@ from shaping_completion import sha
 
 
 class PlacementRelocationTests(unittest.TestCase):
+    def test_assignment_creation_refuses_reserved_or_already_placed_cells(self):
+        from shaping_completion import matrix
+        cells=matrix();cell=next(c for c in cells if c['stage']=='inner' and c['partition']=='inner-0-0' and c['family']=='product_joint_identity')
+        for reserved in [True,False]:
+            with self.subTest(reserved=reserved),tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as d:
+                root=Path(d);(root/'PLAN.json').write_text('{}');binary=root/'bin';binary.mkdir();(binary/'BUILD.json').write_text('{}');directory=root/'worker_assignments';directory.mkdir()
+                if reserved:
+                    claims=root/'cpu-admission';claims.mkdir();(claims/'CLAIMS.json').write_text(json.dumps({cell['id']:{'owner':'existing'}}))
+                else:
+                    (directory/'existing.json').write_text(json.dumps(dict(host='dev',cells=[cell['id']],plan_sha256=sha(root/'PLAN.json'),build_sha256=sha(binary/'BUILD.json'))))
+                before={p.name:p.read_bytes() for p in directory.iterdir()}
+                argv=['assign','--study',str(root),'--binary-dir',str(binary),'--partition','inner-0-0','--host','dev','--cell',cell['id']]
+                with patch.object(sys,'argv',argv),patch('shaping_execution.load_registration',return_value=({},cells,{})):
+                    with self.assertRaisesRegex(ValueError,'reserved cells' if reserved else 'reuse or split'):module.main()
+                self.assertEqual({p.name:p.read_bytes() for p in directory.iterdir()},before)
+
     def test_assignment_lookup_preserves_host_and_scientific_checks(self):
         with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as d:
             root=Path(d);cells,assignment,_,_,_=self.fixture(root)

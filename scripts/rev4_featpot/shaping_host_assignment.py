@@ -306,16 +306,20 @@ def main():
     if args.cell:
         from shaping_execution import registered_subset
         selected=registered_subset(selected,args.cell)
-    if any((args.study/'runs'/c['id']).exists() for c in selected):raise ValueError('existing attempts cannot be reassigned')
-    build_pin=sha(args.binary_dir/'BUILD.json');check(args.study,selected,build_pin,args.host)
-    directory=args.study/'worker_assignments';directory.mkdir(exist_ok=True)
-    suffix='-fresh' if args.stage=='fresh_control_inner' else ''
-    if args.cell:suffix+='-'+__import__('hashlib').sha256(encoded(sorted(args.cell))).hexdigest()[:16]
-    out=directory/(args.partition+'-'+args.family.replace('_','-')+suffix+'.json')
-    record=dict(host=args.host,cells=[c['id'] for c in selected],plan_sha256=sha(args.study/'PLAN.json'),
-                build_sha256=build_pin,partition=args.partition,scientific_inputs_unchanged=True)
-    if args.family=='pretrained_shapes':record['parent_inputs']=parent_inputs(args.study,cells,selected,build_pin)
-    with out.open('xb') as stream:stream.write(encoded(record))
+    with placement_claims(args.study) as claims:
+        if set(c['id'] for c in selected)&set(claims):raise ValueError('reserved cells cannot be assigned')
+        if any((args.study/'runs'/c['id']).exists() for c in selected):raise ValueError('existing attempts cannot be reassigned')
+        build_pin=sha(args.binary_dir/'BUILD.json');check(args.study,selected,build_pin,args.host)
+        if any(assigned_placement(args.study,c,build_pin) for c in selected):
+            raise ValueError('reuse or split existing placement; never create overlapping assignments')
+        directory=args.study/'worker_assignments';directory.mkdir(exist_ok=True)
+        suffix='-fresh' if args.stage=='fresh_control_inner' else ''
+        if args.cell:suffix+='-'+__import__('hashlib').sha256(encoded(sorted(args.cell))).hexdigest()[:16]
+        out=directory/(args.partition+'-'+args.family.replace('_','-')+suffix+'.json')
+        record=dict(host=args.host,cells=[c['id'] for c in selected],plan_sha256=sha(args.study/'PLAN.json'),
+                    build_sha256=build_pin,partition=args.partition,scientific_inputs_unchanged=True)
+        if args.family=='pretrained_shapes':record['parent_inputs']=parent_inputs(args.study,cells,selected,build_pin)
+        with out.open('xb') as stream:stream.write(encoded(record))
     print(json.dumps(record),flush=True)
 
 

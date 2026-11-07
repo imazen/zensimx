@@ -119,6 +119,11 @@ def dispatch(args):
             if not ready:continue
             admission=reserve_worker(args.study,cell['id'])
             if not admission['can_start']:break
+            try:placement=assigned_placement(args.study,cell,identity['build_sha256'])
+            except Exception as error:
+                release_worker(args.study,cell['id']);failure=str(error);break
+            if placement and placement['host']!=__import__('socket').gethostname():
+                release_worker(args.study,cell['id']);placed[cell['id']]=placement;continue
             cmd=['python3','-B','scripts/rev4_featpot/shaping_execution.py','--study',str(args.study),
                  '--binary-dir',str(args.binary_dir),'--partition',args.partition,'--inner-family',
                  '--family',cell['family'],'--cell',cell['id'],'--workers','1']

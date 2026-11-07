@@ -65,7 +65,7 @@ class PretrainedDispatchTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError,'ambiguous'):module.parent_state(root,child,[parent,child],'build')
             gate.assert_called_once()
 
-    def exercise_independent_wait(self,foreign=False):
+    def exercise_independent_wait(self,foreign=False,placement_race=False):
         class Observed(Exception):pass
         with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as d:
             root=Path(d);(root/'PLAN.json').write_text('{}');binary=root/'bin';binary.mkdir();(binary/'BUILD.json').write_text('{}')
@@ -79,13 +79,18 @@ class PretrainedDispatchTests(unittest.TestCase):
                 ticks[0]+=1
                 if ticks[0]==2:raise Observed()
             def readiness(_,cell,*rest):return (False,{'parent_cell':'blocked'}) if cell['id']=='0' and not foreign else (True,None)
-            def placement(_,cell,*rest):return dict(host='remote-fixture',assignment='fixture',assignment_sha256='pin') if foreign and cell['id']=='0' else None
+            placement_calls={}
+            def placement(_,cell,*rest):
+                placement_calls[cell['id']]=placement_calls.get(cell['id'],0)+1
+                if foreign and cell['id']=='0' and not (placement_race and placement_calls['0']==1):
+                    return dict(host='remote-fixture',assignment='fixture',assignment_sha256='pin')
+                return None
             args=SimpleNamespace(study=root,binary_dir=binary,partition='inner-0-0',workers=2,resume_name='test')
             with patch.object(module,'load_registration',return_value=({},cells,{})),patch.object(module,'existing_trial',return_value=None),patch.object(module,'assigned_placement',side_effect=placement),patch.object(module,'parent_state',side_effect=readiness),patch.object(module,'reserve_worker',return_value={'can_start':True}),patch.object(module,'bind_worker'),patch.object(module,'release_worker',side_effect=lambda _,c:released.append(c)),patch.object(module,'verify_inner_fit'),patch.object(module.subprocess,'Popen',Process),patch.object(module.time,'sleep',side_effect=sleep):
                 with self.assertRaises(Observed):module.dispatch(args)
             status=json.loads((root/'dispatch/pretrained/inner-0-0/test/STATUS.json').read_text())
             self.assertEqual(len(launched),1);self.assertEqual(launched[0][-3:],['1','--workers','1'])
-            self.assertEqual(status['completed'],['1']);self.assertEqual(released,['1']);self.assertFalse(status['active'])
+            self.assertEqual(status['completed'],['1']);self.assertEqual(released,['0','1'] if placement_race else ['1']);self.assertFalse(status['active'])
             self.assertEqual(len(status['required_cells']),2)
             self.assertEqual(set(status['interrupted_parent_dependencies']),set() if foreign else {'0'})
             self.assertEqual(set(status['externally_assigned_required']),{'0'} if foreign else set())
@@ -93,6 +98,7 @@ class PretrainedDispatchTests(unittest.TestCase):
 
     def test_waiting_parent_does_not_block_independent_registered_child(self):self.exercise_independent_wait()
     def test_foreign_placement_remains_required_and_never_launches_locally(self):self.exercise_independent_wait(True)
+    def test_placement_changed_during_admission_releases_claim_without_training(self):self.exercise_independent_wait(True,True)
 
 
 if __name__=='__main__':unittest.main()

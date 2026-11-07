@@ -821,7 +821,7 @@ required-work wait. It validates assignment identity and reports the pinned
 placement instead of launching that cell on the coordinator. Completed imports
 still pass the existing native checkpoint gate. A foreign-placement control
 keeps both cells required while only the eligible local child runs; parent-wait
-and failed-parent refusals remain. Ten placement tests and seven pretrained
+and failed-parent refusals remain. Eleven placement tests and eight pretrained
 queue tests pass. Remote orchestration resolves its resource wrapper under the
 worker's own HOME rather than assuming the coordinator's filesystem username.
 
@@ -957,3 +957,9 @@ per epoch in both RUN and RESULT, alongside matching cell/plan/build identity,
 120 epochs and the final checkpoint hash. A changed pair budget or result cell
 refuses adoption. The four-partition preflight passed for all 31 locally completed
 fits and one locally running fit; other-host placements remain required waits.
+
+New assignment creation holds the shared admission transaction while rejecting
+reserved or already placed cells. Pretraining rechecks placement after obtaining
+its claim, releasing it without training if another host acquired the cell in
+the intervening snapshot. This keeps required-work waits explicit and closes
+the placement/admission race without changing any scientific budget or gate.
