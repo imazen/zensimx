@@ -5,6 +5,20 @@ sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'rev4_featpot'))
 from shaping_storage import pending_runs,reservation,required_free,GIB
 
 class StorageTests(unittest.TestCase):
+    def test_measured_import_keeps_full_pending_training_reservations(self):
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as d:
+            r=Path(d);a=r/'runs/a/attempt-001';a.mkdir(parents=True);(a/'RUN.json').write_text('{}')
+            with patch('shaping_storage.shutil.disk_usage') as disk:
+                disk.return_value.free=100*GIB
+                with reservation(r,r/'imports/one',30*GIB,bytes_required=GIB//4):
+                    with reservation(r,r/'imports/two',30*GIB,bytes_required=GIB//8):
+                        record=json.loads((r/'storage-admission/imports-two.json').read_text())
+                        self.assertEqual(record['required_free_bytes'],34*GIB+3*GIB//8)
+                        self.assertEqual(record['pending_runs'],3)
+                    with reservation(r,a,30*GIB,bytes_required=GIB//8):
+                        record=json.loads((r/'storage-admission/a-attempt-001.json').read_text())
+                        self.assertEqual(record['job_allowance_bytes'],GIB)
+
     def test_unresolved_attempts_reserve_even_without_live_pid(self):
         with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as d:
             r=Path(d);a=r/'runs/a/attempt-001';a.mkdir(parents=True);(a/'RUN.json').write_text('{}')

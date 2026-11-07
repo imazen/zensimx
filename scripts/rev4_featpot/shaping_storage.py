@@ -23,7 +23,9 @@ def pending_runs(root):
 
 
 @contextmanager
-def reservation(root,dest,minimum):
+def reservation(root,dest,minimum,*,bytes_required=JOB_ALLOWANCE):
+    if not isinstance(bytes_required,int) or not 0<bytes_required<=JOB_ALLOWANCE:
+        raise ValueError('reservation must be positive and within one-job allowance')
     root=Path(root);dest=Path(dest).resolve();key=str(dest)
     directory=root/'storage-admission';directory.mkdir(exist_ok=True)
     ledger=directory/'RESERVATIONS.json';status=directory/(dest.parent.name+'-'+dest.name+'.json')
@@ -32,12 +34,15 @@ def reservation(root,dest,minimum):
             fcntl.flock(lock,fcntl.LOCK_EX)
             entries=json.loads(ledger.read_text()) if ledger.exists() else {}
             # Do not silently erase stale reservations: unexpected death needs review.
-            pending=pending_runs(root)|set(entries)|{key}
-            free=shutil.disk_usage(root).free;needed=required_free(minimum,len(pending))
+            budgets={name:JOB_ALLOWANCE for name in pending_runs(root)}
+            for name,entry in entries.items():
+                budgets[name]=max(budgets.get(name,0),entry.get('job_allowance_bytes',JOB_ALLOWANCE))
+            budgets[key]=max(budgets.get(key,0),bytes_required)
+            free=shutil.disk_usage(root).free;needed=minimum+AUXILIARY_ALLOWANCE+sum(budgets.values())
             record=dict(run=key,pid=os.getpid(),checked_utc=datetime.now(timezone.utc).isoformat(),
-                        free_bytes=free,required_free_bytes=needed,pending_runs=len(pending),
+                        free_bytes=free,required_free_bytes=needed,pending_runs=len(budgets),
                         stage='admitted' if free>=needed else 'waiting_for_archival',
-                        job_allowance_bytes=JOB_ALLOWANCE,auxiliary_allowance_bytes=AUXILIARY_ALLOWANCE)
+                        job_allowance_bytes=budgets[key],auxiliary_allowance_bytes=AUXILIARY_ALLOWANCE)
             status.write_bytes(encoded(record))
             if free>=needed:
                 entries[key]=record;ledger.write_bytes(encoded(entries));break

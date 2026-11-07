@@ -120,7 +120,15 @@ def collect(study,assignment_path,bundle,pin):
     if assignment['plan_sha256']!=sha(study/'PLAN.json'):raise ValueError('assignment plan drift')
     # A hidden staging tree keeps the live evaluator from seeing partial files.
     staging=study/'worker_collection'/pin
-    with reservation(study,staging,plan['minimum_ssd_free_bytes']):
+    if sha(bundle)!=pin:raise ValueError('bundle checksum differs')
+    with tarfile.open(bundle,'r') as archive:
+        manifest=json.load(archive.extractfile('COLLECTION.json'))
+    files=manifest['files'];payload=sum(row['bytes'] for row in files.values())
+    # Complete immutable fits have measured payload sizes. Preserve full future
+    # allowances for unfinished trainers, plus transport/metadata headroom here.
+    if len(files)>1000 or any(row['bytes']<0 for row in files.values()) or payload>1024**3-16*1024**2:
+        raise ValueError('bundle exceeds one-job storage allowance')
+    with reservation(study,staging,plan['minimum_ssd_free_bytes'],bytes_required=payload+16*1024**2):
         receipt=unpack(bundle,staging,pin)
         if receipt['assignment_sha256']!=sha(assignment_path):raise ValueError('assignment drift')
         run=validate(staging,assignment,cells)
