@@ -1,0 +1,34 @@
+import json
+from pathlib import Path
+import sys,tempfile,unittest
+from unittest.mock import patch
+sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'rev4_featpot'))
+from shaping_progress import audit,report_marker
+from shaping_completion import encoded,sha
+
+
+class ProgressTests(unittest.TestCase):
+    def test_successful_process_without_report_is_not_evaluated(self):
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as d:
+            root=Path(d);(root/'PLAN.json').write_text('{}')
+            cell=dict(id='cell',stage='inner',family='relu')
+            run=root/'runs/cell/attempt-001';run.mkdir(parents=True)
+            (run/'RESULT.json').write_bytes(encoded(dict(cell=cell,plan_sha256=sha(root/'PLAN.json'),exit_code=0,stage='trained')))
+            status=root/'worker.json';status.write_bytes(encoded(dict(checked_utc='2020-01-01T00:00:00+00:00',live=2,unexpectedly_stopped=[],ssd_free_bytes=100)))
+            with patch('shaping_progress.load_registration',return_value=({},[cell],{})):
+                result=audit(root,{'worker':status})
+            c=result['counts']['inner'];self.assertEqual(c['successful_fit_cells'],1)
+            self.assertEqual(c['original_final_report_cells'],0);self.assertEqual(c['neural_diagnostic_receipt_cells'],0)
+            self.assertFalse(result['overall_experiments_complete']);self.assertFalse(result['workers']['worker']['fresh'])
+
+    def test_modified_report_cannot_count_as_passed(self):
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as d:
+            root=Path(d);cell=dict(id='cell');report=root/'REPORT.json';marker=root/'COMPLETE.json'
+            report.write_bytes(encoded(dict(cell=cell,plan_sha256='plan')))
+            marker.write_bytes(encoded(dict(report_sha256=sha(report))))
+            self.assertTrue(report_marker(marker,cell,'plan'))
+            report.write_text('{}')
+            with self.assertRaisesRegex(ValueError,'report drift'):report_marker(marker,cell,'plan')
+
+
+if __name__=='__main__':unittest.main()

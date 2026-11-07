@@ -509,3 +509,16 @@ Both it and the completed retry are retained in the verified archive
 `b92a4cfd00b0dfd07efbf545ec4f3d9351277acd821e77d84165b3b9472d4638`. The fresh head resource receipt is
 2956 s / peak RSS 0.09 GiB / minimum available 36977 MiB / peak load 25.58;
 this excludes the shared pretraining cost and is not an isolated benchmark.
+
+The progress auditor now distinguishes successful processes, final evaluation
+reports, diagnostic receipts, open investigation triggers, original failed gates,
+and cell-level verified archives. It checks receipt/report hashes and labels
+worker observations stale after 120 seconds rather than treating an old PID
+report as live evidence. Controls confirm that a successful process without
+reports is not counted as evaluated and that report hash drift refuses the audit.
+The first actual audit found 126/816 inner fits with final reports and 4/72 fresh
+inner controls; these are not 130 scientifically completed comparisons. The
+required matrix currently contains 2,119 cells including 240 triggered rescues.
+Outer, curve, shuffle, human-only and full-FIT stages remain unexecuted. Central
+control-wave archives are already verified but are deliberately separate from
+the auditor's cell-level archive-receipt count.
