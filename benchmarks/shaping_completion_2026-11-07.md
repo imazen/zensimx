@@ -194,3 +194,7 @@ The completed original and all checkpoint panels are archived with manifest
 `db7c1b9fbdcd09b81a8876e31e48bf5ec331147d8f5522fc9eb130b7589a93bc`.
 Native fit wrapper: `run-heavy: done rc=0 2840s | peak-RSS 0.09GiB |
 min-avail 41595MiB | peak-load 22.27`.
+
+The complete tree inner wave and its three selection receipts are mirrored
+and reread: 584 artifact files, 3,251,255,749 bytes, all hashes matched.
+Archive manifest: `2e7685d7746262d40a42a242358a1084f39c4d839e9944c3b5a72c71acb0213f`.
