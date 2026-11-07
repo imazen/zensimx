@@ -2282,3 +2282,21 @@ Cold readback verified `relu21-admission-evidence`: 11 artifacts, 16922 bytes, r
 
 Cold readback verified `i270-relu21-inputs`: 3 artifacts, 24151161 bytes, receipt
 `eb7aaedd2b94c77b63d6aa8459c3bc680b0b3e9678635f3f6c3dcce9f41e4a0f`.
+
+
+## Incremental worker checkpoint retention at 15:53 UTC
+
+Source `19c404ec6c3b` permits explicit completed prior retention receipts while
+keeping all checks for newly imported fits. Five regression tests passed. The
+i270 pass excluded 74 previously handled cells and verified eight new completed
+fits against durable bundles and current worker checkpoint hashes. Both exact
+open-file inspections passed before removal. It removed 1,624 intermediate
+copies totaling 258,571,249 bytes; final/diagnostic checkpoints remain. Free disk
+was 56,107,479,040 bytes before and 56,369,238,016 after. No training was replayed.
+The coordinator wrapper reported `rc=0 10s | peak-RSS 0.07GiB | min-avail 21732MiB |
+peak-load 32.19`; the worker reported `rc=0 2s | peak-RSS 0.02GiB |
+min-avail 23829MiB | peak-load 19.05`.
+
+Cold readback verified `i270-checkpoint-retention-1553-evidence`: 7
+artifacts, 7207168 bytes, receipt
+`0b8080b5d108a22a79a40651957a5caa523e8f5528feead9650b14c0d4f25fa5`.
