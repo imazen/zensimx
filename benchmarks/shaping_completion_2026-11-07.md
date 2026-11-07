@@ -1265,3 +1265,20 @@ live study, the missing outer-0 admission produced the expected refusal with zer
 prediction-reader calls. This validates admission behavior, not scientific outer
 completion. The final bootstrap runner and interval reduction remain pending.
 Evidence is in `outer-evidence-qualification` under the completion-study root.
+
+### Primary paired-interval reduction
+
+`shaping_bootstrap_reduce.py` requires all 12 families, three outer folds, the
+registered one or three model seeds, five populations, pooled/within rank panels,
+and all 2,000 replicates. It reports every fold and the equal-fold mean, each
+population separately, and the equal four-human composite. Teacher agreement
+never enters that composite. Means are over seed performance, not predictions;
+95% percentile intervals and differences from ReLU use the same replicate index.
+No model selection or pooled-OOF headline occurs in this reduction.
+
+Four checks pass: teacher isolation, exact population/fold/seed weighting,
+cancellation of common source variation in paired differences, and rejection of
+missing families/axes or nonfinite samples. The wrapper reported `done rc=0 1s |
+peak-RSS 0.07GiB | min-avail 32384MiB | peak-load 23.96`. This is synthetic-array
+qualification, not completed scientific intervals. Evidence is in
+`bootstrap-reduce-qualification`; the end-to-end runner remains to be connected.
