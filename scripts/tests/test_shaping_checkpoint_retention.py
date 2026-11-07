@@ -52,4 +52,17 @@ class RetentionTests(unittest.TestCase):
                     with self.assertRaises(ValueError):reclaim(root,rows,root/'receipt.json')
                 self.assertTrue(all(Path(r['path']).exists() for r in rows))
 
+    def test_required_epoch_and_duplicate_paths_refused(self):
+        for mode in ['required','duplicate','outside']:
+            with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as d,patch('shaping_checkpoint_retention.no_users'):
+                root=Path(d);rows=self.fixture(root)
+                if mode=='required':
+                    rows[0]['epoch']=119
+                    rows[0]['path']=str(root/'runs/cell/attempt-001/checkpoints/ckpt_epoch119.bin')
+                elif mode=='duplicate':rows.append(dict(rows[0]))
+                else:rows[0]['path']=str(root/'unrelated.bin')
+                with self.assertRaises(ValueError):reclaim(root,rows,root/'receipt.json')
+                self.assertTrue((root/'runs/cell/attempt-001/checkpoints/ckpt_epoch001.bin').exists())
+                self.assertFalse((root/'receipt.json').exists())
+
 if __name__=='__main__':unittest.main()
