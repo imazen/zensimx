@@ -384,6 +384,34 @@ mod tests {
     }
 
     #[test]
+    fn independent_diagnostics_preserve_analytic_updates() {
+        for family in [
+            Family::Softplus,
+            Family::SiluMonotone,
+            Family::SiluDiagnostic,
+        ] {
+            let mut a = Network::new(config(family, false), 100., &mut SplitMix64::new(75));
+            let mut b = Network::new(config(family, false), 100., &mut SplitMix64::new(75));
+            a.diagnostics_enabled = false;
+            b.diagnostics_enabled = true;
+            for _ in 0..512 {
+                let x = [0.61, 0.83, 0.37];
+                let ca = a.forward(&x);
+                let cb = b.forward(&x);
+                assert_eq!(ca, cb);
+                assert_eq!(a.backward(&x, &ca, 0.1), b.backward(&x, &cb, 0.1));
+                a.step(0.001, 1e-5);
+                b.step(0.001, 1e-5);
+                assert_eq!(a.output, b.output);
+                assert_eq!(a.pin, b.pin);
+            }
+            assert_eq!(b.diagnostics.samples, 2);
+            assert_eq!(b.diagnostics.optimizer_steps, 512);
+            assert!(b.diagnostics.output_gradient_squared.is_finite());
+        }
+    }
+
+    #[test]
     fn analytic_gradients_include_anchors_and_signed_switch_paths() {
         for family in [
             Family::Caps,
@@ -861,17 +889,17 @@ mod tests {
 }
 
 #[derive(Default)]
-struct Diagnostics {
-    backwards: u64,
-    samples: u64,
-    first_zeros: u64,
-    first_values: u64,
-    last_active: Vec<u64>,
-    first_gradient_squared: f64,
-    max_hidden: f64,
-    output_projection_hits: u64,
-    output_gradient_squared: f64,
-    optimizer_steps: u64,
+pub(super) struct Diagnostics {
+    pub(super) backwards: u64,
+    pub(super) samples: u64,
+    pub(super) first_zeros: u64,
+    pub(super) first_values: u64,
+    pub(super) last_active: Vec<u64>,
+    pub(super) first_gradient_squared: f64,
+    pub(super) max_hidden: f64,
+    pub(super) output_projection_hits: u64,
+    pub(super) output_gradient_squared: f64,
+    pub(super) optimizer_steps: u64,
 }
 
 pub(super) struct Network {
@@ -883,6 +911,7 @@ pub(super) struct Network {
     dropout_rng: SplitMix64,
     mask: Option<Vec<f64>>,
     diagnostics: Diagnostics,
+    diagnostics_enabled: bool,
 }
 
 impl Network {
@@ -975,6 +1004,7 @@ impl Network {
             dropout_rng,
             mask: None,
             diagnostics: Diagnostics::default(),
+            diagnostics_enabled: super::optimizer_controls::diagnostics_enabled(),
             blocks,
             output,
             adam: AdamState::new(ni, usize::from(diagnostic), 0, 0),
@@ -1071,7 +1101,7 @@ impl Network {
             result[2 * i + 1] = gradient[i];
         }
         result[2 * pairs..].copy_from_slice(&gradient[pairs..]);
-        if self.config.training.is_some() {
+        if self.config.training.is_some() || self.diagnostics_enabled {
             let stats = &mut self.diagnostics;
             stats.backwards += 1;
             if stats.backwards.is_multiple_of(256) {
@@ -1096,7 +1126,7 @@ impl Network {
         for (g, w) in self.adam.gw1.iter_mut().zip(&self.output) {
             *g += l2 * w;
         }
-        if self.config.training.is_some() {
+        if self.config.training.is_some() || self.diagnostics_enabled {
             self.diagnostics.optimizer_steps += 1;
             self.diagnostics.output_gradient_squared +=
                 self.adam.gw1.iter().map(|g| g * g).sum::<f64>();
@@ -1118,7 +1148,7 @@ impl Network {
             }
         }
         if self.config.family != Family::SiluDiagnostic {
-            if self.config.training.is_some() {
+            if self.config.training.is_some() || self.diagnostics_enabled {
                 self.diagnostics.output_projection_hits +=
                     self.output.iter().filter(|&&w| w < 0.).count() as u64;
             }
@@ -1128,7 +1158,7 @@ impl Network {
     }
 
     pub(super) fn report_diagnostics(&mut self, epoch: usize) {
-        if self.config.training.is_none() {
+        if self.config.training.is_none() && !self.diagnostics_enabled {
             return;
         }
         let stats = std::mem::take(&mut self.diagnostics);

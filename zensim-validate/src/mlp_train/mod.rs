@@ -64,6 +64,7 @@ mod loss_pearson;
 mod loss_steer;
 pub mod map_term;
 mod monotone_research;
+mod optimizer_controls;
 mod shared_depth;
 mod smooth_hinge;
 mod steer_data;
@@ -3187,6 +3188,7 @@ pub fn train_mlp_strategy_pairs(
     let shared_depth_on = shared_depth::enabled(&effective);
     monotone_research::check_admission(&effective);
     input_shaping::check_admission(&effective);
+    optimizer_controls::check_admission(&effective);
     let unrestricted_first = monotone_research::unrestricted_first();
     let shared_smooth = effective.smooth_hinge;
     let first_layer_hp;
@@ -3652,6 +3654,27 @@ pub fn train_mlp_strategy_pairs(
 
     let mut depth =
         shared_depth_on.then(|| shared_depth::Head::new(hyperparams, shared_smooth, &mut init_rng));
+    let plain_optimizer = optimizer_controls::Config::load();
+    if let Some(control) = &plain_optimizer {
+        let head = depth
+            .as_mut()
+            .expect("plain optimizer requires shared-depth CPU owner");
+        assert!(
+            head.research.is_none(),
+            "plain controls must not replace a research-head configuration"
+        );
+        for value in w1
+            .iter_mut()
+            .chain(b1.iter_mut())
+            .chain(head.mid.iter_mut())
+            .chain(head.bias.iter_mut())
+        {
+            *value *= control.init_scale;
+        }
+        project_plain(&mut w1, &mut w2, &mut b1, &mut b2, nonneg, hyperparams);
+        head.project(hyperparams);
+        log_line(&format!("PLAIN_OPTIMIZER_CONTROLS {control:?}"), log);
+    }
     let training_study = depth
         .as_ref()
         .and_then(|head| head.research.as_ref())
@@ -4072,7 +4095,9 @@ pub fn train_mlp_strategy_pairs(
         // schedule is a function of. Unused (and unread) by the uniform
         // draw, which is why adding it changes nothing for a default run.
         let draw_index_base = (epoch as u64).wrapping_mul(hyperparams.pairs_per_epoch as u64);
-        let lr = if let Some(study) = &training_study {
+        let lr = if let Some(control) = &plain_optimizer {
+            control.lr(epoch, hyperparams)
+        } else if let Some(study) = &training_study {
             study.lr(epoch, hyperparams)
         } else if hyperparams.constant_lr {
             hyperparams.initial_lr
@@ -4913,8 +4938,8 @@ pub fn train_mlp_strategy_pairs(
                 log,
             );
         }
-        if let Some(research) = depth.as_mut().and_then(|head| head.research.as_mut()) {
-            research.report_diagnostics(epoch);
+        if let Some(head) = depth.as_mut() {
+            head.report_diagnostics(epoch);
         }
         let avg_loss = if n_steps > 0 {
             total_loss / n_steps as f64

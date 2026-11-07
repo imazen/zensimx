@@ -160,3 +160,32 @@ Wrapper: `run-heavy: done rc=0 48s | peak-RSS 1.63GiB | min-avail 25486MiB | pea
 Training-only pretraining, protocol registration, fair scientific fits and final
 quality/generalization conclusions remain required. Supplied initial parameters
 do not by themselves establish that a shaper was pretrained.
+
+## Independent optimizer diagnostics and plain-head controls
+
+The first completion-study analytic manifests did not include a training-research
+object, so those runs did not enable the existing gradient/projection logging.
+`ZENSIM_OPTIMIZER_DIAGNOSTICS=1` now enables sampled activity, activation-gradient,
+regularized output-gradient and projection counts independently of curricula or
+model construction. Plain shared heads use the same reporting fields. The
+logging path draws no random numbers and does not change optimizer updates.
+Actual-trainer replay and analytic update tests qualify that statement.
+
+The private `plain-shared-optimizer-v1` JSON manifest supplies `init_scale` and
+`schedule` (`cosine`, `constant`, `consolidate`). It requires both
+`ZENSIM_PLAIN_OPTIMIZER_MANIFEST` and `ZENSIM_PLAIN_OPTIMIZER_SHA256`. Scaling
+applies to first/intermediate weights and biases, followed by their existing
+projections; output initialization remains unchanged, matching the research-head
+control's scope. Consolidation uses the initial rate for the first three quarters
+and one tenth for the last quarter, matching the existing research owner.
+Neither control changes the ReLU head, pair stream or objective. Unsupported
+non-shared owners refuse these environment controls before fitting.
+
+Existing frozen binaries and scientific fits are retained. New diagnostic
+replays require separate provenance and baseline-equivalence qualification;
+they do not silently replace the primary fit or enlarge hyperparameter search.
+
+Qualification of compiled source `4aa5d643`: 400 library tests passed, two
+existing ignores unchanged; 65 CLI tests and strict clippy passed. Local and
+remote implementation hashes match. Wrapper: `run-heavy: done rc=0 42s |
+peak-RSS 1.63GiB | min-avail 25588MiB | peak-load 2.26`.

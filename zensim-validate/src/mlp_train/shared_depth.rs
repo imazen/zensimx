@@ -50,6 +50,8 @@ pub(super) struct Head {
     pub(super) width: usize,
     pub(super) smooth: bool,
     adam: AdamState,
+    diagnostics_enabled: bool,
+    diagnostics: super::monotone_research::Diagnostics,
 }
 
 impl Head {
@@ -63,6 +65,8 @@ impl Head {
             .collect::<Vec<_>>();
         let mut head = Self {
             research: super::monotone_research::Network::from_env(hp, smooth, rng),
+            diagnostics_enabled: super::optimizer_controls::diagnostics_enabled(),
+            diagnostics: Default::default(),
             adam: AdamState::new(mid.len(), width, width, 1),
             mid,
             bias: vec![0.; width],
@@ -158,6 +162,21 @@ impl Head {
                 gradient[i] += self.mid[i * self.width + j] * g;
             }
         }
+        if self.diagnostics_enabled {
+            let stats = &mut self.diagnostics;
+            stats.backwards += 1;
+            if stats.backwards.is_multiple_of(256) {
+                stats.samples += 1;
+                stats.first_values += first.len() as u64;
+                stats.first_zeros += first.iter().filter(|&&x| x == 0.).count() as u64;
+                stats.first_gradient_squared += gradient.iter().map(|v| v * v).sum::<f64>();
+                stats.last_active.resize(cache.2.len(), 0);
+                for (n, &h) in stats.last_active.iter_mut().zip(&cache.2) {
+                    *n += u64::from(h != 0.);
+                }
+                stats.max_hidden = cache.2.iter().fold(stats.max_hidden, |m, h| m.max(h.abs()));
+            }
+        }
         gradient
     }
 
@@ -174,6 +193,11 @@ impl Head {
                 *g += hp.l2_lambda * w;
             }
         }
+        if self.diagnostics_enabled {
+            self.diagnostics.optimizer_steps += 1;
+            self.diagnostics.output_gradient_squared +=
+                self.adam.gw2.iter().map(|g| g * g).sum::<f64>();
+        }
         self.adam.step(
             &mut self.mid,
             &mut self.bias,
@@ -181,7 +205,36 @@ impl Head {
             &mut self.pin,
             lr,
         );
+        if self.diagnostics_enabled {
+            self.diagnostics.output_projection_hits +=
+                self.output.iter().filter(|&&w| w > 0.).count() as u64;
+        }
         self.project(hp);
+    }
+
+    pub(super) fn report_diagnostics(&mut self, epoch: usize) {
+        if let Some(research) = &mut self.research {
+            research.report_diagnostics(epoch);
+            return;
+        }
+        if !self.diagnostics_enabled {
+            return;
+        }
+        let s = std::mem::take(&mut self.diagnostics);
+        println!(
+            "TRAINING_DIAGNOSTICS {}",
+            serde_json::json!({
+                "epoch":epoch,"backwards":s.backwards,"sample_stride":256,"sampled_responses":s.samples,
+                "first_zero_activations":s.first_zeros,"first_activation_values":s.first_values,
+                "last_unit_active_counts":s.last_active,"last_units":self.width,
+                "mean_squared_first_activation_gradient":if s.samples>0 {Some(s.first_gradient_squared/s.samples as f64)} else {None},
+                "max_last_activation_in_sample":s.max_hidden,"output_amplitudes":self.output,
+                "output_zero_weights":self.output.iter().filter(|&&w|w==0.).count(),
+                "output_projection_hits":s.output_projection_hits,"optimizer_steps":s.optimizer_steps,
+                "mean_squared_regularized_output_gradient":if s.optimizer_steps>0 {Some(s.output_gradient_squared/s.optimizer_steps as f64)} else {None},
+                "note":"sampled training responses; not a timing profile or proof of globally dead units"
+            })
+        );
     }
 
     pub(super) fn predict(
@@ -324,6 +377,30 @@ mod tests {
         let (_, _, h) =
             super::super::forward(x, w, b, &vec![0.; b.len()], &[0.], x.len(), b.len(), 0.);
         head.forward(&h).0
+    }
+
+    #[test]
+    fn diagnostic_collection_does_not_change_updates() {
+        let hp = hp();
+        let mut a = Head::new(&hp, false, &mut SplitMix64::new(12));
+        let mut b = Head::new(&hp, false, &mut SplitMix64::new(12));
+        a.diagnostics_enabled = false;
+        b.diagnostics_enabled = true;
+        for _ in 0..512 {
+            let x = [0., 0.5, 1., 2.];
+            let ca = a.forward(&x);
+            let cb = b.forward(&x);
+            assert_eq!(ca, cb);
+            assert_eq!(a.backward(&x, &ca, 0.7), b.backward(&x, &cb, 0.7));
+            a.step(&hp, 0.001);
+            b.step(&hp, 0.001);
+            assert_eq!(a.mid, b.mid);
+            assert_eq!(a.bias, b.bias);
+            assert_eq!(a.output, b.output);
+        }
+        assert_eq!(b.diagnostics.samples, 2);
+        assert_eq!(b.diagnostics.optimizer_steps, 512);
+        assert!(b.diagnostics.output_gradient_squared.is_finite());
     }
 
     #[test]
