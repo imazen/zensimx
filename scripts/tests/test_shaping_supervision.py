@@ -8,6 +8,19 @@ from shaping_evaluation import NativeFeatureGateError
 from shaping_completion import encoded
 
 class SupervisionTests(unittest.TestCase):
+    def test_softplus_supplemental_watch_keeps_family_scope(self):
+        from shaping_reexport_supervision import sweep as supplemental
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as d:
+            root=Path(d);cells=[dict(id=f,stage='inner',family=f) for f in ('relu','softplus')]
+            for cell in cells:
+                run=root/'runs'/cell['id']/'attempt-001';run.mkdir(parents=True)
+                (run/'RESULT.json').write_bytes(encoded(dict(cell=cell,stage='trained',epochs=120)))
+            with patch('shaping_reexport_supervision.load_registration',return_value=({},cells,{})),patch('shaping_reexport_supervision.reexport') as export,patch('shaping_reexport_supervision.report') as report:
+                args=SimpleNamespace(study=root,binary_dir=root/'bin',inspector=root/'inspect',family='softplus')
+                self.assertEqual(supplemental(args),1)
+                self.assertTrue(all(c.args[0].run.parent.name=='softplus' and c.args[0].analytic_diagnostic for c in export.call_args_list))
+                report.assert_called_once_with(root/'runs/softplus/attempt-001',root/'reexport_max_pairs/softplus/attempt-001',analytic_diagnostic=True)
+
     def test_undefined_convergence_preserves_failure_and_evaluates_peer(self):
         from shaping_convergence import UndefinedInnerComposite
         with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as d:

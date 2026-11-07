@@ -5314,3 +5314,7 @@ shaping-completion-reexport-check:
 
 shaping-completion-analytic-convergence run root:
     TMPDIR="$HOME/tmp" python3 -B scripts/rev4_featpot/shaping_convergence.py --run {{quote(run)}} --reexport-root {{quote(root)}} --analytic-diagnostic
+
+# Supplemental Softplus panels only; selection still requires separate qualification.
+shaping-completion-watch-softplus-reexports study binaries inspector:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 2G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_reexport_supervision.py --study {{quote(study)}} --binary-dir {{quote(binaries)}} --inspector {{quote(inspector)}} --family softplus --watch

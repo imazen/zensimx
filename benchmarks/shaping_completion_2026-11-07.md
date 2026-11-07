@@ -1835,3 +1835,10 @@ Cold destination SHA-256 verification passed for both bundles:
 The explicit analytic admission test, fifteen evaluation tests and six
 convergence tests pass. Full paired uniform-representation qualification remains
 unexecuted; these supplemental results do not admit outer evaluation.
+
+The supplemental supervisor now accepts an explicit Softplus family scope,
+covering every completed registered inner fit and its scheduled diagnostic
+checkpoints uniformly, including future completions. Its default remains ReLU,
+and separate status records prevent the two supervisors from overwriting each
+other. Family isolation is tested. This starts uniform evidence collection,
+not selection admission; original reports and native failures remain unchanged.
