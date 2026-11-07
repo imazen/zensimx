@@ -17,6 +17,8 @@ os.environ['TMPDIR']=str(Path.home()/'tmp')
 from shaping_completion import REPO, SEEDS, SETTINGS, encoded, sha
 
 
+DRIVER_SHA256=sha(__file__)
+
 def load_registration(root):
     plan=json.loads((root/'PLAN.json').read_text())
     for name,pin in [('MATRIX.json','matrix_sha256'),('PARTITIONS.json','partition_sha256')]:
@@ -130,7 +132,7 @@ def run_native(root,binary_dir,cell,record,attempt,epochs,mem):
         process=subprocess.Popen(command,stdout=log,stderr=subprocess.STDOUT,env=env)
         running=dict(cell=cell,command=command,pid=process.pid,started_utc=datetime.now(timezone.utc).isoformat(),
                      plan_sha256=sha(root/'PLAN.json'),build_sha256=sha(binary_dir/'BUILD.json'),
-                     driver_sha256=sha(__file__),stage='running',epochs=epochs,pairs_per_epoch=50000,
+                     driver_sha256=DRIVER_SHA256,stage='running',epochs=epochs,pairs_per_epoch=50000,
                      scientific_selection=cell['stage']!='resource_pilot')
         (dest/'RUN.json').write_bytes(encoded(running))
         print(json.dumps({'run':str(dest),'pid':process.pid,'cell':cell['id']}),flush=True)

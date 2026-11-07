@@ -13,6 +13,8 @@ from shaping_convergence import report
 from shaping_execution import load_registration
 
 
+DRIVER_SHA256=sha(__file__)
+
 def complete_marker(path,marker):
     if not path.exists():return False
     receipt=json.loads((path/marker).read_text())
@@ -46,7 +48,7 @@ def main():
     while True:
         n=sweep(args)
         status=dict(pid=os.getpid(),checked_utc=datetime.now(timezone.utc).isoformat(),evaluated_inner_neural=n,
-                    stage='watching' if args.watch else 'sweep_finished',driver_sha256=sha(__file__))
+                    stage='watching' if args.watch else 'sweep_finished',driver_sha256=DRIVER_SHA256)
         (args.study/'EVALUATOR_STATUS.json').write_bytes(encoded(status));print(json.dumps(status),flush=True)
         if not args.watch:return
         time.sleep(30)

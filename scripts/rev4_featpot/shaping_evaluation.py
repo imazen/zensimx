@@ -17,6 +17,8 @@ from shaping_completion import REPO, encoded, sha
 from shaping_execution import load_registration
 
 
+DRIVER_SHA256=sha(__file__)
+
 def prepare_validation(root,partition,membership):
     from shaped_linear_study import PREP
     from v2_teacher import row_keys_sha,selection_sha
@@ -177,7 +179,7 @@ def evaluate(args):
                 structure=structure,active_output_coefficients=active,one_output_coefficient=active==1,
                 train=metrics(pred,d['y'],train,d,maps),inner_validation=metrics(pred,d['y'],test,d,maps),
                 selection='registered final epoch only' if checkpoint is None else 'diagnostic checkpoint; not a selection candidate',outer_results_read=False,
-                driver_sha256=sha(__file__),plan_sha256=sha(args.study/'PLAN.json'))
+                driver_sha256=DRIVER_SHA256,plan_sha256=sha(args.study/'PLAN.json'))
     np.savez_compressed(dest/'predictions.npz',original_indices=wanted,native=pred)
     (dest/'REPORT.json').write_bytes(encoded(report))
     (dest/('COMPLETE.json' if checkpoint is None else 'DIAGNOSTIC_COMPLETE.json')).write_bytes(encoded(dict(cell=cell['id'],report_sha256=sha(dest/'REPORT.json'))))

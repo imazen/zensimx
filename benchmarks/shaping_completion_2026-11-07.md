@@ -118,3 +118,13 @@ manifest now describes the complete durable archive; the local tree is partial.
 `LOCAL_ARCHIVE_STATUS.json` in the historical root gives the restoration root,
 and `shaping-completion-20261107/RECLAIMED_OLD_GRAMS.json` lists every removed
 relative path, hash and byte count. The durable archive was not changed.
+
+## Orchestration-source receipt precision
+
+Early Python controllers computed `driver_sha256` by reading their source file
+when writing each receipt. For a process that stayed alive across a source edit,
+that field identifies the file at receipt time, not necessarily the code already
+loaded in memory. Preserve those original receipts with this qualification.
+Their exact native command lines, input pins and immutable binary identities
+remain the reproduction authority. New controllers capture the driver hash at
+module startup. This change does not alter scientific commands or checkpoints.

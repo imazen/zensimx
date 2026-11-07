@@ -17,6 +17,8 @@ from shaping_execution import load_registration
 from shaping_evaluation import probe_values
 
 
+DRIVER_SHA256=sha(__file__)
+
 def write(path,value):path.write_bytes(encoded(value))
 
 
@@ -69,7 +71,7 @@ def run(args):
         if dest.exists():raise ValueError('control attempt exists: '+str(dest))
         dest.mkdir(parents=True)
         running=dict(cell=cell,pid=os.getpid(),process_role='control_worker',stage='running',
-                     started_utc=datetime.now(timezone.utc).isoformat(),driver_sha256=sha(__file__),
+                     started_utc=datetime.now(timezone.utc).isoformat(),driver_sha256=DRIVER_SHA256,
                      plan_sha256=sha(args.study/'PLAN.json'),build_sha256=sha(args.binary_dir/'BUILD.json'))
         write(dest/'RUN.json',running);print(json.dumps({'cell':cell['id'],'pid':os.getpid(),'stage':'running'}),flush=True)
         try:
