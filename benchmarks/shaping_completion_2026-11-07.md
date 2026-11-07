@@ -2794,3 +2794,22 @@ Cold readback verified:
 
 - `legacy-joint10-handoff-admission-evidence`: 27 artifacts, 94050 bytes; receipt `8bc28ed1db26ab61b5e76d716abec910dd2832701f9b0f8a309bcfafb639f82f`.
 - `i265-joint10-handoff-inputs`: 3 artifacts, 24008696 bytes; receipt `35edfa8496f675e37ad83449f602d886e2603f3478a009a08e8fd13987c60b87`.
+
+## November 7, 19:43 UTC storage attribution
+
+A completed allocated-block scan measured 1,788,647,231,488 bytes under
+`/mnt/v/output`, including 639,641,018,368 bytes under `zensim`. The active
+shaping study accounts for 25,518,358,528 bytes of those nested totals. The older
+`~/tmp/e36test` tree separately occupies 123,797,385,216 bytes. Other output
+trees include `imij` (226,911,752,192 bytes), `corpus-builder`
+(183,987,716,096 bytes), `imazen-26-compat` (118,522,765,312 bytes) and
+`zensim-multicodec-probe` (100,090,433,536 bytes). These are allocated disk
+measurements, not deletion eligibility or permission to remove unrelated data.
+
+Evidence is in `disk-attribution-1943/{du.log,MEASUREMENT.json}` under the
+completion artifact root. Since the single du invocation visits nested roots
+first, enclosing totals add the earlier descendant argument totals; they do not
+count bind aliases as additional storage. No experiment was replayed and no
+artifact was removed. The broader duplicate read-only scan was stopped after
+88 seconds; its partial log is not used for totals. Completed scan wrapper:
+`done rc=0 84s | peak-RSS 0.81GiB | min-avail 24863MiB | peak-load 35.12`.
