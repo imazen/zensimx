@@ -603,3 +603,16 @@ Receipt: `RECLAIMED_TREE_TRANSPORT.json` under the completion-study root.
 
 Reclamation wrapper: `run-heavy: done rc=0 33s | peak-RSS 0.02GiB | min-avail 40440MiB | peak-load 20.10`.
 This is a resource observation, not a storage performance benchmark.
+
+A second, explicitly scoped pass verified all 72 completed tree fits and their
+final-report pins, then rehashed their parity-input arrays against the durable
+archive. No process held the inputs. These local parity inputs were removed;
+models, prediction panels, reports and parity logs remain locally available.
+Free filesystem space measured immediately before and after this removal was
+56,575,799,296 and 59,213,643,776 bytes. Concurrent writers remain active, so this
+is an observed filesystem change, not a general file-size-to-space estimate.
+Restoration is from `tree-inner-archive` on the durable mirror, with individual
+hashes in `RECLAIMED_COMPLETED_TREE_PARITY.json`. The earlier transport removal
+and this second pass are separately preserved.
+
+Second-pass wrapper: `run-heavy: done rc=0 28s | peak-RSS 0.02GiB | min-avail 40351MiB | peak-load 20.68`.
