@@ -98,6 +98,25 @@ this verification establishes complete durable copies, not complete local ones.
 Verification receipts, resource logs and coverage are retained in
 `inner-control-batch-reverification` under the completion-study roots.
 
+## Additional joint-shaping training capacity
+
+The 24 registered inner-2-0 joint-shaping cells are now assigned to i270, with
+four live fit processes verified at launch. The worker retains the existing
+frozen training source and binary; the 24-file input capsule (23812705 bytes)
+passed installation checksums. The controller has a 4 GiB cap and each fit a
+1 GiB cap with one thread. The other worker controllers could occupy at most
+3, 8 and 4 threads at admission, giving 19 fit threads on 24 CPUs.
+
+Disk admission followed removal of 37 imported transport duplicates
+(2212474880 bytes) after durable readback and import checks, plus 1390587639
+bytes of inactive compiler intermediates with executables preserved. The first
+installation command referenced a file absent from the old source snapshot;
+the first launch then stopped in input preparation before creating fit attempts.
+The standalone verified installer and subsequent launch succeeded. Both failure
+logs remain preserved. Input and launch/resource evidence passed archive
+readback in `i270-joint20-inputs` and `i270-joint20-qualification`. This records
+execution admission, not completed quality results.
+
 ## Convergence evaluation implementation
 
 The evaluator accepts only completed registered fits and final-epoch selection.
