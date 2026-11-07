@@ -5077,3 +5077,6 @@ shaping-completion-human-qualify study run binaries output cell:
 
 shaping-completion-register-rescue-trigger study run:
     python3 -B scripts/rev4_featpot/shaping_rescue.py --study {{quote(study)}} --trigger-run {{quote(run)}}
+
+shaping-completion-outer-plan-check:
+    python3 -B -m unittest scripts/tests/test_shaping_outer_plan.py

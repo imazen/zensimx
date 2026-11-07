@@ -253,3 +253,13 @@ pinned training log. A regression refuses changed model bytes, changed loss logs
 and outer-exposed reports. Actual completed Softplus, monotone SiLU, ordinary
 SiLU and repaired-ReLU candidates pass the shared reader. This check does not
 select an outer model or open outer responses.
+
+The outer-refit planner resolves selected schedules and finalist roles without
+reading outer labels. `SHAPING_OUTER_ADMISSION.md` fixes how equal-budget inner
+scores choose family roles and how doubled schedules propagate. It also closes
+a coverage gap in the nine original fresh outer-control cells: conditional
+controls are added for distinct pretrained setting/optimizer/phase-length tuples,
+while all original cells remain. Tests cover exact-match reuse, different settings,
+different optimizer choices, doubled phase lengths, paired seeds, deterministic
+IDs and inner-only tie handling. The pure planner explicitly does not admit outer
+evaluation without the separate complete evidence gate.
