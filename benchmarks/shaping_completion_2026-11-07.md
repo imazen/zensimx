@@ -2257,3 +2257,28 @@ The reports preserve whole-batch time/RSS including shared preparation, export
 and evaluation, plus labeled per-fit civil-clock intervals. Per-fit peak RSS
 and training-only timing are unmeasured. No training was replayed. Evidence:
 `control-resources-1547.json` under the completion study output root.
+
+
+## Newly admitted ReLU inner-2-1 wave
+
+After i270 completed its analytic inner-1-0 wave, the twelve previously unstarted
+registered ReLU inner-2-1 fits were assigned there with two workers. Frozen
+input installation verified checksums and explicitly reused identical inputs.
+The first admission check refused before training because 17 active trainers
+were observed against an anticipated 16; that refusal and original command are
+preserved. The corrected admission accounts for 19 aggregate single-thread
+trainers on the observed 24-thread host, within its 20-thread compute budget.
+
+Admission measured 56,143,802,368 free disk bytes against 55,834,574,848 required
+(including the 30 GiB reserve, shared allowance and pending writes), and
+25,424,977,920 available memory bytes. The controller has a 2 GiB cap; each child
+retains its 1 GiB cap. Both native children were verified live. This starts no
+completed fit again and changes no registered scientific input or schedule.
+Additional admissions there are held until headroom improves. Worker source:
+`ce9229d0362d`; commands and receipts: `relu21-admission-evidence`.
+
+Cold readback verified `relu21-admission-evidence`: 11 artifacts, 16922 bytes, receipt
+`167c165462d35362b00a8a6f411271ae471c22212f3d8c5a790bf8a3b13b6460`.
+
+Cold readback verified `i270-relu21-inputs`: 3 artifacts, 24151161 bytes, receipt
+`eb7aaedd2b94c77b63d6aa8459c3bc680b0b3e9678635f3f6c3dcce9f41e4a0f`.
