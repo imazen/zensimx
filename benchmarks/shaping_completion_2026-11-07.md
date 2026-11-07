@@ -2964,3 +2964,54 @@ headroom, the remaining 1,939 MiB does not fit the current 2,048 MiB controller
 cap. Its cache has 504G available. No host installation or compute launch was
 performed there. The bootstrap supervisor was verified live with 89 required
 jobs waiting and no failures.
+
+## November 7, stopped Softplus evaluator recovery and process-aware audits
+
+The supplemental Softplus evaluator's last successful status was 17:55:02 UTC,
+with 57 cells complete. It subsequently exited with an ImportError: its loaded
+`shaping_completion` module lacked `MAX_PAIR_FAMILIES` when a lazy import loaded
+a newer `shaping_selection`. The old PID 1566500 was verified absent. The
+original failed log reports `done rc=1 22693s | peak-RSS 0.24GiB | min-avail
+19360MiB | peak-load 36.39`; its historical watching status did not prove liveness.
+
+The original log/status and completed conversion receipt for rescue cell
+`59b285d756514d34d281` were preserved. No incomplete evaluation directory existed.
+A new evaluator on committed source `a4372c9225b0` launched at 20:20:55 UTC as
+`zensim-softplus-evaluator-recovery-20261107-2020`, with a 2 GiB cap and one job.
+Its Python PID 2937002 was verified by command. It reused the existing native
+conversion after validating its hashes; that conversion receipt remains byte
+identical. Completed reports were reused, and new reports filled the evaluation
+gap. It reported 69 cells complete at the 20:31 recovery observation. No training
+was replayed, and scientific thresholds, exposure and selection rules remain.
+
+The existing progress owner now accepts repeated `--supervisor-status ROLE=PATH`
+arguments. It verifies a recorded local PID's interpreter/script, exact study
+argument and evaluator/archive mode. A watching record whose PID is missing
+is reported as `recorded_process_missing`; a reused PID with a different role
+is rejected. A live PID with an old status remains live with `status_fresh=false`.
+Unavailable process inspection is unknown, not a declaration that work stopped.
+This tool does not restart anything: inspect launch records and current children
+before recovering a writer, including while a replacement is performing its
+first sweep and has not yet replaced the old status.
+
+All nine progress tests pass, including missing/reused PIDs, wrong study/family,
+archive-mode mismatch, stale-but-live records and unavailable observations. The
+existing fit/report/convergence/archive accounting tests also pass.
+`just shaping-completion-progress-check` owns this check. The live audit at
+20:28 verified all ten requested evaluator/archive/bootstrap roles. Its worker
+observations were fresh, with 16 i265, 20 i270 and 12 r3800x live attempts and
+no unexpected stops. It counted 505/816 inner fits, 70/72 fresh controls and
+17/720 rescues trained; pending scientific stages remain unexecuted.
+
+Recovery evidence was cold-readback verified in
+`softplus-supervisor-import-recovery-2020`: 13 files, 1,289,351 bytes, receipt
+SHA-256 `18819b0a8bb453fbb9aea54a466e28600241ab0d02085f29a4d7aa4c39d63e1a`.
+It includes the failed and recovered logs/statuses, unchanged conversion receipt,
+test output, process-aware progress audit and launch identity.
+
+Three original fresh-control order failures on inner-2-1 remain preserved:
+`04740b8209ac529ce90d` (0.000015258789069605427),
+`6b50513c0ada4c611456` (0.000011444091796875) and
+`1c1fb3a1803998068d78` (0.00001239776611328125). Each uniform max-pair final
+report has identity 100, finite outputs and maximum damage increase zero;
+convergence reports and original-cell archives exist. No tolerance was loosened.

@@ -100,6 +100,14 @@ root cause remains under investigation. The evaluation supervisor now records
 failed gates without qualifying that cell, and evaluates independent cells.
 See `benchmarks/shaping_completion_2026-11-07.md`.
 
+Three inner-2-1 fresh controls also fail the original export's final order
+probe: cells `04740b8209ac529ce90d`, `6b50513c0ada4c611456` and
+`1c1fb3a1803998068d78`. Their measured increases are
+0.000015258789069605427, 0.000011444091796875 and 0.00001239776611328125.
+All original failures remain archived. Their uniformly qualified max-pair
+re-exports have exact identity 100 and zero measured order violations under
+the unchanged gate. This does not qualify or promote a serving model.
+
 ## Known Bugs — absent training calibration maps (resolved November 7, 2026)
 
 The generalization evaluator used an uninitialized array for populations absent
