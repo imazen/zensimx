@@ -13,13 +13,20 @@ def replay(args):
     plan,cells,_=load_registration(args.study)
     original=json.loads((args.run/'RUN.json').read_text())
     result=json.loads((args.run/'RESULT.json').read_text())
-    if original['cell'] not in cells or original['cell']['stage']!='inner':raise ValueError('registered inner fit required')
-    if result['stage']!='trained' or result['exit_code']!=0:raise ValueError('completed fit required')
+    if original['cell'] not in cells:raise ValueError('registered fit required')
+    epochs=original.get('epochs',original['cell'].get('epochs'))
+    if epochs is None:raise ValueError('missing registered epoch budget')
+    pilot=getattr(args,'resource_pilot',False)
+    if pilot:
+        if original['cell']['stage']!='resource_pilot' or epochs!=1 or result['stage']!='complete':
+            raise ValueError('only completed one-epoch resource pilot is a qualification replay')
+    elif original['cell']['stage']!='inner' or result['stage']!='trained':raise ValueError('completed registered inner fit required')
+    if result['exit_code']!=0:raise ValueError('failed fit cannot qualify a replay')
     if original['plan_sha256']!=sha(args.study/'PLAN.json'):raise ValueError('original plan drift')
     build=json.loads((args.binary_dir/'BUILD.json').read_text())
     for name,pin in build['binary_sha256'].items():
         if sha(args.binary_dir/name)!=pin:raise ValueError('diagnostic binary drift')
-    old=args.run/'checkpoints'/f"ckpt_epoch{original['epochs']-1:03}.bin"
+    old=args.run/'checkpoints'/f"ckpt_epoch{epochs-1:03}.bin"
     if sha(old)!=result['bake_sha256']:raise ValueError('original checkpoint drift')
     if args.output.exists():raise ValueError('preserve existing replay')
     args.output.mkdir(parents=True);(args.output/'checkpoints').mkdir()
@@ -52,7 +59,7 @@ def replay(args):
     traces=[]
     for line in (args.output/'train.log').read_text().splitlines():
         if line.startswith('TRAINING_DIAGNOSTICS '):traces.append(json.loads(line.split(' ',1)[1]))
-    if [r['epoch'] for r in traces]!=list(range(original['epochs'])):raise ValueError('incomplete diagnostic trace')
+    if [r['epoch'] for r in traces]!=list(range(epochs)):raise ValueError('incomplete diagnostic trace')
     (args.output/'DIAGNOSTICS.json').write_bytes(encoded(traces))
     (args.output/'RESULT.json').write_bytes(encoded(dict(**receipt,canonical_sha256=canonical,match=canonical[0]==canonical[1],epochs=len(traces))))
     if canonical[0]!=canonical[1]:raise ValueError('diagnostics changed canonical model; do not attribute traces to original')
@@ -61,4 +68,5 @@ def replay(args):
 if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__)
     for name in ('study','binary-dir','run','output'):p.add_argument('--'+name,type=Path,required=True)
+    p.add_argument('--resource-pilot',action='store_true',help='qualification only, excluded from scientific selection')
     replay(p.parse_args())

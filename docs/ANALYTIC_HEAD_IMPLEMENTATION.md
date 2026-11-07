@@ -195,3 +195,21 @@ the four actual-trainer replay outputs/logs: 17 artifact files, 100,735 bytes.
 All destination hashes passed client readback after fsync/cache-eviction requests.
 Manifest: `6462a170aaca96a7a1926ed7fcf536a8c1b2b422fd66e947a20fca1315347984`.
 Archive suffix: `shaping-completion-20261107/optimizer-qualification`.
+
+The release build also replays all three frozen native controls exactly after
+removing only `zentrain.repro` (12 seconds, 0.16 GiB peak RSS). A diagnostic
+replay of the actual-data one-epoch resource pilot emitted its complete epoch
+trace and reproduced canonical SHA-256
+`968e8d6fca93600fb1846c2bdc2653ef0bf97bc61f3bd6f3a08f8be5bbc45123`.
+That replay took 23 seconds with 0.09 GiB measured peak RSS. Its initial driver
+attempt refused the older pilot receipt's missing top-level epoch field before
+training; the corrected reader uses the registered cell's explicit epoch budget.
+Both attempt logs are preserved. This pilot is excluded from scientific selection.
+
+Verified release-binary archive manifest:
+`177dd142c0c8b8a9be14dcaa22296aa1cd0b0a441d3739e0bde12dfb727b133b`.
+Verified three-control replay archive manifest:
+`fb90b66bb85889430a69e4ec26b6b530c6c0e375aa1266ae7f6a51ce1d477ca8`.
+
+Verified diagnostic-pilot archive manifest:
+`02067ac8d54ae8c6407f9433d11a3de3beb4b2a91a30db12afb0bcdda98b14af`.
