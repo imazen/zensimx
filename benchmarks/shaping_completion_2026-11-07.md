@@ -3132,3 +3132,23 @@ unexpected stops on all three workers. Inner fits increased to 534/816;
 438 have native cell archive receipts, with the 96 controls covered by their
 separate central archives. All 72 fresh controls and 18 completed rescues retain
 their verified archives. Outer, full-FIT and memorization stages remain pending.
+
+At 21:30 UTC, the remaining available i265 slot admitted the never-started
+inner-2-1 setting-0/seed-2 separate-pretrained-joint cell
+`3cc5aca06facacb2065e`. The existing host guard assigned it atomically; the
+input installer verified its parent checkpoints and immutable partition inputs.
+Native PID 4099400 was observed with the registered 120-epoch command, restoring
+the host's native count to its budget of 16. An initial installer invocation
+omitted the required partition argument and refused before installation or
+training; the failed log is preserved alongside the corrected installation.
+No fit was replayed. Local inspection independently verified 28 live fits and
+no unexpected stops; all 18 downstream selection/outer/variant/full-FIT watcher
+processes were also verified live against their study commands.
+
+Cold-readback archives are `i265-pretrained21-separate2-2133-inputs` (3 files,
+25,196,857 bytes; receipt
+`d97ea08aabbb6bfecc7c00413c0f52e585968f38e760c6c70d6c65f528518b3e`)
+and `i265-pretrained21-separate2-2133-evidence` (8 files, 256,336 bytes;
+receipt `06af2b3c87fe483211ce89364e7597e8a035fab185b9121ed7376f4330eb6ba0`).
+The evidence includes the unchanged placement, installation, launch preflight,
+native identity and complete downstream supervision snapshot.
