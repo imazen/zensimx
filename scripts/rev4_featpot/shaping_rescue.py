@@ -55,20 +55,22 @@ def resolve(root,cell_id):
                 trigger_sha256=sha(trigger_path),plan_sha256=sha(root/'PLAN.json'),outer_results_read=False)
 
 
-def controls(rescue,analytic=False,*,groups=None):
+def controls(rescue,analytic=False,*,groups=None,human_only=False):
     if rescue not in RESCUES:raise ValueError('unregistered rescue')
     scale={'init_half':.5,'init_double':2.}.get(rescue,1.)
     schedule={'constant_lr':'constant','consolidate_lr':'consolidate'}.get(rescue,'cosine')
     if not analytic:return dict(schema='plain-shared-optimizer-v1',init_scale=scale,schedule=schedule)
-    if not groups or sum(g['name']=='cid22' for g in groups)!=1:
-        raise ValueError('analytic training controls require exact admitted row-family groups and one teacher')
+    if not groups or sum(g['name']=='cid22' for g in groups)!=(0 if human_only else 1):
+        raise ValueError('analytic training controls require exact admitted row-family groups and '+('zero teachers' if human_only else 'one teacher'))
     if len({g['name'] for g in groups})!=len(groups) or any(not g['families'] for g in groups):
         raise ValueError('empty or duplicate analytic training groups')
     # Native Events validates each name and row count against admitted tables.
     # Match plain owner's weight AND bias scaling; retain teacher mass and pair order.
-    return dict(schema='monotone-training-v1',init_scale=scale,bias_scale=scale,
+    result=dict(schema='monotone-training-v1',init_scale=scale,bias_scale=scale,
                 dropout=0.,dropout_seed=0,adamw=0.,schedule=schedule,order='random',
                 teacher_mass=1.,balance='none',groups=groups)
+    if human_only:result['human_only']=True
+    return result
 
 
 def rewrite_command(command,binary_dir,output,epochs):

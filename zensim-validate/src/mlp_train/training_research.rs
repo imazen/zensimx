@@ -48,10 +48,30 @@ pub(super) struct Config {
     pub schedule: Schedule,
     pub order: Order,
     pub teacher_mass: f64,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub human_only: bool,
     pub balance: Balance,
     pub groups: Vec<Group>,
 }
+fn is_false(value: &bool) -> bool {
+    !*value
+}
 impl Config {
+    fn validate_teacher_count(&self, count: usize) {
+        if self.human_only {
+            assert_eq!(count, 0, "human-only controls forbid teacher groups");
+            assert_eq!(
+                self.teacher_mass, 1.,
+                "human-only controls cannot reweight a teacher"
+            );
+            assert!(
+                !matches!(self.order, Order::TeacherWarm),
+                "human-only controls cannot warm up a teacher"
+            );
+        } else {
+            assert_eq!(count, 1);
+        }
+    }
     pub(super) fn validate(&self, hp: &MlpHyperparams) {
         assert_eq!(self.schema, "monotone-training-v1");
         assert!(self.init_scale.is_finite() && self.init_scale > 0.);
@@ -292,7 +312,7 @@ impl Events {
             references.push(group.ref_ids.expect("study requires source IDs").to_vec());
             teacher.push(group.name == "cid22");
         }
-        assert_eq!(teacher.iter().filter(|&&v| v).count(), 1);
+        config.validate_teacher_count(teacher.iter().filter(|&&v| v).count());
         // Keep scaler membership fixed, including for teacher_mass=0. Only the
         // proposal CDF changes; no held-out rows or labels enter this operation.
         let mut cdf = ctx.cdf.to_vec();
@@ -413,6 +433,28 @@ impl Events {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn human_only_is_explicit_and_preserves_legacy_serialization() {
+        let legacy = serde_json::json!({"schema":"monotone-training-v1",
+            "init_scale":1.,"bias_scale":1.,"dropout":0.,"dropout_seed":0,
+            "adamw":0.,"schedule":"cosine","order":"random","teacher_mass":1.,
+            "balance":"none","groups":[]});
+        let config: Config = serde_json::from_value(legacy.clone()).unwrap();
+        assert!(!config.human_only);
+        assert_eq!(serde_json::to_value(&config).unwrap(), legacy);
+        config.validate_teacher_count(1);
+        assert!(std::panic::catch_unwind(|| config.validate_teacher_count(0)).is_err());
+        assert!(std::panic::catch_unwind(|| config.validate_teacher_count(2)).is_err());
+        let mut human = config.clone();
+        human.human_only = true;
+        human.validate_teacher_count(0);
+        assert!(std::panic::catch_unwind(|| human.validate_teacher_count(1)).is_err());
+        human.teacher_mass = 0.;
+        assert!(std::panic::catch_unwind(|| human.validate_teacher_count(0)).is_err());
+        human.teacher_mass = 1.;
+        human.order = Order::TeacherWarm;
+        assert!(std::panic::catch_unwind(|| human.validate_teacher_count(0)).is_err());
+    }
     #[test]
     fn within_population_orders_keep_teacher_skips_and_every_population_slot() {
         let events = (0..600)

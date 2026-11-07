@@ -7,6 +7,16 @@ from shaping_selection import HUMANS,aggregate
 from shaping_rescue_selection import aggregate as aggregate_rescues
 
 class RescueTests(unittest.TestCase):
+    def test_human_only_controls_require_explicit_teacher_exclusion(self):
+        groups=[dict(name='human_kadid',families=[0,1])]
+        with self.assertRaisesRegex(ValueError,'one teacher'):controls('constant_lr',True,groups=groups)
+        result=controls('constant_lr',True,groups=groups,human_only=True)
+        self.assertTrue(result['human_only']);self.assertEqual(result['groups'],groups)
+        self.assertEqual(result['teacher_mass'],1.)
+        with self.assertRaisesRegex(ValueError,'zero teachers'):
+            controls('constant_lr',True,groups=groups+[dict(name='cid22',families=[0])],human_only=True)
+        self.assertNotIn('human_only',controls('constant_lr',True,groups=[dict(name='cid22',families=[0])]))
+
     def test_rescue_selection_requires_all_thirty_paired_reports(self):
         cells=matrix();reports={}
         for cell in cells:
