@@ -642,6 +642,31 @@ inode and modification time for reuse, plus mismatch refusal. Shared-base
 installation cannot use this option.
 # Cost report replay
 
+## Live trainer utilization observation
+
+The live profiler (`just shaping-live-profile PID NEW_OUTPUT`) attaches to an
+existing native trainer, records ten seconds of user-cycle samples and a separate
+ten-second hardware-counter observation, and verifies the executable hash and
+process start identity before and after. It does not start or replay training.
+
+On 2026-11-07, the constant-learning-rate ReLU rescue cell
+`9fc732545a4c5e3e170c` was observed with trainer SHA-256
+`721bfd6c58b45e67e143c13b9a94c8f3443dfe75fb4c9b392d49620b2a261d4e`.
+The sampled self-cycle shares were 37.23% for
+`adam_simd::__arcane_adam_pair_fused_inner_v4`, 35.56% for
+`mlp_train::project_plain_indexed`, 5.60% for `shared_depth::Head::backward`,
+and 4.74% for `simd_mlp::forward_pair_avx512`. There were no lost samples.
+The counter interval recorded 9,847.24 ms of task-clock and zero page faults;
+hardware events were multiplexed with 83% coverage. These observations identify
+optimizer/projection work as the main sampled cost for this fit. They do not
+measure an optimization speedup, isolated throughput, or every architecture.
+The profiler itself adds overhead; no scientific binary or training input changed.
+
+Evidence is under `live-trainer-profile-1437` in the completion artifact root,
+with its qualified source and command log preserved in
+`live-trainer-profile-1437-evidence`. Further training replays are disabled by the
+owner's instruction; optimization proposals must not rerun completed fits.
+
 `shaping_model_inventory` reads the exact models named by a hash-bound cost
 workload through the native model owners. It records tree/node counts and the
 expanded f32 layer coefficients, biases and nonzero weights. It deliberately

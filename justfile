@@ -5087,6 +5087,9 @@ shaping-model-inventory binary workload output:
 shaping-model-inventory-check binary inspector workload tree_log output:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_inventory_check.py --binary {{quote(binary)}} --inspector {{quote(inspector)}} --workload {{quote(workload)}} --tree-log {{quote(tree_log)}} --output {{quote(output)}}
 
+shaping-live-profile pid output:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_live_profile.py --pid {{pid}} --output {{quote(output)}}
+
 shaping-completion-dispatch-rescues study binary_dir neutral outer *args:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 6G --jobs 2 -- python3 -B scripts/rev4_featpot/shaping_rescue_dispatch.py --study {{quote(study)}} --binary-dir {{quote(binary_dir)}} --neutral-qualification {{quote(neutral)}} --outer {{outer}} --workers 2 {{args}}
 
