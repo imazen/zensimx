@@ -1799,6 +1799,35 @@ The replay was archived with cold destination readback: 368 artifact files,
 Artifact suffix: `zero-output-optimizer-replay` beneath the completion-study
 local and durable roots. The replay remains excluded from model selection.
 
+## Collapsed-fit first-weight replay: complete checkpoint parity
+
+The additional first-layer weight observer completed the same frozen-product
+cell `7acaa2df5782f9d05f08` for all 120 epochs. Every canonical checkpoint
+matches the original, including transient states. The final canonical hash is
+`511f6d4e47bc5fc828e97ae9c65e68b0e15dae925afcaab318294f69c318c2fa`.
+This qualifies the new weight traces for this fit; the observer does not change
+its optimizer trajectory.
+
+At epoch 0, the sampled mean squared data-pair weight-gradient norm is
+60.93524851312713 and the norm including coupled L2 is 60.93488391083481.
+At epoch 1, they are 0 and 1.824576873014883e-51. Both are zero at every
+epoch from 2 through 119. Each of these first three epochs samples 386 pairs
+with stride 128. These are squared pair-gradient norms, not per-parameter means
+or full-population measurements. They exclude Adam moments, projection and
+decoupled decay. Similar epoch-zero aggregate norms do not prove that L2 had
+no effect on individual coordinates, and the traces do not isolate the causal
+contributions of Adam history or projection to collapse. No architecture-wide
+rejection follows from this single failed fit.
+
+The complete replay passed cold archive readback: 369 artifact files,
+25060478 bytes, under `zero-output-first-weight-replay` in the completion-study
+local and durable roots. SHA manifest:
+`6c1ee1651006d739cb910be96f5ef0c9d4628f453f05f99ee00b9fe1c80c66b4`.
+The launch wrapper reports rc=0, 2337 seconds,
+peak RSS 0.09 GiB, minimum available memory 34940 MiB, peak load 26.68.
+These are replay resource observations, not inference benchmark measurements.
+The replay remains excluded from scientific model selection.
+
 ## Supplemental analytic re-export qualification scope
 
 Before evaluating repaired Softplus quality panels, extend the existing native
