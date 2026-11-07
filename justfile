@@ -5033,3 +5033,6 @@ shaping-completion-dispatch-rescues study binary_dir neutral outer:
 
 shaping-completion-watch-all-evaluation study binary_dir rescue_binary_dir:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 2G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_supervision.py --study {{quote(study)}} --binary-dir {{quote(binary_dir)}} --rescue-binary-dir {{quote(rescue_binary_dir)}} --watch
+
+shaping-completion-reconcile-prefix-failure study cell:
+    python3 -B scripts/rev4_featpot/shaping_reconcile_prefix_failure.py --study {{quote(study)}} --cell {{quote(cell)}}
