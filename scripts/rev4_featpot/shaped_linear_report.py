@@ -280,8 +280,21 @@ def linear_details(root):
     print(json.dumps(dict(stage='linear-details',fits=len(objective),calibrations=len(calibration),stability_cells=len(stability),collision_half_mse_floor=collision)),flush=True)
 
 
+def label_structure(root):
+    from shaped_linear_study import permuted,mapped_labels,metrics
+    _,d=load(root);os.environ['ZEN_PANEL_BIN']=str(root/'bin/panel');seen=set();records=[]
+    for task in json.loads((root/'S4_linear.json').read_text()):
+        key=(tuple(task['train']),task['permutation'],task['seed'])
+        if key in seen:continue
+        seen.add(key);ids=np.array(task['train']);y=permuted(d['y'],d,ids,task['permutation'],task['seed'])
+        _,_,maps=weights_and_targets(y[ids],d['pop'][ids],d['component'][ids],'range',1.)
+        records.append(dict(representative_task=task['id'],mode=task['permutation'],seed=task['seed'],original_vs_permuted=metrics(mapped_labels(y,d['pop'],maps)*100,d['y'],ids,d,maps)))
+    write(root/'linear-details/LABEL_STRUCTURE.json',records)
+    print(json.dumps(dict(stage='label-structure',permutations=len(records))),flush=True)
+
+
 def main():
-    p=argparse.ArgumentParser(description=__doc__);p.add_argument('stage',choices=['audit','linear-details','bootstrap','report','archive']);p.add_argument('--root',type=Path,required=True);a=p.parse_args();{'audit':audit,'linear-details':linear_details,'bootstrap':bootstrap,'report':reduce,'archive':archive}[a.stage](a.root)
+    p=argparse.ArgumentParser(description=__doc__);p.add_argument('stage',choices=['audit','linear-details','label-structure','bootstrap','report','archive']);p.add_argument('--root',type=Path,required=True);a=p.parse_args();{'audit':audit,'linear-details':linear_details,'label-structure':label_structure,'bootstrap':bootstrap,'report':reduce,'archive':archive}[a.stage](a.root)
 
 
 if __name__=='__main__':main()
