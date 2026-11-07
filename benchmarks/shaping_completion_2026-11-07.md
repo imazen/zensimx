@@ -1349,3 +1349,31 @@ or a rejection of the architecture. Other initialization/schedule trials remain
 required. The late-phase measurements and input log hashes are preserved in
 `relu-consolidation-late-phase` in both artifact roots. A single surviving output
 coefficient still combines a nonlinear hidden network; it is not a feature ceiling.
+
+## Fourth completed ReLU consolidation rescue
+
+Cell `88b347ffcffe8506a7ad` completes the second seed on `inner-0-0`
+with the registered 240-epoch consolidation schedule. The native optimizer
+trace records at most one output coefficient at 205 of 240 checkpoints, first
+at epoch 25 and continuously from epoch 37 through 239. All 60 checkpoints
+after the consolidation change at epoch 180 therefore retain one coefficient.
+Together with the preceding three cells, both paired seeds on both inner
+partitions show persistence of collapse through the late consolidation phase.
+This does not settle the other registered rescue schedules or reject ReLU.
+
+At epoch 239, one of 64 last-layer units responds in the 386 sampled responses;
+43,070 of 49,408 sampled first-layer activations are zero. Mean squared first
+activation gradient is 1.282870966060248 and mean squared regularized output
+gradient is 3837056.5065637473. The full trace records 1,065,276 output
+projection hits. Activation gradients are not first-weight gradients, and
+sampled inactivity does not establish global deadness. Convergence still
+requires investigation for both the one-output condition and same-cycle
+inner-composite improvement above 0.002. No outer results were read.
+
+The original run, uniform max-pair evaluation and reexport records passed
+complete destination SHA-256 readback: 714 artifact files, 67,416,352 bytes.
+The independently stored summary and archive receipts are in
+`relu-rescue-seed1-second-partition-diagnosis`. At 10:16:42 UTC the matrix
+had 225/816 completed inner fits, 24/72 fresh inner controls and 4/720
+rescues; outer, learning-curve, shuffled-label and human-only studies remained
+unexecuted. These counts are progress evidence, not completion.
