@@ -1861,3 +1861,18 @@ identity. It preserves incomplete or failed evaluations without archiving them
 as complete and does not reclaim local data. A negative-control test refuses
 missing checkpoint coverage and corrupted repair artifacts before any copy;
 complete inputs mirror both bundles and are not recopied on the next sweep.
+
+## First-weight binary set and native qualification archive
+
+The observer binary set built successfully with release thin LTO and one
+code-generation unit. The resource wrapper measured 591 seconds, 1.70 GiB
+peak RSS, 22944 MiB minimum available RAM and 20.56 peak load; this contended
+build duration is not an inference benchmark. Copied binary hashes match the
+remote build outputs. Complete cold destination verification passed for
+`first-weight-bin` (5 files, 32876354 bytes) and
+`first-weight-native-qualification` (10 files, 677200 bytes).
+
+The full 120-epoch replay controller was launched with required per-epoch weight
+traces and all-checkpoint canonical matching. Storage admission initially held
+it because pending-job allowances exceeded available SSD space. No training
+started through that hold, and no reserve or allowance was weakened.
