@@ -62,12 +62,12 @@ zenpng = { version = ">=0.1.4, <0.3.0", default-features = false }
 zenpixels = { version = ">=0.3.1, <0.4.0", default-features = false }
 zenblend = "0.1.3"
 enough = { version = "0.4.2", default-features = false, features = ["std"] }
-# zenpredict / zenpredict-bake live in sibling `zenanalyze` (not on crates.io).
-# Pinned to a specific git rev for CI portability (no sibling-clone needed).
-# Local developers wanting auto-sync with the sibling worktree should add
-# a `[patch]` section to their personal `.cargo/config.toml`:
-#     [patch."https://github.com/imazen/zenanalyze"]
-#     zenpredict      = { path = "../zenanalyze/zenpredict" }
+# Native research runtime and baker from zenanalyze PR 93. The source pin
+# includes exact Softplus/SiLU operators needed by the shaping study; this is
+# an unreleased research dependency, not a serving-model promotion.
+# Keep the runtime and baker on one revision. Existing frozen bakes and their
+# qualification remain separate from the new experimental activation graphs.
+zenpredict      = { path = "../zenanalyze/zenpredict" }
 #     zenpredict-bake = { path = "../zenanalyze/zenpredict-bake" }
 # Bump the rev deliberately when a zenanalyze fix zensim needs lands.
 #
