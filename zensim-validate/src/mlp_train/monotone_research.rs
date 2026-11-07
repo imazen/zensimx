@@ -27,13 +27,21 @@ pub(super) fn check_admission(hp: &MlpHyperparams) {
 /// Opt-in diagnostic removes first-layer projection while keeping the same
 /// scale-only feature transform. Admission flags still select the shared owner.
 pub(super) fn unrestricted_first() -> bool {
-    let Some(path) = std::env::var_os("ZENSIM_MONOTONE_RESEARCH_MANIFEST") else { return false; };
+    let Some(path) = std::env::var_os("ZENSIM_MONOTONE_RESEARCH_MANIFEST") else {
+        return false;
+    };
     let expected = std::env::var("ZENSIM_MONOTONE_RESEARCH_SHA256").expect("manifest hash");
-    assert_eq!(crate::train_manifest::sha256_file(std::path::Path::new(&path)).unwrap(), expected);
+    assert_eq!(
+        crate::train_manifest::sha256_file(std::path::Path::new(&path)).unwrap(),
+        expected
+    );
     let c: Config = serde_json::from_slice(&std::fs::read(path).unwrap()).expect("research config");
     if c.unrestricted_first {
         assert_eq!(c.family, Family::SiluDiagnostic);
-        assert_eq!(c.max_pairs, 0, "unrestricted diagnostic cannot retain max-pair ties");
+        assert_eq!(
+            c.max_pairs, 0,
+            "unrestricted diagnostic cannot retain max-pair ties"
+        );
     }
     c.unrestricted_first
 }
@@ -72,7 +80,9 @@ struct Config {
     analytic: Option<analytic::Config>,
 }
 
-fn is_false(value: &bool) -> bool { !value }
+fn is_false(value: &bool) -> bool {
+    !value
+}
 
 fn is_zero(value: &f64) -> bool {
     *value == 0.
@@ -458,6 +468,38 @@ mod tests {
     }
 
     #[test]
+    fn diagnostic_updates_free_output_bias_and_retains_signed_paths() {
+        let mut c = config(Family::SiluDiagnostic, false);
+        c.unrestricted_first = true;
+        c.max_pairs = 0;
+        let mut net = Network::new(c, 100., &mut SplitMix64::new(9));
+        net.output.fill(-0.3);
+        net.blocks[0].w.fill(-0.2);
+        net.blocks[0].b.fill(0.4);
+        let x = [0.2, 0.5, 0.7];
+        let cache = net.forward(&x);
+        net.backward(&x, &cache, 0.7);
+        assert_eq!(net.adam.gb1[0], 0.7);
+        net.step(0.001, 0.);
+        assert!(net.pin < 100.);
+        assert!(net.output.iter().all(|w| *w < 0.));
+        assert!(net.blocks[0].w.iter().all(|w| *w < 0.));
+        let first_w = [-0.2, 0.3, -0.4];
+        let first_b = [0.4, -0.5, 0.6];
+        let bytes = net.bake(&[0.], &[1.], &first_w, &first_b, 1, 3);
+        let model = zenpredict::Model::from_bytes(&bytes).unwrap();
+        let mut p = zenpredict::Predictor::new(&model);
+        for raw in [-3.0_f32, 0., 0.3, 3.] {
+            let first = (0..3)
+                .map(|i| (first_w[i] * f64::from(raw) + first_b[i]).max(0.))
+                .collect::<Vec<_>>();
+            assert!(
+                (f64::from(p.predict(&[raw]).unwrap()[0]) - net.forward(&first).0).abs() < 1e-5
+            );
+        }
+    }
+
+    #[test]
     fn nonconvex_controls_are_monotone_and_zero_anchored() {
         for kind in [
             Family::Caps,
@@ -785,7 +827,10 @@ impl Network {
 
     fn new(config: Config, pin: f64, rng: &mut SplitMix64) -> Self {
         assert!(config.max_pairs * 2 <= config.first_width);
-        assert!(!config.unrestricted_first || (config.family == Family::SiluDiagnostic && config.max_pairs == 0));
+        assert!(
+            !config.unrestricted_first
+                || (config.family == Family::SiluDiagnostic && config.max_pairs == 0)
+        );
         assert!((0.0..=1.0).contains(&config.negative_slope));
         assert!(config.negative_slope == 0. || config.family == Family::Switch);
         assert!((1..=2).contains(&config.widths.len()));
@@ -867,8 +912,10 @@ impl Network {
     pub(super) fn training_forward(&self, first: &[f64]) -> (f64, Vec<f64>, Vec<f64>) {
         let mut cache = self.forward(first);
         if let Some(mask) = &self.mask {
-            if self.config.family == Family::SiluDiagnostic { self.adam.gb1[0] += dy; }
-        let last = &cache.2[cache.2.len() - self.output.len()..];
+            if self.config.family == Family::SiluDiagnostic {
+                self.adam.gb1[0] += dy;
+            }
+            let last = &cache.2[cache.2.len() - self.output.len()..];
             cache.0 = last
                 .iter()
                 .zip(&self.output)
@@ -960,7 +1007,9 @@ impl Network {
         }
         let bias = if self.config.family == Family::SiluDiagnostic {
             std::slice::from_mut(&mut self.pin)
-        } else { &mut [] };
+        } else {
+            &mut []
+        };
         self.adam.step(&mut self.output, bias, &mut [], &mut [], lr);
         if let Some(study) = &self.config.training {
             super::training_research::decay(&mut self.output, lr, study.adamw);

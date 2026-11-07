@@ -1,5 +1,14 @@
 # zensim — current working rules
 
+## Known Bugs — manifest comment edit (resolved November 7, 2026)
+
+A research dependency comment edit exposed a commented path-dependency example,
+creating a duplicate TOML key after the native tests had run. Commit `c0478fe0`
+removes the example. TOML parsing and `cargo metadata --no-deps` pass. Validate
+manifest syntax after documentation edits that touch dependency examples; the
+native qualification source `6bb5bd47` predates the accidental edit.
+
+
 ## Known Bugs — research spline and ramp float32 exports (2026-11-06)
 
 All three long spline and all three long single-ramp candidates exceed the

@@ -3236,7 +3236,9 @@ pub fn train_mlp_strategy_pairs(
                          b2: &mut [f64],
                          pin: Option<f64>,
                          hp: &MlpHyperparams| {
-        if unrestricted_first { return; }
+        if unrestricted_first {
+            return;
+        }
         match max_pair_positions.as_deref() {
             Some(pairs) => project_plain_indexed(w1, w2, b1, b2, pin, hp, Some(pairs)),
             None => project_plain(w1, w2, b1, b2, pin, hp),
@@ -3351,7 +3353,10 @@ pub fn train_mlp_strategy_pairs(
     };
 
     if unrestricted_first {
-        log_line("RESEARCH_DIAGNOSTIC: unrestricted first-layer weights/biases; no pair ties; scale-only transform retained; no identity/monotonicity guarantee", log);
+        log_line(
+            "RESEARCH_DIAGNOSTIC: unrestricted first-layer weights/biases; no pair ties; scale-only transform retained; no identity/monotonicity guarantee",
+            log,
+        );
     }
 
     // Say the output convention out loud: a bake trained under DISTANCE and a
@@ -3420,7 +3425,12 @@ pub fn train_mlp_strategy_pairs(
                 *m = 0.0;
             }
         }
-        if hyperparams.smooth_hinge {
+        if unrestricted_first {
+            log_line(
+                "MLP diagnostic: scale-only transform; first-layer weights/biases and output bias are trainable without sign/identity projection",
+                log,
+            );
+        } else if hyperparams.smooth_hinge {
             log_line(
                 "MLP train: --nonneg-distance — scale-only, zero hidden biases, SmoothHinge tau=1/8, output weights <= 0, output bias at pin",
                 log,
