@@ -5057,3 +5057,9 @@ shaping-completion-watch-all-evaluation study binary_dir rescue_binary_dir:
 
 shaping-completion-reconcile-prefix-failure study cell:
     python3 -B scripts/rev4_featpot/shaping_reconcile_prefix_failure.py --study {{quote(study)}} --cell {{quote(cell)}}
+
+shaped-linear-feature-curves root output:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaped_linear_report.py feature-curves --root {{quote(root)}} --output {{quote(output)}}
+
+shaped-linear-feature-curves-test:
+    TMPDIR="$HOME/tmp" python3 -B -m unittest scripts/tests/test_shaped_feature_curves.py

@@ -695,3 +695,55 @@ The `variant-shape-archive` destination passed all-file readback at 06:38:22 UTC
 139 artifact files, 28,243,529 logical bytes. Local staging uses hardlinks to
 immutable initializations; its logical size is not additional SSD allocation.
 This completes initialization preparation, not the registered model fits.
+
+## Per-feature reproducibility in the recovered additive fits
+
+The owner asked whether individual feature shapers recur across trainings. A new
+read-only analysis compares nine historical positive-shaped-products fits at fixed
+lambda 1e-4: each of three source folds has its full-source fit and two 75%-source
+refits. These are deterministic additive solutions, not neural initialization
+replicates. No labels, outer predictions or selection metrics enter this analysis.
+
+Reconstruct each term's continuous piecewise-linear contribution in raw feature
+units, undoing input and basis normalization. Compare at the union of all fitted
+knots, from zero through the largest second knot. Normalize each nonzero curve to
+unit endpoint; preserve its unnormalized endpoint strength separately. Differences
+are linear between knots, so the maximum normalized disagreement occurs on this
+grid. This does not establish behavior beyond the stated domain.
+
+Eight of 984 terms are nonzero in every fit; 781 are zero in every fit. The two
+most similar normalized curves among those eight are:
+
+| Term | Registry interpretation | Maximum normalized curve spread | Maximum/minimum endpoint strength |
+|---|---|---:|---:|
+| f585 | v2 art_soft_peak, scale 2, Y | 0.07191324435473345 | 4.4936803309626905 |
+| f14 × f422 | basic ssim_4th × v2 pjnd_fragility, scale 0, Y | 0.09116305067813268 | 21.311593278910188 |
+
+Across all nine fits, f585 has exactly zero first-segment slope and a positive
+second-segment slope: a dead zone followed by a rising response. Its first raw
+knot ranges from 0.0706766824687084 to 0.07400064202942325. Its far-tail slope
+is not stable. The f14 × f422 term has a positive first-segment slope and exactly
+zero second/third slopes in every fit: a rising response capped at the first
+knot, which ranges from 0.016456244122225128 to 0.018106926808493018.
+
+Feature IDs use the original 720-slot layout, not positions in the reduced raw
+array. Names follow `zensim/src/feature_defs.rs`. The next two always-active terms
+have normalized spreads 0.15555768971263073 and 0.24901071965308388; the remaining
+four have spreads at least 0.9731927214486901. Stability is therefore mixed.
+These are descriptive candidates, not a selected transferable shaper set. Strength
+variation can reflect correlated inputs and fitted target scales; it does not
+alone invalidate similarity of normalized shapes. Transfer into frozen-shape
+neural trials and consistency across neural seeds remain unanswered.
+
+The analysis stores all 984 per-term results, nine fit identities, and SHA-256
+pins for every specification, task and coefficient archive. A synthetic check
+separates scalar gain changes from shape changes, exercises nonunit input scales,
+excludes zero curves from useful stability, and refuses overwriting output.
+`just shaped-linear-feature-curves` reproduces the analysis without modifying the
+historical study. Results are in the completion root's
+`feature-curve-stability-v2/FEATURE_CURVE_STABILITY.json`, mirrored with complete
+destination checksum readback under the same NAS-relative path.
+
+Wrapper: `run-heavy: done rc=0 1s | peak-RSS 0.20GiB | min-avail 40617MiB | peak-load 19.76`
+for the first calculation; the v2 receipt adds original feature-ID mapping. This
+is resource accounting during concurrent training, not an inference benchmark.

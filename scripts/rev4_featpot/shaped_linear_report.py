@@ -340,8 +340,59 @@ def progress(root):
     print(json.dumps({k:v for k,v in result.items() if k!='cells'}),flush=True)
 
 
+def feature_curve_stability(root, output):
+    """Descriptive per-term reproducibility; no labels, selection or refitting."""
+    from shaped_linear_study import RAW_IDS
+    paths=[]
+    for outer in range(3):
+        prefix=f's3-source-positive_shaped_products-o{outer}-'
+        paths.append(root/'fits'/(prefix+'full'))
+        paths.extend(sorted((root/'fits').glob(prefix+'f0.75-*')))
+    if len(paths)!=9:raise ValueError('expected three full and six 75%-source fits')
+    specs=[json.loads((path/'SPEC.json').read_text()) for path in paths]
+    terms=specs[0]['terms']
+    if any(s['terms']!=terms for s in specs):raise ValueError('term identity drift')
+    coefs=[];pins={}
+    for path in paths:
+        with np.load(path/'lambda-0.0001/predictions.npz') as data:
+            coefs.append(data['coefficients'].copy())
+        for suffix in ('SPEC.json','TASK.json','lambda-0.0001/predictions.npz'):
+            pins[str(path/suffix)]=sha(path/suffix)
+    knots=np.array([np.array(s['knots'])*np.array(s['scales'])[:,None] for s in specs])
+    slopes=np.array([c.reshape(-1,3)/np.array(s['scales'])[:,None]/np.array(s['basis_scales']).reshape(-1,3) for c,s in zip(coefs,specs)])
+    if not np.isfinite(slopes).all() or (slopes<0).any():raise ValueError('invalid positive slopes')
+    # Every knot from every compared fit plus zero. Between these points all
+    # curves are linear, so extrema of normalized differences occur here.
+    grid=np.sort(np.concatenate([np.zeros((1,len(terms))),knots.transpose(0,2,1).reshape(-1,len(terms))]),axis=0)
+    curves=[]
+    for k,slope in zip(knots,slopes):
+        segments=np.stack([np.minimum(grid,k[:,0]),np.minimum(np.maximum(grid-k[:,0],0),k[:,1]-k[:,0]),np.maximum(grid-k[:,1],0)],axis=-1)
+        curves.append(np.sum(segments*slope[None,:,:],axis=-1))
+    curves=np.array(curves);strength=curves[:,-1,:];active=strength>0
+    normalized=np.divide(curves,strength[:,None,:],out=np.zeros_like(curves),where=active[:,None,:])
+    rows=[]
+    for i,term in enumerate(terms):
+        n=int(active[:,i].sum());selected=normalized[active[:,i],:,i]
+        rows.append(dict(term=term,raw_feature_ids=[RAW_IDS[j] if j is not None else None for j in term],active_fits=n,total_fits=len(paths),
+            endpoint_strength=strength[:,i].tolist(),
+            normalized_curve_max_spread=float(np.ptp(selected,axis=0).max()) if n>=2 else None,
+            endpoint_strength_ratio=float(strength[:,i].max()/strength[:,i].min()) if n==len(paths) else None,
+            raw_domain_end=float(grid[-1,i])))
+    result=dict(scope='Historical deterministic additive fits: three source folds, full and two 75% source refits each; fixed lambda 1e-4. Not neural seed stability or proof of transferable utility.',
+        domain='Zero through largest TRAIN-fitted second knot per term; no claim beyond this domain.',
+        method='Exact piecewise-linear curve spread at union of knots, normalized independently to unit endpoint; unnormalized strengths retained separately. Zero terms are not stable useful shapers.',
+        fits=[str(p) for p in paths],inputs_sha256=pins,terms=rows,
+        active_in_all=sum(r['active_fits']==len(paths) for r in rows),total_terms=len(rows))
+    output.mkdir(parents=True,exist_ok=False);write(output/'FEATURE_CURVE_STABILITY.json',result)
+    print(json.dumps({k:result[k] for k in ('scope','active_in_all','total_terms')}),flush=True)
+
+
 def main():
-    p=argparse.ArgumentParser(description=__doc__);p.add_argument('stage',choices=['audit','linear-details','label-structure','bootstrap','report','progress','archive']);p.add_argument('--root',type=Path,required=True);a=p.parse_args();{'audit':audit,'linear-details':linear_details,'label-structure':label_structure,'bootstrap':bootstrap,'report':reduce,'progress':progress,'archive':archive}[a.stage](a.root)
+    p=argparse.ArgumentParser(description=__doc__);p.add_argument('stage',choices=['audit','linear-details','label-structure','bootstrap','report','progress','archive','feature-curves']);p.add_argument('--output',type=Path);p.add_argument('--root',type=Path,required=True);a=p.parse_args();
+    if a.stage=='feature-curves':
+        if a.output is None:p.error('feature-curves requires a fresh --output directory')
+        feature_curve_stability(a.root,a.output);return
+    {'audit':audit,'linear-details':linear_details,'label-structure':label_structure,'bootstrap':bootstrap,'report':reduce,'progress':progress,'archive':archive}[a.stage](a.root)
 
 
 if __name__=='__main__':main()

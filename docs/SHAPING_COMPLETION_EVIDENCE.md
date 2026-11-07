@@ -194,3 +194,19 @@ Human-only initialization excludes teacher rows. Preparation requires the comple
 input audit, checks exact membership coverage, and binds raw/declaration/plan hashes
 when reusing cached configurations. Native training must still refit scales on its
 admitted groups and learn shapes separately where the registered family requires it.
+
+## Per-feature curve reproducibility
+
+`just shaped-linear-feature-curves ROOT OUTPUT` compares the historical fixed-lambda
+full and 75%-source additive fits term by term, keeping normalized curve shape
+separate from endpoint strength. It writes a fresh output directory, hashes every
+input, reads no labels, and changes no selection. See the completion result record
+for the measured stable candidates and limits. It does not establish stability
+across neural seeds or transferable benefit from freezing the curves.
+
+Completed worker imports now reserve their checked payload bytes plus 16 MiB of
+metadata headroom. Pending trainers retain the full one-GiB allowance, including
+when an overlapping reservation asks for less. The 30 GiB minimum and 3 GiB
+auxiliary reserve remain unchanged. The first real 240-checkpoint worker import
+passed provenance and per-file hashes, then native evaluation and convergence
+diagnosis; its ongoing improvement remains an investigation trigger.
