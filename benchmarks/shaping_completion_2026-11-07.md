@@ -2177,3 +2177,31 @@ SHA-256 `2ed19635812ae2f22ae5f60ff4f43d4b3fecbfcb817a21c51df07f66511eb653`.
 A dedicated failure archiver now runs from pinned source `6683c197c3cc`, avoiding
 live source-edit drift. It skips existing verified archives and preserves new
 completed failure records without rerunning training or changing scientific gates.
+
+
+## Pretrained inner-1-1 workers admitted at 15:18 UTC
+
+Twenty-four previously unstarted pretrained cells had completed matching parents.
+Placement used sorted registered IDs, alternating between two workers, without
+reading quality scores. Each host received twelve cells and one concurrent fit.
+Every parent-prefix extraction passed the native metadata/shape checks on its
+assigned worker before training. The original 120-epoch prefixes were reused;
+no pretraining or completed fit was replayed. Scientific inputs and total
+registered exposure remain unchanged.
+
+At admission, i265 had 15 existing trainers and 284,392,497,152 free bytes,
+against a 52,613,349,376-byte reserve including pending fits. i270 had 18
+existing trainers and 56,198,414,336 free bytes, against 55,834,574,848 reserved.
+Each new controller has a 2 GiB cap and one thread; child fits retain 1 GiB caps.
+Both controllers and their first children were verified live with no reported
+training failure. These are admission observations, not throughput measurements.
+
+The source snapshot, placement, installation and all 24 extraction records
+passed durable readback in `pretrained11-admission-evidence` (64 artifacts,
+11,370,515 bytes), receipt SHA-256
+`67eba32af8073f29466d04c54f830ce1c6481cd8a523fe559a764ff9e0cead5c`.
+Both input capsules and install receipts also passed durable readback:
+`i265-pretrained11-inputs` (31,262,233 bytes), receipt
+`df616616e8a1878df8d673ab454b0682292074a9e2e1835a05cf4d0a472e29f0`;
+`i270-pretrained11-inputs` (30,453,269 bytes), receipt
+`6115b8627fda894179251dbdfdee9d2e9fdc0e3ac305741cc803afbe125d4ca2`.
