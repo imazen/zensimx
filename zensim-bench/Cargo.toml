@@ -182,7 +182,7 @@ zenbench = { git = "https://github.com/imazen/zenbench", rev = "82ff70a3f0c212cf
 # `testable_dispatch` lets benches/tier_isolation.rs disable the baseline SIMD
 # token (NEON on aarch64) so the scalar arm is real rather than a second
 # measurement of the SIMD path.
-archmage = { version = ">=0.9.28, <=0.9.31-beta.1", features = ["std", "testable_dispatch"] }
+archmage = { version = ">=0.9.28, <0.10.0", features = ["std", "testable_dispatch"] }
 # Bumped 2026-09-01 to the rev the zensim workspace root pins, so the
 # amended-W4 speed arms forward the SHIPPED bakes through the SAME
 # runtime that scores them (`caller_input_width` — i.e. dead-column
