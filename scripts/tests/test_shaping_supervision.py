@@ -102,3 +102,16 @@ class LaterSupervisionTests(unittest.TestCase):
             with patch('shaping_supervision.load_registration',return_value=({},cells,{})),patch('shaping_evaluation.outer_context',return_value=context),patch('shaping_supervision.evaluate',side_effect=evaluate):
                 self.assertEqual(later_sweep(SimpleNamespace(study=root,binary_dir=binary)),1)
                 self.assertTrue((root/'runs/0/attempt-001/LATER_EVALUATION_FAILURE.json').exists())
+
+class StageIsolationTests(unittest.TestCase):
+    def test_inner_watchers_ignore_conditionally_registered_outer_cells(self):
+        from shaping_reexport_supervision import sweep as supplemental
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as directory:
+            root=Path(directory);run=root/'runs/conditional/attempt-001';run.mkdir(parents=True)
+            cell=dict(id='conditional',stage='fresh_control_outer_matched',family='relu')
+            (run/'RESULT.json').write_bytes(encoded(dict(cell=cell,stage='trained',epochs=240)))
+            args=SimpleNamespace(study=root,binary_dir=root/'bin',inspector=root/'inspect')
+            with patch('shaping_supervision.load_registration',return_value=({},[],{})),patch('shaping_supervision.evaluate') as evaluate:
+                self.assertEqual(sweep(args),0);evaluate.assert_not_called()
+            with patch('shaping_reexport_supervision.load_registration',return_value=({},[],{})),patch('shaping_reexport_supervision.reexport') as export:
+                self.assertEqual(supplemental(args),0);export.assert_not_called()

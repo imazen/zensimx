@@ -27,13 +27,13 @@ def sweep(args):
     completed=0
     for result_path in sorted((args.study/'runs').glob('*/attempt-*/RESULT.json')):
         result=json.loads(result_path.read_text());cell=result['cell'];run=result_path.parent
+        if cell['stage'] not in ('inner','fresh_control_inner','rescue','exposure_extension') or result['stage']!='trained':continue
         if cell['stage']=='exposure_extension':
             from shaping_extension import resolve
             registered=resolve(args.study,cell['id'])['cell']
             if cell!=registered:raise ValueError('extension cell differs')
             if cell not in cells:cells.append(cell)
         if cell not in cells:raise ValueError('unregistered training result')
-        if cell['stage'] not in ('inner','fresh_control_inner','rescue','exposure_extension') or result['stage']!='trained':continue
         binaries=args.binary_dir
         if cell['stage'] in ('rescue','exposure_extension'):
             binaries=getattr(args,'rescue_binary_dir',None)

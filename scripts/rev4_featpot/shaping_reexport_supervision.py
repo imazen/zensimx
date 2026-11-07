@@ -16,13 +16,13 @@ def sweep(args):
     _,cells,_=load_registration(args.study);completed=0
     for path in sorted((args.study/'runs').glob('*/attempt-*/RESULT.json')):
         result=json.loads(path.read_text());cell=result['cell'];run=path.parent
+        if cell['family']!='relu' or cell['stage'] not in ('inner','fresh_control_inner','rescue','exposure_extension') or result['stage']!='trained':continue
         if cell['stage']=='exposure_extension':
             from shaping_extension import resolve
             registered=resolve(args.study,cell['id'])['cell']
             if cell!=registered:raise ValueError('extension cell differs')
             if cell not in cells:cells.append(cell)
         if cell not in cells:raise ValueError('unregistered result')
-        if cell['family']!='relu' or cell['stage'] not in ('inner','fresh_control_inner','rescue','exposure_extension') or result['stage']!='trained':continue
         root=args.study/'reexport_max_pairs'/cell['id']/run.name
         failures=[]
         for epoch in (None,*diagnostic_epochs(result['epochs'])):

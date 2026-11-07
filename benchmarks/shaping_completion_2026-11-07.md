@@ -967,3 +967,10 @@ for neutral mixed-supervision execution, not a scientific candidate or evidence
 that human-only training improves quality. The earlier human-only one-epoch
 qualification remains separately identified. Artifacts live in the completion
 root's `human-build-neutral-full/` directory.
+
+Inner original and supplemental evaluation watchers now filter their owned stages
+before checking base-matrix membership. Conditional matched outer controls belong
+to the later evaluator and must not stop an inner watcher merely because they
+are registered by an outer-admission receipt instead of the base matrix. A
+regression test verifies both inner watchers leave that result to its owner;
+existing inner failure and later final-only behavior remain tested.
