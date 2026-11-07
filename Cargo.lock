@@ -2828,12 +2828,6 @@ checksum = "112b39cec0b298b6c1999fee3e31427f74f676e4cb9879ed1a121b43661a4154"
 
 [[package]]
 name = "lz4_flex"
-version = "0.11.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "373f5eceeeab7925e0c1098212f2fbc4d416adec9d35051a6ab251e824c1854a"
-
-[[package]]
-name = "lz4_flex"
 version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ecbdfe44b1bd960b68170b417450a628c43f7cf56bb3c5317e61cb230ee7f226"
@@ -4038,9 +4032,9 @@ dependencies = [
 
 [[package]]
 name = "serde_json"
-version = "1.0.151"
+version = "1.0.154"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c841b55ecdae098c80dcae9cf767f6f8a0c2cdb3416bbef72181df4d0fe73f14"
+checksum = "e7e9cc8b1b85264074fbcc02a88680c4096b1e47df8f739dceb03bf482f04bd6"
 dependencies = [
  "itoa",
  "memchr",
@@ -5688,7 +5682,7 @@ dependencies = [
  "garb",
  "libm",
  "linear-srgb",
- "lz4_flex 0.14.0",
+ "lz4_flex",
  "magetypes",
  "once_cell",
  "paste",
@@ -5725,21 +5719,21 @@ dependencies = [
 [[package]]
 name = "zenpredict"
 version = "0.2.0"
-source = "git+https://github.com/imazen/zenanalyze?rev=38dc80f73887dafae6bf5ebfe9a03be5ef78ebe0#38dc80f73887dafae6bf5ebfe9a03be5ef78ebe0"
+source = "git+https://github.com/imazen/zenanalyze?rev=1f3767a56c104e8ff2aa936dd900ef278d172ea3#1f3767a56c104e8ff2aa936dd900ef278d172ea3"
 dependencies = [
  "archmage",
  "bytemuck",
  "libm",
- "lz4_flex 0.11.6",
+ "lz4_flex",
 ]
 
 [[package]]
 name = "zenpredict-bake"
 version = "0.1.0"
-source = "git+https://github.com/imazen/zenanalyze?rev=38dc80f73887dafae6bf5ebfe9a03be5ef78ebe0#38dc80f73887dafae6bf5ebfe9a03be5ef78ebe0"
+source = "git+https://github.com/imazen/zenanalyze?rev=1f3767a56c104e8ff2aa936dd900ef278d172ea3#1f3767a56c104e8ff2aa936dd900ef278d172ea3"
 dependencies = [
  "bytemuck",
- "lz4_flex 0.11.6",
+ "lz4_flex",
  "serde",
  "serde_json",
  "zenpredict",
