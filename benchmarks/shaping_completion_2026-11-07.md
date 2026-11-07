@@ -2155,3 +2155,25 @@ against 55,834,574,848 reserved bytes (30 GiB reserve, 3 GiB auxiliary allowance
 were verified live. No completed fit was replayed. The 24,090,132-byte input
 capsule and install receipt passed durable readback in `i270-fresh11-inputs`,
 receipt SHA-256 `465b5debbaad42daea9b73bbd4d45aa80adc810fb795be01cad47ea79aeca80a`.
+
+
+## Completed failure evidence archived at 15:07 UTC
+
+Thirteen original fit directories with recorded numerical-gate or undefined
+convergence failures passed durable artifact readback: 4,575 files totaling
+431,258,975 bytes. Their scientific failure classifications remain unchanged;
+archival does not qualify them for selection. Complete original checkpoints and
+reports remain preserved. The first pass archived five cells before refusing a
+rescue checkpoint path that omitted its declared `fit/` directory. The corrected
+owner respects that declaration; the second pass archived eight further cells.
+Four targeted failure-archive tests pass, including nested rescue checkpoints;
+the preceding combined archive suite passed eleven tests before that addition.
+The second-pass wrapper reports `rc=0 17s | peak-RSS 0.07GiB |
+min-avail 29772MiB | peak-load 31.87`.
+
+The inventory and both operation logs passed separate durable readback in
+`failed-original-archive-1507-evidence` (three artifacts, 8,753 bytes), receipt
+SHA-256 `2ed19635812ae2f22ae5f60ff4f43d4b3fecbfcb817a21c51df07f66511eb653`.
+A dedicated failure archiver now runs from pinned source `6683c197c3cc`, avoiding
+live source-edit drift. It skips existing verified archives and preserves new
+completed failure records without rerunning training or changing scientific gates.
