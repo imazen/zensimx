@@ -80,3 +80,16 @@ after fsync and POSIX_FADV_DONTNEED; this does not claim physical NAS cache
 eviction. Manifest SHA-256:
 `01f1ce9634b8164f6d1821061ca1b7990ade5fbb33585e987a64153f01e0df5f`.
 Archive suffix: `shaping-completion-20261107/linear-inner-archive`.
+
+## Convergence evaluation implementation
+
+The evaluator accepts only completed registered fits and final-epoch selection.
+Registered intermediate epochs produce separately marked diagnostic reports;
+they cannot become selection candidates. Native inspection records output
+coefficient counts. The convergence checker requires all scheduled loss epochs
+and all registered checkpoint panels before producing a receipt. It compares
+the latest available pair with matching epoch modulo 50; for continuous fits
+that is epochs 119 and 219, not mismatched learning-rate phases 199 and 239.
+The native four-decimal loss log has a 0.00005 rounding bound; a one-percent
+threshold interval crossing zero triggers investigation. The guard tests pass;
+actual completed-fit curve evaluation remains to be exercised.

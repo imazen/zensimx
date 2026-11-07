@@ -75,4 +75,6 @@ original mirror receipt. The source of this verifier is `c8e87356`.
 Fresh receipts and complete wrapper logs live under
 `/mnt/v/output/zensim/shaping-completion-20261107/archive-verification/`.
 This verifies retention of the earlier experiments, not completion of the new
-activation/shaping comparisons. Their scientific fits have not started.
+activation/shaping comparisons. Their scientific fitting started subsequently;
+see [the execution record](../benchmarks/shaping_completion_2026-11-07.md) for
+completed controls and current qualification limits.

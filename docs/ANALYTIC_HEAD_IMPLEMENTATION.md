@@ -45,9 +45,12 @@ first-layer gradients. Counts distinguish repeated projection from merely
 observing zero weights at the end. They do not by themselves prove a cause of
 capacity collapse. Ordinary diagnostic outputs are not projected nonnegative.
 
-No scientific fitting has started. Frozen protocol, fair tuning, baseline replay,
-input/fragility shaping, convergence experiments and generalization evaluations
-remain required by the completion goal.
+Scientific fitting began after the frozen completion protocol and baseline replay.
+Current execution evidence is recorded in
+[the completion results](../benchmarks/shaping_completion_2026-11-07.md).
+Implementation qualification alone does not establish scientific completion;
+paired tuning, convergence diagnostics and generalization comparisons remain
+separate requirements.
 
 ## Measured implementation qualification
 
