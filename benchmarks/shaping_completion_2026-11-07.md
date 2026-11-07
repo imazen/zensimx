@@ -954,3 +954,16 @@ supervisor. Full-FIT evaluations receive reproducible training-only diagnostics;
 failed gates remain explicit. Supervisor tests cover stage isolation, final-only
 scoring and continuing independent cells after a native gate failure. Other
 later-stage convergence analysis and aggregate comparisons remain required.
+
+### Full-length human-capable trainer compatibility
+
+The human-capable native build manifest `ce8199538b28165f69f6f9b2ea23a1e5609a27a31e8d427b65a67b7de642dd3d`
+completed the registered 240-epoch neutral replay against primary cell
+`8889ddf0ed4c3fd80ba0`. Both canonical model files independently hash to
+`8c770a06ccd258a4d4eccd3473f395587c34c73908187bf424afeb27eda67973`;
+all 240 checkpoints are present. `run-heavy`: 3,777 seconds, peak RSS 1.27 GiB,
+minimum available RAM 30,312 MiB, peak load 20.90. This is compatibility evidence
+for neutral mixed-supervision execution, not a scientific candidate or evidence
+that human-only training improves quality. The earlier human-only one-epoch
+qualification remains separately identified. Artifacts live in the completion
+root's `human-build-neutral-full/` directory.
