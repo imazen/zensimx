@@ -673,3 +673,25 @@ The refreshed progress audit records 133/816 primary inner final reports and
 convergence receipts, 34 retain investigation triggers, and four retain original
 diagnostic-gate failures. No outer-selection or convergence-completion claim
 follows from these process/report counts.
+
+## Generalization shaping initializations
+
+All 33 unique registered feature-training memberships now have separate product
+and damage/fragility initializations: 66 manifests bound to the 672 generalization
+cells. Each uses the existing raw-domain q50/q90 implementation on that view's
+TRAIN rows. Label permutations share only these label-independent initializations;
+no supervised pretraining or learned shape is reused across labels. Native scale
+fitting and supervised shape learning remain requirements of the later refits.
+
+The initializer now rejects cached manifests whose plan, raw-feature pin, kind
+or frozen declaration differs. Eight shape/membership tests pass, including
+held-out-value exclusion, product/separate knot domains, invalid domains,
+source/row membership and cache identity drift. Actual preparation verified all
+66 manifest and receipt hashes before archival.
+
+Preparation wrapper: `run-heavy: done rc=0 17s | peak-RSS 0.26GiB | min-avail 40919MiB | peak-load 19.48`.
+This is a resource observation during concurrent fitting, not a speed benchmark.
+The `variant-shape-archive` destination passed all-file readback at 06:38:22 UTC:
+139 artifact files, 28,243,529 logical bytes. Local staging uses hardlinks to
+immutable initializations; its logical size is not additional SSD allocation.
+This completes initialization preparation, not the registered model fits.
