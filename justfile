@@ -4948,3 +4948,9 @@ shaping-completion-reclaim-old-grams:
 
 shaping-completion-inner-fresh study binary_dir partition:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 2G --jobs 2 -- python3 -B scripts/rev4_featpot/shaping_execution.py --study {{quote(study)}} --binary-dir {{quote(binary_dir)}} --fresh-control-inner --partition {{quote(partition)}} --workers 2
+
+shaping-completion-variants-check:
+    python3 -B -m unittest discover -s scripts/tests -p test_shaping_variants.py
+
+shaping-completion-register-variants study:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_variants.py --study {{quote(study)}}
