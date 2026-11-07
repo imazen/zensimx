@@ -150,3 +150,14 @@ binary-set hashes to a worker hostname. Execution checks assignment before
 creating an attempt; a different host or binary set is refused. Assignment
 cannot move already started attempts. This preserves paired scientific inputs
 while allowing independent workers; it is not a global compute lock.
+
+## Portable collected inputs
+
+Worker collection includes a byte-identical copy of the frozen derived-input
+declaration in its checksummed bundle, without changing the producer run.
+Rescue and extension execution may relocate that declaration path only after
+checking the original command path, collection receipt and frozen SHA-256.
+Original commands remain evidence. Tests cover pack/unpack, an absent original
+worker path, successful relocation and rejection of changed declaration bytes
+or mismatched paths. This qualifies transport behavior, not a scientific fit;
+remote fit collection still requires terminal receipts and every checkpoint.

@@ -6,7 +6,7 @@ import os
 from pathlib import Path, PurePosixPath
 import socket
 import tarfile
-from shaping_completion import encoded, sha
+from shaping_completion import DECLARATION_SHA256,encoded, sha
 
 
 def inventory(root):
@@ -51,15 +51,24 @@ def pack(study,assignment_path,cell_id,attempt,bundle):
     if run['cell']['id']!=cell_id:raise ValueError('cell directory differs')
     # RESULT is written after wait() and closing train.log. No active process
     # or partial attempt is copied; downstream evaluation runs after collection.
-    files=inventory(root)
+    source_files=inventory(root);files=dict(source_files)
+    command=run['command']
+    if command.count('--derived-inputs')!=1:raise ValueError('one derived-input declaration required')
+    declaration=Path(command[command.index('--derived-inputs')+1])
+    if sha(declaration)!=DECLARATION_SHA256:raise ValueError('worker declaration differs from frozen study')
+    portable='COLLECTION_DERIVED_INPUTS.json'
+    if portable in files:raise ValueError('reserved collection filename already present')
+    files[portable]=dict(bytes=declaration.stat().st_size,sha256=sha(declaration))
     if sum(r['bytes'] for r in files.values())>1024**3:raise ValueError('bundle exceeds one-job storage allowance')
-    receipt=dict(cell=run['cell'],attempt=attempt,assignment_sha256=sha(assignment_path),files=files)
+    receipt=dict(cell=run['cell'],attempt=attempt,assignment_sha256=sha(assignment_path),files=files,
+                 pack_driver_sha256=sha(__file__),original_declaration_path=str(declaration))
     with tarfile.open(bundle,'x') as archive:
         import io
         data=encoded(receipt);info=tarfile.TarInfo('COLLECTION.json');info.size=len(data)
         archive.addfile(info,io.BytesIO(data))
-        for name in files:archive.add(root/name,arcname='payload/'+name,recursive=False)
-    if inventory(root)!=files:raise ValueError('worker output changed during packaging; preserve rejected bundle')
+        for name in files:archive.add(declaration if name==portable else root/name,arcname='payload/'+name,recursive=False)
+    if inventory(root)!=source_files or sha(declaration)!=DECLARATION_SHA256:
+        raise ValueError('worker output changed during packaging; preserve rejected bundle')
     receipt['bundle_sha256']=sha(bundle)
     with Path(str(bundle)+'.json').open('xb') as out:out.write(encoded(receipt))
     return receipt
@@ -111,6 +120,8 @@ def collect(study,assignment_path,bundle,pin):
         target.mkdir(exist_ok=False)
         (staging/'WORKER_COLLECTION.json').write_bytes(encoded(dict(
             bundle_sha256=pin,assignment_sha256=sha(assignment_path),
+            pack_driver_sha256=receipt['pack_driver_sha256'],collect_driver_sha256=sha(__file__),
+            original_declaration_path=receipt['original_declaration_path'],
             files=receipt['files'],source_host=assignment['host'],
             verified_bytes=sum(r['bytes'] for r in receipt['files'].values()))))
         staging.rename(target/attempt)

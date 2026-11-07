@@ -18,6 +18,8 @@ ROLES = ('relu', 'extra_trees', 'shaped_additive', 'best_analytic', 'best_produc
 SEEDS = ((1101, 101), (1107, 200000101), (1129, 400000101))
 SETTINGS = ((1e-3, 0.), (1e-3, 1e-5), (3e-4, 0.), (3e-4, 1e-5))
 RESCUES = ('init_half', 'init_double', 'constant_lr', 'consolidate_lr')
+# Exact declaration used by the frozen primary build and worker baseline replays.
+DECLARATION_SHA256 = 'a3802ddeeede6ec5c9e3d03efdd6cc5af683ab4ea2b0d1143c8e9183c5bd46e5'
 
 
 def sha(path):

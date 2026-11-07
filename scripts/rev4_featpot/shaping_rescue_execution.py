@@ -3,7 +3,7 @@ from __future__ import annotations
 import argparse,json,os,subprocess
 from datetime import datetime,timezone
 from pathlib import Path
-from shaping_completion import REPO,encoded,sha
+from shaping_completion import DECLARATION_SHA256,REPO,encoded,sha
 from shaping_execution import load_registration
 from shaping_pretraining import structural_terms
 from shaping_rescue import resolve,controls,rewrite_command,admitted_families
@@ -31,6 +31,20 @@ def primary_source(root,cells,cell,setting,family=None):
     return source,run
 
 
+def portable_command(command,source):
+    command=list(command)
+    if command.count('--derived-inputs')!=1:raise ValueError('one derived-input declaration required')
+    index=command.index('--derived-inputs')+1
+    portable=source/'COLLECTION_DERIVED_INPUTS.json'
+    if portable.exists():
+        receipt=json.loads((source/'WORKER_COLLECTION.json').read_text())
+        if receipt['original_declaration_path']!=command[index]:raise ValueError('collected declaration path differs')
+        if receipt['files'][portable.name]['sha256']!=DECLARATION_SHA256:raise ValueError('collected declaration pin differs')
+        command[index]=str(portable)
+    if sha(command[index])!=DECLARATION_SHA256:raise ValueError('native declaration drift')
+    return command
+
+
 def phase(root,binaries,source,original,dest,epochs,rescue,groups,shaping=None,*,optimizer=None,command_builder=rewrite_command):
     source_bake=source/'checkpoints'/f"ckpt_epoch{original['epochs']-1:03}.bin"
     def metadata(key):
@@ -42,7 +56,7 @@ def phase(root,binaries,source,original,dest,epochs,rescue,groups,shaping=None,*
         if metadata('zentrain.input_shaping_initial_sha256')!=sha(source/'SHAPING.json'):
             raise ValueError('primary shaping manifest drift')
     dest.mkdir(parents=True,exist_ok=False);(dest/'checkpoints').mkdir()
-    command=command_builder(original['command'],binaries,dest,epochs)
+    command=command_builder(portable_command(original['command'],source),binaries,dest,epochs)
     env=os.environ.copy()
     for key in list(env):
         if key.startswith(('ZENSIM_MONOTONE_RESEARCH_','ZENSIM_INPUT_SHAPING_','ZENSIM_PLAIN_OPTIMIZER_')):env.pop(key)
@@ -66,6 +80,7 @@ def phase(root,binaries,source,original,dest,epochs,rescue,groups,shaping=None,*
         files[str(manifest)]=sha(manifest)
     source_files=[source/'RUN.json',source/'RESULT.json',source/'keep.txt']
     source_files.extend(p for p in (source/'HEAD.json',source/'SHAPING.json') if p.exists())
+    source_files.extend(p for p in (source/'COLLECTION_DERIVED_INPUTS.json',source/'WORKER_COLLECTION.json') if p.exists())
     receipt=dict(command=command,source_run=str(source),source_run_sha256=sha(source/'RUN.json'),
                  source_file_sha256={str(p):sha(p) for p in source_files},
                  epochs=epochs,pairs_per_epoch=50000,manifest_sha256=files,build_sha256=sha(binaries/'BUILD.json'))

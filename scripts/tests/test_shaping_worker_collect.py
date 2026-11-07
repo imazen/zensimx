@@ -5,13 +5,47 @@ import sys
 import tarfile
 import tempfile
 import unittest
+from unittest.mock import patch
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'rev4_featpot'))
-from shaping_worker_collect import unpack,inventory,validate
+from shaping_worker_collect import unpack,inventory,validate,pack
 from shaping_completion import encoded,sha
+from shaping_rescue_execution import portable_command
 
 
 class CollectionTests(unittest.TestCase):
+    def test_pack_preserves_inputs_for_portable_rescue(self):
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as d:
+            study=Path(d);root=study/'runs/cell/attempt-001';root.mkdir(parents=True)
+            declaration=study/'worker-declaration.json';declaration.write_bytes(b'{"inputs":[]}\n')
+            pin=sha(declaration)
+            command=['trainer','--derived-inputs',str(declaration)]
+            cell=dict(id='cell',family='relu',stage='inner')
+            run=dict(cell=cell,command=command)
+            (root/'RUN.json').write_bytes(encoded(run))
+            (study/'PLAN.json').write_bytes(b'{}')
+            assignment=study/'assignment.json'
+            assignment.write_bytes(encoded(dict(host='worker',cells=['cell'],plan_sha256=sha(study/'PLAN.json'))))
+            before=inventory(root);bundle=study/'bundle.tar'
+            with patch('shaping_execution.load_registration',return_value=({},[cell],{})), \
+                 patch('shaping_worker_collect.validate',return_value=run), \
+                 patch('shaping_worker_collect.socket.gethostname',return_value='worker'), \
+                 patch('shaping_worker_collect.DECLARATION_SHA256',pin):
+                receipt=pack(study,assignment,'cell','attempt-001',bundle)
+            self.assertEqual(inventory(root),before)
+            out=study/'imported';unpack(bundle,out,receipt['bundle_sha256'])
+            (out/'WORKER_COLLECTION.json').write_bytes(encoded(receipt))
+            declaration.unlink() # Original worker path is absent on the collector.
+            with patch('shaping_rescue_execution.DECLARATION_SHA256',pin):
+                relocated=portable_command(command,out)
+                self.assertEqual(relocated[-1],str(out/'COLLECTION_DERIVED_INPUTS.json'))
+                self.assertEqual(command[-1],str(declaration))
+                with self.assertRaisesRegex(ValueError,'path differs'):
+                    portable_command(['trainer','--derived-inputs','wrong'],out)
+                (out/'COLLECTION_DERIVED_INPUTS.json').write_bytes(b'changed')
+                with self.assertRaisesRegex(ValueError,'declaration drift'):
+                    portable_command(command,out)
+
     def test_readback_and_corruption(self):
         with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as d:
             root=Path(d);src=root/'src';src.mkdir();(src/'model.bin').write_bytes(b'original model bytes')
