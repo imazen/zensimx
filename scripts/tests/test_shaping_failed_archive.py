@@ -49,5 +49,13 @@ class FailedArchiveTests(unittest.TestCase):
             (directory/'attempt-002').mkdir()
             self.assertFalse(failed_eligible(study,directory,[cell]))
 
+    def test_rescue_checkpoint_uses_declared_fit_directory(self):
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as temp:
+            study,directory,run,cell=self.fixture(Path(temp),'gate')
+            identity=json.loads((run/'RUN.json').read_text());identity['fit_directory']='fit'
+            (run/'RUN.json').write_bytes(encoded(identity));(run/'fit').mkdir()
+            (run/'checkpoints').rename(run/'fit/checkpoints')
+            self.assertTrue(failed_eligible(study,directory,[cell]))
+
 
 if __name__=='__main__':unittest.main()

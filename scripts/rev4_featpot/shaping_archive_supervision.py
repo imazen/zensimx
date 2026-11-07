@@ -255,7 +255,7 @@ def failed_eligible(study,directory,cells):
     if result['cell']!=cell or identity['plan_sha256']!=sha(study/'PLAN.json'):raise ValueError('failure archive fit differs')
     proc=Path('/proc')/str(result['pid'])/'cmdline'
     if proc.exists() and str(run).encode() in proc.read_bytes():raise ValueError('failure archive trainer still live')
-    if sha(run/'checkpoints'/f"ckpt_epoch{result['epochs']-1:03}.bin")!=result['bake_sha256']:raise ValueError('failure archive final model drift')
+    if sha(run/identity.get('fit_directory','.')/'checkpoints'/f"ckpt_epoch{result['epochs']-1:03}.bin")!=result['bake_sha256']:raise ValueError('failure archive final model drift')
     for path in failures:
         record=json.loads(path.read_text())
         if record['cell']!=cell or record['scientifically_complete'] is not False or record['outer_results_read'] is not False:raise ValueError('failure archive classification differs')
