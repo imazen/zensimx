@@ -334,3 +334,22 @@ Three focused tests pass: exact selected-setting/seed coverage, refusal before
 fit or response reads when admission is missing, and unchanged inner search
 coverage. These checks qualify orchestration only; no actual outer control fit
 has yet been admitted or measured.
+
+### Native generalization refit executor (2026-11-07)
+
+The variant executor resolves each registered finalist role through the complete
+inner-only outer admission. It binds the independently audited variant rows,
+label permutations and label-independent initial shapes. Reduced source/row
+views preserve explicitly absent populations; human-only fits omit the teacher
+and set the teacher MSE term to zero. Existing native training phases recompute
+scales and supervised pretraining on those variant rows. Pretrained descendants
+retain their fresh-head seeds; full-recipe selected settings, optimizer and
+registered exposure remain fixed. Numerical and membership gates are unchanged.
+
+Three focused tests pass: command preservation across all phase lengths and
+missing populations; explicit analytic human-only optimizer controls; and
+finalist resolution with audited input/shape pins, including tamper refusals.
+These establish orchestration behavior, not completed generalization fits.
+Actual variant fitting remains gated by unfinished inner comparisons. The new
+human-capable native build has begun its separate full-240-epoch neutral replay;
+its previously completed one-epoch checks alone do not qualify that schedule.

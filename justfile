@@ -5097,6 +5097,12 @@ shaping-completion-outer-execution-check:
 shaping-completion-outer-controls-check:
     python3 -B -m unittest scripts/tests/test_shaping_outer_controls.py
 
+shaping-completion-variant-execution-check:
+    TMPDIR="$HOME/tmp" python3 -B -m unittest scripts/tests/test_shaping_variant_execution.py
+
+shaping-completion-variant-fit study binary_dir neutral human_qualification cell:
+    TMPDIR="$HOME/tmp" python3 -B scripts/rev4_featpot/shaping_variant_execution.py --study {{quote(study)}} --binary-dir {{quote(binary_dir)}} --neutral-qualification {{quote(neutral)}} --human-qualification {{quote(human_qualification)}} --cell {{quote(cell)}}
+
 shaping-completion-prepare-outer study outer:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 2G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_outer_execution.py --study {{quote(study)}} --outer {{outer}} --prepare
 
