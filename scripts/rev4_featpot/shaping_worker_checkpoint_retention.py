@@ -20,10 +20,12 @@ def selected(files,epochs,keep):
 
 
 def no_users(paths):
-    result=subprocess.run(['sudo','lsof','-nP','-e','/run/user/107/doc','-e','/run/user/1000/doc','-Fpn'],capture_output=True,text=True)
-    if result.returncode or result.stderr:raise ValueError('open-file inspection failed: '+result.stderr)
-    if {line[1:] for line in result.stdout.splitlines() if line.startswith('n')} & {str(p) for p in paths}:
-        raise ValueError('checkpoint in use')
+    # Exact filenames avoid unrelated stale NFS mounts and host-specific portals.
+    # Bound argv size independently of the number of completed fits.
+    for start in range(0,len(paths),256):
+        result=subprocess.run(['sudo','lsof','-nP','-t','--',*[str(p) for p in paths[start:start+256]]],capture_output=True,text=True)
+        if result.returncode not in (0,1) or result.stderr:raise ValueError('open-file inspection failed: '+result.stderr)
+        if result.stdout:raise ValueError('checkpoint in use')
 
 
 def remove_remote(payload):
@@ -108,7 +110,8 @@ def main():
         command='TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- '+shlex.join(['python3','-c',Path(__file__).read_text(),'--remote'])
         result=subprocess.run(['ssh',a.host,command],input=json.dumps(payload),text=True,capture_output=True)
         Path(str(a.output)+'.remote.log').write_text(result.stderr)
-        result.check_returncode();record.update(stage='worker_duplicates_removed',result=json.loads(result.stdout))
+        if result.returncode:raise RuntimeError('worker verification failed; see '+str(a.output)+'.remote.log')
+        record.update(stage='worker_duplicates_removed',result=json.loads(result.stdout))
         a.output.write_text(json.dumps(record,indent=2)+'\n')
     print(json.dumps(dict(stage=record['stage'],cells=len(payload['cells']),removed_files=record.get('result',{}).get('removed_files'))))
 

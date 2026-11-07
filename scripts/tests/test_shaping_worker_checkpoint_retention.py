@@ -2,7 +2,7 @@ import json,sys,tempfile,unittest
 from pathlib import Path
 from unittest.mock import patch
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'rev4_featpot'))
-from shaping_worker_checkpoint_retention import remove_remote,selected,sha
+from shaping_worker_checkpoint_retention import remove_remote,selected,sha,no_users
 from shaping_checkpoint_retention import retained_epochs
 
 
@@ -44,6 +44,17 @@ class WorkerRetentionTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'inventory'):selected({},120,[0,119])
         files={f'checkpoints/ckpt_epoch{i:03}.bin':{} for i in range(120)}
         with self.assertRaisesRegex(ValueError,'required'):selected(files,120,[0])
+
+    def test_exact_open_file_checks_refuse_warnings_and_busy_files(self):
+        from subprocess import CompletedProcess
+        with patch('shaping_worker_checkpoint_retention.subprocess.run') as run:
+            run.return_value=CompletedProcess([],1,'','')
+            no_users([Path('/data')/str(i) for i in range(300)])
+            self.assertEqual(run.call_count,2)
+            for args in run.call_args_list:self.assertEqual(args.args[0][:5],['sudo','lsof','-nP','-t','--'])
+            for result in [CompletedProcess([],0,'123\n',''),CompletedProcess([],1,'','warning')]:
+                run.return_value=result
+                with self.assertRaises(ValueError):no_users([Path('/data/file')])
 
 
 if __name__=='__main__':unittest.main()
