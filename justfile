@@ -5311,3 +5311,6 @@ shaping-completion-analytic-reexport study run binaries inspector *args:
 
 shaping-completion-reexport-check:
     TMPDIR="$HOME/tmp" python3 -B -m unittest discover -s scripts/tests -p test_shaping_reexport.py
+
+shaping-completion-analytic-convergence run root:
+    TMPDIR="$HOME/tmp" python3 -B scripts/rev4_featpot/shaping_convergence.py --run {{quote(run)}} --reexport-root {{quote(root)}} --analytic-diagnostic

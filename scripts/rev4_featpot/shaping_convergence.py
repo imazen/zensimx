@@ -49,7 +49,7 @@ def diagnostics(losses,scores,active):
                 conclusion='investigate' if reasons else 'registered triggers absent; not a proof of global convergence')
 
 
-def report(run,reexport_root=None):
+def report(run,reexport_root=None,analytic_diagnostic=False):
     identity=json.loads((run/'RUN.json').read_text())
     if identity['cell']['stage'] not in ('inner','fresh_control_inner','rescue','exposure_extension'):raise ValueError('only inner diagnostics admitted')
     result=json.loads((run/'RESULT.json').read_text())
@@ -59,8 +59,9 @@ def report(run,reexport_root=None):
     losses={int(k):float(v) for k,v in lines}
     if sorted(losses)!=list(range(identity['epochs'])):raise ValueError('missing or extra scheduled loss epochs')
     scores={};active={};pins={};builds=set()
-    if reexport_root is not None and identity['cell']['family']!='relu':
-        raise ValueError('max-pair supplemental convergence requires ReLU')
+    if reexport_root is not None:
+        from shaping_reexport import admit_family
+        admit_family(identity['cell']['family'],analytic_diagnostic)
     curve_root=reexport_root if reexport_root is not None else run/'curve_evaluation'
     for path in sorted(curve_root.glob('epoch-*/REPORT.json')):
         marker=path.parent/'DIAGNOSTIC_COMPLETE.json'
@@ -185,6 +186,7 @@ def structure_trace(run,binary_dir,output):
 if __name__=='__main__':
     parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('--run',type=Path,required=True)
     parser.add_argument('--reexport-root',type=Path)
+    parser.add_argument('--analytic-diagnostic',action='store_true')
     parser.add_argument('--training-only',action='store_true');parser.add_argument('--final-report',type=Path)
     parser.add_argument('--structure-trace',type=Path);parser.add_argument('--binary-dir',type=Path)
     args=parser.parse_args()
@@ -194,4 +196,4 @@ if __name__=='__main__':
     elif args.training_only:
         if not args.final_report or args.reexport_root:parser.error('training-only requires final-report and no reexport-root')
         save_training_report(args.run,args.final_report)
-    else:report(args.run,args.reexport_root)
+    else:report(args.run,args.reexport_root,args.analytic_diagnostic)
