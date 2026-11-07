@@ -14,9 +14,11 @@ def size(path):
 def targets(root, depth=0):
     if depth > 3 or not root.is_dir() or root.is_symlink():
         return
+    # CARGO_TARGET_DIR is often named *-build or *-target rather than target.
+    if (root/'.rustc_info.json').is_file() or (root.name == 'target' and (root/'CACHEDIR.TAG').is_file()):
+        yield root
+        return
     if root.name == 'target':
-        if (root/'.rustc_info.json').is_file() or (root/'CACHEDIR.TAG').is_file():
-            yield root
         return
     for path in root.iterdir():
         if path.name not in ('runs', 'data', 'comparators', 'cargo-home', 'objects'):
