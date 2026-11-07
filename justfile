@@ -5233,3 +5233,9 @@ shaping-completion-outer-evidence-check:
 
 shaping-completion-bootstrap-reduce-check:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B -m unittest discover -s scripts/tests -p test_shaping_bootstrap_reduce.py
+
+shaping-completion-bootstrap study draws binary_dir output:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 2G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_bootstrap.py --study {{quote(study)}} --draws {{quote(draws)}} --binary-dir {{quote(binary_dir)}} --output {{quote(output)}}
+
+shaping-completion-bootstrap-check panel:
+    TMPDIR="$HOME/tmp" ZEN_PANEL_BIN={{quote(panel)}} "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B -m unittest discover -s scripts/tests -p test_shaping_bootstrap.py

@@ -1292,3 +1292,28 @@ boundary. No scientific bootstrap used the earlier helper. Updated qualification
 is archived separately in `bootstrap-undefined-qualification`; earlier evidence
 is preserved. A refusal requires reporting undefined uncertainty, not dropping
 sources or silently weakening the comparison.
+
+### Complete primary bootstrap runner
+
+`just shaping-completion-bootstrap STUDY DRAWS BINARIES OUTPUT` now connects the
+102-cell outer-evidence loader, registered component draws, native rank panels
+and paired interval reduction. It reproduces every draw from the registered seed,
+verifies source membership and input hashes, checks recomputed point ranks against
+completed reports, retains all outer population/distortion/source panels, and
+carries convergence classifications into the summary. It writes per-stratum
+samples and a final hash-bound summary only after all inputs pass re-verification.
+Failures preserve partial artifacts without a completion marker. Active output
+must share the study SSD and pass the existing reserve/admission owner.
+
+Four tests pass. The synthetic numerical path covers the complete 102-model
+matrix, all 15 strata and 2,000 replicates through the actual native panel. An
+integration check also writes and verifies final summary/sample receipts with
+synthetic admitted inputs. Other checks reject altered draws/source membership
+and response reads before admission. The resource wrapper reported `done rc=0
+21s | peak-RSS 0.21GiB | min-avail 32229MiB | peak-load 24.15`; these are fixture
+qualification resources, not measured scientific-run or inference costs.
+
+The live runner refused the missing outer-0 admission with zero array-load calls.
+No scientific intervals have been computed. This runner covers primary outer
+comparisons; fresh-head controls and generalization variants still need their
+separate matched comparisons. Evidence: `bootstrap-runner-qualification`.
