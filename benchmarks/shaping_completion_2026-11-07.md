@@ -128,3 +128,25 @@ loaded in memory. Preserve those original receipts with this qualification.
 Their exact native command lines, input pins and immutable binary identities
 remain the reproduction authority. New controllers capture the driver hash at
 module startup. This change does not alter scientific commands or checkpoints.
+
+## Complete inner control selection
+
+The selection owner recomputes the equal-human composite from four populations,
+requires all four settings, both inner folds and all three seeds (one seedless
+solve for quadratic controls), and refuses outer-exposed or incomplete reports.
+The selected tree setting for outer folds 0 and 1 is min_samples_leaf=8 and
+max_features=0.33. Its mean inner human composites are 0.917060008 and
+0.889150989, respectively. These are inner tuning measurements, not outer
+quality claims. Quadratic choices reproduce the table above. Selection receipts
+retain report hashes and keep outer evaluation closed pending neural convergence
+and rescue resolution.
+
+The first fresh-head control wave uses the registered 120 epochs and 50,000 draws
+per epoch. Inspected command lines for seeds 0 and 1 use initialization/sampling
+pairs (1001101,1000101) and (1001107,201000101). These controls have six million
+scheduled draws and remain separately identified from primary twelve-million-draw
+fits. Two one-thread, one-GiB native jobs run concurrently under a two-GiB
+controller cap, after the verified Gram reclamation restored storage headroom.
+
+The storage reclamation receipt itself has a verified durable mirror:
+`ed94eb9b0ff4748a0d90675ac16c7de21b37d32a25a1017cda6796746a8b2a9f`.
