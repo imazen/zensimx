@@ -3105,3 +3105,30 @@ role. All eleven were verified live in the 21:11 audit. That audit found
 529/816 inner fits trained, all 72/72 fresh controls trained/evaluated/archived,
 and all 18/18 completed rescues archived out of 720 required. Outer, full-FIT
 and memorization comparisons remain unexecuted; this is not study completion.
+
+### Additional pretrained placements verified at 21:27 UTC
+
+Six previously unstarted cells were placed without changing scientific inputs:
+four inner-1-1 setting-3/seed-0 pretrained product/separate cells on i270 with
+three workers, and two inner-2-0 setting-1/seed-2 separate-pretrained cells on
+i265 with one worker. Native process and checkpoint inspection verified three
+new trainers on i270 (8, 4 and 7 checkpoint entries) and one on i265 (11 entries).
+The remaining two cells stay queued. Total native counts were 20 and 15,
+respectively, within the existing 20/16 budgets. No fit was replayed.
+
+Both input capsules and the admission evidence passed full destination SHA-256
+readback through the existing mirror owner. Archives under the completion root:
+
+- `i270-pretrained11-setting3-inputs-2120`: 3 files, 25,167,321 bytes;
+  receipt `3984a664113528e9b41224023e6ea58014eb26efb351159b25ea6516854ab57b`.
+- `i265-pretrained20-separate2-inputs-2120`: 3 files, 23,804,217 bytes;
+  receipt `ab9904f81325e8310b30ccf735cccc74cf9b3254bdd80b885b43d3b6f57fabc4`.
+- `pretrained-admission-2128`: 13 files, 35,045 bytes;
+  receipt `a914f1ffb670415a38cf75968df5c3da23334b5081f30d37aa3504ddae129f07`.
+
+The process-aware audit at 21:27:12 UTC verified all eleven registered
+evaluation/archive/bootstrap roles live, with fresh observations and no
+unexpected stops on all three workers. Inner fits increased to 534/816;
+438 have native cell archive receipts, with the 96 controls covered by their
+separate central archives. All 72 fresh controls and 18 completed rescues retain
+their verified archives. Outer, full-FIT and memorization stages remain pending.
