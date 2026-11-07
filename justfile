@@ -5027,3 +5027,6 @@ shaping-completion-extension-fit study binary_dir neutral cell:
 
 shaping-completion-progress study *args:
     TMPDIR="$HOME/tmp" python3 -B scripts/rev4_featpot/shaping_progress.py --study {{quote(study)}} {{args}}
+
+shaping-completion-dispatch-rescues study binary_dir neutral outer:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 6G --jobs 2 -- python3 -B scripts/rev4_featpot/shaping_rescue_dispatch.py --study {{quote(study)}} --binary-dir {{quote(binary_dir)}} --neutral-qualification {{quote(neutral)}} --outer {{outer}} --workers 2
