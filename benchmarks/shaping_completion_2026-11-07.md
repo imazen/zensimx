@@ -1672,3 +1672,18 @@ This does not change scientific fits, selection, training parameters or inputs.
 The proposed replay uses the already qualified optimizer binary and the failed
 fit's exact original command, seeds and frozen shape manifest, with diagnostics
 activated. It is excluded from model selection. Its result is not yet available.
+
+The all-checkpoint replay controller was verified live while waiting for storage
+admission; no training claim is made before its RUN receipt and native process
+exist. Four newly archived cells permitted removal of 812 redundant local
+checkpoints (171,464,073 logical bytes) after cold destination readback and two
+open-file checks. Required checkpoints and failed fits were preserved. The
+retention plan, removal receipt, resource log, replay request and qualification
+test log have a separately verified durable copy in
+`replay-and-retention-1058-qualification`.
+
+A proposed policy amendment is awaiting owner approval: mark a whole setting
+ineligible when any paired human score is undefined, retaining all failed fits,
+and choose the rescue base among fully defined settings. The existing finite
+four-setting requirement remains in force. No individual seed has been dropped,
+undefined score imputed, or rescue selection changed.
