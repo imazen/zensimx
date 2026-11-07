@@ -4,7 +4,7 @@ import numpy as np
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'rev4_featpot'))
 from shaping_completion import FAMILIES,seeds
 from shaping_bootstrap_plan import REPLICATES
-from shaping_bootstrap_reduce import reduce
+from shaping_bootstrap_reduce import reduce,reduce_matched
 
 
 class BootstrapReductionTests(unittest.TestCase):
@@ -39,6 +39,29 @@ class BootstrapReductionTests(unittest.TestCase):
         with self.assertRaises(ValueError):reduce(s,p)
         s,p=self.fixture();s.pop('extra_trees')
         with self.assertRaises(ValueError):reduce(s,p)
+
+
+class MatchedReductionTests(unittest.TestCase):
+    def fixture(self):
+        p={k:np.zeros((3,3,5,2)) for k in ('candidate','control')}
+        return {k:np.repeat(v[...,None],REPLICATES,axis=-1) for k,v in p.items()},p
+
+    def test_matched_source_variation_cancels_and_teacher_is_separate(self):
+        s,p=self.fixture();variation=np.linspace(-.2,.2,REPLICATES)
+        s['control'][...]=variation;s['candidate'][...]=variation+.125;p['candidate'][...]=.125
+        result=reduce_matched(s,p,(0,1,2));human=result['scopes']['mean_outer']['equal_human_composite']
+        np.testing.assert_allclose(human['difference_percentile95'],[.125,.125])
+        self.assertEqual(human['difference_from_control'],.125)
+        s['candidate'][:,:,1,:,:]=1;p['candidate'][:,:,1,:]=1
+        self.assertEqual(human,reduce_matched(s,p,(0,1,2))['scopes']['mean_outer']['equal_human_composite'])
+
+    def test_missing_seed_fold_or_nonfinite_rank_refused(self):
+        s,p=self.fixture()
+        with self.assertRaises(ValueError):reduce_matched(s,p,(0,1))
+        s['candidate']=s['candidate'][:2]
+        with self.assertRaises(ValueError):reduce_matched(s,p,(0,1,2))
+        s,p=self.fixture();s['control'][0,0,0,0,0]=np.nan
+        with self.assertRaises(ValueError):reduce_matched(s,p,(0,1,2))
 
 
 if __name__=='__main__':unittest.main()
