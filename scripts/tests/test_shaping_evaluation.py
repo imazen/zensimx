@@ -1,11 +1,33 @@
 import sys
 from pathlib import Path
 import unittest
+import json
+import tempfile
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'rev4_featpot'))
-from shaping_evaluation import admitted_epoch, evaluation_epoch
+from shaping_evaluation import admitted_epoch, evaluation_epoch, reexport_bake
+from shaping_completion import sha
 
 
 class EvaluationAdmissionTests(unittest.TestCase):
+    def test_reexport_is_bound_to_original_runtime_and_artifacts(self):
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as directory:
+            root=Path(directory)
+            original=root/'original';original.write_bytes(b'original')
+            bake=root/'repaired';bake.write_bytes(b'repaired')
+            build=root/'BUILD.json';build.write_text('{}')
+            receipt=root/'RECEIPT.json'
+            record=dict(representation='research-relu-max-pairs-v1',original_sha256=sha(original),
+                        training_build_sha256='training',evaluation_build_sha256=sha(build),
+                        bake=str(bake),file_sha256={str(bake):sha(bake)})
+            receipt.write_text(json.dumps(record))
+            run=dict(build_sha256='training')
+            self.assertEqual(reexport_bake(receipt,original,run,build),bake)
+            for key in ('representation','original_sha256','training_build_sha256','evaluation_build_sha256'):
+                receipt.write_text(json.dumps({**record,key:'wrong'}))
+                with self.assertRaises(ValueError):reexport_bake(receipt,original,run,build)
+            receipt.write_text(json.dumps(record));bake.write_bytes(b'changed')
+            with self.assertRaises(ValueError):reexport_bake(receipt,original,run,build)
+
     def test_diagnostics_do_not_change_final_selection(self):
         self.assertEqual(evaluation_epoch(240,None),239)
         self.assertEqual(evaluation_epoch(120,None),119)

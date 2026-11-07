@@ -4981,3 +4981,6 @@ shaping-completion-probe-trace model probes predictions output:
 
 shaping-completion-declare-max-pairs model output:
     python3 -B scripts/rev4_featpot/shaping_probe_trace.py --declare-pairs --model {{quote(model)}} --output {{quote(output)}}
+
+shaping-completion-reexport study run binaries inspector epoch:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 2G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_reexport.py --study {{quote(study)}} --run {{quote(run)}} --binary-dir {{quote(binaries)}} --inspector {{quote(inspector)}} --checkpoint {{quote(epoch)}}

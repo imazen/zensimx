@@ -55,3 +55,15 @@ The qualification archive was reread and verified against manifest
 `10916b0792372a1c8354d952e4319a7bef55622fccc4170a85e797329884a62a`.
 Full repaired evaluation across all eligible cells and inference-cost measurements
 remain required.
+
+Supplemental native evaluation now has a separate owner:
+`just shaping-completion-reexport STUDY RUN BINARIES INSPECTOR EPOCH`.
+It requires a completed registered inner ReLU fit, verifies the original training
+identity and evaluator binary hashes, preserves the original inspection and native
+repair receipt, and evaluates through the existing panel/probe owner. Reports go
+under `study/reexport_max_pairs/`; they do not overwrite original reports or enter
+base selection. The same original TRAIN label maps and memberships are used.
+The first epoch-119 replay completed all population panels and unchanged gates;
+its human inner composite was 0.9126419709659228. This diagnostic checkpoint is
+not a selected candidate. Resource wrapper: 3 seconds, peak RSS 0.23 GiB,
+minimum available 39878 MiB, peak load 20.96.

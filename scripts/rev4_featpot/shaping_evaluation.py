@@ -116,6 +116,19 @@ def evaluation_epoch(epochs,checkpoint):
     return checkpoint
 
 
+def reexport_bake(receipt_path,original,run,build_path):
+    receipt=json.loads(receipt_path.read_text())
+    if receipt['representation']!='research-relu-max-pairs-v1':raise ValueError('unsupported re-export')
+    if receipt['original_sha256']!=sha(original):raise ValueError('re-export checkpoint drift')
+    if receipt['training_build_sha256']!=run['build_sha256']:raise ValueError('re-export training build drift')
+    if receipt['evaluation_build_sha256']!=sha(build_path):raise ValueError('re-export evaluator drift')
+    for path,pin in receipt['file_sha256'].items():
+        if sha(path)!=pin:raise ValueError('re-export artifact drift')
+    bake=Path(receipt['bake'])
+    if str(bake) not in receipt['file_sha256']:raise ValueError('unpinned re-export bake')
+    return bake
+
+
 def evaluate(args):
     plan,cells,partitions=load_registration(args.study)
     run=json.loads((args.run/'RUN.json').read_text());result=json.loads((args.run/'RESULT.json').read_text())
@@ -128,7 +141,11 @@ def evaluate(args):
     epoch=evaluation_epoch(epochs,checkpoint)
     bake=args.run/'checkpoints'/f'ckpt_epoch{epoch:03}.bin'
     build=json.loads((args.binary_dir/'BUILD.json').read_text())
-    if sha(args.binary_dir/'BUILD.json')!=run['build_sha256']:raise ValueError('evaluator binary set differs')
+    reexport=getattr(args,'reexport_receipt',None)
+    if reexport is None:
+        if sha(args.binary_dir/'BUILD.json')!=run['build_sha256']:raise ValueError('evaluator binary set differs')
+    else:
+        bake=reexport_bake(reexport,bake,run,args.binary_dir/'BUILD.json')
     for name,pin in build['binary_sha256'].items():
         if sha(args.binary_dir/name)!=pin:raise ValueError('binary drift')
     os.environ['REV4_V2_BIN_DIR']=str(args.binary_dir);os.environ['ZEN_PANEL_BIN']=str(args.binary_dir/'panel')
@@ -140,6 +157,8 @@ def evaluate(args):
     validation=prepare_validation(args.study,cell['partition'],membership)
     training=json.loads((args.study/'comparators'/cell['partition']/'GROUPS.json').read_text())
     dest=args.run/'evaluation' if checkpoint is None else args.run/'curve_evaluation'/f'epoch-{epoch:03}'
+    if reexport is not None:
+        dest=args.study/'reexport_max_pairs'/cell['id']/args.run.name/('final' if checkpoint is None else f'epoch-{epoch:03}')
     if dest.exists():raise ValueError('evaluation exists; preserve and inspect it')
     dest.mkdir(parents=True)
     wanted=np.array(sorted(set(membership['train'])|set(membership['test'])),dtype=np.int64)
@@ -184,6 +203,10 @@ def evaluate(args):
                 train=metrics(pred,d['y'],train,d,maps),inner_validation=metrics(pred,d['y'],test,d,maps),
                 selection='registered final epoch only' if checkpoint is None else 'diagnostic checkpoint; not a selection candidate',outer_results_read=False,
                 driver_sha256=DRIVER_SHA256,plan_sha256=sha(args.study/'PLAN.json'))
+    if reexport is not None:
+        report.update(reexport_receipt=str(reexport),reexport_receipt_sha256=sha(reexport),
+                      evaluation_build_sha256=sha(args.binary_dir/'BUILD.json'),
+                      selection='supplemental re-export; requires uniform representation qualification before selection')
     np.savez_compressed(dest/'predictions.npz',original_indices=wanted,native=pred)
     (dest/'REPORT.json').write_bytes(encoded(report))
     (dest/('COMPLETE.json' if checkpoint is None else 'DIAGNOSTIC_COMPLETE.json')).write_bytes(encoded(dict(cell=cell['id'],report_sha256=sha(dest/'REPORT.json'))))
@@ -195,6 +218,7 @@ def main():
     p.add_argument('--study',type=Path,required=True);p.add_argument('--binary-dir',type=Path,required=True)
     p.add_argument('--run',type=Path,required=True)
     p.add_argument('--checkpoint',type=int,help='registered diagnostic epoch; requires completed training')
+    p.add_argument('--reexport-receipt',type=Path,help='pinned supplemental representation; preserves original reports')
     evaluate(p.parse_args())
 
 
