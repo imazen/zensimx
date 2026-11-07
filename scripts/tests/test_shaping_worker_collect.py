@@ -8,7 +8,7 @@ import unittest
 from unittest.mock import patch
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'rev4_featpot'))
-from shaping_worker_collect import unpack,inventory,validate,pack,collect,verify_transfer
+from shaping_worker_collect import unpack,inventory,validate,pack,collect,verify_transfer,pack_reserved
 from shaping_completion import encoded,sha
 from shaping_rescue_execution import portable_command
 
@@ -39,6 +39,9 @@ class CollectionTests(unittest.TestCase):
                  patch('shaping_worker_collect.socket.gethostname',return_value='worker'), \
                  patch('shaping_worker_collect.DECLARATION_SHA256',pin):
                 receipt=pack(study,assignment,'cell','attempt-001',bundle)
+                with self.assertRaisesRegex(ValueError,'changed during storage admission'):
+                    pack_reserved(study,assignment,'cell','attempt-001',study/'changed.tar',{})
+                self.assertFalse((study/'changed.tar').exists())
             self.assertEqual(inventory(root),before)
             collector=study/'collector';collector.mkdir();(collector/'runs').mkdir()
             (collector/'PLAN.json').write_bytes((study/'PLAN.json').read_bytes())

@@ -218,3 +218,9 @@ the complete bundle, and writes a non-overwriting verification receipt. Collecti
 still validates every member and scientific provenance independently. Actual NAS
 group-preservation refusal and missing remote rsync are retained in transport logs;
 six additional fits subsequently passed durable readback and atomic collection.
+
+Packaging completed worker fits likewise reserves measured payload plus 16 MiB.
+It validates terminal exposure and checkpoints first, pins the payload inventory,
+and refuses a changed inventory after storage admission before creating the tar.
+The normal post-pack input recheck and producer pin remain mandatory. Unknown
+future trainer writes still reserve one GiB; no reserve floor changes.

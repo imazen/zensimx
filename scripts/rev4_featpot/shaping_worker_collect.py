@@ -43,11 +43,20 @@ def pack(study,assignment_path,cell_id,attempt,bundle):
     minimum=json.loads((study/'PLAN.json').read_text())['minimum_ssd_free_bytes']
     if study.stat().st_dev!=bundle.parent.stat().st_dev:
         raise ValueError('worker packaging must use the reserved study filesystem')
-    with reservation(study,bundle,minimum):
-        return pack_reserved(study,assignment_path,cell_id,attempt,bundle)
+    # Terminal artifacts have a finite measured payload, unlike future trainer
+    # writes. Bind that inventory before admission and check it again under it.
+    from shaping_execution import load_registration
+    _,cells,_=load_registration(study)
+    root=study/'runs'/cell_id/attempt
+    validate(root,json.loads(assignment_path.read_text()),cells)
+    files=inventory(root);payload=sum(row['bytes'] for row in files.values())
+    if len(files)>=1000 or payload>1024**3-16*1024**2:
+        raise ValueError('bundle exceeds one-job storage allowance')
+    with reservation(study,bundle,minimum,bytes_required=payload+16*1024**2):
+        return pack_reserved(study,assignment_path,cell_id,attempt,bundle,files)
 
 
-def pack_reserved(study,assignment_path,cell_id,attempt,bundle):
+def pack_reserved(study,assignment_path,cell_id,attempt,bundle,expected_inventory=None):
     from shaping_execution import load_registration
     _,cells,_=load_registration(study)
     assignment=json.loads(assignment_path.read_text())
@@ -61,6 +70,8 @@ def pack_reserved(study,assignment_path,cell_id,attempt,bundle):
     # RESULT is written after wait() and closing train.log. No active process
     # or partial attempt is copied; downstream evaluation runs after collection.
     source_files=inventory(root);files=dict(source_files)
+    if expected_inventory is not None and source_files!=expected_inventory:
+        raise ValueError('worker output changed during storage admission')
     command=run['command']
     if command.count('--derived-inputs')!=1:raise ValueError('one derived-input declaration required')
     declaration=Path(command[command.index('--derived-inputs')+1])
