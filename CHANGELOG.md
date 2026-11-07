@@ -71,6 +71,9 @@
 
 ### Fixed
 
+- Permit relocation of explicitly unstarted joint-shaping cells after verified
+  queue drain, preserving original placement and active fits.
+
 - Keep preserved interrupted parents visible as pretraining dependency waits,
   allowing independent registered children to continue under shared admission.
 

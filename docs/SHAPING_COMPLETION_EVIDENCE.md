@@ -771,6 +771,21 @@ structure before training; parent pretraining is reused, never recomputed.
 Two parent-transport regressions and the existing installer regression pass.
 
 
+## Relocating never-started joint-shaping cells
+
+The assignment owner can split a joint-shaping placement after its live queue
+has acknowledged a drain request. The status must be fresh, match the original
+plan/build/cell set, and preserve every active child. Relocated cells must have
+neither an attempt directory nor a shared CPU claim. The original assignment is
+retained byte for byte as a backup; disjoint kept and moved records preserve the
+registered cell union and scientific identity. Input transport and native
+execution retain their existing checksum and source-admission gates. A drain
+changes admissions, never active training or the registered matrix.
+
+Three placement tests cover preserved active cells, started/reserved/active-cell
+refusals, and undrained/stale/mismatched queue refusals before mutations.
+
+
 ## Saved training resource accounting
 
 `shaping-training-resources` reads registered completed native runs without

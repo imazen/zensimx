@@ -4930,6 +4930,9 @@ shaping-completion-pretrained-dispatch study binary_dir partition:
 shaping-pretrained-dispatch-check:
     TMPDIR="$HOME/tmp" python3 -B -m unittest discover -s scripts/tests -p test_shaping_pretrained_dispatch.py
 
+shaping-host-assignment-check:
+    TMPDIR="$HOME/tmp" python3 -B -m unittest discover -s scripts/tests -p test_shaping_host_assignment.py
+
 shaping-completion-convergence-check:
     python3 -B -m unittest discover -s scripts/tests -p test_shaping_convergence.py
 
