@@ -826,3 +826,23 @@ Only those previously completed cells are excluded; newly imported cells retain
 full durable bundle readback, metadata/checkpoint verification and both open-file
 checks. Missing new checkpoints still cause refusal. Five retention regressions
 pass, including wrong-host, wrong-plan, incomplete and inconsistent prior receipts.
+
+
+## Expanded direct-feature shape consistency
+
+The saved final checkpoints for inner-0-1 now support the full four-setting
+comparison: 24 fits across three seeds and both shaping architectures. Eleven
+of 492 direct terms are nonzero throughout; seventeen are zero throughout.
+Only f403, f603 and f690 also remain nonzero throughout the earlier twelve-fit
+setting-0 comparison spanning both inner partitions. Six fits overlap those
+scopes, giving thirty unique fits, with an unbalanced partition/setting union.
+These are descriptive response checks, not quality-based selection.
+
+In the new scope, f403's maximum normalized response spread is
+0.2514907727773016 and its strength ratio is 4.755047675175603. The other two
+cross-scope surviving terms have strength ratios above 4,452 in the new scope;
+nonzero activity does not establish dependable magnitude. f506 has normalized
+spread 0.0009952661275045216 in the new 24 fits, but is zero in six of the
+earlier twelve fits, all from the other inner partition. This does not support
+a source-independent f506 response. Downstream weights and quality utility
+remain outside this instrument. No model is selected or training replayed.

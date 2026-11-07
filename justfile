@@ -5472,3 +5472,7 @@ shaping-control-resources study output logs:
 
 shaping-control-resources-check:
     TMPDIR="$HOME/tmp" python3 -B -m unittest discover -s scripts/tests -p test_shaping_control_resources.py
+
+# Describe every registered setting within one completed paired inner partition.
+shaping-completion-curve-all-settings study binaries family outer inner output:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_curve_stability.py --study {{quote(study)}} --binary-dir {{quote(binaries)}} --family {{quote(family)}} --outer {{outer}} --inner-fold {{inner}} --settings 0 1 2 3 --output {{quote(output)}}

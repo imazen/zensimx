@@ -2300,3 +2300,21 @@ min-avail 23829MiB | peak-load 19.05`.
 Cold readback verified `i270-checkpoint-retention-1553-evidence`: 7
 artifacts, 7207168 bytes, receipt
 `0b8080b5d108a22a79a40651957a5caa523e8f5528feead9650b14c0d4f25fa5`.
+
+
+## Full-setting descriptive shaping check within inner-0-1
+
+Existing final checkpoints supplied 24 fits (four settings, three seeds, two
+architectures). The unchanged native curve reader verified candidate provenance
+and TRAIN shape layout. Eleven of 492 direct terms are nonzero in all 24 fits;
+seventeen are zero in all. f403, f603 and f690 also survive the earlier
+twelve-fit two-partition scope. Six fits overlap, giving thirty unique fits;
+the union is not a balanced partition/setting comparison. f403's new normalized
+spread is 0.2514907727773016, strength ratio 4.755047675175603. f506's new spread
+is 0.0009952661275045216, but its zero response in six earlier fits contradicts
+source-independent activity. f603/f690 strength ratios exceed 4,452, so activity
+alone does not establish stable magnitude. No quality benefit is inferred.
+
+Evidence: `native-direct-allsettings-inner01-1556`. The wrapper reported
+`rc=0 1s | peak-RSS 0.04GiB | min-avail 22664MiB | peak-load 29.35`.
+This reads stored parameters, not new training or predictions.
