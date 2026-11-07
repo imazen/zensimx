@@ -1774,3 +1774,27 @@ The dedicated recipe also requires canonical parity at every scheduled checkpoin
 Three replay tests pass, including transient model drift despite matching final
 models and exact weight-trace epoch coverage. Native replay qualification remains
 pending; these tests do not establish observer neutrality on scientific fits.
+
+## Collapsed-fit optimizer replay: complete checkpoint parity
+
+The frozen-product cell `7acaa2df5782f9d05f08` completed its full 120-epoch
+diagnostic replay. All 120 canonical checkpoints match the original after
+removing run metadata. Final canonical SHA-256 is
+`511f6d4e47bc5fc828e97ae9c65e68b0e15dae925afcaab318294f69c318c2fa`.
+This qualifies attribution of the existing activation/output optimizer traces
+to that original fit; it does not qualify the new first-weight observer.
+
+Epoch 0 records 60 zero output weights and 353954 output projection hits.
+Epoch 1 records 64 zero output weights and 23623 projection hits; its sampled
+first-activation gradient squared norm is zero, as it is at every later epoch.
+At epoch 2 all 49408 sampled first activations are zero, and the recorded
+regularized output-gradient squared norm is zero. These observations locate
+the collapse during optimization; they do not isolate the causal contribution
+of first-weight data gradients, L2, Adam history or projection. The new
+weight-gradient replay remains required for that investigation.
+
+The replay was archived with cold destination readback: 368 artifact files,
+24966111 bytes, SHA manifest
+`291b783df9dbfd1eca594214a7675e4bc6d2c4bc5a1df999e834309352d62add`.
+Artifact suffix: `zero-output-optimizer-replay` beneath the completion-study
+local and durable roots. The replay remains excluded from model selection.
