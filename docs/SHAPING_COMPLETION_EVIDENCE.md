@@ -854,3 +854,20 @@ preserved executables, including historical variants. Worker copies remain in
 `preserved-binaries-1633/release/examples` beside the removed target directory;
 the durable archive received cold checksum readback before deletion. Future
 cost invocations must use a preserved binary path rather than that Cargo target.
+
+
+## Rescue queue resource controls
+
+Rescue dispatch accepts an optional worker-budget JSON containing only
+`workers`, bounded by the existing one-to-four limit. Changing it affects new
+admissions; active fits finish unchanged. The current value and file hash are
+recorded in queue status. The coordinator still verifies aggregate host CPU, RAM
+and disk headroom before raising that budget. A separate drain flag file stops
+new admissions while active children finish; an empty drained queue reports
+`drained`, preserving its incomplete required-cell list rather than claiming
+scientific completion. Resume continues to verify original completed-fit evidence.
+
+Four dispatch tests pass, including an isolated process simulation that launches
+two children, requests draining, retains their completion and leaves 238 cells
+unstarted. No native training is invoked by that simulation. Resource files
+cannot change epochs, targets, settings or any other scientific input.

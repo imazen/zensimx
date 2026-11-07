@@ -49,6 +49,18 @@ def completed_runs(root,selected,build_pin):
     return completed,pins
 
 
+def resource_controls(args):
+    workers=args.workers;pin=None
+    path=getattr(args,'worker_budget_file',None)
+    if path is not None:
+        content=path.read_bytes();record=json.loads(content)
+        if set(record)!={'workers'}:raise ValueError('worker budget contains non-resource fields')
+        workers=record['workers'];pin=__import__('hashlib').sha256(content).hexdigest()
+    if type(workers) is not int or not 1<=workers<=4:raise ValueError('explicit one-to-four worker budget required')
+    drain=getattr(args,'drain_file',None)
+    return workers,drain is not None and drain.exists(),pin
+
+
 def dispatch(args):
     if not 1<=args.workers<=4:raise ValueError('explicit one-to-four worker budget required')
     _,cells,_=load_registration(args.study)
@@ -72,10 +84,12 @@ def dispatch(args):
     directory.mkdir(parents=True,exist_ok=False)
     identity=dict(pid=os.getpid(),driver_sha256=sha(__file__),plan_sha256=sha(args.study/'PLAN.json'),
                   build_sha256=sha(args.binary_dir/'BUILD.json'),trigger_sha256=sha(trigger),
-                  workers=args.workers,required_cells=[c['id'] for c in selected])
+                  workers=args.workers,required_cells=[c['id'] for c in selected],
+                  worker_budget_file=str(args.worker_budget_file) if getattr(args,'worker_budget_file',None) else None,
+                  drain_file=str(args.drain_file) if getattr(args,'drain_file',None) else None)
     if resume:identity.update(resumed_completed=sorted(completed),resume_evidence_sha256=pins)
     (directory/'RUN.json').write_bytes(encoded(identity))
-    active={};ready=set();failure=None
+    active={};ready=set();failure=None;worker_limit=args.workers;draining=False;budget_pin=None
     selected.sort(key=lambda c:(NEURAL.index(c['family']),c['rescue'],c['seed'],c['partition']))
     while len(completed)<len(selected):
         for cell_id,(process,log) in list(active.items()):
@@ -88,7 +102,8 @@ def dispatch(args):
                 completed.add(cell_id)
             except Exception as error:failure=str(error)
         try:
-            if not failure:
+            worker_limit,draining,budget_pin=resource_controls(args)
+            if not failure and not draining:
                 for family in NEURAL:
                     if family in ready:continue
                     path=args.study/'selection'/f'outer-{args.outer}'/(family+'-base.json')
@@ -101,7 +116,7 @@ def dispatch(args):
                     resolve(args.study,next(c['id'] for c in selected if c['family']==family))
                     ready.add(family)
                 for cell in selected:
-                    if len(active)>=args.workers:break
+                    if len(active)>=worker_limit:break
                     if cell['family'] not in ready or cell['id'] in active or cell['id'] in completed:continue
                     if (args.study/'runs'/cell['id']).exists():raise ValueError('unexpected existing rescue attempt')
                     command=['python3','-B',str(REPO/'scripts/rev4_featpot/shaping_rescue_execution.py'),
@@ -113,9 +128,11 @@ def dispatch(args):
         status=dict(**identity,checked_utc=datetime.now(timezone.utc).isoformat(),ready_families=sorted(ready),
                     waiting_families=sorted(set(NEURAL)-ready),completed=sorted(completed),
                     active={key:value[0].pid for key,value in active.items()},failure=failure,
-                    stage='failed' if failure and not active else 'training_finished' if len(completed)==len(selected) else 'supervising')
+                    worker_limit=worker_limit,worker_budget_sha256=budget_pin,drain_requested=draining,
+                    stage='failed' if failure and not active else 'drained' if draining and not active else 'training_finished' if len(completed)==len(selected) else 'supervising')
         (directory/'STATUS.json').write_bytes(encoded(status))
         if failure and not active:raise RuntimeError(failure)
+        if draining and not active:return
         if len(completed)<len(selected):time.sleep(30)
 
 
@@ -123,5 +140,6 @@ if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__)
     for key in ('study','binary-dir','neutral-qualification'):p.add_argument('--'+key,type=Path,required=True)
     p.add_argument('--outer',type=int,choices=range(3),required=True);p.add_argument('--workers',type=int,default=2)
+    p.add_argument('--worker-budget-file',type=Path);p.add_argument('--drain-file',type=Path)
     p.add_argument('--resume-completed',action='store_true')
     dispatch(p.parse_args())

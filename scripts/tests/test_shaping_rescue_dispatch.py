@@ -3,7 +3,8 @@ import sys,tempfile,unittest,json
 from unittest.mock import patch
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'rev4_featpot'))
 from shaping_completion import matrix,sha
-from shaping_rescue_dispatch import base_ready,completed_runs
+from shaping_rescue_dispatch import base_ready,completed_runs,resource_controls,dispatch
+from types import SimpleNamespace
 
 
 class DispatchTests(unittest.TestCase):
@@ -30,6 +31,42 @@ class DispatchTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError,'exposure differs'):completed_runs(root,[cell],'build')
                 (run/'RESULT.json').unlink()
                 with self.assertRaises(FileNotFoundError):completed_runs(root,[cell],'build')
+
+    def test_resource_file_cannot_change_science_or_exceed_existing_limit(self):
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as d:
+            root=Path(d);budget=root/'budget.json';drain=root/'drain'
+            args=SimpleNamespace(workers=2,worker_budget_file=budget,drain_file=drain)
+            budget.write_text('{"workers":4}')
+            self.assertEqual(resource_controls(args),(4,False,sha(budget)))
+            drain.touch();self.assertTrue(resource_controls(args)[1])
+            for value in [{'workers':5},{'workers':True},{'workers':0},{'workers':2,'epochs':1}]:
+                budget.write_text(json.dumps(value))
+                with self.assertRaises(ValueError):resource_controls(args)
+
+    def test_drain_finishes_active_children_without_launching_replacements(self):
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as d:
+            root=Path(d);study=root/'study';study.mkdir();binary=root/'bin';binary.mkdir()
+            (study/'PLAN.json').write_text('{}');(binary/'BUILD.json').write_text('{}')
+            cells=[dict(id=f'{i:020x}',family='relu',stage='rescue',partition='inner-0-0',rescue='constant_lr',seed=i) for i in range(240)]
+            (study/'RESCUE_TRIGGER_OUTER_0.json').write_text(json.dumps(dict(required_rescue_cells=[c['id'] for c in cells])))
+            drain=root/'DRAIN';budget=root/'BUDGET';budget.write_text('{"workers":2}')
+            args=SimpleNamespace(study=study,binary_dir=binary,neutral_qualification=root,outer=0,workers=2,resume_completed=False,worker_budget_file=budget,drain_file=drain)
+            launched=[]
+            class Child:
+                def __init__(self,command,**kw):
+                    cell=command[command.index('--cell')+1];self.cell=cell;self.pid=1000+len(launched);self.returncode=None;launched.append(cell)
+                    p=study/'runs'/cell/'attempt-001';p.mkdir(parents=True)
+                def poll(self):
+                    if not drain.exists():return None
+                    self.returncode=0;(study/'runs'/self.cell/'attempt-001/RESULT.json').write_text('{"stage":"trained","exit_code":0}')
+                    return 0
+            with patch('shaping_rescue_dispatch.NEURAL',['relu']),patch('shaping_rescue_dispatch.load_registration',return_value=({},cells,{})),patch('shaping_rescue_dispatch.base_ready',return_value=True),patch('shaping_rescue_dispatch.select'),patch('shaping_rescue_dispatch.selected_base'),patch('shaping_rescue_dispatch.resolve'),patch('shaping_rescue_dispatch.subprocess.Popen',Child),patch('shaping_rescue_dispatch.time.sleep',side_effect=lambda _:drain.touch()):
+                dispatch(args)
+            status=json.loads((study/'dispatch/rescue/outer-0/STATUS.json').read_text())
+            self.assertEqual(len(launched),2);self.assertEqual(len(status['completed']),2)
+            self.assertEqual(status['stage'],'drained');self.assertEqual(len(status['required_cells']),240)
+            self.assertFalse(status['active']);self.assertIsNone(status['failure'])
+
 
     def test_all_paired_reports_and_diagnostics_are_required(self):
         cells=matrix()
