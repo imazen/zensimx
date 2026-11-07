@@ -119,3 +119,41 @@ not qualify the still-pending learned-shaper training/export integration.
 Wrapper for the shaped round trip: `run-heavy: done rc=0 29s | peak-RSS 2.60GiB | min-avail 24610MiB | peak-load 1.61`.
 Wrapper for analytic sensitivity: `run-heavy: done rc=0 24s | peak-RSS 2.60GiB | min-avail 24522MiB | peak-load 1.95`.
 Wrapper for strict runtime clippy: `run-heavy: done rc=0 7s | peak-RSS 0.60GiB | min-avail 26441MiB | peak-load 1.92`.
+
+## Learned input-shaping training owner
+
+`ZENSIM_INPUT_SHAPING_MANIFEST` plus the independently supplied
+`ZENSIM_INPUT_SHAPING_SHA256` enables the private `zensim-input-shaping-v1`
+manifest. It declares logical columns, raw damage/reference ids, fixed knots,
+initial slopes/gate heights, and `trainable`. The admitted owner is the
+shared-depth CPU trainer with compact raw fields and scale-only standardization.
+Separate gates require reference values in [0,1]. No product/damage division is
+used to recover a reference field. Frozen and joint modes use the same runtime
+f32 shaping arithmetic before the original feature scale.
+
+Joint updates reuse native Adam, differentiating both factors before changing
+the first-layer weights. Shape slopes and gate heights are projected nonnegative;
+no monotonicity in the gate is claimed. Shape parameters currently have no
+regularization penalty. That differs from weight regularization and must be
+explicit in the scientific protocol; the factorization also has scale freedom.
+Validation consumes current shapes. Every selected/final/epoch checkpoint
+contains current parameters and the initial manifest hash. Native fx1/fx2
+compaction emits the research declaration and runs its bit-exact served-forward
+gate. `BakeScorer` refuses an intermediate shaping checkpoint lacking native
+compaction; the trainer CLI requires `--derived-inputs` when shaping is enabled.
+
+At `3ca48ae7`, `just input-shaping-check` passed: 14 runtime derived-input tests,
+one runtime analytic sensitivity test, 396 trainer library tests with two existing
+ignores unchanged, 65 trainer CLI tests, and strict clippy for both owners.
+Tests exercise independent parameter central differences, frozen versus joint
+updates, current-shape validation predictions, and isolated real CPU training
+whose final and every epoch bake passes native compaction. The initial fixture
+omitted the production keep mask and correctly failed the unchanged dropped-row
+export gate; the corrected fixture uses that mask. A preceding fixture compile
+failure and all test logs are preserved. These are synthetic implementation
+fixtures, not the scientific study.
+
+Wrapper: `run-heavy: done rc=0 48s | peak-RSS 1.63GiB | min-avail 25486MiB | peak-load 3.88`.
+Training-only pretraining, protocol registration, fair scientific fits and final
+quality/generalization conclusions remain required. Supplied initial parameters
+do not by themselves establish that a shaper was pretrained.
