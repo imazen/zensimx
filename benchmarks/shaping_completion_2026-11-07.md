@@ -3446,3 +3446,12 @@ results. Source-copy failure evidence is also retained separately.
 Supporting evidence: `/mnt/v/output/zensim/shaping-completion-20261107/projection-performance-evidence/`.
 
 The exact CPU observer source is preserved in `cpu_branch_accounting_2026-11-07.py`; `just shaping-cpu-accounting` invokes it under the resource wrapper. It has not been rerun for this report.
+
+The pushed projection implementation is `53e0df72ed16`. Its full source snapshot,
+final benchmark executable/raw rounds, all numerical-test/lint logs, CPU observer
+and four host logs, and retained unsuccessful qualification evidence were copied
+to the study's durable `projection-performance-evidence` archive. All 33 artifacts
+(194268266 bytes) passed destination cold SHA-256 readback; receipt SHA-256
+`f6a6da94578fa57d4867ab7d7bf0a6786782e1f52852b0dc4c9cab340339cceb`.
+The archive wrapper reported 4 s, peak RSS 0.03 GiB, minimum available RAM
+37424 MiB and peak load 25.60. No running study binary was changed.
