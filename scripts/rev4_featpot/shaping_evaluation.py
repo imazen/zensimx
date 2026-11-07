@@ -19,6 +19,10 @@ from shaping_execution import load_registration
 
 DRIVER_SHA256=sha(__file__)
 
+class NativeFeatureGateError(ValueError):
+    """Measured feature-contract failure; never a qualified candidate."""
+
+
 def prepare_validation(root,partition,membership):
     from shaped_linear_study import PREP
     from v2_teacher import row_keys_sha,selection_sha
@@ -171,7 +175,7 @@ def evaluate(args):
               damage_increase_violations=int(np.sum(delta>1e-5)),maximum_damage_increase=float(max(0,delta.max())),
               identity_and_order_claim=cell['family']!='silu_diagnostic')
     if not gate['finite'] or (gate['identity_and_order_claim'] and (gate['identity']!=100. or gate['damage_increase_violations'])):
-        (dest/'FAILED_GATE.json').write_bytes(encoded(gate));raise ValueError('native feature qualification failed')
+        (dest/'FAILED_GATE.json').write_bytes(encoded(gate));raise NativeFeatureGateError('native feature qualification failed')
     structure=json.loads(subprocess.check_output([str(args.binary_dir/'bake_dial_refit'),'inspect','--in',str(bake)],text=True))
     output=structure['layers'][-1]
     active=output['stored_weights']-output['zero_weights']

@@ -8,7 +8,7 @@ from pathlib import Path
 import time
 from types import SimpleNamespace
 from shaping_completion import encoded,sha
-from shaping_evaluation import evaluate
+from shaping_evaluation import evaluate,NativeFeatureGateError
 from shaping_convergence import report
 from shaping_execution import load_registration
 
@@ -31,11 +31,26 @@ def sweep(args):
         if cell['stage'] not in ('inner','fresh_control_inner') or result['stage']!='trained':continue
         values=dict(study=args.study,binary_dir=args.binary_dir,run=run)
         print(json.dumps(dict(cell=cell['id'],stage='evaluating',utc=datetime.now(timezone.utc).isoformat())),flush=True)
-        if not complete_marker(run/'evaluation','COMPLETE.json'):evaluate(SimpleNamespace(**values,checkpoint=None))
-        for epoch in (49,99,119,149,199,219,239):
-            if epoch>=result['epochs']:continue
-            if not complete_marker(run/'curve_evaluation'/f'epoch-{epoch:03}','DIAGNOSTIC_COMPLETE.json'):
-                evaluate(SimpleNamespace(**values,checkpoint=epoch))
+        failures=[]
+        for epoch in (None,49,99,119,149,199,219,239):
+            if epoch is not None and epoch>=result['epochs']:continue
+            dest=run/'evaluation' if epoch is None else run/'curve_evaluation'/f'epoch-{epoch:03}'
+            marker='COMPLETE.json' if epoch is None else 'DIAGNOSTIC_COMPLETE.json'
+            failed=dest/'FAILED_GATE.json'
+            if not failed.exists():
+                try:
+                    if not complete_marker(dest,marker):evaluate(SimpleNamespace(**values,checkpoint=epoch))
+                except NativeFeatureGateError:
+                    if not failed.exists():raise
+            if failed.exists():
+                failures.append(dict(checkpoint=epoch,gate=str(failed),gate_sha256=sha(failed),
+                                     finding=json.loads(failed.read_text())))
+        if failures:
+            # Failed checkpoints remain failed. No convergence/selection completion
+            # receipt is emitted, but independent cells can still be evaluated.
+            (run/'EVALUATION_FAILURES.json').write_bytes(encoded(dict(cell=cell,failures=failures,
+                scientifically_complete=False,requires_investigation=True,outer_results_read=False)))
+            continue
         if not (run/'CONVERGENCE.json').exists():report(run)
         completed+=1
     return completed

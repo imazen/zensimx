@@ -260,3 +260,18 @@ mass, no dropout and no balancing. Uniform family codes are a neutral-control
 fixture only. Native wrapper: `run-heavy: done rc=0 20s | peak-RSS 0.09GiB`.
 The enclosing wrapper measured 21 seconds and 0.09 GiB. This one-epoch result
 does not establish memory use at 240 epochs or full-run equivalence.
+
+## First ReLU checkpoint feature-gate failure
+
+Cell `6df732ab294270460360` (inner-0-0, setting 0, paired seed index 2)
+completed training. Its final human inner composite is 0.9197590984467099 and
+its final feature probes pass. Epoch 119 fails the unchanged damage-order
+gate: one increase of 0.0000152587890625 exceeds 0.00001, while identity is
+100 and predictions are finite. This cell is not scientifically complete;
+the failed checkpoint, predictions and gate receipt remain intact.
+
+Supervisor v2 stopped on that measured failure. V3 records failed checkpoints
+as investigation requirements, emits no convergence/selection completion for
+the affected cell, and continues other checkpoints and independent fits. A
+control test verifies that failure remains visible and cannot count as
+completion. No feature threshold or scientific expectation was relaxed.

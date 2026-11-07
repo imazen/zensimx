@@ -1,5 +1,14 @@
 # zensim — current working rules
 
+## Known Bugs — research ReLU diagnostic monotonicity (November 7, 2026)
+
+Completion-study cell `6df732ab294270460360` epoch 119 fails its unchanged
+native damage-order probe: score increase 0.0000152587890625 exceeds 0.00001.
+Its final epoch passed that probe. Preserve the failed checkpoint and inputs;
+root cause remains under investigation. The evaluation supervisor now records
+failed gates without qualifying that cell, and evaluates independent cells.
+See `benchmarks/shaping_completion_2026-11-07.md`.
+
 ## Known Bugs — absent training calibration maps (resolved November 7, 2026)
 
 The generalization evaluator used an uninitialized array for populations absent
