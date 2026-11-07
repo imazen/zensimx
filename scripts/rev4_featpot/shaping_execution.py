@@ -84,7 +84,10 @@ def run_native(root,binary_dir,cell,record,attempt,epochs,mem):
     declaration=json.loads((REPO/'scripts/rev4_featpot/color_noise_fx2_declaration.json').read_text())
     keep=dest/'keep.txt';keep.write_text('\n'.join(map(str,declaration['direct']))+'\n')
     groups=[(n,Path(p),tw,vw,m) for n,p,tw,vw,m in record['groups']]
-    argv=owner.train_command(groups,*SEEDS[cell['seed']],1853,keep,'N',dest/'best.bin',recipe,
+    seeds=SEEDS[cell['seed']]
+    if '_pretrained_' in cell['family'] or cell['stage'].startswith('fresh_control'):
+        seeds=tuple(seed+1000000 for seed in seeds)
+    argv=owner.train_command(groups,*seeds,1853,keep,'N',dest/'best.bin',recipe,
                              strict_admission=True,data_role_decision=Path(record['decision']))
     if Path(argv[0]).resolve()!=(binary_dir/'zensim_mlp_train').resolve():
         raise ValueError('command builder did not select admitted binary')
@@ -102,6 +105,13 @@ def run_native(root,binary_dir,cell,record,attempt,epochs,mem):
         receipt=json.loads((initial.parent/'RECEIPT.json').read_text())
         if sha(initial)!=receipt['manifest_sha256']:raise ValueError('initial shape drift')
         path=dest/'SHAPING.json';shutil.copy2(initial,path)
+        env['ZENSIM_INPUT_SHAPING_MANIFEST']=str(path)
+        env['ZENSIM_INPUT_SHAPING_SHA256']=sha(path)
+    if '_pretrained_' in cell['family']:
+        from shaping_pretraining import extract
+        _,cells,_=load_registration(root)
+        path=dest/'SHAPING.json'
+        extract(root,binary_dir,cell,cells,path)
         env['ZENSIM_INPUT_SHAPING_MANIFEST']=str(path)
         env['ZENSIM_INPUT_SHAPING_SHA256']=sha(path)
     if analytic_family:
@@ -151,7 +161,8 @@ def execute(args):
         else:families=(args.family,)
         selected=[c for c in cells if c['stage']=='inner' and c['family'] in families and c['partition']==args.partition]
         selected.sort(key=lambda c:(c['setting'],c['seed'],families.index(c['family'])))
-        epochs=240;workers=args.workers;mem='1G'
+        epochs=120 if all('_pretrained_' in c['family'] for c in selected) else 240
+        workers=args.workers;mem='1G'
         if not selected or not 1<=workers<=16:raise ValueError('invalid partition or worker count')
     # Native pilot measured 606443 total artifact bytes, including two bakes.
     # Reserve a deliberately conservative fixed 1 GiB per admitted long run;
@@ -217,7 +228,7 @@ def main():
     mode.add_argument('--resource-pilot',action='store_true')
     mode.add_argument('--inner-relu',action='store_true')
     mode.add_argument('--inner-family',action='store_true')
-    p.add_argument('--family',choices=['relu','softplus','silu_monotone','silu_diagnostic','analytic','product_joint_identity','separate_joint_identity','joint_shapes'],default='relu')
+    p.add_argument('--family',choices=['relu','softplus','silu_monotone','silu_diagnostic','analytic','product_joint_identity','separate_joint_identity','joint_shapes','product_pretrained_frozen','product_pretrained_joint','separate_pretrained_frozen','separate_pretrained_joint'],default='relu')
     mode.add_argument('--status',action='store_true')
     p.add_argument('--partition',default='inner-0-0')
     p.add_argument('--workers',type=int,default=12)

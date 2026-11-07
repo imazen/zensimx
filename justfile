@@ -4912,3 +4912,6 @@ shaping-completion-inner-tree study binary_dir partition:
 
 shaping-completion-inner-linear study binary_dir partition:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 4G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_controls.py --study {{quote(study)}} --binary-dir {{quote(binary_dir)}} --partition {{quote(partition)}} --linear
+
+shaping-completion-pretraining-check:
+    python3 -B -m unittest discover -s scripts/tests -p test_shaping_pretraining.py
