@@ -118,3 +118,10 @@ qualification. All source boundaries, fitting budgets, human-only selection
 composites, finite-score requirements, convergence triggers and native probe
 thresholds remain unchanged. The native repair still validates each model's
 first-layer structural requirements; family membership alone cannot qualify it.
+
+The supplemental archive supervisor covers base, fresh-head, rescue and
+registered exposure-extension checkpoint panels and repaired bakes. Extensions
+must reproduce their registration through the existing selection resolver before
+any copy. Every final and scheduled diagnostic report, source checkpoint and
+conversion artifact remains hash-checked before cold archive readback. This does
+not yet provide automatic archive coverage for outer or full-data stages.

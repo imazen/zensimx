@@ -59,7 +59,12 @@ def supplemental_sweep(args):
     logs=args.study/'archive_supervision';logs.mkdir(exist_ok=True)
     for cpath in sorted((args.study/'reexport_max_pairs').glob('*/attempt-*/CONVERGENCE.json')):
         root=cpath.parent;convergence=json.loads(cpath.read_text());cell=convergence['cell']
-        if cell['stage'] not in ('inner','fresh_control_inner','rescue'):continue
+        if cell['stage'] not in ('inner','fresh_control_inner','rescue','exposure_extension'):continue
+        if cell['stage']=='exposure_extension':
+            from shaping_extension import resolve
+            registered=resolve(args.study,cell['id'])['cell']
+            if cell!=registered:raise ValueError('supplemental extension identity differs')
+            if cell not in cells:cells.append(cell)
         if cell not in cells:raise ValueError('supplemental archive cell not registered')
         run=args.study/'runs'/cell['id']/root.name
         identity=json.loads((run/'RUN.json').read_text());result=json.loads((run/'RESULT.json').read_text())

@@ -5322,6 +5322,9 @@ shaping-completion-watch-softplus-reexports study binaries inspector:
 shaping-completion-watch-supplemental-archives study destination:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_archive_supervision.py --study {{quote(study)}} --destination {{quote(destination)}} --supplemental --watch
 
+shaping-completion-supplemental-archive-check:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B -m unittest discover -s scripts/tests -p test_shaping_supplemental_archive.py
+
 shaping-completion-reexport-runtime-compare study run binaries original_binaries inspector output:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 2G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_reexport.py --study {{quote(study)}} --run {{quote(run)}} --binary-dir {{quote(binaries)}} --inspector {{quote(inspector)}} --compare-runtime {{quote(output)}} --original-binary-dir {{quote(original_binaries)}}
 

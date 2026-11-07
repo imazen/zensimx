@@ -8,9 +8,15 @@ from shaping_archive_supervision import supplemental_sweep
 
 class SupplementalArchiveTests(unittest.TestCase):
     def test_complete_pins_required_before_mirroring(self):
+        self.check_complete_pins('inner')
+
+    def test_extension_requires_resolved_registration_and_complete_pins(self):
+        self.check_complete_pins('exposure_extension')
+
+    def check_complete_pins(self,stage):
         with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as d:
             study=Path(d)/'study';study.mkdir();(study/'PLAN.json').write_text('{}')
-            cell=dict(id='cell',family='softplus',stage='inner')
+            cell=dict(id='cell',family='softplus',stage=stage)
             run=study/'runs/cell/attempt-001';root=study/'reexport_max_pairs/cell/attempt-001'
             def write(path,data):path.parent.mkdir(parents=True,exist_ok=True);path.write_bytes(encoded(data))
             write(run/'RUN.json',dict(cell=cell,plan_sha256=sha(study/'PLAN.json'),build_sha256='train'))
@@ -32,7 +38,17 @@ class SupplementalArchiveTests(unittest.TestCase):
                 source=Path(command[command.index('--root')+1]);dest=Path(command[command.index('--destination')+1]);dest.mkdir(parents=True)
                 (source/'SHA256SUMS').write_text('fixture manifest');(dest/'SHA256SUMS').write_text('fixture manifest')
                 write(source/'MIRROR_VERIFIED.json',dict(all_artifact_sha256_verified=True))
-            with patch('shaping_archive_supervision.load_registration',return_value=({},[cell],{})),patch('shaping_archive_supervision.subprocess.run',side_effect=mirror) as native:
+            registered=[] if stage=='exposure_extension' else [cell]
+            with patch('shaping_archive_supervision.load_registration',return_value=({},registered,{})),patch('shaping_archive_supervision.subprocess.run',side_effect=mirror) as native,patch('shaping_extension.resolve',return_value={'cell':cell}) as resolve:
+                if stage=='exposure_extension':
+                    resolve.side_effect=ValueError('extension registration drift')
+                    with self.assertRaisesRegex(ValueError,'registration drift'):supplemental_sweep(args)
+                    native.assert_not_called()
+                    resolve.side_effect=None
+                    resolve.return_value={'cell':dict(cell,seed=99)}
+                    with self.assertRaisesRegex(ValueError,'extension identity differs'):supplemental_sweep(args)
+                    native.assert_not_called()
+                    resolve.return_value={'cell':cell}
                 saved=dict(pins);pins.pop(next(iter(pins)));write(root/'CONVERGENCE.json',c)
                 with self.assertRaisesRegex(ValueError,'incomplete'):supplemental_sweep(args)
                 native.assert_not_called()
