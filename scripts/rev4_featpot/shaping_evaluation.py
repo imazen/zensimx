@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Native inner-fold evaluation; outer results are refused by this entry point."""
+"""Native evaluation with explicit, revalidated outer admission."""
 from __future__ import annotations
 import argparse
 import json
@@ -23,18 +23,29 @@ class NativeFeatureGateError(ValueError):
     """Measured feature-contract failure; never a qualified candidate."""
 
 
+def validation_admission(root,partition):
+    if partition.startswith('inner-'):return None
+    if partition not in ('outer-0','outer-1','outer-2'):
+        raise ValueError('unregistered evaluation partition')
+    from shaping_outer_admission import resolve
+    _,path=resolve(root,int(partition.split('-')[1]))
+    return sha(path)
+
+
 def prepare_validation(root,partition,membership):
+    # Gate before reading even an existing cached outer view.
+    admission=validation_admission(root,partition)
     from shaped_linear_study import PREP
     from v2_teacher import row_keys_sha,selection_sha
     dest=root/'evaluation_views'/partition
     if dest.exists():
         receipt=json.loads((dest/'RECEIPT.json').read_text())
+        if receipt.get('admission_sha256')!=admission:raise ValueError('validation admission drift')
         if receipt['indices']!=membership['test']:raise ValueError('validation membership drift')
         for g in receipt['groups']:
             for path,pin in g['file_sha256'].items():
                 if sha(path)!=pin:raise ValueError('validation view drift')
         return receipt
-    if not partition.startswith('inner-'):raise ValueError('outer evaluation is not admitted here')
     dest.mkdir(parents=True)
     selected=set(membership['test']);offset=0;groups=[]
     for g in json.loads(PREP.read_text())['groups']:
@@ -53,13 +64,14 @@ def prepare_validation(root,partition,membership):
         meta.update(table_sha256=sha(out),keys_sha256=sha(keyout),rows_in=g['rows'],rows_kept=len(local),
                     source_table_sha256=g['sha256'],source_manifest_sha256=g['manifest_sha256'],
                     row_keys_sha256=row_keys_sha(selected_keys),row_selection_sha256=selection_sha(local),
-                    shaping_evaluation=dict(partition=partition,role='inner_validation',indices=ids[local].tolist(),
+                    shaping_evaluation=dict(partition=partition,role='outer_test' if admission else 'inner_validation',indices=ids[local].tolist(),
                                             original_table_sha256=g['sha256'],plan_sha256=sha(root/'PLAN.json')))
         mout=Path(str(out)+'.manifest.json');mout.write_bytes(encoded(meta))
         groups.append(dict(name=g['name'],path=str(out),indices=ids[local].tolist(),
                            file_sha256={str(p):sha(p) for p in (out,keyout,mout)}))
     if {i for g in groups for i in g['indices']}!=selected:raise ValueError('validation coverage differs')
     receipt=dict(partition=partition,indices=membership['test'],groups=groups)
+    if admission:receipt['admission_sha256']=admission
     (dest/'RECEIPT.json').write_bytes(encoded(receipt));return receipt
 
 
@@ -99,8 +111,30 @@ def make_probes(root,partition,train,plan):
     (path.parent/'PROBES.json').write_bytes(encoded(receipt));return receipt
 
 
-def admitted_epoch(run,result,cells):
+def outer_context(root,run,cells,checkpoint=None):
+    if run['cell']['stage'] not in ('outer','fresh_control_outer','fresh_control_outer_matched'):return None
+    if checkpoint is not None:raise ValueError('outer responses cannot diagnose checkpoints')
+    from shaping_outer_admission import resolve
+    from shaping_outer_execution import resolve_cell,prepared
+    partition=run['cell']['partition']
+    if partition not in ('outer-0','outer-1','outer-2'):raise ValueError('unregistered outer partition')
+    outer=int(partition.split('-')[1]);admission,path=resolve(root,outer)
+    if run['cell'] not in [*cells,*admission['additional_cells']]:raise ValueError('unregistered outer cell')
+    schedule=resolve_cell(run['cell'],admission)
+    if run['admission_sha256']!=sha(path) or run['schedule']!=schedule:raise ValueError('outer run admission drift')
+    prepared(root,outer,path)
+    return dict(admission=admission,schedule=schedule,admission_sha256=sha(path))
+
+
+def admitted_epoch(run,result,cells,outer=None):
     cell=run['cell']
+    if outer is not None:
+        if cell['stage'] not in ('outer','fresh_control_outer','fresh_control_outer_matched'):
+            raise ValueError('outer context on an inner run')
+        epochs=outer['schedule']['phase_epochs'][-1]
+        if result['stage']!='trained' or result['exit_code']!=0 or run['epochs']!=epochs:
+            raise ValueError('outer training is not complete at its scheduled epoch')
+        return epochs
     if cell not in cells or cell['stage'] not in ('inner','fresh_control_inner','rescue','exposure_extension'):raise ValueError('only registered inner cells are admitted')
     if result['stage']!='trained' or result['exit_code']!=0:raise ValueError('training is not complete')
     epochs=120 if 'pretrained' in cell['family'] or cell['stage']=='fresh_control_inner' else 240
@@ -145,16 +179,20 @@ def evaluate(args):
         cells=[*cells,resolution['cell']]
     if sha(args.study/'PLAN.json')!=run['plan_sha256']:raise ValueError('run registration drift')
     cell=run['cell']
-    epochs=admitted_epoch(run,result,cells)
-    if cell['stage'] in ('rescue','exposure_extension'):
+    checkpoint=getattr(args,'checkpoint',None)
+    outer=outer_context(args.study,run,cells,checkpoint)
+    epochs=admitted_epoch(run,result,cells,outer)
+    if cell['stage'] in ('rescue','exposure_extension') or outer is not None:
         if cell['stage']=='rescue':
             from shaping_rescue import resolve
             if run['resolution']!=resolve(args.study,cell['id']):raise ValueError('rescue selection/trigger drift')
         exposure=cell['total_pair_draws'] if cell['stage']=='exposure_extension' else 12000000
+        if outer is not None:exposure=outer['schedule']['total_pair_draws']
         if run['training_exposure_pair_draws']!=exposure or run['fit_directory']!='fit':raise ValueError('rescue/extension exposure/layout differs')
         phases=result['phases']
         expected=[120,120] if '_pretrained_' in cell['family'] else [240]
         if cell['stage']=='exposure_extension':expected=cell['phase_epochs']
+        if outer is not None:expected=outer['schedule']['phase_epochs']
         if [p['epochs'] for p in phases]!=expected or any(p['exit_code']!=0 or p['stage']!='trained' for p in phases):
             raise ValueError('incomplete registered rescue phases')
         phase_names=['pretraining','fit'] if len(phases)==2 else ['fit']
@@ -169,11 +207,16 @@ def evaluate(args):
     fit_root=args.run/run.get('fit_directory','.')
     final=fit_root/'checkpoints'/f'ckpt_epoch{epochs-1:03}.bin'
     if sha(final)!=result['bake_sha256']:raise ValueError('final checkpoint drift')
-    checkpoint=getattr(args,'checkpoint',None)
     epoch=evaluation_epoch(epochs,checkpoint)
     bake=fit_root/'checkpoints'/f'ckpt_epoch{epoch:03}.bin'
     build=json.loads((args.binary_dir/'BUILD.json').read_text())
     reexport=getattr(args,'reexport_receipt',None)
+    if outer is not None:
+        identity=outer['admission']['evaluation_representations'][cell['family']]
+        representation='research-relu-max-pairs-v1' if reexport is not None else 'original'
+        if representation!=identity['representation']:raise ValueError('outer evaluation representation differs from inner selection')
+        if representation!='original' and sha(args.binary_dir/'BUILD.json')!=identity['evaluation_build_sha256']:
+            raise ValueError('outer repaired runtime differs from inner selection')
     if reexport is None:
         if sha(args.binary_dir/'BUILD.json')!=run['build_sha256']:raise ValueError('evaluator binary set differs')
     else:
@@ -235,14 +278,20 @@ def evaluate(args):
                 train=metrics(pred,d['y'],train,d,maps),inner_validation=metrics(pred,d['y'],test,d,maps),
                 selection='registered final epoch only' if checkpoint is None else 'diagnostic checkpoint; not a selection candidate',outer_results_read=False,
                 driver_sha256=DRIVER_SHA256,plan_sha256=sha(args.study/'PLAN.json'))
+    if outer is not None:
+        report['outer_test']=report.pop('inner_validation')
+        report.update(outer_results_read=True,admission_sha256=outer['admission_sha256'],
+                      selection='outer test; excluded from all selection')
     if reexport is not None:
         report.update(reexport_receipt=str(reexport),reexport_receipt_sha256=sha(reexport),
                       evaluation_build_sha256=sha(args.binary_dir/'BUILD.json'),
-                      selection='supplemental re-export; requires uniform representation qualification before selection')
+                      selection='outer test; excluded from all selection' if outer is not None else 'supplemental re-export; requires uniform representation qualification before selection')
     np.savez_compressed(dest/'predictions.npz',original_indices=wanted,native=pred)
     (dest/'REPORT.json').write_bytes(encoded(report))
     (dest/('COMPLETE.json' if checkpoint is None else 'DIAGNOSTIC_COMPLETE.json')).write_bytes(encoded(dict(cell=cell['id'],report_sha256=sha(dest/'REPORT.json'))))
-    print(json.dumps({'cell':cell['id'],'inner_selection_score':report['inner_validation']['selection_score']}),flush=True)
+    role='outer_test' if outer is not None else 'inner_validation'
+    score_key='outer_test_score' if outer is not None else 'inner_selection_score'
+    print(json.dumps({'cell':cell['id'],score_key:report[role]['selection_score']}),flush=True)
 
 
 def main():

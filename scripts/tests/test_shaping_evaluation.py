@@ -3,12 +3,44 @@ from pathlib import Path
 import unittest
 import json
 import tempfile
+from unittest.mock import patch
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'rev4_featpot'))
-from shaping_evaluation import admitted_epoch, evaluation_epoch, reexport_bake
+from shaping_evaluation import admitted_epoch, evaluation_epoch, reexport_bake, prepare_validation, outer_context
 from shaping_completion import sha
 
 
 class EvaluationAdmissionTests(unittest.TestCase):
+    def test_cached_outer_view_cannot_bypass_live_admission(self):
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as directory:
+            root=Path(directory);dest=root/'evaluation_views/outer-0';dest.mkdir(parents=True)
+            receipt=dest/'RECEIPT.json'
+            receipt.write_text(json.dumps(dict(indices=[1],groups=[],admission_sha256='stale')))
+            with patch('shaping_outer_admission.resolve',side_effect=ValueError('incomplete inner comparisons')):
+                with self.assertRaisesRegex(ValueError,'incomplete inner'):prepare_validation(root,'outer-0',{'test':[1]})
+            gate=root/'OUTER_ADMISSION.json';gate.write_text('{}')
+            with patch('shaping_outer_admission.resolve',return_value=({},gate)):
+                with self.assertRaisesRegex(ValueError,'admission drift'):prepare_validation(root,'outer-0',{'test':[1]})
+                receipt.write_text(json.dumps(dict(indices=[1],groups=[],admission_sha256=sha(gate))))
+                self.assertEqual(prepare_validation(root,'outer-0',{'test':[1]})['indices'],[1])
+
+    def test_outer_context_requires_exact_schedule_cell_and_prepared_inputs(self):
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as directory:
+            root=Path(directory);gate=root/'OUTER_ADMISSION.json';gate.write_text('{}')
+            cell=dict(id='outer',stage='outer',partition='outer-0',family='relu')
+            schedule=dict(phase_epochs=[480],total_pair_draws=24000000,setting=2,optimizer_choice='base')
+            admission=dict(outer=0,outer_evaluation_admitted=True,additional_cells=[],schedules={'relu':schedule})
+            run=dict(cell=cell,schedule=dict(schedule,fresh=False),admission_sha256=sha(gate),epochs=480)
+            with patch('shaping_outer_admission.resolve',return_value=(admission,gate)),patch('shaping_outer_execution.prepared') as prepared:
+                context=outer_context(root,run,[cell]);prepared.assert_called_once_with(root,0,gate)
+                self.assertEqual(admitted_epoch(run,dict(stage='trained',exit_code=0),[cell],context),480)
+                for bad in (dict(run,admission_sha256='wrong'),dict(run,schedule=dict(schedule,fresh=True))):
+                    with self.assertRaises(ValueError):outer_context(root,bad,[cell])
+                with self.assertRaises(ValueError):outer_context(root,run,[])
+                with self.assertRaisesRegex(ValueError,'cannot diagnose'):outer_context(root,run,[cell],479)
+                with self.assertRaises(ValueError):admitted_epoch(dict(run,epochs=240),dict(stage='trained',exit_code=0),[cell],context)
+                prepared.side_effect=ValueError('outer TRAIN input drift')
+                with self.assertRaisesRegex(ValueError,'TRAIN input drift'):outer_context(root,run,[cell])
+
     def test_rescue_fresh_phase_retains_its_registered_budget(self):
         result={'stage':'trained','exit_code':0}
         for family,epochs in [('relu',240),('product_pretrained_frozen',120),('separate_pretrained_joint',120)]:

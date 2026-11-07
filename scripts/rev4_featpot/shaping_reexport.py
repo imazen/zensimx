@@ -3,7 +3,7 @@ from __future__ import annotations
 import argparse,json,subprocess
 from pathlib import Path
 from shaping_completion import encoded,sha
-from shaping_evaluation import admitted_epoch,evaluation_epoch,evaluate
+from shaping_evaluation import admitted_epoch,evaluation_epoch,evaluate,outer_context
 from shaping_execution import load_registration
 from shaping_probe_trace import unique_signed_pairs
 
@@ -15,7 +15,8 @@ def reexport(args):
         from shaping_extension import resolve
         cells=[*cells,resolve(args.study,run['cell']['id'])['cell']]
     result=json.loads((args.run/'RESULT.json').read_text())
-    epochs=admitted_epoch(run,result,cells)
+    outer=outer_context(args.study,run,cells,args.checkpoint)
+    epochs=admitted_epoch(run,result,cells,outer)
     epoch=evaluation_epoch(epochs,args.checkpoint)
     if run['cell']['family']!='relu':raise ValueError('this exporter qualifies first-layer ReLU pairs only')
     if sha(args.study/'PLAN.json')!=run['plan_sha256']:raise ValueError('registration drift')

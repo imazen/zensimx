@@ -292,3 +292,29 @@ family across every base, rescue and extension candidate. Mixed repaired-ReLU
 runtimes are refused; the selected identity is carried into the admission record
 for outer scoring. Native outer controllers have explicit live-process matching
 in the existing progress owner, rather than being mistaken for stopped wrappers.
+
+### Gated outer neural evaluation (2026-11-07)
+
+The existing native evaluator now supports the admitted outer neural refits and
+matched fresh controls. It revalidates the complete inner-evidence admission,
+exact registered cell, fixed phase schedule and TRAIN-input preparation before
+opening response views, including cached views. Outer diagnostic checkpoints
+are refused. Phase receipts, exposure, final checkpoint and manifests retain the
+same checks as rescue/extension evaluation. ReLU outer scoring must use the
+uniform repaired representation and evaluation build selected by inner evidence.
+Reports label outer metrics `outer_test`, mark outer responses as read, and
+explicitly exclude them from selection. Inner report keys remain unchanged.
+
+Eight evaluator tests passed, including cached-view admission bypass, stale
+admission, wrong schedule/cell, altered TRAIN preparation and diagnostic refusal.
+Three outer-admission and two outer-execution tests passed. The actual study's
+outer-0 view admission refused because `OUTER_ADMISSION.json` is absent; no
+outer response view was created. This is admission-path evidence, not a completed
+outer scoring run. The refusal receipt is
+`/mnt/v/output/zensim/shaping-completion-20261107/outer-evaluation-admission-refusal.json`.
+
+The 07:35 UTC progress audit records 153/816 original inner final reports and
+14/72 fresh inner final reports. Cell archive receipts cover 52 inner and 14
+fresh cells; the audit does not count older central batch archives. Fresh live
+process checks found 17/16/20 fits on the three active workers and no unexpected
+stops. Outer, generalization and full-fit experiments remain incomplete.

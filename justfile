@@ -4906,6 +4906,10 @@ shaping-completion-evaluation-check:
 shaping-completion-evaluate-inner study binary_dir run:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 2G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_evaluation.py --study {{quote(study)}} --binary-dir {{quote(binary_dir)}} --run {{quote(run)}}
 
+# Revalidates complete inner admission before opening any outer response view.
+shaping-completion-evaluate-outer study binary_dir run:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 2G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_evaluation.py --study {{quote(study)}} --binary-dir {{quote(binary_dir)}} --run {{quote(run)}}
+
 # Existing fit owners, with separate memory budgets for native quadratic solves.
 shaping-completion-inner-tree study binary_dir partition:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 2G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_controls.py --study {{quote(study)}} --binary-dir {{quote(binary_dir)}} --partition {{quote(partition)}} --tree
