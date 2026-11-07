@@ -17,6 +17,18 @@ The ownership lock lives separately from audit directories; the CLI regression
 check preserves first-launch directory creation. No scientific fit was launched
 with the intermediate lock-directory placement.
 
+## Known Bugs — legacy queue counters after planned placement handoff (November 7, 2026)
+
+The inner-1-0 legacy batch retains its original 24-cell requirement after eight
+never-started cells are assigned to another worker. Its frozen host guard will
+refuse those future tasks before attempt creation; preserve the old queue's
+refusals and its original counters. Scientific completion is checked per cell
+across the 16 retained and eight transferred assignments. Never retry those
+cells on the original worker or interpret its eventual batch refusal as a failed
+native fit. The controller and collector were resumed after the registry handoff;
+active native children were preserved. Provenance is in the shaping completion
+benchmark record and the durable handoff archive.
+
 ## Known Bugs — first worker bundle directory (resolved November 7, 2026)
 
 The worker packer checked the destination parent's filesystem before creating

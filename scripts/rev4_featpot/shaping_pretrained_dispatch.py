@@ -7,6 +7,7 @@ from shaping_completion import encoded,sha
 from shaping_execution import load_registration
 from shaping_pretraining import matching_parent,completed_parent
 from shaping_rescue_dispatch import reserve_worker,bind_worker,release_worker,verify_inner_fit
+from shaping_host_assignment import assigned_placement
 
 
 DRIVER_SHA256=sha(__file__)
@@ -97,11 +98,17 @@ def dispatch(args):
             if state is not None:
                 if state[0]=='trained':completed.add(cell['id'])
                 else:external[cell['id']]=state[1]
+        placed={}
+        for cell in ([] if failure else selected):
+            if cell['id'] in completed or cell['id'] in active or cell['id'] in external:continue
+            try:placement=assigned_placement(args.study,cell,identity['build_sha256'])
+            except ValueError as error:failure=str(error);break
+            if placement and placement['host']!=__import__('socket').gethostname():placed[cell['id']]=placement
         blocked={};admission=None
         for cell in selected:
             if failure is not None:break
             if len(active)+len(external)>=args.workers:break
-            if cell['id'] in active or cell['id'] in completed or cell['id'] in external:continue
+            if cell['id'] in active or cell['id'] in completed or cell['id'] in external or cell['id'] in placed:continue
             if (args.study/'runs'/cell['id']).exists():raise ValueError('existing child requires explicit reconciliation')
             try:ready,dependency=parent_state(args.study,cell,cells,identity['build_sha256'])
             except ValueError as error:
@@ -127,6 +134,7 @@ def dispatch(args):
         status=dict(**identity,checked_utc=datetime.now(timezone.utc).isoformat(),completed=sorted(completed),
                     active={key:value[0].pid for key,value in active.items()},
                     externally_supervised=external,
+                    externally_assigned_required=placed,
                     interrupted_parent_dependencies=blocked,resource_admission=admission,
                     failure=failure,stage=('failed' if failure and not active else
                         'training_finished' if len(completed)==len(selected) else 'supervising'))

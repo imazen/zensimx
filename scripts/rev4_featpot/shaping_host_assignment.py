@@ -46,6 +46,17 @@ def check(root,cells,build_pin,host=None):
         if record['host']!=host:raise ValueError('cell assigned to another worker')
 
 
+def assigned_placement(root,cell,build_pin):
+    matches=[]
+    for path in (root/'worker_assignments').glob('*.json'):
+        record=json.loads(path.read_text())
+        if cell['id'] in record['cells']:matches.append((path,record))
+    if len(matches)>1:raise ValueError('ambiguous cell placement')
+    if not matches:return None
+    path,record=matches[0];check(root,[cell],build_pin,record['host'])
+    return dict(host=record['host'],assignment=str(path),assignment_sha256=sha(path))
+
+
 def relocate_joint_subset(root,assignment,requested,host,queue_status,receipt,*,proc=Path('/proc')):
     """Split placement only after the old queue has stopped new admissions."""
     from shaping_execution import load_registration
@@ -208,14 +219,14 @@ def coordinate_remote_legacy(root,assignment,requested,target,source_host,remote
     receipt=output/'SOURCE_RELOCATION.json';control=output/'source-control'
     remote_source=driver.parent
     loader='import sys,runpy;root,path=sys.argv[1:3];sys.path.insert(0,root);sys.argv=[path,*sys.argv[3:]];runpy.run_path(path,run_name="__main__")'
-    command=['/home/lilith/work/claudehints/scripts/run-heavy','--mem','1G','--jobs','1','--',
-        'python3','-B','-c',loader,str(remote_source),str(remote_tool),'--study',str(root),
+    command=['python3','-B','-c',loader,str(remote_source),str(remote_tool),'--study',str(root),
         '--binary-dir',str(root.parent/'study-bin'),'--partition',old['partition'],'--host',target,
         '--family','joint_shapes','--relocate-from',str(assignment),'--legacy-status',str(legacy_status),
         '--legacy-driver',str(driver),'--legacy-guard',str(guard),'--legacy-driver-pin',driver_pin,
         '--legacy-guard-pin',guard_pin,'--relocation-receipt',str(receipt),'--control-output',str(control)]
     for cell in requested:command+=['--cell',cell]
-    (output/'COMMAND.json').write_bytes(encoded(dict(command=command,source_host=source_host,collector_pid=pid,collector_start_ticks=start)))
+    remote_command='TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- '+shlex.join(command)
+    (output/'COMMAND.json').write_bytes(encoded(dict(command=command,remote_command=remote_command,source_host=source_host,collector_pid=pid,collector_start_ticks=start)))
     paused=False;remote_started=False;safe_to_resume=False
     try:
         os.kill(pid,signal.SIGSTOP);paused=True;deadline=time.monotonic()+5
@@ -225,7 +236,7 @@ def coordinate_remote_legacy(root,assignment,requested,target,source_host,remote
         if children.read_text().strip():raise ValueError('collector acquired an active child before maintenance')
         subprocess.run(['ssh',source_host,shlex.join(['mkdir',str(output)])],check=True,capture_output=True,text=True,timeout=30)
         remote_started=True
-        result=subprocess.run(['ssh',source_host,'TMPDIR=/home/lilith/tmp '+shlex.join(command)],capture_output=True,text=True,timeout=60)
+        result=subprocess.run(['ssh',source_host,remote_command],capture_output=True,text=True,timeout=60)
         (output/'REMOTE.log').write_text(result.stdout+result.stderr)
         if result.returncode:raise RuntimeError('source relocation refused; preserve remote log')
         record=json.loads(result.stdout)

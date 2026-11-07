@@ -816,6 +816,16 @@ or starts a replacement fit. Nine placement tests cover these transaction and
 uncertain-outcome cases in addition to the queue and source guards.
 
 
+The pretrained dispatcher now keeps remotely assigned cells in an explicit
+required-work wait. It validates assignment identity and reports the pinned
+placement instead of launching that cell on the coordinator. Completed imports
+still pass the existing native checkpoint gate. A foreign-placement control
+keeps both cells required while only the eligible local child runs; parent-wait
+and failed-parent refusals remain. Ten placement tests and six pretrained
+queue tests pass. Remote orchestration resolves its resource wrapper under the
+worker's own HOME rather than assuming the coordinator's filesystem username.
+
+
 ## Saved training resource accounting
 
 `shaping-training-resources` reads registered completed native runs without

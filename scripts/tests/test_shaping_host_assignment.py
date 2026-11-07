@@ -8,6 +8,14 @@ from shaping_completion import sha
 
 
 class PlacementRelocationTests(unittest.TestCase):
+    def test_assignment_lookup_preserves_host_and_scientific_checks(self):
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as d:
+            root=Path(d);cells,assignment,_,_,_=self.fixture(root)
+            row=module.assigned_placement(root,cells[0],'build');self.assertEqual(row['host'],'dev');self.assertEqual(row['assignment_sha256'],sha(assignment))
+            record=json.loads(assignment.read_text());record['build_sha256']='other';assignment.write_text(json.dumps(record))
+            with self.assertRaisesRegex(ValueError,'scientific identity'):module.assigned_placement(root,cells[0],'build')
+            (assignment.parent/'duplicate.json').write_text(assignment.read_text())
+            with self.assertRaisesRegex(ValueError,'ambiguous'):module.assigned_placement(root,cells[0],'build')
     def test_incoming_placement_checksums_are_verified_before_coordinator_mutation(self):
         for corrupt in [False,True]:
             with self.subTest(corrupt=corrupt),tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as d:
