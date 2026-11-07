@@ -58,3 +58,21 @@ checkpoint selection and convergence criteria. Existing controls can substitute
 only when data, objective, budget and selection conditions match. Native runtime
 parity and numerical gates precede quality interpretation. Inference cost is a
 separate measured comparison; expanded coefficient counts are not timing results.
+
+## Archive re-verification, November 7 UTC
+
+All three immutable archive manifests were reread against both local and NAS
+copies with client page-cache eviction requested. Every listed file matched;
+original manifests and receipts were left unchanged. Counts include each
+original mirror receipt. The source of this verifier is `c8e87356`.
+
+| Study | Files per copy | Bytes per copy | Manifest SHA-256 |
+|---|---:|---:|---|
+| shaped-linear | 4404 | 10391488123 | `642428868aada79b69ee4358b14e01a279b7c068e6dd1f0bdea2e478de7b8882` |
+| architectures | 19562 | 1862519579 | `bd18be6b0bef866c781b5a79231713b89ca54ab32e56a990738b85c7532924e7` |
+| trees | 6197 | 6450819470 | `c98912ff5e927496899a5f6d4bd5aaa8a60f4b331d5b1fa483966ce1ac35ecad` |
+
+Fresh receipts and complete wrapper logs live under
+`/mnt/v/output/zensim/shaping-completion-20261107/archive-verification/`.
+This verifies retention of the earlier experiments, not completion of the new
+activation/shaping comparisons. Their scientific fits have not started.
