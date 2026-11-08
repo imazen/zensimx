@@ -87,7 +87,8 @@ def compare_runtime(args,output):
     epochs=admitted_epoch(run,result,cells,None);epoch=evaluation_epoch(epochs,args.checkpoint)
     original=args.run/run.get('fit_directory','.')/'checkpoints'/f'ckpt_epoch{epoch:03}.bin'
     name='final' if args.checkpoint is None else f'epoch-{epoch:03}'
-    receipt=args.study/'reexports'/cell['id']/args.run.name/name/'RECEIPT.json'
+    receipt=(getattr(args,'diagnostic_receipt',None) or
+             args.study/'reexports'/cell['id']/args.run.name/name/'RECEIPT.json')
     build=args.binary_dir/'BUILD.json'
     for key,pin in json.loads(build.read_text())['binary_sha256'].items():
         if sha(args.binary_dir/key)!=pin:raise ValueError('comparison binary drift')
@@ -137,7 +138,10 @@ if __name__=='__main__':
     p.add_argument('--analytic-diagnostic',action='store_true',help='allow supplemental Softplus panels; selection remains unsupported')
     p.add_argument('--compare-runtime',type=Path)
     p.add_argument('--original-binary-dir',type=Path)
+    p.add_argument('--diagnostic-receipt',type=Path,help='compare a separately pinned diagnostic conversion without admitting it to selection')
     args=p.parse_args()
+    if args.diagnostic_receipt is not None and args.compare_runtime is None:
+        p.error('diagnostic-receipt is valid only with compare-runtime')
     if args.compare_runtime:
         if args.original_binary_dir is None:p.error('runtime comparison requires original-binary-dir')
         compare_runtime(args,args.compare_runtime)

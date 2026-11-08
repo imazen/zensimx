@@ -56,6 +56,13 @@ The qualification archive was reread and verified against manifest
 Full repaired evaluation across all eligible cells and inference-cost measurements
 remain required.
 
+`--compare-runtime --diagnostic-receipt PATH` can qualify a separately pinned
+conversion on the complete registered TRAIN and inner-validation population
+tables. It verifies the original bake, original runtime, repaired bake, native
+inputs and original stored predictions through the existing comparison owner.
+This option does not expand eligible families or admit a conversion to selection.
+The original failed diagnostics remain preserved.
+
 Supplemental native evaluation now has a separate owner:
 `just shaping-completion-reexport STUDY RUN BINARIES INSPECTOR EPOCH`.
 It requires a completed registered inner ReLU fit, verifies the original training
