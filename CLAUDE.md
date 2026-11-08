@@ -1,3 +1,10 @@
+## Known Bugs — external scatter response ordering (November 8, 2026)
+
+An older external-scatter fetch could replace a newer model/population selection
+when responses arrived out of order. The viewer now binds each render to its
+request generation. The browser regression deliberately holds the old CSIQ
+response until LIVE clean10 is displayed, then verifies that selection survives.
+
 ## Known Bugs — corrected downstream runtime admission (November 8, 2026)
 
 Source inspection found that new pretrained rescue/outer/variant owners could

@@ -1,7 +1,7 @@
 # Fixed external shaping comparison — November 8, 2026
 
-Incomplete: twelve corrected pretrained models are not yet reported here.
-The first 22 models (18 neural, three tree and one deterministic additive model)
+Incomplete: six corrected jointly trained pretrained models are not yet reported here.
+The first 28 models (24 neural, three tree and one deterministic additive model)
 have both external datasets reported, with every registered paired seed retained. These are fixed
 setting-0 / inner-0-0 comparisons, not tuned finalist results.
 
@@ -12,8 +12,10 @@ native per-fit panels:
 |---|---:|---:|---:|
 | extra_trees | 0.959952 | 0.944171 | 0.940379 |
 | product_joint_identity | 0.953635 | 0.962849 | 0.965796 |
+| product_pretrained_frozen | 0.955031 | 0.963537 | 0.965663 |
 | relu | 0.942569 | 0.962992 | 0.964200 |
 | separate_joint_identity | 0.955053 | 0.956459 | 0.965584 |
+| separate_pretrained_frozen | 0.955550 | 0.954860 | 0.964601 |
 | shaped_additive | 0.935884 | 0.941939 | 0.928206 |
 | silu_diagnostic | 0.893703 | 0.797161 | 0.838427 |
 | silu_monotone | 0.939651 | 0.963340 | 0.963649 |
@@ -25,7 +27,11 @@ gain: product is close to ReLU and separate shaping is lower. This does not
 establish universally better per-feature shapes. Ordinary SiLU's unconstrained
 diagnostic is weaker in these conditions; this is not its selected best-setting
 comparison. Differences between the anchored activations and ReLU are small on
-LIVE clean10. No significance claim is made from these means.
+LIVE clean10. Corrected frozen product shaping also improves the CSIQ point
+mean; its LIVE clean10 difference is small. Corrected frozen separate shaping
+has a lower LIVE clean10 mean than ReLU. No significance claim is made from
+these means. The six corrected frozen models retain all paired seeds and the
+same prespecified setting; they were not selected on these external responses.
 
 The interactive external page retains each fit's signed SROCC, Kendall,
 increasing-logistic PLCC, raw PLCC, 95% whole-source SROCC interval and raw
@@ -55,6 +61,14 @@ Native adapter qualification and the eight external control jobs completed:
 ```text
 run-heavy: done rc=0 8s | peak-RSS 0.20GiB | min-avail 10512MiB | peak-load 24.43
 run-heavy: done rc=0 8s | peak-RSS 0.26GiB | min-avail 25580MiB | peak-load 2.32
+```
+
+All 12 corrected frozen-model dataset jobs completed on an approved worker,
+reusing the existing frozen data payload and adding 5,225,822 bytes of bound
+models/reports. No new training or feature extraction ran for this comparison:
+
+```text
+run-heavy: done rc=0 18s | peak-RSS 0.26GiB | min-avail 18217MiB | peak-load 20.76
 ```
 
 The cold helper build ran at one CPU thread alongside active fits, with no

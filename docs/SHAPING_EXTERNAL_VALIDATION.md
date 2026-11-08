@@ -23,3 +23,12 @@ SHA-256: `61c15270990222fed25f24237664525a9cab1dfd65d822dbdb55ecebabfab7c1`.
 
 This extends descriptive evaluation only. The registered core remains 1,461
 training fits. Untouched final holdouts remain outside this comparison.
+
+Completed model families may arrive in separate immutable binding batches, all
+using the same original registration bytes. `shaping_external_publish.py` merges
+only their native scalar reports. It checks model/report bindings, prediction
+hashes, population denominators and finite scatter coverage, and refuses duplicate
+dataset results or a changed registration. Earlier reports without an inline
+driver hash require their existing verified archive inventory. Each published
+result and scatter retains a source hash and relative hyperlink. Publication
+does not rerun native statistics, fit a calibration or select a model.
