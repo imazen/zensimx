@@ -1,5 +1,18 @@
 # zensim — current working rules
 
+## Neutral control comparison scope (November 8, 2026)
+
+`shaping_rescue_qualification.py` trains its requested full prefix but compares
+only its final checkpoint after stripping provenance and research metadata.
+Its `match` receipt alone does not prove equality at intermediate epochs.
+The separate `shaping_neutral_trajectory.py` requires complete 240-checkpoint
+inventories and finalized qualification, compares every epoch after removing
+only those same two metadata keys, and preserves all comparison hashes and
+canonical files. It launches no training. Missing checkpoints are a refusal,
+not a reduced-coverage success. Mixed-build control reuse that requires full
+trajectory parity must use this additional evidence. Until executed, its
+fixture checks establish comparator behavior only.
+
 ## Known Bugs — downstream admission refactor (resolved November 8, 2026)
 
 Extracting downstream admission left an undefined template variable in the

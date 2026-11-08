@@ -5260,6 +5260,12 @@ shaping-completion-downstream-collection-check:
 shaping-completion-later-evaluation-worker-check:
     TMPDIR="$HOME/tmp" python3 -B -m unittest scripts/tests/test_shaping_later_evaluation_worker.py scripts/tests/test_shaping_evaluation_worker.py scripts/tests/test_shaping_supervision.py
 
+shaping-completion-neutral-trajectory-check:
+    TMPDIR="$HOME/tmp" python3 -B -m unittest scripts/tests/test_shaping_neutral_trajectory.py
+
+shaping-completion-neutral-trajectory study run qualification binaries output:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_neutral_trajectory.py --study {{quote(study)}} --run {{quote(run)}} --qualification {{quote(qualification)}} --binary-dir {{quote(binaries)}} --output {{quote(output)}}
+
 shaping-completion-full-fit-plan-check:
     TMPDIR="$HOME/tmp" python3 -B -m unittest scripts/tests/test_shaping_full_fit_plan.py
 
