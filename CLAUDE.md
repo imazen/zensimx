@@ -1,5 +1,21 @@
 # zensim — current working rules
 
+## Known Bugs — qualification service admission (November 8, 2026)
+
+The first optimized-runtime qualification service lacked a usable user-manager
+environment, so the worker's older resource wrapper reported a monitored fallback.
+The service now has a verified 3-GiB MemoryMax and zero swap allowance; its native
+trainer continued without restart. Future system-service launches must set finite
+service caps in addition to invoking the wrapper.
+
+Its initial qualification claim also lacks the control ID retained in the native
+command. Existing admission conservatively counts one extra pending CPU for this
+active qualification. New qualification source claims the completed control ID
+instead, so the trainer is recognized. Do not restart the active qualification to
+change accounting. Active raw dumps also precede metadata stamping and derived
+input compaction: the failed early finalized-bake comparison is preserved, and
+full parity still requires successful CLI finalization.
+
 ## Known Bugs — threshold diagnostic output directory (November 8, 2026)
 
 The two-epoch threshold-coordinate diagnostic initially omitted creation of its
