@@ -1898,10 +1898,12 @@ const THRESHOLD_INIT_ROWS: usize = 4096;
 /// where `z_j` is the unit's pre-activation. Its own stream (derived from the
 /// init seed), so no other recipe's init or sample draws move. Returns the
 /// number of rows sampled.
+#[allow(clippy::too_many_arguments)]
 fn init_thresholds(
     w1: &[f64],
     b1: &mut [f64],
     std_features: &StdFeatures,
+    input_shapes: Option<&input_shaping::State>,
     groups: &[TrainingGroup<'_>],
     train_indices: &[usize],
     n_hidden: usize,
@@ -1918,6 +1920,7 @@ fn init_thresholds(
     }
     let n = THRESHOLD_INIT_ROWS.min(total);
     let mut z: Vec<Vec<f64>> = vec![Vec::with_capacity(n); n_hidden];
+    let mut shaped_row = Vec::new();
     for _ in 0..n {
         let mut r = (rng.next_u64() % total as u64) as usize;
         let mut pos = 0;
@@ -1925,7 +1928,17 @@ fn init_thresholds(
             r -= counts[pos];
             pos += 1;
         }
-        let x = std_features.row_cow(train_indices[pos], r);
+        // Quantiles must use the same coordinates as the training forward pass.
+        // Keep the original unshaped reader and RNG sequence unchanged.
+        let x = match input_shapes {
+            Some(shapes) => std::borrow::Cow::Borrowed(shapes.row(
+                std_features,
+                train_indices[pos],
+                r,
+                &mut shaped_row,
+            )),
+            None => std_features.row_cow(train_indices[pos], r),
+        };
         for (j, zj) in z.iter_mut().enumerate() {
             let mut acc = 0.0;
             for (k, &xk) in x.iter().enumerate() {
@@ -3623,6 +3636,7 @@ pub fn train_mlp_strategy_pairs(
             &w1,
             &mut b1,
             &std_features,
+            input_shapes.as_ref(),
             groups,
             &train_indices,
             n_hidden,

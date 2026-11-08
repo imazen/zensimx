@@ -3558,3 +3558,30 @@ private study root. These are code qualifications. Replacement-worker
 downstream input transport/deployment, reduced bootstrap dependencies and
 outer-model cost-runner selection remain unfinished; no outer fit is thereby
 reported complete.
+
+### Shaped threshold correction qualified
+
+The corrected private initializer samples TRAIN rows through the exact same
+shaping reader as the forward pass. Its regression compares against materialized
+transformed rows, checks identity/unshaped bit agreement and excludes a decoy
+validation group. All 409 trainer-library tests passed, with two pre-existing
+ignored tests; trainer/benchmark clippy passed. The source archive's two changed
+Rust files and Cargo manifests match the current correction byte for byte.
+The wrapper reports 4,771 s, peak RSS 1.92 GiB, minimum available RAM 24,861 MiB
+and peak load 20.50. This qualifies the implementation, not a scientific cure
+for the original collapsed fits. Native executable assembly and a separately
+registered corrective comparison are subsequent work. No frozen binary or fit
+was replaced or replayed.
+
+The copied target directory did not provide the intended warm build. Saved
+dependency fingerprints differ in compiler identity and source-path hash; the
+original build also used a custom Cargo home and disabled incremental compilation.
+Do not describe a copied target as warm until Cargo actually reports reuse.
+Retain compiler, Cargo-home, profile and source identity when reusing artifacts.
+The initial source transfer failure and the cold build log remain preserved.
+
+Curve consistency remains descriptive. Selecting a fixed feature bank from
+parameters pooled across all source folds would expose each outer fold through
+other folds' training labels. A transfer experiment must select feature identities
+and curve parameters within its own training partition, and label any globally
+informed follow-up as exploratory. No untouched final holdout was opened here.

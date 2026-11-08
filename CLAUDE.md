@@ -1,16 +1,21 @@
 # zensim — current working rules
 
-## Known Bugs — learned-shape threshold initialization (November 8, 2026)
+## Known Bugs — learned-shape threshold initialization (source corrected November 8, 2026)
 
-The threshold initializer reads unshaped `StdFeatures::row_cow`, while training
-with a loaded input-shaping bank reads `input_shaping::State::row`. Non-identity
-banks therefore initialize first-layer thresholds in a different input domain
-from the one used for training. Source inspection establishes this mismatch;
-its contribution to each observed output collapse is not yet isolated.
-Treat existing frozen-bank comparisons as potentially confounded. Hold new
-non-identity pretrained admissions pending a corrected, explicitly qualified
-initializer; preserve active runs and all original evidence. Shape transfer
-also needs fold-local normalization and identity/unshaped controls.
+The frozen primary binary initializes thresholds from unshaped `StdFeatures`
+although a loaded bank trains through `input_shaping::State::row`. Corrected
+source uses that same shaping reader for threshold quantiles; the unshaped
+reader and RNG stream remain unchanged. The materialized-row, identity and
+TRAIN-only regression passed with all 409 library tests and clippy.
+Existing frozen runs retain their original behavior and evidence. The fix's
+contribution to observed collapse is not yet isolated by scientific fitting.
+Treat those bank comparisons as potentially confounded. New corrected trials
+need their own source-bound condition; do not mix new binaries into the frozen
+registration or replay interrupted fits. Nonidentity primary admissions remain
+held while that correction protocol is prepared. Shape transfer also requires
+fold-local feature selection and normalized curves, with identity/unshaped
+controls. A bank chosen from pooled cross-fold parameters cannot establish
+unbiased transfer performance on those same outer folds.
 
 ## Known Bugs — replacement worker service lifecycle (November 8, 2026)
 

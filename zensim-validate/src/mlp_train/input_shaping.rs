@@ -386,6 +386,93 @@ mod tests {
         }
     }
     #[test]
+    fn threshold_quantiles_use_shaped_train_rows_and_preserve_identity() {
+        use super::super::{FeatureRows, GroupLossMode, TrainingGroup, init_thresholds};
+
+        let mut features = fixture();
+        features.groups.push(StdGroup::Lazy {
+            // Validation rows must never affect TRAIN initialization.
+            raw: vec![100., 0.2, 200., 0.9],
+        });
+        let scaler = features.lazy.as_mut().unwrap();
+        scaler.denom[13] = 2.;
+        scaler.denom[720] = 4.;
+        let config = Config {
+            schema: "zensim-input-shaping-v1".into(),
+            trainable: false,
+            terms: vec![term(13, None, false), term(720, Some(422), true)],
+        };
+        let identity = State::new(config.clone(), &features);
+        let mut shaped_config = config;
+        shaped_config.terms[0].slopes = [0., 3., 0.5];
+        shaped_config.terms[1].slopes = [2., 0.5, 1.];
+        shaped_config.terms[1].gate = [0.2, 0.7, 1.];
+        let shaped = State::new(shaped_config, &features);
+
+        let scores = [0., 1.];
+        let dummy_row = [0.; 721];
+        let rows = [&dummy_row[..], &dummy_row[..]];
+        let groups: Vec<_> = (0..2)
+            .map(|i| TrainingGroup {
+                name: format!("group-{i}"),
+                human_scores: &scores,
+                features: FeatureRows::Borrowed(&rows),
+                metric_sigmas: None,
+                train_weight: 1.,
+                validation_weight: 1.,
+                ref_ids: None,
+                loss_mode: GroupLossMode::default(),
+            })
+            .collect();
+        let mut w1 = vec![0.; 721 * 2];
+        w1[13 * 2] = 1.;
+        w1[720 * 2 + 1] = 1.;
+        let materialize = |state: Option<&State>| StdFeatures {
+            groups: (0..2)
+                .map(|g| {
+                    let mut dense = Vec::new();
+                    let mut scratch = Vec::new();
+                    for r in 0..2 {
+                        let x = match state {
+                            Some(s) => s.row(&features, g, r, &mut scratch),
+                            None => features.row(g, r, &mut scratch),
+                        };
+                        dense.extend_from_slice(x);
+                    }
+                    StdGroup::Dense(dense)
+                })
+                .collect(),
+            n_features: 721,
+            lazy: None,
+        };
+        let original_dense = materialize(None);
+        let mut shaped_dense = materialize(Some(&shaped));
+        for seed in [0, 42, 800] {
+            let initialize = |f: &StdFeatures, s: Option<&State>| {
+                let mut biases = [0.; 2];
+                assert_eq!(
+                    init_thresholds(&w1, &mut biases, f, s, &groups, &[0], 2, seed),
+                    2
+                );
+                biases.map(f64::to_bits)
+            };
+            let baseline = initialize(&features, None);
+            assert_eq!(baseline, initialize(&original_dense, None));
+            assert_eq!(baseline, initialize(&features, Some(&identity)));
+            let actual = initialize(&features, Some(&shaped));
+            assert_ne!(
+                actual, baseline,
+                "fixture must expose unshaped initialization"
+            );
+            assert_eq!(actual, initialize(&shaped_dense, None));
+            let StdGroup::Dense(validation) = &mut shaped_dense.groups[1] else {
+                unreachable!()
+            };
+            validation.fill(1e20);
+            assert_eq!(actual, initialize(&shaped_dense, None));
+        }
+    }
+    #[test]
     fn native_identity_frozen_state_and_joint_update() {
         let features = fixture();
         let config = Config {

@@ -4,6 +4,9 @@
 
 ### Research
 
+- Initialize loaded-bank thresholds in the same shaped coordinates used for
+  training; retain the unshaped RNG/reader path. Frozen trials remain unchanged.
+
 - Register the owner-approved 1,281-fit shaping scope, retain original evidence,
   and enforce paired reduced rescue selection and replacement-host admission.
 
