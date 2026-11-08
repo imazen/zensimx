@@ -15,6 +15,10 @@ def context(study,cell_id,binaries,*,host=None):
     cell=found[0];binding=admit_fit(study,cell,sha(binaries/'BUILD.json'),120)
     if binding is None:raise ValueError('only activated corrected inner fits supported')
     admit_cell(study,cell,host=host)
+    from shaping_host_assignment import assigned_placement
+    placement=assigned_placement(study,cell,sha(binaries/'BUILD.json'))
+    if placement is None or placement['host']!=(socket.gethostname() if host is None else host):
+        raise ValueError('one explicit matching corrected worker placement required')
     if (study/'runs'/cell_id).exists():raise ValueError('preserve every prior attempt; no automatic replay')
     groups_path=study/'comparators'/cell['partition']/'GROUPS.json'
     if not groups_path.exists():raise ValueError('prepare the registered TRAIN partition before transport')
@@ -41,7 +45,7 @@ def context(study,cell_id,binaries,*,host=None):
         strict_admission=True,data_role_decision=Path(groups['decision']))
     if Path(command[0])!=binaries/'zensim_mlp_train':raise ValueError('corrected command builder selected another binary')
     from shaping_rescue_worker import source_identity
-    scope=dict(cell=cell,corrected_binding=binding,parent_cell=parent,source_run=str(source),
+    scope=dict(cell=cell,corrected_binding=binding,placement=placement,parent_cell=parent,source_run=str(source),
         parent_result_sha256=sha(source/'RESULT.json'),prefix_sha256=sha(source/'checkpoints/ckpt_epoch119.bin'),
         group_receipt_sha256=sha(groups_path),base_recipe_sha256=sha(BASE),command_template=[source_identity(v) for v in command],
         epochs=120,pairs_per_epoch=50000,outer_results_read=False)

@@ -74,3 +74,10 @@ checkpoints and two bounded states while excluding canonical comparison scratch
 and shared training inputs. Each class is collected once per watcher; it launches
 no training and retires no store. Native execution of this collection path remains
 pending a terminal class qualification.
+
+Corrected wave preparation now seals at most 44 explicitly placed, never-started
+conditions per batch. Placement guards precede input sealing and are reproduced
+in each worker context. Each four-worker controller has its own manifest/status
+directory; controllers retain shared CPU, RAM, SSD and snapshot admission.
+Registration requires corrected activation. This is orchestration support; no
+corrected scientific fit has yet passed that activation gate.

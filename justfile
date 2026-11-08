@@ -5776,3 +5776,9 @@ shaping-snapshot-cli-check study frozen binaries output:
 # Archive each compatibility class once after its full trajectory qualification.
 shaping-control-archive study source host output destination *args:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_control_archive.py --study {{quote(study)}} --source {{quote(source)}} --host {{quote(host)}} --output {{quote(output)}} --destination {{quote(destination)}} {{args}}
+
+shaping-corrected-wave-prepare-check:
+    TMPDIR="$HOME/tmp" python3 -B -m unittest scripts.tests.test_shaping_corrected_wave_prepare
+
+shaping-corrected-wave-prepare study source binaries placements output:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 512M --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_corrected_wave_prepare.py --study {{quote(study)}} --source {{quote(source)}} --binaries {{quote(binaries)}} --placements {{quote(placements)}} --output {{quote(output)}}
