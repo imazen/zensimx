@@ -4,7 +4,9 @@ import argparse,contextlib,json,os,shlex,socket,subprocess,sys,time
 from pathlib import Path
 from shaping_completion import DECLARATION_SHA256,REPO,encoded,sha
 
-HOSTS=('r3500','r3800x','r5600g','i134')
+# Frozen Linux/x86 native artifacts can execute on these transport endpoints.
+# The study's current owner-approved pool remains a separate admission gate.
+HOSTS=('r3500','r3800x','r5600g','i134','r7900x','i270')
 MAX_INPUT_BYTES=384*1024**2
 DATA_ROOTS=(Path('/mnt/v/output/zensim'),Path('/srv/zen-research'))
 

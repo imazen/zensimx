@@ -33,7 +33,15 @@ def training_limit(study=None,cpu_count=None,*,host=None):
     if (row.get('approved') is not True or row.get('per_job_thread_caps_unchanged') is not True
         or row.get('ram_and_storage_guards_unchanged') is not True or row['limits']!=record['limits']):
         raise ValueError('aggregate-only CPU approval differs')
-    limit=record['limits'][host or socket.gethostname()]
+    name=host or socket.gethostname()
+    if name not in record['limits']:
+        from shaping_compute_pool import allowed
+        hosts=allowed(study)
+        if hosts is None or name not in hosts:raise ValueError('host has no approved compute budget')
+        # Newly admitted machines retain the ordinary four-thread headroom.
+        # The four previously approved tighter aggregate ceilings stay intact.
+        return max(1,count-4)
+    limit=record['limits'][name]
     if limit['logical_cpus']!=count or not 1<=limit['max_trainers']<count:
         raise ValueError('observed CPU availability differs from approved budget')
     return limit['max_trainers']

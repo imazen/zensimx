@@ -6,7 +6,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from shaping_completion import encoded,sha
 
-HOSTS=('r5600g','i134','r3500','r3800x')
+HOSTS=('r5600g','i134','r3500','r3800x','r7900x','i270')
 DERIVED=('evaluation','curve_evaluation','CONVERGENCE.json','CONVERGENCE_FAILURE.json','EVALUATION_FAILURES.json','LATER_EVALUATION_FAILURE.json')
 LATER_STAGES=('outer','fresh_control_outer','fresh_control_outer_matched','source_curve','row_curve','shuffle','human_only')
 

@@ -90,7 +90,7 @@ def watch(args):
 
 if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__)
-    p.add_argument('--host',choices=['i265','i270','r3800x','i134','r5600g','r3500'],required=True)
+    p.add_argument('--host',choices=['i265','i270','r7900x','r3800x','i134','r5600g','r3500'],required=True)
     for key in ('source','status-source','study','destination','output'):p.add_argument('--'+key,type=Path,required=True)
     p.add_argument('--transfer-root',type=Path,help='SSD directory for transient transfer containers; native archive destination is unchanged')
     p.add_argument('--watch',action='store_true');watch(p.parse_args())

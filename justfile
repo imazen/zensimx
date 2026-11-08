@@ -5796,3 +5796,6 @@ shaping-scatter-prepare study dashboard output:
 
 shaping-scatter-native study panel manifest output workers='4':
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 2G --jobs {{workers}} -- python3 -B scripts/rev4_featpot/shaping_scatter_native.py --study {{quote(study)}} --panel {{quote(panel)}} --manifest {{quote(manifest)}} --output {{quote(output)}} --workers {{workers}}
+
+shaping-training-budget-check:
+    TMPDIR="$HOME/tmp" python3 -B -m unittest scripts.tests.test_shaping_training_budget

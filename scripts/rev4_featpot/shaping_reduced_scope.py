@@ -210,7 +210,9 @@ def _admit_host(root, host):
                 approvals.append(row)
     if len(approvals) != 1:
         raise ValueError('one pinned owner approval required')
-    if (host or socket.gethostname()) not in approvals[0]['allowed_new_compute_hosts']:
+    from shaping_compute_pool import allowed
+    expanded=allowed(root)
+    if (host or socket.gethostname()) not in (expanded if expanded is not None else approvals[0]['allowed_new_compute_hosts']):
         raise ValueError('host is outside owner-approved replacement compute pool')
     return True
 
