@@ -1,6 +1,7 @@
 import json,sys,tempfile,unittest
 from pathlib import Path
 from unittest.mock import patch
+from types import SimpleNamespace
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'rev4_featpot'))
 from shaping_completion import encoded,sha
 from shaping_partial_restart import CELLS,NAME,register,authorize,compare_available
@@ -55,7 +56,8 @@ class PartialRestartTests(unittest.TestCase):
             row=dict(checkpoint_sha256={name:sha(old/'checkpoints'/name)})
             self.assertFalse(compare_available(old,dest,row,Path('converter'))['compared'])
             (dest/'train.log').write_text('  checkpoint dump: '+json.dumps(dict(path=str(dest/'checkpoints'/name)))+'\n')
-            def strip(command,**kwargs):Path(command[command.index('--out')+1]).write_bytes(Path(command[command.index('--in')+1]).read_bytes())
+            def strip(command,**kwargs):
+                Path(command[command.index('--out')+1]).write_bytes(Path(command[command.index('--in')+1]).read_bytes());return SimpleNamespace(returncode=0)
             with patch('shaping_partial_restart.subprocess.run',side_effect=strip) as native:
                 result=compare_available(old,dest,row,Path('converter'));compare_available(old,dest,row,Path('converter'))
             self.assertFalse(result['compared'][name]['equal']);self.assertEqual(native.call_count,2)

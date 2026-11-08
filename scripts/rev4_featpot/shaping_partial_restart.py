@@ -1,6 +1,6 @@
 """Explicit two-cell restart exception; preserve and compare every old checkpoint."""
 from __future__ import annotations
-import argparse,json,subprocess,time
+import argparse,json,subprocess,time,shutil
 from pathlib import Path
 from shaping_completion import encoded,sha
 
@@ -56,8 +56,8 @@ def authorize(study,cell,attempt):
 
 def compare_available(old,dest,row,binary):
     """Use native post-write log receipts; preserve canonical bytes and mismatches."""
-    directory=dest/'prefix_comparison';directory.mkdir(exist_ok=True)
-    path=dest/'PREFIX_COMPARISON.json'
+    directory=dest/'prefix_comparison_v2';directory.mkdir(exist_ok=True)
+    path=dest/'PREFIX_COMPARISON_V2.json'
     record=json.loads(path.read_text()) if path.exists() else dict(expected=len(row['checkpoint_sha256']),compared={})
     receipts=set()
     for line in (dest/'train.log').read_text().splitlines():
@@ -71,8 +71,13 @@ def compare_available(old,dest,row,binary):
         for label,source in [('original',old/'checkpoints'/name),('restart',dest/'checkpoints'/name)]:
             target=directory/(label+'-'+name)
             with (directory/(label+'-'+name+'.log')).open('x') as log:
-                subprocess.run([str(binary),'strip','--in',str(source),'--out',str(target),'--key','zentrain.repro'],
-                    stdout=log,stderr=subprocess.STDOUT,check=True)
+                result=subprocess.run([str(binary),'strip','--in',str(source),'--out',str(target),'--key','zentrain.repro'],
+                    stdout=log,stderr=subprocess.STDOUT)
+            if result.returncode:
+                message=(directory/(label+'-'+name+'.log')).read_text()
+                if result.returncode==1 and message.startswith('error: metadata key \"zentrain.repro\" not present in ') and not target.exists():
+                    shutil.copyfile(source,target) # Interrupted bakes have no final provenance stamp.
+                else:raise RuntimeError('native canonical comparison failed: '+message)
             outputs.append(sha(target))
         record['compared'][name]=dict(original_sha256=outputs[0],restart_sha256=outputs[1],equal=outputs[0]==outputs[1])
         path.write_bytes(encoded(record))
