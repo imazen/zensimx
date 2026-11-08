@@ -5272,6 +5272,12 @@ shaping-completion-control-compatibility-check:
 shaping-completion-corrected-registration-check:
     TMPDIR="$HOME/tmp" python3 -B -m unittest scripts/tests/test_shaping_corrected_registration.py
 
+shaping-completion-corrected-view-check:
+    TMPDIR="$HOME/tmp" python3 -B -m unittest scripts/tests/test_shaping_corrected_view.py
+
+shaping-completion-corrected-certify study output *proofs:
+    TMPDIR="$HOME/tmp" python3 -B scripts/rev4_featpot/shaping_corrected_view.py --study {{quote(study)}} --output {{quote(output)}} {{proofs}}
+
 shaping-rescue-wave-prepare-check:
     TMPDIR="$HOME/tmp" python3 -B -m unittest scripts/tests/test_shaping_rescue_wave_prepare.py
 
