@@ -69,12 +69,12 @@ def resolve_inputs(study,cell,host,binaries,qualification,kind,human_qualificati
                        execution_kind=kind,human_qualification=human_qualification)
 
 
-def reproduce(record):
+def reproduce(record,*,host=None):
     kind=record['execution_kind'];study=Path(record['study'])
     args=arguments(study,record['cell']['id'],Path(record['binary_dir']),
                    Path(record['neutral_qualification']),kind,
                    Path(record['human_qualification']) if record['human_qualification'] else None)
-    context=admitted(args,kind,host=socket.gethostname())
+    context=admitted(args,kind,host=socket.gethostname() if host is None else host)
     command=['python3','-B',str(REPO/'scripts/rev4_featpot'/('shaping_outer_execution.py' if kind=='outer' else 'shaping_variant_execution.py')),
              '--study',str(study),'--binary-dir',record['binary_dir'],
              '--neutral-qualification',record['neutral_qualification'],'--cell',record['cell']['id']]

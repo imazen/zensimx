@@ -105,6 +105,8 @@ def register(study,cell,host,binaries,qualification,output,*,execution_kind=None
     output.mkdir(parents=True,exist_ok=False);(output/'REQUEST.json').write_bytes(encoded(record))
     assignment=dict(host=host,cells=[cell],partition=record['cell']['partition'],
                     plan_sha256=record['plan_sha256'],build_sha256=record['build_sha256'])
+    if execution_kind is not None:
+        assignment.update(worker_request_path=str(output/'REQUEST.json'),worker_request_sha256=sha(output/'REQUEST.json'))
     (output/'ASSIGNMENT.json').write_bytes(encoded(assignment));return record
 
 

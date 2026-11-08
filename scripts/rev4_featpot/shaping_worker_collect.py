@@ -19,11 +19,12 @@ def inventory(root):
     return result
 
 
-def validate(root, assignment, cells):
+def validate(root, assignment, cells,study=None):
     run=json.loads((root/'RUN.json').read_text())
     result=json.loads((root/'RESULT.json').read_text())
     cell=run['cell']
-    if cell not in cells or cell['id'] not in assignment['cells']:raise ValueError('unassigned cell')
+    downstream=cell['stage'] in ('outer','fresh_control_outer','fresh_control_outer_matched','source_curve','row_curve','shuffle','human_only')
+    if (cell not in cells and not downstream) or cell['id'] not in assignment['cells']:raise ValueError('unassigned cell')
     for key in ('cell','plan_sha256','build_sha256','execution_host','epochs','pairs_per_epoch'):
         if run[key]!=result[key]:raise ValueError('terminal receipt differs: '+key)
     for key in ('recovery_authorization_sha256','recovery_completed_epochs_replayed'):
@@ -32,6 +33,9 @@ def validate(root, assignment, cells):
         if run[key]!=assignment[key]:raise ValueError('worker scientific identity differs')
     if run['execution_host']!=assignment['host']:raise ValueError('worker host differs')
     if result['stage']!='trained' or result['exit_code']!=0:raise ValueError('worker fit not successful')
+    if downstream:
+        from shaping_downstream_collection import validate as validate_downstream
+        return validate_downstream(study,root,assignment,run,result)
     replayed=run.get('recovery_completed_epochs_replayed',0)
     if replayed:
         report=json.loads((root/'PREFIX_COMPARISON_V2.json').read_text())
@@ -75,7 +79,7 @@ def pack(study,assignment_path,cell_id,attempt,bundle):
     from shaping_execution import load_registration
     _,cells,_=load_registration(study)
     root=study/'runs'/cell_id/attempt
-    validate(root,json.loads(assignment_path.read_text()),cells)
+    validate(root,json.loads(assignment_path.read_text()),cells,study)
     files=inventory(root);payload=sum(row['bytes'] for row in files.values())
     if len(files)>=1000 or payload>1024**3-16*1024**2:
         raise ValueError('bundle exceeds one-job storage allowance')
@@ -92,7 +96,7 @@ def pack_reserved(study,assignment_path,cell_id,attempt,bundle,expected_inventor
     if cell_id not in assignment['cells'] or not attempt.startswith('attempt-') or not attempt[8:].isdigit():
         raise ValueError('invalid cell or attempt')
     root=study/'runs'/cell_id/attempt
-    run=validate(root,assignment,cells)
+    run=validate(root,assignment,cells,study)
     from shaping_external_recovery import verify_attempt
     verify_attempt(study,run,attempt)
     if run['cell']['id']!=cell_id:raise ValueError('cell directory differs')
@@ -102,7 +106,7 @@ def pack_reserved(study,assignment_path,cell_id,attempt,bundle,expected_inventor
     if expected_inventory is not None and source_files!=expected_inventory:
         raise ValueError('worker output changed during storage admission')
     command=(json.loads((root/'fit/RUN.json').read_text())['command']
-             if run['cell']['stage']=='rescue' else run['command'])
+             if run.get('fit_directory')=='fit' else run['command'])
     if command.count('--derived-inputs')!=1:raise ValueError('one derived-input declaration required')
     declaration=Path(command[command.index('--derived-inputs')+1])
     if sha(declaration)!=DECLARATION_SHA256:raise ValueError('worker declaration differs from frozen study')
@@ -172,7 +176,7 @@ def collect(study,assignment_path,bundle,pin):
     with reservation(study,staging,plan['minimum_ssd_free_bytes'],bytes_required=payload+16*1024**2):
         receipt=unpack(bundle,staging,pin)
         if receipt['assignment_sha256']!=sha(assignment_path):raise ValueError('assignment drift')
-        run=validate(staging,assignment,cells)
+        run=validate(staging,assignment,cells,study)
         if run['cell']!=receipt['cell']:raise ValueError('collection cell differs')
         attempt=receipt['attempt']
         if not attempt.startswith('attempt-') or not attempt[8:].isdigit():raise ValueError('invalid attempt name')

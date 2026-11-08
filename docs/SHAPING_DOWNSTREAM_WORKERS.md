@@ -17,5 +17,15 @@ Existing attempts cannot be replayed.
 The controller tests cover terminal receipts for unshaped, frozen-pretrained and
 joint-pretrained outer/variant branches. Transport tests cover evidence drift,
 schema/stage mismatch and rejection before CPU admission. They do not establish
-scientific fit completion or a full fleet deployment. Collection and evaluation
-of downstream fits must be qualified independently before launching a wave.
+scientific fit completion or a full fleet deployment.
+
+Downstream assignments also bind the exact worker request. Collection reruns
+the original admission owner using the recorded approved host, resolves
+conditional fresh-control identities through that gate, and checks the full
+selected phase schedule. Every phase must retain its complete epoch inventory,
+native terminal receipt, binary identity and final model hash. The controller's
+exposure must equal the sum of admitted phases; variant role names resolve to
+their admitted model family. The existing primary/rescue collection checks are
+unchanged. Pack, unpack and atomic import coverage includes paired pretrained
+phases; it does not establish a real downstream scientific fit. Evaluation
+deployment still requires separate qualification before launching a wave.
