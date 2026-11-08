@@ -164,7 +164,10 @@ def _run_native(root,binary_dir,cell,record,attempt,epochs,mem):
         if corrected is not None:running['corrected_threshold_condition']=corrected
         (dest/'RUN.json').write_bytes(encoded(running))
         print(json.dumps({'run':str(dest),'pid':process.pid,'cell':cell['id']}),flush=True)
-        rc=process.wait()
+        if corrected is not None:
+            from shaping_snapshot_retention import wait_and_bind
+            rc=wait_and_bind(process,root.parent,dest)
+        else:rc=process.wait()
     final={**running,'stage':'trained' if rc==0 else 'failed','exit_code':rc,
            'finished_utc':datetime.now(timezone.utc).isoformat(),
            'artifact_bytes':sum(p.stat().st_size for p in dest.rglob('*') if p.is_file())}

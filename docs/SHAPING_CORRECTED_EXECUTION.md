@@ -25,6 +25,19 @@ admission all use the same corrected base-selection path. Unchanged ReLU
 rescues retain their IDs and decisions. Existing rescue trigger coverage and
 the original whole-setting undefined policy remain in force.
 
+`shaping_corrected_worker.py` captures the effective condition, activation,
+TRAIN tables, matching completed parent's epoch-119 bank, source modules and
+native binaries in the existing bounded worker capsule. The worker reproduces
+that gate before shared CPU admission and runs the existing 120-epoch command
+owner with a 2-GiB cap. Collection revalidates the corrected condition in both
+RUN and RESULT before publication. The owning wait records the live snapshot
+lock beside the run; binding failures are explicit artifacts and never signal
+or restart the trainer.
+
+The real frozen-study readiness check refused an unactivated corrected ID
+before an attempt existed. Worker capsule/controller fixtures passed; native
+corrected scientific fitting and its transport qualification remain unexecuted.
+
 The frozen four-setting matrix and the archived monotone-SiLU trajectory were
 accepted by these checks on November 8, 2026. Five other native control
 qualifications were still running; no activation was written. Fixture checks establish orchestration

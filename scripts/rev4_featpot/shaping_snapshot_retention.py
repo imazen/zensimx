@@ -42,6 +42,28 @@ def bind(scope,run,output):
     return record
 
 
+def wait_and_bind(process,scope,run):
+    """Observe the owned native child while waiting; never signal or replay it."""
+    import subprocess
+    output=run/'SNAPSHOT_BINDING.json'
+    while process.poll() is None and not output.exists():
+        try:bind(scope,run,output)
+        except ValueError as error:
+            if str(error)!='one live native snapshot-lock owner required':
+                (run/'SNAPSHOT_BINDING_FAILURE.json').write_bytes(encoded(dict(reason=str(error),
+                    native_process_preserved=True,driver_sha256=sha(__file__))))
+                break
+        if not output.exists():
+            try:process.wait(timeout=2)
+            except subprocess.TimeoutExpired:pass
+    code=process.wait()
+    if not output.exists() and not (run/'SNAPSHOT_BINDING_FAILURE.json').exists():
+        (run/'SNAPSHOT_BINDING_FAILURE.json').write_bytes(encoded(dict(
+            reason='native process ended before snapshot-lock binding',native_exit_code=code,
+            native_process_preserved=True,driver_sha256=sha(__file__))))
+    return code
+
+
 def completed(binding):
     record=json.loads(binding.read_text());run=Path(record['run']);directory=Path(record['snapshot_directory'])
     if (record['schema']!='native-snapshot-run-binding-v1' or sha(run/'RUN.json')!=record['run_sha256']

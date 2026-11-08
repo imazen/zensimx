@@ -44,6 +44,12 @@ def validate(root, assignment, cells,study=None):
             raise ValueError('approved partial restart requires every matched prefix checkpoint')
     epochs=120 if '_pretrained_' in cell['family'] or cell['stage']=='fresh_control_inner' else 240
     if run['epochs']!=epochs or run['pairs_per_epoch']!=50000:raise ValueError('exposure differs')
+    if 'corrected_threshold_condition' in run:
+        if study is None:raise ValueError('corrected collection requires its activated study')
+        from shaping_corrected_view import admit_fit
+        expected=admit_fit(study,cell,run['build_sha256'],epochs)
+        if expected is None or any(row.get('corrected_threshold_condition')!=expected for row in (run,result)):
+            raise ValueError('corrected collected condition differs from approved activation')
     fit=root
     if cell['stage']=='rescue':
         if (run.get('process_role')!='rescue_controller' or run.get('fit_directory')!='fit'

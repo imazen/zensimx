@@ -5275,6 +5275,12 @@ shaping-completion-corrected-registration-check:
 shaping-completion-corrected-view-check:
     TMPDIR="$HOME/tmp" python3 -B -m unittest scripts/tests/test_shaping_corrected_view.py
 
+shaping-completion-corrected-worker-check:
+    TMPDIR="$HOME/tmp" python3 -B -m unittest scripts/tests/test_shaping_corrected_worker.py scripts/tests/test_shaping_worker_collect.py scripts/tests/test_shaping_rescue_worker.py scripts/tests/test_shaping_downstream_worker.py
+
+shaping-completion-corrected-worker-register study cell host binaries qualification output:
+    TMPDIR="$HOME/tmp" python3 -B scripts/rev4_featpot/shaping_rescue_worker.py register --execution-kind corrected_inner --study {{quote(study)}} --cell {{quote(cell)}} --host {{quote(host)}} --binaries {{quote(binaries)}} --qualification {{quote(qualification)}} --output {{quote(output)}}
+
 shaping-completion-corrected-certify study output *proofs:
     TMPDIR="$HOME/tmp" python3 -B scripts/rev4_featpot/shaping_corrected_view.py --study {{quote(study)}} --output {{quote(output)}} {{proofs}}
 

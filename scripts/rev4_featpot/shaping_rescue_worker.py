@@ -100,8 +100,12 @@ def register(study,cell,host,binaries,qualification,output,*,execution_kind=None
     if host not in HOSTS:raise ValueError('approved compute worker required')
     if execution_kind is None:record=resolve_inputs(study,cell,host,binaries,qualification)
     else:
-        from shaping_downstream_worker import resolve_inputs as later_inputs
-        record=later_inputs(study,cell,host,binaries,qualification,execution_kind,human_qualification)
+        if execution_kind=='corrected_inner':
+            from shaping_corrected_worker import resolve_inputs as corrected_inputs
+            record=corrected_inputs(study,cell,host,binaries,qualification)
+        else:
+            from shaping_downstream_worker import resolve_inputs as later_inputs
+            record=later_inputs(study,cell,host,binaries,qualification,execution_kind,human_qualification)
     output.mkdir(parents=True,exist_ok=False);(output/'REQUEST.json').write_bytes(encoded(record))
     assignment=dict(host=host,cells=[cell],partition=record['cell']['partition'],
                     plan_sha256=record['plan_sha256'],build_sha256=record['build_sha256'])
@@ -116,7 +120,7 @@ def verify(record,*,allow_missing=False):
         raise ValueError('worker request identity differs')
     if record['schema']=='shaping-native-worker-v2':
         stages={'outer':('outer','fresh_control_outer','fresh_control_outer_matched'),
-                'variant':('source_curve','row_curve','shuffle','human_only')}
+                'variant':('source_curve','row_curve','shuffle','human_only'),'corrected_inner':('inner',)}
         if record.get('execution_kind') not in stages or record['cell']['stage'] not in stages[record['execution_kind']]:
             raise ValueError('downstream worker stage differs')
     elif record.get('execution_kind') is not None:raise ValueError('legacy rescue request cannot change execution kind')
@@ -172,7 +176,8 @@ def work(request):
     record=json.loads(request.read_text());verify(record)
     study=Path(record['study']);cell=record['cell'];key=cell['id']
     if record.get('execution_kind') is not None:
-        from shaping_downstream_worker import reproduce
+        if record['execution_kind']=='corrected_inner':from shaping_corrected_worker import reproduce
+        else:from shaping_downstream_worker import reproduce
         resolution,command=reproduce(record)
     else:
         resolution=resolve(study,key)
@@ -223,7 +228,7 @@ def wave(manifest):
 def main():
     p=argparse.ArgumentParser(description=__doc__);p.add_argument('mode',choices=('register','verify','transfer','receive','work','wave'))
     for name in ('study','binaries','qualification','output','request','remote-source','human-qualification'):p.add_argument('--'+name,type=Path)
-    p.add_argument('--execution-kind',choices=('outer','variant'))
+    p.add_argument('--execution-kind',choices=('outer','variant','corrected_inner'))
     p.add_argument('--cell');p.add_argument('--host',choices=HOSTS);p.add_argument('--allow-missing',action='store_true')
     a,remaining=p.parse_known_args()
     if a.mode=='receive':
