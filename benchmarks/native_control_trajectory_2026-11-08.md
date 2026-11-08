@@ -1,6 +1,6 @@
-# Optimized trainer: completed monotone-SiLU control
+# Optimized trainer: completed native control trajectories
 
-Five other neural control classes remain in progress. No corrected-condition
+Four other neural control classes remain in progress. No corrected-condition
 scientific fit is established by this result.
 
 Control `e3c79ecb9ba271091aa1` (inner partition 1-1, setting 0, seed 0)
@@ -49,3 +49,29 @@ Mirror receipt SHA-256:
 Native command and input identity are in `native-fit/RUN.json`; the comparison
 was invoked through `just shaping-completion-neutral-trajectory` using that
 completed control, the new qualification directory and the pinned runtime.
+
+## ReLU control — November 8, 2026
+
+Control `5d4e81aa35c9b616c3c7` on r5600g also passed all 240 finalized
+checkpoint comparisons under the same V3 BUILD, removing only `zentrain.repro`.
+The native qualifier exited zero with `all_240_checkpoints_equal=true`.
+Its wrapper recorded:
+
+```text
+run-heavy: done rc=0 10761s | peak-RSS 0.11GiB | min-avail 39338MiB | peak-load 15.33
+```
+
+These concurrent-run observations do not establish an isolated speedup.
+The 255-artifact evidence bundle contains 64,391,574 bytes, including native
+bakes and two snapshot states of 9,475,825 and 9,606,848 bytes. All durable
+artifacts passed cold SHA-256 readback. Receipt SHA-256:
+`4b5bcc8cd02fb65180368d8167fa232f723c6b7423ab9f56ac7459c909772c48`.
+Evidence on dev is under the study's
+`control-compatibility-collected-20261108/relu`; the durable copy is under
+`control-compatibility-evidence-20261108/relu`.
+
+The completed ReLU snapshot store was retired only after rereading both durable
+states through the worker's verified read-only study mount, checking the native
+store locks and open-file users, and writing the retirement journal. The journal
+records `completed_store_retired`; other active stores were untouched. The first
+retirement refusal and corrected execution logs remain preserved.

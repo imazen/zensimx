@@ -124,6 +124,19 @@ def corrected_program(root):
     if approval['answer']!='Approve four settings: 1,461 fits':raise ValueError('corrected dashboard owner choice differs')
     result=dict(core_fit_target=1461,corrected_condition_count=288,omitted_original_conditions=108,
                 registration_sha256=sha(path),execution_activated=(path.parent/'ACTIVATION.json').exists())
+    compatibility=root.parent/'corrected-control-qualification-20261108/REGISTRATION.json'
+    if compatibility.exists():
+        from shaping_corrected_view import trajectory
+        cases=json.loads(compatibility.read_text())['cases'];qualified=[]
+        for family,case in cases.items():
+            proof=(root.parent/'optimized-runtime-neutral-qualification-20261108/verified-evidence-v1/trajectory-check-20261108/RESULT.json'
+                if family=='silu_monotone' else root.parent/'control-compatibility-collected-20261108'/family/'RESULT.json')
+            if not proof.exists():continue
+            value=json.loads(proof.read_text());trajectory(value,family,case)
+            if value.get('original_result_sha256',value.get('source_result_sha256'))!=sha(Path(case['run'])/'RESULT.json'):
+                raise ValueError('dashboard compatibility source result differs')
+            qualified.append(family)
+        result.update(compatibility_classes_required=len(cases),compatibility_classes_qualified=sorted(qualified))
     observation=root.parent/'native-supervision-20261108/r5600g.json'
     if observation.exists():
         native=json.loads(observation.read_text());age=(datetime.now(timezone.utc)-datetime.fromisoformat(native['checked_utc'])).total_seconds()
