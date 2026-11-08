@@ -63,6 +63,10 @@ def resolve_inputs(study,cell_id,host,binaries,qualification):
             q=json.loads((qualification/'RESULT.json').read_text())
             if not q['match'] or q['epochs']!=240 or q['build_sha256']!=sha(binaries/'BUILD.json'):
                 raise ValueError('full neutral qualification required')
+    return seal_inputs(paths,study,cell,host,binaries,qualification,resolution)
+
+
+def seal_inputs(paths,study,cell,host,binaries,qualification,resolution,*,execution_kind=None,human_qualification=None):
     # Bind every imported project module, in addition to the documents and data
     # actually read. The exported worker source must match these exact bytes.
     for module in tuple(sys.modules.values()):
@@ -82,15 +86,22 @@ def resolve_inputs(study,cell_id,host,binaries,qualification):
         kind,name=category(path);files[str(path)]=dict(kind=kind,name=name,bytes=path.stat().st_size,sha256=sha(path))
     total=sum(row['bytes'] for row in files.values())
     if total>MAX_INPUT_BYTES or len(files)>4000:raise ValueError('rescue evidence capsule exceeds bounded input allowance')
-    return dict(schema='shaping-rescue-worker-v1',cell=cell,host=host,study=str(study),binary_dir=str(binaries),
+    record=dict(schema='shaping-rescue-worker-v1',cell=cell,host=host,study=str(study),binary_dir=str(binaries),
                 neutral_qualification=str(qualification),resolution=resolution,files=files,input_bytes=total,
                 plan_sha256=sha(study/'PLAN.json'),build_sha256=sha(binaries/'BUILD.json'),
                 driver_sha256=sha(__file__),source_root=str(REPO),outer_results_read=False)
+    if execution_kind is not None:
+        record.update(schema='shaping-native-worker-v2',execution_kind=execution_kind,
+                      human_qualification=str(human_qualification) if human_qualification else None)
+    return record
 
 
-def register(study,cell,host,binaries,qualification,output):
+def register(study,cell,host,binaries,qualification,output,*,execution_kind=None,human_qualification=None):
     if host not in HOSTS:raise ValueError('approved compute worker required')
-    record=resolve_inputs(study,cell,host,binaries,qualification)
+    if execution_kind is None:record=resolve_inputs(study,cell,host,binaries,qualification)
+    else:
+        from shaping_downstream_worker import resolve_inputs as later_inputs
+        record=later_inputs(study,cell,host,binaries,qualification,execution_kind,human_qualification)
     output.mkdir(parents=True,exist_ok=False);(output/'REQUEST.json').write_bytes(encoded(record))
     assignment=dict(host=host,cells=[cell],partition=record['cell']['partition'],
                     plan_sha256=record['plan_sha256'],build_sha256=record['build_sha256'])
@@ -98,9 +109,15 @@ def register(study,cell,host,binaries,qualification,output):
 
 
 def verify(record,*,allow_missing=False):
-    if (record['schema']!='shaping-rescue-worker-v1' or record['host']!=socket.gethostname()
+    if (record['schema'] not in ('shaping-rescue-worker-v1','shaping-native-worker-v2') or record['host']!=socket.gethostname()
         or record['host'] not in HOSTS or record['driver_sha256']!=sha(__file__) or record['outer_results_read']):
         raise ValueError('worker request identity differs')
+    if record['schema']=='shaping-native-worker-v2':
+        stages={'outer':('outer','fresh_control_outer','fresh_control_outer_matched'),
+                'variant':('source_curve','row_curve','shuffle','human_only')}
+        if record.get('execution_kind') not in stages or record['cell']['stage'] not in stages[record['execution_kind']]:
+            raise ValueError('downstream worker stage differs')
+    elif record.get('execution_kind') is not None:raise ValueError('legacy rescue request cannot change execution kind')
     if len(record['files'])>4000 or sum(r['bytes'] for r in record['files'].values())>MAX_INPUT_BYTES:
         raise ValueError('worker input allowance exceeded')
     missing=[]
@@ -152,13 +169,20 @@ def work(request):
     from shaping_storage import reservation
     record=json.loads(request.read_text());verify(record)
     study=Path(record['study']);cell=record['cell'];key=cell['id']
-    if resolve(study,key)!=record['resolution']:raise ValueError('worker cannot reproduce original rescue gate')
+    if record.get('execution_kind') is not None:
+        from shaping_downstream_worker import reproduce
+        resolution,command=reproduce(record)
+    else:
+        resolution=resolve(study,key)
+        command=None
+    if resolution!=record['resolution']:raise ValueError('worker cannot reproduce original evidence gate')
+    if command is None:
+        command=['python3','-B',str(REPO/'scripts/rev4_featpot/shaping_rescue_execution.py'),'--study',str(study),
+                 '--binary-dir',record['binary_dir'],'--neutral-qualification',record['neutral_qualification'],'--cell',key]
     if (study/'runs'/key).exists():raise ValueError('preserve existing attempt; never replay')
     while not reserve_worker(study,key)['can_start']:time.sleep(10)
     try:
         with reservation(study,study/'runs'/key/'attempt-001',30*1024**3):
-            command=['python3','-B',str(REPO/'scripts/rev4_featpot/shaping_rescue_execution.py'),'--study',str(study),
-                     '--binary-dir',record['binary_dir'],'--neutral-qualification',record['neutral_qualification'],'--cell',key]
             with request.with_name('worker.log').open('x') as log:
                 process=subprocess.Popen(command,stdout=log,stderr=subprocess.STDOUT)
                 bind_worker(study,key,process.pid)
@@ -196,14 +220,16 @@ def wave(manifest):
 
 def main():
     p=argparse.ArgumentParser(description=__doc__);p.add_argument('mode',choices=('register','verify','transfer','receive','work','wave'))
-    for name in ('study','binaries','qualification','output','request','remote-source'):p.add_argument('--'+name,type=Path)
+    for name in ('study','binaries','qualification','output','request','remote-source','human-qualification'):p.add_argument('--'+name,type=Path)
+    p.add_argument('--execution-kind',choices=('outer','variant'))
     p.add_argument('--cell');p.add_argument('--host',choices=HOSTS);p.add_argument('--allow-missing',action='store_true')
     a,remaining=p.parse_known_args()
     if a.mode=='receive':
         if remaining[:1]==['--']:remaining=remaining[1:]
         receive(a.request,remaining);return
     if remaining:p.error('unexpected arguments')
-    if a.mode=='register':result=register(a.study,a.cell,a.host,a.binaries,a.qualification,a.output)
+    if a.mode=='register':result=register(a.study,a.cell,a.host,a.binaries,a.qualification,a.output,
+        execution_kind=a.execution_kind,human_qualification=a.human_qualification)
     elif a.mode=='transfer':result=transfer(a.request,a.remote_source)
     elif a.mode=='verify':result=verify(json.loads(a.request.read_text()),allow_missing=a.allow_missing)
     elif a.mode=='wave':result=wave(a.request)
