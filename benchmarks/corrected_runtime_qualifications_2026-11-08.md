@@ -67,3 +67,10 @@ and timestamp, and keeps only the latest and previous metadata observation.
 It starts and signals no fit. The dashboard distinguishes raw compatibility
 checkpoint progress from completed all-epoch trajectory qualification.
 Selectors have separate process identities for each outer fold.
+
+Terminal compatibility collection uses the existing finalized-bake inventory,
+completed snapshot-stage lock and cold-readback mirror owners. It copies native
+checkpoints and two bounded states while excluding canonical comparison scratch
+and shared training inputs. Each class is collected once per watcher; it launches
+no training and retires no store. Native execution of this collection path remains
+pending a terminal class qualification.

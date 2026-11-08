@@ -5772,3 +5772,7 @@ shaping-snapshot-check:
 
 shaping-snapshot-cli-check study frozen binaries output:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_snapshot_cli_check.py --study {{quote(study)}} --frozen {{quote(frozen)}} --binaries {{quote(binaries)}} --output {{quote(output)}}
+
+# Archive each compatibility class once after its full trajectory qualification.
+shaping-control-archive study source host output destination *args:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_control_archive.py --study {{quote(study)}} --source {{quote(source)}} --host {{quote(host)}} --output {{quote(output)}} --destination {{quote(destination)}} {{args}}
