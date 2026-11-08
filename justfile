@@ -5557,6 +5557,12 @@ shaping-temp-storage output:
 shaping-cargo-preserve-check:
     python3 -B -m unittest discover -s scripts/tests -p test_shaping_cargo_preserve.py
 
+shaping-cargo-reclaim-check:
+    python3 -B -m unittest discover -s scripts/tests -p test_shaping_cargo_reclaim.py
+
+shaping-cargo-reclaim preservation receipt manifest receipt_pin manifest_pin home *args:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_cargo_reclaim.py --preservation {{quote(preservation)}} --archive-receipt {{quote(receipt)}} --archive-manifest {{quote(manifest)}} --receipt-pin {{quote(receipt_pin)}} --manifest-pin {{quote(manifest_pin)}} --home {{quote(home)}} {{args}}
+
 # Invoke with complete process visibility; this command never deletes Cargo output.
 shaping-cargo-preserve inventory output home:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_cargo_preserve.py --inventory {{quote(inventory)}} --output {{quote(output)}} --home {{quote(home)}}
