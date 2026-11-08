@@ -237,6 +237,23 @@ input, reads no labels, and changes no selection. See the completion result reco
 for the measured stable candidates and limits. It does not establish stability
 across neural seeds or transferable benefit from freezing the curves.
 
+`shaping-curve-metadata-register` and `shaping-curve-metadata-analyse` extend the
+existing neural response comparison to all 72 joint-product and 72 joint-separate
+primary fits: four settings, six registered inner partitions and three seeds.
+They extract the already collected native `zentrain.input_shaping` metadata,
+binding its original inspection and initialization hashes. They run no fit or
+prediction again. The response mathematics remains the existing union-of-knots
+comparison at exact stored f32 parameters, with amplitude normalization separated
+from zero-path activity and downstream weights excluded.
+
+Global and per-setting panels measure descriptive agreement. Their source folds
+overlap across outer groups, so pooled curves must not become training inputs or
+influence the registered outer selection. Nonzero parameters and small spread
+do not establish predictive utility or a universally useful fixed shaper. The
+analysis reserves 512 MiB on SSD and uses one bounded worker. Its extracted
+parameters and verbatim mathematical functions form a standard-library-only
+replay closure, without model inference or compilation.
+
 Completed worker imports now reserve their checked payload bytes plus 16 MiB of
 metadata headroom. Pending trainers retain the full one-GiB allowance, including
 when an overlapping reservation asks for less. The 30 GiB minimum and 3 GiB

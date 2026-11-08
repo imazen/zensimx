@@ -5850,6 +5850,15 @@ shaping-stable-export-watch study source host output *args:
 shaping-stable-export-watch-check:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B -m unittest scripts.tests.test_shaping_stable_export_watch scripts.tests.test_shaping_stable_export_launch
 
+shaping-curve-metadata-register study collection output:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_curve_metadata.py register --study {{quote(study)}} --collection {{quote(collection)}} --output {{quote(output)}}
+
+shaping-curve-metadata-analyse study manifest source output:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_curve_metadata.py analyse --study {{quote(study)}} --manifest {{quote(manifest)}} --source {{quote(source)}} --output {{quote(output)}}
+
+shaping-curve-metadata-check:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B -m unittest scripts.tests.test_shaping_curve_metadata scripts.tests.test_shaping_curve_stability
+
 shaping-dashboard-browser url output modules family='':
     TMPDIR="$HOME/tmp" NODE_PATH={{quote(modules)}} "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- node scripts/tests/shaping_dashboard_browser.cjs {{quote(url)}} {{quote(output)}} {{quote(family)}}
 
