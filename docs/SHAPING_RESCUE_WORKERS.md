@@ -14,6 +14,8 @@ The native command relocation refuses an existing declaration whose bytes drift;
 a missing old source path can use the shipped frozen declaration. No worker repo
 is overwritten. Existing research files must already match; rsync uses
 `--ignore-existing`, then all destination hashes are checked before fitting.
+Transfer preserves file permissions, including executable bits, without changing
+the ownership or timestamps of shared ancestor directories.
 
 Each dependency manifest has at most 4,000 files and 384 MiB. Incoming rsync runs
 inside the shared SSD reservation owner and a 512-MiB memory scope. Training uses

@@ -126,7 +126,7 @@ def transfer(request,remote_source):
                                 for name,row in record['files'].items() if row['kind']=='data'))
     receiver=['/home/lilith/work/claudehints/scripts/run-heavy','--mem','512M','--jobs','1','--',
               'python3','-B',str(script),'receive','--request',str(remote_request),'--']
-    subprocess.run(['rsync','-aR','--ignore-existing','--from0','--files-from='+str(manifest),
+    subprocess.run(['rsync','-rlptR','--omit-dir-times','--no-implied-dirs','--ignore-existing','--from0','--files-from='+str(manifest),
                     '--rsync-path='+shlex.join(receiver),'/',host+':/'],check=True)
     subprocess.run(['scp',str(request.with_name('ASSIGNMENT.json')),host+':'+str(request.with_name('ASSIGNMENT.json'))],check=True)
     subprocess.run(['ssh',host,shlex.join(command[:-1])],check=True)
