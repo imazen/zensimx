@@ -1,0 +1,63 @@
+import fcntl,json,sys,tempfile,unittest
+from pathlib import Path
+from unittest.mock import patch
+sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'rev4_featpot'))
+import shaping_snapshot_retention as retention
+
+
+class SnapshotRetentionTests(unittest.TestCase):
+    def fixture(self,base):
+        root=base/'shared-training-snapshots';directory=root/('a'*64);directory.mkdir(parents=True)
+        (root/'.lock').write_bytes(b'');(directory/'.lock').write_bytes(b'')
+        for name in retention.STATES:(directory/name).write_bytes(name.encode())
+        run=base/'run';run.mkdir();identity=dict(cell=dict(id='cell'),stage='running',epochs=120,build_sha256='build')
+        (run/'RUN.json').write_text(json.dumps(identity))
+        (run/'RESULT.json').write_text(json.dumps(dict(identity,stage='trained',exit_code=0)))
+        observation=dict(run=str(run),snapshot_directory=str(directory))
+        binding=run/'SNAPSHOT_BINDING.json'
+        binding.write_text(json.dumps(dict(schema='native-snapshot-run-binding-v1',run=str(run),
+            run_sha256=retention.sha(run/'RUN.json'),snapshot_directory=str(directory),native_observation=observation,
+            host=__import__('socket').gethostname())))
+        return directory,binding
+
+    def test_live_lock_and_unfinished_write_refuse_without_staging(self):
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as temporary:
+            base=Path(temporary);directory,binding=self.fixture(base);output=base/'archive-stage'
+            with (directory/'.lock').open('r+b') as owner:
+                fcntl.flock(owner,fcntl.LOCK_EX|fcntl.LOCK_NB)
+                with self.assertRaises(BlockingIOError):retention.stage(binding,output)
+                self.assertFalse(output.exists())
+            (directory/'writing.snap').write_bytes(b'unfinished')
+            with self.assertRaisesRegex(ValueError,'unfinished'):retention.stage(binding,output)
+            self.assertFalse(output.exists())
+
+    def test_failed_runs_are_never_staged(self):
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as temporary:
+            base=Path(temporary);directory,binding=self.fixture(base)
+            path=binding.parent/'RESULT.json';result=json.loads(path.read_text());result['stage']='interrupted';path.write_text(json.dumps(result))
+            with self.assertRaisesRegex(ValueError,'completed native'):retention.stage(binding,base/'archive-stage')
+            self.assertTrue(directory.exists())
+
+    def test_exact_readback_frees_whole_reservation_preserving_archive_and_binding(self):
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as temporary:
+            base=Path(temporary);directory,binding=self.fixture(base);stage=base/'stage'
+            manifest=retention.stage(binding,stage);mirror=base/'durable';mirror.mkdir()
+            hashes={}
+            for path in stage.iterdir():
+                (mirror/path.name).write_bytes(path.read_bytes());hashes[path.name]=retention.sha(path)
+            ledger=''.join(pin+'  '+name+'\n' for name,pin in hashes.items())
+            (stage/'SHA256SUMS').write_text(ledger);(mirror/'SHA256SUMS').write_text(ledger)
+            (stage/'MIRROR_VERIFIED.json').write_text(json.dumps(dict(destination=str(mirror),all_artifact_sha256_verified=True)))
+            receipt=base/'retired.json'
+            remote=mirror/'state-0.snap';remote.write_bytes(b'corrupt')
+            with self.assertRaisesRegex(ValueError,'cold readback'):retention.retire(binding,stage,receipt)
+            self.assertTrue(directory.exists());self.assertFalse(receipt.exists())
+            remote.write_bytes((stage/remote.name).read_bytes())
+            with patch('shaping_checkpoint_retention.no_users') as users:
+                result=retention.retire(binding,stage,receipt);users.assert_called_once()
+            self.assertEqual(result['stage'],'completed_store_retired');self.assertFalse(directory.exists())
+            self.assertTrue((directory.parent/'.lock').exists());self.assertTrue(binding.exists())
+            self.assertEqual(retention.sha(remote),manifest['files'][remote.name])
+
+
+if __name__=='__main__':unittest.main()

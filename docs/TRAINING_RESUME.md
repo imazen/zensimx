@@ -56,6 +56,22 @@ the old snapshots. Completed states continue to consume their reservations;
 archiving and retiring them requires verified durable readback and no active
 users. Changing the store root to bypass a full budget is not admission.
 
+`shaping_snapshot_retention.py bind` records the live native PID, process
+identity, held snapshot lock and immutable RUN hash beside the run, outside
+the native store. `stage` requires successful terminal evidence and both the
+shared admission lock and the per-run writer lock before copying the retained
+states. After the ordinary artifact mirror has cold-verified that stage,
+`retire` rereads every durable state, checks active users and writes its removal
+journal before freeing the entire completed store directory. It preserves the
+shared lock, archived states, binding and scientific outputs. Interrupted runs,
+active locks, unfinished writes and unknown files refuse cleanup. A partial
+removal journal requires explicit reconciliation; it never triggers retraining.
+
+The Python nonblocking lock was checked against an actual active native writer
+on November 8, 2026 and correctly refused acquisition. Fixture coverage also
+checks cold-readback corruption and complete reservation release. No completed
+native store had yet been retired through this new owner at that observation.
+
 Qualification uses real native training, with process exit during an epoch and
 at an epoch boundary. ReLU, anchored Softplus, frozen input shaping and joint
 input shaping must reproduce both the returned bake and the complete final

@@ -5287,6 +5287,18 @@ shaping-rescue-wave-prepare-check:
 shaping-native-observe-check:
     TMPDIR="$HOME/tmp" python3 -B -m unittest scripts/tests/test_shaping_native_observe.py
 
+shaping-snapshot-retention-check:
+    TMPDIR="$HOME/tmp" python3 -B -m unittest scripts/tests/test_shaping_snapshot_retention.py
+
+shaping-snapshot-bind scope run output:
+    TMPDIR="$HOME/tmp" python3 -B scripts/rev4_featpot/shaping_snapshot_retention.py bind --scope {{quote(scope)}} --run {{quote(run)}} --output {{quote(output)}}
+
+shaping-snapshot-stage binding output:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_snapshot_retention.py stage --binding {{quote(binding)}} --output {{quote(output)}}
+
+shaping-snapshot-retire binding stage output:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_snapshot_retention.py retire --binding {{quote(binding)}} --stage-root {{quote(stage)}} --output {{quote(output)}}
+
 shaping-rescue-wave-prepare study source binaries qualification outer placements output:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_rescue_wave_prepare.py --study {{quote(study)}} --source {{quote(source)}} --binaries {{quote(binaries)}} --qualification {{quote(qualification)}} --outer {{outer}} --placements {{quote(placements)}} --output {{quote(output)}}
 
