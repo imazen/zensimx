@@ -32,6 +32,12 @@ def validate(root, assignment, cells):
         if run[key]!=assignment[key]:raise ValueError('worker scientific identity differs')
     if run['execution_host']!=assignment['host']:raise ValueError('worker host differs')
     if result['stage']!='trained' or result['exit_code']!=0:raise ValueError('worker fit not successful')
+    replayed=run.get('recovery_completed_epochs_replayed',0)
+    if replayed:
+        report=json.loads((root/'PREFIX_COMPARISON_V2.json').read_text())
+        if (report['expected']!=replayed or set(report['compared'])!={f'ckpt_epoch{e:03}.bin' for e in range(replayed)}
+            or not all(r['equal'] and r['original_sha256']==r['restart_sha256'] for r in report['compared'].values())):
+            raise ValueError('approved partial restart requires every matched prefix checkpoint')
     epochs=120 if '_pretrained_' in cell['family'] or cell['stage']=='fresh_control_inner' else 240
     if run['epochs']!=epochs or run['pairs_per_epoch']!=50000:raise ValueError('exposure differs')
     expected={f'ckpt_epoch{i:03}.bin' for i in range(epochs)}
