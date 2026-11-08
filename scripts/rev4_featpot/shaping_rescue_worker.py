@@ -179,7 +179,13 @@ def receive(request,arguments):
     from shaping_storage import reservation
     record=json.loads(request.read_text());verify(record,allow_missing=True)
     if not arguments or arguments[0]!='--server':raise ValueError('rsync server arguments required')
-    with reservation(Path(record['study']),request.parent/'input-admission',30*1024**3,bytes_required=limits(record.get('execution_kind'))[0]):
+    with contextlib.ExitStack() as reservations:
+        remaining=limits(record.get('execution_kind'))[0];part=0
+        while remaining:
+            amount=min(remaining,1024**3)
+            destination=request.parent/('input-admission' if part==0 else f'input-admission-{part}')
+            reservations.enter_context(reservation(Path(record['study']),destination,30*1024**3,bytes_required=amount))
+            remaining-=amount;part+=1
         subprocess.run(['rsync',*arguments],check=True)
         verify(record)
 

@@ -1,4 +1,5 @@
 import json,sys,tempfile,unittest
+from contextlib import nullcontext
 from pathlib import Path
 from unittest.mock import patch
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'rev4_featpot'))
@@ -8,6 +9,15 @@ from shaping_completion import encoded,sha
 
 
 class BootstrapWorkerTests(unittest.TestCase):
+    def test_large_bootstrap_input_keeps_the_existing_one_gib_per_reservation_limit(self):
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as directory:
+            root=Path(directory);request=root/'REQUEST.json';request.write_bytes(encoded(dict(study=str(root),execution_kind='bootstrap')))
+            with patch.object(worker,'verify'),patch('shaping_storage.reservation',return_value=nullcontext()) as reserve,patch.object(worker.subprocess,'run'):
+                worker.receive(request,['--server'])
+            self.assertEqual(reserve.call_count,2)
+            self.assertEqual({call.kwargs['bytes_required'] for call in reserve.call_args_list},{1024**3})
+            self.assertEqual(len({call.args[1] for call in reserve.call_args_list}),2)
+
     def test_terminal_pack_collect_preserves_source_and_checks_exact_admitted_models(self):
         with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as directory:
             root=Path(directory);study=root/'study';study.mkdir();source=root/'results/primary';source.mkdir(parents=True)
