@@ -1,5 +1,13 @@
 # zensim — current working rules
 
+## Known Bugs — threshold diagnostic output directory (November 8, 2026)
+
+The two-epoch threshold-coordinate diagnostic initially omitted creation of its
+checkpoint directory. One new probe completed epoch zero but failed its dump;
+preserve that failed attempt and its initial-state-only snapshot without replay.
+The launcher now creates the directory before starting the trainer. The other
+already-running probe received its directory before its first dump.
+
 ## Full-state CPU recovery (November 8, 2026)
 
 New source supports opt-in bounded full-state snapshots for the constrained

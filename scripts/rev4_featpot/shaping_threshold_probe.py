@@ -77,6 +77,7 @@ def run(study,binaries,output,cell):
     try:
         with reservation(study,destination,record['storage']['minimum_free_bytes']):
             destination.mkdir(exist_ok=False)
+            (destination/'checkpoints').mkdir()
             env=os.environ.copy()
             for name in ('ZENSIM_MONOTONE_RESEARCH_MANIFEST','ZENSIM_MONOTONE_RESEARCH_SHA256',
                          'ZENSIM_TRAIN_RESUME','ZENSIM_TRAIN_RESUME_CHECKPOINT_ORIGIN'):env.pop(name,None)
