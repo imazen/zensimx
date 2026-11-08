@@ -3760,3 +3760,26 @@ The archive wrapper reports 27 s, peak RSS 0.02 GiB, minimum available RAM
 42,599 MiB and peak load 4.10. The current full-width receipt-bearing fixture
 retains 41,881,577 bytes; its largest state is 20,952,159 bytes, so two retained
 states plus one equally large pending write use 62,833,736 bytes, below 64 MiB.
+# Approved partial restarts: completed archive, November 8
+
+Both explicitly authorized restarts completed their original 240 epochs:
+`c1b9fabc3c27b2b14fe7` (product identity shaping, seed 1, setting 2) and
+`fd66858f8667dbad12c0` (separate identity shaping, seed 0, setting 2), both
+on inner-0-0. Their registered canonical comparisons match all 19 and 219
+checkpoints retained from the interrupted attempts. This is the previously
+approved recomputation, not exact continuation or additional fitting.
+
+The ordinary native archiver preserves its refusal of multi-attempt directories.
+An explicitly scoped `approved-restarts-native-archive-20261108/` snapshot now
+preserves both complete attempt-002 trees, scalar evaluation and convergence
+evidence, prefix comparisons and original failed comparison records. Original
+partial attempts and their existing archive proofs remain intact. This snapshot
+contains 1,414 artifacts /214,228,945 bytes plus its receipt; every destination
+artifact passed checksum readback with cache-eviction requests. Receipt SHA-256
+`4b44b2d7f05562bb22d21c2016f1cff3c4e7b8b1b5948a6e8612fe28ddc99237`;
+manifest SHA-256
+`cfcba2b8755c9d2e25b73cfc57de66bc01965c07a560f6373366178e2fb06508`.
+
+```text
+run-heavy: done rc=0 9s | peak-RSS 0.03GiB | min-avail 44396MiB | peak-load 0.83
+```
