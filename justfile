@@ -5554,6 +5554,13 @@ shaping-cpu-accounting:
 shaping-temp-storage output:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_temp_storage.py --output {{quote(output)}}
 
+shaping-cargo-preserve-check:
+    python3 -B -m unittest discover -s scripts/tests -p test_shaping_cargo_preserve.py
+
+# Invoke with complete process visibility; this command never deletes Cargo output.
+shaping-cargo-preserve inventory output home:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_cargo_preserve.py --inventory {{quote(inventory)}} --output {{quote(output)}} --home {{quote(home)}}
+
 shaping-host-transition-check:
     python3 -B -m unittest discover -s scripts/tests -p test_shaping_host_transition.py
     python3 -B -m unittest discover -s scripts/tests -p test_shaping_host_assignment.py
