@@ -23,6 +23,10 @@ selectors and shortlists from inner evidence before consuming new rescue
 outcomes or outer responses. Neither of the two failed short probes may be
 replayed. This amendment is not a serving-model promotion.
 
+Routine evaluation stores scalar scores and reproducible model/input identities.
+Metric maps and component planes require an explicit bounded witness request;
+they are not default study outputs. Existing artifacts remain preserved.
+
 ## Compatibility before control reuse
 
 `shaping_control_compatibility.py` registers six neural control classes:
@@ -46,3 +50,8 @@ The owner approval and exact private proposal remain study artifacts. The
 compatibility registration alone does not execute or complete any corrected
 scientific condition. Corrected registration, execution, selection and worker
 deployment must bind these records before fitting.
+
+`shaping_corrected_registration.py` freezes the exact approved 288-condition
+matrix and omission list, preserves immutable observations establishing that
+the 108 omitted conditions have no attempts, and checks all parent/control
+pairings. It preserves the old PLAN/MATRIX and does not activate execution.

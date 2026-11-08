@@ -5266,6 +5266,12 @@ shaping-completion-neutral-trajectory-check:
 shaping-completion-control-compatibility-check:
     TMPDIR="$HOME/tmp" python3 -B -m unittest scripts/tests/test_shaping_control_compatibility.py scripts/tests/test_shaping_neutral_trajectory.py
 
+shaping-completion-corrected-registration-check:
+    TMPDIR="$HOME/tmp" python3 -B -m unittest scripts/tests/test_shaping_corrected_registration.py
+
+shaping-completion-corrected-register study approval proposal binaries output *observations:
+    TMPDIR="$HOME/tmp" python3 -B scripts/rev4_featpot/shaping_corrected_registration.py --study {{quote(study)}} --approval {{quote(approval)}} --proposal {{quote(proposal)}} --binary-dir {{quote(binaries)}} --output {{quote(output)}} {{observations}}
+
 shaping-completion-control-compatibility-register study approval binaries output:
     TMPDIR="$HOME/tmp" python3 -B scripts/rev4_featpot/shaping_control_compatibility.py register --study {{quote(study)}} --approval {{quote(approval)}} --binary-dir {{quote(binaries)}} --output {{quote(output)}}
 
