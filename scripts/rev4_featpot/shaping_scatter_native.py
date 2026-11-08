@@ -87,7 +87,7 @@ if __name__=='__main__':
     p.add_argument('--workers',type=int,default=4);a=p.parse_args();admit_compute(a.study)
     if not 1<=a.workers<=4:p.error('one to four native statistics workers required')
     manifest=json.loads(a.manifest.read_text())
-    if manifest['schema']!='zensim-native-dashboard-jobs-v1' or manifest['outer_results_read']:raise ValueError('native detailed-panel manifest differs')
+    if manifest['schema']!='zensim-native-dashboard-jobs-v1' or manifest['outer_results_read'] or manifest['panel_sha256']!=sha(a.panel):raise ValueError('native detailed-panel manifest differs')
     a.output.mkdir(parents=True,exist_ok=True);record=dict(pid=os.getpid(),stage='running',completed=[],failed={},manifest_sha256=sha(a.manifest))
     with ThreadPoolExecutor(max_workers=a.workers) as pool:
         futures={pool.submit(one,a.study,a.panel,job,a.output):job['report_sha256'] for job in manifest['jobs']}

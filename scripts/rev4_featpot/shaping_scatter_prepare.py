@@ -121,12 +121,13 @@ def prepare(study,dashboard,output):
             cached=json.loads(destination.read_text())
             if cached['report_sha256']!=pin or cached['cell']!=cell or cached['outer_results_read']:
                 raise ValueError('preserve changed scatter publication')
-        rows[cid]=dict(url=url,report_sha256=pin,native_url='details/native/'+pin+'.json')
+        rows[cid]=dict(cell=cell,url=url,report_sha256=pin,native_url='details/native/'+pin+'.json')
         jobs.append(dict(cell=cell,path=str(destination),sha256=sha(destination),report_sha256=pin))
     index=dict(schema='zensim-inner-scatter-index-v1',plan_sha256=plan_pin,cells=rows,pending=pending,outer_results_read=False)
     write_atomic(output/'INDEX.json',index)
     manifest=dict(schema='zensim-native-dashboard-jobs-v1',study=str(study),jobs=jobs,
-                  source_snapshot_sha256=sha(dashboard/'stats.json'),source_driver_sha256=sha(__file__),outer_results_read=False)
+                  source_snapshot_sha256=sha(dashboard/'stats.json'),source_driver_sha256=sha(__file__),
+                  panel_sha256=sha(study.parent/'bounded-resume-runtime-20261108/binaries-v3/panel'),outer_results_read=False)
     write_atomic(output/'NATIVE_JOBS.json',manifest)
     return dict(scatter_reports=len(rows),pending=len(pending),published_bytes=total,budget_bytes=MAX_BYTES,outer_results_read=False)
 
