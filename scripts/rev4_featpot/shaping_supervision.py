@@ -93,6 +93,7 @@ def later_sweep(args):
     _,cells,_=load_registration(args.study);completed=0
     for path in sorted((args.study/'runs').glob('*/attempt-*/RESULT.json')):
         result=json.loads(path.read_text());cell=result['cell'];run_dir=path.parent
+        if getattr(args,'cells',None) is not None and cell['id'] not in args.cells:continue
         if cell['stage'] not in LATER_STAGES or result['stage']!='trained':continue
         run=json.loads((run_dir/'RUN.json').read_text())
         if run['cell']!=cell:raise ValueError('later-stage run/result identity differs')

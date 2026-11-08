@@ -1,4 +1,4 @@
-"""Evaluate newly collected primary worker fits on their original approved host."""
+"""Evaluate collected native fits through their stage's original evidence owner."""
 from __future__ import annotations
 import argparse,fcntl,json,os,shlex,socket,subprocess,sys,tarfile,time
 from datetime import datetime,timezone
@@ -7,7 +7,17 @@ from types import SimpleNamespace
 from shaping_completion import encoded,sha
 
 HOSTS=('r5600g','i134','r3500','r3800x')
-DERIVED=('evaluation','curve_evaluation','CONVERGENCE.json','CONVERGENCE_FAILURE.json','EVALUATION_FAILURES.json')
+DERIVED=('evaluation','curve_evaluation','CONVERGENCE.json','CONVERGENCE_FAILURE.json','EVALUATION_FAILURES.json','LATER_EVALUATION_FAILURE.json')
+LATER_STAGES=('outer','fresh_control_outer','fresh_control_outer_matched','source_curve','row_curve','shuffle','human_only')
+
+
+def later_scope(study,identity,cells):
+    from shaping_evaluation import outer_context
+    context=outer_context(study,identity,cells)
+    if context is None:raise ValueError('later evaluation requires original outer admission')
+    family=context.get('variant',{}).get('resolved_family',identity['cell']['family'])
+    return dict(admission_sha256=context['admission_sha256'],schedule=context['schedule'],resolved_family=family,
+                representation=context['admission']['evaluation_representations'][family])
 
 
 def inventory(root):
@@ -27,7 +37,8 @@ def request(study,run,*,target_host=None):
     _,cells,_=load_registration(study)
     identity=json.loads((run/'RUN.json').read_text());result=json.loads((run/'RESULT.json').read_text())
     cell=identity['cell'];collection=run/'WORKER_COLLECTION.json'
-    if (cell not in cells or cell['stage'] not in ('inner','fresh_control_inner','rescue')
+    later=cell['stage'] in LATER_STAGES
+    if ((cell not in cells and not later) or cell['stage'] not in ('inner','fresh_control_inner','rescue',*LATER_STAGES)
         or identity.get('execution_host') not in HOSTS or not collection.exists()):
         raise ValueError('collected primary fit on an approved worker required')
     if result['cell']!=cell or result['stage']!='trained' or result['exit_code']!=0:
@@ -37,9 +48,11 @@ def request(study,run,*,target_host=None):
     epochs=result['epochs']
     from shaping_evaluation import diagnostic_epochs
     model_root=run/identity.get('fit_directory','.')/'checkpoints'
+    scope=later_scope(study,identity,cells) if later else None
+    epochs_to_pin={epochs-1} if later else {epochs-1,*diagnostic_epochs(epochs)}
     pins={str(p.relative_to(study)):sha(p) for p in
           [run/'RUN.json',run/'RESULT.json',run/identity.get('fit_directory','.')/'train.log',
-           *(model_root/f'ckpt_epoch{e:03}.bin' for e in sorted({epochs-1,*diagnostic_epochs(epochs)}))]}
+           *(model_root/f'ckpt_epoch{e:03}.bin' for e in sorted(epochs_to_pin))]}
     if sha(model_root/f'ckpt_epoch{epochs-1:03}.bin')!=result['bake_sha256']:raise ValueError('final model drift')
     host=target_host or identity['execution_host']
     if host not in HOSTS:raise ValueError('approved evaluation host required')
@@ -54,6 +67,7 @@ def request(study,run,*,target_host=None):
                 plan_sha256=sha(study/'PLAN.json'),source_sha256=pins,
                 reduced_scope_sha256=sha(study/'REDUCED_SCOPE.json'),
                 collection_receipt_sha256=sha(collection),outer_results_read=False)
+    if later:value['later_scope']=scope
     if moving:value.update(fit_execution_host=identity['execution_host'],
                            input_sizes={name:(study/name).stat().st_size for name in pins})
     return value
@@ -68,6 +82,8 @@ def verify_request(study,record,*,allow_missing=False):
         raise ValueError('worker host differs')
     if record['outer_results_read'] or record['plan_sha256']!=sha(study/'PLAN.json'):
         raise ValueError('worker evaluation scope differs')
+    if (record['cell']['stage'] in LATER_STAGES)!=('later_scope' in record):
+        raise ValueError('worker evaluation stage scope differs')
     if 'fit_execution_host' in record:
         if (record['fit_execution_host'] not in HOSTS or record['fit_execution_host']==record['host']
             or record['cell']['family']!='relu' or record['cell']['stage'] not in ('inner','fresh_control_inner')
@@ -89,6 +105,12 @@ def verify_request(study,record,*,allow_missing=False):
     if 'fit_execution_host' in record and original.exists():
         if json.loads(original.read_text())['execution_host']!=record['fit_execution_host']:
             raise ValueError('training origin differs')
+    if 'later_scope' in record:
+        from shaping_execution import load_registration
+        _,cells,_=load_registration(study)
+        identity=json.loads(original.read_text())
+        if identity['execution_host']!=record['host'] or later_scope(study,identity,cells)!=record['later_scope']:
+            raise ValueError('later evaluation original admission differs')
 
 
 def transfer_inputs(args,record,request_path,remote_request):
@@ -129,6 +151,15 @@ def capacity(study=None):
 
 
 def require_terminal(record,files):
+    if 'later_scope' in record:
+        base=Path('runs')/record['cell']['id']/record['attempt']
+        repaired=record['later_scope']['representation']['representation']=='research-relu-max-pairs-v1'
+        parent=Path('reexport_max_pairs')/record['cell']['id']/record['attempt'] if repaired else base
+        final=parent/'final' if repaired else parent/'evaluation'
+        complete=all(str(final/name) in files for name in ('REPORT.json','COMPLETE.json'))
+        failed=str(parent/'LATER_EVALUATION_FAILURE.json') in files and str(final/'FAILED_GATE.json') in files
+        if not complete and not failed:raise ValueError('complete later-stage report or explicit failed gate required')
+        return
     roots=[Path('runs')/record['cell']['id']/record['attempt']]
     if record['cell']['family'] in ('relu','softplus'):
         roots.append(Path('reexport_max_pairs')/record['cell']['id']/record['attempt'])
@@ -151,12 +182,17 @@ def _work(args):
     record=json.loads(args.request.read_text());verify_request(args.study,record)
     if not capacity(args.study):return dict(stage='waiting_for_capacity')
     if args.bundle.exists():raise ValueError('preserve existing evaluation export')
-    from shaping_supervision import sweep
+    from shaping_supervision import sweep,later_sweep
     from shaping_reexport_supervision import sweep as supplemental
     values=SimpleNamespace(study=args.study,binary_dir=args.binary_dir,rescue_binary_dir=getattr(args,'rescue_binary_dir',None),
                            cells=(record['cell']['id'],))
-    sweep(values)
-    if record['cell']['family'] in ('relu','softplus'):
+    if 'later_scope' in record:
+        values.repair_binary_dir=getattr(args,'repair_binary_dir',None)
+        values.repair_inspector=getattr(args,'inspector',None)
+        values.candidate_binary_dir=getattr(args,'candidate_binary_dir',[])
+        later_sweep(values)
+    else:sweep(values)
+    if 'later_scope' not in record and record['cell']['family'] in ('relu','softplus'):
         supplemental(SimpleNamespace(study=args.study,binary_dir=args.repair_binary_dir,inspector=args.inspector,
                                      cells=values.cells,family=record['cell']['family']))
     verify_request(args.study,record)
@@ -222,7 +258,8 @@ def watch(args):
             pending=[];blocked=[];imported=[]
             for path in sorted((args.study/'runs').glob('*/attempt-*/RESULT.json')):
                 value=json.loads(path.read_text());run=path.parent
-                if value.get('stage')!='trained' or value['cell']['stage'] not in ('inner','fresh_control_inner','rescue') or not (run/'WORKER_COLLECTION.json').exists():continue
+                stages=LATER_STAGES if getattr(args,'later_only',False) else ('inner','fresh_control_inner','rescue')
+                if value.get('stage')!='trained' or value['cell']['stage'] not in stages or not (run/'WORKER_COLLECTION.json').exists():continue
                 if any((args.study/p).exists() for p in components(value['cell']['id'],run.name)):continue
                 record=request(args.study,run,target_host=placements.get(value['cell']['id']));host=record['host'];directory=args.output/value['cell']['id']
                 request_path=directory/'REQUEST.json'
@@ -243,6 +280,7 @@ def watch(args):
                     '--bundle',str(remote_bundle),'--binary-dir',str(args.binary_dir),
                     '--repair-binary-dir',str(args.repair_binary_dir),'--inspector',str(args.inspector)]
                 if getattr(args,'rescue_binary_dir',None):command.extend(['--rescue-binary-dir',str(args.rescue_binary_dir)])
+                for directory_path in getattr(args,'candidate_binary_dir',[]):command.extend(['--candidate-binary-dir',str(directory_path)])
                 log_path=directory/f"worker-{len(list(directory.glob('worker-*.log'))):04}.log"
                 with log_path.open('x') as log:
                     result=subprocess.run(['ssh','-o','BatchMode=yes',host,shlex.join(command)],stdout=log,stderr=subprocess.STDOUT)
@@ -274,6 +312,8 @@ def main():
     p.add_argument('--study',type=Path,required=True)
     for name in ('binary-dir','rescue-binary-dir','repair-binary-dir','inspector','request','bundle','output','remote-source','placement-file'):p.add_argument('--'+name,type=Path)
     p.add_argument('--work',action='store_true');p.add_argument('--watch',action='store_true')
+    p.add_argument('--later-only',action='store_true')
+    p.add_argument('--candidate-binary-dir',type=Path,action='append',default=[])
     p.add_argument('--verify-inputs',action='store_true');p.add_argument('--receive',action='store_true')
     p.add_argument('rsync_arguments',nargs=argparse.REMAINDER)
     args=p.parse_args()

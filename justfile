@@ -5257,6 +5257,9 @@ shaping-completion-downstream-worker-check:
 shaping-completion-downstream-collection-check:
     TMPDIR="$HOME/tmp" python3 -B -m unittest scripts/tests/test_shaping_downstream_collection.py scripts/tests/test_shaping_worker_collect.py
 
+shaping-completion-later-evaluation-worker-check:
+    TMPDIR="$HOME/tmp" python3 -B -m unittest scripts/tests/test_shaping_later_evaluation_worker.py scripts/tests/test_shaping_evaluation_worker.py scripts/tests/test_shaping_supervision.py
+
 shaping-completion-full-fit-plan-check:
     TMPDIR="$HOME/tmp" python3 -B -m unittest scripts/tests/test_shaping_full_fit_plan.py
 

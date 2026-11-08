@@ -29,3 +29,19 @@ their admitted model family. The existing primary/rescue collection checks are
 unchanged. Pack, unpack and atomic import coverage includes paired pretrained
 phases; it does not establish a real downstream scientific fit. Evaluation
 deployment still requires separate qualification before launching a wave.
+
+The evaluation transport has an explicit `--later-only` observer mode for
+collected outer, matched fresh-control and generalization fits. It reproduces
+`outer_context`, binds the admitted family/representation and schedule, and
+pins only the registered final checkpoint. Outer responses are never used for
+checkpoint diagnosis. Execution delegates to `later_sweep` with an explicit
+cell filter; repaired representations use its existing re-export path rather
+than the primary supplemental evaluator. A terminal export requires the saved
+final report and completion marker, or the actual failed native gate plus its
+explicit failure receipt. Import preserves the report's outer-evaluation scope
+and admission identity. Cross-host later evaluation is not enabled.
+
+Transport/controller checks use fixture artifacts and native-owner mocks;
+they establish routing, artifact preservation and refusal behavior. A live
+outer or variant admission, real worker evaluation and verified result import
+are still required to establish scientific execution.
