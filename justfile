@@ -5838,6 +5838,9 @@ shaping-stable-pairs-archive-inputs study root:
 shaping-stable-export-prepare study source host output *args:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_stable_export_prepare.py --study {{quote(study)}} --source {{quote(source)}} --host {{quote(host)}} --output {{quote(output)}} {{args}}
 
+shaping-stable-export-collect wave source output:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_stable_export_collect.py --wave {{quote(wave)}} --source {{quote(source)}} --output {{quote(output)}}
+
 shaping-selected-rescue-prepare study source binaries qualification outer family placements output:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_rescue_wave_prepare.py --study {{quote(study)}} --source {{quote(source)}} --binaries {{quote(binaries)}} --qualification {{quote(qualification)}} --outer {{outer}} --selected-family {{quote(family)}} --placements {{quote(placements)}} --output {{quote(output)}}
 
