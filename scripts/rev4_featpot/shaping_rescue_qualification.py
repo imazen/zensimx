@@ -74,7 +74,6 @@ def qualify_on_worker(args):
     from shaping_rescue_dispatch import reserve_worker,release_worker,bind_worker
     from shaping_storage import reservation
     admit_compute(args.study)
-    if args.human_only_cell:raise ValueError('worker qualification currently supports the primary neutral control only')
     if args.output.exists():raise ValueError('preserve existing qualification attempt')
     # The native command retains this control ID in --keep-features. Shared
     # admission can therefore recognize its running trainer instead of counting
@@ -82,6 +81,10 @@ def qualify_on_worker(args):
     key=json.loads((args.run/'RUN.json').read_text())['cell']['id']
     if (len(key)!=20 or any(c not in '0123456789abcdef' for c in key)
         or args.run.parent.name!=key):raise ValueError('registered control directory required')
+    if args.human_only_cell:
+        key=__import__('hashlib').sha256(encoded(dict(source_cell=key,human_only_cell=args.human_only_cell,
+            build_sha256=sha(args.binary_dir/'BUILD.json')))).hexdigest()[:20]
+        if args.output.name!=key:raise ValueError('human qualification output must bind its unique admission identity')
     while True:
         if args.output.exists():raise ValueError('qualification appeared while waiting; preserve it')
         observation=reserve_worker(args.study,key)
@@ -92,7 +95,7 @@ def qualify_on_worker(args):
         bind_worker(args.study,key,os.getpid())
         minimum=json.loads((args.study/'PLAN.json').read_text())['minimum_ssd_free_bytes']
         with reservation(args.study,args.output,minimum,bytes_required=1024**3):
-            return qualify(args)
+            return qualify_human(args) if args.human_only_cell else qualify(args)
     finally:release_worker(args.study,key)
 
 
@@ -116,8 +119,7 @@ def human_command(command,groups,binary_dir,output):
     return cmd
 
 
-def qualify_human(args):
-    import pyarrow.parquet as pq
+def human_context(args):
     from shaping_variant_inputs import load_variant,verify_prepared
     _,cell,identifier,view=load_variant(args.study,args.human_only_cell)
     if cell['stage']!='human_only' or view['teacher_training_rows']!=0:
@@ -131,6 +133,12 @@ def qualify_human(args):
     build=json.loads((args.binary_dir/'BUILD.json').read_text())
     for name,pin in build['binary_sha256'].items():
         if sha(args.binary_dir/name)!=pin:raise ValueError('qualification binary drift')
+    return cell,view,path,record,original,head
+
+
+def qualify_human(args):
+    import pyarrow.parquet as pq
+    cell,view,path,record,original,head=human_context(args)
     groups=[dict(name=n,families=[0]*pq.read_metadata(p).num_rows) for n,p,_,_,_ in record['groups']]
     neutral=controls('init_half',True,groups=groups,human_only=True)
     neutral.update(init_scale=1.,bias_scale=1.)
@@ -146,7 +154,8 @@ def qualify_human(args):
         manifest=dict(head,epochs=1);manifest.pop('training',None)
         if training is not None:manifest['training']=training
         mp=out/'HEAD.json';mp.write_bytes(encoded(manifest))
-        cmd=human_command(original['command'],record['groups'],args.binary_dir,out)
+        from shaping_rescue_execution import portable_command
+        cmd=human_command(portable_command(original['command'],args.run),record['groups'],args.binary_dir,out)
         env=os.environ.copy()
         for key in list(env):
             if key.startswith(('ZENSIM_MONOTONE_RESEARCH_','ZENSIM_INPUT_SHAPING_','ZENSIM_PLAIN_OPTIMIZER_')):env.pop(key)

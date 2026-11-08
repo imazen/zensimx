@@ -1,10 +1,32 @@
 import sys
 from pathlib import Path
-import unittest
+import unittest,json,tempfile,hashlib
+from types import SimpleNamespace
+from unittest.mock import patch
+from contextlib import nullcontext
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'rev4_featpot'))
-from shaping_rescue_qualification import human_command
+from shaping_rescue_qualification import human_command,qualify_on_worker
+from shaping_completion import encoded,sha
 
 class HumanQualificationTests(unittest.TestCase):
+    def test_worker_uses_unique_human_admission_key_and_existing_human_owner(self):
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as directory:
+            root=Path(directory);run=root/'runs'/('a'*20)/'attempt-001';run.mkdir(parents=True)
+            (run/'RUN.json').write_bytes(encoded(dict(cell=dict(id='a'*20))))
+            binaries=root/'binaries';binaries.mkdir();(binaries/'BUILD.json').write_text('{}')
+            (root/'PLAN.json').write_text(json.dumps(dict(minimum_ssd_free_bytes=30*1024**3)))
+            key=hashlib.sha256(encoded(dict(source_cell='a'*20,human_only_cell='human',build_sha256=sha(binaries/'BUILD.json')))).hexdigest()[:20]
+            args=SimpleNamespace(study=root,run=run,binary_dir=binaries,human_only_cell='human',output=root/key)
+            with patch('shaping_reduced_scope.admit_compute'),patch('shaping_rescue_dispatch.reserve_worker',return_value=dict(can_start=True)) as reserve, \
+                    patch('shaping_rescue_dispatch.bind_worker'),patch('shaping_rescue_dispatch.release_worker') as release, \
+                    patch('shaping_storage.reservation',return_value=nullcontext()),patch('shaping_rescue_qualification.qualify_human',return_value='qualified') as human, \
+                    patch('shaping_rescue_qualification.qualify') as original:
+                self.assertEqual(qualify_on_worker(args),'qualified');human.assert_called_once_with(args);original.assert_not_called()
+                reserve.assert_called_once_with(root,key);release.assert_called_once_with(root,key)
+                args.output=root/'wrong-output'
+                with self.assertRaisesRegex(ValueError,'unique admission'):qualify_on_worker(args)
+                self.assertEqual(reserve.call_count,1)
+
     def test_replace_teacher_and_preserve_scientific_flags(self):
         groups=[(n,'/data/'+n+'.parquet',1.,0.,'withinref,rank') for n in
                 ('human_kadid','human_tid2013','human_konfig','human_cid22_a25')]

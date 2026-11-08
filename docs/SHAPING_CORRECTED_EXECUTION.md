@@ -38,6 +38,13 @@ The real frozen-study readiness check refused an unactivated corrected ID
 before an attempt existed. Worker capsule/controller fixtures passed; native
 corrected scientific fitting and its transport qualification remain unexecuted.
 
+Human-only analytic neutral qualification has its own worker CPU/SSD admission
+key, distinct from the simultaneously running full control. Its two one-epoch
+arms still use the same four admitted human populations, zero teacher rows and
+50,000 pairs per epoch. The existing portable command owner resolves collected
+declaration paths. This capability does not reuse qualification from another
+binary or expose outer responses.
+
 The frozen four-setting matrix and the archived monotone-SiLU trajectory were
 accepted by these checks on November 8, 2026. Five other native control
 qualifications were still running; no activation was written. Fixture checks establish orchestration
