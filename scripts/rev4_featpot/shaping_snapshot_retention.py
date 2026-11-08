@@ -118,22 +118,26 @@ def stage(binding,output):
         (output/'SNAPSHOTS.json').write_bytes(encoded(manifest));return manifest
 
 
-def retire(binding,stage_root,receipt):
+def retire(binding,stage_root,receipt,archive_root=None):
     from shaping_checkpoint_retention import archive_inventory,no_users
     record,run,directory=completed(binding);manifest=json.loads((stage_root/'SNAPSHOTS.json').read_text())
     if (manifest['schema']!='completed-native-snapshot-stage-v1' or manifest['binding_sha256']!=sha(binding)
         or manifest['snapshot_directory']!=str(directory)):raise ValueError('archived snapshot binding differs')
-    mirror,hashes=archive_inventory(stage_root)
-    if mirror.resolve()==stage_root.resolve():raise ValueError('distinct durable snapshot archive required')
+    archive_root=stage_root if archive_root is None else archive_root
+    if archive_root.resolve()!=archive_root or stage_root.resolve()!=stage_root or not stage_root.is_relative_to(archive_root):
+        raise ValueError('snapshot stage must be within its canonical archive root')
+    prefix=stage_root.relative_to(archive_root)
+    mirror,hashes=archive_inventory(archive_root)
+    if mirror.resolve()==archive_root.resolve():raise ValueError('distinct durable snapshot archive required')
     if receipt.exists():raise ValueError('preserve previous retirement receipt; reconcile partial journal explicitly')
     with closed_store(directory):
         files=sorted(p for p in directory.iterdir() if p.name in STATES)
         if {p.name for p in files}!=STATES&set(manifest['files']):raise ValueError('snapshot inventory changed after archival')
         rows=[]
         for path in files:
-            regular(path);remote=mirror/path.name;regular(remote)
+            regular(path);relative=prefix/path.name;remote=mirror/relative;regular(remote)
             pin=manifest['files'][path.name]
-            if hashes.get(path.name)!=pin or sha(path)!=pin:raise ValueError('local or archived snapshot manifest drift')
+            if hashes.get(relative.as_posix())!=pin or sha(path)!=pin:raise ValueError('local or archived snapshot manifest drift')
             with remote.open('rb') as stream:
                 os.posix_fadvise(stream.fileno(),0,0,os.POSIX_FADV_DONTNEED)
                 cold=__import__('hashlib').file_digest(stream,'sha256').hexdigest()
@@ -142,7 +146,8 @@ def retire(binding,stage_root,receipt):
         if not rows:raise ValueError('no completed snapshots to retire')
         no_users(rows)
         journal=dict(schema='completed-native-snapshot-retirement-v1',stage='verified_before_removal',
-            snapshot_directory=str(directory),binding_sha256=sha(binding),archive_manifest_sha256=sha(stage_root/'SHA256SUMS'),
+            snapshot_directory=str(directory),binding_sha256=sha(binding),archive_manifest_sha256=sha(archive_root/'SHA256SUMS'),
+            archive_root=str(archive_root),snapshot_archive_prefix=prefix.as_posix(),
             rows=rows,driver_sha256=sha(__file__),checked_utc=datetime.now(timezone.utc).isoformat())
         with receipt.open('xb') as stream:stream.write(encoded(journal));stream.flush();os.fsync(stream.fileno())
         for row in rows:Path(row['path']).unlink()
@@ -156,9 +161,9 @@ def retire(binding,stage_root,receipt):
 
 if __name__=='__main__':
     parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('mode',choices=('bind','stage','retire'))
-    for name in ('scope','run','binding','stage-root','output'):parser.add_argument('--'+name,type=Path)
+    for name in ('scope','run','binding','stage-root','archive-root','output'):parser.add_argument('--'+name,type=Path)
     args=parser.parse_args()
     if args.mode=='bind':result=bind(args.scope,args.run,args.output)
     elif args.mode=='stage':result=stage(args.binding,args.output)
-    else:result=retire(args.binding,args.stage_root,args.output)
+    else:result=retire(args.binding,args.stage_root,args.output,args.archive_root)
     print(json.dumps(result),flush=True)

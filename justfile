@@ -5318,8 +5318,8 @@ shaping-snapshot-bind scope run output:
 shaping-snapshot-stage binding output:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_snapshot_retention.py stage --binding {{quote(binding)}} --output {{quote(output)}}
 
-shaping-snapshot-retire binding stage output:
-    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_snapshot_retention.py retire --binding {{quote(binding)}} --stage-root {{quote(stage)}} --output {{quote(output)}}
+shaping-snapshot-retire binding stage output *args:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_snapshot_retention.py retire --binding {{quote(binding)}} --stage-root {{quote(stage)}} --output {{quote(output)}} {{args}}
 
 shaping-rescue-wave-prepare study source binaries qualification outer placements output:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_rescue_wave_prepare.py --study {{quote(study)}} --source {{quote(source)}} --binaries {{quote(binaries)}} --qualification {{quote(qualification)}} --outer {{outer}} --placements {{quote(placements)}} --output {{quote(output)}}

@@ -72,5 +72,24 @@ class SnapshotRetentionTests(unittest.TestCase):
             self.assertTrue((directory.parent/'.lock').exists());self.assertTrue(binding.exists())
             self.assertEqual(retention.sha(remote),manifest['files'][remote.name])
 
+    def test_nested_snapshot_archive_requires_the_exact_prefixed_manifest(self):
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as temporary:
+            base=Path(temporary);directory,binding=self.fixture(base);archive=base/'stage';archive.mkdir()
+            stage=archive/'snapshots';retention.stage(binding,stage)
+            mirror=base/'durable';(mirror/'snapshots').mkdir(parents=True);hashes={}
+            for path in stage.iterdir():
+                relative=path.relative_to(archive);(mirror/relative).write_bytes(path.read_bytes())
+                hashes[relative.as_posix()]=retention.sha(path)
+            ledger=''.join(pin+'  '+name+'\n' for name,pin in hashes.items())
+            (archive/'SHA256SUMS').write_text(ledger);(mirror/'SHA256SUMS').write_text(ledger)
+            (archive/'MIRROR_VERIFIED.json').write_text(json.dumps(dict(destination=str(mirror),all_artifact_sha256_verified=True)))
+            receipt=base/'retired.json';remote=mirror/'snapshots/state-1.snap';remote.write_bytes(b'corrupt')
+            with self.assertRaisesRegex(ValueError,'cold readback'):retention.retire(binding,stage,receipt,archive)
+            self.assertTrue(directory.exists());self.assertFalse(receipt.exists())
+            remote.write_bytes((stage/remote.name).read_bytes())
+            with patch('shaping_checkpoint_retention.no_users'):
+                result=retention.retire(binding,stage,receipt,archive)
+            self.assertEqual(result['snapshot_archive_prefix'],'snapshots');self.assertFalse(directory.exists())
+
 
 if __name__=='__main__':unittest.main()

@@ -92,3 +92,9 @@ input shaping must reproduce both the returned bake and the complete final
 serialized optimizer state bit for bit. A separate 2,345-feature, 128-unit
 fixture checks the retained size and space for a simultaneous third write.
 These are small implementation controls, not scientific result replays.
+
+A snapshot stage may also be a subdirectory of a larger verified native-run
+archive. `shaping-snapshot-retire ... --archive-root PATH` binds each state to
+its exact relative path in that archive's unchanged SHA256SUMS, then cold-reads
+the durable state before retirement. The stage must remain inside the canonical
+archive root. This avoids a second durable copy of the same state.
