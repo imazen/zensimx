@@ -1,7 +1,7 @@
 const { chromium } = require('playwright');
 const fs = require('fs');
 const path = require('path');
-const url = process.argv[2], output = process.argv[3];
+const url = process.argv[2], output = process.argv[3], family = process.argv[4];
 if (!url || !output) throw Error('Usage: node shaping_dashboard_browser.cjs URL OUTPUT_DIRECTORY');
 (async () => {
   fs.mkdirSync(output, { recursive: true });
@@ -11,8 +11,16 @@ if (!url || !output) throw Error('Usage: node shaping_dashboard_browser.cjs URL 
     const errors = []; page.on('pageerror', e => errors.push(e.message));
     await page.goto(url); await page.waitForFunction(() => document.querySelectorAll('#comparison tbody tr').length > 0);
     await page.click('#detailLink');
+    if (family) {
+      await page.evaluate(family => {
+        const match=data.comparisons.find(r=>r.stage==='inner'&&r.partition===data.default_partition&&r.family===family&&r.setting===0);
+        if(!match)throw Error('Requested family is absent: '+family);
+        showDetail(match);
+      },family);
+    }
     await page.waitForFunction(() => Number(document.querySelector('#scatterRaw').dataset.points) > 0);
     await page.waitForFunction(() => Number(document.querySelector('#scatterNormalized').dataset.points) > 0);
+    await page.waitForFunction(() => document.querySelector('#scatterMessage').textContent.includes('Full native Zenstats is available.'));
     const populations = {};
     for (const pop of ['kadid', 'tid2013', 'konfig', 'cid22_a25', 'cid22_ssim2']) {
       await page.selectOption('#scatterPopulation', pop);
@@ -34,7 +42,8 @@ if (!url || !output) throw Error('Usage: node shaping_dashboard_browser.cjs URL 
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth > innerWidth);
     if (overflow) { const boxes = await page.evaluate(() => [...document.querySelectorAll('*')].map(e => ({tag:e.tagName,id:e.id,className:String(e.className),right:e.getBoundingClientRect().right,width:e.getBoundingClientRect().width})).filter(e => e.right > innerWidth + 1)); fs.writeFileSync(path.join(output,'OVERFLOW.json'),JSON.stringify(boxes,null,2)); throw Error('Page overflows the mobile viewport'); }
     if (errors.length) throw Error(errors.join('\n'));
-    const result = { passed: true, url, populations, source_filter: { all, filtered }, native_panel_visible: true, mobile_overflow: false, page_errors: errors };
+    const selected=await page.locator('#scatterFit').inputValue();
+    const result = { passed: true, url, family:family||'relu', selected, populations, source_filter: { all, filtered }, native_panel_visible: true, mobile_overflow: false, page_errors: errors };
     fs.writeFileSync(path.join(output, 'RESULT.json'), JSON.stringify(result, null, 2) + '\n');
     console.log(JSON.stringify(result));
   } finally { await browser.close(); }
