@@ -5474,6 +5474,12 @@ shaping-cost-qualify binary workload output:
 shaping-cost-fixture-test:
     TMPDIR="$HOME/tmp" python3 -B -m unittest discover -s scripts/tests -p test_shaping_cost_fixture.py -v
 
+# Qualify reduced uncertainty on an eligible host with its native statistics binary.
+shaping-reduced-uncertainty-check panel:
+    TMPDIR="$HOME/tmp" ZEN_PANEL_BIN={{quote(panel)}} "$HOME/work/claudehints/scripts/run-heavy" --mem 2G --jobs 1 -- python3 -B -m unittest discover -s scripts/tests -p 'test_shaping_bootstrap*.py'
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B -m unittest discover -s scripts/tests -p test_shaping_outer_evidence.py
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B -m unittest discover -s scripts/tests -p test_shaping_cost_finalists.py
+
 shaping-cost-native-clippy:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 2G --jobs 1 -- cargo clippy --locked --release -p zensim-validate --example shaping_cost -- -D warnings
 

@@ -1,4 +1,4 @@
-"""Admit all sixteen completed full-FIT models to the native cost instrument."""
+"""Admit completed finalist models to the native cost instrument."""
 from __future__ import annotations
 import argparse,json,shutil,subprocess
 from pathlib import Path
@@ -18,7 +18,7 @@ def coverage(cells):
     return sorted(selected,key=lambda c:(c['family'],-1 if c['seed'] is None else c['seed']))
 
 
-def prepare(root,binaries,output):
+def prepare_full(root,binaries,output):
     from shaped_linear_study import OLD
     from tree_study import RAW_IDS
     if output.exists():raise ValueError('preserve existing finalist workload')
@@ -98,6 +98,97 @@ def prepare(root,binaries,output):
         cells=identities,original_training_indices=chosen,source_pins=pins,workload_sha256=sha(output/'WORKLOAD.json'),
         native_cost_instrument_qualification_required=True,timing_measured=False)))
     return dict(output=str(output),models=len(arms),rows=len(chosen))
+
+
+def prepare_outer(root,binaries,output):
+    """One sixteen-arm workload per fold, using that fold's TRAIN rows only."""
+    from shaped_linear_study import OLD
+    from tree_study import RAW_IDS
+    from shaping_outer_evidence import collect
+    from shaping_reduced_scope import coverage as reduced_coverage
+    scope=reduced_coverage(root)
+    if scope is None:raise ValueError('approved reduced scope required for outer finalist cost')
+    if output.exists():raise ValueError('preserve existing finalist workload')
+    plan,_,partitions=load_registration(root)
+    paths={'population':OLD/'data/pop.npy','raw':OLD/'data/raw.npy'}
+    pins={str(p):sha(p) for p in paths.values()}
+    if any(plan['input_pins'].get(p)!=pin for p,pin in pins.items()):
+        raise ValueError('outer cost input drift')
+    pop=np.load(paths['population'],mmap_mode='r',allow_pickle=False)
+    # Freeze all timing row identities before opening any prediction table.
+    chosen={}
+    for outer in range(3):
+        membership=partitions[f'outer-{outer}']
+        if set(membership['train'])&set(membership['test']):raise ValueError('outer TRAIN/test overlap')
+        chosen[outer]=choose_rows(membership['train'],pop)
+        if set(chosen[outer])&set(membership['test']):raise ValueError('cost rows entered outer test')
+    _,_,rows,evidence,qualifications=collect(root);pins.update(evidence)
+    if len(rows)!=48 or not all('role' in row for row in rows):raise ValueError('all 48 reduced outer finalists required')
+    converter=binaries/'bake_dial_refit';build=binaries/'BUILD.json'
+    if sha(converter)!=json.loads(build.read_text())['binary_sha256']['bake_dial_refit']:
+        raise ValueError('converter binary drift')
+    pins.update({str(build):sha(build),str(converter):sha(converter),
+                 str(root/'REDUCED_SCOPE.json'):scope['registration_sha256']})
+    raw=np.load(paths['raw'],mmap_mode='r',allow_pickle=False)
+    output.mkdir(parents=True);workloads=[]
+    for outer in range(3):
+        directory=output/f'outer-{outer}';directory.mkdir();(directory/'models').mkdir()
+        arms=[];identities=[];admission_pins=set()
+        features=np.asarray(raw[chosen[outer]],dtype='<f4')
+        if not np.isfinite(features).all():raise ValueError('nonfinite outer cost feature row')
+        selected=[row for row in rows if row['cell']['partition']==f'outer-{outer}']
+        expected={(role,seed) for role in ROLES for seed in ((None,) if role=='shaped_additive' else (0,1,2))}
+        if len(selected)!=16 or {(r['role'],r['cell']['seed']) for r in selected}!=expected:
+            raise ValueError('all sixteen role/seed models per outer fold required')
+        for row in sorted(selected,key=lambda r:(r['role'],-1 if r['cell']['seed'] is None else r['cell']['seed'])):
+            cell=row['cell'];family=cell['family'];report=row['report']
+            run=Path(row['run_directory']);panel=Path(row['evaluation_directory'])
+            identity=run/'RUN.json';result=json.loads(identity.read_text());schedule=result.get('schedule')
+            admission_pins.add(result['admission_sha256']);pins[str(identity)]=sha(identity)
+            if family in NEURAL:
+                if 'reexport_receipt' in report:
+                    receipt=Path(report['reexport_receipt']);model=Path(json.loads(receipt.read_text())['bake'])
+                else:model=run/'fit/checkpoints'/f"ckpt_epoch{result['epochs']-1:03}.bin"
+                model_pin=report['checkpoint_sha256']
+            else:
+                model=run/('model.opaque-vector.zcth' if family=='extra_trees' else 'native/model.bin')
+                qualification=report['qualification']
+                model_pin=qualification['native_tree_gate']['model_sha256'] if family=='extra_trees' else qualification['model_sha256']
+            if sha(model)!=model_pin:raise ValueError('outer finalist model drift')
+            pins[str(model)]=model_pin
+            name=row['role']+'-'+('deterministic' if cell['seed'] is None else str(cell['seed']))
+            relative=Path('models')/(name+'.bin');dest=directory/relative
+            if family in NEURAL:
+                dense=panel/'dense'/(model_pin[:16]+'.bin');expected_dense=sha(dense);pins[str(dense)]=expected_dense
+                converted=subprocess.run([str(converter),'densify','--in',str(model),'--out',str(dest)],capture_output=True,text=True)
+                log=directory/('densify-'+name+'.log');log.write_text(converted.stdout+'\n'+converted.stderr)
+                if converted.returncode or 'BIT-IDENTICAL' not in log.read_text() or sha(dest)!=expected_dense:
+                    raise ValueError('outer dense representation differs from evaluated model')
+            else:shutil.copyfile(model,dest)
+            if family not in NEURAL and sha(dest)!=model_pin:raise ValueError('copied outer model differs')
+            lookup=dict(zip(row['indices'],row['predictions']))
+            arms.append(dict(id=name,kind='tree' if family=='extra_trees' else 'shaped_additive' if family=='shaped_additive' else 'bake',
+                             model=str(relative),sha256=sha(dest),expected_score_bits=[float_bits(lookup[i]) for i in chosen[outer]]))
+            identities.append(dict(cell=cell,role=row['role'],resolved_family=family,schedule=schedule))
+        if len(admission_pins)!=1:raise ValueError('mixed outer cost admissions')
+        workload=dict(schema='shaping-cost-v1',admission_sha256=admission_pins.pop(),raw_ids=RAW_IDS,
+                      feature_bits=features.view('<u4').tolist(),arms=arms)
+        path=directory/'WORKLOAD.json';path.write_bytes(encoded(workload))
+        (directory/'PROVENANCE.json').write_bytes(encoded(dict(scope='six reduced finalist roles; fold-local TRAIN-only timing rows',
+            outer=outer,cells=identities,original_training_indices=chosen[outer],source_pins=pins,
+            convergence_qualifications=qualifications[str(outer)],workload_sha256=sha(path),
+            native_cost_instrument_qualification_required=True,timing_measured=False)))
+        workloads.append(str(path))
+    for name,pin in pins.items():
+        if sha(name)!=pin:raise ValueError('outer finalist evidence changed during preparation')
+    (output/'WORKLOADS.json').write_bytes(encoded(dict(workloads=workloads,models=48,timing_measured=False,
+        reduced_scope_sha256=scope['registration_sha256'],cross_fold_timing_rows_identical=False)))
+    return dict(output=str(output),workloads=workloads,models=48,rows_per_workload=40)
+
+
+def prepare(root,binaries,output):
+    from shaping_reduced_scope import coverage as reduced_coverage
+    return (prepare_outer if reduced_coverage(root) else prepare_full)(root,binaries,output)
 
 
 if __name__=='__main__':
