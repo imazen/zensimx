@@ -61,3 +61,27 @@ placement before creating an attempt. Wrapper: 1 s, peak RSS 0.02 GiB, minimum
 available 43,997 MiB. Native model identity, seeds, data, exposure and gates were
 unchanged. The gallery preparation published 804 scalar scatter sets; 144 missing
 native detailed panels were queued on r3500, preserving the previous 660.
+
+All 144 additional native panels subsequently completed and were published at
+19:17:34 UTC, bringing both scatter and native-panel coverage to 804. The two
+72-panel batches ran in 135 s and 128 s respectively, each with peak RSS 0.05 GiB;
+minimum available memory was 13,888 and 13,892 MiB. Both batches reported zero
+failures. The browser check passed all five populations, source filtering,
+training/validation switching and mobile layout, with no page errors.
+
+The corresponding evaluation archive verified 2,177 artifacts / 213,661,701 bytes
+before its receipt. Receipt SHA-256:
+`795f1baae2decc2d5f9c9e6b96949929342b46f9e9232537306a4ce2c8e4d000`.
+Archive wrapper: 11 s, peak RSS 0.03 GiB, minimum available 43,886 MiB.
+Its bundled native commands support code-free scalar replay; that additional
+replay was not run. The frozen external model archive's separate completed replay
+is recorded in the external validation results.
+
+Permission inspection found that mounted copyfile archives had retained binary
+contents while dropping execute bits. The copier now preserves and checks those
+bits. Ten executable artifacts across the three external replay archives and
+this panel archive had their source/NAS execute bits reconciled against pinned
+content. No payload or checksum manifest changed. The repair receipt is in the
+verified `archive-executable-metadata-repair-20261108` archive. Sixteen mirror
+checks passed, including native replay execute-bit preservation. Existing image
+refusals and corruption checks remain intact.
