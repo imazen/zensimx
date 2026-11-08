@@ -42,7 +42,7 @@ receipt.write_text(json.dumps(record,indent=2)+'\n');print(json.dumps(record))
 
 
 def remote(host,payload):
-    if host not in ('i265','i270','r3800x'):raise ValueError('unregistered worker')
+    if host not in ('i265','i270','r3800x','i134','r5600g','r3500'):raise ValueError('unregistered worker')
     command='TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- '+shlex.join(['python3','-c',REMOTE,json.dumps(payload)])
     return json.loads(subprocess.check_output(['ssh',host,command],text=True))
 

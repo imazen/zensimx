@@ -1,5 +1,29 @@
 # zensim — current working rules
 
+## Known Bugs — learned-shape threshold initialization (November 8, 2026)
+
+The threshold initializer reads unshaped `StdFeatures::row_cow`, while training
+with a loaded input-shaping bank reads `input_shaping::State::row`. Non-identity
+banks therefore initialize first-layer thresholds in a different input domain
+from the one used for training. Source inspection establishes this mismatch;
+its contribution to each observed output collapse is not yet isolated.
+Treat existing frozen-bank comparisons as potentially confounded. Hold new
+non-identity pretrained admissions pending a corrected, explicitly qualified
+initializer; preserve active runs and all original evidence. Shape transfer
+also needs fold-local normalization and identity/unshaped controls.
+
+## Known Bugs — replacement worker service lifecycle (November 8, 2026)
+
+Two initial worker launches omitted `--inner-family` and refused in CLI parsing
+before creating attempts. Corrected commands started four attempts per host.
+On r5600g, the user manager then stopped ten seconds after the SSH session ended
+because lingering was disabled, interrupting four attempts before any checkpoint.
+Those attempts have explicit interrupted results and remain excluded from replay.
+Lingering is now enabled and verified. Require persistent user-manager state,
+actual trainer PIDs and advancing artifacts before reporting a replacement wave
+as running. The i134 wave survived and advances. Evidence stays in the private
+study's host-transition directory.
+
 ## Known Bugs — native rescue archive coverage (resolved November 7, 2026)
 
 The primary native archiver excluded rescue-stage runs; supplemental panels and

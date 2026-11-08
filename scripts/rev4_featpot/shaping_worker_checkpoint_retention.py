@@ -122,7 +122,7 @@ def main():
     if sys.argv[1:]==['--remote']:
         print(json.dumps(remove_remote(json.load(sys.stdin))));return
     p=argparse.ArgumentParser(description=__doc__)
-    p.add_argument('--host',choices=['i265','i270','r3800x'],required=True)
+    p.add_argument('--host',choices=['i265','i270','r3800x','i134','r5600g','r3500'],required=True)
     for key in ['study','archive','output']:p.add_argument('--'+key,type=Path,required=True)
     p.add_argument('--prior-receipt',type=Path,action='append',default=[])
     p.add_argument('--apply',action='store_true');a=p.parse_args()
