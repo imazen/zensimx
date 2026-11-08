@@ -14,6 +14,13 @@ This avoids adding a second durable copy of each imported model payload.
 The default remains compatible with existing launches. No existing archive is
 removed, and a collected wave does not by itself prove a native archive exists.
 
+The new coordinator collector was deployed at `4eca5dd1329c` for all six
+existing observed hosts, including the two drained hosts. Four completed fits
+were then imported with transport containers on SSD: `b75efd8fa36bc84da43d`,
+`228220d5d211120358d0`, `4067a348fc6065289cab` and `4bbcbbbb3e3032202e5e`.
+The original native archive owners and statistics publisher were restored;
+training was not restarted. Existing durable copies were retained.
+
 The storage pilot repacked complete original worker inventories from SSD for
 cells `37f22084f40f4abc6f3c` and `44cd35024ebd6fba7d8c`. Their payloads were
 26,869,631 and 33,386,100 bytes, respectively; every payload file hash also
