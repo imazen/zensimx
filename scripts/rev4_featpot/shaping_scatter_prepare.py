@@ -134,4 +134,9 @@ def prepare(study,dashboard,output):
 if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__)
     for name in ('study','dashboard','output'):p.add_argument('--'+name,type=Path,required=True)
-    a=p.parse_args();print(json.dumps(prepare(a.study,a.dashboard,a.output)),flush=True)
+    a=p.parse_args()
+    from contextlib import ExitStack
+    from shaping_storage import reservation
+    with ExitStack() as stack:
+        for part in range(2):stack.enter_context(reservation(a.study,a.output/('.publication-reservation-'+str(part)),30*1024**3))
+        print(json.dumps(prepare(a.study,a.dashboard,a.output)),flush=True)
