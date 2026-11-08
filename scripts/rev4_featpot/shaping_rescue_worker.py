@@ -10,9 +10,9 @@ DATA_ROOTS=(Path('/mnt/v/output/zensim'),Path('/srv/zen-research'))
 
 
 def limits(kind):
-    # Bootstrap reproduces all three outer admissions and their inner evidence,
-    # rather than the one-fold closure of an individual native fit.
-    return (2*1024**3,16000) if kind=='bootstrap' else (MAX_INPUT_BYTES,4000)
+    # Bootstrap reproduces all three outer admissions. Controls retain all 44
+    # frozen array/table inputs. Ordinary neural fit closures keep their cap.
+    return (2*1024**3,16000) if kind in ('bootstrap','control') else (MAX_INPUT_BYTES,4000)
 
 
 def source_identity(value,source=None):
@@ -134,7 +134,8 @@ def verify(record,*,allow_missing=False):
         raise ValueError('worker request identity differs')
     if record['schema']=='shaping-native-worker-v2':
         stages={'outer':('outer','fresh_control_outer','fresh_control_outer_matched'),
-                'variant':('source_curve','row_curve','shuffle','human_only'),'corrected_inner':('inner',),'bootstrap':('bootstrap',)}
+                'variant':('source_curve','row_curve','shuffle','human_only'),'corrected_inner':('inner',),'bootstrap':('bootstrap',),
+                'control':('outer','source_curve','shuffle','human_only')}
         if record.get('execution_kind') not in stages or record['cell']['stage'] not in stages[record['execution_kind']]:
             raise ValueError('downstream worker stage differs')
     elif record.get('execution_kind') is not None:raise ValueError('legacy rescue request cannot change execution kind')
@@ -199,6 +200,9 @@ def work(request):
     if record.get('execution_kind') is not None:
         if record['execution_kind']=='corrected_inner':from shaping_corrected_worker import reproduce
         elif record['execution_kind']=='bootstrap':from shaping_bootstrap_worker import reproduce
+        elif record['execution_kind']=='control':
+            from shaping_control_worker import reproduce
+            record['_request_path']=str(request)
         else:from shaping_downstream_worker import reproduce
         resolution,command=reproduce(record)
     else:
@@ -210,7 +214,8 @@ def work(request):
                  '--binary-dir',record['binary_dir'],'--neutral-qualification',record['neutral_qualification'],'--cell',key]
     if (study/'runs'/key).exists():raise ValueError('preserve existing attempt; never replay')
     while True:
-        if not reserve_worker(study,key)['can_start']:
+        admission=(reserve_worker(study,key,memory_allowance_bytes=4*1024**3) if record.get('execution_kind')=='control' else reserve_worker(study,key))
+        if not admission['can_start']:
             time.sleep(10);continue
         if record.get('execution_kind')=='corrected_inner':
             from shaping_snapshot_retention import capacity

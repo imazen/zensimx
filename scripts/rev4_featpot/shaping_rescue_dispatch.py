@@ -116,12 +116,20 @@ def pending_scientific_cells(root):
     return cells
 
 
-def reserve_worker(root,cell,proc=Path('/proc'),cpu_count=None):
+def reserve_worker(root,cell,proc=Path('/proc'),cpu_count=None,*,memory_allowance_bytes=2*1024**3):
     # The lock spans this short admission transaction, never training.
     # Unexpected dead-owner claims remain reserved for explicit reconciliation.
     with worker_claims(root) as claims:
+        if type(memory_allowance_bytes) is not int or memory_allowance_bytes not in (2*1024**3,4*1024**3):
+            raise ValueError('registered two- or four-GiB worker memory allowance required')
         legacy=pending_scientific_cells(root)
         observation=worker_slot(set(claims)|legacy,proc,cpu_count,study=root)
+        extra=sum(max(0,row.get('memory_allowance_bytes',2*1024**3)-2*1024**3) for row in claims.values())
+        if cell not in claims:extra+=memory_allowance_bytes-2*1024**3
+        if extra:
+            observation['minimum_available_memory_bytes']+=extra
+            observation['can_start'] &= observation['available_memory_bytes']>=observation['minimum_available_memory_bytes']
+            observation['extra_memory_allowance_bytes']=extra
         observation['shared_claims']=len(claims)
         observation['existing_scientific_reservations']=len(legacy)
         if cell in claims:
@@ -129,6 +137,7 @@ def reserve_worker(root,cell,proc=Path('/proc'),cpu_count=None):
         if observation['can_start']:
             claims[cell]=dict(owner=OWNER_TOKEN,dispatcher_pid=os.getpid(),child_pid=None,
                 admitted_utc=datetime.now(timezone.utc).isoformat())
+            if memory_allowance_bytes!=2*1024**3:claims[cell]['memory_allowance_bytes']=memory_allowance_bytes
         return observation
 
 

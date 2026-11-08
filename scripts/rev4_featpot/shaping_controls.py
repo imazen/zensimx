@@ -8,6 +8,7 @@ from datetime import datetime,timezone
 import hashlib
 import json
 import os
+import socket
 from pathlib import Path
 import subprocess
 for key in ('OMP_NUM_THREADS','OPENBLAS_NUM_THREADS','MKL_NUM_THREADS','RAYON_NUM_THREADS'):
@@ -183,6 +184,7 @@ def fit(args,plan,partitions,family,chosen,outer):
         if dest.exists():raise ValueError('control attempt exists: '+str(dest))
         dest.mkdir(parents=True)
         running=dict(cell=cell,pid=os.getpid(),process_role='control_worker',stage='running',
+                     execution_host=socket.gethostname(),
                      started_utc=datetime.now(timezone.utc).isoformat(),driver_sha256=DRIVER_SHA256,
                      plan_sha256=sha(args.study/'PLAN.json'),build_sha256=sha(args.binary_dir/'BUILD.json'))
         if outer is not None:running.update(outer)
@@ -199,7 +201,7 @@ def fit(args,plan,partitions,family,chosen,outer):
                 qualification=dict(native_tree_gate=gate,config=config,objective='reference-balanced mapped-target MSE')
             else:
                 lam=(1e-7,1e-6,1e-4,1e-2)[setting]
-                output=dest/'native';cmd=[str(HEAVY),'--mem','4G','--jobs','1','--',str(args.binary_dir/'bake_dial_refit'),
+                output=dest/'native';cmd=[str(HEAVY),'--mem',getattr(args,'native_mem','4G'),'--jobs','1','--',str(args.binary_dir/'bake_dial_refit'),
                      'linear-study','--inputs',str(linear/'inputs.npz'),'--gram',str(linear/'gram.npz'),
                      '--spec',str(linear/'SPEC.json'),'--lambda',str(lam),'--out',str(output),'--positive']
                 with (dest/'train.log').open('w') as log:
@@ -284,6 +286,7 @@ def main():
     p.add_argument('--partition',required=True);p.add_argument('--attempt',type=int,default=1)
     p.add_argument('--cell',help='registered generalization control cell; retains inner-selected settings')
     p.add_argument('--selected-cell',help='one primary outer control, after full family seed coverage is admitted')
+    p.add_argument('--native-mem',choices=('2G','4G'),default='4G',help='finite native linear child memory cap')
     p.add_argument('--full-fit-refit',action='store_true',help='final all-FIT control with descriptive development evaluation')
     p.add_argument('--full-fit-selection',action='store_true',help='registered four-setting full-FIT control search')
     mode=p.add_mutually_exclusive_group(required=True);mode.add_argument('--tree',action='store_true');mode.add_argument('--linear',action='store_true')

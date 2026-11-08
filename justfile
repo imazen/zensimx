@@ -5560,6 +5560,18 @@ shaping-completion-bootstrap-watch-check:
 shaping-bootstrap-worker-check:
     TMPDIR="$HOME/tmp" python3 -B -m unittest scripts/tests/test_shaping_bootstrap_worker.py scripts/tests/test_shaping_rescue_worker.py scripts/tests/test_shaping_downstream_worker.py scripts/tests/test_shaping_corrected_worker.py
 
+shaping-control-worker-check:
+    TMPDIR="$HOME/tmp" python3 -B -m unittest scripts/tests/test_shaping_control_worker.py scripts/tests/test_shaping_outer_controls.py scripts/tests/test_shaping_rescue_dispatch.py scripts/tests/test_shaping_bootstrap_worker.py
+
+shaping-control-worker-register study cell binaries host output:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 2G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_control_worker.py register --study {{quote(study)}} --cell {{quote(cell)}} --binary-dir {{quote(binaries)}} --host {{quote(host)}} --output {{quote(output)}}
+
+shaping-control-worker-pack request bundle:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_control_worker.py pack --request {{quote(request)}} --bundle {{quote(bundle)}}
+
+shaping-control-worker-collect request bundle pin:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_control_worker.py collect --request {{quote(request)}} --bundle {{quote(bundle)}} --bundle-sha256 {{quote(pin)}}
+
 shaping-bootstrap-worker-register study draws binaries result host output *comparison:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 2G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_bootstrap_worker.py register --study {{quote(study)}} --draws {{quote(draws)}} --binary-dir {{quote(binaries)}} --result-output {{quote(result)}} --host {{quote(host)}} --output {{quote(output)}} {{comparison}}
 

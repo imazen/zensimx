@@ -96,8 +96,25 @@ fitting. Its optional `--selected-cell` executes one primary outer control only
 after the complete family seed set has been admitted. It uses a cell-specific
 SSD reservation, allowing independent tree seeds without sharing a reservation
 key. Ordinary batches and the existing variant/full-fit modes retain their
-original behavior. Control transport and actual outer control fitting remain
-separate work.
+original behavior. Actual outer control fitting remains separate work.
+
+`shaping_control_worker.py` transports the existing tree and linear owners for
+primary outer cells and reduced source/shuffle/human variants. It replays their
+original admission and frozen input/binary hashes, binds NumPy/SciPy/sklearn/
+PyArrow versions, and pins the dynamically loaded tree exporter. Its Python
+process and native linear child each have a 2-GiB cap; the shared claim reserves
+their combined 4-GiB allowance. Other jobs account for this extra allowance
+without changing ordinary 2-GiB admission. Tree fitting remains the existing
+single-thread sklearn control, with Rust native export parity and statistics;
+the positive linear solver remains Rust.
+
+Linear results include their exact compressed input/Gram arrays and JSON
+specification for replay through the native CLI. Collection preserves the
+original worker output and validates completed reports, prediction membership,
+native models/parity artifacts, environment and replay-input hashes before
+publication. The existing later-control archiver accepts the collected layout.
+Controller/capsule fixtures cover these paths; scientific outer fitting still
+waits for complete inner admission.
 
 The frozen four-setting matrix and the archived monotone-SiLU trajectory were
 accepted by these checks on November 8, 2026. Five other native control
