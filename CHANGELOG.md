@@ -2,7 +2,15 @@
 
 ## [Unreleased]
 
+### QUEUED BREAKING CHANGES
+
+None.
+
 ### Research
+
+- Add opt-in bounded full-state snapshots for constrained shared-depth training,
+  retaining optimizer, sampler and shape state with native crash parity controls.
+  Existing frozen study binaries remain unchanged.
 
 - Initialize loaded-bank thresholds in the same shaped coordinates used for
   training; retain the unshaped RNG/reader path. Frozen trials remain unchanged.

@@ -140,6 +140,7 @@ impl Config {
     }
 }
 
+#[derive(Clone, Serialize, Deserialize)]
 pub(super) struct State {
     pub config: Config,
     positions: Vec<(usize, Option<usize>)>,

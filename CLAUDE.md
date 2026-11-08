@@ -1,5 +1,17 @@
 # zensim — current working rules
 
+## Full-state CPU recovery (November 8, 2026)
+
+New source supports opt-in bounded full-state snapshots for the constrained
+shared-depth owner. The crash oracle covers ReLU, Softplus, frozen shaping and
+joint shaping at mid-epoch and epoch boundaries, including optimizer-state
+identity. Limits are two states plus a temporary write within 64 MiB per run,
+a 4 GiB shared store including completed runs, and the existing 30 GiB free
+reserve plus pending allowance. See `docs/TRAINING_RESUME.md`. Existing frozen
+study binaries and weight-only bakes do not gain exact resume retroactively.
+Other owners, CPU-tier transfer and complete resumed CLI/archive handling need
+separate qualification before scientific deployment.
+
 ## Known Bugs — evaluation placement after the worker transition (November 8, 2026)
 
 Stopping old-host fit queues did not disable five evaluation/bootstrap observers.

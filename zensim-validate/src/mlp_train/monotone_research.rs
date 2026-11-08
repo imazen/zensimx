@@ -88,6 +88,7 @@ fn is_zero(value: &f64) -> bool {
     *value == 0.
 }
 
+#[derive(Clone, Serialize, Deserialize)]
 struct Block {
     learn_temperature: bool,
     negative_slope: f64,
@@ -888,7 +889,7 @@ mod tests {
     }
 }
 
-#[derive(Default)]
+#[derive(Clone, Default, Serialize, Deserialize)]
 pub(super) struct Diagnostics {
     pub(super) backwards: u64,
     pub(super) samples: u64,
@@ -902,6 +903,7 @@ pub(super) struct Diagnostics {
     pub(super) optimizer_steps: u64,
 }
 
+#[derive(Clone, Serialize, Deserialize)]
 pub(super) struct Network {
     config: Config,
     blocks: Vec<Block>,

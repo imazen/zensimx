@@ -65,6 +65,8 @@ mod loss_steer;
 pub mod map_term;
 mod monotone_research;
 mod optimizer_controls;
+mod resume;
+mod resume_store;
 mod shared_depth;
 mod smooth_hinge;
 mod steer_data;
@@ -3198,7 +3200,28 @@ pub fn train_mlp_strategy_pairs(
         groups.iter().any(|g| g.loss_mode.has_mse()),
         triplets.map_or(0, |t| t.responses.len()),
     );
+    assert!(
+        std::env::var_os("ZENSIM_TRAIN_RESUME").is_none()
+            || std::env::var_os("ZENSIM_TRAIN_SNAPSHOT_ROOT").is_some(),
+        "resume requires the shared snapshot store"
+    );
     let shared_depth_on = shared_depth::enabled(&effective);
+    if std::env::var_os("ZENSIM_TRAIN_SNAPSHOT_ROOT").is_some() {
+        assert!(
+            shared_depth_on
+                && tv.is_none()
+                && anchor.is_none()
+                && equiv.is_none()
+                && pjnd_anchor.is_none()
+                && konjnd_agg.is_none()
+                && triplets.is_none()
+                && rank_pairs.is_empty()
+                && effective.ema_decay == 0.
+                && effective.early_stop_patience == 0,
+            "full-state snapshots require constrained shared-depth rank/MSE without auxiliary losses, EMA, early stopping or coverage recording"
+        );
+    }
+
     monotone_research::check_admission(&effective);
     input_shaping::check_admission(&effective);
     optimizer_controls::check_admission(&effective);
@@ -4143,7 +4166,70 @@ pub fn train_mlp_strategy_pairs(
         )
     });
 
-    for epoch in 0..hyperparams.n_epochs {
+    let mut resume_session = resume::Session::open(
+        hyperparams,
+        groups,
+        &std_features,
+        &scaler_mean,
+        &scaler_scale,
+    );
+    let mut resume_cursor = None;
+    if let Some(session) = resume_session.as_mut() {
+        assert!(
+            sample_digest.is_none() && pair_plan.is_none() && knees.is_none() && !lookahead_ok,
+            "snapshot sampler/state combination is unsupported"
+        );
+        if let Some(state) = session.loaded.take() {
+            assert!(
+                state.epoch <= hyperparams.n_epochs && state.pair <= hyperparams.pairs_per_epoch,
+                "snapshot cursor out of range"
+            );
+            [w1, b1, w2, b2] = state.weights;
+            adam = state.adam;
+            depth = state.depth;
+            input_shapes = state.shapes;
+            rng.state = state.rng;
+            best_val_score = f64::from_bits(state.best_score_bits);
+            best_bake = state.best_bake;
+            stale_epochs = state.stale_epochs;
+            resume_cursor = Some((
+                state.epoch,
+                state.pair,
+                state.loss,
+                state.steps,
+                state.ties,
+                state.pending_steps,
+            ));
+        }
+    }
+    macro_rules! save_resume {
+        ($epoch:expr,$pair:expr,$loss:expr,$steps:expr,$ties:expr,$pending:expr) => {
+            if let Some(session) = resume_session.as_mut() {
+                session.save(&resume::State {
+                    identity: session.identity.clone(),
+                    epoch: $epoch,
+                    pair: $pair,
+                    weights: [w1.clone(), b1.clone(), w2.clone(), b2.clone()],
+                    adam: adam.clone(),
+                    depth: depth.clone(),
+                    shapes: input_shapes.clone(),
+                    rng: rng.state,
+                    loss: $loss,
+                    steps: $steps,
+                    ties: $ties,
+                    pending_steps: $pending,
+                    best_score_bits: best_val_score.to_bits(),
+                    best_bake: best_bake.clone(),
+                    stale_epochs,
+                });
+            }
+        };
+    }
+    let first_epoch = resume_cursor.as_ref().map_or(0, |s| s.0);
+    if resume_session.is_some() && resume_cursor.is_none() {
+        save_resume!(0, 0, 0., 0, 0, 0);
+    }
+    for epoch in first_epoch..hyperparams.n_epochs {
         // Global draw index, the coordinate `--pair-sampling stratified`'s
         // schedule is a function of. Unused (and unread) by the uniform
         // draw, which is why adding it changes nothing for a default run.
@@ -4167,7 +4253,31 @@ pub fn train_mlp_strategy_pairs(
         // controls the final-flush at epoch end when not aligned with K.
         let mut steps_since_adam = 0u64;
 
-        for pair_i in 0..hyperparams.pairs_per_epoch {
+        let first_pair =
+            if let Some((saved_epoch, pair, loss, steps, ties, pending)) = resume_cursor.take() {
+                assert_eq!(epoch, saved_epoch);
+                total_loss = loss;
+                n_steps = steps;
+                subjective_ties = ties;
+                steps_since_adam = pending;
+                pair
+            } else {
+                0
+            };
+        for pair_i in first_pair..hyperparams.pairs_per_epoch {
+            if resume_session
+                .as_ref()
+                .is_some_and(|session| session.due(pair_i))
+            {
+                save_resume!(
+                    epoch,
+                    pair_i,
+                    total_loss,
+                    n_steps,
+                    subjective_ties,
+                    steps_since_adam
+                );
+            }
             // Pick a training group via inverse-CDF sampling, then a
             // pair (ia, ib) within that group. If per-row CDFs are
             // populated (boost != 1.0), use weighted sampling for the
@@ -5202,6 +5312,7 @@ pub fn train_mlp_strategy_pairs(
                 }
             }
         }
+        save_resume!(epoch + 1, 0, 0., 0, 0, 0);
     }
     record_best_val(best_val_score);
 
@@ -8880,6 +8991,7 @@ mod utils;
 // under --all-targets see the re-export as unused.
 pub use utils::{spearman_correlation, sweep_nan_inf};
 
+#[derive(Clone, serde::Serialize, serde::Deserialize)]
 struct AdamState {
     gw1: Vec<f64>,
     gb1: Vec<f64>,
@@ -9057,6 +9169,7 @@ impl AdamState {
     }
 }
 
+#[derive(Clone, serde::Serialize, serde::Deserialize)]
 pub(crate) struct SplitMix64 {
     state: u64,
 }

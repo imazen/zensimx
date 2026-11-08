@@ -3668,3 +3668,43 @@ on the four replacement workers, respectively, each consuming between 95.36%
 and 100.00% of one core in those samples. The compiler consumed 97.66% of one core
 on its host. These are instantaneous utilization observations, not throughput or
 memory-peak measurements. No worker reported a pending reboot in that observation.
+
+### External recovery and bounded snapshots, November 8
+
+The owner authorized restarting only the two older partial conditions, retaining
+19 and 219 checkpoints. Both run on the approved replacement worker under the
+original frozen executable, seeds, banks, inputs and 240-epoch budgets. The first
+nine product and ten separate checkpoints matched their originals after stripping
+only final provenance metadata. This is a live prefix observation, not completed
+fit qualification. A comparison-helper refusal on unstamped interrupted bakes was
+repaired with a separate observer; both trainers continued. Original refusal logs
+and eventual result reconciliation remain explicit. No unrelated fit was replayed.
+
+The new private full-state snapshot controls pass mid-epoch and epoch-boundary
+crash recovery for ReLU, anchored Softplus, frozen shaping and joint shaping.
+Both returned bakes and complete final serialized states match uninterrupted
+training byte for byte. Rotation, torn-write fallback, writer exclusion, oversized
+serialization refusal and the shared completed-run quota also passed. The
+2,345-feature, 128-unit fixture retained 41,880,851 bytes in two snapshots of
+20,951,909 and 20,928,942 bytes. Adding one simultaneous largest write requires
+62,832,760 bytes, within the 67,108,864-byte run reservation. These are storage
+measurements from a small implementation fixture, not scientific quality results.
+
+Qualification source is `2442b9e6641b5a3b7fe93b10d163b5b209c0f81d`;
+all 414 library tests passed with the two existing ignored tests unchanged.
+The five focused controls passed. Their build/test wrapper reports 221 s,
+peak RSS 1.67 GiB, minimum available RAM 23,964 MiB, peak load 17.96.
+The warm full-library run reports 17 s, peak RSS 0.23 GiB, minimum available
+RAM 24,922 MiB, peak load 15.71. Clippy with warnings denied passed in 80 s,
+peak RSS 0.65 GiB, minimum available RAM 24,343 MiB, peak load 15.74.
+A first prototype's compile failure is retained; its corrected successor passed.
+Existing frozen scientific binaries remain unchanged. Full resumed CLI and archive
+handling and transfer between CPU tiers still need their own qualification.
+
+A separate support archive cold-reread 107 artifacts / 371,665,247 bytes.
+Its mirror receipt SHA-256 is
+`64e39e27300d277b84c8175ed2694b23f5c042b0389c720a7b485cfdbdc05e13`.
+The wrapper reports 11 s, peak RSS 0.02 GiB, minimum available RAM 45,133 MiB,
+peak load 5.98. That frozen snapshot covers resource repair, threshold binary
+qualification and page/recovery deployments; later snapshot-qualification evidence
+is separate. Live logs in the support snapshot are explicitly point-in-time copies.

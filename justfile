@@ -5596,3 +5596,7 @@ shaping-reduced-downstream-check:
 
 shaping-reduced-scope-register study approval:
     python3 -B scripts/rev4_featpot/shaping_reduced_scope.py --study {{quote(study)}} --approval {{quote(approval)}}
+
+# Run on an admitted compute worker with an isolated Cargo output directory.
+shaping-snapshot-check:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 4G --jobs 2 -- cargo test -p zensim-validate --lib mlp_train::resume -- --nocapture

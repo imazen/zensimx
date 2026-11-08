@@ -41,6 +41,7 @@ pub(super) fn validate(hp: &MlpHyperparams) {
     );
 }
 
+#[derive(Clone, serde::Serialize, serde::Deserialize)]
 pub(super) struct Head {
     pub(super) research: Option<super::monotone_research::Network>,
     pub(super) mid: Vec<f64>,
@@ -296,7 +297,7 @@ impl Head {
 }
 
 // Observation-only storage: never share the optimizer's gradients or moments.
-#[derive(Default)]
+#[derive(Clone, Default, serde::Serialize, serde::Deserialize)]
 struct WeightDiagnostics {
     scratch: Option<AdamState>,
     pairs: u64,
