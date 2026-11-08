@@ -5272,6 +5272,9 @@ shaping-completion-control-compatibility-check:
 shaping-control-evidence-check:
     TMPDIR="$HOME/tmp" python3 -B -m unittest scripts/tests/test_shaping_control_evidence.py
 
+shaping-lossless-capsule source output:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_lossless_capsule.py --source {{quote(source)}} --output {{quote(output)}}
+
 shaping-control-evidence-prepare registration family run output:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_control_evidence.py prepare --registration {{quote(registration)}} --family {{quote(family)}} --run {{quote(run)}} --output {{quote(output)}}
 

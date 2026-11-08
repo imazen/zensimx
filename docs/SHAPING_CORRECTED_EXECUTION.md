@@ -53,6 +53,14 @@ and shared TRAIN inputs by their existing identities rather than copying them
 again. Snapshot archival has its separate binding/readback owner. Missing or
 changed native bakes refuse collection.
 
+Transport capsules may use `just shaping-lossless-capsule SOURCE OUTPUT` for
+standard single-thread zstd compression, with the original raw SHA-256,
+compressed SHA-256 and complete decompressed-byte comparison in a sidecar.
+The owner creates the destination parent, preserves existing output, keeps the
+raw source and maintains the SSD reserve. A real 29,736,960-byte input capsule
+produced the same 15,852,985-byte compressed object and exact raw hash through
+this reusable owner. This changes storage representation, not training data.
+
 The frozen four-setting matrix and the archived monotone-SiLU trajectory were
 accepted by these checks on November 8, 2026. Five other native control
 qualifications were still running; no activation was written. Fixture checks establish orchestration
