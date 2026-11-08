@@ -5230,6 +5230,12 @@ shaping-completion-outer-plan-check:
 shaping-completion-outer-admission study outer *args:
     python3 -B scripts/rev4_featpot/shaping_outer_admission.py --study {{quote(study)}} --outer {{outer}} {{args}}
 
+shaping-completion-freeze-worker-policies study:
+    TMPDIR="$HOME/tmp" python3 -B scripts/rev4_featpot/shaping_policy_snapshot.py --study {{quote(study)}}
+
+shaping-completion-policy-snapshot-check:
+    TMPDIR="$HOME/tmp" python3 -B -m unittest discover -s scripts/tests -p test_shaping_policy_snapshot.py
+
 shaping-completion-outer-admission-check:
     python3 -B -m unittest scripts/tests/test_shaping_outer_admission.py
 

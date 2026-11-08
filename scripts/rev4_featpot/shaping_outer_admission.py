@@ -30,6 +30,8 @@ def base_decision(root,family,outer,cells):
         policy=REPO/'docs/SHAPING_UNDEFINED_SETTING_POLICY.md'
         if record['selection_policy_sha256']!=sha(policy):raise ValueError('base eligibility policy drift')
         if actual['ineligible_settings']!=record['ineligible_settings']:raise ValueError('base eligibility reasons differ')
+        from shaping_policy_snapshot import policy_path
+        policy=policy_path(root,policy)
         pins[str(policy)]=sha(policy)
     for key in ('family','outer','selected_setting','required_reports','reported_cells','setting_scores'):
         if json.loads(encoded(actual[key]))!=record[key]:raise ValueError('base decision cannot be reproduced: '+key)

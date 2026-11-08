@@ -105,3 +105,11 @@ bake hashes and training origins were unchanged. Their import and placement
 receipts are in the shaping completion run's
 `mobile-evaluation-20261108/evidence-v1/` verified archive. This qualifies those
 two transfers; it does not establish transport for the excluded stages/families.
+
+Before freezing new outer shortlists, run
+`just shaping-completion-freeze-worker-policies STUDY`. This copies the public
+undefined-setting policy into the study with its exact source SHA-256. New
+outer evidence then uses that stable study path across source exports. Both
+the local source policy and the snapshot must match; established shortlists
+or admissions refuse introducing a new snapshot path. The numerical policy
+and original primary selection receipts remain unchanged.

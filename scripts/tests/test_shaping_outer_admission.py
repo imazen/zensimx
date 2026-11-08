@@ -32,6 +32,11 @@ class OuterAdmissionTests(unittest.TestCase):
             actual,_,evidence=base_decision(root,'extra_trees',0,cells)
             self.assertEqual(actual['selected_setting'],1);self.assertEqual(len(actual['reported_cells']),24)
             self.assertIn(str(REPO/'docs/SHAPING_UNDEFINED_SETTING_POLICY.md'),evidence)
+            from shaping_policy_snapshot import freeze
+            freeze(root)
+            _,_,portable_evidence=base_decision(root,'extra_trees',0,cells)
+            self.assertIn(str(root/'policies/SHAPING_UNDEFINED_SETTING_POLICY.md'),portable_evidence)
+            self.assertNotIn(str(REPO/'docs/SHAPING_UNDEFINED_SETTING_POLICY.md'),portable_evidence)
             record['selection_policy_sha256']='changed';path.write_bytes(encoded(record))
             with self.assertRaisesRegex(ValueError,'policy drift'):base_decision(root,'extra_trees',0,cells)
 
