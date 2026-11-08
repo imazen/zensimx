@@ -98,3 +98,14 @@ archive. `shaping-snapshot-retire ... --archive-root PATH` binds each state to
 its exact relative path in that archive's unchanged SHA256SUMS, then cold-reads
 the durable state before retirement. The stage must remain inside the canonical
 archive root. This avoids a second durable copy of the same state.
+
+`shaping_snapshot_batch.py` groups local successful scientific runs through
+these same stage and retirement functions. It reserves four GiB before copying,
+keeps deferred native-lock conflicts explicit, and excludes unfinished, failed
+and nonlocal runs. Mirror the completed batch with the existing archive owner
+and supply its receipts back to the source worker. Retirement still cold-reads
+each durable state and checks active users before freeing its original store.
+Per-run journals and a separate batch receipt preserve the evidence; the stage
+and durable archive remain intact. A partial removal journal refuses automatic
+continuation. Batch fixture checks use the real staging and cold-readback gates,
+including a corrupted durable state that must leave local states untouched.
