@@ -1,5 +1,16 @@
 # zensim — current working rules
 
+## Corrected worker command preflight (resolved November 8, 2026)
+
+The initial corrected worker set the command owner's TRAINER variable but
+omitted REV4_V2_BIN_DIR, which the strict builder actually uses. No corrected
+scientific condition had been activated or started. The worker now sets the
+explicit binary override and dry-builds the original strict command during
+admission, binding the frozen recipe, declaration, kept feature IDs and lazy
+admission dependencies before attempt creation. A regression uses the actual
+strict command builder to reproduce the missing-override behavior and verify
+the corrected selection. The native scientific binary and inputs are unchanged.
+
 ## Exported rescue policy paths (resolved November 8, 2026)
 
 A new fold-2 ReLU rescue registration refused before creating any job because

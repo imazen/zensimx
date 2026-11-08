@@ -1,7 +1,7 @@
 """Transport corrected inner fits through their activated, source-bound owner."""
-import argparse,json,socket
+import argparse,json,socket,os
 from pathlib import Path
-from shaping_completion import REPO,sha
+from shaping_completion import REPO,SEEDS,sha
 from shaping_corrected_view import admit_fit,admit_parent
 
 
@@ -31,9 +31,19 @@ def context(study,cell_id,binaries,*,host=None):
         if sha(binaries/name)!=pin:raise ValueError('corrected native binary drift')
     if any(weight<=0 or validation!=0 for _,_,weight,validation,_ in groups['groups']):
         raise ValueError('corrected fits require TRAIN-only groups')
+    from shaped_linear_study import BASE
+    if plan['input_pins'].get(str(BASE))!=sha(BASE):raise ValueError('registered base recipe drift')
+    recipe={**json.loads(BASE.read_text())['recipe'],'shared_hidden_activation':'relu','mse_weight':groups.get('mse_weight',1)}
+    owner=configure(binaries)
+    command=owner.train_command([(n,Path(p),tw,vw,m) for n,p,tw,vw,m in groups['groups']],
+        *(seed+1000000 for seed in SEEDS[cell['seed']]),1853,source/'keep.txt','N',
+        study/'runs'/cell_id/'attempt-001/best.bin',recipe,
+        strict_admission=True,data_role_decision=Path(groups['decision']))
+    if Path(command[0])!=binaries/'zensim_mlp_train':raise ValueError('corrected command builder selected another binary')
     scope=dict(cell=cell,corrected_binding=binding,parent_cell=parent,source_run=str(source),
         parent_result_sha256=sha(source/'RESULT.json'),prefix_sha256=sha(source/'checkpoints/ckpt_epoch119.bin'),
-        group_receipt_sha256=sha(groups_path),epochs=120,pairs_per_epoch=50000,outer_results_read=False)
+        group_receipt_sha256=sha(groups_path),base_recipe_sha256=sha(BASE),command_template=command,
+        epochs=120,pairs_per_epoch=50000,outer_results_read=False)
     return dict(cell=cell,scope=scope,groups=groups,parent=source)
 
 
@@ -62,16 +72,22 @@ def reproduce(record,*,host=None):
         '--study',str(study),'--binaries',str(binaries),'--cell',record['cell']['id']]
 
 
-def fit(study,cell_id,binaries):
-    from shaping_execution import run_native
-    admitted=context(study,cell_id,binaries)
+def configure(binaries):
     # The existing command owner is unchanged; these are the same module settings
     # used by its original 120-epoch pretrained/fresh execution path.
     import v2_common
     import v2_lodo_mlp as owner
+    os.environ['REV4_V2_BIN_DIR']=str(binaries)
     v2_common.TRAINER=owner.TRAINER=binaries/'zensim_mlp_train'
     v2_common.FITBIN=owner.FITBIN=binaries/'bake_dial_refit'
     owner.EPOCHS=120;owner.PAIRS_PER_EPOCH=50000;owner.LOG_EVERY=1
+    return owner
+
+
+def fit(study,cell_id,binaries):
+    from shaping_execution import run_native
+    admitted=context(study,cell_id,binaries)
+    configure(binaries)
     return run_native(study,binaries,admitted['cell'],admitted['groups'],1,120,'2G')
 
 

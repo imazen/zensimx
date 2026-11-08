@@ -1,4 +1,4 @@
-import json,sys,tempfile,unittest
+import json,sys,tempfile,unittest,os
 from pathlib import Path
 from unittest.mock import patch
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'rev4_featpot'))
@@ -8,6 +8,20 @@ from shaping_completion import encoded,sha
 
 
 class CorrectedWorkerTests(unittest.TestCase):
+    def test_strict_native_command_uses_the_admitted_binary_override(self):
+        import v2_lodo_mlp as owner
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as directory:
+            root=Path(directory);binaries=root/'admitted'
+            def command():return owner.train_command([],1101,101,1853,root/'keep.txt','N',root/'best.bin',{},strict_admission=True)
+            with patch.dict(os.environ,{'REV4_V2_BIN_DIR':str(root/'wrong')}),patch.object(owner,'strict_training_groups'),patch.object(owner,'strict_group_input_roots',return_value=()):
+                # Merely setting TRAINER does not control the strict builder.
+                with patch.object(owner,'TRAINER',binaries/'zensim_mlp_train'):
+                    self.assertNotEqual(Path(command()[0]),binaries/'zensim_mlp_train')
+                def native(*args):
+                    cmd=command();self.assertEqual(cmd[cmd.index('--epochs')+1],'120');return cmd
+                with patch.object(corrected,'context',return_value=dict(cell={},groups={})),patch('shaping_execution.run_native',side_effect=native):
+                    self.assertEqual(Path(corrected.fit(root,'new',binaries)[0]),binaries/'zensim_mlp_train')
+
     def test_unactivated_or_historical_cell_cannot_reach_native_owner(self):
         with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as directory:
             root=Path(directory);(root/'BUILD.json').write_text('{}')
