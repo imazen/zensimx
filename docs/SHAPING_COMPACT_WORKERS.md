@@ -21,6 +21,12 @@ The idle queue stops after its handoff receipt is written; original manifests,
 requests and status remain preserved. A queue containing any active, failed,
 partial or completed fit refuses this handoff. No native fit is interrupted.
 
+For a placement transition, `handoff --freeze-only` retains the verified idle
+queue in the stopped state expected by the existing placement owner. Its receipt
+binds the PID/start identity and all original request hashes. This mode does not
+change placements, retire a queue or launch a fit; the coordinating transition
+must reconcile placements and retire the stopped queue explicitly.
+
 Run `wave --qualify` first with the original full `--source`, `--wave` manifest
 and a fresh `--output`. It executes the real original admissions without
 claiming a scientific fit or launching its native command. `handoff` records an

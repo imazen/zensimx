@@ -137,7 +137,7 @@ def manifest(path):
     return wave
 
 
-def handoff(source,path,output):
+def handoff(source,path,output,freeze_only=False):
     wave=manifest(path);status=json.loads(path.with_name('WAVE_STATUS.json').read_text());pid=status['pid']
     if status['manifest_sha256']!=sha(path) or status['completed'] or status['failed']:
         raise ValueError('only an entirely unopened idle wave may hand over')
@@ -172,6 +172,10 @@ def handoff(source,path,output):
                         previous_status=status,request_sha256=wave['request_sha256'],launcher_sha256=sha(__file__),
                         native_fits_interrupted=0,checked_utc=datetime.now(timezone.utc).isoformat())
             save(output/'HANDOFF.json',record)
+            if freeze_only:
+                record['stage']='frozen_idle_wave';save(output/'HANDOFF.json',record)
+                stopped=False  # Keep this verified idle queue at its boundary.
+                return record
             os.kill(pid,signal.SIGTERM)
         finally:
             if stopped and proc.exists():os.kill(pid,signal.SIGCONT)
@@ -211,7 +215,8 @@ if __name__=='__main__':
     parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('mode',choices=('preflight','handoff','wave'))
     parser.add_argument('--source',type=Path,required=True)
     for name in ('request','wave','output','study'):parser.add_argument('--'+name,type=Path)
-    parser.add_argument('--qualify',action='store_true');args=parser.parse_args()
+    parser.add_argument('--qualify',action='store_true')
+    parser.add_argument('--freeze-only',action='store_true');args=parser.parse_args()
     value=(reproduce(args.source,args.request) if args.mode=='preflight' else
-           handoff(args.source,args.wave,args.output) if args.mode=='handoff' else run_wave(args))
+           handoff(args.source,args.wave,args.output,args.freeze_only) if args.mode=='handoff' else run_wave(args))
     print(json.dumps(value,sort_keys=True),flush=True)

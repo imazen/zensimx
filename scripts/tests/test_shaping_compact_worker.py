@@ -84,4 +84,24 @@ class CompactWorkerTests(unittest.TestCase):
                     process.wait(timeout=3)
 
 
+    def test_idle_freeze_retains_the_verified_queue_for_placement_transition(self):
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as directory:
+            root=Path(directory);source,study,request,wave,record=self.fixture(root)
+            process=subprocess.Popen([sys.executable,str(source/'scripts/rev4_featpot/shaping_rescue_worker.py'),'wave','--request',str(wave)])
+            try:
+                for _ in range(100):
+                    if (root/'READY').exists():break
+                    time.sleep(.01)
+                else:self.fail('fixture process did not become ready')
+                wave.with_name('WAVE_STATUS.json').write_text(json.dumps(dict(pid=process.pid,manifest_sha256=compact.sha(wave),completed={},failed={})))
+                subprocess.run([*self.command('handoff',source,wave=wave,output=root/'freeze'),'--freeze-only'],capture_output=True,text=True,check=True)
+                receipt=json.loads((root/'freeze/HANDOFF.json').read_text());self.assertEqual(receipt['stage'],'frozen_idle_wave')
+                self.assertEqual((Path('/proc')/str(process.pid)/'stat').read_text().rsplit(')',1)[1].split()[0],'T')
+                self.assertIsNone(process.poll());self.assertFalse((study/'runs').exists())
+            finally:
+                if process.poll() is None:
+                    process.terminate();os.kill(process.pid,signal.SIGCONT)
+                process.wait(timeout=3)
+
+
 if __name__=='__main__':unittest.main()
