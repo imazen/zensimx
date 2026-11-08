@@ -1,5 +1,5 @@
 """Publish scalar scatter inputs from pinned, completed inner reports only."""
-import argparse,json,math,os
+import argparse,gzip,json,math,os
 from pathlib import Path
 from functools import lru_cache
 import numpy as np
@@ -8,6 +8,13 @@ from shaping_execution import load_registration
 
 MAX_BYTES=2*1024**3
 POPULATIONS=('kadid','tid2013','konfig','cid22_a25','cid22_ssim2')
+
+
+def read_points(path):
+    opener=gzip.open if path.suffix=='.gz' else open
+    with opener(path,'rb') as stream:payload=stream.read(16*1024**2+1)
+    if len(payload)>16*1024**2:raise ValueError('scatter document exceeds sixteen MiB')
+    return json.loads(payload)
 
 
 def write_atomic(path,value):
@@ -78,7 +85,9 @@ def prepare(study,dashboard,output):
         if (json.loads(marker.read_text())['report_sha256']!=pin or report['cell']!=cell
             or report['plan_sha256']!=plan_pin or report['outer_results_read'] is not False):
             raise ValueError('completed inner scatter report differs')
-        destination=points/(pin+'.json');url='details/points/'+destination.name
+        destination=points/(pin+'.json')
+        if not destination.exists():destination=points/(pin+'.json.gz')
+        url='details/points/'+destination.name
         if not destination.exists():
             predictions=path.parent/'predictions.npz'
             predicted_pin=prediction_pin(study,path,report,pin,cell)
@@ -114,11 +123,13 @@ def prepare(study,dashboard,output):
                 target_scaling='Existing TRAIN-only population range mapping; held-apart values are not clipped.',
                 protocol_summary='Inner source-disjoint validation; no final holdout, no new inference, no pixel maps.')
             payload=json.dumps(value,allow_nan=False,separators=(',',':')).encode()+b'\n'
+            if len(payload)>16*1024**2:raise ValueError('scatter document exceeds sixteen MiB')
+            payload=gzip.compress(payload,compresslevel=6,mtime=0)
             if total+len(payload)>MAX_BYTES:raise ValueError('scatter publication exceeds its 2-GiB disk budget')
             with destination.open('xb') as stream:stream.write(payload)
             total+=len(payload)
         else:
-            cached=json.loads(destination.read_text())
+            cached=read_points(destination)
             if cached['report_sha256']!=pin or cached['cell']!=cell or cached['outer_results_read']:
                 raise ValueError('preserve changed scatter publication')
         rows[cid]=dict(cell=cell,url=url,report_sha256=pin,native_url='details/native/'+pin+'.json')

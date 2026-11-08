@@ -7,6 +7,17 @@ from shaping_completion import sha
 
 
 class DashboardTests(unittest.TestCase):
+    def test_plain_and_gzip_scalar_documents_preserve_exact_numbers(self):
+        import gzip
+        from shaping_scatter_prepare import read_points
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as directory:
+            root=Path(directory);value={'predicted':[0.,-1.2345678901234567,100.00000000000001],'outer_results_read':False}
+            payload=json.dumps(value).encode();plain=root/'points.json';compressed=root/'points.json.gz'
+            plain.write_bytes(payload);compressed.write_bytes(gzip.compress(payload,mtime=0))
+            self.assertEqual(read_points(plain),value);self.assertEqual(read_points(compressed),value)
+            compressed.write_bytes(gzip.compress(b' '*(16*1024**2+1),mtime=0))
+            with self.assertRaisesRegex(ValueError,'sixteen MiB'):read_points(compressed)
+
     def panel(self,value=.5):
         summary={k:dict(pooled=value,within=value,rows=10,sources=2)
                  for k in ['kadid','tid2013','konfig','cid22_a25','cid22_ssim2']}

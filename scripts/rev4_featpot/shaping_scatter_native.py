@@ -20,7 +20,8 @@ def clean(value):
 def one(study,panel,job,output):
     path=Path(job['path']);pin=job['report_sha256'];destination=output/(pin+'.json')
     if sha(path)!=job['sha256']:raise ValueError('scatter scalar-input hash differs')
-    data=json.loads(path.read_text())
+    from shaping_scatter_prepare import read_points
+    data=read_points(path)
     if data['schema']!='zensim-inner-scatter-v1' or data['outer_results_read'] or data['cell']!=job['cell'] or data['report_sha256']!=pin:
         raise ValueError('inner scalar-panel scope differs')
     if destination.exists():
