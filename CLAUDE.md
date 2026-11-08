@@ -1,3 +1,20 @@
+## Known Bugs — queue setup transfer ordering (November 8, 2026)
+
+Four queue parents were submitted before their asynchronous input transfers
+finished. They refused missing requests before admission or attempt creation.
+Every request/input hash and absence of attempts was checked before launching
+those 14 still-unstarted conditions; refused setup logs remain preserved.
+The reusable scalar-wave launcher completes transfer and verifies the entire
+input manifest before submitting any queue. A running transfer session is not
+evidence that transfer has finished.
+
+Metadata supervisor replacement also exposed wrapper-only unit termination:
+the wrapper ended while its separately scoped, idle Python selector retained
+its advisory lock. The three verified idle metadata children were terminated
+by recorded PID before their replacements started. No native fit was stopped.
+Resolve actual owner PID, command, children and lock release when replacing
+these supervisors; stopping a wrapper unit alone does not prove owner exit.
+
 ## Known Bugs — supplemental wave status startup (November 8, 2026)
 
 The new explicit status option opened a text stream before writing encoded JSON

@@ -35,3 +35,18 @@ evidence in one representation and one qualified evaluator per family. All
 numerical gates, source boundaries, tuning budgets and failure preservation
 remain unchanged. Implementation and qualification do not prove that those
 supplemental reports or downstream experiments have completed.
+
+Measured witness and population results are recorded in
+[the qualification results](../benchmarks/stable_pair_qualification_2026-11-08.md).
+Fixed scalar waves use `shaping-stable-export-prepare`,
+`shaping-stable-export-launch` and `shaping-stable-export-collect`. The launcher
+waits for complete transfer and verifies every immutable input before submitting
+any evaluation. Collection validates hashes, retains existing output directories
+and publishes each new directory atomically. Transport validation does not rerun
+native scoring or fitting.
+
+New dashboard point documents use standard gzip with deterministic headers;
+existing JSON documents remain unchanged. Both the viewer and native panel owner
+accept these files with a 16-MiB decoded-document bound. `gzip -dc FILE.json.gz`
+extracts ordinary JSON without project code. Scalar values and provenance fields
+are preserved exactly; the publication's existing 2-GiB disk limit is unchanged.
