@@ -5,7 +5,7 @@ from datetime import datetime,timezone
 from pathlib import Path
 from shaping_completion import encoded,sha
 
-HOSTS=('r3500','r3800x','i134','r5600g')
+HOSTS=('r3500','r3800x','i134','r5600g','r7900x','i270')
 MAX_OBSERVATION_BYTES=8*1024**2
 
 
@@ -23,7 +23,7 @@ def remote(host,observer,scope,expected):
 
 def sweep(study,observer,output):
     expected=sha(observer);results={};errors={}
-    with ThreadPoolExecutor(max_workers=4) as pool:
+    with ThreadPoolExecutor(max_workers=len(HOSTS)) as pool:
         futures={host:pool.submit(remote,host,observer,study.parent,expected) for host in HOSTS}
         for host,future in futures.items():
             try:results[host]=future.result()
