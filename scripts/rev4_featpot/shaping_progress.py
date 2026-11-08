@@ -196,6 +196,7 @@ SUPERVISOR_SCRIPTS={
     'failed_original_archive':'shaping_archive_supervision.py','bootstrap':'shaping_bootstrap.py',
     'rescue_archive':'shaping_archive_supervision.py',
     'statistics_dashboard':'shaping_progress.py',
+    'worker_evaluation':'shaping_evaluation_worker.py',
 }
 ARCHIVE_FLAGS={'primary_archive':None,'supplemental_archive':'--supplemental',
     'later_neural_archive':'--later-neural','later_control_archive':'--later-controls',

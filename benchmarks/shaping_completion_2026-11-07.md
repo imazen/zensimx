@@ -3585,3 +3585,86 @@ parameters pooled across all source folds would expose each outer fold through
 other folds' training labels. A transfer experiment must select feature identities
 and curve parameters within its own training partition, and label any globally
 informed follow-up as exploratory. No untouched final holdout was opened here.
+
+### Reduced uncertainty and actual outer-model cost preparation
+
+The reduced uncertainty path requires all 48 outer finalist cells and reports six
+inner-selected roles, including their fold-specific resolved families. It retains
+all three outer folds, paired seeds, the original 2,000 whole-source draws and
+human/teacher separation. A separately registered queue contains 24 matched
+comparisons: six roles by two source fractions, population shuffle and human-only
+supervision. The original 88-comparison registration remains intact. No scientific
+interval has been computed by this registration. Fresh-control reports remain
+required, but the original four family-specific fresh-control bootstrap jobs are
+outside the reduced queue because those families need not be selected in every
+fold. See `docs/SHAPING_REDUCED_UNCERTAINTY.md` for the coverage limitation.
+
+The native-statistics regression passed 29 tests on i134. A variable-shadowing
+error in the new reduction initially emptied summaries; the failed log is retained
+and the corrected suite passed. Its wrapper reports 63 s, peak RSS 0.23 GiB,
+minimum available RAM 23,844 MiB and peak load 18.10. Ten outer-evidence tests and
+two cost-preparation tests also passed. Cost preparation now uses three separate
+sixteen-arm workloads from actual outer models, each on forty rows from its own
+fold's TRAIN membership. It cannot substitute removed full-data refits or pool
+different folds as identical paired timing inputs. No finalist cost was measured.
+The cost fixture's wrapper reports 1 s, peak RSS 0.19 GiB, minimum available RAM
+43,357 MiB and peak load 1.34. Source commits are `bf62c1341f60` and `2e8621c3ca94`.
+
+### Recovered collection, Cargo reclamation and durable evidence
+
+Nineteen completed old-worker fits were imported after recovering the collectors;
+no training was restarted. The page publisher now reads the five recovered
+collector status paths rather than stale retired paths. An observed page snapshot
+at 02:33 UTC had 668 successful primary fits out of 816 and no completed outer
+fits. The 26 preserved rescue fits are historical evidence, not a claim that those
+fits all belong to the new 144-cell rescue shortlist.
+
+Eight inactive Cargo output trees were removed after fresh process checks and
+complete reference preservation/readback. Their measured allocated bytes sum to
+11,006,111,744 across the coordinator and two drained workers. This is removed
+Cargo allocation, not an isolated filesystem-free-space delta. The three reference
+archives retain 3,835,627,388 artifact bytes with complete destination checksum
+readback; local manifests and receipts remain searchable. Protected feature,
+training and experiment data were not included in this reclamation. The final
+reclamation wrappers report 2/1/4 s and peak RSS 0.02/0.04/0.05 GiB, respectively.
+
+`reduced-support-evidence-20261108` cold readback verified 122 artifacts totaling
+315,589,277 bytes. It preserves native threshold source qualification, reduced
+analysis source/logs, page deployments, collector recovery, reference manifests
+and final reclamation records. Its receipt SHA-256 is
+`2bc194d69b6c47b383799b98f7bdf4113c1d8d986a10673cd13fdd4a15e2dd49`;
+the manifest SHA-256 is
+`88b02ced25afc995e3122dd0d66dfce0be9e14a93542e24509a00cde4898203a`.
+The archive wrapper reports 6 s, peak RSS 0.02 GiB, minimum available RAM
+43,249 MiB and peak load 8.40. Later worker-evaluation deployment records are
+subsequent evidence and are not included in that frozen snapshot.
+
+### Native evaluation placement correction
+
+Five old evaluation/bootstrap observers remained capable of admitting work on the
+coordinator after fitting moved to the approved pool. Each was retired only after
+verifying its command and absence of active children; no scientific child was
+interrupted. Three stopped legacy rescue queue writers were also retired after
+their only remaining children were verified as zombies. Evaluation, re-export,
+bootstrap execution and finalist-cost preparation now enforce the pinned compute
+pool (`1c67ce31b2b0`). Metadata and archive work remain on the coordinator.
+
+The primary evaluation transport (`1a1914e45c18`) binds original fit, log and
+scheduled checkpoint hashes, evaluates only a requested collected cell on its
+original approved worker, and imports complete checksummed report trees without
+overwriting evidence. It preserves undefined-convergence failures and permits an
+automatic retry only after a capacity wait that began no evaluation. Twenty
+transport/supervision/scope tests passed; the final six-test scope wrapper reports
+1 s, peak RSS 0.07 GiB, minimum available RAM 40,203 MiB and peak load 8.29.
+All four workers passed metadata/source/policy/repair-binary/inspector preflight.
+The deployed source capsule SHA-256 is
+`1706f158c3dc1ee53565e810d5f6e5f56bc344d8f8ddc0f5d51bbe6d4f54c261`.
+The first real request was waiting for worker capacity at inspection; these
+preflights do not prove a completed native import. Rescue, outer and bootstrap
+compute transport remain unfinished.
+
+The 02:33 UTC three-second process-CPU samples observed 7/9/2/12 native trainers
+on the four replacement workers, respectively, each consuming between 95.36%
+and 100.00% of one core in those samples. The compiler consumed 97.66% of one core
+on its host. These are instantaneous utilization observations, not throughput or
+memory-peak measurements. No worker reported a pending reboot in that observation.

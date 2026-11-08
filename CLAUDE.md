@@ -7,8 +7,11 @@ They could still admit new native work on the coordinator. All five were retired
 after checking their live identities and confirming no active child; no scientific
 process was interrupted. Evaluation, re-export, bootstrap execution and finalist
 cost preparation now enforce the same pinned replacement-host pool as fitting.
-Metadata, archive and page work remain on the coordinator. Evaluation transport
-to the replacement pool is required before these compute observers resume.
+Metadata, archive and page work remain on the coordinator. The primary-fit
+evaluation transport is deployed with matching source, policy, repair-binary and
+inspector hashes on all four approved workers. Its first request is waiting for
+worker capacity; no native import is established by that preflight. Rescue,
+outer-stage and bootstrap compute deployment still require their own transport.
 
 ## Known Bugs — collection PATH and drained-worker reconciliation (resolved November 8, 2026)
 
