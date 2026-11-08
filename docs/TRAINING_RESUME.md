@@ -7,16 +7,29 @@ Existing frozen study executables remain unchanged. A weight-only bake is still
 a warm start, not an optimizer continuation.
 
 Set `ZENSIM_TRAIN_SNAPSHOT_ROOT` to one shared store on the active SSD. Use the
-same store for all seeds on that filesystem. Set `ZENSIM_TRAIN_RESUME=1` only
-when continuing an interrupted run with identical executable, arguments, inputs,
-feature mask and research manifests. A missing or changed identity refuses
-continuation before reserving a new run. Keep the original output paths and
-checkpoint directory; preserve the interrupted process log separately.
+same store for all seeds on that filesystem. Preserve the immutable executable
+with its snapshots; continuation verifies its exact bytes.
+
+For the CLI, preserve the interrupted output directory and process log. Set
+`ZENSIM_TRAIN_RESUME=1` and `ZENSIM_TRAIN_RESUME_CHECKPOINT_ORIGIN` to the original
+explicit checkpoint directory. Keep the model/data/seed arguments unchanged,
+but give `--out` and `--dump-checkpoints-dir` fresh destinations. Full snapshot
+identity is checked before any prefix is copied. Only completed checkpoints
+named in native write receipts, with matching SHA-256 hashes, may be copied.
+The interrupted attempt remains untouched. The ordinary CLI fresh-directory
+preflight remains in force. The original checkpoint directory remains the
+identity anchor for subsequent continuations too.
+
+A changed or absent identity refuses continuation before reserving a new run.
+A drifted checkpoint prefix refuses copying. If optimization already completed
+and the CLI finalized those files, reconcile the existing completed artifacts;
+this training-resume route expects its retained raw checkpoint prefix.
 
 Snapshots retain full f64 parameters, all Adam gradients/moments/step counters,
 shared or analytic heads, learned-shape parameters and optimizer state, sampler
 and dropout RNGs, epoch/pair cursor, accumulated loss/counters, best bake and
-selection state, and completed checkpoint write receipts for CLI finalization. Effective hyperparameters, executable bytes, standardized input
+selection state, and completed checkpoint write receipts for CLI finalization.
+Effective hyperparameters, executable bytes, standardized input
 rows, targets, reference membership, scalers, masks and research environment bind
 the identity. Initialization/scaler reconstruction is checked before restoring.
 

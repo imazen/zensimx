@@ -3719,3 +3719,32 @@ artifact manifest SHA-256:
 The archive wrapper reports 6 s, peak RSS 0.02 GiB, minimum available RAM
 44,637 MiB and peak load 3.08. The production trainer executable build is
 subsequent work and is not claimed by this frozen receipt.
+
+### Native CLI snapshot continuation
+
+The fresh-directory preflight correctly rejected an attempted continuation into
+an existing checkpoint directory. The new route retains that contract: after
+matching executable/data/config identity, it checks SHA-256 native write receipts
+and copies only the retained prefix into a fresh output directory. It preserves
+the interrupted attempt. The receipt decoder is shared by the trainer and CLI;
+ordinary checkpoint receipt behavior remains unchanged without snapshot opt-in.
+
+On qualification source `e643c8834d6378e4e19c803bff482d0b4d7fd38a`, all 415 library
+tests passed with the same two pre-existing ignored tests; six focused snapshot
+controls and five native CLI checkpoint-ownership tests passed. Clippy with
+warnings denied and the production executable build passed. The combined final
+checks/build wrapper reports 428 s, peak RSS 1.58 GiB, minimum available RAM
+23,957 MiB and peak load 19.67. The focused six-test wrapper reports 169 s,
+peak RSS 1.67 GiB, minimum available RAM 23,912 MiB and peak load 17.05.
+
+The executable's three legacy two-epoch/200-pair compatibility cells reproduced
+their canonical hashes exactly. A separate two-epoch/10,000-pair CLI control was
+terminated after its committed epoch-one snapshot, then continued in a fresh
+output directory. It replayed zero completed epochs, left the original prefix
+unchanged, and reproduced the uninterrupted best bake and both epoch checkpoints
+byte for byte after removing only provenance. Its two retained snapshots total
+27,560,456 bytes. Its wrapper reports 109 s, peak RSS 0.19 GiB, minimum available
+RAM 24,916 MiB and peak load 17.72. These are implementation controls using
+previously exposed development inputs, not scientific quality-selection fits.
+Matching test and production executables are preserved with the control evidence;
+existing frozen scientific executables remain unchanged.

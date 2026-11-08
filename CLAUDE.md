@@ -9,8 +9,10 @@ identity. Limits are two states plus a temporary write within 64 MiB per run,
 a 4 GiB shared store including completed runs, and the existing 30 GiB free
 reserve plus pending allowance. See `docs/TRAINING_RESUME.md`. Existing frozen
 study binaries and weight-only bakes do not gain exact resume retroactively.
-Other owners, CPU-tier transfer and complete resumed CLI/archive handling need
-separate qualification before scientific deployment.
+The native CLI continuation control passes with fresh output paths, a hash-bound
+checkpoint prefix, preserved interrupted files and bit-identical canonical bakes.
+Other owners, CPU-tier transfer and automated scientific deployment/archive
+integration still need separate qualification.
 
 ## Known Bugs — evaluation placement after the worker transition (November 8, 2026)
 

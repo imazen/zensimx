@@ -85,6 +85,9 @@
 //! `benchmarks/v0_18_methodology_2026-05-13.md` for the canonical
 //! per-bake methodology + reproduction.
 
+#[path = "../mlp_train/checkpoint_receipts.rs"]
+mod shared_checkpoint_receipts;
+
 use clap::parser::ValueSource;
 use clap::{CommandFactory, FromArgMatches, Parser};
 use rayon::prelude::*;
@@ -3173,29 +3176,7 @@ fn preflight_checkpoint_directory(args: &Args) -> std::io::Result<()> {
 /// Receipts are appended by the two checkpoint write sites after fs::write.
 /// This invocation's log vector is the ownership list, never a directory scan.
 fn emitted_checkpoint_paths(log: &[String]) -> Vec<(PathBuf, usize)> {
-    #[derive(serde::Deserialize)]
-    #[serde(untagged)]
-    enum CheckpointPath {
-        Utf8(PathBuf),
-        Native(std::ffi::OsString),
-    }
-    #[derive(serde::Deserialize)]
-    struct WrittenCheckpoint {
-        path: CheckpointPath,
-        epoch: usize,
-    }
-    log.iter()
-        .filter_map(|line| line.strip_prefix("  checkpoint dump: "))
-        .map(|receipt| {
-            let written: WrittenCheckpoint =
-                serde_json::from_str(receipt).expect("checkpoint write receipt");
-            let path = match written.path {
-                CheckpointPath::Utf8(path) => path,
-                CheckpointPath::Native(path) => PathBuf::from(path),
-            };
-            (path, written.epoch)
-        })
-        .collect()
+    shared_checkpoint_receipts::paths(log)
 }
 
 fn stamp_emitted_checkpoints(

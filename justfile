@@ -5600,3 +5600,6 @@ shaping-reduced-scope-register study approval:
 # Run on an admitted compute worker with an isolated Cargo output directory.
 shaping-snapshot-check:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 4G --jobs 2 -- cargo test -p zensim-validate --lib mlp_train::resume -- --nocapture
+
+shaping-snapshot-cli-check study frozen binaries output:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_snapshot_cli_check.py --study {{quote(study)}} --frozen {{quote(frozen)}} --binaries {{quote(binaries)}} --output {{quote(output)}}

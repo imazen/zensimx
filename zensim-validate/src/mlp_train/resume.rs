@@ -320,6 +320,114 @@ pub(super) struct Session {
     pub loaded: Option<State>,
 }
 
+/// The CLI keeps its fresh-directory contract. A matched snapshot may copy
+/// only its hash-bound completed prefix into that new directory, leaving the
+/// interrupted attempt untouched. This runs after full identity validation.
+pub(super) fn relocate_checkpoint_receipts(
+    hp: &MlpHyperparams,
+    receipts: Vec<String>,
+) -> Vec<String> {
+    if std::env::var_os("ZENSIM_TRAIN_RESUME_CHECKPOINT_ORIGIN").is_none() {
+        return receipts;
+    }
+    relocate_into(
+        hp.dump_checkpoints_dir
+            .as_deref()
+            .expect("fresh checkpoint directory"),
+        receipts,
+    )
+}
+
+fn relocate_into(directory: &std::path::Path, receipts: Vec<String>) -> Vec<String> {
+    use std::{fs, io::Write};
+    let paths = super::checkpoint_receipts::paths(&receipts);
+    assert_eq!(paths.len(), receipts.len());
+    let mut entries = Vec::new();
+    let mut bytes = 0_u64;
+    for (line, (source, epoch)) in receipts.into_iter().zip(paths) {
+        let receipt: serde_json::Value =
+            serde_json::from_str(line.strip_prefix("  checkpoint dump: ").unwrap()).unwrap();
+        let name = format!("ckpt_epoch{epoch:03}.bin");
+        assert_eq!(source.file_name(), Some(std::ffi::OsStr::new(&name)));
+        let metadata = fs::symlink_metadata(&source).expect("retained checkpoint prefix");
+        assert!(metadata.file_type().is_file());
+        assert_eq!(receipt["bytes"].as_u64(), Some(metadata.len()));
+        let expected = receipt["sha256"]
+            .as_str()
+            .expect("resume prefix requires native SHA-256 write receipts");
+        assert_eq!(
+            crate::train_manifest::sha256_file(&source).unwrap(),
+            expected,
+            "interrupted prefix drift"
+        );
+        bytes = bytes.checked_add(metadata.len()).unwrap();
+        assert!(
+            bytes <= 1024 * 1024 * 1024,
+            "resume prefix exceeds one-job allowance"
+        );
+        let target = directory.join(name);
+        assert!(!target.exists(), "fresh resume directory required");
+        entries.push((source, target, receipt));
+    }
+    fs::create_dir_all(directory).unwrap();
+    let mut result = Vec::new();
+    for (source, target, mut receipt) in entries {
+        let mut input = fs::File::open(&source).unwrap();
+        let mut output = fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&target)
+            .unwrap();
+        std::io::copy(&mut input, &mut output).unwrap();
+        output.flush().unwrap();
+        output.sync_all().unwrap();
+        assert_eq!(
+            crate::train_manifest::sha256_file(&target).unwrap(),
+            receipt["sha256"].as_str().unwrap()
+        );
+        receipt["path"] = match target.to_str() {
+            Some(path) => serde_json::json!(path),
+            None => serde_json::json!(target.as_os_str()),
+        };
+        result.push(format!("  checkpoint dump: {receipt}"));
+    }
+    fs::File::open(directory).unwrap().sync_all().unwrap();
+    result
+}
+
+#[cfg(all(test, target_os = "linux"))]
+mod relocation_tests {
+    use super::*;
+    #[test]
+    fn copies_only_unchanged_owned_prefix_and_never_overwrites_either_attempt() {
+        let root =
+            std::env::temp_dir().join(format!("zensim-resume-prefix-{}", std::process::id()));
+        std::fs::create_dir(&root).unwrap();
+        let source = root.join("ckpt_epoch000.bin");
+        std::fs::write(&source, b"prefix").unwrap();
+        let pin = crate::train_manifest::sha256_file(&source).unwrap();
+        let receipt = format!(
+            "  checkpoint dump: {}",
+            serde_json::json!({"path":source,"bytes":6,"epoch":0,"sha256":pin})
+        );
+        let dest = root.join("fresh");
+        let result = relocate_into(&dest, vec![receipt.clone()]);
+        assert_eq!(
+            std::fs::read(dest.join("ckpt_epoch000.bin")).unwrap(),
+            b"prefix"
+        );
+        assert_eq!(std::fs::read(&source).unwrap(), b"prefix");
+        assert_eq!(result.len(), 1);
+        assert!(std::panic::catch_unwind(|| relocate_into(&dest, vec![receipt.clone()])).is_err());
+        std::fs::write(&source, b"drift!").unwrap();
+        assert!(
+            std::panic::catch_unwind(|| relocate_into(&root.join("rejected"), vec![receipt]))
+                .is_err()
+        );
+        assert!(!root.join("rejected").exists());
+    }
+}
+
 impl Session {
     pub(super) fn open(
         hp: &MlpHyperparams,
@@ -329,11 +437,25 @@ impl Session {
         scale: &[f64],
     ) -> Option<Self> {
         let root = std::env::var_os("ZENSIM_TRAIN_SNAPSHOT_ROOT")?;
+        let mut canonical_hp = hp.clone();
+        if let Some(origin) = std::env::var_os("ZENSIM_TRAIN_RESUME_CHECKPOINT_ORIGIN") {
+            assert_eq!(
+                std::env::var("ZENSIM_TRAIN_RESUME").as_deref(),
+                Ok("1"),
+                "checkpoint relocation requires explicit resume"
+            );
+            assert_ne!(
+                hp.dump_checkpoints_dir.as_deref(),
+                Some(std::path::Path::new(&origin)),
+                "resume into a fresh checkpoint directory"
+            );
+            canonical_hp.dump_checkpoints_dir = Some(origin.into());
+        }
         let mut hash = Sha256::new();
         hash.update(b"zensim-full-state-v1\0");
         hash.update(crate::train_manifest::sha256_file(&std::env::current_exe().unwrap()).unwrap());
         hash.update(format!(
-            "{hp:?}{mean:?}{scale:?}{:?}{:?}{:?}",
+            "{canonical_hp:?}{mean:?}{scale:?}{:?}{:?}{:?}",
             super::input_keep_mask(),
             super::l2_feature_mult(),
             super::group_l1_lambda()

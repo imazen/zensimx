@@ -58,6 +58,7 @@ use crate::adam_simd;
 // produced by K mini-batch pair forwards, with closed-form gradient
 // added to the RankNet per-prediction backprop direction. See module
 // docs for the exact formula and gradient derivation.
+mod checkpoint_receipts;
 mod e36_tv;
 mod loss_norm_in_norm;
 mod loss_pearson;
@@ -1155,6 +1156,20 @@ fn write_checkpoint_dump(
 ) {
     std::fs::write(path, bytes).expect("H-TRAJ checkpoint dump write failed");
     let line = checkpoint_receipt_line(path, epoch, bytes.len());
+    let line = if std::env::var_os("ZENSIM_TRAIN_SNAPSHOT_ROOT").is_some() {
+        use sha2::{Digest, Sha256};
+        let mut receipt: serde_json::Value =
+            serde_json::from_str(line.strip_prefix("  checkpoint dump: ").unwrap()).unwrap();
+        receipt["sha256"] = serde_json::Value::String(
+            Sha256::digest(bytes)
+                .iter()
+                .map(|b| format!("{b:02x}"))
+                .collect(),
+        );
+        format!("  checkpoint dump: {receipt}")
+    } else {
+        line
+    };
     eprintln!("{line}");
     log.push(line);
 }
@@ -4196,7 +4211,10 @@ pub fn train_mlp_strategy_pairs(
             best_val_score = f64::from_bits(state.best_score_bits);
             best_bake = state.best_bake;
             stale_epochs = state.stale_epochs;
-            log.extend(state.checkpoint_receipts);
+            log.extend(resume::relocate_checkpoint_receipts(
+                hyperparams,
+                state.checkpoint_receipts,
+            ));
             resume_cursor = Some((
                 state.epoch,
                 state.pair,
