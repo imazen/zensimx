@@ -11,7 +11,8 @@ def run(args):
     age=(datetime.now(timezone.utc)-datetime.fromisoformat(status['checked_utc'])).total_seconds()
     if not 0<=age<=120:raise ValueError('refresh worker process observation before collection')
     assignments={}
-    for path in [*(args.study/'worker_assignments').glob('*.json'),*(args.study/'recovery_assignments').glob('*.json')]:
+    for path in [*(args.study/'worker_assignments').glob('*.json'),*(args.study/'recovery_assignments').glob('*.json'),
+                 *(args.study/'downstream_assignments').glob('*.json')]:
         record=json.loads(path.read_text())
         if record['host']!=args.host:continue
         for cell in record['cells']:

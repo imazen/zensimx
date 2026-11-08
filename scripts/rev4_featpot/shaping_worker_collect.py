@@ -40,9 +40,27 @@ def validate(root, assignment, cells):
             raise ValueError('approved partial restart requires every matched prefix checkpoint')
     epochs=120 if '_pretrained_' in cell['family'] or cell['stage']=='fresh_control_inner' else 240
     if run['epochs']!=epochs or run['pairs_per_epoch']!=50000:raise ValueError('exposure differs')
+    fit=root
+    if cell['stage']=='rescue':
+        if (run.get('process_role')!='rescue_controller' or run.get('fit_directory')!='fit'
+            or run.get('resolution',{}).get('cell')!=cell or run.get('training_exposure_pair_draws')!=12000000):
+            raise ValueError('rescue controller scope differs')
+        names=['pretraining','fit'] if '_pretrained_' in cell['family'] else ['fit']
+        phases=result.get('phases',[])
+        if len(phases)!=len(names):raise ValueError('rescue phase coverage differs')
+        for name,phase in zip(names,phases):
+            directory=root/name
+            if (json.loads((directory/'RESULT.json').read_text())!=phase or phase['stage']!='trained'
+                or phase['exit_code']!=0 or phase['epochs']!=epochs or phase['pairs_per_epoch']!=50000):
+                raise ValueError('rescue phase identity or exposure differs')
+            if sha(directory/'checkpoints'/f'ckpt_epoch{epochs-1:03}.bin')!=phase['bake_sha256']:
+                raise ValueError('rescue phase final model drift')
+            if {p.name for p in (directory/'checkpoints').glob('ckpt_epoch*.bin')}!={f'ckpt_epoch{i:03}.bin' for i in range(epochs)}:
+                raise ValueError('rescue phase checkpoint coverage differs')
+        fit=root/'fit'
     expected={f'ckpt_epoch{i:03}.bin' for i in range(epochs)}
-    if {p.name for p in (root/'checkpoints').glob('ckpt_epoch*.bin')}!=expected:raise ValueError('checkpoint coverage differs')
-    if sha(root/'checkpoints'/f'ckpt_epoch{epochs-1:03}.bin')!=result['bake_sha256']:raise ValueError('final bake drift')
+    if {p.name for p in (fit/'checkpoints').glob('ckpt_epoch*.bin')}!=expected:raise ValueError('checkpoint coverage differs')
+    if sha(fit/'checkpoints'/f'ckpt_epoch{epochs-1:03}.bin')!=result['bake_sha256']:raise ValueError('final bake drift')
     return run
 
 
@@ -83,7 +101,8 @@ def pack_reserved(study,assignment_path,cell_id,attempt,bundle,expected_inventor
     source_files=inventory(root);files=dict(source_files)
     if expected_inventory is not None and source_files!=expected_inventory:
         raise ValueError('worker output changed during storage admission')
-    command=run['command']
+    command=(json.loads((root/'fit/RUN.json').read_text())['command']
+             if run['cell']['stage']=='rescue' else run['command'])
     if command.count('--derived-inputs')!=1:raise ValueError('one derived-input declaration required')
     declaration=Path(command[command.index('--derived-inputs')+1])
     if sha(declaration)!=DECLARATION_SHA256:raise ValueError('worker declaration differs from frozen study')

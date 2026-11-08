@@ -27,7 +27,7 @@ def request(study,run):
     _,cells,_=load_registration(study)
     identity=json.loads((run/'RUN.json').read_text());result=json.loads((run/'RESULT.json').read_text())
     cell=identity['cell'];collection=run/'WORKER_COLLECTION.json'
-    if (cell not in cells or cell['stage'] not in ('inner','fresh_control_inner')
+    if (cell not in cells or cell['stage'] not in ('inner','fresh_control_inner','rescue')
         or identity.get('execution_host') not in HOSTS or not collection.exists()):
         raise ValueError('collected primary fit on an approved worker required')
     if result['cell']!=cell or result['stage']!='trained' or result['exit_code']!=0:
@@ -99,7 +99,7 @@ def _work(args):
     if args.bundle.exists():raise ValueError('preserve existing evaluation export')
     from shaping_supervision import sweep
     from shaping_reexport_supervision import sweep as supplemental
-    values=SimpleNamespace(study=args.study,binary_dir=args.binary_dir,rescue_binary_dir=None,
+    values=SimpleNamespace(study=args.study,binary_dir=args.binary_dir,rescue_binary_dir=getattr(args,'rescue_binary_dir',None),
                            cells=(record['cell']['id'],))
     sweep(values)
     if record['cell']['family'] in ('relu','softplus'):
@@ -160,7 +160,7 @@ def watch(args):
             pending=[];blocked=[];imported=[]
             for path in sorted((args.study/'runs').glob('*/attempt-*/RESULT.json')):
                 value=json.loads(path.read_text());run=path.parent
-                if value.get('stage')!='trained' or value['cell']['stage'] not in ('inner','fresh_control_inner') or not (run/'WORKER_COLLECTION.json').exists():continue
+                if value.get('stage')!='trained' or value['cell']['stage'] not in ('inner','fresh_control_inner','rescue') or not (run/'WORKER_COLLECTION.json').exists():continue
                 if any((args.study/p).exists() for p in components(value['cell']['id'],run.name)):continue
                 record=request(args.study,run);host=record['host'];directory=args.output/value['cell']['id']
                 request_path=directory/'REQUEST.json'
@@ -179,6 +179,7 @@ def watch(args):
                     'python3','-B',str(remote),'--work','--study',str(args.study),'--request',str(remote_request),
                     '--bundle',str(remote_bundle),'--binary-dir',str(args.binary_dir),
                     '--repair-binary-dir',str(args.repair_binary_dir),'--inspector',str(args.inspector)]
+                if getattr(args,'rescue_binary_dir',None):command.extend(['--rescue-binary-dir',str(args.rescue_binary_dir)])
                 log_path=directory/f"worker-{len(list(directory.glob('worker-*.log'))):04}.log"
                 with log_path.open('x') as log:
                     result=subprocess.run(['ssh','-o','BatchMode=yes',host,shlex.join(command)],stdout=log,stderr=subprocess.STDOUT)
@@ -208,7 +209,7 @@ def watch(args):
 def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('--study',type=Path,required=True)
-    for name in ('binary-dir','repair-binary-dir','inspector','request','bundle','output','remote-source'):p.add_argument('--'+name,type=Path)
+    for name in ('binary-dir','rescue-binary-dir','repair-binary-dir','inspector','request','bundle','output','remote-source'):p.add_argument('--'+name,type=Path)
     p.add_argument('--work',action='store_true');p.add_argument('--watch',action='store_true')
     args=p.parse_args()
     if args.work:print(json.dumps(work(args)),flush=True)

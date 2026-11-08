@@ -9,6 +9,19 @@ from shaping_evaluation_worker import request,_work,publish
 
 
 class WorkerEvaluationTests(unittest.TestCase):
+    def test_nested_rescue_request_pins_native_phase_without_replaying_it(self):
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as directory:
+            root=Path(directory);study,run=self.fixture(root)
+            import shutil
+            fit=run/'fit';fit.mkdir();shutil.move(str(run/'checkpoints'),str(fit/'checkpoints'));shutil.move(str(run/'train.log'),str(fit/'train.log'))
+            cell=next(c for c in matrix() if c['stage']=='rescue' and c['family']=='silu_monotone')
+            for name in ('RUN.json','RESULT.json'):
+                path=run/name;value=json.loads(path.read_text());value.update(cell=cell,fit_directory='fit');path.write_bytes(encoded(value))
+            with patch('shaping_execution.load_registration',return_value=({},matrix(),{})):
+                record=request(study,run)
+            self.assertTrue(any('/fit/checkpoints/' in name for name in record['source_sha256']))
+            self.assertTrue(any(name.endswith('/fit/train.log') for name in record['source_sha256']))
+
     def fixture(self,root):
         study=root/'study';study.mkdir();(study/'PLAN.json').write_text('{}')
         (study/'REDUCED_SCOPE.json').write_text('{}')

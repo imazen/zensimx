@@ -14,6 +14,34 @@ from shaping_rescue_execution import portable_command
 
 
 class CollectionTests(unittest.TestCase):
+    def test_nested_rescue_pack_retains_controller_and_native_phase(self):
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as directory:
+            study=Path(directory);root=study/'runs/rescue/attempt-001';fit=root/'fit';models=fit/'checkpoints';models.mkdir(parents=True)
+            declaration=study/'declaration.json';declaration.write_text('{}');pin=sha(declaration)
+            cell=dict(id='rescue',family='relu',stage='rescue')
+            (study/'PLAN.json').write_text('{}')
+            for epoch in range(240):(models/f'ckpt_epoch{epoch:03}.bin').write_bytes(bytes([epoch]))
+            phase=dict(command=['trainer','--derived-inputs',str(declaration)],epochs=240,pairs_per_epoch=50000,
+                       stage='trained',exit_code=0,bake_sha256=sha(models/'ckpt_epoch239.bin'))
+            (fit/'RUN.json').write_bytes(encoded(dict(phase,stage='running')))
+            (fit/'RESULT.json').write_bytes(encoded(phase));(fit/'train.log').write_text('native log')
+            run=dict(cell=cell,execution_host='worker',plan_sha256=sha(study/'PLAN.json'),build_sha256='build',
+                     epochs=240,pairs_per_epoch=50000,process_role='rescue_controller',fit_directory='fit',
+                     resolution=dict(cell=cell),training_exposure_pair_draws=12000000)
+            (root/'RUN.json').write_bytes(encoded(run));(root/'RESULT.json').write_bytes(encoded(dict(run,
+                phases=[phase],stage='trained',exit_code=0,bake_sha256=phase['bake_sha256'])))
+            assignment=study/'assignment.json';assignment.write_bytes(encoded(dict(host='worker',cells=['rescue'],
+                plan_sha256=run['plan_sha256'],build_sha256='build')))
+            with patch('shaping_execution.load_registration',return_value=({},[cell],{})), \
+                 patch('shaping_worker_collect.socket.gethostname',return_value='worker'), \
+                 patch('shaping_worker_collect.DECLARATION_SHA256',pin):
+                bundle=study/'rescue.tar';record=pack_reserved(study,assignment,'rescue','attempt-001',bundle)
+                imported=study/'imported';unpack(bundle,imported,record['bundle_sha256'])
+                self.assertEqual((imported/'fit/RESULT.json').read_bytes(),(fit/'RESULT.json').read_bytes())
+                self.assertEqual(validate(imported,json.loads(assignment.read_text()),[cell]),run)
+                (models/'ckpt_epoch000.bin').unlink()
+                with self.assertRaisesRegex(ValueError,'checkpoint coverage'):validate(root,json.loads(assignment.read_text()),[cell])
+
     def test_pack_preserves_inputs_for_portable_rescue(self):
         with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as d:
             study=Path(d);root=study/'runs/cell/attempt-001';root.mkdir(parents=True)
