@@ -5885,3 +5885,9 @@ shaping-plain-native-build target:
 
 shaping-plain-native-clippy target:
     TMPDIR="$HOME/tmp" CARGO_TARGET_DIR={{quote(target)}} "$HOME/work/claudehints/scripts/run-heavy" --mem 8G --jobs 6 -- cargo clippy --locked -p zensim-validate --lib -- -D warnings
+
+shaping-rescue-host-launch-test:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 512M --jobs 1 -- python3 -B -m unittest scripts.tests.test_shaping_rescue_host_launch
+
+shaping-rescue-host-launch wave source host output:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_rescue_host_launch.py --wave {{quote(wave)}} --source {{quote(source)}} --host {{quote(host)}} --output {{quote(output)}}

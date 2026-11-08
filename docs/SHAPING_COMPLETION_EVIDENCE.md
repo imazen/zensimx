@@ -1016,3 +1016,13 @@ the placement/admission race without changing any scientific budget or gate.
 
 Pretrained children inherit the coordinator's resolved Python executable;
 the native trainer and registered scientific inputs remain pinned separately.
+
+## Independent rescue fit scopes, November 8 UTC
+
+The host launcher transfers and verifies every registered request for that host
+before starting its fits. Each request then uses the existing `work` owner in
+its own two-GiB, one-thread resource scope. Shared CPU/RAM/SSD admission remains
+in force. A fit reaching its memory limit cannot take down its sibling fits
+through a shared multi-fit memory scope. The transfer-failure check proves that
+an incomplete host transfer starts no fit and preserves its transport log.
+No training, selection or numerical gate changes are included.
