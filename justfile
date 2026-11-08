@@ -5844,6 +5844,12 @@ shaping-stable-export-collect wave source output:
 shaping-stable-export-launch wave:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_stable_export_launch.py --wave {{quote(wave)}}
 
+shaping-stable-export-watch study source host output *args:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_stable_export_watch.py --study {{quote(study)}} --source {{quote(source)}} --host {{quote(host)}} --output {{quote(output)}} {{args}}
+
+shaping-stable-export-watch-check:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B -m unittest scripts.tests.test_shaping_stable_export_watch scripts.tests.test_shaping_stable_export_launch
+
 shaping-dashboard-browser url output modules family='':
     TMPDIR="$HOME/tmp" NODE_PATH={{quote(modules)}} "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- node scripts/tests/shaping_dashboard_browser.cjs {{quote(url)}} {{quote(output)}} {{quote(family)}}
 

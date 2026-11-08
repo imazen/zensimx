@@ -45,6 +45,13 @@ any evaluation. Collection validates hashes, retains existing output directories
 and publishes each new directory atomically. Transport validation does not rerun
 native scoring or fitting.
 
+`shaping-stable-export-watch` drains the remaining primary models through these
+same fixed-wave owners. It rejects overlapping prior registrations before doing
+work, waits for complete wave artifacts, collects each wave once and preserves
+failed setup evidence. The target remains the original 504 qualified-family
+conditions. New native fits, fit retries and scientific budget changes are
+outside this metadata coordinator.
+
 New dashboard point documents use standard gzip with deterministic headers;
 existing JSON documents remain unchanged. Both the viewer and native panel owner
 accept these files with a 16-MiB decoded-document bound. `gzip -dc FILE.json.gz`
