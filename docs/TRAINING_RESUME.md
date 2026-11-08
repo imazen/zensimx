@@ -1,6 +1,8 @@
 # Bounded full-state CPU snapshots
 
-The constrained shared-depth rank/MSE trainer supports opt-in crash snapshots.
+The constrained shared-depth rank/MSE trainer supports opt-in crash snapshots
+on Linux. Other operating systems explicitly refuse this option; their normal
+training path remains available.
 Existing frozen study executables remain unchanged. A weight-only bake is still
 a warm start, not an optimizer continuation.
 

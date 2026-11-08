@@ -26,7 +26,7 @@ pub(super) struct State {
     pub stale_epochs: usize,
 }
 
-#[cfg(test)]
+#[cfg(all(test, target_os = "linux"))]
 mod tests {
     use super::*;
     use std::{fs, process::Command};

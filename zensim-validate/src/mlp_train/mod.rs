@@ -3208,6 +3208,10 @@ pub fn train_mlp_strategy_pairs(
     let shared_depth_on = shared_depth::enabled(&effective);
     if std::env::var_os("ZENSIM_TRAIN_SNAPSHOT_ROOT").is_some() {
         assert!(
+            cfg!(target_os = "linux"),
+            "full-state snapshots currently require Linux filesystem admission"
+        );
+        assert!(
             shared_depth_on
                 && tv.is_none()
                 && anchor.is_none()

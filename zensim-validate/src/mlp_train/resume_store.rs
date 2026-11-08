@@ -240,7 +240,7 @@ impl Store {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, target_os = "linux"))]
 mod tests {
     use super::*;
     fn directory(label: &str) -> PathBuf {
