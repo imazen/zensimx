@@ -3510,3 +3510,18 @@ cost work at actual outer models. Five reduced-scope tests, nine dispatch tests,
 seven rescue tests, five extension tests and script lint pass. These checks do
 not establish scientific completion. Source and operational/archive evidence
 are recorded under the private study's host-transition and page-deployment roots.
+
+The frozen `host-transition-evidence-20261108-0105` snapshot passed destination
+cold SHA-256 readback for all 162 artifacts, 845,552,771 bytes. Receipt SHA-256:
+`609020ce6004bd09dabf4ec6f1dfd70c3c07689fd06d7124d2eb2e4a667f56ef`.
+The wrapper reported 19 s, peak RSS 0.03 GiB, minimum available RAM 43,857 MiB
+and peak load 1.84. The snapshot includes interrupted-run evidence, worker
+qualification, inventories, launch/drain records, runtime inputs and the primary
+profile. It does not claim later live events were archived. Originals remain.
+
+Ordinary SiLU's outer-0 base selection now has all 24 paired original inner
+reports and diagnostic receipts. It selects setting 3 with human composite
+0.9012379810703367. This is an inner-only tuning result, not outer quality.
+An attempted monotone-SiLU base selection refused because finite final panels
+still lacked required convergence evidence; no selection receipt was written.
+The refusal is retained and the gate was not relaxed.
