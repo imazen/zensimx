@@ -5497,6 +5497,15 @@ shaping-prefix-archive-proof study archive proof:
 shaping-prefix-retention study cell proof:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 256M --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_prefix_retention.py watch --study {{quote(study)}} --cell {{quote(cell)}} --proof {{quote(proof)}}
 
+shaping-threshold-probe-check:
+    TMPDIR="$HOME/tmp" python3 -B -m unittest discover -s scripts/tests -p test_shaping_threshold_probe.py
+
+shaping-threshold-probe-register study binaries output:
+    TMPDIR="$HOME/tmp" python3 -B scripts/rev4_featpot/shaping_threshold_probe.py register --study {{quote(study)}} --binaries {{quote(binaries)}} --output {{quote(output)}}
+
+shaping-threshold-probe-run study binaries output cell:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_threshold_probe.py run --study {{quote(study)}} --binaries {{quote(binaries)}} --output {{quote(output)}} --cell {{quote(cell)}}
+
 shaping-cost-native-clippy:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 2G --jobs 1 -- cargo clippy --locked --release -p zensim-validate --example shaping_cost -- -D warnings
 
