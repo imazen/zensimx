@@ -71,3 +71,10 @@ worker status paths rather than the retired observers' files.
 These observations establish placement and supervision, not completion of the
 new rescue fits or their numerical evaluation. Outer/variant/bootstrap transport
 still needs qualification and deployment.
+
+`shaping-completion-qualify-worker` places the existing full native neutral
+control on an approved worker, sharing CPU claims and a one-GiB pending-output
+reservation with scientific fits. It refuses an existing attempt and never
+retries a native failure. A supplied snapshot store enables the qualified
+trainer's bounded crash recovery. The control still compares canonical native
+weights against the completed frozen fit; it is not a selection candidate.

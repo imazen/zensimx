@@ -1,6 +1,6 @@
 """Native neutral-control replay of a completed analytic prefix; never selection."""
 from __future__ import annotations
-import argparse,json,os,subprocess
+import argparse,json,os,subprocess,time
 from pathlib import Path
 from shaping_completion import encoded,sha
 from shaping_execution import load_registration
@@ -36,7 +36,8 @@ def qualify(args):
     head=json.loads((args.run/'HEAD.json').read_text());head['epochs']=args.epochs;head['training']=neutral
     args.output.mkdir(parents=True,exist_ok=False);(args.output/'checkpoints').mkdir()
     manifest=args.output/'HEAD.json';manifest.write_bytes(encoded(head))
-    cmd=original['command'].copy();cmd[cmd.index('--mem')+1]='2G'
+    from shaping_rescue_execution import portable_command
+    cmd=portable_command(original['command'],args.run);cmd[cmd.index('--mem')+1]='2G'
     index=next(i for i,v in enumerate(cmd) if Path(v).name=='zensim_mlp_train');cmd[index]=str(args.binary_dir/'zensim_mlp_train')
     for flag,value in [('--epochs',args.epochs),('--out',args.output/'best.bin'),('--dump-checkpoints-dir',args.output/'checkpoints')]:
         cmd[cmd.index(flag)+1]=str(value)
@@ -45,6 +46,8 @@ def qualify(args):
         if key.startswith(('ZENSIM_MONOTONE_RESEARCH_','ZENSIM_INPUT_SHAPING_','ZENSIM_PLAIN_OPTIMIZER_')):env.pop(key)
     env.update(ZENSIM_MONOTONE_RESEARCH_MANIFEST=str(manifest),ZENSIM_MONOTONE_RESEARCH_SHA256=sha(manifest),
                ZENSIM_OPTIMIZER_DIAGNOSTICS='1',TMPDIR=str(Path.home()/'tmp'))
+    if getattr(args,'snapshot_root',None):
+        env['ZENSIM_TRAIN_SNAPSHOT_ROOT']=str(args.snapshot_root)
     receipt=dict(original_run=str(args.run),original_result_sha256=sha(args.run/'RESULT.json'),command=cmd,
                  epochs=args.epochs,selection_candidate=False,build_sha256=sha(args.binary_dir/'BUILD.json'),
                  neutral_control=neutral,driver_sha256=sha(__file__))
@@ -63,6 +66,30 @@ def qualify(args):
     (args.output/'RESULT.json').write_bytes(encoded(receipt))
     if not receipt['match']:raise ValueError('neutral controls changed native weights or scaler')
     print(json.dumps(dict(match=True,epochs=args.epochs,canonical_sha256=hashes[0])),flush=True)
+
+
+def qualify_on_worker(args):
+    """Use the same CPU/SSD admission as scientific fits, with no fit retries."""
+    from shaping_reduced_scope import admit_compute
+    from shaping_rescue_dispatch import reserve_worker,release_worker,bind_worker
+    from shaping_storage import reservation
+    admit_compute(args.study)
+    if args.human_only_cell:raise ValueError('worker qualification currently supports the primary neutral control only')
+    if args.output.exists():raise ValueError('preserve existing qualification attempt')
+    key='neutral-'+__import__('hashlib').sha256(encoded(dict(run=str(args.run),
+        build_sha256=sha(args.binary_dir/'BUILD.json'),epochs=args.epochs))).hexdigest()[:20]
+    while True:
+        if args.output.exists():raise ValueError('qualification appeared while waiting; preserve it')
+        observation=reserve_worker(args.study,key)
+        if observation['can_start']:break
+        print(json.dumps(dict(stage='qualification_waiting_for_capacity',admission=observation)),flush=True)
+        time.sleep(30)
+    try:
+        bind_worker(args.study,key,os.getpid())
+        minimum=json.loads((args.study/'PLAN.json').read_text())['minimum_ssd_free_bytes']
+        with reservation(args.study,args.output,minimum,bytes_required=1024**3):
+            return qualify(args)
+    finally:release_worker(args.study,key)
 
 
 def human_command(command,groups,binary_dir,output):
@@ -143,4 +170,5 @@ if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__)
     for name in ('study','run','binary-dir','output'):p.add_argument('--'+name,type=Path,required=True)
     p.add_argument('--epochs',type=int,default=1);p.add_argument('--human-only-cell')
-    args=p.parse_args();(qualify_human if args.human_only_cell else qualify)(args)
+    p.add_argument('--worker',action='store_true');p.add_argument('--snapshot-root',type=Path)
+    args=p.parse_args();(qualify_on_worker if args.worker else qualify_human if args.human_only_cell else qualify)(args)

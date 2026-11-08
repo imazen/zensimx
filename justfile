@@ -5017,6 +5017,12 @@ shaping-completion-rescue-select study family outer:
 shaping-completion-rescue-qualify study run binaries output epochs="1":
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_rescue_qualification.py --study {{quote(study)}} --run {{quote(run)}} --binary-dir {{quote(binaries)}} --output {{quote(output)}} --epochs {{epochs}}
 
+shaping-completion-qualification-worker-check:
+    TMPDIR="$HOME/tmp" python3 -B -m unittest discover -s scripts/tests -p test_shaping_qualification_worker.py
+
+shaping-completion-qualify-worker study run binaries output snapshots epochs="240":
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 3G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_rescue_qualification.py --worker --study {{quote(study)}} --run {{quote(run)}} --binary-dir {{quote(binaries)}} --output {{quote(output)}} --snapshot-root {{quote(snapshots)}} --epochs {{epochs}}
+
 shaping-completion-supervision-check:
     python3 -B -m unittest discover -s scripts/tests -p test_shaping_supervision.py
 
