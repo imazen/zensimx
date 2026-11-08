@@ -34,8 +34,11 @@ def cycle(args,observation,sequence):
     status=args.output/(stamp+'-observation.json')
     with status.open('xb') as stream:stream.write(encoded(observation))
     wave=args.output/stamp
+    # Transport containers are working copies. The native archive owner preserves
+    # their imported payload separately; do not duplicate that payload on the NAS.
+    transfer_root=getattr(args,'transfer_root',None) or args.destination/'worker-transfers'
     collect_wave(SimpleNamespace(host=args.host,source=args.source,study=args.study,status=status,
-                 destination=args.destination/'worker-transfers',output=wave))
+                 destination=transfer_root,output=wave))
     record=json.loads((wave/'WAVE.json').read_text())
     if record['stage']!='collected' or len(record['completed'])!=len(rows):raise ValueError('worker wave incomplete')
     archive=args.destination/f'worker-watch-{args.host}-{args.output.name}-{stamp}'
@@ -57,7 +60,8 @@ def watch(args):
         fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
         args.output.mkdir(parents=True,exist_ok=False)
         record=dict(pid=os.getpid(),host=args.host,source=str(args.source),status_source=str(args.status_source),
-                    driver_sha256=sha(__file__),completed_waves=[],observation_failures=0)
+                    driver_sha256=sha(__file__),completed_waves=[],observation_failures=0,
+                    transfer_root=str(args.transfer_root) if getattr(args,'transfer_root',None) else None)
         sequence=0
         def save(stage,**values):
             record.update(stage=stage,checked_utc=datetime.now(timezone.utc).isoformat(),**values)
@@ -88,4 +92,5 @@ if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('--host',choices=['i265','i270','r3800x','i134','r5600g','r3500'],required=True)
     for key in ('source','status-source','study','destination','output'):p.add_argument('--'+key,type=Path,required=True)
+    p.add_argument('--transfer-root',type=Path,help='SSD directory for transient transfer containers; native archive destination is unchanged')
     p.add_argument('--watch',action='store_true');watch(p.parse_args())

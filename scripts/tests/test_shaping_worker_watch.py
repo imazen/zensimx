@@ -40,6 +40,27 @@ class WorkerWatchTests(unittest.TestCase):
                 transfer.assert_called_once();archive.assert_not_called()
             self.assertTrue((root/'wave-000001-observation.json').exists())
 
+    def test_ssd_transport_does_not_change_durable_wave_destination(self):
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as directory:
+            root=Path(directory)
+            args=SimpleNamespace(study=root,output=root,host='i265',source=root,
+                                 destination=root/'durable',transfer_root=root/'ssd-transfers')
+            seen=[]
+            def transfer(call):
+                seen.append(call.destination);call.output.mkdir()
+                (call.output/'WAVE.json').write_text(json.dumps(dict(stage='collected',completed=[dict(cell='done')])))
+            def archive(command,**kwargs):
+                source=Path(command[-2]);destination=Path(command[-1]);destination.mkdir(parents=True)
+                (source/'SHA256SUMS').write_text('verified fixture\n')
+                (destination/'SHA256SUMS').write_bytes((source/'SHA256SUMS').read_bytes())
+                (source/'MIRROR_VERIFIED.json').write_text(json.dumps(dict(
+                    all_artifact_sha256_verified=True,destination=str(destination))))
+            with patch('shaping_worker_watch.collect_wave',side_effect=transfer),patch('shaping_worker_watch.subprocess.run',side_effect=archive):
+                result=cycle(args,self.status(),1)
+            self.assertEqual(seen,[args.transfer_root])
+            self.assertEqual(result['completed'],1)
+            self.assertEqual(Path(result['archive']['destination']).parent,args.destination)
+
     def test_observation_timeout_does_not_report_training_stopped(self):
         with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as directory:
             root=Path(directory);args=SimpleNamespace(study=root,output=root/'watch',host='i265',source=root,status_source=root,watch=False)

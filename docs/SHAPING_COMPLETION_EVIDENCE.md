@@ -5,6 +5,32 @@ questions. It is not an experiment registration or authorization to select on
 outer folds. Numerical claims below belong to the linked result records;
 fresh archive verification receipts are separate evidence of artifact retention.
 
+## Transfer containers and accessible archives, November 8 UTC
+
+Worker collection accepts `--transfer-root` for an SSD transport directory.
+Only the fetched tar and its transport receipt move there; wave metadata and
+the verified native archive keep their existing durable destinations and gates.
+This avoids adding a second durable copy of each imported model payload.
+The default remains compatible with existing launches. No existing archive is
+removed, and a collected wave does not by itself prove a native archive exists.
+
+The storage pilot repacked complete original worker inventories from SSD for
+cells `37f22084f40f4abc6f3c` and `44cd35024ebd6fba7d8c`. Their payloads were
+26,869,631 and 33,386,100 bytes, respectively; every payload file hash also
+appeared in its verified native archive manifest. The repacked tar sizes were
+27,320,320 and 33,832,960 bytes. `zstd -3 -T1` produced 20,551,376 and
+26,779,523 bytes, with exact decompression hashes. These two measurements do
+not establish a compression ratio for the entire study.
+
+Each sample contains 240 epoch bakes and one final `.bin`, plus four JSON
+records, one text declaration and one log. Bakes account for 26,555,753 and
+33,072,122 bytes. They require training to regenerate; they are not instant
+scratch. Unique inputs, failures, snapshots and provenance remain protected.
+Plain result tables and readable reproduction instructions should accompany
+any future compressed archive. Standard `tar`/`zstd` extraction must work
+without a project-specific decoder; lossless packing must not replace saved
+scientific evidence with a promise to recompute it.
+
 ## What the completed work establishes
 
 The [shaped-linear study](SHAPED_LINEAR_GENERALIZATION_STUDY.md) uses three
