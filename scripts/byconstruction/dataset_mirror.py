@@ -136,6 +136,13 @@ def main():
         target = destination / path.relative_to(args.root)
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(path, target)
+        # copyfile preserves bytes only. Replay helpers also need their original
+        # execute bits; leave data-file permissions and special bits unchanged.
+        executable = path.stat().st_mode & 0o111
+        current = target.stat().st_mode
+        if current & 0o111 != executable:
+            target.chmod((current & 0o777 & ~0o111) | executable)
+        assert target.stat().st_mode & 0o111 == executable, str(target)
         if args.cold_readback:
             with target.open("rb") as stream:
                 os.fsync(stream.fileno())
@@ -158,6 +165,7 @@ def main():
         "artifact_files_verified_before_receipt": len(files),
         "artifact_bytes": total,
         "all_artifact_sha256_verified": True,
+        "executable_bits_preserved": True,
         "random_readbacks": readbacks,
         "readback_method": "fsync, POSIX_FADV_DONTNEED and client SHA-256" if args.cold_readback else "client SHA-256",
     }

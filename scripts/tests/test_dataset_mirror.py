@@ -26,6 +26,19 @@ class RetainedPipe(io.BytesIO):
 
 
 class MirrorKinds(unittest.TestCase):
+    def test_mounted_archive_keeps_executable_bits_for_code_free_replay(self):
+        with tempfile.TemporaryDirectory() as directory:
+            parent=Path(directory);root=parent/'source';root.mkdir();destination=parent/'mirror'
+            tool=root/'tool';tool.write_text('#!/bin/sh\nexit 0\n');tool.chmod(0o751)
+            data=root/'data.txt';data.write_text('retained data');data.chmod(0o640)
+            argv=['dataset_mirror.py','--root',str(root),'--nfs','--destination',str(destination)]
+            with patch.object(sys,'argv',argv),contextlib.redirect_stdout(io.StringIO()):mirror.main()
+            self.assertEqual((destination/'tool').stat().st_mode & 0o111,0o111)
+            self.assertEqual((destination/'data.txt').stat().st_mode & 0o111,0)
+            self.assertEqual((destination/'tool').read_bytes(),tool.read_bytes())
+            receipt=json.loads((destination/'MIRROR_VERIFIED.json').read_text())
+            self.assertTrue(receipt['executable_bits_preserved'])
+
     def test_explicit_destination_verification_with_reclaimed_local_artifacts(self):
         with tempfile.TemporaryDirectory() as directory:
             parent=Path(directory);root=parent/'source';destination=parent/'mirror'

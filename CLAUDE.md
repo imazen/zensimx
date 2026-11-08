@@ -1,3 +1,11 @@
+## Known Bugs — archive executable metadata (November 8, 2026)
+
+The mounted archive copier used copyfile, preserving every byte but dropping
+execute bits on bundled native replay binaries. It now preserves and verifies
+those bits separately from content hashes. Replay-archive metadata repairs use
+the original manifests and source executable bits, with receipts outside sealed
+archives; scientific payloads and existing checksum manifests remain unchanged.
+
 ## Known Bugs — snapshot retirement on unrelated mounts (November 8, 2026)
 
 Completed-state retirement refused before removal because lsof could not stat
