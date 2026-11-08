@@ -245,6 +245,7 @@ SUPERVISOR_SCRIPTS={
     'worker_evaluation':'shaping_evaluation_worker.py',
     'native_training_observer':'shaping_native_watch.py',
     **{f'selection_outer_{outer}':'shaping_selection_watch.py' for outer in range(3)},
+    **{f'collection_{host}':'shaping_worker_watch.py' for host in ('r3500','r3800x','r5600g','i134','r7900x','i270')},
 }
 ARCHIVE_FLAGS={'primary_archive':None,'supplemental_archive':'--supplemental',
     'later_neural_archive':'--later-neural','later_control_archive':'--later-controls',
@@ -280,6 +281,8 @@ def supervisor_observation(root,role,path,proc=Path('/proc'),now=None):
         matches=matches and argument('--family','relu')==role.split('_',1)[0]
     if role.startswith('selection_outer_'):
         matches=matches and argument('--outer')==role.rsplit('_',1)[1]
+    if role.startswith('collection_'):
+        matches=matches and argument('--host')==role.removeprefix('collection_')
     if role in ARCHIVE_FLAGS:
         flags=[flag for flag in ARCHIVE_FLAGS.values() if flag is not None and flag in command]
         matches=matches and flags==([] if ARCHIVE_FLAGS[role] is None else [ARCHIVE_FLAGS[role]])

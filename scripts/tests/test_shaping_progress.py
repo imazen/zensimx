@@ -15,6 +15,14 @@ class ProgressTests(unittest.TestCase):
         (process/'cmdline').write_bytes(('\0'.join(command)+ '\0').encode())
         return root,status,proc
 
+    def test_collection_identity_requires_its_actual_worker(self):
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as d:
+            root,status,proc=self.supervisor_fixture(d,['python3','-B','shaping_worker_watch.py','--study',d,'--host','i270','--watch'])
+            self.assertTrue(supervisor_observation(root,'collection_i270',status,proc)['verified_live'])
+            self.assertFalse(supervisor_observation(root,'collection_r3500',status,proc)['verified_live'])
+            (proc/'42/cmdline').unlink()
+            self.assertFalse(supervisor_observation(root,'collection_i270',status,proc)['verified_live'])
+
     def test_watching_record_with_missing_process_is_not_live(self):
         with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as d:
             root,status,proc=self.supervisor_fixture(d,['python3','shaping_supervision.py','--study',d,'--watch'])
