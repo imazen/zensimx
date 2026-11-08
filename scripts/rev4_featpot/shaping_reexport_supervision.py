@@ -4,7 +4,7 @@ import argparse,json,os,time
 from datetime import datetime,timezone
 from pathlib import Path
 from types import SimpleNamespace
-from shaping_completion import encoded,sha
+from shaping_completion import max_pair_families,encoded,sha
 from shaping_execution import load_registration
 from shaping_reexport import reexport
 from shaping_evaluation import evaluate,NativeFeatureGateError,diagnostic_epochs
@@ -17,7 +17,7 @@ DRIVER_SHA256=sha(__file__)
 
 def sweep(args):
     family=getattr(args,'family','relu')
-    if family not in ('relu','softplus'):raise ValueError('unsupported supplemental family')
+    if family not in max_pair_families(args.study):raise ValueError('unsupported supplemental family')
     _,cells,_=load_registration(args.study);completed=0
     for path in sorted((args.study/'runs').glob('*/attempt-*/RESULT.json')):
         result=json.loads(path.read_text());cell=result['cell'];run=path.parent
@@ -70,7 +70,8 @@ def sweep(args):
 def main():
     p=argparse.ArgumentParser(description=__doc__)
     for key in ('study','binary-dir','inspector'):p.add_argument('--'+key,type=Path,required=True)
-    p.add_argument('--family',choices=('relu','softplus'),default='relu')
+    from shaping_stable_pairs import FAMILIES as qualified_families
+    p.add_argument('--family',choices=('relu','softplus',*qualified_families),default='relu')
     p.add_argument('--watch',action='store_true');args=p.parse_args()
     while True:
         count=sweep(args)

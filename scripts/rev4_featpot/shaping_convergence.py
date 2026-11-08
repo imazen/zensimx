@@ -61,7 +61,7 @@ def report(run,reexport_root=None,analytic_diagnostic=False):
     scores={};active={};pins={};builds=set()
     if reexport_root is not None:
         from shaping_reexport import admit_family
-        admit_family(identity['cell']['family'],analytic_diagnostic)
+        admit_family(identity['cell']['family'],analytic_diagnostic,run.parents[2] if len(run.parents)>2 else None)
     curve_root=reexport_root if reexport_root is not None else run/'curve_evaluation'
     for path in sorted(curve_root.glob('epoch-*/REPORT.json')):
         marker=path.parent/'DIAGNOSTIC_COMPLETE.json'
