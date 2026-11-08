@@ -57,6 +57,10 @@ def resolve_inputs(study,cell_id,host,binaries,qualification):
     # Bind lazily used command/snapshot owners too; a full source export alone
     # must not let modified worker modules escape the capsule's drift check.
     import importlib
+    # The existing recipe owner imports tree_study for shared target helpers.
+    # sklearn's import-time HTML assets are not scientific inputs; initialize
+    # that dependency before capturing the admitted recipe's file reads.
+    importlib.import_module('sklearn.ensemble')
     for name in ('v2_common','v2_lodo_mlp','shaping_snapshot_retention'):
         importlib.import_module(name)
     if host not in HOSTS:raise ValueError('approved corrected-fit worker required')

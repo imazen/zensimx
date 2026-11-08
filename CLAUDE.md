@@ -1,5 +1,14 @@
 # zensim — current working rules
 
+## Known Bugs — corrected capsule dependency initialization (resolved November 8, 2026)
+
+The first corrected wave registration captured an import-time sklearn HTML
+stylesheet while loading the shared recipe helpers and refused its out-of-scope
+path. No request or scientific attempt was created. The third-party module is
+now initialized before the recipe input-read capture; project helpers, actual
+recipe reads, native binaries and placement guards remain source/hash bound.
+The original failed registration and placements remain preserved.
+
 ## Known Bugs — headless checkpoint retention (resolved November 8, 2026)
 
 The open-file checker passed two fixed desktop portal exclusions to lsof.
