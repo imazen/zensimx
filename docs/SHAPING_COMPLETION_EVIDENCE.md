@@ -1041,3 +1041,18 @@ attempt, no CPU/storage claim and no child before retiring a waiter. It holds
 only the short admission transactions while checking that boundary. Claimed or
 productive controllers remain live. The real-process check preserves a claimed
 controller, retires its unstarted neighbor, and creates no scientific attempt.
+
+## Worker preparation for admitted outer fits, November 8 UTC
+
+`shaping_outer_prepare_worker.py` transports the complete outer admission
+evidence and all 44 registered original input files to a permitted worker.
+It calls the existing `shaping_outer_execution.prepare` owner after reproducing
+the admission, under shared CPU/RAM and SSD accounting. Prepared comparator
+tables and TRAIN-only shape initializers return through per-file SHA-256 checks.
+No fit or outer response selection occurs in this helper. Existing mismatched
+inputs, outputs and preparation attempts are preserved and refused.
+
+Four orchestration tests cover missing admission, changed inputs, rejection
+before a CPU claim, and two independent one-GiB transfer reservations. The actual
+outer preparation remains pending complete paired rescue evidence; these tests
+do not count as scientific fits or completed outer work.
