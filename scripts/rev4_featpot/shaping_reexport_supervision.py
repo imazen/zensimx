@@ -81,7 +81,7 @@ def main():
     status_path=args.status or args.study/default
     if args.status:
         status_path.parent.mkdir(parents=True,exist_ok=True)
-        with status_path.open('x') as stream:stream.write(encoded(dict(stage='starting',pid=os.getpid())))
+        with status_path.open('xb') as stream:stream.write(encoded(dict(stage='starting',pid=os.getpid())))
     if args.cells:
         _,registered,_=load_registration(args.study)
         wanted={c['id'] for c in registered if c['family']==args.family and c['stage'] in ('inner','fresh_control_inner','rescue','exposure_extension')}

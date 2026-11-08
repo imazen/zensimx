@@ -1,3 +1,11 @@
+## Known Bugs — supplemental wave status startup (November 8, 2026)
+
+The new explicit status option opened a text stream before writing encoded JSON
+bytes. Four scalar-export queues stopped before admission or scoring; their
+empty status files and logs remain preserved. Binary-mode creation fixes startup.
+Actual CLI checks cover successful startup, scoring-error slot release and
+refusal of an existing status. Replacement launches use fresh status directories.
+
 ## Known Bugs — archive executable metadata (November 8, 2026)
 
 The mounted archive copier used copyfile, preserving every byte but dropping
