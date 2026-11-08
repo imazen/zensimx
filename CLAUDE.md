@@ -13,6 +13,14 @@ not a reduced-coverage success. Mixed-build control reuse that requires full
 trajectory parity must use this additional evidence. Until executed, its
 fixture checks establish comparator behavior only.
 
+`shaping_checkpoint_restore.py` restores missing epochs of a completed control
+from the existing native archive. It reuses the retention owner's archive
+identity check, bounds the copy to 128 MiB, verifies each checkpoint before
+publishing it, and refuses changed existing files. It never overwrites or
+retrains a control. A failed preparation initially assumed a manifest-hash
+field that the mirror receipt does not contain; it made no checkpoint copies.
+The reusable owner uses the actual local/durable SHA256SUMS comparison.
+
 ## Known Bugs — downstream admission refactor (resolved November 8, 2026)
 
 Extracting downstream admission left an undefined template variable in the

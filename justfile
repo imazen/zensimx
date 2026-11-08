@@ -5263,6 +5263,12 @@ shaping-completion-later-evaluation-worker-check:
 shaping-completion-neutral-trajectory-check:
     TMPDIR="$HOME/tmp" python3 -B -m unittest scripts/tests/test_shaping_neutral_trajectory.py
 
+shaping-completion-checkpoint-restore-check:
+    TMPDIR="$HOME/tmp" python3 -B -m unittest scripts/tests/test_shaping_checkpoint_restore.py
+
+shaping-completion-checkpoint-restore study cell output:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_checkpoint_restore.py --study {{quote(study)}} --cell {{quote(cell)}} --output {{quote(output)}}
+
 shaping-completion-neutral-trajectory study run qualification binaries output:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_neutral_trajectory.py --study {{quote(study)}} --run {{quote(run)}} --qualification {{quote(qualification)}} --binary-dir {{quote(binaries)}} --output {{quote(output)}}
 
