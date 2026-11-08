@@ -5205,7 +5205,7 @@ shaping-completion-fetch-worker host remote_bundle destination:
     scp -- {{quote(host + ":" + remote_bundle)}} {{quote(host + ":" + remote_bundle + ".json")}} {{quote(destination + "/")}}
 
 shaping-completion-pack-worker host source study assignment cell bundle attempt='attempt-001':
-    ssh {{quote(host)}} 'TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B {{source}}/scripts/rev4_featpot/shaping_worker_collect.py pack --study {{study}} --assignment {{assignment}} --cell {{cell}} --bundle {{bundle}} --attempt {{attempt}}'
+    ssh {{quote(host)}} 'TMPDIR="$HOME/tmp" PYTHONPATH="{{study}}/../python-runtime" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B {{source}}/scripts/rev4_featpot/shaping_worker_collect.py pack --study {{study}} --assignment {{assignment}} --cell {{cell}} --bundle {{bundle}} --attempt {{attempt}}'
 
 shaping-completion-collect-terminal-worker host source study status destination output:
     TMPDIR="$HOME/tmp" python3 -B scripts/rev4_featpot/shaping_worker_collection_wave.py --host {{quote(host)}} --source {{quote(source)}} --study {{quote(study)}} --status {{quote(status)}} --destination {{quote(destination)}} --output {{quote(output)}}

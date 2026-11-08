@@ -13,6 +13,12 @@ class WorkerWatchTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError,'missing from PATH: just'):
                 watch(SimpleNamespace())
 
+    def test_incomplete_command_export_fails_before_claiming(self):
+        error=subprocess.CalledProcessError(1,['just','--summary'],stderr='missing imported recipe')
+        with patch('shaping_worker_watch.shutil.which',return_value='/usr/bin/tool'),patch('shaping_worker_watch.subprocess.run',side_effect=error) as command:
+            with self.assertRaises(subprocess.CalledProcessError):watch(SimpleNamespace())
+            self.assertEqual(command.call_args.args[0],['just','--summary'])
+
     def status(self):
         return dict(checked_utc=datetime.now(timezone.utc).isoformat(),unexpectedly_stopped=[],live=1,
                     runs=[dict(cell='done',terminal='trained',run='/remote/runs/done/attempt-001'),

@@ -55,6 +55,9 @@ def cycle(args,observation,sequence):
 def watch(args):
     missing=[name for name in ('just','ssh','scp') if shutil.which(name) is None]
     if missing:raise ValueError('worker collection tools missing from PATH: '+', '.join(missing))
+    # Resolve imported recipe files before claiming a long-lived collector.
+    # A source-only export can have a valid justfile but omit its imports.
+    subprocess.run(['just','--summary'],cwd=REPO,capture_output=True,text=True,check=True)
     ownership=args.study/'dispatch/worker-collection';ownership.mkdir(parents=True,exist_ok=True)
     with (ownership/(args.host+'.lock')).open('a') as lock:
         fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)

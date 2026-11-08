@@ -1,3 +1,11 @@
+## Known Bugs — incomplete controller exports (November 8, 2026)
+
+Source-only supervisor exports omitted imported Just recipe files, stopping
+terminal collection before packaging. Native training and completed weights
+remained intact. Collector startup now validates recipe imports; remote packing
+selects the prepared Python runtime. Replacement collectors use full committed
+exports. Failed collection waves and partial attempts stay preserved.
+
 # zensim — current working rules
 
 ## Known Bugs — corrected capsule dependency initialization (resolved November 8, 2026)
