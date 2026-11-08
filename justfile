@@ -5832,6 +5832,9 @@ shaping-stable-pairs-check:
 shaping-stable-pairs-register study qualification source:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_stable_pairs.py --study {{quote(study)}} --qualification {{quote(qualification)}} --source {{quote(source)}}
 
+shaping-stable-pairs-archive-inputs study root:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_stable_pairs_archive.py --study {{quote(study)}} --root {{quote(root)}}
+
 shaping-selected-rescue-prepare study source binaries qualification outer family placements output:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_rescue_wave_prepare.py --study {{quote(study)}} --source {{quote(source)}} --binaries {{quote(binaries)}} --qualification {{quote(qualification)}} --outer {{outer}} --selected-family {{quote(family)}} --placements {{quote(placements)}} --output {{quote(output)}}
 
