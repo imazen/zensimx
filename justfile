@@ -5092,11 +5092,14 @@ shaping-completion-stats-check:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B -m unittest scripts.tests.test_shaping_dashboard scripts.tests.test_shaping_progress scripts.tests.test_shaping_corrected_dashboard
 
 shaping-completion-stats-syntax-check:
-    python3 -B -c 'import re,subprocess; from pathlib import Path; script=re.search(r"<script>(.*)</script>",Path("scripts/rev4_featpot/shaping_dashboard.html").read_text(),re.S).group(1); subprocess.run(["node","--check"],input=script,text=True,check=True)'
+    python3 -B -c 'import re,subprocess; from pathlib import Path; script=re.search(r"<script>(.*?)</script>",Path("scripts/rev4_featpot/shaping_dashboard.html").read_text(),re.S).group(1); subprocess.run(["node","--check"],input=script,text=True,check=True)'
 
 # Bounded metadata observation only: no fit signals, starts or recovery.
 shaping-native-watch study observer output *args:
     TMPDIR="$HOME/tmp" python3 -B scripts/rev4_featpot/shaping_native_watch.py --study {{quote(study)}} --observer {{quote(observer)}} --output {{quote(output)}} {{args}}
+
+shaping-scatter-syntax-check:
+    node --check scripts/rev4_featpot/shaping_dashboard_details.js
 
 shaping-completion-progress-check:
     TMPDIR="$HOME/tmp" python3 -B -m unittest discover -s scripts/tests -p test_shaping_progress.py
@@ -5786,3 +5789,10 @@ shaping-corrected-wave-prepare study source binaries placements output:
 # Metadata only: wait for all six native proof archives, then use the original gate.
 shaping-corrected-activation-watch study *args:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 512M --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_corrected_activate_watch.py --study {{quote(study)}} {{args}}
+
+# Scalar-only viewer inputs; existing reports and native statistics own the numbers.
+shaping-scatter-prepare study dashboard output:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_scatter_prepare.py --study {{quote(study)}} --dashboard {{quote(dashboard)}} --output {{quote(output)}}
+
+shaping-scatter-native study panel manifest output workers='4':
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 2G --jobs {{workers}} -- python3 -B scripts/rev4_featpot/shaping_scatter_native.py --study {{quote(study)}} --panel {{quote(panel)}} --manifest {{quote(manifest)}} --output {{quote(output)}} --workers {{workers}}

@@ -160,6 +160,12 @@ def dashboard_data(root,result,workers):
         for row in status['runs']:
             if row['verified_live']:observations[row['cell']]=dict(**row,host=host,fresh=health['fresh'])
     audited={r['cell']:r for r in result['cells']};records=[]
+    scatter_index=root.parent/'stats/details/INDEX.json';scatter={}
+    if scatter_index.exists():
+        index=json.loads(scatter_index.read_text())
+        if index['schema']!='zensim-inner-scatter-index-v1' or index['plan_sha256']!=plan_pin or index['outer_results_read']:
+            raise ValueError('scatter dashboard index scope differs')
+        scatter=index['cells']
     for cell in cells:
         if cell['stage'] not in ('inner','fresh_control_inner','rescue') or not audited[cell['id']]['required']:continue
         directory=root/'runs'/cell['id'];a=audited[cell['id']]
@@ -178,6 +184,8 @@ def dashboard_data(root,result,workers):
         if markers:
             marker=markers[0];path=marker.parent/'REPORT.json';pin=json.loads(marker.read_text())['report_sha256']
             record['panel']=read_saved_panel(path,pin,cell,plan_pin)
+            if cell['id'] in scatter and scatter[cell['id']]['report_sha256']==pin:
+                record['details']=scatter[cell['id']]
             run=directory/marker.parent.parent.name
             identity=json.loads((run/'RUN.json').read_text())
             if cell['family'] in NEURAL and record['panel']['epoch']!=identity['epochs']-1:
@@ -407,6 +415,10 @@ def main():
         dashboard_lock=dashboard_claim(a.dashboard)
         template=Path(__file__).with_name('shaping_dashboard.html').read_text()
         temp=a.dashboard/f'index.html.{os.getpid()}.writing';temp.write_text(template);temp.replace(a.dashboard/'index.html')
+        asset=Path(__file__).with_name('shaping_dashboard_details.js')
+        if asset.exists():
+            target=a.dashboard/'details.js';temporary=target.with_suffix('.writing')
+            temporary.write_bytes(asset.read_bytes());temporary.replace(target)
         if a.watch:atomic_json(a.dashboard/'publisher-status.json',dict(pid=os.getpid(),stage='starting',
             checked_utc=datetime.now(timezone.utc).isoformat(),error=None))
     while True:
