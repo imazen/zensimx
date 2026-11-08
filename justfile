@@ -5491,6 +5491,21 @@ shaping-external-recovery-check:
     TMPDIR="$HOME/tmp" python3 -B -m unittest discover -s scripts/tests -p test_shaping_external_recovery.py
     TMPDIR="$HOME/tmp" python3 -B -m unittest discover -s scripts/tests -p test_shaping_worker_collect.py
 
+shaping-rescue-worker-check:
+    TMPDIR="$HOME/tmp" python3 -B -m unittest discover -s scripts/tests -p test_shaping_rescue_worker.py
+    TMPDIR="$HOME/tmp" python3 -B -m unittest discover -s scripts/tests -p test_shaping_rescue.py
+    TMPDIR="$HOME/tmp" python3 -B -m unittest discover -s scripts/tests -p test_shaping_worker_collect.py
+    TMPDIR="$HOME/tmp" python3 -B -m unittest discover -s scripts/tests -p test_shaping_evaluation_worker.py
+
+shaping-rescue-worker-register study cell host binaries qualification output:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 512M --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_rescue_worker.py register --study {{quote(study)}} --cell {{quote(cell)}} --host {{host}} --binaries {{quote(binaries)}} --qualification {{quote(qualification)}} --output {{quote(output)}}
+
+shaping-rescue-worker-transfer request source:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 512M --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_rescue_worker.py transfer --request {{quote(request)}} --remote-source {{quote(source)}}
+
+shaping-rescue-worker-run request:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 2G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_rescue_worker.py work --request {{quote(request)}}
+
 shaping-prefix-archive-proof study archive proof:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 256M --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_prefix_retention.py prepare --study {{quote(study)}} --archive {{quote(archive)}} --proof {{quote(proof)}}
 

@@ -41,6 +41,14 @@ def portable_command(command,source):
         if receipt['original_declaration_path']!=command[index]:raise ValueError('collected declaration path differs')
         if receipt['files'][portable.name]['sha256']!=DECLARATION_SHA256:raise ValueError('collected declaration pin differs')
         command[index]=str(portable)
+    elif not Path(command[index]).exists():
+        # An exported worker source can have another location. This one frozen
+        # declaration is content-addressed; missing originals may relocate only
+        # to the shipped declaration with that exact registered hash.
+        from shaping_completion import REPO
+        declaration=REPO/'scripts/rev4_featpot/color_noise_fx2_declaration.json'
+        if sha(declaration)!=DECLARATION_SHA256:raise ValueError('relocated native declaration drift')
+        command[index]=str(declaration)
     if sha(command[index])!=DECLARATION_SHA256:raise ValueError('native declaration drift')
     return command
 
@@ -116,7 +124,7 @@ def execute(args):
     if args.attempt<1 or dest.exists():raise ValueError('preserve existing rescue attempts')
     with reservation(args.study,dest,plan['minimum_ssd_free_bytes']):
         dest.mkdir(parents=True)
-        run=dict(cell=cell,plan_sha256=sha(args.study/'PLAN.json'),build_sha256=sha(args.binary_dir/'BUILD.json'),
+        run=dict(cell=cell,execution_host=__import__('socket').gethostname(),plan_sha256=sha(args.study/'PLAN.json'),build_sha256=sha(args.binary_dir/'BUILD.json'),
                  resolution=resolution,pid=os.getpid(),process_role='rescue_controller',stage='running',
                  selection_policy_sha256=sha(REPO/'docs/SHAPING_RESCUE_SELECTION.md'),
                  driver_sha256=sha(__file__),epochs=120 if '_pretrained_' in cell['family'] else 240,
