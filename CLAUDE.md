@@ -93,6 +93,15 @@ the shaping completion benchmark.
 
 ## Known Bugs — interrupted joint-shaping supervision (November 7, 2026)
 
+Approved partial-restart comparisons can exceed the unchanged 1,000-file
+transport cap when two canonical model copies and their logs are retained for
+each old epoch. `shaping_prefix_retention.py` retires only canonical duplicates
+whose SHA-256 and size match the cold-reread original durable archive. It keeps
+the comparison index, native logs, archive proof and per-file retirement journal;
+the original and restarted training checkpoints remain untouched. Active file
+users or any mismatch refuse retirement. A journal written before unlink makes
+interrupted cleanup repeatable without repeating a fit.
+
 A historical inner-0-0 joint-shaping controller and two fits stopped while its
 status still said running. The scope-end observation does not establish the
 cause. The attempts retained 19 and 219 checkpoints of 240; both partial runs

@@ -5486,9 +5486,16 @@ shaping-evaluation-worker-check:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B -m unittest discover -s scripts/tests -p test_shaping_reduced_scope.py
 
 shaping-external-recovery-check:
+    TMPDIR="$HOME/tmp" python3 -B -m unittest discover -s scripts/tests -p test_shaping_prefix_retention.py
     TMPDIR="$HOME/tmp" python3 -B -m unittest discover -s scripts/tests -p test_shaping_partial_restart.py
     TMPDIR="$HOME/tmp" python3 -B -m unittest discover -s scripts/tests -p test_shaping_external_recovery.py
     TMPDIR="$HOME/tmp" python3 -B -m unittest discover -s scripts/tests -p test_shaping_worker_collect.py
+
+shaping-prefix-archive-proof study archive proof:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 256M --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_prefix_retention.py prepare --study {{quote(study)}} --archive {{quote(archive)}} --proof {{quote(proof)}}
+
+shaping-prefix-retention study cell proof:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 256M --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_prefix_retention.py watch --study {{quote(study)}} --cell {{quote(cell)}} --proof {{quote(proof)}}
 
 shaping-cost-native-clippy:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 2G --jobs 1 -- cargo clippy --locked --release -p zensim-validate --example shaping_cost -- -D warnings
