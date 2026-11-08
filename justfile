@@ -5826,6 +5826,12 @@ shaping-queue-placement-check:
 shaping-selected-rescue-check:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B -m unittest scripts.tests.test_shaping_rescue_wave_prepare scripts.tests.test_shaping_rescue_worker scripts.tests.test_shaping_corrected_downstream scripts.tests.test_shaping_rescue_dispatch
 
+shaping-stable-pairs-check:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B -m unittest scripts.tests.test_shaping_stable_pairs scripts.tests.test_shaping_reexport scripts.tests.test_shaping_selection scripts.tests.test_shaping_selection_watch scripts.tests.test_shaping_rescue_dispatch scripts.tests.test_shaping_rescue scripts.tests.test_shaping_corrected_view scripts.tests.test_shaping_progress scripts.tests.test_shaping_convergence scripts.tests.test_shaping_corrected_dashboard
+
+shaping-stable-pairs-register study qualification source:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_stable_pairs.py --study {{quote(study)}} --qualification {{quote(qualification)}} --source {{quote(source)}}
+
 shaping-selected-rescue-prepare study source binaries qualification outer family placements output:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_rescue_wave_prepare.py --study {{quote(study)}} --source {{quote(source)}} --binaries {{quote(binaries)}} --qualification {{quote(qualification)}} --outer {{outer}} --selected-family {{quote(family)}} --placements {{quote(placements)}} --output {{quote(output)}}
 

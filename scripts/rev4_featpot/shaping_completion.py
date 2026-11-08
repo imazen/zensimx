@@ -5,6 +5,11 @@ from __future__ import annotations
 # Qualified first-layer direct-max representation; later activations remain unchanged.
 MAX_PAIR_FAMILIES=('relu','softplus')
 
+
+def max_pair_families(study):
+    from shaping_stable_pairs import families
+    return (*MAX_PAIR_FAMILIES,*families(study))
+
 import argparse
 from collections import Counter
 from datetime import datetime, timezone
