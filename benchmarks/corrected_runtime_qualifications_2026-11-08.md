@@ -81,3 +81,9 @@ in each worker context. Each four-worker controller has its own manifest/status
 directory; controllers retain shared CPU, RAM, SSD and snapshot admission.
 Registration requires corrected activation. This is orchestration support; no
 corrected scientific fit has yet passed that activation gate.
+
+The activation watcher launches no fit. It waits for six explicitly named proof
+files and their archive receipts, verifies their exact archived manifest entries,
+and delegates certification/activation to the existing all-trajectory owner.
+Missing archive evidence remains pending; a mismatch is a recorded refusal.
+The 288-condition matrix, selectors and native binary identity are unchanged.

@@ -5782,3 +5782,7 @@ shaping-corrected-wave-prepare-check:
 
 shaping-corrected-wave-prepare study source binaries placements output:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 512M --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_corrected_wave_prepare.py --study {{quote(study)}} --source {{quote(source)}} --binaries {{quote(binaries)}} --placements {{quote(placements)}} --output {{quote(output)}}
+
+# Metadata only: wait for all six native proof archives, then use the original gate.
+shaping-corrected-activation-watch study *args:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 512M --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_corrected_activate_watch.py --study {{quote(study)}} {{args}}
