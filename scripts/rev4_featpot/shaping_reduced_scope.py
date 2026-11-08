@@ -181,11 +181,19 @@ def rescue_choices(root, family, outer):
     return RESCUES, pins
 
 
-def admit_rescue(root, cell, *, host=None):
-    """Guard new attempts; historical fit verification keeps its original scope."""
+def neural_families(root, outer):
+    from shaping_completion import NEURAL
+    if coverage(root) is None:
+        return NEURAL
+    record, _ = shortlist(root, outer)
+    selected = {record['roles'][role] for role in RESCUE_ROLES}
+    return tuple(family for family in NEURAL if family in selected)
+
+
+def _admit_host(root, host):
     scope = coverage(root)
     if scope is None:
-        return
+        return False
     import socket
     record = json.loads((root / 'REDUCED_SCOPE.json').read_text())
     approvals = []
@@ -198,12 +206,41 @@ def admit_rescue(root, cell, *, host=None):
         raise ValueError('one pinned owner approval required')
     if (host or socket.gethostname()) not in approvals[0]['allowed_new_compute_hosts']:
         raise ValueError('host is outside owner-approved replacement compute pool')
+    return True
+
+
+def admit_cell(root, cell, *, host=None):
+    """Guard new attempts; historical verification retains original coverage."""
+    if not _admit_host(root, host):
+        return
+    stage = cell['stage']
+    if stage in ('row_curve', 'full_fit_selection', 'full_fit'):
+        raise ValueError('new fit is outside owner-approved reduced scope')
+    if stage == 'rescue':
+        outer = int(cell['partition'].split('-')[1])
+        choices, _ = rescue_choices(root, cell['family'], outer)
+        if cell['rescue'] not in choices:
+            raise ValueError('new rescue is outside owner-approved reduced scope')
+        return
+    if stage in ('outer', 'exposure_extension', 'fresh_control_outer_matched'):
+        outer = int(cell['partition'].split('-')[1])
+        record, _ = shortlist(root, outer)
+        if stage == 'outer':
+            if cell not in record['cells']:
+                raise ValueError('outer fit is outside frozen reduced shortlist')
+        elif cell['family'] not in set(record['roles'].values()):
+            raise ValueError('conditional fit is outside frozen reduced shortlist')
+        # The existing owner must also resolve the exact conditional registration.
+        return
+    record = json.loads((root / 'REDUCED_SCOPE.json').read_text())
+    if cell['id'] not in record['fixed_cells']:
+        raise ValueError('new fit is outside owner-approved reduced scope')
+
+
+def admit_rescue(root, cell, *, host=None):
     if cell['stage'] != 'rescue':
         raise ValueError('registered rescue cell required')
-    outer = int(cell['partition'].split('-')[1])
-    choices, _ = rescue_choices(root, cell['family'], outer)
-    if cell['rescue'] not in choices:
-        raise ValueError('new rescue is outside owner-approved reduced scope')
+    admit_cell(root, cell, host=host)
 
 
 if __name__ == '__main__':

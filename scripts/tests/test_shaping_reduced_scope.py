@@ -133,6 +133,12 @@ class ReducedScopeTests(unittest.TestCase):
                     reduced.admit_rescue(root, cell, host='dev')
                 with self.assertRaisesRegex(ValueError, 'outside owner-approved reduced scope'):
                     reduced.admit_rescue(root, {**cell, 'rescue': 'init_double'}, host='r5600g')
+                for stage in ('row_curve', 'full_fit_selection', 'full_fit'):
+                    removed = next(c for c in matrix() if c['stage'] == stage)
+                    with self.assertRaisesRegex(ValueError, 'outside owner-approved reduced scope'):
+                        reduced.admit_cell(root, removed, host='r5600g')
+                admitted = next(c for c in matrix() if c['stage'] == 'human_only')
+                reduced.admit_cell(root, admitted, host='r5600g')
                 with self.assertRaises(FileExistsError):
                     reduced.register(root, approval)
                 record['interrupted_replays_authorized'] = True

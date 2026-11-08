@@ -14,6 +14,23 @@ def selections():
 
 
 class ExtensionTests(unittest.TestCase):
+    def test_reduced_scope_preserves_paired_extension_requirements(self):
+        required=('relu','softplus','product_joint_identity','separate_joint_identity')
+        decisions={k:v for k,v in selections().items() if k in required}
+        decisions['softplus']['selected_convergence']['0-0']['reasons']=[
+            'loss_improvement_over_one_percent_or_rounding_boundary']
+        result=matrix(decisions,0,candidate_families=required)
+        self.assertEqual(set(result['extended_families']),{'relu','softplus'})
+        self.assertEqual(len(result['cells']),12)
+        self.assertEqual({(c['family'],c['partition'],c['seed']) for c in result['cells']},
+                         {(f,f'inner-0-{fold}',seed) for f in ('relu','softplus')
+                          for fold in range(2) for seed in range(3)})
+        del decisions['relu']
+        with self.assertRaisesRegex(ValueError,'all neural'):
+            matrix(decisions,0,candidate_families=required)
+        with self.assertRaisesRegex(ValueError,'four-role'):
+            matrix(decisions,0,candidate_families=('softplus','product_joint_identity','separate_joint_identity'))
+
     def test_extended_diagnostics_compare_the_final_cycle_without_changing_old_schedules(self):
         from shaping_evaluation import diagnostic_epochs,evaluation_epoch,admitted_epoch
         from shaping_convergence import diagnostics

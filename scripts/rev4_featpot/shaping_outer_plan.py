@@ -1,7 +1,7 @@
 """Resolve inner-selected refit schedules and exact matched fresh controls."""
 from __future__ import annotations
 import hashlib,math
-from shaping_completion import FAMILIES,NEURAL,RESCUES,encoded
+from shaping_completion import FAMILIES,NEURAL,RESCUES,ROLES,encoded
 
 
 def finalist_roles(decisions):
@@ -18,11 +18,20 @@ def finalist_roles(decisions):
         best_separate=best([f for f in FAMILIES if f.startswith('separate_')]))
 
 
-def plan(decisions,extended_families,outer,cells):
+def plan(decisions,extended_families,outer,cells,*,active_families=None,frozen_roles=None):
     """Pure planning: caller must validate complete selection/extension evidence."""
     if outer not in range(3) or set(decisions)!=set(FAMILIES):raise ValueError('complete registered fold decisions required')
+    active=set(FAMILIES) if active_families is None else set(active_families)
+    if (active_families is None)!=(frozen_roles is None):raise ValueError('frozen roles and active families must be paired')
+    if frozen_roles is not None:
+        if (set(frozen_roles)!=set(ROLES) or active!=set(frozen_roles.values()) or len(active)!=6
+            or any(frozen_roles[k]!=k for k in ('relu','extra_trees','shaped_additive'))
+            or frozen_roles['best_analytic'] not in ('softplus','silu_monotone','silu_diagnostic')
+            or frozen_roles['best_product'] not in FAMILIES or not frozen_roles['best_product'].startswith('product_')
+            or frozen_roles['best_separate'] not in FAMILIES or not frozen_roles['best_separate'].startswith('separate_')):
+            raise ValueError('six registered frozen finalist roles required')
     extended=set(extended_families)
-    if not extended<=set(NEURAL) or (extended and 'relu' not in extended):
+    if not extended<=(set(NEURAL)&active) or (extended and 'relu' not in extended):
         raise ValueError('extensions require registered neural families and paired ReLU')
     schedules={}
     for family in FAMILIES:
@@ -32,6 +41,7 @@ def plan(decisions,extended_families,outer,cells):
         if d['setting'] not in range(4) or d['optimizer_choice'] not in ('base',*RESCUES):
             raise ValueError('unregistered setting or optimizer choice')
         if family not in NEURAL and d['optimizer_choice']!='base':raise ValueError('neural rescue applied to nonneural control')
+        if family not in active:continue
         pretrained='_pretrained_' in family
         phases=([240,240] if family in extended else [120,120]) if pretrained else ([480] if family in extended else [240])
         if family not in NEURAL:phases=[]
@@ -56,6 +66,6 @@ def plan(decisions,extended_families,outer,cells):
                 cell['id']=hashlib.sha256(encoded(cell)).hexdigest()[:20];additional.append(cell)
             controls.append(dict(cell=cell,setting=setting,optimizer_choice=choice,epochs=epochs,
                                  paired_families=paired,original_registered_cell=key==base))
-    return dict(outer=outer,schedules=schedules,finalist_roles=finalist_roles(decisions),
+    return dict(outer=outer,schedules=schedules,finalist_roles=finalist_roles(decisions) if frozen_roles is None else dict(frozen_roles),
                 fresh_controls=controls,additional_cells=additional,outer_results_read=False,
                 outer_evaluation_admitted=False,status='plan_requires_verified_selection_and_extension_evidence')

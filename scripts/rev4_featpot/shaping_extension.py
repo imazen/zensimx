@@ -11,8 +11,15 @@ IMPROVEMENT={'loss_improvement_over_one_percent_or_rounding_boundary',
              'same_cycle_inner_composite_improvement_over_0.002'}
 
 
-def matrix(decisions,outer):
-    if set(decisions)!=set(NEURAL):raise ValueError('all neural family selections required')
+def matrix(decisions,outer,*,candidate_families=NEURAL):
+    required=set(candidate_families)
+    reduced=(len(required)==4 and 'relu' in required
+             and sum(f in ('softplus','silu_monotone','silu_diagnostic') for f in required)==1
+             and sum(f.startswith('product_') for f in required)==1
+             and sum(f.startswith('separate_') for f in required)==1)
+    if required!=set(NEURAL) and not (reduced and required<=set(NEURAL)):
+        raise ValueError('registered full or four-role neural scope required')
+    if set(decisions)!=required:raise ValueError('all neural family selections required')
     triggered=[]
     for family,decision in decisions.items():
         if decision['family']!=family or decision['outer']!=outer or decision['outer_results_read']:
@@ -22,7 +29,7 @@ def matrix(decisions,outer):
                 (f'inner-{outer}-{fold}',seed) for fold in range(2) for seed in range(3)}:
             raise ValueError('selected convergence pairing differs')
         if any(IMPROVEMENT & set(c['reasons']) for c in selected):triggered.append(family)
-    families=[f for f in NEURAL if f in triggered or (f=='relu' and triggered)]
+    families=[f for f in NEURAL if f in required and (f in triggered or (f=='relu' and triggered))]
     cells=[]
     def add(family,decision,partition,seed,role,targets):
         pretrained='_pretrained_' in family
@@ -80,10 +87,12 @@ def verify_decision(root,family,outer,cells):
 
 def register(root,outer):
     _,cells,_=load_registration(root);decisions={};pins={}
-    for family in NEURAL:
+    from shaping_reduced_scope import neural_families
+    required=neural_families(root,outer)
+    for family in required:
         decision,path=verify_decision(root,family,outer,cells)
         decisions[family]=decision;pins[str(path)]=sha(path)
-    result=matrix(decisions,outer)
+    result=matrix(decisions,outer,candidate_families=required)
     result.update(plan_sha256=sha(root/'PLAN.json'),decision_sha256=pins,
                   policy_sha256=sha(REPO/'docs/SHAPING_EXPOSURE_EXTENSION.md'),driver_sha256=sha(__file__))
     out=root/'extensions'/f'outer-{outer}';out.mkdir(parents=True,exist_ok=False)
@@ -99,11 +108,13 @@ def resolve(root,cell_id):
         if record['plan_sha256']!=sha(root/'PLAN.json') or record['policy_sha256']!=sha(REPO/'docs/SHAPING_EXPOSURE_EXTENSION.md'):
             raise ValueError('extension registration drift')
         decisions={}
-        for family in NEURAL:
+        from shaping_reduced_scope import neural_families
+        required=neural_families(root,record['outer'])
+        for family in required:
             decision,source=verify_decision(root,family,record['outer'],cells)
             if record['decision_sha256'].get(str(source))!=sha(source):raise ValueError('extension selection drift')
             decisions[family]=decision
-        expected=matrix(decisions,record['outer'])
+        expected=matrix(decisions,record['outer'],candidate_families=required)
         if any(record[k]!=v for k,v in expected.items()):raise ValueError('extension cannot be reproduced')
         found.append((next(c for c in record['cells'] if c['id']==cell_id),path))
     if len(found)!=1:raise ValueError('one registered extension cell required')

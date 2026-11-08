@@ -10,6 +10,22 @@ def decisions():
 
 
 class OuterPlanTests(unittest.TestCase):
+    def test_reduced_roles_do_not_create_unscreened_fit_or_control_obligations(self):
+        d=decisions();roles=finalist_roles(d)
+        # Unselected pretrained settings used to create extra matched controls.
+        d['product_pretrained_joint']['setting']=2
+        d['separate_pretrained_frozen']['setting']=3
+        result=plan(d,[],0,matrix(),active_families=roles.values(),frozen_roles=roles)
+        self.assertEqual(set(result['schedules']),set(roles.values()))
+        self.assertEqual(len(result['schedules']),6)
+        self.assertEqual(result['finalist_roles'],roles)
+        self.assertEqual(len(result['fresh_controls']),3)
+        self.assertEqual(result['additional_cells'],[])
+        with self.assertRaisesRegex(ValueError,'paired'):
+            plan(d,[],0,matrix(),active_families=roles.values())
+        with self.assertRaisesRegex(ValueError,'extensions require'):
+            plan(d,['relu','silu_diagnostic'],0,matrix(),active_families=roles.values(),frozen_roles=roles)
+
     def test_exact_fresh_matches_only_and_original_cells_preserved(self):
         d=decisions();r=plan(d,[],0,matrix())
         self.assertEqual(len(r['fresh_controls']),3);self.assertEqual(r['additional_cells'],[])
