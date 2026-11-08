@@ -72,13 +72,14 @@ def resolve_cell(cell,admission):
     raise ValueError('registered outer neural or fresh-control cell required')
 
 
-def execute(args):
+def admit(args,*,host=None):
+    """Reproduce outer admission and resolve immutable inputs without fitting."""
     plan,cells,_=load_registration(args.study);admission,admission_path=resolve(args.study,args.outer)
     cells+=admission['additional_cells'];matches=[c for c in cells if c['id']==args.cell]
     if len(matches)!=1:raise ValueError('one registered outer cell required')
     cell=matches[0];schedule=resolve_cell(cell,admission);prepared(args.study,args.outer,admission_path)
     from shaping_reduced_scope import admit_cell
-    admit_cell(args.study,cell)
+    admit_cell(args.study,cell,host=host)
     build=json.loads((args.binary_dir/'BUILD.json').read_text())
     for name,pin in build['binary_sha256'].items():
         if sha(args.binary_dir/name)!=pin:raise ValueError('outer native binary drift')
@@ -94,12 +95,30 @@ def execute(args):
     if admission['decision_sha256'].get(str(source/'RUN.json'))!=sha(source/'RUN.json'):
         raise ValueError('outer command template is not pinned by admission')
     if schedule['fresh']:original=fresh_command(original,cell['seed'])
+    templates=[(source,original)]
+    if '_pretrained_' in cell['family']:
+        family=cell['family'].split('_pretrained_')[0]+'_joint_identity'
+        parent,parent_run=primary_source(args.study,cells,template,schedule['setting'],family)
+        if admission['decision_sha256'].get(str(parent/'RUN.json'))!=sha(parent/'RUN.json'):
+            raise ValueError('outer pretraining template is not pinned by admission')
+        templates.append((parent,parent_run))
+    return dict(plan=plan,cells=cells,admission=admission,admission_path=admission_path,
+                cell=cell,schedule=schedule,record=record,groups=groups,source=source,
+                original=original,analytic=analytic,templates=templates)
+
+
+def execute(args):
+    context=admit(args)
+    plan,cells,admission,admission_path,cell,schedule,record,groups,source,original,analytic=(
+        context[name] for name in ('plan','cells','admission','admission_path','cell','schedule',
+                                  'record','groups','source','original','analytic'))
     builder=lambda original,binaries,dest,epochs:command(original,binaries,dest,epochs,record['groups'])
     dest=args.study/'runs'/cell['id']/f'attempt-{args.attempt:03}'
     if args.attempt<1 or dest.exists():raise ValueError('preserve outer fit attempts')
     with reservation(args.study,dest,plan['minimum_ssd_free_bytes']):
         dest.mkdir(parents=True)
         run=dict(cell=cell,schedule=schedule,admission_sha256=sha(admission_path),
+                 execution_host=__import__('socket').gethostname(),
                  plan_sha256=sha(args.study/'PLAN.json'),build_sha256=sha(args.binary_dir/'BUILD.json'),
                  driver_sha256=sha(__file__),pid=os.getpid(),process_role='outer_controller',stage='running',
                  fit_directory='fit',epochs=schedule['phase_epochs'][-1],pairs_per_epoch=50000,

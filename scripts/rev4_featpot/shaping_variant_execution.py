@@ -79,11 +79,12 @@ def resolve(root,cell_id):
         admission_sha256=sha(path),file_sha256=pins,outer_results_read=False)
 
 
-def execute(args):
+def admit(args,*,host=None):
+    """Resolve the original finalist, source and label gates without fitting."""
     plan,cells,_=load_registration(args.study);resolution=resolve(args.study,args.cell)
     cell=resolution['cell'];family=resolution['resolved_family'];schedule=resolution['schedule']
     from shaping_reduced_scope import admit_cell
-    admit_cell(args.study,cell)
+    admit_cell(args.study,cell,host=host)
     if family not in NEURAL:raise ValueError('variant neural runner requires a neural finalist')
     build_path=args.binary_dir/'BUILD.json';build=json.loads(build_path.read_text())
     for name,pin in build['binary_sha256'].items():
@@ -102,6 +103,24 @@ def execute(args):
     template=dict(cell,family=family,partition=f'inner-{outer}-0')
     source,original=primary_source(args.study,cells,template,schedule['setting'])
     if admission['decision_sha256'].get(str(source/'RUN.json'))!=sha(source/'RUN.json'):raise ValueError('unpinned variant command template')
+    templates=[(source,original)]
+    if '_pretrained_' in family:
+        parent_family=family.split('_pretrained_')[0]+'_joint_identity'
+        parent,parent_run=primary_source(args.study,cells,template,schedule['setting'],parent_family)
+        if admission['decision_sha256'].get(str(parent/'RUN.json'))!=sha(parent/'RUN.json'):
+            raise ValueError('unpinned variant pretraining template')
+        templates.append((parent,parent_run))
+    return dict(plan=plan,cells=cells,resolution=resolution,cell=cell,family=family,
+                schedule=schedule,record=record,groups=groups,qualification_pins=qualification_pins,
+                analytic=analytic,outer=outer,admission=admission,source=source,
+                original=original,templates=templates)
+
+
+def execute(args):
+    context=admit(args)
+    plan,cells,resolution,cell,family,schedule,record,groups,qualification_pins,analytic,outer,admission,source,original=(
+        context[name] for name in ('plan','cells','resolution','cell','family','schedule','record',
+                                  'groups','qualification_pins','analytic','outer','admission','source','original'))
     builder=lambda original,binaries,dest,epochs:command(original,binaries,dest,epochs,record['groups'],record['explicit_absent_fit_groups'])
     dest=args.study/'runs'/cell['id']/f'attempt-{args.attempt:03}'
     if args.attempt<1 or dest.exists():raise ValueError('preserve variant fit attempts')
@@ -111,6 +130,7 @@ def execute(args):
             if sha(name)!=pin:raise ValueError('variant native qualification changed while waiting')
         dest.mkdir(parents=True)
         run=dict(cell=cell,resolution=resolution,plan_sha256=sha(args.study/'PLAN.json'),
+            execution_host=__import__('socket').gethostname(),
             build_sha256=sha(build_path),driver_sha256=sha(__file__),pid=os.getpid(),
             process_role='variant_controller',stage='running',fit_directory='fit',epochs=schedule['phase_epochs'][-1],
             pairs_per_epoch=50000,training_exposure_pair_draws=schedule['total_pair_draws'],outer_results_read=False)
