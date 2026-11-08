@@ -255,7 +255,7 @@ def watch(args):
     with (args.output/'.owner').open('a') as lock:
         fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
         while True:
-            pending=[];blocked=[];imported=[]
+            pending=[];blocked=[];imported=[];capacity_wait_hosts=set()
             for path in sorted((args.study/'runs').glob('*/attempt-*/RESULT.json')):
                 value=json.loads(path.read_text());run=path.parent
                 stages=LATER_STAGES if getattr(args,'later_only',False) else ('inner','fresh_control_inner','rescue')
@@ -266,7 +266,12 @@ def watch(args):
                 if directory.exists():
                     if (directory/'FAILURE.json').exists() or not (directory/'WAITING.json').exists():blocked.append(value['cell']['id']);continue
                     if json.loads(request_path.read_text())!=record:raise ValueError('waiting evaluation request drift')
-                else:
+                # One capacity refusal applies to this host for the current
+                # sweep. Do not upload/recheck every queued cell on a full host.
+                # The next sweep probes again; a failure is never a capacity wait.
+                if host in capacity_wait_hosts:
+                    pending.append(record['cell']['id']);continue
+                if not directory.exists():
                     directory.mkdir();request_path.write_bytes(encoded(record))
                 remote=Path(args.remote_source)/'scripts/rev4_featpot/shaping_evaluation_worker.py'
                 remote_request=args.study.parent/'evaluation-worker-jobs'/value['cell']['id']/'REQUEST.json'
@@ -291,6 +296,7 @@ def watch(args):
                 probe=subprocess.run(['ssh',host,'test -f '+shlex.quote(str(remote_bundle)+'.json')])
                 if probe.returncode:
                     (directory/'WAITING.json').write_bytes(encoded(dict(stage='capacity_wait',host=host)))
+                    capacity_wait_hosts.add(host)
                     pending.append(record['cell']['id']);continue
                 bundle=directory/'evaluation.tar'
                 from shaping_storage import reservation
@@ -301,7 +307,8 @@ def watch(args):
                     publish(args.study,request_path,bundle,sidecar['bundle_sha256'],directory/'verified')
                 imported.append(record['cell']['id'])
             status=dict(pid=os.getpid(),checked_utc=datetime.now(timezone.utc).isoformat(),stage='watching',
-                        imported_this_sweep=imported,waiting=pending,requires_reconciliation=blocked)
+                        imported_this_sweep=imported,waiting=pending,requires_reconciliation=blocked,
+                        capacity_wait_hosts=sorted(capacity_wait_hosts))
             (args.output/'STATUS.json').write_bytes(encoded(status));print(json.dumps(status),flush=True)
             if not args.watch:return status
             time.sleep(30)

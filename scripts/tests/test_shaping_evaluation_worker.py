@@ -9,6 +9,35 @@ from shaping_evaluation_worker import request,_work,publish,verify_request,trans
 
 
 class WorkerEvaluationTests(unittest.TestCase):
+    def test_full_host_is_probed_once_per_sweep_without_losing_waiting_cells(self):
+        import shutil
+        from shaping_evaluation_worker import watch
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as directory:
+            root=Path(directory);study,run=self.fixture(root)
+            cells=[c for c in matrix() if c['stage']=='inner' and c['family']=='silu_monotone'][:4]
+            for i,cell in enumerate(cells):
+                target=study/'runs'/cell['id']/'attempt-001'
+                if target!=run:shutil.copytree(run,target)
+                for name in ('RUN.json','RESULT.json'):
+                    path=target/name;value=json.loads(path.read_text());value['cell']=cell
+                    if name=='RUN.json':value['execution_host']='r5600g' if i<2 else 'i134'
+                    path.write_bytes(encoded(value))
+            args=SimpleNamespace(study=study,output=root/'output',remote_source=root/'source',watch=False,
+                                 binary_dir=root/'bin',repair_binary_dir=root/'repair',inspector=root/'inspect')
+            calls=[]
+            def remote(command,**kwargs):
+                calls.append(command)
+                return SimpleNamespace(returncode=int(command[0]=='ssh' and command[-1].startswith('test -f ')))
+            with patch('shaping_execution.load_registration',return_value=({},matrix(),{})), \
+                 patch('shaping_evaluation_worker.subprocess.run',side_effect=remote):
+                for sweep in range(2):
+                    status=watch(args)
+                    self.assertEqual(set(status['waiting']),{c['id'] for c in cells})
+                    self.assertEqual(status['capacity_wait_hosts'],['i134','r5600g'])
+                    self.assertFalse(status['requires_reconciliation'])
+                    work=[c for c in calls if c[0]=='ssh' and '--work' in c[-1]]
+                    self.assertEqual(len(work),2*(sweep+1))
+
     def relu_fixture(self,root):
         study,run=self.fixture(root)
         cell=next(c for c in matrix() if c['stage']=='inner' and c['family']=='relu')

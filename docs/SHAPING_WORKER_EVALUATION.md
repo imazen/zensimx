@@ -21,6 +21,11 @@ and publish whole trees without overwriting existing evidence. Preserve failed
 or unresolved operations for reconciliation; only a capacity wait can retry
 automatically, since it has not begun evaluation.
 
+A full host is probed once per coordinator sweep. Its other pending cells stay
+queued without repeated request uploads or remote capacity processes. Capacity
+is checked afresh on the next sweep; failed or unresolved evaluations remain
+separate and never become automatic retries.
+
 Worker capsules carry the unchanged reduced policy as `REDUCED_PROTOCOL.md`,
 analogous to the original `PROTOCOL.md`. Its hash and the installed source's
 policy must both match the immutable registration. The original policy path and
