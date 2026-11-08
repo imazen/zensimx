@@ -100,9 +100,10 @@ def compute_matched(arms,registration,draws,labels,seed_ids,progress=lambda *arg
     return samples,points,reduce_matched(samples,points,seed_ids)
 
 
-def run(args):
+def admit(args,*,host=None):
+    """Reproduce the complete evidence gate before bootstrap computation."""
     from shaping_reduced_scope import admit_compute
-    admit_compute(args.study)
+    admit_compute(args.study,host=host)
     comparison=getattr(args,'comparison',None);spec=None
     if comparison is None:
         plan,partitions,outputs,pins,qualifications=collect(args.study)
@@ -139,6 +140,16 @@ def run(args):
     build=args.binary_dir/'BUILD.json';binary=args.binary_dir/'panel'
     if sha(binary)!=json.loads(build.read_text())['binary_sha256']['panel']:raise ValueError('native panel drift')
     pins.update({str(build):sha(build),str(binary):sha(binary)})
+    return dict(plan=plan,partitions=partitions,outputs=outputs,pins=pins,qualifications=qualifications,
+        registration=registration,draws=draws,data=data,binary=binary,comparison=comparison,spec=spec,
+        arms=arms if comparison is not None else None,seed_ids=seed_ids if comparison is not None else None)
+
+
+def run(args):
+    context=admit(args)
+    plan=context['plan'];outputs=context['outputs'];pins=context['pins'];qualifications=context['qualifications']
+    registration=context['registration'];draws=context['draws'];data=context['data'];binary=context['binary']
+    comparison=context['comparison'];spec=context['spec'];arms=context['arms'];seed_ids=context['seed_ids']
     os.environ['ZEN_PANEL_BIN']=str(binary)
     from shaping_storage import reservation
     with reservation(args.study,args.output,plan['minimum_ssd_free_bytes']):

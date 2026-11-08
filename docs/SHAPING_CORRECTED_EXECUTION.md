@@ -61,6 +61,14 @@ raw source and maintains the SSD reserve. A real 29,736,960-byte input capsule
 produced the same 15,852,985-byte compressed object and exact raw hash through
 this reusable owner. This changes storage representation, not training data.
 
+Bootstrap admission is now callable separately from computation, so a worker
+capsule can reproduce the original gate and bind its complete input closure.
+The computation still calls that same admission owner first. Every outer
+admission and complete paired report set remains required before predictions
+are opened; registered draw reproduction and native point-rank checks remain
+unchanged. Transport and scientific outer bootstrap execution are not implied
+by this refactor.
+
 The frozen four-setting matrix and the archived monotone-SiLU trajectory were
 accepted by these checks on November 8, 2026. Five other native control
 qualifications were still running; no activation was written. Fixture checks establish orchestration
