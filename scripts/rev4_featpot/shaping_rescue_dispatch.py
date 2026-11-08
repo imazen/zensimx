@@ -15,7 +15,12 @@ from shaping_selection import select
 def base_ready(root,cells,family,outer):
     expected=[c for c in cells if c['family']==family and c['stage']=='inner' and
               c['partition'] in (f'inner-{outer}-0',f'inner-{outer}-1')]
-    if len(expected)!=24:raise ValueError('complete registered base matrix required')
+    seeds=(None,) if family=='shaped_additive' else (0,1,2)
+    coverage={(setting,f'inner-{outer}-{fold}',seed) for setting in range(4)
+              for fold in range(2) for seed in seeds}
+    if (family not in (*NEURAL,'extra_trees','shaped_additive') or len(expected)!=len(coverage)
+        or {(c['setting'],c['partition'],c['seed']) for c in expected}!=coverage):
+        raise ValueError('complete registered base matrix required')
     repaired=family in MAX_PAIR_FAMILIES
     for cell in expected:
         directory=root/('reexport_max_pairs' if repaired else 'runs')/cell['id']
@@ -23,7 +28,7 @@ def base_ready(root,cells,family,outer):
         if len(markers)>1:raise ValueError('ambiguous base report')
         if not markers:return False
         parent=markers[0].parent.parent
-        if not (parent/'CONVERGENCE.json').exists() and not (parent/'CONVERGENCE_FAILURE.json').exists():return False
+        if family in NEURAL and not (parent/'CONVERGENCE.json').exists() and not (parent/'CONVERGENCE_FAILURE.json').exists():return False
     return True
 
 

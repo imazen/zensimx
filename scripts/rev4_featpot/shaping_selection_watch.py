@@ -29,31 +29,51 @@ def sweep(root,outer):
     _,cells,_=load_registration(root);directory=root/'selection'/f'outer-{outer}'
     if not (root/f'RESCUE_TRIGGER_OUTER_{outer}.json').exists():
         return dict(stage='waiting_for_rescue_trigger',completed_rescue_selections=[])
+    from shaping_reduced_scope import coverage,shortlist,neural_families,rescue_choices
+    required_neural=NEURAL
+    if coverage(root) is not None:
+        from shaping_rescue_dispatch import base_ready
+        from shaping_selection import select as select_base
+        created_bases=[]
+        for family in FAMILIES:
+            path=directory/(family+'-base.json')
+            if path.exists() or not base_ready(root,cells,family,outer):continue
+            select_base(SimpleNamespace(study=root,family=family,outer=outer,
+                                        reexport_max_pairs=family in MAX_PAIR_FAMILIES))
+            created_bases.append(family)
+        if not all((directory/(family+'-base.json')).exists() for family in FAMILIES):
+            return dict(stage='waiting_for_complete_original_inner_shortlist',
+                        completed_rescue_selections=[],created_base_selections=created_bases,
+                        outer_results_read=False)
+        shortlist_path=root/'reduced_scope'/f'outer-{outer}'/'SHORTLIST.json'
+        if not shortlist_path.exists():shortlist(root,outer,register=True)
+        required_neural=neural_families(root,outer)
     decisions={};created=[]
-    for family in NEURAL:
+    for family in required_neural:
         base=directory/(family+'-base.json');decision=directory/(family+'-rescue.json')
         if not base.exists():continue
         if not decision.exists():
             representation=json.loads(base.read_text()).get('representation','original')
+            choices,_=rescue_choices(root,family,outer)
             required=[c for c in cells if c['stage']=='rescue' and c['family']==family and
-                      c['partition'] in (f'inner-{outer}-0',f'inner-{outer}-1')]
-            if len(required)!=24:raise ValueError('complete registered rescue matrix required')
+                      c['partition'] in (f'inner-{outer}-0',f'inner-{outer}-1') and c['rescue'] in choices]
+            if len(required)!=6*len(choices):raise ValueError('complete registered rescue matrix required')
             if not all(ready(root,c,representation) for c in required):continue
             select_rescue(SimpleNamespace(study=root,family=family,outer=outer));created.append(family)
         decisions[family]=verify_decision(root,family,outer,cells)[0]
     result=dict(stage='waiting_for_paired_rescue_evidence',completed_rescue_selections=sorted(decisions),
                 created_rescue_selections=created,outer_results_read=False)
-    if set(decisions)!=set(NEURAL):return result
+    if set(decisions)!=set(required_neural):return result
     path=root/'extensions'/f'outer-{outer}'/'REGISTRATION.json'
     if not path.exists():register_extension(root,outer)
     registration=json.loads(path.read_text())
     # Reproduce even an empty extension matrix, which has no cell to resolve.
     from shaping_extension import matrix
-    from shaping_completion import MAX_PAIR_FAMILIES,REPO
-    expected=matrix(decisions,outer)
+    from shaping_completion import REPO
+    expected=matrix(decisions,outer,candidate_families=required_neural)
     if any(registration[k]!=v for k,v in expected.items()) or registration['plan_sha256']!=sha(root/'PLAN.json') or registration['policy_sha256']!=sha(REPO/'docs/SHAPING_EXPOSURE_EXTENSION.md'):
         raise ValueError('extension registration cannot be reproduced')
-    for family in NEURAL:
+    for family in required_neural:
         source=directory/(family+'-rescue.json')
         if registration['decision_sha256'].get(str(source))!=sha(source):raise ValueError('extension decision pin differs')
     result.update(stage='waiting_for_extension_evidence',required_extension_cells=len(registration['cells']))

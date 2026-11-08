@@ -7,6 +7,29 @@ from shaping_selection_watch import ready,sweep
 
 
 class SelectionWatchTests(unittest.TestCase):
+    def test_reduced_watcher_creates_ready_bases_before_waiting_for_other_pools(self):
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as directory:
+            root=Path(directory);selection=root/'selection/outer-0';selection.mkdir(parents=True)
+            (root/'RESCUE_TRIGGER_OUTER_0.json').write_text('{}')
+            cells=matrix()
+            for cell in cells:
+                if cell['stage']!='inner' or cell['family']!='silu_diagnostic' or cell['partition'] not in ('inner-0-0','inner-0-1'):continue
+                run=root/'runs'/cell['id']/'attempt-001';(run/'evaluation').mkdir(parents=True)
+                (run/'evaluation/COMPLETE.json').write_text('{}');(run/'CONVERGENCE.json').write_text('{}')
+            def select_base(args):
+                self.assertEqual(args.family,'silu_diagnostic')
+                self.assertFalse(args.reexport_max_pairs)
+                (selection/(args.family+'-base.json')).write_text('{}')
+            with patch('shaping_selection_watch.load_registration',return_value=({},cells,{})), \
+                    patch('shaping_reduced_scope.coverage',return_value={}), \
+                    patch('shaping_selection.select',side_effect=select_base) as base, \
+                    patch('shaping_selection_watch.select_rescue') as rescue, \
+                    patch('shaping_selection_watch.register_outer') as outer:
+                result=sweep(root,0)
+                self.assertEqual(result['stage'],'waiting_for_complete_original_inner_shortlist')
+                self.assertEqual(result['created_base_selections'],['silu_diagnostic'])
+                base.assert_called_once();rescue.assert_not_called();outer.assert_not_called()
+
     def test_final_report_without_diagnostics_is_not_ready_and_ambiguity_fails(self):
         with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as directory:
             root=Path(directory);cell=dict(id='c',family='relu')

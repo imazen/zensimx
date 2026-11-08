@@ -11,8 +11,14 @@ from shaping_outer_execution import prepare,resolve_cell
 
 def selected_cells(cells,admission):
     partition=f"outer-{admission['outer']}"
-    primary=[c for c in cells if c['stage']=='outer' and c['partition']==partition and c['family'] in NEURAL]
-    if len(primary)!=30 or {(c['family'],c['seed']) for c in primary}!={(f,s) for f in NEURAL for s in range(3)}:
+    families=NEURAL
+    if 'reduced_scope_sha256' in admission:
+        families=tuple(f for f in NEURAL if f in admission['schedules'])
+        expected={admission['finalist_roles'][role] for role in ('relu','best_analytic','best_product','best_separate')}
+        if len(families)!=4 or set(families)!=expected:
+            raise ValueError('four frozen reduced neural roles required')
+    primary=[c for c in cells if c['stage']=='outer' and c['partition']==partition and c['family'] in families]
+    if len(primary)!=3*len(families) or {(c['family'],c['seed']) for c in primary}!={(f,s) for f in families for s in range(3)}:
         raise ValueError('complete thirty-cell paired outer neural matrix required')
     fresh=[v['cell'] for v in admission['fresh_controls']]
     registered=cells+admission['additional_cells']
@@ -58,6 +64,11 @@ def variant_cells(cells,admission,controls=False):
     roles=('extra_trees','shaped_additive') if controls else ('relu','best_analytic','best_product','best_separate')
     chosen=[c for c in cells if c['stage'] in stages and c['partition']==partition and c['family'] in roles]
     expected=[c for c in matrix() if c['stage'] in stages and c['partition']==partition and c['family'] in roles]
+    if 'reduced_scope_sha256' in admission:
+        from shaping_reduced_scope import fixed_cells
+        approved={c['id'] for c in fixed_cells(matrix())}
+        chosen=[c for c in chosen if c['id'] in approved]
+        expected=[c for c in expected if c['id'] in approved]
     if sorted(chosen,key=lambda c:c['id'])!=sorted(expected,key=lambda c:c['id']):
         raise ValueError('complete registered variant matrix required')
     allowed=('extra_trees','shaped_additive') if controls else NEURAL

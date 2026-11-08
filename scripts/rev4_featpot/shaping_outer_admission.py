@@ -38,6 +38,16 @@ def base_decision(root,family,outer,cells):
 
 def build(root,outer):
     _,cells,_=load_registration(root);decisions={};evidence={};neural={};representations={};evaluators={}
+    from shaping_reduced_scope import coverage,shortlist
+    amendment=coverage(root);frozen=None;shortlist_path=None
+    if amendment is not None:
+        frozen,shortlist_path=shortlist(root,outer)
+        active=set(frozen['roles'].values())
+        required_neural=tuple(f for f in NEURAL if f in active)
+        evidence.update(frozen['evidence_sha256'])
+        evidence[str(shortlist_path)]=sha(shortlist_path)
+    else:
+        active=set(FAMILIES);required_neural=NEURAL
     def check_evaluator(family,row):
         identity=dict(representation='research-relu-max-pairs-v1' if 'reexport_receipt' in row else 'original',
                       evaluation_build_sha256=row.get('evaluation_build_sha256'))
@@ -59,7 +69,7 @@ def build(root,outer):
         representations[family]=representation
         decision=dict(family=family,outer=outer,setting=setting,optimizer_choice='base',
                       inner_score=actual['setting_scores'][setting],outer_results_read=False)
-        if family in NEURAL:
+        if family in required_neural:
             # All base settings support the equal-search decision; some also
             # supply a fresh template/pretraining parent at another family's
             # selected setting. Pin every primary source, not only the winner.
@@ -96,7 +106,7 @@ def build(root,outer):
             record['selected_convergence']=convergence;neural[family]=record
             decision['selected_convergence']=convergence
         decisions[family]=decision
-    extension=extension_matrix(neural,outer);extended=extension['extended_families'];extension_results={}
+    extension=extension_matrix(neural,outer,candidate_families=required_neural);extended=extension['extended_families'];extension_results={}
     if extension['cells']:
         path=root/'extensions'/f'outer-{outer}'/'REGISTRATION.json';registration=json.loads(path.read_text())
         if registration['plan_sha256']!=sha(root/'PLAN.json') or registration['policy_sha256']!=sha(REPO/'docs/SHAPING_EXPOSURE_EXTENSION.md'):
@@ -113,9 +123,10 @@ def build(root,outer):
             if run['resolution']['registration_sha256']!=sha(path) or run['resolution']['cell']!=cell:
                 raise ValueError('extension fit resolution differs')
             extension_results[cell['id']]=diagnostic
-    resolved=outer_plan(decisions,extended,outer,cells)
+    resolved=outer_plan(decisions,extended,outer,cells,**({} if frozen is None else
+                        dict(active_families=active,frozen_roles=frozen['roles'])))
     qualifications={}
-    for family in NEURAL:
+    for family in required_neural:
         diagnostics=(list(decisions[family]['selected_convergence'].values()) if family not in extended else
                      [extension_results[c['id']] for c in extension['cells'] if c['family']==family and c['role']=='primary'])
         if len(diagnostics)!=6:raise ValueError('final diagnostic pairing differs')
@@ -125,6 +136,9 @@ def build(root,outer):
     resolved.update(outer_evaluation_admitted=True,status='admitted_with_explicit_convergence_classifications',
                     qualifications=qualifications,evaluation_representations=evaluators,plan_sha256=sha(root/'PLAN.json'),policy_sha256=sha(POLICY),
                     decision_sha256=evidence,driver_sha256=sha(__file__))
+    if amendment is not None:
+        resolved.update(reduced_scope_sha256=amendment['registration_sha256'],
+                        shortlist_sha256=sha(shortlist_path))
     return resolved
 
 

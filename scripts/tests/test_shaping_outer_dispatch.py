@@ -4,12 +4,33 @@ from types import SimpleNamespace
 from unittest.mock import patch
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'rev4_featpot'))
 from shaping_completion import matrix,FAMILIES,encoded,sha
-from shaping_outer_plan import plan
+from shaping_outer_plan import plan,finalist_roles
 from shaping_outer_execution import resolve_cell
 from shaping_outer_dispatch import selected_cells,existing,dispatch
 
 
 class OuterDispatchTests(unittest.TestCase):
+    def test_reduced_outer_and_variant_cells_keep_all_paired_seeds(self):
+        from shaping_outer_dispatch import variant_cells
+        decisions={f:dict(family=f,outer=0,outer_results_read=False,setting=0,
+                         optimizer_choice='base',inner_score=.8) for f in FAMILIES}
+        roles=finalist_roles(decisions)
+        admission=plan(decisions,[],0,self.cells,active_families=roles.values(),frozen_roles=roles)
+        admission.update(outer_evaluation_admitted=True,reduced_scope_sha256='approved')
+        selected=selected_cells(self.cells,admission)
+        self.assertEqual(sum(c['stage']=='outer' for c in selected),12)
+        self.assertEqual(sum(c['stage']=='fresh_control_outer' for c in selected),3)
+        neural=variant_cells(self.cells,admission)
+        controls=variant_cells(self.cells,admission,True)
+        self.assertEqual((len(neural),len(controls)),(48,16))
+        self.assertEqual({c['stage'] for c in neural+controls},{'source_curve','shuffle','human_only'})
+        self.assertEqual({c['fraction'] for c in neural+controls if c['stage']=='source_curve'},{.25,.5})
+        self.assertEqual({c['order_seed'] for c in neural+controls if c['stage']=='source_curve'},{20261107})
+        self.assertEqual({c['permutation'] for c in neural+controls if c['stage']=='shuffle'},{'population'})
+        self.assertEqual({c['permutation_seed'] for c in neural+controls if c['stage']=='shuffle'},{20261107})
+        with self.assertRaisesRegex(ValueError,'complete registered variant'):
+            variant_cells([c for c in self.cells if c['id']!=neural[0]['id']],admission)
+
     def setUp(self):
         self.cells=matrix()
         decisions={f:dict(family=f,outer=0,outer_results_read=False,setting=0,optimizer_choice='base',inner_score=.8) for f in FAMILIES}
