@@ -24,6 +24,14 @@ budgets. Inputs are shared rather than copied per seed. Keep the 30-GiB SSD
 reserve and account for pending output reservations. Existing attempts, including
 failures, refuse another launch.
 
+An explicit, hash-bound `TRAINING_CPU_BUDGET.json` can set aggregate training
+counts independently of per-job thread pools. Its owner approval must preserve
+RAM/storage guards and per-job thread caps; observed CPU availability must match
+the approved host record. Missing configuration retains historical admission.
+Existing frozen executables and loaded orchestration exports remain unchanged;
+new owners use the approved budget, with queued-request transfers recorded
+explicitly before any replacement controller starts.
+
 A wave manifest pins each request and permits at most four controller threads.
 Every child still uses shared CPU/SSD admission. Finished and failed children are
 recorded as they exit; failures never retry. Size the aggregate memory scope from

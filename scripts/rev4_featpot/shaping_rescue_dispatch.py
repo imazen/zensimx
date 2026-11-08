@@ -69,7 +69,7 @@ def resource_controls(args):
     return workers,drain is not None and drain.exists(),pin
 
 
-def worker_slot(active_cells,proc=Path('/proc'),cpu_count=None):
+def worker_slot(active_cells,proc=Path('/proc'),cpu_count=None,study=None):
     cpu_count=len(os.sched_getaffinity(0)) if cpu_count is None else cpu_count
     native=0;own=0
     for path in proc.glob('[0-9]*/comm'):
@@ -81,7 +81,8 @@ def worker_slot(active_cells,proc=Path('/proc'),cpu_count=None):
         except (FileNotFoundError,ProcessLookupError):continue
     pending=max(0,len(active_cells)-own)
     available=int(next(line.split()[1] for line in (proc/'meminfo').read_text().splitlines() if line.startswith('MemAvailable:')))*1024
-    budget=max(1,(cpu_count or 1)-4);minimum=(6+2*pending)*1024**3
+    from shaping_training_budget import training_limit
+    budget=training_limit(study,cpu_count or 1);minimum=(6+2*pending)*1024**3
     return dict(can_start=native+pending<budget and available>=minimum,native_threads=native,
                 pending_dispatcher_threads=pending,cpu_budget=budget,available_memory_bytes=available,
                 minimum_available_memory_bytes=minimum)
@@ -120,7 +121,7 @@ def reserve_worker(root,cell,proc=Path('/proc'),cpu_count=None):
     # Unexpected dead-owner claims remain reserved for explicit reconciliation.
     with worker_claims(root) as claims:
         legacy=pending_scientific_cells(root)
-        observation=worker_slot(set(claims)|legacy,proc,cpu_count)
+        observation=worker_slot(set(claims)|legacy,proc,cpu_count,study=root)
         observation['shared_claims']=len(claims)
         observation['existing_scientific_reservations']=len(legacy)
         if cell in claims:

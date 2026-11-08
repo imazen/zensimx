@@ -71,6 +71,11 @@ def resolve_inputs(study,cell_id,host,binaries,qualification):
             path=Path(filename).absolute()
             if REPO in path.parents and path.suffix=='.py':paths.add(path)
     paths.add(Path(__file__).absolute())
+    for name in ('shaping_training_budget.py','shaping_rescue_dispatch.py'):
+        paths.add(REPO/'scripts/rev4_featpot'/name)
+    budget=study/'TRAINING_CPU_BUDGET.json'
+    if budget.exists():
+        paths.add(budget);paths.add(Path(json.loads(budget.read_text())['approval_path']))
     files={}
     for path in sorted(paths):
         if path.is_symlink() or not path.is_file():raise ValueError('nonregular rescue dependency')

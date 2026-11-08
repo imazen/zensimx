@@ -64,14 +64,15 @@ def verify_request(study,record):
         if sha(study/name)!=pin:raise ValueError('worker evaluation input drift')
 
 
-def capacity():
+def capacity(study=None):
     busy=0
     for path in Path('/proc').glob('[0-9]*/comm'):
         try:
             if path.read_text().strip() in ('zensim_mlp_trai','rustc'):busy+=1
         except (FileNotFoundError,ProcessLookupError):pass
     available=int(next(l.split()[1] for l in Path('/proc/meminfo').read_text().splitlines() if l.startswith('MemAvailable:')))*1024
-    return busy<max(1,len(os.sched_getaffinity(0))-4) and available>=7*1024**3
+    from shaping_training_budget import training_limit
+    return busy<training_limit(study) and available>=7*1024**3
 
 
 def require_terminal(record,files):
@@ -95,7 +96,7 @@ def work(args):
 
 def _work(args):
     record=json.loads(args.request.read_text());verify_request(args.study,record)
-    if not capacity():return dict(stage='waiting_for_capacity')
+    if not capacity(args.study):return dict(stage='waiting_for_capacity')
     if args.bundle.exists():raise ValueError('preserve existing evaluation export')
     from shaping_supervision import sweep
     from shaping_reexport_supervision import sweep as supplemental
