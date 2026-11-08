@@ -5561,5 +5561,9 @@ shaping-host-transition-check:
 shaping-reduced-scope-check:
     python3 -B -m unittest discover -s scripts/tests -p test_shaping_reduced_scope.py
 
+shaping-reduced-downstream-check:
+    python3 -B -m unittest scripts.tests.test_shaping_reduced_scope scripts.tests.test_shaping_extension scripts.tests.test_shaping_outer_plan scripts.tests.test_shaping_outer_dispatch scripts.tests.test_shaping_outer_admission scripts.tests.test_shaping_selection_watch scripts.tests.test_shaping_rescue scripts.tests.test_shaping_rescue_dispatch scripts.tests.test_shaping_host_assignment scripts.tests.test_shaping_host_transition scripts.tests.test_shaping_outer_execution scripts.tests.test_shaping_variant_execution
+    python3 -B scripts/lint_scripts.py
+
 shaping-reduced-scope-register study approval:
     python3 -B scripts/rev4_featpot/shaping_reduced_scope.py --study {{quote(study)}} --approval {{quote(approval)}}

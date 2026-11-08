@@ -3525,3 +3525,36 @@ reports and diagnostic receipts. It selects setting 3 with human composite
 An attempted monotone-SiLU base selection refused because finite final panels
 still lacked required convergence evidence; no selection receipt was written.
 The refusal is retained and the gate was not relaxed.
+
+### Reduced downstream code qualification, 01:23 UTC
+
+The reduced extension, outer and variant matrix paths are now implemented.
+Outer planning preserves all twelve original base decisions for screening,
+freezes six finalist roles before rescue outcomes, and creates schedules only
+for those roles. Unselected pretrained settings no longer create fresh-control
+obligations. Selected pretrained settings still require their exact matched
+fresh controls, reported outside the core when additional controls are needed.
+
+Conditional doubled-exposure diagnostics retain their existing criteria and
+two-fold/three-seed pairing, restricted to shortlisted neural roles. Outer
+dispatch requires twelve neural fits per fold plus its exact fresh controls;
+the control owner supplies three Extra Trees fits and one deterministic additive
+fit, yielding sixteen core outer fits per fold. Variant dispatch keeps the
+approved 48 neural and sixteen nonneural cells per fold: two source fractions,
+one population permutation and human-only supervision. Removed row/full-data
+fits are refused before new attempts. Historical evidence verification remains
+separate from new-admission guards.
+
+The selection owner now creates any ready original base decisions itself before
+waiting for other pools. This removes dependence on the retired exhaustive
+rescue dispatcher visiting each family. A final panel without its required
+diagnostic evidence remains pending, not selected.
+
+The combined check passed 75 relevant tests and the 1,738-script lint. Its
+wrapper reports 21 s, peak RSS 0.07 GiB, minimum available RAM 30,905 MiB and
+peak load 2.39. The durable log is in
+`reduced-downstream-qualification-20261108-0120/qualification.log` under the
+private study root. These are code qualifications. Replacement-worker
+downstream input transport/deployment, reduced bootstrap dependencies and
+outer-model cost-runner selection remain unfinished; no outer fit is thereby
+reported complete.

@@ -101,6 +101,8 @@ def prepared(root,identifier):
 
 def execute(args):
     plan,cells,_,admission,path,cell,family,schedule=fit_cell(args.study,args.cell)
+    from shaping_reduced_scope import admit_cell
+    admit_cell(args.study,cell)
     if family not in NEURAL:raise ValueError('native full-FIT runner requires a neural finalist')
     inputs=prepared(args.study,args.cell)
     build_path=args.binary_dir/'BUILD.json';build=json.loads(build_path.read_text())

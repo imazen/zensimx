@@ -42,6 +42,8 @@ def fresh_command(original,seed):
 
 def execute(args):
     plan,cells,_=load_registration(args.study);resolution=resolve(args.study,args.cell);cell=resolution['cell']
+    from shaping_reduced_scope import admit_cell
+    admit_cell(args.study,cell)
     for name,pin in json.loads((args.binary_dir/'BUILD.json').read_text())['binary_sha256'].items():
         if sha(args.binary_dir/name)!=pin:raise ValueError('extension native binary drift')
     analytic=cell['family'] in ('softplus','silu_monotone','silu_diagnostic')

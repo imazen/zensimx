@@ -77,6 +77,8 @@ def execute(args):
     cells+=admission['additional_cells'];matches=[c for c in cells if c['id']==args.cell]
     if len(matches)!=1:raise ValueError('one registered outer cell required')
     cell=matches[0];schedule=resolve_cell(cell,admission);prepared(args.study,args.outer,admission_path)
+    from shaping_reduced_scope import admit_cell
+    admit_cell(args.study,cell)
     build=json.loads((args.binary_dir/'BUILD.json').read_text())
     for name,pin in build['binary_sha256'].items():
         if sha(args.binary_dir/name)!=pin:raise ValueError('outer native binary drift')

@@ -82,6 +82,8 @@ def resolve(root,cell_id):
 def execute(args):
     plan,cells,_=load_registration(args.study);resolution=resolve(args.study,args.cell)
     cell=resolution['cell'];family=resolution['resolved_family'];schedule=resolution['schedule']
+    from shaping_reduced_scope import admit_cell
+    admit_cell(args.study,cell)
     if family not in NEURAL:raise ValueError('variant neural runner requires a neural finalist')
     build_path=args.binary_dir/'BUILD.json';build=json.loads(build_path.read_text())
     for name,pin in build['binary_sha256'].items():

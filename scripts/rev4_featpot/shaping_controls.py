@@ -115,6 +115,8 @@ def run(args):
 
 
 def fit(args,plan,partitions,family,chosen,outer):
+    from shaping_reduced_scope import admit_cell
+    for cell in chosen:admit_cell(args.study,cell)
     from shaped_linear_study import OLD,metrics,weights_and_targets,fit_spec,apply_basis,HEAVY
     from tree_study import RAW_IDS,estimator,native_gate
     membership=partitions[args.partition]

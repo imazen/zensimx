@@ -85,6 +85,8 @@ def run_native(root,binary_dir,cell,record,attempt,epochs,mem):
 def _run_native(root,binary_dir,cell,record,attempt,epochs,mem):
     from shaping_host_assignment import check
     check(root,[cell],sha(binary_dir/'BUILD.json'))
+    from shaping_reduced_scope import admit_cell
+    admit_cell(root,cell)
     if attempt<1:raise ValueError('attempt must be positive')
     dest=root/'runs'/cell['id']/f'attempt-{attempt:03}'
     if dest.exists():raise ValueError('destination exists; inspect its actual process/artifacts')
