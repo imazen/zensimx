@@ -9,6 +9,21 @@ from shaping_evaluation_worker import request,_work,publish,verify_request,trans
 
 
 class WorkerEvaluationTests(unittest.TestCase):
+    def test_qualified_supplemental_runtime_is_explicit_and_original_controls_stay_pinned(self):
+        from shaping_evaluation_worker import supplemental_binaries
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as directory:
+            root=Path(directory);repair=root/'repair';v3=root/'v3';repair.mkdir();v3.mkdir()
+            (repair/'BUILD.json').write_text('original runtime');(v3/'BUILD.json').write_text('qualified runtime')
+            args=SimpleNamespace(study=root/'study',repair_binary_dir=repair,candidate_binary_dir=[v3])
+            self.assertEqual(supplemental_binaries(args,'relu'),repair)
+            self.assertEqual(supplemental_binaries(args,'softplus'),repair)
+            with self.assertRaisesRegex(ValueError,'unqualified'):supplemental_binaries(args,'silu_monotone')
+            with patch('shaping_completion.max_pair_families',return_value=('relu','softplus','silu_monotone')), \
+                 patch('shaping_corrected_view.BUILD_SHA256',sha(v3/'BUILD.json')):
+                self.assertEqual(supplemental_binaries(args,'silu_monotone'),v3)
+                args.candidate_binary_dir=[]
+                with self.assertRaisesRegex(ValueError,'one explicit'):supplemental_binaries(args,'silu_monotone')
+
     def test_full_host_is_probed_once_per_sweep_without_losing_waiting_cells(self):
         import shutil
         from shaping_evaluation_worker import watch

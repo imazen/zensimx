@@ -192,8 +192,9 @@ def _work(args):
         values.candidate_binary_dir=getattr(args,'candidate_binary_dir',[])
         later_sweep(values)
     else:sweep(values)
-    if 'later_scope' not in record and record['cell']['family'] in ('relu','softplus'):
-        supplemental(SimpleNamespace(study=args.study,binary_dir=args.repair_binary_dir,inspector=args.inspector,
+    from shaping_completion import max_pair_families
+    if 'later_scope' not in record and record['cell']['family'] in max_pair_families(args.study):
+        supplemental(SimpleNamespace(study=args.study,binary_dir=supplemental_binaries(args,record['cell']['family']),inspector=args.inspector,
                                      cells=values.cells,family=record['cell']['family']))
     verify_request(args.study,record)
     files={}
@@ -214,6 +215,18 @@ def _work(args):
         for name in files:archive.add(args.study/name,arcname='payload/'+name,recursive=False)
     result=dict(stage='complete',bundle_sha256=sha(args.bundle),files=len(files),request_sha256=sha(args.request))
     Path(str(args.bundle)+'.json').write_bytes(encoded(result));return result
+
+
+def supplemental_binaries(args,family):
+    """Keep original controls pinned; certified additions use their qualified V3."""
+    from shaping_completion import MAX_PAIR_FAMILIES,max_pair_families
+    if family in MAX_PAIR_FAMILIES:return args.repair_binary_dir
+    if family not in max_pair_families(args.study):raise ValueError('unqualified supplemental family')
+    from shaping_corrected_view import BUILD_SHA256
+    candidates={p for p in (args.repair_binary_dir,*getattr(args,'candidate_binary_dir',[]))
+                if p is not None and (p/'BUILD.json').is_file() and sha(p/'BUILD.json')==BUILD_SHA256}
+    if len(candidates)!=1:raise ValueError('one explicit qualified stable-export runtime required')
+    return next(iter(candidates))
 
 
 def publish(study,request_path,bundle,pin,staging):
