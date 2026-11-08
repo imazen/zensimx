@@ -5810,3 +5810,7 @@ shaping-external-native-build target:
 
 shaping-external-native-qualify binaries tree_model tree_parity linear_model linear_inputs linear_reference output:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_external_native_qualify.py --binaries {{quote(binaries)}} --tree-model {{quote(tree_model)}} --tree-parity {{quote(tree_parity)}} --linear-model {{quote(linear_model)}} --linear-inputs {{quote(linear_inputs)}} --linear-reference {{quote(linear_reference)}} --output {{quote(output)}}
+
+# Stage the already registered inner validation closure; this performs no fitting.
+shaping-evaluation-inputs mode study manifest *args:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_evaluation_inputs.py {{quote(mode)}} --study {{quote(study)}} --manifest {{quote(manifest)}} {{args}}

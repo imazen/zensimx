@@ -1,3 +1,13 @@
+## Known Bugs — missing evaluation input closure (November 8, 2026)
+
+New worker training capsules contained TRAIN views but lacked the separate
+registered validation closure and prepared group metadata. Evaluation stopped
+before native predictions, leaving incomplete view directories. The bounded
+input helper now checks and transports all six registered inner views, probes,
+frozen label/source arrays and prepared metadata. It preserves incomplete caches
+as backups and refuses complete differing files. Copying this existing closure
+adds no training exposure, fitting or untouched holdout read.
+
 ## Known Bugs — corrected inner evaluator dispatch (November 8, 2026)
 
 The worker forwarded candidate runtimes only for later-stage evaluation. Corrected
