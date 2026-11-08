@@ -5820,6 +5820,10 @@ shaping-snapshot-batch-check:
     TMPDIR="$HOME/tmp" python3 -B -m unittest scripts.tests.test_shaping_snapshot_batch scripts.tests.test_shaping_snapshot_retention scripts.tests.test_shaping_checkpoint_retention scripts.tests.test_shaping_open_file_guard
 
 # Native opaque-vector inference helpers; build away from the coordinator host.
+shaping-queue-placement-check:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 512M --jobs 1 -- python3 -B -m unittest scripts.tests.test_shaping_queue_placement scripts.tests.test_shaping_host_transition
+
+# Native opaque-vector inference helpers; build away from the coordinator host.
 shaping-external-native-build target:
     TMPDIR="$HOME/tmp" CARGO_TARGET_DIR={{quote(target)}} CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_DEV_OPT_LEVEL=1 "$HOME/work/claudehints/scripts/run-heavy" --mem 4G --jobs 1 -- "$HOME/.cargo/bin/cargo" build --locked -p zensim-validate --bin corrhead_parity --bin bake_dial_refit
 

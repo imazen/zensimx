@@ -45,3 +45,21 @@ request drift, real idle-process retirement and active-child refusal. They are
 orchestration checks, not native scientific qualification or a measured memory
 improvement. Record real qualification, wrapper accounting and deployment
 evidence separately before claiming either.
+
+`shaping_queue_placement.py` provides a separate maintenance boundary for mixed
+queues. It verifies live queue identities and request hashes, holds the existing
+short CPU/storage transaction locks while stopping queue threads, and records
+their child identities. It signals only queue parents; native children continue.
+The existing placement owner still refuses any moved cell with an attempt or CPU
+reservation. Resume requires the same stopped PID/start identities. A real-child
+fixture verifies continued progress while its queue parent is stopped, and the
+native placement gate refuses a moved condition before creating an attempt.
+
+When splitting a mixed assignment, move all its unstarted, unreserved conditions
+and retain every started condition on its original host. Skip an assignment if
+any unstarted member already owns a CPU reservation. Reconcile source,
+coordinator and destination placements before resuming queues, then seal fresh
+requests for the identical scientific conditions. Preserve original requests and
+assignment backups. Their superseded waiting requests may subsequently refuse
+the changed placement or capsule hash; these are cancelled queue requests, not
+failed scientific fits. Do not relaunch an existing attempt.
