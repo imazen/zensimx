@@ -42,15 +42,41 @@ print(json.dumps({'ready':not missing,'missing':missing}))
     return json.loads(p.stdout)
 
 
+def required_scope(study,cells,stage):
+    if stage=='inner':
+        required={c['id'] for c in cells if c['stage']=='inner' and c['family'] in FAMILIES}
+        if len(required)!=504:raise ValueError('complete qualified primary coverage required')
+        return required,{}
+    if stage!='rescue':raise ValueError('registered inner or rescue stage required')
+    from shaping_reduced_scope import shortlist
+    required=set();pins={}
+    for outer in range(3):
+        scope,path=shortlist(study,outer);pins[str(path)]=sha(path)
+        families=set(scope['roles'].values())&set(FAMILIES)
+        selected=[c for c in scope['cells'] if c['stage']=='rescue' and c['family'] in families]
+        if len(selected)!=12*len(families) or any(c not in cells for c in selected):
+            raise ValueError('complete shortlisted paired rescue scope required')
+        required.update(c['id'] for c in selected)
+    if not required:raise ValueError('nonempty qualified rescue scope required')
+    return required,pins
+
+
 def watch(args):
-    args.output.mkdir(exist_ok=False);lock=(args.output/'OWNER.lock').open('x');fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
+    args.output.mkdir(exist_ok=False)
+    with (args.output/'OWNER.lock').open('x') as lock:
+        fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
+        return watch_locked(args)
+
+
+def watch_locked(args):
     waves=[p.parent for p in args.previous_wave];_,cells,_=load_registration(args.study)
-    required={c['id'] for c in cells if c['stage']=='inner' and c['family'] in FAMILIES}
-    if len(required)!=504:raise ValueError('complete qualified primary coverage required')
+    stage=getattr(args,'stage','inner');required,scope_pins=required_scope(args.study,cells,stage)
     while True:
         status=dict(pid=os.getpid(),checked_utc=datetime.now(timezone.utc).isoformat(),stage='watching',
-            driver_sha256=sha(__file__),waves=list(map(str,waves)),required_models=504,training_replayed=False)
+            driver_sha256=sha(__file__),waves=list(map(str,waves)),required_models=len(required),training_replayed=False,
+            cell_stage=stage,scope_sha256=scope_pins)
         try:
+            if any(sha(name)!=pin for name,pin in scope_pins.items()):raise ValueError('registered rescue shortlist changed')
             assigned=set();waiting=[];registrations=[(wave,json.loads((wave/'REGISTRATION.json').read_text())) for wave in waves]
             for wave,q in registrations:
                 ids={j['cell']['id'] for j in q['jobs']}
@@ -69,8 +95,10 @@ def watch(args):
                     for p in (args.study/'runs'/cid).glob('attempt-*/RESULT.json'))}
                 status.update(trained_models=len(trained))
                 if trained-assigned:
-                    wave=args.study.parent/f'stable-export-wave-{len(waves)+1:04}-20261108'
-                    prepare(args.study,args.source,args.host,list(FAMILIES),[p/'REGISTRATION.json' for p in waves],wave)
+                    prefix='stable-export-wave' if stage=='inner' else 'stable-rescue-export-wave'
+                    wave=args.study.parent/f'{prefix}-{len(waves)+1:04}-20261108'
+                    options={} if stage=='inner' else dict(stage=stage,cell_ids=required,evaluation_inputs=args.evaluation_inputs)
+                    prepare(args.study,args.source,args.host,list(FAMILIES),[p/'REGISTRATION.json' for p in waves],wave,**options)
                     # Record new immutable assignment before submission, so setup
                     # failure cannot make this condition silently eligible again.
                     waves.append(wave);status['waves']=list(map(str,waves));status['stage']='starting_fixed_wave'
@@ -88,5 +116,7 @@ def watch(args):
 if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__)
     for name in ('study','source','output'):p.add_argument('--'+name,type=Path,required=True)
-    p.add_argument('--host',required=True);p.add_argument('--previous-wave',type=Path,action='append',required=True)
+    p.add_argument('--host',required=True);p.add_argument('--previous-wave',type=Path,action='append',default=[])
+    p.add_argument('--stage',choices=('inner','rescue'),default='inner')
+    p.add_argument('--evaluation-inputs',type=Path)
     watch(p.parse_args())

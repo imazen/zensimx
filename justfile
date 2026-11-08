@@ -5891,3 +5891,6 @@ shaping-rescue-host-launch-test:
 
 shaping-rescue-host-launch wave source host output:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_rescue_host_launch.py --wave {{quote(wave)}} --source {{quote(source)}} --host {{quote(host)}} --output {{quote(output)}}
+
+shaping-stable-rescue-export-test:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B -m unittest scripts.tests.test_shaping_stable_rescue_export scripts.tests.test_shaping_stable_export_watch scripts.tests.test_shaping_stable_export_launch

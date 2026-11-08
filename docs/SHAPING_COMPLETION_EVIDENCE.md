@@ -1026,3 +1026,11 @@ in force. A fit reaching its memory limit cannot take down its sibling fits
 through a shared multi-fit memory scope. The transfer-failure check proves that
 an incomplete host transfer starts no fit and preserves its transport log.
 No training, selection or numerical gate changes are included.
+
+The fixed scalar-wave owner also supports shortlisted rescue models. It derives
+its complete paired scope from all three frozen shortlists, binds the existing
+inner evaluation closure, and transports the fit-directory checkpoints plus
+both phase receipts for pretrained rescues. Every phase model and manifest is
+hash-checked before registration; changed checkpoints refuse. This applies the
+already qualified family representation uniformly and retains all numerical
+and provenance gates. It performs no new fitting or outer evaluation.
