@@ -48,7 +48,9 @@ Two initial worker launches omitted `--inner-family` and refused in CLI parsing
 before creating attempts. Corrected commands started four attempts per host.
 On r5600g, the user manager then stopped ten seconds after the SSH session ended
 because lingering was disabled, interrupting four attempts before any checkpoint.
-Those attempts have explicit interrupted results and remain excluded from replay.
+Those attempts have explicit interrupted results. The owner subsequently authorized
+recovery after fixing the external cause; their zero-epoch boundary is admitted
+separately, preserving the original records.
 Lingering is now enabled and verified. Require persistent user-manager state,
 actual trainer PIDs and advancing artifacts before reporting a replacement wave
 as running. The i134 wave survived and advances. Evidence stays in the private
@@ -83,7 +85,9 @@ are archived and explicitly marked interrupted. Never infer trainer liveness
 from a controller status alone: inspect every unfinished RUN and its process.
 Nine never-started cells are recovered through the shared dispatch owner's
 explicit inner-subset mode, with CPU/RAM claims and unchanged per-fit storage
-admission. Partial restarts await owner clarification of the no-replay rule.
+admission. The owner explicitly approved restarting only these two partial conditions with
+the original binary, seeds, data and banks, preserving and comparing all 238
+available checkpoints. This is a restart from initialization, not exact resume.
 The pretrained dispatch owner now records these exact interrupted dependencies
 as waiting and continues independent children; failed or drifted parents still
 refuse. New dispatchers share CPU/RAM admission with rescue and inner recovery.

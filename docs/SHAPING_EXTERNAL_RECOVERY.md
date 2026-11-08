@@ -23,9 +23,21 @@ external/zero-epoch failure evidence, unchanged build identity and matching
 recovery pins in RUN and RESULT. Unrelated later attempts still fail admission.
 The normal complete-checkpoint and native scientific evaluation gates remain.
 
-Two older interrupted joint-shaping fits retain 19 and 219 of 240 epoch
-checkpoints. Their saved bakes contain model parameters/scalers, not optimizer
-and sampler state; the existing warm-start path starts fresh Adam and shared
-depth refuses it. They cannot be described as exact continuations from those
-bakes. Their causes remain unconfirmed. Resource evidence and any proposed
-recovery need separate resolution; this zero-epoch helper cannot admit them.
+The owner separately approved restarting exactly two older partial fits, with
+19 and 219 completed epochs, from their original seeded initialization on the
+approved replacement worker. Their bakes contain model/scaler parameters but no
+Adam or sampler state, so these are explicitly restarts, not exact continuations.
+`shaping_partial_restart.py` binds the approval to the concrete proposal, both
+original RUN/RESULT hashes, all 238 old checkpoints, shape banks, features and
+training inputs. The original frozen executable and 240-epoch exposure remain.
+Every available old checkpoint is compared with the corresponding new one after
+removing only `zentrain.repro`. Canonical comparison files and mismatches remain
+preserved. Native write-completion receipts prevent reading unfinished bakes.
+A failed prefix comparison does not qualify the restart. Collection may append
+attempt 002 beside an unchanged authorized attempt 001, never overwrite it.
+
+Future crash recovery requires full optimizer/sampler snapshots. The owner asks
+for a short recovery interval with bounded disk use. The planned defaults are a
+60-second interval, two retained states and a 64 MiB per-run ceiling including
+in-flight writes, plus a shared filesystem budget and the existing 30 GiB free
+reserve. These are requirements, not a claim that exact snapshots exist yet.

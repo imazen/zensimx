@@ -42,6 +42,8 @@ def register(study,direction):
 
 
 def authorize_attempt(study,cell,attempt):
+    from shaping_partial_restart import CELLS as PARTIAL_CELLS,authorize
+    if cell in PARTIAL_CELLS:return authorize(study,cell,attempt)
     path=study/NAME
     if not path.exists():raise ValueError('later worker attempts require explicit reconciliation')
     record=json.loads(path.read_text())
@@ -60,7 +62,7 @@ def verify_attempt(study,run,attempt):
     if attempt=='attempt-001':return
     row,pin=authorize_attempt(study,run['cell']['id'],attempt)
     if (run['cell']!=row['cell'] or run.get('recovery_authorization_sha256')!=pin
-        or run.get('recovery_completed_epochs_replayed')!=0
+        or run.get('recovery_completed_epochs_replayed')!=row.get('completed_epochs_replayed',0)
         or run['build_sha256']!=row['original_build_sha256']):
         raise ValueError('recovered run differs from its explicit authorization')
 
@@ -70,14 +72,16 @@ def recover(args):
     from shaping_rescue_dispatch import reserve_worker,release_worker,bind_worker
     from shaping_storage import reservation
     row,pin=authorize_attempt(args.study,args.cell,'attempt-002');admit_cell(args.study,row['cell'])
-    if socket.gethostname()!='r5600g':raise ValueError('original worker required')
+    if socket.gethostname()!=row.get('target_host','r5600g'):raise ValueError('authorized worker required')
     if subprocess.check_output(['loginctl','show-user',str(os.getuid()),'-p','Linger','--value'],text=True).strip()!='yes':
         raise ValueError('worker service lifecycle fix not active')
     old=args.study/'runs'/args.cell/'attempt-001';dest=old.parent/'attempt-002'
     if dest.exists():raise ValueError('preserve existing recovery attempt')
     for name,key in [('RUN.json','old_run_sha256'),('RESULT.json','old_result_sha256'),('SHAPING.json','shaping_sha256'),('keep.txt','keep_sha256')]:
         if sha(old/name)!=row[key]:raise ValueError('original recovery evidence drift')
-    if list((old/'checkpoints').glob('ckpt_epoch*.bin')):raise ValueError('saved epoch requires full-state recovery, not an initial-state retry')
+    if not row.get('completed_epochs_replayed') and list((old/'checkpoints').glob('ckpt_epoch*.bin')):raise ValueError('saved epoch requires full-state recovery, not an initial-state retry')
+    for name,expected in row.get('input_sha256',{}).items():
+        if sha(name)!=expected:raise ValueError('approved training input drift')
     original=json.loads((old/'RUN.json').read_text());command=list(original['command'])
     build=args.study.parent/'study-bin/BUILD.json'
     if sha(build)!=row['original_build_sha256']:raise ValueError('frozen binary registration differs')
@@ -88,7 +92,14 @@ def recover(args):
         minimum=json.loads((args.study/'PLAN.json').read_text())['minimum_ssd_free_bytes']
         with reservation(args.study,dest,minimum):
             dest.mkdir();(dest/'checkpoints').mkdir()
-            for name in ('keep.txt','SHAPING.json','SHAPING.provenance.json'):shutil.copyfile(old/name,dest/name)
+            for name in ('keep.txt','SHAPING.json','SHAPING.provenance.json'):
+                if name=='SHAPING.provenance.json' and row.get('completed_epochs_replayed') and not (old/name).exists():continue
+                shutil.copyfile(old/name,dest/name)
+            if row.get('completed_epochs_replayed'):
+                from shaping_completion import DECLARATION_SHA256
+                declaration=Path(__file__).with_name('color_noise_fx2_declaration.json')
+                if sha(declaration)!=DECLARATION_SHA256:raise ValueError('declaration differs')
+                command[command.index('--derived-inputs')+1]=str(declaration)
             for flag,name in [('--out','best.bin'),('--keep-features','keep.txt'),('--dump-checkpoints-dir','checkpoints')]:
                 if command.count(flag)!=1:raise ValueError('ambiguous original output path')
                 command[command.index(flag)+1]=str(dest/name)
@@ -99,9 +110,13 @@ def recover(args):
                 process=subprocess.Popen(command,env=env,stdout=log,stderr=subprocess.STDOUT)
                 run=dict(original,command=command,pid=process.pid,driver_sha256=sha(__file__),
                      started_utc=datetime.now(timezone.utc).isoformat(),stage='running',
-                     recovery_authorization_sha256=pin,recovery_completed_epochs_replayed=0)
+                     recovery_authorization_sha256=pin,recovery_completed_epochs_replayed=row.get('completed_epochs_replayed',0),
+                     execution_host=socket.gethostname())
                 (dest/'RUN.json').write_bytes(encoded(run));bind_worker(args.study,args.cell,process.pid)
-                code=process.wait()
+                if row.get('completed_epochs_replayed'):
+                    from shaping_partial_restart import supervise
+                    code=supervise(process,old,dest,row,build.parent/'bake_dial_refit')
+                else:code=process.wait()
             result=dict(run,stage='trained' if code==0 else 'failed',exit_code=code,finished_utc=datetime.now(timezone.utc).isoformat())
             if code==0:
                 expected={f'ckpt_epoch{e:03}.bin' for e in range(run['epochs'])}
@@ -115,7 +130,7 @@ def recover(args):
 
 def main():
     p=argparse.ArgumentParser(description=__doc__);p.add_argument('--study',type=Path,required=True)
-    p.add_argument('--register-direction',type=Path);p.add_argument('--cell',choices=CELLS)
+    p.add_argument('--register-direction',type=Path);p.add_argument('--cell',choices=CELLS+('c1b9fabc3c27b2b14fe7','fd66858f8667dbad12c0'))
     args=p.parse_args()
     if args.register_direction:print(json.dumps(register(args.study,args.register_direction)),flush=True)
     elif args.cell:print(json.dumps(recover(args)),flush=True)

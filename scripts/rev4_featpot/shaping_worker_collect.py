@@ -154,8 +154,17 @@ def collect(study,assignment_path,bundle,pin):
         from shaping_external_recovery import verify_attempt
         verify_attempt(study,run,attempt)
         target=study/'runs'/run['cell']['id']
-        # mkdir is an exclusive claim; an existing cell is never overwritten.
-        target.mkdir(exist_ok=False)
+        # Only an explicitly authorized later attempt may append to an old cell.
+        if target.exists():
+            if attempt=='attempt-001':raise FileExistsError(str(target))
+            from shaping_external_recovery import authorize_attempt
+            row,_=authorize_attempt(study,run['cell']['id'],attempt)
+            previous=target/'attempt-001'
+            if (sha(previous/'RUN.json')!=row['old_run_sha256']
+                or sha(previous/'RESULT.json')!=row['old_result_sha256']
+                or {p.name for p in target.iterdir()}!={'attempt-001'}):
+                raise ValueError('existing partial evidence differs; preserve it')
+        else:target.mkdir(exist_ok=False)
         (staging/'WORKER_COLLECTION.json').write_bytes(encoded(dict(
             bundle_sha256=pin,assignment_sha256=sha(assignment_path),
             pack_driver_sha256=receipt['pack_driver_sha256'],collect_driver_sha256=sha(__file__),
