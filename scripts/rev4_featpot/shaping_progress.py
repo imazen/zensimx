@@ -123,7 +123,7 @@ def corrected_program(root):
     approval=json.loads(matches[0][0].read_text())
     if approval['answer']!='Approve four settings: 1,461 fits':raise ValueError('corrected dashboard owner choice differs')
     return dict(core_fit_target=1461,corrected_condition_count=288,omitted_original_conditions=108,
-                registration_sha256=sha(path),execution_activated=record['execution_activated'])
+                registration_sha256=sha(path),execution_activated=(path.parent/'ACTIVATION.json').exists())
 
 
 def dashboard_data(root,result,workers):
