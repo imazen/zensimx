@@ -86,6 +86,11 @@ original. The refactored native statistics checks passed on r3800x with
 `run-heavy: done rc=0 31s | peak-RSS 0.23GiB | min-avail 12678MiB | peak-load 3.48`.
 No study outer bootstrap has executed; the complete outer evidence is pending.
 
+`shaping_terminal_transport.py` owns bounded terminal packaging and atomic
+publication. Bootstrap supplies its admission replay and result validator;
+packaging preserves the complete worker directory and imports only after
+hash, scope and identity verification.
+
 The nonneural control owner also exposes its original metadata admission before
 fitting. Its optional `--selected-cell` executes one primary outer control only
 after the complete family seed set has been admitted. It uses a cell-specific

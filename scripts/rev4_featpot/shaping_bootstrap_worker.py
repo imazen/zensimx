@@ -1,5 +1,5 @@
 """Carry complete source-bootstrap evidence to an approved native statistics host."""
-import argparse,hashlib,json,socket,tarfile,io
+import argparse,hashlib,json,socket
 from pathlib import Path
 from types import SimpleNamespace
 from shaping_completion import REPO,encoded,sha
@@ -76,39 +76,14 @@ def validate_result(record,directory):
 
 
 def pack(request,bundle):
-    from shaping_rescue_worker import verify
-    from shaping_worker_collect import inventory
-    from shaping_storage import reservation
-    record=json.loads(request.read_text());verify(record);source=Path(record['result_output'])
-    validate_result(record,source);files=inventory(source);size=sum(row['bytes'] for row in files.values())
-    if len(files)>1000 or size>1024**3-16*1024**2:raise ValueError('bootstrap result exceeds bounded transport allowance')
-    receipt=dict(files=files,request_sha256=sha(request),cell=record['cell'],pack_driver_sha256=sha(__file__))
-    bundle.parent.mkdir(parents=True,exist_ok=True)
-    with reservation(Path(record['study']),bundle,30*1024**3,bytes_required=size+16*1024**2):
-        with tarfile.open(bundle,'x') as archive:
-            data=encoded(receipt);info=tarfile.TarInfo('COLLECTION.json');info.size=len(data);archive.addfile(info,io.BytesIO(data))
-            for name in files:archive.add(source/name,arcname='payload/'+name,recursive=False)
-        if inventory(source)!=files:raise ValueError('bootstrap result changed while packing')
-        receipt['bundle_sha256']=sha(bundle)
-        with Path(str(bundle)+'.json').open('xb') as stream:stream.write(encoded(receipt))
-    return receipt
+    from shaping_terminal_transport import pack as original
+    return original(request,bundle,validate_result)
 
 
 def collect(request,bundle,pin):
-    from shaping_worker_collect import unpack
-    from shaping_storage import reservation
-    record=json.loads(request.read_text());resolution,_=reproduce(record,host=record['host'])
-    if resolution!=record['resolution']:raise ValueError('coordinator cannot reproduce bootstrap admission')
-    result=Path(record['result_output']);study=Path(record['study']);staging=study/'worker_collection'/('bootstrap-'+pin)
-    with reservation(study,staging,30*1024**3):
-        receipt=unpack(bundle,staging,pin)
-        if receipt['request_sha256']!=sha(request) or receipt['cell']!=record['cell']:
-            raise ValueError('bootstrap result request differs')
-        validate_result(record,staging)
-        (staging/'WORKER_COLLECTION.json').write_bytes(encoded(dict(request_sha256=sha(request),bundle_sha256=pin,
-            source_host=record['host'],pack_driver_sha256=receipt['pack_driver_sha256'],collect_driver_sha256=sha(__file__))))
-        staging.rename(result)
-    return dict(result=str(result),summary_sha256=sha(result/'SUMMARY.json'),scientific_fit_count=0)
+    from shaping_terminal_transport import collect as original
+    result=original(request,bundle,pin,reproduce,validate_result)
+    return dict(result,summary_sha256=sha(Path(result['result'])/'SUMMARY.json'),scientific_fit_count=0)
 
 
 if __name__=='__main__':
