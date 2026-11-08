@@ -1034,3 +1034,10 @@ both phase receipts for pretrained rescues. Every phase model and manifest is
 hash-checked before registration; changed checkpoints refuse. This applies the
 already qualified family representation uniformly and retains all numerical
 and provenance gates. It performs no new fitting or outer evaluation.
+
+Pending rescue placement can be changed without replaying a fit. The guarded
+owner checks the exact Python worker, request/source/plan hashes, absence of an
+attempt, no CPU/storage claim and no child before retiring a waiter. It holds
+only the short admission transactions while checking that boundary. Claimed or
+productive controllers remain live. The real-process check preserves a claimed
+controller, retires its unstarted neighbor, and creates no scientific attempt.
