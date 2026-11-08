@@ -26,16 +26,16 @@ latency measurements.
 
 ## Native scoring
 
-Use a shared fixed set of 40 feature rows: eight from each of the four admitted
-human populations and CID22-SSIM2. Select from the FIT source pool only, by ascending original
+Use one fixed 40-row workload per outer fold: eight rows from each of the four
+admitted human populations and CID22-SSIM2. All sixteen model arms in that fold
+share those rows. Select from that fold's TRAIN complement only, by ascending original
 row index within population, before reading predictions. Preserve exact f32
 training-table values and the original feature-ID mapping. Pin the chosen indices,
-source tables, declaration, exported rows and reference predictions. Since the
-three outer training complements differ, a shared label-free workload can
-contain features from a model's already registered outer test fold. It is
-latency input, never additional supervision or a checkpoint-selection signal.
-Freeze row choices without labels or predictions, after the inner decisions
-are fixed. Do not consume development or untouched final-holdout rows.
+source tables, declaration, exported rows and reference predictions. Freeze all
+three row selections before opening predictions, as `prepare_outer` does.
+Workloads differ across folds; report paired model costs within each fold.
+Do not consume outer-test, development or untouched final-holdout rows for this
+workload. This retains the existing TRAIN-only workload owner.
 
 The neural ZNPR arm uses `BakeScorer::score_features`, including declared input
 gathering, learned shaping, scaling and final score transformation. The tree arm
@@ -94,5 +94,9 @@ from retained rounds, without treating repeated timing rounds as model seeds.
 
 Maintain the 30 GiB SSD reserve, account for active and pending writes, and retain
 full stdout/stderr plus the resource wrapper's peak-RSS line. Checksum every
-artifact after reading it back from durable storage. Native harness implementation,
-qualification, finalist availability and actual timing remain completion gates.
+artifact after reading it back from durable storage. Native instruments exist
+as `zensim-validate/examples/shaping_cost.rs` and `shaping_extract_cost.rs`.
+The saved vector qualification covers eight fixture models and forty rows;
+it is arithmetic qualification, not finalist timing. Finalist availability,
+qualification against the actual selected models and measured timing remain
+completion gates.
