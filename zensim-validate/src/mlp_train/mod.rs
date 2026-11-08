@@ -4196,6 +4196,7 @@ pub fn train_mlp_strategy_pairs(
             best_val_score = f64::from_bits(state.best_score_bits);
             best_bake = state.best_bake;
             stale_epochs = state.stale_epochs;
+            log.extend(state.checkpoint_receipts);
             resume_cursor = Some((
                 state.epoch,
                 state.pair,
@@ -4225,6 +4226,11 @@ pub fn train_mlp_strategy_pairs(
                     best_score_bits: best_val_score.to_bits(),
                     best_bake: best_bake.clone(),
                     stale_epochs,
+                    checkpoint_receipts: log
+                        .iter()
+                        .filter(|line| line.starts_with("  checkpoint dump: "))
+                        .cloned()
+                        .collect(),
                 });
             }
         };

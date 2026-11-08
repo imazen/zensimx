@@ -16,7 +16,7 @@ checkpoint directory; preserve the interrupted process log separately.
 Snapshots retain full f64 parameters, all Adam gradients/moments/step counters,
 shared or analytic heads, learned-shape parameters and optimizer state, sampler
 and dropout RNGs, epoch/pair cursor, accumulated loss/counters, best bake and
-selection state. Effective hyperparameters, executable bytes, standardized input
+selection state, and completed checkpoint write receipts for CLI finalization. Effective hyperparameters, executable bytes, standardized input
 rows, targets, reference membership, scalers, masks and research environment bind
 the identity. Initialization/scaler reconstruction is checked before restoring.
 

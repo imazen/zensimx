@@ -24,6 +24,7 @@ pub(super) struct State {
     pub best_score_bits: u64,
     pub best_bake: Option<Vec<u8>>,
     pub stale_epochs: usize,
+    pub checkpoint_receipts: Vec<String>,
 }
 
 #[cfg(all(test, target_os = "linux"))]
@@ -62,6 +63,13 @@ mod tests {
                 init_seed: Some(111),
                 sample_seed: Some(222),
                 early_stop_patience: 0,
+                dump_checkpoints_every: 1,
+                dump_checkpoints_dir: Some(
+                    std::path::PathBuf::from(&out)
+                        .parent()
+                        .unwrap()
+                        .join("checkpoints"),
+                ),
                 n_epochs: 3,
                 pairs_per_epoch: 100,
                 log_every: 1,
@@ -116,6 +124,8 @@ mod tests {
                 ref_ids: None,
                 loss_mode: GroupLossMode::Both,
             };
+            fs::create_dir_all(hp.dump_checkpoints_dir.as_ref().unwrap()).unwrap();
+            let mut training_log = Vec::new();
             let bytes = crate::mlp_train::train_mlp(
                 &mut [group],
                 if shaping {
@@ -126,8 +136,17 @@ mod tests {
                     2
                 },
                 &hp,
-                &mut Vec::new(),
+                &mut training_log,
             );
+            let receipts = training_log
+                .iter()
+                .filter(|line| line.starts_with("  checkpoint dump: "))
+                .collect::<Vec<_>>();
+            fs::write(
+                std::path::Path::new(&out).with_extension("receipts.json"),
+                serde_json::to_vec(&receipts).unwrap(),
+            )
+            .unwrap();
             fs::write(out, bytes).unwrap();
             return;
         }
@@ -225,6 +244,11 @@ mod tests {
                     expected,
                     fs::read(dir.join(format!("{mode}.bin"))).unwrap(),
                     "{kind}/{mode}"
+                );
+                assert_eq!(
+                    fs::read(dir.join("uninterrupted.receipts.json")).unwrap(),
+                    fs::read(dir.join(format!("{mode}.receipts.json"))).unwrap(),
+                    "checkpoint receipt prefix {kind}/{mode}"
                 );
                 let latest = |store: &str| {
                     let run = fs::read_dir(dir.join(store))
