@@ -34,6 +34,22 @@ rows only; full-population statistical denominators remain explicit. The CSV
 download retains raw labels, TRAIN-scaled labels, predictions and row identities.
 Pixel diffmaps and image extraction are not part of this workflow.
 
-The full native worker path is initially unqualified until an actual job finishes.
-Its terminal reports and wrapper logs supply execution evidence; unit checks and
-prepared scatter inputs do not establish completion of native statistics.
+The native publication completed 639 current-comparison fits: 320 on one worker
+and 319 on another, with zero failed fits. Imported panels bind their prediction
+input, report and output hashes. The earlier 180 raw-coordinate pretrained
+responses remain preserved as historical evidence outside the corrected primary
+comparison. They are not silently treated as corrected fits.
+
+The first real neural and tree panel jobs completed with wrapper observations:
+
+```text
+run-heavy: done rc=0 4s | peak-RSS 0.05GiB | min-avail 12859MiB | peak-load 1.90
+run-heavy: done rc=0 3s | peak-RSS 0.05GiB | min-avail 40067MiB | peak-load 4.17
+```
+
+These measurements describe scalar statistics jobs, not model inference speed.
+The committed Playwright browser check exercised all five populations, source
+filtering, training and validation views, native panel visibility and mobile
+layout. It passed with no page errors or mobile overflow. Runtime evidence lives
+beside the generated page under `zenstats-dashboard-20261108/`.
+
