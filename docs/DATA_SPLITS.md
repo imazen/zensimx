@@ -3362,3 +3362,20 @@ human labels; Part B contributes no rows. Its exact-reference alias guard runs
 before fitting. Repeated pristine anchors were verified as identical decoded RGB
 pixels; the existing feature tables omit those identity rows. The private
 training repository owns the new recipe, label joins and run receipts.
+
+
+## November 8 fixed external shaping comparison
+
+The owner requested validation of the research bakes on more datasets.
+`docs/SHAPING_EXTERNAL_VALIDATION.md` registers all 34 setting-0, inner-0-0
+conditions before this comparison's external target parse. It uses the already
+exposed CSIQ866 and LIVE779 targets, retaining the existing LIVE clean10/267
+subset separately. Exact Rev7 feature/extractor identity matches the admitted
+training tables. Each bake and qualified final report is bound before scoring;
+12 corrected conditions initially await their registered final reports.
+
+The first ReLU model scored all866 CSIQ rows /30 sources through the native
+runtime and native statistics adapter. This is an exploratory descriptive read,
+excluded from all fitting, tuning, rescue selection and shortlisting. No new
+training role, calibration or untouched holdout exposure is introduced. The
+registration SHA is `61c15270990222fed25f24237664525a9cab1dfd65d822dbdb55ecebabfab7c1`.
