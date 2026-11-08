@@ -45,3 +45,11 @@ Transport/controller checks use fixture artifacts and native-owner mocks;
 they establish routing, artifact preservation and refusal behavior. A live
 outer or variant admission, real worker evaluation and verified result import
 are still required to establish scientific execution.
+
+After corrected-threshold activation, new pretrained rescue, outer and variant
+fits require the registered corrected native BUILD. Capsule admission and native
+execution both check this binding before creating a fit. Unchanged control
+families retain their separately qualified runtimes. Historical fits stay
+preserved. The stale-build refusal checks cover all three execution owners,
+including a human-only role that resolves to a pretrained family; they launch
+no trainer and create no attempt directory.

@@ -8,6 +8,25 @@ from shaping_selection import aggregate
 
 
 class CorrectedViewTests(unittest.TestCase):
+    def test_downstream_cannot_restore_raw_coordinate_threshold_runtime(self):
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as temporary:
+            root=Path(temporary)
+            # Historical and unchanged control families retain existing gates.
+            view.require_downstream_build(root,'product_pretrained_joint','historical')
+            directory=root/'corrected_thresholds';directory.mkdir()
+            (directory/'REGISTRATION.json').write_text('{}')
+            for family in view.FAMILIES:
+                with self.assertRaisesRegex(ValueError,'awaits native compatibility'):
+                    view.require_downstream_build(root,family,view.BUILD_SHA256)
+            (directory/'ACTIVATION.json').write_text('{}')
+            for family in view.FAMILIES:
+                with self.assertRaisesRegex(ValueError,'registered corrected native build'):
+                    view.require_downstream_build(root,family,'historical')
+                view.require_downstream_build(root,family,view.BUILD_SHA256)
+            for family in ('relu','softplus','silu_monotone','silu_diagnostic',
+                           'product_joint_identity','separate_joint_identity'):
+                view.require_downstream_build(root,family,'independently-qualified')
+
     def test_pending_correction_cannot_freeze_historical_shortlists_or_outer_admission(self):
         with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as temporary:
             root=Path(temporary);(root/'corrected_thresholds').mkdir();(root/'corrected_thresholds/REGISTRATION.json').write_text('{}')

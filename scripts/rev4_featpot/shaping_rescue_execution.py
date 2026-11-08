@@ -113,6 +113,8 @@ def execute(args):
     build=json.loads((args.binary_dir/'BUILD.json').read_text())
     for name,pin in build['binary_sha256'].items():
         if sha(args.binary_dir/name)!=pin:raise ValueError('rescue binary drift')
+    from shaping_corrected_view import require_downstream_build
+    require_downstream_build(args.study,cell['family'],sha(args.binary_dir/'BUILD.json'))
     if cell['family'] in ('softplus','silu_monotone','silu_diagnostic'):
         qualification=json.loads((args.neutral_qualification/'RESULT.json').read_text())
         if not qualification['match'] or qualification['epochs']!=240 or qualification['build_sha256']!=sha(args.binary_dir/'BUILD.json'):

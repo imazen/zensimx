@@ -1,3 +1,13 @@
+## Known Bugs — corrected downstream runtime admission (November 8, 2026)
+
+Source inspection found that new pretrained rescue/outer/variant owners could
+accept the earlier threshold runtime after corrected inner activation. No
+pretrained rescue or outer/variant fit had started. Capsule admission and native
+execution now require the approved corrected BUILD for those families, including
+resolved variant roles. Wrong-runtime checks refuse before creating attempts.
+Unchanged controls keep their existing qualified runtimes and historical results
+remain intact. Real downstream fitting still awaits complete inner selection.
+
 ## Known Bugs — missing evaluation input closure (November 8, 2026)
 
 New worker training capsules contained TRAIN views but lacked the separate

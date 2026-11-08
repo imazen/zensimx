@@ -171,6 +171,18 @@ def require_activation(root):
     if pending(root):raise ValueError('corrected protocol awaits native compatibility activation')
 
 
+def require_downstream_build(root,family,build_sha256):
+    """Retain corrected initialization in new pretrained rescue/refit phases.
+
+    Callers first reproduce the full registration/selection or outer admission.
+    Unchanged control families keep their independently qualified runtimes.
+    """
+    if family not in FAMILIES or not (root/'corrected_thresholds/REGISTRATION.json').exists():return
+    require_activation(root)
+    if build_sha256!=BUILD_SHA256:
+        raise ValueError('corrected pretrained downstream fit requires the registered corrected native build')
+
+
 if __name__=='__main__':
     parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('--study',type=Path,required=True)
     parser.add_argument('--proof',action='append',required=True);parser.add_argument('--output',type=Path)

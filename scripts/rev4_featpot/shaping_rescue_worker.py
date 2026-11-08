@@ -51,6 +51,8 @@ def resolve_inputs(study,cell_id,host,binaries,qualification):
     with reads() as paths:
         _,cells,_=load_registration(study);resolution=resolve(study,cell_id);cell=resolution['cell']
         admit_rescue(study,cell,host=host)
+        from shaping_corrected_view import require_downstream_build
+        require_downstream_build(study,cell['family'],sha(binaries/'BUILD.json'))
         if (study/'runs'/cell_id).exists():raise ValueError('preserve existing rescue; never replay')
         groups=study/'comparators'/cell['partition']/'GROUPS.json'
         record=json.loads(groups.read_text())

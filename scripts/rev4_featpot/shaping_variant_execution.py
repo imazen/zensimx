@@ -89,6 +89,8 @@ def admit(args,*,host=None):
     build_path=args.binary_dir/'BUILD.json';build=json.loads(build_path.read_text())
     for name,pin in build['binary_sha256'].items():
         if sha(args.binary_dir/name)!=pin:raise ValueError('variant native binary drift')
+    from shaping_corrected_view import require_downstream_build
+    require_downstream_build(args.study,family,sha(build_path))
     analytic=family in ('softplus','silu_monotone','silu_diagnostic')
     record=json.loads(Path(resolution['groups_path']).read_text());groups=admitted_families(args.study,record)
     qualification_pins={}
