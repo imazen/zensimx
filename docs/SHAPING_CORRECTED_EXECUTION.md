@@ -45,6 +45,14 @@ arms still use the same four admitted human populations, zero teacher rows and
 declaration paths. This capability does not reuse qualification from another
 binary or expose outer responses.
 
+Completed compatibility controls use `shaping_control_evidence.py` to inventory
+all 240 finalized native bakes, terminal receipts and resource logs against the
+exact comparison ledger. Collection excludes canonical intermediate copies and
+retains their hashes in the terminal ledger. It references the original control
+and shared TRAIN inputs by their existing identities rather than copying them
+again. Snapshot archival has its separate binding/readback owner. Missing or
+changed native bakes refuse collection.
+
 The frozen four-setting matrix and the archived monotone-SiLU trajectory were
 accepted by these checks on November 8, 2026. Five other native control
 qualifications were still running; no activation was written. Fixture checks establish orchestration

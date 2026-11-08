@@ -5269,6 +5269,15 @@ shaping-completion-neutral-trajectory-check:
 shaping-completion-control-compatibility-check:
     TMPDIR="$HOME/tmp" python3 -B -m unittest scripts/tests/test_shaping_control_compatibility.py scripts/tests/test_shaping_neutral_trajectory.py
 
+shaping-control-evidence-check:
+    TMPDIR="$HOME/tmp" python3 -B -m unittest scripts/tests/test_shaping_control_evidence.py
+
+shaping-control-evidence-prepare registration family run output:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_control_evidence.py prepare --registration {{quote(registration)}} --family {{quote(family)}} --run {{quote(run)}} --output {{quote(output)}}
+
+shaping-control-evidence-verify inventory directory:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_control_evidence.py verify --inventory {{quote(inventory)}} --directory {{quote(directory)}}
+
 shaping-completion-corrected-registration-check:
     TMPDIR="$HOME/tmp" python3 -B -m unittest scripts/tests/test_shaping_corrected_registration.py
 
