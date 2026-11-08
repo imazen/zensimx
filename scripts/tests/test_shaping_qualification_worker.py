@@ -11,7 +11,9 @@ class QualificationWorkerTests(unittest.TestCase):
     def args(self,root):
         (root/'PLAN.json').write_text(json.dumps(dict(minimum_ssd_free_bytes=30*1024**3)))
         binaries=root/'bin';binaries.mkdir();(binaries/'BUILD.json').write_text('{}')
-        return SimpleNamespace(study=root,run=root/'original',binary_dir=binaries,
+        run=root/'runs'/('a'*20)/'attempt-001';run.mkdir(parents=True)
+        (run/'RUN.json').write_text(json.dumps(dict(cell=dict(id='a'*20))))
+        return SimpleNamespace(study=root,run=run,binary_dir=binaries,
                                output=root/'qualification',epochs=240,human_only_cell=None)
 
     def test_host_admission_precedes_claim_or_output(self):
@@ -43,6 +45,7 @@ class QualificationWorkerTests(unittest.TestCase):
                 with self.assertRaisesRegex(RuntimeError,'native failure'):qualify_on_worker(args)
                 self.assertEqual(claim.call_count,2);sleep.assert_called_once_with(30)
                 key=claim.call_args.args[1]
+                self.assertEqual(key,'a'*20)
                 bind.assert_called_once();self.assertEqual(bind.call_args.args[:2],(args.study,key))
                 storage.assert_called_once_with(args.study,args.output,30*1024**3,bytes_required=1024**3)
                 native.assert_called_once_with(args);release.assert_called_once_with(args.study,key)

@@ -76,8 +76,12 @@ def qualify_on_worker(args):
     admit_compute(args.study)
     if args.human_only_cell:raise ValueError('worker qualification currently supports the primary neutral control only')
     if args.output.exists():raise ValueError('preserve existing qualification attempt')
-    key='neutral-'+__import__('hashlib').sha256(encoded(dict(run=str(args.run),
-        build_sha256=sha(args.binary_dir/'BUILD.json'),epochs=args.epochs))).hexdigest()[:20]
+    # The native command retains this control ID in --keep-features. Shared
+    # admission can therefore recognize its running trainer instead of counting
+    # the qualification claim as another pending CPU in addition to that trainer.
+    key=json.loads((args.run/'RUN.json').read_text())['cell']['id']
+    if (len(key)!=20 or any(c not in '0123456789abcdef' for c in key)
+        or args.run.parent.name!=key):raise ValueError('registered control directory required')
     while True:
         if args.output.exists():raise ValueError('qualification appeared while waiting; preserve it')
         observation=reserve_worker(args.study,key)

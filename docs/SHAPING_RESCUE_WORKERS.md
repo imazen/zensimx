@@ -78,3 +78,13 @@ reservation with scientific fits. It refuses an existing attempt and never
 retries a native failure. A supplied snapshot store enables the qualified
 trainer's bounded crash recovery. The control still compares canonical native
 weights against the completed frozen fit; it is not a selection candidate.
+
+Active native epoch dumps precede CLI metadata stamping and derived-input
+compaction. A finalized original checkpoint and an active raw dump therefore
+cannot use the finalized-bake byte comparison directly. Keep both forms and
+perform that comparison after successful CLI finalization. An absent metadata
+key in an early diagnostic is not evidence of a changed weight trajectory.
+
+For system-service launches, set finite `MemoryMax` and `MemorySwapMax=0` on
+the service too. A worker's older wrapper can lack a usable user-manager
+environment in this context; a printed fallback is not a hard memory cap.
