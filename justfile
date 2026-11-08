@@ -5813,6 +5813,9 @@ shaping-external-publish-check:
 shaping-external-browser url output modules expected_models:
     TMPDIR="$HOME/tmp" NODE_PATH={{quote(modules)}} node scripts/tests/shaping_external_browser.cjs {{quote(url)}} {{quote(output)}} {{quote(expected_models)}}
 
+shaping-compact-worker-check:
+    TMPDIR="$HOME/tmp" python3 -B -m unittest scripts.tests.test_shaping_compact_worker
+
 # Native opaque-vector inference helpers; build away from the coordinator host.
 shaping-external-native-build target:
     TMPDIR="$HOME/tmp" CARGO_TARGET_DIR={{quote(target)}} CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_DEV_OPT_LEVEL=1 "$HOME/work/claudehints/scripts/run-heavy" --mem 4G --jobs 1 -- "$HOME/.cargo/bin/cargo" build --locked -p zensim-validate --bin corrhead_parity --bin bake_dial_refit
