@@ -1,5 +1,15 @@
 # zensim — current working rules
 
+## Known Bugs — evaluation placement after the worker transition (November 8, 2026)
+
+Stopping old-host fit queues did not disable five evaluation/bootstrap observers.
+They could still admit new native work on the coordinator. All five were retired
+after checking their live identities and confirming no active child; no scientific
+process was interrupted. Evaluation, re-export, bootstrap execution and finalist
+cost preparation now enforce the same pinned replacement-host pool as fitting.
+Metadata, archive and page work remain on the coordinator. Evaluation transport
+to the replacement pool is required before these compute observers resume.
+
 ## Known Bugs — collection PATH and drained-worker reconciliation (resolved November 8, 2026)
 
 Old worker collectors stopped when a planned admission drain briefly exposed

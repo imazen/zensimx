@@ -22,6 +22,8 @@ def admit_representation(family,outer=None,analytic_diagnostic=False):
 
 
 def reexport(args):
+    from shaping_reduced_scope import admit_compute
+    admit_compute(args.study)
     _,cells,_=load_registration(args.study)
     run=json.loads((args.run/'RUN.json').read_text())
     if run['cell']['stage']=='exposure_extension':

@@ -228,6 +228,8 @@ def apply_report_scope(report,context,family):
 
 
 def evaluate(args):
+    from shaping_reduced_scope import admit_compute
+    admit_compute(args.study)
     plan,cells,partitions=load_registration(args.study)
     run=json.loads((args.run/'RUN.json').read_text());result=json.loads((args.run/'RESULT.json').read_text())
     if run['cell']['stage']=='exposure_extension':

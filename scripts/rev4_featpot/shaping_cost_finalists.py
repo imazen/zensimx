@@ -187,7 +187,8 @@ def prepare_outer(root,binaries,output):
 
 
 def prepare(root,binaries,output):
-    from shaping_reduced_scope import coverage as reduced_coverage
+    from shaping_reduced_scope import admit_compute,coverage as reduced_coverage
+    admit_compute(root)
     return (prepare_outer if reduced_coverage(root) else prepare_full)(root,binaries,output)
 
 

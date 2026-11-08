@@ -209,6 +209,11 @@ def _admit_host(root, host):
     return True
 
 
+def admit_compute(root, *, host=None):
+    """Apply the approved pool to evaluation/analysis as well as fitting."""
+    _admit_host(root, host)
+
+
 def admit_cell(root, cell, *, host=None):
     """Guard new attempts; historical verification retains original coverage."""
     if not _admit_host(root, host):

@@ -101,6 +101,8 @@ def compute_matched(arms,registration,draws,labels,seed_ids,progress=lambda *arg
 
 
 def run(args):
+    from shaping_reduced_scope import admit_compute
+    admit_compute(args.study)
     comparison=getattr(args,'comparison',None);spec=None
     if comparison is None:
         plan,partitions,outputs,pins,qualifications=collect(args.study)

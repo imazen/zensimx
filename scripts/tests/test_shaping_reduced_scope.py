@@ -20,6 +20,18 @@ def decisions(outer):
 
 
 class ReducedScopeTests(unittest.TestCase):
+    def test_evaluation_bootstrap_and_cost_refuse_before_native_work(self):
+        from types import SimpleNamespace
+        from shaping_evaluation import evaluate
+        from shaping_reexport import reexport
+        from shaping_bootstrap import run
+        from shaping_cost_finalists import prepare
+        args=SimpleNamespace(study=Path('not-admitted'))
+        with patch('shaping_reduced_scope.admit_compute',side_effect=ValueError('host outside approved pool')),patch('subprocess.run') as launch,patch('numpy.load') as load:
+            for operation in (lambda:evaluate(args),lambda:reexport(args),lambda:run(args),lambda:prepare(args.study,None,None)):
+                with self.assertRaisesRegex(ValueError,'host outside'):operation()
+            launch.assert_not_called();load.assert_not_called()
+
     def test_reduced_rescue_selection_keeps_every_fold_and_seed(self):
         cells = matrix()
         selected = [c for c in cells if c['family'] == 'relu'
