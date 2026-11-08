@@ -163,6 +163,14 @@ def base_path(root,family,outer):
     return root/'selection'/f'outer-{outer}'/(family+suffix+'-base.json')
 
 
+def pending(root):
+    return (root/'corrected_thresholds/REGISTRATION.json').exists() and not (root/'corrected_thresholds/ACTIVATION.json').exists()
+
+
+def require_activation(root):
+    if pending(root):raise ValueError('corrected protocol awaits native compatibility activation')
+
+
 if __name__=='__main__':
     parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('--study',type=Path,required=True)
     parser.add_argument('--proof',action='append',required=True);parser.add_argument('--output',type=Path)

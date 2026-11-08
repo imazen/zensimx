@@ -8,6 +8,18 @@ from shaping_selection import aggregate
 
 
 class CorrectedViewTests(unittest.TestCase):
+    def test_pending_correction_cannot_freeze_historical_shortlists_or_outer_admission(self):
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as temporary:
+            root=Path(temporary);(root/'corrected_thresholds').mkdir();(root/'corrected_thresholds/REGISTRATION.json').write_text('{}')
+            from shaping_outer_admission import build
+            from shaping_reduced_scope import shortlist
+            from shaping_selection import select
+            from types import SimpleNamespace
+            for operation in (lambda:build(root,0),lambda:shortlist(root,0,register=True),
+                              lambda:select(SimpleNamespace(study=root,family='product_pretrained_joint'))):
+                with self.assertRaisesRegex(ValueError,'awaits native compatibility'):operation()
+            self.assertFalse((root/'selection').exists());self.assertFalse((root/'reduced_scope').exists())
+
     def test_only_pretrained_ids_change_and_old_reports_cannot_select(self):
         cells,matrix=CorrectedRegistrationTests().fixture();effective=view.corrected_cells(cells,matrix)
         self.assertEqual(len(cells),len(effective))

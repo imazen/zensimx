@@ -9,7 +9,7 @@ from shaping_execution import load_registration
 from shaping_rescue_selection import select as select_rescue
 from shaping_extension import register as register_extension,verify_decision
 from shaping_outer_admission import register as register_outer,resolve as resolve_outer
-from shaping_corrected_view import base_path
+from shaping_corrected_view import base_path,pending,FAMILIES as CORRECTED_FAMILIES
 
 
 # Preserve the loaded driver identity across later source edits.
@@ -37,11 +37,15 @@ def sweep(root,outer):
         from shaping_selection import select as select_base
         created_bases=[]
         for family in FAMILIES:
+            if pending(root) and family in CORRECTED_FAMILIES:continue
             path=base_path(root,family,outer)
             if path.exists() or not base_ready(root,cells,family,outer):continue
             select_base(SimpleNamespace(study=root,family=family,outer=outer,
                                         reexport_max_pairs=family in MAX_PAIR_FAMILIES))
             created_bases.append(family)
+        if pending(root):
+            return dict(stage='waiting_for_corrected_activation',completed_rescue_selections=[],
+                created_base_selections=created_bases,outer_results_read=False)
         if not all(base_path(root,family,outer).exists() for family in FAMILIES):
             return dict(stage='waiting_for_complete_original_inner_shortlist',
                         completed_rescue_selections=[],created_base_selections=created_bases,

@@ -20,6 +20,12 @@ and the original build of its qualified control class. New corrected fits
 require the corrected binary, 120 epochs, and bounded full-state snapshots.
 Registration alone does not enable them.
 
+While the correction is registered but inactive, corrected-family base selection,
+reduced shortlists and outer admission refuse historical raw-threshold inputs.
+The selection watcher can prepare unaffected base decisions but explicitly waits
+for activation before proceeding. This keeps older completed evidence available
+without letting it allocate the amended downstream trials.
+
 The base selector, rescue resolver/dispatcher, selection watcher and outer
 admission all use the same corrected base-selection path. Unchanged ReLU
 rescues retain their IDs and decisions. Existing rescue trigger coverage and

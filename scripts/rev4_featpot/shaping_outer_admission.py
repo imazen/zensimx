@@ -40,6 +40,8 @@ def base_decision(root,family,outer,cells):
 
 
 def build(root,outer):
+    from shaping_corrected_view import require_activation
+    require_activation(root)
     _,cells,_=load_registration(root);decisions={};evidence={};neural={};representations={};evaluators={}
     from shaping_reduced_scope import coverage,shortlist
     amendment=coverage(root);frozen=None;shortlist_path=None

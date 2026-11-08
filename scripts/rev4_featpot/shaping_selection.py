@@ -110,6 +110,8 @@ def verify_undefined_failure(path,cell,final_report):
 
 
 def select(args):
+    from shaping_corrected_view import FAMILIES as corrected_families,require_activation
+    if args.family in corrected_families:require_activation(args.study)
     _,cells,_=load_registration(args.study)
     repaired=getattr(args,'reexport_max_pairs',False)
     if repaired and args.family not in MAX_PAIR_FAMILIES:raise ValueError('unqualified max-pair family')

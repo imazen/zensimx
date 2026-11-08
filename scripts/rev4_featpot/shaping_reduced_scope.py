@@ -142,6 +142,8 @@ def coverage(root):
 
 def shortlist(root, outer, *, register=False):
     """Reproduce the original inner-only screen before allocating rescue trials."""
+    from shaping_corrected_view import require_activation
+    require_activation(root)
     if coverage(root) is None:
         raise ValueError('approved reduced registration required')
     from shaping_completion import FAMILIES
