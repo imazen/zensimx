@@ -3748,3 +3748,15 @@ RAM 24,916 MiB and peak load 17.72. These are implementation controls using
 previously exposed development inputs, not scientific quality-selection fits.
 Matching test and production executables are preserved with the control evidence;
 existing frozen scientific executables remain unchanged.
+
+The runtime archive cold-reread all 299 artifacts / 1,266,185,068 bytes, including
+matching executables, source, actual library/CLI states and models, and both the
+refused same-directory probe and successful fresh-directory continuation.
+Mirror receipt SHA-256:
+`a9fa070a251d6c4e729952358902fd2e2a59ec717ae26249d0fbf6cf44cfada2`;
+artifact manifest SHA-256:
+`29591d1383a1c9b5994e1d0ee2fe15e472f27c6199c54181e48301e5acde0395`.
+The archive wrapper reports 27 s, peak RSS 0.02 GiB, minimum available RAM
+42,599 MiB and peak load 4.10. The current full-width receipt-bearing fixture
+retains 41,881,577 bytes; its largest state is 20,952,159 bytes, so two retained
+states plus one equally large pending write use 62,833,736 bytes, below 64 MiB.

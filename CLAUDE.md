@@ -23,8 +23,9 @@ process was interrupted. Evaluation, re-export, bootstrap execution and finalist
 cost preparation now enforce the same pinned replacement-host pool as fitting.
 Metadata, archive and page work remain on the coordinator. The primary-fit
 evaluation transport is deployed with matching source, policy, repair-binary and
-inspector hashes on all four approved workers. Its first request is waiting for
-worker capacity; no native import is established by that preflight. Rescue,
+inspector hashes on all four approved workers. Six complete native report bundles have since been verified and imported from
+three approved workers; these import receipts establish execution beyond the
+initial capacity preflight. Rescue,
 outer-stage and bootstrap compute deployment still require their own transport.
 
 ## Known Bugs — collection PATH and drained-worker reconciliation (resolved November 8, 2026)
