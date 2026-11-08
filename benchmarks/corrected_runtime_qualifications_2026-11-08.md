@@ -60,3 +60,10 @@ All raw counters, call stacks, wrapper lines and observation limits are in
 mirrored under the same relative study path on `/mnt/tower/output/zensim`.
 All six artifacts, 140,827 bytes, passed cold readback; receipt SHA-256
 `9129d43b4c4f53788f6cdf942a2f59e1610efc9390d9ef08813022a2b04eb08f`.
+
+The read-only native observer now has a bounded watch owner. It queries the
+four approved workers in parallel, validates each returned host, observer hash
+and timestamp, and keeps only the latest and previous metadata observation.
+It starts and signals no fit. The dashboard distinguishes raw compatibility
+checkpoint progress from completed all-epoch trajectory qualification.
+Selectors have separate process identities for each outer fold.

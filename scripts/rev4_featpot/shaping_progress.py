@@ -122,8 +122,15 @@ def corrected_program(root):
     if len(matches)!=1 or sha(matches[0][0])!=matches[0][1]:raise ValueError('corrected dashboard approval differs')
     approval=json.loads(matches[0][0].read_text())
     if approval['answer']!='Approve four settings: 1,461 fits':raise ValueError('corrected dashboard owner choice differs')
-    return dict(core_fit_target=1461,corrected_condition_count=288,omitted_original_conditions=108,
+    result=dict(core_fit_target=1461,corrected_condition_count=288,omitted_original_conditions=108,
                 registration_sha256=sha(path),execution_activated=(path.parent/'ACTIVATION.json').exists())
+    observation=root.parent/'native-supervision-20261108/r5600g.json'
+    if observation.exists():
+        native=json.loads(observation.read_text());age=(datetime.now(timezone.utc)-datetime.fromisoformat(native['checked_utc'])).total_seconds()
+        result['control_observation']=dict(checked_utc=native['checked_utc'],fresh=0<=age<=120,
+            running={row['cell']['family']:row['checkpoint_count'] for row in native['native_jobs']
+                if row.get('cell') and 'corrected-control-qualification-20261108' in Path(row['run']).parts})
+    return result
 
 
 def dashboard_data(root,result,workers):
@@ -215,6 +222,8 @@ SUPERVISOR_SCRIPTS={
     'rescue_archive':'shaping_archive_supervision.py',
     'statistics_dashboard':'shaping_progress.py',
     'worker_evaluation':'shaping_evaluation_worker.py',
+    'native_training_observer':'shaping_native_watch.py',
+    **{f'selection_outer_{outer}':'shaping_selection_watch.py' for outer in range(3)},
 }
 ARCHIVE_FLAGS={'primary_archive':None,'supplemental_archive':'--supplemental',
     'later_neural_archive':'--later-neural','later_control_archive':'--later-controls',
@@ -248,6 +257,8 @@ def supervisor_observation(root,role,path,proc=Path('/proc'),now=None):
         matches=matches and ('--later-only' in command)==(role=='later_evaluation')
     if role in ('relu_evaluation','softplus_evaluation'):
         matches=matches and argument('--family','relu')==role.split('_',1)[0]
+    if role.startswith('selection_outer_'):
+        matches=matches and argument('--outer')==role.rsplit('_',1)[1]
     if role in ARCHIVE_FLAGS:
         flags=[flag for flag in ARCHIVE_FLAGS.values() if flag is not None and flag in command]
         matches=matches and flags==([] if ARCHIVE_FLAGS[role] is None else [ARCHIVE_FLAGS[role]])

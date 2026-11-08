@@ -5094,6 +5094,10 @@ shaping-completion-stats-check:
 shaping-completion-stats-syntax-check:
     python3 -B -c 'import re,subprocess; from pathlib import Path; script=re.search(r"<script>(.*)</script>",Path("scripts/rev4_featpot/shaping_dashboard.html").read_text(),re.S).group(1); subprocess.run(["node","--check"],input=script,text=True,check=True)'
 
+# Bounded metadata observation only: no fit signals, starts or recovery.
+shaping-native-watch study observer output *args:
+    TMPDIR="$HOME/tmp" python3 -B scripts/rev4_featpot/shaping_native_watch.py --study {{quote(study)}} --observer {{quote(observer)}} --output {{quote(output)}} {{args}}
+
 shaping-completion-progress-check:
     TMPDIR="$HOME/tmp" python3 -B -m unittest discover -s scripts/tests -p test_shaping_progress.py
 

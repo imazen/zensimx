@@ -52,6 +52,12 @@ class ProgressTests(unittest.TestCase):
             (proc/'42/cmdline').write_bytes(('\0'.join(command)+'\0').encode())
             self.assertTrue(supervisor_observation(root,'rescue_archive',status,proc)['verified_live'])
 
+    def test_selector_role_requires_the_exact_outer_fold(self):
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as d:
+            root,status,proc=self.supervisor_fixture(d,['python3','shaping_selection_watch.py','--study',d,'--outer','1','--watch'])
+            self.assertTrue(supervisor_observation(root,'selection_outer_1',status,proc)['verified_live'])
+            self.assertFalse(supervisor_observation(root,'selection_outer_0',status,proc)['verified_live'])
+
     def test_unreadable_process_is_an_unknown_observation(self):
         with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as d:
             root,status,proc=self.supervisor_fixture(d,[])
