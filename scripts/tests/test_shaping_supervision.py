@@ -8,6 +8,30 @@ from shaping_evaluation import NativeFeatureGateError
 from shaping_completion import encoded
 
 class SupervisionTests(unittest.TestCase):
+    def test_cell_filter_does_not_evaluate_unrequested_peers(self):
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as d:
+            root=Path(d);cells=[dict(id=str(i),stage='inner',family='silu_monotone') for i in range(2)]
+            for cell in cells:
+                run=root/'runs'/cell['id']/'attempt-001';run.mkdir(parents=True)
+                (run/'RESULT.json').write_bytes(encoded(dict(cell=cell,stage='trained',epochs=120)))
+            with patch('shaping_supervision.load_registration',return_value=({},cells,{})),patch('shaping_supervision.evaluate') as evaluate,patch('shaping_supervision.report'):
+                self.assertEqual(sweep(SimpleNamespace(study=root,binary_dir=root/'bin',cells=('1',))),1)
+                self.assertEqual({call.args[0].run.parent.name for call in evaluate.call_args_list},{'1'})
+
+    def test_undefined_supplemental_panel_preserves_failure(self):
+        from shaping_reexport_supervision import sweep as supplemental
+        from shaping_convergence import UndefinedInnerComposite
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as d:
+            root=Path(d);cell=dict(id='softplus',stage='inner',family='softplus')
+            run=root/'runs/softplus/attempt-001';run.mkdir(parents=True)
+            (run/'RUN.json').write_bytes(encoded(dict(cell=cell)))
+            (run/'RESULT.json').write_bytes(encoded(dict(cell=cell,stage='trained',epochs=120)))
+            exported=root/'reexport_max_pairs/softplus/attempt-001';exported.mkdir(parents=True)
+            with patch('shaping_reexport_supervision.load_registration',return_value=({},[cell],{})),patch('shaping_reexport_supervision.reexport'),patch('shaping_reexport_supervision.report',side_effect=UndefinedInnerComposite('undefined inner composite')):
+                self.assertEqual(supplemental(SimpleNamespace(study=root,binary_dir=root/'bin',inspector=root/'inspect',family='softplus')),0)
+            failure=json.loads((exported/'CONVERGENCE_FAILURE.json').read_text())
+            self.assertFalse(failure['scientifically_complete']);self.assertFalse(failure['outer_results_read'])
+
     def test_softplus_supplemental_watch_keeps_family_scope(self):
         from shaping_reexport_supervision import sweep as supplemental
         with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as d:

@@ -37,6 +37,7 @@ def sweep(args):
     completed=0
     for result_path in sorted((args.study/'runs').glob('*/attempt-*/RESULT.json')):
         result=json.loads(result_path.read_text());cell=result['cell'];run=result_path.parent
+        if getattr(args,'cells',None) is not None and cell['id'] not in args.cells:continue
         if cell['stage'] not in ('inner','fresh_control_inner','rescue','exposure_extension') or result['stage']!='trained':continue
         if cell['stage']=='exposure_extension':
             from shaping_extension import resolve

@@ -138,6 +138,11 @@ class ReducedScopeTests(unittest.TestCase):
                 self.assertEqual(coverage['core_fit_target'], 1281)
                 self.assertFalse(coverage['completion_claim'])
                 self.assertEqual(coverage['unresolved_fold_cells'], 192)
+                frozen_policy=root/'REDUCED_PROTOCOL.md';frozen_policy.write_bytes(reduced.POLICY.read_bytes())
+                self.assertEqual(reduced.coverage(root)['registration_sha256'],sha(root/'REDUCED_SCOPE.json'))
+                frozen_policy.write_text('changed')
+                with self.assertRaisesRegex(ValueError,'evidence drift'):reduced.coverage(root)
+                frozen_policy.write_bytes(reduced.POLICY.read_bytes())
                 cell = next(c for c in matrix() if c['stage'] == 'rescue'
                             and c['family'] == 'relu' and c['rescue'] == 'init_half')
                 reduced.admit_rescue(root, cell, host='r5600g')

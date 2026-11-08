@@ -9,7 +9,7 @@ from shaping_execution import load_registration
 from shaping_reexport import reexport
 from shaping_evaluation import evaluate,NativeFeatureGateError,diagnostic_epochs
 from shaping_supervision import complete_marker,preserve_failure
-from shaping_convergence import report
+from shaping_convergence import report,UndefinedInnerComposite
 
 
 # Preserve the loaded driver identity across later source edits.
@@ -21,6 +21,7 @@ def sweep(args):
     _,cells,_=load_registration(args.study);completed=0
     for path in sorted((args.study/'runs').glob('*/attempt-*/RESULT.json')):
         result=json.loads(path.read_text());cell=result['cell'];run=path.parent
+        if getattr(args,'cells',None) is not None and cell['id'] not in args.cells:continue
         if cell['family']!=family or cell['stage'] not in ('inner','fresh_control_inner','rescue','exposure_extension') or result['stage']!='trained':continue
         if cell['stage']=='exposure_extension':
             from shaping_extension import resolve
@@ -53,8 +54,15 @@ def sweep(args):
             preserve_failure(root/'EVALUATION_FAILURES.json',dict(cell=cell,failures=failures,scientifically_complete=False))
             continue
         if not (root/'CONVERGENCE.json').exists():
-            if family=='softplus':report(run,root,analytic_diagnostic=True)
-            else:report(run,root)
+            try:
+                if family=='softplus':report(run,root,analytic_diagnostic=True)
+                else:report(run,root)
+            except UndefinedInnerComposite as error:
+                evidence=[run/'RUN.json',run/'RESULT.json',*sorted(root.glob('epoch-*/REPORT.json'))]
+                preserve_failure(root/'CONVERGENCE_FAILURE.json',dict(cell=cell,reason=str(error),
+                    scientifically_complete=False,requires_investigation=True,outer_results_read=False,
+                    evidence_sha256={str(p):sha(p) for p in evidence}))
+                continue
         completed+=1
     return completed
 

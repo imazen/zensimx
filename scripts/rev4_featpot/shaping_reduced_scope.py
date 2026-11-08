@@ -128,7 +128,11 @@ def coverage(root):
             or record['interrupted_fit_replays_authorized'] is not False):
         raise ValueError('reduced coverage registration differs')
     for name, pin in record['evidence_sha256'].items():
-        if sha(name) != pin:
+        evidence_path=Path(name)
+        if evidence_path.name==POLICY.name and (root/'REDUCED_PROTOCOL.md').exists():
+            evidence_path=root/'REDUCED_PROTOCOL.md'
+            if sha(POLICY)!=pin:raise ValueError('local reduced policy drift')
+        if sha(evidence_path) != pin:
             raise ValueError('reduced coverage evidence drift')
     return dict(registration_sha256=sha(path), core_fit_target=1281,
                 required_by_stage=TARGETS, fixed_cell_count=1089,
