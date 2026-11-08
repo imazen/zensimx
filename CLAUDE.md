@@ -23,6 +23,12 @@ not a reduced-coverage success. Mixed-build control reuse that requires full
 trajectory parity must use this additional evidence. Until executed, its
 fixture checks establish comparator behavior only.
 
+The first full native trajectory has now passed: monotone-SiLU control
+`e3c79ecb9ba271091aa1`, all 240 epochs, with the optimized runtime. Its native
+models, ledger and two resume states have a complete durable readback receipt.
+Other control classes remain separate qualifications; see
+`benchmarks/native_control_trajectory_2026-11-08.md`.
+
 `shaping_checkpoint_restore.py` restores missing epochs of a completed control
 from the existing native archive. It reuses the retention owner's archive
 identity check, bounds the copy to 128 MiB, verifies each checkpoint before
