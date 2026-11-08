@@ -1,7 +1,7 @@
 """Explicit corrected-condition view; historical registrations stay immutable."""
 import argparse,json,re
 from pathlib import Path
-from shaping_completion import encoded,sha
+from shaping_completion import REPO,encoded,sha
 from shaping_corrected_registration import BUILD_SHA256,MATRIX_SHA256,FAMILIES,validate_matrix
 from shaping_control_compatibility import FAMILIES as CONTROL_CLASSES
 
@@ -53,7 +53,10 @@ def registration(root,original):
         or record['plan_sha256']!=sha(root/'PLAN.json') or record['outer_results_read'] is not False
         or record['execution_activated'] is not False):raise ValueError('frozen corrected registration differs')
     for name,pin in record['evidence_sha256'].items():
-        if sha(name)!=pin:raise ValueError('corrected registration evidence drift: '+name)
+        evidence=Path(name)
+        if evidence.name=='SHAPING_THRESHOLD_AMENDMENT.md' and evidence.parent.name=='docs':
+            evidence=REPO/'docs'/evidence.name
+        if sha(evidence)!=pin:raise ValueError('corrected registration evidence drift: '+name)
     for host,pin in record['observation_sha256'].items():
         if sha(path.parent/'observations'/(host+'.json'))!=pin:raise ValueError('frozen omission observation drift')
     matrix_path=Path(record['matrix_path'])

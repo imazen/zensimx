@@ -40,9 +40,10 @@ def context(study,cell_id,binaries,*,host=None):
         study/'runs'/cell_id/'attempt-001/best.bin',recipe,
         strict_admission=True,data_role_decision=Path(groups['decision']))
     if Path(command[0])!=binaries/'zensim_mlp_train':raise ValueError('corrected command builder selected another binary')
+    from shaping_rescue_worker import source_identity
     scope=dict(cell=cell,corrected_binding=binding,parent_cell=parent,source_run=str(source),
         parent_result_sha256=sha(source/'RESULT.json'),prefix_sha256=sha(source/'checkpoints/ckpt_epoch119.bin'),
-        group_receipt_sha256=sha(groups_path),base_recipe_sha256=sha(BASE),command_template=command,
+        group_receipt_sha256=sha(groups_path),base_recipe_sha256=sha(BASE),command_template=[source_identity(v) for v in command],
         epochs=120,pairs_per_epoch=50000,outer_results_read=False)
     return dict(cell=cell,scope=scope,groups=groups,parent=source)
 

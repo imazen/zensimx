@@ -26,7 +26,10 @@ def load_registration(root,*,original=False):
     # A worker capsule may carry the exact frozen document beside PLAN.json.
     # Its registered content hash, never a host-specific path, owns admission.
     protocol=root/'PROTOCOL.md'
-    if not protocol.exists():protocol=Path(plan['protocol'])
+    if not protocol.exists():
+        protocol=Path(plan['protocol'])
+        if protocol.name=='SHAPING_COMPLETION_PROTOCOL.md' and protocol.parent.name=='docs':
+            protocol=REPO/'docs'/protocol.name
     if sha(protocol)!=plan['protocol_sha256']:raise ValueError('protocol drift')
     cells=json.loads((root/'MATRIX.json').read_text())
     if not original and (root/'corrected_thresholds/ACTIVATION.json').exists():

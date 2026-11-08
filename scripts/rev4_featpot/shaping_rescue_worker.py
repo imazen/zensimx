@@ -9,6 +9,18 @@ MAX_INPUT_BYTES=384*1024**2
 DATA_ROOTS=(Path('/mnt/v/output/zensim'),Path('/srv/zen-research'))
 
 
+def limits(kind):
+    # Bootstrap reproduces all three outer admissions and their inner evidence,
+    # rather than the one-fold closure of an individual native fit.
+    return (2*1024**3,16000) if kind=='bootstrap' else (MAX_INPUT_BYTES,4000)
+
+
+def source_identity(value,source=None):
+    """Source exports may move; data paths and source-content hashes may not."""
+    source=REPO if source is None else Path(source);path=Path(value)
+    return 'source/'+path.relative_to(source).as_posix() if source in path.parents else str(value)
+
+
 @contextlib.contextmanager
 def reads():
     """Single-process metadata capture; workers still rerun the actual gate."""
@@ -85,11 +97,12 @@ def seal_inputs(paths,study,cell,host,binaries,qualification,resolution,*,execut
         if path.is_symlink() or not path.is_file():raise ValueError('nonregular rescue dependency')
         kind,name=category(path);files[str(path)]=dict(kind=kind,name=name,bytes=path.stat().st_size,sha256=sha(path))
     total=sum(row['bytes'] for row in files.values())
-    if total>MAX_INPUT_BYTES or len(files)>4000:raise ValueError('rescue evidence capsule exceeds bounded input allowance')
+    max_bytes,max_files=limits(execution_kind)
+    if total>max_bytes or len(files)>max_files:raise ValueError('rescue evidence capsule exceeds bounded input allowance')
     record=dict(schema='shaping-rescue-worker-v1',cell=cell,host=host,study=str(study),binary_dir=str(binaries),
-                neutral_qualification=str(qualification),resolution=resolution,files=files,input_bytes=total,
+                neutral_qualification=str(qualification) if qualification is not None else None,resolution=resolution,files=files,input_bytes=total,
                 plan_sha256=sha(study/'PLAN.json'),build_sha256=sha(binaries/'BUILD.json'),
-                driver_sha256=sha(__file__),source_root=str(REPO),outer_results_read=False)
+                driver_sha256=sha(__file__),source_root=str(REPO),outer_results_read=execution_kind=='bootstrap')
     if execution_kind is not None:
         record.update(schema='shaping-native-worker-v2',execution_kind=execution_kind,
                       human_qualification=str(human_qualification) if human_qualification else None)
@@ -116,15 +129,17 @@ def register(study,cell,host,binaries,qualification,output,*,execution_kind=None
 
 def verify(record,*,allow_missing=False):
     if (record['schema'] not in ('shaping-rescue-worker-v1','shaping-native-worker-v2') or record['host']!=socket.gethostname()
-        or record['host'] not in HOSTS or record['driver_sha256']!=sha(__file__) or record['outer_results_read']):
+        or record['host'] not in HOSTS or record['driver_sha256']!=sha(__file__)
+        or record['outer_results_read'] is not (record.get('execution_kind')=='bootstrap')):
         raise ValueError('worker request identity differs')
     if record['schema']=='shaping-native-worker-v2':
         stages={'outer':('outer','fresh_control_outer','fresh_control_outer_matched'),
-                'variant':('source_curve','row_curve','shuffle','human_only'),'corrected_inner':('inner',)}
+                'variant':('source_curve','row_curve','shuffle','human_only'),'corrected_inner':('inner',),'bootstrap':('bootstrap',)}
         if record.get('execution_kind') not in stages or record['cell']['stage'] not in stages[record['execution_kind']]:
             raise ValueError('downstream worker stage differs')
     elif record.get('execution_kind') is not None:raise ValueError('legacy rescue request cannot change execution kind')
-    if len(record['files'])>4000 or sum(r['bytes'] for r in record['files'].values())>MAX_INPUT_BYTES:
+    max_bytes,max_files=limits(record.get('execution_kind'))
+    if len(record['files'])>max_files or sum(r['bytes'] for r in record['files'].values())>max_bytes:
         raise ValueError('worker input allowance exceeded')
     missing=[]
     for original,row in record['files'].items():
@@ -164,7 +179,7 @@ def receive(request,arguments):
     from shaping_storage import reservation
     record=json.loads(request.read_text());verify(record,allow_missing=True)
     if not arguments or arguments[0]!='--server':raise ValueError('rsync server arguments required')
-    with reservation(Path(record['study']),request.parent/'input-admission',30*1024**3,bytes_required=MAX_INPUT_BYTES):
+    with reservation(Path(record['study']),request.parent/'input-admission',30*1024**3,bytes_required=limits(record.get('execution_kind'))[0]):
         subprocess.run(['rsync',*arguments],check=True)
         verify(record)
 
@@ -177,6 +192,7 @@ def work(request):
     study=Path(record['study']);cell=record['cell'];key=cell['id']
     if record.get('execution_kind') is not None:
         if record['execution_kind']=='corrected_inner':from shaping_corrected_worker import reproduce
+        elif record['execution_kind']=='bootstrap':from shaping_bootstrap_worker import reproduce
         else:from shaping_downstream_worker import reproduce
         resolution,command=reproduce(record)
     else:
@@ -208,7 +224,7 @@ def work(request):
                 bind_worker(study,key,process.pid)
                 status=dict(pid=process.pid,request_sha256=sha(request),stage='running',command=command)
                 request.with_name('STATUS.json').write_bytes(encoded(status));code=process.wait()
-            status.update(exit_code=code,stage='trained' if code==0 else 'failed')
+            status.update(exit_code=code,stage=('analysis_finished' if record.get('execution_kind')=='bootstrap' else 'trained') if code==0 else 'failed')
             request.with_name('STATUS.json').write_bytes(encoded(status))
             if code:raise RuntimeError('rescue worker failed; preserve attempt')
             return status

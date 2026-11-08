@@ -69,6 +69,23 @@ are opened; registered draw reproduction and native point-rank checks remain
 unchanged. Transport and scientific outer bootstrap execution are not implied
 by this refactor.
 
+`shaping_bootstrap_worker.py` carries that complete gate, data and source closure
+through the existing worker transport and shared CPU/RAM admission. A bootstrap
+capsule has an explicit 2-GiB/16,000-file maximum because it reproduces all three
+outer admissions; individual fit capsules retain their 384-MiB/4,000-file limit.
+The native statistics runner remains the computation owner. Complete results
+are checked against their exact input identities, model coverage, comparison,
+convergence qualifications and sample hash before atomic collection. Source
+paths are normalized relative to the exported checkout; hashes and data paths
+remain exact. The same source-path normalization covers corrected command
+templates and the frozen protocol/amendment document locations.
+
+Transport fixtures cover refusal before CPU admission, source relocation,
+changed source hashes, and terminal pack/import while preserving the worker's
+original. The refactored native statistics checks passed on r3800x with
+`run-heavy: done rc=0 31s | peak-RSS 0.23GiB | min-avail 12678MiB | peak-load 3.48`.
+No study outer bootstrap has executed; the complete outer evidence is pending.
+
 The frozen four-setting matrix and the archived monotone-SiLU trajectory were
 accepted by these checks on November 8, 2026. Five other native control
 qualifications were still running; no activation was written. Fixture checks establish orchestration

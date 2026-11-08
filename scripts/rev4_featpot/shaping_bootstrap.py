@@ -170,6 +170,7 @@ def run(args):
             summary.update(input_sha256=pins,convergence_qualifications=qualifications,
                 outer_population_reports={r['cell']['id']:r['report']['outer_test'] for r in outputs},
                 samples_sha256=sha(args.output/'samples.npz'),driver_sha256=sha(__file__),numpy_version=np.__version__,
+                source_root=str(Path(__file__).resolve().parents[2]),
                 outer_results_read=True,final_holdout_read=False,scientific_scope=('48 reduced primary outer cells; six inner-selected roles' if any('role' in r for r in outputs) else '102 primary outer cells only; variants and fresh controls require separate comparisons') if comparison is None else 'one fully paired registered matched outer comparison')
             if comparison is not None:summary['comparison']=spec
             (args.output/'SUMMARY.json').write_bytes(encoded(summary))

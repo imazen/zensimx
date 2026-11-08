@@ -5557,6 +5557,18 @@ shaping-completion-register-matched-bootstrap study output:
 shaping-completion-bootstrap-watch-check:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B -m unittest discover -s scripts/tests -p test_shaping_bootstrap_watch.py
 
+shaping-bootstrap-worker-check:
+    TMPDIR="$HOME/tmp" python3 -B -m unittest scripts/tests/test_shaping_bootstrap_worker.py scripts/tests/test_shaping_rescue_worker.py scripts/tests/test_shaping_downstream_worker.py scripts/tests/test_shaping_corrected_worker.py
+
+shaping-bootstrap-worker-register study draws binaries result host output *comparison:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 2G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_bootstrap_worker.py register --study {{quote(study)}} --draws {{quote(draws)}} --binary-dir {{quote(binaries)}} --result-output {{quote(result)}} --host {{quote(host)}} --output {{quote(output)}} {{comparison}}
+
+shaping-bootstrap-worker-pack request bundle:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_bootstrap_worker.py pack --request {{quote(request)}} --bundle {{quote(bundle)}}
+
+shaping-bootstrap-worker-collect request bundle pin:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_bootstrap_worker.py collect --request {{quote(request)}} --bundle {{quote(bundle)}} --bundle-sha256 {{quote(pin)}}
+
 shaping-completion-watch-bootstraps study draws binaries registry output destination:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 2G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_bootstrap.py --study {{quote(study)}} --draws {{quote(draws)}} --binary-dir {{quote(binaries)}} --matched-registry {{quote(registry)}} --output {{quote(output)}} --archive-destination {{quote(destination)}} --watch
 
