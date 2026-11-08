@@ -24,6 +24,11 @@ budgets. Inputs are shared rather than copied per seed. Keep the 30-GiB SSD
 reserve and account for pending output reservations. Existing attempts, including
 failures, refuse another launch.
 
+A wave manifest pins each request and permits at most four controller threads.
+Every child still uses shared CPU/SSD admission. Finished and failed children are
+recorded as they exit; failures never retry. Size the aggregate memory scope from
+the actual candidate family and observed footprints before launching a wave.
+
 Controller and native phase receipts/checkpoints are retained together. Collection
 checks every expected phase, exposure and checkpoint before publication. Native
 evaluation stays on the approved worker with the explicitly matching rescue

@@ -166,8 +166,31 @@ def work(request):
     finally:release_worker(study,key)
 
 
+def wave(manifest):
+    """Bound controller concurrency; individual jobs share CPU/SSD admission."""
+    from concurrent.futures import ThreadPoolExecutor,as_completed
+    record=json.loads(manifest.read_text());requests=[Path(p) for p in record['requests']]
+    if not 1<=record['workers']<=4 or len(set(requests))!=len(requests):raise ValueError('bounded distinct worker wave required')
+    for path,pin in record['request_sha256'].items():
+        if sha(path)!=pin:raise ValueError('wave request drift')
+    if set(record['request_sha256'])!=set(map(str,requests)):raise ValueError('complete wave pins required')
+    status=dict(pid=os.getpid(),manifest_sha256=sha(manifest),stage='running',completed={},failed={})
+    status_path=manifest.with_name('WAVE_STATUS.json')
+    if status_path.exists():raise ValueError('preserve existing wave; no automatic replay')
+    with status_path.open('x') as out:out.write(encoded(status).decode())
+    with ThreadPoolExecutor(max_workers=record['workers']) as pool:
+        futures={pool.submit(work,path):str(path) for path in requests}
+        for future in as_completed(futures):
+            path=futures[future]
+            try:status['completed'][path]=future.result()
+            except Exception as error:status['failed'][path]=str(error)
+            pending=status_path.with_suffix('.writing');pending.write_bytes(encoded(status));pending.replace(status_path)
+    status['stage']='failed_with_preserved_attempts' if status['failed'] else 'trained'
+    status_path.write_bytes(encoded(status));return status
+
+
 def main():
-    p=argparse.ArgumentParser(description=__doc__);p.add_argument('mode',choices=('register','verify','transfer','receive','work'))
+    p=argparse.ArgumentParser(description=__doc__);p.add_argument('mode',choices=('register','verify','transfer','receive','work','wave'))
     for name in ('study','binaries','qualification','output','request','remote-source'):p.add_argument('--'+name,type=Path)
     p.add_argument('--cell');p.add_argument('--host',choices=HOSTS);p.add_argument('--allow-missing',action='store_true')
     a,remaining=p.parse_known_args()
@@ -178,6 +201,7 @@ def main():
     if a.mode=='register':result=register(a.study,a.cell,a.host,a.binaries,a.qualification,a.output)
     elif a.mode=='transfer':result=transfer(a.request,a.remote_source)
     elif a.mode=='verify':result=verify(json.loads(a.request.read_text()),allow_missing=a.allow_missing)
+    elif a.mode=='wave':result=wave(a.request)
     else:result=work(a.request)
     print(json.dumps(result),flush=True)
 

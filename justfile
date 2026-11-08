@@ -5506,6 +5506,9 @@ shaping-rescue-worker-transfer request source:
 shaping-rescue-worker-run request:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 2G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_rescue_worker.py work --request {{quote(request)}}
 
+shaping-rescue-worker-wave manifest memory jobs:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem {{memory}} --jobs {{jobs}} -- python3 -B scripts/rev4_featpot/shaping_rescue_worker.py wave --request {{quote(manifest)}}
+
 shaping-prefix-archive-proof study archive proof:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 256M --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_prefix_retention.py prepare --study {{quote(study)}} --archive {{quote(archive)}} --proof {{quote(proof)}}
 

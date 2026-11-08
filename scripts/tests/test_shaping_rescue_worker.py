@@ -7,6 +7,22 @@ from shaping_completion import encoded,sha
 
 
 class RescueWorkerTests(unittest.TestCase):
+    def test_wave_preserves_independent_failures_and_never_restarts(self):
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as directory:
+            root=Path(directory);paths=[root/'a.json',root/'b.json']
+            for path in paths:path.write_text('{}')
+            manifest=root/'WAVE.json';manifest.write_bytes(encoded(dict(workers=2,requests=list(map(str,paths)),
+                request_sha256={str(path):sha(path) for path in paths})))
+            def child(path):
+                if path==paths[0]:raise ValueError('native failed')
+                return dict(stage='trained')
+            with patch.object(worker,'work',side_effect=child) as fit:
+                result=worker.wave(manifest)
+                self.assertEqual(len(result['completed']),1);self.assertEqual(len(result['failed']),1)
+                self.assertEqual(fit.call_count,2)
+                with self.assertRaisesRegex(ValueError,'no automatic replay'):worker.wave(manifest)
+                self.assertEqual(fit.call_count,2)
+
     def test_missing_declaration_relocates_by_hash_but_existing_drift_refuses(self):
         from shaping_rescue_execution import portable_command
         with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as directory:
