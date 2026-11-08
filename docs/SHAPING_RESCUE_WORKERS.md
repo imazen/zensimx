@@ -53,3 +53,21 @@ evaluation stays on the approved worker with the explicitly matching rescue
 binary set. Final and diagnostic report transport preserves all numerical gates,
 failed gates and convergence classifications. No outer or final-holdout response
 is used by this transport.
+
+## Deployment observation — November 8, 2026
+
+The approved aggregate ceilings are 5, 11, 14 and 14 trainers on r3500,
+r5600g, i134 and r3800x respectively. One live observation confirmed all
+44 native trainers; a later observation found 43 during result finalization.
+Per-job thread pools, memory limits and SSD reservations remain enforced.
+
+All four coordinator collection observers now use the rescue-capable source.
+Their replaced observers were quiesced only after active child operations had
+finished; native training was not interrupted. The evaluation observer also uses
+the rescue binary directory explicitly. Its first sweep must finish before its
+status receipt establishes readiness. The dashboard now reads the replacement
+worker status paths rather than the retired observers' files.
+
+These observations establish placement and supervision, not completion of the
+new rescue fits or their numerical evaluation. Outer/variant/bootstrap transport
+still needs qualification and deployment.
