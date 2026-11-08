@@ -1,3 +1,12 @@
+## Known Bugs — corrected inner evaluator dispatch (November 8, 2026)
+
+The worker forwarded candidate runtimes only for later-stage evaluation. Corrected
+inner fits therefore reached the strict build-identity gate with the legacy
+runtime and stopped before producing predictions. Inner dispatch now selects one
+explicit runtime whose BUILD hash matches the admitted corrected run/result and
+activation binding. Missing unrelated legacy runtimes are not selected. Existing
+failed requests remain preserved; no training or completed evaluation is replayed.
+
 ## Known Bugs — incomplete controller exports (November 8, 2026)
 
 Source-only supervisor exports omitted imported Just recipe files, stopping

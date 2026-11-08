@@ -8,6 +8,25 @@ from shaping_evaluation import NativeFeatureGateError
 from shaping_completion import encoded
 
 class SupervisionTests(unittest.TestCase):
+    def test_corrected_inner_uses_only_its_explicit_matching_native_build(self):
+        from shaping_completion import sha
+        from shaping_supervision import corrected_binaries
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as d:
+            root=Path(d);run=root/'run';run.mkdir();native=root/'native';native.mkdir()
+            (native/'BUILD.json').write_text('qualified corrected build')
+            cell=dict(id='corrected',stage='inner',family='product_pretrained_joint')
+            binding=dict(scope='registered corrected activation')
+            identity=dict(cell=cell,build_sha256=sha(native/'BUILD.json'),corrected_threshold_condition=binding)
+            (run/'RUN.json').write_bytes(encoded(identity));result=dict(**identity,epochs=120)
+            args=SimpleNamespace(study=root,binary_dir=root/'unused_missing_legacy',candidate_binary_dir=[native])
+            with patch('shaping_corrected_view.admit_fit',return_value=binding):
+                self.assertEqual(corrected_binaries(args,run,result,args.binary_dir),native)
+                args.candidate_binary_dir=[]
+                with self.assertRaisesRegex(ValueError,'one explicit matching'):corrected_binaries(args,run,result,args.binary_dir)
+                args.candidate_binary_dir=[native]
+                with patch('shaping_corrected_view.admit_fit',return_value=None):
+                    with self.assertRaisesRegex(ValueError,'activation binding'):corrected_binaries(args,run,result,args.binary_dir)
+
     def test_cell_filter_does_not_evaluate_unrequested_peers(self):
         with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as d:
             root=Path(d);cells=[dict(id=str(i),stage='inner',family='silu_monotone') for i in range(2)]

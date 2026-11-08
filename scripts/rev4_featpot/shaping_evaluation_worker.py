@@ -185,7 +185,7 @@ def _work(args):
     from shaping_supervision import sweep,later_sweep
     from shaping_reexport_supervision import sweep as supplemental
     values=SimpleNamespace(study=args.study,binary_dir=args.binary_dir,rescue_binary_dir=getattr(args,'rescue_binary_dir',None),
-                           cells=(record['cell']['id'],))
+                           cells=(record['cell']['id'],),candidate_binary_dir=getattr(args,'candidate_binary_dir',[]))
     if 'later_scope' in record:
         values.repair_binary_dir=getattr(args,'repair_binary_dir',None)
         values.repair_inspector=getattr(args,'inspector',None)

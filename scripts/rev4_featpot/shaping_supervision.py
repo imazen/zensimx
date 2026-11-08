@@ -32,6 +32,24 @@ def preserve_failure(path, record):
     with path.open('xb') as stream:stream.write(payload)
 
 
+def corrected_binaries(args,run,result,default):
+    identity_path=run/'RUN.json'
+    if not identity_path.exists():return default
+    identity=json.loads(identity_path.read_text())
+    if 'corrected_threshold_condition' not in identity:return default
+    cell=result['cell'];build=identity['build_sha256']
+    if identity['cell']!=cell or result.get('build_sha256')!=build:
+        raise ValueError('corrected evaluator run/result identity differs')
+    from shaping_corrected_view import admit_fit
+    binding=admit_fit(args.study,cell,build,result['epochs'])
+    if binding is None or any(row.get('corrected_threshold_condition')!=binding for row in (identity,result)):
+        raise ValueError('corrected evaluator activation binding differs')
+    candidates=[args.binary_dir,getattr(args,'rescue_binary_dir',None),*getattr(args,'candidate_binary_dir',[])]
+    matches={p for p in candidates if p is not None and (p/'BUILD.json').is_file() and sha(p/'BUILD.json')==build}
+    if len(matches)!=1:raise ValueError('one explicit matching corrected binary directory required')
+    return next(iter(matches))
+
+
 def sweep(args):
     _,cells,_=load_registration(args.study)
     completed=0
@@ -49,6 +67,7 @@ def sweep(args):
         if cell['stage'] in ('rescue','exposure_extension'):
             binaries=getattr(args,'rescue_binary_dir',None)
             if binaries is None:raise ValueError('rescue/extension evaluation requires its explicit pinned binary directory')
+        binaries=corrected_binaries(args,run,result,binaries)
         values=dict(study=args.study,binary_dir=binaries,run=run)
         print(json.dumps(dict(cell=cell['id'],stage='evaluating',utc=datetime.now(timezone.utc).isoformat())),flush=True)
         failures=[]
