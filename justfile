@@ -5269,6 +5269,12 @@ shaping-completion-control-compatibility-check:
 shaping-completion-corrected-registration-check:
     TMPDIR="$HOME/tmp" python3 -B -m unittest scripts/tests/test_shaping_corrected_registration.py
 
+shaping-rescue-wave-prepare-check:
+    TMPDIR="$HOME/tmp" python3 -B -m unittest scripts/tests/test_shaping_rescue_wave_prepare.py
+
+shaping-rescue-wave-prepare study source binaries qualification outer placements output:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_rescue_wave_prepare.py --study {{quote(study)}} --source {{quote(source)}} --binaries {{quote(binaries)}} --qualification {{quote(qualification)}} --outer {{outer}} --placements {{quote(placements)}} --output {{quote(output)}}
+
 shaping-completion-corrected-register study approval proposal binaries output *observations:
     TMPDIR="$HOME/tmp" python3 -B scripts/rev4_featpot/shaping_corrected_registration.py --study {{quote(study)}} --approval {{quote(approval)}} --proposal {{quote(proposal)}} --binary-dir {{quote(binaries)}} --output {{quote(output)}} {{observations}}
 

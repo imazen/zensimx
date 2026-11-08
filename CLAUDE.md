@@ -1,5 +1,15 @@
 # zensim — current working rules
 
+## Exported rescue policy paths (resolved November 8, 2026)
+
+A new fold-2 ReLU rescue registration refused before creating any job because
+its read capture reached the reduced policy at the original source checkout,
+outside the exported source's allowed dependency scope. The reusable wave
+preparer materializes the existing `REDUCED_PROTOCOL.md` fallback only from
+bytes matching the original reduced registration. Existing changed snapshots
+are preserved and refused. The original scientific registration, policy text,
+native binary, fit arguments and numerical gates are unchanged.
+
 ## Neutral control comparison scope (November 8, 2026)
 
 `shaping_rescue_qualification.py` trains its requested full prefix but compares
