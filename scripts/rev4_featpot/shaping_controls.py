@@ -78,7 +78,7 @@ def control_cache_key(partition,context):
     return ('full-fit-refit-' if context and context.get('descriptive') else 'full-fit-selection-' if context and context.get('full_fit') else '')+partition
 
 
-def run(args):
+def admit(args,*,host=None):
     plan,cells,partitions=load_registration(args.study)
     family='extra_trees' if args.tree else 'shaped_additive'
     variant=None
@@ -102,14 +102,27 @@ def run(args):
         outer=dict(admission_sha256=variant['admission_sha256'],selected_setting=variant['schedule']['setting'],variant=variant)
     else:chosen,outer=selected_cells(args.study,args.partition,family,cells)
     if not chosen:raise ValueError('no registered cells')
+    selected=getattr(args,'selected_cell',None)
+    if selected:
+        if outer is None or variant or full_fit or final_refit:raise ValueError('selected control requires a primary outer admission')
+        chosen=[c for c in chosen if c['id']==selected]
+        if len(chosen)!=1:raise ValueError('one admitted outer control cell required')
+    from shaping_reduced_scope import admit_cell
+    for cell in chosen:admit_cell(args.study,cell,host=host)
+    return plan,partitions,family,chosen,outer
+
+
+def run(args):
+    plan,partitions,family,chosen,outer=admit(args)
     if outer is None:return fit(args,plan,partitions,family,chosen,outer)
     from shaping_storage import reservation
     key=control_cache_key(args.partition,outer)
-    dest=args.study/'control_inputs'/key/f'{family}-attempt-{args.attempt:03}'
+    dest=(args.study/'runs'/chosen[0]['id']/f'attempt-{args.attempt:03}' if getattr(args,'selected_cell',None)
+          else args.study/'control_inputs'/key/f'{family}-attempt-{args.attempt:03}')
     with reservation(args.study,dest,plan['minimum_ssd_free_bytes']):
         # Admission may have waited for space; revalidate before reading labels.
-        current=resolve_variant(args.study,args.cell) if variant else (final_refit_cells if final_refit else full_fit_cells if full_fit else selected_cells)(args.study,args.partition,family,cells)
-        if current!=(variant if variant else (chosen,outer)):
+        current=admit(args)
+        if current!=(plan,partitions,family,chosen,outer):
             raise ValueError('outer control admission changed while waiting')
         return fit(args,plan,partitions,family,chosen,outer)
 
@@ -270,6 +283,7 @@ def main():
     p.add_argument('--watch-outer-admission',action='store_true')
     p.add_argument('--partition',required=True);p.add_argument('--attempt',type=int,default=1)
     p.add_argument('--cell',help='registered generalization control cell; retains inner-selected settings')
+    p.add_argument('--selected-cell',help='one primary outer control, after full family seed coverage is admitted')
     p.add_argument('--full-fit-refit',action='store_true',help='final all-FIT control with descriptive development evaluation')
     p.add_argument('--full-fit-selection',action='store_true',help='registered four-setting full-FIT control search')
     mode=p.add_mutually_exclusive_group(required=True);mode.add_argument('--tree',action='store_true');mode.add_argument('--linear',action='store_true')

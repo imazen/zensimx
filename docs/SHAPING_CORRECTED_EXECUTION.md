@@ -86,6 +86,14 @@ original. The refactored native statistics checks passed on r3800x with
 `run-heavy: done rc=0 31s | peak-RSS 0.23GiB | min-avail 12678MiB | peak-load 3.48`.
 No study outer bootstrap has executed; the complete outer evidence is pending.
 
+The nonneural control owner also exposes its original metadata admission before
+fitting. Its optional `--selected-cell` executes one primary outer control only
+after the complete family seed set has been admitted. It uses a cell-specific
+SSD reservation, allowing independent tree seeds without sharing a reservation
+key. Ordinary batches and the existing variant/full-fit modes retain their
+original behavior. Control transport and actual outer control fitting remain
+separate work.
+
 The frozen four-setting matrix and the archived monotone-SiLU trajectory were
 accepted by these checks on November 8, 2026. Five other native control
 qualifications were still running; no activation was written. Fixture checks establish orchestration

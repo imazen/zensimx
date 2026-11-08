@@ -9,6 +9,16 @@ from shaping_controls import selected_cells,run
 
 
 class OuterControlTests(unittest.TestCase):
+    def test_single_seed_execution_still_requires_the_complete_outer_family_admission(self):
+        from shaping_controls import admit
+        cells=matrix();chosen=[c for c in cells if c['stage']=='outer' and c['family']=='extra_trees' and c['partition']=='outer-0']
+        args=SimpleNamespace(study=Path('/unused'),partition='outer-0',tree=True,selected_cell=chosen[1]['id'])
+        with patch('shaping_controls.load_registration',return_value=({},cells,{})),patch('shaping_controls.selected_cells',return_value=(chosen,{'admission_sha256':'pin'})) as selected,patch('shaping_reduced_scope.admit_cell') as gate:
+            context=admit(args,host='r3500');self.assertEqual(context[3],[chosen[1]])
+            selected.assert_called_once();gate.assert_called_once_with(args.study,chosen[1],host='r3500')
+            args.selected_cell='unregistered'
+            with self.assertRaisesRegex(ValueError,'one admitted'):admit(args,host='r3500')
+
     def test_variant_control_receives_reduced_membership_and_selected_setting(self):
         cell=next(c for c in matrix() if c['stage']=='human_only' and c['family']=='extra_trees')
         membership=dict(train=[1,3],test=[9])
