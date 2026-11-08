@@ -294,8 +294,41 @@ impl Fx1Declaration {
         Ok(())
     }
 
-    /// Rewrite a trainer bake of identity width `base + products` into the
-    /// compact derived form, then gate it. See the module docs.
+    /// Shared shaping declaration for export and checkpoint continuation admission.
+    pub(crate) fn shaped_metadata_text(
+        &self,
+        base: usize,
+        shapes: Option<&crate::mlp_train::input_shaping::Config>,
+    ) -> Result<String, String> {
+        let mut declaration = self.metadata_text();
+        if let Some(shapes) = shapes {
+            shapes.validate();
+            if self.reads_research_ids() {
+                return Err("shaping requires native feature ids".into());
+            }
+            let mut lines: Vec<String> = declaration.lines().map(str::to_owned).collect();
+            lines[0] = "zensim-derived-inputs research-shaping-v1".into();
+            let columns = self.kept_columns(base);
+            for t in &shapes.terms {
+                let pos = columns
+                    .iter()
+                    .position(|c| *c == t.column)
+                    .ok_or("shaped column not kept")?;
+                let expected = match t.reference {
+                    None => format!("in {}", t.damage),
+                    Some(f) => format!("product {} {f}", t.damage),
+                };
+                if lines[pos + 1] != expected {
+                    return Err("shaping term differs from declared input".into());
+                }
+                lines[pos + 1] = t.declaration();
+            }
+            declaration = lines.join("\n") + "\n";
+        }
+        Ok(declaration)
+    }
+
+    /// Rewrite a trainer bake to compact derived inputs and verify runtime parity.
     pub fn compact_bake(&self, bytes: &[u8], base: usize) -> Result<Vec<u8>, String> {
         let model =
             Model::from_bytes(bytes).map_err(|e| format!("fx1 compact: parse bake: {e:?}"))?;
@@ -327,31 +360,7 @@ impl Fx1Declaration {
                     .map_err(|e| format!("fx1 shaping metadata: {e}"))
             })
             .transpose()?;
-        let mut declaration = self.metadata_text();
-        if let Some(shapes) = &shapes {
-            shapes.validate();
-            if self.reads_research_ids() {
-                return Err("shaping requires native feature ids".into());
-            }
-            let mut lines: Vec<String> = declaration.lines().map(str::to_owned).collect();
-            lines[0] = "zensim-derived-inputs research-shaping-v1".into();
-            let columns = self.kept_columns(base);
-            for t in &shapes.terms {
-                let pos = columns
-                    .iter()
-                    .position(|c| *c == t.column)
-                    .ok_or("shaped column not kept")?;
-                let expected = match t.reference {
-                    None => format!("in {}", t.damage),
-                    Some(f) => format!("product {} {f}", t.damage),
-                };
-                if lines[pos + 1] != expected {
-                    return Err("shaping term differs from declared input".into());
-                }
-                lines[pos + 1] = t.declaration();
-            }
-            declaration = lines.join("\n") + "\n";
-        }
+        let declaration = self.shaped_metadata_text(base, shapes.as_ref())?;
         let rows = self.kept_columns(base);
         let mut layers: Vec<OwnedLayer> = Vec::new();
         for (li, l) in model.layers().enumerate() {

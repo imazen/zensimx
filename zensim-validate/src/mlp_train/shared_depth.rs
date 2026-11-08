@@ -410,9 +410,13 @@ pub(super) fn checkpoint(
     activation: zenpredict::Activation,
 ) -> Vec<u8> {
     if depth.is_none() {
-        return super::r14_knees::checkpoint(
+        let bytes = super::r14_knees::checkpoint(
             knees, mean, scale, w1, b1, w2, b2, nf, nh, no, dtype, transforms, params, activation,
         );
+        return match shapes {
+            Some(s) => s.stamp(&bytes),
+            None => bytes,
+        };
     }
     assert!(knees.is_none());
     let bytes = super::bake_plain_znpr_v3(

@@ -199,10 +199,24 @@ impl InitialWeights {
         if hp.nonneg_distance && old_pin != hp.nonneg_pin {
             return Err("initial checkpoint identity pin differs".into());
         }
+        let shapes = metadata
+            .get_utf8(super::input_shaping::KEY)
+            .ok()
+            .map(serde_json::from_str::<super::input_shaping::Config>)
+            .transpose()
+            .map_err(|e| format!("initial checkpoint shaping: {e}"))?;
+        if shapes.is_some() && std::env::var_os("ZENSIM_INPUT_SHAPING_MANIFEST").is_none() {
+            return Err(
+                "shaped checkpoint requires an independently hash-bound shaping manifest".into(),
+            );
+        }
         let columns = if let Some(path) = &hp.steer_derived_inputs {
             let (decl, sha) = crate::derived_inputs::Fx1Declaration::load(path)?;
-            if metadata.get_utf8("zensim.derived_inputs").ok()
-                != Some(decl.metadata_text().as_str())
+            let base = n_features
+                .checked_sub(decl.products.len())
+                .ok_or("initial checkpoint feature width differs")?;
+            let expected = decl.shaped_metadata_text(base, shapes.as_ref())?;
+            if metadata.get_utf8("zensim.derived_inputs").ok() != Some(expected.as_str())
                 || metadata.get_utf8("zentrain.derived_inputs_sha256").ok() != Some(sha.as_str())
                 || declared_ids.as_ref() != Some(&decl.read_set())
             {

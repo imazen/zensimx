@@ -1867,7 +1867,16 @@ fn derived_gates(model: &zenpredict::Model) -> Result<Vec<(usize, usize)>, Strin
         return Ok(Vec::new());
     };
     let mut lines = text.lines();
-    if lines.next() != Some("zensim-derived-inputs v1") {
+    let header = lines.next();
+    if header == Some("zensim-derived-inputs research-shaping-v1") {
+        // Validate every native shape/operator, but grant no linear signed-
+        // product exemption: independently shaped channels need nonnegative
+        // ordinary columns or the existing max-pair certificate.
+        zensim::BakeScorer::new(model)
+            .map_err(|e| format!("invalid shaped derived inputs: {e}"))?;
+        return Ok(Vec::new());
+    }
+    if header != Some("zensim-derived-inputs v1") {
         return Err("unknown derived-inputs header".into());
     }
     let mut direct_pos = std::collections::BTreeMap::new();
@@ -3555,6 +3564,18 @@ pub fn train_mlp_strategy_pairs(
     //    (n_pairs[g] × n_features).
     let std_features = StdFeatures::build(groups, n_features, &scaler_mean, &scaler_scale);
     let mut input_shapes = input_shaping::State::load(hyperparams, &std_features);
+    if input_shapes.is_some() {
+        assert!(
+            tv.is_none()
+                && anchor.is_none()
+                && equiv.is_none()
+                && pjnd_anchor.is_none()
+                && konjnd_agg.is_none()
+                && triplets.is_none()
+                && rank_pairs.is_empty(),
+            "input shaping supports rank/MSE groups without auxiliary pools"
+        );
+    }
     let mut knees = r14_knees::KneeState::new(
         hyperparams,
         &scaler_mean,
@@ -4040,6 +4061,7 @@ pub fn train_mlp_strategy_pairs(
     let pooled_on = !hyperparams.pooled_legs.is_empty();
     let lookahead_ok = fuse_w1
         && depth.is_none()
+        && input_shapes.is_none()
         && !hyperparams.monotone_cbc
         && !hyperparams.nonneg_thresholds
         && !parallel
@@ -4738,6 +4760,9 @@ pub fn train_mlp_strategy_pairs(
                 if let Some(k) = knees.as_mut() {
                     k.step(g_idx, ia, ib, &w1, &dh_a, &dh_b, lr);
                 }
+                if let Some(shapes) = &mut input_shapes {
+                    shapes.step(&std_features, g_idx, ia, ib, &w1, &dh_a, &dh_b, lr);
+                }
                 if hyperparams.l2_lambda > 0.0 {
                     for (g, &w) in adam.gw2.iter_mut().zip(w2.iter()) {
                         *g += hyperparams.l2_lambda * w;
@@ -5202,6 +5227,8 @@ pub fn train_mlp_strategy_pairs(
                             &w2,
                             &b2,
                         )
+                    } else if let Some(shapes) = &input_shapes {
+                        shapes.predict(&std_features, gi, g.features.len(), &w1, &b1, &w2, &b2)
                     } else {
                         std_features.predict_with_knees(
                             knees.as_ref(),

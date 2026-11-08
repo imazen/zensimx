@@ -8,6 +8,9 @@ None.
 
 ### Research
 
+- Extend native input shaping to constrained one-hidden-layer models, including
+  validation, checkpoint export and parameter-preserving continuation admission.
+
 - Add opt-in bounded full-state snapshots for constrained shared-depth training,
   retaining optimizer, sampler and shape state with native crash parity controls.
   Existing frozen study binaries remain unchanged.

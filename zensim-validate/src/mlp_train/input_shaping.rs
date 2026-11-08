@@ -10,15 +10,41 @@ mod wire;
 
 pub(crate) const KEY: &str = "zentrain.input_shaping";
 
+fn validate_owner(hp: &MlpHyperparams) {
+    let plain = hp.n_hidden_layers == 1
+        && hp.n_hidden > 0
+        && hp.n_hidden.is_multiple_of(4)
+        && hp.nonneg_distance
+        && hp.monotone_cbc
+        && hp.nonneg_thresholds
+        && hp.minibatch_size == 1
+        && hp.norm_in_norm_weight == 0.
+        && !hp.per_sample_alpha_head
+        && !hp.pool_head
+        && !hp.hybrid_head
+        && !hp.skip_connection
+        && !hp.smooth_hinge
+        && hp.monotone_ramps == 0
+        && hp.free_ramps == 0
+        && hp.monotone_product_pairs.is_empty()
+        && hp.monotone_feature_pin.is_none()
+        && hp.steer_pairs.is_none()
+        && hp.pooled_legs.is_empty()
+        && hp.r14_trainable_knees.is_none()
+        && hp.feature_transforms.is_none()
+        && hp.feature_transform_params.is_none();
+    assert!(
+        super::shared_depth::enabled(hp) || plain,
+        "input shaping requires constrained shared-depth or plain K=1 CPU owner"
+    );
+    assert_eq!(hp.ema_decay, 0., "input shaping does not support EMA");
+}
+
 pub(super) fn check_admission(hp: &MlpHyperparams) {
     if std::env::var_os("ZENSIM_INPUT_SHAPING_MANIFEST").is_some()
         || std::env::var_os("ZENSIM_INPUT_SHAPING_SHA256").is_some()
     {
-        assert!(
-            super::shared_depth::enabled(hp),
-            "input shaping requires shared-depth CPU owner"
-        );
-        assert_eq!(hp.ema_decay, 0., "input shaping does not support EMA");
+        validate_owner(hp);
     }
 }
 
@@ -160,17 +186,29 @@ impl State {
             (Some(p), Some(h)) => (p, h),
             _ => panic!("shaping requires manifest and independent hash"),
         };
-        assert!(
-            super::shared_depth::enabled(hp),
-            "shaping requires shared-depth CPU owner"
-        );
-        assert_eq!(hp.ema_decay, 0., "shaping does not support EMA");
+        validate_owner(hp);
         assert_eq!(
             crate::train_manifest::sha256_file(std::path::Path::new(&path)).unwrap(),
             hash.to_str().unwrap()
         );
         let config: Config =
             serde_json::from_slice(&std::fs::read(path).unwrap()).expect("shaping manifest");
+        if let Some(path) = &hp.init_from {
+            let bytes = std::fs::read(path).expect("shaped continuation checkpoint");
+            let model = zenpredict::Model::from_bytes(&bytes).unwrap();
+            let previous: Config = serde_json::from_str(
+                model
+                    .metadata()
+                    .get_utf8(KEY)
+                    .expect("continuation needs checkpoint shaping"),
+            )
+            .unwrap();
+            assert_eq!(
+                serde_json::to_value(&config).unwrap(),
+                serde_json::to_value(previous).unwrap(),
+                "continuation manifest must preserve checkpoint shaping parameters"
+            );
+        }
         let mut state = Self::new(config, features);
         state.initial_manifest_sha256 = Some(hash.to_str().unwrap().to_owned());
         Some(state)
@@ -269,6 +307,25 @@ impl State {
                 f64::from(t.value(raw[d], f.map_or(1., |f| raw[f]))) / l.denom[t.column];
         }
         scratch
+    }
+    #[allow(clippy::too_many_arguments)]
+    pub(super) fn predict(
+        &self,
+        features: &StdFeatures,
+        group: usize,
+        rows: usize,
+        w1: &[f64],
+        b1: &[f64],
+        w2: &[f64],
+        b2: &[f64],
+    ) -> Vec<f64> {
+        let mut scratch = Vec::new();
+        (0..rows)
+            .map(|row| {
+                let x = self.row(features, group, row, &mut scratch);
+                super::forward(x, w1, b1, w2, b2, features.n_features, b1.len(), 0.).0
+            })
+            .collect()
     }
     #[allow(clippy::too_many_arguments)]
     pub(super) fn step(
@@ -524,8 +581,11 @@ mod tests {
                     .as_nanos()
             ));
             std::fs::create_dir(&root).unwrap();
-            for trainable in [false, true] {
-                let dir = root.join(if trainable { "joint" } else { "frozen" });
+            for (depth, trainable) in [(1, false), (1, true), (2, false), (2, true)] {
+                let dir = root.join(format!(
+                    "depth-{depth}-{}",
+                    if trainable { "joint" } else { "frozen" }
+                ));
                 std::fs::create_dir(&dir).unwrap();
                 let c = Config {
                     schema: "zensim-input-shaping-v1".into(),
@@ -537,7 +597,7 @@ mod tests {
                 let hash = crate::train_manifest::sha256_file(&path).unwrap();
                 let output=std::process::Command::new(std::env::current_exe().unwrap())
                     .args(["--exact","mlp_train::input_shaping::tests::manifest_reaches_training_validation_and_every_checkpoint","--nocapture"])
-                    .env(CHILD,&dir).env("ZENSIM_INPUT_SHAPING_MANIFEST",&path).env("ZENSIM_INPUT_SHAPING_SHA256",hash)
+                    .env(CHILD,&dir).env("ZENSIM_SHAPING_TEST_DEPTH",depth.to_string()).env("ZENSIM_INPUT_SHAPING_MANIFEST",&path).env("ZENSIM_INPUT_SHAPING_SHA256",hash)
                     .env_remove("ZENSIM_MONOTONE_RESEARCH_MANIFEST").env_remove("ZENSIM_MONOTONE_RESEARCH_SHA256")
                     .output().unwrap();
                 std::fs::write(dir.join("stdout.log"), &output.stdout).unwrap();
@@ -580,7 +640,10 @@ mod tests {
             *super::super::INPUT_KEEP_MASK.lock().unwrap() = Some(mask);
 
             let hp = MlpHyperparams {
-                n_hidden_layers: 2,
+                n_hidden_layers: std::env::var("ZENSIM_SHAPING_TEST_DEPTH")
+                    .unwrap()
+                    .parse()
+                    .unwrap(),
                 n_hidden: 4,
                 nonneg_distance: true,
                 monotone_cbc: true,
@@ -618,6 +681,8 @@ mod tests {
                 let model = zenpredict::Model::from_bytes(&bytes).unwrap();
                 let state: Config =
                     serde_json::from_str(model.metadata().get_utf8(KEY).unwrap()).unwrap();
+                state.validate();
+                assert_eq!(model.layers().count(), hp.n_hidden_layers + 1);
                 changed |= serde_json::to_string(&state.terms).unwrap()
                     != serde_json::to_string(&initial.terms).unwrap();
                 let stamped =
@@ -627,9 +692,99 @@ mod tests {
                     zensim::BakeScorer::new(&zenpredict::Model::from_bytes(&stamped).unwrap())
                         .is_err()
                 );
-                declaration.compact_bake(&stamped, 720).unwrap();
+                let compact = declaration.compact_bake(&stamped, 720).unwrap();
+                if hp.n_hidden_layers == 1 {
+                    let declaration_path = dir.join("declaration.json");
+                    std::fs::write(&declaration_path, serde_json::to_vec(&declaration).unwrap())
+                        .unwrap();
+                    let pin = crate::train_manifest::sha256_file(&declaration_path).unwrap();
+                    let compact = zenpredict_bake::append_metadata_utf8(
+                        &compact,
+                        "zentrain.derived_inputs_sha256",
+                        &pin,
+                    )
+                    .unwrap();
+                    let compact = zenpredict_bake::append_metadata_utf8(
+                        &compact, "zentrain.repro", &serde_json::json!({"argv":[
+                            "trainer", "--hidden", "4", "--nonneg-distance", "--monotone-cbc", "--nonneg-thresholds"
+                        ]}).to_string(),
+                    ).unwrap();
+                    let continuation = MlpHyperparams {
+                        steer_derived_inputs: Some(declaration_path),
+                        ..hp.clone()
+                    };
+                    let initial = super::super::warm_start::InitialWeights::load(
+                        &compact,
+                        721,
+                        &continuation,
+                        Some(super::super::input_keep_mask().as_ref().unwrap()),
+                    )
+                    .unwrap();
+                    assert_eq!(initial.w1.len(), 721 * hp.n_hidden);
+                    assert_eq!(initial.w2.len(), hp.n_hidden);
+                }
             }
             assert_eq!(changed, initial.trainable);
+        }
+    }
+
+    #[test]
+    fn plain_owner_rejects_modes_without_shape_gradients() {
+        let hp = MlpHyperparams {
+            n_hidden_layers: 1,
+            n_hidden: 128,
+            nonneg_distance: true,
+            monotone_cbc: true,
+            nonneg_thresholds: true,
+            ..Default::default()
+        };
+        validate_owner(&hp);
+        for invalid in [
+            MlpHyperparams {
+                n_hidden: 3,
+                ..hp.clone()
+            },
+            MlpHyperparams {
+                minibatch_size: 2,
+                ..hp.clone()
+            },
+            MlpHyperparams {
+                nonneg_distance: false,
+                ..hp.clone()
+            },
+            MlpHyperparams {
+                smooth_hinge: true,
+                ..hp.clone()
+            },
+            MlpHyperparams {
+                ema_decay: 0.9,
+                ..hp.clone()
+            },
+        ] {
+            assert!(std::panic::catch_unwind(|| validate_owner(&invalid)).is_err());
+        }
+    }
+
+    #[test]
+    fn plain_validation_tracks_current_shapes() {
+        let features = fixture();
+        let mut config = Config {
+            schema: "zensim-input-shaping-v1".into(),
+            trainable: true,
+            terms: vec![term(13, None, false), term(720, Some(422), false)],
+        };
+        config.terms[0].slopes = [2., 2., 2.];
+        let state = State::new(config, &features);
+        let mut w = vec![0.; 721 * 4];
+        w[13 * 4..14 * 4].fill(1.);
+        w[720 * 4..721 * 4].fill(1.);
+        let predictions = state.predict(&features, 0, 2, &w, &[0.; 4], &[-1.; 4], &[100.]);
+        for (row, actual) in predictions.into_iter().enumerate() {
+            let mut scratch = Vec::new();
+            let x = state.row(&features, 0, row, &mut scratch);
+            assert!((actual - (100. - 4. * (x[13] + x[720]))).abs() < 1e-12);
+            let raw = features.row(0, row, &mut scratch);
+            assert_ne!(actual, 100. - 4. * (raw[13] + raw[720]));
         }
     }
 

@@ -5875,3 +5875,13 @@ shaping-external-native-qualify binaries tree_model tree_parity linear_model lin
 # Stage the already registered inner validation closure; this performs no fitting.
 shaping-evaluation-inputs mode study manifest *args:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_evaluation_inputs.py {{quote(mode)}} --study {{quote(study)}} --manifest {{quote(manifest)}} {{args}}
+
+# Research shaping extension; keep build outputs in an isolated worker directory.
+shaping-plain-native-check target:
+    TMPDIR="$HOME/tmp" CARGO_TARGET_DIR={{quote(target)}} "$HOME/work/claudehints/scripts/run-heavy" --mem 8G --jobs 6 -- cargo test --locked -p zensim-validate --lib mlp_train::input_shaping -- --nocapture
+
+shaping-plain-native-build target:
+    TMPDIR="$HOME/tmp" CARGO_TARGET_DIR={{quote(target)}} "$HOME/work/claudehints/scripts/run-heavy" --mem 8G --jobs 6 -- cargo build --locked -p zensim-validate --bin zensim_mlp_train
+
+shaping-plain-native-clippy target:
+    TMPDIR="$HOME/tmp" CARGO_TARGET_DIR={{quote(target)}} "$HOME/work/claudehints/scripts/run-heavy" --mem 8G --jobs 6 -- cargo clippy --locked -p zensim-validate --lib -- -D warnings
