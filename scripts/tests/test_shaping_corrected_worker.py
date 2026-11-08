@@ -35,13 +35,16 @@ class CorrectedWorkerTests(unittest.TestCase):
             (study/'PLAN.json').write_text('{}');(source/'SHAPING.json').write_text('{}')
             marker=study/'corrected-evidence.json';marker.write_text('{}');binaries=root/'binaries';binaries.mkdir();(binaries/'BUILD.json').write_text('{}')
             cell=dict(id='corrected',family='product_pretrained_joint',partition='inner-0-0',stage='inner')
-            context=dict(cell=cell,parent=source,scope=dict(cell=cell,outer_results_read=False,prefix_sha256='prefix'))
-            def gate(*args,**kwargs):marker.read_bytes();return context
+            guard=study/'worker_assignments/selected.json';guard.parent.mkdir();guard.write_text('{}')
+            other=guard.with_name('historical.json');other.write_text('{}')
+            context=dict(cell=cell,parent=source,scope=dict(cell=cell,outer_results_read=False,prefix_sha256='prefix',placement=dict(assignment=str(guard))))
+            def gate(*args,**kwargs):marker.read_bytes();guard.read_bytes();other.read_bytes();return context
             qualification=root/'corrected-control-qualification-20261108'
             with patch.object(corrected,'context',side_effect=gate),patch.object(worker,'DATA_ROOTS',(root,)):
                 record=corrected.resolve_inputs(study,'corrected','r3500',binaries,qualification)
                 self.assertEqual(record['execution_kind'],'corrected_inner')
                 self.assertIn(str(marker),record['files']);self.assertIn(str(source/'SHAPING.json'),record['files'])
+                self.assertIn(str(guard),record['files']);self.assertNotIn(str(other),record['files'])
                 with patch.object(worker.socket,'gethostname',return_value='r3500'):
                     self.assertEqual(worker.verify(record),[])
                     marker.write_text('drift')

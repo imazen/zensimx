@@ -71,6 +71,12 @@ def resolve_inputs(study,cell_id,host,binaries,qualification):
         if qualification!=study.parent/'corrected-control-qualification-20261108':
             raise ValueError('exact registered compatibility directory required')
     paths.add(Path(__file__).absolute())
+    # Other historical placements are local orchestration state, not inputs to
+    # this condition. Both endpoints still run the complete overlap/host check;
+    # transport only the exact selected guard already bound in scope. This
+    # preserves unrelated drained-worker placement snapshots on new workers.
+    selected=Path(admitted['scope']['placement']['assignment'])
+    paths={path for path in paths if path.parent!=study/'worker_assignments' or path==selected}
     return seal_inputs(paths,study,admitted['cell'],host,binaries,qualification,admitted['scope'],execution_kind='corrected_inner')
 
 
