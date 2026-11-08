@@ -63,3 +63,6 @@ requests for the identical scientific conditions. Preserve original requests and
 assignment backups. Their superseded waiting requests may subsequently refuse
 the changed placement or capsule hash; these are cancelled queue requests, not
 failed scientific fits. Do not relaunch an existing attempt.
+
+The [November 8 placement measurements](../benchmarks/shaping_queue_rebalance_2026-11-08.md)
+record the real deployment, active native counts and verified retirement archives.
