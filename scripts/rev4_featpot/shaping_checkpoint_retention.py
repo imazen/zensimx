@@ -71,10 +71,16 @@ def open_targets(output,targets):
     return sorted({line[1:] for line in output.splitlines() if line.startswith('n') and line[1:] in targets})
 
 
-def no_users(rows):
+def no_users(rows,*,mountinfo=Path('/proc/self/mountinfo')):
     # Enumerate descriptors/mappings once, avoiding an argument list containing
     # tens of thousands of checkpoint paths. Portal mounts are unrelated to /mnt/v.
-    result=subprocess.run(['sudo','lsof','-nP','-e','/run/user/107/doc','-e','/run/user/1000/doc','-Fpn'],capture_output=True,text=True)
+    # Headless workers do not have the coordinator's desktop portal mounts.
+    # lsof refuses a nonexistent -e target; exclude only actual mounted portals.
+    command=['sudo','lsof','-nP']
+    for line in mountinfo.read_text().splitlines():
+        target=line.split()[4]
+        if re.fullmatch('/run/user/[0-9]+/doc',target):command+=['-e',target]
+    result=subprocess.run([*command,'-Fpn'],capture_output=True,text=True)
     if result.returncode!=0 or result.stderr:raise ValueError('open-file inspection failed: '+result.stderr)
     busy=open_targets(result.stdout,{r['path'] for r in rows})
     if busy:raise ValueError('checkpoint still in use: '+str(busy))

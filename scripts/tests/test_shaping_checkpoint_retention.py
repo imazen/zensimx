@@ -2,11 +2,24 @@ import json,sys,tempfile,unittest
 from pathlib import Path
 from unittest.mock import patch
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'rev4_featpot'))
-from shaping_checkpoint_retention import reclaim,retained_epochs,open_targets,candidates
+from shaping_checkpoint_retention import reclaim,retained_epochs,open_targets,candidates,no_users
 from shaping_completion import sha
 from shaping_evaluation import diagnostic_epochs
 
 class RetentionTests(unittest.TestCase):
+    def test_open_file_check_excludes_only_live_portals_and_still_refuses_busy_files(self):
+        from types import SimpleNamespace
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as d:
+            mounts=Path(d)/'mountinfo';mounts.write_text('1 0 1:0 / / rw - ext4 root rw\n')
+            with patch('shaping_checkpoint_retention.subprocess.run',return_value=SimpleNamespace(returncode=0,stderr='',stdout='')) as run:
+                no_users([dict(path='/data/checkpoint')],mountinfo=mounts)
+                self.assertNotIn('-e',run.call_args.args[0])
+                mounts.write_text(mounts.read_text()+'2 1 0:2 / /run/user/123/doc rw - fuse.portal portal rw\n')
+                run.return_value.stdout='p42\nn/data/checkpoint\n'
+                with self.assertRaisesRegex(ValueError,'still in use'):no_users([dict(path='/data/checkpoint')],mountinfo=mounts)
+                self.assertIn('/run/user/123/doc',run.call_args.args[0])
+                self.assertNotIn('/run/user/1000/doc',run.call_args.args[0])
+
     def rescue_fixture(self,root,pretrained=True):
         (root/'PLAN.json').write_text('{"input_pins":{}}')
         cell=dict(id='rescue',stage='rescue',family='product_pretrained_frozen' if pretrained else 'relu')

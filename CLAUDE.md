@@ -1,5 +1,13 @@
 # zensim — current working rules
 
+## Known Bugs — headless checkpoint retention (resolved November 8, 2026)
+
+The open-file checker passed two fixed desktop portal exclusions to lsof.
+On a headless worker those mountpoints did not exist, so lsof refused before
+snapshot retirement; no state was removed. Exclusions now come from the live
+Linux mount table. All lsof errors and active checkpoint users still refuse
+retirement, and durable state hashes are still cold-read before removal.
+
 ## Corrected worker command preflight (resolved November 8, 2026)
 
 The initial corrected worker set the command owner's TRAINER variable but
