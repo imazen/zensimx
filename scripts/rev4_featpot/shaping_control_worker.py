@@ -3,7 +3,7 @@ import argparse,json,shutil,socket
 from pathlib import Path
 from types import SimpleNamespace
 import shaping_controls as owner
-from shaping_completion import REPO,encoded,sha
+from shaping_completion import DECLARATION_SHA256,REPO,encoded,sha
 
 
 def packages():
@@ -29,6 +29,8 @@ def context(study,cell_id,binaries,*,host=None):
     build=json.loads((binaries/'BUILD.json').read_text())
     for name,pin in build['binary_sha256'].items():
         if sha(binaries/name)!=pin:raise ValueError('native control binary drift')
+    if sha(REPO/'scripts/rev4_featpot/color_noise_fx2_declaration.json')!=DECLARATION_SHA256:
+        raise ValueError('frozen control feature declaration drift')
     if family=='extra_trees':sha(REPO/'scripts/v_next/train_corruption_head.py')
     import shaped_linear_study,tree_study
     membership=partitions[cell['partition']]

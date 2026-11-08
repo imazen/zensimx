@@ -30,6 +30,7 @@ class ControlWorkerTests(unittest.TestCase):
             with patch('shaping_execution.load_registration',return_value=(plan,[cell],parts)),patch.object(control.owner,'admit',return_value=(plan,parts,'extra_trees',[cell],dict(admission_sha256='outer',selected_setting=2))),patch.object(worker,'DATA_ROOTS',(root,)):
                 record=control.register(study,cell['id'],binary,'r3500',root/'request')
                 self.assertEqual(record['execution_kind'],'control');self.assertFalse(record['outer_results_read'])
+                self.assertIn(str(control.REPO/'scripts/rev4_featpot/color_noise_fx2_declaration.json'),record['files'])
                 self.assertIn(str(marker),record['files']);self.assertEqual(record['resolution']['expected_indices'],[1,3,9])
                 self.assertEqual(record['resolution']['package_versions'],control.packages())
                 with patch.object(worker.socket,'gethostname',return_value='r3500'):
