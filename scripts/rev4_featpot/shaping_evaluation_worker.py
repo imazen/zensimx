@@ -21,7 +21,7 @@ def components(cell,attempt):
             Path('reexports')/cell/attempt,Path('reexport_max_pairs')/cell/attempt]
 
 
-def request(study,run):
+def request(study,run,*,target_host=None):
     """Metadata-only admission; never replay previously evaluated fits."""
     from shaping_execution import load_registration
     _,cells,_=load_registration(study)
@@ -41,13 +41,25 @@ def request(study,run):
           [run/'RUN.json',run/'RESULT.json',run/identity.get('fit_directory','.')/'train.log',
            *(model_root/f'ckpt_epoch{e:03}.bin' for e in sorted({epochs-1,*diagnostic_epochs(epochs)}))]}
     if sha(model_root/f'ckpt_epoch{epochs-1:03}.bin')!=result['bake_sha256']:raise ValueError('final model drift')
-    return dict(cell=cell,attempt=run.name,host=identity['execution_host'],
+    host=target_host or identity['execution_host']
+    if host not in HOSTS:raise ValueError('approved evaluation host required')
+    moving=host!=identity['execution_host']
+    if moving and (cell['family']!='relu' or cell['stage'] not in ('inner','fresh_control_inner')):
+        raise ValueError('cross-host transport currently supports primary ReLU controls only')
+    if moving:
+        for name in ('keep.txt','COLLECTION_DERIVED_INPUTS.json','WORKER_COLLECTION.json'):
+            path=run/name
+            if path.exists():pins[str(path.relative_to(study))]=sha(path)
+    value=dict(cell=cell,attempt=run.name,host=host,
                 plan_sha256=sha(study/'PLAN.json'),source_sha256=pins,
                 reduced_scope_sha256=sha(study/'REDUCED_SCOPE.json'),
                 collection_receipt_sha256=sha(collection),outer_results_read=False)
+    if moving:value.update(fit_execution_host=identity['execution_host'],
+                           input_sizes={name:(study/name).stat().st_size for name in pins})
+    return value
 
 
-def verify_request(study,record):
+def verify_request(study,record,*,allow_missing=False):
     from shaping_reduced_scope import admit_compute
     admit_compute(study)
     if sha(study/'REDUCED_SCOPE.json')!=record['reduced_scope_sha256']:
@@ -56,12 +68,53 @@ def verify_request(study,record):
         raise ValueError('worker host differs')
     if record['outer_results_read'] or record['plan_sha256']!=sha(study/'PLAN.json'):
         raise ValueError('worker evaluation scope differs')
+    if 'fit_execution_host' in record:
+        if (record['fit_execution_host'] not in HOSTS or record['fit_execution_host']==record['host']
+            or record['cell']['family']!='relu' or record['cell']['stage'] not in ('inner','fresh_control_inner')
+            or set(record['input_sizes'])!=set(record['source_sha256'])
+            or len(record['input_sizes'])>1000
+            or any(type(n) is not int or n<0 for n in record['input_sizes'].values())
+            or sum(record['input_sizes'].values())>128*1024**2):raise ValueError('cross-host input scope differs')
     from pathlib import PurePosixPath
     for name,pin in record['source_sha256'].items():
         path=PurePosixPath(name)
         if path.is_absolute() or '..' in path.parts or path.parts[:3]!=('runs',record['cell']['id'],record['attempt']):
             raise ValueError('worker evaluation input path differs')
-        if sha(study/name)!=pin:raise ValueError('worker evaluation input drift')
+        source=study/name
+        if any(p.is_symlink() for p in [source,*source.parents]):raise ValueError('symlink in evaluation input')
+        if allow_missing and not source.exists():continue
+        if sha(source)!=pin:raise ValueError('worker evaluation input drift')
+        if 'input_sizes' in record and source.stat().st_size!=record['input_sizes'][name]:raise ValueError('evaluation input size differs')
+    original=study/'runs'/record['cell']['id']/record['attempt']/'RUN.json'
+    if 'fit_execution_host' in record and original.exists():
+        if json.loads(original.read_text())['execution_host']!=record['fit_execution_host']:
+            raise ValueError('training origin differs')
+
+
+def transfer_inputs(args,record,request_path,remote_request):
+    """Preserve existing files; pin only the small completed ReLU fit closure."""
+    if 'fit_execution_host' not in record:raise ValueError('explicit cross-host origin required')
+    host=record['host'];script=Path(args.remote_source)/'scripts/rev4_featpot/shaping_evaluation_worker.py'
+    base=['python3','-B',str(script),'--study',str(args.study),'--request',str(remote_request)]
+    subprocess.run(['ssh',host,shlex.join([*base,'--verify-inputs'])],check=True)
+    paths=request_path.with_name('INPUT_PATHS.txt')
+    paths.write_bytes(b''.join(str(args.study/name).lstrip('/').encode()+b'\0' for name in record['source_sha256']))
+    receiver=['env','TMPDIR=/home/lilith/tmp','/home/lilith/work/claudehints/scripts/run-heavy',
+              '--mem','512M','--jobs','1','--',*base,'--receive','--']
+    subprocess.run(['rsync','-rlptR','--omit-dir-times','--no-implied-dirs','--ignore-existing','--from0',
+        '--files-from='+str(paths),'--rsync-path='+shlex.join(receiver),'/',host+':/'],check=True)
+
+
+def receive(args):
+    record=json.loads(args.request.read_text());verify_request(args.study,record,allow_missing=True)
+    if 'fit_execution_host' not in record:raise ValueError('explicit cross-host origin required')
+    arguments=args.rsync_arguments
+    if arguments[:1]==['--']:arguments=arguments[1:]
+    if arguments[:1]!=['--server']:raise ValueError('rsync server arguments required')
+    from shaping_storage import reservation
+    minimum=json.loads((args.study/'PLAN.json').read_text())['minimum_ssd_free_bytes']
+    with reservation(args.study,args.request.parent/'input-admission',minimum,bytes_required=128*1024**2):
+        subprocess.run(['rsync',*arguments],check=True);verify_request(args.study,record)
 
 
 def capacity(study=None):
@@ -149,11 +202,19 @@ def publish(study,request_path,bundle,pin,staging):
             target=study/relative;target.parent.mkdir(parents=True,exist_ok=True);source.rename(target)
     receipt=dict(request_sha256=sha(request_path),bundle_sha256=pin,source_host=record['host'],
                  files=manifest['files'],imported_utc=datetime.now(timezone.utc).isoformat())
+    if 'fit_execution_host' in record:receipt['fit_execution_host']=record['fit_execution_host']
     target=study/'runs'/record['cell']['id']/record['attempt']/'EVALUATION_WORKER_IMPORT.json'
     target.write_bytes(encoded(receipt));return receipt
 
 
 def watch(args):
+    placements={}
+    if getattr(args,'placement_file',None):
+        placement=json.loads(args.placement_file.read_text())
+        if placement['plan_sha256']!=sha(args.study/'PLAN.json') or placement['outer_results_read']:
+            raise ValueError('evaluation placement plan differs')
+        placements=placement['placements']
+        if any(host not in HOSTS for host in placements.values()):raise ValueError('unapproved evaluation placement')
     args.output.mkdir(parents=True,exist_ok=True)
     with (args.output/'.owner').open('a') as lock:
         fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
@@ -163,7 +224,7 @@ def watch(args):
                 value=json.loads(path.read_text());run=path.parent
                 if value.get('stage')!='trained' or value['cell']['stage'] not in ('inner','fresh_control_inner','rescue') or not (run/'WORKER_COLLECTION.json').exists():continue
                 if any((args.study/p).exists() for p in components(value['cell']['id'],run.name)):continue
-                record=request(args.study,run);host=record['host'];directory=args.output/value['cell']['id']
+                record=request(args.study,run,target_host=placements.get(value['cell']['id']));host=record['host'];directory=args.output/value['cell']['id']
                 request_path=directory/'REQUEST.json'
                 if directory.exists():
                     if (directory/'FAILURE.json').exists() or not (directory/'WAITING.json').exists():blocked.append(value['cell']['id']);continue
@@ -175,6 +236,7 @@ def watch(args):
                 remote_bundle=remote_request.parent/'evaluation.tar'
                 subprocess.run(['ssh',host,'mkdir -p '+shlex.quote(str(remote_request.parent))],check=True)
                 subprocess.run(['scp',str(request_path),host+':'+str(remote_request)],check=True)
+                if 'fit_execution_host' in record:transfer_inputs(args,record,request_path,remote_request)
                 command=['env','TMPDIR=/home/lilith/tmp','PYTHONPATH='+str(args.study.parent/'python-runtime'),
                     '/home/lilith/work/claudehints/scripts/run-heavy','--mem','3G','--jobs','1','--',
                     'python3','-B',str(remote),'--work','--study',str(args.study),'--request',str(remote_request),
@@ -210,10 +272,14 @@ def watch(args):
 def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('--study',type=Path,required=True)
-    for name in ('binary-dir','rescue-binary-dir','repair-binary-dir','inspector','request','bundle','output','remote-source'):p.add_argument('--'+name,type=Path)
+    for name in ('binary-dir','rescue-binary-dir','repair-binary-dir','inspector','request','bundle','output','remote-source','placement-file'):p.add_argument('--'+name,type=Path)
     p.add_argument('--work',action='store_true');p.add_argument('--watch',action='store_true')
+    p.add_argument('--verify-inputs',action='store_true');p.add_argument('--receive',action='store_true')
+    p.add_argument('rsync_arguments',nargs=argparse.REMAINDER)
     args=p.parse_args()
-    if args.work:print(json.dumps(work(args)),flush=True)
+    if args.verify_inputs:print(json.dumps(verify_request(args.study,json.loads(args.request.read_text()),allow_missing=True)),flush=True)
+    elif args.receive:receive(args)
+    elif args.work:print(json.dumps(work(args)),flush=True)
     else:watch(args)
 
 

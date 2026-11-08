@@ -5486,6 +5486,9 @@ shaping-reduced-uncertainty-check panel:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B -m unittest discover -s scripts/tests -p test_shaping_outer_evidence.py
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B -m unittest discover -s scripts/tests -p test_shaping_cost_finalists.py
 
+shaping-evaluation-watch study binaries repair rescue inspector output source *args:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_evaluation_worker.py --study {{quote(study)}} --binary-dir {{quote(binaries)}} --repair-binary-dir {{quote(repair)}} --rescue-binary-dir {{quote(rescue)}} --inspector {{quote(inspector)}} --output {{quote(output)}} --remote-source {{quote(source)}} --watch {{args}}
+
 shaping-evaluation-worker-check:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B -m unittest discover -s scripts/tests -p test_shaping_evaluation_worker.py
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B -m unittest discover -s scripts/tests -p test_shaping_supervision.py

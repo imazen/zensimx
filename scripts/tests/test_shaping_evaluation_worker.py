@@ -5,10 +5,81 @@ from unittest.mock import patch
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'rev4_featpot'))
 from shaping_completion import matrix,encoded,sha
 from shaping_evaluation import diagnostic_epochs
-from shaping_evaluation_worker import request,_work,publish
+from shaping_evaluation_worker import request,_work,publish,verify_request,transfer_inputs
 
 
 class WorkerEvaluationTests(unittest.TestCase):
+    def relu_fixture(self,root):
+        study,run=self.fixture(root)
+        cell=next(c for c in matrix() if c['stage']=='inner' and c['family']=='relu')
+        target=run.parent.with_name(cell['id']);run.parent.rename(target);run=target/run.name
+        for name in ('RUN.json','RESULT.json'):
+            path=run/name;value=json.loads(path.read_text());value['cell']=cell;path.write_bytes(encoded(value))
+        (run/'keep.txt').write_text('0\n1\n')
+        return study,run
+
+    def test_cross_host_request_keeps_training_origin_and_pins_portable_inputs(self):
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as directory:
+            study,run=self.relu_fixture(Path(directory));before=(run/'RUN.json').read_bytes()
+            with patch('shaping_execution.load_registration',return_value=({},matrix(),{})):
+                record=request(study,run,target_host='r3800x')
+                with self.assertRaisesRegex(ValueError,'approved'):request(study,run,target_host='dev')
+            self.assertEqual(record['host'],'r3800x');self.assertEqual(record['fit_execution_host'],'r5600g')
+            self.assertEqual((run/'RUN.json').read_bytes(),before)
+            self.assertTrue(any(n.endswith('/WORKER_COLLECTION.json') for n in record['source_sha256']))
+            self.assertTrue(any(n.endswith('/keep.txt') for n in record['source_sha256']))
+            self.assertEqual(set(record['input_sizes']),set(record['source_sha256']))
+
+    def test_cross_host_scope_refuses_unqualified_family(self):
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as directory:
+            study,run=self.fixture(Path(directory))
+            with patch('shaping_execution.load_registration',return_value=({},matrix(),{})):
+                with self.assertRaisesRegex(ValueError,'ReLU controls only'):request(study,run,target_host='r3800x')
+
+    def test_missing_transfer_inputs_are_preflight_only_and_drift_or_origin_refuse(self):
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as directory:
+            study,run=self.relu_fixture(Path(directory))
+            with patch('shaping_execution.load_registration',return_value=({},matrix(),{})):
+                record=request(study,run,target_host='r3800x')
+            with patch('shaping_reduced_scope.admit_compute'),patch('shaping_evaluation_worker.socket.gethostname',return_value='r3800x'):
+                verify_request(study,record)
+                model=next((run/'checkpoints').glob('*.bin'));data=model.read_bytes();model.unlink()
+                verify_request(study,record,allow_missing=True)
+                with self.assertRaises(FileNotFoundError):verify_request(study,record)
+                model.write_bytes(data+b'drift')
+                with self.assertRaisesRegex(ValueError,'drift'):verify_request(study,record,allow_missing=True)
+                model.write_bytes(data)
+                record['fit_execution_host']='i134'
+                with self.assertRaisesRegex(ValueError,'training origin'):verify_request(study,record)
+
+    def test_transfer_refuses_overwrites_and_uses_bounded_receiver(self):
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as directory:
+            root=Path(directory);study,run=self.relu_fixture(root)
+            with patch('shaping_execution.load_registration',return_value=({},matrix(),{})):
+                record=request(study,run,target_host='r3800x')
+            args=SimpleNamespace(study=study,remote_source=root/'export');path=root/'REQUEST.json';path.write_bytes(encoded(record))
+            with patch('shaping_evaluation_worker.subprocess.run') as call:
+                transfer_inputs(args,record,path,path)
+            self.assertIn('--verify-inputs',call.call_args_list[0].args[0][-1])
+            command=call.call_args_list[1].args[0]
+            self.assertEqual(command[0],'rsync')
+            for flag in ('--ignore-existing','--no-implied-dirs','--omit-dir-times'):self.assertIn(flag,command)
+            receiver=next(v for v in command if v.startswith('--rsync-path='))
+            self.assertIn('--mem 512M',receiver);self.assertIn('--receive',receiver)
+
+    def test_cross_host_payload_and_symlink_guards_apply_during_preflight(self):
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as directory:
+            study,run=self.relu_fixture(Path(directory))
+            with patch('shaping_execution.load_registration',return_value=({},matrix(),{})):
+                record=request(study,run,target_host='r3800x')
+            with patch('shaping_reduced_scope.admit_compute'),patch('shaping_evaluation_worker.socket.gethostname',return_value='r3800x'):
+                name=next(iter(record['input_sizes']));original=record['input_sizes'][name]
+                record['input_sizes'][name]=128*1024**2+1
+                with self.assertRaisesRegex(ValueError,'input scope'):verify_request(study,record,allow_missing=True)
+                record['input_sizes'][name]=original
+                keep=run/'keep.txt';keep.unlink();keep.symlink_to(run/'train.log')
+                with self.assertRaisesRegex(ValueError,'symlink'):verify_request(study,record,allow_missing=True)
+
     def test_nested_rescue_request_pins_native_phase_without_replaying_it(self):
         with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as directory:
             root=Path(directory);study,run=self.fixture(root)

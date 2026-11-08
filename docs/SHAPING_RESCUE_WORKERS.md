@@ -88,3 +88,12 @@ key in an early diagnostic is not evidence of a changed weight trajectory.
 For system-service launches, set finite `MemoryMax` and `MemorySwapMax=0` on
 the service too. A worker's older wrapper can lack a usable user-manager
 environment in this context; a printed fallback is not a hard memory cap.
+
+Primary ReLU evaluations may use an explicit placement file to move from a busy
+training host to another approved worker. Training origin remains pinned and
+unchanged; only evaluation placement changes. The small completed-fit closure
+includes the exact diagnostic models, native log and portable declaration receipt.
+It is limited to 128 MiB and 1,000 files, with a reserved 512-MiB rsync receiver,
+drift checks and no overwrites. Missing inputs are permitted only during transport
+preflight; native evaluation still requires every pin and all existing gates.
+Other families and rescue/outer stages retain their existing placement rules.
