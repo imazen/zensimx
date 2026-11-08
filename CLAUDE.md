@@ -1,5 +1,17 @@
 # zensim — current working rules
 
+## Known Bugs — collection PATH and drained-worker reconciliation (resolved November 8, 2026)
+
+Old worker collectors stopped when a planned admission drain briefly exposed
+unfinished result finalization. Fresh reconciliation later showed zero live or
+unresolved attempts and nineteen trained fits awaiting import. Preserve failed
+watcher records and restart collection from fresh terminal artifacts; never
+restart the fits. The first recovery launch also supplied a PATH without the
+mise-installed `just`, so it refused before transfer. Collectors now preflight
+`just`, `ssh` and `scp` before claiming ownership or reporting a watching stage.
+Launch with a resolved tool path; a live observer alone does not prove transfer
+readiness. Recovered watcher status paths must replace stale paths in the page.
+
 ## Known Bugs — learned-shape threshold initialization (source corrected November 8, 2026)
 
 The frozen primary binary initializes thresholds from unshaped `StdFeatures`

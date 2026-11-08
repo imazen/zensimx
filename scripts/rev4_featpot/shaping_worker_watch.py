@@ -1,6 +1,6 @@
 """Observe worker processes and collect terminal waves through verified owners."""
 from __future__ import annotations
-import argparse,fcntl,json,os,shlex,subprocess,time
+import argparse,fcntl,json,os,shlex,shutil,subprocess,time
 from datetime import datetime,timezone
 from pathlib import Path
 from types import SimpleNamespace
@@ -50,6 +50,8 @@ def cycle(args,observation,sequence):
 
 
 def watch(args):
+    missing=[name for name in ('just','ssh','scp') if shutil.which(name) is None]
+    if missing:raise ValueError('worker collection tools missing from PATH: '+', '.join(missing))
     ownership=args.study/'dispatch/worker-collection';ownership.mkdir(parents=True,exist_ok=True)
     with (ownership/(args.host+'.lock')).open('a') as lock:
         fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)

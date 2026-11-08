@@ -8,6 +8,11 @@ from shaping_worker_watch import pending,cycle,watch
 
 
 class WorkerWatchTests(unittest.TestCase):
+    def test_missing_transfer_tool_fails_before_claiming_or_publishing_status(self):
+        with patch('shaping_worker_watch.shutil.which',side_effect=lambda name:None if name=='just' else '/usr/bin/'+name):
+            with self.assertRaisesRegex(ValueError,'missing from PATH: just'):
+                watch(SimpleNamespace())
+
     def status(self):
         return dict(checked_utc=datetime.now(timezone.utc).isoformat(),unexpectedly_stopped=[],live=1,
                     runs=[dict(cell='done',terminal='trained',run='/remote/runs/done/attempt-001'),
