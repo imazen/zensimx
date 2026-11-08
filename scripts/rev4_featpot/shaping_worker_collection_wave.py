@@ -23,8 +23,11 @@ def run(args):
         cell=row['cell'];local=args.study/'runs'/cell/Path(row['run']).name
         if local.exists():continue
         if cell not in assignments:raise ValueError('terminal cell has no host assignment')
-        if Path(row['run']).name!='attempt-001':raise ValueError('later worker attempts require explicit reconciliation')
-        pending.append(dict(cell=cell,assignment=str(assignments[cell]),assignment_sha256=sha(assignments[cell])))
+        attempt=Path(row['run']).name
+        if attempt!='attempt-001':
+            from shaping_external_recovery import authorize_attempt
+            authorize_attempt(args.study,cell,attempt)
+        pending.append(dict(cell=cell,attempt=attempt,assignment=str(assignments[cell]),assignment_sha256=sha(assignments[cell])))
     if len({r['cell'] for r in pending})!=len(pending):raise ValueError('duplicate terminal attempts')
     args.output.mkdir(parents=True,exist_ok=False)
     record=dict(host=args.host,source=str(args.source),status_sha256=sha(args.status),
@@ -32,14 +35,14 @@ def run(args):
     receipt=args.output/'WAVE.json';receipt.write_bytes(encoded(record))
     try:
         for row in pending:
-            cell=row['cell'];assignment=row['assignment']
-            remote=args.study.parent/'worker-bundles'/f'{cell}-attempt-001.tar'
-            destination=args.destination/f'{args.host}-{cell}-attempt-001';bundle=destination/remote.name
+            cell=row['cell'];assignment=row['assignment'];attempt=row['attempt']
+            remote=args.study.parent/'worker-bundles'/f'{cell}-{attempt}.tar'
+            destination=args.destination/f'{args.host}-{cell}-{attempt}';bundle=destination/remote.name
             with (args.output/(cell+'.log')).open('x') as log:
                 def call(command):
                     log.write(json.dumps(command)+'\n');log.flush()
                     subprocess.run(command,cwd=REPO,stdout=log,stderr=subprocess.STDOUT,check=True)
-                call(['just','shaping-completion-pack-worker',args.host,str(args.source),str(args.study),assignment,cell,str(remote)])
+                call(['just','shaping-completion-pack-worker',args.host,str(args.source),str(args.study),assignment,cell,str(remote),attempt])
                 call(['just','shaping-completion-fetch-worker',args.host,str(remote),str(destination)])
                 pin=json.loads(Path(str(bundle)+'.json').read_text())['bundle_sha256']
                 for action in ('verify-transfer','collect'):

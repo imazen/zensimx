@@ -26,6 +26,8 @@ def validate(root, assignment, cells):
     if cell not in cells or cell['id'] not in assignment['cells']:raise ValueError('unassigned cell')
     for key in ('cell','plan_sha256','build_sha256','execution_host','epochs','pairs_per_epoch'):
         if run[key]!=result[key]:raise ValueError('terminal receipt differs: '+key)
+    for key in ('recovery_authorization_sha256','recovery_completed_epochs_replayed'):
+        if run.get(key)!=result.get(key):raise ValueError('recovery terminal identity differs')
     for key in ('plan_sha256','build_sha256'):
         if run[key]!=assignment[key]:raise ValueError('worker scientific identity differs')
     if run['execution_host']!=assignment['host']:raise ValueError('worker host differs')
@@ -67,6 +69,8 @@ def pack_reserved(study,assignment_path,cell_id,attempt,bundle,expected_inventor
         raise ValueError('invalid cell or attempt')
     root=study/'runs'/cell_id/attempt
     run=validate(root,assignment,cells)
+    from shaping_external_recovery import verify_attempt
+    verify_attempt(study,run,attempt)
     if run['cell']['id']!=cell_id:raise ValueError('cell directory differs')
     # RESULT is written after wait() and closing train.log. No active process
     # or partial attempt is copied; downstream evaluation runs after collection.
@@ -147,6 +151,8 @@ def collect(study,assignment_path,bundle,pin):
         if run['cell']!=receipt['cell']:raise ValueError('collection cell differs')
         attempt=receipt['attempt']
         if not attempt.startswith('attempt-') or not attempt[8:].isdigit():raise ValueError('invalid attempt name')
+        from shaping_external_recovery import verify_attempt
+        verify_attempt(study,run,attempt)
         target=study/'runs'/run['cell']['id']
         # mkdir is an exclusive claim; an existing cell is never overwritten.
         target.mkdir(exist_ok=False)
