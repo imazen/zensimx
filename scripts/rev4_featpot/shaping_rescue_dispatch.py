@@ -150,23 +150,40 @@ def dispatch(args):
     if len(selected)!=240:raise ValueError('complete registered rescue wave required')
     if set(json.loads(trigger.read_text())['required_rescue_cells'])!={c['id'] for c in selected}:
         raise ValueError('trigger coverage differs')
+    from shaping_reduced_scope import coverage,shortlist
+    reduced=coverage(args.study)
+    scope_pin=None
+    if reduced is not None:
+        scope,scope_path=shortlist(args.study,args.outer)
+        required={c['id'] for c in scope['cells'] if c['stage']=='rescue'}
+        selected=[c for c in selected if c['id'] in required]
+        if len(selected)!=48 or {c['id'] for c in selected}!=required:
+            raise ValueError('complete owner-approved reduced rescue wave required')
+        scope_pin=sha(scope_path)
+        from shaping_reduced_scope import admit_rescue
+        admit_rescue(args.study,selected[0])
     resume=getattr(args,'resume_completed',False)
     completed,pins=completed_runs(args.study,selected,sha(args.binary_dir/'BUILD.json')) if resume else (set(),{})
     if not resume and any((args.study/'runs'/c['id']).exists() for c in selected):
         raise ValueError('existing rescue attempts require explicit reconciliation')
     directory=args.study/'dispatch/rescue'/f'outer-{args.outer}'
-    if resume:
+    if reduced is not None:directory=directory/'reduced-v1'
+    if resume and directory.exists():
         previous=json.loads((directory/'STATUS.json').read_text())
         if Path(f"/proc/{previous['pid']}").exists():raise ValueError('previous rescue dispatcher still live')
         if any(Path(f'/proc/{pid}').exists() for pid in previous['active'].values()):
             raise ValueError('previous rescue children still live')
         directory=directory/('resume-'+datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%fZ'))
+    elif resume and reduced is None:
+        raise ValueError('previous rescue dispatcher status required')
     directory.mkdir(parents=True,exist_ok=False)
     identity=dict(pid=os.getpid(),driver_sha256=sha(__file__),plan_sha256=sha(args.study/'PLAN.json'),
                   build_sha256=sha(args.binary_dir/'BUILD.json'),trigger_sha256=sha(trigger),
                   workers=args.workers,worker_capacity=capacity,required_cells=[c['id'] for c in selected],
                   worker_budget_file=str(args.worker_budget_file) if getattr(args,'worker_budget_file',None) else None,
                   drain_file=str(args.drain_file) if getattr(args,'drain_file',None) else None)
+    if reduced is not None:
+        identity.update(reduced_scope_sha256=reduced['registration_sha256'],shortlist_sha256=scope_pin)
     if resume:identity.update(resumed_completed=sorted(completed),resume_evidence_sha256=pins)
     (directory/'RUN.json').write_bytes(encoded(identity))
     active={};ready=set();failure=None;worker_limit=args.workers;draining=False;budget_pin=None;admission=None

@@ -136,6 +136,76 @@ def coverage(root):
                 completion_claim=False)
 
 
+def shortlist(root, outer, *, register=False):
+    """Reproduce the original inner-only screen before allocating rescue trials."""
+    if coverage(root) is None:
+        raise ValueError('approved reduced registration required')
+    from shaping_completion import FAMILIES
+    from shaping_outer_admission import base_decision
+    _, cells, _ = load_registration(root)
+    decisions = {}
+    evidence = {str(root / 'REDUCED_SCOPE.json'): sha(root / 'REDUCED_SCOPE.json')}
+    for family in FAMILIES:
+        actual, _, pins = base_decision(root, family, outer, cells)
+        setting = actual['selected_setting']
+        decisions[family] = dict(family=family, outer=outer, setting=setting,
+                                 optimizer_choice='base', outer_results_read=False,
+                                 inner_score=actual['setting_scores'][setting])
+        evidence.update(pins)
+    result = fold_cells(cells, decisions, outer)
+    result.update(evidence_sha256=evidence,
+                  reduced_scope_sha256=sha(root / 'REDUCED_SCOPE.json'))
+    path = root / 'reduced_scope' / f'outer-{outer}' / 'SHORTLIST.json'
+    if register:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open('xb') as stream:
+            stream.write(encoded(result))
+    else:
+        if json.loads(path.read_text()) != result:
+            raise ValueError('reduced shortlist cannot be reproduced')
+    return result, path
+
+
+def rescue_choices(root, family, outer):
+    """Keep legacy scope unless a verified owner amendment is present."""
+    if coverage(root) is None:
+        from shaping_completion import RESCUES as original
+        return original, {}
+    pins = {str(root / 'REDUCED_SCOPE.json'): sha(root / 'REDUCED_SCOPE.json')}
+    # ReLU's role is fixed in advance and does not depend on the candidate pools.
+    if family != 'relu':
+        record, path = shortlist(root, outer)
+        if family not in {record['roles'][role] for role in RESCUE_ROLES}:
+            raise ValueError('family is outside the frozen rescue shortlist')
+        pins[str(path)] = sha(path)
+    return RESCUES, pins
+
+
+def admit_rescue(root, cell, *, host=None):
+    """Guard new attempts; historical fit verification keeps its original scope."""
+    scope = coverage(root)
+    if scope is None:
+        return
+    import socket
+    record = json.loads((root / 'REDUCED_SCOPE.json').read_text())
+    approvals = []
+    for name in record['evidence_sha256']:
+        if Path(name).suffix == '.json':
+            row = json.loads(Path(name).read_text())
+            if isinstance(row, dict) and row.get('answer') == 'Approve reduced plan (recommended)':
+                approvals.append(row)
+    if len(approvals) != 1:
+        raise ValueError('one pinned owner approval required')
+    if (host or socket.gethostname()) not in approvals[0]['allowed_new_compute_hosts']:
+        raise ValueError('host is outside owner-approved replacement compute pool')
+    if cell['stage'] != 'rescue':
+        raise ValueError('registered rescue cell required')
+    outer = int(cell['partition'].split('-')[1])
+    choices, _ = rescue_choices(root, cell['family'], outer)
+    if cell['rescue'] not in choices:
+        raise ValueError('new rescue is outside owner-approved reduced scope')
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--study', type=Path, required=True)

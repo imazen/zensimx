@@ -10,6 +10,8 @@ from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'rev4_featpot'))
 from shaping_completion import FAMILIES, encoded, matrix, sha
 import shaping_reduced_scope as reduced
+from shaping_rescue_selection import aggregate as rescue_aggregate
+from shaping_selection import HUMANS
 
 
 def decisions(outer):
@@ -18,6 +20,46 @@ def decisions(outer):
 
 
 class ReducedScopeTests(unittest.TestCase):
+    def test_reduced_rescue_selection_keeps_every_fold_and_seed(self):
+        cells = matrix()
+        selected = [c for c in cells if c['family'] == 'relu'
+                    and c['partition'] in ('inner-0-0', 'inner-0-1')
+                    and ((c['stage'] == 'inner' and c['setting'] == 2)
+                         or (c['stage'] == 'rescue' and c['rescue'] in reduced.RESCUES))]
+        reports = {}
+        for cell in selected:
+            score = .82 if cell.get('rescue') == 'constant_lr' else .8
+            reports[cell['id']] = dict(cell=cell, outer_results_read=False,
+                inner_validation=dict(selection_score=score,
+                    summary={h: dict(pooled=score, within=score) for h in HUMANS}))
+        result = rescue_aggregate(cells, reports, 'relu', 0, 2, rescue_choices=reduced.RESCUES)
+        self.assertEqual(result['required_reports'], 18)
+        self.assertEqual(result['selected_choice'], 'constant_lr')
+        self.assertEqual(set(result['choice_scores']), {'base', 'init_half', 'constant_lr'})
+        with self.assertRaisesRegex(ValueError, 'all paired'):
+            rescue_aggregate(cells, reports, 'relu', 0, 2)
+        missing = dict(reports)
+        del missing[selected[0]['id']]
+        with self.assertRaisesRegex(ValueError, 'all paired'):
+            rescue_aggregate(cells, missing, 'relu', 0, 2, rescue_choices=reduced.RESCUES)
+        exposed = copy.deepcopy(reports)
+        exposed[selected[0]['id']]['outer_results_read'] = True
+        with self.assertRaisesRegex(ValueError, 'outer-exposed'):
+            rescue_aggregate(cells, exposed, 'relu', 0, 2, rescue_choices=reduced.RESCUES)
+        with self.assertRaisesRegex(ValueError, 'registered rescue choices'):
+            rescue_aggregate(cells, reports, 'relu', 0, 2, rescue_choices=('constant_lr',))
+
+    def test_only_fixed_relu_can_rescue_before_complete_shortlisting(self):
+        with tempfile.TemporaryDirectory(dir=Path.home() / 'tmp') as directory:
+            root = Path(directory)
+            (root / 'REDUCED_SCOPE.json').write_text('{}')
+            with patch.object(reduced, 'coverage', return_value={}):
+                choices, pins = reduced.rescue_choices(root, 'relu', 0)
+                self.assertEqual(choices, reduced.RESCUES)
+                self.assertIn(str(root / 'REDUCED_SCOPE.json'), pins)
+                with self.assertRaises(FileNotFoundError):
+                    reduced.rescue_choices(root, 'softplus', 0)
+
     def test_exact_1281_original_cells_and_no_mutation(self):
         cells = matrix()
         before = copy.deepcopy(cells)
@@ -71,7 +113,8 @@ class ReducedScopeTests(unittest.TestCase):
             record = dict(proposal=str(proposal), proposal_sha256=sha(proposal),
                           answer='Approve reduced plan (recommended)', core_fit_target=1281,
                           interrupted_replays_authorized=False, active_fits_must_finish=True,
-                          old_registration_preserved=True)
+                          old_registration_preserved=True,
+                          allowed_new_compute_hosts=['r5600g', 'i134', 'r3500', 'r3800x'])
             approval.write_bytes(encoded(record))
             with patch.object(reduced, 'PROPOSAL_SHA256', sha(proposal)), \
                     patch.object(reduced, 'load_registration', return_value=({}, matrix(), {})):
@@ -83,6 +126,13 @@ class ReducedScopeTests(unittest.TestCase):
                 self.assertEqual(coverage['core_fit_target'], 1281)
                 self.assertFalse(coverage['completion_claim'])
                 self.assertEqual(coverage['unresolved_fold_cells'], 192)
+                cell = next(c for c in matrix() if c['stage'] == 'rescue'
+                            and c['family'] == 'relu' and c['rescue'] == 'init_half')
+                reduced.admit_rescue(root, cell, host='r5600g')
+                with self.assertRaisesRegex(ValueError, 'replacement compute pool'):
+                    reduced.admit_rescue(root, cell, host='dev')
+                with self.assertRaisesRegex(ValueError, 'outside owner-approved reduced scope'):
+                    reduced.admit_rescue(root, {**cell, 'rescue': 'init_double'}, host='r5600g')
                 with self.assertRaises(FileExistsError):
                     reduced.register(root, approval)
                 record['interrupted_replays_authorized'] = True

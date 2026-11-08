@@ -59,7 +59,12 @@ def verify_decision(root,family,outer,cells):
         if evidence.name in ('REPORT.json','CONVERGENCE.json'):
             row=json.loads(evidence.read_text())
             (reports if evidence.name=='REPORT.json' else convergence)[row['cell']['id']]=row
-    actual=aggregate(cells,reports,family,outer,setting)
+    from shaping_reduced_scope import rescue_choices
+    choices,scope_pins=rescue_choices(root,family,outer)
+    if scope_pins and (decision.get('rescue_choices')!=list(choices)
+                      or any(decision['evidence_sha256'].get(path)!=pin for path,pin in scope_pins.items())):
+        raise ValueError('reduced rescue decision scope differs')
+    actual=aggregate(cells,reports,family,outer,setting,rescue_choices=choices)
     for key in ('family','outer','base_setting','choice_scores','selected_choice','required_reports','reported_cells','outer_results_read'):
         if actual[key]!=decision[key]:raise ValueError('rescue decision cannot be reproduced: '+key)
     selected={c['id'] for c in cells if c['id'] in reports and

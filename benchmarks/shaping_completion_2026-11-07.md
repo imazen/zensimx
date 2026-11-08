@@ -3455,3 +3455,58 @@ to the study's durable `projection-performance-evidence` archive. All 33 artifac
 `f6a6da94578fa57d4867ab7d7bf0a6786782e1f52852b0dc4c9cab340339cceb`.
 The archive wrapper reported 4 s, peak RSS 0.03 GiB, minimum available RAM
 37424 MiB and peak load 25.60. No running study binary was changed.
+
+## November 8, replacement workers and approved reduced coverage
+
+The owner approved a 1,281-fit core in place of 2,599 fits. The immutable original
+PLAN/MATRIX/PARTITIONS remain unchanged. `docs/SHAPING_REDUCED_SCOPE.md` owns the
+coverage policy; the live study's `REDUCED_SCOPE.json` pins that policy, the
+original registration and the external approval/proposal receipts. The fixed
+subset contains 1,089 original IDs. Another 192 rescue/outer IDs require complete
+inner-only base shortlists; they are not recorded as resolved or completed.
+Interrupted fits remain excluded from replay. Additional completed or active
+cells remain preserved outside the reduced core.
+
+Reduced rescue decisions retain all two-fold, three-seed pairs: six base reports
+and six reports for each of half initialization and constant learning rate.
+The original four-choice selector remains the default for unamended studies.
+Shortlists freeze before rescue outcomes and exclude outer response reads.
+New rescue execution checks the approved host pool. Historical fit verification
+retains its original scope so additional completed evidence remains archivable.
+Full reduced outer/extension/variant orchestration is not yet wired.
+
+All three tiny platform controls reproduced their frozen native bytes on r3500;
+the wrapper reports 14 s, peak RSS 0.16 GiB, minimum available RAM 13,855 MiB and
+peak load 0.22. Two new identity-shaping fits were then observed live there.
+Fresh observations at 00:48 UTC also verified seven live fits on r5600g and
+eleven on i134 with advancing logged epochs. Four earlier r5600g attempts were
+interrupted by user-manager shutdown before any checkpoint. Their interrupted
+results and original artifacts remain; none was restarted. Lingering was enabled
+before the replacement waves. Separate bounded queues cover three more
+never-started primary cells on r3800x and use shared CPU/RAM admission.
+
+Fifteen old downstream controllers on the replaced coordinator host were
+verified waiting with no active children, then retired by their exact PID/start
+identity. No scientific fit was interrupted. Three stopped old rescue parents
+remain stopped while their already-admitted work is preserved. The private
+host-transition evidence retains before/retirement records and a first-pass
+receipt-name collision; its second pass uses separate per-status receipt names.
+
+A ten-second attached profile of live primary trainer PID 1764008 on r5600g
+recorded 987 cycle samples with none lost: 41.61% in fused Adam and 36.66% in
+constraint projection. This is sampled CPU attribution, not a speed benchmark
+or an end-to-end optimization result. Its wrapper reports 12 s, peak RSS
+0.02 GiB, minimum available RAM 39,563 MiB and peak load 10.07.
+
+Read-only storage inventories with complete process visibility covered the
+coordinator and all eight other relevant hosts. They found inactive Cargo
+targets on the coordinator, i265 and i270; i134's qualification target is active
+and protected. Other matching scratch trees remain protected data. No new cache
+or experiment deletion occurred during this inventory.
+
+The statistics publisher now displays approved targets alongside preserved
+original counts, includes replacement-worker observations and points inference
+cost work at actual outer models. Five reduced-scope tests, nine dispatch tests,
+seven rescue tests, five extension tests and script lint pass. These checks do
+not establish scientific completion. Source and operational/archive evidence
+are recorded under the private study's host-transition and page-deployment roots.

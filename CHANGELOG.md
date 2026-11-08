@@ -4,6 +4,9 @@
 
 ### Research
 
+- Register the owner-approved 1,281-fit shaping scope, retain original evidence,
+  and enforce paired reduced rescue selection and replacement-host admission.
+
 - Reduce native max-pair projection passes and reuse fused Adam's active input
   rows, preserving exact constraint arithmetic; retain the dense permuted-pair
   clamp after measured regression in the first prototype.

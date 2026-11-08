@@ -8,14 +8,16 @@ from shaping_rescue import selected_base
 from shaping_selection import human_score
 
 
-def aggregate(cells,reports,family,outer,setting):
+def aggregate(cells,reports,family,outer,setting,*,rescue_choices=RESCUES):
     if family not in NEURAL or setting not in range(4):raise ValueError('registered neural setting required')
+    if tuple(rescue_choices) not in (tuple(RESCUES),('init_half','constant_lr')):
+        raise ValueError('registered rescue choices required')
     expected=[c for c in cells if c['family']==family and c['partition'] in (f'inner-{outer}-0',f'inner-{outer}-1')
-              and (c['stage']=='rescue' or (c['stage']=='inner' and c['setting']==setting))]
-    choices=('base',*RESCUES)
+              and ((c['stage']=='rescue' and c['rescue'] in rescue_choices) or (c['stage']=='inner' and c['setting']==setting))]
+    choices=('base',*rescue_choices)
     key=lambda c:('base' if c['stage']=='inner' else c['rescue'],c['partition'],c['seed'])
     required={(choice,f'inner-{outer}-{fold}',seed) for choice in choices for fold in range(2) for seed in range(3)}
-    if len(expected)!=30 or {key(c) for c in expected}!=required:raise ValueError('registered rescue coverage differs')
+    if len(expected)!=len(required) or {key(c) for c in expected}!=required:raise ValueError('registered rescue coverage differs')
     if set(reports)!={c['id'] for c in expected}:raise ValueError('all paired base/rescue reports required')
     representations={(('research-relu-max-pairs-v1',r['evaluation_build_sha256'])
                       if 'reexport_receipt' in r else ('original',None)) for r in reports.values()}
@@ -29,7 +31,7 @@ def aggregate(cells,reports,family,outer,setting):
     best=max(means.values())
     winner=next(choice for choice in choices if best-means[choice]<=1e-12)
     return dict(family=family,outer=outer,base_setting=setting,choice_scores=means,selected_choice=winner,
-                required_reports=30,reported_cells=sorted(reports),outer_results_read=False)
+                required_reports=len(required),reported_cells=sorted(reports),outer_results_read=False)
 
 
 def verified_candidate(root,cell,representation='original',*,allow_undefined_failure=False):
@@ -98,13 +100,15 @@ def select(args):
     _,cells,_=load_registration(args.study)
     setting,base_path,base_pin=selected_base(args.study,args.family,args.outer,cells)
     base=json.loads(Path(base_path).read_text());representation=base.get('representation','original')
+    from shaping_reduced_scope import rescue_choices
+    choices,scope_pins=rescue_choices(args.study,args.family,args.outer)
     expected=[c for c in cells if c['family']==args.family and c['partition'] in (f'inner-{args.outer}-0',f'inner-{args.outer}-1')
-              and (c['stage']=='rescue' or (c['stage']=='inner' and c['setting']==setting))]
-    reports={};pins={base_path:base_pin};convergence={}
+              and ((c['stage']=='rescue' and c['rescue'] in choices) or (c['stage']=='inner' and c['setting']==setting))]
+    reports={};pins={base_path:base_pin,**scope_pins};convergence={}
     for cell in expected:
         row,c,evidence=verified_candidate(args.study,cell,representation)
         reports[cell['id']]=row;convergence[cell['id']]=c;pins.update(evidence)
-    decision=aggregate(cells,reports,args.family,args.outer,setting)
+    decision=aggregate(cells,reports,args.family,args.outer,setting,rescue_choices=choices)
     winner=decision['selected_choice']
     selected=[c for c in expected if ('base' if c['stage']=='inner' else c['rescue'])==winner]
     extension=any(convergence[c['id']]['investigation_required'] for c in selected)
@@ -112,6 +116,7 @@ def select(args):
                     selected_convergence={c['id']:convergence[c['id']] for c in selected},
                     further_investigation_required=extension,outer_evaluation_admitted=False,
                     status='selected_pending_convergence_resolution' if extension else 'selected_pending_outer_fold_gate')
+    if scope_pins:decision['rescue_choices']=list(choices)
     path=args.study/'selection'/f'outer-{args.outer}'/(args.family+'-rescue.json')
     if path.exists():raise ValueError('preserve existing rescue decision')
     path.write_bytes(encoded(decision));print(json.dumps(decision),flush=True)

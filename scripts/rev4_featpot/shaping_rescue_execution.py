@@ -99,6 +99,8 @@ def phase(root,binaries,source,original,dest,epochs,rescue,groups,shaping=None,*
 
 def execute(args):
     plan,cells,_=load_registration(args.study);resolution=resolve(args.study,args.cell)
+    from shaping_reduced_scope import admit_rescue
+    admit_rescue(args.study,resolution['cell'])
     cell=resolution['cell'];setting=resolution['resolved_setting']
     build=json.loads((args.binary_dir/'BUILD.json').read_text())
     for name,pin in build['binary_sha256'].items():
