@@ -11,6 +11,20 @@ def write(path,value):
     path.parent.mkdir(parents=True,exist_ok=True);path.write_bytes(encoded(value))
 
 class BootstrapWatchTests(unittest.TestCase):
+    def test_reduced_queue_waits_for_admissions_and_refuses_old_exhaustive_registry(self):
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as d:
+            root=Path(d);registry=root/'registry'
+            entries=[dict(file=f'comparison-{i:03}.json',spec=dict(role='relu',condition=dict(stage='human_only'))) for i in range(24)]
+            write(registry/'MATCHED_REGISTRATION.json',dict(comparisons=entries))
+            args=SimpleNamespace(study=root/'study',matched_registry=registry,draws=root/'draws',binary_dir=root/'bin',output=root/'out',archive_destination=root/'archive')
+            with patch('shaping_execution.load_registration',return_value=({},[],{})),patch('shaping_bootstrap_plan.load_comparison'),patch('shaping_reduced_scope.coverage',return_value={'registration_sha256':'approved'}),patch('shaping_bootstrap.subprocess.run') as execute,patch('builtins.print'):
+                status=watch_sweep(args)
+                self.assertEqual(status['required'],25);self.assertEqual(len(status['waiting']),25)
+                execute.assert_not_called()
+                write(registry/'MATCHED_REGISTRATION.json',dict(comparisons=entries+[dict(file=f'comparison-{i:03}.json',spec={}) for i in range(24,88)]))
+                with self.assertRaisesRegex(ValueError,'queue required'):watch_sweep(args)
+                execute.assert_not_called()
+
     def test_metadata_waits_for_all_fits_and_repaired_panels(self):
         with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as d:
             study=Path(d);cell=dict(id='cell',stage='outer',partition='outer-0',family='relu')

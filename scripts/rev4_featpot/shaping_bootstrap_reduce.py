@@ -1,7 +1,7 @@
 """Paired percentile intervals; mean seed performance, never mean predictions."""
 from __future__ import annotations
 import numpy as np
-from shaping_completion import FAMILIES,seeds
+from shaping_completion import FAMILIES,ROLES,seeds
 from shaping_bootstrap_plan import REPLICATES
 
 POPULATIONS=('cid22_a25','cid22_ssim2','kadid','konfig','tid2013')
@@ -14,12 +14,14 @@ def interval(samples,point,control,control_point):
                 difference_percentile95=np.quantile(samples-control,[.025,.975]).tolist())
 
 
-def reduce(samples,points):
+def reduce(samples,points,*,families=FAMILIES):
     """Input axes: fold, model seed, population, pooled/within, replicate."""
-    if set(samples)!=set(FAMILIES) or set(points)!=set(FAMILIES):
+    if tuple(families) not in (tuple(FAMILIES),tuple(ROLES)):
+        raise ValueError('registered original families or six finalist roles required')
+    if set(samples)!=set(families) or set(points)!=set(families):
         raise ValueError('all registered families required for primary reduction')
     averaged={};point_average={}
-    for family in FAMILIES:
+    for family in families:
         s=np.asarray(samples[family]);p=np.asarray(points[family])
         shape=(3,len(tuple(seeds(family))),len(POPULATIONS),2)
         if s.shape!=(*shape,REPLICATES) or p.shape!=shape:
@@ -31,8 +33,8 @@ def reduce(samples,points):
     result={}
     for name,folds in [('outer-0',[0]),('outer-1',[1]),('outer-2',[2]),('mean_outer',[0,1,2])]:
         control=averaged['relu'][folds].mean(axis=0);control_point=point_average['relu'][folds].mean(axis=0)
-        families={}
-        for family in FAMILIES:
+        family_results={}
+        for family in families:
             s=averaged[family][folds].mean(axis=0);p=point_average[family][folds].mean(axis=0)
             populations={}
             for i,population in enumerate(POPULATIONS):
@@ -41,8 +43,8 @@ def reduce(samples,points):
                 populations[population]['composite']=interval(s[i].mean(axis=0),p[i].mean(),control[i].mean(axis=0),control_point[i].mean())
             human=interval(s[list(HUMANS)].mean(axis=(0,1)),p[list(HUMANS)].mean(),
                            control[list(HUMANS)].mean(axis=(0,1)),control_point[list(HUMANS)].mean())
-            families[family]=dict(populations=populations,equal_human_composite=human)
-        result[name]=families
+            family_results[family]=dict(populations=populations,equal_human_composite=human)
+        result[name]=family_results
     return dict(scopes=result,replicates=REPLICATES,confidence_level=.95,
         estimator='mean seed rank performance; equal outer folds; equal four human populations and pooled/within ranks',
         teacher_in_human_headline=False,pooled_oof_used=False,selection_performed=False,

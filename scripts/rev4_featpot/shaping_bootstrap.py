@@ -4,7 +4,7 @@ import argparse,json,os,subprocess,sys,time
 from datetime import datetime,timezone
 from pathlib import Path
 import numpy as np
-from shaping_completion import FAMILIES,encoded,seeds,sha
+from shaping_completion import FAMILIES,ROLES,encoded,seeds,sha
 from shaping_outer_evidence import collect,collect_matched,primary_cells
 from shaping_bootstrap_plan import SEED,REPLICATES,population_groups,component_draws
 from shaping_bootstrap_stats import paired_stratum
@@ -33,9 +33,16 @@ def verify_draws(registration,draws,partitions,populations,components):
 
 
 def compute(outputs,registration,draws,labels,progress=lambda *args:None):
-    primary_cells([row['cell'] for row in outputs])
-    samples={f:np.full((3,len(tuple(seeds(f))),5,2,REPLICATES),np.nan) for f in FAMILIES}
-    points={f:np.full((3,len(tuple(seeds(f))),5,2),np.nan) for f in FAMILIES}
+    reduced=any('role' in row for row in outputs)
+    families=ROLES if reduced else FAMILIES
+    if reduced:
+        expected={(r,f'outer-{o}',s) for r in ROLES for o in range(3) for s in seeds(r)}
+        actual=[(row.get('role'),row['cell']['partition'],row['cell']['seed']) for row in outputs]
+        if len(actual)!=48 or set(actual)!=expected:
+            raise ValueError('complete reduced role/fold/seed coverage required')
+    else:primary_cells([row['cell'] for row in outputs])
+    samples={f:np.full((3,len(tuple(seeds(f))),5,2,REPLICATES),np.nan) for f in families}
+    points={f:np.full((3,len(tuple(seeds(f))),5,2),np.nan) for f in families}
     for stratum in registration['strata']:
         outer=stratum['outer'];population=stratum['population'];pi=POPULATIONS.index(population)
         selected=[r for r in outputs if r['cell']['partition']==f'outer-{outer}']
@@ -48,7 +55,7 @@ def compute(outputs,registration,draws,labels,progress=lambda *args:None):
             predictions.append(row['predictions'][[lookup[i] for i in rows]])
         result=paired_stratum(predictions,labels[rows],groups,draws[stratum['array']])
         for k,row in enumerate(selected):
-            family=row['cell']['family'];seed=row['cell']['seed'];si=0 if seed is None else seed
+            family=row['role'] if reduced else row['cell']['family'];seed=row['cell']['seed'];si=0 if seed is None else seed
             summary=row['report']['outer_test']['summary'][population]
             expected=np.array([summary['pooled'],summary['within']],dtype=float)
             if not np.isfinite(expected).all() or not np.allclose(result['point'][k],expected,rtol=0,atol=1e-9):
@@ -56,7 +63,7 @@ def compute(outputs,registration,draws,labels,progress=lambda *args:None):
             samples[family][outer,si,pi]=np.stack((result['pooled'][k],result['within'][k]))
             points[family][outer,si,pi]=result['point'][k]
         progress(stratum,result)
-    return samples,points,reduce(samples,points)
+    return samples,points,reduce(samples,points,families=families)
 
 
 
@@ -150,7 +157,7 @@ def run(args):
             summary.update(input_sha256=pins,convergence_qualifications=qualifications,
                 outer_population_reports={r['cell']['id']:r['report']['outer_test'] for r in outputs},
                 samples_sha256=sha(args.output/'samples.npz'),driver_sha256=sha(__file__),numpy_version=np.__version__,
-                outer_results_read=True,final_holdout_read=False,scientific_scope='102 primary outer cells only; variants and fresh controls require separate comparisons' if comparison is None else 'one fully paired registered matched outer comparison')
+                outer_results_read=True,final_holdout_read=False,scientific_scope=('48 reduced primary outer cells; six inner-selected roles' if any('role' in r for r in outputs) else '102 primary outer cells only; variants and fresh controls require separate comparisons') if comparison is None else 'one fully paired registered matched outer comparison')
             if comparison is not None:summary['comparison']=spec
             (args.output/'SUMMARY.json').write_bytes(encoded(summary))
             (args.output/'COMPLETE.json').write_bytes(encoded(dict(summary_sha256=sha(args.output/'SUMMARY.json'))))
@@ -214,15 +221,18 @@ def watch_sweep(args):
     _,cells,_=load_registration(args.study)
     registry=args.matched_registry/'MATCHED_REGISTRATION.json'
     entries=json.loads(registry.read_text())['comparisons']
-    # This validates all 88 entries and the policy before admitting any job.
+    # Validate the entire original or owner-amended registry before any job.
     if not entries:raise ValueError('empty matched bootstrap registry')
     load_comparison(args.study,args.matched_registry/entries[0]['file'])
     jobs=[('primary',None,None)]+[(Path(row['file']).stem,args.matched_registry/row['file'],row['spec']) for row in entries]
-    if len(jobs)!=89:raise ValueError('complete primary plus matched bootstrap queue required')
+    from shaping_reduced_scope import coverage
+    reduced=coverage(args.study)
+    required=25 if reduced else 89
+    if len(jobs)!=required:raise ValueError('complete primary plus matched bootstrap queue required')
     args.output.mkdir(parents=True,exist_ok=True)
     failures=args.output/'failures';failures.mkdir(exist_ok=True)
     logs=args.output/'logs';logs.mkdir(exist_ok=True)
-    status=dict(pid=os.getpid(),checked_utc=datetime.now(timezone.utc).isoformat(),required=89,completed=[],archived=[],failed=[],waiting=[],driver_sha256=sha(__file__))
+    status=dict(pid=os.getpid(),checked_utc=datetime.now(timezone.utc).isoformat(),required=required,completed=[],archived=[],failed=[],waiting=[],driver_sha256=sha(__file__))
     admissions=None
     for name,comparison,spec in jobs:
         output=args.output/name;failure=failures/(name+'.json')
@@ -235,7 +245,7 @@ def watch_sweep(args):
         if not all((args.study/'selection'/f'outer-{o}'/'OUTER_ADMISSION.json').exists() for o in range(3)):
             status['waiting'].append(name);continue
         if admissions is None:admissions={o:resolve(args.study,o)[0] for o in range(3)}
-        if spec is None:wanted=primary_cells(cells)
+        if spec is None:wanted=primary_cells(cells,admissions)
         else:
             pairs,_=matched_cells(cells,admissions,**spec)
             wanted=list({c['id']:c for pair in pairs for c in (pair['candidate'],pair['control'])}.values())
@@ -254,7 +264,7 @@ def watch_sweep(args):
             status['completed'].append(name)
             archive_output(output,args.archive_destination/name,logs);status['archived'].append(name)
         (args.output/'ACTIVE.json').write_bytes(encoded(dict(**launch,finished_utc=datetime.now(timezone.utc).isoformat(),exit_code=child.returncode)))
-    status.update(checked_utc=datetime.now(timezone.utc).isoformat(),stage='complete' if len(status['completed'])==89 else 'waiting_or_failed')
+    status.update(checked_utc=datetime.now(timezone.utc).isoformat(),stage='complete' if len(status['completed'])==required else 'waiting_or_failed')
     (args.output/'STATUS.json').write_bytes(encoded(status));print(json.dumps(status),flush=True)
     return status
 

@@ -73,43 +73,56 @@ def register(study,output):
     return record
 
 
-def matched_specs(cells):
+def matched_specs(cells,*,reduced=False):
     fields={'source_curve':('stage','fraction','order_seed'),'row_curve':('stage','fraction','order_seed'),
             'shuffle':('stage','permutation','permutation_seed'),'human_only':('stage',)}
     specs={}
     for cell in cells:
         if cell['stage'] in fields:
+            if reduced and not (cell['stage']=='human_only'
+                or (cell['stage']=='source_curve' and cell['fraction'] in (.25,.5) and cell['order_seed']==20261107)
+                or (cell['stage']=='shuffle' and cell['permutation']=='population' and cell['permutation_seed']==20261107)):
+                continue
             spec=dict(role=cell['family'],condition={k:cell[k] for k in fields[cell['stage']]})
             specs[encoded(spec)]=spec
-    for family in NEURAL:
+    for family in (() if reduced else NEURAL):
         if '_pretrained_' in family:
             spec=dict(fresh_family=family);specs[encoded(spec)]=spec
-    if len(specs)!=88:raise ValueError('complete 88-comparison matched analysis required')
+    if len(specs)!=(24 if reduced else 88):raise ValueError('complete registered matched analysis required')
     return [specs[k] for k in sorted(specs)]
 
 
 def register_matched(study,output):
-    _,cells,_=load_registration(study);specs=matched_specs(cells)
+    from shaping_reduced_scope import coverage
+    scope=coverage(study)
+    _,cells,_=load_registration(study);specs=matched_specs(cells,reduced=scope is not None)
     output.mkdir(parents=True,exist_ok=False);entries=[]
     for i,spec in enumerate(specs):
         path=output/f'comparison-{i:03}.json';path.write_bytes(encoded(spec))
         entries.append(dict(file=path.name,spec=spec,sha256=sha(path)))
-    policy=REPO/'docs/SHAPING_MATCHED_UNCERTAINTY.md'
+    policy=REPO/('docs/SHAPING_REDUCED_UNCERTAINTY.md' if scope else 'docs/SHAPING_MATCHED_UNCERTAINTY.md')
     record=dict(schema='shaping-matched-bootstrap-plan-v1',plan_sha256=sha(study/'PLAN.json'),
                 policy_sha256=sha(policy),comparisons=entries,scores_read=False,outer_results_read=False,
                 seed=SEED,replicates=REPLICATES,driver_sha256=sha(__file__))
+    if scope:record['reduced_scope_sha256']=scope['registration_sha256']
     (output/'MATCHED_REGISTRATION.json').write_bytes(encoded(record));return record
 
 
 def load_comparison(study,path):
     _,cells,_=load_registration(study)
     registration=path.parent/'MATCHED_REGISTRATION.json';record=json.loads(registration.read_text())
-    policy=REPO/'docs/SHAPING_MATCHED_UNCERTAINTY.md'
+    reduced='reduced_scope_sha256' in record
+    policy=REPO/('docs/SHAPING_REDUCED_UNCERTAINTY.md' if reduced else 'docs/SHAPING_MATCHED_UNCERTAINTY.md')
+    if reduced:
+        from shaping_reduced_scope import coverage
+        scope=coverage(study)
+        if scope is None or scope['registration_sha256']!=record['reduced_scope_sha256']:
+            raise ValueError('reduced matched scope drift')
     if (record['plan_sha256']!=sha(study/'PLAN.json') or record['policy_sha256']!=sha(policy)
         or record['scores_read'] or record['outer_results_read'] or record['seed']!=SEED or record['replicates']!=REPLICATES):
         raise ValueError('matched analysis registration drift')
     entries=record['comparisons']
-    if [r['spec'] for r in entries]!=matched_specs(cells):raise ValueError('matched comparison coverage differs')
+    if [r['spec'] for r in entries]!=matched_specs(cells,reduced=reduced):raise ValueError('matched comparison coverage differs')
     pins={str(registration):sha(registration),str(policy):sha(policy)};selected=[]
     for i,row in enumerate(entries):
         if row['file']!=f'comparison-{i:03}.json':raise ValueError('matched comparison file identity differs')

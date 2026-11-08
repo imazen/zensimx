@@ -9,6 +9,20 @@ from shaping_prediction_evidence import save
 
 
 class OuterEvidenceTests(unittest.TestCase):
+    def test_reduced_primary_requires_all_role_seeds_and_consistent_scope(self):
+        from shaping_completion import ROLES
+        roles=dict(zip(ROLES,('relu','extra_trees','shaped_additive','softplus',
+                              'product_joint_identity','separate_joint_identity')))
+        admissions={o:dict(reduced_scope_sha256='approved',finalist_roles=dict(roles)) for o in range(3)}
+        admissions[1]['finalist_roles']['best_analytic']='silu_monotone'
+        selected=primary_cells(matrix(),admissions)
+        self.assertEqual(len(selected),48)
+        self.assertEqual({c['family'] for c in selected if c['partition']=='outer-1'},set(admissions[1]['finalist_roles'].values()))
+        with self.assertRaisesRegex(ValueError,'48-cell'):primary_cells(selected[:-1],admissions)
+        with self.assertRaisesRegex(ValueError,'48-cell'):primary_cells(selected[:-1]+[selected[0]],admissions)
+        admissions[2]['reduced_scope_sha256']='changed'
+        with self.assertRaisesRegex(ValueError,'mixed reduced'):primary_cells(matrix(),admissions)
+
     def test_complete_fixture_and_changed_prediction_table(self):
         with tempfile.TemporaryDirectory(dir=os.environ['TMPDIR']) as directory:
             root=Path(directory);(root/'PLAN.json').write_text('{}');plan_pin=sha(root/'PLAN.json')

@@ -8,8 +8,23 @@ from shaping_outer_admission import resolve
 from shaping_prediction_evidence import read
 
 
-def primary_cells(cells):
+def primary_cells(cells,admissions=None):
     selected=[c for c in cells if c['stage']=='outer']
+    if admissions is not None and any(a.get('reduced_scope_sha256') for a in admissions.values()):
+        if set(admissions)!={0,1,2} or not all(a.get('reduced_scope_sha256') for a in admissions.values()):
+            raise ValueError('all three reduced outer admissions required')
+        if len({a['reduced_scope_sha256'] for a in admissions.values()})!=1:
+            raise ValueError('mixed reduced outer registrations')
+        expected=set()
+        for outer,a in admissions.items():
+            roles=a['finalist_roles']
+            if set(roles)!=set(ROLES) or len(set(roles.values()))!=6:
+                raise ValueError('six distinct reduced finalist roles required')
+            expected.update((roles[r],f'outer-{outer}',s) for r in ROLES for s in seeds(r))
+        selected=[c for c in selected if (c['family'],c['partition'],c['seed']) in expected]
+        if len(selected)!=48 or {(c['family'],c['partition'],c['seed']) for c in selected}!=expected:
+            raise ValueError('complete 48-cell reduced outer matrix required')
+        return sorted(selected,key=lambda c:(c['partition'],c['family'],-1 if c['seed'] is None else c['seed']))
     expected={(f,f'outer-{o}',s) for o in range(3) for f in FAMILIES for s in seeds(f)}
     if len(selected)!=102 or {(c['family'],c['partition'],c['seed']) for c in selected}!=expected:
         raise ValueError('complete 102-cell registered outer matrix required')
@@ -18,9 +33,9 @@ def primary_cells(cells):
 
 def collect(study):
     plan,cells,partitions=load_registration(study);plan_pin=sha(study/'PLAN.json')
-    selected=primary_cells(cells)
     # All three full inner gates are reproduced before even checking reports.
     admissions={o:resolve(study,o) for o in range(3)}
+    selected=primary_cells(cells,{o:a for o,(a,_) in admissions.items()})
     pending=[];pins={str(study/'PLAN.json'):plan_pin};qualifications={}
     for o,(admission,path) in admissions.items():
         pins[str(path)]=sha(path);qualifications[str(o)]=admission['qualifications']
@@ -75,7 +90,12 @@ def collect(study):
                     pins[name]=pin
                 if sha(receipt['bake'])!=report['checkpoint_sha256']:raise ValueError('outer report re-export differs')
                 pins[str(receipt_path)]=sha(receipt_path)
-        outputs.append(dict(cell=cell,report=report,indices=expected,predictions=values))
+        output=dict(cell=cell,report=report,indices=expected,predictions=values,
+                    run_directory=str(run_dir),evaluation_directory=str(evaluation))
+        a=admissions[int(cell['partition'].split('-')[1])][0]
+        if a.get('reduced_scope_sha256'):
+            output['role']=next(r for r,f in a['finalist_roles'].items() if f==cell['family'])
+        outputs.append(output)
     return plan,partitions,outputs,pins,qualifications
 
 

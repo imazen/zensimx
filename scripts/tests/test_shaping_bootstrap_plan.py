@@ -32,6 +32,33 @@ if __name__=='__main__':unittest.main()
 
 
 class MatchedRegistrationTests(unittest.TestCase):
+    def test_reduced_comparisons_keep_all_roles_and_only_approved_conditions(self):
+        from shaping_completion import matrix,ROLES
+        from shaping_bootstrap_plan import matched_specs
+        specs=matched_specs(matrix(),reduced=True)
+        self.assertEqual(len(specs),24)
+        for role in ROLES:
+            conditions=[s['condition'] for s in specs if s['role']==role]
+            self.assertEqual(len(conditions),4)
+            self.assertEqual({c['fraction'] for c in conditions if c['stage']=='source_curve'},{.25,.5})
+            self.assertEqual([c for c in conditions if c['stage']=='shuffle'],
+                             [dict(stage='shuffle',permutation='population',permutation_seed=20261107)])
+            self.assertIn(dict(stage='human_only'),conditions)
+
+    def test_reduced_registry_is_separate_and_pins_scope(self):
+        import tempfile
+        from unittest.mock import patch
+        from shaping_completion import matrix
+        from shaping_bootstrap_plan import register_matched,load_comparison
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as d:
+            root=Path(d);study=root/'study';study.mkdir();(study/'PLAN.json').write_text('{}')
+            with patch('shaping_bootstrap_plan.load_registration',return_value=({},matrix(),{})),patch('shaping_reduced_scope.coverage',return_value={'registration_sha256':'approved'}):
+                record=register_matched(study,root/'reduced');self.assertEqual(len(record['comparisons']),24)
+                path=root/'reduced'/record['comparisons'][0]['file']
+                self.assertEqual(load_comparison(study,path)[0],record['comparisons'][0]['spec'])
+                with patch('shaping_reduced_scope.coverage',return_value={'registration_sha256':'changed'}):
+                    with self.assertRaisesRegex(ValueError,'scope drift'):load_comparison(study,path)
+
     def test_complete_registration_and_specification_drift_refused(self):
         import json,tempfile
         from unittest.mock import patch

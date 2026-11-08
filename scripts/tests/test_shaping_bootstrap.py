@@ -13,6 +13,24 @@ from shaping_completion import matrix,encoded,sha
 
 
 class BootstrapRunnerTests(unittest.TestCase):
+    def test_reduced_roles_allow_fold_specific_families_and_require_every_seed(self):
+        from shaping_completion import ROLES
+        outputs,registration,draws,labels,*_=self.fixture()
+        families=dict(zip(ROLES,('relu','extra_trees','shaped_additive','softplus',
+                                 'product_joint_identity','separate_joint_identity')))
+        selected=[]
+        for row in outputs:
+            mapping=dict(families)
+            if row['cell']['partition']=='outer-1':mapping['best_analytic']='silu_monotone'
+            for role,family in mapping.items():
+                if row['cell']['family']==family:selected.append(dict(row,role=role))
+        samples,points,summary=compute(selected,registration,draws,labels)
+        self.assertEqual(set(samples),set(ROLES));self.assertEqual(len(selected),48)
+        self.assertEqual(samples['shaped_additive'].shape,(3,1,5,2,REPLICATES))
+        self.assertLess(summary['scopes']['mean_outer']['best_analytic']['equal_human_composite']['difference_from_relu'],0)
+        with self.assertRaisesRegex(ValueError,'role/fold/seed'):compute(selected[:-1],registration,draws,labels)
+        with self.assertRaisesRegex(ValueError,'role/fold/seed'):compute(selected[:-1]+[selected[0]],registration,draws,labels)
+
     def fixture(self):
         populations=[];components=[];labels=[];partitions={};strata=[];draws={};rng=np.random.default_rng(SEED)
         for fold in range(3):
