@@ -3708,3 +3708,14 @@ The wrapper reports 11 s, peak RSS 0.02 GiB, minimum available RAM 45,133 MiB,
 peak load 5.98. That frozen snapshot covers resource repair, threshold binary
 qualification and page/recovery deployments; later snapshot-qualification evidence
 is separate. Live logs in the support snapshot are explicitly point-in-time copies.
+
+The separate bounded-snapshot qualification archive cold-reread all 138 artifacts
+/ 268,982,990 bytes. It includes both prototype source archives, failed and
+successful check logs, actual model/state fixtures, the full-width footprint and
+qualification manifest. Mirror receipt SHA-256:
+`f20d7e7c13a39c6b1ba6bdc4cbd59ccac3ad575ff0203e25dbe484fda5bf6c39`;
+artifact manifest SHA-256:
+`b4eb2e5d2076edbd310ad592b73a94aabb3bf20302cc2c00251ffa09b9f44e40`.
+The archive wrapper reports 6 s, peak RSS 0.02 GiB, minimum available RAM
+44,637 MiB and peak load 3.08. The production trainer executable build is
+subsequent work and is not claimed by this frozen receipt.
