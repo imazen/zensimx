@@ -109,6 +109,23 @@ def comparison_rows(records):
     return result
 
 
+def corrected_program(root):
+    path=root/'corrected_thresholds/REGISTRATION.json'
+    if not path.exists():return None
+    record=json.loads(path.read_text())
+    if (record['schema']!='corrected-shaped-threshold-registration-v1' or record['core_fit_target']!=1461
+        or record['corrected_condition_count']!=288 or len(record['omitted_original_conditions'])!=108
+        or record['outer_results_read'] or record['settings']!=[0,1,2,3] or record['paired_seeds']!=[0,1,2]):
+        raise ValueError('corrected dashboard registration differs')
+    matches=[(Path(p),pin) for p,pin in record['evidence_sha256'].items()
+             if Path(p).name=='THRESHOLD_COORDINATE_APPROVAL_20261108.json']
+    if len(matches)!=1 or sha(matches[0][0])!=matches[0][1]:raise ValueError('corrected dashboard approval differs')
+    approval=json.loads(matches[0][0].read_text())
+    if approval['answer']!='Approve four settings: 1,461 fits':raise ValueError('corrected dashboard owner choice differs')
+    return dict(core_fit_target=1461,corrected_condition_count=288,omitted_original_conditions=108,
+                registration_sha256=sha(path),execution_activated=record['execution_activated'])
+
+
 def dashboard_data(root,result,workers):
     from shaping_completion import FAMILIES,MAX_PAIR_FAMILIES
     from shaping_execution import live_status
@@ -169,6 +186,7 @@ def dashboard_data(root,result,workers):
     return dict(schema='zensim-shaping-stats-v1',generated_utc=result['checked_utc'],plan_sha256=plan_pin,
         counts=result['counts'],required_cells=result['required_cells'],fleet=fleet,
         scope_amendment=result.get('scope_amendment'),
+        corrected_program=corrected_program(root),
         supervisors=result['supervisors'],all_supervisors_live=result['all_requested_supervisor_processes_verified_live'],
         comparisons=comparisons,records=records,default_partition=default,
         neural_settings=plan['neural_settings'],families=list(FAMILIES),
