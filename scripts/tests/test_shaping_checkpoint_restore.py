@@ -25,6 +25,8 @@ class CheckpointRestoreTests(unittest.TestCase):
     def test_missing_checkpoints_are_restored_without_overwriting_an_existing_one(self):
         with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as directory:
             root=Path(directory);study,cell,mirror,inventory=self.fixture(root)
+            # Unrelated archived reports must not consume checkpoint allowance.
+            (study/'runs/cell/MIRROR_VERIFIED.json').write_bytes(encoded(dict(artifact_bytes=1024**3)))
             existing=study/'runs/cell/attempt-001/checkpoints/ckpt_epoch239.bin';before=existing.stat().st_mtime_ns
             with patch('shaping_execution.load_registration',return_value=(dict(minimum_ssd_free_bytes=0),[cell],{})), \
                  patch('shaping_checkpoint_retention.archive_inventory',return_value=(mirror,inventory)):

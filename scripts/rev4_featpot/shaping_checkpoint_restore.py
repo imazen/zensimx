@@ -16,10 +16,12 @@ def restore(study,cell,output):
         or identity['epochs']!=240 or terminal['stage']!='trained' or terminal['exit_code']!=0
         or identity['plan_sha256']!=sha(study/'PLAN.json')):
         raise ValueError('completed registered 240-epoch control required')
-    receipt=json.loads((directory/'MIRROR_VERIFIED.json').read_text())
-    if receipt['artifact_bytes']>ALLOWANCE:raise ValueError('restore exceeds its finite allowance')
     mirror,inventory=archive_inventory(directory)
     paths={f'attempt-001/checkpoints/ckpt_epoch{e:03}.bin':inventory[f'attempt-001/checkpoints/ckpt_epoch{e:03}.bin'] for e in range(240)}
+    # The native archive also contains reports; reserve only the named missing
+    # checkpoint payload. The streaming guard below still bounds actual writes.
+    needed=sum((mirror/name).stat().st_size for name in paths if not (directory/name).exists())
+    if needed>ALLOWANCE:raise ValueError('restore exceeds its finite allowance')
     output.mkdir(parents=True,exist_ok=False)
     result=dict(cell=identity['cell'],archive=str(mirror),archive_manifest_sha256=sha(directory/'SHA256SUMS'),
                 restored={},already_present=[],copied_bytes=0,outer_responses_read=False)
