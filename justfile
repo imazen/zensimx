@@ -5248,6 +5248,9 @@ shaping-completion-outer-controls-check:
 shaping-completion-variant-execution-check:
     TMPDIR="$HOME/tmp" python3 -B -m unittest scripts/tests/test_shaping_variant_execution.py
 
+shaping-completion-downstream-execution-check:
+    TMPDIR="$HOME/tmp" python3 -B -m unittest scripts/tests/test_shaping_downstream_execution.py scripts/tests/test_shaping_outer_execution.py scripts/tests/test_shaping_variant_execution.py
+
 shaping-completion-full-fit-plan-check:
     TMPDIR="$HOME/tmp" python3 -B -m unittest scripts/tests/test_shaping_full_fit_plan.py
 

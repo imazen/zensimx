@@ -1,5 +1,16 @@
 # zensim — current working rules
 
+## Known Bugs — downstream admission refactor (resolved November 8, 2026)
+
+Extracting downstream admission left an undefined template variable in the
+pretrained outer/variant execution branches and an undefined build path in
+variant execution. These branches had not executed in the registered study.
+Execution now reuses the exact parent template already pinned by admission,
+and variant receipts hash the explicit binary directory's BUILD.json.
+Controller coverage reaches terminal receipts for unshaped, frozen-pretrained
+and joint-pretrained cases in both owners, without launching native fits.
+This is orchestration coverage, not scientific qualification of those fits.
+
 ## Known Bugs — qualification service admission (November 8, 2026)
 
 The first optimized-runtime qualification service lacked a usable user-manager

@@ -130,8 +130,7 @@ def execute(args):
                 shaping=json.loads((args.study/'shapes'/cell['partition']/kind/'INITIAL.json').read_text())
             choice=schedule['optimizer_choice']
             if '_pretrained_' in cell['family']:
-                family=cell['family'].split('_pretrained_')[0]+'_joint_identity'
-                parent,parent_run=primary_source(args.study,cells,template,schedule['setting'],family)
+                parent,parent_run=context['templates'][1]
                 if admission['decision_sha256'].get(str(parent/'RUN.json'))!=sha(parent/'RUN.json'):
                     raise ValueError('outer pretraining template is not pinned by admission')
                 epochs=schedule['phase_epochs'][0]

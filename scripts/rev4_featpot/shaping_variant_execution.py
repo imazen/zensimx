@@ -118,6 +118,7 @@ def admit(args,*,host=None):
 
 def execute(args):
     context=admit(args)
+    build_path=args.binary_dir/'BUILD.json'
     plan,cells,resolution,cell,family,schedule,record,groups,qualification_pins,analytic,outer,admission,source,original=(
         context[name] for name in ('plan','cells','resolution','cell','family','schedule','record',
                                   'groups','qualification_pins','analytic','outer','admission','source','original'))
@@ -140,8 +141,7 @@ def execute(args):
         try:
             choice=schedule['optimizer_choice']
             if '_pretrained_' in family:
-                parent_family=family.split('_pretrained_')[0]+'_joint_identity'
-                parent,parent_run=primary_source(args.study,cells,template,schedule['setting'],parent_family)
+                parent,parent_run=context['templates'][1]
                 if admission['decision_sha256'].get(str(parent/'RUN.json'))!=sha(parent/'RUN.json'):raise ValueError('unpinned variant pretraining template')
                 epochs=schedule['phase_epochs'][0]
                 phases.append(phase(args.study,args.binary_dir,parent,parent_run,dest/'pretraining',epochs,choice,groups,shaping,
