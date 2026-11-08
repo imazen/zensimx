@@ -32,6 +32,16 @@ Existing frozen executables and loaded orchestration exports remain unchanged;
 new owners use the approved budget, with queued-request transfers recorded
 explicitly before any replacement controller starts.
 
+`shaping_queue_transfer.py` can move unopened requests from an initial wave.
+It excludes the first worker slots, including threads waiting for admission,
+and refuses any completed wave member or already-started transfer candidate.
+During the short CPU/storage admission transaction it suspends only the Python
+queue, preserves each original request under a transfer suffix, and resumes the
+queue in `finally`. Separate native controllers/trainers continue throughout.
+The old queue later records explicit missing-request errors for transferred
+proposals; these are superseded orchestration entries, not failed native fits.
+Each new owner gets a fresh pinned request, and only one fit may exist per cell.
+
 A wave manifest pins each request and permits at most four controller threads.
 Every child still uses shared CPU/SSD admission. Finished and failed children are
 recorded as they exit; failures never retry. Size the aggregate memory scope from
