@@ -2,7 +2,7 @@
 from __future__ import annotations
 import argparse,json
 from pathlib import Path
-from shaping_completion import MAX_PAIR_FAMILIES,NEURAL,RESCUES,REPO,encoded,sha
+from shaping_completion import max_pair_families,NEURAL,RESCUES,REPO,encoded,sha
 from shaping_execution import load_registration
 from shaping_rescue import selected_base
 from shaping_selection import human_score
@@ -39,7 +39,7 @@ def verified_candidate(root,cell,representation='original',*,allow_undefined_fai
     if representation not in ('original','research-relu-max-pairs-v1'):
         raise ValueError('unknown candidate representation')
     repaired=representation=='research-relu-max-pairs-v1'
-    if repaired and cell['family'] not in MAX_PAIR_FAMILIES:raise ValueError('unqualified max-pair family')
+    if repaired and cell['family'] not in max_pair_families(root):raise ValueError('unqualified max-pair family')
     pins={}
     directory=root/('reexport_max_pairs' if repaired else 'runs')/cell['id']
     markers=list(directory.glob('attempt-*/final/COMPLETE.json' if repaired else 'attempt-*/evaluation/COMPLETE.json'))

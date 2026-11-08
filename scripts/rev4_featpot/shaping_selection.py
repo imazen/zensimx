@@ -4,7 +4,7 @@ import argparse
 import json
 import math
 from pathlib import Path
-from shaping_completion import MAX_PAIR_FAMILIES,FAMILIES,NEURAL,REPO,encoded,sha
+from shaping_completion import max_pair_families,FAMILIES,NEURAL,REPO,encoded,sha
 from shaping_execution import load_registration
 
 HUMANS=('kadid','tid2013','konfig','cid22_a25')
@@ -114,7 +114,7 @@ def select(args):
     if args.family in corrected_families:require_activation(args.study)
     _,cells,_=load_registration(args.study)
     repaired=getattr(args,'reexport_max_pairs',False)
-    if repaired and args.family not in MAX_PAIR_FAMILIES:raise ValueError('unqualified max-pair family')
+    if repaired and args.family not in max_pair_families(args.study):raise ValueError('unqualified max-pair family')
     expected=[c for c in cells if c['stage']=='inner' and c['family']==args.family
               and c['partition'] in (f'inner-{args.outer}-0',f'inner-{args.outer}-1')]
     reports={};pins={};convergence={}

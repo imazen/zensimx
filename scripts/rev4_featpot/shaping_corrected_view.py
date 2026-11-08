@@ -160,6 +160,8 @@ def base_path(root,family,outer):
     # Only an explicitly activated study changes selection paths. Originals remain
     # readable for historical diagnostics and unchanged families retain their path.
     suffix='-corrected-threshold' if (root/'corrected_thresholds/ACTIVATION.json').exists() and family in FAMILIES else ''
+    from shaping_completion import MAX_PAIR_FAMILIES,max_pair_families
+    if family not in MAX_PAIR_FAMILIES and family in max_pair_families(root):suffix+='-stable-max-pairs'
     return root/'selection'/f'outer-{outer}'/(family+suffix+'-base.json')
 
 

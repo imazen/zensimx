@@ -5,7 +5,7 @@ from contextlib import contextmanager
 from datetime import datetime,timezone
 from pathlib import Path
 from types import SimpleNamespace
-from shaping_completion import MAX_PAIR_FAMILIES,NEURAL,REPO,encoded,sha
+from shaping_completion import max_pair_families,NEURAL,REPO,encoded,sha
 from shaping_execution import load_registration,registered_subset
 from shaping_host_assignment import check
 from shaping_rescue import selected_base,resolve
@@ -21,7 +21,7 @@ def base_ready(root,cells,family,outer):
     if (family not in (*NEURAL,'extra_trees','shaped_additive') or len(expected)!=len(coverage)
         or {(c['setting'],c['partition'],c['seed']) for c in expected}!=coverage):
         raise ValueError('complete registered base matrix required')
-    repaired=family in MAX_PAIR_FAMILIES
+    repaired=family in max_pair_families(root)
     for cell in expected:
         directory=root/('reexport_max_pairs' if repaired else 'runs')/cell['id']
         markers=list(directory.glob('attempt-*/final/COMPLETE.json' if repaired else 'attempt-*/evaluation/COMPLETE.json'))
@@ -230,7 +230,7 @@ def dispatch(args):
                     path=base_path(args.study,family,args.outer)
                     if not path.exists():
                         if not base_ready(args.study,cells,family,args.outer):continue
-                        select(SimpleNamespace(study=args.study,family=family,outer=args.outer,reexport_max_pairs=family in MAX_PAIR_FAMILIES))
+                        select(SimpleNamespace(study=args.study,family=family,outer=args.outer,reexport_max_pairs=family in max_pair_families(args.study)))
                     selected_base(args.study,family,args.outer,cells)
                     # Recheck the frozen trigger and selected evidence before
                     # considering the family ready; each child repeats this gate.

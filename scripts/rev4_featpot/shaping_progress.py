@@ -147,7 +147,7 @@ def corrected_program(root):
 
 
 def dashboard_data(root,result,workers):
-    from shaping_completion import FAMILIES,MAX_PAIR_FAMILIES
+    from shaping_completion import FAMILIES,max_pair_families
     from shaping_execution import live_status
     plan,cells,_=load_registration(root);plan_pin=result['plan_sha256']
     local=live_status(root,persist=False,emit=False)
@@ -159,7 +159,7 @@ def dashboard_data(root,result,workers):
                           fresh=health['fresh'],checked_utc=status['checked_utc']))
         for row in status['runs']:
             if row['verified_live']:observations[row['cell']]=dict(**row,host=host,fresh=health['fresh'])
-    audited={r['cell']:r for r in result['cells']};records=[]
+    audited={r['cell']:r for r in result['cells']};records=[];repaired_families=max_pair_families(root)
     scatter_index=root.parent/'stats/details/INDEX.json';scatter={}
     if scatter_index.exists():
         index=json.loads(scatter_index.read_text())
@@ -177,7 +177,7 @@ def dashboard_data(root,result,workers):
             investigation=any(v['convergence_failure'] or any(d['investigation_required'] for d in v['diagnostics'].values()) for v in a['attempts']),
             diagnostics_ready=cell['family'] not in NEURAL or any(v['convergence_failure'] or v['diagnostics'] for v in a['attempts']),
             archive=a['archive_receipt_verified'],panel=None,curve=[],reasons=[])
-        repaired=cell['family'] in MAX_PAIR_FAMILIES
+        repaired=cell['family'] in repaired_families
         base=root/'reexport_max_pairs'/cell['id'] if repaired else directory
         markers=list(base.glob('attempt-*/final/COMPLETE.json' if repaired else 'attempt-*/evaluation/COMPLETE.json'))
         if len(markers)>1:raise ValueError('ambiguous dashboard final: '+cell['id'])

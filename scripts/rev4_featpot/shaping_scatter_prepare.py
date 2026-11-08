@@ -3,7 +3,7 @@ import argparse,json,math,os
 from pathlib import Path
 from functools import lru_cache
 import numpy as np
-from shaping_completion import MAX_PAIR_FAMILIES,encoded,sha
+from shaping_completion import max_pair_families,encoded,sha
 from shaping_execution import load_registration
 
 MAX_BYTES=2*1024**3
@@ -15,7 +15,7 @@ def write_atomic(path,value):
 
 
 def report_path(study,record):
-    cell=record['cell'];repaired=cell['family'] in MAX_PAIR_FAMILIES
+    cell=record['cell'];repaired=cell['family'] in max_pair_families(study)
     root=study/('reexport_max_pairs' if repaired else 'runs')/cell['id']
     markers=list(root.glob('attempt-*/final/COMPLETE.json' if repaired else 'attempt-*/evaluation/COMPLETE.json'))
     if len(markers)!=1:raise ValueError('one completed scatter representation required')

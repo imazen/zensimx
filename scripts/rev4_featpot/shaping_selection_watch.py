@@ -4,7 +4,7 @@ import argparse,fcntl,json,os,time
 from datetime import datetime,timezone
 from pathlib import Path
 from types import SimpleNamespace
-from shaping_completion import MAX_PAIR_FAMILIES,FAMILIES,NEURAL,encoded,sha
+from shaping_completion import max_pair_families,FAMILIES,NEURAL,encoded,sha
 from shaping_execution import load_registration
 from shaping_rescue_selection import select as select_rescue
 from shaping_extension import register as register_extension,verify_decision
@@ -18,7 +18,7 @@ DRIVER_SHA256=sha(__file__)
 def ready(root,cell,representation):
     repaired=representation=='research-relu-max-pairs-v1'
     if representation not in ('original','research-relu-max-pairs-v1'):raise ValueError('unknown selection representation')
-    if repaired and cell['family'] not in MAX_PAIR_FAMILIES:raise ValueError('unqualified max-pair family')
+    if repaired and cell['family'] not in max_pair_families(root):raise ValueError('unqualified max-pair family')
     directory=root/('reexport_max_pairs' if repaired else 'runs')/cell['id']
     markers=list(directory.glob('attempt-*/final/COMPLETE.json' if repaired else 'attempt-*/evaluation/COMPLETE.json'))
     if len(markers)>1:raise ValueError('ambiguous completed candidate')
@@ -41,7 +41,7 @@ def sweep(root,outer):
             path=base_path(root,family,outer)
             if path.exists() or not base_ready(root,cells,family,outer):continue
             select_base(SimpleNamespace(study=root,family=family,outer=outer,
-                                        reexport_max_pairs=family in MAX_PAIR_FAMILIES))
+                                        reexport_max_pairs=family in max_pair_families(root)))
             created_bases.append(family)
         if pending(root):
             return dict(stage='waiting_for_corrected_activation',completed_rescue_selections=[],
