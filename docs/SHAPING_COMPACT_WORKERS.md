@@ -66,3 +66,20 @@ failed scientific fits. Do not relaunch an existing attempt.
 
 The [November 8 placement measurements](../benchmarks/shaping_queue_rebalance_2026-11-08.md)
 record the real deployment, active native counts and verified retirement archives.
+
+## Shortlisted rescue transport
+
+`just shaping-selected-rescue-prepare` adds the missing transport preparation
+for the four neural roles after the complete registered inner shortlist exists.
+It replays the existing shortlist and rescue-resolution gates, checks the full
+12-condition paired matrix for the requested family, and creates requests only
+for conditions with neither an attempt nor a prior placement. Failed, partial,
+active and completed attempts remain preserved and carry no new completion claim.
+The placement file must name exactly the still-unassigned conditions. The existing
+worker registrar retains runtime, source, data, qualification and recipe checks.
+Manifests have at most four workers and reuse the normal shared admission owner.
+The original fixed ReLU entry point still requires all twelve unopened conditions.
+
+This is transport support, not evidence that downstream fitting has happened.
+Corrected pretrained rescues still require the registered corrected native build;
+analytic control rescues retain their full neutral-trajectory qualification.

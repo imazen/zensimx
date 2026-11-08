@@ -5823,6 +5823,12 @@ shaping-snapshot-batch-check:
 shaping-queue-placement-check:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 512M --jobs 1 -- python3 -B -m unittest scripts.tests.test_shaping_queue_placement scripts.tests.test_shaping_host_transition
 
+shaping-selected-rescue-check:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B -m unittest scripts.tests.test_shaping_rescue_wave_prepare scripts.tests.test_shaping_rescue_worker scripts.tests.test_shaping_corrected_downstream scripts.tests.test_shaping_rescue_dispatch
+
+shaping-selected-rescue-prepare study source binaries qualification outer family placements output:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_rescue_wave_prepare.py --study {{quote(study)}} --source {{quote(source)}} --binaries {{quote(binaries)}} --qualification {{quote(qualification)}} --outer {{outer}} --selected-family {{quote(family)}} --placements {{quote(placements)}} --output {{quote(output)}}
+
 # Native opaque-vector inference helpers; build away from the coordinator host.
 shaping-external-native-build target:
     TMPDIR="$HOME/tmp" CARGO_TARGET_DIR={{quote(target)}} CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_DEV_OPT_LEVEL=1 "$HOME/work/claudehints/scripts/run-heavy" --mem 4G --jobs 1 -- "$HOME/.cargo/bin/cargo" build --locked -p zensim-validate --bin corrhead_parity --bin bake_dial_refit
