@@ -1,5 +1,5 @@
 """Qualify a uniform stable export without changing fitting or numerical gates."""
-import argparse,json,math
+import argparse,json,math,shutil
 from pathlib import Path
 from shaping_completion import encoded,sha
 
@@ -9,6 +9,18 @@ FAMILIES=('silu_monotone','product_joint_identity','product_pretrained_frozen','
 WITNESSES={'1a22976d73e29a7c2217':219,'d20acb0b9441fc96aab8':119,
            '7e28ac0fc83682e66022':119,'46c5fe4370e1e47e9b4a':99}
 GROUPS={'human_kadid','human_tid2013','human_konfig','human_cid22_a25','cid22'}
+
+
+def frozen_sources(root,source):
+    destination=root/'qualification-source';destination.mkdir(exist_ok=True);result=[]
+    for name in ('shaping_probe_trace.py','shaping_reexport.py'):
+        original=source/'scripts/rev4_featpot'/name;target=destination/name
+        if target.exists():
+            if sha(target)!=sha(original):raise ValueError('preserve changed qualification source')
+        else:shutil.copyfile(original,target)
+        if sha(target)!=sha(original):raise ValueError('qualification source copy drift')
+        result.append(target)
+    return result
 
 
 def families(study):
@@ -52,7 +64,7 @@ def register(study,root,source):
     evidence={str(study/'PLAN.json'):sha(study/'PLAN.json'),
               str(study/'corrected_thresholds/ACTIVATION.json'):sha(study/'corrected_thresholds/ACTIVATION.json')}
     trace=source/'scripts/rev4_featpot/shaping_probe_trace.py';comparison=source/'scripts/rev4_featpot/shaping_reexport.py'
-    evidence.update({str(p):sha(p) for p in (trace,comparison,root/'CASES.json',root/'ADDITIONAL_CASES.json')})
+    evidence.update({str(p):sha(p) for p in (*frozen_sources(root,source),root/'CASES.json',root/'ADDITIONAL_CASES.json')})
     cases=[]
     for item in [*initial,*additional]:
         cid=item['cell'];cell=registered[cid];epoch=item['epoch'];folder=root/cid

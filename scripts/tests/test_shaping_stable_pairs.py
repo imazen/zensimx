@@ -5,10 +5,22 @@ from unittest.mock import patch
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'rev4_featpot'))
 from shaping_completion import max_pair_families,sha
 from shaping_reexport import admit_family
-from shaping_stable_pairs import families,register,NAME,FAMILIES,WITNESSES
+from shaping_stable_pairs import families,register,frozen_sources,NAME,FAMILIES,WITNESSES
 
 
 class StablePairQualificationTests(unittest.TestCase):
+    def test_qualification_source_is_portable_and_changed_copies_are_preserved(self):
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as directory:
+            root=Path(directory);source=root/'immutable-export';scripts=source/'scripts/rev4_featpot';scripts.mkdir(parents=True)
+            output=root/'qualification';output.mkdir()
+            for name in ('shaping_probe_trace.py','shaping_reexport.py'):(scripts/name).write_text('frozen native owner source')
+            copied=frozen_sources(output,source)
+            self.assertTrue(all(p.is_relative_to(output) for p in copied))
+            self.assertEqual(copied,frozen_sources(output,source))
+            copied[0].write_text('changed evidence')
+            with self.assertRaisesRegex(ValueError,'preserve changed'):frozen_sources(output,source)
+            self.assertEqual(copied[0].read_text(),'changed evidence')
+
     def test_unregistered_study_keeps_original_admission_and_all_gate_expectations(self):
         with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as directory:
             study=Path(directory)
