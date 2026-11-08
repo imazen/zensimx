@@ -1,6 +1,6 @@
 """Retain needed local epochs; reread durable checkpoints before removing duplicates."""
 from __future__ import annotations
-import argparse,json,os,re,shutil,subprocess
+import argparse,json,os,re,shutil,subprocess,sys
 from datetime import datetime,timezone
 from pathlib import Path
 from shaping_completion import encoded,sha
@@ -76,8 +76,19 @@ def no_users(rows,*,mountinfo=Path('/proc/self/mountinfo')):
     # tens of thousands of checkpoint paths. Portal mounts are unrelated to /mnt/v.
     # Headless workers do not have the coordinator's desktop portal mounts.
     # lsof refuses a nonexistent -e target; exclude only actual mounted portals.
+    mounts=mountinfo.read_text().splitlines()
+    if any(line.split(' - ',1)[1].split()[0] in ('nfs','nfs4','fuse.gvfsd-fuse') for line in mounts):
+        paths=[r['path'] for r in rows];helper=Path(__file__).with_name('shaping_open_file_guard.py')
+        result=subprocess.run(['sudo','-n','timeout','--kill-after=1s','15s',sys.executable,str(helper)],
+                              input=json.dumps(dict(targets=paths)),capture_output=True,text=True,timeout=20)
+        if result.returncode or result.stderr:raise ValueError('inode open-file inspection failed: '+result.stderr+result.stdout)
+        inspection=json.loads(result.stdout)
+        if (inspection['schema']!='inode-open-file-inspection-v1' or set(inspection['targets'])!=set(paths)
+            or inspection['errors']):raise ValueError('incomplete inode open-file inspection')
+        if inspection['busy']:raise ValueError('checkpoint still in use: '+str(inspection['busy']))
+        return
     command=['sudo','lsof','-nP']
-    for line in mountinfo.read_text().splitlines():
+    for line in mounts:
         target=line.split()[4]
         if re.fullmatch('/run/user/[0-9]+/doc',target):command+=['-e',target]
     result=subprocess.run([*command,'-Fpn'],capture_output=True,text=True)

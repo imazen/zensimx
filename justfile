@@ -5817,7 +5817,7 @@ shaping-compact-worker-check:
     TMPDIR="$HOME/tmp" python3 -B -m unittest scripts.tests.test_shaping_compact_worker
 
 shaping-snapshot-batch-check:
-    TMPDIR="$HOME/tmp" python3 -B -m unittest scripts.tests.test_shaping_snapshot_batch scripts.tests.test_shaping_snapshot_retention
+    TMPDIR="$HOME/tmp" python3 -B -m unittest scripts.tests.test_shaping_snapshot_batch scripts.tests.test_shaping_snapshot_retention scripts.tests.test_shaping_checkpoint_retention scripts.tests.test_shaping_open_file_guard
 
 # Native opaque-vector inference helpers; build away from the coordinator host.
 shaping-external-native-build target:

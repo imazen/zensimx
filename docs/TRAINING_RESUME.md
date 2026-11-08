@@ -109,3 +109,10 @@ Per-run journals and a separate batch receipt preserve the evidence; the stage
 and durable archive remain intact. A partial removal journal refuses automatic
 continuation. Batch fixture checks use the real staging and cold-readback gates,
 including a corrupted durable state that must leave local states untouched.
+
+Where NFS or GVFS mount metadata can prevent lsof from completing, active-user
+inspection uses the kernel's descriptor/mapping device and inode identities.
+This also detects hard-link and bind aliases. Unrelated network descriptors do
+not trigger filesystem stats. The root inspection has a deadline, verifies the
+complete target list and refuses errors or active mappings; it does not accept
+an incomplete lsof listing.

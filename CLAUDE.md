@@ -1,3 +1,12 @@
+## Known Bugs — snapshot retirement on unrelated mounts (November 8, 2026)
+
+Completed-state retirement refused before removal because lsof could not stat
+unrelated NFS file mounts or a desktop GVFS mount. On those mount layouts, the
+guard now inspects target device/inode identities through proc descriptors and
+memory mappings, including aliases. It avoids filesystem lookups on unrelated
+network devices and retains bounded root inspection plus fail-closed errors.
+Original failed attempts, native states and verified archives remain preserved.
+
 ## Known Bugs — external scatter response ordering (November 8, 2026)
 
 An older external-scatter fetch could replace a newer model/population selection
