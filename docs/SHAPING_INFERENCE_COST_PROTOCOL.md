@@ -7,10 +7,12 @@ been collected under this protocol.
 
 ## Models and evidence
 
-Measure every registered full-FIT model: all sixteen cells across the six
-finalist roles, retaining the three paired seeds where registered and the single
-deterministic shaped-additive fit. Resolve roles and settings from the existing
-full-FIT admission and selection owners. Require completed fits, final reports,
+Under the owner-approved reduced scope, measure the actual 48 outer-fit models:
+six finalist roles in each of three outer folds, retaining three paired seeds
+where registered and one deterministic shaped-additive fit per fold. Resolve
+roles, settings and exact cell coverage through `shaping_outer_evidence.primary_cells`
+and the three existing outer admissions. The omitted full-FIT retuning and refit
+stages are not prerequisites. Require completed fits, final reports,
 native qualification, and reproducible model hashes before timing. Use the exact
 representation that supplied each final report, including any qualified max-pair
 re-export. Preserve original failed gates and convergence qualifications.
@@ -25,11 +27,15 @@ latency measurements.
 ## Native scoring
 
 Use a shared fixed set of 40 feature rows: eight from each of the four admitted
-human populations and CID22-SSIM2. Select from full FIT only, by ascending original
+human populations and CID22-SSIM2. Select from the FIT source pool only, by ascending original
 row index within population, before reading predictions. Preserve exact f32
 training-table values and the original feature-ID mapping. Pin the chosen indices,
-source tables, declaration, exported rows and reference predictions. No outer,
-development or final-holdout row is needed for this workload.
+source tables, declaration, exported rows and reference predictions. Since the
+three outer training complements differ, a shared label-free workload can
+contain features from a model's already registered outer test fold. It is
+latency input, never additional supervision or a checkpoint-selection signal.
+Freeze row choices without labels or predictions, after the inner decisions
+are fixed. Do not consume development or untouched final-holdout rows.
 
 The neural ZNPR arm uses `BakeScorer::score_features`, including declared input
 gathering, learned shaping, scaling and final score transformation. The tree arm
