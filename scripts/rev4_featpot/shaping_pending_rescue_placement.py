@@ -1,7 +1,7 @@
 """Retire only unclaimed, childless rescue waiters before changing placement."""
 from contextlib import ExitStack
 from datetime import datetime,timezone
-import argparse,fcntl,json,os,signal,socket,time
+import argparse,fcntl,json,os,signal,socket,time,subprocess
 from pathlib import Path
 from shaping_completion import encoded,sha
 from shaping_host_assignment import process_identity
@@ -76,8 +76,69 @@ def retire(study,limit,output,proc=Path('/proc')):
                 except FileNotFoundError:pass
 
 
+def prepare_target(study,proofs,source,binaries,qualification,target,output):
+    from shaping_rescue_worker import HOSTS
+    if target not in HOSTS:raise ValueError('approved target required')
+    output.mkdir(parents=True,exist_ok=False);rows=[]
+    for proof in proofs:
+        record=json.loads(proof.read_text())
+        if record['stage']!='unstarted_waiters_retired' or record['native_processes_signalled'] or record['host'] not in HOSTS:
+            raise ValueError('verified source retirement required')
+        rows.extend(record['rows'])
+    if not rows or len({r['cell']['id'] for r in rows})!=len(rows) or any(not r.get('retired_before_fit') for r in rows):
+        raise ValueError('distinct retired unstarted cells required')
+    jobs=[];placements=[]
+    for row in rows:
+        old_path=Path(row['request']);old=json.loads(old_path.read_text());cid=row['cell']['id']
+        if sha(old_path)!=row['request_sha256'] or old['cell']!=row['cell'] or old['host']==target or (study/'runs'/cid).exists():
+            raise ValueError('source request or attempt changed')
+        program='''import json
+from pathlib import Path
+root=Path(STUDY);request=REQUEST;cid=CELL
+assert not (root/'runs'/cid).exists()
+claims=root/'cpu-admission/CLAIMS.json'
+assert not claims.exists() or cid not in json.loads(claims.read_text())
+for p in Path('/proc').glob('[0-9]*/cmdline'):
+ try:a=[s.decode() for s in p.read_bytes().split(b'\\0') if s]
+ except (FileNotFoundError,ProcessLookupError,PermissionError):continue
+ assert not ('work' in a and request in a and any(Path(s).name=='shaping_rescue_worker.py' for s in a))
+'''
+        program='STUDY='+repr(str(study))+'\nREQUEST='+repr(str(old_path))+'\nCELL='+repr(cid)+'\n'+program
+        subprocess.run(['ssh',old['host'],'python3 -B -'],input=program,text=True,check=True)
+        matches=[p for p in (study/'downstream_assignments').glob('*.json') if cid in json.loads(p.read_text())['cells']]
+        if len(matches)!=1 or json.loads(matches[0].read_text())['host']!=old['host']:raise ValueError('one original placement required')
+        job=output/'jobs'/cid
+        with (output/(cid+'.log')).open('x') as log:
+            subprocess.run(['python3','-B',str(source/'scripts/rev4_featpot/shaping_rescue_worker.py'),'register',
+                '--study',str(study),'--binaries',str(binaries),'--qualification',str(qualification),
+                '--cell',cid,'--host',target,'--output',str(job)],stdout=log,stderr=subprocess.STDOUT,check=True,cwd=source)
+        request=job/'REQUEST.json';new=json.loads(request.read_text())
+        if new!={**old,'host':target}:raise ValueError('placement change altered scientific request')
+        assignment=study/'downstream_assignments'/('rebalanced-'+cid+'-'+target+'.json')
+        if assignment.exists():raise ValueError('preserve existing replacement placement')
+        jobs.append(dict(cell=new['cell'],host=target,request=str(request),request_sha256=sha(request),
+                         previous_request=str(old_path),previous_request_sha256=sha(old_path),
+                         assignment=str(assignment),assignment_sha256=sha(job/'ASSIGNMENT.json')))
+        placements.append(dict(original=str(matches[0]),original_sha256=sha(matches[0]),
+                               backup=str(output/'original-placements'/matches[0].name),new=str(assignment),content=str(job/'ASSIGNMENT.json')))
+    record=dict(stage='prepared',source=str(source),source_driver_sha256=sha(source/'scripts/rev4_featpot/shaping_rescue_worker.py'),
+                jobs=jobs,placements=placements,retirement_proof_sha256={str(p):sha(p) for p in proofs},
+                scientific_requests_unchanged_except_host=True,training_replayed=False)
+    journal=output/'REGISTRATION.json';journal.write_bytes(encoded(record))
+    (output/'original-placements').mkdir()
+    for item in placements:
+        path=Path(item['original'])
+        if sha(path)!=item['original_sha256']:raise ValueError('placement changed before installation')
+        path.rename(item['backup']);Path(item['new']).write_bytes(Path(item['content']).read_bytes())
+    record['stage']='registered';journal.write_bytes(encoded(record));return record
+
+
 if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__)
     for key in ('study','output'):p.add_argument('--'+key,type=Path,required=True)
-    p.add_argument('--limit',type=int,required=True);a=p.parse_args();r=retire(a.study,a.limit,a.output)
-    print(json.dumps(dict(stage=r['stage'],retired=len(r['rows']),native_processes_signalled=[])),flush=True)
+    p.add_argument('--mode',choices=('retire','target'),default='retire');p.add_argument('--limit',type=int)
+    p.add_argument('--proof',type=Path,action='append',default=[]);p.add_argument('--target')
+    for key in ('source','binaries','qualification'):p.add_argument('--'+key,type=Path)
+    a=p.parse_args()
+    r=(retire(a.study,a.limit,a.output) if a.mode=='retire' else prepare_target(a.study,a.proof,a.source,a.binaries,a.qualification,a.target,a.output))
+    print(json.dumps(dict(stage=r['stage'],cells=len(r.get('rows',r.get('jobs',[]))),training_replayed=False)),flush=True)
