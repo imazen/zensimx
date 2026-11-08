@@ -123,3 +123,22 @@ already sealed before those explanatory files were added.
 ```text
 run-heavy: done rc=0 5s | peak-RSS 0.03GiB | min-avail 44497MiB | peak-load 0.70
 ```
+
+The six corrected frozen models have a separate durable snapshot,
+`external-corrected-frozen-archive-20261108/`: 216 artifacts /93,678,019 bytes
+plus its receipt, all destination checksums reread with cache-eviction requests.
+Receipt SHA-256
+`59d17318df7b481334af356bb0d77c5d7664e17808a4c1519e38a011dc51494a`;
+manifest SHA-256
+`e03eea7c8e5dd56e5678a7e9cef9f086696d331eb8202f31b8bb353ff9a7ad86`.
+Its `REPRODUCE.sh` executed on an approved worker: all 12 prediction TSVs matched
+byte for byte, and all signed-statistic and source-interval commands completed.
+This replays inference only. Frozen bakes, inference corpora, native helpers,
+targets/source IDs and command lines are included; shared training data is not
+duplicated per scoring batch. Browser evidence covers all 84 current
+model/population plots and the delayed-response selection regression.
+
+```text
+run-heavy: done rc=0 3s | peak-RSS 0.03GiB | min-avail 44608MiB | peak-load 2.35
+run-heavy: done rc=0 2s | peak-RSS 0.11GiB | min-avail 18458MiB | peak-load 20.41
+```
