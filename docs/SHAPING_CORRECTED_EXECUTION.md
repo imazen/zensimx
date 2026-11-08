@@ -12,12 +12,22 @@ The compatibility certifier requires all six prespecified neural control
 classes, their exact original final models, all 240 epochs, the corrected
 binary identity and the permitted metadata-removal scope. It refuses missing
 epochs, intermediate mismatches, changed originals and nonterminal fits.
-Certifying writes no activation and launches no training. An activation file
-and execution/selection integration are still required before scientific use.
+Certifying writes no activation and launches no training. Explicit activation
+requires that certificate before any outer admission. The loader then supplies
+the corrected comparison view while retaining an explicit original-only view
+for provenance. Parent-bank reuse admits only the registered matching parent
+and the original build of its qualified control class. New corrected fits
+require the corrected binary, 120 epochs, and bounded full-state snapshots.
+Registration alone does not enable them.
+
+The base selector, rescue resolver/dispatcher, selection watcher and outer
+admission all use the same corrected base-selection path. Unchanged ReLU
+rescues retain their IDs and decisions. Existing rescue trigger coverage and
+the original whole-setting undefined policy remain in force.
 
 The frozen four-setting matrix and the archived monotone-SiLU trajectory were
 accepted by these checks on November 8, 2026. Five other native control
-qualifications were still running. Fixture checks establish orchestration
+qualifications were still running; no activation was written. Fixture checks establish orchestration
 behavior; they do not complete those native qualifications or corrected fits.
 
 Once explicitly activated, affected base-selection paths use the

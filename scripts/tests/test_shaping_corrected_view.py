@@ -1,4 +1,5 @@
-import copy,sys,unittest
+import copy,sys,unittest,json,tempfile
+from unittest.mock import patch
 from pathlib import Path
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'rev4_featpot'))
 from scripts.tests.test_shaping_corrected_registration import CorrectedRegistrationTests
@@ -55,6 +56,43 @@ class CorrectedViewTests(unittest.TestCase):
         with self.assertRaises(ValueError):view.trajectory(proof,'softplus',case)
         proof['trajectory']['stripped_metadata_keys'].append('zentrain.monotone_research')
         view.trajectory(proof,'softplus',case)
+
+    def test_activation_requires_six_proofs_and_keeps_historical_selections(self):
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as directory:
+            root=Path(directory)/'study';(root/'corrected_thresholds').mkdir(parents=True)
+            (root/'PLAN.json').write_text('{}');(root/'corrected_thresholds/REGISTRATION.json').write_text('{}')
+            compatibility=root.parent/'corrected-control-qualification-20261108/REGISTRATION.json'
+            compatibility.parent.mkdir();cases={};proofs={}
+            for family in view.CONTROL_CLASSES:
+                case,proof=self.proof(family);run=root/'runs'/family;run.mkdir(parents=True)
+                (run/'RESULT.json').write_text('{}');case.update(run=str(run),original_build_sha256='old-build')
+                if family in ('softplus','silu_monotone','silu_diagnostic'):
+                    proof['trajectory']['stripped_metadata_keys'].append('zentrain.monotone_research')
+                if family=='silu_monotone':
+                    comparison=proof.pop('trajectory');proof.update(comparison,schema='native-control-trajectory-parity-v1',selection_candidate=False)
+                    proof['original_result_sha256']=view.sha(run/'RESULT.json')
+                else:proof['source_result_sha256']=view.sha(run/'RESULT.json')
+                cases[family]=case;proofs[family]=root.parent/(family+'.json')
+                proofs[family].write_text(json.dumps(proof))
+            compatibility.write_text(json.dumps(dict(build_sha256=view.BUILD_SHA256,plan_sha256=view.sha(root/'PLAN.json'),cases=cases)))
+            for family,path in proofs.items():
+                if family=='silu_monotone':continue
+                proof=json.loads(path.read_text());proof['registration_sha256']=view.sha(compatibility);path.write_text(json.dumps(proof))
+            original,matrix=CorrectedRegistrationTests().fixture();effective=view.corrected_cells(original,matrix)
+            registered=dict(plan_sha256=view.sha(root/'PLAN.json'))
+            with patch('shaping_execution.load_registration',return_value=({},original,{})),patch.object(view,'registration',return_value=(registered,matrix,effective)):
+                missing=dict(proofs);missing.pop('relu')
+                with self.assertRaisesRegex(ValueError,'all six'):view.activate(root,missing)
+                self.assertFalse((root/'corrected_thresholds/ACTIVATION.json').exists())
+                view.activate(root,proofs)
+                self.assertEqual(view.activated_view(root,original),effective)
+                self.assertEqual(view.base_path(root,'relu',0).name,'relu-base.json')
+                self.assertEqual(view.base_path(root,'product_pretrained_joint',0).name,'product_pretrained_joint-corrected-threshold-base.json')
+                with self.assertRaisesRegex(ValueError,'preserve prior'):view.activate(root,proofs)
+                view.admit_parent(root,dict(next(c for c in effective if c['id']==matrix['corrected_pretrained_conditions'][0]['id'])),
+                    matrix['corrected_pretrained_conditions'][0]['parent'],'old-build',view.BUILD_SHA256)
+                proofs['relu'].write_text('{}')
+                with self.assertRaisesRegex(ValueError,'evidence drift'):view.activated_view(root,original)
 
 
 if __name__=='__main__':unittest.main()

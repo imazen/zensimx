@@ -46,8 +46,10 @@ def extract(root,binary_dir,child,cells,destination):
     run=json.loads((source/'RUN.json').read_text())
     if run['cell']!=parent or run['epochs']!=240 or run['pairs_per_epoch']!=50000:
         raise ValueError('parent exposure or registered identity differs')
-    if run['plan_sha256']!=sha(root/'PLAN.json') or run['build_sha256']!=sha(binary_dir/'BUILD.json'):
-        raise ValueError('parent plan/binary differs')
+    if run['plan_sha256']!=sha(root/'PLAN.json'):raise ValueError('parent plan differs')
+    if run['build_sha256']!=sha(binary_dir/'BUILD.json'):
+        from shaping_corrected_view import admit_parent
+        admit_parent(root,child,parent,run['build_sha256'],sha(binary_dir/'BUILD.json'))
     if sha(source/'checkpoints/ckpt_epoch239.bin')!=result['bake_sha256']:
         raise ValueError('completed parent bake drift')
     prefix=source/'checkpoints/ckpt_epoch119.bin'

@@ -241,6 +241,9 @@ def admit_cell(root, cell, *, host=None):
             raise ValueError('conditional fit is outside frozen reduced shortlist')
         # The existing owner must also resolve the exact conditional registration.
         return
+    if stage=='inner' and (root/'corrected_thresholds/ACTIVATION.json').exists():
+        from shaping_corrected_view import corrected_entry
+        if corrected_entry(root,cell) is not None:return
     record = json.loads((root / 'REDUCED_SCOPE.json').read_text())
     if cell['id'] not in record['fixed_cells']:
         raise ValueError('new fit is outside owner-approved reduced scope')

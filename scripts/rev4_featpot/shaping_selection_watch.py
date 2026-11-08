@@ -9,6 +9,7 @@ from shaping_execution import load_registration
 from shaping_rescue_selection import select as select_rescue
 from shaping_extension import register as register_extension,verify_decision
 from shaping_outer_admission import register as register_outer,resolve as resolve_outer
+from shaping_corrected_view import base_path
 
 
 # Preserve the loaded driver identity across later source edits.
@@ -36,12 +37,12 @@ def sweep(root,outer):
         from shaping_selection import select as select_base
         created_bases=[]
         for family in FAMILIES:
-            path=directory/(family+'-base.json')
+            path=base_path(root,family,outer)
             if path.exists() or not base_ready(root,cells,family,outer):continue
             select_base(SimpleNamespace(study=root,family=family,outer=outer,
                                         reexport_max_pairs=family in MAX_PAIR_FAMILIES))
             created_bases.append(family)
-        if not all((directory/(family+'-base.json')).exists() for family in FAMILIES):
+        if not all(base_path(root,family,outer).exists() for family in FAMILIES):
             return dict(stage='waiting_for_complete_original_inner_shortlist',
                         completed_rescue_selections=[],created_base_selections=created_bases,
                         outer_results_read=False)
@@ -50,7 +51,7 @@ def sweep(root,outer):
         required_neural=neural_families(root,outer)
     decisions={};created=[]
     for family in required_neural:
-        base=directory/(family+'-base.json');decision=directory/(family+'-rescue.json')
+        base=base_path(root,family,outer);decision=directory/(family+'-rescue.json')
         if not base.exists():continue
         if not decision.exists():
             representation=json.loads(base.read_text()).get('representation','original')
@@ -79,7 +80,7 @@ def sweep(root,outer):
     result.update(stage='waiting_for_extension_evidence',required_extension_cells=len(registration['cells']))
     for cell in registration['cells']:
         if not ready(root,cell,decisions[cell['family']]['representation']):return result
-    if not all((directory/(family+'-base.json')).exists() for family in FAMILIES):return result
+    if not all(base_path(root,family,outer).exists() for family in FAMILIES):return result
     admission=directory/'OUTER_ADMISSION.json'
     if not admission.exists():register_outer(root,outer)
     verified,_=resolve_outer(root,outer)

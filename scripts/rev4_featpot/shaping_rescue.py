@@ -8,7 +8,8 @@ from shaping_selection import aggregate,verify_undefined_failure
 
 
 def selected_base(root,family,outer,cells):
-    path=root/'selection'/f'outer-{outer}'/(family+'-base.json')
+    from shaping_corrected_view import base_path
+    path=base_path(root,family,outer)
     record=json.loads(path.read_text())
     if record['plan_sha256']!=sha(root/'PLAN.json') or record['outer_results_read']:
         raise ValueError('selection plan or exposure differs')

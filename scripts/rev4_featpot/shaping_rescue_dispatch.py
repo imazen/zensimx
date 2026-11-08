@@ -210,7 +210,8 @@ def dispatch(args):
             if not failure and not draining:
                 for family in NEURAL:
                     if family in ready:continue
-                    path=args.study/'selection'/f'outer-{args.outer}'/(family+'-base.json')
+                    from shaping_corrected_view import base_path
+                    path=base_path(args.study,family,args.outer)
                     if not path.exists():
                         if not base_ready(args.study,cells,family,args.outer):continue
                         select(SimpleNamespace(study=args.study,family=family,outer=args.outer,reexport_max_pairs=family in MAX_PAIR_FAMILIES))

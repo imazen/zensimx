@@ -14,7 +14,8 @@ POLICY=REPO/'docs/SHAPING_OUTER_ADMISSION.md'
 
 
 def base_decision(root,family,outer,cells):
-    path=root/'selection'/f'outer-{outer}'/(family+'-base.json')
+    from shaping_corrected_view import base_path
+    path=base_path(root,family,outer)
     record=json.loads(path.read_text())
     if record['plan_sha256']!=sha(root/'PLAN.json') or record['outer_results_read']:
         raise ValueError('base decision plan or exposure differs')

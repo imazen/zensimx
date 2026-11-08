@@ -155,7 +155,8 @@ def select(args):
                   investigation_triggered=any(convergence.values()),convergence=convergence,driver_sha256=sha(__file__))
     result['representation']='research-relu-max-pairs-v1' if repaired else 'original'
     dest=args.study/'selection'/f'outer-{args.outer}';dest.mkdir(parents=True,exist_ok=True)
-    path=dest/(args.family+'-base.json')
+    from shaping_corrected_view import base_path
+    path=base_path(args.study,args.family,args.outer)
     if path.exists():raise ValueError('preserve existing selection receipt')
     path.write_bytes(encoded(result));print(json.dumps(result),flush=True)
 

@@ -5278,6 +5278,9 @@ shaping-completion-corrected-view-check:
 shaping-completion-corrected-certify study output *proofs:
     TMPDIR="$HOME/tmp" python3 -B scripts/rev4_featpot/shaping_corrected_view.py --study {{quote(study)}} --output {{quote(output)}} {{proofs}}
 
+shaping-completion-corrected-activate study *proofs:
+    TMPDIR="$HOME/tmp" python3 -B scripts/rev4_featpot/shaping_corrected_view.py --study {{quote(study)}} --activate {{proofs}}
+
 shaping-rescue-wave-prepare-check:
     TMPDIR="$HOME/tmp" python3 -B -m unittest scripts/tests/test_shaping_rescue_wave_prepare.py
 

@@ -19,7 +19,7 @@ from shaping_completion import REPO, SEEDS, SETTINGS, encoded, sha
 
 DRIVER_SHA256=sha(__file__)
 
-def load_registration(root):
+def load_registration(root,*,original=False):
     plan=json.loads((root/'PLAN.json').read_text())
     for name,pin in [('MATRIX.json','matrix_sha256'),('PARTITIONS.json','partition_sha256')]:
         if sha(root/name)!=plan[pin]:raise ValueError(f'registration drift: {name}')
@@ -28,7 +28,11 @@ def load_registration(root):
     protocol=root/'PROTOCOL.md'
     if not protocol.exists():protocol=Path(plan['protocol'])
     if sha(protocol)!=plan['protocol_sha256']:raise ValueError('protocol drift')
-    return plan,json.loads((root/'MATRIX.json').read_text()),json.loads((root/'PARTITIONS.json').read_text())
+    cells=json.loads((root/'MATRIX.json').read_text())
+    if not original and (root/'corrected_thresholds/ACTIVATION.json').exists():
+        from shaping_corrected_view import activated_view
+        cells=activated_view(root,cells)
+    return plan,cells,json.loads((root/'PARTITIONS.json').read_text())
 
 
 def prepare_partition(root, partition, membership, plan):
@@ -85,6 +89,8 @@ def run_native(root,binary_dir,cell,record,attempt,epochs,mem):
 def _run_native(root,binary_dir,cell,record,attempt,epochs,mem):
     from shaping_host_assignment import check
     check(root,[cell],sha(binary_dir/'BUILD.json'))
+    from shaping_corrected_view import admit_fit
+    corrected=admit_fit(root,cell,sha(binary_dir/'BUILD.json'),epochs)
     from shaping_reduced_scope import admit_cell
     admit_cell(root,cell)
     if attempt<1:raise ValueError('attempt must be positive')
@@ -114,6 +120,10 @@ def _run_native(root,binary_dir,cell,record,attempt,epochs,mem):
     argv+=['--lr',str(lr),'--l2',str(l2),'--no-sample-coverage',
            '--dump-checkpoints-every','1','--dump-checkpoints-dir',str(ckpt)]
     env=os.environ.copy()
+    if corrected is not None:
+        for key in list(env):
+            if key.startswith(('ZENSIM_TRAIN_RESUME','ZENSIM_TRAIN_SNAPSHOT','ZENSIM_PLAIN_OPTIMIZER_')):env.pop(key,None)
+        env['ZENSIM_TRAIN_SNAPSHOT_ROOT']=str(root.parent/'shared-training-snapshots')
     for key in ('ZENSIM_MONOTONE_RESEARCH_MANIFEST','ZENSIM_MONOTONE_RESEARCH_SHA256',
                 'ZENSIM_INPUT_SHAPING_MANIFEST','ZENSIM_INPUT_SHAPING_SHA256'):
         env.pop(key,None)
@@ -151,6 +161,7 @@ def _run_native(root,binary_dir,cell,record,attempt,epochs,mem):
                      plan_sha256=sha(root/'PLAN.json'),build_sha256=sha(binary_dir/'BUILD.json'),
                      driver_sha256=DRIVER_SHA256,stage='running',epochs=epochs,pairs_per_epoch=50000,
                      scientific_selection=cell['stage']!='resource_pilot')
+        if corrected is not None:running['corrected_threshold_condition']=corrected
         (dest/'RUN.json').write_bytes(encoded(running))
         print(json.dumps({'run':str(dest),'pid':process.pid,'cell':cell['id']}),flush=True)
         rc=process.wait()
