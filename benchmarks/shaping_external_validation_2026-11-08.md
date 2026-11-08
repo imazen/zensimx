@@ -91,3 +91,21 @@ the original witnesses remain available. Mirror wrapper accounting:
 ```text
 run-heavy: done rc=0 15s | peak-RSS 0.02GiB | min-avail 45276MiB | peak-load 2.00
 ```
+
+The four external controls and their native parity evidence also have a verified
+durable snapshot: `external-controls-native-archive-20261108/`, 177 artifacts /
+231,062,836 bytes, plus its receipt. Receipt SHA-256
+`4e53b9a73070068d9d9df04aa2bbce54a69cf9f55bc9f9bf6f7636c71e44d9fa`;
+manifest SHA-256
+`29f80a56246153e7154cff0fb616cc7ff462bc98800d913714ea73c6ae445f35`.
+All artifacts were reread from the destination with cache-eviction requests.
+The immutable snapshot includes both failed additive adapter attempts alongside
+the successful native-basis outputs. Its binaries, raw arrays, predictions,
+bootstrap inputs and browser evidence remain inspectable without fitting.
+`external-controls-reproduction-20261108/` separately preserves reproduction
+commands and the exact executed qualification source; the first snapshot was
+already sealed before those explanatory files were added.
+
+```text
+run-heavy: done rc=0 5s | peak-RSS 0.03GiB | min-avail 44497MiB | peak-load 0.70
+```
