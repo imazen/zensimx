@@ -5557,3 +5557,9 @@ shaping-temp-storage output:
 shaping-host-transition-check:
     python3 -B -m unittest discover -s scripts/tests -p test_shaping_host_transition.py
     python3 -B -m unittest discover -s scripts/tests -p test_shaping_host_assignment.py
+
+shaping-reduced-scope-check:
+    python3 -B -m unittest discover -s scripts/tests -p test_shaping_reduced_scope.py
+
+shaping-reduced-scope-register study approval:
+    python3 -B scripts/rev4_featpot/shaping_reduced_scope.py --study {{quote(study)}} --approval {{quote(approval)}}
