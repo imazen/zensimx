@@ -399,3 +399,62 @@ mod tests {
         assert!(s.apply(&[-1.], &mut [0.; 3]).is_err());
     }
 }
+
+#[derive(clap::Args)]
+pub(super) struct PredictArgs {
+    #[arg(long)]
+    bake: PathBuf,
+    #[arg(long)]
+    inputs: PathBuf,
+    #[arg(long)]
+    out: PathBuf,
+}
+
+/// Inference reuses the fitting adapter's exact f32 basis and Predictor.
+pub(super) fn predict(a: &PredictArgs) -> Result<(), String> {
+    use std::io::Write;
+    let bytes = std::fs::read(&a.bake).map_err(|e| e.to_string())?;
+    let model = Model::from_bytes(&bytes).map_err(|e| format!("parse bake: {e:?}"))?;
+    let text = model
+        .metadata()
+        .get_utf8("zentrain.research_basis")
+        .map_err(|e| format!("missing frozen research basis: {e:?}"))?;
+    let spec: Spec = serde_json::from_str(text).map_err(|e| e.to_string())?;
+    if spec.width() != model.n_inputs() {
+        return Err("frozen research basis/model width differs".into());
+    }
+    let npz = Npz::open(&a.inputs)?;
+    let x = npz.get("x")?;
+    let [rows, width] = x.shape.as_slice() else {
+        return Err("raw prediction matrix must be 2-D".into());
+    };
+    if *rows == 0 || *width == 0 {
+        return Err("empty raw prediction matrix".into());
+    }
+    let raw = x.f32s()?;
+    if raw.iter().any(|v| !v.is_finite()) {
+        return Err("nonfinite raw prediction input".into());
+    }
+    spec.validate(*width)?;
+    let file = std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&a.out)
+        .map_err(|e| e.to_string())?;
+    let mut output = std::io::BufWriter::new(file);
+    writeln!(output, "row_idx\tpred").map_err(|e| e.to_string())?;
+    let mut predictor = zenpredict::Predictor::new(&model);
+    let mut basis = vec![0_f32; spec.width()];
+    for (i, row) in raw.chunks_exact(*width).enumerate() {
+        spec.apply(row, &mut basis)?;
+        let value = predictor
+            .predict(&basis)
+            .map_err(|e| format!("predict: {e:?}"))?[0];
+        if !value.is_finite() {
+            return Err(format!("nonfinite prediction at row {i}"));
+        }
+        writeln!(output, "{i}\t{value:.17e}").map_err(|e| e.to_string())?;
+    }
+    output.flush().map_err(|e| e.to_string())?;
+    Ok(())
+}

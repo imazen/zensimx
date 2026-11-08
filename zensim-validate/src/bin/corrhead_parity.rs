@@ -26,6 +26,7 @@
 //!   Two implementations can differ by 1e-16 on `p` and still be identical
 //!   where it matters, and this is the check that says so.
 
+use std::io::Write;
 use std::path::PathBuf;
 
 use zensim::corruption_head::CorruptionHead;
@@ -35,6 +36,7 @@ fn usage() -> ! {
     eprintln!(
         "corrhead_parity --head <head.zcth> --parity <parity.npz> [--set test|gate|both] \
          [--raw-ulp-max N] [--prob-tol F]\n\n\
+         --predict-raw <out.tsv> --set test runs inference on test_X only.\n\n\
          Compares zensim::corruption_head against the sklearn vectors the exporter wrote.\n\
          `--raw-ulp-max` defaults to 0: the tree walk is exact and any drift is a defect.\n\
          `--prob-tol` defaults to 1e-12; the achieved max is always printed."
@@ -65,6 +67,7 @@ struct Args {
     sets: Vec<String>,
     raw_ulp_max: u64,
     prob_tol: f64,
+    predictions: Option<PathBuf>,
 }
 
 fn parse_args() -> Args {
@@ -73,10 +76,14 @@ fn parse_args() -> Args {
     let mut sets = vec!["test".to_string(), "gate".to_string()];
     let mut raw_ulp_max = 0u64;
     let mut prob_tol = 1e-12f64;
+    let mut predictions = None;
     let mut it = std::env::args().skip(1);
     while let Some(a) = it.next() {
         match a.as_str() {
             "--head" => head = it.next().map(PathBuf::from),
+            "--predict-raw" => {
+                predictions = Some(it.next().map(PathBuf::from).unwrap_or_else(|| usage()))
+            }
             "--parity" => parity = it.next().map(PathBuf::from),
             "--set" => {
                 let v = it.next().unwrap_or_else(|| usage());
@@ -111,6 +118,7 @@ fn parse_args() -> Args {
         sets,
         raw_ulp_max,
         prob_tol,
+        predictions,
     }
 }
 
@@ -135,6 +143,48 @@ fn main() {
         head.deadband_score(),
     );
     println!("parity {}", args.parity.display());
+
+    // Explicit inference mode is separate from the unchanged parity gate.
+    // Its NPZ needs only <set>_X; it never invents reference predictions.
+    if let Some(path) = &args.predictions {
+        assert_eq!(
+            args.sets.len(),
+            1,
+            "raw prediction requires one explicit --set"
+        );
+        let set = &args.sets[0];
+        let x = npz.get(&format!("{set}_X")).expect("prediction matrix");
+        let [n_rows, n_cols] = x.shape.as_slice() else {
+            panic!("prediction matrix must be 2-D");
+        };
+        let values = x.f64s().expect("prediction matrix f64");
+        let ids = head.declared_feature_ids();
+        assert_eq!(*n_cols, ids.len(), "prediction matrix read set");
+        assert_eq!(values.len(), n_rows * n_cols, "prediction matrix length");
+        assert!(
+            values.iter().all(|value| value.is_finite()),
+            "nonfinite prediction input"
+        );
+        let mut row = vec![0.0f64; head.caller_input_width()];
+        let output = std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(path)
+            .unwrap_or_else(|error| panic!("create {}: {error}", path.display()));
+        let mut output = std::io::BufWriter::new(output);
+        writeln!(output, "row_idx\traw").expect("prediction header");
+        for i in 0..*n_rows {
+            for (j, &id) in ids.iter().enumerate() {
+                row[usize::from(id)] = values[i * n_cols + j];
+            }
+            let raw = head.decision_function(&row).expect("prediction width");
+            assert!(raw.is_finite(), "nonfinite native prediction at row {i}");
+            writeln!(output, "{i}\t{raw:.17e}").expect("prediction row");
+        }
+        output.flush().expect("prediction flush");
+        println!("raw predictions: {n_rows} rows -> {}", path.display());
+        return;
+    }
 
     let mut failed = false;
     for set in &args.sets {

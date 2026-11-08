@@ -176,6 +176,8 @@ enum Cmd {
     Inspect(InspectArgs),
     /// Certified fixed-basis quadratic fit for the registered opaque-vector study.
     LinearStudy(linear_study::Args),
+    /// Score a frozen research-basis bake on its declared raw vector layout.
+    LinearPredict(linear_study::PredictArgs),
     /// Re-export a private monotone-research spline using positive bounded segments.
     /// No fitting; preserves the original file and records any slope rounding repair.
     RepairResearchSpline(RepairResearchSplineArgs),
@@ -6164,6 +6166,7 @@ fn main() -> ExitCode {
         Cmd::ReadMeta(a) => cmd_read_meta(a).map(|_| false),
         Cmd::Inspect(a) => cmd_inspect(a).map(|_| false),
         Cmd::LinearStudy(a) => linear_study::run(a).map(|_| false),
+        Cmd::LinearPredict(a) => linear_study::predict(a).map(|_| false),
         Cmd::RepairResearchSpline(a) => cmd_repair_research_spline(a).map(|_| false),
         Cmd::RepairResearchMaxPairs(a) => cmd_repair_research_max_pairs(a).map(|_| false),
         Cmd::Interpolate(a) => cmd_interpolate(a).map(|_| false),

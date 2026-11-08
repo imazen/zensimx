@@ -1,8 +1,8 @@
 # Fixed external shaping comparison — November 8, 2026
 
-Incomplete: the three tree models, additive model and twelve corrected pretrained
-models are not yet reported here. The first 18 neural models have both external
-datasets reported, with every registered paired seed retained. These are fixed
+Incomplete: twelve corrected pretrained models are not yet reported here.
+The first 22 models (18 neural, three tree and one deterministic additive model)
+have both external datasets reported, with every registered paired seed retained. These are fixed
 setting-0 / inner-0-0 comparisons, not tuned finalist results.
 
 Mean signed SROCC across the three paired seeds, computed from the preserved
@@ -10,9 +10,11 @@ native per-fit panels:
 
 | Approach | CSIQ866 | LIVE clean10/267 | LIVE full779, overlap |
 |---|---:|---:|---:|
+| extra_trees | 0.959952 | 0.944171 | 0.940379 |
 | product_joint_identity | 0.953635 | 0.962849 | 0.965796 |
 | relu | 0.942569 | 0.962992 | 0.964200 |
 | separate_joint_identity | 0.955053 | 0.956459 | 0.965584 |
+| shaped_additive | 0.935884 | 0.941939 | 0.928206 |
 | silu_diagnostic | 0.893703 | 0.797161 | 0.838427 |
 | silu_monotone | 0.939651 | 0.963340 | 0.963649 |
 | softplus | 0.940742 | 0.963019 | 0.963212 |
@@ -40,8 +42,31 @@ Artifacts: `/mnt/v/output/zensim/shaping-completion-20261107/external-validation
 The initial neural batch preserved 35 successful dataset jobs, two failed additive
 adapter invocations and the earlier successful ReLU/CSIQ pilot. The additive bake
 requires its frozen 2,952-term basis; the ordinary dense-feature predictor refused
-it. No training was repeated. The dedicated native basis adapter is pending
-qualification. Neural batch wrapper accounting, including an SSD admission wait:
+it. No training was repeated. The dedicated native basis adapter subsequently matched all15,374 frozen
+responses exactly, including the existing identity/damage probe rows. Tree
+inference matched all15,109 frozen raw responses exactly; its unchanged parity
+gate also passed. No tolerance was relaxed. Qualification SHA is
+`4d2ff83252ef37f570f1b1582b58ff4d203f57c858dadc6d8c8a7633de389ff5`.
+The additive model remains an opaque-vector model requiring its frozen basis,
+not a directly pixel-servable bake.
+
+Native adapter qualification and the eight external control jobs completed:
+
+```text
+run-heavy: done rc=0 8s | peak-RSS 0.20GiB | min-avail 10512MiB | peak-load 24.43
+run-heavy: done rc=0 8s | peak-RSS 0.26GiB | min-avail 25580MiB | peak-load 2.32
+```
+
+The cold helper build ran at one CPU thread alongside active fits, with no
+training changes. Scoped clippy passed with warnings denied. Compiler wrapper
+accounting:
+
+```text
+run-heavy: done rc=0 1542s | peak-RSS 1.35GiB | min-avail 9807MiB | peak-load 25.94
+run-heavy: done rc=0 200s | peak-RSS 0.65GiB | min-avail 10106MiB | peak-load 24.30
+```
+
+Neural batch wrapper accounting, including an SSD admission wait:
 
 ```text
 run-heavy: done rc=1 244s | peak-RSS 0.26GiB | min-avail 23679MiB | peak-load 6.43
@@ -55,5 +80,14 @@ run-heavy: done rc=0 1s | peak-RSS 0.25GiB | min-avail 24310MiB | peak-load 6.24
 
 Browser verification passed for CSIQ866, LIVE clean267 and LIVE full779 scatter
 points, with no page errors or mobile overflow. Build and adapter qualification
-are separate from training-fit counts. Archive verification remains pending for
-this new external batch.
+are separate from training-fit counts. The first-18 archive has been cold-read and checksum verified: 448 artifact
+files /280,955,068 bytes, plus its receipt (449 final inventory files). Receipt
+SHA-256 `32ba7786c28a66d5edd34b55d434ea1f1c15d0c88aad0de43dbda28f6ffbacc5`;
+manifest SHA-256 `d6e1d7037c2d169b12b918d55a1373baef81f1cdfeef30daceec12a66f475a55`.
+Destination: the run's durable `external-neural-first18-archive-20261108/` mirror.
+Browser PNG witnesses are preserved in a verified tar inside this table archive;
+the original witnesses remain available. Mirror wrapper accounting:
+
+```text
+run-heavy: done rc=0 15s | peak-RSS 0.02GiB | min-avail 45276MiB | peak-load 2.00
+```

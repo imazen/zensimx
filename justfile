@@ -5799,3 +5799,14 @@ shaping-scatter-native study panel manifest output workers='4':
 
 shaping-training-budget-check:
     TMPDIR="$HOME/tmp" python3 -B -m unittest scripts.tests.test_shaping_training_budget
+
+# Execute one registered descriptive external bake comparison on an admitted worker.
+shaping-external-score root study binaries tree_binary copies cell dataset:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_external_validation.py --root {{quote(root)}} --study {{quote(study)}} --binaries {{quote(binaries)}} --tree-binary {{quote(tree_binary)}} --copies {{quote(copies)}} --cell {{quote(cell)}} --dataset {{quote(dataset)}}
+
+# Native opaque-vector inference helpers; build away from the coordinator host.
+shaping-external-native-build target:
+    TMPDIR="$HOME/tmp" CARGO_TARGET_DIR={{quote(target)}} CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_DEV_OPT_LEVEL=1 "$HOME/work/claudehints/scripts/run-heavy" --mem 4G --jobs 1 -- "$HOME/.cargo/bin/cargo" build --locked -p zensim-validate --bin corrhead_parity --bin bake_dial_refit
+
+shaping-external-native-qualify binaries tree_model tree_parity linear_model linear_inputs linear_reference output:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_external_native_qualify.py --binaries {{quote(binaries)}} --tree-model {{quote(tree_model)}} --tree-parity {{quote(tree_parity)}} --linear-model {{quote(linear_model)}} --linear-inputs {{quote(linear_inputs)}} --linear-reference {{quote(linear_reference)}} --output {{quote(output)}}
