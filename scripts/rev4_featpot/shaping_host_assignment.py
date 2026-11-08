@@ -57,6 +57,86 @@ def assigned_placement(root,cell,build_pin):
     return dict(host=record['host'],assignment=str(path),assignment_sha256=sha(path))
 
 
+def transition_records(records,cells,protected,retired_hosts,targets,plan_pin,build_pin):
+    """Plan placement changes for never-started primary cells only.
+
+    The caller must stop old queue writers and combine every host's started and
+    reserved-cell inventory first. Active/completed/failed attempts never move.
+    New placement records are admission guards; pretrained input capsules still
+    require parent_inputs() before they can be packaged or executed.
+    """
+    if not targets or set(targets)&set(retired_hosts):raise ValueError('distinct replacement hosts required')
+    registered={c['id']:c for c in cells};seen=set();assigned={}
+    for name,row in records.items():
+        ids=set(row['cells'])
+        if len(ids)!=len(row['cells']) or ids&seen or not ids<=set(registered):
+            raise ValueError('overlapping or unregistered placement')
+        if row['plan_sha256']!=plan_pin:raise ValueError('placement plan differs')
+        seen|=ids
+        assigned.update({i:row['host'] for i in ids})
+    pending=sorted((c for c in cells if c['stage']=='inner' and c['id'] not in protected
+                    and (c['id'] not in assigned or assigned[c['id']] in retired_hosts)),
+                   key=lambda c:(c['partition'],c['setting'],c['family'],c['seed']))
+    moving={c['id'] for c in pending};replaced={};created={};groups={}
+    for name,row in records.items():
+        if not moving&set(row['cells']):continue
+        if row['build_sha256']!=build_pin:raise ValueError('primary placement build differs')
+        kept=[i for i in row['cells'] if i not in moving]
+        replaced[name]=dict(row,cells=kept) if kept else None
+    for index,cell in enumerate(pending):
+        host=targets[index%len(targets)];family=cell['family']
+        group=('pretrained_shapes' if '_pretrained_' in family else 'joint_shapes'
+               if family.endswith('_joint_identity') else 'relu' if family=='relu' else 'analytic')
+        groups.setdefault((cell['partition'],group,host),[]).append(cell['id'])
+    for (partition,group,host),ids in groups.items():
+        pin=__import__('hashlib').sha256(encoded(ids)).hexdigest()[:16]
+        name=f'host-transition-{partition}-{group}-{host}-{pin}.json'
+        if name in records:raise ValueError('replacement placement already exists')
+        created[name]=dict(host=host,cells=ids,partition=partition,
+            plan_sha256=plan_pin,build_sha256=build_pin,scientific_inputs_unchanged=True,
+            host_transition=True,parent_capsule_required=group=='pretrained_shapes')
+    if set(i for r in created.values() for i in r['cells'])!=moving or moving&set(protected):
+        raise ValueError('transition coverage or protected-cell mismatch')
+    return dict(replaced=replaced,created=created,moved=sorted(moving),
+                protected=sorted(protected),training_replayed=False)
+
+
+def apply_transition(root,plan,stopped_queues,receipt,proc=Path('/proc')):
+    """Install a reviewed transition while the old local writers are stopped."""
+    if receipt.exists():raise ValueError('preserve existing host transition receipt')
+    for queue in stopped_queues:
+        if process_identity(proc,queue['pid'])!=('T',queue['start_ticks']):
+            raise ValueError('old queue must remain admission-stopped')
+    directory=root/'worker_assignments'
+    with placement_claims(root) as claims:
+        if set(plan['moved'])&set(claims) or any((root/'runs'/i).exists() for i in plan['moved']):
+            raise ValueError('started or reserved cell cannot move')
+        backups={}
+        for name in plan['replaced']:
+            path=directory/name;backup=path.with_name(path.name+'.host-transition.bak')
+            if backup.exists():raise ValueError('preserve existing placement backup')
+            backups[name]=dict(path=str(backup),sha256=sha(path))
+        if any((directory/name).exists() for name in plan['created']):
+            raise ValueError('preserve existing replacement placements')
+        record=dict(stage='planned',checked_utc=datetime.now(timezone.utc).isoformat(),
+                    plan=plan,backups=backups,stopped_queues=stopped_queues,
+                    driver_sha256=sha(__file__),training_replayed=False)
+        receipt.parent.mkdir(parents=True,exist_ok=True)
+        with receipt.open('xb') as stream:stream.write(encoded(record))
+        for name,kept in plan['replaced'].items():
+            path=directory/name;path.rename(backups[name]['path'])
+            if kept is not None:
+                with path.open('xb') as stream:stream.write(encoded(kept))
+            if sha(backups[name]['path'])!=backups[name]['sha256']:
+                raise ValueError('original placement backup differs')
+        for name,row in plan['created'].items():
+            with (directory/name).open('xb') as stream:stream.write(encoded(row))
+        record.update(stage='placements_installed',verified_utc=datetime.now(timezone.utc).isoformat(),
+                      created_sha256={name:sha(directory/name) for name in plan['created']})
+        receipt.write_bytes(encoded(record))
+        return record
+
+
 def relocate_joint_subset(root,assignment,requested,host,queue_status,receipt,*,proc=Path('/proc')):
     """Split placement only after the old queue has stopped new admissions."""
     from shaping_execution import load_registration

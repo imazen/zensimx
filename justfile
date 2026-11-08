@@ -5553,3 +5553,7 @@ shaping-cpu-accounting:
 # Read-only storage inventory. Run with root visibility when evaluating active Cargo users.
 shaping-temp-storage output:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_temp_storage.py --output {{quote(output)}}
+
+shaping-host-transition-check:
+    python3 -B -m unittest discover -s scripts/tests -p test_shaping_host_transition.py
+    python3 -B -m unittest discover -s scripts/tests -p test_shaping_host_assignment.py
