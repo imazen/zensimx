@@ -97,3 +97,11 @@ It is limited to 128 MiB and 1,000 files, with a reserved 512-MiB rsync receiver
 drift checks and no overwrites. Missing inputs are permitted only during transport
 preflight; native evaluation still requires every pin and all existing gates.
 Other families and rescue/outer stages retain their existing placement rules.
+
+The first two live primary ReLU evaluations moved from r5600g and i134 to
+r3800x and completed there. Both full report bundles were imported after the
+existing final/diagnostic and supplemental convergence checks. Final native
+bake hashes and training origins were unchanged. Their import and placement
+receipts are in the shaping completion run's
+`mobile-evaluation-20261108/evidence-v1/` verified archive. This qualifies those
+two transfers; it does not establish transport for the excluded stages/families.
