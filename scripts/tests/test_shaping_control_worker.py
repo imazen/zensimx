@@ -21,6 +21,18 @@ class ControlWorkerTests(unittest.TestCase):
                 self.assertEqual(json.loads((root/'cpu-admission/CLAIMS.json').read_text()),{})
                 self.assertTrue(reserve_worker(root,'ordinary')['can_start']);release_worker(root,'ordinary')
 
+    def test_native_startup_keeps_its_memory_allowance_until_epoch_zero(self):
+        from shaping_rescue_dispatch import reserve_worker,release_worker
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as temporary:
+            root=Path(temporary)
+            def observed(*args,**kwargs):return dict(can_start=True,minimum_available_memory_bytes=6*1024**3,available_memory_bytes=9*1024**3)
+            with patch('shaping_rescue_dispatch.pending_scientific_cells',return_value=set()),patch('shaping_rescue_dispatch.worker_slot',side_effect=observed):
+                self.assertTrue(reserve_worker(root,'first',warmup_until_checkpoint=True)['can_start'])
+                self.assertFalse(reserve_worker(root,'second',warmup_until_checkpoint=True)['can_start'])
+                checkpoint=root/'runs/first/attempt-001/checkpoints/ckpt_epoch000.bin';checkpoint.parent.mkdir(parents=True);checkpoint.write_bytes(b'epoch-zero')
+                self.assertTrue(reserve_worker(root,'second',warmup_until_checkpoint=True)['can_start'])
+                release_worker(root,'first');release_worker(root,'second')
+
     def test_control_capsule_binds_original_admission_and_package_versions(self):
         with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as temporary:
             root=Path(temporary);study=root/'study';study.mkdir();(study/'PLAN.json').write_text('{}')

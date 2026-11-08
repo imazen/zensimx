@@ -116,7 +116,7 @@ def pending_scientific_cells(root):
     return cells
 
 
-def reserve_worker(root,cell,proc=Path('/proc'),cpu_count=None,*,memory_allowance_bytes=2*1024**3):
+def reserve_worker(root,cell,proc=Path('/proc'),cpu_count=None,*,memory_allowance_bytes=2*1024**3,warmup_until_checkpoint=False):
     # The lock spans this short admission transaction, never training.
     # Unexpected dead-owner claims remain reserved for explicit reconciliation.
     with worker_claims(root) as claims:
@@ -126,6 +126,12 @@ def reserve_worker(root,cell,proc=Path('/proc'),cpu_count=None,*,memory_allowanc
         observation=worker_slot(set(claims)|legacy,proc,cpu_count,study=root)
         extra=sum(max(0,row.get('memory_allowance_bytes',2*1024**3)-2*1024**3) for row in claims.values())
         if cell not in claims:extra+=memory_allowance_bytes-2*1024**3
+        warming=[key for key,row in claims.items() if row.get('warmup_until_checkpoint')
+                 and not any((root/'runs'/key).glob('attempt-*/checkpoints/ckpt_epoch000.bin'))]
+        # A newly visible native PID may still be allocating its training data.
+        # Retain a warmup allowance until its first completed epoch, independently
+        # of CPU accounting. This staggers allocation without serializing fits.
+        extra+=2*1024**3*(len(warming)+(1 if warmup_until_checkpoint and cell not in claims else 0))
         if extra:
             observation['minimum_available_memory_bytes']+=extra
             observation['can_start'] &= observation['available_memory_bytes']>=observation['minimum_available_memory_bytes']
@@ -138,6 +144,7 @@ def reserve_worker(root,cell,proc=Path('/proc'),cpu_count=None,*,memory_allowanc
             claims[cell]=dict(owner=OWNER_TOKEN,dispatcher_pid=os.getpid(),child_pid=None,
                 admitted_utc=datetime.now(timezone.utc).isoformat())
             if memory_allowance_bytes!=2*1024**3:claims[cell]['memory_allowance_bytes']=memory_allowance_bytes
+            if warmup_until_checkpoint:claims[cell]['warmup_until_checkpoint']=True
         return observation
 
 

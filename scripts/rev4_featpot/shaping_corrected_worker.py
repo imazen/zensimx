@@ -69,7 +69,8 @@ def resolve_inputs(study,cell_id,host,binaries,qualification):
 def reproduce(record,*,host=None):
     study=Path(record['study']);binaries=Path(record['binary_dir'])
     admitted=context(study,record['cell']['id'],binaries,host=socket.gethostname() if host is None else host)
-    return admitted['scope'],['python3','-B',str(REPO/'scripts/rev4_featpot/shaping_corrected_worker.py'),
+    heavy=Path.home()/'work/claudehints/scripts/run-heavy'
+    return admitted['scope'],[str(heavy),'--mem','512M','--jobs','1','--','python3','-B',str(REPO/'scripts/rev4_featpot/shaping_corrected_worker.py'),
         '--study',str(study),'--binaries',str(binaries),'--cell',record['cell']['id']]
 
 

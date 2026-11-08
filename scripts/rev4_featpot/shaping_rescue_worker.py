@@ -214,7 +214,9 @@ def work(request):
                  '--binary-dir',record['binary_dir'],'--neutral-qualification',record['neutral_qualification'],'--cell',key]
     if (study/'runs'/key).exists():raise ValueError('preserve existing attempt; never replay')
     while True:
-        admission=(reserve_worker(study,key,memory_allowance_bytes=4*1024**3) if record.get('execution_kind')=='control' else reserve_worker(study,key))
+        if record.get('execution_kind')=='control':admission=reserve_worker(study,key,memory_allowance_bytes=4*1024**3)
+        elif record.get('execution_kind')=='corrected_inner':admission=reserve_worker(study,key,warmup_until_checkpoint=True)
+        else:admission=reserve_worker(study,key)
         if not admission['can_start']:
             time.sleep(10);continue
         if record.get('execution_kind')=='corrected_inner':

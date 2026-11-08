@@ -48,7 +48,8 @@ class CorrectedWorkerTests(unittest.TestCase):
                     with self.assertRaisesRegex(ValueError,'drift'):worker.verify(record)
             with patch.object(corrected,'context',return_value=context) as gate:
                 scope,command=corrected.reproduce(record,host='r3500')
-                self.assertEqual(scope,context['scope']);self.assertEqual(Path(command[2]).name,'shaping_corrected_worker.py')
+                self.assertEqual(scope,context['scope']);self.assertTrue(any(Path(arg).name=='shaping_corrected_worker.py' for arg in command))
+                self.assertEqual(command[command.index('--mem')+1],'512M')
                 self.assertEqual(command[command.index('--cell')+1],'corrected')
 
     def test_changed_gate_refuses_before_cpu_claim(self):

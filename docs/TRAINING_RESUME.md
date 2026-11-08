@@ -79,6 +79,13 @@ retirement is needed; it releases the CPU claim while waiting. This transaction
 does not serialize training. The corrected capsule also pins command and
 snapshot modules loaded lazily during execution.
 
+Corrected-fit Python supervisors run in individual 512-MiB scopes, outside the
+wave controller's shared limit; native trainers retain their 2-GiB scopes. RAM
+admission keeps an extra startup allowance until epoch zero exists, so a newly
+visible PID does not prematurely release its allocation allowance. This
+staggers initialization while allowing independent training to overlap. CPU
+ceilings, datasets, seeds, pair budgets and snapshot limits are unchanged.
+
 Qualification uses real native training, with process exit during an epoch and
 at an epoch boundary. ReLU, anchored Softplus, frozen input shaping and joint
 input shaping must reproduce both the returned bake and the complete final
