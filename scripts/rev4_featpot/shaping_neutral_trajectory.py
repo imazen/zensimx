@@ -6,9 +6,9 @@ from shaping_completion import NEURAL,encoded,sha
 STRIPPED_KEYS=('zentrain.repro','zentrain.monotone_research')
 
 
-def canonical(source,binary,output):
+def canonical(source,binary,output,keys=STRIPPED_KEYS):
     path=source
-    for index,key in enumerate(STRIPPED_KEYS):
+    for index,key in enumerate(keys):
         target=output.with_name(output.name+f'-{index}.bin')
         subprocess.run([str(binary),'strip','--in',str(path),'--out',str(target),'--key',key],
                        check=True,capture_output=True,text=True)
@@ -16,7 +16,7 @@ def canonical(source,binary,output):
     return path
 
 
-def compare_checkpoints(original,neutral,binary,output,epochs):
+def compare_checkpoints(original,neutral,binary,output,epochs,metadata_keys=STRIPPED_KEYS):
     """Internal comparator; the public command separately requires all 240 epochs."""
     names=[f'ckpt_epoch{epoch:03}.bin' for epoch in range(epochs)]
     expected=set(names)
@@ -29,14 +29,14 @@ def compare_checkpoints(original,neutral,binary,output,epochs):
         directory=output/Path(name).stem;directory.mkdir()
         canonical_pins={}
         for label,path in inputs.items():
-            result=canonical(path,binary,directory/label)
+            result=canonical(path,binary,directory/label,metadata_keys)
             canonical_pins[label]=sha(result)
             if sha(path)!=pins[label]:raise ValueError('checkpoint changed during comparison')
         rows[name]=dict(input_sha256=pins,canonical_sha256=canonical_pins,
                         equal=canonical_pins['original']==canonical_pins['neutral'])
         (output/'PROGRESS.json').write_bytes(encoded(dict(required=epochs,compared=rows)))
     return dict(required=epochs,compared=rows,all_equal=all(row['equal'] for row in rows.values()),
-                stripped_metadata_keys=list(STRIPPED_KEYS))
+                stripped_metadata_keys=list(metadata_keys))
 
 
 def qualify(args):

@@ -5263,6 +5263,15 @@ shaping-completion-later-evaluation-worker-check:
 shaping-completion-neutral-trajectory-check:
     TMPDIR="$HOME/tmp" python3 -B -m unittest scripts/tests/test_shaping_neutral_trajectory.py
 
+shaping-completion-control-compatibility-check:
+    TMPDIR="$HOME/tmp" python3 -B -m unittest scripts/tests/test_shaping_control_compatibility.py scripts/tests/test_shaping_neutral_trajectory.py
+
+shaping-completion-control-compatibility-register study approval binaries output:
+    TMPDIR="$HOME/tmp" python3 -B scripts/rev4_featpot/shaping_control_compatibility.py register --study {{quote(study)}} --approval {{quote(approval)}} --binary-dir {{quote(binaries)}} --output {{quote(output)}}
+
+shaping-completion-control-compatibility-run study registration binaries family output:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 3G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_control_compatibility.py run --study {{quote(study)}} --registration {{quote(registration)}} --binary-dir {{quote(binaries)}} --family {{quote(family)}} --output {{quote(output)}}
+
 shaping-completion-checkpoint-restore-check:
     TMPDIR="$HOME/tmp" python3 -B -m unittest scripts/tests/test_shaping_checkpoint_restore.py
 
