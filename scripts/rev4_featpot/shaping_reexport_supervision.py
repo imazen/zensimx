@@ -72,16 +72,36 @@ def main():
     for key in ('study','binary-dir','inspector'):p.add_argument('--'+key,type=Path,required=True)
     from shaping_stable_pairs import FAMILIES as qualified_families
     p.add_argument('--family',choices=('relu','softplus',*qualified_families),default='relu')
+    p.add_argument('--cell',action='append',dest='cells',help='explicit registered wave; superseded historical cells stay preserved')
+    p.add_argument('--status',type=Path,help='fresh per-wave status; refuses reuse')
+    p.add_argument('--reserve-slot',action='store_true',help='reserve one shared CPU admission slot for this evaluation wave')
     p.add_argument('--watch',action='store_true');args=p.parse_args()
-    while True:
-        count=sweep(args)
-        status=dict(pid=os.getpid(),checked_utc=datetime.now(timezone.utc).isoformat(),
-                    completed_supplemental_cells=count,stage='watching' if args.watch else 'sweep_finished',
-                    driver_sha256=DRIVER_SHA256)
-        (args.study/('REEXPORT_EVALUATOR_STATUS.json' if args.family=='relu' else 'SOFTPLUS_REEXPORT_EVALUATOR_STATUS.json')).write_bytes(encoded(status))
-        print(json.dumps(status),flush=True)
-        if not args.watch:return
-        time.sleep(30)
+    default=('REEXPORT_EVALUATOR_STATUS.json' if args.family=='relu' else 'SOFTPLUS_REEXPORT_EVALUATOR_STATUS.json'
+             if args.family=='softplus' else 'STABLE_EXPORT_'+args.family.upper()+'_STATUS.json')
+    status_path=args.status or args.study/default
+    if args.status:
+        status_path.parent.mkdir(parents=True,exist_ok=True)
+        with status_path.open('x') as stream:stream.write(encoded(dict(stage='starting',pid=os.getpid())))
+    if args.cells:
+        _,registered,_=load_registration(args.study)
+        wanted={c['id'] for c in registered if c['family']==args.family and c['stage'] in ('inner','fresh_control_inner','rescue','exposure_extension')}
+        if len(args.cells)!=len(set(args.cells)) or not set(args.cells)<=wanted:raise ValueError('distinct registered family cells required')
+    claimed=False;key='reexport-'+args.family+'-'+__import__('hashlib').sha256(encoded(args.cells or ['all'])).hexdigest()[:16]
+    try:
+        if args.reserve_slot:
+            from shaping_rescue_dispatch import reserve_worker,release_worker
+            while not reserve_worker(args.study,key)['can_start']:time.sleep(10)
+            claimed=True
+        while True:
+            count=sweep(args)
+            status=dict(pid=os.getpid(),checked_utc=datetime.now(timezone.utc).isoformat(),
+                        completed_supplemental_cells=count,stage='watching' if args.watch else 'sweep_finished',
+                        driver_sha256=DRIVER_SHA256,shared_slot=key if claimed else None)
+            status_path.write_bytes(encoded(status));print(json.dumps(status),flush=True)
+            if not args.watch:return
+            time.sleep(30)
+    finally:
+        if claimed:release_worker(args.study,key)
 
 
 if __name__=='__main__':main()
