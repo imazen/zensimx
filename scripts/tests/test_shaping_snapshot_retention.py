@@ -6,6 +6,19 @@ import shaping_snapshot_retention as retention
 
 
 class SnapshotRetentionTests(unittest.TestCase):
+    def test_completed_reservations_and_pending_claims_stop_admission_before_native_start(self):
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as temporary:
+            root=Path(temporary);study=root/'study';(study/'cpu-admission').mkdir(parents=True)
+            (study/'cpu-admission/CLAIMS.json').write_text(json.dumps(dict(old={},new={})))
+            store=root/'shared-training-snapshots';store.mkdir()
+            for i in range(62):(store/f'{i:064x}').mkdir()
+            observed=dict(native_jobs=[dict(cell=dict(id='old'),snapshot_directory=str(store/f'{0:064x}'))])
+            with patch.object(retention,'observe',return_value=observed):
+                self.assertTrue(retention.capacity(study,'new')['can_start'])
+                (store/f'{62:064x}').mkdir();self.assertFalse(retention.capacity(study,'new')['can_start'])
+                with self.assertRaisesRegex(ValueError,'CPU claim'):retention.capacity(study,'unclaimed')
+            self.assertFalse((study/'runs').exists())
+
     def fixture(self,base):
         root=base/'shared-training-snapshots';directory=root/('a'*64);directory.mkdir(parents=True)
         (root/'.lock').write_bytes(b'');(directory/'.lock').write_bytes(b'')

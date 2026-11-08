@@ -9,6 +9,29 @@ from shaping_native_observe import observe
 STATES={'state-0.snap','state-1.snap'}
 
 
+def capacity(study,key):
+    """Count completed stores and all pending CPU claims under admission locks."""
+    from shaping_host_assignment import placement_claims
+    root=study.parent/'shared-training-snapshots';root.mkdir(exist_ok=True)
+    if root.resolve()!=root:raise ValueError('canonical shared snapshot root required')
+    with placement_claims(study) as claims:
+        if key not in claims:raise ValueError('snapshot admission requires the shared CPU claim')
+        with (root/'.lock').open('a+b') as lock:
+            regular(root/'.lock')
+            fcntl.flock(lock,fcntl.LOCK_EX)
+            directories=[p for p in root.iterdir() if p.name!='.lock']
+            if any(p.is_symlink() or not p.is_dir() or not re.fullmatch('[0-9a-f]{64}',p.name) for p in directories):
+                raise ValueError('unknown shared snapshot store entry')
+            represented={row['cell']['id'] for row in observe([study.parent])['native_jobs']
+                if row.get('cell') and row.get('snapshot_directory') and Path(row['snapshot_directory']).parent==root}
+            pending=set(claims)-represented
+            # This matches native (4 GiB - 4096 bytes) / 64 MiB. Old trainers
+            # without snapshots are conservatively counted as pending slots.
+            return dict(can_start=len(directories)+len(pending)<=63,store_directories=len(directories),
+                pending_cpu_claims=len(pending),maximum_store_reservations=63,
+                shared_reservation_bytes=4*1024**3)
+
+
 def regular(path):
     if path.resolve()!=path or path.is_symlink() or not path.is_file():raise ValueError('regular canonical file required: '+str(path))
 

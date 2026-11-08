@@ -187,7 +187,20 @@ def work(request):
         command=['python3','-B',str(REPO/'scripts/rev4_featpot/shaping_rescue_execution.py'),'--study',str(study),
                  '--binary-dir',record['binary_dir'],'--neutral-qualification',record['neutral_qualification'],'--cell',key]
     if (study/'runs'/key).exists():raise ValueError('preserve existing attempt; never replay')
-    while not reserve_worker(study,key)['can_start']:time.sleep(10)
+    while True:
+        if not reserve_worker(study,key)['can_start']:
+            time.sleep(10);continue
+        if record.get('execution_kind')=='corrected_inner':
+            from shaping_snapshot_retention import capacity
+            try:observation=capacity(study,key)
+            except Exception:
+                release_worker(study,key);raise
+            if not observation['can_start']:
+                release_worker(study,key)
+                request.with_name('STATUS.json').write_bytes(encoded(dict(stage='waiting_for_snapshot_retirement',
+                    pid=os.getpid(),request_sha256=sha(request),snapshot_capacity=observation)))
+                time.sleep(10);continue
+        break
     try:
         with reservation(study,study/'runs'/key/'attempt-001',30*1024**3):
             with request.with_name('worker.log').open('x') as log:

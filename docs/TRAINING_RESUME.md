@@ -72,6 +72,13 @@ on November 8, 2026 and correctly refused acquisition. Fixture coverage also
 checks cold-readback corruption and complete reservation release. No completed
 native store had yet been retired through this new owner at that observation.
 
+Corrected worker admission counts completed store directories and pending CPU
+claims against those same 63 native reservations. Actual live snapshot-lock
+owners avoid double-counting. Admission waits before creating an attempt when
+retirement is needed; it releases the CPU claim while waiting. This transaction
+does not serialize training. The corrected capsule also pins command and
+snapshot modules loaded lazily during execution.
+
 Qualification uses real native training, with process exit during an epoch and
 at an epoch boundary. ReLU, anchored Softplus, frozen input shaping and joint
 input shaping must reproduce both the returned bake and the complete final

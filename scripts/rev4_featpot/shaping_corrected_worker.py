@@ -39,6 +39,11 @@ def context(study,cell_id,binaries,*,host=None):
 
 def resolve_inputs(study,cell_id,host,binaries,qualification):
     from shaping_rescue_worker import HOSTS,reads,seal_inputs
+    # Bind lazily used command/snapshot owners too; a full source export alone
+    # must not let modified worker modules escape the capsule's drift check.
+    import importlib
+    for name in ('v2_common','v2_lodo_mlp','shaping_snapshot_retention'):
+        importlib.import_module(name)
     if host not in HOSTS:raise ValueError('approved corrected-fit worker required')
     with reads() as paths:
         admitted=context(study,cell_id,binaries,host=host)
