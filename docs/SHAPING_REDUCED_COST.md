@@ -63,3 +63,18 @@ full durable checksum readback. Failure preserves the original attempt; neither
 fits nor timings replay implicitly. Observation failures re-poll the same owner.
 These tools do not establish that the still-outstanding finalist measurements
 have executed.
+
+The frozen `b6784ba1a692` owner is deployed and verified live while waiting for
+the complete outer matrix. Preparation and timing target i270; existing training
+owners retain their previous sources. Admission/transport checks passed on
+r7900x and again with the explicit i270 worker interpreter. They cover the
+48-model preparation/transport path, changed row/model/input refusals, original
+worker caps, reproduced gates and CPU-claim release after failed timing. The
+fixture bytes in the transport tests are not scoring qualification.
+
+The deployment closure passed complete durable readback for 24 files and
+53,106,501 bytes under
+`/mnt/tower/output/zensim/shaping-completion-20261107/cost-pipeline-deployment-archive-20261109`.
+It includes the native tools, preserved setup refusal, successful checks, source
+base plus overlays, launch identity and the verified waiting owner. No actual
+finalist timing or fresh finalist RSS observation is claimed by this deployment.
