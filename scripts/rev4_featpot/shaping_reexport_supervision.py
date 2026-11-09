@@ -15,6 +15,19 @@ from shaping_convergence import report,UndefinedInnerComposite
 # Preserve the loaded driver identity across later source edits.
 DRIVER_SHA256=sha(__file__)
 
+def admit_explicit_cells(study,requested,family):
+    _,registered,_=load_registration(study)
+    wanted={c['id'] for c in registered if c['family']==family and c['stage'] in ('inner','fresh_control_inner','rescue')}
+    if len(requested)!=len(set(requested)):raise ValueError('distinct registered family cells required')
+    from shaping_extension import resolve
+    for key in set(requested)-wanted:
+        cell=resolve(study,key)['cell']
+        if cell['id']!=key or cell['family']!=family or cell['stage']!='exposure_extension':
+            raise ValueError('distinct registered family cells required')
+        wanted.add(key)
+    if not set(requested)<=wanted:raise ValueError('distinct registered family cells required')
+
+
 def sweep(args):
     family=getattr(args,'family','relu')
     if family not in max_pair_families(args.study):raise ValueError('unsupported supplemental family')
@@ -83,9 +96,7 @@ def main():
         status_path.parent.mkdir(parents=True,exist_ok=True)
         with status_path.open('xb') as stream:stream.write(encoded(dict(stage='starting',pid=os.getpid())))
     if args.cells:
-        _,registered,_=load_registration(args.study)
-        wanted={c['id'] for c in registered if c['family']==args.family and c['stage'] in ('inner','fresh_control_inner','rescue','exposure_extension')}
-        if len(args.cells)!=len(set(args.cells)) or not set(args.cells)<=wanted:raise ValueError('distinct registered family cells required')
+        admit_explicit_cells(args.study,args.cells,args.family)
     claimed=False;key='reexport-'+args.family+'-'+__import__('hashlib').sha256(encoded(args.cells or ['all'])).hexdigest()[:16]
     try:
         if args.reserve_slot:

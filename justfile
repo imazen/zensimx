@@ -5538,7 +5538,7 @@ shaping-completion-analytic-reexport study run binaries inspector *args:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 2G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_reexport.py --study {{quote(study)}} --run {{quote(run)}} --binary-dir {{quote(binaries)}} --inspector {{quote(inspector)}} --analytic-diagnostic {{args}}
 
 shaping-completion-reexport-check:
-    TMPDIR="$HOME/tmp" python3 -B -m unittest discover -s scripts/tests -p test_shaping_reexport.py
+    TMPDIR="$HOME/tmp" python3 -B -m unittest scripts.tests.test_shaping_reexport scripts.tests.test_shaping_reexport_cli
 
 shaping-completion-analytic-convergence run root:
     TMPDIR="$HOME/tmp" python3 -B scripts/rev4_featpot/shaping_convergence.py --run {{quote(run)}} --reexport-root {{quote(root)}} --analytic-diagnostic

@@ -1,3 +1,13 @@
+## Known Bugs — explicit extension scalar IDs (source corrected November 9, 2026)
+
+The scalar-export CLI checked explicit IDs against the original matrix only,
+although conditional exposure extensions have a separate immutable registration.
+Its execution loop already resolved those cells, but startup would reject them
+before reserving a CPU or evaluating. Explicit extension IDs now use that same
+full registered resolver; unknown, wrong-family and duplicate IDs still refuse.
+No scoring arithmetic, selection rule or scientific exposure changes. The real
+CLI checks cover admitted extension startup and refusal before CPU admission.
+
 ## Known Bugs — stable exporter native tool closure (source corrected November 9, 2026)
 
 The first rescue scalar wave on a newly used endpoint lacked the original
