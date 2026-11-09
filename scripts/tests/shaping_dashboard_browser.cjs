@@ -40,6 +40,19 @@ if (!url || !output) throw Error('Usage: node shaping_dashboard_browser.cjs URL 
         if (document.querySelectorAll('#seeds .seed').length !== match.required) throw Error('Extension seed denominator differs');
         return {registered:data.extension_records.length,comparisons:data.extension_comparisons.length,shown:match.cells,curves:true};
       });
+      await page.waitForFunction(() => Number(document.querySelector('#scatterRaw').dataset.points) > 0 &&
+        Number(document.querySelector('#scatterNormalized').dataset.points) > 0 &&
+        document.querySelector('#scatterMessage').textContent.includes('Full native Zenstats is available.'));
+      extensionCoverage.scatter_populations = {};
+      for (const pop of ['kadid','tid2013','konfig','cid22_a25','cid22_ssim2']) {
+        await page.selectOption('#scatterPopulation',pop);
+        const count=Number(await page.locator('#scatterRaw').getAttribute('data-points'));
+        if (!(count>0)) throw Error('No extension scalar points for '+pop);
+        extensionCoverage.scatter_populations[pop]=count;
+      }
+      extensionCoverage.scatter_fit=await page.locator('#scatterFit').inputValue();
+      if (!extensionCoverage.shown.includes(extensionCoverage.scatter_fit)) throw Error('Extension scatter belongs to another cohort');
+      await page.selectOption('#scatterPopulation','cid22_a25');
       await page.locator('#detail').screenshot({path:path.join(output,'extensions.png')});
       await page.selectOption('#stage','inner');
       await page.waitForFunction(() => rows().length > 0 && rows().every(r=>r.stage==='inner'));
