@@ -33,6 +33,16 @@ class WorkerEvaluationTests(unittest.TestCase):
                 request.assert_not_called();native.assert_not_called()
             self.assertEqual(status['waiting'],[]);self.assertEqual(status['imported_this_sweep'],[])
 
+    def test_explicit_cell_scope_leaves_other_owners_fits_untouched(self):
+        from shaping_evaluation_worker import watch
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as directory:
+            root=Path(directory);study,run=self.fixture(root)
+            args=SimpleNamespace(study=study,output=root/'output',watch=False,cells=['another-cell'])
+            with patch('shaping_evaluation_worker.request') as request,patch('shaping_evaluation_worker.subprocess.run') as native:
+                status=watch(args)
+            request.assert_not_called();native.assert_not_called()
+            self.assertFalse(status['waiting']);self.assertFalse(status['requires_reconciliation'])
+
     def test_qualified_supplemental_runtime_is_explicit_and_original_controls_stay_pinned(self):
         from shaping_evaluation_worker import supplemental_binaries
         with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as directory:
@@ -103,6 +113,46 @@ class WorkerEvaluationTests(unittest.TestCase):
             study,run=self.fixture(Path(directory))
             with patch('shaping_execution.load_registration',return_value=({},matrix(),{})):
                 with self.assertRaisesRegex(ValueError,'ReLU controls only'):request(study,run,target_host='r3800x')
+
+    def test_extension_transport_pins_phase_manifest_and_preserves_registration(self):
+        import shutil
+        for family in ('relu','softplus'):
+            with self.subTest(family=family),tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as directory:
+                study,run=self.relu_fixture(Path(directory))
+                fit=run/'fit';fit.mkdir()
+                shutil.move(str(run/'checkpoints'),str(fit/'checkpoints'))
+                shutil.move(str(run/'train.log'),str(fit/'train.log'))
+                for epoch in {479,*diagnostic_epochs(480)}:
+                    (fit/'checkpoints'/f'ckpt_epoch{epoch:03}.bin').write_text(str(epoch))
+                cell=json.loads((run/'RUN.json').read_text())['cell']
+                cell.update(family=family,stage='exposure_extension',phase_epochs=[480])
+                resolution=dict(cell=cell,registration_sha256='frozen-registration')
+                identity=dict(cell=cell,execution_host='i270',fit_directory='fit',resolution=resolution)
+                (run/'RUN.json').write_bytes(encoded(identity));(fit/'HEAD.json').write_text('original head')
+                phase=dict(epochs=480,manifest_sha256={str(fit/'HEAD.json'):sha(fit/'HEAD.json')})
+                (fit/'RESULT.json').write_bytes(encoded(phase))
+                result=dict(cell=cell,stage='trained',exit_code=0,epochs=480,phases=[phase],
+                            bake_sha256=sha(fit/'checkpoints/ckpt_epoch479.bin'))
+                (run/'RESULT.json').write_bytes(encoded(result))
+                before=(run/'RUN.json').read_bytes()
+                with patch('shaping_execution.load_registration',return_value=({},matrix(),{})), \
+                     patch('shaping_extension.resolve',return_value=resolution):
+                    record=request(study,run,target_host='r7900x')
+                for name in ('HEAD.json','RESULT.json'):
+                    self.assertIn(str((fit/name).relative_to(study)),record['source_sha256'])
+                with patch('shaping_reduced_scope.admit_compute'), \
+                     patch('shaping_evaluation_worker.socket.gethostname',return_value='r7900x'), \
+                     patch('shaping_extension.resolve',return_value=resolution):
+                    verify_request(study,record)
+                self.assertEqual((run/'RUN.json').read_bytes(),before)
+                with patch('shaping_reduced_scope.admit_compute'), \
+                     patch('shaping_evaluation_worker.socket.gethostname',return_value='r7900x'), \
+                     patch('shaping_extension.resolve',return_value=dict(resolution,registration_sha256='drift')):
+                    with self.assertRaisesRegex(ValueError,'registration differs'):verify_request(study,record)
+                (fit/'HEAD.json').write_text('changed')
+                with patch('shaping_execution.load_registration',return_value=({},matrix(),{})), \
+                     patch('shaping_extension.resolve',return_value=resolution):
+                    with self.assertRaisesRegex(ValueError,'phase manifest differs'):request(study,run,target_host='r7900x')
 
     def test_missing_transfer_inputs_are_preflight_only_and_drift_or_origin_refuse(self):
         with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as directory:

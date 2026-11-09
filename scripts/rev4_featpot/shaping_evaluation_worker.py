@@ -11,6 +11,11 @@ DERIVED=('evaluation','curve_evaluation','CONVERGENCE.json','CONVERGENCE_FAILURE
 LATER_STAGES=('outer','fresh_control_outer','fresh_control_outer_matched','source_curve','row_curve','shuffle','human_only')
 
 
+def portable_control(cell):
+    return ((cell['family']=='relu' and cell['stage'] in ('inner','fresh_control_inner'))
+            or (cell['family'] in ('relu','softplus') and cell['stage']=='exposure_extension'))
+
+
 def later_scope(study,identity,cells):
     from shaping_evaluation import outer_context
     context=outer_context(study,identity,cells)
@@ -62,9 +67,21 @@ def request(study,run,*,target_host=None):
     host=target_host or identity['execution_host']
     if host not in HOSTS:raise ValueError('approved evaluation host required')
     moving=host!=identity['execution_host']
-    if moving and (cell['family']!='relu' or cell['stage'] not in ('inner','fresh_control_inner')):
-        raise ValueError('cross-host transport currently supports primary ReLU controls only')
+    if moving and not portable_control(cell):
+        raise ValueError('cross-host transport supports primary ReLU controls only, or registered ReLU/Softplus extensions')
     if moving:
+        if cell['stage']=='exposure_extension':
+            if cell['phase_epochs']!=[epochs]:raise ValueError('portable extension requires one complete native phase')
+            phase_root=run/identity['fit_directory']
+            phase=json.loads((phase_root/'RESULT.json').read_text())
+            if result['phases']!=[phase]:raise ValueError('portable extension phase receipt differs')
+            phase_paths=[phase_root/'RESULT.json']
+            for name,pin in phase['manifest_sha256'].items():
+                path=Path(name)
+                if not path.is_relative_to(phase_root) or sha(path)!=pin:
+                    raise ValueError('portable extension phase manifest differs')
+                phase_paths.append(path)
+            pins.update({str(path.relative_to(study)):sha(path) for path in phase_paths})
         for name in ('keep.txt','COLLECTION_DERIVED_INPUTS.json','WORKER_COLLECTION.json'):
             path=run/name
             if path.exists():pins[str(path.relative_to(study))]=sha(path)
@@ -91,7 +108,7 @@ def verify_request(study,record,*,allow_missing=False):
         raise ValueError('worker evaluation stage scope differs')
     if 'fit_execution_host' in record:
         if (record['fit_execution_host'] not in HOSTS or record['fit_execution_host']==record['host']
-            or record['cell']['family']!='relu' or record['cell']['stage'] not in ('inner','fresh_control_inner')
+            or not portable_control(record['cell'])
             or set(record['input_sizes'])!=set(record['source_sha256'])
             or len(record['input_sizes'])>1000
             or any(type(n) is not int or n<0 for n in record['input_sizes'].values())
@@ -108,8 +125,15 @@ def verify_request(study,record,*,allow_missing=False):
         if 'input_sizes' in record and source.stat().st_size!=record['input_sizes'][name]:raise ValueError('evaluation input size differs')
     original=study/'runs'/record['cell']['id']/record['attempt']/'RUN.json'
     if 'fit_execution_host' in record and original.exists():
-        if json.loads(original.read_text())['execution_host']!=record['fit_execution_host']:
+        identity=json.loads(original.read_text())
+        if identity['execution_host']!=record['fit_execution_host']:
             raise ValueError('training origin differs')
+        if identity['cell']!=record['cell']:raise ValueError('portable evaluation cell differs')
+        if record['cell']['stage']=='exposure_extension':
+            from shaping_extension import resolve
+            resolution=resolve(study,record['cell']['id'])
+            if resolution!=identity['resolution'] or resolution['cell']!=record['cell']:
+                raise ValueError('portable extension registration differs')
     if 'later_scope' in record:
         from shaping_execution import load_registration
         _,cells,_=load_registration(study)
@@ -119,7 +143,7 @@ def verify_request(study,record,*,allow_missing=False):
 
 
 def transfer_inputs(args,record,request_path,remote_request):
-    """Preserve existing files; pin only the small completed ReLU fit closure."""
+    """Preserve existing files; pin the bounded completed control-fit closure."""
     if 'fit_execution_host' not in record:raise ValueError('explicit cross-host origin required')
     host=record['host'];script=Path(args.remote_source)/'scripts/rev4_featpot/shaping_evaluation_worker.py'
     base=['python3','-B',str(script),'--study',str(args.study),'--request',str(remote_request)]
@@ -277,6 +301,7 @@ def watch(args):
             for path in sorted((args.study/'runs').glob('*/attempt-*/RESULT.json')):
                 value=json.loads(path.read_text());run=path.parent
                 stages=LATER_STAGES if getattr(args,'later_only',False) else ('inner','fresh_control_inner','rescue','exposure_extension')
+                if getattr(args,'cells',None) and value['cell']['id'] not in args.cells:continue
                 if getattr(args,'family',None) and value['cell']['family'] not in args.family:continue
                 if value.get('stage')!='trained' or value['cell']['stage'] not in stages or not (run/'WORKER_COLLECTION.json').exists():continue
                 if any((args.study/p).exists() for p in components(value['cell']['id'],run.name)):continue
@@ -345,6 +370,7 @@ def main():
     p.add_argument('--work',action='store_true');p.add_argument('--watch',action='store_true')
     p.add_argument('--later-only',action='store_true')
     p.add_argument('--family',action='append',help='explicit coordinator family scope; existing reports remain protected')
+    p.add_argument('--cell',action='append',dest='cells',help='evaluate only these collected registered cell IDs')
     p.add_argument('--candidate-binary-dir',type=Path,action='append',default=[])
     p.add_argument('--verify-inputs',action='store_true');p.add_argument('--receive',action='store_true')
     p.add_argument('rsync_arguments',nargs=argparse.REMAINDER)

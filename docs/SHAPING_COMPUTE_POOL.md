@@ -47,3 +47,13 @@ cost replacement's refusal occurred before a fit, score or benchmark started.
 The closed resource-change evidence passed durable cold checksum readback as
 59 payload files, 1,074,485 bytes, plus its receipt, under
 `i270-benchmark-withdrawal-evidence-20261109` beside the study archives.
+
+Completed ReLU/Softplus exposure extensions can be evaluated on another eligible
+worker. The transport keeps the original training host and RUN bytes, binds the
+complete extension resolution, and includes the native phase receipt and its
+head manifest alongside final/diagnostic checkpoints. The existing 128 MiB
+input limit, no-overwrite transfer, native build checks and scoring gates remain.
+An explicit `--cell` scope lets a new owner handle only the withdrawn host's
+pending fits without duplicating another owner's evaluations. Primary transport
+continues to accept only the previously qualified ReLU controls; other stages
+and families still refuse cross-host requests.
