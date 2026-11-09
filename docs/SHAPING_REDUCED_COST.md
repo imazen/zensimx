@@ -93,6 +93,17 @@ artifact root. The separate twenty metadata checks include complete 48-model
 transport, count/role/input corruption refusals and unchanged ordinary-fit caps;
 they do not constitute native scoring qualification.
 
+The `71eeaf3897cb` cost owner now waits for the complete outer matrix, with
+the same i270 placement, CPU boundary, native timing instrument and 32/64 gates.
+Its predecessor was verified waiting and childless before replacement; no
+preparation, fit or timing was interrupted. The complete accounting checks also
+passed with the actual i270 interpreter. The deployment and qualification closure
+passed durable checksum readback for 127 files and 83,998,205 bytes under
+`/mnt/tower/output/zensim/shaping-completion-20261107/finalist-complexity-deployment-archive-20261109`.
+The archive includes fixed specimen inputs, prebuilt tools, readable reports,
+compressed source plus overlays and the verified owner identity. Actual finalist
+counts and inference observations remain pending the registered outer fits.
+
 The frozen `b6784ba1a692` owner is deployed and verified live while waiting for
 the complete outer matrix. Preparation and timing target i270; existing training
 owners retain their previous sources. Admission/transport checks passed on
