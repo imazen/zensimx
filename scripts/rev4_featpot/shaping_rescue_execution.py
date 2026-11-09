@@ -8,6 +8,7 @@ from shaping_execution import load_registration
 from shaping_pretraining import structural_terms
 from shaping_rescue import resolve,controls,rewrite_command,admitted_families
 from shaping_storage import reservation
+from shaping_snapshot_retention import phase_authority,wait_and_bind
 
 
 def primary_source(root,cells,cell,setting,family=None):
@@ -67,7 +68,8 @@ def phase(root,binaries,source,original,dest,epochs,rescue,groups,shaping=None,*
     command=command_builder(portable_command(original['command'],source),binaries,dest,epochs)
     env=os.environ.copy()
     for key in list(env):
-        if key.startswith(('ZENSIM_MONOTONE_RESEARCH_','ZENSIM_INPUT_SHAPING_','ZENSIM_PLAIN_OPTIMIZER_')):env.pop(key)
+        if key.startswith(('ZENSIM_MONOTONE_RESEARCH_','ZENSIM_INPUT_SHAPING_','ZENSIM_PLAIN_OPTIMIZER_',
+                           'ZENSIM_TRAIN_RESUME','ZENSIM_TRAIN_SNAPSHOT')):env.pop(key)
     env.update(TMPDIR=str(Path.home()/'tmp'),ZENSIM_OPTIMIZER_DIAGNOSTICS='1',
                OMP_NUM_THREADS='1',RAYON_NUM_THREADS='1',OPENBLAS_NUM_THREADS='1')
     files={}
@@ -92,10 +94,17 @@ def phase(root,binaries,source,original,dest,epochs,rescue,groups,shaping=None,*
     receipt=dict(command=command,source_run=str(source),source_run_sha256=sha(source/'RUN.json'),
                  source_file_sha256={str(p):sha(p) for p in source_files},
                  epochs=epochs,pairs_per_epoch=50000,manifest_sha256=files,build_sha256=sha(binaries/'BUILD.json'))
+    snapshots=os.environ.get('ZENSIM_PHASE_SNAPSHOTS')=='1'
+    if snapshots:
+        parent=dest.parent/'RUN.json';identity=json.loads(parent.read_text())
+        receipt.update(cell=identity['cell'],snapshot_phase=True,parent_run_sha256=sha(parent))
+        phase_authority(dest,receipt)
+        env['ZENSIM_TRAIN_SNAPSHOT_ROOT']=str(root.parent/'shared-training-snapshots')
     with (dest/'train.log').open('w') as log:
         process=subprocess.Popen(command,stdout=log,stderr=subprocess.STDOUT,env=env)
         receipt.update(pid=process.pid,stage='running',started_utc=datetime.now(timezone.utc).isoformat())
-        (dest/'RUN.json').write_bytes(encoded(receipt));rc=process.wait()
+        (dest/'RUN.json').write_bytes(encoded(receipt))
+        rc=wait_and_bind(process,root.parent,dest) if snapshots else process.wait()
     receipt.update(exit_code=rc,stage='trained' if rc==0 else 'failed',finished_utc=datetime.now(timezone.utc).isoformat())
     if rc==0:
         if len(list((dest/'checkpoints').glob('ckpt_epoch*.bin')))!=epochs:raise ValueError('phase checkpoint inventory differs')

@@ -9,13 +9,18 @@ def save(path,value):
     temporary=path.with_suffix('.writing');temporary.write_text(json.dumps(value,indent=2)+'\n');temporary.replace(path)
 
 
-def stage(study,output,owner,storage):
+def stage(study,output,owner,storage,*,phases_only=False,cells=None):
     if output.exists():raise ValueError('preserve the existing snapshot batch')
     output.mkdir(parents=True);rows=[];deferred=[];nonlocal_count=unfinished=0;total=0
     with ExitStack() as stack:
         for index in range(4):stack.enter_context(storage.reservation(study,output/('reservation-'+str(index)),30*1024**3))
-        for binding in sorted((study/'runs').glob('*/attempt-*/SNAPSHOT_BINDING.json')):
+        bindings=list((study/'runs').glob('*/attempt-*/SNAPSHOT_BINDING.json')) if not phases_only else []
+        bindings+=list((study/'runs').glob('*/attempt-*/*/SNAPSHOT_BINDING.json'))
+        for binding in sorted(bindings):
             bound=json.loads(binding.read_text())
+            identity=json.loads(binding.with_name('RUN.json').read_text())
+            if phases_only and not identity.get('snapshot_phase'):continue
+            if cells is not None and identity['cell']['id'] not in cells:continue
             if bound['host']!=socket.gethostname():nonlocal_count+=1;continue
             result=binding.with_name('RESULT.json')
             if not result.exists():unfinished+=1;continue
@@ -39,7 +44,8 @@ def stage(study,output,owner,storage):
         value=dict(schema='completed-snapshot-batch-v1',stage='complete',host=socket.gethostname(),
                    study=str(study),rows=rows,deferred=deferred,skipped_nonlocal=nonlocal_count,
                    skipped_unfinished_or_failed=unfinished,bytes=total,helper_sha256=owner.sha(owner.__file__),
-                   checked_utc=datetime.now(timezone.utc).isoformat(),scientific_training_launched=False)
+                   checked_utc=datetime.now(timezone.utc).isoformat(),scientific_training_launched=False,
+                   phases_only=phases_only,selected_cells=sorted(cells) if cells is not None else None)
         save(output/'BATCH.json',value)
     return dict(stage='complete',stores=len(rows),bytes=total,deferred=len(deferred))
 
@@ -71,8 +77,9 @@ if __name__=='__main__':
     parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('mode',choices=('stage','retire'))
     parser.add_argument('--source',type=Path,required=True);parser.add_argument('--study',type=Path)
     parser.add_argument('--root',type=Path,required=True);parser.add_argument('--receipt',type=Path)
+    parser.add_argument('--phases-only',action='store_true');parser.add_argument('--cell',action='append')
     args=parser.parse_args();sys.path.insert(0,str(args.source/'scripts/rev4_featpot'))
     import shaping_snapshot_retention as owner
     import shaping_storage as storage
-    value=stage(args.study,args.root,owner,storage) if args.mode=='stage' else retire(args.root,args.receipt,owner)
+    value=stage(args.study,args.root,owner,storage,phases_only=args.phases_only,cells=set(args.cell) if args.cell is not None else None) if args.mode=='stage' else retire(args.root,args.receipt,owner)
     print(json.dumps(value),flush=True)

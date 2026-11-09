@@ -231,13 +231,19 @@ def work(request):
         command=['python3','-B',str(REPO/'scripts/rev4_featpot/shaping_rescue_execution.py'),'--study',str(study),
                  '--binary-dir',record['binary_dir'],'--neutral-qualification',record['neutral_qualification'],'--cell',key]
     if (study/'runs'/key).exists():raise ValueError('preserve existing attempt; never replay')
+    phase_count=None
+    if record.get('execution_kind') in ('outer','variant','extension'):
+        phase_count=len(record['resolution']['schedule']['phase_epochs'])
+        if phase_count not in (1,2):raise ValueError('one or two registered snapshot phases required')
+    admission_options={}
+    if memory_allowance(record)==4*1024**3:admission_options['memory_allowance_bytes']=4*1024**3
+    if record.get('execution_kind')=='corrected_inner':admission_options['warmup_until_checkpoint']=True
+    if phase_count is not None:admission_options['snapshot_phases']=phase_count
     while True:
-        if memory_allowance(record)==4*1024**3:admission=reserve_worker(study,key,memory_allowance_bytes=4*1024**3)
-        elif record.get('execution_kind')=='corrected_inner':admission=reserve_worker(study,key,warmup_until_checkpoint=True)
-        else:admission=reserve_worker(study,key)
+        admission=reserve_worker(study,key,**admission_options)
         if not admission['can_start']:
             time.sleep(10);continue
-        if record.get('execution_kind')=='corrected_inner':
+        if record.get('execution_kind')=='corrected_inner' or phase_count is not None:
             from shaping_snapshot_retention import capacity
             try:observation=capacity(study,key)
             except Exception:
@@ -249,9 +255,11 @@ def work(request):
                 time.sleep(10);continue
         break
     try:
-        with reservation(study,study/'runs'/key/'attempt-001',30*1024**3):
+        with reservation(study,study/'runs'/key/'attempt-001',(34 if phase_count is not None else 30)*1024**3):
             with request.with_name('worker.log').open('x') as log:
-                process=subprocess.Popen(command,stdout=log,stderr=subprocess.STDOUT)
+                environment=os.environ.copy();environment.pop('ZENSIM_PHASE_SNAPSHOTS',None)
+                if phase_count is not None:environment['ZENSIM_PHASE_SNAPSHOTS']='1'
+                process=subprocess.Popen(command,stdout=log,stderr=subprocess.STDOUT,env=environment)
                 bind_worker(study,key,process.pid)
                 status=dict(pid=process.pid,request_sha256=sha(request),stage='running',command=command)
                 request.with_name('STATUS.json').write_bytes(encoded(status));code=process.wait()
