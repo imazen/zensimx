@@ -80,3 +80,12 @@ fix and its independent HTTP verification passed cold readback separately in
 The first publisher launch rejected an unregistered optional supervisor label
 before publication; the corrected launch and original failed log are preserved.
 Scientific fits and scoring were unaffected by that launch refusal.
+
+Scalar-wave preparation now validates each complete immutable extension fold
+once and includes every cell, rather than reconstructing that fold separately
+for each cell. Selection, policy, matrix and provenance checks use the same
+full-fold validator. Duplicate IDs and registration failures still refuse.
+Four preparation/launch/watch checks passed. The actual three-fold check retained
+all 60 registered extension cells exactly; run-heavy reported 9 s, peak RSS
+0.11 GiB and minimum available 44,067 MiB. This is metadata preparation cost.
+Scientific models and native scoring arithmetic are unchanged.

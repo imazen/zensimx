@@ -7,6 +7,18 @@ from shaping_evaluation import diagnostic_epochs
 from shaping_execution import load_registration
 
 
+def registered_extensions(study,primary):
+    """Retain full registration checks once per fold, rather than once per cell."""
+    from shaping_extension import registered_fold
+    result=[];seen={c['id'] for c in primary}
+    for path in (study/'extensions').glob('outer-*/REGISTRATION.json'):
+        record=registered_fold(study,path,cells=primary)
+        for cell in record['cells']:
+            if cell['id'] in seen:raise ValueError('one registered extension cell required')
+            seen.add(cell['id']);result.append(cell)
+    return result
+
+
 def runtime_inputs(study,paths):
     binaries=study.parent/'bounded-resume-runtime-20261108/binaries-v3'
     build=binaries/'BUILD.json';value=json.loads(build.read_text());paths.add(build)
@@ -65,11 +77,7 @@ def prepare(study,source,host,selected_families,previous,output,*,stage='inner',
     if sha(owner)!=sha(Path(__file__).with_name(owner.name)):raise ValueError('exported supplemental owner differs')
     _,cells,_=load_registration(study);certificate=study/NAME;pin=sha(certificate);assigned=set();previous_pins={}
     if stage=='exposure_extension':
-        from shaping_extension import resolve as resolve_extension
-        for registration in (study/'extensions').glob('outer-*/REGISTRATION.json'):
-            for cell in json.loads(registration.read_text())['cells']:
-                if resolve_extension(study,cell['id'])['cell']!=cell:raise ValueError('extension scalar registration differs')
-                cells.append(cell)
+        cells.extend(registered_extensions(study,tuple(cells)))
     if cell_ids is not None and not set(cell_ids)<={c['id'] for c in cells if c['stage']==stage and c['family'] in selected_families}:
         raise ValueError('explicit scalar scope contains unregistered or wrong-stage cells')
     for path in previous:
