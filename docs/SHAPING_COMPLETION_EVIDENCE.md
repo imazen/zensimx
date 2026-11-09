@@ -1317,3 +1317,24 @@ disabled/default policies and any pre-existing scheduled shutdown. Cancelling an
 already scheduled shutdown requires its separate attribution and operation record;
 the generic helper does not cancel it. Three focused checks passed on i270:
 `done rc=0 0s | peak-RSS 0.02GiB | min-avail 22249MiB | peak-load 7.86`.
+
+The explicitly enabled policies on r3500, r3800x and i270 received the same
+temporary hold, with no scheduled shutdown present. i134 and r7900x had no
+explicit automatic-reboot setting; their installed unattended-upgrade source
+defaults it to false, so their policies were left alone. All four owned override
+paths, original policies and exact contents are recorded in `REQUIRED_CLEANUP.json`
+under `downstream-readiness-20261109T0906`; `PROGRESS.json` points to that record.
+Before goal completion, remove only the exact owned override after scientific
+jobs have ended, restore the original policy and do not request a reboot.
+
+The same readiness pass confirmed all three existing one-epoch human-only native
+equivalence controls have zero teacher rows, matching canonical bakes and the
+qualified V3 BUILD. These are control qualifications, not completed human-only
+scientific comparisons. The frozen source-bootstrap draw registration and all
+24 matched comparison specifications are present; their 25 analysis jobs still
+wait for the required outer evidence. No control was retrained for this check.
+
+The 13-file, 17,359-byte readiness, source and reboot-operation closure passed
+complete durable checksum readback under `downstream-readiness-20261109T0906`
+beside the study archives. The required policy restoration remains outstanding
+while scientific jobs run.
