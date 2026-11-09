@@ -2,8 +2,10 @@
 
 This specifies the outstanding cost measurements required by
 [the completion protocol](SHAPING_COMPLETION_PROTOCOL.md). It does not change
-training, selection, convergence, or evaluation gates. No timing results have
-been collected under this protocol.
+training, selection, convergence, or evaluation gates. The six prescribed image
+extraction measurements are recorded in
+[the extraction results](../benchmarks/shaping_extraction_cost_2026-11-09.md).
+Finalist vector timing remains outstanding.
 
 ## Models and evidence
 

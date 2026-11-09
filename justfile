@@ -5727,6 +5727,15 @@ shaping-extraction-profile binary workload output launcher cpu_tool_dir cpus job
 shaping-cost-finalists study binary_dir output:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 2G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_cost_finalists.py --study {{quote(study)}} --binary-dir {{quote(binary_dir)}} --output {{quote(output)}}
 
+shaping-cost-worker-check:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B -m unittest scripts.tests.test_shaping_cost_worker scripts.tests.test_shaping_cost_finalists scripts.tests.test_shaping_bootstrap_worker scripts.tests.test_shaping_training_budget
+
+shaping-vector-cost-run study root cpus:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 512M --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_vector_bench.py run --study {{quote(study)}} --root {{quote(root)}} --cpus {{quote(cpus)}}
+
+shaping-cost-pipeline *args:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 512M --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_cost_pipeline.py {{args}}
+
 shaping-cost-finalists-check:
     python3 -B -m unittest discover -s scripts/tests -p test_shaping_cost_finalists.py
     python3 -B -m unittest discover -s scripts/tests -p test_shaping_full_fit_selection.py

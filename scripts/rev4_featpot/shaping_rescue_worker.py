@@ -14,7 +14,7 @@ DATA_ROOTS=(Path('/mnt/v/output/zensim'),Path('/srv/zen-research'))
 def limits(kind):
     # Bootstrap reproduces all three outer admissions. Controls retain all 44
     # frozen array/table inputs. Ordinary neural fit closures keep their cap.
-    return (2*1024**3,16000) if kind in ('bootstrap','control') else (MAX_INPUT_BYTES,4000)
+    return (2*1024**3,16000) if kind in ('bootstrap','control','cost_prepare') else (MAX_INPUT_BYTES,4000)
 
 
 def memory_allowance(record):
@@ -120,7 +120,7 @@ def seal_inputs(paths,study,cell,host,binaries,qualification,resolution,*,execut
     record=dict(schema='shaping-rescue-worker-v1',cell=cell,host=host,study=str(study),binary_dir=str(binaries),
                 neutral_qualification=str(qualification) if qualification is not None else None,resolution=resolution,files=files,input_bytes=total,
                 plan_sha256=sha(study/'PLAN.json'),build_sha256=sha(binaries/'BUILD.json'),
-                driver_sha256=sha(__file__),source_root=str(REPO),outer_results_read=execution_kind=='bootstrap')
+                driver_sha256=sha(__file__),source_root=str(REPO),outer_results_read=execution_kind in ('bootstrap','cost_prepare'))
     if execution_kind is not None:
         record.update(schema='shaping-native-worker-v2',execution_kind=execution_kind,
                       human_qualification=str(human_qualification) if human_qualification else None)
@@ -148,12 +148,13 @@ def register(study,cell,host,binaries,qualification,output,*,execution_kind=None
 def verify(record,*,allow_missing=False):
     if (record['schema'] not in ('shaping-rescue-worker-v1','shaping-native-worker-v2') or record['host']!=socket.gethostname()
         or record['host'] not in HOSTS or record['driver_sha256']!=sha(__file__)
-        or record['outer_results_read'] is not (record.get('execution_kind')=='bootstrap')):
+        or record['outer_results_read'] is not (record.get('execution_kind') in ('bootstrap','cost_prepare'))):
         raise ValueError('worker request identity differs')
     if record['schema']=='shaping-native-worker-v2':
         stages={'outer':('outer','fresh_control_outer','fresh_control_outer_matched'),
                 'variant':('source_curve','row_curve','shuffle','human_only'),'corrected_inner':('inner',),'bootstrap':('bootstrap',),
-                'control':('outer','source_curve','shuffle','human_only'),'extension':('exposure_extension',)}
+                'control':('outer','source_curve','shuffle','human_only'),'extension':('exposure_extension',),
+                'cost_prepare':('cost_prepare',)}
         if record.get('execution_kind') not in stages or record['cell']['stage'] not in stages[record['execution_kind']]:
             raise ValueError('downstream worker stage differs')
     elif record.get('execution_kind') is not None:raise ValueError('legacy rescue request cannot change execution kind')
@@ -218,6 +219,7 @@ def work(request):
     if record.get('execution_kind') is not None:
         if record['execution_kind']=='corrected_inner':from shaping_corrected_worker import reproduce
         elif record['execution_kind']=='bootstrap':from shaping_bootstrap_worker import reproduce
+        elif record['execution_kind']=='cost_prepare':from shaping_cost_worker import reproduce
         elif record['execution_kind']=='control':
             from shaping_control_worker import reproduce
             record['_request_path']=str(request)
@@ -263,7 +265,7 @@ def work(request):
                 bind_worker(study,key,process.pid)
                 status=dict(pid=process.pid,request_sha256=sha(request),stage='running',command=command)
                 request.with_name('STATUS.json').write_bytes(encoded(status));code=process.wait()
-            status.update(exit_code=code,stage=('analysis_finished' if record.get('execution_kind')=='bootstrap' else 'trained') if code==0 else 'failed')
+            status.update(exit_code=code,stage=('analysis_finished' if record.get('execution_kind') in ('bootstrap','cost_prepare') else 'trained') if code==0 else 'failed')
             request.with_name('STATUS.json').write_bytes(encoded(status))
             if code:raise RuntimeError('rescue worker failed; preserve attempt')
             return status

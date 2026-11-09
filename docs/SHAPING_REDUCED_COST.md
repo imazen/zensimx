@@ -41,3 +41,25 @@ thirty-two clean paired timing rounds, resource receipts, binary identity and
 the distinction between vector scoring and image extraction. This changes the
 model source from omitted full-data refits to actual outer finalists; it does
 not weaken the timing gates in the original inference-cost protocol.
+
+`shaping_cost_pipeline.py` waits for the same complete primary outer evidence
+as the source-bootstrap owner. It seals all 48 actual models, evaluated dense
+representations, selected TRAIN rows and native converter into the existing
+bounded worker transport. A worker runs the existing workload preparer; no model
+is trained. Preparation transport checks every fold, row selection, schedule,
+model and input pin before timing admission.
+
+`shaping_vector_bench.py` then times all sixteen arms in each fold through the
+already qualified native instrument and verified CPU boundary. It registers the
+actual launcher PID with zenbench, preserves the 32/64 paired-round gates, and
+collects each model's fresh-process maximum RSS through the existing GNU-time
+owner. Models remain shared in the prepared workload. A busy training host keeps
+the benchmark waiting without holding a CPU claim. Native work has a four-GiB
+memory cap and the existing 30-GiB SSD floor.
+
+The coordinator collects terminal outputs only after complete worker inventory
+agreement and archives both prepared models and timing/memory evidence with
+full durable checksum readback. Failure preserves the original attempt; neither
+fits nor timings replay implicitly. Observation failures re-poll the same owner.
+These tools do not establish that the still-outstanding finalist measurements
+have executed.

@@ -100,15 +100,12 @@ def prepare_full(root,binaries,output):
     return dict(output=str(output),models=len(arms),rows=len(chosen))
 
 
-def prepare_outer(root,binaries,output):
-    """One sixteen-arm workload per fold, using that fold's TRAIN rows only."""
+def outer_training_rows(root):
+    """Freeze all three TRAIN row selections before opening predictions."""
     from shaped_linear_study import OLD
-    from tree_study import RAW_IDS
-    from shaping_outer_evidence import collect
     from shaping_reduced_scope import coverage as reduced_coverage
     scope=reduced_coverage(root)
     if scope is None:raise ValueError('approved reduced scope required for outer finalist cost')
-    if output.exists():raise ValueError('preserve existing finalist workload')
     plan,_,partitions=load_registration(root)
     paths={'population':OLD/'data/pop.npy','raw':OLD/'data/raw.npy'}
     pins={str(p):sha(p) for p in paths.values()}
@@ -122,6 +119,15 @@ def prepare_outer(root,binaries,output):
         if set(membership['train'])&set(membership['test']):raise ValueError('outer TRAIN/test overlap')
         chosen[outer]=choose_rows(membership['train'],pop)
         if set(chosen[outer])&set(membership['test']):raise ValueError('cost rows entered outer test')
+    return scope,paths,pins,chosen
+
+
+def prepare_outer(root,binaries,output):
+    """One sixteen-arm workload per fold, using that fold's TRAIN rows only."""
+    from tree_study import RAW_IDS
+    from shaping_outer_evidence import collect
+    if output.exists():raise ValueError('preserve existing finalist workload')
+    scope,paths,pins,chosen=outer_training_rows(root)
     _,_,rows,evidence,qualifications=collect(root);pins.update(evidence)
     if len(rows)!=48 or not all('role' in row for row in rows):raise ValueError('all 48 reduced outer finalists required')
     converter=binaries/'bake_dial_refit';build=binaries/'BUILD.json'
