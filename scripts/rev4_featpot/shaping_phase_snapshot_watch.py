@@ -134,6 +134,7 @@ def watch(args):
                         raise ValueError('staged phase batch scope differs')
                     save('archiving_completed_states')
                     mirror=args.destination/host/root.name
+                    mirror.parent.mkdir(parents=True,exist_ok=True)
                     execute([str(heavy),'--mem','512M','--jobs','1','--','python3','-B',str(REPO/'scripts/byconstruction/dataset_mirror.py'),
                         '--root',str(root),'--nfs','--cold-readback','--artifact-kind','training','--destination',str(mirror)],log)
                     for name in ('MIRROR_VERIFIED.json','SHA256SUMS'):
