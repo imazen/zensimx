@@ -14,7 +14,7 @@ def read_state(path):
     if hashlib.sha256(raw[40:]).digest()!=raw[8:40]:raise ValueError('snapshot payload checksum differs')
     value=json.loads(raw[40:])
     if value['identity']!=path.parent.name:raise ValueError('snapshot identity differs')
-    return int.from_bytes(raw[:8],'little'),value,hashlib.sha256(raw).hexdigest()
+    return int.from_bytes(raw[:8],'little'),value,hashlib.sha256(raw).hexdigest(),raw
 
 
 def numeric_arrays(value,prefix=''):
@@ -33,19 +33,22 @@ def numeric_arrays(value,prefix=''):
     return rows
 
 
-def probe(binding,output):
+def probe(binding,output,retain_state=None):
     bound=json.loads(binding.read_text());run=Path(bound['run']);directory=Path(bound['snapshot_directory'])
     if (bound['schema']!='native-snapshot-run-binding-v1' or bound['host']!=socket.gethostname()
         or sha(run/'RUN.json')!=bound['run_sha256']):raise ValueError('local phase binding differs')
     paths=list(directory.glob('state-*.snap'))
     if not 1<=len(paths)<=2:raise ValueError('one or two committed native states required')
-    states=[(p,*read_state(p)) for p in paths];path,generation,value,pin=max(states,key=lambda r:r[1])
+    states=[(p,*read_state(p)) for p in paths];path,generation,value,pin,raw=max(states,key=lambda r:r[1])
     arrays=[]
-    for key in ('adam','depth','shapes'):arrays.extend(numeric_arrays(value.get(key),key))
+    for key in ('weights','adam','depth','shapes'):arrays.extend(numeric_arrays(value.get(key),key))
+    if retain_state is not None:
+        with retain_state.open('xb') as stream:stream.write(raw)
     row=dict(checked_utc=datetime.now(timezone.utc).isoformat(),host=socket.gethostname(),
         driver_sha256=sha(__file__),
         binding=str(binding),binding_sha256=sha(binding),run_sha256=bound['run_sha256'],
         snapshot=str(path),generation=generation,snapshot_sha256=pin,
+        retained_state=str(retain_state) if retain_state is not None else None,
         payload_checksum_verified=True,epoch=value['epoch'],pair=value['pair'],arrays=arrays,
         total_numeric_values=sum(r['length'] for r in arrays),subnormal_values=sum(r['subnormal'] for r in arrays),
         native_state_modified=False,native_training_started=False,
@@ -57,5 +60,6 @@ def probe(binding,output):
 if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__)
     for key in ('binding','output'):p.add_argument('--'+key,type=Path,required=True)
-    a=p.parse_args();r=probe(a.binding,a.output)
+    p.add_argument('--retain-state',type=Path,help='explicit bounded witness: retain this single selected state')
+    a=p.parse_args();r=probe(a.binding,a.output,a.retain_state)
     print(json.dumps({k:r[k] for k in ('host','epoch','pair','total_numeric_values','subnormal_values')}))
