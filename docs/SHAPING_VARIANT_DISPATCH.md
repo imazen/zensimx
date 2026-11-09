@@ -30,6 +30,13 @@ memory or SSD headroom excludes a worker from that placement wave. These are
 scheduling hints; each fit still passes the original CPU/RAM/SSD admission.
 Already registered or active conditions are never moved by this dispatcher.
 
+The progress viewer reports approved cells separately from preserved original
+fits. Once each 64-cell rescue/outer shortlist is frozen, its IDs enter the
+approved counters; older nonshortlisted rescues remain visible as preserved
+evidence and do not advance the 144-cell rescue progress bar. Unresolved
+assignment counts reflect the remaining unfrozen folds, while the original
+scope registration remains unchanged.
+
 `shaping_bootstrap_pipeline.py` separately queues the existing primary source
 bootstrap and all 24 reduced matched comparisons. Each analysis waits for all
 three outer admissions and its complete paired model/report evidence. It then

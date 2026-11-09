@@ -214,6 +214,7 @@ def dashboard_data(root,result,workers):
     return dict(schema='zensim-shaping-stats-v1',generated_utc=result['checked_utc'],plan_sha256=plan_pin,
         counts=result['counts'],required_cells=result['required_cells'],fleet=fleet,
         scope_amendment=result.get('scope_amendment'),
+        approved_progress=result.get('approved_progress'),
         corrected_program=corrected_program(root),
         supervisors=result['supervisors'],all_supervisors_live=result['all_requested_supervisor_processes_verified_live'],
         comparisons=comparisons,records=records,default_partition=default,
@@ -369,8 +370,10 @@ def audit(root,workers,supervisors=None):
     supervising={role:supervisor_observation(root,role,path,now=now)
                  for role,path in (supervisors or {}).items()}
     from shaping_reduced_scope import coverage
+    from shaping_approved_progress import approved_progress
     return dict(checked_utc=now.isoformat(),plan_sha256=plan_pin,required_cells=len(required),
                 scope_amendment=coverage(root),
+                approved_progress=approved_progress(root,rows),
                 counts=counts,workers=observed,cells=rows,overall_experiments_complete=False,
                 supervisors=supervising,
                 all_requested_supervisor_processes_verified_live=all(v['verified_live'] is True for v in supervising.values()) if supervising else None,

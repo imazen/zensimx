@@ -5103,6 +5103,7 @@ shaping-scatter-syntax-check:
 
 shaping-completion-progress-check:
     TMPDIR="$HOME/tmp" python3 -B -m unittest discover -s scripts/tests -p test_shaping_progress.py
+    TMPDIR="$HOME/tmp" python3 -B -m unittest scripts.tests.test_shaping_approved_progress
 
 # Observe real run-heavy scope survival before a queue-only controller replacement.
 shaping-pretrained-handoff-scope-check output:
