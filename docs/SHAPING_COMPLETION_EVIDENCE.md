@@ -1267,6 +1267,24 @@ the completed primary/rescue inner-selection summary, source overlay and hash-bo
 reference to the existing shared source archive. The measured selection results
 are recorded in [the primary inner report](../benchmarks/shaping_primary_inner_2026-11-08.md).
 
+### Four further unstarted extensions, November 9 UTC
+
+A later live observation found three unclaimed waiters on r3800x and one on
+r7900x, while i134 and i270 had available CPU and RAM admission capacity. The
+same previously qualified placement helper retired only those four childless,
+unclaimed, never-started waiters. Two moved to i134 and two to i270. Each new
+request equals its original except for the host; all retain the original
+`a40069f5` source and four-GiB caps. Exact process inspection verified one live
+native trainer for each replacement. No scientific training or completed
+evaluation was replayed, and no active fit was signaled.
+
+The complete operational closure passed durable cold checksum readback as 53
+files, with 6,415,522 payload bytes before the receipt, under
+`extension-placement-second-20261109T1020` beside the study archives. It preserves
+the original requests and placements, exact-PID retirement proofs, transferred
+input identities and live replacement process records. The helper qualification
+was reused; no new native qualification was run.
+
 ## Repeated progress validation, November 9 UTC
 
 The progress audit called the complete extension resolver for every registered
