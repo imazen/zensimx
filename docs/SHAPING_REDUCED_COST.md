@@ -82,6 +82,17 @@ qualification uses the existing eight fixed inner specimens and previously
 qualified parameter counts; no fit or timing is replayed. The new preparation
 source must pass that check before replacing the waiting deployed owner.
 
+The native check passed on i134: all eight structural inventories matched their
+qualified references, and all six neural counts matched their earlier native
+parameter reports. The reader also parsed each neural specimen's saved training
+resource receipts. Run-heavy reported `done rc=0 1s | peak-RSS 0.04GiB |
+min-avail 25151MiB | peak-load 6.57`. Input hashes were checked before transfer
+and again after execution. The qualification is under
+`finalist-complexity-native-30148477-20261109/qualification` in the study's
+artifact root. The separate twenty metadata checks include complete 48-model
+transport, count/role/input corruption refusals and unchanged ordinary-fit caps;
+they do not constitute native scoring qualification.
+
 The frozen `b6784ba1a692` owner is deployed and verified live while waiting for
 the complete outer matrix. Preparation and timing target i270; existing training
 owners retain their previous sources. Admission/transport checks passed on

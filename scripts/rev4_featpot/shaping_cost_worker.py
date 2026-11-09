@@ -49,6 +49,8 @@ def register(study,binaries,result,host,output):
     from shaping_rescue_worker import HOSTS,reads,seal_inputs
     # Initialize third-party imports before capturing actual recipe reads.
     import shaping_cost_finalists,shaped_linear_study,tree_study,shaping_outer_evidence
+    # Native preparation calls these lazily; bind their source in its capsule.
+    import shaping_parameter_count,shaping_training_resources
     if host not in HOSTS or not output_scope(study,result):
         raise ValueError('approved worker and fresh study-local cost output required')
     result.parent.mkdir(parents=True,exist_ok=True)

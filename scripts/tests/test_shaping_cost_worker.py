@@ -43,6 +43,8 @@ class CostWorkerTests(unittest.TestCase):
                 q=owner.register(study,binaries,root/'new-prepared','i270',root/'registered')
                 self.assertTrue(q['outer_results_read']);self.assertFalse(q['final_holdout_read'])
                 self.assertEqual(q['execution_kind'],'cost_prepare');self.assertIn(str(root/'evidence.json'),q['files'])
+                for module in ('shaping_parameter_count.py','shaping_training_resources.py'):
+                    self.assertTrue(any(Path(p).name==module for p in q['files']))
                 with patch.object(worker.socket,'gethostname',return_value='i270'):
                     self.assertEqual(worker.verify(q),[]);resolution,command=owner.reproduce(q)
                     self.assertEqual(resolution,q['resolution']);self.assertEqual(Path(command[2]).name,'shaping_cost_finalists.py')
