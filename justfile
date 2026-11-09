@@ -5825,6 +5825,12 @@ shaping-scatter-prepare study dashboard output:
 shaping-scatter-native study panel manifest output workers='4':
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 2G --jobs {{workers}} -- python3 -B scripts/rev4_featpot/shaping_scatter_native.py --study {{quote(study)}} --panel {{quote(panel)}} --manifest {{quote(manifest)}} --output {{quote(output)}} --workers {{workers}}
 
+shaping-gradient-probe-build study source target output:
+    TMPDIR="$HOME/tmp" python3 -B scripts/rev4_featpot/shaping_gradient_probe.py --study {{quote(study)}} --source {{quote(source)}} --target {{quote(target)}} --output {{quote(output)}}
+
+shaping-gradient-probe-bench binary output:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- {{quote(binary)}} {{quote(output)}}
+
 shaping-training-budget-check:
     TMPDIR="$HOME/tmp" python3 -B -m unittest scripts.tests.test_shaping_training_budget
 
