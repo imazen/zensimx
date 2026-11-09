@@ -1142,3 +1142,28 @@ The phased native archive owner also accepts actual registered exposure
 extensions, reproduces their registration and checks continuous 480-epoch or
 paired 240-epoch phase budgets and model hashes. Nine focused archive checks
 pass, including preserved original failures and rejected changed exposure.
+
+## Explicit extension scalar startup, November 9 UTC
+
+The supplemental evaluator's execution loop resolved conditional extensions,
+but its explicit-cell CLI guard consulted only the original matrix. Before any
+extension completed, source inspection found that every explicit extension wave
+would refuse before CPU admission. Startup now resolves those IDs through the
+same complete extension-registration gate. Original inner/fresh/rescue IDs keep
+their matrix check; wrong-family, unknown and duplicate IDs still refuse before
+claiming a CPU or scoring. Native arithmetic and selection rules are unchanged.
+
+Fourteen CLI, export, transfer-order and registration checks pass. A separate
+metadata check on r7900x confirmed that a real registered product extension is
+absent from the original matrix and accepted through the unchanged resolver.
+It launched no trainer or scorer. Its run-heavy receipt is `done rc=0 5s |
+peak-RSS 0.12GiB | min-avail 15995MiB | peak-load 4.59`.
+
+All three waiting, childless conditional scalar observers were replaced with
+the frozen `dd5d4632da6e` source, retaining their resolved r5600g/i270/r7900x
+placements. Their new commands, live PIDs and fresh waiting states were verified.
+No native fit was signaled or replayed. The 36-file, 701,370-byte deployment
+closure passed complete durable readback under
+`extension-scalar-cli-deployment-archive-20261109` beside the study archives.
+It binds the existing shared source archive by checksum rather than duplicating
+it. Actual extension evaluation remains pending completion of those fits.
