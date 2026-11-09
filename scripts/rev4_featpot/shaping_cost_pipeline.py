@@ -110,7 +110,8 @@ print(json.dumps(row))
         command=['systemd-run','--user','--unit='+unit,'--property=MemoryMax=640M','--property=MemorySwapMax=0',
             '--property=Nice=19','--property=IOSchedulingClass=idle','--property=StandardOutput=append:'+str(root)+'.log',
             '--property=StandardError=append:'+str(root)+'.log',
-            str(Path.home()/'work/claudehints/scripts/run-heavy'),'--mem','512M','--jobs','1','--','python3','-B',
+            '--setenv=PYTHONPATH='+str(args.study.parent/'python-runtime'),
+            str(Path.home()/'work/claudehints/scripts/run-heavy'),'--mem','512M','--jobs','1','--','/usr/bin/python3','-B',
             str(REPO/'scripts/rev4_featpot/shaping_vector_bench.py'),'run','--study',str(args.study),'--root',str(root),'--cpus',args.cpus]
         (args.output/'BENCHMARK_SUBMITTED.json').write_bytes(encoded(dict(host=args.host,unit=unit,command=command,
             registration_sha256=sha(root/'REGISTRATION.json'))))

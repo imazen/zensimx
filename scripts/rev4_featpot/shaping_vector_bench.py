@@ -1,5 +1,5 @@
 """Time all admitted outer scoring models, preserving paired rounds and failures."""
-import argparse,json,os,platform,shutil,subprocess,time
+import argparse,json,os,platform,shutil,subprocess,sys,time
 from datetime import datetime,timezone
 from pathlib import Path
 from shaping_completion import ROLES,encoded,sha
@@ -64,7 +64,7 @@ def run(root,study,cpus):
     if (root/'STATUS.json').exists():raise ValueError('preserve previous vector timing owner; no implicit replay')
     key='vector-cost-'+sha(root/'REGISTRATION.json')[:16];held=False
     status=dict(pid=os.getpid(),host=platform.node(),registration_sha256=sha(root/'REGISTRATION.json'),
-        cpus=cpus,completed_folds=[],stage='waiting_for_idle_benchmark_host')
+        cpus=cpus,metadata_python=sys.executable,completed_folds=[],stage='waiting_for_idle_benchmark_host')
     def save(stage,**values):
         status.update(stage=stage,checked_utc=datetime.now(timezone.utc).isoformat(),**values)
         (root/'STATUS.json').write_bytes(encoded(status))
@@ -97,7 +97,7 @@ def run(root,study,cpus):
                 # Reuse the verified cpuset for these one-model observations.
                 command=[str(Path.home()/'work/claudehints/scripts/run-heavy'),'--mem','4G','--jobs','1','--',
                     'bash',record['launcher'],cpus,'env','PYTHONPATH='+str(Path(__file__).parent),
-                    'python3','-B',str(Path(__file__).with_name('shaping_cost_memory.py')),
+                    sys.executable,'-B',str(Path(__file__).with_name('shaping_cost_memory.py')),
                     '--binary',record['instrument'],'--workload',str(workload),'--output',str(root/f'memory-outer-{outer}')]
                 with (root/f'outer-{outer}-memory.log').open('xb') as log:
                     child=subprocess.Popen(command,stdout=log,stderr=subprocess.STDOUT,env=env)
