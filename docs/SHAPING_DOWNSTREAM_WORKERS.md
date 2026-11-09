@@ -63,3 +63,12 @@ systemd cap must cover its child scope; a child requesting more memory cannot
 escape an enclosing smaller cgroup. This resource correction changes no phase
 length, pairing, optimizer or selection gate.
 
+Outer input preparation also transports the human-role decision reached through
+the frozen base recipe. The original table manifest did not enumerate that
+indirect file. The first outer-2 preparation therefore refused before writing
+any feature table or starting a model. Registration now checks the base recipe's
+original plan hash and seals the referenced decision alongside the other inputs.
+Failed requests, service logs and incomplete directories remain preserved;
+repair uses a fresh preparation request and does not replay scientific training.
+The dependency test rejects recipe drift and checks the exact indirect path.
+

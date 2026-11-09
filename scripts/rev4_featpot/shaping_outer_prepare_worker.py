@@ -13,6 +13,15 @@ from shaping_completion import REPO, encoded, sha
 MAX_BYTES = 2 * 1024**3
 
 
+def preparation_dependencies(plan):
+    from shaped_linear_study import BASE
+    if sha(BASE)!=plan['input_pins'].get(str(BASE)):
+        raise ValueError('registered preparation recipe drift')
+    # prepare_neural reads this admission decision through the frozen recipe,
+    # outside the original feature/label table manifest.
+    return {Path(json.loads(BASE.read_text())['output'])/'root/human_role_decision.json'}
+
+
 def register(study, outer, host, output):
     from shaping_rescue_worker import HOSTS, reads
     from shaping_outer_admission import resolve
@@ -24,6 +33,7 @@ def register(study, outer, host, output):
     with reads() as paths:
         admission, path = resolve(study, outer)
         plan, _, _ = load_registration(study)
+        paths.update(preparation_dependencies(plan))
     # Preparation reads the original registered feature/label tables. It never
     # fits a model or opens an outer response for selection.
     paths.update(map(Path, plan['input_pins']))

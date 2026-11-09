@@ -10,6 +10,15 @@ import shaping_outer_prepare_worker as owner
 
 
 class OuterPreparationTests(unittest.TestCase):
+    def test_frozen_recipe_adds_its_indirect_role_decision_to_transfer_closure(self):
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as scratch:
+            root=Path(scratch);recipe=root/'recipe.json';recipe.write_text(json.dumps(dict(output=str(root/'original'))))
+            plan=dict(input_pins={str(recipe):owner.sha(recipe)})
+            with patch('shaped_linear_study.BASE',recipe):
+                self.assertEqual(owner.preparation_dependencies(plan),{root/'original/root/human_role_decision.json'})
+                recipe.write_text(json.dumps(dict(output=str(root/'changed'))))
+                with self.assertRaisesRegex(ValueError,'recipe drift'):owner.preparation_dependencies(plan)
+
     def test_admission_failure_creates_no_request_or_computation(self):
         with tempfile.TemporaryDirectory(dir=Path.home() / 'tmp') as scratch:
             root = Path(scratch)
