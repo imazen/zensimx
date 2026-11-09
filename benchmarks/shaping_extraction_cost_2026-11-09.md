@@ -68,3 +68,42 @@ is required for native extraction replay. The archive includes both incomplete
 attempts, all six completed reports, raw rounds, source, CPU-boundary launcher
 and prebuilt native tools. PACK_VERIFIED.json, MEMBERS.json and the durable
 MIRROR_VERIFIED.json retain the exact inventory and readback evidence.
+
+## CPU profile of the frozen native implementation
+
+The owner asked which code accounts for the 4096-square latency. The release
+instrument calls `research::extract`, then
+`compute_folded720_streaming_extras`, then `foldapp_streaming_walk_impl`.
+It requests slots 0–227 and 372–719 and creates a fresh `V2Scratch` per call.
+The full request uses the all-channel specialization. The measured region
+includes feature computation and result allocation; pixel generation, hashes
+and parity checks are outside that region.
+
+A separate 199 Hz DWARF perf capture on the same i270 CPU boundary and identical
+native binary recorded 1,159 samples with zero lost samples. It profiles native
+qualification, including nine extraction calls and fixture setup. These sampled
+cycle percentages describe that diagnostic process, not a new latency run:
+
+| Leaf kernel | Sampled cycles |
+|---|---:|
+| Fused vertical blur/SSIM, canonical f64, v3 | 22.78% |
+| Vertical local-11 box blur, v3 | 16.63% |
+| Fused horizontal local-11 blur, v3 | 12.90% |
+| Horizontal local-11 box blur, v3 | 2.94% |
+| Dense feature block, canonical f64, v3 | 12.56% |
+| sRGB-to-XYB conversion, v3 | 5.98% |
+| Gradient feature block, canonical f64, v3 | 4.94% |
+
+The sampled hot symbols confirm AVX2/v3 execution. Blur and fused SSIM account
+for 55.25% of sampled cycles in total. Memory copying and clearing account for
+3.21% and 1.21%, respectively; allocation reuse is not established as the main
+bottleneck. The reported process RSS also includes the instrument's three
+resident RGB8 pairs and preflight setup, rather than isolating extraction heap.
+Parent call chains include unresolved frames, so these are leaf self-cycle
+percentages; no complete caller attribution is claimed.
+
+The profile's run-heavy receipt is `done rc=0 6s | peak-RSS 0.46GiB |
+min-avail 25909MiB | peak-load 0.40`. This duration is diagnostic process time
+and does not replace the unprofiled benchmark results above. Raw perf data,
+full reports, launch identity and native qualification outputs are under
+`/mnt/v/output/zensim/shaping-completion-20261107/extraction-profile-i270-20261109`.
