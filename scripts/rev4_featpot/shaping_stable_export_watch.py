@@ -42,12 +42,20 @@ print(json.dumps({'ready':not missing,'missing':missing}))
     return json.loads(p.stdout)
 
 
-def required_scope(study,cells,stage):
+def required_scope(study,cells,stage,outer=None):
     if stage=='inner':
         required={c['id'] for c in cells if c['stage']=='inner' and c['family'] in FAMILIES}
         if len(required)!=504:raise ValueError('complete qualified primary coverage required')
         return required,{}
-    if stage!='rescue':raise ValueError('registered inner or rescue stage required')
+    if stage=='exposure_extension':
+        if outer not in range(3):raise ValueError('one registered extension fold required')
+        path=study/'extensions'/f'outer-{outer}'/'REGISTRATION.json';record=json.loads(path.read_text())
+        selected=[c for c in record['cells'] if c['family'] in FAMILIES]
+        if any(c['stage']!=stage for c in selected) or len({c['id'] for c in selected})!=len(selected):
+            raise ValueError('registered extension scalar scope differs')
+        cells.extend(c for c in record['cells'] if c not in cells)
+        return {c['id'] for c in selected},{str(path):sha(path)}
+    if stage!='rescue':raise ValueError('registered inner stage required')
     from shaping_reduced_scope import shortlist
     required=set();pins={}
     for outer in range(3):
@@ -70,7 +78,15 @@ def watch(args):
 
 def watch_locked(args):
     waves=[p.parent for p in args.previous_wave];_,cells,_=load_registration(args.study)
-    stage=getattr(args,'stage','inner');required,scope_pins=required_scope(args.study,cells,stage)
+    stage=getattr(args,'stage','inner');outer=getattr(args,'outer',None)
+    if stage=='exposure_extension':
+        if outer not in range(3):raise ValueError('one registered extension fold required')
+        path=args.study/'extensions'/f'outer-{outer}'/'REGISTRATION.json'
+        while not path.exists():
+            (args.output/'STATUS.json').write_bytes(encoded(dict(pid=os.getpid(),stage='waiting_for_extension_registration',outer=outer,
+                checked_utc=datetime.now(timezone.utc).isoformat(),training_replayed=False)))
+            time.sleep(30)
+    required,scope_pins=required_scope(args.study,cells,stage,outer)
     while True:
         status=dict(pid=os.getpid(),checked_utc=datetime.now(timezone.utc).isoformat(),stage='watching',
             driver_sha256=sha(__file__),waves=list(map(str,waves)),required_models=len(required),training_replayed=False,
@@ -95,7 +111,7 @@ def watch_locked(args):
                     for p in (args.study/'runs'/cid).glob('attempt-*/RESULT.json'))}
                 status.update(trained_models=len(trained))
                 if trained-assigned:
-                    prefix='stable-export-wave' if stage=='inner' else 'stable-rescue-export-wave'
+                    prefix='stable-export-wave' if stage=='inner' else 'stable-rescue-export-wave' if stage=='rescue' else f'stable-extension-{outer}-export-wave'
                     wave=args.study.parent/f'{prefix}-{len(waves)+1:04}-20261108'
                     options={} if stage=='inner' else dict(stage=stage,cell_ids=required,evaluation_inputs=args.evaluation_inputs)
                     prepare(args.study,args.source,args.host,list(FAMILIES),[p/'REGISTRATION.json' for p in waves],wave,**options)
@@ -117,6 +133,7 @@ if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__)
     for name in ('study','source','output'):p.add_argument('--'+name,type=Path,required=True)
     p.add_argument('--host',required=True);p.add_argument('--previous-wave',type=Path,action='append',default=[])
-    p.add_argument('--stage',choices=('inner','rescue'),default='inner')
+    p.add_argument('--stage',choices=('inner','rescue','exposure_extension'),default='inner')
+    p.add_argument('--outer',type=int,choices=range(3))
     p.add_argument('--evaluation-inputs',type=Path)
     watch(p.parse_args())

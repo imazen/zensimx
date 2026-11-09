@@ -1090,3 +1090,12 @@ identities. Missing evidence, changed requests and uncertain submissions remain
 failures; no interrupted scientific attempt is replayed. Extended pack/unpack
 checks cover continuous ReLU and separately pretrained frozen shaping. The
 conditional fits themselves are still pending the active rescue comparisons.
+
+The fixed scalar exporter also accepts a single actual conditional-extension
+registration per fold. Its scope is hash-bound to that registration; each model
+retains its original phase receipts, fixed final and diagnostic checkpoints,
+selection closure and registered inner views. This adds no synthetic condition
+or fitting. Unqualified ReLU/analytic controls continue through their existing
+registered evaluators; qualified added families use the same certified stable
+representation as their base/rescue comparison. No conditional extension scalar
+export has yet run.

@@ -8,6 +8,21 @@ from shaping_stable_export_prepare import rescue_inputs
 
 
 class RescueScopeTests(unittest.TestCase):
+    def test_extension_scope_is_bound_to_one_actual_conditional_registration(self):
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as tmp:
+            root=Path(tmp);path=root/'extensions/outer-1/REGISTRATION.json';path.parent.mkdir(parents=True)
+            cells=[dict(id=f'{family}-{fold}-{seed}',stage='exposure_extension',family=family,
+                        partition=f'inner-1-{fold}',seed=seed)
+                   for family in ('relu','product_joint_identity','separate_joint_identity')
+                   for fold in range(2) for seed in range(3)]
+            path.write_text(json.dumps(dict(cells=cells)))
+            registered=[];required,pins=required_scope(root,registered,'exposure_extension',1)
+            self.assertEqual(len(required),12);self.assertEqual(pins,{str(path):sha(path)})
+            self.assertEqual(registered,cells)
+            self.assertTrue(all(not c['id'].startswith('relu-') for c in cells if c['id'] in required))
+            with self.assertRaisesRegex(ValueError,'one registered extension fold'):
+                required_scope(root,[],'exposure_extension')
+
     def test_only_complete_shortlisted_paired_rescues_are_required(self):
         cells=matrix();families={'product_joint_identity','separate_joint_identity'}
         with tempfile.TemporaryDirectory() as tmp:

@@ -13,7 +13,10 @@ def rescue_inputs(study,source,run,identity,result,paths):
     from shaping_rescue import resolve
     from shaping_completion import REPO
     with reads() as dependencies:
-        resolution=resolve(study,identity['cell']['id'])
+        if identity['cell'].get('stage')=='exposure_extension':
+            from shaping_extension import resolve as resolve_extension
+            resolution=resolve_extension(study,identity['cell']['id'])
+        else:resolution=resolve(study,identity['cell']['id'])
     if resolution!=identity['resolution']:raise ValueError('rescue resolution drift')
     for path in dependencies:
         if REPO in path.parents:
@@ -41,12 +44,18 @@ def prepare(study,source,host,selected_families,previous,output,*,stage='inner',
     from shaping_reduced_scope import admit_compute
     admit_compute(study,host=host);qualified=set(families(study))
     if not selected_families or not set(selected_families)<=qualified:raise ValueError('explicit qualified families required')
-    if stage not in ('inner','rescue'):raise ValueError('registered inner or rescue stage required')
-    if stage=='rescue' and (not cell_ids or evaluation_inputs is None):raise ValueError('explicit rescue scope and inner evaluation closure required')
+    if stage not in ('inner','rescue','exposure_extension'):raise ValueError('registered inner stage required')
+    if stage!='inner' and (not cell_ids or evaluation_inputs is None):raise ValueError('explicit rescue scope and inner evaluation closure required')
     if output.exists():raise ValueError('preserve existing scalar-export wave')
     owner=source/'scripts/rev4_featpot/shaping_reexport_supervision.py'
     if sha(owner)!=sha(Path(__file__).with_name(owner.name)):raise ValueError('exported supplemental owner differs')
     _,cells,_=load_registration(study);certificate=study/NAME;pin=sha(certificate);assigned=set();previous_pins={}
+    if stage=='exposure_extension':
+        from shaping_extension import resolve as resolve_extension
+        for registration in (study/'extensions').glob('outer-*/REGISTRATION.json'):
+            for cell in json.loads(registration.read_text())['cells']:
+                if resolve_extension(study,cell['id'])['cell']!=cell:raise ValueError('extension scalar registration differs')
+                cells.append(cell)
     if cell_ids is not None and not set(cell_ids)<={c['id'] for c in cells if c['stage']==stage and c['family'] in selected_families}:
         raise ValueError('explicit scalar scope contains unregistered or wrong-stage cells')
     for path in previous:
@@ -79,7 +88,7 @@ def prepare(study,source,host,selected_families,previous,output,*,stage='inner',
         run=runs[0];identity=json.loads((run/'RUN.json').read_text());result=json.loads((run/'RESULT.json').read_text())
         if identity['cell']!=cell or result['cell']!=cell:raise ValueError('original model identity differs')
         fit=run/identity.get('fit_directory','.')
-        if stage=='rescue':rescue_inputs(study,source,run,identity,result,paths)
+        if stage!='inner':rescue_inputs(study,source,run,identity,result,paths)
         for name in ('RUN.json','RESULT.json','train.log','HEAD.json','SHAPING.json','keep.txt','COLLECTION_DERIVED_INPUTS.json','WORKER_COLLECTION.json'):
             path=run/name
             if path.exists():paths.add(path)
@@ -105,7 +114,7 @@ if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__)
     for name in ('study','source','output'):p.add_argument('--'+name,type=Path,required=True)
     p.add_argument('--host',required=True);p.add_argument('--family',action='append',required=True)
-    p.add_argument('--stage',choices=('inner','rescue'),default='inner')
+    p.add_argument('--stage',choices=('inner','rescue','exposure_extension'),default='inner')
     p.add_argument('--cell-list',type=Path);p.add_argument('--evaluation-inputs',type=Path)
     p.add_argument('--previous-wave',type=Path,action='append',default=[]);a=p.parse_args()
     selected=json.loads(a.cell_list.read_text()) if a.cell_list else None
