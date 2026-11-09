@@ -1,5 +1,16 @@
 # Inference cost from reduced-study outer models
 
+Image extraction can run before the outer models finish. Every finalist uses
+the same frozen raw table read set, `tree_study.RAW_IDS`, including the mandatory
+tree control. `shaping_extract_bench.py` verifies all six already qualified
+workloads against that read set and the original plan before timing. It measures
+the prescribed three RGB8 pairs at 256, 1024 and 4096 pixels per side with one
+and four threads, using an enforced uniform CPU class and zenbench's existing
+paired-round gates. The complete input/binary/launcher closure is hash bound.
+This independent extraction measurement admits no finalist model and supplies no
+vector-scoring or end-to-end timing claim. The vector workload still requires
+all actual outer finalists below.
+
 The approved reduced study omits full-data retuning and refits. Measure the actual
 48 outer finalist models instead: six selected roles, three source-disjoint
 folds, three seeds per stochastic role and one additive model per fold.

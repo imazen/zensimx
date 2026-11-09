@@ -5711,6 +5711,13 @@ shaping-extraction-qualify binary workload output jobs:
 shaping-extraction-fixture-check:
     python3 -B -m unittest discover -s scripts/tests -p test_shaping_extract_fixture.py
 
+# Extraction over frozen raw inputs; vector-scoring cost waits for finalists.
+shaping-extraction-bench-register study fixtures binary launcher cpu_tool root:
+    TMPDIR="$HOME/tmp" python3 -B scripts/rev4_featpot/shaping_extract_bench.py register --study {{quote(study)}} --fixtures {{quote(fixtures)}} --binary {{quote(binary)}} --launcher {{quote(launcher)}} --cpu-tool {{quote(cpu_tool)}} --root {{quote(root)}}
+
+shaping-extraction-bench study root cpus:
+    TMPDIR="$HOME/tmp" python3 -B scripts/rev4_featpot/shaping_extract_bench.py run --study {{quote(study)}} --root {{quote(root)}} --cpus {{quote(cpus)}}
+
 shaping-cost-finalists study binary_dir output:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 2G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_cost_finalists.py --study {{quote(study)}} --binary-dir {{quote(binary_dir)}} --output {{quote(output)}}
 
