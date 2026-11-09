@@ -53,5 +53,16 @@ class ExtractionBenchTests(unittest.TestCase):
                     owner.register(*args,out)
             self.assertFalse(out.exists())
 
+    def test_explicit_subset_preserves_unstarted_case_identities(self):
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as scratch:
+            root=Path(scratch);args=self.prepare(root);out=root/'timing'
+            remaining=list(owner.CASES[1:])
+            with patch.dict(sys.modules,tree_study=SimpleNamespace(RAW_IDS=[1,3])):
+                record=owner.register(*args,out,remaining)
+                with self.assertRaisesRegex(ValueError,'distinct registered'):
+                    owner.register(*args,root/'duplicate',['256-4','256-4'])
+            self.assertEqual(record['cases'],remaining)
+            self.assertEqual(owner.verify(out,args[0])['cases'],remaining)
+
 
 if __name__=='__main__':unittest.main()

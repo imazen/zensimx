@@ -14,8 +14,11 @@ from shaping_completion import encoded, sha
 CASES = tuple(f'{size}-{threads}' for size in (256, 1024, 4096) for threads in (1, 4))
 
 
-def register(study, fixtures, binary, launcher, cpu_tool, output):
+def register(study, fixtures, binary, launcher, cpu_tool, output, cases=None):
     from tree_study import RAW_IDS
+    cases=list(CASES) if cases is None else list(cases)
+    if not cases or len(cases)!=len(set(cases)) or not set(cases)<=set(CASES):
+        raise ValueError('distinct registered extraction cases required')
     if output.exists():
         raise ValueError('preserve existing extraction timing registration')
     fixture = json.loads((fixtures/'REGISTRATION.json').read_text())
@@ -41,7 +44,7 @@ def register(study, fixtures, binary, launcher, cpu_tool, output):
         shutil.copy2(fixtures/(name+'.json'), output/(name+'.json'))
     (output/'BUILD.json').write_bytes(binary.with_name('BUILD.json').read_bytes())
     record = dict(schema='shaping-independent-extraction-cost-v1',
-        plan_sha256=sha(study/'PLAN.json'), study=str(study), cases=list(CASES), file_sha256=pins,
+        plan_sha256=sha(study/'PLAN.json'), study=str(study), cases=cases, file_sha256=pins,
         source_fixture_registration_sha256=sha(fixtures/'REGISTRATION.json'),
         build_sha256=sha(output/'BUILD.json'), launcher_source=str(launcher),
         raw_ids=RAW_IDS, raw_ids_owner='tree_study.RAW_IDS',
@@ -57,7 +60,8 @@ def verify(root, study):
     record = json.loads((root/'REGISTRATION.json').read_text())
     if (record['schema'] != 'shaping-independent-extraction-cost-v1'
             or record['plan_sha256'] != sha(study/'PLAN.json')
-            or record['cases'] != list(CASES) or record['scientific_selection']
+            or not record['cases'] or len(record['cases'])!=len(set(record['cases']))
+            or not set(record['cases'])<=set(CASES) or record['scientific_selection']
             or record['outer_results_read'] or record['driver_sha256'] != sha(__file__)
             or record['build_sha256'] != sha(root/'BUILD.json')):
         raise ValueError('extraction cost registration differs')
@@ -74,7 +78,7 @@ def run(root, study, cpus):
     admit_compute(study)
     if platform.node().split('.')[0] in ('dev', 'r7900x'):
         raise ValueError('cost protocol requires another eligible benchmark host')
-    verify(root, study)
+    record=verify(root, study)
     if (root/'STATUS.json').exists():
         raise ValueError('preserve previous timing owner; no implicit replay')
     keys = ['extraction-cost-'+sha(root/'REGISTRATION.json')[:16]+'-'+str(i) for i in range(4)]
@@ -104,7 +108,7 @@ def run(root, study, cpus):
             for key in ('OMP_NUM_THREADS', 'OPENBLAS_NUM_THREADS', 'MKL_NUM_THREADS', 'RAYON_NUM_THREADS', 'CARGO_BUILD_JOBS'):
                 env.pop(key, None)
             env.update(TMPDIR=str(Path.home()/'tmp'), PATH=str(root/'inputs')+':'+env['PATH'])
-            for name in CASES:
+            for name in record['cases']:
                 verify(root, study)
                 workload = root/(name+'.json'); payload = json.loads(workload.read_text())
                 command = [str(Path.home()/'work/claudehints/scripts/run-heavy'), '--mem', '4G',
@@ -142,6 +146,7 @@ if __name__ == '__main__':
     for key in ('study', 'root', 'fixtures', 'binary', 'launcher', 'cpu-tool'):
         p.add_argument('--'+key, type=Path)
     p.add_argument('--cpus')
+    p.add_argument('--case',choices=CASES,action='append',help='register only still-unstarted cases; default all six')
     a = p.parse_args()
-    result = register(a.study, a.fixtures, a.binary, a.launcher, a.cpu_tool, a.root) if a.mode == 'register' else run(a.root, a.study, a.cpus)
+    result = register(a.study, a.fixtures, a.binary, a.launcher, a.cpu_tool, a.root,a.case) if a.mode == 'register' else run(a.root, a.study, a.cpus)
     print(json.dumps(dict(stage=result.get('stage', 'registered'), cases=result.get('cases', result.get('completed_cases')))), flush=True)
