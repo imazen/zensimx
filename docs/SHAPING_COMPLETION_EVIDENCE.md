@@ -1288,3 +1288,16 @@ through their three complete fold registrations. The metadata-only check reporte
 `done rc=0 17s | peak-RSS 0.06GiB | min-avail 40452MiB | peak-load 3.79`.
 This is not a measured before/after speed ratio; the previous audit was reused
 rather than rerun for a timing baseline.
+
+The childless metadata publisher was replaced with frozen `c61fc9200d7e` source;
+its new PID and successful publication were verified. The live JSON returned
+HTTP 200 from r3500 through the advertised network URL. Existing scatter assets
+remain present. The first inspected publication reported ten trained extensions,
+eight completed canonical diagnostics and eight cell archives. These are dated
+observations; resolve current progress from the live page and worker artifacts.
+No scientific process was signaled or reconfigured.
+
+The qualification, source overlays, shared-source hashes and deployment proof
+passed complete durable readback as 20 files totaling 3,098,665 bytes under
+`fold-progress-evidence-c61fc920-20261109` beside the study archives. The existing
+shared source package is referenced by checksum rather than uploaded again.
