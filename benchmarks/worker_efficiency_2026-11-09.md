@@ -75,3 +75,18 @@ completed epoch was replayed. The full points, resource times and affinity
 journals passed durable cold readback under `critical-fold-affinity-evidence-20261109`:
 21 payload files, 267,443 bytes, plus receipt. `shaping_epoch_windows.py` preserves
 the interval selection and refuses missing or unordered epochs.
+
+The supplemental archive observer previously reopened and hashed every native
+bake, conversion artifact and report before reaching its already-archived check.
+That repeated work on every polling pass. Closed panel/bake pairs now reuse
+their original cold-readback receipts after checking both local/durable manifest
+identities, the archive destination and the convergence record's archived hash.
+Initial and partially completed archives still execute every original validation
+gate before mirroring; no scientific eligibility or retention rule changed.
+
+A read-only pass verified all 931 closed supplemental pairs through this path
+without reading native bakes: `run-heavy: done rc=0 6s | peak-RSS 0.02GiB |
+min-avail 44754MiB | peak-load 1.81`. This is metadata verification cost. The old
+full pass was not replayed to manufacture a timing comparison. Tests retain
+the first-archive refusal cases and verify that closed pairs read no native bake,
+while changed archive manifests or convergence hashes refuse.

@@ -129,13 +129,33 @@ def sweep(args):
 
 
 
+def supplemental_archived(study,root,destination):
+    """Closed archives need identity checks, not repeated native-model rereads."""
+    from shaping_artifact_retention import archive_inventory
+    directories=[('panels',root.parent),('bakes',study/'reexports'/root.parent.name)]
+    if not all((directory/'MIRROR_VERIFIED.json').is_file() for _,directory in directories):return False
+    for kind,directory in directories:
+        mirror,inventory=archive_inventory(directory)
+        # Earlier qualified collectors used rescue/conditional names for the
+        # same immutable evidence. Keep their sealed destinations unchanged.
+        if mirror.parent!=destination:
+            raise ValueError('closed supplemental archive destination differs')
+        if kind=='panels':
+            convergence=root/'CONVERGENCE.json'
+            if inventory.get(convergence.relative_to(directory).as_posix())!=sha(convergence):
+                raise ValueError('closed supplemental convergence differs')
+    return True
+
+
 def supplemental_sweep(args):
     """Mirror only complete, uniformly pinned supplemental checkpoint panels."""
     from shaping_evaluation import diagnostic_epochs
     _,cells,_=load_registration(args.study);completed=0
     logs=args.study/'archive_supervision';logs.mkdir(exist_ok=True)
     for cpath in sorted((args.study/'reexport_max_pairs').glob('*/attempt-*/CONVERGENCE.json')):
-        root=cpath.parent;convergence=json.loads(cpath.read_text());cell=convergence['cell']
+        root=cpath.parent
+        if supplemental_archived(args.study,root,args.destination):continue
+        convergence=json.loads(cpath.read_text());cell=convergence['cell']
         if cell['stage'] not in ('inner','fresh_control_inner','rescue','exposure_extension'):continue
         if cell['stage']=='exposure_extension':
             from shaping_extension import resolve

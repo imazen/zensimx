@@ -36,8 +36,9 @@ class SupplementalArchiveTests(unittest.TestCase):
             args=SimpleNamespace(study=study,destination=Path(d)/'archive')
             def mirror(command,**kwargs):
                 source=Path(command[command.index('--root')+1]);dest=Path(command[command.index('--destination')+1]);dest.mkdir(parents=True)
-                (source/'SHA256SUMS').write_text('fixture manifest');(dest/'SHA256SUMS').write_text('fixture manifest')
-                write(source/'MIRROR_VERIFIED.json',dict(all_artifact_sha256_verified=True))
+                manifest=''.join(sha(p)+'  '+p.relative_to(source).as_posix()+'\n' for p in sorted(source.rglob('*')) if p.is_file())
+                (source/'SHA256SUMS').write_text(manifest);(dest/'SHA256SUMS').write_text(manifest)
+                write(source/'MIRROR_VERIFIED.json',dict(all_artifact_sha256_verified=True,destination=str(dest)))
             registered=[] if stage=='exposure_extension' else [cell]
             with patch('shaping_archive_supervision.load_registration',return_value=({},registered,{})),patch('shaping_archive_supervision.subprocess.run',side_effect=mirror) as native,patch('shaping_extension.resolve',return_value={'cell':cell}) as resolve:
                 if stage=='exposure_extension':
@@ -57,5 +58,15 @@ class SupplementalArchiveTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError,'artifact drift'):supplemental_sweep(args)
                 native.assert_not_called();bake.write_bytes(b'repaired')
                 self.assertEqual(supplemental_sweep(args),2)
-                self.assertEqual(supplemental_sweep(args),0)
+                def metadata_only(path):
+                    if Path(path).suffix=='.bin':raise AssertionError('completed native bake was read again')
+                    return sha(path)
+                with patch('shaping_archive_supervision.sha',side_effect=metadata_only):
+                    self.assertEqual(supplemental_sweep(args),0)
                 self.assertEqual(native.call_count,2)
+                destination=args.destination/'supplemental-bakes-cell';manifest=destination/'SHA256SUMS';original=manifest.read_bytes();manifest.write_text('changed')
+                with self.assertRaisesRegex(ValueError,'archive identity differs'):supplemental_sweep(args)
+                manifest.write_bytes(original)
+                write(root/'CONVERGENCE.json',dict(c,evaluation_build_sha256='changed'))
+                with self.assertRaisesRegex(ValueError,'closed supplemental convergence differs'):supplemental_sweep(args)
+                native.assert_called();self.assertEqual(native.call_count,2)
