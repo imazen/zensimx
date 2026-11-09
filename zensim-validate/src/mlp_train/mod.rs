@@ -31,6 +31,7 @@ mod capabilities;
 mod confidence_weights;
 mod contrast_precision;
 pub(crate) mod input_shaping;
+mod paired_gradient;
 pub mod r14_knees;
 pub mod transforms;
 mod warm_start;

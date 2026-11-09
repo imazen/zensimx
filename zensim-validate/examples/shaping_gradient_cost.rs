@@ -6,6 +6,9 @@ use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
 
+#[path = "../src/mlp_train/paired_gradient.rs"]
+mod paired_gradient;
+
 const WIDTH: usize = 128;
 const FEATURES: usize = 984;
 
@@ -16,16 +19,7 @@ fn separate(weights: &[f64], a: &[f64], b: &[f64]) -> (f64, f64) {
 }
 
 fn paired(weights: &[f64], a: &[f64], b: &[f64]) -> (f64, f64) {
-    assert_eq!(weights.len(), a.len());
-    assert_eq!(a.len(), b.len());
-    // Use the same additive identity as Iterator::sum, including signed zero.
-    let zero: f64 = std::iter::empty::<f64>().sum();
-    let (mut ga, mut gb) = (zero, zero);
-    for ((w, da), db) in weights.iter().zip(a).zip(b) {
-        ga += w * da;
-        gb += w * db;
-    }
-    (ga, gb)
+    paired_gradient::dot_pair(weights, a, b)
 }
 
 #[inline(never)]

@@ -348,8 +348,9 @@ impl State {
         let l = features.lazy.as_ref().unwrap();
         for (j, (t, &(d, f))) in self.config.terms.iter().zip(&self.positions).enumerate() {
             let w = &weights[t.column * nh..(t.column + 1) * nh];
-            let ga = w.iter().zip(da).map(|(w, g)| w * g).sum::<f64>() / l.denom[t.column];
-            let gb = w.iter().zip(db).map(|(w, g)| w * g).sum::<f64>() / l.denom[t.column];
+            let (ga, gb) = super::paired_gradient::dot_pair(w, da, db);
+            let ga = ga / l.denom[t.column];
+            let gb = gb / l.denom[t.column];
             let pa = t.derivatives(a[d], f.map_or(1., |f| a[f]));
             let pb = t.derivatives(b[d], f.map_or(1., |f| b[f]));
             for k in 0..6 {
