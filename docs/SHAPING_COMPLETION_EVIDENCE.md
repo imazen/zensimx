@@ -1167,3 +1167,28 @@ closure passed complete durable readback under
 `extension-scalar-cli-deployment-archive-20261109` beside the study archives.
 It binds the existing shared source archive by checksum rather than duplicating
 it. Actual extension evaluation remains pending completion of those fits.
+
+## Effective primary archive coverage, November 9 UTC
+
+The metadata reconciliation now accounts for all 816 effective primary fits:
+718 individual cell archives, 72 ExtraTrees fits in their central batch archive,
+24 shaped-additive fits in their batch archive, and the two authorized recovered
+joint-shaping fits in the recovery archive. No primary cell lacks coverage.
+The page's individual-cell archive counter remains a different measure; its
+718 count does not imply that the 98 batch-archived fits were lost.
+
+`shaping_primary_archive_coverage.py` binds every successful primary RUN/RESULT
+and final-model identity to its archive manifest, also binding control report
+completion and plan identity. It checks each source/durable manifest pair through
+the existing verified-archive owner. It reuses previous complete durable payload
+readbacks; this is a coverage reconciliation rather than a fresh payload scrub.
+Interrupted attempts remain preserved and do not replace the successful attempt.
+Tests cover recovered-run selection, missing/changed model pins and wrong-plan
+control reports. The actual 816-fit audit reported `done rc=0 1s | peak-RSS
+0.09GiB | min-avail 44025MiB | peak-load 1.70`.
+
+The ledger, all 721 distinct receipt/manifest pairs, source overlays and audit
+logs passed complete durable readback as 1,466 files and 33,611,382 bytes under
+`primary-archive-coverage-evidence-20261109` beside the study archives.
+This covers the primary screen only. Rescue, conditional exposure, outer and
+memorization-stage completion remain separate requirements.
