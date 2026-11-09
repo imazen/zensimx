@@ -36,9 +36,13 @@ Unit coverage exercises slot exhaustion across a completed first phase,
 480-epoch parent authority, actual-command mismatches and existing retention
 contracts. The native state engine's prior mechanical tests cover mid-epoch
 and epoch-boundary recovery for plain, Softplus, frozen and joint shaping.
-Actual phase bindings and later snapshot retirement remain execution evidence
-to collect after deploying the new owners; these unit tests do not establish
-that future scientific fits have run.
+The frozen `0dea5f546a6e` orchestration source is deployed to the six eligible
+workers and nine future extension, outer and variant owners. Each replacement
+owner was verified childless and waiting before replacement, then verified live
+against its exact command afterward. No active scientific fit was signaled or
+replayed. The unchanged registration and selection gates still control admission.
+Actual bindings for these future scientific phases remain execution evidence to
+collect after admission; deployment does not establish that those fits have run.
 
 `shaping_phase_snapshot_watch.py` retires only successful states whose parent
 fits have completed immutable worker collection. It checks worker metadata
@@ -56,3 +60,20 @@ the native pool within 4 GiB per worker and each staging workspace within
 4 GiB, rather than accumulating completed state payloads. Interrupted or
 uncollected runs remain protected. The watcher can also retire earlier
 completed one-phase stores through the same unchanged provenance gates.
+
+The first six-worker cycle archived and retired 154 completed one-phase stores.
+It also removed 3,153,443,999 bytes of coordinator staging payload after complete
+durable readback; those bytes were temporary staging, not a reduction in the
+coordinator's pre-cycle stored results. Metadata and retirement journals remain.
+The actual future two-phase retirement path has not yet executed.
+
+Worker preflight verified all nine transported module hashes, standard-library-only
+retirement imports and read-only NFS archive access inside a 512 MiB/no-swap scope
+on all six workers. The namespace requires the system NFS mount helper. Resolve
+the archive export and server address from live `findmnt` output; a coordinator's
+server hostname need not resolve on every worker.
+
+Deployment and the first retirement cycle are recorded under
+`/mnt/v/output/zensim/shaping-completion-20261107/phase-recovery-pipeline-install-20261109`.
+The continuously supervised owner records each independently verified batch under
+`phase-snapshot-retention-0dea5f54-20261109` in the same study root.
