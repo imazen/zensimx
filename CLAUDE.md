@@ -8,6 +8,11 @@ and the executable inspector; transfer verifies the complete closure before
 starting scalar owners. Re-export also checks the inspector before making an
 output directory. Training checkpoints and scientific gates are unchanged.
 
+The raw rescue evaluator additionally stopped two Softplus jobs before prediction
+at a missing legacy optimizer BUILD file. Native runtime deployment now checks
+the complete declared binary closure on each endpoint. Existing reports remain
+protected; repairing missing tools does not replay training.
+
 ## Known Bugs — canonical assignment transfer (source corrected November 9, 2026)
 
 The rescue launcher transferred the job capsule's ASSIGNMENT.json but omitted

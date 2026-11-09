@@ -1099,3 +1099,22 @@ or fitting. Unqualified ReLU/analytic controls continue through their existing
 registered evaluators; qualified added families use the same certified stable
 representation as their base/rescue comparison. No conditional extension scalar
 export has yet run.
+
+## Evaluator runtime deployment, November 9 UTC
+
+The expanded worker pool also exposed missing legacy evaluator binaries on
+one endpoint. Two raw Softplus jobs stopped at the absent optimizer BUILD file,
+before prediction. `shaping_evaluation_runtime.py` binds each supplied native
+BUILD and every declared binary, plus the executable inspector, before copying
+missing files. Existing different bytes remain protected. Destination checks
+cover both bytes and executable flags; storage admission reserves measured
+missing bytes plus tar/transfer headroom, retaining the 30-GiB floor. Deployment
+produces no predictions or fits.
+
+The coordinator evaluator now supports an explicit family scope. ReLU and
+Softplus retain their original evaluators; added qualified families use their
+fixed registered scalar waves. This prevents a second canonical evaluation on
+the original training host while the fixed wave is evaluating the same model.
+Every existing raw report and failure stays preserved. Outer fits retain their
+admitted representation. Fourteen focused runtime/evaluator checks pass,
+including changed-byte refusal and exclusion before any duplicate prediction.

@@ -5267,6 +5267,9 @@ shaping-completion-downstream-worker-check:
 shaping-outer-prepare-worker-check:
     TMPDIR="$HOME/tmp" python3 -B -m unittest scripts.tests.test_shaping_outer_prepare_worker
 
+shaping-evaluation-runtime-verify manifest host:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 512M --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_evaluation_runtime.py transfer --manifest {{quote(manifest)}} --host {{quote(host)}}
+
 shaping-outer-pipeline-check:
     TMPDIR="$HOME/tmp" python3 -B -m unittest scripts.tests.test_shaping_outer_pipeline scripts.tests.test_shaping_outer_prepare_worker scripts.tests.test_shaping_rescue_host_launch
 

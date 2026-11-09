@@ -9,6 +9,16 @@ from shaping_evaluation_worker import request,_work,publish,verify_request,trans
 
 
 class WorkerEvaluationTests(unittest.TestCase):
+    def test_explicit_family_scope_avoids_duplicate_added_family_predictions(self):
+        from shaping_evaluation_worker import watch
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as directory:
+            root=Path(directory);study,run=self.fixture(root)
+            args=SimpleNamespace(study=study,output=root/'output',watch=False,family=['relu','softplus'])
+            with patch('shaping_evaluation_worker.request') as request,patch('shaping_evaluation_worker.subprocess.run') as native:
+                status=watch(args)
+                request.assert_not_called();native.assert_not_called()
+            self.assertEqual(status['waiting'],[]);self.assertEqual(status['imported_this_sweep'],[])
+
     def test_qualified_supplemental_runtime_is_explicit_and_original_controls_stay_pinned(self):
         from shaping_evaluation_worker import supplemental_binaries
         with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as directory:

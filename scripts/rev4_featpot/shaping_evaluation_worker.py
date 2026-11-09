@@ -277,6 +277,7 @@ def watch(args):
             for path in sorted((args.study/'runs').glob('*/attempt-*/RESULT.json')):
                 value=json.loads(path.read_text());run=path.parent
                 stages=LATER_STAGES if getattr(args,'later_only',False) else ('inner','fresh_control_inner','rescue','exposure_extension')
+                if getattr(args,'family',None) and value['cell']['family'] not in args.family:continue
                 if value.get('stage')!='trained' or value['cell']['stage'] not in stages or not (run/'WORKER_COLLECTION.json').exists():continue
                 if any((args.study/p).exists() for p in components(value['cell']['id'],run.name)):continue
                 record=request(args.study,run,target_host=placements.get(value['cell']['id']));host=record['host'];directory=args.output/value['cell']['id']
@@ -338,6 +339,7 @@ def main():
     for name in ('binary-dir','rescue-binary-dir','repair-binary-dir','inspector','request','bundle','output','remote-source','placement-file'):p.add_argument('--'+name,type=Path)
     p.add_argument('--work',action='store_true');p.add_argument('--watch',action='store_true')
     p.add_argument('--later-only',action='store_true')
+    p.add_argument('--family',action='append',help='explicit coordinator family scope; existing reports remain protected')
     p.add_argument('--candidate-binary-dir',type=Path,action='append',default=[])
     p.add_argument('--verify-inputs',action='store_true');p.add_argument('--receive',action='store_true')
     p.add_argument('rsync_arguments',nargs=argparse.REMAINDER)
