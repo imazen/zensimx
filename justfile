@@ -5733,6 +5733,15 @@ shaping-cost-worker-check:
 shaping-gradient-pretrained-check:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 512M --jobs 1 -- python3 -B -m unittest scripts.tests.test_shaping_gradient_pretrained
 
+# Diagnostic attachment only; this does not measure benchmark latency.
+shaping-training-profile pid output seconds='15':
+    test {{quote(seconds)}} -ge 1
+    test {{quote(seconds)}} -le 30
+    mkdir -p {{quote(output)}}
+    test ! -e {{quote(output + "/perf.data")}}
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 512M --jobs 1 -- prlimit --fsize=67108864:67108864 -- perf record -e cycles:u -F 199 --call-graph dwarf,8192 -o {{quote(output + "/perf.data")}} -p {{quote(pid)}} -- sleep {{quote(seconds)}}
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 512M --jobs 1 -- perf report -i {{quote(output + "/perf.data")}} --stdio --no-children --percent-limit 0 > {{quote(output + "/perf-self.txt")}}
+
 shaping-gradient-pretrained-register study binaries output:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 512M --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_gradient_pretrained.py register --study {{quote(study)}} --binary-dir {{quote(binaries)}} --output {{quote(output)}}
 
