@@ -27,3 +27,16 @@ It preserves raw counters, the sampled perf file, readable per-array summaries,
 individual native-state hashes and a compressed pair of bounded original state
 witnesses. These snapshots are diagnostic witnesses, not qualified recovery
 points. The study retains its scientific gates and registered exposures.
+
+The initial resource evidence passed durable cold checksum readback: 26 payload
+files, 4,022,872 bytes, plus the receipt. Both compressed native state witnesses
+were independently decompressed and matched their original per-file SHA-256.
+
+`just shaping-affinity-probe STUDY OUTPUT --pid PID --cpu CPU ...` performs a
+bounded scheduling observation on existing study trainers. It records original
+thread affinities, samples baseline/pinned/restored perf counters, and restores
+original affinities in a finally block. Sampling failure restoration and
+withdrawn-host refusal are covered. This tool does not change trainer arguments,
+weights, snapshots, seeds, exposure or native arithmetic. Its implementation
+checks do not establish a throughput improvement; an actual observation is
+required before any scheduling recommendation.

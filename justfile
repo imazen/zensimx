@@ -5286,6 +5286,12 @@ shaping-completion-downstream-collection-check:
 shaping-completion-later-evaluation-worker-check:
     TMPDIR="$HOME/tmp" python3 -B -m unittest scripts/tests/test_shaping_later_evaluation_worker.py scripts/tests/test_shaping_evaluation_worker.py scripts/tests/test_shaping_supervision.py
 
+shaping-affinity-probe study output *args:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 512M --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_affinity_probe.py --study {{quote(study)}} --output {{quote(output)}} {{args}}
+
+shaping-affinity-probe-check:
+    TMPDIR="$HOME/tmp" python3 -B -m unittest scripts/tests/test_shaping_affinity_probe.py
+
 shaping-completion-neutral-trajectory-check:
     TMPDIR="$HOME/tmp" python3 -B -m unittest scripts/tests/test_shaping_neutral_trajectory.py
 
