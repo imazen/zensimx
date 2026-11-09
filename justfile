@@ -5892,6 +5892,9 @@ shaping-corrected-activation-watch study *args:
 shaping-scatter-prepare study dashboard output:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_scatter_prepare.py --study {{quote(study)}} --dashboard {{quote(dashboard)}} --output {{quote(output)}}
 
+shaping-scatter-reuse-check:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 512M --jobs 1 -- python3 -B -m unittest scripts.tests.test_shaping_scatter_reuse scripts.tests.test_shaping_extension_scatter scripts.tests.test_shaping_dashboard
+
 shaping-scatter-native study panel manifest output workers='4':
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 2G --jobs {{workers}} -- python3 -B scripts/rev4_featpot/shaping_scatter_native.py --study {{quote(study)}} --panel {{quote(panel)}} --manifest {{quote(manifest)}} --output {{quote(output)}} --workers {{workers}}
 

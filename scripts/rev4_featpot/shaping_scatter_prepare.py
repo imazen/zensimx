@@ -36,6 +36,33 @@ def write_atomic(path,value):
     temporary=path.with_suffix('.writing');temporary.write_text(json.dumps(value,allow_nan=False,separators=(',',':'))+'\n');temporary.replace(path)
 
 
+def missing_native_jobs(manifest,native):
+    """Keep validated cached panels out of the next native dispatch entirely."""
+    if manifest['schema']!='zensim-native-dashboard-jobs-v1' or manifest['outer_results_read']:
+        raise ValueError('registered inner native manifest required')
+    missing=[];reused=[];seen=set()
+    for job in manifest['jobs']:
+        if job['cell']['stage'] not in INNER_STAGES:raise ValueError('inner native cell required')
+        pin=job['report_sha256']
+        if len(pin)!=64 or any(c not in '0123456789abcdef' for c in pin) or pin in seen:
+            raise ValueError('invalid or duplicate native report identity')
+        seen.add(pin);path=native/(pin+'.json')
+        if not path.exists():
+            missing.append(job);continue
+        if path.is_symlink() or not path.is_file():raise ValueError('regular cached native panel required')
+        with path.open('rb') as stream:payload=stream.read(16*1024**2+1)
+        if len(payload)>16*1024**2:raise ValueError('cached native panel exceeds sixteen MiB')
+        panel=json.loads(payload)
+        expected=dict(schema='zensim-native-detailed-panel-v1',cell=job['cell'],report_sha256=pin,
+                      input_sha256=job['sha256'],panel_sha256=manifest['panel_sha256'],outer_results_read=False)
+        if any(panel.get(k)!=v for k,v in expected.items()):
+            raise ValueError('preserve changed cached native panel')
+        reused.append(dict(report_sha256=pin,path=str(path),sha256=hashlib.sha256(payload).hexdigest()))
+    return dict(manifest,jobs=missing),dict(schema='zensim-native-panel-reuse-v1',reused=reused,
+        required_panels=len(seen),missing_panels=len(missing),outer_results_read=False,
+        interpretation='Cache identity and current bytes checked; original archival receipts retain their readback evidence.')
+
+
 def report_path(study,record):
     cell=record['cell'];repaired=cell['family'] in max_pair_families(study)
     root=study/('reexport_max_pairs' if repaired else 'runs')/cell['id']
@@ -154,7 +181,11 @@ def prepare(study,dashboard,output):
                   source_snapshot_sha256=hashlib.sha256(snapshot_bytes).hexdigest(),source_driver_sha256=sha(__file__),
                   panel_sha256=sha(study.parent/'bounded-resume-runtime-20261108/binaries-v3/panel'),outer_results_read=False)
     write_atomic(output/'NATIVE_JOBS.json',manifest)
-    return dict(scatter_reports=len(rows),pending=len(pending),published_bytes=total,budget_bytes=MAX_BYTES,outer_results_read=False)
+    missing,reused=missing_native_jobs(manifest,output/'native')
+    write_atomic(output/'NATIVE_MISSING_JOBS.json',missing)
+    write_atomic(output/'NATIVE_REUSE_VERIFIED.json',reused)
+    return dict(scatter_reports=len(rows),pending=len(pending),published_bytes=total,budget_bytes=MAX_BYTES,
+                missing_native_panels=len(missing['jobs']),reused_native_panels=len(reused['reused']),outer_results_read=False)
 
 
 if __name__=='__main__':

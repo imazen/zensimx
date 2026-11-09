@@ -55,3 +55,12 @@ All 107 new archived native JSONs also match the independently checked
 publication receipt. The evidence includes both browser runs, the exact frozen
 statistics snapshot, before/after inventories and the committed source overlay.
 This is a completed publication snapshot, not completion of the scientific study.
+
+Incremental preparation now also writes `NATIVE_MISSING_JOBS.json` and
+`NATIVE_REUSE_VERIFIED.json`. Dispatch the missing manifest to the existing
+native worker; the full manifest remains available as the complete inventory.
+Cached panels must match the cell, report, input, runtime, schema and inner-scope
+identities before reuse, and the reuse receipt records their current hashes.
+Changed caches refuse; no existing native output is overwritten. This keeps
+already published statistical calculations out of subsequent worker dispatches.
+Original archive receipts still own durable checksum-readback evidence.
