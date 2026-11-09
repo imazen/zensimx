@@ -10,6 +10,18 @@ if (!url || !output) throw Error('Usage: node shaping_dashboard_browser.cjs URL 
     const page = await browser.newPage({ viewport: { width: 1440, height: 1100 } });
     const errors = []; page.on('pageerror', e => errors.push(e.message));
     await page.goto(url); await page.waitForFunction(() => document.querySelectorAll('#comparison tbody tr').length > 0);
+    const approvedProgress = await page.evaluate(() => {
+      if (!data.scope_amendment) return null;
+      if (!data.approved_progress) throw Error('Approved progress is missing from the reduced viewer');
+      const expected=data.approved_progress.counts.rescue;
+      const card=[...document.querySelectorAll('#cards .card')].find(e=>e.querySelector('small').textContent==='Approved rescues trained');
+      if(!card||card.querySelector('b').textContent!==expected.successful_fit_cells+' / '+expected.required)
+        throw Error('Rendered rescue progress differs from the approved subset');
+      if(!document.querySelector('#coverage').textContent.includes(data.approved_progress.unresolved_fold_cells+' rescue/outer cell assignments'))
+        throw Error('Rendered unresolved assignments differ from frozen shortlists');
+      return {trained:expected.successful_fit_cells,required:expected.required,
+        preserved:data.counts.rescue.successful_fit_cells,unresolved:data.approved_progress.unresolved_fold_cells};
+    });
     await page.click('#detailLink');
     if (family) {
       await page.evaluate(family => {
@@ -43,7 +55,7 @@ if (!url || !output) throw Error('Usage: node shaping_dashboard_browser.cjs URL 
     if (overflow) { const boxes = await page.evaluate(() => [...document.querySelectorAll('*')].map(e => ({tag:e.tagName,id:e.id,className:String(e.className),right:e.getBoundingClientRect().right,width:e.getBoundingClientRect().width})).filter(e => e.right > innerWidth + 1)); fs.writeFileSync(path.join(output,'OVERFLOW.json'),JSON.stringify(boxes,null,2)); throw Error('Page overflows the mobile viewport'); }
     if (errors.length) throw Error(errors.join('\n'));
     const selected=await page.locator('#scatterFit').inputValue();
-    const result = { passed: true, url, family:family||'relu', selected, populations, source_filter: { all, filtered }, native_panel_visible: true, mobile_overflow: false, page_errors: errors };
+    const result = { passed: true, url, family:family||'relu', selected, populations, source_filter: { all, filtered }, native_panel_visible: true, mobile_overflow: false, page_errors: errors, approved_progress:approvedProgress };
     fs.writeFileSync(path.join(output, 'RESULT.json'), JSON.stringify(result, null, 2) + '\n');
     console.log(JSON.stringify(result));
   } finally { await browser.close(); }
