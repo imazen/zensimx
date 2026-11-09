@@ -10,18 +10,31 @@ from shaping_execution import load_registration
 # Preserve the loaded driver identity across later source edits.
 DRIVER_SHA256=sha(__file__)
 
+def canonical_candidate(study,run,cell):
+    """A qualified supplemental report may own completion independently of raw failures."""
+    from shaping_completion import max_pair_families
+    if cell['family'] not in max_pair_families(study):return False
+    root=study/'reexport_max_pairs'/cell['id']/run.name
+    if not all((root/name).exists() for name in ('CONVERGENCE.json','final/COMPLETE.json')):return False
+    from shaping_rescue_selection import verified_candidate
+    verified_candidate(study,cell,'research-relu-max-pairs-v1')
+    return True
+
+
 def eligible(directory,cells,plan_pin):
     attempts=list(directory.glob('attempt-*'))
     # Multiple attempts need explicit reconciliation of all retained failures.
     if len(attempts)!=1:return False
     run=attempts[0]
-    if not all((run/name).is_file() for name in ('RUN.json','RESULT.json','CONVERGENCE.json','evaluation/COMPLETE.json')):return False
+    if not all((run/name).is_file() for name in ('RUN.json','RESULT.json')):return False
     identity=json.loads((run/'RUN.json').read_text());result=json.loads((run/'RESULT.json').read_text())
     cell=identity['cell']
     if cell['stage'] not in ('inner','fresh_control_inner'):return False
     if cell not in cells or cell['id']!=directory.name:raise ValueError('archive cell identity differs')
     if cell['stage'] not in ('inner','fresh_control_inner') or result['stage']!='trained':return False
     if identity['plan_sha256']!=plan_pin or result['cell']!=cell or result['exit_code']!=0:raise ValueError('archive fit differs')
+    if canonical_candidate(directory.parent.parent,run,cell):return True
+    if not all((run/name).is_file() for name in ('CONVERGENCE.json','evaluation/COMPLETE.json')):return False
     c=json.loads((run/'CONVERGENCE.json').read_text())
     if c['cell']!=cell or c['outer_results_read']:raise ValueError('archive convergence identity differs')
     for name,pin in c['report_sha256'].items():
@@ -37,25 +50,38 @@ def rescue_eligible(study,directory,cells):
     attempts=list(directory.glob('attempt-*'))
     if len(attempts)!=1:return False
     run=attempts[0]
-    if not all((run/n).is_file() for n in ('RUN.json','RESULT.json','CONVERGENCE.json','evaluation/COMPLETE.json')):return False
+    if not all((run/n).is_file() for n in ('RUN.json','RESULT.json')):return False
     identity=json.loads((run/'RUN.json').read_text());result=json.loads((run/'RESULT.json').read_text());cell=identity['cell']
-    if cell['stage']!='rescue' or result['stage']!='trained':return False
-    if any((run/n).exists() for n in ('EVALUATION_FAILURES.json','CONVERGENCE_FAILURE.json')):return False
-    if cell not in cells or cell['id']!=directory.name:raise ValueError('rescue archive registration differs')
+    if cell['stage'] not in ('rescue','exposure_extension') or result['stage']!='trained':return False
+    extension=cell['stage']=='exposure_extension'
+    if extension:
+        from shaping_extension import resolve as resolve_extension
+        resolution=resolve_extension(study,cell['id'])
+        if cell!=resolution['cell']:raise ValueError('extension archive registration differs')
+    elif cell not in cells:raise ValueError('rescue archive registration differs')
+    if cell['id']!=directory.name:raise ValueError('rescue archive registration differs')
+    canonical=canonical_candidate(study,run,cell)
+    if not canonical:
+        if not all((run/n).is_file() for n in ('CONVERGENCE.json','evaluation/COMPLETE.json')):return False
+        if any((run/n).exists() for n in ('EVALUATION_FAILURES.json','CONVERGENCE_FAILURE.json')):return False
+    expected_epochs=cell['phase_epochs'] if extension else [120,120] if '_pretrained_' in cell['family'] else [240]
     expected=dict(cell=cell,plan_sha256=sha(study/'PLAN.json'),build_sha256=identity['build_sha256'],
-                  epochs=120 if '_pretrained_' in cell['family'] else 240,pairs_per_epoch=50000,
-                  training_exposure_pair_draws=12000000,fit_directory='fit',process_role='rescue_controller')
+                  epochs=expected_epochs[-1],pairs_per_epoch=50000,
+                  training_exposure_pair_draws=cell['total_pair_draws'] if extension else 12000000,
+                  fit_directory='fit',process_role='extension_controller' if extension else 'rescue_controller')
     if any(row.get(k)!=v for row in (identity,result) for k,v in expected.items()) or result['exit_code']!=0:
         raise ValueError('rescue archive identity or exposure differs')
     process=Path('/proc')/str(identity['pid'])/'cmdline'
     if process.exists():
         command=process.read_bytes().decode()
-        if 'shaping_rescue_execution.py' in command and cell['id'] in command:return False
+        driver='shaping_extension_execution.py' if extension else 'shaping_rescue_execution.py'
+        if driver in command and cell['id'] in command:return False
     from shaping_rescue import resolve
     from shaping_rescue_selection import verified_candidate
-    if identity['resolution']!=resolve(study,cell['id']) or result['resolution']!=identity['resolution']:
+    if not extension:resolution=resolve(study,cell['id'])
+    if identity['resolution']!=resolution or result['resolution']!=identity['resolution']:
         raise ValueError('rescue archive resolution differs')
-    epochs=[120,120] if '_pretrained_' in cell['family'] else [240]
+    epochs=expected_epochs
     if [p['epochs'] for p in result['phases']]!=epochs:raise ValueError('rescue archive phase exposure differs')
     for name,phase in zip(['pretraining','fit'] if len(epochs)==2 else ['fit'],result['phases']):
         directory=run/name
@@ -65,7 +91,7 @@ def rescue_eligible(study,directory,cells):
             raise ValueError('rescue archive phase model drift')
         for path,pin in phase['manifest_sha256'].items():
             if sha(path)!=pin:raise ValueError('rescue archive phase manifest drift')
-    verified_candidate(study,cell)
+    if not canonical:verified_candidate(study,cell)
     return True
 
 
@@ -77,9 +103,19 @@ def sweep(args):
         if (directory/'MIRROR_VERIFIED.json').exists():continue
         rescue=getattr(args,'rescue',False)
         if not (rescue_eligible(args.study,directory,cells) if rescue else eligible(directory,cells,sha(args.study/'PLAN.json'))):continue
-        dest=args.destination/(('rescue-native-' if rescue else 'inner-')+directory.name)
+        extension=rescue and json.loads(next(directory.glob('attempt-*/RUN.json')).read_text())['cell']['stage']=='exposure_extension'
+        dest=args.destination/(('extension-native-' if extension else 'rescue-native-' if rescue else 'inner-')+directory.name)
         if dest.exists() or (directory/'SHA256SUMS').exists():
             raise ValueError('unfinished archive requires explicit reconciliation: '+str(directory))
+        run=next(directory.glob('attempt-*/RUN.json')).parent
+        canonical=args.study/'reexport_max_pairs'/directory.name/run.name
+        if all((canonical/name).exists() for name in ('CONVERGENCE.json','final/COMPLETE.json')):
+            basis=dict(retention_only=True,scientific_selection_unchanged=True,
+                canonical_evidence_sha256={str(canonical/name):sha(canonical/name)
+                    for name in ('CONVERGENCE.json','final/COMPLETE.json','final/REPORT.json')})
+            path=directory/'CANONICAL_RETENTION_BASIS.json'
+            if path.exists() and json.loads(path.read_text())!=basis:raise ValueError('native retention basis differs')
+            path.write_bytes(encoded(basis))
         log=logs/(('rescue-native-' if rescue else '')+directory.name+'.log')
         command=['python3','-B',str(REPO/'scripts/byconstruction/dataset_mirror.py'),
                  '--root',str(directory),'--nfs','--cold-readback','--destination',str(dest)]

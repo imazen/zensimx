@@ -7,13 +7,15 @@ from shaping_completion import encoded,sha
 
 
 class RescueArchiveTests(unittest.TestCase):
-    def fixture(self,root,pretrained=False):
+    def fixture(self,root,pretrained=False,extension=False):
         (root/'PLAN.json').write_text('{}');directory=root/'runs/cell';run=directory/'attempt-001'
-        run.mkdir(parents=True);cell=dict(id='cell',stage='rescue',family='product_pretrained_frozen' if pretrained else 'relu')
-        resolution=dict(cell=cell,registered=True);epochs=120 if pretrained else 240
+        run.mkdir(parents=True);cell=dict(id='cell',stage='exposure_extension' if extension else 'rescue',family='product_pretrained_frozen' if pretrained else 'relu')
+        epochs=(240 if pretrained else 480) if extension else 120 if pretrained else 240
+        if extension:cell.update(phase_epochs=[epochs,epochs] if pretrained else [epochs],total_pair_draws=24000000)
+        resolution=dict(cell=cell,registered=True)
         identity=dict(cell=cell,plan_sha256=sha(root/'PLAN.json'),build_sha256='build',epochs=epochs,
-            pairs_per_epoch=50000,training_exposure_pair_draws=12000000,fit_directory='fit',
-            process_role='rescue_controller',pid=999999999,resolution=resolution)
+            pairs_per_epoch=50000,training_exposure_pair_draws=24000000 if extension else 12000000,fit_directory='fit',
+            process_role='extension_controller' if extension else 'rescue_controller',pid=999999999,resolution=resolution)
         phases=[]
         for name in (['pretraining','fit'] if pretrained else ['fit']):
             p=run/name;(p/'checkpoints').mkdir(parents=True);model=p/'checkpoints'/f'ckpt_epoch{epochs-1:03}.bin';model.write_bytes(name.encode())
@@ -33,6 +35,29 @@ class RescueArchiveTests(unittest.TestCase):
                     self.assertTrue(rescue_eligible(root,directory,[cell]));verify.assert_called_once_with(root,cell)
                     model=run/'fit/checkpoints'/('ckpt_epoch119.bin' if pretrained else 'ckpt_epoch239.bin');model.write_bytes(b'changed')
                     with self.assertRaisesRegex(ValueError,'phase model drift'):rescue_eligible(root,directory,[cell])
+
+    def test_qualified_canonical_reports_allow_retention_with_original_failures_preserved(self):
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as d:
+            root=Path(d);directory,run,cell,resolution=self.fixture(root,True)
+            canonical=root/'reexport_max_pairs/cell/attempt-001';(canonical/'final').mkdir(parents=True)
+            (canonical/'CONVERGENCE.json').write_text('{}');(canonical/'final/COMPLETE.json').write_text('{}')
+            (run/'CONVERGENCE.json').unlink();(run/'evaluation/COMPLETE.json').unlink()
+            failed=run/'EVALUATION_FAILURES.json';failed.write_text('preserved raw order failure')
+            with patch('shaping_completion.max_pair_families',return_value=(cell['family'],)), \
+                 patch('shaping_rescue.resolve',return_value=resolution),patch('shaping_rescue_selection.verified_candidate') as verify:
+                self.assertTrue(rescue_eligible(root,directory,[cell]))
+                verify.assert_called_once_with(root,cell,'research-relu-max-pairs-v1')
+            self.assertEqual(failed.read_text(),'preserved raw order failure')
+
+    def test_registered_extensions_preserve_continuous_and_pretrained_exposure(self):
+        for pretrained in (False,True):
+            with self.subTest(pretrained=pretrained),tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as d:
+                root=Path(d);directory,run,cell,resolution=self.fixture(root,pretrained,True)
+                with patch('shaping_extension.resolve',return_value=resolution),patch('shaping_rescue_selection.verified_candidate'):
+                    self.assertTrue(rescue_eligible(root,directory,[]))
+                    result=json.loads((run/'RESULT.json').read_text());result['training_exposure_pair_draws']-=50000
+                    (run/'RESULT.json').write_text(json.dumps(result))
+                    with self.assertRaisesRegex(ValueError,'identity or exposure differs'):rescue_eligible(root,directory,[])
 
     def test_failed_or_unevaluated_runs_remain_with_their_existing_owner(self):
         with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as d:

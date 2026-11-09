@@ -1126,3 +1126,19 @@ their separately pinned representations. An absent or ambiguous matching
 runtime refuses before prediction. Eighteen focused supervision checks pass,
 including routing an added family to its qualified build while preserving the
 legacy control build. Outer fits remain unstarted until the full inner gate.
+
+## Native checkpoint retention after qualified scalar export, November 9 UTC
+
+The native archive watcher previously required original raw convergence markers,
+even when a uniformly qualified supplemental representation already supplied
+the complete scalar/convergence evidence. It can now retain that native run
+through the existing `verified_candidate` gate, pinning the canonical evidence
+in its archive. Original raw failures remain inside the retained native run;
+archival does not change scientific selection or convert failed raw checks into
+successes. Missing canonical evidence still leaves failed raw runs with their
+existing failure owner.
+
+The phased native archive owner also accepts actual registered exposure
+extensions, reproduces their registration and checks continuous 480-epoch or
+paired 240-epoch phase budgets and model hashes. Nine focused archive checks
+pass, including preserved original failures and rejected changed exposure.
