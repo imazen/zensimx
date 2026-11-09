@@ -5831,6 +5831,12 @@ shaping-gradient-probe-build study source target output:
 shaping-gradient-probe-bench binary output:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- {{quote(binary)}} {{quote(output)}}
 
+shaping-gradient-probe-report root binary output:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 512M --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_gradient_report.py --root {{quote(root)}} --binary {{quote(binary)}} --output {{quote(output)}}
+
+shaping-gradient-probe-report-check:
+    TMPDIR="$HOME/tmp" python3 -B -m unittest scripts.tests.test_shaping_gradient_report
+
 shaping-training-budget-check:
     TMPDIR="$HOME/tmp" python3 -B -m unittest scripts.tests.test_shaping_training_budget
 
