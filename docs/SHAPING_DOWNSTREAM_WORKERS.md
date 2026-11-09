@@ -93,3 +93,18 @@ transported controls. Their failure records remain preserved; correcting the
 observer and replacing collectors does not restart any trainer or weaken stopped-
 attempt reconciliation. Wrong identities and missing requests still refuse.
 
+
+The approved replacement registered and submitted all 19 fold-2 outer fits
+across r7900x, i134, r3800x and r3500, and collected all four non-neural
+controls. The human-only wave subsequently began admission. These are live
+execution facts, not completion of the neural/generalization program.
+Prepared TRAIN inputs passed durable cold readback as 26 payload files,
+46,531,896 bytes; dispatch-repair evidence has 217 payload files, 6,848,208
+bytes; observer/rebalance evidence has 48 payload files, 221,862 bytes.
+They are retained beside the study archives as `prepared-outer-2-archive-20261109`,
+`downstream-dispatch-repair-evidence-20261109` and
+`control-observer-and-affinity-repair-evidence-20261109` respectively.
+All five replacement collectors reported fresh worker observations without
+unexpectedly stopped attempts. Their first startup refusals lacked the service
+PATH; corrected launches preserve those logs and pass the tool preflight.
+No scientific model was restarted or replayed during these repairs.

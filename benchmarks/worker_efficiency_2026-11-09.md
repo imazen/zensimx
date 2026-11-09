@@ -90,3 +90,14 @@ min-avail 44754MiB | peak-load 1.81`. This is metadata verification cost. The ol
 full pass was not replayed to manufacture a timing comparison. Tests retain
 the first-archive refusal cases and verify that closed pairs read no native bake,
 while changed archive manifests or convergence hashes refuse.
+
+After five of the eleven pinned fits completed, the six survivors still used
+only four physical cores: logical CPUs 4/10 and 5/11 each shared a core, while
+physical cores 1 and 2 had no assigned fit. Two surviving fits moved from CPUs
+10/11 to 1/2. Their PID/start-ticks/commands and all four thread affinities were
+matched against the original checksum-bound observation before changing pins;
+rollback retains the previous CPUs. All six fits now occupy separate physical
+cores. This changes scheduling only, with no native restart, signal, scientific
+input or arithmetic change. No timing gain is claimed. The complete reassignment
+receipt is in the verified observer/rebalance archive named in the downstream
+worker record.
