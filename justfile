@@ -6005,6 +6005,12 @@ shaping-relocation-preflight-check:
 shaping-stable-export-prepare-check:
     TMPDIR="$HOME/tmp" python3 -B -m unittest scripts.tests.test_shaping_stable_export_prepare scripts.tests.test_shaping_stable_export_launch scripts.tests.test_shaping_stable_export_watch
 
+shaping-epoch-windows-check:
+    TMPDIR="$HOME/tmp" python3 -B -m unittest scripts.tests.test_shaping_epoch_windows
+
+shaping-epoch-windows run original transition priority output:
+    TMPDIR="$HOME/tmp" python3 -B scripts/rev4_featpot/shaping_epoch_windows.py --run {{quote(run)}} --original {{quote(original)}} --transition {{quote(transition)}} --priority {{quote(priority)}} --output {{quote(output)}}
+
 shaping-selected-rescue-prepare study source binaries qualification outer family placements output:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_rescue_wave_prepare.py --study {{quote(study)}} --source {{quote(source)}} --binaries {{quote(binaries)}} --qualification {{quote(qualification)}} --outer {{outer}} --selected-family {{quote(family)}} --placements {{quote(placements)}} --output {{quote(output)}}
 
