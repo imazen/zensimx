@@ -38,3 +38,12 @@ other eligible workers; the previously admitted scientific fits remain protected
 This is a resource change, not a change to data, seeds, exposure or numerical
 gates. Withdrawal, placement and evaluation checks pass on an eligible worker.
 
+The `85fd619d` source was deployed to the five remaining compatible workers.
+All eleven replacement metadata owners were observed live; long first scoring
+sweeps are tracked by their actual PID/child even before their first status
+file. Fold-1 preparation/scalar work targets r7900x. Future finalist cost work
+targets r3800x, retaining the cost owner's existing refusal of r7900x. The first
+cost replacement's refusal occurred before a fit, score or benchmark started.
+The closed resource-change evidence passed durable cold checksum readback as
+59 payload files, 1,074,485 bytes, plus its receipt, under
+`i270-benchmark-withdrawal-evidence-20261109` beside the study archives.
