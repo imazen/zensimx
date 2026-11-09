@@ -50,7 +50,7 @@ def stage(study,output,owner,storage,*,phases_only=False,cells=None):
     return dict(stage='complete',stores=len(rows),bytes=total,deferred=len(deferred))
 
 
-def retire(root,receipt,owner):
+def retire(root,receipt,owner,*,trim_staged=False):
     if receipt.exists() or receipt.is_relative_to(root):raise ValueError('fresh retirement receipt outside the immutable archive required')
     batch=json.loads((root/'BATCH.json').read_text())
     if (batch['schema']!='completed-snapshot-batch-v1' or batch['stage']!='complete'
@@ -65,6 +65,9 @@ def retire(root,receipt,owner):
             if (old['stage']!='completed_store_retired' or old['binding_sha256']!=row['binding_sha256']
                 or old['archive_root']!=str(root) or old['archive_manifest_sha256']!=owner.sha(root/'SHA256SUMS')
                 or Path(row['snapshot_directory']).exists()):raise ValueError('partial snapshot retirement requires explicit reconciliation')
+            if trim_staged and not old.get('staged_payload_trimmed'):
+                raise ValueError('existing retirement did not trim staged payload; reconcile separately')
+        elif trim_staged:owner.retire(binding,stage_root,journal,root,trim_staged=True)
         else:owner.retire(binding,stage_root,journal,root)
         retired.append(dict(binding=str(binding),journal=str(journal),journal_sha256=owner.sha(journal)))
     save(receipt,dict(schema='completed-snapshot-batch-retirement-v1',stage='complete',archive_root=str(root),

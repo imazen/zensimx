@@ -5856,6 +5856,9 @@ shaping-paired-gradient-register study original_registration binaries output:
 shaping-paired-gradient-qualify study registration family output:
     TMPDIR="$HOME/tmp" python3 -B scripts/rev4_featpot/shaping_paired_gradient_qualification.py run --study {{quote(study)}} --registration {{quote(registration)}} --family {{quote(family)}} --output {{quote(output)}}
 
+shaping-phase-snapshot-watch study output destination archive_source archive_mount *args:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 512M --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_phase_snapshot_watch.py watch --study {{quote(study)}} --output {{quote(output)}} --destination {{quote(destination)}} --archive-source {{quote(archive_source)}} --archive-mount {{quote(archive_mount)}} {{args}}
+
 shaping-training-budget-check:
     TMPDIR="$HOME/tmp" python3 -B -m unittest scripts.tests.test_shaping_training_budget
 

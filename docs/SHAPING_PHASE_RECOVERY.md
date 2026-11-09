@@ -39,3 +39,20 @@ and epoch-boundary recovery for plain, Softplus, frozen and joint shaping.
 Actual phase bindings and later snapshot retirement remain execution evidence
 to collect after deploying the new owners; these unit tests do not establish
 that future scientific fits have run.
+
+`shaping_phase_snapshot_watch.py` retires only successful states whose parent
+fits have completed immutable worker collection. It checks worker metadata
+against those collected hashes, stages at most 4 GiB, and uses the existing
+durable mirror with complete cold readback. Retirement checks native locks,
+all state hashes and open users. A private read-only archive mount namespace
+lets a worker read the actual archive while preserving its ordinary mount view;
+the caller's finite memory cap, nice level and idle I/O class remain enforced.
+
+The worker removes global and staged state copies together after the same
+cold verification. The coordinator separately removes its verified staged
+payload and keeps manifests, bindings, locations and retirement journals.
+Only one archive batch runs at a time. A successful cycle therefore keeps
+the native pool within 4 GiB per worker and each staging workspace within
+4 GiB, rather than accumulating completed state payloads. Interrupted or
+uncollected runs remain protected. The watcher can also retire earlier
+completed one-phase stores through the same unchanged provenance gates.

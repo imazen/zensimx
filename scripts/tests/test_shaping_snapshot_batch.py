@@ -92,5 +92,18 @@ class SnapshotBatchTests(unittest.TestCase):
             for name in owner.STATES:self.assertEqual((stage/('a'*64)/name).read_bytes(),name.encode())
             self.assertFalse((root/'TRIMMED.json').exists())
 
+    def test_combined_retirement_checks_and_removes_both_worker_copies(self):
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as directory:
+            root=Path(directory);study,run,store,binding=self.fixture(root);stage=root/'stage'
+            batch.stage(study,stage,owner,SimpleNamespace(reservation=lambda *args,**kwargs:nullcontext()))
+            durable=self.archive(root,stage)
+            with patch('shaping_checkpoint_retention.no_users') as users:
+                batch.retire(stage,root/'RETIRED.json',owner,trim_staged=True)
+                self.assertEqual(len(users.call_args.args[0]),4)
+            self.assertFalse(store.exists())
+            for name in owner.STATES:
+                self.assertFalse((stage/('a'*64)/name).exists())
+                self.assertEqual((durable/('a'*64)/name).read_bytes(),name.encode())
+
 
 if __name__=='__main__':unittest.main()

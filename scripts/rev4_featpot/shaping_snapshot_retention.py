@@ -165,7 +165,7 @@ def stage(binding,output):
         (output/'SNAPSHOTS.json').write_bytes(encoded(manifest));return manifest
 
 
-def retire(binding,stage_root,receipt,archive_root=None):
+def retire(binding,stage_root,receipt,archive_root=None,*,trim_staged=False):
     from shaping_checkpoint_retention import archive_inventory,no_users
     record,run,directory=completed(binding);manifest=json.loads((stage_root/'SNAPSHOTS.json').read_text())
     if (manifest['schema']!='completed-native-snapshot-stage-v1' or manifest['binding_sha256']!=sha(binding)
@@ -189,9 +189,14 @@ def retire(binding,stage_root,receipt,archive_root=None):
                 os.posix_fadvise(stream.fileno(),0,0,os.POSIX_FADV_DONTNEED)
                 cold=__import__('hashlib').file_digest(stream,'sha256').hexdigest()
             if cold!=pin:raise ValueError('durable snapshot cold readback differs')
-            rows.append(dict(path=str(path),durable_path=str(remote),sha256=pin,bytes=path.stat().st_size))
+            row=dict(path=str(path),durable_path=str(remote),sha256=pin,bytes=path.stat().st_size)
+            if trim_staged:
+                staged=stage_root/path.name;regular(staged)
+                if sha(staged)!=pin:raise ValueError('staged snapshot changed before retirement')
+                row['staged_path']=str(staged)
+            rows.append(row)
         if not rows:raise ValueError('no completed snapshots to retire')
-        no_users(rows)
+        no_users(rows+[dict(row,path=row['staged_path']) for row in rows if 'staged_path' in row])
         journal=dict(schema='completed-native-snapshot-retirement-v1',stage='verified_before_removal',
             snapshot_directory=str(directory),binding_sha256=sha(binding),archive_manifest_sha256=sha(archive_root/'SHA256SUMS'),
             archive_root=str(archive_root),snapshot_archive_prefix=prefix.as_posix(),
@@ -199,11 +204,14 @@ def retire(binding,stage_root,receipt,archive_root=None):
         with receipt.open('xb') as stream:stream.write(encoded(journal));stream.flush();os.fsync(stream.fileno())
         for row in rows:Path(row['path']).unlink()
         (directory/'.lock').unlink();directory.rmdir()
+        if trim_staged:
+            for row in rows:Path(row['staged_path']).unlink()
         # Removing only state files would retain the native 64-MiB reservation.
         parent_fd=os.open(directory.parent,os.O_RDONLY)
         try:os.fsync(parent_fd)
         finally:os.close(parent_fd)
-        journal['stage']='completed_store_retired';receipt.write_bytes(encoded(journal));return journal
+        journal.update(stage='completed_store_retired',staged_payload_trimmed=trim_staged)
+        receipt.write_bytes(encoded(journal));return journal
 
 
 if __name__=='__main__':
