@@ -1,5 +1,5 @@
 """Publish scalar scatter inputs from pinned, completed inner reports only."""
-import argparse,gzip,json,math,os
+import argparse,gzip,hashlib,json,math,os
 from pathlib import Path
 from functools import lru_cache
 import numpy as np
@@ -76,7 +76,8 @@ def prediction_pin(study,path,report,pin,cell):
 
 def prepare(study,dashboard,output):
     plan,cells,partitions=load_registration(study)
-    snapshot=json.loads((dashboard/'stats.json').read_text());plan_pin=sha(study/'PLAN.json')
+    snapshot_bytes=(dashboard/'stats.json').read_bytes()
+    snapshot=json.loads(snapshot_bytes);plan_pin=sha(study/'PLAN.json')
     if snapshot['plan_sha256']!=plan_pin:raise ValueError('statistics snapshot registration differs')
     records=registered_scatter_cells(study,cells,snapshot)
     from shaped_linear_study import OLD,mapped_labels
@@ -150,7 +151,7 @@ def prepare(study,dashboard,output):
     index=dict(schema='zensim-inner-scatter-index-v1',plan_sha256=plan_pin,cells=rows,pending=pending,outer_results_read=False)
     write_atomic(output/'INDEX.json',index)
     manifest=dict(schema='zensim-native-dashboard-jobs-v1',study=str(study),jobs=jobs,
-                  source_snapshot_sha256=sha(dashboard/'stats.json'),source_driver_sha256=sha(__file__),
+                  source_snapshot_sha256=hashlib.sha256(snapshot_bytes).hexdigest(),source_driver_sha256=sha(__file__),
                   panel_sha256=sha(study.parent/'bounded-resume-runtime-20261108/binaries-v3/panel'),outer_results_read=False)
     write_atomic(output/'NATIVE_JOBS.json',manifest)
     return dict(scatter_reports=len(rows),pending=len(pending),published_bytes=total,budget_bytes=MAX_BYTES,outer_results_read=False)
