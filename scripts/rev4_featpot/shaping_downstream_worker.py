@@ -85,4 +85,7 @@ def reproduce(record,*,host=None):
              '--neutral-qualification',record['neutral_qualification'],'--cell',record['cell']['id']]
     if kind=='outer':command.extend(['--outer',str(args.outer)])
     elif kind=='variant':command.extend(['--human-qualification',record['human_qualification']])
+    if record.get('streaming_memory') is not None:
+        from shaping_streaming_memory import validate
+        validate(record);command.extend(['--streaming-memory','2G'])
     return scope(context,kind),command

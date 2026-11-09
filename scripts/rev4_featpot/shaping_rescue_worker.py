@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse,contextlib,json,os,shlex,socket,subprocess,sys,time
 from pathlib import Path
 from shaping_completion import DECLARATION_SHA256,REPO,encoded,sha
+from shaping_streaming_memory import attach as attach_streaming_memory
 
 # Frozen Linux/x86 native artifacts can execute on these transport endpoints.
 # The study's current owner-approved pool remains a separate admission gate.
@@ -23,6 +24,9 @@ def limits(kind):
 
 def memory_allowance(record):
     """Reserve the same bound as the largest native phase and its parent scope."""
+    if record.get('streaming_memory') is not None:
+        from shaping_streaming_memory import validate
+        return validate(record)
     kind=record.get('execution_kind')
     if kind in ('control','extension'):
         return 4*1024**3
@@ -155,6 +159,9 @@ def register(study,cell,host,binaries,qualification,output,*,execution_kind=None
         maximum,count=limits(execution_kind)
         if record['input_bytes']>maximum or len(record['files'])>count:raise ValueError('runtime evidence exceeds existing capsule allowance')
         record['runtime_compatibility']=runtime
+    attach_streaming_memory(record,study,category,Path(__file__).with_name('shaping_streaming_memory.py'))
+    maximum,count=limits(execution_kind)
+    if record['input_bytes']>maximum or len(record['files'])>count:raise ValueError('resource evidence exceeds existing capsule allowance')
     output.mkdir(parents=True,exist_ok=False);(output/'REQUEST.json').write_bytes(encoded(record))
     assignment=dict(host=host,cells=[cell],partition=record['cell']['partition'],
                     plan_sha256=record['plan_sha256'],build_sha256=record['build_sha256'])
@@ -260,6 +267,8 @@ def work(request):
     admission_options={}
     if memory_allowance(record)==4*1024**3:admission_options['memory_allowance_bytes']=4*1024**3
     if record.get('execution_kind')=='corrected_inner':admission_options['warmup_until_checkpoint']=True
+    streaming=record.get('streaming_memory') is not None
+    if streaming:admission_options['warmup_until_checkpoint']=True
     if phase_count is not None:admission_options['snapshot_phases']=phase_count
     while True:
         admission=reserve_worker(study,key,**admission_options)
@@ -284,7 +293,11 @@ def work(request):
                 process=subprocess.Popen(command,stdout=log,stderr=subprocess.STDOUT,env=environment)
                 bind_worker(study,key,process.pid)
                 status=dict(pid=process.pid,request_sha256=sha(request),stage='running',command=command)
-                request.with_name('STATUS.json').write_bytes(encoded(status));code=process.wait()
+                request.with_name('STATUS.json').write_bytes(encoded(status))
+                if streaming:
+                    from shaping_streaming_memory import wait_for_first_checkpoint
+                    code=wait_for_first_checkpoint(process,study,key)
+                else:code=process.wait()
             status.update(exit_code=code,stage=('analysis_finished' if record.get('execution_kind') in ('bootstrap','cost_prepare') else 'trained') if code==0 else 'failed')
             request.with_name('STATUS.json').write_bytes(encoded(status))
             if code:raise RuntimeError('rescue worker failed; preserve attempt')

@@ -81,6 +81,29 @@ durable readback; those bytes were temporary staging, not a reduction in the
 coordinator's pre-cycle stored results. Metadata and retirement journals remain.
 The actual future two-phase retirement path has not yet executed.
 
+## Qualified memory sizing for future streaming refits
+
+The completed 480-epoch ReLU, identity-start joint product and identity-start
+joint separate fits each reported 0.11 GiB native peak RSS and 0.17 GiB for
+the whole worker receipt. The sampled Softplus fit reported 2.42 GiB. The
+resource qualification reuses these existing complete runs and their exact
+native BUILD identities; no control trajectory is replayed for memory sizing.
+
+New outer/variant requests may attach the hash-bound
+`STREAMING_MEMORY_QUALIFICATION.json` profile for those three measured families
+with exactly one 480-epoch phase. Their parent scope, admission allowance and
+native wrapper all use 2 GiB. Allocation admission retains an extra two GiB
+until the owning worker observes its first fit checkpoint, then clears only
+its own warmup flag. Other workers' claims stay untouched. The existing
+aggregate CPU, RAM-availability, SSD and snapshot-store guards remain in force.
+
+Existing requests keep their original bounds. Analytic phases retain their
+four-GiB doubled-exposure allocation; unqualified builds, other families and
+other phase schedules keep their previous resource path. The argument proof
+over all three saved native templates changes only `run-heavy --mem`.
+Scientific command arguments, exposure, data, seeds, binary bytes and numerical
+gates are unchanged. Future throughput under this policy is not yet measured.
+
 Worker preflight verified all nine transported module hashes, standard-library-only
 retirement imports and read-only NFS archive access inside a 512 MiB/no-swap scope
 on all six workers. The namespace requires the system NFS mount helper. Resolve

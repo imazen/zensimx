@@ -17,14 +17,14 @@ STAGES=('source_curve','row_curve','shuffle','human_only')
 POPULATIONS={'human_kadid','human_tid2013','human_konfig','human_cid22_a25','cid22'}
 
 
-def command(original,binaries,dest,epochs,groups,absent):
+def command(original,binaries,dest,epochs,groups,absent,*,memory_cap=None):
     names=[g[0] for g in groups]
     if set(names)|set(absent)!=POPULATIONS or set(names)&set(absent) or len(names)!=len(set(names)):
         raise ValueError('variant populations must match their explicit absence declaration')
     if not names or any(w<=0 or v!=0 or m!=('withinref,both' if n=='cid22' else 'withinref,rank') for n,_,w,v,m in groups):
         raise ValueError('variant objective requires admitted TRAIN-only groups')
     if epochs not in (120,240,480):raise ValueError('unregistered variant phase exposure')
-    cmd=phase_command(original,binaries,dest,240 if epochs==120 else epochs)
+    cmd=phase_command(original,binaries,dest,240 if epochs==120 else epochs,memory_cap=memory_cap)
     cmd[cmd.index('--epochs')+1]=str(epochs)
     if cmd.count('--mse-weight')!=1:raise ValueError('one native MSE weight required')
     cmd[cmd.index('--mse-weight')+1]='1' if 'cid22' in names else '0'
@@ -124,7 +124,9 @@ def execute(args):
     plan,cells,resolution,cell,family,schedule,record,groups,qualification_pins,analytic,outer,admission,source,original=(
         context[name] for name in ('plan','cells','resolution','cell','family','schedule','record',
                                   'groups','qualification_pins','analytic','outer','admission','source','original'))
-    builder=lambda original,binaries,dest,epochs:command(original,binaries,dest,epochs,record['groups'],record['explicit_absent_fit_groups'])
+    from shaping_streaming_memory import native_cap
+    cap=native_cap(family,getattr(args,'streaming_memory',None))
+    builder=lambda original,binaries,dest,epochs:command(original,binaries,dest,epochs,record['groups'],record['explicit_absent_fit_groups'],memory_cap=cap)
     dest=args.study/'runs'/cell['id']/f'attempt-{args.attempt:03}'
     if args.attempt<1 or dest.exists():raise ValueError('preserve variant fit attempts')
     with reservation(args.study,dest,plan['minimum_ssd_free_bytes']):
@@ -165,4 +167,5 @@ if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__)
     for key in ('study','binary-dir','neutral-qualification','human-qualification'):p.add_argument('--'+key,type=Path,required=True)
     p.add_argument('--cell',required=True);p.add_argument('--attempt',type=int,default=1)
+    p.add_argument('--streaming-memory',choices=('2G',))
     execute(p.parse_args())

@@ -1338,3 +1338,36 @@ The 13-file, 17,359-byte readiness, source and reboot-operation closure passed
 complete durable checksum readback under `downstream-readiness-20261109T0906`
 beside the study archives. The required policy restoration remains outstanding
 while scientific jobs run.
+
+## Streaming refit memory qualification, November 9 UTC
+
+The existing complete 480-epoch resource observations separate the streaming
+families from analytic event materialization:
+
+| Family | Host | Native peak RSS | Whole-worker peak RSS | Whole-worker seconds |
+|---|---|---:|---:|---:|
+| ReLU | r7900x | 0.11 GiB | 0.17 GiB | 5,662 |
+| Joint product, identity start | r3800x | 0.11 GiB | 0.17 GiB | 9,311 |
+| Joint separate, identity start | i270 | 0.11 GiB | 0.17 GiB | 5,810 |
+| Softplus | i270 | 2.42 GiB | 2.42 GiB | 7,185 |
+
+These are different training conditions and hosts, not a throughput comparison.
+Their full original run-heavy lines, RUN/RESULT and native logs are retained
+under `streaming-memory-evidence-20261109`. The native/whole-worker minimum
+available memory observations are respectively 12,340/12,342 MiB for ReLU,
+10,427/10,362 MiB for product, 19,662/19,696 MiB for separate, and
+19,329/19,327 MiB for Softplus. Peak loads were 9.69, 3.76, 7.78 and 8.25.
+
+The resource profile allows new outer/variant capsules to use matched two-GiB
+parent/native caps for the three measured streaming families at one 480-epoch
+phase. Legacy requests, unknown builds and analytic phases retain their existing
+bounds. Warmup headroom is released only by the owning worker after its first
+checkpoint. Capsule source capture eagerly binds the resource helper, and every
+qualification evidence file must be present in the sealed input map.
+
+Focused checks cover legacy caps, unchanged native arguments, analytic refusal,
+resource-evidence drift and missing pins, original downstream gates and warmup
+ownership. A metadata-only check using the three actual saved native command
+templates confirmed parent/child cap agreement and no scientific argument change:
+`done rc=0 0s | peak-RSS 0.03GiB | min-avail 42045MiB | peak-load 1.57`.
+No fit or score was replayed, and no new scientific condition was registered.

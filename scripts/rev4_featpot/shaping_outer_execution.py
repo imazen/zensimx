@@ -14,14 +14,14 @@ from shaping_extension_execution import command as phase_command,optimizer,fresh
 from shaping_storage import reservation
 
 
-def command(original,binaries,dest,epochs,groups):
+def command(original,binaries,dest,epochs,groups,*,memory_cap=None):
     if epochs not in (120,240,480):raise ValueError('unregistered outer phase exposure')
     if {g[0] for g in groups}!={'human_kadid','human_tid2013','human_konfig','human_cid22_a25','cid22'} or len(groups)!=5:
         raise ValueError('exact admitted primary populations required')
     if any(weight<=0 or validation!=0 for _,_,weight,validation,_ in groups):raise ValueError('outer refit must use TRAIN only')
     if any(mode!=('withinref,both' if name=='cid22' else 'withinref,rank') for name,_,_,_,mode in groups):
         raise ValueError('registered human/teacher objectives required')
-    cmd=phase_command(original,binaries,dest,240 if epochs==120 else epochs)
+    cmd=phase_command(original,binaries,dest,240 if epochs==120 else epochs,memory_cap=memory_cap)
     cmd[cmd.index('--epochs')+1]=str(epochs)
     result=[];i=0
     while i<len(cmd):
@@ -114,7 +114,9 @@ def execute(args):
     plan,cells,admission,admission_path,cell,schedule,record,groups,source,original,analytic=(
         context[name] for name in ('plan','cells','admission','admission_path','cell','schedule',
                                   'record','groups','source','original','analytic'))
-    builder=lambda original,binaries,dest,epochs:command(original,binaries,dest,epochs,record['groups'])
+    from shaping_streaming_memory import native_cap
+    cap=native_cap(cell['family'],getattr(args,'streaming_memory',None))
+    builder=lambda original,binaries,dest,epochs:command(original,binaries,dest,epochs,record['groups'],memory_cap=cap)
     dest=args.study/'runs'/cell['id']/f'attempt-{args.attempt:03}'
     if args.attempt<1 or dest.exists():raise ValueError('preserve outer fit attempts')
     with reservation(args.study,dest,plan['minimum_ssd_free_bytes']):
@@ -155,7 +157,8 @@ if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__);p.add_argument('--study',type=Path,required=True)
     p.add_argument('--outer',type=int,choices=range(3),required=True);p.add_argument('--prepare',action='store_true')
     p.add_argument('--binary-dir',type=Path);p.add_argument('--neutral-qualification',type=Path)
-    p.add_argument('--cell');p.add_argument('--attempt',type=int,default=1);a=p.parse_args()
+    p.add_argument('--cell');p.add_argument('--attempt',type=int,default=1)
+    p.add_argument('--streaming-memory',choices=('2G',));a=p.parse_args()
     if a.prepare:print(json.dumps(prepare(a.study,a.outer)),flush=True)
     else:
         if not (a.binary_dir and a.neutral_qualification and a.cell):p.error('fit requires binary, qualification and cell')

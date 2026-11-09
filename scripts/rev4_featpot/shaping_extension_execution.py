@@ -12,7 +12,7 @@ from shaping_rescue_execution import primary_source,phase
 from shaping_storage import reservation
 
 
-def command(original,binaries,dest,epochs):
+def command(original,binaries,dest,epochs,*,memory_cap=None):
     if epochs not in (240,480):raise ValueError('unregistered extension phase length')
     result=rewrite_command(original,binaries,dest,240)
     result[result.index('--epochs')+1]=str(epochs)
@@ -20,6 +20,9 @@ def command(original,binaries,dest,epochs):
     # receives a bounded 4 GiB cap; its actual peak must be measured, not scaled
     # from the qualified 240-epoch replay's resource receipt.
     if epochs==480:result[result.index('--mem')+1]='4G'
+    if memory_cap is not None:
+        if memory_cap!='2G':raise ValueError('explicit two-GiB streaming cap required')
+        result[result.index('--mem')+1]=memory_cap
     return result
 
 

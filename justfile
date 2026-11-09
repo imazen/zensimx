@@ -6020,3 +6020,6 @@ shaping-reboot-hold output:
 
 shaping-reboot-hold-check:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 512M --jobs 1 -- python3 -B -m unittest scripts.tests.test_shaping_reboot_hold
+
+shaping-streaming-memory-check:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B -m unittest scripts.tests.test_shaping_streaming_memory scripts.tests.test_shaping_phase_memory scripts.tests.test_shaping_outer_execution scripts.tests.test_shaping_variant_execution scripts.tests.test_shaping_rescue_worker scripts.tests.test_shaping_downstream_worker
