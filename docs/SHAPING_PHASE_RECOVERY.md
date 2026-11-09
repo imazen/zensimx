@@ -139,3 +139,20 @@ state and a collection/observation path that preserves the complete attempt
 history. The fleet currently assumes an attempt executes on one host. Native
 state capture alone does not qualify that orchestration or cross-host trajectory
 parity. Keep original trainers running while preparing a proposal.
+
+The first actual preflight captured six active extensions without signalling or
+replaying a trainer. All 537 completed checkpoint receipts matched their native
+files. The full states contained 84,863,433 bytes; the complete evidence tar's
+86,361,449 file bytes compressed to 9,671,899 bytes. Independent decompression
+verified every state's file hash and native body digest. The source wrapper
+reported 117 s, peak RSS 0.26 GiB, minimum available 34,195 MiB and peak load
+16.17; this is read-only preflight cost, not a native training measurement.
+
+The closed `relocation-proposal-evidence-20261109` archive passed durable cold
+readback as 14 payload files, 9,897,870 bytes, plus receipt. Its proposed resource
+placement uses two fits each on r3500, i134 and r7900x, preserving original
+scientific conditions and memory caps. That proposal is pending explicit
+reconciliation authority for healthy active attempts. It has not moved a fit,
+qualified cross-host continuation or changed the recovered-attempt allowlist.
+All six original native owners were subsequently verified still live by their
+exact PID, start ticks and command.
