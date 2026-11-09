@@ -54,5 +54,17 @@ Original timings and collection hashes are on dev under
 `/mnt/v/output/zensim/shaping-completion-20261107/extraction-timing-i270-20261109`,
 `extraction-timing-i270-ready-20261109` (incomplete),
 `extraction-timing-i270-owned-20261109`, and
-`extraction-timing-collection-20261109`. The consolidated archive is recorded
-separately after durable readback.
+`extraction-timing-collection-20261109`.
+
+The consolidated archive passed complete durable readback at
+`/mnt/tower/output/zensim/shaping-completion-20261107/extraction-cost-results-ready-20261109`.
+Its 111 logical payload files occupy 59,363,477 bytes before hard-link
+deduplication and compression. The standalone tar.zst is 4,816,479 bytes,
+SHA-256 `59b04c62b99b5eaf3cec4e698308f6731f47e026d6862c90d286b206b48aa36f`.
+Every logical tar member's hash, length and mode was checked; hard-link targets
+were resolved and verified. Identical native tools are stored once and restore
+with ordinary `tar -I zstd -xf`, including their executable bits. No compiler
+is required for native extraction replay. The archive includes both incomplete
+attempts, all six completed reports, raw rounds, source, CPU-boundary launcher
+and prebuilt native tools. PACK_VERIFIED.json, MEMBERS.json and the durable
+MIRROR_VERIFIED.json retain the exact inventory and readback evidence.
