@@ -4,6 +4,33 @@ from pathlib import Path
 from shaping_completion import encoded,sha
 
 
+def install_assignments(jobs,host,output):
+    """The packer uses canonical study assignments, separate from job capsules."""
+    paths={}
+    for job in jobs:
+        path=Path(job['assignment']);pin=sha(path)
+        if job.get('assignment_sha256',pin)!=pin:raise ValueError('registered canonical assignment differs')
+        row=json.loads(path.read_text())
+        if row['host']!=host or row['cells']!=[job['cell']['id']]:raise ValueError('canonical assignment scope differs')
+        paths[str(path)]=pin
+    program='paths='+repr(paths)+'\n'+'''import hashlib,json
+from pathlib import Path
+for name,pin in paths.items():
+ p=Path(name)
+ if p.exists():
+  with p.open('rb') as f:actual=hashlib.file_digest(f,'sha256').hexdigest()
+  assert actual==pin,'preserve different canonical assignment: '+name
+print(json.dumps(dict(checked=len(paths))))
+'''
+    subprocess.run(['ssh',host,'python3 -B -'],input=program,text=True,check=True,capture_output=True)
+    manifest=output/'ASSIGNMENT_PATHS.txt';manifest.write_bytes(b''.join(p.lstrip('/').encode()+b'\0' for p in paths))
+    subprocess.run(['rsync','-rlptR','--omit-dir-times','--no-implied-dirs','--ignore-existing','--from0',
+                    '--files-from='+str(manifest),'/',host+':/'],check=True)
+    verify=program.replace('if p.exists():','if True:')
+    subprocess.run(['ssh',host,'python3 -B -'],input=verify,text=True,check=True,capture_output=True)
+    (output/'CANONICAL_ASSIGNMENTS_VERIFIED.json').write_bytes(encoded(dict(host=host,assignment_sha256=paths)))
+
+
 def launch(waves,source,host,output):
     from shaping_rescue_worker import HOSTS
     if host not in HOSTS:raise ValueError('approved native worker required')
@@ -25,6 +52,7 @@ def launch(waves,source,host,output):
         for job in jobs:
             subprocess.run(['python3','-B',str(driver),'transfer','--request',job['request'],
                             '--remote-source',str(source)],stdout=log,stderr=subprocess.STDOUT,check=True,cwd=source)
+    install_assignments(jobs,host,output)
     (output/'INPUT_VERIFIED.json').write_bytes(encoded(dict(host=host,requests={j['request']:j['request_sha256'] for j in jobs})))
     rows=[]
     for job in jobs:

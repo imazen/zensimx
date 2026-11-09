@@ -1,3 +1,13 @@
+## Known Bugs — canonical assignment transfer (source corrected November 9, 2026)
+
+The rescue launcher transferred the job capsule's ASSIGNMENT.json but omitted
+the canonical study/downstream_assignments path later passed to the terminal
+packer. Two collectors stopped before creating a bundle when the first new
+rescues completed. Training outputs remain intact. The launcher now verifies
+and transfers canonical assignments before admitting any fit, preserving
+existing different bytes. The metadata repair and collection restart are
+separate from scientific fitting; neither requires training to replay.
+
 ## Known Bugs — queue setup transfer ordering (November 8, 2026)
 
 Four queue parents were submitted before their asynchronous input transfers

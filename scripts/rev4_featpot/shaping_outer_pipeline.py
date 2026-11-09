@@ -74,7 +74,7 @@ def register_fits(args):
         if assignment.exists():
             raise ValueError('preserve existing outer assignment')
         assignment.write_bytes((directory / 'ASSIGNMENT.json').read_bytes())
-        jobs.append(dict(cell=cell, host=host, request=str(request), request_sha256=sha(request), assignment=str(assignment)))
+        jobs.append(dict(cell=cell, host=host, request=str(request), request_sha256=sha(request), assignment=str(assignment), assignment_sha256=sha(assignment)))
     record = dict(stage='registered', source=str(REPO), jobs=jobs,
                   source_driver_sha256=sha(REPO / 'scripts/rev4_featpot/shaping_rescue_worker.py'),
                   admission_sha256=sha(args.study / 'selection' / f'outer-{args.outer}' / 'OUTER_ADMISSION.json'),

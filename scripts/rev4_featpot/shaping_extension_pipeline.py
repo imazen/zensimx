@@ -41,7 +41,7 @@ def watch(args):
                 if assignment.exists():
                     raise ValueError('preserve existing extension assignment')
                 assignment.write_bytes((directory / 'ASSIGNMENT.json').read_bytes())
-                jobs.append(dict(cell=cell, host=host, request=str(request), request_sha256=sha(request), assignment=str(assignment)))
+                jobs.append(dict(cell=cell, host=host, request=str(request), request_sha256=sha(request), assignment=str(assignment), assignment_sha256=sha(assignment)))
             record = dict(stage='registered', source=str(REPO), jobs=jobs, conditional_registration=str(path),
                           conditional_registration_sha256=sha(path), source_driver_sha256=sha(REPO / 'scripts/rev4_featpot/shaping_rescue_worker.py'),
                           training_replayed=False)
