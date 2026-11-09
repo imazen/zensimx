@@ -22,13 +22,35 @@ def capacity(study,key):
             directories=[p for p in root.iterdir() if p.name!='.lock']
             if any(p.is_symlink() or not p.is_dir() or not re.fullmatch('[0-9a-f]{64}',p.name) for p in directories):
                 raise ValueError('unknown shared snapshot store entry')
-            represented={row['cell']['id'] for row in observe([study.parent])['native_jobs']
-                if row.get('cell') and row.get('snapshot_directory') and Path(row['snapshot_directory']).parent==root}
-            pending=set(claims)-represented
+            represented={}
+            existing=set(directories)
+            for row in observe([study.parent])['native_jobs']:
+                path=Path(row['snapshot_directory']) if row.get('snapshot_directory') else None
+                if row.get('cell') and path in existing:
+                    represented.setdefault(row['cell']['id'],set()).add(path)
+            pending=0;pending_claims=0
+            for key,claim in claims.items():
+                maximum=claim.get('snapshot_phases',1)
+                if type(maximum) is not int or maximum not in (1,2):
+                    raise ValueError('invalid native snapshot phase reservation')
+                accounted=set(represented.get(key,()))
+                if 'snapshot_phases' in claim:
+                    # Completed first-phase stores still consume their slot.
+                    # These bindings belong to this new scientific cell only;
+                    # legacy engineering claims may intentionally reuse a cell ID.
+                    for binding in (study/'runs'/key).glob('attempt-*/*/SNAPSHOT_BINDING.json'):
+                        value=json.loads(binding.read_text());run=binding.parent
+                        path=Path(value['snapshot_directory'])
+                        if (value['host']==__import__('socket').gethostname() and path in existing
+                            and value['run']==str(run) and value['run_sha256']==sha(run/'RUN.json')
+                            and json.loads((run/'RUN.json').read_text())['cell']['id']==key):
+                            accounted.add(path)
+                remaining=max(0,maximum-len(accounted));pending+=remaining
+                pending_claims+=int(remaining>0)
             # This matches native (4 GiB - 4096 bytes) / 64 MiB. Old trainers
             # without snapshots are conservatively counted as pending slots.
-            return dict(can_start=len(directories)+len(pending)<=63,store_directories=len(directories),
-                pending_cpu_claims=len(pending),maximum_store_reservations=63,
+            return dict(can_start=len(directories)+pending<=63,store_directories=len(directories),
+                pending_cpu_claims=pending_claims,pending_snapshot_slots=pending,maximum_store_reservations=63,
                 shared_reservation_bytes=4*1024**3)
 
 
@@ -53,15 +75,39 @@ def closed_store(directory):
 
 def bind(scope,run,output):
     if output!=run/'SNAPSHOT_BINDING.json' or output.exists():raise ValueError('one preserved binding beside the run required')
-    rows=[r for r in observe([scope])['native_jobs'] if r['run']==str(run)]
+    rows=[r for r in observe([scope])['native_jobs'] if r.get('snapshot_run',r['run'])==str(run)]
     if len(rows)!=1 or not rows[0]['snapshot_directory']:raise ValueError('one live native snapshot-lock owner required')
     row=rows[0];directory=Path(row['snapshot_directory']);regular(run/'RUN.json')
     identity=json.loads((run/'RUN.json').read_text())
-    if identity['stage']!='running' or identity['epochs'] not in (120,240):raise ValueError('active registered native exposure required')
+    if identity['stage']!='running':raise ValueError('active registered native exposure required')
+    if identity.get('snapshot_phase'):
+        phase_authority(run,identity)
+        native=[i for i,v in enumerate(identity['command']) if Path(v).name=='zensim_mlp_train']
+        if len(native)!=1 or row['command']!=identity['command'][native[0]:]:
+            raise ValueError('snapshot phase native command differs')
+    elif identity['epochs'] not in (120,240):raise ValueError('active registered native exposure required')
     record=dict(schema='native-snapshot-run-binding-v1',run=str(run),run_sha256=sha(run/'RUN.json'),
         snapshot_directory=str(directory),native_observation=row,host=__import__('socket').gethostname(),
         checked_utc=datetime.now(timezone.utc).isoformat(),driver_sha256=sha(__file__))
     with output.open('xb') as stream:stream.write(encoded(record))
+    return record
+
+
+def phase_authority(run,identity):
+    """A phase inherits its exact registered budget from its unchanged parent."""
+    parent=run.parent/'RUN.json';record=json.loads(parent.read_text())
+    if (run.name not in ('fit','pretraining') or identity['cell']!=record['cell']
+        or identity['parent_run_sha256']!=sha(parent) or identity['build_sha256']!=record['build_sha256']):
+        raise ValueError('snapshot phase parent identity differs')
+    schedule=record.get('schedule',record.get('resolution',{}).get('schedule',{}))
+    phases=schedule.get('phase_epochs',record['cell'].get('phase_epochs'))
+    if phases is None and record['cell']['stage']=='rescue':
+        phases=[120,120] if '_pretrained_' in record['cell']['family'] else [240]
+    if not phases or len(phases) not in (1,2) or any(e not in (120,240,480) for e in phases):
+        raise ValueError('registered parent phase exposure required')
+    if run.name=='pretraining' and len(phases)!=2:raise ValueError('unregistered pretraining snapshot')
+    if identity['epochs']!=phases[0 if run.name=='pretraining' else -1]:
+        raise ValueError('snapshot phase exposure differs')
     return record
 
 
@@ -90,10 +136,11 @@ def wait_and_bind(process,scope,run):
 def completed(binding):
     record=json.loads(binding.read_text());run=Path(record['run']);directory=Path(record['snapshot_directory'])
     if (record['schema']!='native-snapshot-run-binding-v1' or sha(run/'RUN.json')!=record['run_sha256']
-        or record['native_observation']['run']!=str(run)
+        or record['native_observation'].get('snapshot_run',record['native_observation']['run'])!=str(run)
         or record['native_observation']['snapshot_directory']!=str(directory)
         or record['host']!=__import__('socket').gethostname()):raise ValueError('snapshot binding identity differs')
     result=json.loads((run/'RESULT.json').read_text());identity=json.loads((run/'RUN.json').read_text())
+    if identity.get('snapshot_phase'):phase_authority(run,identity)
     if (result.get('stage') not in ('trained','qualified') or result.get('exit_code')!=0
         or result['cell']!=identity['cell'] or result['epochs']!=identity['epochs']
         or result['build_sha256']!=identity['build_sha256']):raise ValueError('successful completed native run required; interrupted states stay protected')

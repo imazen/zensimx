@@ -44,11 +44,17 @@ def observe(scopes,*,proc=Path('/proc'),cgroups=Path('/sys/fs/cgroup')):
                     and re.fullmatch('[0-9a-f]{64}',path.parent.name)):snapshot.append(str(path.parent))
             snapshot=sorted(set(snapshot))
             if len(snapshot)>1:raise ValueError('ambiguous native snapshot directory')
-            rows.append(dict(pid=int(entry.parent.name),state=fields[0],start_ticks=int(fields[19]),
+            row=dict(pid=int(entry.parent.name),state=fields[0],start_ticks=int(fields[19]),
                 run=str(run),cell=record.get('cell'),command=command[:-1] if command[-1]=='' else command,
                 checkpoint_count=len(list((output.parent/'checkpoints').glob('ckpt_epoch*.bin'))),
                 memory_max=(cap/'memory.max').read_text().strip(),swap_max=(cap/'memory.swap.max').read_text().strip(),
-                snapshot_directory=snapshot[0] if snapshot else None))
+                snapshot_directory=snapshot[0] if snapshot else None)
+            phase=output.parent/'RUN.json'
+            if output.parent.name in ('fit','pretraining') and phase.exists():
+                phase_identity=json.loads(phase.read_text())
+                if phase_identity.get('snapshot_phase') is True:
+                    row['snapshot_run']=str(output.parent)
+            rows.append(row)
         except (FileNotFoundError,ProcessLookupError):disappeared.append(int(entry.parent.name))
     return dict(schema='scoped-native-training-observation-v1',host=socket.gethostname(),
         checked_utc=datetime.now(timezone.utc).isoformat(),native_jobs=rows,disappeared_during_observation=disappeared,

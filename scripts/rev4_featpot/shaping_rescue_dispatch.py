@@ -116,12 +116,14 @@ def pending_scientific_cells(root):
     return cells
 
 
-def reserve_worker(root,cell,proc=Path('/proc'),cpu_count=None,*,memory_allowance_bytes=2*1024**3,warmup_until_checkpoint=False):
+def reserve_worker(root,cell,proc=Path('/proc'),cpu_count=None,*,memory_allowance_bytes=2*1024**3,warmup_until_checkpoint=False,snapshot_phases=None):
     # The lock spans this short admission transaction, never training.
     # Unexpected dead-owner claims remain reserved for explicit reconciliation.
     with worker_claims(root) as claims:
         if type(memory_allowance_bytes) is not int or memory_allowance_bytes not in (2*1024**3,4*1024**3):
             raise ValueError('registered two- or four-GiB worker memory allowance required')
+        if snapshot_phases is not None and (type(snapshot_phases) is not int or snapshot_phases not in (1,2)):
+            raise ValueError('one or two native snapshot phases required')
         legacy=pending_scientific_cells(root)
         observation=worker_slot(set(claims)|legacy,proc,cpu_count,study=root)
         extra=sum(max(0,row.get('memory_allowance_bytes',2*1024**3)-2*1024**3) for row in claims.values())
@@ -145,6 +147,7 @@ def reserve_worker(root,cell,proc=Path('/proc'),cpu_count=None,*,memory_allowanc
                 admitted_utc=datetime.now(timezone.utc).isoformat())
             if memory_allowance_bytes!=2*1024**3:claims[cell]['memory_allowance_bytes']=memory_allowance_bytes
             if warmup_until_checkpoint:claims[cell]['warmup_until_checkpoint']=True
+            if snapshot_phases is not None:claims[cell]['snapshot_phases']=snapshot_phases
         return observation
 
 
