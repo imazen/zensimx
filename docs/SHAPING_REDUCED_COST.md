@@ -104,6 +104,17 @@ The archive includes fixed specimen inputs, prebuilt tools, readable reports,
 compressed source plus overlays and the verified owner identity. Actual finalist
 counts and inference observations remain pending the registered outer fits.
 
+Vector timing additionally requires an idle worker through the shared admission
+transaction. The earlier precheck counted native MLP processes only; a Python
+tree fit, evaluator, bootstrap owner or pre-native reservation could still be
+active. The benchmark now refuses admission while any shared worker claim,
+unresolved scientific reservation or native trainer exists, without taking a
+claim while it waits. Its status retains the observed admission counts and
+reason. Ordinary training admission remains concurrent. This does not change
+zenbench serialization, paired rounds, CPU dispatch, timing thresholds or any
+scientific condition. Metadata checks exercise occupied/idle cases, ordinary
+concurrent fits and the actual benchmark caller's idle requirement.
+
 The frozen `b6784ba1a692` owner is deployed and verified live while waiting for
 the complete outer matrix. Preparation and timing target i270; existing training
 owners retain their previous sources. Admission/transport checks passed on

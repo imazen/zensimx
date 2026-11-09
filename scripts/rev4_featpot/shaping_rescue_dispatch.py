@@ -116,10 +116,11 @@ def pending_scientific_cells(root):
     return cells
 
 
-def reserve_worker(root,cell,proc=Path('/proc'),cpu_count=None,*,memory_allowance_bytes=2*1024**3,warmup_until_checkpoint=False,snapshot_phases=None):
+def reserve_worker(root,cell,proc=Path('/proc'),cpu_count=None,*,memory_allowance_bytes=2*1024**3,warmup_until_checkpoint=False,snapshot_phases=None,require_idle=False):
     # The lock spans this short admission transaction, never training.
     # Unexpected dead-owner claims remain reserved for explicit reconciliation.
     with worker_claims(root) as claims:
+        if type(require_idle) is not bool:raise ValueError('explicit idle-admission policy required')
         if type(memory_allowance_bytes) is not int or memory_allowance_bytes not in (2*1024**3,4*1024**3):
             raise ValueError('registered two- or four-GiB worker memory allowance required')
         if snapshot_phases is not None and (type(snapshot_phases) is not int or snapshot_phases not in (1,2)):
@@ -142,6 +143,8 @@ def reserve_worker(root,cell,proc=Path('/proc'),cpu_count=None,*,memory_allowanc
         observation['existing_scientific_reservations']=len(legacy)
         if cell in claims:
             observation.update(can_start=False,reason='cell already claimed')
+        if require_idle and (claims or legacy or observation['native_threads'] or observation['pending_dispatcher_threads']):
+            observation.update(can_start=False,reason='benchmark waits for active or reserved worker work')
         if observation['can_start']:
             claims[cell]=dict(owner=OWNER_TOKEN,dispatcher_pid=os.getpid(),child_pid=None,
                 admitted_utc=datetime.now(timezone.utc).isoformat())

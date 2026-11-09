@@ -55,7 +55,7 @@ def verify(root,study):
 def run(root,study,cpus):
     from shaping_cost_report import report
     from shaping_reduced_scope import admit_compute
-    from shaping_rescue_dispatch import reserve_worker,bind_worker,release_worker,worker_slot
+    from shaping_rescue_dispatch import reserve_worker,bind_worker,release_worker
     from shaping_storage import reservation
     admit_compute(study)
     if platform.node().split('.')[0] in ('dev','r7900x'):
@@ -73,10 +73,11 @@ def run(root,study,cpus):
         while True:
             # Benchmarks use zenbench's admission; do not hold a CPU claim ahead
             # of active training while waiting for a quiet benchmark host.
-            if worker_slot(set(),study=study)['native_threads']==0:
-                admission=reserve_worker(study,key,memory_allowance_bytes=4*1024**3)
-                if admission['can_start']:held=True;break
-            save('waiting_for_idle_benchmark_host');time.sleep(30)
+            # Inspect all existing claims atomically, including Python controls,
+            # evaluation/bootstrap work and trainers not yet visible natively.
+            admission=reserve_worker(study,key,memory_allowance_bytes=4*1024**3,require_idle=True)
+            if admission['can_start']:held=True;break
+            save('waiting_for_idle_benchmark_host',worker_admission=admission);time.sleep(30)
         with reservation(study,root,30*1024**3):
             env=os.environ.copy()
             env.update(TMPDIR=str(Path.home()/'tmp'),PATH=str(root/'inputs')+':'+env['PATH'],

@@ -8,6 +8,30 @@ from types import SimpleNamespace
 
 
 class DispatchTests(unittest.TestCase):
+    def test_benchmark_idle_admission_counts_non_native_and_pending_work(self):
+        from contextlib import nullcontext
+        for claims,legacy,native in [({'python-control':{}},set(),0),({}, {'pre-native-fit'},0),({},set(),1),({},set(),0)]:
+            with self.subTest(claims=claims,legacy=legacy,native=native):
+                observation=dict(can_start=True,native_threads=native,pending_dispatcher_threads=0,
+                    available_memory_bytes=64*1024**3,minimum_available_memory_bytes=6*1024**3)
+                busy=bool(claims or legacy or native)
+                with patch('shaping_rescue_dispatch.worker_claims',return_value=nullcontext(claims)), \
+                     patch('shaping_rescue_dispatch.pending_scientific_cells',return_value=legacy), \
+                     patch('shaping_rescue_dispatch.worker_slot',return_value=observation):
+                    result=reserve_worker(Path('/study'),'benchmark',memory_allowance_bytes=4*1024**3,require_idle=True)
+                self.assertEqual(result['can_start'],not busy);self.assertEqual('benchmark' in claims,not busy)
+
+    def test_independent_training_keeps_ordinary_concurrent_admission(self):
+        from contextlib import nullcontext
+        claims={'existing-fit':{}}
+        observation=dict(can_start=True,native_threads=1,pending_dispatcher_threads=0,
+            available_memory_bytes=64*1024**3,minimum_available_memory_bytes=6*1024**3)
+        with patch('shaping_rescue_dispatch.worker_claims',return_value=nullcontext(claims)), \
+             patch('shaping_rescue_dispatch.pending_scientific_cells',return_value=set()), \
+             patch('shaping_rescue_dispatch.worker_slot',return_value=observation):
+            self.assertTrue(reserve_worker(Path('/study'),'second-fit')['can_start'])
+        self.assertIn('second-fit',claims)
+
     def test_resume_preserves_exposure_and_refuses_failed_or_changed_models(self):
         with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as d:
             root=Path(d);(root/'PLAN.json').write_text('{}')

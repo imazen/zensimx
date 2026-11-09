@@ -115,8 +115,9 @@ class VectorBenchTests(unittest.TestCase):
             from contextlib import nullcontext
             from types import SimpleNamespace
             child=SimpleNamespace(pid=4321,wait=lambda:1)
-            with patch('shaping_reduced_scope.admit_compute'),patch.object(bench.platform,'node',return_value='i270'),patch('shaping_rescue_dispatch.worker_slot',return_value={'native_threads':0}),patch('shaping_rescue_dispatch.reserve_worker',return_value={'can_start':True}),patch('shaping_rescue_dispatch.bind_worker'),patch('shaping_rescue_dispatch.release_worker') as release,patch('shaping_storage.reservation',return_value=nullcontext()),patch.object(bench.subprocess,'Popen',return_value=child):
+            with patch('shaping_reduced_scope.admit_compute'),patch.object(bench.platform,'node',return_value='i270'),patch('shaping_rescue_dispatch.reserve_worker',return_value={'can_start':True}) as reserve,patch('shaping_rescue_dispatch.bind_worker'),patch('shaping_rescue_dispatch.release_worker') as release,patch('shaping_storage.reservation',return_value=nullcontext()),patch.object(bench.subprocess,'Popen',return_value=child):
                 with self.assertRaisesRegex(RuntimeError,'preserve original attempt'):bench.run(out,study,'0-7')
+                self.assertTrue(reserve.call_args.kwargs['require_idle'])
                 release.assert_called_once();self.assertTrue((out/'outer-0.log').exists());self.assertEqual(json.loads((out/'STATUS.json').read_text())['stage'],'failed_with_preserved_evidence')
 
 

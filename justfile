@@ -5745,6 +5745,9 @@ shaping-runtime-equivalence-check:
 shaping-finalist-complexity-check:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B -m unittest scripts.tests.test_shaping_cost_complexity scripts.tests.test_shaping_cost_worker scripts.tests.test_shaping_cost_finalists scripts.tests.test_shaping_parameter_count scripts.tests.test_shaping_training_resources
 
+shaping-vector-idle-check:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B -m unittest scripts.tests.test_shaping_rescue_dispatch scripts.tests.test_shaping_cost_worker
+
 shaping-finalist-complexity-qualify study fixture expected output:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_cost_complexity.py qualify --study {{quote(study)}} --fixture {{quote(fixture)}} --expected {{quote(expected)}} --output {{quote(output)}}
 
