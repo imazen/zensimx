@@ -26,9 +26,19 @@ eight input-shaping library tests pass. The trainer build's run-heavy peak RSS
 was 1.70 GiB; the separate library-test compilation peaked at 1.20 GiB.
 The candidate trainer SHA-256 is
 `d68d5d443ba6fb14d99855084a7442edc13e728fb492bb19be2ea070987cb2de`.
-It has not been deployed to registered fits. Before future joint-product or
-joint-separate fits may use it, compare every checkpoint of each original
-240-epoch control trajectory. Other families keep the existing qualified runtime.
+It has not been deployed to registered scientific fits. Both original
+240-epoch controls, joint-product and joint-separate identity shaping, now
+passed every checkpoint comparison: 480 of 480 checkpoints matched after
+removing only the reproduction metadata. The native phase inputs, settings,
+seeds and exposure remained frozen. Other families keep the existing qualified
+runtime; this evidence does not authorize substituting the candidate into them.
+
+The full qualification archive passed durable checksum readback for 1,937 files
+and 592,364,916 bytes under
+`/mnt/tower/output/zensim/shaping-completion-20261107/paired-gradient-native-20261109/qualification`.
+It retains the original references, candidate checkpoints, canonical bakes,
+registration, reports and raw logs. These two engineering runs add no scientific
+conditions to the registered study. Whole-training speed remains unmeasured.
 
 Raw evidence and complete durable checksum readback:
 `/mnt/v/output/zensim/shaping-completion-20261107/gradient-kernel-probe-20261109/`,
