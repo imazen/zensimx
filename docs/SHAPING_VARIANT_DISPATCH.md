@@ -21,3 +21,12 @@ The prepared memberships, label permutations, TRAIN-only shaping banks and
 their independent audits are reused unchanged. The original scope policy is
 [SHAPING_REDUCED_SCOPE.md](SHAPING_REDUCED_SCOPE.md); this dispatcher changes
 execution placement and ordering, not that policy or scientific exposure.
+
+`shaping_bootstrap_pipeline.py` separately queues the existing primary source
+bootstrap and all 24 reduced matched comparisons. Each analysis waits for all
+three outer admissions and its complete paired model/report evidence. It then
+uses the existing bootstrap admission and transport owners on an approved
+worker, with shared CPU/RAM/SSD admission. Registered source draws, seeds,
+replicate counts and comparison definitions remain unchanged. Analyses can run
+independently as their inputs finish; their collected results receive complete
+destination checksum readback. No model is trained by this queue.

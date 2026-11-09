@@ -5612,6 +5612,12 @@ shaping-bootstrap-worker-collect request bundle pin:
 shaping-completion-watch-bootstraps study draws binaries registry output destination:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 2G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_bootstrap.py --study {{quote(study)}} --draws {{quote(draws)}} --binary-dir {{quote(binaries)}} --matched-registry {{quote(registry)}} --output {{quote(output)}} --archive-destination {{quote(destination)}} --watch
 
+shaping-completion-bootstrap-pipeline study draws binaries registry output destination:
+    TMPDIR="$HOME/tmp" python3 -B scripts/rev4_featpot/shaping_bootstrap_pipeline.py --study {{quote(study)}} --draws {{quote(draws)}} --binaries {{quote(binaries)}} --registry {{quote(registry)}} --output {{quote(output)}} --destination {{quote(destination)}}
+
+shaping-completion-bootstrap-pipeline-check:
+    TMPDIR="$HOME/tmp" python3 -B -m unittest scripts.tests.test_shaping_bootstrap_pipeline scripts.tests.test_shaping_bootstrap_worker
+
 # Native cost instrument: tests/builds run on an eligible non-dev host.
 shaping-cost-native-test:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 2G --jobs 1 -- cargo test --locked --release -p zensim-validate --example shaping_cost
