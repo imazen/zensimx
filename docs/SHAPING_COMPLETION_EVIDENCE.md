@@ -1204,3 +1204,35 @@ Nonfinite inputs refuse, signed-pair ambiguity still refuses, and the original
 native scoring gates remain mandatory. Five focused checks passed on i270:
 `done rc=0 0s | peak-RSS 0.11GiB | min-avail 20979MiB | peak-load 7.19`.
 Scientific recovery and archive receipts remain separate from these source checks.
+
+Recovery subsequently completed the four missing supplemental checkpoint panels
+with the original registered evaluator. The first recovery command accidentally
+selected the training V3 build; the unchanged mixed-build convergence gate refused.
+Those four new panels were preserved separately, then scored with the correct
+evaluator. The successful wave reported `done rc=0 14s | peak-RSS 0.27GiB |
+min-avail 38084MiB | peak-load 7.14`; the refused wave took 15 seconds. No training
+was replayed. All 29 previously completed report/receipt hashes stayed unchanged,
+and the unsigned epoch-149 conversion retained the original model SHA-256.
+The 468-file evaluation bundle was verified and published through the existing
+import owner. This unblocked the fold-1 rescue selection and its registered
+conditional extensions. The recovered native cell also has its durable archive.
+
+The generic evaluator and three waiting, childless extension scalar observers
+now use frozen `6d64c4a9f825` source, available on all six permitted workers.
+The scalar replacements use fresh output directories and retain both prior
+fold-2 wave registrations. Initial replacements refused existing output paths
+before scoring; their failed launch evidence remains preserved. Live replacement
+PIDs and waiting states were verified. Scientific fits were not signaled.
+
+The historical coverage ledger independently accounts for all 180 retained
+original raw-threshold pretrained fits, each with an individual verified archive.
+Their identities come from the immutable original matrix minus the 108 expressly
+omitted conditions; they remain auxiliary evidence and never substitute for the
+corrected primary screen. This reconciliation reused existing complete readbacks
+and reported `done rc=0 1s | peak-RSS 0.04GiB | min-avail 39934MiB | peak-load 2.54`.
+
+The source package, recovery evidence, failed attempts and all 180 historical
+receipt/manifest pairs passed complete durable readback as 511 files totaling
+65,012,807 bytes under `unsigned-export-recovery-evidence-20261109` beside the
+study archives. This does not establish completion of the remaining scientific
+extensions, outer evaluations or memorization controls.
