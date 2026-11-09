@@ -50,3 +50,11 @@ training speedup measurement. `--apply-observation` can reuse exactly these
 assignments after verifying every process identity, original thread affinity,
 worker eligibility and the completed observation's input hashes; `--restore`
 reverts them. Native scientific inputs and eleven-fit concurrency are retained.
+
+The exact observed CPU assignments were subsequently applied to the same eleven
+verified trainers on r5600g, retaining their original affinities for rollback.
+The application affects these processes only and ends when they exit. Its
+observation, application receipt, original affinities and source passed durable
+cold readback under `r5600g-affinity-evidence-20261109`: 14 payload files,
+184,787 bytes, plus receipt. Eleven-fit concurrency remains; an epoch-throughput
+speedup has not yet been established.

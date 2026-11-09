@@ -70,3 +70,13 @@ Collected-fit rows in the statistics page use RUN.json's recorded training host.
 Previously, a completed worker fit could be labeled with the coordinator host
 after its copied files were observed locally. This display correction preserves
 the actual training origin when evaluation occurs on another worker.
+
+The four relocated evaluations subsequently completed native, converted-bake and
+canonical-panel archival: twelve original cold-readback mirror receipts, with
+current manifest identities checked in `extension-relocation-complete-evidence-20261109`
+(19 payload files, 734,663 bytes, plus receipt). The deployed training-origin
+fix and its independent HTTP verification passed cold readback separately in
+`dashboard-origin-evidence-20261109` (17 payload files, 483,041 bytes, plus receipt).
+The first publisher launch rejected an unregistered optional supervisor label
+before publication; the corrected launch and original failed log are preserved.
+Scientific fits and scoring were unaffected by that launch refusal.
