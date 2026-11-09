@@ -1,3 +1,13 @@
+## Known Bugs — stable exporter native tool closure (source corrected November 9, 2026)
+
+The first rescue scalar wave on a newly used endpoint lacked the original
+native inspector. Three owners stopped before any inspector, conversion or
+scoring command executed. Their three empty output directories and original
+launch logs are preserved. New registrations bind every native binary, BUILD
+and the executable inspector; transfer verifies the complete closure before
+starting scalar owners. Re-export also checks the inspector before making an
+output directory. Training checkpoints and scientific gates are unchanged.
+
 ## Known Bugs — canonical assignment transfer (source corrected November 9, 2026)
 
 The rescue launcher transferred the job capsule's ASSIGNMENT.json but omitted

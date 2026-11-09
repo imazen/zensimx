@@ -4,10 +4,21 @@ from unittest.mock import patch
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'rev4_featpot'))
 from shaping_completion import matrix,sha
 from shaping_stable_export_watch import required_scope
-from shaping_stable_export_prepare import rescue_inputs
+from shaping_stable_export_prepare import rescue_inputs,runtime_inputs
 
 
 class RescueScopeTests(unittest.TestCase):
+    def test_runtime_closure_includes_executable_inspector_and_all_native_binaries(self):
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as tmp:
+            root=Path(tmp);study=root/'study';binaries=root/'bounded-resume-runtime-20261108/binaries-v3';binaries.mkdir(parents=True)
+            native=binaries/'baker';native.write_bytes(b'frozen binary')
+            build=binaries/'BUILD.json';build.write_text(json.dumps(dict(binary_sha256={'baker':sha(native)})))
+            inspector=root/'first-weight-native-qualification/zenpredict-inspect';inspector.parent.mkdir();inspector.write_bytes(b'inspector');inspector.chmod(0o755)
+            paths=set();runtime=runtime_inputs(study,paths)
+            self.assertEqual(paths,{native,build,inspector});self.assertEqual(runtime['inspector_sha256'],sha(inspector))
+            native.write_bytes(b'drift')
+            with self.assertRaisesRegex(ValueError,'native binary drift'):runtime_inputs(study,set())
+
     def test_extension_scope_is_bound_to_one_actual_conditional_registration(self):
         with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as tmp:
             root=Path(tmp);path=root/'extensions/outer-1/REGISTRATION.json';path.parent.mkdir(parents=True)

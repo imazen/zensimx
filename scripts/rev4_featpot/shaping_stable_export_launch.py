@@ -21,6 +21,10 @@ for name,row in q['files'].items():
  p=Path(name)
  if ALLOW_MISSING and not p.exists():continue
  assert not p.is_symlink() and p.stat().st_size==row['bytes'] and hashlib.sha256(p.read_bytes()).hexdigest()==row['sha256'],name
+if 'runtime' in q and not ALLOW_MISSING:
+ r=q['runtime'];p=Path(r['inspector'])
+ assert p.stat().st_mode&0o111 and hashlib.sha256(p.read_bytes()).hexdigest()==r['inspector_sha256']
+ assert hashlib.sha256(Path(r['binary_dir']+'/BUILD.json').read_bytes()).hexdigest()==r['build_sha256']
 print('VERIFIED',len(q['files']),flush=True)
 '''
     # First install the new registration only; preflight refuses divergent
@@ -32,18 +36,20 @@ print('VERIFIED',len(q['files']),flush=True)
             program='REGISTRATION='+repr(str(wave/'REGISTRATION.json'))+'\nPIN='+repr(sha(wave/'REGISTRATION.json'))+'\nALLOW_MISSING='+repr(allow_missing)+'\n'+verify
             subprocess.run(['ssh',host,'python3 -B -'],input=program,text=True,stdout=log,stderr=subprocess.STDOUT,check=True)
         check(True)
-        subprocess.run(['rsync','-rt','--omit-dir-times','--from0','--files-from='+str(wave/'INPUT_PATHS.txt'),'/',host+':/'],stdout=log,stderr=subprocess.STDOUT,check=True)
+        subprocess.run(['rsync','-rpt','--omit-dir-times','--from0','--files-from='+str(wave/'INPUT_PATHS.txt'),'/',host+':/'],stdout=log,stderr=subprocess.STDOUT,check=True)
         check(False)
     (output/'INPUT_VERIFIED.json').write_bytes(encoded(dict(registration_sha256=sha(wave/'REGISTRATION.json'),all_input_sha256_verified=True)))
     records=[]
+    runtime=q.get('runtime',dict(binary_dir=str(root/'bounded-resume-runtime-20261108/binaries-v3'),
+                                inspector=str(root/'first-weight-native-qualification/zenpredict-inspect')))
     for family in q['families']:
         jobs=[j for j in q['jobs'] if j['cell']['family']==family]
         if not jobs:continue
         directory=output/family;directory.mkdir();unit='zensim-'+wave.name+'-'+family.replace('_','-')
         command=['env','TMPDIR=/home/lilith/tmp','PYTHONPATH='+str(root/'python-runtime'),
             '/home/lilith/work/claudehints/scripts/run-heavy','--mem','1G','--jobs','1','--','python3','-B',str(owner),
-            '--study',str(study),'--binary-dir',str(root/'bounded-resume-runtime-20261108/binaries-v3'),
-            '--inspector',str(root/'first-weight-native-qualification/zenpredict-inspect'),
+            '--study',str(study),'--binary-dir',runtime['binary_dir'],
+            '--inspector',runtime['inspector'],
             '--family',family,'--status',str(directory/'STATUS.json'),'--reserve-slot']
         for job in jobs:command.extend(['--cell',job['cell']['id']])
         subprocess.run(['ssh',host,shlex.join(['mkdir','-p',str(directory)])],check=True)

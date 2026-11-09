@@ -41,6 +41,8 @@ def reexport(args):
     for name,pin in json.loads(build_path.read_text())['binary_sha256'].items():
         if sha(args.binary_dir/name)!=pin:raise ValueError('binary drift')
     original=args.run/run.get('fit_directory','.')/'checkpoints'/f'ckpt_epoch{epoch:03}.bin'
+    if not args.inspector.is_file() or not args.inspector.stat().st_mode&0o111:
+        raise ValueError('executable native inspector required before re-export')
     dest=args.study/'reexports'/run['cell']['id']/args.run.name/('final' if args.checkpoint is None else f'epoch-{epoch:03}')
     if dest.exists():raise ValueError('preserve existing re-export')
     dest.mkdir(parents=True)

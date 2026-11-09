@@ -7,6 +7,20 @@ from shaping_evaluation import diagnostic_epochs
 from shaping_execution import load_registration
 
 
+def runtime_inputs(study,paths):
+    binaries=study.parent/'bounded-resume-runtime-20261108/binaries-v3'
+    build=binaries/'BUILD.json';value=json.loads(build.read_text());paths.add(build)
+    for name,pin in value['binary_sha256'].items():
+        path=binaries/name
+        if sha(path)!=pin:raise ValueError('stable exporter native binary drift')
+        paths.add(path)
+    inspector=study.parent/'first-weight-native-qualification/zenpredict-inspect'
+    if not inspector.is_file() or not inspector.stat().st_mode&0o111:
+        raise ValueError('stable exporter executable inspector required')
+    paths.add(inspector)
+    return dict(binary_dir=str(binaries),build_sha256=sha(build),inspector=str(inspector),inspector_sha256=sha(inspector))
+
+
 def rescue_inputs(study,source,run,identity,result,paths):
     """Preserve phase receipts and the exact inner selection dependency closure."""
     from shaping_rescue_worker import reads
@@ -66,6 +80,7 @@ def prepare(study,source,host,selected_families,previous,output,*,stage='inner',
         if assigned&ids:raise ValueError('overlapping prior scalar-export waves')
         assigned|=ids;previous_pins[str(path)]=sha(path)
     q=json.loads(certificate.read_text());paths={certificate,*map(Path,q['evidence_sha256'])};jobs=[]
+    runtime=runtime_inputs(study,paths)
     if evaluation_inputs is not None:
         from shaping_evaluation_inputs import validate
         closure=json.loads(evaluation_inputs.read_text());validate(study,closure);paths.add(evaluation_inputs)
@@ -103,7 +118,7 @@ def prepare(study,source,host,selected_families,previous,output,*,stage='inner',
     if len(files)>10000 or sum(q['bytes'] for q in files.values())>2*1024**3:raise ValueError('scalar-export wave exceeds input allowance')
     record=dict(schema='fixed-qualified-supplemental-wave-v1',source=str(source),source_owner_sha256=sha(owner),host=host,
         families=list(selected_families),jobs=jobs,plan_sha256=sha(study/'PLAN.json'),qualification_sha256=pin,
-        previous_wave_sha256=previous_pins,files=files,training_replayed=False,outer_or_final_holdout_read=False)
+        previous_wave_sha256=previous_pins,files=files,runtime=runtime,training_replayed=False,outer_or_final_holdout_read=False)
     if stage!='inner':record['cell_stage']=stage
     output.mkdir(parents=True,exist_ok=False);(output/'REGISTRATION.json').write_bytes(encoded(record))
     (output/'INPUT_PATHS.txt').write_bytes(b''.join(str(p).lstrip('/').encode()+b'\0' for p in sorted(paths)))
