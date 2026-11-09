@@ -182,7 +182,11 @@ def require_downstream_build(root,family,build_sha256):
     if family not in FAMILIES or not (root/'corrected_thresholds/REGISTRATION.json').exists():return
     require_activation(root)
     if build_sha256!=BUILD_SHA256:
-        raise ValueError('corrected pretrained downstream fit requires the registered corrected native build')
+        from shaping_runtime_equivalence import canonical_build
+        try:compatible=canonical_build(root,family,build_sha256)==BUILD_SHA256
+        except ValueError:compatible=False
+        if not compatible:
+            raise ValueError('corrected pretrained downstream fit requires the registered corrected native build')
 
 
 if __name__=='__main__':

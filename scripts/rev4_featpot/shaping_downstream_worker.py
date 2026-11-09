@@ -73,6 +73,8 @@ def resolve_inputs(study,cell,host,binaries,qualification,kind,human_qualificati
 
 def reproduce(record,*,host=None):
     kind=record['execution_kind'];study=Path(record['study'])
+    from shaping_runtime_equivalence import verify_binding
+    verify_binding(study,record)
     args=arguments(study,record['cell']['id'],Path(record['binary_dir']),
                    Path(record['neutral_qualification']),kind,
                    Path(record['human_qualification']) if record['human_qualification'] else None)

@@ -130,6 +130,8 @@ def seal_inputs(paths,study,cell,host,binaries,qualification,resolution,*,execut
 
 def register(study,cell,host,binaries,qualification,output,*,execution_kind=None,human_qualification=None):
     if host not in HOSTS:raise ValueError('approved compute worker required')
+    from shaping_runtime_equivalence import select
+    binaries,runtime=select(study,cell,execution_kind,binaries)
     if execution_kind is None:record=resolve_inputs(study,cell,host,binaries,qualification)
     else:
         if execution_kind=='corrected_inner':
@@ -138,6 +140,18 @@ def register(study,cell,host,binaries,qualification,output,*,execution_kind=None
         else:
             from shaping_downstream_worker import resolve_inputs as later_inputs
             record=later_inputs(study,cell,host,binaries,qualification,execution_kind,human_qualification)
+    if runtime is not None:
+        path=Path(runtime['certificate']);certificate=json.loads(path.read_text())
+        additions={str(path):sha(path),str(path.with_name('ACTIVATION.json')):sha(path.with_name('ACTIVATION.json')),
+                   **certificate['artifact_sha256']}
+        for name,pin in additions.items():
+            source=Path(name);kind,relative=category(source)
+            if sha(source)!=pin:raise ValueError('qualified runtime evidence changed during registration')
+            record['files'][name]=dict(kind=kind,name=relative,bytes=source.stat().st_size,sha256=pin)
+        record['input_bytes']=sum(row['bytes'] for row in record['files'].values())
+        maximum,count=limits(execution_kind)
+        if record['input_bytes']>maximum or len(record['files'])>count:raise ValueError('runtime evidence exceeds existing capsule allowance')
+        record['runtime_compatibility']=runtime
     output.mkdir(parents=True,exist_ok=False);(output/'REQUEST.json').write_bytes(encoded(record))
     assignment=dict(host=host,cells=[cell],partition=record['cell']['partition'],
                     plan_sha256=record['plan_sha256'],build_sha256=record['build_sha256'])
@@ -217,6 +231,8 @@ def work(request):
     from shaping_storage import reservation
     record=json.loads(request.read_text());verify(record)
     study=Path(record['study']);cell=record['cell'];key=cell['id']
+    from shaping_runtime_equivalence import verify_binding
+    verify_binding(study,record)
     if record.get('execution_kind') is not None:
         if record['execution_kind']=='corrected_inner':from shaping_corrected_worker import reproduce
         elif record['execution_kind']=='bootstrap':from shaping_bootstrap_worker import reproduce

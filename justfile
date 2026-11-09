@@ -5733,6 +5733,15 @@ shaping-cost-worker-check:
 shaping-gradient-pretrained-check:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 512M --jobs 1 -- python3 -B -m unittest scripts.tests.test_shaping_gradient_pretrained
 
+shaping-runtime-equivalence-check:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B -m unittest scripts.tests.test_shaping_runtime_equivalence scripts.tests.test_shaping_corrected_view scripts.tests.test_shaping_downstream_worker scripts.tests.test_shaping_rescue_worker scripts.tests.test_shaping_downstream_collection
+
+shaping-runtime-equivalence-prepare study baseline candidate identity pretrained:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 512M --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_runtime_equivalence.py prepare --study {{quote(study)}} --baseline {{quote(baseline)}} --candidate {{quote(candidate)}} --identity {{quote(identity)}} --pretrained {{quote(pretrained)}}
+
+shaping-runtime-equivalence-activate study certificate:
+    TMPDIR="$HOME/tmp" python3 -B scripts/rev4_featpot/shaping_runtime_equivalence.py activate --study {{quote(study)}} --certificate {{quote(certificate)}}
+
 # Diagnostic attachment only; this does not measure benchmark latency.
 shaping-training-profile pid output seconds='15':
     test {{quote(seconds)}} -ge 1
