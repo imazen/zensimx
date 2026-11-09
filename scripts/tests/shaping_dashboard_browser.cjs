@@ -3,6 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const url = process.argv[2], output = process.argv[3], family = process.argv[4];
 const extensions = process.argv[5] === 'extensions';
+const extensionCell = process.argv[6] || null;
 if (!url || !output) throw Error('Usage: node shaping_dashboard_browser.cjs URL OUTPUT_DIRECTORY');
 (async () => {
   fs.mkdirSync(output, { recursive: true });
@@ -26,20 +27,30 @@ if (!url || !output) throw Error('Usage: node shaping_dashboard_browser.cjs URL 
     let extensionCoverage = null;
     if (extensions) {
       await page.selectOption('#stage', 'exposure_extension');
+      if (extensionCell) {
+        const partition = await page.evaluate(id => {
+          const row=data.extension_records.find(r=>r.cell.id===id && r.trained && r.details);
+          if (!row) throw Error('Requested completed extension has no scatter: '+id);
+          return row.cell.partition;
+        },extensionCell);
+        await page.selectOption('#partition',partition);
+      }
       await page.waitForFunction(() => document.querySelectorAll('#comparison tbody tr').length > 0);
-      extensionCoverage = await page.evaluate(() => {
+      extensionCoverage = await page.evaluate(extensionCell => {
         if (!data.extension_records.length) throw Error('Registered extension records are absent');
         if (data.records.some(r => r.cell.stage === 'exposure_extension')) throw Error('Extensions mixed into original-budget records');
         if (!document.querySelector('#setting').disabled) throw Error('Selected extension setting can be filtered away');
         if (rows().some(r => r.stage !== 'exposure_extension')) throw Error('Extension view includes another budget');
         const match=data.extension_comparisons.find(r => r.partition===document.querySelector('#partition').value &&
+          (!extensionCell || r.cells.includes(extensionCell)) &&
           r.cells.some(id=>data.extension_records.find(v=>v.cell.id===id).curve.length));
         if (!match) throw Error('No saved extension curve in the selected partition');
         showDetail(match);
         if (!document.querySelector('#curves polyline')) throw Error('Saved extension curves did not render');
         if (document.querySelectorAll('#seeds .seed').length !== match.required) throw Error('Extension seed denominator differs');
         return {registered:data.extension_records.length,comparisons:data.extension_comparisons.length,shown:match.cells,curves:true};
-      });
+      },extensionCell);
+      if (extensionCell) await page.selectOption('#scatterFit',extensionCell);
       await page.waitForFunction(() => Number(document.querySelector('#scatterRaw').dataset.points) > 0 &&
         Number(document.querySelector('#scatterNormalized').dataset.points) > 0 &&
         document.querySelector('#scatterMessage').textContent.includes('Full native Zenstats is available.'));
