@@ -1513,3 +1513,12 @@ artifact when fewer than three exist and refuses empty inventories. Full SHA-256
 verification of all files is unchanged. The failed destination remains preserved;
 a retry uses a new destination. One-file, two-file, existing three-file, and
 corruption-refusal checks pass.
+## Known Bugs — doubled-phase memory admission (source corrected November 9, 2026)
+
+Source inspection found that an outer or variant schedule containing a
+480-epoch native phase requested a 4 GiB child scope while its controller and
+shared admission still reserved 2 GiB. These stages had not started. Their
+controller cap and admission reservation now both derive from the registered
+phase lengths and cover the largest native phase. Ordinary 240-epoch neural
+fits keep their existing bound. No active fit or scientific schedule changed.
+

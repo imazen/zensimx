@@ -32,7 +32,7 @@ print(json.dumps(dict(checked=len(paths))))
 
 
 def launch(waves,source,host,output):
-    from shaping_rescue_worker import HOSTS
+    from shaping_rescue_worker import HOSTS,memory_allowance
     if host not in HOSTS:raise ValueError('approved native worker required')
     jobs=[]
     for wave in waves:
@@ -59,7 +59,8 @@ def launch(waves,source,host,output):
         request=Path(job['request']);unit='zensim-rescue-'+job['cell']['id']+'-'+output.name
         scientific=json.loads(request.read_text())
         runtime=Path(scientific['study']).parent/'python-runtime'
-        memory='4G' if scientific.get('execution_kind') in ('control','extension') else '2G'
+        memory_bytes=memory_allowance(scientific)
+        memory=str(memory_bytes//1024**3)+'G'
         command=['env','TMPDIR=/home/lilith/tmp','PYTHONPATH='+str(runtime),
                  '/home/lilith/work/claudehints/scripts/run-heavy','--mem',memory,'--jobs','1','--',
                  'python3','-B',str(driver),'work','--request',str(request)]
@@ -68,7 +69,7 @@ def launch(waves,source,host,output):
                 '--property=StandardOutput=append:'+str(request.with_name('service.log')),
                 '--property=StandardError=append:'+str(request.with_name('service.log')),*command]
         row=dict(host=host,cell=job['cell'],request=job['request'],unit=unit,command=command,
-                 memory_max_bytes=(4 if memory=='4G' else 2)*1024**3,threads_per_fit=1)
+                 memory_max_bytes=memory_bytes,threads_per_fit=1)
         (output/(job['cell']['id']+'-LAUNCH.json')).write_bytes(encoded(row))
         subprocess.run(['ssh',host,shlex.join(remote)],check=True)
         rows.append(row)

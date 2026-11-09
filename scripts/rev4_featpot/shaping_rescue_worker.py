@@ -17,6 +17,20 @@ def limits(kind):
     return (2*1024**3,16000) if kind in ('bootstrap','control') else (MAX_INPUT_BYTES,4000)
 
 
+def memory_allowance(record):
+    """Reserve the same bound as the largest native phase and its parent scope."""
+    kind=record.get('execution_kind')
+    if kind in ('control','extension'):
+        return 4*1024**3
+    if kind in ('outer','variant'):
+        phases=record['resolution']['schedule']['phase_epochs']
+        if not phases or any(type(e) is not int or e not in (120,240,480) for e in phases):
+            raise ValueError('registered downstream phase lengths required for memory admission')
+        if max(phases)==480:
+            return 4*1024**3
+    return 2*1024**3
+
+
 def source_identity(value,source=None):
     """Source exports may move; data paths and source-content hashes may not."""
     source=REPO if source is None else Path(source);path=Path(value)
@@ -218,7 +232,7 @@ def work(request):
                  '--binary-dir',record['binary_dir'],'--neutral-qualification',record['neutral_qualification'],'--cell',key]
     if (study/'runs'/key).exists():raise ValueError('preserve existing attempt; never replay')
     while True:
-        if record.get('execution_kind') in ('control','extension'):admission=reserve_worker(study,key,memory_allowance_bytes=4*1024**3)
+        if memory_allowance(record)==4*1024**3:admission=reserve_worker(study,key,memory_allowance_bytes=4*1024**3)
         elif record.get('execution_kind')=='corrected_inner':admission=reserve_worker(study,key,warmup_until_checkpoint=True)
         else:admission=reserve_worker(study,key)
         if not admission['can_start']:

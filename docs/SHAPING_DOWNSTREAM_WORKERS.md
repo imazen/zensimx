@@ -53,3 +53,13 @@ families retain their separately qualified runtimes. Historical fits stay
 preserved. The stale-build refusal checks cover all three execution owners,
 including a human-only role that resolves to a pretrained family; they launch
 no trainer and create no attempt directory.
+# Native phase memory bounds
+
+Outer and variant requests bind their resolved schedule. The launcher and shared
+CPU/RAM admission use the same resource helper: 4 GiB if any registered native
+phase runs for 480 epochs, otherwise the existing 2 GiB neural bound. Extension
+and non-neural control owners retain their existing 4 GiB bound. A controller's
+systemd cap must cover its child scope; a child requesting more memory cannot
+escape an enclosing smaller cgroup. This resource correction changes no phase
+length, pairing, optimizer or selection gate.
+
