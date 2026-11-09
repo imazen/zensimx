@@ -8,6 +8,18 @@ from shaping_completion import encoded,sha
 
 
 class ProgressTests(unittest.TestCase):
+    def test_progress_validates_a_complete_extension_fold_once(self):
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as d:
+            root=Path(d);(root/'PLAN.json').write_text('{}')
+            p=root/'extensions/outer-0/REGISTRATION.json';p.parent.mkdir(parents=True);p.write_text('{}')
+            cells=[dict(id=str(i),stage='exposure_extension',family='relu') for i in range(12)]
+            with patch('shaping_progress.load_registration',return_value=({},[],{})), \
+                 patch('shaping_extension.registered_fold',return_value=dict(cells=cells)) as verify:
+                result=audit(root,{})
+            verify.assert_called_once_with(root,p,cells=())
+            self.assertEqual(result['counts']['exposure_extension']['required'],12)
+            self.assertEqual(result['counts']['exposure_extension']['successful_fit_cells'],0)
+
     def supervisor_fixture(self,d,command):
         root=Path(d);status=root/'status.json';proc=root/'proc';process=proc/'42'
         process.mkdir(parents=True)

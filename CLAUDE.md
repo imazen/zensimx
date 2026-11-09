@@ -1565,3 +1565,12 @@ models retain the original pairing/native checks, and all scoring gates remain.
 Existing partial exports and failed worker logs must remain preserved. Resume
 evaluation from completed reports; this does not authorize training replays.
 
+## Known Bugs — repeated extension progress validation (source corrected November 9, 2026)
+
+The progress audit reconstructed a complete extension fold once for each of its
+cells. With 60 cells in three immutable fold registrations, this repeatedly read
+and hashed the same rescue evidence. It now validates the complete fold once per
+sweep, retaining every selection, policy, matrix and provenance check. Per-cell
+resolution uses that same full-fold validator. Active scientific owners retain
+their frozen source; this change requires no training or evaluation replay.
+

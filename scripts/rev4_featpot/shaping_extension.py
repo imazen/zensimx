@@ -99,23 +99,31 @@ def register(root,outer):
     (out/'REGISTRATION.json').write_bytes(encoded(result));print(json.dumps(result),flush=True)
 
 
+def registered_fold(root,path,*,cells=None):
+    """Reconstruct and verify the complete immutable fold, including every cell."""
+    if cells is None:_,cells,_=load_registration(root)
+    record=json.loads(path.read_text())
+    if record['plan_sha256']!=sha(root/'PLAN.json') or record['policy_sha256']!=sha(REPO/'docs/SHAPING_EXPOSURE_EXTENSION.md'):
+        raise ValueError('extension registration drift')
+    decisions={}
+    from shaping_reduced_scope import neural_families
+    required=neural_families(root,record['outer'])
+    for family in required:
+        decision,source=verify_decision(root,family,record['outer'],cells)
+        if record['decision_sha256'].get(str(source))!=sha(source):raise ValueError('extension selection drift')
+        decisions[family]=decision
+    expected=matrix(decisions,record['outer'],candidate_families=required)
+    if any(record[k]!=v for k,v in expected.items()):raise ValueError('extension cannot be reproduced')
+    return record
+
+
 def resolve(root,cell_id):
     _,cells,_=load_registration(root)
     found=[]
     for path in (root/'extensions').glob('outer-*/REGISTRATION.json'):
         record=json.loads(path.read_text())
         if not any(c['id']==cell_id for c in record['cells']):continue
-        if record['plan_sha256']!=sha(root/'PLAN.json') or record['policy_sha256']!=sha(REPO/'docs/SHAPING_EXPOSURE_EXTENSION.md'):
-            raise ValueError('extension registration drift')
-        decisions={}
-        from shaping_reduced_scope import neural_families
-        required=neural_families(root,record['outer'])
-        for family in required:
-            decision,source=verify_decision(root,family,record['outer'],cells)
-            if record['decision_sha256'].get(str(source))!=sha(source):raise ValueError('extension selection drift')
-            decisions[family]=decision
-        expected=matrix(decisions,record['outer'],candidate_families=required)
-        if any(record[k]!=v for k,v in expected.items()):raise ValueError('extension cannot be reproduced')
+        record=registered_fold(root,path,cells=cells)
         found.append((next(c for c in record['cells'] if c['id']==cell_id),path))
     if len(found)!=1:raise ValueError('one registered extension cell required')
     cell,path=found[0]

@@ -1,6 +1,7 @@
 import copy
 from pathlib import Path
-import sys,unittest
+import sys,unittest,json,tempfile
+from unittest.mock import patch
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'rev4_featpot'))
 from shaping_completion import NEURAL
 from shaping_extension import matrix
@@ -14,6 +15,30 @@ def selections():
 
 
 class ExtensionTests(unittest.TestCase):
+    def test_whole_fold_validation_rejects_drift_in_a_different_cell(self):
+        from shaping_extension import registered_fold,resolve
+        from shaping_completion import encoded,sha
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as directory:
+            root=Path(directory);(root/'PLAN.json').write_text('{}');(root/'docs').mkdir()
+            policy=root/'docs/SHAPING_EXPOSURE_EXTENSION.md';policy.write_text('frozen policy')
+            decisions=selections();decisions['softplus']['selected_convergence']['0-0']['reasons']=['loss_improvement_over_one_percent_or_rounding_boundary']
+            paths={}
+            for family,decision in decisions.items():
+                p=root/'selection/outer-0'/(family+'-rescue.json');p.parent.mkdir(parents=True,exist_ok=True);p.write_bytes(encoded(decision));paths[family]=p
+            record=matrix(decisions,0);record.update(plan_sha256=sha(root/'PLAN.json'),policy_sha256=sha(policy),decision_sha256={str(p):sha(p) for p in paths.values()})
+            p=root/'extensions/outer-0/REGISTRATION.json';p.parent.mkdir(parents=True);p.write_bytes(encoded(record))
+            with patch('shaping_extension.REPO',root),patch('shaping_extension.load_registration',return_value=({},[],{})), \
+                 patch('shaping_reduced_scope.neural_families',return_value=NEURAL), \
+                 patch('shaping_extension.verify_decision',side_effect=lambda root,family,outer,cells:(decisions[family],paths[family])):
+                self.assertEqual(registered_fold(root,p),record)
+                first=record['cells'][0]['id'];self.assertEqual(resolve(root,first)['cell'],record['cells'][0])
+                record['cells'][-1]['seed']=99;p.write_bytes(encoded(record))
+                with self.assertRaisesRegex(ValueError,'cannot be reproduced'):registered_fold(root,p)
+                with self.assertRaisesRegex(ValueError,'cannot be reproduced'):resolve(root,first)
+                record=matrix(decisions,0);record.update(plan_sha256=sha(root/'PLAN.json'),policy_sha256=sha(policy),decision_sha256={str(p):sha(p) for p in paths.values()});p.write_bytes(encoded(record))
+                paths['relu'].write_text('changed selection')
+                with self.assertRaisesRegex(ValueError,'selection drift'):registered_fold(root,p)
+
     def test_reduced_scope_preserves_paired_extension_requirements(self):
         required=('relu','softplus','product_joint_identity','separate_joint_identity')
         decisions={k:v for k,v in selections().items() if k in required}

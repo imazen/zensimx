@@ -299,11 +299,11 @@ def audit(root,workers,supervisors=None):
         expected={c['id'] for c in cells if c['stage']=='rescue' and c['partition'].startswith(f'inner-{outer}-')}
         if set(trigger['required_rescue_cells'])!=expected or trigger['outer_results_read']:raise ValueError('rescue trigger differs')
         required|=expected
+    primary_registration=tuple(cells)
     for path in (root/'extensions').glob('outer-*/REGISTRATION.json'):
-        extension=json.loads(path.read_text())
-        from shaping_extension import resolve
+        from shaping_extension import registered_fold
+        extension=registered_fold(root,path,cells=primary_registration)
         for cell in extension['cells']:
-            if resolve(root,cell['id'])['cell']!=cell:raise ValueError('extension drift')
             cells.append(cell);required.add(cell['id'])
     for path in (root/'selection').glob('outer-*/OUTER_ADMISSION.json'):
         from shaping_outer_admission import resolve as resolve_outer

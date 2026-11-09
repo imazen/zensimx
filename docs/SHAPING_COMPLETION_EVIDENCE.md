@@ -1266,3 +1266,25 @@ under `extension-placement-5628b2d8-20261109` beside the study archives. It incl
 the completed primary/rescue inner-selection summary, source overlay and hash-bound
 reference to the existing shared source archive. The measured selection results
 are recorded in [the primary inner report](../benchmarks/shaping_primary_inner_2026-11-08.md).
+
+## Repeated progress validation, November 9 UTC
+
+The progress audit called the complete extension resolver for every registered
+cell. Each call reconstructed and checked the same fold's paired rescue evidence
+and entire extension matrix. The shared `registered_fold` validator now performs
+those checks once per fold per progress sweep. Per-cell resolution also uses it;
+all policy, selection, source, pairing and full-matrix comparisons remain. A
+changed cell elsewhere in the fold still refuses resolution of an unchanged cell.
+
+Nineteen focused extension/progress checks passed on i270: `done rc=0 0s |
+peak-RSS 0.07GiB | min-avail 22256MiB | peak-load 7.26`. Active scientific sources,
+models, conditions and numerical gates are unchanged. Native training and scoring
+are not needed to qualify this metadata refactor.
+
+An actual complete audit over the current study retained identical outcomes for
+all 2,600 non-extension registered cells compared with the prior saved audit,
+including unstarted and omitted entries. All 60 extension cells were reconstructed
+through their three complete fold registrations. The metadata-only check reported
+`done rc=0 17s | peak-RSS 0.06GiB | min-avail 40452MiB | peak-load 3.79`.
+This is not a measured before/after speed ratio; the previous audit was reused
+rather than rerun for a timing baseline.
