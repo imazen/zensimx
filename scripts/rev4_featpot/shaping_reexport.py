@@ -1,11 +1,39 @@
 """Preserve and evaluate a separately pinned native max-pair representation."""
 from __future__ import annotations
-import argparse,json,subprocess
+import argparse,json,shutil,subprocess
 from pathlib import Path
 from shaping_completion import MAX_PAIR_FAMILIES,max_pair_families,encoded,sha
 from shaping_evaluation import admitted_epoch,evaluation_epoch,evaluate,outer_context
 from shaping_execution import load_registration
 from shaping_probe_trace import unique_signed_pairs
+
+
+def export_pairs(model):
+    """An unsigned first layer needs no cancellation repair; keep its exact bytes."""
+    import numpy as np
+    first,following=model['layers'][:2]
+    weights=np.array(first['weights'],np.float64).reshape(first['in_dim'],first['out_dim'])
+    biases=np.array(first['biases'],np.float64)
+    if (first['activation']!='relu' or first['in_dim']<=0 or first['out_dim']<=0
+        or following['in_dim']!=first['out_dim'] or len(biases)!=first['out_dim']
+        or not np.isfinite(weights).all() or not np.isfinite(biases).all()):
+        raise ValueError('finite adjacent research ReLU layers required')
+    if np.all(weights>=0):return []
+    return unique_signed_pairs(model)
+
+
+def convert_export(original,bake,declaration,pairs,binary,log):
+    if bake.exists() or log.exists():raise ValueError('preserve existing export conversion')
+    if not pairs:
+        shutil.copyfile(original,bake)
+        if sha(bake)!=sha(original):raise ValueError('unsigned checkpoint copy differs')
+        log.write_bytes(encoded(dict(conversion='unchanged-nonnegative-first-layer',
+                                     original_sha256=sha(original),output_sha256=sha(bake))))
+        return 'unchanged-nonnegative-first-layer'
+    native=subprocess.run([str(binary),'repair-research-max-pairs',
+        '--in',str(original),'--out',str(bake),'--pairs',str(declaration)],capture_output=True,text=True)
+    log.write_text(native.stdout+native.stderr);native.check_returncode()
+    return 'native-signed-max-pairs'
 
 
 def admit_family(family,analytic_diagnostic=False,study=None):
@@ -49,17 +77,14 @@ def reexport(args):
     inspection=subprocess.run([str(args.inspector),str(original),'--weights'],check=True,capture_output=True,text=True)
     model=dest/'original-inspection.json';model.write_text(inspection.stdout)
     (dest/'inspection.log').write_text(inspection.stderr)
-    pairs=unique_signed_pairs(json.loads(inspection.stdout))
+    pairs=export_pairs(json.loads(inspection.stdout))
     declaration=dest/'pairs.txt'
     declaration.write_text('relu-max-pairs-v1\n'+''.join(f'{a} {b}\n' for a,b in pairs))
     bake=dest/'repaired.bin'
-    native=subprocess.run([str(args.binary_dir/'bake_dial_refit'),'repair-research-max-pairs',
-        '--in',str(original),'--out',str(bake),'--pairs',str(declaration)],capture_output=True,text=True)
-    (dest/'repair.log').write_text(native.stdout+native.stderr)
-    native.check_returncode()
+    conversion=convert_export(original,bake,declaration,pairs,args.binary_dir/'bake_dial_refit',dest/'repair.log')
     receipt=dict(representation='research-relu-max-pairs-v1',original_sha256=sha(original),
         training_build_sha256=run['build_sha256'],evaluation_build_sha256=sha(build_path),
-        inspector_sha256=sha(args.inspector),bake=str(bake),pairs=pairs,
+        inspector_sha256=sha(args.inspector),bake=str(bake),pairs=pairs,conversion=conversion,
         driver_sha256=sha(__file__),file_sha256={str(x):sha(x) for x in (model,declaration,bake,dest/'repair.log')})
     args.reexport_receipt=dest/'RECEIPT.json';args.reexport_receipt.write_bytes(encoded(receipt))
     evaluate(args)

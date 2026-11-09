@@ -1192,3 +1192,15 @@ logs passed complete durable readback as 1,466 files and 33,611,382 bytes under
 `primary-archive-coverage-evidence-20261109` beside the study archives.
 This covers the primary screen only. Rescue, conditional exposure, outer and
 memorization-stage completion remain separate requirements.
+
+## Unsigned diagnostic checkpoint export, November 9 UTC
+
+The final Softplus rescue completed native training, but supplemental evaluation
+stopped at epoch 149 because its first layer contained no negative coefficients.
+The model had 43,218 nonzero first-layer weights, all nonnegative; this was an
+absent cancellation pattern, not an empty model. The exporter now retains the
+original model bytes in this case and records the unchanged conversion explicitly.
+Nonfinite inputs refuse, signed-pair ambiguity still refuses, and the original
+native scoring gates remain mandatory. Five focused checks passed on i270:
+`done rc=0 0s | peak-RSS 0.11GiB | min-avail 20979MiB | peak-load 7.19`.
+Scientific recovery and archive receipts remain separate from these source checks.

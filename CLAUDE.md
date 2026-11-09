@@ -1554,3 +1554,13 @@ Remote archive commands also explicitly set the disk-backed TMPDIR required by
 the private read-only mount helper. All refusals occurred before state removal;
 failed preflights remain preserved. No native training was replayed or changed.
 
+## Known Bugs — unsigned checkpoint export (source corrected November 9, 2026)
+
+A completed Softplus rescue's epoch-149 first layer had no negative weights.
+The signed-pair proposal therefore refused before supplemental scoring, after
+earlier checkpoint reports had completed. Stable export now preserves such an
+unsigned model byte for byte; finite adjacent ReLU layers are required, signed
+models retain the original pairing/native checks, and all scoring gates remain.
+Existing partial exports and failed worker logs must remain preserved. Resume
+evaluation from completed reports; this does not authorize training replays.
+

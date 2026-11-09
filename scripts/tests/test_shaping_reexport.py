@@ -4,6 +4,33 @@ sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'rev4_featpot'))
 from shaping_reexport import admit_family
 
 class ReexportAdmissionTests(unittest.TestCase):
+    def test_unsigned_checkpoint_is_preserved_exactly_without_native_repair(self):
+        import tempfile
+        from unittest.mock import patch
+        from shaping_reexport import export_pairs,convert_export
+        model=dict(layers=[dict(in_dim=2,out_dim=2,activation='relu',weights=[1.,0.,0.,2.],biases=[-1.,-2.]),
+                           dict(in_dim=2,out_dim=1,weights=[1.,1.])])
+        self.assertEqual(export_pairs(model),[])
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as d:
+            root=Path(d);original=root/'original';original.write_bytes(bytes(range(256)))
+            with patch('shaping_reexport.subprocess.run') as native:
+                kind=convert_export(original,root/'bake',root/'pairs',[],root/'native',root/'log')
+            native.assert_not_called();self.assertEqual(kind,'unchanged-nonnegative-first-layer')
+            self.assertEqual((root/'bake').read_bytes(),original.read_bytes())
+            with self.assertRaisesRegex(ValueError,'preserve existing'):
+                convert_export(original,root/'bake',root/'pairs',[],root/'native',root/'log')
+        for value in (float('nan'),float('inf')):
+            model['layers'][0]['weights'][0]=value
+            with self.assertRaisesRegex(ValueError,'finite adjacent'):export_pairs(model)
+
+    def test_signed_pairs_still_require_unambiguous_tied_native_candidates(self):
+        from shaping_reexport import export_pairs
+        model=dict(layers=[dict(in_dim=1,out_dim=2,activation='relu',weights=[2.,-1.],biases=[0.,-1.]),
+                           dict(in_dim=2,out_dim=1,weights=[1.,1.])])
+        self.assertEqual(export_pairs(model),[[0,1]])
+        model['layers'][1]['weights'][1]=2.
+        with self.assertRaisesRegex(ValueError,'ambiguous or unsupported'):export_pairs(model)
+
     def test_analytic_repair_requires_explicit_diagnostic_scope(self):
         admit_family('relu')
         with self.assertRaises(ValueError):admit_family('softplus')
