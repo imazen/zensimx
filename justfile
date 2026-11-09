@@ -6013,3 +6013,10 @@ shaping-pending-rescue-placement-test:
 
 shaping-pending-rescue-retire study limit output stage="rescue":
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 512M --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_pending_rescue_placement.py --study {{quote(study)}} --limit {{limit}} --output {{quote(output)}} --stage {{quote(stage)}}
+
+# Run on an explicitly enabled approved worker; restore its policy after the study.
+shaping-reboot-hold output:
+    sudo -n python3 -B scripts/rev4_featpot/shaping_reboot_hold.py --output {{quote(output)}}
+
+shaping-reboot-hold-check:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 512M --jobs 1 -- python3 -B -m unittest scripts.tests.test_shaping_reboot_hold

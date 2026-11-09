@@ -1301,3 +1301,19 @@ The qualification, source overlays, shared-source hashes and deployment proof
 passed complete durable readback as 20 files totaling 3,098,665 bytes under
 `fold-progress-evidence-c61fc920-20261109` beside the study archives. The existing
 shared source package is referenced by checksum rather than uploaded again.
+
+## Scheduled reboot protection, November 9 UTC
+
+The downstream readiness check found that r5600g had an actual root-scheduled
+kernel reboot for November 10 at 04:00 UTC. Its automatic-reboot policy was
+explicitly enabled. The scheduled reboot was cancelled and absence of a remaining
+shutdown was verified. A separately journaled, temporary apt override disables
+automatic reboots while retaining package updates. Removing that exact owned
+override after the scientific work ends is required cleanup; it is recorded in
+the operation journal and coordinator progress. No trainer was signaled.
+
+The reusable hold owner refuses existing policies, previously journaled operations,
+disabled/default policies and any pre-existing scheduled shutdown. Cancelling an
+already scheduled shutdown requires its separate attribution and operation record;
+the generic helper does not cancel it. Three focused checks passed on i270:
+`done rc=0 0s | peak-RSS 0.02GiB | min-avail 22249MiB | peak-load 7.86`.
