@@ -89,3 +89,21 @@ Four preparation/launch/watch checks passed. The actual three-fold check retaine
 all 60 registered extension cells exactly; run-heavy reported 9 s, peak RSS
 0.11 GiB and minimum available 44,067 MiB. This is metadata preparation cost.
 Scientific models and native scoring arithmetic are unchanged.
+
+The fold-0 scalar queue had one unstarted wave on fully occupied r5600g; waiting
+for that wave also delayed four other completed models. The exact Python owner
+was verified childless, without an admission claim or scoring artifacts, before
+retirement. No native trainer or completed scoring work was interrupted. Five
+disjoint one-model waves then ran concurrently on i134 under the existing
+one-thread, one-GiB worker caps and shared admission. All five completed their
+original report positions and were collected with full provenance checks.
+Measured worker times were 149, 151, 148, 149 and 149 s, each peak RSS 0.28 GiB.
+The new watcher retains these five registrations and waits for the sixth model.
+
+All five models have native, canonical-panel and converted-bake archive receipts;
+the fifteen current manifest pairs were checked against their full cold-readback
+receipts. This metadata closure passed durable cold readback separately as
+`scalar-unblock-evidence-20261109`: 58 payload files, 2,711,145 bytes, plus receipt.
+Complete worker logs/statuses are compressed and independently member-hashed in
+`scalar-unblock-finished-logs-evidence-20261109`: four payload files, 10,853 bytes,
+plus receipt. Models, training conditions and scientific gates were unchanged.

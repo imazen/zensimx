@@ -58,3 +58,20 @@ observation, application receipt, original affinities and source passed durable
 cold readback under `r5600g-affinity-evidence-20261109`: 14 payload files,
 184,787 bytes, plus receipt. Eleven-fit concurrency remains; an epoch-throughput
 speedup has not yet been established.
+
+The fold-2 product fit was subsequently given its physical core's training
+capacity: it remains on CPU 7, while the other trainer previously on sibling
+CPU 1 moved to CPU 0. All eleven fits continued with the same code and inputs;
+logical CPU 1 supplies headroom instead of CPU 0. Its ten-second samples recorded
+14,735,546,216 versus 39,633,349,823 retired instructions. These counters alone
+are not a training-speed measurement.
+
+Existing epoch logs give an observed wall-time comparison. Five complete old
+intervals, epochs 99–104, had median 155.8 s; five recent intervals after priority
+pinning, epochs 119–124, had median 56.0 s. Transition-spanning intervals are
+excluded. Epochs, learned sparsity and competing work differ, so this does not
+isolate causality or establish a general concurrency optimum. No gradient or
+completed epoch was replayed. The full points, resource times and affinity
+journals passed durable cold readback under `critical-fold-affinity-evidence-20261109`:
+21 payload files, 267,443 bytes, plus receipt. `shaping_epoch_windows.py` preserves
+the interval selection and refuses missing or unordered epochs.
