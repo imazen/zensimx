@@ -36,7 +36,7 @@ Unit coverage exercises slot exhaustion across a completed first phase,
 480-epoch parent authority, actual-command mismatches and existing retention
 contracts. The native state engine's prior mechanical tests cover mid-epoch
 and epoch-boundary recovery for plain, Softplus, frozen and joint shaping.
-The frozen `0dea5f546a6e` orchestration source is deployed to the six eligible
+The frozen `0dea5f546a6e` orchestration source was deployed to the six eligible
 workers and nine future extension, outer and variant owners. Each replacement
 owner was verified childless and waiting before replacement, then verified live
 against its exact command afterward. No active scientific fit was signaled or

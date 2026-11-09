@@ -93,7 +93,7 @@ artifact root. The separate twenty metadata checks include complete 48-model
 transport, count/role/input corruption refusals and unchanged ordinary-fit caps;
 they do not constitute native scoring qualification.
 
-The `71eeaf3897cb` cost owner now waits for the complete outer matrix, with
+The `71eeaf3897cb` accounting owner was deployed to wait for the complete outer matrix, with
 the same i270 placement, CPU boundary, native timing instrument and 32/64 gates.
 Its predecessor was verified waiting and childless before replacement; no
 preparation, fit or timing was interrupted. The complete accounting checks also
@@ -115,7 +115,18 @@ zenbench serialization, paired rounds, CPU dispatch, timing thresholds or any
 scientific condition. Metadata checks exercise occupied/idle cases, ordinary
 concurrent fits and the actual benchmark caller's idle requirement.
 
-The frozen `b6784ba1a692` owner is deployed and verified live while waiting for
+The current waiting cost owner uses frozen source `7f35253a0725`. It replaced
+the accounting owner only after proving that owner was waiting, childless and
+had created no preparation job. A live i270 admission probe observed six native
+trainers and six worker claims and correctly refused without adding a claim or
+starting any compute. Twenty admission/transport checks pass, including unchanged
+ordinary fit concurrency and benchmark claim release after a failed timing.
+The new owner was verified live while awaiting all 48 outer finalists.
+Its 32-file, 813,050-byte deployment closure passed complete durable readback
+under `vector-idle-deployment-archive-20261109` beside the study archives.
+No actual finalist measurement follows from these scheduling checks.
+
+The initial frozen `b6784ba1a692` owner was deployed and verified live while waiting for
 the complete outer matrix. Preparation and timing target i270; existing training
 owners retain their previous sources. Admission/transport checks passed on
 r7900x and again with the explicit i270 worker interpreter. They cover the
