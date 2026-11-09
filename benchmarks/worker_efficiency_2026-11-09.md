@@ -40,3 +40,13 @@ withdrawn-host refusal are covered. This tool does not change trainer arguments,
 weights, snapshots, seeds, exposure or native arithmetic. Its implementation
 checks do not establish a throughput improvement; an actual observation is
 required before any scheduling recommendation.
+
+The actual eleven-fit baseline/pinned/restored observation recorded respectively
+836 / 2 / 715 CPU migrations and 172,131,043,830 / 210,217,888,489 /
+161,789,228,369 retired instructions in ten-second perf windows. Aggregate task
+times were 95,551.66 / 93,948.12 / 96,717.51 ms. All original affinities were
+restored successfully. This suggests a scheduling benefit but is not an isolated
+training speedup measurement. `--apply-observation` can reuse exactly these
+assignments after verifying every process identity, original thread affinity,
+worker eligibility and the completed observation's input hashes; `--restore`
+reverts them. Native scientific inputs and eleven-fit concurrency are retained.

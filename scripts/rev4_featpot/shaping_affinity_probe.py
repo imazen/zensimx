@@ -29,6 +29,45 @@ def sample(records,output,seconds):
     return command
 
 
+def apply_observation(study,observation,output,*,restore=False):
+    """Reuse an exact observation's assignments; preserve a rollback receipt."""
+    from shaping_compute_pool import allowed
+    from shaping_training_budget import training_limit
+    receipt=json.loads((observation/'RESULT.json').read_text())
+    original=observation/'ORIGINAL.json';value=json.loads(original.read_text())
+    hosts=allowed(study)
+    if ((hosts is not None and socket.gethostname() not in hosts)
+        or socket.gethostname()!=receipt['host'] or sha(original)!=receipt['files_sha256']['ORIGINAL.json']
+        or value['records']!=receipt['records'] or not receipt['original_affinities_restored']
+        or len(value['records'])>training_limit(study)):
+        raise ValueError('eligible worker and exact completed observation required')
+    for record in value['records']:
+        require_same(record)
+        command=record['command']
+        if '--out' not in command or not Path(command[command.index('--out')+1]).is_relative_to(study/'runs'):
+            raise ValueError('native fit must belong to this study')
+    for thread in value['threads']:
+        expected={thread['cpu']} if restore else set(thread['original'])
+        if os.sched_getaffinity(thread['tid'])!=expected:raise ValueError('thread affinity changed since observation')
+    output.mkdir(parents=True,exist_ok=False);changed=[]
+    try:
+        for thread in value['threads']:
+            require_same(next(r for r in value['records'] if r['pid']==thread['pid']))
+            target=set(thread['original']) if restore else {thread['cpu']}
+            os.sched_setaffinity(thread['tid'],target);changed.append(thread)
+    except Exception:
+        for thread in reversed(changed):
+            require_same(next(r for r in value['records'] if r['pid']==thread['pid']))
+            os.sched_setaffinity(thread['tid'],{thread['cpu']} if restore else thread['original'])
+        raise
+    result=dict(checked_utc=datetime.now(timezone.utc).isoformat(),host=socket.gethostname(),
+                action='restore' if restore else 'pin',observation=str(observation),
+                observation_sha256=sha(observation/'RESULT.json'),original=value,
+                observed_affinities={str(t['tid']):sorted(os.sched_getaffinity(t['tid'])) for t in value['threads']},
+                training_started=False,training_replayed=False)
+    (output/'APPLIED.json').write_bytes(encoded(result));return result
+
+
 def probe(study,pids,cpus,output,seconds):
     from shaping_compute_pool import allowed
     from shaping_training_budget import training_limit
@@ -84,7 +123,15 @@ def probe(study,pids,cpus,output,seconds):
 if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('--study',type=Path,required=True);p.add_argument('--output',type=Path,required=True)
-    p.add_argument('--pid',type=int,action='append',required=True)
-    p.add_argument('--cpu',type=int,action='append',required=True)
+    p.add_argument('--pid',type=int,action='append')
+    p.add_argument('--cpu',type=int,action='append')
     p.add_argument('--seconds',type=int,default=10)
-    a=p.parse_args();print(json.dumps(probe(a.study,a.pid,a.cpu,a.output,a.seconds)))
+    p.add_argument('--apply-observation',type=Path)
+    p.add_argument('--restore',action='store_true')
+    a=p.parse_args()
+    if a.apply_observation:
+        if a.pid or a.cpu:p.error('observation assignments cannot be overridden')
+        print(json.dumps(apply_observation(a.study,a.apply_observation,a.output,restore=a.restore)))
+    else:
+        if not a.pid or not a.cpu or a.restore:p.error('probe requires explicit PIDs/CPUs; restore requires an observation')
+        print(json.dumps(probe(a.study,a.pid,a.cpu,a.output,a.seconds)))
