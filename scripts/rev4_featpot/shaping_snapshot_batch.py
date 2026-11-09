@@ -73,13 +73,57 @@ def retire(root,receipt,owner):
     return dict(stage='complete',retired_stores=len(retired))
 
 
+def trim(root,retirement,receipt,owner):
+    """Remove only cold-verified staged state duplicates after store retirement."""
+    from shaping_checkpoint_retention import archive_inventory,no_users
+    import os,hashlib,re
+    if root.resolve()!=root or receipt.exists() or receipt.is_relative_to(root):
+        raise ValueError('canonical stage and fresh external trim receipt required')
+    batch=json.loads((root/'BATCH.json').read_text());retired=json.loads(retirement.read_text())
+    if (batch['schema']!='completed-snapshot-batch-v1' or batch['stage']!='complete'
+        or retired['schema']!='completed-snapshot-batch-retirement-v1' or retired['stage']!='complete'
+        or retired['archive_root']!=str(root) or retired['archive_manifest_sha256']!=owner.sha(root/'SHA256SUMS')
+        or retired['stores']!=len(batch['rows'])):
+        raise ValueError('completed store retirement and exact archive required')
+    mirror,pins=archive_inventory(root);rows=[]
+    for row in batch['rows']:
+        directory=Path(row['stage'])
+        if directory.parent!=root or not re.fullmatch('[0-9a-f]{64}',directory.name):
+            raise ValueError('bounded snapshot stage directory required')
+        manifest=json.loads((directory/'SNAPSHOTS.json').read_text())
+        for name in sorted(owner.STATES & set(manifest['files'])):
+            path=directory/name;owner.regular(path);relative=path.relative_to(root).as_posix()
+            pin=manifest['files'][name]
+            if pins.get(relative)!=pin or owner.sha(path)!=pin:raise ValueError('staged snapshot drift')
+            remote=mirror/relative;owner.regular(remote)
+            with remote.open('rb') as stream:
+                os.posix_fadvise(stream.fileno(),0,0,os.POSIX_FADV_DONTNEED)
+                if hashlib.file_digest(stream,'sha256').hexdigest()!=pin:
+                    raise ValueError('staged state cold readback differs')
+            rows.append(dict(path=str(path),durable_path=str(remote),sha256=pin,bytes=path.stat().st_size))
+    if not rows:raise ValueError('no staged snapshot payload to trim')
+    no_users(rows)
+    value=dict(schema='completed-snapshot-stage-trim-v1',stage='verified_before_removal',rows=rows,
+        archive_root=str(root),archive_manifest_sha256=owner.sha(root/'SHA256SUMS'),
+        retirement_sha256=owner.sha(retirement),bytes=sum(r['bytes'] for r in rows),
+        checked_utc=datetime.now(timezone.utc).isoformat())
+    with receipt.open('x') as stream:
+        json.dump(value,stream,indent=2);stream.write('\n');stream.flush();os.fsync(stream.fileno())
+    for row in rows:Path(row['path']).unlink()
+    value['stage']='archived_stage_payload_trimmed';save(receipt,value)
+    return dict(stage=value['stage'],files=len(rows),bytes=value['bytes'])
+
+
 if __name__=='__main__':
-    parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('mode',choices=('stage','retire'))
+    parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('mode',choices=('stage','retire','trim'))
     parser.add_argument('--source',type=Path,required=True);parser.add_argument('--study',type=Path)
     parser.add_argument('--root',type=Path,required=True);parser.add_argument('--receipt',type=Path)
+    parser.add_argument('--retirement',type=Path)
     parser.add_argument('--phases-only',action='store_true');parser.add_argument('--cell',action='append')
     args=parser.parse_args();sys.path.insert(0,str(args.source/'scripts/rev4_featpot'))
     import shaping_snapshot_retention as owner
     import shaping_storage as storage
-    value=stage(args.study,args.root,owner,storage,phases_only=args.phases_only,cells=set(args.cell) if args.cell is not None else None) if args.mode=='stage' else retire(args.root,args.receipt,owner)
+    if args.mode=='stage':value=stage(args.study,args.root,owner,storage,phases_only=args.phases_only,cells=set(args.cell) if args.cell is not None else None)
+    elif args.mode=='retire':value=retire(args.root,args.receipt,owner)
+    else:value=trim(args.root,args.retirement,args.receipt,owner)
     print(json.dumps(value),flush=True)

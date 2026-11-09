@@ -36,8 +36,7 @@ snapshot_user=$(id -un)
 snapshot_script=$(realpath "$0")
 exec sudo -n systemd-run --scope --quiet \
     --property="MemoryMax=$snapshot_memory" --property=MemorySwapMax=0 \
-    --property=Nice=19 --property=IOSchedulingClass=idle \
-    unshare --mount --propagation private /usr/bin/env \
+    nice -n19 ionice -c3 unshare --mount --propagation private /usr/bin/env \
     PATH="$PATH" TMPDIR="${TMPDIR:?}" \
     OMP_NUM_THREADS="${OMP_NUM_THREADS:?}" \
     RAYON_NUM_THREADS="${RAYON_NUM_THREADS:?}" \

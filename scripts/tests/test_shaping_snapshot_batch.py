@@ -63,5 +63,34 @@ class SnapshotBatchTests(unittest.TestCase):
                 batch.stage(study,root/'stage',owner,SimpleNamespace(reservation=lambda *args,**kwargs:nullcontext()))
             for name in owner.STATES:self.assertEqual((store/name).read_bytes(),name.encode())
 
+    def test_staged_duplicates_trim_only_after_complete_retirement_and_cold_readback(self):
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as directory:
+            root=Path(directory);study,run,store,binding=self.fixture(root);stage=root/'stage'
+            batch.stage(study,stage,owner,SimpleNamespace(reservation=lambda *args,**kwargs:nullcontext()))
+            durable=self.archive(root,stage);retirement=root/'RETIRED.json'
+            with patch('shaping_checkpoint_retention.no_users'):
+                batch.retire(stage,retirement,owner)
+            with patch('shaping_checkpoint_retention.no_users') as users:
+                result=batch.trim(stage,retirement,root/'TRIMMED.json',owner)
+                self.assertEqual(len(users.call_args.args[0]),2)
+            self.assertEqual(result['files'],2)
+            for name in owner.STATES:
+                self.assertFalse((stage/('a'*64)/name).exists())
+                self.assertEqual((durable/('a'*64)/name).read_bytes(),name.encode())
+            self.assertTrue((stage/('a'*64)/'SNAPSHOTS.json').exists())
+            self.assertEqual((run/'model.bin').read_bytes(),b'keep model')
+
+    def test_corrupt_archive_prevents_staged_duplicate_removal(self):
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as directory:
+            root=Path(directory);study,run,store,binding=self.fixture(root);stage=root/'stage'
+            batch.stage(study,stage,owner,SimpleNamespace(reservation=lambda *args,**kwargs:nullcontext()))
+            durable=self.archive(root,stage);retirement=root/'RETIRED.json'
+            with patch('shaping_checkpoint_retention.no_users'):batch.retire(stage,retirement,owner)
+            (durable/('a'*64)/'state-1.snap').write_bytes(b'corrupt')
+            with self.assertRaisesRegex(ValueError,'cold readback differs'):
+                batch.trim(stage,retirement,root/'TRIMMED.json',owner)
+            for name in owner.STATES:self.assertEqual((stage/('a'*64)/name).read_bytes(),name.encode())
+            self.assertFalse((root/'TRIMMED.json').exists())
+
 
 if __name__=='__main__':unittest.main()
