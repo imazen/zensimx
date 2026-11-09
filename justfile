@@ -5996,6 +5996,12 @@ shaping-state-probe binding output *args:
 shaping-state-probe-check:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 256M --jobs 1 -- python3 -B -m unittest scripts.tests.test_shaping_state_probe
 
+shaping-relocation-preflight study placements output:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 512M --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_relocation_preflight.py --study {{quote(study)}} --placements {{quote(placements)}} --output {{quote(output)}}
+
+shaping-relocation-preflight-check:
+    TMPDIR="$HOME/tmp" python3 -B -m unittest scripts.tests.test_shaping_relocation_preflight scripts.tests.test_shaping_state_probe
+
 shaping-selected-rescue-prepare study source binaries qualification outer family placements output:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_rescue_wave_prepare.py --study {{quote(study)}} --source {{quote(source)}} --binaries {{quote(binaries)}} --qualification {{quote(qualification)}} --outer {{outer}} --selected-family {{quote(family)}} --placements {{quote(placements)}} --output {{quote(output)}}
 

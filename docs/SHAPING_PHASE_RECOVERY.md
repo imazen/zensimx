@@ -121,3 +121,21 @@ Deployment and the first retirement cycle are recorded under
 `/mnt/v/output/zensim/shaping-completion-20261107/phase-recovery-pipeline-install-20261109`.
 The continuously supervised owner records each independently verified batch under
 `phase-snapshot-retention-0dea5f54-20261109` in the same study root.
+
+## Read-only relocation preflight
+
+`just shaping-relocation-preflight STUDY PLACEMENTS OUTPUT` captures evidence for
+up to eight still-running, single-phase 480-epoch exposure extensions. It checks
+the original phase/parent hashes, complete conditional registration, bound live
+native PID/start ticks/command, native binary closure, state payload checksums,
+and every completed checkpoint receipt from the selected full state. It retains
+one bounded state witness and its immutable input metadata per proposed move,
+under an explicit SSD reservation capped at 256 MiB. It never signals a trainer,
+starts recovery, changes an attempt or alters its scientific eligibility.
+
+A captured witness is not automatic authority to stop a healthy fit. Actual
+relocation needs reconciliation of the original live controller, a then-current
+state and a collection/observation path that preserves the complete attempt
+history. The fleet currently assumes an attempt executes on one host. Native
+state capture alone does not qualify that orchestration or cross-host trajectory
+parity. Keep original trainers running while preparing a proposal.
