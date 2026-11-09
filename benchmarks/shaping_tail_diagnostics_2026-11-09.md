@@ -96,3 +96,10 @@ checksum readback under `primary-tail-evidence-20261109`: 42 payload files,
 76,754,679 bytes, plus its receipt. This archive is sufficient to inspect and
 reproduce the tabulated metrics without retraining or rebuilding native code.
 Seed summaries have their separate closure and reuse that archived CSV.
+
+The seed-spread closure passed durable cold readback under
+`primary-tail-seed-spread-verified-20261109`: six payload files, 185,651 bytes,
+plus its receipt. It includes the calculator and references the existing shared
+CSV archive. The committed calculator reproduces all 27 full summaries with
+finite-value, complete-stratum and distinct-seed checks; wrapper zero seconds,
+`peak-RSS 0.02GiB | min-avail 43604MiB | peak-load 1.91`.
