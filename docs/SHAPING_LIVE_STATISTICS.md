@@ -53,7 +53,7 @@ filtering, training and validation views, native panel visibility and mobile
 layout. It passed with no page errors or mobile overflow. Runtime evidence lives
 beside the generated page under `zenstats-dashboard-20261108/`.
 
-# Conditional exposure curves
+## Conditional exposure curves
 
 The longer-exposure selector displays only registered extension cohorts, using
 their selected settings and optimizer choices. All registered seeds remain
@@ -77,4 +77,13 @@ checks pass on i270. The browser witness renders extension curves and then
 checks the original five-population scatters, source filtering, detailed native
 panels and mobile layout: three seconds, `peak-RSS 0.12GiB | min-avail 43452MiB |
 peak-load 3.14`. These are metadata/UI checks, not new scientific evaluations.
+
+The deployed publisher runs the committed `d91a8abe` source. A separate worker
+verified HTTP 200 for its page and 5,251,276-byte JSON snapshot containing all 60
+extensions and 20 cohorts. The closed qualification/activation evidence passed
+durable cold checksum readback as 44 payload files, 6,623,564 bytes, plus its
+receipt, under `extension-curves-dashboard-evidence-20261109` beside the study.
+The archive's evaluation-artifact mode permits the browser witness PNGs; the
+initial feature-artifact mode refused before any destination payload was created.
+Its refusal log is retained. Existing native point assets are reused in place.
 
