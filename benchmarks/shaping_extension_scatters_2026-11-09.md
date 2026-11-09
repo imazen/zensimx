@@ -41,3 +41,17 @@ The same full browser checks passed against this frozen copy, including
 extension native geometry and all five populations. No model or metric-statistic
 calculation was repeated for the snapshot. The reusable freezer excludes live
 operator locks and temporary publication files.
+
+The closed publication evidence passed mounted-storage cold checksum readback
+at 14:21:21 UTC: 49 payload files, 726,981,641 bytes, plus its receipt, under
+`scatter-publication-evidence-20261109` beside the study archives. The mirror
+used fsync, cache-drop advice and SHA-256 rereads; its resource wrapper recorded
+27 s and peak RSS 0.03 GiB. The compressed viewer contains 4,224 files and
+2,139,216,882 uncompressed file bytes, including its snapshot record; its zstd
+size is 672,588,101 bytes. The complete native-worker evidence contains 1,607
+files and 147,222,546 uncompressed file bytes, compressed to 48,631,894 bytes.
+Every archive member was decompressed and checked against its source hash.
+All 107 new archived native JSONs also match the independently checked
+publication receipt. The evidence includes both browser runs, the exact frozen
+statistics snapshot, before/after inventories and the committed source overlay.
+This is a completed publication snapshot, not completion of the scientific study.
