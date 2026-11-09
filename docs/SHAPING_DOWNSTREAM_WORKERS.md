@@ -77,9 +77,10 @@ peak RSS 0.49 GiB, and its prepared outputs passed transport verification. No
 outer model had started. Subsequent outer registration refused its existing
 384-MiB evidence-capsule limit. One measured product condition required
 1,348,701,640 bytes in 3,838 files, including the complete registered selection
-evidence; this is an input closure, not per-fit RAM. The production limit and its
-test remain unchanged pending owner approval of a separate downstream transport
-allowance. The diagnostic inspected dependencies only and launched no model.
+evidence; this is an input closure, not per-fit RAM. The owner subsequently approved a 2-GiB / 16,000-file allowance for
+outer and variant capsules. Their receivers retain two independent one-GiB
+reservations above the 30-GiB disk floor. Rescue and corrected-inner transfers
+retain their original 384-MiB / 4,000-file bounds. The diagnostic inspected dependencies only and launched no model.
 An already registered, unstarted tree-control capsule and all failed dispatch
 records remain preserved. This preparation repair does not establish successful
 outer fitting or generalization results.

@@ -15,11 +15,12 @@ DATA_ROOTS=(Path('/mnt/v/output/zensim'),Path('/srv/zen-research'))
 def limits(kind):
     # Bootstrap reproduces all three outer admissions. Controls retain all 44
     # frozen array/table inputs. Cost preparation seals the complete outer
-    # matrix. Ordinary neural fit closures keep their cap.
+    # matrix. The owner approved the same two-GiB closure for outer/variant
+    # selection evidence on November 9; ordinary rescue/inner caps stay intact.
     # Extensions reproduce the complete fold's selection, measured at 487 MB
     # before source/runtime evidence. Keep the transfer bounded separately.
     if kind=='extension':return 1024**3,4000
-    return (2*1024**3,16000) if kind in ('bootstrap','control','cost_prepare') else (MAX_INPUT_BYTES,4000)
+    return (2*1024**3,16000) if kind in ('bootstrap','control','cost_prepare','outer','variant') else (MAX_INPUT_BYTES,4000)
 
 
 def memory_allowance(record):

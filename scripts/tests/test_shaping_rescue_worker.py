@@ -7,8 +7,19 @@ from shaping_completion import encoded,sha
 
 
 class RescueWorkerTests(unittest.TestCase):
+    def test_approved_downstream_closure_has_a_finite_two_gib_and_file_limit(self):
+        for kind in ('outer','variant'):
+            self.assertEqual(worker.limits(kind),(2*1024**3,16000))
+            record=dict(schema='shaping-native-worker-v2',host='r3500',driver_sha256=sha(worker.__file__),
+                outer_results_read=False,execution_kind=kind,cell=dict(stage='outer' if kind=='outer' else 'human_only'),
+                files={'oversized':dict(bytes=2*1024**3+1)})
+            with patch.object(worker.socket,'gethostname',return_value='r3500'):
+                with self.assertRaisesRegex(ValueError,'input allowance exceeded'):worker.verify(record)
+                record['files']={str(i):dict(bytes=0) for i in range(16001)}
+                with self.assertRaisesRegex(ValueError,'input allowance exceeded'):worker.verify(record)
+
     def test_extension_bound_does_not_expand_ordinary_neural_transfers(self):
-        for kind in (None,'outer','variant','corrected_inner'):
+        for kind in (None,'corrected_inner'):
             self.assertEqual(worker.limits(kind),(384*1024**2,4000))
         record=dict(schema='shaping-native-worker-v2',host='r3500',driver_sha256=sha(worker.__file__),
             outer_results_read=False,execution_kind='extension',cell=dict(stage='exposure_extension'),
