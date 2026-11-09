@@ -1056,3 +1056,15 @@ Four orchestration tests cover missing admission, changed inputs, rejection
 before a CPU claim, and two independent one-GiB transfer reservations. The actual
 outer preparation remains pending complete paired rescue evidence; these tests
 do not count as scientific fits or completed outer work.
+
+The outer pipeline waits for each fold's complete inner admission, submits the
+bounded preparation, and spreads the exact admitted neural, fresh-head and
+tree/linear cells proportionally across all six native workers. Every fit keeps
+its own admission and memory scope. Control fits reserve four GiB for the
+Python/native process combination; neural fits retain two GiB. The pipeline
+collects terminal controls through their original native parity and prediction
+owners. A first terminal import now creates the destination parent only after
+reproducing its admission and verifying its staged payload. The new regression
+check exercises that previously missing parent. Submission uncertainty and any
+partial preparation stop the pipeline with preserved evidence. No outer model
+has been trained by these orchestration checks.

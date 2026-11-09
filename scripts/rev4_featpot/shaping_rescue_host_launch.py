@@ -29,16 +29,18 @@ def launch(waves,source,host,output):
     rows=[]
     for job in jobs:
         request=Path(job['request']);unit='zensim-rescue-'+job['cell']['id']+'-'+output.name
-        runtime=Path(json.loads(request.read_text())['study']).parent/'python-runtime'
+        scientific=json.loads(request.read_text())
+        runtime=Path(scientific['study']).parent/'python-runtime'
+        memory='4G' if scientific.get('execution_kind')=='control' else '2G'
         command=['env','TMPDIR=/home/lilith/tmp','PYTHONPATH='+str(runtime),
-                 '/home/lilith/work/claudehints/scripts/run-heavy','--mem','2G','--jobs','1','--',
+                 '/home/lilith/work/claudehints/scripts/run-heavy','--mem',memory,'--jobs','1','--',
                  'python3','-B',str(driver),'work','--request',str(request)]
-        remote=['systemd-run','--user','--unit='+unit,'--property=MemoryMax=2G','--property=MemorySwapMax=0',
+        remote=['systemd-run','--user','--unit='+unit,'--property=MemoryMax='+memory,'--property=MemorySwapMax=0',
                 '--property=Nice=19','--property=IOSchedulingClass=idle',
                 '--property=StandardOutput=append:'+str(request.with_name('service.log')),
                 '--property=StandardError=append:'+str(request.with_name('service.log')),*command]
         row=dict(host=host,cell=job['cell'],request=job['request'],unit=unit,command=command,
-                 memory_max_bytes=2*1024**3,threads_per_fit=1)
+                 memory_max_bytes=(4 if memory=='4G' else 2)*1024**3,threads_per_fit=1)
         (output/(job['cell']['id']+'-LAUNCH.json')).write_bytes(encoded(row))
         subprocess.run(['ssh',host,shlex.join(remote)],check=True)
         rows.append(row)

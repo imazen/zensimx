@@ -36,5 +36,6 @@ def collect(request,bundle,pin,reproduce,validate):
         validate(record,staging)
         (staging/'WORKER_COLLECTION.json').write_bytes(encoded(dict(request_sha256=sha(request),bundle_sha256=pin,
             source_host=record['host'],pack_driver_sha256=receipt['pack_driver_sha256'],collect_driver_sha256=sha(__file__))))
+        result.parent.mkdir(parents=True,exist_ok=True)
         staging.rename(result)
     return dict(result=str(result),files=len(receipt['files']),bytes=sum(row['bytes'] for row in receipt['files'].values()))
