@@ -5540,6 +5540,12 @@ shaping-completion-analytic-reexport study run binaries inspector *args:
 shaping-completion-reexport-check:
     TMPDIR="$HOME/tmp" python3 -B -m unittest scripts.tests.test_shaping_reexport scripts.tests.test_shaping_reexport_cli
 
+shaping-primary-archive-coverage-check:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 512M --jobs 1 -- python3 -B -m unittest scripts.tests.test_shaping_primary_archive_coverage
+
+shaping-primary-archive-coverage study output *args:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 512M --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_primary_archive_coverage.py --study {{quote(study)}} --output {{quote(output)}} {{args}}
+
 shaping-completion-analytic-convergence run root:
     TMPDIR="$HOME/tmp" python3 -B scripts/rev4_featpot/shaping_convergence.py --run {{quote(run)}} --reexport-root {{quote(root)}} --analytic-diagnostic
 
