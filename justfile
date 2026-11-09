@@ -5844,6 +5844,12 @@ shaping-gradient-probe-report root binary output:
 shaping-gradient-probe-report-check:
     TMPDIR="$HOME/tmp" python3 -B -m unittest scripts.tests.test_shaping_gradient_report
 
+shaping-paired-gradient-register study original_registration binaries output:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 512M --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_paired_gradient_qualification.py register --study {{quote(study)}} --original-registration {{quote(original_registration)}} --binary-dir {{quote(binaries)}} --output {{quote(output)}}
+
+shaping-paired-gradient-qualify study registration family output:
+    TMPDIR="$HOME/tmp" python3 -B scripts/rev4_featpot/shaping_paired_gradient_qualification.py run --study {{quote(study)}} --registration {{quote(registration)}} --family {{quote(family)}} --output {{quote(output)}}
+
 shaping-training-budget-check:
     TMPDIR="$HOME/tmp" python3 -B -m unittest scripts.tests.test_shaping_training_budget
 
