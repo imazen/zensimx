@@ -13,7 +13,8 @@ DATA_ROOTS=(Path('/mnt/v/output/zensim'),Path('/srv/zen-research'))
 
 def limits(kind):
     # Bootstrap reproduces all three outer admissions. Controls retain all 44
-    # frozen array/table inputs. Ordinary neural fit closures keep their cap.
+    # frozen array/table inputs. Cost preparation seals the complete outer
+    # matrix. Ordinary neural fit closures keep their cap.
     return (2*1024**3,16000) if kind in ('bootstrap','control','cost_prepare') else (MAX_INPUT_BYTES,4000)
 
 

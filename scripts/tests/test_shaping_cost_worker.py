@@ -31,6 +31,23 @@ def fixture(root):
 
 
 class CostWorkerTests(unittest.TestCase):
+    def test_capsule_reproduces_cost_gate_and_keeps_existing_training_caps(self):
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as d:
+            root=Path(d);study,_,_,record=fixture(root);binaries=root/'bin';binaries.mkdir();(binaries/'BUILD.json').write_text('{}')
+            def context(*args):
+                (root/'evidence.json').read_bytes();return record['resolution']
+            with patch.object(owner,'context',side_effect=context),patch.object(worker,'DATA_ROOTS',(root,)):
+                q=owner.register(study,binaries,root/'new-prepared','i270',root/'registered')
+                self.assertTrue(q['outer_results_read']);self.assertFalse(q['final_holdout_read'])
+                self.assertEqual(q['execution_kind'],'cost_prepare');self.assertIn(str(root/'evidence.json'),q['files'])
+                with patch.object(worker.socket,'gethostname',return_value='i270'):
+                    self.assertEqual(worker.verify(q),[]);resolution,command=owner.reproduce(q)
+                    self.assertEqual(resolution,q['resolution']);self.assertEqual(Path(command[2]).name,'shaping_cost_finalists.py')
+                    (root/'evidence.json').write_text('drift')
+                    with self.assertRaisesRegex(ValueError,'dependency drift'):worker.verify(q)
+            self.assertEqual(worker.limits('cost_prepare'),(2*1024**3,16000))
+            self.assertEqual(worker.limits('corrected_inner'),(384*1024**2,4000))
+
     def test_complete_transport_preserves_every_model(self):
         with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as d:
             root=Path(d);_,prepared,request,record=fixture(root);owner.validate_result(record,prepared);bundle=root/'result.tar'
