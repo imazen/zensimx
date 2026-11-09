@@ -8,6 +8,21 @@ from shaping_execution import load_registration
 
 MAX_BYTES=2*1024**3
 POPULATIONS=('kadid','tid2013','konfig','cid22_a25','cid22_ssim2')
+INNER_STAGES=('inner','fresh_control_inner','rescue','exposure_extension')
+
+
+def registered_scatter_cells(study,primary,snapshot):
+    registered={c['id']:c for c in primary}
+    if snapshot.get('extension_records'):
+        from shaping_stable_export_prepare import registered_extensions
+        registered.update((c['id'],c) for c in registered_extensions(study,tuple(primary)))
+    records=[r for r in [*snapshot['records'],*snapshot.get('extension_records',[])] if r.get('panel')]
+    if len({r['cell']['id'] for r in records})!=len(records):raise ValueError('duplicate scatter candidate')
+    for record in records:
+        cell=record['cell']
+        if cell!=registered.get(cell['id']) or cell['stage'] not in INNER_STAGES:
+            raise ValueError('scatter candidate is outside registered inner scope')
+    return records
 
 
 def read_points(path):
@@ -60,9 +75,10 @@ def prediction_pin(study,path,report,pin,cell):
 
 
 def prepare(study,dashboard,output):
-    plan,cells,partitions=load_registration(study);registered={c['id']:c for c in cells}
+    plan,cells,partitions=load_registration(study)
     snapshot=json.loads((dashboard/'stats.json').read_text());plan_pin=sha(study/'PLAN.json')
     if snapshot['plan_sha256']!=plan_pin:raise ValueError('statistics snapshot registration differs')
+    records=registered_scatter_cells(study,cells,snapshot)
     from shaped_linear_study import OLD,mapped_labels
     original=Path(plan['original_plan']).parent
     paths={**{k:OLD/'data'/f'{k}.npy' for k in ('y','pop')},
@@ -72,15 +88,12 @@ def prepare(study,dashboard,output):
     arrays={k:np.load(path,allow_pickle=False,mmap_mode='r') for k,path in paths.items()}
     output.mkdir(parents=True,exist_ok=True);points=output/'points';points.mkdir(exist_ok=True)
     rows={};jobs=[];pending=[];total=sum(p.stat().st_size for p in output.rglob('*') if p.is_file())
-    records=[r for r in snapshot['records'] if r.get('panel')]
     # The default partition/setting gets detailed native panels first; all other
     # completed settings and paired seeds remain available in the same index.
     records.sort(key=lambda r:(r['cell']['partition']!=snapshot['default_partition'],r['cell']['setting']!=0,
                                r['cell']['seed'] not in (0,None),r['cell']['family'],r['cell']['id']))
     for record in records:
         cell=record['cell'];cid=cell['id']
-        if cell!=registered.get(cid) or cell['stage'] not in ('inner','fresh_control_inner','rescue'):
-            raise ValueError('scatter candidate is outside registered inner scope')
         path,marker=report_path(study,record);pin=sha(path);report=json.loads(path.read_text())
         if (json.loads(marker.read_text())['report_sha256']!=pin or report['cell']!=cell
             or report['plan_sha256']!=plan_pin or report['outer_results_read'] is not False):

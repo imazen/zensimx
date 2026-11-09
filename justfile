@@ -6008,6 +6008,9 @@ shaping-stable-export-prepare-check:
 shaping-epoch-windows-check:
     TMPDIR="$HOME/tmp" python3 -B -m unittest scripts.tests.test_shaping_epoch_windows
 
+shaping-extension-scatter-check:
+    TMPDIR="$HOME/tmp" python3 -B -m unittest scripts.tests.test_shaping_extension_scatter scripts.tests.test_shaping_dashboard
+
 shaping-epoch-windows run original transition priority output:
     TMPDIR="$HOME/tmp" python3 -B scripts/rev4_featpot/shaping_epoch_windows.py --run {{quote(run)}} --original {{quote(original)}} --transition {{quote(transition)}} --priority {{quote(priority)}} --output {{quote(output)}}
 
