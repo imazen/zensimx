@@ -104,6 +104,13 @@ over all three saved native templates changes only `run-heavy --mem`.
 Scientific command arguments, exposure, data, seeds, binary bytes and numerical
 gates are unchanged. Future throughput under this policy is not yet measured.
 
+The six waiting outer/variant pipelines now use frozen `13a57031ab88` source
+under `streaming-memory-runtime-13a57031-20261109` beside the study. Their exact
+commands, new status paths and live PIDs are retained there. Extension training,
+terminal collection, bootstrap and finalist-cost owners retain their current
+sources. The shared four-GiB snapshot storage budget and 34-GiB admission floor
+are unchanged by the separate RAM profile.
+
 Worker preflight verified all nine transported module hashes, standard-library-only
 retirement imports and read-only NFS archive access inside a 512 MiB/no-swap scope
 on all six workers. The namespace requires the system NFS mount helper. Resolve

@@ -1352,6 +1352,8 @@ families from analytic event materialization:
 | Softplus | i270 | 2.42 GiB | 2.42 GiB | 7,185 |
 
 These are different training conditions and hosts, not a throughput comparison.
+The worker column is the wrapper's GNU time maximum-RSS receipt; simultaneous
+aggregate parent/child RSS was not measured.
 Their full original run-heavy lines, RUN/RESULT and native logs are retained
 under `streaming-memory-evidence-20261109`. The native/whole-worker minimum
 available memory observations are respectively 12,340/12,342 MiB for ReLU,
@@ -1371,3 +1373,24 @@ ownership. A metadata-only check using the three actual saved native command
 templates confirmed parent/child cap agreement and no scientific argument change:
 `done rc=0 0s | peak-RSS 0.03GiB | min-avail 42045MiB | peak-load 1.57`.
 No fit or score was replayed, and no new scientific condition was registered.
+
+The final 39-check suite passed on i270 (`done rc=0 1s | peak-RSS 0.05GiB |
+min-avail 20398MiB | peak-load 7.96`). It ran from a complete exported source
+tree after an initial mixed-source test setup properly refused an out-of-root
+module path. No existing assertion was relaxed.
+
+Frozen `13a57031ab88` source is verified on all six eligible workers. Six waiting,
+childless outer/variant metadata owners were replaced and their new PIDs and
+fresh waiting states verified. Variant owners point to the matching replacement
+outer status paths. Existing active and queued fit owners were untouched.
+No new outer/variant model had begun when this source was deployed; actual
+training throughput with the new profile remains unmeasured.
+
+The 54-file, 6,978,337-byte source-overlay, original resource observations,
+qualification and deployment closure passed complete durable readback under
+`streaming-memory-deployment-evidence-20261109` beside the study archives.
+`resource-evidence/` in that archive restores the original
+`streaming-memory-evidence-20261109/` directory; the top-level qualification
+copy restores `study/STREAMING_MEMORY_QUALIFICATION.json`. The existing shared
+source package and its source overlays are hash bound, avoiding another full
+source upload. No native model payload is duplicated by this closure.
