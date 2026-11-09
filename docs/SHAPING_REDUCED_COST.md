@@ -64,6 +64,24 @@ fits nor timings replay implicitly. Observation failures re-poll the same owner.
 These tools do not establish that the still-outstanding finalist measurements
 have executed.
 
+Finalist preparation also records each timed model's byte size and native tree
+or layer structure through the existing qualified inventory executable. Neural
+models receive their original final-phase parameter accounting, including tied
+weights, fixed intercepts, frozen shapers and learned temperatures, through
+`shaping_parameter_count`. Their observed training time and run-heavy receipts
+come from the existing phase-resource reader. Additive models report the actual
+fitted basis-coefficient count and nonzero coefficients. Tree/node counts remain
+separate from scalar training-parameter counts. These are structural and observed
+resource reports; none measures effective capacity or isolated training speed.
+Preparation and terminal collection bind these reports to all sixteen models
+per fold, the exact timed representation and the sealed original training inputs.
+Missing reports, changed counts or unbound evidence refuse collection.
+
+The integrated reader has passed its transport/count-binding checks. Its native
+qualification uses the existing eight fixed inner specimens and previously
+qualified parameter counts; no fit or timing is replayed. The new preparation
+source must pass that check before replacing the waiting deployed owner.
+
 The frozen `b6784ba1a692` owner is deployed and verified live while waiting for
 the complete outer matrix. Preparation and timing target i270; existing training
 owners retain their previous sources. Admission/transport checks passed on

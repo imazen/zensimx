@@ -30,6 +30,8 @@ def context(study,binaries,host):
             q=report['qualification'];pin=q['native_tree_gate']['model_sha256'] if family=='extra_trees' else q['model_sha256']
         if sha(model)!=pin:raise ValueError('outer cost source model differs')
         pins[str(model)]=pin
+    from shaping_cost_complexity import inputs as complexity_inputs
+    complexity_pins,_,_=complexity_inputs(study,rows);pins.update(complexity_pins)
     build=binaries/'BUILD.json';converter=binaries/'bake_dial_refit'
     if sha(converter)!=json.loads(build.read_text())['binary_sha256']['bake_dial_refit']:
         raise ValueError('outer cost converter differs')
@@ -105,6 +107,10 @@ def validate_result(record,directory):
             path=root/arm['model']
             if (not path.resolve().is_relative_to(root.resolve()) or path.is_symlink()
                 or sha(path)!=arm['sha256']):raise ValueError('prepared cost model hash differs')
+        from shaping_cost_complexity import validate_fold
+        # Proof paths use the worker's original absolute data identities.
+        validate_fold(root/'complexity',root/'WORKLOAD.json',cells,
+            {name:pin for name,pin in p['source_pins'].items()})
     if any(all_pins.get(name)!=pin for name,pin in record['resolution']['input_sha256'].items()):
         raise ValueError('prepared cost input pins differ')
 

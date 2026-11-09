@@ -5736,6 +5736,12 @@ shaping-gradient-pretrained-check:
 shaping-runtime-equivalence-check:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B -m unittest scripts.tests.test_shaping_runtime_equivalence scripts.tests.test_shaping_corrected_view scripts.tests.test_shaping_downstream_worker scripts.tests.test_shaping_rescue_worker scripts.tests.test_shaping_downstream_collection
 
+shaping-finalist-complexity-check:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B -m unittest scripts.tests.test_shaping_cost_complexity scripts.tests.test_shaping_cost_worker scripts.tests.test_shaping_cost_finalists scripts.tests.test_shaping_parameter_count scripts.tests.test_shaping_training_resources
+
+shaping-finalist-complexity-qualify study fixture expected output:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_cost_complexity.py qualify --study {{quote(study)}} --fixture {{quote(fixture)}} --expected {{quote(expected)}} --output {{quote(output)}}
+
 shaping-runtime-equivalence-prepare study baseline candidate identity pretrained:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 512M --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_runtime_equivalence.py prepare --study {{quote(study)}} --baseline {{quote(baseline)}} --candidate {{quote(candidate)}} --identity {{quote(identity)}} --pretrained {{quote(pretrained)}}
 

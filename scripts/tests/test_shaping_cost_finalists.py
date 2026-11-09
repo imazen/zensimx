@@ -48,8 +48,9 @@ class FinalistTests(unittest.TestCase):
                 self.assertEqual(choose.call_count,3)
                 return plan,partitions,rows,{},dict.fromkeys(('0','1','2'),{})
             from shaping_cost_fixture import choose_rows
-            with patch('shaping_reduced_scope.coverage',return_value=scope),patch('shaping_cost_finalists.load_registration',return_value=(plan,cells,partitions)),patch('shaped_linear_study.OLD',old),patch('shaping_cost_finalists.choose_rows',wraps=choose_rows) as choose,patch('shaping_outer_evidence.collect',side_effect=admitted),patch('shaping_cost_finalists.subprocess.run',side_effect=convert):
+            with patch('shaping_reduced_scope.coverage',return_value=scope),patch('shaping_cost_finalists.load_registration',return_value=(plan,cells,partitions)),patch('shaped_linear_study.OLD',old),patch('shaping_cost_finalists.choose_rows',wraps=choose_rows) as choose,patch('shaping_outer_evidence.collect',side_effect=admitted),patch('shaping_cost_finalists.subprocess.run',side_effect=convert),patch('shaping_cost_complexity.inputs',return_value=({},root/'inventory',root/'inspector')),patch('shaping_cost_complexity.write_fold') as complexity:
                 result=prepare_outer(study,binaries,root/'out');self.assertEqual(result['models'],48)
+                self.assertEqual(complexity.call_count,3)
                 for outer in range(3):
                     workload=json.loads((root/f'out/outer-{outer}/WORKLOAD.json').read_text())
                     provenance=json.loads((root/f'out/outer-{outer}/PROVENANCE.json').read_text())

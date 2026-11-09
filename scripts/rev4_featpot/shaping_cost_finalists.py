@@ -130,6 +130,8 @@ def prepare_outer(root,binaries,output):
     scope,paths,pins,chosen=outer_training_rows(root)
     _,_,rows,evidence,qualifications=collect(root);pins.update(evidence)
     if len(rows)!=48 or not all('role' in row for row in rows):raise ValueError('all 48 reduced outer finalists required')
+    from shaping_cost_complexity import inputs as complexity_inputs,write_fold
+    complexity_pins,inventory,inspector=complexity_inputs(root,rows);pins.update(complexity_pins)
     converter=binaries/'bake_dial_refit';build=binaries/'BUILD.json'
     if sha(converter)!=json.loads(build.read_text())['binary_sha256']['bake_dial_refit']:
         raise ValueError('converter binary drift')
@@ -184,6 +186,7 @@ def prepare_outer(root,binaries,output):
             outer=outer,cells=identities,original_training_indices=chosen[outer],source_pins=pins,
             convergence_qualifications=qualifications[str(outer)],workload_sha256=sha(path),
             native_cost_instrument_qualification_required=True,timing_measured=False)))
+        write_fold(root,selected,path,directory/'complexity',inventory,inspector)
         workloads.append(str(path))
     for name,pin in pins.items():
         if sha(name)!=pin:raise ValueError('outer finalist evidence changed during preparation')

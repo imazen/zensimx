@@ -10,20 +10,23 @@ import shaping_rescue_worker as worker
 
 
 def fixture(root):
+    from scripts.tests.test_shaping_cost_complexity import fixture as complexity_fixture
     study=root/'study';study.mkdir();(study/'PLAN.json').write_text('{}')
     prepared=root/'prepared';prepared.mkdir();marker=root/'evidence.json';marker.write_text('{}');pins={str(marker):sha(marker)}
     resolution=dict(input_sha256=pins,cells=[],chosen_rows={str(o):list(range(o*40,(o+1)*40)) for o in range(3)},qualifications={str(o):{} for o in range(3)},raw_ids=[0])
     record=dict(execution_kind='cost_prepare',study=str(study),result_output=str(prepared),source_root=str(root/'source'),host='i270',cell=dict(id='cost-condition'),resolution=resolution)
     paths=[]
+    families=dict(zip(ROLES,('relu','extra_trees','shaped_additive','softplus','product_joint_identity','separate_joint_identity')))
     for outer in range(3):
         directory=prepared/f'outer-{outer}';(directory/'models').mkdir(parents=True);cells=[];arms=[]
         for role in ROLES:
             for seed in ((None,) if role=='shaped_additive' else range(3)):
-                cell=dict(id=f'{outer}-{role}-{seed}',family=role,partition=f'outer-{outer}',seed=seed)
-                item=dict(cell=cell,role=role,schedule={'phase_epochs':[240]});resolution['cells'].append(item);cells.append(dict(item,resolved_family=role))
+                cell=dict(id=f'{outer}-{role}-{seed}',family=families[role],partition=f'outer-{outer}',seed=seed)
+                item=dict(cell=cell,role=role,schedule={'phase_epochs':[240]});resolution['cells'].append(item);cells.append(dict(item,resolved_family=families[role]))
                 name=role+'-'+('deterministic' if seed is None else str(seed));model=directory/'models'/(name+'.bin');model.write_bytes(name.encode())
                 arms.append(dict(id=name,kind='bake',model='models/'+model.name,sha256=sha(model),expected_score_bits=[0]*40))
         path=directory/'WORKLOAD.json';path.write_bytes(encoded(dict(schema='shaping-cost-v1',admission_sha256='admitted',raw_ids=[0],feature_bits=[[0]]*40,arms=arms)));paths.append(str(path))
+        complexity_fixture(directory/'complexity',path,cells,pins)
         (directory/'PROVENANCE.json').write_bytes(encoded(dict(outer=outer,workload_sha256=sha(path),original_training_indices=resolution['chosen_rows'][str(outer)],cells=cells,source_pins=pins,timing_measured=False,convergence_qualifications={})))
     (prepared/'WORKLOADS.json').write_bytes(encoded(dict(workloads=paths,models=48,timing_measured=False)))
     request=root/'REQUEST.json';request.write_bytes(encoded(record));(prepared/'WORKER_COLLECTION.json').write_bytes(encoded(dict(request_sha256=sha(request),source_host='i270')))
