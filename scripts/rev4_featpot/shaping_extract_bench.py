@@ -72,6 +72,8 @@ def verify(root, study):
 
 
 def run(root, study, cpus):
+    # Qualify the metadata/report interpreter before any native timing starts.
+    from shaping_cost_report import report
     from shaping_reduced_scope import admit_compute
     from shaping_rescue_dispatch import reserve_worker, bind_worker, release_worker
     from shaping_storage import reservation
@@ -124,7 +126,6 @@ def run(root, study, cpus):
                     code = child.wait()
                 if code:
                     raise RuntimeError('extraction benchmark stopped; preserve '+name+' evidence')
-                from shaping_cost_report import report
                 report(root/('timing-'+name), workload, root/(name+'-REPORT.json'))
                 status['completed_cases'].append(name)
                 save('measuring')
