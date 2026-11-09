@@ -45,6 +45,26 @@ class DashboardTests(unittest.TestCase):
         row=comparison_rows(records)[0]
         self.assertEqual((row['reported'],row['required']),(2,3));self.assertIsNone(row['human']['mean'])
 
+    def test_extension_roles_exposures_and_optimizer_choices_remain_separate(self):
+        records=[]
+        for role,epochs,choice in [('primary',[480],'base'),('fresh_head',[240],'base'),
+                                   ('primary',[480],'constant_lr')]:
+            for seed in range(3):
+                r=self.record(seed,.8);r['cell'].update(stage='exposure_extension',role=role,
+                    phase_epochs=epochs,optimizer_choice=choice,total_pair_draws=sum(epochs)*50000)
+                records.append(r)
+        # A primary-budget result must not complete any longer-exposure cohort.
+        records.append(self.record(0,.95))
+        rows=comparison_rows(records);extensions=[r for r in rows if r['stage']=='exposure_extension']
+        self.assertEqual(len(extensions),3)
+        self.assertTrue(all(r['required']==3 and r['reported']==3 and r['delta'] is None for r in extensions))
+        self.assertEqual({r['total_pair_draws'] for r in extensions},{12000000,24000000})
+        records[0]['panel']=None
+        rows=comparison_rows(records)
+        partial=next(r for r in rows if r['stage']=='exposure_extension' and r['role']=='primary' and r['optimizer_choice']=='base')
+        self.assertEqual((partial['required'],partial['reported']),(3,2))
+        self.assertIsNone(partial['human']['mean'])
+
     def test_undefined_pair_excludes_entire_setting_across_inner_folds(self):
         records=[self.record(s,.8,family='product_joint_identity') for s in range(3)]
         records += [self.record(s,None if s==0 else .8,family='product_joint_identity',partition='inner-0-1') for s in range(3)]

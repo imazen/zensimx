@@ -19,6 +19,7 @@ class ProgressTests(unittest.TestCase):
             verify.assert_called_once_with(root,p,cells=())
             self.assertEqual(result['counts']['exposure_extension']['required'],12)
             self.assertEqual(result['counts']['exposure_extension']['successful_fit_cells'],0)
+            self.assertEqual(result['extension_cells'],cells)
 
     def supervisor_fixture(self,d,command):
         root=Path(d);status=root/'status.json';proc=root/'proc';process=proc/'42'

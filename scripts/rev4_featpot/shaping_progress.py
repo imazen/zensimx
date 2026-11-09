@@ -80,7 +80,10 @@ def paired_delta(rows,baseline):
 def comparison_rows(records):
     groups={}
     for record in records:
-        c=record['cell'];key=(c['stage'],c['partition'],c['setting'],c.get('rescue'),c['family'])
+        c=record['cell'];extension=c['stage']=='exposure_extension'
+        key=(c['stage'],c['partition'],c['setting'],c.get('rescue'),c['family'],
+             c.get('optimizer_choice') if extension else None,c.get('role') if extension else None,
+             tuple(c['phase_epochs']) if extension else ())
         groups.setdefault(key,[]).append(record)
     undefined=set()
     for r in records:
@@ -88,9 +91,11 @@ def comparison_rows(records):
         if c['stage']=='inner' and r.get('panel') and r['panel']['validation']['human'] is None:
             undefined.add((c['family'],c['partition'].split('-')[1],c['setting']))
     result=[]
-    for (stage,partition,setting,rescue,family),items in groups.items():
+    for (stage,partition,setting,rescue,family,optimizer_choice,role,phase_epochs),items in groups.items():
         n=len(items);panels=[r['panel'] for r in items if r.get('panel')]
         row=dict(stage=stage,partition=partition,setting=setting,rescue=rescue,family=family,
+            optimizer_choice=optimizer_choice,role=role,phase_epochs=list(phase_epochs),
+            total_pair_draws=items[0]['cell'].get('total_pair_draws'),
             label=LABELS.get(family,family),required=n,reported=len(panels),
             trained=sum(r['trained'] for r in items),live=sum(r['state']=='running' for r in items),
             human=average([p['validation']['human'] for p in panels],n),
@@ -103,7 +108,7 @@ def comparison_rows(records):
         for dataset in ('kadid','tid2013','konfig','cid22_a25','cid22_ssim2'):
             row['datasets'][dataset]={metric:average([p['validation']['datasets'][dataset][metric] for p in panels],n)
                                      for metric in ('pooled','within','mean')}
-        baseline=groups.get(('inner',partition,setting,None,'relu'),[])
+        baseline=groups.get(('inner',partition,setting,None,'relu',None,None,()),[])
         row['delta']=paired_delta(items,baseline) if stage=='inner' and not row['ineligible'] else None
         result.append(row)
     return result
@@ -166,8 +171,11 @@ def dashboard_data(root,result,workers):
         if index['schema']!='zensim-inner-scatter-index-v1' or index['plan_sha256']!=plan_pin or index['outer_results_read']:
             raise ValueError('scatter dashboard index scope differs')
         scatter=index['cells']
-    for cell in cells:
-        if cell['stage'] not in ('inner','fresh_control_inner','rescue') or not audited[cell['id']]['required']:continue
+    extension_cells=result.get('extension_cells',[])
+    if any(c['stage']!='exposure_extension' or audited[c['id']]['stage']!='exposure_extension' for c in extension_cells):
+        raise ValueError('dashboard extension audit scope differs')
+    for cell in [*cells,*extension_cells]:
+        if cell['stage'] not in ('inner','fresh_control_inner','rescue','exposure_extension') or not audited[cell['id']]['required']:continue
         directory=root/'runs'/cell['id'];a=audited[cell['id']]
         trained=any(v['fit_success'] for v in a['attempts']);seen=observations.get(cell['id'],{})
         state='trained' if trained else 'running' if seen.get('verified_live') and seen.get('fresh') else 'last observed running' if seen.get('verified_live') else seen.get('terminal') or 'pending'
@@ -207,6 +215,8 @@ def dashboard_data(root,result,workers):
                 record['curve']=[points[k] for k in sorted(points)]
                 break
         records.append(record)
+    extension_records=[r for r in records if r['cell']['stage']=='exposure_extension']
+    records=[r for r in records if r['cell']['stage']!='exposure_extension']
     comparisons=comparison_rows(records)
     primary=[r for r in comparisons if r['stage']=='inner' and r['setting']==0]
     coverage={p:sum(r['reported']/r['required'] for r in primary if r['partition']==p) for p in {r['partition'] for r in primary}}
@@ -218,10 +228,12 @@ def dashboard_data(root,result,workers):
         corrected_program=corrected_program(root),
         supervisors=result['supervisors'],all_supervisors_live=result['all_requested_supervisor_processes_verified_live'],
         comparisons=comparisons,records=records,default_partition=default,
+        extension_records=extension_records,extension_comparisons=comparison_rows(extension_records),
         neural_settings=plan['neural_settings'],families=list(FAMILIES),
         methodology=dict(human='Equal mean of pooled and within-source SROCC on each of four human datasets. Teacher excluded.',
             uncertainty='Mean and sample SD across all registered paired seeds; not source-bootstrap confidence intervals.',
             exposure='Primary neural fits: 240 epochs; pretrained shapes: 120-epoch prefix plus 120-epoch fresh head. Fresh controls: 120 epochs. 50,000 pairs per epoch.',
+            extensions='Conditional longer-exposure fits retain selected settings and optimizer choices. Continuous fits use 480 epochs; pretrained fits use a 240-epoch prefix plus a 240-epoch fresh head. Matched fresh-head controls are separate. Curves show final-phase epochs. No retuning or checkpoint selection on extension curves.',
             scope='Source-disjoint inner validation. Outer and memorization comparisons remain pending until their registered gates pass.',
             completeness='An incomplete or undefined seed group has no aggregate score. A single undefined paired human fit makes its entire outer-group setting ineligible.'))
 
@@ -375,6 +387,7 @@ def audit(root,workers,supervisors=None):
                 scope_amendment=coverage(root),
                 approved_progress=approved_progress(root,rows),
                 counts=counts,workers=observed,cells=rows,overall_experiments_complete=False,
+                extension_cells=[c for c in cells if c['stage']=='exposure_extension'],
                 supervisors=supervising,
                 all_requested_supervisor_processes_verified_live=all(v['verified_live'] is True for v in supervising.values()) if supervising else None,
                 interpretation='Fit, final-report, convergence and archive counts are distinct. Inner reports do not complete outer/variant comparisons. Cell-level archive receipts and manifest identity checked here; central batch archives are not counted. File readback occurred during archival.')

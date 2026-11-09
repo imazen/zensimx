@@ -2,6 +2,7 @@ const { chromium } = require('playwright');
 const fs = require('fs');
 const path = require('path');
 const url = process.argv[2], output = process.argv[3], family = process.argv[4];
+const extensions = process.argv[5] === 'extensions';
 if (!url || !output) throw Error('Usage: node shaping_dashboard_browser.cjs URL OUTPUT_DIRECTORY');
 (async () => {
   fs.mkdirSync(output, { recursive: true });
@@ -22,6 +23,27 @@ if (!url || !output) throw Error('Usage: node shaping_dashboard_browser.cjs URL 
       return {trained:expected.successful_fit_cells,required:expected.required,
         preserved:data.counts.rescue.successful_fit_cells,unresolved:data.approved_progress.unresolved_fold_cells};
     });
+    let extensionCoverage = null;
+    if (extensions) {
+      await page.selectOption('#stage', 'exposure_extension');
+      await page.waitForFunction(() => document.querySelectorAll('#comparison tbody tr').length > 0);
+      extensionCoverage = await page.evaluate(() => {
+        if (!data.extension_records.length) throw Error('Registered extension records are absent');
+        if (data.records.some(r => r.cell.stage === 'exposure_extension')) throw Error('Extensions mixed into original-budget records');
+        if (!document.querySelector('#setting').disabled) throw Error('Selected extension setting can be filtered away');
+        if (rows().some(r => r.stage !== 'exposure_extension')) throw Error('Extension view includes another budget');
+        const match=data.extension_comparisons.find(r => r.partition===document.querySelector('#partition').value &&
+          r.cells.some(id=>data.extension_records.find(v=>v.cell.id===id).curve.length));
+        if (!match) throw Error('No saved extension curve in the selected partition');
+        showDetail(match);
+        if (!document.querySelector('#curves polyline')) throw Error('Saved extension curves did not render');
+        if (document.querySelectorAll('#seeds .seed').length !== match.required) throw Error('Extension seed denominator differs');
+        return {registered:data.extension_records.length,comparisons:data.extension_comparisons.length,shown:match.cells,curves:true};
+      });
+      await page.locator('#detail').screenshot({path:path.join(output,'extensions.png')});
+      await page.selectOption('#stage','inner');
+      await page.waitForFunction(() => rows().length > 0 && rows().every(r=>r.stage==='inner'));
+    }
     await page.click('#detailLink');
     if (family) {
       await page.evaluate(family => {
@@ -55,7 +77,7 @@ if (!url || !output) throw Error('Usage: node shaping_dashboard_browser.cjs URL 
     if (overflow) { const boxes = await page.evaluate(() => [...document.querySelectorAll('*')].map(e => ({tag:e.tagName,id:e.id,className:String(e.className),right:e.getBoundingClientRect().right,width:e.getBoundingClientRect().width})).filter(e => e.right > innerWidth + 1)); fs.writeFileSync(path.join(output,'OVERFLOW.json'),JSON.stringify(boxes,null,2)); throw Error('Page overflows the mobile viewport'); }
     if (errors.length) throw Error(errors.join('\n'));
     const selected=await page.locator('#scatterFit').inputValue();
-    const result = { passed: true, url, family:family||'relu', selected, populations, source_filter: { all, filtered }, native_panel_visible: true, mobile_overflow: false, page_errors: errors, approved_progress:approvedProgress };
+    const result = { passed: true, url, family:family||'relu', selected, populations, source_filter: { all, filtered }, native_panel_visible: true, mobile_overflow: false, page_errors: errors, approved_progress:approvedProgress, extension_coverage:extensionCoverage };
     fs.writeFileSync(path.join(output, 'RESULT.json'), JSON.stringify(result, null, 2) + '\n');
     console.log(JSON.stringify(result));
   } finally { await browser.close(); }

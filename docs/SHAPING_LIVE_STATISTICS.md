@@ -53,3 +53,28 @@ filtering, training and validation views, native panel visibility and mobile
 layout. It passed with no page errors or mobile overflow. Runtime evidence lives
 beside the generated page under `zenstats-dashboard-20261108/`.
 
+# Conditional exposure curves
+
+The longer-exposure selector displays only registered extension cohorts, using
+their selected settings and optimizer choices. All registered seeds remain
+required for each aggregate. Training-phase lengths and total pair draws are
+shown in fit details; fresh-head controls, phase budgets and optimizer choices
+are distinct cohorts. Curves show only saved evaluated checkpoints from the
+final phase. They do not authorize retuning or checkpoint selection.
+
+The snapshot retains original-budget `records` and `comparisons` unchanged for
+existing scatter consumers. Extensions use separate `extension_records` and
+`extension_comparisons`. Their cell identities come from the audit's already
+validated whole-fold registrations, without another per-cell resolution pass.
+No additional training, inference or pixel maps are needed. Extension scalar
+scatters remain outside the original-budget scatter publisher's scope.
+
+Qualification compared all 1,608 original records' saved panels, curves, failure
+flags and reasons unchanged, while adding all 60 registered extensions in 20
+three-seed cohorts. The actual metadata snapshot took 27 seconds with
+`peak-RSS 0.12GiB | min-avail 43450MiB | peak-load 3.02`. Twenty-two focused
+checks pass on i270. The browser witness renders extension curves and then
+checks the original five-population scatters, source filtering, detailed native
+panels and mobile layout: three seconds, `peak-RSS 0.12GiB | min-avail 43452MiB |
+peak-load 3.14`. These are metadata/UI checks, not new scientific evaluations.
+
