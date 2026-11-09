@@ -31,3 +31,13 @@ The study remains incomplete: extension publication does not complete the
 remaining native fits, outer comparisons, human-only ablations, source curves,
 shuffles, bootstrap uncertainty or finalist inference costs. The original
 scientific selection and final-holdout boundaries remain in force.
+
+A frozen viewer capture also links all 1,098 original report JSONs, preserving
+its relative report URLs. It holds immutable scalar assets through hard links
+and gives mutable publication metadata independent inodes; active publishers
+cannot overwrite that metadata through the snapshot. The actual capture had
+4,223 payload files and 2,139,216,335 bytes before its own SNAPSHOT.json record.
+The same full browser checks passed against this frozen copy, including
+extension native geometry and all five populations. No model or metric-statistic
+calculation was repeated for the snapshot. The reusable freezer excludes live
+operator locks and temporary publication files.
