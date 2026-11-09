@@ -273,7 +273,7 @@ def watch(args):
     with (args.output/'.owner').open('a') as lock:
         fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
         while True:
-            pending=[];blocked=[];imported=[];capacity_wait_hosts=set()
+            pending=[];blocked=[];imported=[];capacity_wait_hosts=set();withdrawn_compute_hosts=set()
             for path in sorted((args.study/'runs').glob('*/attempt-*/RESULT.json')):
                 value=json.loads(path.read_text());run=path.parent
                 stages=LATER_STAGES if getattr(args,'later_only',False) else ('inner','fresh_control_inner','rescue','exposure_extension')
@@ -281,6 +281,11 @@ def watch(args):
                 if value.get('stage')!='trained' or value['cell']['stage'] not in stages or not (run/'WORKER_COLLECTION.json').exists():continue
                 if any((args.study/p).exists() for p in components(value['cell']['id'],run.name)):continue
                 record=request(args.study,run,target_host=placements.get(value['cell']['id']));host=record['host'];directory=args.output/value['cell']['id']
+                from shaping_compute_pool import allowed
+                hosts=allowed(args.study)
+                if hosts is not None and host not in hosts:
+                    pending.append(value['cell']['id']);withdrawn_compute_hosts.add(host)
+                    continue
                 request_path=directory/'REQUEST.json'
                 if directory.exists():
                     if (directory/'FAILURE.json').exists() or not (directory/'WAITING.json').exists():blocked.append(value['cell']['id']);continue
@@ -327,7 +332,7 @@ def watch(args):
                 imported.append(record['cell']['id'])
             status=dict(pid=os.getpid(),checked_utc=datetime.now(timezone.utc).isoformat(),stage='watching',
                         imported_this_sweep=imported,waiting=pending,requires_reconciliation=blocked,
-                        capacity_wait_hosts=sorted(capacity_wait_hosts))
+                        capacity_wait_hosts=sorted(capacity_wait_hosts),withdrawn_compute_hosts=sorted(withdrawn_compute_hosts))
             (args.output/'STATUS.json').write_bytes(encoded(status));print(json.dumps(status),flush=True)
             if not args.watch:return status
             time.sleep(30)

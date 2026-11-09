@@ -43,6 +43,10 @@ print(json.dumps(dict(host=socket.gethostname(),native=len(native),claims=len(cl
 
 
 def loads(study, capacities):
+    from shaping_compute_pool import allowed
+    hosts=allowed(study)
+    capacities={host:cap for host,cap in capacities.items() if hosts is None or host in hosts}
+    if not capacities:raise ValueError('no currently authorized placement worker')
     with ThreadPoolExecutor(max_workers=len(capacities)) as pool:
         futures = {host: pool.submit(observation, study, host, cap) for host, cap in capacities.items()}
         observed = {host: future.result() for host, future in futures.items()}

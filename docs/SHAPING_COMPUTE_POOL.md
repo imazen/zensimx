@@ -23,3 +23,18 @@ needed. Scalar scores, label-calibration tables and learned input-shaping
 parameters are required data and are not pixel maps. Current generated artifacts
 remain preserved unless covered by that explicit map permission or the study's
 verified-completed-output retention policy.
+## Resource withdrawal overlay
+
+An owner reservation can remove a worker from new compute through
+`study/COMPUTE_WITHDRAWALS.json`. It binds the plan, an exact direction record
+and its hash. The original capsule-bound `COMPUTE_POOL.json` remains unchanged,
+so existing attempts, imports and archives retain their original provenance.
+New placements exclude withdrawn hosts before probing them. Outer/variant and
+bootstrap placement use the reduced live host set. Pending evaluations on a
+withdrawn host stay explicitly pending without transfer or remote execution.
+
+On November 9 the owner reserved i270 for benchmarking. New work must use the
+other eligible workers; the previously admitted scientific fits remain protected.
+This is a resource change, not a change to data, seeds, exposure or numerical
+gates. Withdrawal, placement and evaluation checks pass on an eligible worker.
+

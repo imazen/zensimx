@@ -28,7 +28,10 @@ def queue(study, registry):
         if spec != row['spec']:
             raise ValueError('registered uncertainty comparison differs')
         result.append(dict(name=path.stem, comparison=str(path), spec=spec))
-    counts = {host: 0 for host in HOST_SLOTS}
+    from shaping_compute_pool import allowed
+    hosts=allowed(study)
+    counts = {host: 0 for host in HOST_SLOTS if hosts is None or host in hosts}
+    if not counts:raise ValueError('no currently authorized bootstrap worker')
     for row in result:
         host = min(counts, key=lambda h: counts[h] / HOST_SLOTS[h])
         counts[host] += 1

@@ -16,7 +16,8 @@ HOST_SLOTS = dict(r7900x=20, i270=20, i134=14, r3800x=14, r5600g=11, r3500=5)
 
 def placements(cells, outer, loads=None):
     # Rotate ties by fold, then fill proportionally to approved CPU capacity.
-    names = list(HOST_SLOTS)
+    names = [host for host in HOST_SLOTS if loads is None or host in loads]
+    if not names:raise ValueError('no currently authorized outer worker')
     names = names[outer:] + names[:outer]
     counts = {host: 0 if loads is None else loads[host] for host in names}
     out = []

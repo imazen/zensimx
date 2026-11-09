@@ -9,6 +9,20 @@ from shaping_evaluation_worker import request,_work,publish,verify_request,trans
 
 
 class WorkerEvaluationTests(unittest.TestCase):
+    def test_withdrawn_compute_preserves_pending_fit_without_remote_work(self):
+        from shaping_evaluation_worker import watch
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as directory:
+            root=Path(directory);study,run=self.fixture(root)
+            args=SimpleNamespace(study=study,output=root/'output',watch=False)
+            with patch('shaping_execution.load_registration',return_value=({},matrix(),{})), \
+                 patch('shaping_compute_pool.allowed',return_value={'r3500'}), \
+                 patch('shaping_evaluation_worker.subprocess.run') as remote:
+                status=watch(args)
+            remote.assert_not_called()
+            self.assertEqual(status['waiting'],[json.loads((run/'RESULT.json').read_text())['cell']['id']])
+            self.assertEqual(status['withdrawn_compute_hosts'],['r5600g'])
+            self.assertFalse(status['imported_this_sweep']);self.assertFalse(status['requires_reconciliation'])
+
     def test_explicit_family_scope_avoids_duplicate_added_family_predictions(self):
         from shaping_evaluation_worker import watch
         with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as directory:
