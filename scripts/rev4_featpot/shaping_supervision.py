@@ -123,8 +123,14 @@ def later_sweep(args):
         repaired=identity['representation']=='research-relu-max-pairs-v1'
         values=dict(study=args.study,run=run_dir,checkpoint=None)
         if repaired:
-            binaries=getattr(args,'repair_binary_dir',None);inspector=getattr(args,'repair_inspector',None)
-            if binaries is None or inspector is None:raise ValueError('later ReLU requires explicit repaired runtime and inspector')
+            inspector=getattr(args,'repair_inspector',None)
+            if inspector is None:raise ValueError('later max-pair evaluation requires explicit inspector')
+            candidates=[getattr(args,'repair_binary_dir',None),args.binary_dir,
+                        getattr(args,'rescue_binary_dir',None),*getattr(args,'candidate_binary_dir',[])]
+            matches={p for p in candidates if p is not None and (p/'BUILD.json').exists()
+                     and sha(p/'BUILD.json')==identity['evaluation_build_sha256']}
+            if len(matches)!=1:raise ValueError('one explicit inner-selected max-pair runtime required')
+            binaries=next(iter(matches))
             dest=args.study/'reexport_max_pairs'/cell['id']/run_dir.name/'final'
             existing=args.study/'reexports'/cell['id']/run_dir.name/'final/RECEIPT.json'
             values.update(binary_dir=binaries,inspector=inspector)

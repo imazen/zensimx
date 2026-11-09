@@ -8,6 +8,32 @@ from shaping_evaluation import NativeFeatureGateError
 from shaping_completion import encoded
 
 class SupervisionTests(unittest.TestCase):
+    def test_later_max_pair_runtime_matches_the_inner_selected_family_certificate(self):
+        from shaping_completion import sha
+        from shaping_supervision import later_sweep
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as d:
+            root=Path(d);run=root/'runs/model/attempt-001';run.mkdir(parents=True)
+            cell=dict(id='model',stage='outer',family='product_joint_identity')
+            (run/'RUN.json').write_text(json.dumps(dict(cell=cell)))
+            (run/'RESULT.json').write_text(json.dumps(dict(cell=cell,stage='trained')))
+            old=root/'legacy';old.mkdir();(old/'BUILD.json').write_text('original ReLU representation')
+            new=root/'qualified';new.mkdir();(new/'BUILD.json').write_text('qualified added family representation')
+            identity=dict(representation='research-relu-max-pairs-v1',evaluation_build_sha256=sha(new/'BUILD.json'))
+            context=dict(admission=dict(evaluation_representations={cell['family']:identity}))
+            args=SimpleNamespace(study=root,binary_dir=old,repair_binary_dir=old,
+                                 repair_inspector=root/'inspector',candidate_binary_dir=[new])
+            def reexport(values):
+                self.assertEqual(values.binary_dir,new)
+                self.assertEqual(values.inspector,args.repair_inspector)
+            with patch('shaping_supervision.load_registration',return_value=({},[cell],{})), \
+                 patch('shaping_evaluation.outer_context',return_value=context), \
+                 patch('shaping_reexport.reexport',side_effect=reexport) as native:
+                self.assertEqual(later_sweep(args),1);native.assert_called_once()
+                identity['evaluation_build_sha256']='unavailable'
+                native.reset_mock()
+                with self.assertRaisesRegex(ValueError,'inner-selected max-pair runtime'):later_sweep(args)
+                native.assert_not_called()
+
     def test_corrected_inner_uses_only_its_explicit_matching_native_build(self):
         from shaping_completion import sha
         from shaping_supervision import corrected_binaries

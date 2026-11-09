@@ -1118,3 +1118,11 @@ the original training host while the fixed wave is evaluating the same model.
 Every existing raw report and failure stays preserved. Outer fits retain their
 admitted representation. Fourteen focused runtime/evaluator checks pass,
 including changed-byte refusal and exclusion before any duplicate prediction.
+
+Later neural evaluation now resolves a repaired model's runtime from the exact
+inner-selected `evaluation_build_sha256`, among the explicitly supplied native
+directories. Original ReLU/Softplus and the added qualified families can retain
+their separately pinned representations. An absent or ambiguous matching
+runtime refuses before prediction. Eighteen focused supervision checks pass,
+including routing an added family to its qualified build while preserving the
+legacy control build. Outer fits remain unstarted until the full inner gate.
