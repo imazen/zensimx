@@ -40,6 +40,15 @@ It retains the original references, candidate checkpoints, canonical bakes,
 registration, reports and raw logs. These two engineering runs add no scientific
 conditions to the registered study. Whole-training speed remains unmeasured.
 
+`shaping_gradient_pretrained.py` separately registers corrected joint-product and
+joint-separate pretrained controls at inner-0-0, setting 0, seed 0. Each check
+imports that original fit's exact learned input bank and retains its complete
+120-epoch, 50,000-pair-per-epoch second phase. The original pretraining prefix
+is not recomputed. Every one of the 120 finalized checkpoints must match after
+removing only reproduction metadata. These are two engineering qualification
+runs, separate from the registered scientific fit count. Registration grants
+no scientific runtime substitution; the existing downstream gates stay in force.
+
 Raw evidence and complete durable checksum readback:
 `/mnt/v/output/zensim/shaping-completion-20261107/gradient-kernel-probe-20261109/`,
 mirrored under the same suffix in `/mnt/tower/output/zensim/`.

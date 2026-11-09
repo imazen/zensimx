@@ -5730,6 +5730,15 @@ shaping-cost-finalists study binary_dir output:
 shaping-cost-worker-check:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B -m unittest scripts.tests.test_shaping_cost_worker scripts.tests.test_shaping_cost_finalists scripts.tests.test_shaping_bootstrap_worker scripts.tests.test_shaping_training_budget
 
+shaping-gradient-pretrained-check:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 512M --jobs 1 -- python3 -B -m unittest scripts.tests.test_shaping_gradient_pretrained
+
+shaping-gradient-pretrained-register study binaries output:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 512M --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_gradient_pretrained.py register --study {{quote(study)}} --binary-dir {{quote(binaries)}} --output {{quote(output)}}
+
+shaping-gradient-pretrained-run study registration family output:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 512M --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_gradient_pretrained.py run --study {{quote(study)}} --registration {{quote(registration)}} --family {{quote(family)}} --output {{quote(output)}}
+
 shaping-vector-cost-run study root cpus:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 512M --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_vector_bench.py run --study {{quote(study)}} --root {{quote(root)}} --cpus {{quote(cpus)}}
 
