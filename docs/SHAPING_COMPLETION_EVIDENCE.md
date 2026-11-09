@@ -1236,3 +1236,33 @@ receipt/manifest pairs passed complete durable readback as 511 files totaling
 65,012,807 bytes under `unsigned-export-recovery-evidence-20261109` beside the
 study archives. This does not establish completion of the remaining scientific
 extensions, outer evaluations or memorization controls.
+
+## Unstarted extension placement, November 9 UTC
+
+Live placement observation found nine unclaimed waiters behind four native fits
+on r7900x, while r5600g had eight native fits and no waiters. The per-job four-GiB
+caps and existing aggregate RAM guard limited additional admissions on r7900x;
+there was no exclusive training lock. Three never-started extension waiters were
+retired under the existing CPU/storage transaction locks after verifying no claim,
+attempt, reservation or child. No native process was signaled.
+
+Their complete sealed requests were retained byte for byte except for the host.
+Native binaries, source hashes, data, seeds, schedules, exposure and snapshot
+budgets did not change. Original placements, requests and retirement proofs remain
+preserved. All three replacement controllers were verified live on r5600g, with
+11 aggregate claims, the approved ceiling. A separate 2.040855-second proc-counter
+sample observed 11 native trainers consuming 971.6516 percent of one CPU in total
+on that 12-CPU host. This is an instantaneous utilization observation, not a
+training-throughput benchmark or a measured speed ratio.
+
+Three focused placement checks passed on i270, including refusal of wrong-stage
+waiters and preservation of claimed work. Wrapper: `done rc=0 1s | peak-RSS
+0.03GiB | min-avail 20555MiB | peak-load 7.39`. Transfer and verified launch took
+36 seconds (`peak-RSS 0.02GiB | min-avail 40324MiB | peak-load 2.09`) on the
+metadata coordinator. No scientific training or completed evaluation was replayed.
+
+The 38-file, 5,329,539-byte placement closure passed complete durable readback
+under `extension-placement-5628b2d8-20261109` beside the study archives. It includes
+the completed primary/rescue inner-selection summary, source overlay and hash-bound
+reference to the existing shared source archive. The measured selection results
+are recorded in [the primary inner report](../benchmarks/shaping_primary_inner_2026-11-08.md).
