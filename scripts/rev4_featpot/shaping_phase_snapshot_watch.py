@@ -95,7 +95,9 @@ def watch(args):
                 except subprocess.TimeoutExpired:save(status['stage'])
         save(status['stage'],child_pid=None)
         if code:raise RuntimeError('snapshot cleanup command failed; preserve '+str(log))
-    def remote(host,command,log):execute(['ssh',host,shlex.join(list(map(str,command)))],log)
+    def remote(host,command,log):
+        payload=['env','TMPDIR='+str(Path.home()/'tmp'),*map(str,command)]
+        execute(['ssh',host,shlex.join(payload)],log)
     heavy=Path.home()/'work/claudehints/scripts/run-heavy'
     helper=REPO/'scripts/rev4_featpot/shaping_snapshot_batch.py'
     namespace=REPO/'scripts/rev4_featpot/shaping_archive_namespace.sh'

@@ -1533,3 +1533,14 @@ the native benchmark, retaining all unregistered processes and existing RAM,
 temperature, paired-round and CPU-boundary gates. The native instrument is
 unchanged. The earlier one-thread timing completed its full clean-round budget.
 
+## Known Bugs — archive guard dependency closure (source corrected November 9, 2026)
+
+Snapshot cleanup on two worker environments stopped during dependency preflight:
+its shared open-file guard lived in a checkpoint-analysis module that eagerly
+imported NumPy. The archive identity and open-file functions now live in a
+standard-library module, with the checkpoint owner re-exporting the same APIs.
+Their existing hash, cold-readback and active-user contracts remain unchanged.
+Remote archive commands also explicitly set the disk-backed TMPDIR required by
+the private read-only mount helper. All refusals occurred before state removal;
+failed preflights remain preserved. No native training was replayed or changed.
+

@@ -78,7 +78,7 @@ def retire(root,receipt,owner,*,trim_staged=False):
 
 def trim(root,retirement,receipt,owner):
     """Remove only cold-verified staged state duplicates after store retirement."""
-    from shaping_checkpoint_retention import archive_inventory,no_users
+    from shaping_artifact_retention import archive_inventory,no_users
     import os,hashlib,re
     if root.resolve()!=root or receipt.exists() or receipt.is_relative_to(root):
         raise ValueError('canonical stage and fresh external trim receipt required')

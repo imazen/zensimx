@@ -36,7 +36,7 @@ class SnapshotBatchTests(unittest.TestCase):
             storage=SimpleNamespace(reservation=lambda *args,**kwargs:nullcontext())
             result=batch.stage(study,stage,owner,storage);self.assertEqual(result['stores'],1)
             durable=self.archive(root,stage)
-            with patch('shaping_checkpoint_retention.no_users'):
+            with patch('shaping_artifact_retention.no_users'):
                 result=batch.retire(stage,root/'RETIRED.json',owner)
             self.assertEqual(result['retired_stores'],1);self.assertFalse(store.exists())
             self.assertEqual((run/'model.bin').read_bytes(),b'keep model')
@@ -49,7 +49,7 @@ class SnapshotBatchTests(unittest.TestCase):
             root=Path(directory);study,run,store,binding=self.fixture(root);stage=root/'stage'
             batch.stage(study,stage,owner,SimpleNamespace(reservation=lambda *args,**kwargs:nullcontext()))
             durable=self.archive(root,stage);(durable/('a'*64)/'state-0.snap').write_bytes(b'corrupt')
-            with patch('shaping_checkpoint_retention.no_users'):
+            with patch('shaping_artifact_retention.no_users'):
                 with self.assertRaisesRegex(ValueError,'cold readback differs'):batch.retire(stage,root/'RETIRED.json',owner)
             for name in owner.STATES:self.assertEqual((store/name).read_bytes(),name.encode())
             self.assertFalse(binding.with_name('SNAPSHOT_RETIREMENT.json').exists())
@@ -68,9 +68,9 @@ class SnapshotBatchTests(unittest.TestCase):
             root=Path(directory);study,run,store,binding=self.fixture(root);stage=root/'stage'
             batch.stage(study,stage,owner,SimpleNamespace(reservation=lambda *args,**kwargs:nullcontext()))
             durable=self.archive(root,stage);retirement=root/'RETIRED.json'
-            with patch('shaping_checkpoint_retention.no_users'):
+            with patch('shaping_artifact_retention.no_users'):
                 batch.retire(stage,retirement,owner)
-            with patch('shaping_checkpoint_retention.no_users') as users:
+            with patch('shaping_artifact_retention.no_users') as users:
                 result=batch.trim(stage,retirement,root/'TRIMMED.json',owner)
                 self.assertEqual(len(users.call_args.args[0]),2)
             self.assertEqual(result['files'],2)
@@ -85,7 +85,7 @@ class SnapshotBatchTests(unittest.TestCase):
             root=Path(directory);study,run,store,binding=self.fixture(root);stage=root/'stage'
             batch.stage(study,stage,owner,SimpleNamespace(reservation=lambda *args,**kwargs:nullcontext()))
             durable=self.archive(root,stage);retirement=root/'RETIRED.json'
-            with patch('shaping_checkpoint_retention.no_users'):batch.retire(stage,retirement,owner)
+            with patch('shaping_artifact_retention.no_users'):batch.retire(stage,retirement,owner)
             (durable/('a'*64)/'state-1.snap').write_bytes(b'corrupt')
             with self.assertRaisesRegex(ValueError,'cold readback differs'):
                 batch.trim(stage,retirement,root/'TRIMMED.json',owner)
@@ -97,7 +97,7 @@ class SnapshotBatchTests(unittest.TestCase):
             root=Path(directory);study,run,store,binding=self.fixture(root);stage=root/'stage'
             batch.stage(study,stage,owner,SimpleNamespace(reservation=lambda *args,**kwargs:nullcontext()))
             durable=self.archive(root,stage)
-            with patch('shaping_checkpoint_retention.no_users') as users:
+            with patch('shaping_artifact_retention.no_users') as users:
                 batch.retire(stage,root/'RETIRED.json',owner,trim_staged=True)
                 self.assertEqual(len(users.call_args.args[0]),4)
             self.assertFalse(store.exists())

@@ -166,7 +166,7 @@ def stage(binding,output):
 
 
 def retire(binding,stage_root,receipt,archive_root=None,*,trim_staged=False):
-    from shaping_checkpoint_retention import archive_inventory,no_users
+    from shaping_artifact_retention import archive_inventory,no_users
     record,run,directory=completed(binding);manifest=json.loads((stage_root/'SNAPSHOTS.json').read_text())
     if (manifest['schema']!='completed-native-snapshot-stage-v1' or manifest['binding_sha256']!=sha(binding)
         or manifest['snapshot_directory']!=str(directory)):raise ValueError('archived snapshot binding differs')

@@ -66,7 +66,7 @@ class SnapshotRetentionTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError,'cold readback'):retention.retire(binding,stage,receipt)
             self.assertTrue(directory.exists());self.assertFalse(receipt.exists())
             remote.write_bytes((stage/remote.name).read_bytes())
-            with patch('shaping_checkpoint_retention.no_users') as users:
+            with patch('shaping_artifact_retention.no_users') as users:
                 result=retention.retire(binding,stage,receipt);users.assert_called_once()
             self.assertEqual(result['stage'],'completed_store_retired');self.assertFalse(directory.exists())
             self.assertTrue((directory.parent/'.lock').exists());self.assertTrue(binding.exists())
@@ -87,7 +87,7 @@ class SnapshotRetentionTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError,'cold readback'):retention.retire(binding,stage,receipt,archive)
             self.assertTrue(directory.exists());self.assertFalse(receipt.exists())
             remote.write_bytes((stage/remote.name).read_bytes())
-            with patch('shaping_checkpoint_retention.no_users'):
+            with patch('shaping_artifact_retention.no_users'):
                 result=retention.retire(binding,stage,receipt,archive)
             self.assertEqual(result['snapshot_archive_prefix'],'snapshots');self.assertFalse(directory.exists())
 
