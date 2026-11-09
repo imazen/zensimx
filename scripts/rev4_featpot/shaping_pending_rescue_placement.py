@@ -13,8 +13,9 @@ def idle(study,cid,pid,claims,storage,proc=Path('/proc')):
             and not (proc/str(pid)/'task'/str(pid)/'children').read_text().strip())
 
 
-def retire(study,limit,output,proc=Path('/proc')):
+def retire(study,limit,output,proc=Path('/proc'),*,stage='rescue'):
     if not 1<=limit<=20:raise ValueError('bounded pending placement count required')
+    if stage not in ('rescue','exposure_extension'):raise ValueError('registered pending fit stage required')
     output.mkdir(parents=True,exist_ok=False)
     record=dict(stage='checking_unstarted_waiters',host=socket.gethostname(),study=str(study),
                 rows=[],native_processes_signalled=[],driver_sha256=sha(__file__),training_replayed=False)
@@ -33,7 +34,8 @@ def retire(study,limit,output,proc=Path('/proc')):
                     if len(positions)!=1 or argv[positions[0]+1:positions[0]+2]!=['work'] or '--request' not in argv:continue
                     if not Path(os.readlink(directory/'exe')).name.startswith('python'):continue
                     request=Path(argv[argv.index('--request')+1]);q=json.loads(request.read_text());cid=q['cell']['id'];pid=int(directory.name)
-                    if q['study']!=str(study) or q['cell']['stage']!='rescue' or q['host']!=socket.gethostname():continue
+                    if q['study']!=str(study) or q['cell']['stage']!=stage or q['host']!=socket.gethostname():continue
+                    if stage=='exposure_extension' and q.get('execution_kind')!='extension':continue
                     if q['driver_sha256']!=sha(argv[positions[0]]) or q['plan_sha256']!=sha(study/'PLAN.json'):
                         raise ValueError('waiter source or study identity differs')
                     state,start=process_identity(proc,pid)
@@ -108,10 +110,21 @@ for p in Path('/proc').glob('[0-9]*/cmdline'):
         matches=[p for p in (study/'downstream_assignments').glob('*.json') if cid in json.loads(p.read_text())['cells']]
         if len(matches)!=1 or json.loads(matches[0].read_text())['host']!=old['host']:raise ValueError('one original placement required')
         job=output/'jobs'/cid
-        with (output/(cid+'.log')).open('x') as log:
-            subprocess.run(['python3','-B',str(source/'scripts/rev4_featpot/shaping_rescue_worker.py'),'register',
-                '--study',str(study),'--binaries',str(binaries),'--qualification',str(qualification),
-                '--cell',cid,'--host',target,'--output',str(job)],stdout=log,stderr=subprocess.STDOUT,check=True,cwd=source)
+        if old.get('execution_kind')=='extension':
+            # Reuse every sealed input and its original source, rather than
+            # recapturing a dependency set in a different registration process.
+            new=relocated_extension(old,target,source)
+            job.mkdir(parents=True)
+            request=job/'REQUEST.json';request.write_bytes(encoded(new))
+            assignment=dict(host=target,cells=[cid],partition=new['cell']['partition'],
+                plan_sha256=new['plan_sha256'],build_sha256=new['build_sha256'],
+                worker_request_path=str(request),worker_request_sha256=sha(request))
+            (job/'ASSIGNMENT.json').write_bytes(encoded(assignment))
+        else:
+            with (output/(cid+'.log')).open('x') as log:
+                subprocess.run(['python3','-B',str(source/'scripts/rev4_featpot/shaping_rescue_worker.py'),'register',
+                    '--study',str(study),'--binaries',str(binaries),'--qualification',str(qualification),
+                    '--cell',cid,'--host',target,'--output',str(job)],stdout=log,stderr=subprocess.STDOUT,check=True,cwd=source)
         request=job/'REQUEST.json';new=json.loads(request.read_text())
         if new!={**old,'host':target}:raise ValueError('placement change altered scientific request')
         assignment=study/'downstream_assignments'/('rebalanced-'+cid+'-'+target+'.json')
@@ -133,12 +146,22 @@ for p in Path('/proc').glob('[0-9]*/cmdline'):
     record['stage']='registered';journal.write_bytes(encoded(record));return record
 
 
+def relocated_extension(old,target,source):
+    from shaping_rescue_worker import HOSTS
+    if (target not in HOSTS or old.get('host')==target or old.get('execution_kind')!='extension'
+        or old['cell']['stage']!='exposure_extension' or old['source_root']!=str(source)
+        or old['driver_sha256']!=sha(source/'scripts/rev4_featpot/shaping_rescue_worker.py')):
+        raise ValueError('original sealed extension source and distinct approved target required')
+    return dict(old,host=target)
+
+
 if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__)
     for key in ('study','output'):p.add_argument('--'+key,type=Path,required=True)
     p.add_argument('--mode',choices=('retire','target'),default='retire');p.add_argument('--limit',type=int)
+    p.add_argument('--stage',choices=('rescue','exposure_extension'),default='rescue')
     p.add_argument('--proof',type=Path,action='append',default=[]);p.add_argument('--target')
     for key in ('source','binaries','qualification'):p.add_argument('--'+key,type=Path)
     a=p.parse_args()
-    r=(retire(a.study,a.limit,a.output) if a.mode=='retire' else prepare_target(a.study,a.proof,a.source,a.binaries,a.qualification,a.target,a.output))
+    r=(retire(a.study,a.limit,a.output,stage=a.stage) if a.mode=='retire' else prepare_target(a.study,a.proof,a.source,a.binaries,a.qualification,a.target,a.output))
     print(json.dumps(dict(stage=r['stage'],cells=len(r.get('rows',r.get('jobs',[]))),training_replayed=False)),flush=True)

@@ -6011,5 +6011,5 @@ shaping-stable-rescue-export-test:
 shaping-pending-rescue-placement-test:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 512M --jobs 1 -- python3 -B -m unittest scripts.tests.test_shaping_pending_rescue_placement
 
-shaping-pending-rescue-retire study limit output:
-    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 512M --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_pending_rescue_placement.py --study {{quote(study)}} --limit {{limit}} --output {{quote(output)}}
+shaping-pending-rescue-retire study limit output stage="rescue":
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 512M --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_pending_rescue_placement.py --study {{quote(study)}} --limit {{limit}} --output {{quote(output)}} --stage {{quote(stage)}}
