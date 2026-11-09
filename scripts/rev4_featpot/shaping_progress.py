@@ -151,6 +151,20 @@ def corrected_program(root):
     return result
 
 
+def fit_host(root,cell,seen):
+    """Imported results retain their recorded training origin."""
+    host=seen.get('host')
+    if seen.get('run'):
+        run=Path(seen['run'])
+        if not run.is_relative_to(root/'runs'/cell['id']):raise ValueError('dashboard observed run differs')
+        path=run/'RUN.json'
+        if path.is_file():
+            identity=json.loads(path.read_text())
+            if identity['cell']['id']!=cell['id']:raise ValueError('dashboard training origin differs')
+            host=identity.get('execution_host',host)
+    return host
+
+
 def dashboard_data(root,result,workers):
     from shaping_completion import FAMILIES,max_pair_families
     from shaping_execution import live_status
@@ -179,7 +193,7 @@ def dashboard_data(root,result,workers):
         directory=root/'runs'/cell['id'];a=audited[cell['id']]
         trained=any(v['fit_success'] for v in a['attempts']);seen=observations.get(cell['id'],{})
         state='trained' if trained else 'running' if seen.get('verified_live') and seen.get('fresh') else 'last observed running' if seen.get('verified_live') else seen.get('terminal') or 'pending'
-        record=dict(cell=cell,trained=trained,state=state,host=seen.get('host'),
+        record=dict(cell=cell,trained=trained,state=state,host=fit_host(root,cell,seen),
             last_epoch=seen.get('last_epoch'),required_epochs=seen.get('required_epochs'),
             original_failed_gate=any(v['original_failed_gates'] for v in a['attempts']),
             investigation=any(v['convergence_failure'] or any(d['investigation_required'] for d in v['diagnostics'].values()) for v in a['attempts']),

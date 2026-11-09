@@ -1,12 +1,27 @@
 import contextlib,io,json,sys,tempfile,unittest
 from pathlib import Path
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'rev4_featpot'))
-from shaping_progress import panel_values,average,paired_delta,comparison_rows,read_saved_panel,dashboard_claim
+from shaping_progress import panel_values,average,paired_delta,comparison_rows,read_saved_panel,dashboard_claim,fit_host
 from shaping_execution import live_status
 from shaping_completion import sha
 
 
 class DashboardTests(unittest.TestCase):
+    def test_collected_fit_keeps_training_host_instead_of_coordinator_host(self):
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as directory:
+            root=Path(directory);cell=dict(id='registered-cell');run=root/'runs'/cell['id']/'attempt-001'
+            run.mkdir(parents=True);path=run/'RUN.json'
+            path.write_text(json.dumps(dict(cell=cell,execution_host='i270')))
+            self.assertEqual(fit_host(root,cell,dict(host='dev',run=str(run))),'i270')
+            path.write_text(json.dumps(dict(cell=dict(id='different'),execution_host='i270')))
+            with self.assertRaisesRegex(ValueError,'origin differs'):fit_host(root,cell,dict(host='dev',run=str(run)))
+
+    def test_uncollected_live_fit_uses_observed_worker_without_invented_origin(self):
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as directory:
+            root=Path(directory);cell=dict(id='registered-cell');run=root/'runs'/cell['id']/'attempt-001'
+            self.assertEqual(fit_host(root,cell,dict(host='r3500',run=str(run))),'r3500')
+            self.assertIsNone(fit_host(root,cell,{}))
+
     def test_plain_and_gzip_scalar_documents_preserve_exact_numbers(self):
         import gzip
         from shaping_scatter_prepare import read_points

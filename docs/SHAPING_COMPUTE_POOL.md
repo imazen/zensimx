@@ -57,3 +57,16 @@ An explicit `--cell` scope lets a new owner handle only the withdrawn host's
 pending fits without duplicating another owner's evaluations. Primary transport
 continues to accept only the previously qualified ReLU controls; other stages
 and families still refuse cross-host requests.
+
+All admitted i270 native fits drained successfully on November 9; the final fit
+finished at 12:15:22 UTC and the following live scan found zero native trainers.
+The four remaining control evaluations were imported from r7900x without any
+training replay. The closed transport evidence passed durable cold checksum
+readback: 56 payload files, 1,382,319 bytes, plus its receipt, under
+`extension-transport-evidence-20261109`. Its capture includes the first two
+imports; later scientific artifacts use the ordinary archive owners.
+
+Collected-fit rows in the statistics page use RUN.json's recorded training host.
+Previously, a completed worker fit could be labeled with the coordinator host
+after its copied files were observed locally. This display correction preserves
+the actual training origin when evaluation occurs on another worker.
