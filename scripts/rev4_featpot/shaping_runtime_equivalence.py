@@ -64,8 +64,11 @@ def prepare(study,baseline,candidate,identity,pretrained):
                 if manifest.get(relative)!=sha(item):raise ValueError('trajectory artifact differs from verified archive')
                 artifacts[str(item)]=sha(item)
             run=json.loads((directory/family/'RUN.json').read_text())
+            result=json.loads((directory/family/'RESULT.json').read_text())
             if (run['cell']!=expected or run['epochs']!=epochs or run['pairs_per_epoch']!=50000
-                or run['build_sha256']!=build):
+                or run['build_sha256']!=build or result.get('exit_code')!=0
+                or result['stage'] not in ('trained','qualified') or result['cell']!=expected
+                or result['epochs']!=epochs or result['pairs_per_epoch']!=50000):
                 raise ValueError('qualified native exposure differs')
             cases[family]=dict(cell=expected,epochs=epochs,proof=str(path),proof_sha256=sha(path),
                 registration=str(directory/'REGISTRATION.json'),registration_sha256=sha(directory/'REGISTRATION.json'))

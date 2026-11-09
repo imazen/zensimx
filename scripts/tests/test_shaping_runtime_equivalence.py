@@ -30,7 +30,7 @@ def fixture():
                     trajectory=dict(required=epochs,all_equal=True,stripped_metadata_keys=['zentrain.repro'],compared=compared))
                 (folder/family).mkdir();run=dict(cell=cell,epochs=epochs,pairs_per_epoch=50000,build_sha256=build)
                 (folder/family/'RUN.json').write_bytes(encoded(run))
-                (folder/family/'RESULT.json').write_bytes(encoded(proof if epochs==240 else dict(run,stage='trained',exit_code=0)))
+                (folder/family/'RESULT.json').write_bytes(encoded(dict(run,**proof,exit_code=0) if epochs==240 else dict(run,stage='trained',exit_code=0)))
                 if epochs==120:(folder/family/'QUALIFICATION.json').write_bytes(encoded(proof))
                 cases[family]=dict(cell=cell,reference_sha256=refs)
             schema='paired-gradient-native-trajectory-v1' if epochs==240 else 'paired-gradient-corrected-pretrained-v1'
