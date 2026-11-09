@@ -33,3 +33,11 @@ Keep the inner-selected evaluation representation and its original evaluator.
 Do not regenerate completed scientific fits, amend undefined-score rules, widen
 the shortlist, shorten a phase or bypass an incomplete paired selection. No model
 promotion or serving-profile change follows from runtime equivalence.
+
+Extension transport reproduces the complete fold's existing selection evidence.
+The first fold-2 closure measured 1,647 files and 487,417,886 bytes before the
+imported-source additions. Its former ordinary-neural 384 MiB allowance refused
+before request creation or native training. Extensions now have a separate
+1 GiB / 4,000-file input bound, reserved through the existing SSD admission.
+Other neural transfers retain 384 MiB. No selection evidence is omitted and
+the 30 GiB free-space floor remains unchanged.

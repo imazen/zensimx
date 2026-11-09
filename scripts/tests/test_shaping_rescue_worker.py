@@ -7,6 +7,15 @@ from shaping_completion import encoded,sha
 
 
 class RescueWorkerTests(unittest.TestCase):
+    def test_extension_bound_does_not_expand_ordinary_neural_transfers(self):
+        for kind in (None,'outer','variant','corrected_inner'):
+            self.assertEqual(worker.limits(kind),(384*1024**2,4000))
+        record=dict(schema='shaping-native-worker-v2',host='r3500',driver_sha256=sha(worker.__file__),
+            outer_results_read=False,execution_kind='extension',cell=dict(stage='exposure_extension'),
+            files={'oversized':dict(bytes=1024**3+1)})
+        with patch.object(worker.socket,'gethostname',return_value='r3500'):
+            with self.assertRaisesRegex(ValueError,'input allowance exceeded'):worker.verify(record)
+
     def test_wave_preserves_independent_failures_and_never_restarts(self):
         with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as directory:
             root=Path(directory);paths=[root/'a.json',root/'b.json']
