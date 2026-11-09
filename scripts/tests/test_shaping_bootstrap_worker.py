@@ -22,10 +22,10 @@ class BootstrapWorkerTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as directory:
             root=Path(directory);study=root/'study';study.mkdir();source=root/'results/primary';source.mkdir(parents=True)
             (source/'samples.npz').write_bytes(b'fixture transport payload')
-            pins={'source/scripts/owner.py':'source-hash','/data/response.tsv':'response-hash'}
+            pins={'source/scripts/rev4_featpot/shaping_bootstrap.py':'source-hash','/data/response.tsv':'response-hash'}
             resolution=dict(input_sha256=pins,cells=[dict(id='outer-model')],comparison=None,qualifications={})
             record=dict(study=str(study),result_output=str(source),host='r3500',cell=dict(id='bootstrap-condition'),resolution=resolution)
-            summary=dict(input_sha256={'/worker/export/scripts/owner.py':'source-hash','/data/response.tsv':'response-hash'},
+            summary=dict(input_sha256={'/worker/export/scripts/rev4_featpot/shaping_bootstrap.py':'source-hash','/data/response.tsv':'response-hash'},
                 source_root='/worker/export',samples_sha256=sha(source/'samples.npz'),convergence_qualifications={},
                 outer_results_read=True,final_holdout_read=False,outer_population_reports={'outer-model':{}})
             def save(value):
@@ -42,7 +42,7 @@ class BootstrapWorkerTests(unittest.TestCase):
 
     def test_source_export_relocation_preserves_scope_but_not_changed_hashes(self):
         coordinator=Path('/coordinator/source');remote=Path('/worker/export')
-        def context(source,pin):return dict(pins={str(source/'scripts/owner.py'):pin,'/data/frozen.tsv':'data-hash'},spec=None,outputs=[],qualifications={})
+        def context(source,pin):return dict(pins={str(source/'scripts/rev4_featpot/shaping_bootstrap.py'):pin,'/data/frozen.tsv':'data-hash'},spec=None,outputs=[],qualifications={})
         with patch.object(worker,'REPO',coordinator):expected=bootstrap.scope(context(coordinator,'source-hash'))
         with patch.object(worker,'REPO',remote):
             self.assertEqual(bootstrap.scope(context(remote,'source-hash')),expected)
