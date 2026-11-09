@@ -23,3 +23,27 @@ both architectures, checking all epoch exports and native compaction gates.
 Additional checks exercise plain validation against current shape values and
 reject unsupported owners. These engineering checks do not establish scientific
 quality gains or justify reusing controls trained under a different recipe.
+
+## Reusable defaults and predictable training
+
+The owner clarified on November 9 that shaping should reduce outlier ratios and
+scatter sprawl, and make good training runs easier to understand and achieve.
+Average rank correlation alone does not establish that benefit. Compare tails,
+raw calibration, normalized scatter geometry and paired-seed reliability while
+retaining the registered human headline and separate teacher diagnostics.
+
+Curve agreement is descriptive: downstream weights can compensate for a shaper's
+scale and form. A transferable default needs explicit anchor/scale conventions,
+training-complement-only derivation and an actual matched frozen-bank or
+joint-from-bank trial. A bank assembled across folds that saw an evaluation
+source cannot establish source-disjoint transfer on that source. Register any
+additional trials before fitting; the current primary selection rule is unchanged.
+
+`just shaping-tail-summary STUDY DASHBOARD OUTPUT` reads existing native scalar
+panels for every one of the 72 registered setting/partition/seed conditions in
+each neural primary family. It preserves missing/undefined metrics without a
+partial aggregate, compares identical conditions against ReLU, and separates
+raw residual tails from quantile-normalized geometry. Human summaries give the
+four rated populations equal weight; CID22 SSIM2 remains separate. It performs
+no fitting, inference or architecture selection. Corpus-standard-deviation
+outlier ratio is a broad threshold, so zero OR does not establish tight scatter.
