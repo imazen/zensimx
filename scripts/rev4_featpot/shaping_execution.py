@@ -251,14 +251,31 @@ def registered_subset(selected,requested):
     return [c for c in selected if c['id'] in requested]
 
 
+def transported_control_live(root,run,directory,argv):
+    """Bind the control CLI to its exact request rather than a module name."""
+    scripts=[i for i,v in enumerate(argv) if Path(v).name=='shaping_control_worker.py']
+    if len(scripts)!=1 or argv[scripts[0]+1:scripts[0]+2]!=['fit'] or argv.count('--request')!=1:return False
+    try:
+        request=Path(argv[argv.index('--request')+1]);record=json.loads(request.read_text())
+        status=json.loads(request.with_name('STATUS.json').read_text())
+        return (status.get('request_sha256')==sha(request)
+            and record.get('execution_kind')=='control' and record.get('study')==str(root)
+            and record.get('cell')==run['cell'] and record.get('result_output')==str(directory)
+            and record.get('host')==run.get('execution_host')
+            and record.get('plan_sha256')==run['plan_sha256'] and record.get('build_sha256')==run['build_sha256'])
+    except (OSError,ValueError,IndexError,KeyError):return False
+
+
 def live_status(root,*,persist=True,emit=True):
     import re
     rows=[]
     for path in sorted(root.glob('runs/*/attempt-*/RUN.json')):
         run=json.loads(path.read_text());pid=run['pid']
         try:
-            command=Path(f'/proc/{pid}/cmdline').read_bytes().replace(b'\0',b' ').decode()
-            if run.get('process_role')=='control_worker':live=str(root) in command and 'shaping_controls.py' in command
+            argv=[v.decode() for v in Path(f'/proc/{pid}/cmdline').read_bytes().split(b'\0') if v]
+            command=' '.join(argv)
+            if run.get('process_role')=='control_worker':
+                live=(str(root) in command and 'shaping_controls.py' in command) or transported_control_live(root,run,path.parent,argv)
             elif run.get('process_role')=='rescue_controller':live=str(root) in command and 'shaping_rescue_execution.py' in command and run['cell']['id'] in command
             elif run.get('process_role')=='extension_controller':live=str(root) in command and 'shaping_extension_execution.py' in command and run['cell']['id'] in command
             elif run.get('process_role')=='outer_controller':live=str(root) in command and 'shaping_outer_execution.py' in command and run['cell']['id'] in command

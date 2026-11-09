@@ -85,3 +85,11 @@ An already registered, unstarted tree-control capsule and all failed dispatch
 records remain preserved. This preparation repair does not establish successful
 outer fitting or generalization results.
 
+The control status reader also recognizes the transported `shaping_control_worker`
+fit CLI. It checks the request hash retained by its worker status and matches the
+study, cell, output, host, plan and binary identities against RUN.json. Previously
+it recognized only the direct control CLI, so two collectors stopped during live
+transported controls. Their failure records remain preserved; correcting the
+observer and replacing collectors does not restart any trainer or weaken stopped-
+attempt reconciliation. Wrong identities and missing requests still refuse.
+
