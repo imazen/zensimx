@@ -41,6 +41,20 @@ workers and nine future extension, outer and variant owners. Each replacement
 owner was verified childless and waiting before replacement, then verified live
 against its exact command afterward. No active scientific fit was signaled or
 replayed. The unchanged registration and selection gates still control admission.
+
+Four completed paired-gradient engineering stores have also been retired through
+the existing snapshot owner. Their full recovery states had complete durable
+readback under `paired-gradient-fullstate-archive-20261109`. Retirement reread
+the durable state hashes, checked the original successful bindings and native
+store locks, and refused active file users. It removed sixteen worker files:
+eight global state files and their eight staged duplicates, measuring
+165,860,564 bytes before removal, and released four store reservations.
+The durable payload and coordinator copy remain available. No training signal
+was sent and no state from an active or interrupted fit was removed.
+The retirement process reported `done rc=0 2s | peak-RSS 0.02GiB |
+min-avail 16145MiB | peak-load 4.48`; this is metadata-cleanup resource use.
+Its collected journals and removal inventory passed durable checksum readback
+under `paired-gradient-state-retirement-20261109` beside the study archives.
 Actual bindings for these future scientific phases remain execution evidence to
 collect after admission; deployment does not establish that those fits have run.
 
