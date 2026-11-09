@@ -1287,6 +1287,25 @@ was reused; no new native qualification was run.
 
 ## Repeated progress validation, November 9 UTC
 
+### Failed raw-export archive watcher, November 9 UTC
+
+The failed-export watcher exited when the first conditional extension's raw
+monotonicity gate failed: its registration check accepted only original-matrix
+cells. The preserved log ends with `failure archive registration differs`. The
+canonical native collector separately archived that complete run and raw failure
+at 09:25 UTC; no scientific data was lost and the raw numerical threshold remains
+unchanged.
+
+Failed-extension preservation now resolves the complete conditional registration
+and requires both recorded resolutions and the cell identity to match. Existing
+model, report and failure hashes remain mandatory; preservation never qualifies
+a failed raw export scientifically. Five focused tests pass on i270, including
+unknown, mismatched-cell and mismatched-resolution refusals (`peak-RSS 0.07GiB`,
+`min-avail 22041MiB`, `peak-load 7.17`, wrapper zero seconds). The actual failed
+extension's existing evidence also passes the new preservation check: two
+seconds, `peak-RSS 0.11GiB`, `min-avail 43566MiB`, `peak-load 1.58`. No native fit,
+scoring run or completed archive payload was replayed for these checks.
+
 The progress audit called the complete extension resolver for every registered
 cell. Each call reconstructed and checked the same fold's paired rescue evidence
 and entire extension matrix. The shared `registered_fold` validator now performs

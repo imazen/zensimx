@@ -1,5 +1,6 @@
 import json,os,sys,tempfile,unittest
 from pathlib import Path
+from unittest.mock import patch
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'rev4_featpot'))
 from shaping_archive_supervision import failed_eligible
 from shaping_completion import encoded,sha
@@ -56,6 +57,26 @@ class FailedArchiveTests(unittest.TestCase):
             (run/'RUN.json').write_bytes(encoded(identity));(run/'fit').mkdir()
             (run/'checkpoints').rename(run/'fit/checkpoints')
             self.assertTrue(failed_eligible(study,directory,[cell]))
+
+    def test_extension_uses_complete_conditional_registration(self):
+        for drift in (None,'cell','identity','result','unregistered'):
+            with self.subTest(drift=drift), tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as temp:
+                study,directory,run,cell=self.fixture(Path(temp),'gate')
+                cell['stage']='exposure_extension'
+                resolution=dict(cell=cell,schedule=dict(phase_epochs=[120]))
+                for name in ('RUN.json','RESULT.json','EVALUATION_FAILURES.json'):
+                    path=run/name;row=json.loads(path.read_text());row['cell']=cell
+                    if name in ('RUN.json','RESULT.json'):
+                        row['resolution']={} if drift==('identity' if name=='RUN.json' else 'result') else resolution
+                    path.write_bytes(encoded(row))
+                admitted=json.loads(json.dumps(resolution))
+                if drift=='cell':admitted['cell']['family']='softplus'
+                with patch('shaping_extension.resolve',return_value=admitted,
+                           side_effect=ValueError('not registered') if drift=='unregistered' else None) as resolve:
+                    if drift is None:self.assertTrue(failed_eligible(study,directory,[]))
+                    else:
+                        with self.assertRaises(ValueError):failed_eligible(study,directory,[])
+                    resolve.assert_called_once_with(study,cell['id'])
 
 
 if __name__=='__main__':unittest.main()

@@ -1,3 +1,12 @@
+## Known Bugs — failed-export archive extension registration (resolved November 9, 2026)
+
+The failed raw-export archive watcher checked only the original matrix and stopped
+when a conditional exposure extension produced a failed raw gate. Its native run
+and raw failure were subsequently preserved by the canonical archive collector.
+The failed-export owner now validates the complete conditional registration and
+both recorded resolutions before preserving such evidence. Numerical gates and
+scientific completion are unchanged; unknown or mismatched registrations refuse.
+
 ## Known Bugs — explicit extension scalar IDs (source corrected November 9, 2026)
 
 The scalar-export CLI checked explicit IDs against the original matrix only,

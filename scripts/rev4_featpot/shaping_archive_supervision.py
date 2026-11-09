@@ -324,7 +324,14 @@ def failed_eligible(study,directory,cells):
     failures=[p for n in ('EVALUATION_FAILURES.json','CONVERGENCE_FAILURE.json') if (p:=run/n).exists()]
     if not failures:return False
     identity=json.loads((run/'RUN.json').read_text());result=json.loads((run/'RESULT.json').read_text());cell=identity['cell']
-    if cell not in cells or cell['id']!=directory.name or cell['stage'] not in ('inner','fresh_control_inner','rescue'):raise ValueError('failure archive registration differs')
+    if cell['stage']=='exposure_extension':
+        from shaping_extension import resolve as resolve_extension
+        resolution=resolve_extension(study,cell['id'])
+        if (cell!=resolution['cell'] or identity.get('resolution')!=resolution
+            or result.get('resolution')!=resolution):raise ValueError('failure archive extension registration differs')
+    elif cell not in cells or cell['stage'] not in ('inner','fresh_control_inner','rescue'):
+        raise ValueError('failure archive registration differs')
+    if cell['id']!=directory.name:raise ValueError('failure archive directory differs')
     if result['stage']!='trained' or result['exit_code']!=0:return False
     if result['cell']!=cell or identity['plan_sha256']!=sha(study/'PLAN.json'):raise ValueError('failure archive fit differs')
     proc=Path('/proc')/str(result['pid'])/'cmdline'
