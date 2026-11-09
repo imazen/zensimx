@@ -84,6 +84,7 @@ def run(root, study, cpus):
         status.update(stage=stage, checked_utc=datetime.now(timezone.utc).isoformat())
         (root/'STATUS.json').write_bytes(encoded(status))
     save('waiting_for_admission')
+    held = []
     try:
         while True:
             held = []
@@ -96,6 +97,7 @@ def run(root, study, cpus):
                 break
             for key in held:
                 release_worker(study, key)
+            held = []
             time.sleep(10)
         with reservation(study, root, 30*1024**3):
             env = os.environ.copy()
@@ -130,7 +132,7 @@ def run(root, study, cpus):
         save('failed_with_preserved_evidence')
         raise
     finally:
-        for key in keys:
+        for key in held:
             release_worker(study, key)
 
 
