@@ -1285,9 +1285,7 @@ the original requests and placements, exact-PID retirement proofs, transferred
 input identities and live replacement process records. The helper qualification
 was reused; no new native qualification was run.
 
-## Repeated progress validation, November 9 UTC
-
-### Failed raw-export archive watcher, November 9 UTC
+## Failed raw-export archive watcher, November 9 UTC
 
 The failed-export watcher exited when the first conditional extension's raw
 monotonicity gate failed: its registration check accepted only original-matrix
@@ -1305,6 +1303,16 @@ unknown, mismatched-cell and mismatched-resolution refusals (`peak-RSS 0.07GiB`,
 extension's existing evidence also passes the new preservation check: two
 seconds, `peak-RSS 0.11GiB`, `min-avail 43566MiB`, `peak-load 1.58`. No native fit,
 scoring run or completed archive payload was replayed for these checks.
+
+The committed replacement watcher is live under exact process inspection and
+the dashboard again verifies every listed supervisor. The closed recovery
+snapshot passed complete durable cold checksum readback: 36 payload files,
+1,262,604 bytes, plus its receipt, under
+`failed-export-extension-recovery-evidence-20261109` beside the study archives.
+It preserves the original failure log, actual eligibility check, source overlays
+against the existing shared source archive and replacement process identity.
+
+## Repeated progress validation, November 9 UTC
 
 The progress audit called the complete extension resolver for every registered
 cell. Each call reconstructed and checked the same fold's paired rescue evidence
