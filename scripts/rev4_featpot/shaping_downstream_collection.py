@@ -11,7 +11,7 @@ def validate(study,root,assignment,run,result):
     request=Path(assignment['worker_request_path'])
     if sha(request)!=assignment['worker_request_sha256']:raise ValueError('downstream request pin differs')
     record=json.loads(request.read_text());kind=record.get('execution_kind')
-    if (record['schema']!='shaping-native-worker-v2' or kind not in ('outer','variant')
+    if (record['schema']!='shaping-native-worker-v2' or kind not in ('outer','variant','extension')
         or record['host'] not in HOSTS or record['host']!=assignment['host']
         or record['study']!=str(study) or record['cell']!=run['cell']
         or record['plan_sha256']!=run['plan_sha256'] or record['build_sha256']!=run['build_sha256']):
@@ -20,9 +20,9 @@ def validate(study,root,assignment,run,result):
     if resolution!=record['resolution']:raise ValueError('downstream original gate differs')
     schedule=resolution['schedule'];cell=run['cell']
     stages={'outer':('outer','fresh_control_outer','fresh_control_outer_matched'),
-            'variant':('source_curve','row_curve','shuffle','human_only')}
+            'variant':('source_curve','row_curve','shuffle','human_only'),'extension':('exposure_extension',)}
     if cell['stage'] not in stages[kind]:raise ValueError('downstream stage differs')
-    family=cell['family'] if kind=='outer' else resolution['resolution']['resolved_family']
+    family=cell['family'] if kind in ('outer','extension') else resolution['resolution']['resolved_family']
     names=['pretraining','fit'] if '_pretrained_' in family else ['fit']
     epochs=schedule['phase_epochs']
     if (len(epochs)!=len(names) or any(e not in (120,240,480) for e in epochs)

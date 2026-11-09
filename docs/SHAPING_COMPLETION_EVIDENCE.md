@@ -1068,3 +1068,25 @@ reproducing its admission and verifying its staged payload. The new regression
 check exercises that previously missing parent. Submission uncertainty and any
 partial preparation stop the pipeline with preserved evidence. No outer model
 has been trained by these orchestration checks.
+
+## Conditional exposure extensions on the worker pool, November 9 UTC
+
+The existing extension dispatch had assumed all ten neural families, although
+the approved reduced selector registers four neural roles per fold. Its
+admission now resolves the approved family set and reproduces that same
+registered matrix. The worker transport additionally carries conditional
+extension identities, the original selection closure and every required phase.
+Each extension keeps its original fresh initialization, seeds, optimizer choice,
+phase lengths and pair-draw exposure. Its controller records execution host and
+that outer responses remain unread. Four-GiB scopes and reservations cover the
+existing 480-epoch command's memory allowance.
+
+`shaping_extension_pipeline.py` waits for the actual conditional registration,
+then distributes every registered cell across the same six native endpoints.
+It does not decide whether an extension is triggered. Collection rechecks the
+original registration and all 480 checkpoints, or both 240-epoch phases, before
+import. Existing evaluation and convergence owners accept these registered
+identities. Missing evidence, changed requests and uncertain submissions remain
+failures; no interrupted scientific attempt is replayed. Extended pack/unpack
+checks cover continuous ReLU and separately pretrained frozen shaping. The
+conditional fits themselves are still pending the active rescue comparisons.

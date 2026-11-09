@@ -5273,6 +5273,9 @@ shaping-outer-pipeline-check:
 shaping-outer-pipeline study output binaries qualification outer host:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_outer_pipeline.py --study {{quote(study)}} --output {{quote(output)}} --binaries {{quote(binaries)}} --qualification {{quote(qualification)}} --outer {{outer}} --prepare-host {{quote(host)}}
 
+shaping-extension-pipeline study output binaries qualification outer:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_extension_pipeline.py --study {{quote(study)}} --output {{quote(output)}} --binaries {{quote(binaries)}} --qualification {{quote(qualification)}} --outer {{outer}}
+
 shaping-completion-downstream-collection-check:
     TMPDIR="$HOME/tmp" python3 -B -m unittest scripts/tests/test_shaping_downstream_collection.py scripts/tests/test_shaping_worker_collect.py
 

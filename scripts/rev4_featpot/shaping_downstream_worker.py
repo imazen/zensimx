@@ -6,7 +6,7 @@ from shaping_completion import DECLARATION_SHA256,REPO,sha
 
 
 def arguments(study,cell,binaries,qualification,kind,human_qualification=None):
-    if kind not in ('outer','variant'):raise ValueError('registered downstream execution kind required')
+    if kind not in ('outer','variant','extension'):raise ValueError('registered downstream execution kind required')
     if kind=='variant' and human_qualification is None:raise ValueError('variant human qualification directory required')
     values=dict(study=study,cell=cell,binary_dir=binaries,neutral_qualification=qualification,
                 human_qualification=human_qualification,attempt=1)
@@ -28,8 +28,10 @@ def arguments(study,cell,binaries,qualification,kind,human_qualification=None):
 def admitted(args,kind,*,host=None):
     if kind=='outer':
         from shaping_outer_execution import admit
-    else:
+    elif kind=='variant':
         from shaping_variant_execution import admit
+    else:
+        from shaping_extension_worker import admit
     return admit(args,host=host)
 
 
@@ -63,7 +65,7 @@ def resolve_inputs(study,cell,host,binaries,qualification,kind,human_qualificati
                 paths.add(declaration)
         if kind=='outer':
             paths.add(study/'outer_inputs'/context['cell']['partition']/'PREPARED.json')
-        else:paths.update(map(Path,context['resolution']['file_sha256']))
+        elif kind=='variant':paths.update(map(Path,context['resolution']['file_sha256']))
     paths.add(Path(__file__).absolute())
     return seal_inputs(paths,study,context['cell'],host,binaries,qualification,resolution,
                        execution_kind=kind,human_qualification=human_qualification)
@@ -75,9 +77,10 @@ def reproduce(record,*,host=None):
                    Path(record['neutral_qualification']),kind,
                    Path(record['human_qualification']) if record['human_qualification'] else None)
     context=admitted(args,kind,host=socket.gethostname() if host is None else host)
-    command=['python3','-B',str(REPO/'scripts/rev4_featpot'/('shaping_outer_execution.py' if kind=='outer' else 'shaping_variant_execution.py')),
+    driver={'outer':'shaping_outer_execution.py','variant':'shaping_variant_execution.py','extension':'shaping_extension_execution.py'}[kind]
+    command=['python3','-B',str(REPO/'scripts/rev4_featpot'/driver),
              '--study',str(study),'--binary-dir',record['binary_dir'],
              '--neutral-qualification',record['neutral_qualification'],'--cell',record['cell']['id']]
     if kind=='outer':command.extend(['--outer',str(args.outer)])
-    else:command.extend(['--human-qualification',record['human_qualification']])
+    elif kind=='variant':command.extend(['--human-qualification',record['human_qualification']])
     return scope(context,kind),command

@@ -23,7 +23,7 @@ def validate(root, assignment, cells,study=None):
     run=json.loads((root/'RUN.json').read_text())
     result=json.loads((root/'RESULT.json').read_text())
     cell=run['cell']
-    downstream=cell['stage'] in ('outer','fresh_control_outer','fresh_control_outer_matched','source_curve','row_curve','shuffle','human_only')
+    downstream=cell['stage'] in ('outer','fresh_control_outer','fresh_control_outer_matched','source_curve','row_curve','shuffle','human_only','exposure_extension')
     if (cell not in cells and not downstream) or cell['id'] not in assignment['cells']:raise ValueError('unassigned cell')
     for key in ('cell','plan_sha256','build_sha256','execution_host','epochs','pairs_per_epoch'):
         if run[key]!=result[key]:raise ValueError('terminal receipt differs: '+key)

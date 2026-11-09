@@ -139,7 +139,7 @@ def verify(record,*,allow_missing=False):
     if record['schema']=='shaping-native-worker-v2':
         stages={'outer':('outer','fresh_control_outer','fresh_control_outer_matched'),
                 'variant':('source_curve','row_curve','shuffle','human_only'),'corrected_inner':('inner',),'bootstrap':('bootstrap',),
-                'control':('outer','source_curve','shuffle','human_only')}
+                'control':('outer','source_curve','shuffle','human_only'),'extension':('exposure_extension',)}
         if record.get('execution_kind') not in stages or record['cell']['stage'] not in stages[record['execution_kind']]:
             raise ValueError('downstream worker stage differs')
     elif record.get('execution_kind') is not None:raise ValueError('legacy rescue request cannot change execution kind')
@@ -218,7 +218,7 @@ def work(request):
                  '--binary-dir',record['binary_dir'],'--neutral-qualification',record['neutral_qualification'],'--cell',key]
     if (study/'runs'/key).exists():raise ValueError('preserve existing attempt; never replay')
     while True:
-        if record.get('execution_kind')=='control':admission=reserve_worker(study,key,memory_allowance_bytes=4*1024**3)
+        if record.get('execution_kind') in ('control','extension'):admission=reserve_worker(study,key,memory_allowance_bytes=4*1024**3)
         elif record.get('execution_kind')=='corrected_inner':admission=reserve_worker(study,key,warmup_until_checkpoint=True)
         else:admission=reserve_worker(study,key)
         if not admission['can_start']:
@@ -274,7 +274,7 @@ def wave(manifest):
 def main():
     p=argparse.ArgumentParser(description=__doc__);p.add_argument('mode',choices=('register','verify','transfer','receive','work','wave'))
     for name in ('study','binaries','qualification','output','request','remote-source','human-qualification'):p.add_argument('--'+name,type=Path)
-    p.add_argument('--execution-kind',choices=('outer','variant','corrected_inner'))
+    p.add_argument('--execution-kind',choices=('outer','variant','corrected_inner','extension'))
     p.add_argument('--cell');p.add_argument('--host',choices=HOSTS);p.add_argument('--allow-missing',action='store_true')
     a,remaining=p.parse_known_args()
     if a.mode=='receive':

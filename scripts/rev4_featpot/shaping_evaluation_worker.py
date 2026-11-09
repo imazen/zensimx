@@ -37,8 +37,13 @@ def request(study,run,*,target_host=None):
     _,cells,_=load_registration(study)
     identity=json.loads((run/'RUN.json').read_text());result=json.loads((run/'RESULT.json').read_text())
     cell=identity['cell'];collection=run/'WORKER_COLLECTION.json'
+    if cell['stage']=='exposure_extension':
+        from shaping_extension import resolve
+        resolved=resolve(study,cell['id'])
+        if resolved['cell']!=cell or resolved!=identity['resolution']:raise ValueError('extension evaluation registration differs')
+        cells.append(cell)
     later=cell['stage'] in LATER_STAGES
-    if ((cell not in cells and not later) or cell['stage'] not in ('inner','fresh_control_inner','rescue',*LATER_STAGES)
+    if ((cell not in cells and not later) or cell['stage'] not in ('inner','fresh_control_inner','rescue','exposure_extension',*LATER_STAGES)
         or identity.get('execution_host') not in HOSTS or not collection.exists()):
         raise ValueError('collected primary fit on an approved worker required')
     if result['cell']!=cell or result['stage']!='trained' or result['exit_code']!=0:
@@ -271,7 +276,7 @@ def watch(args):
             pending=[];blocked=[];imported=[];capacity_wait_hosts=set()
             for path in sorted((args.study/'runs').glob('*/attempt-*/RESULT.json')):
                 value=json.loads(path.read_text());run=path.parent
-                stages=LATER_STAGES if getattr(args,'later_only',False) else ('inner','fresh_control_inner','rescue')
+                stages=LATER_STAGES if getattr(args,'later_only',False) else ('inner','fresh_control_inner','rescue','exposure_extension')
                 if value.get('stage')!='trained' or value['cell']['stage'] not in stages or not (run/'WORKER_COLLECTION.json').exists():continue
                 if any((args.study/p).exists() for p in components(value['cell']['id'],run.name)):continue
                 record=request(args.study,run,target_host=placements.get(value['cell']['id']));host=record['host'];directory=args.output/value['cell']['id']

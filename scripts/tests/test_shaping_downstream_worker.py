@@ -30,14 +30,14 @@ class DownstreamWorkerTests(unittest.TestCase):
         marker=write(study/'gate-input.json',{'gate':'audited'})
         admission=write(study/'selection/outer-0/OUTER_ADMISSION.json',{})
         write(study/'outer_inputs/outer-0/PREPARED.json',{})
-        cell=dict(id='new',partition='outer-0',stage='outer' if kind=='outer' else 'human_only',family='relu')
+        cell=dict(id='new',partition='outer-0',stage={'outer':'outer','variant':'human_only','extension':'exposure_extension'}[kind],family='relu')
         context=dict(cell=cell,schedule=dict(setting=1,phase_epochs=[240]),
                      templates=[(source,dict(command=['trainer','--derived-inputs','/old/declaration.json']))],
                      admission_path=admission,resolution=dict(file_sha256={str(marker):sha(marker)}))
         return study,binaries,marker,context
 
     def test_capsule_captures_gate_reads_and_refuses_drift_before_worker_execution(self):
-        for kind in ('outer','variant'):
+        for kind in ('outer','variant','extension'):
             with self.subTest(kind=kind),tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as directory:
                 root=Path(directory);study,binaries,marker,context=self.fixture(root,kind)
                 def gate(args,execution_kind,host=None):
@@ -56,7 +56,7 @@ class DownstreamWorkerTests(unittest.TestCase):
                         with self.assertRaisesRegex(ValueError,'drift'):worker.verify(record)
 
     def test_reproduction_reuses_original_owner_and_builds_its_original_cli(self):
-        for kind in ('outer','variant'):
+        for kind in ('outer','variant','extension'):
             with self.subTest(kind=kind),tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as directory:
                 root=Path(directory);study,binaries,marker,context=self.fixture(root,kind)
                 record=dict(study=str(study),cell=context['cell'],binary_dir=str(binaries),

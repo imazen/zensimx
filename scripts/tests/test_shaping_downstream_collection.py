@@ -13,8 +13,8 @@ class DownstreamCollectionTests(unittest.TestCase):
             path.parent.mkdir(parents=True,exist_ok=True);path.write_bytes(encoded(value));return path
         write(study/'PLAN.json',{})
         declaration=write(study/'declaration.json',{})
-        cell=dict(id='cell',stage='fresh_control_outer_matched' if kind=='outer' else 'human_only',
-                  family=family if kind=='outer' else 'best_product',partition='outer-0')
+        cell=dict(id='cell',stage={'outer':'fresh_control_outer_matched','variant':'human_only','extension':'exposure_extension'}[kind],
+                  family=family if kind in ('outer','extension') else 'best_product',partition='outer-0')
         schedule=dict(phase_epochs=epochs,total_pair_draws=sum(epochs)*50000,setting=0,optimizer_choice='base')
         resolution=dict(cell=cell,schedule=schedule,admission_sha256='admission',
                         resolution=dict(cell=cell,resolved_family=family),outer_results_read=False)
@@ -43,7 +43,8 @@ class DownstreamCollectionTests(unittest.TestCase):
 
     def test_pack_unpack_preserves_all_native_phases_and_resolves_conditional_cells(self):
         cases=[('outer','relu',[120]),('outer','product_pretrained_joint',[240,240]),
-               ('variant','product_pretrained_frozen',[480,480]),('variant','softplus',[240])]
+               ('variant','product_pretrained_frozen',[480,480]),('variant','softplus',[240]),
+               ('extension','relu',[480]),('extension','separate_pretrained_frozen',[240,240])]
         for kind,family,epochs in cases:
             with self.subTest(kind=kind,family=family),tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as directory:
                 study=Path(directory);root,run,result,assignment,path,resolution,declaration=self.fixture(study,kind,family,epochs)

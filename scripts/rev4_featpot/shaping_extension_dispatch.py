@@ -10,10 +10,12 @@ from shaping_extension import matrix,verify_decision
 
 def admitted(root,outer):
     _,cells,_=load_registration(root);decisions={};pins={}
-    for family in NEURAL:
+    from shaping_reduced_scope import neural_families
+    required=neural_families(root,outer)
+    for family in required:
         decisions[family],path=verify_decision(root,family,outer,cells);pins[str(path)]=sha(path)
     path=root/'extensions'/f'outer-{outer}'/'REGISTRATION.json';record=json.loads(path.read_text())
-    expected=matrix(decisions,outer)
+    expected=matrix(decisions,outer,candidate_families=required)
     if any(record[k]!=v for k,v in expected.items()) or record['decision_sha256']!=pins:
         raise ValueError('extension matrix or paired decisions differ')
     if record['plan_sha256']!=sha(root/'PLAN.json') or record['policy_sha256']!=sha(REPO/'docs/SHAPING_EXPOSURE_EXTENSION.md'):

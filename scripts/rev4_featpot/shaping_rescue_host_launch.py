@@ -31,7 +31,7 @@ def launch(waves,source,host,output):
         request=Path(job['request']);unit='zensim-rescue-'+job['cell']['id']+'-'+output.name
         scientific=json.loads(request.read_text())
         runtime=Path(scientific['study']).parent/'python-runtime'
-        memory='4G' if scientific.get('execution_kind')=='control' else '2G'
+        memory='4G' if scientific.get('execution_kind') in ('control','extension') else '2G'
         command=['env','TMPDIR=/home/lilith/tmp','PYTHONPATH='+str(runtime),
                  '/home/lilith/work/claudehints/scripts/run-heavy','--mem',memory,'--jobs','1','--',
                  'python3','-B',str(driver),'work','--request',str(request)]

@@ -59,7 +59,7 @@ def execute(args):
     if args.attempt<1 or dest.exists():raise ValueError('preserve extension attempts')
     with reservation(args.study,dest,plan['minimum_ssd_free_bytes']):
         dest.mkdir(parents=True)
-        run=dict(cell=cell,resolution=resolution,plan_sha256=sha(args.study/'PLAN.json'),
+        run=dict(cell=cell,resolution=resolution,execution_host=__import__('socket').gethostname(),outer_results_read=False,plan_sha256=sha(args.study/'PLAN.json'),
                  build_sha256=sha(args.binary_dir/'BUILD.json'),driver_sha256=sha(__file__),pid=os.getpid(),
                  process_role='extension_controller',stage='running',fit_directory='fit',
                  epochs=cell['phase_epochs'][-1],pairs_per_epoch=50000,
