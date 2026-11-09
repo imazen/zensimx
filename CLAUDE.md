@@ -1522,3 +1522,14 @@ controller cap and admission reservation now both derive from the registered
 phase lengths and cover the largest native phase. Ordinary 240-epoch neural
 fits keep their existing bound. No active fit or scientific schedule changed.
 
+## Known Bugs — parallel extraction cost ownership (source corrected November 9, 2026)
+
+The first four-thread extraction timing omitted zenbench's explicit launcher
+ownership. Its own CPU work therefore remained in global foreign-load admission,
+leaving 25 clean paired rounds out of 64 on an otherwise idle worker. The raw
+incomplete attempt is preserved. The cost owner now registers only its actual
+PID through the existing launcher contract; zenbench recognizes that owner and
+the native benchmark, retaining all unregistered processes and existing RAM,
+temperature, paired-round and CPU-boundary gates. The native instrument is
+unchanged. The earlier one-thread timing completed its full clean-round budget.
+

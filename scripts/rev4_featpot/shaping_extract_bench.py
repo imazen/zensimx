@@ -115,7 +115,8 @@ def run(root, study, cpus):
                 workload = root/(name+'.json'); payload = json.loads(workload.read_text())
                 command = [str(Path.home()/'work/claudehints/scripts/run-heavy'), '--mem', '4G',
                     '--jobs', str(payload['threads']), '--', 'bash', str(root/'inputs/profile_test_cpuset.sh'),
-                    cpus, 'env', 'ZENSIM_FORMULA_REV=7', str(root/'inputs/shaping_extract_cost'),
+                    cpus, 'env', 'ZENSIM_FORMULA_REV=7',
+                    'ZENBENCH_LAUNCHER_PIDS='+str(os.getpid()), str(root/'inputs/shaping_extract_cost'),
                     'bench', str(workload), str(root/('timing-'+name))]
                 status.update(case=name, command=command)
                 save('measuring')

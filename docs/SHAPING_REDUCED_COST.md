@@ -11,6 +11,12 @@ This independent extraction measurement admits no finalist model and supplies no
 vector-scoring or end-to-end timing claim. The vector workload still requires
 all actual outer finalists below.
 
+The launcher records its own live PID through `ZENBENCH_LAUNCHER_PIDS` so the
+existing resource monitor can separate the benchmark's work from foreign CPU
+load. All other process, temperature, memory and round gates retain their
+original settings. Keep incomplete timing attempts; a retry uses a fresh
+registration/output and names only its still-needed cases.
+
 The approved reduced study omits full-data retuning and refits. Measure the actual
 48 outer finalist models instead: six selected roles, three source-disjoint
 folds, three seeds per stochastic role and one additive model per fold.
