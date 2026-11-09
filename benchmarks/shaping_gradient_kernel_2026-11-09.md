@@ -26,7 +26,7 @@ eight input-shaping library tests pass. The trainer build's run-heavy peak RSS
 was 1.70 GiB; the separate library-test compilation peaked at 1.20 GiB.
 The candidate trainer SHA-256 is
 `d68d5d443ba6fb14d99855084a7442edc13e728fb492bb19be2ea070987cb2de`.
-It has not been deployed to registered scientific fits. Both original
+Both original
 240-epoch controls, joint-product and joint-separate identity shaping, now
 passed every checkpoint comparison: 480 of 480 checkpoints matched after
 removing only the reproduction metadata. The native phase inputs, settings,
@@ -44,10 +44,49 @@ conditions to the registered study. Whole-training speed remains unmeasured.
 joint-separate pretrained controls at inner-0-0, setting 0, seed 0. Each check
 imports that original fit's exact learned input bank and retains its complete
 120-epoch, 50,000-pair-per-epoch second phase. The original pretraining prefix
-is not recomputed. Every one of the 120 finalized checkpoints must match after
-removing only reproduction metadata. These are two engineering qualification
-runs, separate from the registered scientific fit count. Registration grants
-no scientific runtime substitution; the existing downstream gates stay in force.
+was not recomputed. Both checks passed all 120 finalized checkpoints after
+removing only reproduction metadata: 240 additional comparisons, or 720 across
+all four controls. These are engineering qualifications, separate from the
+registered scientific fit count. Their complete durable archive contains
+977 files and 417,811,300 bytes under the corresponding
+`paired-gradient-pretrained-native-20261109/qualification` suffix.
+
+After all six workers validated the certificate and the registration/collection
+owners were upgraded, the candidate was activated for unstarted cells in these
+four classes. Existing scientific fits retain their original runtime. The
+certificate preserves actual native build identities, original corrected-control
+qualification and every scientific selection gate. See
+[runtime substitution policy](../docs/SHAPING_RUNTIME_EQUIVALENCE.md).
+The deployment's 61-file, 87,970,261-byte archive passed complete durable readback
+at `runtime-equivalence-deployment-archive-20261109` beside the study archives.
+It includes prebuilt tools, compressed source, qualification proofs and activation
+bindings. Whole-training speed remains unmeasured.
+
+## Live trainer CPU profiles
+
+Two 15-second, 199 Hz captures observed running native trainers without sending
+training signals or changing their commands. These are different families,
+settings and CPUs; their percentages cannot establish a speed ratio.
+Parent frames include unresolved addresses, so only leaf self cycles are used.
+
+The candidate product-pretrained joint check on r7900x recorded 3,026 samples
+with none lost. Fused AVX-512 Adam accounted for 38.78%, input-shaping gradient
+updates 24.04%, max-pair projection 9.64%, shared-head backward 8.87% and paired
+AVX-512 forward inference 7.98% of sampled cycles.
+
+An original-runtime scientific Softplus rescue on i134 recorded 2,997 samples
+with none lost. Keep its hybrid CPU events separate: the performance-core event
+attributed 44.01% to fused AVX2 Adam, 37.77% to max-pair projection and 4.79% to
+paired AVX2 forward inference. The efficiency-core event had only 48 samples;
+its separate Adam/projection percentages were 52.20%/37.21%.
+
+Both capture processes reported `done rc=0 16s | peak-RSS 0.05GiB` through
+run-heavy. Minimum available memory and peak load were 13,507 MiB / 2.39 on
+r7900x and 23,761 MiB / 8.59 on i134. These receipts measure the profiler,
+not the target trainer's memory. The complete 20-file, 50,880,538-byte archive
+passed durable readback at `trainer-gradient-profiles-20261109` beside the study
+archives. Adam and constraint projection remain concrete optimization targets;
+these windows do not measure the study's overall evaluation/checking fraction.
 
 Raw evidence and complete durable checksum readback:
 `/mnt/v/output/zensim/shaping-completion-20261107/gradient-kernel-probe-20261109/`,
