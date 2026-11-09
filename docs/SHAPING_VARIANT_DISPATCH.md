@@ -22,6 +22,14 @@ their independent audits are reused unchanged. The original scope policy is
 [SHAPING_REDUCED_SCOPE.md](SHAPING_REDUCED_SCOPE.md); this dispatcher changes
 execution placement and ordering, not that policy or scientific exposure.
 
+Outer, extension and variant placement samples each worker's live native jobs,
+shared claims, and unclaimed waiting controllers before assigning a new wave.
+It distributes new work relative to that existing backlog and approved CPU
+capacity, avoiding queues on busy workers while other workers are empty. Low
+memory or SSD headroom excludes a worker from that placement wave. These are
+scheduling hints; each fit still passes the original CPU/RAM/SSD admission.
+Already registered or active conditions are never moved by this dispatcher.
+
 `shaping_bootstrap_pipeline.py` separately queues the existing primary source
 bootstrap and all 24 reduced matched comparisons. Each analysis waits for all
 three outer admissions and its complete paired model/report evidence. It then

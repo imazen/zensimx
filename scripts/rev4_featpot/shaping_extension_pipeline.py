@@ -33,7 +33,10 @@ def watch(args):
                     raise ValueError('conditional extension registration differs')
             save('registering_existing_extension_conditions', registered_cells=len(cells), registration_sha256=sha(path))
             jobs = []
-            for cell, host in placements(cells, args.outer):
+            from shaping_placement import loads
+            live_loads, observation = loads(args.study, HOST_SLOTS)
+            (args.output / 'PLACEMENT_OBSERVATION.json').write_bytes(encoded(observation))
+            for cell, host in placements(cells, args.outer, live_loads):
                 directory = args.output / 'jobs' / cell['id']
                 register(args.study, cell['id'], host, args.binaries, args.qualification, directory, execution_kind='extension')
                 request = directory / 'REQUEST.json'

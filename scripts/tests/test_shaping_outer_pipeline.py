@@ -10,6 +10,14 @@ import shaping_outer_pipeline as owner
 
 
 class PipelineTests(unittest.TestCase):
+    def test_busy_hosts_do_not_receive_new_work_ahead_of_empty_hosts(self):
+        cells = [dict(id=str(i), seed=i % 3, family='relu') for i in range(12)]
+        loads = dict(owner.HOST_SLOTS)
+        loads['r7900x'] = 0
+        result = owner.placements(cells, 0, loads)
+        self.assertEqual([host for _, host in result], ['r7900x'] * 12)
+        self.assertEqual(loads['r7900x'], 0)
+
     def test_spreading_preserves_every_cell_and_uses_each_native_host(self):
         cells = [dict(id=str(i), seed=i % 3, family='relu') for i in range(84)]
         for outer in range(3):

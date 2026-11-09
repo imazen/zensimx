@@ -14,11 +14,11 @@ from shaping_completion import REPO, encoded, sha
 HOST_SLOTS = dict(r7900x=20, i270=20, i134=14, r3800x=14, r5600g=11, r3500=5)
 
 
-def placements(cells, outer):
+def placements(cells, outer, loads=None):
     # Rotate ties by fold, then fill proportionally to approved CPU capacity.
     names = list(HOST_SLOTS)
     names = names[outer:] + names[:outer]
-    counts = {host: 0 for host in names}
+    counts = {host: 0 if loads is None else loads[host] for host in names}
     out = []
     for cell in sorted(cells, key=lambda c: (c['seed'] is None, c['seed'] or 0, c['family'], c['id'])):
         host = min(names, key=lambda h: counts[h] / HOST_SLOTS[h])
@@ -59,11 +59,14 @@ def register_fits(args):
         raise ValueError('complete registered outer controls required')
     selected += controls
     jobs = []
+    from shaping_placement import loads
+    live_loads, observation = loads(args.study, HOST_SLOTS)
     wave = args.output / 'neural-fits'
     if wave.exists():
         raise ValueError('preserve existing outer registration')
     wave.mkdir()
-    for cell, host in placements(selected, args.outer):
+    (wave / 'PLACEMENT_OBSERVATION.json').write_bytes(encoded(observation))
+    for cell, host in placements(selected, args.outer, live_loads):
         directory = wave / 'jobs' / cell['id']
         if cell['family'] in ('extra_trees', 'shaped_additive'):
             register_control(args.study, cell['id'], args.binaries, host, directory)

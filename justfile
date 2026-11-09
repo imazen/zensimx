@@ -5376,7 +5376,7 @@ shaping-completion-variant-pipeline study output binary_dir neutral human_qualif
     TMPDIR="$HOME/tmp" python3 -B scripts/rev4_featpot/shaping_variant_pipeline.py --study {{quote(study)}} --output {{quote(output)}} --binaries {{quote(binary_dir)}} --qualification {{quote(neutral)}} --human-qualification {{quote(human_qualification)}} --outer {{outer}} --outer-status {{quote(outer_status)}}
 
 shaping-completion-variant-pipeline-check:
-    TMPDIR="$HOME/tmp" python3 -B -m unittest scripts.tests.test_shaping_variant_pipeline scripts.tests.test_shaping_outer_pipeline
+    TMPDIR="$HOME/tmp" python3 -B -m unittest scripts.tests.test_shaping_variant_pipeline scripts.tests.test_shaping_outer_pipeline scripts.tests.test_shaping_placement
 
 shaping-completion-variant-control study binary_dir partition cell mode:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 4G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_controls.py --study {{quote(study)}} --binary-dir {{quote(binary_dir)}} --partition {{quote(partition)}} --cell {{quote(cell)}} --{{mode}}

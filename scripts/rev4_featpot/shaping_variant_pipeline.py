@@ -36,8 +36,11 @@ def register_fits(args, stage):
     cells, admission = selected(args.study, args.outer, stage)
     wave = args.output / stage
     wave.mkdir(exist_ok=False)
+    from shaping_placement import loads
+    live_loads, observation = loads(args.study, HOST_SLOTS)
+    (wave / 'PLACEMENT_OBSERVATION.json').write_bytes(encoded(observation))
     jobs = []
-    for cell, host in placements(cells, args.outer):
+    for cell, host in placements(cells, args.outer, live_loads):
         directory = wave / 'jobs' / cell['id']
         if cell['family'] in ('extra_trees', 'shaped_additive'):
             register_control(args.study, cell['id'], args.binaries, host, directory)
