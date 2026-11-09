@@ -5718,6 +5718,12 @@ shaping-extraction-bench-register study fixtures binary launcher cpu_tool root *
 shaping-extraction-bench study root cpus:
     TMPDIR="$HOME/tmp" python3 -B scripts/rev4_featpot/shaping_extract_bench.py run --study {{quote(study)}} --root {{quote(root)}} --cpus {{quote(cpus)}}
 
+# Profiles qualification calls; sampled runs do not supply benchmark timings.
+shaping-extraction-profile binary workload output launcher cpu_tool_dir cpus jobs:
+    mkdir -p {{quote(output)}}
+    test ! -e {{quote(output + "/perf.data")}}
+    TMPDIR="$HOME/tmp" PATH={{quote(cpu_tool_dir)}}:"$PATH" "$HOME/work/claudehints/scripts/run-heavy" --mem 4G --jobs {{jobs}} -- bash {{quote(launcher)}} {{quote(cpus)}} env ZENSIM_FORMULA_REV=7 perf record -F 199 --call-graph dwarf,8192 -o {{quote(output + "/perf.data")}} -- {{quote(binary)}} qualify {{quote(workload)}} {{quote(output + "/native")}}
+
 shaping-cost-finalists study binary_dir output:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 2G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_cost_finalists.py --study {{quote(study)}} --binary-dir {{quote(binary_dir)}} --output {{quote(output)}}
 
