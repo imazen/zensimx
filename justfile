@@ -6068,3 +6068,10 @@ shaping-reboot-hold-check:
 
 shaping-streaming-memory-check:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 1G --jobs 1 -- python3 -B -m unittest scripts.tests.test_shaping_streaming_memory scripts.tests.test_shaping_phase_memory scripts.tests.test_shaping_outer_execution scripts.tests.test_shaping_variant_execution scripts.tests.test_shaping_rescue_worker scripts.tests.test_shaping_downstream_worker
+
+# Run against an isolated source export so its lockfile cannot alter research pins.
+codec-stable-simd-check manifest config:
+    cargo update --manifest-path {{quote(manifest)}} --config {{quote(config)}} -p archmage -p magetypes
+    cargo test --manifest-path {{quote(manifest)}} --config {{quote(config)}} -p zensim --release --features training --test v1_golden_bytes
+    cargo test --manifest-path {{quote(manifest)}} --config {{quote(config)}} -p zensim --release --lib serving::tests::every_shipped_profile_scores_its_pinned_value -- --exact
+    cargo check --manifest-path {{quote(manifest)}} --config {{quote(config)}} -p zensim --release --lib

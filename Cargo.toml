@@ -35,8 +35,8 @@ zensim-regress = { version = "0.4.0", path = "zensim-regress", default-features 
 # rsqrt_path_precision_vs_scalar fails at max_rel 1.67e-5 (measured A/B,
 # 2026-08-05 — the same movement is the prime suspect for the CI v1-golden
 # flip, benchmarks/v1_golden_env_triage_2026-08-05.md). Do not lower.
-archmage = { version = ">=0.9.28, <=0.9.31-beta.1", features = ["macros", "avx512"] }
-magetypes = { version = ">=0.9.30, <=0.9.31-beta.1", features = ["avx512"] }
+archmage = { version = ">=0.9.28, <=0.9.31", features = ["macros", "avx512"] }
+magetypes = { version = ">=0.9.30, <=0.9.31", features = ["avx512"] }
 # The pure-Rust port of musl's libm (rust-lang/libm). NOT a new edge into the
 # dependency closure -- `cargo tree -p zensim -e normal -i libm` already shows
 # it arriving twice (num-traits <- linear-srgb, and zenpredict). Made explicit

@@ -1583,3 +1583,10 @@ sweep, retaining every selection, policy, matrix and provenance check. Per-cell
 resolution uses that same full-fold validator. Active scientific owners retain
 their frozen source; this change requires no training or evaluation replay.
 
+
+## Known Bugs — codec consumer stable SIMD resolution (2026-11-10)
+
+The workspace SIMD upper bound stopped at 0.9.31-beta.1, so the current
+codec/pixel family could not resolve the research metric dev dependency.
+The upper bound now admits stable 0.9.31. Numeric expectations, kernels,
+model inputs and frozen standalone study manifests are unchanged.

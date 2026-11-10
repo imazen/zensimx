@@ -6,6 +6,10 @@
 
 None.
 
+### Fixed
+
+- Admit the archmage/magetypes 0.9.31 stable release for codec consumers while preserving existing numerical gates and frozen study binaries.
+
 ### Research
 
 - Extend native input shaping to constrained one-hidden-layer models, including
