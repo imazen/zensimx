@@ -64,10 +64,11 @@ def run(args):
     repo = Path(__file__).resolve().parents[2]
     sys.path.insert(0, str(repo / "scripts/rev4_featpot"))
     from shaping_completion import encoded, sha
-    args.output.mkdir(parents=True, exist_ok=False)
-    with (args.output / "OWNER.lock").open("x") as lock:
+    args.output.mkdir(parents=True, exist_ok=args.resume)
+    with (args.output / "OWNER.lock").open("a" if args.resume else "x") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        failures = {}
+        previous = args.output / "STATUS.json"
+        failures = json.loads(previous.read_text()).get("collection_failures", {}) if args.resume and previous.exists() else {}
         while True:
             jobs = discover(args.study, args.dispatch)
             observations, unavailable = {}, {}
@@ -125,7 +126,7 @@ def run(args):
                               job["host"] + ":" + str(bundle) + ".json", str(directory) + "/"])
                         pin = json.loads(Path(str(local) + ".json").read_text())["bundle_sha256"]
                         call(["python3", "-B", str(driver), "collect", "--request", job["request"],
-                              "--bundle", str(local), "--sha256", pin])
+                              "--bundle", str(local), "--bundle-sha256", pin])
                     collected.append(cid)
                 except Exception as error:
                     failures[cid] = str(error)
@@ -133,7 +134,7 @@ def run(args):
             record = dict(pid=os.getpid(), stage="collecting_registered_dispatch",
                           checked_utc=datetime.now(timezone.utc).isoformat(), registered=len(jobs),
                           required=217, collected=len(collected), newly_trained_pending=trained,
-                          failed_native_cells=failed, collection_failures=failures, unavailable_hosts=unavailable,
+                          failed_native_cells=failed, collection_failures={k:v for k,v in failures.items() if k not in collected}, unavailable_hosts=unavailable,
                           training_replayed=False, job_ids=sorted(jobs))
             (args.output / "STATUS.json").write_bytes(encoded(record))
             if len(jobs) == 217 and len(collected) == 217:
@@ -150,4 +151,5 @@ if __name__ == "__main__":
     for name in ("study", "dispatch", "output"):
         parser.add_argument("--" + name, type=Path, required=True)
     parser.add_argument("--watch", action="store_true")
+    parser.add_argument("--resume", action="store_true", help="retain existing receipts and unresolved collection failures")
     run(parser.parse_args())
