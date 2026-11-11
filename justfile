@@ -6079,3 +6079,7 @@ codec-stable-simd-check manifest config:
 # Finite metadata recovery; canonical owners verify and collect existing fits.
 shaping-resume-collect study jobs output:
     python3 scripts/rev4_featpot/shaping_resume_collect.py --study "{{study}}" --jobs "{{jobs}}" --output "{{output}}"
+
+# Preserve registered requests when completing an interrupted outer dispatch.
+shaping-resume-dispatch *args:
+    python3 -B scripts/rev4_featpot/shaping_resume_dispatch.py {{args}}
