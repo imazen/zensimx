@@ -32,7 +32,7 @@ def run(args):
                      and c["partition"] == f"outer-{args.outer}"
                      and c["family"] in ("extra_trees", "shaped_additive")]
         required = {c["id"]: c for c in selected}
-        if len(required) != 19:
+        if not required or len(required) != len(selected):
             raise ValueError("complete registered reduced outer scope required")
         jobs = {}
         for request in args.previous.glob("jobs/*/REQUEST.json"):
