@@ -106,6 +106,7 @@ def watch(args):
         try:
             while True:
                 save('watching_completed_collections')
+                cycle_pending=0
                 for host in (getattr(args,'worker_hosts',None) or HOSTS):
                     allowed=collected(args.study,host)
                     if not allowed:continue
@@ -114,7 +115,7 @@ def watch(args):
                         capture_output=True,text=True,check=True,timeout=30)
                     observed=json.loads(probe.stdout)
                     if observed['host']!=host:raise ValueError('resolved snapshot worker identity differs')
-                    cells=observed['pending_cells']
+                    cells=observed['pending_cells'];cycle_pending+=len(cells)
                     if not cells:continue
                     index=len(status['batches'])+1;root=args.output/host/f'batch-{index:04}'
                     root.parent.mkdir(parents=True,exist_ok=True);log=root.with_name(root.name+'.log')
@@ -152,6 +153,7 @@ def watch(args):
                         archive_receipt_sha256=sha(root/'MIRROR_VERIFIED.json'),stores=len(batch['rows']),
                         retired_stores=json.loads(retirement.read_text())['stores'],trimmed_local_bytes=result['bytes']))
                     save('watching_completed_collections',host=None,batch=None)
+                save('watching_completed_collections',last_cycle_pending_cells=cycle_pending)
                 if not args.watch:return status
                 time.sleep(60)
         except BaseException as error:

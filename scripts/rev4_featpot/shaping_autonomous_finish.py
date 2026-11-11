@@ -94,9 +94,15 @@ def run(args):
             archive_path=args.dispatch/"archive-once/STATUS.json"
             archived=json.loads(archive_path.read_text()) if archive_path.exists() else {}
             archived_ids=set(archived.get("complete",{}))
-            if archived.get("failures"):alerts["archives"]=archived["failures"]
+            extra=set(config.get("extra_archive_ids",[]))
+            archive_failures={k:v for k,v in archived.get("failures",{}).items() if k in ids|extra}
+            if archive_failures:alerts["archives"]=archive_failures
+            snapshot_path=Path(config["snapshot_status"])
+            snapshot=json.loads(snapshot_path.read_text()) if snapshot_path.exists() else {}
+            snapshots_closed=(snapshot.get("last_cycle_pending_cells")==0
+                and snapshot.get("checked_utc","")>=collection.get("checked_utc",""))
             (args.output/"ALERTS.json").write_bytes(encoded(alerts))
-            complete=imported and len(ids)==252 and panels==252 and ids<=archived_ids and all(
+            complete=imported and len(ids)==252 and panels==252 and ids|extra<=archived_ids and snapshots_closed and all(
                 state["jobs"].get(name,{}).get("stage")=="complete" for name in config["jobs"])
             save("computation_and_archive_closure_ready" if complete else "needs_attention" if alerts else "advancing_registered_work",
                  delivered=collection.get("collected",0),required_new_deliveries=217,
@@ -107,6 +113,18 @@ def run(args):
                     final_holdout_read=False,serving_model_promoted=False,
                     computational_closure=True,scientific_goal_completion_asserted=False,
                     registry_sha256=sha(args.config),source=__file__)))
+                # Only metadata owners are retired here. Every fit remains with
+                # its original worker, and all required model work is closed.
+                import signal
+                for stopper in config.get("stop_owners",[]):
+                    record_path=Path(stopper["status"])
+                    if not record_path.exists():continue
+                    owner=json.loads(record_path.read_text());pid=owner.get("pid")
+                    process=Path("/proc")/str(pid)/"cmdline"
+                    if not process.exists():continue
+                    argv=[v.decode() for v in process.read_bytes().split(b"\0") if v]
+                    if any(Path(v).name==stopper["script"] for v in argv) and stopper["scope"] in argv:
+                        os.kill(pid,signal.SIGTERM)
                 return
             time.sleep(60)
 
