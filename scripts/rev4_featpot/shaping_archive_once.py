@@ -21,6 +21,10 @@ def sweep(args, state):
         if p.exists():allowed.update(json.loads(p.read_text()).get("job_ids",[]))
         p=args.delivery_root/"legacy-delivery/JOBS.json"
         if p.exists():allowed.update(r["cell"]["id"] for r in json.loads(p.read_text()))
+    extras=set()
+    if getattr(args,"extra_native_jobs",None):
+        extras={row["cell"] for row in json.loads(args.extra_native_jobs.read_text())}
+        if allowed is not None:allowed.update(extras)
     for result in sorted((args.study / "runs").glob("*/attempt-*/RESULT.json")):
         run = result.parent; cid = run.parent.name
         if (allowed is not None and cid not in allowed) or cid in state["complete"] or cid in state["failures"]:
@@ -29,7 +33,7 @@ def sweep(args, state):
         if missing and not Path(missing).exists():
             continue
         value = json.loads(result.read_text()); cell = value["cell"]
-        if cell["stage"] not in ("outer","fresh_control_outer","fresh_control_outer_matched","human_only","source_curve","shuffle"):
+        if cid not in extras and cell["stage"] not in ("outer","fresh_control_outer","fresh_control_outer_matched","human_only","source_curve","shuffle"):
             continue
         if value["exit_code"] != 0 or not (run / "WORKER_COLLECTION.json").exists():
             continue
@@ -37,10 +41,18 @@ def sweep(args, state):
         panels = (run / "evaluation", args.study / "reexport_max_pairs" / cid / run.name / "final")
         if not any((p / "COMPLETE.json").exists() for p in panels):
             continue
-        if native and not any((run / n).exists() for n in ("EVALUATION_WORKER_IMPORT.json","DIRECT_LATER_EVALUATION.json")):
+        if cid not in extras and native and not any((run / n).exists() for n in ("EVALUATION_WORKER_IMPORT.json","DIRECT_LATER_EVALUATION.json")):
             continue
         try:
-            bundles = (later_neural_bundles if native else later_control_bundles)(args.study,run.parent,cells)
+            if cid in extras:
+                from shaping_archive_supervision import rescue_eligible, canonical_candidate
+                if not rescue_eligible(args.study,run.parent,cells):continue
+                if not canonical_candidate(args.study,run,cell):
+                    raise ValueError("extra native delivery lacks qualified supplemental evidence")
+                bundles=[("run",run.parent),("panels",args.study/"reexport_max_pairs"/cid),
+                         ("bakes",args.study/"reexports"/cid)]
+            else:
+                bundles = (later_neural_bundles if native else later_control_bundles)(args.study,run.parent,cells)
             if not bundles:
                 continue
             receipts = {}
@@ -82,6 +94,7 @@ if __name__=="__main__":
     for name in ("study","output","destination"):parser.add_argument("--"+name,type=Path,required=True)
     parser.add_argument("--watch",action="store_true")
     parser.add_argument("--mount-config",type=Path)
+    parser.add_argument("--extra-native-jobs",type=Path)
     parser.add_argument("--delivery-root",type=Path);args=parser.parse_args()
     args.output.mkdir(parents=True,exist_ok=True)
     path=args.output/"STATUS.json"

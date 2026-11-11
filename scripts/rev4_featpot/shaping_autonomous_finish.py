@@ -102,7 +102,7 @@ def run(args):
             snapshots_closed=(snapshot.get("last_cycle_pending_cells")==0
                 and snapshot.get("checked_utc","")>=collection.get("checked_utc",""))
             (args.output/"ALERTS.json").write_bytes(encoded(alerts))
-            complete=imported and len(ids)==252 and panels==252 and ids|extra<=archived_ids and snapshots_closed and all(
+            complete=imported and len(ids)==252 and panels==252 and (ids|extra)<=archived_ids and snapshots_closed and all(
                 state["jobs"].get(name,{}).get("stage")=="complete" for name in config["jobs"])
             save("computation_and_archive_closure_ready" if complete else "needs_attention" if alerts else "advancing_registered_work",
                  delivered=collection.get("collected",0),required_new_deliveries=217,
