@@ -54,6 +54,8 @@ pub(super) struct Head {
     diagnostics_enabled: bool,
     diagnostics: super::monotone_research::Diagnostics,
     weight_diagnostics: WeightDiagnostics,
+    #[serde(skip)]
+    backward_pre_gradient: Vec<f64>,
 }
 
 impl Head {
@@ -70,6 +72,7 @@ impl Head {
             diagnostics_enabled: super::optimizer_controls::diagnostics_enabled(),
             diagnostics: Default::default(),
             weight_diagnostics: Default::default(),
+            backward_pre_gradient: Vec::new(),
             adam: AdamState::new(mid.len(), width, width, 1),
             mid,
             bias: vec![0.; width],
@@ -144,12 +147,14 @@ impl Head {
         if let Some(research) = &mut self.research {
             return research.backward(first, cache, dy);
         }
-        let mut pre_gradient = vec![0.; self.width];
+        // Reuse pair-local scratch; checkpoint decoding leaves this empty.
+        self.backward_pre_gradient.resize(self.width, 0.);
+        self.backward_pre_gradient.fill(0.);
         smooth_hinge::backprop_grad_head(
             &cache.1,
             &cache.2,
             dy,
-            &mut pre_gradient,
+            &mut self.backward_pre_gradient,
             &mut self.adam.gb1,
             &self.output,
             &mut self.adam.gw2,
@@ -160,7 +165,7 @@ impl Head {
         );
         let mut gradient = vec![0.; first.len()];
         for (i, &value) in first.iter().enumerate() {
-            for (j, &g) in pre_gradient.iter().enumerate() {
+            for (j, &g) in self.backward_pre_gradient.iter().enumerate() {
                 self.adam.gw1[i * self.width + j] += value * g;
                 gradient[i] += self.mid[i * self.width + j] * g;
             }
@@ -472,6 +477,60 @@ mod tests {
         let (_, _, h) =
             super::super::forward(x, w, b, &vec![0.; b.len()], &[0.], x.len(), b.len(), 0.);
         head.forward(&h).0
+    }
+
+    // Fixed-work allocation probes; run each test separately under heaptrack.
+    #[inline(never)]
+    fn scratch_allocation_workload(fresh: bool) {
+        let mut hp = hp();
+        hp.n_hidden = 128;
+        hp.max_pairs = 32;
+        let mut head = Head::new(&hp, false, &mut SplitMix64::new(12));
+        let x = vec![0.5; 128];
+        let cache = head.forward(&x);
+        for _ in 0..8192 {
+            if fresh {
+                head.backward_pre_gradient = Vec::new();
+            }
+            std::hint::black_box(head.backward(std::hint::black_box(&x), &cache, 0.7));
+        }
+        assert!(std::hint::black_box(head.adam.gw1[0]).is_finite());
+    }
+
+    #[test]
+    fn scratch_allocations_fresh() {
+        scratch_allocation_workload(true);
+    }
+
+    #[test]
+    fn scratch_allocations_reused() {
+        scratch_allocation_workload(false);
+    }
+
+    #[test]
+    fn backward_scratch_is_reset_and_not_checkpointed() {
+        let hp = hp();
+        let mut reused = Head::new(&hp, false, &mut SplitMix64::new(12));
+        let mut restored: Head =
+            serde_json::from_slice(&serde_json::to_vec(&reused).unwrap()).unwrap();
+        reused.backward_pre_gradient = vec![91.; reused.width];
+        assert!(restored.backward_pre_gradient.is_empty());
+        for _ in 0..32 {
+            let x = [0., 0.5, 1., 2.];
+            let cache = reused.forward(&x);
+            assert_eq!(
+                reused.backward(&x, &cache, 0.7),
+                restored.backward(&x, &cache, 0.7)
+            );
+            reused.step(&hp, 0.001);
+            restored.step(&hp, 0.001);
+            assert_eq!(
+                serde_json::to_vec(&reused).unwrap(),
+                serde_json::to_vec(&restored).unwrap()
+            );
+            // A fresh scratch allocation is the previous implementation path.
+            restored.backward_pre_gradient = Vec::new();
+        }
     }
 
     #[test]

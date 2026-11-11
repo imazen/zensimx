@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Reuse plain shared-head backward scratch without changing serialized training state; measured allocation evidence is in benchmarks/shared_head_scratch_2026-11-11.md.
+
+
 ### QUEUED BREAKING CHANGES
 
 None.
