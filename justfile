@@ -6089,3 +6089,9 @@ shaping-finalize-continuation *args:
 
 shaping-seal-local *args:
     python3 -B scripts/rev4_featpot/shaping_local_collection.py {{args}}
+
+shaping-autonomous-finish *args:
+    python3 -B scripts/rev4_featpot/shaping_autonomous_finish.py {{args}}
+
+shaping-archive-once *args:
+    python3 -B scripts/rev4_featpot/shaping_archive_once.py {{args}}

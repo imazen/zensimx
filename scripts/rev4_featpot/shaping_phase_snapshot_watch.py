@@ -20,7 +20,7 @@ def collected(study,host):
     result={}
     for marker in sorted((study/'runs').glob('*/attempt-*/WORKER_COLLECTION.json')):
         receipt=json.loads(marker.read_text())
-        if receipt['source_host']!=host:continue
+        if receipt['source_host']!=host or receipt.get('continued_collection'):continue
         run=marker.parent;parent=json.loads((run/'RUN.json').read_text())
         terminal=json.loads((run/'RESULT.json').read_text())
         if terminal.get('stage')!='trained' or terminal.get('exit_code')!=0:continue
@@ -106,7 +106,7 @@ def watch(args):
         try:
             while True:
                 save('watching_completed_collections')
-                for host in HOSTS:
+                for host in (getattr(args,'worker_hosts',None) or HOSTS):
                     allowed=collected(args.study,host)
                     if not allowed:continue
                     command=['python3','-B',str(Path(__file__)),'probe','--study',str(args.study)]
@@ -162,7 +162,7 @@ if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__);p.add_argument('mode',choices=('watch','probe','finish'))
     for name in ('study','output','destination','archive-mount','root','retirement','trim-receipt'):
         p.add_argument('--'+name,type=Path)
-    p.add_argument('--archive-source');p.add_argument('--watch',action='store_true');a=p.parse_args()
+    p.add_argument('--worker-host',action='append',dest='worker_hosts',choices=HOSTS);p.add_argument('--archive-source');p.add_argument('--watch',action='store_true');a=p.parse_args()
     if a.mode=='probe':result=pending(a.study,json.load(sys.stdin))
     elif a.mode=='finish':
         import shaping_snapshot_batch as batch

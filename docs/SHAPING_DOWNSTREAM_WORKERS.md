@@ -117,3 +117,12 @@ A matched fresh control resolves the full evidence closure only for its owning f
 A pretrained finalist can use a joint parent from an inactive family only when the admission already pins that parent's complete base-decision evidence and the original native candidate gate verifies its RUN. Each worker request pins the resulting parent RUN bytes. The frozen admission, selected setting and training budget remain unchanged.
 
 When the coordinator also trains, use shaping_local_collection.py for its successful terminal fits. It verifies the frozen request, native terminal gates and file inventory before sealing a local collection receipt; it does not transfer or restart the fit.
+
+
+## Autonomous completion
+
+The resumed dispatch uses persistent services and frozen source exports. Variant stages preserve already registered requests, split launches by their original source identity, and reuse complete submission receipts. Partial or conflicting submissions remain explicit failures; no failed fit is silently restarted.
+
+shaping_resume_supervisor.py collects the finite 217 new deliveries (214 remaining core cells and three registered matched controls). shaping_legacy_delivery.py reconciles the 35 existing outer-fold-2 deliveries. Four host-scoped final evaluators and a final-only continuation evaluator preserve the original score gates. shaping_archive_once.py validates each closed result and performs durable checksum readback once.
+
+shaping_autonomous_finish.py advances the registered 25 uncertainty analyses and 48-model cost workflow only after their artifact prerequisites exist. It records commands before launch, preserves failures, and writes a readiness receipt after computational and archive closure. Scientific interpretation and the complete-study claim remain separate. The cost preparation can use shared coordinator data directly, preserving the existing transport-capsule limits. Continued-run training resources retain separate observed clocks and leave unavailable aggregate time/RSS values null.
