@@ -16,6 +16,14 @@ def ready_panel(study, cid):
         (run/"evaluation",study/"reexport_max_pairs"/cid/run.name/"final"))
 
 
+def job_complete(job):
+    path=Path(job["complete_marker"])
+    if not path.exists():return False
+    record=json.loads(path.read_text())
+    if any(record.get(k)!=v for k,v in job.get("completion",{}).items()):return False
+    return all(isinstance(record.get(k),list) and len(record[k])==v for k,v in job.get("completion_lengths",{}).items())
+
+
 def run(args):
     args.output.mkdir(parents=True,exist_ok=True)
     path=args.output/"STATUS.json"
@@ -57,15 +65,18 @@ def run(args):
                     if code is None:
                         continue
                     log.close();children.pop(name)
-                    expected=Path(job["complete_marker"])
-                    state["jobs"][name].update(stage="complete" if code==0 and expected.exists() else "failed",exit_code=code)
+                    state["jobs"][name].update(stage="complete" if code==0 and job_complete(job) else "failed",exit_code=code)
                     continue
                 if prior:
                     # The prior child may outlive a coordinator wrapper.
                     process=Path("/proc")/str(prior["pid"])/"cmdline"
                     if process.exists():
-                        continue
-                    state["jobs"][name].update(stage="submission_unresolved")
+                        argv=[v.decode() for v in process.read_bytes().split(b"\0") if v]
+                        script=next(v for v in job["command"] if v.endswith(".py"))
+                        output=job["command"][job["command"].index("--output")+1]
+                        if script in argv and output in argv:
+                            continue
+                    state["jobs"][name].update(stage="complete" if job_complete(job) else "submission_unresolved")
                     continue
                 if job["gate"]=="legacy" and len(legacy.get("completed",[]))!=35:
                     continue
