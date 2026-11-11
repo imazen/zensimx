@@ -148,7 +148,17 @@ def watch(args):
                     from shaping_snapshot_batch import trim
                     import shaping_snapshot_retention as owner
                     save('trimming_verified_coordinator_duplicates')
-                    result=trim(root,retirement,root.with_name(root.name+'-COORDINATOR_TRIMMED.json'),owner)
+                    if host==socket.gethostname():
+                        # Worker and coordinator are the same directory here;
+                        # finish already trimmed it after durable readback.
+                        proof=json.loads(worker_trim.read_text())
+                        if (proof.get('stage')!='worker_global_and_staged_states_retired'
+                            or proof.get('archive_root')!=str(root)
+                            or proof.get('retirement_sha256')!=sha(retirement)):
+                            raise ValueError('local completed-state trim proof differs')
+                        result=dict(bytes=0)
+                    else:
+                        result=trim(root,retirement,root.with_name(root.name+'-COORDINATOR_TRIMMED.json'),owner)
                     status['batches'].append(dict(host=host,archive_root=str(root),durable_destination=str(mirror),
                         archive_receipt_sha256=sha(root/'MIRROR_VERIFIED.json'),stores=len(batch['rows']),
                         retired_stores=json.loads(retirement.read_text())['stores'],trimmed_local_bytes=result['bytes']))

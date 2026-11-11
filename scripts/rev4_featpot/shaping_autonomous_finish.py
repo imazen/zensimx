@@ -49,6 +49,10 @@ def run(args):
                     row=json.loads(p.read_text())
                     if row.get("stage") in ("failed_with_preserved_evidence","failed_preserved"):
                         alerts[name]=row
+            snapshot_path=Path(config["snapshot_status"])
+            if snapshot_path.exists():
+                snapshot=json.loads(snapshot_path.read_text())
+                if snapshot.get("stage")=="failed_with_preserved_evidence":alerts["snapshot_retention"]=snapshot
             if collection.get("collection_failures"):alerts["collection"]=collection["collection_failures"]
             if collection.get("failed_native_cells"):alerts["native_fits"]=collection["failed_native_cells"]
             if legacy.get("failures"):alerts["legacy_delivery"]=legacy["failures"]
