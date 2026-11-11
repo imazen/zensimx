@@ -304,6 +304,9 @@ def watch(args):
                 if getattr(args,'cells',None) and value['cell']['id'] not in args.cells:continue
                 if getattr(args,'family',None) and value['cell']['family'] not in args.family:continue
                 if value.get('stage')!='trained' or value['cell']['stage'] not in stages or not (run/'WORKER_COLLECTION.json').exists():continue
+                if getattr(args,'fit_host',None) is not None:
+                    identity=json.loads((run/'RUN.json').read_text())
+                    if identity['execution_host']!=args.fit_host:continue
                 if any((args.study/p).exists() for p in components(value['cell']['id'],run.name)):continue
                 record=request(args.study,run,target_host=placements.get(value['cell']['id']));host=record['host'];directory=args.output/value['cell']['id']
                 from shaping_compute_pool import allowed
@@ -369,6 +372,7 @@ def main():
     for name in ('binary-dir','rescue-binary-dir','repair-binary-dir','inspector','request','bundle','output','remote-source','placement-file'):p.add_argument('--'+name,type=Path)
     p.add_argument('--work',action='store_true');p.add_argument('--watch',action='store_true')
     p.add_argument('--later-only',action='store_true')
+    p.add_argument('--fit-host',choices=('i134','r3500','r3800x','r5600g'),help='coordinate only fits executed on this current worker')
     p.add_argument('--family',action='append',help='explicit coordinator family scope; existing reports remain protected')
     p.add_argument('--cell',action='append',dest='cells',help='evaluate only these collected registered cell IDs')
     p.add_argument('--candidate-binary-dir',type=Path,action='append',default=[])

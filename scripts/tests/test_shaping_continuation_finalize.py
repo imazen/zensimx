@@ -75,3 +75,19 @@ class ContinuationFinalizationTests(unittest.TestCase):
             self.assertFalse((root/"RESULT.json").exists())
             self.assertFalse((root/"CONTINUATION.json").exists())
             self.assertEqual((root/"fit/best.bin").read_bytes(),b"old-best")
+
+    def test_interrupted_result_receipts_are_preserved_on_success(self):
+        with tempfile.TemporaryDirectory(dir=Path.home()/"tmp") as temp:
+            study,root,cap,native=self.fixture(Path(temp))
+            for directory in (root,root/"fit"):
+                initial=json.loads((directory/"RUN.json").read_text())
+                (directory/"RESULT.json").write_bytes(encoded(dict(initial,stage="failed",exit_code=143)))
+            with patch("shaping_continuation_finalize.socket.gethostname",return_value="i134"):
+                finalize(study,cap,native)
+                # A crash after publishing only one receipt can reconcile
+                # without copying or recomputing any checkpoint.
+                result=finalize(study,cap,native)
+                self.assertTrue(result["publication_reconciled"])
+            for directory in (root,root/"fit"):
+                self.assertEqual(json.loads((directory/"RESULT.interrupted.json").read_text())["exit_code"],143)
+                self.assertEqual(json.loads((directory/"RESULT.json").read_text())["exit_code"],0)
