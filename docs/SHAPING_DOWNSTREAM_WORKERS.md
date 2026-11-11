@@ -108,3 +108,12 @@ All five replacement collectors reported fresh worker observations without
 unexpectedly stopped attempts. Their first startup refusals lacked the service
 PATH; corrected launches preserve those logs and pass the tool preflight.
 No scientific model was restarted or replayed during these repairs.
+
+
+## Resumed dispatch and local collection
+
+A matched fresh control resolves the full evidence closure only for its owning fold. The other fold admissions are inspected as metadata to reject duplicate identities. This retains the two-GiB worker limit.
+
+A pretrained finalist can use a joint parent from an inactive family only when the admission already pins that parent's complete base-decision evidence and the original native candidate gate verifies its RUN. Each worker request pins the resulting parent RUN bytes. The frozen admission, selected setting and training budget remain unchanged.
+
+When the coordinator also trains, use shaping_local_collection.py for its successful terminal fits. It verifies the frozen request, native terminal gates and file inventory before sealing a local collection receipt; it does not transfer or restart the fit.

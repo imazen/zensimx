@@ -156,3 +156,8 @@ reconciliation authority for healthy active attempts. It has not moved a fit,
 qualified cross-host continuation or changed the recovered-attempt allowlist.
 All six original native owners were subsequently verified still live by their
 exact PID, start ticks and command.
+
+
+## Finalizing a transferred complete native phase
+
+shaping_continuation_finalize.py accepts one successful registered phase continued from a checksum-verified full optimizer snapshot at an epoch boundary. It requires unchanged scientific arguments and manifests, a matching snapshot checkpoint prefix, all native checkpoint write receipts, and disjoint complete epoch coverage. It preserves the original RUN identities, both raw logs, optimizer snapshot and prior best model; CONTINUATION.json records both execution hosts and zero completed epochs replayed. It publishes the phase and controller RESULT receipts only after validating and retaining that evidence. This operation never executes a trainer.

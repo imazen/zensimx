@@ -101,8 +101,8 @@ def admit(args,*,host=None):
     if '_pretrained_' in cell['family']:
         family=cell['family'].split('_pretrained_')[0]+'_joint_identity'
         parent,parent_run=primary_source(args.study,cells,template,schedule['setting'],family)
-        if admission['decision_sha256'].get(str(parent/'RUN.json'))!=sha(parent/'RUN.json'):
-            raise ValueError('outer pretraining template is not pinned by admission')
+        from shaping_template_provenance import require_parent
+        require_parent(args.study,admission,parent)
         templates.append((parent,parent_run))
     return dict(plan=plan,cells=cells,admission=admission,admission_path=admission_path,
                 cell=cell,schedule=schedule,record=record,groups=groups,source=source,

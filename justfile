@@ -6083,3 +6083,9 @@ shaping-resume-collect study jobs output:
 # Preserve registered requests when completing an interrupted outer dispatch.
 shaping-resume-dispatch *args:
     python3 -B scripts/rev4_featpot/shaping_resume_dispatch.py {{args}}
+
+shaping-finalize-continuation *args:
+    python3 -B scripts/rev4_featpot/shaping_continuation_finalize.py {{args}}
+
+shaping-seal-local *args:
+    python3 -B scripts/rev4_featpot/shaping_local_collection.py {{args}}

@@ -1590,3 +1590,5 @@ The workspace SIMD upper bound stopped at 0.9.31-beta.1, so the current
 codec/pixel family could not resolve the research metric dev dependency.
 The upper bound now admits stable 0.9.31. Numeric expectations, kernels,
 model inputs and frozen standalone study manifests are unchanged.
+
+- Resolved restart orchestration defects (2026-11-11): matched fresh controls captured unrelated fold closures; inactive joint parents needed explicit validation through their already pinned base evidence; coordinator-local terminal fits need in-place collection rather than a transport rename onto their existing directory. Native training inputs and budgets are unchanged.

@@ -111,6 +111,8 @@ def admit(args,*,host=None):
         parent,parent_run=primary_source(args.study,cells,template,schedule['setting'],parent_family)
         if admission['decision_sha256'].get(str(parent/'RUN.json'))!=sha(parent/'RUN.json'):
             raise ValueError('unpinned variant pretraining template')
+        from shaping_template_provenance import require_parent
+        require_parent(args.study,admission,parent)
         templates.append((parent,parent_run))
     return dict(plan=plan,cells=cells,resolution=resolution,cell=cell,family=family,
                 schedule=schedule,record=record,groups=groups,qualification_pins=qualification_pins,
