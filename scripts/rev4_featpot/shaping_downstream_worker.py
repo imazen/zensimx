@@ -19,7 +19,14 @@ def arguments(study,cell,binaries,qualification,kind,human_qualification=None):
             from shaping_outer_admission import resolve
             for outer in range(3):
                 path=study/'selection'/f'outer-{outer}'/'OUTER_ADMISSION.json'
-                if path.exists():found.extend(c for c in resolve(study,outer)[0]['additional_cells'] if c['id']==cell)
+                if path.exists():
+                    import json
+                    # Discover the owning fold from its sealed metadata before
+                    # resolving that fold's full evidence closure. Opening all
+                    # three closures inflated one matched control to 3.66 GB.
+                    raw = json.loads(path.read_text())
+                    if any(c['id'] == cell for c in raw['additional_cells']):
+                        found.extend(c for c in resolve(study,outer)[0]['additional_cells'] if c['id']==cell)
         if len(found)!=1:raise ValueError('one registered outer cell required')
         values['outer']=int(found[0]['partition'].split('-')[1])
     return SimpleNamespace(**values)

@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+- Resolve matched outer controls against their owning fold, avoiding unrelated evidence in bounded worker capsules.
+
+
 ### Changed
 
 - Reuse plain shared-head backward scratch without changing serialized training state; measured allocation evidence is in benchmarks/shared_head_scratch_2026-11-11.md.

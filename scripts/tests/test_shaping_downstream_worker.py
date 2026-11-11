@@ -19,6 +19,22 @@ class DownstreamWorkerTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'human qualification'):downstream.arguments(Path('/study'),'c',Path('/bin'),Path('/q'),'variant')
         with self.assertRaisesRegex(ValueError,'execution kind'):downstream.arguments(Path('/study'),'c',Path('/bin'),Path('/q'),'rescue')
 
+    def test_matched_control_resolves_only_its_owning_fold_but_rejects_duplicate_identity(self):
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as directory:
+            root=Path(directory);cell=dict(id='matched',partition='outer-1')
+            for outer in range(3):
+                path=root/'selection'/f'outer-{outer}'/'OUTER_ADMISSION.json'
+                path.parent.mkdir(parents=True)
+                path.write_bytes(encoded(dict(additional_cells=[cell] if outer==1 else [])))
+            with patch('shaping_execution.load_registration',return_value=({},[],{})), \
+                 patch('shaping_outer_admission.resolve',return_value=({'additional_cells':[cell]},None)) as resolve:
+                args=downstream.arguments(root,'matched',Path('/bin'),Path('/q'),'outer')
+                self.assertEqual(args.outer,1)
+                resolve.assert_called_once_with(root,1)
+                (root/'selection/outer-2/OUTER_ADMISSION.json').write_bytes(encoded(dict(additional_cells=[cell])))
+                with self.assertRaisesRegex(ValueError,'one registered outer'):
+                    downstream.arguments(root,'matched',Path('/bin'),Path('/q'),'outer')
+
     def fixture(self,root,kind):
         study=root/'study';binaries=root/'bin';source=study/'runs/template/attempt-001'
         def write(path,value):
