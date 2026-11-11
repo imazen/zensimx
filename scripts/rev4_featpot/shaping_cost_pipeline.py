@@ -25,6 +25,25 @@ def submit(args):
     return request
 
 
+def local_preparation(args):
+    """Prepare from the coordinator's shared frozen evidence without a transport capsule."""
+    from shaping_cost_worker import context, validate_result
+    from shaping_cost_finalists import prepare
+    from shaping_worker_collect import inventory
+    import socket
+    prepared=args.output/'prepared';request=args.output/'LOCAL_PREPARATION_REQUEST.json'
+    resolution=context(args.study,args.binaries,socket.gethostname())
+    record=dict(schema='shaping-local-cost-preparation-v1',execution_kind='cost_prepare',
+        study=str(args.study),source_root=str(REPO),result_output=str(prepared),
+        binary_dir=str(args.binaries),resolution=resolution,scientific_fit_count=0,final_holdout_read=False)
+    request.write_bytes(encoded(record))
+    prepare(args.study,args.binaries,prepared)
+    validate_result(record,prepared)
+    (prepared/'WORKER_COLLECTION.json').write_bytes(encoded(dict(local_collection=True,
+        request_sha256=sha(request),source_host=socket.gethostname(),files=inventory(prepared))))
+    return request
+
+
 def watch(args):
     from shaping_rescue_worker import HOSTS
     if args.host not in HOSTS or args.host=='r7900x':raise ValueError('eligible non-training benchmark host required')
@@ -80,23 +99,28 @@ print(json.dumps(row))
         while not ready(args.study):
             save('waiting_for_complete_outer_finalists');time.sleep(30)
         save('submitting_admitted_cost_preparation')
-        request=submit(args);record=json.loads(request.read_text());prepared=Path(record['result_output'])
-        prep_unit=json.loads((args.output/'preparation/launch/LAUNCH.json').read_text())['rows'][0]['unit']
-        while True:
-            row=observed(request.with_name('STATUS.json'),'shaping_cost_finalists.py',prep_unit,prepared)
-            if row.get('stage'):
-                if row['request_sha256']!=sha(request):raise ValueError('cost preparation request differs')
-                if row['stage']=='analysis_finished':break
-            save('waiting_for_cost_preparation',worker_observation=row);time.sleep(30)
-        save('collecting_prepared_finalists')
-        bundle=args.study.parent/'worker-bundles'/('cost-prepare-'+record['cell']['id']+'.tar')
-        remote([str(Path.home()/'work/claudehints/scripts/run-heavy'),'--mem','512M','--jobs','1','--',
-            'python3','-B',REPO/'scripts/rev4_featpot/shaping_cost_worker.py','pack','--request',request,'--bundle',bundle],
-            'pack-prepared')
-        transport=args.output/'transport';transport.mkdir()
-        execute(['rsync','-rt','--ignore-existing',args.host+':'+str(bundle),args.host+':'+str(bundle)+'.json',str(transport)+'/'],'collect-prepared')
-        from shaping_cost_worker import collect
-        collect(request,transport/bundle.name,json.loads((transport/(bundle.name+'.json')).read_text())['bundle_sha256'])
+        if getattr(args,'local_preparation',False):
+            request=local_preparation(args);record=json.loads(request.read_text());prepared=Path(record['result_output'])
+            remote(['mkdir','-p',prepared.parent],'prepare-shared-parent')
+            execute(['rsync','-rt','--mkpath','--ignore-existing',str(prepared)+'/',args.host+':'+str(prepared)+'/'],'transfer-local-prepared')
+        else:
+            request=submit(args);record=json.loads(request.read_text());prepared=Path(record['result_output'])
+            prep_unit=json.loads((args.output/'preparation/launch/LAUNCH.json').read_text())['rows'][0]['unit']
+            while True:
+                row=observed(request.with_name('STATUS.json'),'shaping_cost_finalists.py',prep_unit,prepared)
+                if row.get('stage'):
+                    if row['request_sha256']!=sha(request):raise ValueError('cost preparation request differs')
+                    if row['stage']=='analysis_finished':break
+                save('waiting_for_cost_preparation',worker_observation=row);time.sleep(30)
+            save('collecting_prepared_finalists')
+            bundle=args.study.parent/'worker-bundles'/('cost-prepare-'+record['cell']['id']+'.tar')
+            remote([str(Path.home()/'work/claudehints/scripts/run-heavy'),'--mem','512M','--jobs','1','--',
+                'python3','-B',REPO/'scripts/rev4_featpot/shaping_cost_worker.py','pack','--request',request,'--bundle',bundle],
+                'pack-prepared')
+            transport=args.output/'transport';transport.mkdir()
+            execute(['rsync','-rt','--ignore-existing',args.host+':'+str(bundle),args.host+':'+str(bundle)+'.json',str(transport)+'/'],'collect-prepared')
+            from shaping_cost_worker import collect
+            collect(request,transport/bundle.name,json.loads((transport/(bundle.name+'.json')).read_text())['bundle_sha256'])
         archive(prepared,'prepared')
         save('registering_vector_timing')
         from shaping_vector_bench import register
@@ -147,5 +171,5 @@ if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__)
     for name in ('study','binaries','output','destination','instrument','qualification','launcher','cpu-tool'):
         p.add_argument('--'+name,type=Path,required=True)
-    p.add_argument('--host',required=True);p.add_argument('--cpus',required=True)
+    p.add_argument('--local-preparation',action='store_true');p.add_argument('--host',required=True);p.add_argument('--cpus',required=True)
     print(json.dumps(watch(p.parse_args())),flush=True)

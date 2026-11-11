@@ -27,6 +27,35 @@ def parse_log(text,epochs):
                 precision='Wrapper seconds are integer-reported; RSS/load retain wrapper rounding; native elapsed is reported to 0.1 seconds.')
 
 
+def continuation_resources(directory, result, pins):
+    root=directory.parent;proof_path=root/'CONTINUATION.json'
+    proof=json.loads(proof_path.read_text())
+    if (result.get('continuation_sha256')!=sha(proof_path)
+        or proof['original_phase_sha256']!=sha(directory/'RUN.json')):
+        raise ValueError('continued resource provenance differs')
+    pins[str(proof_path)]=sha(proof_path)
+    segments=[]
+    for name in ('original-train.log','native-train.log'):
+        path=root/'continuation-evidence'/name
+        if proof['evidence_sha256'].get(str(path.relative_to(root)))!=sha(path):
+            raise ValueError('continued raw resource log drift')
+        pins[str(path)]=sha(path);rows={}
+        for match in re.finditer(r'^[ \t]*epoch\s+(\d+)\s+\|[^\n]*\| t=([0-9.]+)s[ \t]*$',path.read_text(),re.M):
+            epoch,t=int(match[1]),float(match[2])
+            if not math.isfinite(t) or t<0 or epoch in rows and rows[epoch]!=t:
+                raise ValueError('continued native clock differs')
+            rows[epoch]=t
+        if not rows:raise ValueError('continued native elapsed observations missing')
+        times=[rows[e] for e in sorted(rows)]
+        if times!=sorted(times):raise ValueError('nonmonotone segment clock')
+        segments.append(dict(log=str(path),epoch_elapsed_seconds=rows))
+    return dict(wrapper_elapsed_seconds=None,wrapper_peak_rss_gib_reported=None,
+        wrapper_min_available_mib=None,wrapper_peak_load=None,native_elapsed_seconds_by_epoch=None,
+        observed_native_segments=segments,completed_epochs_recomputed=proof['completed_epochs_replayed'],
+        resource_coverage_complete=False,
+        interpretation='Retained native segment clocks; no comparable single-wrapper elapsed time or peak RSS. No prorating, clock concatenation or memory estimate.')
+
+
 def phase_record(directory,epochs,pins):
     result_path=directory/'RESULT.json';log=directory/'train.log'
     result=json.loads(result_path.read_text())
@@ -35,7 +64,7 @@ def phase_record(directory,epochs,pins):
     if sha(model)!=result['bake_sha256']:raise ValueError('final phase model drift')
     for p in (directory/'RUN.json',result_path,log,model):pins[str(p)]=sha(p)
     return dict(directory=str(directory),epochs=epochs,pair_draws=epochs*result['pairs_per_epoch'],
-                execution_host=result.get('execution_host'),resources=parse_log(log.read_text(),epochs))
+                execution_host=result.get('execution_host'),resources=(continuation_resources(directory,result,pins) if (directory.parent/'CONTINUATION.json').exists() else parse_log(log.read_text(),epochs)))
 
 
 def report(run,output):
@@ -71,7 +100,7 @@ def report(run,output):
     for path,pin in pins.items():
         if sha(path)!=pin:raise ValueError('resource evidence changed')
     record=dict(cell=identity['cell'],execution_host=identity.get('execution_host'),phases=phases,reused_pretraining=reused,
-                directly_executed_phase_wrapper_seconds=sum(p['resources']['wrapper_elapsed_seconds'] for p in phases),
+                directly_executed_phase_wrapper_seconds=(sum(p['resources']['wrapper_elapsed_seconds'] for p in phases) if all(p['resources']['wrapper_elapsed_seconds'] is not None for p in phases) else None),
                 scientific_eligibility_asserted=False,training_replayed=False,source_pins=pins,driver_sha256=sha(__file__),
                 interpretation='Observed concurrent-run resource accounting, not an isolated benchmark or cross-host speed comparison. Shared parent work remains explicit and is not treated as free.')
     output.write_bytes(encoded(record));return record

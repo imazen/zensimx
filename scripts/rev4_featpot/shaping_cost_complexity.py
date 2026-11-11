@@ -30,7 +30,9 @@ def inputs(study,rows):
                 directory=run/phase;native=json.loads((directory/'RESULT.json').read_text())
                 paths.extend([directory/'RUN.json',directory/'RESULT.json',directory/'train.log',
                     directory/'checkpoints'/f"ckpt_epoch{native['epochs']-1:03}.bin"])
-        elif row['cell']['family']=='shaped_additive':paths.append(run/'native/RESULT.json')
+        if (run/'CONTINUATION.json').exists():
+            paths.extend((run/'CONTINUATION.json',run/'continuation-evidence/original-train.log',run/'continuation-evidence/native-train.log'))
+        if row['cell']['family']=='shaped_additive':paths.append(run/'native/RESULT.json')
         pins.update({str(p):sha(p) for p in paths})
     return pins,binary,inspector
 
