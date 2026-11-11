@@ -79,7 +79,7 @@ def finalize(study, capture, native):
         if (proof["original_run_sha256"] != sha(root / "RUN.json")
                 or proof["original_phase_sha256"] != sha(phase / "RUN.json")
                 or proof["snapshot_sha256"] != done["snapshot_sha256"]
-                or proof["completed_epochs_replayed"] != 0):
+                or proof["completed_epochs_replayed"] not in (0, 1)):
             raise ValueError("partial continuation publication identity differs")
         for name, digest in proof["checkpoint_sha256"].items():
             if sha(phase / "checkpoints" / name) != digest:
@@ -89,7 +89,7 @@ def finalize(study, capture, native):
                 raise ValueError("preserve changed continuation evidence")
         publish(root,phase,initial,phase_initial,proof_path,native,
                 proof["checkpoint_sha256"][f"ckpt_epoch{initial['epochs']-1:03}.bin"])
-        return dict(cell=cid,completed_epochs_replayed=0,publication_reconciled=True,
+        return dict(cell=cid,completed_epochs_replayed=proof["completed_epochs_replayed"],publication_reconciled=True,
                     continuation_sha256=sha(proof_path),epochs=initial["epochs"])
     for directory, original_identity in ((root, initial), (phase, phase_initial)):
         path = directory / "RESULT.json"
@@ -142,9 +142,17 @@ def finalize(study, capture, native):
     old_log = (original / "fit/train.log").read_text()
     new_log = (native / "train.log").read_text()
     old_epochs, new_epochs = epoch_rows(old_log), epoch_rows(new_log)
-    if (set(old_epochs) != set(range(state["epoch"]))
+    prefix_epochs = set(range(state["epoch"]))
+    tail = set(old_epochs) - prefix_epochs
+    if (not prefix_epochs <= set(old_epochs) or tail not in (set(), {state["epoch"]})
             or set(new_epochs) != set(range(state["epoch"], epochs))):
         raise ValueError("continuation epoch coverage is incomplete or replayed")
+    for e in tail:
+        checkpoint = original / "fit/checkpoints" / f"ckpt_epoch{e:03}.bin"
+        if (sha(checkpoint) != receipts[e]["sha256"]
+                or checkpoint.stat().st_size != receipts[e]["bytes"]):
+            raise ValueError("recomputed uncaptured tail checkpoint differs")
+
     postprocessed = f"Stamped {epochs} checkpoint dump(s) with complete training metadata" in new_log
     if postprocessed:
         binary = Path(done["command"][0])
@@ -173,7 +181,7 @@ def finalize(study, capture, native):
             # Native completion stamps metadata and applies the frozen
             # derived-input compaction, including to the relocated prefix.
             # Preserve the raw optimizer-snapshot prefix before replacing it.
-            if e >= state["epoch"] or sha(dest) != row["sha256"]:
+            if e not in (prefix_epochs | tail) or sha(dest) != row["sha256"]:
                 raise ValueError("preserve conflicting original checkpoint")
             raw_prefix = root / "continuation-evidence/raw-prefix" / dest.name
             raw_prefix.parent.mkdir(parents=True, exist_ok=True)
@@ -205,7 +213,9 @@ def finalize(study, capture, native):
     proof = dict(schema="exact-state-continuation-finalization-v1", cell=cell,
                  original_run_sha256=sha(root / "RUN.json"), original_phase_sha256=sha(phase / "RUN.json"),
                  initial_execution_host=initial["execution_host"], resumed_execution_host=done["execution_host"],
-                 snapshot_sha256=pin, resumed_at_epoch=state["epoch"], completed_epochs_replayed=0,
+                 snapshot_sha256=pin, resumed_at_epoch=state["epoch"], completed_epochs_replayed=len(tail),
+                 committed_snapshot_epochs_replayed=0, recomputed_uncaptured_tail_epochs=sorted(tail),
+                 uncaptured_tail_raw_sha256={str(e):receipts[e]["sha256"] for e in sorted(tail)},
                  checkpoint_sha256={f"ckpt_epoch{e:03}.bin": final_pins[e]["sha256"] for e in sorted(expected)},
                  native_checkpoint_postprocessing=postprocessed,
                  evidence_sha256={str(p.relative_to(root)): sha(p) for p in evidence.rglob("*") if p.is_file()},
@@ -216,8 +226,15 @@ def finalize(study, capture, native):
         raise ValueError("preserve completed or partially published continuation receipt")
     canonical = []
     seen = set()
-    for text in (old_log, new_log):
+    for is_original, text in ((True, old_log), (False, new_log)):
         for line in text.splitlines():
+            if is_original and tail:
+                match = re.match(r"^\s*epoch\s+(\d+)\s+\|",line)
+                diagnostic = line.startswith(("TRAINING_DIAGNOSTICS ", "FIRST_WEIGHT_DIAGNOSTICS "))
+                if match and int(match[1]) in tail:
+                    continue
+                if diagnostic and json.loads(line.split(" ",1)[1]).get("epoch") in tail:
+                    continue
             if line.startswith("  checkpoint dump: "):
                 continue
             if line in seen:
@@ -242,7 +259,7 @@ def finalize(study, capture, native):
         stream.write(encoded(proof))
     publish(root,phase,initial,phase_initial,proof_path,native,final_pins[epochs-1]["sha256"])
     return dict(cell=cid, initial_execution_host=initial["execution_host"],
-                resumed_execution_host=done["execution_host"], completed_epochs_replayed=0,
+                resumed_execution_host=done["execution_host"], completed_epochs_replayed=len(tail),
                 continuation_sha256=sha(proof_path), epochs=epochs)
 
 

@@ -91,3 +91,17 @@ class ContinuationFinalizationTests(unittest.TestCase):
             for directory in (root,root/"fit"):
                 self.assertEqual(json.loads((directory/"RESULT.interrupted.json").read_text())["exit_code"],143)
                 self.assertEqual(json.loads((directory/"RESULT.json").read_text())["exit_code"],0)
+
+    def test_one_uncaptured_tail_epoch_requires_exact_raw_checkpoint_equality(self):
+        with tempfile.TemporaryDirectory(dir=Path.home()/"tmp") as temp:
+            study,root,cap,native=self.fixture(Path(temp))
+            original=cap.parent/"original-attempt/fit"
+            shutil.copyfile(native/"checkpoints/ckpt_epoch060.bin",original/"checkpoints/ckpt_epoch060.bin")
+            with (original/"train.log").open("a") as f:f.write("  epoch 60 | loss=1\n")
+            with patch("shaping_continuation_finalize.socket.gethostname",return_value="i134"):
+                result=finalize(study,cap,native)
+            self.assertEqual(result["completed_epochs_replayed"],1)
+            proof=json.loads((root/"CONTINUATION.json").read_text())
+            self.assertEqual(proof["committed_snapshot_epochs_replayed"],0)
+            self.assertEqual(proof["recomputed_uncaptured_tail_epochs"],[60])
+            self.assertEqual(sum(" | loss=" in line for line in (root/"fit/train.log").read_text().splitlines()),120)
