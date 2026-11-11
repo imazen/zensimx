@@ -90,18 +90,42 @@ def finalize(study, capture, native):
     if (set(old_epochs) != set(range(state["epoch"]))
             or set(new_epochs) != set(range(state["epoch"], epochs))):
         raise ValueError("continuation epoch coverage is incomplete or replayed")
+    postprocessed = f"Stamped {epochs} checkpoint dump(s) with complete training metadata" in new_log
+    if postprocessed:
+        binary = Path(done["command"][0])
+        build = binary.parent / "BUILD.json"
+        metadata = json.loads(build.read_text())
+        if (sha(build) != done["build_sha256"]
+                or metadata["binary_sha256"][binary.name] != sha(binary)):
+            raise ValueError("native checkpoint postprocessor binary drift")
+    for line in state["checkpoint_receipts"]:
+        row = json.loads(line.removeprefix("  checkpoint dump: "))
+        prefix = original / "fit/checkpoints" / f"ckpt_epoch{row['epoch']:03}.bin"
+        if prefix.stat().st_size != row["bytes"] or sha(prefix) != row["sha256"]:
+            raise ValueError("original optimizer snapshot checkpoint prefix drift")
     target = phase / "checkpoints"
     target.mkdir(exist_ok=True)
+    final_pins = {}
     for e in sorted(expected):
         source = native / "checkpoints" / f"ckpt_epoch{e:03}.bin"
         row = receipts[e]
-        if source.stat().st_size != row["bytes"] or sha(source) != row["sha256"]:
+        final_pin = sha(source)
+        if not postprocessed and (source.stat().st_size != row["bytes"] or final_pin != row["sha256"]):
             raise ValueError("native continued checkpoint drift")
+        final_pins[e] = dict(row, bytes=source.stat().st_size, sha256=final_pin)
         dest = target / source.name
-        if dest.exists():
-            if sha(dest) != row["sha256"]:
+        if dest.exists() and sha(dest) != final_pin:
+            # Native completion stamps metadata and applies the frozen
+            # derived-input compaction, including to the relocated prefix.
+            # Preserve the raw optimizer-snapshot prefix before replacing it.
+            if e >= state["epoch"] or sha(dest) != row["sha256"]:
                 raise ValueError("preserve conflicting original checkpoint")
-        else:
+            raw_prefix = root / "continuation-evidence/raw-prefix" / dest.name
+            raw_prefix.parent.mkdir(parents=True, exist_ok=True)
+            if raw_prefix.exists():
+                raise ValueError("preserve existing raw-prefix checkpoint")
+            dest.rename(raw_prefix)
+        if not dest.exists():
             with source.open("rb") as src, dest.open("xb") as dst:
                 shutil.copyfileobj(src, dst, 1024 * 1024)
                 dst.flush()
@@ -127,7 +151,8 @@ def finalize(study, capture, native):
                  original_run_sha256=sha(root / "RUN.json"), original_phase_sha256=sha(phase / "RUN.json"),
                  initial_execution_host=initial["execution_host"], resumed_execution_host=done["execution_host"],
                  snapshot_sha256=pin, resumed_at_epoch=state["epoch"], completed_epochs_replayed=0,
-                 checkpoint_sha256={f"ckpt_epoch{e:03}.bin": receipts[e]["sha256"] for e in sorted(expected)},
+                 checkpoint_sha256={f"ckpt_epoch{e:03}.bin": final_pins[e]["sha256"] for e in sorted(expected)},
+                 native_checkpoint_postprocessing=postprocessed,
                  evidence_sha256={str(p.relative_to(root)): sha(p) for p in evidence.rglob("*") if p.is_file()},
                  finalized_utc=datetime.now(timezone.utc).isoformat(), driver_sha256=sha(__file__),
                  log_processing="Identical repeated native output lines collapsed; both raw logs retained.")
@@ -145,7 +170,7 @@ def finalize(study, capture, native):
             seen.add(line)
             canonical.append(line)
     for e in sorted(expected):
-        row = dict(receipts[e], path=str(target / f"ckpt_epoch{e:03}.bin"))
+        row = dict(final_pins[e], path=str(target / f"ckpt_epoch{e:03}.bin"))
         canonical.append("  checkpoint dump: " + json.dumps(row, separators=(",", ":")))
     log = phase / "train.log"
     if log.exists():
@@ -162,7 +187,7 @@ def finalize(study, capture, native):
         stream.write(encoded(proof))
     finished = datetime.fromtimestamp((native / "RESULT.json").stat().st_mtime, timezone.utc).isoformat()
     phase_result = dict(phase_initial, stage="trained", exit_code=0, finished_utc=finished,
-                        bake_sha256=receipts[epochs - 1]["sha256"], continuation_sha256=sha(proof_path))
+                        bake_sha256=final_pins[epochs - 1]["sha256"], continuation_sha256=sha(proof_path))
     controller = dict(initial, stage="trained", exit_code=0, finished_utc=finished,
                       bake_sha256=phase_result["bake_sha256"], phases=[phase_result],
                       continuation_sha256=sha(proof_path))
