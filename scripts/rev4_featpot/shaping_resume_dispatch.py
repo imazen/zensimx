@@ -35,7 +35,7 @@ def run(args):
         if not required or len(required) != len(selected):
             raise ValueError("complete registered reduced outer scope required")
         jobs = {}
-        for request in args.previous.glob("jobs/*/REQUEST.json"):
+        for request in sorted(p for previous in args.previous for p in previous.glob("jobs/*/REQUEST.json")):
             q = json.loads(request.read_text())
             cid = q["cell"]["id"]
             assignment = args.study / "downstream_assignments" / ("outer-" + cid + "-" + q["host"] + ".json")
@@ -49,7 +49,7 @@ def run(args):
                 raise ValueError("registered request has an excluded host")
             jobs[cid] = dict(cell=q["cell"], host=q["host"], request=str(request),
                              request_sha256=sha(request), assignment=str(assignment),
-                             assignment_sha256=sha(assignment), source=str(args.previous_source))
+                             assignment_sha256=sha(assignment), source=str(args.previous_source if q["source_root"] == "/home/lilith/work/zen/zensimx" else Path(q["source_root"])))
         live, observation = loads(args.study, {h: HOST_SLOTS[h] for h in ("i134", "r3500", "r3800x", "r5600g")})
         (args.output / "PLACEMENT_OBSERVATION.json").write_bytes(encoded(observation))
         for cell, host in placements([c for c in selected if c["id"] not in jobs], args.outer, live):
@@ -80,13 +80,7 @@ def run(args):
                     save("launching_remaining_outer_fits", host=host, source=source)
                     launch([wave], Path(source), host, wave / ("launch-" + host))
         save("all_outer_fits_submitted", required_models=len(jobs))
-        while True:
-            done, total = collect_controls(args, list(jobs.values()))
-            save("collecting_outer_controls", collected_controls=done, required_controls=total)
-            if len(done) == total:
-                save("all_outer_fits_submitted_and_controls_collected", required_models=len(jobs))
-                return
-            time.sleep(60)
+        return
     except Exception as error:
         save("failed_with_preserved_evidence", error=str(error))
         raise
@@ -94,7 +88,8 @@ def run(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
-    for name in ("source", "previous-source", "study", "previous", "output", "binaries", "qualification"):
+    for name in ("source", "previous-source", "study", "output", "binaries", "qualification"):
         parser.add_argument("--" + name, type=Path, required=True)
+    parser.add_argument("--previous", type=Path, action="append", required=True)
     parser.add_argument("--outer", type=int, choices=range(3), required=True)
     run(parser.parse_args())
