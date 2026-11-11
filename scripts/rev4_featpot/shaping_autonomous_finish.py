@@ -19,7 +19,9 @@ def ready_panel(study, cid):
 def job_complete(job):
     path=Path(job["complete_marker"])
     if not path.exists():return False
-    record=json.loads(path.read_text())
+    if not job.get("completion"):raise ValueError("explicit terminal fields required")
+    try:record=json.loads(path.read_text())
+    except (OSError,json.JSONDecodeError):return False
     if any(record.get(k)!=v for k,v in job.get("completion",{}).items()):return False
     return all(isinstance(record.get(k),list) and len(record[k])==v for k,v in job.get("completion_lengths",{}).items())
 

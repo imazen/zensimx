@@ -14,9 +14,19 @@ def sweep(args, state):
     from shaping_execution import load_registration
     from shaping_archive_supervision import later_neural_bundles, later_control_bundles
     _, cells, _ = load_registration(args.study)
+    allowed=None
+    if getattr(args,"delivery_root",None):
+        allowed=set()
+        p=args.delivery_root/"continuous-collection/STATUS.json"
+        if p.exists():allowed.update(json.loads(p.read_text()).get("job_ids",[]))
+        p=args.delivery_root/"legacy-delivery/JOBS.json"
+        if p.exists():allowed.update(r["cell"]["id"] for r in json.loads(p.read_text()))
     for result in sorted((args.study / "runs").glob("*/attempt-*/RESULT.json")):
         run = result.parent; cid = run.parent.name
-        if cid in state["complete"] or cid in state["failures"]:
+        if (allowed is not None and cid not in allowed) or cid in state["complete"] or cid in state["failures"]:
+            continue
+        missing=state.get("waiting_inputs",{}).get(cid)
+        if missing and not Path(missing).exists():
             continue
         value = json.loads(result.read_text()); cell = value["cell"]
         if cell["stage"] not in ("outer","fresh_control_outer","fresh_control_outer_matched","human_only","source_curve","shuffle"):
@@ -38,7 +48,7 @@ def sweep(args, state):
                 marker = root / "MIRROR_VERIFIED.json"
                 if not marker.exists():
                     destination = args.destination / ("later-" + kind + "-" + cid)
-                    log = args.output / (cid + "-" + kind + ".log")
+                    log = args.output / (cid + "-" + kind + "-" + str(len(list(args.output.glob(cid + "-" + kind + "-*.log")))) + ".log")
                     with log.open("x") as stream:
                         subprocess.run(["python3","-B",str(REPO/"scripts/byconstruction/dataset_mirror.py"),
                             "--root",str(root),"--nfs","--cold-readback","--destination",str(destination)],
@@ -49,8 +59,15 @@ def sweep(args, state):
                     raise ValueError("archive readback receipt differs")
                 receipts[str(root)] = dict(destination=str(destination),receipt_sha256=sha(marker),manifest_sha256=sha(root/"SHA256SUMS"))
             state["complete"][cid] = receipts
+        except FileNotFoundError as error:
+            state.setdefault("waiting_inputs",{})[cid]=str(error.filename)
         except Exception as error:
-            state["failures"][cid] = str(error)
+            logs=list(args.output.glob(cid+"-*.log"))
+            transient=any("Stale file handle" in p.read_text() for p in logs)
+            if transient:
+                state.setdefault("storage_wait",{})[cid]=str(error)
+            else:
+                state["failures"][cid] = str(error)
         save(args,state)
     return state
 
@@ -63,13 +80,25 @@ def save(args,state):
 if __name__=="__main__":
     parser=argparse.ArgumentParser(description=__doc__)
     for name in ("study","output","destination"):parser.add_argument("--"+name,type=Path,required=True)
-    parser.add_argument("--watch",action="store_true");args=parser.parse_args()
+    parser.add_argument("--watch",action="store_true")
+    parser.add_argument("--mount-config",type=Path)
+    parser.add_argument("--delivery-root",type=Path);args=parser.parse_args()
     args.output.mkdir(parents=True,exist_ok=True)
     path=args.output/"STATUS.json"
     state=json.loads(path.read_text()) if path.exists() else dict(stage="archiving_completed_deliveries",complete={},failures={})
     with (args.output/"OWNER.lock").open("a") as lock:
         fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
         while True:
+            if args.mount_config:
+                config=json.loads(args.mount_config.read_text())
+                from shaping_archive_mount import ensure
+                try:
+                    ensure(Path(config["target"]),config["source"],Path(config["mount_root"]),config["subdirectory"])
+                    state["storage_unavailable"]=None
+                except OSError as error:
+                    state["storage_unavailable"]=str(error);save(args,state)
+                    if not args.watch:raise
+                    time.sleep(60);continue
             sweep(args,state);save(args,state)
             if not args.watch:break
             time.sleep(60)

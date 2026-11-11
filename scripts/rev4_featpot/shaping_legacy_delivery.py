@@ -47,7 +47,7 @@ def run(args):
     from shaping_variant_pipeline import selected
     from shaping_worker_collect import inventory
     study, out = args.study, args.output
-    out.mkdir(parents=True, exist_ok=False)
+    out.mkdir(parents=True, exist_ok=getattr(args,"resume",False))
     _, cells, _ = load_registration(study)
     admission = json.loads((study / "selection/outer-2/OUTER_ADMISSION.json").read_text())
     wanted = selected_cells(cells, admission)
@@ -65,8 +65,9 @@ def run(args):
             raise ValueError("one original outer-2 assignment required: " + cid)
         a = json.loads(paths[0].read_text())
         host = moves[cid]["target"] if cid in moves else a["host"]
-        if host not in ALLOWED:
-            raise ValueError("outer-2 provider is outside current compute pool")
+        existing=study/"runs"/cid/"attempt-001/WORKER_COLLECTION.json"
+        if host not in ALLOWED and not existing.exists():
+            raise ValueError("uncollected outer-2 provider requires preserved data delivery: "+cid+" "+host)
         default = study.parent / "downstream-cap-approved-20261109T2210" / kind / "outer-2"
         default = default / ("neural-fits" if kind == "outer" else "human_only") / "jobs" / cid / "REQUEST.json"
         jobs.append(dict(cell=cell, host=host, assignment=str(paths[0]),
@@ -83,7 +84,7 @@ def run(args):
         if (root / "WORKER_COLLECTION.json").exists():
             materialize_archived_components(study,cid)
             done.append(cid); status(); continue
-        directory = out / cid; directory.mkdir()
+        directory = out / cid; directory.mkdir(exist_ok=getattr(args,"resume",False))
         log = directory / "recovery.log"
         def call(command):
             with log.open("a") as stream:
@@ -215,4 +216,5 @@ def seal_continued(study, root, host):
 if __name__=="__main__":
     parser=argparse.ArgumentParser(description=__doc__)
     for name in ("study","dispatch","placements","output"):parser.add_argument("--"+name,type=Path,required=True)
+    parser.add_argument("--resume",action="store_true")
     print(json.dumps(run(parser.parse_args())))
