@@ -35,29 +35,87 @@ def register_fits(args, stage):
     from shaping_control_worker import register as register_control
     cells, admission = selected(args.study, args.outer, stage)
     wave = args.output / stage
-    wave.mkdir(exist_ok=False)
+    wave.mkdir(exist_ok=getattr(args, "resume", False))
+    saved = wave / "REGISTRATION.json"
+    if saved.exists():
+        record = json.loads(saved.read_text())
+        if (record["admission_sha256"] != sha(admission)
+                or {j["cell"]["id"] for j in record["jobs"]} != {c["id"] for c in cells}
+                or any(sha(j["request"]) != j["request_sha256"] for j in record["jobs"])):
+            raise ValueError("preserve changed variant registration")
+        return wave, record["jobs"]
     from shaping_placement import loads
     live_loads, observation = loads(args.study, worker_slots(args))
-    (wave / 'PLACEMENT_OBSERVATION.json').write_bytes(encoded(observation))
+    (wave / "PLACEMENT_OBSERVATION.json").write_bytes(encoded(observation))
     jobs = []
-    for cell, host in placements(cells, args.outer, live_loads):
-        directory = wave / 'jobs' / cell['id']
-        if cell['family'] in ('extra_trees', 'shaped_additive'):
-            register_control(args.study, cell['id'], args.binaries, host, directory)
+    remaining = []
+    for cell in cells:
+        candidates = list((args.study / "downstream_assignments").glob("variant-" + cell["id"] + "-*.json"))
+        if not candidates:
+            remaining.append(cell)
+            continue
+        if len(candidates) != 1:
+            raise ValueError("preserve ambiguous existing variant assignments")
+        assignment = candidates[0]
+        a = json.loads(assignment.read_text())
+        request = Path(a["worker_request_path"]) if "worker_request_path" in a else wave / "jobs" / cell["id"] / "REQUEST.json"
+        q = json.loads(request.read_text())
+        if (q["cell"] != cell or a["host"] != q["host"] or a["host"] not in worker_slots(args)
+                or a["cells"] != [cell["id"]]
+                or any(a[k] != q[k] for k in ("plan_sha256", "build_sha256"))
+                or ("worker_request_sha256" in a and a["worker_request_sha256"] != sha(request))):
+            raise ValueError("preserve conflicting existing variant request")
+        jobs.append(dict(cell=cell, host=a["host"], request=str(request), request_sha256=sha(request),
+                         assignment=str(assignment), assignment_sha256=sha(assignment), source=q["source_root"]))
+        live_loads[a["host"]] += 1
+    for cell, host in placements(remaining, args.outer, live_loads):
+        directory = wave / "jobs" / cell["id"]
+        if cell["family"] in ("extra_trees", "shaped_additive"):
+            register_control(args.study, cell["id"], args.binaries, host, directory)
         else:
-            register(args.study, cell['id'], host, args.binaries, args.qualification, directory,
-                     execution_kind='variant', human_qualification=args.human_qualification)
-        request = directory / 'REQUEST.json'
-        assignment = args.study / 'downstream_assignments' / ('variant-' + cell['id'] + '-' + host + '.json')
-        with assignment.open('xb') as stream:
-            stream.write((directory / 'ASSIGNMENT.json').read_bytes())
+            register(args.study, cell["id"], host, args.binaries, args.qualification, directory,
+                     execution_kind="variant", human_qualification=args.human_qualification)
+        request = directory / "REQUEST.json"
+        assignment = args.study / "downstream_assignments" / ("variant-" + cell["id"] + "-" + host + ".json")
+        with assignment.open("xb") as stream:
+            stream.write((directory / "ASSIGNMENT.json").read_bytes())
         jobs.append(dict(cell=cell, host=host, request=str(request), request_sha256=sha(request),
-                         assignment=str(assignment), assignment_sha256=sha(assignment)))
-    record = dict(stage='registered', source=str(REPO), jobs=jobs, training_replayed=False,
-                  source_driver_sha256=sha(REPO / 'scripts/rev4_featpot/shaping_rescue_worker.py'),
+                         assignment=str(assignment), assignment_sha256=sha(assignment), source=str(REPO)))
+    record = dict(stage="registered", source=str(REPO), jobs=jobs, training_replayed=False,
+                  source_driver_sha256=sha(REPO / "scripts/rev4_featpot/shaping_rescue_worker.py"),
                   admission_sha256=sha(admission), variant_stage=stage)
-    (wave / 'REGISTRATION.json').write_bytes(encoded(record))
+    saved.write_bytes(encoded(record))
     return wave, jobs
+
+
+def launch_registered(args, wave, jobs, save):
+    from shaping_rescue_host_launch import launch
+    for source in sorted({job.get("source", str(REPO)) for job in jobs}):
+        subset = [j for j in jobs if j.get("source", str(REPO)) == source]
+        part = wave / ("source-" + __import__("hashlib").sha256(source.encode()).hexdigest()[:12])
+        part.mkdir(exist_ok=True)
+        registration = dict(stage="registered", jobs=subset,
+            source_driver_sha256=sha(Path(source) / "scripts/rev4_featpot/shaping_rescue_worker.py"))
+        path = part / "REGISTRATION.json"
+        if path.exists() and json.loads(path.read_text()) != registration:
+            raise ValueError("preserve different source-specific variant wave")
+        if not path.exists():
+            path.write_bytes(encoded(registration))
+        for host in worker_slots(args):
+            required = [j for j in subset if j["host"] == host]
+            if not required:
+                continue
+            output = part / ("launch-" + host)
+            receipt = output / "LAUNCH.json"
+            if receipt.exists():
+                rows = json.loads(receipt.read_text())["rows"]
+                if {r["cell"]["id"] for r in rows} != {j["cell"]["id"] for j in required}:
+                    raise ValueError("preserve different completed host launch")
+                continue
+            if output.exists():
+                raise ValueError("partial host submission needs process reconciliation; never replay")
+            save("launching_admitted_variants", host=host)
+            launch([part], Path(source), host, output)
 
 
 def admission_started(jobs):
@@ -88,7 +146,7 @@ print(json.dumps(waiting))
 
 def watch(args):
     from shaping_rescue_host_launch import launch
-    args.output.mkdir(parents=True, exist_ok=False)
+    args.output.mkdir(parents=True, exist_ok=getattr(args, "resume", False))
     with (args.output / 'OWNER.lock').open('x') as lock:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         status = dict(pid=os.getpid(), outer=args.outer, training_replayed=False, driver_sha256=sha(__file__))
@@ -114,10 +172,7 @@ def watch(args):
             for stage in (getattr(args, 'stages', None) or STAGES):
                 save('registering_admitted_variants', variant_stage=stage)
                 wave, jobs = register_fits(args, stage)
-                for host in HOST_SLOTS:
-                    if any(j['host'] == host for j in jobs):
-                        save('launching_admitted_variants', variant_stage=stage, host=host)
-                        launch([wave], REPO, host, wave / ('launch-' + host))
+                launch_registered(args, wave, jobs, save)
                 all_jobs.extend(jobs)
                 while waiting := admission_started(jobs):
                     save('waiting_for_priority_admission', variant_stage=stage, waiting_cells=waiting)
@@ -140,6 +195,7 @@ if __name__ == '__main__':
     for key in ('study', 'output', 'binaries', 'qualification', 'human-qualification', 'outer-status'):
         p.add_argument('--' + key, type=Path, required=True)
     p.add_argument('--outer', type=int, choices=range(3), required=True)
+    p.add_argument("--resume", action="store_true")
     p.add_argument("--worker-host", action="append", dest="worker_hosts", choices=tuple(HOST_SLOTS))
     p.add_argument("--stage", action="append", dest="stages", choices=STAGES)
     watch(p.parse_args())
