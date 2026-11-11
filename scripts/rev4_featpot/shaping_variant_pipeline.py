@@ -9,7 +9,7 @@ import subprocess
 import time
 
 from shaping_completion import REPO, encoded, sha
-from shaping_outer_pipeline import HOST_SLOTS, placements, collect_controls
+from shaping_outer_pipeline import HOST_SLOTS, placements, collect_controls, worker_slots
 
 STAGES = ('human_only', 'source_curve', 'shuffle')
 COUNTS = dict(human_only=16, source_curve=32, shuffle=16)
@@ -37,7 +37,7 @@ def register_fits(args, stage):
     wave = args.output / stage
     wave.mkdir(exist_ok=False)
     from shaping_placement import loads
-    live_loads, observation = loads(args.study, HOST_SLOTS)
+    live_loads, observation = loads(args.study, worker_slots(args))
     (wave / 'PLACEMENT_OBSERVATION.json').write_bytes(encoded(observation))
     jobs = []
     for cell, host in placements(cells, args.outer, live_loads):
@@ -111,7 +111,7 @@ def watch(args):
                 save('waiting_for_outer_fit_submission')
                 time.sleep(30)
             all_jobs = []
-            for stage in STAGES:
+            for stage in (getattr(args, 'stages', None) or STAGES):
                 save('registering_admitted_variants', variant_stage=stage)
                 wave, jobs = register_fits(args, stage)
                 for host in HOST_SLOTS:
@@ -140,4 +140,6 @@ if __name__ == '__main__':
     for key in ('study', 'output', 'binaries', 'qualification', 'human-qualification', 'outer-status'):
         p.add_argument('--' + key, type=Path, required=True)
     p.add_argument('--outer', type=int, choices=range(3), required=True)
+    p.add_argument("--worker-host", action="append", dest="worker_hosts", choices=tuple(HOST_SLOTS))
+    p.add_argument("--stage", action="append", dest="stages", choices=STAGES)
     watch(p.parse_args())

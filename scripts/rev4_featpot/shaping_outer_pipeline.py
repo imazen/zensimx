@@ -14,6 +14,15 @@ from shaping_completion import REPO, encoded, sha
 HOST_SLOTS = dict(r7900x=20, i270=20, i134=14, r3800x=14, r5600g=11, r3500=5)
 
 
+def worker_slots(args):
+    requested = getattr(args, "worker_hosts", None)
+    if requested is None:
+        return dict(HOST_SLOTS)
+    if not requested or len(set(requested)) != len(requested) or not set(requested) <= set(HOST_SLOTS):
+        raise ValueError("explicit distinct known worker hosts required")
+    return {host: HOST_SLOTS[host] for host in requested}
+
+
 def placements(cells, outer, loads=None):
     # Rotate ties by fold, then fill proportionally to approved CPU capacity.
     names = [host for host in HOST_SLOTS if loads is None or host in loads]
@@ -61,7 +70,7 @@ def register_fits(args):
     selected += controls
     jobs = []
     from shaping_placement import loads
-    live_loads, observation = loads(args.study, HOST_SLOTS)
+    live_loads, observation = loads(args.study, worker_slots(args))
     wave = args.output / 'neural-fits'
     if wave.exists():
         raise ValueError('preserve existing outer registration')
@@ -199,4 +208,5 @@ if __name__ == '__main__':
         p.add_argument('--' + key, type=Path, required=True)
     p.add_argument('--outer', type=int, choices=range(3), required=True)
     p.add_argument('--prepare-host', choices=tuple(HOST_SLOTS), required=True)
+    p.add_argument("--worker-host", action="append", dest="worker_hosts", choices=tuple(HOST_SLOTS))
     watch(p.parse_args())

@@ -6075,3 +6075,7 @@ codec-stable-simd-check manifest config:
     cargo test --manifest-path {{quote(manifest)}} --config {{quote(config)}} -p zensim --release --features training --test v1_golden_bytes
     cargo test --manifest-path {{quote(manifest)}} --config {{quote(config)}} -p zensim --release --lib serving::tests::every_shipped_profile_scores_its_pinned_value -- --exact
     cargo check --manifest-path {{quote(manifest)}} --config {{quote(config)}} -p zensim --release --lib
+
+# Finite metadata recovery; canonical owners verify and collect existing fits.
+shaping-resume-collect study jobs output:
+    python3 scripts/rev4_featpot/shaping_resume_collect.py --study "{{study}}" --jobs "{{jobs}}" --output "{{output}}"

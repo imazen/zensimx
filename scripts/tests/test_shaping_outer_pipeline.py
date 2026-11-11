@@ -10,6 +10,16 @@ import shaping_outer_pipeline as owner
 
 
 class PipelineTests(unittest.TestCase):
+    def test_explicit_pool_excludes_withdrawn_hosts_before_observation(self):
+        args = SimpleNamespace(worker_hosts=["i134", "r3500", "r3800x", "r5600g"])
+        slots = owner.worker_slots(args)
+        self.assertEqual(set(slots), set(args.worker_hosts))
+        self.assertNotIn("r7900x", slots)
+        self.assertNotIn("i270", slots)
+        for invalid in ([], ["i134", "i134"], ["unknown"]):
+            with self.assertRaisesRegex(ValueError, "distinct known"):
+                owner.worker_slots(SimpleNamespace(worker_hosts=invalid))
+
     def test_busy_hosts_do_not_receive_new_work_ahead_of_empty_hosts(self):
         cells = [dict(id=str(i), seed=i % 3, family='relu') for i in range(12)]
         loads = dict(owner.HOST_SLOTS)
