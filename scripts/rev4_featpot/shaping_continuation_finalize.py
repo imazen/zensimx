@@ -10,6 +10,36 @@ import socket
 import sys
 
 
+def publish(root, phase, initial, phase_initial, proof_path, native, final_pin):
+    from shaping_completion import encoded, sha
+    finished = datetime.fromtimestamp((native / "RESULT.json").stat().st_mtime, timezone.utc).isoformat()
+    phase_result = dict(phase_initial, stage="trained", exit_code=0, finished_utc=finished,
+                        bake_sha256=final_pin, continuation_sha256=sha(proof_path))
+    controller = dict(initial, stage="trained", exit_code=0, finished_utc=finished,
+                      bake_sha256=final_pin, phases=[phase_result], continuation_sha256=sha(proof_path))
+    records = ((phase / "RESULT.json", phase_result, phase_initial),
+               (root / "RESULT.json", controller, initial))
+    for path, value, original in records:
+        if not path.exists():
+            continue
+        old = json.loads(path.read_text())
+        if old == value:
+            continue
+        if (old.get("stage") != "failed" or old.get("exit_code") == 0
+                or any(old.get(k) != v for k, v in original.items() if k != "stage")):
+            raise ValueError("preserve conflicting phase/controller result")
+    for path, value, original in records:
+        if path.exists():
+            if json.loads(path.read_text()) == value:
+                continue
+            retained = path.with_name("RESULT.interrupted.json")
+            if retained.exists():
+                raise ValueError("preserve existing interrupted result receipt")
+            path.rename(retained)
+        with path.open("xb") as stream:
+            stream.write(encoded(value))
+
+
 def finalize(study, capture, native):
     from shaping_completion import encoded, sha
     from shaping_state_probe import read_state
@@ -43,6 +73,31 @@ def finalize(study, capture, native):
             or done["build_sha256"] != phase_initial["build_sha256"]
             or initial["execution_host"] != done["source_host"]):
         raise ValueError("preserve original run/phase provenance")
+    proof_path = root / "CONTINUATION.json"
+    if proof_path.exists():
+        proof = json.loads(proof_path.read_text())
+        if (proof["original_run_sha256"] != sha(root / "RUN.json")
+                or proof["original_phase_sha256"] != sha(phase / "RUN.json")
+                or proof["snapshot_sha256"] != done["snapshot_sha256"]
+                or proof["completed_epochs_replayed"] != 0):
+            raise ValueError("partial continuation publication identity differs")
+        for name, digest in proof["checkpoint_sha256"].items():
+            if sha(phase / "checkpoints" / name) != digest:
+                raise ValueError("preserve changed finalized checkpoint")
+        for name, digest in proof["evidence_sha256"].items():
+            if sha(root / name) != digest:
+                raise ValueError("preserve changed continuation evidence")
+        publish(root,phase,initial,phase_initial,proof_path,native,
+                proof["checkpoint_sha256"][f"ckpt_epoch{initial['epochs']-1:03}.bin"])
+        return dict(cell=cid,completed_epochs_replayed=0,publication_reconciled=True,
+                    continuation_sha256=sha(proof_path),epochs=initial["epochs"])
+    for directory, original_identity in ((root, initial), (phase, phase_initial)):
+        path = directory / "RESULT.json"
+        if path.exists():
+            old = json.loads(path.read_text())
+            if (old.get("stage") != "failed" or old.get("exit_code") == 0
+                    or any(old.get(k) != v for k,v in original_identity.items() if k != "stage")):
+                raise ValueError("preserve conflicting interrupted result")
     command = list(cap["native"]["command"])
     if command != phase_initial["command"][phase_initial["command"].index("--") + 1:]:
         raise ValueError("captured native command differs")
@@ -185,15 +240,7 @@ def finalize(study, capture, native):
         retain(source, dest)
     with proof_path.open("xb") as stream:
         stream.write(encoded(proof))
-    finished = datetime.fromtimestamp((native / "RESULT.json").stat().st_mtime, timezone.utc).isoformat()
-    phase_result = dict(phase_initial, stage="trained", exit_code=0, finished_utc=finished,
-                        bake_sha256=final_pins[epochs - 1]["sha256"], continuation_sha256=sha(proof_path))
-    controller = dict(initial, stage="trained", exit_code=0, finished_utc=finished,
-                      bake_sha256=phase_result["bake_sha256"], phases=[phase_result],
-                      continuation_sha256=sha(proof_path))
-    for path, value in ((phase / "RESULT.json", phase_result), (root / "RESULT.json", controller)):
-        with path.open("xb") as stream:
-            stream.write(encoded(value))
+    publish(root,phase,initial,phase_initial,proof_path,native,final_pins[epochs-1]["sha256"])
     return dict(cell=cid, initial_execution_host=initial["execution_host"],
                 resumed_execution_host=done["execution_host"], completed_epochs_replayed=0,
                 continuation_sha256=sha(proof_path), epochs=epochs)
