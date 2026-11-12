@@ -144,3 +144,5 @@ A fresh finishing owner reuses semantically complete analysis receipts before la
 A relocated variant metadata owner resolves legacy control assignments through their sole preserved request matching cell, host, plan and build. It does not register or retrain the control; ambiguous matches remain errors.
 
 Repeated external interruptions retain every raw log and verified checkpoint prefix, and capture the latest committed state. Recovery records explicitly identify an assembled prefix and its predecessor evidence. A recovered pretraining phase is finalized independently and cannot mark its controller complete; only its original, still-unstarted registered fit follows through the unchanged phase builder.
+
+During an approved compute loan, shaping_awake_until_closed.py can run under systemd-inhibit for idle and sleep until the finishing readiness receipt appears. It does not block a manual shutdown. Recovered two-phase controllers reserve both snapshot phases, including the preserved pretraining store.

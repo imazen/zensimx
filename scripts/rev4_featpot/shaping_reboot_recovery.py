@@ -198,7 +198,7 @@ def finish_pretrained_controller(study,request):
         record["groups"],record["explicit_absent_fit_groups"],memory_cap=cap)
     from shaping_rescue_worker import memory_allowance
     memory=memory_allowance(job)
-    while not reserve_worker(study,cid,memory_allowance_bytes=memory,snapshot_phases=1)["can_start"]:
+    while not reserve_worker(study,cid,memory_allowance_bytes=memory,snapshot_phases=2)["can_start"]:
         time.sleep(10)
     try:
         bind_worker(study,cid,os.getpid())
