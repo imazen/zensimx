@@ -285,6 +285,35 @@ def publish(study,request_path,bundle,pin,staging):
     target.write_bytes(encoded(receipt));return receipt
 
 
+def publish_local(study,request_path,bundle,pin,staging):
+    """Seal a same-host evaluation without overwriting its original files."""
+    from shaping_worker_collect import unpack,inventory
+    record=json.loads(request_path.read_text())
+    if record["host"]!=socket.gethostname():
+        raise ValueError("same-host evaluation adoption required")
+    marker=study/"runs"/record["cell"]["id"]/record["attempt"]/"EVALUATION_WORKER_IMPORT.json"
+    if marker.exists():raise ValueError("preserve existing local evaluation receipt")
+    manifest=unpack(bundle,staging,pin)
+    if manifest["request_sha256"]!=sha(request_path) or manifest["host"]!=record["host"]:
+        raise ValueError("local evaluation request differs")
+    for name,expected in record["source_sha256"].items():
+        if sha(study/name)!=expected:raise ValueError("coordinator fit changed during evaluation")
+    allowed=components(record["cell"]["id"],record["attempt"])
+    if any(not any(Path(name)==prefix or prefix in Path(name).parents for prefix in allowed) for name in manifest["files"]):
+        raise ValueError("unexpected local evaluation component")
+    require_terminal(record,manifest["files"])
+    actual={}
+    for relative in allowed:
+        path=study/relative
+        if path.is_file():actual[str(relative)]=dict(bytes=path.stat().st_size,sha256=sha(path))
+        elif path.is_dir():actual.update({str(relative/name):row for name,row in inventory(path).items()})
+    if actual!=manifest["files"]:raise ValueError("preserve changed local evaluation evidence")
+    receipt=dict(request_sha256=sha(request_path),bundle_sha256=pin,source_host=record["host"],
+        files=manifest["files"],local_evaluation=True,imported_utc=datetime.now(timezone.utc).isoformat())
+    marker.write_bytes(encoded(receipt))
+    return receipt
+
+
 def watch(args):
     placements={}
     if getattr(args,'placement_file',None):
@@ -356,7 +385,8 @@ def watch(args):
                 with reservation(args.study,bundle,minimum):
                     subprocess.run(['scp',host+':'+str(remote_bundle),host+':'+str(remote_bundle)+'.json',str(directory)+'/'],check=True)
                     sidecar=json.loads((directory/(remote_bundle.name+'.json')).read_text())
-                    publish(args.study,request_path,bundle,sidecar['bundle_sha256'],directory/'verified')
+                    owner=publish_local if host==socket.gethostname() else publish
+                    owner(args.study,request_path,bundle,sidecar['bundle_sha256'],directory/'verified')
                 imported.append(record['cell']['id'])
             status=dict(pid=os.getpid(),checked_utc=datetime.now(timezone.utc).isoformat(),stage='watching',
                         imported_this_sweep=imported,waiting=pending,requires_reconciliation=blocked,

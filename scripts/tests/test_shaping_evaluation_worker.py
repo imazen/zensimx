@@ -245,6 +245,15 @@ class WorkerEvaluationTests(unittest.TestCase):
             args=SimpleNamespace(study=study,request=request_path,bundle=root/'evaluation.tar',binary_dir=root/'bin')
             with patch('shaping_evaluation_worker.verify_request'),patch('shaping_evaluation_worker.capacity',return_value=True),patch('shaping_supervision.sweep',side_effect=evaluate),patch('shaping_evaluation_worker.socket.gethostname',return_value='r5600g'):
                 result=_work(args)
+            from shaping_evaluation_worker import publish_local
+            with patch('shaping_evaluation_worker.socket.gethostname',return_value='r5600g'):
+                (run/'evaluation/REPORT.json').write_text('changed')
+                with self.assertRaisesRegex(ValueError,'changed local'):
+                    publish_local(study,request_path,args.bundle,result['bundle_sha256'],root/'local-rejected')
+                (run/'evaluation/REPORT.json').write_text('report')
+                local=publish_local(study,request_path,args.bundle,result['bundle_sha256'],root/'local-verified')
+            self.assertTrue(local['local_evaluation'])
+            self.assertEqual((run/'evaluation/REPORT.json').read_text(),'report')
             other=root/'coordinator';other.mkdir()
             import shutil
             for name in record['source_sha256']:

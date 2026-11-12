@@ -134,3 +134,5 @@ The controller checks metadata once per minute and retires its metadata watchers
 shaping_reboot_recovery.py captures a same-host unfinished native phase only when the current boot is later than its frozen snapshot binding. It requires the original build, manifest pins, complete checkpoint prefix, committed epoch-boundary optimizer state and a closed snapshot store. The original attempt and both saved states are preserved under a bounded capture. The existing native continuation and scientific finalizer then complete the remaining exposure; the original request is marked trained only after finalization.
 
 Variant metadata owners reopen their ownership lock when explicitly resumed; they retain existing registrations and launch receipts.
+
+Same-host evaluation uses publish_local to compare its completed component tree byte for byte against the verified export bundle before writing an import receipt. The ordinary remote publication path continues to reject existing destinations, and changed local files remain a hard failure.
