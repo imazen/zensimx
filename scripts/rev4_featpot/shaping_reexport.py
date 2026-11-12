@@ -22,6 +22,39 @@ def export_pairs(model):
     return unique_signed_pairs(model)
 
 
+def registered_export_pairs(model,command):
+    """Use the qualified trainer's declared adjacent layout when dead units tie."""
+    try:
+        return export_pairs(model)
+    except ValueError as error:
+        if str(error)!="ambiguous or unsupported signed pair":raise
+    import numpy as np
+    required=("--nonneg-distance","--monotone-cbc","--nonneg-thresholds")
+    def argument(flag):
+        if command.count(flag)!=1:raise ValueError("one registered layout argument required")
+        return command[command.index(flag)+1]
+    if any(command.count(f)!=1 for f in required) or argument("--n-hidden-layers")!="2":
+        raise ValueError("registered shared monotone layout required")
+    first,following=model["layers"][:2]
+    n=int(argument("--max-pairs"))
+    if not 0<n<=first["out_dim"]//2 or int(argument("--hidden"))!=first["out_dim"]:
+        raise ValueError("registered adjacent-pair dimensions differ")
+    w=np.array(first["weights"],np.float64).reshape(first["in_dim"],first["out_dim"])
+    b=np.array(first["biases"])
+    middle=np.array(following["weights"],np.float32).reshape(following["in_dim"],following["out_dim"])
+    signed=set(map(int,np.flatnonzero(np.any(w<0,axis=0))));pairs=[]
+    for i in range(n):
+        u,v=2*i,2*i+1
+        if v not in signed:continue
+        if (u in signed or b[u]!=0 or b[v]>0
+            or not np.array_equal(middle[u].view(np.uint32),middle[v].view(np.uint32))
+            or not np.all(w[:,u]+w[:,v]>=0)):
+            raise ValueError("declared native pair invariants differ")
+        pairs.append([u,v]);signed.remove(v)
+    if signed or not pairs:raise ValueError("signed units outside declared native pairs")
+    return pairs
+
+
 def convert_export(original,bake,declaration,pairs,binary,log):
     if bake.exists() or log.exists():raise ValueError('preserve existing export conversion')
     if not pairs:
@@ -77,7 +110,8 @@ def reexport(args):
     inspection=subprocess.run([str(args.inspector),str(original),'--weights'],check=True,capture_output=True,text=True)
     model=dest/'original-inspection.json';model.write_text(inspection.stdout)
     (dest/'inspection.log').write_text(inspection.stderr)
-    pairs=export_pairs(json.loads(inspection.stdout))
+    phase_identity=json.loads((args.run/run.get('fit_directory','.')/'RUN.json').read_text())
+    pairs=registered_export_pairs(json.loads(inspection.stdout),phase_identity['command'])
     declaration=dest/'pairs.txt'
     declaration.write_text('relu-max-pairs-v1\n'+''.join(f'{a} {b}\n' for a,b in pairs))
     bake=dest/'repaired.bin'

@@ -136,3 +136,5 @@ shaping_reboot_recovery.py captures a same-host unfinished native phase only whe
 Variant metadata owners reopen their ownership lock when explicitly resumed; they retain existing registrations and launch receipts.
 
 Same-host evaluation uses publish_local to compare its completed component tree byte for byte against the verified export bundle before writing an import receipt. The ordinary remote publication path continues to reject existing destinations, and changed local files remain a hard failure.
+
+A shared head can contain multiple dead units with identical zero outgoing rows. When generic pair inference is ambiguous, registered_export_pairs verifies the frozen two-layer trainer command's adjacent (2i, 2i+1) layout and every sign, bias, tied-row and coverage invariant. The native max-pair converter remains the final admission gate. Generic inference and its ambiguity refusal are unchanged.

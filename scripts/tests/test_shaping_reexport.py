@@ -55,3 +55,16 @@ class ReexportAdmissionTests(unittest.TestCase):
         context['admission']['evaluation_representations']['softplus']['representation']='research-relu-max-pairs-v1'
         admit_representation('softplus',context)
         with self.assertRaises(ValueError):admit_representation('silu_monotone',context,True)
+
+
+class RegisteredPairLayoutTests(unittest.TestCase):
+    def test_declared_adjacent_layout_resolves_dead_ties_without_relaxing_generic_proposal(self):
+        from shaping_reexport import export_pairs,registered_export_pairs
+        model=dict(layers=[dict(in_dim=1,out_dim=4,activation='relu',weights=[2.,-1.,2.,-1.],biases=[0.,-1.,0.,-1.]),
+                           dict(in_dim=4,out_dim=1,weights=[0.,0.,0.,0.])])
+        command=['trainer','--hidden','4','--n-hidden-layers','2','--max-pairs','2',
+                 '--nonneg-distance','--monotone-cbc','--nonneg-thresholds']
+        with self.assertRaisesRegex(ValueError,'ambiguous'):export_pairs(model)
+        self.assertEqual(registered_export_pairs(model,command),[[0,1],[2,3]])
+        model['layers'][1]['weights'][1]=1.
+        with self.assertRaisesRegex(ValueError,'invariants'):registered_export_pairs(model,command)
