@@ -64,6 +64,9 @@ def run(args):
             # final-only in-place evaluation; it never opens a tuning surface.
             for name,job in config["jobs"].items():
                 prior=state["jobs"].get(name)
+                if prior is None and job_complete(job):
+                    state["jobs"][name]=dict(stage="complete",reused_terminal_receipt=True)
+                    continue
                 if prior and prior["stage"] in ("complete","failed","submission_unresolved"):
                     continue
                 if name in children:

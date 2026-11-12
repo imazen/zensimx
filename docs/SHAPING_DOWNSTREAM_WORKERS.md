@@ -138,3 +138,5 @@ Variant metadata owners reopen their ownership lock when explicitly resumed; the
 Same-host evaluation uses publish_local to compare its completed component tree byte for byte against the verified export bundle before writing an import receipt. The ordinary remote publication path continues to reject existing destinations, and changed local files remain a hard failure.
 
 A shared head can contain multiple dead units with identical zero outgoing rows. Native output compaction can reorder the original adjacent units. When generic inference is ambiguous, registered_export_pairs reuses the augmenting matching construction from the owned native warm-start implementation to prove a complete disjoint pairing under the unchanged sign, bias, tied-row and slope constraints. The frozen command binds the allowed pair count and shared monotone head. The native max-pair converter remains the final admission gate. Generic inference and its ambiguity refusal are unchanged.
+
+A fresh finishing owner reuses semantically complete analysis receipts before launching any child. Restarting metadata supervision therefore does not repeat completed final evaluations or analyses.
