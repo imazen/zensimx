@@ -10,15 +10,15 @@ import socket
 import sys
 
 
-def publish(root, phase, initial, phase_initial, proof_path, native, final_pin):
+def publish(root, phase, initial, phase_initial, proof_path, native, final_pin, phase_only=False):
     from shaping_completion import encoded, sha
     finished = datetime.fromtimestamp((native / "RESULT.json").stat().st_mtime, timezone.utc).isoformat()
     phase_result = dict(phase_initial, stage="trained", exit_code=0, finished_utc=finished,
                         bake_sha256=final_pin, continuation_sha256=sha(proof_path))
     controller = dict(initial, stage="trained", exit_code=0, finished_utc=finished,
                       bake_sha256=final_pin, phases=[phase_result], continuation_sha256=sha(proof_path))
-    records = ((phase / "RESULT.json", phase_result, phase_initial),
-               (root / "RESULT.json", controller, initial))
+    records = ((phase / "RESULT.json", phase_result, phase_initial),)
+    if not phase_only:records += ((root / "RESULT.json", controller, initial),)
     for path, value, original in records:
         if not path.exists():
             continue
@@ -61,19 +61,27 @@ def finalize(study, capture, native):
             or state["pair"] != 0 or done["source_pair"] != 0):
         raise ValueError("epoch-boundary exact-state source differs")
     root = study / "runs" / cid / "attempt-001"
-    phase = root / "fit"
+    phase_name=cap.get("recovery_phase","fit")
+    if phase_name not in ("fit","pretraining"):raise ValueError("registered recovery phase required")
+    phase_only=phase_name=="pretraining"
+    phase = root / phase_name
     original = capture.parent / "original-attempt"
     initial = json.loads((root / "RUN.json").read_text())
+    if phase_only:
+        schedule=initial.get("schedule",initial.get("resolution",{}).get("schedule",{}))
+        if schedule.get("phase_epochs")!=[120,120] or (root/"fit").exists():
+            raise ValueError("registered unfinished two-phase controller required")
     phase_initial = json.loads((phase / "RUN.json").read_text())
     if (sha(root / "RUN.json") != sha(original / "RUN.json")
-            or sha(phase / "RUN.json") != sha(original / "fit/RUN.json")
+            or sha(phase / "RUN.json") != sha(original / phase_name / "RUN.json")
             or phase_initial["parent_run_sha256"] != sha(root / "RUN.json")
             or initial["cell"] != cell or phase_initial["cell"] != cell
             or done["build_sha256"] != initial["build_sha256"]
             or done["build_sha256"] != phase_initial["build_sha256"]
             or initial["execution_host"] != done["source_host"]):
         raise ValueError("preserve original run/phase provenance")
-    proof_path = root / "CONTINUATION.json"
+    evidence_root=phase if phase_only else root
+    proof_path = evidence_root / "CONTINUATION.json"
     if proof_path.exists():
         proof = json.loads(proof_path.read_text())
         if (proof["original_run_sha256"] != sha(root / "RUN.json")
@@ -88,7 +96,7 @@ def finalize(study, capture, native):
             if sha(root / name) != digest:
                 raise ValueError("preserve changed continuation evidence")
         publish(root,phase,initial,phase_initial,proof_path,native,
-                proof["checkpoint_sha256"][f"ckpt_epoch{initial['epochs']-1:03}.bin"])
+                proof["checkpoint_sha256"][f"ckpt_epoch{phase_initial['epochs']-1:03}.bin"],phase_only)
         return dict(cell=cid,completed_epochs_replayed=proof["completed_epochs_replayed"],publication_reconciled=True,
                     continuation_sha256=sha(proof_path),epochs=initial["epochs"])
     for directory, original_identity in ((root, initial), (phase, phase_initial)):
@@ -108,8 +116,8 @@ def finalize(study, capture, native):
     for name, digest in phase_initial["manifest_sha256"].items():
         if sha(name) != digest:
             raise ValueError("continuation optimizer/head/shaping manifest drift")
-    epochs = initial["epochs"]
-    if epochs not in (120, 240, 480) or (root / "pretraining").exists():
+    epochs = phase_initial["epochs"]
+    if epochs not in (120, 240, 480) or ((root / "pretraining").exists() and not phase_only):
         raise ValueError("one registered native continuation phase required")
     expected = set(range(epochs))
     receipts = {}
@@ -139,7 +147,7 @@ def finalize(study, capture, native):
                     raise ValueError("conflicting epoch diagnostics")
                 rows[e] = line
         return rows
-    old_log = (original / "fit/train.log").read_text()
+    old_log = (original / phase_name / "train.log").read_text()
     new_log = (native / "train.log").read_text()
     old_epochs, new_epochs = epoch_rows(old_log), epoch_rows(new_log)
     prefix_epochs = set(range(state["epoch"]))
@@ -148,7 +156,7 @@ def finalize(study, capture, native):
             or set(new_epochs) != set(range(state["epoch"], epochs))):
         raise ValueError("continuation epoch coverage is incomplete or replayed")
     for e in tail:
-        checkpoint = original / "fit/checkpoints" / f"ckpt_epoch{e:03}.bin"
+        checkpoint = original / phase_name / "checkpoints" / f"ckpt_epoch{e:03}.bin"
         if (sha(checkpoint) != receipts[e]["sha256"]
                 or checkpoint.stat().st_size != receipts[e]["bytes"]):
             raise ValueError("recomputed uncaptured tail checkpoint differs")
@@ -163,7 +171,7 @@ def finalize(study, capture, native):
             raise ValueError("native checkpoint postprocessor binary drift")
     for line in state["checkpoint_receipts"]:
         row = json.loads(line.removeprefix("  checkpoint dump: "))
-        prefix = original / "fit/checkpoints" / f"ckpt_epoch{row['epoch']:03}.bin"
+        prefix = original / phase_name / "checkpoints" / f"ckpt_epoch{row['epoch']:03}.bin"
         if prefix.stat().st_size != row["bytes"] or sha(prefix) != row["sha256"]:
             raise ValueError("original optimizer snapshot checkpoint prefix drift")
     target = phase / "checkpoints"
@@ -183,19 +191,26 @@ def finalize(study, capture, native):
             # Preserve the raw optimizer-snapshot prefix before replacing it.
             if e not in (prefix_epochs | tail) or sha(dest) != row["sha256"]:
                 raise ValueError("preserve conflicting original checkpoint")
-            raw_prefix = root / "continuation-evidence/raw-prefix" / dest.name
+            raw_prefix = evidence_root / "continuation-evidence/raw-prefix" / dest.name
             raw_prefix.parent.mkdir(parents=True, exist_ok=True)
             if raw_prefix.exists():
                 raise ValueError("preserve existing raw-prefix checkpoint")
             dest.rename(raw_prefix)
         if not dest.exists():
+            if postprocessed and e in prefix_epochs:
+                raw_source=original/phase_name/"checkpoints"/source.name
+                if sha(raw_source)!=final_pin:
+                    raw_prefix=evidence_root/"continuation-evidence/raw-prefix"/source.name
+                    raw_prefix.parent.mkdir(parents=True,exist_ok=True)
+                    if raw_prefix.exists():raise ValueError("preserve existing predecessor raw checkpoint")
+                    shutil.copy2(raw_source,raw_prefix)
             with source.open("rb") as src, dest.open("xb") as dst:
                 shutil.copyfileobj(src, dst, 1024 * 1024)
                 dst.flush()
                 os.fsync(dst.fileno())
     if {p.name for p in target.glob("ckpt_epoch*.bin")} != {f"ckpt_epoch{e:03}.bin" for e in expected}:
         raise ValueError("canonical checkpoint coverage differs")
-    evidence = root / "continuation-evidence"
+    evidence = evidence_root / "continuation-evidence"
     evidence.mkdir(exist_ok=True)
     def retain(source, dest):
         dest.parent.mkdir(parents=True, exist_ok=True)
@@ -207,10 +222,11 @@ def finalize(study, capture, native):
                 shutil.copyfileobj(src, dst, 1024 * 1024)
     for source, name in ((capture, "CAPTURE.json"), (native / "RESULT.json", "NATIVE_RESULT.json"),
                          (native / "train.log", "native-train.log"),
-                         (original / "fit/train.log", "original-train.log")):
+                         (original / phase_name / "train.log", "original-train.log")):
         retain(source, evidence / name)
     retain(Path(selected["captured"]), evidence / state["identity"] / "source.snap")
     proof = dict(schema="exact-state-continuation-finalization-v1", cell=cell,
+                 recovery_phase=phase_name,controller_complete=not phase_only,
                  original_run_sha256=sha(root / "RUN.json"), original_phase_sha256=sha(phase / "RUN.json"),
                  initial_execution_host=initial["execution_host"], resumed_execution_host=done["execution_host"],
                  snapshot_sha256=pin, resumed_at_epoch=state["epoch"], completed_epochs_replayed=len(tail),
@@ -221,7 +237,8 @@ def finalize(study, capture, native):
                  evidence_sha256={str(p.relative_to(root)): sha(p) for p in evidence.rglob("*") if p.is_file()},
                  finalized_utc=datetime.now(timezone.utc).isoformat(), driver_sha256=sha(__file__),
                  log_processing="Identical repeated native output lines collapsed; both raw logs retained.")
-    proof_path = root / "CONTINUATION.json"
+    evidence_root=phase if phase_only else root
+    proof_path = evidence_root / "CONTINUATION.json"
     if proof_path.exists():
         raise ValueError("preserve completed or partially published continuation receipt")
     canonical = []
@@ -257,7 +274,7 @@ def finalize(study, capture, native):
         retain(source, dest)
     with proof_path.open("xb") as stream:
         stream.write(encoded(proof))
-    publish(root,phase,initial,phase_initial,proof_path,native,final_pins[epochs-1]["sha256"])
+    publish(root,phase,initial,phase_initial,proof_path,native,final_pins[epochs-1]["sha256"],phase_only)
     return dict(cell=cid, initial_execution_host=initial["execution_host"],
                 resumed_execution_host=done["execution_host"], completed_epochs_replayed=len(tail),
                 continuation_sha256=sha(proof_path), epochs=epochs)

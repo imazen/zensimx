@@ -142,3 +142,5 @@ A shared head can contain multiple dead units with identical zero outgoing rows.
 A fresh finishing owner reuses semantically complete analysis receipts before launching any child. Restarting metadata supervision therefore does not repeat completed final evaluations or analyses.
 
 A relocated variant metadata owner resolves legacy control assignments through their sole preserved request matching cell, host, plan and build. It does not register or retrain the control; ambiguous matches remain errors.
+
+Repeated external interruptions retain every raw log and verified checkpoint prefix, and capture the latest committed state. Recovery records explicitly identify an assembled prefix and its predecessor evidence. A recovered pretraining phase is finalized independently and cannot mark its controller complete; only its original, still-unstarted registered fit follows through the unchanged phase builder.

@@ -105,3 +105,27 @@ class ContinuationFinalizationTests(unittest.TestCase):
             self.assertEqual(proof["committed_snapshot_epochs_replayed"],0)
             self.assertEqual(proof["recomputed_uncaptured_tail_epochs"],[60])
             self.assertEqual(sum(" | loss=" in line for line in (root/"fit/train.log").read_text().splitlines()),120)
+
+
+class PretrainingPhaseFinalizationTests(unittest.TestCase):
+    fixture=ContinuationFinalizationTests.fixture
+    def test_pretraining_finalization_never_completes_controller(self):
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as temp:
+            study,root,capture,native=self.fixture(Path(temp))
+            for base in (root,capture.parent/'original-attempt'):
+                (base/'fit').rename(base/'pretraining')
+                initial=json.loads((base/'RUN.json').read_text())
+                initial['resolution']=dict(schedule=dict(phase_epochs=[120,120]))
+                (base/'RUN.json').write_bytes(encoded(initial))
+                phase=base/'pretraining';p=json.loads((phase/'RUN.json').read_text())
+                p['parent_run_sha256']=sha(base/'RUN.json');(phase/'RUN.json').write_bytes(encoded(p))
+            cap=json.loads(capture.read_text());cap['recovery_phase']='pretraining';capture.write_bytes(encoded(cap))
+            done=json.loads((native/'RESULT.json').read_text());done['source_capture_sha256']=sha(capture)
+            (native/'RESULT.json').write_bytes(encoded(done))
+            with patch('shaping_continuation_finalize.socket.gethostname',return_value='i134'):
+                finalize(study,capture,native)
+            self.assertTrue((root/'pretraining/RESULT.json').exists())
+            self.assertFalse((root/'RESULT.json').exists())
+            self.assertFalse((root/'fit').exists())
+            proof=json.loads((root/'pretraining/CONTINUATION.json').read_text())
+            self.assertFalse(proof['controller_complete'])

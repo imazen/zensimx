@@ -16,7 +16,7 @@ def resume(capture,output,study):
     selected=Path(row['selected']['captured']);_,state,pin,_=read_state(selected)
     if pin!=row['selected']['sha256'] or state['epoch']!=row['selected']['epoch']:
         raise ValueError('preserved optimizer state differs')
-    phase_record=json.loads((staged/'fit/RUN.json').read_text())
+    phase_record=json.loads((staged/row.get('recovery_phase','fit')/'RUN.json').read_text())
     build=Path(command[0]).parent/'BUILD.json'
     if sha(build)!=phase_record['build_sha256']:raise ValueError('original native build differs')
     for name,digest in json.loads(build.read_text())['binary_sha256'].items():
