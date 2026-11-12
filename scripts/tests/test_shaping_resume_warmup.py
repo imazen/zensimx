@@ -20,5 +20,6 @@ class ResumeWarmupTests(unittest.TestCase):
                 before=owner.reserve_worker(study,"before")
                 point.write_bytes(b"completed native checkpoint")
                 after=owner.reserve_worker(study,"after")
+                owner.reserve_worker(study,"resumed",warmup_until_checkpoint=True,warmup_checkpoint=point)
             self.assertEqual(before["minimum_available_memory_bytes"],8*1024**3)
             self.assertEqual(after["minimum_available_memory_bytes"],6*1024**3)

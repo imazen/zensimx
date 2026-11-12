@@ -148,3 +148,5 @@ Repeated external interruptions retain every raw log and verified checkpoint pre
 During an approved compute loan, shaping_awake_until_closed.py can run under systemd-inhibit for idle and sleep until the finishing readiness receipt appears. It does not block a manual shutdown. Recovered two-phase controllers reserve both snapshot phases, including the preserved pretraining store.
 
 A continuation binds its warmup reservation to its first newly computed checkpoint, rather than to a canonical primary-run path. Existing checkpoint prefixes cannot release the allowance early, and a completed new checkpoint releases it without waiting for scientific collection. CPU and memory ceilings are unchanged.
+
+Native observation may identify a pretraining phase as its run directory. Continuation resolves the controller from the separately bound phase parent and verifies both identities; it does not compare the phase RUN against the controller RUN.

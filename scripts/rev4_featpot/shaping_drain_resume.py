@@ -9,7 +9,9 @@ def resume(capture,output,study):
     row=json.loads(capture.read_text());native=row['native'];cid=native['cell']['id']
     if socket.gethostname() not in ('r3500','r3800x','r5600g','i134') or output.exists():
         raise ValueError('eligible worker and fresh continuation output required')
-    command=list(native['command']);phase=Path(row['phase']);original=Path(native['run'])
+    command=list(native['command']);phase=Path(row['phase']);original=phase.parent
+    if phase.name not in ('fit','pretraining') or Path(native['run']) not in (original,phase):
+        raise ValueError('bound native phase and controller root required')
     staged=capture.parent/'original-attempt'
     if not staged.is_dir() or not row['exact_state_checksum_verified']:
         raise ValueError('complete preserved original attempt required')
