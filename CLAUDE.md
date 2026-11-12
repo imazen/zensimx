@@ -1596,3 +1596,9 @@ model inputs and frozen standalone study manifests are unchanged.
 ## Known Bugs — repeated pretraining parent guard (November 12, 2026)
 
 The outer and variant admission paths already verified inactive joint parents through frozen base-decision evidence, but their execution paths repeated the obsolete direct-RUN-pin check. Six admitted conditions failed before creating a native phase. Execution now uses the same require_parent proof as admission. Preserve the six zero-step failures, all original requests and native inputs when preparing successor requests. No training budget or scientific admission changes.
+
+## Known Bugs — continuation metadata (resolved November 12, 2026)
+
+A pretraining observation can name the phase directory as its run. Continuation now resolves its controller through the separately bound phase parent and preserves both identities. Explicit pretraining finalization publishes only the phase; the original unstarted fit completes the controller afterward.
+
+Continuation warmup originally searched a primary-run checkpoint path. It now binds the allowance to the first newly computed continuation checkpoint, retaining the allowance through loading and releasing it after actual progress. Existing memory caps and aggregate CPU limits are unchanged.
