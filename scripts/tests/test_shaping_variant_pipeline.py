@@ -52,6 +52,26 @@ class VariantPipelineTests(unittest.TestCase):
                     owner.watch(args)
                 register.assert_not_called()
 
+    def test_relocated_owner_reuses_legacy_control_request_without_registration(self):
+        import json
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as scratch:
+            root=Path(scratch);output=root/'dispatch/new';output.mkdir(parents=True)
+            study=root/'study';assignment=study/'downstream_assignments/variant-aaaaaaaaaaaaaaaaaaaa-i134.json'
+            assignment.parent.mkdir(parents=True)
+            cell=dict(id='aaaaaaaaaaaaaaaaaaaa',family='extra_trees',stage='human_only')
+            a=dict(host='i134',cells=[cell['id']],plan_sha256='plan',build_sha256='build')
+            assignment.write_text(json.dumps(a))
+            request=root/'dispatch/original/human_only/jobs'/cell['id']/'REQUEST.json'
+            request.parent.mkdir(parents=True)
+            request.write_text(json.dumps(dict(cell=cell,host='i134',plan_sha256='plan',build_sha256='build',source_root='frozen-source')))
+            admission=root/'admission';admission.write_text('sealed')
+            args=SimpleNamespace(study=study,output=output,outer=0,resume=True,worker_hosts=['i134'])
+            with patch.object(owner,'selected',return_value=([cell],admission)), patch('shaping_placement.loads',return_value=({'i134':0},{})), patch('shaping_control_worker.register') as register:
+                wave,jobs=owner.register_fits(args,'human_only')
+            register.assert_not_called()
+            self.assertEqual(jobs[0]['request'],str(request))
+            self.assertFalse((wave/'jobs').exists())
+
 
 if __name__ == '__main__':
     unittest.main()

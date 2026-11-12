@@ -59,6 +59,18 @@ def register_fits(args, stage):
         assignment = candidates[0]
         a = json.loads(assignment.read_text())
         request = Path(a["worker_request_path"]) if "worker_request_path" in a else wave / "jobs" / cell["id"] / "REQUEST.json"
+        if not request.exists() and "worker_request_path" not in a:
+            # Older control assignments pin cell/host/build without storing
+            # their request path. Recover the sole matching registered request
+            # when a metadata owner moves to a new output directory.
+            candidates=[]
+            for prior in args.output.parent.glob("**/jobs/"+cell["id"]+"/REQUEST.json"):
+                value=json.loads(prior.read_text())
+                if (value.get("cell")==cell and value.get("host")==a["host"]
+                    and all(value.get(k)==a[k] for k in ("plan_sha256","build_sha256"))):
+                    candidates.append(prior)
+            if len(candidates)!=1:raise ValueError("one preserved control request required")
+            request=candidates[0]
         q = json.loads(request.read_text())
         if (q["cell"] != cell or a["host"] != q["host"] or a["host"] not in worker_slots(args)
                 or a["cells"] != [cell["id"]]
