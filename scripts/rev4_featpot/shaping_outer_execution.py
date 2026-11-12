@@ -135,8 +135,8 @@ def execute(args):
             choice=schedule['optimizer_choice']
             if '_pretrained_' in cell['family']:
                 parent,parent_run=context['templates'][1]
-                if admission['decision_sha256'].get(str(parent/'RUN.json'))!=sha(parent/'RUN.json'):
-                    raise ValueError('outer pretraining template is not pinned by admission')
+                from shaping_template_provenance import require_parent
+                require_parent(args.study,admission,parent)
                 epochs=schedule['phase_epochs'][0]
                 phases.append(phase(args.study,args.binary_dir,parent,parent_run,dest/'pretraining',epochs,choice,groups,shaping,
                     optimizer=optimizer(choice,False,groups),command_builder=builder))

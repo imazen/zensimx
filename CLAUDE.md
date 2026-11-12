@@ -1592,3 +1592,7 @@ The upper bound now admits stable 0.9.31. Numeric expectations, kernels,
 model inputs and frozen standalone study manifests are unchanged.
 
 - Resolved restart orchestration defects (2026-11-11): matched fresh controls captured unrelated fold closures; inactive joint parents needed explicit validation through their already pinned base evidence; coordinator-local terminal fits need in-place collection rather than a transport rename onto their existing directory. Native training inputs and budgets are unchanged.
+
+## Known Bugs — repeated pretraining parent guard (November 12, 2026)
+
+The outer and variant admission paths already verified inactive joint parents through frozen base-decision evidence, but their execution paths repeated the obsolete direct-RUN-pin check. Six admitted conditions failed before creating a native phase. Execution now uses the same require_parent proof as admission. Preserve the six zero-step failures, all original requests and native inputs when preparing successor requests. No training budget or scientific admission changes.
