@@ -23,7 +23,7 @@ def export_pairs(model):
 
 
 def registered_export_pairs(model,command):
-    """Use the qualified trainer's declared adjacent layout when dead units tie."""
+    """Recover a disjoint native pair proof for a registered, compacted head."""
     try:
         return export_pairs(model)
     except ValueError as error:
@@ -35,23 +35,36 @@ def registered_export_pairs(model,command):
         return command[command.index(flag)+1]
     if any(command.count(f)!=1 for f in required) or argument("--n-hidden-layers")!="2":
         raise ValueError("registered shared monotone layout required")
-    first,following=model["layers"][:2]
-    n=int(argument("--max-pairs"))
+    first,following=model["layers"][:2];n=int(argument("--max-pairs"))
     if not 0<n<=first["out_dim"]//2 or int(argument("--hidden"))!=first["out_dim"]:
-        raise ValueError("registered adjacent-pair dimensions differ")
+        raise ValueError("registered pair dimensions differ")
     w=np.array(first["weights"],np.float64).reshape(first["in_dim"],first["out_dim"])
     b=np.array(first["biases"])
     middle=np.array(following["weights"],np.float32).reshape(following["in_dim"],following["out_dim"])
-    signed=set(map(int,np.flatnonzero(np.any(w<0,axis=0))));pairs=[]
-    for i in range(n):
-        u,v=2*i,2*i+1
-        if v not in signed:continue
-        if (u in signed or b[u]!=0 or b[v]>0
-            or not np.array_equal(middle[u].view(np.uint32),middle[v].view(np.uint32))
-            or not np.all(w[:,u]+w[:,v]>=0)):
-            raise ValueError("declared native pair invariants differ")
-        pairs.append([u,v]);signed.remove(v)
-    if signed or not pairs:raise ValueError("signed units outside declared native pairs")
+    signed=set(map(int,np.flatnonzero(np.any(w<0,axis=0))))
+    if len(signed)>n:raise ValueError("signed units exceed declared native pairs")
+    # Native output compaction can reorder hidden units. Reuse the augmenting
+    # matching construction from mlp_train/warm_start.rs, with complete middle
+    # rows in place of scalar output coefficients. Every edge proves the same
+    # sign, bias, slope and bit-identical tied-row invariants as the native gate.
+    edges={}
+    for v in sorted(signed):
+        edges[v]=[u for u in range(first["out_dim"]) if u not in signed and b[u]==0 and b[v]<=0
+            and np.array_equal(middle[u].view(np.uint32),middle[v].view(np.uint32))
+            and np.all(w[:,u]+w[:,v]>=0)]
+    matched={}
+    def augment(v,seen):
+        for u in edges[v]:
+            if u in seen:continue
+            seen.add(u)
+            if u not in matched or augment(matched[u],seen):
+                matched[u]=v;return True
+        return False
+    for v in sorted(signed,key=lambda v:(len(edges[v]),v)):
+        if not augment(v,set()):raise ValueError("declared native pair invariants lack complete matching")
+    pairs=[[u,v] for u,v in sorted(matched.items())]
+    if {v for u,v in pairs}!=signed or len({u for u,v in pairs})!=len(pairs):
+        raise ValueError("incomplete disjoint native pair proof")
     return pairs
 
 

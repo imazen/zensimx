@@ -65,6 +65,8 @@ class RegisteredPairLayoutTests(unittest.TestCase):
         command=['trainer','--hidden','4','--n-hidden-layers','2','--max-pairs','2',
                  '--nonneg-distance','--monotone-cbc','--nonneg-thresholds']
         with self.assertRaisesRegex(ValueError,'ambiguous'):export_pairs(model)
-        self.assertEqual(registered_export_pairs(model,command),[[0,1],[2,3]])
+        pairs=registered_export_pairs(model,command)
+        self.assertEqual({v for u,v in pairs},{1,3})
+        self.assertEqual(len({u for u,v in pairs}),2)
         model['layers'][1]['weights'][1]=1.
         with self.assertRaisesRegex(ValueError,'invariants'):registered_export_pairs(model,command)
