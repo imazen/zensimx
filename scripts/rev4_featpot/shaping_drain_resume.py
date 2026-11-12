@@ -24,7 +24,7 @@ def resume(capture,output,study):
     from shaping_rescue_dispatch import reserve_worker,bind_worker,release_worker
     from shaping_snapshot_retention import capacity
     memory=int(native['memory_max'])
-    while not reserve_worker(study,cid,memory_allowance_bytes=memory,warmup_until_checkpoint=True,snapshot_phases=1)['can_start']:
+    while not reserve_worker(study,cid,memory_allowance_bytes=memory,warmup_until_checkpoint=True,snapshot_phases=1,warmup_checkpoint=output/"checkpoints"/f"ckpt_epoch{state['epoch']:03}.bin")['can_start']:
         time.sleep(10)
     try:
         if shutil.disk_usage(study).free<34*1024**3:raise ValueError('continuation SSD reserve unavailable')

@@ -116,7 +116,7 @@ def pending_scientific_cells(root):
     return cells
 
 
-def reserve_worker(root,cell,proc=Path('/proc'),cpu_count=None,*,memory_allowance_bytes=2*1024**3,warmup_until_checkpoint=False,snapshot_phases=None,require_idle=False):
+def reserve_worker(root,cell,proc=Path('/proc'),cpu_count=None,*,memory_allowance_bytes=2*1024**3,warmup_until_checkpoint=False,snapshot_phases=None,require_idle=False,warmup_checkpoint=None):
     # The lock spans this short admission transaction, never training.
     # Unexpected dead-owner claims remain reserved for explicit reconciliation.
     with worker_claims(root) as claims:
@@ -125,12 +125,19 @@ def reserve_worker(root,cell,proc=Path('/proc'),cpu_count=None,*,memory_allowanc
             raise ValueError('registered two- or four-GiB worker memory allowance required')
         if snapshot_phases is not None and (type(snapshot_phases) is not int or snapshot_phases not in (1,2)):
             raise ValueError('one or two native snapshot phases required')
+        if warmup_checkpoint is not None:
+            checkpoint=Path(warmup_checkpoint)
+            if (not warmup_until_checkpoint or checkpoint.resolve()!=checkpoint
+                or not checkpoint.is_relative_to(root.parent) or checkpoint.parent.name!="checkpoints"
+                or not __import__("re").fullmatch(r"ckpt_epoch[0-9]{3}\.bin",checkpoint.name)):
+                raise ValueError("registered first-new-checkpoint warmup path required")
         legacy=pending_scientific_cells(root)
         observation=worker_slot(set(claims)|legacy,proc,cpu_count,study=root)
         extra=sum(max(0,row.get('memory_allowance_bytes',2*1024**3)-2*1024**3) for row in claims.values())
         if cell not in claims:extra+=memory_allowance_bytes-2*1024**3
         warming=[key for key,row in claims.items() if row.get('warmup_until_checkpoint')
-                 and not any((root/'runs'/key).glob('attempt-*/checkpoints/ckpt_epoch000.bin'))]
+                 and not (Path(row['warmup_checkpoint']).is_file() if row.get('warmup_checkpoint') else
+                     any((root/'runs'/key).glob('attempt-*/checkpoints/ckpt_epoch000.bin')))]
         # A newly visible native PID may still be allocating its training data.
         # Retain a warmup allowance until its first completed epoch, independently
         # of CPU accounting. This staggers allocation without serializing fits.
@@ -150,6 +157,7 @@ def reserve_worker(root,cell,proc=Path('/proc'),cpu_count=None,*,memory_allowanc
                 admitted_utc=datetime.now(timezone.utc).isoformat())
             if memory_allowance_bytes!=2*1024**3:claims[cell]['memory_allowance_bytes']=memory_allowance_bytes
             if warmup_until_checkpoint:claims[cell]['warmup_until_checkpoint']=True
+            if warmup_checkpoint is not None:claims[cell]['warmup_checkpoint']=str(warmup_checkpoint)
             if snapshot_phases is not None:claims[cell]['snapshot_phases']=snapshot_phases
         return observation
 

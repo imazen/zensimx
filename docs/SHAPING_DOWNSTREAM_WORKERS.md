@@ -146,3 +146,5 @@ A relocated variant metadata owner resolves legacy control assignments through t
 Repeated external interruptions retain every raw log and verified checkpoint prefix, and capture the latest committed state. Recovery records explicitly identify an assembled prefix and its predecessor evidence. A recovered pretraining phase is finalized independently and cannot mark its controller complete; only its original, still-unstarted registered fit follows through the unchanged phase builder.
 
 During an approved compute loan, shaping_awake_until_closed.py can run under systemd-inhibit for idle and sleep until the finishing readiness receipt appears. It does not block a manual shutdown. Recovered two-phase controllers reserve both snapshot phases, including the preserved pretraining store.
+
+A continuation binds its warmup reservation to its first newly computed checkpoint, rather than to a canonical primary-run path. Existing checkpoint prefixes cannot release the allowance early, and a completed new checkpoint releases it without waiting for scientific collection. CPU and memory ceilings are unchanged.
