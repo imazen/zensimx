@@ -54,7 +54,7 @@ def resume(capture,output,study):
         env=os.environ.copy();env.update(row['environment'])
         env.update(ZENSIM_TRAIN_RESUME='1',ZENSIM_TRAIN_RESUME_CHECKPOINT_ORIGIN=str(phase/'checkpoints'))
         record=dict(cell=native['cell'],source_capture=str(capture),source_capture_sha256=sha(capture),
-            source_host='r7900x',execution_host=socket.gethostname(),source_epoch=state['epoch'],source_pair=state['pair'],
+            source_host=json.loads((staged/'RUN.json').read_text())['execution_host'],execution_host=socket.gethostname(),source_epoch=state['epoch'],source_pair=state['pair'],
             snapshot_sha256=pin,build_sha256=sha(build),pid=os.getpid(),stage='starting',command=command,
             scientific_collection_pending=True,completed_epochs_replayed=0)
         (output/'RUN.json').write_bytes(encoded(record))

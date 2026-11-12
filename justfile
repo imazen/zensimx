@@ -6095,3 +6095,7 @@ shaping-autonomous-finish *args:
 
 shaping-archive-once *args:
     python3 -B scripts/rev4_featpot/shaping_archive_once.py {{args}}
+
+# Recover only reboot-interrupted registered native phases from committed full state.
+shaping-reboot-recovery *args:
+    python3 -B scripts/rev4_featpot/shaping_reboot_recovery.py {{args}}

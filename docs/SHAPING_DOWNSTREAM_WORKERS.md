@@ -128,3 +128,9 @@ shaping_resume_supervisor.py collects the finite 217 new deliveries (214 remaini
 shaping_autonomous_finish.py advances the registered 25 uncertainty analyses and 48-model cost workflow only after their artifact prerequisites exist. It records commands before launch, preserves failures, and writes a readiness receipt after computational and archive closure. Scientific interpretation and the complete-study claim remain separate. The cost preparation can use shared coordinator data directly, preserving the existing transport-capsule limits. Continued-run training resources retain separate observed clocks and leave unavailable aggregate time/RSS values null.
 
 The controller checks metadata once per minute and retires its metadata watchers after all registered deliveries, final panels, analysis receipts and durable archives close. The snapshot watcher uses the worker's verified trim receipt when worker and coordinator share the same directory, avoiding a second trim. Four recovered conditional extension results are included explicitly in archive closure. The study-owned archive mount can recover stale NFS handles; checksum failures remain hard failures.
+
+## Recovery after an external reboot
+
+shaping_reboot_recovery.py captures a same-host unfinished native phase only when the current boot is later than its frozen snapshot binding. It requires the original build, manifest pins, complete checkpoint prefix, committed epoch-boundary optimizer state and a closed snapshot store. The original attempt and both saved states are preserved under a bounded capture. The existing native continuation and scientific finalizer then complete the remaining exposure; the original request is marked trained only after finalization.
+
+Variant metadata owners reopen their ownership lock when explicitly resumed; they retain existing registrations and launch receipts.

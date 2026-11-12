@@ -147,7 +147,7 @@ print(json.dumps(waiting))
 def watch(args):
     from shaping_rescue_host_launch import launch
     args.output.mkdir(parents=True, exist_ok=getattr(args, "resume", False))
-    with (args.output / 'OWNER.lock').open('x') as lock:
+    with (args.output / 'OWNER.lock').open('a' if getattr(args,'resume',False) else 'x') as lock:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         status = dict(pid=os.getpid(), outer=args.outer, training_replayed=False, driver_sha256=sha(__file__))
         def save(stage, **values):
