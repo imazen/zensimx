@@ -77,3 +77,28 @@ discovery, not independent confirmation or proof that extra interactions help.
 
 The source owner is `scripts/rev4_featpot/shaping_residual_followup.py`;
 generated predictions and row-level evidence remain outside git.
+
+## Execution checks
+
+Native trainer tests and clippy pass. A short real-input comparison reproduces
+both checkpoints from the old trainer byte for byte after removing only
+`zentrain.repro`, for both one-layer and shared-depth owners. The post-fit
+evaluator reproduces the completed product control's development composite and
+all three exposed A control points exactly. A short, fully finalized CLI run
+also passes the consumer max-pair conversion, identity, finite-output and
+damage-order probes with the new negative-Softplus parameterization.
+
+Partial library checkpoints carry binary provenance until the trainer CLI
+finalizes them. The private max-pair converter requires the finalized UTF-8
+provenance. Retain refused partial conversions and use completed CLI outputs
+for consumer qualification; do not change a running checkpoint or weaken that
+admission gate. Final scientific evaluations still require the registered last
+epoch, independently of the short format qualification.
+
+The finite finish owner, `shaping_followup_finish.py`, checks actual native PIDs
+and terminal records, collects completed fits, evaluates each final checkpoint
+once, packs quiescent artifacts and performs durable checksum readback. It
+starts no fitting or selection work and exits after the 15-result closure.
+Errors become an explicit `needs_repair` state. Reused input archives are named
+by manifest identity; checkpoint bundles are compressed without changing their
+contents. No final holdout is opened by this owner.

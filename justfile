@@ -1,3 +1,18 @@
+# Finite November 13 follow-up; callers choose an eligible worker and resource cap.
+shaping-followup-prepare study archive output binary source:
+    python3 -B scripts/rev4_featpot/shaping_followup.py prepare-human --study {{quote(study)}} --archive {{quote(archive)}} --output {{quote(output)}} --binary {{quote(binary)}} --source {{quote(source)}}
+
+shaping-followup-fit request:
+    python3 -B scripts/rev4_featpot/shaping_followup.py run-human --request {{quote(request)}}
+
+shaping-followup-finish root study archive:
+    python3 -B scripts/rev4_featpot/shaping_followup_finish.py --root {{quote(root)}} --study {{quote(study)}} --archive {{quote(archive)}}
+
+shaping-followup-native-check:
+    cargo test --release --locked -p zensim-validate --lib -- mlp_train::
+    cargo clippy --release --locked -p zensim-validate --lib --bin zensim_mlp_train -- -D warnings
+    cargo build --release --locked -p zensim-validate --bin zensim_mlp_train
+
 # Chroma Stage A transport: the caller places this in one worker run-heavy scope.
 chroma-pilot action root:
     python3 -B scripts/byconstruction/chroma_pilot.py {{quote(action)}} {{quote(root)}}
