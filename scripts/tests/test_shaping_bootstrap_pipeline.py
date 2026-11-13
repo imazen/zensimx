@@ -24,6 +24,13 @@ class BootstrapPipelineTests(unittest.TestCase):
                 self.assertEqual(len(queue), 25)
                 self.assertEqual([row['spec'] for row in queue[1:]], [row['spec'] for row in rows])
                 self.assertEqual({row['host'] for row in queue}, set(owner.HOST_SLOTS))
+                current = ['i134', 'r3500', 'r5600g']
+                restricted = owner.queue(root / 'study', root, current)
+                self.assertEqual({row['host'] for row in restricted}, set(current))
+                self.assertEqual([(row['name'], row['spec']) for row in restricted],
+                                 [(row['name'], row['spec']) for row in queue])
+                with self.assertRaisesRegex(ValueError, 'distinct known'):
+                    owner.queue(root / 'study', root, ['i134', 'i134'])
                 rows.pop()
                 (root / 'MATCHED_REGISTRATION.json').write_text(json.dumps(dict(comparisons=rows)))
                 with self.assertRaisesRegex(ValueError, 'all 24'):

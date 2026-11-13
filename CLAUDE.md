@@ -1630,3 +1630,10 @@ packer correctly refused a source hash mismatch. Packing now uses the exact
 source root in the original worker request. The request, source hashes, native
 parity, completed scalar panel and terminal transport checks remain unchanged;
 collection does not refit the control.
+
+## Bootstrap resource placement (November 13, 2026)
+
+The uncertainty pipeline accepts repeated `--worker-host` options to restrict
+placement to an explicit current subset of the authorized pool. Unknown or
+duplicate hosts refuse, and live withdrawals still apply. This changes placement
+only; all 25 comparisons, source-bootstrap draws and scientific gates remain.

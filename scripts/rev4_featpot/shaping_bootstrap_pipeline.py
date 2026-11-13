@@ -13,7 +13,7 @@ from shaping_completion import REPO, encoded, sha
 from shaping_outer_pipeline import HOST_SLOTS
 
 
-def queue(study, registry):
+def queue(study, registry, worker_hosts=None):
     from shaping_bootstrap_plan import load_comparison
     from shaping_reduced_scope import coverage
     if coverage(study) is None:
@@ -30,10 +30,13 @@ def queue(study, registry):
         result.append(dict(name=path.stem, comparison=str(path), spec=spec))
     from shaping_compute_pool import allowed
     hosts=allowed(study)
-    counts = {host: 0 for host in HOST_SLOTS if hosts is None or host in hosts}
+    from types import SimpleNamespace
+    from shaping_outer_pipeline import worker_slots
+    slots = worker_slots(SimpleNamespace(worker_hosts=worker_hosts))
+    counts = {host: 0 for host in slots if hosts is None or host in hosts}
     if not counts:raise ValueError('no currently authorized bootstrap worker')
     for row in result:
-        host = min(counts, key=lambda h: counts[h] / HOST_SLOTS[h])
+        host = min(counts, key=lambda h: counts[h] / slots[h])
         counts[host] += 1
         row['host'] = host
     return result
@@ -124,7 +127,7 @@ print(p.read_text() if p.exists() else '{}')
 
 
 def watch(args):
-    jobs = queue(args.study, args.registry)
+    jobs = queue(args.study, args.registry, getattr(args, 'worker_hosts', None))
     args.output.mkdir(parents=True, exist_ok=False)
     for name in ('results', 'logs'):
         (args.output / name).mkdir()
@@ -164,4 +167,6 @@ if __name__ == '__main__':
     p = argparse.ArgumentParser(description=__doc__)
     for key in ('study', 'draws', 'registry', 'binaries', 'output', 'destination'):
         p.add_argument('--' + key, type=Path, required=True)
+    p.add_argument('--worker-host', action='append', dest='worker_hosts',
+                   help='use only these currently authorized workers')
     watch(p.parse_args())
