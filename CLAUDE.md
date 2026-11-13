@@ -1648,3 +1648,13 @@ parser and pin those files, matching the existing inner qualification method.
 Row membership, final model bytes and the bit-exact native gate are unchanged.
 Preserve the first prepared workload and refused timing; no fit or scientific
 quality evaluation is replayed for this preparation correction.
+
+## Known Bugs — stale snapshot success during closure (resolved November 13, 2026)
+
+The finisher accepted a snapshot owner's earlier zero-pending count after a
+later probe had failed. It now requires a successful, current completed cycle
+and no unresolved owner alerts before recording closure. After coordinator
+migration, 45 worker-local retirement receipts were restored from the preserved
+worker tree only where the snapshot-binding SHA matched. A fresh four-worker
+audit then completed with zero pending stores. Existing failed probes remain
+preserved; neither missing evidence nor failed metadata owners count as success.

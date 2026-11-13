@@ -26,6 +26,12 @@ def job_complete(job):
     return all(isinstance(record.get(k),list) and len(record[k])==v for k,v in job.get("completion_lengths",{}).items())
 
 
+def snapshot_closure_ready(snapshot, collection):
+    return (snapshot.get("stage") == "watching_completed_collections"
+        and snapshot.get("last_cycle_pending_cells") == 0
+        and snapshot.get("checked_utc", "") >= collection.get("checked_utc", ""))
+
+
 def run(args):
     args.output.mkdir(parents=True,exist_ok=True)
     path=args.output/"STATUS.json"
@@ -106,10 +112,9 @@ def run(args):
             if archive_failures:alerts["archives"]=archive_failures
             snapshot_path=Path(config["snapshot_status"])
             snapshot=json.loads(snapshot_path.read_text()) if snapshot_path.exists() else {}
-            snapshots_closed=(snapshot.get("last_cycle_pending_cells")==0
-                and snapshot.get("checked_utc","")>=collection.get("checked_utc",""))
+            snapshots_closed=snapshot_closure_ready(snapshot,collection)
             (args.output/"ALERTS.json").write_bytes(encoded(alerts))
-            complete=imported and len(ids)==252 and panels==252 and (ids|extra)<=archived_ids and snapshots_closed and all(
+            complete=not alerts and imported and len(ids)==252 and panels==252 and (ids|extra)<=archived_ids and snapshots_closed and all(
                 state["jobs"].get(name,{}).get("stage")=="complete" for name in config["jobs"])
             save("computation_and_archive_closure_ready" if complete else "needs_attention" if alerts else "advancing_registered_work",
                  delivered=collection.get("collected",0),required_new_deliveries=217,
