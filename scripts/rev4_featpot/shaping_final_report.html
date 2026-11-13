@@ -8,6 +8,7 @@ body{font:16px system-ui,sans-serif;color:#e6edf3;background:#10171f;max-width:1
 <p id="status">Loading verified results…</p>
 <p>Human composite: equal weight for KADID, TID2013, KonFiG F and CID22 human ratings; equal pooled and within-source ranks; equal outer folds and paired seeds. SSIM2 teacher agreement is separate. Final holdouts were not read and no serving model was promoted.</p>
 <div id="headline"></div>
+<p>All twelve approaches received the registered primary screen; this page focuses on the six finalist roles. <a href="https://github.com/imazen/zensimx/blob/main/benchmarks/shaping_primary_inner_2026-11-08.md">Complete twelve-family screen and optimizer rescues</a>.</p>
 <p class="muted">Intervals use 2,000 stratified whole-source bootstrap draws, conditional on these fitted models and observed sources. They do not estimate uncertainty from retraining. Ten of twelve neural family/fold groups retain registered optimization warnings; the observed model comparisons do not establish global convergence or architectural superiority.</p>
 <h2>Outer-test scatter plots</h2>
 <p>Each axis is a percentile rank within its dataset and outer fold. Colors identify the three source-disjoint folds. The diagonal is perfect rank agreement. These plots reuse stored predictions and show scatter geometry; the headline statistic is the registered mean of fold statistics.</p>
@@ -21,7 +22,7 @@ body{font:16px system-ui,sans-serif;color:#e6edf3;background:#10171f;max-width:1
 <p class="muted">Measured on r3800x. Time is the median across the trained models of each model’s median 40-row batch mean per row, excluding image feature extraction. Pruning differs between trained models. This is not an isolated architecture benchmark or an end-to-end image latency measurement. All 48 timing and fresh-process memory cases completed their original gates.</p>
 <h2>Original A architecture and training data</h2><div id="adata"></div>
 <p>Three matched seeds were trained for each of shaped and unshaped A recipes. The result is mixed: LIVE improves, LIVE clean10 declines, and CSIQ is essentially unchanged. These development comparisons do not establish a general improvement over the serving A model.</p>
-<p>Joint product shaping is a useful candidate initialization, but this study did not establish one reusable per-feature bank across seeds. The frozen-bank trials use seed-matched learned prefixes. A universally good default bank requires a separate transfer test.</p>
+<p>Identity-initialized joint product shaping is a useful training candidate, but this study did not establish one reusable per-feature bank across seeds. The frozen-bank trials use seed-matched learned prefixes. A universally good default bank requires a separate transfer test.</p>
 <details><summary>Native population and source statistics</summary><p>Select a model to inspect its saved native panels; no inference is rerun.</p><select id="model"></select><pre id="native"></pre></details>
 <details><summary>Registered fit coverage and optimization diagnostics</summary><pre id="coverage"></pre></details>
 <p><a href="results.json">Download results and scatter coordinates</a> · <a href="INPUTS.json">Input identities</a></p>

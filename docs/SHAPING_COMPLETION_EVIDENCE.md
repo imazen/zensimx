@@ -1,5 +1,13 @@
 # Evidence carried into the activation and shaping follow-up
 
+The registered study closed on November 13, 2026: 1,461 fitting conditions,
+25 registered uncertainty analyses, 48 finalist timing/memory cases and 256
+later-stage delivery archive closures. The separate six-model original-A
+comparison is also retained. See the [final results and limitations](../benchmarks/shaping_final_results_2026-11-13.md)
+for measured comparisons, historical versus corrected conditions, optimization
+warnings, code-free scalar views and reproduction pointers. No final holdout
+was opened and no serving model was promoted.
+
 This reconstruction distinguishes existing evidence from the new study's open
 questions. It is not an experiment registration or authorization to select on
 outer folds. Numerical claims below belong to the linked result records;
