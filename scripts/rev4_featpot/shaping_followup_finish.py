@@ -222,6 +222,8 @@ def run(root,study,archive,interval):
             except Exception as e:state['failures'].append(dict(id=identifier,error=str(e)))
         if state['evaluated']==15 and not state['failures']:
             # Collect the frozen A provenance and bounded snapshots once.
+            subprocess.run(['rsync','-a','--checksum','--exclude=.lock',
+                'r3800x:'+str(root/'human-snapshots')+'/',str(root/'human-snapshots')+'/'],check=True)
             for relative in ('a-snapshots','a-inputs/templates'):
                 dest=root/relative;dest.mkdir(parents=True,exist_ok=True)
                 subprocess.run(['rsync','-a','--checksum','r5600g:'+str(root/relative)+'/',str(dest)+'/'],check=True)
