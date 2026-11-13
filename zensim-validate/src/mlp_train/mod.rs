@@ -30,6 +30,7 @@
 mod capabilities;
 mod confidence_weights;
 mod contrast_precision;
+mod hard_case_weights;
 pub(crate) mod input_shaping;
 mod paired_gradient;
 pub mod r14_knees;
@@ -3237,7 +3238,24 @@ pub fn train_mlp_strategy_pairs(
             "full-state snapshots currently require Linux filesystem admission"
         );
         assert!(
-            shared_depth_on
+            (shared_depth_on
+                || (effective.n_hidden_layers == 1
+                    && effective.nonneg_distance
+                    && effective.monotone_cbc
+                    && effective.nonneg_thresholds
+                    && effective.minibatch_size == 1
+                    && effective.norm_in_norm_weight == 0.
+                    && !effective.pool_head
+                    && !effective.hybrid_head
+                    && !effective.per_sample_alpha_head
+                    && !effective.skip_connection
+                    && effective.monotone_ramps == 0
+                    && effective.free_ramps == 0
+                    && effective.monotone_product_pairs.is_empty()
+                    && effective.monotone_feature_pin.is_none()
+                    && effective.steer_pairs.is_none()
+                    && effective.pooled_legs.is_empty()
+                    && effective.r14_trainable_knees.is_none()))
                 && tv.is_none()
                 && anchor.is_none()
                 && equiv.is_none()
@@ -3247,7 +3265,7 @@ pub fn train_mlp_strategy_pairs(
                 && rank_pairs.is_empty()
                 && effective.ema_decay == 0.
                 && effective.early_stop_patience == 0,
-            "full-state snapshots require constrained shared-depth rank/MSE without auxiliary losses, EMA, early stopping or coverage recording"
+            "full-state snapshots require constrained plain/shared-depth rank/MSE without auxiliary losses, EMA or early stopping"
         );
     }
 
@@ -3286,6 +3304,7 @@ pub fn train_mlp_strategy_pairs(
         !rank_pairs.is_empty(),
         log,
     );
+    let hard_case = hard_case_weights::Plan::load(groups, hyperparams);
     let initial = hyperparams.init_from.as_ref().map(|path| {
         let bytes = std::fs::read(path)
             .unwrap_or_else(|e| panic!("initial checkpoint {}: {e}", path.display()));
@@ -4578,6 +4597,9 @@ pub fn train_mlp_strategy_pairs(
                 .as_ref()
                 .map_or(1., |events| events.weight(drawn));
             pair_weight *= study_weight;
+            if let Some(p) = &hard_case {
+                pair_weight *= p.pair(g_idx, ia, ib);
+            }
             // RankNet term. Zeroed for `GroupLossMode::Mse` groups and for
             // tied / sub-threshold pairs of a `Both` group.
             let (dl_dya_rn, dl_dyb_rn) = if want_rank {

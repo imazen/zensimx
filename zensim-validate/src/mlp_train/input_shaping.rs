@@ -10,6 +10,37 @@ mod wire;
 
 pub(crate) const KEY: &str = "zentrain.input_shaping";
 
+/// Trainer-only controls stay outside the consumer's shape wire format.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Controls {
+    schema: String,
+    lr_scale: f64,
+    identity_l2: f64,
+}
+impl Controls {
+    fn load() -> Option<Self> {
+        match (
+            std::env::var_os("ZENSIM_SHAPE_OPTIMIZER_MANIFEST"),
+            std::env::var("ZENSIM_SHAPE_OPTIMIZER_SHA256"),
+        ) {
+            (None, Err(std::env::VarError::NotPresent)) => None,
+            (Some(path), Ok(hash)) => {
+                assert_eq!(
+                    crate::train_manifest::sha256_file(std::path::Path::new(&path)).unwrap(),
+                    hash
+                );
+                let c: Self = serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap();
+                assert_eq!(c.schema, "shaping-stability-v1");
+                assert!(c.lr_scale.is_finite() && c.lr_scale > 0. && c.lr_scale <= 1.);
+                assert!(c.identity_l2.is_finite() && c.identity_l2 >= 0.);
+                Some(c)
+            }
+            _ => panic!("shape optimizer requires manifest and independent hash"),
+        }
+    }
+}
+
 fn validate_owner(hp: &MlpHyperparams) {
     let plain = hp.n_hidden_layers == 1
         && hp.n_hidden > 0
@@ -41,6 +72,15 @@ fn validate_owner(hp: &MlpHyperparams) {
 }
 
 pub(super) fn check_admission(hp: &MlpHyperparams) {
+    if std::env::var_os("ZENSIM_SHAPE_OPTIMIZER_MANIFEST").is_some()
+        || std::env::var_os("ZENSIM_SHAPE_OPTIMIZER_SHA256").is_some()
+    {
+        assert!(
+            std::env::var_os("ZENSIM_INPUT_SHAPING_MANIFEST").is_some(),
+            "shape controls require shaping"
+        );
+        Controls::load().unwrap();
+    }
     if std::env::var_os("ZENSIM_INPUT_SHAPING_MANIFEST").is_some()
         || std::env::var_os("ZENSIM_INPUT_SHAPING_SHA256").is_some()
     {
@@ -176,6 +216,8 @@ pub(super) struct State {
     v: Vec<f64>,
     steps: i32,
     initial_manifest_sha256: Option<String>,
+    #[serde(default)]
+    controls: Option<Controls>,
 }
 impl State {
     pub(super) fn load(hp: &MlpHyperparams, features: &StdFeatures) -> Option<Self> {
@@ -211,6 +253,11 @@ impl State {
         }
         let mut state = Self::new(config, features);
         state.initial_manifest_sha256 = Some(hash.to_str().unwrap().to_owned());
+        state.controls = Controls::load();
+        assert!(
+            state.controls.is_none() || state.config.trainable,
+            "shape controls need trainable shapes"
+        );
         Some(state)
     }
     fn new(config: Config, features: &StdFeatures) -> Self {
@@ -282,6 +329,7 @@ impl State {
             v: vec![0.; n],
             steps: 0,
             initial_manifest_sha256: None,
+            controls: None,
         }
     }
     fn raw<'a>(&self, features: &'a StdFeatures, group: usize, row: usize) -> &'a [f32] {
@@ -358,6 +406,25 @@ impl State {
             }
         }
         assert!(self.gradients.iter().all(|x| x.is_finite()));
+        let mut lr = lr;
+        if let Some(c) = &self.controls {
+            lr *= c.lr_scale;
+            // Mean squared slope departure from identity; gates participate
+            // only for separately shaped reference inputs.
+            let count: usize = self
+                .config
+                .terms
+                .iter()
+                .map(|t| if t.separate { 6 } else { 3 })
+                .sum();
+            for (j, t) in self.config.terms.iter().enumerate() {
+                for k in 0..if t.separate { 6 } else { 3 } {
+                    let target = if k < 3 { 1. } else { [0., 0.5, 1.][k - 3] };
+                    self.gradients[j * 6 + k] +=
+                        2. * c.identity_l2 * (self.params[j * 6 + k] - target) / count as f64;
+                }
+            }
+        }
         self.steps += 1;
         crate::adam_simd::adam_update(&mut crate::adam_simd::AdamUpdateArgs {
             w: &mut self.params,
@@ -392,6 +459,18 @@ impl State {
         }
     }
     pub(super) fn stamp(&self, bytes: &[u8]) -> Vec<u8> {
+        let controlled;
+        let bytes = if let Some(c) = &self.controls {
+            controlled = zenpredict_bake::append_metadata_utf8(
+                bytes,
+                "zentrain.shape_optimizer",
+                &serde_json::to_string(c).unwrap(),
+            )
+            .unwrap();
+            &controlled
+        } else {
+            bytes
+        };
         let bytes = zenpredict_bake::append_metadata_utf8(
             bytes,
             KEY,
@@ -530,6 +609,45 @@ mod tests {
             validation.fill(1e20);
             assert_eq!(actual, initialize(&shaped_dense, None));
         }
+    }
+    #[test]
+    fn shape_stability_controls_are_neutral_at_defaults_and_shrink_departures() {
+        let features = fixture();
+        let config = Config {
+            schema: "zensim-input-shaping-v1".into(),
+            trainable: true,
+            terms: vec![term(13, None, false)],
+        };
+        let mut plain = State::new(config.clone(), &features);
+        let mut neutral = State::new(config.clone(), &features);
+        neutral.controls = Some(Controls {
+            schema: "shaping-stability-v1".into(),
+            lr_scale: 1.,
+            identity_l2: 0.,
+        });
+        let mut weights = vec![0.; 721];
+        weights[13] = 1.;
+        plain.step(&features, 0, 0, 1, &weights, &[1.], &[1.], 0.01);
+        neutral.step(&features, 0, 0, 1, &weights, &[1.], &[1.], 0.01);
+        assert_eq!(plain.params, neutral.params);
+        assert_eq!(plain.m, neutral.m);
+        assert_eq!(plain.v, neutral.v);
+        let mut slow = State::new(config, &features);
+        slow.controls = Some(Controls {
+            schema: "shaping-stability-v1".into(),
+            lr_scale: 0.1,
+            identity_l2: 0.001,
+        });
+        slow.step(&features, 0, 0, 1, &weights, &[1.], &[1.], 0.01);
+        assert!((slow.params[0] - 1.).abs() < (plain.params[0] - 1.).abs());
+        slow.params[0] = 2.;
+        slow.config.terms[0].slopes[0] = 2.;
+        slow.m.fill(0.);
+        slow.v.fill(0.);
+        slow.steps = 0;
+        slow.step(&features, 0, 0, 1, &weights, &[0.], &[0.], 0.01);
+        assert!(slow.params[0] < 2.);
+        assert_eq!(slow.config.terms[0].value(0., 1.), 0.);
     }
     #[test]
     fn native_identity_frozen_state_and_joint_update() {

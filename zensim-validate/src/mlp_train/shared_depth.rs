@@ -56,6 +56,8 @@ pub(super) struct Head {
     weight_diagnostics: WeightDiagnostics,
     #[serde(skip)]
     backward_pre_gradient: Vec<f64>,
+    #[serde(default)]
+    output_latent: Option<Vec<f64>>,
 }
 
 impl Head {
@@ -64,15 +66,31 @@ impl Head {
         let mid = (0..hp.n_hidden * width)
             .map(|_| rng.next_normal() * (2. / (hp.n_hidden + width) as f64).sqrt())
             .collect::<Vec<_>>();
-        let output = (0..width)
+        let mut output = (0..width)
             .map(|_| rng.next_normal() * (2. / (width + 1) as f64).sqrt())
             .collect::<Vec<_>>();
+        let update = super::optimizer_controls::Config::load()
+            .map(|c| c.output_update)
+            .unwrap_or_default();
+        if update != super::optimizer_controls::OutputUpdate::Projected {
+            for w in &mut output {
+                *w = -w.abs().max(1e-8);
+            }
+        }
+        let output_latent = (update == super::optimizer_controls::OutputUpdate::NegativeSoftplus)
+            .then(|| {
+                output
+                    .iter()
+                    .map(|w| super::optimizer_controls::inverse_softplus(-w))
+                    .collect()
+            });
         let mut head = Self {
             research: super::monotone_research::Network::from_env(hp, smooth, rng),
             diagnostics_enabled: super::optimizer_controls::diagnostics_enabled(),
             diagnostics: Default::default(),
             weight_diagnostics: Default::default(),
             backward_pre_gradient: Vec::new(),
+            output_latent,
             adam: AdamState::new(mid.len(), width, width, 1),
             mid,
             bias: vec![0.; width],
@@ -206,13 +224,23 @@ impl Head {
             self.diagnostics.output_gradient_squared +=
                 self.adam.gw2.iter().map(|g| g * g).sum::<f64>();
         }
+        if let Some(latent) = &self.output_latent {
+            for (g, q) in self.adam.gw2.iter_mut().zip(latent) {
+                *g *= -super::optimizer_controls::softplus_slope(*q);
+            }
+        }
         self.adam.step(
             &mut self.mid,
             &mut self.bias,
-            &mut self.output,
+            self.output_latent.as_mut().unwrap_or(&mut self.output),
             &mut self.pin,
             lr,
         );
+        if let Some(latent) = &self.output_latent {
+            for (w, q) in self.output.iter_mut().zip(latent) {
+                *w = -super::optimizer_controls::softplus(*q);
+            }
+        }
         if self.diagnostics_enabled {
             self.diagnostics.output_projection_hits +=
                 self.output.iter().filter(|&&w| w > 0.).count() as u64;

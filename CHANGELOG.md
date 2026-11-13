@@ -21,6 +21,14 @@ None.
 
 ### Research
 
+- Add opt-in shape stability, human hard-case rank weights and effective-output
+  parameterization controls for the registered November 13 follow-up. Default
+  plain/shared native checkpoint bytes match the previous trainer on the
+  two-epoch real-input qualification.
+
+- Extend bounded full-state snapshots to constrained one-layer rank/MSE
+  training, with byte-identical mid-epoch and boundary crash recovery checks.
+
 - Extend native input shaping to constrained one-hidden-layer models, including
   validation, checkpoint export and parameter-preserving continuation admission.
 

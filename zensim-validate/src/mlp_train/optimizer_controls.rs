@@ -1,6 +1,33 @@
 //! Private hash-bound controls; no sampling or model-family substitution.
 use super::MlpHyperparams;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
+
+#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub(super) enum OutputUpdate {
+    #[default]
+    Projected,
+    NegativeAbsInit,
+    NegativeSoftplus,
+}
+pub(super) fn softplus(x: f64) -> f64 {
+    x.max(0.) + (-x.abs()).exp().ln_1p()
+}
+pub(super) fn softplus_slope(x: f64) -> f64 {
+    if x >= 0. {
+        1. / (1. + (-x).exp())
+    } else {
+        let e = x.exp();
+        e / (1. + e)
+    }
+}
+pub(super) fn inverse_softplus(x: f64) -> f64 {
+    if x > 30. {
+        x + (-(-x).exp()).ln_1p()
+    } else {
+        x.exp_m1().ln()
+    }
+}
 
 pub(super) fn check_admission(hp: &MlpHyperparams) {
     if std::env::var_os("ZENSIM_PLAIN_OPTIMIZER_MANIFEST").is_some()
@@ -27,6 +54,8 @@ pub(super) struct Config {
     schema: String,
     pub init_scale: f64,
     pub schedule: Schedule,
+    #[serde(default)]
+    pub output_update: OutputUpdate,
 }
 impl Config {
     pub(super) fn load() -> Option<Self> {
@@ -79,6 +108,15 @@ pub(super) fn diagnostics_enabled() -> bool {
 mod tests {
     use super::*;
     #[test]
+    fn negative_softplus_effective_gradient_and_inverse_are_consistent() {
+        for q in [-40., -5., -1., 0., 5., 40.] {
+            let h = 1e-5;
+            let numerical = -(softplus(q + h) - softplus(q - h)) / (2. * h);
+            assert!((numerical + softplus_slope(q)).abs() < 1e-9);
+            assert!((inverse_softplus(softplus(q)) - q).abs() < 1e-12);
+        }
+    }
+    #[test]
     fn consolidation_boundary_and_cosine_prefix_are_exact() {
         let mut hp = MlpHyperparams {
             initial_lr: 0.001,
@@ -89,6 +127,7 @@ mod tests {
             schema: "plain-shared-optimizer-v1".into(),
             init_scale: 1.,
             schedule: Schedule::Consolidate,
+            output_update: OutputUpdate::Projected,
         };
         assert_eq!(c.lr(179, &hp), hp.initial_lr);
         assert_eq!(c.lr(180, &hp), hp.initial_lr * 0.1);
@@ -144,7 +183,14 @@ mod tests {
                     .as_nanos()
             ));
             std::fs::create_dir(&root).unwrap();
-            for mode in ["base", "diagnostics", "neutral", "rescue"] {
+            for mode in [
+                "base",
+                "diagnostics",
+                "neutral",
+                "rescue",
+                "abs_init",
+                "softplus",
+            ] {
                 let mut command = std::process::Command::new(std::env::current_exe().unwrap());
                 command.args(["--exact","mlp_train::optimizer_controls::tests::real_plain_trainer_neutral_replay_and_rescue","--nocapture"])
                     .env(CHILD,root.join(format!("{mode}.bin"))).env_remove("ZENSIM_PLAIN_OPTIMIZER_MANIFEST")
@@ -152,10 +198,11 @@ mod tests {
                 if mode != "base" {
                     command.env("ZENSIM_OPTIMIZER_DIAGNOSTICS", "1");
                 }
-                if mode == "neutral" || mode == "rescue" {
+                if matches!(mode, "neutral" | "rescue" | "abs_init" | "softplus") {
                     let path = root.join(format!("{mode}.json"));
-                    let config = serde_json::json!({"schema":"plain-shared-optimizer-v1","init_scale":if mode=="neutral" {1.} else {0.5},
-                        "schedule":if mode=="neutral" {"cosine"} else {"consolidate"}});
+                    let config = serde_json::json!({"schema":"plain-shared-optimizer-v1","init_scale":if mode=="rescue" {0.5} else {1.},
+                        "schedule":if mode=="rescue" {"consolidate"} else {"cosine"},
+                        "output_update":match mode {"abs_init"=>"negative_abs_init","softplus"=>"negative_softplus",_=>"projected"}});
                     std::fs::write(&path, serde_json::to_vec(&config).unwrap()).unwrap();
                     command
                         .env(
@@ -182,6 +229,11 @@ mod tests {
             assert_eq!(base, std::fs::read(root.join("diagnostics.bin")).unwrap());
             assert_eq!(base, std::fs::read(root.join("neutral.bin")).unwrap());
             assert_ne!(base, std::fs::read(root.join("rescue.bin")).unwrap());
+            assert_ne!(base, std::fs::read(root.join("abs_init.bin")).unwrap());
+            assert_ne!(
+                std::fs::read(root.join("abs_init.bin")).unwrap(),
+                std::fs::read(root.join("softplus.bin")).unwrap()
+            );
         }
     }
 }

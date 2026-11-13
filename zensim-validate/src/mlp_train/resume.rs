@@ -1,4 +1,4 @@
-//! Full precision state for the constrained shared-depth CPU owner.
+//! Full precision state for the constrained plain/shared-depth CPU owner.
 use super::{
     AdamState, MlpHyperparams, StdFeatures, TrainingGroup, input_shaping, resume_store,
     shared_depth,
@@ -76,6 +76,11 @@ mod tests {
                 mse_weight: 0.1,
                 ..Default::default()
             };
+            let one_layer = std::env::var("ZENSIM_RESUME_FIXTURE_KIND")
+                .is_ok_and(|v| v.starts_with("one_layer"));
+            if one_layer {
+                hp.n_hidden_layers = 1;
+            }
             if std::env::var("ZENSIM_RESUME_FIXTURE_KIND").as_deref() == Ok("changed") {
                 hp.initial_lr *= 2.;
             }
@@ -87,7 +92,7 @@ mod tests {
             }
             let shaping = matches!(
                 std::env::var("ZENSIM_RESUME_FIXTURE_KIND").as_deref(),
-                Ok("frozen" | "joint")
+                Ok("frozen" | "joint" | "one_layer_joint")
             );
             let mut compact = CompactRows {
                 data: x.iter().flat_map(|v| [v[0] as f32, v[1] as f32]).collect(),
@@ -152,7 +157,15 @@ mod tests {
         }
         let root = std::env::temp_dir().join(format!("zensim-full-resume-{}", std::process::id()));
         fs::create_dir(&root).unwrap();
-        for kind in ["plain", "softplus", "frozen", "joint"] {
+        for kind in [
+            "plain",
+            "softplus",
+            "frozen",
+            "joint",
+            "output_softplus",
+            "one_layer",
+            "one_layer_joint",
+        ] {
             let dir = root.join(kind);
             fs::create_dir(&dir).unwrap();
             let manifest = dir.join("head.json");
@@ -160,7 +173,15 @@ mod tests {
                 "widths":[4],"first_width":4,"max_pairs":0,"init_seed":111,"sample_seed":222,"epochs":3,"pairs_per_epoch":100,
                 "analytic":{"temperature":0.73,"learn_temperature":true,"bias":0.37}})).unwrap()).unwrap();
             let shape_manifest = dir.join("shapes.json");
-            fs::write(&shape_manifest,serde_json::to_vec(&serde_json::json!({"schema":"zensim-input-shaping-v1","trainable":kind=="joint",
+            let output_manifest = dir.join("output.json");
+            fs::write(
+                &output_manifest,
+                serde_json::to_vec(&serde_json::json!({"schema":"plain-shared-optimizer-v1",
+                "init_scale":1.,"schedule":"cosine","output_update":"negative_softplus"}))
+                .unwrap(),
+            )
+            .unwrap();
+            fs::write(&shape_manifest,serde_json::to_vec(&serde_json::json!({"schema":"zensim-input-shaping-v1","trainable":matches!(kind,"joint"|"one_layer_joint"),
                 "terms":[{"column":13,"damage":13,"reference":null,"separate":false,"knots":[0.25,1.0],"slopes":[0.8,1.2,1.4],"gate":[0.0,0.5,1.0]},
                 {"column":720,"damage":13,"reference":422,"separate":true,"knots":[0.25,1.0],"slopes":[1.0,1.2,1.4],"gate":[0.0,0.4,1.0]}]})).unwrap()).unwrap();
             let invoke = |mode: &str, resume: bool, crash: Option<&str>, epoch: bool| {
@@ -201,7 +222,15 @@ mod tests {
                             crate::train_manifest::sha256_file(&manifest).unwrap(),
                         );
                 }
-                if matches!(kind, "frozen" | "joint") {
+                if kind == "output_softplus" {
+                    command
+                        .env("ZENSIM_PLAIN_OPTIMIZER_MANIFEST", &output_manifest)
+                        .env(
+                            "ZENSIM_PLAIN_OPTIMIZER_SHA256",
+                            crate::train_manifest::sha256_file(&output_manifest).unwrap(),
+                        );
+                }
+                if matches!(kind, "frozen" | "joint" | "one_layer_joint") {
                     command
                         .env("ZENSIM_INPUT_SHAPING_MANIFEST", &shape_manifest)
                         .env(
