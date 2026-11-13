@@ -38,12 +38,14 @@ for d in sorted((r/'runs').glob('*')):
  if terminal.exists():v=json.loads(terminal.read_text())
  live=[p['pid'] for p in native if any(str(d) in a for a in p['argv'])]
  stage=v.get('stage','preparing');trained=stage=='trained'
- logs=list(d.glob('*/writes/train.log')) if a else [d/'train.log'];epoch=None
+ logs=sorted(d.glob('*/writes/train.log')) if a else [d/'train.log'];epoch=None
  for log in logs:
   if not log.exists():continue
   with log.open('rb') as f:
-   f.seek(max(0,log.stat().st_size-65536));text=f.read().decode(errors='replace')
-  matches=re.findall(r'(?<![A-Za-z_])epoch(?:=|\\s+)([0-9]+)',text)
+   offset=max(0,log.stat().st_size-65536);f.seek(offset);text=f.read().decode(errors='replace')
+  if offset:text=text.split('\\n',1)[1] if '\\n' in text else ''
+  epoch=None
+  matches=re.findall(r'(?m)^(?:\\s*epoch\\s+|subjective-rank epoch=)([0-9]+)(?=\\s|$)',text)
   if matches:epoch=int(matches[-1])
  if epoch is not None and not 0<=epoch<(120 if a else 240):raise ValueError('invalid epoch parsed from training log')
  unit='zensim-followup-'+d.name+'.service'
