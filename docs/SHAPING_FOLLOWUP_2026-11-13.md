@@ -1,5 +1,54 @@
 # Bounded shaping follow-up
 
+## Completed results — November 13
+
+All 15 fitting conditions and fixed-final evaluations completed. The owner
+exited after durable checksum readback at 14:29 UTC. A live-process check at
+22:39 UTC found no remaining native study trainers on the three training
+workers. No fresh confirmation set was read and no serving model was promoted.
+
+The human-plus-SSIM2 screen uses one previously exposed source fold. Mean
+paired changes in its equal-dataset pooled/within-source human composite are:
+
+| Intervention | Mean change | Positive seed changes |
+|---|---:|---:|
+| Cross-fitted human hard-case weights | -0.00059542 | 1/3 |
+| Negative-magnitude output initialization | -0.00102083 | 1/3 |
+| Negative-Softplus output parameterization | +0.00019375 | 2/3 |
+
+The small parameterization gain is mixed across seeds. It does not establish a
+consistent improvement. These controls are the product finalist, not serving A.
+
+For the full A recipe, mean paired SROCC changes versus its matched unshaped
+F32 controls are:
+
+| Intervention | CSIQ | LIVE | LIVE clean10 |
+|---|---:|---:|---:|
+| Shared frozen bank | -0.00109569 | +0.00221974 | -0.00214712 |
+| Slower joint shapes plus identity penalty | +0.00090913 | +0.00312949 | -0.00096397 |
+
+Slower regularized shaping reduces the clean10 regression relative to the
+shared frozen bank, but still regresses in two of three paired seeds. CSIQ's
+positive mean is driven by one seed; the other two changes are negative. LIVE
+improves in all three seeds for both arms. These are descriptive results on the
+already exposed views, not independent evidence of surpassing A. This phase
+has not established universally useful per-feature shaping defaults.
+
+The verified closure contains 16 payload files totaling 309,025,240 bytes.
+Compressed bundles preserve the fitted models, scalar evaluation/replay
+inputs, training/optimizer snapshots from every worker, code and provenance.
+Existing training-data archives are referenced by identity rather than copied
+again. Evidence is outside git under
+`/mnt/v/output/zensim/shaping-followup-20261113/closure` on the coordinator;
+the durable receipt records its separate archive destination. Its manifest
+SHA-256 is `b2b685358e11e7921a840cfc3a6d201878ce10c7a8827573415d8207dc9a7714`.
+The current source/destination manifests and result bytes matched when checked
+at 22:39 UTC; the full payload readback was reused rather than repeated.
+
+The 15-fit scope is closed. No additional tuning or evaluation phase started.
+
+## Registered scope
+
 The owner approved all three directions on November 13, prioritizing paired
 tree/product error analysis. The previous 1,461-fit study stays closed. This
 phase has **15 new fitting conditions**, three paired seeds per condition:
