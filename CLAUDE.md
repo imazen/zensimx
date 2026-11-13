@@ -1612,3 +1612,12 @@ Fresh publication, recovery after raw retention, repeated completed publication
 and conflicting-evidence refusal are covered. Native training, optimizer state,
 checkpoint coverage and provenance checks are unchanged. This source repair
 does not establish completion of any interrupted real run.
+
+## Known Bugs — completed native recovery publication (resolved November 13, 2026)
+
+Recovery previously tried to resume a native phase even when its terminal
+receipt already existed. It now collects that existing phase through the full
+continuation finalizer instead. Byte-identical predecessor evidence can be reused
+after interrupted publication; different evidence remains protected. Failed
+native receipts cannot publish completion or trigger a training replay. The
+registered unstarted fit after recovered pretraining retains its original budget.

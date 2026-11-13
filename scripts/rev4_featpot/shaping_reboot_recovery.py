@@ -96,14 +96,21 @@ def work(study, capture_path, output, request):
     archive=status.with_name("STATUS.before-reboot-"+boot_id+".json")
     if archive.exists():raise ValueError("preserve previous recovery attempt")
     archive.write_bytes(status.read_bytes())
-    resume(capture_path,output,study)
+    # Native completion may precede an interruption in scientific publication.
+    # The finalizer below verifies the existing result and its full closure;
+    # never rerun a trainer when a terminal native receipt already exists.
+    if not (output/"RESULT.json").exists():
+        resume(capture_path,output,study)
     for item in row.get("predecessor_evidence",[]):
         source=Path(item["path"])
         if sha(source)!=item["sha256"]:raise ValueError("predecessor evidence changed")
         dest=study/"runs"/job["cell"]["id"]/"attempt-001/continuation-evidence/predecessors"/item["name"]
         dest.parent.mkdir(parents=True,exist_ok=True)
-        if dest.exists():raise ValueError("preserve predecessor recovery evidence")
-        shutil.copy2(source,dest)
+        if dest.exists():
+            if dest.stat().st_size != source.stat().st_size or sha(dest) != item["sha256"]:
+                raise ValueError("preserve different predecessor recovery evidence")
+        else:
+            shutil.copy2(source,dest)
     result=finalize(study,capture_path,output)
     if row.get("recovery_phase")=="pretraining":
         finish_pretrained_controller(study,request)

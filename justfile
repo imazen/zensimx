@@ -6103,4 +6103,5 @@ shaping-reboot-recovery *args:
 # Focused checks for exact-state continuation and its memory admission.
 shaping-recovery-tests:
     PYTHONPATH="scripts/rev4_featpot:${PYTHONPATH:-}" python3 -B -m unittest discover -s scripts/tests -p 'test_shaping_continuation_finalize.py'
+    PYTHONPATH="scripts/rev4_featpot:${PYTHONPATH:-}" python3 -B -m unittest discover -s scripts/tests -p 'test_shaping_reboot_recovery.py'
     PYTHONPATH="scripts/rev4_featpot:${PYTHONPATH:-}" python3 -B -m unittest discover -s scripts/tests -p 'test_shaping_resume_warmup.py'
