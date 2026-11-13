@@ -133,7 +133,7 @@ print(json.dumps(dict(ready=(result/'WORKER_EXECUTION.json').exists(),stage=row.
         bundle = args.study.parent / 'worker-bundles' / ('outer-control-' + job['cell']['id'] + '.tar')
         argv = ['env', 'TMPDIR=/home/lilith/tmp', 'PYTHONPATH=' + str(args.study.parent / 'python-runtime'),
                 '/home/lilith/work/claudehints/scripts/run-heavy', '--mem', '512M', '--jobs', '1', '--',
-                'python3', '-B', str(REPO / 'scripts/rev4_featpot/shaping_control_worker.py'),
+                'python3', '-B', str(Path(q['source_root']) / 'scripts/rev4_featpot/shaping_control_worker.py'),
                 'pack', '--request', str(request), '--bundle', str(bundle)]
         (transport / 'PACK_SUBMITTED.json').write_bytes(encoded(dict(command=argv, host=q['host'], request_sha256=sha(request))))
         with (transport / 'pack.log').open('x') as log:

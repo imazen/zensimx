@@ -1,4 +1,6 @@
 from pathlib import Path
+import json
+import shlex
 from types import SimpleNamespace
 import sys
 import tempfile
@@ -10,6 +12,27 @@ import shaping_outer_pipeline as owner
 
 
 class PipelineTests(unittest.TestCase):
+    def test_terminal_control_pack_uses_its_frozen_source(self):
+        with tempfile.TemporaryDirectory(dir=Path.home() / 'tmp') as scratch:
+            root = Path(scratch)
+            request = root / 'REQUEST.json'
+            frozen = root / 'frozen-source'
+            request.write_text(json.dumps(dict(result_output=str(root / 'result'),
+                                              source_root=str(frozen), host='r5600g')))
+            args = SimpleNamespace(study=root / 'study', output=root / 'out')
+            cell = dict(id='c', family='shaped_additive')
+            class PackObserved(Exception):
+                pass
+            def remote(command, **kwargs):
+                if kwargs.get('capture_output'):
+                    return SimpleNamespace(stdout=json.dumps(dict(ready=True)))
+                actual = shlex.split(command[2])
+                self.assertIn(str(frozen / 'scripts/rev4_featpot/shaping_control_worker.py'), actual)
+                raise PackObserved()
+            with patch.object(owner.subprocess, 'run', side_effect=remote):
+                with self.assertRaises(PackObserved):
+                    owner.collect_controls(args, [dict(request=str(request), cell=cell)])
+
     def test_explicit_pool_excludes_withdrawn_hosts_before_observation(self):
         args = SimpleNamespace(worker_hosts=["i134", "r3500", "r3800x", "r5600g"])
         slots = owner.worker_slots(args)

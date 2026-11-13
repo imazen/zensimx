@@ -1621,3 +1621,12 @@ continuation finalizer instead. Byte-identical predecessor evidence can be reuse
 after interrupted publication; different evidence remains protected. Failed
 native receipts cannot publish completion or trigger a training replay. The
 registered unstarted fit after recovered pretraining retains its original budget.
+
+## Known Bugs — frozen control transport source (resolved November 13, 2026)
+
+The control collector launched the packer from its own current source export.
+When that export differed from the completed control's frozen package, the
+packer correctly refused a source hash mismatch. Packing now uses the exact
+source root in the original worker request. The request, source hashes, native
+parity, completed scalar panel and terminal transport checks remain unchanged;
+collection does not refit the control.
