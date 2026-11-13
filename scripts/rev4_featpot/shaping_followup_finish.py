@@ -43,8 +43,9 @@ for d in sorted((r/'runs').glob('*')):
   if not log.exists():continue
   with log.open('rb') as f:
    f.seek(max(0,log.stat().st_size-65536));text=f.read().decode(errors='replace')
-  matches=re.findall(r'(?:epoch=|epoch\\s+)([0-9]+)',text)
+  matches=re.findall(r'(?<![A-Za-z_])epoch(?:=|\\s+)([0-9]+)',text)
   if matches:epoch=int(matches[-1])
+ if epoch is not None and not 0<=epoch<(120 if a else 240):raise ValueError('invalid epoch parsed from training log')
  unit='zensim-followup-'+d.name+'.service'
  active=subprocess.run(['systemctl','--user','is-active',unit],capture_output=True,text=True).stdout.strip()
  if live and stage=='preparing':stage='training'
@@ -100,7 +101,7 @@ def close(root,study,archive,results):
     write(closure/'RESULTS.json',summary(root,results))
     # Quiescent fit/evaluation trees are packed once. Do not include the live
     # supervisor or duplicate the previously archived shared training arrays.
-    for name in ('runs','evaluations','native-source','native-bin-v2','human-inputs','a-inputs','a-evaluation-inputs','qualification'):
+    for name in ('runs','evaluations','native-source','native-bin-v2','human-inputs','a-inputs','a-evaluation-inputs','qualification','runtime'):
         bundle=closure/(name+'.tar.zst')
         if bundle.exists():continue
         if not (root/name).exists():raise ValueError('closure input absent: '+name)
