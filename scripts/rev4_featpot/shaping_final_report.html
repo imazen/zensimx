@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Completed shaping study</title>
+<style>
+body{font:16px system-ui,sans-serif;color:#e6edf3;background:#10171f;max-width:1400px;margin:auto;padding:24px}h1,h2{font-weight:600}p{line-height:1.55;max-width:1050px}table{border-collapse:collapse;width:100%;margin:20px 0}th,td{border-bottom:1px solid #34404d;padding:10px;text-align:left}small,.muted{color:#acb8c6}a{color:#8fc6ff}select,button{font:inherit;background:#1d2a39;color:inherit;border:1px solid #4e6176;border-radius:5px;padding:7px;margin-right:10px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:18px}.card{background:#16212d;border:1px solid #34404d;border-radius:8px;padding:14px}canvas{width:100%;aspect-ratio:1}summary{cursor:pointer;padding:10px}pre{white-space:pre-wrap;max-height:650px;overflow:auto;font-size:12px}.error{color:#ffa6a6}
+</style>
+<h1>Shaping study · final results</h1>
+<p id="status">Loading verified results…</p>
+<p>Human composite: equal weight for KADID, TID2013, KonFiG F and CID22 human ratings; equal pooled and within-source ranks; equal outer folds and paired seeds. SSIM2 teacher agreement is separate. Final holdouts were not read and no serving model was promoted.</p>
+<div id="headline"></div>
+<p class="muted">Intervals use 2,000 stratified whole-source bootstrap draws, conditional on these fitted models and observed sources. They do not estimate uncertainty from retraining. Ten of twelve neural family/fold groups retain registered optimization warnings; the observed model comparisons do not establish global convergence or architectural superiority.</p>
+<h2>Outer-test scatter plots</h2>
+<p>Each axis is a percentile rank within its dataset and outer fold. Colors identify the three source-disjoint folds. The diagonal is perfect rank agreement. These plots reuse stored predictions and show scatter geometry; the headline statistic is the registered mean of fold statistics.</p>
+<label>Dataset <select id="population"></select></label><label>Seed <select id="seed"><option>0</option><option>1</option><option>2</option></select></label>
+<div id="plots" class="grid"></div>
+<h2>Human datasets and teacher agreement</h2><div id="populations"></div>
+<h2>Matched ablations and learning curves</h2>
+<p>Each difference compares the named condition with the same role trained on the full source set using human and SSIM2 supervision. A human-only product model reaches 0.9049, but its improvement over mixed supervision has an interval crossing zero. Shuffled-label models retain nonzero quality correlation, especially the constrained additive model; these controls are not evidence that all shortcuts or memorization have been eliminated.</p>
+<div id="comparisons"></div>
+<h2>Measured scoring cost</h2><div id="costs"></div>
+<p class="muted">Measured on r3800x. Time is the median across the trained models of each model’s median 40-row batch mean per row, excluding image feature extraction. Pruning differs between trained models. This is not an isolated architecture benchmark or an end-to-end image latency measurement. All 48 timing and fresh-process memory cases completed their original gates.</p>
+<h2>Original A architecture and training data</h2><div id="adata"></div>
+<p>Three matched seeds were trained for each of shaped and unshaped A recipes. The result is mixed: LIVE improves, LIVE clean10 declines, and CSIQ is essentially unchanged. These development comparisons do not establish a general improvement over the serving A model.</p>
+<p>Joint product shaping is a useful candidate initialization, but this study did not establish one reusable per-feature bank across seeds. The frozen-bank trials use seed-matched learned prefixes. A universally good default bank requires a separate transfer test.</p>
+<details><summary>Native population and source statistics</summary><p>Select a model to inspect its saved native panels; no inference is rerun.</p><select id="model"></select><pre id="native"></pre></details>
+<details><summary>Registered fit coverage and optimization diagnostics</summary><pre id="coverage"></pre></details>
+<p><a href="results.json">Download results and scatter coordinates</a> · <a href="INPUTS.json">Input identities</a></p>
+<script>
+const names={relu:'ReLU',best_analytic:'Softplus',best_product:'Joint product shaping',best_separate:'Selected separate shaping',extra_trees:'Extra Trees',shaped_additive:'Shaped additive'};
+const labels={kadid:'KADID',tid2013:'TID2013',konfig:'KonFiG F',cid22_a25:'CID22 human',cid22_ssim2:'CID22 SSIM2 teacher'};
+const number=(x,n=4)=>Number(x).toFixed(n),interval=x=>x.map(v=>number(v)).join(' to ');
+function table(headers,rows){const t=document.createElement('table'),h=t.createTHead().insertRow();for(const s of headers){const c=document.createElement('th');c.textContent=s;h.append(c)}const b=t.createTBody();for(const row of rows){const r=b.insertRow();for(const s of row)r.insertCell().textContent=s}return t}
+fetch('results.json').then(r=>{if(!r.ok)throw Error(r.status);return r.json()}).then(d=>{
+document.querySelector('#status').textContent='Complete: 1,461 fitting conditions · 25 uncertainty analyses · 48 scoring and memory cases · 256 later-stage archive closures.';
+document.querySelector('#headline').append(table(['Approach','Human composite','Difference from ReLU','95% paired difference interval'],d.roles.map(r=>{const v=d.primary[r].equal_human_composite;return[names[r],number(v.point),number(v.difference_from_relu),interval(v.difference_percentile95)]})));
+const pop=document.querySelector('#population');for(const [k,v] of Object.entries(labels)){const o=document.createElement('option');o.value=k;o.textContent=v;pop.append(o)}
+const canvases={};for(const r of d.roles){const c=document.createElement('div');c.className='card';const h=document.createElement('h3');h.textContent=names[r];c.append(h);const canvas=document.createElement('canvas');canvas.width=520;canvas.height=520;canvas.setAttribute('aria-label',names[r]+' outer-test scatter');c.append(canvas);const caption=document.createElement('small');c.append(caption);canvases[r]={canvas,caption};document.querySelector('#plots').append(c)}
+function draw(){for(const role of d.roles){const {canvas,caption}=canvases[role],c=canvas.getContext('2d'),m=44,w=canvas.width-2*m;const seed=role==='shaped_additive'?'deterministic':document.querySelector('#seed').value;const pts=d.scatter_points[[role,seed,pop.value].join('|')];if(!pts)throw Error('Missing registered scatter series');c.clearRect(0,0,520,520);c.strokeStyle='#435366';c.beginPath();c.rect(m,m,w,w);c.moveTo(m,m+w);c.lineTo(m+w,m);c.stroke();for(const [x,y,f]of pts){c.fillStyle=['#77b6ff50','#ffa85850','#57d9b350'][f];c.fillRect(m+x*w,m+(1-y)*w,2,2)}c.fillStyle='#c2cbd6';c.font='14px system-ui';c.fillText('0',m-8,m+w+20);c.fillText('1',m+w-5,m+w+20);c.fillText('Human target rank →',m+85,512);c.save();c.translate(15,m+w-80);c.rotate(-Math.PI/2);c.fillText('Model quality rank →',0,0);c.restore();caption.textContent=pts.length.toLocaleString()+' outer-test rows · '+(seed==='deterministic'?'deterministic model':'paired seed '+seed)}}
+pop.addEventListener('change',draw);document.querySelector('#seed').addEventListener('change',draw);draw();
+document.querySelector('#populations').append(table(['Approach',...Object.values(labels)],d.roles.map(r=>[names[r],...Object.keys(labels).map(p=>number(d.primary[r].populations[p].composite.point))])));
+document.querySelector('#comparisons').append(table(['Approach','Condition','Human composite','Difference from full mixed model','95% paired difference interval'],d.comparisons.map(r=>{const v=r.summary.equal_human_composite,c=r.spec.condition;const label=c.stage==='source_curve'?(100*c.fraction)+'% of sources':c.stage==='human_only'?'Human only':'Population-shuffled labels';return[names[r.spec.role],label,number(v.point),number(v.difference_from_control),interval(v.difference_percentile95)]})));
+document.querySelector('#costs').append(table(['Approach','Timed models','Median serialized model bytes','Median batch mean per row (µs)'],d.roles.map(r=>{const c=d.costs[r];return[names[r],String(c.models),c.median_bytes.toLocaleString(),number(c.median_batch_mean_row_ns/1000,2)]})));
+document.querySelector('#adata').append(table(['Dataset / population','Unshaped mean','Joint product mean','Paired mean difference'],d.a_data.rows.map(r=>[r.dataset+' / '+r.population,number(r.mean.unshaped),number(r.mean.joint_product),number(r.mean_delta)])));
+document.querySelector('#coverage').textContent=JSON.stringify({coverage:d.core,optimization:d.convergence,uncertainty:d.uncertainty},null,2);
+const model=document.querySelector('#model');for(const key of Object.keys(d.population_reports)){const o=document.createElement('option');o.value=key;o.textContent=key;model.append(o)}const show=()=>document.querySelector('#native').textContent=JSON.stringify(d.population_reports[model.value],null,2);model.addEventListener('change',show);show();
+}).catch(e=>{document.querySelector('#status').className='error';document.querySelector('#status').textContent='Report failed to load: '+e.message;console.error(e)});
+</script></html>

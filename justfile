@@ -6105,3 +6105,7 @@ shaping-recovery-tests:
     PYTHONPATH="scripts/rev4_featpot:${PYTHONPATH:-}" python3 -B -m unittest discover -s scripts/tests -p 'test_shaping_continuation_finalize.py'
     PYTHONPATH="scripts/rev4_featpot:${PYTHONPATH:-}" python3 -B -m unittest discover -s scripts/tests -p 'test_shaping_reboot_recovery.py'
     PYTHONPATH="scripts/rev4_featpot:${PYTHONPATH:-}" python3 -B -m unittest discover -s scripts/tests -p 'test_shaping_resume_warmup.py'
+
+# Completed summaries and cached outer-test points; never fit or score a model.
+shaping-final-report study dispatch output a_data:
+    TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 2G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_final_report.py --study {{quote(study)}} --dispatch {{quote(dispatch)}} --output {{quote(output)}} --a-data {{quote(a_data)}}
