@@ -51,6 +51,16 @@ def tails(pred, target):
     return dict(rank_mae=float(err.mean()),rank_p95=float(np.quantile(err,.95)),rank_p99=float(np.quantile(err,.99)))
 
 
+def replay_batch(path,jobs):
+    """Standalone input to the bundled Rust panel; no Python needed to rescore."""
+    labels={}
+    with path.open('x') as f:
+        for i,(label,pred,target) in enumerate(jobs):
+            token='panel-'+str(i);labels[token]=label
+            f.write(token+'\t'+','.join(repr(float(v)) for v in pred)+'\t'+','.join(repr(float(v)) for v in target)+'\n')
+    write(path.with_suffix('.labels.json'),labels)
+
+
 def feature_probe(study,bake,output,binaries):
     probes=json.loads((study/'evaluation_views/outer-0/PROBES.json').read_text())
     if sha(probes['path'])!=probes['sha256']:raise ValueError('feature probe drift')
@@ -94,6 +104,13 @@ def human(study, run, output, binaries):
     d.update({n:np.load(original_root/'data'/f'{n}.npy',allow_pickle=False)[indices] for n in ('component','family')})
     os.environ['ZEN_PANEL_BIN']=str(binaries/'panel')
     panels=metrics(pred,d['y'],np.arange(len(indices)),d,control['maps'])
+    jobs=[]
+    for pop in sorted(set(d['pop'])):
+        ids=np.flatnonzero(d['pop']==pop);jobs.append((str(pop)+'|pooled',pred[ids],d['y'][ids]))
+        for component in sorted(set(d['component'][ids])):
+            q=ids[d['component'][ids]==component]
+            jobs.append((str(pop)+'|source|'+str(component),pred[q],d['y'][q]))
+    replay_batch(output/'replay-batch.tsv',jobs)
     rank_tails={str(pop):tails(pred[d['pop']==pop],d['y'][d['pop']==pop]) for pop in sorted(set(d['pop']))}
     diagnostics=[]
     for line in (run/'train.log').read_text().splitlines():
@@ -143,6 +160,7 @@ def a_recipe(run, inputs, output, binaries, study):
             panel,=panel_batch([(name,pred,target)],stats='srocc',raw_errors=True)
             if panel['n_dropped']:raise ValueError('canonical A panel dropped rows')
             stats[name]=dict(rows=len(ids),statistics=panel,**tails(pred,target))
+        replay_batch(dest/'replay-batch.tsv',[(name,values[ids],[rows[i]['target'] for i in ids]) for name,ids in subsets.items()])
         write(dest/'SCATTER.json',dict(predicted=values.tolist(),target=[r['target'] for r in rows],source=[r['group'] for r in rows]))
         datasets[dataset]=stats
     result=dict(stage='complete',id=run.name,arm=terminal['arm'],seed=terminal['seed'],recipe='A',

@@ -99,6 +99,33 @@ def close(root,study,archive,results):
         raise ValueError('durable archive must resolve to the verified NAS mount')
     closure=root/'closure';closure.mkdir(exist_ok=True)
     write(closure/'RESULTS.json',summary(root,results))
+    (closure/'REPLAY.md').write_text('''# Replaying the saved scalar panels
+
+Run `sha256sum -c SHA256SUMS` before extraction. Extract the `.tar.zst`
+bundles into one directory with `tar --zstd -xf <bundle>`.
+
+The native executable bundle is Linux x86-64. Each evaluation carries the
+actual scalar prediction/target inputs for its pooled and within-source panels:
+
+```
+native-bin-v2/panel --batch evaluations/<model>/replay-batch.tsv --stats srocc --raw-errors
+native-bin-v2/panel --batch evaluations/<A-model>/live/replay-batch.tsv --stats srocc --raw-errors
+```
+
+The adjacent `.labels.json` maps compact labels to their original populations
+and sources. No new fit, calibration, image extraction or Python code is needed
+for these panels. The JSON results retain rank tails and the paired-seed
+comparison. Human composite scores average pooled/within-source SROCC, equally
+over the four human populations; CID22 SSIM2 stays separate.
+
+`REUSED_INPUT_CLOSURES.json` identifies the previously verified training-data
+archives. `human-inputs/` contains the exact commands, shape/optimizer manifests,
+row weights and input hashes. `a-inputs/` contains the registered A commands,
+shared/fixed templates and bank provenance; its original recipe and runtime
+are in the named original-A shared archive. Native executable/source identities
+are in `native-bin-v2/BUILD.json`. All 15 conditions use fixed final epochs.
+This is a development screen; no fresh confirmation or serving promotion occurred.
+''')
     # Quiescent fit/evaluation trees are packed once. Do not include the live
     # supervisor or duplicate the previously archived shared training arrays.
     for name in ('runs','evaluations','native-source','native-bin-v2','human-inputs','a-inputs','a-evaluation-inputs','qualification','runtime'):
