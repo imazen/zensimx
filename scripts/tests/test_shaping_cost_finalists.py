@@ -22,6 +22,7 @@ class FinalistTests(unittest.TestCase):
             binaries=root/'bin';binaries.mkdir();converter=binaries/'bake_dial_refit';converter.write_text('converter')
             (binaries/'BUILD.json').write_bytes(encoded(dict(binary_sha256={'bake_dial_refit':sha(converter)})))
             families=dict(zip(ROLES,('relu','extra_trees','shaped_additive','softplus','product_joint_identity','separate_joint_identity')))
+            prep=root/'PREP.json';prep.write_text(json.dumps(dict(groups=[dict(name='fixture',rows=120)])))
             rows=[];partitions={};cells=matrix()
             for outer in range(3):
                 test=list(range(outer*40,(outer+1)*40));train=sorted(set(range(120))-set(test))
@@ -39,7 +40,11 @@ class FinalistTests(unittest.TestCase):
                         else:
                             dense=panel/'dense'/(pin[:16]+'.bin');dense.parent.mkdir(exist_ok=True);dense.write_bytes(model.read_bytes())
                             report=dict(checkpoint_sha256=pin)
-                        rows.append(dict(cell=cell,role=role,report=report,indices=list(range(120)),predictions=np.arange(120,dtype=float),run_directory=str(run),evaluation_directory=str(panel)))
+                            (panel/'fixture-train.tsv').write_text('row_idx\tpred\n'+''.join(f'{j}\t{float(i)!r}\n' for j,i in enumerate(train)))
+                        cached=np.arange(120,dtype=float)
+                        if family not in ('extra_trees','shaped_additive'):
+                            cached=np.nextafter(cached,np.inf)
+                        rows.append(dict(cell=cell,role=role,report=report,indices=list(range(120)),predictions=cached,run_directory=str(run),evaluation_directory=str(panel)))
             def convert(command,**kwargs):
                 Path(command[-1]).write_bytes(Path(command[-3]).read_bytes())
                 return SimpleNamespace(returncode=0,stdout='BIT-IDENTICAL',stderr='')
@@ -48,7 +53,7 @@ class FinalistTests(unittest.TestCase):
                 self.assertEqual(choose.call_count,3)
                 return plan,partitions,rows,{},dict.fromkeys(('0','1','2'),{})
             from shaping_cost_fixture import choose_rows
-            with patch('shaping_reduced_scope.coverage',return_value=scope),patch('shaping_cost_finalists.load_registration',return_value=(plan,cells,partitions)),patch('shaped_linear_study.OLD',old),patch('shaping_cost_finalists.choose_rows',wraps=choose_rows) as choose,patch('shaping_outer_evidence.collect',side_effect=admitted),patch('shaping_cost_finalists.subprocess.run',side_effect=convert),patch('shaping_cost_complexity.inputs',return_value=({},root/'inventory',root/'inspector')),patch('shaping_cost_complexity.write_fold') as complexity:
+            with patch('shaping_reduced_scope.coverage',return_value=scope),patch('shaping_cost_finalists.load_registration',return_value=(plan,cells,partitions)),patch('shaped_linear_study.OLD',old),patch('shaped_linear_study.PREP',prep),patch('shaping_cost_finalists.choose_rows',wraps=choose_rows) as choose,patch('shaping_outer_evidence.collect',side_effect=admitted),patch('shaping_cost_finalists.subprocess.run',side_effect=convert),patch('shaping_cost_complexity.inputs',return_value=({},root/'inventory',root/'inspector')),patch('shaping_cost_complexity.write_fold') as complexity:
                 result=prepare_outer(study,binaries,root/'out');self.assertEqual(result['models'],48)
                 self.assertEqual(complexity.call_count,3)
                 for outer in range(3):

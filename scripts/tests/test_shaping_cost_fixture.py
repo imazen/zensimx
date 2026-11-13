@@ -1,11 +1,23 @@
 import json,sys,tempfile,unittest
 from pathlib import Path
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'rev4_featpot'))
-from shaping_cost_fixture import choose_rows,float_bits,archived_control
+from shaping_cost_fixture import choose_rows,float_bits,archived_control,native_training_predictions
 from shaping_completion import sha
 
 
 class CostFixtureTests(unittest.TestCase):
+    def test_native_text_preserves_exact_bits_and_rejects_row_drift(self):
+        with tempfile.TemporaryDirectory(dir=Path.home()/'tmp') as temp:
+            panel=Path(temp);path=panel/'human-train.tsv'
+            path.write_text('row_idx\tpred\n0\t51.076045989990234\n1\t-0.0\n')
+            values,pins=native_training_predictions(panel,[1,3],[dict(name='human',rows=4)])
+            self.assertEqual(float_bits(values[1]),0x404989bbe0000000)
+            self.assertEqual(float_bits(values[3]),float_bits(-0.))
+            self.assertEqual(pins[str(path)],sha(path))
+            path.write_text('row_idx\tpred\n1\t51.076045989990234\n0\t-0.0\n')
+            with self.assertRaisesRegex(ValueError,'row order'):
+                native_training_predictions(panel,[1,3],[dict(name='human',rows=4)])
+
     def test_fixed_rows_never_enter_nontraining_membership(self):
         populations=[str(i//10) for i in range(50)]
         train=[i for i in range(50) if i%10!=0]

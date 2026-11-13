@@ -24,6 +24,25 @@ def choose_rows(train,populations):
 def float_bits(value):return struct.unpack('<Q',struct.pack('<d',float(value)))[0]
 
 
+def native_training_predictions(panel, train, groups):
+    """Read round-tripping native text without a dataframe decimal conversion."""
+    training=set(train);values={};pins={};offset=0
+    if len(training)!=len(train):raise ValueError('distinct native training rows required')
+    for group in groups:
+        ids=[i for i in range(offset,offset+group['rows']) if i in training]
+        offset+=group['rows']
+        if not ids:continue
+        path=panel/(group['name']+'-train.tsv')
+        with path.open() as stream:rows=list(csv.DictReader(stream,delimiter='\t'))
+        if len(rows)!=len(ids) or [int(row['row_idx']) for row in rows]!=list(range(len(ids))):
+            raise ValueError('native training row order differs')
+        predictions=[float(row['pred']) for row in rows]
+        if not np.isfinite(predictions).all():raise ValueError('finite native predictions required')
+        values.update(zip(ids,predictions));pins[str(path)]=sha(path)
+    if set(values)!=training:raise ValueError('complete native training prediction coverage required')
+    return values,pins
+
+
 def archived_control(study,family,paths):
     """Original inner controls bind predictions through their verified batch archive."""
     archive=study.parent/('tree-inner-archive' if family=='extra_trees' else 'linear-inner-archive')

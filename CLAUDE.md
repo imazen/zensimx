@@ -1637,3 +1637,14 @@ The uncertainty pipeline accepts repeated `--worker-host` options to restrict
 placement to an explicit current subset of the authorized pool. Unknown or
 duplicate hosts refuse, and live withdrawals still apply. This changes placement
 only; all 25 comparisons, source-bootstrap draws and scientific gates remain.
+
+## Known Bugs — outer cost prediction decimal parsing (resolved November 13, 2026)
+
+The first outer timing attempt refused an exact-score check: cached panel value
+`404989bbe0000001` differed from native score bits `404989bbe0000000`. The
+saved native text `51.076045989990234` round-trips to the latter. Outer neural
+timing oracles now read the original native TRAIN TSVs with Python's float
+parser and pin those files, matching the existing inner qualification method.
+Row membership, final model bytes and the bit-exact native gate are unchanged.
+Preserve the first prepared workload and refused timing; no fit or scientific
+quality evaluation is replayed for this preparation correction.

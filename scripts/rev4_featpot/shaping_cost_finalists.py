@@ -128,7 +128,7 @@ def prepare_outer(root,binaries,output):
     from shaping_outer_evidence import collect
     if output.exists():raise ValueError('preserve existing finalist workload')
     scope,paths,pins,chosen=outer_training_rows(root)
-    _,_,rows,evidence,qualifications=collect(root);pins.update(evidence)
+    _,partitions,rows,evidence,qualifications=collect(root);pins.update(evidence)
     if len(rows)!=48 or not all('role' in row for row in rows):raise ValueError('all 48 reduced outer finalists required')
     from shaping_cost_complexity import inputs as complexity_inputs,write_fold
     complexity_pins,inventory,inspector=complexity_inputs(root,rows);pins.update(complexity_pins)
@@ -174,7 +174,14 @@ def prepare_outer(root,binaries,output):
                     raise ValueError('outer dense representation differs from evaluated model')
             else:shutil.copyfile(model,dest)
             if family not in NEURAL and sha(dest)!=model_pin:raise ValueError('copied outer model differs')
-            lookup=dict(zip(row['indices'],row['predictions']))
+            if family in NEURAL:
+                from shaped_linear_study import PREP
+                from shaping_cost_fixture import native_training_predictions
+                lookup,native_pins=native_training_predictions(panel,partitions[f'outer-{outer}']['train'],
+                    json.loads(PREP.read_text())['groups'])
+                pins.update(native_pins)
+            else:
+                lookup=dict(zip(row['indices'],row['predictions']))
             arms.append(dict(id=name,kind='tree' if family=='extra_trees' else 'shaped_additive' if family=='shaped_additive' else 'bake',
                              model=str(relative),sha256=sha(dest),expected_score_bits=[float_bits(lookup[i]) for i in chosen[outer]]))
             identities.append(dict(cell=cell,role=row['role'],resolved_family=family,schedule=schedule))
