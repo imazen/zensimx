@@ -202,8 +202,12 @@ def finalize(study, capture, native):
                 if sha(raw_source)!=final_pin:
                     raw_prefix=evidence_root/"continuation-evidence/raw-prefix"/source.name
                     raw_prefix.parent.mkdir(parents=True,exist_ok=True)
-                    if raw_prefix.exists():raise ValueError("preserve existing predecessor raw checkpoint")
-                    shutil.copy2(raw_source,raw_prefix)
+                    if raw_prefix.exists():
+                        if (raw_prefix.stat().st_size != raw_source.stat().st_size
+                                or sha(raw_prefix) != sha(raw_source)):
+                            raise ValueError("preserve different predecessor raw checkpoint")
+                    else:
+                        shutil.copy2(raw_source,raw_prefix)
             with source.open("rb") as src, dest.open("xb") as dst:
                 shutil.copyfileobj(src, dst, 1024 * 1024)
                 dst.flush()

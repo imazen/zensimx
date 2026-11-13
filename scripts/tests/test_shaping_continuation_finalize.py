@@ -51,6 +51,75 @@ class ContinuationFinalizationTests(unittest.TestCase):
         shutil.copytree(root,capture.parent/"original-attempt")
         return study,root,capture,native
 
+    def postprocessed_fixture(self, base):
+        study,root,capture,native=self.fixture(base)
+        binary=base/"bin/trainer";binary.parent.mkdir()
+        binary.write_bytes(b"frozen-native-postprocessor")
+        build=binary.parent/"BUILD.json"
+        build.write_bytes(encoded(dict(binary_sha256={binary.name:sha(binary)})))
+        for attempt in (root,capture.parent/"original-attempt"):
+            initial=json.loads((attempt/"RUN.json").read_text())
+            initial["build_sha256"]=sha(build)
+            (attempt/"RUN.json").write_bytes(encoded(initial))
+            phase=attempt/"fit";record=json.loads((phase/"RUN.json").read_text())
+            record["build_sha256"]=sha(build)
+            record["parent_run_sha256"]=sha(attempt/"RUN.json")
+            record["command"][2]=str(binary)
+            (phase/"RUN.json").write_bytes(encoded(record))
+        cap=json.loads(capture.read_text())
+        cap["native"]["command"][0]=str(binary)
+        capture.write_bytes(encoded(cap))
+        done=json.loads((native/"RESULT.json").read_text())
+        done["command"][0]=str(binary)
+        done["build_sha256"]=sha(build)
+        done["source_capture_sha256"]=sha(capture)
+        (native/"RESULT.json").write_bytes(encoded(done))
+        with (native/"train.log").open("a") as stream:
+            stream.write("Stamped 120 checkpoint dump(s) with complete training metadata\n")
+        for checkpoint in (native/"checkpoints").glob("*.bin"):
+            checkpoint.write_bytes(checkpoint.read_bytes()+b"-stamped")
+        return study,root,capture,native
+
+    def test_stamped_prefix_preserves_raw_bytes_and_reconciles(self):
+        with tempfile.TemporaryDirectory(dir=Path.home()/"tmp") as temp:
+            study,root,capture,native=self.postprocessed_fixture(Path(temp))
+            original=capture.parent/"original-attempt/fit/checkpoints"
+            with patch("shaping_continuation_finalize.socket.gethostname",return_value="i134"):
+                finalize(study,capture,native)
+                self.assertTrue(finalize(study,capture,native)["publication_reconciled"])
+            for raw in original.glob("*.bin"):
+                retained=root/"continuation-evidence/raw-prefix"/raw.name
+                self.assertEqual(retained.read_bytes(),raw.read_bytes())
+                self.assertEqual((root/"fit/checkpoints"/raw.name).read_bytes(),
+                                 (native/"checkpoints"/raw.name).read_bytes())
+
+    def test_stamped_prefix_recovers_after_raw_retention(self):
+        with tempfile.TemporaryDirectory(dir=Path.home()/"tmp") as temp:
+            study,root,capture,native=self.postprocessed_fixture(Path(temp))
+            retained=root/"continuation-evidence/raw-prefix/ckpt_epoch000.bin"
+            retained.parent.mkdir(parents=True)
+            (root/"fit/checkpoints"/retained.name).rename(retained)
+            pin=sha(retained)
+            with patch("shaping_continuation_finalize.socket.gethostname",return_value="i134"):
+                finalize(study,capture,native)
+            self.assertEqual(sha(retained),pin)
+            self.assertEqual((root/"fit/checkpoints"/retained.name).read_bytes(),
+                             (native/"checkpoints"/retained.name).read_bytes())
+
+    def test_stamped_prefix_rejects_changed_retained_evidence(self):
+        with tempfile.TemporaryDirectory(dir=Path.home()/"tmp") as temp:
+            study,root,capture,native=self.postprocessed_fixture(Path(temp))
+            retained=root/"continuation-evidence/raw-prefix/ckpt_epoch000.bin"
+            retained.parent.mkdir(parents=True)
+            (root/"fit/checkpoints"/retained.name).rename(retained)
+            retained.write_bytes(b"conflicting-evidence")
+            with patch("shaping_continuation_finalize.socket.gethostname",return_value="i134"):
+                with self.assertRaisesRegex(ValueError,"predecessor raw checkpoint"):
+                    finalize(study,capture,native)
+            self.assertEqual(retained.read_bytes(),b"conflicting-evidence")
+            self.assertFalse((root/"RESULT.json").exists())
+            self.assertFalse((root/"fit/checkpoints"/retained.name).exists())
+
     def test_exact_state_finalization_preserves_initial_identity_and_raw_logs(self):
         with tempfile.TemporaryDirectory(dir=Path.home()/"tmp") as temp:
             study,root,cap,native=self.fixture(Path(temp));pin=sha(root/"RUN.json")

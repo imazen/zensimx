@@ -1602,3 +1602,13 @@ The outer and variant admission paths already verified inactive joint parents th
 A pretraining observation can name the phase directory as its run. Continuation now resolves its controller through the separately bound phase parent and preserves both identities. Explicit pretraining finalization publishes only the phase; the original unstarted fit completes the controller afterward.
 
 Continuation warmup originally searched a primary-run checkpoint path. It now binds the allowance to the first newly computed continuation checkpoint, retaining the allowance through loading and releasing it after actual progress. Existing memory caps and aggregate CPU limits are unchanged.
+
+## Known Bugs — stamped continuation prefix publication (resolved November 13, 2026)
+
+The continuation finalizer retained a raw prefix checkpoint and then rejected
+that same retained file while publishing its stamped successor. It now reuses
+retained raw evidence only when its size and SHA-256 match the frozen original.
+Fresh publication, recovery after raw retention, repeated completed publication
+and conflicting-evidence refusal are covered. Native training, optimizer state,
+checkpoint coverage and provenance checks are unchanged. This source repair
+does not establish completion of any interrupted real run.
