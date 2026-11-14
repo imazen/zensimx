@@ -1,0 +1,23 @@
+[package]
+name = "aichdr-score"
+version = "0.0.0"
+edition = "2024"
+publish = false
+description = "Score AIC-HDR2025 (Rec.2100 PQ PNG16) pairs with the published zensim crate's compute_hdr"
+
+# Standalone: it builds against the PUBLISHED zensim crate (../../../zensim/zensim),
+# which shares its package name with this workspace's research crate.
+[workspace]
+
+[dependencies]
+zensim = { path = "../../../zensim/zensim" }
+zenpng = { git = "https://github.com/imazen/zenpng", rev = "02a7f0df5f72dd79b0afa58d66ced7cdd8395e31", default-features = false }
+zenpixels = { version = "0.3.1", default-features = false }
+enough = { version = "0.4.5", default-features = false, features = ["std"] }
+
+# Same codec pins as the zensimx root manifest.
+[patch.crates-io]
+zenpixels = { git = "https://github.com/imazen/zenpixels", rev = "fa836abf72afe9826e866dc25712b7c800323962" }
+zencodec = { git = "https://github.com/imazen/zencodec", rev = "1816b4d082234c04c3805411b437b8396040f522" }
+zenflate = { git = "https://github.com/imazen/zenflate", rev = "a0ea03637a2cc9a193e343018ae2cfb1a6c31edd" }
+zenpixels-convert = { git = "https://github.com/imazen/zenpixels", rev = "fa836abf72afe9826e866dc25712b7c800323962" }

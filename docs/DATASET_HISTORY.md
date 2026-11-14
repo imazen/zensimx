@@ -712,6 +712,8 @@ Shipped today (verified in `zensim/src/profile.rs`): **A** = `v47_strict_qat_nat
 
 **AIC-HDR2025: UNOBTAINABLE (user ruling 2026-08-05)** — the dataset was never publicly released (README-only clone at `/mnt/v/datasets/aic-hdr2025/`) and the authors are unresponsive; STOP live-checking `github.com/jpeg-aic/AIC-HDR2025`. Removed from the HDR anchor plans; it can never enter train or eval.
 
+**AIC-HDR2025: RELEASED 2026-11-14** (jpeg-aic/AIC-HDR2025 `33ab64e5`: 105 PNGs, `jnd_scores.csv`, `rd_curves.csv`, `metric_scores.csv`). The ruling above is superseded; the set is now T0 eval-only. Its released SSIM-family columns (`SSIM`, `SSIM after TM`, `MS-SSIM (PQ)`, `MS-SSIM_after TM`) do not reproduce the paper's Table II; the other 25 columns do. First read: `benchmarks/aichdr2025_eval_2026-11-14.md`.
+
 ---
 
 ## 2. What didn't work — falsification ledger (verdict strength matters)
