@@ -1825,13 +1825,16 @@ HDR-VDP-2, below CVVDP at 10k nits on Korshunov by 0.024 (interval excludes zero
 level on Korshunov) and above SSIMULACRA2 on the PU renderings (+0.17 pooled, +0.12 on Korshunov, +0.16 on
 Narwaria). Nothing is adopted on this read.
 
-**AIC2026 leg share (owner question, 2026-11-04).** The trainer samples a pair with probability proportional to its
-group's `train_weight` (`zensim-train-core/src/lib.rs`), so a group's share of the draws is rows × weight over the
-total. In the continuation step (60 epochs × 50,000 draws, `train.log` of `mixF3-s0`) the AIC2026 public_train leg is
-3,920 pairs at ×256 = 48.3% of the draws (coverage 18.3%, chroma teacher 11.6%, BAPPS 10.7%, SafeSyn 6.9%, the human
-MOS legs 1.5% each, MDID 0.7%, CID22 0.6%), about 370 passes over each AIC pair; the 120-epoch base fit has no AIC
-leg, so over base fit plus continuation AIC2026 is 16.1% of all draws. At ×64 it would be 18.9% of the continuation's
-draws, at ×16 5.5%. The weight was never ablated (method review, experiment 1).
+**AIC2026 leg share (owner question, 2026-11-04; corrected 2026-11-17).** The frozen CPU trainers at
+`58417ce7` and `f60fa7e5` construct the group-selection CDF directly from `train_weight`, without multiplying
+by row counts. In the 60-epoch continuation (50,000 attempts per epoch), AIC2026 public_train has weight 256
+out of 335.745046866341: 76.2483% of sampling attempts. Coverage accounts for 6.4399%, TID2013 within-reference
+ranking 5.3664%, MDID 5.3664%, TID2013 cross-reference ranking 5.3664%, SafeSyn 0.3029%, CID22 0.3013%,
+BAPPS 0.2978% and the chroma teacher 0.3105%. The 120-epoch base has no AIC leg, so AIC2026 represents
+25.4161% of all nine million configured attempts. These are nominal probabilities before same-row or tied-pair
+skips, not measured accepted-pair fractions or gradient shares. Earlier 48.3% continuation / 16.1% overall
+figures and their alternative-weight projections used an incorrect rows-times-weight calculation. The
+original study did not ablate the AIC weight (method review, experiment 1).
 
 *Addendum, SSIMULACRA2 on HDR done properly.* zenmetrics' `benchmarks/pu_integrated_upiq_2026-06-09.md` scored the
 same 380 UPIQ pairs with PU21 integrated into SSIMULACRA2's perceptual encoding (fast-ssim2 `hdr-pu`, absolute
