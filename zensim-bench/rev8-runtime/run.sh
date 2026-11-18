@@ -50,6 +50,9 @@ for threads in ${REV8_THREADS:-16 1}; do
                 printf "%s\trunning\t%s\t%s\t%s\t%s\n" "$(date -u +%FT%TZ)" "$threads" "$geometry" "$mode" "$$" >> "$root/progress.tsv"
                 uptime
                 if [[ $mode == latency && -n ${REV8_ADMISSION_PROGRAM:-} ]]; then
+                    if [[ -n ${REV8_ADMISSION_SHA256:-} ]]; then
+                        printf "%s  %s\n" "$REV8_ADMISSION_SHA256" "$REV8_ADMISSION_PROGRAM" | sha256sum --check --status
+                    fi
                     "$REV8_ADMISSION_PROGRAM"
                 fi
                 if [[ $(hostname -s) == i265 ]]; then
