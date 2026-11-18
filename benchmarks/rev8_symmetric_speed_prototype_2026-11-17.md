@@ -2,7 +2,7 @@
 
 ## Missing and limitations
 
-The owner narrowed the timing matrix to 1024×1024 and 4000×3000. Accepted evidence covers 8 of 12 descriptive latency cells and 80 of 96 scoped RSS measurements. The original full-sweep capture contributes 1 accepted Zenbench cell. The report will fill the remaining cells after their host lock admits them.
+The owner narrowed the timing matrix to 1024×1024 and 4000×3000. Accepted evidence covers 12 of 12 descriptive latency cells and 96 of 96 scoped RSS measurements. The original full-sweep capture contributes 1 accepted Zenbench cell.
 
 The max-pair + PCHIP head is a timing fixture with synthetic coefficients.
 The benchmark uses generated RGB8 SDR scenes. It does not establish perceptual
@@ -82,8 +82,12 @@ Each cell reads **median [min, max] ms · Mpx/s at median · Rev7 median / arm m
 | dev / v3 | 1 | 4000x3000 | 00 | 284.115 [282.363, 284.386] · 42.24 · 1.000× | 637.313 [636.454, 638.821] · 18.83 · 0.446× | 732.648 [732.194, 734.986] · 16.38 · 0.388× | 841.602 [840.880, 842.856] · 14.26 · 0.338× |
 | dev / v3 | 16 | 1024x1024 | 00 | 9.374 [6.975, 13.592] · 111.86 · 1.000× | 7.470 [7.306, 10.045] · 140.36 · 1.255× | 9.039 [9.011, 12.497] · 116.01 · 1.037× | 10.204 [10.047, 10.246] · 102.77 · 0.919× |
 | dev / v3 | 16 | 4000x3000 | 00 | 115.847 [110.487, 122.790] · 103.58 · 1.000× | 108.275 [107.156, 109.394] · 110.83 · 1.070× | 117.882 [115.354, 118.502] · 101.80 · 0.983× | 129.690 [128.811, 129.721] · 92.53 · 0.893× |
+| i265 / v3 | 1 | 1024x1024 | 00 | 35.259 [33.325, 35.693] · 29.74 · 1.000× | 81.953 [81.211, 82.998] · 12.79 · 0.430× | 108.044 [106.387, 108.515] · 9.71 · 0.326× | 118.295 [117.697, 118.873] · 8.86 · 0.298× |
+| i265 / v3 | 1 | 4000x3000 | 00 | 367.063 [366.505, 373.640] · 32.69 · 1.000× | 883.314 [881.459, 884.115] · 13.59 · 0.416× | 1004.441 [1004.302, 1004.950] · 11.95 · 0.365× | 1128.383 [1127.636, 1130.898] · 10.63 · 0.325× |
+| i265 / v3 | 16 | 1024x1024 | 00 | 22.266 [16.618, 37.817] · 47.09 · 1.000× | 9.628 [8.271, 10.091] · 108.91 · 2.313× | 10.318 [9.471, 11.086] · 101.63 · 2.158× | 11.269 [11.254, 12.064] · 93.05 · 1.976× |
+| i265 / v3 | 16 | 4000x3000 | 00 | 188.802 [176.360, 206.132] · 63.56 · 1.000× | 202.667 [201.920, 203.235] · 59.21 · 0.932× | 211.478 [209.952, 212.659] · 56.74 · 0.893× | 216.065 [215.834, 240.844] · 55.54 · 0.874× |
 
-All three Rev8 variants had higher medians than Rev7 at 1T on dev. Alg S4 had the lowest median in each of the four dev 16T cells. On v4x, all three prototypes had lower 16T medians at both sizes. On v3, Hybrid S5 had higher medians at both sizes and Alg S5 was close to Rev7. These observations are for fixture 00 and three rounds.
+All three Rev8 variants had higher medians than Rev7 in the six 1T cells. Alg S4 had the lowest 16T median in all four dev cells and at 1024² on i265. At 12 MP and 16T on i265, Rev7 recorded 188.802 ms and Alg S4 recorded 202.667 ms. Each Rev8 variant used less peak RSS than Rev7 at 12 MP in every placement and thread count. The latency findings describe fixture 00 and three rounds per cell.
 
 | Geometry | Fixture ID | RGB8 source FNV-1a 64 | RGB8 distorted FNV-1a 64 |
 |---|---:|---|---|
@@ -96,7 +100,9 @@ The full clean-round sweep was withdrawn. The earlier accepted cell
 retains its original method of 20 fixtures, 100 ms warm-up per arm and
 fixture, and the first 32 clean interleaved single-call rounds per fixture.
 P50 and p95 are pooled type-7 quantiles. Rejected and interrupted captures
-remain in the handoff alongside the admitted receipts.
+remain in the handoff alongside the admitted receipts. One dev attempt
+started after the scratch admission check changed and was stopped. It
+remains in the rejected receipts.
 
 | Host / tier | Threads | Geometry | Calls per arm | Rev7 p50 / p95 ms | Alg S4 | Alg S5 | Hybrid S5 |
 |---|---:|---|---:|---:|---:|---:|---:|
@@ -132,12 +138,12 @@ RSS reads use the rebuilt instrument with identical scorer source.
 | dev / v3 | 16 | 840x944 | 126,152 | 37,244 | 39,324 | 38,992 |
 | dev / v3 | 16 | 1024x1024 | 158,124 | 44,536 | 46,332 | 45,920 |
 | dev / v3 | 16 | 4000x3000 | 614,196 | 209,576 | 215,448 | 215,524 |
-| i265 / v3 | 1 | 1024x1024 | — | — | — | — |
-| i265 / v3 | 1 | 4000x3000 | — | — | — | — |
-| i265 / v3 | 16 | 1024x1024 | — | — | — | — |
-| i265 / v3 | 16 | 4000x3000 | — | — | — | — |
+| i265 / v3 | 1 | 1024x1024 | 33,000 | 12,484 | 12,680 | 12,572 |
+| i265 / v3 | 1 | 4000x3000 | 178,572 | 82,900 | 83,256 | 83,292 |
+| i265 / v3 | 16 | 1024x1024 | 154,356 | 45,960 | 47,096 | 47,244 |
+| i265 / v3 | 16 | 4000x3000 | 586,664 | 209,976 | 215,768 | 215,184 |
 
-The fresh-process RSS passes supplied 800 paired 1T/16T score-bit comparisons, with 0 differences. The descriptive capture reader also checks the score bits across thread counts wherever both cells exist.
+The fresh-process RSS passes supplied 960 paired 1T/16T score-bit comparisons, with 0 differences. The descriptive capture reader also checks the score bits across thread counts wherever both cells exist.
 
 ## Numerical verification
 
@@ -259,6 +265,14 @@ the receipts for the 12 MP fresh-process RSS workers.
 | dev / v3 | 16 | rev8-alg-s4 | `run-heavy: done rc=0 5s · peak-RSS 0.20GiB · min-avail 38464MiB · peak-load 2.37` |
 | dev / v3 | 16 | rev8-alg-s5 | `run-heavy: done rc=0 5s · peak-RSS 0.21GiB · min-avail 38405MiB · peak-load 3.45` |
 | dev / v3 | 16 | rev8-hybrid-s5 | `run-heavy: done rc=0 6s · peak-RSS 0.21GiB · min-avail 38566MiB · peak-load 4.09` |
+| i265 / v3 | 1 | zensim-a-rev7 | `run-heavy: done rc=0 11s · peak-RSS 0.17GiB · min-avail 23530MiB · peak-load 6.87` |
+| i265 / v3 | 1 | rev8-alg-s4 | `run-heavy: done rc=0 22s · peak-RSS 0.08GiB · min-avail 23561MiB · peak-load 5.01` |
+| i265 / v3 | 1 | rev8-alg-s5 | `run-heavy: done rc=0 23s · peak-RSS 0.08GiB · min-avail 23642MiB · peak-load 3.87` |
+| i265 / v3 | 1 | rev8-hybrid-s5 | `run-heavy: done rc=0 26s · peak-RSS 0.08GiB · min-avail 23197MiB · peak-load 3.11` |
+| i265 / v3 | 16 | zensim-a-rev7 | `run-heavy: done rc=0 8s · peak-RSS 0.56GiB · min-avail 23054MiB · peak-load 2.67` |
+| i265 / v3 | 16 | rev8-alg-s4 | `run-heavy: done rc=0 7s · peak-RSS 0.20GiB · min-avail 23259MiB · peak-load 2.67` |
+| i265 / v3 | 16 | rev8-alg-s5 | `run-heavy: done rc=0 7s · peak-RSS 0.21GiB · min-avail 23291MiB · peak-load 3.61` |
+| i265 / v3 | 16 | rev8-hybrid-s5 | `run-heavy: done rc=0 8s · peak-RSS 0.21GiB · min-avail 23422MiB · peak-load 4.71` |
 
 The public diff was checked for household identifiers, LAN addresses,
 MAC-address patterns and private source names. The frozen
