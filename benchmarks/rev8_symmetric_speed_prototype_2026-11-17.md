@@ -2,7 +2,7 @@
 
 ## Missing and limitations
 
-**Capture in progress.** 1 of 30 paired latency cells and 59 of 120 fresh-process RSS cells have admissible evidence. Em dashes mark missing cells.
+**Capture in progress.** 1 of 30 paired latency cells and 80 of 120 fresh-process RSS cells have admissible evidence. Em dashes mark missing cells.
 
 The max-pair + PCHIP head is a timing fixture with synthetic coefficients.
 The benchmark uses generated RGB8 SDR scenes. It does not establish perceptual
@@ -93,16 +93,16 @@ Table cells read **p50/p95 ms · Mpx/s · speedup vs Rev7 · peak RSS KiB**.
 | dev / v4x | 16 | 840x944 | — · 127,716 | — · 37,432 | — · 38,820 | — · 38,720 |
 | dev / v4x | 16 | 1024x1024 | — · 154,112 | — · 44,384 | — · 46,064 | — · 46,256 |
 | dev / v4x | 16 | 4000x3000 | — · 598,820 | — · 208,608 | — · 215,080 | — · 215,460 |
-| dev / v3 | 1 | 64x64 | — · — | — · — | — · — | — · — |
-| dev / v3 | 1 | 256x256 | — · — | — · — | — · — | — · — |
-| dev / v3 | 1 | 840x944 | — · — | — · — | — · — | — · — |
-| dev / v3 | 1 | 1024x1024 | — · — | — · — | — · — | — · — |
-| dev / v3 | 1 | 4000x3000 | — · — | — · — | — · — | — · — |
+| dev / v3 | 1 | 64x64 | — · 7,884 | — · 4,252 | — · 4,040 | — · 4,152 |
+| dev / v3 | 1 | 256x256 | — · 14,680 | — · 4,920 | — · 4,872 | — · 4,888 |
+| dev / v3 | 1 | 840x944 | — · 27,912 | — · 10,368 | — · 10,444 | — · 10,664 |
+| dev / v3 | 1 | 1024x1024 | — · 32,748 | — · 12,232 | — · 12,300 | — · 12,300 |
+| dev / v3 | 1 | 4000x3000 | — · 178,148 | — · 82,696 | — · 83,048 | — · 82,980 |
 | dev / v3 | 16 | 64x64 | — · 7,428 | — · 4,036 | — · 4,036 | — · 4,076 |
 | dev / v3 | 16 | 256x256 | — · 27,052 | — · 9,828 | — · 10,828 | — · 10,272 |
 | dev / v3 | 16 | 840x944 | — · 126,152 | — · 37,244 | — · 39,324 | — · 38,992 |
 | dev / v3 | 16 | 1024x1024 | — · 158,124 | — · 44,536 | — · 46,332 | — · 45,920 |
-| dev / v3 | 16 | 4000x3000 | — · 614,196 | — · 209,576 | — · 215,448 | — · — |
+| dev / v3 | 16 | 4000x3000 | — · 614,196 | — · 209,576 | — · 215,448 | — · 215,524 |
 | i265 / v3 | 1 | 64x64 | — · — | — · — | — · — | — · — |
 | i265 / v3 | 1 | 256x256 | — · — | — · — | — · — | — · — |
 | i265 / v3 | 1 | 840x944 | — · — | — · — | — · — | — · — |
@@ -202,7 +202,7 @@ both discounts.
 - Brightness and texture changes move the orientation proxy even after
   discounts. These witnesses establish what enters the timing fixture.
 
-The fresh-process RSS passes supply 400 paired 1T/16T score comparisons, with 0 differing score bit patterns.
+The fresh-process RSS passes supply 800 paired 1T/16T score comparisons, with 0 differing score bit patterns.
 
 ## Build and resource receipts
 
@@ -224,6 +224,11 @@ fixture packet, so its own resource high-water measurements have a different sco
 | dev / v4x | 16 | rev8-alg-s4 | `run-heavy: done rc=0 4s · peak-RSS 0.20GiB · min-avail 39351MiB · peak-load 8.73` |
 | dev / v4x | 16 | rev8-alg-s5 | `run-heavy: done rc=0 5s · peak-RSS 0.21GiB · min-avail 39143MiB · peak-load 8.45` |
 | dev / v4x | 16 | rev8-hybrid-s5 | `run-heavy: done rc=0 5s · peak-RSS 0.21GiB · min-avail 38218MiB · peak-load 9.55` |
+| dev / v3 | 1 | zensim-a-rev7 | `run-heavy: done rc=0 10s · peak-RSS 0.17GiB · min-avail 38336MiB · peak-load 3.07` |
+| dev / v3 | 1 | rev8-alg-s4 | `run-heavy: done rc=0 15s · peak-RSS 0.08GiB · min-avail 38456MiB · peak-load 3.53` |
+| dev / v3 | 1 | rev8-alg-s5 | `run-heavy: done rc=0 18s · peak-RSS 0.08GiB · min-avail 38356MiB · peak-load 3.87` |
+| dev / v3 | 1 | rev8-hybrid-s5 | `run-heavy: done rc=0 20s · peak-RSS 0.08GiB · min-avail 38438MiB · peak-load 4.52` |
 | dev / v3 | 16 | zensim-a-rev7 | `run-heavy: done rc=0 5s · peak-RSS 0.59GiB · min-avail 37885MiB · peak-load 2.76` |
 | dev / v3 | 16 | rev8-alg-s4 | `run-heavy: done rc=0 5s · peak-RSS 0.20GiB · min-avail 38464MiB · peak-load 2.37` |
 | dev / v3 | 16 | rev8-alg-s5 | `run-heavy: done rc=0 5s · peak-RSS 0.21GiB · min-avail 38405MiB · peak-load 3.45` |
+| dev / v3 | 16 | rev8-hybrid-s5 | `run-heavy: done rc=0 6s · peak-RSS 0.21GiB · min-avail 38566MiB · peak-load 4.09` |
