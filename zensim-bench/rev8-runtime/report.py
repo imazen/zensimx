@@ -40,7 +40,7 @@ def receipt(log, tier, threads, geometry):
 
 def latency(root, stem, tier, threads, geometry):
     log, summary = receipt(root / f"{stem}_latency.log", tier, threads, geometry)
-    require(not re.search(r'foreign pid=\d+ name="(cc1plus|cc1|rustc|cargo|cmake|ninja|zensim_mlp_trai)"', log),
+    require(not re.search(r'foreign pid=\d+ name="(cc1plus|cc1|rustc|clippy-driver|cargo|cmake|ninja|zensim_mlp_trai)"', log),
             "foreign compilation or training during the capture")
     run = json.loads((root / f"{stem}_latency.json").read_text())
     require(not run["unreliable"], "zenbench declined capture")

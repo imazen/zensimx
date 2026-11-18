@@ -536,8 +536,8 @@ fn streamed_moments_track_direct_f64_windows() {
             b.into_iter().map(xy).collect(),
         ];
         let (mut w, mut h) = (w, h);
-        for s in 0..5 {
-            for c in 0..3 {
+        for (s, scale) in result.features.iter().enumerate() {
+            for (c, terms) in scale.iter().enumerate() {
                 let mut expect = [0.0; 3];
                 for y in 0..h {
                     for x in 0..w {
@@ -565,7 +565,7 @@ fn streamed_moments_track_direct_f64_windows() {
                 }
                 for (i, idx) in [0, 3, 8].into_iter().enumerate() {
                     let expected = expect[i] / (w * h) as f64;
-                    let actual = result.features[s][c][idx];
+                    let actual = terms[idx];
                     let abs = (actual - expected).abs();
                     assert!(
                         abs < 2e-5,

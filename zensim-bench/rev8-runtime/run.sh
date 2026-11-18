@@ -49,13 +49,16 @@ for threads in ${REV8_THREADS:-16 1}; do
                 root=$1; threads=$2; geometry=$3; mode=$4; shift 4
                 printf "%s\trunning\t%s\t%s\t%s\t%s\n" "$(date -u +%FT%TZ)" "$threads" "$geometry" "$mode" "$$" >> "$root/progress.tsv"
                 uptime
+                if [[ $mode == latency && -n ${REV8_ADMISSION_PROGRAM:-} ]]; then
+                    "$REV8_ADMISSION_PROGRAM"
+                fi
                 if [[ $(hostname -s) == i265 ]]; then
                     df -B1 / | awk "NR == 2 { exit !(\$4 >= 5368709120) }"
                 fi
                 exec "$@"
             ' bash "$root" "$threads" "$geometry" "$mode" \
                 "$HOME/work/claudehints/scripts/run-heavy" --mem "$mem" --jobs 16 -- \
-                env RAYON_NUM_THREADS="$threads" OMP_NUM_THREADS="$threads" ZENBENCH_LAUNCHER_PIDS="$$" ZENBENCH_GATE_TRACE=1 \
+                env RAYON_NUM_THREADS="$threads" OMP_NUM_THREADS="$threads" ZENBENCH_LAUNCHER_PIDS="$$" ZENBENCH_GATE_TRACE=1 ZENBENCH_NO_SAVE=1 \
                 /usr/bin/time -v -o "$stem.time.txt" taskset -c "$cpus" "$bin" "$tier" "$threads" "$width" "$height" "${args[@]}" \
                 > "$stem.log" 2>&1; then
                 printf '%s\tcomplete\t%s\t%s\t%s\n' "$(date -u +%FT%TZ)" "$threads" "$geometry" "$mode" >> "$root/progress.tsv"

@@ -21,6 +21,8 @@ None.
 
 ### Research
 
+- Add the opt-in symmetric Rev8 SDR prototype and its paired Rev7 timing fixture (`6a48974a`).
+
 - Add opt-in shape stability, human hard-case rank weights and effective-output
   parameterization controls for the registered November 13 follow-up. Default
   plain/shared native checkpoint bytes match the previous trainer on the
