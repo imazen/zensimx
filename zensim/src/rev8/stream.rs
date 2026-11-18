@@ -3,7 +3,9 @@ use core::ops::Range;
 #[cfg(feature = "threads")]
 use rayon::prelude::*;
 
-use super::{COMMON, Features, RgbRows, Variant, kernels::RowKernels};
+use super::{
+    COMMON, Features, Fx2Extraction, IntensityTarget, RgbRows, Variant, kernels::RowKernels,
+};
 
 pub(super) const RADIUS: usize = 5;
 pub(super) const LANES: usize = 16;
@@ -13,6 +15,7 @@ const TAPS: usize = 2 * RADIUS + 1;
 const RING: usize = TAPS;
 const PARALLEL_PIXELS: usize = 192 * 192;
 pub(super) const TAU: f64 = 0.05;
+const C_FRAG: f64 = 0.02;
 
 pub(super) type Moments = [Vec<f32>; MOMENTS];
 type PixelRow = [Vec<f32>; PLANES];
@@ -30,6 +33,7 @@ pub(super) struct PixelStencil<'a> {
 #[derive(Clone, Copy, Default)]
 pub(super) struct RowTotals {
     pub features: Features,
+    pub sym_grad: f64,
     pub orientation: [f64; 2],
     pub forward: [f64; 4],
     pub reverse: [f64; 4],
@@ -44,6 +48,7 @@ impl RowTotals {
         for (own, rhs) in self.features[..COMMON].iter_mut().zip(other.features) {
             *own += rhs;
         }
+        self.sym_grad += other.sym_grad;
         for (own, rhs) in self.orientation.iter_mut().zip(other.orientation) {
             *own += rhs;
         }
@@ -149,11 +154,17 @@ impl Level {
         &mut self.pixels[slot]
     }
 
-    fn load_base<K: RowKernels>(&mut self, math: K, y: usize, a: RgbRows<'_>, b: RgbRows<'_>) {
+    fn load_base<K: RowKernels, const NITS500: bool>(
+        &mut self,
+        math: K,
+        y: usize,
+        a: RgbRows<'_>,
+        b: RgbRows<'_>,
+    ) {
         let row = self.padded_row(y);
         let (a_channels, b_channels) = row.split_at_mut(3);
-        math.color(a.row(y), a_channels);
-        math.color(b.row(y), b_channels);
+        math.color::<NITS500>(a.row(y), a_channels);
+        math.color::<NITS500>(b.row(y), b_channels);
     }
 
     fn downsample(&mut self, parent: &Self, y: usize) {
@@ -177,7 +188,7 @@ impl Level {
         }
     }
 
-    fn push<K: RowKernels, const HYBRID: bool>(
+    fn push<K: RowKernels, const HYBRID: bool, const SYM_GRAD: bool>(
         &mut self,
         math: K,
         y: usize,
@@ -223,7 +234,7 @@ impl Level {
                     &mut self.vertical_bank[c],
                     self.padded,
                 );
-                math.terms::<HYBRID>(
+                math.terms::<HYBRID, SYM_GRAD>(
                     &self.vertical_bank[c],
                     PixelStencil {
                         before: [&before[c], &before[c + 3]],
@@ -253,7 +264,7 @@ impl Strip {
         }
     }
 
-    fn scan<K: RowKernels, const HYBRID: bool>(
+    fn scan<K: RowKernels, const HYBRID: bool, const NITS500: bool, const SYM_GRAD: bool>(
         &mut self,
         math: K,
         a: RgbRows<'_>,
@@ -269,12 +280,12 @@ impl Strip {
 
         let mut totals = StripTotals::default();
         for y in self.levels[0].input.clone() {
-            self.levels[0].load_base(math, y, a, b);
+            self.levels[0].load_base::<_, NITS500>(math, y, a, b);
             let mut row = y;
             for (s, total) in totals[..self.levels.len()].iter_mut().enumerate() {
                 let (processed, rest) = self.levels.split_at_mut(s + 1);
                 let level = &mut processed[s];
-                level.push::<_, HYBRID>(math, row, total);
+                level.push::<_, HYBRID, SYM_GRAD>(math, row, total);
                 let Some(child) = rest.first_mut() else { break };
                 let pair_complete = row % 2 == 1 || row == level.geometry.height - 1;
                 if !pair_complete || !child.input.contains(&(row / 2)) {
@@ -289,13 +300,13 @@ impl Strip {
     }
 }
 
-fn extract_mode<K: RowKernels, const HYBRID: bool>(
+fn extract_mode<K: RowKernels, const HYBRID: bool, const NITS500: bool, const SYM_GRAD: bool>(
     math: K,
     a: RgbRows<'_>,
     b: RgbRows<'_>,
     scales: usize,
     parallel: bool,
-) -> [[Features; 3]; 5] {
+) -> Fx2Extraction {
     let mut geometry = [Geometry::default(); 5];
     geometry[0] = Geometry {
         width: a.width,
@@ -339,7 +350,7 @@ fn extract_mode<K: RowKernels, const HYBRID: bool>(
             .into_par_iter()
             .map_init(
                 || Strip::new(active),
-                |strip, rows| strip.scan::<_, HYBRID>(math, a, b, rows),
+                |strip, rows| strip.scan::<_, HYBRID, NITS500, SYM_GRAD>(math, a, b, rows),
             )
             .collect::<Vec<_>>()
             .into_iter()
@@ -347,15 +358,16 @@ fn extract_mode<K: RowKernels, const HYBRID: bool>(
     } else {
         let mut strip = Strip::new(active);
         for rows in ranges {
-            merge(strip.scan::<_, HYBRID>(math, a, b, rows));
+            merge(strip.scan::<_, HYBRID, NITS500, SYM_GRAD>(math, a, b, rows));
         }
     }
 
     let base_samples = (a.width * a.height) as f64;
     let [phi_a, phi_b] = pooled[0][1].orientation.map(|v| v / base_samples);
-    for (scale, shape) in pooled.iter_mut().zip(active) {
+    let mut scale_fragility = [[0.0; 3]; 5];
+    for ((scale, shape), frag) in pooled.iter_mut().zip(active).zip(&mut scale_fragility) {
         let inv_n = 1.0 / (shape.width * shape.height) as f64;
-        for group in scale {
+        for (group, f) in scale.iter_mut().zip(frag.iter_mut()) {
             if HYBRID {
                 group.features[COMMON..].copy_from_slice(&blend(
                     phi_a,
@@ -367,9 +379,16 @@ fn extract_mode<K: RowKernels, const HYBRID: bool>(
             for term in &mut group.features {
                 *term *= inv_n;
             }
+            if SYM_GRAD {
+                let mean_g = group.sym_grad * inv_n;
+                *f = C_FRAG / (mean_g + C_FRAG);
+            }
         }
     }
-    pooled.map(|scale| scale.map(|group| group.features))
+    Fx2Extraction {
+        features: pooled.map(|scale| scale.map(|group| group.features)),
+        scale_fragility,
+    }
 }
 
 pub(super) fn blend(a: f64, b: f64, forward: [f64; 4], reverse: [f64; 4]) -> [f64; 4] {
@@ -395,9 +414,34 @@ pub(super) fn extract<K: RowKernels>(
     parallel: bool,
 ) -> [[Features; 3]; 5] {
     if variant.hybrid() {
-        extract_mode::<_, true>(math, a, b, variant.scales(), parallel)
+        extract_mode::<_, true, false, false>(math, a, b, variant.scales(), parallel).features
     } else {
-        extract_mode::<_, false>(math, a, b, variant.scales(), parallel)
+        extract_mode::<_, false, false, false>(math, a, b, variant.scales(), parallel).features
+    }
+}
+
+pub(super) fn extract_fx2<K: RowKernels>(
+    math: K,
+    a: RgbRows<'_>,
+    b: RgbRows<'_>,
+    variant: Variant,
+    target: IntensityTarget,
+    parallel: bool,
+) -> Fx2Extraction {
+    let s = variant.scales();
+    match (variant.hybrid(), target) {
+        (true, IntensityTarget::Nits255) => {
+            extract_mode::<_, true, false, true>(math, a, b, s, parallel)
+        }
+        (true, IntensityTarget::Nits500) => {
+            extract_mode::<_, true, true, true>(math, a, b, s, parallel)
+        }
+        (false, IntensityTarget::Nits255) => {
+            extract_mode::<_, false, false, true>(math, a, b, s, parallel)
+        }
+        (false, IntensityTarget::Nits500) => {
+            extract_mode::<_, false, true, true>(math, a, b, s, parallel)
+        }
     }
 }
 
@@ -408,7 +452,7 @@ pub(super) fn diagnostic(a: RgbRows<'_>, b: RgbRows<'_>) -> RowTotals {
         height: a.height,
     }];
     let mut strip = Strip::new(&geometry);
-    let row = strip.scan::<_, true>(
+    let row = strip.scan::<_, true, false, false>(
         super::kernels::RowMath(archmage::ScalarToken),
         a,
         b,

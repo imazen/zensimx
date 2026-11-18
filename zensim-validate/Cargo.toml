@@ -22,6 +22,7 @@ gpu-cpu  = ["zensim-train-gpu/gpu-cpu"]
 # `ZENSIM_FEATCANON=exact|c32|c64|neum|off` and the f64 exact-oracle bodies
 # exist only in a zensim built with `oracle` (a ruler, not semantics).
 featcanon-oracle = ["zensim/oracle"]
+rev8-proto = ["zensim/rev8-proto"]
 
 [dependencies]
 # `corruption-head`: the ZCTH evaluator + the ONE owner of the deploy
@@ -120,3 +121,7 @@ harness = false
 name = "projection_rows"
 path = "benches/projection_rows.rs"
 harness = false
+
+[[example]]
+name = "rev8_mixf3_pilot"
+required-features = ["rev8-proto"]

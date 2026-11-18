@@ -7,6 +7,16 @@ mod tests;
 
 use crate::score_math::pchip_eval_capped;
 
+/// XYB white-luminance assumption used during perceptual conversion.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum IntensityTarget {
+    /// JPEG XL / Rev7 SDR white at 255 cd/m^2.
+    #[default]
+    Nits255,
+    /// Metric-tuned 500 cd/m^2 target rescaled to match at black and white.
+    Nits500,
+}
+
 /// Geometry and feature recipe for the Rev8 prototype.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Variant {
@@ -105,6 +115,35 @@ pub struct Result {
     pub features: [[Features; 3]; 5],
 }
 
+/// Symmetric scalar features plus per-(scale, channel) fragility factors.
+pub struct Fx2Extraction {
+    /// Means indexed by scale, then X/Y/B, then [`FEATURE_NAMES`].
+    /// Inactive scales and orientation slots are zero.
+    pub features: [[Features; 3]; 5],
+    /// Symmetric gradient fragility `0.02 / (mean_sym_grad + 0.02)` per `(scale, channel)`.
+    pub scale_fragility: [[f64; 3]; 5],
+}
+
+impl Fx2Extraction {
+    /// Pack the 240 [`Variant::AlgS4`] damage features followed by their 240
+    /// `damage * scale_fragility` products for `fx2`-style training.
+    pub fn alg_s4_fx2_inputs(&self) -> [f64; 480] {
+        let mut out = [0.0; 480];
+        let mut idx = 0;
+        for s in 0..4 {
+            for c in 0..3 {
+                for k in 0..COMMON {
+                    let d = self.features[s][c][k];
+                    out[idx] = d;
+                    out[240 + idx] = d * self.scale_fragility[s][c];
+                    idx += 1;
+                }
+            }
+        }
+        out
+    }
+}
+
 /// Compute a prototype score. Returns `None` for mismatched geometry.
 /// With the `threads` feature, parallel calls use the caller's Rayon pool.
 pub fn compute(a: RgbRows<'_>, b: RgbRows<'_>, variant: Variant, parallel: bool) -> Option<Result> {
@@ -116,6 +155,21 @@ pub fn compute(a: RgbRows<'_>, b: RgbRows<'_>, variant: Variant, parallel: bool)
         score: score(&features, variant),
         features,
     })
+}
+
+/// Extract [`Variant::AlgS4`]/`AlgS5`/`HybridS5` features and symmetric
+/// `scale_fragility` at an explicit XYB [`IntensityTarget`].
+pub fn extract_fx2(
+    a: RgbRows<'_>,
+    b: RgbRows<'_>,
+    variant: Variant,
+    target: IntensityTarget,
+    parallel: bool,
+) -> Option<Fx2Extraction> {
+    if (a.width, a.height) != (b.width, b.height) {
+        return None;
+    }
+    Some(kernels::extract_fx2(a, b, variant, target, parallel))
 }
 
 /// Name the runtime dispatch tier used by [`compute`].

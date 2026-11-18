@@ -1,5 +1,7 @@
 use super::kernels::RowKernels;
-use super::{FEATURE_NAMES, RgbRows, Variant, compute, kernels, stream};
+use super::{
+    FEATURE_NAMES, IntensityTarget, RgbRows, Variant, compute, extract_fx2, kernels, stream,
+};
 use archmage::{
     ScalarToken,
     testing::{CompileTimePolicy, for_each_token_permutation},
@@ -215,8 +217,23 @@ fn reciprocal_cube_root_exp_mask_and_negative_variance_rails() {
         }
     }
     let mut black = [vec![0.0; 32], vec![0.0; 32], vec![0.0; 32]];
-    math.color(&[[0; 3]], &mut black);
+    math.color::<false>(&[[0; 3]], &mut black);
     assert_eq!(black.map(|channel| channel[5]), [0.42, 0.01, 0.55]);
+
+    let mut black500 = [vec![0.0; 32], vec![0.0; 32], vec![0.0; 32]];
+    math.color::<true>(&[[0; 3]], &mut black500);
+    assert_eq!(black500.map(|channel| channel[5]), [0.42, 0.01, 0.55]);
+
+    let mut white255 = [vec![0.0; 32], vec![0.0; 32], vec![0.0; 32]];
+    let mut white500 = [vec![0.0; 32], vec![0.0; 32], vec![0.0; 32]];
+    math.color::<false>(&[[255; 3]], &mut white255);
+    math.color::<true>(&[[255; 3]], &mut white500);
+    for c in 0..3 {
+        assert!(
+            (white255[c][5] - white500[c][5]).abs() <= 2e-7,
+            "white ch {c}"
+        );
+    }
 
     let exp = |x| eval(math.negative_exp(splat(x)));
     assert_eq!(exp(0.0), 1.0);
@@ -597,4 +614,124 @@ fn streamed_moments_track_direct_f64_windows() {
         }
     }
     println!("REV8_F64_WINDOW max-abs [L1,D21,MSE]={max_error:?}");
+}
+
+#[test]
+fn fx2_and_500nit_symmetry_identity_and_thread_parity() {
+    #[cfg(feature = "threads")]
+    let pools = [1, 2, 4, 8, 16].map(|n| {
+        rayon::ThreadPoolBuilder::new()
+            .num_threads(n)
+            .build()
+            .unwrap()
+    });
+    for (w, h, recipe) in [(1, 1, 4), (17, 13, 4), (64, 64, 5), (256, 191, 3)] {
+        let (a, b) = pair(w, h, recipe);
+        let a_view = view(&a, w, h);
+        let b_view = view(&b, w, h);
+
+        let base = compute(a_view, b_view, Variant::AlgS4, false).unwrap();
+        let fx255_ab = extract_fx2(
+            a_view,
+            b_view,
+            Variant::AlgS4,
+            IntensityTarget::Nits255,
+            false,
+        )
+        .unwrap();
+        let fx255_ba = extract_fx2(
+            b_view,
+            a_view,
+            Variant::AlgS4,
+            IntensityTarget::Nits255,
+            false,
+        )
+        .unwrap();
+        for s in 0..4 {
+            for c in 0..3 {
+                for k in 0..super::COMMON {
+                    assert_eq!(
+                        base.features[s][c][k].to_bits(),
+                        fx255_ab.features[s][c][k].to_bits(),
+                        "Nits255 feature mismatch at s={s} c={c} k={k}"
+                    );
+                }
+                assert_eq!(
+                    fx255_ab.scale_fragility[s][c].to_bits(),
+                    fx255_ba.scale_fragility[s][c].to_bits(),
+                );
+                let f = fx255_ab.scale_fragility[s][c];
+                assert!(f.is_finite() && f > 0.0 && f <= 1.0, "frag={f}");
+            }
+        }
+        assert_eq!(
+            fx255_ab.alg_s4_fx2_inputs().map(f64::to_bits),
+            fx255_ba.alg_s4_fx2_inputs().map(f64::to_bits),
+        );
+
+        let fx500_ab = extract_fx2(
+            a_view,
+            b_view,
+            Variant::AlgS4,
+            IntensityTarget::Nits500,
+            false,
+        )
+        .unwrap();
+        let fx500_ba = extract_fx2(
+            b_view,
+            a_view,
+            Variant::AlgS4,
+            IntensityTarget::Nits500,
+            false,
+        )
+        .unwrap();
+        assert_eq!(
+            fx500_ab.alg_s4_fx2_inputs().map(f64::to_bits),
+            fx500_ba.alg_s4_fx2_inputs().map(f64::to_bits),
+        );
+        let fx500_aa = extract_fx2(
+            a_view,
+            a_view,
+            Variant::AlgS4,
+            IntensityTarget::Nits500,
+            false,
+        )
+        .unwrap();
+        assert!(
+            fx500_aa
+                .alg_s4_fx2_inputs()
+                .iter()
+                .all(|v| v.to_bits() == 0)
+        );
+        for s in 0..4 {
+            for c in 0..3 {
+                let f = fx500_ab.scale_fragility[s][c];
+                assert!(f.is_finite() && f > 0.0 && f <= 1.0, "frag500={f}");
+            }
+        }
+
+        #[cfg(feature = "threads")]
+        if (w, h) == (256, 191) {
+            for pool in &pools {
+                for target in [IntensityTarget::Nits255, IntensityTarget::Nits500] {
+                    let expected =
+                        extract_fx2(a_view, b_view, Variant::AlgS4, target, false).unwrap();
+                    let par = pool
+                        .install(|| extract_fx2(a_view, b_view, Variant::AlgS4, target, true))
+                        .unwrap();
+                    let par_swap = pool
+                        .install(|| extract_fx2(b_view, a_view, Variant::AlgS4, target, true))
+                        .unwrap();
+                    assert_eq!(
+                        expected.alg_s4_fx2_inputs().map(f64::to_bits),
+                        par.alg_s4_fx2_inputs().map(f64::to_bits),
+                    );
+                    assert_eq!(
+                        expected.alg_s4_fx2_inputs().map(f64::to_bits),
+                        par_swap.alg_s4_fx2_inputs().map(f64::to_bits),
+                    );
+                }
+            }
+        }
+    }
 }

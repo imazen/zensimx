@@ -2,7 +2,7 @@ use archmage::ScalarToken;
 use archmage_attune::{attune, attuned};
 use magetypes::simd::{backends::F32x16Convert, generic::f32x16 as V};
 
-use super::{COMMON, Features, RgbRows, Variant, stream};
+use super::{COMMON, Features, Fx2Extraction, IntensityTarget, RgbRows, Variant, stream};
 use crate::color::{
     K_B0, K_M00, K_M01, K_M02, K_M10, K_M11, K_M12, K_M20, K_M21, K_M22, srgb_u8_to_linear,
 };
@@ -16,6 +16,8 @@ pub(super) const BETA: f32 = 0.35;
 const MEAN: f32 = 1.0 / 121.0;
 const CBRT_BIAS: f32 = 0.155_954_2;
 const OFFSETS: [f32; 3] = [0.42, 0.45, 0.55];
+const MUL_500: f64 = 500.0 / 255.0;
+const SCALE_500: f32 = 0.770_926_36;
 
 #[attune(_*_t, +v4(cfg(avx512)), +v4x(cfg(avx512)))]
 fn scan(
@@ -36,6 +38,38 @@ pub(super) fn extract(
 ) -> [[Features; 3]; 5] {
     attuned!(
         scan(a, b, variant, parallel),
+        [
+            _v4x(cfg(avx512)),
+            _v4(cfg(avx512)),
+            _v3,
+            _neon,
+            _wasm128,
+            _scalar
+        ]
+    )
+}
+
+#[attune(_*_t, +v4(cfg(avx512)), +v4x(cfg(avx512)))]
+fn scan_fx2(
+    token: Token,
+    a: RgbRows<'_>,
+    b: RgbRows<'_>,
+    variant: Variant,
+    target: IntensityTarget,
+    parallel: bool,
+) -> Fx2Extraction {
+    stream::extract_fx2(RowMath(token), a, b, variant, target, parallel)
+}
+
+pub(super) fn extract_fx2(
+    a: RgbRows<'_>,
+    b: RgbRows<'_>,
+    variant: Variant,
+    target: IntensityTarget,
+    parallel: bool,
+) -> Fx2Extraction {
+    attuned!(
+        scan_fx2(a, b, variant, target, parallel),
         [
             _v4x(cfg(avx512)),
             _v4(cfg(avx512)),
@@ -165,7 +199,19 @@ impl<T: F32x16Convert> RowMath<T> {
     }
 
     #[inline(always)]
-    pub(super) fn color_math(self, rgb: &[[u8; 3]], out: &mut [Vec<f32>]) {
+    pub(super) fn color_math<const NITS500: bool>(self, rgb: &[[u8; 3]], out: &mut [Vec<f32>]) {
+        let scale = if NITS500 {
+            self.splat(SCALE_500)
+        } else {
+            self.splat(1.0)
+        };
+        let mul = |w: f32| {
+            if NITS500 {
+                (f64::from(w) * MUL_500) as f32
+            } else {
+                w
+            }
+        };
         for chunk in (0..rgb.len()).step_by(LANES) {
             let n = (rgb.len() - chunk).min(LANES);
             let to_linear = |c: usize| {
@@ -185,18 +231,23 @@ impl<T: F32x16Convert> RowMath<T> {
             let b = to_linear(2);
             let mix = |m0, m1, m2| {
                 self.fma(
-                    self.splat(m0),
+                    self.splat(mul(m0)),
                     r,
                     self.fma(
-                        self.splat(m1),
+                        self.splat(mul(m1)),
                         g,
-                        self.fma(self.splat(m2), b, self.splat(K_B0)),
+                        self.fma(self.splat(mul(m2)), b, self.splat(K_B0)),
                     ),
                 )
             };
-            let c0 = self.cube_root_and_add(mix(K_M00, K_M01, K_M02), -CBRT_BIAS);
-            let c1 = self.cube_root_and_add(mix(K_M10, K_M11, K_M12), -CBRT_BIAS);
-            let c2 = self.cube_root_and_add(mix(K_M20, K_M21, K_M22), -CBRT_BIAS);
+            let mut c0 = self.cube_root_and_add(mix(K_M00, K_M01, K_M02), -CBRT_BIAS);
+            let mut c1 = self.cube_root_and_add(mix(K_M10, K_M11, K_M12), -CBRT_BIAS);
+            let mut c2 = self.cube_root_and_add(mix(K_M20, K_M21, K_M22), -CBRT_BIAS);
+            if NITS500 {
+                c0 *= scale;
+                c1 *= scale;
+                c2 *= scale;
+            }
             let black = (r + g + b).simd_eq(self.splat(0.0));
             let y = (c0 + c1) * self.splat(0.5);
             self.store(
@@ -354,7 +405,7 @@ impl<T: F32x16Convert> RowMath<T> {
     }
 
     #[inline(always)]
-    pub(super) fn terms_math<const HYBRID: bool>(
+    pub(super) fn terms_math<const HYBRID: bool, const SYM_GRAD: bool>(
         self,
         moments: &Moments,
         pixels: PixelStencil<'_>,
@@ -367,6 +418,7 @@ impl<T: F32x16Convert> RowMath<T> {
         let eps = self.splat(EPS);
         let mut totals = [zero; COMMON];
         let mut orientation = [zero; 2];
+        let mut sym_grad = zero;
         let mut powers = [[0.0_f64; LANES]; 7];
         #[cfg(test)]
         let mut orientation_parts = [[zero; 3]; 2];
@@ -437,6 +489,9 @@ impl<T: F32x16Convert> RowMath<T> {
             for (idx, value) in terms {
                 totals[idx] += value * live;
             }
+            if SYM_GRAD {
+                sym_grad += (ga + gb) * self.splat(0.5) * live;
+            }
             let l = (l * live).to_array();
             let s = (structure.max(zero) * live).to_array();
             let d = (damage * live).to_array();
@@ -501,6 +556,9 @@ impl<T: F32x16Convert> RowMath<T> {
         for (i, lanes) in [1, 2, 4, 5, 6, 8, 19].into_iter().zip(powers) {
             rows.features[i] += lanes.into_iter().sum::<f64>();
         }
+        if SYM_GRAD {
+            rows.sym_grad += f64::from(sym_grad.reduce_add());
+        }
         #[cfg(test)]
         {
             rows.mean_fragility += f64::from(mean_fragility.reduce_add());
@@ -527,7 +585,7 @@ impl<T: F32x16Convert> RowMath<T> {
 // Re-enter each dense row at the feature boundary. Strip orchestration
 // (including Rayon workers) does not inherit target features from scan.
 pub(super) trait RowKernels: Copy + Send + Sync {
-    fn color(self, rgb: &[[u8; 3]], out: &mut [Vec<f32>]);
+    fn color<const NITS500: bool>(self, rgb: &[[u8; 3]], out: &mut [Vec<f32>]);
     fn horizontal(
         self,
         a: &[f32],
@@ -538,7 +596,7 @@ pub(super) trait RowKernels: Copy + Send + Sync {
         padded: usize,
     );
     fn vertical(self, taps: &[&Moments; 11], out: &mut Moments, padded: usize);
-    fn terms<const HYBRID: bool>(
+    fn terms<const HYBRID: bool, const SYM_GRAD: bool>(
         self,
         moments: &Moments,
         pixels: PixelStencil<'_>,
@@ -548,8 +606,8 @@ pub(super) trait RowKernels: Copy + Send + Sync {
 }
 
 #[attune(_*_t, +v4(cfg(avx512)), +v4x(cfg(avx512)))]
-fn color_row(token: Token, rgb: &[[u8; 3]], out: &mut [Vec<f32>]) {
-    RowMath(token).color_math(rgb, out);
+fn color_row<const NITS500: bool>(token: Token, rgb: &[[u8; 3]], out: &mut [Vec<f32>]) {
+    RowMath(token).color_math::<NITS500>(rgb, out);
 }
 
 #[attune(_*_t, +v4(cfg(avx512)), +v4x(cfg(avx512)))]
@@ -571,21 +629,21 @@ fn vertical_row(token: Token, taps: &[&Moments; 11], out: &mut Moments, padded: 
 }
 
 #[attune(_*_t, +v4(cfg(avx512)), +v4x(cfg(avx512)))]
-fn terms_row<const HYBRID: bool>(
+fn terms_row<const HYBRID: bool, const SYM_GRAD: bool>(
     token: Token,
     moments: &Moments,
     pixels: PixelStencil<'_>,
     channel: usize,
     totals: &mut stream::RowTotals,
 ) {
-    RowMath(token).terms_math::<HYBRID>(moments, pixels, channel, totals);
+    RowMath(token).terms_math::<HYBRID, SYM_GRAD>(moments, pixels, channel, totals);
 }
 
 macro_rules! row_kernels {
     ($token:ty, $color:ident, $horizontal:ident, $vertical:ident, $terms:ident) => {
         impl RowKernels for RowMath<$token> {
-            fn color(self, rgb: &[[u8; 3]], out: &mut [Vec<f32>]) {
-                $color(self.0, rgb, out);
+            fn color<const NITS500: bool>(self, rgb: &[[u8; 3]], out: &mut [Vec<f32>]) {
+                $color::<NITS500>(self.0, rgb, out);
             }
 
             fn horizontal(
@@ -604,14 +662,14 @@ macro_rules! row_kernels {
                 $vertical(self.0, taps, out, padded);
             }
 
-            fn terms<const HYBRID: bool>(
+            fn terms<const HYBRID: bool, const SYM_GRAD: bool>(
                 self,
                 moments: &Moments,
                 pixels: PixelStencil<'_>,
                 channel: usize,
                 totals: &mut stream::RowTotals,
             ) {
-                $terms::<HYBRID>(self.0, moments, pixels, channel, totals);
+                $terms::<HYBRID, SYM_GRAD>(self.0, moments, pixels, channel, totals);
             }
         }
     };
