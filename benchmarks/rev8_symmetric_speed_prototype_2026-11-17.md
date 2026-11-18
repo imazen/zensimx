@@ -2,7 +2,7 @@
 
 ## Missing and limitations
 
-**Capture in progress.** 1 of 30 paired latency cells and 80 of 120 fresh-process RSS cells have admissible evidence. Em dashes mark missing cells.
+The owner narrowed the timing matrix to 1024×1024 and 4000×3000. Accepted evidence covers 8 of 12 descriptive latency cells and 80 of 96 scoped RSS measurements. The original full-sweep capture contributes 1 accepted Zenbench cell. The report will fill the remaining cells after their host lock admits them.
 
 The max-pair + PCHIP head is a timing fixture with synthetic coefficients.
 The benchmark uses generated RGB8 SDR scenes. It does not establish perceptual
@@ -49,70 +49,95 @@ the 8-pixel grid and 0.35 times the local slope reversal. The blend uses a
 pair evaluates the logistic once from the positive gap and blends in descending
 orientation order. The grid and reversal terms are local heuristic signals.
 
-## Benchmark method
+## Descriptive end-to-end timings
 
-All four arms consume the same twenty deterministic textured RGB8 pairs per
-geometry, with procedural flat and grain regions, gradients, clipping, chroma
-changes, grid artifacts, ringing-like periodic patterns and quantization.
-There is a 100 ms warmup per arm and image. Zenbench interleaves one scorer call
-per arm in randomized order. The first 32 clean paired rounds per image
-give 640 individual calls per arm and cell. P50 and p95 are pooled type-7
-quantiles in milliseconds. Throughput is pixels divided by median latency.
-Speedup is the Rev7 median divided by the arm median.
+The timed call includes the RGB8 scorer, feature extraction, pooling and
+the complete scoring head. The same resident source and distorted RGB8
+buffers are used by all arms. Fixture 00 was held fixed from the existing
+deterministic packet, at each geometry. The four arms each get one
+untimed warm-up call. The three matched, single-call rounds run in
+forward, reverse and forward arm order. The measured range is the
+smallest and largest of those three wall-clock observations.
 
-The published Rev7 control is [the pinned public A scorer](https://github.com/imazen/zensim/tree/bebc6ea45d2b6adb6ab70affc3e289707ef74fb0)
-with the ordinary RGB8 `Zensim::compute` entry point, build bake SHA-256
+The public control is [the pinned public A scorer](https://github.com/imazen/zensim/tree/bebc6ea45d2b6adb6ab70affc3e289707ef74fb0)
+with the ordinary RGB8 `Zensim::compute` entry point and bake SHA-256
 `d5e2a56db35c32620d9f9d9c19ba3bc78bd8fea2b8cd933cde8447428d85e62a`.
-The three Rev8 arms include feature extraction, pooling and the timing head.
-No decode, I/O, prepared reference, maps, or process-start cost enters latency.
 
-dev pins CPU 0 for 1T and CPUs 0–7,16–23 for 16T. The i265 pins are CPU 0 and
-CPUs 0–15. The native dev tier is v4x, and the forced v3 run disables both
-AVX-512 tokens before constructing either scorer. The Intel process uses the
-same stripped dev-built x86-64 binary and runtime v3 dispatch. Each process
-verifies the tier and Rayon pool size. The 64² walk is serial in the prototype
-under either pool configuration. Available strips bound worker use at 256².
+Dev pins CPU 0 for 1T and CPUs 0–7,16–23 for 16T. The i265 pins are CPU 0
+and CPUs 0–15. The native dev tier is v4x, and forced v3 disables both
+AVX-512 tokens before constructing either scorer. Intel uses the same
+stripped dev-built binary with runtime v3 dispatch. The host locks
+serialize the requested captures. The descriptive replay uses the normal
+host placement and resource caps.
 
-Each arm, thread count and size gets a separate GNU time process for RSS.
-The process scores the twenty pairs with one pair resident at a time. RSS is
-peak KiB for scorer, allocator, runtime and input buffers together. The latency
-process holds the complete packet resident outside the measured calls. The
-host-lock collector retains Zenbench round traces and run-heavy high-water
-receipts for each invocation.
+Each cell reads **median [min, max] ms · Mpx/s at median · Rev7 median / arm median**.
 
-Table cells read **p50/p95 ms · Mpx/s · speedup vs Rev7 · peak RSS KiB**.
-| Host / tier | Threads | Geometry | Rev7 | Alg S4 | Alg S5 | Hybrid S5 |
-|---|---:|---|---|---|---|---|
-| dev / v4x | 1 | 64x64 | — · 7,660 | — · 4,376 | — · 4,292 | — · 4,316 |
-| dev / v4x | 1 | 256x256 | — · 14,668 | — · 4,840 | — · 5,044 | — · 5,052 |
-| dev / v4x | 1 | 840x944 | — · 28,100 | — · 10,260 | — · 10,332 | — · 10,660 |
-| dev / v4x | 1 | 1024x1024 | — · 32,772 | — · 12,244 | — · 12,284 | — · 12,296 |
-| dev / v4x | 1 | 4000x3000 | — · 178,180 | — · 82,712 | — · 82,992 | — · 83,172 |
-| dev / v4x | 16 | 64x64 | — · 7,348 | — · 4,304 | — · 3,968 | — · 4,540 |
-| dev / v4x | 16 | 256x256 | — · 26,948 | — · 11,576 | — · 11,924 | — · 11,760 |
-| dev / v4x | 16 | 840x944 | — · 127,716 | — · 37,432 | — · 38,820 | — · 38,720 |
-| dev / v4x | 16 | 1024x1024 | — · 154,112 | — · 44,384 | — · 46,064 | — · 46,256 |
-| dev / v4x | 16 | 4000x3000 | — · 598,820 | — · 208,608 | — · 215,080 | — · 215,460 |
-| dev / v3 | 1 | 64x64 | — · 7,884 | — · 4,252 | — · 4,040 | — · 4,152 |
-| dev / v3 | 1 | 256x256 | — · 14,680 | — · 4,920 | — · 4,872 | — · 4,888 |
-| dev / v3 | 1 | 840x944 | — · 27,912 | — · 10,368 | — · 10,444 | — · 10,664 |
-| dev / v3 | 1 | 1024x1024 | — · 32,748 | — · 12,232 | — · 12,300 | — · 12,300 |
-| dev / v3 | 1 | 4000x3000 | — · 178,148 | — · 82,696 | — · 83,048 | — · 82,980 |
-| dev / v3 | 16 | 64x64 | — · 7,428 | — · 4,036 | — · 4,036 | — · 4,076 |
-| dev / v3 | 16 | 256x256 | — · 27,052 | — · 9,828 | — · 10,828 | — · 10,272 |
-| dev / v3 | 16 | 840x944 | — · 126,152 | — · 37,244 | — · 39,324 | — · 38,992 |
-| dev / v3 | 16 | 1024x1024 | — · 158,124 | — · 44,536 | — · 46,332 | — · 45,920 |
-| dev / v3 | 16 | 4000x3000 | — · 614,196 | — · 209,576 | — · 215,448 | — · 215,524 |
-| i265 / v3 | 1 | 64x64 | — · — | — · — | — · — | — · — |
-| i265 / v3 | 1 | 256x256 | — · — | — · — | — · — | — · — |
-| i265 / v3 | 1 | 840x944 | — · — | — · — | — · — | — · — |
-| i265 / v3 | 1 | 1024x1024 | — · — | — · — | — · — | — · — |
-| i265 / v3 | 1 | 4000x3000 | — · — | — · — | — · — | — · — |
-| i265 / v3 | 16 | 64x64 | 2.187/3.106 · 1.87 · 1.000× · — | 0.348/1.861 · 11.76 · 6.281× · — | 0.355/1.403 · 11.53 · 6.158× · — | 0.425/1.207 · 9.64 · 5.149× · — |
-| i265 / v3 | 16 | 256x256 | — · — | — · — | — · — | — · — |
-| i265 / v3 | 16 | 840x944 | — · — | — · — | — · — | — · — |
-| i265 / v3 | 16 | 1024x1024 | — · — | — · — | — · — | — · — |
-| i265 / v3 | 16 | 4000x3000 | — · — | — · — | — · — | — · — |
+| Host / tier | Threads | Geometry | Fixture | Rev7 | Alg S4 | Alg S5 | Hybrid S5 |
+|---|---:|---|---:|---|---|---|---|
+| dev / v4x | 1 | 1024x1024 | 00 | 19.143 [18.648, 19.973] · 54.78 · 1.000× | 38.445 [37.965, 38.581] · 27.28 · 0.498× | 45.579 [45.462, 45.597] · 23.01 · 0.420× | 50.127 [50.103, 50.257] · 20.92 · 0.382× |
+| dev / v4x | 1 | 4000x3000 | 00 | 185.615 [185.473, 185.988] · 64.65 · 1.000× | 373.520 [373.394, 374.476] · 32.13 · 0.497× | 408.740 [408.317, 409.752] · 29.36 · 0.454× | 459.625 [458.943, 464.005] · 26.11 · 0.404× |
+| dev / v4x | 16 | 1024x1024 | 00 | 7.336 [4.474, 13.081] · 142.94 · 1.000× | 5.105 [4.527, 5.244] · 205.41 · 1.437× | 5.254 [5.063, 5.277] · 199.58 · 1.396× | 5.640 [5.578, 5.658] · 185.92 · 1.301× |
+| dev / v4x | 16 | 4000x3000 | 00 | 101.406 [94.872, 111.741] · 118.34 · 1.000× | 86.273 [84.648, 88.852] · 139.09 · 1.175× | 87.485 [87.464, 88.501] · 137.17 · 1.159× | 89.105 [86.383, 92.027] · 134.67 · 1.138× |
+| dev / v3 | 1 | 1024x1024 | 00 | 30.667 [30.408, 31.350] · 34.19 · 1.000× | 69.718 [69.195, 70.261] · 15.04 · 0.440× | 89.962 [89.140, 90.051] · 11.66 · 0.341× | 99.619 [98.517, 99.734] · 10.53 · 0.308× |
+| dev / v3 | 1 | 4000x3000 | 00 | 284.115 [282.363, 284.386] · 42.24 · 1.000× | 637.313 [636.454, 638.821] · 18.83 · 0.446× | 732.648 [732.194, 734.986] · 16.38 · 0.388× | 841.602 [840.880, 842.856] · 14.26 · 0.338× |
+| dev / v3 | 16 | 1024x1024 | 00 | 9.374 [6.975, 13.592] · 111.86 · 1.000× | 7.470 [7.306, 10.045] · 140.36 · 1.255× | 9.039 [9.011, 12.497] · 116.01 · 1.037× | 10.204 [10.047, 10.246] · 102.77 · 0.919× |
+| dev / v3 | 16 | 4000x3000 | 00 | 115.847 [110.487, 122.790] · 103.58 · 1.000× | 108.275 [107.156, 109.394] · 110.83 · 1.070× | 117.882 [115.354, 118.502] · 101.80 · 0.983× | 129.690 [128.811, 129.721] · 92.53 · 0.893× |
+
+All three Rev8 variants had higher medians than Rev7 at 1T on dev. Alg S4 had the lowest median in each of the four dev 16T cells. On v4x, all three prototypes had lower 16T medians at both sizes. On v3, Hybrid S5 had higher medians at both sizes and Alg S5 was close to Rev7. These observations are for fixture 00 and three rounds.
+
+| Geometry | Fixture ID | RGB8 source FNV-1a 64 | RGB8 distorted FNV-1a 64 |
+|---|---:|---|---|
+| 1024x1024 | 00 | `64ff9309176504db` | `fa2ec446e996b737` |
+| 4000x3000 | 00 | `65379aaed2fd6068` | `1f77de5b662649ec` |
+
+## Original admitted Zenbench evidence
+
+The full clean-round sweep was withdrawn. The earlier accepted cell
+retains its original method of 20 fixtures, 100 ms warm-up per arm and
+fixture, and the first 32 clean interleaved single-call rounds per fixture.
+P50 and p95 are pooled type-7 quantiles. Rejected and interrupted captures
+remain in the handoff alongside the admitted receipts.
+
+| Host / tier | Threads | Geometry | Calls per arm | Rev7 p50 / p95 ms | Alg S4 | Alg S5 | Hybrid S5 |
+|---|---:|---|---:|---:|---:|---:|---:|
+| i265 / v3 | 16 | 64x64 | 640 | 2.1869 / 3.1063 | 0.3482 / 1.8613 | 0.3552 / 1.4035 | 0.4247 / 1.2068 |
+
+## Peak RSS
+
+Each arm, thread count and geometry uses a fresh GNU time process. It
+scores the original twenty pairs with one pair resident at a time. The
+peak is KiB for scorer, allocator, runtime and buffers together. The dev
+RSS reads were captured with the original instrument. The scoped Intel
+RSS reads use the rebuilt instrument with identical scorer source.
+
+| Host / tier | Threads | Geometry | Rev7 KiB | Alg S4 KiB | Alg S5 KiB | Hybrid S5 KiB |
+|---|---:|---|---:|---:|---:|---:|
+| dev / v4x | 1 | 64x64 | 7,660 | 4,376 | 4,292 | 4,316 |
+| dev / v4x | 1 | 256x256 | 14,668 | 4,840 | 5,044 | 5,052 |
+| dev / v4x | 1 | 840x944 | 28,100 | 10,260 | 10,332 | 10,660 |
+| dev / v4x | 1 | 1024x1024 | 32,772 | 12,244 | 12,284 | 12,296 |
+| dev / v4x | 1 | 4000x3000 | 178,180 | 82,712 | 82,992 | 83,172 |
+| dev / v4x | 16 | 64x64 | 7,348 | 4,304 | 3,968 | 4,540 |
+| dev / v4x | 16 | 256x256 | 26,948 | 11,576 | 11,924 | 11,760 |
+| dev / v4x | 16 | 840x944 | 127,716 | 37,432 | 38,820 | 38,720 |
+| dev / v4x | 16 | 1024x1024 | 154,112 | 44,384 | 46,064 | 46,256 |
+| dev / v4x | 16 | 4000x3000 | 598,820 | 208,608 | 215,080 | 215,460 |
+| dev / v3 | 1 | 64x64 | 7,884 | 4,252 | 4,040 | 4,152 |
+| dev / v3 | 1 | 256x256 | 14,680 | 4,920 | 4,872 | 4,888 |
+| dev / v3 | 1 | 840x944 | 27,912 | 10,368 | 10,444 | 10,664 |
+| dev / v3 | 1 | 1024x1024 | 32,748 | 12,232 | 12,300 | 12,300 |
+| dev / v3 | 1 | 4000x3000 | 178,148 | 82,696 | 83,048 | 82,980 |
+| dev / v3 | 16 | 64x64 | 7,428 | 4,036 | 4,036 | 4,076 |
+| dev / v3 | 16 | 256x256 | 27,052 | 9,828 | 10,828 | 10,272 |
+| dev / v3 | 16 | 840x944 | 126,152 | 37,244 | 39,324 | 38,992 |
+| dev / v3 | 16 | 1024x1024 | 158,124 | 44,536 | 46,332 | 45,920 |
+| dev / v3 | 16 | 4000x3000 | 614,196 | 209,576 | 215,448 | 215,524 |
+| i265 / v3 | 1 | 1024x1024 | — | — | — | — |
+| i265 / v3 | 1 | 4000x3000 | — | — | — | — |
+| i265 / v3 | 16 | 1024x1024 | — | — | — | — |
+| i265 / v3 | 16 | 4000x3000 | — | — | — | — |
+
+The fresh-process RSS passes supplied 800 paired 1T/16T score-bit comparisons, with 0 differences. The descriptive capture reader also checks the score bits across thread counts wherever both cells exist.
 
 ## Numerical verification
 
@@ -202,17 +227,19 @@ both discounts.
 - Brightness and texture changes move the orientation proxy even after
   discounts. These witnesses establish what enters the timing fixture.
 
-The fresh-process RSS passes supply 800 paired 1T/16T score comparisons, with 0 differing score bit patterns.
-
 ## Build and resource receipts
 
-Release uses thin LTO and one codegen unit with runtime dispatch. The measured scorer and fixture
-implementation are in local revision `6a48974a`. The stripped runtime SHA-256 is
-`65235d83b3a392648c5280b438d274ad55bfd51a9645df7ad9f40ce85c4df68e`.
+The scored code is from local revision `6a48974a`. The release build
+uses thin LTO and one codegen unit with runtime CPU dispatch. The three-round
+mode adds timing and fixture identity outside the shared scoring calls.
 
-All accepted worker receipts accompany the raw captures. The following high-water receipts
-are from the fresh-process 12 MP RSS runs. The timing process retains the 20-pair
-fixture packet, so its own resource high-water measurements have a different scope.
+| Instrument | Stripped-binary SHA-256 |
+|---|---|
+| Original Zenbench and dev RSS | `65235d83b3a392648c5280b438d274ad55bfd51a9645df7ad9f40ce85c4df68e` |
+| Descriptive timings and scoped i265 RSS | `63be36b3aebfceb4e5620c20cf01efc23ff3a618bdbe09dcd2d43070b09e0647` |
+
+All admitted worker logs retain their run-heavy receipts. The table gives
+the receipts for the 12 MP fresh-process RSS workers.
 
 | Host / tier | Threads | Arm | Run-heavy receipt |
 |---|---:|---|---|
@@ -232,3 +259,8 @@ fixture packet, so its own resource high-water measurements have a different sco
 | dev / v3 | 16 | rev8-alg-s4 | `run-heavy: done rc=0 5s · peak-RSS 0.20GiB · min-avail 38464MiB · peak-load 2.37` |
 | dev / v3 | 16 | rev8-alg-s5 | `run-heavy: done rc=0 5s · peak-RSS 0.21GiB · min-avail 38405MiB · peak-load 3.45` |
 | dev / v3 | 16 | rev8-hybrid-s5 | `run-heavy: done rc=0 6s · peak-RSS 0.21GiB · min-avail 38566MiB · peak-load 4.09` |
+
+The public diff was checked for household identifiers, LAN addresses,
+MAC-address patterns and private source names. The frozen
+`feature_v2.rs` hash, all revised scorer tests and the split comparison
+are recorded above.

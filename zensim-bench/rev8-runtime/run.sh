@@ -40,6 +40,8 @@ for threads in ${REV8_THREADS:-16 1}; do
             stem="$root/${threads}t_${geometry}_$mode"
             if [[ $mode == latency ]]; then
                 args=(latency "$stem.json")
+            elif [[ $mode == descriptive ]]; then
+                args=(descriptive "${REV8_FIXTURE_ID:-00}")
             else
                 args=(rss "$mode")
             fi

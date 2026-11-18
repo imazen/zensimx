@@ -6141,3 +6141,6 @@ rev8-asm binary:
 
 rev8-report artifacts binary_sha256 output:
     python3 -B zensim-bench/rev8-runtime/report.py {{quote(artifacts)}} {{quote(binary_sha256)}} {{quote(output)}}
+
+rev8-bounded-report artifacts clean_sha256 bounded_sha256 output:
+    python3 -B zensim-bench/rev8-runtime/report.py {{quote(artifacts)}} {{quote(clean_sha256)}} {{quote(output)}} --bounded-sha256 {{quote(bounded_sha256)}}

@@ -1,7 +1,11 @@
 //! Interleaved resident RGB8 scoring and fresh-process high-water measurement.
 #![forbid(unsafe_code)]
 
-use std::{path::Path, sync::Arc, time::Duration};
+use std::{
+    path::Path,
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
 use archmage::{SimdToken, X64V3Token, X64V4Token, X64V4xToken};
 use research::rev8::{self, RgbRows, Variant};
@@ -149,10 +153,68 @@ fn latency(width: usize, height: usize, parallel: bool, output: &Path) {
     }
 }
 
+fn descriptive(width: usize, height: usize, parallel: bool, fixture: usize) {
+    assert!(
+        fixture < IMAGES,
+        "fixture ID must be in the original packet"
+    );
+    let pair = Pair::new(fixture, width, height);
+    let checksum = |rgb: &[[u8; 3]]| {
+        rgb.iter()
+            .flatten()
+            .fold(0xcbf2_9ce4_8422_2325_u64, |hash, &byte| {
+                (hash ^ u64::from(byte)).wrapping_mul(0x0100_0000_01b3)
+            })
+    };
+    println!(
+        "fixture\t{fixture:02}\t{:016x}\t{:016x}",
+        checksum(&pair.a),
+        checksum(&pair.b)
+    );
+    let baseline = rev7::Zensim::new(rev7::ZensimProfile::A).with_parallel(parallel);
+    let warmup =
+        ARMS.map(|(_, variant)| zenbench::black_box(pair.score(variant, &baseline, parallel)));
+    assert!(warmup.iter().all(|s| s.is_finite()));
+
+    let mut results = [[(0u128, 0u64); ARMS.len()]; 3];
+    for (round, samples) in results.iter_mut().enumerate() {
+        for (slot, sample) in samples.iter_mut().enumerate() {
+            let arm = if round % 2 == 0 {
+                slot
+            } else {
+                ARMS.len() - 1 - slot
+            };
+            let start = Instant::now();
+            let score = zenbench::black_box(pair.score(ARMS[arm].1, &baseline, parallel));
+            let nanoseconds = start.elapsed().as_nanos();
+            assert_eq!(score.to_bits(), warmup[arm].to_bits());
+            *sample = (nanoseconds, score.to_bits());
+        }
+    }
+
+    for (round, samples) in results.into_iter().enumerate() {
+        for (slot, (elapsed, score)) in samples.into_iter().enumerate() {
+            let arm = if round % 2 == 0 {
+                slot
+            } else {
+                ARMS.len() - 1 - slot
+            };
+            let (name, _) = ARMS[arm];
+            println!(
+                "sample\t{}\t{}\t{name}\t{elapsed}\t{score:016x}",
+                round + 1,
+                slot + 1
+            );
+        }
+    }
+}
+
 fn main() {
     let args: Vec<_> = std::env::args().skip(1).collect();
     let [tier, threads, width, height, mode, destination] = args.as_slice() else {
-        panic!("usage: zensim-rev8-runtime TIER THREADS WIDTH HEIGHT latency PATH | rss ARM");
+        panic!(
+            "usage: zensim-rev8-runtime TIER THREADS WIDTH HEIGHT latency PATH | descriptive FIXTURE | rss ARM"
+        );
     };
     let threads: usize = threads.parse().unwrap();
     assert!(matches!(threads, 1 | 16));
@@ -167,6 +229,7 @@ fn main() {
     );
     match mode.as_str() {
         "latency" => latency(width, height, parallel, Path::new(destination)),
+        "descriptive" => descriptive(width, height, parallel, destination.parse().unwrap()),
         "rss" => {
             let (_, variant) = ARMS.iter().find(|(name, _)| name == destination).unwrap();
             let baseline = rev7::Zensim::new(rev7::ZensimProfile::A).with_parallel(parallel);

@@ -157,16 +157,114 @@ def matrix(data):
     return "\n".join(lines) + "\n"
 
 
+
+def descriptive_cell(root, stem, tier, threads, geometry):
+    log, run_heavy = receipt(root / f"{stem}_descriptive.log", tier, threads, geometry)
+    fixtures = re.findall(r"^fixture\t(\d{2})\t([0-9a-f]{16})\t([0-9a-f]{16})$", log, re.MULTILINE)
+    require(len(fixtures) == 1, "expected one resident fixture")
+    samples = re.findall(r"^sample\t(\d)\t(\d)\t([^\t]+)\t(\d+)\t([0-9a-f]{16})$", log, re.MULTILINE)
+    expected = [(str(round_), str(slot), arm)
+                for round_ in range(1, 4)
+                for slot, arm in enumerate(ARMS if round_ % 2 else reversed(ARMS), start=1)]
+    require([sample[:3] for sample in samples] == expected, "invalid round count or alternating arm order")
+    per_arm = {}
+    for arm in ARMS:
+        ns = [int(row[3]) for row in samples if row[2] == arm]
+        scores = {row[4] for row in samples if row[2] == arm}
+        require(all(x > 0 for x in ns) and len(scores) == 1, "invalid timing or nonrepeatable score")
+        per_arm[arm] = {
+            "median_ms": statistics.median(ns) / 1e6, "min_ms": min(ns) / 1e6,
+            "max_ms": max(ns) / 1e6, "ns": ns, "score_bits": scores.pop(),
+        }
+    return fixtures[0], per_arm, run_heavy
+
+
+def bounded(artifacts, clean_digest, digest):
+    prior = summarize(artifacts, clean_digest)
+    clean = [cell for cell in prior["cells"] if "latency_capture" in cell]
+    desc, missing = [], []
+    fixtures = {}
+    for host, tier in PLACEMENTS:
+        roots = [
+            p for p in sorted(artifacts.glob(f"{host}-{tier}*"), reverse=True)
+            if (p / "collector.tsv").is_file()
+            and (p / "collector.tsv").read_text().split()[:2] == [host, tier]
+            and (p / "binary.sha256").read_text().split()[0] == digest
+        ]
+        for threads in THREADS:
+            for geometry in ("1024x1024", "4000x3000"):
+                stem = f"{threads}t_{geometry}"
+                ident = {"host": host, "tier": tier, "threads": threads, "geometry": geometry}
+                try:
+                    result, origin = search(roots, lambda p: descriptive_cell(p, stem, tier, threads, geometry))
+                    fixture, arms, timing_receipt = result
+                    require(fixtures.setdefault(geometry, fixture) == fixture, "different resident fixture bytes")
+                    for item in arms.values():
+                        item["speedup"] = arms[ARMS[0]]["median_ms"] / item["median_ms"]
+                        width, height = map(int, geometry.split("x"))
+                        item["mpx_s"] = width * height / (1000 * item["median_ms"])
+                    desc.append({**ident, "capture": origin, "fixture": fixture, "arms": arms,
+                                 "run_heavy": timing_receipt})
+                except ValueError as error:
+                    missing.append({**ident, "mode": "descriptive", "reason": str(error)})
+
+                if host == "i265":
+                    prior_cell = next(c for c in prior["cells"]
+                                      if all(c[k] == v for k, v in ident.items()))
+                    for arm in ARMS:
+                        if "rss_kib" in prior_cell["arms"][arm]:
+                            continue
+                        try:
+                            data, origin = search(roots, lambda p: rss(p, stem, arm, tier, threads, geometry))
+                            prior_cell["arms"][arm].update(data, rss_capture=origin, rss_binary_sha256=digest)
+                        except ValueError as error:
+                            missing.append({**ident, "mode": arm, "reason": str(error)})
+
+    keys = {(c["host"], c["tier"], c["geometry"]) for c in desc}
+    for host, tier, geometry in sorted(keys):
+        pair = {c["threads"]: c for c in desc if (c["host"], c["tier"], c["geometry"]) == (host, tier, geometry)}
+        if len(pair) == 2:
+            for arm in ARMS:
+                a = pair[1]["arms"][arm]["score_bits"]
+                b = pair[16]["arms"][arm]["score_bits"]
+                require(a == b, f"{host}/{tier}/{geometry}/{arm} differed between 1T and 16T")
+    return {
+        "clean_binary_sha256": clean_digest, "bounded_binary_sha256": digest, "fixtures": fixtures,
+        "descriptive": desc, "accepted_zenbench": clean, "rss_and_original_cells": prior["cells"],
+        "dev_rss_thread_score_checks": prior["thread_score_checks"], "missing": missing,
+    }
+
+
+def bounded_matrix(data):
+    lines = [
+        "| Host / tier | Threads | Geometry | Fixture | Rev7 | Alg S4 | Alg S5 | Hybrid S5 |",
+        "|---|---:|---|---:|---|---|---|---|",
+    ]
+    for c in data["descriptive"]:
+        line = [f'{c["host"]} / {c["tier"]}', c["threads"], c["geometry"], c["fixture"][0]]
+        for arm in ARMS:
+            item = c["arms"][arm]
+            line.append(f'{item["median_ms"]:.3f} [{item["min_ms"]:.3f}, {item["max_ms"]:.3f}]'
+                        f' · {item["mpx_s"]:.2f} · {item["speedup"]:.3f}×')
+        lines.append("| " + " | ".join(map(str, line)) + " |")
+    return "\n".join(lines) + "\n"
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("artifacts", type=Path)
     parser.add_argument("runtime_sha256")
     parser.add_argument("output", type=Path)
     parser.add_argument("--partial", action="store_true")
+    parser.add_argument("--bounded-sha256")
     args = parser.parse_args()
-    data = summarize(args.artifacts, args.runtime_sha256)
+    if args.bounded_sha256:
+        data = bounded(args.artifacts, args.runtime_sha256, args.bounded_sha256)
+        view = bounded_matrix(data)
+    else:
+        data = summarize(args.artifacts, args.runtime_sha256)
+        view = matrix(data)
     args.output.with_suffix(".json").write_text(json.dumps(data, indent=2) + "\n")
-    args.output.with_suffix(".md").write_text(matrix(data))
+    args.output.with_suffix(".md").write_text(view)
     if data["missing"] and not args.partial:
         raise SystemExit(f'{len(data["missing"])} missing or rejected capture cells')
 
