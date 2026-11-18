@@ -57,11 +57,13 @@ include = [
 all-features = true
 
 [features]
+# Experimental RGB8-only symmetric scorer with an untrained head.
+rev8-proto = ["dep:archmage-attune"]
 # Export-only retained term maps; absent from default and product builds.
 viz-memory = ["feature-regime-v2", "custom-profiles", "training", "dep:serde_json"]
 viz-export = ["viz-memory", "dep:zenpng"]
 default = ["avx512", "imgref", "threads", "deprecated-profiles", "candidate-profiles", "feature-regime-v2"]
-avx512 = ["archmage/avx512", "magetypes/avx512"]
+avx512 = ["archmage/avx512", "magetypes/avx512", "archmage-attune?/avx512"]
 ## Diagnostic ONLY: accumulate `Σ activity` during extraction so `ScaleStats::
 ## iw_mean_w` reports the factor the `1/n`-pooled `iw_*` features carry (they
 ## should be pooled `1/Σw`; see benchmarks/iw_pooling_normalization_2026-07-15.md).
@@ -195,6 +197,8 @@ feature-regime-v2 = []
 
 [dependencies]
 archmage = { workspace = true }
+# Attune syntax without advancing the existing runtime/codec token cohort.
+archmage-attune = { package = "archmage-macros", git = "https://github.com/imazen/archmage", rev = "6bfd83d744e41259ec758054631dcb0928fc4ea1", optional = true }
 bytemuck = { workspace = true }
 magetypes = { workspace = true }
 libm = { workspace = true }

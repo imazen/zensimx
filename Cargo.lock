@@ -150,7 +150,7 @@ version = "0.9.30"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "15785ee3576fbd41276a25f063b1e6b5bf323af9b4924632e25a8de6a3065f06"
 dependencies = [
- "archmage-macros",
+ "archmage-macros 0.9.30",
  "safe_unaligned_simd",
  "winarm-cpufeatures",
 ]
@@ -160,6 +160,16 @@ name = "archmage-macros"
 version = "0.9.30"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ce7707714970d5cf476caccbae2d282000c6c14ca5aada878e722a10d8e1c153"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 3.0.9",
+]
+
+[[package]]
+name = "archmage-macros"
+version = "0.9.31"
+source = "git+https://github.com/imazen/archmage?rev=6bfd83d744e41259ec758054631dcb0928fc4ea1#6bfd83d744e41259ec758054631dcb0928fc4ea1"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -5761,6 +5771,7 @@ name = "zensim"
 version = "0.3.0"
 dependencies = [
  "archmage",
+ "archmage-macros 0.9.31",
  "butteraugli",
  "bytemuck",
  "enough",

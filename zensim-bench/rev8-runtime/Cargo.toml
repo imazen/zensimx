@@ -1,0 +1,21 @@
+[package]
+name = "zensim-rev8-runtime"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[dependencies]
+# Published A and the research prototype have separate entry points and share
+# Archmage's process-wide dispatch control. Rev7 uses its original bake.
+rev7 = { package = "zensim", git = "https://github.com/imazen/zensim", rev = "bebc6ea45d2b6adb6ab70affc3e289707ef74fb0", default-features = false, features = ["threads", "avx512"] }
+research = { package = "zensim", path = "../../zensim", default-features = false, features = ["rev8-proto", "threads", "avx512"] }
+archmage = { version = "=0.9.30", features = ["testable_dispatch"] }
+magetypes = "=0.9.30"
+rayon = "=1.12.0"
+zenbench = { git = "https://github.com/imazen/zenbench", rev = "82ff70a3f0c212cf88f53d6e9c3e02de13f32eec", default-features = false }
+
+[profile.release]
+lto = "thin"
+codegen-units = 1

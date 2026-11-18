@@ -6124,3 +6124,20 @@ shaping-recovery-tests:
 # Completed summaries and cached outer-test points; never fit or score a model.
 shaping-final-report study dispatch output a_data:
     TMPDIR="$HOME/tmp" "$HOME/work/claudehints/scripts/run-heavy" --mem 2G --jobs 1 -- python3 -B scripts/rev4_featpot/shaping_final_report.py --study {{quote(study)}} --dispatch {{quote(dispatch)}} --output {{quote(output)}} --a-data {{quote(a_data)}}
+
+# Rev8 is a separate, non-default research scorer.
+rev8-test:
+    cargo test --locked -p zensim --lib --features rev8-proto rev8:: -- --nocapture
+
+rev8-runtime:
+    cargo build --release --locked --manifest-path zensim-bench/rev8-runtime/Cargo.toml
+
+rev8-portability:
+    cargo check --locked -p zensim --lib --no-default-features --features rev8-proto --target aarch64-unknown-linux-gnu
+    RUSTFLAGS='-C target-feature=+simd128' cargo check --locked -p zensim --lib --no-default-features --features rev8-proto --target wasm32-wasip1
+
+rev8-asm binary:
+    python3 -B zensim-bench/rev8-runtime/audit_asm.py {{quote(binary)}}
+
+rev8-report artifacts binary_sha256 output:
+    python3 -B zensim-bench/rev8-runtime/report.py {{quote(artifacts)}} {{quote(binary_sha256)}} {{quote(output)}}
