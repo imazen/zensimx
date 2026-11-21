@@ -422,7 +422,7 @@ impl DetPow for f64 {
 // ============================================================================
 //
 // Scalar replications of magetypes' generated `*_midp` formulas
-// (`simd/generic/generated/transcendentals_f32x8.rs`, magetypes 0.9.28) —
+// (`simd/generic/generated/transcendentals_f32x8.rs`, magetypes 0.9.32) —
 // the SAME polynomials and IEEE bit manipulation the production SIMD path
 // evaluates lane-wise, written in inherent `f32` ops so every tier produces
 // identical bits by construction. This is the Rev4 canonical arithmetic for
@@ -437,12 +437,11 @@ impl DetPow for f64 {
 // fused-tier semantics is the canonical one), `round()`/`to_i32_round()`
 // are ties-to-even (`f32::round_ties_even`, matching `_mm256_round_ps
 // (NEAREST)` and magetypes' scalar `roundevenf`/`convert_f32_to_i32_round`),
-// and min/max/blend keep the generated code's operand order. Non-finite
-// inputs follow the generated code's blend order so even NaN produces the
-// same deterministic (garbage) bits on every tier.
+// and min/max/blend keep the generated code's NaN-preserving operand order
+// (magetypes 0.9.32 preserves quiet NaN inputs across `log2_midp`/`exp2_midp`).
 
 /// Canonical `log2_midp`: (a−1)/(a+1) transform with odd polynomial,
-/// edge blends in the generated order (0 → −inf, <0 → NaN, +inf → +inf).
+/// edge blends in the generated order (0 → −inf, <0 or NaN → NaN, +inf → +inf).
 #[inline]
 pub(crate) fn log2_midp_f32(x: f32) -> f32 {
     const SQRT2_OVER_2: u32 = 0x3f35_04f3;
@@ -464,7 +463,7 @@ pub(crate) fn log2_midp_f32(x: f32) -> f32 {
     if x == 0.0 {
         r = f32::NEG_INFINITY;
     }
-    if x < 0.0 {
+    if x < 0.0 || x.is_nan() {
         r = f32::NAN;
     }
     if x == f32::INFINITY {
@@ -474,10 +473,9 @@ pub(crate) fn log2_midp_f32(x: f32) -> f32 {
 }
 
 /// Canonical `exp2_midp`: ties-even split (|frac| ≤ 0.5), degree-6
-/// Horner, exponent-bit reconstruction; edge blends in the generated
-/// order (< −126 → 0, ≥ 128 → +inf).
+/// Horner, exponent-bit reconstruction; NaN-preserving clamp and edge
+/// blends in the generated order (< −126 → 0, ≥ 128 → +inf, NaN → NaN).
 #[inline]
-#[allow(clippy::manual_clamp)] // NaN semantics must match the SIMD .max().min() lanes
 pub(crate) fn exp2_midp_f32(x: f32) -> f32 {
     const C1: f32 = core::f32::consts::LN_2;
     const C2: f32 = 0.240_226_46;
@@ -486,8 +484,9 @@ pub(crate) fn exp2_midp_f32(x: f32) -> f32 {
     const C5: f32 = 0.001_333_37;
     const C6: f32 = 0.000_154_47;
 
-    let clamped = x.max(-126.0).min(128.0);
-    let xi = clamped.round_ties_even().min(127.0);
+    let clamped = x.clamp(-126.0, 128.0);
+    let rounded = clamped.round_ties_even();
+    let xi = if rounded > 127.0 { 127.0 } else { rounded };
     let xf = clamped - xi;
     let poly = C6
         .mul_add(xf, C5)

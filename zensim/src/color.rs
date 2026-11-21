@@ -608,14 +608,27 @@ impl<T: F32x16Convert> CanonChunk<T> {
         let g = GenericF32x16::from_array_t(self.token, g_arr);
         let b = GenericF32x16::from_array_t(self.token, b_arr);
         if CLAMP {
-            (
-                r.max(self.zero).min(self.one),
-                g.max(self.zero).min(self.one),
-                b.max(self.zero).min(self.one),
-            )
+            (self.clamp01(r), self.clamp01(g), self.clamp01(b))
         } else {
             (r, g, b)
         }
+    }
+
+    /// `x.max(+0).min(1)` with the canon's NaN-drop semantics on every
+    /// backend: ordered compares plus `blend`, so a NaN lane (including
+    /// sNaN on AVX-512 `vrangeps`) yields the constant exactly like
+    /// `f32::max`/`min` (imazen/archmage#145). Bit-identical on finite
+    /// lanes and to the prior x86 lowering.
+    #[inline(always)]
+    fn clamp01(&self, x: GenericF32x16<T>) -> GenericF32x16<T> {
+        let hi = GenericF32x16::blend(x.simd_gt(self.zero), x, self.zero);
+        GenericF32x16::blend(hi.simd_lt(self.one), hi, self.one)
+    }
+
+    /// `x.max(+0)` with the same NaN-drop semantics as [`Self::clamp01`].
+    #[inline(always)]
+    fn max0(&self, x: GenericF32x16<T>) -> GenericF32x16<T> {
+        GenericF32x16::blend(x.simd_gt(self.zero), x, self.zero)
     }
 
     /// The canonical opsin absorbance mix — [`opsin_px_canon`]'s fused
@@ -629,15 +642,9 @@ impl<T: F32x16Convert> CanonChunk<T> {
     ) -> [GenericF32x16<T>; 3] {
         let [m0, m1, m2] = &self.m;
         [
-            m0[0]
-                .mul_add(r, m0[1].mul_add(g, m0[2].mul_add(b, self.bias)))
-                .max(self.zero),
-            m1[0]
-                .mul_add(r, m1[1].mul_add(g, m1[2].mul_add(b, self.bias)))
-                .max(self.zero),
-            m2[0]
-                .mul_add(r, m2[1].mul_add(g, m2[2].mul_add(b, self.bias)))
-                .max(self.zero),
+            self.max0(m0[0].mul_add(r, m0[1].mul_add(g, m0[2].mul_add(b, self.bias)))),
+            self.max0(m1[0].mul_add(r, m1[1].mul_add(g, m1[2].mul_add(b, self.bias)))),
+            self.max0(m2[0].mul_add(r, m2[1].mul_add(g, m2[2].mul_add(b, self.bias)))),
         ]
     }
 
