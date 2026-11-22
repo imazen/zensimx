@@ -4210,6 +4210,51 @@ mod tests {
         assert!(attr.density().iter().all(|v| v.is_finite()));
     }
 
+    #[test]
+    fn fused_attribution_uses_the_canonical_profile_b_score() {
+        let (w, h) = (96, 80);
+        let (src, dst) = test_pair(w, h);
+        let z = Zensim::new(ZensimProfile::B);
+        let src = RgbSlice::new(&src, w, h);
+        let dst = RgbSlice::new(&dst, w, h);
+        let precomputed = z.precompute_reference(&src).unwrap();
+        let canonical = z.compute_with_ref(&precomputed, &dst).unwrap();
+        let sensitivities = [-0.5; 156];
+        let mut session = AttributionSession::new();
+        let check = |(result, map): (crate::ZensimResult, AttributionResult), bin| {
+            assert_eq!(result.score().to_bits(), canonical.score().to_bits());
+            assert_eq!(result.features(), canonical.features());
+            assert_eq!(map.bin(), bin);
+            assert_eq!((map.width(), map.height()), (w, h));
+            assert!(map.density().iter().all(|value| value.is_finite()));
+            assert!(map.density().iter().any(|&value| value != 0.0));
+        };
+
+        check(
+            z.compute_with_ref_score_and_attribution(&precomputed, &dst, &sensitivities)
+                .unwrap(),
+            1,
+        );
+        check(
+            z.compute_with_ref_score_and_attribution_binned(&precomputed, &dst, &sensitivities, 8)
+                .unwrap(),
+            8,
+        );
+        for _ in 0..2 {
+            check(
+                z.compute_with_ref_score_and_attribution_stale_binned(
+                    &precomputed,
+                    &dst,
+                    &sensitivities,
+                    &mut session,
+                    8,
+                )
+                .unwrap(),
+                8,
+            );
+        }
+    }
+
     /// C3a golden gate 2: the fused attribution equals the standalone f64
     /// density to f32-combine precision (identical retained planes by the
     /// C1 banding-parity construction; the deltas are the f32 kernel, the
@@ -6370,16 +6415,12 @@ pub(crate) fn zero_attribution(width: usize, height: usize, bin: usize) -> Attri
 }
 
 impl crate::metric::Zensim {
-    /// **The fused compare (task #67 C3a)**: scalar score + attribution
-    /// steering map from ONE plane pipeline — the codec-loop call shape.
+    /// Compute a scalar score and a basic-feature attribution map.
     ///
-    /// Runs the SAME per-scale walk as
-    /// [`compute_with_ref_and_diffmap`](Self::compute_with_ref_and_diffmap)
-    /// (the score is bit-identical to that path's), retaining each scale's
-    /// SSIM-error and mu planes and deriving the BASIC-block (f0-155)
-    /// attribution density from them with no additional blur work. The
-    /// marginal cost over a score-only compare is the f32 combine + spread
-    /// + SAT.
+    /// For profiles scored by the basic walk, the map retains that walk's
+    /// SSIM-error and mu planes and adds the f32 combine, spread and summed
+    /// area table. Profiles with a revision-5-or-later folded scoring plan
+    /// obtain their scalar score from [`compute_with_ref`](Self::compute_with_ref).
     ///
     /// `s` is the caller-supplied model gradient (`∂score/∂f_k`, basic
     /// layout; entries past 155 ignored). The density uses the C2b-final
@@ -6570,10 +6611,10 @@ impl crate::metric::Zensim {
         crate::metric::validate_ref_dimensions(precomputed, distorted)?;
         check_within_max_pixels(distorted.width(), distorted.height(), self.max_pixels())?;
         let mut config = config_from_params(params, self.parallel());
-        config.formula_revision = revision;
         // Only the candidate map owner may skip channels: its score/features
         // were already computed. Legacy callers also consume the returned row.
         if revision.is_some() {
+            config.formula_revision = revision;
             // This stage consumes only basic/peak signals. The canonical
             // planned extraction above already handled all scored families;
             // B's inherited masked/IW switches would run an unused chain here.
@@ -6940,32 +6981,51 @@ impl crate::metric::Zensim {
                 },
             )
         };
-        let mut result = result.with_profile(self.profile());
-        // Same real-scoring step as `compute_with_ref_and_diffmap` — the
-        // scalar golden gate (`fused_score_bit_matches_diffmap_path`) holds
-        // this path bit-identical to the fold-diffmap call's score.
-        // Candidate callers already scored their own model. This pass only
-        // supplies its map signals, so do not run the legacy profile's head
-        // against a deliberately narrower feature row.
-        if revision.is_none() && precomputed.sampling.is_none() {
-            crate::metric::apply_mlp_scoring_with_codec(
-                &mut result,
-                params,
-                width as u32,
-                height as u32,
-                None,
-            )?;
-        }
+        // Candidate callers score their declared feature plans separately.
+        let result = if revision.is_none() && precomputed.sampling.is_none() {
+            self.score_basic_attribution(precomputed, distorted, &config, result)?
+        } else {
+            result.with_profile(self.profile())
+        };
 
         let t_pipe = t_all.elapsed().as_secs_f64() * 1e3;
         Ok((result, t_pipe, combine_ms.get()))
     }
 
-    /// **Stale-scalar single-pass fused compare (task #70; C3a ranked
-    /// lever 3)**: scalar score + attribution steering map from ONE
-    /// pipeline pass with NO second sweep — the attribution combine runs
-    /// in-strip on cache-hot planes using the coefficient packs derived
-    /// from the PREVIOUS compare through the same `session`.
+    fn score_basic_attribution(
+        &self,
+        precomputed: &PrecomputedReference,
+        distorted: &impl ImageSource,
+        config: &crate::metric::ZensimConfig,
+        result: crate::ZensimResult,
+    ) -> Result<crate::ZensimResult, ZensimError> {
+        // The basic-map walk emits the legacy feature row. Fold-backed
+        // profiles need their canonical scoring plan, including any features
+        // beyond this row. Keep the map and score on their respective walks.
+        if config
+            .formula_revision
+            .is_some_and(|r| r >= crate::feature_defs::FormulaRevision::Rev5)
+            && crate::fold_engine::is_fold_backable(config)
+        {
+            return self.compute_with_ref(precomputed, distorted);
+        }
+
+        let mut result = result.with_profile(self.profile());
+        crate::metric::apply_mlp_scoring_with_codec(
+            &mut result,
+            self.profile().params(),
+            distorted.width() as u32,
+            distorted.height() as u32,
+            None,
+        )?;
+        Ok(result)
+    }
+
+    /// Compute a scalar score and a basic-feature attribution map with
+    /// one-compare-old coefficients. The attribution combine runs in-strip
+    /// on cache-hot planes. Profiles with a revision-5-or-later folded
+    /// scoring plan obtain their scalar score from
+    /// [`compute_with_ref`](Self::compute_with_ref).
     ///
     /// **Semantics — the map lags one iterate.** The returned map combines
     /// THIS compare's per-pixel signal planes with the PREVIOUS compare's
@@ -6983,9 +7043,9 @@ impl crate::metric::Zensim {
     /// changes) runs the fresh fused path
     /// ([`compute_with_ref_score_and_attribution`](Self::compute_with_ref_score_and_attribution))
     /// and primes the session — that call returns the FRESH map at fresh
-    /// cost; subsequent calls are single-pass. The session is valid for
-    /// ONE precomputed reference; switching references without `reset()`
-    /// is a caller error the session cannot detect.
+    /// cost. Subsequent map passes reuse the coefficient packs. The session
+    /// is valid for one precomputed reference. Call `reset()` before switching
+    /// references because the session cannot detect the change.
     ///
     /// # Errors
     ///
@@ -7223,16 +7283,7 @@ impl crate::metric::Zensim {
             &mut win_plane,
             on_scale,
         );
-        let mut result = result.with_profile(self.profile());
-        // Same real-scoring step as every compare path — bit-identical
-        // score (the in-strip fold reads planes, never writes stats).
-        crate::metric::apply_mlp_scoring_with_codec(
-            &mut result,
-            params,
-            width as u32,
-            height as u32,
-            None,
-        )?;
+        let result = self.score_basic_attribution(precomputed, distorted, &config, result)?;
         session.coeffs = next_coeffs;
 
         let t_pipe = t_all.elapsed().as_secs_f64() * 1e3;

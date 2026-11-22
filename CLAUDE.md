@@ -1,3 +1,17 @@
+## Known Bugs — current Profile B with basic attribution (resolved November 22, 2026)
+
+Fresh basic attribution replaced the profile's reference color revision with
+an absent override. Keeping the revision exposed a second mismatch between
+the basic walk's feature row and Profile B's declared features. Fresh and
+stale basic maps now keep the profile revision and use the canonical cached
+scorer for revision-5-or-later folded profiles. Their score takes a separate
+pass. Explicit candidate revisions still drive the candidate map walk.
+
+The 96×80 regression checks the score bits and features against the
+canonical scorer for fresh per-pixel, fresh binned, and primed and reused
+stale binned attribution. All 48 attribution unit tests pass. The two manual
+performance probes retain their existing ignore annotations.
+
 ## Known Bugs — failed-export archive extension registration (resolved November 9, 2026)
 
 The failed raw-export archive watcher checked only the original matrix and stopped
