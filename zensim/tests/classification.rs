@@ -323,11 +323,11 @@ fn truncate_lsb_detected_as_rounding_error() {
         .expect("rounding_bias should be populated for RoundingError");
     // LSB truncation is unidirectional — all errors should be in one direction
     // (positive, since truncation rounds toward zero = dst is lower)
-    for ch in 0..3 {
+    for (ch, &pos_frac) in bias.positive_fraction.iter().enumerate() {
         assert!(
-            bias.positive_fraction[ch] > 0.9 || bias.positive_fraction[ch] < 0.1,
+            pos_frac > 0.9 || pos_frac < 0.1,
             "truncation should be heavily skewed, ch={ch} pos_frac={:.3}",
-            bias.positive_fraction[ch],
+            pos_frac,
         );
     }
     assert!(
@@ -670,11 +670,11 @@ fn round_half_up_detected_as_rounding_error() {
         .expect("rounding_bias should be populated for RoundingError");
     // round_half_up vs default rounding: errors should be unidirectional
     // (all negative, since round_half_up rounds UP = dst is higher)
-    for ch in 0..3 {
+    for (ch, &pos_frac) in bias.positive_fraction.iter().enumerate() {
         assert!(
-            bias.positive_fraction[ch] > 0.9 || bias.positive_fraction[ch] < 0.1,
+            pos_frac > 0.9 || pos_frac < 0.1,
             "round_half_up should be heavily skewed, ch={ch} pos_frac={:.3}",
-            bias.positive_fraction[ch],
+            pos_frac,
         );
     }
 }

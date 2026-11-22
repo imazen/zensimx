@@ -319,7 +319,7 @@ fn sq_sum_into_inner_v4(token: archmage::X64V4Token, a: &[f32], b: &[f32], out: 
         let base = c * 16;
         let va = f32x16::from_array_t(token, a[base..][..16].try_into().unwrap());
         let vb = f32x16::from_array_t(token, b[base..][..16].try_into().unwrap());
-        out[base..base + 16].copy_from_slice(&va.mul_add(va, vb * vb).to_array());
+        out[base..base + 16].copy_from_slice(&va.mul_add_relaxed(va, vb * vb).to_array());
     }
     let v3 = token.v3();
     let chunks8 = (n - chunks * 16) / 8;
@@ -327,7 +327,7 @@ fn sq_sum_into_inner_v4(token: archmage::X64V4Token, a: &[f32], b: &[f32], out: 
         let base = chunks * 16 + c * 8;
         let va = f32x8::from_array_t(v3, a[base..][..8].try_into().unwrap());
         let vb = f32x8::from_array_t(v3, b[base..][..8].try_into().unwrap());
-        out[base..base + 8].copy_from_slice(&va.mul_add(va, vb * vb).to_array());
+        out[base..base + 8].copy_from_slice(&va.mul_add_relaxed(va, vb * vb).to_array());
     }
     for i in (chunks * 16 + chunks8 * 8)..n {
         out[i] = a[i].mul_add(a[i], b[i] * b[i]);
@@ -343,7 +343,7 @@ fn sq_sum_into_inner_v3(token: archmage::X64V3Token, a: &[f32], b: &[f32], out: 
         let base = c * 8;
         let va = f32x8::from_array_t(token, a[base..][..8].try_into().unwrap());
         let vb = f32x8::from_array_t(token, b[base..][..8].try_into().unwrap());
-        out[base..base + 8].copy_from_slice(&va.mul_add(va, vb * vb).to_array());
+        out[base..base + 8].copy_from_slice(&va.mul_add_relaxed(va, vb * vb).to_array());
     }
     for i in (chunks * 8)..n {
         out[i] = a[i].mul_add(a[i], b[i] * b[i]);
@@ -360,7 +360,7 @@ fn sq_sum_into_inner(token: Token, a: &[f32], b: &[f32], out: &mut [f32]) {
     for ((ac, bc), oc) in a_chunks.iter().zip(b_chunks).zip(out_chunks) {
         let va = f32x8::from_array_t(token, *ac);
         let vb = f32x8::from_array_t(token, *bc);
-        va.mul_add(va, vb * vb).store(oc);
+        va.mul_add_relaxed(va, vb * vb).store(oc);
     }
     for ((&a, &b), o) in a_tail
         .iter()
@@ -1510,9 +1510,9 @@ fn build_weights_and_mse_inner_v4(
 
         // mask = 1 / (1 + k_mask * a)  → use rcp via division (denominator never zero
         //   because k_mask ≥ 0, a ≥ 0, +1 floor)
-        let mask = one / kmv.mul_add(av, one);
+        let mask = one / kmv.mul_add_relaxed(av, one);
         // iw_weight = 1 + k_iw * a
-        let iw = kiv.mul_add(av, one);
+        let iw = kiv.mul_add_relaxed(av, one);
         let diff = sv - dv;
         let d2 = diff * diff;
         mse_mask += (d2 * mask).reduce_add() as f64;
@@ -1563,8 +1563,8 @@ fn build_weights_and_mse_inner_v3(
         let sv = f32x8::from_array_t(token, src[base..][..8].try_into().unwrap());
         let dv = f32x8::from_array_t(token, dst[base..][..8].try_into().unwrap());
 
-        let mask = one / kmv.mul_add(av, one);
-        let iw = kiv.mul_add(av, one);
+        let mask = one / kmv.mul_add_relaxed(av, one);
+        let iw = kiv.mul_add_relaxed(av, one);
         let diff = sv - dv;
         let d2 = diff * diff;
         mse_mask += (d2 * mask).reduce_add() as f64;
@@ -1625,8 +1625,8 @@ fn build_weights_and_mse_inner(
         let sv = f32x8::from_array_t(token, *sc);
         let dv = f32x8::from_array_t(token, *dc);
 
-        let mask = one / kmv.mul_add(av, one);
-        let iw = kiv.mul_add(av, one);
+        let mask = one / kmv.mul_add_relaxed(av, one);
+        let iw = kiv.mul_add_relaxed(av, one);
         let diff = sv - dv;
         let d2 = diff * diff;
         mse_mask += (d2 * mask).reduce_add() as f64;
@@ -1677,7 +1677,7 @@ fn build_mask_weight_and_mse_inner_v4(
         let av = f32x16::from_array_t(token, activity[base..][..16].try_into().unwrap());
         let sv = f32x16::from_array_t(token, src[base..][..16].try_into().unwrap());
         let dv = f32x16::from_array_t(token, dst[base..][..16].try_into().unwrap());
-        let mask = one / kmv.mul_add(av, one);
+        let mask = one / kmv.mul_add_relaxed(av, one);
         let diff = sv - dv;
         let d2 = diff * diff;
         mse += (d2 * mask).reduce_add() as f64;
@@ -1713,7 +1713,7 @@ fn build_mask_weight_and_mse_inner_v3(
         let av = f32x8::from_array_t(token, activity[base..][..8].try_into().unwrap());
         let sv = f32x8::from_array_t(token, src[base..][..8].try_into().unwrap());
         let dv = f32x8::from_array_t(token, dst[base..][..8].try_into().unwrap());
-        let mask = one / kmv.mul_add(av, one);
+        let mask = one / kmv.mul_add_relaxed(av, one);
         let diff = sv - dv;
         let d2 = diff * diff;
         mse += (d2 * mask).reduce_add() as f64;
@@ -1751,7 +1751,7 @@ fn build_mask_weight_and_mse_inner(
         let av = f32x8::from_array_t(token, *ac);
         let sv = f32x8::from_array_t(token, *sc);
         let dv = f32x8::from_array_t(token, *dc);
-        let mask = one / kmv.mul_add(av, one);
+        let mask = one / kmv.mul_add_relaxed(av, one);
         let diff = sv - dv;
         let d2 = diff * diff;
         mse += (d2 * mask).reduce_add() as f64;
@@ -1790,7 +1790,7 @@ fn build_iw_weight_and_mse_inner_v4(
         let av = f32x16::from_array_t(token, activity[base..][..16].try_into().unwrap());
         let sv = f32x16::from_array_t(token, src[base..][..16].try_into().unwrap());
         let dv = f32x16::from_array_t(token, dst[base..][..16].try_into().unwrap());
-        let iw = kiv.mul_add(av, one);
+        let iw = kiv.mul_add_relaxed(av, one);
         let diff = sv - dv;
         let d2 = diff * diff;
         mse += (d2 * iw).reduce_add() as f64;
@@ -1826,7 +1826,7 @@ fn build_iw_weight_and_mse_inner_v3(
         let av = f32x8::from_array_t(token, activity[base..][..8].try_into().unwrap());
         let sv = f32x8::from_array_t(token, src[base..][..8].try_into().unwrap());
         let dv = f32x8::from_array_t(token, dst[base..][..8].try_into().unwrap());
-        let iw = kiv.mul_add(av, one);
+        let iw = kiv.mul_add_relaxed(av, one);
         let diff = sv - dv;
         let d2 = diff * diff;
         mse += (d2 * iw).reduce_add() as f64;
@@ -1864,7 +1864,7 @@ fn build_iw_weight_and_mse_inner(
         let av = f32x8::from_array_t(token, *ac);
         let sv = f32x8::from_array_t(token, *sc);
         let dv = f32x8::from_array_t(token, *dc);
-        let iw = kiv.mul_add(av, one);
+        let iw = kiv.mul_add_relaxed(av, one);
         let diff = sv - dv;
         let d2 = diff * diff;
         mse += (d2 * iw).reduce_add() as f64;
@@ -2500,10 +2500,10 @@ fn build_mask_and_iw_mse_inline_inner(
         let sv = f32x16::from_array_t(token, *sc);
         let dv = f32x16::from_array_t(token, *dc);
 
-        let mask = one / kmv.mul_add(av, one);
+        let mask = one / kmv.mul_add_relaxed(av, one);
         // IW weight computed inline — bit-identical to `kiv.mul_add(av, one)`
         // produced by `build_weights_and_mse_inner_v4`, but never stored.
-        let iw = kiv.mul_add(av, one);
+        let iw = kiv.mul_add_relaxed(av, one);
         let diff = sv - dv;
         let d2 = diff * diff;
         mse_mask += (d2 * mask).reduce_add() as f64;
@@ -2546,7 +2546,7 @@ fn build_iw_mse_only_inner(
         let av = f32x16::from_array_t(token, *ac);
         let sv = f32x16::from_array_t(token, *sc);
         let dv = f32x16::from_array_t(token, *dc);
-        let iw = kiv.mul_add(av, one);
+        let iw = kiv.mul_add_relaxed(av, one);
         let diff = sv - dv;
         let d2 = diff * diff;
         mse += (d2 * iw).reduce_add() as f64;
@@ -2607,7 +2607,7 @@ fn ssim_channel_masked_with_iw_inline_inner(
         let s12v = f32x16::from_array_t(token, *s12c);
         let mva = f32x16::from_array_t(token, *mac);
         let av = f32x16::from_array_t(token, *ac);
-        let mvb = kiv.mul_add(av, one); // IW weight inline
+        let mvb = kiv.mul_add_relaxed(av, one); // IW weight inline
 
         let d_raw = ssim_dissim16(token, form, m1, m2, ssq, s12v);
 
@@ -2685,7 +2685,7 @@ fn ssim_channel_iw_inline_inner(
         let ssq = f32x16::from_array_t(token, *ssqc);
         let s12v = f32x16::from_array_t(token, *s12c);
         let av = f32x16::from_array_t(token, *ac);
-        let mv = kiv.mul_add(av, one);
+        let mv = kiv.mul_add_relaxed(av, one);
 
         let d = ((ssim_dissim16(token, form, m1, m2, ssq, s12v)) * mv).max(zero);
         let d2 = d * d;
@@ -2753,7 +2753,7 @@ fn edge_diff_channel_masked_with_iw_inline_inner(
         let m2 = f32x16::from_array_t(token, *m2c);
         let mva = f32x16::from_array_t(token, *mac);
         let av = f32x16::from_array_t(token, *ac);
-        let mvb = kiv.mul_add(av, one);
+        let mvb = kiv.mul_add_relaxed(av, one);
 
         let diff1 = (i1 - m1).abs();
         let diff2 = (i2 - m2).abs();
@@ -2845,7 +2845,7 @@ fn edge_diff_channel_iw_inline_inner(
         let m1 = f32x16::from_array_t(token, *m1c);
         let m2 = f32x16::from_array_t(token, *m2c);
         let av = f32x16::from_array_t(token, *ac);
-        let mv = kiv.mul_add(av, one);
+        let mv = kiv.mul_add_relaxed(av, one);
 
         let diff1 = (i1 - m1).abs();
         let diff2 = (i2 - m2).abs();
@@ -3074,8 +3074,8 @@ fn build_inline_mse_inner(
         let sv = f32x16::from_array_t(token, *sc);
         let dv = f32x16::from_array_t(token, *dc);
 
-        let mask = one / kmv.mul_add(av, one);
-        let iw = kiv.mul_add(av, one);
+        let mask = one / kmv.mul_add_relaxed(av, one);
+        let iw = kiv.mul_add_relaxed(av, one);
         let diff = sv - dv;
         let d2 = diff * diff;
         mse_mask += (d2 * mask).reduce_add() as f64;
@@ -3120,7 +3120,7 @@ fn build_inline_mask_mse_inner(
         let sv = f32x16::from_array_t(token, *sc);
         let dv = f32x16::from_array_t(token, *dc);
 
-        let mask = one / kmv.mul_add(av, one);
+        let mask = one / kmv.mul_add_relaxed(av, one);
         let diff = sv - dv;
         let d2 = diff * diff;
         mse_mask += (d2 * mask).reduce_add() as f64;
@@ -3182,8 +3182,8 @@ fn ssim_channel_inline_both_inner(
         let s12v = f32x16::from_array_t(token, *s12c);
         let av = f32x16::from_array_t(token, *ac);
 
-        let mva = one / kmv.mul_add(av, one); // mask weight inline
-        let mvb = kiv.mul_add(av, one); // IW weight inline
+        let mva = one / kmv.mul_add_relaxed(av, one); // mask weight inline
+        let mvb = kiv.mul_add_relaxed(av, one); // IW weight inline
 
         let d_raw = ssim_dissim16(token, form, m1, m2, ssq, s12v);
 
@@ -3262,7 +3262,7 @@ fn ssim_channel_inline_mask_inner(
         let ssq = f32x16::from_array_t(token, *ssqc);
         let s12v = f32x16::from_array_t(token, *s12c);
         let av = f32x16::from_array_t(token, *ac);
-        let mv = one / kmv.mul_add(av, one);
+        let mv = one / kmv.mul_add_relaxed(av, one);
 
         let d = ((ssim_dissim16(token, form, m1, m2, ssq, s12v)) * mv).max(zero);
         let d2 = d * d;
@@ -3324,8 +3324,8 @@ fn ssim_signal_inline_both_inner(
         let d_raw = f32x16::from_array_t(token, *sc);
         let av = f32x16::from_array_t(token, *ac);
 
-        let mva = one / kmv.mul_add(av, one); // mask weight inline
-        let mvb = kiv.mul_add(av, one); // IW weight inline
+        let mva = one / kmv.mul_add_relaxed(av, one); // mask weight inline
+        let mvb = kiv.mul_add_relaxed(av, one); // IW weight inline
 
         let da = (d_raw * mva).max(zero);
         let d2a = da * da;
@@ -3382,7 +3382,7 @@ fn ssim_signal_inline_mask_inner(
 
     for (sc, ac) in sig_chunks.iter().zip(act_chunks) {
         let av = f32x16::from_array_t(token, *ac);
-        let mv = one / kmv.mul_add(av, one);
+        let mv = one / kmv.mul_add_relaxed(av, one);
 
         let d = (f32x16::from_array_t(token, *sc) * mv).max(zero);
         let d2 = d * d;
@@ -3427,7 +3427,7 @@ fn ssim_signal_iw_inline_inner(
 
     for (sc, ac) in sig_chunks.iter().zip(act_chunks) {
         let av = f32x16::from_array_t(token, *ac);
-        let wv = kiv.mul_add(av, one);
+        let wv = kiv.mul_add_relaxed(av, one);
 
         let d = (f32x16::from_array_t(token, *sc) * wv).max(zero);
         let d2 = d * d;
@@ -3494,8 +3494,8 @@ fn edge_diff_channel_inline_both_inner(
         let m2 = f32x16::from_array_t(token, *m2c);
         let av = f32x16::from_array_t(token, *ac);
 
-        let mva = one / kmv.mul_add(av, one);
-        let mvb = kiv.mul_add(av, one);
+        let mva = one / kmv.mul_add_relaxed(av, one);
+        let mvb = kiv.mul_add_relaxed(av, one);
 
         let diff1 = (i1 - m1).abs();
         let diff2 = (i2 - m2).abs();
@@ -3588,7 +3588,7 @@ fn edge_diff_channel_inline_mask_inner(
         let m1 = f32x16::from_array_t(token, *m1c);
         let m2 = f32x16::from_array_t(token, *m2c);
         let av = f32x16::from_array_t(token, *ac);
-        let mv = one / kmv.mul_add(av, one);
+        let mv = one / kmv.mul_add_relaxed(av, one);
 
         let diff1 = (i1 - m1).abs();
         let diff2 = (i2 - m2).abs();

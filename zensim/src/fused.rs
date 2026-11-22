@@ -114,7 +114,7 @@ fn ext_accumulate16<T: F32x16Backend + Copy>(
     acc.act_sum += act.reduce_add() as f64;
     let d2 = pd * pd;
     if ext.mask {
-        let w = one / f32x16::<T>::splat_t(token, ext.k_mask).mul_add(act, one);
+        let w = one / f32x16::<T>::splat_t(token, ext.k_mask).mul_add_relaxed(act, one);
         let da = (sd * w).max(zero);
         let d2a = da * da;
         let d4a = d2a * d2a;
@@ -129,7 +129,7 @@ fn ext_accumulate16<T: F32x16Backend + Copy>(
         acc.masked_mse += (d2 * w).reduce_add() as f64;
     }
     if ext.iw {
-        let w = f32x16::<T>::splat_t(token, ext.k_iw).mul_add(act, one);
+        let w = f32x16::<T>::splat_t(token, ext.k_iw).mul_add_relaxed(act, one);
         let db = (sd * w).max(zero);
         let d2b = db * db;
         let d4b = d2b * d2b;
@@ -161,7 +161,7 @@ fn ext_accumulate8<T: F32x8Backend + Copy>(
     acc.act_sum += act.reduce_add() as f64;
     let d2 = pd * pd;
     if ext.mask {
-        let w = one / GenericF32x8::<T>::splat_t(token, ext.k_mask).mul_add(act, one);
+        let w = one / GenericF32x8::<T>::splat_t(token, ext.k_mask).mul_add_relaxed(act, one);
         let da = (sd * w).max(zero);
         let d2a = da * da;
         let d4a = d2a * d2a;
@@ -176,7 +176,7 @@ fn ext_accumulate8<T: F32x8Backend + Copy>(
         acc.masked_mse += (d2 * w).reduce_add() as f64;
     }
     if ext.iw {
-        let w = GenericF32x8::<T>::splat_t(token, ext.k_iw).mul_add(act, one);
+        let w = GenericF32x8::<T>::splat_t(token, ext.k_iw).mul_add_relaxed(act, one);
         let db = (sd * w).max(zero);
         let d2b = db * db;
         let d4b = d2b * d2b;
@@ -6116,7 +6116,7 @@ fn fused_vblur_ssim_canon64_vec<P: crate::featcanon::Pool64>(
                     if ext.on {
                         $add!(row, row32, act_sum, x0, actv);
                         if ext.mask {
-                            let w = one / km.mul_add(actv, one);
+                            let w = one / km.mul_add_relaxed(actv, one);
                             let da = (sd * w).max(zero);
                             let d2a = da * da;
                             $add!(row, row32, masked_ssim_d, x0, da);
@@ -6132,7 +6132,7 @@ fn fused_vblur_ssim_canon64_vec<P: crate::featcanon::Pool64>(
                             $add!(row, row32, masked_mse, x0, d2 * w);
                         }
                         if ext.iw {
-                            let w = kiw.mul_add(actv, one);
+                            let w = kiw.mul_add_relaxed(actv, one);
                             let db = (sd * w).max(zero);
                             let d2b = db * db;
                             $add!(row, row32, iw_ssim_d, x0, db);

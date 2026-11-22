@@ -579,12 +579,12 @@ pub(crate) fn cbrt_newton_x16<T: magetypes::simd::backends::F32x16Convert>(
     let q = (f32x16::from_i32_t(token, a.bitcast_to_i32()) * third).to_i32();
     let r = f32x16::from_i32_bitcast_t(token, i32x16::splat_t(token, CBRT_NEWTON_MAGIC) - q);
     let t = a * r;
-    let e = (-t).mul_add(r * r, one);
-    let r = (r * e).mul_add(third, r);
+    let e = (-t).mul_add_relaxed(r * r, one);
+    let r = (r * e).mul_add_relaxed(third, r);
     let y = (a * r) * r;
     let y2 = y * y;
-    let res = (-y2).mul_add(y, a);
-    let y = y.mul_add(res / (y2 + y2).mul_add(y, a), y);
+    let res = (-y2).mul_add_relaxed(y, a);
+    let y = y.mul_add_relaxed(res / (y2 + y2).mul_add_relaxed(y, a), y);
     let sign = x & f32x16::splat_t(token, -0.0);
     let zero = x.simd_eq(f32x16::zero_t(token));
     f32x16::blend(zero, x, y | sign)
@@ -605,12 +605,12 @@ pub(crate) fn cbrt_newton_nonneg_x16<T: magetypes::simd::backends::F32x16Convert
     let q = (f32x16::from_i32_t(token, a.bitcast_to_i32()) * third).to_i32();
     let r = f32x16::from_i32_bitcast_t(token, i32x16::splat_t(token, CBRT_NEWTON_MAGIC) - q);
     let t = a * r;
-    let e = (-t).mul_add(r * r, one);
-    let r = (r * e).mul_add(third, r);
+    let e = (-t).mul_add_relaxed(r * r, one);
+    let r = (r * e).mul_add_relaxed(third, r);
     let y = (a * r) * r;
     let y2 = y * y;
-    let res = (-y2).mul_add(y, a);
-    let y = y.mul_add(res / (y2 + y2).mul_add(y, a), y);
+    let res = (-y2).mul_add_relaxed(y, a);
+    let y = y.mul_add_relaxed(res / (y2 + y2).mul_add_relaxed(y, a), y);
     let zero = a.simd_eq(f32x16::zero_t(token));
     f32x16::blend(zero, a, y)
 }

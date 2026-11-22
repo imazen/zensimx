@@ -549,8 +549,8 @@ impl Lanes16F32 {
     /// first half of a difference pair's fold, see the gradient kernel).
     #[inline(always)]
     pub(crate) fn add_into<P: Pool>(&self, pool: &mut P) {
-        for l in 0..16 {
-            pool.add(l, self.0[l]);
+        for (l, &val) in self.0.iter().enumerate() {
+            pool.add(l, val);
         }
     }
 
@@ -558,8 +558,8 @@ impl Lanes16F32 {
     /// `lane += v as f64`), then clear.
     #[inline(always)]
     pub(crate) fn fold_into<P: Pool>(&mut self, pool: &mut P) {
-        for l in 0..16 {
-            pool.add(l, self.0[l]);
+        for (l, &val) in self.0.iter().enumerate() {
+            pool.add(l, val);
         }
         self.0 = [0.0; 16];
     }

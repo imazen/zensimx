@@ -130,7 +130,7 @@ impl<T: F32x16Convert> RowMath<T> {
             let (a, b, c) = (a.to_array(), b.to_array(), c.to_array());
             V::from_array_t(self.0, core::array::from_fn(|i| a[i].mul_add(b[i], c[i])))
         } else {
-            a.mul_add(b, c)
+            a.mul_add_relaxed(b, c)
         }
     }
 

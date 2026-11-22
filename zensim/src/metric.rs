@@ -3471,11 +3471,11 @@ fn derive_classification(delta_stats: &DeltaStats, _result: &ZensimResult) -> Er
     // deltas is a channel swap. No other operation produces this pattern.
     let mut zero_channels = 0u32;
     let mut hot_channels = 0u32;
-    for ch in 0..3 {
-        if delta_stats.max_abs_delta[ch] < 1.0 / 255.0 {
+    for &max_d in &delta_stats.max_abs_delta {
+        if max_d < 1.0 / 255.0 {
             zero_channels += 1;
         }
-        if delta_stats.max_abs_delta[ch] > 0.1 {
+        if max_d > 0.1 {
             hot_channels += 1;
         }
     }

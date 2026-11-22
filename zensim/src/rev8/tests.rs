@@ -703,9 +703,8 @@ fn fx2_and_500nit_symmetry_identity_and_thread_parity() {
                 .iter()
                 .all(|v| v.to_bits() == 0)
         );
-        for s in 0..4 {
-            for c in 0..3 {
-                let f = fx500_ab.scale_fragility[s][c];
+        for scale_frag in fx500_ab.scale_fragility.iter().take(4) {
+            for &f in scale_frag {
                 assert!(f.is_finite() && f > 0.0 && f <= 1.0, "frag500={f}");
             }
         }

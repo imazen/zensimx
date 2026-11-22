@@ -642,9 +642,18 @@ impl<T: F32x16Convert> CanonChunk<T> {
     ) -> [GenericF32x16<T>; 3] {
         let [m0, m1, m2] = &self.m;
         [
-            self.max0(m0[0].mul_add(r, m0[1].mul_add(g, m0[2].mul_add(b, self.bias)))),
-            self.max0(m1[0].mul_add(r, m1[1].mul_add(g, m1[2].mul_add(b, self.bias)))),
-            self.max0(m2[0].mul_add(r, m2[1].mul_add(g, m2[2].mul_add(b, self.bias)))),
+            self.max0(m0[0].mul_add_relaxed(
+                r,
+                m0[1].mul_add_relaxed(g, m0[2].mul_add_relaxed(b, self.bias)),
+            )),
+            self.max0(m1[0].mul_add_relaxed(
+                r,
+                m1[1].mul_add_relaxed(g, m1[2].mul_add_relaxed(b, self.bias)),
+            )),
+            self.max0(m2[0].mul_add_relaxed(
+                r,
+                m2[1].mul_add_relaxed(g, m2[2].mul_add_relaxed(b, self.bias)),
+            )),
         ]
     }
 
@@ -673,7 +682,7 @@ impl<T: F32x16Convert> CanonChunk<T> {
         let x = self.half * (c0 - c1);
         let y = self.half * (c0 + c1);
         (
-            x.mul_add(self.fourteen, self.x_bias),
+            x.mul_add_relaxed(self.fourteen, self.x_bias),
             y + self.y_bias,
             (t2 - y) + self.b_bias,
         )
@@ -709,7 +718,7 @@ impl<T: F32x16Convert> CanonChunk<T> {
         let x = self.half * (c0 - c1);
         let y = self.half * (c0 + c1);
         (
-            x.mul_add(self.pu_x_scale, self.x_bias),
+            x.mul_add_relaxed(self.pu_x_scale, self.x_bias),
             y + self.y_bias,
             (c2 - y) + self.b_bias,
         )
@@ -1167,13 +1176,13 @@ fn srgb_to_positive_xyb_planar_inner_v4(
         let b = f32x16::from_array_t(token, b_arr);
 
         let mixed0 = m00
-            .mul_add(r, m01.mul_add(g, m02.mul_add(b, bias)))
+            .mul_add_relaxed(r, m01.mul_add_relaxed(g, m02.mul_add_relaxed(b, bias)))
             .max(zero);
         let mixed1 = m10
-            .mul_add(r, m11.mul_add(g, m12.mul_add(b, bias)))
+            .mul_add_relaxed(r, m11.mul_add_relaxed(g, m12.mul_add_relaxed(b, bias)))
             .max(zero);
         let mixed2 = m20
-            .mul_add(r, m21.mul_add(g, m22.mul_add(b, bias)))
+            .mul_add_relaxed(r, m21.mul_add_relaxed(g, m22.mul_add_relaxed(b, bias)))
             .max(zero);
 
         // SIMD cube root (~15 bits, single Halley iteration; safe because
@@ -1188,7 +1197,7 @@ fn srgb_to_positive_xyb_planar_inner_v4(
         let x = half * (c0 - c1);
         let y = half * (c0 + c1);
 
-        let x_pos = x.mul_add(fourteen, x_bias);
+        let x_pos = x.mul_add_relaxed(fourteen, x_bias);
         let y_pos = y + y_bias;
         let b_pos = (t2 - y) + b_bias;
 
@@ -1244,13 +1253,13 @@ fn srgb_to_positive_xyb_planar_inner_v4(
         let b = f32x8::from_array_t(v3, b_arr);
 
         let mixed0 = m00_8
-            .mul_add(r, m01_8.mul_add(g, m02_8.mul_add(b, bias8)))
+            .mul_add_relaxed(r, m01_8.mul_add_relaxed(g, m02_8.mul_add_relaxed(b, bias8)))
             .max(zero8);
         let mixed1 = m10_8
-            .mul_add(r, m11_8.mul_add(g, m12_8.mul_add(b, bias8)))
+            .mul_add_relaxed(r, m11_8.mul_add_relaxed(g, m12_8.mul_add_relaxed(b, bias8)))
             .max(zero8);
         let mixed2 = m20_8
-            .mul_add(r, m21_8.mul_add(g, m22_8.mul_add(b, bias8)))
+            .mul_add_relaxed(r, m21_8.mul_add_relaxed(g, m22_8.mul_add_relaxed(b, bias8)))
             .max(zero8);
 
         let t0 = mixed0.cbrt_midp();
@@ -1261,7 +1270,7 @@ fn srgb_to_positive_xyb_planar_inner_v4(
         let c1 = t1 + ab8;
         let x = half8 * (c0 - c1);
         let y = half8 * (c0 + c1);
-        let x_pos = x.mul_add(fourteen8, x_bias8);
+        let x_pos = x.mul_add_relaxed(fourteen8, x_bias8);
         let y_pos = y + y_bias8;
         let b_pos = (t2 - y) + b_bias8;
 
@@ -1357,13 +1366,13 @@ fn srgb_to_positive_xyb_planar_inner_v4x(
         let b = f32x16::from_array_t(token, b_arr);
 
         let mixed0 = m00
-            .mul_add(r, m01.mul_add(g, m02.mul_add(b, bias)))
+            .mul_add_relaxed(r, m01.mul_add_relaxed(g, m02.mul_add_relaxed(b, bias)))
             .max(zero);
         let mixed1 = m10
-            .mul_add(r, m11.mul_add(g, m12.mul_add(b, bias)))
+            .mul_add_relaxed(r, m11.mul_add_relaxed(g, m12.mul_add_relaxed(b, bias)))
             .max(zero);
         let mixed2 = m20
-            .mul_add(r, m21.mul_add(g, m22.mul_add(b, bias)))
+            .mul_add_relaxed(r, m21.mul_add_relaxed(g, m22.mul_add_relaxed(b, bias)))
             .max(zero);
 
         // SIMD cube root (~15 bits, single Halley iteration; safe because
@@ -1378,7 +1387,7 @@ fn srgb_to_positive_xyb_planar_inner_v4x(
         let x = half * (c0 - c1);
         let y = half * (c0 + c1);
 
-        let x_pos = x.mul_add(fourteen, x_bias);
+        let x_pos = x.mul_add_relaxed(fourteen, x_bias);
         let y_pos = y + y_bias;
         let b_pos = (t2 - y) + b_bias;
 
@@ -1434,13 +1443,13 @@ fn srgb_to_positive_xyb_planar_inner_v4x(
         let b = f32x8::from_array_t(v3, b_arr);
 
         let mixed0 = m00_8
-            .mul_add(r, m01_8.mul_add(g, m02_8.mul_add(b, bias8)))
+            .mul_add_relaxed(r, m01_8.mul_add_relaxed(g, m02_8.mul_add_relaxed(b, bias8)))
             .max(zero8);
         let mixed1 = m10_8
-            .mul_add(r, m11_8.mul_add(g, m12_8.mul_add(b, bias8)))
+            .mul_add_relaxed(r, m11_8.mul_add_relaxed(g, m12_8.mul_add_relaxed(b, bias8)))
             .max(zero8);
         let mixed2 = m20_8
-            .mul_add(r, m21_8.mul_add(g, m22_8.mul_add(b, bias8)))
+            .mul_add_relaxed(r, m21_8.mul_add_relaxed(g, m22_8.mul_add_relaxed(b, bias8)))
             .max(zero8);
 
         let t0 = mixed0.cbrt_midp();
@@ -1451,7 +1460,7 @@ fn srgb_to_positive_xyb_planar_inner_v4x(
         let c1 = t1 + ab8;
         let x = half8 * (c0 - c1);
         let y = half8 * (c0 + c1);
-        let x_pos = x.mul_add(fourteen8, x_bias8);
+        let x_pos = x.mul_add_relaxed(fourteen8, x_bias8);
         let y_pos = y + y_bias8;
         let b_pos = (t2 - y) + b_bias8;
 
@@ -1550,13 +1559,13 @@ fn srgb_to_positive_xyb_planar_inner_v3(
         let b = f32x8::from_array_t(token, b_arr);
 
         let mixed0 = m00
-            .mul_add(r, m01.mul_add(g, m02.mul_add(b, bias)))
+            .mul_add_relaxed(r, m01.mul_add_relaxed(g, m02.mul_add_relaxed(b, bias)))
             .max(zero);
         let mixed1 = m10
-            .mul_add(r, m11.mul_add(g, m12.mul_add(b, bias)))
+            .mul_add_relaxed(r, m11.mul_add_relaxed(g, m12.mul_add_relaxed(b, bias)))
             .max(zero);
         let mixed2 = m20
-            .mul_add(r, m21.mul_add(g, m22.mul_add(b, bias)))
+            .mul_add_relaxed(r, m21.mul_add_relaxed(g, m22.mul_add_relaxed(b, bias)))
             .max(zero);
 
         let t0 = mixed0.cbrt_midp();
@@ -1570,7 +1579,7 @@ fn srgb_to_positive_xyb_planar_inner_v3(
         let y = half * (c0 + c1);
 
         // Fused make_positive: X*14+0.42, Y+0.01, (B-Y)+0.55
-        let x_pos = x.mul_add(fourteen, x_bias);
+        let x_pos = x.mul_add_relaxed(fourteen, x_bias);
         let y_pos = y + y_bias;
         let b_pos = (t2 - y) + b_bias;
 
@@ -1709,13 +1718,22 @@ impl<T: F32x8Convert> OpsinChunk<T> {
     ) -> [GenericF32x8<T>; 3] {
         let [m0, m1, m2] = &self.m;
         let mixed0 = m0[0]
-            .mul_add(r, m0[1].mul_add(g, m0[2].mul_add(b, self.bias)))
+            .mul_add_relaxed(
+                r,
+                m0[1].mul_add_relaxed(g, m0[2].mul_add_relaxed(b, self.bias)),
+            )
             .max(self.zero);
         let mixed1 = m1[0]
-            .mul_add(r, m1[1].mul_add(g, m1[2].mul_add(b, self.bias)))
+            .mul_add_relaxed(
+                r,
+                m1[1].mul_add_relaxed(g, m1[2].mul_add_relaxed(b, self.bias)),
+            )
             .max(self.zero);
         let mixed2 = m2[0]
-            .mul_add(r, m2[1].mul_add(g, m2[2].mul_add(b, self.bias)))
+            .mul_add_relaxed(
+                r,
+                m2[1].mul_add_relaxed(g, m2[2].mul_add_relaxed(b, self.bias)),
+            )
             .max(self.zero);
         [mixed0.cbrt_midp(), mixed1.cbrt_midp(), mixed2.cbrt_midp()]
     }
@@ -1738,7 +1756,7 @@ impl<T: F32x8Convert> OpsinChunk<T> {
         t: [GenericF32x8<T>; 3],
     ) -> (GenericF32x8<T>, GenericF32x8<T>, GenericF32x8<T>) {
         let (x, y, _) = self.plain(t);
-        let x_pos = x.mul_add(self.fourteen, self.x_bias);
+        let x_pos = x.mul_add_relaxed(self.fourteen, self.x_bias);
         let y_pos = y + self.y_bias;
         let b_pos = (t[2] - y) + self.b_bias;
         (x_pos, y_pos, b_pos)
@@ -1895,9 +1913,9 @@ fn srgb_to_xyb_planar_inner_v3(
         let b = f32x8::from_array_t(token, b_arr);
 
         // Opsin absorbance matrix multiply with FMA
-        let mixed0 = m00.mul_add(r, m01.mul_add(g, m02.mul_add(b, bias)));
-        let mixed1 = m10.mul_add(r, m11.mul_add(g, m12.mul_add(b, bias)));
-        let mixed2 = m20.mul_add(r, m21.mul_add(g, m22.mul_add(b, bias)));
+        let mixed0 = m00.mul_add_relaxed(r, m01.mul_add_relaxed(g, m02.mul_add_relaxed(b, bias)));
+        let mixed1 = m10.mul_add_relaxed(r, m11.mul_add_relaxed(g, m12.mul_add_relaxed(b, bias)));
+        let mixed2 = m20.mul_add_relaxed(r, m21.mul_add_relaxed(g, m22.mul_add_relaxed(b, bias)));
 
         let mixed0 = mixed0.max(zero);
         let mixed1 = mixed1.max(zero);
@@ -2130,13 +2148,13 @@ fn linear_to_positive_xyb_planar_inner_v4(
         let b = f32x16::from_array_t(token, b_arr).max(zero).min(one);
 
         let mixed0 = m00
-            .mul_add(r, m01.mul_add(g, m02.mul_add(b, bias)))
+            .mul_add_relaxed(r, m01.mul_add_relaxed(g, m02.mul_add_relaxed(b, bias)))
             .max(zero);
         let mixed1 = m10
-            .mul_add(r, m11.mul_add(g, m12.mul_add(b, bias)))
+            .mul_add_relaxed(r, m11.mul_add_relaxed(g, m12.mul_add_relaxed(b, bias)))
             .max(zero);
         let mixed2 = m20
-            .mul_add(r, m21.mul_add(g, m22.mul_add(b, bias)))
+            .mul_add_relaxed(r, m21.mul_add_relaxed(g, m22.mul_add_relaxed(b, bias)))
             .max(zero);
 
         let t0 = mixed0.cbrt_midp();
@@ -2149,7 +2167,7 @@ fn linear_to_positive_xyb_planar_inner_v4(
         let x = half * (c0 - c1);
         let y = half * (c0 + c1);
 
-        let x_pos = x.mul_add(fourteen, x_bias);
+        let x_pos = x.mul_add_relaxed(fourteen, x_bias);
         let y_pos = y + y_bias;
         let b_pos = (t2 - y) + b_bias;
 
@@ -2205,13 +2223,13 @@ fn linear_to_positive_xyb_planar_inner_v4(
         let b = f32x8::from_array_t(v3, b_arr).max(zero8).min(one8);
 
         let mixed0 = m00_8
-            .mul_add(r, m01_8.mul_add(g, m02_8.mul_add(b, bias8)))
+            .mul_add_relaxed(r, m01_8.mul_add_relaxed(g, m02_8.mul_add_relaxed(b, bias8)))
             .max(zero8);
         let mixed1 = m10_8
-            .mul_add(r, m11_8.mul_add(g, m12_8.mul_add(b, bias8)))
+            .mul_add_relaxed(r, m11_8.mul_add_relaxed(g, m12_8.mul_add_relaxed(b, bias8)))
             .max(zero8);
         let mixed2 = m20_8
-            .mul_add(r, m21_8.mul_add(g, m22_8.mul_add(b, bias8)))
+            .mul_add_relaxed(r, m21_8.mul_add_relaxed(g, m22_8.mul_add_relaxed(b, bias8)))
             .max(zero8);
 
         let t0 = mixed0.cbrt_midp();
@@ -2222,7 +2240,7 @@ fn linear_to_positive_xyb_planar_inner_v4(
         let c1 = t1 + ab8;
         let x = half8 * (c0 - c1);
         let y = half8 * (c0 + c1);
-        let x_pos = x.mul_add(fourteen8, x_bias8);
+        let x_pos = x.mul_add_relaxed(fourteen8, x_bias8);
         let y_pos = y + y_bias8;
         let b_pos = (t2 - y) + b_bias8;
 
@@ -2320,13 +2338,13 @@ fn linear_to_positive_xyb_planar_inner_v4x(
         let b = f32x16::from_array_t(token, b_arr).max(zero).min(one);
 
         let mixed0 = m00
-            .mul_add(r, m01.mul_add(g, m02.mul_add(b, bias)))
+            .mul_add_relaxed(r, m01.mul_add_relaxed(g, m02.mul_add_relaxed(b, bias)))
             .max(zero);
         let mixed1 = m10
-            .mul_add(r, m11.mul_add(g, m12.mul_add(b, bias)))
+            .mul_add_relaxed(r, m11.mul_add_relaxed(g, m12.mul_add_relaxed(b, bias)))
             .max(zero);
         let mixed2 = m20
-            .mul_add(r, m21.mul_add(g, m22.mul_add(b, bias)))
+            .mul_add_relaxed(r, m21.mul_add_relaxed(g, m22.mul_add_relaxed(b, bias)))
             .max(zero);
 
         let t0 = mixed0.cbrt_midp();
@@ -2339,7 +2357,7 @@ fn linear_to_positive_xyb_planar_inner_v4x(
         let x = half * (c0 - c1);
         let y = half * (c0 + c1);
 
-        let x_pos = x.mul_add(fourteen, x_bias);
+        let x_pos = x.mul_add_relaxed(fourteen, x_bias);
         let y_pos = y + y_bias;
         let b_pos = (t2 - y) + b_bias;
 
@@ -2395,13 +2413,13 @@ fn linear_to_positive_xyb_planar_inner_v4x(
         let b = f32x8::from_array_t(v3, b_arr).max(zero8).min(one8);
 
         let mixed0 = m00_8
-            .mul_add(r, m01_8.mul_add(g, m02_8.mul_add(b, bias8)))
+            .mul_add_relaxed(r, m01_8.mul_add_relaxed(g, m02_8.mul_add_relaxed(b, bias8)))
             .max(zero8);
         let mixed1 = m10_8
-            .mul_add(r, m11_8.mul_add(g, m12_8.mul_add(b, bias8)))
+            .mul_add_relaxed(r, m11_8.mul_add_relaxed(g, m12_8.mul_add_relaxed(b, bias8)))
             .max(zero8);
         let mixed2 = m20_8
-            .mul_add(r, m21_8.mul_add(g, m22_8.mul_add(b, bias8)))
+            .mul_add_relaxed(r, m21_8.mul_add_relaxed(g, m22_8.mul_add_relaxed(b, bias8)))
             .max(zero8);
 
         let t0 = mixed0.cbrt_midp();
@@ -2412,7 +2430,7 @@ fn linear_to_positive_xyb_planar_inner_v4x(
         let c1 = t1 + ab8;
         let x = half8 * (c0 - c1);
         let y = half8 * (c0 + c1);
-        let x_pos = x.mul_add(fourteen8, x_bias8);
+        let x_pos = x.mul_add_relaxed(fourteen8, x_bias8);
         let y_pos = y + y_bias8;
         let b_pos = (t2 - y) + b_bias8;
 
@@ -2512,13 +2530,13 @@ fn linear_to_positive_xyb_planar_inner_v3(
         let b = f32x8::from_array_t(token, b_arr).max(zero).min(one);
 
         let mixed0 = m00
-            .mul_add(r, m01.mul_add(g, m02.mul_add(b, bias)))
+            .mul_add_relaxed(r, m01.mul_add_relaxed(g, m02.mul_add_relaxed(b, bias)))
             .max(zero);
         let mixed1 = m10
-            .mul_add(r, m11.mul_add(g, m12.mul_add(b, bias)))
+            .mul_add_relaxed(r, m11.mul_add_relaxed(g, m12.mul_add_relaxed(b, bias)))
             .max(zero);
         let mixed2 = m20
-            .mul_add(r, m21.mul_add(g, m22.mul_add(b, bias)))
+            .mul_add_relaxed(r, m21.mul_add_relaxed(g, m22.mul_add_relaxed(b, bias)))
             .max(zero);
 
         let t0 = mixed0.cbrt_midp();
@@ -2531,7 +2549,7 @@ fn linear_to_positive_xyb_planar_inner_v3(
         let x = half * (c0 - c1);
         let y = half * (c0 + c1);
 
-        let x_pos = x.mul_add(fourteen, x_bias);
+        let x_pos = x.mul_add_relaxed(fourteen, x_bias);
         let y_pos = y + y_bias;
         let b_pos = (t2 - y) + b_bias;
 

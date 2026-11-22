@@ -6939,7 +6939,7 @@ fn append_block_kernel_generic<T: F32x8Backend + Copy, const CROSS: bool, const 
                 r_lumt += pjnd_transducer_v(
                     token,
                     raw_abs_err,
-                    t.mul_add(k_lum_ratio, act),
+                    t.mul_add_relaxed(k_lum_ratio, act),
                     k_mid,
                     c_pjnd_clamp,
                 );
@@ -6947,7 +6947,7 @@ fn append_block_kernel_generic<T: F32x8Backend + Copy, const CROSS: bool, const 
                 r_xm += pjnd_transducer_v(
                     token,
                     raw_abs_err,
-                    act_c.mul_add(k_xch_ratio, act),
+                    act_c.mul_add_relaxed(k_xch_ratio, act),
                     k_mid,
                     c_pjnd_clamp,
                 );
@@ -7723,7 +7723,7 @@ fn csfw_block_kernel_generic<T: F32x8Backend + Copy>(
             let ry = V8::<T>::from_array_t(token, ref_y[i..i + 8].try_into().unwrap());
 
             // w = clamp(b0 + y·(b1 + y·b2), w_min, w_max) — Horner, 2 FMA.
-            let w = ry.mul_add(ry.mul_add(b2, b1), b0).max(w_min).min(w_max);
+            let w = ry.mul_add_relaxed(ry.mul_add_relaxed(b2, b1), b0).max(w_min).min(w_max);
             let ws = w * s;
             let wd = w * dd;
             r_w += w;

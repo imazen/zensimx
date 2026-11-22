@@ -8607,8 +8607,8 @@ impl MeanOffsetRows {
             let mut diff = [0.0f64; 3];
             for (c, d) in diff.iter_mut().enumerate() {
                 let mut acc = 0.0f64;
-                for y in row_start..row_end {
-                    acc += self.rows[y][c];
+                for row in &self.rows[row_start..row_end] {
+                    acc += row[c];
                 }
                 *d = acc;
             }
@@ -9065,7 +9065,7 @@ fn foldapp_streaming_walk_impl<S: ImageSource, D: ImageSource, const ALL_CHANNEL
             let y1 = info.y0 + info.strip_h;
             let range = info.y0 * info.plane_w..y1 * info.plane_w;
             let ret = retention.as_deref_mut().expect("prepared retaining walk");
-            for ch in 0..3 {
+            for (ch, dst_plane) in ret.pyr_dst[0].iter_mut().enumerate() {
                 if !compute.channel_active(0, ch) {
                     let rows = producer.rows(
                         crate::feature_v2_stream::Side::Distorted,
@@ -9074,7 +9074,7 @@ fn foldapp_streaming_walk_impl<S: ImageSource, D: ImageSource, const ALL_CHANNEL
                         info.y0,
                         y1,
                     );
-                    ret.pyr_dst[0][ch][range.clone()].copy_from_slice(rows);
+                    dst_plane[range.clone()].copy_from_slice(rows);
                 }
             }
         }
@@ -10121,15 +10121,12 @@ fn foldapp_streaming_walk_impl<S: ImageSource, D: ImageSource, const ALL_CHANNEL
     // --- CSFW finalize (Y-only, per scale): the weighted GLOBAL_* twins
     //     from the Y CSFW accumulators (design §4.1). ---
     if csfw_on {
-        for scale in 0..n_scales {
+        for (scale, csfw) in accums[1].csfw.iter().enumerate().take(n_scales) {
             if !compute.at_scale(scale).csfw {
                 continue;
             }
             let base = scale * CSFW_PER_SCALE;
-            finish_csfw(
-                &accums[1].csfw[scale],
-                &mut features_csfw[base..base + CSFW_PER_SCALE],
-            );
+            finish_csfw(csfw, &mut features_csfw[base..base + CSFW_PER_SCALE]);
         }
     }
 

@@ -2781,11 +2781,11 @@ mod tests {
             }
         }
         // Inactive channels' `mg` must be the (0,0) production uses.
-        for si in 0..LOCAL_SCALES {
+        for (si, mg_scale) in snap.mg.iter().enumerate().take(LOCAL_SCALES) {
             for ch in [0usize, 2] {
                 if !plan.compute.channel_active(si + 1, ch) {
                     assert_eq!(
-                        snap.mg[si][ch],
+                        mg_scale[ch],
                         (0.0, 0.0),
                         "inactive mg s{} ch{ch} must be (0,0)",
                         si + 1

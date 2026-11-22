@@ -3853,9 +3853,15 @@ mod tests {
             false,
         )
         .unwrap();
-        for i in 0..w * h {
-            let expect = basic.density()[i] as f64 + v2a.density[i];
-            let got = full.density()[i] as f64;
+        for (i, (&basic_d, (&v2a_d, &full_d))) in basic
+            .density()
+            .iter()
+            .zip(v2a.density.iter().zip(full.density().iter()))
+            .take(w * h)
+            .enumerate()
+        {
+            let expect = basic_d as f64 + v2a_d;
+            let got = full_d as f64;
             assert!(
                 (got - expect).abs() <= 1e-6 * expect.abs().max(1e-9) + 1e-9,
                 "pixel {i}: full {got} vs basic+v2app {expect}"

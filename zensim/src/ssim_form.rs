@@ -1371,26 +1371,31 @@ impl<T: F32x16Backend + Copy> SsimSplats16<T> {
         ssq: f32x16<T>,
         s12: f32x16<T>,
     ) -> f32x16<T> {
-        let num_s = self.two.mul_add((-m1).mul_add(m2, s12), self.c2);
-        let denom_s = (-m2).mul_add(m2, (-m1).mul_add(m1, ssq)) + self.c2;
+        let num_s = self
+            .two
+            .mul_add_relaxed((-m1).mul_add_relaxed(m2, s12), self.c2);
+        let denom_s = (-m2).mul_add_relaxed(m2, (-m1).mul_add_relaxed(m1, ssq)) + self.c2;
         // Every arm reduces to ONE divide by expressing the luminance term as
         // a (numerator, denominator) pair folded into the structure ratio.
         let (num_m, den_m) = match self.form {
             SsimLumaForm::Ssim2Legacy => {
                 let mu_diff = m1 - m2;
-                (mu_diff.mul_add(-mu_diff, self.one), self.one)
+                (mu_diff.mul_add_relaxed(-mu_diff, self.one), self.one)
             }
             SsimLumaForm::SsimLumaC1 => (
-                self.two.mul_add(m1 * m2, self.c1),
-                m1.mul_add(m1, m2.mul_add(m2, self.c1)),
+                self.two.mul_add_relaxed(m1 * m2, self.c1),
+                m1.mul_add_relaxed(m1, m2.mul_add_relaxed(m2, self.c1)),
             ),
             SsimLumaForm::Lorentz => {
                 let mu_diff = m1 - m2;
-                (self.one, mu_diff.mul_add(mu_diff, self.one))
+                (self.one, mu_diff.mul_add_relaxed(mu_diff, self.one))
             }
             SsimLumaForm::Clamp => {
                 let mu_diff = m1 - m2;
-                (mu_diff.mul_add(-mu_diff, self.one).max(self.zero), self.one)
+                (
+                    mu_diff.mul_add_relaxed(-mu_diff, self.one).max(self.zero),
+                    self.one,
+                )
             }
         };
         // `den_m` is exactly 1.0 for the two arms that do not need it, and
@@ -1415,15 +1420,19 @@ impl<T: F32x16Backend + Copy> SsimSplats16<T> {
     ) -> f32x16<T> {
         let mu_diff = m1 - m2;
         let mean_error2 = mu_diff * mu_diff;
-        let variance_sum = (-m2).mul_add(m2, (-m1).mul_add(m1, ssq)).max(self.zero);
+        let variance_sum = (-m2)
+            .mul_add_relaxed(m2, (-m1).mul_add_relaxed(m1, ssq))
+            .max(self.zero);
         let error_variance = (err - mean_error2).max(self.zero);
         let luma_loss = match self.form {
             SsimLumaForm::Ssim2Legacy => mean_error2,
             SsimLumaForm::Clamp => mean_error2.min(self.one),
             SsimLumaForm::Lorentz => mean_error2 / (mean_error2 + self.one),
-            SsimLumaForm::SsimLumaC1 => mean_error2 / m1.mul_add(m1, m2.mul_add(m2, self.c1)),
+            SsimLumaForm::SsimLumaC1 => {
+                mean_error2 / m1.mul_add_relaxed(m1, m2.mul_add_relaxed(m2, self.c1))
+            }
         };
-        (self.one - luma_loss).mul_add(error_variance / (variance_sum + self.c2), luma_loss)
+        (self.one - luma_loss).mul_add_relaxed(error_variance / (variance_sum + self.c2), luma_loss)
     }
 }
 
@@ -1460,24 +1469,29 @@ impl<T: F32x8Backend + Copy> SsimSplats8<T> {
         ssq: GenericF32x8<T>,
         s12: GenericF32x8<T>,
     ) -> GenericF32x8<T> {
-        let num_s = self.two.mul_add((-m1).mul_add(m2, s12), self.c2);
-        let denom_s = (-m2).mul_add(m2, (-m1).mul_add(m1, ssq)) + self.c2;
+        let num_s = self
+            .two
+            .mul_add_relaxed((-m1).mul_add_relaxed(m2, s12), self.c2);
+        let denom_s = (-m2).mul_add_relaxed(m2, (-m1).mul_add_relaxed(m1, ssq)) + self.c2;
         let (num_m, den_m) = match self.form {
             SsimLumaForm::Ssim2Legacy => {
                 let mu_diff = m1 - m2;
-                (mu_diff.mul_add(-mu_diff, self.one), self.one)
+                (mu_diff.mul_add_relaxed(-mu_diff, self.one), self.one)
             }
             SsimLumaForm::SsimLumaC1 => (
-                self.two.mul_add(m1 * m2, self.c1),
-                m1.mul_add(m1, m2.mul_add(m2, self.c1)),
+                self.two.mul_add_relaxed(m1 * m2, self.c1),
+                m1.mul_add_relaxed(m1, m2.mul_add_relaxed(m2, self.c1)),
             ),
             SsimLumaForm::Lorentz => {
                 let mu_diff = m1 - m2;
-                (self.one, mu_diff.mul_add(mu_diff, self.one))
+                (self.one, mu_diff.mul_add_relaxed(mu_diff, self.one))
             }
             SsimLumaForm::Clamp => {
                 let mu_diff = m1 - m2;
-                (mu_diff.mul_add(-mu_diff, self.one).max(self.zero), self.one)
+                (
+                    mu_diff.mul_add_relaxed(-mu_diff, self.one).max(self.zero),
+                    self.one,
+                )
             }
         };
         self.one - (num_m * num_s) / (den_m * denom_s)
@@ -1494,15 +1508,19 @@ impl<T: F32x8Backend + Copy> SsimSplats8<T> {
     ) -> GenericF32x8<T> {
         let mu_diff = m1 - m2;
         let mean_error2 = mu_diff * mu_diff;
-        let variance_sum = (-m2).mul_add(m2, (-m1).mul_add(m1, ssq)).max(self.zero);
+        let variance_sum = (-m2)
+            .mul_add_relaxed(m2, (-m1).mul_add_relaxed(m1, ssq))
+            .max(self.zero);
         let error_variance = (err - mean_error2).max(self.zero);
         let luma_loss = match self.form {
             SsimLumaForm::Ssim2Legacy => mean_error2,
             SsimLumaForm::Clamp => mean_error2.min(self.one),
             SsimLumaForm::Lorentz => mean_error2 / (mean_error2 + self.one),
-            SsimLumaForm::SsimLumaC1 => mean_error2 / m1.mul_add(m1, m2.mul_add(m2, self.c1)),
+            SsimLumaForm::SsimLumaC1 => {
+                mean_error2 / m1.mul_add_relaxed(m1, m2.mul_add_relaxed(m2, self.c1))
+            }
         };
-        (self.one - luma_loss).mul_add(error_variance / (variance_sum + self.c2), luma_loss)
+        (self.one - luma_loss).mul_add_relaxed(error_variance / (variance_sum + self.c2), luma_loss)
     }
 }
 

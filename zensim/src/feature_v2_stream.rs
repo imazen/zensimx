@@ -1349,9 +1349,9 @@ impl<'a, S: ImageSource, D: ImageSource> StripPlaneProducer<'a, S, D> {
                 st.plane_h
             };
             let floor = ks_floor.min(ds_floor);
-            for si in 0..2 {
-                for ch in 0..3 {
-                    self.planes[si][ch][scale].retire_below(floor);
+            for side in &mut self.planes {
+                for ch in side {
+                    ch[scale].retire_below(floor);
                 }
             }
             // Linear rows are read only by the next level's downscale; the

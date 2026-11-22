@@ -3922,12 +3922,12 @@ fn fused_blur_h_ssim_inner_v4(
             let dv = f32x16::from_array_t(token, d_arr);
             sum_s = sum_s + sv;
             sum_d = sum_d + dv;
-            sum_sq = sv.mul_add(sv, dv.mul_add(dv, sum_sq));
+            sum_sq = sv.mul_add_relaxed(sv, dv.mul_add_relaxed(dv, sum_sq));
             sum_prod = if err {
                 let e = sv - dv;
-                e.mul_add(e, sum_prod)
+                e.mul_add_relaxed(e, sum_prod)
             } else {
-                sv.mul_add(dv, sum_prod)
+                sv.mul_add_relaxed(dv, sum_prod)
             };
         }
 
@@ -4016,16 +4016,19 @@ fn fused_blur_h_ssim_inner_v4(
             let dr = f32x16::from_array_t(token, d_rem);
             sum_s = sum_s + sa - sr;
             sum_d = sum_d + da - dr;
-            sum_sq = sa.mul_add(
+            sum_sq = sa.mul_add_relaxed(
                 sa,
-                da.mul_add(da, (-sr).mul_add(sr, (-dr).mul_add(dr, sum_sq))),
+                da.mul_add_relaxed(
+                    da,
+                    (-sr).mul_add_relaxed(sr, (-dr).mul_add_relaxed(dr, sum_sq)),
+                ),
             );
             sum_prod = if err {
                 let ea = sa - da;
                 let er = sr - dr;
-                ea.mul_add(ea, (-er).mul_add(er, sum_prod))
+                ea.mul_add_relaxed(ea, (-er).mul_add_relaxed(er, sum_prod))
             } else {
-                sa.mul_add(da, (-sr).mul_add(dr, sum_prod))
+                sa.mul_add_relaxed(da, (-sr).mul_add_relaxed(dr, sum_prod))
             };
         }
     }
@@ -4075,12 +4078,12 @@ fn fused_blur_h_ssim_inner_v4(
             let dv = f32x8::from_array_t(v3, d_arr);
             sum_s = sum_s + sv;
             sum_d = sum_d + dv;
-            sum_sq = sv.mul_add(sv, dv.mul_add(dv, sum_sq));
+            sum_sq = sv.mul_add_relaxed(sv, dv.mul_add_relaxed(dv, sum_sq));
             sum_prod = if err {
                 let e = sv - dv;
-                e.mul_add(e, sum_prod)
+                e.mul_add_relaxed(e, sum_prod)
             } else {
-                sv.mul_add(dv, sum_prod)
+                sv.mul_add_relaxed(dv, sum_prod)
             };
         }
 
@@ -4168,16 +4171,19 @@ fn fused_blur_h_ssim_inner_v4(
             let dr = f32x8::from_array_t(v3, d_rem);
             sum_s = sum_s + sa - sr;
             sum_d = sum_d + da - dr;
-            sum_sq = sa.mul_add(
+            sum_sq = sa.mul_add_relaxed(
                 sa,
-                da.mul_add(da, (-sr).mul_add(sr, (-dr).mul_add(dr, sum_sq))),
+                da.mul_add_relaxed(
+                    da,
+                    (-sr).mul_add_relaxed(sr, (-dr).mul_add_relaxed(dr, sum_sq)),
+                ),
             );
             sum_prod = if err {
                 let ea = sa - da;
                 let er = sr - dr;
-                ea.mul_add(ea, (-er).mul_add(er, sum_prod))
+                ea.mul_add_relaxed(ea, (-er).mul_add_relaxed(er, sum_prod))
             } else {
-                sa.mul_add(da, (-sr).mul_add(dr, sum_prod))
+                sa.mul_add_relaxed(da, (-sr).mul_add_relaxed(dr, sum_prod))
             };
         }
     }
@@ -4513,12 +4519,12 @@ fn fused_blur_h_ssim_v4x_strided<const MU1: bool>(
                 sum_s = sum_s + sv;
             }
             sum_d = sum_d + dv;
-            sum_sq = sv.mul_add(sv, dv.mul_add(dv, sum_sq));
+            sum_sq = sv.mul_add_relaxed(sv, dv.mul_add_relaxed(dv, sum_sq));
             sum_prod = if err {
                 let e = sv - dv;
-                e.mul_add(e, sum_prod)
+                e.mul_add_relaxed(e, sum_prod)
             } else {
-                sv.mul_add(dv, sum_prod)
+                sv.mul_add_relaxed(dv, sum_prod)
             };
         }
 
@@ -4614,16 +4620,19 @@ fn fused_blur_h_ssim_v4x_strided<const MU1: bool>(
                 sum_s = sum_s + sa - sr;
             }
             sum_d = sum_d + da - dr;
-            sum_sq = sa.mul_add(
+            sum_sq = sa.mul_add_relaxed(
                 sa,
-                da.mul_add(da, (-sr).mul_add(sr, (-dr).mul_add(dr, sum_sq))),
+                da.mul_add_relaxed(
+                    da,
+                    (-sr).mul_add_relaxed(sr, (-dr).mul_add_relaxed(dr, sum_sq)),
+                ),
             );
             sum_prod = if err {
                 let ea = sa - da;
                 let er = sr - dr;
-                ea.mul_add(ea, (-er).mul_add(er, sum_prod))
+                ea.mul_add_relaxed(ea, (-er).mul_add_relaxed(er, sum_prod))
             } else {
-                sa.mul_add(da, (-sr).mul_add(dr, sum_prod))
+                sa.mul_add_relaxed(da, (-sr).mul_add_relaxed(dr, sum_prod))
             };
         }
     }
@@ -4675,12 +4684,12 @@ fn fused_blur_h_ssim_v4x_strided<const MU1: bool>(
                 sum_s = sum_s + sv;
             }
             sum_d = sum_d + dv;
-            sum_sq = sv.mul_add(sv, dv.mul_add(dv, sum_sq));
+            sum_sq = sv.mul_add_relaxed(sv, dv.mul_add_relaxed(dv, sum_sq));
             sum_prod = if err {
                 let e = sv - dv;
-                e.mul_add(e, sum_prod)
+                e.mul_add_relaxed(e, sum_prod)
             } else {
-                sv.mul_add(dv, sum_prod)
+                sv.mul_add_relaxed(dv, sum_prod)
             };
         }
 
@@ -4775,16 +4784,19 @@ fn fused_blur_h_ssim_v4x_strided<const MU1: bool>(
                 sum_s = sum_s + sa - sr;
             }
             sum_d = sum_d + da - dr;
-            sum_sq = sa.mul_add(
+            sum_sq = sa.mul_add_relaxed(
                 sa,
-                da.mul_add(da, (-sr).mul_add(sr, (-dr).mul_add(dr, sum_sq))),
+                da.mul_add_relaxed(
+                    da,
+                    (-sr).mul_add_relaxed(sr, (-dr).mul_add_relaxed(dr, sum_sq)),
+                ),
             );
             sum_prod = if err {
                 let ea = sa - da;
                 let er = sr - dr;
-                ea.mul_add(ea, (-er).mul_add(er, sum_prod))
+                ea.mul_add_relaxed(ea, (-er).mul_add_relaxed(er, sum_prod))
             } else {
-                sa.mul_add(da, (-sr).mul_add(dr, sum_prod))
+                sa.mul_add_relaxed(da, (-sr).mul_add_relaxed(dr, sum_prod))
             };
         }
     }
@@ -4952,12 +4964,12 @@ fn fused_blur_h_ssim_inner_v3(
             let dv = f32x8::from_array_t(token, d_arr);
             sum_s = sum_s + sv;
             sum_d = sum_d + dv;
-            sum_sq = sv.mul_add(sv, dv.mul_add(dv, sum_sq));
+            sum_sq = sv.mul_add_relaxed(sv, dv.mul_add_relaxed(dv, sum_sq));
             sum_prod = if err {
                 let e = sv - dv;
-                e.mul_add(e, sum_prod)
+                e.mul_add_relaxed(e, sum_prod)
             } else {
-                sv.mul_add(dv, sum_prod)
+                sv.mul_add_relaxed(dv, sum_prod)
             };
         }
 
@@ -5045,16 +5057,19 @@ fn fused_blur_h_ssim_inner_v3(
             let dr = f32x8::from_array_t(token, d_rem);
             sum_s = sum_s + sa - sr;
             sum_d = sum_d + da - dr;
-            sum_sq = sa.mul_add(
+            sum_sq = sa.mul_add_relaxed(
                 sa,
-                da.mul_add(da, (-sr).mul_add(sr, (-dr).mul_add(dr, sum_sq))),
+                da.mul_add_relaxed(
+                    da,
+                    (-sr).mul_add_relaxed(sr, (-dr).mul_add_relaxed(dr, sum_sq)),
+                ),
             );
             sum_prod = if err {
                 let ea = sa - da;
                 let er = sr - dr;
-                ea.mul_add(ea, (-er).mul_add(er, sum_prod))
+                ea.mul_add_relaxed(ea, (-er).mul_add_relaxed(er, sum_prod))
             } else {
-                sa.mul_add(da, (-sr).mul_add(dr, sum_prod))
+                sa.mul_add_relaxed(da, (-sr).mul_add_relaxed(dr, sum_prod))
             };
         }
     }
@@ -5188,12 +5203,12 @@ fn fused_blur_h_ssim_inner(
             let dv = f32x8::from_array_t(token, d_arr);
             sum_s = sum_s + sv;
             sum_d = sum_d + dv;
-            sum_sq = sv.mul_add(sv, dv.mul_add(dv, sum_sq));
+            sum_sq = sv.mul_add_relaxed(sv, dv.mul_add_relaxed(dv, sum_sq));
             sum_prod = if err {
                 let e = sv - dv;
-                e.mul_add(e, sum_prod)
+                e.mul_add_relaxed(e, sum_prod)
             } else {
-                sv.mul_add(dv, sum_prod)
+                sv.mul_add_relaxed(dv, sum_prod)
             };
         }
 
@@ -5257,16 +5272,19 @@ fn fused_blur_h_ssim_inner(
             let dr = f32x8::from_array_t(token, d_rem);
             sum_s = sum_s + sa - sr;
             sum_d = sum_d + da - dr;
-            sum_sq = sa.mul_add(
+            sum_sq = sa.mul_add_relaxed(
                 sa,
-                da.mul_add(da, (-sr).mul_add(sr, (-dr).mul_add(dr, sum_sq))),
+                da.mul_add_relaxed(
+                    da,
+                    (-sr).mul_add_relaxed(sr, (-dr).mul_add_relaxed(dr, sum_sq)),
+                ),
             );
             sum_prod = if err {
                 let ea = sa - da;
                 let er = sr - dr;
-                ea.mul_add(ea, (-er).mul_add(er, sum_prod))
+                ea.mul_add_relaxed(ea, (-er).mul_add_relaxed(er, sum_prod))
             } else {
-                sa.mul_add(da, (-sr).mul_add(dr, sum_prod))
+                sa.mul_add_relaxed(da, (-sr).mul_add_relaxed(dr, sum_prod))
             };
         }
     };
@@ -6873,7 +6891,7 @@ fn fused_blur_h_local11(
         let tap = |k: usize| {
             let a = f32x8::load_t(token, a_t[k..k + 8].try_into().unwrap());
             let b = f32x8::load_t(token, b_t[k..k + 8].try_into().unwrap());
-            let q = a.mul_add(a, b * b);
+            let q = a.mul_add_relaxed(a, b * b);
             let p = if err {
                 let e = a - b;
                 e * e
@@ -6975,7 +6993,7 @@ fn fused_blur_hv_local11(
         let tap = |k: usize| {
             let a = f32x8::load_t(token, a_t[k..k + 8].try_into().unwrap());
             let b = f32x8::load_t(token, b_t[k..k + 8].try_into().unwrap());
-            let q = a.mul_add(a, b * b);
+            let q = a.mul_add_relaxed(a, b * b);
             let p = if err {
                 let e = a - b;
                 e * e
@@ -11466,7 +11484,7 @@ fn fused_blur_h_local11_wide(
         let tap = |k: usize| {
             let a = f32x16::load_t(token, a_t[k..k + 16].try_into().unwrap());
             let b = f32x16::load_t(token, b_t[k..k + 16].try_into().unwrap());
-            let q = a.mul_add(a, b * b);
+            let q = a.mul_add_relaxed(a, b * b);
             let p = if err {
                 let e = a - b;
                 e * e
@@ -11693,7 +11711,7 @@ fn fused_blur_hv_local11_wide(
         let tap = |k: usize| {
             let a = f32x16::load_t(token, a_t[k..k + 16].try_into().unwrap());
             let b = f32x16::load_t(token, b_t[k..k + 16].try_into().unwrap());
-            let q = a.mul_add(a, b * b);
+            let q = a.mul_add_relaxed(a, b * b);
             let p = if err {
                 let e = a - b;
                 e * e
