@@ -3,12 +3,14 @@
 ## [Unreleased]
 
 ### Fixed
+- Migrate remaining deprecated `magetypes` `mul_add` calls in `zensim-train-core` and `zensim-validate` to `mul_add_relaxed` so workspace Rust 1.100.0 clippy passes with `-D warnings`.
 - Migrate deprecated `magetypes` `mul_add` calls to `mul_add_relaxed` and replace `clippy::needless_range_loop` loops in `zensim` so Rust 1.100.0 clippy passes with `-D warnings`.
 - Resolve matched outer controls against their owning fold, avoiding unrelated evidence in bounded worker capsules.
 
 
 ### Changed
 
+- Upgrade `archmage`, `archmage-macros`, and `magetypes` to `0.9.33` across workspace, `zensim/Cargo.toml` (`archmage-attune` caret instead of `=0.9.32`), `tools/e34-reference-features`, and `zensim-bench`.
 - Update workspace dependencies (`bytemuck` 1.25.2, `imgref` 1.12.3, `rgb` 0.8.53, `linear-srgb` 0.6.12, `zenbench` 0.1.11, `enough` 0.4.5, `almost-enough` 0.4.5, `zenutils-apidoc` 0.1.1), advance the `zenflate` patch (`f6c96cc6`), drop the `macos-15-intel` tools-release runner, and add `CROSS_CONTAINER_OPTS: --security-opt seccomp=unconfined` to the `i686` cross CI job.
 - Reuse plain shared-head backward scratch without changing serialized training state; measured allocation evidence is in benchmarks/shared_head_scratch_2026-11-11.md.
 

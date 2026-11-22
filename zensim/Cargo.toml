@@ -197,7 +197,7 @@ feature-regime-v2 = []
 
 [dependencies]
 archmage = { workspace = true }
-archmage-attune = { package = "archmage-macros", version = "=0.9.32", optional = true }
+archmage-attune = { package = "archmage-macros", version = "0.9.33", optional = true }
 bytemuck = { workspace = true }
 magetypes = { workspace = true }
 libm = { workspace = true }

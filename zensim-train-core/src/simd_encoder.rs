@@ -79,7 +79,7 @@ fn accumulate_rows_f32_v4(
             let w_block: &[f32; 16] = (&row[off..off + 16]).try_into().unwrap();
             let h_v = GenericF32x16::load_t(token, h_block);
             let w_v = GenericF32x16::load_t(token, w_block);
-            s_v.mul_add(w_v, h_v).store(h_block);
+            s_v.mul_add_relaxed(w_v, h_v).store(h_block);
         }
         if mid_fused {
             let s8 = GenericF32x8::splat_t(token, s);
@@ -87,7 +87,7 @@ fn accumulate_rows_f32_v4(
             let w_block: &[f32; 8] = (&row[tail..tail + 8]).try_into().unwrap();
             let h_v = GenericF32x8::load_t(token, h_block);
             let w_v = GenericF32x8::load_t(token, w_block);
-            s8.mul_add(w_v, h_v).store(h_block);
+            s8.mul_add_relaxed(w_v, h_v).store(h_block);
         }
         for j in n8..n_hidden {
             h_pre[j] += s * row[j];
@@ -145,10 +145,10 @@ fn dot_product_f32_v4(token: archmage::X64V4Token, h: &[f32], w: &[f32]) -> f32 
         let hi_w: &[f32; 8] = (&w[off + 8..off + 16]).try_into().unwrap();
         let h_lo = GenericF32x8::load_t(token, lo_h);
         let w_lo = GenericF32x8::load_t(token, lo_w);
-        acc = h_lo.mul_add(w_lo, acc);
+        acc = h_lo.mul_add_relaxed(w_lo, acc);
         let h_hi = GenericF32x8::load_t(token, hi_h);
         let w_hi = GenericF32x8::load_t(token, hi_w);
-        acc = h_hi.mul_add(w_hi, acc);
+        acc = h_hi.mul_add_relaxed(w_hi, acc);
     }
     // Remaining 8-lane chunk when len%16 >= 8 (fused domain [16k, n8)).
     if chunks16 * 16 + 8 <= n8 {
@@ -157,7 +157,7 @@ fn dot_product_f32_v4(token: archmage::X64V4Token, h: &[f32], w: &[f32]) -> f32 
         let w_block: &[f32; 8] = (&w[off..off + 8]).try_into().unwrap();
         let h_v = GenericF32x8::load_t(token, h_block);
         let w_v = GenericF32x8::load_t(token, w_block);
-        acc = h_v.mul_add(w_v, acc);
+        acc = h_v.mul_add_relaxed(w_v, acc);
     }
     let mut lanes = [0.0f32; 8];
     acc.store(&mut lanes);
@@ -200,7 +200,7 @@ fn accumulate_rows_f32_v3(
             let w_block: &[f32; 8] = (&row[off..off + 8]).try_into().unwrap();
             let h_v = GenericF32x8::load_t(token, h_block);
             let w_v = GenericF32x8::load_t(token, w_block);
-            s_v.mul_add(w_v, h_v).store(h_block);
+            s_v.mul_add_relaxed(w_v, h_v).store(h_block);
         }
         for j in tail..n_hidden {
             h_pre[j] += s * row[j];
@@ -248,7 +248,7 @@ fn dot_product_f32_v3(token: archmage::X64V3Token, h: &[f32], w: &[f32]) -> f32 
         let w_block: &[f32; 8] = (&w[off..off + 8]).try_into().unwrap();
         let h_v = GenericF32x8::load_t(token, h_block);
         let w_v = GenericF32x8::load_t(token, w_block);
-        acc = h_v.mul_add(w_v, acc);
+        acc = h_v.mul_add_relaxed(w_v, acc);
     }
     let mut lanes = [0.0f32; 8];
     acc.store(&mut lanes);
@@ -294,7 +294,7 @@ fn accumulate_rows_f32(
             let w_block: &[f32; 8] = (&row[off..off + 8]).try_into().unwrap();
             let h_v = f32x8::load_t(token, h_block);
             let w_v = f32x8::load_t(token, w_block);
-            s_v.mul_add(w_v, h_v).store(h_block);
+            s_v.mul_add_relaxed(w_v, h_v).store(h_block);
         }
         for j in tail..n_hidden {
             h_pre[j] += s * row[j];
@@ -340,7 +340,7 @@ fn dot_product_f32(token: Token, h: &[f32], w: &[f32]) -> f32 {
         let w_block: &[f32; 8] = (&w[off..off + 8]).try_into().unwrap();
         let h_v = f32x8::load_t(token, h_block);
         let w_v = f32x8::load_t(token, w_block);
-        acc = h_v.mul_add(w_v, acc);
+        acc = h_v.mul_add_relaxed(w_v, acc);
     }
     let mut lanes = [0.0f32; 8];
     acc.store(&mut lanes);

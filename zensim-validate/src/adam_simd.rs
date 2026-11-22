@@ -207,12 +207,12 @@ fn first_moment4<T: magetypes::simd::backends::F64x4Backend>(
 ) -> magetypes::simd::generic::f64x4<T> {
     use magetypes::simd::generic::f64x4;
     if g.to_array().map(f64::to_bits) == [0; 4] {
-        return flush_moment4(token, one_minus.mul_add(g, beta * m));
+        return flush_moment4(token, one_minus.mul_add_relaxed(g, beta * m));
     }
     let zero = f64x4::zero_t(token);
     let bypass = m.simd_eq(zero) & g.simd_ne(zero) & g.abs().simd_lt(cutoff);
     let safe_g = f64x4::blend(bypass, zero, g);
-    let value = flush_moment4(token, one_minus.mul_add(safe_g, beta * m));
+    let value = flush_moment4(token, one_minus.mul_add_relaxed(safe_g, beta * m));
     f64x4::blend(bypass, g & f64x4::splat_t(token, -0.0), value)
 }
 
@@ -227,12 +227,12 @@ fn first_moment8(
     cutoff: f64x8<archmage::X64V4Token>,
 ) -> f64x8<archmage::X64V4Token> {
     if g.to_array().map(f64::to_bits) == [0; 8] {
-        return flush_moment8(token, one_minus.mul_add(g, beta * m));
+        return flush_moment8(token, one_minus.mul_add_relaxed(g, beta * m));
     }
     let zero = f64x8::zero_t(token);
     let bypass = m.simd_eq(zero) & g.simd_ne(zero) & g.abs().simd_lt(cutoff);
     let safe_g = f64x8::blend(bypass, zero, g);
-    let value = flush_moment8(token, one_minus.mul_add(safe_g, beta * m));
+    let value = flush_moment8(token, one_minus.mul_add_relaxed(safe_g, beta * m));
     f64x8::blend(bypass, g & f64x8::splat_t(token, -0.0), value)
 }
 
@@ -373,7 +373,7 @@ fn adam_update_inner_v4(token: archmage::X64V4Token, args: &mut AdamUpdateArgs<'
         let m_new = first_moment8(token, g, m, beta1_v, one_minus_b1_v, first_cutoff_v);
         // v_new = β2·v + (1-β2)·g·g → fma(one_minus_b2, g*g, β2*v)
         let gg = g * g;
-        let v_new = flush_moment8(token, one_minus_b2_v.mul_add(gg, beta2_v * v));
+        let v_new = flush_moment8(token, one_minus_b2_v.mul_add_relaxed(gg, beta2_v * v));
 
         let m_hat = m_new * inv_bc1_v;
         let v_hat = v_new * inv_bc2_v;
@@ -662,7 +662,7 @@ fn adam_update_inner_v4_rsqrt_body<P: RsqrtPrecisionTier>(
 
         let m_new = first_moment8(token, g, m, beta1_v, one_minus_b1_v, first_cutoff_v);
         let gg = g * g;
-        let v_new = flush_moment8(token, one_minus_b2_v.mul_add(gg, beta2_v * v));
+        let v_new = flush_moment8(token, one_minus_b2_v.mul_add_relaxed(gg, beta2_v * v));
 
         let m_hat = m_new * inv_bc1_v;
         let v_hat = v_new * inv_bc2_v;
@@ -674,7 +674,7 @@ fn adam_update_inner_v4_rsqrt_body<P: RsqrtPrecisionTier>(
         let r1 = P::rsqrt(token, rsqrt_input);
 
         // sqrt(v_hat) = v_hat * rsqrt(v_hat), fused with the + eps.
-        let denom = v_hat.mul_add(r1, eps_v);
+        let denom = v_hat.mul_add_relaxed(r1, eps_v);
 
         // Tier-selected reciprocal.
         let rd = P::recip(token, denom);
@@ -798,7 +798,7 @@ fn adam_update_inner_v3_body(token: archmage::X64V3Token, args: &mut AdamUpdateA
 
         let m_new = first_moment4(token, g, m, beta1_v, one_minus_b1_v, first_cutoff_v);
         let gg = g * g;
-        let v_new = flush_moment4(token, one_minus_b2_v.mul_add(gg, beta2_v * v));
+        let v_new = flush_moment4(token, one_minus_b2_v.mul_add_relaxed(gg, beta2_v * v));
 
         let m_hat = m_new * inv_bc1_v;
         let v_hat = v_new * inv_bc2_v;
@@ -873,7 +873,7 @@ fn adam_update_inner(token: Token, args: &mut AdamUpdateArgs<'_>) {
 
         let m_new = first_moment4(token, g, m, beta1_v, one_minus_b1_v, first_cutoff_v);
         let gg = g * g;
-        let v_new = flush_moment4(token, one_minus_b2_v.mul_add(gg, beta2_v * v));
+        let v_new = flush_moment4(token, one_minus_b2_v.mul_add_relaxed(gg, beta2_v * v));
 
         let m_hat = m_new * inv_bc1_v;
         let v_hat = v_new * inv_bc2_v;
@@ -1207,10 +1207,12 @@ fn fwd_accum_row_v3(
     for ((wc, hac), hbc) in w4.iter().zip(ha4.iter_mut()).zip(hb4.iter_mut()) {
         let wv = f64x4::load_t(token, wc);
         if do_a {
-            sa_v.mul_add(wv, f64x4::load_t(token, hac)).store(hac);
+            sa_v.mul_add_relaxed(wv, f64x4::load_t(token, hac))
+                .store(hac);
         }
         if do_b {
-            sb_v.mul_add(wv, f64x4::load_t(token, hbc)).store(hbc);
+            sb_v.mul_add_relaxed(wv, f64x4::load_t(token, hbc))
+                .store(hbc);
         }
     }
 }
@@ -1457,10 +1459,10 @@ fn adam_pair_fused_inner_v3_body(token: archmage::X64V3Token, args: &mut AdamW1F
                 {
                     let mut g = if gz { zero_v } else { f64x4::load_t(token, gc) };
                     if do_a {
-                        g = sa_v.mul_add(f64x4::load_t(token, &dha_chunks[c]), g);
+                        g = sa_v.mul_add_relaxed(f64x4::load_t(token, &dha_chunks[c]), g);
                     }
                     if do_b {
-                        g = sb_v.mul_add(f64x4::load_t(token, &dhb_chunks[c]), g);
+                        g = sb_v.mul_add_relaxed(f64x4::load_t(token, &dhb_chunks[c]), g);
                     }
                     let w = f64x4::load_t(token, wc);
                     let m = f64x4::load_t(token, mc);
@@ -1492,7 +1494,8 @@ fn adam_pair_fused_inner_v3_body(token: archmage::X64V3Token, args: &mut AdamW1F
                     let v = flush_moment4(token, v);
                     let m_new = first_moment4(token, g, m, beta1_v, one_minus_b1_v, first_cutoff_v);
                     let gg = g * g;
-                    let v_new = flush_moment4(token, one_minus_b2_v.mul_add(gg, beta2_v * v));
+                    let v_new =
+                        flush_moment4(token, one_minus_b2_v.mul_add_relaxed(gg, beta2_v * v));
                     let m_hat = m_new * inv_bc1_v;
                     let v_hat = v_new * inv_bc2_v;
                     let denom = v_hat.sqrt() + eps_v;
