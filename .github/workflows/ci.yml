@@ -263,6 +263,7 @@ jobs:
           # orientation tests died with PermissionDenied). Point it at the
           # mounted target dir; `Cross.toml` passes the variable through.
           CODEC_CORPUS_CACHE: /target/codec-corpus-cache
+          CROSS_CONTAINER_OPTS: --security-opt seccomp=unconfined
         run: cross test --target i686-unknown-linux-gnu --no-fail-fast -p zensim -p zensim-regress -- --nocapture
 
   msrv:
