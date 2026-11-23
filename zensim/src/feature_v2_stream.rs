@@ -62,7 +62,7 @@ pub(crate) fn linear_pyramid() -> bool {
 /// Rows `y0 .. y0 + n` of an sRGB8 source as planar linear RGB (`out`: three
 /// planes of `n · width`), through the sRGB8 table the conversion uses.
 pub(crate) fn srgb8_rows_to_linear(
-    src: &impl ImageSource,
+    src: &(impl ImageSource + ?Sized),
     y0: usize,
     n: usize,
     width: usize,
@@ -371,7 +371,7 @@ struct ScaleState {
 
 /// The streaming producer: rolling XYB pyramids for both sides of a pair
 /// plus the per-scale kernel-strip emission cursors.
-pub(crate) struct StripPlaneProducer<'a, S: ImageSource, D: ImageSource> {
+pub(crate) struct StripPlaneProducer<'a, S: ImageSource + ?Sized, D: ImageSource + ?Sized> {
     source: &'a S,
     distorted: &'a D,
     sampled: Option<[Vec<crate::streaming::XybPyramidLevel>; 2]>,
@@ -428,7 +428,7 @@ pub(crate) struct StripPlaneProducer<'a, S: ImageSource, D: ImageSource> {
 /// which thread runs it changes.
 #[cfg(feature = "threads")]
 fn convert_side_scale0(
-    src: &impl ImageSource,
+    src: &(impl ImageSource + ?Sized),
     planes: &mut [Vec<RollingPlane>; 3],
     hi0: usize,
     n_new: usize,
@@ -459,7 +459,7 @@ fn convert_side_scale0(
 /// Rev5 unread X/B scale zero: retain two rows only, immediately downscale.
 /// Canonical color conversion is pointwise, including its partial vector tail.
 fn convert_side_y_and_downscale(
-    source: &impl ImageSource,
+    source: &(impl ImageSource + ?Sized),
     planes: &mut [Vec<RollingPlane>; 3],
     hi0: usize,
     n_new: usize,
@@ -511,7 +511,7 @@ fn convert_side_y_and_downscale(
 /// disjoint Y/coarse-X/coarse-B output rows and two-row chroma scratch.
 #[cfg(feature = "threads")]
 fn convert_side_y_and_downscale_parallel(
-    source: &impl ImageSource,
+    source: &(impl ImageSource + ?Sized),
     planes: &mut [Vec<RollingPlane>; 3],
     hi0: usize,
     n_new: usize,
@@ -631,7 +631,7 @@ fn scale_capacity_rows(scale: usize, plane_h: usize, advance_rows: usize) -> usi
     (STRIP_ROWS + 2 * HALO_P + step + 32).min(plane_h.max(1) + 2 * HALO_P)
 }
 
-impl<'a, S: ImageSource, D: ImageSource> StripPlaneProducer<'a, S, D> {
+impl<'a, S: ImageSource + ?Sized, D: ImageSource + ?Sized> StripPlaneProducer<'a, S, D> {
     /// Build a producer for a dimension-matched pair. Caller has already
     /// applied entry-point validation (dims match, ≥ MIN_PYRAMID_DIM —
     /// sub-64 inputs are reflect-padded BEFORE constructing, exactly like
@@ -1478,7 +1478,7 @@ impl<'a, S: ImageSource, D: ImageSource> StripPlaneProducer<'a, S, D> {
 #[cfg(feature = "feature-regime-v2")]
 #[cfg_attr(not(feature = "custom-profiles"), allow(dead_code))]
 pub(crate) fn hdr_source_to_xyb(
-    source: &impl ImageSource,
+    source: &(impl ImageSource + ?Sized),
     encoding: HdrEncoding,
     out: &mut [Vec<f32>; 3],
     revision: crate::feature_defs::FormulaRevision,
@@ -1500,7 +1500,7 @@ pub(crate) fn hdr_source_to_xyb(
 }
 
 fn hdr_source_row_to_nits(
-    src: &impl ImageSource,
+    src: &(impl ImageSource + ?Sized),
     y: usize,
     encoding: HdrEncoding,
     out: &mut [[f32; 3]],

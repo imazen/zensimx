@@ -2999,7 +2999,7 @@ mod featcanon_contract_tests {
                         ($want:ident, $got:ident, $B:literal, $V:literal, $K:literal, $R:literal) => {{
                             let ($want, want_hooks) = run_gradient::<$B, $V, $K>(
                                 |s, d, a, ad, w, h, lo, hi, r4| {
-                                    gradient_block_kernel_canon::<LanesF64, $B, $V, $K, $R, false>(
+                                    gradient_block_kernel_canon::<LanesF64, $R, false>(
                                         s,
                                         d,
                                         a,
@@ -3012,6 +3012,9 @@ mod featcanon_contract_tests {
                                         hi,
                                         r4,
                                         Mode::Canon64,
+                                        $B,
+                                        $V,
+                                        $K,
                                     )
                                 },
                                 &src_h,
@@ -3136,7 +3139,7 @@ mod featcanon_contract_tests {
                 hi: f32,
                 r4: Option<Rev4Grad<'_>>,
             ) -> GradientAccum {
-                gradient_block_kernel_canon64_vec_scalar::<crate::featcanon::LanesF64, B, V, K, R, false>(
+                gradient_block_kernel_canon64_vec_scalar::<crate::featcanon::LanesF64, R, false>(
                     _t,
                     s,
                     d,
@@ -3150,6 +3153,9 @@ mod featcanon_contract_tests {
                     hi,
                     r4,
                     Mode::Canon64,
+                    B,
+                    V,
+                    K,
                 )
             }
             #[cfg(target_arch = "x86_64")]
@@ -3167,7 +3173,7 @@ mod featcanon_contract_tests {
                 hi: f32,
                 r4: Option<Rev4Grad<'_>>,
             ) -> GradientAccum {
-                gradient_block_kernel_canon64_vec_v3::<crate::featcanon::LanesF64, B, V, K, R, false>(
+                gradient_block_kernel_canon64_vec_v3::<crate::featcanon::LanesF64, R, false>(
                     t,
                     s,
                     d,
@@ -3181,6 +3187,9 @@ mod featcanon_contract_tests {
                     hi,
                     r4,
                     Mode::Canon64,
+                    B,
+                    V,
+                    K,
                 )
             }
             #[cfg(all(target_arch = "x86_64", feature = "avx512"))]
@@ -3198,7 +3207,7 @@ mod featcanon_contract_tests {
                 hi: f32,
                 r4: Option<Rev4Grad<'_>>,
             ) -> GradientAccum {
-                gradient_block_kernel_canon64_vec_v4::<crate::featcanon::LanesF64, B, V, K, R, false>(
+                gradient_block_kernel_canon64_vec_v4::<crate::featcanon::LanesF64, R, false>(
                     t,
                     s,
                     d,
@@ -3212,6 +3221,9 @@ mod featcanon_contract_tests {
                     hi,
                     r4,
                     Mode::Canon64,
+                    B,
+                    V,
+                    K,
                 )
             }
             #[cfg(all(target_arch = "x86_64", feature = "avx512"))]
@@ -3229,7 +3241,7 @@ mod featcanon_contract_tests {
                 hi: f32,
                 r4: Option<Rev4Grad<'_>>,
             ) -> GradientAccum {
-                gradient_block_kernel_canon64_vec_v4x::<crate::featcanon::LanesF64, B, V, K, R, false>(
+                gradient_block_kernel_canon64_vec_v4x::<crate::featcanon::LanesF64, R, false>(
                     t,
                     s,
                     d,
@@ -3243,6 +3255,9 @@ mod featcanon_contract_tests {
                     hi,
                     r4,
                     Mode::Canon64,
+                    B,
+                    V,
+                    K,
                 )
             }
             let mut rng = Rng(0x6752_4144_5F43_4153);

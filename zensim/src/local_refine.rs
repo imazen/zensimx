@@ -1426,7 +1426,7 @@ impl<'a> Query<'a> {
         for y in gy0..gy1 {
             let ly = y - gy0;
             for x in gx0..gx1 {
-                let terms = feature_v2::gradient_terms64::<false, false, false>;
+                let terms = feature_v2::gradient_terms64::<false>;
                 let o = terms(
                     &src_g,
                     &dst_old,
@@ -1439,6 +1439,8 @@ impl<'a> Query<'a> {
                     ly,
                     0.0,
                     0.0,
+                    false,
+                    false,
                     false,
                 );
                 let n = terms(
@@ -1453,6 +1455,8 @@ impl<'a> Query<'a> {
                     ly,
                     0.0,
                     0.0,
+                    false,
+                    false,
                     false,
                 );
                 acc.sum_grad_src += n.gsrc - o.gsrc;

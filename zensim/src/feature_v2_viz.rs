@@ -87,7 +87,7 @@ pub(crate) fn viz_visit_maps(
                         maps[18 + j][i] = kn[j];
                     }
                     let (gsrc, gms, ring, band) = if x == 0 || x + 1 == w {
-                        let g = gradient_terms64::<false, false, false>(
+                        let g = gradient_terms64::<false>(
                             &sh,
                             &dh,
                             &p.act,
@@ -100,11 +100,13 @@ pub(crate) fn viz_visit_maps(
                             0.0,
                             0.0,
                             true,
+                            false,
+                            false,
                         );
                         (g.gsrc as f32, g.g as f32, g.ring as f32, g.band as f32)
                     } else {
                         let row = (y + 1) * w;
-                        let g = gradient_terms32_v::<f32, false, false, false>(
+                        let g = gradient_terms32_v::<f32, false>(
                             (),
                             sh[row + x - 1],
                             sh[row + x + 1],
@@ -123,6 +125,8 @@ pub(crate) fn viz_visit_maps(
                             0.0,
                             0.0,
                             true,
+                            false,
+                            false,
                         );
                         (g.0, g.2, g.4, g.5)
                     };

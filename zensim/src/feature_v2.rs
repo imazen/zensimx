@@ -322,23 +322,41 @@ mod ring_form_tests {
         let (src_h, dst_h, act, mu1, mu2) = p;
         let m = crate::featcanon::Mode::Canon64;
         if hp {
-            gradient_block_kernel_canon::<
-                crate::featcanon::Lanes16F64,
+            gradient_block_kernel_canon::<crate::featcanon::Lanes16F64, true, false>(
+                src_h,
+                dst_h,
+                act,
+                &[],
+                mu1,
+                mu2,
+                w,
+                h,
+                0.0,
+                0.0,
+                None,
+                m,
                 false,
                 false,
                 false,
-                true,
-                false,
-            >(src_h, dst_h, act, &[], mu1, mu2, w, h, 0.0, 0.0, None, m)
+            )
         } else {
-            gradient_block_kernel_canon::<
-                crate::featcanon::Lanes16F64,
+            gradient_block_kernel_canon::<crate::featcanon::Lanes16F64, false, false>(
+                src_h,
+                dst_h,
+                act,
+                &[],
+                mu1,
+                mu2,
+                w,
+                h,
+                0.0,
+                0.0,
+                None,
+                m,
                 false,
                 false,
                 false,
-                false,
-                false,
-            >(src_h, dst_h, act, &[], mu1, mu2, w, h, 0.0, 0.0, None, m)
+            )
         }
     }
 
@@ -4507,7 +4525,7 @@ impl V2PreparedReference {
 /// performed), convert to XYB once, and materialize all
 /// [`crate::NUM_SCALES`] pyramid levels.
 pub(crate) fn prepare_v2_reference_impl(
-    source: &impl ImageSource,
+    source: &(impl ImageSource + ?Sized),
     max_pixels: Option<usize>,
     parallel: bool,
     cache_moments: bool,
@@ -4516,7 +4534,7 @@ pub(crate) fn prepare_v2_reference_impl(
 }
 
 fn prepare_v2_reference_impl_inner(
-    source: &impl ImageSource,
+    source: &(impl ImageSource + ?Sized),
     max_pixels: Option<usize>,
     parallel: bool,
     cache_moments: bool,
@@ -4551,7 +4569,7 @@ fn prepare_v2_reference_impl_inner(
 /// order; the in-place/out-of-place split changes only where the result
 /// is stored).
 fn build_v2_ref_scales(
-    img: &impl ImageSource,
+    img: &(impl ImageSource + ?Sized),
     parallel: bool,
 ) -> Vec<([Vec<f32>; 3], usize, usize)> {
     assert!(
@@ -4950,7 +4968,7 @@ impl Rev5StripJob {
         }
     }
 
-    fn gather<S: ImageSource, D: ImageSource>(
+    fn gather<S: ImageSource + ?Sized, D: ImageSource + ?Sized>(
         &mut self,
         producer: &crate::feature_v2_stream::StripPlaneProducer<'_, S, D>,
         info: crate::feature_v2_stream::StripInfo,
@@ -5463,7 +5481,7 @@ enum BlockWalkMsg {
 /// rows the next strip needs.
 #[cfg(feature = "threads")]
 #[allow(clippy::too_many_arguments)]
-fn rev5_block_walk<S: ImageSource, D: ImageSource, const ALL_CHANNELS: bool>(
+fn rev5_block_walk<S: ImageSource + ?Sized, D: ImageSource + ?Sized, const ALL_CHANNELS: bool>(
     source: &S,
     distorted: &D,
     dims: &[(usize, usize)],
@@ -6219,7 +6237,7 @@ fn retain_basic_sd(
 /// consumer (phase B): zero-copy producer slices for interior strips, or
 /// the scratch buffers phase A filled for edge strips. Identical bytes
 /// either way (C1's producer gate).
-fn stream_windows_shared<'w, S: ImageSource, D: ImageSource>(
+fn stream_windows_shared<'w, S: ImageSource + ?Sized, D: ImageSource + ?Sized>(
     producer: &'w crate::feature_v2_stream::StripPlaneProducer<'_, S, D>,
     info: &crate::feature_v2_stream::StripInfo,
     ch: usize,
@@ -6250,7 +6268,7 @@ fn stream_windows_shared<'w, S: ImageSource, D: ImageSource>(
 /// has no caller for it; `cfg_attr` scopes the allow to exactly that case
 /// rather than silencing dead-code detection when `threads` IS on.
 #[cfg_attr(not(feature = "threads"), allow(dead_code))]
-fn stream_gather_windows<S: ImageSource, D: ImageSource>(
+fn stream_gather_windows<S: ImageSource + ?Sized, D: ImageSource + ?Sized>(
     producer: &crate::feature_v2_stream::StripPlaneProducer<'_, S, D>,
     info: &crate::feature_v2_stream::StripInfo,
     ch: usize,
@@ -6273,7 +6291,7 @@ fn stream_gather_windows<S: ImageSource, D: ImageSource>(
 /// activity), plus the P2 strip-tiled bs2 σ-split chain when the append
 /// cell is active (`abs_src`/`activity_tmp` are dead after the activity
 /// chain and serve as its square/H temps).
-fn stream_phase_a<S: ImageSource, D: ImageSource>(
+fn stream_phase_a<S: ImageSource + ?Sized, D: ImageSource + ?Sized>(
     producer: &crate::feature_v2_stream::StripPlaneProducer<'_, S, D>,
     info: &crate::feature_v2_stream::StripInfo,
     ch: usize,
@@ -8662,12 +8680,12 @@ fn foldapp_streaming_walk<S: ImageSource, D: ImageSource>(
         .compute
         .unwrap_or_else(|| ComputeSet::from_toggles(toggles));
     if compute.full_res_xb && compute.coarse_y_only_scales == 0 {
-        foldapp_streaming_walk_impl::<S, D, true>(
+        foldapp_streaming_walk_impl::<true>(
             source, distorted, parallel, toggles, front_end, scratch, extras,
         )
     } else {
         assert!(compute.allows_full_res_y_subset());
-        foldapp_streaming_walk_impl::<S, D, false>(
+        foldapp_streaming_walk_impl::<false>(
             source, distorted, parallel, toggles, front_end, scratch, extras,
         )
     }
@@ -8678,9 +8696,17 @@ fn foldapp_streaming_walk<S: ImageSource, D: ImageSource>(
 // the higher crossover. Paired instrument: imazen/zensimx f3e19a47.
 const PARALLEL_MIN_PIXELS: usize = 36_864;
 
-fn foldapp_streaming_walk_impl<S: ImageSource, D: ImageSource, const ALL_CHANNELS: bool>(
-    source: &S,
-    distorted: &D,
+// `&dyn ImageSource`, not generics: every caller's `(S, D)` pair used to
+// monomorphize this ~200-line orchestration body (and the whole producer
+// chain under it) once per source-type pair per `ALL_CHANNELS` — that fan
+// was a measurable slice of `.text`. The producer's only source contact is
+// `row_bytes` through the vtable once per source row in the conversion
+// front end — two vtable calls per row across the pair, cold next to the
+// per-row conversion work — and the kernels downstream of it are already
+// non-generic over `&[f32]` planes: identical bits either way.
+fn foldapp_streaming_walk_impl<const ALL_CHANNELS: bool>(
+    source: &dyn ImageSource,
+    distorted: &dyn ImageSource,
     parallel: bool,
     toggles: V2NewFeatureToggles,
     front_end: crate::feature_v2_stream::FrontEnd,
@@ -9027,7 +9053,7 @@ fn foldapp_streaming_walk_impl<S: ImageSource, D: ImageSource, const ALL_CHANNEL
     let __t_walk = crate::fold_timing::start();
     #[cfg(feature = "threads")]
     if block_walk {
-        rev5_block_walk::<S, D, ALL_CHANNELS>(
+        rev5_block_walk::<_, _, ALL_CHANNELS>(
             source,
             distorted,
             &dims,
@@ -13514,6 +13540,13 @@ fn compute_v2_append_attribution_impl(
 #[cfg(feature = "feature-regime-v2")]
 include!("feature_v2_tests.rs");
 
+// This include is UNCONDITIONAL on purpose: despite the name, the file owns
+// the shipped era-2/canon/canonical-64 kernel bodies (dense_block_kernel_era2,
+// dense_block_kernel_canon*, gradient_block_kernel_canon*). Its oracle-only
+// pieces are gated inside it — `mod oracle`, the `bench_*`/`harness_*` fns and
+// the `*_exact` kernels carry `cfg(any(test, feature = "oracle"))` — so a
+// production build already excludes them. Gating the include itself would
+// break the lib.
 include!("feature_v2_oracle.rs");
 
 #[cfg(feature = "viz-memory")]

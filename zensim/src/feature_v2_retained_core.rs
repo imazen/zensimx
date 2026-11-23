@@ -234,7 +234,7 @@ pub(super) fn rev5_retained_phase_b(
 
 // Keep retained-only scratch and dispatch out of the score walk's caller.
 #[inline(never)]
-pub(super) fn rev5_retained_single_channel<S: ImageSource, D: ImageSource>(
+pub(super) fn rev5_retained_single_channel<S: ImageSource + ?Sized, D: ImageSource + ?Sized>(
     producer: &crate::feature_v2_stream::StripPlaneProducer<'_, S, D>,
     info: &crate::feature_v2_stream::StripInfo,
     ch: usize,

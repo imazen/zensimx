@@ -3632,7 +3632,7 @@ fn nits_rgb_from_hdr_source(src: &impl ImageSource) -> Result<Vec<f32>, ZensimEr
     Ok(out)
 }
 
-pub(crate) fn reject_hdr_input(source: &impl ImageSource) -> Result<(), ZensimError> {
+pub(crate) fn reject_hdr_input(source: &(impl ImageSource + ?Sized)) -> Result<(), ZensimError> {
     if source.is_hdr() {
         return Err(ZensimError::HdrInputRequiresPuPath);
     }
@@ -3959,16 +3959,19 @@ pub(crate) fn reflect_index(i: usize, n: usize) -> usize {
 }
 
 /// Reflect(mirror)-pad `src` up to at least [`MIN_PYRAMID_DIM`] in each dim.
-pub(crate) fn reflect_pad_to_min(src: &impl ImageSource) -> OwnedImage {
+pub(crate) fn reflect_pad_to_min(src: &(impl ImageSource + ?Sized)) -> OwnedImage {
     reflect_pad_for_scales(src, crate::NUM_SCALES)
 }
 
 /// Reflect(mirror)-pad `src` up to [`min_pyramid_dim_for_scales`] in each dim.
-pub(crate) fn reflect_pad_for_scales(src: &impl ImageSource, num_scales: usize) -> OwnedImage {
+pub(crate) fn reflect_pad_for_scales(
+    src: &(impl ImageSource + ?Sized),
+    num_scales: usize,
+) -> OwnedImage {
     reflect_pad_to_size(src, min_pyramid_dim_for_scales(num_scales))
 }
 
-pub(crate) fn reflect_pad_to_size(src: &impl ImageSource, min_dim: usize) -> OwnedImage {
+pub(crate) fn reflect_pad_to_size(src: &(impl ImageSource + ?Sized), min_dim: usize) -> OwnedImage {
     let (w, h) = (src.width(), src.height());
     let bpp = src.pixel_format().bytes_per_pixel();
     let (bw, bh) = (w.max(min_dim), h.max(min_dim));

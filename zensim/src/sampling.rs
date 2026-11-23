@@ -198,7 +198,7 @@ impl Sampling {
     /// `revision` is the walk's formula revision (canonical opsin at Rev4).
     pub(crate) fn pyramid(
         self,
-        source: &impl ImageSource,
+        source: &(impl ImageSource + ?Sized),
         parallel: bool,
         revision: crate::feature_defs::FormulaRevision,
     ) -> Vec<XybPyramidLevel> {
@@ -237,7 +237,7 @@ impl Sampling {
 
     pub(crate) fn reference(
         self,
-        source: &impl ImageSource,
+        source: &(impl ImageSource + ?Sized),
         parallel: bool,
         revision: crate::feature_defs::FormulaRevision,
     ) -> crate::PrecomputedReference {

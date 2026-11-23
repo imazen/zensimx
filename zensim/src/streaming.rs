@@ -1385,7 +1385,7 @@ fn multiscale_stats_over_pu_xyb(
 
 /// Shared native SDR conversion before XYB. The caller validated the format.
 fn native_sdr_linear_row(
-    source: &impl ImageSource,
+    source: &(impl ImageSource + ?Sized),
     y: usize,
     absolute_y: usize,
     out: &mut [[f32; 3]],
@@ -1474,7 +1474,7 @@ pub(crate) fn native_sdr_linear_rgb(
 /// `revision` is the computation's formula revision; it selects the canonical
 /// opsin body at Rev4 (featcanon D1) and nothing else.
 pub(crate) fn convert_source_to_xyb(
-    source: &impl ImageSource,
+    source: &(impl ImageSource + ?Sized),
     padded_width: usize,
     parallel: bool,
     revision: crate::feature_defs::FormulaRevision,
@@ -1490,7 +1490,7 @@ pub(crate) fn convert_source_to_xyb(
 /// instead of allocating new ones. Each plane must have at least
 /// `padded_width * source.height()` elements.
 pub(crate) fn convert_source_to_xyb_into(
-    source: &impl ImageSource,
+    source: &(impl ImageSource + ?Sized),
     planes: &mut [Vec<f32>; 3],
     padded_width: usize,
     parallel: bool,
@@ -1517,7 +1517,7 @@ pub(crate) fn convert_source_to_xyb_into(
 /// subset-local phase.)
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn convert_source_to_xyb_into_slices(
-    source: &impl ImageSource,
+    source: &(impl ImageSource + ?Sized),
     p0: &mut [f32],
     p1: &mut [f32],
     p2: &mut [f32],
@@ -1563,7 +1563,7 @@ pub(crate) const DEFAULT_CONVERT_CHUNK_ROWS: usize = 64;
 /// the pool is. That was 23 % of the fold-backed score's 16-thread wall.
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn convert_source_to_xyb_into_slices_chunked(
-    source: &impl ImageSource,
+    source: &(impl ImageSource + ?Sized),
     p0: &mut [f32],
     p1: &mut [f32],
     p2: &mut [f32],

@@ -671,8 +671,8 @@ fn run_cell(
 /// cell-major (`scale * 3 + channel`), matching their `PerChannel` registry
 /// blocks. A slice for a family that is not requested is left untouched.
 pub(super) fn run(
-    source: &impl ImageSource,
-    distorted: &impl ImageSource,
+    source: &(impl ImageSource + ?Sized),
+    distorted: &(impl ImageSource + ?Sized),
     parallel: bool,
     revision: FormulaRevision,
     work: Work,

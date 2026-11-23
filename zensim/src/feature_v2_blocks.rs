@@ -113,7 +113,7 @@ pub(crate) type ChunkPlanes = [[Option<Arc<RowBlock>>; crate::NUM_SCALES]; 3];
 /// downscaled at once ([`crate::feature_v2_stream`]'s
 /// `convert_side_y_and_downscale`); otherwise the chunk is one conversion
 /// call, as the streaming producer's 64-row chunks are.
-pub(crate) fn produce_chunk<S: ImageSource>(
+pub(crate) fn produce_chunk<S: ImageSource + ?Sized>(
     source: &S,
     k: usize,
     dims: &[(usize, usize)],
