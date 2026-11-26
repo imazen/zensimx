@@ -508,7 +508,7 @@ impl From<io::Error> for PngError {
 /// for typical assets). 16-bit and float formats are not supported.
 fn pixel_buffer_to_rgba8(pixels: &PixelBuf, w: u32, h: u32) -> Result<Vec<u8>, PngError> {
     use zenpixels::SampleType;
-    let layout = pixels.spec().layout;
+    let layout = pixels.format().layout;
     if layout.sample != SampleType::U8 {
         return Err(PngError::Decode(format!(
             "unsupported channel type {:?}; only U8 supported",
@@ -603,7 +603,7 @@ impl GrayBitmap {
 
 fn pixel_buffer_to_gray8(pixels: &PixelBuf) -> Result<Vec<u8>, PngError> {
     use zenpixels::SampleType;
-    let layout = pixels.spec().layout;
+    let layout = pixels.format().layout;
     if layout.sample != SampleType::U8 {
         return Err(PngError::Decode(format!(
             "expected U8 channels, got {:?}",

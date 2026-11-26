@@ -3,7 +3,7 @@ use anyhow::{Context, Result, ensure};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::{fs, path::Path};
-use zenpixels::{AlphaMode, ChannelOrder, ColorSpace, ImageSpec, Primaries, Transfer};
+use zenpixels::{AlphaMode, ChannelOrder, ColorSpace, PixelFormat, Primaries, Transfer};
 
 use super::dhash_bits;
 
@@ -33,7 +33,7 @@ pub(super) fn fingerprint(path: &Path, assume_untagged_srgb: bool) -> Result<Val
         width >= 9 && height >= 8,
         "native linear audit requires at least 9x8"
     );
-    let source_descriptor = pixels.spec().clone();
+    let source_descriptor = pixels.format().clone();
     let mut descriptor = source_descriptor.clone();
     let applied_srgb_assumption = untagged_png
         && assume_untagged_srgb
@@ -84,7 +84,7 @@ pub(super) fn fingerprint(path: &Path, assume_untagged_srgb: bool) -> Result<Val
     );
     let converter = zenpixels_convert::RowPlan::build(
         &descriptor,
-        &ImageSpec::RGBF32_LINEAR,
+        &PixelFormat::RGBF32_LINEAR,
         &zenpixels_convert::ConvertPolicy::permissive(),
         None,
     )

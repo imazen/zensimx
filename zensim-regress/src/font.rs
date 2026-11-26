@@ -522,7 +522,7 @@ fn build_scaled_run_per_cell(
         strip.width(),
         strip.height(),
         (strip.width() as usize) * 4,
-        &zenpixels::specs::RGBA8_SRGB,
+        &zenpixels::formats::RGBA8_SRGB,
     )
     .expect("strip slice dims valid");
 

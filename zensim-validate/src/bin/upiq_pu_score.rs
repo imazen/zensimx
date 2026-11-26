@@ -72,7 +72,7 @@ fn decode_exr_rgb(path: &Path, bytes: &[u8]) -> Result<Rgb, String> {
         .map_err(|e| e.to_string())?;
     let pixels = decoded.pixels();
     if !matches!(
-        pixels.spec().color,
+        pixels.format().color,
         zenpixels::ColorSpace::Rgb {
             primaries: zenpixels::Primaries::Bt709,
             ..
@@ -82,7 +82,7 @@ fn decode_exr_rgb(path: &Path, bytes: &[u8]) -> Result<Rgb, String> {
             "{path:?}: non-BT709/unknown EXR chromaticities require an explicit color contract"
         ));
     }
-    let channels = if pixels.spec().layout.order.has_alpha_slot() {
+    let channels = if pixels.format().layout.order.has_alpha_slot() {
         4
     } else {
         3

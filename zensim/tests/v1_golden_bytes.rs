@@ -88,7 +88,7 @@ fn load_png_rgb8(path: &std::path::Path) -> (Vec<[u8; 3]>, usize, usize) {
     let cfg = zenpng::PngDecodeConfig::default();
     let out = zenpng::decode(&bytes, &cfg, &enough::Unstoppable).expect("zenpng decode");
     let (w, h) = (out.info.width as usize, out.info.height as usize);
-    let layout = out.pixels.spec().layout;
+    let layout = out.pixels.format().layout;
     assert_eq!(layout.sample, SampleType::U8);
     let slice = out.pixels.as_view();
     let (channels, has_alpha) = (layout.channels(), layout.order.has_alpha_slot());

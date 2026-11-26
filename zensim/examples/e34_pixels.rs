@@ -93,7 +93,7 @@ fn source_plan(info: &zenpng::PngInfo) -> Option<(zenpixels::Primaries, zenpixel
 
 // Explicit E36 SDR ingress delegates pixel math to existing native owners.
 fn read_srgb_opaque(v: &Value) -> (Vec<[u8; 3]>, usize, usize) {
-    use zenpixels::{ImageSpec, Transfer};
+    use zenpixels::{PixelFormat, Transfer};
     use zenpixels_convert::{AlphaPolicy, ConvertPolicy, RowPlan};
     let bytes = fs::read(text(v, "source")).unwrap();
     assert_eq!(sha(&bytes), text(v, "source_sha256"));
@@ -110,12 +110,12 @@ fn read_srgb_opaque(v: &Value) -> (Vec<[u8; 3]>, usize, usize) {
     });
     let pixels = oriented.as_ref().unwrap_or(&decoded.pixels);
     let desc = pixels
-        .spec()
+        .format()
         .clone()
         .with_primaries(primaries)
         .with_transfer(Transfer::Srgb);
     let policy = ConvertPolicy::permissive().with_alpha(AlphaPolicy::Forbid);
-    let converter = RowPlan::build(&desc, &ImageSpec::RGB8_SRGB, &policy, None).unwrap();
+    let converter = RowPlan::build(&desc, &PixelFormat::RGB8_SRGB, &policy, None).unwrap();
     let (ow, oh) = orientation.output_dimensions(info.width, info.height);
     let (w, h) = (ow as usize, oh as usize);
     let mut rgb = vec![[0u8; 3]; w * h];

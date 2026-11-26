@@ -137,7 +137,7 @@ fn decode_png_rgb8(bytes: &[u8]) -> Result<(Vec<u8>, u32, u32)> {
     let cfg = zenpng::PngDecodeConfig::default();
     let out = zenpng::decode(bytes, &cfg, &Unstoppable).map_err(|e| anyhow!("{e:?}"))?;
     let (w, h) = (out.info.width as usize, out.info.height as usize);
-    let layout = out.pixels.spec().layout;
+    let layout = out.pixels.format().layout;
     let channels = layout.channels();
     let slice = out.pixels.as_view();
     let samples_per_row = w * channels;

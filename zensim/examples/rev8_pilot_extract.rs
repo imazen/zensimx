@@ -11,7 +11,7 @@ use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
 use zencodec::{ImageFormat, ImageFormatRegistry};
-use zenpixels::{ImageSpec, PixelBuf, SampleLayout, SampleType};
+use zenpixels::{PixelBuf, PixelFormat, SampleLayout, SampleType};
 use zenpixels_convert::{ConvertPolicy, RowPlan};
 use zensim::rev8::{IntensityTarget, RgbRows, Variant, extract_fx2};
 use zensim::{RgbSlice, feature_set_id::FeatureSetId, research};
@@ -88,21 +88,21 @@ fn check_safe_path(path: &Path) -> Result<(), String> {
 }
 
 fn pixelbuffer_to_rgb8(pb: &PixelBuf) -> Result<(Vec<[u8; 3]>, usize, usize), String> {
-    let spec = pb.spec();
+    let format = pb.format();
     let w = pb.width() as usize;
     let h = pb.height() as usize;
     let slice = pb.as_view();
     let stride = slice.stride();
     let data = slice.as_strided_bytes();
     let mut flat = Vec::new();
-    if spec.layout == SampleLayout::RGB8 {
+    if format.layout == SampleLayout::RGB8 {
         flat.reserve(w * h * 3);
         let bpr = w * 3;
         for row in 0..h {
             let s = row * stride;
             flat.extend_from_slice(&data[s..s + bpr]);
         }
-    } else if spec.layout == SampleLayout::RGBA8 {
+    } else if format.layout == SampleLayout::RGBA8 {
         flat.reserve(w * h * 3);
         for row in 0..h {
             let s = row * stride;
@@ -114,12 +114,12 @@ fn pixelbuffer_to_rgb8(pb: &PixelBuf) -> Result<(Vec<[u8; 3]>, usize, usize), St
         let dst_stride = w * 3;
         flat.resize(dst_stride * h, 0);
         let plan = RowPlan::build(
-            spec,
-            &ImageSpec::RGB8_SRGB,
+            format,
+            &PixelFormat::RGB8_SRGB,
             &ConvertPolicy::permissive(),
             None,
         )
-        .map_err(|e| format!("cannot plan {spec:?} -> RGB8_SRGB: {e}"))?;
+        .map_err(|e| format!("cannot plan {format:?} -> RGB8_SRGB: {e}"))?;
         for y in 0..h {
             plan.convert_row(
                 slice.row(y as u32),
@@ -141,7 +141,7 @@ fn decode_png_rgb8(bytes: &[u8], path: &Path) -> Result<(Vec<[u8; 3]>, usize, us
         &enough::Unstoppable,
     )
     .map_err(|e| format!("zenpng {path:?}: {e}"))?;
-    let layout = out.pixels.spec().layout;
+    let layout = out.pixels.format().layout;
     if layout.sample == SampleType::U16 {
         // Match zen_io's rounded (v * 255 + 32767) / 65535 narrowing on 16-bit PNGs.
         let w = out.info.width as usize;

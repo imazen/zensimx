@@ -8,7 +8,7 @@ use std::collections::BTreeSet;
 use std::fs;
 use std::io::Write;
 use std::path::Path;
-use zenpixels::ImageSpec;
+use zenpixels::PixelFormat;
 use zenpixels_convert::{ConvertPolicy, convert_to_buf};
 
 use super::dhash_bits;
@@ -29,7 +29,7 @@ fn fingerprint(path: &Path, max_pixels: Option<u64>) -> Result<Value> {
     );
     let rgb = convert_to_buf(
         &decoded.pixels.as_view(),
-        &ImageSpec::RGB8_SRGB,
+        &PixelFormat::RGB8_SRGB,
         &ConvertPolicy::permissive(),
     )
     .map_err(|e| anyhow::anyhow!("{}: {e}", path.display()))?;

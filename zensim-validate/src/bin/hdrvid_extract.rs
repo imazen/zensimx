@@ -222,7 +222,7 @@ fn load(
     )
     .map_err(|e| format!("{path:?}: {e}"))?;
     let pixels = decoded.pixels;
-    let layout = pixels.spec().layout;
+    let layout = pixels.format().layout;
     if layout.sample != zenpixels::SampleType::U16
         || layout.order != zenpixels::ChannelOrder::Rgb
         || (pixels.width() as usize, pixels.height() as usize) != size
@@ -231,7 +231,7 @@ fn load(
             "{path:?}: not a {}x{} RGB16 display frame ({:?})",
             size.0,
             size.1,
-            pixels.spec()
+            pixels.format()
         ));
     }
     let (w, h) = size;
