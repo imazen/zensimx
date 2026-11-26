@@ -57,9 +57,9 @@ codec-corpus = "1.0.3"
 zenbench = "0.1.11"
 # Current upstream main, fetched 2026-09-13; pin the filter-study implementation.
 zenresize = { git = "https://github.com/imazen/zenresize", rev = "e3975fb9d6d6b7baa96038a0eb8e27febb37c012", default-features = false, features = ["std"] }
-zenpng = { version = ">=0.1.4, <0.3.0", default-features = false }
-# Shared PNG/JPEG buffers use the converged 0.3 pixel representation.
-zenpixels = { version = ">=0.3.1, <0.4.0", default-features = false }
+zenpng = { version = ">=0.2.0, <0.4.0", default-features = false }
+# Shared PNG/JPEG buffers use the converged 0.5 pixel representation.
+zenpixels = { version = ">=0.5.0, <0.6.0", default-features = false }
 zenblend = "0.1.3"
 enough = { version = "0.4.5", default-features = false, features = ["std"] }
 # Native research runtime and baker from zenanalyze PRs 93 and 94. The source pin
@@ -94,14 +94,17 @@ zenpredict-bake = { git = "https://github.com/imazen/zenanalyze", rev = "8bf61bc
 # E34 P7: directional bootstrap probability and public Student helpers (PR 82).
 zenstats = { package = "zenmetrics-stats", git = "https://github.com/imazen/zenmetrics", rev = "48665c8fb1bb3de5c99d792ae4ed4f3f1e854629", default-features = false, features = ["parallel"] }
 
-# Git-only codec contracts from zenjpeg main; dependency patches do not propagate.
+# Git-only codec contracts for the zenpixels 0.5 cohort; dependency patches do not propagate.
 [patch.crates-io]
-zenpixels = { git = "https://github.com/imazen/zenpixels", rev = "fa836abf72afe9826e866dc25712b7c800323962" }
-zencodec = { git = "https://github.com/imazen/zencodec", rev = "1816b4d082234c04c3805411b437b8396040f522" }
-zenmeta = { git = "https://github.com/imazen/zencodec", rev = "1816b4d082234c04c3805411b437b8396040f522" }
-ultrahdr-core = { git = "https://github.com/imazen/ultrahdr", rev = "8a30cadfd08721749050215b924ca0a58a42e277" }
-
-zenpixels-convert = { git = "https://github.com/imazen/zenpixels", rev = "fa836abf72afe9826e866dc25712b7c800323962" }
-zenpng = { git = "https://github.com/imazen/zenpng", rev = "72abb2980eba56b2508c2a5ecaaba4aaaac6929c" }
+zenpixels = { git = "https://github.com/imazen/zenpixels", rev = "9686936bfa49df370a1e71666b252b9f48f744b4" }
+zenpixels-convert = { git = "https://github.com/imazen/zenpixels", rev = "9686936bfa49df370a1e71666b252b9f48f744b4" }
+# zenresize still requests zenpixels 0.3 internally.
+zenpixels-03 = { package = "zenpixels", git = "https://github.com/imazen/zenpixels", rev = "fa836abf72afe9826e866dc25712b7c800323962" }
+zencodec = { git = "https://github.com/imazen/zencodec", rev = "3a10011b6b05d2269e29db5e40db71888d0fcfce" }
+zenmeta = { git = "https://github.com/imazen/zencodec", rev = "3a10011b6b05d2269e29db5e40db71888d0fcfce" }
+ultrahdr-core = { git = "https://github.com/imazen/ultrahdr", rev = "5220840ec1098ab00905c3bc758e6fe36ff58d5c" }
+zenpng = { git = "https://github.com/imazen/zenpng", rev = "b0205a1b72864ad047f5ec465f1900f167496484" }
 # Current PNG strip compression uses the same tested source as the siblings.
-zenflate = { git = "https://github.com/imazen/zenflate", rev = "f6c96cc68e6ce49473943dba1ff1159bfad7a74d" }
+zenflate = { git = "https://github.com/imazen/zenflate", rev = "7270e38faca9cdbae793938fa229d40ac4fe4c39" }
+garb = { git = "https://github.com/imazen/garb", rev = "457ff8b9153e9d675a39dc098052b2ffeb6206fa" }
+linear-srgb = { git = "https://github.com/imazen/linear-srgb", rev = "ae83f19426737635fee3dd16f228681019f52585" }

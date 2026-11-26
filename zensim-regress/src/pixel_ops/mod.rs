@@ -23,7 +23,7 @@ use std::path::Path;
 
 use enough::Unstoppable;
 use rgb::Rgba;
-use zenpixels::PixelBuffer;
+use zenpixels::PixelBuf;
 use zenpng::{EncodeConfig, PngDecodeConfig};
 
 /// Resampling filter for [`resize`].
@@ -503,23 +503,23 @@ impl From<io::Error> for PngError {
     }
 }
 
-/// Convert zenpng's erased `PixelBuffer` into RGBA8 packed bytes.
+/// Convert zenpng's erased `PixelBuf` into RGBA8 packed bytes.
 /// Handles RGBA8, RGB8, Gray8, GrayAlpha8 (the formats PNG can yield
 /// for typical assets). 16-bit and float formats are not supported.
-fn pixel_buffer_to_rgba8(pixels: &PixelBuffer, w: u32, h: u32) -> Result<Vec<u8>, PngError> {
-    use zenpixels::ChannelType;
-    let desc = pixels.descriptor();
-    if desc.channel_type() != ChannelType::U8 {
+fn pixel_buffer_to_rgba8(pixels: &PixelBuf, w: u32, h: u32) -> Result<Vec<u8>, PngError> {
+    use zenpixels::SampleType;
+    let layout = pixels.spec().layout;
+    if layout.sample != SampleType::U8 {
         return Err(PngError::Decode(format!(
             "unsupported channel type {:?}; only U8 supported",
-            desc.channel_type()
+            layout.sample
         )));
     }
     let n = (w as usize) * (h as usize);
-    let slice = pixels.as_slice();
+    let slice = pixels.as_view();
     let mut out = Vec::with_capacity(n * 4);
-    let channels = desc.channels();
-    let has_alpha = desc.has_alpha();
+    let channels = layout.channels();
+    let has_alpha = layout.order.has_alpha_slot();
     for y in 0..h {
         let row = slice.row(y);
         match (channels, has_alpha) {
@@ -601,20 +601,20 @@ impl GrayBitmap {
     }
 }
 
-fn pixel_buffer_to_gray8(pixels: &PixelBuffer) -> Result<Vec<u8>, PngError> {
-    use zenpixels::ChannelType;
-    let desc = pixels.descriptor();
-    if desc.channel_type() != ChannelType::U8 {
+fn pixel_buffer_to_gray8(pixels: &PixelBuf) -> Result<Vec<u8>, PngError> {
+    use zenpixels::SampleType;
+    let layout = pixels.spec().layout;
+    if layout.sample != SampleType::U8 {
         return Err(PngError::Decode(format!(
             "expected U8 channels, got {:?}",
-            desc.channel_type()
+            layout.sample
         )));
     }
-    let slice = pixels.as_slice();
+    let slice = pixels.as_view();
     let w = slice.width() as usize;
     let h = slice.rows() as usize;
-    let channels = desc.channels();
-    let has_alpha = desc.has_alpha();
+    let channels = layout.channels();
+    let has_alpha = layout.order.has_alpha_slot();
     let mut out = Vec::with_capacity(w * h);
     for y in 0..h as u32 {
         let row = slice.row(y);

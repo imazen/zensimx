@@ -206,7 +206,7 @@ thiserror = { workspace = true }
 linear-srgb = { workspace = true }
 imgref = { workspace = true, optional = true }
 rgb = { workspace = true, optional = true }
-zenpixels = { version = ">=0.3.1, <0.4.0", default-features = false, features = ["std"], optional = true }
+zenpixels = { version = ">=0.5.0, <0.6.0", default-features = false, features = ["std"], optional = true }
 # Runtime for the `PreviewV0_3` MLP scorer. zenpredict is MIT/Apache-2.0
 # (matching zensim), so the runtime dep is unconditional in 0.3.0+.
 # Prior comments claiming AGPL referred to a license plan that was
@@ -250,11 +250,11 @@ zenpredict-bake = { workspace = true }
 # (image::open/imageops::resize are only kept above for the pre-existing
 # examples that already used them; new example/bench tooling uses these).
 zenpng = { workspace = true }
-zenpixels = { workspace = true }
+zenpixels = { workspace = true, features = ["icc"] }
 # E36 example ingress uses native named-profile conversion and white compositing.
-zenpixels-convert = { version = ">=0.3.1, <0.4.0", default-features = false, features = ["std"] }
-zencodec = { version = ">=0.2.0, <0.3.0", default-features = false }
-zenmeta = { version = "0.1.0", default-features = false }
+zenpixels-convert = { version = ">=0.5.0, <0.6.0", default-features = false, features = ["std", "icc-db"] }
+zencodec = { version = ">=0.3.0, <0.5.0", default-features = false }
+zenmeta = { version = "0.2.0", default-features = false }
 # `zenpng`'s encode entry points all take `imgref::ImgRef<rgb::Rgb<u8>>`, so
 # example tooling that WRITES a PNG (`zen_io::encode_png_rgb8`, used by the
 # `diffmap_heatmap` demo) needs `rgb` by name. It is already a non-dev
@@ -262,7 +262,7 @@ zenmeta = { version = "0.1.0", default-features = false }
 # the examples building under any feature combination.
 rgb = { workspace = true }
 # Decoder revision advances with the sibling cohort; frozen pixels require replay.
-zenjpeg = { git = "https://github.com/imazen/zenjpeg", rev = "f39ab8359305c086916d36ed942dd27c41ae8e3c", default-features = false }
+zenjpeg = { git = "https://github.com/imazen/zenjpeg", rev = "8d9d2e96b003f911ef385fc9acafd0f68b7afdd9", default-features = false }
 # Pins the shipped Profile C weight bytes (profile_c_tests::weight_sha256_pinned).
 # Same version zensim-validate already uses in this workspace.
 sha2 = "0.11.0"

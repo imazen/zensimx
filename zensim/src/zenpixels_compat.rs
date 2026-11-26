@@ -1,7 +1,7 @@
 //! Adapter for zenpixels pixel types.
 //!
 //! Provides [`ZenpixelsSource`], a validated wrapper that implements
-//! [`ImageSource`] for any zenpixels [`PixelSlice`] or [`PixelBuffer`].
+//! [`ImageSource`] for any zenpixels [`PixelView`] or [`PixelBuf`].
 //!
 //! # Supported formats
 //!
@@ -29,7 +29,10 @@
 
 use std::borrow::Cow;
 
-use zenpixels::{AlphaMode as ZpAlpha, PixelBuffer, PixelDescriptor, PixelSlice, TransferFunction};
+use zenpixels::{
+    AlphaMode as ZpAlpha, ChannelOrder, ColorSpace, ImageSpec, PixelBuf, PixelView,
+    Primaries as ZpPrimaries, SampleLayout, SignalRange, Transfer,
+};
 
 use crate::error::UnsupportedFormat;
 use crate::source::{AlphaMode, ColorPrimaries, ImageSource, PixelFormat};
@@ -37,7 +40,7 @@ use crate::source::{AlphaMode, ColorPrimaries, ImageSource, PixelFormat};
 /// Validated adapter wrapping zenpixels pixel data for use with zensim.
 ///
 /// Created via [`try_from_slice`](Self::try_from_slice) or
-/// [`try_from_buffer`](Self::try_from_buffer). Validates the pixel descriptor
+/// [`try_from_buffer`](Self::try_from_buffer). Validates the image spec
 /// and maps it to the correct zensim format, alpha mode, and color primaries.
 ///
 /// For premultiplied alpha, the data is un-premultiplied into an internal
@@ -54,21 +57,21 @@ pub struct ZenpixelsSource<'a> {
 }
 
 impl<'a> ZenpixelsSource<'a> {
-    /// Create from a borrowed [`PixelSlice`].
+    /// Create from a borrowed [`PixelView`].
     ///
-    /// Validates the pixel descriptor and rejects unsupported formats.
+    /// Validates the image spec and rejects unsupported formats.
     /// For premultiplied alpha, allocates and un-premultiplies the data.
-    pub fn try_from_slice(slice: &'a PixelSlice<'a>) -> Result<Self, UnsupportedFormat> {
-        let desc = slice.descriptor();
-        let (pixel_format, alpha_mode, color_primaries) = map_descriptor(&desc)?;
+    pub fn try_from_slice(slice: &'a PixelView<'a>) -> Result<Self, UnsupportedFormat> {
+        let spec = slice.spec();
+        let (pixel_format, alpha_mode, color_primaries) = map_descriptor(spec)?;
 
         let width = slice.width() as usize;
         let height = slice.rows() as usize;
         let stride = slice.stride();
         let raw = slice.as_strided_bytes();
 
-        let data = if matches!(desc.alpha, Some(ZpAlpha::Premultiplied)) {
-            Cow::Owned(unpremultiply(raw, width, height, stride, &desc))
+        let data = if spec.color.alpha() == ZpAlpha::Premultiplied {
+            Cow::Owned(unpremultiply(raw, width, height, stride, spec))
         } else {
             Cow::Borrowed(raw)
         };
@@ -84,28 +87,28 @@ impl<'a> ZenpixelsSource<'a> {
         })
     }
 
-    /// Create from an owned [`PixelBuffer`].
+    /// Create from an owned [`PixelBuf`].
     ///
     /// Same validation as [`try_from_slice`](Self::try_from_slice).
     /// The buffer's backing memory is borrowed for the lifetime of the source.
-    pub fn try_from_buffer(buf: &'a PixelBuffer) -> Result<Self, UnsupportedFormat> {
-        let desc = buf.descriptor();
-        let (pixel_format, alpha_mode, color_primaries) = map_descriptor(&desc)?;
+    pub fn try_from_buffer(buf: &'a PixelBuf) -> Result<Self, UnsupportedFormat> {
+        let spec = buf.spec();
+        let (pixel_format, alpha_mode, color_primaries) = map_descriptor(spec)?;
 
         let width = buf.width() as usize;
         let height = buf.height() as usize;
         let stride = buf.stride();
 
-        // PixelBuffer may have internal offset; get contiguous or strided bytes.
-        let raw = match buf.as_contiguous_bytes() {
+        // PixelBuf may have internal offset; get contiguous bytes.
+        let raw = match buf.as_view().as_contiguous_bytes() {
             Some(bytes) => bytes,
             None => {
-                return Err(UnsupportedFormat("non-contiguous PixelBuffer layout"));
+                return Err(UnsupportedFormat("non-contiguous PixelBuf layout"));
             }
         };
 
-        let data = if matches!(desc.alpha, Some(ZpAlpha::Premultiplied)) {
-            Cow::Owned(unpremultiply(raw, width, height, stride, &desc))
+        let data = if spec.color.alpha() == ZpAlpha::Premultiplied {
+            Cow::Owned(unpremultiply(raw, width, height, stride, spec))
         } else {
             Cow::Borrowed(raw)
         };
@@ -151,21 +154,38 @@ impl ImageSource for ZenpixelsSource<'_> {
     }
 }
 
-/// Map a zenpixels [`PixelDescriptor`] to zensim types.
+/// Map a zenpixels [`ImageSpec`] to zensim types.
 fn map_descriptor(
-    desc: &PixelDescriptor,
+    spec: &ImageSpec,
 ) -> Result<(PixelFormat, AlphaMode, ColorPrimaries), UnsupportedFormat> {
-    use zenpixels::{ColorPrimaries as ZpPrimaries, PixelFormat as ZpFormat, SignalRange};
+    if matches!(
+        spec.layout.order,
+        ChannelOrder::Gray | ChannelOrder::GrayAlpha
+    ) || matches!(spec.color, ColorSpace::Gray { .. })
+    {
+        return Err(UnsupportedFormat("grayscale formats not supported"));
+    }
+
+    let ColorSpace::Rgb {
+        primaries,
+        transfer,
+        range,
+        alpha,
+        ..
+    } = spec.color
+    else {
+        return Err(UnsupportedFormat("unsupported color space — expected RGB"));
+    };
 
     // Reject unsupported transfers
-    match desc.transfer {
-        TransferFunction::Srgb | TransferFunction::Bt709 => {}
-        TransferFunction::Linear => {
-            if !matches!(desc.format, ZpFormat::RgbaF32) {
+    match transfer {
+        Transfer::Srgb | Transfer::Bt709 => {}
+        Transfer::Linear => {
+            if spec.layout != SampleLayout::RGBAF32 {
                 return Err(UnsupportedFormat("linear transfer requires RgbaF32 format"));
             }
         }
-        TransferFunction::Pq | TransferFunction::Hlg => {
+        Transfer::Pq | Transfer::Hlg(_) => {
             return Err(UnsupportedFormat(
                 "HDR transfers (PQ, HLG) are not supported by the SDR ImageSource pipeline — \
                  decode to absolute-luminance linear RGB and use Zensim::compute_pu_linear",
@@ -179,44 +199,37 @@ fn map_descriptor(
     }
 
     // Reject narrow signal range
-    if desc.signal_range != SignalRange::Full {
+    if range != SignalRange::Full {
         return Err(UnsupportedFormat(
             "narrow/limited signal range not supported — expand to full range first",
         ));
     }
 
     // Map pixel format
-    let pixel_format = match desc.format {
-        ZpFormat::Rgb8 => PixelFormat::Srgb8Rgb,
-        ZpFormat::Rgba8 | ZpFormat::Rgbx8 => PixelFormat::Srgb8Rgba,
-        ZpFormat::Bgra8 | ZpFormat::Bgrx8 => PixelFormat::Srgb8Bgra,
-        ZpFormat::Rgba16 => PixelFormat::Srgb16Rgba,
-        ZpFormat::RgbaF32 => PixelFormat::LinearF32Rgba,
-        ZpFormat::Gray8
-        | ZpFormat::Gray16
-        | ZpFormat::GrayF32
-        | ZpFormat::GrayA8
-        | ZpFormat::GrayA16
-        | ZpFormat::GrayAF32 => {
-            return Err(UnsupportedFormat("grayscale formats not supported"));
-        }
+    let pixel_format = match spec.layout {
+        SampleLayout::RGB8 => PixelFormat::Srgb8Rgb,
+        SampleLayout::RGBA8 | SampleLayout::RGBX8 => PixelFormat::Srgb8Rgba,
+        SampleLayout::BGRA8 | SampleLayout::BGRX8 => PixelFormat::Srgb8Bgra,
+        SampleLayout::RGBA16 => PixelFormat::Srgb16Rgba,
+        SampleLayout::RGBAF32 => PixelFormat::LinearF32Rgba,
         _ => {
             return Err(UnsupportedFormat("unsupported pixel format"));
         }
     };
 
     // Map alpha mode
-    let alpha_mode = match desc.alpha {
-        None => AlphaMode::Opaque,
-        Some(ZpAlpha::Undefined) => AlphaMode::Opaque,
-        Some(ZpAlpha::Opaque) => AlphaMode::Opaque,
-        Some(ZpAlpha::Straight) => AlphaMode::Straight,
-        Some(ZpAlpha::Premultiplied) => AlphaMode::Straight, // un-premultiplied by adapter
-        _ => AlphaMode::Straight,                            // future variants → treat as straight
+    let alpha_mode = if matches!(spec.layout, SampleLayout::RGBX8 | SampleLayout::BGRX8) {
+        AlphaMode::Opaque
+    } else {
+        match alpha {
+            ZpAlpha::None | ZpAlpha::Undefined | ZpAlpha::Opaque => AlphaMode::Opaque,
+            ZpAlpha::Straight | ZpAlpha::Premultiplied => AlphaMode::Straight,
+            _ => AlphaMode::Straight,
+        }
     };
 
     // Map color primaries
-    let color_primaries = match desc.primaries {
+    let color_primaries = match primaries {
         ZpPrimaries::Bt709 => ColorPrimaries::Srgb,
         ZpPrimaries::DisplayP3 => ColorPrimaries::DisplayP3,
         ZpPrimaries::Bt2020 => ColorPrimaries::Bt2020,
@@ -235,14 +248,12 @@ fn unpremultiply(
     width: usize,
     height: usize,
     stride: usize,
-    desc: &PixelDescriptor,
+    spec: &ImageSpec,
 ) -> Vec<u8> {
-    use zenpixels::PixelFormat as ZpFormat;
-
     let mut out = data.to_vec();
 
-    match desc.format {
-        ZpFormat::Rgba8 | ZpFormat::Rgbx8 | ZpFormat::Bgra8 | ZpFormat::Bgrx8 => {
+    match spec.layout {
+        SampleLayout::RGBA8 | SampleLayout::RGBX8 | SampleLayout::BGRA8 | SampleLayout::BGRX8 => {
             for y in 0..height {
                 let row_start = y * stride;
                 for x in 0..width {
@@ -265,7 +276,7 @@ fn unpremultiply(
                 }
             }
         }
-        ZpFormat::Rgba16 => {
+        SampleLayout::RGBA16 => {
             for y in 0..height {
                 let row_start = y * stride;
                 for x in 0..width {
@@ -285,7 +296,7 @@ fn unpremultiply(
                 }
             }
         }
-        ZpFormat::RgbaF32 => {
+        SampleLayout::RGBAF32 => {
             for y in 0..height {
                 let row_start = y * stride;
                 for x in 0..width {
@@ -326,7 +337,7 @@ mod tests {
 
     #[test]
     fn rgbx_maps_to_opaque() {
-        let desc = PixelDescriptor::RGBX8_SRGB;
+        let desc = ImageSpec::RGBX8_SRGB;
         let (fmt, alpha, _) = map_descriptor(&desc).unwrap();
         assert_eq!(fmt, PixelFormat::Srgb8Rgba);
         assert_eq!(alpha, AlphaMode::Opaque);
@@ -334,7 +345,7 @@ mod tests {
 
     #[test]
     fn bgrx_maps_to_opaque() {
-        let desc = PixelDescriptor::BGRX8_SRGB;
+        let desc = ImageSpec::BGRX8_SRGB;
         let (fmt, alpha, _) = map_descriptor(&desc).unwrap();
         assert_eq!(fmt, PixelFormat::Srgb8Bgra);
         assert_eq!(alpha, AlphaMode::Opaque);
@@ -342,7 +353,7 @@ mod tests {
 
     #[test]
     fn rgba_straight_maps_correctly() {
-        let desc = PixelDescriptor::RGBA8_SRGB;
+        let desc = ImageSpec::RGBA8_SRGB;
         let (fmt, alpha, _) = map_descriptor(&desc).unwrap();
         assert_eq!(fmt, PixelFormat::Srgb8Rgba);
         assert_eq!(alpha, AlphaMode::Straight);
@@ -350,25 +361,25 @@ mod tests {
 
     #[test]
     fn hdr_rejected() {
-        let desc = PixelDescriptor::RGBA8_SRGB.with_transfer(TransferFunction::Pq);
+        let desc = ImageSpec::RGBA8_SRGB.with_transfer(Transfer::Pq);
         assert!(map_descriptor(&desc).is_err());
     }
 
     #[test]
     fn unknown_transfer_rejected() {
-        let desc = PixelDescriptor::RGBA8_SRGB.with_transfer(TransferFunction::Unknown);
+        let desc = ImageSpec::RGBA8_SRGB.with_transfer(Transfer::Unknown);
         assert!(map_descriptor(&desc).is_err());
     }
 
     #[test]
     fn grayscale_rejected() {
-        let desc = PixelDescriptor::GRAY8_SRGB;
+        let desc = ImageSpec::GRAY8_SRGB;
         assert!(map_descriptor(&desc).is_err());
     }
 
     #[test]
     fn p3_primaries_mapped() {
-        let desc = PixelDescriptor::RGBA8_SRGB.with_primaries(zenpixels::ColorPrimaries::DisplayP3);
+        let desc = ImageSpec::RGBA8_SRGB.with_primaries(ZpPrimaries::DisplayP3);
         let (_, _, primaries) = map_descriptor(&desc).unwrap();
         assert_eq!(primaries, ColorPrimaries::DisplayP3);
     }
@@ -377,7 +388,7 @@ mod tests {
     fn unpremultiply_u8_roundtrip() {
         // Premultiplied: R=100 means straight R = 100 * 255/200 ≈ 127
         let data = vec![100u8, 50, 25, 200];
-        let result = unpremultiply(&data, 1, 1, 4, &PixelDescriptor::RGBA8_SRGB);
+        let result = unpremultiply(&data, 1, 1, 4, &ImageSpec::RGBA8_SRGB);
         assert_eq!(result[3], 200); // alpha unchanged
         assert_eq!(result[0], 128); // 100 * 255/200 = 127.5 → 128 (round-to-nearest)
         assert_eq!(result[1], 64); // 50 * 255/200 = 63.75 → 64 (round-to-nearest)
@@ -386,7 +397,7 @@ mod tests {
     #[test]
     fn unpremultiply_a0_clears_rgb() {
         let data = vec![255u8, 128, 64, 0];
-        let result = unpremultiply(&data, 1, 1, 4, &PixelDescriptor::RGBA8_SRGB);
+        let result = unpremultiply(&data, 1, 1, 4, &ImageSpec::RGBA8_SRGB);
         assert_eq!(result, [0, 0, 0, 0]);
     }
 }

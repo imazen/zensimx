@@ -71,19 +71,25 @@ fn decode_exr_rgb(path: &Path, bytes: &[u8]) -> Result<Rgb, String> {
         .decode(bytes, &enough::Unstoppable)
         .map_err(|e| e.to_string())?;
     let pixels = decoded.pixels();
-    if pixels.descriptor().primaries != zenpixels::ColorPrimaries::Bt709 {
+    if !matches!(
+        pixels.spec().color,
+        zenpixels::ColorSpace::Rgb {
+            primaries: zenpixels::Primaries::Bt709,
+            ..
+        }
+    ) {
         return Err(format!(
             "{path:?}: non-BT709/unknown EXR chromaticities require an explicit color contract"
         ));
     }
-    let channels = if pixels.descriptor().alpha.is_some() {
+    let channels = if pixels.spec().layout.order.has_alpha_slot() {
         4
     } else {
         3
     };
     let (w, h) = (pixels.width() as usize, pixels.height() as usize);
     let mut raw = Vec::with_capacity(w * h * 3);
-    let view = pixels.as_slice();
+    let view = pixels.as_view();
     for y in 0..h {
         for p in view.row(y as u32).chunks_exact(channels * 4) {
             let values: [f32; 3] = core::array::from_fn(|c| {

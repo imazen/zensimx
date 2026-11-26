@@ -517,12 +517,12 @@ fn build_scaled_run_per_cell(
     let scaled_char_w_usize = scaled_char_w as usize;
 
     // Strided zero-copy view of the strip.
-    let strip_slice = zenpixels::PixelSlice::new(
+    let strip_slice = zenpixels::PixelView::new(
         strip.as_raw(),
         strip.width(),
         strip.height(),
         (strip.width() as usize) * 4,
-        zenpixels::PixelDescriptor::RGBA8_SRGB,
+        &zenpixels::specs::RGBA8_SRGB,
     )
     .expect("strip slice dims valid");
 
@@ -540,8 +540,10 @@ fn build_scaled_run_per_cell(
 
     for i in 0..count {
         let glyph_idx = (start + i).min(CHAR_COUNT - 1);
-        // crop_view: zero-copy strided sub-view of cell `glyph_idx`.
-        let cell = strip_slice.crop_view(glyph_idx * BASE_CHAR_W, 0, BASE_CHAR_W, BASE_CHAR_H);
+        // crop: zero-copy strided sub-view of cell `glyph_idx`.
+        let cell = strip_slice
+            .crop(glyph_idx * BASE_CHAR_W, 0, BASE_CHAR_W, BASE_CHAR_H)
+            .expect("cell bounds valid");
 
         sr.reset();
         let cell_x = (i as usize) * scaled_char_w_usize;

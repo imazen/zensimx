@@ -42,9 +42,9 @@ fn gmsbank_chroma_prefix_dump() {
                     let data = std::fs::read(root.join("encoded").join(name.trim_start_matches('/'))).unwrap();
                     let decoded = zenpng::decode(&data, &zenpng::PngDecodeConfig::default(), &enough::Unstoppable).unwrap();
                     let pb = decoded.pixels;
-                    assert!(pb.descriptor().layout_compatible(zenpixels::PixelDescriptor::RGB8));
+                    assert_eq!(pb.spec().layout, zenpixels::SampleLayout::RGB8);
                     let (w,h) = (pb.width() as usize,pb.height() as usize);
-                    let slice = pb.as_slice();
+                    let slice = pb.as_view();
                     let mut bytes = Vec::with_capacity(w*h*3);
                     for y in 0..h { bytes.extend_from_slice(&slice.row(y as u32)[..w*3]); }
                     (bytes,w,h)

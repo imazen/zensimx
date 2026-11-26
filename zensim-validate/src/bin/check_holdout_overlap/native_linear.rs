@@ -3,7 +3,7 @@ use anyhow::{Context, Result, ensure};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::{fs, path::Path};
-use zenpixels::{ColorPrimaries, PixelDescriptor, TransferFunction};
+use zenpixels::{AlphaMode, ChannelOrder, ColorSpace, ImageSpec, Primaries, Transfer};
 
 use super::dhash_bits;
 
@@ -33,36 +33,69 @@ pub(super) fn fingerprint(path: &Path, assume_untagged_srgb: bool) -> Result<Val
         width >= 9 && height >= 8,
         "native linear audit requires at least 9x8"
     );
-    let source_descriptor = pixels.descriptor();
-    let mut descriptor = source_descriptor;
-    let applied_srgb_assumption =
-        untagged_png && assume_untagged_srgb && descriptor.transfer == TransferFunction::Unknown;
+    let source_descriptor = pixels.spec().clone();
+    let mut descriptor = source_descriptor.clone();
+    let applied_srgb_assumption = untagged_png
+        && assume_untagged_srgb
+        && matches!(
+            descriptor.color,
+            ColorSpace::Rgb {
+                transfer: Transfer::Unknown,
+                ..
+            } | ColorSpace::Gray {
+                transfer: Transfer::Unknown,
+                ..
+            } | ColorSpace::Untagged { .. }
+        );
     if applied_srgb_assumption {
-        descriptor.transfer = TransferFunction::Srgb;
+        match descriptor.color {
+            ColorSpace::Untagged { alpha, .. } => {
+                descriptor.color = if descriptor.layout.order == ChannelOrder::Gray {
+                    ColorSpace::GRAY_SRGB.with_alpha(alpha)
+                } else {
+                    ColorSpace::SRGB.with_alpha(alpha)
+                };
+            }
+            _ => {
+                descriptor = descriptor.with_transfer(Transfer::Srgb);
+            }
+        }
     }
+    let (primaries, transfer) = match &descriptor.color {
+        ColorSpace::Rgb {
+            primaries,
+            transfer,
+            ..
+        } => (Some(*primaries), Some(*transfer)),
+        ColorSpace::Gray { transfer, .. } => (Some(Primaries::Bt709), Some(*transfer)),
+        _ => (None, None),
+    };
     ensure!(
-        descriptor.primaries == ColorPrimaries::Bt709,
+        primaries == Some(Primaries::Bt709),
         "unknown/non-BT709 primaries"
     );
     ensure!(
-        descriptor.alpha.is_none(),
+        !descriptor.layout.order.has_alpha_slot() && descriptor.color.alpha() == AlphaMode::None,
         "alpha needs an explicit audit compositing policy"
     );
     ensure!(
-        matches!(
-            descriptor.transfer,
-            TransferFunction::Srgb | TransferFunction::Linear
-        ),
+        matches!(transfer, Some(Transfer::Srgb | Transfer::Linear)),
         "unsupported transfer: {descriptor:?}"
     );
-    let mut converter =
-        zenpixels_convert::RowConverter::new(descriptor, PixelDescriptor::RGBF32_LINEAR)
-            .map_err(|e| anyhow::anyhow!("{e}"))?;
+    let converter = zenpixels_convert::RowPlan::build(
+        &descriptor,
+        &ImageSpec::RGBF32_LINEAR,
+        &zenpixels_convert::ConvertPolicy::permissive(),
+        None,
+    )
+    .map_err(|e| anyhow::anyhow!("{e}"))?;
     let mut row = vec![0u8; width as usize * 12];
     let mut luma = Vec::with_capacity(width as usize * height as usize);
-    let view = pixels.as_slice();
+    let view = pixels.as_view();
     for y in 0..height {
-        converter.convert_row(view.row(y), &mut row, width);
+        converter
+            .convert_row(view.row(y), &mut row, width, y)
+            .map_err(|e| anyhow::anyhow!("{e}"))?;
         for pixel in row.as_chunks::<12>().0 {
             let channels = [0, 1, 2].map(|i| f32::from_ne_bytes(pixel.as_chunks::<4>().0[i]));
             ensure!(
@@ -101,7 +134,7 @@ fn fingerprint_luma(luma: &mut [f32], width: u32, height: u32) -> Result<(u64, f
     }
     let config = zenresize::ResizeConfig::builder(width, height, 9, 8)
         .filter(zenresize::Filter::Lanczos)
-        .format(PixelDescriptor::GRAYF32_LINEAR)
+        .format(zenresize::PixelDescriptor::GRAYF32_LINEAR)
         .build();
     let small = zenresize::Resizer::new(&config).resize_f32(luma);
     ensure!(small.iter().all(|v| v.is_finite()), "nonfinite resample");
