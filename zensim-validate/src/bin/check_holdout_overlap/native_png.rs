@@ -48,7 +48,7 @@ fn fingerprint(path: &Path, max_pixels: Option<u64>) -> Result<Value> {
     );
     let config = zenresize::ResizeConfig::builder(width, height, 9, 8)
         .filter(zenresize::Filter::Lanczos)
-        .format(zenresize::PixelDescriptor::GRAY8_SRGB)
+        .format(zenresize::PixelFormat::GRAY8_SRGB)
         .build();
     let small = zenresize::Resizer::new(&config).resize(&luma);
     let hash = dhash_bits::from_luma9x8(small.as_slice().try_into().context("native 9x8")?);

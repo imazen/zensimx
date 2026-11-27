@@ -146,11 +146,11 @@ pub fn resize_rgb8(
     if w == target_w && h == target_h {
         return pixels.to_vec();
     }
-    use zenresize::{Filter, PixelDescriptor, ResizeConfig, Resizer};
+    use zenresize::{Filter, PixelFormat, ResizeConfig, Resizer};
     let flat: Vec<u8> = pixels.iter().flat_map(|p| p.iter().copied()).collect();
     let config = ResizeConfig::builder(w as u32, h as u32, target_w as u32, target_h as u32)
         .filter(Filter::Lanczos)
-        .format(PixelDescriptor::RGB8_SRGB)
+        .format(PixelFormat::RGB8_SRGB)
         .build();
     let out = Resizer::new(&config).resize(&flat);
     out.as_chunks::<3>()

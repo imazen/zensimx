@@ -660,7 +660,7 @@ pub(crate) fn resize(src: &Bitmap, w: u32, h: u32, filter: ResampleFilter) -> Bi
     }
     let config = zenresize::ResizeConfig::builder(src.width, src.height, w, h)
         .filter(filter.to_zenresize())
-        .input(zenresize::PixelDescriptor::RGBA8_SRGB)
+        .input(zenresize::PixelFormat::RGBA8_SRGB)
         .build();
     let pixels = zenresize::Resizer::new(&config).resize(&src.pixels);
     Bitmap {
@@ -681,8 +681,7 @@ pub(crate) fn resize_byte_linear(src: &Bitmap, w: u32, h: u32, filter: ResampleF
     if (src.width, src.height) == (w, h) {
         return src.clone();
     }
-    let desc =
-        zenresize::PixelDescriptor::RGBA8_SRGB.with_transfer(zenresize::TransferFunction::Linear);
+    let desc = zenresize::PixelFormat::RGBA8_SRGB.with_transfer(zenresize::Transfer::Linear);
     let config = zenresize::ResizeConfig::builder(src.width, src.height, w, h)
         .filter(filter.to_zenresize())
         .input(desc)
@@ -699,7 +698,7 @@ pub(crate) fn resize_byte_linear(src: &Bitmap, w: u32, h: u32, filter: ResampleF
 /// switched to an RGBA8 strip so the resize uses the correct
 /// linear-alpha pipeline. Kept for future callers that genuinely need
 /// gamma-aware single-channel resize (no double-encoding trap as long
-/// as the caller passes the right `TransferFunction`).
+/// as the caller passes the right `Transfer`).
 #[allow(dead_code)]
 pub(crate) fn resize_gray(src: &GrayBitmap, w: u32, h: u32, filter: ResampleFilter) -> GrayBitmap {
     if src.width == 0 || src.height == 0 || w == 0 || h == 0 {
@@ -714,7 +713,7 @@ pub(crate) fn resize_gray(src: &GrayBitmap, w: u32, h: u32, filter: ResampleFilt
     }
     let config = zenresize::ResizeConfig::builder(src.width, src.height, w, h)
         .filter(filter.to_zenresize())
-        .input(zenresize::PixelDescriptor::GRAY8_SRGB)
+        .input(zenresize::PixelFormat::GRAY8_SRGB)
         .build();
     let pixels = zenresize::Resizer::new(&config).resize(&src.pixels);
     GrayBitmap {

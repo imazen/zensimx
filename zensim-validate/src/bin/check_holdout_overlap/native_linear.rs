@@ -134,7 +134,7 @@ fn fingerprint_luma(luma: &mut [f32], width: u32, height: u32) -> Result<(u64, f
     }
     let config = zenresize::ResizeConfig::builder(width, height, 9, 8)
         .filter(zenresize::Filter::Lanczos)
-        .format(zenresize::PixelDescriptor::GRAYF32_LINEAR)
+        .format(zenresize::PixelFormat::GRAYF32_LINEAR)
         .build();
     let small = zenresize::Resizer::new(&config).resize_f32(luma);
     ensure!(small.iter().all(|v| v.is_finite()), "nonfinite resample");

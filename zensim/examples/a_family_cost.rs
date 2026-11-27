@@ -64,10 +64,10 @@ fn prepare(manifest: &Path, out: &Path) {
             if side == n {
                 px = crop;
             } else {
-                use zenresize::{Filter, PixelDescriptor, ResizeConfig, Resizer};
+                use zenresize::{Filter, PixelFormat, ResizeConfig, Resizer};
                 let cfg = ResizeConfig::builder(n as u32, n as u32, side as u32, side as u32)
                     .filter(Filter::Mitchell)
-                    .format(PixelDescriptor::RGB8_SRGB)
+                    .format(PixelFormat::RGB8_SRGB)
                     .build();
                 let resized = Resizer::new(&cfg).resize(bytemuck::cast_slice(&crop));
                 px = resized.as_chunks::<3>().0.to_vec();
@@ -76,12 +76,12 @@ fn prepare(manifest: &Path, out: &Path) {
             h = side;
         }
         if let Some(edge) = src.long_edge.filter(|&edge| w.max(h) > edge) {
-            use zenresize::{Filter, PixelDescriptor, ResizeConfig, Resizer};
+            use zenresize::{Filter, PixelFormat, ResizeConfig, Resizer};
             let tw = (w * edge / w.max(h)).max(1);
             let th = (h * edge / w.max(h)).max(1);
             let cfg = ResizeConfig::builder(w as u32, h as u32, tw as u32, th as u32)
                 .filter(Filter::Mitchell)
-                .format(PixelDescriptor::RGB8_SRGB)
+                .format(PixelFormat::RGB8_SRGB)
                 .build();
             let resized = Resizer::new(&cfg).resize(bytemuck::cast_slice(&px));
             px = resized.as_chunks::<3>().0.to_vec();

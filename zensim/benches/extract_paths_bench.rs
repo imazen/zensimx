@@ -1026,7 +1026,7 @@ fn revision_models_bench(sizes: &[usize], manifest: &str) {
 fn resize_filter_bench(sizes: &[usize]) {
     use zenresize::filter::InterpolationDetails;
     use zenresize::weights::F32WeightTable;
-    use zenresize::{Filter, PixelDescriptor, ResizeConfig, Resizer};
+    use zenresize::{Filter, PixelFormat, ResizeConfig, Resizer};
     let filters = [
         Filter::Box,
         Filter::Triangle,
@@ -1072,7 +1072,7 @@ fn resize_filter_bench(sizes: &[usize]) {
                 let n = 96usize;
                 let m = n * den / num;
                 let cfg = ResizeConfig::builder(n as u32, n as u32, m as u32, m as u32)
-                    .format(PixelDescriptor::GRAYF32_LINEAR)
+                    .format(PixelFormat::GRAYF32_LINEAR)
                     .filter(filter)
                     .build();
                 let mut resizer = Resizer::new(&cfg);
@@ -1137,7 +1137,7 @@ fn resize_filter_bench(sizes: &[usize]) {
                         let d = num as f64 / den as f64;
                         let m = n * den / num;
                         let cfg = ResizeConfig::builder(n as u32, n as u32, m as u32, m as u32)
-                            .format(PixelDescriptor::GRAYF32_LINEAR)
+                            .format(PixelFormat::GRAYF32_LINEAR)
                             .filter(filter)
                             .build();
                         bench_arm(group, format!("{}_{}x", filter.name(), d), move |b| {

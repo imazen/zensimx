@@ -85,7 +85,7 @@ fn main() {
             let char_w = char_width_for_height(char_h).max(1);
             let cfg = zenresize::ResizeConfig::builder(BASE_CHAR_W, BASE_CHAR_H, char_w, char_h)
                 .filter(filter)
-                .format(zenresize::PixelDescriptor::RGBA8_SRGB)
+                .format(zenresize::PixelFormat::RGBA8_SRGB)
                 .build();
             let mut resizer = zenresize::Resizer::new(&cfg);
 

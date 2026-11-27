@@ -529,7 +529,7 @@ fn build_scaled_run_per_cell(
     let cfg =
         zenresize::ResizeConfig::builder(BASE_CHAR_W, BASE_CHAR_H, scaled_char_w, scaled_char_h)
             .filter(filter.to_zenresize_filter())
-            .input(zenresize::PixelDescriptor::RGBA8_SRGB)
+            .input(zenresize::PixelFormat::RGBA8_SRGB)
             .build();
 
     // One streaming resizer for the whole run: `reset()` between cells
