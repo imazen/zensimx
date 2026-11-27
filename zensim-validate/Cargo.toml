@@ -82,7 +82,7 @@ zenpng = { workspace = true }
 # the PQ code-value image source handed to the native HDR walk.
 linear-srgb = { workspace = true, features = ["transfer"] }
 bytemuck = { workspace = true }
-zenexr = { git = "https://github.com/imazen/zenextras", rev = "496666cd48487e21d26c1a203619927ad551c363" }
+zenexr = { git = "https://github.com/imazen/zenextras", rev = "778c3b85f95afc968c2310cf18323dbea4bb00b8" }
 zenpixels = { workspace = true, features = ["imgref"] }
 zenresize = { workspace = true }
 zenpixels-convert = { version = ">=0.5.0, <0.6.0", default-features = false, features = ["std"] }

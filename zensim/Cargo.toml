@@ -262,7 +262,7 @@ zenmeta = { version = "0.2.0", default-features = false }
 # the examples building under any feature combination.
 rgb = { workspace = true }
 # Decoder revision advances with the sibling cohort; frozen pixels require replay.
-zenjpeg = { git = "https://github.com/imazen/zenjpeg", rev = "e58c3d57b03409233cc3c165b6dc7849ee5081c8", default-features = false }
+zenjpeg = { git = "https://github.com/imazen/zenjpeg", rev = "4b37b7670735adb06488789a7b67721bc2d85756", default-features = false }
 # Pins the shipped Profile C weight bytes (profile_c_tests::weight_sha256_pinned).
 # Same version zensim-validate already uses in this workspace.
 sha2 = "0.11.0"

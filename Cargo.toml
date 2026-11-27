@@ -102,7 +102,7 @@ zenpixels-convert = { git = "https://github.com/imazen/zenpixels", rev = "d40a95
 zenpixels-03 = { package = "zenpixels", git = "https://github.com/imazen/zenpixels", rev = "fa836abf72afe9826e866dc25712b7c800323962" }
 zencodec = { git = "https://github.com/imazen/zencodec", rev = "26326a6e1ab59086c7f8683eb27f4c8e054d5e54" }
 zenmeta = { git = "https://github.com/imazen/zencodec", rev = "26326a6e1ab59086c7f8683eb27f4c8e054d5e54" }
-ultrahdr-core = { git = "https://github.com/imazen/ultrahdr", rev = "5bc640c6adcd358587ab70b6645fa4e19da31af5" }
+ultrahdr-core = { git = "https://github.com/imazen/ultrahdr", rev = "5643769d70487be50f16ebf9ac58bcb8bf191bd7" }
 zenpng = { git = "https://github.com/imazen/zenpng", rev = "c55a2ff702d765312d7855bcb6ab477c5f24363d" }
 # Current PNG strip compression uses the same tested source as the siblings.
 zenflate = { git = "https://github.com/imazen/zenflate", rev = "7270e38faca9cdbae793938fa229d40ac4fe4c39" }
