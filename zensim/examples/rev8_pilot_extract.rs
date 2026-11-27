@@ -92,7 +92,7 @@ fn pixelbuffer_to_rgb8(pb: &PixelBuf) -> Result<(Vec<[u8; 3]>, usize, usize), St
     let w = pb.width() as usize;
     let h = pb.height() as usize;
     let slice = pb.as_view();
-    let stride = slice.stride();
+    let stride = slice.stride_bytes();
     let data = slice.as_strided_bytes();
     let mut flat = Vec::new();
     if format.layout == SampleLayout::RGB8 {
@@ -121,11 +121,11 @@ fn pixelbuffer_to_rgb8(pb: &PixelBuf) -> Result<(Vec<[u8; 3]>, usize, usize), St
         )
         .map_err(|e| format!("cannot plan {format:?} -> RGB8_SRGB: {e}"))?;
         for y in 0..h {
-            plan.convert_row(
+            plan.convert_row_at(
+                y as u32,
                 slice.row(y as u32),
                 &mut flat[y * dst_stride..(y + 1) * dst_stride],
                 w as u32,
-                y as u32,
             )
             .map_err(|e| format!("convert row {y}: {e}"))?;
         }

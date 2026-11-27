@@ -361,9 +361,9 @@ fn wrap_text(text: &str, max_cols: usize) -> String {
 /// At small char_h this manifests as visible "edges of other characters"
 /// inside each glyph.
 ///
-/// Implementation: wrap the strip as a `zenpixels::PixelSlice` (zero-
-/// copy strided view), then `crop_view(...)` for each glyph cell — that
-/// also-zero-copy adjusts only the slice's offset+stride. Drive
+/// Implementation: wrap the strip as a `zenpixels::PixelView` (zero-
+/// copy strided view), then `crop(PixelRect::new(...))` for each glyph cell — that
+/// also-zero-copy adjusts only the view's byte offset + stride. Drive
 /// `zenresize::StreamingResize` row-by-row, feeding `cell.row(y)`
 /// directly (a 26×4 byte sub-slice of the original strip's bytes — no
 /// copy, no full-strip-width row reads).
@@ -542,7 +542,12 @@ fn build_scaled_run_per_cell(
         let glyph_idx = (start + i).min(CHAR_COUNT - 1);
         // crop: zero-copy strided sub-view of cell `glyph_idx`.
         let cell = strip_slice
-            .crop(glyph_idx * BASE_CHAR_W, 0, BASE_CHAR_W, BASE_CHAR_H)
+            .crop(zenpixels::PixelRect::new(
+                glyph_idx * BASE_CHAR_W,
+                0,
+                BASE_CHAR_W,
+                BASE_CHAR_H,
+            ))
             .expect("cell bounds valid");
 
         sr.reset();

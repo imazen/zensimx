@@ -275,22 +275,22 @@ impl<'a> From<&'a Bitmap> for BitmapRef<'a> {
 ///
 /// Wraps an external `&[u8]` buffer with arbitrary row stride for
 /// **zero-copy interop** with strided pixel sources (e.g.,
-/// `zenpixels::PixelSlice`, mmap'd image rows, decoder line buffers).
+/// `zenpixels::PixelView`, mmap'd image rows, decoder line buffers).
 ///
-/// # Constructing from `zenpixels::PixelSlice`
+/// # Constructing from `zenpixels::PixelView`
 ///
 /// `zenpixels` types are intentionally not part of this crate's public
 /// API surface (to keep version coalescing safe for downstream
 /// consumers). Callers that depend on both crates can build a
-/// [`BitmapRef`] from a `PixelSlice` using only its public accessors:
+/// [`BitmapRef`] from a `PixelView` using only its public accessors:
 ///
 /// ```ignore
 /// // The caller depends on both zenpixels and zensim-regress directly.
 /// let bm = BitmapRef::from_borrowed_rgba8_strided(
-///     slice.as_strided_bytes(),
-///     slice.width(),
-///     slice.rows(),
-///     slice.stride() as u32,
+///     view.as_strided_bytes(),
+///     view.width(),
+///     view.height(),
+///     view.stride_bytes() as u32,
 /// )?;
 /// ```
 ///
@@ -612,7 +612,7 @@ fn pixel_buffer_to_gray8(pixels: &PixelBuf) -> Result<Vec<u8>, PngError> {
     }
     let slice = pixels.as_view();
     let w = slice.width() as usize;
-    let h = slice.rows() as usize;
+    let h = slice.height() as usize;
     let channels = layout.channels();
     let has_alpha = layout.order.has_alpha_slot();
     let mut out = Vec::with_capacity(w * h);

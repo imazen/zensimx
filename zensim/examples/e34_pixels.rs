@@ -122,11 +122,11 @@ fn read_srgb_opaque(v: &Value) -> (Vec<[u8; 3]>, usize, usize) {
     let input = pixels.as_view();
     for y in 0..h {
         converter
-            .convert_row(
+            .convert_row_at(
+                y as u32,
                 input.row(y as u32),
                 bytemuck::cast_slice_mut(&mut rgb[y * w..(y + 1) * w]),
                 w as u32,
-                y as u32,
             )
             .unwrap();
     }

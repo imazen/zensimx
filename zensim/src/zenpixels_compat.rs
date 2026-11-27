@@ -66,8 +66,8 @@ impl<'a> ZenpixelsSource<'a> {
         let (pixel_format, alpha_mode, color_primaries) = map_descriptor(format)?;
 
         let width = slice.width() as usize;
-        let height = slice.rows() as usize;
-        let stride = slice.stride();
+        let height = slice.height() as usize;
+        let stride = slice.stride_bytes();
         let raw = slice.as_strided_bytes();
 
         let data = if format.color.alpha() == ZpAlpha::Premultiplied {
@@ -97,7 +97,7 @@ impl<'a> ZenpixelsSource<'a> {
 
         let width = buf.width() as usize;
         let height = buf.height() as usize;
-        let stride = buf.stride();
+        let stride = buf.stride_bytes();
 
         // PixelBuf may have internal offset; get contiguous bytes.
         let raw = match buf.as_view().as_contiguous_bytes() {

@@ -94,7 +94,7 @@ pub(super) fn fingerprint(path: &Path, assume_untagged_srgb: bool) -> Result<Val
     let view = pixels.as_view();
     for y in 0..height {
         converter
-            .convert_row(view.row(y), &mut row, width, y)
+            .convert_row_at(y, view.row(y), &mut row, width)
             .map_err(|e| anyhow::anyhow!("{e}"))?;
         for pixel in row.as_chunks::<12>().0 {
             let channels = [0, 1, 2].map(|i| f32::from_ne_bytes(pixel.as_chunks::<4>().0[i]));
