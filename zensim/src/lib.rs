@@ -126,8 +126,8 @@
 //!
 //! ## zenpixels support
 //!
-//! With the `zenpixels` feature, any `zenpixels::PixelSlice` or
-//! `zenpixels::PixelBuffer` can be used directly via `ZenpixelsSource`:
+//! With the `zenpixels` feature, any `zenpixels::PixelView` or
+//! `zenpixels::PixelBuf` can be used directly via `ZenpixelsSource`:
 //!
 //! ```ignore
 //! use zensim::{Zensim, ZensimProfile, ZenpixelsSource};
@@ -152,7 +152,7 @@
 //!   Passing wide-gamut data as sRGB will produce incorrect scores.
 //! - **Pixel formats:** [`RgbSlice`] (sRGB u8), [`RgbaSlice`] (sRGB u8 + alpha),
 //!   `imgref::ImgRef` (sRGB u8, stride-aware, default feature),
-//!   `ZenpixelsSource` (zenpixels `PixelSlice`/`PixelBuffer`, `zenpixels` feature),
+//!   `ZenpixelsSource` (zenpixels `PixelView`/`PixelBuf`, `zenpixels` feature),
 //!   [`StridedBytes`] (any of `Srgb8Rgb`, `Srgb8Rgba`, `Srgb8Bgra`,
 //!   `Srgb16Rgba`, `LinearF32Rgba`), or implement [`ImageSource`] directly.
 //! - **Alpha:** RGBA inputs are composited over a deterministic noise

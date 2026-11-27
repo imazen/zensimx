@@ -23,7 +23,7 @@ use std::path::Path;
 
 use enough::Unstoppable;
 use rgb::Rgba;
-use zenpixels::PixelBuffer;
+use zenpixels::PixelBuf;
 use zenpng::{EncodeConfig, PngDecodeConfig};
 
 /// Resampling filter for [`resize`].
@@ -275,22 +275,22 @@ impl<'a> From<&'a Bitmap> for BitmapRef<'a> {
 ///
 /// Wraps an external `&[u8]` buffer with arbitrary row stride for
 /// **zero-copy interop** with strided pixel sources (e.g.,
-/// `zenpixels::PixelSlice`, mmap'd image rows, decoder line buffers).
+/// `zenpixels::PixelView`, mmap'd image rows, decoder line buffers).
 ///
-/// # Constructing from `zenpixels::PixelSlice`
+/// # Constructing from `zenpixels::PixelView`
 ///
 /// `zenpixels` types are intentionally not part of this crate's public
 /// API surface (to keep version coalescing safe for downstream
 /// consumers). Callers that depend on both crates can build a
-/// [`BitmapRef`] from a `PixelSlice` using only its public accessors:
+/// [`BitmapRef`] from a `PixelView` using only its public accessors:
 ///
 /// ```ignore
 /// // The caller depends on both zenpixels and zensim-regress directly.
 /// let bm = BitmapRef::from_borrowed_rgba8_strided(
-///     slice.as_strided_bytes(),
-///     slice.width(),
-///     slice.rows(),
-///     slice.stride() as u32,
+///     view.as_strided_bytes(),
+///     view.width(),
+///     view.height(),
+///     view.stride_bytes() as u32,
 /// )?;
 /// ```
 ///
@@ -503,23 +503,23 @@ impl From<io::Error> for PngError {
     }
 }
 
-/// Convert zenpng's erased `PixelBuffer` into RGBA8 packed bytes.
+/// Convert zenpng's erased `PixelBuf` into RGBA8 packed bytes.
 /// Handles RGBA8, RGB8, Gray8, GrayAlpha8 (the formats PNG can yield
 /// for typical assets). 16-bit and float formats are not supported.
-fn pixel_buffer_to_rgba8(pixels: &PixelBuffer, w: u32, h: u32) -> Result<Vec<u8>, PngError> {
-    use zenpixels::ChannelType;
-    let desc = pixels.descriptor();
-    if desc.channel_type() != ChannelType::U8 {
+fn pixel_buffer_to_rgba8(pixels: &PixelBuf, w: u32, h: u32) -> Result<Vec<u8>, PngError> {
+    use zenpixels::SampleType;
+    let layout = pixels.format().layout;
+    if layout.sample != SampleType::U8 {
         return Err(PngError::Decode(format!(
             "unsupported channel type {:?}; only U8 supported",
-            desc.channel_type()
+            layout.sample
         )));
     }
     let n = (w as usize) * (h as usize);
-    let slice = pixels.as_slice();
+    let slice = pixels.as_view();
     let mut out = Vec::with_capacity(n * 4);
-    let channels = desc.channels();
-    let has_alpha = desc.has_alpha();
+    let channels = layout.channels();
+    let has_alpha = layout.order.has_alpha_slot();
     for y in 0..h {
         let row = slice.row(y);
         match (channels, has_alpha) {
@@ -601,20 +601,20 @@ impl GrayBitmap {
     }
 }
 
-fn pixel_buffer_to_gray8(pixels: &PixelBuffer) -> Result<Vec<u8>, PngError> {
-    use zenpixels::ChannelType;
-    let desc = pixels.descriptor();
-    if desc.channel_type() != ChannelType::U8 {
+fn pixel_buffer_to_gray8(pixels: &PixelBuf) -> Result<Vec<u8>, PngError> {
+    use zenpixels::SampleType;
+    let layout = pixels.format().layout;
+    if layout.sample != SampleType::U8 {
         return Err(PngError::Decode(format!(
             "expected U8 channels, got {:?}",
-            desc.channel_type()
+            layout.sample
         )));
     }
-    let slice = pixels.as_slice();
+    let slice = pixels.as_view();
     let w = slice.width() as usize;
-    let h = slice.rows() as usize;
-    let channels = desc.channels();
-    let has_alpha = desc.has_alpha();
+    let h = slice.height() as usize;
+    let channels = layout.channels();
+    let has_alpha = layout.order.has_alpha_slot();
     let mut out = Vec::with_capacity(w * h);
     for y in 0..h as u32 {
         let row = slice.row(y);
@@ -660,7 +660,7 @@ pub(crate) fn resize(src: &Bitmap, w: u32, h: u32, filter: ResampleFilter) -> Bi
     }
     let config = zenresize::ResizeConfig::builder(src.width, src.height, w, h)
         .filter(filter.to_zenresize())
-        .input(zenresize::PixelDescriptor::RGBA8_SRGB)
+        .input(zenresize::PixelFormat::RGBA8_SRGB)
         .build();
     let pixels = zenresize::Resizer::new(&config).resize(&src.pixels);
     Bitmap {
@@ -681,8 +681,7 @@ pub(crate) fn resize_byte_linear(src: &Bitmap, w: u32, h: u32, filter: ResampleF
     if (src.width, src.height) == (w, h) {
         return src.clone();
     }
-    let desc =
-        zenresize::PixelDescriptor::RGBA8_SRGB.with_transfer(zenresize::TransferFunction::Linear);
+    let desc = zenresize::PixelFormat::RGBA8_SRGB.with_transfer(zenresize::Transfer::Linear);
     let config = zenresize::ResizeConfig::builder(src.width, src.height, w, h)
         .filter(filter.to_zenresize())
         .input(desc)
@@ -699,7 +698,7 @@ pub(crate) fn resize_byte_linear(src: &Bitmap, w: u32, h: u32, filter: ResampleF
 /// switched to an RGBA8 strip so the resize uses the correct
 /// linear-alpha pipeline. Kept for future callers that genuinely need
 /// gamma-aware single-channel resize (no double-encoding trap as long
-/// as the caller passes the right `TransferFunction`).
+/// as the caller passes the right `Transfer`).
 #[allow(dead_code)]
 pub(crate) fn resize_gray(src: &GrayBitmap, w: u32, h: u32, filter: ResampleFilter) -> GrayBitmap {
     if src.width == 0 || src.height == 0 || w == 0 || h == 0 {
@@ -714,7 +713,7 @@ pub(crate) fn resize_gray(src: &GrayBitmap, w: u32, h: u32, filter: ResampleFilt
     }
     let config = zenresize::ResizeConfig::builder(src.width, src.height, w, h)
         .filter(filter.to_zenresize())
-        .input(zenresize::PixelDescriptor::GRAY8_SRGB)
+        .input(zenresize::PixelFormat::GRAY8_SRGB)
         .build();
     let pixels = zenresize::Resizer::new(&config).resize(&src.pixels);
     GrayBitmap {

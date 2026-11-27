@@ -83,15 +83,15 @@ fn v1_config() -> ZensimConfig {
 }
 
 fn load_png_rgb8(path: &std::path::Path) -> (Vec<[u8; 3]>, usize, usize) {
-    use zenpixels::ChannelType;
+    use zenpixels::SampleType;
     let bytes = std::fs::read(path).unwrap_or_else(|e| panic!("read {path:?}: {e}"));
     let cfg = zenpng::PngDecodeConfig::default();
     let out = zenpng::decode(&bytes, &cfg, &enough::Unstoppable).expect("zenpng decode");
     let (w, h) = (out.info.width as usize, out.info.height as usize);
-    let desc = out.pixels.descriptor();
-    assert_eq!(desc.channel_type(), ChannelType::U8);
-    let slice = out.pixels.as_slice();
-    let (channels, has_alpha) = (desc.channels(), desc.has_alpha());
+    let layout = out.pixels.format().layout;
+    assert_eq!(layout.sample, SampleType::U8);
+    let slice = out.pixels.as_view();
+    let (channels, has_alpha) = (layout.channels(), layout.order.has_alpha_slot());
     let mut rgb = Vec::with_capacity(w * h);
     for y in 0..h as u32 {
         let row = slice.row(y);

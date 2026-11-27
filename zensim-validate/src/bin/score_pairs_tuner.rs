@@ -133,22 +133,22 @@ fn load_rgb8(p: &Path) -> Result<(Vec<u8>, u32, u32)> {
 }
 
 fn decode_png_rgb8(bytes: &[u8]) -> Result<(Vec<u8>, u32, u32)> {
-    use zenpixels::ChannelType;
+    use zenpixels::SampleType;
     let cfg = zenpng::PngDecodeConfig::default();
     let out = zenpng::decode(bytes, &cfg, &Unstoppable).map_err(|e| anyhow!("{e:?}"))?;
     let (w, h) = (out.info.width as usize, out.info.height as usize);
-    let desc = out.pixels.descriptor();
-    let channels = desc.channels() as usize;
-    let slice = out.pixels.as_slice();
+    let layout = out.pixels.format().layout;
+    let channels = layout.channels();
+    let slice = out.pixels.as_view();
     let samples_per_row = w * channels;
     let mut samples: Vec<u8> = Vec::with_capacity(h * samples_per_row);
-    match desc.channel_type() {
-        ChannelType::U8 => {
+    match layout.sample {
+        SampleType::U8 => {
             for y in 0..h as u32 {
                 samples.extend_from_slice(&slice.row(y)[..samples_per_row]);
             }
         }
-        ChannelType::U16 => {
+        SampleType::U16 => {
             for y in 0..h as u32 {
                 for pair in slice.row(y).as_chunks::<2>().0.iter().take(samples_per_row) {
                     let v = u16::from_ne_bytes([pair[0], pair[1]]) as u32;

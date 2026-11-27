@@ -189,7 +189,7 @@ impl ImageSource for CodeImage {
 
 /// The experiment's dimming shader on one code value.
 fn dim(v: f32) -> f32 {
-    use linear_srgb::tf::{linear_to_pq, pq_to_linear};
+    use linear_srgb::default::{linear_to_pq, pq_to_linear};
     linear_to_pq(pq_to_linear(v) / 8.0)
 }
 
@@ -222,18 +222,20 @@ fn load(
     )
     .map_err(|e| format!("{path:?}: {e}"))?;
     let pixels = decoded.pixels;
-    let d = pixels.descriptor();
-    if d.channel_type() != zenpixels::ChannelType::U16
-        || d.layout() != zenpixels::ChannelLayout::Rgb
+    let layout = pixels.format().layout;
+    if layout.sample != zenpixels::SampleType::U16
+        || layout.order != zenpixels::ChannelOrder::Rgb
         || (pixels.width() as usize, pixels.height() as usize) != size
     {
         return Err(format!(
-            "{path:?}: not a {}x{} RGB16 display frame ({d:?})",
-            size.0, size.1
+            "{path:?}: not a {}x{} RGB16 display frame ({:?})",
+            size.0,
+            size.1,
+            pixels.format()
         ));
     }
     let (w, h) = size;
-    let view = pixels.as_slice();
+    let view = pixels.as_view();
     let mut data = Vec::with_capacity(w * h);
     for y in 0..h {
         for p in view.row(y as u32).as_chunks::<6>().0 {
@@ -479,7 +481,7 @@ mod tests {
 
     #[test]
     fn dimming_divides_spec_peak_luminance_by_eight() {
-        use linear_srgb::tf::pq_to_linear;
+        use linear_srgb::default::pq_to_linear;
         for v in [0.1f32, 0.3, 0.5, 0.58, 0.75, 0.9] {
             let ratio = pq_to_linear(v) / pq_to_linear(dim(v));
             assert!((ratio - 8.0).abs() < 8.0 * 2e-3, "{v}: {ratio}");

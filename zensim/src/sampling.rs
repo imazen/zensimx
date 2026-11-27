@@ -9,7 +9,7 @@ use crate::streaming::XybPyramidLevel;
 use crate::{ImageSource, ZensimError};
 use zenresize::filter::InterpolationDetails;
 use zenresize::weights::F32WeightTable;
-use zenresize::{Filter, PixelDescriptor, ResizeConfig, Resizer};
+use zenresize::{Filter, PixelFormat, ResizeConfig, Resizer};
 
 pub(crate) const KEY: &str = "zentrain.sampling";
 
@@ -173,7 +173,7 @@ impl Sampling {
         }
         let config =
             ResizeConfig::builder(previous.1 as u32, previous.2 as u32, w as u32, h as u32)
-                .format(PixelDescriptor::GRAYF32_LINEAR)
+                .format(PixelFormat::GRAYF32_LINEAR)
                 .filter(self.filter())
                 .build();
         #[cfg(feature = "threads")]

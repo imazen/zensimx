@@ -8,7 +8,8 @@ use std::collections::BTreeSet;
 use std::fs;
 use std::io::Write;
 use std::path::Path;
-use zenpixels_convert::PixelBufferConvertTypedExt;
+use zenpixels::PixelFormat;
+use zenpixels_convert::{ConvertPolicy, convert_to_buf};
 
 use super::dhash_bits;
 
@@ -26,13 +27,18 @@ fn fingerprint(path: &Path, max_pixels: Option<u64>) -> Result<Value> {
         width >= 9 && height >= 8,
         "native audit requires at least 9x8"
     );
-    let rgb = decoded.pixels.to_rgb8();
+    let rgb = convert_to_buf(
+        &decoded.pixels.as_view(),
+        &PixelFormat::RGB8_SRGB,
+        &ConvertPolicy::permissive(),
+    )
+    .map_err(|e| anyhow::anyhow!("{}: {e}", path.display()))?;
     let mut luma = Vec::with_capacity(width as usize * height as usize);
-    for row in rgb.as_imgref().rows() {
-        for p in row {
+    let rgb_view = rgb.as_view();
+    for y in 0..height {
+        for &[r, g, b] in rgb_view.row(y).as_chunks::<3>().0 {
             luma.push(
-                ((2126 * u32::from(p.r) + 7152 * u32::from(p.g) + 722 * u32::from(p.b)) / 10000)
-                    as u8,
+                ((2126 * u32::from(r) + 7152 * u32::from(g) + 722 * u32::from(b)) / 10000) as u8,
             );
         }
     }
@@ -42,7 +48,7 @@ fn fingerprint(path: &Path, max_pixels: Option<u64>) -> Result<Value> {
     );
     let config = zenresize::ResizeConfig::builder(width, height, 9, 8)
         .filter(zenresize::Filter::Lanczos)
-        .format(zenresize::PixelDescriptor::GRAY8_SRGB)
+        .format(zenresize::PixelFormat::GRAY8_SRGB)
         .build();
     let small = zenresize::Resizer::new(&config).resize(&luma);
     let hash = dhash_bits::from_luma9x8(small.as_slice().try_into().context("native 9x8")?);

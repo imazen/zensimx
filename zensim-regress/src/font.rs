@@ -361,9 +361,9 @@ fn wrap_text(text: &str, max_cols: usize) -> String {
 /// At small char_h this manifests as visible "edges of other characters"
 /// inside each glyph.
 ///
-/// Implementation: wrap the strip as a `zenpixels::PixelSlice` (zero-
-/// copy strided view), then `crop_view(...)` for each glyph cell — that
-/// also-zero-copy adjusts only the slice's offset+stride. Drive
+/// Implementation: wrap the strip as a `zenpixels::PixelView` (zero-
+/// copy strided view), then `crop(PixelRect::new(...))` for each glyph cell — that
+/// also-zero-copy adjusts only the view's byte offset + stride. Drive
 /// `zenresize::StreamingResize` row-by-row, feeding `cell.row(y)`
 /// directly (a 26×4 byte sub-slice of the original strip's bytes — no
 /// copy, no full-strip-width row reads).
@@ -517,19 +517,19 @@ fn build_scaled_run_per_cell(
     let scaled_char_w_usize = scaled_char_w as usize;
 
     // Strided zero-copy view of the strip.
-    let strip_slice = zenpixels::PixelSlice::new(
+    let strip_slice = zenpixels::PixelView::new(
         strip.as_raw(),
         strip.width(),
         strip.height(),
         (strip.width() as usize) * 4,
-        zenpixels::PixelDescriptor::RGBA8_SRGB,
+        &zenpixels::formats::RGBA8_SRGB,
     )
     .expect("strip slice dims valid");
 
     let cfg =
         zenresize::ResizeConfig::builder(BASE_CHAR_W, BASE_CHAR_H, scaled_char_w, scaled_char_h)
             .filter(filter.to_zenresize_filter())
-            .input(zenresize::PixelDescriptor::RGBA8_SRGB)
+            .input(zenresize::PixelFormat::RGBA8_SRGB)
             .build();
 
     // One streaming resizer for the whole run: `reset()` between cells
@@ -540,8 +540,15 @@ fn build_scaled_run_per_cell(
 
     for i in 0..count {
         let glyph_idx = (start + i).min(CHAR_COUNT - 1);
-        // crop_view: zero-copy strided sub-view of cell `glyph_idx`.
-        let cell = strip_slice.crop_view(glyph_idx * BASE_CHAR_W, 0, BASE_CHAR_W, BASE_CHAR_H);
+        // crop: zero-copy strided sub-view of cell `glyph_idx`.
+        let cell = strip_slice
+            .crop(zenpixels::PixelRect::new(
+                glyph_idx * BASE_CHAR_W,
+                0,
+                BASE_CHAR_W,
+                BASE_CHAR_H,
+            ))
+            .expect("cell bounds valid");
 
         sr.reset();
         let cell_x = (i as usize) * scaled_char_w_usize;

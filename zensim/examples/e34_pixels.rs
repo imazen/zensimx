@@ -48,10 +48,8 @@ fn source_orientation_is_identity(bytes: &[u8]) -> bool {
 }
 
 // Metadata admission is shared by probing and pixel normalization.
-fn source_plan(
-    info: &zenpng::PngInfo,
-) -> Option<(zenpixels::ColorPrimaries, zenpixels::Orientation)> {
-    use zenpixels::ColorPrimaries;
+fn source_plan(info: &zenpng::PngInfo) -> Option<(zenpixels::Primaries, zenpixels::Orientation)> {
+    use zenpixels::Primaries;
     if info.has_alpha {
         return None;
     } // E36 excludes unqualified matte conversion.
@@ -62,7 +60,7 @@ fn source_plan(
     if info.source_gamma.is_some() || info.chromaticities.is_some() {
         return None;
     }
-    let mut primaries = ColorPrimaries::Bt709;
+    let mut primaries = Primaries::Bt709;
     if let Some(c) = info.cicp {
         if info.icc_profile.is_some()
             || (
@@ -74,13 +72,13 @@ fn source_plan(
             return None;
         }
         primaries = match c.color_primaries {
-            1 => ColorPrimaries::Bt709,
-            12 => ColorPrimaries::DisplayP3,
+            1 => Primaries::Bt709,
+            12 => Primaries::DisplayP3,
             _ => return None,
         };
     }
     if let Some(icc) = &info.icc_profile {
-        let id = zenpixels::icc::identify_common(icc)?;
+        let id = zenpixels::icc::IccIdentification::from_icc(icc)?;
         if !id.is_srgb()
             || !matches!(
                 id.valid_use,
@@ -95,8 +93,8 @@ fn source_plan(
 
 // Explicit E36 SDR ingress delegates pixel math to existing native owners.
 fn read_srgb_opaque(v: &Value) -> (Vec<[u8; 3]>, usize, usize) {
-    use zenpixels::{PixelDescriptor, TransferFunction};
-    use zenpixels_convert::{AlphaPolicy, ConvertOptions, RowConverter};
+    use zenpixels::{PixelFormat, Transfer};
+    use zenpixels_convert::{AlphaPolicy, ConvertPolicy, RowPlan};
     let bytes = fs::read(text(v, "source")).unwrap();
     assert_eq!(sha(&bytes), text(v, "source_sha256"));
     let cfg = zenpng::PngDecodeConfig::default().with_max_pixels(120_000_000);
@@ -107,26 +105,30 @@ fn read_srgb_opaque(v: &Value) -> (Vec<[u8; 3]>, usize, usize) {
     // Explicit caller contract: absent profile/gamma/chromaticities means sRGB.
     // All original metadata remains in the hashed probe receipt.
     let oriented = (!orientation.is_identity()).then(|| {
-        zenpixels_convert::orient::apply_orientation(decoded.pixels.as_slice(), orientation)
+        zenpixels_convert::orient::apply_orientation(&decoded.pixels.as_view(), orientation)
+            .unwrap()
     });
     let pixels = oriented.as_ref().unwrap_or(&decoded.pixels);
     let desc = pixels
-        .descriptor()
+        .format()
+        .clone()
         .with_primaries(primaries)
-        .with_transfer(TransferFunction::Srgb);
-    let options = ConvertOptions::permissive().with_alpha_policy(AlphaPolicy::Forbid);
-    let mut converter =
-        RowConverter::new_explicit(desc, PixelDescriptor::RGB8_SRGB, &options).unwrap();
+        .with_transfer(Transfer::Srgb);
+    let policy = ConvertPolicy::permissive().with_alpha(AlphaPolicy::Forbid);
+    let converter = RowPlan::build(&desc, &PixelFormat::RGB8_SRGB, &policy, None).unwrap();
     let (ow, oh) = orientation.output_dimensions(info.width, info.height);
     let (w, h) = (ow as usize, oh as usize);
     let mut rgb = vec![[0u8; 3]; w * h];
-    let input = pixels.as_slice();
+    let input = pixels.as_view();
     for y in 0..h {
-        converter.convert_row(
-            input.row(y as u32),
-            bytemuck::cast_slice_mut(&mut rgb[y * w..(y + 1) * w]),
-            w as u32,
-        );
+        converter
+            .convert_row_at(
+                y as u32,
+                input.row(y as u32),
+                bytemuck::cast_slice_mut(&mut rgb[y * w..(y + 1) * w]),
+                w as u32,
+            )
+            .unwrap();
     }
     (rgb, w, h)
 }
@@ -157,7 +159,7 @@ fn main() {
                         "width": info.width, "height": info.height,
                         "bit_depth": info.bit_depth, "has_alpha": info.has_alpha,
                         "icc_sha256": info.icc_profile.as_ref().map(|v| sha(v)),
-                    "icc_native_identification": info.icc_profile.as_ref().map(|v| format!("{:?}", zenpixels::icc::identify_common(v))),
+                    "icc_native_identification": info.icc_profile.as_ref().map(|v| format!("{:?}", zenpixels::icc::IccIdentification::from_icc(v))),
                         "srgb_intent": info.srgb_intent,
                         "source_gamma": info.source_gamma,
                         "cicp": format!("{:?}", info.cicp),

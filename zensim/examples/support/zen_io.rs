@@ -54,30 +54,30 @@ fn decode_bmp_rgb8(bytes: &[u8]) -> (Vec<[u8; 3]>, usize, usize) {
 }
 
 fn decode_png_rgb8(bytes: &[u8], max_pixels: Option<u64>) -> (Vec<[u8; 3]>, usize, usize) {
-    use zenpixels::ChannelType;
+    use zenpixels::SampleType;
     let mut cfg = zenpng::PngDecodeConfig::default();
     if let Some(max_pixels) = max_pixels {
         cfg = cfg.with_max_pixels(max_pixels);
     }
     let out = zenpng::decode(bytes, &cfg, &Unstoppable).expect("zenpng decode");
     let (w, h) = (out.info.width as usize, out.info.height as usize);
-    let desc = out.pixels.descriptor();
-    let channels = desc.channels() as usize;
-    let has_alpha = desc.has_alpha();
-    let slice = out.pixels.as_slice();
+    let layout = out.pixels.format().layout;
+    let channels = layout.channels();
+    let has_alpha = layout.order.has_alpha_slot();
+    let slice = out.pixels.as_view();
     let samples_per_row = w * channels;
     // Flatten rows to one u8 sample buffer. 16-bit PNGs (e.g. the CID22
     // validation set) narrow each native-endian u16 sample by rounded
     // v*255/65535 — the same convention `image::open().to_rgb8()` applies
     // on the v1-arm extraction path.
     let mut samples: Vec<u8> = Vec::with_capacity(h * samples_per_row);
-    match desc.channel_type() {
-        ChannelType::U8 => {
+    match layout.sample {
+        SampleType::U8 => {
             for y in 0..h as u32 {
                 samples.extend_from_slice(&slice.row(y)[..samples_per_row]);
             }
         }
-        ChannelType::U16 => {
+        SampleType::U16 => {
             for y in 0..h as u32 {
                 for pair in slice.row(y).as_chunks::<2>().0.iter().take(samples_per_row) {
                     let v = u16::from_ne_bytes([pair[0], pair[1]]) as u32;
@@ -146,11 +146,11 @@ pub fn resize_rgb8(
     if w == target_w && h == target_h {
         return pixels.to_vec();
     }
-    use zenresize::{Filter, PixelDescriptor, ResizeConfig, Resizer};
+    use zenresize::{Filter, PixelFormat, ResizeConfig, Resizer};
     let flat: Vec<u8> = pixels.iter().flat_map(|p| p.iter().copied()).collect();
     let config = ResizeConfig::builder(w as u32, h as u32, target_w as u32, target_h as u32)
         .filter(Filter::Lanczos)
-        .format(PixelDescriptor::RGB8_SRGB)
+        .format(PixelFormat::RGB8_SRGB)
         .build();
     let out = Resizer::new(&config).resize(&flat);
     out.as_chunks::<3>()
@@ -219,25 +219,25 @@ pub fn encode_png_rgb8(pixels: &[[u8; 3]], w: usize, h: usize) -> Vec<u8> {
 /// PQ/HLG code-value containers like the kadis-hdr cICP-spliced PNGs);
 /// 8-bit inputs widen by `v * 257`. Alpha dropped. Panics on failure.
 pub fn decode_rgb16(path: &std::path::Path) -> (Vec<[u16; 3]>, usize, usize) {
-    use zenpixels::ChannelType;
+    use zenpixels::SampleType;
     let bytes = std::fs::read(path).unwrap_or_else(|e| panic!("read {path:?}: {e}"));
     let cfg = zenpng::PngDecodeConfig::default();
     let out = zenpng::decode(&bytes, &cfg, &Unstoppable).expect("zenpng decode");
     let (w, h) = (out.info.width as usize, out.info.height as usize);
-    let desc = out.pixels.descriptor();
-    let channels = desc.channels() as usize;
-    let slice = out.pixels.as_slice();
+    let layout = out.pixels.format().layout;
+    let channels = layout.channels();
+    let slice = out.pixels.as_view();
     let samples_per_row = w * channels;
     let mut samples: Vec<u16> = Vec::with_capacity(h * samples_per_row);
-    match desc.channel_type() {
-        ChannelType::U8 => {
+    match layout.sample {
+        SampleType::U8 => {
             for y in 0..h as u32 {
                 for &v in &slice.row(y)[..samples_per_row] {
                     samples.push(v as u16 * 257);
                 }
             }
         }
-        ChannelType::U16 => {
+        SampleType::U16 => {
             for y in 0..h as u32 {
                 for pair in slice.row(y).as_chunks::<2>().0.iter().take(samples_per_row) {
                     samples.push(u16::from_ne_bytes([pair[0], pair[1]]));

@@ -8,7 +8,9 @@
 //!
 //! Run with: `cargo test -p zensim --features zenpixels --test zenpixels_compat`
 
-use zenpixels::{AlphaMode as ZpAlpha, PixelBuffer, PixelDescriptor, PixelSlice, TransferFunction};
+use zenpixels::{
+    AlphaMode as ZpAlpha, PixelBuf, PixelFormat as ZpPixelFormat, PixelView, Transfer, formats,
+};
 use zensim::{
     AlphaMode, ImageSource, RgbSlice, RgbaSlice, StridedBytes, ZenpixelsSource, Zensim,
     ZensimProfile,
@@ -84,10 +86,8 @@ fn rgb8_matches_rgbslice() {
     // Via zenpixels
     let src_bytes: Vec<u8> = src.iter().flat_map(|p| p.iter().copied()).collect();
     let dst_bytes: Vec<u8> = dst.iter().flat_map(|p| p.iter().copied()).collect();
-    let src_slice =
-        PixelSlice::new(&src_bytes, 16, 16, 16 * 3, PixelDescriptor::RGB8_SRGB).unwrap();
-    let dst_slice =
-        PixelSlice::new(&dst_bytes, 16, 16, 16 * 3, PixelDescriptor::RGB8_SRGB).unwrap();
+    let src_slice = PixelView::new(&src_bytes, 16, 16, 16 * 3, &formats::RGB8_SRGB).unwrap();
+    let dst_slice = PixelView::new(&dst_bytes, 16, 16, 16 * 3, &formats::RGB8_SRGB).unwrap();
     let zp_src = ZenpixelsSource::try_from_slice(&src_slice).unwrap();
     let zp_dst = ZenpixelsSource::try_from_slice(&dst_slice).unwrap();
     let zp_result = z.compute(&zp_src, &zp_dst).unwrap();
@@ -112,10 +112,8 @@ fn rgba8_matches_rgbaslice() {
 
     let src_bytes: Vec<u8> = src.iter().flat_map(|p| p.iter().copied()).collect();
     let dst_bytes: Vec<u8> = dst.iter().flat_map(|p| p.iter().copied()).collect();
-    let src_slice =
-        PixelSlice::new(&src_bytes, 16, 16, 16 * 4, PixelDescriptor::RGBA8_SRGB).unwrap();
-    let dst_slice =
-        PixelSlice::new(&dst_bytes, 16, 16, 16 * 4, PixelDescriptor::RGBA8_SRGB).unwrap();
+    let src_slice = PixelView::new(&src_bytes, 16, 16, 16 * 4, &formats::RGBA8_SRGB).unwrap();
+    let dst_slice = PixelView::new(&dst_bytes, 16, 16, 16 * 4, &formats::RGBA8_SRGB).unwrap();
     let zp_src = ZenpixelsSource::try_from_slice(&src_slice).unwrap();
     let zp_dst = ZenpixelsSource::try_from_slice(&dst_slice).unwrap();
     let zp_result = z.compute(&zp_src, &zp_dst).unwrap();
@@ -145,10 +143,8 @@ fn rgbx8_treated_as_opaque() {
     // RGBX8 — padding byte should be ignored
     let src_bytes: Vec<u8> = src.iter().flat_map(|p| p.iter().copied()).collect();
     let dst_bytes: Vec<u8> = dst.iter().flat_map(|p| p.iter().copied()).collect();
-    let src_slice =
-        PixelSlice::new(&src_bytes, 16, 16, 16 * 4, PixelDescriptor::RGBX8_SRGB).unwrap();
-    let dst_slice =
-        PixelSlice::new(&dst_bytes, 16, 16, 16 * 4, PixelDescriptor::RGBX8_SRGB).unwrap();
+    let src_slice = PixelView::new(&src_bytes, 16, 16, 16 * 4, &formats::RGBX8_SRGB).unwrap();
+    let dst_slice = PixelView::new(&dst_bytes, 16, 16, 16 * 4, &formats::RGBX8_SRGB).unwrap();
     let zp_src = ZenpixelsSource::try_from_slice(&src_slice).unwrap();
     let zp_dst = ZenpixelsSource::try_from_slice(&dst_slice).unwrap();
 
@@ -194,10 +190,8 @@ fn bgra8_matches_stridedbytes() {
     );
     let native = z.compute(&native_src, &native_dst).unwrap();
 
-    let src_slice =
-        PixelSlice::new(&src_bgra, 16, 16, 16 * 4, PixelDescriptor::BGRA8_SRGB).unwrap();
-    let dst_slice =
-        PixelSlice::new(&dst_bgra, 16, 16, 16 * 4, PixelDescriptor::BGRA8_SRGB).unwrap();
+    let src_slice = PixelView::new(&src_bgra, 16, 16, 16 * 4, &formats::BGRA8_SRGB).unwrap();
+    let dst_slice = PixelView::new(&dst_bgra, 16, 16, 16 * 4, &formats::BGRA8_SRGB).unwrap();
     let zp_src = ZenpixelsSource::try_from_slice(&src_slice).unwrap();
     let zp_dst = ZenpixelsSource::try_from_slice(&dst_slice).unwrap();
     let zp_result = z.compute(&zp_src, &zp_dst).unwrap();
@@ -215,10 +209,10 @@ fn identical_images_score_100() {
     let z = zensim();
     let px = test_pixels_rgba();
     let bytes: Vec<u8> = px.iter().flat_map(|p| p.iter().copied()).collect();
-    let slice = PixelSlice::new(&bytes, 16, 16, 16 * 4, PixelDescriptor::RGBA8_SRGB).unwrap();
+    let slice = PixelView::new(&bytes, 16, 16, 16 * 4, &formats::RGBA8_SRGB).unwrap();
     let src = ZenpixelsSource::try_from_slice(&slice).unwrap();
 
-    let slice2 = PixelSlice::new(&bytes, 16, 16, 16 * 4, PixelDescriptor::RGBA8_SRGB).unwrap();
+    let slice2 = PixelView::new(&bytes, 16, 16, 16 * 4, &formats::RGBA8_SRGB).unwrap();
     let dst = ZenpixelsSource::try_from_slice(&slice2).unwrap();
 
     let result = z.compute(&src, &dst).unwrap();
@@ -236,8 +230,8 @@ fn different_images_score_below_100() {
         .iter()
         .flat_map(|p| p.iter().copied())
         .collect();
-    let s = PixelSlice::new(&src_bytes, 16, 16, 16 * 4, PixelDescriptor::RGBA8_SRGB).unwrap();
-    let d = PixelSlice::new(&dst_bytes, 16, 16, 16 * 4, PixelDescriptor::RGBA8_SRGB).unwrap();
+    let s = PixelView::new(&src_bytes, 16, 16, 16 * 4, &formats::RGBA8_SRGB).unwrap();
+    let d = PixelView::new(&dst_bytes, 16, 16, 16 * 4, &formats::RGBA8_SRGB).unwrap();
     let src = ZenpixelsSource::try_from_slice(&s).unwrap();
     let dst = ZenpixelsSource::try_from_slice(&d).unwrap();
     let result = z.compute(&src, &dst).unwrap();
@@ -269,8 +263,8 @@ fn premultiplied_matches_straight() {
     let straight_bytes: Vec<u8> = straight.iter().flat_map(|p| p.iter().copied()).collect();
 
     // Premultiplied via zenpixels adapter (un-premultiplies internally)
-    let premul_desc = PixelDescriptor::RGBA8_SRGB.with_alpha(Some(ZpAlpha::Premultiplied));
-    let p_slice = PixelSlice::new(&premul, 16, 16, 16 * 4, premul_desc).unwrap();
+    let premul_desc = ZpPixelFormat::RGBA8_SRGB.with_alpha(ZpAlpha::Premultiplied);
+    let p_slice = PixelView::new(&premul, 16, 16, 16 * 4, &premul_desc).unwrap();
     let zp_src = ZenpixelsSource::try_from_slice(&p_slice).unwrap();
 
     // (1) Pixel-exact adapter contract: recovery must match a reference
@@ -299,7 +293,7 @@ fn premultiplied_matches_straight() {
             }
         })
         .collect();
-    let r_slice = PixelSlice::new(&reference, 16, 16, 16 * 4, PixelDescriptor::RGBA8_SRGB).unwrap();
+    let r_slice = PixelView::new(&reference, 16, 16, 16 * 4, &formats::RGBA8_SRGB).unwrap();
     let r_src = ZenpixelsSource::try_from_slice(&r_slice).unwrap();
     let exact = z.compute(&zp_src, &r_src).unwrap();
     assert_eq!(
@@ -314,8 +308,7 @@ fn premultiplied_matches_straight() {
     // while a SKIPPED un-premultiply (premul scored as straight) scores 12.1.
     // The 90 floor separates those regimes without re-coupling this test to
     // metric-calibration drift; (1) above carries the exactness guarantee.
-    let s_slice =
-        PixelSlice::new(&straight_bytes, 16, 16, 16 * 4, PixelDescriptor::RGBA8_SRGB).unwrap();
+    let s_slice = PixelView::new(&straight_bytes, 16, 16, 16 * 4, &formats::RGBA8_SRGB).unwrap();
     let zp_dst = ZenpixelsSource::try_from_slice(&s_slice).unwrap();
     let zp_result = z.compute(&zp_src, &zp_dst).unwrap();
     assert!(
@@ -327,9 +320,9 @@ fn premultiplied_matches_straight() {
 
 #[test]
 fn hdr_transfer_rejected() {
-    let desc = PixelDescriptor::RGBA8_SRGB.with_transfer(TransferFunction::Pq);
+    let desc = ZpPixelFormat::RGBA8_SRGB.with_transfer(Transfer::Pq);
     let data = vec![0u8; 16 * 16 * 4];
-    let slice = PixelSlice::new(&data, 16, 16, 16 * 4, desc).unwrap();
+    let slice = PixelView::new(&data, 16, 16, 16 * 4, &desc).unwrap();
     let result = ZenpixelsSource::try_from_slice(&slice);
     assert!(result.is_err());
 }
@@ -337,7 +330,7 @@ fn hdr_transfer_rejected() {
 #[test]
 fn grayscale_rejected() {
     let data = vec![128u8; 16 * 16];
-    let slice = PixelSlice::new(&data, 16, 16, 16, PixelDescriptor::GRAY8_SRGB).unwrap();
+    let slice = PixelView::new(&data, 16, 16, 16, &formats::GRAY8_SRGB).unwrap();
     let result = ZenpixelsSource::try_from_slice(&slice);
     assert!(result.is_err());
 }
@@ -349,10 +342,10 @@ fn pixel_buffer_end_to_end() {
         .iter()
         .flat_map(|p| p.iter().copied())
         .collect();
-    let buf = PixelBuffer::from_vec(px.clone(), 16, 16, PixelDescriptor::RGBA8_SRGB).unwrap();
+    let buf = PixelBuf::from_bytes(px.clone(), 16, 16, ZpPixelFormat::RGBA8_SRGB).unwrap();
     let src = ZenpixelsSource::try_from_buffer(&buf).unwrap();
 
-    let buf2 = PixelBuffer::from_vec(px, 16, 16, PixelDescriptor::RGBA8_SRGB).unwrap();
+    let buf2 = PixelBuf::from_bytes(px, 16, 16, ZpPixelFormat::RGBA8_SRGB).unwrap();
     let dst = ZenpixelsSource::try_from_buffer(&buf2).unwrap();
 
     let result = z.compute(&src, &dst).unwrap();

@@ -11,8 +11,8 @@ use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
 use zencodec::{ImageFormat, ImageFormatRegistry};
-use zenpixels::{ChannelType, PixelBuffer, PixelDescriptor};
-use zenpixels_convert::converter::RowConverter;
+use zenpixels::{PixelBuf, PixelFormat, SampleLayout, SampleType};
+use zenpixels_convert::{ConvertPolicy, RowPlan};
 use zensim::rev8::{IntensityTarget, RgbRows, Variant, extract_fx2};
 use zensim::{RgbSlice, feature_set_id::FeatureSetId, research};
 
@@ -87,26 +87,22 @@ fn check_safe_path(path: &Path) -> Result<(), String> {
     Ok(())
 }
 
-fn pixelbuffer_to_rgb8(pb: &PixelBuffer) -> Result<(Vec<[u8; 3]>, usize, usize), String> {
-    let desc = pb.descriptor();
+fn pixelbuffer_to_rgb8(pb: &PixelBuf) -> Result<(Vec<[u8; 3]>, usize, usize), String> {
+    let format = pb.format();
     let w = pb.width() as usize;
     let h = pb.height() as usize;
-    let slice = pb.as_slice();
-    let stride = slice.stride();
+    let slice = pb.as_view();
+    let stride = slice.stride_bytes();
     let data = slice.as_strided_bytes();
     let mut flat = Vec::new();
-    if desc.layout_compatible(PixelDescriptor::RGB8)
-        || desc.layout_compatible(PixelDescriptor::RGB8_SRGB)
-    {
+    if format.layout == SampleLayout::RGB8 {
         flat.reserve(w * h * 3);
         let bpr = w * 3;
         for row in 0..h {
             let s = row * stride;
             flat.extend_from_slice(&data[s..s + bpr]);
         }
-    } else if desc.layout_compatible(PixelDescriptor::RGBA8)
-        || desc.layout_compatible(PixelDescriptor::RGBA8_SRGB)
-    {
+    } else if format.layout == SampleLayout::RGBA8 {
         flat.reserve(w * h * 3);
         for row in 0..h {
             let s = row * stride;
@@ -117,10 +113,22 @@ fn pixelbuffer_to_rgb8(pb: &PixelBuffer) -> Result<(Vec<[u8; 3]>, usize, usize),
     } else {
         let dst_stride = w * 3;
         flat.resize(dst_stride * h, 0);
-        let mut conv = RowConverter::new(desc, PixelDescriptor::RGB8_SRGB)
-            .map_err(|e| format!("cannot plan {desc:?} -> RGB8_SRGB: {e}"))?;
-        conv.convert_rows(data, stride, &mut flat, dst_stride, w as u32, h as u32)
-            .map_err(|e| format!("convert_rows {desc:?} -> RGB8_SRGB: {e}"))?;
+        let plan = RowPlan::build(
+            format,
+            &PixelFormat::RGB8_SRGB,
+            &ConvertPolicy::permissive(),
+            None,
+        )
+        .map_err(|e| format!("cannot plan {format:?} -> RGB8_SRGB: {e}"))?;
+        for y in 0..h {
+            plan.convert_row_at(
+                y as u32,
+                slice.row(y as u32),
+                &mut flat[y * dst_stride..(y + 1) * dst_stride],
+                w as u32,
+            )
+            .map_err(|e| format!("convert row {y}: {e}"))?;
+        }
     }
     let rgb = flat.as_chunks::<3>().0.to_vec();
     Ok((rgb, w, h))
@@ -133,13 +141,13 @@ fn decode_png_rgb8(bytes: &[u8], path: &Path) -> Result<(Vec<[u8; 3]>, usize, us
         &enough::Unstoppable,
     )
     .map_err(|e| format!("zenpng {path:?}: {e}"))?;
-    let desc = out.pixels.descriptor();
-    if desc.channel_type() == ChannelType::U16 {
+    let layout = out.pixels.format().layout;
+    if layout.sample == SampleType::U16 {
         // Match zen_io's rounded (v * 255 + 32767) / 65535 narrowing on 16-bit PNGs.
         let w = out.info.width as usize;
         let h = out.info.height as usize;
-        let ch = desc.channels() as usize;
-        let slice = out.pixels.as_slice();
+        let ch = layout.channels();
+        let slice = out.pixels.as_view();
         let spr = w * ch;
         let mut samples = Vec::with_capacity(h * spr);
         for y in 0..h as u32 {

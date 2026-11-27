@@ -77,7 +77,7 @@ fn noise(pixels: &[[u8; 3]], amplitude: i16) -> Vec<[u8; 3]> {
 fn gaussian(pixels: &[[u8; 3]], w: usize, h: usize, sigma: f32) -> Vec<[u8; 3]> {
     let cfg = zenresize::ResizeConfig::builder(w as u32, h as u32, w as u32, h as u32)
         .filter(zenresize::Filter::Box)
-        .format(zenresize::PixelDescriptor::RGB8_SRGB)
+        .format(zenresize::PixelFormat::RGB8_SRGB)
         .srgb()
         .post_blur(sigma)
         .build();
